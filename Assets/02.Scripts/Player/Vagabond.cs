@@ -2,10 +2,27 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Cinemachine;  // Cinemachine 네임스페이스 추가
+
 public class Vagabond : BaseController
 {
+    [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
+
     private void OnEnable() 
     {
+        // 카메라를 동적으로 찾아서 설정
+        if (cinemachineCamera == null)
+        {
+            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();  // 씬에서 CinemachineFreeLook 카메라를 검색
+        }
+        
+         // 카메라 대상 초기화
+        if (cinemachineCamera != null)
+        {
+            cinemachineCamera.Follow = this.transform;  // 캐릭터를 카메라의 Follow 대상으로 설정
+            cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
+        }
+
         Managers.Input.KeyAction += OnKeyboard;
     }
 
@@ -16,12 +33,10 @@ public class Vagabond : BaseController
 
     protected override void Update() 
     {
-        // 매 프레임마다 움직임을 업데이트
         base.Update();
         UpdateMovement();
     }
 
-    // 키보드 입력 처리 메서드
     private void OnKeyboard()
     {
         CheckMovementInput();
@@ -32,43 +47,52 @@ public class Vagabond : BaseController
         float horizontalInput = Input.GetAxis("Horizontal");
         float verticalInput = Input.GetAxis("Vertical");
 
-        // 방향 벡터를 계산
-        moveDirection = new Vector3(horizontalInput, 0f, verticalInput).normalized;
+        // 카메라의 로컬 좌표계를 기준으로 방향 벡터 계산
+        Vector3 forward = cinemachineCamera.transform.forward;  // 카메라의 앞쪽 방향
+        Vector3 right = cinemachineCamera.transform.right;      // 카메라의 오른쪽 방향
 
+        forward.y = 0;  // 평면 상의 방향으로 제한
+        right.y = 0;
+
+        forward.Normalize();
+        right.Normalize();
+
+        // 입력값을 카메라 좌표계 기준으로 변환
+        moveDirection = (forward * verticalInput + right * horizontalInput).normalized;
     }
 
-    //움직임 상태 전환
     protected override void UpdateMovement()
     {
-        // moveDirection의 크기가 0보다 크면 이동
         if (moveDirection.magnitude > 0)
         {
-            if (Input.GetKey(KeyCode.LeftShift)) // 달리기 입력
+            if (Input.GetKey(KeyCode.LeftShift))
             {
                 if (State == Define.State.Runing)
-                return;
+                    return;
                 State = Define.State.Runing;
             }
             else
             {
                 if (State == Define.State.Moving)
-                return;
+                    return;
                 State = Define.State.Moving;
             }
         }
         else
         {
             if (State == Define.State.Idle)
-            return;
+                return;
             State = Define.State.Idle;
         }
     }
+
     protected override void UpdateMoving()
     {
         Move(moveDirection, moveSpeed);
-    }  
+    }
+
     protected override void UpdateRuning()
     {
         Move(moveDirection, runSpeed);
-    }  
+    }
 }

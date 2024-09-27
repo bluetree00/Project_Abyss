@@ -3187,6 +3187,7 @@ MonoBehaviour:
   rb: {fileID: 0}
   moveSpeed: 3
   runSpeed: 8
+  cinemachineCamera: {fileID: 0}
 --- !u!1 &5690047436474366794
 GameObject:
   m_ObjectHideFlags: 0
