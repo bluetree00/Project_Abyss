@@ -45,21 +45,24 @@ public class Vagabond : BaseController
         {
             if (Input.GetKey(KeyCode.LeftShift)) // 달리기 입력
             {
+                if (State == Define.State.Runing)
+                return;
                 State = Define.State.Runing;
-               // Move(moveDirection, runSpeed);
             }
             else
             {
+                if (State == Define.State.Moving)
+                return;
                 State = Define.State.Moving;
-                //Move(moveDirection, moveSpeed);
             }
         }
         else
         {
+            if (State == Define.State.Idle)
+            return;
             State = Define.State.Idle;
         }
     }
-
     protected override void UpdateMoving()
     {
         Move(moveDirection, moveSpeed);
