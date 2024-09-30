@@ -8,6 +8,13 @@ public class Vagabond : BaseController
 {
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
 
+    // 연속 공격 관련 변수 추가
+    private int comboStep = 0;               // 현재 콤보 단계
+    private float comboTimer = 0;            // 콤보 타이머
+    [SerializeField] private float comboDelay = 1.0f;  // 콤보 유지 시간
+    private bool isAttacking = false;        // 현재 공격 중인지 확인
+    private bool comboInputReceived = false; // 연속 공격 입력 여부
+
     private void OnEnable() 
     {
         // 카메라를 동적으로 찾아서 설정
@@ -16,7 +23,7 @@ public class Vagabond : BaseController
             cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();  // 씬에서 CinemachineFreeLook 카메라를 검색
         }
 
-         // 카메라 대상 초기화
+        // 카메라 대상 초기화
         if (cinemachineCamera != null)
         {
             cinemachineCamera.Follow = this.transform;  // 캐릭터를 카메라의 Follow 대상으로 설정
@@ -35,19 +42,97 @@ public class Vagabond : BaseController
     {
         base.Update();
         UpdateMovement();
+
+        HandleComboTimer();  // 콤보 타이머 관리
     }
 
-    //입력 관리
+    // 입력 처리
     private void OnInput()
     {
+        if (!CanProcessInput())
+            return;
+        
         CheckMovementInput();
 
-        // 공격 발생 입력
-        if(Input.GetMouseButtonDown(0))
+        // 마우스 좌클릭으로 공격 시작
+        if (Input.GetMouseButtonDown(0))
         {
-            Debug.Log("공격 시작");
-            State = Define.State.NormalAttack_01;
+            ProcessAttack();
         }
+    }
+
+    // 공격 처리
+    private void ProcessAttack()
+    {
+        if (isAttacking)
+        {
+            comboInputReceived = true;  // 이미 공격 중이면 콤보 입력만 처리
+            return;
+        }
+
+        StartComboAttack();
+    }
+
+    // 콤보 공격 시작
+    private void StartComboAttack()
+    {
+        comboStep++;
+        comboStep = Mathf.Clamp(comboStep, 1, 3);  // 콤보는 최대 3단계까지
+
+        comboTimer = comboDelay;   // 콤보 타이머 초기화
+        isAttacking = true;
+        comboInputReceived = false;
+
+        // 애니메이터 트리거로 콤보 단계에 맞는 공격 실행
+        Debug.Log("공격 " + comboStep + " 시작");
+        State = (Define.State)((int)Define.State.NormalAttack_01 + comboStep - 1);  // 각 콤보 단계에 맞는 상태 설정
+    }
+
+    // 공격 애니메이션 끝날 때 호출될 함수 (애니메이션 이벤트로 호출)
+    public void OnAttackEnd()
+    {
+        isAttacking = false;
+
+        if (comboInputReceived && comboStep < 3)
+        {
+            StartComboAttack();  // 연속 공격 이어가기
+        }
+        else
+        {
+            ResetCombo();  // 콤보 초기화
+        }
+    }
+
+    // 콤보 타이머 관리
+    private void HandleComboTimer()
+    {
+        if (comboStep > 0)
+        {
+            comboTimer -= Time.deltaTime;
+            if (comboTimer <= 0f)
+            {
+                ResetCombo();  // 콤보 시간이 지나면 초기화
+            }
+        }
+    }
+
+    // 콤보 초기화
+    private void ResetCombo()
+    {
+        comboStep = 0;
+        isAttacking = false;
+        comboTimer = 0;
+        comboInputReceived = false;
+    }
+
+    // 특정 상태일 때 입력을 처리하지 않도록 설정
+    private bool CanProcessInput()
+    {
+        // 공격 중일 때는 이동 입력만 처리
+        if (isAttacking)
+            return false;
+
+        return true;
     }
 
     private void CheckMovementInput()
@@ -71,29 +156,23 @@ public class Vagabond : BaseController
 
     protected override void UpdateMovement()
     {
+        if (comboStep > 0)
+            return;  // 공격 중일 때는 이동 상태 업데이트를 중단
+
         if (moveDirection.magnitude > 0)
         {
-            if (Input.GetKey(KeyCode.LeftShift))
-            {
-                if (State == Define.State.Runing)
-                    return;
-                State = Define.State.Runing;
-            }
-            else
-            {
-                if (State == Define.State.Moving)
-                    return;
-                State = Define.State.Moving;
-            }
+            ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
         }
         else
         {
-            if (State == Define.State.Idle)
-                return;
-            if (State == Define.State.NormalAttack_01)
-                return;
-            State = Define.State.Idle;
+            ChangeState(Define.State.Idle);
         }
+    }
+
+    private void ChangeState(Define.State newState)
+    {
+        if (State != newState)
+            State = newState;
     }
 
     //Moving 상태
@@ -107,15 +186,4 @@ public class Vagabond : BaseController
     {
         Move(moveDirection, runSpeed);
     }
-
-    
-    //기본 상태 전환
-    private void OnIdle()
-    {
-        State = Define.State.Idle;
-    }
-
-
-
-    
 }

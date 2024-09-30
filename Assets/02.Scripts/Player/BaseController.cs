@@ -83,6 +83,13 @@ public class BaseController : MonoBehaviour
                 case Define.State.NormalAttack_01:
                     anim.CrossFade("NormalAttack_01", 0.1f);
                    break;
+                case Define.State.NormalAttack_02:
+                    anim.CrossFade("NormalAttack_02", 0.1f);
+                   break;
+                case Define.State.NormalAttack_03:
+                    anim.CrossFade("NormalAttack_03", 0.1f);
+                   break;
+
                
             }
         }
@@ -108,6 +115,12 @@ public class BaseController : MonoBehaviour
             case Define.State.NormalAttack_01:
                 UpdateNormalAttack_01();
                 break;
+            case Define.State.NormalAttack_02:
+                UpdateNormalAttack_02();
+                break;
+            case Define.State.NormalAttack_03:
+                UpdateNormalAttack_03();
+                break;
            
         }
     }
@@ -117,5 +130,7 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
     protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
     protected virtual void UpdateNormalAttack_01(){}  // Dodge 상태에서의 로직
+    protected virtual void UpdateNormalAttack_02(){}  // Dodge 상태에서의 로직
+    protected virtual void UpdateNormalAttack_03(){}  // Dodge 상태에서의 로직
 
 }
