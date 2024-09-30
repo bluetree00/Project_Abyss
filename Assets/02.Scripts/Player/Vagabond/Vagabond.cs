@@ -15,7 +15,7 @@ public class Vagabond : BaseController
         {
             cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();  // 씬에서 CinemachineFreeLook 카메라를 검색
         }
-        
+
          // 카메라 대상 초기화
         if (cinemachineCamera != null)
         {
@@ -23,12 +23,12 @@ public class Vagabond : BaseController
             cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
         }
 
-        Managers.Input.KeyAction += OnKeyboard;
+        Managers.Input.KeyAction += OnInput;
     }
 
     private void OnDisable() 
     {
-        Managers.Input.KeyAction -= OnKeyboard;
+        Managers.Input.KeyAction -= OnInput;
     }
 
     protected override void Update() 
@@ -37,9 +37,17 @@ public class Vagabond : BaseController
         UpdateMovement();
     }
 
-    private void OnKeyboard()
+    //입력 관리
+    private void OnInput()
     {
         CheckMovementInput();
+
+        // 공격 발생 입력
+        if(Input.GetMouseButtonDown(0))
+        {
+            Debug.Log("공격 시작");
+            State = Define.State.NormalAttack_01;
+        }
     }
 
     private void CheckMovementInput()
@@ -82,17 +90,32 @@ public class Vagabond : BaseController
         {
             if (State == Define.State.Idle)
                 return;
+            if (State == Define.State.NormalAttack_01)
+                return;
             State = Define.State.Idle;
         }
     }
 
+    //Moving 상태
     protected override void UpdateMoving()
     {
         Move(moveDirection, moveSpeed);
     }
 
+    //Runing 상태
     protected override void UpdateRuning()
     {
         Move(moveDirection, runSpeed);
     }
+
+    
+    //기본 상태 전환
+    private void OnIdle()
+    {
+        State = Define.State.Idle;
+    }
+
+
+
+    
 }

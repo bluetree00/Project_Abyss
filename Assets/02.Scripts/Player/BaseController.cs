@@ -80,6 +80,9 @@ public class BaseController : MonoBehaviour
                 case Define.State.Die:
                     anim.CrossFade("Die", 0.1f);
                    break;
+                case Define.State.NormalAttack_01:
+                    anim.CrossFade("NormalAttack_01", 0.1f);
+                   break;
                
             }
         }
@@ -102,6 +105,9 @@ public class BaseController : MonoBehaviour
             case Define.State.Dodge:
                 UpdateDodge();
                 break;
+            case Define.State.NormalAttack_01:
+                UpdateNormalAttack_01();
+                break;
            
         }
     }
@@ -110,5 +116,6 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
     protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
     protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
+    protected virtual void UpdateNormalAttack_01(){}  // Dodge 상태에서의 로직
 
 }

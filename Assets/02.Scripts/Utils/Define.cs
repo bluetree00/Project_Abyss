@@ -34,6 +34,11 @@ public class Define
         Moving,
         Runing,
         Dodge,
+        NormalAttack_01,
+        NormalAttack_02,
+        NormalAttack_03,
+        NormalAttack_04,
+        NormalAttack_05,
         
     }
 
