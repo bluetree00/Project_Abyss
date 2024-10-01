@@ -37,11 +37,13 @@ public class Managers : MonoBehaviour
                 go.AddComponent<Managers>();
             }
 
+            
             // 오브젝트가 비활성화된 경우 활성화
             if (!go.activeSelf)
             {
                 go.SetActive(true);
             }
+            
 
             DontDestroyOnLoad(go); // 씬이 변경되어도 유지
             s_instance = go.GetComponent<Managers>();
@@ -50,6 +52,7 @@ public class Managers : MonoBehaviour
 
     public static void Clear()
     {
+        s_instance = null;
         Input.Clear();
     }
 

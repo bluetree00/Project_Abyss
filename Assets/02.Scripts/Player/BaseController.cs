@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class BaseController : MonoBehaviour
 {
+    #region  기본 초기화
     [SerializeField]
     protected Define.State _state = Define.State.Idle;
 
@@ -15,7 +16,6 @@ public class BaseController : MonoBehaviour
 
     [SerializeField]
     protected Rigidbody rb;  // Rigidbody 참조
-    
 
     public float moveSpeed = 5f; // 기본 이동 속도
     public float runSpeed = 8f;  // 기본 달리기 속도
@@ -31,6 +31,9 @@ public class BaseController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
     }
 
+    #endregion
+
+    //캐릭터들의 기본 상속 움직임
     protected virtual void Move(Vector3 direction, float speed)
     {
         //State = Define.State.Moving;
@@ -89,6 +92,12 @@ public class BaseController : MonoBehaviour
                 case Define.State.NormalAttack_03:
                     anim.CrossFade("NormalAttack_03", 0.1f);
                    break;
+                case Define.State.NormalSkile_01:
+                    anim.CrossFade("NormalSkile_01", 0.1f);
+                   break;
+                case Define.State.UltimateSkile_01:
+                    anim.CrossFade("UltimateSkile_01", 0.1f);
+                   break;
 
                
             }
@@ -121,6 +130,12 @@ public class BaseController : MonoBehaviour
             case Define.State.NormalAttack_03:
                 UpdateNormalAttack_03();
                 break;
+            case Define.State.NormalSkile_01:
+                UpdateNormalSkile_01();
+                break;
+            case Define.State.UltimateSkile_01:
+                UpdateUltimateSkile_01();
+                break;
            
         }
     }
@@ -129,8 +144,10 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
     protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
     protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
-    protected virtual void UpdateNormalAttack_01(){}  // Dodge 상태에서의 로직
-    protected virtual void UpdateNormalAttack_02(){}  // Dodge 상태에서의 로직
-    protected virtual void UpdateNormalAttack_03(){}  // Dodge 상태에서의 로직
+    protected virtual void UpdateNormalAttack_01(){}  // NormalAttack_01 상태에서의 로직
+    protected virtual void UpdateNormalAttack_02(){}  // NormalAttack_02 상태에서의 로직
+    protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
+    protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
+    protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
 
 }
