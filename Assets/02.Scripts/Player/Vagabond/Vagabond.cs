@@ -176,7 +176,7 @@ public class Vagabond : BaseController
 
     #endregion
 
-    #region  마우스 우클릭 공격 관련 코드
+    #region  마우스 좌클릭 공격 관련 코드
     // 공격 처리
     private void ProcessAttack()
     {
@@ -229,7 +229,7 @@ public class Vagabond : BaseController
     }
     #endregion 
 
-    #region  Shift 회피 코드
+    #region  회피 코드
 
     private void ProcessDodge()
     {
@@ -239,6 +239,8 @@ public class Vagabond : BaseController
     #endregion 
 
     #region 사용할 애니메이션 이벤트
+
+    //애니메이션이 끝나고 Idle 상태로 전환함
     private void OnEndEvent()
     {
         ChangeState(Define.State.Idle);
