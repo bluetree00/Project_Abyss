@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,17 +7,23 @@ using Cinemachine;  // Cinemachine 네임스페이스 추가
 
 public class Vagabond : BaseController
 {
+    #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
 
-    // 연속 공격 관련 변수 추가
-    private int comboStep = 0;               // 현재 콤보 단계
-    private float comboTimer = 0;            // 콤보 타이머
-    [SerializeField] private float comboDelay = 1.0f;  // 콤보 유지 시간
-    private bool isAttacking = false;        // 현재 공격 중인지 확인
-    private bool comboInputReceived = false; // 연속 공격 입력 여부
+    private int attackComboStep = 0;       // 공격 스택 단계
+    private float comboTimer = 0.0f;       // 콤보 유지 시간
+    public float comboDuration = 3.0f;     // 콤보가 유지되는 시간
+
+
+    //플레이어의 강제 회전 방지
+    void FreezeRotation()
+    {
+        rb.angularVelocity = Vector3.zero;
+    }
 
     private void OnEnable() 
     {
+        
         // 카메라를 동적으로 찾아서 설정
         if (cinemachineCamera == null)
         {
@@ -35,15 +42,30 @@ public class Vagabond : BaseController
 
     private void OnDisable() 
     {
+       
         Managers.Input.KeyAction -= OnInput;
+        
     }
 
+    #endregion
+
+    #region 업데이트, 상시 인풋
     protected override void Update() 
     {
         base.Update();
         UpdateMovement();
+        FreezeRotation();
+       
+        // 공격 콤보 시간이 다 지나면 초기화
+        if (comboTimer > 0)
+        {
+            comboTimer -= Time.deltaTime;
+            if (comboTimer <= 0)
+            {
+                ResetCombo();
+            }
+        }
 
-        HandleComboTimer();  // 콤보 타이머 관리
     }
 
     // 입력 처리
@@ -59,82 +81,47 @@ public class Vagabond : BaseController
         {
             ProcessAttack();
         }
-    }
 
-    // 공격 처리
-    private void ProcessAttack()
-    {
-        if (isAttacking)
+        // 키보드 E 입력 (기본 스킬)
+        if (Input.GetKeyDown(KeyCode.E))
         {
-            comboInputReceived = true;  // 이미 공격 중이면 콤보 입력만 처리
-            return;
+            ProcessSkile();
         }
 
-        StartComboAttack();
-    }
-
-    // 콤보 공격 시작
-    private void StartComboAttack()
-    {
-        comboStep++;
-        comboStep = Mathf.Clamp(comboStep, 1, 3);  // 콤보는 최대 3단계까지
-
-        comboTimer = comboDelay;   // 콤보 타이머 초기화
-        isAttacking = true;
-        comboInputReceived = false;
-
-        // 애니메이터 트리거로 콤보 단계에 맞는 공격 실행
-        Debug.Log("공격 " + comboStep + " 시작");
-        State = (Define.State)((int)Define.State.NormalAttack_01 + comboStep - 1);  // 각 콤보 단계에 맞는 상태 설정
-    }
-
-    // 공격 애니메이션 끝날 때 호출될 함수 (애니메이션 이벤트로 호출)
-    public void OnAttackEnd()
-    {
-        isAttacking = false;
-
-        if (comboInputReceived && comboStep < 3)
+        // 키보드 Q 입력 (기본 궁극기)
+        if (Input.GetKeyDown(KeyCode.Q))
         {
-            StartComboAttack();  // 연속 공격 이어가기
+            ProcessUltimateSkile();
         }
-        else
+
+        // 키보드 SHift 입력 (기본 회피)
+        if (Input.GetMouseButtonDown(1))
         {
-            ResetCombo();  // 콤보 초기화
+            ProcessDodge();
         }
+
     }
 
-    // 콤보 타이머 관리
-    private void HandleComboTimer()
-    {
-        if (comboStep > 0)
-        {
-            comboTimer -= Time.deltaTime;
-            if (comboTimer <= 0f)
-            {
-                ResetCombo();  // 콤보 시간이 지나면 초기화
-            }
-        }
-    }
-
-    // 콤보 초기화
-    private void ResetCombo()
-    {
-        comboStep = 0;
-        isAttacking = false;
-        comboTimer = 0;
-        comboInputReceived = false;
-    }
+    #endregion
 
     // 특정 상태일 때 입력을 처리하지 않도록 설정
+
+    private readonly Define.State[] BusyStates  = {
+    Define.State.NormalAttack_01,
+    Define.State.NormalAttack_02,
+    Define.State.NormalAttack_03,
+    Define.State.NormalSkile_01,
+    Define.State.UltimateSkile_01,
+    Define.State.Dodge
+};
+
     private bool CanProcessInput()
     {
-        // 공격 중일 때는 이동 입력만 처리
-        if (isAttacking)
-            return false;
-
-        return true;
+        return !Array.Exists(BusyStates , state => State == state);
     }
 
+
+    #region 기본 WASD 이동 관련 코드
     private void CheckMovementInput()
     {
         float horizontalInput = Input.GetAxis("Horizontal");
@@ -156,9 +143,9 @@ public class Vagabond : BaseController
 
     protected override void UpdateMovement()
     {
-        if (comboStep > 0)
-            return;  // 공격 중일 때는 이동 상태 업데이트를 중단
-
+        if (!CanProcessInput())
+            return;
+       
         if (moveDirection.magnitude > 0)
         {
             ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
@@ -186,4 +173,76 @@ public class Vagabond : BaseController
     {
         Move(moveDirection, runSpeed);
     }
+
+    #endregion
+
+    #region  마우스 우클릭 공격 관련 코드
+    // 공격 처리
+    private void ProcessAttack()
+    {
+        comboTimer = comboDuration; // 콤보 타이머 초기화
+        attackComboStep++; // 콤보 스택 증가
+
+        if (attackComboStep == 1)
+        {
+            Debug.Log("첫 번째 공격");
+            ChangeState(Define.State.NormalAttack_01);
+        }
+        else if (attackComboStep == 2)
+        {
+            Debug.Log("두 번째 공격");
+            ChangeState(Define.State.NormalAttack_02);
+        }
+        else if (attackComboStep == 3)
+        {
+            Debug.Log("세 번째 공격");
+            ChangeState(Define.State.NormalAttack_03);
+            attackComboStep = 0; // 마지막 공격 후 초기화
+            comboTimer = 0;
+        }
+    }
+
+
+    private void ResetCombo()
+    {
+        attackComboStep = 0;
+        comboTimer = 0;
+        ChangeState(Define.State.Idle);
+    }
+   
+
+    #endregion
+
+    #region  E 스킬 코드
+    private void ProcessSkile()
+    {
+        Debug.Log("E");
+        ChangeState(Define.State.NormalSkile_01);
+    }
+    #endregion 
+
+    #region  Q 스킬 코드
+    private void ProcessUltimateSkile()
+    {
+        Debug.Log("Q");
+        ChangeState(Define.State.UltimateSkile_01);
+    }
+    #endregion 
+
+    #region  Shift 회피 코드
+
+    private void ProcessDodge()
+    {
+        ChangeState(Define.State.Dodge);
+    }
+
+    #endregion 
+
+    #region 사용할 애니메이션 이벤트
+    private void OnEndEvent()
+    {
+        ChangeState(Define.State.Idle);
+    }
+
+    #endregion 
 }

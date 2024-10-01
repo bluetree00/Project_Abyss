@@ -39,6 +39,9 @@ public class Define
         NormalAttack_03,
         NormalAttack_04,
         NormalAttack_05,
+
+        NormalSkile_01,
+        UltimateSkile_01,
         
     }
 
