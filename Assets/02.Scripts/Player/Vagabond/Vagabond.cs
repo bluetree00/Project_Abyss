@@ -14,6 +14,11 @@ public class Vagabond : BaseController
     private float comboTimer = 0.0f;       // 콤보 유지 시간
     public float comboDuration = 3.0f;     // 콤보가 유지되는 시간
 
+    private bool canDodge = true;          // 대시 가능 여부
+    public float dashSpeed = 10f;          // 대시 속도
+    public float dashDuration = 0.2f;      // 대시 지속 시간
+    public float dodgeCooldown = 2f;       // 대시 쿨타임
+    private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
 
     //플레이어의 강제 회전 방지
     void FreezeRotation()
@@ -23,7 +28,6 @@ public class Vagabond : BaseController
 
     private void OnEnable() 
     {
-        
         // 카메라를 동적으로 찾아서 설정
         if (cinemachineCamera == null)
         {
@@ -42,9 +46,7 @@ public class Vagabond : BaseController
 
     private void OnDisable() 
     {
-       
         Managers.Input.KeyAction -= OnInput;
-        
     }
 
     #endregion
@@ -65,12 +67,18 @@ public class Vagabond : BaseController
                 ResetCombo();
             }
         }
-
     }
 
     // 입력 처리
     private void OnInput()
     {
+
+        // 키보드 Shift 입력 (기본 회피)
+        if (Input.GetMouseButtonDown(1))
+        {
+            ProcessDodge();
+        }
+
         if (!CanProcessInput())
             return;
         
@@ -94,32 +102,24 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
-        // 키보드 SHift 입력 (기본 회피)
-        if (Input.GetMouseButtonDown(1))
-        {
-            ProcessDodge();
-        }
-
     }
 
     #endregion
 
     // 특정 상태일 때 입력을 처리하지 않도록 설정
-
-    private readonly Define.State[] BusyStates  = {
-    Define.State.NormalAttack_01,
-    Define.State.NormalAttack_02,
-    Define.State.NormalAttack_03,
-    Define.State.NormalSkile_01,
-    Define.State.UltimateSkile_01,
-    Define.State.Dodge
-};
+    private readonly Define.State[] BusyStates = {
+        Define.State.NormalAttack_01,
+        Define.State.NormalAttack_02,
+        Define.State.NormalAttack_03,
+        Define.State.NormalSkile_01,
+        Define.State.UltimateSkile_01,
+        Define.State.Dodge
+    };
 
     private bool CanProcessInput()
     {
-        return !Array.Exists(BusyStates , state => State == state);
+        return !Array.Exists(BusyStates, state => State == state);
     }
-
 
     #region 기본 WASD 이동 관련 코드
     private void CheckMovementInput()
@@ -145,7 +145,7 @@ public class Vagabond : BaseController
     {
         if (!CanProcessInput())
             return;
-       
+
         if (moveDirection.magnitude > 0)
         {
             ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
@@ -176,8 +176,7 @@ public class Vagabond : BaseController
 
     #endregion
 
-    #region  마우스 좌클릭 공격 관련 코드
-    // 공격 처리
+    #region 마우스 좌클릭 공격 관련 코드
     private void ProcessAttack()
     {
         comboTimer = comboDuration; // 콤보 타이머 초기화
@@ -202,18 +201,16 @@ public class Vagabond : BaseController
         }
     }
 
-
     private void ResetCombo()
     {
         attackComboStep = 0;
         comboTimer = 0;
         ChangeState(Define.State.Idle);
     }
-   
 
     #endregion
 
-    #region  E 스킬 코드
+    #region E 스킬 코드
     private void ProcessSkile()
     {
         Debug.Log("E");
@@ -221,7 +218,7 @@ public class Vagabond : BaseController
     }
     #endregion 
 
-    #region  Q 스킬 코드
+    #region Q 스킬 코드
     private void ProcessUltimateSkile()
     {
         Debug.Log("Q");
@@ -229,22 +226,55 @@ public class Vagabond : BaseController
     }
     #endregion 
 
-    #region  회피 코드
+    #region 대시 코드
 
     private void ProcessDodge()
     {
-        ChangeState(Define.State.Dodge);
+        if (canDodge)
+        {
+            dodgeCoroutine = StartCoroutine(DashCoroutine());
+        }
     }
 
-    #endregion 
+    private IEnumerator DashCoroutine()
+    {
+        canDodge = false;  // 대시 가능 여부를 false로 설정
+        ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
 
-    #region 사용할 애니메이션 이벤트
+        Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;  // 대시 방향 설정
+        float startTime = Time.time;
 
-    //애니메이션이 끝나고 Idle 상태로 전환함
+        // 대시 지속 시간 동안 캐릭터 이동
+        while (Time.time < startTime + dashDuration)
+        {
+            rb.velocity = dashDirection * dashSpeed;
+            yield return null;
+        }
+
+        rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
+        yield return new WaitForSeconds(dodgeCooldown);  // 대시 쿨타임 대기
+
+        canDodge = true;  // 다시 대시 가능하도록 설정
+    }
+
+    #endregion
+
+    #region 애니메이션 이벤트 처리
+
     private void OnEndEvent()
     {
-        ChangeState(Define.State.Idle);
+        // 대시 후 이동 입력 확인
+        if (moveDirection.magnitude > 0)
+        {
+            // 이동 방향이 있으면 달리기 상태로 전환 (Shift 누를 시 달리기)
+            ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
+        }
+        else
+        {
+            // 이동 입력이 없으면 Idle 상태로 전환
+            ChangeState(Define.State.Idle);
+        }
     }
 
-    #endregion 
+    #endregion
 }

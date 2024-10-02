@@ -3189,6 +3189,9 @@ MonoBehaviour:
   runSpeed: 8
   cinemachineCamera: {fileID: 0}
   comboDuration: 10
+  dashSpeed: 20
+  dashDuration: 0.3
+  dodgeCooldown: 0.3
 --- !u!1 &5690047436474366794
 GameObject:
   m_ObjectHideFlags: 0
