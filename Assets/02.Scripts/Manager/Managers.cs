@@ -4,19 +4,30 @@ using UnityEngine;
 
 public class Managers : MonoBehaviour
 {
-    static Managers s_instance; // 사용할 매니저
-    public static Managers Instance { get { Init(); return s_instance; } } // 유일한 매니저를 가져옴
+    private static Managers s_instance;
+    public static Managers Instance
+    {
+        get
+        {
+            if (s_instance == null)
+            {
+                Init(); // 인스턴스가 null일 때만 초기화
+            }
+            return s_instance;
+        }
+    }
 
     #region Core // 게임 코어 매니저
-    InputManager _input = new InputManager();
-    ResourceManager _resource = new ResourceManager();
+    private InputManager _input = new InputManager();
+    private ResourceManager _resource = new ResourceManager();
+
     public static InputManager Input { get { return Instance._input; } }
     public static ResourceManager Resource { get { return Instance._resource; } }
     #endregion
 
-    void Start()
+    void Awake()
     {
-        Init();
+        Init(); // Awake에서 초기화
     }
 
     void Update()
@@ -24,40 +35,30 @@ public class Managers : MonoBehaviour
         _input.OnUpdate();
     }
 
-    public static void Init()
+    private static void Init()
     {
         if (s_instance == null)
         {
             GameObject go = GameObject.Find("@Managers");
-
             if (go == null)
             {
-                // @Managers 오브젝트가 없으면 새로 생성
                 go = new GameObject { name = "@Managers" };
                 go.AddComponent<Managers>();
             }
-
-            
-            // 오브젝트가 비활성화된 경우 활성화
             if (!go.activeSelf)
-            {
                 go.SetActive(true);
-            }
-            
 
-            DontDestroyOnLoad(go); // 씬이 변경되어도 유지
+            DontDestroyOnLoad(go);
             s_instance = go.GetComponent<Managers>();
         }
     }
 
     public static void Clear()
     {
-        s_instance = null;
-        Input.Clear();
-    }
-
-    public void CoroutineHelper(IEnumerator coroutine)
-    {
-        StartCoroutine(coroutine);
+        if (s_instance != null)
+        {
+            s_instance._input.Clear(); // Input 매니저의 Clear() 호출
+            s_instance = null; // 인스턴스 초기화
+        }
     }
 }

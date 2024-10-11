@@ -576,7 +576,7 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.87117904
+      - time: 0.74959093
         functionName: OnEndEvent
         data: 
         objectReferenceParameter: {instanceID: 0}
