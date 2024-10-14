@@ -11,54 +11,54 @@ public class Managers : MonoBehaviour
         {
             if (s_instance == null)
             {
-                Init(); // 인스턴스가 null일 때만 초기화
+                GameObject go = GameObject.Find("@Managers");
+                if (go == null)
+                {
+                    go = new GameObject { name = "@Managers" };
+                    go.AddComponent<Managers>();
+                }
+                s_instance = go.GetComponent<Managers>();
+                DontDestroyOnLoad(go);
             }
             return s_instance;
         }
     }
 
     #region Core // 게임 코어 매니저
-    private InputManager _input = new InputManager();
-    private ResourceManager _resource = new ResourceManager();
+    private InputManager _input;
+    private ResourceManager _resource;
+    private ObjectPooler _objectPooler;
 
-    public static InputManager Input { get { return Instance._input; } }
-    public static ResourceManager Resource { get { return Instance._resource; } }
+    public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
+    public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
+    public ObjectPooler ObjectPooler => _objectPooler;
     #endregion
 
     void Awake()
     {
-        Init(); // Awake에서 초기화
+        if (s_instance == null)
+        {
+            s_instance = this;
+            DontDestroyOnLoad(this);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     void Update()
     {
-        _input.OnUpdate();
-    }
-
-    private static void Init()
-    {
-        if (s_instance == null)
-        {
-            GameObject go = GameObject.Find("@Managers");
-            if (go == null)
-            {
-                go = new GameObject { name = "@Managers" };
-                go.AddComponent<Managers>();
-            }
-            if (!go.activeSelf)
-                go.SetActive(true);
-
-            DontDestroyOnLoad(go);
-            s_instance = go.GetComponent<Managers>();
-        }
+        _input?.OnUpdate();
     }
 
     public static void Clear()
     {
         if (s_instance != null)
         {
-            s_instance._input.Clear(); // Input 매니저의 Clear() 호출
-            s_instance = null; // 인스턴스 초기화
+            s_instance._input?.Clear(); // Input 매니저의 Clear() 호출
+            s_instance._resource?.Clear(); // ResourceManager에 Clear() 메서드를 추가하여 리소스 정리
+            s_instance = null;
         }
     }
 }
