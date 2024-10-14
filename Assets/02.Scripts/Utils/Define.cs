@@ -45,6 +45,28 @@ public class Define
         
     }
 
+    public enum MonsterState //몬스터 상태
+    {
+        //기본적으로 사용하는 상태
+        Die,
+        Idle,
+        Moving,
+        Runing,
+        Dodge,
+        NormalAttack_01,
+        NormalAttack_02,
+        NormalAttack_03,
+        NormalAttack_04,
+        NormalAttack_05,
+
+        NormalSkile_01,
+        UltimateSkile_01,
+        
+    }
+
+
+
+
     public enum UIEvent
     {
 
