@@ -3281,6 +3281,8 @@ GameObject:
   - component: {fileID: 7896098146778208122}
   - component: {fileID: 1633829258006158585}
   - component: {fileID: 783116215357855786}
+  - component: {fileID: 2373234104073805725}
+  - component: {fileID: 2932361905463973482}
   m_Layer: 0
   m_Name: TsetMonster_1
   m_TagString: Untagged
@@ -3296,7 +3298,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8225616670553665561}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.99369144, z: -0, w: 0.11214826}
+  m_LocalRotation: {x: 0, y: 0.99369186, z: 0, w: 0.11214538}
   m_LocalPosition: {x: 0.29903808, y: 0, z: 0.853924}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3322,10 +3324,10 @@ Animator:
   m_GameObject: {fileID: 8225616670553665561}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 50c561459ed778a4ba81abad6e604ec0, type: 3}
-  m_Controller: {fileID: 9100000, guid: 54729139290db944d80768265b71f667, type: 2}
+  m_Controller: {fileID: 9100000, guid: cf2e38a65b8106d4e93834402363fc9c, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
-  m_ApplyRootMotion: 1
+  m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_WarningMessage: 
@@ -3366,7 +3368,52 @@ LODGroup:
     - renderer: {fileID: 7318787418073650299}
     - renderer: {fileID: 4392894498784192702}
     - renderer: {fileID: 6435618565095793549}
+  m_Enabled: 0
+--- !u!114 &2373234104073805725
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8225616670553665561}
   m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d76c513835a69847a6a8cd1ac4aaff5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _state: 1
+  _destPos: {x: 0, y: 0, z: 0}
+  _lockTarget: {fileID: 0}
+  rb: {fileID: 0}
+  moveSpeed: 5
+  runSpeed: 8
+  onDead:
+    m_PersistentCalls:
+      m_Calls: []
+  _scacRange: 10
+  _attackRange: 1
+--- !u!195 &2932361905463973482
+NavMeshAgent:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8225616670553665561}
+  m_Enabled: 1
+  m_AgentTypeID: 0
+  m_Radius: 0.5
+  m_Speed: 3.5
+  m_Acceleration: 8
+  avoidancePriority: 50
+  m_AngularSpeed: 120
+  m_StoppingDistance: 0
+  m_AutoTraverseOffMeshLink: 1
+  m_AutoBraking: 1
+  m_AutoRepath: 1
+  m_Height: 2
+  m_BaseOffset: 0
+  m_WalkableMask: 4294967295
+  m_ObstacleAvoidanceType: 4
 --- !u!1 &8226184384891106496
 GameObject:
   m_ObjectHideFlags: 0
