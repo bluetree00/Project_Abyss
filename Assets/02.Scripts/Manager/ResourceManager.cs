@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class ResourceManager
 {
-
     public T Load<T>(string path) where T : Object
     {
         return Resources.Load<T>(path);
@@ -12,16 +11,16 @@ public class ResourceManager
 
     public GameObject Instantiate(string path, Transform parent = null)
     {
-        GameObject prefab = Load<GameObject>($"Prefabs/{path}"); //가져올 오브젝트 경로 설정
-        if(prefab == null)
+        GameObject prefab = Load<GameObject>($"Prefabs/{path}"); // 가져올 오브젝트 경로 설정
+        if (prefab == null)
         {
-            Debug.Log($"Failed to load prefab :{path}");
-            return  null;
+            Debug.Log($"Failed to load prefab : {path}");
+            return null;
         }
 
         GameObject go = Object.Instantiate(prefab, parent);
         int index = go.name.IndexOf("(Clone)");
-        if(index > 0)
+        if (index > 0)
         {
             go.name = go.name.Substring(0, index);
         }
@@ -31,11 +30,16 @@ public class ResourceManager
 
     public void Destroy(GameObject go)
     {
-        if(go == null)
+        if (go == null)
         {
             return;
         }
 
         Object.Destroy(go);
+    }
+
+    public void Clear()
+    {
+        // 리소스 정리 코드 추가 가능
     }
 }

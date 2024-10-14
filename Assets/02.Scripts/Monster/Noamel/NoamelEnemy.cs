@@ -98,8 +98,6 @@ public class NoamelEneny : MonsterBaseController
 
     void OnEndHitEvent()
     {
-        Debug.Log("Monster OnEndtHitEvent");
-
         State = Define.MonsterState.Idle;
     }
 

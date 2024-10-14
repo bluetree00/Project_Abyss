@@ -49,7 +49,7 @@ public class BaseController : MonoBehaviour
 
         // 회전 처리 - 부드럽게 회전하도록 변경
         Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 5f); // 5f는 회전 속도 계수
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 5f는 회전 속도 계수
     }
 
 
