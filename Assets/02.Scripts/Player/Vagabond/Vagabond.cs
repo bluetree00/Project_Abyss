@@ -41,12 +41,13 @@ public class Vagabond : BaseController
             cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
         }
 
+        Managers.Input.KeyAction -= OnInput;
         Managers.Input.KeyAction += OnInput;
     }
 
     private void OnDisable() 
     {
-        Managers.Input.KeyAction -= OnInput;
+       
     }
 
     #endregion
