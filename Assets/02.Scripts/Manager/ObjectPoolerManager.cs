@@ -1,6 +1,6 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using System;
 
 public class ObjectPoolerManager
 {
@@ -24,13 +24,19 @@ public class ObjectPoolerManager
 
         foreach (Pool pool in pools)
         {
-            poolDictionary[pool.tag] = new Queue<GameObject>();
+            InitializePool(pool);
+        }
+    }
 
-            for (int i = 0; i < pool.initialSize; i++)
-            {
-                GameObject obj = CreateNewObject(pool.tag, pool.resourcePath);
-                ReturnToPool(obj); // 초기 오브젝트를 풀에 추가
-            }
+    // 특정 Pool을 초기화하여 미리 오브젝트를 생성하는 메서드
+    private void InitializePool(Pool pool)
+    {
+        poolDictionary[pool.tag] = new Queue<GameObject>();
+
+        for (int i = 0; i < pool.initialSize; i++)
+        {
+            GameObject obj = CreateNewObject(pool.tag, pool.resourcePath);
+            ReturnToPool(obj); // 초기 오브젝트를 풀에 추가
         }
     }
 
@@ -52,9 +58,11 @@ public class ObjectPoolerManager
 
     public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
     {
+        // 풀에 태그가 존재하지 않는 경우 초기화
         if (!poolDictionary.ContainsKey(tag))
         {
-            throw new Exception($"Pool with tag {tag} doesn't exist.");
+            Pool newPool = new Pool { tag = tag, resourcePath = $"Effects/{tag}", initialSize = 1 };
+            InitializePool(newPool);  // 동적으로 풀 초기화
         }
 
         if (poolDictionary[tag].Count == 0)
