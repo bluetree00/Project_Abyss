@@ -280,17 +280,98 @@ public class Vagabond : BaseController
         }
     }
 
-    public void SpawnShinySlashEffect()
+    public void SpawnShinySlashEffect1()
     {
-        // 플레이어 위치 기준으로 Z축 1만큼 앞에 생성
-        Vector3 spawnPosition = playerTransform.position + playerTransform.forward * 1f;
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
 
-        // 플레이어의 정면 방향으로 회전값 설정
-        Quaternion spawnRotation = Quaternion.LookRotation(transform.forward);
+        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+
+        // 플레이어의 회전값을 가져온 후 Z축에 68도 추가
+        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
+        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 0f, 68f); // 플레이어 회전에 Z축 68도 추가
 
         // ObjectPoolerManager를 통해 이펙트 생성
-        Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+
+        // 이펙트가 생성될 때의 위치와 회전값을 설정
+        effectObject.transform.position = spawnPosition;
+        effectObject.transform.rotation = spawnRotation; // Z축 회전만 68도 추가된 회전값
     }
+
+    public void SpawnShinySlashEffect2()
+    {
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
+
+        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+
+    
+        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
+        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 0f, 180f);
+
+        // ObjectPoolerManager를 통해 이펙트 생성
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+
+        // 이펙트가 생성될 때의 위치와 회전값을 설정
+        effectObject.transform.position = spawnPosition;
+        effectObject.transform.rotation = spawnRotation; 
+    }
+
+    public void SpawnShinySlashEffect3()
+    {
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
+
+        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+
+     
+        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
+        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 360f, -60f);
+
+        // ObjectPoolerManager를 통해 이펙트 생성
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+
+        // 이펙트가 생성될 때의 위치와 회전값을 설정
+        effectObject.transform.position = spawnPosition;
+        effectObject.transform.rotation = spawnRotation; 
+    }
+
+    public void SpawnShinySlashEffect4()
+    {
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
+
+        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+
+    
+        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
+        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 360f, -140f);
+
+        // ObjectPoolerManager를 통해 이펙트 생성
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+
+        // 이펙트가 생성될 때의 위치와 회전값을 설정
+        effectObject.transform.position = spawnPosition;
+        effectObject.transform.rotation = spawnRotation; 
+    }
+
 
 
     #endregion
