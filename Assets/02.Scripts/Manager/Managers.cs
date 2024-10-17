@@ -27,11 +27,13 @@ public class Managers : MonoBehaviour
     #region Core // 게임 코어 매니저
     private InputManager _input;
     private ResourceManager _resource;
-    private ObjectPooler _objectPooler;
+    private ObjectPoolerManager _objectPoolerManager;
+
 
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
-    public ObjectPooler ObjectPooler => _objectPooler;
+    public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
+
     #endregion
 
     void Awake()
@@ -40,6 +42,12 @@ public class Managers : MonoBehaviour
         {
             s_instance = this;
             DontDestroyOnLoad(this);
+
+                // ObjectPoolerManager 초기화
+            ObjectPoolerManager.Pool[] pools = {
+                new ObjectPoolerManager.Pool { tag = "ShinySlash", resourcePath = "Effects/ShinySlash", initialSize = 10 }
+            };
+            _objectPoolerManager = new ObjectPoolerManager(pools);
         }
         else
         {

@@ -55,6 +55,8 @@ public class Vagabond : BaseController
     #region 업데이트, 상시 인풋
     protected override void Update() 
     {
+        Managers.Input.KeyAction += OnInput;
+
         base.Update();
         UpdateMovement();
         FreezeRotation();
@@ -276,6 +278,19 @@ public class Vagabond : BaseController
             ChangeState(Define.State.Idle);
         }
     }
+
+    public void SpawnShinySlashEffect()
+    {
+        // 플레이어 위치 기준으로 Z축 1만큼 앞에 생성
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+
+        // 지정된 회전값으로 설정
+        Quaternion spawnRotation = Quaternion.Euler(-55f, 28f, 56f);
+
+        // ObjectPoolerManager를 통해 이펙트 생성
+        Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+    }
+
 
     #endregion
 }
