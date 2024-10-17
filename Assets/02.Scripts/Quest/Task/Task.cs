@@ -53,7 +53,7 @@ public class Task : ScriptableObject
 
     public int CurrentSuccess
     {
-        get => CurrentSuccess;
+        get => currentSuccess;
         set
         {
             int prevSuccess = currentSuccess;
