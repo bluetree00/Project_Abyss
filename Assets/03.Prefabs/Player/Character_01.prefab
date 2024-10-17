@@ -4756,6 +4756,7 @@ MonoBehaviour:
   _destPos: {x: 0, y: 0, z: 0}
   _lockTarget: {fileID: 0}
   rb: {fileID: 0}
+  playerTransform: {fileID: 0}
   moveSpeed: 3
   runSpeed: 5
   cinemachineCamera: {fileID: 0}
