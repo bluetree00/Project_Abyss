@@ -54,6 +54,8 @@ public class Quest : ScriptableObject
     private bool useAutoComplete;
     [SerializeField]
     private bool isCancelable;
+    [SerializeField]
+    private bool isSavable;
 
     [Header("Condition")]
     [SerializeField]
@@ -83,6 +85,7 @@ public class Quest : ScriptableObject
     public bool IsCancel => State == QuestState.Cancel;
     public virtual bool IsCancelable => isCancelable && cancelConditions.All(x => x.IsPass(this));
     public bool IsAcceptable => acceptionConditions.All(x => x.IsPass(this));
+    public virtual bool IsSavable => isSavable;
 
 
     // 이벤트 모음
@@ -172,6 +175,35 @@ public class Quest : ScriptableObject
         clone.taskGroups = taskGroups.Select(x => new TaskGroup(x)).ToArray();
 
         return clone;
+    }
+
+    public QuestSaveData ToSaveData()
+    {
+        return new QuestSaveData
+        {
+            codeName = codeName,
+            state = State,
+            taskGroupIndex = currentTaskGroupIndex,
+            taskSuccessCounts = CurrentTaskGroup.Tasks.Select(x => x.CurrentSuccess).ToArray()
+        };
+    }
+
+    public void LoadFrom(QuestSaveData saveData)
+    {
+        State = saveData.state;
+        currentTaskGroupIndex = saveData.taskGroupIndex;
+
+        for (int i = 0; i < currentTaskGroupIndex; i++)
+        {
+            var taskGroup = taskGroups[i];
+            taskGroup.Complete();
+        }
+
+        for (int i = 0; i < saveData.taskSuccessCounts.Length; i++)
+        {
+            CurrentTaskGroup.Start();
+            CurrentTaskGroup.Tasks[i].CurrentSuccess = saveData.taskSuccessCounts[i];
+        }
     }
 
     private void OnSuccessChanged(Task task, int currentSuccess, int prevSuccess)
