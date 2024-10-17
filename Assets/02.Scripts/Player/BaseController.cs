@@ -16,6 +16,7 @@ public class BaseController : MonoBehaviour
 
     [SerializeField]
     protected Rigidbody rb;  // Rigidbody 참조
+    public Transform playerTransform; // 플레이어의 Transform을 할당
 
     public float moveSpeed = 5f; // 기본 이동 속도
     public float runSpeed = 8f;  // 기본 달리기 속도
@@ -30,6 +31,9 @@ public class BaseController : MonoBehaviour
     protected virtual void Init()
     {
         rb = GetComponent<Rigidbody>();
+
+        // playerTransform을 현재 객체의 Transform으로 초기화
+        playerTransform = transform;
     }
 
     #endregion

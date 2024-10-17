@@ -20,6 +20,7 @@ public class Vagabond : BaseController
     public float dodgeCooldown = 2f;       // 대시 쿨타임
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
 
+
     //플레이어의 강제 회전 방지
     void FreezeRotation()
     {
@@ -55,7 +56,7 @@ public class Vagabond : BaseController
     #region 업데이트, 상시 인풋
     protected override void Update() 
     {
-        Managers.Input.KeyAction += OnInput;
+        Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
         UpdateMovement();
@@ -282,10 +283,10 @@ public class Vagabond : BaseController
     public void SpawnShinySlashEffect()
     {
         // 플레이어 위치 기준으로 Z축 1만큼 앞에 생성
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+        Vector3 spawnPosition = playerTransform.position + playerTransform.forward * 1f;
 
-        // 지정된 회전값으로 설정
-        Quaternion spawnRotation = Quaternion.Euler(-55f, 28f, 56f);
+        // 플레이어의 정면 방향으로 회전값 설정
+        Quaternion spawnRotation = Quaternion.LookRotation(transform.forward);
 
         // ObjectPoolerManager를 통해 이펙트 생성
         Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
