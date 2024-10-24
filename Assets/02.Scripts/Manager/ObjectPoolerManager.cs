@@ -19,6 +19,7 @@ public class ObjectPoolerManager
         public int initialSize; // 초기 객체 수
     }
 
+    //생성자
     public ObjectPoolerManager(Pool[] pools)
     {
         this.pools = pools;
@@ -107,7 +108,9 @@ public class ObjectPoolerManager
         return objectToSpawn;
     }
 
-    // T 타입의 컴포넌트를 가진 객체를 생성하는 메서드
+    // T 타입의 컴포넌트를 가진 객체를 생성하는 메서드 주로 컴포넌트를 가지고있는 오브젝트를 사용할때 사용하면 될듯.
+    //예를들어 풀러에 있는 오브젝트에 바로 힘을 주고 싶을때 Rigidbody rb = bullet.GetComponent<Rigidbody>(); 처럼 참조를 거치지 않고
+    // Rigidbody rb = objectPoolerManager.SpawnFromPool<Rigidbody>("Bullet", new Vector3(0, 0, 0), Quaternion.identity); 이런식으로 바로 사용하면 됨
     public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
     {
         GameObject objectToSpawn = SpawnFromPool(tag, position, rotation);
@@ -126,24 +129,19 @@ public class ObjectPoolerManager
     public void ReturnToPool(GameObject obj)
     {
         obj.SetActive(false);
-        Debug.Log($"Attempting to return {obj.name} to pool.");
         
         // Debug 로그 추가
         if (!poolDictionary.ContainsKey(obj.name))
         {
-            Debug.LogWarning($"Pool with tag {obj.name} doesn't exist. Object destroyed instead of returned to pool.");
             GameObject.Destroy(obj);
         }
         else
         {
-            Debug.Log($"{obj.name} returned to pool.");
             poolDictionary[obj.name].Enqueue(obj);
         }
     }
 
-
-
-    // 풀의 상태를 로그로 출력하는 메서드
+    // 풀의 상태를 로그로 출력하는 메서드 확인용
     public void LogPoolStatus()
     {
         foreach (var pool in pools)

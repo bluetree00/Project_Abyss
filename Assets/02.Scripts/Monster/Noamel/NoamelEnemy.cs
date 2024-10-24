@@ -108,7 +108,12 @@ public class NoamelEneny : MonsterBaseController
         currentHealth -= damage;
         if (currentHealth <= 0)
         {
-            // Destroy(this.gameObject);
+            // 몬스터의 위치에서 Y축으로 1 단위 위쪽에 이펙트를 생성
+            Vector3 spawnPosition2 = new Vector3(transform.position.x, 1f, transform.position.z); // Y축을 1로 고정
+            Quaternion spawnRotation2 = Quaternion.identity; // 회전 값은 필요에 따라 설정
+
+            GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
+            Destroy(this.gameObject);
         }
         Debug.Log($"Monster took {damage} damage. Current Health: {currentHealth}");
 

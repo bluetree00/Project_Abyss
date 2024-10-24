@@ -8,6 +8,7 @@ TagManager:
   - ShinySlash
   - HitEffect_01
   - HitEffect_02
+  - DieEffect_01
   layers:
   - Default
   - TransparentFX
