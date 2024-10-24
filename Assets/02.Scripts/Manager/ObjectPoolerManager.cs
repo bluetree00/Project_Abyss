@@ -4,16 +4,19 @@ using UnityEngine;
 
 public class ObjectPoolerManager
 {
-    private Dictionary<string, Queue<GameObject>> poolDictionary;
-    private List<GameObject> spawnObjects;
-    private Pool[] pools;
+    private Dictionary<string, Queue<GameObject>> poolDictionary; // 태그와 객체 큐를 매핑
+    private List<GameObject> spawnObjects; // 생성된 객체들을 저장할 리스트
+    private List<string> tags; // 태그를 저장할 리스트
+    private Pool[] pools; // 초기화할 풀 정보
+    private GameObject parentObject ; // 부모 오브젝트
+    
 
     [Serializable]
     public class Pool
     {
-        public string tag;
+        public string tag; // 태그 이름
         public string resourcePath; // 리소스 매니저에서 사용할 경로
-        public int initialSize;
+        public int initialSize; // 초기 객체 수
     }
 
     public ObjectPoolerManager(Pool[] pools)
@@ -21,14 +24,18 @@ public class ObjectPoolerManager
         this.pools = pools;
         poolDictionary = new Dictionary<string, Queue<GameObject>>();
         spawnObjects = new List<GameObject>();
+        tags = new List<string>();
 
+        // 부모 오브젝트 생성
+        parentObject = new GameObject("EffectPool");
+        
         foreach (Pool pool in pools)
         {
             InitializePool(pool);
+            AddNewTag(pool.tag); // 초기화할 때 태그 추가
         }
     }
 
-    // 특정 Pool을 초기화하여 미리 오브젝트를 생성하는 메서드
     private void InitializePool(Pool pool)
     {
         poolDictionary[pool.tag] = new Queue<GameObject>();
@@ -52,10 +59,25 @@ public class ObjectPoolerManager
         GameObject obj = GameObject.Instantiate(prefab);
         obj.name = tag;
         obj.SetActive(false);
-        spawnObjects.Add(obj);
+        spawnObjects.Add(obj); // 생성된 객체를 리스트에 추가
+
+        // 부모 오브젝트의 자식으로 설정
+        obj.transform.SetParent(parentObject.transform);
+        
         return obj;
     }
 
+    // 새로운 태그를 추가하는 메서드
+    public void AddNewTag(string tag)
+    {
+        if (!tags.Contains(tag))
+        {
+            tags.Add(tag); // 태그 리스트에 추가
+            Debug.Log($"Tag '{tag}' added.");
+        }
+    }
+
+    // 풀에서 객체를 생성하는 메서드
     public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
     {
         // 풀에 태그가 존재하지 않는 경우 초기화
@@ -85,6 +107,7 @@ public class ObjectPoolerManager
         return objectToSpawn;
     }
 
+    // T 타입의 컴포넌트를 가진 객체를 생성하는 메서드
     public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
     {
         GameObject objectToSpawn = SpawnFromPool(tag, position, rotation);
@@ -99,9 +122,13 @@ public class ObjectPoolerManager
         }
     }
 
+    // 객체를 풀로 반환하는 메서드
     public void ReturnToPool(GameObject obj)
     {
         obj.SetActive(false);
+        Debug.Log($"Attempting to return {obj.name} to pool.");
+        
+        // Debug 로그 추가
         if (!poolDictionary.ContainsKey(obj.name))
         {
             Debug.LogWarning($"Pool with tag {obj.name} doesn't exist. Object destroyed instead of returned to pool.");
@@ -109,10 +136,14 @@ public class ObjectPoolerManager
         }
         else
         {
+            Debug.Log($"{obj.name} returned to pool.");
             poolDictionary[obj.name].Enqueue(obj);
         }
     }
 
+
+
+    // 풀의 상태를 로그로 출력하는 메서드
     public void LogPoolStatus()
     {
         foreach (var pool in pools)

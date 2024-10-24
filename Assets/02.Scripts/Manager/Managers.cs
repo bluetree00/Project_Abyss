@@ -1,3 +1,4 @@
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -45,7 +46,8 @@ public class Managers : MonoBehaviour
 
                 // ObjectPoolerManager 초기화
             ObjectPoolerManager.Pool[] pools = {
-                new ObjectPoolerManager.Pool { tag = "ShinySlash", resourcePath = "Effects/ShinySlash", initialSize = 10 }
+                new ObjectPoolerManager.Pool { tag = "ShinySlash", resourcePath = "Effects/ShinySlash", initialSize = 10 },
+                new ObjectPoolerManager.Pool { tag = "HitEffect_02", resourcePath = "Effects/HitEffect_02", initialSize = 10 }
             };
             _objectPoolerManager = new ObjectPoolerManager(pools);
         }

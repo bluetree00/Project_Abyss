@@ -13,6 +13,8 @@ public class EffectBehaviour : MonoBehaviour
     private System.Collections.IEnumerator ReturnToPoolAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
+
         Managers.ObjectPooler.ReturnToPool(gameObject); // 풀로 반환
     }
+
 }

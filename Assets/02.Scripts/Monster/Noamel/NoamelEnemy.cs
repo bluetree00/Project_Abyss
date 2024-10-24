@@ -37,7 +37,7 @@ public class NoamelEneny : MonsterBaseController
     {
         if (_lockTarget != null)
         {
-            Vector3 _destPos = _lockTarget.transform.position;
+            _destPos = _lockTarget.transform.position;
             float distance = (_destPos - transform.position).magnitude;
             if (distance <= _attackRange)
             {
@@ -106,10 +106,21 @@ public class NoamelEneny : MonsterBaseController
     private void ApplyDamage(float damage)
     {
         currentHealth -= damage;
-        if(currentHealth <= 0)
-        Destroy(this.gameObject);
+        if (currentHealth <= 0)
+        {
+            // Destroy(this.gameObject);
+        }
         Debug.Log($"Monster took {damage} damage. Current Health: {currentHealth}");
+
+        // 몬스터의 위치에서 Y축으로 1 단위 위쪽에 이펙트를 생성
+        Vector3 spawnPosition = new Vector3(transform.position.x, 1f, transform.position.z); // Y축을 1로 고정
+        Quaternion spawnRotation = Quaternion.identity; // 회전 값은 필요에 따라 설정
+
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
     }
+
+
+
 
     // 몬스터 공격 애니메이션 이벤트
     void OnAttackEvent()
