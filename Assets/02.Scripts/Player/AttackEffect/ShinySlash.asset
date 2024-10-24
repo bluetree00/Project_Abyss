@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: ShinySlash
   m_EditorClassIdentifier: 
   effectName: ShinySlash
-  damage: 1
+  damage: 10
   hitInterval: 0.1
   effectTag: ShinySlash
