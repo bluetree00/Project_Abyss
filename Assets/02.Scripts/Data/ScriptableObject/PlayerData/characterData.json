@@ -1,0 +1,6 @@
+{
+    "baseMoveSpeed": 5.0,
+    "baseRunSpeed": 8.0,
+    "maxHealth": 100,
+    "attackPower": 20
+}

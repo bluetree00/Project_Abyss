@@ -44,7 +44,7 @@ public class Managers : MonoBehaviour
             s_instance = this;
             DontDestroyOnLoad(this);
 
-                // ObjectPoolerManager 초기화
+                // ObjectPoolerManager 초기화 추후 초기화 전용 스크립트에 분할
             ObjectPoolerManager.Pool[] pools = {
                 new ObjectPoolerManager.Pool { tag = "ShinySlash", resourcePath = "Effects/ShinySlash", initialSize = 10 },
                 new ObjectPoolerManager.Pool { tag = "HitEffect_02", resourcePath = "Effects/HitEffect_02", initialSize = 10 },
