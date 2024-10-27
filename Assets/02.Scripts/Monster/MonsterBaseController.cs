@@ -6,6 +6,9 @@ public class MonsterBaseController : MonoBehaviour
 {
     #region  기본 초기화
     [SerializeField]
+    protected  MonsterData monsterData; // CharacterData ScriptableObject 참조
+
+    [SerializeField]
     protected Define.MonsterState _state = Define.MonsterState.Idle;
 
     [SerializeField]
