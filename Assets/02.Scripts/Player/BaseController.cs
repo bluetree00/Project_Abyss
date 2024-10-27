@@ -8,7 +8,6 @@ public class BaseController : MonoBehaviour
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
     protected Vector3 moveDirection;  // 이동 방향
-    
 
     [SerializeField]
     protected Define.State _state = Define.State.Idle;
