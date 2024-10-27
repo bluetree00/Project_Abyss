@@ -6,6 +6,9 @@ public class BaseController : MonoBehaviour
 {
     #region  기본 초기화
     [SerializeField]
+    private CharacterData characterData; // CharacterData ScriptableObject 참조
+    
+    [SerializeField]
     protected Define.State _state = Define.State.Idle;
 
     [SerializeField]
