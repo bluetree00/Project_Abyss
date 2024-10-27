@@ -9,16 +9,12 @@ public class Vagabond : BaseController
 {
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
-
-    private int attackComboStep = 0;       // 공격 스택 단계
-    private float comboTimer = 0.0f;       // 콤보 유지 시간
-    public float comboDuration = 3.0f;     // 콤보가 유지되는 시간
-
-    private bool canDodge = true;          // 대시 가능 여부
-    public float dashSpeed = 10f;          // 대시 속도
-    public float dashDuration = 0.2f;      // 대시 지속 시간
-    public float dodgeCooldown = 2f;       // 대시 쿨타임
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
+
+    protected override void Init()
+    {
+        base.Init(); // 부모 클래스의 초기화 코드 호출
+    }
 
 
     //플레이어의 강제 회전 방지
@@ -63,10 +59,10 @@ public class Vagabond : BaseController
         FreezeRotation();
        
         // 공격 콤보 시간이 다 지나면 초기화
-        if (comboTimer > 0)
+        if (characterData.comboTimer > 0)
         {
-            comboTimer -= Time.deltaTime;
-            if (comboTimer <= 0)
+            characterData.comboTimer -= Time.deltaTime;
+            if (characterData.comboTimer <= 0)
             {
                 ResetCombo();
             }
@@ -169,13 +165,13 @@ public class Vagabond : BaseController
     //Moving 상태
     protected override void UpdateMoving()
     {
-        Move(moveDirection, moveSpeed);
+        Move(moveDirection, characterData.baseMoveSpeed);
     }
 
     //Runing 상태
     protected override void UpdateRuning()
     {
-        Move(moveDirection, runSpeed);
+        Move(moveDirection, characterData.baseRunSpeed);
     }
 
     #endregion
@@ -183,32 +179,32 @@ public class Vagabond : BaseController
     #region 마우스 좌클릭 공격 관련 코드
     private void ProcessAttack()
     {
-        comboTimer = comboDuration; // 콤보 타이머 초기화
-        attackComboStep++; // 콤보 스택 증가
+        characterData.comboTimer = characterData.comboDuration; // 콤보 타이머 초기화
+        characterData.attackComboStep++; // 콤보 스택 증가
 
-        if (attackComboStep == 1)
+        if (characterData.attackComboStep == 1)
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
         }
-        else if (attackComboStep == 2)
+        else if (characterData.attackComboStep == 2)
         {
             Debug.Log("두 번째 공격");
             ChangeState(Define.State.NormalAttack_02);
         }
-        else if (attackComboStep == 3)
+        else if (characterData.attackComboStep == 3)
         {
             Debug.Log("세 번째 공격");
             ChangeState(Define.State.NormalAttack_03);
-            attackComboStep = 0; // 마지막 공격 후 초기화
-            comboTimer = 0;
+            characterData.attackComboStep = 0; // 마지막 공격 후 초기화
+            characterData.comboTimer = 0;
         }
     }
 
     private void ResetCombo()
     {
-        attackComboStep = 0;
-        comboTimer = 0;
+        characterData.attackComboStep = 0;
+        characterData.comboTimer = 0;
         ChangeState(Define.State.Idle);
     }
 
@@ -234,7 +230,7 @@ public class Vagabond : BaseController
 
     private void ProcessDodge()
     {
-        if (canDodge)
+        if (characterData.canDodge)
         {
             dodgeCoroutine = StartCoroutine(DashCoroutine());
         }
@@ -242,23 +238,23 @@ public class Vagabond : BaseController
 
     private IEnumerator DashCoroutine()
     {
-        canDodge = false;  // 대시 가능 여부를 false로 설정
+        characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
         ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
 
         Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;  // 대시 방향 설정
         float startTime = Time.time;
 
         // 대시 지속 시간 동안 캐릭터 이동
-        while (Time.time < startTime + dashDuration)
+        while (Time.time < startTime + characterData.dashDuration)
         {
-            rb.velocity = dashDirection * dashSpeed;
+            rb.velocity = dashDirection * characterData.dashSpeed;
             yield return null;
         }
 
         rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
-        yield return new WaitForSeconds(dodgeCooldown);  // 대시 쿨타임 대기
+        yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
 
-        canDodge = true;  // 다시 대시 가능하도록 설정
+        characterData.canDodge = true;  // 다시 대시 가능하도록 설정
     }
 
     #endregion

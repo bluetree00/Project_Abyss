@@ -6,8 +6,10 @@ public class BaseController : MonoBehaviour
 {
     #region  기본 초기화
     [SerializeField]
-    private CharacterData characterData; // CharacterData ScriptableObject 참조
+    protected  CharacterData characterData; // CharacterData ScriptableObject 참조
+    protected Vector3 moveDirection;  // 이동 방향
     
+
     [SerializeField]
     protected Define.State _state = Define.State.Idle;
 
@@ -21,21 +23,16 @@ public class BaseController : MonoBehaviour
     protected Rigidbody rb;  // Rigidbody 참조
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
-    public float moveSpeed = 5f; // 기본 이동 속도
-    public float runSpeed = 8f;  // 기본 달리기 속도
-    protected Vector3 moveDirection;  // 이동 방향
-    
 
     private void Start()
     {
         Init();
+        
     }
 
     protected virtual void Init()
     {
         rb = GetComponent<Rigidbody>();
-
-        // playerTransform을 현재 객체의 Transform으로 초기화
         playerTransform = transform;
     }
 
@@ -58,10 +55,6 @@ public class BaseController : MonoBehaviour
         Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 5f는 회전 속도 계수
     }
-
-
-    // 상태 업데이트는 각 파생 클래스에서 구현하도록 가상 함수로 선언
-    protected virtual void UpdateMovement() {}
 
 
     //상태별 애니메이션 설정
@@ -106,8 +99,6 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkile_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-
-               
             }
         }
     }
@@ -144,10 +135,10 @@ public class BaseController : MonoBehaviour
             case Define.State.UltimateSkile_01:
                 UpdateUltimateSkile_01();
                 break;
-           
         }
     }
 
+    protected virtual void UpdateMovement(){}
     protected virtual void UpdateIdle(){}  // Idle 상태에서의 로직
     protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
     protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
