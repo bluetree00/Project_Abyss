@@ -29,11 +29,13 @@ public class Managers : MonoBehaviour
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
+    private StageManager _stageManager;
 
 
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
+    public static StageManager Stage => Instance._stageManager;
 
     #endregion
 
@@ -44,13 +46,13 @@ public class Managers : MonoBehaviour
             s_instance = this;
             DontDestroyOnLoad(this);
 
-                // ObjectPoolerManager 초기화 추후 초기화 전용 스크립트에 분할
-            ObjectPoolerManager.Pool[] pools = {
-                new ObjectPoolerManager.Pool { tag = "ShinySlash", resourcePath = "Effects/ShinySlash", initialSize = 10 },
-                new ObjectPoolerManager.Pool { tag = "HitEffect_02", resourcePath = "Effects/HitEffect_02", initialSize = 10 },
-                new ObjectPoolerManager.Pool { tag = "DieEffect_01", resourcePath = "Effects/DieEffect_01", initialSize = 5 }
-            };
-            _objectPoolerManager = new ObjectPoolerManager(pools);
+            // ObjectPoolerManager 초기화 코드 분리
+            List<ObjectPoolerManager.Pool> initialPools = ObjectPoolInitializer.GetInitialPools();
+            _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray()); // 현재 리스트이고 생성자 형태가 배열임으로 여기서 배열로 변환후 생성자 타입에 넣어줌
+
+           
+            // StageManager 초기화 시 StageDataLoader를 사용
+            //_stageManager = new StageManager(StageDataLoader.LoadStageData());
         }
         else
         {
