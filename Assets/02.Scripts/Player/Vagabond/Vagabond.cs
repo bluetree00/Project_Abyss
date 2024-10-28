@@ -10,12 +10,10 @@ public class Vagabond : BaseController
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
-
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
     }
-
 
     //플레이어의 강제 회전 방지
     void FreezeRotation()
@@ -40,11 +38,8 @@ public class Vagabond : BaseController
 
         Managers.Input.KeyAction -= OnInput;
         Managers.Input.KeyAction += OnInput;
-    }
 
-    private void OnDisable() 
-    {
-       
+        characterData.canDodge = true; //구르기 활성화
     }
 
     #endregion
@@ -236,26 +231,40 @@ public class Vagabond : BaseController
         }
     }
 
-    private IEnumerator DashCoroutine()
+       private IEnumerator DashCoroutine()
+{
+    characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
+    ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
+
+    float startTime = Time.time;
+
+    while (Time.time < startTime + characterData.dashDuration)
     {
-        characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
-        ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
+        CheckMovementInput();  // 대시 중에도 입력 방향을 계속 갱신
 
-        Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;  // 대시 방향 설정
-        float startTime = Time.time;
+        // 현재 입력 방향(moveDirection)으로 대시
+        Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;
+        rb.velocity = dashDirection * characterData.dashSpeed;
 
-        // 대시 지속 시간 동안 캐릭터 이동
-        while (Time.time < startTime + characterData.dashDuration)
+        // 대시 방향으로 캐릭터 회전
+        if (dashDirection != Vector3.zero)
         {
-            rb.velocity = dashDirection * characterData.dashSpeed;
-            yield return null;
+            Quaternion targetRotation = Quaternion.LookRotation(dashDirection);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 부드럽게 회전
         }
 
-        rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
-        yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
-
-        characterData.canDodge = true;  // 다시 대시 가능하도록 설정
+        yield return null;
     }
+
+    rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
+    yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
+
+    characterData.canDodge = true;  // 다시 대시 가능하도록 설정
+}
+
+
+
+
 
     #endregion
 

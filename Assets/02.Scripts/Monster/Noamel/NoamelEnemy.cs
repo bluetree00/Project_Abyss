@@ -6,14 +6,6 @@ using UnityEngine.AI;
 
 public class NoamelEneny : MonsterBaseController
 {
-    
-    
-    [SerializeField]
-    private float _scacRange = 10;
-
-    [SerializeField]
-    private float _attackRange = 1;
-
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리
 
     protected override void UpdateIdle()
@@ -26,7 +18,7 @@ public class NoamelEneny : MonsterBaseController
         }
 
         float distance = (player.transform.position - transform.position).magnitude;
-        if (distance <= _scacRange)
+        if (distance <= MonsterData._scacRange)
         {
             _lockTarget = player;
             State = Define.MonsterState.Moving;
@@ -40,7 +32,7 @@ public class NoamelEneny : MonsterBaseController
         {
             _destPos = _lockTarget.transform.position;
             float distance = (_destPos - transform.position).magnitude;
-            if (distance <= _attackRange)
+            if (distance <= MonsterData._attackRange)
             {
                 NavMeshAgent nma = gameObject.GetComponent<NavMeshAgent>();
                 nma.SetDestination(transform.position);
@@ -58,7 +50,7 @@ public class NoamelEneny : MonsterBaseController
         {
             NavMeshAgent nma = gameObject.GetComponent<NavMeshAgent>();
             nma.SetDestination(_destPos);
-            nma.speed = moveSpeed;
+            nma.speed = monsterData.moveSpeed;
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 20 * Time.deltaTime);
         }
     }
@@ -80,11 +72,15 @@ public class NoamelEneny : MonsterBaseController
         {
             EffectData effectData = effectComponent.effectData;
 
-            // 쿨타임 체크 및 데미지 처리
-            if (CanHit(effectData))
+                // 플레이어용 이펙트인지 확인 후 데미지 처리
+            if (effectData.isPlayerEffect)
             {
-                ApplyDamage(effectData.damage);
-                StartHitCooldown(effectData.effectName, effectData.hitInterval); // 쿨타임 시작
+                // 쿨타임 체크 및 데미지 처리
+                if (CanHit(effectData))
+                {
+                    ApplyDamage(effectData.damage);
+                    StartHitCooldown(effectData.effectName, effectData.hitInterval); // 쿨타임 시작
+                }
             }
         }
     }
@@ -124,7 +120,6 @@ public class NoamelEneny : MonsterBaseController
 
         GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
     }
-
 
 
 

@@ -16,3 +16,4 @@ MonoBehaviour:
   damage: 10
   hitInterval: 0.1
   effectTag: ShinySlash
+  isPlayerEffect: 1
