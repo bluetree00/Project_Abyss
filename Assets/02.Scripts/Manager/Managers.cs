@@ -30,12 +30,14 @@ public class Managers : MonoBehaviour
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
     private StageManager _stageManager;
+    private UIManager _ui;
 
 
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
     public static StageManager Stage => Instance._stageManager;
+    public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
 
     #endregion
 

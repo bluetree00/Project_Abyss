@@ -18,12 +18,21 @@ public class Define
     }
     public enum WorldObject
     {
-
+        Unknown,
+        Player,
+        Monster,
     }
 
     public enum WorldObjectUI
     {
+        HPBar,
+        PostureBar,
+    }
 
+    public enum UIEvent
+    {
+        Click,
+        Drag,
     }
 
    
@@ -66,13 +75,8 @@ public class Define
         
     }
 
+    
 
-
-
-    public enum UIEvent
-    {
-
-    }
 
     public enum MouseEvent
     {
