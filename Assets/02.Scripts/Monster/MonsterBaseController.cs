@@ -7,6 +7,16 @@ public class MonsterBaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  MonsterData monsterData; // CharacterData ScriptableObject 참조
+    public MonsterData MonsterData => monsterData; // Public getter
+
+    [SerializeField]
+    protected float MaxHp;
+
+    [SerializeField]
+    protected float hp;  // 기본 hp
+
+    public float MaximumHp => MaxHp;
+    public float CurrentHp => hp; // 읽기 전용 프로퍼티
 
     [SerializeField]
     protected Define.MonsterState _state = Define.MonsterState.Idle;
@@ -20,11 +30,6 @@ public class MonsterBaseController : MonoBehaviour
     [SerializeField]
     protected Rigidbody rb;  // Rigidbody 참조
 
-     [SerializeField]
-    protected int Maxhp;  // 기본 hp
-
-    [SerializeField]
-    protected int hp;  // 기본 hp
 
     public float moveSpeed = 5f; // 기본 이동 속도
     public float runSpeed = 8f;  // 기본 달리기 속도
@@ -37,6 +42,10 @@ public class MonsterBaseController : MonoBehaviour
     private void Start()
     {
         Init();
+        MaxHp = monsterData.maxHealth; // 개인 HP 초기화
+        hp = MaxHp;
+
+        Managers.UI.MakeWorldSpaceUI<UI_HPBar>(transform);
     }
 
     protected virtual void Init()

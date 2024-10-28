@@ -6,13 +6,14 @@ using UnityEngine.AI;
 
 public class NoamelEneny : MonsterBaseController
 {
+    
+    
     [SerializeField]
     private float _scacRange = 10;
 
     [SerializeField]
     private float _attackRange = 1;
 
-    private float currentHealth = 100f; // 몬스터의 현재 체력
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리
 
     protected override void UpdateIdle()
@@ -105,8 +106,8 @@ public class NoamelEneny : MonsterBaseController
 
     private void ApplyDamage(float damage)
     {
-        currentHealth -= damage;
-        if (currentHealth <= 0)
+        hp -= damage;
+        if (hp <= 0)
         {
             // 몬스터의 위치에서 Y축으로 1 단위 위쪽에 이펙트를 생성
             Vector3 spawnPosition2 = new Vector3(transform.position.x, 1f, transform.position.z); // Y축을 1로 고정
@@ -115,7 +116,7 @@ public class NoamelEneny : MonsterBaseController
             GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
             Destroy(this.gameObject);
         }
-        Debug.Log($"Monster took {damage} damage. Current Health: {currentHealth}");
+        Debug.Log($"Monster took {damage} damage. Current Health: {hp}");
 
         // 몬스터의 위치에서 Y축으로 1 단위 위쪽에 이펙트를 생성
         Vector3 spawnPosition = new Vector3(transform.position.x, 1f, transform.position.z); // Y축을 1로 고정
