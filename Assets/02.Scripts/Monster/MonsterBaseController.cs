@@ -29,13 +29,6 @@ public class MonsterBaseController : MonoBehaviour
 
     [SerializeField]
     protected Rigidbody rb;  // Rigidbody 참조
-
-
-    public float moveSpeed = 5f; // 기본 이동 속도
-    public float runSpeed = 8f;  // 기본 달리기 속도
-
-    
-
     protected Vector3 moveDirection;  // 이동 방향
     
 
