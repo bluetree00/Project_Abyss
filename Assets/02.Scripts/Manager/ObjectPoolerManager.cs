@@ -4,36 +4,47 @@ using UnityEngine;
 
 public class ObjectPoolerManager
 {
-    private Dictionary<string, Queue<GameObject>> poolDictionary; // 태그와 객체 큐를 매핑
-    private List<GameObject> spawnObjects; // 생성된 객체들을 저장할 리스트
-    private List<string> tags; // 태그를 저장할 리스트
-    private Pool[] pools; // 초기화할 풀 정보
-    private GameObject parentObject ; // 부모 오브젝트
-    
+    private Dictionary<string, Queue<GameObject>> poolDictionary;
+    private List<GameObject> spawnObjects;
+    private List<string> tags;
+    private Dictionary<PoolType, GameObject> parentObjects;  // 부모 오브젝트를 풀 타입별로 관리
+    private Pool[] pools;
+
+    // 열거형으로 풀 타입 정의
+    public enum PoolType
+    {
+        Effect,
+        Monster,
+        Character
+    }
 
     [Serializable]
     public class Pool
     {
-        public string tag; // 태그 이름
-        public string resourcePath; // 리소스 매니저에서 사용할 경로
-        public int initialSize; // 초기 객체 수
+        public string tag;
+        public string resourcePath;
+        public int initialSize;
+        public PoolType poolType;
     }
 
-    //생성자
     public ObjectPoolerManager(Pool[] pools)
     {
         this.pools = pools;
         poolDictionary = new Dictionary<string, Queue<GameObject>>();
         spawnObjects = new List<GameObject>();
         tags = new List<string>();
+        parentObjects = new Dictionary<PoolType, GameObject>();
 
-        // 부모 오브젝트 생성
-        parentObject = new GameObject("EffectPool");
-        
+        // 풀 타입별 부모 오브젝트 생성
+        parentObjects[PoolType.Effect] = new GameObject("EffectPool");
+        parentObjects[PoolType.Monster] = new GameObject("MonsterPool");
+        parentObjects[PoolType.Character] = new GameObject("CharacterPool");
+
+        // 풀 초기화
         foreach (Pool pool in pools)
         {
             InitializePool(pool);
-            AddNewTag(pool.tag); // 초기화할 때 태그 추가
+            AddNewTag(pool.tag);
         }
     }
 
@@ -43,13 +54,14 @@ public class ObjectPoolerManager
 
         for (int i = 0; i < pool.initialSize; i++)
         {
-            GameObject obj = CreateNewObject(pool.tag, pool.resourcePath);
-            ReturnToPool(obj); // 초기 오브젝트를 풀에 추가
+            GameObject obj = CreateNewObject(pool.tag, pool.resourcePath, pool.poolType);
+            ReturnToPool(obj);
         }
     }
 
-    private GameObject CreateNewObject(string tag, string resourcePath)
+    private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
+         Debug.Log($"Loading prefab from path: {resourcePath}");
         GameObject prefab = Managers.Resource.Load<GameObject>($"Prefabs/{resourcePath}");
         if (prefab == null)
         {
@@ -60,41 +72,36 @@ public class ObjectPoolerManager
         GameObject obj = GameObject.Instantiate(prefab);
         obj.name = tag;
         obj.SetActive(false);
-        spawnObjects.Add(obj); // 생성된 객체를 리스트에 추가
+        spawnObjects.Add(obj);
 
-        // 부모 오브젝트의 자식으로 설정
-        obj.transform.SetParent(parentObject.transform);
-        
+        // 부모 오브젝트 설정
+        obj.transform.SetParent(parentObjects[poolType].transform);
         return obj;
     }
 
-    // 새로운 태그를 추가하는 메서드
     public void AddNewTag(string tag)
     {
         if (!tags.Contains(tag))
         {
-            tags.Add(tag); // 태그 리스트에 추가
+            tags.Add(tag);
             Debug.Log($"Tag '{tag}' added.");
         }
     }
 
-    // 풀에서 객체를 생성하는 메서드
     public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
     {
-        // 풀에 태그가 존재하지 않는 경우 초기화
         if (!poolDictionary.ContainsKey(tag))
         {
-            Pool newPool = new Pool { tag = tag, resourcePath = $"Effects/{tag}", initialSize = 1 };
-            InitializePool(newPool);  // 동적으로 풀 초기화
+            Pool newPool = new Pool { tag = tag, resourcePath = $"Effects/{tag}", initialSize = 1, poolType = PoolType.Effect };
+            InitializePool(newPool);
         }
 
         if (poolDictionary[tag].Count == 0)
         {
-            // 풀에 오브젝트가 부족할 경우 새 오브젝트 생성 후 추가
             Pool pool = Array.Find(pools, x => x.tag == tag);
             if (pool != null)
             {
-                GameObject obj = CreateNewObject(pool.tag, pool.resourcePath);
+                GameObject obj = CreateNewObject(pool.tag, pool.resourcePath, pool.poolType);
                 if (obj != null)
                     poolDictionary[tag].Enqueue(obj);
             }
@@ -108,10 +115,7 @@ public class ObjectPoolerManager
         return objectToSpawn;
     }
 
-    // T 타입의 컴포넌트를 가진 객체를 생성하는 메서드 주로 컴포넌트를 가지고있는 오브젝트를 사용할때 사용하면 될듯.
-    //예를들어 풀러에 있는 오브젝트에 바로 힘을 주고 싶을때 Rigidbody rb = bullet.GetComponent<Rigidbody>(); 처럼 참조를 거치지 않고
-    // Rigidbody rb = objectPoolerManager.SpawnFromPool<Rigidbody>("Bullet", new Vector3(0, 0, 0), Quaternion.identity); 이런식으로 바로 사용하면 됨
-    public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
+    public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component //오브젝트에 있는 컴포넌트를 이용하고 싶을때 사용 예를들어 rd 참조
     {
         GameObject objectToSpawn = SpawnFromPool(tag, position, rotation);
         if (objectToSpawn.TryGetComponent(out T component))
@@ -125,12 +129,10 @@ public class ObjectPoolerManager
         }
     }
 
-    // 객체를 풀로 반환하는 메서드
     public void ReturnToPool(GameObject obj)
     {
         obj.SetActive(false);
-        
-        // Debug 로그 추가
+
         if (!poolDictionary.ContainsKey(obj.name))
         {
             GameObject.Destroy(obj);
@@ -141,7 +143,6 @@ public class ObjectPoolerManager
         }
     }
 
-    // 풀의 상태를 로그로 출력하는 메서드 확인용
     public void LogPoolStatus()
     {
         foreach (var pool in pools)
