@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ObjectPoolerManager
+public class ObjectPoolerManager 
 {
     private Dictionary<string, Queue<GameObject>> poolDictionary;
     private List<GameObject> spawnObjects;
