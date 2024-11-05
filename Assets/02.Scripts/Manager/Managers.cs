@@ -52,9 +52,6 @@ public class Managers : MonoBehaviour
             // ObjectPoolerManager 초기화 코드 분리
             List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools("BaseTest");
             _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray()); // 현재 리스트이고 생성자 형태가 배열임으로 여기서 배열로 변환후 생성자 타입에 넣어줌
-
-            // StageManager 초기화 시 StageDataLoader를 사용
-            //_stageManager = new StageManager(StageDataLoader.LoadStageData());
         }
         else
         {
