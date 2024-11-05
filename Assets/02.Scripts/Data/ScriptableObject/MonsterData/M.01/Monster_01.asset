@@ -14,3 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 100
   Hp: 100
+  _scacRange: 10
+  _attackRange: 1
+  moveSpeed: 5
+  runSpeed: 8
