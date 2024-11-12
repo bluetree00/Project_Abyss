@@ -9,6 +9,7 @@ public class StageManager
     private Dictionary<string, GameObject> stageDictionary;
     private Dictionary<string, Portal> portals;  // 포탈을 저장하는 딕셔너리
     private string bossStageName;  // 보스 스테이지 이름 추가
+    private Stage currentStage;  // 현재 진행 중인 스테이지를 추적
 
     public enum StageType
     {
@@ -63,6 +64,9 @@ public class StageManager
                 InitializeStage(stage);
             }
         }
+
+        // 첫 번째 스테이지 설정
+        SetInitialStage();
 
         // 챕터별로 스테이지를 연결하는 로직을 작성
         GenerateFilteredMST();
@@ -131,6 +135,41 @@ public class StageManager
         return false;
     }
 
+    // 첫 번째 스테이지를 설정하는 메서드
+    private void SetInitialStage()
+    {
+        // 첫 번째 스테이지를 첫 번째 챕터의 첫 번째 스테이지로 설정
+        Stage firstStage = chapters.SelectMany(c => c.stages).FirstOrDefault();
+        
+        if (firstStage != null)
+        {
+            currentStage = firstStage;
+            ActivateStage(firstStage);
+            Debug.Log($"Initial stage: {firstStage.stageName} activated.");
+        }
+        else
+        {
+            Debug.LogError("No stages found to initialize.");
+        }
+    }
+
+    // 스테이지를 활성화하는 메서드
+    private void ActivateStage(Stage stage)
+    {
+        if (currentStage != null && stageDictionary.ContainsKey(currentStage.stageName))
+        {
+            // 이전 스테이지 비활성화
+            GameObject previousStageObject = stageDictionary[currentStage.stageName];
+            previousStageObject.SetActive(false);
+        }
+
+        if (stageDictionary.ContainsKey(stage.stageName))
+        {
+            GameObject stageObject = stageDictionary[stage.stageName];
+            stageObject.SetActive(true);
+        }
+    }
+
     // 포탈을 통해 이동할 다음 스테이지를 선택하는 함수
     public void MoveToNextStage(string portalName)
     {
@@ -156,20 +195,50 @@ public class StageManager
         if (nextStage != null)
         {
             Debug.Log($"Moving to next stage: {nextStage.stageName}");
-            // 다음 스테이지로 이동하는 로직을 추가 (씬 전환 등)
+            currentStage = nextStage;  // 현재 스테이지 업데이트
+            ActivateStage(nextStage);  // 새로운 스테이지 활성화
+        }
+        else
+        {
+            Debug.LogError("No valid connected stages found.");
         }
     }
 
     private class UnionFind
     {
         private int[] parent;
-        public UnionFind(int size) => parent = new int[size];
-        public int Find(int x) => parent[x] == x ? x : (parent[x] = Find(parent[x]));
+        private int[] rank;
+
+        public UnionFind(int size)
+        {
+            parent = new int[size];
+            rank = new int[size];
+            for (int i = 0; i < size; i++)
+                parent[i] = i;
+        }
+
+        public int Find(int x)
+        {
+            if (parent[x] != x)
+                parent[x] = Find(parent[x]); // 경로 압축
+            return parent[x];
+        }
+
         public bool Union(int x, int y)
         {
             int rootX = Find(x), rootY = Find(y);
             if (rootX == rootY) return false;
-            parent[rootY] = rootX;
+
+            // 랭크 최적화
+            if (rank[rootX] > rank[rootY])
+                parent[rootY] = rootX;
+            else if (rank[rootX] < rank[rootY])
+                parent[rootX] = rootY;
+            else
+            {
+                parent[rootY] = rootX;
+                rank[rootX]++;
+            }
             return true;
         }
     }

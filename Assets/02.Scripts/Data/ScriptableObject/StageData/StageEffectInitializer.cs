@@ -3,7 +3,6 @@ using UnityEngine;
 
 public static class StageEffectInitializer
 {
-    // 챕터 데이터를 받아오는 함수
     public static List<StageManager.Stage> GetInitialStagesForChapter(string chapterDataName, out List<StageManager.ConnectionRestriction> restrictions, out string bossStageName)
     {
         StageData stageData = Resources.Load<StageData>($"Data/{chapterDataName}");
@@ -20,12 +19,10 @@ public static class StageEffectInitializer
         restrictions = new List<StageManager.ConnectionRestriction>();
         bossStageName = string.Empty;
 
-        // 챕터마다 스테이지 로드
         foreach (var chapter in stageData.chapters)
         {
-            bossStageName = chapter.bossStageName; // 보스 스테이지 설정
+            bossStageName = chapter.bossStageName;
 
-            // 스테이지 데이터 처리
             foreach (var stageSetting in chapter.stages)
             {
                 int weight = stageSetting.randomWeight
@@ -41,7 +38,6 @@ public static class StageEffectInitializer
                 });
             }
 
-            // 연결 제약 추가
             foreach (var restriction in chapter.connectionRestrictions)
             {
                 restrictions.Add(new StageManager.ConnectionRestriction
