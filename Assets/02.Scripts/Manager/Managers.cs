@@ -62,7 +62,7 @@ public class Managers : MonoBehaviour
             stages = StageEffectInitializer.GetInitialStagesForChapter("testStage_01", out restrictions, out bossStageName);
 
             // 초기화된 스테이지 데이터를 StageManager에 적용
-            //_stageManager = new StageManager(stages, restrictions, bossStageName);
+            _stageManager = new StageManager(stages, restrictions, bossStageName);
         }
         else
         {

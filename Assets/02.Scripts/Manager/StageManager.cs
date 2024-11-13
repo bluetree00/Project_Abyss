@@ -5,7 +5,6 @@ using System.Linq;
 
 public class StageManager
 {
-    private List<Chapter> chapters; // 챕터 목록
     private Dictionary<string, GameObject> stageDictionary;
     private Dictionary<string, Portal> portals;  // 포탈을 저장하는 딕셔너리
     private string bossStageName;  // 보스 스테이지 이름 추가
@@ -83,35 +82,27 @@ public class StageManager
         }
     }
 
-    // 챕터 관리 클래스
-    [Serializable]
-    public class Chapter
+    // StageManager 생성자 수정
+    public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName)
     {
-        public string chapterName;
-        public List<Stage> stages;
-        public List<ConnectionRestriction> connectionRestrictions;
-        public string bossStageName;
-    }
+        this.bossStageName = bossStageName;
+        this.stageDictionary = new Dictionary<string, GameObject>();
+        this.portals = new Dictionary<string, Portal>();
 
-    public StageManager(List<Chapter> chapters, Dictionary<string, Portal> portals)
-    {
-        this.chapters = chapters;
-        this.portals = portals;
-        stageDictionary = new Dictionary<string, GameObject>();
-
-        foreach (var chapter in chapters)
+        // 스테이지 초기화
+        foreach (var stage in stages)
         {
-            foreach (var stage in chapter.stages)
-            {
-                InitializeStage(stage);
-            }
+            InitializeStage(stage);
         }
+
+        // 연결 제한 설정
+        ApplyRestrictions(restrictions);
 
         // 첫 번째 스테이지 설정
         SetInitialStage();
 
-        // 챕터별로 스테이지를 연결하는 로직을 작성
-        GenerateFilteredMST();
+        // 스테이지를 연결하는 로직을 작성
+        GenerateFilteredMST(stages, restrictions);
     }
 
     private void InitializeStage(Stage stage)
@@ -126,33 +117,39 @@ public class StageManager
         }
     }
 
-    private void GenerateFilteredMST()
+    private void ApplyRestrictions(List<ConnectionRestriction> restrictions)
+    {
+        foreach (var restriction in restrictions)
+        {
+            // 연결 제한을 적용하는 로직 (예: 특정 스테이지의 이동을 제한)
+            Debug.Log($"Restriction: {restriction.restrictedStage} cannot be connected until {restriction.requiredStage} is completed.");
+        }
+    }
+
+    private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
     {
         List<Edge> edges = new List<Edge>();
 
-        // 각 챕터의 스테이지끼리 연결할 수 있도록 엣지 생성
-        foreach (var chapter in chapters)
+        // 스테이지끼리 연결할 수 있도록 엣지 생성
+        for (int i = 0; i < stages.Count; i++)
         {
-            for (int i = 0; i < chapter.stages.Count; i++)
+            for (int j = i + 1; j < stages.Count; j++)
             {
-                for (int j = i + 1; j < chapter.stages.Count; j++)
-                {
-                    if (IsConnectionRestricted(chapter.stages[i].stageName, chapter.stages[j].stageName))
-                        continue;
+                if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
+                    continue;
 
-                    int weight = (chapter.stages[i].weight + chapter.stages[j].weight) / 2;
-                    edges.Add(new Edge(chapter.stages[i], chapter.stages[j], weight));
-                }
+                int weight = (stages[i].weight + stages[j].weight) / 2;
+                edges.Add(new Edge(stages[i], stages[j], weight));
             }
         }
 
         edges.Sort((a, b) => a.weight.CompareTo(b.weight));
-        UnionFind unionFind = new UnionFind(chapters.Count);
+        UnionFind unionFind = new UnionFind(stages.Count);
 
         foreach (var edge in edges)
         {
-            int indexA = chapters.SelectMany(c => c.stages).ToList().IndexOf(edge.start);
-            int indexB = chapters.SelectMany(c => c.stages).ToList().IndexOf(edge.end);
+            int indexA = stages.IndexOf(edge.start);
+            int indexB = stages.IndexOf(edge.end);
 
             if (unionFind.Union(indexA, indexB))
             {
@@ -161,17 +158,14 @@ public class StageManager
         }
     }
 
-    private bool IsConnectionRestricted(string stageA, string stageB)
+    private bool IsConnectionRestricted(string stageA, string stageB, List<ConnectionRestriction> restrictions)
     {
-        foreach (var chapter in chapters)
+        foreach (var restriction in restrictions)
         {
-            foreach (var restriction in chapter.connectionRestrictions)
+            if ((stageA == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)) ||
+                (stageB == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)))
             {
-                if ((stageA == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)) ||
-                    (stageB == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)))
-                {
-                    return true;
-                }
+                return true;
             }
         }
         return false;
@@ -179,21 +173,22 @@ public class StageManager
 
     // 첫 번째 스테이지를 설정하는 메서드
     private void SetInitialStage()
+{
+    // 첫 번째 스테이지를 첫 번째 스테이지로 설정
+    GameObject firstStageObject = stageDictionary.Values.FirstOrDefault();
+
+    if (firstStageObject != null)
     {
-        // 첫 번째 스테이지를 첫 번째 챕터의 첫 번째 스테이지로 설정
-        Stage firstStage = chapters.SelectMany(c => c.stages).FirstOrDefault();
-        
-        if (firstStage != null)
-        {
-            currentStage = firstStage;
-            ActivateStage(firstStage);
-            Debug.Log($"Initial stage: {firstStage.stageName} activated.");
-        }
-        else
-        {
-            Debug.LogError("No stages found to initialize.");
-        }
+        currentStage = new Stage { stageName = firstStageObject.name };  // Stage 객체 초기화
+        ActivateStage(currentStage);  // 첫 번째 스테이지 활성화
+        Debug.Log($"Initial stage: {firstStageObject.name} activated.");
     }
+    else
+    {
+        Debug.LogError("No stages found to initialize.");
+    }
+}
+
 
     // 스테이지를 활성화하는 메서드
     private void ActivateStage(Stage stage)
