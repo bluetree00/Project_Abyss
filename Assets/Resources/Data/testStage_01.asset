@@ -13,31 +13,31 @@ MonoBehaviour:
   m_Name: testStage_01
   m_EditorClassIdentifier: 
   chapters:
-  - chapterName: 
+  - chapterName: testStage_01
     stages:
-    - stageName: testStage1
-      resourcePath: 
+    - stageName: Start_01
+      resourcePath: Start_01
       stageType: 0
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
-    - stageName: testStage2
-      resourcePath: 
+    - stageName: Stage_01
+      resourcePath: Stage_01
       stageType: 1
       weight: 0
       randomWeight: 1
       minWeight: 1
       maxWeight: 10
-    - stageName: testStage3
-      resourcePath: 
+    - stageName: Stage_02
+      resourcePath: Stage_02
       stageType: 1
       weight: 0
       randomWeight: 1
       minWeight: 1
       maxWeight: 10
-    - stageName: testStage4
-      resourcePath: 
+    - stageName: Stage_03
+      resourcePath: Stage_03
       stageType: 3
       weight: 0
       randomWeight: 0
