@@ -34,11 +34,53 @@ public class StageManager
         public string requiredStage;
     }
 
+    // 포탈 클래스 수정
+    [Serializable]
     public class Portal
     {
-        public string portalName;
-        public string currentStage;
-        public List<string> connectedStages;
+        public string portalName;                         // 포탈의 이름
+        public string currentStage;                       // 현재 포탈이 연결된 스테이지
+        public List<PortalStage> connectedStages;         // 연결된 스테이지 목록
+
+        [Serializable]
+        public class PortalStage
+        {
+            public Stage stage;       // 포탈에 연결된 스테이지
+            public int priority;      // 해당 스테이지의 우선순위
+        }
+
+        // 포탈이 활성화될 때 호출
+        public void ActivatePortal(StageManager stageManager)
+        {
+            // 우선순위대로 스테이지를 정렬하고, 우선순위가 가장 높은 스테이지로 이동
+            var sortedStages = new List<PortalStage>(connectedStages);
+            sortedStages.Sort((a, b) => a.priority.CompareTo(b.priority));  // 우선순위 기준으로 정렬
+
+            if (sortedStages.Count > 0)
+            {
+                // 우선순위가 높은 스테이지로 이동
+                var nextStage = sortedStages[0].stage;  // 우선순위가 가장 높은 스테이지 선택
+                Debug.Log($"Moving to next stage: {nextStage.stageName}");
+
+                stageManager.MoveToNextStage(nextStage);  // StageManager의 MoveToNextStage 호출
+            }
+            else
+            {
+                Debug.LogError("No connected stages for this portal.");
+            }
+        }
+
+        // 포탈에 스테이지 연결하기
+        public void ConnectStages(List<StageManager.Stage> stages)
+        {
+            connectedStages = new List<PortalStage>();  // 연결된 스테이지 초기화
+
+            foreach (var stage in stages)
+            {
+                // 각 스테이지를 연결하고, 우선순위는 기본적으로 1로 설정
+                connectedStages.Add(new PortalStage { stage = stage, priority = 1 });
+            }
+        }
     }
 
     // 챕터 관리 클래스
@@ -171,36 +213,16 @@ public class StageManager
     }
 
     // 포탈을 통해 이동할 다음 스테이지를 선택하는 함수
-    public void MoveToNextStage(string portalName)
+    public void MoveToNextStage(Stage nextStage)
     {
-        if (!portals.ContainsKey(portalName)) 
-        {
-            Debug.LogError($"Portal {portalName} not found.");
-            return;
-        }
-
-        Portal portal = portals[portalName];
-        List<Stage> connectedStages = new List<Stage>();
-
-        // 포탈에 연결된 스테이지 목록 가져오기
-        foreach (var stageName in portal.connectedStages)
-        {
-            Stage stage = chapters.SelectMany(c => c.stages).FirstOrDefault(s => s.stageName == stageName);
-            if (stage != null)
-                connectedStages.Add(stage);
-        }
-
-        // 연결된 스테이지 중 가중치가 가장 낮은 스테이지로 이동
-        Stage nextStage = connectedStages.OrderBy(s => s.weight).FirstOrDefault();
         if (nextStage != null)
         {
             Debug.Log($"Moving to next stage: {nextStage.stageName}");
-            currentStage = nextStage;  // 현재 스테이지 업데이트
             ActivateStage(nextStage);  // 새로운 스테이지 활성화
         }
         else
         {
-            Debug.LogError("No valid connected stages found.");
+            Debug.LogError("No valid next stage.");
         }
     }
 
