@@ -7,6 +7,8 @@ public class BaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
+    [SerializeField]
+    protected EffectData effectData;
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
