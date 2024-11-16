@@ -71,7 +71,6 @@ public class Vagabond : BaseController
         // 키보드 Shift 입력 (기본 회피)
         if (Input.GetMouseButtonDown(1))
         {
-             Managers.Stage.MoveToNextStage(2);
             ProcessDodge();
         }
 
@@ -182,6 +181,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
+            Managers.Stage.MoveToNextStage(1);
         }
         else if (characterData.attackComboStep == 2)
         {

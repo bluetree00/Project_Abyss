@@ -11,7 +11,8 @@ public class StageManager
     private Stage currentStage;
     private string bossStageName;
     private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
-
+    private Dictionary<string, GameObject> stagePrefabs; // 캐시된 스테이지 프리팹
+    private bool isStageMoving = false;
     public enum StageType
     {
         MainMenu,
@@ -40,6 +41,7 @@ public class StageManager
         this.bossStageName = bossStageName;
         stageDictionary = new Dictionary<string, GameObject>();
         mstGraph = new Dictionary<string, List<string>>();
+        stagePrefabs = new Dictionary<string, GameObject>(); // 초기화
 
         InitializeStages(stages);
         GenerateFilteredMST(stages, restrictions);
@@ -53,8 +55,19 @@ public class StageManager
         {
             if (!stageDictionary.ContainsKey(stage.stageName))
             {
-                GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
-                GameObject stageObject = GameObject.Instantiate(stagePrefab);
+                // 프리팹 캐시 사용
+                if (!stagePrefabs.ContainsKey(stage.resourcePath))
+                {
+                    GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
+                    if (stagePrefab == null)
+                    {
+                        Debug.LogError($"Prefab not found: {stage.resourcePath}");
+                        continue;
+                    }
+                    stagePrefabs[stage.resourcePath] = stagePrefab; // 캐싱
+                }
+
+                GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath]);
                 stageObject.name = stage.stageName;
                 stageObject.SetActive(false);
                 stageDictionary[stage.stageName] = stageObject;
@@ -64,6 +77,12 @@ public class StageManager
 
     private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
     {
+        if (stages == null || stages.Count == 0)
+        {
+            Debug.LogError("No stages provided for MST generation.");
+            return;
+        }
+
         List<Edge> edges = new List<Edge>();
 
         for (int i = 0; i < stages.Count; i++)
@@ -114,11 +133,27 @@ public class StageManager
 
     private void SaveMSTData()
     {
+        // 기존에 동일한 MSTData 자산이 존재하는지 확인
+        string assetPath = "Assets/Resources/Data/MSTData.asset";
+        MSTData existingData = AssetDatabase.LoadAssetAtPath<MSTData>(assetPath);
+
+        // 만약 기존 자산이 있다면 삭제
+        if (existingData != null)
+        {
+            AssetDatabase.DeleteAsset(assetPath);
+            Debug.Log("Existing MSTData asset deleted.");
+        }
+
+        // 새로운 MSTData 생성
         mstData = ScriptableObject.CreateInstance<MSTData>();
         mstData.SetGraphData(mstGraph);
-        AssetDatabase.CreateAsset(mstData, "Assets/Resources/Data/MSTData.asset");
+
+        // 새로 생성된 MSTData를 지정된 경로에 저장
+        AssetDatabase.CreateAsset(mstData, assetPath);
         AssetDatabase.SaveAssets();
+        Debug.Log("New MSTData asset created.");
     }
+
 
     private void SetInitialStage()
     {
@@ -152,13 +187,34 @@ public class StageManager
 
     public void MoveToNextStage(int steps)
     {
+        if (isStageMoving) return; // 이미 한 번 호출된 경우, 다시 호출하지 않도록 막기
         if (currentStage == null)
         {
             Debug.LogError("Current stage is not set.");
             return;
         }
 
+        // Resources에서 MSTData 로드
+        if (mstData == null)
+        {
+            mstData = Resources.Load<MSTData>("Data/MSTData");
+            if (mstData == null)
+            {
+                Debug.LogError("MSTData not found!");
+                return;
+            }
+        }
+
+        // 현재 스테이지의 연결된 스테이지 목록 가져오기
         var allStages = mstData.GetStageSequence(currentStage.stageName);
+
+        if (allStages == null || allStages.Count == 0)
+        {
+            Debug.LogError("No connected stages found in MSTData.");
+            return;
+        }
+
+        // 'steps'만큼 이동할 인덱스 계산
         int nextIndex = Mathf.Clamp(steps - 1, 0, allStages.Count - 1);
         string nextStageName = allStages[nextIndex];
 
@@ -171,6 +227,8 @@ public class StageManager
         {
             Debug.LogError($"Stage {nextStageName} not found in stage dictionary.");
         }
+
+         isStageMoving = false;
     }
 
     // Union-Find 클래스
