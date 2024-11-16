@@ -15,15 +15,15 @@ MonoBehaviour:
   stageSequences:
   - startStageName: Start_01
     connectedStages:
-    - Stage_01
     - Stage_03
     - Stage_02
-  - startStageName: Stage_01
+    - Stage_01
+  - startStageName: Start_01
     connectedStages:
-    - Start_01
-  - startStageName: Stage_03
-    connectedStages:
-    - Start_01
+    - Stage_02
   - startStageName: Stage_02
+    connectedStages:
+    - Stage_03
+  - startStageName: Stage_03
     connectedStages:
     - Start_01
