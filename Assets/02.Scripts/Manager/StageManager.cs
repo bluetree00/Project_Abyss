@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
+using UnityEditor;
+using UnityEngine;
 
 public class StageManager
 {
-    private Dictionary<string, GameObject> stageDictionary;
-    private Dictionary<string, Portal> portals;  // 포탈을 저장하는 딕셔너리
-    private string bossStageName;  // 보스 스테이지 이름 추가
-    private Stage currentStage;  // 현재 진행 중인 스테이지를 추적
+    private Dictionary<string, GameObject> stageDictionary;   // 스테이지 이름과 오브젝트 매핑
+    private Dictionary<string, List<string>> mstGraph;        // MST 결과 그래프
+    private Stage currentStage;
+    private string bossStageName;
+    private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
 
     public enum StageType
     {
@@ -33,96 +35,30 @@ public class StageManager
         public string requiredStage;
     }
 
-    // 포탈 클래스 수정
-    [Serializable]
-    public class Portal
-    {
-        public string portalName;                         // 포탈의 이름
-        public string currentStage;                       // 현재 포탈이 연결된 스테이지
-        public List<PortalStage> connectedStages;         // 연결된 스테이지 목록
-
-        [Serializable]
-        public class PortalStage
-        {
-            public Stage stage;       // 포탈에 연결된 스테이지
-            public int priority;      // 해당 스테이지의 우선순위
-        }
-
-        // 포탈이 활성화될 때 호출
-        public void ActivatePortal(StageManager stageManager)
-        {
-            // 우선순위대로 스테이지를 정렬하고, 우선순위가 가장 높은 스테이지로 이동
-            var sortedStages = new List<PortalStage>(connectedStages);
-            sortedStages.Sort((a, b) => a.priority.CompareTo(b.priority));  // 우선순위 기준으로 정렬
-
-            if (sortedStages.Count > 0)
-            {
-                // 우선순위가 높은 스테이지로 이동
-                var nextStage = sortedStages[0].stage;  // 우선순위가 가장 높은 스테이지 선택
-                Debug.Log($"Moving to next stage: {nextStage.stageName}");
-
-                stageManager.MoveToNextStage(nextStage);  // StageManager의 MoveToNextStage 호출
-            }
-            else
-            {
-                Debug.LogError("No connected stages for this portal.");
-            }
-        }
-
-        // 포탈에 스테이지 연결하기
-        public void ConnectStages(List<StageManager.Stage> stages)
-        {
-            connectedStages = new List<PortalStage>();  // 연결된 스테이지 초기화
-
-            foreach (var stage in stages)
-            {
-                // 각 스테이지를 연결하고, 우선순위는 기본적으로 1로 설정
-                connectedStages.Add(new PortalStage { stage = stage, priority = 1 });
-            }
-        }
-    }
-
-    // StageManager 생성자 수정
     public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName)
     {
         this.bossStageName = bossStageName;
-        this.stageDictionary = new Dictionary<string, GameObject>();
-        this.portals = new Dictionary<string, Portal>();
+        stageDictionary = new Dictionary<string, GameObject>();
+        mstGraph = new Dictionary<string, List<string>>();
 
-        // 스테이지 초기화
+        InitializeStages(stages);
+        GenerateFilteredMST(stages, restrictions);
+        SaveMSTData();
+        SetInitialStage();
+    }
+
+    private void InitializeStages(List<Stage> stages)
+    {
         foreach (var stage in stages)
         {
-            InitializeStage(stage);
-        }
-
-        // 연결 제한 설정
-        ApplyRestrictions(restrictions);
-
-        // 첫 번째 스테이지 설정
-        SetInitialStage();
-
-        // 스테이지를 연결하는 로직을 작성
-        GenerateFilteredMST(stages, restrictions);
-    }
-
-    private void InitializeStage(Stage stage)
-    {
-        if (!stageDictionary.ContainsKey(stage.stageName))
-        {
-            GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
-            GameObject stageObject = GameObject.Instantiate(stagePrefab);
-            stageObject.name = stage.stageName;
-            stageObject.SetActive(false);
-            stageDictionary[stage.stageName] = stageObject;
-        }
-    }
-
-    private void ApplyRestrictions(List<ConnectionRestriction> restrictions)
-    {
-        foreach (var restriction in restrictions)
-        {
-            // 연결 제한을 적용하는 로직 (예: 특정 스테이지의 이동을 제한)
-            Debug.Log($"Restriction: {restriction.restrictedStage} cannot be connected until {restriction.requiredStage} is completed.");
+            if (!stageDictionary.ContainsKey(stage.stageName))
+            {
+                GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
+                GameObject stageObject = GameObject.Instantiate(stagePrefab);
+                stageObject.name = stage.stageName;
+                stageObject.SetActive(false);
+                stageDictionary[stage.stageName] = stageObject;
+            }
         }
     }
 
@@ -130,7 +66,6 @@ public class StageManager
     {
         List<Edge> edges = new List<Edge>();
 
-        // 스테이지끼리 연결할 수 있도록 엣지 생성
         for (int i = 0; i < stages.Count; i++)
         {
             for (int j = i + 1; j < stages.Count; j++)
@@ -153,7 +88,13 @@ public class StageManager
 
             if (unionFind.Union(indexA, indexB))
             {
-                Debug.Log($"Connecting {edge.start.stageName} <-> {edge.end.stageName} with weight {edge.weight}");
+                if (!mstGraph.ContainsKey(edge.start.stageName))
+                    mstGraph[edge.start.stageName] = new List<string>();
+                if (!mstGraph.ContainsKey(edge.end.stageName))
+                    mstGraph[edge.end.stageName] = new List<string>();
+
+                mstGraph[edge.start.stageName].Add(edge.end.stageName);
+                mstGraph[edge.end.stageName].Add(edge.start.stageName);
             }
         }
     }
@@ -171,31 +112,32 @@ public class StageManager
         return false;
     }
 
-    // 첫 번째 스테이지를 설정하는 메서드
+    private void SaveMSTData()
+    {
+        mstData = ScriptableObject.CreateInstance<MSTData>();
+        mstData.SetGraphData(mstGraph);
+        AssetDatabase.CreateAsset(mstData, "Assets/Resources/Data/MSTData.asset");
+        AssetDatabase.SaveAssets();
+    }
+
     private void SetInitialStage()
-{
-    // 첫 번째 스테이지를 첫 번째 스테이지로 설정
-    GameObject firstStageObject = stageDictionary.Values.FirstOrDefault();
-
-    if (firstStageObject != null)
     {
-        currentStage = new Stage { stageName = firstStageObject.name };  // Stage 객체 초기화
-        ActivateStage(currentStage);  // 첫 번째 스테이지 활성화
-        Debug.Log($"Initial stage: {firstStageObject.name} activated.");
+        GameObject firstStageObject = stageDictionary.Values.FirstOrDefault();
+        if (firstStageObject != null)
+        {
+            currentStage = new Stage { stageName = firstStageObject.name };
+            ActivateStage(currentStage);
+        }
+        else
+        {
+            Debug.LogError("No stages found to initialize.");
+        }
     }
-    else
-    {
-        Debug.LogError("No stages found to initialize.");
-    }
-}
 
-
-    // 스테이지를 활성화하는 메서드
     private void ActivateStage(Stage stage)
     {
         if (currentStage != null && stageDictionary.ContainsKey(currentStage.stageName))
         {
-            // 이전 스테이지 비활성화
             GameObject previousStageObject = stageDictionary[currentStage.stageName];
             previousStageObject.SetActive(false);
         }
@@ -204,23 +146,34 @@ public class StageManager
         {
             GameObject stageObject = stageDictionary[stage.stageName];
             stageObject.SetActive(true);
+            currentStage = stage;
         }
     }
 
-    // 포탈을 통해 이동할 다음 스테이지를 선택하는 함수
-    public void MoveToNextStage(Stage nextStage)
+    public void MoveToNextStage(int steps)
     {
-        if (nextStage != null)
+        if (currentStage == null)
         {
-            Debug.Log($"Moving to next stage: {nextStage.stageName}");
-            ActivateStage(nextStage);  // 새로운 스테이지 활성화
+            Debug.LogError("Current stage is not set.");
+            return;
+        }
+
+        var allStages = mstData.GetStageSequence(currentStage.stageName);
+        int nextIndex = Mathf.Clamp(steps - 1, 0, allStages.Count - 1);
+        string nextStageName = allStages[nextIndex];
+
+        if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
+        {
+            Debug.Log($"Moving to next stage: {nextStageName}");
+            ActivateStage(new Stage { stageName = nextStageName });
         }
         else
         {
-            Debug.LogError("No valid next stage.");
+            Debug.LogError($"Stage {nextStageName} not found in stage dictionary.");
         }
     }
 
+    // Union-Find 클래스
     private class UnionFind
     {
         private int[] parent;
@@ -230,14 +183,13 @@ public class StageManager
         {
             parent = new int[size];
             rank = new int[size];
-            for (int i = 0; i < size; i++)
-                parent[i] = i;
+            for (int i = 0; i < size; i++) parent[i] = i;
         }
 
         public int Find(int x)
         {
             if (parent[x] != x)
-                parent[x] = Find(parent[x]); // 경로 압축
+                parent[x] = Find(parent[x]);
             return parent[x];
         }
 
@@ -246,11 +198,10 @@ public class StageManager
             int rootX = Find(x), rootY = Find(y);
             if (rootX == rootY) return false;
 
-            // 랭크 최적화
             if (rank[rootX] > rank[rootY])
                 parent[rootY] = rootX;
             else if (rank[rootX] < rank[rootY])
-                parent[rootX] = rootY;
+                parent[rootY] = rootY;
             else
             {
                 parent[rootY] = rootX;
@@ -260,6 +211,7 @@ public class StageManager
         }
     }
 
+    // Edge 클래스
     private class Edge
     {
         public Stage start, end;
