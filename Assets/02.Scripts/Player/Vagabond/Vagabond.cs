@@ -71,6 +71,7 @@ public class Vagabond : BaseController
         // 키보드 Shift 입력 (기본 회피)
         if (Input.GetMouseButtonDown(1))
         {
+             Managers.Stage.MoveToNextStage(2);
             ProcessDodge();
         }
 
