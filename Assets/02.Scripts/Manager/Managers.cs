@@ -29,18 +29,16 @@ public class Managers : MonoBehaviour
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
-    private StageManager _stageManager;
+    private StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
-
 
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
-    public static StageManager Stage => Instance._stageManager;
+    public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
 
     #endregion
-
 
     void Awake()
     {
@@ -49,9 +47,9 @@ public class Managers : MonoBehaviour
             s_instance = this;
             DontDestroyOnLoad(this);
 
-            // ObjectPoolerManager 초기화 코드 분리
+            // ObjectPoolerManager 초기화
             List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools("BaseTest");
-            _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray()); // 현재 리스트이고 생성자 형태가 배열임으로 여기서 배열로 변환후 생성자 타입에 넣어줌
+            _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
 
             // 스테이지 데이터를 초기화
             List<StageManager.Stage> stages;
@@ -60,11 +58,11 @@ public class Managers : MonoBehaviour
 
             stages = StageEffectInitializer.GetInitialStagesForChapter("testStage_01", out restrictions, out bossStageName);
 
-            // 초기화된 데이터로 StageManager 인스턴스를 생성하고, MST 계산을 시작
-            StageManager stageManager = new StageManager(stages, restrictions, bossStageName);
+            // StageManager 인스턴스를 생성하고 _stageManager에 할당
+            _stageManager = new StageManager(stages, restrictions, bossStageName);
             
-            // 예시로 첫 번째 스테이지로 이동
-            stageManager.MoveToNextStage(1);  // 첫 번째 스테이지로 이동
+            // 첫 번째 스테이지로 이동
+            _stageManager.MoveToNextStage(1);
         }
         else
         {
@@ -81,8 +79,8 @@ public class Managers : MonoBehaviour
     {
         if (s_instance != null)
         {
-            s_instance._input?.Clear(); // Input 매니저의 Clear() 호출
-            s_instance._resource?.Clear(); // ResourceManager에 Clear() 메서드를 추가하여 리소스 정리
+            s_instance._input?.Clear();
+            s_instance._resource?.Clear();
             s_instance = null;
         }
     }

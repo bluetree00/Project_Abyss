@@ -12,3 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fec193b6a0c32414eadea4b69aeba508, type: 3}
   m_Name: MSTData
   m_EditorClassIdentifier: 
+  stageSequences:
+  - startStageName: Start_01
+    connectedStages:
+    - Stage_01
+    - Stage_03
+    - Stage_02
+  - startStageName: Stage_01
+    connectedStages:
+    - Start_01
+  - startStageName: Stage_03
+    connectedStages:
+    - Start_01
+  - startStageName: Stage_02
+    connectedStages:
+    - Start_01

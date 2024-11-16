@@ -17,7 +17,7 @@ MonoBehaviour:
     stages:
     - stageName: Start_01
       resourcePath: Start_01
-      stageType: 0
+      stageType: 1
       weight: 0
       randomWeight: 0
       minWeight: 1
