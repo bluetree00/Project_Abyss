@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "MSTData", menuName = "Stage/MSTData")]
@@ -12,12 +11,10 @@ public class MSTData : ScriptableObject
     public class StageSequence
     {
         public string startStageName;  // 시작 스테이지 이름
-        public List<string> connectedStages;  // 연결된 스테이지들
 
         public StageSequence(string startStageName)
         {
             this.startStageName = startStageName;
-            connectedStages = new List<string>();
         }
     }
 
@@ -28,17 +25,7 @@ public class MSTData : ScriptableObject
 
         foreach (var kvp in mstGraph)
         {
-            stageSequences.Add(new StageSequence(kvp.Key)
-            {
-                connectedStages = kvp.Value
-            });
+            stageSequences.Add(new StageSequence(kvp.Key));
         }
-    }
-
-    // 특정 시작 스테이지에서 연결된 스테이지 순서를 반환
-    public List<string> GetStageSequence(string startStageName)
-    {
-        var sequence = stageSequences.FirstOrDefault(s => s.startStageName == startStageName);
-        return sequence?.connectedStages ?? new List<string>(); // 연결된 스테이지 없으면 빈 리스트 반환
     }
 }

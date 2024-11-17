@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using UnityEditor;
 using UnityEngine;
+using UnityEditor;
+using System.Linq;
 
 public class StageManager
 {
@@ -13,6 +13,7 @@ public class StageManager
     private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
     private Dictionary<string, GameObject> stagePrefabs; // 캐시된 스테이지 프리팹
     private bool isStageMoving = false;
+
     public enum StageType
     {
         MainMenu,
@@ -76,47 +77,55 @@ public class StageManager
     }
 
     private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
+{
+    if (stages == null || stages.Count == 0)
     {
-        if (stages == null || stages.Count == 0)
+        Debug.LogError("No stages provided for MST generation.");
+        return;
+    }
+
+    List<Edge> edges = new List<Edge>();
+
+    // 각 스테이지 간의 연결 관계를 고려한 에지 리스트 생성
+    for (int i = 0; i < stages.Count; i++)
+    {
+        for (int j = i + 1; j < stages.Count; j++)
         {
-            Debug.LogError("No stages provided for MST generation.");
-            return;
-        }
+            // 연결 제한을 고려한 필터링
+            if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
+                continue;
 
-        List<Edge> edges = new List<Edge>();
+            // 가중치를 랜덤하게 설정 (예: 1 ~ 10 범위의 랜덤 값)
+            int weight = UnityEngine.Random.Range(1, 11);  // 1에서 10까지 랜덤 값으로 가중치 설정
 
-        for (int i = 0; i < stages.Count; i++)
-        {
-            for (int j = i + 1; j < stages.Count; j++)
-            {
-                if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
-                    continue;
-
-                int weight = (stages[i].weight + stages[j].weight) / 2;
-                edges.Add(new Edge(stages[i], stages[j], weight));
-            }
-        }
-
-        edges.Sort((a, b) => a.weight.CompareTo(b.weight));
-        UnionFind unionFind = new UnionFind(stages.Count);
-
-        foreach (var edge in edges)
-        {
-            int indexA = stages.IndexOf(edge.start);
-            int indexB = stages.IndexOf(edge.end);
-
-            if (unionFind.Union(indexA, indexB))
-            {
-                if (!mstGraph.ContainsKey(edge.start.stageName))
-                    mstGraph[edge.start.stageName] = new List<string>();
-                if (!mstGraph.ContainsKey(edge.end.stageName))
-                    mstGraph[edge.end.stageName] = new List<string>();
-
-                mstGraph[edge.start.stageName].Add(edge.end.stageName);
-                mstGraph[edge.end.stageName].Add(edge.start.stageName);
-            }
+            edges.Add(new Edge(stages[i], stages[j], weight));
         }
     }
+
+    // 에지들을 가중치 기준으로 오름차순 정렬
+    edges.Sort((a, b) => a.weight.CompareTo(b.weight));
+    
+    UnionFind unionFind = new UnionFind(stages.Count);
+
+    // 최소 신장 트리(MST) 생성
+    foreach (var edge in edges)
+    {
+        int indexA = stages.IndexOf(edge.start);
+        int indexB = stages.IndexOf(edge.end);
+
+        if (unionFind.Union(indexA, indexB))
+        {
+            if (!mstGraph.ContainsKey(edge.start.stageName))
+                mstGraph[edge.start.stageName] = new List<string>();
+            if (!mstGraph.ContainsKey(edge.end.stageName))
+                mstGraph[edge.end.stageName] = new List<string>();
+
+            mstGraph[edge.start.stageName].Add(edge.end.stageName);
+            mstGraph[edge.end.stageName].Add(edge.start.stageName);
+        }
+    }
+}
+
 
     private bool IsConnectionRestricted(string stageA, string stageB, List<ConnectionRestriction> restrictions)
     {
@@ -153,7 +162,6 @@ public class StageManager
         AssetDatabase.SaveAssets();
         Debug.Log("New MSTData asset created.");
     }
-
 
     private void SetInitialStage()
     {
@@ -205,18 +213,27 @@ public class StageManager
             }
         }
 
-        // 현재 스테이지의 연결된 스테이지 목록 가져오기
-        var allStages = mstData.GetStageSequence(currentStage.stageName);
+        // stageSequences에서 순차적으로 이동
+        var stageSequence = mstData.stageSequences;
 
-        if (allStages == null || allStages.Count == 0)
+        if (stageSequence == null || stageSequence.Count == 0)
         {
-            Debug.LogError("No connected stages found in MSTData.");
+            Debug.LogError("No stage sequences found in MSTData.");
             return;
         }
 
-        // 'steps'만큼 이동할 인덱스 계산
-        int nextIndex = Mathf.Clamp(steps - 1, 0, allStages.Count - 1);
-        string nextStageName = allStages[nextIndex];
+        // stageSequences의 순서대로 이동
+        int currentIndex = stageSequence.FindIndex(s => s.startStageName == currentStage.stageName);
+
+        if (currentIndex == -1)
+        {
+            Debug.LogError("Current stage not found in stage sequences.");
+            return;
+        }
+
+        // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
+        int nextIndex = Mathf.Clamp(currentIndex + steps, 0, stageSequence.Count - 1);
+        string nextStageName = stageSequence[nextIndex].startStageName;
 
         if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
         {
@@ -228,7 +245,7 @@ public class StageManager
             Debug.LogError($"Stage {nextStageName} not found in stage dictionary.");
         }
 
-         isStageMoving = false;
+        isStageMoving = false;
     }
 
     // Union-Find 클래스

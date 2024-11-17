@@ -10,6 +10,7 @@ public class NormalEnemy : MonsterBaseController
 
     protected override void UpdateIdle()
     {
+        
         GameObject player = GameObject.FindGameObjectWithTag("Player");
 
         if (player == null)
