@@ -9,7 +9,6 @@ public class StageManager
     private Dictionary<string, GameObject> stageDictionary;   // 스테이지 이름과 오브젝트 매핑
     private Dictionary<string, List<string>> mstGraph;        // MST 결과 그래프
     private Stage currentStage;
-    private string bossStageName;
     private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
     private Dictionary<string, GameObject> stagePrefabs; // 캐시된 스테이지 프리팹
     private bool isStageMoving = false;
@@ -39,7 +38,6 @@ public class StageManager
 
     public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName)
     {
-        this.bossStageName = bossStageName;
         stageDictionary = new Dictionary<string, GameObject>();
         mstGraph = new Dictionary<string, List<string>>();
         stagePrefabs = new Dictionary<string, GameObject>(); // 초기화
@@ -77,55 +75,54 @@ public class StageManager
     }
 
     private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
-{
-    if (stages == null || stages.Count == 0)
     {
-        Debug.LogError("No stages provided for MST generation.");
-        return;
-    }
-
-    List<Edge> edges = new List<Edge>();
-
-    // 각 스테이지 간의 연결 관계를 고려한 에지 리스트 생성
-    for (int i = 0; i < stages.Count; i++)
-    {
-        for (int j = i + 1; j < stages.Count; j++)
+        if (stages == null || stages.Count == 0)
         {
-            // 연결 제한을 고려한 필터링
-            if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
-                continue;
+            Debug.LogError("No stages provided for MST generation.");
+            return;
+        }
 
-            // 가중치를 랜덤하게 설정 (예: 1 ~ 10 범위의 랜덤 값)
-            int weight = UnityEngine.Random.Range(1, 11);  // 1에서 10까지 랜덤 값으로 가중치 설정
+        List<Edge> edges = new List<Edge>();
 
-            edges.Add(new Edge(stages[i], stages[j], weight));
+        // 각 스테이지 간의 연결 관계를 고려한 에지 리스트 생성
+        for (int i = 0; i < stages.Count; i++)
+        {
+            for (int j = i + 1; j < stages.Count; j++)
+            {
+                // 연결 제한을 고려한 필터링
+                if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
+                    continue;
+
+                // 가중치를 랜덤하게 설정 (예: 1 ~ 10 범위의 랜덤 값)
+                int weight = UnityEngine.Random.Range(1, 11);  // 1에서 10까지 랜덤 값으로 가중치 설정
+
+                edges.Add(new Edge(stages[i], stages[j], weight));
+            }
+        }
+
+        // 에지들을 가중치 기준으로 오름차순 정렬
+        edges.Sort((a, b) => a.weight.CompareTo(b.weight));
+
+        UnionFind unionFind = new UnionFind(stages.Count);
+
+        // 최소 신장 트리(MST) 생성
+        foreach (var edge in edges)
+        {
+            int indexA = stages.IndexOf(edge.start);
+            int indexB = stages.IndexOf(edge.end);
+
+            if (unionFind.Union(indexA, indexB))
+            {
+                if (!mstGraph.ContainsKey(edge.start.stageName))
+                    mstGraph[edge.start.stageName] = new List<string>();
+                if (!mstGraph.ContainsKey(edge.end.stageName))
+                    mstGraph[edge.end.stageName] = new List<string>();
+
+                mstGraph[edge.start.stageName].Add(edge.end.stageName);
+                mstGraph[edge.end.stageName].Add(edge.start.stageName);
+            }
         }
     }
-
-    // 에지들을 가중치 기준으로 오름차순 정렬
-    edges.Sort((a, b) => a.weight.CompareTo(b.weight));
-    
-    UnionFind unionFind = new UnionFind(stages.Count);
-
-    // 최소 신장 트리(MST) 생성
-    foreach (var edge in edges)
-    {
-        int indexA = stages.IndexOf(edge.start);
-        int indexB = stages.IndexOf(edge.end);
-
-        if (unionFind.Union(indexA, indexB))
-        {
-            if (!mstGraph.ContainsKey(edge.start.stageName))
-                mstGraph[edge.start.stageName] = new List<string>();
-            if (!mstGraph.ContainsKey(edge.end.stageName))
-                mstGraph[edge.end.stageName] = new List<string>();
-
-            mstGraph[edge.start.stageName].Add(edge.end.stageName);
-            mstGraph[edge.end.stageName].Add(edge.start.stageName);
-        }
-    }
-}
-
 
     private bool IsConnectionRestricted(string stageA, string stageB, List<ConnectionRestriction> restrictions)
     {
