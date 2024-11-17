@@ -181,7 +181,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
-            Managers.Stage.MoveToNextStage(1);
+            Managers.Stage.MoveToNextStage(2);
         }
         else if (characterData.attackComboStep == 2)
         {
