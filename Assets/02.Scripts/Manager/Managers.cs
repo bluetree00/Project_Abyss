@@ -62,7 +62,7 @@ public class Managers : MonoBehaviour
             _stageManager = new StageManager(stages, restrictions, bossStageName);
             
             // 첫 번째 스테이지로 이동
-            _stageManager.MoveToNextStage(1);
+            _stageManager.MoveToNextStage(0);
         }
         else
         {
