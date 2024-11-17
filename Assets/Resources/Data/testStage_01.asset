@@ -19,7 +19,7 @@ MonoBehaviour:
       resourcePath: Start_01
       stageType: 1
       weight: 0
-      randomWeight: 0
+      randomWeight: 1
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_01
@@ -38,9 +38,9 @@ MonoBehaviour:
       maxWeight: 10
     - stageName: Stage_03
       resourcePath: Stage_03
-      stageType: 3
+      stageType: 1
       weight: 0
-      randomWeight: 0
+      randomWeight: 1
       minWeight: 1
       maxWeight: 10
     connectionRestrictions: []
