@@ -15,31 +15,12 @@ public class Vagabond : BaseController
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
-        FindEffectData();
     }
 
     //플레이어의 강제 회전 방지
     void FreezeRotation()
     {
         rb.angularVelocity = Vector3.zero;
-    }
-
-    void FindEffectData(){
-        GameObject effectprefab = Resources.Load<GameObject>("Prefabs/Effects/ShinySlash");
-        if (effectprefab != null){
-            GameObject instance = Instantiate(effectprefab);
-            EffectComponent effectComponent = instance.GetComponent<EffectComponent>();
-            if (effectComponent != null){
-                Debug.Log($"<color=green>이펙트 컴포넌트 찾기 완료</color>");
-                effectData = effectComponent.effectData;
-                effectData.damage = characterData.attackPower;
-            }
-            else{
-                Debug.LogWarning("못찾음");
-            }
-            Destroy(instance);
-        }
-        
     }
 
     private void OnEnable() 
