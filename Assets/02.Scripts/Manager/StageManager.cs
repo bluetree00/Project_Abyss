@@ -93,8 +93,10 @@ public class StageManager
                 if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
                     continue;
 
-                // 가중치를 랜덤하게 설정 (예: 1 ~ 10 범위의 랜덤 값)
-                int weight = UnityEngine.Random.Range(1, 11);  // 1에서 10까지 랜덤 값으로 가중치 설정
+                int minWeight = Mathf.Min(stages[i].weight, stages[j].weight); 
+                int maxWeight = Mathf.Max(stages[i].weight, stages[j].weight);
+
+                int weight = UnityEngine.Random.Range(minWeight, maxWeight + 1);
 
                 edges.Add(new Edge(stages[i], stages[j], weight));
             }
