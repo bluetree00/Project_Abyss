@@ -53,19 +53,7 @@ public class Managers : MonoBehaviour
             List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools("BaseTest");
             _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
 
-            // // 스테이지 데이터를 초기화
-            // List<StageManager.Stage> stages;
-            // List<StageManager.ConnectionRestriction> restrictions;
-            // string bossStageName;
-
-            // stages = StageEffectInitializer.GetInitialStagesForChapter("Chapter1", out restrictions, out bossStageName);
-
-            // // StageManager 인스턴스를 생성하고 _stageManager에 할당
-            // _stageManager = new StageManager(stages, restrictions, bossStageName);
             
-            // // 첫 번째 스테이지로 이동
-            // _stageManager.MoveToNextStage(0);
-            // StageTransitionManager 초기화
             if (_stageTransitionManager == null)
             {
                 _stageTransitionManager = new StageTransitionManager();
