@@ -297,4 +297,42 @@ public class StageManager
             this.weight = weight;
         }
     }
+
+    public void CleanupChapter()
+    {
+        Debug.Log("Cleaning up the current chapter...");
+
+        // 모든 스테이지 오브젝트 비활성화 및 삭제
+        foreach (var stageName in stageDictionary.Keys.ToList())
+        {
+            if (stageDictionary.TryGetValue(stageName, out GameObject stageObject))
+            {
+                // 스테이지 오브젝트 비활성화
+                stageObject.SetActive(false);
+
+                // 메모리에서 제거
+                GameObject.Destroy(stageObject);
+                stageDictionary.Remove(stageName);
+            }
+        }
+
+        // 캐시된 프리팹 데이터 정리
+        stagePrefabs.Clear();
+
+        // 최소 신장 트리 데이터 초기화
+        if (mstGraph != null)
+        {
+            mstGraph.Clear();
+            mstData = null;
+        }
+
+        // 현재 스테이지 정보 초기화
+        currentStage = null;
+
+        // 스테이지 이동 상태 초기화
+        isStageMoving = false;
+
+        Debug.Log("Chapter cleanup complete. Ready for the next chapter.");
+    }
+
 }
