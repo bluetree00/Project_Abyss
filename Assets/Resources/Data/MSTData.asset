@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stageSequences:
   - startStageName: Start_01
+  - startStageName: Stage_01
   - startStageName: Stage_03
   - startStageName: Stage_02
-  - startStageName: Stage_01

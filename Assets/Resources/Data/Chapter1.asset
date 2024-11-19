@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 76fb99c7fc95ef84c84c3f3b3b247d86, type: 3}
-  m_Name: testStage_01
+  m_Name: Chapter1
   m_EditorClassIdentifier: 
   chapters:
-  - chapterName: testStage_01
+  - chapterName: Chapter1
     stages:
     - stageName: Start_01
       resourcePath: Start_01
-      stageType: 1
+      stageType: 0
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_01
