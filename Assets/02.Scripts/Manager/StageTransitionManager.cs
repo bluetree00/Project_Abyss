@@ -18,6 +18,9 @@ public class StageTransitionManager
     // 챕터를 로드하는 메서드
     public void LoadChapter(string chapterName)
     {
+        // 현재 챕터 정리 코드 추가 필요
+        //Managers.Stage.CleanupChapter();
+
         currentChapterName = chapterName;
 
         // 현재 챕터의 스테이지 데이터 로드
