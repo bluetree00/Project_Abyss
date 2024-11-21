@@ -4,6 +4,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "MSTData", menuName = "Stage/MSTData")]
 public class MSTData : ScriptableObject
 {
+    
     [SerializeField]  // SerializeField 속성 추가하여 인스펙터에 표시
     public List<StageSequence> stageSequences;
 
