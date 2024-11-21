@@ -6,6 +6,8 @@ using System.Linq;
 
 public class StageManager
 {
+     private string currentChapterName; // 현재 챕터 이름
+     
     private Dictionary<string, GameObject> stageDictionary;   // 스테이지 이름과 오브젝트 매핑
     private Dictionary<string, List<string>> mstGraph;        // MST 결과 그래프
     private Stage currentStage;
@@ -50,6 +52,16 @@ public class StageManager
 
     private void InitializeStages(List<Stage> stages)
     {
+        // 챕터 이름에 해당하는 부모 오브젝트 생성
+        string chapterParentName = $"Chapter_{currentChapterName}_Parent";
+        GameObject chapterParent = GameObject.Find(chapterParentName);
+
+        if (chapterParent == null)
+        {
+            chapterParent = new GameObject(chapterParentName);
+            Debug.Log($"Created chapter parent object: {chapterParentName}");
+        }
+
         foreach (var stage in stages)
         {
             if (!stageDictionary.ContainsKey(stage.stageName))
@@ -66,13 +78,15 @@ public class StageManager
                     stagePrefabs[stage.resourcePath] = stagePrefab; // 캐싱
                 }
 
-                GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath]);
+                // 스테이지 오브젝트 생성 및 부모 설정
+                GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath], chapterParent.transform);
                 stageObject.name = stage.stageName;
                 stageObject.SetActive(false);
                 stageDictionary[stage.stageName] = stageObject;
             }
         }
     }
+
 
     private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
     {
@@ -328,9 +342,6 @@ public class StageManager
 
         // 현재 스테이지 정보 초기화
         currentStage = null;
-
-        // 스테이지 이동 상태 초기화
-        isStageMoving = false;
 
         Debug.Log("Chapter cleanup complete. Ready for the next chapter.");
     }

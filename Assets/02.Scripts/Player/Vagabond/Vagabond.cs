@@ -182,11 +182,13 @@ public class Vagabond : BaseController
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
             Managers.Stage.MoveToNextStage(1);
+            Managers.Stage.CleanupChapter();
         }
         else if (characterData.attackComboStep == 2)
         {
             Debug.Log("두 번째 공격");
             ChangeState(Define.State.NormalAttack_02);
+            Managers.StageTransitionManager.LoadChapter("Chapter1");
         }
         else if (characterData.attackComboStep == 3)
         {
@@ -194,6 +196,8 @@ public class Vagabond : BaseController
             ChangeState(Define.State.NormalAttack_03);
             characterData.attackComboStep = 0; // 마지막 공격 후 초기화
             characterData.comboTimer = 0;
+            Managers.Stage.MoveToNextStage(1);
+            
         }
     }
 
