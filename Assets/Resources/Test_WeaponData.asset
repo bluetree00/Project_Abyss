@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0a16f3bfb213f3488624f788e357d4c, type: 3}
   m_Name: Test_WeaponData
   m_EditorClassIdentifier: 
-  weaponName: "\uAE30\uBCF8 \uBB34\uAE30"
+  weaponName: Test_WeaponData
   weaponDamage: 10
