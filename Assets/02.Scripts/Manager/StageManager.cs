@@ -4,6 +4,11 @@ using UnityEngine;
 using UnityEditor;
 using System.Linq;
 
+//Managers.Stage.MoveToNextStage(1); 스테이지 넘기기
+//Managers.StageTransitionManager.LoadChapter("Chapter1"); 챕터 로드 하기
+//Managers.Stage.CleanupChapter(); 현재 챕터 지우기
+
+
 public class StageManager
 {
      private string currentChapterName; // 현재 챕터 이름
