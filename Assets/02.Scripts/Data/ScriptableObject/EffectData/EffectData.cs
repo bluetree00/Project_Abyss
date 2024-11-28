@@ -23,5 +23,12 @@ public class EffectData : ScriptableObject
         damage = newDamage; // 새로운 데미지로 설정
     }
 
-    // 이 데이터 스크립트 안에서 캐릭터 데이터와 이펙트 데이터를 연결하는 함수
+    // 캐릭터데이터 매니저에서 받아온 [캐릭터 공격력 + 무기 공격력 = {종합 공격력}]을 이펙트 데이터로 동기화
+    public float SetEffectDamage()
+    {
+        damage = Managers.CharacterData.GetTotalDamage();
+
+        return damage;
+    }
+
 }

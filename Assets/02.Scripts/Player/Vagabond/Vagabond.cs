@@ -12,6 +12,7 @@ public class Vagabond : BaseController
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
+    [SerializeField] WeaponData weaponData; //데스트용 무기 데이터
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출

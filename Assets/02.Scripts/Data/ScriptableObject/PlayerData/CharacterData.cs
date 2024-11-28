@@ -27,12 +27,38 @@ public class CharacterData : ScriptableObject
     [Header("특성 관련 수치")]
     // 태그별 부스트 정보
     public float attackPowerBoostAmount = 10f;
-    public float attackPowerBoostDuration = 5f;
+    public float attackPowerBoostDuration = 10f;
 
     public float moveSpeedBoostAmount = 10f;
     public float moveSpeedBoostDuration = 3f;
 
+    // 초기 스탯 수치
+    private float initialBaseMoveSpeed;
+    private float initialBaseRunSpeed;
+    private int initialMaxHealth;
+    private int initialAttackPower;
+
     #region 특성 스탯 부스트 처리 메소드 모음
+
+    // 초기값 저장 메서드
+    public void Initialize()
+    {
+        initialBaseMoveSpeed = baseMoveSpeed;
+        initialBaseRunSpeed = baseRunSpeed;
+        initialMaxHealth = maxHealth;
+        initialAttackPower = attackPower;
+    }
+
+    // 스탯 복원 메서드
+    public void RestoreInitialStats()
+    {
+        baseMoveSpeed = initialBaseMoveSpeed;
+        baseRunSpeed = initialBaseRunSpeed;
+        maxHealth = initialMaxHealth;
+        attackPower = initialAttackPower;
+
+        Debug.Log("스탯 복원 완료");
+    }
         
     // 스탯 부스트 처리 메서드
     public void ApplyBoostByTag(MonoBehaviour behaviour, string tag)

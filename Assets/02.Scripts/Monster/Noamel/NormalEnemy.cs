@@ -78,7 +78,7 @@ public class NormalEnemy : MonsterBaseController
                 // 쿨타임 체크 및 데미지 처리
                 if (CanHit(effectData))
                 {
-                    ApplyDamage(effectData.damage);
+                    ApplyDamage(effectData.SetEffectDamage());
                     StartHitCooldown(effectData.effectName, effectData.hitInterval); // 쿨타임 시작
                 }
             }
