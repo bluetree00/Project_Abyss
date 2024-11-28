@@ -114,6 +114,8 @@ public class Managers : MonoBehaviour
     {
         // 게임 실행 종료 시 초기값으로 복원
         CharacterData.characterData.RestoreInitialStats();
+        // 게임 종료 시 사용한 후 필요없는 로드파일들 메모리 해제
+        Resources.UnloadUnusedAssets();
     }
 
 
