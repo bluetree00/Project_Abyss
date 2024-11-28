@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Test_WeaponData
   m_EditorClassIdentifier: 
   weaponName: "\uAE30\uBCF8 \uBB34\uAE30"
-  weaponDamage: 0
+  weaponDamage: 10
