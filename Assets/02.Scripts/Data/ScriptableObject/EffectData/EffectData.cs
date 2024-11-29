@@ -4,7 +4,8 @@ using UnityEngine;
 public class EffectData : ScriptableObject
 {
     public string effectName; // 이펙트 이름
-    public float damage; // 기본 데미지
+    public float damage; // 기본 데미지 = 계수
+    public float totalDamage; // 계산이 끝난 데미지 처리에서 사용할 변수
     public float hitInterval; // 타격 간격
     public string effectTag; // 이펙트 태그 추가
     public bool isPlayerEffect; // 플레이어용 이펙트 여부
@@ -26,9 +27,9 @@ public class EffectData : ScriptableObject
     // 캐릭터데이터 매니저에서 받아온 [캐릭터 공격력 + 무기 공격력 = {종합 공격력}]을 이펙트 데이터로 동기화
     public float SetEffectDamage()
     {
-        damage = Managers.CharacterData.GetTotalDamage();
+        totalDamage = Managers.CharacterData.GetTotalDamage();
 
-        return damage;
+        return totalDamage;
     }
 
 }

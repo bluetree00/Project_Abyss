@@ -5,6 +5,11 @@ public class CharacterDataManager
     public CharacterData    characterData;
     public WeaponData       currentweaponData;
     private WeaponData      newWeaponData;
+
+    // public CharacterDataManager(string p)
+    // {   
+
+    // }
     
 
     public void EquipWeapon(string newWeapon)
