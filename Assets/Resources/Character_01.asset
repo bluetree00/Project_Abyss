@@ -15,7 +15,7 @@ MonoBehaviour:
   baseMoveSpeed: 5
   baseRunSpeed: 8
   maxHealth: 0
-  attackPower: 0
+  attackPower: 10
   attackComboStep: 0
   comboTimer: 0
   comboDuration: 3
@@ -23,3 +23,7 @@ MonoBehaviour:
   dashSpeed: 10
   dashDuration: 0.2
   dodgeCooldown: 2
+  attackPowerBoostAmount: 72.5
+  attackPowerBoostDuration: 10
+  moveSpeedBoostAmount: 10
+  moveSpeedBoostDuration: 3

@@ -9,6 +9,8 @@ TagManager:
   - HitEffect_01
   - HitEffect_02
   - DieEffect_01
+  - APBoost
+  - MSBoost
   layers:
   - Default
   - TransparentFX
