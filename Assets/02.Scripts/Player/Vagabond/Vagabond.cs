@@ -3,13 +3,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-using Cinemachine;  // Cinemachine 네임스페이스 추가
+using Cinemachine;
+using System.ComponentModel;
+using Unity.VisualScripting;  // Cinemachine 네임스페이스 추가
 
 public class Vagabond : BaseController
 {
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
+    [SerializeField] WeaponData weaponData; //데스트용 무기 데이터
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
@@ -232,41 +235,56 @@ public class Vagabond : BaseController
         }
     }
 
-       private IEnumerator DashCoroutine()
-{
-    characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
-    ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
-
-    float startTime = Time.time;
-
-    while (Time.time < startTime + characterData.dashDuration)
+    private IEnumerator DashCoroutine()
     {
-        CheckMovementInput();  // 대시 중에도 입력 방향을 계속 갱신
+        characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
+        ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
 
-        // 현재 입력 방향(moveDirection)으로 대시
-        Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;
-        rb.velocity = dashDirection * characterData.dashSpeed;
+        float startTime = Time.time;
 
-        // 대시 방향으로 캐릭터 회전
-        if (dashDirection != Vector3.zero)
+        while (Time.time < startTime + characterData.dashDuration)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(dashDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 부드럽게 회전
+            CheckMovementInput();  // 대시 중에도 입력 방향을 계속 갱신
+
+            // 현재 입력 방향(moveDirection)으로 대시
+            Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;
+            rb.velocity = dashDirection * characterData.dashSpeed;
+
+            // 대시 방향으로 캐릭터 회전
+            if (dashDirection != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(dashDirection);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 부드럽게 회전
+            }
+
+            yield return null;
         }
 
-        yield return null;
+        rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
+        yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
+
+        characterData.canDodge = true;  // 다시 대시 가능하도록 설정
     }
 
-    rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
-    yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
-
-    characterData.canDodge = true;  // 다시 대시 가능하도록 설정
-}
 
 
 
 
+    #endregion
 
+    #region 특성 (스탯) 처리
+        private void OnTriggerEnter(Collider other) {
+
+            //충돌한 오브젝트 태그 확인
+            string otherTag = other.tag;
+
+            //태그에 따른 특성 증가(점진적 감소) 처리
+            characterData.ApplyBoostByTag(this, otherTag);
+
+            //충돌한 오브젝트 제거
+            if (otherTag == "APBoost" || otherTag == "MSBoost")
+                Destroy(other.gameObject);
+        }
     #endregion
 
     #region 애니메이션 이벤트 처리
