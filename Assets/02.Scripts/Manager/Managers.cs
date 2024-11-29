@@ -59,7 +59,7 @@ public class Managers : MonoBehaviour
                 _stageTransitionManager = new StageTransitionManager();
             }
 
-            _stageTransitionManager.LoadChapter("Chapter1");
+            //_stageTransitionManager.LoadChapter("Chapter1");
         }
         else
         {
