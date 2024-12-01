@@ -16,6 +16,7 @@ public class Vagabond : BaseController
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
+         Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
     //플레이어의 강제 회전 방지
