@@ -29,6 +29,16 @@ public class Define
         PostureBar,
     }
 
+    public enum PopupType
+    {
+        None,            // 기본값
+        Settings,        // 설정 팝업
+        Inventory,       // 인벤토리 팝업
+        Warning,         // 경고 팝업
+        Confirmation,    // 확인 팝업
+        Tutorial,        // 튜토리얼 팝업
+    }
+
     public enum UIEvent
     {
         Click,
