@@ -100,6 +100,13 @@ public class UIManager
 		return popup;
     }
 
+     public UI_Augment_Choice ShowAugmentChoiceUI(List<AugmentData> availableAugments, System.Action<AugmentData> onAugmentSelected)
+    {
+        UI_Augment_Choice augmentChoiceUI = ShowPopupUI<UI_Augment_Choice>(); // 기존 팝업 UI처럼 호출
+        augmentChoiceUI.InitAugments(availableAugments, onAugmentSelected); // 증강 아이템 초기화
+        return augmentChoiceUI;
+    }
+    
     public void ClosePopupUI(UI_Popup popup)
     {
 		if (_popupStack.Count == 0)
