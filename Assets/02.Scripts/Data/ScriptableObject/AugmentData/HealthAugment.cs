@@ -17,5 +17,8 @@ public class HealthAugment : AugmentData
     {
         //필요한 로직 사용
        Debug.Log("증강 효과 발동!");
+
+       
+
     }
 }

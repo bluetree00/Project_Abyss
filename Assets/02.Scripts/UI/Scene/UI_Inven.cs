@@ -24,7 +24,7 @@ public class UI_Inven : UI_Scene
         {
             GameObject item = Managers.UI.MakeSubItem<UI_Inven_Item>(gridPanel.transform).gameObject;            
             UI_Inven_Item invenItem = item.GetOrAddComponent<UI_Inven_Item>();
-            invenItem.SetInfo($"집행검{i}번");
+            invenItem.SetInfo($"bow num{i}");
         }
     }
 }

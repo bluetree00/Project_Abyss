@@ -18,8 +18,6 @@ public class Vagabond : BaseController
         
         base.Init(); // 부모 클래스의 초기화 코드 호출
          Managers.UI.ShowSceneUI<UI_Inven>();
-         Managers.UI.ShowAugmentChoiceUI(null);
-      
     }
 
     //플레이어의 강제 회전 방지
@@ -188,6 +186,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
+            Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)

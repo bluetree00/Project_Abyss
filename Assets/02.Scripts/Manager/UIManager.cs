@@ -77,14 +77,7 @@ public class UIManager
 		if (string.IsNullOrEmpty(name))
 			name = typeof(T).Name;
 
-        Debug.Log($"Loading augment: {name}");
         GameObject go = Managers.Resource.Instantiate($"UI/Augments/{name}");
-        if (go == null)
-        {
-            Debug.LogError($"Prefab not found at path: UI/Augments/{name}");
-            return null;
-        }
-        Debug.Log("Prefab loaded successfully.");
 		if (parent != null)
 			go.transform.SetParent(parent);
 
@@ -150,7 +143,7 @@ public class UIManager
             return;
 
         UI_Popup popup = _popupStack.Pop();
-        //Managers.Resource.Destroy(popup.gameObject);
+        Managers.Resource.Destroy(popup.gameObject);
         popup = null;
         _order--;
     }

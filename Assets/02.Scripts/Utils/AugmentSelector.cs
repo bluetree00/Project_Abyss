@@ -34,19 +34,52 @@ public static class AugmentSelector
         if (pool == null || pool.Length == 0)
             return null;
 
-        // 이미 선택된 증강 제외
-        var availablePool = pool.Except(_selectedAugments).ToArray();
-        if (availablePool.Length == 0)
+        string selectedAugment = null;
+
+        // 증강이 남아있을 때까지 계속해서 증강을 선택
+        while (true)
         {
-            Debug.LogWarning("선택 가능한 증강이 없습니다.");
-            return null;
+            // 이미 선택된 증강 제외
+            var availablePool = pool.Except(_selectedAugments).ToArray();
+
+            if (availablePool.Length == 0)
+            {
+                // 해당 등급에서 더 이상 선택할 수 있는 증강이 없을 경우
+                Debug.LogWarning($"선택 가능한 {grade} 등급 증강이 없습니다. 다른 등급에서 선택합니다.");
+                
+                // 선택할 다른 등급 찾기
+                // Common -> Rare -> Unique 순으로 검사
+                string[] nextPool = grade switch
+                {
+                    "Common" => RareAugments,
+                    "Rare" => UniqueAugments,
+                    "Unique" => CommonAugments, // 마지막엔 다시 Common으로 돌아가도록 할 수도 있음
+                    _ => null
+                };
+
+                if (nextPool != null && nextPool.Length > 0)
+                {
+                    pool = nextPool;  // 다른 등급으로 변경
+                    continue;  // 다른 등급에서 다시 시도
+                }
+                else
+                {
+                    Debug.LogWarning("모든 증강 등급에서 더 이상 선택할 수 있는 증강이 없습니다.");
+                    return null;  // 더 이상 선택할 증강이 없으면 null 반환
+                }
+            }
+
+            // 증강이 남아있으면 랜덤으로 선택
+            int randomIndex = Random.Range(0, availablePool.Length);
+            selectedAugment = availablePool[randomIndex];
+
+            // 선택된 증강이 유효하다면 반복 종료
+            if (selectedAugment != null)
+            {
+                _selectedAugments.Add(selectedAugment);
+                break;
+            }
         }
-
-        int randomIndex = Random.Range(0, availablePool.Length);
-        string selectedAugment = availablePool[randomIndex];
-
-        // 선택된 증강 추가
-        _selectedAugments.Add(selectedAugment);
 
         return selectedAugment;
     }
@@ -81,7 +114,7 @@ public static class AugmentSelector
 
         Debug.Log(augmentName);
 
-        return augmentName;
+        return augmentName; // 하나의 증강 이름만 반환
     }
 
     /// <summary>
@@ -92,3 +125,4 @@ public static class AugmentSelector
         _selectedAugments.Clear();
     }
 }
+
