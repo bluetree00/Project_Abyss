@@ -72,6 +72,18 @@ public class UIManager
 		return Util.GetOrAddComponent<T>(go);
 	}
 
+    public T MakeAugment<T>(Transform parent = null, string name = null) where T : UI_Base
+	{
+		if (string.IsNullOrEmpty(name))
+			name = typeof(T).Name;
+
+        GameObject go = Managers.Resource.Instantiate($"UI/Augments/{name}");
+		if (parent != null)
+			go.transform.SetParent(parent);
+
+		return Util.GetOrAddComponent<T>(go);
+	}
+
 	public T ShowSceneUI<T>(string name = null) where T : UI_Scene
 	{
 		if (string.IsNullOrEmpty(name))
@@ -100,6 +112,17 @@ public class UIManager
 		return popup;
     }
 
+    public UI_Augment_Choice ShowAugmentChoiceUI(List<AugmentData> availableAugments)
+    {
+        UI_Augment_Choice augmentChoiceUI = ShowPopupUI<UI_Augment_Choice>();
+        
+        // 증강 UI 초기화 및 선택 항목 표시
+        augmentChoiceUI.InitAugments(availableAugments);
+        augmentChoiceUI.ShowAugmentChoices(); // 선택 가능한 증강 UI 표시
+        return augmentChoiceUI;
+    }
+
+    
     public void ClosePopupUI(UI_Popup popup)
     {
 		if (_popupStack.Count == 0)
@@ -120,7 +143,7 @@ public class UIManager
             return;
 
         UI_Popup popup = _popupStack.Pop();
-        //Managers.Resource.Destroy(popup.gameObject);
+        Managers.Resource.Destroy(popup.gameObject);
         popup = null;
         _order--;
     }

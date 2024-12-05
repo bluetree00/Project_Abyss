@@ -35,7 +35,8 @@ public class Managers : MonoBehaviour
     private UIManager _ui;
     private StageTransitionManager _stageTransitionManager;
     private CharacterDataManager _characterDataManager;     //캐릭터 데이터 관리 매니저
-
+    SceneManagerEx _scene = new SceneManagerEx();
+    DataManager _data = new DataManager();
 
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
@@ -43,6 +44,8 @@ public class Managers : MonoBehaviour
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
+    public static SceneManagerEx Scene { get { return Instance._scene; } }
+    public static DataManager Data { get { return Instance._data; } }
     public static CharacterDataManager CharacterData => 
     Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());    //캐릭터 데이터 관리 매니저
 
@@ -81,7 +84,7 @@ public class Managers : MonoBehaviour
     void Update()
     {
         _input?.OnUpdate();
-    }
+    } 
 
     public static void Clear()
     {

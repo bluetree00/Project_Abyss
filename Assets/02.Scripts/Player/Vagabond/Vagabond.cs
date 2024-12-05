@@ -15,6 +15,7 @@ public class Vagabond : BaseController
     [SerializeField] WeaponData weaponData; //데스트용 무기 데이터
     protected override void Init()
     {
+        
         base.Init(); // 부모 클래스의 초기화 코드 호출
          Managers.UI.ShowSceneUI<UI_Inven>();
     }
@@ -185,6 +186,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
+            Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)
