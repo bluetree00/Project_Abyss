@@ -50,29 +50,29 @@ public class UI_Augment_Choice : UI_Popup
     }
 
     public void ShowAugmentChoices()
-{
-    Bind<GameObject>(typeof(GameObjects));
-    GameObject gridPanel = Get<GameObject>((int)GameObjects.GridPanel);
-
-    // 기존 자식 객체들 삭제
-    foreach (Transform child in gridPanel.transform)
-        Managers.Resource.Destroy(child.gameObject);
-
-    // availableAugments 기반으로 UI 생성
-    if (availableAugments != null && availableAugments.Count > 0)
     {
-        foreach (AugmentData augment in availableAugments)
+        Bind<GameObject>(typeof(GameObjects));
+        GameObject gridPanel = Get<GameObject>((int)GameObjects.GridPanel);
+
+        // 기존 자식 객체들 삭제
+        foreach (Transform child in gridPanel.transform)
+            Managers.Resource.Destroy(child.gameObject);
+
+        // availableAugments 기반으로 UI 생성
+        if (availableAugments != null && availableAugments.Count > 0)
         {
-            // 증강 데이터를 바탕으로 UI 항목 생성
-            GameObject augments = Managers.UI.MakeAugment<UI_Augment_Item>(gridPanel.transform).gameObject;
-            UI_Augment_Item augmentItem = augments.GetOrAddComponent<UI_Augment_Item>();
-            augmentItem.SetInfo(augment); // 증강 데이터 설정
+            foreach (AugmentData augment in availableAugments)
+            {
+                // 증강 데이터를 바탕으로 UI 항목 생성
+                GameObject augments = Managers.UI.MakeAugment<UI_Augment_Item>(gridPanel.transform).gameObject;
+                UI_Augment_Item augmentItem = augments.GetOrAddComponent<UI_Augment_Item>();
+                augmentItem.SetInfo(augment); // 증강 데이터 설정
+            }
+        }
+        else
+        {
+            Debug.LogWarning("No available augments to display.");
         }
     }
-    else
-    {
-        Debug.LogWarning("No available augments to display.");
-    }
-}
 
 }

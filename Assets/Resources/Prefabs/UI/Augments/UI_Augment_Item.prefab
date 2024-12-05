@@ -34,7 +34,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 4.0000305, y: 50}
+  m_AnchoredPosition: {x: 4.0000305, y: -157}
   m_SizeDelta: {x: 300, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8106872360762849853
@@ -237,8 +237,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_wordSpacing: 0
@@ -358,7 +358,6 @@ GameObject:
   - component: {fileID: 923065543537177191}
   - component: {fileID: 6265124134742931161}
   - component: {fileID: 5569863683474781709}
-  - component: {fileID: -5044358010058093983}
   - component: {fileID: 5961385244998772693}
   m_Layer: 5
   m_Name: UI_Augment_Item
@@ -417,7 +416,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 4a6da82be15df434eaed45c19b0fdd14, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 6c972a3cf1d514adfbb95337a9e527f3, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -427,19 +426,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &-5044358010058093983
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8537894112783498605}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 85a5fa433f960304ab15d758cd4ecbe6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  augmentData: {fileID: 11400000, guid: f59d31e5f358a3e478acc8ee51cf0aa3, type: 2}
 --- !u!114 &5961385244998772693
 MonoBehaviour:
   m_ObjectHideFlags: 0

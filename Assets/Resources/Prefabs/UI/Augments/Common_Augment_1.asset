@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb80246492f5ed04a8351e03b3c45065, type: 3}
   m_Name: Common_Augment_1
   m_EditorClassIdentifier: 
-  Name: 1
-  Icon: {fileID: 21300000, guid: ff6d06c5a07434d9b8edaa92176cd86f, type: 3}
+  Name: Common
+  Icon: {fileID: 21300000, guid: b0f83ae0bcd8c4cde8f0433b62ec10c4, type: 3}
   Description: Increases the target's health.
   Grade: 0
   healthBonus: 50
