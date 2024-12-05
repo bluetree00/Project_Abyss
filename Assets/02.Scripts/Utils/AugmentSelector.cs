@@ -22,67 +22,71 @@ public static class AugmentSelector
     /// 각 증강 등급에서 중복 없는 랜덤 증강 이름을 선택
     /// </summary>
     private static string GetRandomAugmentFromGrade(string grade)
+{
+    string[] pool = grade switch
     {
-        string[] pool = grade switch
+        "Common" => CommonAugments,
+        "Rare" => RareAugments,
+        "Unique" => UniqueAugments,
+        _ => null
+    };
+
+    if (pool == null || pool.Length == 0)
+        return null;
+
+    string selectedAugment = null;
+
+    // 전체 증강 수를 제한하여 무한 루프 방지
+    HashSet<string> attemptedGrades = new HashSet<string>();
+
+    while (true)
+    {
+        // 현재 등급에서 선택 가능한 증강 필터링
+        var availablePool = pool.Except(_selectedAugments).ToArray();
+
+        if (availablePool.Length == 0)
         {
-            "Common" => CommonAugments,
-            "Rare" => RareAugments,
-            "Unique" => UniqueAugments,
-            _ => null
-        };
+            attemptedGrades.Add(grade);
 
-        if (pool == null || pool.Length == 0)
-            return null;
-
-        string selectedAugment = null;
-
-        // 증강이 남아있을 때까지 계속해서 증강을 선택
-        while (true)
-        {
-            // 이미 선택된 증강 제외
-            var availablePool = pool.Except(_selectedAugments).ToArray();
-
-            if (availablePool.Length == 0)
+            // 모든 등급을 순환했는지 확인
+            if (attemptedGrades.Count == 3) // 3개 등급 (Common, Rare, Unique)
             {
-                // 해당 등급에서 더 이상 선택할 수 있는 증강이 없을 경우
-                Debug.LogWarning($"선택 가능한 {grade} 등급 증강이 없습니다. 다른 등급에서 선택합니다.");
-                
-                // 선택할 다른 등급 찾기
-                // Common -> Rare -> Unique 순으로 검사
-                string[] nextPool = grade switch
-                {
-                    "Common" => RareAugments,
-                    "Rare" => UniqueAugments,
-                    "Unique" => CommonAugments, // 마지막엔 다시 Common으로 돌아가도록 할 수도 있음
-                    _ => null
-                };
-
-                if (nextPool != null && nextPool.Length > 0)
-                {
-                    pool = nextPool;  // 다른 등급으로 변경
-                    continue;  // 다른 등급에서 다시 시도
-                }
-                else
-                {
-                    Debug.LogWarning("모든 증강 등급에서 더 이상 선택할 수 있는 증강이 없습니다.");
-                    return null;  // 더 이상 선택할 증강이 없으면 null 반환
-                }
+                Debug.LogWarning("모든 증강 등급에서 더 이상 선택할 수 있는 증강이 없습니다.");
+                return null; // 선택 불가능한 상태
             }
 
-            // 증강이 남아있으면 랜덤으로 선택
-            int randomIndex = Random.Range(0, availablePool.Length);
-            selectedAugment = availablePool[randomIndex];
-
-            // 선택된 증강이 유효하다면 반복 종료
-            if (selectedAugment != null)
+            // 다음 등급으로 이동
+            grade = grade switch
             {
-                _selectedAugments.Add(selectedAugment);
-                break;
-            }
+                "Common" => "Rare",
+                "Rare" => "Unique",
+                "Unique" => "Common",
+                _ => null
+            };
+
+            pool = grade switch
+            {
+                "Common" => CommonAugments,
+                "Rare" => RareAugments,
+                "Unique" => UniqueAugments,
+                _ => null
+            };
+
+            continue; // 다른 등급에서 다시 시도
         }
 
-        return selectedAugment;
+        // 선택 가능한 증강에서 무작위 선택
+        int randomIndex = Random.Range(0, availablePool.Length);
+        selectedAugment = availablePool[randomIndex];
+
+        // 선택한 증강 추가
+        _selectedAugments.Add(selectedAugment);
+        break;
     }
+
+    return selectedAugment;
+}
+
 
     /// <summary>
     /// 확률에 따라 증강 등급을 선택
