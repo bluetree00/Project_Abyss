@@ -56,6 +56,13 @@ public class Define
         Drag,
     }
 
+    public enum AugmentGrade
+    {
+        Common,
+        Rare,
+        Unique
+    }
+
    
     public enum State //상태
     {
