@@ -61,11 +61,11 @@ public class ObjectPoolerManager
 
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
-         Debug.Log($"Loading prefab from path: {resourcePath}");
+         //Debug.Log($"Loading prefab from path: {resourcePath}");
         GameObject prefab = Managers.Resource.Load<GameObject>($"Prefabs/{resourcePath}");
         if (prefab == null)
         {
-            Debug.LogError($"Prefab at path {resourcePath} not found.");
+            //Debug.LogError($"Prefab at path {resourcePath} not found.");
             return null;
         }
 
