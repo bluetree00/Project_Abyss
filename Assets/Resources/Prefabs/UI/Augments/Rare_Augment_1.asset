@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb80246492f5ed04a8351e03b3c45065, type: 3}
   m_Name: Rare_Augment_1
   m_EditorClassIdentifier: 
-  Name: Rare
+  Name: Rare_Augment_1
   Icon: {fileID: 21300000, guid: 69df03b9d51684abeb15c88e6b2d3313, type: 3}
   Description: Increases the target's health.
   Grade: 1

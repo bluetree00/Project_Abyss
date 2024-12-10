@@ -22,71 +22,68 @@ public static class AugmentSelector
     /// 각 증강 등급에서 중복 없는 랜덤 증강 이름을 선택
     /// </summary>
     private static string GetRandomAugmentFromGrade(string grade)
-{
-    string[] pool = grade switch
     {
-        "Common" => CommonAugments,
-        "Rare" => RareAugments,
-        "Unique" => UniqueAugments,
-        _ => null
-    };
-
-    if (pool == null || pool.Length == 0)
-        return null;
-
-    string selectedAugment = null;
-
-    // 전체 증강 수를 제한하여 무한 루프 방지
-    HashSet<string> attemptedGrades = new HashSet<string>();
-
-    while (true)
-    {
-        // 현재 등급에서 선택 가능한 증강 필터링
-        var availablePool = pool.Except(_selectedAugments).ToArray();
-
-        if (availablePool.Length == 0)
+        string[] pool = grade switch
         {
-            attemptedGrades.Add(grade);
+            "Common" => CommonAugments,
+            "Rare" => RareAugments,
+            "Unique" => UniqueAugments,
+            _ => null
+        };
 
-            // 모든 등급을 순환했는지 확인
-            if (attemptedGrades.Count == 3) // 3개 등급 (Common, Rare, Unique)
+        if (pool == null || pool.Length == 0)
+            return null;
+
+        string selectedAugment = null;
+
+        // 전체 증강 수를 제한하여 무한 루프 방지
+        HashSet<string> attemptedGrades = new HashSet<string>();
+
+        while (true)
+        {
+            // 현재 등급에서 선택 가능한 증강 필터링
+            var availablePool = pool.Except(_selectedAugments).ToArray();
+
+            if (availablePool.Length == 0)
             {
-                Debug.LogWarning("모든 증강 등급에서 더 이상 선택할 수 있는 증강이 없습니다.");
-                return null; // 선택 불가능한 상태
+                attemptedGrades.Add(grade);
+
+                // 모든 등급을 순환했는지 확인
+                if (attemptedGrades.Count == 3) // 3개 등급 (Common, Rare, Unique)
+                {
+                    Debug.LogWarning("모든 증강 등급에서 더 이상 선택할 수 있는 증강이 없습니다.");
+                    return null; // 선택 불가능한 상태
+                }
+
+                // 다음 등급으로 이동
+                grade = grade switch
+                {
+                    "Common" => "Rare",
+                    "Rare" => "Unique",
+                    "Unique" => "Common",
+                    _ => null
+                };
+
+                pool = grade switch
+                {
+                    "Common" => CommonAugments,
+                    "Rare" => RareAugments,
+                    "Unique" => UniqueAugments,
+                    _ => null
+                };
+
+                continue; // 다른 등급에서 다시 시도
             }
 
-            // 다음 등급으로 이동
-            grade = grade switch
-            {
-                "Common" => "Rare",
-                "Rare" => "Unique",
-                "Unique" => "Common",
-                _ => null
-            };
+            // 선택 가능한 증강에서 무작위 선택
+            int randomIndex = Random.Range(0, availablePool.Length);
+            selectedAugment = availablePool[randomIndex];
 
-            pool = grade switch
-            {
-                "Common" => CommonAugments,
-                "Rare" => RareAugments,
-                "Unique" => UniqueAugments,
-                _ => null
-            };
-
-            continue; // 다른 등급에서 다시 시도
+            break;
         }
 
-        // 선택 가능한 증강에서 무작위 선택
-        int randomIndex = Random.Range(0, availablePool.Length);
-        selectedAugment = availablePool[randomIndex];
-
-        // 선택한 증강 추가
-        _selectedAugments.Add(selectedAugment);
-        break;
+        return selectedAugment;
     }
-
-    return selectedAugment;
-}
-
 
     /// <summary>
     /// 확률에 따라 증강 등급을 선택
@@ -114,11 +111,22 @@ public static class AugmentSelector
     public static string GetRandomAugmentName()
     {
         string grade = GetRandomGrade(); // 등급 선택
-        string augmentName = GetRandomAugmentFromGrade(grade); // 중복 방지된 증강 선택
+        string augmentName = GetRandomAugmentFromGrade(grade); // 중복 방지 없이 증강 선택
 
         Debug.Log(augmentName);
 
         return augmentName; // 하나의 증강 이름만 반환
+    }
+
+    /// <summary>
+    /// 외부에서 증강을 선택했을 때 해당 증강을 중복 목록에 추가
+    /// </summary>
+    public static void AddSelectedAugment(string augmentName)
+    {
+        if (!_selectedAugments.Contains(augmentName))
+        {
+            _selectedAugments.Add(augmentName); // 선택된 증강만 중복 처리
+        }
     }
 
     /// <summary>
@@ -129,4 +137,3 @@ public static class AugmentSelector
         _selectedAugments.Clear();
     }
 }
-
