@@ -3,32 +3,34 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "NewCharacterData", menuName = "Characters/Character Data")]
 public class CharacterData : ScriptableObject
 {
+    // 캐릭터 기본 정보
+    [Header("캐릭터 기본 정보")]
+    public string characterName;
+
     // 캐릭터 기본 스탯
     [Header("캐릭터 기본 스탯")]
     public float baseMoveSpeed;
     public float baseRunSpeed;
     public int maxHealth;
     public int attackPower;
-    
+
     // 공격, 콤보 관련 수치
     [Header("공격, 콤보 관련 수치")]
     public int attackComboStep = 0;       // 공격 스택 단계
     public float comboTimer = 0.0f;       // 콤보 유지 시간
-    public float comboDuration = 3.0f;     // 콤보가 유지되는 시간
+    public float comboDuration = 3.0f;   // 콤보가 유지되는 시간
 
     // 대시 관련 수치
     [Header("대시 관련 수치")]
     public bool canDodge = true;          // 대시 가능 여부
-    public float dashSpeed = 10f;          // 대시 속도
-    public float dashDuration = 0.2f;      // 대시 지속 시간
-    public float dodgeCooldown = 2f;       // 대시 쿨타임
+    public float dashSpeed = 10f;         // 대시 속도
+    public float dashDuration = 0.2f;     // 대시 지속 시간
+    public float dodgeCooldown = 2f;     // 대시 쿨타임
 
     // 특성 관련 수치
     [Header("특성 관련 수치")]
-    // 태그별 부스트 정보
     public float attackPowerBoostAmount = 10f;
     public float attackPowerBoostDuration = 10f;
-
     public float moveSpeedBoostAmount = 10f;
     public float moveSpeedBoostDuration = 3f;
 
@@ -38,102 +40,101 @@ public class CharacterData : ScriptableObject
     private int initialMaxHealth;
     private int initialAttackPower;
 
-    #region 특성 스탯 부스트 처리 메소드 모음
+    // 무기 관련
+    [Header("무기 관련")]
+    public WeaponData equippedWeapon;
 
-    // 초기값 저장 메서드
+    // 총 데미지 계산
+    private int totalAttackPower;
+
+    // 총 공격력 가져오기
+    public int GetTotalAttackPower()
+    {
+        return totalAttackPower;
+    }
+
+    // 총 공격력 업데이트
+    private void UpdateTotalAttackPower()
+    {
+        totalAttackPower = attackPower;
+
+        if (equippedWeapon != null)
+        {
+            totalAttackPower += equippedWeapon.CalculateEffectiveAttackPower();
+        }
+    }
+
+    // 초기화 메서드
     public void Initialize()
     {
         initialBaseMoveSpeed = baseMoveSpeed;
         initialBaseRunSpeed = baseRunSpeed;
         initialMaxHealth = maxHealth;
         initialAttackPower = attackPower;
+
+        UpdateTotalAttackPower(); // 초기화 시 총 공격력 계산
     }
 
-    // 스탯 복원 메서드
-    public void RestoreInitialStats()
+    // 부스트 적용 메서드
+    public void ApplyAttackBoost(float boostAmount, float duration)
     {
-        baseMoveSpeed = initialBaseMoveSpeed;
-        baseRunSpeed = initialBaseRunSpeed;
-        maxHealth = initialMaxHealth;
-        attackPower = initialAttackPower;
+        attackPower += Mathf.RoundToInt(boostAmount);
+        Debug.Log($"공격력이 {boostAmount}만큼 증가했습니다! 지속 시간: {duration}초");
 
-        Debug.Log("스탯 복원 완료");
+        UpdateTotalAttackPower(); // 부스트 후 총 공격력 재계산
     }
-        
-    // 스탯 부스트 처리 메서드
-    public void ApplyBoostByTag(MonoBehaviour behaviour, string tag)
+
+    public void ApplyMoveSpeedBoost(float boostAmount, float duration)
     {
-        switch (tag)
+        baseMoveSpeed += boostAmount;
+        Debug.Log($"이동 속도가 {boostAmount}만큼 증가했습니다! 지속 시간: {duration}초");
+    }
+
+    // 무기 장착 메서드
+    public void EquipWeapon(WeaponData newWeapon)
+    {
+        if (newWeapon == equippedWeapon)
         {
-            case "APBoost":
-                behaviour.StartCoroutine(DecayStat("attackPower", attackPowerBoostAmount, attackPowerBoostDuration));
-                break;
+            Debug.Log("같은 무기가 이미 장착되어 있습니다.");
+            return;
+        }
 
-            case "MSBoost":
-                behaviour.StartCoroutine(DecayStat("baseMoveSpeed", moveSpeedBoostAmount, moveSpeedBoostDuration));
-                break;
+        equippedWeapon = newWeapon;
 
-            default:
-                Debug.LogWarning($"정의되지 않은 태그: {tag}");
-                break;
+        if (newWeapon != null)
+        {
+            Debug.Log($"{characterName}이(가) {newWeapon.weaponName}을(를) 장착했습니다.");
+        }
+        else
+        {
+            Debug.Log($"{characterName}이(가) 무기를 해제했습니다.");
+        }
+
+        UpdateTotalAttackPower(); // 무기 장착 또는 해제 시 총 공격력 업데이트
+    }
+
+    // 무기 해제 메서드
+    public void UnequipWeapon()
+    {
+        if (equippedWeapon != null)
+        {
+            Debug.Log($"{characterName}이(가) {equippedWeapon.weaponName}을(를) 해제했습니다.");
+            equippedWeapon = null;
+
+            UpdateTotalAttackPower(); // 무기 해제 시 총 공격력 업데이트
+        }
+        else
+        {
+            Debug.Log("장착된 무기가 없습니다.");
         }
     }
 
-    private System.Collections.IEnumerator DecayStat(string statName, float boostAmount, float duration)
+    // 무기 효과를 적용하는 메서드
+    public void ApplyWeaponEffectsToDamage(ref float damage)
     {
-        float originalValue = GetStatValue(statName);
-        if (originalValue == -1f) yield break;
-
-        // 스탯 증가
-        SetStatValue(statName, originalValue + boostAmount);
-
-        Debug.Log($"<color=red>{statName} : {boostAmount} 만큼 증가</color>");
-
-        // 점진적으로 감소
-        float elapsed = 0f;
-        while (elapsed < duration)
+        if (equippedWeapon != null)
         {
-            elapsed += Time.deltaTime;
-            float currentValue = Mathf.Lerp(originalValue + boostAmount, originalValue, elapsed / duration);
-            SetStatValue(statName, currentValue);
-            yield return null;
-        }
-
-        // 최종적으로 원래 값 복원
-        SetStatValue(statName, originalValue);
-    }
-
-    private float GetStatValue(string statName)
-    {
-        // 스위치 문으로 각 스탯의 이름으로 수치를 가져오는 함수
-        switch (statName)
-        {
-            case "baseMoveSpeed": return baseMoveSpeed;
-            case "baseRunSpeed": return baseRunSpeed;
-            case "maxHealth": return maxHealth;
-            case "attackPower": return attackPower;
-            default:
-                Debug.LogWarning($"Stat {statName} not found!");
-                return -1f;
+            equippedWeapon.ApplyWeaponEffects(ref damage);
         }
     }
-
-    private void SetStatValue(string statName, float value)
-    {
-        //스위치 문으로 각 스탯을 관리하여 스탯값을 설정하는 함수
-        switch (statName)
-        {
-            case "baseMoveSpeed": baseMoveSpeed = value; break;
-            case "baseRunSpeed": baseRunSpeed = value; break;
-            case "maxHealth": maxHealth = Mathf.RoundToInt(value); break; // Health는 반올림하여 정수로 캐스팅
-            case "attackPower": attackPower = Mathf.RoundToInt(value); break; // 공격력도 반올림하여 정수로 캐스팅
-            default:
-                Debug.LogWarning($"Stat {statName} not found!");
-                break;
-        }
-    }
-    #endregion
-
-    
-    
 }

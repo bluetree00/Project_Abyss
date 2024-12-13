@@ -44,10 +44,10 @@ public class Managers : MonoBehaviour
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
+    public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
+
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
-    public static CharacterDataManager CharacterData => 
-    Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());    //캐릭터 데이터 관리 매니저
 
     #endregion
 
@@ -77,8 +77,8 @@ public class Managers : MonoBehaviour
     }
 
     void Start() {
-        FindandDataSync(); // 게임 시작 후 오브젝트 로딩 후에 캐릭터 찾기
-        CharacterData.characterData.Initialize(); //게임 시작 시 캐릭터 기본 스탯 초기값 저장
+        //FindandDataSync(); // 게임 시작 후 오브젝트 로딩 후에 캐릭터 찾기
+        //CharacterData.characterData.Initialize(); //게임 시작 시 캐릭터 기본 스탯 초기값 저장
     }
 
     void Update()
@@ -110,21 +110,21 @@ public class Managers : MonoBehaviour
     #region MonoBehaviour 필요한 작업
 
 
-    void FindandDataSync()      //게임이 시작된 후 캐릭터를 찾아 캐릭터 데이터를 동기화시키는 작업
-    {
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null){
-            string characterName = playerObj.name;
-            CharacterData currentPlayerData = Resource.Load<CharacterData>($"{characterName}");
-            Debug.Log($"{currentPlayerData.name}");
-            CharacterData.characterData = currentPlayerData; 
-            Debug.Log($"<color=green>{CharacterData.characterData} 데이터 전달 완료 </color>");
-        }
-        else
-        {   
-            Debug.LogWarning($"<color=orange>{_characterDataManager.characterData} 데이터 없음 </color>");
-        }
-    }
+    // void FindandDataSync()      //게임이 시작된 후 캐릭터를 찾아 캐릭터 데이터를 동기화시키는 작업
+    // {
+    //     GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+    //     if (playerObj != null){
+    //         string characterName = playerObj.name;
+    //         CharacterData currentPlayerData = Resource.Load<CharacterData>($"{characterName}");
+    //         Debug.Log($"{currentPlayerData.name}");
+    //         CharacterData.characterData = currentPlayerData; 
+    //         Debug.Log($"<color=green>{CharacterData.characterData} 데이터 전달 완료 </color>");
+    //     }
+    //     else
+    //     {   
+    //         Debug.LogWarning($"<color=orange>{_characterDataManager.characterData} 데이터 없음 </color>");
+    //     }
+    // }
 
     void CheckWeapon()
     {
@@ -134,7 +134,7 @@ public class Managers : MonoBehaviour
     void OnApplicationQuit()
     {
         // 게임 실행 종료 시 초기값으로 복원
-        CharacterData.characterData.RestoreInitialStats();
+        //CharacterData.characterData.RestoreInitialStats();
         // 게임 종료 시 사용한 후 필요없는 로드파일들 메모리 해제
         Resources.UnloadUnusedAssets();
     }

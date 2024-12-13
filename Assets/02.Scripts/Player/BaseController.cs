@@ -7,6 +7,8 @@ public class BaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
+    [SerializeField] 
+    protected WeaponData weaponData; //데스트용 무기 데이터
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -26,15 +28,17 @@ public class BaseController : MonoBehaviour
     private void Start()
     {
         Init();
-        
     }
 
     protected virtual void Init()
     {
         rb = GetComponent<Rigidbody>();
         playerTransform = transform;
-    }
+        string characterName = gameObject.name; 
 
+        characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
+        Managers.CharacterData.SetCharacterData(characterData);
+    }
     #endregion
 
     //캐릭터들의 기본 상속 움직임

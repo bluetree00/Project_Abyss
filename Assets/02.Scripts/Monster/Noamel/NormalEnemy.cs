@@ -1,8 +1,6 @@
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections.Generic;
 
 public class NormalEnemy : MonsterBaseController
 {
@@ -10,7 +8,6 @@ public class NormalEnemy : MonsterBaseController
 
     protected override void UpdateIdle()
     {
-        
         GameObject player = GameObject.FindGameObjectWithTag("Player");
 
         if (player == null)
@@ -72,8 +69,13 @@ public class NormalEnemy : MonsterBaseController
         if (effectComponent != null)
         {
             EffectData effectData = effectComponent.effectData;
+            if (effectData == null)
+            {
+                Debug.LogError("EffectData is null in EffectComponent!");
+                return;
+            }
 
-                // 플레이어용 이펙트인지 확인 후 데미지 처리
+            // 플레이어용 이펙트인지 확인 후 데미지 처리
             if (effectData.isPlayerEffect)
             {
                 // 쿨타임 체크 및 데미지 처리
@@ -84,6 +86,7 @@ public class NormalEnemy : MonsterBaseController
                 }
             }
         }
+    
     }
 
     private bool CanHit(EffectData effectData)
@@ -91,7 +94,8 @@ public class NormalEnemy : MonsterBaseController
         // 쿨타임 체크
         if (hitCooldowns.ContainsKey(effectData.effectName))
         {
-            return Time.time >= hitCooldowns[effectData.effectName]; // 현재 시간이 쿨타임이 끝나는 시간보다 크거나 같은지 체크
+            bool canHit = Time.time >= hitCooldowns[effectData.effectName]; // 현재 시간이 쿨타임이 끝나는 시간보다 크거나 같은지 체크
+            return canHit;
         }
         return true; // 처음 공격일 경우
     }
@@ -111,6 +115,7 @@ public class NormalEnemy : MonsterBaseController
             Quaternion spawnRotation2 = Quaternion.identity; // 회전 값은 필요에 따라 설정
 
             GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
+            Debug.Log("Monster died, spawning die effect.");
             Destroy(this.gameObject);
         }
         Debug.Log($"Monster took {damage} damage. Current Health: {hp}");
@@ -120,9 +125,8 @@ public class NormalEnemy : MonsterBaseController
         Quaternion spawnRotation = Quaternion.identity; // 회전 값은 필요에 따라 설정
 
         GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
+        Debug.Log("Spawned hit effect.");
     }
-
-
 
     // 몬스터 공격 애니메이션 이벤트
     void OnAttackEvent()

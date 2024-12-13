@@ -12,12 +12,11 @@ public class Vagabond : BaseController
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
-    [SerializeField] WeaponData weaponData; //데스트용 무기 데이터
     protected override void Init()
     {
         
         base.Init(); // 부모 클래스의 초기화 코드 호출
-         Managers.UI.ShowSceneUI<UI_Inven>();
+        //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
     //플레이어의 강제 회전 방지
@@ -44,7 +43,7 @@ public class Vagabond : BaseController
         Managers.Input.KeyAction -= OnInput;
         Managers.Input.KeyAction += OnInput;
 
-        characterData.canDodge = true; //구르기 활성화
+
     }
 
     #endregion
@@ -186,7 +185,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
-            Managers.UI.ShowAugmentChoiceUI(null);
+           Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)
@@ -274,7 +273,7 @@ public class Vagabond : BaseController
 
 
     #endregion
-
+/*
     #region 특성 (스탯) 처리
         private void OnTriggerEnter(Collider other) {
 
@@ -289,7 +288,7 @@ public class Vagabond : BaseController
                 Destroy(other.gameObject);
         }
     #endregion
-
+*/
     #region 애니메이션 이벤트 처리
 
     private void OnEndEvent()

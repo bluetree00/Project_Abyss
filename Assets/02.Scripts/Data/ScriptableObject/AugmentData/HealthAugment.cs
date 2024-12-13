@@ -16,9 +16,9 @@ public class HealthAugment : AugmentData
     public override void UseAugment(GameObject target)
     {
         //필요한 로직 사용
-       Debug.Log($"'{Name}'증강 효과 발동!");
+        Debug.Log($"'{Name}'증강 효과 발동!");
         AugmentSelector.AddSelectedAugment(Name);
-       
+        Managers.CharacterData.AdjustStat("AttackPower", 10);
 
     }
 }

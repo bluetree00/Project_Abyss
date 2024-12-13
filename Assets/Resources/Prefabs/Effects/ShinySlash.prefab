@@ -4939,6 +4939,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   effectData: {fileID: 11400000, guid: 341f413cd2860484db58d0abb9eeb5e1, type: 2}
+  ownerCharacterData: {fileID: 11400000, guid: 0016ea1f1ec94d1478eb444510df67ca, type: 2}
 --- !u!1 &8111811156769411746
 GameObject:
   m_ObjectHideFlags: 0
