@@ -12,8 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23298f6ade84bab4997956109bb63e2c, type: 3}
   m_Name: ShinySlash
   m_EditorClassIdentifier: 
+  ownerCharacterData: {fileID: 11400000, guid: 0016ea1f1ec94d1478eb444510df67ca, type: 2}
+  ownerWeaponData: {fileID: 0}
   effectName: ShinySlash
   damage: 10
+  totalDamage: 0
   hitInterval: 0.1
   effectTag: ShinySlash
   isPlayerEffect: 1
