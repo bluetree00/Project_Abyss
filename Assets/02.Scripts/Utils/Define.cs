@@ -78,8 +78,12 @@ public class Define
         NormalAttack_04,
         NormalAttack_05,
 
-        NormalSkile_01,
-        UltimateSkile_01,
+        NormalSkill_01,
+        UltimateSkill_01,
+
+        // 무기와 일반 Idle 상태 분리
+
+        Test_Axe_Idle,
         
     }
 
