@@ -110,8 +110,8 @@ public class Vagabond : BaseController
         Define.State.NormalAttack_01,
         Define.State.NormalAttack_02,
         Define.State.NormalAttack_03,
-        Define.State.NormalSkile_01,
-        Define.State.UltimateSkile_01,
+        Define.State.NormalSkill_01,
+        Define.State.UltimateSkill_01,
         Define.State.Dodge
     };
 
@@ -215,7 +215,7 @@ public class Vagabond : BaseController
     private void ProcessSkile()
     {
         Debug.Log("E");
-        ChangeState(Define.State.NormalSkile_01);
+        ChangeState(Define.State.NormalSkill_01);
     }
     #endregion 
 
@@ -223,7 +223,7 @@ public class Vagabond : BaseController
     private void ProcessUltimateSkile()
     {
         Debug.Log("Q");
-        ChangeState(Define.State.UltimateSkile_01);
+        ChangeState(Define.State.UltimateSkill_01);
     }
     #endregion 
 
@@ -397,6 +397,23 @@ public class Vagabond : BaseController
         effectObject.transform.position = spawnPosition;
         effectObject.transform.rotation = spawnRotation; 
     }
+
+    #region 테스트용 무기 아이들 코드
+    private void OnTriggerEnter(Collider other) {
+        if (other.tag == "WeaponChange")
+        {
+            // 임시로 텍스트 작성 => 향후 스트링으로 충돌하거나 선택한 정보의 이름값을 받아와 적용
+            GameObject testWeaponObj = Managers.Resource.Load<GameObject>("Prefabs/Test_AxeBasic_01");
+            GameObject.Instantiate(testWeaponObj, weaponTranform);
+            if (testWeaponObj == null)
+                Debug.LogError("무기 안 불러와짐");
+            ChangeState(Define.State.Test_Axe_Idle);
+        }
+    } 
+
+    
+
+    #endregion
 
 
 

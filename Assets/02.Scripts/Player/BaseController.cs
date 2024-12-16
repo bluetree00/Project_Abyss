@@ -9,6 +9,7 @@ public class BaseController : MonoBehaviour
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
     [SerializeField] 
     protected WeaponData weaponData; //데스트용 무기 데이터
+    public Transform weaponTranform; // 무기 오브젝트가 장착될 위치
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -24,6 +25,9 @@ public class BaseController : MonoBehaviour
     protected Rigidbody rb;  // Rigidbody 참조
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
+
+    // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수수
+    // 무기SO.무기이름 
 
     private void Start()
     {
@@ -96,12 +100,21 @@ public class BaseController : MonoBehaviour
                 case Define.State.NormalAttack_03:
                     anim.CrossFade("NormalAttack_03", 0.1f);
                    break;
-                case Define.State.NormalSkile_01:
+                case Define.State.NormalSkill_01:
                     anim.CrossFade("NormalSkile_01", 0.1f);
                    break;
-                case Define.State.UltimateSkile_01:
+                case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
+
+                //테스트용 무기 Idle
+                case Define.State.Test_Axe_Idle:
+                   anim.CrossFade("Test_Axe_Idle", 0.2f);
+                   break;
+                // case Define.State.currentWeaponIdle:
+                //      null 체크
+                //    anim.CrossFade($"{매개변수 스트링}", 0.2f);
+                //    break;
             }
         }
     }
@@ -132,11 +145,16 @@ public class BaseController : MonoBehaviour
             case Define.State.NormalAttack_03:
                 UpdateNormalAttack_03();
                 break;
-            case Define.State.NormalSkile_01:
+            case Define.State.NormalSkill_01:
                 UpdateNormalSkile_01();
                 break;
-            case Define.State.UltimateSkile_01:
+            case Define.State.UltimateSkill_01:
                 UpdateUltimateSkile_01();
+                break;
+
+            //
+            case Define.State.Test_Axe_Idle:
+                UpdateWeaponIdle();
                 break;
         }
     }
@@ -151,5 +169,8 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
     protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
     protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
+
+    // test 무기 idle
+    protected virtual void UpdateWeaponIdle(){} // 무기 idle 상태 로직직
 
 }
