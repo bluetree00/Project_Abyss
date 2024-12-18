@@ -1,7 +1,28 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Weapon/WeaponData", fileName = "WeaponData")]
-public class WeaponData : ScriptableObject
+// 무기 타입 열거형
+    public enum WeaponType
+    {
+        Sword,
+        Bow,
+        Staff,
+        Dagger,
+        Axe
+    }
+
+    // 무기 등급 열거형
+    public enum WeaponRarity
+    {
+        Common,
+        Rare,
+        Epic,
+        Legendary
+    }
+
+// 얘를 상속받아서 각 무기들의 SO 데이터 생성 예정
+// 얘는 모든 무기 SO 들의 부모 가상 클래스
+
+public abstract class WeaponData : ScriptableObject
 {
     // 기본 무기 정보
     [Header("기본 무기 정보")]
@@ -36,7 +57,7 @@ public class WeaponData : ScriptableObject
     }
 
     // 무기 효과를 적용하는 메서드
-    public void ApplyWeaponEffects(ref float damage)
+    public virtual void ApplyWeaponEffects(ref float damage)
     {
         if (hasSpecialEffect)
         {
@@ -46,22 +67,5 @@ public class WeaponData : ScriptableObject
         }
     }
 
-    // 무기 타입 열거형
-    public enum WeaponType
-    {
-        Sword,
-        Bow,
-        Staff,
-        Dagger,
-        Axe
-    }
-
-    // 무기 등급 열거형
-    public enum WeaponRarity
-    {
-        Common,
-        Rare,
-        Epic,
-        Legendary
-    }
+    
 }
