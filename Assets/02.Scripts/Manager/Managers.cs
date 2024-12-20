@@ -46,7 +46,7 @@ public class Managers : MonoBehaviour
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
-    public static WeaponManager WeaponData => Instance.weaponManager ?? (Instance.weaponManager = new WeaponManager());
+    public static WeaponManager Weapon => Instance.weaponManager ?? (Instance.weaponManager = new WeaponManager());
 
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }

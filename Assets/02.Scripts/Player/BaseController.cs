@@ -9,7 +9,8 @@ public class BaseController : MonoBehaviour
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
     [SerializeField] 
     protected WeaponData weaponData; //데스트용 무기 데이터
-    public Transform weaponTranform; // 무기 오브젝트가 장착될 위치
+    [SerializeField]
+    protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -26,7 +27,7 @@ public class BaseController : MonoBehaviour
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
 
-    // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수수
+    // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
     // 무기SO.무기이름 
 
     private void Start()
@@ -42,8 +43,16 @@ public class BaseController : MonoBehaviour
 
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
+
+        // Managers.Weapon.WMDataInit(weaponContainer, characterData, );
     }
     #endregion
+
+    // {Test} 각 Enum 별로 들고있는 기본 무기 설정
+    void GetBasicWeapon()
+    {
+
+    }
 
     //캐릭터들의 기본 상속 움직임
     protected virtual void Move(Vector3 direction, float speed)

@@ -398,24 +398,5 @@ public class Vagabond : BaseController
         effectObject.transform.rotation = spawnRotation; 
     }
 
-    #region 테스트용 무기 아이들 코드
-    private void OnTriggerEnter(Collider other) {
-        if (other.tag == "WeaponChange")
-        {
-            // 임시로 텍스트 작성 => 향후 스트링으로 충돌하거나 선택한 정보의 이름값을 받아와 적용
-            GameObject testWeaponObj = Managers.Resource.Load<GameObject>("Prefabs/Test_AxeBasic_01");
-            GameObject.Instantiate(testWeaponObj, weaponTranform);
-            if (testWeaponObj == null)
-                Debug.LogError("무기 안 불러와짐");
-            ChangeState(Define.State.Test_Axe_Idle);
-        }
-    } 
-
-    
-
-    #endregion
-
-
-
     #endregion
 }
