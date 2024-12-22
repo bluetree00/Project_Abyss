@@ -43,16 +43,8 @@ public class BaseController : MonoBehaviour
 
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
-
-        // Managers.Weapon.WMDataInit(weaponContainer, characterData, );
     }
     #endregion
-
-    // {Test} 각 Enum 별로 들고있는 기본 무기 설정
-    void GetBasicWeapon()
-    {
-
-    }
 
     //캐릭터들의 기본 상속 움직임
     protected virtual void Move(Vector3 direction, float speed)
