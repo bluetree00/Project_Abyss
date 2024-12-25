@@ -45,6 +45,10 @@ public class CharacterData : ScriptableObject
     // 무기 관련
     [Header("무기 관련")]
     public WeaponData equippedWeapon;
+    
+    //캐릭터 클래스
+    [Header("캐릭터 클래스")]
+    public Define.CharacterClass conClass;
 
     // 총 데미지 계산
     private int totalAttackPower;

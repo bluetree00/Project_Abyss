@@ -7,8 +7,6 @@ public class BaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
-    [SerializeField] 
-    protected WeaponData weaponData; //데스트용 무기 데이터
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
     protected Vector3 moveDirection;  // 이동 방향
@@ -43,6 +41,10 @@ public class BaseController : MonoBehaviour
 
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
+
+        string className = characterData.conClass.ToString();
+        weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{className}");
+        Managers.Weapon.ContainerDataInit(weaponContainer);
     }
     #endregion
 

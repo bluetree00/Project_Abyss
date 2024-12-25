@@ -9,20 +9,21 @@ public class WeaponManager
     public WeaponContainer w_Con { get; private set; }
 
     // 컨테이너 데이터를 받아옴 => 컨테이너 안에 무기 SO 존재
-    void ContainerDataInit(WeaponContainer con)
+    public void ContainerDataInit(WeaponContainer con)
     {
         w_Con = con;   // 매니저 변수 = 매개변수 동기화
         SetDefult();   // 기본 무기 설정
+        w_Con.InitiateWeaponObject(); // 무기 오브젝트 생성
     }
 
     // 컨테이너 내부에 있는 변수나 함수를 WeaponManager에서 사용 => SO는 함수 실행이 아닌 변수로만 사용
 
     void SetDefult()
     {
-        string basicClass_WeaponName = w_Con.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
-        WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{basicClass_WeaponName}"); // 무기 데이터 로드
+        string ClassName = w_Con.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
+        WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
         w_Con.currentWeapon = resourceWData;
-
+        w_Con.ownWeapons[0] = resourceWData;
     }
 
     public void SetWeapon(string itemName)

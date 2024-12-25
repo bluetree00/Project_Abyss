@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cc867ab6a6b3b1840a37fefe4068021c, type: 3}
-  m_Name: Basic_Knight
+  m_Name: basic_Knight_01
   m_EditorClassIdentifier: 
-  weaponName: 
+  weaponName: test
   attackPower: 0
   description: 
   hasSpecialEffect: 0
@@ -22,4 +22,10 @@ MonoBehaviour:
   upgradeLevel: 0
   weaponType: 0
   attackSpeed: 1
-  Type: 0
+  Q_SkillName: testQ
+  Q_SkillDescription: 
+  Q_SkillEffectName: []
+  E_SkillName: testE
+  E_SkillDescription: 
+  E_SkillEffectName: []
+  weaponObjName: basic_Knight_01

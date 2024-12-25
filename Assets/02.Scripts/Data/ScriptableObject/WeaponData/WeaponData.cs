@@ -67,17 +67,13 @@ public abstract class WeaponData : ScriptableObject
     public string E_SkillDescription; // E 스킬 설명
     public string[] E_SkillEffectName; // E 스킬 이펙트 이름 배열(리스트)
 
-
     // Q 스킬 추상함수
-    // public abstract void QSkill(); // Q 스킬 추상함수
     public abstract void QSkill(); // Q 스킬 추상함수
     
     // E 스킬 추상함수
-    // public abstract void ESkill(); // E 스킬 추상함수
     public abstract void ESkill(); // E 스킬 추상함수
 
     // 무기 오브젝트 이름 변수
-    // public string weaponObjName;
     public string weaponObjName;
 
 
