@@ -30,7 +30,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
         if (currentWeapon != null)
         {
             string weaponObjName = currentWeapon.weaponObjName;
-            GameObject weaponObject = Managers.Resource.Q_Instantiate(weaponObjName, Quaternion.identity);
+            GameObject weaponObject = Managers.Resource.Q_Instantiate($"Weapons/{weaponObjName}", Quaternion.identity);
             if (weaponObject != null)
             {
                 Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
