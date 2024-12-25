@@ -28,6 +28,26 @@ public class ResourceManager
         return go;
     }
 
+    public GameObject Q_Instantiate(string path, Quaternion rotation = default, Transform parent = null)
+    {
+        GameObject prefab = Load<GameObject>($"Prefabs/{path}"); // 가져올 오브젝트 경로 설정
+        if (prefab == null)
+        {
+            Debug.Log($"Failed to load prefab : {path}");
+            return null;
+        }
+
+        GameObject go = Object.Instantiate(prefab, parent);
+        go.transform.rotation = rotation; // 회전값 설정
+        int index = go.name.IndexOf("(Clone)");
+        if (index > 0)
+        {
+            go.name = go.name.Substring(0, index);
+        }
+
+        return go;
+    }
+
     public void Destroy(GameObject go)
     {
         if (go == null)
