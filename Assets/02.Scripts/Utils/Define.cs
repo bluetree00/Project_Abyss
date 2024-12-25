@@ -63,6 +63,15 @@ public class Define
         Unique
     }
 
+    public enum CharacterClass
+    {     // {Test} 각 캐릭터의 클래스를 알아보기 위한 클래스 Enum
+    Knight,
+    Mage,
+    Hunter,
+    Rogue,
+    Guardian,
+    }
+
    
     public enum State //상태
     {

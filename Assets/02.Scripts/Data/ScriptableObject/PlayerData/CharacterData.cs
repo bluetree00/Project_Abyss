@@ -1,12 +1,6 @@
 using UnityEngine;
 
-public enum CharacterClass{     // {Test} 각 캐릭터의 클래스를 알아보기 위한 클래스 Enum
-    Knight,
-    Mage,
-    Hunter,
-    Rogue,
-    Guardian,
-}
+
 
 [CreateAssetMenu(fileName = "NewCharacterData", menuName = "Characters/Character Data")]
 public class CharacterData : ScriptableObject
@@ -14,8 +8,6 @@ public class CharacterData : ScriptableObject
     // 캐릭터 기본 정보
     [Header("캐릭터 기본 정보")]
     public string characterName;
-    [Header("캐릭터 클래스")]
-    public CharacterClass Class;
 
     // 캐릭터 기본 스탯
     [Header("캐릭터 기본 스탯")]
@@ -139,7 +131,7 @@ public class CharacterData : ScriptableObject
         }
     }
 
-    // 무기 효과를 적용하는 메서드
+    //무기 효과를 적용하는 메서드
     public void ApplyWeaponEffectsToDamage(ref float damage)
     {
         if (equippedWeapon != null)
@@ -147,40 +139,4 @@ public class CharacterData : ScriptableObject
             equippedWeapon.ApplyWeaponEffects(ref damage);
         }
     }
-
-    #region 캐릭터 클래스 Enum 설정값 자동화
-    public void SetSO_Enum()
-    {
-        switch(true)
-        {
-            case bool _ when name.Contains("Knight") :
-                Class = CharacterClass.Knight;
-                break;
-            case bool _ when name.Contains("Mage") :
-                Class = CharacterClass.Mage;
-                break;
-            case bool _ when name.Contains("Hunter") :
-                Class = CharacterClass.Hunter;
-                break;
-            case bool _ when name.Contains("Rogue") :
-                Class = CharacterClass.Rogue;
-                break;
-            case bool _ when name.Contains("Guardian") :
-                Class = CharacterClass.Guardian;
-                break;
-            default:
-                Class = CharacterClass.Knight;
-                break;
-        }
-    }
-
-    private void OnValidate() {
-        SetSO_Enum();
-    }
-
-    public string class_string()
-    {
-        return Class.ToString();
-    }
-    #endregion
 }

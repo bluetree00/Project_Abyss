@@ -107,11 +107,6 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-
-                //테스트용 무기 Idle
-                case Define.State.Test_Axe_Idle:
-                   anim.CrossFade("Test_Axe_Idle", 0.2f);
-                   break;
                 // case Define.State.currentWeaponIdle:
                 //      null 체크
                 //    anim.CrossFade($"{매개변수 스트링}", 0.2f);
