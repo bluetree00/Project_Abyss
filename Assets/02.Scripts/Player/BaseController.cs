@@ -42,13 +42,45 @@ public class BaseController : MonoBehaviour
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
 
-        // string className = characterData.conClass.ToString();
-        // weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{className}");
-        // Managers.Weapon.ContainerDataInit(weaponContainer);
-
                                                                                     // return된 스트링 값 그대로 사용
         weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
-        Managers.Weapon.ContainerDataInit(weaponContainer);
+        // 하위 오브젝트 이름을 출력하여 확인
+        foreach (Transform child in playerTransform)
+        {
+            Debug.Log($"Child: {child.name}");
+        }
+
+        // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
+        Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
+        if (weaponHandTransform != null)
+        {
+            // WeaponManager의 ContainerDataInit 메서드에 손의 트랜스폼을 전달
+            Managers.Weapon.ContainerDataInit(weaponContainer, weaponHandTransform);
+        }
+        else
+        {
+            Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
+        }
+        
+    }
+
+    private Transform FindDeepChildBFS(Transform parent, string name)
+    {
+        Queue<Transform> queue = new Queue<Transform>();
+        queue.Enqueue(parent);
+
+        while (queue.Count > 0)
+        {
+            Transform current = queue.Dequeue();
+            if (current.name == name)
+                return current;
+
+            foreach (Transform child in current)
+            {
+                queue.Enqueue(child);
+            }
+        }
+        return null;
     }
     #endregion
 

@@ -9,15 +9,24 @@ public class WeaponManager
     public WeaponContainer w_Con { get; private set; }
 
     // 컨테이너 데이터를 받아옴 => 컨테이너 안에 무기 SO 존재
-    public void ContainerDataInit(WeaponContainer con)
+    // public void ContainerDataInit(WeaponContainer con)
+    // {
+    //     w_Con = con;   // 매니저 변수 = 매개변수 동기화
+    //     SetDefult();   // 기본 무기 설정
+    //     w_Con.SpawnWeaponObject(); // 무기 오브젝트 생성
+    // }
+
+    public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform)
     {
         w_Con = con;   // 매니저 변수 = 매개변수 동기화
+        w_Con.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
         SetDefult();   // 기본 무기 설정
-        w_Con.InitiateWeaponObject(); // 무기 오브젝트 생성
+        w_Con.SpawnWeaponObject(); // 무기 오브젝트 생성
     }
 
-    // 컨테이너 내부에 있는 변수나 함수를 WeaponManager에서 사용 => SO는 함수 실행이 아닌 변수로만 사용
-
+    /// <summary>
+    /// 기본 무기 설정
+    /// </summary>
     void SetDefult()
     {
         string ClassName = w_Con.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
@@ -26,6 +35,11 @@ public class WeaponManager
         w_Con.ownWeapons[0] = resourceWData;
     }
 
+
+    /// <summary>
+    /// 무기가 바뀔 때 호출할 함수 => 무기 변경 함수
+    /// </summary>
+    /// <param name="itemName"></param>
     public void SetWeapon(string itemName)
     {
         WeaponData itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
