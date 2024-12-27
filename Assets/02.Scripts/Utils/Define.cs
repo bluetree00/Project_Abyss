@@ -63,13 +63,32 @@ public class Define
         Unique
     }
 
-    public enum CharacterClass
-    {     // {Test} 각 캐릭터의 클래스를 알아보기 위한 클래스 Enum
-    Knight,
-    Mage,
-    Hunter,
-    Rogue,
-    Guardian,
+    public enum CharacterClass  // {Test} 각 캐릭터의 클래스를 알아보기 위한 클래스 Enum
+    {     
+        Knight,
+        Mage,
+        Hunter,
+        Rogue,
+        Guardian,
+    }
+
+    public static string GetCharacterClassString(string characterName)
+    {
+        switch (characterName)
+        {
+            case "Character_01":
+                return "Knight_container";
+            case "Mage":
+                return "Mage_container";
+            case "Hunter":
+                return "Hunter_container";
+            case "Rogue":
+                return "Rogue_container";
+            case "Guardian":
+                return "Guardian_container";
+            default:
+                return "Unknown";
+        }
     }
 
    

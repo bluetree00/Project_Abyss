@@ -42,8 +42,12 @@ public class BaseController : MonoBehaviour
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
 
-        string className = characterData.conClass.ToString();
-        weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{className}");
+        // string className = characterData.conClass.ToString();
+        // weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{className}");
+        // Managers.Weapon.ContainerDataInit(weaponContainer);
+
+                                                                                    // return된 스트링 값 그대로 사용
+        weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
         Managers.Weapon.ContainerDataInit(weaponContainer);
     }
     #endregion
