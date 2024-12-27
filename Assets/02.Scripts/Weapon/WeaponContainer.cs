@@ -37,12 +37,12 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
             }
             else
             {
-                Debug.LogError($"무기 {weaponObjName} 생성성에 실패했습니다.");
+                Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
             }
         }
         else
         {
-            Debug.LogError("현재 무기가 null 입니다다.");
+            Debug.LogError("현재 무기가 null 입니다.");
         }
     }
 
