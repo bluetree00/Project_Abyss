@@ -54,6 +54,7 @@ public class Vagabond : BaseController
         Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
+        CheckMovementInput();
         UpdateMovement();
         FreezeRotation();
        
@@ -66,6 +67,7 @@ public class Vagabond : BaseController
                 ResetCombo();
             }
         }
+
     }
 
     // 입력 처리
@@ -81,7 +83,7 @@ public class Vagabond : BaseController
         if (!CanProcessInput())
             return;
         
-        CheckMovementInput();
+        //CheckMovementInput();
 
         // 마우스 좌클릭으로 공격 시작
         if (Input.GetMouseButtonDown(0))
@@ -144,6 +146,8 @@ public class Vagabond : BaseController
     {
         if (!CanProcessInput())
             return;
+        
+        //CheckMovementInput(); // 입력 상태 갱신
 
         if (moveDirection.magnitude > 0)
         {
@@ -153,12 +157,15 @@ public class Vagabond : BaseController
         {
             ChangeState(Define.State.Idle);
         }
+
+        Debug.Log("진행중");
     }
 
     private void ChangeState(Define.State newState)
     {
         if (State != newState)
             State = newState;
+        
     }
 
     //Moving 상태
@@ -185,7 +192,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
-           Managers.UI.ShowAugmentChoiceUI(null);
+          // Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)
