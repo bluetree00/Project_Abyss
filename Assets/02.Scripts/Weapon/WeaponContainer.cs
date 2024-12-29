@@ -19,11 +19,11 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     /// </summary>
     [SerializeField]
     public Define.CharacterClass conClass;
+    [SerializeField]
+    private GameObject currentWeaponObject;
 
     // 손의 트랜스폼을 저장할 변수
     public Transform weaponHandTransform;
-    public Vector3 weaponHandPosition = new Vector3(0, 0, 0.45f);
-    public Quaternion weaponHandRotation = Quaternion.Euler(90, 0, 0);
 
     // public enum ConClass { Kinght, Archer, Mage, Thief, Warrior } => Define.cs에 있음
 
@@ -54,14 +54,18 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     {
         if (currentWeapon != null)
         {
+            if (currentWeaponObject != null)
+            {
+                Destroy(currentWeaponObject);
+            }
+
             string weaponObjName = currentWeapon.weaponObjName;
-            GameObject weaponObject = Managers.Resource.Q_Instantiate($"Weapons/{weaponObjName}", Quaternion.identity);
-            if (weaponObject != null)
+            currentWeaponObject = Managers.Resource.Instantiate($"Weapons/{weaponObjName}");
+            if (currentWeaponObject != null)
             {
                 // 무기 오브젝트를 손의 트랜스폼 하위에 생성
-                weaponObject.transform.SetParent(weaponHandTransform);
-                weaponObject.transform.localPosition = weaponHandPosition;
-                weaponObject.transform.localRotation = weaponHandRotation;
+                currentWeaponObject.transform.SetParent(weaponHandTransform);
+                currentWeaponObject.transform.localPosition = Vector3.zero;
 
                 Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
             }

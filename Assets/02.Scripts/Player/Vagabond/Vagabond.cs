@@ -54,6 +54,7 @@ public class Vagabond : BaseController
         Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
+        CheckMovementInput();
         UpdateMovement();
         FreezeRotation();
        
@@ -81,7 +82,7 @@ public class Vagabond : BaseController
         if (!CanProcessInput())
             return;
         
-        CheckMovementInput();
+        // CheckMovementInput();
 
         // 마우스 좌클릭으로 공격 시작
         if (Input.GetMouseButtonDown(0))
@@ -101,6 +102,24 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
+        //------------------------키 중복 체크해야함------------------------
+        // 키보드 1 입력 (무기 교체)
+        if (Input.GetKey(KeyCode.Alpha1))
+        {
+            Managers.Weapon.ChangeWeapon(1);
+        }
+
+        // 키보드 2 입력 (무기 교체)
+        if (Input.GetKey(KeyCode.Alpha2))
+        {
+            Managers.Weapon.ChangeWeapon(2);
+        }
+
+        if (Input.GetKey(KeyCode.G))
+        {
+            Managers.Weapon.SetWeapon("basic_Knight_02");
+        }
+        //-----------------------------------------------------------------
     }
 
     #endregion
@@ -185,7 +204,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
-           Managers.UI.ShowAugmentChoiceUI(null);
+        //    Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)

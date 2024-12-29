@@ -7,6 +7,7 @@ public class BaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
+    public CharacterData CharacterData { get { return characterData; } }
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
     protected Vector3 moveDirection;  // 이동 방향
@@ -44,11 +45,6 @@ public class BaseController : MonoBehaviour
 
                                                                                     // return된 스트링 값 그대로 사용
         weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
-        // 하위 오브젝트 이름을 출력하여 확인
-        foreach (Transform child in playerTransform)
-        {
-            Debug.Log($"Child: {child.name}");
-        }
 
         // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
         Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
@@ -61,7 +57,6 @@ public class BaseController : MonoBehaviour
         {
             Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
         }
-        
     }
 
     private Transform FindDeepChildBFS(Transform parent, string name)
