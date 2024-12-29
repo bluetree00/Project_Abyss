@@ -3,10 +3,12 @@ using System;
 
 public class WeaponManager
 {
+    WeaponData itemNameData;
     /// <summary>
     /// 무기 컨테이너
     /// </summary>
-    public WeaponContainer w_Con { get; private set; }
+    public static WeaponContainer w_Con { get; private set; } // 일반 변수에서 static 변수로 변경
+    public CharacterData cData { get; private set; }
 
     // 컨테이너 데이터를 받아옴 => 컨테이너 안에 무기 SO 존재
     // public void ContainerDataInit(WeaponContainer con)
@@ -42,12 +44,16 @@ public class WeaponManager
     /// <param name="itemName"></param>
     public void SetWeapon(string itemName)
     {
-        WeaponData itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
-
+        itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
+        Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
         if (Array.Exists(w_Con.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
         {
             Debug.Log("이미 소지중인 무기입니다.");
             return;
+        }
+        else
+        {
+            Debug.Log("새로운 무기를 획득했습니다.");
         }
     
         int emptySlotIndex = Array.IndexOf(w_Con.ownWeapons, null); // 빈 공간 찾기
@@ -57,6 +63,27 @@ public class WeaponManager
         }
     
         w_Con.currentWeapon = itemNameData;
+    }
+
+    public void ChangeWeapon(int index)
+    {
+        if (w_Con.ownWeapons[index - 1] != null)
+        {
+            w_Con.currentWeapon = w_Con.ownWeapons[index - 1];
+            w_Con.SpawnWeaponObject();
+        }
+        
+    }
+
+    // 캐릭터 오브젝트 이름으로 찾아서 변수에 동기화
+    // Find() 함수 사용 => 캐릭터 오브젝트 찾고 => 캐릭터 오브젝트에 붙어있는 컴포넌트로 접근해서 => 컨테이너의 배열에 접근
+    public void FindCharacterWeaponContainer(string characterName)
+    {
+        GameObject characterObj = GameObject.Find(characterName);
+        if (characterObj != null)
+        {
+            w_Con = characterObj.GetComponent<WeaponContainer>();
+        }
     }
 
 
