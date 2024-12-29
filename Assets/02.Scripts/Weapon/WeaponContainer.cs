@@ -29,27 +29,6 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
 
     // kinght : WeaponContainer
     // ConClass = Knight
-
-    // public void SpawnWeaponObject()
-    // {
-    //     if (currentWeapon != null)
-    //     {
-    //         string weaponObjName = currentWeapon.weaponObjName;
-    //         GameObject weaponObject = Managers.Resource.Q_Instantiate($"Weapons/{weaponObjName}", Quaternion.identity);
-    //         if (weaponObject != null)
-    //         {
-    //             Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
-    //         }
-    //         else
-    //         {
-    //             Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
-    //         }
-    //     }
-    //     else
-    //     {
-    //         Debug.LogError("현재 무기가 null 입니다.");
-    //     }
-    // }
     public void SpawnWeaponObject()
     {
         if (currentWeapon != null)
