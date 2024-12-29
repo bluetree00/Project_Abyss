@@ -67,7 +67,6 @@ public class Vagabond : BaseController
                 ResetCombo();
             }
         }
-
     }
 
     // 입력 처리
@@ -83,7 +82,7 @@ public class Vagabond : BaseController
         if (!CanProcessInput())
             return;
         
-        //CheckMovementInput();
+        // CheckMovementInput();
 
         // 마우스 좌클릭으로 공격 시작
         if (Input.GetMouseButtonDown(0))
@@ -103,6 +102,24 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
+        //------------------------키 중복 체크해야함------------------------
+        // 키보드 1 입력 (무기 교체)
+        if (Input.GetKey(KeyCode.Alpha1))
+        {
+            Managers.Weapon.ChangeWeapon(1);
+        }
+
+        // 키보드 2 입력 (무기 교체)
+        if (Input.GetKey(KeyCode.Alpha2))
+        {
+            Managers.Weapon.ChangeWeapon(2);
+        }
+
+        if (Input.GetKey(KeyCode.G))
+        {
+            Managers.Weapon.SetWeapon("basic_Knight_02");
+        }
+        //-----------------------------------------------------------------
     }
 
     #endregion
@@ -112,8 +129,8 @@ public class Vagabond : BaseController
         Define.State.NormalAttack_01,
         Define.State.NormalAttack_02,
         Define.State.NormalAttack_03,
-        Define.State.NormalSkile_01,
-        Define.State.UltimateSkile_01,
+        Define.State.NormalSkill_01,
+        Define.State.UltimateSkill_01,
         Define.State.Dodge
     };
 
@@ -146,8 +163,6 @@ public class Vagabond : BaseController
     {
         if (!CanProcessInput())
             return;
-        
-        //CheckMovementInput(); // 입력 상태 갱신
 
         if (moveDirection.magnitude > 0)
         {
@@ -157,15 +172,12 @@ public class Vagabond : BaseController
         {
             ChangeState(Define.State.Idle);
         }
-
-        Debug.Log("진행중");
     }
 
     private void ChangeState(Define.State newState)
     {
         if (State != newState)
             State = newState;
-        
     }
 
     //Moving 상태
@@ -192,7 +204,7 @@ public class Vagabond : BaseController
         {
             Debug.Log("첫 번째 공격");
             ChangeState(Define.State.NormalAttack_01);
-          // Managers.UI.ShowAugmentChoiceUI(null);
+        //    Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)
@@ -222,7 +234,7 @@ public class Vagabond : BaseController
     private void ProcessSkile()
     {
         Debug.Log("E");
-        ChangeState(Define.State.NormalSkile_01);
+        ChangeState(Define.State.NormalSkill_01);
     }
     #endregion 
 
@@ -230,7 +242,7 @@ public class Vagabond : BaseController
     private void ProcessUltimateSkile()
     {
         Debug.Log("Q");
-        ChangeState(Define.State.UltimateSkile_01);
+        ChangeState(Define.State.UltimateSkill_01);
     }
     #endregion 
 
@@ -404,8 +416,6 @@ public class Vagabond : BaseController
         effectObject.transform.position = spawnPosition;
         effectObject.transform.rotation = spawnRotation; 
     }
-
-
 
     #endregion
 }

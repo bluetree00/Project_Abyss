@@ -7,8 +7,9 @@ public class BaseController : MonoBehaviour
     #region  기본 초기화
     [SerializeField]
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
-    [SerializeField] 
-    protected WeaponData weaponData; //데스트용 무기 데이터
+    public CharacterData CharacterData { get { return characterData; } }
+    [SerializeField]
+    protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -25,6 +26,9 @@ public class BaseController : MonoBehaviour
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
 
+    // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
+    // 무기SO.무기이름 
+
     private void Start()
     {
         Init();
@@ -38,6 +42,40 @@ public class BaseController : MonoBehaviour
 
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
+
+                                                                                    // return된 스트링 값 그대로 사용
+        weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
+
+        // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
+        Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
+        if (weaponHandTransform != null)
+        {
+            // WeaponManager의 ContainerDataInit 메서드에 손의 트랜스폼을 전달
+            Managers.Weapon.ContainerDataInit(weaponContainer, weaponHandTransform);
+        }
+        else
+        {
+            Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
+        }
+    }
+
+    private Transform FindDeepChildBFS(Transform parent, string name)
+    {
+        Queue<Transform> queue = new Queue<Transform>();
+        queue.Enqueue(parent);
+
+        while (queue.Count > 0)
+        {
+            Transform current = queue.Dequeue();
+            if (current.name == name)
+                return current;
+
+            foreach (Transform child in current)
+            {
+                queue.Enqueue(child);
+            }
+        }
+        return null;
     }
     #endregion
 
@@ -96,12 +134,16 @@ public class BaseController : MonoBehaviour
                 case Define.State.NormalAttack_03:
                     anim.CrossFade("NormalAttack_03", 0.1f);
                    break;
-                case Define.State.NormalSkile_01:
+                case Define.State.NormalSkill_01:
                     anim.CrossFade("NormalSkile_01", 0.1f);
                    break;
-                case Define.State.UltimateSkile_01:
+                case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
+                // case Define.State.currentWeaponIdle:
+                //      null 체크
+                //    anim.CrossFade($"{매개변수 스트링}", 0.2f);
+                //    break;
             }
         }
     }
@@ -132,11 +174,16 @@ public class BaseController : MonoBehaviour
             case Define.State.NormalAttack_03:
                 UpdateNormalAttack_03();
                 break;
-            case Define.State.NormalSkile_01:
+            case Define.State.NormalSkill_01:
                 UpdateNormalSkile_01();
                 break;
-            case Define.State.UltimateSkile_01:
+            case Define.State.UltimateSkill_01:
                 UpdateUltimateSkile_01();
+                break;
+
+            //
+            case Define.State.Test_Axe_Idle:
+                UpdateWeaponIdle();
                 break;
         }
     }
@@ -151,5 +198,8 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
     protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
     protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
+
+    // test 무기 idle
+    protected virtual void UpdateWeaponIdle(){} // 무기 idle 상태 로직직
 
 }

@@ -1,7 +1,31 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Weapon/WeaponData", fileName = "WeaponData")]
-public class WeaponData : ScriptableObject
+// 무기 타입 열거형
+    public enum WeaponType
+    {
+        Sword,
+        Bow,
+        Staff,
+        Dagger,
+        Axe
+    }
+
+    // 무기 등급 열거형
+    public enum WeaponRarity
+    {
+        Common,
+        Rare,
+        Epic,
+        Legendary
+    }
+
+// 얘를 상속받아서 각 무기들의 SO 데이터 생성 예정
+// 얘는 모든 무기 SO 들의 부모 가상 클래스
+
+// 웨폰 데이터를 상속받은 CommonSwordData, RareSwordData, UniqueSwordData, LegendarySwordData 
+// 추상 함수를 만들고 각각의 데이터에서 오버라이딩하여 다른 기능을 하도록 구현
+
+public abstract class WeaponData : ScriptableObject
 {
     // 기본 무기 정보
     [Header("기본 무기 정보")]
@@ -28,6 +52,40 @@ public class WeaponData : ScriptableObject
     [Header("공격 속도")]
     public float attackSpeed = 1.0f;       // 기본 공격 속도 (1초당 공격 횟수)
 
+
+    // Q 스킬 이름, 설명 변수
+    // Q 이펙트 이름 담을 배열(리스트) 변수
+    [Header("Q 스킬")]
+    public string Q_SkillName; // Q 스킬 이름
+    public string Q_SkillDescription; // Q 스킬 설명
+    public string[] Q_SkillEffectName; // Q 스킬 이펙트 이름 배열(리스트)
+
+    // E 스킬 이름, 설명 변수
+    // E 이펙트 이름 담을 배열(리스트) 변수
+    [Header("E 스킬")]
+    public string E_SkillName; // E 스킬 이름
+    public string E_SkillDescription; // E 스킬 설명
+    public string[] E_SkillEffectName; // E 스킬 이펙트 이름 배열(리스트)
+
+    // 무기 오브젝트 이름 변수
+    [Header("무기 오브젝트")]
+    public string weaponObjName;
+
+    // Q 스킬 추상함수
+    public abstract void QSkill(); // Q 스킬 추상함수
+    
+    // E 스킬 추상함수
+    public abstract void ESkill(); // E 스킬 추상함수
+
+    
+
+
+
+
+
+
+
+
     // 공격력 증가 계산
     public int CalculateEffectiveAttackPower()
     {
@@ -35,8 +93,8 @@ public class WeaponData : ScriptableObject
         return attackPower + bonusPower;
     }
 
-    // 무기 효과를 적용하는 메서드
-    public void ApplyWeaponEffects(ref float damage)
+    // // 무기 효과를 적용하는 메서드
+    public virtual void ApplyWeaponEffects(ref float damage)
     {
         if (hasSpecialEffect)
         {
@@ -46,22 +104,5 @@ public class WeaponData : ScriptableObject
         }
     }
 
-    // 무기 타입 열거형
-    public enum WeaponType
-    {
-        Sword,
-        Bow,
-        Staff,
-        Dagger,
-        Axe
-    }
-
-    // 무기 등급 열거형
-    public enum WeaponRarity
-    {
-        Common,
-        Rare,
-        Epic,
-        Legendary
-    }
+    
 }
