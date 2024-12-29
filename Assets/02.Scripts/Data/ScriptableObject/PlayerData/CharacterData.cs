@@ -1,5 +1,7 @@
 using UnityEngine;
 
+
+
 [CreateAssetMenu(fileName = "NewCharacterData", menuName = "Characters/Character Data")]
 public class CharacterData : ScriptableObject
 {
@@ -43,6 +45,10 @@ public class CharacterData : ScriptableObject
     // 무기 관련
     [Header("무기 관련")]
     public WeaponData equippedWeapon;
+    
+    //캐릭터 클래스
+    [Header("캐릭터 클래스")]
+    public Define.CharacterClass conClass;
 
     // 총 데미지 계산
     private int totalAttackPower;
@@ -129,7 +135,7 @@ public class CharacterData : ScriptableObject
         }
     }
 
-    // 무기 효과를 적용하는 메서드
+    //무기 효과를 적용하는 메서드
     public void ApplyWeaponEffectsToDamage(ref float damage)
     {
         if (equippedWeapon != null)
