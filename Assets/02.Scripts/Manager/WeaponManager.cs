@@ -8,15 +8,6 @@ public class WeaponManager
     /// 무기 컨테이너
     /// </summary>
     public static WeaponContainer w_Con { get; private set; } // 일반 변수에서 static 변수로 변경
-    public CharacterData cData { get; private set; }
-
-    // 컨테이너 데이터를 받아옴 => 컨테이너 안에 무기 SO 존재
-    // public void ContainerDataInit(WeaponContainer con)
-    // {
-    //     w_Con = con;   // 매니저 변수 = 매개변수 동기화
-    //     SetDefult();   // 기본 무기 설정
-    //     w_Con.SpawnWeaponObject(); // 무기 오브젝트 생성
-    // }
 
     public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform)
     {
