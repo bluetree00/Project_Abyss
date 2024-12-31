@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
@@ -10,21 +8,33 @@ public class UI_Inven_Item : UI_Base
     {
         ItemIcon,
         ItemNameText,
+        ItemQuantityText
     }
 
-    string _name;
+    private ItemData _itemData;
 
     public override void Init()
     {
         Bind<GameObject>(typeof(GameObjects));
-       
-       Get<GameObject>((int)GameObjects.ItemNameText).GetComponent<TextMeshProUGUI>().text = _name;
 
-        Get<GameObject>((int)GameObjects.ItemIcon).BindEvent((PointerEventData) => { Debug.Log($"아이템 클릭! {_name}"); });
+        if (_itemData != null)
+        {
+            Get<GameObject>((int)GameObjects.ItemNameText)
+                .GetComponent<TextMeshProUGUI>().text = _itemData.Name;
+
+            Get<GameObject>((int)GameObjects.ItemIcon)
+                .GetComponent<Image>().sprite = _itemData.Icon;
+
+            Get<GameObject>((int)GameObjects.ItemQuantityText)
+                .GetComponent<TextMeshProUGUI>().text = $"x{_itemData.Quantity}";
+
+            Get<GameObject>((int)GameObjects.ItemIcon)
+                .BindEvent((PointerEventData) => Debug.Log($"아이템 클릭: {_itemData.Name}"));
+        }
     }
 
-    public void SetInfo(string name)
+    public void SetInfo(ItemData itemData)
     {
-        _name = name;
+        _itemData = itemData;
     }
 }
