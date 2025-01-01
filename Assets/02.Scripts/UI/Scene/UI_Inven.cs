@@ -14,7 +14,7 @@ public class UI_Inven : UI_Scene
         base.Init();
 
         // ScriptableObject 데이터 로드
-        InvenData invenData = Managers.Resource.Load<InvenData>("Data/InvenData");
+        InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
         if (invenData == null)
         {
             Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
