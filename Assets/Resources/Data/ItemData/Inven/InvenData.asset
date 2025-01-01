@@ -13,6 +13,5 @@ MonoBehaviour:
   m_Name: InvenData
   m_EditorClassIdentifier: 
   ItemList:
-  - Name: 
-    Icon: {fileID: 0}
-    Quantity: 0
+  - Name: UI_EquipmentItem
+    UIType: UI_EquipmentItem
