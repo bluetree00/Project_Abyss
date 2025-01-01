@@ -12,6 +12,6 @@ public class InvenData : ScriptableObject
 public class ItemData
 {
     public string Name;     // 아이템 이름
-    public Sprite Icon;     // 아이템 아이콘
-    public int Quantity;    // 아이템 수량
+    public string  UIType;
+
 }

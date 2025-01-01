@@ -4,37 +4,31 @@ using TMPro;
 
 public class UI_Inven_Item : UI_Base
 {
-    enum GameObjects
+    public enum GameObjects
     {
         ItemIcon,
         ItemNameText,
-        ItemQuantityText
     }
 
-    private ItemData _itemData;
+    protected string _name;
+    protected int _quantity;
 
     public override void Init()
     {
         Bind<GameObject>(typeof(GameObjects));
 
-        if (_itemData != null)
-        {
-            Get<GameObject>((int)GameObjects.ItemNameText)
-                .GetComponent<TextMeshProUGUI>().text = _itemData.Name;
+        // 이름과 수량을 UI에 설정
+        Get<GameObject>((int)GameObjects.ItemNameText)
+            .GetComponent<TextMeshProUGUI>().text = _name;
 
-            Get<GameObject>((int)GameObjects.ItemIcon)
-                .GetComponent<Image>().sprite = _itemData.Icon;
-
-            Get<GameObject>((int)GameObjects.ItemQuantityText)
-                .GetComponent<TextMeshProUGUI>().text = $"x{_itemData.Quantity}";
-
-            Get<GameObject>((int)GameObjects.ItemIcon)
-                .BindEvent((PointerEventData) => Debug.Log($"아이템 클릭: {_itemData.Name}"));
-        }
+        // 아이템 아이콘 클릭 이벤트
+        Get<GameObject>((int)GameObjects.ItemIcon)
+            .BindEvent((PointerEventData) => { Debug.Log($"아이템 클릭! {_name}"); });
     }
 
-    public void SetInfo(ItemData itemData)
+    public virtual void SetInfo(string name)
     {
-        _itemData = itemData;
+        _name = name;
+
     }
 }
