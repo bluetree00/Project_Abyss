@@ -171,7 +171,7 @@ public class UIManager
             return;
         }
 
-        // 중복 아이템 방지
+        // 중복 아이템 방지 필요시 해제
         if (invenData.ItemList.Exists(item => item.Name == name && item.UIType == uiType))
         {
             Debug.LogWarning($"이미 존재하는 아이템: {name}");
