@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Reflection;
 using UnityEngine;
 
 public class UI_Inven : UI_Scene
 {
     enum GameObjects
     {
-        GridPanel  // 아이템을 표시할 그리드 패널
+        GridPanel // 아이템을 표시할 그리드 패널
     }
 
     public override void Init()
@@ -21,8 +20,28 @@ public class UI_Inven : UI_Scene
             return;
         }
 
-        // GridPanel을 가져오기
-        Bind<GameObject>(typeof(GameObjects));
+        // 이벤트 구독
+        invenData.OnInventoryChanged += RefreshInventory;
+
+        // 초기 UI 생성
+        RefreshInventory();
+    }
+
+    // 인벤토리 UI를 새로 갱신하는 메서드
+    public void RefreshInventory()
+    {
+        // ScriptableObject 데이터 로드
+        InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
+        if (invenData == null)
+        {
+            Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
+            return;
+        }
+
+        // GridPanel 가져오기
+        if (_objects == null || !_objects.ContainsKey(typeof(GameObjects))) // 중복 방지
+            Bind<GameObject>(typeof(GameObjects));
+        
         GameObject gridPanel = Get<GameObject>((int)GameObjects.GridPanel);
 
         // 기존 아이템 UI 삭제
@@ -31,10 +50,9 @@ public class UI_Inven : UI_Scene
             Managers.Resource.Destroy(child.gameObject);
         }
 
-        // 아이템 리스트 기반으로 UI 생성
+        // 현재 인벤토리 데이터 기반으로 UI 다시 생성
         foreach (ItemData itemData in invenData.ItemList)
         {
-            // 매개변수로 받은 UIType에 따라 동적으로 UI 생성
             Type itemType = Type.GetType(itemData.UIType);
             if (itemType == null)
             {
@@ -46,24 +64,18 @@ public class UI_Inven : UI_Scene
         }
     }
 
+
     private void CreateItemUI(Type uiType, Transform parent, string name)
     {
         try
         {
-            // MakeSubItem<T> 메서드를 동적으로 호출
-            MethodInfo method = typeof(UIManager).GetMethod("MakeSubItem").MakeGenericMethod(uiType);
+            // 동적으로 MakeSubItem<T> 메서드 호출
+            var method = typeof(UIManager).GetMethod("MakeSubItem").MakeGenericMethod(uiType);
+            var itemObject = method.Invoke(Managers.UI, new object[] { parent, null });
 
-            // Managers.UI를 명시적으로 참조
-            object itemObject = method.Invoke(Managers.UI, new object[] { parent, null });
-
-            // 생성된 UI에 데이터를 설정
             if (itemObject is UI_Inven_Item invenItem)
             {
                 invenItem.SetInfo(name);
-            }
-            else
-            {
-                Debug.LogError($"UI 생성 실패: {uiType.Name}는 UI_Inven_Item 타입이 아닙니다.");
             }
         }
         catch (Exception ex)
@@ -71,5 +83,4 @@ public class UI_Inven : UI_Scene
             Debug.LogError($"UI 생성 중 오류 발생: {ex.Message}");
         }
     }
-
 }
