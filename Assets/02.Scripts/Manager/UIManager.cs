@@ -163,8 +163,24 @@ public class UIManager
     //인벤토리 아이템 추가 방식 uiType가 핵심 추가될 UI 형태 ex) UI_EquipmentItem 만약 다인 플레이시 자신의 이벤을 플레이어가 생성 저장필요
     public void InvenPushItem(string name, string uiType)
     {
+        // ScriptableObject 로드
         InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
+        if (invenData == null)
+        {
+            Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
+            return;
+        }
 
+        // 중복 아이템 방지
+        if (invenData.ItemList.Exists(item => item.Name == name && item.UIType == uiType))
+        {
+            Debug.LogWarning($"이미 존재하는 아이템: {name}");
+            return;
+        }
+
+        // 아이템 추가
         invenData.AddItem(name, uiType);
     }
+
+
 }

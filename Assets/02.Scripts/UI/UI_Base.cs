@@ -17,10 +17,19 @@ public abstract class UI_Base : MonoBehaviour
 
 	protected void Bind<T>(Type type) where T : UnityEngine.Object
 	{
+		// 이미 키가 존재하면 중복 방지
+		if (_objects.ContainsKey(typeof(T)))
+		{
+			Debug.LogWarning($"[{typeof(T)}] 타입이 이미 바인딩되었습니다. 중복 추가를 방지합니다.");
+			return;
+		}
+
+		// Enum으로부터 이름을 가져와 UnityEngine.Object 배열 생성
 		string[] names = Enum.GetNames(type);
 		UnityEngine.Object[] objects = new UnityEngine.Object[names.Length];
 		_objects.Add(typeof(T), objects);
 
+		// GameObject 또는 다른 타입에 따라 객체를 찾음
 		for (int i = 0; i < names.Length; i++)
 		{
 			if (typeof(T) == typeof(GameObject))
@@ -32,6 +41,7 @@ public abstract class UI_Base : MonoBehaviour
 				Debug.Log($"Failed to bind({names[i]})");
 		}
 	}
+
 
 	protected T Get<T>(int idx) where T : UnityEngine.Object
 	{
