@@ -13,7 +13,5 @@ MonoBehaviour:
   m_Name: InvenData
   m_EditorClassIdentifier: 
   ItemList:
-  - Name: Test
-    UIType: UI_EquipmentItem
-  - Name: UI_EquipmentItem
+  - Name: Item_Test
     UIType: UI_EquipmentItem
