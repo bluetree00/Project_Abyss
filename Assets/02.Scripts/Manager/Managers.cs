@@ -79,8 +79,7 @@ public class Managers : MonoBehaviour
     }
 
     void Start() {
-        //FindandDataSync(); // 게임 시작 후 오브젝트 로딩 후에 캐릭터 찾기
-        //CharacterData.characterData.Initialize(); //게임 시작 시 캐릭터 기본 스탯 초기값 저장
+    
     }
 
     void Update()
@@ -112,22 +111,6 @@ public class Managers : MonoBehaviour
     #region MonoBehaviour 필요한 작업
 
 
-    // void FindandDataSync()      //게임이 시작된 후 캐릭터를 찾아 캐릭터 데이터를 동기화시키는 작업
-    // {
-    //     GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-    //     if (playerObj != null){
-    //         string characterName = playerObj.name;
-    //         CharacterData currentPlayerData = Resource.Load<CharacterData>($"{characterName}");
-    //         Debug.Log($"{currentPlayerData.name}");
-    //         CharacterData.characterData = currentPlayerData; 
-    //         Debug.Log($"<color=green>{CharacterData.characterData} 데이터 전달 완료 </color>");
-    //     }
-    //     else
-    //     {   
-    //         Debug.LogWarning($"<color=orange>{_characterDataManager.characterData} 데이터 없음 </color>");
-    //     }
-    // }
-
     void CheckWeapon()
     {
         
@@ -142,7 +125,6 @@ public class Managers : MonoBehaviour
     }
 
 
-
     #endregion
-    
+
 }
