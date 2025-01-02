@@ -8,7 +8,7 @@ public class AddItem : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            Managers.UI.InvenPushItem("UI_EquipmentItem", "UI_EquipmentItem");
+            Managers.UI.InvenPushItem("Item_Test", "UI_EquipmentItem");
 
             Destroy(this.gameObject);
         }
