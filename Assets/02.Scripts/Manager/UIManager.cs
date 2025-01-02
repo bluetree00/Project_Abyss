@@ -159,4 +159,12 @@ public class UIManager
         CloseAllPopupUI();
         _sceneUI = null;
     }
+
+    //인벤토리 아이템 추가 방식 uiType가 핵심 추가될 UI 형태 ex) UI_EquipmentItem 만약 다인 플레이시 자신의 이벤을 플레이어가 생성 저장필요
+    public void InvenPushItem(string name, string uiType)
+    {
+        InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
+
+        invenData.AddItem(name, uiType);
+    }
 }
