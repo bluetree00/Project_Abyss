@@ -28,4 +28,9 @@ MonoBehaviour:
   E_SkillName: 
   E_SkillDescription: 
   E_SkillEffectName: []
-  weaponObjName: basic_knight_03
+  weaponObjName: basic_Knight_03
+  weapon_Idle_AnimationName: Test_Axe_Idle
+  weapon_Attack_AnimationName: 
+  weapon_Run_AnimationName: 
+  weapon_Hit_AnimationName: 
+  weapon_Die_AnimationName: 
