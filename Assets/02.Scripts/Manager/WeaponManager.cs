@@ -9,11 +9,16 @@ public class WeaponManager
     /// </summary>
     public static WeaponContainer w_Con { get; private set; } // 일반 변수에서 static 변수로 변경
 
-    public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform)
+    public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null)
     {
         w_Con = con;   // 매니저 변수 = 매개변수 동기화
-        w_Con.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
         SetDefult();   // 기본 무기 설정
+        if (weaponHandTransform == null)
+        {
+            Debug.LogError("손의 트랜스폼이 null입니다.");
+            return;
+        }
+        w_Con.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
         w_Con.SpawnWeaponObject(); // 무기 오브젝트 생성
     }
 
@@ -63,7 +68,6 @@ public class WeaponManager
             w_Con.currentWeapon = w_Con.ownWeapons[index - 1];
             w_Con.SpawnWeaponObject();
         }
-        
     }
 
     // 캐릭터 오브젝트 이름으로 찾아서 변수에 동기화
@@ -75,6 +79,11 @@ public class WeaponManager
         {
             w_Con = characterObj.GetComponent<WeaponContainer>();
         }
+    }
+
+    public WeaponData GetCurrentWeaponData()
+    {
+        return w_Con.currentWeapon;
     }
 
 

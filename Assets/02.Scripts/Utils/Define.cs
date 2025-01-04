@@ -111,7 +111,7 @@ public class Define
 
         // 무기와 일반 Idle 상태 분리
 
-        Test_Axe_Idle,
+        currentWeaponIdle,
         
     }
 

@@ -10,6 +10,8 @@ public class BaseController : MonoBehaviour
     public CharacterData CharacterData { get { return characterData; } }
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
+    [SerializeField]
+    WeaponData currentWeapon;
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -140,10 +142,9 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-                // case Define.State.currentWeaponIdle:
-                //      null 체크
-                //    anim.CrossFade($"{매개변수 스트링}", 0.2f);
-                //    break;
+                //  case Define.State.currentWeaponIdle:
+                //     anim.CrossFade($"{Managers.Weapon.GetCurrentWeaponData().weapon_Idle_AnimationName}", 0.1f);
+                //     break;
             }
         }
     }
@@ -180,11 +181,6 @@ public class BaseController : MonoBehaviour
             case Define.State.UltimateSkill_01:
                 UpdateUltimateSkile_01();
                 break;
-
-            //
-            case Define.State.Test_Axe_Idle:
-                UpdateWeaponIdle();
-                break;
         }
     }
 
@@ -200,6 +196,6 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
 
     // test 무기 idle
-    protected virtual void UpdateWeaponIdle(){} // 무기 idle 상태 로직직
+    protected virtual void UpdateWeaponIdle(){} // 무기 idle 상태 로직
 
 }
