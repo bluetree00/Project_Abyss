@@ -12,6 +12,8 @@ public class Vagabond : BaseController
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
+    private bool isInputLocked = false;
+    private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
     protected override void Init()
     {
         
@@ -102,24 +104,45 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
+
         //------------------------키 중복 체크해야함------------------------
         // 키보드 1 입력 (무기 교체)
-        if (Input.GetKey(KeyCode.Alpha1))
+        if (Input.GetKeyDown(KeyCode.Alpha1))
         {
+            if (isInputLocked)
+            return;
+
             Managers.Weapon.ChangeWeapon(1);
+            StartCoroutine(LockInput());
         }
 
         // 키보드 2 입력 (무기 교체)
-        if (Input.GetKey(KeyCode.Alpha2))
+        if (Input.GetKeyDown(KeyCode.Alpha2))
         {
+            if (isInputLocked)
+            return;
+
             Managers.Weapon.ChangeWeapon(2);
+            StartCoroutine(LockInput());
         }
 
-        if (Input.GetKey(KeyCode.G))
+        // 키보드 G 입력 (무기 설정)
+        if (Input.GetKeyDown(KeyCode.G))
         {
+            if (isInputLocked)
+            return;
+
             Managers.Weapon.SetWeapon("basic_Knight_02");
-        }
+            StartCoroutine(LockInput());
+        }   
         //-----------------------------------------------------------------
+    }
+
+    private IEnumerator LockInput()
+    {
+        isInputLocked = true;
+        yield return new WaitForSeconds(inputLockDuration);
+        isInputLocked = false;
     }
 
     #endregion
@@ -171,6 +194,7 @@ public class Vagabond : BaseController
         else
         {
             ChangeState(Define.State.Idle);
+            // ChangeState(Define.State.currentWeaponIdle);
         }
     }
 
@@ -225,6 +249,7 @@ public class Vagabond : BaseController
     {
         characterData.attackComboStep = 0;
         characterData.comboTimer = 0;
+        // ChangeState(Define.State.currentWeaponIdle);
         ChangeState(Define.State.Idle);
     }
 
@@ -321,7 +346,9 @@ public class Vagabond : BaseController
         else
         {
             // 이동 입력이 없으면 Idle 상태로 전환
+            // ChangeState(Define.State.currentWeaponIdle);
             ChangeState(Define.State.Idle);
+            
         }
     }
 

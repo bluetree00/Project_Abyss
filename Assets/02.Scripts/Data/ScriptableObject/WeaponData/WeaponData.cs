@@ -71,11 +71,20 @@ public abstract class WeaponData : ScriptableObject
     [Header("무기 오브젝트")]
     public string weaponObjName;
 
+    // 무기에 해당하는 애니메이션 이름
+    [Header("무기 애니메이션")]
+    public string weapon_Idle_AnimationName;
+    public string weapon_Attack_AnimationName;
+    public string weapon_Run_AnimationName;
+    public string weapon_Hit_AnimationName;
+    public string weapon_Die_AnimationName;
+
     // Q 스킬 추상함수
     public abstract void QSkill(); // Q 스킬 추상함수
     
     // E 스킬 추상함수
     public abstract void ESkill(); // E 스킬 추상함수
+
 
     
 
