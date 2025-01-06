@@ -19,6 +19,11 @@ public class WeaponManager
         private set { _cont = value; }
     }
 
+    /// <summary>
+    /// 무기 컨테이너 초기화
+    /// </summary>
+    /// <param name="con"></param>
+    /// <param name="weaponHandTransform"></param>
     public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null)
     {
         _cont = con;   // 매니저 변수 = 매개변수 동기화
@@ -72,6 +77,10 @@ public class WeaponManager
         if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
     }
 
+    /// <summary>
+    /// 무기 변경 함수
+    /// </summary>
+    /// <param name="index"></param>
     public void ChangeWeapon(int index)
     {
         if (_cont.ownWeapons[index - 1] != null)
@@ -81,6 +90,10 @@ public class WeaponManager
         }
     }
 
+    /// <summary>
+    /// 무기 제거 함수
+    /// </summary>
+    /// <param name="index"></param>
     public void RemoveWeapon(int index)
     {
         if (_cont.ownWeapons[index - 1] != null)
@@ -108,6 +121,10 @@ public class WeaponManager
         }
     }
 
+    /// <summary>
+    /// 현재 무기 데이터 넘겨주기
+    /// </summary>
+    /// <returns></returns>
     public WeaponData GetCurrentWeaponData()
     {
         return _cont.currentWeapon;
