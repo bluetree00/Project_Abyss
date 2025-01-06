@@ -64,17 +64,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
         }
     }
 
-    private void OnEnable()
-    {
-        WeaponManager.OnWeaponRemoved += DestroyCurrentWeaponObject;
-    }
-
-    private void OnDisable()
-    {
-        WeaponManager.OnWeaponRemoved -= DestroyCurrentWeaponObject;
-    }
-
-    private void DestroyCurrentWeaponObject()
+    public void DestroyCurrentWeaponObject()
     {
         if (currentWeaponObject != null)
         {

@@ -3,8 +3,6 @@ using System;
 
 public class WeaponManager
 {
-    public delegate void WeaponRemovedHandler();
-    public static event WeaponRemovedHandler OnWeaponRemoved;
     WeaponData itemNameData;
     /// <summary>
     /// 무기 컨테이너
@@ -101,7 +99,7 @@ public class WeaponManager
             if (_cont.currentWeapon == _cont.ownWeapons[index - 1])
             {
                 _cont.currentWeapon = null;
-                OnWeaponRemoved?.Invoke(); // 이벤트 호출
+                _cont.DestroyCurrentWeaponObject();
             }
 
             Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
