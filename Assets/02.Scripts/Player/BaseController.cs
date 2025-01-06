@@ -11,7 +11,7 @@ public class BaseController : MonoBehaviour
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
     [SerializeField]
-    WeaponData currentWeapon;
+    protected WeaponData currentWeapon;
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
