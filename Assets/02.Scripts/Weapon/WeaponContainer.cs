@@ -9,6 +9,8 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     /// </summary>
     [SerializeField]
     public WeaponData currentWeapon;
+    [SerializeField]
+    public bool isWeaponEquipped = false;
     /// <summary>
     /// 보유중인 무기
     /// </summary>
@@ -41,6 +43,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
 
             string weaponObjName = currentWeapon.weaponObjName;
             currentWeaponObject = Managers.Resource.Instantiate($"Weapons/{weaponObjName}");
+            isWeaponEquipped = true;        //무기 장착 확인
             if (currentWeaponObject != null)
             {
                 // 무기 오브젝트를 손의 트랜스폼 하위에 생성

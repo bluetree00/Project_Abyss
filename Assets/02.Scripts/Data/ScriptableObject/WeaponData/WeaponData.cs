@@ -78,6 +78,7 @@ public abstract class WeaponData : ScriptableObject
     public string weapon_Run_AnimationName;
     public string weapon_Hit_AnimationName;
     public string weapon_Die_AnimationName;
+    public string weapon_ChangeWeapon_AnimationName;
 
     // Q 스킬 추상함수
     public abstract void QSkill(); // Q 스킬 추상함수

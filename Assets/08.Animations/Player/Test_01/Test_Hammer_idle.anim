@@ -6,7 +6,7 @@ AnimationClip:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Test_Axe_idle
+  m_Name: Test_Hammer_idle
   serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0

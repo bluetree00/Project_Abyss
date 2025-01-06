@@ -113,9 +113,11 @@ public class Vagabond : BaseController
             if (isInputLocked)
             return;
 
+            weaponContainer.isWeaponEquipped = false;
+            Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(1);
+            ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
-            ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
 
@@ -125,9 +127,11 @@ public class Vagabond : BaseController
             if (isInputLocked)
             return;
 
+            weaponContainer.isWeaponEquipped = false;
+            Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(2);
+            ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
-            ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
 
@@ -169,7 +173,8 @@ public class Vagabond : BaseController
         Define.State.NormalAttack_03,
         Define.State.NormalSkill_01,
         Define.State.UltimateSkill_01,
-        Define.State.Dodge
+        Define.State.Dodge,
+        Define.State.ChangeWeapon,
     };
 
     private bool CanProcessInput()
@@ -208,8 +213,8 @@ public class Vagabond : BaseController
         }
         else
         {
-            // ChangeState(Define.State.Idle);
-            ChangeState(Define.State.currentWeaponIdle);
+            ChangeState(Define.State.Idle);
+            // ChangeState(Define.State.currentWeaponIdle);
         }
     }
 

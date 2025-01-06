@@ -100,6 +100,7 @@ public class Define
         Moving,
         Runing,
         Dodge,
+        ChangeWeapon,
         NormalAttack_01,
         NormalAttack_02,
         NormalAttack_03,
