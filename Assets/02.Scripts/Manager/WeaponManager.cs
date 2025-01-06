@@ -3,23 +3,33 @@ using System;
 
 public class WeaponManager
 {
+    public delegate void WeaponRemovedHandler();
+    public static event WeaponRemovedHandler OnWeaponRemoved;
     WeaponData itemNameData;
     /// <summary>
     /// 무기 컨테이너
     /// </summary>
-    public static WeaponContainer w_Con { get; private set; } // 일반 변수에서 static 변수로 변경
+    // public static WeaponContainer _cont { get; private set; } // 일반 변수에서 static 변수로 변경
+
+    private static WeaponContainer _cont; // 백킹 필드
+
+    public static WeaponContainer Cont
+    {
+        get { return _cont; }
+        private set { _cont = value; }
+    }
 
     public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null)
     {
-        w_Con = con;   // 매니저 변수 = 매개변수 동기화
+        _cont = con;   // 매니저 변수 = 매개변수 동기화
         SetDefult();   // 기본 무기 설정
         if (weaponHandTransform == null)
         {
             Debug.LogError("손의 트랜스폼이 null입니다.");
             return;
         }
-        w_Con.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
-        w_Con.SpawnWeaponObject(); // 무기 오브젝트 생성
+        _cont.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
+        _cont.SpawnWeaponObject(); // 무기 오브젝트 생성
     }
 
     /// <summary>
@@ -27,10 +37,10 @@ public class WeaponManager
     /// </summary>
     void SetDefult()
     {
-        string ClassName = w_Con.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
+        string ClassName = _cont.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
         WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
-        w_Con.currentWeapon = resourceWData;
-        w_Con.ownWeapons[0] = resourceWData;
+        _cont.currentWeapon = resourceWData;
+        _cont.ownWeapons[0] = resourceWData;
     }
 
 
@@ -42,7 +52,7 @@ public class WeaponManager
     {
         itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
         Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
-        if (Array.Exists(w_Con.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
+        if (Array.Exists(_cont.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
         {
             Debug.Log("이미 소지중인 무기입니다.");
             return;
@@ -52,21 +62,41 @@ public class WeaponManager
             Debug.Log("새로운 무기를 획득했습니다.");
         }
     
-        int emptySlotIndex = Array.IndexOf(w_Con.ownWeapons, null); // 빈 공간 찾기
+        int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
         if (emptySlotIndex != -1)
         {
-            w_Con.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
+            _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
         }
     
-        w_Con.currentWeapon = itemNameData;
+        if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData;
+        if (_cont.CurrentWeaponObject == null)
+        {
+            _cont.SpawnWeaponObject();
+        }
     }
 
     public void ChangeWeapon(int index)
     {
-        if (w_Con.ownWeapons[index - 1] != null)
+        if (_cont.ownWeapons[index - 1] != null)
         {
-            w_Con.currentWeapon = w_Con.ownWeapons[index - 1];
-            w_Con.SpawnWeaponObject();
+            _cont.currentWeapon = _cont.ownWeapons[index - 1];
+            _cont.SpawnWeaponObject();
+        }
+    }
+
+    public void RemoveWeapon(int index)
+    {
+        if (_cont.ownWeapons[index - 1] != null)
+        {
+            if (_cont.currentWeapon == _cont.ownWeapons[index - 1])
+            {
+                _cont.currentWeapon = null;
+                OnWeaponRemoved?.Invoke(); // 이벤트 호출
+            }
+            
+            Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
+            _cont.ownWeapons[index - 1] = null;
+            
         }
     }
 
@@ -77,14 +107,12 @@ public class WeaponManager
         GameObject characterObj = GameObject.Find(characterName);
         if (characterObj != null)
         {
-            w_Con = characterObj.GetComponent<WeaponContainer>();
+            _cont = characterObj.GetComponent<WeaponContainer>();
         }
     }
 
     public WeaponData GetCurrentWeaponData()
     {
-        return w_Con.currentWeapon;
+        return _cont.currentWeapon;
     }
-
-
 }
