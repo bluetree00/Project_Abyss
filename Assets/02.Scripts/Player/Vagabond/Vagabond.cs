@@ -140,6 +140,16 @@ public class Vagabond : BaseController
             Managers.Weapon.SetWeapon("basic_Knight_02");
             StartCoroutine(LockInput());
         }   
+
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            Managers.Weapon.RemoveWeapon(1);
+        }
+
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            Managers.Weapon.RemoveWeapon(2);
+        }
         //-----------------------------------------------------------------
     }
 

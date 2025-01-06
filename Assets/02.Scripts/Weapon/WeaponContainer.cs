@@ -21,6 +21,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     public Define.CharacterClass conClass;
     [SerializeField]
     private GameObject currentWeaponObject;
+    public GameObject CurrentWeaponObject { get { return currentWeaponObject; } }
 
     // 손의 트랜스폼을 저장할 변수
     public Transform weaponHandTransform;
@@ -57,6 +58,25 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
         else
         {
             Debug.LogError("현재 무기가 null 입니다.");
+        }
+    }
+
+    private void OnEnable()
+    {
+        WeaponManager.OnWeaponRemoved += DestroyCurrentWeaponObject;
+    }
+
+    private void OnDisable()
+    {
+        WeaponManager.OnWeaponRemoved -= DestroyCurrentWeaponObject;
+    }
+
+    private void DestroyCurrentWeaponObject()
+    {
+        if (currentWeaponObject != null)
+        {
+            Destroy(currentWeaponObject);
+            currentWeaponObject = null;
         }
     }
 
