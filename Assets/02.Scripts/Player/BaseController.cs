@@ -109,6 +109,7 @@ public class BaseController : MonoBehaviour
             _state = value;
 
             Animator anim = GetComponent<Animator>();
+            WeaponData weapon = Managers.Weapon.GetCurrentWeaponData();
             switch(_state)
             {
                 // 플레이어 기본 움직임 상태
@@ -142,9 +143,16 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-                //  case Define.State.currentWeaponIdle:
-                //     anim.CrossFade($"{Managers.Weapon.GetCurrentWeaponData().weapon_Idle_AnimationName}", 0.1f);
-                //     break;
+                 case Define.State.currentWeaponIdle:
+                    if (Managers.Weapon.GetCurrentWeaponData().weapon_Idle_AnimationName == "")
+                    {
+                        anim.CrossFade("Idle", 0.2f);
+                    }
+                    else
+                    {
+                        anim.CrossFade($"{Managers.Weapon.GetCurrentWeaponData().weapon_Idle_AnimationName}", 0.1f);
+                    }
+                    break;
             }
         }
     }
@@ -180,6 +188,9 @@ public class BaseController : MonoBehaviour
                 break;
             case Define.State.UltimateSkill_01:
                 UpdateUltimateSkile_01();
+                break;
+            case Define.State.currentWeaponIdle:
+                UpdateWeaponIdle();
                 break;
         }
     }
