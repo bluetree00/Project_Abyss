@@ -113,6 +113,7 @@ public class Vagabond : BaseController
             return;
 
             Managers.Weapon.ChangeWeapon(1);
+            ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
 
@@ -123,6 +124,7 @@ public class Vagabond : BaseController
             return;
 
             Managers.Weapon.ChangeWeapon(2);
+            ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
 
@@ -193,8 +195,8 @@ public class Vagabond : BaseController
         }
         else
         {
-            ChangeState(Define.State.Idle);
-            // ChangeState(Define.State.currentWeaponIdle);
+            // ChangeState(Define.State.Idle);
+            ChangeState(Define.State.currentWeaponIdle);
         }
     }
 

@@ -45,6 +45,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
                 // 무기 오브젝트를 손의 트랜스폼 하위에 생성
                 currentWeaponObject.transform.SetParent(weaponHandTransform);
                 currentWeaponObject.transform.localPosition = Vector3.zero;
+                // currentWeaponObject.transform.localRotation = Quaternion.identity;
 
                 Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
             }
