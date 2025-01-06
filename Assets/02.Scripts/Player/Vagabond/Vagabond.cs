@@ -18,6 +18,7 @@ public class Vagabond : BaseController
     {
         
         base.Init(); // 부모 클래스의 초기화 코드 호출
+        currentWeapon = Managers.Weapon.GetCurrentWeaponData(); // 현재 무기 데이터를 가져옴
         //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
@@ -113,6 +114,7 @@ public class Vagabond : BaseController
             return;
 
             Managers.Weapon.ChangeWeapon(1);
+            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
@@ -124,6 +126,7 @@ public class Vagabond : BaseController
             return;
 
             Managers.Weapon.ChangeWeapon(2);
+            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             ChangeState(Define.State.currentWeaponIdle);
             StartCoroutine(LockInput());
         }
