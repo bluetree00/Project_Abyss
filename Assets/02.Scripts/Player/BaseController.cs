@@ -144,16 +144,14 @@ public class BaseController : MonoBehaviour
                    break;
                  case Define.State.currentWeaponIdle:
 
-                    
-
                     if (Managers.Weapon.GetCurrentWeaponData() == null){
                         anim.CrossFade("Idle", 0.2f);
                         return;
                     } 
                     else{
 
-                        Debug.Log($"{Managers.Weapon.GetCurrentWeaponData().name}");
-                        
+                        Debug.Log($"현재 상태 : {Managers.Weapon.GetCurrentWeaponData().name}");
+
                         if (Managers.Weapon.GetCurrentWeaponData().weapon_Idle_AnimationName == ""){
                             anim.CrossFade("Idle", 0.2f);
                         }

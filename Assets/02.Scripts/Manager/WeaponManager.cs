@@ -68,11 +68,8 @@ public class WeaponManager
             _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
         }
     
-        if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData;
-        if (_cont.CurrentWeaponObject == null)
-        {
-            _cont.SpawnWeaponObject();
-        }
+        if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
+        if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
     }
 
     public void ChangeWeapon(int index)
@@ -93,7 +90,7 @@ public class WeaponManager
                 _cont.currentWeapon = null;
                 OnWeaponRemoved?.Invoke(); // 이벤트 호출
             }
-            
+
             Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
             _cont.ownWeapons[index - 1] = null;
             
