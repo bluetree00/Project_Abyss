@@ -12,6 +12,8 @@ TagManager:
   - APBoost
   - MSBoost
   - WeaponChange
+  - FrontAttack
+  - FrontAttackHit
   layers:
   - Default
   - TransparentFX

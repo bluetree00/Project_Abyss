@@ -3,6 +3,9 @@ using System;
 
 public class WeaponManager
 {
+    //NOTE: 무기 획득 이벤트를 위한 델리게이트 선언
+    public delegate void WeaponAddedHandler(string newWeaponName);  // 무기 획득 이벤트 
+    public static event WeaponAddedHandler OnWeaponAdded;
     WeaponData itemNameData;
     /// <summary>
     /// 무기 컨테이너
@@ -48,7 +51,7 @@ public class WeaponManager
 
 
     /// <summary>
-    /// 무기가 바뀔 때 호출할 함수 => 무기 변경 함수
+    /// 무기가 바뀔 때 호출할 함수 => 무기 획득 함수
     /// </summary>
     /// <param name="itemName"></param>
     public void SetWeapon(string itemName)
@@ -62,13 +65,14 @@ public class WeaponManager
         }
         else
         {
-            Debug.Log("새로운 무기를 획득했습니다.");
+            Debug.Log($"새로운 무기({itemNameData})를 획득했습니다.");
         }
     
         int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
         if (emptySlotIndex != -1)
         {
             _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
+            OnWeaponAdded?.Invoke(itemNameData.name); // 이벤트 호출
         }
     
         if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
@@ -104,6 +108,7 @@ public class WeaponManager
 
             Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
             _cont.ownWeapons[index - 1] = null;
+            // TODO--->무기 제거 후 해당 이름으로 생성되었던 오브젝트 풀러 제거
             
         }
     }

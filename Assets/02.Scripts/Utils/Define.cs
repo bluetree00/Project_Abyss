@@ -106,6 +106,7 @@ public class Define
         NormalAttack_03,
         NormalAttack_04,
         NormalAttack_05,
+        JumpAttack,
 
         NormalSkill_01,
         UltimateSkill_01,
