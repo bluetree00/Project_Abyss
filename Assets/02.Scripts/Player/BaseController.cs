@@ -119,7 +119,7 @@ public class BaseController : MonoBehaviour
                     weaponContainer.isWeaponEquipped && 
                     currentWeapon.weapon_Idle_AnimationName != "")
                     {   
-                        Debug.Log("무기 장착 상태");
+                        Debug.Log($"무기  : {currentWeapon.weapon_Idle_AnimationName} 장착 상태");
                         anim.CrossFade($"{currentWeapon.weapon_Idle_AnimationName}", 0.1f);
                     }
                     else
@@ -156,6 +156,16 @@ public class BaseController : MonoBehaviour
                    break;
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
+                   break;
+                case Define.State.JumpAttack:              // 테스트용 상태
+                    if (weaponContainer.currentWeapon.name == "basic_Knight_02")
+                    {
+                        anim.CrossFade("JumpAttack", 0.1f);
+                    }
+                    else{
+                        Debug.Log("해당 무기가 장착되어 있지 않습니다.");
+                        anim.CrossFade("Idle", 0.2f);
+                    }
                    break;
             }
         }
