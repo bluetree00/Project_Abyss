@@ -10,6 +10,9 @@ public class BaseController : MonoBehaviour
     public CharacterData CharacterData { get { return characterData; } }
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
+    [SerializeField]
+    protected WeaponData currentWeapon;
+    protected Animator anim;
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -39,6 +42,7 @@ public class BaseController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         playerTransform = transform;
         string characterName = gameObject.name; 
+        anim = GetComponent<Animator>();
 
         characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         Managers.CharacterData.SetCharacterData(characterData);
@@ -106,12 +110,22 @@ public class BaseController : MonoBehaviour
         {
             _state = value;
 
-            Animator anim = GetComponent<Animator>();
+            // Animator anim = GetComponent<Animator>();
             switch(_state)
-            {
+            {   //TODO : 아무 무기도 소지하고 있지 않은 상태 구분해서 처리 필요
                 // 플레이어 기본 움직임 상태
                 case Define.State.Idle:
-                   anim.CrossFade("Idle", 0.2f);
+                    if (weaponContainer != null && 
+                    weaponContainer.isWeaponEquipped && 
+                    currentWeapon.weapon_Idle_AnimationName != "")
+                    {   
+                        Debug.Log($"무기  : {currentWeapon.weapon_Idle_AnimationName} 장착 상태");
+                        anim.CrossFade($"{currentWeapon.weapon_Idle_AnimationName}", 0.1f);
+                    }
+                    else
+                    {
+                        anim.CrossFade("Idle", 0.2f);
+                    } 
                    break;
                 case Define.State.Moving:
                    anim.CrossFade("Moving", 0.1f);
@@ -124,6 +138,9 @@ public class BaseController : MonoBehaviour
                    break;
                 case Define.State.Die:
                     anim.CrossFade("Die", 0.1f);
+                   break;
+                case Define.State.ChangeWeapon:
+                    anim.CrossFade($"{currentWeapon.weapon_ChangeWeapon_AnimationName}", 0.2f);
                    break;
                 case Define.State.NormalAttack_01:
                     anim.CrossFade("NormalAttack_01", 0.1f);
@@ -140,10 +157,17 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-                // case Define.State.currentWeaponIdle:
-                //      null 체크
-                //    anim.CrossFade($"{매개변수 스트링}", 0.2f);
-                //    break;
+                   //FIXME : 테스트용 상태 ==> 추후 삭제, 무기에 따라 상태를 변경해야함, 노말어택에서 분기를 통해 나눠야함
+                case Define.State.JumpAttack:              // 테스트용 상태
+                    if (weaponContainer.currentWeapon.name == "basic_Knight_02")
+                    {
+                        anim.CrossFade("JumpAttack", 0.1f);
+                    }
+                    else{
+                        Debug.Log("해당 무기가 장착되어 있지 않습니다.");
+                        anim.CrossFade("Idle", 0.2f);
+                    }
+                   break;
             }
         }
     }
@@ -180,11 +204,6 @@ public class BaseController : MonoBehaviour
             case Define.State.UltimateSkill_01:
                 UpdateUltimateSkile_01();
                 break;
-
-            //
-            case Define.State.Test_Axe_Idle:
-                UpdateWeaponIdle();
-                break;
         }
     }
 
@@ -198,8 +217,5 @@ public class BaseController : MonoBehaviour
     protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
     protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
     protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
-
-    // test 무기 idle
-    protected virtual void UpdateWeaponIdle(){} // 무기 idle 상태 로직직
 
 }
