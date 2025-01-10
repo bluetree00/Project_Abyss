@@ -112,7 +112,7 @@ public class BaseController : MonoBehaviour
 
             // Animator anim = GetComponent<Animator>();
             switch(_state)
-            {
+            {   //TODO : 아무 무기도 소지하고 있지 않은 상태 구분해서 처리 필요
                 // 플레이어 기본 움직임 상태
                 case Define.State.Idle:
                     if (weaponContainer != null && 
@@ -157,6 +157,7 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
+                   //FIXME : 테스트용 상태 ==> 추후 삭제, 무기에 따라 상태를 변경해야함, 노말어택에서 분기를 통해 나눠야함
                 case Define.State.JumpAttack:              // 테스트용 상태
                     if (weaponContainer.currentWeapon.name == "basic_Knight_02")
                     {
