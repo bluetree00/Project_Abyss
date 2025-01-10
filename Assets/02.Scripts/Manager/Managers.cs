@@ -106,24 +106,26 @@ public class Managers : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        WeaponManager.OnWeaponAdded += CreateNewObjectPooler;
+    }
+
+    private void OnDisable()
+    {
+        WeaponManager.OnWeaponAdded -= CreateNewObjectPooler;
+    }
+
+    private void CreateNewObjectPooler(string newWeaponName)        //새로운 무기가 추가될 때마다 새로운 오브젝트 풀러를 생성 / 무기 이름을 받아 생성함
+    {
+        List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools(newWeaponName);
+        _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
+        Debug.Log($"새로운 오브젝트 풀러가 생성되었습니다: {newWeaponName}");
+    }
+
 
     // 매니저에서 처리해줘야할 작업 : MonoBehaviour가 필요한 작업들
     #region MonoBehaviour 필요한 작업
-
-
-    void CheckWeapon()
-    {
-        
-    }
-
-    void OnApplicationQuit()
-    {
-        // 게임 실행 종료 시 초기값으로 복원
-        //CharacterData.characterData.RestoreInitialStats();
-        // 게임 종료 시 사용한 후 필요없는 로드파일들 메모리 해제
-        Resources.UnloadUnusedAssets();
-    }
-
 
     #endregion
 

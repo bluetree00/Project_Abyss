@@ -14,11 +14,15 @@ public class Vagabond : BaseController
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
 
     private bool isInventoryOpen = false; // 인벤토리 열림 상태
+    private bool isInputLocked = false;
+    private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
     protected override void Init()
     {
         
         base.Init(); // 부모 클래스의 초기화 코드 호출
         
+        currentWeapon = Managers.Weapon.GetCurrentWeaponData(); // 현재 무기 데이터를 가져옴
+        //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
     //플레이어의 강제 회전 방지
@@ -104,6 +108,26 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
+        //FIXME: 테스트용 코드
+        // 키보드 F 입력 (테스트용 점프 공격)
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            if (isInputLocked)
+            return;
+
+            if (weaponContainer.currentWeapon.name == "basic_Knight_02"){
+                ChangeState(Define.State.JumpAttack);
+                StartCoroutine(LockInput(2f));
+            }
+            else{
+                Debug.Log("해당 무기가 장착되어 있지 않습니다.");
+                StartCoroutine(LockInput(1f));
+                return;
+            }
+            
+        }
+
+
         if (Input.GetKeyDown(KeyCode.I))
         {
             if (isInventoryOpen)
@@ -129,22 +153,60 @@ public class Vagabond : BaseController
 
         //------------------------키 중복 체크해야함------------------------
         // 키보드 1 입력 (무기 교체)
-        if (Input.GetKey(KeyCode.Alpha1))
+        if (Input.GetKeyDown(KeyCode.Alpha1))
         {
+            if (isInputLocked)
+            return;
+
+            weaponContainer.isWeaponEquipped = false;
+            Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(1);
+            ChangeState(Define.State.ChangeWeapon);
+            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
+            StartCoroutine(LockInput(inputLockDuration));
         }
 
         // 키보드 2 입력 (무기 교체)
-        if (Input.GetKey(KeyCode.Alpha2))
+        if (Input.GetKeyDown(KeyCode.Alpha2))
         {
+            if (isInputLocked)
+            return;
+
+            weaponContainer.isWeaponEquipped = false;
+            Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(2);
+            ChangeState(Define.State.ChangeWeapon);
+            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
+            StartCoroutine(LockInput(inputLockDuration));
         }
 
-        if (Input.GetKey(KeyCode.G))
+        // 키보드 G 입력 (무기 설정)
+        if (Input.GetKeyDown(KeyCode.G))
         {
+            if (isInputLocked)
+            return;
+
             Managers.Weapon.SetWeapon("basic_Knight_02");
+            StartCoroutine(LockInput(inputLockDuration));
+        }   
+
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            Managers.Weapon.RemoveWeapon(1);
+        }
+
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            Managers.Weapon.RemoveWeapon(2);
         }
         //-----------------------------------------------------------------
+    }
+
+    private IEnumerator LockInput(float sec)
+    {
+        isInputLocked = true;
+        yield return new WaitForSeconds(sec);
+        isInputLocked = false;
     }
 
     #endregion
@@ -156,7 +218,9 @@ public class Vagabond : BaseController
         Define.State.NormalAttack_03,
         Define.State.NormalSkill_01,
         Define.State.UltimateSkill_01,
-        Define.State.Dodge
+        Define.State.Dodge,
+        Define.State.ChangeWeapon,
+        Define.State.JumpAttack,
     };
 
     private bool CanProcessInput()
@@ -196,6 +260,7 @@ public class Vagabond : BaseController
         else
         {
             ChangeState(Define.State.Idle);
+            // ChangeState(Define.State.currentWeaponIdle);
         }
     }
 
@@ -250,6 +315,7 @@ public class Vagabond : BaseController
     {
         characterData.attackComboStep = 0;
         characterData.comboTimer = 0;
+        // ChangeState(Define.State.currentWeaponIdle);
         ChangeState(Define.State.Idle);
     }
 
@@ -346,8 +412,28 @@ public class Vagabond : BaseController
         else
         {
             // 이동 입력이 없으면 Idle 상태로 전환
+            // ChangeState(Define.State.currentWeaponIdle);
             ChangeState(Define.State.Idle);
+            
         }
+    }
+
+    public void FrontAttack()
+    {
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
+
+        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
+        Vector3 spawnPosition = transform.position + transform.forward * 1f;
+        Quaternion spawnRotation = transform.rotation; // 플레이어의 현재 회전값
+
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("FrontAttack", spawnPosition, spawnRotation);
+
+        effectObject.transform.position = spawnPosition;
+        effectObject.transform.rotation = spawnRotation;
     }
 
     public void SpawnShinySlashEffect1()

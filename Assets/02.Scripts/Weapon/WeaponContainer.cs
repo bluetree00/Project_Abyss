@@ -9,6 +9,8 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     /// </summary>
     [SerializeField]
     public WeaponData currentWeapon;
+    [SerializeField]
+    public bool isWeaponEquipped = false;
     /// <summary>
     /// 보유중인 무기
     /// </summary>
@@ -21,6 +23,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
     public Define.CharacterClass conClass;
     [SerializeField]
     private GameObject currentWeaponObject;
+    public GameObject CurrentWeaponObject { get { return currentWeaponObject; } }
 
     // 손의 트랜스폼을 저장할 변수
     public Transform weaponHandTransform;
@@ -40,11 +43,13 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
 
             string weaponObjName = currentWeapon.weaponObjName;
             currentWeaponObject = Managers.Resource.Instantiate($"Weapons/{weaponObjName}");
+            isWeaponEquipped = true;        //무기 장착 확인
             if (currentWeaponObject != null)
             {
                 // 무기 오브젝트를 손의 트랜스폼 하위에 생성
                 currentWeaponObject.transform.SetParent(weaponHandTransform);
                 currentWeaponObject.transform.localPosition = Vector3.zero;
+                currentWeaponObject.transform.localRotation = Quaternion.identity;
 
                 Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
             }
@@ -56,6 +61,15 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
         else
         {
             Debug.LogError("현재 무기가 null 입니다.");
+        }
+    }
+
+    public void DestroyCurrentWeaponObject()
+    {
+        if (currentWeaponObject != null)
+        {
+            Destroy(currentWeaponObject);
+            currentWeaponObject = null;
         }
     }
 
