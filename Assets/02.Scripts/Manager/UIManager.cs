@@ -10,6 +10,8 @@ public class UIManager
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
     UI_Scene _sceneUI = null;
 
+      // 특정 UI를 추적하기 위한 Dictionary
+    Dictionary<string, GameObject> _uiObjects = new Dictionary<string, GameObject>();
     public GameObject Root
     {
         get
@@ -95,6 +97,8 @@ public class UIManager
 
 		go.transform.SetParent(Root.transform);
 
+        _uiObjects[name] = go;
+
 		return sceneUI;
 	}
 
@@ -108,6 +112,7 @@ public class UIManager
         _popupStack.Push(popup);
 
         go.transform.SetParent(Root.transform);
+        
 
 		return popup;
     }
@@ -120,6 +125,21 @@ public class UIManager
         augmentChoiceUI.InitAugments(availableAugments);
         augmentChoiceUI.ShowAugmentChoices(); // 선택 가능한 증강 UI 표시
         return augmentChoiceUI;
+    }
+
+    // 특정 UI 제거
+    public void CloseUI(string name)
+    {
+        if (!_uiObjects.ContainsKey(name))
+        {
+            Debug.LogWarning($"UI [{name}] 존재하지 않습니다.");
+            return;
+        }
+
+        GameObject uiObject = _uiObjects[name];
+        _uiObjects.Remove(name); // Dictionary에서 제거
+        Managers.Resource.Destroy(uiObject);
+        _order--;
     }
 
     
@@ -171,15 +191,32 @@ public class UIManager
             return;
         }
 
-        // 중복 아이템 방지 필요시 해제
-        if (invenData.ItemList.Exists(item => item.Name == name && item.UIType == uiType))
+        // // 중복 아이템 방지 필요시 해제
+        // if (invenData.ItemList.Exists(item => item.Name == name && item.UIType == uiType))
+        // {
+        //     Debug.LogWarning($"이미 존재하는 아이템: {name}");
+        //     return;
+        // }
+
+          // UI가 이미 파괴되었는지 확인
+        if (_uiObjects.ContainsKey(name) && _uiObjects[name] == null)
         {
-            Debug.LogWarning($"이미 존재하는 아이템: {name}");
-            return;
+            Debug.LogWarning($"UI [{name}]가 이미 파괴되었습니다. 아이템을 추가할 수 없습니다.");
+            _uiObjects.Remove(name); // 파괴된 UI 객체 참조 제거
         }
 
         // 아이템 추가
         invenData.AddItem(name, uiType);
+
+        // 인벤토리 UI 갱신
+        if (_sceneUI is UI_Inven uiInven && _uiObjects.ContainsKey("UI_Inven"))
+        {
+            uiInven.RefreshInventory(); // UI 갱신
+        }
+        else
+        {
+            Debug.Log("닫혀있음");
+        }
     }
 
 
