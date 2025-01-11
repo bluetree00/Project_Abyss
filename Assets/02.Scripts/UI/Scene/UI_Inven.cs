@@ -19,10 +19,7 @@ public class UI_Inven : UI_Scene
             Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
             return;
         }
-
-        // 이벤트 구독
-        invenData.OnInventoryChanged += RefreshInventory;
-
+        
         // 초기 UI 생성
         RefreshInventory();
     }

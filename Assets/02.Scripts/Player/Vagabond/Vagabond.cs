@@ -137,7 +137,7 @@ public class Vagabond : BaseController
             }
 
             // UI 열기
-            Managers.UI.ShowSceneUI<UI_Inven>();
+            Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
             isInventoryOpen = true; // 상태 업데이트
         }
 
@@ -146,7 +146,7 @@ public class Vagabond : BaseController
             if (isInventoryOpen)
             {
                 // UI 닫기
-                Managers.UI.CloseAllPopupUI();
+                Managers.UI.CloseUI("UI_Inven");
                 isInventoryOpen = false; // 상태 업데이트
             }
         }

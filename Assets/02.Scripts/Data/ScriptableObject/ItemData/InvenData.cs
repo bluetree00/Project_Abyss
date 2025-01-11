@@ -18,7 +18,9 @@ public class InvenData : ScriptableObject
         ItemList.Add(newItem);
 
         // 이벤트 호출 (구독된 메서드 실행)
-        OnInventoryChanged?.Invoke();
+        //OnInventoryChanged?.Invoke();
+
+        
     }
 }
 
