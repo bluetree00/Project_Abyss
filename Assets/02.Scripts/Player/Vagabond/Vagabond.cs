@@ -11,6 +11,8 @@ public class Vagabond : BaseController
 {
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
+
+    // 기본 초기화는 추후에 Define으로 이동 처리 예정
     private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
 
     private bool isInventoryOpen = false; // 인벤토리 열림 상태
@@ -130,15 +132,23 @@ public class Vagabond : BaseController
 
         if (Input.GetKeyDown(KeyCode.I))
         {
+            if(isInputLocked)
+            {
+                return;
+            }
+
             if (isInventoryOpen)
             {
                 // 이미 열려 있으면 처리하지 않음
+                Managers.UI.CloseUI("UI_Inven");
+                isInventoryOpen = false; // 상태 업데이트
                 return;
             }
 
             // UI 열기
             Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
             isInventoryOpen = true; // 상태 업데이트
+            StartCoroutine(LockInput(inputLockDuration));
         }
 
         if (Input.GetKeyDown(KeyCode.Escape))
