@@ -30,7 +30,10 @@ MonoBehaviour:
   E_SkillEffectName: []
   weaponObjName: basic_Knight_02
   weapon_Idle_AnimationName: 
-  weapon_Attack_AnimationName: 
+  weapon_Attack_AnimationName:
+  - NormalAttack_01
+  - NormalAttack_02
+  - NormalAttack_03
   weapon_Run_AnimationName: 
   weapon_Hit_AnimationName: 
   weapon_Die_AnimationName: 

@@ -3,9 +3,6 @@ using System;
 
 public class WeaponManager
 {
-    //NOTE: 무기 획득 이벤트를 위한 델리게이트 선언
-    public delegate void WeaponAddedHandler(string newWeaponName);  // 무기 획득 이벤트 
-    public static event WeaponAddedHandler OnWeaponAdded;
     WeaponData itemNameData;
     /// <summary>
     /// 무기 컨테이너
@@ -72,7 +69,7 @@ public class WeaponManager
         if (emptySlotIndex != -1)
         {
             _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
-            OnWeaponAdded?.Invoke(itemNameData.name); // 이벤트 호출
+            Managers.Effect.SetEffectPooler(itemNameData.weaponName); // 무기 이름으로 이펙트 풀러 생성
         }
     
         if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
