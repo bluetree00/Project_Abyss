@@ -19,13 +19,13 @@ public class Grid : MonoBehaviour
 
     private void OnEnable() 
     {
-        GameEvent.CheckIfShapeCanBePlaced += CheckIfShapeCanBePlaceed;
+        GameEvent.CheckIfShapeCanBePlaced += CheckIfShapeCanBePlaced;
     }
 
 
     private void OnDisable() 
     {
-        GameEvent.CheckIfShapeCanBePlaced -= CheckIfShapeCanBePlaceed;
+        GameEvent.CheckIfShapeCanBePlaced -= CheckIfShapeCanBePlaced;
     }
     // 게임 시작 시 호출 (Unity 생명 주기 함수)
     void Start()
@@ -47,6 +47,9 @@ public class Grid : MonoBehaviour
     // 그리드 칸을 생성하는 함수
     private void SpawnGridSquares()
     {
+        // int square_index = 0;
+        // _gridSquares[_gridSquares.Count -1].GetComponent<GridSquare>().SquareIndex =square_index;
+        // square_index++;
         // 행(row)과 열(column)을 반복하며 칸을 생성
         for (int row = 0; row < rows; ++row)
         {
@@ -113,18 +116,36 @@ public class Grid : MonoBehaviour
         }
     }
 
-    private void CheckIfShapeCanBePlaceed()
+    private void CheckIfShapeCanBePlaced()
     {
+        var squareIndexes = new List<int>();
+
         foreach (var square in _gridSquares)
         {
             var gridSquare = square.GetComponent<GridSquare>();
 
-            if(gridSquare.CanWeUseThisSquare() == true)
+            if(gridSquare.Selected && !gridSquare.SquareOccupied)
             {
-                gridSquare.ActivateSquare();
+                squareIndexes.Add(gridSquare.SquareIndex);
+                gridSquare.Selected = false;
             }
         }
 
-        shapeStorage.GetCurrentSelectedShape().DeactivateShape();
+        var GetCurrentSelectedShape = shapeStorage.GetCurrentSelectedShape();
+        if (GetCurrentSelectedShape == null) return;
+        
+        if(GetCurrentSelectedShape.TotalSquareNumber == squareIndexes.Count)
+        {
+            foreach(var squareIndexe in squareIndexes)
+            {
+                _gridSquares[squareIndexe].GetComponent<GridSquare>().PlaceShapeOnBoard();
+            }
+
+            GetCurrentSelectedShape.DeactivateShape();
+        }
+        else
+        {
+            GameEvent.MoveShapeToStartPosition();
+        }
     }
 }
