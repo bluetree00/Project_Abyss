@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Unity.PlasticSCM.Editor.WebApi;
 using UnityEngine;
 
 public class Grid : MonoBehaviour
@@ -46,45 +45,37 @@ public class Grid : MonoBehaviour
     }
 
     // 그리드 칸을 생성하는 함수
-   private void SpawnGridSquares()
-{
-    int square_index = 0; // square_index 초기화
-    // 행(row)과 열(column)을 반복하며 칸을 생성
-    for (int row = 0; row < rows; ++row)
+    private void SpawnGridSquares()
     {
-        for (int column = 0; column < columns; ++column)
+        // 행(row)과 열(column)을 반복하며 칸을 생성
+        for (int row = 0; row < rows; ++row)
         {
-            // 프리팹을 복제(Instantiate)하여 새로운 칸 생성
-            var gridSquare = Instantiate(gridSquarePrefab, transform);
-            
-            // 생성된 칸의 스케일(크기 비율) 설정
-            gridSquare.transform.localScale = new Vector3(squareScale, squareScale, squareScale);
-
-            // 생성된 칸을 리스트에 추가
-            _gridSquares.Add(gridSquare);
-
-            // 칸의 GridSquare 컴포넌트를 가져와 초기화
-            var gridSquareComponent = gridSquare.GetComponent<GridSquare>();
-            if (gridSquareComponent != null)
+            for (int column = 0; column < columns; ++column)
             {
-                // 칸의 초기 이미지를 짝수/홀수 구분에 따라 설정
-                gridSquareComponent.SetImage((row * columns + column) % 2 == 0);
+                // 프리팹을 복제(Instantiate)하여 새로운 칸 생성
+                var gridSquare = Instantiate(gridSquarePrefab, transform);
 
-                // 각 칸에 고유한 인덱스를 설정
-                gridSquareComponent.SquareIndex = square_index; // square_index 할당
+                // 생성된 칸의 스케일(크기 비율) 설정
+                gridSquare.transform.localScale = new Vector3(squareScale, squareScale, squareScale);
 
-                // square_index 증가
-                square_index++;
-            }
-            else
-            {
-                // GridSquare 컴포넌트가 없는 경우 경고 메시지 출력
-                Debug.LogError("GridSquare 컴포넌트가 누락되었습니다.");
+                // 생성된 칸을 리스트에 추가
+                _gridSquares.Add(gridSquare);
+
+                // 칸의 GridSquare 컴포넌트를 가져와 초기화
+                var gridSquareComponent = gridSquare.GetComponent<GridSquare>();
+                if (gridSquareComponent != null)
+                {
+                    // 칸의 초기 이미지를 짝수/홀수 구분에 따라 설정
+                    gridSquareComponent.SetImage((row * columns + column) % 2 == 0);
+                }
+                else
+                {
+                    // GridSquare 컴포넌트가 없는 경우 경고 메시지 출력
+                    Debug.LogError("GridSquare 컴포넌트가 누락되었습니다.");
+                }
             }
         }
     }
-}
-
 
     // 생성된 칸들의 위치를 설정하는 함수
     private void SetGridSquaresPositions()
@@ -124,34 +115,16 @@ public class Grid : MonoBehaviour
 
     private void CheckIfShapeCanBePlaceed()
     {
-        var SquareIndexs = new List<int>();
         foreach (var square in _gridSquares)
         {
             var gridSquare = square.GetComponent<GridSquare>();
 
-            if(gridSquare.Selected && !gridSquare.SquareOccupied)
+            if(gridSquare.CanWeUseThisSquare() == true)
             {
-                SquareIndexs.Add(gridSquare.SquareIndex);
-                gridSquare.Selected = false;
-                //gridSquare.ActivateSquare();
+                gridSquare.ActivateSquare();
             }
         }
 
-        var GetCurrentSelectedShape = shapeStorage.GetCurrentSelectedShape();
-        if(GetCurrentSelectedShape == null) return;
-
-        if(GetCurrentSelectedShape.TotalSquareNumber == SquareIndexs.Count)
-        {
-            foreach (var SquareIndex in SquareIndexs)
-            {
-                _gridSquares[SquareIndex].GetComponent<GridSquare>().PlaceShapeOnBoard();
-            }
-
-            GetCurrentSelectedShape.DeactivateShape();
-        }
-        else
-        {
-            GameEvent.MoveShapeToStartPosition();
-        }
+        shapeStorage.GetCurrentSelectedShape().DeactivateShape();
     }
 }
