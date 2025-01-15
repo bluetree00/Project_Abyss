@@ -11,6 +11,7 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
 
     [HideInInspector]
     public ShapeData CurrentShapeData; // ScriptableObject로 관리되는 ShapeData
+    public int TotalSquareNumber {get; set;}
 
     private List<GameObject> _currentShape = new List<GameObject>(); // 활성화된 정사각형 오브젝트를 저장할 리스트
     private Vector3 _shapeStartScale; // Shape의 초기 크기
@@ -29,6 +30,16 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
         _shapeDraggable = true;
         _startPosition = _transform.localPosition;
         _shapeActive = true;
+    }
+
+    private void OnEnable() 
+    {
+        GameEvent.MoveShapeToStartPosition += MoveShapeToStartPosition;
+    }
+
+    private void OnDisable() 
+    {
+        GameEvent.MoveShapeToStartPosition -= MoveShapeToStartPosition;
     }
 
     public bool IsOnStartPosition()
@@ -94,10 +105,10 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
         CurrentShapeData = shapeData;
 
         // 활성화할 정사각형 개수 계산
-        var totalSquareNumber = GetNumberOfSquares(shapeData);
+        TotalSquareNumber = GetNumberOfSquares(shapeData);
 
         // 리스트에 정사각형 오브젝트를 추가 (부족하면 생성)
-        while (_currentShape.Count <= totalSquareNumber)
+        while (_currentShape.Count <= TotalSquareNumber)
         {
             _currentShape.Add(Instantiate(squareShapeImage, transform));
         }
@@ -242,5 +253,10 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
     public void OnPointerDown(PointerEventData eventData)
     {
         Debug.Log("Pointer Down");
+    }
+
+    public void MoveShapeToStartPosition()
+    {
+        _transform.transform.localPosition = _startPosition;
     }
 }
