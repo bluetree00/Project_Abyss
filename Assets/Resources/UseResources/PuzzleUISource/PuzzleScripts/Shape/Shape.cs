@@ -5,6 +5,8 @@ using UnityEngine;
 public class Shape : MonoBehaviour
 {
     public GameObject squareShapeImage; // 사각형 오브젝트 프리팹
+    
+    [HideInInspector]
     public ShapeData CurrentShapeData;  // 현재 사용할 ShapeData ScriptableObject
 
     private List<GameObject> _currentShape = new List<GameObject>(); // 생성된 사각형 오브젝트 리스트
