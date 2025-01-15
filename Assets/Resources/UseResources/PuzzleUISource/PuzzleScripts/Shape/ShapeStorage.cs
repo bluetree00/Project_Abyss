@@ -17,9 +17,19 @@ public class ShapeStorage : MonoBehaviour
         
     }
 
-    // Update is called once per frame
-    void Update()
+    public Shape GetCurrentSelectedShape()
     {
-        
+        foreach(var shape in shapeList)
+        {
+            if(shape.IsOnStartPosition()== false && shape.IsAnyOfShapeSquareActive())
+            {
+                return shape;
+            }
+        }
+
+        Debug.LogError("no shape selected!");
+        return null;
     }
+
+    
 }
