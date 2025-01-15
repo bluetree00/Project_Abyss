@@ -16,11 +16,22 @@ public class Grid : MonoBehaviour
     private Vector2 _offset = new Vector2(0.0f, 0.0f); // 각 칸 간의 거리 계산을 위한 오프셋
     private List<GameObject> _gridSquares = new List<GameObject>(); // 생성된 칸(GameObject) 리스트
 
+    private void OnEnable() 
+    {
+        GameEvent.CheckIfShapeCanBePlaced += CheckIfShapeCanBePlaceed;
+    }
+
+
+    private void OnDisable() 
+    {
+        GameEvent.CheckIfShapeCanBePlaced -= CheckIfShapeCanBePlaceed;
+    }
     // 게임 시작 시 호출 (Unity 생명 주기 함수)
     void Start()
     {
         CreateGrid(); // 그리드 생성
     }
+
 
     // 그리드를 생성하는 함수
     private void CreateGrid()
@@ -97,6 +108,19 @@ public class Grid : MonoBehaviour
             {
                 rectTransform.anchoredPosition = new Vector2(posX, posY); // UI 캔버스 상 위치 설정
                 rectTransform.localPosition = new Vector3(posX, posY, 0.0f); // 로컬 좌표 설정
+            }
+        }
+    }
+
+    private void CheckIfShapeCanBePlaceed()
+    {
+        foreach (var square in _gridSquares)
+        {
+            var gridSquare = square.GetComponent<GridSquare>();
+
+            if(gridSquare.CanWeUseThisSquare() == true)
+            {
+                gridSquare.ActivateSquare();
             }
         }
     }
