@@ -4,6 +4,7 @@ using UnityEngine;
 public class Grid : MonoBehaviour
 {
     // 그리드 설정 관련 변수들
+    public ShapeStorage shapeStorage;
     public int columns = 0; // 그리드의 열 개수
     public int rows = 0; // 그리드의 행 개수
     public float squaresGap = 0.1f; // 각 칸 사이의 간격
@@ -123,5 +124,7 @@ public class Grid : MonoBehaviour
                 gridSquare.ActivateSquare();
             }
         }
+
+        shapeStorage.GetCurrentSelectedShape().DeactivateShape();
     }
 }
