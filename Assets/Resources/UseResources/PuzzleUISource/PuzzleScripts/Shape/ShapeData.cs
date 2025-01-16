@@ -56,12 +56,15 @@ public class ShapeData : ScriptableObject
 
     // 새로운 보드를 생성
     public void CreateNewBoard()
-    {
-        board = new Row[rows]; // 보드 배열을 행(Row) 개수만큼 생성
+{
+    Debug.Log($"Creating new board with {rows} rows and {columns} columns.");
+    board = new Row[rows]; // 보드 배열을 행(Row) 개수만큼 생성
 
-        for (var i = 0; i < rows; i++)
-        {
-            board[i] = new Row(columns); // 각 행(Row)을 생성하고 열(columns) 크기를 설정
-        }
+    for (var i = 0; i < rows; i++)
+    {
+        board[i] = new Row(columns); // 각 행(Row)을 생성하고 열(columns) 크기를 설정
+        Debug.Log($"Row {i} created with {columns} columns.");
     }
+}
+
 }
