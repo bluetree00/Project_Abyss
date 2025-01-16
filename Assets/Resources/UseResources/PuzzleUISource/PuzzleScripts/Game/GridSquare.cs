@@ -10,14 +10,15 @@ public class GridSquare : MonoBehaviour
     public Image normalImage;
     public List<Sprite> normallmages;
 
-    public bool Selected { get; set; } // Ensure the set accessor is public
-    public int SquareIndex { get; set; }
-    public bool SquareOccupied { get; set; }
-
+    public bool Selected {get; set;}
+    public int SquareIndex{get; set;}
+    public bool SquareOccupied {get; set;}
+    // Start is called before the first frame update
     void Start()
     {
         Selected = false;
         SquareOccupied = false;
+        
     }
 
     public bool CanWeUseThisSquare()
@@ -37,37 +38,56 @@ public class GridSquare : MonoBehaviour
         Selected = true;
         SquareOccupied = true;
     }
+    
+
 
     public void SetImage(bool setFirstImage)
     {
         normalImage.GetComponent<Image>().sprite = setFirstImage ? normallmages[1] : normallmages[0];
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    private void OnTriggerEnter2D(Collider2D other) 
     {
-        if (SquareOccupied == false)
+        if(SquareOccupied == false)
         {
             Selected = true;
             hooverImage.gameObject.SetActive(true);
         }
+        else if(other.GetComponent<ShapeSquare>() != null)
+        {
+            other.GetComponent<ShapeSquare>().SetOccupied();
+        }
+       
+       
     }
 
-    private void OnTriggerStay2D(Collider2D other)
+     private void OnTriggerStay2D(Collider2D other) 
     {
         Selected = true;
 
-        if (SquareOccupied == false)
+        if(SquareOccupied == false)
         {
             hooverImage.gameObject.SetActive(true);
         }
+        else if(other.GetComponent<ShapeSquare>() != null)
+        {
+            other.GetComponent<ShapeSquare>().SetOccupied();
+        }
     }
 
-    private void OnTriggerExit2D(Collider2D other)
+    private void OnTriggerExit2D(Collider2D other) 
     {
-        if (SquareOccupied == false)
+        if(SquareOccupied == false)
         {
             Selected = false;
             hooverImage.gameObject.SetActive(false);
         }
+        else if(other.GetComponent<ShapeSquare>() != null)
+        {
+            other.GetComponent<ShapeSquare>().UnSetOccupied();
+        }
+
+
     }
+
 }

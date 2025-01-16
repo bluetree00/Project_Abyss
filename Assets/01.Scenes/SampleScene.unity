@@ -914,7 +914,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 6, y: -367}
-  m_SizeDelta: {x: 1468.32, y: 216.1}
+  m_SizeDelta: {x: 1515.93, y: 216.1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &587577162
 MonoBehaviour:
@@ -2477,8 +2477,8 @@ MonoBehaviour:
   shapeStorage: {fileID: 706426767}
   columns: 8
   rows: 8
-  squaresGap: 3
-  gridSquarePrefab: {fileID: 3707343352377569076, guid: 3937ff2d3da99f546a154d4faa149e6a,
+  squaresGap: 1
+  gridSquare: {fileID: 3707343352377569076, guid: 3937ff2d3da99f546a154d4faa149e6a,
     type: 3}
   startPosition: {x: -380, y: 500}
   squareScale: 0.9
