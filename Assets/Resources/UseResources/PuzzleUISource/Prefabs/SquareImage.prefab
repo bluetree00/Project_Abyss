@@ -69,7 +69,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: c53e8b9e338e12340acc87211bbe377a, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 0d8ed4a51d33f3c44980d73b3c8ce086, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -162,7 +162,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 50, y: 45}
+  m_Size: {x: 30, y: 25}
   m_EdgeRadius: 0
 --- !u!1 &4314807843991578628
 GameObject:

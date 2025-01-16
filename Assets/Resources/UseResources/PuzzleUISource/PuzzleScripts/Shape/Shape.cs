@@ -34,12 +34,12 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
 
     private void OnEnable() 
     {
-        GameEvent.MoveShapeToStartPosition += MoveShapeToStartPosition;
+        GameEvents.MoveShapeToStartPosition += MoveShapeToStartPosition;
     }
 
     private void OnDisable() 
     {
-        GameEvent.MoveShapeToStartPosition -= MoveShapeToStartPosition;
+        GameEvents.MoveShapeToStartPosition -= MoveShapeToStartPosition;
     }
 
     public bool IsOnStartPosition()
@@ -110,7 +110,7 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
         // 리스트에 정사각형 오브젝트를 추가 (부족하면 생성)
         while (_currentShape.Count <= TotalSquareNumber)
         {
-            _currentShape.Add(Instantiate(squareShapeImage, transform));
+            _currentShape.Add(Instantiate(squareShapeImage, transform) as GameObject);
         }
 
         // 모든 정사각형 오브젝트 초기화
@@ -246,7 +246,7 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
     public void OnEndDrag(PointerEventData eventData)
     {
         this.GetComponent<RectTransform>().localScale = _shapeStartScale; // 크기를 원래대로 복구
-        GameEvent.CheckIfShapeCanBePlaced(); // 드래그된 Shape가 배치 가능한지 체크
+        GameEvents.CheckIfShapeCanBePlaced(); // 드래그된 Shape가 배치 가능한지 체크
     }
 
     // 마우스 버튼 클릭 이벤트 처리
