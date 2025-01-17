@@ -100,99 +100,82 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
     }
 
     // Shape를 생성
-    public void CreateShape(ShapeData shapeData)
+   public void CreateShape(ShapeData shapeData)
+{
+    CurrentShapeData = shapeData;
+
+    // 활성화할 정사각형 개수 계산
+    TotalSquareNumber = GetNumberOfSquares(shapeData);
+
+    // 리스트에 정사각형 오브젝트를 추가 (부족하면 생성)
+    while (_currentShape.Count <= TotalSquareNumber)
     {
-        CurrentShapeData = shapeData;
+        _currentShape.Add(Instantiate(squareShapeImage, transform));
+    }
 
-        // 활성화할 정사각형 개수 계산
-        TotalSquareNumber = GetNumberOfSquares(shapeData);
+    // 모든 정사각형 오브젝트 초기화
+    foreach (var square in _currentShape)
+    {
+        square.gameObject.transform.localPosition = Vector3.zero;
+        square.gameObject.SetActive(false);
+    }
 
-        // 리스트에 정사각형 오브젝트를 추가 (부족하면 생성)
-        while (_currentShape.Count <= TotalSquareNumber)
+    // 정사각형 오브젝트의 크기 계산
+    var squareRect = squareShapeImage.GetComponent<RectTransform>();
+    var moveDistance = new Vector2(squareRect.rect.width * squareRect.localScale.x,
+                                   squareRect.rect.height * squareRect.localScale.y);
+
+    int currentIndexInList = 0;
+
+    // 행과 열을 기반으로 정사각형 배치
+    for (var row = 0; row < shapeData.rows; row++)
+    {
+        for (var column = 0; column < shapeData.columns; column++)
         {
-            _currentShape.Add(Instantiate(squareShapeImage, transform) as GameObject);
-        }
-
-        // 모든 정사각형 오브젝트 초기화
-        foreach (var square in _currentShape)
-        {
-            square.gameObject.transform.position = Vector3.zero;
-            square.gameObject.SetActive(false);
-        }
-
-        // 정사각형 오브젝트의 크기 계산
-        var squareRect = squareShapeImage.GetComponent<RectTransform>();
-        var moveDistance = new Vector2(squareRect.rect.width * squareRect.localScale.x,
-                                       squareRect.rect.height * squareRect.localScale.y);
-
-        int currentIndexInList = 0;
-
-        // 행과 열을 기반으로 정사각형 배치
-        for (var row = 0; row < shapeData.rows; row++)
-        {
-            for (var column = 0; column < shapeData.columns; column++)
+            if (shapeData.board[row].column[column])
             {
-                if (shapeData.board[row].column[column])
-                {
-                    _currentShape[currentIndexInList].SetActive(true); // 활성화
-                    _currentShape[currentIndexInList].GetComponent<RectTransform>().localPosition =
-                        new Vector2(GetXpositionForShapeSquare(shapeData, column, moveDistance),
-                                    GetYPositionForShapeSquare(shapeData, row, moveDistance)); // 위치 설정
+         
+                _currentShape[currentIndexInList].SetActive(true);
+                _currentShape[currentIndexInList].GetComponent<RectTransform>().localPosition =
+                    new Vector2(GetXPositionForShapeSquare(shapeData, column, moveDistance),
+                                GetYPositionForShapeSquare(shapeData, row, moveDistance));
 
-                    currentIndexInList++;
-                }
+                currentIndexInList++;
             }
         }
     }
+}
 
-    // 정사각형의 Y 좌표 계산
+
+    private float GetXPositionForShapeSquare(ShapeData shapeData, int column, Vector2 moveDistance)
+    {
+        float shiftOnX = 0f;
+        if (shapeData.columns > 1)
+        {
+            float startXPos;
+            if (shapeData.columns % 2 != 0)
+                startXPos = (shapeData.columns / 2) * moveDistance.x * -1;
+            else
+                startXPos = ((shapeData.columns / 2) - 1) * moveDistance.x * -1 - moveDistance.x / 2;
+            shiftOnX = startXPos + column * moveDistance.x;
+
+        }
+        return shiftOnX;
+    }
+
     private float GetYPositionForShapeSquare(ShapeData shapeData, int row, Vector2 moveDistance)
     {
         float shiftOnY = 0f;
-
         if (shapeData.rows > 1)
         {
-            if (shapeData.rows % 2 != 0) // 행 개수가 홀수인 경우
-            {
-                var middleSquareIndex = (shapeData.rows - 1) / 2;
-
-                shiftOnY = (row - middleSquareIndex) * moveDistance.y;
-            }
-            else // 행 개수가 짝수인 경우
-            {
-                var middleSquareIndex1 = (shapeData.rows / 2) - 1;
-                var middleSquareIndex2 = shapeData.rows / 2;
-
-                shiftOnY = (row <= middleSquareIndex1 ? (row - middleSquareIndex1) : (row - middleSquareIndex2)) * moveDistance.y;
-            }
+            float startYPos;
+            if (shapeData.rows % 2 != 0)
+                startYPos = (shapeData.rows / 2) * moveDistance.y;
+            else
+                startYPos = ((shapeData.rows / 2) - 1) * moveDistance.y + moveDistance.y / 2;
+            shiftOnY = startYPos - row * moveDistance.y;
         }
-
         return shiftOnY;
-    }
-
-    // 정사각형의 X 좌표 계산
-    private float GetXpositionForShapeSquare(ShapeData shapeData, int column, Vector2 moveDistance)
-    {
-        float shiftOnX = 0f;
-
-        if (shapeData.columns > 1)
-        {
-            if (shapeData.columns % 2 != 0) // 열 개수가 홀수인 경우
-            {
-                var middleSquareIndex = (shapeData.columns - 1) / 2;
-
-                shiftOnX = (column - middleSquareIndex) * moveDistance.x;
-            }
-            else // 열 개수가 짝수인 경우
-            {
-                var middleSquareIndex1 = (shapeData.columns / 2) - 1;
-                var middleSquareIndex2 = shapeData.columns / 2;
-
-                shiftOnX = (column <= middleSquareIndex1 ? (column - middleSquareIndex1) : (column - middleSquareIndex2)) * moveDistance.x;
-            }
-        }
-
-        return shiftOnX;
     }
 
     // 활성화된 정사각형 개수 계산
