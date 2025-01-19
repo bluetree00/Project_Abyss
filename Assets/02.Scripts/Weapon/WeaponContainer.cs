@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponContainer
@@ -42,7 +43,7 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
             }
 
             string weaponObjName = currentWeapon.weaponObjName;
-            currentWeaponObject = Managers.Resource.Instantiate($"Weapons/{weaponObjName}");
+            /*currentWeaponObject = Managers.Resource.Instantiate($"Weapons/{weaponObjName}");
             isWeaponEquipped = true;        //무기 장착 확인
             if (currentWeaponObject != null)
             {
@@ -56,7 +57,25 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
             else
             {
                 Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
-            }
+            }*/
+            AddressablesManager.Instance.InstantiateAsync(weaponObjName, (instance) =>
+            {
+                currentWeaponObject = instance;
+                isWeaponEquipped = true;
+
+                if (currentWeaponObject != null)
+                {
+                    currentWeaponObject.transform.SetParent(weaponHandTransform);
+                    currentWeaponObject.transform.localPosition = Vector3.zero;
+                    currentWeaponObject.transform.localRotation = Quaternion.identity;
+
+                    Debug.Log($"무기 {weaponObjName}가 성공적으로 생성.");
+                }
+                else
+                {
+                    Debug.LogError($"무기 {weaponObjName} 생성에 실패.");
+                }
+            });
         }
         else
         {
