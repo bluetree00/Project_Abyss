@@ -37,6 +37,7 @@ public class Managers : MonoBehaviour
     private StageTransitionManager _stageTransitionManager;
     private CharacterDataManager _characterDataManager;     //캐릭터 데이터 관리 매니저
     private WeaponManager weaponManager; // 무기 데이터 관리 매니저
+    private AddressablesManager addressablesManager; // Addressables 매니저
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
 
