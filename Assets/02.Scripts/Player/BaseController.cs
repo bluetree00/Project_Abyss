@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -44,32 +45,72 @@ public class BaseController : MonoBehaviour
         string characterName = gameObject.name; 
         anim = GetComponent<Animator>();
 
-        characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
-        Managers.CharacterData.SetCharacterData(characterData);
+        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
+        //characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
+        //weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
+        LoadCharacterData(characterName, () =>
+        {
+            LoadWeaponContainer(Define.GetCharacterClassString(characterName), () =>
+            {
+                // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
+                Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
+                if (weaponHandTransform != null)
+                {
+                    // WeaponManager의 ContainerDataInit 메서드에 손의 트랜스폼을 전달
+                    Managers.Weapon.ContainerDataInit(weaponContainer, weaponHandTransform);
+                }
+                else
+                {
+                    Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
+                }
 
-                                                                                    // return된 스트링 값 그대로 사용
-        weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
-        if (weaponContainer == null) 
-        {
-            Debug.LogError("<color=red>무기 컨테이너를 찾을 수 없습니다.</color>");
-            return;
-        }
-        else
-        {
-            Debug.Log("<color=green>무기 컨테이너를 찾았습니다.</color>");
-        }
+                LoadWeaponData("basic_Knight_01");
+            });
+        });
+        
+    }
 
-        // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
-        Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
-        if (weaponHandTransform != null)
+    private void LoadCharacterData(string characterName, Action OnSuccess = null)
+    {
+        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, characterData_instance =>
         {
-            // WeaponManager의 ContainerDataInit 메서드에 손의 트랜스폼을 전달
-            Managers.Weapon.ContainerDataInit(weaponContainer, weaponHandTransform);
-        }
-        else
+            if (characterData_instance == null)
+            {
+                Debug.LogError("캐릭터 데이터가 null입니다.");
+                return;
+            }
+            characterData = characterData_instance;
+            Debug.Log($"캐릭터 데이터({characterData.characterName})를 로드했습니다.");
+            Managers.CharacterData.SetCharacterData(characterData);
+        });
+    }
+
+    private void LoadWeaponContainer(string characterClassString, Action OnSuccess = null)
+    {
+        AddressablesManager.Instance.LoadAsset<WeaponContainer>(characterClassString, weaponContainer_instance =>
         {
-            Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
-        }
+            if (weaponContainer_instance == null)
+            {
+                Debug.LogError("무기 컨테이너가 null입니다.");
+                return;
+            }
+            weaponContainer = weaponContainer_instance;
+            Debug.Log($"무기 컨테이너({weaponContainer.name})를 로드했습니다.");
+        });
+    }
+
+    protected void LoadWeaponData(string weaponName)
+    {
+        AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, WData_instance =>
+        {
+            if (WData_instance == null)
+            {
+                Debug.LogError("무기 데이터가 null입니다.");
+                return;
+            }
+            currentWeapon = WData_instance;
+            Debug.Log($"기본 무기 데이터({currentWeapon.weaponName})를 로드했습니다.");
+        });
     }
 
     private Transform FindDeepChildBFS(Transform parent, string name)

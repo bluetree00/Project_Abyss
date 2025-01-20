@@ -11,7 +11,7 @@ public class WeaponManager
 
     private static WeaponContainer _cont; // 백킹 필드
 
-    public static WeaponContainer Cont
+    public WeaponContainer Cont
     {
         get { return _cont; }
         private set { _cont = value; }
@@ -24,6 +24,11 @@ public class WeaponManager
     /// <param name="weaponHandTransform"></param>
     public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null)
     {
+        if (con == null)
+        {
+            Debug.LogError("무기 컨테이너가 null입니다.");
+            return;
+        }
         _cont = con;   // 매니저 변수 = 매개변수 동기화
         SetDefult();   // 기본 무기 설정
         if (weaponHandTransform == null)
@@ -40,8 +45,23 @@ public class WeaponManager
     /// </summary>
     void SetDefult()
     {
+        WeaponData resourceWData = null;
         string ClassName = _cont.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
-        WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
+        //WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
+        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
+        AddressablesManager.Instance.LoadAsset<WeaponData>($"basic_{ClassName}_01", WData_instance =>
+        {
+            if (WData_instance == null)
+            {
+                Debug.LogError("무기 데이터가 null입니다.");
+                return;
+            }
+            else{
+                WeaponData resourceWData = WData_instance;
+                Debug.Log($"기본 무기 데이터({resourceWData.weaponName})를 로드했습니다.");
+            }
+            
+        }); // 무기 데이터 로드
         _cont.currentWeapon = resourceWData;
         _cont.ownWeapons[0] = resourceWData;
     }
@@ -53,8 +73,22 @@ public class WeaponManager
     /// <param name="itemName"></param>
     public void SetWeapon(string itemName)
     {
-        itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
-        Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
+        //itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
+        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
+        AddressablesManager.Instance.LoadAsset<WeaponData>(itemName, WData_instance =>
+        {
+            if (WData_instance == null)
+            {
+                Debug.LogError("무기 데이터가 null입니다.");
+                return;
+            }
+            else{
+                itemNameData = WData_instance;
+                Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
+            }
+            
+        }); // 무기 데이터 로드
+        
         if (Array.Exists(_cont.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
         {
             Debug.Log("이미 소지중인 무기입니다.");
@@ -127,6 +161,11 @@ public class WeaponManager
     /// <returns></returns>
     public WeaponData GetCurrentWeaponData()
     {
+        if (_cont == null)
+        {
+            Debug.LogError("무기 컨테이너가 null입니다.");
+            return null;
+        }
         return _cont.currentWeapon;
     }
 }
