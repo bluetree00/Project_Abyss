@@ -20,10 +20,7 @@ public class Vagabond : BaseController
     private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
     protected override void Init()
     {
-        
         base.Init(); // 부모 클래스의 초기화 코드 호출
-        
-        currentWeapon = Managers.Weapon.GetCurrentWeaponData(); // 현재 무기 데이터를 가져옴
         //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
@@ -59,6 +56,11 @@ public class Vagabond : BaseController
     #region 업데이트, 상시 인풋
     protected override void Update() 
     {
+        if (characterData == null)
+        {
+            return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
+        }
+
         Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();

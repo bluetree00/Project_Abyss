@@ -58,22 +58,22 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
             {
                 Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
             }*/
-            AddressablesManager.Instance.InstantiateAsync(weaponObjName, (instance) =>
+
+            AddressablesManager.Instance.InstantiateAsync(weaponObjName, instance =>
             {
                 currentWeaponObject = instance;
-                isWeaponEquipped = true;
-
+                isWeaponEquipped = true;        //무기 장착 확인
                 if (currentWeaponObject != null)
                 {
                     currentWeaponObject.transform.SetParent(weaponHandTransform);
                     currentWeaponObject.transform.localPosition = Vector3.zero;
                     currentWeaponObject.transform.localRotation = Quaternion.identity;
 
-                    Debug.Log($"무기 {weaponObjName}가 성공적으로 생성.");
+                    Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
                 }
                 else
                 {
-                    Debug.LogError($"무기 {weaponObjName} 생성에 실패.");
+                    Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
                 }
             });
         }
