@@ -7,6 +7,18 @@ public class ShapeStorage : MonoBehaviour
     public List<ShapeData> shapeData; // 모양 데이터 리스트
     public List<Shape> shapeList;     // 생성된 모양 리스트
 
+    
+    private void OnEnable()
+    {
+        GameEvents.RequestNewShapes += RequestNewShapes;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.RequestNewShapes -= RequestNewShapes;
+    }
+
+
     // Start is called before the first frame update
     void Start()
     {
@@ -30,7 +42,6 @@ public class ShapeStorage : MonoBehaviour
             Debug.Log($"Shape created with ShapeData: {selectedShapeData.name}");
         }
     }
-
     // 현재 선택된 Shape 반환
     public Shape GetCurrentSelectedShape()
     {
@@ -45,5 +56,14 @@ public class ShapeStorage : MonoBehaviour
 
         Debug.LogError("No shape selected!");
         return null;
+    }
+
+    private void RequestNewShapes()
+    {
+        foreach(var shape in shapeList)
+        {
+            var shapeIndex = UnityEngine.Random.Range(0, shapeData.Count);
+            shape.RequestNewShape(shapeData[shapeIndex]);
+        }
     }
 }
