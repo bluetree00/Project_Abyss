@@ -133,14 +133,10 @@ public class Grid : MonoBehaviour
 
     if (currentSelectedShape == null) return;
 
-    // 디버깅: squareIndexes.Count와 currentSelectedShape.TotalSquareNumber 출력
-    Debug.Log($"squareIndexes.Count: {squareIndexes.Count}, currentSelectedShape.TotalSquareNumber: {currentSelectedShape.TotalSquareNumber}");
-
     // 선택된 칸의 수와 모양의 요구하는 칸 수가 일치하는지 확인
     if (currentSelectedShape.TotalSquareNumber == squareIndexes.Count)
     {
         // 디버깅: 선택된 칸에 모양을 배치할 때
-        Debug.Log("칸 수가 일치하므로 모양을 배치합니다.");
 
         // 선택된 칸에 모양을 배치
         foreach (var squareIndex in squareIndexes)
@@ -151,13 +147,31 @@ public class Grid : MonoBehaviour
             if (!gridSquare.SquareOccupied)
             {
                 gridSquare.ActivateSquare(); // 그리드에 모양 배치
-                Debug.Log($"모양이 칸 {squareIndex}에 배치되었습니다.");
             }
         }
 
-        // 모양을 비활성화
-        currentSelectedShape.DeactivateShape();
-        Debug.Log("모양 비활성화 완료.");
+        var shapeLeft = 0;
+
+        foreach (var shape in shapeStorage.shapeList)
+        {
+            if(shape.IsOnStartPosition() && shape.IsAnyOfShapeSquareActive())
+            {
+                shapeLeft++;
+            }
+        }
+
+
+        if(shapeLeft ==0)
+        {
+            GameEvents.RequestNewShapes();
+
+        }
+        else
+        {
+            GameEvents.SetShapeInactive();
+        }
+
+
     }
     else
     {
