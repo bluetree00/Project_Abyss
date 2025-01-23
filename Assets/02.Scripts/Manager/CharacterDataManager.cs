@@ -15,7 +15,7 @@ public class CharacterDataManager
             return;
         }
         m_CharacterData = characterData;
-        Debug.Log($"캐릭터 데이터를 로드했습니다 : {m_CharacterData}");
+        Debug.Log($"캐릭터 데이터를 로드(캐릭터데이터매니저): {m_CharacterData}");
     }
 
     // 무기를 장착.

@@ -37,11 +37,10 @@ public class Managers : MonoBehaviour
     private StageTransitionManager _stageTransitionManager;
     private CharacterDataManager _characterDataManager;     //캐릭터 데이터 관리 매니저
     private WeaponManager weaponManager; // 무기 데이터 관리 매니저
-    private AddressablesManager addressablesManager; // Addressables 매니저
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
 
-    public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
+    public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
     public static EffectManager Effect => Instance._effectManager;
@@ -88,6 +87,18 @@ public class Managers : MonoBehaviour
     void Update()
     {
         _input?.OnUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            AddressablesManager.Instance.InstantiateAsync("Character_01", (GameObject obj) =>
+            {
+                Debug.Log($"{obj.name} 생성 완료");
+            },
+            ()=>
+            {
+                Debug.Log("<color=red>생성 실패</color>");
+            });
+        }
     } 
 
     public static void Clear()

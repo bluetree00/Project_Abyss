@@ -33,7 +33,8 @@ public class BaseController : MonoBehaviour
     // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
     // 무기SO.무기이름 
 
-    private void Start()
+    //NOTE: 초기화 작업을 Awake에서 처리하도록 변경
+    private void Awake()
     {
         Init();
     }
@@ -42,7 +43,8 @@ public class BaseController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         playerTransform = transform;
-        string characterName = gameObject.name; 
+        // string characterName = gameObject.name;
+        string characterName = gameObject.name.Replace("(Clone)", ""); 
         anim = GetComponent<Animator>();
 
         //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
@@ -70,7 +72,7 @@ public class BaseController : MonoBehaviour
         
     }
 
-    private void LoadCharacterData(string characterName, Action OnSuccess = null)
+    protected void LoadCharacterData(string characterName, Action OnSuccess = null)
     {
         AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, characterData_instance =>
         {
@@ -81,11 +83,12 @@ public class BaseController : MonoBehaviour
             }
             characterData = characterData_instance;
             Debug.Log($"캐릭터 데이터({characterData.characterName})를 로드했습니다.");
+            OnSuccess.Invoke();
             Managers.CharacterData.SetCharacterData(characterData);
         });
     }
 
-    private void LoadWeaponContainer(string characterClassString, Action OnSuccess = null)
+    protected void LoadWeaponContainer(string characterClassString, Action OnSuccess = null)
     {
         AddressablesManager.Instance.LoadAsset<WeaponContainer>(characterClassString, weaponContainer_instance =>
         {
@@ -96,10 +99,11 @@ public class BaseController : MonoBehaviour
             }
             weaponContainer = weaponContainer_instance;
             Debug.Log($"무기 컨테이너({weaponContainer.name})를 로드했습니다.");
+            OnSuccess.Invoke();
         });
     }
 
-    protected void LoadWeaponData(string weaponName)
+    protected void LoadWeaponData(string weaponName, Action OnSuccess = null)
     {
         AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, WData_instance =>
         {
@@ -110,6 +114,7 @@ public class BaseController : MonoBehaviour
             }
             currentWeapon = WData_instance;
             Debug.Log($"기본 무기 데이터({currentWeapon.weaponName})를 로드했습니다.");
+            // OnSuccess.Invoke();
         });
     }
 
