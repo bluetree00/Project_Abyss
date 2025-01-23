@@ -40,7 +40,7 @@ public class AddressablesManager : MonoBehaviour
     /// <param name="key"></param>
     /// <param name="onSuccess"></param>
     /// <param name="onFailure"></param>
-    public void LoadAsset<T>(string key, Action<T> onSuccess, Action onFailure = null) where T : UnityEngine.Object
+    public void LoadAsset<T>(string key, Action<T> onSuccess = null, Action onFailure = null) where T : UnityEngine.Object
     {
         Addressables.LoadAssetAsync<T>(key).Completed += handle =>
         {
@@ -66,11 +66,9 @@ public class AddressablesManager : MonoBehaviour
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
             onSuccess?.Invoke(handle.Result);
-            Debug.Log($"<color=green>키가 {key}인 에셋을 성공적으로 로드.</color>");
         }
         else
         {
-            Debug.LogError($"<color=red>키가 {key}인 에셋 로드에 실패.</color>");
             onFailure?.Invoke();
         }
     }

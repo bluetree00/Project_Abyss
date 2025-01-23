@@ -21,6 +21,7 @@ public class Vagabond : BaseController
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
+        //currentWeapon = weaponContainer.currentWeapon; // 현재 무기 정보를 초기화
         //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
@@ -45,8 +46,8 @@ public class Vagabond : BaseController
             cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
         }
 
-        Managers.Input.KeyAction -= OnInput;
-        Managers.Input.KeyAction += OnInput;
+        Managers.Input_M.KeyAction -= OnInput;
+        Managers.Input_M.KeyAction += OnInput;
 
 
     }
@@ -61,7 +62,7 @@ public class Vagabond : BaseController
             return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
         }
 
-        Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
+        Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
         CheckMovementInput();
@@ -110,25 +111,6 @@ public class Vagabond : BaseController
         if (Input.GetKeyDown(KeyCode.Q))
         {
             ProcessUltimateSkile();
-        }
-
-        //FIXME: 테스트용 코드
-        // 키보드 F 입력 (테스트용 점프 공격)
-        if (Input.GetKeyDown(KeyCode.F))
-        {
-            if (isInputLocked)
-            return;
-
-            if (weaponContainer.currentWeapon.name == "basic_Knight_02"){
-                ChangeState(Define.State.JumpAttack);
-                StartCoroutine(LockInput(2f));
-            }
-            else{
-                Debug.Log("해당 무기가 장착되어 있지 않습니다.");
-                StartCoroutine(LockInput(1f));
-                return;
-            }
-            
         }
 
 

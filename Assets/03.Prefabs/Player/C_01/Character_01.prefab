@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 307230810678793473}
   m_Layer: 0
-  m_Name: Sword_parentR
+  m_Name: Weapon_parentR
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3056,7 +3056,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1690126038755852255
 Transform:
   m_ObjectHideFlags: 0
@@ -4752,7 +4752,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 24d4dbaecfb6a7b47b2523e10dd3aeaf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  characterData: {fileID: 11400000, guid: 0016ea1f1ec94d1478eb444510df67ca, type: 2}
+  characterData: {fileID: 0}
+  weaponContainer: {fileID: 0}
+  currentWeapon: {fileID: 0}
   _state: 1
   _destPos: {x: 0, y: 0, z: 0}
   _lockTarget: {fileID: 0}
