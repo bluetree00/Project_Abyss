@@ -100,14 +100,16 @@ public class WeaponManager
                 {
                     Debug.Log($"새로운 무기({itemNameData})를 획득했습니다.");
                 }
-            
+
                 int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
                 if (emptySlotIndex != -1)
                 {
                     _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
+                    //CHECKLIST: 무기 추가 후 해당 이름으로 생성되었던 오브젝트 풀러 생성(테스트용 무기2에 이펙트 데이터가 없어서 오류 뜸)
+                    //[ ]
                     Managers.Effect.SetEffectPooler(itemNameData.weaponName); // 무기 이름으로 이펙트 풀러 생성
                 }
-            
+
                 if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
                 if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
             }
@@ -141,8 +143,12 @@ public class WeaponManager
     /// <param name="index"></param>
     public void ChangeWeapon(int index)
     {
-        if (_cont.ownWeapons[index - 1] != null)
+        if (_cont.ownWeapons[index - 1] == null)
         {
+            Debug.Log($"<color=orange> 변경하려는 무기가 없습니다. </color>");
+            return;
+        }
+        else{
             _cont.currentWeapon = _cont.ownWeapons[index - 1];
             _cont.SpawnWeaponObject();
         }
@@ -158,10 +164,10 @@ public class WeaponManager
         {
             if (_cont.currentWeapon == _cont.ownWeapons[index - 1])
             {
-                _cont.currentWeapon = null;
                 _cont.DestroyCurrentWeaponObject();
+                // _cont.currentWeapon = null;
             }
-
+            
             Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
             _cont.ownWeapons[index - 1] = null;
             // TODO--->무기 제거 후 해당 이름으로 생성되었던 오브젝트 풀러 제거

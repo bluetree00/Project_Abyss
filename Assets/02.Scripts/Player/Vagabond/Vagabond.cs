@@ -155,6 +155,11 @@ public class Vagabond : BaseController
             weaponContainer.isWeaponEquipped = false;
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(1);
+            if (weaponContainer.ownWeapons[0] == null){
+                ChangeState(Define.State.Idle);
+                StartCoroutine(LockInput(inputLockDuration));
+                return;
+            }
             ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
@@ -169,6 +174,11 @@ public class Vagabond : BaseController
             weaponContainer.isWeaponEquipped = false;
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(2);
+            if (weaponContainer.ownWeapons[1] == null){
+                ChangeState(Define.State.Idle);
+                StartCoroutine(LockInput(inputLockDuration));
+                return;
+            }
             ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
@@ -187,11 +197,13 @@ public class Vagabond : BaseController
         if (Input.GetKeyDown(KeyCode.F1))
         {
             Managers.Weapon.RemoveWeapon(1);
+            if (currentWeapon == null)  ChangeState(Define.State.Idle);
         }
 
         if (Input.GetKeyDown(KeyCode.F2))
         {
             Managers.Weapon.RemoveWeapon(2);
+            if (currentWeapon == null)  ChangeState(Define.State.Idle);
         }
         //-----------------------------------------------------------------
     }

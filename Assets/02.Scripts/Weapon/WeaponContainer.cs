@@ -85,11 +85,21 @@ public class WeaponContainer : ScriptableObject // => 예시 ) Knight : WeaponCo
 
     public void DestroyCurrentWeaponObject()
     {
+        string currentWeaponObjName = currentWeaponObject.name.Replace("(Clone)", "");
+        string currentWeaponName    = currentWeapon.name;
         if (currentWeaponObject != null)
         {
-            Destroy(currentWeaponObject);
+            AddressablesManager.Instance.ReleaseInstance(currentWeaponObjName);
+            AddressablesManager.Instance.ReleaseAsset(currentWeaponName);
+            //Destroy(currentWeaponObject);
             currentWeaponObject = null;
+            currentWeapon = null;
         }
+    }
+
+    public void DisableObject()
+    {
+        currentWeaponObject.SetActive(false);
     }
 
 }
