@@ -13,11 +13,14 @@ public class Grid : MonoBehaviour
     public float squareScale = 0.5f; // 각 그리드 칸의 스케일(크기 비율)
     public float everySquareOffset = 0.0f; // 칸 크기에 추가적으로 더해질 오프셋
 
+    // 퍼블릭으로 모양 선택 변수 추가
+    public Define.ShapeType selectedShapeType = Define.ShapeType.Apple;  // 디폴트는 Apple 모양
 
     // 내부에서 사용하는 변수들
     private Vector2 _offset = new Vector2(0.0f, 0.0f); // 각 칸 간의 거리 계산을 위한 오프셋
     private List<GameObject> _gridSquares = new List<GameObject>(); // 생성된 칸(GameObject) 리스트
     
+    private LineIndicator _lineIndicator;
 
     private void OnEnable() 
     {
@@ -32,7 +35,7 @@ public class Grid : MonoBehaviour
     // 게임 시작 시 호출 (Unity 생명 주기 함수)
     void Start()
     {
-
+        _lineIndicator = GetComponent<LineIndicator>();
         CreateGrid(); // 그리드 생성
     }
 
@@ -50,36 +53,44 @@ public class Grid : MonoBehaviour
     {
         int square_index = 0; // 각 칸의 고유 인덱스 초기화
 
-        for( var row = 0; row < rows; ++row)
+        for (var row = 0; row < rows; ++row)
         {
-            for(var column = 0; column < columns; ++column)
+            for (var column = 0; column < columns; ++column)
             {
+                // 그리드 칸 생성
                 _gridSquares.Add(Instantiate(gridSquare) as GameObject);
 
-                _gridSquares[_gridSquares.Count -1].GetComponent<GridSquare>().SquareIndex = square_index;
-                _gridSquares[_gridSquares.Count -1].transform.SetParent(this.transform);
-                _gridSquares[_gridSquares.Count -1].transform.localScale = new Vector3(squareScale, squareScale, squareScale);
-                _gridSquares[_gridSquares.Count -1].GetComponent<GridSquare>().SetImage(square_index % 2 == 0);
+                // 생성된 그리드 칸의 정보 설정
+                var gridSquareComponent = _gridSquares[_gridSquares.Count - 1].GetComponent<GridSquare>();
+                gridSquareComponent.SquareIndex = square_index;
+                gridSquareComponent.transform.SetParent(this.transform);
+                gridSquareComponent.transform.localScale = new Vector3(squareScale, squareScale, squareScale);
+
+                // 모양 정보를 받아와서 적용
+                int[,] shapeGrid = Define.GetShapeGrid(selectedShapeType);  // 선택된 모양 가져오기
+                bool isShape = shapeGrid[row, column] == 1;  // 해당 칸에 모양이 있으면 true
+
+                gridSquareComponent.SetImage(isShape);  // 해당 칸에 모양 적용
+
                 square_index++;
             }
         }
-
     }
 
     private void SetGridSquaresPositions()
     {
-       int column_number = 0;
-       int row_number = 0;
-       Vector2 square_gap_number = new Vector2(0.0f, 0.0f);
-       bool row_moved = false;
+        int column_number = 0;
+        int row_number = 0;
+        Vector2 square_gap_number = new Vector2(0.0f, 0.0f);
+        bool row_moved = false;
 
-       var square_rect = _gridSquares[0].GetComponent<RectTransform>();
+        var square_rect = _gridSquares[0].GetComponent<RectTransform>();
 
-       _offset.x = square_rect.rect.width * square_rect.transform.localScale.x + everySquareOffset;
-       _offset.y = square_rect.rect.height * square_rect.transform.localScale.y + everySquareOffset;
+        _offset.x = square_rect.rect.width * square_rect.transform.localScale.x + everySquareOffset;
+        _offset.y = square_rect.rect.height * square_rect.transform.localScale.y + everySquareOffset;
 
-       foreach(GameObject square in _gridSquares)
-       {
+        foreach(GameObject square in _gridSquares)
+        {
             if(column_number + 1 > columns)
             {
                 square_gap_number.x = 0;
@@ -101,7 +112,7 @@ public class Grid : MonoBehaviour
             {
                 row_moved = true;
                 square_gap_number.y++;
-                pos_y_offset +=squaresGap;
+                pos_y_offset += squaresGap;
             }
 
             square.GetComponent<RectTransform>().anchoredPosition = new Vector2(startPosition.x + pos_x_offset,
@@ -109,79 +120,73 @@ public class Grid : MonoBehaviour
             square.GetComponent<RectTransform>().localPosition = new Vector3(startPosition.x + pos_x_offset,
                 startPosition.y - pos_y_offset, 0.0f);
 
-            column_number ++;
-       }
+            column_number++;
+        }
     }
 
     private void CheckIfShapeCanBePlaced()
-{
-    var squareIndexes = new List<int>(); // 선택된 칸들의 인덱스를 저장할 리스트
-
-    foreach (var square in _gridSquares)
     {
-        var gridSquare = square.GetComponent<GridSquare>();
+        var squareIndexes = new List<int>(); // 선택된 칸들의 인덱스를 저장할 리스트
 
-        // 칸이 선택되었고, 이미 채워지지 않았다면
-        if (gridSquare.Selected && !gridSquare.SquareOccupied)
+        foreach (var square in _gridSquares)
         {
-            squareIndexes.Add(gridSquare.SquareIndex);
-            gridSquare.Selected = false; // 선택된 칸을 비선택 상태로 변경
-        }
-    }
+            var gridSquare = square.GetComponent<GridSquare>();
 
-    var currentSelectedShape = shapeStorage.GetCurrentSelectedShape();
-
-    if (currentSelectedShape == null) return;
-
-    // 선택된 칸의 수와 모양의 요구하는 칸 수가 일치하는지 확인
-    if (currentSelectedShape.TotalSquareNumber == squareIndexes.Count)
-    {
-        // 디버깅: 선택된 칸에 모양을 배치할 때
-
-        // 선택된 칸에 모양을 배치
-        foreach (var squareIndex in squareIndexes)
-        {
-            var gridSquare = _gridSquares[squareIndex].GetComponent<GridSquare>();
-
-            // 이미 배치된 칸을 제외하고 모양을 배치
-            if (!gridSquare.SquareOccupied)
+            // 칸이 선택되었고, 이미 채워지지 않았다면
+            if (gridSquare.Selected && !gridSquare.SquareOccupied)
             {
-                gridSquare.ActivateSquare(); // 그리드에 모양 배치
+                squareIndexes.Add(gridSquare.SquareIndex);
+                gridSquare.Selected = false; // 선택된 칸을 비선택 상태로 변경
             }
         }
 
-        var shapeLeft = 0;
+        var currentSelectedShape = shapeStorage.GetCurrentSelectedShape();
 
-        foreach (var shape in shapeStorage.shapeList)
+        if (currentSelectedShape == null) return;
+
+        // 선택된 칸의 수와 모양의 요구하는 칸 수가 일치하는지 확인
+        if (currentSelectedShape.TotalSquareNumber == squareIndexes.Count)
         {
-            if(shape.IsOnStartPosition() && shape.IsAnyOfShapeSquareActive())
+            // 디버깅: 선택된 칸에 모양을 배치할 때
+
+            // 선택된 칸에 모양을 배치
+            foreach (var squareIndex in squareIndexes)
             {
-                shapeLeft++;
+                var gridSquare = _gridSquares[squareIndex].GetComponent<GridSquare>();
+
+                // 이미 배치된 칸을 제외하고 모양을 배치
+                if (!gridSquare.SquareOccupied)
+                {
+                    gridSquare.ActivateSquare(); // 그리드에 모양 배치
+                }
             }
-        }
 
+            var shapeLeft = 0;
 
-        if(shapeLeft ==0)
-        {
-            GameEvents.RequestNewShapes();
+            foreach (var shape in shapeStorage.shapeList)
+            {
+                if(shape.IsOnStartPosition() && shape.IsAnyOfShapeSquareActive())
+                {
+                    shapeLeft++;
+                }
+            }
 
+            if(shapeLeft == 0)
+            {
+                GameEvents.RequestNewShapes();
+            }
+            else
+            {
+                GameEvents.SetShapeInactive();
+            }
         }
         else
         {
-            GameEvents.SetShapeInactive();
+            // 디버깅: 칸 수가 일치하지 않음
+            Debug.Log("칸 수가 일치하지 않아 모양을 시작 위치로 되돌립니다.");
+            
+            // 모양을 시작 위치로 되돌림
+            GameEvents.MoveShapeToStartPosition();
         }
-
-
     }
-    else
-    {
-        // 디버깅: 칸 수가 일치하지 않음
-        Debug.Log("칸 수가 일치하지 않아 모양을 시작 위치로 되돌립니다.");
-        
-        // 모양을 시작 위치로 되돌림
-        GameEvents.MoveShapeToStartPosition();
-    }
-}
-
-
 }

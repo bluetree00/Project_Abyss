@@ -145,4 +145,55 @@ public class Define
         Click,
     }
 
+    public enum ShapeType
+    {
+        Unknown,
+        Apple,
+        Banana,
+        Orange,
+        Cherry,
+        Grape,
+        Pear
+    }
+
+
+    // 그리드 형태를 정의하는 배열들
+    public static readonly int[,] AppleShape = new int[8, 8]
+    {
+        {0, 0, 0, 1, 1, 0, 0, 0},
+        {0, 0, 1, 1, 1, 1, 0, 0},
+        {0, 1, 1, 1, 1, 1, 1, 0},
+        {0, 1, 1, 1, 1, 1, 1, 0},
+        {0, 0, 1, 1, 1, 1, 0, 0},
+        {0, 0, 0, 1, 1, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0}
+    };
+
+    public static readonly int[,] BananaShape = new int[8, 8] // 예시: 다른 모양도 추가
+    {
+        {0, 0, 1, 1, 1, 0, 0, 0},
+        {0, 1, 1, 1, 1, 1, 0, 0},
+        {1, 1, 1, 1, 1, 1, 1, 0},
+        {0, 1, 1, 1, 1, 1, 1, 0},
+        {0, 0, 1, 1, 1, 1, 0, 0},
+        {0, 0, 1, 1, 1, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 1, 1, 0}
+    };
+
+    // 모양을 불러오는 함수 (필요한 경우)
+    public static int[,] GetShapeGrid(ShapeType shapeType)
+    {
+        switch (shapeType)
+        {
+            case ShapeType.Apple:
+                return AppleShape;
+            case ShapeType.Banana:
+                return BananaShape;
+            default:
+                return new int[8, 8]; // 기본적으로 빈 배열을 반환
+        }
+    }
+
 }
