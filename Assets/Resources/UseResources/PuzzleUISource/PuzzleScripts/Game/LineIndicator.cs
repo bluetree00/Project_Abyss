@@ -36,7 +36,6 @@ public class LineIndicator : MonoBehaviour
         return appleShape[row, col] == 1;
     }
 
-    // 기존의 GetGridSquareIndex 함수는 그대로 두기
     public int GetGridSquareIndex(int square)
     {
         for (int row = 0; row < 8; row++)
