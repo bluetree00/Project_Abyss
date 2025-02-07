@@ -11,7 +11,7 @@ public class WeaponManager
 
     private static WeaponContainer _cont; // 백킹 필드
 
-    public static WeaponContainer Cont
+    public WeaponContainer Cont
     {
         get { return _cont; }
         private set { _cont = value; }
@@ -22,28 +22,53 @@ public class WeaponManager
     /// </summary>
     /// <param name="con"></param>
     /// <param name="weaponHandTransform"></param>
-    public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null)
+    public void ContainerDataInit(WeaponContainer con, Transform weaponHandTransform = null, Action action = null)
     {
+        if (con == null)
+        {
+            Debug.LogError("무기 컨테이너가 null입니다.");
+            return;
+        }
         _cont = con;   // 매니저 변수 = 매개변수 동기화
-        SetDefult();   // 기본 무기 설정
         if (weaponHandTransform == null)
         {
             Debug.LogError("손의 트랜스폼이 null입니다.");
             return;
         }
         _cont.weaponHandTransform = weaponHandTransform; // 손의 트랜스폼 설정
-        _cont.SpawnWeaponObject(); // 무기 오브젝트 생성
+        SetDefult();   // 기본 무기 설정
+        // _cont.SpawnWeaponObject(); // 무기 오브젝트 생성
     }
+    
 
     /// <summary>
     /// 기본 무기 설정
     /// </summary>
-    void SetDefult()
+    void SetDefult(Action action = null)
     {
+        WeaponData resourceWData = null;
         string ClassName = _cont.conClass.ToString(); // 컨테이너 클래스를 문자열로 변환
-        WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
-        _cont.currentWeapon = resourceWData;
-        _cont.ownWeapons[0] = resourceWData;
+        //WeaponData resourceWData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/basic_{ClassName}_01"); // 무기 데이터 로드
+        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
+        AddressablesManager.Instance.LoadAsset<WeaponData>($"basic_{ClassName}_01", WData_instance =>
+        {
+            if (WData_instance == null)
+            {
+                Debug.LogError("무기 데이터가 null입니다.");
+                return;
+            }
+            else{
+                resourceWData = WData_instance;
+                Debug.Log($"기본 무기 데이터({resourceWData.weaponName})를 로드했습니다.");
+                _cont.currentWeapon = resourceWData;
+                _cont.ownWeapons[0] = resourceWData;
+                _cont.SpawnWeaponObject(); // 무기 오브젝트 생성
+            }
+            
+        }); // 무기 데이터 로드
+        // _cont.currentWeapon = resourceWData;
+        // _cont.ownWeapons[0] = resourceWData;
+        action?.Invoke();
     }
 
 
@@ -53,27 +78,63 @@ public class WeaponManager
     /// <param name="itemName"></param>
     public void SetWeapon(string itemName)
     {
-        itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
-        Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
-        if (Array.Exists(_cont.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
+        //itemNameData = Managers.Resource.Load<WeaponData>($"Data/WeaponData/{itemName}"); // 충돌한 아이템 이름으로 무기 데이터 로드
+        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
+        AddressablesManager.Instance.LoadAsset<WeaponData>(itemName, WData_instance =>
         {
-            Debug.Log("이미 소지중인 무기입니다.");
-            return;
-        }
-        else
-        {
-            Debug.Log($"새로운 무기({itemNameData})를 획득했습니다.");
-        }
+            if (WData_instance == null)
+            {
+                Debug.LogError("무기 데이터가 null입니다.");
+                return;
+            }
+            else{
+                itemNameData = WData_instance;
+                Debug.Log(itemNameData.weaponName + "을 획득했습니다.");
+
+                if (Array.Exists(_cont.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
+                {
+                    Debug.Log("이미 소지중인 무기입니다.");
+                    return;
+                }
+                else
+                {
+                    Debug.Log($"새로운 무기({itemNameData})를 획득했습니다.");
+                }
+
+                int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
+                if (emptySlotIndex != -1)
+                {
+                    _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
+                    //CHECKLIST: 무기 추가 후 해당 이름으로 생성되었던 오브젝트 풀러 생성(테스트용 무기2에 이펙트 데이터가 없어서 오류 뜸)
+                    //[ ]
+                    Managers.Effect.SetEffectPooler(itemNameData.weaponName); // 무기 이름으로 이펙트 풀러 생성
+                }
+
+                if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
+                if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
+            }
+            
+        }); // 무기 데이터 로드
+        
+        // if (Array.Exists(_cont.ownWeapons, weapon => weapon == itemNameData)) // 이미 소지중인 무기인지 확인
+        // {
+        //     Debug.Log("이미 소지중인 무기입니다.");
+        //     return;
+        // }
+        // else
+        // {
+        //     Debug.Log($"새로운 무기({itemNameData})를 획득했습니다.");
+        // }
     
-        int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
-        if (emptySlotIndex != -1)
-        {
-            _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
-            Managers.Effect.SetEffectPooler(itemNameData.weaponName); // 무기 이름으로 이펙트 풀러 생성
-        }
+        // int emptySlotIndex = Array.IndexOf(_cont.ownWeapons, null); // 빈 공간 찾기
+        // if (emptySlotIndex != -1)
+        // {
+        //     _cont.ownWeapons[emptySlotIndex] = itemNameData; // 빈 공간에 무기 추가
+        //     Managers.Effect.SetEffectPooler(itemNameData.weaponName); // 무기 이름으로 이펙트 풀러 생성
+        // }
     
-        if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
-        if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
+        // if (_cont.currentWeapon == null) _cont.currentWeapon = itemNameData; // 현재 무기가 없으면 현재 무기로 설정
+        // if (_cont.CurrentWeaponObject == null) _cont.SpawnWeaponObject(); // 무기 오브젝트가 없으면 생성
     }
 
     /// <summary>
@@ -82,8 +143,12 @@ public class WeaponManager
     /// <param name="index"></param>
     public void ChangeWeapon(int index)
     {
-        if (_cont.ownWeapons[index - 1] != null)
+        if (_cont.ownWeapons[index - 1] == null)
         {
+            Debug.Log($"<color=orange> 변경하려는 무기가 없습니다. </color>");
+            return;
+        }
+        else{
             _cont.currentWeapon = _cont.ownWeapons[index - 1];
             _cont.SpawnWeaponObject();
         }
@@ -99,10 +164,10 @@ public class WeaponManager
         {
             if (_cont.currentWeapon == _cont.ownWeapons[index - 1])
             {
-                _cont.currentWeapon = null;
                 _cont.DestroyCurrentWeaponObject();
+                // _cont.currentWeapon = null;
             }
-
+            
             Debug.Log($"{_cont.ownWeapons[index - 1].name} 를 제거했습니다.");
             _cont.ownWeapons[index - 1] = null;
             // TODO--->무기 제거 후 해당 이름으로 생성되었던 오브젝트 풀러 제거
@@ -127,6 +192,11 @@ public class WeaponManager
     /// <returns></returns>
     public WeaponData GetCurrentWeaponData()
     {
+        if (_cont == null)
+        {
+            Debug.LogError("무기 컨테이너가 null입니다.");
+            return null;
+        }
         return _cont.currentWeapon;
     }
 }

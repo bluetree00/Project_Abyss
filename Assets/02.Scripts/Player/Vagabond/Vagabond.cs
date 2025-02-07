@@ -20,10 +20,8 @@ public class Vagabond : BaseController
     private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
     protected override void Init()
     {
-        
         base.Init(); // 부모 클래스의 초기화 코드 호출
-        
-        currentWeapon = Managers.Weapon.GetCurrentWeaponData(); // 현재 무기 데이터를 가져옴
+        //currentWeapon = weaponContainer.currentWeapon; // 현재 무기 정보를 초기화
         //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
@@ -48,8 +46,8 @@ public class Vagabond : BaseController
             cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
         }
 
-        Managers.Input.KeyAction -= OnInput;
-        Managers.Input.KeyAction += OnInput;
+        Managers.Input_M.KeyAction -= OnInput;
+        Managers.Input_M.KeyAction += OnInput;
 
 
     }
@@ -59,7 +57,12 @@ public class Vagabond : BaseController
     #region 업데이트, 상시 인풋
     protected override void Update() 
     {
-        Managers.Input.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
+        if (characterData == null)
+        {
+            return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
+        }
+
+        Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
         CheckMovementInput();
@@ -110,25 +113,6 @@ public class Vagabond : BaseController
             ProcessUltimateSkile();
         }
 
-        //FIXME: 테스트용 코드
-        // 키보드 F 입력 (테스트용 점프 공격)
-        if (Input.GetKeyDown(KeyCode.F))
-        {
-            if (isInputLocked)
-            return;
-
-            if (weaponContainer.currentWeapon.name == "basic_Knight_02"){
-                ChangeState(Define.State.JumpAttack);
-                StartCoroutine(LockInput(2f));
-            }
-            else{
-                Debug.Log("해당 무기가 장착되어 있지 않습니다.");
-                StartCoroutine(LockInput(1f));
-                return;
-            }
-            
-        }
-
 
         if (Input.GetKeyDown(KeyCode.I))
         {
@@ -171,6 +155,11 @@ public class Vagabond : BaseController
             weaponContainer.isWeaponEquipped = false;
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(1);
+            if (weaponContainer.ownWeapons[0] == null){
+                ChangeState(Define.State.Idle);
+                StartCoroutine(LockInput(inputLockDuration));
+                return;
+            }
             ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
@@ -185,6 +174,11 @@ public class Vagabond : BaseController
             weaponContainer.isWeaponEquipped = false;
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(2);
+            if (weaponContainer.ownWeapons[1] == null){
+                ChangeState(Define.State.Idle);
+                StartCoroutine(LockInput(inputLockDuration));
+                return;
+            }
             ChangeState(Define.State.ChangeWeapon);
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
@@ -203,11 +197,13 @@ public class Vagabond : BaseController
         if (Input.GetKeyDown(KeyCode.F1))
         {
             Managers.Weapon.RemoveWeapon(1);
+            if (currentWeapon == null)  ChangeState(Define.State.Idle);
         }
 
         if (Input.GetKeyDown(KeyCode.F2))
         {
             Managers.Weapon.RemoveWeapon(2);
+            if (currentWeapon == null)  ChangeState(Define.State.Idle);
         }
         //-----------------------------------------------------------------
     }
