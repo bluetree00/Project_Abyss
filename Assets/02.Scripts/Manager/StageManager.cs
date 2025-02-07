@@ -160,6 +160,7 @@ public class StageManager
 
     private void SaveMSTData()
     {
+#if UNITY_EDITOR
         // 기존에 동일한 MSTData 자산이 존재하는지 확인
         string assetPath = "Assets/Resources/Data/MSTData.asset";
         MSTData existingData = AssetDatabase.LoadAssetAtPath<MSTData>(assetPath);
@@ -179,6 +180,7 @@ public class StageManager
         AssetDatabase.CreateAsset(mstData, assetPath);
         AssetDatabase.SaveAssets();
         Debug.Log("New MSTData asset created.");
+#endif
     }
 
     private void SetInitialStage()
