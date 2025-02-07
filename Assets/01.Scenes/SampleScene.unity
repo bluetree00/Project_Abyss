@@ -2064,7 +2064,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1137637146}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.015695453, y: 0.00000008940697, z: -0.000000037252903, w: 0.99987686}
+  m_LocalRotation: {x: -0.015695423, y: 0.000000059604645, z: -0.000000022351742,
+    w: 0.99987686}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2475,8 +2476,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   shapeStorage: {fileID: 706426767}
-  columns: 8
-  rows: 8
+  columns: 10
+  rows: 10
   squaresGap: 1
   gridSquare: {fileID: 3707343352377569076, guid: 3937ff2d3da99f546a154d4faa149e6a,
     type: 3}
@@ -2791,7 +2792,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1933667679}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.03551152, y: 0.00000008940696, z: -0.00000006705522, w: 0.99936926}
+  m_LocalRotation: {x: 0.03551152, y: 0.000000059604638, z: -0.000000029802319, w: 0.99936926}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0

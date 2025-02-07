@@ -124,43 +124,68 @@ public class Grid : MonoBehaviour
         }
     }
 
-    private void CheckIfShapeCanBePlaced()
+   private void CheckIfShapeCanBePlaced()
+{
+    var squareIndexes = new List<int>(); // 선택된 칸들의 인덱스를 저장할 리스트
+
+    // 선택된 칸들을 찾아 리스트에 추가
+    foreach (var square in _gridSquares)
     {
-        var squareIndexes = new List<int>(); // 선택된 칸들의 인덱스를 저장할 리스트
+        var gridSquare = square.GetComponent<GridSquare>();
 
-        foreach (var square in _gridSquares)
+        // 칸이 선택되었고, 이미 채워지지 않았다면
+        if (gridSquare.Selected && !gridSquare.SquareOccupied)
         {
-            var gridSquare = square.GetComponent<GridSquare>();
+            squareIndexes.Add(gridSquare.SquareIndex);
+            gridSquare.Selected = false; // 선택된 칸을 비선택 상태로 변경
+        }
+    }
 
-            // 칸이 선택되었고, 이미 채워지지 않았다면
-            if (gridSquare.Selected && !gridSquare.SquareOccupied)
+    var currentSelectedShape = shapeStorage.GetCurrentSelectedShape();
+
+    if (currentSelectedShape == null) return;
+
+    // 선택된 칸의 수와 모양의 요구하는 칸 수가 일치하는지 확인
+    if (currentSelectedShape.TotalSquareNumber == squareIndexes.Count)
+    {
+        int[,] shapeGrid = Define.GetShapeGrid(selectedShapeType); // 선택된 모양 가져오기
+        bool canPlaceShape = true; // 배치 가능 여부 확인 변수
+
+        // 0인 칸과 겹치는지 체크
+        foreach (var squareIndex in squareIndexes)
+        {
+            var gridSquare = _gridSquares[squareIndex].GetComponent<GridSquare>();
+
+            // 현재 칸의 row와 column을 계산
+            int row = squareIndex / columns;
+            int column = squareIndex % columns;
+
+            // 해당 칸이 1인 부분이어야만 배치 가능
+            if (shapeGrid[row, column] == 0)
             {
-                squareIndexes.Add(gridSquare.SquareIndex);
-                gridSquare.Selected = false; // 선택된 칸을 비선택 상태로 변경
+                canPlaceShape = false; // 0인 부분과 겹치면 배치 불가
+                break;
             }
         }
 
-        var currentSelectedShape = shapeStorage.GetCurrentSelectedShape();
-
-        if (currentSelectedShape == null) return;
-
-        // 선택된 칸의 수와 모양의 요구하는 칸 수가 일치하는지 확인
-        if (currentSelectedShape.TotalSquareNumber == squareIndexes.Count)
+        // 0인 부분과 겹치지 않으면 배치
+        if (canPlaceShape)
         {
-            // 디버깅: 선택된 칸에 모양을 배치할 때
-
-            // 선택된 칸에 모양을 배치
             foreach (var squareIndex in squareIndexes)
             {
                 var gridSquare = _gridSquares[squareIndex].GetComponent<GridSquare>();
 
-                // 이미 배치된 칸을 제외하고 모양을 배치
-                if (!gridSquare.SquareOccupied)
+                int row = squareIndex / columns;
+                int column = squareIndex % columns;
+
+                // 모양의 1인 부분에만 배치
+                if (shapeGrid[row, column] == 1 && !gridSquare.SquareOccupied)
                 {
                     gridSquare.ActivateSquare(); // 그리드에 모양 배치
                 }
             }
 
+            // 남은 모양 체크 후 이벤트 처리
             var shapeLeft = 0;
 
             foreach (var shape in shapeStorage.shapeList)
@@ -182,11 +207,20 @@ public class Grid : MonoBehaviour
         }
         else
         {
-            // 디버깅: 칸 수가 일치하지 않음
-            Debug.Log("칸 수가 일치하지 않아 모양을 시작 위치로 되돌립니다.");
+           
+            Debug.Log("0인 부분과 겹쳐서 모양을 시작 위치로.");
             
             // 모양을 시작 위치로 되돌림
             GameEvents.MoveShapeToStartPosition();
         }
     }
+    else
+    {
+        
+        Debug.Log("칸 수가 일치하지 않아 모양을 시작 위치로.");
+     
+        GameEvents.MoveShapeToStartPosition();
+    }
+}
+
 }
