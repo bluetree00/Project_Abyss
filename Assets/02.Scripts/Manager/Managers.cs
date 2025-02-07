@@ -31,6 +31,7 @@ public class Managers : MonoBehaviour
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
+    private EffectManager _effectManager;
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
     private StageTransitionManager _stageTransitionManager;
@@ -42,6 +43,7 @@ public class Managers : MonoBehaviour
     public static InputManager Input => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
+    public static EffectManager Effect => Instance._effectManager;
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
@@ -106,17 +108,7 @@ public class Managers : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-        WeaponManager.OnWeaponAdded += CreateNewObjectPooler;
-    }
-
-    private void OnDisable()
-    {
-        WeaponManager.OnWeaponAdded -= CreateNewObjectPooler;
-    }
-
-    private void CreateNewObjectPooler(string newWeaponName)        //새로운 무기가 추가될 때마다 새로운 오브젝트 풀러를 생성 / 무기 이름을 받아 생성함
+    public void CreateNewObjectPooler(string newWeaponName)        //새로운 무기가 추가될 때마다 새로운 오브젝트 풀러를 생성 / 무기 이름을 받아 생성함
     {
         List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools(newWeaponName);
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());

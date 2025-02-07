@@ -49,6 +49,15 @@ public class BaseController : MonoBehaviour
 
                                                                                     // return된 스트링 값 그대로 사용
         weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
+        if (weaponContainer == null) 
+        {
+            Debug.LogError("<color=red>무기 컨테이너를 찾을 수 없습니다.</color>");
+            return;
+        }
+        else
+        {
+            Debug.Log("<color=green>무기 컨테이너를 찾았습니다.</color>");
+        }
 
         // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
         Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
@@ -119,7 +128,6 @@ public class BaseController : MonoBehaviour
                     weaponContainer.isWeaponEquipped && 
                     currentWeapon.weapon_Idle_AnimationName != "")
                     {   
-                        Debug.Log($"무기  : {currentWeapon.weapon_Idle_AnimationName} 장착 상태");
                         anim.CrossFade($"{currentWeapon.weapon_Idle_AnimationName}", 0.1f);
                     }
                     else
@@ -143,13 +151,16 @@ public class BaseController : MonoBehaviour
                     anim.CrossFade($"{currentWeapon.weapon_ChangeWeapon_AnimationName}", 0.2f);
                    break;
                 case Define.State.NormalAttack_01:
-                    anim.CrossFade("NormalAttack_01", 0.1f);
+                    NormalAttack(1);
+                    // anim.CrossFade("NormalAttack_01", 0.1f);
                    break;
                 case Define.State.NormalAttack_02:
-                    anim.CrossFade("NormalAttack_02", 0.1f);
+                    NormalAttack(2);
+                    // anim.CrossFade("NormalAttack_02", 0.1f);
                    break;
                 case Define.State.NormalAttack_03:
-                    anim.CrossFade("NormalAttack_03", 0.1f);
+                    NormalAttack(3);
+                    // anim.CrossFade("NormalAttack_03", 0.1f);
                    break;
                 case Define.State.NormalSkill_01:
                     anim.CrossFade("NormalSkile_01", 0.1f);
@@ -157,18 +168,28 @@ public class BaseController : MonoBehaviour
                 case Define.State.UltimateSkill_01:
                     anim.CrossFade("UltimateSkile_01", 0.1f);
                    break;
-                   //FIXME : 테스트용 상태 ==> 추후 삭제, 무기에 따라 상태를 변경해야함, 노말어택에서 분기를 통해 나눠야함
-                case Define.State.JumpAttack:              // 테스트용 상태
-                    if (weaponContainer.currentWeapon.name == "basic_Knight_02")
-                    {
-                        anim.CrossFade("JumpAttack", 0.1f);
-                    }
-                    else{
-                        Debug.Log("해당 무기가 장착되어 있지 않습니다.");
-                        anim.CrossFade("Idle", 0.2f);
-                    }
-                   break;
             }
+        }
+    }
+
+    private void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
+    {
+        if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
+        {
+            if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
+            {
+                anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
+            }
+            else
+            {   
+                _state = Define.State.Idle;
+                Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
+            }
+        }
+        else
+        {
+            Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
+            _state = Define.State.Idle;
         }
     }
 
