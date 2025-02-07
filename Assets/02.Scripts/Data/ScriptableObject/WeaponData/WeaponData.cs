@@ -74,7 +74,7 @@ public abstract class WeaponData : ScriptableObject
     // 무기에 해당하는 애니메이션 이름
     [Header("무기 애니메이션")]
     public string weapon_Idle_AnimationName;
-    public string weapon_Attack_AnimationName;
+    public string[] weapon_Attack_AnimationName = new string[3];
     public string weapon_Run_AnimationName;
     public string weapon_Hit_AnimationName;
     public string weapon_Die_AnimationName;
