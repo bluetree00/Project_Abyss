@@ -267,6 +267,7 @@ public void RemoveBlocksByID(int shapeID)
             if (column < columns - 1 && shapeGrid[row, column + 1] == 1) stack.Push(currentIndex + 1);
         }
     }
+     GameEvents.CheckIfShapeCanBePlaced?.Invoke();
 
 }
 
