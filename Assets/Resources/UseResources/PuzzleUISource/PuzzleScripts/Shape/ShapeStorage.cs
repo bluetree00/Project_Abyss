@@ -84,7 +84,7 @@ public class ShapeStorage : MonoBehaviour
             }
         }
 
-        Debug.LogError("No shape selected!");
+//        Debug.LogError("No shape selected!");
         return null;
     }
 
