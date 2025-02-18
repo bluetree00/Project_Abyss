@@ -199,15 +199,9 @@ public class Grid : MonoBehaviour
                     shapeLeft++;
                 }
             }
-
-            if(shapeLeft == 0)
-            {
-                GameEvents.RequestNewShapes();
-            }
-            else
-            {
-                GameEvents.SetShapeInactive();
-            }
+           
+            GameEvents.SetShapeInactive();
+            
         }
         else
         {
