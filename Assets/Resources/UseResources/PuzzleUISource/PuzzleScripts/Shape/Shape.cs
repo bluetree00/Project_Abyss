@@ -252,9 +252,22 @@ public class Shape : MonoBehaviour, IPointerClickHandler, IPointerUpHandler, IBe
     }
 
     public void OnPointerDown(PointerEventData eventData)
-    {
-        Debug.Log($"Shape {shapeID} Selected");
-    }
+{
+    Debug.Log($"Shape {shapeID} Selected");
+    if (_canvas == null) return;
+
+    Vector2 pos;
+    RectTransformUtility.ScreenPointToLocalPointInRectangle(
+        _canvas.transform as RectTransform,
+        eventData.position,
+        _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : Camera.main,
+        out pos);
+
+    // 클릭 시에도 즉시 마우스 위치로 블록 위치 업데이트
+    _transform.localPosition = pos + offset;
+}
+
+
 
     public void MoveShapeToStartPosition()
     {
