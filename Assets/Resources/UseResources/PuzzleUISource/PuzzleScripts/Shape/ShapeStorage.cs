@@ -6,6 +6,7 @@ public class ShapeStorage : MonoBehaviour
 {
     public List<ShapeData> shapeData; // 전체 블록 데이터 리스트
     public List<Shape> shapeList;     // 생성된 블록 리스트
+    public static Shape LastRestoredShape;
 
     private int currentID = 0; // 고유 블록 ID
     private Dictionary<int, ShapeData> shapeMap = new Dictionary<int, ShapeData>(); // ID와 블록 저장용 Map
@@ -97,7 +98,7 @@ public class ShapeStorage : MonoBehaviour
         }
     }
 
-    // 🔹 특정 ID 기반으로 블록을 복구하는 기능 추가
+     // 🔹 특정 ID 기반으로 블록을 복구하는 기능 수정 (복구된 도형 저장)
     public void RestoreShapeByID(int shapeID)
     {
         if (!shapeDataByID.ContainsKey(shapeID))
@@ -115,6 +116,8 @@ public class ShapeStorage : MonoBehaviour
                 shape.RequestNewShape(restoredShapeData);
                 AssignUniqueID(shape, shapeID, restoredShapeData);
                 Debug.Log($"Restored shape with ID {shapeID}: {restoredShapeData.name}");
+                // 복구된 도형을 정적 변수에 저장
+                LastRestoredShape = shape;
                 return;
             }
         }
