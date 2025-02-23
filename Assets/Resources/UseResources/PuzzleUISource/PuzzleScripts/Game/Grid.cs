@@ -25,11 +25,13 @@ public class Grid : MonoBehaviour
     private void OnEnable() 
     {
         GameEvents.CheckIfShapeCanBePlaced += CheckIfShapeCanBePlaced;
+        GameEvents.RequestBlockRemoval += RemoveBlocksByID; // 🔹 블록 삭제 이벤트 구독
     }
 
     private void OnDisable() 
     {
         GameEvents.CheckIfShapeCanBePlaced -= CheckIfShapeCanBePlaced;
+        GameEvents.RequestBlockRemoval -= RemoveBlocksByID; // 🔹 구독 해제
     }
 
     // 게임 시작 시 호출 (Unity 생명 주기 함수)
@@ -164,6 +166,7 @@ public class Grid : MonoBehaviour
             if (shapeGrid[row, column] == 0)
             {
                 canPlaceShape = false; // 0인 부분과 겹치면 배치 불가
+             
                 break;
             }
         }
@@ -181,7 +184,8 @@ public class Grid : MonoBehaviour
                 // 모양의 1인 부분에만 배치
                 if (shapeGrid[row, column] == 1 && !gridSquare.SquareOccupied)
                 {
-                    gridSquare.ActivateSquare(); // 그리드에 모양 배치
+                    gridSquare.PlaceShapeOnBoard(currentSelectedShape.GetShapeID()); // 🔹 블록 ID 저장
+                    
                 }
             }
 
@@ -195,15 +199,9 @@ public class Grid : MonoBehaviour
                     shapeLeft++;
                 }
             }
-
-            if(shapeLeft == 0)
-            {
-                GameEvents.RequestNewShapes();
-            }
-            else
-            {
-                GameEvents.SetShapeInactive();
-            }
+           
+            GameEvents.SetShapeInactive();
+            
         }
         else
         {
@@ -221,6 +219,50 @@ public class Grid : MonoBehaviour
      
         GameEvents.MoveShapeToStartPosition();
     }
+}
+
+public void RemoveBlocksByID(int shapeID)
+{
+    HashSet<int> visited = new HashSet<int>(); // 방문한 블록 저장
+    Stack<int> stack = new Stack<int>(); // DFS를 위한 스택
+
+    int[,] shapeGrid = Define.GetShapeGrid(selectedShapeType); // 🔹 Grid의 selectedShapeType 사용
+
+    foreach (var square in _gridSquares)
+    {
+        var gridSquare = square.GetComponent<GridSquare>();
+        if (gridSquare.SquareOccupied && gridSquare.GetShapeID() == shapeID)
+        {
+            stack.Push(gridSquare.SquareIndex);
+        }
+    }
+
+    while (stack.Count > 0)
+    {
+        int currentIndex = stack.Pop();
+
+        if (!visited.Contains(currentIndex))
+        {
+            visited.Add(currentIndex);
+            var currentSquare = _gridSquares[currentIndex].GetComponent<GridSquare>();
+
+            if (currentSquare.SquareOccupied && currentSquare.GetShapeID() == shapeID)
+            {
+                currentSquare.ClearSquare(); // 블록 삭제
+            }
+
+            int row = currentIndex / columns;
+            int column = currentIndex % columns;
+
+            // 🔹 추가적인 연결 체크 로직 (shapeGrid를 참조)
+            if (row > 0 && shapeGrid[row - 1, column] == 1) stack.Push(currentIndex - columns);
+            if (row < rows - 1 && shapeGrid[row + 1, column] == 1) stack.Push(currentIndex + columns);
+            if (column > 0 && shapeGrid[row, column - 1] == 1) stack.Push(currentIndex - 1);
+            if (column < columns - 1 && shapeGrid[row, column + 1] == 1) stack.Push(currentIndex + 1);
+        }
+    }
+     GameEvents.CheckIfShapeCanBePlaced?.Invoke();
+
 }
 
 }
