@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Unity.VisualScripting;
 using UnityEngine;
+
 public class Define
 {
-
     public enum Layer
     {
         Monster = 8,
@@ -23,8 +23,7 @@ public class Define
 
     public enum Sound
     {
-
-
+        // 사운드 관련 식별자들을 추가
     }
     
     public enum WorldObject
@@ -63,7 +62,7 @@ public class Define
         Unique
     }
 
-    public enum CharacterClass  // {Test} 각 캐릭터의 클래스를 알아보기 위한 클래스 Enum
+    public enum CharacterClass  // 각 캐릭터의 클래스를 알아보기 위한 Enum
     {     
         Knight,
         Mage,
@@ -90,11 +89,9 @@ public class Define
                 return "Unknown";
         }
     }
-
    
-    public enum State //상태
+    public enum State // 상태
     {
-        //기본적으로 사용하는 상태
         Die,
         Idle,
         Moving,
@@ -107,19 +104,13 @@ public class Define
         NormalAttack_04,
         NormalAttack_05,
         JumpAttack,
-
         NormalSkill_01,
         UltimateSkill_01,
-
-        // 무기와 일반 Idle 상태 분리
-
         currentWeaponIdle,
-        
     }
 
-    public enum MonsterState //몬스터 상태
+    public enum MonsterState // 몬스터 상태
     {
-        //기본적으로 사용하는 상태
         Die,
         Idle,
         Moving,
@@ -131,10 +122,8 @@ public class Define
         NormalAttack_03,
         NormalAttack_04,
         NormalAttack_05,
-
         NormalSkile_01,
         UltimateSkile_01,
-        
     }
 
     public enum MouseEvent
@@ -156,6 +145,14 @@ public class Define
         Pear
     }
 
+    // MonsterType 식별자를
+    public enum MonsterType
+    {
+        EvilMage,
+        Orc,
+        Slime,
+        Specter
+    }
 
     // 그리드 형태를 정의하는 배열들
     public static readonly int[,] AppleShape = new int[10, 10]
@@ -186,7 +183,6 @@ public class Define
         {1, 1, 1, 0, 0, 0, 0, 1, 1, 1}
     };
 
-
     // 모양을 불러오는 함수 (필요한 경우)
     public static int[,] GetShapeGrid(ShapeType shapeType)
     {
@@ -200,5 +196,4 @@ public class Define
                 return new int[10, 10]; // 기본적으로 빈 배열을 반환
         }
     }
-
 }
