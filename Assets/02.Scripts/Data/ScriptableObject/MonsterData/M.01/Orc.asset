@@ -10,11 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc76d2524c68e7441ad9e604d45bc693, type: 3}
-  m_Name: Monster_01
+  m_Name: Orc
   m_EditorClassIdentifier: 
+  monsterName: 
   maxHealth: 100
   Hp: 100
   _scacRange: 10
-  _attackRange: 1
-  moveSpeed: 5
-  runSpeed: 8
+  _attackRange: 2
+  moveSpeed: 4
+  runSpeed: 6

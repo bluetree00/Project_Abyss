@@ -14,6 +14,7 @@ TagManager:
   - WeaponChange
   - FrontAttack
   - FrontAttackHit
+  - Orc
   layers:
   - Default
   - TransparentFX
