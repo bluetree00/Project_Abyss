@@ -4,6 +4,12 @@ using System.Collections.Generic;
 
 public class OcrMonster : MonsterBaseController
 {
+    // 예시: OcrMonster는 Define.MonsterType.Orc로 식별
+    protected override Define.MonsterType MonsterTypeIdentifier
+    {
+        get { return Define.MonsterType.Orc; }
+    }
+
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리
 
     protected override void UpdateIdle()
@@ -29,7 +35,7 @@ public class OcrMonster : MonsterBaseController
             float distance = (_destPos - transform.position).magnitude;
             if (distance <= MonsterData._attackRange)
             {
-                NavMeshAgent nma = gameObject.GetComponent<NavMeshAgent>();
+                NavMeshAgent nma = GetComponent<NavMeshAgent>();
                 nma.SetDestination(transform.position);
                 State = Define.MonsterState.NormalAttack_01;
                 return;
@@ -43,7 +49,7 @@ public class OcrMonster : MonsterBaseController
         }
         else
         {
-            NavMeshAgent nma = gameObject.GetComponent<NavMeshAgent>();
+            NavMeshAgent nma = GetComponent<NavMeshAgent>();
             nma.SetDestination(_destPos);
             nma.speed = monsterData.moveSpeed;
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 20 * Time.deltaTime);
@@ -108,7 +114,7 @@ public class OcrMonster : MonsterBaseController
             Quaternion spawnRotation2 = Quaternion.identity;
             GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
             Debug.Log("Monster died, spawning die effect.");
-            Destroy(this.gameObject);
+            Destroy(gameObject);
         }
         Debug.Log($"Monster took {damage} damage. Current Health: {hp}");
 

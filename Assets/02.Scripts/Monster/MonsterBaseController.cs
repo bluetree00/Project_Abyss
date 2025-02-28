@@ -38,13 +38,20 @@ public class MonsterBaseController : MonoBehaviour
         rb.angularVelocity = Vector3.zero;
     }
 
+    // 각 몬스터의 고유 식별자를 Define.MonsterType으로 반환하는 가상 프로퍼티
+    // 기본값은 Slime으로 설정 (파생 클래스에서 반드시 오버라이드)
+    protected virtual Define.MonsterType MonsterTypeIdentifier 
+    {
+        get { return Define.MonsterType.Slime; }
+    }
+
     protected virtual void Init()
     {
         rb = GetComponent<Rigidbody>();
 
-        // 게임 오브젝트의 태그를 데이터 로드 키로 사용
-        string monsterTag = gameObject.tag; 
-        LoadMonsterData(monsterTag, OnMonsterDataLoaded);
+        // Define에서 제공하는 MonsterType을 문자열 키로 변환하여 데이터 로드
+        string key = MonsterTypeIdentifier.ToString(); 
+        LoadMonsterData(key, OnMonsterDataLoaded);
     }
 
     // 데이터 로딩 완료 후 호출될 콜백
