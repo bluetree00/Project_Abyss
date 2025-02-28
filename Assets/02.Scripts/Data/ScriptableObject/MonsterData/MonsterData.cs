@@ -3,6 +3,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "NewEffectData", menuName = "Monsters/Monster Data")]
 public class MonsterData : ScriptableObject
 {
+     // 캐릭터 기본 정보
+    [Header("캐릭터 기본 정보")]
+    public string monsterName;
     public float maxHealth;
     public float Hp;
     public float _scacRange = 10;

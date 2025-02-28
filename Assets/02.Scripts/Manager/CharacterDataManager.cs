@@ -4,6 +4,8 @@ public class CharacterDataManager
 {
     private static CharacterData m_CharacterData; //현재 캐릭터의 데이터
     public CharacterData M_CharacterData { get { return m_CharacterData; } }
+    private static MonsterData m_MonsterData; //현재 캐릭터의 데이터
+    public MonsterData M_MonsterData { get { return m_MonsterData; } }
     private static WeaponData EquippedWeapon; //현재 무기의 데이터
 
     // 새로운 캐릭터 데이터를 메인으로 설정.
@@ -17,6 +19,18 @@ public class CharacterDataManager
         m_CharacterData = characterData;
         Debug.Log($"캐릭터 데이터를 로드(캐릭터데이터매니저): {m_CharacterData}");
     }
+
+    public void SetMonsterData(MonsterData monsterData)
+    {
+        if (monsterData == null)
+        {
+            Debug.LogError("character data 를 로드하는데 실패했습니다, 현재 데이터가 null 입니다.");
+            return;
+        }
+        m_MonsterData = monsterData;
+        Debug.Log($"캐릭터 데이터를 로드(캐릭터데이터매니저): {m_MonsterData}");
+    }
+
 
     // 무기를 장착.
     public void EquipWeapon(WeaponData weaponData)
