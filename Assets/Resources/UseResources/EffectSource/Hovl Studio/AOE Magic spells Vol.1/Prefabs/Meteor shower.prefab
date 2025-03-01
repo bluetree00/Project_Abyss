@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 108106897617494064}
   - component: {fileID: 114745230419815290}
   - component: {fileID: 82820276732194086}
-  - component: {fileID: -5956872313544200700}
+  - component: {fileID: 3607701858999000024}
   m_Layer: 0
   m_Name: Meteor shower
   m_TagString: Untagged
@@ -5134,7 +5134,7 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &-5956872313544200700
+--- !u!114 &3607701858999000024
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
