@@ -29610,7 +29610,7 @@ GameObject:
   - component: {fileID: 108990421757153786}
   - component: {fileID: 82033017084784452}
   - component: {fileID: 114635776230039818}
-  - component: {fileID: -4528287116731859969}
+  - component: {fileID: 8059171103125462539}
   m_Layer: 0
   m_Name: Lightning strike
   m_TagString: Untagged
@@ -34840,7 +34840,7 @@ MonoBehaviour:
   RandomVolume: 0
   minVolume: 0.4
   maxVolume: 1
---- !u!114 &-4528287116731859969
+--- !u!114 &8059171103125462539
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
