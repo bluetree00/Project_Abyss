@@ -14,14 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pools:
   - tag: ShinySlash
-    resourcePath: Effects/ShinySlash
+    resourcePath: ShinySlash
     initialSize: 5
     poolType: 0
   - tag: HitEffect_02
-    resourcePath: Effects/HitEffect_02
+    resourcePath: HitEffect_02
     initialSize: 5
     poolType: 0
   - tag: DieEffect_01
-    resourcePath: Effects/DieEffect_01
+    resourcePath: DieEffect_01
     initialSize: 5
     poolType: 0
