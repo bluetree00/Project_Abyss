@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -35,7 +34,7 @@ public class Managers : MonoBehaviour
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
     private StageTransitionManager _stageTransitionManager;
-    private CharacterDataManager _characterDataManager;     //캐릭터 데이터 관리 매니저
+    private CharacterDataManager _characterDataManager;     // 캐릭터 데이터 관리 매니저
     private WeaponManager weaponManager; // 무기 데이터 관리 매니저
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
@@ -52,7 +51,6 @@ public class Managers : MonoBehaviour
 
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
-
     #endregion
 
     void Awake()
@@ -62,17 +60,9 @@ public class Managers : MonoBehaviour
             s_instance = this;
             DontDestroyOnLoad(this);
 
-            // ObjectPoolerManager 초기화
-            List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools("BaseTest");
-            _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-
-            
+            // 나머지 초기화 작업
             if (_stageTransitionManager == null)
-            {
                 _stageTransitionManager = new StageTransitionManager();
-            }
-
-            //_stageTransitionManager.LoadChapter("Chapter1");
         }
         else
         {
@@ -80,8 +70,30 @@ public class Managers : MonoBehaviour
         }
     }
 
-    void Start() {
-    
+    void Start()
+    {
+        // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행
+        StartCoroutine(InitializeManagers());
+    }
+
+    private IEnumerator InitializeManagers()
+    {
+        bool isCompleted = false;
+        List<ObjectPoolerManager.Pool> initialPools = null;
+        
+        // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
+        ObjectPoolEffectInitializer.GetInitialPools("BaseTest", pools =>
+        {
+            initialPools = pools;
+            isCompleted = true;
+        });
+        
+        // 풀 데이터 로드 완료까지 대기
+        yield return new WaitUntil(() => isCompleted);
+        
+        // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
+        _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
+        Debug.Log("ObjectPoolerManager 초기화 완료 (Addressables 방식)");
     }
 
     void Update()
@@ -94,7 +106,7 @@ public class Managers : MonoBehaviour
             {
                 Debug.Log($"{obj.name} 생성 완료");
             },
-            ()=>
+            () =>
             {
                 Debug.Log("<color=red>생성 실패</color>");
             });
@@ -120,17 +132,13 @@ public class Managers : MonoBehaviour
         }
     }
 
-    public void CreateNewObjectPooler(string newWeaponName)        //새로운 무기가 추가될 때마다 새로운 오브젝트 풀러를 생성 / 무기 이름을 받아 생성함
+    public void CreateNewObjectPooler(string newWeaponName)
     {
-        List<ObjectPoolerManager.Pool> initialPools = ObjectPoolEffectInitializer.GetInitialPools(newWeaponName);
-        _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-        Debug.Log($"새로운 오브젝트 풀러가 생성되었습니다: {newWeaponName}");
+        // 새로운 무기가 추가될 때 비동기 방식으로 풀 데이터를 로드하여 새로운 풀러 생성
+        ObjectPoolEffectInitializer.GetInitialPools(newWeaponName, pools =>
+        {
+            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
+            Debug.Log($"새로운 오브젝트 풀러가 생성되었습니다: {newWeaponName}");
+        });
     }
-
-
-    // 매니저에서 처리해줘야할 작업 : MonoBehaviour가 필요한 작업들
-    #region MonoBehaviour 필요한 작업
-
-    #endregion
-
 }
