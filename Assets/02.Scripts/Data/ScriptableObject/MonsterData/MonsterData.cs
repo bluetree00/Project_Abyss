@@ -13,4 +13,7 @@ public class MonsterData : ScriptableObject
     public float moveSpeed = 5f; // 기본 이동 속도
     public float runSpeed = 8f;  // 기본 달리기 속도
 
+     [Header("공격 정보")]
+    public float attackCooldown = 1.0f; // 공격 후 재공격까지의 대기 시간
+
 }

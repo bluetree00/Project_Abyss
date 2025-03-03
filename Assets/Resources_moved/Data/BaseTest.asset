@@ -25,3 +25,7 @@ MonoBehaviour:
     resourcePath: DieEffect_01
     initialSize: 5
     poolType: 0
+  - tag: BloodShot
+    resourcePath: BloodShot
+    initialSize: 5
+    poolType: 1

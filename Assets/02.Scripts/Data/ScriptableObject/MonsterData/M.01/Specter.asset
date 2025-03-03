@@ -17,5 +17,6 @@ MonoBehaviour:
   Hp: 100
   _scacRange: 15
   _attackRange: 10
-  moveSpeed: 4
-  runSpeed: 6
+  moveSpeed: 1
+  runSpeed: 1
+  attackCooldown: 1
