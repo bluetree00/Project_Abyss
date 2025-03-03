@@ -150,7 +150,7 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 10
-    - _Emission: 2
+    - _Emission: 40
     - _EnableBlendModePreserveSpecularLighting: 0
     - _EnableFogOnTransparent: 1
     - _ExcludeFromTUAndAA: 0
