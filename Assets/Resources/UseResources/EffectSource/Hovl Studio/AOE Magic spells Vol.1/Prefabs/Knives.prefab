@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 108166228675917214}
   - component: {fileID: 114536902040008898}
   - component: {fileID: 82660171331382076}
-  - component: {fileID: 915277968552935604}
+  - component: {fileID: -1571866850849444626}
   m_Layer: 0
   m_Name: Knives
   m_TagString: Untagged
@@ -5104,7 +5104,7 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &915277968552935604
+--- !u!114 &-1571866850849444626
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

@@ -50,6 +50,7 @@ public class BaseController : MonoBehaviour
         //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
         //characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
         //weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
+
         LoadCharacterData(characterName, () =>
         {
             LoadWeaponContainer(Define.GetCharacterClassString(characterName), () =>

@@ -69,6 +69,16 @@ public class AddressablesManager : MonoBehaviour
             HandleCompletion(handle, key, onSuccess, onFailure);
         };
     }
+     
+     //동기 버전으로 사용시
+    public T LoadAssetSync<T>(string key) where T : UnityEngine.Object
+    {
+        var handle = Addressables.LoadAssetAsync<T>(key);
+        handle.WaitForCompletion();  // 동기적으로 대기
+        return handle.Result;
+    }
+
+
     /// <summary>
     /// 어드레서블 시스템으로 프리팹을 생성하는 함수
     /// </summary>

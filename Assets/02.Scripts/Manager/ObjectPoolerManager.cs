@@ -7,10 +7,10 @@ public class ObjectPoolerManager
     private Dictionary<string, Queue<GameObject>> poolDictionary;
     private List<GameObject> spawnObjects;
     private List<string> tags;
-    private Dictionary<PoolType, GameObject> parentObjects;  // 부모 오브젝트를 풀 타입별로 관리
+    private Dictionary<PoolType, GameObject> parentObjects;  // 각 풀 타입별 부모 오브젝트 관리
     private Pool[] pools;
 
-    // 열거형으로 풀 타입 정의
+    // 풀 타입 열거형
     public enum PoolType
     {
         Effect,
@@ -35,12 +35,12 @@ public class ObjectPoolerManager
         tags = new List<string>();
         parentObjects = new Dictionary<PoolType, GameObject>();
 
-        // 풀 타입별 부모 오브젝트 생성
+        // 각 풀 타입별 부모 오브젝트 생성
         parentObjects[PoolType.Effect] = new GameObject("EffectPool");
         parentObjects[PoolType.Monster] = new GameObject("MonsterPool");
         parentObjects[PoolType.Character] = new GameObject("CharacterPool");
 
-        // 풀 초기화
+        // 각 풀 초기화
         foreach (Pool pool in pools)
         {
             InitializePool(pool);
@@ -61,11 +61,12 @@ public class ObjectPoolerManager
 
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
-         //Debug.Log($"Loading prefab from path: {resourcePath}");
-        GameObject prefab = Managers.Resource.Load<GameObject>($"Prefabs/{resourcePath}");
+        // AddressablesManager를 사용하여 프리팹을 동기적으로 로드합니다.
+        // LoadAssetSync는 AddressablesManager에 구현된 동기 로드용 메서드입니다.
+        GameObject prefab = AddressablesManager.Instance.LoadAssetSync<GameObject>(resourcePath);
         if (prefab == null)
         {
-            //Debug.LogError($"Prefab at path {resourcePath} not found.");
+            Debug.LogError($"Prefab at path {resourcePath} not found.");
             return null;
         }
 
@@ -92,7 +93,14 @@ public class ObjectPoolerManager
     {
         if (!poolDictionary.ContainsKey(tag))
         {
-            Pool newPool = new Pool { tag = tag, resourcePath = $"Effects/{tag}", initialSize = 1, poolType = PoolType.Effect };
+            // 등록되지 않은 태그인 경우 기본 설정으로 풀 초기화
+            Pool newPool = new Pool
+            {
+                tag = tag,
+                resourcePath = $"Effects/{tag}",
+                initialSize = 1,
+                poolType = PoolType.Effect
+            };
             InitializePool(newPool);
         }
 
@@ -111,11 +119,10 @@ public class ObjectPoolerManager
         objectToSpawn.transform.position = position;
         objectToSpawn.transform.rotation = rotation;
         objectToSpawn.SetActive(true);
-
         return objectToSpawn;
     }
 
-    public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component //오브젝트에 있는 컴포넌트를 이용하고 싶을때 사용 예를들어 rd 참조
+    public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
     {
         GameObject objectToSpawn = SpawnFromPool(tag, position, rotation);
         if (objectToSpawn.TryGetComponent(out T component))
@@ -145,7 +152,7 @@ public class ObjectPoolerManager
 
     public void LogPoolStatus()
     {
-        foreach (var pool in pools)
+        foreach (Pool pool in pools)
         {
             if (poolDictionary.ContainsKey(pool.tag))
             {

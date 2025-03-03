@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 114854165852359842}
   - component: {fileID: 199798401150151838}
   - component: {fileID: 108158424509105500}
-  - component: {fileID: -1405796319988938545}
+  - component: {fileID: 4392177438318379412}
   m_Layer: 0
   m_Name: Meteor shower 2
   m_TagString: Untagged
@@ -5018,7 +5018,7 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
---- !u!114 &-1405796319988938545
+--- !u!114 &4392177438318379412
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

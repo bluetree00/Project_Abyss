@@ -1,32 +1,35 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public static class ObjectPoolEffectInitializer
 {
-    public static List<ObjectPoolerManager.Pool> GetInitialPools(string effectPoolDataName)
+    public static void GetInitialPools(string effectPoolDataName, Action<List<ObjectPoolerManager.Pool>> callback)
     {
-        // 스크립터블 오브젝트를 이름으로 로드
-        EffectPoolData effectPoolData = Resources.Load<EffectPoolData>($"Data/{effectPoolDataName}");
-        
-        if (effectPoolData == null)
+        // AddressablesManager를 사용하여 Addressables로 풀 데이터를 로드합니다.
+        AddressablesManager.Instance.LoadAsset<EffectPoolData>(effectPoolDataName, effectPoolData =>
         {
-            Debug.LogError($"EffectPoolData with name {effectPoolDataName} not found.");
-            return new List<ObjectPoolerManager.Pool>();
-        }
-
-        List<ObjectPoolerManager.Pool> pools = new List<ObjectPoolerManager.Pool>();
-
-        foreach (var pool in effectPoolData.pools)
-        {
-            pools.Add(new ObjectPoolerManager.Pool
+            if (effectPoolData == null)
             {
-                tag = pool.tag,
-                resourcePath = pool.resourcePath,
-                initialSize = pool.initialSize,
-                poolType = pool.poolType
-            });
-        }
+                Debug.LogError($"EffectPoolData with name {effectPoolDataName} not found.");
+                callback(new List<ObjectPoolerManager.Pool>());
+                return;
+            }
 
-        return pools;
+            List<ObjectPoolerManager.Pool> pools = new List<ObjectPoolerManager.Pool>();
+
+            foreach (var pool in effectPoolData.pools)
+            {
+                pools.Add(new ObjectPoolerManager.Pool
+                {
+                    tag = pool.tag,
+                    resourcePath = pool.resourcePath,
+                    initialSize = pool.initialSize,
+                    poolType = pool.poolType
+                });
+            }
+
+            callback(pools);
+        });
     }
 }
