@@ -62,7 +62,7 @@ public class ObjectPoolerManager
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
         // AddressablesManager를 사용하여 프리팹을 동기적으로 로드합니다.
-        // LoadAssetSync는 AddressablesManager에 구현된 동기 로드용 메서드입니다.
+    
         GameObject prefab = AddressablesManager.Instance.LoadAssetSync<GameObject>(resourcePath);
         if (prefab == null)
         {
