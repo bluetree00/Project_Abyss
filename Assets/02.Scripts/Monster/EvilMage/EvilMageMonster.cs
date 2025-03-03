@@ -8,7 +8,7 @@ public class EvilMageMonster : MonsterBaseController
     // 예시: OcrMonster는 Define.MonsterType.Orc로 식별
     protected override Define.MonsterType MonsterTypeIdentifier
     {
-        get { return Define.MonsterType.Specter; }
+        get { return Define.MonsterType.EvilMage; }
     }
 
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리

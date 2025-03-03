@@ -47,7 +47,7 @@ Material:
     m_Floats:
     - _CullMode: 0
     - _Depthpower: 1
-    - _Emission: 10
+    - _Emission: 30
     - _Opacity: 1
     - _Usecenterglow: 0
     - _Usedepth: 0
