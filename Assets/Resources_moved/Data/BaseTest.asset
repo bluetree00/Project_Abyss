@@ -29,3 +29,7 @@ MonoBehaviour:
     resourcePath: BloodShot
     initialSize: 5
     poolType: 1
+  - tag: Laser
+    resourcePath: Laser
+    initialSize: 5
+    poolType: 0

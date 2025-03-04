@@ -15,7 +15,8 @@ MonoBehaviour:
   monsterName: 
   maxHealth: 100
   Hp: 100
-  _scacRange: 10
-  _attackRange: 10
-  moveSpeed: 4
-  runSpeed: 6
+  _scacRange: 15
+  _attackRange: 15
+  moveSpeed: 1
+  runSpeed: 1
+  attackCooldown: 1
