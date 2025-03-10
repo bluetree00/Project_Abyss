@@ -15,13 +15,6 @@ MonoBehaviour:
   chapters:
   - chapterName: Chapter1
     stages:
-    - stageName: Start_01
-      resourcePath: Start_01
-      stageType: 0
-      weight: 0
-      randomWeight: 0
-      minWeight: 1
-      maxWeight: 10
     - stageName: Stage_01
       resourcePath: Stage_01
       stageType: 1
@@ -38,6 +31,27 @@ MonoBehaviour:
       maxWeight: 10
     - stageName: Stage_03
       resourcePath: Stage_03
+      stageType: 1
+      weight: 0
+      randomWeight: 1
+      minWeight: 1
+      maxWeight: 10
+    - stageName: Stage_04
+      resourcePath: Stage_04
+      stageType: 1
+      weight: 0
+      randomWeight: 1
+      minWeight: 1
+      maxWeight: 10
+    - stageName: Stage_05
+      resourcePath: Stage_05
+      stageType: 1
+      weight: 0
+      randomWeight: 1
+      minWeight: 1
+      maxWeight: 10
+    - stageName: Stage_06
+      resourcePath: Stage_06
       stageType: 1
       weight: 0
       randomWeight: 1
