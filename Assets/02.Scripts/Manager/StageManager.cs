@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
+using UnityEngine.AddressableAssets; //[NEW]
+using UnityEngine.ResourceManagement.AsyncOperations; //[NEW]
 
 //Managers.Stage.MoveToNextStage(1); 스테이지 넘기기
 //Managers.StageTransitionManager.LoadChapter("Chapter1"); 챕터 로드 하기
 //Managers.Stage.CleanupChapter(); 현재 챕터 지우기
-
 
 public class StageManager
 {
@@ -19,6 +20,8 @@ public class StageManager
     private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
     private Dictionary<string, GameObject> stagePrefabs; // 캐시된 스테이지 프리팹
     private bool isStageMoving = false;
+    private List<string> usedStages = new List<string>(); //[NEW] 사용된 스테이지 목록
+    private int stageSteps = 0; // 스테이지 이동 횟수
 
     public enum StageType
     {
@@ -43,14 +46,17 @@ public class StageManager
         public string requiredStage;
     }
 
-    public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName)
+    public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName, int chapterNumber)
     {
         stageDictionary = new Dictionary<string, GameObject>();
         mstGraph = new Dictionary<string, List<string>>();
         stagePrefabs = new Dictionary<string, GameObject>(); // 초기화
 
-        InitializeStages(stages);
-        GenerateFilteredMST(stages, restrictions);
+        int numberOfStages = 5 + (chapterNumber - 1); // 챕터가 증가할수록 스테이지 갯수 증가
+        List<Stage> selectedStages = stages.OrderBy(x => Guid.NewGuid()).Take(numberOfStages).ToList(); // 랜덤으로 스테이지 선택
+
+        InitializeStages(selectedStages);
+        GenerateFilteredMST(selectedStages, restrictions);
         SaveMSTData();
         SetInitialStage();
     }
@@ -74,23 +80,50 @@ public class StageManager
                 // 프리팹 캐시 사용
                 if (!stagePrefabs.ContainsKey(stage.resourcePath))
                 {
-                    GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
-                    if (stagePrefab == null)
+                    // GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
+                    // if (stagePrefab == null)
+                    // {
+                    //     Debug.LogError($"Prefab not found: {stage.resourcePath}");
+                    //     continue;
+                    // }
+                    // stagePrefabs[stage.resourcePath] = stagePrefab; // 캐싱
+                    Addressables.LoadAssetAsync<GameObject>(stage.resourcePath).Completed += (handle) =>
                     {
-                        Debug.LogError($"Prefab not found: {stage.resourcePath}");
-                        continue;
-                    }
-                    stagePrefabs[stage.resourcePath] = stagePrefab; // 캐싱
+                        if (handle.Status == AsyncOperationStatus.Succeeded)
+                        {
+                            stagePrefabs[stage.resourcePath] = handle.Result;
+                        }
+                        else
+                        {
+                            Debug.LogError($"Prefab not found: {stage.resourcePath}");
+                        }
+                    };
                 }
 
                 // 스테이지 오브젝트 생성 및 부모 설정
-                GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath], chapterParent.transform);
-                stageObject.name = stage.stageName;
-                stageObject.SetActive(false);
-                stageDictionary[stage.stageName] = stageObject;
+                //GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath], chapterParent.transform);
+                AsyncOperationHandle<GameObject> handle = Addressables.InstantiateAsync(stage.resourcePath);
+                handle.WaitForCompletion();
+                if (handle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    GameObject stageObject = handle.Result;
+                    stageObject.transform.SetParent(chapterParent.transform);
+                    stageObject.name = stage.stageName;
+                    stageObject.SetActive(false);
+                    stageDictionary[stage.stageName] = stageObject;
+                }
+                else
+                {
+                    Debug.LogError($"Failed to instantiate stage: {stage.resourcePath}");
+                }
+                // stageObject.name = stage.stageName;
+                // stageObject.SetActive(false);
+                // stageDictionary[stage.stageName] = stageObject;
             }
         }
     }
+
+    
 
 
     private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
@@ -183,7 +216,7 @@ public class StageManager
 #endif
     }
 
-    private void SetInitialStage()
+    public void SetInitialStage()
     {
         GameObject firstStageObject = stageDictionary.Values.FirstOrDefault();
         if (firstStageObject != null)
@@ -210,6 +243,11 @@ public class StageManager
             GameObject stageObject = stageDictionary[stage.stageName];
             stageObject.SetActive(true);
             currentStage = stage;
+        }
+
+        else // 모든 상황의 예외가 발생했을 때 예외 처리 디버그
+        {
+            Debug.LogError($"Stage {stage.stageName} not found in stage dictionary.");
         }
     }
 
@@ -252,13 +290,40 @@ public class StageManager
         }
 
         // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
-        int nextIndex = Mathf.Clamp(currentIndex + steps, 0, stageSequence.Count - 1);
+        int nextIndex = currentIndex + steps;
+
+        if (nextIndex >= stageSequence.Count)
+        {
+            nextIndex = 0;
+        }
+
+        // 사용된 스테이지는 제외
+        int loopCount = 0; // 무한 루프 방지를 위한 카운터
+        while (nextIndex < stageSequence.Count && usedStages.Contains(stageSequence[nextIndex].startStageName))
+        {
+            nextIndex++;
+            if (nextIndex >= stageSequence.Count)
+            {
+                nextIndex = 0;
+            }
+
+            loopCount++;
+            if (loopCount > stageSequence.Count)
+            {
+                Debug.LogWarning("Infinite loop detected in MoveToNextStage.");
+                loopCount = 0;
+                usedStages.Clear(); // 사용된 스테이지 목록 초기화
+                break;
+            }
+        }
+
         string nextStageName = stageSequence[nextIndex].startStageName;
 
         if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
         {
             Debug.Log($"Moving to next stage: {nextStageName}");
             ActivateStage(new Stage { stageName = nextStageName });
+            usedStages.Add(nextStageName); //[NEW] 사용된 스테이지 목록에 추가
         }
         else
         {
@@ -267,6 +332,63 @@ public class StageManager
 
         isStageMoving = false;
     }
+
+
+    
+    // public void MoveToNextStage(int steps)
+    // {
+    //     if (isStageMoving) return; // 이미 한 번 호출된 경우, 다시 호출하지 않도록 막기
+    //     if (currentStage == null)
+    //     {
+    //         Debug.LogError("Current stage is not set.");
+    //         return;
+    //     }
+
+    //     // Resources에서 MSTData 로드
+    //     if (mstData == null)
+    //     {
+    //         mstData = Resources.Load<MSTData>("Data/MSTData");
+    //         if (mstData == null)
+    //         {
+    //             Debug.LogError("MSTData not found!");
+    //             return;
+    //         }
+    //     }
+
+    //     // stageSequences에서 순차적으로 이동
+    //     var stageSequence = mstData.stageSequences;
+
+    //     if (stageSequence == null || stageSequence.Count == 0)
+    //     {
+    //         Debug.LogError("No stage sequences found in MSTData.");
+    //         return;
+    //     }
+
+    //     // stageSequences의 순서대로 이동
+    //     int currentIndex = stageSequence.FindIndex(s => s.startStageName == currentStage.stageName);
+
+    //     if (currentIndex == -1)
+    //     {
+    //         Debug.LogError("Current stage not found in stage sequences.");
+    //         return;
+    //     }
+
+    //     // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
+    //     int nextIndex = Mathf.Clamp(currentIndex + steps, 0, stageSequence.Count - 1);
+    //     string nextStageName = stageSequence[nextIndex].startStageName;
+
+    //     if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
+    //     {
+    //         Debug.Log($"Moving to next stage: {nextStageName}");
+    //         ActivateStage(new Stage { stageName = nextStageName });
+    //     }
+    //     else
+    //     {
+    //         Debug.LogError($"Stage {nextStageName} not found in stage dictionary.");
+    //     }
+
+    //     isStageMoving = false;
+    // }
 
     // Union-Find 클래스
     private class UnionFind
@@ -349,6 +471,7 @@ public class StageManager
 
         // 현재 스테이지 정보 초기화
         currentStage = null;
+        usedStages.Clear(); //[NEW] 사용된 스테이지 목록 초기화
 
         Debug.Log("Chapter cleanup complete. Ready for the next chapter.");
     }

@@ -38,11 +38,13 @@ public class StageTransitionManager
         }
 
         // StageManager 초기화
-        Managers.Instance._stageManager = new StageManager(stages, restrictions, bossStageName);
+        Managers.Instance._stageManager = new StageManager(stages, restrictions, bossStageName, 1);
 
         // 첫 번째 스테이지부터 시작
-        Managers.Stage.MoveToNextStage(0); // 첫 번째 스테이지 시작
-        currentStageIndex = 0;
+        // Managers.Stage.MoveToNextStage(0); // 첫 번째 스테이지 시작
+        // currentStageIndex = 0;
+        Managers.Stage.SetInitialStage(); // 첫 번째 스테이지 시작
+        currentStageIndex = 0; // 첫 번째 스테이지 인덱스 설정
         Debug.Log($"Loaded chapter: {chapterName}");
     }
 

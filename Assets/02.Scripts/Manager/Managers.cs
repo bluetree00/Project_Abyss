@@ -74,6 +74,8 @@ public class Managers : MonoBehaviour
     {
         // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행
         StartCoroutine(InitializeManagers());
+
+        StageTransitionManager.LoadChapter("Chapter1"); // 첫 번째 챕터 로드
     }
 
     private IEnumerator InitializeManagers()
@@ -127,7 +129,7 @@ public class Managers : MonoBehaviour
     {
         if (_stageManager != null)
         {
-            _stageManager = new StageManager(stages, restrictions, bossStageName);
+            _stageManager = new StageManager(stages, restrictions, bossStageName, 1);
             _stageManager.MoveToNextStage(0); // 새로운 스테이지로 이동
         }
     }
