@@ -59,6 +59,8 @@ public class StageManager
         GenerateFilteredMST(selectedStages, restrictions);
         SaveMSTData();
         SetInitialStage();
+
+        Managers.GameEvent.portal   += MoveToNextStage; // 이벤트 추가
     }
 
     private void InitializeStages(List<Stage> stages)
@@ -297,6 +299,7 @@ public class StageManager
             nextIndex = 0;
         }
 
+        //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
         // 사용된 스테이지는 제외
         int loopCount = 0; // 무한 루프 방지를 위한 카운터
         while (nextIndex < stageSequence.Count && usedStages.Contains(stageSequence[nextIndex].startStageName))
