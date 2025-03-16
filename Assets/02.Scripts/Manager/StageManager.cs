@@ -21,7 +21,10 @@ public class StageManager
     private Dictionary<string, GameObject> stagePrefabs; // 캐시된 스테이지 프리팹
     private bool isStageMoving = false;
     private List<string> usedStages = new List<string>(); //[NEW] 사용된 스테이지 목록
+    private List<Stage> eventStages = new List<Stage>(); // 이벤트 스테이지 목록
     private int stageSteps = 0; // 스테이지 이동 횟수
+    public int eventStageThreshold = 99; // 이벤트 스테이지로 진입하기 위한 진행 횟수
+    //TODO: 챕터가 넘어갈 때마다 스테이지 이동 횟수 상한 증가 필요 (챕터 1은 5번 진행, 챕터 2는 6번 진행 등)
 
     public enum StageType
     {
@@ -52,11 +55,15 @@ public class StageManager
         mstGraph = new Dictionary<string, List<string>>();
         stagePrefabs = new Dictionary<string, GameObject>(); // 초기화
 
-        int numberOfStages = 5 + (chapterNumber - 1); // 챕터가 증가할수록 스테이지 갯수 증가
-        List<Stage> selectedStages = stages.OrderBy(x => Guid.NewGuid()).Take(numberOfStages).ToList(); // 랜덤으로 스테이지 선택
+        //int numberOfStages = 5 + (chapterNumber - 1); // 챕터가 증가할수록 스테이지 갯수 증가
+        //List<Stage> selectedStages = stages.OrderBy(x => Guid.NewGuid()).Take(numberOfStages).ToList(); // 랜덤으로 스테이지 선택
 
-        InitializeStages(selectedStages);
-        GenerateFilteredMST(selectedStages, restrictions);
+        // 이벤트 스테이지를 포함하여 시퀀스 구성
+        eventStages = stages.Where(s => s.stageType == StageType.Event).ToList();
+        stages.AddRange(eventStages);
+
+        InitializeStages(stages);
+        GenerateFilteredMST(stages, restrictions);
         SaveMSTData();
         SetInitialStage();
 
@@ -273,12 +280,29 @@ public class StageManager
             }
         }
 
+        //TODO: 보스 스테이지를 따로 관리할지 한 시퀀스에서 관리할 지 고려해야함.
+        // if (stageSteps >= 6) // 스테이지 이동 횟수가 6회 이상인 경우, 보스 스테이지로 이동
+        // {
+        //     MoveToBossStage();
+        //     return;
+        // }
+
         // stageSequences에서 순차적으로 이동
         var stageSequence = mstData.stageSequences;
 
         if (stageSequence == null || stageSequence.Count == 0)
         {
             Debug.LogError("No stage sequences found in MSTData.");
+            return;
+        }
+
+        // 모든 스테이지가 사용되었는지 확인
+        List<string> stageNames = stageSequence.Select(s => s.startStageName).ToList();
+        bool allUsedStagesIncluded = stageNames.All(stage => usedStages.Contains(stage));
+    
+        if (allUsedStagesIncluded)
+        {
+            Debug.Log("<color=blue> 모든 스테이지가 사용되었습니다. </color>");
             return;
         }
 
@@ -293,10 +317,10 @@ public class StageManager
 
         // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
         int nextIndex = currentIndex + steps;
-
+        // nextIndex가 stageSequences의 범위보다 커지면 그 값만큼 빼줌
         if (nextIndex >= stageSequence.Count)
         {
-            nextIndex = 0;
+            nextIndex -= stageSequence.Count;
         }
 
         //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
@@ -307,7 +331,7 @@ public class StageManager
             nextIndex++;
             if (nextIndex >= stageSequence.Count)
             {
-                nextIndex = 0;
+                nextIndex -= stageSequence.Count;
             }
 
             loopCount++;
@@ -327,6 +351,15 @@ public class StageManager
             Debug.Log($"Moving to next stage: {nextStageName}");
             ActivateStage(new Stage { stageName = nextStageName });
             usedStages.Add(nextStageName); //[NEW] 사용된 스테이지 목록에 추가
+
+            // 스테이지 진행 횟수 증가
+            stageSteps++;
+            Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
+            if (stageSteps >= eventStageThreshold)
+            {
+                // 이벤트 스테이지로 진입
+                MoveToEventStage();
+            }
         }
         else
         {
@@ -336,7 +369,27 @@ public class StageManager
         isStageMoving = false;
     }
 
+    private void MoveToEventStage()
+    {
+        if (eventStages.Count == 0)
+        {
+            Debug.LogWarning("No event stages available.");
+            return;
+        }
 
+        // 랜덤으로 이벤트 스테이지 선택
+        Stage eventStage = eventStages[UnityEngine.Random.Range(0, eventStages.Count)];
+        if (stageDictionary.TryGetValue(eventStage.stageName, out GameObject eventStageObject))
+        {
+            Debug.Log($"Moving to event stage: {eventStage.stageName}");
+            ActivateStage(eventStage);
+            usedStages.Add(eventStage.stageName); // 사용된 스테이지 목록에 추가
+        }
+        else
+        {
+            Debug.LogError($"Event stage {eventStage.stageName} not found in stage dictionary.");
+        }
+    }
     
     // public void MoveToNextStage(int steps)
     // {
