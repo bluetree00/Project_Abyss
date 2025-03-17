@@ -302,7 +302,7 @@ public class StageManager
     
         if (allUsedStagesIncluded)
         {
-            Debug.Log("<color=blue> 모든 스테이지가 사용되었습니다. </color>");
+            Debug.Log("<color=gray> 모든 스테이지가 사용되었습니다. </color>");
             return;
         }
 

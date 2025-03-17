@@ -85,5 +85,12 @@ MonoBehaviour:
       randomWeight: 1
       minWeight: 1
       maxWeight: 10
+    - stageName: Stage_Event_01
+      resourcePath: Stage_Event_01
+      stageType: 2
+      weight: 0
+      randomWeight: 1
+      minWeight: 1
+      maxWeight: 10
     connectionRestrictions: []
     bossStageName: testStage4
