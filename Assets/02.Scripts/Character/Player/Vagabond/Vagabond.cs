@@ -7,7 +7,7 @@ using Cinemachine;
 using System.ComponentModel;
 using Unity.VisualScripting;  // Cinemachine 네임스페이스 추가
 
-public class Vagabond : BaseController
+public class Vagabond : CharacterController
 {
     #region 기본 초기화, 생성자, 소멸자
     [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
@@ -18,6 +18,7 @@ public class Vagabond : BaseController
     private bool isInventoryOpen = false; // 인벤토리 열림 상태
     private bool isInputLocked = false;
     private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
+
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
