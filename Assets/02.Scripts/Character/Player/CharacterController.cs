@@ -13,11 +13,14 @@ public class CharacterController : MonoBehaviour
     public CharacterData CharacterData { get { return characterData; } }
     [SerializeField]
     protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
+    public WeaponContainer WeaponContainer => weaponContainer;
     [SerializeField]
-    protected WeaponData currentWeapon;
+    public WeaponData currentWeapon;
     protected Animator anim;
     public Animator Anim => anim; 
     protected Vector3 moveDirection;  // 이동 방향
+    public Vector3 MoveDirection => moveDirection;
+
 
     [SerializeField]
     protected Define.State _state = Define.State.Idle;
@@ -33,6 +36,7 @@ public class CharacterController : MonoBehaviour
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
     protected StateMachine<CharacterController> stateMachine;
+    public StateMachine<CharacterController> StateMachine => stateMachine; // 혹은 아래처럼 캐스팅해서 오버라이드
 
 
 
@@ -141,8 +145,8 @@ public class CharacterController : MonoBehaviour
     }
     #endregion
 
-    //캐릭터들의 기본 상속 움직임
-    protected virtual void Move(Vector3 direction, float speed)
+    //캐릭터들의 기본 상속 움직임 움직임 함수는 추후에 솔리드 방식으로 전부 분해 필요요
+    public void Move(Vector3 direction, float speed)
     {
         //State = Define.State.Moving;
 
@@ -160,129 +164,52 @@ public class CharacterController : MonoBehaviour
     }
 
 
-    //상태별 애니메이션 설정
-    protected virtual Define.State State
+    public string GetAttackAnimName(int index)
     {
-        get { return _state; }
-        set
-        {
-            _state = value;
+        if (currentWeapon == null) return "";
+        if (index - 1 < 0 || index - 1 >= currentWeapon.weapon_Attack_AnimationName.Length)
+            return "";
 
-            // Animator anim = GetComponent<Animator>();
-            switch(_state)
-            {   //TODO : 아무 무기도 소지하고 있지 않은 상태 구분해서 처리 필요
-                // 플레이어 기본 움직임 상태
-                case Define.State.Idle:
-                    if (weaponContainer != null && 
-                    weaponContainer.isWeaponEquipped && 
-                    currentWeapon.weapon_Idle_AnimationName != "")
-                    {   
-                        anim.CrossFade($"{currentWeapon.weapon_Idle_AnimationName}", 0.1f);
-                    }
-                    else
-                    {
-                        anim.CrossFade("Idle", 0.2f);
-                    } 
-                   break;
-                case Define.State.Moving:
-                   anim.CrossFade("Moving", 0.1f);
-                   break;
-                case Define.State.Runing:
-                   anim.CrossFade("Runing", 0.3f);
-                   break;
-                case Define.State.Dodge:
-                    anim.CrossFade("Dodge", 0.1f, -1);
-                   break;
-                case Define.State.Die:
-                    anim.CrossFade("Die", 0.1f);
-                   break;
-                case Define.State.ChangeWeapon:
-                    anim.CrossFade($"{currentWeapon.weapon_ChangeWeapon_AnimationName}", 0.2f);
-                   break;
-                case Define.State.NormalAttack_01:
-                    NormalAttack(1);
-                   break;
-                case Define.State.NormalAttack_02:
-                    NormalAttack(2);
-                   break;
-                case Define.State.NormalAttack_03:
-                    NormalAttack(3);
-                   break;
-                case Define.State.NormalSkill_01:
-                    anim.CrossFade("NormalSkile_01", 0.1f);
-                   break;
-                case Define.State.UltimateSkill_01:
-                    anim.CrossFade("UltimateSkile_01", 0.1f);
-                   break;
-            }
-        }
+        return currentWeapon.weapon_Attack_AnimationName[index - 1];
     }
 
-    public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
-    {
-        if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
-        {
-            if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
-            {
-                anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
-            }
-            else
-            {   
-                _state = Define.State.Idle;
-                Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
-            }
-        }
-        else
-        {
-            Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
-            _state = Define.State.Idle;
-        }
-    }
+
+    // public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
+    // {
+    //     if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
+    //     {
+    //         if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
+    //         {
+    //             anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
+    //         }
+    //         else
+    //         {   
+    //             _state = Define.State.Idle;
+    //             Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
+    //         }
+    //     }
+    //     else
+    //     {
+    //         Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
+    //         _state = Define.State.Idle;
+    //     }
+    // }
 
      //상태별 업데이트 패턴
     protected virtual void Update()
     {
-        switch (_state)
-        {
-            case Define.State.Idle:
-                UpdateIdle();
-                break;
-            case Define.State.Moving:
-                UpdateMoving();
-                break;
-             case Define.State.Runing:
-                UpdateRuning();
-                break;
-            case Define.State.Dodge:
-                UpdateDodge();
-                break;
-            case Define.State.NormalAttack_01:
-                UpdateNormalAttack_01();
-                break;
-            case Define.State.NormalAttack_02:
-                UpdateNormalAttack_02();
-                break;
-            case Define.State.NormalAttack_03:
-                UpdateNormalAttack_03();
-                break;
-            case Define.State.NormalSkill_01:
-                UpdateNormalSkile_01();
-                break;
-            case Define.State.UltimateSkill_01:
-                UpdateUltimateSkile_01();
-                break;
-        }
+
     }
 
-    protected virtual void UpdateMovement(){}
-    protected virtual void UpdateIdle(){}  // Idle 상태에서의 로직
-    protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
-    protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
-    protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
-    protected virtual void UpdateNormalAttack_01(){}  // NormalAttack_01 상태에서의 로직
-    protected virtual void UpdateNormalAttack_02(){}  // NormalAttack_02 상태에서의 로직
-    protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
-    protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
-    protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
+    // protected virtual void UpdateMovement(){}
+    // protected virtual void UpdateIdle(){}  // Idle 상태에서의 로직
+    // protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
+    // protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
+    // protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
+    // protected virtual void UpdateNormalAttack_01(){}  // NormalAttack_01 상태에서의 로직
+    // protected virtual void UpdateNormalAttack_02(){}  // NormalAttack_02 상태에서의 로직
+    // protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
+    // protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
+    // protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
 
 }

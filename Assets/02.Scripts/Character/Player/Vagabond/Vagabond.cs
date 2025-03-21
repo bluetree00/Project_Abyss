@@ -23,6 +23,9 @@ public class Vagabond : CharacterController
     private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
     
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
+
+    public new StateMachine<Vagabond> StateMachine => stateMachine;
+
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
@@ -164,11 +167,11 @@ public class Vagabond : CharacterController
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(1);
             if (weaponContainer.ownWeapons[0] == null){
-                ChangeState(Define.State.Idle);
+                stateMachine.ChangeState(new VagabondIdleState());
                 StartCoroutine(LockInput(inputLockDuration));
                 return;
             }
-            ChangeState(Define.State.ChangeWeapon);
+            stateMachine.ChangeState(new VagabondChangeWeaponState());
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
         }
@@ -183,11 +186,11 @@ public class Vagabond : CharacterController
             Debug.Log(weaponContainer.isWeaponEquipped);
             Managers.Weapon.ChangeWeapon(2);
             if (weaponContainer.ownWeapons[1] == null){
-                ChangeState(Define.State.Idle);
+                stateMachine.ChangeState(new VagabondIdleState());
                 StartCoroutine(LockInput(inputLockDuration));
                 return;
             }
-            ChangeState(Define.State.ChangeWeapon);
+            stateMachine.ChangeState(new VagabondChangeWeaponState());
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
             StartCoroutine(LockInput(inputLockDuration));
         }
@@ -205,13 +208,13 @@ public class Vagabond : CharacterController
         if (Input.GetKeyDown(KeyCode.F1))
         {
             Managers.Weapon.RemoveWeapon(1);
-            if (currentWeapon == null)  ChangeState(Define.State.Idle);
+            if (currentWeapon == null)  stateMachine.ChangeState(new VagabondIdleState());;
         }
 
         if (Input.GetKeyDown(KeyCode.F2))
         {
             Managers.Weapon.RemoveWeapon(2);
-            if (currentWeapon == null)  ChangeState(Define.State.Idle);
+            if (currentWeapon == null)  stateMachine.ChangeState(new VagabondIdleState());;
         }
         //-----------------------------------------------------------------
     }
@@ -251,39 +254,26 @@ public class Vagabond : CharacterController
         moveDirection = (forward * verticalInput + right * horizontalInput).normalized;
     }
 
-    protected override void UpdateMovement()
+    protected void UpdateMovement()
     {
         if (!CanProcessInput())
             return;
 
         if (moveDirection.magnitude > 0)
         {
-            ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
+            // Shift 누르면 Run 상태로, 아니면 Move 상태로
+            if (Input.GetKey(KeyCode.LeftShift))
+                stateMachine.ChangeState(new VagabondRunState());
+            else
+                stateMachine.ChangeState(new VagabondMoveState());
         }
         else
         {
-            ChangeState(Define.State.Idle);
-            // ChangeState(Define.State.currentWeaponIdle);
+            stateMachine.ChangeState(new VagabondIdleState());
         }
     }
 
-    private void ChangeState(Define.State newState)
-    {
-        if (State != newState)
-            State = newState;
-    }
 
-    //Moving 상태
-    protected override void UpdateMoving()
-    {
-        Move(moveDirection, characterData.baseMoveSpeed);
-    }
-
-    //Runing 상태
-    protected override void UpdateRuning()
-    {
-        Move(moveDirection, characterData.baseRunSpeed);
-    }
 
     #endregion
 
@@ -319,7 +309,7 @@ public class Vagabond : CharacterController
         characterData.attackComboStep = 0;
         characterData.comboTimer = 0;
         // ChangeState(Define.State.currentWeaponIdle);
-        ChangeState(Define.State.Idle);
+        stateMachine.ChangeState(new VagabondIdleState());
     }
 
     #endregion
@@ -328,7 +318,7 @@ public class Vagabond : CharacterController
     private void ProcessSkile()
     {
         Debug.Log("E");
-        ChangeState(Define.State.NormalSkill_01);
+        stateMachine.ChangeState(new VagabondSkillState());
     }
     #endregion 
 
@@ -336,7 +326,7 @@ public class Vagabond : CharacterController
     private void ProcessUltimateSkile()
     {
         Debug.Log("Q");
-        ChangeState(Define.State.UltimateSkill_01);
+        stateMachine.ChangeState(new VagabondUltimateState());
     }
     #endregion 
 
@@ -353,7 +343,7 @@ public class Vagabond : CharacterController
     private IEnumerator DashCoroutine()
     {
         characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
-        ChangeState(Define.State.Dodge);  // 상태를 Dodge로 변경
+        stateMachine.ChangeState(new VagabondDodgeState());
 
         float startTime = Time.time;
 
@@ -395,19 +385,9 @@ public class Vagabond : CharacterController
 
     private void OnEndEvent()
     {
-        // 대시 후 이동 입력 확인
-        if (moveDirection.magnitude > 0)
-        {
-            // 이동 방향이 있으면 달리기 상태로 전환 (Shift 누를 시 달리기)
-            ChangeState(Input.GetKey(KeyCode.LeftShift) ? Define.State.Runing : Define.State.Moving);
-        }
-        else
-        {
-            // 이동 입력이 없으면 Idle 상태로 전환
-            // ChangeState(Define.State.currentWeaponIdle);
-            ChangeState(Define.State.Idle);
+     
+        stateMachine.ChangeState(new VagabondUltimateState());
             
-        }
     }
 
     public void FrontAttack()
