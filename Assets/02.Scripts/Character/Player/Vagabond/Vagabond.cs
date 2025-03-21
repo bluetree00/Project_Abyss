@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Game.CharacterStates;
+
+using Game.CharacterStates.VagabondStates;
 
 using Cinemachine;
 using System.ComponentModel;
@@ -18,10 +21,12 @@ public class Vagabond : CharacterController
     private bool isInventoryOpen = false; // 인벤토리 열림 상태
     private bool isInputLocked = false;
     private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
-
+    
+    protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     protected override void Init()
     {
         base.Init(); // 부모 클래스의 초기화 코드 호출
+        stateMachine.Setup(this, new VagabondIdleState());
         //currentWeapon = weaponContainer.currentWeapon; // 현재 무기 정보를 초기화
         //Managers.UI.ShowSceneUI<UI_Inven>();
     }
@@ -63,12 +68,13 @@ public class Vagabond : CharacterController
             return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
         }
 
-        Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
+        //Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
         CheckMovementInput();
         UpdateMovement();
         FreezeRotation();
+        stateMachine.Update();
        
         // 공격 콤보 시간이 다 지나면 초기화
         if (characterData.comboTimer > 0)
@@ -100,6 +106,7 @@ public class Vagabond : CharacterController
         if (Input.GetMouseButtonDown(0))
         {
             ProcessAttack();
+
         }
 
         // 키보드 E 입력 (기본 스킬)
@@ -218,22 +225,11 @@ public class Vagabond : CharacterController
 
     #endregion
 
-    // 특정 상태일 때 입력을 처리하지 않도록 설정
-    private readonly Define.State[] BusyStates = {
-        Define.State.NormalAttack_01,
-        Define.State.NormalAttack_02,
-        Define.State.NormalAttack_03,
-        Define.State.NormalSkill_01,
-        Define.State.UltimateSkill_01,
-        Define.State.Dodge,
-        Define.State.ChangeWeapon,
-        Define.State.JumpAttack,
-    };
-
     private bool CanProcessInput()
     {
-        return !Array.Exists(BusyStates, state => State == state);
+        return !(stateMachine.CurrentState?.BlocksInput ?? false);
     }
+
 
     #region 기본 WASD 이동 관련 코드
     private void CheckMovementInput()
@@ -300,19 +296,19 @@ public class Vagabond : CharacterController
         if (characterData.attackComboStep == 1)
         {
             Debug.Log("첫 번째 공격");
-            ChangeState(Define.State.NormalAttack_01);
+            stateMachine.ChangeState(new VagabondAttack_01());
         //    Managers.UI.ShowAugmentChoiceUI(null);
           
         }
         else if (characterData.attackComboStep == 2)
         {
             Debug.Log("두 번째 공격");
-            ChangeState(Define.State.NormalAttack_02);
+            stateMachine.ChangeState(new VagabondAttack_02());
         }
         else if (characterData.attackComboStep == 3)
         {
             Debug.Log("세 번째 공격");
-            ChangeState(Define.State.NormalAttack_03);
+            stateMachine.ChangeState(new VagabondAttack_03());
             characterData.attackComboStep = 0; // 마지막 공격 후 초기화
             characterData.comboTimer = 0;
         }
@@ -390,21 +386,10 @@ public class Vagabond : CharacterController
 
 
     #endregion
+
+
 /*
-    #region 특성 (스탯) 처리
-        private void OnTriggerEnter(Collider other) {
 
-            //충돌한 오브젝트 태그 확인
-            string otherTag = other.tag;
-
-            //태그에 따른 특성 증가(점진적 감소) 처리
-            characterData.ApplyBoostByTag(this, otherTag);
-
-            //충돌한 오브젝트 제거
-            if (otherTag == "APBoost" || otherTag == "MSBoost")
-                Destroy(other.gameObject);
-        }
-    #endregion
 */
     #region 애니메이션 이벤트 처리
 
