@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Game.CharacterStates;
+using Game.CharacterStates.States;
 
 public class CharacterController : MonoBehaviour
 {
@@ -14,6 +16,7 @@ public class CharacterController : MonoBehaviour
     [SerializeField]
     protected WeaponData currentWeapon;
     protected Animator anim;
+    public Animator Anim => anim; 
     protected Vector3 moveDirection;  // 이동 방향
 
     [SerializeField]
@@ -28,6 +31,9 @@ public class CharacterController : MonoBehaviour
     [SerializeField]
     protected Rigidbody rb;  // Rigidbody 참조
     public Transform playerTransform; // 플레이어의 Transform을 할당
+
+    protected StateMachine<CharacterController> stateMachine;
+
 
 
     // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
@@ -46,10 +52,6 @@ public class CharacterController : MonoBehaviour
         // string characterName = gameObject.name;
         string characterName = gameObject.name.Replace("(Clone)", ""); 
         anim = GetComponent<Animator>();
-
-        //NOTE: 리소스 로드를 AddressablesManager를 통해 하도록 변경
-        //characterData = Managers.Resource.Load<CharacterData>($"Data/PlayerData/{characterName}");
-        //weaponContainer = Managers.Resource.Load<WeaponContainer>($"Data/Container/{Define.GetCharacterClassString(characterName)}");
 
         LoadCharacterData(characterName, () =>
         {
@@ -199,15 +201,12 @@ public class CharacterController : MonoBehaviour
                    break;
                 case Define.State.NormalAttack_01:
                     NormalAttack(1);
-                    // anim.CrossFade("NormalAttack_01", 0.1f);
                    break;
                 case Define.State.NormalAttack_02:
                     NormalAttack(2);
-                    // anim.CrossFade("NormalAttack_02", 0.1f);
                    break;
                 case Define.State.NormalAttack_03:
                     NormalAttack(3);
-                    // anim.CrossFade("NormalAttack_03", 0.1f);
                    break;
                 case Define.State.NormalSkill_01:
                     anim.CrossFade("NormalSkile_01", 0.1f);
@@ -219,7 +218,7 @@ public class CharacterController : MonoBehaviour
         }
     }
 
-    private void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
+    public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
     {
         if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
         {
