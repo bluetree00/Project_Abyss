@@ -12,8 +12,7 @@ public class CharacterController : MonoBehaviour
     protected  CharacterData characterData; // CharacterData ScriptableObject 참조
     public CharacterData CharacterData { get { return characterData; } }
     [SerializeField]
-    protected WeaponContainer weaponContainer; // 무기 컨테이너 변수
-    public WeaponContainer WeaponContainer => weaponContainer;
+    public WeaponContainer weaponContainer; // 무기 컨테이너 변수 추후 상속 구조 변경
     [SerializeField]
     public WeaponData currentWeapon;
     protected Animator anim;
@@ -76,6 +75,8 @@ public class CharacterController : MonoBehaviour
                 LoadWeaponData("basic_Knight_01");
             });
         });
+
+        
         
     }
 
@@ -92,6 +93,8 @@ public class CharacterController : MonoBehaviour
             Debug.Log($"캐릭터 데이터({characterData.characterName})를 로드했습니다.");
             OnSuccess.Invoke();
             Managers.CharacterData.SetCharacterData(characterData);
+
+            characterData.canDodge = true;  // 대시 가능 여부 초기화
         });
     }
 
@@ -164,36 +167,30 @@ public class CharacterController : MonoBehaviour
     }
 
 
-    public string GetAttackAnimName(int index)
+
+    public string NormalAttack(int attackIndex)  // Return the animation name
+{
+    if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
     {
-        if (currentWeapon == null) return "";
-        if (index - 1 < 0 || index - 1 >= currentWeapon.weapon_Attack_AnimationName.Length)
-            return "";
-
-        return currentWeapon.weapon_Attack_AnimationName[index - 1];
-    }
-
-
-    public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
-    {
-        if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
+        string animationName = currentWeapon.weapon_Attack_AnimationName[attackIndex - 1];
+        if (!string.IsNullOrEmpty(animationName))
         {
-            if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
-            {
-                anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
-            }
-            else
-            {   
-                _state = Define.State.Idle;
-                Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
-            }
+            return animationName; // Return the animation name
         }
         else
-        {
-            Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
+        {   
             _state = Define.State.Idle;
+            Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
+            return null;
         }
     }
+    else
+    {
+        Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
+        _state = Define.State.Idle;
+        return null;
+    }
+}
 
      //상태별 업데이트 패턴
     protected virtual void Update()

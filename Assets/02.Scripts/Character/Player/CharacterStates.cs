@@ -12,8 +12,8 @@ namespace Game.CharacterStates.States
             Debug.Log($"{typeof(T).Name} - Idle 상태 진입");
 
             // 무기 장착 여부 및 애니메이션 이름에 따라 애니메이션 설정
-            if (owner.WeaponContainer != null &&
-                owner.WeaponContainer.isWeaponEquipped &&
+            if (owner.weaponContainer != null &&
+                owner.weaponContainer.isWeaponEquipped &&
                 owner.currentWeapon != null &&
                 !string.IsNullOrEmpty(owner.currentWeapon.weapon_Idle_AnimationName))
             {
