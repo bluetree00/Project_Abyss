@@ -278,34 +278,63 @@ public class Vagabond : CharacterController
     #endregion
 
     #region 마우스 좌클릭 공격 관련 코드
+    // private void ProcessAttack()
+    // {
+    //     characterData.comboTimer = characterData.comboDuration; // 콤보 타이머 초기화
+    //     characterData.attackComboStep++; // 콤보 스택 증가
+
+    //     if (characterData.attackComboStep == 1)
+    //     {
+    //         Debug.Log("첫 번째 공격");
+    //         stateMachine.ChangeState(new VagabondAttack_01());
+    
+    //     //    Managers.UI.ShowAugmentChoiceUI(null);
+          
+    //     }
+    //     else if (characterData.attackComboStep == 2)
+    //     {
+    //         Debug.Log("두 번째 공격");
+    //         stateMachine.ChangeState(new VagabondAttack_02());
+            
+    //     }
+    //     else if (characterData.attackComboStep == 3)
+    //     {
+    //         Debug.Log("세 번째 공격");
+    //         stateMachine.ChangeState(new VagabondAttack_03());
+           
+    //         characterData.attackComboStep = 0; // 마지막 공격 후 초기화
+    //         characterData.comboTimer = 0;
+    //     }
+    // }
+
     private void ProcessAttack()
     {
-        characterData.comboTimer = characterData.comboDuration; // 콤보 타이머 초기화
-        characterData.attackComboStep++; // 콤보 스택 증가
+  
 
-        if (characterData.attackComboStep == 1)
+        characterData.comboTimer = characterData.comboDuration;
+        characterData.attackComboStep++;
+
+        // 현재 무기의 최대 콤보 수를 초과했는지 확인
+        if (characterData.attackComboStep > currentWeapon.maxComboCount)
         {
-            Debug.Log("첫 번째 공격");
-            stateMachine.ChangeState(new VagabondAttack_01());
-            Anim.CrossFade("NormalAttack_01", 0.1f);
-        //    Managers.UI.ShowAugmentChoiceUI(null);
-          
+            characterData.attackComboStep = 1;
         }
-        else if (characterData.attackComboStep == 2)
+
+        // 애니메이션 이름 가져오기
+        string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
+        Debug.Log($"공격 {characterData.attackComboStep}: {animName}");
+
+        // 상태 전환
+        stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
+        
+        // 마지막 콤보라면 초기화 미리 예약
+        if (characterData.attackComboStep == currentWeapon.maxComboCount)
         {
-            Debug.Log("두 번째 공격");
-            stateMachine.ChangeState(new VagabondAttack_02());
-            
-        }
-        else if (characterData.attackComboStep == 3)
-        {
-            Debug.Log("세 번째 공격");
-            stateMachine.ChangeState(new VagabondAttack_03());
-           
-            characterData.attackComboStep = 0; // 마지막 공격 후 초기화
+            characterData.attackComboStep = 0;
             characterData.comboTimer = 0;
         }
     }
+
 
     private void ResetCombo()
     {

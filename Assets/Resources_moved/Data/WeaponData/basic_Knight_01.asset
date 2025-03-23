@@ -15,6 +15,15 @@ MonoBehaviour:
   weaponName: test
   attackPower: 10
   description: 
+  normalAttackAnimations:
+  - NormalAttack_01
+  - NormalAttack_02
+  - NormalAttack_03
+  maxComboCount: 3
+  comboEndTimes:
+  - 1
+  - 1
+  - 1
   hasSpecialEffect: 0
   specialEffectDescription: 
   bonusDamage: 0
