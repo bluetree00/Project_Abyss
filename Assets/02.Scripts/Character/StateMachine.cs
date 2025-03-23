@@ -26,6 +26,14 @@ namespace Game.CharacterStates
     {
         if (newState == null) return;
 
+        // 동일 타입의 상태이며 반복이 허용되지 않으면 전환 막기
+        if (currentState != null &&
+            currentState.GetType() == newState.GetType() &&
+            !newState.CanRepeat)
+        {
+            return;
+        }
+
         currentState?.Exit(ownerEntity);
         previousState = currentState;
         currentState = newState;

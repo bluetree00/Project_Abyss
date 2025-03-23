@@ -174,26 +174,26 @@ public class CharacterController : MonoBehaviour
     }
 
 
-    // public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
-    // {
-    //     if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
-    //     {
-    //         if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
-    //         {
-    //             anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
-    //         }
-    //         else
-    //         {   
-    //             _state = Define.State.Idle;
-    //             Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
-    //         }
-    //     }
-    //     else
-    //     {
-    //         Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
-    //         _state = Define.State.Idle;
-    //     }
-    // }
+    public void NormalAttack(int attackIndex)  //NOTE: 편의를 위해 매개변수를 1부터 시작하도록 설정
+    {
+        if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
+        {
+            if (currentWeapon.weapon_Attack_AnimationName[attackIndex - 1] != "")
+            {
+                anim.CrossFade($"{currentWeapon.weapon_Attack_AnimationName[attackIndex - 1]}", 0.1f);
+            }
+            else
+            {   
+                _state = Define.State.Idle;
+                Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
+            }
+        }
+        else
+        {
+            Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
+            _state = Define.State.Idle;
+        }
+    }
 
      //상태별 업데이트 패턴
     protected virtual void Update()
