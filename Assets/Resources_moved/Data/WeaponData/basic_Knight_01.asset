@@ -30,11 +30,13 @@ MonoBehaviour:
   E_SkillEffectName: []
   weaponObjName: basic_Knight_02
   weapon_Idle_AnimationName: 
-  weapon_Attack_AnimationName:
+  weapon_ChangeWeapon_AnimationName: Test_Sword_ChangeAction
+  normalAttackAnimations:
   - NormalAttack_01
   - NormalAttack_02
   - NormalAttack_03
-  weapon_Run_AnimationName: 
-  weapon_Hit_AnimationName: 
-  weapon_Die_AnimationName: 
-  weapon_ChangeWeapon_AnimationName: Test_Sword_ChangeAction
+  maxComboCount: 3
+  comboEndTimes:
+  - 0.6
+  - 0.6
+  - 1

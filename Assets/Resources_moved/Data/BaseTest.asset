@@ -33,3 +33,7 @@ MonoBehaviour:
     resourcePath: Laser
     initialSize: 5
     poolType: 0
+  - tag: FrontAttack
+    resourcePath: FrontAttack
+    initialSize: 5
+    poolType: 0
