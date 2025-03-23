@@ -16,22 +16,21 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-    public class VagabondIdleState : IdleState<Vagabond>
+    public class VagabondIdleState : State<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            base.Enter(owner);
-            // 베가본드 전용 Idle 로직
+            owner.Anim.CrossFade("Idle", 0.2f);
         }
 
         public override void Execute(Vagabond owner)
         {
-            base.Execute(owner);
+ 
         }
 
         public override void Exit(Vagabond owner)
         {
-            base.Exit(owner);
+            
         }
     }
 
@@ -104,23 +103,22 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Enter(Vagabond owner)
         {
-            _blocksInput = true; // 상태 진입 시 입력 막기
-            var animName = owner.GetAttackAnimName(1);
-            if (!string.IsNullOrEmpty(animName))
-                owner.Anim.CrossFade(animName, 0.1f);
-            else
-                Debug.LogWarning("공격 애니메이션이 없습니다.");
+           // _blocksInput = true; // 입력 받기 차단
+           _blocksInput = true;
+            owner.Anim.CrossFade("NormalAttack_01", 0.1f);
+            Debug.Log("NormalAttack_01");
+        
+      
         }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, owner.GetAttackAnimName(1), 0.95f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_01", 0.6f))
             {
-                _blocksInput = false; // 이제 입력 받기 허용
+              _blocksInput = false; // 이제 입력 받기 허용
             }
         }
-
         public override void Exit(Vagabond owner)
         {
             _blocksInput = false; // 상태 종료 시 확실히 입력 허용
@@ -133,25 +131,24 @@ namespace Game.CharacterStates.VagabondStates
          private bool _blocksInput = false;
         public override bool BlocksInput => _blocksInput;
 
-        public override void Enter(Vagabond owner)
+       public override void Enter(Vagabond owner)
         {
-            _blocksInput = true; // 상태 진입 시 입력 막기
-            var animName = owner.GetAttackAnimName(2);
-            if (!string.IsNullOrEmpty(animName))
-                owner.Anim.CrossFade(animName, 0.1f);
-            else
-                Debug.LogWarning("공격 애니메이션이 없습니다.");
-        }
+           // _blocksInput = true; // 입력 받기 차단
+           _blocksInput = true;
+            owner.Anim.CrossFade("NormalAttack_02", 0.1f);
 
+      
+        }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, owner.GetAttackAnimName(2), 0.95f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_02", 0.6f))
             {
-                _blocksInput = false; // 이제 입력 받기 허용
+              _blocksInput = false; // 이제 입력 받기 허용
             }
         }
+
         public override void Exit(Vagabond owner) { }
     }
 
@@ -160,24 +157,24 @@ namespace Game.CharacterStates.VagabondStates
         private bool _blocksInput = false;
         public override bool BlocksInput => _blocksInput;
 
-        public override void Enter(Vagabond owner)
+       public override void Enter(Vagabond owner)
         {
-            _blocksInput = true; // 상태 진입 시 입력 막기
-            var animName = owner.GetAttackAnimName(3);
-            if (!string.IsNullOrEmpty(animName))
-                owner.Anim.CrossFade(animName, 0.1f);
-            else
-                Debug.LogWarning("공격 애니메이션이 없습니다.");
+           // _blocksInput = true; // 입력 받기 차단
+           _blocksInput = true;
+            owner.Anim.CrossFade("NormalAttack_03", 0.1f);
+        
+
         }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, owner.GetAttackAnimName(3), 0.95f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_03", 0.8f))
             {
-                _blocksInput = false; // 이제 입력 받기 허용
+              _blocksInput = false; // 이제 입력 받기 허용
             }
         }
+
         public override void Exit(Vagabond owner) { }
     }
 

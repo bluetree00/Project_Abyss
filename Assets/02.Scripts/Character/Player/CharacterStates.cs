@@ -41,13 +41,12 @@ namespace Game.CharacterStates.States
     {
         public override void Enter(T owner)
         {
-           
+             owner.Anim?.CrossFade("Moving", 0.1f);
         }
 
         public override void Execute(T owner)
         {
             // owner.Move(owner.moveDirection, owner.CharacterData.baseMoveSpeed);
-            owner.Anim?.CrossFade("Moving", 0.1f);
         }
 
         public override void Exit(T owner) { }

@@ -71,7 +71,7 @@ public class Vagabond : CharacterController
             return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
         }
 
-        //Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
+        Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
 
         base.Update();
         CheckMovementInput();
@@ -100,10 +100,9 @@ public class Vagabond : CharacterController
             ProcessDodge();
         }
 
-        if (!CanProcessInput())
-            return;
+         if (!CanProcessInput())
+             return;
         
-        // CheckMovementInput();
 
         // 마우스 좌클릭으로 공격 시작
         if (Input.GetMouseButtonDown(0))
@@ -230,6 +229,7 @@ public class Vagabond : CharacterController
 
     private bool CanProcessInput()
     {
+        
         return !(stateMachine.CurrentState?.BlocksInput ?? false);
     }
 
@@ -256,7 +256,7 @@ public class Vagabond : CharacterController
 
     protected void UpdateMovement()
     {
-        if (!CanProcessInput())
+         if (!CanProcessInput())
             return;
 
         if (moveDirection.magnitude > 0)
@@ -287,6 +287,7 @@ public class Vagabond : CharacterController
         {
             Debug.Log("첫 번째 공격");
             stateMachine.ChangeState(new VagabondAttack_01());
+            Anim.CrossFade("NormalAttack_01", 0.1f);
         //    Managers.UI.ShowAugmentChoiceUI(null);
           
         }
@@ -294,11 +295,13 @@ public class Vagabond : CharacterController
         {
             Debug.Log("두 번째 공격");
             stateMachine.ChangeState(new VagabondAttack_02());
+            
         }
         else if (characterData.attackComboStep == 3)
         {
             Debug.Log("세 번째 공격");
             stateMachine.ChangeState(new VagabondAttack_03());
+           
             characterData.attackComboStep = 0; // 마지막 공격 후 초기화
             characterData.comboTimer = 0;
         }
@@ -386,8 +389,18 @@ public class Vagabond : CharacterController
     private void OnEndEvent()
     {
      
-        stateMachine.ChangeState(new VagabondUltimateState());
-            
+        if (moveDirection.magnitude > 0)
+        {
+            // Shift 누르면 Run 상태로, 아니면 Move 상태로
+            if (Input.GetKey(KeyCode.LeftShift))
+                stateMachine.ChangeState(new VagabondRunState());
+            else
+                stateMachine.ChangeState(new VagabondMoveState());
+        }
+        else
+        {
+            stateMachine.ChangeState(new VagabondIdleState());
+        }
     }
 
     public void FrontAttack()
