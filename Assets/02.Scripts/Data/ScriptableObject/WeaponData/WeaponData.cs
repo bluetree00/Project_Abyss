@@ -33,6 +33,10 @@ public abstract class WeaponData : ScriptableObject
     public int attackPower;     // 무기 공격력
     public string description;  // 무기 설명
 
+    public string[] normalAttackAnimations;  // "Attack_01", "Attack_02", ...
+    public int maxComboCount;                // 콤보 최대 수 (배열과 연동 가능)
+    public float[] comboEndTimes;            // 각 공격 애니메이션의 endTime
+
     // 특수 효과 관련
     [Header("특수 효과")]
     public bool hasSpecialEffect;          // 특수 효과 여부

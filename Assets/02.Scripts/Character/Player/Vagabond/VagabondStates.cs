@@ -197,6 +197,41 @@ namespace Game.CharacterStates.VagabondStates
         public override void Exit(Vagabond owner) { }
     }
 
+    public class VagabondComboAttackState : State<Vagabond>
+    {
+        private readonly string animationName;
+        private bool _blocksInput = true;
+
+        public override bool BlocksInput => _blocksInput;
+
+        public VagabondComboAttackState(string animationName, int comboStep)
+        {
+            this.animationName = animationName;
+        }
+
+        public override void Enter(Vagabond owner)
+        {
+            owner.Anim.CrossFade(animationName, 0.1f);
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            int index = Mathf.Clamp(owner.CharacterData.attackComboStep - 1, 0, owner.currentWeapon.comboEndTimes.Length - 1);
+            float endTime = owner.currentWeapon.comboEndTimes[index];
+
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, animationName, endTime))
+            {
+                _blocksInput = false;
+            }
+        }
+
+        public override void Exit(Vagabond owner)
+        {
+            _blocksInput = false;
+        }
+    }
+
+
     public class VagabondChangeWeaponState : State<Vagabond>
 {
     public override bool BlocksInput => true;
