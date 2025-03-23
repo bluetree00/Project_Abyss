@@ -15,6 +15,11 @@ MonoBehaviour:
   weaponName: test2
   attackPower: 0
   description: 
+  normalAttackAnimations:
+  - HammerAttack
+  maxComboCount: 1
+  comboEndTimes:
+  - 1
   hasSpecialEffect: 0
   specialEffectDescription: 
   bonusDamage: 0
