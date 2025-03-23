@@ -6,7 +6,7 @@ namespace Game.CharacterStates.VagabondStates
 {
     
     public static class AnimationHelper // 애니메이션 도우미 클래스 예시 : if (AnimationHelper.IsAnimationFinished(owner.Anim, "Attack_01")) 후에 체크크
-    {
+    {                                   // 이 값의 endtime 또한 변수로 가져와서 매개변수에 자동으로 들어가도록 추후 변경
         public static bool IsAnimationFinished(Animator anim, string animationName, float endTime = 0.95f, int layer = 0)
         {
             if (anim == null) return false;
@@ -21,6 +21,17 @@ namespace Game.CharacterStates.VagabondStates
         public override void Enter(Vagabond owner)
         {
             owner.Anim.CrossFade("Idle", 0.2f);
+
+            if (owner.weaponContainer != null && 
+                    owner.weaponContainer.isWeaponEquipped && 
+                    owner.currentWeapon.weapon_Idle_AnimationName != "")
+                    {   
+                        owner.Anim.CrossFade($"{owner.currentWeapon.weapon_Idle_AnimationName}", 0.1f);
+                    }
+                    else
+                    {
+                        owner.Anim.CrossFade("Idle", 0.2f);
+                    } 
         }
 
         public override void Execute(Vagabond owner)
@@ -77,16 +88,22 @@ namespace Game.CharacterStates.VagabondStates
     // Dodge
     public class VagabondDodgeState : State<Vagabond>
     {
-        public override bool BlocksInput => false;
+        private bool _blocksInput = false;
+        public override bool BlocksInput => _blocksInput;
 
         public override void Enter(Vagabond owner)
         {
+            _blocksInput = true;
             owner.Anim.CrossFade("Dodge", 0.1f);
         }
 
         public override void Execute(Vagabond owner)
         {
-            // 회피 중 처리
+            // 애니메이션 끝났는지 체크
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "Dodge", 0.6f))
+            {
+              _blocksInput = false; // 이제 입력 받기 허용
+            }
         }
 
         public override void Exit(Vagabond owner)
@@ -105,16 +122,16 @@ namespace Game.CharacterStates.VagabondStates
         {
            // _blocksInput = true; // 입력 받기 차단
            _blocksInput = true;
-            owner.Anim.CrossFade("NormalAttack_01", 0.1f);
-            Debug.Log("NormalAttack_01");
-        
+
+           owner.Anim.CrossFade($"{owner.NormalAttack(1)}", 0.1f);
+           
       
         }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_01", 0.6f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(1)}", 0.6f))
             {
               _blocksInput = false; // 이제 입력 받기 허용
             }
@@ -135,15 +152,16 @@ namespace Game.CharacterStates.VagabondStates
         {
            // _blocksInput = true; // 입력 받기 차단
            _blocksInput = true;
-            owner.Anim.CrossFade("NormalAttack_02", 0.1f);
 
+           owner.Anim.CrossFade($"{owner.NormalAttack(2)}", 0.1f);
+           
       
         }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_02", 0.6f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(2)}", 0.6f))
             {
               _blocksInput = false; // 이제 입력 받기 허용
             }
@@ -157,19 +175,20 @@ namespace Game.CharacterStates.VagabondStates
         private bool _blocksInput = false;
         public override bool BlocksInput => _blocksInput;
 
-       public override void Enter(Vagabond owner)
+      public override void Enter(Vagabond owner)
         {
            // _blocksInput = true; // 입력 받기 차단
            _blocksInput = true;
-            owner.Anim.CrossFade("NormalAttack_03", 0.1f);
-        
 
+           owner.Anim.CrossFade($"{owner.NormalAttack(3)}", 0.1f);
+           
+      
         }
 
         public override void Execute(Vagabond owner)
         {
             // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, "NormalAttack_03", 0.8f))
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(3)}", 0.9f))
             {
               _blocksInput = false; // 이제 입력 받기 허용
             }

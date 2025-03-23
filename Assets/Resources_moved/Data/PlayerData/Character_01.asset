@@ -17,10 +17,10 @@ MonoBehaviour:
   baseRunSpeed: 8
   maxHealth: 0
   attackPower: 10
-  attackComboStep: 2
-  comboTimer: 2.8767748
+  attackComboStep: 0
+  comboTimer: 0
   comboDuration: 3
-  canDodge: 1
+  canDodge: 0
   dashSpeed: 10
   dashDuration: 0.2
   dodgeCooldown: 2
@@ -28,3 +28,5 @@ MonoBehaviour:
   attackPowerBoostDuration: 10
   moveSpeedBoostAmount: 10
   moveSpeedBoostDuration: 3
+  equippedWeapon: {fileID: 0}
+  conClass: 0

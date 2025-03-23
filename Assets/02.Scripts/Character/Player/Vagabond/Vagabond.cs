@@ -347,6 +347,7 @@ public class Vagabond : CharacterController
     {
         characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
         stateMachine.ChangeState(new VagabondDodgeState());
+        Debug.Log("대시");
 
         float startTime = Time.time;
 
