@@ -167,46 +167,11 @@ public class CharacterController : MonoBehaviour
     }
 
 
-
-    public string NormalAttack(int attackIndex)  // Return the animation name
-{
-    if (currentWeapon != null && attackIndex >= 1 && attackIndex - 1 < currentWeapon.weapon_Attack_AnimationName.Length)
-    {
-        string animationName = currentWeapon.weapon_Attack_AnimationName[attackIndex - 1];
-        if (!string.IsNullOrEmpty(animationName))
-        {
-            return animationName; // Return the animation name
-        }
-        else
-        {   
-            _state = Define.State.Idle;
-            Debug.Log("해당 무기의 공격 애니메이션이 없습니다.");
-            return null;
-        }
-    }
-    else
-    {
-        Debug.Log("무기가 장착되어 있지 않거나 공격 인덱스가 잘못되었습니다.");
-        _state = Define.State.Idle;
-        return null;
-    }
-}
-
      //상태별 업데이트 패턴
     protected virtual void Update()
     {
 
     }
 
-    // protected virtual void UpdateMovement(){}
-    // protected virtual void UpdateIdle(){}  // Idle 상태에서의 로직
-    // protected virtual void UpdateMoving(){}  // Moving 상태에서의 로직
-    // protected virtual void UpdateRuning(){}  // Runing 상태에서의 로직
-    // protected virtual void UpdateDodge(){}  // Dodge 상태에서의 로직
-    // protected virtual void UpdateNormalAttack_01(){}  // NormalAttack_01 상태에서의 로직
-    // protected virtual void UpdateNormalAttack_02(){}  // NormalAttack_02 상태에서의 로직
-    // protected virtual void UpdateNormalAttack_03(){}  // NormalAttack_03 상태에서의 로직
-    // protected virtual void UpdateNormalSkile_01(){}  // NormalSkile_01 상태에서의 로직
-    // protected virtual void UpdateUltimateSkile_01(){}  // UltimateSkile_01 상태에서의 로직
 
 }

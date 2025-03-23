@@ -112,90 +112,6 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-    // Attack
-    public class VagabondAttack_01 : State<Vagabond>
-    {
-        private bool _blocksInput = false;
-        public override bool BlocksInput => _blocksInput;
-
-        public override void Enter(Vagabond owner)
-        {
-           // _blocksInput = true; // 입력 받기 차단
-           _blocksInput = true;
-
-           owner.Anim.CrossFade($"{owner.NormalAttack(1)}", 0.1f);
-           
-      
-        }
-
-        public override void Execute(Vagabond owner)
-        {
-            // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(1)}", 0.6f))
-            {
-              _blocksInput = false; // 이제 입력 받기 허용
-            }
-        }
-        public override void Exit(Vagabond owner)
-        {
-            _blocksInput = false; // 상태 종료 시 확실히 입력 허용
-        }
-    }
-
-
-    public class VagabondAttack_02 : State<Vagabond>
-    {
-         private bool _blocksInput = false;
-        public override bool BlocksInput => _blocksInput;
-
-       public override void Enter(Vagabond owner)
-        {
-           // _blocksInput = true; // 입력 받기 차단
-           _blocksInput = true;
-
-           owner.Anim.CrossFade($"{owner.NormalAttack(2)}", 0.1f);
-           
-      
-        }
-
-        public override void Execute(Vagabond owner)
-        {
-            // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(2)}", 0.6f))
-            {
-              _blocksInput = false; // 이제 입력 받기 허용
-            }
-        }
-
-        public override void Exit(Vagabond owner) { }
-    }
-
-    public class VagabondAttack_03 : State<Vagabond>
-    {
-        private bool _blocksInput = false;
-        public override bool BlocksInput => _blocksInput;
-
-      public override void Enter(Vagabond owner)
-        {
-           // _blocksInput = true; // 입력 받기 차단
-           _blocksInput = true;
-
-           owner.Anim.CrossFade($"{owner.NormalAttack(3)}", 0.1f);
-           
-      
-        }
-
-        public override void Execute(Vagabond owner)
-        {
-            // 애니메이션 끝났는지 체크
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, $"{owner.NormalAttack(3)}", 0.9f))
-            {
-              _blocksInput = false; // 이제 입력 받기 허용
-            }
-        }
-
-        public override void Exit(Vagabond owner) { }
-    }
 
     public class VagabondComboAttackState : State<Vagabond>
     {
@@ -203,6 +119,8 @@ namespace Game.CharacterStates.VagabondStates
         private bool _blocksInput = true;
 
         public override bool BlocksInput => _blocksInput;
+
+         private readonly int comboIndex;
 
         public VagabondComboAttackState(string animationName, int comboStep)
         {
@@ -222,6 +140,14 @@ namespace Game.CharacterStates.VagabondStates
             if (AnimationHelper.IsAnimationFinished(owner.Anim, animationName, endTime))
             {
                 _blocksInput = false;
+
+                    // 마지막 콤보일 경우 여기서만 초기화!
+                if (comboIndex == owner.currentWeapon.maxComboCount)
+                {
+                    owner.CharacterData.attackComboStep = 0;
+                    owner.CharacterData.comboTimer = 0;
+                    owner.StateMachine.ChangeState(new VagabondIdleState());
+                }
             }
         }
 
