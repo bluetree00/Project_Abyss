@@ -33,10 +33,6 @@ public abstract class WeaponData : ScriptableObject
     public int attackPower;     // 무기 공격력
     public string description;  // 무기 설명
 
-    public string[] normalAttackAnimations;  // "Attack_01", "Attack_02", ...
-    public int maxComboCount;                // 콤보 최대 수 (배열과 연동 가능)
-    public float[] comboEndTimes;            // 각 공격 애니메이션의 endTime
-
     // 특수 효과 관련
     [Header("특수 효과")]
     public bool hasSpecialEffect;          // 특수 효과 여부
@@ -78,26 +74,16 @@ public abstract class WeaponData : ScriptableObject
     // 무기에 해당하는 애니메이션 이름
     [Header("무기 애니메이션")]
     public string weapon_Idle_AnimationName;
-    public string[] weapon_Attack_AnimationName = new string[3];
-    public string weapon_Run_AnimationName;
-    public string weapon_Hit_AnimationName;
-    public string weapon_Die_AnimationName;
     public string weapon_ChangeWeapon_AnimationName;
+    public string[] normalAttackAnimations;  // "Attack_01", "Attack_02", ...
+    public int maxComboCount;                // 콤보 최대 수 (배열과 연동 가능)
+    public float[] comboEndTimes;            // 각 공격 애니메이션의 endTime
 
     // Q 스킬 추상함수
     public abstract void QSkill(); // Q 스킬 추상함수
     
     // E 스킬 추상함수
     public abstract void ESkill(); // E 스킬 추상함수
-
-
-    
-
-
-
-
-
-
 
 
     // 공격력 증가 계산

@@ -278,34 +278,6 @@ public class Vagabond : CharacterController
     #endregion
 
     #region 마우스 좌클릭 공격 관련 코드
-    // private void ProcessAttack()
-    // {
-    //     characterData.comboTimer = characterData.comboDuration; // 콤보 타이머 초기화
-    //     characterData.attackComboStep++; // 콤보 스택 증가
-
-    //     if (characterData.attackComboStep == 1)
-    //     {
-    //         Debug.Log("첫 번째 공격");
-    //         stateMachine.ChangeState(new VagabondAttack_01());
-    
-    //     //    Managers.UI.ShowAugmentChoiceUI(null);
-          
-    //     }
-    //     else if (characterData.attackComboStep == 2)
-    //     {
-    //         Debug.Log("두 번째 공격");
-    //         stateMachine.ChangeState(new VagabondAttack_02());
-            
-    //     }
-    //     else if (characterData.attackComboStep == 3)
-    //     {
-    //         Debug.Log("세 번째 공격");
-    //         stateMachine.ChangeState(new VagabondAttack_03());
-           
-    //         characterData.attackComboStep = 0; // 마지막 공격 후 초기화
-    //         characterData.comboTimer = 0;
-    //     }
-    // }
 
     private void ProcessAttack()
     {
@@ -327,12 +299,6 @@ public class Vagabond : CharacterController
         // 상태 전환
         stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
         
-        // 마지막 콤보라면 초기화 미리 예약
-        if (characterData.attackComboStep == currentWeapon.maxComboCount)
-        {
-            characterData.attackComboStep = 0;
-            characterData.comboTimer = 0;
-        }
     }
 
 
@@ -404,34 +370,12 @@ public class Vagabond : CharacterController
         characterData.canDodge = true;  // 다시 대시 가능하도록 설정
     }
 
-
-
-
-
     #endregion
-
 
 /*
 
 */
-    #region 애니메이션 이벤트 처리
-
-    private void OnEndEvent()
-    {
-     
-        if (moveDirection.magnitude > 0)
-        {
-            // Shift 누르면 Run 상태로, 아니면 Move 상태로
-            if (Input.GetKey(KeyCode.LeftShift))
-                stateMachine.ChangeState(new VagabondRunState());
-            else
-                stateMachine.ChangeState(new VagabondMoveState());
-        }
-        else
-        {
-            stateMachine.ChangeState(new VagabondIdleState());
-        }
-    }
+    #region 애니메이션 이벤트 처리  ////////// 전무 무기에서 생성 타이밍 조절 가능하기에 안써도 됨.
 
     public void FrontAttack()
     {
