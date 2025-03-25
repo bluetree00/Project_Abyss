@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class EvilMageMonster : MonsterBaseController
+public class EvilMageMonster : MonsterController
 {
     // 예시: SpecterMonster는 Define.MonsterType.Specter로 식별
     protected override Define.MonsterType MonsterTypeIdentifier => Define.MonsterType.Specter;
@@ -11,14 +11,14 @@ public class EvilMageMonster : MonsterBaseController
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임 저장
     private float _nextAttackTime = 0.0f; // 다음 공격 가능 시간
 
-    protected override void UpdateIdle()
+    protected  void UpdateIdle()
     {
         // 씬 내의 MonsterBaseController 컴포넌트를 가진 모든 오브젝트를 찾습니다.
-        MonsterBaseController[] candidates = GameObject.FindObjectsOfType<MonsterBaseController>();
-        MonsterBaseController target = null;
+        MonsterController[] candidates = GameObject.FindObjectsOfType<MonsterController>();
+        MonsterController target = null;
         float minDistance = float.MaxValue;
 
-        foreach (MonsterBaseController candidate in candidates)
+        foreach (MonsterController candidate in candidates)
         {
             // 자기 자신은 제외
             if (candidate == this)
@@ -36,7 +36,7 @@ public class EvilMageMonster : MonsterBaseController
         if (target != null && minDistance <= MonsterData._scacRange)
         {
             _lockTarget = target.gameObject;
-            State = Define.MonsterState.Moving;
+         
             return;
         }
         
@@ -49,12 +49,12 @@ public class EvilMageMonster : MonsterBaseController
         if (playerDistance <= MonsterData._scacRange)
         {
             _lockTarget = player;
-            State = Define.MonsterState.Moving;
+    
             return;
         }
     }
 
-    protected override void UpdateMoving()
+    protected  void UpdateMoving()
     {
         if (_lockTarget != null)
         {
@@ -65,7 +65,7 @@ public class EvilMageMonster : MonsterBaseController
             {
                 NavMeshAgent nma = GetComponent<NavMeshAgent>();
                 nma.SetDestination(transform.position);
-                State = Define.MonsterState.NormalAttack_01;
+            
                 return;
             }
         }
@@ -73,7 +73,7 @@ public class EvilMageMonster : MonsterBaseController
         Vector3 dir = _destPos - transform.position;
         if (dir.magnitude < 0.1f)
         {
-            State = Define.MonsterState.Idle;
+         
         }
         else
         {
@@ -84,7 +84,7 @@ public class EvilMageMonster : MonsterBaseController
         }
     }
 
-    protected override void UpdateNormalAttack_01()
+    protected  void UpdateNormalAttack_01()
     {
         if (_lockTarget != null)
         {
@@ -202,6 +202,6 @@ public class EvilMageMonster : MonsterBaseController
     void OnEndHitEvent()
     {
         // 공격 애니메이션 종료 시 호출되어 상태를 Idle로 전환
-        State = Define.MonsterState.Idle;
+       
     }  
 }

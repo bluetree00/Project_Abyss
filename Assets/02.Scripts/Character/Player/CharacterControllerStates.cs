@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Game.CharacterStates.States
+namespace Game.CharacterStates.CharacterControllerStates
 {
 
     // 기본 상속할 상태 클래스들
