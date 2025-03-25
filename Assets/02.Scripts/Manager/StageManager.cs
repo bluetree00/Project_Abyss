@@ -351,37 +351,10 @@ public class StageManager
         int nextIndex = (currentIndex + steps) % stageSequence.Count;
 
         //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
-        // 사용된 스테이지는 제외
-        //int loopCount = 0; // 무한 루프 방지를 위한 카운터
-        // while (nextIndex < stageSequence.Count && usedValues.Contains(stageUsageDictionary[stageSequence[nextIndex].startStageName]))
-        // {
-        //     nextIndex++;
-        //     if (nextIndex >= stageSequence.Count)
-        //     {
-        //         nextIndex -= stageSequence.Count;
-        //     }
-        //     loopCount++;
-        //     if (loopCount > stageSequence.Count)
-        //     {
-        //         Debug.LogWarning("다음 스테이지 진행 중 무한 루프 감지.");
-        //         loopCount = 0;
-        //         foreach (var key in stageUsageDictionary.Keys.ToList())
-        //         {
-        //             if (stageUsageDictionary[key] == 1)
-        //             {
-        //                 stageUsageDictionary[key] = 0; // 일반 스테이지 초기화
-        //             }
-        //             else if (stageUsageDictionary[key] == 4)
-        //             {
-        //                 stageUsageDictionary[key] = 3; // 이벤트 스테이지 초기화
-        //             }
-        //         }
-        //         break;
-        //     }
-        // }
+        //사용된 스테이지는 제외
         HashSet<int> usedValues = new HashSet<int> { 1, 3, 4 }; // 사용된 스테이지 값 집합
         int loopCount = 0; // 무한 루프 방지를 위한 카운터
-        int maxLoopCount = stageSequence.Count + 1; // 최대 루프 횟수 설정
+        int maxLoopCount = stageSequence.Count * 2; // 최대 루프 횟수 설정
         do
         {
             if (usedValues.Contains(stageUsageDictionary[stageSequence[nextIndex].startStageName]))
