@@ -77,7 +77,7 @@ public class StageManager
         }
 
         // 초기화된 딕셔너리의 모든 키와 밸류 값을 디버그 창에 표시
-        Debug.Log("<color=gray>Stage Usage Dictionary Initialized:</color>");
+        Debug.Log("<color=gray>스테이지 사용 딕셔너리 초기화됨:</color>");
         foreach (var kvp in stageUsageDictionary)
         {
             Debug.Log($"<color=gray>Stage: {kvp.Key}, Usage: {kvp.Value}</color>");
@@ -132,6 +132,10 @@ public class StageManager
 
                 // 스테이지 오브젝트 생성 및 부모 설정
                 //GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath], chapterParent.transform);
+                // stageObject.name = stage.stageName;
+                // stageObject.SetActive(false);
+                // stageDictionary[stage.stageName] = stageObject;
+                //-------------------------------------------------------------------------------------
                 AsyncOperationHandle<GameObject> handle = Addressables.InstantiateAsync(stage.resourcePath);
                 handle.WaitForCompletion();
                 if (handle.Status == AsyncOperationStatus.Succeeded)
@@ -146,9 +150,7 @@ public class StageManager
                 {
                     Debug.LogError($"Failed to instantiate stage: {stage.resourcePath}");
                 }
-                // stageObject.name = stage.stageName;
-                // stageObject.SetActive(false);
-                // stageDictionary[stage.stageName] = stageObject;
+                
             }
         }
     }
@@ -338,13 +340,15 @@ public class StageManager
             return;
         }
 
-        // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
-        int nextIndex = currentIndex + steps;
-        // nextIndex가 stageSequences의 범위보다 커지면 그 값만큼 빼줌
-        if (nextIndex >= stageSequence.Count)
-        {
-            nextIndex -= stageSequence.Count;
-        }
+        // // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
+        // int nextIndex = currentIndex + steps;
+        // // nextIndex가 stageSequences의 범위보다 커지면 그 값만큼 빼줌
+        // if (nextIndex >= stageSequence.Count)
+        // {
+        //     nextIndex -= stageSequence.Count;
+        // }
+
+        int nextIndex = (currentIndex + steps) % stageSequence.Count;
 
         //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
         // 사용된 스테이지는 제외
@@ -376,14 +380,24 @@ public class StageManager
         //     }
         // }
         HashSet<int> usedValues = new HashSet<int> { 1, 3, 4 }; // 사용된 스테이지 값 집합
+        int loopCount = 0; // 무한 루프 방지를 위한 카운터
+        int maxLoopCount = stageSequence.Count + 1; // 최대 루프 횟수 설정
         do
         {
             if (usedValues.Contains(stageUsageDictionary[stageSequence[nextIndex].startStageName]))
             {
-                nextIndex++;
-                if (nextIndex >= stageSequence.Count)
+                // nextIndex++;
+                // if (nextIndex >= stageSequence.Count)
+                // {
+                //     nextIndex -= stageSequence.Count;
+                // }
+                nextIndex = (nextIndex + 1) % stageSequence.Count;
+
+                loopCount++;
+                if (loopCount > maxLoopCount)
                 {
-                    nextIndex -= stageSequence.Count;
+                    Debug.LogWarning("다음 스테이지 진행 중 무한 루프 감지.");
+                    break;
                 }
             }
             else
@@ -392,12 +406,33 @@ public class StageManager
             }
         } while (true);
 
+        
+
         string nextStageName = stageSequence[nextIndex].startStageName;
 
         if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
         {
-            Debug.Log($"Moving to next stage: {nextStageName}");
-            ActivateStage(new Stage { stageName = nextStageName });
+            //Debug.Log($"Moving to next stage: {nextStageName}");
+            //ActivateStage(new Stage { stageName = nextStageName });
+
+            // 스테이지 진행 횟수 증가
+            stageSteps++;
+            Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
+
+            if (stageSteps >= eventStageThreshold)
+            {
+                // 이벤트 스테이지로 진입
+                MoveToEventStage();
+                //stageSteps--;
+                Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
+                isStageMoving = false;
+                return;
+            }
+            else
+            {
+                Debug.Log($"Moving to next stage: {nextStageName}");
+                ActivateStage(new Stage { stageName = nextStageName });
+            }
 
             // 스테이지 사용 여부 업데이트
             if (stageUsageDictionary[nextStageName] == 0)
@@ -405,24 +440,10 @@ public class StageManager
                 stageUsageDictionary[nextStageName] = 1; // 일반 스테이지 사용됨
                 Debug.Log($"<color=gray>Stage: {nextStageName}, Usage: {stageUsageDictionary[nextStageName]}</color>"); // 로그 출력
             }
-            else if (stageUsageDictionary[nextStageName] == 3)
-            {
-                stageUsageDictionary[nextStageName] = 4; // 이벤트 스테이지 사용됨
-                Debug.Log($"<color=gray>Stage: {nextStageName}, Usage: {stageUsageDictionary[nextStageName]}</color>"); // 로그 출력
-            }
-
-            // 스테이지 진행 횟수 증가
-            stageSteps++;
-            Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
-            if (stageSteps >= eventStageThreshold)
-            {
-                // 이벤트 스테이지로 진입
-                MoveToEventStage();
-            }
         }
         else
         {
-            Debug.LogError($"Stage {nextStageName} not found in stage dictionary.");
+            Debug.LogError($"스테이지 {nextStageName}를 딕셔너리에서 찾을 수 없음.");
         }
 
         isStageMoving = false;
@@ -432,7 +453,7 @@ public class StageManager
     {
         if (eventStages.Count == 0)
         {
-            Debug.LogWarning("No event stages available.");
+            Debug.LogWarning("이벤트 스테이지가 없음.");
             return;
         }
 
@@ -479,12 +500,12 @@ public class StageManager
             }
             else
             {
-                Debug.LogError($"Event stage {eventStageName} not found in stage dictionary.");
+                Debug.LogError($"이벤트 스테이지 {eventStageName}를 딕셔너리에서 찾을 수 없음.");
             }
         }
         else
         {
-            Debug.LogWarning("No event stages found in the sequence.");
+            Debug.LogWarning("시퀀스에서 이벤트 스테이지를 찾을 수 없음.");
         }
         eventStageThreshold += 3; // 이벤트 스테이지로 진입하기 위한 횟수 증가
     }
