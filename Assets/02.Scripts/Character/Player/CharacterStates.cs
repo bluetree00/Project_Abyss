@@ -9,20 +9,18 @@ namespace Game.CharacterStates.States
     {
         public override void Enter(T owner)
         {
-            Debug.Log($"{typeof(T).Name} - Idle 상태 진입");
+            owner.Anim.CrossFade("Idle", 0.2f);
 
-            // 무기 장착 여부 및 애니메이션 이름에 따라 애니메이션 설정
-            if (owner.weaponContainer != null &&
-                owner.weaponContainer.isWeaponEquipped &&
-                owner.currentWeapon != null &&
-                !string.IsNullOrEmpty(owner.currentWeapon.weapon_Idle_AnimationName))
-            {
-                owner.Anim.CrossFade(owner.currentWeapon.weapon_Idle_AnimationName, 0.2f);
-            }
-            else
-            {
-                owner.Anim.CrossFade("Idle", 0.2f);
-            }
+            if (owner.weaponContainer != null && 
+                    owner.weaponContainer.isWeaponEquipped && 
+                    owner.currentWeapon.weapon_Idle_AnimationName != "")
+                    {   
+                        owner.Anim.CrossFade($"{owner.currentWeapon.weapon_Idle_AnimationName}", 0.1f);
+                    }
+                    else
+                    {
+                        owner.Anim.CrossFade("Idle", 0.2f);
+                    } 
         }
 
         public override void Execute(T owner)

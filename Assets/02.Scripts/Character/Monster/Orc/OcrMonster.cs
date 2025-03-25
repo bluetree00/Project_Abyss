@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
+using Game.CharacterStates;
+using Game.CharacterStates.VagabondStates;
 
 public class OcrMonster : MonsterBaseController
 {
@@ -11,6 +13,10 @@ public class OcrMonster : MonsterBaseController
     }
 
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리
+
+    protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
+
+    public new StateMachine<Vagabond> StateMachine => stateMachine;
 
     protected override void UpdateIdle()
     {
