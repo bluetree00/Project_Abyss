@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Game.CharacterStates;
-using Game.CharacterStates.States;
+using Game.CharacterStates.CharacterControllerStates;
 
 public class CharacterController : MonoBehaviour
 {
@@ -35,9 +35,6 @@ public class CharacterController : MonoBehaviour
     public Transform playerTransform; // 플레이어의 Transform을 할당
 
     protected StateMachine<CharacterController> stateMachine;
-    public StateMachine<CharacterController> StateMachine => stateMachine; // 혹은 아래처럼 캐스팅해서 오버라이드
-
-
 
     // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
     // 무기SO.무기이름 

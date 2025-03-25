@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
 
-public class SpecterMonster : MonsterBaseController
+public class SpecterMonster : MonsterController
 {
     // 예시: SpecterMonster는 Define.MonsterType.Specter로 식별
     protected override Define.MonsterType MonsterTypeIdentifier => Define.MonsterType.Specter;
@@ -10,7 +10,7 @@ public class SpecterMonster : MonsterBaseController
     private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임 저장
     private float _nextAttackTime = 0.0f; // 다음 공격 가능 시간
 
-    protected override void UpdateIdle()
+    protected  void UpdateIdle()
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player == null)
@@ -20,12 +20,12 @@ public class SpecterMonster : MonsterBaseController
         if (distance <= MonsterData._scacRange)
         {
             _lockTarget = player;
-            State = Define.MonsterState.Moving;
+           
             return;
         }
     }
 
-    protected override void UpdateMoving()
+    protected  void UpdateMoving()
     {
         if (_lockTarget != null)
         {
@@ -36,7 +36,7 @@ public class SpecterMonster : MonsterBaseController
             {
                 NavMeshAgent nma = GetComponent<NavMeshAgent>();
                 nma.SetDestination(transform.position);
-                State = Define.MonsterState.NormalAttack_01;
+                
                 return;
             }
         }
@@ -44,7 +44,7 @@ public class SpecterMonster : MonsterBaseController
         Vector3 dir = _destPos - transform.position;
         if (dir.magnitude < 0.1f)
         {
-            State = Define.MonsterState.Idle;
+           
         }
         else
         {
@@ -55,7 +55,7 @@ public class SpecterMonster : MonsterBaseController
         }
     }
 
-    protected override void UpdateNormalAttack_01()
+    protected  void UpdateNormalAttack_01()
     {
         if (_lockTarget != null)
         {
@@ -152,6 +152,6 @@ public class SpecterMonster : MonsterBaseController
     void OnEndHitEvent()
     {
         // 공격 애니메이션 종료 시 호출되어 상태를 Idle로 전환
-        State = Define.MonsterState.Idle;
+       
     }  
 }

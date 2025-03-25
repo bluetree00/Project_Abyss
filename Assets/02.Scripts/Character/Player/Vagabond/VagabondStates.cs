@@ -1,6 +1,6 @@
 using System.Collections;
 using UnityEngine;
-using Game.CharacterStates.States;
+using Game.CharacterStates.CharacterControllerStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
@@ -20,18 +20,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.Anim.CrossFade("Idle", 0.2f);
-
-            if (owner.weaponContainer != null && 
-                    owner.weaponContainer.isWeaponEquipped && 
-                    owner.currentWeapon.weapon_Idle_AnimationName != "")
-                    {   
-                        owner.Anim.CrossFade($"{owner.currentWeapon.weapon_Idle_AnimationName}", 0.1f);
-                    }
-                    else
-                    {
-                        owner.Anim.CrossFade("Idle", 0.2f);
-                    } 
+            base.Enter(owner);
         }
 
         public override void Execute(Vagabond owner)
