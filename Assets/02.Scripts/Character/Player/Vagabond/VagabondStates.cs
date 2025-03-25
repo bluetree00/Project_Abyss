@@ -16,7 +16,7 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-    public class VagabondIdleState : State<Vagabond>
+    public class VagabondIdleState : IdleState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
