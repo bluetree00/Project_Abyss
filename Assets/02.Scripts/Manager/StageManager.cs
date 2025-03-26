@@ -365,6 +365,7 @@ public class StageManager
                 //     nextIndex -= stageSequence.Count;
                 // }
                 nextIndex = (nextIndex + 1) % stageSequence.Count;
+                Debug.Log($"{nextIndex}");
 
                 loopCount++;
                 if (loopCount > maxLoopCount)
@@ -411,7 +412,7 @@ public class StageManager
             if (stageUsageDictionary[nextStageName] == 0)
             {
                 stageUsageDictionary[nextStageName] = 1; // 일반 스테이지 사용됨
-                Debug.Log($"<color=gray>Stage: {nextStageName}, Usage: {stageUsageDictionary[nextStageName]}</color>"); // 로그 출력
+                //Debug.Log($"<color=gray>Stage: {nextStageName}, Usage: {stageUsageDictionary[nextStageName]}</color>"); // 로그 출력
             }
         }
         else
@@ -424,6 +425,7 @@ public class StageManager
 
     private void MoveToEventStage()
     {
+        if (isStageMoving) return; // 이미 한 번 호출된 경우, 다시 호출하지 않도록 막기
         if (eventStages.Count == 0)
         {
             Debug.LogWarning("이벤트 스테이지가 없음.");
@@ -481,6 +483,7 @@ public class StageManager
             Debug.LogWarning("시퀀스에서 이벤트 스테이지를 찾을 수 없음.");
         }
         eventStageThreshold += 3; // 이벤트 스테이지로 진입하기 위한 횟수 증가
+        isStageMoving = false;
     }
     
     // public void MoveToNextStage(int steps)
