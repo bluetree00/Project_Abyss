@@ -17,22 +17,37 @@ public class OcrMonster : MonsterController
     protected new StateMachine<OcrMonster> stateMachine = new StateMachine<OcrMonster>();
     public new StateMachine<OcrMonster> StateMachine => stateMachine;
 
+    private float _lastAttackTime = Mathf.NegativeInfinity;
+
+    public bool CanAttack()
+    {
+        return Time.time >= _lastAttackTime + MonsterData.attackCooldown;
+    }
+
+    public void MarkAttackTime()
+    {
+        _lastAttackTime = Time.time;
+    }
+
     protected override void Init()
     {
         base.Init();
+    }
+
+      protected override void Update()
+    {
+        
+        base.Update();
+        stateMachine.Update();
+
+       
+    }
+
+    protected override void OnMonsterReady()
+    {
         stateMachine.Setup(this, new OrcIdleState());
     }
 
-
-    private void UpdateNormalAttack_01()
-    {
-        if (_lockTarget != null)
-        {
-            Vector3 dir = _lockTarget.transform.position - transform.position;
-            Quaternion quat = Quaternion.LookRotation(dir);
-            transform.rotation = Quaternion.Lerp(transform.rotation, quat, 20 * Time.deltaTime);
-        }
-    }
 
     private void OnTriggerEnter(Collider other)
     {
