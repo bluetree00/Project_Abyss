@@ -25,21 +25,18 @@ namespace Game.CharacterStates.OrcStates
         }
 
         public override void Execute(OcrMonster owner)
+    {
+        if (owner.PlayerTransform == null)
+            return;
+
+        float distance = Vector3.Distance(owner.PlayerTransform.position, owner.transform.position);
+        if (distance <= owner.MonsterData._scacRange)
         {
-             GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player == null)
-                return;
-
-            Debug.Log("플레이어 찾음");
-
-            float distance = (player.transform.position - owner.transform.position).magnitude;
-            if (distance <= owner.MonsterData._scacRange)
-            {
-                owner._lockTarget = player;
-                owner.StateMachine.ChangeState(new MoveState());
-                return;
-            }
+            owner._lockTarget = owner.PlayerTransform.gameObject;
+            owner.StateMachine.ChangeState(new MoveState());
         }
+    }
+
 
         public override void Exit(OcrMonster owner)
         {
@@ -55,17 +52,16 @@ namespace Game.CharacterStates.OrcStates
             owner.Anim.CrossFade("Moving", 0.1f);
         }
 
-       public override void Execute(OcrMonster owner)
+      public override void Execute(OcrMonster owner)
     {
         if (owner._lockTarget != null)
         {
             owner._destPos = owner._lockTarget.transform.position;
             float distance = Vector3.Distance(owner._destPos, owner.transform.position);
 
-            // ✅ 공격 사거리 + 쿨타임 체크
             if (distance <= owner.MonsterData._attackRange && owner.CanAttack())
             {
-                owner.GetComponent<NavMeshAgent>().SetDestination(owner.transform.position); // 제자리
+                owner.Agent.SetDestination(owner.transform.position); // 제자리 멈춤
                 owner.StateMachine.ChangeState(new NormalAttackState());
                 return;
             }
@@ -78,12 +74,12 @@ namespace Game.CharacterStates.OrcStates
         }
         else
         {
-            NavMeshAgent nma = owner.GetComponent<NavMeshAgent>();
-            nma.SetDestination(owner._destPos);
-            nma.speed = owner.MonsterData.moveSpeed;
+            owner.Agent.SetDestination(owner._destPos);
+            owner.Agent.speed = owner.MonsterData.moveSpeed;
             owner.transform.rotation = Quaternion.Slerp(owner.transform.rotation, Quaternion.LookRotation(dir), 20 * Time.deltaTime);
         }
     }
+
 
 
         public override void Exit(OcrMonster owner)

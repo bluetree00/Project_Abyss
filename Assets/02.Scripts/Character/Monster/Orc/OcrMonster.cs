@@ -1,46 +1,36 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Game.CharacterStates;
 using Game.CharacterStates.OrcStates;
 
 public class OcrMonster : MonsterController
 {
-    // 예시: OcrMonster는 Define.MonsterType.Orc로 식별
-    protected override Define.MonsterType MonsterTypeIdentifier
-    {
-        get { return Define.MonsterType.Orc; }
-    }
+    protected override Define.MonsterType MonsterTypeIdentifier => Define.MonsterType.Orc;
 
-    private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>(); // 각 이펙트의 쿨타임을 저장하는 딕셔너리
-
+    private Dictionary<string, float> hitCooldowns = new Dictionary<string, float>();
     protected new StateMachine<OcrMonster> stateMachine = new StateMachine<OcrMonster>();
     public new StateMachine<OcrMonster> StateMachine => stateMachine;
 
     private float _lastAttackTime = Mathf.NegativeInfinity;
 
-    public bool CanAttack()
-    {
-        return Time.time >= _lastAttackTime + MonsterData.attackCooldown;
-    }
+    public bool CanAttack() => Time.time >= _lastAttackTime + MonsterData.attackCooldown;
+    public void MarkAttackTime() => _lastAttackTime = Time.time;
 
-    public void MarkAttackTime()
-    {
-        _lastAttackTime = Time.time;
-    }
+    public Transform PlayerTransform { get; private set; }
+    public NavMeshAgent Agent { get; private set; }
 
-    protected override void Init()
+    // ✅ 비동기 초기화
+    protected override async Task InitAsync()
     {
-        base.Init();
-    }
+        Agent = GetComponent<NavMeshAgent>();
+        PlayerTransform = GameObject.FindGameObjectWithTag("Player")?.transform;
 
-      protected override void Update()
-    {
-        
-        base.Update();
-        stateMachine.Update();
+        await base.InitAsync();
 
-       
+        // ✅ 명시적으로 완료 반환
+        return;
     }
 
     protected override void OnMonsterReady()
@@ -48,38 +38,36 @@ public class OcrMonster : MonsterController
         stateMachine.Setup(this, new OrcIdleState());
     }
 
+    protected override void Update()
+    {
+        base.Update();
+        if (!isInitialized) return;
+        stateMachine.Update();
+    }
 
     private void OnTriggerEnter(Collider other)
     {
         EffectComponent effectComponent = other.GetComponent<EffectComponent>();
-        if (effectComponent != null)
-        {
-            EffectData effectData = effectComponent.effectData;
-            if (effectData == null)
-            {
-                Debug.LogError("EffectData is null in EffectComponent!");
-                return;
-            }
+        if (effectComponent == null) return;
 
-            // 플레이어용 이펙트인지 확인 후 데미지 처리
-            if (effectData.isPlayerEffect)
-            {
-                if (CanHit(effectData))
-                {
-                    ApplyDamage(effectData.SetEffectDamage());
-                    StartHitCooldown(effectData.effectName, effectData.hitInterval);
-                }
-            }
+        EffectData effectData = effectComponent.effectData;
+        if (effectData == null)
+        {
+            Debug.LogError("EffectData is null in EffectComponent!");
+            return;
+        }
+
+        if (effectData.isPlayerEffect && CanHit(effectData))
+        {
+            ApplyDamage(effectData.SetEffectDamage());
+            StartHitCooldown(effectData.effectName, effectData.hitInterval);
         }
     }
 
     private bool CanHit(EffectData effectData)
     {
         if (hitCooldowns.ContainsKey(effectData.effectName))
-        {
-            bool canHit = Time.time >= hitCooldowns[effectData.effectName];
-            return canHit;
-        }
+            return Time.time >= hitCooldowns[effectData.effectName];
         return true;
     }
 
@@ -93,18 +81,14 @@ public class OcrMonster : MonsterController
         hp -= damage;
         if (hp <= 0)
         {
-            Vector3 spawnPosition2 = new Vector3(transform.position.x, 1f, transform.position.z);
-            Quaternion spawnRotation2 = Quaternion.identity;
-            GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
-            Debug.Log("Monster died, spawning die effect.");
+            Vector3 pos = new Vector3(transform.position.x, 1f, transform.position.z);
+            Managers.ObjectPooler.SpawnFromPool("DieEffect_01", pos, Quaternion.identity);
             Destroy(gameObject);
+            return;
         }
+
         Debug.Log($"Monster took {damage} damage. Current Health: {hp}");
-
-        Vector3 spawnPosition = new Vector3(transform.position.x, 1f, transform.position.z);
-        Quaternion spawnRotation = Quaternion.identity;
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
-        Debug.Log("Spawned hit effect.");
+        Vector3 hitPos = new Vector3(transform.position.x, 1f, transform.position.z);
+        Managers.ObjectPooler.SpawnFromPool("HitEffect_02", hitPos, Quaternion.identity);
     }
-
 }
