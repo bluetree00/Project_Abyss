@@ -1,222 +1,90 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using Game.CharacterStates;
-
 using Game.CharacterStates.VagabondStates;
-
 using Cinemachine;
-using System.ComponentModel;
-using Unity.VisualScripting;  // Cinemachine 네임스페이스 추가
 
 public class Vagabond : CharacterController
 {
-    #region 기본 초기화, 생성자, 소멸자
-    [SerializeField] private CinemachineFreeLook cinemachineCamera;  // 시네머신 카메라 참조
+    [SerializeField] private CinemachineFreeLook cinemachineCamera;
 
-    // 기본 초기화는 추후에 Define으로 이동 처리 예정
-    private Coroutine dodgeCoroutine;      // 대시 코루틴을 추적하기 위한 변수
-
-    private bool isInventoryOpen = false; // 인벤토리 열림 상태
+    private Coroutine dodgeCoroutine;
+    private bool isInventoryOpen = false;
     private bool isInputLocked = false;
-    private float inputLockDuration = 2f; // 입력을 무시할 시간 (초)
-    
-    protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
+    private float inputLockDuration = 2f;
 
+    protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
 
-    protected override void Init()
+    private async void Start()
     {
-        base.Init(); // 부모 클래스의 초기화 코드 호출
+        await InitAsync();
         stateMachine.Setup(this, new VagabondIdleState());
-        //currentWeapon = weaponContainer.currentWeapon; // 현재 무기 정보를 초기화
-        //Managers.UI.ShowSceneUI<UI_Inven>();
     }
 
-    //플레이어의 강제 회전 방지
-    void FreezeRotation()
+    protected override async Task InitAsync()
     {
-        rb.angularVelocity = Vector3.zero;
-    }
+        await base.InitAsync();
 
-    private void OnEnable() 
-    {
-        // 카메라를 동적으로 찾아서 설정
         if (cinemachineCamera == null)
-        {
-            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();  // 씬에서 CinemachineFreeLook 카메라를 검색
-        }
+            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();
 
-        // 카메라 대상 초기화
         if (cinemachineCamera != null)
         {
-            cinemachineCamera.Follow = this.transform;  // 캐릭터를 카메라의 Follow 대상으로 설정
-            cinemachineCamera.LookAt = this.transform;  // 캐릭터를 카메라의 LookAt 대상으로 설정
+            cinemachineCamera.Follow = transform;
+            cinemachineCamera.LookAt = transform;
         }
 
         Managers.Input_M.KeyAction -= OnInput;
         Managers.Input_M.KeyAction += OnInput;
 
-
+        await Task.CompletedTask;
     }
 
-    #endregion
-
-    #region 업데이트, 상시 인풋
-    protected override void Update() 
+    protected override void Update()
     {
-        if (characterData == null)
-        {
-            return; // characterData가 로드될 때까지 Update 로직을 실행하지 않음
-        }
-
-        Managers.Input_M.KeyAction += OnInput; //캐릭터 오브젝트 생성 툴 사용시 삭제
+        if (characterData == null || cinemachineCamera == null) return;
 
         base.Update();
         CheckMovementInput();
         UpdateMovement();
         FreezeRotation();
         stateMachine.Update();
-       
-        // 공격 콤보 시간이 다 지나면 초기화
+
+         // 공중 상태 연동
+        if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
+        {
+            stateMachine.ChangeState(new VagabondInAirState());
+        }
+
+
         if (characterData.comboTimer > 0)
         {
             characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0)
-            {
-                ResetCombo();
-            }
+            if (characterData.comboTimer <= 0) ResetCombo();
         }
     }
 
-    // 입력 처리
     private void OnInput()
     {
+        if (Input.GetMouseButtonDown(1)) ProcessDodge();
+        if (!CanProcessInput()) return;
 
-        // 키보드 Shift 입력 (기본 회피)
-        if (Input.GetMouseButtonDown(1))
-        {
-            ProcessDodge();
-        }
-
-         if (!CanProcessInput())
-             return;
-        
-
-        // 마우스 좌클릭으로 공격 시작
-        if (Input.GetMouseButtonDown(0))
-        {
-            ProcessAttack();
-
-        }
-
-        // 키보드 E 입력 (기본 스킬)
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            ProcessSkile();
-        }
-
-        // 키보드 Q 입력 (기본 궁극기)
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
-            ProcessUltimateSkile();
-        }
-
-
-        if (Input.GetKeyDown(KeyCode.I))
-        {
-            if(isInputLocked)
-            {
-                return;
-            }
-
-            if (isInventoryOpen)
-            {
-                // 이미 열려 있으면 처리하지 않음
-                Managers.UI.CloseUI("UI_Inven");
-                isInventoryOpen = false; // 상태 업데이트
-                return;
-            }
-
-            // UI 열기
-            Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
-            isInventoryOpen = true; // 상태 업데이트
-            StartCoroutine(LockInput(inputLockDuration));
-        }
-
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            if (isInventoryOpen)
-            {
-                // UI 닫기
-                Managers.UI.CloseUI("UI_Inven");
-                isInventoryOpen = false; // 상태 업데이트
-            }
-        }
-
-        //------------------------키 중복 체크해야함------------------------
-        // 키보드 1 입력 (무기 교체)
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            if (isInputLocked)
-            return;
-
-            weaponContainer.isWeaponEquipped = false;
-            Debug.Log(weaponContainer.isWeaponEquipped);
-            Managers.Weapon.ChangeWeapon(1);
-            if (weaponContainer.ownWeapons[0] == null){
-                stateMachine.ChangeState(new VagabondIdleState());
-                StartCoroutine(LockInput(inputLockDuration));
-                return;
-            }
-            stateMachine.ChangeState(new VagabondChangeWeaponState());
-            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
-            StartCoroutine(LockInput(inputLockDuration));
-        }
-
-        // 키보드 2 입력 (무기 교체)
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            if (isInputLocked)
-            return;
-
-            weaponContainer.isWeaponEquipped = false;
-            Debug.Log(weaponContainer.isWeaponEquipped);
-            Managers.Weapon.ChangeWeapon(2);
-            if (weaponContainer.ownWeapons[1] == null){
-                stateMachine.ChangeState(new VagabondIdleState());
-                StartCoroutine(LockInput(inputLockDuration));
-                return;
-            }
-            stateMachine.ChangeState(new VagabondChangeWeaponState());
-            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
-            StartCoroutine(LockInput(inputLockDuration));
-        }
-
-        // 키보드 G 입력 (무기 설정)
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            if (isInputLocked)
-            return;
-
-            Managers.Weapon.SetWeapon("basic_Knight_02");
-            StartCoroutine(LockInput(inputLockDuration));
-        }   
-
-        if (Input.GetKeyDown(KeyCode.F1))
-        {
-            Managers.Weapon.RemoveWeapon(1);
-            if (currentWeapon == null)  stateMachine.ChangeState(new VagabondIdleState());;
-        }
-
-        if (Input.GetKeyDown(KeyCode.F2))
-        {
-            Managers.Weapon.RemoveWeapon(2);
-            if (currentWeapon == null)  stateMachine.ChangeState(new VagabondIdleState());;
-        }
-        //-----------------------------------------------------------------
+        if (Input.GetMouseButtonDown(0)) ProcessAttack();
+        if (Input.GetKeyDown(KeyCode.E)) ProcessSkile();
+        if (Input.GetKeyDown(KeyCode.Q)) ProcessUltimateSkile();
+        if (Input.GetKeyDown(KeyCode.I)) ToggleInventory();
+        if (Input.GetKeyDown(KeyCode.Escape)) CloseInventory();
+        if (Input.GetKeyDown(KeyCode.Alpha1)) ChangeWeapon(1);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) ChangeWeapon(2);
+        if (Input.GetKeyDown(KeyCode.G)) SetWeapon("basic_Knight_02");
+        if (Input.GetKeyDown(KeyCode.F1)) RemoveWeapon(1);
+        if (Input.GetKeyDown(KeyCode.F2)) RemoveWeapon(2);
+        if (Input.GetKeyDown(KeyCode.Space)) ProcessJump(); // ✅ 점프 입력 처리
     }
+
+    private bool CanProcessInput() => !(stateMachine.CurrentState?.BlocksInput ?? false);
 
     private IEnumerator LockInput(float sec)
     {
@@ -225,43 +93,24 @@ public class Vagabond : CharacterController
         isInputLocked = false;
     }
 
-    #endregion
-
-    private bool CanProcessInput()
-    {
-        
-        return !(stateMachine.CurrentState?.BlocksInput ?? false);
-    }
-
-
-    #region 기본 WASD 이동 관련 코드
     private void CheckMovementInput()
     {
-        float horizontalInput = Input.GetAxis("Horizontal");
-        float verticalInput = Input.GetAxis("Vertical");
+        float h = Input.GetAxis("Horizontal");
+        float v = Input.GetAxis("Vertical");
 
-        // 카메라의 로컬 좌표계를 기준으로 방향 벡터 계산
-        Vector3 forward = cinemachineCamera.transform.forward;  // 카메라의 앞쪽 방향
-        Vector3 right = cinemachineCamera.transform.right;      // 카메라의 오른쪽 방향
+        Vector3 forward = cinemachineCamera.transform.forward;
+        Vector3 right = cinemachineCamera.transform.right;
 
-        forward.y = 0;  // 평면 상의 방향으로 제한
-        right.y = 0;
-
-        forward.Normalize();
-        right.Normalize();
-
-        // 입력값을 카메라 좌표계 기준으로 변환
-        moveDirection = (forward * verticalInput + right * horizontalInput).normalized;
+        forward.y = right.y = 0;
+        moveDirection = (forward.normalized * v + right.normalized * h).normalized;
     }
 
     protected void UpdateMovement()
     {
-         if (!CanProcessInput())
-            return;
+        if (!CanProcessInput()) return;
 
         if (moveDirection.magnitude > 0)
         {
-            // Shift 누르면 Run 상태로, 아니면 Move 상태로
             if (Input.GetKey(KeyCode.LeftShift))
                 stateMachine.ChangeState(new VagabondRunState());
             else
@@ -273,111 +122,134 @@ public class Vagabond : CharacterController
         }
     }
 
-
-
-    #endregion
-
-    #region 마우스 좌클릭 공격 관련 코드
+    private void FreezeRotation() => rb.angularVelocity = Vector3.zero;
 
     private void ProcessAttack()
     {
-  
-
         characterData.comboTimer = characterData.comboDuration;
         characterData.attackComboStep++;
 
-        // 현재 무기의 최대 콤보 수를 초과했는지 확인
         if (characterData.attackComboStep > currentWeapon.maxComboCount)
-        {
             characterData.attackComboStep = 1;
-        }
 
-        // 애니메이션 이름 가져오기
         string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
-        Debug.Log($"공격 {characterData.attackComboStep}: {animName}");
-
-        // 상태 전환
         stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
-        
     }
-
 
     private void ResetCombo()
     {
         characterData.attackComboStep = 0;
         characterData.comboTimer = 0;
-        // ChangeState(Define.State.currentWeaponIdle);
         stateMachine.ChangeState(new VagabondIdleState());
     }
 
-    #endregion
-
-    #region E 스킬 코드
-    private void ProcessSkile()
-    {
-        Debug.Log("E");
-        stateMachine.ChangeState(new VagabondSkillState());
-    }
-    #endregion 
-
-    #region Q 스킬 코드
-    private void ProcessUltimateSkile()
-    {
-        Debug.Log("Q");
-        stateMachine.ChangeState(new VagabondUltimateState());
-    }
-    #endregion 
-
-    #region 대시 코드
+    private void ProcessSkile() => stateMachine.ChangeState(new VagabondSkillState());
+    private void ProcessUltimateSkile() => stateMachine.ChangeState(new VagabondUltimateState());
 
     private void ProcessDodge()
     {
         if (characterData.canDodge)
-        {
             dodgeCoroutine = StartCoroutine(DashCoroutine());
-        }
     }
 
     private IEnumerator DashCoroutine()
     {
-        characterData.canDodge = false;  // 대시 가능 여부를 false로 설정
+        characterData.canDodge = false;
         stateMachine.ChangeState(new VagabondDodgeState());
-        Debug.Log("대시");
 
         float startTime = Time.time;
-
         while (Time.time < startTime + characterData.dashDuration)
         {
-            CheckMovementInput();  // 대시 중에도 입력 방향을 계속 갱신
+            CheckMovementInput();
+            Vector3 dashDir = moveDirection != Vector3.zero ? moveDirection : transform.forward;
+            rb.velocity = dashDir * characterData.dashSpeed;
 
-            // 현재 입력 방향(moveDirection)으로 대시
-            Vector3 dashDirection = moveDirection != Vector3.zero ? moveDirection : transform.forward;
-            rb.velocity = dashDirection * characterData.dashSpeed;
-
-            // 대시 방향으로 캐릭터 회전
-            if (dashDirection != Vector3.zero)
-            {
-                Quaternion targetRotation = Quaternion.LookRotation(dashDirection);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 부드럽게 회전
-            }
-
+            Quaternion targetRot = Quaternion.LookRotation(dashDir);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
             yield return null;
         }
 
-        rb.velocity = Vector3.zero;  // 대시 후 속도 초기화
-        yield return new WaitForSeconds(characterData.dodgeCooldown);  // 대시 쿨타임 대기
-
-        characterData.canDodge = true;  // 다시 대시 가능하도록 설정
+        rb.velocity = Vector3.zero;
+        yield return new WaitForSeconds(characterData.dodgeCooldown);
+        characterData.canDodge = true;
     }
 
-    #endregion
+    private void ProcessJump()
+    {
+        if (IsJumping() || !IsGrounded()) return;
 
-/*
+        stateMachine.ChangeState(new VagabondJumpStartState()); // ✅ 점프 시작 상태로 전환
+    }
 
-*/
-    #region 애니메이션 이벤트 처리  ////////// 전무 무기에서 생성 타이밍 조절 가능하기에 안써도 됨.
+    private void ChangeWeapon(int index)
+    {
+        if (isInputLocked) return;
 
-    public void FrontAttack()
+        weaponContainer.isWeaponEquipped = false;
+        Managers.Weapon.ChangeWeapon(index);
+
+        if (weaponContainer.ownWeapons[index - 1] == null)
+        {
+            stateMachine.ChangeState(new VagabondIdleState());
+        }
+        else
+        {
+            stateMachine.ChangeState(new VagabondChangeWeaponState());
+            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
+        }
+
+        StartCoroutine(LockInput(inputLockDuration));
+    }
+
+    private void SetWeapon(string weaponName)
+    {
+        if (isInputLocked) return;
+
+        Managers.Weapon.SetWeapon(weaponName);
+        StartCoroutine(LockInput(inputLockDuration));
+    }
+
+    private void RemoveWeapon(int index)
+    {
+        Managers.Weapon.RemoveWeapon(index);
+        if (currentWeapon == null)
+            stateMachine.ChangeState(new VagabondIdleState());
+    }
+
+    private void ToggleInventory()
+    {
+        if (isInputLocked) return;
+
+        if (isInventoryOpen)
+        {
+            Managers.UI.CloseUI("UI_Inven");
+            isInventoryOpen = false;
+        }
+        else
+        {
+            Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
+            isInventoryOpen = true;
+            StartCoroutine(LockInput(inputLockDuration));
+        }
+    }
+
+    private void CloseInventory()
+    {
+        if (isInventoryOpen)
+        {
+            Managers.UI.CloseUI("UI_Inven");
+            isInventoryOpen = false;
+        }
+    }
+
+    #region 이펙트 관련
+    public void FrontAttack() => SpawnEffect("FrontAttack", Vector3.forward);
+    public void SpawnShinySlashEffect1() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 68));
+    public void SpawnShinySlashEffect2() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 180));
+    public void SpawnShinySlashEffect3() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 360, -60));
+    public void SpawnShinySlashEffect4() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 360, -140));
+
+    private void SpawnEffect(string effectName, Vector3 forwardOffset, Vector3? additionalRotation = null)
     {
         if (Managers.ObjectPooler == null)
         {
@@ -385,107 +257,15 @@ public class Vagabond : CharacterController
             return;
         }
 
-        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
-        Quaternion spawnRotation = transform.rotation; // 플레이어의 현재 회전값
+        Vector3 spawnPosition = transform.position + transform.TransformDirection(forwardOffset);
+        Quaternion spawnRotation = transform.rotation;
 
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("FrontAttack", spawnPosition, spawnRotation);
+        if (additionalRotation.HasValue)
+            spawnRotation *= Quaternion.Euler(additionalRotation.Value);
 
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool(effectName, spawnPosition, spawnRotation);
         effectObject.transform.position = spawnPosition;
         effectObject.transform.rotation = spawnRotation;
     }
-
-    public void SpawnShinySlashEffect1()
-    {
-        if (Managers.ObjectPooler == null)
-        {
-            Debug.LogError("ObjectPoolerManager is not initialized.");
-            return;
-        }
-
-        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
-
-        // 플레이어의 회전값을 가져온 후 Z축에 68도 추가
-        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
-        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 0f, 68f); // 플레이어 회전에 Z축 68도 추가
-
-        // ObjectPoolerManager를 통해 이펙트 생성
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
-
-        // 이펙트가 생성될 때의 위치와 회전값을 설정
-        effectObject.transform.position = spawnPosition;
-        effectObject.transform.rotation = spawnRotation; // Z축 회전만 68도 추가된 회전값
-    }
-
-    public void SpawnShinySlashEffect2()
-    {
-        if (Managers.ObjectPooler == null)
-        {
-            Debug.LogError("ObjectPoolerManager is not initialized.");
-            return;
-        }
-
-        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
-
-    
-        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
-        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 0f, 180f);
-
-        // ObjectPoolerManager를 통해 이펙트 생성
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
-
-        // 이펙트가 생성될 때의 위치와 회전값을 설정
-        effectObject.transform.position = spawnPosition;
-        effectObject.transform.rotation = spawnRotation; 
-    }
-
-    public void SpawnShinySlashEffect3()
-    {
-        if (Managers.ObjectPooler == null)
-        {
-            Debug.LogError("ObjectPoolerManager is not initialized.");
-            return;
-        }
-
-        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
-
-     
-        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
-        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 360f, -60f);
-
-        // ObjectPoolerManager를 통해 이펙트 생성
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
-
-        // 이펙트가 생성될 때의 위치와 회전값을 설정
-        effectObject.transform.position = spawnPosition;
-        effectObject.transform.rotation = spawnRotation; 
-    }
-
-    public void SpawnShinySlashEffect4()
-    {
-        if (Managers.ObjectPooler == null)
-        {
-            Debug.LogError("ObjectPoolerManager is not initialized.");
-            return;
-        }
-
-        // 플레이어의 정면을 기준으로 Z축 방향으로 1만큼 이동
-        Vector3 spawnPosition = transform.position + transform.forward * 1f;
-
-    
-        Quaternion playerRotation = transform.rotation; // 플레이어의 현재 회전
-        Quaternion spawnRotation = playerRotation * Quaternion.Euler(0f, 360f, -140f);
-
-        // ObjectPoolerManager를 통해 이펙트 생성
-        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
-
-        // 이펙트가 생성될 때의 위치와 회전값을 설정
-        effectObject.transform.position = spawnPosition;
-        effectObject.transform.rotation = spawnRotation; 
-    }
-
     #endregion
 }

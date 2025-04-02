@@ -1,131 +1,174 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using Game.CharacterStates;
-using Game.CharacterStates.States;
+using Game.CharacterStates.CharacterControllerStates;
 
 public class CharacterController : MonoBehaviour
 {
-    #region  기본 초기화
-    [SerializeField]
-    protected  CharacterData characterData; // CharacterData ScriptableObject 참조
-    public CharacterData CharacterData { get { return characterData; } }
-    [SerializeField]
-    public WeaponContainer weaponContainer; // 무기 컨테이너 변수 추후 상속 구조 변경
-    [SerializeField]
-    public WeaponData currentWeapon;
+    [SerializeField] protected CharacterData characterData;
+    public CharacterData CharacterData => characterData;
+
+    [SerializeField] public WeaponContainer weaponContainer;
+    [SerializeField] public WeaponData currentWeapon;
+
     protected Animator anim;
-    public Animator Anim => anim; 
-    protected Vector3 moveDirection;  // 이동 방향
+    public Animator Anim => anim;
+
+    protected Vector3 moveDirection;
     public Vector3 MoveDirection => moveDirection;
 
+    [SerializeField] protected Define.State _state = Define.State.Idle;
+    [SerializeField] protected Vector3 _destPos;
+    [SerializeField] protected GameObject _lockTarget;
+    [SerializeField] protected Rigidbody rb;
 
-    [SerializeField]
-    protected Define.State _state = Define.State.Idle;
-
-    [SerializeField]
-    protected Vector3 _destPos;
-
-    [SerializeField]
-    protected GameObject _lockTarget;
-
-    [SerializeField]
-    protected Rigidbody rb;  // Rigidbody 참조
-    public Transform playerTransform; // 플레이어의 Transform을 할당
+    public Transform playerTransform;
 
     protected StateMachine<CharacterController> stateMachine;
-    public StateMachine<CharacterController> StateMachine => stateMachine; // 혹은 아래처럼 캐스팅해서 오버라이드
 
+    [Header("Gravity & Jump Settings")]
+    [SerializeField] private float gravity = -30f;
+    [SerializeField] private float fallMultiplier = 2f;
+    [SerializeField] private float groundCheckDistance = 0.3f;
+    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private float jumpForce = 7f;
 
+    [Header("Hard Landing Settings")]
+    [SerializeField] private float hardLandingTimeThreshold = 0.8f;
 
-    // 매니저에서 가져온 현재 무기 이름 받아줄 스트링 변수
-    // 무기SO.무기이름 
+    private bool isGrounded;
+    private bool isJumping;
+    private float airTime = 0f;
+    private float airStartTime = 0f;
 
-    //NOTE: 초기화 작업을 Awake에서 처리하도록 변경
-    private void Awake()
+    public enum AirState
     {
-        Init();
+        None,
+        JumpStart,
+        InAir,
+        Landing
     }
 
-    protected virtual void Init()
+    public AirState CurrentAirState { get; private set; } = AirState.None;
+
+    public void SetAirState(AirState state)
+    {
+        CurrentAirState = state;
+
+        if (state == AirState.InAir)
+        {
+            airStartTime = Time.time;
+        }
+    }
+
+    public bool IsInAir => CurrentAirState == AirState.InAir;
+    public bool IsHardLanding => (Time.time - airStartTime) >= hardLandingTimeThreshold;
+    public bool IsGrounded() => isGrounded;
+    public bool IsJumping() => isJumping;
+
+    public void FinishJump() => isJumping = false;
+
+    private async void Awake()
+    {
+        await InitAsync();
+    }
+
+    protected virtual async Task InitAsync()
     {
         rb = GetComponent<Rigidbody>();
-        playerTransform = transform;
-        // string characterName = gameObject.name;
-        string characterName = gameObject.name.Replace("(Clone)", ""); 
+        rb.useGravity = false;
         anim = GetComponent<Animator>();
+        playerTransform = transform;
 
-        LoadCharacterData(characterName, () =>
-        {
-            LoadWeaponContainer(Define.GetCharacterClassString(characterName), () =>
-            {
-                // 하위 오브젝트 중 "Weapon_parentR" 이름을 가진 트랜스폼을 BFS로 찾음
-                Transform weaponHandTransform = FindDeepChildBFS(playerTransform, "Weapon_parentR");
-                if (weaponHandTransform != null)
-                {
-                    // WeaponManager의 ContainerDataInit 메서드에 손의 트랜스폼을 전달
-                    Managers.Weapon.ContainerDataInit(weaponContainer, weaponHandTransform);
-                }
-                else
-                {
-                    Debug.LogError("Weapon_parentR 트랜스폼을 찾을 수 없습니다.");
-                }
+        string characterName = gameObject.name.Replace("(Clone)", "");
+        string characterClass = Define.GetCharacterClassString(characterName);
 
-                LoadWeaponData("basic_Knight_01");
-            });
-        });
+        await LoadCharacterDataAsync(characterName);
+        await LoadWeaponContainerAsync(characterClass);
+        await SetupWeaponAttachmentAsync("Weapon_parentR");
+        await LoadWeaponDataAsync("basic_Knight_01");
 
-        
-        
+        await Task.CompletedTask;
     }
 
-    protected void LoadCharacterData(string characterName, Action OnSuccess = null)
+    protected async Task LoadCharacterDataAsync(string characterName)
     {
-        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, characterData_instance =>
+        var tcs = new TaskCompletionSource<bool>();
+        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, data =>
         {
-            if (characterData_instance == null)
+            if (data == null)
             {
                 Debug.LogError("캐릭터 데이터가 null입니다.");
+                tcs.SetResult(false);
                 return;
             }
-            characterData = characterData_instance;
-            Debug.Log($"캐릭터 데이터({characterData.characterName})를 로드했습니다.");
-            OnSuccess.Invoke();
-            Managers.CharacterData.SetCharacterData(characterData);
 
-            characterData.canDodge = true;  // 대시 가능 여부 초기화
+            characterData = data;
+            Managers.CharacterData.SetCharacterData(characterData);
+            characterData.canDodge = true;
+
+            Debug.Log($"캐릭터 데이터({characterData.characterName}) 로드됨");
+            tcs.SetResult(true);
         });
+
+        await tcs.Task;
     }
 
-    protected void LoadWeaponContainer(string characterClassString, Action OnSuccess = null)
+    protected async Task LoadWeaponContainerAsync(string classKey)
     {
-        AddressablesManager.Instance.LoadAsset<WeaponContainer>(characterClassString, weaponContainer_instance =>
+        var tcs = new TaskCompletionSource<bool>();
+        AddressablesManager.Instance.LoadAsset<WeaponContainer>(classKey, container =>
         {
-            if (weaponContainer_instance == null)
+            if (container == null)
             {
                 Debug.LogError("무기 컨테이너가 null입니다.");
+                tcs.SetResult(false);
                 return;
             }
-            weaponContainer = weaponContainer_instance;
-            Debug.Log($"무기 컨테이너({weaponContainer.name})를 로드했습니다.");
-            OnSuccess.Invoke();
+
+            weaponContainer = container;
+            Debug.Log($"무기 컨테이너({weaponContainer.name}) 로드됨");
+            tcs.SetResult(true);
         });
+
+        await tcs.Task;
     }
 
-    protected void LoadWeaponData(string weaponName, Action OnSuccess = null)
+    protected async Task SetupWeaponAttachmentAsync(string handName)
     {
-        AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, WData_instance =>
+        Transform handTransform = FindDeepChildBFS(playerTransform, handName);
+        if (handTransform != null)
         {
-            if (WData_instance == null)
+            Managers.Weapon.ContainerDataInit(weaponContainer, handTransform);
+        }
+        else
+        {
+            Debug.LogError($"{handName} 트랜스폼을 찾을 수 없습니다.");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    protected async Task LoadWeaponDataAsync(string weaponName)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, data =>
+        {
+            if (data == null)
             {
                 Debug.LogError("무기 데이터가 null입니다.");
+                tcs.SetResult(false);
                 return;
             }
-            currentWeapon = WData_instance;
-            Debug.Log($"기본 무기 데이터({currentWeapon.weaponName})를 로드했습니다.");
-            // OnSuccess.Invoke();
+
+            currentWeapon = data;
+            Debug.Log($"기본 무기 데이터({currentWeapon.weaponName}) 로드됨");
+            tcs.SetResult(true);
         });
+
+        await tcs.Task;
     }
 
     private Transform FindDeepChildBFS(Transform parent, string name)
@@ -144,34 +187,78 @@ public class CharacterController : MonoBehaviour
                 queue.Enqueue(child);
             }
         }
+
         return null;
     }
-    #endregion
 
-    //캐릭터들의 기본 상속 움직임 움직임 함수는 추후에 솔리드 방식으로 전부 분해 필요요
     public void Move(Vector3 direction, float speed)
     {
-        //State = Define.State.Moving;
-
         if (direction.magnitude <= 0) return;
-        
-        // 방향 벡터 정규화
-        Vector3 normalizedDirection = direction.normalized;
 
-        // 이동 처리
+        Vector3 normalizedDirection = direction.normalized;
         rb.velocity = new Vector3(normalizedDirection.x * speed, rb.velocity.y, normalizedDirection.z * speed);
 
-        // 회전 처리 - 부드럽게 회전하도록 변경
         Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f); // 5f는 회전 속도 계수
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f);
     }
 
+    protected virtual void Update() { }
 
-     //상태별 업데이트 패턴
-    protected virtual void Update()
+    private void FixedUpdate()
     {
-
+        UpdateGroundedCheck();
+        UpdateAirStateAuto();
+        ApplyMassBasedGravity();
     }
 
+    private void UpdateGroundedCheck()
+    {
+        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
+        float rayLength = 1.0f;
 
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+        {
+            isGrounded = true;
+        }
+        else
+        {
+            isGrounded = false;
+        }
+
+        Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
+    }
+
+    private void UpdateAirStateAuto()
+    {
+        if (!isGrounded && CurrentAirState == AirState.None)
+        {
+            SetAirState(AirState.InAir);
+        }
+        else if (isGrounded && CurrentAirState != AirState.None)
+        {
+            SetAirState(AirState.None);
+            FinishJump();
+        }
+    }
+
+    private void ApplyMassBasedGravity()
+    {
+        if (!isGrounded || isJumping)
+        {
+            float finalGravity = gravity;
+            if (rb.velocity.y < 0)
+                finalGravity *= fallMultiplier;
+
+            rb.AddForce(Vector3.up * finalGravity, ForceMode.Force);
+        }
+    }
+
+    public void Jump()
+    {
+        if (!isGrounded) return;
+
+        isJumping = true;
+        rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
+        rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+    }
 }

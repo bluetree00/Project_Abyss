@@ -6,12 +6,12 @@ using UnityEngine.UI;
 public class UI_HPBar : UI_Base
 {
 
-    MonsterBaseController monster; //스크립터블 오브젝트
+    MonsterController monster; //스크립터블 오브젝트
 
     public override void Init()
     {
         Bind<GameObject>(typeof(Define.WorldObjectUI));
-        monster = transform.parent.GetComponent<MonsterBaseController>();
+        monster = transform.parent.GetComponent<MonsterController>();
     }
 
     private void Update()

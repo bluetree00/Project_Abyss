@@ -1,3 +1,5 @@
+using System;
+using Game.CharacterStates.MonsterControllerStates;
 using UnityEngine;
 
 namespace Game.CharacterStates
@@ -47,6 +49,11 @@ namespace Game.CharacterStates
             ChangeState(previousState);
         }
     }
-}
+
+        internal void ChangeState<T>(MoveState<T> moveState) where T : MonsterController
+        {
+            throw new NotImplementedException();
+        }
+    }
 
 }
