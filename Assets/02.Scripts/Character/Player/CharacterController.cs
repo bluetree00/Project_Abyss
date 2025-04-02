@@ -38,6 +38,11 @@ public class CharacterController : MonoBehaviour
     [Header("Hard Landing Settings")]
     [SerializeField] private float hardLandingTimeThreshold = 0.8f;
 
+    [Header("Movement Settings")]
+    [SerializeField] private float airControlMultiplier = 0.5f;
+    [SerializeField] private float groundDrag = 4f;
+    [SerializeField] private float airDrag = 0.5f;
+
     private bool isGrounded;
     private bool isJumping;
     private float airTime = 0f;
@@ -79,6 +84,8 @@ public class CharacterController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         rb.useGravity = false;
+        rb.drag = groundDrag;
+
         anim = GetComponent<Animator>();
         playerTransform = transform;
 
@@ -193,13 +200,26 @@ public class CharacterController : MonoBehaviour
 
     public void Move(Vector3 direction, float speed)
     {
-        if (direction.magnitude <= 0) return;
+        if (direction.magnitude <= 0)
+        {
+            StopHorizontalMovement();
+            return;
+        }
 
         Vector3 normalizedDirection = direction.normalized;
-        rb.velocity = new Vector3(normalizedDirection.x * speed, rb.velocity.y, normalizedDirection.z * speed);
+        float appliedSpeed = IsInAir ? speed * airControlMultiplier : speed;
+        rb.velocity = new Vector3(normalizedDirection.x * appliedSpeed, rb.velocity.y, normalizedDirection.z * appliedSpeed);
 
         Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f);
+    }
+
+    public void StopHorizontalMovement()
+    {
+        if (IsInAir)
+            return; // 공중에서는 자연스러운 감속을 위해 멈추지 않음
+
+        rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
     }
 
     protected virtual void Update() { }
@@ -209,16 +229,19 @@ public class CharacterController : MonoBehaviour
         UpdateGroundedCheck();
         UpdateAirStateAuto();
         ApplyMassBasedGravity();
+
+        // 공중/지상 상태에 따라 drag 변경
+        rb.drag = IsInAir ? airDrag : groundDrag;
     }
 
-    private void UpdateGroundedCheck()
+   private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-        float rayLength = 1.0f;
+        float rayLength = groundCheckDistance + 0.1f;
 
         if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
         {
-            isGrounded = true;
+            isGrounded = hit.distance <= groundCheckDistance + 0.05f; // 약간 여유
         }
         else
         {
@@ -227,6 +250,7 @@ public class CharacterController : MonoBehaviour
 
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
     }
+
 
     private void UpdateAirStateAuto()
     {
