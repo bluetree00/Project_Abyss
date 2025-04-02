@@ -1,6 +1,6 @@
 using System.Collections;
 using UnityEngine;
-using Game.CharacterStates.States;
+using Game.CharacterStates.CharacterControllerStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
@@ -16,22 +16,11 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-    public class VagabondIdleState : State<Vagabond>
+    public class VagabondIdleState : IdleState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            owner.Anim.CrossFade("Idle", 0.2f);
-
-            if (owner.weaponContainer != null && 
-                    owner.weaponContainer.isWeaponEquipped && 
-                    owner.currentWeapon.weapon_Idle_AnimationName != "")
-                    {   
-                        owner.Anim.CrossFade($"{owner.currentWeapon.weapon_Idle_AnimationName}", 0.1f);
-                    }
-                    else
-                    {
-                        owner.Anim.CrossFade("Idle", 0.2f);
-                    } 
+            base.Enter(owner);
         }
 
         public override void Execute(Vagabond owner)
@@ -117,11 +106,8 @@ namespace Game.CharacterStates.VagabondStates
     {
         private readonly string animationName;
         private bool _blocksInput = true;
-
         public override bool BlocksInput => _blocksInput;
-
-         private readonly int comboIndex;
-
+        private readonly int comboIndex;
         public VagabondComboAttackState(string animationName, int comboStep)
         {
             this.animationName = animationName;
@@ -141,7 +127,6 @@ namespace Game.CharacterStates.VagabondStates
             {
                 _blocksInput = false;
 
-                    // 마지막 콤보일 경우 여기서만 초기화!
                 if (comboIndex == owner.currentWeapon.maxComboCount)
                 {
                     owner.CharacterData.attackComboStep = 0;
@@ -206,4 +191,109 @@ namespace Game.CharacterStates.VagabondStates
         public override void Execute(Vagabond owner) { }
         public override void Exit(Vagabond owner) { }
     }
+
+        public class VagabondJumpStartState : State<Vagabond>
+    {
+        public override bool BlocksInput => true;
+
+        public override void Enter(Vagabond owner)
+        {
+            owner.SetAirState(CharacterController.AirState.JumpStart);
+            owner.Anim.CrossFade("Jump_Start", 0.1f);
+            owner.Jump(); // Rigidbody 점프
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+       
+
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "Jump_Start", 0.9f))
+            {
+                owner.StateMachine.ChangeState(new VagabondInAirState());
+            }
+        }
+
+
+        public override void Exit(Vagabond owner) { }
+    }
+
+
+
+    public class VagabondInAirState : State<Vagabond>
+    {
+        public override bool BlocksInput => true;
+
+        public override void Enter(Vagabond owner)
+        {
+            owner.SetAirState(CharacterController.AirState.InAir);
+            owner.Anim.CrossFade("Jump_Loop", 0.1f);
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            if (owner.IsGrounded())
+            {
+                if (owner.IsHardLanding)
+                    owner.StateMachine.ChangeState(new VagabondHardLandingState());
+                else
+                    owner.StateMachine.ChangeState(new VagabondLandingState());
+            }
+
+        }
+
+
+        public override void Exit(Vagabond owner) { }
+    }
+
+
+    public class VagabondLandingState : State<Vagabond>
+    {
+        public override bool BlocksInput => true;
+
+        public override void Enter(Vagabond owner)
+        {
+            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.Anim.CrossFade("Jump_Land", 0.1f);
+            owner.FinishJump(); // 점프 종료
+            Debug.Log("Jump_Land");
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "Jump_Land", 0.3f))
+            {
+                owner.StateMachine.ChangeState(new VagabondIdleState());
+            }
+        }
+
+        public override void Exit(Vagabond owner) { }
+    }
+
+
+    public class VagabondHardLandingState : State<Vagabond>
+    {
+        public override bool BlocksInput => true;
+
+        public override void Enter(Vagabond owner)
+        {
+            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.Anim.CrossFade("Jump_HardLand", 0.1f);
+            owner.FinishJump();
+            Debug.Log("Hard Landing");
+
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, "Jump_HardLand", 0.9f))
+            {
+                owner.StateMachine.ChangeState(new VagabondIdleState());
+            }
+        }
+
+        public override void Exit(Vagabond owner) { }
+    }
+
+
+
 }
