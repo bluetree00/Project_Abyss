@@ -28,6 +28,48 @@ public class CharacterController : MonoBehaviour
 
     protected StateMachine<CharacterController> stateMachine;
 
+    [Header("Gravity & Jump Settings")]
+    [SerializeField] private float gravity = -30f;
+    [SerializeField] private float fallMultiplier = 2f;
+    [SerializeField] private float groundCheckDistance = 0.3f;
+    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private float jumpForce = 7f;
+
+    [Header("Hard Landing Settings")]
+    [SerializeField] private float hardLandingTimeThreshold = 0.8f;
+
+    private bool isGrounded;
+    private bool isJumping;
+    private float airTime = 0f;
+    private float airStartTime = 0f;
+
+    public enum AirState
+    {
+        None,
+        JumpStart,
+        InAir,
+        Landing
+    }
+
+    public AirState CurrentAirState { get; private set; } = AirState.None;
+
+    public void SetAirState(AirState state)
+    {
+        CurrentAirState = state;
+
+        if (state == AirState.InAir)
+        {
+            airStartTime = Time.time;
+        }
+    }
+
+    public bool IsInAir => CurrentAirState == AirState.InAir;
+    public bool IsHardLanding => (Time.time - airStartTime) >= hardLandingTimeThreshold;
+    public bool IsGrounded() => isGrounded;
+    public bool IsJumping() => isJumping;
+
+    public void FinishJump() => isJumping = false;
+
     private async void Awake()
     {
         await InitAsync();
@@ -36,6 +78,7 @@ public class CharacterController : MonoBehaviour
     protected virtual async Task InitAsync()
     {
         rb = GetComponent<Rigidbody>();
+        rb.useGravity = false;
         anim = GetComponent<Animator>();
         playerTransform = transform;
 
@@ -160,4 +203,62 @@ public class CharacterController : MonoBehaviour
     }
 
     protected virtual void Update() { }
+
+    private void FixedUpdate()
+    {
+        UpdateGroundedCheck();
+        UpdateAirStateAuto();
+        ApplyMassBasedGravity();
+    }
+
+    private void UpdateGroundedCheck()
+    {
+        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
+        float rayLength = 1.0f;
+
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+        {
+            isGrounded = true;
+        }
+        else
+        {
+            isGrounded = false;
+        }
+
+        Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
+    }
+
+    private void UpdateAirStateAuto()
+    {
+        if (!isGrounded && CurrentAirState == AirState.None)
+        {
+            SetAirState(AirState.InAir);
+        }
+        else if (isGrounded && CurrentAirState != AirState.None)
+        {
+            SetAirState(AirState.None);
+            FinishJump();
+        }
+    }
+
+    private void ApplyMassBasedGravity()
+    {
+        if (!isGrounded || isJumping)
+        {
+            float finalGravity = gravity;
+            if (rb.velocity.y < 0)
+                finalGravity *= fallMultiplier;
+
+            rb.AddForce(Vector3.up * finalGravity, ForceMode.Force);
+        }
+    }
+
+    public void Jump()
+    {
+        if (!isGrounded) return;
+
+        isJumping = true;
+        rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
+        rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+    }
 }

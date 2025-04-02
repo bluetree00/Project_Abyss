@@ -21,27 +21,21 @@ namespace Game.CharacterStates.OrcStates
         {
             Debug.Log("IdleState Enter 호출됨");
             owner.Anim.CrossFade("Idle", 0.1f);
-    
         }
 
         public override void Execute(OcrMonster owner)
-    {
-        if (owner.PlayerTransform == null)
-            return;
-
-        float distance = Vector3.Distance(owner.PlayerTransform.position, owner.transform.position);
-        if (distance <= owner.MonsterData._scacRange)
         {
-            owner._lockTarget = owner.PlayerTransform.gameObject;
-            owner.StateMachine.ChangeState(new MoveState());
-        }
-    }
+            if (owner.PlayerTransform == null)
+                return;
 
-
-        public override void Exit(OcrMonster owner)
-        {
-       
+            float distance = Vector3.Distance(owner.PlayerTransform.position, owner.transform.position);
+            if (distance <= owner.MonsterData._scacRange)
+            {
+                owner._lockTarget = owner.PlayerTransform.gameObject;
+                owner.StateMachine.ChangeState(new MoveState());
+            }
         }
+        public override void Exit(OcrMonster owner) {}
     }
 
 
@@ -52,7 +46,7 @@ namespace Game.CharacterStates.OrcStates
             owner.Anim.CrossFade("Moving", 0.1f);
         }
 
-      public override void Execute(OcrMonster owner)
+    public override void Execute(OcrMonster owner)
     {
         if (owner._lockTarget != null)
         {

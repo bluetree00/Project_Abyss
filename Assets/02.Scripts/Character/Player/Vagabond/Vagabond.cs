@@ -42,18 +42,22 @@ public class Vagabond : CharacterController
         await Task.CompletedTask;
     }
 
-    private void FreezeRotation() => rb.angularVelocity = Vector3.zero;
-
     protected override void Update()
     {
-          if (characterData == null || cinemachineCamera == null) return;
-        if (characterData == null) return;
+        if (characterData == null || cinemachineCamera == null) return;
 
         base.Update();
         CheckMovementInput();
         UpdateMovement();
         FreezeRotation();
         stateMachine.Update();
+
+         // 공중 상태 연동
+        if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
+        {
+            stateMachine.ChangeState(new VagabondInAirState());
+        }
+
 
         if (characterData.comboTimer > 0)
         {
@@ -77,6 +81,7 @@ public class Vagabond : CharacterController
         if (Input.GetKeyDown(KeyCode.G)) SetWeapon("basic_Knight_02");
         if (Input.GetKeyDown(KeyCode.F1)) RemoveWeapon(1);
         if (Input.GetKeyDown(KeyCode.F2)) RemoveWeapon(2);
+        if (Input.GetKeyDown(KeyCode.Space)) ProcessJump(); // ✅ 점프 입력 처리
     }
 
     private bool CanProcessInput() => !(stateMachine.CurrentState?.BlocksInput ?? false);
@@ -90,8 +95,6 @@ public class Vagabond : CharacterController
 
     private void CheckMovementInput()
     {
-
-
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
 
@@ -101,7 +104,6 @@ public class Vagabond : CharacterController
         forward.y = right.y = 0;
         moveDirection = (forward.normalized * v + right.normalized * h).normalized;
     }
-
 
     protected void UpdateMovement()
     {
@@ -119,6 +121,8 @@ public class Vagabond : CharacterController
             stateMachine.ChangeState(new VagabondIdleState());
         }
     }
+
+    private void FreezeRotation() => rb.angularVelocity = Vector3.zero;
 
     private void ProcessAttack()
     {
@@ -168,6 +172,13 @@ public class Vagabond : CharacterController
         rb.velocity = Vector3.zero;
         yield return new WaitForSeconds(characterData.dodgeCooldown);
         characterData.canDodge = true;
+    }
+
+    private void ProcessJump()
+    {
+        if (IsJumping() || !IsGrounded()) return;
+
+        stateMachine.ChangeState(new VagabondJumpStartState()); // ✅ 점프 시작 상태로 전환
     }
 
     private void ChangeWeapon(int index)
@@ -231,7 +242,7 @@ public class Vagabond : CharacterController
         }
     }
 
-    #region 이펙트 관련 (생략 가능)
+    #region 이펙트 관련
     public void FrontAttack() => SpawnEffect("FrontAttack", Vector3.forward);
     public void SpawnShinySlashEffect1() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 68));
     public void SpawnShinySlashEffect2() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 180));
