@@ -353,32 +353,34 @@ public class StageManager
         //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
         //사용된 스테이지는 제외
         HashSet<int> usedValues = new HashSet<int> { 1, 3, 4 }; // 사용된 스테이지 값 집합
-        int loopCount = 0; // 무한 루프 방지를 위한 카운터
-        int maxLoopCount = stageSequence.Count * 2; // 최대 루프 횟수 설정
-        do
-        {
-            if (usedValues.Contains(stageUsageDictionary[stageSequence[nextIndex].startStageName]))
-            {
-                // nextIndex++;
-                // if (nextIndex >= stageSequence.Count)
-                // {
-                //     nextIndex -= stageSequence.Count;
-                // }
-                nextIndex = (nextIndex + 1) % stageSequence.Count;
-                Debug.Log($"{nextIndex}");
+        int loopCount = 0;
+        int maxLoopCount = stageSequence.Count;
 
-                loopCount++;
-                if (loopCount > maxLoopCount)
-                {
-                    Debug.LogWarning("다음 스테이지 진행 중 무한 루프 감지.");
-                    break;
-                }
-            }
-            else
+        // ✅ 탐색하면서 도착한 스테이지를 새로운 기준으로 삼음
+        while (loopCount < maxLoopCount)
+        {
+            Debug.Log($"<color=gray> {loopCount} 번째 반복중...  </color>");
+            string stageName = stageSequence[nextIndex].startStageName;
+
+            if (!usedValues.Contains(stageUsageDictionary[stageName]))
             {
+                // 사용되지 않은 스테이지를 찾으면 즉시 탈출
+                Debug.Log("<color=green> 사용되지 않은 스테이지 발견. </color>");
                 break;
             }
-        } while (true);
+
+            // 현재 도착한 스테이지를 기준으로 다시 탐색 (기준점 변경)
+            currentIndex = nextIndex;
+            nextIndex = (currentIndex + 1) % stageSequence.Count;
+
+            loopCount++;
+        }
+
+        if (loopCount >= maxLoopCount)
+        {
+            Debug.LogWarning("모든 스테이지가 사용되었습니다.");
+            return;
+        }
 
         
 
@@ -398,7 +400,6 @@ public class StageManager
                 // 이벤트 스테이지로 진입
                 MoveToEventStage();
                 //stageSteps--;
-                Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
                 isStageMoving = false;
                 return;
             }
@@ -471,7 +472,6 @@ public class StageManager
 
                 // 이벤트 스테이지 사용 여부 업데이트
                 stageUsageDictionary[eventStageName] = 4; // 이벤트 스테이지 사용됨
-                Debug.Log($"<color=gray>Stage: {eventStageName}, Usage: {stageUsageDictionary[eventStageName]}</color>"); // 로그 출력
             }
             else
             {
