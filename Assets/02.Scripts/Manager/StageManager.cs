@@ -365,7 +365,6 @@ public class StageManager
             if (!usedValues.Contains(stageUsageDictionary[stageName]))
             {
                 // 사용되지 않은 스테이지를 찾으면 즉시 탈출
-                Debug.Log("<color=green> 사용되지 않은 스테이지 발견. </color>");
                 break;
             }
 
