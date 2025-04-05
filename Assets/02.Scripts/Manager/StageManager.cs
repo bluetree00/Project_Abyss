@@ -340,14 +340,6 @@ public class StageManager
             return;
         }
 
-        // // nextIndex는 현재 인덱스를 기준으로 다음 스테이지로 이동
-        // int nextIndex = currentIndex + steps;
-        // // nextIndex가 stageSequences의 범위보다 커지면 그 값만큼 빼줌
-        // if (nextIndex >= stageSequence.Count)
-        // {
-        //     nextIndex -= stageSequence.Count;
-        // }
-
         int nextIndex = (currentIndex + steps) % stageSequence.Count;
 
         //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
