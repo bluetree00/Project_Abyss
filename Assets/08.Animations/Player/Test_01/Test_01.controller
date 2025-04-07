@@ -59,7 +59,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Blend Tree
+  m_Name: MoveBlend
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
@@ -166,7 +166,7 @@ AnimatorStateMachine:
     m_Position: {x: 270, y: 880, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -4808324795611362665}
-    m_Position: {x: 965.6053, y: 318.3693, z: 0}
+    m_Position: {x: 290, y: 70, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions: []
   m_EntryTransitions: []
@@ -269,7 +269,7 @@ AnimatorController:
     m_DefaultFloat: 0
     m_DefaultInt: 0
     m_DefaultBool: 0
-    m_Controller: {fileID: 0}
+    m_Controller: {fileID: 9100000}
   m_AnimatorLayers:
   - serializedVersion: 5
     m_Name: Base Layer
@@ -471,7 +471,7 @@ BlendTree:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Blend Tree
+  m_Name: MoveBlend
   m_Childs:
   - serializedVersion: 2
     m_Motion: {fileID: 7400000, guid: 57ba4920ed5811e4ea680744879a1c3a, type: 3}

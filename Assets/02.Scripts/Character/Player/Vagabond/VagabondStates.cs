@@ -15,21 +15,35 @@ namespace Game.CharacterStates.VagabondStates
 
     public class VagabondIdleState : IdleState<Vagabond> { }
 
-    public class VagabondMoveState : State<Vagabond>
+    public class VagabondMoveBlendState : State<Vagabond>
+{
+    public override void Enter(Vagabond owner)
     {
-        public override bool BlocksInput => false;
-        public override void Enter(Vagabond owner) => owner.Anim.CrossFade("Moving", 0.2f);
-        public override void Execute(Vagabond owner) => owner.Move(owner.MoveDirection, owner.CharacterData.baseMoveSpeed);
-        public override void Exit(Vagabond owner) { }
+        owner.Anim.CrossFade("MoveBlend", 0.1f); // ✅ 반드시 Blend Tree 상태 이름
     }
 
-    public class VagabondRunState : State<Vagabond>
+    public override void Execute(Vagabond owner)
     {
-        public override bool BlocksInput => false;
-        public override void Enter(Vagabond owner) => owner.Anim.CrossFade("Runing", 0.2f);
-        public override void Execute(Vagabond owner) => owner.Move(owner.MoveDirection, owner.CharacterData.baseRunSpeed);
-        public override void Exit(Vagabond owner) { }
+        float moveAmount = owner.MoveDirection.magnitude;
+        float targetSpeed = moveAmount > 0
+            ? (Input.GetKey(KeyCode.LeftShift) ? 1f : 0.5f)
+            : 0f;
+
+        owner.Anim.SetFloat("MoveSpeed", targetSpeed, 0.1f, Time.deltaTime);
+
+        float moveSpeed = targetSpeed >= 0.9f
+            ? owner.CharacterData.baseRunSpeed
+            : owner.CharacterData.baseMoveSpeed;
+
+        owner.Move(owner.MoveDirection, moveSpeed);
     }
+
+    public override void Exit(Vagabond owner)
+    {
+        owner.Anim.SetFloat("MoveSpeed", 0f); // 종료 시 리셋
+    }
+}
+
 
     public class VagabondDodgeState : AnimationState<Vagabond>
     {
@@ -152,8 +166,8 @@ namespace Game.CharacterStates.VagabondStates
             {
                 owner.StateMachine.ChangeState(
                     owner.IsHardLanding
-                    ? new VagabondHardLandingState()
-                    : new VagabondLandingState());
+                        ? new VagabondHardLandingState()
+                        : new VagabondLandingState());
             }
         }
 

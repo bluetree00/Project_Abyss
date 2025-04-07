@@ -87,22 +87,19 @@ public class Vagabond : CharacterController
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
 
-    protected void UpdateMovement()
+        protected void UpdateMovement()
     {
         if (!CanProcessInput()) return;
 
-        if (moveDirection.magnitude > 0)
+        if (moveDirection.magnitude > 0.01f)
         {
-            if (inputActions.Player.Run.IsPressed())
-                stateMachine.ChangeState(new VagabondRunState());
-            else
-                stateMachine.ChangeState(new VagabondMoveState());
+            if (!(stateMachine.CurrentState is VagabondMoveBlendState))
+                stateMachine.ChangeState(new VagabondMoveBlendState());
         }
-        else
-        {
-            stateMachine.ChangeState(new VagabondIdleState());
-        }
+
     }
+
+
 
     private bool CanProcessInput() => !(stateMachine.CurrentState?.BlocksInput ?? false);
     private void FreezeRotation() => rb.angularVelocity = Vector3.zero;
