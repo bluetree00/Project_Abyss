@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Game.CharacterStates;
 using Game.CharacterStates.CharacterControllerStates;
+using UnityEngine.InputSystem;
 
 public class CharacterController : MonoBehaviour
 {
@@ -28,6 +29,9 @@ public class CharacterController : MonoBehaviour
 
     protected StateMachine<CharacterController> stateMachine;
 
+    protected PlayerInputActions inputActions;
+    protected bool inputReady = false;
+
     [Header("Gravity & Jump Settings")]
     [SerializeField] private float gravity = -30f;
     [SerializeField] private float fallMultiplier = 2f;
@@ -45,7 +49,6 @@ public class CharacterController : MonoBehaviour
 
     private bool isGrounded;
     private bool isJumping;
-    private float airTime = 0f;
     private float airStartTime = 0f;
 
     public enum AirState
@@ -63,16 +66,13 @@ public class CharacterController : MonoBehaviour
         CurrentAirState = state;
 
         if (state == AirState.InAir)
-        {
             airStartTime = Time.time;
-        }
     }
 
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= hardLandingTimeThreshold;
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
-
     public void FinishJump() => isJumping = false;
 
     private async void Awake()
@@ -97,7 +97,16 @@ public class CharacterController : MonoBehaviour
         await SetupWeaponAttachmentAsync("Weapon_parentR");
         await LoadWeaponDataAsync("basic_Knight_01");
 
+        LoadInputActions(); // ✅ 직접 생성
         await Task.CompletedTask;
+    }
+
+    protected void LoadInputActions()
+    {
+        inputActions = new PlayerInputActions();
+        inputActions.Enable(); // 전체 활성화 (또는 inputActions.Player.Enable())
+        inputReady = true;
+        Debug.Log("✅ PlayerInputActions 생성 및 활성화 완료");
     }
 
     protected async Task LoadCharacterDataAsync(string characterName)
@@ -217,7 +226,7 @@ public class CharacterController : MonoBehaviour
     public void StopHorizontalMovement()
     {
         if (IsInAir)
-            return; // 공중에서는 자연스러운 감속을 위해 멈추지 않음
+            return;
 
         rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
     }
@@ -230,18 +239,17 @@ public class CharacterController : MonoBehaviour
         UpdateAirStateAuto();
         ApplyMassBasedGravity();
 
-        // 공중/지상 상태에 따라 drag 변경
         rb.drag = IsInAir ? airDrag : groundDrag;
     }
 
-   private void UpdateGroundedCheck()
+    private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
         float rayLength = groundCheckDistance + 0.1f;
 
         if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
         {
-            isGrounded = hit.distance <= groundCheckDistance + 0.05f; // 약간 여유
+            isGrounded = hit.distance <= groundCheckDistance + 0.05f;
         }
         else
         {
@@ -250,7 +258,6 @@ public class CharacterController : MonoBehaviour
 
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
     }
-
 
     private void UpdateAirStateAuto()
     {
