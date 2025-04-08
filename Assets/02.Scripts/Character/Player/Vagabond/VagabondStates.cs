@@ -1,5 +1,7 @@
 using UnityEngine;
 using Game.CharacterStates.CharacterControllerStates;
+using Game.CharacterStates.StateMachine;
+using Game.Interfaces;
 
 namespace Game.CharacterStates.VagabondStates
 {
@@ -16,34 +18,33 @@ namespace Game.CharacterStates.VagabondStates
     public class VagabondIdleState : IdleState<Vagabond> { }
 
     public class VagabondMoveBlendState : State<Vagabond>
-{
-    public override void Enter(Vagabond owner)
     {
-        owner.Anim.CrossFade("MoveBlend", 0.1f); // ✅ 반드시 Blend Tree 상태 이름
+        public override void Enter(Vagabond owner)
+        {
+            owner.Anim.CrossFade("MoveBlend", 0.1f);
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            float moveAmount = owner.MoveDirection.magnitude;
+            float targetSpeed = moveAmount > 0
+                ? (Input.GetKey(KeyCode.LeftShift) ? 1f : 0.5f)
+                : 0f;
+
+            owner.Anim.SetFloat("MoveSpeed", targetSpeed, 0.1f, Time.deltaTime);
+
+            float moveSpeed = targetSpeed >= 0.9f
+                ? owner.CharacterData.baseRunSpeed
+                : owner.CharacterData.baseMoveSpeed;
+
+            owner.Move(owner.MoveDirection, moveSpeed);
+        }
+
+        public override void Exit(Vagabond owner)
+        {
+            owner.Anim.SetFloat("MoveSpeed", 0f);
+        }
     }
-
-    public override void Execute(Vagabond owner)
-    {
-        float moveAmount = owner.MoveDirection.magnitude;
-        float targetSpeed = moveAmount > 0
-            ? (Input.GetKey(KeyCode.LeftShift) ? 1f : 0.5f)
-            : 0f;
-
-        owner.Anim.SetFloat("MoveSpeed", targetSpeed, 0.1f, Time.deltaTime);
-
-        float moveSpeed = targetSpeed >= 0.9f
-            ? owner.CharacterData.baseRunSpeed
-            : owner.CharacterData.baseMoveSpeed;
-
-        owner.Move(owner.MoveDirection, moveSpeed);
-    }
-
-    public override void Exit(Vagabond owner)
-    {
-        owner.Anim.SetFloat("MoveSpeed", 0f); // 종료 시 리셋
-    }
-}
-
 
     public class VagabondDodgeState : AnimationState<Vagabond>
     {
@@ -53,7 +54,13 @@ namespace Game.CharacterStates.VagabondStates
             base.Enter(owner);
         }
 
-        protected override void OnAnimationEnd(Vagabond owner) { }
+        protected override void OnAnimationEnd(Vagabond owner)
+        {
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
+        }
     }
 
     public class VagabondComboAttackState : AnimationState<Vagabond>
@@ -79,7 +86,11 @@ namespace Game.CharacterStates.VagabondStates
             {
                 owner.CharacterData.attackComboStep = 0;
                 owner.CharacterData.comboTimer = 0;
-                owner.StateMachine.ChangeState(new VagabondIdleState());
+            }
+
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
             }
         }
     }
@@ -102,7 +113,10 @@ namespace Game.CharacterStates.VagabondStates
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            owner.StateMachine.ChangeState(new VagabondIdleState());
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
         }
     }
 
@@ -116,7 +130,10 @@ namespace Game.CharacterStates.VagabondStates
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            owner.StateMachine.ChangeState(new VagabondIdleState());
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
         }
     }
 
@@ -130,7 +147,10 @@ namespace Game.CharacterStates.VagabondStates
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            owner.StateMachine.ChangeState(new VagabondIdleState());
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
         }
     }
 
@@ -182,12 +202,14 @@ namespace Game.CharacterStates.VagabondStates
             owner.FinishJump();
             SetupAnimation("Jump_Land", 0.3f);
             base.Enter(owner);
-            Debug.Log("Jump_Land");
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            owner.StateMachine.ChangeState(new VagabondIdleState());
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
         }
     }
 
@@ -199,12 +221,39 @@ namespace Game.CharacterStates.VagabondStates
             owner.FinishJump();
             SetupAnimation("Jump_HardLand", 0.9f);
             base.Enter(owner);
-            Debug.Log("Hard Landing");
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            owner.StateMachine.ChangeState(new VagabondIdleState());
+            if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
         }
     }
-}
+
+    public class CommonSwordAttack1 : AnimationState<Vagabond>
+    {
+        private readonly AttackStateMachine<Vagabond> machine;
+
+        public CommonSwordAttack1(AttackStateMachine<Vagabond> sm) => machine = sm;
+
+        public override void Enter(Vagabond owner)
+        {
+            SetupAnimation(owner.currentWeapon.normalAttackAnimations[0], owner.currentWeapon.comboEndTimes[0]);
+            base.Enter(owner);
+        }
+
+        protected override void OnAnimationEnd(Vagabond owner)
+        {
+            if (machine.NextComboQueued)
+            {
+                // machine.ChangeState(new CommonSwordAttack2(machine));
+            }
+            else if (owner is IIdleStateProvider<Vagabond> idleProvider)
+            {
+                owner.StateMachine.ChangeState(idleProvider.GetIdleState());
+            }
+        }
+    }
+} 

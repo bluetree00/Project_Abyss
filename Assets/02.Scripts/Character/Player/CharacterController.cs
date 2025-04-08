@@ -23,11 +23,15 @@ public class CharacterController : MonoBehaviour
     [SerializeField] protected Define.State _state = Define.State.Idle;
     [SerializeField] protected Vector3 _destPos;
     [SerializeField] protected GameObject _lockTarget;
-    [SerializeField] protected Rigidbody rb;
+    [SerializeField] private Rigidbody rb;
+    public Rigidbody Rigid => rb;
+
 
     public Transform playerTransform;
 
     protected StateMachine<CharacterController> stateMachine;
+    public StateMachine<CharacterController> StateMachine => stateMachine;
+
 
     protected PlayerInputActions inputActions;
     protected bool inputReady = false;
@@ -74,6 +78,12 @@ public class CharacterController : MonoBehaviour
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
+
+    public virtual string GetIdleAnimationName()
+    {
+        return "Idle"; // 기본값
+    }
+
 
     private async void Awake()
     {
