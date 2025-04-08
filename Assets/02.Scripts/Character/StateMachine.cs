@@ -54,6 +54,11 @@ namespace Game.CharacterStates
         {
             throw new NotImplementedException();
         }
+
+        internal void ChangeState<T>(CharacterControllerStates.IdleState<T> idleState) where T : CharacterController
+        {
+            throw new NotImplementedException();
+        }
     }
 
 }

@@ -20,10 +20,10 @@ MonoBehaviour:
   attackComboStep: 0
   comboTimer: 0
   comboDuration: 3
-  canDodge: 0
-  dashSpeed: 10
+  canDodge: 1
+  dashSpeed: 15
   dashDuration: 0.2
-  dodgeCooldown: 2
+  dodgeCooldown: 0.5
   attackPowerBoostAmount: 72.5
   attackPowerBoostDuration: 10
   moveSpeedBoostAmount: 10
