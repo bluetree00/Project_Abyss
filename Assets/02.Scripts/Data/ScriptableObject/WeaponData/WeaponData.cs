@@ -90,6 +90,19 @@ public abstract class WeaponData : ScriptableObject, IComboAttackProvider
         }
     }
 
+    public virtual string GetNormalAttackAnimation(int step)
+    {
+        if (normalAttackAnimations == null || normalAttackAnimations.Length == 0)
+            return "DefaultAttack"; // fallback
+
+        if (step <= 0 || step > normalAttackAnimations.Length)
+            return normalAttackAnimations[0];
+
+        return normalAttackAnimations[step - 1];
+    }
+
+
+
     /// <summary>
     /// 이 무기에 해당하는 공격 상태 머신 반환
     /// 캐릭터 타입에 따라 유효성을 판단할 수 있음
