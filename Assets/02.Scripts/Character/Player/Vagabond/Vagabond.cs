@@ -91,6 +91,13 @@ public class Vagabond : CharacterController
 
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
             stateMachine.ChangeState(GetState<VagabondInAirState>());
+
+        if (characterData.comboTimer > 0)
+        {
+            characterData.comboTimer -= Time.deltaTime;
+            if (characterData.comboTimer <= 0)
+                ResetCombo();
+        }
     }
 
     private void CheckMovementInput()
@@ -112,33 +119,51 @@ public class Vagabond : CharacterController
     private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
-    private void ProcessAttack()
+     private void ProcessAttack()
     {
         if (!CanProcessInput()) return;
+
+        characterData.comboTimer = characterData.comboDuration;
         characterData.attackComboStep++;
+
         if (characterData.attackComboStep > currentWeapon.maxComboCount)
             characterData.attackComboStep = 1;
 
-        string animName = currentWeapon.GetNormalAttackAnimation(characterData.attackComboStep);
+        string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
         stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
+    }
+
+    private void ResetCombo()
+    {
+        characterData.attackComboStep = 0;
+        characterData.comboTimer = 0;
+        stateMachine.ChangeState(GetState<VagabondIdleState>());
     }
 
     private void ProcessDodge()
     {
         if (!CanProcessInput() || !characterData.canDodge) return;
+        isInputLocked = true;
         dodgeCoroutine = StartCoroutine(DashCoroutine());
     }
+
 
     private IEnumerator DashCoroutine()
     {
         characterData.canDodge = false;
         stateMachine.ChangeState(GetState<VagabondDodgeState>());
 
+        yield return null; // Ensure animator updates in first frame
+
         float startTime = Time.time;
+        Vector3 dashDir = moveDirection != Vector3.zero ? moveDirection : transform.forward;
+        if (dashDir == Vector3.zero)
+            dashDir = transform.forward; // Ensure fallback direction
+
         while (Time.time < startTime + characterData.dashDuration)
         {
             CheckMovementInput();
-            Vector3 dashDir = moveDirection != Vector3.zero ? moveDirection : transform.forward;
+            if (moveDirection != Vector3.zero) dashDir = moveDirection;
             Rigid.velocity = dashDir * characterData.dashSpeed;
 
             Quaternion targetRot = Quaternion.LookRotation(dashDir);
@@ -147,6 +172,8 @@ public class Vagabond : CharacterController
         }
 
         Rigid.velocity = Vector3.zero;
+        isInputLocked = false;
+        stateMachine.ChangeState(GetState<VagabondIdleState>()); 
         yield return new WaitForSeconds(characterData.dodgeCooldown);
         characterData.canDodge = true;
     }
