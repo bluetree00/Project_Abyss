@@ -1,4 +1,8 @@
+// 일부 클래스 생략된 상태로, 주요 리팩토링이 적용된 Vagabond 클래스입니다.
+
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using Cinemachine;
@@ -10,6 +14,8 @@ public class Vagabond : CharacterController
     [SerializeField] private CinemachineFreeLook cinemachineCamera;
 
     private Coroutine dodgeCoroutine;
+    private Coroutine inputLockCoroutine;
+
     private bool isInventoryOpen = false;
     private bool isInputLocked = false;
     private float inputLockDuration = 2f;
@@ -17,11 +23,28 @@ public class Vagabond : CharacterController
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
 
+    private Dictionary<Type, State<Vagabond>> cachedStates = new();
+
     private async void Start()
     {
         await InitAsync();
-        stateMachine.Setup(this, new VagabondIdleState());
+        CacheStates();
+        stateMachine.Setup(this, GetState<VagabondIdleState>());
     }
+
+    private void CacheStates()
+    {
+        cachedStates[typeof(VagabondIdleState)] = new VagabondIdleState();
+        cachedStates[typeof(VagabondMoveBlendState)] = new VagabondMoveBlendState();
+        cachedStates[typeof(VagabondInAirState)] = new VagabondInAirState();
+        cachedStates[typeof(VagabondJumpStartState)] = new VagabondJumpStartState();
+        cachedStates[typeof(VagabondSkillState)] = new VagabondSkillState();
+        cachedStates[typeof(VagabondUltimateState)] = new VagabondUltimateState();
+        cachedStates[typeof(VagabondDodgeState)] = new VagabondDodgeState();
+        cachedStates[typeof(VagabondChangeWeaponState)] = new VagabondChangeWeaponState();
+    }
+
+    public  T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
 
     protected override async Task InitAsync()
     {
@@ -37,7 +60,7 @@ public class Vagabond : CharacterController
         }
 
         if (inputReady)
-            BindInputActions(); // ✅ 입력 바인딩
+            BindInputActions();
     }
 
     private void BindInputActions()
@@ -45,8 +68,8 @@ public class Vagabond : CharacterController
         inputActions.Player.Attack.performed += _ => ProcessAttack();
         inputActions.Player.Dodge.performed += _ => ProcessDodge();
         inputActions.Player.Jump.performed += _ => ProcessJump();
-        inputActions.Player.Skill.performed += _ => ProcessSkill();
-        inputActions.Player.Ultimate.performed += _ => ProcessUltimate();
+        inputActions.Player.Skill.performed += _ => stateMachine.ChangeState(GetState<VagabondSkillState>());
+        inputActions.Player.Ultimate.performed += _ => stateMachine.ChangeState(GetState<VagabondUltimateState>());
         inputActions.Player.InventoryToggle.performed += _ => ToggleInventory();
         inputActions.Player.CloseInventory.performed += _ => CloseInventory();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(1);
@@ -67,63 +90,38 @@ public class Vagabond : CharacterController
         stateMachine.Update();
 
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
-            stateMachine.ChangeState(new VagabondInAirState());
-
-        if (characterData.comboTimer > 0)
-        {
-            characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0) ResetCombo();
-        }
+            stateMachine.ChangeState(GetState<VagabondInAirState>());
     }
 
-     private void CheckMovementInput()
+    private void CheckMovementInput()
     {
         Vector2 input = inputActions.Player.Move.ReadValue<Vector2>();
-
         Vector3 forward = cinemachineCamera.transform.forward;
         Vector3 right = cinemachineCamera.transform.right;
         forward.y = right.y = 0;
-
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
 
     protected void UpdateMovement()
     {
         if (!CanProcessInput()) return;
-
-        if (moveDirection.magnitude > 0.01f)
-        {
-            if (!(stateMachine.CurrentState is VagabondMoveBlendState))
-                stateMachine.ChangeState(new VagabondMoveBlendState());
-        }
+        if (moveDirection.magnitude > 0.01f && !(stateMachine.CurrentState is VagabondMoveBlendState))
+            stateMachine.ChangeState(GetState<VagabondMoveBlendState>());
     }
 
-    private bool CanProcessInput() => !(stateMachine.CurrentState?.BlocksInput ?? false);
+    private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
     private void ProcessAttack()
     {
         if (!CanProcessInput()) return;
-
-        characterData.comboTimer = characterData.comboDuration;
         characterData.attackComboStep++;
-
         if (characterData.attackComboStep > currentWeapon.maxComboCount)
             characterData.attackComboStep = 1;
 
-        string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
+        string animName = currentWeapon.GetNormalAttackAnimation(characterData.attackComboStep);
         stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
     }
-
-    private void ResetCombo()
-    {
-        characterData.attackComboStep = 0;
-        characterData.comboTimer = 0;
-        stateMachine.ChangeState(new VagabondIdleState());
-    }
-
-    private void ProcessSkill() => stateMachine.ChangeState(new VagabondSkillState());
-    private void ProcessUltimate() => stateMachine.ChangeState(new VagabondUltimateState());
 
     private void ProcessDodge()
     {
@@ -134,7 +132,7 @@ public class Vagabond : CharacterController
     private IEnumerator DashCoroutine()
     {
         characterData.canDodge = false;
-        stateMachine.ChangeState(new VagabondDodgeState());
+        stateMachine.ChangeState(GetState<VagabondDodgeState>());
 
         float startTime = Time.time;
         while (Time.time < startTime + characterData.dashDuration)
@@ -156,41 +154,40 @@ public class Vagabond : CharacterController
     private void ProcessJump()
     {
         if (IsJumping() || !IsGrounded()) return;
-        stateMachine.ChangeState(new VagabondJumpStartState());
+        stateMachine.ChangeState(GetState<VagabondJumpStartState>());
     }
 
     private void ChangeWeapon(int index)
     {
         if (isInputLocked) return;
-
         weaponContainer.isWeaponEquipped = false;
         Managers.Weapon.ChangeWeapon(index);
 
         if (weaponContainer.ownWeapons[index - 1] == null)
         {
-            stateMachine.ChangeState(new VagabondIdleState());
+            stateMachine.ChangeState(GetState<VagabondIdleState>());
         }
         else
         {
-            stateMachine.ChangeState(new VagabondChangeWeaponState());
+            stateMachine.ChangeState(GetState<VagabondChangeWeaponState>());
             currentWeapon = Managers.Weapon.GetCurrentWeaponData();
         }
 
-        StartCoroutine(LockInput(inputLockDuration));
+        LockInput(inputLockDuration);
     }
 
     private void SetWeapon(string weaponName)
     {
         if (isInputLocked) return;
         Managers.Weapon.SetWeapon(weaponName);
-        StartCoroutine(LockInput(inputLockDuration));
+        LockInput(inputLockDuration);
     }
 
     private void RemoveWeapon(int index)
     {
         Managers.Weapon.RemoveWeapon(index);
         if (currentWeapon == null)
-            stateMachine.ChangeState(new VagabondIdleState());
+            stateMachine.ChangeState(GetState<VagabondIdleState>());
     }
 
     private void ToggleInventory()
@@ -206,7 +203,7 @@ public class Vagabond : CharacterController
         {
             Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
             isInventoryOpen = true;
-            StartCoroutine(LockInput(inputLockDuration));
+            LockInput(inputLockDuration);
         }
     }
 
@@ -219,7 +216,15 @@ public class Vagabond : CharacterController
         }
     }
 
-    private IEnumerator LockInput(float sec)
+    private void LockInput(float sec)
+    {
+        if (inputLockCoroutine != null)
+            StopCoroutine(inputLockCoroutine);
+
+        inputLockCoroutine = StartCoroutine(LockInputCoroutine(sec));
+    }
+
+    private IEnumerator LockInputCoroutine(float sec)
     {
         isInputLocked = true;
         yield return new WaitForSeconds(sec);
@@ -248,8 +253,13 @@ public class Vagabond : CharacterController
             spawnRotation *= Quaternion.Euler(additionalRotation.Value);
 
         GameObject effectObject = Managers.ObjectPooler.SpawnFromPool(effectName, spawnPosition, spawnRotation);
-        effectObject.transform.position = spawnPosition;
-        effectObject.transform.rotation = spawnRotation;
+        if (effectObject == null)
+        {
+            Debug.LogWarning($"{effectName} 이펙트 생성 실패");
+            return;
+        }
+
+        effectObject.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
     }
     #endregion
 }
