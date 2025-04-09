@@ -28,5 +28,16 @@ MonoBehaviour:
   attackPowerBoostDuration: 10
   moveSpeedBoostAmount: 10
   moveSpeedBoostDuration: 3
+  jumpForce: 7
+  gravity: -30
+  fallMultiplier: 2
+  groundCheckDistance: 0.3
+  hardLandingTimeThreshold: 0.8
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  airControlMultiplier: 0.5
+  groundDrag: 4
+  airDrag: 0.5
   equippedWeapon: {fileID: 0}
   conClass: 0
