@@ -3,6 +3,47 @@ using UnityEngine;
 namespace Game.CharacterStates.CharacterControllerStates
 {
 
+    public abstract class AnimationState<T> : State<T> where T : CharacterController
+    {
+        private string _animName;
+        private float _endTime = 0.95f;
+        private int _layer = 0;
+        private bool _blocksInput = true;
+
+        public override bool BlocksInput => _blocksInput;
+
+        protected void SetupAnimation(string animName, float endTime = 0.95f, int layer = 0)
+        {
+            _animName = animName;
+            _endTime = endTime;
+            _layer = layer;
+        }
+
+        public override void Enter(T owner)
+        {
+            owner.Anim.CrossFade(_animName, 0.1f);
+        }
+
+        public override void Execute(T owner)
+        {
+            if (owner.Anim.IsInTransition(_layer)) return; // 전이 중이면 건너뜀
+            
+            if (AnimationHelper.IsAnimationFinished(owner.Anim, _animName, _endTime, _layer))
+            {
+                _blocksInput = false;
+                OnAnimationEnd(owner);
+            }
+        }
+
+        public override void Exit(T owner)
+        {
+            _blocksInput = false;
+        }
+
+        protected abstract void OnAnimationEnd(T owner);
+    }
+
+
     // 기본 상속할 상태 클래스들
 
    public class IdleState<T> : State<T> where T : CharacterController
