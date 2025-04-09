@@ -56,11 +56,9 @@ namespace Game.CharacterStates.VagabondStates
         protected override void OnAnimationEnd(Vagabond owner) { }
     }
 
-   public class VagabondComboAttackState : AnimationState<Vagabond>
+      public class VagabondComboAttackState : AnimationState<Vagabond>
     {
         private readonly int comboIndex;
-
-        public override bool BlocksInput => true;
 
         public VagabondComboAttackState(string animName, int comboStep)
         {
@@ -71,7 +69,7 @@ namespace Game.CharacterStates.VagabondStates
         public override void Enter(Vagabond owner)
         {
             float endTime = owner.currentWeapon.comboEndTimes[comboIndex - 1];
-            SetupAnimation(owner.currentWeapon.GetNormalAttackAnimation(comboIndex), endTime);
+            SetupAnimation(owner.currentWeapon.normalAttackAnimations[comboIndex - 1], endTime);
             base.Enter(owner);
         }
 
@@ -81,7 +79,7 @@ namespace Game.CharacterStates.VagabondStates
             {
                 owner.CharacterData.attackComboStep = 0;
                 owner.CharacterData.comboTimer = 0;
-                owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
+                owner.StateMachine.ChangeState(new VagabondIdleState());
             }
         }
     }
