@@ -36,6 +36,21 @@ public class CharacterData : ScriptableObject
     public float moveSpeedBoostAmount = 10f;
     public float moveSpeedBoostDuration = 3f;
 
+       [Header("점프 및 중력 설정")]
+    public float jumpForce = 7f;
+    public float gravity = -30f;
+    public float fallMultiplier = 2f;
+
+    [Header("지면 체크 및 착지 관련")]
+    public float groundCheckDistance = 0.3f;
+    public float hardLandingTimeThreshold = 0.8f;
+    public LayerMask groundLayer;
+
+    [Header("물리 이동 관련")]
+    public float airControlMultiplier = 0.5f;
+    public float groundDrag = 4f;
+    public float airDrag = 0.5f;
+
     // 초기 스탯 수치
     private float initialBaseMoveSpeed;
     private float initialBaseRunSpeed;

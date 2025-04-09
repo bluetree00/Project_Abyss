@@ -26,97 +26,69 @@ public class CharacterController : MonoBehaviour
     [SerializeField] private Rigidbody rb;
     public Rigidbody Rigid => rb;
 
-
     public Transform playerTransform;
 
     protected StateMachine<CharacterController> stateMachine;
     public StateMachine<CharacterController> StateMachine => stateMachine;
 
-
     protected PlayerInputActions inputActions;
     protected bool inputReady = false;
-
-    [Header("Gravity & Jump Settings")]
-    [SerializeField] private float gravity = -30f;
-    [SerializeField] private float fallMultiplier = 2f;
-    [SerializeField] private float groundCheckDistance = 0.3f;
-    [SerializeField] private LayerMask groundLayer;
-    [SerializeField] private float jumpForce = 7f;
-
-    [Header("Hard Landing Settings")]
-    [SerializeField] private float hardLandingTimeThreshold = 0.8f;
-
-    [Header("Movement Settings")]
-    [SerializeField] private float airControlMultiplier = 0.5f;
-    [SerializeField] private float groundDrag = 4f;
-    [SerializeField] private float airDrag = 0.5f;
 
     private bool isGrounded;
     private bool isJumping;
     private float airStartTime = 0f;
 
-    public enum AirState
-    {
-        None,
-        JumpStart,
-        InAir,
-        Landing
-    }
-
+    public enum AirState { None, JumpStart, InAir, Landing }
     public AirState CurrentAirState { get; private set; } = AirState.None;
 
     public void SetAirState(AirState state)
     {
         CurrentAirState = state;
-
         if (state == AirState.InAir)
             airStartTime = Time.time;
     }
 
     public bool IsInAir => CurrentAirState == AirState.InAir;
-    public bool IsHardLanding => (Time.time - airStartTime) >= hardLandingTimeThreshold;
+    public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
 
-    public virtual string GetIdleAnimationName()
-    {
-        return "Idle"; // 기본값
-    }
-
+    public virtual string GetIdleAnimationName() => "Idle";
 
     private async void Awake()
     {
         await InitAsync();
     }
 
-    protected virtual async Task InitAsync()
+   protected virtual async Task InitAsync()
     {
         rb = GetComponent<Rigidbody>();
-        rb.useGravity = false;
-        rb.drag = groundDrag;
-
         anim = GetComponent<Animator>();
         playerTransform = transform;
 
         string characterName = gameObject.name.Replace("(Clone)", "");
         string characterClass = Define.GetCharacterClassString(characterName);
 
-        await LoadCharacterDataAsync(characterName);
+        await LoadCharacterDataAsync(characterName); // ❗ 반드시 먼저 로드
+
+        // ✅ characterData가 로드된 후에 접근
+        rb.useGravity = false;
+        rb.drag = characterData.groundDrag;
+
         await LoadWeaponContainerAsync(characterClass);
         await SetupWeaponAttachmentAsync("Weapon_parentR");
         await LoadWeaponDataAsync("basic_Knight_01");
 
-        LoadInputActions(); // ✅ 직접 생성
-        await Task.CompletedTask;
+        LoadInputActions();
     }
+
 
     protected void LoadInputActions()
     {
         inputActions = new PlayerInputActions();
-        inputActions.Enable(); // 전체 활성화 (또는 inputActions.Player.Enable())
+        inputActions.Enable();
         inputReady = true;
-        Debug.Log("✅ PlayerInputActions 생성 및 활성화 완료");
     }
 
     protected async Task LoadCharacterDataAsync(string characterName)
@@ -135,7 +107,6 @@ public class CharacterController : MonoBehaviour
             Managers.CharacterData.SetCharacterData(characterData);
             characterData.canDodge = true;
 
-            Debug.Log($"캐릭터 데이터({characterData.characterName}) 로드됨");
             tcs.SetResult(true);
         });
 
@@ -147,16 +118,8 @@ public class CharacterController : MonoBehaviour
         var tcs = new TaskCompletionSource<bool>();
         AddressablesManager.Instance.LoadAsset<WeaponContainer>(classKey, container =>
         {
-            if (container == null)
-            {
-                Debug.LogError("무기 컨테이너가 null입니다.");
-                tcs.SetResult(false);
-                return;
-            }
-
             weaponContainer = container;
-            Debug.Log($"무기 컨테이너({weaponContainer.name}) 로드됨");
-            tcs.SetResult(true);
+            tcs.SetResult(container != null);
         });
 
         await tcs.Task;
@@ -166,14 +129,7 @@ public class CharacterController : MonoBehaviour
     {
         Transform handTransform = FindDeepChildBFS(playerTransform, handName);
         if (handTransform != null)
-        {
             Managers.Weapon.ContainerDataInit(weaponContainer, handTransform);
-        }
-        else
-        {
-            Debug.LogError($"{handName} 트랜스폼을 찾을 수 없습니다.");
-        }
-
         await Task.CompletedTask;
     }
 
@@ -182,16 +138,8 @@ public class CharacterController : MonoBehaviour
         var tcs = new TaskCompletionSource<bool>();
         AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, data =>
         {
-            if (data == null)
-            {
-                Debug.LogError("무기 데이터가 null입니다.");
-                tcs.SetResult(false);
-                return;
-            }
-
             currentWeapon = data;
-            Debug.Log($"기본 무기 데이터({currentWeapon.weaponName}) 로드됨");
-            tcs.SetResult(true);
+            tcs.SetResult(data != null);
         });
 
         await tcs.Task;
@@ -209,9 +157,7 @@ public class CharacterController : MonoBehaviour
                 return current;
 
             foreach (Transform child in current)
-            {
                 queue.Enqueue(child);
-            }
         }
 
         return null;
@@ -226,7 +172,7 @@ public class CharacterController : MonoBehaviour
         }
 
         Vector3 normalizedDirection = direction.normalized;
-        float appliedSpeed = IsInAir ? speed * airControlMultiplier : speed;
+        float appliedSpeed = IsInAir ? speed * characterData.airControlMultiplier : speed;
         rb.velocity = new Vector3(normalizedDirection.x * appliedSpeed, rb.velocity.y, normalizedDirection.z * appliedSpeed);
 
         Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
@@ -235,9 +181,7 @@ public class CharacterController : MonoBehaviour
 
     public void StopHorizontalMovement()
     {
-        if (IsInAir)
-            return;
-
+        if (IsInAir) return;
         rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
     }
 
@@ -245,21 +189,25 @@ public class CharacterController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (characterData == null)
+            return; // 아직 초기화 안 되었음
+
         UpdateGroundedCheck();
         UpdateAirStateAuto();
         ApplyMassBasedGravity();
 
-        rb.drag = IsInAir ? airDrag : groundDrag;
+        rb.drag = IsInAir ? characterData.airDrag : characterData.groundDrag;
     }
+
 
     private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-        float rayLength = groundCheckDistance + 0.1f;
+        float rayLength = characterData.groundCheckDistance + 0.1f;
 
-        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayLength, characterData.groundLayer))
         {
-            isGrounded = hit.distance <= groundCheckDistance + 0.05f;
+            isGrounded = hit.distance <= characterData.groundCheckDistance + 0.05f;
         }
         else
         {
@@ -286,9 +234,9 @@ public class CharacterController : MonoBehaviour
     {
         if (!isGrounded || isJumping)
         {
-            float finalGravity = gravity;
+            float finalGravity = characterData.gravity;
             if (rb.velocity.y < 0)
-                finalGravity *= fallMultiplier;
+                finalGravity *= characterData.fallMultiplier;
 
             rb.AddForce(Vector3.up * finalGravity, ForceMode.Force);
         }
@@ -300,6 +248,6 @@ public class CharacterController : MonoBehaviour
 
         isJumping = true;
         rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
-        rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+        rb.AddForce(Vector3.up * characterData.jumpForce, ForceMode.Impulse);
     }
 }
