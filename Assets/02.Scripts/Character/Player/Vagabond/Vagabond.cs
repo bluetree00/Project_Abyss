@@ -1,5 +1,3 @@
-// 일부 클래스 생략된 상태로, 주요 리팩토링이 적용된 Vagabond 클래스입니다.
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,15 +11,20 @@ public class Vagabond : CharacterController
 {
     [SerializeField] private CinemachineFreeLook cinemachineCamera;
 
-    private Coroutine dodgeCoroutine;
     private Coroutine inputLockCoroutine;
-
     private bool isInventoryOpen = false;
     private bool isInputLocked = false;
     private float inputLockDuration = 2f;
 
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
+
+    public override void GoToIdleState()
+{
+    stateMachine.ChangeState(GetState<VagabondIdleState>());
+}
+
+
 
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
 
@@ -44,11 +47,14 @@ public class Vagabond : CharacterController
         cachedStates[typeof(VagabondChangeWeaponState)] = new VagabondChangeWeaponState();
     }
 
-    public  T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
+    public T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
 
     protected override async Task InitAsync()
     {
         await base.InitAsync();
+
+        MoveAbility = new DefaultMoveAbility();               // 커스텀 이동
+        DodgeAbility = new DefaultDodgeAbility();          // 커스텀 회피
 
         if (cinemachineCamera == null)
             cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();
@@ -66,7 +72,7 @@ public class Vagabond : CharacterController
     private void BindInputActions()
     {
         inputActions.Player.Attack.performed += _ => ProcessAttack();
-        inputActions.Player.Dodge.performed += _ => ProcessDodge();
+        inputActions.Player.Dodge.performed += _ => DodgeAbility?.Dodge(this);
         inputActions.Player.Jump.performed += _ => ProcessJump();
         inputActions.Player.Skill.performed += _ => stateMachine.ChangeState(GetState<VagabondSkillState>());
         inputActions.Player.Ultimate.performed += _ => stateMachine.ChangeState(GetState<VagabondUltimateState>());
@@ -85,6 +91,7 @@ public class Vagabond : CharacterController
 
         base.Update();
         CheckMovementInput();
+        MoveAbility?.Move(this, moveDirection);
         UpdateMovement();
         FreezeRotation();
         stateMachine.Update();
@@ -119,7 +126,7 @@ public class Vagabond : CharacterController
     private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
-     private void ProcessAttack()
+    private void ProcessAttack()
     {
         if (!CanProcessInput()) return;
 
@@ -138,44 +145,6 @@ public class Vagabond : CharacterController
         characterData.attackComboStep = 0;
         characterData.comboTimer = 0;
         stateMachine.ChangeState(GetState<VagabondIdleState>());
-    }
-
-    private void ProcessDodge()
-    {
-        if (!CanProcessInput() || !characterData.canDodge) return;
-        isInputLocked = true;
-        dodgeCoroutine = StartCoroutine(DashCoroutine());
-    }
-
-
-    private IEnumerator DashCoroutine()
-    {
-        characterData.canDodge = false;
-        stateMachine.ChangeState(GetState<VagabondDodgeState>());
-
-        yield return null; // Ensure animator updates in first frame
-
-        float startTime = Time.time;
-        Vector3 dashDir = moveDirection != Vector3.zero ? moveDirection : transform.forward;
-        if (dashDir == Vector3.zero)
-            dashDir = transform.forward; // Ensure fallback direction
-
-        while (Time.time < startTime + characterData.dashDuration)
-        {
-            CheckMovementInput();
-            if (moveDirection != Vector3.zero) dashDir = moveDirection;
-            Rigid.velocity = dashDir * characterData.dashSpeed;
-
-            Quaternion targetRot = Quaternion.LookRotation(dashDir);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
-            yield return null;
-        }
-
-        Rigid.velocity = Vector3.zero;
-        isInputLocked = false;
-        stateMachine.ChangeState(GetState<VagabondIdleState>()); 
-        yield return new WaitForSeconds(characterData.dodgeCooldown);
-        characterData.canDodge = true;
     }
 
     private void ProcessJump()
