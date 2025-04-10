@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Game.CharacterStates;
 using Game.CharacterStates.CharacterControllerStates;
-using UnityEngine.InputSystem;
 
 public class CharacterController : MonoBehaviour
 {
@@ -28,11 +28,11 @@ public class CharacterController : MonoBehaviour
 
     public Transform playerTransform;
 
-    protected StateMachine<CharacterController> stateMachine;
-    public StateMachine<CharacterController> StateMachine => stateMachine;
-
     protected PlayerInputActions inputActions;
     protected bool inputReady = false;
+
+    public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
+    public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
 
     private bool isGrounded;
     private bool isJumping;
@@ -41,27 +41,32 @@ public class CharacterController : MonoBehaviour
     public enum AirState { None, JumpStart, InAir, Landing }
     public AirState CurrentAirState { get; private set; } = AirState.None;
 
-    public void SetAirState(AirState state)
-    {
-        CurrentAirState = state;
-        if (state == AirState.InAir)
-            airStartTime = Time.time;
-    }
-
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
+
+    // CharacterController.cs
+    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
+    public StateMachine<CharacterController> StateMachine => stateMachine;
+
+
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
 
-    public virtual string GetIdleAnimationName() => "Idle";
+    // CharacterController.cs
+    public virtual void GoToIdleState()
+    {
+        // 기본 구현은 아무것도 안 해도 되고
+    }
+
+
 
     private async void Awake()
     {
         await InitAsync();
     }
 
-   protected virtual async Task InitAsync()
+    protected virtual async Task InitAsync()
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
@@ -70,9 +75,7 @@ public class CharacterController : MonoBehaviour
         string characterName = gameObject.name.Replace("(Clone)", "");
         string characterClass = Define.GetCharacterClassString(characterName);
 
-        await LoadCharacterDataAsync(characterName); // ❗ 반드시 먼저 로드
-
-        // ✅ characterData가 로드된 후에 접근
+        await LoadCharacterDataAsync(characterName);
         rb.useGravity = false;
         rb.drag = characterData.groundDrag;
 
@@ -81,8 +84,11 @@ public class CharacterController : MonoBehaviour
         await LoadWeaponDataAsync("basic_Knight_01");
 
         LoadInputActions();
-    }
 
+        // ✅ 기본 모듈 지정
+        MoveAbility = new DefaultMoveAbility();
+        DodgeAbility = new DefaultDodgeAbility();
+    }
 
     protected void LoadInputActions()
     {
@@ -185,12 +191,18 @@ public class CharacterController : MonoBehaviour
         rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
     }
 
-    protected virtual void Update() { }
+    protected virtual void Update()
+    {
+        if (!inputReady || characterData == null) return;
+
+        // ✅ 입력 → MoveAbility에 위임
+        MoveAbility?.Move(this, moveDirection);
+    }
 
     private void FixedUpdate()
     {
         if (characterData == null)
-            return; // 아직 초기화 안 되었음
+            return;
 
         UpdateGroundedCheck();
         UpdateAirStateAuto();
@@ -198,7 +210,6 @@ public class CharacterController : MonoBehaviour
 
         rb.drag = IsInAir ? characterData.airDrag : characterData.groundDrag;
     }
-
 
     private void UpdateGroundedCheck()
     {
@@ -249,5 +260,12 @@ public class CharacterController : MonoBehaviour
         isJumping = true;
         rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
         rb.AddForce(Vector3.up * characterData.jumpForce, ForceMode.Impulse);
+    }
+
+    public void SetAirState(AirState state)
+    {
+        CurrentAirState = state;
+        if (state == AirState.InAir)
+            airStartTime = Time.time;
     }
 }
