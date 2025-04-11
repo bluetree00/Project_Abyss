@@ -34,8 +34,6 @@ namespace Game.CharacterStates.VagabondStates
             float moveSpeed = targetSpeed >= 0.9f
                 ? owner.CharacterData.baseRunSpeed
                 : owner.CharacterData.baseMoveSpeed;
-
-            owner.Move(owner.MoveDirection, moveSpeed);
         }
 
         public override void Exit(Vagabond owner)

@@ -8,6 +8,11 @@ using Game.CharacterStates.CharacterControllerStates;
 
 public class CharacterController : MonoBehaviour
 {
+    //============================================================
+    // 🔶 필드 및 프로퍼티
+    //============================================================
+
+    [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
@@ -23,6 +28,7 @@ public class CharacterController : MonoBehaviour
     [SerializeField] protected Define.State _state = Define.State.Idle;
     [SerializeField] protected Vector3 _destPos;
     [SerializeField] protected GameObject _lockTarget;
+
     [SerializeField] private Rigidbody rb;
     public Rigidbody Rigid => rb;
 
@@ -34,6 +40,13 @@ public class CharacterController : MonoBehaviour
     public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
     public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
 
+    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
+    public StateMachine<CharacterController> StateMachine => stateMachine;
+
+    //============================================================
+    // 🔷 점프 및 공중 상태 관리
+    //============================================================
+
     private bool isGrounded;
     private bool isJumping;
     private float airStartTime = 0f;
@@ -44,20 +57,13 @@ public class CharacterController : MonoBehaviour
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
 
-    // CharacterController.cs
-    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
-    public StateMachine<CharacterController> StateMachine => stateMachine;
-
-
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
 
-    // CharacterController.cs
-    public virtual void GoToIdleState()
-    {
-        // 기본 구현은 아무것도 안 해도 되고
-    }
+    //============================================================
+    // 🔹 초기화
+    //============================================================
 
     private async void Awake()
     {
@@ -83,7 +89,6 @@ public class CharacterController : MonoBehaviour
 
         LoadInputActions();
 
-        // ✅ 기본 모듈 지정
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
     }
@@ -167,21 +172,9 @@ public class CharacterController : MonoBehaviour
         return null;
     }
 
-    public void Move(Vector3 direction, float speed)
-    {
-        if (direction.magnitude <= 0)
-        {
-            StopHorizontalMovement();
-            return;
-        }
-
-        Vector3 normalizedDirection = direction.normalized;
-        float appliedSpeed = IsInAir ? speed * characterData.airControlMultiplier : speed;
-        rb.velocity = new Vector3(normalizedDirection.x * appliedSpeed, rb.velocity.y, normalizedDirection.z * appliedSpeed);
-
-        Quaternion targetRotation = Quaternion.LookRotation(normalizedDirection);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f);
-    }
+    //============================================================
+    // 🟢 이동 처리
+    //============================================================
 
     public void StopHorizontalMovement()
     {
@@ -189,18 +182,40 @@ public class CharacterController : MonoBehaviour
         rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
     }
 
+    //============================================================
+    // 🔺 점프 처리
+    //============================================================
+
+    public void Jump()
+    {
+        if (!isGrounded) return;
+
+        isJumping = true;
+        rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
+        rb.AddForce(Vector3.up * characterData.jumpForce, ForceMode.Impulse);
+    }
+
+    public void SetAirState(AirState state)
+    {
+        CurrentAirState = state;
+        if (state == AirState.InAir)
+            airStartTime = Time.time;
+    }
+
+    //============================================================
+    // 🔄 유니티 생명주기
+    //============================================================
+
     protected virtual void Update()
     {
         if (!inputReady || characterData == null) return;
 
-        // ✅ 입력 → MoveAbility에 위임
         MoveAbility?.Move(this, moveDirection);
     }
 
     private void FixedUpdate()
     {
-        if (characterData == null)
-            return;
+        if (characterData == null) return;
 
         UpdateGroundedCheck();
         UpdateAirStateAuto();
@@ -208,6 +223,10 @@ public class CharacterController : MonoBehaviour
 
         rb.drag = IsInAir ? characterData.airDrag : characterData.groundDrag;
     }
+
+    //============================================================
+    // ⚙️ 물리 및 상태 관련
+    //============================================================
 
     private void UpdateGroundedCheck()
     {
@@ -251,19 +270,12 @@ public class CharacterController : MonoBehaviour
         }
     }
 
-    public void Jump()
-    {
-        if (!isGrounded) return;
+    //============================================================
+    // 🟦 상태 전환 관련
+    //============================================================
 
-        isJumping = true;
-        rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
-        rb.AddForce(Vector3.up * characterData.jumpForce, ForceMode.Impulse);
-    }
-
-    public void SetAirState(AirState state)
+    public virtual void GoToIdleState()
     {
-        CurrentAirState = state;
-        if (state == AirState.InAir)
-            airStartTime = Time.time;
+        // 자식 클래스에서 오버라이드
     }
 }

@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: Character_01
   m_EditorClassIdentifier: 
   characterName: Character_01
-  baseMoveSpeed: 5
+  baseMoveSpeed: 7
   baseRunSpeed: 8
   maxHealth: 0
   attackPower: 10
-  attackComboStep: 0
-  comboTimer: 0
+  attackComboStep: 1
+  comboTimer: 0.14985739
   comboDuration: 3
   canDodge: 1
   dashSpeed: 15
