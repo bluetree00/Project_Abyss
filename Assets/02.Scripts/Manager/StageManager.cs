@@ -25,7 +25,6 @@ public class StageManager
     private Dictionary<string, int> stageUsageDictionary = new Dictionary<string, int>(); // 스테이지 사용 여부 딕셔너리
     private int stageSteps = 0; // 스테이지 이동 횟수
     public int eventStageThreshold = 5; // 이벤트 스테이지로 진입하기 위한 진행 횟수
-    //TODO: 챕터가 넘어갈 때마다 스테이지 이동 횟수 상한 증가 필요 (챕터 1은 5번 진행, 챕터 2는 6번 진행 등)
 
     public enum StageType
     {
@@ -42,7 +41,6 @@ public class StageManager
         public string resourcePath;
         public StageType stageType;
         public int weight;
-        public string label;
     }
 
     public class ConnectionRestriction
@@ -59,10 +57,6 @@ public class StageManager
 
         //int numberOfStages = 5 + (chapterNumber - 1); // 챕터가 증가할수록 스테이지 갯수 증가
         //List<Stage> selectedStages = stages.OrderBy(x => Guid.NewGuid()).Take(numberOfStages).ToList(); // 랜덤으로 스테이지 선택
-
-        // 이벤트 스테이지를 포함하여 시퀀스 구성
-        eventStages = stages.Where(s => s.stageType == StageType.Event).ToList();
-        stages.AddRange(eventStages);
 
         // 스테이지 사용 여부 딕셔너리 초기화
         foreach (var stage in stages)
