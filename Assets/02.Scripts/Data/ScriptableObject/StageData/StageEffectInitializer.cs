@@ -55,6 +55,7 @@ public static class StageEffectInitializer
         return (stages, restrictions, bossStageName);
     }
 
+    #region 사용 메서드 분리
     /// <summary>
     /// 어드레서블로 프리팹을 비동기 로드하는 메서드 분리
     /// </summary>
@@ -96,12 +97,14 @@ public static class StageEffectInitializer
             stages.Add(new StageManager.Stage
             {
                 stageName = prefab.name,
-                resourcePath = prefab.name,
+                addressableKey = prefab.name,
                 stageType = StageManager.StageType.InGame,
                 weight = UnityEngine.Random.Range(1, 20), // 랜덤 가중치 설정
             });
         }
     }
+
+    
 
     /// <summary>
     /// 연결 제한 사항을 업데이트하는 메서드
@@ -121,6 +124,9 @@ public static class StageEffectInitializer
             });
         }
     }
+
+    
+    #endregion
 }
 
 

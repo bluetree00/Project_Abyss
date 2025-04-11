@@ -25,7 +25,7 @@ public class StageTransitionManager
         // 현재 챕터 정리 코드 추가 필요
         //Managers.Stage.CleanupChapter();
 
-        currentChapterName = chapterName;
+        //currentChapterName = chapterName;
 
         // 현재 챕터의 스테이지 데이터 로드
         List<StageManager.Stage> stages;
@@ -35,7 +35,7 @@ public class StageTransitionManager
         // stages = StageEffectInitializer.GetInitialStagesForChapter(
         //     chapterName, out restrictions, out bossStageName);
 
-        (stages, restrictions, bossStageName) = await StageEffectInitializer.GetInitialStagesForChapterAsync(currentChapterName);
+        (stages, restrictions, bossStageName) = await StageEffectInitializer.GetInitialStagesForChapterAsync(chapterName);
 
         if (stages == null || stages.Count == 0)
         {
