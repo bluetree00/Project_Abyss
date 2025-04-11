@@ -9,6 +9,11 @@ using Game.CharacterStates.VagabondStates;
 
 public class Vagabond : CharacterController
 {
+    //============================================================
+    // 🔶 상태 및 변수
+    //============================================================
+
+    [Header("Camera")]
     [SerializeField] private CinemachineFreeLook cinemachineCamera;
 
     private Coroutine inputLockCoroutine;
@@ -19,20 +24,34 @@ public class Vagabond : CharacterController
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
 
-    public override void GoToIdleState()
-{
-    stateMachine.ChangeState(GetState<VagabondIdleState>());
-}
-
-
-
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
+
+    //============================================================
+    // 🟢 초기화
+    //============================================================
 
     private async void Start()
     {
         await InitAsync();
         CacheStates();
         stateMachine.Setup(this, GetState<VagabondIdleState>());
+    }
+
+    protected override async Task InitAsync()
+    {
+        await base.InitAsync();
+
+        if (cinemachineCamera == null)
+            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();
+
+        if (cinemachineCamera != null)
+        {
+            cinemachineCamera.Follow = transform;
+            cinemachineCamera.LookAt = transform;
+        }
+
+        if (inputReady)
+            BindInputActions();
     }
 
     private void CacheStates()
@@ -49,25 +68,11 @@ public class Vagabond : CharacterController
 
     public T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
 
-    protected override async Task InitAsync()
-    {
-        await base.InitAsync();
+    public override void GoToIdleState() => stateMachine.ChangeState(GetState<VagabondIdleState>());
 
-        MoveAbility = new DefaultMoveAbility();               // 커스텀 이동
-        DodgeAbility = new DefaultDodgeAbility();          // 커스텀 회피
-
-        if (cinemachineCamera == null)
-            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();
-
-        if (cinemachineCamera != null)
-        {
-            cinemachineCamera.Follow = transform;
-            cinemachineCamera.LookAt = transform;
-        }
-
-        if (inputReady)
-            BindInputActions();
-    }
+    //============================================================
+    // 🔹 입력 바인딩
+    //============================================================
 
     private void BindInputActions()
     {
@@ -85,13 +90,17 @@ public class Vagabond : CharacterController
         inputActions.Player.RemoveWeapon2.performed += _ => RemoveWeapon(2);
     }
 
+    //============================================================
+    // 🔄 Unity 생명주기
+    //============================================================
+
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
         base.Update();
         CheckMovementInput();
-        MoveAbility?.Move(this, moveDirection);
+
         UpdateMovement();
         FreezeRotation();
         stateMachine.Update();
@@ -116,15 +125,20 @@ public class Vagabond : CharacterController
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
 
-    protected void UpdateMovement()
+    private void UpdateMovement()
     {
         if (!CanProcessInput()) return;
+
         if (moveDirection.magnitude > 0.01f && !(stateMachine.CurrentState is VagabondMoveBlendState))
             stateMachine.ChangeState(GetState<VagabondMoveBlendState>());
     }
 
-    private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
+    private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
+
+    //============================================================
+    // 🗡️ 전투 및 스킬
+    //============================================================
 
     private void ProcessAttack()
     {
@@ -153,9 +167,14 @@ public class Vagabond : CharacterController
         stateMachine.ChangeState(GetState<VagabondJumpStartState>());
     }
 
+    //============================================================
+    // 🧤 무기 관리
+    //============================================================
+
     private void ChangeWeapon(int index)
     {
         if (isInputLocked) return;
+
         weaponContainer.isWeaponEquipped = false;
         Managers.Weapon.ChangeWeapon(index);
 
@@ -175,6 +194,7 @@ public class Vagabond : CharacterController
     private void SetWeapon(string weaponName)
     {
         if (isInputLocked) return;
+
         Managers.Weapon.SetWeapon(weaponName);
         LockInput(inputLockDuration);
     }
@@ -182,9 +202,14 @@ public class Vagabond : CharacterController
     private void RemoveWeapon(int index)
     {
         Managers.Weapon.RemoveWeapon(index);
+
         if (currentWeapon == null)
             stateMachine.ChangeState(GetState<VagabondIdleState>());
     }
+
+    //============================================================
+    // 🎒 인벤토리
+    //============================================================
 
     private void ToggleInventory()
     {
@@ -212,6 +237,10 @@ public class Vagabond : CharacterController
         }
     }
 
+    //============================================================
+    // 🔐 입력 잠금 처리
+    //============================================================
+
     private void LockInput(float sec)
     {
         if (inputLockCoroutine != null)
@@ -227,7 +256,10 @@ public class Vagabond : CharacterController
         isInputLocked = false;
     }
 
-    #region 이펙트 관련
+    //============================================================
+    // ✨ 이펙트 스폰   // 추후 무기별 고유 공격으로 생성 개선 예정정
+    //============================================================
+
     public void FrontAttack() => SpawnEffect("FrontAttack", Vector3.forward);
     public void SpawnShinySlashEffect1() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 68));
     public void SpawnShinySlashEffect2() => SpawnEffect("ShinySlash", Vector3.forward, new Vector3(0, 0, 180));
@@ -257,5 +289,4 @@ public class Vagabond : CharacterController
 
         effectObject.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
     }
-    #endregion
 }
