@@ -16,7 +16,7 @@ public class StageTransitionManager
     }
 
     // 챕터를 로드하는 메서드
-    public void LoadChapter(string chapterName)
+    public async void LoadChapter(string chapterName)
     {
         // 현재 챕터 정리 코드 추가 필요
         //Managers.Stage.CleanupChapter();
@@ -28,8 +28,10 @@ public class StageTransitionManager
         List<StageManager.ConnectionRestriction> restrictions;
         string bossStageName;
 
-        stages = StageEffectInitializer.GetInitialStagesForChapter(
-            chapterName, out restrictions, out bossStageName);
+        // stages = StageEffectInitializer.GetInitialStagesForChapter(
+        //     chapterName, out restrictions, out bossStageName);
+
+        (stages, restrictions, bossStageName) = await StageEffectInitializer.GetInitialStagesForChapterAsync(chapterName);
 
         if (stages == null || stages.Count == 0)
         {

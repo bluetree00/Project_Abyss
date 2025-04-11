@@ -42,6 +42,7 @@ public class StageManager
         public string resourcePath;
         public StageType stageType;
         public int weight;
+        public string label;
     }
 
     public class ConnectionRestriction
@@ -93,6 +94,8 @@ public class StageManager
 
     private void InitializeStages(List<Stage> stages)
     {
+        // 현재 챕터 이름을 가져와 string chapterLabel에 저장
+        string chapterLabel = currentChapterName;
         // 챕터 이름에 해당하는 부모 오브젝트 생성
         string chapterParentName = $"Chapter_{currentChapterName}_Parent";
         GameObject chapterParent = GameObject.Find(chapterParentName);
@@ -110,13 +113,6 @@ public class StageManager
                 // 프리팹 캐시 사용
                 if (!stagePrefabs.ContainsKey(stage.resourcePath))
                 {
-                    // GameObject stagePrefab = Managers.Resource.Load<GameObject>($"Prefabs/{stage.resourcePath}");
-                    // if (stagePrefab == null)
-                    // {
-                    //     Debug.LogError($"Prefab not found: {stage.resourcePath}");
-                    //     continue;
-                    // }
-                    // stagePrefabs[stage.resourcePath] = stagePrefab; // 캐싱
                     Addressables.LoadAssetAsync<GameObject>(stage.resourcePath).Completed += (handle) =>
                     {
                         if (handle.Status == AsyncOperationStatus.Succeeded)
@@ -131,11 +127,6 @@ public class StageManager
                 }
 
                 // 스테이지 오브젝트 생성 및 부모 설정
-                //GameObject stageObject = GameObject.Instantiate(stagePrefabs[stage.resourcePath], chapterParent.transform);
-                // stageObject.name = stage.stageName;
-                // stageObject.SetActive(false);
-                // stageDictionary[stage.stageName] = stageObject;
-                //-------------------------------------------------------------------------------------
                 AsyncOperationHandle<GameObject> handle = Addressables.InstantiateAsync(stage.resourcePath);
                 handle.WaitForCompletion();
                 if (handle.Status == AsyncOperationStatus.Succeeded)
@@ -153,6 +144,8 @@ public class StageManager
                 
             }
         }
+
+        
     }
 
     
@@ -386,19 +379,10 @@ public class StageManager
             stageSteps++;
             Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
 
-            if (stageSteps >= eventStageThreshold)
-            {
-                // 이벤트 스테이지로 진입
-                MoveToEventStage();
-                //stageSteps--;
-                isStageMoving = false;
-                return;
-            }
-            else
-            {
-                Debug.Log($"Moving to next stage: {nextStageName}");
-                ActivateStage(new Stage { stageName = nextStageName });
-            }
+            //TODO : 이벤트 스테이지로 이동하는 조건 추가 필요
+
+            Debug.Log($"Moving to next stage: {nextStageName}");
+            ActivateStage(new Stage { stageName = nextStageName });
 
             // 스테이지 사용 여부 업데이트
             if (stageUsageDictionary[nextStageName] == 0)
@@ -413,6 +397,8 @@ public class StageManager
         }
 
         isStageMoving = false;
+
+        //Json 데이터로 저장한다
     }
 
     private void MoveToEventStage()

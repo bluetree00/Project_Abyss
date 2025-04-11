@@ -63,61 +63,61 @@ MonoBehaviour:
     m_Address: Stage_01
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cac3274903773b348b4a64d74cc72749
     m_Address: Stage_02
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c687223a99306374dbed0c34e1e98da7
     m_Address: Stage_03
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bb70e9701ecbd2c43819ea9d46a4db17
     m_Address: Stage_04
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5e6bbea5626e5b14b842bc94075e5482
     m_Address: Stage_05
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e0619b9f709b2d84dbf65c7a0b39db5d
     m_Address: Stage_06
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 238ba21079af72345b72bbe3a9e55131
     m_Address: Stage_07
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 05aeaca3d114c1e468c71cd92b6551d1
     m_Address: Stage_08
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7c02c6121cfca2e49b4276ded3306bf4
     m_Address: Stage_09
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 397cdb6e9edef36498d4ae54ce7aa105
     m_Address: Stage_10
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8afa8cef4fa478c4bb5a2d93d604719d
     m_Address: Stage_Event_02

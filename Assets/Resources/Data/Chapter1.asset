@@ -19,77 +19,70 @@ MonoBehaviour:
       resourcePath: Stage_01
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_02
       resourcePath: Stage_02
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_03
       resourcePath: Stage_03
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_04
       resourcePath: Stage_04
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_05
       resourcePath: Stage_05
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_06
       resourcePath: Stage_06
       stageType: 1
       weight: 0
-      randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_Event_02
-      resourcePath: Stage_Event_02
-      stageType: 2
-      weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_07
       resourcePath: Stage_07
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_08
       resourcePath: Stage_08
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     - stageName: Stage_09
       resourcePath: Stage_09
       stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
-    - stageName: Stage_Event_01
-      resourcePath: Stage_Event_01
-      stageType: 2
+    - stageName: Stage_10
+      resourcePath: Stage_10
+      stageType: 1
       weight: 0
-      randomWeight: 1
+      randomWeight: 0
       minWeight: 1
       maxWeight: 10
     connectionRestrictions: []
