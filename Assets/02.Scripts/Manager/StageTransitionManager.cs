@@ -1,17 +1,21 @@
 using System.Collections.Generic;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 public class StageTransitionManager
 {
     private string currentChapterName; // 현재 챕터 이름
     private int currentStageIndex;     // 현재 스테이지 인덱스
-    private List<string> chapterSequence; // 챕터 순서 리스트
+    private List<StageData.ChapterName> chapterSequence; // 챕터 순서 리스트
 
     public StageTransitionManager()
     {
         // 초기화 스테이지가 추가되면 리스트 챕터를 추가
-        chapterSequence = new List<string> { "Chapter1", "Chapter2", "Chapter3" };
-        currentChapterName = chapterSequence[0]; // 첫 번째 챕터부터 시작
+        //chapterSequence = new List<string> { "Chapter1", "Chapter2", "Chapter3" };
+        //currentChapterName = chapterSequence[0]; // 첫 번째 챕터부터 시작
+
+        chapterSequence = new List<StageData.ChapterName> { StageData.ChapterName.Chapter1, StageData.ChapterName.Chapter2, StageData.ChapterName.Chapter3 };
+        currentChapterName = chapterSequence[0].ToString(); // 첫 번째 챕터부터 시작
         currentStageIndex = 0;
     }
 
@@ -31,7 +35,7 @@ public class StageTransitionManager
         // stages = StageEffectInitializer.GetInitialStagesForChapter(
         //     chapterName, out restrictions, out bossStageName);
 
-        (stages, restrictions, bossStageName) = await StageEffectInitializer.GetInitialStagesForChapterAsync(chapterName);
+        (stages, restrictions, bossStageName) = await StageEffectInitializer.GetInitialStagesForChapterAsync(currentChapterName);
 
         if (stages == null || stages.Count == 0)
         {
@@ -50,19 +54,20 @@ public class StageTransitionManager
         Debug.Log($"Loaded chapter: {chapterName}");
     }
 
+    // TODO : 보스 스테이지 클리어 후 다음 챕터 로드 로직 수정 필요
     // 보스 스테이지 클리어 후 다음 챕터 로드
-    public void OnBossStageCleared()
-    {
-        int currentChapterIndex = chapterSequence.IndexOf(currentChapterName);
-        if (currentChapterIndex + 1 < chapterSequence.Count)
-        {
-            string nextChapterName = chapterSequence[currentChapterIndex + 1];
-            LoadChapter(nextChapterName);
-        }
-        else
-        {
-            Debug.Log("All chapters completed!");
-            // 게임 종료 혹은 다른 로직
-        }
-    }
+    // public void OnBossStageCleared()
+    // {
+    //     int currentChapterIndex = chapterSequence.IndexOf(currentChapterName);
+    //     if (currentChapterIndex + 1 < chapterSequence.Count)
+    //     {
+    //         string nextChapterName = chapterSequence[currentChapterIndex + 1];
+    //         LoadChapter(nextChapterName);
+    //     }
+    //     else
+    //     {
+    //         Debug.Log("All chapters completed!");
+    //         // 게임 종료 혹은 다른 로직
+    //     }
+    // }
 }
