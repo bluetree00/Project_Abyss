@@ -257,6 +257,55 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 1717884589}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &76022241
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 76022243}
+  - component: {fileID: 76022242}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &76022242
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 76022241}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1ec17a479889144bb6572c1e910045a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isAccessGoogleSheet: 1
+  googleSheetUrl: https://script.google.com/macros/s/AKfycbyl8jcvtDwLMkaUR_s_3KcMFIVF_F74HScUdCPwvAutGFYgwfu5PleWLjJ3E9ST96aC/exec
+  availSheets: Sheet1/Sheet2
+  generateFolderPath: /GenerateGoogleSheet
+  googleSheetSO: {fileID: 11400000, guid: 71781ca5bc846994a9f60531041669d6, type: 2}
+--- !u!4 &76022243
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 76022241}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.4069391, y: 0.55583715, z: -2.817425}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &77392278
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -942,7 +991,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.33373412, y: -0.34040564, z: 0.13080086, w: 0.8692736}
+  m_LocalRotation: {x: 0.3337338, y: -0.34042972, z: 0.13081338, w: 0.8692625}
   m_LocalPosition: {x: -6.77, y: 3.23, z: 2.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -5540,3 +5589,4 @@ SceneRoots:
   - {fileID: 1723880099}
   - {fileID: 256535122}
   - {fileID: 1065498054}
+  - {fileID: 76022243}
