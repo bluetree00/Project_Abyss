@@ -59,8 +59,6 @@ public class CharacterController : MonoBehaviour
         // 기본 구현은 아무것도 안 해도 되고
     }
 
-
-
     private async void Awake()
     {
         await InitAsync();
