@@ -7,13 +7,13 @@ using UnityEngine.AddressableAssets;
 
 public static class StageEffectInitializer
 {
-    public static async Task<(List<StageManager.Stage>, List<StageManager.ConnectionRestriction>, string, Dictionary<EventStageData.EventStageType, List<StageManager.Stage>>)> GetInitialStagesForChapterAsync(string chapterSOName)
+    public static async Task<(List<StageManager.Stage>, List<StageManager.ConnectionRestriction>, string)> GetInitialStagesForChapterAsync(string chapterSOName)
     {
         // StageData 로드
         //StageData stageData = Resources.Load<StageData>($"Data/{chapterSOName}");
 
         string chapterFileName = "Data/" + chapterSOName;
-        string eventStageLabel = "Event";
+        //string eventStageLabel = "Event";
 
         var handle = Addressables.LoadAssetsAsync<StageData>(chapterFileName, null);
         IList<StageData> stageDataList = await handle.Task;
@@ -22,7 +22,7 @@ public static class StageEffectInitializer
         if (stageDataList == null || stageDataList.Count == 0)
         {
             Debug.LogError($"No StageData found with name {chapterSOName}.");
-            return (null, null, null, null);
+            return (null, null, null);
         }
 
         // 첫 번째 StageData 사용
@@ -30,7 +30,6 @@ public static class StageEffectInitializer
 
         // 결과 목록 초기화
         List<StageManager.Stage> stages = new List<StageManager.Stage>();
-        Dictionary<EventStageData.EventStageType, List<StageManager.Stage>> eventStageDic = new Dictionary<EventStageData.EventStageType, List<StageManager.Stage>>();
         List<StageManager.ConnectionRestriction> restrictions = new List<StageManager.ConnectionRestriction>();
         string bossStageName = stageData.chapters[0].bossStageName;
         string chapterName = stageData.chapters[0].chapterName.ToString();
