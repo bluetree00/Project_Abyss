@@ -12,9 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c0d059488cfec348a7841aa676f307b, type: 3}
   m_Name: EventStageData_
   m_EditorClassIdentifier: 
+  eventstageType: 1
   eventStages:
-  - eventstageType: 0
-    eventStages:
-    - addressableKey: 
-      stageType: 0
-      triggerCondition: 0
+  - addressableKey: 
+    stageType: 2
+    triggerCondition: 0
+  - addressableKey: 
+    stageType: 2
+    triggerCondition: 0
