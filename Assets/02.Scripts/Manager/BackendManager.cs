@@ -1,18 +1,25 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using BackEnd;
 
 public class BackendManager : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    private void Awake()
     {
-        
+        DontDestroyOnLoad(gameObject);
+        BackendSetup();
     }
 
-    // Update is called once per frame
-    void Update()
+    private void BackendSetup()
     {
-        
+        var bro = Backend.Initialize();
+
+        if (bro.IsSuccess())
+        {
+            Debug.Log("Backend Initialization Success: " + bro.GetMessage());
+        }
+        else
+        {
+            Debug.LogError("Backend Initialization Failed: " + bro.GetMessage());
+        }
     }
 }
