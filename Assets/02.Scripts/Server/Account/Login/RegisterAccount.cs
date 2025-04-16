@@ -85,6 +85,9 @@ public class RegisterAccount : LoginBase
                     if (callback.IsSuccess())
                     {
                         SetMessage($"회원가입이 완료되었습니다.{inputFieldID.text}님 환영 합니다."); // 회원가입 성공 메시지 설정
+
+                        //계정 생성에 성공했을 때 해당 계정의 게임 정보 생성
+                        BackendGameData.instanece.GameDataInsert(); // 게임 데이터 추가 
                         
                         SceneUtilitys.LoadScene(SceneNames.Lobby); // 로비 씬으로 이동
                     }
