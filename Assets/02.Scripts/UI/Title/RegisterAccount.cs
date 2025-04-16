@@ -85,7 +85,8 @@ public class RegisterAccount : LoginBase
                     if (callback.IsSuccess())
                     {
                         SetMessage($"회원가입이 완료되었습니다.{inputFieldID.text}님 환영 합니다."); // 회원가입 성공 메시지 설정
-                        Debug.Log("회원가입 성공: " + callback.GetMessage()); // 회원가입 성공 메시지 출력
+                        
+                        SceneUtilitys.LoadScene(SceneNames.Lobby); // 로비 씬으로 이동
                     }
                  
                 });

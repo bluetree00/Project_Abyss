@@ -51,7 +51,8 @@ public class Login : LoginBase
             if (callback.IsSuccess())
             {
                 SetMessage($"{inputFieldID.text}님 환영합니다."); // 로그인 성공 메시지 설정
-                Debug.Log("로그인 성공: " + callback.GetMessage()); // 로그인 성공 메시지 출력
+                
+                SceneUtilitys.LoadScene(SceneNames.Lobby); // 로비 씬으로 이동
 
             }
             else
