@@ -34,6 +34,6 @@ public class LogoScenario : MonoBehaviour
 
     private void OnAfterProgress()
     {
-        SceneHelper.LoadScene(nextScene); // 다음 씬 로드
+        SceneUtilitys.LoadScene(nextScene); // 다음 씬 로드
     }
 }
