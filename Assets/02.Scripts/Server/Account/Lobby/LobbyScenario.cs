@@ -1,4 +1,5 @@
 
+using BackEnd;
 using UnityEngine;
 
 public class LobbyScenario : MonoBehaviour
@@ -9,5 +10,10 @@ public class LobbyScenario : MonoBehaviour
     private void Awake()
     {
         user.GetUserInfoFromBackend(); // 유저 정보 가져오기
+    }
+
+    private void Start()
+    {
+        BackendGameData.Instance.GameDataLoad(); // 게임 데이터 로드
     }
 }
