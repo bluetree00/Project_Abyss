@@ -51,5 +51,75 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Project_A.sln"
+    "dotnet.defaultSolution": "Project_A.sln",
+    "todo-tree.general.tags": [
+    "BUG",
+    "TODO",
+    "FIXME",
+    "[ ]",
+    "[x]",
+    "NOTE",
+    "CHECKLIST",
+    "WARNING"
+    ],
+
+    "todo-tree.highlights.defaultHighlight": {
+        "icon": "alert",
+        "type": "text",
+        "foreground": "#003366",
+        "background": "#D3D3D3",
+        "opacity": 100,
+        "iconColour": "#98FB98"
+    },
+    "todo-tree.highlights.customHighlight": {
+        "TODO": {
+            "icon": "check",
+            "type": "line"
+        },
+        "FIXME": {
+            "foreground": "#000000",
+            "background": "#FFF700",
+            "iconColour": "#FFF700",
+            "gutterIcon": true
+        },
+        "WARNING": {
+          "background": "#ffc404",
+          "foreground": "#ffffff",
+          "gutterIcon": true,
+          "icon": "alert",
+          "iconColour": "#ff9f04"
+        },
+        "[ ]": {
+          "background": "#f87364",
+          "foreground": "#ffffff",
+          "gutterIcon": true,
+          "icon": "x",
+          "iconColour": "#f87364",
+          "type": "text"
+        },
+        "[x]": {
+          "background": "#20a904",
+          "foreground": "#ffffff",
+          "gutterIcon": true,
+          "icon": "check",
+          "iconColour": "#20a904",
+          "type": "text"
+        },
+        "CHECKLIST": {
+          "background": "#20a904",
+          "foreground": "#ffffff",
+          "gutterIcon": true,
+          "icon": "check-circle-fill",
+          "iconColour": "#20a904",
+          "type": "text"
+        },
+        "NOTE": {
+          "background": "#cc6363",
+          "foreground": "#ffffff",
+          "gutterIcon": true,
+          "icon": "star-fill",
+          "iconColour": "#ffc404",
+          "type": "text"
+        }
+    }
 }
