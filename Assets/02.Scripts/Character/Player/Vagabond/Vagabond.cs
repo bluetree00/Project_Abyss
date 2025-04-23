@@ -83,11 +83,8 @@ public class Vagabond : CharacterController
         inputActions.Player.Ultimate.performed += _ => stateMachine.ChangeState(GetState<VagabondUltimateState>());
         inputActions.Player.InventoryToggle.performed += _ => ToggleInventory();
         inputActions.Player.CloseInventory.performed += _ => CloseInventory();
-        inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(1);
-        inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(2);
-        inputActions.Player.SetWeapon.performed += _ => SetWeapon("basic_Knight_02");
-        inputActions.Player.RemoveWeapon1.performed += _ => RemoveWeapon(1);
-        inputActions.Player.RemoveWeapon2.performed += _ => RemoveWeapon(2);
+        inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
+        inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
     }
 
     //============================================================
@@ -142,16 +139,16 @@ public class Vagabond : CharacterController
 
     private void ProcessAttack()
     {
-        if (!CanProcessInput()) return;
+        // if (!CanProcessInput()) return;
 
-        characterData.comboTimer = characterData.comboDuration;
-        characterData.attackComboStep++;
+        // characterData.comboTimer = characterData.comboDuration;
+        // characterData.attackComboStep++;
 
-        if (characterData.attackComboStep > currentWeapon.maxComboCount)
-            characterData.attackComboStep = 1;
+        // if (characterData.attackComboStep > currentWeapon.maxComboCount)
+        //     characterData.attackComboStep = 1;
 
-        string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
-        stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
+        // string animName = currentWeapon.normalAttackAnimations[characterData.attackComboStep - 1];
+        // stateMachine.ChangeState(new VagabondComboAttackState(animName, characterData.attackComboStep));
     }
 
     private void ResetCombo()
@@ -175,37 +172,19 @@ public class Vagabond : CharacterController
     {
         if (isInputLocked) return;
 
-        weaponContainer.isWeaponEquipped = false;
-        Managers.Weapon.ChangeWeapon(index);
-
-        if (weaponContainer.ownWeapons[index - 1] == null)
+        if (weaponManagerSO == null)
         {
-            stateMachine.ChangeState(GetState<VagabondIdleState>());
-        }
-        else
-        {
-            stateMachine.ChangeState(GetState<VagabondChangeWeaponState>());
-            currentWeapon = Managers.Weapon.GetCurrentWeaponData();
+            Debug.LogError("weaponManagerSO is not initialized.");
+            return;
         }
 
-        LockInput(inputLockDuration);
+        weaponManagerSO.SwitchWeapon(index);
+       
     }
+   
 
-    private void SetWeapon(string weaponName)
-    {
-        if (isInputLocked) return;
 
-        Managers.Weapon.SetWeapon(weaponName);
-        LockInput(inputLockDuration);
-    }
 
-    private void RemoveWeapon(int index)
-    {
-        Managers.Weapon.RemoveWeapon(index);
-
-        if (currentWeapon == null)
-            stateMachine.ChangeState(GetState<VagabondIdleState>());
-    }
 
     //============================================================
     // 🎒 인벤토리

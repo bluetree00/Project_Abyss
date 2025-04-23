@@ -16,9 +16,6 @@ public class CharacterController : MonoBehaviour
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
-    [SerializeField] public WeaponContainer weaponContainer;
-    [SerializeField] public WeaponData currentWeapon;
-
     protected Animator anim;
     public Animator Anim => anim;
 
@@ -42,6 +39,11 @@ public class CharacterController : MonoBehaviour
 
     protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
     public StateMachine<CharacterController> StateMachine => stateMachine;
+
+
+    public Transform handTransform;  // 플레이어 손 트랜스폼
+    public WeaponManagerSO weaponManagerSO;           // ✔️ 인게임에서 사용하는 런타임용 인스턴스
+
 
     //============================================================
     // 🔷 점프 및 공중 상태 관리
@@ -83,14 +85,16 @@ public class CharacterController : MonoBehaviour
         rb.useGravity = false;
         rb.drag = characterData.groundDrag;
 
-        await LoadWeaponContainerAsync(characterClass);
-        await SetupWeaponAttachmentAsync("Weapon_parentR");
-        await LoadWeaponDataAsync("basic_Knight_01");
-
         LoadInputActions();
 
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
+
+        weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>(); // 자신의 장비 런타임 인스턴스 생성
+        weaponManagerSO.Initialize(2); // 슬롯 수 설정
+
+        weaponManagerSO.weaponHandTransform = handTransform;
+
     }
 
     protected void LoadInputActions()
@@ -122,37 +126,6 @@ public class CharacterController : MonoBehaviour
         await tcs.Task;
     }
 
-    protected async Task LoadWeaponContainerAsync(string classKey)
-    {
-        var tcs = new TaskCompletionSource<bool>();
-        AddressablesManager.Instance.LoadAsset<WeaponContainer>(classKey, container =>
-        {
-            weaponContainer = container;
-            tcs.SetResult(container != null);
-        });
-
-        await tcs.Task;
-    }
-
-    protected async Task SetupWeaponAttachmentAsync(string handName)
-    {
-        Transform handTransform = FindDeepChildBFS(playerTransform, handName);
-        if (handTransform != null)
-            Managers.Weapon.ContainerDataInit(weaponContainer, handTransform);
-        await Task.CompletedTask;
-    }
-
-    protected async Task LoadWeaponDataAsync(string weaponName)
-    {
-        var tcs = new TaskCompletionSource<bool>();
-        AddressablesManager.Instance.LoadAsset<WeaponData>(weaponName, data =>
-        {
-            currentWeapon = data;
-            tcs.SetResult(data != null);
-        });
-
-        await tcs.Task;
-    }
 
     private Transform FindDeepChildBFS(Transform parent, string name)
     {
@@ -269,6 +242,25 @@ public class CharacterController : MonoBehaviour
             rb.AddForce(Vector3.up * finalGravity, ForceMode.Force);
         }
     }
+
+    public bool PickupWeapon(WeaponData newWeapon)
+    {
+        for (int i = 0; i < weaponManagerSO.SlotCount; i++)
+        {
+            if (weaponManagerSO.GetWeaponAtSlot(i) == null)
+            {
+                weaponManagerSO.EquipWeapon(newWeapon, i);
+                weaponManagerSO.SwitchWeapon(i);
+
+                Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
+                return true; // 습득 성공
+            }
+        }
+
+        Debug.Log("⚠ 모든 슬롯이 꽉 찼습니다!");
+        return false; // 습득 실패
+    }
+
 
     //============================================================
     // 🟦 상태 전환 관련
