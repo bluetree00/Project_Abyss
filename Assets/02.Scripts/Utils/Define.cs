@@ -71,6 +71,50 @@ public class Define
         Guardian,
     }
 
+    public enum EquipmentSlotType
+    {
+        Weapon,
+        SubWeapon,
+        Armor,
+        Helmet,
+        Gloves,
+        Boots,
+        Ring,
+        Necklace
+    }
+
+        // 무기 타입
+    public enum WeaponType
+    {
+        Sword,
+        Bow,
+        Staff,
+        Dagger,
+        Axe
+    }
+
+    // 무기 등급
+    public enum WeaponRarity
+    {
+        Common,
+        Rare,
+        Epic,
+        Legendary
+    }
+
+    public enum WeaponPrefabKey
+    {
+        basic_Knight_02,
+        Sword_01,
+        Bow_Elite,
+        Staff_Legend,
+        
+        
+    }
+
+
+
+
     public static string GetCharacterClassString(string characterName)
     {
         switch (characterName)

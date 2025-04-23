@@ -66,14 +66,14 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Enter(Vagabond owner)
         {
-            float endTime = owner.currentWeapon.comboEndTimes[comboIndex - 1];
-            SetupAnimation(owner.currentWeapon.normalAttackAnimations[comboIndex - 1], endTime);
+            float endTime = owner.weaponManagerSO.CurrentWeapon.comboEndTimes[comboIndex - 1];
+            SetupAnimation(owner.weaponManagerSO.CurrentWeapon.normalAttackAnimations[comboIndex - 1], endTime);
             base.Enter(owner);
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            if (comboIndex == owner.currentWeapon.maxComboCount)
+            if (comboIndex == owner.weaponManagerSO.CurrentWeapon.maxComboCount)
             {
                 owner.CharacterData.attackComboStep = 0;
                 owner.CharacterData.comboTimer = 0;
@@ -86,7 +86,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            string anim = owner.currentWeapon?.weapon_ChangeWeapon_AnimationName;
+            string anim = owner.weaponManagerSO.CurrentWeapon?.weapon_ChangeWeapon_AnimationName;
             if (!string.IsNullOrEmpty(anim))
             {
                 SetupAnimation(anim, 0.95f);

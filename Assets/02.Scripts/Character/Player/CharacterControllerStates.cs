@@ -52,16 +52,16 @@ namespace Game.CharacterStates.CharacterControllerStates
         {
             owner.Anim.CrossFade("Idle", 0.2f);
 
-            if (owner.weaponContainer != null && 
-                    owner.weaponContainer.isWeaponEquipped && 
-                    owner.currentWeapon.weapon_Idle_AnimationName != "")
-                    {   
-                        owner.Anim.CrossFade($"{owner.currentWeapon.weapon_Idle_AnimationName}", 0.1f);
-                    }
-                    else
-                    {
-                        owner.Anim.CrossFade("Idle", 0.2f);
-                    } 
+            // if (owner.weaponManager != null && 
+            //         owner.weaponManager.isWeaponEquipped && 
+            //         owner.weaponManager.CurrentWeapon.weapon_Idle_AnimationName != "")
+            //         {   
+            //             owner.Anim.CrossFade($"{owner.weaponManager.CurrentWeapon.weapon_Idle_AnimationName}", 0.1f);
+            //         }
+            //         else
+            //         {
+            //             owner.Anim.CrossFade("Idle", 0.2f);
+            //         } 
         }
 
         public override void Execute(T owner)
