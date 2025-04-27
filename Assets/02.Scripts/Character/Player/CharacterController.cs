@@ -36,6 +36,8 @@ public class CharacterController : MonoBehaviour
 
     public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
     public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
+    public ILightAttackAbility<CharacterController> LightAttackAbility { get; protected set; }
+    public IHeavyAttackAbility<CharacterController> HeavyAttackAbility { get; protected set; }
 
     protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
     public StateMachine<CharacterController> StateMachine => stateMachine;
@@ -89,10 +91,11 @@ public class CharacterController : MonoBehaviour
 
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
+        LightAttackAbility = new DefaultLightAttackAbility();
+        HeavyAttackAbility = new DefaultHeavyAttackAbility();
 
         weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>(); // 자신의 장비 런타임 인스턴스 생성
         weaponManagerSO.Initialize(2); // 슬롯 수 설정
-
         weaponManagerSO.weaponHandTransform = handTransform;
 
     }
@@ -126,25 +129,6 @@ public class CharacterController : MonoBehaviour
         await tcs.Task;
     }
 
-
-    private Transform FindDeepChildBFS(Transform parent, string name)
-    {
-        Queue<Transform> queue = new Queue<Transform>();
-        queue.Enqueue(parent);
-
-        while (queue.Count > 0)
-        {
-            Transform current = queue.Dequeue();
-            if (current.name == name)
-                return current;
-
-            foreach (Transform child in current)
-                queue.Enqueue(child);
-        }
-
-        return null;
-    }
-
     //============================================================
     // 🟢 이동 처리
     //============================================================
@@ -159,7 +143,7 @@ public class CharacterController : MonoBehaviour
     // 🔺 점프 처리
     //============================================================
 
-    public void Jump()
+    public void Jump() //TODO 추후 모듈로 빼기
     {
         if (!isGrounded) return;
 
