@@ -253,7 +253,13 @@ public class CharacterController : MonoBehaviour
                 weaponManagerSO.SwitchWeapon(i);
 
                 Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
+
+
+                //추후 무기에 맞는 SO로 수정하면 무기별 이펙트 초기화 가능. 스킬도 동일 처리 가능
+                Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
+
                 return true; // 습득 성공
+
             }
         }
 

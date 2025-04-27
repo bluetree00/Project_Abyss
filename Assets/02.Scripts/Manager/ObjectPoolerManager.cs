@@ -50,6 +50,13 @@ public class ObjectPoolerManager
 
     private void InitializePool(Pool pool)
     {
+
+        if (poolDictionary.ContainsKey(pool.tag))
+        {
+            Debug.LogWarning($"[ObjectPooler] 이미 존재하는 풀: {pool.tag}, 초기화를 건너뜀");
+            return;
+        }
+
         poolDictionary[pool.tag] = new Queue<GameObject>();
 
         for (int i = 0; i < pool.initialSize; i++)
@@ -58,6 +65,7 @@ public class ObjectPoolerManager
             ReturnToPool(obj);
         }
     }
+
 
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
