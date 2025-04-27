@@ -83,16 +83,6 @@ public class Define
         Necklace
     }
 
-        // 무기 타입
-    public enum WeaponType
-    {
-        Sword,
-        Bow,
-        Staff,
-        Dagger,
-        Axe
-    }
-
     // 무기 등급
     public enum WeaponRarity
     {
@@ -110,6 +100,33 @@ public class Define
         Staff_Legend,
         
         
+    }
+
+     // 무기 타입
+    public enum WeaponType
+    {
+        Sword,
+        Bow,
+        Staff,
+        Dagger,
+        Axe
+    }
+
+    public static class WeaponTypeStrings
+    {
+        public static readonly Dictionary<WeaponType, string> WeaponTypeMap = new Dictionary<WeaponType, string>
+        {
+            { WeaponType.Sword, "Sword" },
+            { WeaponType.Bow, "Bow" },
+            { WeaponType.Staff, "Staff" },
+            { WeaponType.Dagger, "Dagger" },
+            { WeaponType.Axe, "Axe" }
+        };
+
+        public static string GetWeaponTypeString(WeaponType weaponType)
+        {
+            return WeaponTypeMap[weaponType];
+        }
     }
 
 

@@ -13,7 +13,7 @@ public abstract class WeaponData : ScriptableObject
      public Define.WeaponPrefabKey weaponKey;
 
 
-    [Header("무기 타입")]
+    [Header("무기 타입")] // 타입을 이름 기준으로 풀러 연결 초기화화 기본 이펙트를 정해줌. 추후 수정가능 
     public Define.WeaponType weaponType;
 
     [Header("무기 등급")]

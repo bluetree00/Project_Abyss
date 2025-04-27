@@ -30,7 +30,7 @@ public class Managers : MonoBehaviour
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
-    private EffectManager _effectManager;
+
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
     private StageTransitionManager _stageTransitionManager;
@@ -42,7 +42,6 @@ public class Managers : MonoBehaviour
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
-    public static EffectManager Effect => Instance._effectManager;
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
@@ -72,19 +71,22 @@ public class Managers : MonoBehaviour
 
     void Start()
     {
-        // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행
-        StartCoroutine(InitializeManagers());
 
         StageTransitionManager.LoadChapter("Chapter1"); // 첫 번째 챕터 로드
     }
+    
 
-    private IEnumerator InitializeManagers()
+    // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
+    // StartCoroutine(InitializeObjectPool("BaseTest"));
+    // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행 준비된 SO에 넣고 해당 이름을 매개변수로 전달 전달 방식은 enum의 내용을 사용 추후 DB도 사용가능
+    public IEnumerator InitializeObjectPool(string effectPoolDataName)
     {
+
         bool isCompleted = false;
         List<ObjectPoolerManager.Pool> initialPools = null;
         
         // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
-        ObjectPoolEffectInitializer.GetInitialPools("BaseTest", pools =>
+        ObjectPoolEffectInitializer.GetInitialPools(effectPoolDataName, pools =>
         {
             initialPools = pools;
             isCompleted = true;
@@ -95,8 +97,9 @@ public class Managers : MonoBehaviour
         
         // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-        Debug.Log("ObjectPoolerManager 초기화 완료 (Addressables 방식)");
+        Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
+
 
     void Update()
     {
@@ -134,13 +137,5 @@ public class Managers : MonoBehaviour
         }
     }
 
-    public void CreateNewObjectPooler(string newWeaponName)
-    {
-        // 새로운 무기가 추가될 때 비동기 방식으로 풀 데이터를 로드하여 새로운 풀러 생성
-        ObjectPoolEffectInitializer.GetInitialPools(newWeaponName, pools =>
-        {
-            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
-            Debug.Log($"새로운 오브젝트 풀러가 생성되었습니다: {newWeaponName}");
-        });
-    }
+
 }
