@@ -95,6 +95,7 @@ public class Define
     public enum WeaponPrefabKey
     {
         basic_Knight_02,
+        basic_Knight_03,
         Sword_01,
         Bow_Elite,
         Staff_Legend,

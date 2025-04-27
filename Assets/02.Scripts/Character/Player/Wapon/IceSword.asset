@@ -15,7 +15,7 @@ MonoBehaviour:
   weaponName: "\uC5BC\uC74C\uAC80"
   attackPower: 50
   description: "\u3147"
-  weaponKey: 0
+  weaponKey: 1
   weaponType: 0
   rarity: 0
   upgradeLevel: 0
