@@ -41,7 +41,7 @@ public class UIGraphVisualizer : MonoBehaviour
         ClearExistingVisualization();
 
         // 1. 그래프 데이터 생성
-        generatedGraph = PeglinMapGenerator.Generate(layerSizes, seed);
+        generatedGraph = PeglinMapGenerator.PeglinMapGenerator.Generate(layerSizes, seed);
 
         if (generatedGraph == null || generatedGraph.Nodes == null || generatedGraph.Edges == null)
         {
