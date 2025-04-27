@@ -19,6 +19,9 @@ public class WeaponManagerSO : ScriptableObject
     // 무기 슬롯 수
     public int SlotCount => weaponSlots.Length;
 
+    // 각 슬롯에 대한 무기 오브젝트
+    private GameObject[] weaponObjects;
+
     // 손의 트랜스폼을 저장할 변수
     public Transform weaponHandTransform;
 
@@ -29,16 +32,26 @@ public class WeaponManagerSO : ScriptableObject
     /// <summary>
     /// 초기화용 (런타임에서 ScriptableObject 복제 후 초기화에 사용)
     /// </summary>
-    public void Initialize(int slotSize)
+     public void Initialize(int slotSize)
     {
         weaponSlots = new WeaponData[slotSize];
+        weaponObjects = new GameObject[slotSize]; // 각 슬롯에 대응되는 무기 오브젝트 배열 초기화
         currentSlotIndex = 0;
         currentWeapon = null;
         isWeaponEquipped = false;
+
+        // 각 슬롯에 대응되는 무기 객체 초기화
+        for (int i = 0; i < weaponSlots.Length; i++)
+        {
+            if (weaponSlots[i] != null)
+            {
+                SpawnWeaponObject(i);  // 각 슬롯에 대해 초기화
+            }
+        }
     }
 
     /// <summary>
-    /// 특정 슬롯에 무기 장착 //TODO장착될때 풀러 패키지를 등록해야함
+    /// 특정 슬롯에 무기 장착
     /// </summary>
     public void EquipWeapon(WeaponData newWeapon, int slotIndex)
     {
@@ -79,12 +92,18 @@ public class WeaponManagerSO : ScriptableObject
     {
         if (IsValidSlot(slotIndex) && weaponSlots[slotIndex] != null)
         {
+            // 현재 활성화된 무기를 비활성화
+            if (weaponObjects[currentSlotIndex] != null)
+            {
+                weaponObjects[currentSlotIndex].SetActive(false);
+            }
+
+            // 새로 선택한 슬롯의 무기를 활성화
             currentSlotIndex = slotIndex;
             currentWeapon = weaponSlots[slotIndex];
             isWeaponEquipped = true;
+            ActivateWeaponInSlot(slotIndex);  // 해당 슬롯의 무기 활성화
         }
-
-        SpawnWeaponObject(); // 무기 전환 후 자동 생성
     }
 
     /// <summary>
@@ -135,41 +154,57 @@ public class WeaponManagerSO : ScriptableObject
     }
 
         /// <summary>
-    /// 현재 무기를 오브젝트로 스폰하여 손에 붙임
-    /// </summary>
-     public void SpawnWeaponObject()
-    {
-        if (currentWeapon != null)
+        /// 슬롯에 해당하는 무기 오브젝트를 생성하여 활성화
+        /// </summary>
+        private void SpawnWeaponObject(int slotIndex)
         {
-            if (currentWeaponObject != null)
+            if (weaponSlots[slotIndex] != null)
             {
-                Destroy(currentWeaponObject);
-            }
-
-            string weaponObjName = currentWeapon.weaponKey.ToString();  // weaponKey를 사용
-          
-
-            AddressablesManager.Instance.InstantiateAsync(weaponObjName, instance =>
-            {
-                currentWeaponObject = instance;
-                isWeaponEquipped = true;        //무기 장착 확인
-                if (currentWeaponObject != null)
+                // 이미 해당 슬롯에 무기 오브젝트가 있으면 비활성화 후 재활성화
+                if (weaponObjects[slotIndex] != null)
                 {
-                    currentWeaponObject.transform.SetParent(weaponHandTransform);
-                    currentWeaponObject.transform.localPosition = Vector3.zero;
-                    currentWeaponObject.transform.localRotation = Quaternion.identity;
-
-                    Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
+                    weaponObjects[slotIndex].SetActive(true);
                 }
                 else
                 {
-                    Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
+                    string weaponObjName = weaponSlots[slotIndex].weaponKey.ToString();  // weaponKey 사용
+                    AddressablesManager.Instance.InstantiateAsync(weaponObjName, instance =>
+                    {
+                        weaponObjects[slotIndex] = instance;
+                        if (weaponObjects[slotIndex] != null)
+                        {
+                            weaponObjects[slotIndex].transform.SetParent(weaponHandTransform);
+                            weaponObjects[slotIndex].transform.localPosition = Vector3.zero;
+                            weaponObjects[slotIndex].transform.localRotation = Quaternion.identity;
+
+                            Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
+                        }
+                        else
+                        {
+                            Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
+                        }
+                    });
                 }
-            });
+            }
+            else
+            {
+                Debug.LogError("현재 무기가 null 입니다.");
+            }
+        }
+
+         /// <summary>
+    /// 특정 슬롯의 무기를 활성화
+    /// </summary>
+    private void ActivateWeaponInSlot(int slotIndex)
+    {
+        if (weaponObjects[slotIndex] != null)
+        {
+            weaponObjects[slotIndex].SetActive(true);
         }
         else
         {
-            Debug.LogError("현재 무기가 null 입니다.");
+            // 객체가 없다면 무기 초기화
+            SpawnWeaponObject(slotIndex);
         }
     }
 

@@ -79,7 +79,7 @@ public class Managers : MonoBehaviour
     // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
     // StartCoroutine(InitializeObjectPool("BaseTest"));
     // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행 준비된 SO에 넣고 해당 이름을 매개변수로 전달 전달 방식은 enum의 내용을 사용 추후 DB도 사용가능
-    public IEnumerator InitializeObjectPool(string effectPoolDataName)
+    public IEnumerator InitializeObjectPool(string effectPoolDataName) //이펙트 SO패기지 초기화 방식
     {
 
         bool isCompleted = false;
@@ -99,6 +99,8 @@ public class Managers : MonoBehaviour
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
+
+    
 
 
     void Update()
