@@ -15,6 +15,7 @@ MonoBehaviour:
   weaponName: "\uBD88\uAC80"
   attackPower: 50
   description: "\u3147"
+  weaponKey: 0
   weaponType: 0
   rarity: 0
   upgradeLevel: 0
@@ -22,11 +23,21 @@ MonoBehaviour:
   specialEffectDescription: 
   bonusDamage: 0
   attackSpeed: 1
-  weaponObjName: 
+  animatorController: {fileID: 9100000, guid: 67c492d1e16a4324b9450437c3ec5415, type: 2}
+  attackAnimations:
+  - {fileID: 7400000, guid: 1042ddceda6413b42bdf8b41654654cf, type: 3}
+  - {fileID: 4253555960331518044, guid: ab477963ea9888c4ba680a7fa524a821, type: 3}
+  - {fileID: -9125089287145705826, guid: ed612fc5a43b1ab489c5af4b8c21c07f, type: 3}
+  maxAttackCount: 3
   weapon_Idle_AnimationName: 
   weapon_ChangeWeapon_AnimationName: 
-  normalAttackAnimations: []
-  maxComboCount: 0
-  comboEndTimes: []
+  normalAttackAnimations:
+  - NormalAttack_1
+  - NormalAttack_2
+  - NormalAttack_3
+  comboEndTimes:
+  - 0.5
+  - 0.5
+  - 0.5
   QSkillData: {fileID: 0}
   ESkillData: {fileID: 0}
