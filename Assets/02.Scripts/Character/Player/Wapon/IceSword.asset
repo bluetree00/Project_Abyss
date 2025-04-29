@@ -23,10 +23,21 @@ MonoBehaviour:
   specialEffectDescription: 
   bonusDamage: 0
   attackSpeed: 1
+  animatorController: {fileID: 9100000, guid: 67c492d1e16a4324b9450437c3ec5415, type: 2}
+  attackAnimations:
+  - {fileID: 7400000, guid: 023a20245aaaca745be629e34ca4879b, type: 3}
+  - {fileID: 4054582416913108729, guid: 3c7fd33174ef24b44af246ebf57cd47d, type: 3}
+  - {fileID: -1331077060854833458, guid: 3d86a47c910d3674d80883281ccda3a8, type: 3}
+  maxAttackCount: 3
   weapon_Idle_AnimationName: 
   weapon_ChangeWeapon_AnimationName: 
-  normalAttackAnimations: []
-  maxComboCount: 0
-  comboEndTimes: []
+  normalAttackAnimations:
+  - NormalAttack_1
+  - NormalAttack_2
+  - NormalAttack_3
+  comboEndTimes:
+  - 0.5
+  - 0.5
+  - 0.5
   QSkillData: {fileID: 0}
   ESkillData: {fileID: 0}

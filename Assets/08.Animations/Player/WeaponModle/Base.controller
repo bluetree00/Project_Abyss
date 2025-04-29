@@ -186,7 +186,7 @@ AnimatorStateMachine:
     m_Position: {x: 520, y: 410, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -3901157022025212941}
-    m_Position: {x: 300, y: 300, z: 0}
+    m_Position: {x: 290, y: 300, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 8495169437042116347}
     m_Position: {x: 290, y: 380, z: 0}
@@ -195,25 +195,25 @@ AnimatorStateMachine:
     m_Position: {x: 290, y: 470, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 822480236603746679}
-    m_Position: {x: 100, y: -310, z: 0}
+    m_Position: {x: 280, y: -40, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 1062853198476301513}
-    m_Position: {x: 370, y: -310, z: 0}
+    m_Position: {x: 550, y: -40, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 236539038807405030}
     m_Position: {x: 520, y: 480, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 6550616578323718705}
-    m_Position: {x: 270, y: 680, z: 0}
+    m_Position: {x: 290, y: 620, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -805122142285106589}
-    m_Position: {x: 270, y: 760, z: 0}
+    m_Position: {x: 290, y: 680, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 3169405538638197383}
-    m_Position: {x: 270, y: 820, z: 0}
+    m_Position: {x: 290, y: 740, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -7803366098384346537}
-    m_Position: {x: 270, y: 880, z: 0}
+    m_Position: {x: 290, y: 800, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -4808324795611362665}
     m_Position: {x: 290, y: 60, z: 0}
@@ -260,7 +260,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: NormalAttack_2
+  m_Name: NormalAttack_02
   m_Speed: 3.5
   m_CycleOffset: 0
   m_Transitions: []
@@ -311,7 +311,7 @@ AnimatorController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Test_01
+  m_Name: Base
   serializedVersion: 5
   m_AnimatorParameters:
   - m_Name: MoveSpeed
@@ -497,7 +497,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: NormalAttack_1
+  m_Name: NormalAttack_01
   m_Speed: 2.5
   m_CycleOffset: 0
   m_Transitions: []
@@ -664,7 +664,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: NormalAttack_3
+  m_Name: NormalAttack_03
   m_Speed: 2.5
   m_CycleOffset: 0
   m_Transitions: []

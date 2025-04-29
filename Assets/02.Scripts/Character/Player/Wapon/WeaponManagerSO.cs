@@ -1,212 +1,237 @@
 using UnityEngine;
+using System;
+using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewWeaponManager", menuName = "Managers/WeaponManagerSO", order = 1)]
 public class WeaponManagerSO : ScriptableObject
 {
-    // 무기 슬롯들 (예: 0번: 주무기, 1번: 보조무기 등)
     [SerializeField] private WeaponData[] weaponSlots = new WeaponData[2];
+    public int SlotCount => weaponSlots.Length;
 
-    // 현재 선택된 슬롯 인덱스
     [SerializeField] private int currentSlotIndex = 0;
-
-    // 현재 장착 중인 무기
     [SerializeField] private WeaponData currentWeapon;
     public WeaponData CurrentWeapon => currentWeapon;
+
+    [SerializeField] private GameObject currentWeaponObject;
+    public GameObject CurrentWeaponObject => currentWeaponObject;
 
     [SerializeField] private bool isWeaponEquipped = false;
     public bool IsWeaponEquipped => isWeaponEquipped;
 
-    // 무기 슬롯 수
-    public int SlotCount => weaponSlots.Length;
-
-    // 각 슬롯에 대한 무기 오브젝트
-    private GameObject[] weaponObjects;
-
-    // 손의 트랜스폼을 저장할 변수
     public Transform weaponHandTransform;
 
-    [SerializeField]
-    private GameObject currentWeaponObject;
-    public GameObject CurrentWeaponObject { get { return currentWeaponObject; } }
+    private GameObject[] weaponObjects;
+    private Dictionary<string, AnimatorOverrideController> cachedAnimators = new();
 
-    /// <summary>
-    /// 초기화용 (런타임에서 ScriptableObject 복제 후 초기화에 사용)
-    /// </summary>
-     public void Initialize(int slotSize)
+    private RuntimeAnimatorController defaultController;
+
+    public void Initialize(int slotSize, Animator animator)
     {
         weaponSlots = new WeaponData[slotSize];
-        weaponObjects = new GameObject[slotSize]; // 각 슬롯에 대응되는 무기 오브젝트 배열 초기화
+        weaponObjects = new GameObject[slotSize];
         currentSlotIndex = 0;
         currentWeapon = null;
+        currentWeaponObject = null;
         isWeaponEquipped = false;
 
-        // 각 슬롯에 대응되는 무기 객체 초기화
-        for (int i = 0; i < weaponSlots.Length; i++)
-        {
-            if (weaponSlots[i] != null)
-            {
-                SpawnWeaponObject(i);  // 각 슬롯에 대해 초기화
-            }
-        }
+        defaultController = animator.runtimeAnimatorController;
     }
 
-    /// <summary>
-    /// 특정 슬롯에 무기 장착
-    /// </summary>
-    public void EquipWeapon(WeaponData newWeapon, int slotIndex)
+    public void EquipWeapon(WeaponData newWeapon, int slotIndex, Animator animator)
     {
-        if (IsValidSlot(slotIndex))
-        {
-            weaponSlots[slotIndex] = newWeapon;
+        if (!IsValidSlot(slotIndex) || newWeapon == null) return;
 
-            // 현재 슬롯이라면 즉시 장착
-            if (slotIndex == currentSlotIndex)
-            {
-                currentWeapon = newWeapon;
-                isWeaponEquipped = true;
-            }
+        // 기존 장착 무기 비활성화
+        if (slotIndex == currentSlotIndex)
+        {
+            if (currentWeaponObject != null)
+                currentWeaponObject.SetActive(false);
+
+            ClearWeaponAnimations(animator);
+            currentWeaponObject = null; // 명확하게 null 처리
         }
-    }
 
-    /// <summary>
-    /// 무기 해제
-    /// </summary>
-    public void UnequipWeapon(int slotIndex)
-    {
-        if (IsValidSlot(slotIndex))
+        weaponSlots[slotIndex] = newWeapon;
+
+        if (slotIndex == currentSlotIndex)
         {
-            weaponSlots[slotIndex] = null;
-
-            if (slotIndex == currentSlotIndex)
-            {
-                currentWeapon = null;
-                isWeaponEquipped = false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// 무기 슬롯 전환
-    /// </summary>
-    public void SwitchWeapon(int slotIndex)
-    {
-        if (IsValidSlot(slotIndex) && weaponSlots[slotIndex] != null)
-        {
-            // 현재 활성화된 무기를 비활성화
-            if (weaponObjects[currentSlotIndex] != null)
-            {
-                weaponObjects[currentSlotIndex].SetActive(false);
-            }
-
-            // 새로 선택한 슬롯의 무기를 활성화
-            currentSlotIndex = slotIndex;
-            currentWeapon = weaponSlots[slotIndex];
+            currentWeapon = newWeapon;
             isWeaponEquipped = true;
-            ActivateWeaponInSlot(slotIndex);  // 해당 슬롯의 무기 활성화
+            ActivateWeaponInSlot(slotIndex, animator);
+        }
+        else
+        {
+            SpawnWeaponObject(slotIndex, animator);
         }
     }
 
-    /// <summary>
-    /// 슬롯 내 무기 데이터 조회
-    /// </summary>
+    public void SwitchWeapon(int slotIndex, Animator animator)
+    {
+        if (!IsValidSlot(slotIndex) || weaponSlots[slotIndex] == null) return;
+
+        // 기존 무기 비활성화
+        if (currentWeaponObject != null)
+        {
+            currentWeaponObject.SetActive(false);
+        }
+
+        ClearWeaponAnimations(animator);
+
+        currentSlotIndex = slotIndex;
+        currentWeapon = weaponSlots[slotIndex];
+        isWeaponEquipped = true;
+
+        // 새로운 슬롯에 무기 오브젝트가 존재하면 활성화하고 애니메이션 적용
+        if (weaponObjects[slotIndex] != null)
+        {
+            weaponObjects[slotIndex].SetActive(true);
+            currentWeaponObject = weaponObjects[slotIndex];
+            ApplyWeaponAnimations(currentWeapon, animator);
+        }
+        else
+        {
+            SpawnWeaponObject(slotIndex, animator);
+        }
+    }
+
+    public void UnequipCurrentWeapon(Animator animator)
+    {
+        if (currentWeaponObject != null)
+        {
+            currentWeaponObject.SetActive(false);
+        }
+
+        ClearWeaponAnimations(animator);
+        currentWeapon = null;
+        currentWeaponObject = null;
+        isWeaponEquipped = false;
+    }
+
     public WeaponData GetWeaponAtSlot(int slotIndex)
     {
-        if (IsValidSlot(slotIndex))
-            return weaponSlots[slotIndex];
-
-        return null;
+        return IsValidSlot(slotIndex) ? weaponSlots[slotIndex] : null;
     }
 
-    /// <summary>
-    /// 현재 슬롯 인덱스 반환
-    /// </summary>
-    public int GetCurrentSlotIndex()
-    {
-        return currentSlotIndex;
-    }
-
-    /// <summary>
-    /// 슬롯 인덱스 유효성 검사
-    /// </summary>
-    private bool IsValidSlot(int index)
-    {
-        return index >= 0 && index < weaponSlots.Length;
-    }
+    public int GetCurrentSlotIndex() => currentSlotIndex;
 
     public bool HasEmptySlot()
     {
-        foreach (var slot in weaponSlots)
-        {
-            if (slot == null)
-                return true;
-        }
+        foreach (var w in weaponSlots)
+            if (w == null) return true;
         return false;
     }
 
     public int GetFirstEmptySlotIndex()
     {
         for (int i = 0; i < weaponSlots.Length; i++)
-        {
-            if (weaponSlots[i] == null)
-                return i;
-        }
-        return -1; // 없으면 -1
+            if (weaponSlots[i] == null) return i;
+        return -1;
     }
 
-        /// <summary>
-        /// 슬롯에 해당하는 무기 오브젝트를 생성하여 활성화
-        /// </summary>
-        private void SpawnWeaponObject(int slotIndex)
-        {
-            if (weaponSlots[slotIndex] != null)
-            {
-                // 이미 해당 슬롯에 무기 오브젝트가 있으면 비활성화 후 재활성화
-                if (weaponObjects[slotIndex] != null)
-                {
-                    weaponObjects[slotIndex].SetActive(true);
-                }
-                else
-                {
-                    string weaponObjName = weaponSlots[slotIndex].weaponKey.ToString();  // weaponKey 사용
-                    AddressablesManager.Instance.InstantiateAsync(weaponObjName, instance =>
-                    {
-                        weaponObjects[slotIndex] = instance;
-                        if (weaponObjects[slotIndex] != null)
-                        {
-                            weaponObjects[slotIndex].transform.SetParent(weaponHandTransform);
-                            weaponObjects[slotIndex].transform.localPosition = Vector3.zero;
-                            weaponObjects[slotIndex].transform.localRotation = Quaternion.identity;
+    private void SpawnWeaponObject(int slotIndex, Animator animator = null)
+{
+    var weapon = weaponSlots[slotIndex];
+    if (weapon == null) return;
 
-                            Debug.Log($"무기 {weaponObjName}가 성공적으로 생성되었습니다.");
-                        }
-                        else
-                        {
-                            Debug.LogError($"무기 {weaponObjName} 생성에 실패했습니다.");
-                        }
-                    });
-                }
-            }
-            else
-            {
-                Debug.LogError("현재 무기가 null 입니다.");
-            }
-        }
+    string key = weapon.weaponKey.ToString();
 
-         /// <summary>
-    /// 특정 슬롯의 무기를 활성화
-    /// </summary>
-    private void ActivateWeaponInSlot(int slotIndex)
+    // 이미 생성된 무기 오브젝트가 있으면 생성하지 않음
+    if (weaponObjects[slotIndex] != null) return;
+
+    AddressablesManager.Instance.InstantiateAsync(key, instance =>
     {
-        if (weaponObjects[slotIndex] != null)
+        // 슬롯 무기 데이터가 바뀌었을 수 있으므로 다시 확인
+        if (weaponSlots[slotIndex]?.weaponKey.ToString() != key) return;
+
+        // 무기 객체가 중복 생성되는 것을 방지
+        if (weaponObjects[slotIndex] != null) return;
+
+        weaponObjects[slotIndex] = instance;
+
+        instance.transform.SetParent(weaponHandTransform);
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+
+        if (slotIndex == currentSlotIndex)
         {
-            weaponObjects[slotIndex].SetActive(true);
+            currentWeaponObject = instance;
+            currentWeaponObject.SetActive(true);
+
+            if (animator != null)
+                ApplyWeaponAnimations(weaponSlots[slotIndex], animator);
         }
         else
         {
-            // 객체가 없다면 무기 초기화
-            SpawnWeaponObject(slotIndex);
+            instance.SetActive(false);
         }
+    });
+}
+
+    private void ActivateWeaponInSlot(int slotIndex, Animator animator)
+    {
+        // 이미 생성된 무기 오브젝트가 있으면 활성화, 없으면 생성
+        if (weaponObjects[slotIndex] != null)
+        {
+            weaponObjects[slotIndex].SetActive(true);
+            currentWeaponObject = weaponObjects[slotIndex];
+        }
+        else
+        {
+            SpawnWeaponObject(slotIndex, animator);
+        }
+
+        ApplyWeaponAnimations(weaponSlots[slotIndex], animator);
     }
 
+    private void ApplyWeaponAnimations(WeaponData weapon, Animator animator)
+    {
+        if (weapon == null || animator == null || weapon.animatorController == null)
+            return;
 
+        string key = weapon.weaponKey.ToString();
+        if (!cachedAnimators.TryGetValue(key, out var ovr))
+        {
+            ovr = new AnimatorOverrideController(defaultController);
+            cachedAnimators[key] = ovr;
+        }
+
+        string[] attackKeys = GetSortedAttackKeys(defaultController, "NormalAttack_");
+        for (int i = 0; i < attackKeys.Length; i++)
+        {
+            if (i < weapon.attackAnimations.Count && weapon.attackAnimations[i] != null)
+            {
+                ovr[attackKeys[i]] = weapon.attackAnimations[i];
+            }
+        }
+
+        animator.runtimeAnimatorController = ovr;
+    }
+
+    private void ClearWeaponAnimations(Animator animator)
+    {
+        if (animator == null || defaultController == null) return;
+        animator.runtimeAnimatorController = defaultController;
+    }
+
+    private string[] GetSortedAttackKeys(RuntimeAnimatorController controller, string prefix)
+    {
+        var clips = controller.animationClips;
+        var keys = new List<string>();
+
+        foreach (var clip in clips)
+            if (clip.name.StartsWith(prefix))
+                keys.Add(clip.name);
+
+        keys.Sort((a, b) =>
+        {
+            int.TryParse(a.Substring(prefix.Length), out int aNum);
+            int.TryParse(b.Substring(prefix.Length), out int bNum);
+            return aNum.CompareTo(bNum);
+        });
+
+        return keys.ToArray();
+    }
+
+    private bool IsValidSlot(int index) =>
+        index >= 0 && index < weaponSlots.Length;
 }

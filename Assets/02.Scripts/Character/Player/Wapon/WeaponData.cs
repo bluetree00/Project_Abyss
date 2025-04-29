@@ -1,5 +1,6 @@
 using UnityEngine;
 using Game.CharacterStates;
+using System.Collections.Generic;
 
 public abstract class WeaponData : ScriptableObject
 {
@@ -32,11 +33,15 @@ public abstract class WeaponData : ScriptableObject
 
     // ======= 무기 오브젝트 및 애니메이션 =======
 
+    [Header("애니메이터 컨트롤러")]
+    public RuntimeAnimatorController animatorController; // 여기에 애니메이터 컨트롤러 추가
+
     [Header("무기 애니메이션")]
+    public List<AnimationClip> attackAnimations; // 공격 애니메이션 목록
+    public int maxAttackCount = 3; // 최대 공격 수
     public string weapon_Idle_AnimationName;
     public string weapon_ChangeWeapon_AnimationName;
     public string[] normalAttackAnimations;
-    public int maxComboCount;
     public float[] comboEndTimes;
 
     // ======= 스킬 (인터페이스 기반 SO 연결) =======

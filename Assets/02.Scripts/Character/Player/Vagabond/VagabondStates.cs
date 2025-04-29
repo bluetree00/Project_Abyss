@@ -60,12 +60,25 @@ namespace Game.CharacterStates.VagabondStates
 
         public VagabondComboAttackState(string animName, int comboStep)
         {
+            if (string.IsNullOrEmpty(animName))
+            {
+                Debug.LogError("Invalid animation name passed to Combo Attack.");
+                return;
+            }
+
             comboIndex = comboStep;
             SetupAnimation(animName);
         }
 
         public override void Enter(Vagabond owner)
         {
+            if (owner.weaponManagerSO.CurrentWeapon == null)
+            {
+                Debug.LogError("No weapon equipped! Cannot perform combo attack.");
+                owner.StateMachine.ChangeState(new VagabondIdleState()); // 무기가 없으면 대기 상태로 전환
+                return;
+            }
+
             float endTime = owner.weaponManagerSO.CurrentWeapon.comboEndTimes[comboIndex - 1];
             SetupAnimation(owner.weaponManagerSO.CurrentWeapon.normalAttackAnimations[comboIndex - 1], endTime);
             base.Enter(owner);
@@ -73,7 +86,7 @@ namespace Game.CharacterStates.VagabondStates
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            if (comboIndex == owner.weaponManagerSO.CurrentWeapon.maxComboCount)
+            if (comboIndex == owner.weaponManagerSO.CurrentWeapon.maxAttackCount)
             {
                 owner.CharacterData.attackComboStep = 0;
                 owner.CharacterData.comboTimer = 0;
@@ -81,6 +94,7 @@ namespace Game.CharacterStates.VagabondStates
             }
         }
     }
+
 
     public class VagabondChangeWeaponState : AnimationState<Vagabond>
     {
