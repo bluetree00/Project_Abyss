@@ -72,6 +72,7 @@ public class Managers : MonoBehaviour
     void Start()
     {
 
+        //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
         StageTransitionManager.LoadChapter("Chapter1"); // 첫 번째 챕터 로드
     }
     

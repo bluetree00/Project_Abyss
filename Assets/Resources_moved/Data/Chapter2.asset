@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Chapter2
   m_EditorClassIdentifier: 
   chapters:
-  - chapterName: Chapter2
+  - chapterName: 1
     stages:
     - stageName: Stage_07
       resourcePath: Stage_07
