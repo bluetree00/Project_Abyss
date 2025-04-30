@@ -10,70 +10,76 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
-  m_Name: Default Local Group
+  m_Name: Chapter1
   m_EditorClassIdentifier: 
-  m_GroupName: Default Local Group
+  m_GroupName: Chapter1
   m_Data:
     m_SerializedData: []
-  m_GUID: f1076af87ac402947b621c4a9f046477
+  m_GUID: d4094ce9bf9b5764d8d2f86451146f33
   m_SerializeEntries:
-  - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
-    m_Address: DieEffect_01
+  - m_GUID: b79683fc9b4fed944aad523ba8a63ad9
+    m_Address: Stage_01
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: df8384e9e946c054099e3b4a01b82abc
-    m_Address: FrontAttackHit
+  - m_GUID: cac3274903773b348b4a64d74cc72749
+    m_Address: Stage_02
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e71e3e83b252509489dbb4e6432dbdfb
-    m_Address: FrontAttack
+  - m_GUID: c687223a99306374dbed0c34e1e98da7
+    m_Address: Stage_03
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fa8d2b10821bf1144b73cb2af26335ec
-    m_Address: HitEffect_02
+  - m_GUID: bb70e9701ecbd2c43819ea9d46a4db17
+    m_Address: Stage_04
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 87167b19fb4a32a4e8e4f2c5f40a40b3
-    m_Address: ShinySlash
+  - m_GUID: 5e6bbea5626e5b14b842bc94075e5482
+    m_Address: Stage_05
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
-    m_Address: BloodShot
+  - m_GUID: e0619b9f709b2d84dbf65c7a0b39db5d
+    m_Address: Stage_06
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b478a3c4c8ae3bb42a5785ab95bcf6d3
-    m_Address: Laser
+  - m_GUID: 238ba21079af72345b72bbe3a9e55131
+    m_Address: Stage_07
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8afa8cef4fa478c4bb5a2d93d604719d
-    m_Address: Stage_Event_02
+  - m_GUID: 05aeaca3d114c1e468c71cd92b6551d1
+    m_Address: Stage_08
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 222ff1f2ae8111e4a971dd71d0b30a25
-    m_Address: Stage_Event_01
+  - m_GUID: 7c02c6121cfca2e49b4276ded3306bf4
+    m_Address: Stage_09
     m_ReadOnly: 0
     m_SerializedLabels:
-    - default
+    - Chapter1
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 397cdb6e9edef36498d4ae54ce7aa105
+    m_Address: Stage_10
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Chapter1
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: 0538f398efa519e449d1c9070e1008d3, type: 2}
-    - {fileID: 11400000, guid: 2d2aa95da1df2864fb7fd0edefba8292, type: 2}
+    - {fileID: 11400000, guid: 6512e12c0ba7ef243bc89c6ef2e2ab5f, type: 2}
+    - {fileID: 11400000, guid: 64a508944d6e346408720914078714ec, type: 2}

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Chapter1
   m_EditorClassIdentifier: 
   chapters:
-  - chapterName: Chapter1
+  - chapterName: 0
     stages:
     - stageName: Stage_01
       resourcePath: Stage_01
@@ -57,13 +57,6 @@ MonoBehaviour:
       randomWeight: 1
       minWeight: 1
       maxWeight: 10
-    - stageName: Stage_Event_02
-      resourcePath: Stage_Event_02
-      stageType: 2
-      weight: 0
-      randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
     - stageName: Stage_07
       resourcePath: Stage_07
       stageType: 1
@@ -85,9 +78,9 @@ MonoBehaviour:
       randomWeight: 1
       minWeight: 1
       maxWeight: 10
-    - stageName: Stage_Event_01
-      resourcePath: Stage_Event_01
-      stageType: 2
+    - stageName: Stage_10
+      resourcePath: Stage_10
+      stageType: 1
       weight: 0
       randomWeight: 1
       minWeight: 1
