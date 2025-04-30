@@ -17,6 +17,7 @@ namespace PeglinMapGenerator // 필요에 따라 네임스페이스를 변경하
     public struct Node
     {
         public int Id;       // 유니크 ID (0부터 순차적으로 증가)
+        // 스테이지 이름 변수
         public int Layer;    // 몇 번째 층인지 (0부터)
         public int Position; // 그 층에서 몇 번째 노드인지 (0부터)
         public NodeType Type; // 노드 타입
