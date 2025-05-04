@@ -23,12 +23,12 @@ MonoBehaviour:
   specialEffectDescription: 
   bonusDamage: 0
   attackSpeed: 1
-  comboResetTime: 1.5
+  comboResetTime: 10
   animatorController: {fileID: 9100000, guid: 67c492d1e16a4324b9450437c3ec5415, type: 2}
   attackAnimations:
-  - {fileID: 7400000, guid: 1042ddceda6413b42bdf8b41654654cf, type: 3}
-  - {fileID: 4253555960331518044, guid: ab477963ea9888c4ba680a7fa524a821, type: 3}
-  - {fileID: -9125089287145705826, guid: ed612fc5a43b1ab489c5af4b8c21c07f, type: 3}
+  - {fileID: 7400002, guid: 52c2de492ef1443458626e80a78b7c99, type: 3}
+  - {fileID: 7400000, guid: 77fc626278dbd774a9e6b1fee68562c4, type: 3}
+  - {fileID: 7400000, guid: 8decc86bf4985ea42b3005926975955f, type: 3}
   maxAttackCount: 3
   weapon_Idle_AnimationName: 
   weapon_ChangeWeapon_AnimationName: 

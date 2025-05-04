@@ -3,15 +3,6 @@ using Game.CharacterStates.CharacterControllerStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
-    public static class AnimationHelper
-    {
-        public static bool IsAnimationFinished(Animator anim, string animationName, float endTime = 0.95f, int layer = 0)
-        {
-            if (anim == null) return false;
-            AnimatorStateInfo animState = anim.GetCurrentAnimatorStateInfo(layer);
-            return animState.IsName(animationName) && animState.normalizedTime >= endTime;
-        }
-    }
 
     public class VagabondIdleState : IdleState<Vagabond> { }
 
@@ -24,6 +15,9 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Execute(Vagabond owner)
         {
+             if (!owner.CanProcessInput())
+             return;
+
             float moveAmount = owner.MoveDirection.magnitude;
             float targetSpeed = moveAmount > 0
                 ? (Input.GetKey(KeyCode.LeftShift) ? 1f : 0.5f)
@@ -54,62 +48,62 @@ namespace Game.CharacterStates.VagabondStates
         protected override void OnAnimationEnd(Vagabond owner) { }
     }
 
-      public class VagabondComboAttackState : AnimationState<Vagabond>
+    public class VagabondComboAttackState : AnimationState<Vagabond>
     {
-        private readonly int comboIndex;
+        //public override bool BlocksInput => true;
+        private int comboIndex;
 
-        public VagabondComboAttackState(string animName, int comboStep)
+        private bool blocksInput = true;
+        public override bool BlocksInput => blocksInput;
+
+        public void SetComboIndex(int index)
         {
-            if (string.IsNullOrEmpty(animName))
-            {
-                Debug.LogError("Invalid animation name passed to Combo Attack.");
-                return;
-            }
-
-            comboIndex = comboStep;
-            SetupAnimation(animName);
+            comboIndex = index;
         }
 
         public override void Enter(Vagabond owner)
         {
+            blocksInput = true;
+            
             if (owner.weaponManagerSO.CurrentWeapon == null)
             {
-                Debug.LogError("No weapon equipped! Cannot perform combo attack.");
-                owner.StateMachine.ChangeState(new VagabondIdleState());
+                Debug.LogError("무기가 없습니다. 콤보 공격 불가.");
+                owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
                 return;
             }
 
             var weapon = owner.weaponManagerSO.CurrentWeapon;
+            int index = Mathf.Clamp(comboIndex, 0, weapon.normalAttackAnimations.Length - 1);
 
-            // 유효한 인덱스 계산
-            int index = Mathf.Clamp(comboIndex - 1, 0, weapon.normalAttackAnimations.Length - 1);
-
-            // comboEndTimes 배열 길이 확인
-            if (index >= weapon.comboEndTimes.Length)
-            {
-                Debug.LogError($"ComboEndTimes 배열이 부족합니다. comboIndex: {comboIndex}");
-                owner.StateMachine.ChangeState(new VagabondIdleState());
-                return;
-            }
-
+            string animName = weapon.normalAttackAnimations[index];
             float endTime = weapon.comboEndTimes[index];
-            string animationName = weapon.normalAttackAnimations[index];
 
-            SetupAnimation(animationName, endTime);
+            SetupAnimation(animName, endTime);
+
+            owner.OnAttackAnimationStart(); // ✅ 공격 상태 시작 알림
             base.Enter(owner);
         }
+        
 
+        public override void Exit(Vagabond owner)
+        {
+            blocksInput = false;
+            owner.OnAttackAnimationEnd();
+        }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            if (comboIndex == owner.weaponManagerSO.CurrentWeapon.maxAttackCount)
+            owner.OnAttackAnimationEnd(); // ✅ 공격 상태 종료 알림 및 예약 콤보 처리
+
+            // 다음 입력 예약이 없는 경우만 상태 전환 (중복 방지)
+            if (!owner.IsAttacking)
             {
-                owner.CharacterData.attackComboStep = 0;
-                owner.CharacterData.comboTimer = 0;
-                owner.StateMachine.ChangeState(new VagabondIdleState());
+                owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
             }
         }
     }
+
+
 
 
     public class VagabondChangeWeaponState : AnimationState<Vagabond>

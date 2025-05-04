@@ -14,12 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stageSequences:
   - startStageName: Stage_06
-  - startStageName: Stage_08
   - startStageName: Stage_10
-  - startStageName: Stage_04
   - startStageName: Stage_02
-  - startStageName: Stage_07
-  - startStageName: Stage_03
-  - startStageName: Stage_01
-  - startStageName: Stage_05
+  - startStageName: Stage_04
+  - startStageName: Stage_08
   - startStageName: Stage_09
+  - startStageName: Stage_05
+  - startStageName: Stage_07
+  - startStageName: Stage_01
+  - startStageName: Stage_03
