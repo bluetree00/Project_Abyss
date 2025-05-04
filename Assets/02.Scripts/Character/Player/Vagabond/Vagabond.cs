@@ -115,9 +115,12 @@ public class Vagabond : CharacterController
         if (characterData.comboTimer > 0)
         {
             characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0);
-                //ResetCombo();
+            if (characterData.comboTimer <= 0)
+            {
+                ResetCombo();
+            }
         }
+
     }
 
     private void CheckMovementInput()
@@ -167,11 +170,11 @@ public class Vagabond : CharacterController
         {
             PerformHeavyAttack();
         }
-        // 그 외에는 콤보 공격
-        else
+         else
         {
-            PerformComboAttack(inputTime);
+            PerformLightAttack(); // 중간 영역도 일반 공격으로 간주
         }
+       
     }
 
     // 공격 취소
@@ -198,20 +201,20 @@ public class Vagabond : CharacterController
         return;
     }
 
-    Debug.Log("Light Attack performed");
+    Debug.Log("Light Combo Attack (First Step) performed");
 
-    // attackComboStep을 0-based로 다루기
-    int comboIndex = characterData.attackComboStep;
-    var attackAnimations = weaponManagerSO.CurrentWeapon.attackAnimations;
+    // 콤보 타이머 초기화
+    characterData.comboTimer = weaponManagerSO.CurrentWeapon.comboResetTime; // 예: 1.5초
 
-    if (comboIndex < 0 || comboIndex >= attackAnimations.Count)
-    {
-        Debug.LogWarning("Combo index out of bounds, using last available animation.");
-        comboIndex = attackAnimations.Count - 1;
-    }
+    // 첫 번째 콤보 공격 애니메이션
+    characterData.attackComboStep = 0;
+    string comboAnimation = weaponManagerSO.CurrentWeapon.attackAnimations[characterData.attackComboStep].name;
 
-    string comboAnimation = attackAnimations[comboIndex].name;
+    // 상태 전환
     stateMachine.ChangeState(new VagabondComboAttackState(comboAnimation, characterData.attackComboStep));
+
+    // 콤보 단계 증가 (다음 공격에서 사용)
+    characterData.attackComboStep++;
 }
 
 
@@ -235,34 +238,12 @@ public class Vagabond : CharacterController
     }
 
 
-    // 콤보 공격 처리
-   private void PerformComboAttack(float inputTime)
+private void ResetCombo()
 {
-    if (weaponManagerSO.CurrentWeapon == null)
-    {
-        Debug.LogError("No weapon equipped! Cannot perform combo attack.");
-        return; // 무기가 없으면 콤보 공격을 수행하지 않음
-    }
-
-    Debug.Log("Combo Attack performed");
-
-    // 콤보 단계 증가 (0-based로 변경)
-    int comboIndex = characterData.attackComboStep;
-
-    // 공격 콤보 단계에 맞는 애니메이션 처리
-    string comboAnimation = weaponManagerSO.CurrentWeapon.attackAnimations[comboIndex].name;
-
-    // 콤보 진행 상태 전환
-    stateMachine.ChangeState(new VagabondComboAttackState(comboAnimation, characterData.attackComboStep));
-
-    // 콤보 단계 증가
-    characterData.attackComboStep++;
-    if (characterData.attackComboStep >= weaponManagerSO.CurrentWeapon.maxAttackCount)
-    {
-        // 최대 콤보 카운트에 도달하면 초기화
-        characterData.attackComboStep = 0;
-    }
+    characterData.attackComboStep = 0;
+    characterData.comboTimer = 0;
 }
+
 
 
 

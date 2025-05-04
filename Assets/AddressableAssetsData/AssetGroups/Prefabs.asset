@@ -18,13 +18,13 @@ MonoBehaviour:
   m_GUID: f61eda09f507db44c87b7289dfa55356
   m_SerializeEntries:
   - m_GUID: 6350a5d5eb23e9a44a71feee21792eef
-    m_Address: basic_Knight_02
+    m_Address: Basic_Knight_02
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 537b48c693566ce4781a27f730612c04
-    m_Address: basic_Knight_03
+    m_Address: Basic_Knight_03
     m_ReadOnly: 0
     m_SerializedLabels:
     - default

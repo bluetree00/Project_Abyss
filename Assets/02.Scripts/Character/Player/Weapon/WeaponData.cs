@@ -31,6 +31,10 @@ public abstract class WeaponData : ScriptableObject
     [Header("공격 속도")]
     public float attackSpeed = 1.0f;
 
+        [Header("Combo")]
+    public float comboResetTime = 1.5f; // 콤보 입력 대기 시간
+
+
     // ======= 무기 오브젝트 및 애니메이션 =======
 
     [Header("애니메이터 컨트롤러")]
