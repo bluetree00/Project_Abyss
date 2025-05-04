@@ -64,5 +64,16 @@ public class Util
         return null;
 
     }
+
+    public static Transform FindDeepChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
+        {
+            if (child.name == name)
+                return child;
+        }
+        return null;
+    }
+
    
 }

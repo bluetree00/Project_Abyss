@@ -18,7 +18,7 @@ MonoBehaviour:
   maxHealth: 0
   attackPower: 10
   attackComboStep: 1
-  comboTimer: 0.14985739
+  comboTimer: -0.068115115
   comboDuration: 3
   canDodge: 1
   dashSpeed: 15
@@ -31,7 +31,7 @@ MonoBehaviour:
   jumpForce: 7
   gravity: -30
   fallMultiplier: 2
-  groundCheckDistance: 0.3
+  groundCheckDistance: 20
   hardLandingTimeThreshold: 0.8
   groundLayer:
     serializedVersion: 2

@@ -23,6 +23,7 @@ MonoBehaviour:
   specialEffectDescription: 
   bonusDamage: 0
   attackSpeed: 1
+  comboResetTime: 1.5
   animatorController: {fileID: 9100000, guid: 67c492d1e16a4324b9450437c3ec5415, type: 2}
   attackAnimations:
   - {fileID: 7400000, guid: 1042ddceda6413b42bdf8b41654654cf, type: 3}

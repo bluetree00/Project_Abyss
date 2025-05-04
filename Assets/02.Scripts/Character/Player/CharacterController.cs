@@ -63,9 +63,6 @@ public class CharacterController : MonoBehaviour
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
 
-     // 동적으로 추출된 공격 스테이트 키
-    private string[] attackStateKeys;
-
     //============================================================
     // 🔹 초기화
     //============================================================
@@ -95,7 +92,12 @@ public class CharacterController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
         playerTransform = transform;
+
+        handTransform = Util.FindDeepChild(transform, "WeaponSocket");
+        if (handTransform == null)
+            Debug.LogWarning("⚠ WeaponSocket 트랜스폼을 찾지 못했습니다.");
     }
+
 
     /// <summary>
     /// 캐릭터 데이터(속성 데이터)를 Addressables로 로드.

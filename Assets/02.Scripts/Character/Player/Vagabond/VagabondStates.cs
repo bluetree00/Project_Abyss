@@ -75,14 +75,30 @@ namespace Game.CharacterStates.VagabondStates
             if (owner.weaponManagerSO.CurrentWeapon == null)
             {
                 Debug.LogError("No weapon equipped! Cannot perform combo attack.");
-                owner.StateMachine.ChangeState(new VagabondIdleState()); // 무기가 없으면 대기 상태로 전환
+                owner.StateMachine.ChangeState(new VagabondIdleState());
                 return;
             }
 
-            float endTime = owner.weaponManagerSO.CurrentWeapon.comboEndTimes[comboIndex - 1];
-            SetupAnimation(owner.weaponManagerSO.CurrentWeapon.normalAttackAnimations[comboIndex - 1], endTime);
+            var weapon = owner.weaponManagerSO.CurrentWeapon;
+
+            // 유효한 인덱스 계산
+            int index = Mathf.Clamp(comboIndex - 1, 0, weapon.normalAttackAnimations.Length - 1);
+
+            // comboEndTimes 배열 길이 확인
+            if (index >= weapon.comboEndTimes.Length)
+            {
+                Debug.LogError($"ComboEndTimes 배열이 부족합니다. comboIndex: {comboIndex}");
+                owner.StateMachine.ChangeState(new VagabondIdleState());
+                return;
+            }
+
+            float endTime = weapon.comboEndTimes[index];
+            string animationName = weapon.normalAttackAnimations[index];
+
+            SetupAnimation(animationName, endTime);
             base.Enter(owner);
         }
+
 
         protected override void OnAnimationEnd(Vagabond owner)
         {

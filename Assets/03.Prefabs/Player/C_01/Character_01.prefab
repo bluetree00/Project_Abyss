@@ -4753,13 +4753,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 0}
-  weaponContainer: {fileID: 0}
-  currentWeapon: {fileID: 0}
   _state: 1
   _destPos: {x: 0, y: 0, z: 0}
   _lockTarget: {fileID: 0}
   rb: {fileID: 0}
   playerTransform: {fileID: 0}
+  handTransform: {fileID: 1690126038755852255}
+  weaponManagerSO: {fileID: 0}
   cinemachineCamera: {fileID: 0}
 --- !u!54 &5927879569963914574
 Rigidbody:

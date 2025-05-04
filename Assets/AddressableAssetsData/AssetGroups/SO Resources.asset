@@ -23,18 +23,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - SO
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 75e80eb3277f6154198be0d24e3c6141
-    m_Address: basic_Knight_02
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fa2cc8743a2dc5f49beaf19801ff7715
-    m_Address: basic_Knight_01
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0016ea1f1ec94d1478eb444510df67ca
     m_Address: Character_01
     m_ReadOnly: 0
