@@ -9,10 +9,6 @@ using Game.CharacterStates.VagabondStates;
 
 public class Vagabond : CharacterController
 {
-    //============================================================
-    // 🔶 상태 및 변수
-    //============================================================
-
     [Header("Camera")]
     [SerializeField] private CinemachineFreeLook cinemachineCamera;
 
@@ -21,18 +17,17 @@ public class Vagabond : CharacterController
     private bool isInputLocked = false;
     private float inputLockDuration = 2f;
 
-    private float attackInputTime = 0f; // 공격 입력 시작 시간
-    private const float lightAttackDuration = 0.4f; // 일반 공격 최대 시간
-    private const float heavyAttackDuration = 0.5f; // 강공격 최대 시간
+    private float attackInputTime = 0f;
+    private const float lightAttackDuration = 0.4f;
+    private const float heavyAttackDuration = 1f;
+
+    private bool isAttacking = false;
+    private bool nextComboQueued = false;
 
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
 
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
-
-    //============================================================
-    // 🟢 초기화
-    //============================================================
 
     private async void Start()
     {
@@ -68,21 +63,17 @@ public class Vagabond : CharacterController
         cachedStates[typeof(VagabondUltimateState)] = new VagabondUltimateState();
         cachedStates[typeof(VagabondDodgeState)] = new VagabondDodgeState();
         cachedStates[typeof(VagabondChangeWeaponState)] = new VagabondChangeWeaponState();
+        cachedStates[typeof(VagabondComboAttackState)] = new VagabondComboAttackState();
     }
 
     public T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
 
     public override void GoToIdleState() => stateMachine.ChangeState(GetState<VagabondIdleState>());
 
-    //============================================================
-    // 🔹 입력 바인딩
-    //============================================================
-
     private void BindInputActions()
     {
-        inputActions.Player.Attack.started += _ => OnAttackStarted(); // 공격 시작 기록용
-        inputActions.Player.Attack.performed += _ => ProcessAttack(); // 공격 수행
-        inputActions.Player.Attack.canceled += _ => OnAttackCanceled(); // 공격 종료
+        inputActions.Player.Attack.started += _ => OnAttackStarted();
+        inputActions.Player.Attack.canceled += _ => OnAttackReleased(); // 변경 포인트
 
         inputActions.Player.Dodge.performed += _ => DodgeAbility?.Dodge(this);
         inputActions.Player.Jump.performed += _ => ProcessJump();
@@ -94,17 +85,12 @@ public class Vagabond : CharacterController
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
     }
 
-    //============================================================
-    // 🔄 Unity 생명주기
-    //============================================================
-
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
         base.Update();
         CheckMovementInput();
-
         UpdateMovement();
         FreezeRotation();
         stateMachine.Update();
@@ -116,15 +102,18 @@ public class Vagabond : CharacterController
         {
             characterData.comboTimer -= Time.deltaTime;
             if (characterData.comboTimer <= 0)
-            {
                 ResetCombo();
-            }
         }
-
     }
 
     private void CheckMovementInput()
     {
+        if (!CanProcessInput())
+        {
+            moveDirection = Vector3.zero;
+            return;
+        }
+
         Vector2 input = inputActions.Player.Move.ReadValue<Vector2>();
         Vector3 forward = cinemachineCamera.transform.forward;
         Vector3 right = cinemachineCamera.transform.right;
@@ -141,112 +130,89 @@ public class Vagabond : CharacterController
     }
 
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
-    private bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
+    public bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
 
     //============================================================
-    // 🗡️ 전투 및 스킬
+    // 🗡️ 공격 시스템 개선
     //============================================================
 
-   // 공격 시작 기록
+    public bool IsAttacking { get; private set; }
     private void OnAttackStarted()
     {
-        attackInputTime = Time.time;  // 공격 입력 시작 시간
+        attackInputTime = Time.time;
     }
 
-    // 공격 수행
-    private void ProcessAttack()
+    private void OnAttackReleased()
     {
         if (!CanProcessInput()) return;
 
-        float inputTime = Time.time - attackInputTime;
+        float inputHeldDuration = Time.time - attackInputTime;
 
-        // 입력 시간이 lightAttackDuration 이하일 경우 일반 공격
-        if (inputTime <= lightAttackDuration)
+        if (isAttacking)
         {
+            nextComboQueued = true;
+            return;
+        }
+
+        if (inputHeldDuration <= lightAttackDuration)
             PerformLightAttack();
-        }
-        // 입력 시간이 heavyAttackDuration 이상일 경우 강공격
-        else if (inputTime > heavyAttackDuration)
-        {
+        else if (inputHeldDuration > heavyAttackDuration)
             PerformHeavyAttack();
-        }
-         else
-        {
-            PerformLightAttack(); // 중간 영역도 일반 공격으로 간주
-        }
-       
     }
 
-    // 공격 취소
-    private void OnAttackCanceled()
-    {
-        float inputTime = Time.time - attackInputTime;
 
-        if (inputTime <= lightAttackDuration)
-        {
-            PerformLightAttack();
-        }
-        else if (inputTime > heavyAttackDuration)
-        {
-            PerformHeavyAttack();
-        }
-    }
-
-    // 일반 공격 처리
     private void PerformLightAttack()
-{
-    if (weaponManagerSO.CurrentWeapon == null)
     {
-        Debug.Log("No weapon equipped! Cannot perform attack.");
-        return;
+        if (weaponManagerSO.CurrentWeapon == null)
+        {
+            Debug.Log("No weapon equipped! Cannot perform attack.");
+            return;
+        }
+
+        var weapon = weaponManagerSO.CurrentWeapon;
+
+        if (characterData.attackComboStep >= weapon.maxAttackCount)
+            characterData.attackComboStep = 0;
+
+        Debug.Log($"Light Combo Attack Step {characterData.attackComboStep + 1} performed");
+
+        characterData.comboTimer = weapon.comboResetTime;
+
+        var comboState = GetState<VagabondComboAttackState>();
+        comboState.SetComboIndex(characterData.attackComboStep);
+        stateMachine.ChangeState(comboState);
+
+        characterData.attackComboStep++;
+        Debug.Log($"Combo Step: {characterData.attackComboStep}");
     }
 
-    Debug.Log("Light Combo Attack (First Step) performed");
-
-    // 콤보 타이머 초기화
-    characterData.comboTimer = weaponManagerSO.CurrentWeapon.comboResetTime; // 예: 1.5초
-
-    // 첫 번째 콤보 공격 애니메이션
-    characterData.attackComboStep = 0;
-    string comboAnimation = weaponManagerSO.CurrentWeapon.attackAnimations[characterData.attackComboStep].name;
-
-    // 상태 전환
-    stateMachine.ChangeState(new VagabondComboAttackState(comboAnimation, characterData.attackComboStep));
-
-    // 콤보 단계 증가 (다음 공격에서 사용)
-    characterData.attackComboStep++;
-}
-
-
-
-
-    // 강공격 처리
     private void PerformHeavyAttack()
     {
         if (weaponManagerSO.CurrentWeapon == null)
         {
             Debug.LogError("No weapon equipped! Cannot perform attack.");
-            return; // 무기가 없으면 공격을 수행하지 않음
+            return;
         }
 
         Debug.Log("Heavy Attack performed");
-        characterData.attackComboStep = 1; // 강공격 시 콤보 초기화
 
-        // 애니메이션 이름과 콤보 단계 전달
-        string comboAnimation = weaponManagerSO.CurrentWeapon.normalAttackAnimations[characterData.attackComboStep - 1]; // 애니메이션 이름
-        stateMachine.ChangeState(new VagabondComboAttackState(comboAnimation, characterData.attackComboStep)); // 콤보 단계와 애니메이션 이름 넘기기
+        characterData.attackComboStep = 1;
+        // Heavy attack state logic 추가 가능
     }
 
 
-private void ResetCombo()
-{
-    characterData.attackComboStep = 0;
-    characterData.comboTimer = 0;
-}
+    public void OnAttackAnimationStart() => isAttacking = true;
+    public void OnAttackAnimationEnd()
+    {
+        isAttacking = false;
+    }
 
-
-
-
+    private void ResetCombo()
+    {
+        characterData.attackComboStep = 0;
+        characterData.comboTimer = 0;
+        nextComboQueued = false;
+    }
 
     private void ProcessJump()
     {
@@ -255,7 +221,7 @@ private void ResetCombo()
     }
 
     //============================================================
-    // 🧤 무기 관리
+    // 🎒 인벤토리 & 무기
     //============================================================
 
     private void ChangeWeapon(int index)
@@ -269,16 +235,7 @@ private void ResetCombo()
         }
 
         weaponManagerSO.SwitchWeapon(index, anim);
-       
     }
-   
-
-
-
-
-    //============================================================
-    // 🎒 인벤토리
-    //============================================================
 
     private void ToggleInventory()
     {
@@ -306,10 +263,6 @@ private void ResetCombo()
         }
     }
 
-    //============================================================
-    // 🔐 입력 잠금 처리
-    //============================================================
-
     private void LockInput(float sec)
     {
         if (inputLockCoroutine != null)
@@ -326,7 +279,7 @@ private void ResetCombo()
     }
 
     //============================================================
-    // ✨ 이펙트 스폰   // 추후 무기별 고유 공격으로 생성 개선 예정정
+    // ✨ 이펙트 스폰
     //============================================================
 
     public void FrontAttack() => SpawnEffect("FrontAttack", Vector3.forward);

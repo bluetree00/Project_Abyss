@@ -51,17 +51,6 @@ namespace Game.CharacterStates.CharacterControllerStates
         public override void Enter(T owner)
         {
             owner.Anim.CrossFade("Idle", 0.2f);
-
-            // if (owner.weaponManager != null && 
-            //         owner.weaponManager.isWeaponEquipped && 
-            //         owner.weaponManager.CurrentWeapon.weapon_Idle_AnimationName != "")
-            //         {   
-            //             owner.Anim.CrossFade($"{owner.weaponManager.CurrentWeapon.weapon_Idle_AnimationName}", 0.1f);
-            //         }
-            //         else
-            //         {
-            //             owner.Anim.CrossFade("Idle", 0.2f);
-            //         } 
         }
 
         public override void Execute(T owner)
