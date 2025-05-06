@@ -188,8 +188,6 @@ public class WeaponManagerSO : ScriptableObject
 
     private void ApplyWeaponAnimations(WeaponData weapon, Animator animator)
     {
-        if (weapon == null || animator == null || weapon.animatorController == null)
-            return;
 
         string key = weapon.weaponKey.ToString();
         if (!cachedAnimators.TryGetValue(key, out var ovr))

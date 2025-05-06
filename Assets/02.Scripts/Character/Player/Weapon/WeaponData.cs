@@ -30,12 +30,9 @@ public abstract class WeaponData : ScriptableObject
     // ======= 특수 효과 =======
     [Header("특수 효과")]
     public bool hasSpecialEffect;
-    public string specialEffectDescription;
     public float bonusDamage;
 
     // ======= 공격 속도 =======
-    [Header("공격 속도")]
-    public float attackSpeed = 1.0f;
 
         [Header("Combo")]
     public float comboResetTime = 1.5f; // 콤보 입력 대기 시간
@@ -43,13 +40,9 @@ public abstract class WeaponData : ScriptableObject
 
     // ======= 무기 오브젝트 및 애니메이션 =======
 
-    [Header("애니메이터 컨트롤러")]
-    public RuntimeAnimatorController animatorController; // 여기에 애니메이터 컨트롤러 추가
-
     [Header("무기 애니메이션")]
     public List<AnimationClip> attackAnimations; // 공격 애니메이션 목록
     public int maxAttackCount = 3; // 최대 공격 수
-    public string weapon_Idle_AnimationName;
     public string weapon_ChangeWeapon_AnimationName;
     public string[] normalAttackAnimations;
     public float[] comboEndTimes;
@@ -88,14 +81,4 @@ public abstract class WeaponData : ScriptableObject
         }
     }
 
-    public virtual string GetNormalAttackAnimation(int step)
-    {
-        if (normalAttackAnimations == null || normalAttackAnimations.Length == 0)
-            return "DefaultAttack";
-
-        if (step <= 0 || step > normalAttackAnimations.Length)
-            return normalAttackAnimations[0];
-
-        return normalAttackAnimations[step - 1];
-    }
 }
