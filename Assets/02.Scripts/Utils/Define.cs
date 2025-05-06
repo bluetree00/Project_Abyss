@@ -96,6 +96,7 @@ public class Define
     {
         Basic_Knight_02,
         Basic_Knight_03,
+        Basic_Bow_01,
         Sword_01,
         Bow_Elite,
         Staff_Legend,

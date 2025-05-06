@@ -1,7 +1,9 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Weapon/Data/BasicSwordWeapon")]
-public class SwordWeaponData : WeaponData
+[CreateAssetMenu(menuName = "Weapon/Data/BasicBowWeapon")]
+public class BowWeaponData : WeaponData
 {
     public override void UseQSkill(GameObject user)
     {

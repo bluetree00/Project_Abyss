@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using BackEnd;
 using TMPro;
-using UnityEditor.VersionControl;
 
 public class RegisterAccount : LoginBase
 {

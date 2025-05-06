@@ -318,7 +318,6 @@ public class CharacterController : MonoBehaviour
             if (weaponManagerSO.GetWeaponAtSlot(i) == null)
             {
                 weaponManagerSO.EquipWeapon(newWeapon, i, anim); // Equip the weapon with animations
-            //  weaponManagerSO.SwitchWeapon(i, anim); // Switch to the new weapon slot
 
                 Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
 
@@ -347,9 +346,7 @@ public class CharacterController : MonoBehaviour
 
      public virtual void GoToComboAttackState()
     {
-        // 부모 클래스에서 기본적으로 상태 전환을 처리하거나,
-        // 기본적인 상태 전환 로직을 자식 클래스가 구현하도록 요구할 수 있습니다.
-        // 자식 클래스에서 구현하도록 할 수 있습니다.
+
         Debug.Log("GoToComboAttackState is not implemented in the base class.");
     }
     

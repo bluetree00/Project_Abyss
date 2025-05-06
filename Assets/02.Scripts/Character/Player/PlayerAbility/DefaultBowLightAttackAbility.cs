@@ -2,8 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Weapon/Abilities/SwordLightAttack")]
-public class DefaultLightAttackAbility : ScriptableObject, ILightAttackAbility<CharacterController>
+[CreateAssetMenu(menuName = "Weapon/Abilities/BowLightAttack")]
+public class DefaultBowLightAttackAbility : ScriptableObject, ILightAttackAbility<CharacterController>
 {
     public void LightAttack(CharacterController controller)
     {
@@ -29,4 +29,3 @@ public class DefaultLightAttackAbility : ScriptableObject, ILightAttackAbility<C
         Debug.Log($"Combo Step: {controller.CharacterData.attackComboStep}");
     }
 }
-

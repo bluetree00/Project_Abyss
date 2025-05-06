@@ -6,6 +6,7 @@ using UnityEngine;
 using Cinemachine;
 using Game.CharacterStates;
 using Game.CharacterStates.VagabondStates;
+using UnityEngine.InputSystem;
 
 public class Vagabond : CharacterController
 {
@@ -86,6 +87,7 @@ public class Vagabond : CharacterController
     {
         inputActions.Player.Attack.started += _ => OnAttackStarted();
         inputActions.Player.Attack.canceled += _ => OnAttackReleased(); // 변경 포인트
+        
 
         inputActions.Player.Dodge.performed += _ => DodgeAbility?.Dodge(this);
         inputActions.Player.Jump.performed += _ => ProcessJump();
@@ -166,33 +168,39 @@ public class Vagabond : CharacterController
             return;
         }
 
+         // 🔁 마우스 클릭 방향으로 회전
+        RotateTowardsMousePosition();
+    
+
         if (inputHeldDuration <= lightAttackDuration)
         {
-           // PerformLightAttack();
            LightAttackAbility?.LightAttack(this);
         }
         else if (inputHeldDuration > heavyAttackDuration)
         {
-            PerformHeavyAttack();
-          //  HeavyAttackAbility?.HeavyAttack(this);
+            HeavyAttackAbility?.HeavyAttack(this);
         }
             
     }
 
-    private void PerformHeavyAttack()
+    private void RotateTowardsMousePosition()
     {
-        if (weaponManagerSO.CurrentWeapon == null)
+        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+        RaycastHit hit;
+        int groundMask = LayerMask.GetMask("Ground");
+
+        if (Physics.Raycast(ray, out hit, 100f, groundMask))
         {
-            Debug.LogError("No weapon equipped! Cannot perform attack.");
-            return;
+            Vector3 lookDir = hit.point - transform.position;
+            lookDir.y = 0f;
+
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(lookDir);
+                transform.rotation = targetRotation;
+            }
         }
-
-        Debug.Log("Heavy Attack performed");
-
-        characterData.attackComboStep = 1;
-        // Heavy attack state logic 추가 가능
     }
-
 
     public void OnAttackAnimationStart() => isAttacking = true;
     public void OnAttackAnimationEnd()
