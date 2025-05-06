@@ -4,9 +4,28 @@ using Game.CharacterStates.CharacterControllerStates;
 namespace Game.CharacterStates.VagabondStates
 {
 
-    public class VagabondIdleState : IdleState<Vagabond> { }
+    public class VagabondIdleState : IdleState<Vagabond>
+    {
+        public override void Enter(Vagabond owner)
+        {
+            base.Enter(owner);
+            owner.Anim.CrossFade("VagabondIdle", 0.2f);  // Vagabond의 Idle 애니메이션
+        }
 
-      public class VagabondMoveBlendState : State<Vagabond>
+        public override void Execute(Vagabond owner)
+        {
+            // Vagabond Idle 상태에서 지속적인 로직 처리
+        }
+
+        public override void Exit(Vagabond owner)
+        {
+            base.Exit(owner);
+            // 필요시 다른 종료 로직
+        }
+    }
+
+
+    public class VagabondMoveBlendState : State<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {

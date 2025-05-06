@@ -53,6 +53,11 @@ public class Vagabond : CharacterController
             BindInputActions();
     }
 
+    protected override void InitAbilities()
+    {
+        base.InitAbilities();
+    }
+
     private void CacheStates()
     {
         cachedStates[typeof(VagabondIdleState)] = new VagabondIdleState();
@@ -69,6 +74,13 @@ public class Vagabond : CharacterController
     public T GetState<T>() where T : State<Vagabond> => cachedStates[typeof(T)] as T;
 
     public override void GoToIdleState() => stateMachine.ChangeState(GetState<VagabondIdleState>());
+
+    public override void GoToComboAttackState()
+    {
+        var comboState = GetState<VagabondComboAttackState>();
+        comboState.SetComboIndex(characterData.attackComboStep);
+        stateMachine.ChangeState(comboState);
+    }
 
     private void BindInputActions()
     {
@@ -155,9 +167,16 @@ public class Vagabond : CharacterController
         }
 
         if (inputHeldDuration <= lightAttackDuration)
-            PerformLightAttack();
+        {
+           // PerformLightAttack();
+           LightAttackAbility?.LightAttack(this);
+        }
         else if (inputHeldDuration > heavyAttackDuration)
+        {
             PerformHeavyAttack();
+          //  HeavyAttackAbility?.HeavyAttack(this);
+        }
+            
     }
 
 

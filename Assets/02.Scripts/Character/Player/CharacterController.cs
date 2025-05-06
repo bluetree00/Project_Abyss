@@ -16,6 +16,11 @@ public class CharacterController : MonoBehaviour
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
+    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
+    public StateMachine<CharacterController> StateMachine => stateMachine;
+
+    public WeaponManagerSO weaponManagerSO;
+
     protected Animator anim;
     public Animator Anim => anim;
 
@@ -39,11 +44,8 @@ public class CharacterController : MonoBehaviour
     public ILightAttackAbility<CharacterController> LightAttackAbility { get; protected set; }
     public IHeavyAttackAbility<CharacterController> HeavyAttackAbility { get; protected set; }
 
-    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
-    public StateMachine<CharacterController> StateMachine => stateMachine;
-
     public Transform handTransform;  
-    public WeaponManagerSO weaponManagerSO;
+
 
     //============================================================
     // 🔷 점프 및 공중 상태 관리
@@ -58,6 +60,7 @@ public class CharacterController : MonoBehaviour
 
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
+
 
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
@@ -126,7 +129,7 @@ public class CharacterController : MonoBehaviour
     /// <summary>
     /// 캐릭터의 이동, 회피, 공격 등 기본 어빌리티를 초기화.
     /// </summary>
-    private void InitAbilities()
+    protected virtual void InitAbilities()
     {
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
@@ -328,6 +331,15 @@ public class CharacterController : MonoBehaviour
     {
         // 자식 클래스에서 구현
     }
+
+     public virtual void GoToComboAttackState()
+    {
+        // 부모 클래스에서 기본적으로 상태 전환을 처리하거나,
+        // 기본적인 상태 전환 로직을 자식 클래스가 구현하도록 요구할 수 있습니다.
+        // 자식 클래스에서 구현하도록 할 수 있습니다.
+        Debug.Log("GoToComboAttackState is not implemented in the base class.");
+    }
+    
 
     
 }
