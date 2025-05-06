@@ -99,6 +99,7 @@ public class CharacterController : MonoBehaviour
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("⚠ WeaponSocket 트랜스폼을 찾지 못했습니다.");
+
     }
 
 
@@ -133,8 +134,19 @@ public class CharacterController : MonoBehaviour
     {
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
-        LightAttackAbility = new DefaultLightAttackAbility();
-        HeavyAttackAbility = new DefaultHeavyAttackAbility();
+
+    }
+
+    public void OnWeaponEquipped()
+    {
+        var weapon = weaponManagerSO.CurrentWeapon;
+
+        if (weapon != null)
+        {
+            LightAttackAbility = weapon.LightAttack;
+            //HeavyAttackAbility = weapon.HeavyAttack;
+            // 다른 능력도 여기서 초기화 가능
+        }
     }
 
     /// <summary>
@@ -145,6 +157,7 @@ public class CharacterController : MonoBehaviour
         weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
         weaponManagerSO.Initialize(2, anim); // 슬롯 수를 2로 초기화
         weaponManagerSO.weaponHandTransform = handTransform;
+        weaponManagerSO.OnWeaponEquippedEvent += OnWeaponEquipped;
     }
 
     /// <summary>
@@ -299,25 +312,25 @@ public class CharacterController : MonoBehaviour
     /// 
     /// 
     public bool PickupWeapon(WeaponData newWeapon)
-{
-    for (int i = 0; i < weaponManagerSO.SlotCount; i++)
     {
-        if (weaponManagerSO.GetWeaponAtSlot(i) == null)
+        for (int i = 0; i < weaponManagerSO.SlotCount; i++)
         {
-            weaponManagerSO.EquipWeapon(newWeapon, i, anim); // Equip the weapon with animations
-          //  weaponManagerSO.SwitchWeapon(i, anim); // Switch to the new weapon slot
+            if (weaponManagerSO.GetWeaponAtSlot(i) == null)
+            {
+                weaponManagerSO.EquipWeapon(newWeapon, i, anim); // Equip the weapon with animations
+            //  weaponManagerSO.SwitchWeapon(i, anim); // Switch to the new weapon slot
 
-            Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
+                Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
 
-            Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
+                Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
 
-            return true;
+                return true;
+            }
         }
-    }
 
-    Debug.Log("⚠ 모든 슬롯이 꽉 찼습니다!");
-    return false;
-}
+        Debug.Log("⚠ 모든 슬롯이 꽉 찼습니다!");
+        return false;
+    }
 
 
     //============================================================

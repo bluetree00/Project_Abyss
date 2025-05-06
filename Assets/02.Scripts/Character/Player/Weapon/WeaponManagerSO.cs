@@ -25,6 +25,8 @@ public class WeaponManagerSO : ScriptableObject
 
     private RuntimeAnimatorController defaultController;
 
+    public event Action OnWeaponEquippedEvent;
+
     public void Initialize(int slotSize, Animator animator)
     {
         weaponSlots = new WeaponData[slotSize];
@@ -58,6 +60,7 @@ public class WeaponManagerSO : ScriptableObject
             currentWeapon = newWeapon;
             isWeaponEquipped = true;
             ActivateWeaponInSlot(slotIndex, animator);
+            OnWeaponEquippedEvent?.Invoke(); // 이벤트 호출
         }
         else
         {

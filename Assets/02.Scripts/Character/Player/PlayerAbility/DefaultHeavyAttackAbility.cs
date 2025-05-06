@@ -2,7 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DefaultHeavyAttackAbility : IHeavyAttackAbility<CharacterController>
+[CreateAssetMenu(menuName = "Weapon/Abilities/LightAttack")]
+public class DefaultHeavyAttackAbility : ScriptableObject, IHeavyAttackAbility<CharacterController>
 {
     public void HeavyAttack(CharacterController controller)
     {
