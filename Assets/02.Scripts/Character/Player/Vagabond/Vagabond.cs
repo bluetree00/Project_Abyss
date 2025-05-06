@@ -75,7 +75,7 @@ public class Vagabond : CharacterController
 
     public override void GoToIdleState() => stateMachine.ChangeState(GetState<VagabondIdleState>());
 
-    public override void GoToComboAttackState()
+    public override void GoToComboAttackState() //자신에 필요한 연속 공격 내용
     {
         var comboState = GetState<VagabondComboAttackState>();
         comboState.SetComboIndex(characterData.attackComboStep);
@@ -177,32 +177,6 @@ public class Vagabond : CharacterController
           //  HeavyAttackAbility?.HeavyAttack(this);
         }
             
-    }
-
-
-    private void PerformLightAttack()
-    {
-        if (weaponManagerSO.CurrentWeapon == null)
-        {
-            Debug.Log("No weapon equipped! Cannot perform attack.");
-            return;
-        }
-
-        var weapon = weaponManagerSO.CurrentWeapon;
-
-        if (characterData.attackComboStep >= weapon.maxAttackCount)
-            characterData.attackComboStep = 0;
-
-        Debug.Log($"Light Combo Attack Step {characterData.attackComboStep + 1} performed");
-
-        characterData.comboTimer = weapon.comboResetTime;
-
-        var comboState = GetState<VagabondComboAttackState>();
-        comboState.SetComboIndex(characterData.attackComboStep);
-        stateMachine.ChangeState(comboState);
-
-        characterData.attackComboStep++;
-        Debug.Log($"Combo Step: {characterData.attackComboStep}");
     }
 
     private void PerformHeavyAttack()
