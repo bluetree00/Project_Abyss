@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Weapon/Abilities/SwordLightAttack")]
-public class DefaultLightAttackAbility : ScriptableObject, ILightAttackAbility<CharacterController>
+public class DefaultLightAttackAbility : LightAttackAbilitySO 
 {
-    public void LightAttack(CharacterController controller)
+    public override void LightAttack(CharacterController controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {

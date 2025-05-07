@@ -16,23 +16,19 @@ MonoBehaviour:
   attackPower: 50
   description: "\u3147"
   weaponKey: 1
-  weaponType: 0
+  weaponType: 5
   lightAttackSO: {fileID: 11400000, guid: faec1f9fb0782e14c820c1487cccb831, type: 2}
   heavyAttackSO: {fileID: 0}
   rarity: 0
   upgradeLevel: 0
   hasSpecialEffect: 0
-  specialEffectDescription: 
   bonusDamage: 0
-  attackSpeed: 1
   comboResetTime: 10
-  animatorController: {fileID: 9100000, guid: 67c492d1e16a4324b9450437c3ec5415, type: 2}
   attackAnimations:
   - {fileID: 7400000, guid: 023a20245aaaca745be629e34ca4879b, type: 3}
   - {fileID: 7400000, guid: d2e134cdb3d54ed41ad26d7625cb1639, type: 3}
   - {fileID: 7400002, guid: cacfd06da54ef1e48b7922dd14a677f5, type: 3}
   maxAttackCount: 3
-  weapon_Idle_AnimationName: 
   weapon_ChangeWeapon_AnimationName: 
   normalAttackAnimations:
   - NormalAttack_1

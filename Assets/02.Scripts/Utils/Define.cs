@@ -111,7 +111,9 @@ public class Define
         Bow,
         Staff,
         Dagger,
-        Axe
+        Axe,
+        BaseTest, // 테스트용
+
     }
 
     public static class WeaponTypeStrings
