@@ -37,3 +37,7 @@ MonoBehaviour:
     resourcePath: FrontAttack
     initialSize: 5
     poolType: 0
+  - tag: Basic_Arrow_01
+    resourcePath: Basic_Arrow_01
+    initialSize: 5
+    poolType: 0
