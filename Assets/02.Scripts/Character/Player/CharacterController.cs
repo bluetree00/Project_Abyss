@@ -137,6 +137,13 @@ public class CharacterController : MonoBehaviour
 
     }
 
+    public void ClearWeaponAbilities()
+    {
+        LightAttackAbility = null;
+        HeavyAttackAbility = null;
+    }
+
+
     public void OnWeaponEquipped()
     {
         var weapon = weaponManagerSO.CurrentWeapon;
@@ -144,10 +151,11 @@ public class CharacterController : MonoBehaviour
         if (weapon != null)
         {
             LightAttackAbility = weapon.LightAttack;
-            //HeavyAttackAbility = weapon.HeavyAttack;
-            // 다른 능력도 여기서 초기화 가능
+              ///  HeavyAttackAbility = weapon.HeavyAttack;
+            // 필요한 경우 다른 능력도 여기서 초기화
         }
     }
+
 
     /// <summary>
     /// 무기 매니저를 생성하고 슬롯을 초기화.

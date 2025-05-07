@@ -35,8 +35,8 @@ MonoBehaviour:
   - NormalAttack_2
   - NormalAttack_3
   comboEndTimes:
-  - 1
-  - 1
-  - 1
+  - 0.5
+  - 0.5
+  - 0.5
   QSkillData: {fileID: 0}
   ESkillData: {fileID: 0}
