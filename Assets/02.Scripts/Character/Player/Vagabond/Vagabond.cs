@@ -46,12 +46,41 @@ public class Vagabond : CharacterController
 
         if (cinemachineCamera != null)
         {
+            // 카메라의 LookAt과 Follow를 캐릭터로 설정
             cinemachineCamera.Follow = transform;
             cinemachineCamera.LookAt = transform;
+
+            // 쿼터뷰 고정 각도 설정
+            SetCameraToQuarterView();
         }
 
         if (inputReady)
             BindInputActions();
+    }
+
+
+    
+    private void SetCameraToQuarterView()
+    {
+        // 카메라의 Orbit 값을 수동으로 설정하여 쿼터뷰 각도를 고정
+        float height = 5f; // 카메라의 높이
+        float radius = 2f; // 캐릭터와의 거리
+
+        // 카메라의 Orbit 3개의 Rig (Top, Middle, Bottom) 모두 같은 값으로 설정하여 일관되게 유지
+        cinemachineCamera.m_Orbits[0].m_Height = height; 
+        cinemachineCamera.m_Orbits[0].m_Radius = radius;
+        cinemachineCamera.m_Orbits[1].m_Height = height;
+        cinemachineCamera.m_Orbits[1].m_Radius = radius;
+        cinemachineCamera.m_Orbits[2].m_Height = height;
+        cinemachineCamera.m_Orbits[2].m_Radius = radius;
+
+        // 카메라의 X/Y축 회전 각도를 쿼터뷰에 맞게 고정
+        cinemachineCamera.m_XAxis.Value = 0.5f; // 45도 각도 (0.25는 360도 기준으로 90도 회전)
+        cinemachineCamera.m_YAxis.Value = 0.6f;  // 약간 내려다보는 시점 (0 ~ 1 사이)
+
+        // 카메라 회전 속도를 0으로 설정하여, 플레이어가 회전해도 카메라가 고정되게 함
+        cinemachineCamera.m_XAxis.m_MaxSpeed = 0f;
+        cinemachineCamera.m_YAxis.m_MaxSpeed = 0f;
     }
 
     protected override void InitAbilities()
@@ -168,16 +197,21 @@ public class Vagabond : CharacterController
             return;
         }
 
-         // 🔁 마우스 클릭 방향으로 회전
-        RotateTowardsMousePosition();
-    
+        // ✅ 무기를 장착한 경우에만 방향 회전
+        if (weaponManagerSO?.CurrentWeapon != null)
+        {
+            RotateTowardsMousePosition();
+        }
+        
 
         if (inputHeldDuration <= lightAttackDuration)
         {
+           
            LightAttackAbility?.LightAttack(this);
         }
         else if (inputHeldDuration > heavyAttackDuration)
         {
+           
             HeavyAttackAbility?.HeavyAttack(this);
         }
             
@@ -235,6 +269,11 @@ public class Vagabond : CharacterController
             return;
         }
 
+        // ✅ 현재 슬롯과 같은 슬롯이면 무시
+        if (weaponManagerSO.GetCurrentSlotIndex() == index)
+            return;
+
+        stateMachine.ChangeState(GetState<VagabondIdleState>());
         weaponManagerSO.SwitchWeapon(index, anim);
     }
 

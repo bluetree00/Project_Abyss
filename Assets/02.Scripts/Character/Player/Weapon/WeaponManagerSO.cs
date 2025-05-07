@@ -43,6 +43,10 @@ public class WeaponManagerSO : ScriptableObject
     {
         if (!IsValidSlot(slotIndex) || newWeapon == null) return;
 
+          // 🔸 무기 능력 초기화
+        var controller = weaponHandTransform.GetComponentInParent<CharacterController>();
+        controller?.ClearWeaponAbilities();
+
         // 기존 장착 무기 비활성화
         if (slotIndex == currentSlotIndex)
         {
@@ -72,6 +76,10 @@ public class WeaponManagerSO : ScriptableObject
     {
         if (!IsValidSlot(slotIndex) || weaponSlots[slotIndex] == null) return;
 
+            // 🔸 무기 능력 초기화
+        var controller = weaponHandTransform.GetComponentInParent<CharacterController>();
+        controller?.ClearWeaponAbilities();
+
         // 기존 무기 비활성화
         if (currentWeaponObject != null)
         {
@@ -83,7 +91,7 @@ public class WeaponManagerSO : ScriptableObject
         currentSlotIndex = slotIndex;
         currentWeapon = weaponSlots[slotIndex];
         isWeaponEquipped = true;
-
+        OnWeaponEquippedEvent?.Invoke(); // 이벤트 호출
         // 새로운 슬롯에 무기 오브젝트가 존재하면 활성화하고 애니메이션 적용
         if (weaponObjects[slotIndex] != null)
         {
