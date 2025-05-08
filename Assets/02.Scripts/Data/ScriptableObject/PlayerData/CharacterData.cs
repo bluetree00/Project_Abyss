@@ -81,7 +81,7 @@ public class CharacterData : ScriptableObject
 
         if (equippedWeapon != null)
         {
-            totalAttackPower += equippedWeapon.CalculateEffectiveAttackPower();
+          //  totalAttackPower += equippedWeapon.CalculateEffectiveAttackPower();
         }
     }
 
@@ -155,7 +155,7 @@ public class CharacterData : ScriptableObject
     {
         if (equippedWeapon != null)
         {
-            equippedWeapon.ApplyWeaponEffects(ref damage);
+          //  equippedWeapon.ApplyWeaponEffects(ref damage);
         }
     }
 }

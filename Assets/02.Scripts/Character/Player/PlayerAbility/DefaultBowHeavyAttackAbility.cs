@@ -4,7 +4,7 @@ using UnityEngine;
 
 
 [CreateAssetMenu(menuName = "Weapon/Abilities/HeavyAttack")]
-public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
+public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
 {
     [Header("차지 공격 설정")]
     public float minChargeTime = 1f;

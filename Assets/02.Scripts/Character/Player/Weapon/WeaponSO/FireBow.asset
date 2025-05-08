@@ -18,25 +18,11 @@ MonoBehaviour:
   weaponKey: 2
   weaponType: 5
   lightAttackSO: {fileID: 11400000, guid: 744e3851e90b81044a11536cd76b3c41, type: 2}
-  heavyAttackSO: {fileID: 0}
+  lightAttackAnimationSetSO: {fileID: 11400000, guid: ad0294838541f744ba97aeb58d027632,
+    type: 2}
+  heavyAttackSO: {fileID: 11400000, guid: 2e472854b823a8e48bfb3894c4d061ca, type: 2}
+  heavyAttackSet: {fileID: 11400000, guid: 8829db679320ee640a4de726eb52ecee, type: 2}
   rarity: 0
-  upgradeLevel: 0
-  hasSpecialEffect: 0
-  bonusDamage: 0
-  comboResetTime: 10
-  attackAnimations:
-  - {fileID: 7400002, guid: d03b0ba70bc28304580a748b3ecc0180, type: 3}
-  - {fileID: 7400002, guid: d03b0ba70bc28304580a748b3ecc0180, type: 3}
-  - {fileID: 7400002, guid: d03b0ba70bc28304580a748b3ecc0180, type: 3}
-  maxAttackCount: 3
   weapon_ChangeWeapon_AnimationName: 
-  normalAttackAnimations:
-  - NormalAttack_1
-  - NormalAttack_2
-  - NormalAttack_3
-  comboEndTimes:
-  - 0.5
-  - 0.5
-  - 0.5
   QSkillData: {fileID: 0}
   ESkillData: {fileID: 0}

@@ -66,6 +66,8 @@ public class CharacterController : MonoBehaviour
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
 
+    public object Animator { get; internal set; }
+
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
@@ -289,4 +291,5 @@ public class CharacterController : MonoBehaviour
     {
         Debug.Log("GoToComboAttackState is not implemented in the base class.");
     }
+
 }

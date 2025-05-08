@@ -207,14 +207,16 @@ public class WeaponManagerSO : ScriptableObject
         string[] attackKeys = GetSortedAttackKeys(defaultController, "NormalAttack_");
         for (int i = 0; i < attackKeys.Length; i++)
         {
-            if (i < weapon.attackAnimations.Count && weapon.attackAnimations[i] != null)
+            if (i < weapon.lightAttackAnimationSetSO.attackAnimations.Count && weapon.lightAttackAnimationSetSO.attackAnimations[i] != null)
             {
-                ovr[attackKeys[i]] = weapon.attackAnimations[i];
+                ovr[attackKeys[i]] = weapon.lightAttackAnimationSetSO.attackAnimations[i];
             }
         }
 
         animator.runtimeAnimatorController = ovr;
     }
+
+
 
     private void ClearWeaponAnimations(Animator animator)
     {

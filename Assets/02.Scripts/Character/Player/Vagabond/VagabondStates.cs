@@ -67,7 +67,7 @@ namespace Game.CharacterStates.VagabondStates
         protected override void OnAnimationEnd(Vagabond owner) { }
     }
 
-    public class VagabondComboAttackState : AnimationState<Vagabond>
+   public class VagabondComboAttackState : AnimationState<Vagabond>
     {
         //public override bool BlocksInput => true;
         private int comboIndex;
@@ -92,11 +92,11 @@ namespace Game.CharacterStates.VagabondStates
             }
 
             var weapon = owner.weaponManagerSO.CurrentWeapon;
-            int index = Mathf.Clamp(comboIndex, 0, weapon.normalAttackAnimations.Length - 1);
+            int index = Mathf.Clamp(comboIndex, 0, weapon.lightAttackAnimationSetSO.normalAttackAnimations.Length - 1);
 
-            string animName = weapon.normalAttackAnimations[index];
-            float endTime = weapon.comboEndTimes[index];
-
+            string animName = weapon.lightAttackAnimationSetSO.normalAttackAnimations[index];
+            float endTime = weapon.lightAttackAnimationSetSO.comboEndTimes[index];
+            
             SetupAnimation(animName, endTime);
 
             owner.OnAttackAnimationStart(); // ✅ 공격 상태 시작 알림
