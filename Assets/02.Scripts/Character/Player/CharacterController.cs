@@ -1,3 +1,6 @@
+//============================================================
+// 📦 네임스페이스 및 의존성
+//============================================================
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -9,7 +12,7 @@ using Game.CharacterStates.CharacterControllerStates;
 public class CharacterController : MonoBehaviour
 {
     //============================================================
-    // 🔶 필드 및 프로퍼티
+    // 🔶 필드 및 프로퍼티: 캐릭터 정보 및 핵심 시스템
     //============================================================
 
     [Header("Character & Weapon")]
@@ -39,20 +42,22 @@ public class CharacterController : MonoBehaviour
     protected PlayerInputActions inputActions;
     protected bool inputReady = false;
 
+    //============================================================
+    // 🎮 캐릭터 능력
+    //============================================================
     public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
     public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
     public ILightAttackAbility<CharacterController> LightAttackAbility { get; protected set; }
     public IHeavyAttackAbility<CharacterController> HeavyAttackAbility { get; protected set; }
+    public IJumpAbility<CharacterController> JumpAbility { get; protected set; }
 
-    public Transform handTransform;  
-
+    public Transform handTransform;  // 무기 장착 위치
 
     //============================================================
     // 🔷 점프 및 공중 상태 관리
     //============================================================
-
-    private bool isGrounded;
-    private bool isJumping;
+    public bool isGrounded;
+    public bool isJumping;
     private float airStartTime = 0f;
 
     public enum AirState { None, JumpStart, InAir, Landing }
@@ -61,23 +66,18 @@ public class CharacterController : MonoBehaviour
     public bool IsInAir => CurrentAirState == AirState.InAir;
     public bool IsHardLanding => (Time.time - airStartTime) >= characterData.hardLandingTimeThreshold;
 
-
     public bool IsGrounded() => isGrounded;
     public bool IsJumping() => isJumping;
     public void FinishJump() => isJumping = false;
 
     //============================================================
-    // 🔹 초기화
+    // 🛠 초기화
     //============================================================
-
     private async void Awake()
     {
         await InitAsync();
     }
 
-    /// <summary>
-    /// 캐릭터의 모든 핵심 시스템을 비동기 초기화.
-    /// </summary>
     protected virtual async Task InitAsync()
     {
         InitCoreComponents();
@@ -87,9 +87,6 @@ public class CharacterController : MonoBehaviour
         InitWeaponManager();
     }
 
-    /// <summary>
-    /// 리지드바디, 애니메이터 등 핵심 컴포넌트를 초기화.
-    /// </summary>
     private void InitCoreComponents()
     {
         rb = GetComponent<Rigidbody>();
@@ -99,13 +96,8 @@ public class CharacterController : MonoBehaviour
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("⚠ WeaponSocket 트랜스폼을 찾지 못했습니다.");
-
     }
 
-
-    /// <summary>
-    /// 캐릭터 데이터(속성 데이터)를 Addressables로 로드.
-    /// </summary>
     private async Task InitCharacterDataAsync()
     {
         string characterName = gameObject.name.Replace("(Clone)", "");
@@ -117,9 +109,6 @@ public class CharacterController : MonoBehaviour
         rb.drag = characterData.groundDrag;
     }
 
-    /// <summary>
-    /// 캐릭터의 입력 시스템(InputActions)을 초기화하고 활성화.
-    /// </summary>
     private void InitInputActions()
     {
         inputActions = new PlayerInputActions();
@@ -127,14 +116,11 @@ public class CharacterController : MonoBehaviour
         inputReady = true;
     }
 
-    /// <summary>
-    /// 캐릭터의 이동, 회피, 공격 등 기본 어빌리티를 초기화.
-    /// </summary>
     protected virtual void InitAbilities()
     {
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
-
+        JumpAbility = new DefaultJumpAbility();
     }
 
     public void ClearWeaponAbilities()
@@ -143,34 +129,24 @@ public class CharacterController : MonoBehaviour
         HeavyAttackAbility = null;
     }
 
-
     public void OnWeaponEquipped()
     {
         var weapon = weaponManagerSO.CurrentWeapon;
-
         if (weapon != null)
         {
             LightAttackAbility = weapon.LightAttack;
-              ///  HeavyAttackAbility = weapon.HeavyAttack;
-            // 필요한 경우 다른 능력도 여기서 초기화
+            // HeavyAttackAbility = weapon.HeavyAttack;
         }
     }
 
-
-    /// <summary>
-    /// 무기 매니저를 생성하고 슬롯을 초기화.
-    /// </summary>
     private void InitWeaponManager()
     {
         weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
-        weaponManagerSO.Initialize(2, anim); // 슬롯 수를 2로 초기화
+        weaponManagerSO.Initialize(2, anim); // 무기 슬롯 수 2개로 초기화
         weaponManagerSO.weaponHandTransform = handTransform;
         weaponManagerSO.OnWeaponEquippedEvent += OnWeaponEquipped;
     }
 
-    /// <summary>
-    /// 캐릭터 데이터(Stat 등)를 비동기로 Addressables에서 로드.
-    /// </summary>
     protected async Task LoadCharacterDataAsync(string characterName)
     {
         var tcs = new TaskCompletionSource<bool>();
@@ -197,10 +173,6 @@ public class CharacterController : MonoBehaviour
     //============================================================
     // 🟢 이동 처리
     //============================================================
-
-    /// <summary>
-    /// 공중 상태가 아니라면 수평 속도를 정지시킴킴.
-    /// </summary>
     public void StopHorizontalMovement()
     {
         if (IsInAir) return;
@@ -210,22 +182,6 @@ public class CharacterController : MonoBehaviour
     //============================================================
     // 🔺 점프 처리
     //============================================================
-
-    /// <summary>
-    /// 캐릭터가 점프하도록 함함.
-    /// </summary>
-    public void Jump()
-    {
-        if (!isGrounded) return;
-
-        isJumping = true;
-        rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
-        rb.AddForce(Vector3.up * characterData.jumpForce, ForceMode.Impulse);
-    }
-
-    /// <summary>
-    /// 현재 공중 상태를 설정.
-    /// </summary>
     public void SetAirState(AirState state)
     {
         CurrentAirState = state;
@@ -236,11 +192,9 @@ public class CharacterController : MonoBehaviour
     //============================================================
     // 🔄 유니티 생명주기
     //============================================================
-
     protected virtual void Update()
     {
         if (!inputReady || characterData == null) return;
-
         MoveAbility?.Move(this, moveDirection);
     }
 
@@ -256,12 +210,8 @@ public class CharacterController : MonoBehaviour
     }
 
     //============================================================
-    // ⚙️ 물리 및 상태 관련
+    // ⚙️ 물리 및 상태 관련 처리
     //============================================================
-
-    /// <summary>
-    /// 레이캐스트로 현재 땅에 닿아 있는지 검사.
-    /// </summary>
     private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
@@ -279,9 +229,6 @@ public class CharacterController : MonoBehaviour
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
     }
 
-    /// <summary>
-    /// 공중 상태를 자동으로 업데이트.
-    /// </summary>
     private void UpdateAirStateAuto()
     {
         if (!isGrounded && CurrentAirState == AirState.None)
@@ -295,9 +242,6 @@ public class CharacterController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 캐릭터 중력 처리를 직접 적용.
-    /// </summary>
     private void ApplyMassBasedGravity()
     {
         if (!isGrounded || isJumping)
@@ -311,26 +255,20 @@ public class CharacterController : MonoBehaviour
     }
 
     //============================================================
-    // 🟧 무기 습득
+    // 🟧 무기 습득 및 장착
     //============================================================
-
-    /// <summary>
-    /// 무기를 획득하고 빈 슬롯에 장착.
-    /// </summary>
-    /// 
-    /// 
     public bool PickupWeapon(WeaponData newWeapon)
     {
         for (int i = 0; i < weaponManagerSO.SlotCount; i++)
         {
             if (weaponManagerSO.GetWeaponAtSlot(i) == null)
             {
-                weaponManagerSO.EquipWeapon(newWeapon, i, anim); // Equip the weapon with animations
-
+                weaponManagerSO.EquipWeapon(newWeapon, i, anim);
                 Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
 
                 Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
 
+                weaponManagerSO.SwitchWeapon(i, anim);
                 return true;
             }
         }
@@ -339,25 +277,16 @@ public class CharacterController : MonoBehaviour
         return false;
     }
 
-
     //============================================================
     // 🟦 상태 전환
     //============================================================
-
-    /// <summary>
-    /// 캐릭터를 Idle 상태로 전환. (자식 클래스에서 오버라이드 가능)
-    /// </summary>
     public virtual void GoToIdleState()
     {
-        // 자식 클래스에서 구현
+        // 자식 클래스에서 구현 예정
     }
 
-     public virtual void GoToComboAttackState()
+    public virtual void GoToComboAttackState()
     {
-
         Debug.Log("GoToComboAttackState is not implemented in the base class.");
     }
-    
-
-    
 }

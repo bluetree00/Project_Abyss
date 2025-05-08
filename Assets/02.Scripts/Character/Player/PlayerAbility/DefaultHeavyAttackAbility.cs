@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Weapon/Abilities/HeavyAttack")]
-public class DefaultHeavyAttackAbility : ScriptableObject, IHeavyAttackAbility<CharacterController>
+public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
 {
-    public void HeavyAttack(CharacterController controller)
+    public override void HeavyAttack(CharacterController controller)
     {
         throw new System.NotImplementedException();
     }
