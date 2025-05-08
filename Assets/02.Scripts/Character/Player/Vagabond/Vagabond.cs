@@ -319,7 +319,7 @@ public class Vagabond : CharacterController
     }
 
     //============================================================
-    // ✨ 이펙트 스폰
+    // ✨ 이펙트 스폰 추후 장비 데이터로 이전
     //============================================================
 
     public void FrontAttack() => SpawnEffect("FrontAttack", Vector3.forward);

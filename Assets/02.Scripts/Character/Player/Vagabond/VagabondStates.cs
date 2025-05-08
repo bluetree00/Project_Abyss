@@ -182,7 +182,8 @@ namespace Game.CharacterStates.VagabondStates
             owner.SetAirState(CharacterController.AirState.JumpStart);
             SetupAnimation("Jump_Start", 0.9f);
             base.Enter(owner);
-            owner.Jump();
+            // owner.Jump();
+            owner.JumpAbility.Jump(owner);
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
