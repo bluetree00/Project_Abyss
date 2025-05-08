@@ -30,6 +30,9 @@ public class Vagabond : CharacterController
 
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
 
+    private bool isChargingHeavyAttack = false;
+    private float heavyAttackChargeTime = 0f;
+
     private async void Start()
     {
         await InitAsync();
@@ -138,6 +141,8 @@ public class Vagabond : CharacterController
         FreezeRotation();
         stateMachine.Update();
 
+        HandleHeavyAttackCharging();
+
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
             stateMachine.ChangeState(GetState<VagabondInAirState>());
 
@@ -148,6 +153,15 @@ public class Vagabond : CharacterController
                 ResetCombo();
         }
     }
+
+    private void HandleHeavyAttackCharging()
+    {
+        if (!isChargingHeavyAttack) return;
+
+        heavyAttackChargeTime += Time.deltaTime;
+        HeavyAttackAbility?.HeavyAttackUpdateCharging(this, heavyAttackChargeTime);
+    }
+
 
     private void CheckMovementInput()
     {
@@ -182,7 +196,22 @@ public class Vagabond : CharacterController
     public bool IsAttacking { get; private set; }
     private void OnAttackStarted()
     {
+         if (!CanProcessInput()) return;
+
         attackInputTime = Time.time;
+
+            // 차징 시작
+        if (weaponManagerSO?.CurrentWeapon != null)
+        {
+            RotateTowardsMousePosition();
+        }
+
+        if (HeavyAttackAbility != null)
+        {
+            isChargingHeavyAttack = true;
+            heavyAttackChargeTime = 0f;
+            HeavyAttackAbility.HeavyAttackStartCharging(this);
+        }
     }
 
     private void OnAttackReleased()
@@ -197,25 +226,24 @@ public class Vagabond : CharacterController
             return;
         }
 
-        // ✅ 무기를 장착한 경우에만 방향 회전
         if (weaponManagerSO?.CurrentWeapon != null)
-        {
             RotateTowardsMousePosition();
+
+        if (isChargingHeavyAttack)
+        {
+            isChargingHeavyAttack = false;
+            HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heavyAttackChargeTime);
+            heavyAttackChargeTime = 0f;
+            return;
         }
-        
 
         if (inputHeldDuration <= lightAttackDuration)
         {
-           
-           LightAttackAbility?.LightAttack(this);
+            LightAttackAbility?.LightAttack(this);
         }
-        else if (inputHeldDuration > heavyAttackDuration)
-        {
-           
-            HeavyAttackAbility?.HeavyAttack(this);
-        }
-            
     }
+
+    
 
     private void RotateTowardsMousePosition()
     {

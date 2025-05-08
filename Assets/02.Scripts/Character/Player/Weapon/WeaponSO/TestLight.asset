@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0dae19108f1d2fa4b9feaaca667cdbb7, type: 3}
+  m_Name: TestLight
+  m_EditorClassIdentifier: 
+  maxComboCount: 3
+  comboResetTime: 10
+  comboClips:
+  - {fileID: 7400002, guid: 52c2de492ef1443458626e80a78b7c99, type: 3}
+  - {fileID: 7400000, guid: 77fc626278dbd774a9e6b1fee68562c4, type: 3}
+  - {fileID: 7400000, guid: 8decc86bf4985ea42b3005926975955f, type: 3}
+  comboEndTimes:
+  - 0.5
+  - 0.5
+  - 0.5
+  normalAttackAnimations:
+  - NormalAttack_1
+  - NormalAttack_2
+  - NormalAttack_3

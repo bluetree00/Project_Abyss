@@ -10,33 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6e74aa18f5758d945a9051e100c58590, type: 3}
-  m_Name: IceSword
+  m_Name: FireSword
   m_EditorClassIdentifier: 
-  weaponName: "\uC5BC\uC74C\uAC80"
+  weaponName: "\uBD88\uAC80"
   attackPower: 50
   description: "\u3147"
-  weaponKey: 1
+  weaponKey: 0
   weaponType: 5
   lightAttackSO: {fileID: 11400000, guid: faec1f9fb0782e14c820c1487cccb831, type: 2}
-  heavyAttackSO: {fileID: 0}
+  lightAttackAnimationSetSO: {fileID: 11400000, guid: 5b11edcb39e1548459fe10a162b99c2e,
+    type: 2}
+  heavyAttackSO: {fileID: 11400000, guid: 2e472854b823a8e48bfb3894c4d061ca, type: 2}
+  heavyAttackSet: {fileID: 11400000, guid: 8829db679320ee640a4de726eb52ecee, type: 2}
   rarity: 0
-  upgradeLevel: 0
-  hasSpecialEffect: 0
-  bonusDamage: 0
   comboResetTime: 10
-  attackAnimations:
-  - {fileID: 7400000, guid: 023a20245aaaca745be629e34ca4879b, type: 3}
-  - {fileID: 7400000, guid: d2e134cdb3d54ed41ad26d7625cb1639, type: 3}
-  - {fileID: 7400002, guid: cacfd06da54ef1e48b7922dd14a677f5, type: 3}
-  maxAttackCount: 3
   weapon_ChangeWeapon_AnimationName: 
-  normalAttackAnimations:
-  - NormalAttack_1
-  - NormalAttack_2
-  - NormalAttack_3
-  comboEndTimes:
-  - 0.5
-  - 0.5
-  - 0.5
   QSkillData: {fileID: 0}
   ESkillData: {fileID: 0}
