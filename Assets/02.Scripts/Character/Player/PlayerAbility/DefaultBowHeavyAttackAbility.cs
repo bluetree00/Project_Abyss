@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-[CreateAssetMenu(menuName = "Weapon/Abilities/HeavyAttack")]
+[CreateAssetMenu(menuName = "Weapon/Abilities/BowHeavyAttack")]
 public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
 {
     [Header("차지 공격 설정")]
@@ -13,6 +13,10 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
     public GameObject chargedAttackEffectPrefab;
 
     private GameObject chargeEffectInstance;
+
+    public override float MinChargeTime => throw new System.NotImplementedException();
+
+    public override float MaxChargeTime => throw new System.NotImplementedException();
 
     public override void HeavyAttackStartCharging(CharacterController character)
     {

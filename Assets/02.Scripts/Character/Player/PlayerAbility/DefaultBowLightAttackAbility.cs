@@ -15,6 +15,8 @@ public class DefaultBowLightAttackAbility : LightAttackAbilitySO
             return;
         }
 
+        controller.RotateTowardsMousePosition();
+
         Vector3 firePoint = controller.transform.position + Vector3.up * 0.5f;
         Vector3 fireDir = controller.transform.forward;
 

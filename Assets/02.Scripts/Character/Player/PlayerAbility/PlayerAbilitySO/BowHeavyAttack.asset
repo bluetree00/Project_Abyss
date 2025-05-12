@@ -9,8 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a209c0f63279769478d14110c2e6e848, type: 3}
-  m_Name: HeavyAttack
+  m_Script: {fileID: 11500000, guid: 4f5f115e662fe5842be035382f4927af, type: 3}
+  m_Name: BowHeavyAttack
   m_EditorClassIdentifier: 
   minChargeTime: 1
   maxChargeTime: 3
+  chargeEffectPrefab: {fileID: 0}
+  chargedAttackEffectPrefab: {fileID: 0}

@@ -12,8 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5244b3f95327ce44782ade5caed1dfcf, type: 3}
   m_Name: TestHeavy
   m_EditorClassIdentifier: 
-  chargeClip: {fileID: 0}
-  attackClip: {fileID: 0}
-  endClip: {fileID: 0}
+  chargeClip: {fileID: 7400002, guid: 4539621a37b409840b7b8e0dc0c51618, type: 3}
+  attackClip: {fileID: 7400002, guid: c163e50b5304c804087f317babb02781, type: 3}
+  endClip: {fileID: 7400000, guid: 1fb5156f95474594ba5c842a0c266fdf, type: 3}
+  HeavyAttackAnimations:
+  - Heavycharge
+  - HeavyAttack
+  - HeavyAttackEnd
   chargeDuration: 1.5
   attackPower: 100
