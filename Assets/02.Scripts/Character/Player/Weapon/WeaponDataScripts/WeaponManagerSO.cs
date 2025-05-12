@@ -194,27 +194,68 @@ public class WeaponManagerSO : ScriptableObject
         ApplyWeaponAnimations(weaponSlots[slotIndex], animator);
     }
 
-    private void ApplyWeaponAnimations(WeaponData weapon, Animator animator)
+    public void ApplyWeaponAnimations(WeaponData weapon, Animator animator)
     {
+        ApplyLightAttackAnimations(weapon, animator);
+        ApplyHeavyAttackAnimations(weapon, animator);
+    }
+
+    private void ApplyLightAttackAnimations(WeaponData weapon, Animator animator)
+    {
+        if (weapon == null || animator == null || weapon.lightAttackAnimationSetSO == null) return;
 
         string key = weapon.weaponKey.ToString();
-        if (!cachedAnimators.TryGetValue(key, out var ovr))
+
+        // 기존 오버라이드 컨트롤러 재사용 또는 생성
+        if (!cachedAnimators.TryGetValue(key, out var overrideController))
         {
-            ovr = new AnimatorOverrideController(defaultController);
-            cachedAnimators[key] = ovr;
+            overrideController = new AnimatorOverrideController(defaultController);
+            cachedAnimators[key] = overrideController;
         }
 
         string[] attackKeys = GetSortedAttackKeys(defaultController, "NormalAttack_");
+
         for (int i = 0; i < attackKeys.Length; i++)
         {
-            if (i < weapon.lightAttackAnimationSetSO.attackAnimations.Count && weapon.lightAttackAnimationSetSO.attackAnimations[i] != null)
+            if (i < weapon.lightAttackAnimationSetSO.attackAnimations.Count &&
+                weapon.lightAttackAnimationSetSO.attackAnimations[i] != null)
             {
-                ovr[attackKeys[i]] = weapon.lightAttackAnimationSetSO.attackAnimations[i];
+                overrideController[attackKeys[i]] = weapon.lightAttackAnimationSetSO.attackAnimations[i];
             }
         }
 
-        animator.runtimeAnimatorController = ovr;
+        // 애니메이터에 적용
+        animator.runtimeAnimatorController = overrideController;
     }
+
+
+    private void ApplyHeavyAttackAnimations(WeaponData weapon, Animator animator)
+    {
+        if (weapon == null || animator == null || weapon.heavyAttackSet == null) return;
+
+        string key = weapon.weaponKey.ToString();
+
+        // 이미 light에서 오버라이드한 컨트롤러가 있는 경우 재사용
+        if (!cachedAnimators.TryGetValue(key, out var overrideController))
+        {
+            overrideController = new AnimatorOverrideController(defaultController);
+            cachedAnimators[key] = overrideController;
+        }
+
+        var heavySet = weapon.heavyAttackSet;
+
+        if (heavySet.HeavyAttackAnimations.Length >= 3)
+        {
+            overrideController[heavySet.HeavyAttackAnimations[0]] = heavySet.chargeClip;
+            overrideController[heavySet.HeavyAttackAnimations[1]] = heavySet.attackClip;
+            overrideController[heavySet.HeavyAttackAnimations[2]] = heavySet.endClip;
+        }
+
+        // 현재 애니메이터 컨트롤러를 다시 설정
+        animator.runtimeAnimatorController = overrideController;
+    }
+
+
 
 
 

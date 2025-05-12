@@ -4,4 +4,7 @@ public interface IHeavyAttackAbility<T> where T : CharacterController
     void HeavyAttackUpdateCharging(CharacterController character, float chargeTime);
     void HeavyAttackReleaseChargedAttack(CharacterController character, float chargeTime);
     void HeavyAttackCancelCharging(CharacterController character);
+
+    float MinChargeTime { get; }
+    float MaxChargeTime { get; }
 }

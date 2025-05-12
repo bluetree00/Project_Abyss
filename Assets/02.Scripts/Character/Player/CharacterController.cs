@@ -40,10 +40,10 @@ public class CharacterController : MonoBehaviour
     public Transform playerTransform;
 
     protected PlayerInputActions inputActions;
-    protected bool inputReady = false;
+    public bool inputReady = false;
 
     //============================================================
-    // 🎮 캐릭터 능력
+    // 🎮 캐릭터 능력 모듈
     //============================================================
     public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
     public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
@@ -137,7 +137,7 @@ public class CharacterController : MonoBehaviour
         if (weapon != null)
         {
             LightAttackAbility = weapon.LightAttack;
-            // HeavyAttackAbility = weapon.HeavyAttack;
+            HeavyAttackAbility = weapon.HeavyAttack;
         }
     }
 
@@ -179,6 +179,25 @@ public class CharacterController : MonoBehaviour
     {
         if (IsInAir) return;
         rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
+    }
+
+    public void RotateTowardsMousePosition() //캐릭터를 마우스 방향으로 회전하게 함
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+        RaycastHit hit;
+        int groundMask = LayerMask.GetMask("Ground");
+
+        if (Physics.Raycast(ray, out hit, 100f, groundMask))
+        {
+            Vector3 lookDir = hit.point - transform.position;
+            lookDir.y = 0f;
+
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(lookDir);
+                transform.rotation = targetRotation;
+            }
+        }
     }
 
     //============================================================
@@ -282,14 +301,11 @@ public class CharacterController : MonoBehaviour
     //============================================================
     // 🟦 상태 전환
     //============================================================
-    public virtual void GoToIdleState()
-    {
-        // 자식 클래스에서 구현 예정
-    }
-
-    public virtual void GoToComboAttackState()
-    {
-        Debug.Log("GoToComboAttackState is not implemented in the base class.");
-    }
+    public virtual void GoToIdleState(){}
+    public virtual void GoToComboAttackState(){}
+    public virtual void GoToHeavyAttackChargeStartState(){}
+    public virtual void GoToHeavyAttackChargeHoldingState(){}
+    public virtual void GoToHeavyAttackChargedAttackState(){}
+    public virtual void GoToHeavyAttackChargeCancelState(){}
 
 }

@@ -21,7 +21,7 @@ public abstract class WeaponData : ScriptableObject
     [Header("사용할 무기 노말 공격 기능")]
     public LightAttackAbilitySO lightAttackSO;
 
-    [Header("노말 공격 애니메이션 세트")]
+    [Header("노말 공격 애니메이션, 콤보보 세팅 SO")]
     public LightAttackAnimationSetSO lightAttackAnimationSetSO; 
 
     // ======= 모으기, 강공격 공격 방식, 애니메이션 =======
