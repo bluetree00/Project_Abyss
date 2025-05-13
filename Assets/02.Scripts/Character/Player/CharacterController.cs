@@ -42,6 +42,16 @@ public class CharacterController : MonoBehaviour
     protected PlayerInputActions inputActions;
     public bool inputReady = false;
 
+    public float heavyAttackChargeThreshold = 1.5f;
+
+    public float heldDuration = 0f;
+    public float attackInputTime = 0f;
+    public float heavyAttackChargeTime = 0f;
+    public float heavyAttackReleaseTime = 0.4f;
+
+    public bool isAttacking = false;
+
+    public bool isInChargingState = false;
     //============================================================
     // 🎮 캐릭터 능력 모듈
     //============================================================
@@ -290,6 +300,8 @@ public class CharacterController : MonoBehaviour
                 Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
 
                 weaponManagerSO.SwitchWeapon(i, anim);
+
+                GoToIdleState();
                 return true;
             }
         }

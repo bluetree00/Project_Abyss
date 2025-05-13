@@ -18,21 +18,13 @@ public class Vagabond : CharacterController
     private bool isInputLocked = false;
     private float inputLockDuration = 2f;
 
-    private float attackInputTime = 0f;
-
-    private bool isAttacking = false;
     private bool nextComboQueued = false;
 
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
     public new StateMachine<Vagabond> StateMachine => stateMachine;
 
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
-
-    private float heavyAttackChargeTime = 0f;
-    private bool isInChargingState = false;
-    private float heavyAttackChargeThreshold = 0.8f;
-
-    private float heldDuration = 0f;
+  
 
 
     public float ChargeTime { get; private set; }
@@ -141,6 +133,7 @@ public class Vagabond : CharacterController
         FreezeRotation();
         stateMachine.Update();
 
+ 
         CheckHeavyAttackChargingState();
 
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
@@ -155,18 +148,38 @@ public class Vagabond : CharacterController
     }
 
 
+
     private void CheckHeavyAttackChargingState()
     {
-        if (isInChargingState) return;
+        if (isAttacking)
+            return;
 
-        if (heavyAttackChargeTime >= heavyAttackChargeThreshold)
+        if (inputActions.Player.Attack.IsPressed())
         {
-            Debug.Log("Heavy Attack Charge Threshold Reached");
-            HeavyAttackAbility?.HeavyAttackStartCharging(this);
-            isInChargingState = true;
+            heavyAttackChargeTime += Time.deltaTime;
 
+            if (!isInChargingState && heavyAttackChargeTime >= heavyAttackReleaseTime)
+            {
+                isInChargingState = true;
+                HeavyAttackAbility.HeavyAttackStartCharging(this);
+            }
+
+            if (isInChargingState)
+            {
+                HeavyAttackAbility.HeavyAttackUpdateCharging(this, heavyAttackChargeTime);
+            }
+        }
+        else
+        {
+            // ✅ 단순 입력 해제 시에는 내부 변수만 초기화
+            heavyAttackChargeTime = 0f;
+            isInChargingState = false;
         }
     }
+
+
+
+
 
     private void CheckMovementInput()
     {
@@ -204,49 +217,70 @@ public class Vagabond : CharacterController
         isInChargingState = false;
         heavyAttackChargeTime = 0f;
         heldDuration = 0f;
+        
     }
 
-    private void OnAttackReleased()
+    public void OnAttackReleased()
+{
+    if (!CanProcessInput()) return;
+
+    if (attackInputTime == 0f)
     {
-        if (!CanProcessInput()) return;
+        Debug.LogWarning("Attack released without a valid start time.");
+        return;
+    }
 
-        if (attackInputTime == 0f)
-        {
-            Debug.LogWarning("Attack released without a valid start time.");
-            return;
-        }
+    heldDuration = Time.time - attackInputTime;
+    Debug.Log($"Attack held for {heldDuration} seconds");
 
-        heldDuration = Time.time - attackInputTime;
-
-        Debug.Log($"Attack held for {heldDuration} seconds");
-
-        if (heldDuration >= heavyAttackChargeThreshold)
-        {
-            if (!isAttacking)
-                HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heldDuration);
-        }
+    if (heldDuration >= heavyAttackChargeThreshold)
+    {
+        HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heldDuration);
+    }
+    else
+    {
+        if (!isAttacking)
+            LightAttackAbility?.LightAttack(this);
         else
-        {
-            if (!isAttacking)
-                LightAttackAbility?.LightAttack(this);
-            else
-                nextComboQueued = true;
-        }
+            nextComboQueued = true;
+    }
 
-        // 반드시 초기화
-        attackInputTime = 0f;
-        heavyAttackChargeTime = 0f;
-        heldDuration = 0f;
-        isInChargingState = false;
+    // 반드시 초기화
+    attackInputTime = 0f;
+    heavyAttackChargeTime = 0f;
+    heldDuration = 0f;
+    isInChargingState = false;
+
+    OnAttackAnimationEnd();
+}
+
+
+    public bool ShouldCancelAttack()
+    {
+        // 구르기(Dodge) 입력이 들어왔거나, 다른 취소 조건이 충족되면 true 반환
+        return inputActions.Player.Dodge.triggered;  // 예시: 구르기 입력 감지
     }
 
 
-    public void OnAttackAnimationStart() => isAttacking = true;
+    public void CancelHeavyAttack()
+    {
+        // 강공격을 취소하는 공용 메서드
+        heavyAttackChargeTime = 0f;
+        OnAttackAnimationEnd();  // 애니메이션 종료 처리
+        StateMachine.ChangeState(GetState<VagabondIdleState>());  // Idle 상태로 전환
+    }
+
+
+
+    public void OnAttackAnimationStart()
+    {
+        isAttacking = true;
+    }
+
     public void OnAttackAnimationEnd()
     {
         isAttacking = false;
     }
-
 
     private void ResetCombo()
     {

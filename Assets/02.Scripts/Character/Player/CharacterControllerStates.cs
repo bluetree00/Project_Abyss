@@ -5,30 +5,32 @@ namespace Game.CharacterStates.CharacterControllerStates
 
     public abstract class AnimationState<T> : State<T> where T : CharacterController
     {
-        private string _animName;
-        private float _endTime = 0.95f;
-        private int _layer = 0;
-        private bool _blocksInput = true;
+        private int _animHash;
+        private float _endTime;
+        private int _layer;
+        private bool _blocksInput;
 
         public override bool BlocksInput => _blocksInput;
 
-        protected void SetupAnimation(string animName, float endTime = 0.95f, int layer = 0)
+        protected void InitAnimation(string animName, float endTime = 0.95f, int layer = 0, bool blocksInput = true)
         {
-            _animName = animName;
+            _animHash = Animator.StringToHash(animName);
             _endTime = endTime;
             _layer = layer;
+            _blocksInput = blocksInput;
         }
 
         public override void Enter(T owner)
         {
-            owner.Anim.CrossFade(_animName, 0.1f);
+            owner.Anim.CrossFade(_animHash, 0.1f, _layer);
         }
 
         public override void Execute(T owner)
         {
-            if (owner.Anim.IsInTransition(_layer)) return; // 전이 중이면 건너뜀
-            
-            if (AnimationHelper.IsAnimationFinished(owner.Anim, _animName, _endTime, _layer))
+            if (owner.Anim.IsInTransition(_layer)) return;
+
+            var stateInfo = owner.Anim.GetCurrentAnimatorStateInfo(_layer);
+            if (stateInfo.shortNameHash == _animHash && stateInfo.normalizedTime >= _endTime)
             {
                 _blocksInput = false;
                 OnAnimationEnd(owner);
@@ -42,6 +44,7 @@ namespace Game.CharacterStates.CharacterControllerStates
 
         protected abstract void OnAnimationEnd(T owner);
     }
+
 
 
     // 기본 상속할 상태 클래스들
