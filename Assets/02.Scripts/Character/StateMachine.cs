@@ -50,10 +50,6 @@ namespace Game.CharacterStates
         }
     }
 
-        internal void ChangeState<T>(MoveState<T> moveState) where T : MonsterController
-        {
-            throw new NotImplementedException();
-        }
     }
 
 }

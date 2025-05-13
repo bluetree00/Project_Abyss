@@ -45,7 +45,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            SetupAnimation("Dodge", 0.6f);
+            InitAnimation("Dodge", 0.6f);
             base.Enter(owner);
         }
 
@@ -79,7 +79,7 @@ namespace Game.CharacterStates.VagabondStates
             string animName = weapon.lightAttackAnimationSetSO.normalAttackAnimations[index];
             float endTime = weapon.lightAttackAnimationSetSO.comboEndTimes[index];
 
-            SetupAnimation(animName, endTime);
+            InitAnimation(animName, endTime);
             owner.RotateTowardsMousePosition();
             owner.OnAttackAnimationStart();
             base.Enter(owner);
@@ -94,9 +94,7 @@ namespace Game.CharacterStates.VagabondStates
         protected override void OnAnimationEnd(Vagabond owner)
         {
             owner.OnAttackAnimationEnd();
-          
-                owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
-            
+            owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
         }
     }
 
@@ -107,16 +105,14 @@ namespace Game.CharacterStates.VagabondStates
             string anim = owner.weaponManagerSO.CurrentWeapon?.weapon_ChangeWeapon_AnimationName;
             if (!string.IsNullOrEmpty(anim))
             {
-                SetupAnimation(anim, 0.95f);
+                InitAnimation(anim, 0.95f);
                 base.Enter(owner);
-
-                 owner.StateMachine.ChangeState(new VagabondIdleState()); //임시
+                owner.StateMachine.ChangeState(new VagabondIdleState()); // 임시
             }
             else
             {
                 Debug.LogWarning("무기 변경 애니메이션 이름이 비어있거나 무기가 없습니다.");
-
-                 owner.StateMachine.ChangeState(new VagabondIdleState()); //임시
+                owner.StateMachine.ChangeState(new VagabondIdleState());
             }
         }
 
@@ -130,7 +126,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            SetupAnimation("NormalSkile_01");
+            InitAnimation("NormalSkile_01");
             base.Enter(owner);
         }
 
@@ -144,7 +140,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            SetupAnimation("UltimateSkile_01");
+            InitAnimation("UltimateSkile_01");
             base.Enter(owner);
         }
 
@@ -159,7 +155,7 @@ namespace Game.CharacterStates.VagabondStates
         public override void Enter(Vagabond owner)
         {
             owner.SetAirState(CharacterController.AirState.JumpStart);
-            SetupAnimation("Jump_Start", 0.9f);
+            InitAnimation("Jump_Start", 0.9f);
             base.Enter(owner);
             owner.JumpAbility.Jump(owner);
         }
@@ -200,7 +196,7 @@ namespace Game.CharacterStates.VagabondStates
         {
             owner.SetAirState(CharacterController.AirState.Landing);
             owner.FinishJump();
-            SetupAnimation("Jump_Land", 0.3f);
+            InitAnimation("Jump_Land", 0.3f);
             base.Enter(owner);
             Debug.Log("Jump_Land");
         }
@@ -217,7 +213,7 @@ namespace Game.CharacterStates.VagabondStates
         {
             owner.SetAirState(CharacterController.AirState.Landing);
             owner.FinishJump();
-            SetupAnimation("Jump_HardLand", 0.9f);
+            InitAnimation("Jump_HardLand", 0.9f);
             base.Enter(owner);
             Debug.Log("Hard Landing");
         }
@@ -228,12 +224,12 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-        public class VagabondChargeStartState : AnimationState<Vagabond>
+    public class VagabondChargeStartState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            owner.HeavyAttackAbility.HeavyAttackStartCharging(owner);
-            SetupAnimation("Heavycharge", 0.3f);
+            Debug.Log("차지 공격 시작 상태 진입");
+            InitAnimation("Heavycharge", 0.3f);
             base.Enter(owner);
         }
 
@@ -243,7 +239,7 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-    public class VagabondChargeHoldingState : State<Vagabond>
+    public class VagabondChargeHoldingState : AnimationState<Vagabond>
     {
         private bool blocksInput = true;
         public override bool BlocksInput => blocksInput;
@@ -251,32 +247,32 @@ namespace Game.CharacterStates.VagabondStates
         public override void Enter(Vagabond owner)
         {
             Debug.Log("차지 공격 유지 상태 진입");
+            InitAnimation("Heavycharge", 0.3f);
+            base.Enter(owner);
             
         }
 
         public override void Execute(Vagabond owner)
         {
-            owner.HeavyAttackAbility.HeavyAttackUpdateCharging(owner, owner.ChargeTime);
-
-           
-                if (owner.ChargeTime >= owner.HeavyAttackAbility.MinChargeTime)
-                {
-                    owner.StateMachine.ChangeState(owner.GetState<VagabondChargedAttackState>());
-                }
-                else
-                    owner.StateMachine.ChangeState(owner.GetState<VagabondChargeCancelState>());
-            
+            if (owner.heavyAttackChargeTime >= owner.heavyAttackChargeThreshold)
+            {
+                owner.StateMachine.ChangeState(owner.GetState<VagabondChargedAttackState>());
+            }
         }
 
         public override void Exit(Vagabond owner)
         {
-            blocksInput = false;  // 차지 상태 종료 후 입력 차단 해제
+            blocksInput = false;
             Debug.Log("차지 공격 유지 상태 종료");
+        }
+
+        protected override void OnAnimationEnd(Vagabond owner)
+        {
+            throw new System.NotImplementedException();
         }
     }
 
-
-    public class VagabondChargedAttackState : AnimationState<Vagabond>
+   public class VagabondChargedAttackState : AnimationState<Vagabond>
     {
         private bool blocksInput = true;
         public override bool BlocksInput => blocksInput;
@@ -286,29 +282,49 @@ namespace Game.CharacterStates.VagabondStates
             blocksInput = true;  // 공격 중 입력 차단
             owner.OnAttackAnimationStart();
 
-            owner.HeavyAttackAbility.HeavyAttackReleaseChargedAttack(owner, owner.ChargeTime);
-
             var weapon = owner.weaponManagerSO.CurrentWeapon;
             string animName = weapon?.heavyAttackSet?.attackClip?.name ?? "HeavyAttack";
 
-            SetupAnimation(animName, 0.7f);
+            // InitAnimation 방식으로 애니메이션 초기화
+            InitAnimation(animName, 0.7f);
             base.Enter(owner);
+        }
+
+        public override void Execute(Vagabond owner)
+        {
+            base.Execute(owner);
+
+            // 구르기 입력이 들어오면 강공격 취소
+            if (owner.ShouldCancelAttack())
+            {
+                owner.CancelHeavyAttack();  // 강공격 취소 처리
+            }
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
+            // 애니메이션 종료 후 처리
             blocksInput = false;  // 공격 종료 후 입력 차단 해제
-            owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
+
+             owner.HeavyAttackAbility.HeavyAttackCancelCharging(owner);  // 차지 기능 초기화
+
+            // 강공격이 취소되었을 경우 이미 Idle 상태로 돌아갔으므로, 입력 차단을 해제하고 Idle 상태로 전환
+            if (owner.StateMachine.CurrentState is VagabondChargedAttackState)
+            {
+                owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
+            }
+
             owner.OnAttackAnimationEnd();
         }
     }
 
+
+
     public class VagabondChargeCancelState : AnimationState<Vagabond>
     {
-        public override void Enter(Vagabond owner)
+         public override void Enter(Vagabond owner)
         {
             owner.HeavyAttackAbility.HeavyAttackCancelCharging(owner);
-            SetupAnimation("HeavyAttackEnd", 0.4f);
             base.Enter(owner);
         }
 
@@ -319,4 +335,3 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 }
-    
