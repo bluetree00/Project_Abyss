@@ -1,10 +1,32 @@
+/// <summary>
+/// 강공격(Heavy Attack)에 대한 기능을 정의하는 인터페이스입니다.
+/// </summary>
+/// <typeparam name="T">CharacterController를 상속하는 캐릭터 타입</typeparam>
 public interface IHeavyAttackAbility<T> where T : CharacterController
 {
-    void HeavyAttackStartCharging(CharacterController character); //차지를 시작하는 단계
-    void HeavyAttackUpdateCharging(CharacterController character, float chargeTime);  //차지를 모으는 동안 사용될 기능
-    void HeavyAttackReleaseChargedAttack(CharacterController character, float chargeTime);    // 차지량에 따른 공격 기능 변화 가능
-    void HeavyAttackCancelCharging(CharacterController character); //공격이 취소 될떄 전용 초기화
+    /// <summary>
+    /// 강공격 차지를 시작할 때 호출.
+    /// </summary>
+    /// <param name="character">강공격을 수행하는 캐릭터</param>
+    void HeavyAttackStartCharging(CharacterController character);
 
-    float MinChargeTime { get; }    //최대 차지 시간
-    float MaxChargeTime { get; }    //최소 차지 시간
+    /// <summary>
+    /// 강공격을 차지하는 동안 매 프레임 호출.
+    /// </summary>
+    /// <param name="character">강공격을 수행하는 캐릭터</param>
+    /// <param name="chargeTime">현재까지 누적된 차지 시간</param>
+    void HeavyAttackUpdateCharging(CharacterController character, float chargeTime);
+
+    /// <summary>
+    /// 강공격 버튼에서 손을 떼면, 차지 시간에 따라 공격을을 실행.
+    /// </summary>
+    /// <param name="character">강공격을 수행하는 캐릭터</param>
+    /// <param name="chargeTime">최종 누적된 차지 시간</param>
+    void HeavyAttackReleaseChargedAttack(CharacterController character, float chargeTime);
+
+    /// <summary>
+    /// 강공격이 끝나거나 중간에 취소되었을 때 호출되어, 초기화 작업을 수행.
+    /// </summary>
+    /// <param name="character">강공격을 수행하던 캐릭터</param>
+    void HeavyAttackCancelCharging(CharacterController character);
 }
