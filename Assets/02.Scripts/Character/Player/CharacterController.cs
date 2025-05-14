@@ -314,6 +314,7 @@ public class CharacterController : MonoBehaviour
     // 🟦 상태 전환
     //============================================================
     public virtual void GoToIdleState(){}
+    public virtual void GotoDodgeState(){}
     public virtual void GoToComboAttackState(){}
     public virtual void GoToHeavyAttackChargeStartState(){}
     public virtual void GoToHeavyAttackChargeHoldingState(){}

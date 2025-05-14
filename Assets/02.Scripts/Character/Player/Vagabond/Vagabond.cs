@@ -7,6 +7,7 @@ using Cinemachine;
 using Game.CharacterStates;
 using Game.CharacterStates.VagabondStates;
 using UnityEngine.InputSystem;
+using Unity.VisualScripting;
 
 public class Vagabond : CharacterController
 {
@@ -104,6 +105,7 @@ public class Vagabond : CharacterController
         stateMachine.ChangeState(comboState);
     }
 
+    public override void GotoDodgeState() => stateMachine.ChangeState(GetState<VagabondDodgeState>());
     public override void GoToHeavyAttackChargeStartState() => stateMachine.ChangeState(GetState<VagabondChargeStartState>());
     public override void GoToHeavyAttackChargeHoldingState() => stateMachine.ChangeState(GetState<VagabondChargeHoldingState>());
     public override void GoToHeavyAttackChargedAttackState() => stateMachine.ChangeState(GetState<VagabondChargedAttackState>());
@@ -133,8 +135,18 @@ public class Vagabond : CharacterController
         FreezeRotation();
         stateMachine.Update();
 
- 
+         //TODO: 기존 강공격이지만 마우스 유지만 사용하는 모으기 공격에 적합.
         CheckHeavyAttackChargingState();
+
+        //TODO: 현재 방식에서 무기 타입에 따라 강공격 로직을 분기해서 나눠야함
+        // if (weaponManagerSO.CurrentWeapon.weaponType == 타입 확인 )
+        // {
+        //     CheckBowHeavyAttackCharging();
+        // }
+        // else
+        // {
+        //     CheckHeavyAttackChargingState();
+        // }
 
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
             stateMachine.ChangeState(GetState<VagabondInAirState>());
@@ -151,8 +163,11 @@ public class Vagabond : CharacterController
 
     private void CheckHeavyAttackChargingState()
     {
-        if (isAttacking)
+        if (isAttacking) //기본 강공격 용으로 만들어야 함 기본 강공격만 걸러야 보우의 강공격이 놓은때를 인식할수 있음 아니면 걸림 is Attacking에
+        {
             return;
+        }
+
 
         if (inputActions.Player.Attack.IsPressed())
         {
@@ -221,38 +236,38 @@ public class Vagabond : CharacterController
     }
 
     public void OnAttackReleased()
-{
-    if (!CanProcessInput()) return;
-
-    if (attackInputTime == 0f)
     {
-        Debug.LogWarning("Attack released without a valid start time.");
-        return;
-    }
+        if (!CanProcessInput()) return;
 
-    heldDuration = Time.time - attackInputTime;
-    Debug.Log($"Attack held for {heldDuration} seconds");
+        if (attackInputTime == 0f)
+        {
+            Debug.LogWarning("Attack released without a valid start time.");
+            return;
+        }
 
-    if (heldDuration >= heavyAttackChargeThreshold)
-    {
-        HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heldDuration);
-    }
-    else
-    {
-        if (!isAttacking)
-            LightAttackAbility?.LightAttack(this);
+        heldDuration = Time.time - attackInputTime;
+        Debug.Log($"Attack held for {heldDuration} seconds");
+
+        if (heldDuration >= heavyAttackChargeThreshold)
+        {
+            HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heldDuration);
+        }
         else
-            nextComboQueued = true;
+        {
+            if (!isAttacking)
+                LightAttackAbility?.LightAttack(this);
+            else
+                nextComboQueued = true;
+        }
+
+        // 반드시 초기화
+        attackInputTime = 0f;
+        heavyAttackChargeTime = 0f;
+        heldDuration = 0f;
+        isInChargingState = false;
+
+        OnAttackAnimationEnd();
     }
-
-    // 반드시 초기화
-    attackInputTime = 0f;
-    heavyAttackChargeTime = 0f;
-    heldDuration = 0f;
-    isInChargingState = false;
-
-    OnAttackAnimationEnd();
-}
 
 
     public bool ShouldCancelAttack()

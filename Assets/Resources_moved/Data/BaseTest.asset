@@ -41,3 +41,11 @@ MonoBehaviour:
     resourcePath: Basic_Arrow_01
     initialSize: 5
     poolType: 0
+  - tag: Bow_Charge_Effect_Heavy
+    resourcePath: Bow_Charge_Effect_Heavy
+    initialSize: 5
+    poolType: 0
+  - tag: Projectile_HeavyArrow
+    resourcePath: Projectile_HeavyArrow
+    initialSize: 5
+    poolType: 0
