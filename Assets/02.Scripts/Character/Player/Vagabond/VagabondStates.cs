@@ -3,12 +3,17 @@ using Game.CharacterStates.CharacterControllerStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
+    // ──────────────────────────────
+    // ▶ IDLE / MOVE 상태
+    // ──────────────────────────────
+
+    // 기본 대기 상태
     public class VagabondIdleState : IdleState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
             base.Enter(owner);
-            owner.Anim.CrossFade("VagabondIdle", 0.2f);
+            owner.Anim.CrossFade("MoveBlend", 0.2f); // 이동 애니메이션 시작
         }
 
         public override void Execute(Vagabond owner) { }
@@ -19,11 +24,12 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // 이동 상태 (Blend Tree 사용)
     public class VagabondMoveBlendState : State<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            owner.Anim.CrossFade("MoveBlend", 0.1f);
+            owner.Anim.CrossFade("MoveBlend", 0.1f); // 이동 애니메이션 시작
         }
 
         public override void Execute(Vagabond owner)
@@ -32,25 +38,39 @@ namespace Game.CharacterStates.VagabondStates
 
             float moveAmount = owner.MoveDirection.magnitude;
             float targetSpeed = moveAmount > 0 ? (Input.GetKey(KeyCode.LeftShift) ? 1f : 0.5f) : 0f;
+
+            // 애니메이션 Blend 파라미터 조절
             owner.Anim.SetFloat("MoveSpeed", targetSpeed, 0.1f, Time.deltaTime);
         }
 
         public override void Exit(Vagabond owner)
         {
-            owner.Anim.SetFloat("MoveSpeed", 0f);
+            owner.Anim.SetFloat("MoveSpeed", 0f); // 이동 종료 시 속도 초기화
         }
     }
+
+    // ──────────────────────────────
+    // ▶ 회피 상태
+    // ──────────────────────────────
 
     public class VagabondDodgeState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            InitAnimation("Dodge", 0.6f);
+            InitAnimation("Dodge", 0.6f); // 회피 애니메이션 초기화
             base.Enter(owner);
         }
 
-        protected override void OnAnimationEnd(Vagabond owner) { }
+        protected override void OnAnimationEnd(Vagabond owner)
+        {
+            owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
+        }
+
     }
+
+    // ──────────────────────────────
+    // ▶ 콤보 공격 상태
+    // ──────────────────────────────
 
     public class VagabondComboAttackState : AnimationState<Vagabond>
     {
@@ -76,19 +96,22 @@ namespace Game.CharacterStates.VagabondStates
 
             var weapon = owner.weaponManagerSO.CurrentWeapon;
             int index = Mathf.Clamp(comboIndex, 0, weapon.lightAttackAnimationSetSO.normalAttackAnimations.Length - 1);
+
+            // 콤보 애니메이션 및 종료 시간 설정
             string animName = weapon.lightAttackAnimationSetSO.normalAttackAnimations[index];
             float endTime = weapon.lightAttackAnimationSetSO.comboEndTimes[index];
 
             InitAnimation(animName, endTime);
-            owner.RotateTowardsMousePosition();
-            owner.OnAttackAnimationStart();
+
+            owner.RotateTowardsMousePosition();      // 캐릭터 방향 회전
+            owner.OnAttackAnimationStart();          // 공격 시작 처리
             base.Enter(owner);
         }
 
         public override void Exit(Vagabond owner)
         {
             blocksInput = false;
-            owner.OnAttackAnimationEnd();
+            owner.OnAttackAnimationEnd(); // 공격 종료 처리
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
@@ -98,16 +121,21 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // ──────────────────────────────
+    // ▶ 무기 변경 상태
+    // ──────────────────────────────
+
     public class VagabondChangeWeaponState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
             string anim = owner.weaponManagerSO.CurrentWeapon?.weapon_ChangeWeapon_AnimationName;
+
             if (!string.IsNullOrEmpty(anim))
             {
                 InitAnimation(anim, 0.95f);
                 base.Enter(owner);
-                owner.StateMachine.ChangeState(new VagabondIdleState()); // 임시
+                owner.StateMachine.ChangeState(new VagabondIdleState()); // 임시 처리
             }
             else
             {
@@ -122,11 +150,15 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // ──────────────────────────────
+    // ▶ 스킬 / 궁극기 상태
+    // ──────────────────────────────
+
     public class VagabondSkillState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
         {
-            InitAnimation("NormalSkile_01");
+            InitAnimation("NormalSkile_01"); // 일반 스킬
             base.Enter(owner);
         }
 
@@ -140,7 +172,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            InitAnimation("UltimateSkile_01");
+            InitAnimation("UltimateSkile_01"); // 궁극기
             base.Enter(owner);
         }
 
@@ -150,6 +182,10 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // ──────────────────────────────
+    // ▶ 점프 / 착지 관련 상태
+    // ──────────────────────────────
+
     public class VagabondJumpStartState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
@@ -157,7 +193,8 @@ namespace Game.CharacterStates.VagabondStates
             owner.SetAirState(CharacterController.AirState.JumpStart);
             InitAnimation("Jump_Start", 0.9f);
             base.Enter(owner);
-            owner.JumpAbility.Jump(owner);
+
+            owner.JumpAbility.Jump(owner); // 점프 실행
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
@@ -173,7 +210,7 @@ namespace Game.CharacterStates.VagabondStates
         public override void Enter(Vagabond owner)
         {
             owner.SetAirState(CharacterController.AirState.InAir);
-            owner.Anim.CrossFade("Jump_Loop", 0.1f);
+            owner.Anim.CrossFade("Jump_Loop", 0.1f); // 공중 애니메이션
         }
 
         public override void Execute(Vagabond owner)
@@ -198,6 +235,7 @@ namespace Game.CharacterStates.VagabondStates
             owner.FinishJump();
             InitAnimation("Jump_Land", 0.3f);
             base.Enter(owner);
+
             Debug.Log("Jump_Land");
         }
 
@@ -215,6 +253,7 @@ namespace Game.CharacterStates.VagabondStates
             owner.FinishJump();
             InitAnimation("Jump_HardLand", 0.9f);
             base.Enter(owner);
+
             Debug.Log("Hard Landing");
         }
 
@@ -224,6 +263,11 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // ──────────────────────────────
+    // ▶ 강공격 (차지 공격) 관련 상태
+    // ──────────────────────────────
+
+    // 강공격 시작 (버튼 누름)
     public class VagabondChargeStartState : AnimationState<Vagabond>
     {
         public override void Enter(Vagabond owner)
@@ -239,6 +283,7 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
+    // 강공격 유지 (버튼 누르고 있음)
     public class VagabondChargeHoldingState : AnimationState<Vagabond>
     {
         private bool blocksInput = true;
@@ -249,7 +294,6 @@ namespace Game.CharacterStates.VagabondStates
             Debug.Log("차지 공격 유지 상태 진입");
             InitAnimation("Heavycharge", 0.3f);
             base.Enter(owner);
-            
         }
 
         public override void Execute(Vagabond owner)
@@ -268,24 +312,24 @@ namespace Game.CharacterStates.VagabondStates
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            throw new System.NotImplementedException();
+            throw new System.NotImplementedException(); // 애니메이션 끝나는 일이 없음
         }
     }
 
-   public class VagabondChargedAttackState : AnimationState<Vagabond>
+    // 차지 공격 실행
+    public class VagabondChargedAttackState : AnimationState<Vagabond>
     {
         private bool blocksInput = true;
         public override bool BlocksInput => blocksInput;
 
         public override void Enter(Vagabond owner)
         {
-            blocksInput = true;  // 공격 중 입력 차단
+            blocksInput = true;
             owner.OnAttackAnimationStart();
 
             var weapon = owner.weaponManagerSO.CurrentWeapon;
             string animName = weapon?.heavyAttackSet?.attackClip?.name ?? "HeavyAttack";
 
-            // InitAnimation 방식으로 애니메이션 초기화
             InitAnimation(animName, 0.7f);
             base.Enter(owner);
         }
@@ -294,21 +338,17 @@ namespace Game.CharacterStates.VagabondStates
         {
             base.Execute(owner);
 
-            // 구르기 입력이 들어오면 강공격 취소
             if (owner.ShouldCancelAttack())
             {
-                owner.CancelHeavyAttack();  // 강공격 취소 처리
+                owner.CancelHeavyAttack();
             }
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
-            // 애니메이션 종료 후 처리
-            blocksInput = false;  // 공격 종료 후 입력 차단 해제
+            blocksInput = false;
+            owner.HeavyAttackAbility.HeavyAttackCancelCharging(owner);
 
-             owner.HeavyAttackAbility.HeavyAttackCancelCharging(owner);  // 차지 기능 초기화
-
-            // 강공격이 취소되었을 경우 이미 Idle 상태로 돌아갔으므로, 입력 차단을 해제하고 Idle 상태로 전환
             if (owner.StateMachine.CurrentState is VagabondChargedAttackState)
             {
                 owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
@@ -318,11 +358,10 @@ namespace Game.CharacterStates.VagabondStates
         }
     }
 
-
-
+    // 강공격 취소 (차지 도중 중단)
     public class VagabondChargeCancelState : AnimationState<Vagabond>
     {
-         public override void Enter(Vagabond owner)
+        public override void Enter(Vagabond owner)
         {
             owner.HeavyAttackAbility.HeavyAttackCancelCharging(owner);
             base.Enter(owner);

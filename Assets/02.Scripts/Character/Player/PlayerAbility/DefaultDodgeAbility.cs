@@ -26,7 +26,8 @@ public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
             : controller.transform.forward;
 
         float startTime = Time.time;
-        controller.Anim.CrossFade("Dodge", 0.1f);
+        
+        controller.GotoDodgeState();
 
         while (Time.time < startTime + dashDuration)
         {
@@ -35,8 +36,6 @@ public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
         }
 
         controller.Rigid.velocity = Vector3.zero;
-
-        controller.GoToIdleState(); // 타입 상관없이 알아서 자기 상태로 감
 
 
         yield return new WaitForSeconds(controller.CharacterData.dodgeCooldown);

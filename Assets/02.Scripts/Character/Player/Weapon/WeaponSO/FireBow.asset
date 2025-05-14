@@ -21,7 +21,7 @@ MonoBehaviour:
   lightAttackAnimationSetSO: {fileID: 11400000, guid: ad0294838541f744ba97aeb58d027632,
     type: 2}
   heavyAttackSO: {fileID: 11400000, guid: 2e472854b823a8e48bfb3894c4d061ca, type: 2}
-  heavyAttackSet: {fileID: 11400000, guid: 8829db679320ee640a4de726eb52ecee, type: 2}
+  heavyAttackSet: {fileID: 11400000, guid: a3db9819293ea554ca105c52cbcdb5fe, type: 2}
   rarity: 0
   weapon_ChangeWeapon_AnimationName: 
   QSkillData: {fileID: 0}
