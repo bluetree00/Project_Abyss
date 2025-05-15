@@ -16,7 +16,7 @@ MonoBehaviour:
   attackPower: 50
   description: 
   weaponKey: 2
-  weaponType: 5
+  weaponType: 1
   lightAttackSO: {fileID: 11400000, guid: 744e3851e90b81044a11536cd76b3c41, type: 2}
   lightAttackAnimationSetSO: {fileID: 11400000, guid: ad0294838541f744ba97aeb58d027632,
     type: 2}

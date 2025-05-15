@@ -17,8 +17,8 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
 
     public override void HeavyAttackStartCharging(CharacterController controller)
     {
-        Debug.Log("차지 시작");
 
+        controller.RotateTowardsMousePosition();
         controller.GoToHeavyAttackChargeStartState();
     }
 

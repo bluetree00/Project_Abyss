@@ -53,7 +53,7 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7e9e8dd837a3b374d9ed3a7cbb24398b
+  - m_GUID: 374490bfe1bd07842b945c91025ffee1
     m_Address: Bow_Charge_Effect_Heavy
     m_ReadOnly: 0
     m_SerializedLabels:

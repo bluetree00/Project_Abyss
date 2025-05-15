@@ -14,7 +14,7 @@ public abstract class WeaponData : ScriptableObject
      public Define.WeaponPrefabKey weaponKey;
 
 
-    [Header("무기 구성 풀러 패키지 이펙트, 프리펩 등")] // 타입을 이름 기준으로 풀러 연결 초기화화 기본 이펙트를 정해줌. 추후 수정가능 
+    [Header("무기 구성 풀러 패키지 이펙트, 프리펩 등")] // 타입을 이름 기준으로 풀러 연결 초기화화 기본 이펙트를 정해줌. 추후 패키지 풀러 연결로 사용용
     public Define.WeaponType weaponType;
 
     // ======= 노말 공격 공격 방식, 애니메이션 =======

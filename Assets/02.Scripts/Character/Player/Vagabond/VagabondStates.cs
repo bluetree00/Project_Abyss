@@ -272,7 +272,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            Debug.Log("차지 공격 시작 상태 진입");
+
             InitAnimation("Heavycharge", 0.3f);
             base.Enter(owner);
         }
@@ -291,7 +291,7 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Enter(Vagabond owner)
         {
-            Debug.Log("차지 공격 유지 상태 진입");
+
             InitAnimation("Heavycharge", 0.3f);
             base.Enter(owner);
         }
@@ -307,7 +307,7 @@ namespace Game.CharacterStates.VagabondStates
         public override void Exit(Vagabond owner)
         {
             blocksInput = false;
-            Debug.Log("차지 공격 유지 상태 종료");
+
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
