@@ -138,15 +138,6 @@ public class Vagabond : CharacterController
          //TODO: 기존 강공격이지만 마우스 유지만 사용하는 모으기 공격에 적합.
         CheckHeavyAttackChargingState();
 
-        //TODO: 현재 방식에서 무기 타입에 따라 강공격 로직을 분기해서 나눠야함
-        // if (weaponManagerSO.CurrentWeapon.weaponType == 타입 확인 )
-        // {
-        //     CheckBowHeavyAttackCharging();
-        // }
-        // else
-        // {
-        //     CheckHeavyAttackChargingState();
-        // }
 
         if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
             stateMachine.ChangeState(GetState<VagabondInAirState>());
@@ -159,15 +150,33 @@ public class Vagabond : CharacterController
         }
     }
 
-
-
     private void CheckHeavyAttackChargingState()
+    {
+        if (weaponManagerSO?.CurrentWeapon == null)
+            return;
+
+        var weaponType = weaponManagerSO.CurrentWeapon.weaponType;
+
+        switch (weaponType)
+        {
+            case Define.WeaponType.Sword:
+                CheckSwordHeavyAttackChargingState();
+                break;
+            case Define.WeaponType.Bow:
+                CheckBowHeavyAttackChargingState();
+                break;
+        }
+    }
+
+
+    
+
+    private void CheckSwordHeavyAttackChargingState()
     {
         if (isAttacking) //기본 강공격 용으로 만들어야 함 기본 강공격만 걸러야 보우의 강공격이 놓은때를 인식할수 있음 아니면 걸림 is Attacking에
         {
             return;
         }
-
 
         if (inputActions.Player.Attack.IsPressed())
         {
@@ -191,6 +200,33 @@ public class Vagabond : CharacterController
             isInChargingState = false;
         }
     }
+
+    private void CheckBowHeavyAttackChargingState()
+    {
+
+        if (inputActions.Player.Attack.IsPressed())
+        {
+            heavyAttackChargeTime += Time.deltaTime;
+
+            if (!isInChargingState && heavyAttackChargeTime >= heavyAttackReleaseTime)
+            {
+                isInChargingState = true;
+                HeavyAttackAbility.HeavyAttackStartCharging(this);
+            }
+
+            if (isInChargingState)
+            {
+                HeavyAttackAbility.HeavyAttackUpdateCharging(this, heavyAttackChargeTime);
+            }
+        }
+        else
+        {
+            // ✅ 단순 입력 해제 시에는 내부 변수만 초기화
+            heavyAttackChargeTime = 0f;
+            isInChargingState = false;
+        }
+    }
+
 
 
 
@@ -224,29 +260,31 @@ public class Vagabond : CharacterController
     
     private void OnAttackStarted()
     {
-        if (!CanProcessInput()) return;
-
-        Debug.Log("OnAttackStarted called");
+        // ✅ 공격이 입력되었지만 바로 처리되지 않는 상태라면, 시간만 저장
+        if (!CanProcessInput())
+        {
+            attackInputTime = Time.time;
+            return;
+        }
 
         attackInputTime = Time.time;
         isInChargingState = false;
         heavyAttackChargeTime = 0f;
         heldDuration = 0f;
-        
     }
 
     public void OnAttackReleased()
     {
         if (!CanProcessInput()) return;
 
+        // ✅ fallback: attackInputTime이 설정되지 않았더라도 대응
         if (attackInputTime == 0f)
         {
-            Debug.LogWarning("Attack released without a valid start time.");
-            return;
+            Debug.LogWarning("Attack released without a valid start time. Fallback initialized.");
+             return;
         }
 
         heldDuration = Time.time - attackInputTime;
-        Debug.Log($"Attack held for {heldDuration} seconds");
 
         if (heldDuration >= heavyAttackChargeThreshold)
         {
@@ -260,7 +298,6 @@ public class Vagabond : CharacterController
                 nextComboQueued = true;
         }
 
-        // 반드시 초기화
         attackInputTime = 0f;
         heavyAttackChargeTime = 0f;
         heldDuration = 0f;
@@ -268,6 +305,7 @@ public class Vagabond : CharacterController
 
         OnAttackAnimationEnd();
     }
+
 
 
     public bool ShouldCancelAttack()

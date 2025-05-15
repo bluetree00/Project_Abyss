@@ -65,7 +65,7 @@ namespace Game.CharacterStates.CharacterControllerStates
     {
         public override void Enter(T owner)
         {
-            owner.Anim.CrossFade("Idle", 0.2f);
+           // owner.Anim.CrossFade("Idle", 0.2f);
         }
 
         public override void Execute(T owner)
@@ -75,7 +75,7 @@ namespace Game.CharacterStates.CharacterControllerStates
 
         public override void Exit(T owner)
         {
-            Debug.Log($"{typeof(T).Name} - Idle 상태 종료");
+           
         }
     }
 

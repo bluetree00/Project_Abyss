@@ -30,6 +30,31 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     {
         controller.GoToHeavyAttackChargedAttackState();
 
+           string effectName = "ShinySlash";
+
+        int effectCount = Random.Range(10, 15); // 이펙트 생성 개수
+        for (int i = 0; i < effectCount; i++)
+        {
+            Vector3 randomOffset = new Vector3(
+                Random.Range(-0.5f, 0.5f),
+                Random.Range(-0.2f, 0.5f),
+                Random.Range(0.3f, 1.0f)
+            );
+
+            Quaternion randomRotation = Quaternion.Euler(
+                Random.Range(-30f, 30f),
+                Random.Range(0f, 360f),
+                Random.Range(-30f, 30f)
+            );
+
+            Vector3 spawnPosition = controller.handTransform.position +controller.handTransform.TransformDirection(randomOffset);
+            Quaternion spawnRotation = controller.handTransform.rotation * randomRotation;
+
+            GameObject effect = Managers.ObjectPooler.SpawnFromPool(effectName, spawnPosition, spawnRotation);
+
+            if (effect != null)
+                effect.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+        }
     }
 
     // 공격이 끝나게게 될때 전용 초기화.
