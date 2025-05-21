@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace PeglinMapGenerator // 필요에 따라 네임스페이스를 변경하세요.
+namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경하세요.
 {
     // 노드 타입 열거형
     public enum NodeType
@@ -70,15 +70,10 @@ namespace PeglinMapGenerator // 필요에 따라 네임스페이스를 변경하
     }
 
     // 그래프 생성기
-    public static class PeglinMapGenerator
+    public static class MapGeneratorManager
     {
-        /// <summary>
-        /// Peglin 맵과 유사한 구조의 결정론적 그래프를 생성합니다.
-        /// </summary>
-        /// <param name="layerSizes">각 레이어의 노드 수를 지정하는 배열입니다.</param>
-        /// <param name="seed">노드 생성 순서 및 특정 규칙 분기에 사용될 시드값입니다. (현재 코드에서는 노드 ID에만 영향을 줍니다.)</param>
-        /// <returns>생성된 그래프 데이터(노드 및 간선)를 담은 Graph 객체를 반환합니다.</returns>
-        public static Graph Generate(int[] layerSizes, int seed = 123)
+        
+        public static Graph Generate(StageData.ChapterData chapterData, int seed = 123)
         {
             var graph = new Graph();
             var rnd = new Random(seed); // 간선 로직에서 직접 사용 안 함 (향후 무작위성 추가 시 활용 가능)
@@ -86,13 +81,13 @@ namespace PeglinMapGenerator // 필요에 따라 네임스페이스를 변경하
             int idCounter = 0;
 
             // 입력 유효성 검사 (최소 2개 레이어 필요, 각 레이어 크기는 1 이상)
-            if (layerSizes == null || layerSizes.Length < 2)
+            if (chapterData == null || chapterData.layerSizes == null || chapterData.layerSizes.Length < 2)
             {
                  // 유니티나 다른 환경에서 콘솔 출력 대신 적절한 로깅 또는 예외 처리를 하세요.
                 Console.WriteLine("오류: 레이어 배열은 최소 2개 이상의 크기를 가져야 합니다.");
                 return graph; // 빈 그래프 반환
             }
-            if (layerSizes.Any(size => size <= 0))
+            if (chapterData.layerSizes.Any(size => size <= 0))
             {
                 // 유니티나 다른 환경에서 콘솔 출력 대신 적절한 로깅 또는 예외 처리를 하세요.
                  Console.WriteLine("오류: 레이어 크기는 1 이상이어야 합니다.");
@@ -101,14 +96,14 @@ namespace PeglinMapGenerator // 필요에 따라 네임스페이스를 변경하
 
 
             // 1) 노드 생성
-            for (int i = 0; i < layerSizes.Length; i++)
+            for (int i = 0; i < chapterData.layerSizes.Length; i++)
             {
                 var currentLayerNodes = new List<Node>();
                 NodeType type = NodeType.Normal;
                 if (i == 0) type = NodeType.Start;
-                else if (i == layerSizes.Length - 1) type = NodeType.End;
+                else if (i == chapterData.layerSizes.Length - 1) type = NodeType.End;
 
-                for (int pos = 0; pos < layerSizes[i]; pos++)
+                for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
                 {
                     var node = new Node(idCounter++, i, pos, type);
                     currentLayerNodes.Add(node);

@@ -61,7 +61,7 @@ public class Managers : MonoBehaviour
 
             // 나머지 초기화 작업
             if (_stageTransitionManager == null)
-                _stageTransitionManager = new StageTransitionManager();
+              _stageTransitionManager = new StageTransitionManager();
         }
         else
         {
@@ -73,7 +73,7 @@ public class Managers : MonoBehaviour
     {
 
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
-        StageTransitionManager.LoadChapter("Chapter1"); // 첫 번째 챕터 로드
+        _stageTransitionManager.Init("Data/Chapter1"); // 첫 번째 챕터 로드
     }
     
 
@@ -119,6 +119,7 @@ public class Managers : MonoBehaviour
                 Debug.Log("<color=red>생성 실패</color>");
             });
         }
+    
     } 
 
     public static void Clear()
@@ -128,15 +129,6 @@ public class Managers : MonoBehaviour
             s_instance._input?.Clear();
             s_instance._resource?.Clear();
             s_instance = null;
-        }
-    }
-
-    public void ReloadStageManager(List<StageManager.Stage> stages, List<StageManager.ConnectionRestriction> restrictions, string bossStageName)
-    {
-        if (_stageManager != null)
-        {
-            _stageManager = new StageManager(stages, restrictions, bossStageName, 1);
-            _stageManager.MoveToNextStage(0); // 새로운 스테이지로 이동
         }
     }
 
