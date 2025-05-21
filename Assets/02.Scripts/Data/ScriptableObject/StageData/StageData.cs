@@ -19,20 +19,54 @@ public class StageData : ScriptableObject
         Chapter10
     }
 
+    public enum StageName
+    {
+        Stage1,
+        Stage2,
+        Stage3,
+        Stage4,
+        Stage5,
+        Stage6,
+        Stage7,
+        Stage8,
+        Stage9,
+        Stage10,
+        Stage11,
+        Stage12,
+        Stage13,
+        Stage14,
+        Stage15,
+        Stage16,
+        Stage17,
+        Stage18,
+        Stage19,
+        Stage20,
+        Stage21,
+        Stage22,
+        Stage23,
+        Stage24,
+        Stage25,
+        Stage26,
+        Stage27,
+        Stage28,
+        Stage29,
+        Stage30,
+    }
+
     [System.Serializable]
     public class ChapterData
     {
         public ChapterName chapterName;
+        public int[] layerSizes;
         public List<StageSettings> stages;
-        public List<StageConnectionRestriction> connectionRestrictions;
+        //public List<StageConnectionRestriction> connectionRestrictions;
         public string bossStageName;
 
         [System.Serializable]
         public class StageSettings
         {
-            public string stageName;
+            public StageName stageName;
             public string resourcePath;
-            public StageManager.StageType stageType;
             public int weight;
             public bool randomWeight;
 
@@ -41,11 +75,11 @@ public class StageData : ScriptableObject
             // public int maxWeight = 20;
         }
 
-        [System.Serializable]
-        public class StageConnectionRestriction
-        {
-            public string restrictedStage;
-            public string requiredStage;
-        }
+        // [System.Serializable]
+        // public class StageConnectionRestriction
+        // {
+        //     public string restrictedStage;
+        //     public string requiredStage;
+        // }
     }
 }

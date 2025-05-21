@@ -2,7 +2,8 @@ using UnityEngine;
 using UnityEngine.UI; // UI 요소 사용
 using System.Collections.Generic;
 using System.Linq;
-using PeglinMapGenerator; // 그래프 생성 코드가 있는 네임스페이스 사용
+using MapGeneratorManager;
+using System.Collections; // 그래프 생성 코드가 있는 네임스페이스 사용
 
 public class UIGraphVisualizer : MonoBehaviour
 {
@@ -32,16 +33,29 @@ public class UIGraphVisualizer : MonoBehaviour
             // Screen Space Overlay에서는 Line Renderer 대신 다른 UI 선 그리기 방법을 사용해야 합니다.
         }
 
+        StartCoroutine(WaitForStageManagerInitialization());
 
-        GenerateAndVisualizeGraph();
+        // GenerateAndVisualizeGraph();
+    }
+
+    private IEnumerator WaitForStageManagerInitialization()
+    {
+       // StageManager가 초기화될 때까지 대기
+       while (Managers.Stage == null || Managers.Stage.stageGraph == null)
+       {
+           yield return null;
+       }
+
+       // 그래프 시각화
+       GenerateAndVisualizeGraph();
     }
 
     public void GenerateAndVisualizeGraph()
     {
-        ClearExistingVisualization();
+        ClearExistingVisualization(); 
 
         // 1. 그래프 데이터 생성
-        generatedGraph = PeglinMapGenerator.PeglinMapGenerator.Generate(layerSizes, seed);
+        generatedGraph = Managers.Stage.stageGraph;
 
         if (generatedGraph == null || generatedGraph.Nodes == null || generatedGraph.Edges == null)
         {
