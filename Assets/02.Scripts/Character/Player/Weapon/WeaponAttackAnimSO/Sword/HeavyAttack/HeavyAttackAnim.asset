@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5244b3f95327ce44782ade5caed1dfcf, type: 3}
-  m_Name: TestHeavy
+  m_Name: HeavyAttackAnim
   m_EditorClassIdentifier: 
   chargeClip: {fileID: 7400002, guid: 4539621a37b409840b7b8e0dc0c51618, type: 3}
   attackClip: {fileID: 7400002, guid: c163e50b5304c804087f317babb02781, type: 3}
