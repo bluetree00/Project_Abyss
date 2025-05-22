@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경하세요.
 {
@@ -76,7 +78,7 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
         public static Graph Generate(StageData.ChapterData chapterData, int seed = 123)
         {
             var graph = new Graph();
-            var rnd = new Random(seed); // 간선 로직에서 직접 사용 안 함 (향후 무작위성 추가 시 활용 가능)
+            var rnd = new System.Random(seed); // 간선 로직에서 직접 사용 안 함 (향후 무작위성 추가 시 활용 가능)
             var layers = new List<List<Node>>();
             int idCounter = 0;
 
@@ -230,6 +232,7 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                  // 이 레이어 쌍에 대한 간선 생성 완료
             }
 
+            UnityEngine.Debug.Log("그래프 생성 완료: " + graph.Nodes.Count + " 노드, " + graph.Edges.Count + " 간선");
             return graph;
         }
 
