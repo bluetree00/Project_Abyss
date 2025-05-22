@@ -33,7 +33,6 @@ public class Managers : MonoBehaviour
 
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
-    private StageTransitionManager _stageTransitionManager;
     private CharacterDataManager _characterDataManager;     // 캐릭터 데이터 관리 매니저
     private GameEventManager gameEventManager; // 게임 이벤트 매니저
     SceneManagerEx _scene = new SceneManagerEx();
@@ -44,7 +43,6 @@ public class Managers : MonoBehaviour
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
-    public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
     public static GameEventManager GameEvent => Instance.gameEventManager ?? (Instance.gameEventManager = new GameEventManager());
 
@@ -58,10 +56,6 @@ public class Managers : MonoBehaviour
         {
             s_instance = this;
             DontDestroyOnLoad(this);
-
-            // 나머지 초기화 작업
-            if (_stageTransitionManager == null)
-                _stageTransitionManager = new StageTransitionManager();
         }
         else
         {
@@ -71,9 +65,7 @@ public class Managers : MonoBehaviour
 
     void Start()
     {
-
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
-        _stageTransitionManager.Init("Data/Chapter1"); // 첫 번째 챕터 로드
     }
     
 
@@ -119,16 +111,6 @@ public class Managers : MonoBehaviour
                 Debug.Log("<color=red>생성 실패</color>");
             });
         }
-        // 방향에 따라 첫 번째 또는 두 번째 노드로 이동
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) // 왼쪽 화살표
-        {
-            Stage.MoveToNextStage(-1);
-        }
-        else if (Input.GetKeyDown(KeyCode.RightArrow)) // 오른쪽 화살표
-        {
-            Stage.MoveToNextStage(1);
-        }
-    
     } 
 
     public static void Clear()
