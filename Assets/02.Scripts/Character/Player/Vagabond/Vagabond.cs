@@ -123,6 +123,9 @@ public class Vagabond : CharacterController
         inputActions.Player.CloseInventory.performed += _ => CloseInventory();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
+        //NOTE: 이 부분은 테스트용으로, 실제 게임에서는 필요하지 않을 수 있습니다.
+        inputActions.Player.testKey.performed += _ => Managers.Stage.MoveToNextStage(1);
+        inputActions.Player.testKey2.performed += _ => Managers.Stage.MoveToNextStage(-1);
     }
 
     protected override void Update()
