@@ -2,14 +2,12 @@ using UnityEngine;
 using UnityEngine.UI; // UI 요소 사용
 using System.Collections.Generic;
 using System.Linq;
-using PeglinMapGenerator; // 그래프 생성 코드가 있는 네임스페이스 사용
+using MapGeneratorManager;
+using System.Collections; // 그래프 생성 코드가 있는 네임스페이스 사용
 
 public class UIGraphVisualizer : MonoBehaviour
 {
-    [Header("Graph Generation Parameters")]
-    [SerializeField] private int[] layerSizes = { 1, 2, 3, 4, 3, 2, 1 }; // 인스펙터에서 설정할 레이어 크기
     [SerializeField] private int seed = 42; // 그래프 생성 시드
-
     [Header("Visualization Settings (UI)")]
     [SerializeField] private GameObject uiNodePrefab; // 노드 시각화에 사용할 UI 프리팹 (Image, Button 등 Rect Transform 가짐)
     [SerializeField] private GameObject uiEdgePrefab; // 간선 시각화에 사용할 프리 (Line Renderer 포함)
@@ -32,16 +30,43 @@ public class UIGraphVisualizer : MonoBehaviour
             // Screen Space Overlay에서는 Line Renderer 대신 다른 UI 선 그리기 방법을 사용해야 합니다.
         }
 
+        StartCoroutine(WaitForStageManagerInitialization());
+    }
 
+    private IEnumerator WaitForStageManagerInitialization()
+    {
+        while (Managers.Stage == null)
+        {
+            yield return null;
+        }
+
+        Managers.Stage.OnGraphGenerated += HandleGraphGenerated;
+    }
+
+    private void HandleGraphGenerated(Graph graph)
+    {
+        if (graph == null)
+        {
+            Debug.LogError("Received null graph from StageManager.");
+            return;
+        }
+
+        Debug.Log($"Received graph with {graph.Nodes.Count} nodes and {graph.Edges.Count} edges.");
+        generatedGraph = graph;
+
+        // 그래프 시각화
         GenerateAndVisualizeGraph();
     }
 
     public void GenerateAndVisualizeGraph()
     {
-        ClearExistingVisualization();
+        ClearExistingVisualization(); 
 
-        // 1. 그래프 데이터 생성
-        generatedGraph = PeglinMapGenerator.PeglinMapGenerator.Generate(layerSizes, seed);
+        if (generatedGraph == null)
+        {
+            Debug.LogError("Generated graph is null.");
+            return;
+        }
 
         if (generatedGraph == null || generatedGraph.Nodes == null || generatedGraph.Edges == null)
         {
@@ -148,6 +173,8 @@ public class UIGraphVisualizer : MonoBehaviour
                 Debug.LogWarning($"Could not find UI rect transforms for edge {edgeData.FromId} -> {edgeData.ToId}.");
             }
         }
+
+        Debug.Log($"그래프 시각화 완료: {generatedGraph.Nodes.Count} 노드, {generatedGraph.Edges.Count} 간선");
     }
 
     void ClearExistingVisualization()
