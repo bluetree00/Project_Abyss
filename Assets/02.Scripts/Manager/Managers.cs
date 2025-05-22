@@ -73,7 +73,7 @@ public class Managers : MonoBehaviour
     {
 
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
-        StageTransitionManager.LoadChapter("Chapter1"); // 첫 번째 챕터 로드
+        _stageTransitionManager.Init("Data/Chapter1"); // 첫 번째 챕터 로드
     }
     
 
@@ -101,7 +101,7 @@ public class Managers : MonoBehaviour
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
 
-    
+
 
 
     void Update()
@@ -119,6 +119,16 @@ public class Managers : MonoBehaviour
                 Debug.Log("<color=red>생성 실패</color>");
             });
         }
+        // 방향에 따라 첫 번째 또는 두 번째 노드로 이동
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) // 왼쪽 화살표
+        {
+            Stage.MoveToNextStage(-1);
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) // 오른쪽 화살표
+        {
+            Stage.MoveToNextStage(1);
+        }
+    
     } 
 
     public static void Clear()
@@ -128,15 +138,6 @@ public class Managers : MonoBehaviour
             s_instance._input?.Clear();
             s_instance._resource?.Clear();
             s_instance = null;
-        }
-    }
-
-    public void ReloadStageManager(List<StageManager.Stage> stages, List<StageManager.ConnectionRestriction> restrictions, string bossStageName)
-    {
-        if (_stageManager != null)
-        {
-            _stageManager = new StageManager(stages, restrictions, bossStageName, 1);
-            _stageManager.MoveToNextStage(0); // 새로운 스테이지로 이동
         }
     }
 
