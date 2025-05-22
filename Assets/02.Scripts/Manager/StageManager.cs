@@ -1,491 +1,133 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
+using MapGeneratorManager;
 using System.Linq;
-using UnityEngine.AddressableAssets; //[NEW]
-using UnityEngine.ResourceManagement.AsyncOperations; //[NEW]
+using System; // MapGeneratorManager에서 정의된 Graph, Node, Edge 클래스 사용
 
-//Managers.Stage.MoveToNextStage(1); 스테이지 넘기기
-//Managers.StageTransitionManager.LoadChapter("Chapter1"); 챕터 로드 하기
-//Managers.Stage.CleanupChapter(); 현재 챕터 지우기
 
 public class StageManager
 {
-     private string currentChapterName; // 현재 챕터 이름
-     
-    private Dictionary<string, GameObject> stageDictionary;   // 스테이지 이름과 오브젝트 매핑
-    private Dictionary<string, List<string>> mstGraph;        // MST 결과 그래프
-    private Stage currentStage;
-    private MSTData mstData; // MSTData 스크립터블 오브젝트를 저장
-    private Dictionary<string, GameObject> cacheStagePrefabs; // 캐시된 스테이지 프리팹
-    private bool isStageMoving = false;
-    private List<Stage> eventStages = new List<Stage>(); // 이벤트 스테이지 목록
-    private Dictionary<string, int> stageUsageDictionary = new Dictionary<string, int>(); // 스테이지 사용 여부 딕셔너리
-    private int stageSteps = 0; // 스테이지 이동 횟수
-    public int eventStageThreshold = 5; // 이벤트 스테이지로 진입하기 위한 진행 횟수
+    public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
+    private Node? currentNode; // 현재 활성화된 노드
+    private Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
+    public event Action<Graph> OnGraphGenerated; // 그래프 생성 완료 이벤트
 
-    public enum StageType
+    //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
+
+    public StageManager(StageData stageData)
     {
-        MainMenu,
-        InGame,
-        Event,
-        BossBattle
-    }
-
-    [Serializable]
-    public class Stage
-    {
-        public string stageName;
-        public string addressableKey;
-        public StageType stageType;
-        public int weight;
-    }
-
-    public class ConnectionRestriction
-    {
-        public string restrictedStage;
-        public string requiredStage;
-    }
-
-    public StageManager(List<Stage> stages, List<ConnectionRestriction> restrictions, string bossStageName, int chapterNumber)
-    {
-        stageDictionary = new Dictionary<string, GameObject>();
-        mstGraph = new Dictionary<string, List<string>>();
-        cacheStagePrefabs = new Dictionary<string, GameObject>(); // 초기화
-
-        //int numberOfStages = 5 + (chapterNumber - 1); // 챕터가 증가할수록 스테이지 갯수 증가
-        //List<Stage> selectedStages = stages.OrderBy(x => Guid.NewGuid()).Take(numberOfStages).ToList(); // 랜덤으로 스테이지 선택
-
-        // 스테이지 사용 여부 딕셔너리 초기화
-        foreach (var stage in stages)
+        if (stageData == null)
         {
-            if (stage.stageType == StageType.Event)
-            {
-                stageUsageDictionary[stage.stageName] = 3; // 이벤트 스테이지는 3으로 초기화
-            }
-            else if (stage.stageType == StageType.InGame)
-            {
-                stageUsageDictionary[stage.stageName] = 0; // 일반 스테이지는 0으로 초기화
-            }
-        }
-
-        // 초기화된 딕셔너리의 모든 키와 밸류 값을 디버그 창에 표시
-        Debug.Log("<color=gray>스테이지 사용 딕셔너리 초기화됨:</color>");
-        foreach (var kvp in stageUsageDictionary)
-        {
-            Debug.Log($"<color=gray>Stage: {kvp.Key}, Usage: {kvp.Value}</color>");
-        }
-
-        InitializeStages(stages);
-        GenerateFilteredMST(stages, restrictions);
-        SaveMSTData();
-        SetInitialStage();
-
-        Managers.GameEvent.portal   += MoveToNextStage; // 이벤트 추가
-    }
-
-    private void InitializeStages(List<Stage> stages)
-    {
-        // 현재 챕터 이름을 가져와 string chapterLabel에 저장
-        string chapterLabel = currentChapterName;
-        // 챕터 이름에 해당하는 부모 오브젝트 생성
-        string chapterParentName = $"Chapter_{currentChapterName}_Parent";
-        GameObject chapterParent = GameObject.Find(chapterParentName);
-
-        if (chapterParent == null)
-        {
-            chapterParent = new GameObject(chapterParentName);
-            Debug.Log($"Created chapter parent object: {chapterParentName}");
-        }
-
-        foreach (var stage in stages)
-        {
-            if (!stageDictionary.ContainsKey(stage.stageName))
-            {
-                // 프리팹 캐시 사용
-                if (!cacheStagePrefabs.ContainsKey(stage.addressableKey))
-                {
-                    Addressables.LoadAssetAsync<GameObject>(stage.addressableKey).Completed += (handle) =>
-                    {
-                        if (handle.Status == AsyncOperationStatus.Succeeded)
-                        {
-                            cacheStagePrefabs[stage.addressableKey] = handle.Result;
-                        }
-                        else
-                        {
-                            Debug.LogError($"Prefab not found: {stage.addressableKey}");
-                        }
-                    };
-                }
-
-                // 스테이지 오브젝트 생성 및 부모 설정
-                AsyncOperationHandle<GameObject> handle = Addressables.InstantiateAsync(stage.addressableKey);
-                handle.WaitForCompletion();
-                if (handle.Status == AsyncOperationStatus.Succeeded)
-                {
-                    GameObject stageObject = handle.Result;
-                    stageObject.transform.SetParent(chapterParent.transform);
-                    stageObject.name = stage.stageName;
-                    stageObject.SetActive(false);
-                    stageDictionary[stage.stageName] = stageObject;
-                }
-                else
-                {
-                    Debug.LogError($"Failed to instantiate stage: {stage.addressableKey}");
-                }
-                
-            }
-        }
-
-        
-    }
-
-
-    private void GenerateFilteredMST(List<Stage> stages, List<ConnectionRestriction> restrictions)
-    {
-        if (stages == null || stages.Count == 0)
-        {
-            Debug.LogError("No stages provided for MST generation.");
+            Debug.LogError("StageData is null!");
             return;
         }
-
-        List<Edge> edges = new List<Edge>();
-
-        // 각 스테이지 간의 연결 관계를 고려한 에지 리스트 생성
-        for (int i = 0; i < stages.Count; i++)
+        stageGraph = MapGeneratorManager.MapGeneratorManager.Generate(stageData.chapters[0]);
+        nodeToStageMap = new Dictionary<int, GameObject>();
+        InitializeStages();
+        SetInitialStage();
+        if (stageGraph != null)
         {
-            for (int j = i + 1; j < stages.Count; j++)
-            {
-                // 연결 제한을 고려한 필터링
-                if (IsConnectionRestricted(stages[i].stageName, stages[j].stageName, restrictions))
-                    continue;
-
-                int minWeight = Mathf.Min(stages[i].weight, stages[j].weight); 
-                int maxWeight = Mathf.Max(stages[i].weight, stages[j].weight);
-
-                int weight = UnityEngine.Random.Range(minWeight, maxWeight + 1);
-
-                edges.Add(new Edge(stages[i], stages[j], weight));
-            }
-        }
-
-        // 에지들을 가중치 기준으로 오름차순 정렬
-        edges.Sort((a, b) => a.weight.CompareTo(b.weight));
-
-        UnionFind unionFind = new UnionFind(stages.Count);
-
-        // 최소 신장 트리(MST) 생성
-        foreach (var edge in edges)
-        {
-            int indexA = stages.IndexOf(edge.start);
-            int indexB = stages.IndexOf(edge.end);
-
-            if (unionFind.Union(indexA, indexB))
-            {
-                if (!mstGraph.ContainsKey(edge.start.stageName))
-                    mstGraph[edge.start.stageName] = new List<string>();
-                if (!mstGraph.ContainsKey(edge.end.stageName))
-                    mstGraph[edge.end.stageName] = new List<string>();
-
-                mstGraph[edge.start.stageName].Add(edge.end.stageName);
-                mstGraph[edge.end.stageName].Add(edge.start.stageName);
-            }
-        }
-    }
-
-    private bool IsConnectionRestricted(string stageA, string stageB, List<ConnectionRestriction> restrictions)
-    {
-        foreach (var restriction in restrictions)
-        {
-            if ((stageA == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)) ||
-                (stageB == restriction.restrictedStage && !stageDictionary.ContainsKey(restriction.requiredStage)))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void SaveMSTData()
-    {
-#if UNITY_EDITOR
-        // 기존에 동일한 MSTData 자산이 존재하는지 확인
-        string assetPath = "Assets/Resources/Data/MSTData.asset";
-        MSTData existingData = AssetDatabase.LoadAssetAtPath<MSTData>(assetPath);
-
-        // 만약 기존 자산이 있다면 삭제
-        if (existingData != null)
-        {
-            AssetDatabase.DeleteAsset(assetPath);
-            Debug.Log("Existing MSTData asset deleted.");
-        }
-
-        // 새로운 MSTData 생성
-        mstData = ScriptableObject.CreateInstance<MSTData>();
-        mstData.SetGraphData(mstGraph);
-
-        // 새로 생성된 MSTData를 지정된 경로에 저장
-        AssetDatabase.CreateAsset(mstData, assetPath);
-        AssetDatabase.SaveAssets();
-        Debug.Log("New MSTData asset created.");
-#endif
-    }
-
-    public void SetInitialStage()
-    {
-        GameObject firstStageObject = stageDictionary.Values.FirstOrDefault();
-        if (firstStageObject != null)
-        {
-            currentStage = new Stage { stageName = firstStageObject.name };
-            ActivateStage(currentStage);
-            stageUsageDictionary[currentStage.stageName] = 1; // 첫 스테이지 사용됨
-            Debug.Log($"<color=gray>Stage: {currentStage.stageName}, Usage: {stageUsageDictionary[currentStage.stageName]}</color>"); // 로그 출력
+            Debug.Log("Stage graph generated successfully.");
+            OnGraphGenerated?.Invoke(stageGraph); // 그래프 생성 완료 이벤트 호출
         }
         else
         {
-            Debug.LogError("No stages found to initialize.");
+            Debug.LogError("Failed to generate stage graph.");
         }
     }
 
-    private void ActivateStage(Stage stage)
+    private void InitializeStages()
     {
-        if (currentStage != null && stageDictionary.ContainsKey(currentStage.stageName))
+        //TODO: 스테이지 오브젝트를 어드레서블에서 로드해서 생성해야함.
+        foreach (var node in stageGraph.Nodes)
         {
-            GameObject previousStageObject = stageDictionary[currentStage.stageName];
-            previousStageObject.SetActive(false);
-        }
-
-        if (stageDictionary.ContainsKey(stage.stageName))
-        {
-            GameObject stageObject = stageDictionary[stage.stageName];
-            stageObject.SetActive(true);
-            currentStage = stage;
-        }
-
-        else // 모든 상황의 예외가 발생했을 때 예외 처리 디버그
-        {
-            Debug.LogError($"Stage {stage.stageName} not found in stage dictionary.");
+            // 각 노드에 해당하는 스테이지 오브젝트 생성
+            GameObject stageObject = new GameObject($"Stage_{node.Id}");
+            stageObject.SetActive(false); // 초기에는 비활성화
+            nodeToStageMap[node.Id] = stageObject;
         }
     }
 
-    public void MoveToNextStage(int steps)
+    private void SetInitialStage()
     {
-        if (isStageMoving) return; // 이미 한 번 호출된 경우, 다시 호출하지 않도록 막기
-        if (currentStage == null)
+        // 그래프의 첫 번째 노드를 활성화
+        currentNode = stageGraph.Nodes.Find(node => node.Type == NodeType.Start);
+        if (currentNode.HasValue)
         {
-            Debug.LogError("Current stage is not set.");
-            return;
+            ActivateStage(currentNode.Value);
+        }
+        else
+        {
+            Debug.LogError("No start node found in the graph.");
+        }
+    }
+
+    private void ActivateStage(Node node)
+    {
+        // 현재 활성화된 스테이지 비활성화
+        if (currentNode.HasValue && nodeToStageMap.ContainsKey(currentNode.Value.Id))
+        {
+            nodeToStageMap[currentNode.Value.Id].SetActive(false);
         }
 
-        // Resources에서 MSTData 로드
-        if (mstData == null)
+        // 새로운 노드의 스테이지 활성화
+        if (nodeToStageMap.ContainsKey(node.Id))
         {
-            mstData = Resources.Load<MSTData>("Data/MSTData");
-            if (mstData == null)
+            nodeToStageMap[node.Id].SetActive(true);
+            currentNode = node;
+            Debug.Log($"Activated stage: {node.Id} ({node.GetLabel()})");
+        }
+        else
+        {
+            Debug.LogError($"Stage for node {node.Id} not found.");
+        }
+    }
+
+    public void MoveToNextStage(int direction)
+    {
+        Debug.Log($"Moving to next stage in direction: {direction}");
+        {
+            var connectedNodes = GetConnectedNodes();
+            if (connectedNodes.Count == 0)
             {
-                Debug.LogError("MSTData not found!");
+                Debug.LogError("No connected nodes to move to.");
                 return;
             }
-        }
 
-        //TODO: 보스 스테이지를 따로 관리할지 한 시퀀스에서 관리할 지 고려해야함.
-        // if (stageSteps >= 6) // 스테이지 이동 횟수가 6회 이상인 경우, 보스 스테이지로 이동
-        // {
-        //     MoveToBossStage();
-        //     return;
-        // }
-
-        // stageSequences에서 순차적으로 이동
-        var stageSequence = mstData.stageSequences;
-
-        if (stageSequence == null || stageSequence.Count == 0)
-        {
-            Debug.LogError("No stage sequences found in MSTData.");
-            return;
-        }
-
-        // 모든 스테이지가 사용되었는지 확인
-        //List<string> stageNames = stageSequence.Select(s => s.startStageName).ToList();
-        bool allUsedStagesIncluded = stageUsageDictionary.Values.All(value => value == 1 || value == 4);
-    
-        if (allUsedStagesIncluded)
-        {
-            Debug.Log("<color=gray> 모든 스테이지가 사용되었습니다. </color>");
-            return;
-        }
-
-        // stageSequences의 순서대로 이동
-        int currentIndex = stageSequence.FindIndex(s => s.startStageName == currentStage.stageName);
-
-        if (currentIndex == -1)
-        {
-            Debug.LogError("Current stage not found in stage sequences.");
-            return;
-        }
-
-        int nextIndex = (currentIndex + steps) % stageSequence.Count;
-
-        //TODO : 사용된 스테이지 제외 방법 다시 고려해야함
-        //사용된 스테이지는 제외
-        HashSet<int> usedValues = new HashSet<int> { 1, 3, 4 }; // 사용된 스테이지 값 집합
-        int loopCount = 0;
-        int maxLoopCount = stageSequence.Count;
-
-        // ✅ 탐색하면서 도착한 스테이지를 새로운 기준으로 삼음
-        while (loopCount < maxLoopCount)
-        {
-            Debug.Log($"<color=gray> {loopCount} 번째 반복중...  </color>");
-            string stageName = stageSequence[nextIndex].startStageName;
-
-            if (!usedValues.Contains(stageUsageDictionary[stageName]))
+            // 방향에 따라 노드 이동
+            if (direction == 1) // 오른쪽
             {
-                // 사용되지 않은 스테이지를 찾으면 즉시 탈출
-                break;
+                ActivateStage(connectedNodes[1]);
             }
-
-            // 현재 도착한 스테이지를 기준으로 다시 탐색 (기준점 변경)
-            currentIndex = nextIndex;
-            nextIndex = (currentIndex + 1) % stageSequence.Count;
-
-            loopCount++;
-        }
-
-        if (loopCount >= maxLoopCount)
-        {
-            Debug.LogWarning("모든 스테이지가 사용되었습니다.");
-            return;
-        }
-
-        
-
-        string nextStageName = stageSequence[nextIndex].startStageName;
-
-        if (stageDictionary.TryGetValue(nextStageName, out GameObject nextStageObject))
-        {
-            //Debug.Log($"Moving to next stage: {nextStageName}");
-            //ActivateStage(new Stage { stageName = nextStageName });
-
-            // 스테이지 진행 횟수 증가
-            stageSteps++;
-            Debug.Log($"<color=orange> 현재 스테이지 진행 횟수 : {stageSteps} </color>");
-
-            //TODO : 이벤트 스테이지로 이동하는 조건 추가 필요
-
-            Debug.Log($"Moving to next stage: {nextStageName}");
-            ActivateStage(new Stage { stageName = nextStageName });
-
-            // 스테이지 사용 여부 업데이트
-            if (stageUsageDictionary[nextStageName] == 0)
+            else if (direction == -1) // 왼쪽
             {
-                stageUsageDictionary[nextStageName] = 1; // 일반 스테이지 사용됨
-                //Debug.Log($"<color=gray>Stage: {nextStageName}, Usage: {stageUsageDictionary[nextStageName]}</color>"); // 로그 출력
+                ActivateStage(connectedNodes[0]);
             }
-        }
-        else
-        {
-            Debug.LogError($"스테이지 {nextStageName}를 딕셔너리에서 찾을 수 없음.");
-        }
-
-        isStageMoving = false;
-
-        //Json 데이터로 저장한다
-    }
-
-    // Union-Find 클래스
-    private class UnionFind
-    {
-        private int[] parent;
-        private int[] rank;
-
-        public UnionFind(int size)
-        {
-            parent = new int[size];
-            rank = new int[size];
-            for (int i = 0; i < size; i++) parent[i] = i;
-        }
-
-        public int Find(int x)
-        {
-            if (parent[x] != x)
-                parent[x] = Find(parent[x]);
-            return parent[x];
-        }
-
-        public bool Union(int x, int y)
-        {
-            int rootX = Find(x), rootY = Find(y);
-            if (rootX == rootY) return false;
-
-            if (rank[rootX] > rank[rootY])
-                parent[rootY] = rootX;
-            else if (rank[rootX] < rank[rootY])
-                parent[rootY] = rootY;
             else
             {
-                parent[rootY] = rootX;
-                rank[rootX]++;
+                Debug.LogWarning("Invalid direction or no node available in that direction.");
             }
-            return true;
         }
     }
 
-    // Edge 클래스
-    private class Edge
+    public List<Node> GetConnectedNodes()
     {
-        public Stage start, end;
-        public int weight;
-        public Edge(Stage start, Stage end, int weight)
+        if (!currentNode.HasValue)
         {
-            this.start = start;
-            this.end = end;
-            this.weight = weight;
+            Debug.LogError("Current node is not set.");
+            return new List<Node>();
         }
+
+        var connectedEdges = stageGraph.Edges.Where(edge => edge.FromId == currentNode.Value.Id);
+        var connectedNodes = new List<Node>();
+        foreach (var edge in connectedEdges)
+        {
+            Node? connectedNode = stageGraph.Nodes.Find(node => node.Id == edge.ToId);
+            if (connectedNode.HasValue)
+            {
+                connectedNodes.Add(connectedNode.Value);
+            }
+        }
+        return connectedNodes;
     }
-
-    public void CleanupChapter()
-    {
-        Debug.Log("Cleaning up the current chapter...");
-
-        // 모든 스테이지 오브젝트 비활성화 및 삭제
-        foreach (var stageName in stageDictionary.Keys.ToList())
-        {
-            if (stageDictionary.TryGetValue(stageName, out GameObject stageObject))
-            {
-                // 스테이지 오브젝트 비활성화
-                stageObject.SetActive(false);
-
-                // 메모리에서 제거
-                GameObject.Destroy(stageObject);
-                stageDictionary.Remove(stageName);
-            }
-        }
-
-        // 캐시된 프리팹 데이터 정리
-        cacheStagePrefabs.Clear();
-
-        // 최소 신장 트리 데이터 초기화
-        if (mstGraph != null)
-        {
-            mstGraph.Clear();
-            mstData = null;
-        }
-
-        // 현재 스테이지 정보 초기화
-        currentStage = null;
-        foreach (var key in stageUsageDictionary.Keys.ToList())
-        {
-            if (stageUsageDictionary[key] == 1)
-            {
-                stageUsageDictionary[key] = 0; // 일반 스테이지 초기화
-            }
-            else if (stageUsageDictionary[key] == 4)
-            {
-                stageUsageDictionary[key] = 3; // 이벤트 스테이지 초기화
-            }
-        }
-
-        Debug.Log("Chapter cleanup complete. Ready for the next chapter.");
-    }
-
 }
