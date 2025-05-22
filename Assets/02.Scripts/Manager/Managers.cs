@@ -61,7 +61,7 @@ public class Managers : MonoBehaviour
 
             // 나머지 초기화 작업
             if (_stageTransitionManager == null)
-              _stageTransitionManager = new StageTransitionManager();
+                _stageTransitionManager = new StageTransitionManager();
         }
         else
         {
@@ -101,7 +101,7 @@ public class Managers : MonoBehaviour
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
 
-    
+
 
 
     void Update()
@@ -118,6 +118,15 @@ public class Managers : MonoBehaviour
             {
                 Debug.Log("<color=red>생성 실패</color>");
             });
+        }
+        // 방향에 따라 첫 번째 또는 두 번째 노드로 이동
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) // 왼쪽 화살표
+        {
+            Stage.MoveToNextStage(-1);
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) // 오른쪽 화살표
+        {
+            Stage.MoveToNextStage(1);
         }
     
     } 

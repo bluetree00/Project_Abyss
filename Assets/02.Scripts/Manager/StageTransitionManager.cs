@@ -21,22 +21,22 @@ public class StageTransitionManager
         }
 
         // StageData 로드
-        StageData stageData = await LoadStageDataAsync(stageDataAddress);
-        if (stageData == null)
-        {
-            Debug.LogError("Failed to load StageData!");
-            return;
-        }
+        // StageData stageData = await LoadStageDataAsync(stageDataAddress);
+        // if (stageData == null)
+        // {
+        //     Debug.LogError("Failed to load StageData!");
+        //     return;
+        // }
 
         // StageManager 초기화
-        stageManager = new StageManager(stageData);
+        //stageManager = new StageManager(stageData);
 
         // 연결된 노드 출력 (디버깅용)
-        var connectedNodes = stageManager.GetConnectedNodes();
-        foreach (var node in connectedNodes)
-        {
-            Debug.Log($"Connected Node: {node.Id} ({node.GetLabel()})");
-        }
+        // var connectedNodes = stageManager.GetConnectedNodes();
+        // foreach (var node in connectedNodes)
+        // {
+        //     Debug.Log($"Connected Node: {node.Id} ({node.GetLabel()})");
+        // }
     }
 
     private async Task<StageData> LoadStageDataAsync(string address)

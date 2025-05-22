@@ -5,6 +5,36 @@ using UnityEngine;
 public class StageData : ScriptableObject
 {
     public List<ChapterData> chapters;
+    [System.Serializable]
+    public class ChapterData
+    {
+        public ChapterName chapterName;
+        public int[] layerSizes;
+        public List<StageSettings> stages;
+        //public List<StageConnectionRestriction> connectionRestrictions;
+        public string bossStageName;
+
+        [System.Serializable]
+        public class StageSettings
+        {
+            public StageName stageName;
+            public string resourcePath;
+            public int weight;
+            public bool randomWeight;
+
+            //CHECKLIST : 랜덤 가중치 설정 시 최소, 최대 가중치 설정 필요
+            // public int minWeight = 1;
+            // public int maxWeight = 20;
+        }
+
+        // [System.Serializable]
+        // public class StageConnectionRestriction
+        // {
+        //     public string restrictedStage;
+        //     public string requiredStage;
+        // }
+    }
+
     public enum ChapterName
     {
         Chapter1,
@@ -51,35 +81,5 @@ public class StageData : ScriptableObject
         Stage28,
         Stage29,
         Stage30,
-    }
-
-    [System.Serializable]
-    public class ChapterData
-    {
-        public ChapterName chapterName;
-        public int[] layerSizes;
-        public List<StageSettings> stages;
-        //public List<StageConnectionRestriction> connectionRestrictions;
-        public string bossStageName;
-
-        [System.Serializable]
-        public class StageSettings
-        {
-            public StageName stageName;
-            public string resourcePath;
-            public int weight;
-            public bool randomWeight;
-
-            //CHECKLIST : 랜덤 가중치 설정 시 최소, 최대 가중치 설정 필요
-            // public int minWeight = 1;
-            // public int maxWeight = 20;
-        }
-
-        // [System.Serializable]
-        // public class StageConnectionRestriction
-        // {
-        //     public string restrictedStage;
-        //     public string requiredStage;
-        // }
     }
 }

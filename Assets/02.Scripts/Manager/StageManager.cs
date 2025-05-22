@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using MapGeneratorManager;
-using System.Linq; // MapGeneratorManager에서 정의된 Graph, Node, Edge 클래스 사용
+using System.Linq;
+using System; // MapGeneratorManager에서 정의된 Graph, Node, Edge 클래스 사용
 
 
 public class StageManager
@@ -9,6 +10,9 @@ public class StageManager
     public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
     private Node? currentNode; // 현재 활성화된 노드
     private Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
+    public event Action<Graph> OnGraphGenerated; // 그래프 생성 완료 이벤트
+
+    //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
 
     public StageManager(StageData stageData)
     {
@@ -21,10 +25,20 @@ public class StageManager
         nodeToStageMap = new Dictionary<int, GameObject>();
         InitializeStages();
         SetInitialStage();
+        if (stageGraph != null)
+        {
+            Debug.Log("Stage graph generated successfully.");
+            OnGraphGenerated?.Invoke(stageGraph); // 그래프 생성 완료 이벤트 호출
+        }
+        else
+        {
+            Debug.LogError("Failed to generate stage graph.");
+        }
     }
 
     private void InitializeStages()
     {
+        //TODO: 스테이지 오브젝트를 어드레서블에서 로드해서 생성해야함.
         foreach (var node in stageGraph.Nodes)
         {
             // 각 노드에 해당하는 스테이지 오브젝트 생성
@@ -69,27 +83,30 @@ public class StageManager
         }
     }
 
-    public void MoveToNextStage()
+    public void MoveToNextStage(int direction)
     {
-        var connectedNodes = GetConnectedNodes();
-        if (connectedNodes.Count == 0)
+        Debug.Log($"Moving to next stage in direction: {direction}");
         {
-            Debug.LogError("No connected nodes to move to.");
-            return;
-        }
+            var connectedNodes = GetConnectedNodes();
+            if (connectedNodes.Count == 0)
+            {
+                Debug.LogError("No connected nodes to move to.");
+                return;
+            }
 
-        // 방향에 따라 첫 번째 또는 두 번째 노드로 이동
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) // 왼쪽 화살표
-        {
-            ActivateStage(connectedNodes[0]);
-        }
-        else if (Input.GetKeyDown(KeyCode.RightArrow)) // 오른쪽 화살표
-        {
-            ActivateStage(connectedNodes[1]);
-        }
-        else
-        {
-            Debug.LogWarning("Invalid direction or no node available in that direction.");
+            // 방향에 따라 노드 이동
+            if (direction == 1) // 오른쪽
+            {
+                ActivateStage(connectedNodes[1]);
+            }
+            else if (direction == -1) // 왼쪽
+            {
+                ActivateStage(connectedNodes[0]);
+            }
+            else
+            {
+                Debug.LogWarning("Invalid direction or no node available in that direction.");
+            }
         }
     }
 

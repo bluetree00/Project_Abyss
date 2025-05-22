@@ -690,7 +690,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.33362526, y: -0.3418232, z: 0.13148518, w: 0.86865574}
+  m_LocalRotation: {x: 0.33362204, y: -0.34188822, z: 0.13151789, w: 0.8686265}
   m_LocalPosition: {x: -6.77, y: 3.23, z: 2.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3206,7 +3206,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 174526281bebf8946941b1f3570502cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  layerSizes: 010000000200000003000000040000000200000001000000
   seed: 42
   uiNodePrefab: {fileID: 1823072879475938879, guid: 21bef655f843e4948baebf2cef5f1a0b,
     type: 3}
