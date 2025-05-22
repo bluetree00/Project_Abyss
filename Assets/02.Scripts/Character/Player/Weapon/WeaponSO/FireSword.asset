@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e74aa18f5758d945a9051e100c58590, type: 3}
   m_Name: FireSword
   m_EditorClassIdentifier: 
-  weaponName: "\uBD88\uAC80"
+  weaponName: FireSword
   attackPower: 50
-  description: "\u3147"
+  description: "\uD654\uC5FC\uAC80"
   weaponKey: 0
   weaponType: 0
   lightAttackSO: {fileID: 11400000, guid: faec1f9fb0782e14c820c1487cccb831, type: 2}
