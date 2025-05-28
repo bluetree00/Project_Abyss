@@ -25,25 +25,41 @@ public class AddressablesManager : MonoBehaviour
         {
             if (_instance == null)
             {
-                GameObject go = new GameObject("AddressablesManager");
-                _instance = go.AddComponent<AddressablesManager>();
-                DontDestroyOnLoad(go);
+                // 씬에 이미 존재하는 AddressablesManager를 먼저 찾음
+                _instance = FindObjectOfType<AddressablesManager>();
+                if (_instance == null)
+                {
+                    // 없으면 새로 생성
+                    GameObject go = new GameObject("AddressablesManager");
+                    _instance = go.AddComponent<AddressablesManager>();
+                    DontDestroyOnLoad(go);
+                }
             }
             return _instance;
         }
     }
 
-    
+    private Task _initTask;
+    public Task InitTask => _initTask;
+
+
 
     private void Start()
     {
-        StartCoroutine(InitAddressables());
+        //StartCoroutine(InitAddressables());
+        _initTask = InitAddressablesCoroutine();
     }
 
     IEnumerator InitAddressables()
     {
         var Init = Addressables.InitializeAsync();
         yield return Init;
+    }
+
+    private async Task InitAddressablesCoroutine()
+    {
+        var init = Addressables.InitializeAsync();
+        await init.Task;
     }
 
     private void UpdateLoadedAssetsList()
@@ -122,17 +138,36 @@ public class AddressablesManager : MonoBehaviour
     /// <param name="key"></param>
     public async Task<GameObject> InstantiateAsyncTask(string key)
     {
-        var handle = Addressables.InstantiateAsync(key);
-        await handle.Task;
-        if (handle.Status == AsyncOperationStatus.Succeeded)
+        // var handle = Addressables.InstantiateAsync(key);
+        // await handle.Task;
+        // if (handle.Status == AsyncOperationStatus.Succeeded)
+        // {
+        //     loadedAssets[key] = handle;
+        //     UpdateLoadedAssetsList();
+        //     return handle.Result;
+        // }
+        // else
+        // {
+        //     Debug.LogError($"Failed to instantiate prefab: {key}");
+        //     return null;
+        // }
+
+        // Addressables 초기화가 끝날 때까지 대기
+        if (_initTask != null)
+            await _initTask;
+
+        try
         {
-            loadedAssets[key] = handle;
-            UpdateLoadedAssetsList();
-            return handle.Result;
+            var handle = Addressables.InstantiateAsync(key);
+            await handle.Task;
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+                return handle.Result;
+            Debug.LogError($"Failed to instantiate: {key}");
+            return null;
         }
-        else
+        catch (Exception ex)
         {
-            Debug.LogError($"Failed to instantiate prefab: {key}");
+            Debug.LogError($"Exception during Addressables instantiate: {key} - {ex}");
             return null;
         }
     }

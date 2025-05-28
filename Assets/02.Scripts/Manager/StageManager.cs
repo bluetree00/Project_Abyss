@@ -3,7 +3,10 @@ using UnityEngine;
 using MapGeneratorManager;
 using System.Linq;
 using System;
-using System.Threading.Tasks; // MapGeneratorManager에서 정의된 Graph, Node, Edge 클래스 사용
+using System.Threading.Tasks;
+using System.Collections;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations; // MapGeneratorManager에서 정의된 Graph, Node, Edge 클래스 사용
 
 
 public class StageManager
@@ -82,9 +85,10 @@ public class StageManager
 
         for (int i = 0; i < nodeCount; i++)
         {
-            // 스테이지 설정이 부족하면 순환해서 사용
+            // // 스테이지 설정이 부족하면 순환해서 사용
             var stageSettings = stageSettingsList[i % settingsCount];
             string address = stageSettings.stageName.ToString();
+            Debug.Log($"[StageManager] Try load {i}/{nodeCount} : {address}");
 
             // Addressables에서 오브젝트 비동기 로드
             GameObject stageObject = await AddressablesManager.Instance.InstantiateAsyncTask(address);
@@ -96,10 +100,10 @@ public class StageManager
             stageObject.SetActive(false);
             var node = stageGraph.Nodes[i];
             nodeToStageMap[node.Id] = stageObject;
+            
         }
 
         SetInitialStage();
-
     }
 
     private void SetInitialStage()
