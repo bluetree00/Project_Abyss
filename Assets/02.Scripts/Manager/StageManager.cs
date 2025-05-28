@@ -78,7 +78,7 @@ public class StageManager
         {
             // 스테이지 설정이 부족하면 순환해서 사용
             var stageSettings = stageSettingsList[i % settingsCount];
-            string address = stageSettings.resourcePath;
+            string address = stageSettings.stageName.ToString();
 
             // Addressables에서 오브젝트 비동기 로드
             GameObject stageObject = await AddressablesManager.Instance.InstantiateAsyncTask(address);
