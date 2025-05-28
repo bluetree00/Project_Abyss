@@ -16,7 +16,7 @@ public class LoadedAsset
 public class AddressableManager : MonoBehaviour
 {
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
-    [SerializeField]
+    [NonSerialized]
     private List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
     private static AddressableManager _instance;
     public static AddressableManager Instance
