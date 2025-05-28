@@ -6,33 +6,38 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-[Serializable]
+[System.Serializable]
 public class LoadedAsset
 {
     public string key;
-    public AsyncOperationHandle handle;
+    [System.NonSerialized]public AsyncOperationHandle handle;
 }
 
-public class AddressablesManager : MonoBehaviour
+public class AddressableManager : MonoBehaviour
 {
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
     [SerializeField]
     private List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
-    private static AddressablesManager _instance;
-    public static AddressablesManager Instance
+    private static AddressableManager _instance;
+    public static AddressableManager Instance
     {
         get
         {
             if (_instance == null)
             {
                 // 씬에 이미 존재하는 AddressablesManager를 먼저 찾음
-                _instance = FindObjectOfType<AddressablesManager>();
+                // _instance = FindObjectOfType<AddressableManager>();
+                // if (_instance == null)
+                // {
+                //     // 없으면 새로 생성
+                //     GameObject go = new GameObject("AddressableManager");
+                //     _instance = go.AddComponent<AddressableManager>();
+                //     DontDestroyOnLoad(go);
+                // }
+
                 if (_instance == null)
                 {
-                    // 없으면 새로 생성
-                    GameObject go = new GameObject("AddressablesManager");
-                    _instance = go.AddComponent<AddressablesManager>();
-                    DontDestroyOnLoad(go);
+                    _instance = FindObjectOfType<AddressableManager>();
                 }
             }
             return _instance;

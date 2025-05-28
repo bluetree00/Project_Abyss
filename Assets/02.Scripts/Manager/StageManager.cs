@@ -91,7 +91,7 @@ public class StageManager
             Debug.Log($"[StageManager] Try load {i}/{nodeCount} : {address}");
 
             // Addressables에서 오브젝트 비동기 로드
-            GameObject stageObject = await AddressablesManager.Instance.InstantiateAsyncTask(address);
+            GameObject stageObject = await AddressableManager.Instance.InstantiateAsyncTask(address);
             if (stageObject == null)
             {
                 Debug.LogError($"해당 주소를 가진 오브젝트 로드 실패 : {address}");
