@@ -11,7 +11,6 @@ public class StageData : ScriptableObject
         public ChapterName chapterName;
         public int[] layerSizes;
         public List<StageSettings> stages;
-        //public List<StageConnectionRestriction> connectionRestrictions;
         public string bossStageName;
 
         [System.Serializable]

@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 public class Managers : MonoBehaviour
 {
@@ -50,6 +52,11 @@ public class Managers : MonoBehaviour
     public static DataManager Data { get { return Instance._data; } }
     #endregion
 
+    #region Data // 데이터 매니저
+    public static GraphData _graphData { get; private set; }
+    public static StageData _stageData { get; private set; } // StageData 인스턴스
+    #endregion
+
     void Awake()
     {
         if (s_instance == null)
@@ -63,9 +70,31 @@ public class Managers : MonoBehaviour
         }
     }
 
-    void Start()
+    async void Start()
     {
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
+        //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
+        // 1. Addressable로 StageData 로드
+        _stageData = await AddressablesManager.Instance.LoadAssetAsyncTask<StageData>("Data/Chapter1");
+        if (_stageData == null) { Debug.LogError("StageData 로드 실패!"); return; }
+
+        // 2. GraphData에 그래프 생성 및 저장
+        _graphData = await AddressablesManager.Instance.LoadAssetAsyncTask<GraphData>("NewGraphData");
+        if (_graphData == null){ Debug.LogError("GraphData 로드 실패!"); return; }
+        _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
+
+        // 3. StageManager 초기화 (매개변수 없이)
+        _stageManager = new StageManager();
+        _stageManager.Initialize();
+    }
+
+    public StageData GetStageData()
+    {
+        return _stageData;
+    }
+    public GraphData GetGraphData()
+    {
+        return _graphData;
     }
     
 
@@ -77,17 +106,17 @@ public class Managers : MonoBehaviour
 
         bool isCompleted = false;
         List<ObjectPoolerManager.Pool> initialPools = null;
-        
+
         // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
         ObjectPoolEffectInitializer.GetInitialPools(effectPoolDataName, pools =>
         {
             initialPools = pools;
             isCompleted = true;
         });
-        
+
         // 풀 데이터 로드 완료까지 대기
         yield return new WaitUntil(() => isCompleted);
-        
+
         // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");

@@ -78,6 +78,29 @@ public class AddressablesManager : MonoBehaviour
         return handle.Result;
     }
 
+    /// <summary>
+    /// 어드레서블 시스템으로 데이터를 비동기적으로 로드하는 함수
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="key"></param>
+    /// <returns></returns>
+    public async Task<T> LoadAssetAsyncTask<T>(string key) where T : UnityEngine.Object
+    {
+        var handle = Addressables.LoadAssetAsync<T>(key);
+        await handle.Task;
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+        {
+            loadedAssets[key] = handle;
+            UpdateLoadedAssetsList();
+            return handle.Result;
+        }
+        else
+        {
+            Debug.LogError($"Failed to load asset: {key}");
+            return null;
+        }
+    }
+
 
     /// <summary>
     /// 어드레서블 시스템으로 프리팹을 생성하는 함수
@@ -91,6 +114,27 @@ public class AddressablesManager : MonoBehaviour
         {
             HandleCompletion(handle, key, onSuccess, onFailure);
         };
+    }
+
+    /// <summary>
+    /// 어드레서블 시스템으로 프리팹을 생성하는 비동기 함수
+    /// </summary>
+    /// <param name="key"></param>
+    public async Task<GameObject> InstantiateAsyncTask(string key)
+    {
+        var handle = Addressables.InstantiateAsync(key);
+        await handle.Task;
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+        {
+            loadedAssets[key] = handle;
+            UpdateLoadedAssetsList();
+            return handle.Result;
+        }
+        else
+        {
+            Debug.LogError($"Failed to instantiate prefab: {key}");
+            return null;
+        }
     }
 
     private void HandleCompletion<T>(AsyncOperationHandle<T> handle, string key, Action<T> onSuccess, Action onFailure = null) where T : UnityEngine.Object
