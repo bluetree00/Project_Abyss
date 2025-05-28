@@ -163,7 +163,7 @@ public class CharacterController : MonoBehaviour
     {
         var tcs = new TaskCompletionSource<bool>();
 
-        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, data =>
+        AddressableManager.Instance.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
             {
