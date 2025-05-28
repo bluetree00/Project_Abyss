@@ -68,6 +68,12 @@ public class StageManager
         var chapter = stageData.chapters[0]; // 예시: 첫 번째 챕터 사용
         var stageSettingsList = chapter.stages;
 
+        if (stageSettingsList == null || stageSettingsList.Count == 0)
+        {
+            Debug.LogError("stageSettingsList가 null이거나 비어 있습니다!");
+            return;
+        }
+
         // 2. 노드 수와 스테이지 설정 수 비교
         int nodeCount = stageGraph.Nodes.Count;
         int settingsCount = stageSettingsList.Count;
