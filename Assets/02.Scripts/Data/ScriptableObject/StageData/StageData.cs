@@ -17,7 +17,7 @@ public class StageData : ScriptableObject
         public class StageSettings
         {
             public StageName stageName;
-            public string resourcePath;
+            public string resourcePath => stageName.ToString();
             public int weight;
             public bool randomWeight;
 
@@ -50,35 +50,35 @@ public class StageData : ScriptableObject
 
     public enum StageName
     {
-        Stage1,
-        Stage2,
-        Stage3,
-        Stage4,
-        Stage5,
-        Stage6,
-        Stage7,
-        Stage8,
-        Stage9,
-        Stage10,
-        Stage11,
-        Stage12,
-        Stage13,
-        Stage14,
-        Stage15,
-        Stage16,
-        Stage17,
-        Stage18,
-        Stage19,
-        Stage20,
-        Stage21,
-        Stage22,
-        Stage23,
-        Stage24,
-        Stage25,
-        Stage26,
-        Stage27,
-        Stage28,
-        Stage29,
-        Stage30,
+        Stage_01,
+        Stage_02,
+        Stage_03,
+        Stage_04,
+        Stage_05,
+        Stage_06,
+        Stage_07,
+        Stage_08,
+        Stage_09,
+        Stage_10,
+        Stage_11,
+        Stage_12,
+        Stage_13,
+        Stage_14,
+        Stage_15,
+        Stage_16,
+        Stage_17,
+        Stage_18,
+        Stage_19,
+        Stage_20,
+        Stage_21,
+        Stage_22,
+        Stage_23,
+        Stage_24,
+        Stage_25,
+        Stage_26,
+        Stage_27,
+        Stage_28,
+        Stage_29,
+        Stage_30,
     }
 }
