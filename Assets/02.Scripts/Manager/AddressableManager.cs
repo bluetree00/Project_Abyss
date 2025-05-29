@@ -13,31 +13,11 @@ public class LoadedAsset
     [System.NonSerialized]public AsyncOperationHandle handle;
 }
 
-public class AddressableManager : MonoBehaviour
+public class AddressableManager
 {
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
     [NonSerialized]
     private List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
-    private static AddressableManager _instance;
-    public static AddressableManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                //씬에 이미 존재하는 AddressablesManager를 먼저 찾음
-                _instance = FindObjectOfType<AddressableManager>();
-                if (_instance == null)
-                {
-                    // 없으면 새로 생성
-                    GameObject go = new GameObject("AddressableManager");
-                    _instance = go.AddComponent<AddressableManager>();
-                    DontDestroyOnLoad(go);
-                }
-            }
-            return _instance;
-        }
-    }
 
     private Task _initTask;
     public Task InitTask => _initTask;

@@ -32,6 +32,7 @@ public class Managers : MonoBehaviour
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
+    private AddressableManager _addressableManager; // AddressableManager 인스턴스
 
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
@@ -55,6 +56,7 @@ public class Managers : MonoBehaviour
     #region Data // 데이터 매니저
     public static GraphData _graphData { get; private set; }
     public static StageData _stageData { get; private set; } // StageData 인스턴스
+    public static AddressableManager AddressableManager => Instance._addressableManager ?? (Instance._addressableManager = new AddressableManager());
     #endregion
 
     void Awake()
@@ -74,12 +76,13 @@ public class Managers : MonoBehaviour
     {
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
         //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
+        //FIXME : Json으로 StageData와 GraphData를 저장하고 불러오는 기능 추가 필요
         // 1. Addressable로 StageData 로드
-        _stageData = await AddressableManager.Instance.LoadAssetAsyncTask<StageData>("Data/Chapter1");
+        _stageData = await AddressableManager.LoadAssetAsyncTask<StageData>("Data/Chapter1");
         if (_stageData == null) { Debug.LogError("StageData 로드 실패!"); return; }
 
         // 2. GraphData에 그래프 생성 및 저장
-        _graphData = await AddressableManager.Instance.LoadAssetAsyncTask<GraphData>("NewGraphData");
+        _graphData = await AddressableManager.LoadAssetAsyncTask<GraphData>("NewGraphData");
         if (_graphData == null){ Debug.LogError("GraphData 로드 실패!"); return; }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
@@ -132,7 +135,7 @@ public class Managers : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            AddressableManager.Instance.InstantiateAsync("Character_01", (GameObject obj) =>
+            AddressableManager.InstantiateAsync("Character_01", (GameObject obj) =>
             {
                 Debug.Log($"{obj.name} 생성 완료");
             },
