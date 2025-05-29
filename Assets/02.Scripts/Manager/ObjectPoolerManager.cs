@@ -74,7 +74,7 @@ public class ObjectPoolerManager
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
         // AddressablesManager를 사용하여 리소스 경로로 프리팹을 동기적으로 로드
-        GameObject prefab = AddressableManager.Instance.LoadAssetSync<GameObject>(resourcePath);
+        GameObject prefab = Managers.AddressableManager.LoadAssetSync<GameObject>(resourcePath);
         if (prefab == null)
         {
             Debug.LogError($"Prefab at path {resourcePath} not found.");

@@ -14,32 +14,9 @@ public class StageManager
     public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
     private Node? currentNode; // 현재 활성화된 노드
     private Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
-    private Dictionary<string, GameObject> loadedStagePrefabs = new Dictionary<string, GameObject>();
     public event Action<Graph> OnGraphGenerated; // 그래프 생성 완료 이벤트
 
     //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
-
-    // public StageManager(StageData stageData)
-    // {
-    //     if (stageData == null)
-    //     {
-    //         Debug.LogError("StageData is null!");
-    //         return;
-    //     }
-    //     stageGraph = MapGeneratorManager.MapGeneratorManager.Generate(stageData.chapters[0]);
-    //     nodeToStageMap = new Dictionary<int, GameObject>();
-    //     InitializeStages();
-    //     SetInitialStage();
-    //     if (stageGraph != null)
-    //     {
-    //         Debug.Log("Stage graph generated successfully.");
-    //         OnGraphGenerated?.Invoke(stageGraph); // 그래프 생성 완료 이벤트 호출
-    //     }
-    //     else
-    //     {
-    //         Debug.LogError("Failed to generate stage graph.");
-    //     }
-    // }
 
     public void Initialize()
     {
@@ -53,75 +30,20 @@ public class StageManager
         stageGraph = graphData.graph;
         nodeToStageMap = new Dictionary<int, GameObject>();
         InitializeStages();
+        SetInitialStage();
         OnGraphGenerated?.Invoke(stageGraph);
     }
 
-    private async void InitializeStages()
+    private void InitializeStages()
     {
         //TODO: 스테이지 오브젝트를 어드레서블에서 로드해서 생성해야함.
-        // foreach (var node in stageGraph.Nodes)
-        // {
-        //     // 각 노드에 해당하는 스테이지 오브젝트 생성
-        //     GameObject stageObject = new GameObject($"Stage_{node.Id}");
-        //     stageObject.SetActive(false); // 초기에는 비활성화
-        //     nodeToStageMap[node.Id] = stageObject;
-        // }
-
-        StageData stageData = Managers.Instance.GetStageData();
-        var chapter = stageData.chapters[0]; // 예시: 첫 번째 챕터 사용
-        var stageSettingsList = chapter.stages;
-
-        if (stageSettingsList == null || stageSettingsList.Count == 0)
+        foreach (var node in stageGraph.Nodes)
         {
-            Debug.LogError("stageSettingsList가 null이거나 비어 있습니다!");
-            return;
-        }
-
-        int nodeCount = stageGraph.Nodes.Count;
-        int settingsCount = stageSettingsList.Count;
-
-        nodeToStageMap = new Dictionary<int, GameObject>();
-
-        // 1. Addressables에서 모든 프리팹 미리 로드
-        await PreloadStagePrefabs(stageSettingsList);
-
-        // 2. for문에서는 Instantiate만 수행
-        for (int i = 0; i < nodeCount; i++)
-        {
-            Debug.Log($"Initializing stage for node {i + 1}/{nodeCount}");
-            var stageSettings = stageSettingsList[i % settingsCount];
-            string address = stageSettings.stageName.ToString();
-
-            if (loadedStagePrefabs.TryGetValue(address, out var prefab))
-            {
-                GameObject stageObject = GameObject.Instantiate(prefab);
-                stageObject.SetActive(false);
-                var node = stageGraph.Nodes[i];
-                nodeToStageMap[node.Id] = stageObject;
-            }
-            else
-            {
-                Debug.LogError($"Prefab not found for address: {address}");
-            }
-
-        }
-
-        SetInitialStage();
-    }
-
-    private async Task PreloadStagePrefabs(List<StageData.ChapterData.StageSettings> stageSettingsList)
-    {
-        foreach (var stageSettings in stageSettingsList)
-        {
-            string address = stageSettings.stageName.ToString();
-            if (!loadedStagePrefabs.ContainsKey(address))
-            {
-                GameObject prefab = await AddressableManager.Instance.LoadAssetAsyncTask<GameObject>(address);
-                if (prefab != null)
-                    loadedStagePrefabs[address] = prefab;
-                else
-                    Debug.LogError($"Failed to preload prefab: {address}");
-            }
+            // 각 노드에 해당하는 스테이지 오브젝트 생성
+            GameObject stageObject = new GameObject($"Stage_{node.Id}");
+            stageObject.SetActive(false); // 초기에는 비활성화
+            nodeToStageMap[node.Id] = stageObject;
+            Debug.Log($"Initializing stage for node {node.Id} ({node.GetLabel()})");
         }
     }
 
@@ -164,7 +86,6 @@ public class StageManager
         {
             nodeToStageMap[node.Id].SetActive(true);
             currentNode = node;
-            Debug.Log($"Activated stage: {node.Id} ({node.GetLabel()})");
 
             // 현재 노드 강조
             var visualizer = GameObject.FindObjectOfType<UIGraphVisualizer>();
