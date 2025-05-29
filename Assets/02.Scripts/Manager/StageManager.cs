@@ -14,6 +14,7 @@ public class StageManager
     public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
     private Node? currentNode; // 현재 활성화된 노드
     private Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
+    private Dictionary<string, GameObject> loadedStagePrefabs = new Dictionary<string, GameObject>();
     public event Action<Graph> OnGraphGenerated; // 그래프 생성 완료 이벤트
 
     //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
@@ -66,7 +67,6 @@ public class StageManager
         //     nodeToStageMap[node.Id] = stageObject;
         // }
 
-        // 1. StageData에서 현재 챕터와 스테이지 설정 리스트 가져오기
         StageData stageData = Managers.Instance.GetStageData();
         var chapter = stageData.chapters[0]; // 예시: 첫 번째 챕터 사용
         var stageSettingsList = chapter.stages;
@@ -77,33 +77,52 @@ public class StageManager
             return;
         }
 
-        // 2. 노드 수와 스테이지 설정 수 비교
         int nodeCount = stageGraph.Nodes.Count;
         int settingsCount = stageSettingsList.Count;
 
         nodeToStageMap = new Dictionary<int, GameObject>();
 
+        // 1. Addressables에서 모든 프리팹 미리 로드
+        await PreloadStagePrefabs(stageSettingsList);
+
+        // 2. for문에서는 Instantiate만 수행
         for (int i = 0; i < nodeCount; i++)
         {
-            // // 스테이지 설정이 부족하면 순환해서 사용
+            Debug.Log($"Initializing stage for node {i + 1}/{nodeCount}");
             var stageSettings = stageSettingsList[i % settingsCount];
             string address = stageSettings.stageName.ToString();
-            Debug.Log($"[StageManager] Try load {i}/{nodeCount} : {address}");
 
-            // Addressables에서 오브젝트 비동기 로드
-            GameObject stageObject = await AddressableManager.Instance.InstantiateAsyncTask(address);
-            if (stageObject == null)
+            if (loadedStagePrefabs.TryGetValue(address, out var prefab))
             {
-                Debug.LogError($"해당 주소를 가진 오브젝트 로드 실패 : {address}");
-                continue;
+                GameObject stageObject = GameObject.Instantiate(prefab);
+                stageObject.SetActive(false);
+                var node = stageGraph.Nodes[i];
+                nodeToStageMap[node.Id] = stageObject;
             }
-            stageObject.SetActive(false);
-            var node = stageGraph.Nodes[i];
-            nodeToStageMap[node.Id] = stageObject;
-            
+            else
+            {
+                Debug.LogError($"Prefab not found for address: {address}");
+            }
+
         }
 
         SetInitialStage();
+    }
+
+    private async Task PreloadStagePrefabs(List<StageData.ChapterData.StageSettings> stageSettingsList)
+    {
+        foreach (var stageSettings in stageSettingsList)
+        {
+            string address = stageSettings.stageName.ToString();
+            if (!loadedStagePrefabs.ContainsKey(address))
+            {
+                GameObject prefab = await AddressableManager.Instance.LoadAssetAsyncTask<GameObject>(address);
+                if (prefab != null)
+                    loadedStagePrefabs[address] = prefab;
+                else
+                    Debug.LogError($"Failed to preload prefab: {address}");
+            }
+        }
     }
 
     private void SetInitialStage()
