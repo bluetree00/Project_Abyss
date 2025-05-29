@@ -25,19 +25,14 @@ public class AddressableManager : MonoBehaviour
         {
             if (_instance == null)
             {
-                // 씬에 이미 존재하는 AddressablesManager를 먼저 찾음
-                // _instance = FindObjectOfType<AddressableManager>();
-                // if (_instance == null)
-                // {
-                //     // 없으면 새로 생성
-                //     GameObject go = new GameObject("AddressableManager");
-                //     _instance = go.AddComponent<AddressableManager>();
-                //     DontDestroyOnLoad(go);
-                // }
-
+                //씬에 이미 존재하는 AddressablesManager를 먼저 찾음
+                _instance = FindObjectOfType<AddressableManager>();
                 if (_instance == null)
                 {
-                    _instance = FindObjectOfType<AddressableManager>();
+                    // 없으면 새로 생성
+                    GameObject go = new GameObject("AddressableManager");
+                    _instance = go.AddComponent<AddressableManager>();
+                    DontDestroyOnLoad(go);
                 }
             }
             return _instance;

@@ -119,6 +119,7 @@ public class Managers : MonoBehaviour
 
         // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
+        
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
 
