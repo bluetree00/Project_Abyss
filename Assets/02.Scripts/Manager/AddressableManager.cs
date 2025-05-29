@@ -6,18 +6,17 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-[System.Serializable]
+[Serializable]
 public class LoadedAsset
 {
     public string key;
-    [System.NonSerialized]public AsyncOperationHandle handle;
+    public AsyncOperationHandle handle;
 }
 
 public class AddressableManager
 {
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
-    [NonSerialized]
-    private List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
+    public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
 
     private Task _initTask;
     public Task InitTask => _initTask;
