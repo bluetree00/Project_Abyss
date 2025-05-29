@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
+using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
@@ -27,6 +28,8 @@ public class Managers : MonoBehaviour
             return s_instance;
         }
     }
+    [SerializeField]
+    private List<LoadedAsset> _loadedAssetsList = new List<LoadedAsset>();
 
     #region Core // 게임 코어 매니저
     private InputManager _input;
@@ -83,13 +86,15 @@ public class Managers : MonoBehaviour
 
         // 2. GraphData에 그래프 생성 및 저장
         _graphData = await AddressableManager.LoadAssetAsyncTask<GraphData>("NewGraphData");
-        if (_graphData == null){ Debug.LogError("GraphData 로드 실패!"); return; }
+        if (_graphData == null) { Debug.LogError("GraphData 로드 실패!"); return; }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
         // 3. StageManager 초기화 (매개변수 없이)
         _stageManager = new StageManager();
         _stageManager.Initialize();
+        
     }
+
 
     public StageData GetStageData()
     {
