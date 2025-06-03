@@ -4,7 +4,7 @@ using Game.CharacterStates.MonsterControllerStates;
 using UnityEngine.AI;
 using System.Threading.Tasks;
 
-public class MonsterController : MonoBehaviour
+public class MonsterController : CharacterBase
 {
     [SerializeField] public MonsterData monsterData;
     public MonsterData MonsterData => monsterData;

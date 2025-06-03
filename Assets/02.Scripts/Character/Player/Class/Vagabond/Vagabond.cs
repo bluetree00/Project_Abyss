@@ -9,7 +9,7 @@ using Game.CharacterStates.VagabondStates;
 using UnityEngine.InputSystem;
 using Unity.VisualScripting;
 
-public class Vagabond : CharacterController
+public class Vagabond : CharacterBase
 {
     [Header("Camera")]
     [SerializeField] private CinemachineFreeLook cinemachineCamera;

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SlimeMonster : MonsterController
+public class PlayerController : CharacterController
 {
     // Start is called before the first frame update
     void Start()

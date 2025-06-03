@@ -5,7 +5,7 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Weapon/Abilities/SwordLightAttack")]
 public class DefaultLightAttackAbility : LightAttackAbilitySO 
 {
-    public override void LightAttack(CharacterController controller)
+    public override void LightAttack(CharacterBase controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {

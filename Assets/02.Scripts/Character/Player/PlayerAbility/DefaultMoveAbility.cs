@@ -2,9 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DefaultMoveAbility : IMoveAbility<CharacterController>
+public class DefaultMoveAbility : IMoveAbility<CharacterBase>
 {
-    public void Move(CharacterController  owner, Vector3 direction)
+    public void Move(CharacterBase  owner, Vector3 direction)
     {
         if (direction.sqrMagnitude < 0.01f)
         {
