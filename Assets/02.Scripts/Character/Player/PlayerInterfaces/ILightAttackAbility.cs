@@ -1,4 +1,4 @@
-public interface ILightAttackAbility<T> where T : CharacterController
+public interface ILightAttackAbility<T> where T : CharacterBase
 {
     void LightAttack(T controller);
 }

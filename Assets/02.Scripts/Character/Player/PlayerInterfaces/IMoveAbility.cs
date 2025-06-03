@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public interface IMoveAbility<T> where T : CharacterController
+public interface IMoveAbility<T> where T : CharacterBase
 {
-    void Move(T controller, Vector3 direction);
+    void Move(T CharacterBase, Vector3 direction);
 }

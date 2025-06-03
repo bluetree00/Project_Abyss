@@ -1,4 +1,4 @@
-public interface IDodgeAbility<T> where T : CharacterController
+public interface IDodgeAbility<T> where T : CharacterBase
 {
-    void Dodge(CharacterController controller);
+    void Dodge(CharacterBase controller);
 }

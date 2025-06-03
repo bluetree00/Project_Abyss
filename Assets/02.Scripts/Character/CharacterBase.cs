@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Game.CharacterStates;
-using Game.CharacterStates.CharacterControllerStates;
+using Game.CharacterStates.CharacterBaseStates;
 
-public class CharacterController : MonoBehaviour
+public class CharacterBase : MonoBehaviour
 {
     //============================================================
     // 🔶 필드 및 프로퍼티: 캐릭터 정보 및 핵심 시스템
@@ -19,8 +19,8 @@ public class CharacterController : MonoBehaviour
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
-    protected StateMachine<CharacterController> stateMachine = new StateMachine<CharacterController>();
-    public StateMachine<CharacterController> StateMachine => stateMachine;
+    protected StateMachine<CharacterBase> stateMachine = new StateMachine<CharacterBase>();
+    public StateMachine<CharacterBase> StateMachine => stateMachine;
 
     public WeaponManagerSO weaponManagerSO;
 
@@ -55,11 +55,11 @@ public class CharacterController : MonoBehaviour
     //============================================================
     // 🎮 캐릭터 능력 모듈
     //============================================================
-    public IMoveAbility<CharacterController> MoveAbility { get; protected set; }
-    public IDodgeAbility<CharacterController> DodgeAbility { get; protected set; }
-    public ILightAttackAbility<CharacterController> LightAttackAbility { get; protected set; }
-    public IHeavyAttackAbility<CharacterController> HeavyAttackAbility { get; protected set; }
-    public IJumpAbility<CharacterController> JumpAbility { get; protected set; }
+    public IMoveAbility<CharacterBase> MoveAbility { get; protected set; }
+    public IDodgeAbility<CharacterBase> DodgeAbility { get; protected set; }
+    public ILightAttackAbility<CharacterBase> LightAttackAbility { get; protected set; }
+    public IHeavyAttackAbility<CharacterBase> HeavyAttackAbility { get; protected set; }
+    public IJumpAbility<CharacterBase> JumpAbility { get; protected set; }
 
     public Transform handTransform;  // 무기 장착 위치
 

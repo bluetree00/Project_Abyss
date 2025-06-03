@@ -1,5 +1,5 @@
 using UnityEngine;
-using Game.CharacterStates.CharacterControllerStates;
+using Game.CharacterStates.CharacterBaseStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
@@ -190,7 +190,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.JumpStart);
+            owner.SetAirState(CharacterBase.AirState.JumpStart);
             InitAnimation("Jump_Start", 0.9f);
             base.Enter(owner);
 
@@ -209,7 +209,7 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.InAir);
+            owner.SetAirState(CharacterBase.AirState.InAir);
             owner.Anim.CrossFade("Jump_Loop", 0.1f); // 공중 애니메이션
         }
 
@@ -231,7 +231,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.SetAirState(CharacterBase.AirState.Landing);
             owner.FinishJump();
             InitAnimation("Jump_Land", 0.3f);
             base.Enter(owner);
@@ -249,7 +249,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.SetAirState(CharacterBase.AirState.Landing);
             owner.FinishJump();
             InitAnimation("Jump_HardLand", 0.9f);
             base.Enter(owner);

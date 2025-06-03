@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DefaultJumpAbility : JumpAbilitySO
 {
-    public override void Jump(CharacterController controller)
+    public override void Jump(CharacterBase controller)
     {
         if (!controller.isGrounded) return;
 

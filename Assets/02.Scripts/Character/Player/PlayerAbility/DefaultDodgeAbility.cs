@@ -1,11 +1,11 @@
 using System.Collections;
 using UnityEngine;
 
-public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
+public class DefaultDodgeAbility : IDodgeAbility<CharacterBase>
 {
     private bool isDodging = false;
 
-    public void Dodge(CharacterController controller)
+    public void Dodge(CharacterBase controller)
     {
         if (isDodging || !controller.CharacterData.canDodge)
             return;
@@ -13,7 +13,7 @@ public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
         controller.StartCoroutine(DodgeCoroutine(controller));
     }
 
-    private IEnumerator DodgeCoroutine(CharacterController controller)
+    private IEnumerator DodgeCoroutine(CharacterBase controller)
     {
         isDodging = true;
         controller.CharacterData.canDodge = false;
