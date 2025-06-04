@@ -51,6 +51,7 @@ public class DataManager
         try
         {
             string json = File.ReadAllText(path);
+            Debug.Log(Application.persistentDataPath);
             return JsonConvert.DeserializeObject<T>(json);
         }
         catch (System.Exception ex)
@@ -66,6 +67,7 @@ public class DataManager
         try
         {
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+            Debug.Log(Application.persistentDataPath);
             File.WriteAllText(path, json);
         }
         catch (System.Exception ex)
