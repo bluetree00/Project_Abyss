@@ -219,6 +219,8 @@ public class Define
         Specter
     }
 
+    
+
     // 그리드 형태를 정의하는 배열들
     public static readonly int[,] AppleShape = new int[10, 10]
     {

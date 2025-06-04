@@ -4,14 +4,32 @@ using UnityEngine;
 
 public class FSMMonsterAIController : IMonsterAIController
 {
-    public void Initialize()
+    private MonsterController monster;
+    private MonsterController.MonsterState currentState;
+
+    public void InitAI(MonsterController monster)
     {
-        throw new System.NotImplementedException();
+        this.monster = monster;
+        currentState = MonsterController.MonsterState.Idle;
     }
 
-    public void Tick()
+    public void TickAI()
     {
-        throw new System.NotImplementedException();
+        switch (currentState)
+        {
+            case MonsterController.MonsterState.Idle:
+                HandleIdle();
+                break;
+            case MonsterController.MonsterState.Patrol:
+                HandlePatrol();
+                break;
+            // ... 다른 상태
+        }
     }
 
+    public void OnEnterCombat() { currentState = MonsterController.MonsterState.Chase; }
+    public void OnExitCombat() { currentState = MonsterController.MonsterState.Patrol; }
+
+    private void HandleIdle() { /* 로직 */ }
+    private void HandlePatrol() { /* 로직 */ }
 }
