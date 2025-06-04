@@ -2,11 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class HeavyAttackAbilitySO : ScriptableObject, IHeavyAttackAbility<CharacterBase>
+public abstract class HeavyAttackAbilitySO : ScriptableObject, IHeavyAttackAbility<PlayerCharacter>
 {
-    public abstract void HeavyAttackStartCharging(CharacterBase character);
-    public abstract void HeavyAttackUpdateCharging(CharacterBase character, float chargeTime);
-    public abstract void HeavyAttackReleaseChargedAttack(CharacterBase character, float chargeTime);
-    public abstract void HeavyAttackCancelCharging(CharacterBase character);
+    public abstract void HeavyAttackStartCharging(PlayerCharacter character);
+    public abstract void HeavyAttackUpdateCharging(PlayerCharacter character, float chargeTime);
+    public abstract void HeavyAttackReleaseChargedAttack(PlayerCharacter character, float chargeTime);
+    public abstract void HeavyAttackCancelCharging(PlayerCharacter character);
 
 }

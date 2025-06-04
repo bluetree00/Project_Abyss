@@ -7,7 +7,7 @@ public class DefaultBowLightAttackAbility : LightAttackAbilitySO
 {
     public string arrowPoolKey = "Basic_Arrow_01"; // ObjectPooler에서 사용할 키 추후 어떤 화살을 사용할지는 외부에서 결정후 그 변수를 사용.
 
-    public override void LightAttack(CharacterBase controller)
+    public override void LightAttack(PlayerCharacter controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {

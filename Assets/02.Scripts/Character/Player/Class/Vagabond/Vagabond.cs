@@ -9,7 +9,7 @@ using Game.CharacterStates.VagabondStates;
 using UnityEngine.InputSystem;
 using Unity.VisualScripting;
 
-public class Vagabond : CharacterBase
+public class Vagabond : PlayerCharacter
 {
     [Header("Camera")]
     [SerializeField] private CinemachineFreeLook cinemachineCamera;
@@ -26,7 +26,6 @@ public class Vagabond : CharacterBase
 
     private Dictionary<Type, State<Vagabond>> cachedStates = new();
   
-
 
     public float ChargeTime { get; private set; }
 
