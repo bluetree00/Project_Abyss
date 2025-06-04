@@ -1,12 +1,12 @@
 using UnityEngine;
 
-namespace Game.CharacterStates.CharacterBaseStates
+namespace Game.CharacterStates.PlayerCharacterStates
 {
     /// <summary>
     /// 애니메이션 상태를 공통으로 처리하는 추상 클래스.
     /// 특정 애니메이션 이름과 종료 시간(normalizedTime)을 기준으로 상태 전환을 제어한다.
     /// </summary>
-    public abstract class AnimationState<T> : State<T> where T : CharacterBase
+    public abstract class AnimationState<T> : State<T> where T : PlayerCharacter
     {
         private int _animHash;         // 애니메이션 해시 값
         private float _endTime;        // 애니메이션 종료 시점 (normalizedTime)
@@ -61,7 +61,7 @@ namespace Game.CharacterStates.CharacterBaseStates
     /// <summary>
     /// 캐릭터의 Idle 상태. 기본 대기 상태.
     /// </summary>
-    public class IdleState<T> : State<T> where T : CharacterBase
+    public class IdleState<T> : State<T> where T : PlayerCharacter
     {
         public override void Enter(T owner)
         {
@@ -82,7 +82,7 @@ namespace Game.CharacterStates.CharacterBaseStates
     /// <summary>
     /// 캐릭터가 이동 중일 때의 상태. (걷기)
     /// </summary>
-    public class MoveState<T> : State<T> where T : CharacterBase
+    public class MoveState<T> : State<T> where T : PlayerCharacter
     {
         public override void Enter(T owner)
         {
@@ -101,7 +101,7 @@ namespace Game.CharacterStates.CharacterBaseStates
     /// <summary>
     /// 캐릭터가 달릴 때의 상태.
     /// </summary>
-    public class RuningState<T> : State<T> where T : CharacterBase
+    public class RuningState<T> : State<T> where T : PlayerCharacter
     {
         public override void Enter(T owner)
         {
@@ -119,7 +119,7 @@ namespace Game.CharacterStates.CharacterBaseStates
     /// <summary>
     /// 캐릭터가 구르기(dodge)할 때의 상태.
     /// </summary>
-    public class DodgeState<T> : State<T> where T : CharacterBase
+    public class DodgeState<T> : State<T> where T : PlayerCharacter
     {
         public override void Enter(T owner)
         {
@@ -137,7 +137,7 @@ namespace Game.CharacterStates.CharacterBaseStates
     /// <summary>
     /// 캐릭터가 사망할 때의 상태.
     /// </summary>
-    public class DieState<T> : State<T> where T : CharacterBase
+    public class DieState<T> : State<T> where T : PlayerCharacter
     {
         public override void Enter(T owner)
         {

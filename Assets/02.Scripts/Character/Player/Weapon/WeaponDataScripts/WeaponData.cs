@@ -32,8 +32,8 @@ public abstract class WeaponData : ScriptableObject
     public HeavyAttackAnimationSetSO heavyAttackSet;
 
     // SO로 모듈을 받아서 인터페이스로 연결
-    public ILightAttackAbility<CharacterBase> LightAttack => lightAttackSO;
-    public IHeavyAttackAbility<CharacterBase> HeavyAttack => heavyAttackSO;
+    public ILightAttackAbility<PlayerCharacter> LightAttack => lightAttackSO;
+    public IHeavyAttackAbility<PlayerCharacter> HeavyAttack => heavyAttackSO;
 
     [Header("무기 등급")] //추후 사용 가능성 있음
     public Define.WeaponRarity rarity;

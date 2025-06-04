@@ -1,4 +1,4 @@
-public interface IJumpAbility<T> where T : CharacterBase
+public interface IJumpAbility<T> where T : PlayerCharacter
 {
     void Jump(T controller);
 }
