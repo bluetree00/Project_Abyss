@@ -92,23 +92,23 @@ public class Managers : MonoBehaviour
         // _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
         // 1. StageData 로드 (없으면 새로 생성)
-        _stageData = JsonManager.LoadJson<StageData>(StageDataFile);
+        _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
         if (_stageData == null)
         {
             Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
             _stageData = ScriptableObject.CreateInstance<StageData>();
             // 필요시 기본값 설정
-            JsonManager.SaveJson(StageDataFile, _stageData);
+            DataManager.SaveJsonFile(StageDataFile, _stageData);
         }
 
         // 2. GraphData 로드 (없으면 새로 생성)
-        _graphData = JsonManager.LoadJson<GraphData>(GraphDataFile);
+        _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
         if (_graphData == null)
         {
             Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
             _graphData = ScriptableObject.CreateInstance<GraphData>();
             // 필요시 기본값 설정
-            JsonManager.SaveJson(GraphDataFile, _graphData);
+            DataManager.SaveJsonFile(GraphDataFile, _graphData);
         }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
@@ -130,8 +130,8 @@ public class Managers : MonoBehaviour
     
     public void SaveAllData()
     {
-       JsonManager.SaveJson(StageDataFile, _stageData);
-       JsonManager.SaveJson(GraphDataFile, _graphData);
+       DataManager.SaveJsonFile(StageDataFile, _stageData);
+       DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
     
 
