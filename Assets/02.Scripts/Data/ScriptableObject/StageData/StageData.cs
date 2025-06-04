@@ -5,6 +5,19 @@ using UnityEngine;
 public class StageData : ScriptableObject
 {
     public List<ChapterData> chapters;
+
+    /// <summary>
+    /// 기본값을 chapters에 할당하는 메서드
+    /// </summary>
+    public void SetDefaultValues()
+    {
+        chapters = new List<ChapterData>
+        {
+            ChapterData.CreateDefault()
+        };
+    }
+
+
     [System.Serializable]
     public class ChapterData
     {
@@ -12,6 +25,31 @@ public class StageData : ScriptableObject
         public int[] layerSizes;
         public List<StageSettings> stages;
         public string bossStageName;
+
+        /// <summary>
+        /// 기본값을 가진 ChapterData 생성
+        /// </summary>
+        public static ChapterData CreateDefault()
+        {
+            var chapter = new ChapterData
+            {
+                chapterName = ChapterName.Chapter1,
+                layerSizes = new int[] { 1, 2, 3, 4, 3, 2, 1 },
+                stages = new List<StageSettings>(),
+                bossStageName = StageName.Stage_10.ToString()
+            };
+            // Stage 10개, enum 순서대로
+            for (int i = 0; i < 10; i++)
+            {
+                chapter.stages.Add(new StageSettings
+                {
+                    stageName = (StageName)i,
+                    weight = 1,
+                    randomWeight = false
+                });
+            }
+            return chapter;
+        }
 
         [System.Serializable]
         public class StageSettings

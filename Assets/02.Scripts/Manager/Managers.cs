@@ -97,7 +97,8 @@ public class Managers : MonoBehaviour
         {
             Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
             _stageData = ScriptableObject.CreateInstance<StageData>();
-            // 필요시 기본값 설정
+            _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
+            
             DataManager.SaveJsonFile(StageDataFile, _stageData);
         }
 
