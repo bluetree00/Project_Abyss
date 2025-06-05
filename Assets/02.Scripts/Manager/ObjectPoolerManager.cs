@@ -50,9 +50,37 @@ public class ObjectPoolerManager
             AddNewTag(pool.tag);   // 태그 추가
         }
     }
+    // 모든 풀 비동기 초기화
+    // public async Task InitializeAllPoolsAsync()
+    // {
+    //     foreach (Pool pool in pools)
+    //     {
+    //         await InitializePoolAsync(pool);
+    //         AddNewTag(pool.tag);
+    //     }
+    // }
+
+    // // 비동기 풀 단일 초기화
+    // private async Task InitializePoolAsync(Pool pool)
+    // {
+    //     if (poolDictionary.ContainsKey(pool.tag))
+    //     {
+    //         Debug.LogWarning($"[ObjectPooler] 이미 존재하는 풀: {pool.tag}, 초기화를 건너뜀");
+    //         return;
+    //     }
+
+    //     poolDictionary[pool.tag] = new Queue<GameObject>();
+
+    //     for (int i = 0; i < pool.initialSize; i++)
+    //     {
+    //         GameObject obj = await CreateNewObjectAsync(pool.tag, pool.resourcePath, pool.poolType);
+    //         if (obj != null)
+    //             ReturnToPool(obj);
+    //     }
+    // }
 
     // 특정 풀을 초기화하는 메서드
-    
+
     private void InitializePool(Pool pool)
     {
         // 이미 풀에 해당 태그가 존재하면 초기화를 건너뜀
@@ -76,7 +104,7 @@ public class ObjectPoolerManager
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
         // AddressablesManager를 사용하여 리소스 경로로 프리팹을 동기적으로 로드
-        GameObject prefab = AddressableManager.Instance.LoadAssetSync<GameObject>(resourcePath);
+        GameObject prefab = Managers.AddressableManager.LoadAssetSync<GameObject>(resourcePath);
         if (prefab == null)
         {
             Debug.LogError($"Prefab at path {resourcePath} not found.");
@@ -93,6 +121,8 @@ public class ObjectPoolerManager
         obj.transform.SetParent(parentObjects[poolType].transform);
         return obj;
     }
+
+    #region 비동기 메서드
     //**********************************************************************
     // 비동기 오브젝트 생성
     // private async Task<GameObject> CreateNewObjectAsync(string tag, string resourcePath, PoolType poolType)
@@ -112,36 +142,68 @@ public class ObjectPoolerManager
     //     return obj;
     // }
 
-    // // 비동기 풀 초기화
-    // private async Task InitializePoolAsync(Pool pool)
+    // // 비동기 풀에서 오브젝트 꺼내기
+    // public async Task<GameObject> SpawnFromPoolAsync(string tag, Vector3 position, Quaternion rotation)
     // {
-    //     if (poolDictionary.ContainsKey(pool.tag))
+    //     // 해당 태그가 등록되지 않은 경우 기본 설정으로 풀을 비동기 초기화
+    //     if (!poolDictionary.ContainsKey(tag))
     //     {
-    //         Debug.LogWarning($"[ObjectPooler] 이미 존재하는 풀: {pool.tag}, 초기화를 건너뜀");
-    //         return;
+    //         Pool newPool = new Pool
+    //         {
+    //             tag = tag,
+    //             resourcePath = $"Effects/{tag}",
+    //             initialSize = 1,
+    //             poolType = PoolType.Effect
+    //         };
+    //         await InitializePoolAsync(newPool);
+    //         AddNewTag(tag);
     //     }
 
-    //     poolDictionary[pool.tag] = new Queue<GameObject>();
-
-    //     for (int i = 0; i < pool.initialSize; i++)
+    //     // 풀이 비어있으면 새 오브젝트를 비동기로 생성하여 풀에 넣음
+    //     if (poolDictionary[tag].Count == 0)
     //     {
-    //         GameObject obj = await CreateNewObjectAsync(pool.tag, pool.resourcePath, pool.poolType);
-    //         if (obj != null)
-    //             ReturnToPool(obj);
+    //         Pool pool = Array.Find(pools, x => x.tag == tag);
+    //         if (pool != null)
+    //         {
+    //             GameObject obj = await CreateNewObjectAsync(pool.tag, pool.resourcePath, pool.poolType);
+    //             if (obj != null)
+    //                 poolDictionary[tag].Enqueue(obj);
+    //         }
+    //     }
+
+    //     // 풀에서 오브젝트를 꺼내고 위치와 회전 설정 후 활성화
+    //     GameObject objectToSpawn = poolDictionary[tag].Dequeue();
+    //     objectToSpawn.transform.position = position;
+    //     objectToSpawn.transform.rotation = rotation;
+    //     objectToSpawn.SetActive(true);
+    //     return objectToSpawn;
+    // }
+
+    // // 무기 풀에서 무기를 비동기로 꺼내는 메서드
+    // public async Task<GameObject> SpawnWeaponFromPoolAsync(string weaponKey, Vector3 position, Quaternion rotation)
+    // {
+    //     return await SpawnFromPoolAsync(weaponKey, position, rotation);
+    // }
+
+    // // 제네릭 방식으로 컴포넌트를 비동기로 가져오는 메서드
+    // public async Task<T> SpawnFromPoolAsync<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
+    // {
+    //     GameObject objectToSpawn = await SpawnFromPoolAsync(tag, position, rotation);
+    //     if (objectToSpawn.TryGetComponent(out T component))
+    //     {
+    //         return component;
+    //     }
+    //     else
+    //     {
+    //         ReturnToPool(objectToSpawn);
+    //         throw new Exception($"Component {typeof(T)} not found on pooled object with tag {tag}");
     //     }
     // }
 
-    // // 모든 풀 비동기 초기화
-    // public async Task InitializeAllPoolsAsync()
-    // {
-    //     foreach (Pool pool in pools)
-    //     {
-    //         await InitializePoolAsync(pool);
-    //         AddNewTag(pool.tag);
-    //     }
-    // }
+
     //**********************************************************************
-
+    #endregion
+    
     // 새로운 태그를 태그 목록에 추가하는 메서드
     public void AddNewTag(string tag)
     {

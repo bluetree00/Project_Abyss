@@ -23,7 +23,6 @@ public class Managers : MonoBehaviour
                     go.AddComponent<Managers>();
                 }
                 s_instance = go.GetComponent<Managers>();
-                DontDestroyOnLoad(go);
             }
             return s_instance;
         }
@@ -36,13 +35,14 @@ public class Managers : MonoBehaviour
     public static StageData _stageData { get; private set; } // StageData 인스턴스
     private const string StageDataFile = "StageData.json";
     private const string GraphDataFile = "GraphData.json";
-    public static AddressableManager AddressableManager => AddressableManager.Instance;
+    public static AddressableManager AddressableManager => Instance._addressableManager ?? (Instance._addressableManager = new AddressableManager());
     #endregion
 
     #region Core // 게임 코어 매니저
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
+    private AddressableManager _addressableManager; // AddressableManager 인스턴스
 
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
@@ -71,6 +71,7 @@ public class Managers : MonoBehaviour
         {
             s_instance = this;
             DontDestroyOnLoad(this);
+
         }
         else
         {
@@ -106,8 +107,8 @@ public class Managers : MonoBehaviour
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
         // 3. StageManager 초기화 (매개변수 없이)
-        _stageManager = new StageManager();
-        _stageManager.InitializeAsync();
+        // _stageManager = new StageManager();
+        // _stageManager.InitializeAsync();
         
     }
 
@@ -155,11 +156,29 @@ public class Managers : MonoBehaviour
 
         // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
+        //StartCoroutine(poolerInitialize());
 
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
 
+    // IEnumerator poolerInitialize()
+    // {
+    //     var initTask = _objectPoolerManager.InitializeAllPoolsAsync();
+    //     yield return new WaitUntil(() => initTask.IsCompleted);
+    //     if (initTask.IsFaulted)
+    //     {
+    //         Debug.LogError("ObjectPoolerManager 초기화 실패: " + initTask.Exception);
+    //     }
+    //     else
+    //     {
+    //         Debug.Log("ObjectPoolerManager 초기화 성공");
+    //     }
+    // }
 
+    // public async void asd()
+    // {
+    //     await _stageManager.InitializeAsync();
+    // }
 
 
     void Update()
@@ -180,7 +199,8 @@ public class Managers : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.G))
         {
-            _stageManager.Stageprepare();
+            _stageManager = new StageManager();
+            _stageManager.InitializeAsync();
         }
     } 
 

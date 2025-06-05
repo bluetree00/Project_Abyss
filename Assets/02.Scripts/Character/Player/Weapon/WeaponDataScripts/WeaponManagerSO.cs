@@ -150,7 +150,7 @@ public class WeaponManagerSO : ScriptableObject
     if (weaponObjects[slotIndex] != null) return;
 
     //[ ]
-    AddressableManager.Instance.InstantiateAsync(key, instance =>
+    Managers.AddressableManager.InstantiateAsync(key, instance =>
     {
         // 슬롯 무기 데이터가 바뀌었을 수 있으므로 다시 확인
         if (weaponSlots[slotIndex]?.weaponKey.ToString() != key) return;
