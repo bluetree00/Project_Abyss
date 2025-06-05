@@ -125,8 +125,8 @@ public class Vagabond : CharacterController
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
         //NOTE: 이 부분은 테스트용으로, 실제 게임에서는 필요하지 않을 수 있습니다.
         //WARNING: 이 부분의 async/await 사용은 주의가 필요
-        inputActions.Player.testKey.performed += async _ => await Managers.Stage.MoveToNextStage(1);
-        inputActions.Player.testKey2.performed += async _ => await Managers.Stage.MoveToNextStage(-1);
+        inputActions.Player.testKey.performed += _ => Managers.Stage.MoveToNextStage(1);
+        inputActions.Player.testKey2.performed += _ => Managers.Stage.MoveToNextStage(-1);
     }
 
     protected override void Update()

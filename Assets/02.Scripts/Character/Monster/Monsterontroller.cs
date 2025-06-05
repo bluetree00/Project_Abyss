@@ -57,7 +57,8 @@ public class MonsterController : MonoBehaviour
     protected async Task LoadMonsterDataAsync(string key)
     {
         var tcs = new TaskCompletionSource<bool>();
-        Managers.AddressableManager.LoadAsset<MonsterData>(key, data =>
+        //[ ]
+        AddressableManager.Instance.LoadAsset<MonsterData>(key, data =>
         {
             if (data == null)
             {

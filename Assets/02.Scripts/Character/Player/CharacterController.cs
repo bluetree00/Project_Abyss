@@ -162,8 +162,8 @@ public class CharacterController : MonoBehaviour
     protected async Task LoadCharacterDataAsync(string characterName)
     {
         var tcs = new TaskCompletionSource<bool>();
-
-        Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
+        //[ ]
+        AddressableManager.Instance.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
             {
