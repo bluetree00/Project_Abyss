@@ -13,8 +13,21 @@ public class LoadedAsset
     public AsyncOperationHandle handle;
 }
 
-public class AddressableManager
+public class AddressableManager : MonoBehaviour
 {
+    public static AddressableManager Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
     public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
 

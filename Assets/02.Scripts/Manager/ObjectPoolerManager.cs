@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class ObjectPoolerManager 
@@ -42,7 +43,7 @@ public class ObjectPoolerManager
         parentObjects[PoolType.Monster] = new GameObject("MonsterPool");
         parentObjects[PoolType.Character] = new GameObject("CharacterPool");
 
-        // 풀 초기화
+        //풀 초기화
         foreach (Pool pool in pools)
         {
             InitializePool(pool);  // 각 풀 초기화
@@ -51,6 +52,7 @@ public class ObjectPoolerManager
     }
 
     // 특정 풀을 초기화하는 메서드
+    
     private void InitializePool(Pool pool)
     {
         // 이미 풀에 해당 태그가 존재하면 초기화를 건너뜀
@@ -74,7 +76,7 @@ public class ObjectPoolerManager
     private GameObject CreateNewObject(string tag, string resourcePath, PoolType poolType)
     {
         // AddressablesManager를 사용하여 리소스 경로로 프리팹을 동기적으로 로드
-        GameObject prefab = Managers.AddressableManager.LoadAssetSync<GameObject>(resourcePath);
+        GameObject prefab = AddressableManager.Instance.LoadAssetSync<GameObject>(resourcePath);
         if (prefab == null)
         {
             Debug.LogError($"Prefab at path {resourcePath} not found.");
@@ -91,6 +93,54 @@ public class ObjectPoolerManager
         obj.transform.SetParent(parentObjects[poolType].transform);
         return obj;
     }
+    //**********************************************************************
+    // 비동기 오브젝트 생성
+    // private async Task<GameObject> CreateNewObjectAsync(string tag, string resourcePath, PoolType poolType)
+    // {
+    //     GameObject prefab = await AddressableManager.Instance.LoadAssetAsyncTask<GameObject>(resourcePath);
+    //     if (prefab == null)
+    //     {
+    //         Debug.LogError($"Prefab at path {resourcePath} not found.");
+    //         return null;
+    //     }
+
+    //     GameObject obj = GameObject.Instantiate(prefab);
+    //     obj.name = tag;
+    //     obj.SetActive(false);
+    //     spawnObjects.Add(obj);
+    //     obj.transform.SetParent(parentObjects[poolType].transform);
+    //     return obj;
+    // }
+
+    // // 비동기 풀 초기화
+    // private async Task InitializePoolAsync(Pool pool)
+    // {
+    //     if (poolDictionary.ContainsKey(pool.tag))
+    //     {
+    //         Debug.LogWarning($"[ObjectPooler] 이미 존재하는 풀: {pool.tag}, 초기화를 건너뜀");
+    //         return;
+    //     }
+
+    //     poolDictionary[pool.tag] = new Queue<GameObject>();
+
+    //     for (int i = 0; i < pool.initialSize; i++)
+    //     {
+    //         GameObject obj = await CreateNewObjectAsync(pool.tag, pool.resourcePath, pool.poolType);
+    //         if (obj != null)
+    //             ReturnToPool(obj);
+    //     }
+    // }
+
+    // // 모든 풀 비동기 초기화
+    // public async Task InitializeAllPoolsAsync()
+    // {
+    //     foreach (Pool pool in pools)
+    //     {
+    //         await InitializePoolAsync(pool);
+    //         AddNewTag(pool.tag);
+    //     }
+    // }
+    //**********************************************************************
 
     // 새로운 태그를 태그 목록에 추가하는 메서드
     public void AddNewTag(string tag)

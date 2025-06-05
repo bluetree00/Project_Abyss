@@ -67,7 +67,6 @@ public class DataManager
         try
         {
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
-            Debug.Log(Application.persistentDataPath);
             File.WriteAllText(path, json);
         }
         catch (System.Exception ex)

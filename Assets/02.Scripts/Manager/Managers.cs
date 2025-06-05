@@ -31,11 +31,18 @@ public class Managers : MonoBehaviour
     [SerializeField]
     private List<LoadedAsset> _loadedAssetsList = new List<LoadedAsset>();
 
+    #region Data // 데이터 매니저
+    public static GraphData _graphData { get; private set; }
+    public static StageData _stageData { get; private set; } // StageData 인스턴스
+    private const string StageDataFile = "StageData.json";
+    private const string GraphDataFile = "GraphData.json";
+    public static AddressableManager AddressableManager => AddressableManager.Instance;
+    #endregion
+
     #region Core // 게임 코어 매니저
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
-    private AddressableManager _addressableManager; // AddressableManager 인스턴스
 
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
@@ -56,13 +63,7 @@ public class Managers : MonoBehaviour
     public static DataManager Data { get { return Instance._data; } }
     #endregion
 
-    #region Data // 데이터 매니저
-    public static GraphData _graphData { get; private set; }
-    public static StageData _stageData { get; private set; } // StageData 인스턴스
-    private const string StageDataFile = "StageData.json";
-    private const string GraphDataFile = "GraphData.json";
-    public static AddressableManager AddressableManager => Instance._addressableManager ?? (Instance._addressableManager = new AddressableManager());
-    #endregion
+    
 
     void Awake()
     {
@@ -81,15 +82,6 @@ public class Managers : MonoBehaviour
     {
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
         //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
-        //FIXME : Json으로 StageData와 GraphData를 저장하고 불러오는 기능 추가 필요
-        // 1. Addressable로 StageData 로드
-        // _stageData = await AddressableManager.LoadAssetAsyncTask<StageData>("Data/Chapter1");
-        // if (_stageData == null) { Debug.LogError("StageData 로드 실패!"); return; }
-
-        // // 2. GraphData에 그래프 생성 및 저장
-        // _graphData = await AddressableManager.LoadAssetAsyncTask<GraphData>("NewGraphData");
-        // if (_graphData == null) { Debug.LogError("GraphData 로드 실패!"); return; }
-        // _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
         // 1. StageData 로드 (없으면 새로 생성)
         _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
@@ -98,8 +90,8 @@ public class Managers : MonoBehaviour
             Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
             _stageData = ScriptableObject.CreateInstance<StageData>();
             _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
-            
-            DataManager.SaveJsonFile(StageDataFile, _stageData);
+
+            SaveStageData();
         }
 
         // 2. GraphData 로드 (없으면 새로 생성)
@@ -109,15 +101,17 @@ public class Managers : MonoBehaviour
             Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
             _graphData = ScriptableObject.CreateInstance<GraphData>();
             // 필요시 기본값 설정
-            DataManager.SaveJsonFile(GraphDataFile, _graphData);
+            SaveGraphData();
         }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
         // 3. StageManager 초기화 (매개변수 없이)
         _stageManager = new StageManager();
-        _stageManager.Initialize();
+        _stageManager.InitializeAsync();
         
     }
+
+    
 
 
     public StageData GetStageData()
@@ -129,10 +123,14 @@ public class Managers : MonoBehaviour
         return _graphData;
     }
     
-    public void SaveAllData()
+    public void SaveStageData()
     {
        DataManager.SaveJsonFile(StageDataFile, _stageData);
-       DataManager.SaveJsonFile(GraphDataFile, _graphData);
+    }
+
+    public void SaveGraphData()
+    {
+        DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
     
 
@@ -178,6 +176,11 @@ public class Managers : MonoBehaviour
             {
                 Debug.Log("<color=red>생성 실패</color>");
             });
+        }
+
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            _stageManager.Stageprepare();
         }
     } 
 

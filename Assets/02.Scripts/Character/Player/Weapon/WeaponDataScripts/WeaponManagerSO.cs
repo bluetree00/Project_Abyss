@@ -149,7 +149,8 @@ public class WeaponManagerSO : ScriptableObject
     // 이미 생성된 무기 오브젝트가 있으면 생성하지 않음
     if (weaponObjects[slotIndex] != null) return;
 
-    Managers.AddressableManager.InstantiateAsync(key, instance =>
+    //[ ]
+    AddressableManager.Instance.InstantiateAsync(key, instance =>
     {
         // 슬롯 무기 데이터가 바뀌었을 수 있으므로 다시 확인
         if (weaponSlots[slotIndex]?.weaponKey.ToString() != key) return;
