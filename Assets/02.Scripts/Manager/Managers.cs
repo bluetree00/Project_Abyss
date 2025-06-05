@@ -1,8 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Unity.VisualScripting;
+using UnityEditor.VersionControl;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 public class Managers : MonoBehaviour
 {
@@ -20,20 +23,29 @@ public class Managers : MonoBehaviour
                     go.AddComponent<Managers>();
                 }
                 s_instance = go.GetComponent<Managers>();
-                DontDestroyOnLoad(go);
             }
             return s_instance;
         }
     }
+    [SerializeField]
+    private List<LoadedAsset> _loadedAssetsList = new List<LoadedAsset>();
+
+    #region Data // 데이터 매니저
+    public static GraphData _graphData { get; private set; }
+    public static StageData _stageData { get; private set; } // StageData 인스턴스
+    private const string StageDataFile = "StageData.json";
+    private const string GraphDataFile = "GraphData.json";
+    public static AddressableManager AddressableManager => Instance._addressableManager ?? (Instance._addressableManager = new AddressableManager());
+    #endregion
 
     #region Core // 게임 코어 매니저
     private InputManager _input;
     private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
+    private AddressableManager _addressableManager; // AddressableManager 인스턴스
 
     public StageManager _stageManager; // StageManager 변수 선언
     private UIManager _ui;
-    private StageTransitionManager _stageTransitionManager;
     private CharacterDataManager _characterDataManager;     // 캐릭터 데이터 관리 매니저
     private GameEventManager gameEventManager; // 게임 이벤트 매니저
     SceneManagerEx _scene = new SceneManagerEx();
@@ -44,13 +56,14 @@ public class Managers : MonoBehaviour
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
-    public static StageTransitionManager StageTransitionManager => Instance._stageTransitionManager; // StageTransitionManager 인스턴스를 반환
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
     public static GameEventManager GameEvent => Instance.gameEventManager ?? (Instance.gameEventManager = new GameEventManager());
 
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
     #endregion
+
+    
 
     void Awake()
     {
@@ -59,9 +72,6 @@ public class Managers : MonoBehaviour
             s_instance = this;
             DontDestroyOnLoad(this);
 
-            // 나머지 초기화 작업
-            if (_stageTransitionManager == null)
-                _stageTransitionManager = new StageTransitionManager();
         }
         else
         {
@@ -71,9 +81,57 @@ public class Managers : MonoBehaviour
 
     void Start()
     {
-
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
-        _stageTransitionManager.Init("Data/Chapter1"); // 첫 번째 챕터 로드
+        //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
+
+        // 1. StageData 로드 (없으면 새로 생성)
+        _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
+        if (_stageData == null)
+        {
+            Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
+            _stageData = ScriptableObject.CreateInstance<StageData>();
+            _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
+
+            SaveStageData();
+        }
+
+        // 2. GraphData 로드 (없으면 새로 생성)
+        _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
+        if (_graphData == null)
+        {
+            Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
+            _graphData = ScriptableObject.CreateInstance<GraphData>();
+            // 필요시 기본값 설정
+            SaveGraphData();
+        }
+        _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
+
+        // 3. StageManager 초기화 (매개변수 없이)
+        // _stageManager = new StageManager();
+        // _stageManager.InitializeAsync();
+        
+    }
+
+    
+
+
+    public StageData GetStageData()
+    {
+        return _stageData;
+    }
+    public GraphData GetGraphData()
+    {
+        return _graphData;
+    }
+    
+    public void SaveStageData()
+    {
+       DataManager.SaveJsonFile(StageDataFile, _stageData);
+    }
+
+    public void SaveGraphData()
+    {
+        DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
     
 
@@ -85,23 +143,42 @@ public class Managers : MonoBehaviour
 
         bool isCompleted = false;
         List<ObjectPoolerManager.Pool> initialPools = null;
-        
+
         // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
         ObjectPoolEffectInitializer.GetInitialPools(effectPoolDataName, pools =>
         {
             initialPools = pools;
             isCompleted = true;
         });
-        
+
         // 풀 데이터 로드 완료까지 대기
         yield return new WaitUntil(() => isCompleted);
-        
+
         // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
+        //StartCoroutine(poolerInitialize());
+
         Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
     }
 
+    // IEnumerator poolerInitialize()
+    // {
+    //     var initTask = _objectPoolerManager.InitializeAllPoolsAsync();
+    //     yield return new WaitUntil(() => initTask.IsCompleted);
+    //     if (initTask.IsFaulted)
+    //     {
+    //         Debug.LogError("ObjectPoolerManager 초기화 실패: " + initTask.Exception);
+    //     }
+    //     else
+    //     {
+    //         Debug.Log("ObjectPoolerManager 초기화 성공");
+    //     }
+    // }
 
+    // public async void asd()
+    // {
+    //     await _stageManager.InitializeAsync();
+    // }
 
 
     void Update()
@@ -110,7 +187,7 @@ public class Managers : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            AddressablesManager.Instance.InstantiateAsync("Character_01", (GameObject obj) =>
+            AddressableManager.InstantiateAsync("Character_01", (GameObject obj) =>
             {
                 Debug.Log($"{obj.name} 생성 완료");
             },
@@ -119,16 +196,12 @@ public class Managers : MonoBehaviour
                 Debug.Log("<color=red>생성 실패</color>");
             });
         }
-        // 방향에 따라 첫 번째 또는 두 번째 노드로 이동
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) // 왼쪽 화살표
+
+        if (Input.GetKeyDown(KeyCode.G))
         {
-            Stage.MoveToNextStage(-1);
+            _stageManager = new StageManager();
+            _stageManager.InitializeAsync();
         }
-        else if (Input.GetKeyDown(KeyCode.RightArrow)) // 오른쪽 화살표
-        {
-            Stage.MoveToNextStage(1);
-        }
-    
     } 
 
     public static void Clear()

@@ -34,6 +34,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
                 Managers.ObjectPooler.ReturnToPool(dummyEffect);
 
             // 강화 Dummy 이펙트 생성
+            //[ ]
             dummyEffect = Managers.ObjectPooler.SpawnFromPool(dummyEffectKeyUpgraded, controller.handTransform.position, controller.handTransform.rotation);
             dummyEffect.transform.SetParent(controller.handTransform);
             upgraded = true;
@@ -57,7 +58,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         Vector3 fireDir = controller.transform.forward;
 
         Quaternion arrowRotation = Quaternion.LookRotation(fireDir);
-
+        //[ ]
         GameObject arrowObj = Managers.ObjectPooler.SpawnFromPool(projectileToSpawn, firePoint, arrowRotation);
 
 
