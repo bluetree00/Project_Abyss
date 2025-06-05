@@ -32,22 +32,30 @@ public class StageManager
 
 
         // InitializeStages();
-        // SetInitialStage();        
+        // SetInitialStage();      
+        StageprepareAsync();  
     }
-
-    public void Stageprepare()
+     
+    public void StageprepareAsync()
     {
-        // 1. 첫 번째(시작) 노드만 미리 생성
         Node? startNode = stageGraph.Nodes.Find(node => node.Type == NodeType.Start);
+        Debug.LogWarning(startNode.Value.ToString());
+        Debug.LogWarning(GetStageAddress(startNode.Value));
         if (startNode.HasValue)
         {
-            //그래프의 첫 번째 노드에 해당하는 스테이지 오브젝트를 어드레서블로 로드하여 생성
-            GameObject stageObject = Managers.AddressableManager.InstantiateAsyncTask(GetStageAddress(startNode.Value)).Result;
-            stageObject.SetActive(false); // 초기에는 비활성화
+            //어드레서블을 사용해서 오브젝트를 로드
+            GameObject stageObject = Managers.AddressableManager.LoadAssetSync<GameObject>(GetStageAddress(startNode.Value));
+            if (stageObject == null)
+            {
+                Debug.LogError($"Stage prefab not found for node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
+                return;
+            }
+            stageObject = GameObject.Instantiate(stageObject);
+            stageObject.SetActive(false);
             nodeToStageMap[startNode.Value.Id] = stageObject;
             Debug.Log($"Preparing stage for start node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
-            currentNode = startNode; // 현재 노드를 시작 노드로 설정
-            ActivateStage(currentNode.Value); // 시작 노드의 스테이지 활성화
+            currentNode = startNode;
+            ActivateStage(currentNode.Value);
         }
         else
         {

@@ -58,7 +58,7 @@ public class MonsterController : MonoBehaviour
     {
         var tcs = new TaskCompletionSource<bool>();
         //[ ]
-        AddressableManager.Instance.LoadAsset<MonsterData>(key, data =>
+        Managers.AddressableManager.LoadAsset<MonsterData>(key, data =>
         {
             if (data == null)
             {

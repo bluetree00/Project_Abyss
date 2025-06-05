@@ -8,7 +8,7 @@ public static class ObjectPoolEffectInitializer
     {
         // AddressablesManager를 사용하여 Addressables로 풀 데이터를 로드합니다.
         //[ ]
-        AddressableManager.Instance.LoadAsset<EffectPoolData>(effectPoolDataName, effectPoolData =>
+        Managers.AddressableManager.LoadAsset<EffectPoolData>(effectPoolDataName, effectPoolData =>
         {
             if (effectPoolData == null)
             {

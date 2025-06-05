@@ -142,6 +142,7 @@ public class EvilMageMonster : MonsterController
         {
             Vector3 spawnPosition2 = new Vector3(transform.position.x, 1f, transform.position.z);
             Quaternion spawnRotation2 = Quaternion.identity;
+            //[ ]
             GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
             Debug.Log("Monster died, spawning die effect.");
             Destroy(gameObject);
@@ -150,6 +151,7 @@ public class EvilMageMonster : MonsterController
 
         Vector3 spawnPosition = new Vector3(transform.position.x, 1f, transform.position.z);
         Quaternion spawnRotation = Quaternion.identity;
+        //[ ]
         GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
         Debug.Log("Spawned hit effect.");
     }
@@ -165,8 +167,9 @@ public class EvilMageMonster : MonsterController
             Quaternion targetRotation = Quaternion.LookRotation(dir);
             Vector3 spawnPosition = transform.position + transform.forward * 2f + Vector3.up * 0.5f;
             Quaternion spawnRotation = targetRotation;
-            
+
             // 발사체(이펙트) 생성
+            //[ ]
             GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("Laser", spawnPosition, spawnRotation);
 
             // 코루틴을 통해 일정 시간(trackingDuration) 동안 발사체가 대상 방향으로 회전(추적)하도록 함.

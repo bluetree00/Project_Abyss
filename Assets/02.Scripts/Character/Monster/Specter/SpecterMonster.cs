@@ -114,6 +114,7 @@ public class SpecterMonster : MonsterController
         {
             Vector3 spawnPosition2 = new Vector3(transform.position.x, 1f, transform.position.z);
             Quaternion spawnRotation2 = Quaternion.identity;
+            // [ ]
             GameObject effectObject2 = Managers.ObjectPooler.SpawnFromPool("DieEffect_01", spawnPosition2, spawnRotation2);
             Debug.Log("Monster died, spawning die effect.");
             Destroy(gameObject);
@@ -122,6 +123,7 @@ public class SpecterMonster : MonsterController
 
         Vector3 spawnPosition = new Vector3(transform.position.x, 1f, transform.position.z);
         Quaternion spawnRotation = Quaternion.identity;
+        // [ ]
         GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("HitEffect_02", spawnPosition, spawnRotation);
         Debug.Log("Spawned hit effect.");
     }
@@ -137,6 +139,7 @@ public class SpecterMonster : MonsterController
             Quaternion targetRotation = Quaternion.LookRotation(dir);
             Vector3 spawnPosition = transform.position + transform.forward; // 몬스터 전방에서 발사
             Quaternion spawnRotation = targetRotation;
+            //[ ]
             GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("BloodShot", spawnPosition, spawnRotation);
 
             // Rigidbody가 있다면, 발사체에 속도 부여 (발사체 이동 처리)

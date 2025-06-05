@@ -82,6 +82,7 @@ public class OcrMonster : MonsterController
         if (hp <= 0)
         {
             Vector3 pos = new Vector3(transform.position.x, 1f, transform.position.z);
+            //[ ]
             Managers.ObjectPooler.SpawnFromPool("DieEffect_01", pos, Quaternion.identity);
             Destroy(gameObject);
             return;
@@ -89,6 +90,7 @@ public class OcrMonster : MonsterController
 
         Debug.Log($"Monster took {damage} damage. Current Health: {hp}");
         Vector3 hitPos = new Vector3(transform.position.x, 1f, transform.position.z);
+        //[ ]
         Managers.ObjectPooler.SpawnFromPool("HitEffect_02", hitPos, Quaternion.identity);
     }
 }
