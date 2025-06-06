@@ -251,12 +251,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac0b09e7857660247b1477e93731de29, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!4 &69086422 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 7806537232425094438, guid: ca652da6f7c041b45bd778278f551cb0,
-    type: 3}
-  m_PrefabInstance: {fileID: 1717884589}
-  m_PrefabAsset: {fileID: 0}
 --- !u!224 &239304350 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 4787284863261159481, guid: 705f00126b8864841a49f15692aae6ed,
@@ -1171,12 +1165,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1646083055}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!4 &813735898 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 307230810678793473, guid: ca652da6f7c041b45bd778278f551cb0,
-    type: 3}
-  m_PrefabInstance: {fileID: 1717884589}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1627,6 +1615,24 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
+--- !u!114 &902707823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 902707817}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9ca994562a3554419cc6d0285df26e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rb: {fileID: 0}
+  playerTransform: {fileID: 0}
+  detectionRange: 10
+  attackRange: 2
+  agent: {fileID: 0}
+  animator: {fileID: 0}
 --- !u!1001 &907720147
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2940,6 +2946,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 902707820}
+    - targetCorrespondingSourceObject: {fileID: 5122791751604650877, guid: de20f6e3cfd44e66afde228afe5bad43,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 902707823}
   m_SourcePrefab: {fileID: 100100000, guid: de20f6e3cfd44e66afde228afe5bad43, type: 3}
 --- !u!1 &1646083054
 GameObject:
@@ -2988,16 +2998,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 21090145654656543, guid: ca652da6f7c041b45bd778278f551cb0,
-        type: 3}
-      propertyPath: m_Name
-      value: Weapon_parentR
-      objectReference: {fileID: 0}
-    - target: {fileID: 3595655214979945547, guid: ca652da6f7c041b45bd778278f551cb0,
-        type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 3848504199153708277, guid: ca652da6f7c041b45bd778278f551cb0,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -3058,11 +3058,6 @@ PrefabInstance:
       propertyPath: handTransform
       value: 
       objectReference: {fileID: 0}
-    - target: {fileID: 4328729809646960608, guid: ca652da6f7c041b45bd778278f551cb0,
-        type: 3}
-      propertyPath: weaponTranform
-      value: 
-      objectReference: {fileID: 69086422}
     - target: {fileID: 5927879569963914574, guid: ca652da6f7c041b45bd778278f551cb0,
         type: 3}
       propertyPath: m_Mass
@@ -3073,52 +3068,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Character_01
       objectReference: {fileID: 0}
-    - target: {fileID: 6012832463454176742, guid: ca652da6f7c041b45bd778278f551cb0,
-        type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects:
-    - {fileID: 3595655214979945547, guid: ca652da6f7c041b45bd778278f551cb0, type: 3}
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 307230810678793473, guid: ca652da6f7c041b45bd778278f551cb0,
-        type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1776522626}
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ca652da6f7c041b45bd778278f551cb0, type: 3}
---- !u!1 &1776522625
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1776522626}
-  m_Layer: 0
-  m_Name: WeaponSocket
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1776522626
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1776522625}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 813735898}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1851247647
 GameObject:
   m_ObjectHideFlags: 0
