@@ -1,22 +1,24 @@
-using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
+using System.Threading.Tasks;
 
 public class BatFSMController : MonsterController
 {
-    protected Dictionary<MonsterState, IMonsterState> fsmStates;
-    protected MonsterState currentStateKey;
-    protected IMonsterState currentState;
+    private Dictionary<MonsterState, IMonsterState> fsmStates;
+    private MonsterState currentStateKey;
+    private IMonsterState currentState;
+
+    public System.Action<MonsterState> RequestStateChange;
 
     protected override async Task InitAsync()
     {
+        RequestStateChange = ChangeState;
         await base.InitAsync();
         InitializeFSM();
         ChangeState(MonsterState.Idle);
     }
 
-    protected virtual void InitializeFSM()
+    private void InitializeFSM()
     {
         fsmStates = new Dictionary<MonsterState, IMonsterState>
         {
@@ -29,13 +31,14 @@ public class BatFSMController : MonsterController
 
         foreach (var state in fsmStates.Values)
         {
-            state.Init(this);
+            state.Init(this, RequestStateChange);
         }
     }
 
     private void ChangeState(MonsterState newState)
     {
-        currentState?.Exit();
+        if (currentState != null)
+            currentState.Exit();
 
         currentStateKey = newState;
         currentState = fsmStates[newState];
@@ -53,9 +56,9 @@ public class BatFSMController : MonsterController
         }
     }
 
-    protected override void Update()
-    {
-        base.Update();
-        HandleAI();
-    }
+    // protected override void Update()
+    // {
+    //     base.Update();
+    //     HandleAI();
+    // }
 }

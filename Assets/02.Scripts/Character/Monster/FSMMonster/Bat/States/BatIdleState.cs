@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,6 +18,11 @@ public class BatIdleState : IMonsterState
     public void Init(MonsterController controller)
     {
         throw new System.NotImplementedException();
+    }
+
+    public void Init(MonsterController controller, Action<MonsterController.MonsterState> onStateChange)
+    {
+        throw new NotImplementedException();
     }
 
     // Start is called before the first frame update
