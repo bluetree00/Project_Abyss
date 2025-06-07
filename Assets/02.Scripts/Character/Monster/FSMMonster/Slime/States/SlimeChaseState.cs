@@ -33,5 +33,10 @@ public class SlimeChaseState : IMonsterState
     }
 
     public void Exit() { }
+
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        throw new System.NotImplementedException();
+    }
 }
 

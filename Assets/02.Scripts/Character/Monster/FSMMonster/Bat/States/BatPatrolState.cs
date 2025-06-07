@@ -19,6 +19,11 @@ public class BatPatrolState : IMonsterState
         throw new System.NotImplementedException();
     }
 
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        throw new System.NotImplementedException();
+    }
+
     MonsterController.MonsterState IMonsterState.Update()
     {
         throw new System.NotImplementedException();
