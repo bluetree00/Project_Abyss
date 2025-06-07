@@ -85,10 +85,12 @@ public class PlayerCharacter : CharacterBase
         InitInputActions();
         InitAbilities();
         InitWeaponManager();
+        
     }
 
     private void InitCoreComponents()
     {
+        Managers.Player.RegisterPlayer(this.transform); // 플레이어 매니저에 현재 플레이어 등록
 
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)

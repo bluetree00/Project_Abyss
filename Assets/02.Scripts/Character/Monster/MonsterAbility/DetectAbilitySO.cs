@@ -2,17 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DetectAbilitySO : MonoBehaviour
+// ScriptableObject
+public class DetectAbilitySO : MonsterAbilitySO
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    public float range;
 
-    // Update is called once per frame
-    void Update()
+    public override IMonsterAbility CreateAbilityInstance()
     {
-        
+        return new DetectAbility(range);
     }
 }

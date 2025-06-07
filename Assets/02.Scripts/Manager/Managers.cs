@@ -50,6 +50,10 @@ public class Managers : MonoBehaviour
 
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
+
+    private PlayerManager _playerManager = new PlayerManager();
+    public static PlayerManager Player => Instance._playerManager;
+
     #endregion
 
     void Awake()
