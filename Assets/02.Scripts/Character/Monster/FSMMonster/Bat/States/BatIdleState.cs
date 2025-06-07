@@ -1,28 +1,59 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class BatIdleState : IMonsterState
 {
+    private MonsterController controller;
+    private IMonsterStateChanger stateChanger;
+
+    private float idleDuration = 3f; // Idle 유지 시간
+    private float elapsedTime;
+
+    private IMonsterAbility detectAbility;
+
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        this.controller = controller;
+        this.stateChanger = stateChanger;
+
+        // 탐지 어빌리티 가져오기
+        var abilitySet = controller.AbilitySet; // MonsterController에 AbilitySet이 public/protected 여야 함
+        detectAbility = abilitySet.GetAbility<IMonsterAbility>(Define.AbilityType.Detect);
+    }
+
     public void Enter()
     {
-       
+        elapsedTime = 0f;
+
+        // Idle 애니메이션 재생 (Blend Tree)
+         controller.animator.Play("Idle");
     }
 
     public void Exit()
     {
-        throw new System.NotImplementedException();
+        // 필요 시 정리 작업
     }
 
-    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    public MonsterController.MonsterState Update()
     {
-        throw new NotImplementedException();
-    }
+        elapsedTime += Time.deltaTime;
 
+        // 탐지 어빌리티 실행 (플레이어 발견 시 Chase 상태로 전환)
+        detectAbility?.Execute();
 
-    MonsterController.MonsterState IMonsterState.Update()
-    {
-        throw new System.NotImplementedException();
+        if (controller.HasDetectedTarget) // 탐지 성공하면 상태 변경
+        {
+            stateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
+            return MonsterController.MonsterState.Chase;
+        }
+
+        // 일정 시간이 지나면 Patrol 상태로 전환
+        if (elapsedTime >= idleDuration)
+        {
+            stateChanger.RequestStateChange(MonsterController.MonsterState.Patrol);
+            return MonsterController.MonsterState.Patrol;
+        }
+
+        return MonsterController.MonsterState.Idle;
     }
 }

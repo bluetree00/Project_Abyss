@@ -13,6 +13,16 @@ public abstract class MonsterController : CharacterBase
         Die
     }
 
+    public MonsterAbilitySetSO AbilitySet { get; private set; }
+
+    public bool HasDetectedTarget { get; private set; }
+
+    public void SetDetected(bool detected)
+    {
+        HasDetectedTarget = detected;
+    }
+
+
     public float detectionRange = 10f;
     public float attackRange = 2f;
     public NavMeshAgent agent;
@@ -24,6 +34,26 @@ public abstract class MonsterController : CharacterBase
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
     }
+
+    public void MoveTo(Vector3 destination)
+    {
+        if (agent != null && agent.isActiveAndEnabled)
+        {
+            agent.SetDestination(destination);
+            animator?.SetBool("isMoving", true); // 필요시 애니메이션 제어
+        }
+    }
+
+    public void StopMoving()
+    {
+        if (agent != null && agent.isActiveAndEnabled)
+        {
+            agent.ResetPath();
+            animator?.SetBool("isMoving", false); // 정지 애니메이션
+        }
+    }
+
+
 
     public abstract void HandleAI();
 }
