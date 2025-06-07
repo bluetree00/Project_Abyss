@@ -133,6 +133,17 @@ public class Define
         }
     }
 
+    public enum AbilityType
+    {
+        Detect,
+        Attack,
+        Die,
+        Patrol,
+        SkillQ,
+        SkillE,
+        // ...
+    }
+
 
 
 

@@ -9,6 +9,8 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     private MonsterState currentStateKey;
     private IMonsterState currentState;
 
+    private MonsterAbilitySetSO monsterAbilitySet;
+
     protected override async Task InitAsync()
     {
         await base.InitAsync();
