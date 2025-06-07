@@ -7,7 +7,7 @@ public class BatIdleState : IMonsterState
 {
     public void Enter()
     {
-        throw new System.NotImplementedException();
+       
     }
 
     public void Exit()
@@ -15,32 +15,11 @@ public class BatIdleState : IMonsterState
         throw new System.NotImplementedException();
     }
 
-    public void Init(MonsterController controller)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void Init(MonsterController controller, Action<MonsterController.MonsterState> onStateChange)
-    {
-        throw new NotImplementedException();
-    }
-
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
         throw new NotImplementedException();
     }
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
 
     MonsterController.MonsterState IMonsterState.Update()
     {
