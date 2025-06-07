@@ -19,6 +19,11 @@ public class BatDieState : IMonsterState
         throw new System.NotImplementedException();
     }
 
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        throw new System.NotImplementedException();
+    }
+
     // Start is called before the first frame update
     void Start()
     {

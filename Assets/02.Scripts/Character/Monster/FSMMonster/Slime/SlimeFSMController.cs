@@ -29,7 +29,7 @@ public class SlimeFSMController : MonsterController
 
         foreach (var state in fsmStates.Values)
         {
-            state.Init(this);
+            //state.Init(this);
         }
     }
 
@@ -54,9 +54,5 @@ public class SlimeFSMController : MonsterController
         }
     }
 
-    protected override void Update()
-    {
-        base.Update();
-        HandleAI();
-    }
+   
 }

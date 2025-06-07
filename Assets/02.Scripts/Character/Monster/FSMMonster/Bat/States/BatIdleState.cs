@@ -25,6 +25,11 @@ public class BatIdleState : IMonsterState
         throw new NotImplementedException();
     }
 
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        throw new NotImplementedException();
+    }
+
     // Start is called before the first frame update
     void Start()
     {
