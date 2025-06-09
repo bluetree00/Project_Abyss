@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
+[CreateAssetMenu(fileName = "NewPlayerDodgeAbility", menuName = "Abilities/Player/DodgeAbility")]
 public class DefaultDodgeAbility : IDodgeAbility<PlayerCharacter>
 {
     private bool isDodging = false;
@@ -26,7 +27,7 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerCharacter>
             : controller.transform.forward;
 
         float startTime = Time.time;
-        
+
         controller.GotoDodgeState();
 
         while (Time.time < startTime + dashDuration)

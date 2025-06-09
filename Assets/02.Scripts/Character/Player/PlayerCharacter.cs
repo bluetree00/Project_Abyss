@@ -43,6 +43,7 @@ public class PlayerCharacter : CharacterBase
     //============================================================
     // 🎮 캐릭터 능력 모듈
     //============================================================
+    
     public IMoveAbility<PlayerCharacter> MoveAbility { get; protected set; }
     public IDodgeAbility<PlayerCharacter> DodgeAbility { get; protected set; }
     public ILightAttackAbility<PlayerCharacter> LightAttackAbility { get; protected set; }

@@ -1,14 +1,20 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-// ScriptableObject
+[CreateAssetMenu(menuName = "Monster/Abilities/Detect")]
 public class DetectAbilitySO : MonsterAbilitySO
 {
-    public float range;
+    
+    [SerializeField] private float range;
+
+    public void SetRange(float r)
+    {
+        range = r;
+    }
 
     public override IMonsterAbility CreateAbilityInstance()
     {
         return new DetectAbility(range);
     }
+
+
 }
