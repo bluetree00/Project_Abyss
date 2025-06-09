@@ -2,22 +2,9 @@ using UnityEngine;
 
 public abstract class MonsterAbilitySO : ScriptableObject
 {
-    [SerializeField, HideInInspector]
-    private Define.MonsterAbilityType type;
 
-    public Define.MonsterAbilityType Type => type;  // public 읽기 전용 프로퍼티
+    public abstract Define.MonsterAbilityType MonsterAbilityType { get; }
 
-    public void SetType(Define.MonsterAbilityType newType)
-    {
-        if (type == Define.MonsterAbilityType.None)
-        {
-            type = newType;
-        }
-        else
-        {
-            Debug.LogWarning("Ability type is already set and cannot be changed.");
-        }
-    }
-
+    // 능력 인스턴스 생성 추상 메서드
     public abstract IMonsterAbility CreateAbilityInstance();
 }

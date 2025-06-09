@@ -16,7 +16,7 @@ public class MonsterAbilitySetSO : ScriptableObject
         {
             var ability = abilitySO.CreateAbilityInstance();
             ability.Init(controller);
-            runtimeAbilities.Add(abilitySO.Type, ability);
+            runtimeAbilities.Add(abilitySO.MonsterAbilityType, ability);
         }
     }
 

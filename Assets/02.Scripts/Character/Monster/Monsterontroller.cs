@@ -13,6 +13,8 @@ public abstract class MonsterController : CharacterBase
         Die
     }
 
+    [SerializeField] private MonsterAbilitySetSO abilitySetSO;
+
     public MonsterAbilitySetSO AbilitySet { get; private set; }
 
     public bool HasDetectedTarget { get; private set; }
@@ -21,7 +23,6 @@ public abstract class MonsterController : CharacterBase
     {
         HasDetectedTarget = detected;
     }
-
 
     public float detectionRange = 10f;
     public float attackRange = 2f;
@@ -33,6 +34,10 @@ public abstract class MonsterController : CharacterBase
         await base.InitAsync();
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
+
+        
+        AbilitySet = Instantiate(abilitySetSO); // 또는 abilitySetSO 사용
+        AbilitySet.InitAbilities(this);
     }
 
     public void MoveTo(Vector3 destination)

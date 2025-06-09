@@ -13,5 +13,4 @@ MonoBehaviour:
   m_Name: NormalBat
   m_EditorClassIdentifier: 
   abilityList:
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 11400000, guid: 4e48b410d1353a24ba6d587de917e58c, type: 2}
