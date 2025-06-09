@@ -14,8 +14,7 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     // 현재 활성화된 상태 인스턴스
     private IMonsterState currentState;
 
-    // 몬스터가 가진 어빌리티 집합 SO (현재 선언만 되어 있음, 필요 시 초기화 및 사용)
-    public MonsterAbilitySetSO monsterAbilitySet;
+
 
     // 비동기 초기화 메서드, 부모 초기화 후 FSM 초기화 및 초기 상태 지정
     protected override async Task InitAsync()
@@ -23,9 +22,6 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
         await base.InitAsync();    // 부모 클래스 초기화 수행
         InitializeFSM();           // FSM 상태들을 등록하고 초기화
         RequestStateChange(MonsterState.Idle); // 초기 상태를 Idle로 설정
-
-        if (monsterAbilitySet != null)
-            monsterAbilitySet.InitAbilities(this);
     }
 
     // FSM 상태별 인스턴스를 생성 및 등록하는 메서드

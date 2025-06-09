@@ -3,8 +3,9 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Monster/Abilities/Detect")]
 public class DetectAbilitySO : MonsterAbilitySO
 {
-    
     [SerializeField] private float range;
+
+     public override Define.MonsterAbilityType MonsterAbilityType => Define.MonsterAbilityType.Detect;
 
     public void SetRange(float r)
     {
@@ -15,6 +16,4 @@ public class DetectAbilitySO : MonsterAbilitySO
     {
         return new DetectAbility(range);
     }
-
-
 }
