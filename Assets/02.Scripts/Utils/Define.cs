@@ -116,32 +116,25 @@ public class Define
 
     }
 
-    public static class WeaponTypeStrings
+    public enum MonsterAbilityType
     {
-        public static readonly Dictionary<WeaponType, string> WeaponTypeMap = new Dictionary<WeaponType, string>
-        {
-            { WeaponType.Sword, "Sword" },
-            { WeaponType.Bow, "Bow" },
-            { WeaponType.Staff, "Staff" },
-            { WeaponType.Dagger, "Dagger" },
-            { WeaponType.Axe, "Axe" }
-        };
-
-        public static string GetWeaponTypeString(WeaponType weaponType)
-        {
-            return WeaponTypeMap[weaponType];
-        }
-    }
-
-    public enum AbilityType
-    {
+        None, // 기본값
         Detect,
         Attack,
+        Dash,
+        Fireball,
         Die,
         Patrol,
         SkillQ,
         SkillE,
+
         // ...
+    }
+
+    public enum PlayerAbilityType
+    {
+        Dodge,
+        Attack,
     }
 
 

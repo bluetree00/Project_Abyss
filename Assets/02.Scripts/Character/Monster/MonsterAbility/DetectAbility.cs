@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DetectAbility : IMonsterAbility
 {
-    public Define.AbilityType Type => Define.AbilityType.Detect;  // 이 어빌리티의 타입을 명시
+    public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Detect;  // 이 어빌리티의 타입을 명시
 
     private float range;
     private MonsterController owner;

@@ -6,7 +6,7 @@ public class MonsterAbilitySetSO : ScriptableObject
 {
     [SerializeField] private List<MonsterAbilitySO> abilityList;
 
-    private Dictionary<Define.AbilityType, IMonsterAbility> runtimeAbilities = new();
+    private Dictionary<Define.MonsterAbilityType, IMonsterAbility> runtimeAbilities = new();
 
     public void InitAbilities(MonsterController controller)
     {
@@ -16,11 +16,11 @@ public class MonsterAbilitySetSO : ScriptableObject
         {
             var ability = abilitySO.CreateAbilityInstance();
             ability.Init(controller);
-            runtimeAbilities.Add(abilitySO.type, ability);
+            runtimeAbilities.Add(abilitySO.Type, ability);
         }
     }
 
-    public T GetAbility<T>(Define.AbilityType type) where T : class, IMonsterAbility
+    public T GetAbility<T>(Define.MonsterAbilityType type) where T : class, IMonsterAbility
     {
         if (runtimeAbilities.TryGetValue(type, out var ability))
             return ability as T;
@@ -28,7 +28,7 @@ public class MonsterAbilitySetSO : ScriptableObject
         return null;
     }
 
-    public bool HasAbility(Define.AbilityType type)
+    public bool HasAbility(Define.MonsterAbilityType type)
     {
         return runtimeAbilities.ContainsKey(type);
     }

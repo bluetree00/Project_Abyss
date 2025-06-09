@@ -18,7 +18,7 @@ public class BatIdleState : IMonsterState
 
         // 탐지 어빌리티 가져오기
         var abilitySet = controller.AbilitySet; // MonsterController에 AbilitySet이 public/protected 여야 함
-        detectAbility = abilitySet.GetAbility<IMonsterAbility>(Define.AbilityType.Detect);
+        detectAbility = abilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Detect);
     }
 
     public void Enter()
