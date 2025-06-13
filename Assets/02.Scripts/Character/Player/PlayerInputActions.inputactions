@@ -130,6 +130,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "testKey",
+                    "type": "Button",
+                    "id": "fd941fcb-8e5d-4ff4-99a6-706a9e2c533b",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "testKey2",
+                    "type": "Button",
+                    "id": "7f71ffa7-6801-4f5f-aee6-896532f2aa29",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -328,6 +346,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "CloseInventory",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "208c14a9-13a6-46c5-ab1b-c824e416f1fe",
+                    "path": "<Keyboard>/leftArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "testKey",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "80c37f88-4bea-4225-b833-07e25d7f12a3",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "testKey2",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
