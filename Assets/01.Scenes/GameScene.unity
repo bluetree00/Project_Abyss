@@ -1531,7 +1531,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 901022453}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.04377365, y: 0.24978141, z: 0.10345331, w: 0.9617643}
+  m_LocalRotation: {x: -0.043773666, y: 0.2497814, z: 0.1034533, w: 0.9617643}
   m_LocalPosition: {x: -1, y: -0.00000002602868, z: 0.00000006277301}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2860,6 +2860,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: NormalBatFSM
+      objectReference: {fileID: 0}
+    - target: {fileID: 5122791751604650877, guid: de20f6e3cfd44e66afde228afe5bad43,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5122791751604887389, guid: de20f6e3cfd44e66afde228afe5bad43,
         type: 3}

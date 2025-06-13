@@ -47,4 +47,9 @@ public class DefaultBowLightAttackAbility : LightAttackAbilitySO
         controller.CharacterData.attackComboStep++;
         Debug.Log($"Combo Step: {controller.CharacterData.attackComboStep}");
     }
+
+    public override void SpawnEffect(PlayerCharacter controller, Vector3 forwardOffset, Vector3? additionalRotation = null)
+    {
+        throw new System.NotImplementedException();
+    }
 }
