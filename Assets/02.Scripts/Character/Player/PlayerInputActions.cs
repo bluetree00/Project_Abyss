@@ -152,6 +152,24 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""testKey"",
+                    ""type"": ""Button"",
+                    ""id"": ""fd941fcb-8e5d-4ff4-99a6-706a9e2c533b"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""testKey2"",
+                    ""type"": ""Button"",
+                    ""id"": ""7f71ffa7-6801-4f5f-aee6-896532f2aa29"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -352,6 +370,28 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""CloseInventory"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""208c14a9-13a6-46c5-ab1b-c824e416f1fe"",
+                    ""path"": ""<Keyboard>/leftArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""testKey"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""80c37f88-4bea-4225-b833-07e25d7f12a3"",
+                    ""path"": ""<Keyboard>/rightArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""testKey2"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -374,6 +414,8 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_ChangeWeapon2 = m_Player.FindAction("ChangeWeapon2", throwIfNotFound: true);
         m_Player_Run = m_Player.FindAction("Run", throwIfNotFound: true);
         m_Player_CloseInventory = m_Player.FindAction("CloseInventory", throwIfNotFound: true);
+        m_Player_testKey = m_Player.FindAction("testKey", throwIfNotFound: true);
+        m_Player_testKey2 = m_Player.FindAction("testKey2", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -449,6 +491,8 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_ChangeWeapon2;
     private readonly InputAction m_Player_Run;
     private readonly InputAction m_Player_CloseInventory;
+    private readonly InputAction m_Player_testKey;
+    private readonly InputAction m_Player_testKey2;
     public struct PlayerActions
     {
         private @PlayerInputActions m_Wrapper;
@@ -467,6 +511,8 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         public InputAction @ChangeWeapon2 => m_Wrapper.m_Player_ChangeWeapon2;
         public InputAction @Run => m_Wrapper.m_Player_Run;
         public InputAction @CloseInventory => m_Wrapper.m_Player_CloseInventory;
+        public InputAction @testKey => m_Wrapper.m_Player_testKey;
+        public InputAction @testKey2 => m_Wrapper.m_Player_testKey2;
         public InputActionMap Get() { return m_Wrapper.m_Player; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -518,6 +564,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @CloseInventory.started += instance.OnCloseInventory;
             @CloseInventory.performed += instance.OnCloseInventory;
             @CloseInventory.canceled += instance.OnCloseInventory;
+            @testKey.started += instance.OnTestKey;
+            @testKey.performed += instance.OnTestKey;
+            @testKey.canceled += instance.OnTestKey;
+            @testKey2.started += instance.OnTestKey2;
+            @testKey2.performed += instance.OnTestKey2;
+            @testKey2.canceled += instance.OnTestKey2;
         }
 
         private void UnregisterCallbacks(IPlayerActions instance)
@@ -564,6 +616,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @CloseInventory.started -= instance.OnCloseInventory;
             @CloseInventory.performed -= instance.OnCloseInventory;
             @CloseInventory.canceled -= instance.OnCloseInventory;
+            @testKey.started -= instance.OnTestKey;
+            @testKey.performed -= instance.OnTestKey;
+            @testKey.canceled -= instance.OnTestKey;
+            @testKey2.started -= instance.OnTestKey2;
+            @testKey2.performed -= instance.OnTestKey2;
+            @testKey2.canceled -= instance.OnTestKey2;
         }
 
         public void RemoveCallbacks(IPlayerActions instance)
@@ -597,5 +655,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         void OnChangeWeapon2(InputAction.CallbackContext context);
         void OnRun(InputAction.CallbackContext context);
         void OnCloseInventory(InputAction.CallbackContext context);
+        void OnTestKey(InputAction.CallbackContext context);
+        void OnTestKey2(InputAction.CallbackContext context);
     }
 }
