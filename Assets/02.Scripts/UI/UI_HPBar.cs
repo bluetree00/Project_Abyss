@@ -20,8 +20,8 @@ public class UI_HPBar : UI_Base
         transform.position = parent.position + Vector3.up * (parent.GetComponent<Collider>().bounds.size.y); // 콜라이더 위에 위치시켜 오브젝트들의 높이,키 대응
         transform.rotation = Camera.main.transform.rotation; // 카메라에 rotation에 체력 게이지의 rotation을 맞춰줌
 
-        float ratio = monster.CurrentHp / monster.MaximumHp; // 체력 게이지 적용
-        SetHpRatio(ratio);
+    //    float ratio = monster.CurrentHp / monster.MaximumHp; // 체력 게이지 적용
+    //    SetHpRatio(ratio);
     }
 
     public void SetHpRatio(float ratio)

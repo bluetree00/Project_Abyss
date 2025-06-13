@@ -9,7 +9,7 @@ public class WeaponPickup : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            var player = other.GetComponent<CharacterController>();
+            var player = other.GetComponent<PlayerCharacter>();
             if (player != null)
             {
                 // 습득 성공 여부를 받아서 처리

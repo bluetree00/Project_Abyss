@@ -116,21 +116,25 @@ public class Define
 
     }
 
-    public static class WeaponTypeStrings
+    public enum MonsterAbilityType
     {
-        public static readonly Dictionary<WeaponType, string> WeaponTypeMap = new Dictionary<WeaponType, string>
-        {
-            { WeaponType.Sword, "Sword" },
-            { WeaponType.Bow, "Bow" },
-            { WeaponType.Staff, "Staff" },
-            { WeaponType.Dagger, "Dagger" },
-            { WeaponType.Axe, "Axe" }
-        };
+        None, // 기본값
+        Detect,
+        Attack,
+        Dash,
+        Fireball,
+        Die,
+        Patrol,
+        SkillQ,
+        SkillE,
 
-        public static string GetWeaponTypeString(WeaponType weaponType)
-        {
-            return WeaponTypeMap[weaponType];
-        }
+        // ...
+    }
+
+    public enum PlayerAbilityType
+    {
+        Dodge,
+        Attack,
     }
 
 
@@ -218,6 +222,8 @@ public class Define
         Slime,
         Specter
     }
+
+    
 
     // 그리드 형태를 정의하는 배열들
     public static readonly int[,] AppleShape = new int[10, 10]

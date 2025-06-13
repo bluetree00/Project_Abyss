@@ -7,7 +7,7 @@ public class DefaultBowLightAttackAbility : LightAttackAbilitySO
 {
     public string arrowPoolKey = "Basic_Arrow_01"; // ObjectPooler에서 사용할 키 추후 어떤 화살을 사용할지는 외부에서 결정후 그 변수를 사용.
 
-    public override void LightAttack(CharacterController controller)
+    public override void LightAttack(PlayerCharacter controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {
@@ -46,5 +46,10 @@ public class DefaultBowLightAttackAbility : LightAttackAbilitySO
 
         controller.CharacterData.attackComboStep++;
         Debug.Log($"Combo Step: {controller.CharacterData.attackComboStep}");
+    }
+
+    public override void SpawnEffect(PlayerCharacter controller, Vector3 forwardOffset, Vector3? additionalRotation = null)
+    {
+        throw new System.NotImplementedException();
     }
 }
