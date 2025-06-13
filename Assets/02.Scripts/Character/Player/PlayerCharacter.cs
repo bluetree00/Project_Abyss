@@ -96,6 +96,7 @@ public class PlayerCharacter : CharacterBase
         InitAbilities();
         InitWeaponManager();
         SetupCamera();
+        
         if (inputReady) BindInputActions();
     }
 
@@ -289,6 +290,7 @@ public class PlayerCharacter : CharacterBase
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
+
 
         MoveAbility?.Move(this, moveDirection);
         CheckHeavyAttackChargingState();
