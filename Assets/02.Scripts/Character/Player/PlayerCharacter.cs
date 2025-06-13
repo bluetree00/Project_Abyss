@@ -96,6 +96,7 @@ public class PlayerCharacter : CharacterBase
         InitAbilities();
         InitWeaponManager();
         SetupCamera();
+        
         if (inputReady) BindInputActions();
     }
 
@@ -130,7 +131,7 @@ public class PlayerCharacter : CharacterBase
     private async Task LoadCharacterDataAsync(string characterName)
     {
         var tcs = new TaskCompletionSource<bool>();
-        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, data =>
+        Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
             {
@@ -289,6 +290,7 @@ public class PlayerCharacter : CharacterBase
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
+
 
         MoveAbility?.Move(this, moveDirection);
         CheckHeavyAttackChargingState();
