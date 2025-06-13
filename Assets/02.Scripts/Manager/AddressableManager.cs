@@ -13,37 +13,66 @@ public class LoadedAsset
     public AsyncOperationHandle handle;
 }
 
-public class AddressablesManager : MonoBehaviour
+public class AddressableManager
 {
-    private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
-    [SerializeField]
-    private List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
-    private static AddressablesManager _instance;
-    public static AddressablesManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                GameObject go = new GameObject("AddressablesManager");
-                _instance = go.AddComponent<AddressablesManager>();
-                DontDestroyOnLoad(go);
-            }
-            return _instance;
-        }
-    }
+    // public static AddressableManager Instance { get; private set; }
 
-    
+    // private void Awake()
+    // {
+    //     if (Instance != null && Instance != this)
+    //     {
+    //         Destroy(gameObject);
+    //         return;
+    //     }
+    //     Instance = this;
+    //     DontDestroyOnLoad(gameObject);
+    // }
+
+    private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
+    public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
+
+    private Task _initTask;
+    public Task InitTask => _initTask;
+
+    private bool _isInitialized = false;
+    private bool _initFailed = false;
+
+
 
     private void Start()
     {
-        StartCoroutine(InitAddressables());
+        //StartCoroutine(InitAddressables());
+        //_initTask = InitAddressablesCoroutine();
     }
 
-    IEnumerator InitAddressables()
+    // IEnumerator InitAddressables()
+    // {
+    //     var Init = Addressables.InitializeAsync();
+    //     yield return Init;
+    // }
+
+    private async Task InitAddressablesCoroutine()
     {
-        var Init = Addressables.InitializeAsync();
-        yield return Init;
+        try
+        {
+            var init = Addressables.InitializeAsync();
+            await init.Task;
+            if (init.Status == AsyncOperationStatus.Succeeded)
+            {
+                _isInitialized = true;
+                Debug.Log("Addressables 초기화 성공");
+            }
+            else
+            {
+                Debug.LogError("Addressables 초기화 실패");
+                _initFailed = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Addressables 초기화 중 예외 발생: {ex}");
+            _initFailed = true;
+        }
     }
 
     private void UpdateLoadedAssetsList()
@@ -78,6 +107,29 @@ public class AddressablesManager : MonoBehaviour
         return handle.Result;
     }
 
+    /// <summary>
+    /// 어드레서블 시스템으로 데이터를 비동기적으로 로드하는 함수
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="key"></param>
+    /// <returns></returns>
+    public async Task<T> LoadAssetAsyncTask<T>(string key) where T : UnityEngine.Object
+    {
+        var handle = Addressables.LoadAssetAsync<T>(key);
+        await handle.Task;
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+        {
+            loadedAssets[key] = handle;
+            UpdateLoadedAssetsList();
+            return handle.Result;
+        }
+        else
+        {
+            Debug.LogError($"Failed to load asset: {key}");
+            return null;
+        }
+    }
+
 
     /// <summary>
     /// 어드레서블 시스템으로 프리팹을 생성하는 함수
@@ -91,6 +143,28 @@ public class AddressablesManager : MonoBehaviour
         {
             HandleCompletion(handle, key, onSuccess, onFailure);
         };
+    }
+
+    /// <summary>
+    /// 어드레서블 시스템으로 프리팹을 생성하는 비동기 함수
+    /// </summary>
+    /// <param name="key"></param>
+    public async Task<GameObject> InstantiateAsyncTask(string key)
+    {
+        try
+        {
+            var handle = Addressables.InstantiateAsync(key);
+            await handle.Task;
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+                return handle.Result;
+            Debug.LogError($"Failed to instantiate: {key}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception during Addressables instantiate: {key} - {ex}");
+            return null;
+        }
     }
 
     private void HandleCompletion<T>(AsyncOperationHandle<T> handle, string key, Action<T> onSuccess, Action onFailure = null) where T : UnityEngine.Object

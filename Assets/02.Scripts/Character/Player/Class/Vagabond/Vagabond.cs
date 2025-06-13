@@ -207,8 +207,6 @@ public class Vagabond : PlayerCharacter
         Vector2 input = inputActions.Player.Move.ReadValue<Vector2>();
         Vector3 forward = cinemachineCamera.transform.forward;
         Vector3 right = cinemachineCamera.transform.right;
-
-        // 수평 방향으로만 이동하도록 y축 성분 0으로 설정
         forward.y = right.y = 0;
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
@@ -230,6 +228,8 @@ public class Vagabond : PlayerCharacter
     /// </summary>
     protected override void Update()
     {
+        if (!inputReady || characterData == null || cinemachineCamera == null) return;
+        
         base.Update();
 
         CheckMovementInput();

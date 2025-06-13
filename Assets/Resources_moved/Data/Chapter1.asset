@@ -12,3 +12,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 76fb99c7fc95ef84c84c3f3b3b247d86, type: 3}
   m_Name: Chapter1
   m_EditorClassIdentifier: 
+  chapters:
+  - chapterName: 0
+    layerSizes: 01000000020000000300000004000000030000000200000001000000
+    stages:
+    - stageName: 0
+      weight: 0
+      randomWeight: 0
+    - stageName: 1
+      weight: 0
+      randomWeight: 0
+    - stageName: 2
+      weight: 0
+      randomWeight: 0
+    - stageName: 3
+      weight: 0
+      randomWeight: 0
+    - stageName: 4
+      weight: 0
+      randomWeight: 0
+    - stageName: 5
+      weight: 0
+      randomWeight: 0
+    - stageName: 6
+      weight: 0
+      randomWeight: 0
+    - stageName: 7
+      weight: 0
+      randomWeight: 0
+    - stageName: 8
+      weight: 0
+      randomWeight: 0
+    - stageName: 9
+      weight: 0
+      randomWeight: 0
+    bossStageName: 
