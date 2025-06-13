@@ -44,7 +44,7 @@ public class WeaponManagerSO : ScriptableObject
         if (!IsValidSlot(slotIndex) || newWeapon == null) return;
 
           // 🔸 무기 능력 초기화
-        var controller = weaponHandTransform.GetComponentInParent<CharacterController>();
+        var controller = weaponHandTransform.GetComponentInParent<PlayerCharacter>();
         controller?.ClearWeaponAbilities();
 
         // 기존 장착 무기 비활성화
@@ -77,7 +77,7 @@ public class WeaponManagerSO : ScriptableObject
         if (!IsValidSlot(slotIndex) || weaponSlots[slotIndex] == null) return;
 
             // 🔸 무기 능력 초기화
-        var controller = weaponHandTransform.GetComponentInParent<CharacterController>();
+        var controller = weaponHandTransform.GetComponentInParent<PlayerCharacter>();
         controller?.ClearWeaponAbilities();
 
         // 기존 무기 비활성화

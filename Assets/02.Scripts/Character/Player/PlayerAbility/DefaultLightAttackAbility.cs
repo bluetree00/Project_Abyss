@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Weapon/Abilities/SwordLightAttack")]
-public class DefaultLightAttackAbility : LightAttackAbilitySO 
+public class DefaultLightAttackAbility : LightAttackAbilitySO
 {
-    public override void LightAttack(CharacterController controller)
+    public override void LightAttack(PlayerCharacter controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {
@@ -28,4 +28,31 @@ public class DefaultLightAttackAbility : LightAttackAbilitySO
         controller.CharacterData.attackComboStep++;
         Debug.Log($"Combo Step: {controller.CharacterData.attackComboStep}");
     }
+    
+    public override void SpawnEffect(PlayerCharacter controller, Vector3 forwardOffset, Vector3? additionalRotation = null)
+    {
+        if (Managers.ObjectPooler == null)
+        {
+            Debug.LogError("ObjectPoolerManager is not initialized.");
+            return;
+        }
+
+        Vector3 spawnPosition = controller.transform.position + controller.transform.TransformDirection(forwardOffset);
+        Quaternion spawnRotation = controller.transform.rotation;
+
+        if (additionalRotation.HasValue)
+            spawnRotation *= Quaternion.Euler(additionalRotation.Value);
+
+        GameObject effectObject = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+        if (effectObject == null)
+        {
+            Debug.LogWarning($"{"ShinySlash"} 이펙트 생성 실패");
+            return;
+        }
+
+        effectObject.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+    }
+
+
+
 }

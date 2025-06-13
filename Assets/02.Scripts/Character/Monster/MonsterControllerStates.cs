@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Game.CharacterStates.MonsterControllerStates
 {
     
-    public class MoveState<T> : State<T> where T : MonsterController
+    public class MoveState<T> : State<T> where T : CharacterBase
     {
         public override void Enter(T owner)
         {
