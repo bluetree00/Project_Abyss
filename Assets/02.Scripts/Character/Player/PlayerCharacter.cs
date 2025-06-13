@@ -130,7 +130,7 @@ public class PlayerCharacter : CharacterBase
     private async Task LoadCharacterDataAsync(string characterName)
     {
         var tcs = new TaskCompletionSource<bool>();
-        AddressablesManager.Instance.LoadAsset<CharacterData>(characterName, data =>
+        Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
             {
