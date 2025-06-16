@@ -22,9 +22,17 @@ public class CharacterData : ScriptableObject
     public float comboTimer = 0.0f;       // 콤보 유지 시간
     public float comboDuration = 3.0f;   // 콤보가 유지되는 시간
 
+    [Header("강공격 관련 수치")]
+
+    public float heavyAttackChargeThreshold = 1.5f;
+    public float heldDuration = 0f;
+    public float attackInputTime = 0f;
+    public float heavyAttackChargeTime = 0f;
+    public float heavyAttackReleaseTime = 0.4f;
+    
+
     // 대시 관련 수치
     [Header("대시 관련 수치")]
-    public bool canDodge = true;          // 대시 가능 여부
     public float dashSpeed = 10f;         // 대시 속도
     public float dashDuration = 0.2f;     // 대시 지속 시간
     public float dodgeCooldown = 2f;     // 대시 쿨타임

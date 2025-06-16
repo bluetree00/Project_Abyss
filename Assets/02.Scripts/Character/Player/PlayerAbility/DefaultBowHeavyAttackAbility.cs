@@ -27,7 +27,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         controller.GoToHeavyAttackChargeHoldingState();
 
         // 충전량이 일정 시간 이상되면 업그레이드
-        if (chargeTime >= controller.heavyAttackChargeThreshold && !upgraded)
+        if (chargeTime >= controller.CharacterData.heavyAttackChargeThreshold && !upgraded)
         {
             // 기존 Dummy 제거
             if (dummyEffect != null)
@@ -79,7 +79,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         controller.GoToIdleState();
 
         upgraded = false;
-        controller.heavyAttackChargeTime = 0f;
+        controller.CharacterData.heavyAttackChargeTime = 0f;
         controller.isInChargingState = false;
     }
 }
