@@ -101,6 +101,8 @@ namespace Game.CharacterStates.VagabondStates
             string animName = weapon.lightAttackAnimationSetSO.normalAttackAnimations[index];
             float endTime = weapon.lightAttackAnimationSetSO.comboEndTimes[index];
 
+            
+
             InitAnimation(animName, endTime);
 
             owner.RotateTowardsMousePosition();      // 캐릭터 방향 회전
@@ -110,12 +112,13 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Exit(Vagabond owner)
         {
-            blocksInput = false;
+            Debug.Log("콤보 공격 상태 종료");
             owner.OnAttackAnimationEnd(); // 공격 종료 처리
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
+            blocksInput = false;
             owner.OnAttackAnimationEnd();
             owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
         }
@@ -298,7 +301,7 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Execute(Vagabond owner)
         {
-            if (owner.heavyAttackChargeTime >= owner.heavyAttackChargeThreshold)
+            if (owner.CharacterData.heavyAttackChargeTime >= owner.CharacterData.heavyAttackChargeThreshold)
             {
                 owner.StateMachine.ChangeState(owner.GetState<VagabondChargedAttackState>());
             }

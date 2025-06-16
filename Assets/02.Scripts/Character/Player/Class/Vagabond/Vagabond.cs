@@ -134,6 +134,8 @@ public class Vagabond : PlayerCharacter
     /// </summary>
     public override void GoToIdleState() => stateMachine.ChangeState(GetState<VagabondIdleState>());
 
+    public bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
+
     /// <summary>
     /// 공격 콤보 상태로 전환, 콤보 단계 인덱스 세팅.
     /// </summary>
@@ -237,34 +239,17 @@ public class Vagabond : PlayerCharacter
 
         stateMachine.Update();
 
-        HandleAirState();
+
+        if (characterData.comboTimer > 0)
+        {
+            characterData.comboTimer -= Time.deltaTime;
+            if (characterData.comboTimer <= 0)
+                ResetCombo();
+        }
+
     }
 
-    /// <summary>
-    /// 현재 공중 상태를 확인하고, 상태 머신에 반영.
-    /// InAir 상태면 VagabondInAirState로 전환.
-    /// 착지 상태면 이동 또는 대기 상태로 전환.
-    /// </summary>
-    private void HandleAirState()
-    {
-        if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
-        {
-            stateMachine.ChangeState(GetState<VagabondInAirState>());
-        }
-        else if (CurrentAirState == AirState.None)
-        {
-            if (moveDirection.magnitude > 0.01f)
-            {
-                if (!(stateMachine.CurrentState is VagabondMoveBlendState))
-                    stateMachine.ChangeState(GetState<VagabondMoveBlendState>());
-            }
-            else
-            {
-                if (!(stateMachine.CurrentState is VagabondIdleState))
-                    stateMachine.ChangeState(GetState<VagabondIdleState>());
-            }
-        }
-    }
+
 
     //============================================================
     // 공격 처리
@@ -278,14 +263,14 @@ public class Vagabond : PlayerCharacter
     {
         if (!CanProcessInput())
         {
-            attackInputTime = Time.time;
+            characterData.attackInputTime = Time.time;
             return;
         }
 
-        attackInputTime = Time.time;
+        characterData.attackInputTime = Time.time;
         isInChargingState = false;
-        heavyAttackChargeTime = 0f;
-        heldDuration = 0f;
+        characterData.heavyAttackChargeTime = 0f;
+        characterData.heldDuration = 0f;
     }
 
     /// <summary>
@@ -297,18 +282,18 @@ public class Vagabond : PlayerCharacter
     {
         if (!CanProcessInput()) return;
 
-        if (attackInputTime == 0f)
+        if (characterData.attackInputTime == 0f)
         {
             Debug.LogWarning("Attack released without a valid start time. Fallback initialized.");
             return;
         }
 
-        heldDuration = Time.time - attackInputTime;
+        characterData.heldDuration = Time.time - characterData.attackInputTime;
 
-        if (heldDuration >= heavyAttackChargeThreshold)
+        if (characterData.heldDuration >= characterData.heavyAttackChargeThreshold)
         {
             // 차지 공격 실행
-            HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, heldDuration);
+            HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, characterData.heldDuration);
         }
         else
         {
@@ -319,9 +304,9 @@ public class Vagabond : PlayerCharacter
                 nextComboQueued = true;
         }
 
-        attackInputTime = 0f;
-        heavyAttackChargeTime = 0f;
-        heldDuration = 0f;
+        characterData.attackInputTime = 0f;
+        characterData.heavyAttackChargeTime = 0f;
+        characterData.heldDuration = 0f;
         isInChargingState = false;
 
         OnAttackAnimationEnd();
@@ -337,6 +322,17 @@ public class Vagabond : PlayerCharacter
     /// </summary>
     public override void OnAttackAnimationEnd() => isAttacking = false;
 
+    private void ResetCombo()
+    {
+        characterData.attackComboStep = 0;
+        characterData.comboTimer = 0;
+        nextComboQueued = false;
+
+        stateMachine.ChangeState(GetState<VagabondIdleState>());
+        Debug.Log("Combo reset due to timer expiration.");
+    }
+
+
     /// <summary>
     /// 현재 공격을 취소해야 하는지 판단 (예: 회피 입력 발생).
     /// </summary>
@@ -348,7 +344,7 @@ public class Vagabond : PlayerCharacter
     /// </summary>
     public void CancelHeavyAttack()
     {
-        heavyAttackChargeTime = 0f;
+        characterData.heavyAttackChargeTime = 0f;
         OnAttackAnimationEnd();
         StateMachine.ChangeState(GetState<VagabondIdleState>());
     }
