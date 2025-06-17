@@ -18,7 +18,7 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     {
         controller.GoToHeavyAttackChargeHoldingState();
 
-        if(chargeTime >= controller.heavyAttackChargeThreshold)
+        if(chargeTime >= controller.CharacterData.heavyAttackChargeThreshold)
         {
             controller.isAttacking = true;
             controller.HeavyAttackAbility.HeavyAttackReleaseChargedAttack(controller, chargeTime);
@@ -61,7 +61,7 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     public override void HeavyAttackCancelCharging(PlayerCharacter controller)
     {
           //내부 변수만 초기화
-            controller.heavyAttackChargeTime = 0f;
+            controller.CharacterData.heavyAttackChargeTime = 0f;
             controller.isInChargingState = false;
     }
 }

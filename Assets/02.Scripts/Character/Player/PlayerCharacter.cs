@@ -31,18 +31,10 @@ public class PlayerCharacter : CharacterBase
 
     protected PlayerInputActions inputActions;
     public bool inputReady = false;
-
-    public float heavyAttackChargeThreshold = 1.5f;
-    public float heldDuration = 0f, attackInputTime = 0f;
-    public float heavyAttackChargeTime = 0f, heavyAttackReleaseTime = 0.4f;
-
-    public bool isAttacking = false;
-    public bool isInChargingState = false;
     private bool isInventoryOpen = false;
     protected bool isInputLocked = false;
     private float inputLockDuration = 2f;
     private Coroutine inputLockCoroutine;
-    protected bool nextComboQueued = false;
 
     [Header("Camera")]
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
@@ -58,6 +50,18 @@ public class PlayerCharacter : CharacterBase
     public IJumpAbility<PlayerCharacter> JumpAbility { get; protected set; }
 
     public Transform handTransform;
+
+    //============================================================
+    // 캐릭터 상태 관리
+    //============================================================
+
+    public bool isAttacking = false;
+    public bool isInChargingState = false;
+    public float heavyAttackChargeThreshold => characterData.heavyAttackChargeThreshold;
+    public bool canDodge = false; // 대시 가능 여부
+    public bool IsInChargingState;
+    public bool nextComboQueued = false; // 다음 콤보가 대기 중인지 여부
+
 
     //============================================================
     // 점프 및 공중 상태 관리
@@ -106,7 +110,7 @@ public class PlayerCharacter : CharacterBase
     /// </summary>
     private void InitCoreComponents()
     {
-        Managers.Player.RegisterPlayer(transform);
+        Managers.Player.SetPlayer(transform); //매니저에 플레이어 등록
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
@@ -141,7 +145,7 @@ public class PlayerCharacter : CharacterBase
             }
             characterData = data;
             Managers.CharacterData.SetCharacterData(data);
-            characterData.canDodge = true;
+            canDodge = true;
             tcs.SetResult(true);
         });
         await tcs.Task;
@@ -205,8 +209,6 @@ public class PlayerCharacter : CharacterBase
     //============================================================
     // 입력 처리 템플릿 매서드 패턴 방식
     //============================================================
-
-    public bool CanProcessInput() => !isInputLocked && !(stateMachine.CurrentState?.BlocksInput ?? false);
 
     /// <summary>
     /// 입력 잠금 코루틴 처리.
@@ -295,12 +297,6 @@ public class PlayerCharacter : CharacterBase
         MoveAbility?.Move(this, moveDirection);
         CheckHeavyAttackChargingState();
 
-        if (characterData.comboTimer > 0)
-        {
-            characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0)
-                ResetCombo();
-        }
     }
 
     private void FixedUpdate()
@@ -393,50 +389,69 @@ public class PlayerCharacter : CharacterBase
     private void CheckSwordHeavyAttackChargingState()
     {
         if (isAttacking) return;
+
         if (inputActions.Player.Attack.IsPressed())
         {
-            heavyAttackChargeTime += Time.deltaTime;
-            if (!isInChargingState && heavyAttackChargeTime >= heavyAttackReleaseTime)
+            characterData.heavyAttackChargeTime += Time.deltaTime;
+
+            if (!isInChargingState && characterData.heavyAttackChargeTime >= characterData.heavyAttackReleaseTime)
             {
                 isInChargingState = true;
                 HeavyAttackAbility.HeavyAttackStartCharging(this);
             }
+
             if (isInChargingState)
-                HeavyAttackAbility.HeavyAttackUpdateCharging(this, heavyAttackChargeTime);
+            {
+                HeavyAttackAbility.HeavyAttackUpdateCharging(this, characterData.heavyAttackChargeTime);
+
+                // [자동 발사 트리거]
+                if ( characterData.heavyAttackChargeTime >= heavyAttackChargeThreshold)
+                {
+                    GoToHeavyAttackChargedAttackState();
+                    characterData.heavyAttackChargeTime = 0f;
+                    isInChargingState = false;
+                }
+            }
         }
         else
         {
-            heavyAttackChargeTime = 0f;
+             characterData.heavyAttackChargeTime = 0f;
             isInChargingState = false;
         }
     }
+
 
     private void CheckBowHeavyAttackChargingState()
     {
         if (inputActions.Player.Attack.IsPressed())
         {
-            heavyAttackChargeTime += Time.deltaTime;
-            if (!isInChargingState && heavyAttackChargeTime >= heavyAttackReleaseTime)
+             characterData.heavyAttackChargeTime += Time.deltaTime;
+
+            if (!isInChargingState &&  characterData.heavyAttackChargeTime >=  characterData.heavyAttackReleaseTime)
             {
                 isInChargingState = true;
                 HeavyAttackAbility.HeavyAttackStartCharging(this);
             }
+
             if (isInChargingState)
-                HeavyAttackAbility.HeavyAttackUpdateCharging(this, heavyAttackChargeTime);
+            {
+                HeavyAttackAbility.HeavyAttackUpdateCharging(this,  characterData.heavyAttackChargeTime);
+            }
+        }
+        else if (isInChargingState) // 뗄 때 발사
+        {
+            GoToHeavyAttackChargedAttackState();
+             characterData.heavyAttackChargeTime = 0f;
+            isInChargingState = false;
         }
         else
         {
-            heavyAttackChargeTime = 0f;
+            characterData.heavyAttackChargeTime = 0f;
             isInChargingState = false;
         }
     }
 
-    private void ResetCombo()
-    {
-        characterData.attackComboStep = 0;
-        characterData.comboTimer = 0;
-        nextComboQueued = false;
-    }
+
 
     //============================================================
     // 상태 전환

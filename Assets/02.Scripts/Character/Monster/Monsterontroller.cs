@@ -6,6 +6,7 @@ public abstract class MonsterController : CharacterBase
 {
     public enum MonsterState
     {
+        None,
         Idle,
         Patrol,
         Chase,
@@ -19,13 +20,12 @@ public abstract class MonsterController : CharacterBase
 
     public bool HasDetectedTarget { get; private set; }
 
+    public Transform playerTarget;
+
     public void SetDetected(bool detected)
     {
         HasDetectedTarget = detected;
     }
-
-    public float detectionRange = 10f;
-    public float attackRange = 2f;
     public NavMeshAgent agent;
     public Animator animator;
 
@@ -35,9 +35,32 @@ public abstract class MonsterController : CharacterBase
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
 
-        
+
         AbilitySet = Instantiate(abilitySetSO); // 또는 abilitySetSO 사용
         AbilitySet.InitAbilities(this);
+        
+        // 매니저에 등록된 플레이어를 찾아옴
+         if (Managers.Player.PlayerTransform != null)
+            SetTarget(Managers.Player.PlayerTransform);
+        else
+            Managers.Player.OnPlayerSpawned += SetTarget; // 플레이어가 등록될때 이벤트로 플레이어를 찾아옴
+    }
+
+    private void SetTarget(Transform player)
+    {
+        playerTarget = player;
+        Debug.Log($"[Monster {name}] 타겟 설정 완료: {player.name}");
+    }
+
+    private void OnDisable()
+    {
+        OnDestroy();
+    }
+
+    private void OnDestroy()
+    {
+        if (Managers.Player != null)
+            Managers.Player.OnPlayerSpawned -= SetTarget;
     }
 
     public void MoveTo(Vector3 destination)
@@ -56,6 +79,12 @@ public abstract class MonsterController : CharacterBase
             agent.ResetPath();
             animator?.SetBool("isMoving", false); // 정지 애니메이션
         }
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        HandleAI();
     }
 
 
