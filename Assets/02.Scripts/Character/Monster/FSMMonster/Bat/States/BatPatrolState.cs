@@ -31,6 +31,7 @@ public class BatPatrolState : IMonsterState
 
     public MonsterController.MonsterState Update()
     {
+        Debug.Log("BatPatrolState Update");
         // 탐지되면 추적 상태로 전환
         if (controller.HasDetectedTarget)
             return MonsterController.MonsterState.Chase;
