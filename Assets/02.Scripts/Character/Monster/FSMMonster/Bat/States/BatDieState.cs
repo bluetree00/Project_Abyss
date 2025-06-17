@@ -6,22 +6,22 @@ public class BatDieState : IMonsterState
 {
     public void Enter()
     {
-        throw new System.NotImplementedException();
+   
     }
 
     public void Exit()
     {
-        throw new System.NotImplementedException();
+       
     }
 
     public void Init(MonsterController controller)
     {
-        throw new System.NotImplementedException();
+       
     }
 
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
-        throw new System.NotImplementedException();
+     
     }
 
     // Start is called before the first frame update
@@ -38,6 +38,7 @@ public class BatDieState : IMonsterState
 
     MonsterController.MonsterState IMonsterState.Update()
     {
+        Debug.Log("BatDieState Update");
         throw new System.NotImplementedException();
     }
 }
