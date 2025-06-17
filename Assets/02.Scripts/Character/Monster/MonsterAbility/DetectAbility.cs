@@ -4,10 +4,10 @@ using UnityEngine;
 
 public class DetectAbility : IMonsterAbility
 {
-    public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Detect;  // 이 어빌리티의 타입을 명시
-
     private float range;
     private MonsterController owner;
+
+    public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Detect;
 
     public DetectAbility(float range)
     {
@@ -21,7 +21,7 @@ public class DetectAbility : IMonsterAbility
 
     public void Execute()
     {
-        Transform player = Managers.Player.PlayerTransform;
+        Transform player = owner.playerTarget;
 
         if (player == null)
         {
@@ -30,14 +30,6 @@ public class DetectAbility : IMonsterAbility
         }
 
         float distance = Vector3.Distance(owner.transform.position, player.position);
-        if (distance < range)
-        {
-            Debug.Log("Player detected!");
-            owner.SetDetected(true);
-        }
-        else
-        {
-            owner.SetDetected(false);
-        }
+        owner.SetDetected(distance < range);
     }
 }

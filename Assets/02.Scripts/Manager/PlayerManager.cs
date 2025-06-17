@@ -1,18 +1,16 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerManager
 {
+    public event Action<Transform> OnPlayerSpawned;
     public Transform PlayerTransform { get; private set; }
 
-    public void RegisterPlayer(Transform player)
+    public void SetPlayer(Transform player)
     {
         PlayerTransform = player;
-    }
-
-    public void Clear()
-    {
-        PlayerTransform = null;
+        OnPlayerSpawned?.Invoke(player);
     }
 }

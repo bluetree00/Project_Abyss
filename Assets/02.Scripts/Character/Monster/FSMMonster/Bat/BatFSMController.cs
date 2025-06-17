@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Unity.Collections;
 
 public class BatFSMController : MonsterController, IMonsterStateChanger
 {
@@ -14,6 +15,8 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     // 현재 활성화된 상태 인스턴스
     private IMonsterState currentState;
 
+    [SerializeField, ReadOnly]
+    private MonsterState debugCurrentState;
 
 
     // 비동기 초기화 메서드, 부모 초기화 후 FSM 초기화 및 초기 상태 지정
@@ -52,6 +55,7 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
 
         currentState?.Exit();    // 현재 상태가 있으면 종료 처리
         currentStateKey = newState;   // 상태 키 변경
+        debugCurrentState = newState; // <- 인스펙터용 상태 업데이트
         currentState = fsmStates[newState]; // 새로운 상태 할당
         currentState.Enter();    // 새로운 상태 진입 처리
     }
@@ -59,7 +63,9 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     // 매 프레임 호출되며 현재 상태의 Update 로직 실행
     public override void HandleAI()
     {
+        Debug.Log($"StateKey: {currentStateKey}, CurrentState: {(currentState != null ? currentState.GetType().Name : "NULL")}");
         currentState?.Update();
     }
+
 
 }

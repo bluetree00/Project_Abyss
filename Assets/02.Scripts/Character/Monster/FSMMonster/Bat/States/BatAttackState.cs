@@ -21,7 +21,7 @@ public class BatAttackState : IMonsterState
 
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
-        throw new System.NotImplementedException();
+       
     }
 
     // Start is called before the first frame update

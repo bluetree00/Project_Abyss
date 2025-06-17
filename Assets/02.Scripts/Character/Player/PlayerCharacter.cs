@@ -110,7 +110,7 @@ public class PlayerCharacter : CharacterBase
     /// </summary>
     private void InitCoreComponents()
     {
-        Managers.Player.RegisterPlayer(transform);
+        Managers.Player.SetPlayer(transform); //매니저에 플레이어 등록
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
