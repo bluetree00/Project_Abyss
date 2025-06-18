@@ -63,7 +63,6 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     // 매 프레임 호출되며 현재 상태의 Update 로직 실행
     public override void HandleAI()
     {
-        Debug.Log($"StateKey: {currentStateKey}, CurrentState: {(currentState != null ? currentState.GetType().Name : "NULL")}");
         currentState?.Update();
     }
 

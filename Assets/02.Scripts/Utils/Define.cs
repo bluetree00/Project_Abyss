@@ -129,13 +129,9 @@ public class Define
     {
         None, // 기본값
         Detect,
-        Attack,
-        Dash,
-        Fireball,
-        Die,
         Patrol,
-        SkillQ,
-        SkillE,
+        Chase,
+        Attack,
 
         // ...
     }

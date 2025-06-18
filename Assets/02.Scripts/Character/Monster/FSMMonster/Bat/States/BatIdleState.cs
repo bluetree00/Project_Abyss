@@ -26,7 +26,7 @@ public class BatIdleState : IMonsterState
         elapsedTime = 0f;
 
         // Idle 애니메이션 재생 (Blend Tree)
-         controller.animator.Play("Idle");
+        controller.animator.CrossFade("MoveBlend", 0.1f);
     }
 
     public void Exit()

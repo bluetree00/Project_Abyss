@@ -20,12 +20,20 @@ public abstract class MonsterController : CharacterBase
 
     public bool HasDetectedTarget { get; private set; }
 
+    public bool IsInAttackRange { get; private set; }
+
     public Transform playerTarget;
 
     public void SetDetected(bool detected)
     {
         HasDetectedTarget = detected;
     }
+
+    public void SetInAttackRange(bool inRange)
+    {
+       IsInAttackRange = inRange;
+    }
+    
     public NavMeshAgent agent;
     public Animator animator;
 
@@ -68,7 +76,6 @@ public abstract class MonsterController : CharacterBase
         if (agent != null && agent.isActiveAndEnabled)
         {
             agent.SetDestination(destination);
-            animator?.SetBool("isMoving", true); // 필요시 애니메이션 제어
         }
     }
 
@@ -77,7 +84,6 @@ public abstract class MonsterController : CharacterBase
         if (agent != null && agent.isActiveAndEnabled)
         {
             agent.ResetPath();
-            animator?.SetBool("isMoving", false); // 정지 애니메이션
         }
     }
 
