@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Monster/Abilities/Detect")]
-public class DetectAbilitySO : MonsterAbilitySO
+public class DetectAbilitySO : MonsterAbilitySO 
 {
     [SerializeField] private float range;
 
