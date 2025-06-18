@@ -1,32 +1,39 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class BatChaseState : IMonsterState
 {
+    private MonsterController controller;
+    private IMonsterStateChanger stateChanger;
+    private IMonsterAbility chaseAbility;
+
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        this.controller = controller;
+        this.stateChanger = stateChanger;
+
+        chaseAbility = controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Chase);
+    }
+
     public void Enter()
     {
-        Transform player = Managers.Player.PlayerTransform;
+        controller.Anim.CrossFade("MoveBlend", 1f);
     }
 
     public void Exit()
     {
-   
+        controller.StopMoving();
     }
 
-    public void Init(MonsterController controller)
+    public MonsterController.MonsterState Update()
     {
-        
-    }
+        chaseAbility?.Execute();
 
-    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
-    {
-        
-    }
+        if (controller.IsInAttackRange)
+        {
+            stateChanger.RequestStateChange(MonsterController.MonsterState.Attack);
+            return MonsterController.MonsterState.Attack;
+        }
 
-    MonsterController.MonsterState IMonsterState.Update()
-    {
-        return MonsterController.MonsterState.Attack;
-        
+        return MonsterController.MonsterState.Chase;
     }
 }
