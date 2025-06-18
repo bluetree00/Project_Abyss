@@ -4,25 +4,28 @@ using UnityEngine;
 
 public class BatAttackState : IMonsterState
 {
+     private MonsterController controller;
+    private IMonsterStateChanger stateChanger;
+
+
+    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
+    {
+        this.controller = controller;
+        this.stateChanger = stateChanger;
+       
+    }
+
     public void Enter()
     {
-        throw new System.NotImplementedException();
+        Debug.Log("Bat Attack State Entered");
+        controller.Anim.CrossFade("NormalAttack_1", 1f);
     }
 
     public void Exit()
     {
-        throw new System.NotImplementedException();
+        
     }
 
-    public void Init(MonsterController controller)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
-    {
-       
-    }
 
     // Start is called before the first frame update
     void Start()
