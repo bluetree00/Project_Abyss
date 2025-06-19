@@ -18,6 +18,7 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     [SerializeField, ReadOnly]
     private MonsterState debugCurrentState;
 
+    public override Define.MonsterType Type => Define.MonsterType.Bat;
 
     // 비동기 초기화 메서드, 부모 초기화 후 FSM 초기화 및 초기 상태 지정
     protected override async Task InitAsync()

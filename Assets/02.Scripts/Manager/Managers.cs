@@ -143,28 +143,27 @@ public class Managers : MonoBehaviour
     // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
     // StartCoroutine(InitializeObjectPool("BaseTest"));
     // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행 준비된 SO에 넣고 해당 이름을 매개변수로 전달 전달 방식은 enum의 내용을 사용 추후 DB도 사용가능
-    public IEnumerator InitializeObjectPool(string effectPoolDataName) //이펙트 SO패기지 초기화 방식
+    public async System.Threading.Tasks.Task InitializeObjectPoolAsync(string effectPoolDataName)
     {
-
-        bool isCompleted = false;
-        List<ObjectPoolerManager.Pool> initialPools = null;
-
-        // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
-        ObjectPoolEffectInitializer.GetInitialPools(effectPoolDataName, pools =>
+        if (string.IsNullOrEmpty(effectPoolDataName))
         {
-            initialPools = pools;
-            isCompleted = true;
-        });
+            Debug.LogError("InitializeObjectPoolAsync: effectPoolDataName이 null이거나 빈 문자열입니다.");
+            return;
+        }
 
-        // 풀 데이터 로드 완료까지 대기
-        yield return new WaitUntil(() => isCompleted);
+        List<ObjectPoolerManager.Pool> initialPools = await ObjectPoolEffectInitializer.GetInitialPoolsAsync(effectPoolDataName);
 
-        // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
+        if (initialPools == null || initialPools.Count == 0)
+        {
+            Debug.LogError($"InitializeObjectPoolAsync: '{effectPoolDataName}'에 대한 풀 데이터가 비어 있습니다.");
+            return;
+        }
+
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-        //StartCoroutine(poolerInitialize());
 
-        Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
+        Debug.Log($"[ObjectPoolManager] '{effectPoolDataName}' 풀 초기화 완료 (Task 기반 Addressables 방식)");
     }
+
 
     // IEnumerator poolerInitialize()
     // {
