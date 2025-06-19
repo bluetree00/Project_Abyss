@@ -1,46 +1,37 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 public class BatAttackState : IMonsterState
 {
-     private MonsterController controller;
+    private MonsterController controller;
     private IMonsterStateChanger stateChanger;
-
+    private IMonsterAbility attackAbility;
 
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
         this.controller = controller;
         this.stateChanger = stateChanger;
-       
+        attackAbility = controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Attack);
     }
 
     public void Enter()
     {
-        Debug.Log("Bat Attack State Entered");
-        controller.Anim.CrossFade("NormalAttack_1", 1f);
+        controller.SetAttack(true); // 공격 시작
+        attackAbility.Execute();    // 공격 어빌리티 실행
+        controller.Anim.CrossFade("NormalAttack_1", 0.1f);
+    }
+
+    public MonsterController.MonsterState Update()
+    {
+        // 공격이 끝났다면 추적 상태로 전환
+        if (!controller.IsAttacking)
+        {
+            stateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
+            return MonsterController.MonsterState.Chase;
+        }
+
+        return MonsterController.MonsterState.Attack;
     }
 
     public void Exit()
     {
-        
-    }
-
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
-    MonsterController.MonsterState IMonsterState.Update()
-    {
-        throw new System.NotImplementedException();
+        controller.StopMoving();
     }
 }

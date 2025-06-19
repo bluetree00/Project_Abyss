@@ -25,15 +25,26 @@ public class PatrolAbility : IMonsterAbility
             return;
 
         Vector3 target = waypoints[currentIndex];
+        var agent = owner.agent;
 
-        if (Vector3.Distance(owner.transform.position, target) < stopDistance)
+        // 안정적인 도착 판정
+        bool hasArrived =
+            !agent.pathPending &&
+            agent.remainingDistance <= stopDistance &&
+            agent.velocity.sqrMagnitude < 0.01f;
+
+        if (hasArrived)
         {
-            // 다음 웨이포인트로 갱신
             currentIndex = (currentIndex + 1) % waypoints.Length;
-            target = waypoints[currentIndex]; // 바로 다음 타겟으로 이동하도록 갱신
+            target = waypoints[currentIndex];
+            Debug.Log($"[Patrol] Reached waypoint. Moving to next index {currentIndex}");
+            owner.MoveTo(target);
         }
-
-        owner.MoveTo(target);
+        else
+        {
+            owner.MoveTo(target);
+        }
     }
+
 
 }

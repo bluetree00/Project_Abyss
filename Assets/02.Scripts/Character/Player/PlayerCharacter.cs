@@ -354,7 +354,7 @@ public class PlayerCharacter : CharacterBase
     // 무기 시스템  Ｓｗｏｒｄ Ａｎｄ Ｂｏｗ
     //============================================================
 
-    public bool PickupWeapon(WeaponData newWeapon)
+    public async Task<bool> PickupWeaponAsync(WeaponData newWeapon)
     {
         for (int i = 0; i < weaponManagerSO.SlotCount; i++)
         {
@@ -362,15 +362,22 @@ public class PlayerCharacter : CharacterBase
             {
                 weaponManagerSO.EquipWeapon(newWeapon, i, anim);
                 Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
-                Managers.Instance.StartCoroutine(Managers.Instance.InitializeObjectPool("BaseTest"));
+
+                // 무기 이름 기반으로 이펙트 패키지 이름 생성 (예: "SwordEffectPool")
+                // string effectPoolKey = $"{newWeapon.weaponName}EffectPool";
+
+                await Managers.Instance.InitializeObjectPoolAsync("BaseTest"); // async 방식으로 변경 추후 장비에 맞는 EffectPool패키지를 로드 추후 예외처리도 포함
+
                 weaponManagerSO.SwitchWeapon(i, anim);
                 GoToIdleState();
                 return true;
             }
         }
+
         Debug.Log("⚠ 모든 슬롯이 꽉 찼습니다!");
         return false;
     }
+
 
     private void CheckHeavyAttackChargingState()
     {

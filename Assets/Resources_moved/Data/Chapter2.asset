@@ -14,48 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapters:
   - chapterName: 1
+    layerSizes: 
     stages:
-    - stageName: Stage_07
-      resourcePath: Stage_07
-      stageType: 1
+    - stageName: 0
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_08
-      resourcePath: Stage_08
-      stageType: 1
+    - stageName: 1
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_09
-      resourcePath: Stage_09
-      stageType: 1
+    - stageName: 2
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_10
-      resourcePath: Stage_10
-      stageType: 1
+    - stageName: 3
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_11
-      resourcePath: Stage_11
-      stageType: 1
+    - stageName: 4
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    - stageName: Stage_12
-      resourcePath: Stage_12
-      stageType: 1
+    - stageName: 5
       weight: 0
       randomWeight: 1
-      minWeight: 1
-      maxWeight: 10
-    connectionRestrictions: []
     bossStageName: testStage4
