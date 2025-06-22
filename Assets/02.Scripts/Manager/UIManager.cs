@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -117,10 +118,18 @@ public class UIManager
 		return popup;
     }
 
+    //TODO:다시 수정할 필요 있음
+    // 팝업 UI를 표시하고 스택에 추가
+    public bool HasPopup<T>() where T : UI_Popup
+    {
+        return _popupStack.Any(p => p is T);
+    }
+
+
     public UI_Augment_Choice ShowAugmentChoiceUI(List<AugmentData> availableAugments)
     {
         UI_Augment_Choice augmentChoiceUI = ShowPopupUI<UI_Augment_Choice>();
-        
+
         // 증강 UI 초기화 및 선택 항목 표시
         augmentChoiceUI.InitAugments(availableAugments);
         augmentChoiceUI.ShowAugmentChoices(); // 선택 가능한 증강 UI 표시
