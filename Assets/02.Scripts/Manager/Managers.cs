@@ -197,6 +197,16 @@ public class Managers : MonoBehaviour
             });
         }
 
+        if (Input.GetKeyDown(KeyCode.Escape))
+	    {
+	    	// 이미 열려 있으면 무시
+	    	if (UI.HasPopup<UI_Pause>()) return;
+    
+	    	// 게임 멈추고 일시정지 UI 띄움
+	    	Time.timeScale = 0f;
+	    	UI.ShowPopupUI<UI_Pause>();
+	    }
+
         if (Input.GetKeyDown(KeyCode.G))
         {
             _stageManager = new StageManager();
