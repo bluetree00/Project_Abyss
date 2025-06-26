@@ -52,7 +52,7 @@ public abstract class MonsterController : CharacterBase
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
 
-         //몬스터 타입에 맞는 자동 풀 키 생성
+        //몬스터 타입에 맞는 자동 풀 키 생성
         string effectPoolKey = $"{Type}EffectPool";
         Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
         await Managers.Instance.InitializeObjectPoolAsync(effectPoolKey);
@@ -61,10 +61,16 @@ public abstract class MonsterController : CharacterBase
         AbilitySet = Instantiate(abilitySetSO); // 또는 abilitySetSO 사용
         AbilitySet.InitAbilities(this);
         
-        
+
+    }
+
+    private void OnEnable()
+    {
         // 매니저에 등록된 플레이어를 찾아옴
         if (Managers.Player.PlayerTransform != null)
+        {
             SetTarget(Managers.Player.PlayerTransform);
+        }
         else
             Managers.Player.OnPlayerSpawned += SetTarget; // 플레이어가 등록될때 이벤트로 플레이어를 찾아옴
     }
@@ -72,17 +78,7 @@ public abstract class MonsterController : CharacterBase
     private void SetTarget(Transform player)
     {
         playerTarget = player;
-        Debug.Log($"[Monster {name}] 타겟 설정 완료: {player.name}");
-        
-    }
 
-    private void OnDisable()
-    {
-        OnDestroy();
-    }
-
-    private void OnDestroy()
-    {
         if (Managers.Player != null)
             Managers.Player.OnPlayerSpawned -= SetTarget;
     }
