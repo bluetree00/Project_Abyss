@@ -52,7 +52,7 @@ public class Managers : MonoBehaviour
     private PlayerManager _playerManager = new PlayerManager();
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
-    
+
 
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
@@ -65,7 +65,7 @@ public class Managers : MonoBehaviour
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
 
-     public static PlayerManager Player => Instance._playerManager;
+    public static PlayerManager Player => Instance._playerManager;
     #endregion
 
 
@@ -111,13 +111,10 @@ public class Managers : MonoBehaviour
         }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
-        // 3. StageManager 초기화 (매개변수 없이)
-        // _stageManager = new StageManager();
-        // _stageManager.InitializeAsync();
-        
+
     }
 
-    
+
 
 
     public StageData GetStageData()
@@ -128,17 +125,17 @@ public class Managers : MonoBehaviour
     {
         return _graphData;
     }
-    
+
     public void SaveStageData()
     {
-       DataManager.SaveJsonFile(StageDataFile, _stageData);
+        DataManager.SaveJsonFile(StageDataFile, _stageData);
     }
 
     public void SaveGraphData()
     {
         DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
-    
+
 
     // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
     // StartCoroutine(InitializeObjectPool("BaseTest"));
@@ -165,26 +162,6 @@ public class Managers : MonoBehaviour
     }
 
 
-    // IEnumerator poolerInitialize()
-    // {
-    //     var initTask = _objectPoolerManager.InitializeAllPoolsAsync();
-    //     yield return new WaitUntil(() => initTask.IsCompleted);
-    //     if (initTask.IsFaulted)
-    //     {
-    //         Debug.LogError("ObjectPoolerManager 초기화 실패: " + initTask.Exception);
-    //     }
-    //     else
-    //     {
-    //         Debug.Log("ObjectPoolerManager 초기화 성공");
-    //     }
-    // }
-
-    // public async void asd()
-    // {
-    //     await _stageManager.InitializeAsync();
-    // }
-
-
     void Update()
     {
         _input?.OnUpdate();
@@ -206,7 +183,7 @@ public class Managers : MonoBehaviour
             _stageManager = new StageManager();
             _stageManager.InitializeAsync();
         }
-    } 
+    }
 
     public static void Clear()
     {

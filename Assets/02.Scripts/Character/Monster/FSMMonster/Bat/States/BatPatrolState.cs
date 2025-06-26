@@ -31,9 +31,11 @@ public class BatPatrolState : IMonsterState
 
         if (controller.HasDetectedTarget)
         {
+            Debug.Log("[BatPatrolState] Target Detected!");
             stateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
             return MonsterController.MonsterState.Chase;
         }
+
 
         return MonsterController.MonsterState.Patrol;
     }
