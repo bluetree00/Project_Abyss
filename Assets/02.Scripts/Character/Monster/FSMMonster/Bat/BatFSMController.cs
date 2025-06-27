@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Unity.Collections;
+using Cysharp.Threading.Tasks;
 
 public class BatFSMController : MonsterController, IMonsterStateChanger
 {
@@ -21,7 +22,7 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
     public override Define.MonsterType Type => Define.MonsterType.Bat;
 
     // 비동기 초기화 메서드, 부모 초기화 후 FSM 초기화 및 초기 상태 지정
-    protected override async Task InitAsync()
+    protected override async UniTask InitAsync()
     {
         await base.InitAsync();    // 부모 클래스 초기화 수행
         InitializeFSM();           // FSM 상태들을 등록하고 초기화

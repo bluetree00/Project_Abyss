@@ -6,6 +6,7 @@ using UnityEngine;
 using Game.CharacterStates;
 using Game.CharacterStates.VagabondStates;
 using Unity.VisualScripting;
+using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// Vagabond 플레이어 캐릭터 클래스.
@@ -53,7 +54,7 @@ public class Vagabond : PlayerCharacter
     /// 비동기 초기화 확장 (부모 클래스 호출).
     /// 추가 초기화가 필요한 경우 여기에 작성.
     /// </summary>
-    protected override async Task InitAsync()
+    protected override async UniTask InitAsync()
     {
         await base.InitAsync();
     }

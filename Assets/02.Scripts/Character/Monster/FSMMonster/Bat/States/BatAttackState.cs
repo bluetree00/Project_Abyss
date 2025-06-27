@@ -3,12 +3,15 @@ public class BatAttackState : IMonsterState
     private MonsterController controller;
     private IMonsterStateChanger stateChanger;
     private IMonsterAbility attackAbility;
+    private BatAnimationEventReceiver animationEventReceiver;
 
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
         this.controller = controller;
         this.stateChanger = stateChanger;
         attackAbility = controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Attack);
+
+        animationEventReceiver = controller.GetComponent<BatAnimationEventReceiver>();
     }
 
     public void Enter()
