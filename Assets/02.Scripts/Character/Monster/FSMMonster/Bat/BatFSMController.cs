@@ -7,19 +7,26 @@ using Cysharp.Threading.Tasks;
 
 public class BatFSMController : MonsterController, IMonsterStateChanger
 {
-    // 상태 키와 상태 인스턴스를 매핑하는 딕셔너리
+    // FSM 상태 키(enum)와 상태 인스턴스를 매핑하는 딕셔너리
     private Dictionary<MonsterState, IMonsterState> fsmStates = new();
 
-    // 현재 상태의 키(enum)
+    // 현재 상태의 키
     private MonsterState currentStateKey;
 
     // 현재 활성화된 상태 인스턴스
     private IMonsterState currentState;
 
+    // 디버그용 현재 상태 노출
     [SerializeField, ReadOnly]
     private MonsterState debugCurrentState;
 
+    // 외부에서 상태 접근 허용 (읽기 전용)
+    public IMonsterState CurrentState => currentState;
+
+    // 이 몬스터의 타입 정보 (부모에 정의된 추상 프로퍼티 구현)
     public override Define.MonsterType Type => Define.MonsterType.Bat;
+
+    
 
     // 비동기 초기화 메서드, 부모 초기화 후 FSM 초기화 및 초기 상태 지정
     protected override async UniTask InitAsync()

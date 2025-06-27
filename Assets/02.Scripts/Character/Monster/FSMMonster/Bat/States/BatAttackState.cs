@@ -17,7 +17,7 @@ public class BatAttackState : IMonsterState
     public void Enter()
     {
         controller.SetAttack(true); // 공격 시작
-        attackAbility.Execute();    // 공격 어빌리티 실행
+        // attackAbility.Execute();    // 공격 어빌리티 실행
         controller.Anim.CrossFade("NormalAttack_1", 0.1f);
     }
 

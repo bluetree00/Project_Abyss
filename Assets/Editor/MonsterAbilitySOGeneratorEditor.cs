@@ -39,7 +39,7 @@ public class MonsterAbilitySOGeneratorEditor : EditorWindow
                 chaseSpeed = EditorGUILayout.FloatField("Chase Speed", chaseSpeed);
                 chaseAttackRange = EditorGUILayout.FloatField("Attack Range", chaseAttackRange);
                 break;
-             case Define.MonsterAbilityType.Patrol:
+            case Define.MonsterAbilityType.Patrol:
                 EditorGUILayout.LabelField("Patrol Waypoints (World Space)");
 
                 scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Height(100));
@@ -58,6 +58,10 @@ public class MonsterAbilitySOGeneratorEditor : EditorWindow
                 {
                     patrolPoints.Clear();
                 }
+                break;
+            case Define.MonsterAbilityType.Attack:
+                range = EditorGUILayout.FloatField("Attack Range", range);
+                duration = EditorGUILayout.FloatField("Cooldown Time", duration);
                 break;
            
         }
@@ -93,6 +97,12 @@ public class MonsterAbilitySOGeneratorEditor : EditorWindow
                 var patrol = ScriptableObject.CreateInstance<PatrolAbilitySO>();
                 patrol.SetWaypoints(patrolPoints.ToArray());
                 asset = patrol;
+                break;
+            case Define.MonsterAbilityType.Attack:
+                var attack = ScriptableObject.CreateInstance<AttackAbilitySO>();
+                attack.SetAttackRange(range);
+                attack.SetCooldownTime(duration);
+                asset = attack;
                 break;
             
         }
