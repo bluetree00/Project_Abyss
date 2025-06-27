@@ -3,7 +3,7 @@
 //============================================================
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Game.CharacterStates;
@@ -40,10 +40,10 @@ public class CharacterBase : MonoBehaviour
     }
 
     // 비동기 초기화 함수 (파생 클래스에서 재정의 가능)
-    protected virtual async Task InitAsync()
+    protected virtual async UniTask InitAsync()
     {
         InitCoreComponents();
-        await Task.CompletedTask;  // 혹시 비동기 작업 추가시 대비
+        await UniTask.CompletedTask;  // 혹시 비동기 작업 추가시 대비
     }
 
     // 핵심 컴포넌트(Animator, Rigidbody, Transform) 초기화

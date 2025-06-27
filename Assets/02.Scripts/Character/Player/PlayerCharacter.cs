@@ -4,12 +4,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Cinemachine;
 using Game.CharacterStates;
 using Game.CharacterStates.CharacterControllerStates;
+using Cysharp.Threading.Tasks;
 
 public class PlayerCharacter : CharacterBase
 {
@@ -91,7 +91,7 @@ public class PlayerCharacter : CharacterBase
     /// 캐릭터 초기화 비동기 메서드.
     /// 상위 InitAsync 호출 후 컴포넌트, 데이터, 입력, 능력, 무기 매니저, 카메라 초기화.
     /// </summary>
-    protected override async Task InitAsync()
+    protected override async UniTask InitAsync()
     {
         await base.InitAsync();
         InitCoreComponents();
@@ -120,7 +120,7 @@ public class PlayerCharacter : CharacterBase
     /// <summary>
     /// 캐릭터 데이터 비동기 로드 및 초기 설정.
     /// </summary>
-    private async Task InitCharacterDataAsync()
+    private async UniTask InitCharacterDataAsync()
     {
         string characterName = gameObject.name.Replace("(Clone)", "");
         await LoadCharacterDataAsync(characterName);
@@ -132,24 +132,28 @@ public class PlayerCharacter : CharacterBase
     /// 캐릭터 데이터를 Addressables에서 로드하고 캐릭터 데이터 설정.
     /// </summary>
     /// <param name="characterName">로드할 캐릭터 데이터 이름</param>
-    private async Task LoadCharacterDataAsync(string characterName)
+    private async UniTask LoadCharacterDataAsync(string characterName)
     {
-        var tcs = new TaskCompletionSource<bool>();
+        var utcs = new UniTaskCompletionSource<bool>();
+
         Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
             {
                 Debug.LogError("캐릭터 데이터가 null입니다.");
-                tcs.SetResult(false);
+                utcs.TrySetResult(false);
                 return;
             }
+
             characterData = data;
             Managers.CharacterData.SetCharacterData(data);
             canDodge = true;
-            tcs.SetResult(true);
+            utcs.TrySetResult(true);
         });
-        await tcs.Task;
+
+        await utcs.Task;
     }
+
 
     private void InitInputActions()
     {
@@ -354,7 +358,7 @@ public class PlayerCharacter : CharacterBase
     // 무기 시스템  Ｓｗｏｒｄ Ａｎｄ Ｂｏｗ
     //============================================================
 
-    public async Task<bool> PickupWeaponAsync(WeaponData newWeapon)
+    public async UniTask<bool> PickupWeaponAsync(WeaponData newWeapon)
     {
         for (int i = 0; i < weaponManagerSO.SlotCount; i++)
         {

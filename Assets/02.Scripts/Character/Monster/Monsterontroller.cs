@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 public abstract class MonsterController : CharacterBase
 {
@@ -46,7 +46,7 @@ public abstract class MonsterController : CharacterBase
     public NavMeshAgent agent;
     public Animator animator;
 
-    protected override async Task InitAsync()
+    protected override async UniTask InitAsync()
     {
         await base.InitAsync();
         agent = GetComponent<NavMeshAgent>();
