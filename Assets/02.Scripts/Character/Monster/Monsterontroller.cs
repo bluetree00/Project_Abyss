@@ -18,6 +18,10 @@ public abstract class MonsterController : CharacterBase
 
     [SerializeField] private MonsterAbilitySetSO abilitySetSO;
 
+    [SerializeField] private MonsterEffectProfileSO effectProfile;
+    public MonsterEffectProfileSO EffectProfile => effectProfile;
+
+
     public MonsterAbilitySetSO AbilitySet { get; private set; }
 
     public bool HasDetectedTarget { get; private set; }
@@ -103,7 +107,6 @@ public abstract class MonsterController : CharacterBase
     {
         base.Update();
         HandleAI();
-        
     }
 
 
