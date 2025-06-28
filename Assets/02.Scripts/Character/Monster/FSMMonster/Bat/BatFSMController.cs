@@ -46,6 +46,7 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
         RegisterState(MonsterState.Patrol, new BatPatrolState());
         RegisterState(MonsterState.Chase, new BatChaseState());
         RegisterState(MonsterState.Attack, new BatAttackState());
+        RegisterState(MonsterState.AttackReady, new BatAttackReadyState());
         RegisterState(MonsterState.Die, new BatDieState());
     }
 
