@@ -17,7 +17,6 @@ public class UI_Pause : UI_Popup
 
 	enum Texts
 	{
-		TitleText,
 		resumeText,
 		exitText,
 	}
@@ -26,13 +25,15 @@ public class UI_Pause : UI_Popup
 	{
 		Tab_Chapter,
 		Tab_Weapon,
-		Tab_Inven,
+		Tab_Inventory,
 		ResumeButton,
 		ExitButton
 	}
 
 	// 탭 전환을 위한 변수
 	private string _currentTab = "Chapter";
+	private int _tabIndex = 0;
+	private readonly string[] _tabNames = { "Chapter", "Weapon", "Inven" };
 
 	public override void Init()
 	{
@@ -42,17 +43,53 @@ public class UI_Pause : UI_Popup
 		Bind<TextMeshProUGUI>(typeof(Texts));
 		Bind<Button>(typeof(Buttons));
 
-		GetTMPText((int)Texts.TitleText).text = "Paused";
+		// 현재 탭 인덱스 초기화
+    	_tabIndex = System.Array.IndexOf(_tabNames, _currentTab);
+
+    	// 초기 탭 설정
+    	ShowTab(_tabNames[_tabIndex]);
+
 		GetTMPText((int)Texts.resumeText).text = "Resume";
 		GetTMPText((int)Texts.exitText).text = "Exit";
 
 		// 버튼 이벤트 바인딩
-        BindEvent(GetButton((int)Buttons.Tab_Chapter).gameObject, (_) => ShowTab("Chapter"));
-        BindEvent(GetButton((int)Buttons.Tab_Weapon).gameObject, (_) => ShowTab("Weapon"));
-        BindEvent(GetButton((int)Buttons.Tab_Inven).gameObject, (_) => ShowTab("Inven"));
-        
+		GameObject tabChapter = GetButton((int)Buttons.Tab_Chapter).gameObject;
+		BindEvent(tabChapter, (PointerEventData data) =>
+		{
+			ShowTab("Chapter");
+			//UpdateChapterInfo();  // 챕터 정보 업데이트
+		}, Define.UIEvent.Click);
 
+		GameObject tabWeapon = GetButton((int)Buttons.Tab_Weapon).gameObject;
+		BindEvent(tabWeapon, (PointerEventData data) =>
+		{
+			ShowTab("Weapon");
+			//UpdateWeaponInfo();  // 무기 정보 업데이트
+		}, Define.UIEvent.Click);
 
+		GameObject tabInven = GetButton((int)Buttons.Tab_Inventory).gameObject;
+		BindEvent(tabInven, (PointerEventData data) =>
+		{
+			ShowTab("Inven");
+			//UpdateInventoryInfo();  // 인벤토리 정보 업데이트
+		}, Define.UIEvent.Click);
+
+		// 초기 탭 설정
+		if (_currentTab == "Chapter")
+		{
+			ShowTab("Chapter");
+			//UpdateChapterInfo();
+		}
+		else if (_currentTab == "Weapon")
+		{
+			ShowTab("Weapon");
+			//UpdateWeaponInfo();
+		}
+		else if (_currentTab == "Inven")
+		{
+			ShowTab("Inven");
+			//UpdateInventoryInfo();
+		}
 
 		GameObject resumeGo = GetButton((int)Buttons.ResumeButton).gameObject;
 		BindEvent(resumeGo, (PointerEventData data) =>
@@ -69,36 +106,54 @@ public class UI_Pause : UI_Popup
 		}, Define.UIEvent.Click);
 
 	}
-	
-	// 탭을 전환하는 메서드
-    private void ShowTab(string tabName)
-    {
-        // 현재 탭을 표시하고, 나머지 탭은 숨김
-        Get<GameObject>((int)GameObjects.Panel_Chapter).SetActive(tabName == "Chapter");
-        Get<GameObject>((int)GameObjects.Panel_Weapon).SetActive(tabName == "Weapon");
-        Get<GameObject>((int)GameObjects.Panel_Inven).SetActive(tabName == "Inven");
 
-        _currentTab = tabName;  // 현재 탭 상태 저장
-    }
-	
-	// 예시로, "Chapter" 탭에 대해 표시할 텍스트나 아이템 업데이트
-	private void UpdateChapterInfo()
+	// 탭을 전환하는 메서드
+	private void ShowTab(string tabName)
 	{
-		// 현재 챕터 정보 업데이트 예시
-		Get<TextMeshProUGUI>((int)GameObjects.Panel_Chapter).text = "현재 챕터: 1장";
+		// 현재 탭을 표시하고, 나머지 탭은 숨김
+		Get<GameObject>((int)GameObjects.Panel_Chapter).SetActive(tabName == "Chapter");
+		Get<GameObject>((int)GameObjects.Panel_Weapon).SetActive(tabName == "Weapon");
+		Get<GameObject>((int)GameObjects.Panel_Inven).SetActive(tabName == "Inven");
+
+		_currentTab = tabName;  // 현재 탭 상태 저장
+
+		// ★ 탭이 바뀔 때마다 _tabIndex도 동기화
+    	_tabIndex = System.Array.IndexOf(_tabNames, tabName);
 	}
 
-    // 예시로, "Weapon" 탭에 대해 표시할 무기 정보 업데이트
-    private void UpdateWeaponInfo()
-    {
-        // 현재 사용 중인 무기 정보 업데이트 예시
-        Get<TextMeshProUGUI>((int)GameObjects.Panel_Weapon).text = "현재 무기: 검";
-    }
+	private void Update() {
 
-    // 예시로, "Inventory" 탭에 대해 표시할 아이템 정보 업데이트
-    private void UpdateInventoryInfo()
-    {
-        // 인벤토리 정보 업데이트 예시
-        Get<TextMeshProUGUI>((int)GameObjects.Panel_Inven).text = "인벤토리: 10/20";
-    }
+		if (gameObject.activeInHierarchy)
+		{
+			// UI_Pause가 활성화된 상태에서만 Tab키 입력 처리
+			if (Input.GetKeyDown(KeyCode.Tab))
+			{
+				_tabIndex = (_tabIndex + 1) % _tabNames.Length;
+				ShowTab(_tabNames[_tabIndex]);
+			}
+		}
+		
+	}
+	
+	//TODO: 탭에 따라 표시할 정보를 업데이트하는 메서드들 구현 필요. 테스트 요망
+	// 예시로, "Chapter" 탭에 대해 표시할 텍스트나 아이템 업데이트
+	// private void UpdateChapterInfo()
+	// {
+	// 	// 현재 챕터 정보 업데이트 예시
+	// 	Get<TextMeshProUGUI>((int)GameObjects.Panel_Chapter).text = "현재 챕터: 테스트중(텍스트 연결 필요)";
+	// }
+
+	// // 예시로, "Weapon" 탭에 대해 표시할 무기 정보 업데이트
+	// private void UpdateWeaponInfo()
+	// {
+	//     // 현재 사용 중인 무기 정보 업데이트 예시
+	//     Get<TextMeshProUGUI>((int)GameObjects.Panel_Weapon).text = "현재 무기: 테스트중(텍스트 연결 필요)";
+	// }
+
+	// // 예시로, "Inventory" 탭에 대해 표시할 아이템 정보 업데이트
+	// private void UpdateInventoryInfo()
+	// {
+	//     // 인벤토리 정보 업데이트 예시
+	//     Get<TextMeshProUGUI>((int)GameObjects.Panel_Inven).text = "인벤토리: 테스트중(텍스트 연결 필요)";
+	// }
 }

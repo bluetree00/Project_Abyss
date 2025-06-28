@@ -185,27 +185,28 @@ public class Managers : MonoBehaviour
     {
         _input?.OnUpdate();
 
-        if (Input.GetKeyDown(KeyCode.Tab))
-        {
-            AddressableManager.InstantiateAsync("Character_01", (GameObject obj) =>
-            {
-                Debug.Log($"{obj.name} 생성 완료");
-            },
-            () =>
-            {
-                Debug.Log("<color=red>생성 실패</color>");
-            });
-        }
+        //NOTE: 잠시 주석 처리 (원래 캐릭터 스폰용 코드)
+        // if (Input.GetKeyDown(KeyCode.Tab))
+        // {
+        //     AddressableManager.InstantiateAsync("Character_01", (GameObject obj) =>
+        //     {
+        //         Debug.Log($"{obj.name} 생성 완료");
+        //     },
+        //     () =>
+        //     {
+        //         Debug.Log("<color=red>생성 실패</color>");
+        //     });
+        // }
 
         if (Input.GetKeyDown(KeyCode.Escape))
-	    {
-	    	// 이미 열려 있으면 무시
-	    	if (UI.HasPopup<UI_Pause>()) return;
-    
-	    	// 게임 멈추고 일시정지 UI 띄움
-	    	Time.timeScale = 0f;
-	    	UI.ShowPopupUI<UI_Pause>();
-	    }
+        {
+            // 이미 열려 있으면 무시
+            if (UI.HasPopup<UI_Pause>()) return;
+
+            // 게임 멈추고 일시정지 UI 띄움
+            Time.timeScale = 0f;
+            UI.ShowPopupUI<UI_Pause>();
+        }
 
         if (Input.GetKeyDown(KeyCode.G))
         {
