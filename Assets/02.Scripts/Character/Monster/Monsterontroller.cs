@@ -13,6 +13,7 @@ public abstract class MonsterController : CharacterBase
         Patrol,
         Chase,
         Attack,
+        AttackReady,
         Die
     }
 
