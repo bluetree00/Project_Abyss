@@ -1,16 +1,18 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-public class AttackAbility : IMonsterAbility
+public class AttackAbilitySet : IMonsterAbility
 {
+    private List<IMonsterAbility> attackAbilities = new();
+    private MonsterController owner;
+
     private float attackRange;
     private float cooldownTime;
     private float lastAttackTime = Mathf.NegativeInfinity;
 
-    private MonsterController owner;
-
     public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Attack;
 
-    public AttackAbility(float attackRange, float cooldownTime)
+    public AttackAbilitySet(float attackRange, float cooldownTime)
     {
         this.attackRange = attackRange;
         this.cooldownTime = cooldownTime;
@@ -19,6 +21,17 @@ public class AttackAbility : IMonsterAbility
     public void Init(MonsterController owner)
     {
         this.owner = owner;
+        foreach (var ability in attackAbilities)
+        {
+            ability.Init(owner);
+        }
+    }
+
+    public void AddAttackAbility(IMonsterAbility ability)
+    {
+        attackAbilities.Add(ability);
+        if (owner != null)
+            ability.Init(owner);
     }
 
     public void Execute()
@@ -34,11 +47,19 @@ public class AttackAbility : IMonsterAbility
         if (distance <= attackRange)
         {
             lastAttackTime = Time.time;
+            owner.SetAttack(true);
 
-            // 공격 시작 시 처리
-            owner.SetAttack(true); 
-            // 애니메이션은 상태 클래스에서 따로 실행
+            var selectedAbility = SelectAttackAbility();
+            selectedAbility?.Execute();
         }
+    }
+
+    private IMonsterAbility SelectAttackAbility()
+    {
+        if (attackAbilities.Count == 0)
+            return null;
+
+        return attackAbilities[Random.Range(0, attackAbilities.Count)];
     }
 
     public bool CanAttack()

@@ -31,6 +31,8 @@ public abstract class MonsterController : CharacterBase
 
     public bool IsAttacking { get; private set; }
 
+    public float AttackReadyTime = 0f; // 공격 준비 시간
+
     public Transform playerTarget;
 
     public void SetDetected(bool detected)
@@ -46,6 +48,11 @@ public abstract class MonsterController : CharacterBase
     public void SetAttack(bool isAttacking)
     {
        IsAttacking = isAttacking;
+    }
+
+    public void SetAttackReadyTime(float time)
+    {
+        AttackReadyTime = time;
     }
     
     public NavMeshAgent agent;
@@ -108,6 +115,12 @@ public abstract class MonsterController : CharacterBase
     {
         base.Update();
         HandleAI();
+
+
+        if (AttackReadyTime > 0f)
+        {
+            AttackReadyTime -= Time.deltaTime;
+        }
     }
 
 
