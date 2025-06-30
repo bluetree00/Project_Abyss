@@ -99,7 +99,7 @@ public class MonsterAbilitySOGeneratorEditor : EditorWindow
                 asset = patrol;
                 break;
             case Define.MonsterAbilityType.Attack:
-                var attack = ScriptableObject.CreateInstance<AttackAbilitySO>();
+                var attack = ScriptableObject.CreateInstance<AttackAbilitySetSO>();
                 attack.SetAttackRange(range);
                 attack.SetCooldownTime(duration);
                 asset = attack;
