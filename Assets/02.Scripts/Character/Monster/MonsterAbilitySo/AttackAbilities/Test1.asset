@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ef4f683f9145dce4398d5480093fb2f6, type: 3}
-  m_Name: NormalAttackAbilitySO
+  m_Name: Test1
   m_EditorClassIdentifier: 
   damage: 15
   attackRange: 1.8
-  attackAnimation: {fileID: 7492081622912475716, guid: 824c9e4c64b83d3458bfd911f8200cb2,
-    type: 3}
+  attackAnimation: {fileID: 0}
+  style: 0
+  purpose: 0

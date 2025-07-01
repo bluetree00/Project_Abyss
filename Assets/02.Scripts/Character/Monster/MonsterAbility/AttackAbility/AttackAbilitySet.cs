@@ -3,20 +3,13 @@ using UnityEngine;
 
 public class AttackAbilitySet : IMonsterAbility
 {
-    private List<IMonsterAbility> attackAbilities = new();
+    private List<IAttackAbility> attackAbilities = new();
+    private Dictionary<Define.AttackStyle, List<IAttackAbility>> attackByStyle = new();
     private MonsterController owner;
-
-    private float attackRange;
-    private float cooldownTime;
-    private float lastAttackTime = Mathf.NegativeInfinity;
 
     public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Attack;
 
-    public AttackAbilitySet(float attackRange, float cooldownTime)
-    {
-        this.attackRange = attackRange;
-        this.cooldownTime = cooldownTime;
-    }
+    public AttackAbilitySet() { }
 
     public void Init(MonsterController owner)
     {
@@ -29,41 +22,41 @@ public class AttackAbilitySet : IMonsterAbility
 
     public void AddAttackAbility(IMonsterAbility ability)
     {
-        attackAbilities.Add(ability);
-        if (owner != null)
-            ability.Init(owner);
+        if (ability is IAttackAbility attackAbility)
+        {
+            attackAbilities.Add(attackAbility);
+
+            if (!attackByStyle.TryGetValue(attackAbility.Style, out var list))
+            {
+                list = new List<IAttackAbility>();
+                attackByStyle[attackAbility.Style] = list;
+            }
+            list.Add(attackAbility);
+
+            if (owner != null)
+                attackAbility.Init(owner);
+        }
+        else
+        {
+            Debug.LogWarning("[AttackAbilitySet] 공격 어빌리티가 아닙니다: " + ability.GetType().Name);
+        }
     }
 
     public void Execute()
     {
-        if (!CanAttack())
-            return;
-
-        Transform target = owner.playerTarget;
-        if (target == null)
-            return;
-
-        float distance = Vector3.Distance(owner.transform.position, target.position);
-        if (distance <= attackRange)
-        {
-            lastAttackTime = Time.time;
-            owner.SetAttack(true);
-
-            var selectedAbility = SelectAttackAbility();
-            selectedAbility?.Execute();
-        }
+        var selectedAbility = SelectAttackAbility(Define.AttackStyle.Melee, Define.AttackPurpose.Normal);
+        selectedAbility?.Execute();
     }
 
-    private IMonsterAbility SelectAttackAbility()
+    public IAttackAbility SelectAttackAbility(Define.AttackStyle style, Define.AttackPurpose purpose)
     {
-        if (attackAbilities.Count == 0)
+        if (!attackByStyle.TryGetValue(style, out var list))
             return null;
 
-        return attackAbilities[Random.Range(0, attackAbilities.Count)];
-    }
+        var filtered = list.FindAll(a => a.Purpose == purpose);
+        if (filtered.Count == 0)
+            return null;
 
-    public bool CanAttack()
-    {
-        return Time.time >= lastAttackTime + cooldownTime;
+        return filtered[Random.Range(0, filtered.Count)];
     }
 }

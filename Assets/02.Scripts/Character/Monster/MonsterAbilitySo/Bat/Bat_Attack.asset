@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Bat_Attack
   m_EditorClassIdentifier: 
   attackAbilities:
-  - {fileID: 11400000, guid: a1fb58ce6712c3b429ce8713bd50b17d, type: 2}
+  - {fileID: 11400000, guid: fd4936992be19e347ab8b1a3effc44d7, type: 2}
   attackRange: 2
   cooldownTime: 1.5

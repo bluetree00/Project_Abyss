@@ -25,6 +25,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
     private Type[] attackSOTypes;
     private int selectedAttackTypeIndex = 0;
 
+    private string newAttackSOName = "NewAttackSO";
     private AttackAbilitySO tempAttackSO;
     private Editor tempEditor;
     private SerializedObject serializedTempAttackSO;
@@ -82,6 +83,8 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
         GUILayout.Label("새 공격 SO 생성", EditorStyles.boldLabel);
         selectedAttackTypeIndex = EditorGUILayout.Popup("공격 타입 선택", selectedAttackTypeIndex, attackSOTypeNames);
 
+        newAttackSOName = EditorGUILayout.TextField("SO 파일 이름", newAttackSOName);
+
         if (attackSOTypes.Length > 0)
         {
             Type selectedType = attackSOTypes[selectedAttackTypeIndex];
@@ -102,11 +105,9 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
                 if (!Directory.Exists(attackFolder))
                     Directory.CreateDirectory(attackFolder);
 
-                string name = tempAttackSO.name;
-                if (string.IsNullOrEmpty(name))
-                    name = selectedType.Name;
-
+                string name = string.IsNullOrWhiteSpace(newAttackSOName) ? selectedType.Name : newAttackSOName;
                 string path = AssetDatabase.GenerateUniqueAssetPath($"{attackFolder}/{name}.asset");
+
                 AssetDatabase.CreateAsset(UnityEngine.Object.Instantiate(tempAttackSO), path);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -182,8 +183,6 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
         CreateAndAddAbility<AttackAbilitySetSO>(abilitySetSO, folderPath, $"{selectedMonsterType}_Attack", so =>
         {
             so.attackAbilities.Clear();
-            so.SetAttackRange(attackRange);
-            so.SetCooldownTime(attackCooldown);
 
             for (int i = 0; i < availableAttackAbilities.Count; i++)
             {
