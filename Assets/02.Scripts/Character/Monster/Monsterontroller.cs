@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 
 public abstract class MonsterController : CharacterBase
 {
@@ -12,88 +13,84 @@ public abstract class MonsterController : CharacterBase
         Idle,
         Patrol,
         Chase,
-        Attack,
         AttackReady,
+        Attack,
         Die
     }
 
+    [Header("Abilities")]
     [SerializeField] private MonsterAbilitySetSO abilitySetSO;
+    public MonsterAbilitySet AbilitySet { get; private set; }
 
+    [Header("Effects")]
     [SerializeField] private MonsterEffectProfileSO effectProfile;
     public MonsterEffectProfileSO EffectProfile => effectProfile;
 
 
-    public MonsterAbilitySetSO AbilitySet { get; private set; }
-
     public bool HasDetectedTarget { get; private set; }
-
     public bool IsInAttackRange { get; private set; }
-
     public bool IsAttacking { get; private set; }
+    public float AttackReadyTime = 0f;
 
-    public float AttackReadyTime = 0f; // 공격 준비 시간
-
+    [Header("References")]
     public Transform playerTarget;
-
-    public void SetDetected(bool detected)
-    {
-        HasDetectedTarget = detected;
-    }
-
-    public void SetInAttackRange(bool inRange)
-    {
-       IsInAttackRange = inRange;
-    }
-
-    public void SetAttack(bool isAttacking)
-    {
-       IsAttacking = isAttacking;
-    }
-
-    public void SetAttackReadyTime(float time)
-    {
-        AttackReadyTime = time;
-    }
-    
     public NavMeshAgent agent;
     public Animator animator;
+
+    // 현재 선택된 공격 (공격 대기 상태에서 결정됨)
+    public IAttackAbility CurrentAttackAbility { get; set; }
+    
+    public void SetDetected(bool detected) => HasDetectedTarget = detected;
+    public void SetInAttackRange(bool inRange) => IsInAttackRange = inRange;
+    public void SetAttack(bool isAttacking) => IsAttacking = isAttacking;
+    public void SetAttackReadyTime(float time) => AttackReadyTime = time;
 
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
+
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
 
-        //몬스터 타입에 맞는 자동 풀 키 생성
+        // 오브젝트 풀 초기화
         string effectPoolKey = $"{Type}EffectPool";
         Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
         await Managers.Instance.InitializeObjectPoolAsync(effectPoolKey);
 
-
-        AbilitySet = Instantiate(abilitySetSO); // 또는 abilitySetSO 사용
-        AbilitySet.InitAbilities(this);
-        
-
+        // AbilitySet 생성
+        AbilitySet = abilitySetSO.CreateRuntimeSet(this);
     }
 
     private void OnEnable()
     {
-        // 매니저에 등록된 플레이어를 찾아옴
         if (Managers.Player.PlayerTransform != null)
         {
             SetTarget(Managers.Player.PlayerTransform);
         }
         else
-            Managers.Player.OnPlayerSpawned += SetTarget; // 플레이어가 등록될때 이벤트로 플레이어를 찾아옴
+        {
+            Managers.Player.OnPlayerSpawned += SetTarget;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (Managers.Player != null)
+        {
+            Managers.Player.OnPlayerSpawned -= SetTarget;
+        }
     }
 
     private void SetTarget(Transform player)
     {
         playerTarget = player;
-
-        if (Managers.Player != null)
-            Managers.Player.OnPlayerSpawned -= SetTarget;
     }
+
+    public void SetCurrentAttackAbility(IAttackAbility ability)
+    {
+        CurrentAttackAbility = ability;
+    }
+
 
     public void MoveTo(Vector3 destination)
     {
@@ -116,14 +113,11 @@ public abstract class MonsterController : CharacterBase
         base.Update();
         HandleAI();
 
-
         if (AttackReadyTime > 0f)
         {
             AttackReadyTime -= Time.deltaTime;
         }
     }
-
-
 
     public abstract void HandleAI();
 }

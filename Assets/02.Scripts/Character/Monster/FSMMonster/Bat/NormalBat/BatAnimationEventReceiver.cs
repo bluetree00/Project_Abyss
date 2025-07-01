@@ -6,6 +6,9 @@ public class BatAnimationEventReceiver : MonoBehaviour
 {
     private MonsterController controller;
 
+    public event System.Action OnAttackStartEvent;
+    public event System.Action OnAttackEndEvent;
+
     private void Awake()
     {
         if (controller == null)
@@ -15,7 +18,6 @@ public class BatAnimationEventReceiver : MonoBehaviour
             Debug.LogWarning("[BatAnimationEventReceiver] MonsterController를 찾을 수 없습니다.");
     }
 
-    // 애니메이션 이벤트 연결
     public void OnAttackStart()
     {
         if (controller == null || controller.EffectProfile == null)
@@ -31,9 +33,9 @@ public class BatAnimationEventReceiver : MonoBehaviour
         Vector3 spawnPos = controller.transform.TransformPoint(offset);
         Quaternion spawnRot = Quaternion.Euler(rotationEuler);
 
-        // var effectObj = Managers.ObjectPooler.SpawnFromPool(effectName, spawnPos, spawnRot);
-        // if (effectObj == null)
-        //     Debug.LogWarning($"{effectName} 이펙트 생성 실패");
+        // 이펙트 생성 코드 (주석 처리된 부분)
+
+        OnAttackStartEvent?.Invoke();
     }
 
     public void OnAttackEnd()
@@ -46,5 +48,7 @@ public class BatAnimationEventReceiver : MonoBehaviour
 
         controller.SetAttack(false);
         Debug.Log("OnAttackEnd: 공격 종료");
+
+        OnAttackEndEvent?.Invoke();
     }
 }

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Bat_Patrol
   m_EditorClassIdentifier: 
   waypoints:
-  - {x: 10, y: 0, z: -10}
-  - {x: 10, y: 0, z: 10}
+  - {x: 0, y: 0, z: 0}
+  - {x: 0, y: 0, z: 0}

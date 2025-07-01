@@ -1,5 +1,5 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
 
 [CreateAssetMenu(menuName = "Monster/AbilitySet")]
 public class MonsterAbilitySetSO : ScriptableObject
@@ -7,15 +7,9 @@ public class MonsterAbilitySetSO : ScriptableObject
     [SerializeReference]
     public List<MonsterAbilitySO> abilities = new();
 
-    public void InitAbilities(MonsterController owner)
+    // 기존 방식은 유지하되, 런타임용 AbilitySet을 만드는 메서드 추가
+    public MonsterAbilitySet CreateRuntimeSet(MonsterController owner)
     {
-        foreach (var ability in abilities)
-            ability.CreateAbilityInstance().Init(owner);
-    }
-
-    public T GetAbility<T>(Define.MonsterAbilityType type) where T : class, IMonsterAbility
-    {
-        var so = abilities.Find(a => a.MonsterAbilityType == type);
-        return so?.CreateAbilityInstance() as T;
+        return new MonsterAbilitySet(this, owner);
     }
 }

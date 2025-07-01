@@ -194,6 +194,20 @@ public class Define
         Specter
     }
 
+    public enum AttackStyle
+    {
+        Melee,
+        Ranged,
+        Magic,
+    }
+
+    public enum AttackPurpose
+    {
+        Normal,
+        Special,
+        Ultimate,
+    }
+
     
 
     // 그리드 형태를 정의하는 배열들

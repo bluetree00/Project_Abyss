@@ -100,8 +100,6 @@ public class MonsterAbilitySOGeneratorEditor : EditorWindow
                 break;
             case Define.MonsterAbilityType.Attack:
                 var attack = ScriptableObject.CreateInstance<AttackAbilitySetSO>();
-                attack.SetAttackRange(range);
-                attack.SetCooldownTime(duration);
                 asset = attack;
                 break;
             
