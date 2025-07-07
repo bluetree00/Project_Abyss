@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class NormalAttackAbility : IMonsterAbility
+public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
 {
     private float damage;
     private float range;
@@ -62,10 +62,12 @@ public class NormalAttackAbility : IMonsterAbility
         }
     }
 
+    public AnimationClip GetAttackAnimationClip() => animationClip;
+
     private void OnAttackStart()
     {
         Debug.Log($"NormalAttackAbility: 공격 시작 이벤트 받음, 데미지: {damage}");
-        // 실제 데미지 처리 등 로직 추가
+        // 실제 데미지 처리 로직 추가
     }
 
     private void OnAttackEnd()

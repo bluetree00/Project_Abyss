@@ -38,7 +38,7 @@ public class AttackAbilitySet : IMonsterAbility
         }
         else
         {
-            Debug.LogWarning("[AttackAbilitySet] 공격 어빌리티가 아닙니다: " + ability.GetType().Name);
+               Debug.LogWarning("[AttackAbilitySet] 공격 어빌리티가 아닙니다: " + ability.GetType().Name);
         }
     }
 
