@@ -39,7 +39,7 @@ public abstract class MonsterController : CharacterBase
 
     // 현재 선택된 공격 (공격 대기 상태에서 결정됨)
     public IAttackAbility CurrentAttackAbility { get; set; }
-    
+
     public void SetDetected(bool detected) => HasDetectedTarget = detected;
     public void SetInAttackRange(bool inRange) => IsInAttackRange = inRange;
     public void SetAttack(bool isAttacking) => IsAttacking = isAttacking;
@@ -120,4 +120,51 @@ public abstract class MonsterController : CharacterBase
     }
 
     public abstract void HandleAI();
+    
+
+    /// <summary>
+    /// 몬스터의 Animator에서 특정 기본 애니메이션 클립을 새 애니메이션 클립으로 오버라이드합니다.
+    /// </summary>
+    /// <param name="clipName">기본 클립 이름 (예: AnimationClipNames.Attack)</param>
+    /// <param name="newClip">대체할 애니메이션 클립</param>
+    public void OverrideAnimationClip(string clipName, AnimationClip newClip)
+    {
+        if (animator == null || newClip == null)
+            return;
+
+        AnimatorOverrideController overrideController = null;
+
+        if (animator.runtimeAnimatorController is AnimatorOverrideController currentOverride)
+        {
+            overrideController = currentOverride;
+        }
+        else
+        {
+            overrideController = new AnimatorOverrideController(animator.runtimeAnimatorController);
+            animator.runtimeAnimatorController = overrideController;
+        }
+
+        var overrides = new List<KeyValuePair<AnimationClip, AnimationClip>>();
+        overrideController.GetOverrides(overrides);
+
+        bool replaced = false;
+        for (int i = 0; i < overrides.Count; i++)
+        {
+            if (overrides[i].Key.name == clipName)
+            {
+                overrides[i] = new KeyValuePair<AnimationClip, AnimationClip>(overrides[i].Key, newClip);
+                replaced = true;
+                break;
+            }
+        }
+
+        if (!replaced)
+        {
+            Debug.LogWarning($"Animator 기본 클립 '{clipName}'을(를) 찾지 못했습니다.");
+        }
+
+        overrideController.ApplyOverrides(overrides);
+    }
+
+
 }
