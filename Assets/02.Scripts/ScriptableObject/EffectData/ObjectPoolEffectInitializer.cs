@@ -1,36 +1,39 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 public static class ObjectPoolEffectInitializer
 {
-    public static void GetInitialPools(string effectPoolDataName, Action<List<ObjectPoolerManager.Pool>> callback)
+    public static async Task<List<ObjectPoolerManager.Pool>> GetInitialPoolsAsync(string poolKey)
     {
-        // AddressablesManager를 사용하여 Addressables로 풀 데이터를 로드합니다.
-        //[ ]
-        Managers.AddressableManager.LoadAsset<EffectPoolData>(effectPoolDataName, effectPoolData =>
+        var handle = Addressables.LoadAssetAsync<EffectPoolData>(poolKey);
+        await handle.Task;
+
+        if (handle.Status != AsyncOperationStatus.Succeeded)
         {
-            if (effectPoolData == null)
+            Debug.LogError($"[GetInitialPoolsAsync] '{poolKey}' 로드 실패");
+            return new List<ObjectPoolerManager.Pool>();
+        }
+
+        var effectPoolData = handle.Result;
+        List<ObjectPoolerManager.Pool> pools = new List<ObjectPoolerManager.Pool>();
+
+        foreach (var pool in effectPoolData.pools)
+        {
+            pools.Add(new ObjectPoolerManager.Pool
             {
-                Debug.LogError($"EffectPoolData with name {effectPoolDataName} not found.");
-                callback(new List<ObjectPoolerManager.Pool>());
-                return;
-            }
+                tag = pool.tag,
+                resourcePath = pool.resourcePath,
+                initialSize = pool.initialSize,
+                poolType = pool.poolType
+            });
+        }
 
-            List<ObjectPoolerManager.Pool> pools = new List<ObjectPoolerManager.Pool>();
-
-            foreach (var pool in effectPoolData.pools)
-            {
-                pools.Add(new ObjectPoolerManager.Pool
-                {
-                    tag = pool.tag,
-                    resourcePath = pool.resourcePath,
-                    initialSize = pool.initialSize,
-                    poolType = pool.poolType
-                });
-            }
-
-            callback(pools);
-        });
+        return pools;
     }
+
+
 }

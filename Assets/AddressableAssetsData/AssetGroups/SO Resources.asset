@@ -29,26 +29,20 @@ MonoBehaviour:
     m_SerializedLabels:
     - SO
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a57de8c5aea93c042933a2a7f11554fb
-    m_Address: Orc
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2485c60bd8cfad240816e25c2d63b4a8
-    m_Address: Specter
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2079b83d448fcca489539999f72f264e
     m_Address: BaseTest
     m_ReadOnly: 0
     m_SerializedLabels:
     - SO
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2af48f4328f525944be4fab275001aaa
-    m_Address: EvilMage
+  - m_GUID: 6b2e54f869313fb4bbf387506b6972d7
+    m_Address: BatEffectPool
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - SO
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5c3dafdd6d7738842ad37bfc15a0594d
+    m_Address: NormalBat01_EffectSO
     m_ReadOnly: 0
     m_SerializedLabels:
     - SO

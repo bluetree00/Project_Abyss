@@ -4039,6 +4039,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2721112331854502123, guid: 2d87cebda5d67d64e906d47258aef8d1,
+        type: 3}
+      propertyPath: abilitySetSO
+      value: 
+      objectReference: {fileID: 11400000, guid: dc27e9312c9768f429922a9ac4aae21a,
+        type: 2}
+    - target: {fileID: 2721112331854502123, guid: 2d87cebda5d67d64e906d47258aef8d1,
+        type: 3}
+      propertyPath: effectProfile
+      value: 
+      objectReference: {fileID: 11400000, guid: 5c3dafdd6d7738842ad37bfc15a0594d,
+        type: 2}
     - target: {fileID: 6431980481465561276, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -4052,7 +4064,7 @@ PrefabInstance:
     - target: {fileID: 6431980481465561276, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 10
+      value: 11.9
       objectReference: {fileID: 0}
     - target: {fileID: 6431980481465561276, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
@@ -4093,14 +4105,26 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 215ec68ddc3051b48a0ecda5aa5b2fda, type: 2}
+      objectReference: {fileID: 22100000, guid: d4088aa9e7df9be479eab1ca73cd048d,
+        type: 2}
+    - target: {fileID: 7449390507434194877, guid: 2d87cebda5d67d64e906d47258aef8d1,
+        type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8763121155009113271, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
       propertyPath: m_Name
       value: NormalBatFSM
       objectReference: {fileID: 0}
+    - target: {fileID: 8763121155009113271, guid: 2d87cebda5d67d64e906d47258aef8d1,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 6984242580533987168, guid: 2d87cebda5d67d64e906d47258aef8d1, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2d87cebda5d67d64e906d47258aef8d1, type: 3}
