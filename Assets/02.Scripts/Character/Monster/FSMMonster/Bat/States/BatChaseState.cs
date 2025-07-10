@@ -30,8 +30,8 @@ public class BatChaseState : IMonsterState
 
         if (controller.IsInAttackRange)
         {
-            stateChanger.RequestStateChange(MonsterController.MonsterState.Attack);
-            return MonsterController.MonsterState.Attack;
+            stateChanger.RequestStateChange(MonsterController.MonsterState.AttackReady);
+            return MonsterController.MonsterState.AttackReady;
         }
 
         return MonsterController.MonsterState.Chase;

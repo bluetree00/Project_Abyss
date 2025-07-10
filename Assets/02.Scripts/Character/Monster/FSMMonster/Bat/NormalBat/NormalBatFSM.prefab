@@ -1220,6 +1220,7 @@ GameObject:
   - component: {fileID: 8122922350055448226}
   - component: {fileID: 6260470570577329147}
   - component: {fileID: 2721112331854502123}
+  - component: {fileID: 6565284892386501083}
   m_Layer: 0
   m_Name: NormalBatFSM
   m_TagString: Untagged
@@ -1242,6 +1243,7 @@ Transform:
   m_Children:
   - {fileID: 3422851975040775335}
   - {fileID: 1961772755731215538}
+  - {fileID: 6982673257107337016}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &7449390507434194877
@@ -1257,7 +1259,7 @@ Animator:
   m_Controller: {fileID: 9100000, guid: 215ec68ddc3051b48a0ecda5aa5b2fda, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
-  m_ApplyRootMotion: 0
+  m_ApplyRootMotion: 1
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_WarningMessage: 
@@ -1349,8 +1351,96 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rb: {fileID: 0}
   playerTransform: {fileID: 0}
-  abilitySetSO: {fileID: 11400000, guid: 41fbf5c2a341a3d41be2c8ead4db608a, type: 2}
+  abilitySetSO: {fileID: 0}
+  effectProfile: {fileID: 0}
+  AttackReadyTime: 0
   playerTarget: {fileID: 0}
   agent: {fileID: 0}
   animator: {fileID: 0}
   debugCurrentState: 0
+--- !u!114 &6565284892386501083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8763121155009113271}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be40c333b83dcda41aa374eb3545b4c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!1001 &5549432559238239632
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6431980481465561276}
+    m_Modifications:
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3309732437982122736, guid: 490c976fa961f51408181fda0927602e,
+        type: 3}
+      propertyPath: m_Name
+      value: AttackAura
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 490c976fa961f51408181fda0927602e, type: 3}
+--- !u!4 &6982673257107337016 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3307044924261759656, guid: 490c976fa961f51408181fda0927602e,
+    type: 3}
+  m_PrefabInstance: {fileID: 5549432559238239632}
+  m_PrefabAsset: {fileID: 0}

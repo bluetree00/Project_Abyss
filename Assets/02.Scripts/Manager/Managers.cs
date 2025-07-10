@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using Cysharp.Threading.Tasks;
 
 public class Managers : MonoBehaviour
 {
@@ -52,11 +53,12 @@ public class Managers : MonoBehaviour
     private PlayerManager _playerManager = new PlayerManager();
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
-    
+
 
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
+    
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
@@ -65,7 +67,7 @@ public class Managers : MonoBehaviour
     public static SceneManagerEx Scene { get { return Instance._scene; } }
     public static DataManager Data { get { return Instance._data; } }
 
-     public static PlayerManager Player => Instance._playerManager;
+    public static PlayerManager Player => Instance._playerManager;
     #endregion
 
 
@@ -111,13 +113,10 @@ public class Managers : MonoBehaviour
         }
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
-        // 3. StageManager 초기화 (매개변수 없이)
-        // _stageManager = new StageManager();
-        // _stageManager.InitializeAsync();
-        
+
     }
 
-    
+
 
 
     public StageData GetStageData()
@@ -128,62 +127,41 @@ public class Managers : MonoBehaviour
     {
         return _graphData;
     }
-    
+
     public void SaveStageData()
     {
-       DataManager.SaveJsonFile(StageDataFile, _stageData);
+        DataManager.SaveJsonFile(StageDataFile, _stageData);
     }
 
     public void SaveGraphData()
     {
         DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
-    
 
-    // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
+
+    // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화 추후 UniTask로 변경 예정
     // StartCoroutine(InitializeObjectPool("BaseTest"));
     // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행 준비된 SO에 넣고 해당 이름을 매개변수로 전달 전달 방식은 enum의 내용을 사용 추후 DB도 사용가능
-    public IEnumerator InitializeObjectPool(string effectPoolDataName) //이펙트 SO패기지 초기화 방식
+    public async System.Threading.Tasks.Task InitializeObjectPoolAsync(string effectPoolDataName)
     {
-
-        bool isCompleted = false;
-        List<ObjectPoolerManager.Pool> initialPools = null;
-
-        // AddressablesManager를 통해 풀 데이터를 비동기 로드 (GetInitialPools는 콜백 방식으로 수정됨)
-        ObjectPoolEffectInitializer.GetInitialPools(effectPoolDataName, pools =>
+        if (string.IsNullOrEmpty(effectPoolDataName))
         {
-            initialPools = pools;
-            isCompleted = true;
-        });
+            Debug.LogError("InitializeObjectPoolAsync: effectPoolDataName이 null이거나 빈 문자열입니다.");
+            return;
+        }
 
-        // 풀 데이터 로드 완료까지 대기
-        yield return new WaitUntil(() => isCompleted);
+        List<ObjectPoolerManager.Pool> initialPools = await ObjectPoolEffectInitializer.GetInitialPoolsAsync(effectPoolDataName);
 
-        // 로드된 풀 데이터를 이용하여 ObjectPoolerManager 초기화
+        if (initialPools == null || initialPools.Count == 0)
+        {
+            Debug.LogError($"InitializeObjectPoolAsync: '{effectPoolDataName}'에 대한 풀 데이터가 비어 있습니다.");
+            return;
+        }
+
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-        //StartCoroutine(poolerInitialize());
 
-        Debug.Log($"{effectPoolDataName} 풀 초기화 완료 (Addressables 방식)");
+        Debug.Log($"[ObjectPoolManager] '{effectPoolDataName}' 풀 초기화 완료 (Task 기반 Addressables 방식)");
     }
-
-    // IEnumerator poolerInitialize()
-    // {
-    //     var initTask = _objectPoolerManager.InitializeAllPoolsAsync();
-    //     yield return new WaitUntil(() => initTask.IsCompleted);
-    //     if (initTask.IsFaulted)
-    //     {
-    //         Debug.LogError("ObjectPoolerManager 초기화 실패: " + initTask.Exception);
-    //     }
-    //     else
-    //     {
-    //         Debug.Log("ObjectPoolerManager 초기화 성공");
-    //     }
-    // }
-
-    // public async void asd()
-    // {
-    //     await _stageManager.InitializeAsync();
-    // }
 
 
     void Update()
@@ -207,7 +185,7 @@ public class Managers : MonoBehaviour
             _stageManager = new StageManager();
             _stageManager.InitializeAsync();
         }
-    } 
+    }
 
     public static void Clear()
     {

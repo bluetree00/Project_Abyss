@@ -164,24 +164,6 @@ public class Define
         }
     }
    
-    public enum State // 상태
-    {
-        Die,
-        Idle,
-        Moving,
-        Runing,
-        Dodge,
-        ChangeWeapon,
-        NormalAttack_01,
-        NormalAttack_02,
-        NormalAttack_03,
-        NormalAttack_04,
-        NormalAttack_05,
-        JumpAttack,
-        NormalSkill_01,
-        UltimateSkill_01,
-        currentWeaponIdle,
-    }
 
     public enum MouseEvent
     {
@@ -205,10 +187,25 @@ public class Define
     // MonsterType 식별자를
     public enum MonsterType
     {
+        Bat,
         EvilMage,
         Orc,
         Slime,
         Specter
+    }
+
+    public enum AttackStyle
+    {
+        Melee,
+        Ranged,
+        Magic,
+    }
+
+    public enum AttackPurpose
+    {
+        Normal,
+        Special,
+        Ultimate,
     }
 
     
