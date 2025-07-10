@@ -16,12 +16,12 @@ MonoBehaviour:
   - tag: ShinySlash
     resourcePath: ShinySlash
     initialSize: 5
-    poolType: 0
+    poolType: 1
   - tag: HitEffect_02
     resourcePath: HitEffect_02
     initialSize: 5
-    poolType: 0
+    poolType: 1
   - tag: DieEffect_01
     resourcePath: DieEffect_01
     initialSize: 5
-    poolType: 0
+    poolType: 1

@@ -66,6 +66,16 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
 
     private void OnAttackStart()
     {
+        if (owner == null) return;
+
+        // 이펙트를 생성할 위치 (몬스터 앞 방향으로 약간 떨어진 곳)
+        Vector3 spawnOffset = owner.transform.forward * 1.0f; // 1.0f는 거리, 필요에 따라 조정
+        Vector3 spawnPosition = owner.transform.position + spawnOffset;
+
+        Quaternion spawnRotation = Quaternion.LookRotation(owner.transform.forward); // 방향 유지
+
+        GameObject effect = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+
         Debug.Log($"NormalAttackAbility: 공격 시작 이벤트 받음, 데미지: {damage}");
         // 실제 데미지 처리 로직 추가
     }

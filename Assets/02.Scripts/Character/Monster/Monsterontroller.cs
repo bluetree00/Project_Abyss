@@ -52,13 +52,15 @@ public abstract class MonsterController : CharacterBase
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
 
-        // 오브젝트 풀 초기화
-        string effectPoolKey = $"{Type}EffectPool";
-        Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
-        await Managers.Instance.InitializeObjectPoolAsync(effectPoolKey);
-
+        
         // AbilitySet 생성
         AbilitySet = abilitySetSO.CreateRuntimeSet(this);
+
+        // 오브젝트 풀 초기화 몬스터가 먼저 필드에 있으면 매니저랑 초기화 타이밍이 겹침 
+        string effectPoolKey = $"{Type}EffectPool";
+        Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
+
+        await Managers.Instance.InitializeObjectPoolAsync("BaseTest"); 
     }
 
     private void OnEnable()
@@ -123,7 +125,7 @@ public abstract class MonsterController : CharacterBase
     
 
     /// <summary>
-    /// 몬스터의 Animator에서 특정 기본 애니메이션 클립을 새 애니메이션 클립으로 오버라이드합니다.
+    /// 몬스터의 Animator에서 특정 기본 애니메이션 클립을 새 애니메이션 클립으로 오버라이드
     /// </summary>
     /// <param name="clipName">기본 클립 이름 (예: AnimationClipNames.Attack)</param>
     /// <param name="newClip">대체할 애니메이션 클립</param>
