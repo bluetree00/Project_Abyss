@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using Cysharp.Threading.Tasks;
 
 public class Managers : MonoBehaviour
 {
@@ -57,6 +58,7 @@ public class Managers : MonoBehaviour
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
+    
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
@@ -137,7 +139,7 @@ public class Managers : MonoBehaviour
     }
 
 
-    // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
+    // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화 추후 UniTask로 변경 예정
     // StartCoroutine(InitializeObjectPool("BaseTest"));
     // 비동기 방식으로 풀 데이터를 로드하여 풀러 초기화 진행 준비된 SO에 넣고 해당 이름을 매개변수로 전달 전달 방식은 enum의 내용을 사용 추후 DB도 사용가능
     public async System.Threading.Tasks.Task InitializeObjectPoolAsync(string effectPoolDataName)
