@@ -2,10 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Unity.VisualScripting;
-using UnityEditor.VersionControl;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
 public class Managers : MonoBehaviour
 {
@@ -63,7 +60,7 @@ public class Managers : MonoBehaviour
     public static DataManager Data { get { return Instance._data; } }
     #endregion
 
-    
+
 
     void Awake()
     {
@@ -77,39 +74,76 @@ public class Managers : MonoBehaviour
         {
             Destroy(gameObject);
         }
+        _addressableManager = new AddressableManager();
     }
 
     void Start()
     {
+        StartCoroutine(InitializeManagersCoroutine());
         //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
         //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
 
         // 1. StageData 로드 (없으면 새로 생성)
+        // _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
+        // if (_stageData == null)
+        // {
+        //     Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
+        //     _stageData = ScriptableObject.CreateInstance<StageData>();
+        //     _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
+
+        //     SaveStageData();
+        // }
+
+        // // 2. GraphData 로드 (없으면 새로 생성)
+        // _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
+        // if (_graphData == null)
+        // {
+        //     Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
+        //     _graphData = ScriptableObject.CreateInstance<GraphData>();
+        //     // 필요시 기본값 설정
+        //     SaveGraphData();
+        // }
+        // _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
+        
+    }
+
+    private IEnumerator InitializeManagersCoroutine()
+    {
+        // 1. AddressableManager 초기화
+        var initTask = _addressableManager.InitAsync();
+        while (!initTask.IsCompleted)
+            yield return null;
+
+        if (initTask.IsFaulted)
+        {
+            Debug.LogError($"Addressables 초기화 실패: {initTask.Exception}");
+            yield break;
+        }
+
+        // 2. StageData 로드
         _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
         if (_stageData == null)
         {
             Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
             _stageData = ScriptableObject.CreateInstance<StageData>();
-            _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
-
+            _stageData.SetDefaultValues();
             SaveStageData();
         }
 
-        // 2. GraphData 로드 (없으면 새로 생성)
+        // 3. GraphData 로드
         _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
         if (_graphData == null)
         {
             Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
             _graphData = ScriptableObject.CreateInstance<GraphData>();
-            // 필요시 기본값 설정
             SaveGraphData();
         }
+
+        // 4. Graph 생성
+        yield return null; // 프레임 나누기
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
 
-        // 3. StageManager 초기화 (매개변수 없이)
-        // _stageManager = new StageManager();
-        // _stageManager.InitializeAsync();
-        
+        Debug.Log("모든 매니저 초기화 완료");
     }
 
     
@@ -210,10 +244,26 @@ public class Managers : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.G))
         {
-            _stageManager = new StageManager();
-            _stageManager.InitializeAsync();
+            // _stageManager = new StageManager();
+            // _stageManager.InitializeAsync();
+            StartStageasync();
+            Debug.Log("StageManager StartStageasync 실행");
         }
-    } 
+    }
+
+    private bool isStageInitializing = false;
+
+    private async void StartStageasync()
+    {
+        if (isStageInitializing) return;
+        isStageInitializing = true;
+    
+        _stageManager = new StageManager();
+        await _stageManager.InitializeStageManager();
+    
+        Debug.Log("StageManager 초기화 완료");
+        isStageInitializing = false;
+    }
 
     public static void Clear()
     {
