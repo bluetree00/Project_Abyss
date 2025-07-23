@@ -44,15 +44,22 @@ public abstract class MonsterController : CharacterBase
     public void SetInAttackRange(bool inRange) => IsInAttackRange = inRange;
     public void SetAttack(bool isAttacking) => IsAttacking = isAttacking;
     public void SetAttackReadyTime(float time) => AttackReadyTime = time;
+    [SerializeField] private MonsterStat _myStat;
+    public MonsterStat MyStat => _myStat;
+
+    protected abstract int MonsterId { get; }
+
 
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
 
+        _myStat = Managers.MonsterData.GetStatById(MonsterId);
+
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
 
-        
+
         // AbilitySet 생성
         AbilitySet = abilitySetSO.CreateRuntimeSet(this);
 
@@ -60,7 +67,7 @@ public abstract class MonsterController : CharacterBase
         string effectPoolKey = $"{Type}EffectPool";
         Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
 
-        await Managers.Instance.InitializeObjectPoolAsync("BaseTest"); 
+        await Managers.Instance.InitializeObjectPoolAsync("BaseTest");
     }
 
     private void OnEnable()

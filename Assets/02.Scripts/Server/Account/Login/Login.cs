@@ -1,109 +1,139 @@
-using System.Collections;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using BackEnd;
+using Cysharp.Threading.Tasks;
 
-public class Login : LoginBase
+public class Login : MonoBehaviour
 {
-    //ID 필드 색상 변경
-    [SerializeField]
-    private Image imageID;
-    
-    [SerializeField]
-    private TMP_InputField inputFieldID; // ID 입력 필드
+    [SerializeField] private Image imageID;
+    [SerializeField] private TMP_InputField inputFieldID;
+    [SerializeField] private Image imagePW;
+    [SerializeField] private TMP_InputField inputFieldPW;
+    [SerializeField] private Button btnLogin;
 
-    [SerializeField]
-    private Image imagePW; // 비밀번호 입력 필드 색상 변경
-
-    [SerializeField]
-    private TMP_InputField inputFieldPW; // 비밀번호 입력 필드
-
-
-    [SerializeField]
-    private Button btnLogin; // 로그인 버튼
-
-    public void OnclickLogin()
+    private void Awake()
     {
-
-        ResetUI(imageID, imagePW); // UI 초기화
-
-        // 필드 데이터 비어있는지 확인
-        if (IsFieldDataEmpty(imageID, inputFieldID.text, "ID") || IsFieldDataEmpty(imagePW, inputFieldPW.text, "비밀번호"))
-        {
-            return; // 필드 데이터가 비어있으면 메서드 종료
-        }
-
-        btnLogin.interactable = false; // 로그인 버튼 비활성화
-
-        StartCoroutine(nameof(LoginProcess)); // 로그인 프로세스 시작
-
-        ResponseToLogin(inputFieldID.text, inputFieldPW.text); // 로그인 응답 처리
+        btnLogin.onClick.AddListener(OnClickLogin);
     }
 
-    private void ResponseToLogin(string ID, string PW)
+    private async void OnClickLogin()
     {
+        ResetUI();
+
+        if (IsFieldDataEmpty(imageID, inputFieldID.text, "ID") || 
+            IsFieldDataEmpty(imagePW, inputFieldPW.text, "비밀번호"))
+        {
+            return;
+        }
+
+        btnLogin.interactable = false;
+        SetMessage("로그인 시도 중...");
+
+        bool loginSuccess = await TryLoginAsync(inputFieldID.text, inputFieldPW.text);
+
+        if (loginSuccess)
+        {
+            SetMessage("로그인 성공! 몬스터 데이터 불러오는 중...");
+
+            await Managers.MonsterData.InitializeAsync();
+
+            SetMessage("데이터 불러오기 완료. 로비로 이동합니다.");
+            SceneUtilitys.LoadScene(SceneNames.Lobby);
+        }
+        else
+        {
+            btnLogin.interactable = true;
+            SetMessage("로그인 실패");
+            // 필요 시 에러 메시지 UI 업데이트 (아래 함수 참고)
+        }
+    }
+
+    private UniTask<bool> TryLoginAsync(string ID, string PW)
+    {
+        var tcs = new UniTaskCompletionSource<bool>();
+
         Backend.BMember.CustomLogin(ID, PW, callback =>
         {
-            StopCoroutine(nameof(LoginProcess)); // 로그인 프로세스 중지
-
             if (callback.IsSuccess())
             {
-                SetMessage($"{inputFieldID.text}님 환영합니다."); // 로그인 성공 메시지 설정
-                
-                SceneUtilitys.LoadScene(SceneNames.Lobby); // 로비 씬으로 이동
-
+                tcs.TrySetResult(true);
             }
             else
             {
-                btnLogin.interactable = true; // 로그인 버튼 활성화
+                int statusCode = 0;
+                int.TryParse(callback.GetStatusCode(), out statusCode);
 
-                string message = string.Empty; // 메시지 초기화
-
-                switch( int.Parse(callback.GetStatusCode()))
-                {
-                    case 401: // 비밀번호 오류
-                        message = callback.GetMessage().Contains("customID") ? "존재하지 않는 아이디 입니다." : "잘못된 비밀번호 입니다.";
-                        break;
-                    case 403: //유저 or 디바이스 차단
-                        message = callback.GetMessage().Contains("customID") ? "차단된 아이디 입니다." : "차단된 디바이스 입니다.";
-                        break;
-                    case 410: //탈퇴 진행중
-                        message = "탈퇴 진행중입니다.";
-                        break;
-                    default:
-                        message = callback.GetMessage(); // 기본 메시지 설정
-                        break;
-                   
-                }
-
-                if(message.Contains("비밀번호"))
-                {
-                    GuideForIncorrectlyEnteredData(imagePW, message); // 비밀번호 오류 메시지 설정
-                }
-                else
-                {
-                    GuideForIncorrectlyEnteredData(imageID, message); // ID 오류 메시지 설정
-                }
-           
+                HandleLoginError(statusCode, callback.GetMessage());
+                tcs.TrySetResult(false);
             }
         });
-         
+
+        return tcs.Task;
     }
 
-    private IEnumerator LoginProcess()
+
+    private void HandleLoginError(int statusCode, string message)
     {
-        float time = 0f; // 시간 초기화
+        btnLogin.interactable = true;
 
-        while(true)
+        switch(statusCode)
         {
-            time += Time.deltaTime; // 시간 증가
-
-            SetMessage($"로그인 중...{time:F1}"); // 로그인 중 메시지 설정
-
-            yield return null; // 다음 프레임까지 대기
+            case 401:
+                if (message.Contains("customID"))
+                    GuideForIncorrectlyEnteredData(imageID, "존재하지 않는 아이디 입니다.");
+                else
+                    GuideForIncorrectlyEnteredData(imagePW, "잘못된 비밀번호 입니다.");
+                break;
+            case 403:
+                if (message.Contains("customID"))
+                    GuideForIncorrectlyEnteredData(imageID, "차단된 아이디 입니다.");
+                else
+                    GuideForIncorrectlyEnteredData(imagePW, "차단된 디바이스 입니다.");
+                break;
+            case 410:
+                SetMessage("탈퇴 진행중입니다.");
+                break;
+            default:
+                SetMessage(message);
+                break;
         }
-        // 로그인 성공 시 처리할 내용
-        Debug.Log("로그인 성공!");
+    }
+
+    private void ResetUI()
+    {
+        // 색상 초기화 등 필요한 UI 초기화 처리
+        ResetImageColor(imageID);
+        ResetImageColor(imagePW);
+        SetMessage("");
+    }
+
+    private bool IsFieldDataEmpty(Image image, string text, string fieldName)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            GuideForIncorrectlyEnteredData(image, $"{fieldName}을(를) 입력하세요.");
+            return true;
+        }
+        return false;
+    }
+
+    private void GuideForIncorrectlyEnteredData(Image image, string message)
+    {
+        // 이미지 색상 변경, 메시지 표시 등 구현
+        image.color = Color.red;
+        SetMessage(message);
+    }
+
+    private void ResetImageColor(Image image)
+    {
+        image.color = Color.white;
+    }
+
+    private void SetMessage(string message)
+    {
+        // 메시지 출력용 구현 (예: UI 텍스트 업데이트)
+        Debug.Log(message);
     }
 }
