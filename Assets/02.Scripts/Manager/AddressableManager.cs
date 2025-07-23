@@ -15,64 +15,42 @@ public class LoadedAsset
 
 public class AddressableManager
 {
-    // public static AddressableManager Instance { get; private set; }
-
-    // private void Awake()
-    // {
-    //     if (Instance != null && Instance != this)
-    //     {
-    //         Destroy(gameObject);
-    //         return;
-    //     }
-    //     Instance = this;
-    //     DontDestroyOnLoad(gameObject);
-    // }
 
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
     public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
 
     private Task _initTask;
-    public Task InitTask => _initTask;
-
     private bool _isInitialized = false;
     private bool _initFailed = false;
 
 
-
-    private void Start()
+    public async Task InitAsync()
     {
-        //StartCoroutine(InitAddressables());
-        //_initTask = InitAddressablesCoroutine();
-    }
+        if (_isInitialized) return;
 
-    // IEnumerator InitAddressables()
-    // {
-    //     var Init = Addressables.InitializeAsync();
-    //     yield return Init;
-    // }
-
-    private async Task InitAddressablesCoroutine()
-    {
         try
         {
-            var init = Addressables.InitializeAsync();
-            await init.Task;
-            if (init.Status == AsyncOperationStatus.Succeeded)
-            {
-                _isInitialized = true;
-                Debug.Log("Addressables 초기화 성공");
-            }
-            else
-            {
-                Debug.LogError("Addressables 초기화 실패");
-                _initFailed = true;
-            }
+            var operation = Addressables.InitializeAsync();
+            await operation.Task;
+            _isInitialized = true;
+            Debug.Log("Addressables 초기화 성공");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"Addressables 초기화 중 예외 발생: {ex}");
-            _initFailed = true;
+            Debug.LogError($"Addressables 초기화 실패: {ex}");
+            throw;
         }
+    }
+
+    public bool IsInitialized => _isInitialized;
+    
+    // 모든 Addressables 작업 전에 반드시 초기화 대기
+    private async Task EnsureInitializedAsync()
+    {
+        if (_isInitialized) return;
+        await _initTask;
+        if (_initFailed)
+            throw new Exception("Addressables 초기화 실패");
     }
 
     private void UpdateLoadedAssetsList()
@@ -137,8 +115,9 @@ public class AddressableManager
     /// <param name="key"></param>
     /// <param name="onSuccess"></param>
     /// <param name="onFailure"></param>
-    public void InstantiateAsync(string key, Action<GameObject> onSuccess, Action onFailure = null)
+    public async Task InstantiateAsync(string key, Action<GameObject> onSuccess, Action onFailure = null)
     {
+        await EnsureInitializedAsync();
         Addressables.InstantiateAsync(key).Completed += handle =>
         {
             HandleCompletion(handle, key, onSuccess, onFailure);
@@ -151,6 +130,7 @@ public class AddressableManager
     /// <param name="key"></param>
     public async Task<GameObject> InstantiateAsyncTask(string key)
     {
+        await EnsureInitializedAsync();
         try
         {
             var handle = Addressables.InstantiateAsync(key);

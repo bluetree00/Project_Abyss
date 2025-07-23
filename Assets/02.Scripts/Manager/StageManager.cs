@@ -18,8 +18,9 @@ public class StageManager
 
     //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
 
-    public void InitializeAsync()
+    public async Task InitializeStageManager()
     {
+        Debug.Log("StageManager InitializeAsync 시작");
         // GraphData는 싱글톤 또는 Managers에서 참조
         GraphData graphData = Managers._graphData;
         if (graphData == null || graphData.graph == null)
@@ -33,27 +34,34 @@ public class StageManager
 
         // InitializeStages();
         // SetInitialStage();      
-        StageprepareAsync();  
+        await StageprepareAsync();  
     }
      
-    public void StageprepareAsync()
+    public async Task StageprepareAsync()
     {
+        Debug.Log("StageManager StageprepareAsync 시작");
+        foreach (var node in stageGraph.Nodes)
+        {
+            if (!nodeToStageMap.ContainsKey(node.Id))
+            {
+                GameObject stageObject = await Managers.AddressableManager.InstantiateAsyncTask(GetStageAddress(node));
+                if (stageObject != null)
+                {
+                    stageObject.SetActive(false);
+                    nodeToStageMap[node.Id] = stageObject;
+                    Debug.Log($"Preparing stage for node {node.Id} ({node.GetLabel()})");
+                }
+                else
+                {
+                    Debug.LogError($"Stage prefab not found for node {node.Id} ({node.GetLabel()})");
+                }
+            }
+        }
         Node? startNode = stageGraph.Nodes.Find(node => node.Type == NodeType.Start);
         Debug.LogWarning(startNode.Value.ToString());
         Debug.LogWarning(GetStageAddress(startNode.Value));
         if (startNode.HasValue)
         {
-            //어드레서블을 사용해서 오브젝트를 로드
-            GameObject stageObject = Managers.AddressableManager.LoadAssetSync<GameObject>(GetStageAddress(startNode.Value));
-            if (stageObject == null)
-            {
-                Debug.LogError($"Stage prefab not found for node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
-                return;
-            }
-            stageObject = GameObject.Instantiate(stageObject);
-            stageObject.SetActive(false);
-            nodeToStageMap[startNode.Value.Id] = stageObject;
-            Debug.Log($"Preparing stage for start node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
             currentNode = startNode;
             ActivateStage(currentNode.Value);
         }
@@ -61,6 +69,28 @@ public class StageManager
         {
             Debug.LogError("No start node found in the graph.");
         }
+        
+
+    // if (startNode.HasValue)
+        // {
+        //     //어드레서블을 사용해서 오브젝트를 로드
+        //     GameObject stageObject = await Managers.AddressableManager.InstantiateAsyncTask(GetStageAddress(startNode.Value));
+        //     if (stageObject == null)
+        //     {
+        //         Debug.LogError($"Stage prefab not found for node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
+        //         return;
+        //     }
+        //     //stageObject = GameObject.Instantiate(stageObject);
+        //     stageObject.SetActive(false);
+        //     nodeToStageMap[startNode.Value.Id] = stageObject;
+        //     Debug.Log($"Preparing stage for start node {startNode.Value.Id} ({startNode.Value.GetLabel()})");
+        //     currentNode = startNode;
+        //     await ActivateStage(currentNode.Value);
+        // }
+        // else
+        // {
+        //     Debug.LogError("No start node found in the graph.");
+        // }
 
         OnGraphGenerated?.Invoke(stageGraph);
     }
@@ -68,8 +98,9 @@ public class StageManager
     // Addressables 키 규칙에 맞게 주소 생성
     private string GetStageAddress(Node node)
     {
-        // 예시: "Stage_01", "Stage_02" 등
-        return $"Stage_{node.Id + 1:D2}";
+        string address = $"Stage_{node.Id + 1:D2}";
+        Debug.Log($"Generated Addressables key: {address}");
+        return address;
     }
 
         // // ActivateStage를 비동기로 변경
@@ -143,6 +174,22 @@ public class StageManager
             nodeToStageMap[currentNode.Value.Id].SetActive(false);
         }
 
+        // 해당 노드의 스테이지 오브젝트가 없으면 Addressables에서 비동기로 생성
+        // if (!nodeToStageMap.ContainsKey(node.Id) || nodeToStageMap[node.Id] == null)
+        // {
+        //     GameObject stageObject = await Managers.AddressableManager.InstantiateAsyncTask(GetStageAddress(node));
+        //     if (stageObject != null)
+        //     {
+        //         stageObject.SetActive(false);
+        //         nodeToStageMap[node.Id] = stageObject;
+        //     }
+        //     else
+        //     {
+        //         Debug.LogError($"Stage prefab not found for node {node.Id} ({node.GetLabel()})");
+        //         return;
+        //     }
+        // }
+
         // 새로운 노드의 스테이지 활성화
         if (nodeToStageMap.ContainsKey(node.Id))
         {
@@ -156,20 +203,20 @@ public class StageManager
         }
 
         // 현재 노드 강조 //
-        if (nodeToStageMap.ContainsKey(node.Id))
-        {
-            nodeToStageMap[node.Id].SetActive(true);
-            currentNode = node;
+        // if (nodeToStageMap.ContainsKey(node.Id))
+        // {
+        //     nodeToStageMap[node.Id].SetActive(true);
+        //     currentNode = node;
 
-            // 현재 노드 강조
-            var visualizer = GameObject.FindObjectOfType<UIGraphVisualizer>();
-            if (visualizer != null)
-                visualizer.HighlightCurrentNode(node.Id);
-        }
-        else
-        {
-            Debug.LogError($"Stage for node {node.Id} not found.");
-        }
+        //     // 현재 노드 강조
+        //     var visualizer = GameObject.FindObjectOfType<UIGraphVisualizer>();
+        //     if (visualizer != null)
+        //         visualizer.HighlightCurrentNode(node.Id);
+        // }
+        // else
+        // {
+        //     Debug.LogError($"Stage for node {node.Id} not found.");
+        // }
     }
 
     public void MoveToNextStage(int direction)
@@ -209,6 +256,7 @@ public class StageManager
             return new List<Node>();
         }
 
+        Debug.Log($"Finding connected nodes for current node: {currentNode.Value.Id}");
         var connectedEdges = stageGraph.Edges.Where(edge => edge.FromId == currentNode.Value.Id);
         var connectedNodes = new List<Node>();
         foreach (var edge in connectedEdges)
