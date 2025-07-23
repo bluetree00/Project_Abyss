@@ -54,6 +54,11 @@ public class Managers : MonoBehaviour
     SceneManagerEx _scene = new SceneManagerEx();
     DataManager _data = new DataManager();
 
+    private MonsterDataManager _monsterDataManager;
+    public static MonsterDataManager MonsterData => Instance._monsterDataManager ??= new MonsterDataManager();
+
+
+
 
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
