@@ -51,7 +51,7 @@ public class DataManager
         try
         {
             string json = File.ReadAllText(path);
-            Debug.Log(Application.persistentDataPath);
+            Debug.Log($"{Application.persistentDataPath}/{fileName} 로드 완료");
             return JsonConvert.DeserializeObject<T>(json);
         }
         catch (System.Exception ex)
@@ -68,6 +68,7 @@ public class DataManager
         {
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(path, json);
+            Debug.Log($"Json 저장 완료: {path}");
         }
         catch (System.Exception ex)
         {
