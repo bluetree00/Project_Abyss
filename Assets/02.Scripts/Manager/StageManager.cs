@@ -14,7 +14,6 @@ public class StageManager
     public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
     private Node? currentNode; // 현재 활성화된 노드
     private Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
-    public event Action<Graph> OnGraphGenerated; // 그래프 생성 완료 이벤트
 
     //TODO: Json으로 그래프 정보와 스테이지 정보를 저장하고 불러오는 기능 추가
 
