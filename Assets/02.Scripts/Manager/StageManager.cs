@@ -57,6 +57,7 @@ public class StageManager
                 }
             }
         }
+        Debug.Log("All stages prepared, setting initial stage.");
         Node? startNode = stageGraph.Nodes.Find(node => node.Type == NodeType.Start);
         Debug.LogWarning(startNode.Value.ToString());
         Debug.LogWarning(GetStageAddress(startNode.Value));
@@ -64,6 +65,7 @@ public class StageManager
         {
             currentNode = startNode;
             ActivateStage(currentNode.Value);
+            Debug.Log($"Activated stage: {startNode.Value.Id} {startNode.Value.GetLabel()})");
         }
         else
         {
@@ -91,8 +93,6 @@ public class StageManager
         // {
         //     Debug.LogError("No start node found in the graph.");
         // }
-
-        OnGraphGenerated?.Invoke(stageGraph);
     }
 
     // Addressables 키 규칙에 맞게 주소 생성
