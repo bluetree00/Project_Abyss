@@ -188,10 +188,20 @@ public class Define
     public enum MonsterType
     {
         Bat,
-        EvilMage,
         Orc,
         Slime,
-        Specter
+
+    }
+
+     public static readonly Dictionary<MonsterType, int> MonsterIdMap = new()
+    {
+        { MonsterType.Bat, 1001 },
+       
+    };
+
+    public static int GetMonsterId(MonsterType type)
+    {
+        return MonsterIdMap.TryGetValue(type, out var id) ? id : -1;
     }
 
     public enum AttackStyle
