@@ -9,10 +9,10 @@ public class MonsterStat
     public int level;
     public int max_hp;
     public int attack;
-    public float attack_range;
     public float move_speed;
+    public float attack_range;
+    public float attack_cooldown;
     public float def;
-    public float player_identification;
     public int stat_version;
 }
 
