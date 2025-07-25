@@ -4107,24 +4107,13 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 22100000, guid: d4088aa9e7df9be479eab1ca73cd048d,
         type: 2}
-    - target: {fileID: 7449390507434194877, guid: 2d87cebda5d67d64e906d47258aef8d1,
-        type: 3}
-      propertyPath: m_ApplyRootMotion
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8763121155009113271, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
       propertyPath: m_Name
       value: NormalBatFSM
       objectReference: {fileID: 0}
-    - target: {fileID: 8763121155009113271, guid: 2d87cebda5d67d64e906d47258aef8d1,
-        type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects:
-    - {fileID: 6984242580533987168, guid: 2d87cebda5d67d64e906d47258aef8d1, type: 3}
+    m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2d87cebda5d67d64e906d47258aef8d1, type: 3}
