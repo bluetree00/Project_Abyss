@@ -82,6 +82,9 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
 
     private void OnAttackEnd()
     {
+        if (owner == null) return;
+        owner.SetAttackReadyTime(owner.MyStat.attack_cooldown);
+        owner.SetAttack(false);
         Debug.Log("NormalAttackAbility: 공격 종료 이벤트 받음");
     }
 }
