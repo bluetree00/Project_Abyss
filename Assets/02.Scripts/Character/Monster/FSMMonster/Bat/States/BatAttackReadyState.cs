@@ -36,7 +36,7 @@ public class BatAttackReadyState : IMonsterState
         {
             controller.SetCurrentAttackAbility(selectedAttack);
 
-            if (selectedAttack is IAnimClipProvider clipProvider)
+            if (selectedAttack is IAnimClipProvider clipProvider) //어빌리티에 있는 공격 애니메이션을 적용
             {
                 var clip = clipProvider.GetAttackAnimationClip();
                 controller.OverrideAnimationClip("Attack", clip);  // 몬스터 컨트롤러 내 함수 호출
