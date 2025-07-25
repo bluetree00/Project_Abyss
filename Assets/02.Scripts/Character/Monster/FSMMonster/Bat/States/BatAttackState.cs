@@ -29,6 +29,6 @@ public class BatAttackState : IMonsterState
 
     public void Exit()
     {
-        controller.StopMoving();
+        // controller.StopMoving();
     }
 }

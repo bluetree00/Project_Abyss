@@ -6,9 +6,6 @@ public class BatAttackReadyState : IMonsterState
     private IMonsterStateChanger stateChanger;
     private AttackAbilitySet attackAbilitySet;
 
-    private float readyTime = 0.5f;
-    private float timer;
-
     private Define.AttackStyle selectedStyle = Define.AttackStyle.Melee; 
     private Define.AttackPurpose selectedPurpose = Define.AttackPurpose.Normal;
 
@@ -27,7 +24,6 @@ public class BatAttackReadyState : IMonsterState
     public void Enter()
     {
         controller.StopMoving();
-        timer = readyTime;
 
         // 어빌리티 선택 및 애니메이션 오버라이드 준비
         var selectedAttack = attackAbilitySet?.SelectAttackAbility(selectedStyle, selectedPurpose);
@@ -49,17 +45,39 @@ public class BatAttackReadyState : IMonsterState
 
     public MonsterController.MonsterState Update()
     {
-        timer -= Time.deltaTime;
+        // ✅ 현재 거리 측정하여 IsInAttackRange 갱신
+        float distanceToTarget = Vector3.Distance(controller.transform.position, controller.playerTarget.position);
+        bool isInRange = distanceToTarget <= controller.MyStat.attack_range;
 
-        if(timer <= 0f)
+        controller.SetInAttackRange(isInRange); // 수동 갱신
+
+        // ✅ 공격 범위 이탈 시 추적 상태로 전환
+        if (!isInRange)
         {
-            // 공격 상태로 전환
+            stateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
+            return MonsterController.MonsterState.Chase;
+        }
+
+        // ✅ 쿨타임이 끝나면 공격 상태로 전환
+        if (controller.AttackReadyTime <= 0f)
+        {
             stateChanger.RequestStateChange(MonsterController.MonsterState.Attack);
             return MonsterController.MonsterState.Attack;
         }
 
+        // ✅ 공격 방향 회전 보정
+        Vector3 direction = controller.playerTarget.position - controller.transform.position;
+        direction.y = 0f;
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            controller.transform.rotation = Quaternion.Slerp(controller.transform.rotation, targetRotation, Time.deltaTime * 10f);
+        }
+
         return MonsterController.MonsterState.AttackReady;
     }
+
+
 
     public void Exit()
     {
