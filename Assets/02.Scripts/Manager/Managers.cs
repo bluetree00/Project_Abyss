@@ -28,7 +28,7 @@ public class Managers : MonoBehaviour
     private List<LoadedAsset> _loadedAssetsList = new List<LoadedAsset>();
 
     #region Data // 데이터 매니저
-    public static GraphData _graphData { get; private set; }
+    public static GraphData _graphData { get; set; }
     public static StageData _stageData { get; private set; } // StageData 인스턴스
     private const string StageDataFile = "StageData.json";
     private const string GraphDataFile = "GraphData.json";
@@ -104,7 +104,7 @@ public class Managers : MonoBehaviour
         //     SaveGraphData();
         // }
         // _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
-        
+
     }
 
     private IEnumerator InitializeManagersCoroutine()
@@ -121,23 +121,10 @@ public class Managers : MonoBehaviour
         }
 
         // 2. StageData 로드
-        _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
-        if (_stageData == null)
-        {
-            Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
-            _stageData = ScriptableObject.CreateInstance<StageData>();
-            _stageData.SetDefaultValues();
-            SaveStageData();
-        }
+        LoadStageData();
 
         // 3. GraphData 로드
-        _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
-        if (_graphData == null)
-        {
-            Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
-            _graphData = ScriptableObject.CreateInstance<GraphData>();
-            SaveGraphData();
-        }
+        LoadGraphData();
 
         // 4. Graph 생성
         yield return null; // 프레임 나누기
@@ -146,7 +133,7 @@ public class Managers : MonoBehaviour
         Debug.Log("모든 매니저 초기화 완료");
     }
 
-    
+
 
 
     public StageData GetStageData()
@@ -157,17 +144,46 @@ public class Managers : MonoBehaviour
     {
         return _graphData;
     }
-    
+
     public void SaveStageData()
     {
-       DataManager.SaveJsonFile(StageDataFile, _stageData);
+        DataManager.SaveJsonFile(StageDataFile, _stageData);
+    }
+
+    public void LoadStageData()
+    {
+        _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
+        if (_stageData == null)
+        {
+            Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
+            _stageData = ScriptableObject.CreateInstance<StageData>();
+            _stageData.SetDefaultValues();
+            SaveStageData();
+        }
     }
 
     public void SaveGraphData()
     {
+        if (_graphData == null)
+        {
+            Debug.LogError("GraphData가 null입니다. 저장할 수 없습니다.");
+            return;
+        }
+
         DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
-    
+
+    public void LoadGraphData()
+    {
+        _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
+        if (_graphData == null)
+        {
+            Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
+            _graphData = ScriptableObject.CreateInstance<GraphData>();
+            SaveGraphData();
+        }
+    }
+
 
     // 예시로 다른 풀도 추가 외부에서는 Managers를 붙여서 접근 초기화
     // StartCoroutine(InitializeObjectPool("BaseTest"));
@@ -257,10 +273,10 @@ public class Managers : MonoBehaviour
     {
         if (isStageInitializing) return;
         isStageInitializing = true;
-    
+
         _stageManager = new StageManager();
         await _stageManager.InitializeStageManager();
-    
+
         Debug.Log("StageManager 초기화 완료");
         isStageInitializing = false;
     }
@@ -274,6 +290,53 @@ public class Managers : MonoBehaviour
             s_instance = null;
         }
     }
+
+    void OnApplicationQuit()
+    {
+        Stage.SaveGraphState(); // 게임 종료 시 그래프 상태 저장
+    }
+
+
+    //NOTE : MonoBehaviour가 없는 하위 매니저들에서 사용할 코루틴 실행 함수
+    #region Coroutine // 코루틴 매니저
+    // 코루틴 매니저는 MonoBehaviour를 상속받아야 하므로
+    // Managers 클래스가 MonoBehaviour를 상속받고 있습니다.
+
+    // 코루틴 실행 메서드
+    public static Coroutine StartCoroutineStatic(IEnumerator routine)
+    {
+        if (Instance == null)
+        {
+            Debug.LogError("Managers instance is not initialized. Coroutine cannot be started.");
+            return null;
+        }
+
+        return Instance.StartCoroutine(routine);
+    }
+
+    public static void StopCoroutineStatic(Coroutine coroutine)
+    {
+        if (Instance == null)
+        {
+            Debug.LogError("Managers instance is not initialized. Coroutine cannot be stopped.");
+            return;
+        }
+
+        Instance.StopCoroutine(coroutine);
+    }
+
+    public static void StopAllCoroutinesStatic()
+    {
+        if (Instance == null)
+        {
+            Debug.LogError("Managers instance is not initialized. All coroutines cannot be stopped.");
+            return;
+        }
+
+        Instance.StopAllCoroutines();
+    }
+
+    #endregion
 
 
 }
