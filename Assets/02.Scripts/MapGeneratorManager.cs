@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경하세요.
@@ -63,12 +64,27 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
     // 그래프 데이터 구조
     public class Graph
     {
-        public List<Node> Nodes { get; } = new List<Node>();
-        // 중복 간선 방지를 위해 HashSet 사용
-        public HashSet<Edge> Edges { get; } = new HashSet<Edge>();
+        // public List<Node> Nodes { get; } = new List<Node>();
+        // // 중복 간선 방지를 위해 HashSet 사용
+        // public HashSet<Edge> Edges { get; } = new HashSet<Edge>();
 
         // ToDot() 메소드는 제거되었습니다.
         // 생성된 그래프 데이터를 사용하려면 Nodes와 Edges 컬렉션을 직접 순회해야 합니다.
+
+        public List<Node> Nodes { get; set; } = new List<Node>();
+        [JsonIgnore] // HashSet은 직렬화하지 않음
+        public HashSet<Edge> Edges { get; set; } = new HashSet<Edge>();
+
+        // 직렬화를 위한 List<Edge> 속성
+        [JsonProperty("Edges")]
+        public List<Edge> SerializableEdges
+        {
+            get => Edges.ToList(); // HashSet -> List로 변환
+            set => Edges = new HashSet<Edge>(value); // List -> HashSet으로 복원
+        }
+
+        [JsonConstructor]
+        public Graph() { }
     }
 
     // 그래프 생성기
@@ -99,31 +115,15 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
 
             // NOTE : 노드 ID 순열 생성 부분
             // =================================================================
-            int totalNodeCount = chapterData.layerSizes.Sum();
-            List<int> randomIds = Enumerable.Range(0, totalNodeCount)
-                                            .OrderBy(_ => UnityEngine.Random.value)
-                                            .ToList();
+            // int totalNodeCount = chapterData.layerSizes.Sum();
+            // List<int> randomIds = Enumerable.Range(0, totalNodeCount)
+            //                                 .OrderBy(_ => UnityEngine.Random.value)
+            //                                 .ToList();
 
-            int randomIdIndex = 0;
+            // int randomIdIndex = 0;
 
 
-            // 1) 노드 생성
-            // for (int i = 0; i < chapterData.layerSizes.Length; i++)
-            // {
-            //     var currentLayerNodes = new List<Node>();
-            //     NodeType type = NodeType.Normal;
-            //     if (i == 0) type = NodeType.Start;
-            //     else if (i == chapterData.layerSizes.Length - 1) type = NodeType.End;
-
-            //     for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
-            //     {
-            //         var node = new Node(idCounter++, i, pos, type);
-            //         currentLayerNodes.Add(node);
-            //         graph.Nodes.Add(node);
-            //     }
-
-            //     layers.Add(currentLayerNodes);
-            // }
+            //1) 노드 생성
             for (int i = 0; i < chapterData.layerSizes.Length; i++)
             {
                 var currentLayerNodes = new List<Node>();
@@ -133,14 +133,30 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
 
                 for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
                 {
-                    int randomId = randomIds[randomIdIndex++];
-                    var node = new Node(randomId, i, pos, type);
+                    var node = new Node(idCounter++, i, pos, type);
                     currentLayerNodes.Add(node);
                     graph.Nodes.Add(node);
                 }
 
                 layers.Add(currentLayerNodes);
             }
+            // for (int i = 0; i < chapterData.layerSizes.Length; i++)
+            // {
+            //     var currentLayerNodes = new List<Node>();
+            //     NodeType type = NodeType.Normal;
+            //     if (i == 0) type = NodeType.Start;
+            //     else if (i == chapterData.layerSizes.Length - 1) type = NodeType.End;
+
+            //     for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
+            //     {
+            //         int randomId = randomIds[randomIdIndex++];
+            //         var node = new Node(randomId, i, pos, type);
+            //         currentLayerNodes.Add(node);
+            //         graph.Nodes.Add(node);
+            //     }
+
+            //     layers.Add(currentLayerNodes);
+            // }
             //================================================================
 
             // 2) 간선 생성 (규칙 적용 + 특정 N=M+2 케이스에서 간선 제한 무시)
@@ -261,7 +277,7 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
             }
 
             UnityEngine.Debug.Log("그래프 생성 완료: " + graph.Nodes.Count + " 노드, " + graph.Edges.Count + " 간선");
-            Managers.Instance.SaveGraphData(); // 그래프 데이터 저장
+            //Managers.Instance.SaveGraphData(); // 그래프 데이터 저장
             return graph;
         }
 

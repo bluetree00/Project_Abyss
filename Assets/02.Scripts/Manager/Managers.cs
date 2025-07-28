@@ -129,6 +129,11 @@ public class Managers : MonoBehaviour
         // 4. Graph 생성
         yield return null; // 프레임 나누기
         _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
+        if (_graphData.graph == null)
+        {
+            Debug.LogError("그래프 생성 실패");
+            yield break;
+        }
 
         Debug.Log("모든 매니저 초기화 완료");
     }
@@ -170,18 +175,22 @@ public class Managers : MonoBehaviour
             return;
         }
 
-        DataManager.SaveJsonFile(GraphDataFile, _graphData);
+        var runtimeData = _graphData.ToRuntime();
+        DataManager.SaveJsonFile(GraphDataFile, runtimeData);
     }
 
     public void LoadGraphData()
     {
-        _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
-        if (_graphData == null)
+        var runtimeData = DataManager.LoadJsonFile<GraphDataRuntime>(GraphDataFile);
+        if (runtimeData == null)
         {
             Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
             _graphData = ScriptableObject.CreateInstance<GraphData>();
-            SaveGraphData();
+            return;
         }
+
+        _graphData = ScriptableObject.CreateInstance<GraphData>();
+        _graphData.FromRuntime(runtimeData);
     }
 
 
@@ -293,7 +302,9 @@ public class Managers : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        Stage.SaveGraphState(); // 게임 종료 시 그래프 상태 저장
+        Debug.Log($"그래프 저장 직전 상태: graph = {_graphData.graph}, nodeCount = {_graphData.graph?.Nodes?.Count}");
+
+        Stage.SaveGraphData();
     }
 
 
