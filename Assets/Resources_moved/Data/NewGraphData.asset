@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b691e76eeaeebc4b9a0d92ba784130e, type: 3}
   m_Name: NewGraphData
   m_EditorClassIdentifier: 
+  isProgress: 0
+  isClear: 0
