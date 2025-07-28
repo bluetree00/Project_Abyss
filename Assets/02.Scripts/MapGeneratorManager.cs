@@ -97,7 +97,33 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
             }
 
 
+            // NOTE : 노드 ID 순열 생성 부분
+            // =================================================================
+            int totalNodeCount = chapterData.layerSizes.Sum();
+            List<int> randomIds = Enumerable.Range(0, totalNodeCount)
+                                            .OrderBy(_ => UnityEngine.Random.value)
+                                            .ToList();
+
+            int randomIdIndex = 0;
+
+
             // 1) 노드 생성
+            // for (int i = 0; i < chapterData.layerSizes.Length; i++)
+            // {
+            //     var currentLayerNodes = new List<Node>();
+            //     NodeType type = NodeType.Normal;
+            //     if (i == 0) type = NodeType.Start;
+            //     else if (i == chapterData.layerSizes.Length - 1) type = NodeType.End;
+
+            //     for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
+            //     {
+            //         var node = new Node(idCounter++, i, pos, type);
+            //         currentLayerNodes.Add(node);
+            //         graph.Nodes.Add(node);
+            //     }
+
+            //     layers.Add(currentLayerNodes);
+            // }
             for (int i = 0; i < chapterData.layerSizes.Length; i++)
             {
                 var currentLayerNodes = new List<Node>();
@@ -107,13 +133,15 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
 
                 for (int pos = 0; pos < chapterData.layerSizes[i]; pos++)
                 {
-                    var node = new Node(idCounter++, i, pos, type);
+                    int randomId = randomIds[randomIdIndex++];
+                    var node = new Node(randomId, i, pos, type);
                     currentLayerNodes.Add(node);
                     graph.Nodes.Add(node);
                 }
 
                 layers.Add(currentLayerNodes);
             }
+            //================================================================
 
             // 2) 간선 생성 (규칙 적용 + 특정 N=M+2 케이스에서 간선 제한 무시)
             for (int i = 0; i < layers.Count - 1; i++)
@@ -149,7 +177,7 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                             targetIndices.Add(1);
                         }
                     }
-                     // 규칙 2: 상위 레이어 노드 수 N이 하위 레이어 노드 수 M보다 작거나 같을 때 (1 < N <= M)
+                    // 규칙 2: 상위 레이어 노드 수 N이 하위 레이어 노드 수 M보다 작거나 같을 때 (1 < N <= M)
                     else if (upperSize <= lowerSize)
                     {
                         // M이 N보다 정확히 2n 큰 경우에 대한 특별 규칙 적용 (n=1)
@@ -157,8 +185,8 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                         if (lowerSize == upperSize + 2)
                         {
                             // posU * 2 와 posU * 2 + 1 위치의 노드를 연결 대상으로 삼음
-                             targetIndices.Add(nodeU.Position * 2);
-                             targetIndices.Add(nodeU.Position * 2 + 1);
+                            targetIndices.Add(nodeU.Position * 2);
+                            targetIndices.Add(nodeU.Position * 2 + 1);
                         }
                         else // 그 외의 N <= M 일반 규칙
                         {
@@ -170,16 +198,16 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                     // 규칙 3: 상위 레이어 노드 수 N이 하위 레이어 노드 수 M보다 클 때 (N > M)
                     else // upperSize > lowerSize
                     {
-                         // N이 M보다 정확히 2n 큰 경우에 대한 특별 규칙 적용 (n=1)
-                         // (이 규칙 자체는 제한 무시와는 별개로 대상 인덱스를 계산하는 규칙임)
-                         if (upperSize == lowerSize + 2) // N = M + 2
-                         {
-                             // 모든 하위 레이어 노드를 연결 대상으로 삼음
-                             for (int k = 0; k < lowerSize; k++)
-                             {
-                                 targetIndices.Add(k);
-                             }
-                         }
+                        // N이 M보다 정확히 2n 큰 경우에 대한 특별 규칙 적용 (n=1)
+                        // (이 규칙 자체는 제한 무시와는 별개로 대상 인덱스를 계산하는 규칙임)
+                        if (upperSize == lowerSize + 2) // N = M + 2
+                        {
+                            // 모든 하위 레이어 노드를 연결 대상으로 삼음
+                            for (int k = 0; k < lowerSize; k++)
+                            {
+                                targetIndices.Add(k);
+                            }
+                        }
                         else // 그 외의 N > M 일반 규칙
                         {
                             if (nodeU.Position == 0) // 가장 왼쪽 노드
@@ -188,7 +216,7 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                             }
                             else if (nodeU.Position == upperSize - 1) // 가장 오른쪽 노드
                             {
-                                 targetIndices.Add(lowerSize - 1);
+                                targetIndices.Add(lowerSize - 1);
                             }
                             else // 중간 노드 (0 < posU < upperSize - 1)
                             {
@@ -206,30 +234,30 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
                     // 중복 인덱스 제거 및 유효 범위 확인 후 보정
                     foreach (var targetIndex in targetIndices.Distinct())
                     {
-                         // Clamp를 사용하여 인덱스가 0 미만이거나 lowerSize-1을 초과하지 않도록 보정
-                         int clampedTargetIndex = Math.Clamp(targetIndex, 0, lowerSize - 1);
-                         var nodeV = lowerLayer[clampedTargetIndex];
+                        // Clamp를 사용하여 인덱스가 0 미만이거나 lowerSize-1을 초과하지 않도록 보정
+                        int clampedTargetIndex = Math.Clamp(targetIndex, 0, lowerSize - 1);
+                        var nodeV = lowerLayer[clampedTargetIndex];
 
-                         // 이 레이어에서 제한 무시 플래그가 true이면 제한 검사 없이 추가 시도
-                         if (ignoreIncomingLimitForThisLayer || lowerNodeParentCounts.GetValueOrDefault(nodeV.Id, 0) < 2)
-                         {
-                             var edge = new Edge(nodeU.Id, nodeV.Id);
-                             // HashSet에 간선이 성공적으로 추가되면 카운트 증가 (중복 방지 포함)
-                             // (제한 무시 레이어에서는 이 카운트가 실제 제한에 사용되지는 않지만,
-                             // 그래프 데이터 자체의 정보로 유용할 수 있어 업데이트는 유지)
-                             if (graph.Edges.Add(edge))
-                             {
-                                 // lowerNodeParentCounts[nodeV.Id]++; // GetValueOrDefault 사용 시 필요
-                                 if (!lowerNodeParentCounts.ContainsKey(nodeV.Id)) // GetValueOrDefault 사용하지 않을 경우
-                                 {
-                                     lowerNodeParentCounts[nodeV.Id] = 0; // 초기화 보장
-                                 }
-                                 lowerNodeParentCounts[nodeV.Id]++;
-                             }
-                         }
+                        // 이 레이어에서 제한 무시 플래그가 true이면 제한 검사 없이 추가 시도
+                        if (ignoreIncomingLimitForThisLayer || lowerNodeParentCounts.GetValueOrDefault(nodeV.Id, 0) < 2)
+                        {
+                            var edge = new Edge(nodeU.Id, nodeV.Id);
+                            // HashSet에 간선이 성공적으로 추가되면 카운트 증가 (중복 방지 포함)
+                            // (제한 무시 레이어에서는 이 카운트가 실제 제한에 사용되지는 않지만,
+                            // 그래프 데이터 자체의 정보로 유용할 수 있어 업데이트는 유지)
+                            if (graph.Edges.Add(edge))
+                            {
+                                // lowerNodeParentCounts[nodeV.Id]++; // GetValueOrDefault 사용 시 필요
+                                if (!lowerNodeParentCounts.ContainsKey(nodeV.Id)) // GetValueOrDefault 사용하지 않을 경우
+                                {
+                                    lowerNodeParentCounts[nodeV.Id] = 0; // 초기화 보장
+                                }
+                                lowerNodeParentCounts[nodeV.Id]++;
+                            }
+                        }
                     }
                 }
-                 // 이 레이어 쌍에 대한 간선 생성 완료
+                // 이 레이어 쌍에 대한 간선 생성 완료
             }
 
             UnityEngine.Debug.Log("그래프 생성 완료: " + graph.Nodes.Count + " 노드, " + graph.Edges.Count + " 간선");
