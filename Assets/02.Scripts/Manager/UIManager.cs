@@ -273,7 +273,6 @@ public class UIManager
                     }
                 });
 
-                Debug.Log($"NodeIcon mapped for node {nodeIcon.nodeId} ({node.Value.GetLabel()})");
             }
             else
             {

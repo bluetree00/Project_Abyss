@@ -277,7 +277,6 @@ namespace MapGeneratorManager // 필요에 따라 네임스페이스를 변경�
             }
 
             UnityEngine.Debug.Log("그래프 생성 완료: " + graph.Nodes.Count + " 노드, " + graph.Edges.Count + " 간선");
-            //Managers.Instance.SaveGraphData(); // 그래프 데이터 저장
             return graph;
         }
 
