@@ -14,6 +14,7 @@ public class StageManager
     public Graph stageGraph; // MapGeneratorManager에서 생성된 그래프
     private Node? currentNode; // 현재 활성화된 노드
     public Dictionary<int, GameObject> nodeToStageMap; // 노드 ID와 스테이지 오브젝트 매핑
+    private const string GraphDataFile = "GraphData.json"; // 그래프 데이터 파일 이름
 
     private bool isNodemoved = false; // 노드 이동 여부
 
@@ -22,21 +23,9 @@ public class StageManager
     public async Task InitializeStageManager()
     {
         Debug.Log("StageManager InitializeAsync 시작");
-        GraphData loadedGraphData = LoadGraphData();
-        GraphData graphData = loadedGraphData;
-        if (graphData == null)
-        {
-            Debug.LogWarning("로드된 그래프 데이터 없음.");
-            return;
-        }
-        Managers._graphData = graphData; // 그래프 데이터 설정
-        if (graphData == null || graphData.graph == null)
-        {
-            Debug.LogError("GraphData or graph is null!");
-            return;
-        }
-        stageGraph = graphData.graph;
-        currentNode = graphData.currentNode.Id != -1 ? graphData.currentNode : null;
+
+        stageGraph =  Managers._graphData.graph;
+        currentNode = Managers._graphData.currentNode.Id != -1 ? Managers._graphData.currentNode : null;
         nodeToStageMap = new Dictionary<int, GameObject>();
 
         Managers.UI.InitializeNodeIcons(stageGraph.Nodes);
@@ -56,7 +45,7 @@ public class StageManager
                 {
                     stageObject.SetActive(false);
                     nodeToStageMap[node.Id] = stageObject;
-                    Debug.Log($"Preparing stage for node {node.Id} ({node.GetLabel()})");
+                    //Debug.Log($"Preparing stage for node {node.Id} ({node.GetLabel()})");
                 }
                 else
                 {
@@ -64,7 +53,7 @@ public class StageManager
                 }
             }
         }
-        
+
         Debug.Log("All stages prepared, setting initial stage.");
         Node? startNode = currentNode ?? stageGraph.Nodes.Find(node => node.Type == NodeType.Start);
         Debug.LogWarning(startNode.Value.ToString());
@@ -91,7 +80,7 @@ public class StageManager
 
         char labelChar = (char)('A' + node.Id); // 0 -> 'A', 1 -> 'B', ...
         string address = $"Stage_{labelChar}";
-        Debug.Log($"Generated Addressables key: {address}");
+        //Debug.Log($"Generated Addressables key: {address}");
         return address;
     }
 
@@ -241,30 +230,26 @@ public class StageManager
         isNodemoved = false; // 노드 이동 상태 해제
     }
 
-    public void SaveGraphData()
+    public void SaveGraphStateData()
     {
-        var runtimeData = new
+        var runtimeData = new GraphDataRuntime
         {
+            graph = stageGraph,
+            edges = stageGraph.Edges.ToList(),
             currentNode = currentNode.HasValue ? currentNode.Value.Id : -1,
-            visitedNodes = stageGraph.Nodes.Where(node => nodeToStageMap[node.Id].activeSelf).Select(node => node.Id).ToList(),
-            graph = stageGraph
+            visitedNodes = stageGraph.Nodes
+                .Where(node => nodeToStageMap[node.Id].activeSelf)
+                .Select(node => node.Id)
+                .ToList(),
+            isProgress = false, // 필요하다면 현재 진행 상태를 반영
+            isClear = false     // 필요하다면 클리어 상태를 반영
         };
 
-        DataManager.SaveJsonFile("GraphData.json", runtimeData);
+        Debug.Log("저장 직전 Edges 개수: " + runtimeData.graph.SerializableEdges.Count);
+        DataManager.SaveJsonFile(GraphDataFile, runtimeData);
         Debug.Log("그래프 상태 저장.");
     }
-
-    public GraphData LoadGraphData()
-    {
-        var graphData = DataManager.LoadJsonFile<GraphData>("GraphData.json");
-        if (graphData == null)
-        {
-            Debug.LogWarning("Graph Data 파일을 로드할 수 없습니다.");
-            return null;
-        }
-        Debug.Log("그래프 상태 로드 완료.");
-        return graphData;
-    }
 }
+
 
 

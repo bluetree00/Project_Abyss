@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using MapGeneratorManager;
 
 public class Managers : MonoBehaviour
 {
@@ -29,6 +30,7 @@ public class Managers : MonoBehaviour
 
     #region Data // 데이터 매니저
     public static GraphData _graphData { get; set; }
+    private GraphData _loadedGraphData; // 로드된 GraphData 인스턴스
     public static StageData _stageData { get; private set; } // StageData 인스턴스
     private const string StageDataFile = "StageData.json";
     private const string GraphDataFile = "GraphData.json";
@@ -123,17 +125,22 @@ public class Managers : MonoBehaviour
         // 2. StageData 로드
         LoadStageData();
 
-        // 3. GraphData 로드
-        LoadGraphData();
+        _graphData = null; // 초기화
 
-        // 4. Graph 생성
-        yield return null; // 프레임 나누기
-        _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
-        if (_graphData.graph == null)
+        // 3. GraphData 로드
+        _loadedGraphData = LoadGraphData();
+
+        if (_loadedGraphData == null)
         {
-            Debug.LogError("그래프 생성 실패");
-            yield break;
+            _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
+            Debug.Log("새로운 GraphData 생성 및 초기화");
         }
+        else
+        {
+            _graphData.graph = _loadedGraphData.graph;
+            Debug.Log("GraphData 로드 완료");
+        }
+        SaveGraphData();
 
         Debug.Log("모든 매니저 초기화 완료");
     }
@@ -176,21 +183,23 @@ public class Managers : MonoBehaviour
         }
 
         var runtimeData = _graphData.ToRuntime();
+        Debug.Log("저장 직전 Edges 개수: " + runtimeData.graph.SerializableEdges.Count);
         DataManager.SaveJsonFile(GraphDataFile, runtimeData);
     }
 
-    public void LoadGraphData()
+    public GraphData LoadGraphData()
     {
         var runtimeData = DataManager.LoadJsonFile<GraphDataRuntime>(GraphDataFile);
         if (runtimeData == null)
         {
             Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
             _graphData = ScriptableObject.CreateInstance<GraphData>();
-            return;
+            return null;
         }
 
         _graphData = ScriptableObject.CreateInstance<GraphData>();
         _graphData.FromRuntime(runtimeData);
+        return _graphData;
     }
 
 
@@ -302,9 +311,7 @@ public class Managers : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        Debug.Log($"그래프 저장 직전 상태: graph = {_graphData.graph}, nodeCount = {_graphData.graph?.Nodes?.Count}");
-
-        Stage.SaveGraphData();
+        Stage.SaveGraphStateData();
     }
 
 
