@@ -15,19 +15,19 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
     private GameObject dummyEffect;
     private bool upgraded = false;
 
-    public override void HeavyAttackStartCharging(CharacterController controller)
+    public override void HeavyAttackStartCharging(PlayerCharacter controller)
     {
 
         controller.RotateTowardsMousePosition();
         controller.GoToHeavyAttackChargeStartState();
     }
 
-    public override void HeavyAttackUpdateCharging(CharacterController controller, float chargeTime)
+    public override void HeavyAttackUpdateCharging(PlayerCharacter controller, float chargeTime)
     {
         controller.GoToHeavyAttackChargeHoldingState();
 
         // 충전량이 일정 시간 이상되면 업그레이드
-        if (chargeTime >= controller.heavyAttackChargeThreshold && !upgraded)
+        if (chargeTime >= controller.CharacterData.heavyAttackChargeThreshold && !upgraded)
         {
             // 기존 Dummy 제거
             if (dummyEffect != null)
@@ -41,7 +41,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         }
     }
 
-    public override void HeavyAttackReleaseChargedAttack(CharacterController controller, float chargeTime)
+    public override void HeavyAttackReleaseChargedAttack(PlayerCharacter controller, float chargeTime)
     {
         controller.GoToHeavyAttackChargedAttackState();
 
@@ -67,7 +67,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         upgraded = false;
     }
 
-    public override void HeavyAttackCancelCharging(CharacterController controller)
+    public override void HeavyAttackCancelCharging(PlayerCharacter controller)
     {
         // Dummy 이펙트 제거
         if (dummyEffect != null)
@@ -79,7 +79,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         controller.GoToIdleState();
 
         upgraded = false;
-        controller.heavyAttackChargeTime = 0f;
+        controller.CharacterData.heavyAttackChargeTime = 0f;
         controller.isInChargingState = false;
     }
 }

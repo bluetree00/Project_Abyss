@@ -577,14 +577,14 @@ ModelImporter:
       curves: []
       events:
       - time: 0.1700797
-        functionName: SpawnShinySlashEffect3
+        functionName: SpawnSlashEffect3
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
       - time: 0.3057621
-        functionName: SpawnShinySlashEffect4
+        functionName: SpawnSlashEffect4
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0

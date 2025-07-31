@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chapters:
   - chapterName: 1
-    layerSizes: 00000000000000000000000000000000000000000000000000000000
+    layerSizes: 
     stages:
     - stageName: 0
       weight: 0
