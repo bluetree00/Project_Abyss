@@ -171,69 +171,6 @@ public class Vagabond : PlayerCharacter
     /// 강공격 차지 취소 상태 전환.
     /// </summary>
     public override void GoToHeavyAttackChargeCancelState() => stateMachine.ChangeState(GetState<VagabondChargeCancelState>());
-
-    private void BindInputActions()
-    {
-        inputActions.Player.Attack.started += _ => OnAttackStarted();
-        inputActions.Player.Attack.canceled += _ => OnAttackReleased();
-        inputActions.Player.Dodge.performed += _ => DodgeAbility?.Dodge(this);
-        inputActions.Player.Jump.performed += _ => ProcessJump();
-        inputActions.Player.Skill.performed += _ => stateMachine.ChangeState(GetState<VagabondSkillState>());
-        inputActions.Player.Ultimate.performed += _ => stateMachine.ChangeState(GetState<VagabondUltimateState>());
-        inputActions.Player.InventoryToggle.performed += _ => ToggleInventory();
-        inputActions.Player.CloseInventory.performed += _ => CloseInventory();
-        inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
-        inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
-        //NOTE: 이 부분은 테스트용으로, 실제 게임에서는 필요하지 않을 수 있습니다.
-        //WARNING: 이 부분의 async/await 사용은 주의가 필요
-        inputActions.Player.testKey.started += _ => Managers.Stage.MoveToNextStage(-1);
-        inputActions.Player.testKey2.started += _ => Managers.Stage.MoveToNextStage(1);
-    }
-
-    protected override void Update()
-    {
-        if (!inputReady || characterData == null || cinemachineCamera == null) return;
-
-        base.Update();
-        CheckMovementInput();
-        UpdateMovement();
-        FreezeRotation();
-        stateMachine.Update();
-
-         //TODO: 기존 강공격이지만 마우스 유지만 사용하는 모으기 공격에 적합.
-        CheckHeavyAttackChargingState();
-
-
-        if (CurrentAirState == AirState.InAir && !(stateMachine.CurrentState is VagabondInAirState))
-            stateMachine.ChangeState(GetState<VagabondInAirState>());
-
-        if (characterData.comboTimer > 0)
-        {
-            characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0)
-                ResetCombo();
-        }
-    }
-
-    private void CheckHeavyAttackChargingState()
-    {
-        if (weaponManagerSO?.CurrentWeapon == null)
-            return;
-
-        var weaponType = weaponManagerSO.CurrentWeapon.weaponType;
-
-        switch (weaponType)
-        {
-            case Define.WeaponType.Sword:
-                CheckSwordHeavyAttackChargingState();
-                break;
-            case Define.WeaponType.Bow:
-                CheckBowHeavyAttackChargingState();
-                break;
-        }
-    }
-
-
     
 
     private void CheckSwordHeavyAttackChargingState()
