@@ -7,18 +7,18 @@ using UnityEngine;
 public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
 {
 
-    public override void HeavyAttackStartCharging(CharacterController controller)
+    public override void HeavyAttackStartCharging(PlayerCharacter controller)
     {
         Debug.Log("차지 시작");
         
         controller.GoToHeavyAttackChargeStartState();
     }
 
-    public override void HeavyAttackUpdateCharging(CharacterController controller, float chargeTime)
+    public override void HeavyAttackUpdateCharging(PlayerCharacter controller, float chargeTime)
     {
         controller.GoToHeavyAttackChargeHoldingState();
 
-        if(chargeTime >= controller.heavyAttackChargeThreshold)
+        if(chargeTime >= controller.CharacterData.heavyAttackChargeThreshold)
         {
             controller.isAttacking = true;
             controller.HeavyAttackAbility.HeavyAttackReleaseChargedAttack(controller, chargeTime);
@@ -26,7 +26,7 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     }
 
     // 차지량에 따른 공격 변화 가능
-    public override void HeavyAttackReleaseChargedAttack(CharacterController controller, float chargeTime)
+    public override void HeavyAttackReleaseChargedAttack(PlayerCharacter controller, float chargeTime)
     {
         controller.GoToHeavyAttackChargedAttackState();
 
@@ -58,10 +58,10 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     }
 
     // 공격이 끝나게게 될때 전용 초기화.
-    public override void HeavyAttackCancelCharging(CharacterController controller)
+    public override void HeavyAttackCancelCharging(PlayerCharacter controller)
     {
           //내부 변수만 초기화
-            controller.heavyAttackChargeTime = 0f;
+            controller.CharacterData.heavyAttackChargeTime = 0f;
             controller.isInChargingState = false;
     }
 }

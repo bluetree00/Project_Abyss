@@ -1,5 +1,5 @@
 using UnityEngine;
-using Game.CharacterStates.CharacterControllerStates;
+using Game.CharacterStates.PlayerCharacterStates;
 
 namespace Game.CharacterStates.VagabondStates
 {
@@ -101,6 +101,8 @@ namespace Game.CharacterStates.VagabondStates
             string animName = weapon.lightAttackAnimationSetSO.normalAttackAnimations[index];
             float endTime = weapon.lightAttackAnimationSetSO.comboEndTimes[index];
 
+            
+
             InitAnimation(animName, endTime);
 
             owner.RotateTowardsMousePosition();      // 캐릭터 방향 회전
@@ -110,12 +112,13 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Exit(Vagabond owner)
         {
-            blocksInput = false;
+            Debug.Log("콤보 공격 상태 종료");
             owner.OnAttackAnimationEnd(); // 공격 종료 처리
         }
 
         protected override void OnAnimationEnd(Vagabond owner)
         {
+            blocksInput = false;
             owner.OnAttackAnimationEnd();
             owner.StateMachine.ChangeState(owner.GetState<VagabondIdleState>());
         }
@@ -190,7 +193,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.JumpStart);
+            owner.SetAirState(PlayerCharacter.AirState.JumpStart);
             InitAnimation("Jump_Start", 0.9f);
             base.Enter(owner);
 
@@ -209,7 +212,7 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.InAir);
+            owner.SetAirState(PlayerCharacter.AirState.InAir);
             owner.Anim.CrossFade("Jump_Loop", 0.1f); // 공중 애니메이션
         }
 
@@ -231,7 +234,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.SetAirState(PlayerCharacter.AirState.Landing);
             owner.FinishJump();
             InitAnimation("Jump_Land", 0.3f);
             base.Enter(owner);
@@ -249,7 +252,7 @@ namespace Game.CharacterStates.VagabondStates
     {
         public override void Enter(Vagabond owner)
         {
-            owner.SetAirState(CharacterController.AirState.Landing);
+            owner.SetAirState(PlayerCharacter.AirState.Landing);
             owner.FinishJump();
             InitAnimation("Jump_HardLand", 0.9f);
             base.Enter(owner);
@@ -298,7 +301,7 @@ namespace Game.CharacterStates.VagabondStates
 
         public override void Execute(Vagabond owner)
         {
-            if (owner.heavyAttackChargeTime >= owner.heavyAttackChargeThreshold)
+            if (owner.CharacterData.heavyAttackChargeTime >= owner.CharacterData.heavyAttackChargeThreshold)
             {
                 owner.StateMachine.ChangeState(owner.GetState<VagabondChargedAttackState>());
             }

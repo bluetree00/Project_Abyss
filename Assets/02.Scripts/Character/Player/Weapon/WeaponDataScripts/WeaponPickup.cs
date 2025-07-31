@@ -1,24 +1,30 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
+
 public class WeaponPickup : MonoBehaviour
 {
-    public WeaponData weaponDataToGive; // 이 오브젝트에 붙어있는 무기 데이터
+    public WeaponData weaponDataToGive;
 
-   private void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
         {
-            var player = other.GetComponent<CharacterController>();
+            var player = other.GetComponent<PlayerCharacter>();
             if (player != null)
             {
-                // 습득 성공 여부를 받아서 처리
-                bool success = player.PickupWeapon(weaponDataToGive);
-
-                if (success)
-                    Destroy(gameObject); // 습득 성공 시에만 무기 제거
+                // 비동기 래퍼 실행
+                HandlePickupAsync(player);
             }
         }
     }
 
+    // 래퍼 메서드는 async void로 정의 (Unity 이벤트 핸들러에서 호출 가능)
+    private async void HandlePickupAsync(PlayerCharacter player)
+    {
+        bool success = await player.PickupWeaponAsync(weaponDataToGive);
+        if (success)
+            Destroy(gameObject);
+    }
 }

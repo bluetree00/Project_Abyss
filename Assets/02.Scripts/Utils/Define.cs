@@ -116,21 +116,30 @@ public class Define
 
     }
 
-    public static class WeaponTypeStrings
+    public enum MonsterState
     {
-        public static readonly Dictionary<WeaponType, string> WeaponTypeMap = new Dictionary<WeaponType, string>
-        {
-            { WeaponType.Sword, "Sword" },
-            { WeaponType.Bow, "Bow" },
-            { WeaponType.Staff, "Staff" },
-            { WeaponType.Dagger, "Dagger" },
-            { WeaponType.Axe, "Axe" }
-        };
+        Idle,
+        Patrol,
+        Chase,
+        Attack,
+        Die
+    }
 
-        public static string GetWeaponTypeString(WeaponType weaponType)
-        {
-            return WeaponTypeMap[weaponType];
-        }
+    public enum MonsterAbilityType
+    {
+        None, // 기본값
+        Detect,
+        Patrol,
+        Chase,
+        Attack,
+
+        // ...
+    }
+
+    public enum PlayerAbilityType
+    {
+        Dodge,
+        Attack,
     }
 
 
@@ -155,41 +164,6 @@ public class Define
         }
     }
    
-    public enum State // 상태
-    {
-        Die,
-        Idle,
-        Moving,
-        Runing,
-        Dodge,
-        ChangeWeapon,
-        NormalAttack_01,
-        NormalAttack_02,
-        NormalAttack_03,
-        NormalAttack_04,
-        NormalAttack_05,
-        JumpAttack,
-        NormalSkill_01,
-        UltimateSkill_01,
-        currentWeaponIdle,
-    }
-
-    public enum MonsterState // 몬스터 상태
-    {
-        Die,
-        Idle,
-        Moving,
-        Runing,
-        Dodge,
-        Hit,
-        NormalAttack_01,
-        NormalAttack_02,
-        NormalAttack_03,
-        NormalAttack_04,
-        NormalAttack_05,
-        NormalSkile_01,
-        UltimateSkile_01,
-    }
 
     public enum MouseEvent
     {
@@ -213,11 +187,38 @@ public class Define
     // MonsterType 식별자를
     public enum MonsterType
     {
-        EvilMage,
+        Bat,
         Orc,
         Slime,
-        Specter
+
     }
+
+     public static readonly Dictionary<MonsterType, int> MonsterIdMap = new()
+    {
+        { MonsterType.Bat, 1001 },
+       
+    };
+
+    public static int GetMonsterId(MonsterType type)
+    {
+        return MonsterIdMap.TryGetValue(type, out var id) ? id : -1;
+    }
+
+    public enum AttackStyle
+    {
+        Melee,
+        Ranged,
+        Magic,
+    }
+
+    public enum AttackPurpose
+    {
+        Normal,
+        Special,
+        Ultimate,
+    }
+
+    
 
     // 그리드 형태를 정의하는 배열들
     public static readonly int[,] AppleShape = new int[10, 10]

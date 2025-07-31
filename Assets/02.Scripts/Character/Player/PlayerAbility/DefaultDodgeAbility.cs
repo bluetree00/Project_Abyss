@@ -1,22 +1,23 @@
 using System.Collections;
 using UnityEngine;
 
-public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
+[CreateAssetMenu(fileName = "NewPlayerDodgeAbility", menuName = "Abilities/Player/DodgeAbility")]
+public class DefaultDodgeAbility : IDodgeAbility<PlayerCharacter>
 {
     private bool isDodging = false;
 
-    public void Dodge(CharacterController controller)
+    public void Dodge(PlayerCharacter controller)
     {
-        if (isDodging || !controller.CharacterData.canDodge)
+        if (isDodging || !controller.canDodge)
             return;
 
         controller.StartCoroutine(DodgeCoroutine(controller));
     }
 
-    private IEnumerator DodgeCoroutine(CharacterController controller)
+    private IEnumerator DodgeCoroutine(PlayerCharacter controller)
     {
         isDodging = true;
-        controller.CharacterData.canDodge = false;
+        controller.canDodge = false;
 
         float dashDuration = controller.CharacterData.dashDuration;
         float dashSpeed = controller.CharacterData.dashSpeed;
@@ -26,7 +27,7 @@ public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
             : controller.transform.forward;
 
         float startTime = Time.time;
-        
+
         controller.GotoDodgeState();
 
         while (Time.time < startTime + dashDuration)
@@ -39,7 +40,7 @@ public class DefaultDodgeAbility : IDodgeAbility<CharacterController>
 
 
         yield return new WaitForSeconds(controller.CharacterData.dodgeCooldown);
-        controller.CharacterData.canDodge = true;
+        controller.canDodge = true;
         isDodging = false;
     }
 }
