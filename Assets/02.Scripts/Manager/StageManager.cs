@@ -172,7 +172,7 @@ public class StageManager
             {
                 Debug.LogWarning("연결된 노드가 단 하나이므로 자동적으로 연결되어있는 노드로 이동.");
                 ActivateStage(connectedNodes[0]); // 유일한 노드로 이동
-                Managers.StartCoroutineStatic(WaitForNodeMove()); // 노드 이동 완료 대기
+                //Managers.StartCoroutineStatic(WaitForNodeMove()); // 노드 이동 완료 대기
                 return;
             }
 
@@ -199,7 +199,7 @@ public class StageManager
             }
         }
 
-        Managers.StartCoroutineStatic(WaitForNodeMove()); // 노드 이동 완료 대기
+        //Managers.StartCoroutineStatic(WaitForNodeMove()); // 노드 이동 완료 대기
     }
 
     public List<Node> GetConnectedNodes()

@@ -93,67 +93,7 @@ public class Managers : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(InitializeManagersCoroutine());
-        //TODO : 어드레서블 키 값으로 자동으로 받을 수 있도록 수정 요망
-        //FIXME : 추후 어드레서블 키 값을 input 형태로 받아올 수 있도록 수정 필요
 
-        // 1. StageData 로드 (없으면 새로 생성)
-        // _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
-        // if (_stageData == null)
-        // {
-        //     Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
-        //     _stageData = ScriptableObject.CreateInstance<StageData>();
-        //     _stageData.SetDefaultValues(); // 기본값 설정 메서드 호출
-
-        //     SaveStageData();
-        // }
-
-        // // 2. GraphData 로드 (없으면 새로 생성)
-        // _graphData = DataManager.LoadJsonFile<GraphData>(GraphDataFile);
-        // if (_graphData == null)
-        // {
-        //     Debug.LogWarning("GraphData 파일이 없어 새로 생성합니다.");
-        //     _graphData = ScriptableObject.CreateInstance<GraphData>();
-        //     // 필요시 기본값 설정
-        //     SaveGraphData();
-        // }
-        // _graphData.graph = MapGeneratorManager.MapGeneratorManager.Generate(_stageData.chapters[0]);
-
-
-    }
-
-
-
-
-    public StageData GetStageData()
-    {
-        return _stageData;
-    }
-    public GraphData GetGraphData()
-    {
-        return _graphData;
-    }
-
-    public void SaveStageData()
-    {
-        DataManager.SaveJsonFile(StageDataFile, _stageData);
-    }
-
-    public void LoadStageData()
-    {
-        _stageData = DataManager.LoadJsonFile<StageData>(StageDataFile);
-        if (_stageData == null)
-        {
-            Debug.LogWarning("StageData 파일이 없어 새로 생성합니다.");
-            _stageData = ScriptableObject.CreateInstance<StageData>();
-            _stageData.SetDefaultValues();
-            SaveStageData();
-        }
-    }
-
-    public void SaveGraphData()
-    {
-        DataManager.SaveJsonFile(GraphDataFile, _graphData);
     }
 
 
@@ -213,8 +153,6 @@ public class Managers : MonoBehaviour
         {
             // _stageManager = new StageManager();
             // _stageManager.InitializeAsync();
-            StartStageasync();
-            Debug.Log("StageManager StartStageasync 실행");
         }
     }
 
