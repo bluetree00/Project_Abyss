@@ -30,11 +30,10 @@ public class Managers : MonoBehaviour
     private List<LoadedAsset> _loadedAssetsList = new List<LoadedAsset>();
 
     #region Data // 데이터 매니저
-    public static GraphData _graphData { get; set; }
-    private GraphData _loadedGraphData; // 로드된 GraphData 인스턴스
-    public static StageData _stageData { get; private set; } // StageData 인스턴스
     private const string StageDataFile = "StageData.json";
     private const string GraphDataFile = "GraphData.json";
+    private StageGraphDataManager _stageGraphDataManager;
+    public static StageGraphDataManager StageGraphData => Instance._stageGraphDataManager ??= new StageGraphDataManager();
     public static AddressableManager AddressableManager => Instance._addressableManager ?? (Instance._addressableManager = new AddressableManager());
     #endregion
 
@@ -62,7 +61,7 @@ public class Managers : MonoBehaviour
     public static InputManager Input_M => Instance._input ?? (Instance._input = new InputManager());
     public static ResourceManager Resource => Instance._resource ?? (Instance._resource = new ResourceManager());
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
-    
+
     public static StageManager Stage => Instance._stageManager; // StageManager 인스턴스를 반환
     public static UIManager UI => Instance._ui ?? (Instance._ui = new UIManager());
     public static CharacterDataManager CharacterData => Instance._characterDataManager ?? (Instance._characterDataManager = new CharacterDataManager());
@@ -89,6 +88,7 @@ public class Managers : MonoBehaviour
             Destroy(gameObject);
         }
         _addressableManager = new AddressableManager();
+        InitializeAddressablesAsync().Forget();
     }
 
     void Start()
@@ -153,6 +153,7 @@ public class Managers : MonoBehaviour
         {
             // _stageManager = new StageManager();
             // _stageManager.InitializeAsync();
+            InitializeStageManagerAsync().Forget();
         }
     }
 
@@ -165,6 +166,97 @@ public class Managers : MonoBehaviour
             s_instance = null;
         }
     }
+
+    
+    // 게임 데이터 저장 메서드
+    private void SaveGameData()
+    {
+        try
+        {
+            Debug.Log("게임 데이터 저장 시작...");
+
+            // StageGraphData 저장
+            if (_stageGraphDataManager != null && _stageGraphDataManager.IsInitialized)
+            {
+                _stageGraphDataManager.SaveToJson();
+                Debug.Log("스테이지 그래프 데이터 저장 완료");
+            }
+
+            // 향후 추가될 다른 데이터 매니저들
+            // CharacterData, InventoryData 등...
+
+            Debug.Log("모든 게임 데이터 저장 완료");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"게임 데이터 저장 실패: {e.Message}");
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveGameData();
+    }
+
+    #region 초기화 메서드 관리
+    // G 키 입력 시 호출되는 스테이지 매니저 초기화 메서드
+    private async UniTask InitializeStageManagerAsync()
+    {
+        try
+        {
+            Debug.Log("G 키 입력: 스테이지 매니저 초기화 시작");
+
+            // AddressableManager 초기화 확인 (이미 초기화되어 있지 않다면 초기화 대기)
+            if (_addressableManager == null || !_addressableManager.IsInitialized)
+            {
+                Debug.Log("AddressableManager 초기화 대기 중...");
+                _addressableManager = _addressableManager ?? new AddressableManager();
+                await _addressableManager.InitAsync();
+                Debug.Log("AddressableManager 초기화 완료");
+            }
+
+            // 기존 스테이지 매니저가 있다면 정리
+            if (_stageManager != null)
+            {
+                Debug.Log("기존 스테이지 매니저 정리 중...");
+                try
+                {
+                    _stageManager.Cleanup();
+                }
+                catch (System.Exception cleanupEx)
+                {
+                    Debug.LogWarning($"기존 스테이지 매니저 정리 중 오류 (무시하고 계속): {cleanupEx.Message}");
+                }
+            }
+
+            // 새 스테이지 매니저 생성 및 초기화
+            _stageManager = new StageManager();
+            await _stageManager.InitializeStageManager();
+
+            Debug.Log("스테이지 매니저 초기화 완료!");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"스테이지 매니저 초기화 실패: {e.Message}");
+            Debug.LogError($"Stack Trace: {e.StackTrace}");
+        }
+    }
+
+    // AddressableManager 초기화 메서드 추가
+    private async UniTask InitializeAddressablesAsync()
+    {
+        try
+        {
+            Debug.Log("Addressables 초기화 시작");
+            await _addressableManager.InitAsync();
+            Debug.Log("Addressables 초기화 완료");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Addressables 초기화 실패: {e.Message}");
+        }
+    }
+    #endregion
 
 
 }

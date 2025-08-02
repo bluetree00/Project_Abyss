@@ -177,6 +177,8 @@ public class PlayerCharacter : CharacterBase
         inputActions.Player.CloseInventory.performed += _ => CloseInventory();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
+        inputActions.Player.testKey.performed += _ => Managers.Stage.MoveToNextStage(-1);
+        inputActions.Player.testKey2.performed += _ => Managers.Stage.MoveToNextStage(1);
     }
 
     protected virtual void InitAbilities()
