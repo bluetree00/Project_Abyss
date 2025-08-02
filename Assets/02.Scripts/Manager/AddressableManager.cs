@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using Cysharp.Threading.Tasks;
 
 [Serializable]
 public class LoadedAsset
@@ -15,40 +16,74 @@ public class LoadedAsset
 
 public class AddressableManager
 {
-
     private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
     public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
 
-    private Task _initTask;
+    // Task -> UniTask로 변경
+    private UniTask? _initTask;
     private bool _isInitialized = false;
     private bool _initFailed = false;
 
-
-    public async Task InitAsync()
+    // Task -> UniTask로 변경
+    public async UniTask InitAsync()
     {
         if (_isInitialized) return;
 
+        // 초기화가 이미 진행 중이면 기존 작업 대기
+        if (_initTask.HasValue)
+        {
+            await _initTask.Value;
+            return;
+        }
+
         try
         {
-            var operation = Addressables.InitializeAsync();
-            await operation.Task;
+            _initTask = InitializeAddressablesAsync();
+            await _initTask.Value;
             _isInitialized = true;
+            _initFailed = false;
             Debug.Log("Addressables 초기화 성공");
         }
         catch (Exception ex)
         {
+            _initFailed = true;
             Debug.LogError($"Addressables 초기화 실패: {ex}");
+            throw;
+        }
+    }
+
+    // Task -> UniTask로 변경
+    private async UniTask InitializeAddressablesAsync()
+    {
+        try
+        {
+            var operation = Addressables.InitializeAsync();
+            // Task -> UniTask로 변경
+            await operation.ToUniTask();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Addressables 초기화 중 오류: {ex.Message}");
             throw;
         }
     }
 
     public bool IsInitialized => _isInitialized;
     
-    // 모든 Addressables 작업 전에 반드시 초기화 대기
-    private async Task EnsureInitializedAsync()
+    // Task -> UniTask로 변경
+    private async UniTask EnsureInitializedAsync()
     {
         if (_isInitialized) return;
-        await _initTask;
+
+        if (!_initTask.HasValue)
+        {
+            await InitAsync();
+        }
+        else
+        {
+            await _initTask.Value;
+        }
+
         if (_initFailed)
             throw new Exception("Addressables 초기화 실패");
     }
@@ -65,10 +100,6 @@ public class AddressableManager
     /// <summary>
     /// 어드레서블 시스템으로 데이터를 로드하는 함수
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="key"></param>
-    /// <param name="onSuccess"></param>
-    /// <param name="onFailure"></param>
     public void LoadAsset<T>(string key, Action<T> onSuccess = null, Action onFailure = null) where T : UnityEngine.Object
     {
         Addressables.LoadAssetAsync<T>(key).Completed += handle =>
@@ -77,7 +108,7 @@ public class AddressableManager
         };
     }
      
-     //동기 버전으로 사용시
+    //동기 버전으로 사용시
     public T LoadAssetSync<T>(string key) where T : UnityEngine.Object
     {
         var handle = Addressables.LoadAssetAsync<T>(key);
@@ -91,10 +122,12 @@ public class AddressableManager
     /// <typeparam name="T"></typeparam>
     /// <param name="key"></param>
     /// <returns></returns>
-    public async Task<T> LoadAssetAsyncTask<T>(string key) where T : UnityEngine.Object
+    // Task -> UniTask로 변경
+    public async UniTask<T> LoadAssetAsyncTask<T>(string key) where T : UnityEngine.Object
     {
         var handle = Addressables.LoadAssetAsync<T>(key);
-        await handle.Task;
+        // Task -> UniTask로 변경
+        await handle.ToUniTask();
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
             loadedAssets[key] = handle;
@@ -108,14 +141,14 @@ public class AddressableManager
         }
     }
 
-
     /// <summary>
     /// 어드레서블 시스템으로 프리팹을 생성하는 함수
     /// </summary>
     /// <param name="key"></param>
     /// <param name="onSuccess"></param>
     /// <param name="onFailure"></param>
-    public async Task InstantiateAsync(string key, Action<GameObject> onSuccess, Action onFailure = null)
+    // Task -> UniTask로 변경
+    public async UniTask InstantiateAsync(string key, Action<GameObject> onSuccess, Action onFailure = null)
     {
         await EnsureInitializedAsync();
         Addressables.InstantiateAsync(key).Completed += handle =>
@@ -128,13 +161,15 @@ public class AddressableManager
     /// 어드레서블 시스템으로 프리팹을 생성하는 비동기 함수
     /// </summary>
     /// <param name="key"></param>
-    public async Task<GameObject> InstantiateAsyncTask(string key)
+    // Task -> UniTask로 변경
+    public async UniTask<GameObject> InstantiateAsyncTask(string key)
     {
         await EnsureInitializedAsync();
         try
         {
             var handle = Addressables.InstantiateAsync(key);
-            await handle.Task;
+            // Task -> UniTask로 변경
+            await handle.ToUniTask();
             if (handle.Status == AsyncOperationStatus.Succeeded)
                 return handle.Result;
             Debug.LogError($"Failed to instantiate: {key}");
