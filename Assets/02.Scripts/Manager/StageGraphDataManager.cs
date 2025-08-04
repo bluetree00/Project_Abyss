@@ -26,28 +26,6 @@ public class StageGraphDataManager
 
     public async UniTask InitializeAsync()
     {
-        // bool success = false;
-
-        // if (File.Exists(FilePath))
-        // {
-        //     Debug.Log("로컬 StageGraphData 로드");
-        //     success = LoadFromJson();
-
-        //     // TODO: 서버 연결 시 버전 비교 로직 추가
-        //     // await CheckServerVersionAndUpdate();
-        // }
-        // if (!success)
-        // {
-        //     Debug.Log("로컬 StageGraphData가 없거나 비어있음. 새로 생성");
-        //     await CreateNewGraphAsync();
-        //     SaveToJson();
-        // }
-
-        // // JSON 데이터를 MapGeneratorManager.Graph로 변환
-        // _cachedGraph = ConvertToMapGeneratorGraph();
-
-        // IsInitialized = true;
-
         if (File.Exists(FilePath))
         {
             Debug.Log("로컬 StageGraphData 로드");
@@ -628,6 +606,7 @@ public class StageGraphDataManager
             }
 
             // ⭐ 버전 체크: CSV 진행상황 버전이 현재 데이터보다 높거나 같을 때만 업데이트
+            //CHECKLIST: 추후에 헷갈릴 수 있는 코드 = 서버 버전과 현재 버전 비교
             if (_currentData.dataVersion >= progressVersion)
             {
                 Debug.Log($"CSV 진행상황 버전({progressVersion})이 현재 데이터 버전({_currentData.dataVersion})보다 낮습니다. 진행상황 업데이트를 건너뜁니다.");
