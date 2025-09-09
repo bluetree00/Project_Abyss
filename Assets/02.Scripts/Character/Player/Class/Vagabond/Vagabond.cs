@@ -68,8 +68,10 @@ public class Vagabond : PlayerCharacter
     }
 
     /// <summary>
-    /// Vagabond 전용 상태 인스턴스를 생성하여 캐시 딕셔너리에 저장.
+    /// Vagabond 전용 상태 인스턴스를 생성하여 캐시 딕셔너리에 저장. 
     /// </summary>
+    /// 
+    /// 현재 방식을 템플릿 매서드 방식으로 개편 할 예정
     private void CacheStates()
     {
         cachedStates[typeof(VagabondIdleState)] = new VagabondIdleState();
