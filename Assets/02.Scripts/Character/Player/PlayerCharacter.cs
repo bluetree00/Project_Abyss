@@ -11,6 +11,9 @@ using Game.CharacterStates;
 using Game.CharacterStates.CharacterControllerStates;
 using Cysharp.Threading.Tasks;
 
+// 입력 버퍼
+using Game.Inputs; // Command, InputBuffer, IClock, UnscaledClock
+
 public class PlayerCharacter : CharacterBase
 {
     //============================================================
@@ -40,6 +43,15 @@ public class PlayerCharacter : CharacterBase
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
 
     //============================================================
+    // 입력 버퍼 & 시간축
+    //============================================================
+    protected IClock Clock { get; private set; }
+    public InputBuffer InputBuffer { get; private set; }
+
+    /// <summary>파생 클래스에서 버퍼로 커맨드를 밀어넣을 때 쓰는 헬퍼</summary>
+    protected void EnqueueCommand(Command cmd) => InputBuffer?.Push(cmd);
+
+    //============================================================
     // 캐릭터 능력 모듈
     //============================================================
 
@@ -61,7 +73,6 @@ public class PlayerCharacter : CharacterBase
     public bool canDodge = false; // 대시 가능 여부
     public bool IsInChargingState;
     public bool nextComboQueued = false; // 다음 콤보가 대기 중인지 여부
-
 
     //============================================================
     // 점프 및 공중 상태 관리
@@ -86,7 +97,6 @@ public class PlayerCharacter : CharacterBase
 
     private async void Start() => await InitAsync();
 
-
     /// <summary>
     /// 캐릭터 초기화 비동기 메서드.
     /// 상위 InitAsync 호출 후 컴포넌트, 데이터, 입력, 능력, 무기 매니저, 카메라 초기화.
@@ -94,28 +104,32 @@ public class PlayerCharacter : CharacterBase
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
+
+        // 시간축/입력 버퍼 초기화 (히트스톱/슬로모 무시를 위해 Unscaled 사용)
+        Clock = new UnscaledClock();
+        // capacity=16, window=0.18s, dedupe=40ms — 필요 시 튜닝
+        InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeMs: 0.04f);
+
         InitCoreComponents();
         await InitCharacterDataAsync();
         InitInputActions();
         InitAbilities();
         InitWeaponManager();
         SetupCamera();
-        
+
         if (inputReady) BindInputActions();
     }
-
 
     /// <summary>
     /// 캐릭터 필수 컴포넌트 초기화 (플레이어 등록, 무기 소켓 찾기 등).
     /// </summary>
     private void InitCoreComponents()
     {
-        Managers.Player.SetPlayer(transform); //매니저에 플레이어 등록
+        Managers.Player.SetPlayer(transform); // 매니저에 플레이어 등록
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
     }
-
 
     /// <summary>
     /// 캐릭터 데이터 비동기 로드 및 초기 설정.
@@ -131,7 +145,6 @@ public class PlayerCharacter : CharacterBase
     /// <summary>
     /// 캐릭터 데이터를 Addressables에서 로드하고 캐릭터 데이터 설정.
     /// </summary>
-    /// <param name="characterName">로드할 캐릭터 데이터 이름</param>
     private async UniTask LoadCharacterDataAsync(string characterName)
     {
         var utcs = new UniTaskCompletionSource<bool>();
@@ -154,7 +167,6 @@ public class PlayerCharacter : CharacterBase
         await utcs.Task;
     }
 
-
     private void InitInputActions()
     {
         inputActions = new PlayerInputActions();
@@ -163,21 +175,30 @@ public class PlayerCharacter : CharacterBase
     }
 
     /// <summary>
-    /// 입력 액션과 이벤트 바인딩 (공격, 회피, 점프 등).
+    /// 입력 액션과 이벤트 바인딩
+    /// - 이동은 지속 입력(즉시형)으로 유지
+    /// - 공격/회피/스킬/궁극은 버퍼에 Push만 (실행/전이는 상태가 승인)
     /// </summary>
     protected virtual void BindInputActions()
     {
-        inputActions.Player.Attack.started += _ => OnAttackStarted();
-        inputActions.Player.Attack.canceled += _ => OnAttackReleased();
-        inputActions.Player.Dodge.performed += _ => DodgeAbility?.Dodge(this);
-        inputActions.Player.Jump.performed += _ => ProcessJump();
-        inputActions.Player.Skill.performed += _ => OnSkillAttack();
-        inputActions.Player.Ultimate.performed += _ => OnUltimateAttack();
+        // ── 공격 입력: 차지/탭 분리는 파생 클래스에서 판단하세요 ──
+        inputActions.Player.Attack.started  += _ => OnAttackStarted();   // 차지 시작 등
+        inputActions.Player.Attack.canceled += _ => OnAttackReleased();  // 탭/릴리즈 판단
+
+        // ── 회피/스킬/궁극: 버퍼에 Push만 ──
+        inputActions.Player.Dodge.performed    += _ => InputBuffer.Push(Command.Dodge);
+        inputActions.Player.Skill.performed    += _ => InputBuffer.Push(Command.Skill);
+        inputActions.Player.Ultimate.performed += _ => InputBuffer.Push(Command.Skill); // 필요하면 Command 확장
+
+        // ── 점프/인벤토리/무기 교체 등은 즉시형 유지 ──
+        inputActions.Player.Jump.performed           += _ => ProcessJump();
         inputActions.Player.InventoryToggle.performed += _ => ToggleInventory();
-        inputActions.Player.CloseInventory.performed += _ => CloseInventory();
-        inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
-        inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
-        inputActions.Player.testKey.performed += _ => Managers.Stage.MoveToNextStage(-1);
+        inputActions.Player.CloseInventory.performed  += _ => CloseInventory();
+        inputActions.Player.ChangeWeapon1.performed   += _ => ChangeWeapon(0);
+        inputActions.Player.ChangeWeapon2.performed   += _ => ChangeWeapon(1);
+
+        // 테스트 키
+        inputActions.Player.testKey.performed  += _ => Managers.Stage.MoveToNextStage(-1);
         inputActions.Player.testKey2.performed += _ => Managers.Stage.MoveToNextStage(1);
     }
 
@@ -186,6 +207,7 @@ public class PlayerCharacter : CharacterBase
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
         JumpAbility = new DefaultJumpAbility();
+        // Light/Heavy는 무기 장착 시 주입
     }
 
     private void InitWeaponManager()
@@ -213,12 +235,9 @@ public class PlayerCharacter : CharacterBase
     }
 
     //============================================================
-    // 입력 처리 템플릿 매서드 패턴 방식
+    // 입력 처리 템플릿 메서드(파생 훅)
     //============================================================
 
-    /// <summary>
-    /// 입력 잠금 코루틴 처리.
-    /// </summary>
     private void LockInput(float sec)
     {
         if (inputLockCoroutine != null)
@@ -233,34 +252,26 @@ public class PlayerCharacter : CharacterBase
         isInputLocked = false;
     }
 
-    /// <summary>
-    /// 공격 입력 시작 시 처리 (상속 구현).
-    /// </summary>
-    protected virtual void OnAttackStarted() {}
+    /// <summary>공격 입력 시작(차지 시작 등) — 파생에서 구현</summary>
+    protected virtual void OnAttackStarted() { }
 
     /// <summary>
-    /// 공격 입력 해제 시 처리 (상속 구현).
+    /// 공격 입력 해제(탭/차지 판별) — 파생에서:
+    /// - 탭이면: EnqueueCommand(Command.Light)
+    /// - 차지면: 상태 전이 or HeavyAbility 호출/버퍼 사용
     /// </summary>
     protected virtual void OnAttackReleased() { }
-    
-    /// <summary>
-    /// 점프 입력 처리 (상속 구현).
-    /// </summary>
+
+    /// <summary>점프 입력 처리 — 파생에서 이동/상태 연계</summary>
     protected virtual void ProcessJump() { }
 
-    /// <summary>
-    /// 스킬 공격 입력 처리 (상속 구현).
-    /// </summary>
+    /// <summary>스킬 입력 처리(즉시형으로 쓰고 싶다면 여기서 직접 실행해도 됨)</summary>
     protected virtual void OnSkillAttack() { }
 
-    /// <summary>
-    /// 궁극기 공격 입력 처리 (상속 구현).
-    /// </summary>
+    /// <summary>궁극기 입력 처리</summary>
     protected virtual void OnUltimateAttack() { }
 
-    /// <summary>
-    /// 무기 변경 처리 (상속 구현).
-    /// </summary>
+    /// <summary>무기 변경</summary>
     protected virtual void ChangeWeapon(int index) { }
 
     protected virtual void ToggleInventory()
@@ -289,7 +300,6 @@ public class PlayerCharacter : CharacterBase
     }
 
     public virtual void OnAttackAnimationEnd() => isAttacking = false;
-    
 
     //============================================================
     // 유니티 생명주기
@@ -299,10 +309,17 @@ public class PlayerCharacter : CharacterBase
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
+        // ① 입력 버퍼 만료 정리(프레임당 1회)
+        InputBuffer?.TickPrune();
 
+        // ② 이동 처리(지속 입력은 즉시형 — 보통 파생에서 moveDirection을 채움)
         MoveAbility?.Move(this, moveDirection);
-        CheckHeavyAttackChargingState();
 
+        // ③ 상태 머신 업데이트(현재 상태가 허용하면 버퍼를 소비해 전이/실행)
+        stateMachine.Update();
+
+        // ④ 차지 로직(무기 타입별)
+        CheckHeavyAttackChargingState();
     }
 
     private void FixedUpdate()
@@ -354,8 +371,6 @@ public class PlayerCharacter : CharacterBase
             airStartTime = Time.time;
     }
 
-    
-
     //============================================================
     // 무기 시스템  Ｓｗｏｒｄ Ａｎｄ Ｂｏｗ
     //============================================================
@@ -369,10 +384,8 @@ public class PlayerCharacter : CharacterBase
                 weaponManagerSO.EquipWeapon(newWeapon, i, anim);
                 Debug.Log($"[무기 습득] {newWeapon.weaponName} 을 {i}번 슬롯에 장착함");
 
-                // 무기 이름 기반으로 이펙트 패키지 이름 생성 (예: "SwordEffectPool")
-                // string effectPoolKey = $"{newWeapon.weaponName}EffectPool";
-
-                await Managers.Instance.InitializeObjectPoolAsync("BaseTest"); // async 방식으로 변경 추후 장비에 맞는 EffectPool패키지를 로드 추후 예외처리도 포함
+                // 무기 이름 기반 이펙트 풀 로드(예시)
+                await Managers.Instance.InitializeObjectPoolAsync("BaseTest");
 
                 weaponManagerSO.SwitchWeapon(i, anim);
                 GoToIdleState();
@@ -383,7 +396,6 @@ public class PlayerCharacter : CharacterBase
         Debug.Log("⚠ 모든 슬롯이 꽉 찼습니다!");
         return false;
     }
-
 
     private void CheckHeavyAttackChargingState()
     {
@@ -410,15 +422,15 @@ public class PlayerCharacter : CharacterBase
             if (!isInChargingState && characterData.heavyAttackChargeTime >= characterData.heavyAttackReleaseTime)
             {
                 isInChargingState = true;
-                HeavyAttackAbility.HeavyAttackStartCharging(this);
+                HeavyAttackAbility?.HeavyAttackStartCharging(this);
             }
 
             if (isInChargingState)
             {
-                HeavyAttackAbility.HeavyAttackUpdateCharging(this, characterData.heavyAttackChargeTime);
+                HeavyAttackAbility?.HeavyAttackUpdateCharging(this, characterData.heavyAttackChargeTime);
 
-                // [자동 발사 트리거]
-                if ( characterData.heavyAttackChargeTime >= heavyAttackChargeThreshold)
+                // 자동 발사 트리거: 임계 이상이면 바로 발동
+                if (characterData.heavyAttackChargeTime >= heavyAttackChargeThreshold)
                 {
                     GoToHeavyAttackChargedAttackState();
                     characterData.heavyAttackChargeTime = 0f;
@@ -428,33 +440,32 @@ public class PlayerCharacter : CharacterBase
         }
         else
         {
-             characterData.heavyAttackChargeTime = 0f;
+            characterData.heavyAttackChargeTime = 0f;
             isInChargingState = false;
         }
     }
-
 
     private void CheckBowHeavyAttackChargingState()
     {
         if (inputActions.Player.Attack.IsPressed())
         {
-             characterData.heavyAttackChargeTime += Time.deltaTime;
+            characterData.heavyAttackChargeTime += Time.deltaTime;
 
-            if (!isInChargingState &&  characterData.heavyAttackChargeTime >=  characterData.heavyAttackReleaseTime)
+            if (!isInChargingState && characterData.heavyAttackChargeTime >= characterData.heavyAttackReleaseTime)
             {
                 isInChargingState = true;
-                HeavyAttackAbility.HeavyAttackStartCharging(this);
+                HeavyAttackAbility?.HeavyAttackStartCharging(this);
             }
 
             if (isInChargingState)
             {
-                HeavyAttackAbility.HeavyAttackUpdateCharging(this,  characterData.heavyAttackChargeTime);
+                HeavyAttackAbility?.HeavyAttackUpdateCharging(this, characterData.heavyAttackChargeTime);
             }
         }
         else if (isInChargingState) // 뗄 때 발사
         {
             GoToHeavyAttackChargedAttackState();
-             characterData.heavyAttackChargeTime = 0f;
+            characterData.heavyAttackChargeTime = 0f;
             isInChargingState = false;
         }
         else
@@ -464,10 +475,8 @@ public class PlayerCharacter : CharacterBase
         }
     }
 
-
-
     //============================================================
-    // 상태 전환
+    // 상태 전환 (파생에서 구현)
     //============================================================
     public virtual void GoToIdleState() { }
     public virtual void GotoDodgeState() { }
