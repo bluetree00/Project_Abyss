@@ -39,7 +39,6 @@ public class BatFSMController : MonsterController, IMonsterStateChanger
         await base.InitAsync();    // 부모 클래스 초기화 수행
         InitializeFSM();           // FSM 상태들을 등록하고 초기화
         RequestStateChange(MonsterState.Idle); // 초기 상태를 Idle로 설정
-        
 
     }
 

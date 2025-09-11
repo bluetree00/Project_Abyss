@@ -10,17 +10,17 @@ using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// Vagabond 플레이어 캐릭터 클래스.
-/// PlayerCharacter를 상속하며, Vagabond 전용 상태 머신과 상태들을 관리한다.
+/// PlayerController를 상속하며, Vagabond 전용 상태 머신과 상태들을 관리한다.
 /// 입력, 상태 전환, 공격 처리, 무기 변경, 카메라 설정 등 Vagabond 특화된 기능 구현.
 /// </summary>
-public class Vagabond : PlayerCharacter
+public class Vagabond : PlayerController
 {
     //============================================================
     // 상태 머신 및 상태 캐시
     //============================================================
 
     /// <summary>
-    /// Vagabond 전용 상태 머신 인스턴스 (PlayerCharacter와 별도 유지).
+    /// Vagabond 전용 상태 머신 인스턴스 (PlayerController와 별도 유지).
     /// </summary>
     protected new StateMachine<Vagabond> stateMachine = new StateMachine<Vagabond>();
 
@@ -48,6 +48,11 @@ public class Vagabond : PlayerCharacter
         await InitAsync();
         CacheStates();
         stateMachine.Setup(this, GetState<VagabondIdleState>());
+    }
+
+     public override void HandleFSM()
+    {
+        // currentState?.Update();
     }
 
     /// <summary>

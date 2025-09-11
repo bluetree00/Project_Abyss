@@ -5,7 +5,7 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Weapon/Abilities/SwordLightAttack")]
 public class DefaultLightAttackAbility : LightAttackAbilitySO
 {
-    public override void LightAttack(PlayerCharacter controller)
+    public override void LightAttack(PlayerController controller)
     {
         if (controller.weaponManagerSO.CurrentWeapon == null)
         {
@@ -29,7 +29,7 @@ public class DefaultLightAttackAbility : LightAttackAbilitySO
         Debug.Log($"Combo Step: {controller.CharacterData.attackComboStep}");
     }
     
-    public override void SpawnEffect(PlayerCharacter controller, Vector3 forwardOffset, Vector3? additionalRotation = null)
+    public override void SpawnEffect(PlayerController controller, Vector3 forwardOffset, Vector3? additionalRotation = null)
     {
         if (Managers.ObjectPooler == null)
         {

@@ -12,20 +12,33 @@ using Game.CharacterStates.CharacterControllerStates;
 using Cysharp.Threading.Tasks;
 
 // 입력 버퍼
-using Game.Inputs; // Command, InputBuffer, IClock, UnscaledClock
+using Game.Inputs;
 
-public class PlayerCharacter : CharacterBase
+
+public abstract class PlayerController : CharacterBase
 {
     //============================================================
     // 캐릭터 정보 및 핵심 시스템
     //============================================================
 
+     public enum PlayerState
+    {
+        None,
+        Idle,
+        Move,
+        Dodge,
+        AttackReady,
+        Attack,
+        Die
+    }
+
+
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
-    protected StateMachine<PlayerCharacter> stateMachine = new();
-    public StateMachine<PlayerCharacter> StateMachine => stateMachine;
+    protected StateMachine<PlayerController> stateMachine = new();
+    public StateMachine<PlayerController> StateMachine => stateMachine;
 
     public WeaponManagerSO weaponManagerSO;
 
@@ -55,11 +68,11 @@ public class PlayerCharacter : CharacterBase
     // 캐릭터 능력 모듈
     //============================================================
 
-    public IMoveAbility<PlayerCharacter> MoveAbility { get; protected set; }
-    public IDodgeAbility<PlayerCharacter> DodgeAbility { get; protected set; }
-    public ILightAttackAbility<PlayerCharacter> LightAttackAbility { get; protected set; }
-    public IHeavyAttackAbility<PlayerCharacter> HeavyAttackAbility { get; protected set; }
-    public IJumpAbility<PlayerCharacter> JumpAbility { get; protected set; }
+    public IMoveAbility<PlayerController> MoveAbility { get; protected set; }
+    public IDodgeAbility<PlayerController> DodgeAbility { get; protected set; }
+    public ILightAttackAbility<PlayerController> LightAttackAbility { get; protected set; }
+    public IHeavyAttackAbility<PlayerController> HeavyAttackAbility { get; protected set; }
+    public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
 
     public Transform handTransform;
 
@@ -120,6 +133,7 @@ public class PlayerCharacter : CharacterBase
         if (inputReady) BindInputActions();
     }
 
+  
     /// <summary>
     /// 캐릭터 필수 컴포넌트 초기화 (플레이어 등록, 무기 소켓 찾기 등).
     /// </summary>
@@ -309,6 +323,8 @@ public class PlayerCharacter : CharacterBase
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
+        HandleFSM();
+
         // ① 입력 버퍼 만료 정리(프레임당 1회)
         InputBuffer?.TickPrune();
 
@@ -320,7 +336,10 @@ public class PlayerCharacter : CharacterBase
 
         // ④ 차지 로직(무기 타입별)
         CheckHeavyAttackChargingState();
+
     }
+
+    public abstract void HandleFSM();
 
     private void FixedUpdate()
     {
@@ -525,4 +544,6 @@ public class PlayerCharacter : CharacterBase
                 transform.rotation = Quaternion.LookRotation(lookDir);
         }
     }
+
+   
 }

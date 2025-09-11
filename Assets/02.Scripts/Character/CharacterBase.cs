@@ -7,7 +7,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Game.CharacterStates;
-using Game.CharacterStates.PlayerCharacterStates;
+using Game.CharacterStates.PlayerControllerStates;
 
 //============================================================
 // CharacterBase 클래스
