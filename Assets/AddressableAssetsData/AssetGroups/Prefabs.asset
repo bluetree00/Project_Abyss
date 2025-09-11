@@ -30,7 +30,7 @@ MonoBehaviour:
     - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca652da6f7c041b45bd778278f551cb0
-    m_Address: Character_01
+    m_Address: Vagabond
     m_ReadOnly: 0
     m_SerializedLabels:
     - default

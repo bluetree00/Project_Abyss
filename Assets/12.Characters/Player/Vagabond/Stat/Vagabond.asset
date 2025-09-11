@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a50724be94515614bb37761dd5c0846c, type: 3}
+  m_Name: Vagabond
+  m_EditorClassIdentifier: 
+  characterName: Vagabond
+  baseMoveSpeed: 7
+  baseRunSpeed: 8
+  maxHealth: 0
+  attackPower: 10
+  attackComboStep: 1
+  comboTimer: -0.068115115
+  comboDuration: 3
+  heavyAttackChargeThreshold: 1.5
+  heldDuration: 0
+  attackInputTime: 0
+  heavyAttackChargeTime: 0
+  heavyAttackReleaseTime: 0.4
+  dashSpeed: 15
+  dashDuration: 0.2
+  dodgeCooldown: 0.5
+  attackPowerBoostAmount: 72.5
+  attackPowerBoostDuration: 10
+  moveSpeedBoostAmount: 10
+  moveSpeedBoostDuration: 3
+  jumpForce: 7
+  gravity: -30
+  fallMultiplier: 2
+  groundCheckDistance: 20
+  hardLandingTimeThreshold: 0.8
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  airControlMultiplier: 0.5
+  groundDrag: 4
+  airDrag: 0.5
+  equippedWeapon: {fileID: 0}
+  conClass: 0

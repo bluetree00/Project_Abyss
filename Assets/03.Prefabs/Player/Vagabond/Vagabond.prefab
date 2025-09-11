@@ -4612,7 +4612,7 @@ GameObject:
   - component: {fileID: 5927879569963914574}
   - component: {fileID: 8044376054531864269}
   m_Layer: 0
-  m_Name: Character_01
+  m_Name: Vagabond
   m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4674,17 +4674,15 @@ MonoBehaviour:
   characterData: {fileID: 0}
   weaponManagerSO: {fileID: 0}
   inputReady: 0
-  heavyAttackChargeThreshold: 1.5
-  heldDuration: 0
-  attackInputTime: 0
-  heavyAttackChargeTime: 0
-  heavyAttackReleaseTime: 0.4
+  cinemachineCamera: {fileID: 0}
+  handTransform: {fileID: 0}
   isAttacking: 0
   isInChargingState: 0
-  handTransform: {fileID: 0}
+  canDodge: 0
+  IsInChargingState: 0
+  nextComboQueued: 0
   isGrounded: 0
   isJumping: 0
-  cinemachineCamera: {fileID: 0}
 --- !u!54 &5927879569963914574
 Rigidbody:
   m_ObjectHideFlags: 0

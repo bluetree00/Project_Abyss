@@ -24,7 +24,7 @@ MonoBehaviour:
     - SO
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0016ea1f1ec94d1478eb444510df67ca
-    m_Address: Character_01
+    m_Address: Vagabond
     m_ReadOnly: 0
     m_SerializedLabels:
     - SO
