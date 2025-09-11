@@ -52,6 +52,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9500000, guid: 7a5a3e219870e1b42ba792e890964c79, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 9e8393b404f9515478445dadb1477ae1, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -64,6 +68,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 7734942533704668299}
+    - targetCorrespondingSourceObject: {fileID: 100292, guid: 7a5a3e219870e1b42ba792e890964c79,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8850024555196897739}
   m_SourcePrefab: {fileID: 100100000, guid: 7a5a3e219870e1b42ba792e890964c79, type: 3}
 --- !u!1 &1029962071964783689 stripped
 GameObject:
@@ -121,3 +129,29 @@ CapsuleCollider:
   m_Height: 1.1494575
   m_Direction: 1
   m_Center: {x: -0.0050507486, y: 0.57640946, z: 0.0141810775}
+--- !u!114 &8850024555196897739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1029962071964783689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4f7c56a7c078694da19f4138f34d64b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rb: {fileID: 0}
+  playerTransform: {fileID: 0}
+  characterData: {fileID: 0}
+  weaponManagerSO: {fileID: 0}
+  inputReady: 0
+  cinemachineCamera: {fileID: 0}
+  handTransform: {fileID: 0}
+  isAttacking: 0
+  isInChargingState: 0
+  canDodge: 0
+  IsInChargingState: 0
+  nextComboQueued: 0
+  isGrounded: 0
+  isJumping: 0

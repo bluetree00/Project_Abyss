@@ -2,11 +2,11 @@ using System.Collections;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewPlayerDodgeAbility", menuName = "Abilities/Player/DodgeAbility")]
-public class DefaultDodgeAbility : IDodgeAbility<PlayerCharacter>
+public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 {
     private bool isDodging = false;
 
-    public void Dodge(PlayerCharacter controller)
+    public void Dodge(PlayerController controller)
     {
         if (isDodging || !controller.canDodge)
             return;
@@ -14,7 +14,7 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerCharacter>
         controller.StartCoroutine(DodgeCoroutine(controller));
     }
 
-    private IEnumerator DodgeCoroutine(PlayerCharacter controller)
+    private IEnumerator DodgeCoroutine(PlayerController controller)
     {
         isDodging = true;
         controller.canDodge = false;
