@@ -7,15 +7,18 @@ using Unity.VisualScripting;
 using Cysharp.Threading.Tasks;
 using Unity.Collections;
 
+// 입력 버퍼
+using Game.Inputs;
+
 /// <summary>
 /// Vagabond 플레이어 캐릭터 클래스.
 /// PlayerController를 상속하며, Vagabond 전용 상태 머신과 상태들을 관리한다.
 /// 입력, 상태 전환, 공격 처리, 무기 변경, 카메라 설정 등 Vagabond 특화된 기능 구현.
 /// </summary>
-public class Knight : PlayerController , IPlayerStateChanger
+public class Knight : PlayerController, IPlayerStateChanger
 {
 
-        // FSM 상태 키(enum)와 상태 인스턴스를 매핑하는 딕셔너리
+    // FSM 상태 키(enum)와 상태 인스턴스를 매핑하는 딕셔너리
     private Dictionary<PlayerState, IPlayerState> fsmStates = new();
 
     // 현재 상태의 키
@@ -24,7 +27,7 @@ public class Knight : PlayerController , IPlayerStateChanger
     // 현재 활성화된 상태 인스턴스
     private IPlayerState currentState;
 
-     // 외부에서 상태 접근 허용 (읽기 전용)
+    // 외부에서 상태 접근 허용 (읽기 전용)
     public IPlayerState CurrentState => currentState;
 
     // 디버그용 현재 상태 노출
@@ -54,20 +57,20 @@ public class Knight : PlayerController , IPlayerStateChanger
     }
 
 
-    
+
 
     private async void Start()
     {
         await InitAsync();
         CacheStates();
-        //stateMachine.Setup(this, GetState<VagabondIdleState>());
+
     }
 
     /// <summary>
     /// 비동기 초기화 확장 (부모 클래스 호출).
     /// 추가 초기화가 필요한 경우 여기에 작성.
     /// </summary>
-     protected override async UniTask InitAsync()
+    protected override async UniTask InitAsync()
     {
         await base.InitAsync();    // 부모 클래스 초기화 수행
         InitializeFSM();           // FSM 상태들을 등록하고 초기화
@@ -75,7 +78,7 @@ public class Knight : PlayerController , IPlayerStateChanger
 
     }
 
-    
+
 
     // FSM 상태별 인스턴스를 생성 및 등록하는 메서드
     private void InitializeFSM()
@@ -102,7 +105,7 @@ public class Knight : PlayerController , IPlayerStateChanger
     /// 현재 방식을 템플릿 매서드 방식으로 개편 할 예정
     private void CacheStates()
     {
-      
+
     }
 
 
@@ -187,7 +190,7 @@ public class Knight : PlayerController , IPlayerStateChanger
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
-        
+
         base.Update();
 
         CheckMovementInput();
@@ -219,58 +222,72 @@ public class Knight : PlayerController , IPlayerStateChanger
     /// 공격 입력 시작 시 호출.
     /// 공격 준비 및 차지 공격 관련 변수 초기화.
     /// </summary>
+    /// 
+    private bool _heavyAutoTriggered;
+    [SerializeField] private float tapMaxSec = 0.18f;    // 탭 임계 (선택)
+    [SerializeField] private float holdMinSec = 0.25f;   // 홀드 임계 (헤비)
     protected override void OnAttackStarted()
     {
-        if (!CanProcessInput())
-        {
-            characterData.attackInputTime = Time.time;
-            return;
-        }
+        if (!CanProcessInput()) return;
 
-        characterData.attackInputTime = Time.time;
-        isInChargingState = false;
+        characterData.attackInputTime = Time.unscaledTime;
         characterData.heavyAttackChargeTime = 0f;
-        characterData.heldDuration = 0f;
+        isInChargingState = true;
+        _heavyAutoTriggered = false;
+
+        // 차지 효과 시작(파티클/사운드 등)
+        HeavyAttackAbility?.HeavyAttackStartCharging(this);
     }
 
-    /// <summary>
-    /// 공격 입력 해제 시 호출.
-    /// 입력 누른 시간에 따라 차지 공격 또는 일반 공격 실행.
-    /// 콤보 입력 여부 처리.
-    /// </summary>
     protected override void OnAttackReleased()
     {
         if (!CanProcessInput()) return;
 
-        if (characterData.attackInputTime == 0f)
-        {
-            Debug.LogWarning("Attack released without a valid start time. Fallback initialized.");
-            return;
-        }
+        // 유효 시작이 없으면 무시
+        if (characterData.attackInputTime <= 0f) return;
 
-        characterData.heldDuration = Time.time - characterData.attackInputTime;
+        float held = Time.unscaledTime - characterData.attackInputTime;
 
-        if (characterData.heldDuration >= characterData.heavyAttackChargeThreshold)
+        // 소드: 자동발사 이미 Push했다면 중복 방지
+        if (!_heavyAutoTriggered && held >= characterData.heavyAttackChargeThreshold)
         {
-            // 차지 공격 실행
-            HeavyAttackAbility?.HeavyAttackReleaseChargedAttack(this, characterData.heldDuration);
+            InputBuffer.Push(Command.Heavy);
         }
         else
         {
-            // 차지 공격이 아니면 기본 공격
-            if (!isAttacking)
-                LightAttackAbility?.LightAttack(this);
-            else
-                nextComboQueued = true;
+            // 탭 또는 임계 미달 → 라이트
+            InputBuffer.Push(Command.Light);
         }
 
+        // 차지 종료(실행은 상태가 결정)
+        HeavyAttackAbility?.HeavyAttackUpdateCharging(this, held);
+        HeavyAttackAbility?.HeavyAttackCancelCharging(this);
+
+        // 클린업(플래그만 정리, 공격 실행/애니 종료는 상태에게 맡김)
         characterData.attackInputTime = 0f;
         characterData.heavyAttackChargeTime = 0f;
-        characterData.heldDuration = 0f;
         isInChargingState = false;
-
-        OnAttackAnimationEnd();
     }
+
+    // 차지 중 자동 발사(소드) 예시: Update에서 임계 도달 시 버퍼 Push
+    private void CheckSwordHeavyAttackChargingState()
+    {
+        if (isAttacking) return;
+        if (!isInChargingState) return;
+
+        characterData.heavyAttackChargeTime += Time.unscaledDeltaTime;
+        HeavyAttackAbility?.HeavyAttackUpdateCharging(this, characterData.heavyAttackChargeTime);
+
+        if (!_heavyAutoTriggered &&
+            characterData.heavyAttackChargeTime >= characterData.heavyAttackChargeThreshold)
+        {
+            InputBuffer.Push(Command.Heavy);
+            _heavyAutoTriggered = true;
+            isInChargingState = false; // 더 이상 차지 업데이트 안 함
+        }
+    }
+
+
 
     /// <summary>
     /// 공격 애니메이션 시작 시 호출, 공격 중임을 표시.

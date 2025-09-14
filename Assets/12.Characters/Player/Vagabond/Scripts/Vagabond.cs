@@ -81,8 +81,6 @@ public class Vagabond : PlayerController
     {
         cachedStates[typeof(VagabondIdleState)] = new VagabondIdleState();
         cachedStates[typeof(VagabondMoveBlendState)] = new VagabondMoveBlendState();
-        cachedStates[typeof(VagabondInAirState)] = new VagabondInAirState();
-        cachedStates[typeof(VagabondJumpStartState)] = new VagabondJumpStartState();
         cachedStates[typeof(VagabondSkillState)] = new VagabondSkillState();
         cachedStates[typeof(VagabondUltimateState)] = new VagabondUltimateState();
         cachedStates[typeof(VagabondDodgeState)] = new VagabondDodgeState();
@@ -180,11 +178,6 @@ public class Vagabond : PlayerController
     public override void GoToHeavyAttackChargeCancelState() => stateMachine.ChangeState(GetState<VagabondChargeCancelState>());
     
 
-    private void CheckSwordHeavyAttackChargingState()
-    {
-        if (IsJumping() || !IsGrounded()) return;
-        stateMachine.ChangeState(GetState<VagabondJumpStartState>());
-    }
 
     //============================================================
     // 입력 처리
