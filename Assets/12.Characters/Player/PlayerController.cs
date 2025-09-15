@@ -90,6 +90,16 @@ public abstract class PlayerController : CharacterBase
     public bool IsInChargingState;
     public bool nextComboQueued = false; // 다음 콤보가 대기 중인지 여부
 
+    // 레이어 FSM에 활용될 락 , 감속
+    private int _moveLockCount = 0;
+    public bool IsMoveLocked => _moveLockCount > 0;
+    public float MoveScale { get; private set; } = 1f;
+
+    public void AcquireMoveLock()  => _moveLockCount++;
+    public void ReleaseMoveLock()  => _moveLockCount = Mathf.Max(0, _moveLockCount - 1);
+    public void SetMoveScale(float s) => MoveScale = Mathf.Clamp01(s);
+
+
     //============================================================
     // 점프 및 공중 상태 관리
     //============================================================
