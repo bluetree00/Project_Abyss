@@ -8,8 +8,8 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 
     public void Dodge(PlayerController controller)
     {
-        if (isDodging || !controller.canDodge)
-            return;
+        // if (isDodging || !controller.canDodge)
+        //     return;
 
         controller.StartCoroutine(DodgeCoroutine(controller));
     }
@@ -17,7 +17,7 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
     private IEnumerator DodgeCoroutine(PlayerController controller)
     {
         isDodging = true;
-        controller.canDodge = false;
+        // controller.canDodge = false;
 
         float dashDuration = controller.CharacterData.dashDuration;
         float dashSpeed = controller.CharacterData.dashSpeed;
@@ -28,7 +28,7 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 
         float startTime = Time.time;
 
-        controller.GotoDodgeState();
+        // controller.GotoDodgeState();
 
         while (Time.time < startTime + dashDuration)
         {
@@ -40,7 +40,7 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 
 
         yield return new WaitForSeconds(controller.CharacterData.dodgeCooldown);
-        controller.canDodge = true;
+        // controller.canDodge = true;
         isDodging = false;
     }
 }

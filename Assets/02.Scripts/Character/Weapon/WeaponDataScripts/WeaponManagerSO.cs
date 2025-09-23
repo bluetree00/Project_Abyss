@@ -2,6 +2,9 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// 무기 관리 스크립터블 오브젝트
+/// </summary>
 [CreateAssetMenu(fileName = "NewWeaponManager", menuName = "Managers/WeaponManagerSO", order = 1)]
 public class WeaponManagerSO : ScriptableObject
 {
@@ -203,7 +206,7 @@ public class WeaponManagerSO : ScriptableObject
 
     private void ApplyLightAttackAnimations(WeaponData weapon, Animator animator)
     {
-        if (weapon == null || animator == null || weapon.lightAttackAnimationSetSO == null) return;
+        // if (weapon == null || animator == null || weapon.lightAttackAnimationSetSO == null) return;
 
         string key = weapon.weaponKey.ToString();
 
@@ -218,11 +221,11 @@ public class WeaponManagerSO : ScriptableObject
 
         for (int i = 0; i < attackKeys.Length; i++)
         {
-            if (i < weapon.lightAttackAnimationSetSO.attackAnimations.Count &&
-                weapon.lightAttackAnimationSetSO.attackAnimations[i] != null)
-            {
-                overrideController[attackKeys[i]] = weapon.lightAttackAnimationSetSO.attackAnimations[i];
-            }
+            // if (i < weapon.lightAttackAnimationSetSO.attackAnimations.Count &&
+            //     weapon.lightAttackAnimationSetSO.attackAnimations[i] != null)
+            // {
+            //     overrideController[attackKeys[i]] = weapon.lightAttackAnimationSetSO.attackAnimations[i];
+            // }
         }
 
         // 애니메이터에 적용

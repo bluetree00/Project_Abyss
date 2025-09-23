@@ -1,0 +1,1 @@
+public enum ActState  { None, AttackReady, Attack, Skill }
