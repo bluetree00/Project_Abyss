@@ -8,13 +8,13 @@ public sealed class BowAttackInputPolicy : IAttackInputPolicy
     {
         Controller.CharacterData.attackInputTime = Time.unscaledTime;
         Controller.CharacterData.heavyAttackChargeTime = 0f;
-        Controller.isInChargingState = true;
+        // Controller.isInChargingState = true;
         Controller.HeavyAttackAbility?.HeavyAttackStartCharging(Controller);
     }
 
     public void Tick(PlayerController Controller, float dt)
     {
-        if (!Controller.isInChargingState) return;
+        // if (!Controller.isInChargingState) return;
         Controller.CharacterData.heavyAttackChargeTime += Time.unscaledDeltaTime;
         Controller.HeavyAttackAbility?.HeavyAttackUpdateCharging(Controller, Controller.CharacterData.heavyAttackChargeTime);
         // 활은 자동 발사 없음 (릴리즈에서만 발사)
@@ -32,6 +32,6 @@ public sealed class BowAttackInputPolicy : IAttackInputPolicy
         Controller.HeavyAttackAbility?.HeavyAttackCancelCharging(Controller);
         Controller.CharacterData.attackInputTime = 0f;
         Controller.CharacterData.heavyAttackChargeTime = 0f;
-        Controller.isInChargingState = false;
+        // Controller.isInChargingState = false;
     }
 }

@@ -12,6 +12,18 @@ public class HeavyAttackAnimationSetSO : ScriptableObject
     [Header("강공격 종료 애니메이션")]
     public AnimationClip endClip;
 
+
+     [Header("모으기 애니메이션")]
+    public AnimationClip chargeClip_Air;
+
+    [Header("강공격 실행 애니메이션")]
+    public AnimationClip attackClip_Air;
+
+    [Header("강공격 종료 애니메이션")]
+    public AnimationClip endClip_Air;
+
+    
+
     [Header("변경할 기존 공격 애니메이션 이름")]
     public string[] HeavyAttackAnimations;
 

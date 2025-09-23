@@ -19,12 +19,12 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
     {
 
         controller.RotateTowardsMousePosition();
-        controller.GoToHeavyAttackChargeStartState();
+        // controller.GoToHeavyAttackChargeStartState();
     }
 
     public override void HeavyAttackUpdateCharging(PlayerController controller, float chargeTime)
     {
-        controller.GoToHeavyAttackChargeHoldingState();
+        // controller.GoToHeavyAttackChargeHoldingState();
 
         // 충전량이 일정 시간 이상되면 업그레이드
         if (chargeTime >= controller.CharacterData.heavyAttackChargeThreshold && !upgraded)
@@ -43,7 +43,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
 
     public override void HeavyAttackReleaseChargedAttack(PlayerController controller, float chargeTime)
     {
-        controller.GoToHeavyAttackChargedAttackState();
+        // controller.GoToHeavyAttackChargedAttackState();
 
         // Dummy 이펙트 제거
         if (dummyEffect != null)
@@ -62,7 +62,7 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
         GameObject arrowObj = Managers.ObjectPooler.SpawnFromPool(projectileToSpawn, firePoint, arrowRotation);
 
 
-        controller.GoToIdleState();
+        // controller.GoToIdleState();
         
         upgraded = false;
     }
@@ -76,10 +76,10 @@ public class DefaultBowHeavyAttackAbility : HeavyAttackAbilitySO
             dummyEffect = null;
         }
 
-        controller.GoToIdleState();
+        // controller.GoToIdleState();
 
         upgraded = false;
         controller.CharacterData.heavyAttackChargeTime = 0f;
-        controller.isInChargingState = false;
+        // controller.isInChargingState = false;
     }
 }

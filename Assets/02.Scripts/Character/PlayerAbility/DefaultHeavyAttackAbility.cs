@@ -11,12 +11,12 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     {
         Debug.Log("차지 시작");
         
-        controller.GoToHeavyAttackChargeStartState();
+        // controller.GoToHeavyAttackChargeStartState();
     }
 
     public override void HeavyAttackUpdateCharging(PlayerController controller, float chargeTime)
     {
-        controller.GoToHeavyAttackChargeHoldingState();
+        // controller.GoToHeavyAttackChargeHoldingState();
 
         if(chargeTime >= controller.CharacterData.heavyAttackChargeThreshold)
         {
@@ -28,7 +28,7 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     // 차지량에 따른 공격 변화 가능
     public override void HeavyAttackReleaseChargedAttack(PlayerController controller, float chargeTime)
     {
-        controller.GoToHeavyAttackChargedAttackState();
+        // controller.GoToHeavyAttackChargedAttackState();
 
            string effectName = "ShinySlash";
 
@@ -62,6 +62,6 @@ public class DefaultHeavyAttackAbility : HeavyAttackAbilitySO
     {
           //내부 변수만 초기화
             controller.CharacterData.heavyAttackChargeTime = 0f;
-            controller.isInChargingState = false;
+            // controller.isInChargingState = false;
     }
 }

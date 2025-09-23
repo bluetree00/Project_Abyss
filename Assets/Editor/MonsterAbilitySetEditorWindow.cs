@@ -18,7 +18,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
     private List<Vector3> patrolWaypoints = new();
     private Vector2 patrolScrollPos;
 
-    private List<AttackAbilitySO> availableAttackAbilities = new();
+    private List<MonsterAttackAbilitySO> availableAttackAbilities = new();
     private List<bool> selectedAttackAbilityFlags = new();
 
     private string[] attackSOTypeNames;
@@ -26,7 +26,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
     private int selectedAttackTypeIndex = 0;
 
     private string newAttackSOName = "NewAttackSO";
-    private AttackAbilitySO tempAttackSO;
+    private MonsterAttackAbilitySO tempAttackSO;
     private Editor tempEditor;
     private SerializedObject serializedTempAttackSO;
 
@@ -51,11 +51,11 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
         availableAttackAbilities.Clear();
         selectedAttackAbilityFlags.Clear();
 
-        string[] guids = AssetDatabase.FindAssets("t:AttackAbilitySO");
+        string[] guids = AssetDatabase.FindAssets("t:MonsterAttackAbilitySO");
         foreach (string guid in guids)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
-            AttackAbilitySO ability = AssetDatabase.LoadAssetAtPath<AttackAbilitySO>(path);
+            MonsterAttackAbilitySO ability = AssetDatabase.LoadAssetAtPath<MonsterAttackAbilitySO>(path);
             if (ability != null)
             {
                 availableAttackAbilities.Add(ability);
@@ -68,7 +68,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
     {
         attackSOTypes = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(assembly => assembly.GetTypes())
-            .Where(t => t.IsSubclassOf(typeof(AttackAbilitySO)) && !t.IsAbstract)
+            .Where(t => t.IsSubclassOf(typeof(MonsterAttackAbilitySO)) && !t.IsAbstract)
             .ToArray();
 
         attackSOTypeNames = attackSOTypes.Select(t => t.Name).ToArray();
@@ -90,7 +90,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
             Type selectedType = attackSOTypes[selectedAttackTypeIndex];
             if (tempAttackSO == null || tempAttackSO.GetType() != selectedType)
             {
-                tempAttackSO = ScriptableObject.CreateInstance(selectedType) as AttackAbilitySO;
+                tempAttackSO = ScriptableObject.CreateInstance(selectedType) as MonsterAttackAbilitySO;
                 tempEditor = Editor.CreateEditor(tempAttackSO);
                 serializedTempAttackSO = new SerializedObject(tempAttackSO);
             }
@@ -180,7 +180,7 @@ public class MonsterAbilitySetEditorWindow : EditorWindow
         }
         abilitySetSO.abilities.Clear();
 
-        CreateAndAddAbility<AttackAbilitySetSO>(abilitySetSO, folderPath, $"{selectedMonsterType}_Attack", so =>
+        CreateAndAddAbility<MonsterAttackAbilitySetSO>(abilitySetSO, folderPath, $"{selectedMonsterType}_Attack", so =>
         {
             so.attackAbilities.Clear();
 
