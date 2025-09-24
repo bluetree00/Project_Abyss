@@ -90,16 +90,16 @@ public class Knight : PlayerController
     // 무기 변경도 액션 중립 상태에서만 허용 권장
     protected override void ChangeWeapon(int index)
     {
-        if (isInputLocked) return;
-        if (weaponManagerSO == null) { Debug.LogError("weaponManagerSO is not initialized."); return; }
-        if (weaponManagerSO.GetCurrentSlotIndex() == index) return;
+        // if (isInputLocked) return;
+        // if (weaponManagerSO == null) { Debug.LogError("weaponManagerSO is not initialized."); return; }
+        // if (weaponManagerSO.GetCurrentSlotIndex() == index) return;
 
-        if (actSM != null && actSM.CurrentId != ActState.None)
-        {
-            // 현재 액션 중이면 무기 교체 지연/무시. 필요하면 큐잉 로직 추가.
-            return;
-        }
+        // if (actSM != null && actSM.CurrentId != ActState.None)
+        // {
+        //     // 현재 액션 중이면 무기 교체 지연/무시. 필요하면 큐잉 로직 추가.
+        //     return;
+        // }
 
-        weaponManagerSO.SwitchWeapon(index, anim);
+        // weaponManagerSO.SwitchWeapon(index, anim);
     }
 }

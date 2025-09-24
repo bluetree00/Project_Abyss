@@ -41,7 +41,10 @@ public class PlayerController : CharacterBase
     private IAttackInputPolicy _attackPolicy;
 
     // 애니메이터 오버라이드 서비스(프로젝트의 구현체 사용)
-    private AnimatorOverrideService _animSvc;
+    public AnimatorOverrideService _animSvc;
+
+    //애니메이션 이벤트 리시버 : 인벤트 타이밍에 맞게 러너를 실행해서 체크
+    public PlayerAttackEventReceiver attackEventReceiver;
 
     //============================================================
     // 레이어 FSM (Locomotion / Action)
@@ -190,9 +193,9 @@ public class PlayerController : CharacterBase
     private void InitWeaponManager()
     {
         weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
-        weaponManagerSO.Initialize(2, anim);
-        weaponManagerSO.weaponHandTransform = handTransform;
-        weaponManagerSO.OnWeaponEquippedEvent += OnWeaponEquipped;
+        // weaponManagerSO.Initialize(2, anim);
+        // weaponManagerSO.weaponHandTransform = handTransform;
+        // weaponManagerSO.OnWeaponEquippedEvent += OnWeaponEquipped;
     }
 
     public void ClearWeaponAbilities()
@@ -201,29 +204,7 @@ public class PlayerController : CharacterBase
         HeavyAttackAbility = null;
     }
 
-    // 무기 장착 시: 어빌리티/입력정책 주입
-    public void OnWeaponEquipped()
-    {
-        var weapon = weaponManagerSO.CurrentWeapon;
-        ClearWeaponAbilities();
 
-        if (weapon != null)
-        {
-            LightAttackAbility = weapon.LightAttack;
-            HeavyAttackAbility = weapon.HeavyAttack;
-
-            _attackPolicy = weapon.weaponType switch
-            {
-                Define.WeaponType.Sword => new SwordAttackInputPolicy(),
-                Define.WeaponType.Bow   => new BowAttackInputPolicy(),
-                _ => new SwordAttackInputPolicy(),
-            };
-        }
-        else
-        {
-            _attackPolicy = null;
-        }
-    }
 
     //============================================================
     // 입력 바인딩(훅은 Push만/정책 위임)
@@ -277,55 +258,7 @@ public class PlayerController : CharacterBase
     public float LightComboResetTime { get; private set; } = 1.5f;
     public IReadOnlyList<float> LightComboEndTimes { get; private set; }
 
-    public void ApplyAttackAnimationSet(bool isAir)
-    {
-        var w = weaponManagerSO?.CurrentWeapon;
-        if (w == null || _animSvc == null) return;
 
-        // ── 라이트 세트: 이름 매핑(normalAttackAnimations ↔ attackAnimations) ──
-        var light = w.lightSet; // LightAttackAnimationSetSO
-        if (light != null)
-        {
-            int nameCount = light.normalAttackAnimations != null ? light.normalAttackAnimations.Length : 0;
-            int clipCount = light.attackAnimations        != null ? light.attackAnimations.Count        : 0;
-            int n = Mathf.Min(nameCount, clipCount);
-
-            if (n > 0)
-            {
-                var map = new Dictionary<string, AnimationClip>(n);
-                for (int i = 0; i < n; i++)
-                {
-                    string key  = light.normalAttackAnimations[i];
-                    var    clip = light.attackAnimations[i];
-                    if (!string.IsNullOrEmpty(key) && clip != null)
-                        map[key] = clip;
-                }
-                _animSvc.OverrideMap(map);
-            }
-            else
-            {
-                Debug.LogWarning("[ApplyAttackAnimationSet] Light set has no valid name/clip pairs.");
-            }
-
-            // 콤보 메타 적용(상태에서 참조)
-            LightMaxComboCount  = Mathf.Max(1, light.maxAttackCount);
-            LightComboResetTime = Mathf.Max(0f, light.comboResetTime);
-            LightComboEndTimes  = light.comboEndTimes; // null 가능
-        }
-
-        // ── 헤비 세트: 지상/공중 분기 ──
-        var hs = w.heavyAttackSet;
-        if (hs != null && hs.HeavyAttackAnimations != null && hs.HeavyAttackAnimations.Length >= 3)
-        {
-            var charge = isAir && hs.chargeClip_Air != null ? hs.chargeClip_Air : hs.chargeClip;
-            var attack = isAir && hs.attackClip_Air != null ? hs.attackClip_Air : hs.attackClip;
-            var end    = isAir && hs.endClip_Air    != null ? hs.endClip_Air    : hs.endClip;
-
-            if (charge != null) _animSvc.Override(hs.HeavyAttackAnimations[0], charge);
-            if (attack != null) _animSvc.Override(hs.HeavyAttackAnimations[1], attack);
-            if (end    != null) _animSvc.Override(hs.HeavyAttackAnimations[2], end);
-        }
-    }
 
 
     // 콤보창 헬퍼(애니 이벤트에서 호출)

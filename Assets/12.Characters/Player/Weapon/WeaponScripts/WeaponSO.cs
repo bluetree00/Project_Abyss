@@ -13,10 +13,12 @@ public class WeaponSO : ScriptableObject {
     public float baseDefense;
     public int groundEndCount;
     public int airEndCount;
-    public AnimationSetSO groundAnimSet; // addressable ref
+    public AnimationSetSO groundAnimSet; //NOTE: 애니메이션 클립을 넣게 변경해야함
     public AnimationSetSO airAnimSet;
-    public WeaponAbilitySetSO abilitySet;
-    public EffectPackageSO effectPackage;
+    public WeaponAbilitySetSO abilitySet; //NOTE: 공격의 한개씩을 담당 내부에들어가는 어빌리티는 수치뿐만 아니라 SO의 이펙트와 콜라이더를 어떻게 할지 고민해야함
+                                          //NOTE: 여기서 완성하지 않아도 하나씩 공격에 들어가는 구성을 완료하면 러너에서 애니메이션 이펙트 콜라이더 셋의 정보를
+                                        //NOTE: 받아서 실행한다면 공격타이밍에 맞게 해당 공격들의 이펙트 콜라이더 애니메이션을 분리해서 호출 가능해짐. 
+    public EffectPackageSO effectPackage;    //NOTE: 이펙트와 콜라이더는 형태만 잘 지정해주고 필요시 호출대기 러너에서 그대로 호출하기
     public ColliderPackageSO colliderPackage;
 }
 
