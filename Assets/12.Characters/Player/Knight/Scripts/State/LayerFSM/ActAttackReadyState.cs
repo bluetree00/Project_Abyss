@@ -11,7 +11,7 @@ public class ActAttackReadyState : ILayerState<ActState>
     {
         // 컨텍스트별(지상/공중) 애니 세트 교체
         var isAir = !_controller.IsGrounded();
-        _controller.ApplyAttackAnimationSet(isAir);
+
 
         // 이동 제어(풀보디 공격 기준; 상체공격이면 0.2f 같은 감속으로)
         _controller.AcquireMoveLock();
