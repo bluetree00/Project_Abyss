@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: WeaponAnimation
+  m_EditorClassIdentifier: 
+  m_GroupName: WeaponAnimation
+  m_Data:
+    m_SerializedData: []
+  m_GUID: e022b22868950144f9a5f9bdc5770e86
+  m_SerializeEntries:
+  - m_GUID: ea88c1cbbc57198499ce3da9463baea4
+    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
+    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
+    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
+    m_Address: Anim/Weapon/Ground/Sword_SpSlash_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 165130b8a71020641b870cab32d18c5e
+    m_Address: Anim/Weapon/Ground/Sword_ESlash_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 1de5a423f87bdf440b4fba19b0aa9f29, type: 2}
+    - {fileID: 11400000, guid: 1662ca5420d8e5440b181ddd87f76b7c, type: 2}

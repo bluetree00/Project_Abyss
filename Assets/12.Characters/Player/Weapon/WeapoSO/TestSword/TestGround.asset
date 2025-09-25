@@ -12,4 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: TestGround
   m_EditorClassIdentifier: 
-  slots: []
+  slots:
+  - slotName: 
+    variants: []
+    expectedEventCount: 0
