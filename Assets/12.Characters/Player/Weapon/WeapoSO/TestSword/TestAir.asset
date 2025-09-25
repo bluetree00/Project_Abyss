@@ -18,8 +18,3 @@ MonoBehaviour:
     - animKey: 
       weight: 0
     expectedEventCount: 0
-  - slotName: 
-    variants:
-    - animKey: 
-      weight: 0
-    expectedEventCount: 0
