@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
-  m_Name: WeaponAbillity
+  m_Name: WeaponEffect
   m_EditorClassIdentifier: 
-  m_GroupName: WeaponAbillity
+  m_GroupName: WeaponEffect
   m_Data:
     m_SerializedData: []
-  m_GUID: 839b9659ecea42e41944f759125a3bf8
+  m_GUID: a89689c06a9ec6f4586663b808a34bd2
   m_SerializeEntries:
-  - m_GUID: cb9aceca967c7da45aae479d66a29df8
-    m_Address: Assets/12.Characters/Player/Weapon/WeapoSO/TestSword/Testabillity.asset
+  - m_GUID: 8c18363245b2ef14d871d17e286d704b
+    m_Address: Assets/12.Characters/Player/Weapon/WeapoSO/TestSword/TestEffect.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -26,5 +26,5 @@ MonoBehaviour:
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: 37fc56b42ad42b04a9f1eeb243fcd8f9, type: 2}
-    - {fileID: 11400000, guid: 7027a8abba89b0f4ea52ba155798f73f, type: 2}
+    - {fileID: 11400000, guid: 7d0ad871a21d15c43abe61db78cc7628, type: 2}
+    - {fileID: 11400000, guid: c99803cc6650d304a86c155d28be98ad, type: 2}

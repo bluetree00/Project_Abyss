@@ -10,7 +10,7 @@ using UnityEngine;
 
 #region Animation Set
 [CreateAssetMenu(menuName = "Game/AnimationSetSO")]
-public class AnimationSetSO : ScriptableObject
+public class WeaponAnimationSetSO : ScriptableObject
 {
 [Serializable]
 public class AnimationVariant

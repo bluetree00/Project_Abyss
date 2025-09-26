@@ -9,8 +9,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5834b5087d578d24c926ce20cd31e6d6, type: 3}
-  m_Name: WeaponAbillity_ContentUpdateGroupSchema
+  m_Script: {fileID: 11500000, guid: 6661ff4902369464499effdd30aa041a, type: 3}
+  m_Name: TestEffectPact
   m_EditorClassIdentifier: 
-  m_Group: {fileID: 11400000, guid: e97f331e54bd38946b7f02d2436a69a1, type: 2}
-  m_StaticContent: 0
+  mappings:
+  - slotIndex: 0
+    eventIndex: 0
+    effects:
+    - {fileID: 11400000, guid: 8c18363245b2ef14d871d17e286d704b, type: 2}

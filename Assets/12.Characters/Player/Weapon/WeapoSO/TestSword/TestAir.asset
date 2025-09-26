@@ -17,4 +17,6 @@ MonoBehaviour:
     variants:
     - animKey: 
       weight: 0
+    - animKey: 
+      weight: 0
     expectedEventCount: 0
