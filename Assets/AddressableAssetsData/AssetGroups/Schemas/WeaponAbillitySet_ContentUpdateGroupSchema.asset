@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5834b5087d578d24c926ce20cd31e6d6, type: 3}
-  m_Name: WeaponAbillity_ContentUpdateGroupSchema
+  m_Name: WeaponAbillitySet_ContentUpdateGroupSchema
   m_EditorClassIdentifier: 
-  m_Group: {fileID: 11400000, guid: e97f331e54bd38946b7f02d2436a69a1, type: 2}
+  m_Group: {fileID: 11400000, guid: ebe7e2344044e2a448c31bef261f97a6, type: 2}
   m_StaticContent: 0

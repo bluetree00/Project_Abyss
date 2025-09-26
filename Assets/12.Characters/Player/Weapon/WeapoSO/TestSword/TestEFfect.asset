@@ -9,19 +9,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6661ff4902369464499effdd30aa041a, type: 3}
-  m_Name: TestEFfect
+  m_Script: {fileID: 11500000, guid: bca08cd8f89b88545880059f2431a5b7, type: 3}
+  m_Name: TestEffect
   m_EditorClassIdentifier: 
-  mappings:
-  - slotIndex: 0
-    eventIndex: 0
-    effects:
-    - id: 
-      effectKey: 
-      attachPoint: 
-      localPosition: {x: 0, y: 0, z: 0}
-      localEuler: {x: 0, y: 0, z: 0}
-      localScale: {x: 0, y: 0, z: 0}
-      followAttach: 0
-      lifetime: 0
-      syncColliderId: 
+  id: 
+  addressableKey: 
+  attachPoint: weapon_tip
+  localPosition: {x: 0, y: 0, z: 0}
+  localEuler: {x: 0, y: 0, z: 0}
+  localScale: {x: 1, y: 1, z: 1}
+  followAttach: 0
+  lifetime: 2
+  syncColliderId: 
+  variantTag: 
+  recommendedPoolSize: 4
