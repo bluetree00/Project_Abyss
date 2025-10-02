@@ -2,33 +2,50 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-
-// ======= ScriptableObject definitions for modular weapon data =======
-// This single file contains multiple ScriptableObject types you can split
-// into separate files later if desired.
-
-
-#region Animation Set
-[CreateAssetMenu(menuName = "Game/AnimationSetSO")]
+[CreateAssetMenu(menuName = "Game/WeaponAnimationSetSO")]
 public class WeaponAnimationSetSO : ScriptableObject
 {
-[Serializable]
-public class AnimationVariant
-{
-public string animKey; // Addressables key or local clip reference name
-public float weight = 1f; // variant selection weight
+
+    [Serializable]
+    public class ClipMapping
+    {
+        public string baseClipName;      // Animator Controller 상태 이름
+        public string addressableKey;    // Addressables Key
+        public WeaponActionType actionType;
+        public int comboIndex = 0;       // 콤보 인덱스
+    }
+
+    [Serializable]
+    public class AnimGroupMapping
+    {
+        public WeaponAnimGroup groupType;
+        public List<ClipMapping> clipMappings = new List<ClipMapping>();
+
+        // 그룹 안에서 액션 타입별 조회
+        public IEnumerable<ClipMapping> GetMappingsForAction(WeaponActionType action)
+        {
+            foreach (var m in clipMappings)
+                if (m.actionType == action) yield return m;
+        }
+    }
+
+    // Ground / Air 그룹 리스트
+    public List<AnimGroupMapping> animGroups = new List<AnimGroupMapping>();
+
+    // 그룹과 액션으로 조회
+    public IEnumerable<ClipMapping> GetMappings(WeaponAnimGroup group, WeaponActionType action)
+    {
+        var grp = animGroups.Find(g => g.groupType == group);
+        if (grp != null)
+            return grp.GetMappingsForAction(action);
+        return new List<ClipMapping>();
+    }
+
+    // 모든 매핑 반환 (모든 그룹 포함)
+    public IEnumerable<ClipMapping> GetAllMappings()
+    {
+        foreach (var g in animGroups)
+            foreach (var m in g.clipMappings)
+                yield return m;
+    }
 }
-
-
-[Serializable]
-public class AnimationSlot
-{
-public string slotName; // e.g. "Attack1"
-public List<AnimationVariant> variants = new List<AnimationVariant>();
-public int expectedEventCount = 1; // how many anim events the slot uses
-}
-
-
-public List<AnimationSlot> slots = new List<AnimationSlot>();
-}
-#endregion

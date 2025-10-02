@@ -1,40 +1,90 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 변경된 ColliderPackageSO : EventMapping now references ColliderSO objects
-[CreateAssetMenu(menuName = "Game/ColliderPackageSO")]
+[CreateAssetMenu(menuName = "Game/WeaponColliderPackageSO (Indexed Steps)")]
 public class WeaponColliderPackageSO : ScriptableObject
 {
+    /// <summary>
+    /// 하나의 EffectIndex 내 단계(step)별 콜라이더 정의
+    /// </summary>
     [Serializable]
-    public class EventMapping {
-        public int slotIndex;
-        public int eventIndex;
+    public class StepEntry
+    {
+        [Header("Step Identity")]
+        [Tooltip("EffectIndex 내 순서 / Step 번호")]
+        public int step = 0;
 
-        // 직접 SO 레퍼런스를 갖도록 (에디터에서 드래그 앤 드롭)
-        public List<WeaponColliderSO> colliders = new List<WeaponColliderSO>();
+        [Header("Collider Reference")]
+        [Tooltip("실제 사용할 콜라이더 ScriptableObject 참조")]
+        public WeaponColliderSO colliderSO;
     }
 
-    public List<EventMapping> mappings = new List<EventMapping>();
+    /// <summary>
+    /// 특정 EffectIndex에 포함된 StepEntry 리스트
+    /// </summary>
+    [Serializable]
+    public class IndexEntry
+    {
+        [Header("Effect Index Identity")]
+        [Tooltip("해당 액션 내 EffectIndex / 몇 번째 이벤트인지")]
+        public int effectIndex = 0;
 
-    // 런타임용 조회 헬퍼 (단순, 필요하면 캐시화)
-    public List<WeaponColliderSO> GetCollidersFor(int slotIndex, int eventIndex) {
-        for (int i = 0; i < mappings.Count; i++) {
-            var m = mappings[i];
-            if (m.slotIndex == slotIndex && m.eventIndex == eventIndex)
-                return m.colliders;
-        }
-        return null;
+        [Header("Step List")]
+        [Tooltip("EffectIndex 내 각 Step별 콜라이더 리스트")]
+        public List<StepEntry> steps = new List<StepEntry>();
     }
 
-    // id로 검색하는 보조 메소드 (만약 ID로 참조하고 싶을 때)
-    public WeaponColliderSO GetColliderById(string id) {
-        foreach (var m in mappings) {
-            foreach (var c in m.colliders) {
-                if (c != null && c.id == id) return c;
+    /// <summary>
+    /// 특정 Group + ActionType의 콜라이더 묶음
+    /// </summary>
+    [Serializable]
+    public class ActionEntry
+    {
+        [Header("Action Identity")]
+        [Tooltip("Ground / Air 구분")]
+        public WeaponAnimGroup group = WeaponAnimGroup.Ground;
+
+        [Tooltip("Light / Heavy / QSkill 등 액션 타입")]
+        public WeaponActionType actionType;
+
+        [Header("Collider Indices")]
+        [Tooltip("해당 액션에 포함된 EffectIndex 리스트")]
+        public List<IndexEntry> effectIndices = new List<IndexEntry>();
+    }
+
+    [Header("Weapon Collider Package")]
+    [Tooltip("장비 단위로 구성된 콜라이더 패키지")]
+    public List<ActionEntry> actions = new List<ActionEntry>();
+
+    // ------------------ 런타임 캐시 ------------------
+    private Dictionary<(WeaponAnimGroup, WeaponActionType, int, int), WeaponColliderSO> _entryMap;
+
+    private void OnEnable()
+    {
+        _entryMap = new Dictionary<(WeaponAnimGroup, WeaponActionType, int, int), WeaponColliderSO>();
+
+        foreach (var action in actions)
+        {
+            foreach (var indexEntry in action.effectIndices)
+            {
+                foreach (var stepEntry in indexEntry.steps)
+                {
+                    var key = (action.group, action.actionType, indexEntry.effectIndex, stepEntry.step);
+                    if (!_entryMap.ContainsKey(key) && stepEntry.colliderSO != null)
+                        _entryMap.Add(key, stepEntry.colliderSO);
+                }
             }
         }
-        return null;
+    }
+
+    /// <summary>
+    /// 런타임 조회: Group, ActionType, EffectIndex, Step으로 검색
+    /// </summary>
+    public WeaponColliderSO GetCollider(WeaponAnimGroup group, WeaponActionType action, int effectIndex, int step = 0)
+    {
+        if (_entryMap == null) OnEnable();
+        _entryMap.TryGetValue((group, action, effectIndex, step), out var colliderSO);
+        return colliderSO;
     }
 }

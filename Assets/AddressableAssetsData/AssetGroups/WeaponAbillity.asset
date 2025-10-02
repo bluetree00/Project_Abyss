@@ -18,7 +18,7 @@ MonoBehaviour:
   m_GUID: 839b9659ecea42e41944f759125a3bf8
   m_SerializeEntries:
   - m_GUID: cb9aceca967c7da45aae479d66a29df8
-    m_Address: Assets/12.Characters/Player/Weapon/WeapoSO/TestSword/Testabillity.asset
+    m_Address: SoData/Abillity/Weapon
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
