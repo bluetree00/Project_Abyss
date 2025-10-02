@@ -12,16 +12,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95d84735d3c1927499746979873409a8, type: 3}
   m_Name: Testabillity
   m_EditorClassIdentifier: 
-  abilityKey: 
-  cooldown: 0
   steps:
-  - eventIndex: 0
-    effectId: 
-    colliderIds: []
-    damage: 0
-    actionKey: 
-  - eventIndex: 0
-    effectId: 
-    colliderIds: []
-    damage: 0
-    actionKey: 
+  - stepIndex: 0
+    order: 0
+    baseDamage: 0
+    knockbackMultiplier: 0
+    selfMovement: {x: 0, y: 0, z: 0}
+    effectScaleMultiplier: 0
+    effectLifeMultiplier: 0
+    colliderSizeMultiplier: 0
+    colliderDurationMultiplier: 0
+    payloadKey: 
+    duration: 0
+    executeInFixedUpdate: 0
+    oneShot: 0
+  - stepIndex: 1
+    order: 0
+    baseDamage: 0
+    knockbackMultiplier: 0
+    selfMovement: {x: 0, y: 0, z: 0}
+    effectScaleMultiplier: 0
+    effectLifeMultiplier: 0
+    colliderSizeMultiplier: 0
+    colliderDurationMultiplier: 0
+    payloadKey: 
+    duration: 0
+    executeInFixedUpdate: 0
+    oneShot: 0
+  - stepIndex: 2
+    order: 0
+    baseDamage: 0
+    knockbackMultiplier: 0
+    selfMovement: {x: 0, y: 0, z: 0}
+    effectScaleMultiplier: 0
+    effectLifeMultiplier: 0
+    colliderSizeMultiplier: 0
+    colliderDurationMultiplier: 0
+    payloadKey: 
+    duration: 0
+    executeInFixedUpdate: 0
+    oneShot: 0

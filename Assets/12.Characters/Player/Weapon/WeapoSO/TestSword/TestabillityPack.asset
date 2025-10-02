@@ -16,3 +16,17 @@ MonoBehaviour:
   - actionType: 1
     abilities:
     - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 2
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 3
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 4
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 5
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}

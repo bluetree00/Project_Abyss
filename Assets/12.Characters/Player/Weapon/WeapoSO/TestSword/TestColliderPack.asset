@@ -12,8 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7c1610179ecfe8419638dbb34df2058, type: 3}
   m_Name: TestColliderPack
   m_EditorClassIdentifier: 
-  mappings:
-  - slotIndex: 0
-    eventIndex: 0
-    colliders:
-    - {fileID: 11400000, guid: 9bb9e06c265b747409ac4dda67ba6db8, type: 2}
+  actions:
+  - group: 0
+    actionType: 1
+    effectIndices:
+    - effectIndex: 0
+      steps:
+      - step: 0
+        colliderSO: {fileID: 0}
+    - effectIndex: 1
+      steps:
+      - step: 0
+        colliderSO: {fileID: 0}
+    - effectIndex: 2
+      steps:
+      - step: 0
+        colliderSO: {fileID: 0}

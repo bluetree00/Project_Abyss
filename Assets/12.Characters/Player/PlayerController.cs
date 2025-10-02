@@ -22,6 +22,7 @@ public class PlayerController : CharacterBase
     public CharacterData CharacterData => characterData;
 
     public WeaponManagerSO weaponManagerSO;
+    private PlayerWeaponHandler weaponHandler;
 
     protected PlayerInputActions inputActions;
     public bool inputReady = false;
@@ -44,7 +45,7 @@ public class PlayerController : CharacterBase
     public AnimatorOverrideService _animSvc;
 
     //애니메이션 이벤트 리시버 : 인벤트 타이밍에 맞게 러너를 실행해서 체크
-    public PlayerAttackEventReceiver attackEventReceiver;
+    private PlayerAnimationEventReceiver EventReceiver;
 
     //============================================================
     // 레이어 FSM (Locomotion / Action)
@@ -193,9 +194,6 @@ public class PlayerController : CharacterBase
     private void InitWeaponManager()
     {
         weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
-        // weaponManagerSO.Initialize(2, anim);
-        // weaponManagerSO.weaponHandTransform = handTransform;
-        // weaponManagerSO.OnWeaponEquippedEvent += OnWeaponEquipped;
     }
 
     public void ClearWeaponAbilities()
