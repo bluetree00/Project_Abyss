@@ -82,3 +82,15 @@ public enum StageNodeType
     Treasure,
     Event
 }
+
+[System.Serializable]
+public class ProgressDataJSON
+{
+    public int currentNodeId;
+    public List<int> visitedNodes;
+    public List<int> clearedNodes;
+    public bool isProgress;
+    public bool isClear;
+    public int dataVersion;
+    public string lastUpdateTime;
+}
