@@ -190,13 +190,22 @@ public class Define
         Bat,
         Orc,
         Slime,
+        Snail,
+        EarthGolem,
+        SkeletonKnight,
+        Witch,
 
     }
 
-     public static readonly Dictionary<MonsterType, int> MonsterIdMap = new()
+    public static readonly Dictionary<MonsterType, int> MonsterIdMap = new()
     {
         { MonsterType.Bat, 1001 },
-       
+        { MonsterType.Orc, 1002 },
+        { MonsterType.Slime, 1003 },
+        { MonsterType.Snail, 1005 },
+        { MonsterType.EarthGolem, 1006 },
+        { MonsterType.SkeletonKnight, 1007 },
+        { MonsterType.Witch, 1004 }
     };
 
     public static int GetMonsterId(MonsterType type)
@@ -213,7 +222,11 @@ public class Define
 
     public enum AttackPurpose
     {
-        Normal,
+        Normal01,
+        Normal02,
+        Normal03,
+        Normal04,
+        Normal05,
         Special,
         Ultimate,
     }

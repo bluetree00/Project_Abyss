@@ -35,7 +35,8 @@ public class MonsterDataManager
         IsInitialized = true;
     }
 
-    private void LoadFromJson()
+    // 테스트용으로 public
+    public void LoadFromJson()
     {
         try
         {

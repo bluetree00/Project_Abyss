@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Monster/Abilities/NormalAttack")]
-public class NormalAttackAbilitySO : AttackAbilitySO
+public class NormalAttackAbilitySO : MonsterAttackAbilitySO
 {
     [SerializeField] private float damage = 15f;
     [SerializeField] private float attackRange = 1.8f;
