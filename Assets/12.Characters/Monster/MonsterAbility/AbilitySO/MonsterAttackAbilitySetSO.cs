@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Monster/Abilities/AttackSet", fileName = "New_AttackSet")]
-public class AttackAbilitySetSO : MonsterAbilitySO
+public class MonsterAttackAbilitySetSO : MonsterAbilitySO
 {
     [SerializeField]
-    public List<AttackAbilitySO> attackAbilities = new List<AttackAbilitySO>();
+    public List<MonsterAttackAbilitySO> attackAbilities = new List<MonsterAttackAbilitySO>();
 
     public override Define.MonsterAbilityType MonsterAbilityType => Define.MonsterAbilityType.Attack;
 

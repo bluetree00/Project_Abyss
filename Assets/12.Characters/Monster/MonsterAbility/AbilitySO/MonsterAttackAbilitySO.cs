@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class AttackAbilitySO : MonsterAbilitySO
+public abstract class MonsterAttackAbilitySO : MonsterAbilitySO
 {
     public override abstract IMonsterAbility ReturnAbilityInstance();
 }

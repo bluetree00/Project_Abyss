@@ -55,6 +55,7 @@ public abstract class MonsterController : CharacterBase
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
+        // 로그인 씬 안 거치고 테스트하도록 몬스터컨트롤러 에서 매니저 접근
         Managers.MonsterData.LoadFromJson();
         _myStat = Managers.MonsterData.GetStatById(MonsterId);
 
