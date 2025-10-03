@@ -34,7 +34,7 @@ public class BatIdleState : IMonsterState
         // 필요 시 정리 작업
     }
 
-    public MonsterController.MonsterState Update()
+    public MonsterController.MonsterState StateUpdate()
     {
         elapsedTime += Time.deltaTime;
 

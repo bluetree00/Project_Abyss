@@ -2,43 +2,27 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BatAnimationEventReceiver : MonoBehaviour
+public class BatAnimationEventReceiver : MonsterAnimationEventReceiver
 {
-    private MonsterController controller;
-
-    public event System.Action OnAttackStartEvent;
-    public event System.Action OnAttackEndEvent;
-
-    private void Awake()
+    public override void OnAttackStart()
     {
         if (controller == null)
-            controller = GetComponent<MonsterController>() ?? GetComponentInParent<MonsterController>();
-
-        if (controller == null)
-            Debug.LogWarning("[BatAnimationEventReceiver] MonsterController를 찾을 수 없습니다.");
-    }
-
-    public void OnAttackStart()
-    {
-        if (controller == null || controller.EffectProfile == null)
             return;
 
         controller.SetAttack(true);
         Debug.Log("OnAttackStart: 공격 시작");
 
-        string effectName = controller.EffectProfile.attackEffect;
-        Vector3 offset = controller.EffectProfile.attackEffectOffset;
-        Vector3 rotationEuler = controller.EffectProfile.attackEffectRotation;
+        if (TryGetAttackEffect(out var effectName, out var offset, out var rotationEuler))
+        {
+            Vector3 spawnPos = controller.transform.TransformPoint(offset);
+            Quaternion spawnRot = Quaternion.Euler(rotationEuler);
+            SpawnAttackEffect(effectName, spawnPos, spawnRot);
+        }
 
-        Vector3 spawnPos = controller.transform.TransformPoint(offset);
-        Quaternion spawnRot = Quaternion.Euler(rotationEuler);
-
-        // 이펙트 생성 코드 (주석 처리된 부분)
-
-        OnAttackStartEvent?.Invoke();
+        RaiseAttackStartEvent();
     }
 
-    public void OnAttackEnd()
+    public override void OnAttackEnd()
     {
         if (controller == null)
         {
@@ -49,6 +33,9 @@ public class BatAnimationEventReceiver : MonoBehaviour
         controller.SetAttack(false);
         Debug.Log("OnAttackEnd: 공격 종료");
 
-        OnAttackEndEvent?.Invoke();
+        RaiseAttackEndEvent();
     }
+
+    // 배트 전용 커스터마이징이 필요하면 아래를 오버라이드
+    // protected override void SpawnAttackEffect(string effectName, Vector3 pos, Quaternion rot) { /* Bat 커스텀 */ }
 }

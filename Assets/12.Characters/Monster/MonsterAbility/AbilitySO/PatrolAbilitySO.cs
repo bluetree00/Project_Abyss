@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Monster/Abilities/Patrol")]
+[CreateAssetMenu(menuName = "Monster/Abilities/Patrol", fileName = "New_Patrol")]
 public class PatrolAbilitySO : MonsterAbilitySO
 {
     [SerializeField] private Vector3[] waypoints;
@@ -12,7 +12,7 @@ public class PatrolAbilitySO : MonsterAbilitySO
         waypoints = points;
     }
 
-    public override IMonsterAbility CreateAbilityInstance()
+    public override IMonsterAbility ReturnAbilityInstance()
     {
         return new PatrolAbility(waypoints);
     }

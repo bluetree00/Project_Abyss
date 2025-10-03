@@ -17,7 +17,7 @@ public class BatAttackState : IMonsterState
         controller.CurrentAttackAbility?.Execute();
     }
 
-    public MonsterController.MonsterState Update()
+    public MonsterController.MonsterState StateUpdate()
     {
         if (!controller.IsAttacking)
         {

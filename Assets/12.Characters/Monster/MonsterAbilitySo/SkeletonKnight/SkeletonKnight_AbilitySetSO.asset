@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f2f10879e10e9745bca0448af6ee7e5, type: 3}
+  m_Name: SkeletonKnight_AbilitySetSO
+  m_EditorClassIdentifier: 
+  abilities:
+  - {fileID: 11400000, guid: 7c364c644c2f1454a95e2b853cb3af85, type: 2}
+  - {fileID: 11400000, guid: 6271c66660786054ab1799f9d2bb3149, type: 2}
+  - {fileID: 11400000, guid: 512465bbe4aeb374fbd701e63fb05d4b, type: 2}
+  - {fileID: 11400000, guid: 05c6ad28190ad02449184fc38ceeae61, type: 2}

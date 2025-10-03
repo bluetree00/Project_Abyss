@@ -6,6 +6,6 @@ public interface IMonsterState
 {
     void Init(MonsterController controller, IMonsterStateChanger stateChanger);
     void Enter();
-    MonsterController.MonsterState Update();
+    MonsterController.MonsterState StateUpdate();
     void Exit();
 }

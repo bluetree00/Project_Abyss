@@ -24,7 +24,7 @@ public class BatPatrolState : IMonsterState
         controller.Anim.CrossFade("MoveBlend", 0.1f);
     }
 
-    public MonsterController.MonsterState Update()
+    public MonsterController.MonsterState StateUpdate()
     {
         patrolAbility?.Execute();
         detectAbility?.Execute();

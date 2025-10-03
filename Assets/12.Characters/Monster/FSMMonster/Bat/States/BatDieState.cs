@@ -36,7 +36,7 @@ public class BatDieState : IMonsterState
         
     }
 
-    MonsterController.MonsterState IMonsterState.Update()
+    MonsterController.MonsterState IMonsterState.StateUpdate()
     {
         Debug.Log("BatDieState Update");
         throw new System.NotImplementedException();

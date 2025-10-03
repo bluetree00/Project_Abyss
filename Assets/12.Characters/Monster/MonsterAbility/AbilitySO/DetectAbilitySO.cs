@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Monster/Abilities/Detect")]
+[CreateAssetMenu(menuName = "Monster/Abilities/Detect", fileName = "New_Detect")]
 public class DetectAbilitySO : MonsterAbilitySO 
 {
     [SerializeField] private float range;
@@ -19,7 +19,7 @@ public class DetectAbilitySO : MonsterAbilitySO
     }
 
     // 기존 인터페이스에 맞춘 오버라이드용 메서드 (필요 시)
-    public override IMonsterAbility CreateAbilityInstance()
+    public override IMonsterAbility ReturnAbilityInstance()
     {
         // Managers.Player.PlayerTransform 이 null 일 수 있으니 주의
         return new DetectAbility(range);
