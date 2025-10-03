@@ -83,6 +83,42 @@ public enum StageNodeType
     Event
 }
 
+// ⭐ JSON 변환을 위한 임시 데이터 구조체들
+[System.Serializable]
+public class MapDataJSON
+{
+    public string chapterName;
+    public List<int> layerSizes;
+    public List<StageSettingsJSON> stages;
+    public List<NodeDataJSON> nodes;
+    public List<EdgeDataJSON> edges;
+    public int dataVersion;
+}
+
+[System.Serializable]
+public class StageSettingsJSON
+{
+    public string stageName;
+    public string resourcePath;
+}
+
+[System.Serializable]
+public class NodeDataJSON
+{
+    public int nodeId;
+    public int layer;
+    public float positionX;
+    public float positionY;
+    public string nodeType;
+}
+
+[System.Serializable]
+public class EdgeDataJSON
+{
+    public int fromId;
+    public int toId;
+}
+
 [System.Serializable]
 public class ProgressDataJSON
 {
