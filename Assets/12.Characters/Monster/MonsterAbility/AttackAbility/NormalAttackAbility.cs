@@ -10,7 +10,7 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
     private Define.AttackPurpose purpose;
 
     private MonsterController owner;
-    private BatAnimationEventReceiver eventReceiver;
+    private MonsterAnimationEventReceiver eventReceiver;
 
     public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Attack;
     public Define.AttackStyle Style => style;
@@ -29,7 +29,7 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
     {
         this.owner = owner;
 
-        eventReceiver = owner.GetComponent<BatAnimationEventReceiver>();
+        eventReceiver = owner.GetComponent<MonsterAnimationEventReceiver>();
         if (eventReceiver != null)
         {
             eventReceiver.OnAttackStartEvent += OnAttackStart;
@@ -52,9 +52,9 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
         if (owner == null || owner.playerTarget == null)
             return;
 
-        float distance = Vector3.Distance(owner.transform.position, owner.playerTarget.position);
-        if (distance > range)
-            return;
+        // float distance = Vector3.Distance(owner.transform.position, owner.playerTarget.position);
+        // if (distance > range)
+        //     return;
 
         if (animationClip != null)
         {
@@ -68,14 +68,20 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
     {
         if (owner == null) return;
 
+        // 현재 진행 중인 Purpose와 이 Ability의 Purpose가 다르면 무시 (중복 구독 방지용 필터)
+        if (owner.currentAttackPurpose != purpose)
+            return;
+
         // 이펙트를 생성할 위치 (몬스터 앞 방향으로 약간 떨어진 곳)
         Vector3 spawnOffset = owner.transform.forward * 1.0f; // 1.0f는 거리, 필요에 따라 조정
         Vector3 spawnPosition = owner.transform.position + spawnOffset;
 
         Quaternion spawnRotation = Quaternion.LookRotation(owner.transform.forward); // 방향 유지
 
-        GameObject effect = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
+        //CHECKLIST:임시 로그 비활성화
+        //GameObject effect = Managers.ObjectPooler.SpawnFromPool("ShinySlash", spawnPosition, spawnRotation);
 
+        //CHECKLIST:임시 로그 비활성화
         Debug.Log($"NormalAttackAbility: 공격 시작 이벤트 받음, 데미지: {damage}");
         // 실제 데미지 처리 로직 추가
     }
@@ -83,8 +89,12 @@ public class NormalAttackAbility : IAttackAbility, IAnimClipProvider
     private void OnAttackEnd()
     {
         if (owner == null) return;
+
+        if (owner.currentAttackPurpose != purpose)
+            return;
         owner.SetAttackReadyTime(owner.MyStat.attack_cooldown);
         owner.SetAttack(false);
-        Debug.Log("NormalAttackAbility: 공격 종료 이벤트 받음");
+        //CHECKLIST:임시 로그 비활성화
+        //Debug.Log("NormalAttackAbility: 공격 종료 이벤트 받음");
     }
 }

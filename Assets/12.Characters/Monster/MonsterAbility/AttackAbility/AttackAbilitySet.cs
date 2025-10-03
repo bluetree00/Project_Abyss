@@ -7,6 +7,10 @@ public class AttackAbilitySet : IMonsterAbility
     private Dictionary<Define.AttackStyle, List<IAttackAbility>> attackByStyle = new();
     private MonsterController owner;
 
+    // 캐싱: 전체 어빌리티 스냅샷 (읽기 전용 노출용)
+    private IAttackAbility[] _cachedAll;
+    private bool _cacheDirty = true;
+
     public Define.MonsterAbilityType Type => Define.MonsterAbilityType.Attack;
 
     public AttackAbilitySet() { }
@@ -25,6 +29,7 @@ public class AttackAbilitySet : IMonsterAbility
         if (ability is IAttackAbility attackAbility)
         {
             attackAbilities.Add(attackAbility);
+            _cacheDirty = true; // 목록 변경 → 캐시 무효화
 
             if (!attackByStyle.TryGetValue(attackAbility.Style, out var list))
             {
@@ -44,7 +49,7 @@ public class AttackAbilitySet : IMonsterAbility
 
     public void Execute()
     {
-        var selectedAbility = SelectAttackAbility(Define.AttackStyle.Melee, Define.AttackPurpose.Normal);
+        var selectedAbility = SelectAttackAbility(Define.AttackStyle.Melee, Define.AttackPurpose.Normal01);
         selectedAbility?.Execute();
     }
 

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Monster/Abilities/Chase")]
+[CreateAssetMenu(menuName = "Monster/Abilities/Chase", fileName = "New_Chase")]
 public class ChaseAbilitySO : MonsterAbilitySO 
 {
     [SerializeField] private float speed;
@@ -25,7 +25,7 @@ public class ChaseAbilitySO : MonsterAbilitySO
     }
 
     // 기존 인터페이스에 맞춘 오버라이드용 메서드 (필요 시)
-    public override IMonsterAbility CreateAbilityInstance()
+    public override IMonsterAbility ReturnAbilityInstance()
     {
          return new ChaseAbility(speed, attackRange);
     }

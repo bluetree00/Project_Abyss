@@ -9,7 +9,7 @@ public class MonsterAbilitySet
     {
         foreach (var abilitySO in abilitySetSO.abilities)
         {
-            var instance = abilitySO.CreateAbilityInstance();
+            var instance = abilitySO.ReturnAbilityInstance();
             instance.Init(owner);
             abilityMap[abilitySO.MonsterAbilityType] = instance;
         }

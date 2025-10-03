@@ -24,7 +24,7 @@ public class BatChaseState : IMonsterState
         controller.StopMoving();
     }
 
-    public MonsterController.MonsterState Update()
+    public MonsterController.MonsterState StateUpdate()
     {
         chaseAbility?.Execute();
 

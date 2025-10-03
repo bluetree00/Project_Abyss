@@ -17,6 +17,7 @@ public abstract class MonsterController : CharacterBase
         Attack,
         Die
     }
+    [HideInInspector] public Define.AttackPurpose currentAttackPurpose;
 
     [Header("Abilities")]
     [SerializeField] private MonsterAbilitySetSO abilitySetSO;
@@ -31,6 +32,7 @@ public abstract class MonsterController : CharacterBase
     public bool IsInAttackRange { get; private set; }
     public bool IsAttacking { get; private set; }
     public float AttackReadyTime = 0f;
+    public int comboCount = 0;
 
     [Header("References")]
     public Transform playerTarget;
@@ -53,7 +55,7 @@ public abstract class MonsterController : CharacterBase
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
-
+        Managers.MonsterData.LoadFromJson();
         _myStat = Managers.MonsterData.GetStatById(MonsterId);
 
         agent = GetComponent<NavMeshAgent>();

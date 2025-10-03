@@ -7,7 +7,7 @@ public class BatAttackReadyState : IMonsterState
     private AttackAbilitySet attackAbilitySet;
 
     private Define.AttackStyle selectedStyle = Define.AttackStyle.Melee; 
-    private Define.AttackPurpose selectedPurpose = Define.AttackPurpose.Normal;
+    private Define.AttackPurpose selectedPurpose = Define.AttackPurpose.Normal01;
 
     public void Init(MonsterController controller, IMonsterStateChanger stateChanger)
     {
@@ -43,7 +43,7 @@ public class BatAttackReadyState : IMonsterState
         controller.animator.CrossFade("AttackReady", 0.1f);
     }
 
-    public MonsterController.MonsterState Update()
+    public MonsterController.MonsterState StateUpdate()
     {
         // ✅ 현재 거리 측정하여 IsInAttackRange 갱신
         float distanceToTarget = Vector3.Distance(controller.transform.position, controller.playerTarget.position);
