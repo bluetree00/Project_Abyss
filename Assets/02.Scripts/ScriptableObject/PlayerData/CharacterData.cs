@@ -132,7 +132,7 @@ public class CharacterData : ScriptableObject
 
         if (newWeapon != null)
         {
-            Debug.Log($"{characterName}이(가) {newWeapon.weaponName}을(를) 장착했습니다.");
+     
         }
         else
         {
@@ -147,7 +147,7 @@ public class CharacterData : ScriptableObject
     {
         if (equippedWeapon != null)
         {
-            Debug.Log($"{characterName}이(가) {equippedWeapon.weaponName}을(를) 해제했습니다.");
+        
             equippedWeapon = null;
 
             UpdateTotalAttackPower(); // 무기 해제 시 총 공격력 업데이트
