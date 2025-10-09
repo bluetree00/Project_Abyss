@@ -21,7 +21,7 @@ public class PlayerController : CharacterBase
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
-    public WeaponManagerSO weaponManagerSO;
+    //public WeaponManagerSO weaponManagerSO;
     private PlayerWeaponHandler weaponHandler;
 
     protected PlayerInputActions inputActions;
@@ -193,7 +193,7 @@ public class PlayerController : CharacterBase
 
     private void InitWeaponManager()
     {
-        weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
+       // weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
     }
 
     public void ClearWeaponAbilities()

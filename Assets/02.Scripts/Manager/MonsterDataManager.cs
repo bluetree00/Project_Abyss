@@ -6,7 +6,7 @@ using Cysharp.Threading.Tasks;
 using System;
 using LitJson;
 
-public class MonsterDataManager
+public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데이터 구조이지만 중간에 SO를 거처서 사용하는 내용으로 가야할 듯
 {
     private const string MonsterDataFileName = "monster_data.json";
     private string FilePath => Path.Combine(Application.persistentDataPath, MonsterDataFileName);

@@ -44111,6 +44111,7 @@ GameObject:
   - component: {fileID: 7443540175002269332}
   - component: {fileID: 1988122540706983207}
   - component: {fileID: 5847375943224835734}
+  - component: {fileID: 3318717271860074658}
   m_Layer: 0
   m_Name: Test1
   m_TagString: Untagged
@@ -44128,7 +44129,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 6080320727006332776}
@@ -49013,6 +49014,21 @@ ParticleSystemRenderer:
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
   m_MaskInteraction: 0
+--- !u!114 &3318717271860074658
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6816472555740340718}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17fc3a22ae69b6a40bd1c72fe9976439, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  localCenter: {x: 0, y: 0, z: 0}
+  localSize: {x: 14.2, y: 14.2, z: 14.2}
+  duration: 0.5
 --- !u!1 &7471483600294019789
 GameObject:
   m_ObjectHideFlags: 0
