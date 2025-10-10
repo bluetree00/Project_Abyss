@@ -1,17 +1,13 @@
-// PlayerWeaponManager_WithPool_Addressables.cs
 using System;
-using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
-/// 풀러(ObjectPoolerManager)를 사용하도록 개선된 PlayerWeaponManager
-/// - 슬롯 2개 관리
-/// - 풀러에서 무기 인스턴스 Spawn/Return 사용
-/// - 풀러 미설정 시 Addressables.InstantiateAsync 폴백
-/// - 즉시 교체 정책 (Immediate equip)
+/// 플레이어별 무기 매니저 (싱글톤 아님)
+/// - Player가 소유하고, Player에서 접근하도록 함
+/// - AcquireWeaponAsync(WeaponData) 오버로드 제공
 /// </summary>
 public class PlayerWeaponManager : MonoBehaviour
 {
@@ -25,302 +21,145 @@ public class PlayerWeaponManager : MonoBehaviour
         public bool IsEmpty => runtimeData == null;
     }
 
-    [Header("Slots")]
     public WeaponSlot[] slots = new WeaponSlot[2];
+    private System.Collections.Generic.List<WeaponData> _owned = new System.Collections.Generic.List<WeaponData>();
 
-    // 플레이어가 가진 무기 목록(인벤토리). 런타임 복사본을 저장.
-    private List<WeaponData> _owned = new List<WeaponData>();
+    // 소유자(선택): Player 참조 보관하면 편함
+    private PlayerController _owner;
 
-    // 외부 풀러 레퍼런스 (null이면 폴백으로 Addressables 사용)
-    private ObjectPoolerManager _objectPoolerManager = null;
-
-    // 이벤트
-    public event Action<int, WeaponData> OnEquip;
-    public event Action<int> OnUnequip;
-    public event Action<int, int> OnSwap;
-
-    private void Awake()
+    public void Initialize(PlayerController owner)
     {
-        for (int i = 0; i < SlotCount; i++)
-            slots[i] = new WeaponSlot();
+        _owner = owner;
+        for (int i = 0; i < slots.Length; i++) if (slots[i] == null) slots[i] = new WeaponSlot();
     }
 
-    #region Pooler 설정 API
-
-    public void SetObjectPooler(ObjectPoolerManager pooler)
-    {
-        _objectPoolerManager = pooler;
-    }
-
-    #endregion
-
-    #region Public API (획득/장착/언장착 등)
-
+    // WeaponSO 키로 로드 후 획득 (기존 기능 유지)
     public async UniTask AcquireWeaponAsync(string weaponSOKey, bool autoEquip = true)
     {
-        if (string.IsNullOrEmpty(weaponSOKey))
-        {
-            Debug.LogError("AcquireWeaponAsync: weaponSOKey가 비어있음");
-            return;
-        }
-
-        // Addressables에서 SO 로드
+        if (string.IsNullOrEmpty(weaponSOKey)) return;
         var handle = Addressables.LoadAssetAsync<WeaponSO>(weaponSOKey);
         await handle.Task;
-
-        if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
-        {
-            Debug.LogError($"AcquireWeaponAsync: WeaponSO 로드 실패 - {weaponSOKey}");
-            return;
-        }
+        if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null) return;
 
         var runtime = new WeaponData(handle.Result);
-        _owned.Add(runtime);
-
-        if (autoEquip)
-        {
-            int empty = GetFirstEmptySlotIndex();
-            if (empty >= 0)
-                await EquipToSlotAsync(empty, runtime);
-        }
+        await AcquireWeaponAsync(runtime, autoEquip);
     }
 
-    public async UniTask EquipToSlotAsync(int slotIndex, WeaponData runtimeData)
+    // WeaponData 직접 전달받아 획득 처리 (월드오브젝트가 호출할 때 사용)
+    public async UniTask AcquireWeaponAsync(WeaponData runtimeData, bool autoEquip = true)
     {
-        if (slotIndex < 0 || slotIndex >= SlotCount) throw new ArgumentOutOfRangeException(nameof(slotIndex));
-        if (runtimeData == null) throw new ArgumentNullException(nameof(runtimeData));
+        if (runtimeData == null) return;
 
-        // 1) 기존 장비 언장착
-        await UnequipSlotAsync(slotIndex);
+        _owned.Add(runtimeData);
 
-        // 2) Spawn 위치/회전
-        Transform attach = GetWeaponAttachTransform(slotIndex);
-        Vector3 spawnPos = attach != null ? attach.position : this.transform.position;
-        Quaternion spawnRot = attach != null ? attach.rotation : Quaternion.identity;
-
-        GameObject go = null;
-
-        // 3) 풀러에서 Spawn
-        if (_objectPoolerManager != null)
-        {
-            try
-            {
-                go = _objectPoolerManager.SpawnWeaponFromPool(runtimeData.weaponKey, spawnPos, spawnRot);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"Pool spawn 실패({runtimeData.weaponKey}), Addressables.InstantiateAsync 사용. Exception: {e.Message}");
-            }
-        }
-
-        // 4) 풀러 없거나 실패하면 Addressables.InstantiateAsync 사용
-        if (go == null)
-        {
-            if (string.IsNullOrEmpty(runtimeData.prefabKey))
-            {
-                Debug.LogWarning($"EquipToSlotAsync: 무기 {runtimeData.weaponKey}에 prefabKey 없음. 데이터만 슬롯에 등록.");
-                slots[slotIndex].runtimeData = runtimeData;
-                slots[slotIndex].instance = null;
-                OnEquip?.Invoke(slotIndex, runtimeData);
-                return;
-            }
-
-            try
-            {
-                var handle = Addressables.InstantiateAsync(runtimeData.prefabKey, spawnPos, spawnRot);
-                await handle.Task;
-
-                if (handle.Status == AsyncOperationStatus.Succeeded)
-                    go = handle.Result;
-                else
-                    Debug.LogError($"EquipToSlotAsync: Addressables.InstantiateAsync 실패 - {runtimeData.prefabKey}");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"EquipToSlotAsync: Addressables.InstantiateAsync Exception - {runtimeData.prefabKey}, {ex.Message}");
-            }
-        }
-
-        if (go == null)
-        {
-            slots[slotIndex].runtimeData = runtimeData;
-            slots[slotIndex].instance = null;
-            OnEquip?.Invoke(slotIndex, runtimeData);
-            return;
-        }
-
-        // 5) 부모 설정 및 초기화
-        if (attach != null)
-        {
-            go.transform.SetParent(attach, worldPositionStays: true);
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.identity;
-        }
-        else
-            go.transform.SetParent(this.transform, worldPositionStays: true);
-
-        var inst = go.GetComponent<WeaponInstance>() ?? go.AddComponent<WeaponInstance>();
-        inst.Initialize(runtimeData);
-        inst.OnEquip();
-
-        slots[slotIndex].runtimeData = runtimeData;
-        slots[slotIndex].instance = go;
-        OnEquip?.Invoke(slotIndex, runtimeData);
-    }
-
-    public async UniTask UnequipSlotAsync(int slotIndex)
-    {
-        if (slotIndex < 0 || slotIndex >= SlotCount) throw new ArgumentOutOfRangeException(nameof(slotIndex));
-
-        var slot = slots[slotIndex];
-        if (slot.instance != null)
-        {
-            bool returnedToPool = false;
-
-            if (_objectPoolerManager != null)
-            {
-                try
-                {
-                    _objectPoolerManager.ReturnToPool(slot.instance);
-                    returnedToPool = true;
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning($"UnequipSlotAsync: ReturnToPool 실패, Destroy 폴백. Exception: {e.Message}");
-                }
-            }
-
-            if (!returnedToPool)
-                Destroy(slot.instance);
-
-            slot.instance = null;
-        }
-
-        slot.runtimeData = null;
-        OnUnequip?.Invoke(slotIndex);
-        await UniTask.CompletedTask;
-    }
-
-    public async UniTask SwapSlotsAsync(int a, int b)
-    {
-        if (a == b) return;
-        if (a < 0 || a >= SlotCount || b < 0 || b >= SlotCount) return;
-
-        var tmpData = slots[a].runtimeData;
-        var tmpInst = slots[a].instance;
-
-        slots[a].runtimeData = slots[b].runtimeData;
-        slots[a].instance = slots[b].instance;
-        if (slots[a].instance != null)
-            slots[a].instance.transform.SetParent(GetWeaponAttachTransform(a), false);
-
-        slots[b].runtimeData = tmpData;
-        slots[b].instance = tmpInst;
-        if (slots[b].instance != null)
-            slots[b].instance.transform.SetParent(GetWeaponAttachTransform(b), false);
-
-        OnSwap?.Invoke(a, b);
-        await UniTask.CompletedTask;
-    }
-
-    #endregion
-
-    #region Pickup / Replace
-
-    public async UniTask HandlePickupAsync(string weaponSOKey, bool autoEquip = true)
-    {
-        if (string.IsNullOrEmpty(weaponSOKey)) return;
-
-        var handle = Addressables.LoadAssetAsync<WeaponSO>(weaponSOKey);
-        await handle.Task;
-
-        if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
-        {
-            Debug.LogError($"HandlePickupAsync: WeaponSO 로드 실패 - {weaponSOKey}");
-            return;
-        }
-
-        var newRuntime = new WeaponData(handle.Result);
+        // 빈 슬롯이 있으면 자동 장착
         int empty = GetFirstEmptySlotIndex();
-
-        if (empty >= 0)
+        if (autoEquip && empty >= 0)
         {
-            _owned.Add(newRuntime);
-            if (autoEquip) await EquipToSlotAsync(empty, newRuntime);
-            else AddToInventoryOnly(newRuntime);
+            await EquipToSlotAsync(empty, runtimeData);
             return;
         }
 
-        int? chosen = await ShowReplacePromptAsync(newRuntime);
-        if (chosen == null)
+        // 빈 슬롯 없으면 단순히 인벤토리에만 넣기 (또는 교체 흐름 호출)
+        // TODO: 교체 UI/로직 처리
+    }
+
+    private async UniTask EquipToSlotAsync(int slotIndex, WeaponData runtimeData)
+    {
+        if (slotIndex < 0 || slotIndex >= SlotCount) return;
+
+        // 기존 장비 제거(있으면)
+        if (!slots[slotIndex].IsEmpty)
         {
-            Debug.Log("HandlePickupAsync: 플레이어가 획득을 취소함");
-            return;
+            Destroy(slots[slotIndex].instance);
         }
 
-        await ReplaceSlotAsync(chosen.Value, newRuntime);
-    }
-
-    public async UniTask ReplaceSlotAsync(int slotIndex, WeaponData newRuntime)
-    {
-        if (slotIndex < 0 || slotIndex >= SlotCount) throw new ArgumentOutOfRangeException(nameof(slotIndex));
-        var slot = slots[slotIndex];
-
-        if (slot.runtimeData != null)
-            SpawnDroppedWeaponAtPlayer(slot.runtimeData);
-
-        if (slot.instance != null)
+        // 인스턴스 생성
+        GameObject instance = null;
+        if (runtimeData.prefabKey != null)
         {
-            try { _objectPoolerManager?.ReturnToPool(slot.instance); }
-            catch { Destroy(slot.instance); }
-            slot.instance = null;
+            var prefabHandle = Addressables.LoadAssetAsync<GameObject>(runtimeData.prefabKey);
+            await prefabHandle.Task;
+            if (prefabHandle.Status == AsyncOperationStatus.Succeeded)
+            {
+                instance = Instantiate(prefabHandle.Result, _owner.handTransform);
+            }
         }
 
-        _owned.Add(newRuntime);
-        await EquipToSlotAsync(slotIndex, newRuntime);
+        // 슬롯 등록
+        slots[slotIndex].runtimeData = runtimeData;
+        slots[slotIndex].instance = instance;
+
+        Debug.Log($"[{name}] Equipped {runtimeData.displayName} to slot {slotIndex}");
     }
 
-    #endregion
-
-    #region Helpers / UI Stubs
-
-    private Transform GetWeaponAttachTransform(int slotIndex) => this.transform;
-
-    private void SpawnDroppedWeaponAtPlayer(WeaponData oldData)
-    {
-        Debug.Log($"SpawnDroppedWeaponAtPlayer: '{oldData.displayName}' 드랍(실제 구현 필요).");
-    }
-
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
-    {
-        Debug.Log($"ShowReplacePromptAsync: 인벤토리가 가득 찼습니다. '{newWeapon.displayName}' 교체 시뮬레이션.");
-        await UniTask.Delay(TimeSpan.FromSeconds(1));
-        return 0;
-    }
-
-    private void AddToInventoryOnly(WeaponData runtime)
-    {
-        _owned.Add(runtime);
-    }
-
-    #endregion
-
-    #region Utility
-
-    public WeaponData GetCurrentWeapon(int slotIndex)
-    {
-        if (slotIndex < 0 || slotIndex >= SlotCount) return null;
-        return slots[slotIndex].runtimeData;
-    }
-
-    public IReadOnlyList<WeaponData> GetOwnedWeapons() => _owned.AsReadOnly();
 
     public int GetFirstEmptySlotIndex()
     {
         for (int i = 0; i < SlotCount; i++)
-            if (slots[i].IsEmpty) return i;
+            if (slots[i] == null || slots[i].IsEmpty) return i;
         return -1;
     }
 
-    #endregion
+        /// <summary>
+    /// 월드에서 플레이어가 WeaponData를 획득했을 때 처리
+    /// - 빈 슬롯이 있으면 바로 장착
+    /// - 슬롯이 가득 찼으면 교체 UI 호출
+    /// </summary>
+    public async UniTask HandlePickupAsync(WeaponData runtimeData, bool autoEquip = true)
+    {
+        if (runtimeData == null) return;
+
+        // 1) 소유 목록에 추가
+        _owned.Add(runtimeData);
+
+        // 2) 빈 슬롯 확인
+        int emptySlot = GetFirstEmptySlotIndex();
+        if (autoEquip && emptySlot >= 0)
+        {
+            await EquipToSlotAsync(emptySlot, runtimeData);
+            return;
+        }
+
+        // 3) 슬롯이 가득 찼으면 교체 처리
+        // TODO: 실제 UI나 프롬프트를 여는 부분
+        int? chosenSlot = await ShowReplacePromptAsync(runtimeData);
+        if (chosenSlot.HasValue)
+        {
+            await ReplaceSlotAsync(chosenSlot.Value, runtimeData);
+        }
+        else
+        {
+            // 플레이어가 취소하면 인벤토리만 등록
+            Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
+        }
+    }
+
+    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
+    {
+        // 실제 UI 구현에 맞게 수정 필요
+        Debug.Log($"Inventory full! Replace weapon with: {newWeapon.displayName}? Simulated choice: slot 0");
+        await UniTask.Delay(TimeSpan.FromSeconds(1f));
+        return 0; // 테스트용으로 항상 0번 슬롯 교체
+    }
+
+    private async UniTask ReplaceSlotAsync(int slotIndex, WeaponData newRuntime)
+    {
+        if (slotIndex < 0 || slotIndex >= SlotCount) throw new ArgumentOutOfRangeException(nameof(slotIndex));
+
+        var slot = slots[slotIndex];
+
+        // 기존 무기 제거
+        if (slot.instance != null)
+        {
+            Destroy(slot.instance);
+            slot.instance = null;
+        }
+
+        slot.runtimeData = null;
+
+        // 새 무기 장착
+        await EquipToSlotAsync(slotIndex, newRuntime);
+    }
+
 }
