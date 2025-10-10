@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9dc7018711651984db8c6161c6452993, type: 3}
   m_Name: Sword
   m_EditorClassIdentifier: 
-  weaponKey: 
-  displayName: 
+  weaponKey: Sword
+  displayName: "\uB300\uB2E8\uD55C\uAC80"
   prefabKey: Basic_Knight_02
-  iconKey: 
+  iconKey: "\uC544\uC9C1\uC5C6\uC74C"
   baseAttack: 10
   baseDefense: 10
   groundEndCount: 3

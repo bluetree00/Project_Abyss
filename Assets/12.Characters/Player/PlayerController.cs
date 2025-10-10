@@ -22,6 +22,8 @@ public class PlayerController : CharacterBase
     public CharacterData CharacterData => characterData;
 
     //public WeaponManagerSO weaponManagerSO;
+      // 플레이어가 가지는 무기 매니저 (인스펙터에서 붙이거나 런타임에 AddComponent)
+    public PlayerWeaponManager WeaponManager;
     private PlayerWeaponHandler weaponHandler;
 
     protected PlayerInputActions inputActions;
@@ -111,7 +113,7 @@ public class PlayerController : CharacterBase
         await base.InitAsync();
 
         // 시간축/입력 버퍼
-        Clock      = new UnscaledClock();
+        Clock = new UnscaledClock();
         // capacity=16, window=0.18s, dedupeMs=40 — 추천값
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 40f);
 
@@ -122,11 +124,11 @@ public class PlayerController : CharacterBase
         InitWeaponManager();
         SetupCamera();
 
-         // FSM 틀은 부모에서 준비
+        // FSM 틀은 부모에서 준비
         locoSM = new LayerStateMachine<LocoState>(this);
-        actSM  = new LayerStateMachine<ActState>(this);
+        actSM = new LayerStateMachine<ActState>(this);
 
-         // 자식이 자기 상태 등록하도록 훅 제공
+        // 자식이 자기 상태 등록하도록 훅 제공
         InitLayerFSMs();
 
         // 초기 상태
@@ -139,12 +141,27 @@ public class PlayerController : CharacterBase
 
     }
 
+
+
     private void InitCoreComponents()
     {
         Managers.Player.SetPlayer(transform);
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
         if (handTransform == null)
             Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
+    }
+    
+    private void InitWeaponManager()
+    {
+        // 이미 인스펙터에서 붙어있지 않으면 런타임에 생성
+        WeaponManager = GetComponent<PlayerWeaponManager>();
+        if (WeaponManager == null)
+        {
+            WeaponManager = gameObject.AddComponent<PlayerWeaponManager>();
+        }
+
+        // 플레이어 참조 전달 (선택 사항)
+        WeaponManager.Initialize(this);
     }
 
     private async UniTask InitCharacterDataAsync()
@@ -191,10 +208,6 @@ public class PlayerController : CharacterBase
         // Light/Heavy는 무기 장착 시 주입
     }
 
-    private void InitWeaponManager()
-    {
-       // weaponManagerSO = ScriptableObject.CreateInstance<WeaponManagerSO>();
-    }
 
     public void ClearWeaponAbilities()
     {
