@@ -11,9 +11,9 @@ using UnityEngine;
 [Serializable]
 public class WeaponData
 {
-    public string weaponKey;
+    public string WeaponDisplayKey;
     public string displayName;
-    public string prefabKey;
+    public string weaponPrefabKey;
     public string iconKey;
     public float baseAttack;
     public float baseDefense;
@@ -36,9 +36,9 @@ public class WeaponData
     {
         if (so == null) throw new ArgumentNullException(nameof(so));
 
-        weaponKey = so.weaponKey;
+        WeaponDisplayKey = so.weaponDisplayKey;
+        weaponPrefabKey = so.weaponKey;
         displayName = so.displayName;
-        prefabKey = so.prefabKey;
         iconKey = so.iconKey;
         baseAttack = so.baseAttack;
         baseDefense = so.baseDefense;

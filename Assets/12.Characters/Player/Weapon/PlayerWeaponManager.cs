@@ -76,9 +76,9 @@ public class PlayerWeaponManager : MonoBehaviour
 
         // 인스턴스 생성
         GameObject instance = null;
-        if (runtimeData.prefabKey != null)
+        if (runtimeData.weaponPrefabKey != null)
         {
-            var prefabHandle = Addressables.LoadAssetAsync<GameObject>(runtimeData.prefabKey);
+            var prefabHandle = Addressables.LoadAssetAsync<GameObject>(runtimeData.weaponPrefabKey);
             await prefabHandle.Task;
             if (prefabHandle.Status == AsyncOperationStatus.Succeeded)
             {
