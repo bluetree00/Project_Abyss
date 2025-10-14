@@ -22,12 +22,12 @@ public class WorldWeaponDisplay : MonoBehaviour
 
     private async UniTask SpawnWeaponPrefabAsync(WeaponSO so)
     {
-        if (string.IsNullOrEmpty(so.prefabKey)) return;
+        if (string.IsNullOrEmpty(so.weaponDisplayKey)) return;
 
         if (_weaponInstance != null)
             Destroy(_weaponInstance);
 
-        var handle = Addressables.InstantiateAsync(so.prefabKey, transform.position, transform.rotation);
+        var handle = Addressables.InstantiateAsync(so.weaponDisplayKey, transform.position, transform.rotation);
         await handle.Task;
 
         if (handle.Status == AsyncOperationStatus.Succeeded)
@@ -40,7 +40,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"Weapon prefab 생성 실패: {so.prefabKey}");
+            Debug.LogError($"Weapon prefab 생성 실패: {so.weaponDisplayKey}");
         }
     }
 

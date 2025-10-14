@@ -24,7 +24,6 @@ public class PlayerController : CharacterBase
     //public WeaponManagerSO weaponManagerSO;
       // 플레이어가 가지는 무기 매니저 (인스펙터에서 붙이거나 런타임에 AddComponent)
     public PlayerWeaponManager WeaponManager;
-    private PlayerWeaponHandler weaponHandler;
 
     protected PlayerInputActions inputActions;
     public bool inputReady = false;

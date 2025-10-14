@@ -4,6 +4,7 @@ using UnityEngine;
 public class WeaponSO : ScriptableObject
 {
     [Header("기본 정보")]
+    public string weaponDisplayKey;
     public string weaponKey;
     public string displayName;
     public string prefabKey;
