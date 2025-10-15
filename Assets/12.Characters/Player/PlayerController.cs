@@ -113,9 +113,9 @@ public class PlayerController : CharacterBase
 
         // 시간축/입력 버퍼
         Clock = new UnscaledClock();
-        // capacity=16, window=0.18s, dedupeMs=40 — 추천값
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 40f);
 
+        // 핵심 컴포넌트 초기화
         InitCoreComponents();
         await InitCharacterDataAsync();
         InitInputActions();
@@ -123,22 +123,47 @@ public class PlayerController : CharacterBase
         InitWeaponManager();
         SetupCamera();
 
-        // FSM 틀은 부모에서 준비
+        // FSM 초기화
         locoSM = new LayerStateMachine<LocoState>(this);
-        actSM = new LayerStateMachine<ActState>(this);
-
-        // 자식이 자기 상태 등록하도록 훅 제공
+        actSM  = new LayerStateMachine<ActState>(this);
         InitLayerFSMs();
-
-        // 초기 상태
         locoSM.Change(LocoState.Idle);
         actSM.Change(ActState.None);
 
-        _animSvc = new AnimatorOverrideService(anim); // 프로젝트 구현체에 맞게
+        // 애니메이터 오버라이드 서비스 초기화
+        _animSvc = new AnimatorOverrideService(anim);
 
+        // WeaponManager 이벤트 구독: 장비 변경 시 애니메이션 적용
+        if (WeaponManager != null)
+        {
+            WeaponManager.OnWeaponChanged += OnWeaponChangedApplyAnimation;
+        }
+
+        // 입력 바인딩
         if (inputReady) BindInputActions();
-
     }
+
+    // ============================================================
+    // WeaponChanged 이벤트 콜백: 장비 교체 시 애니 적용
+    // ============================================================
+    private void OnWeaponChangedApplyAnimation(WeaponData newWeapon, GameObject weaponInstance)
+    {
+        if (newWeapon == null || _animSvc == null || newWeapon.animationSet == null || !Managers.AnimationResources.IsInitialized)
+            return;
+
+        var animSet = newWeapon.animationSet;
+
+        foreach (var mapping in animSet.GetAllMappings())
+        {
+            var clip = Managers.AnimationResources.GetClip(mapping.addressableKey);
+            if (clip != null)
+            {
+                _animSvc.Override(mapping.baseClipName, clip);
+                Debug.Log($"[AnimOverride] Applied {mapping.baseClipName} <- {mapping.addressableKey}");
+            }
+        }
+    }
+
 
 
 
