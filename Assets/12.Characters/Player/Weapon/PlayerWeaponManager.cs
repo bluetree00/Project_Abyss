@@ -13,8 +13,24 @@ using UnityEngine.InputSystem;
 /// - ReplaceSlotAsync, SwapSlotsAsync 포함
 /// - 기존 장비는 비활성화, 새 장비는 활성화
 /// - 프리팹 Transform 원본 유지
+/// 
+/// 추가:
+/// - IWeaponProvider 인터페이스 구현
+/// - CurrentWeaponData/Instance 접근자, 유틸 메서드 제공
 /// </summary>
-public class PlayerWeaponManager : MonoBehaviour
+public interface IWeaponProvider
+{
+    WeaponData CurrentWeaponData { get; }
+    GameObject CurrentWeaponInstance { get; }
+    bool HasWeapon { get; }
+    int CurrentSlotIndex { get; }
+    event Action<WeaponData, GameObject> OnWeaponChanged;
+    bool TryGetCurrentWeapon(out WeaponData data, out GameObject instance);
+    T GetCurrentWeaponComponent<T>() where T : Component;
+    Component GetCurrentWeaponComponent(Type type);
+}
+
+public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 {
     public int SlotCount => 2;
 
@@ -35,8 +51,62 @@ public class PlayerWeaponManager : MonoBehaviour
     private int currentSlotIndex = -1;
     private bool _isSwitching = false;
 
-    public Action<WeaponData, GameObject> OnWeaponChanged;
+    // 기존 이벤트 유지 (외부에서 구독)
+    public event Action<WeaponData, GameObject> OnWeaponChanged;
 
+    // ----------------------
+    // 편의 접근자 / IWeaponProvider 구현
+    // ----------------------
+    public WeaponData CurrentWeaponData
+    {
+        get
+        {
+            if (currentSlotIndex >= 0 && currentSlotIndex < SlotCount)
+                return slots[currentSlotIndex].runtimeData;
+            return null;
+        }
+    }
+
+    public GameObject CurrentWeaponInstance
+    {
+        get
+        {
+            if (currentSlotIndex >= 0 && currentSlotIndex < SlotCount)
+                return slots[currentSlotIndex].instance;
+            return null;
+        }
+    }
+
+    public bool HasWeapon => CurrentWeaponData != null;
+    public int CurrentSlotIndex => currentSlotIndex;
+
+    public bool TryGetCurrentWeapon(out WeaponData data, out GameObject instance)
+    {
+        data = CurrentWeaponData;
+        instance = CurrentWeaponInstance;
+        return data != null;
+    }
+
+    /// <summary>
+    /// 장비 인스턴스에서 특정 컴포넌트를 안전하게 가져옵니다(캐싱은 호출자에게 맡김).
+    /// </summary>
+    public T GetCurrentWeaponComponent<T>() where T : Component
+    {
+        var inst = CurrentWeaponInstance;
+        if (inst == null) return null;
+        return inst.GetComponent<T>();
+    }
+
+    public Component GetCurrentWeaponComponent(Type type)
+    {
+        var inst = CurrentWeaponInstance;
+        if (inst == null) return null;
+        return inst.GetComponent(type);
+    }
+
+    // ----------------------
+    // 내부
+    // ----------------------
     private void Awake()
     {
         for (int i = 0; i < slots.Length; i++)
@@ -201,6 +271,7 @@ public class PlayerWeaponManager : MonoBehaviour
     private async UniTask SetCurrentSlotInternalAsync(int slotIndex)
     {
         currentSlotIndex = slotIndex;
+        // 이벤트 호출 (IWeaponProvider 구현체의 이벤트)
         OnWeaponChanged?.Invoke(slots[slotIndex].runtimeData, slots[slotIndex].instance);
         await UniTask.Yield();
     }
