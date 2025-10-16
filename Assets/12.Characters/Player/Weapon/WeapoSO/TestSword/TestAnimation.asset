@@ -15,25 +15,23 @@ MonoBehaviour:
   animGroups:
   - groupType: 0
     clipMappings:
-    - baseClipName: 
-      addressableKey: 
+    - baseClipName: NormalAttack_1
+      addressableKey: NormalAttack_1
       actionType: 1
       comboIndex: 0
-    - baseClipName: 
-      addressableKey: 
+    - baseClipName: NormalAttack_2
+      addressableKey: NormalAttack_2
       actionType: 1
       comboIndex: 0
-    - baseClipName: 
-      addressableKey: 
+    - baseClipName: NormalAttack_3
+      addressableKey: NormalAttack_3
       actionType: 1
       comboIndex: 0
-  - groupType: 1
-    clipMappings:
-    - baseClipName: 
-      addressableKey: 
-      actionType: 5
+    - baseClipName: UltimateSkile_01
+      addressableKey: UltimateSkile_01
+      actionType: 3
       comboIndex: 0
-    - baseClipName: 
-      addressableKey: 
-      actionType: 5
+    - baseClipName: NormalSkile_01
+      addressableKey: NormalSkile_01
+      actionType: 4
       comboIndex: 0
