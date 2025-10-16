@@ -133,6 +133,12 @@ public class PlayerController : CharacterBase
         // 애니메이터 오버라이드 서비스 초기화
         _animSvc = new AnimatorOverrideService(anim);
 
+        EventReceiver = GetComponent<PlayerAnimationEventReceiver>();
+        if (EventReceiver == null)
+            EventReceiver = gameObject.AddComponent<PlayerAnimationEventReceiver>();
+
+        EventReceiver.SetTarget(this);
+
         // WeaponManager 이벤트 구독: 장비 변경 시 애니메이션 적용
         if (WeaponManager != null)
         {
@@ -162,8 +168,35 @@ public class PlayerController : CharacterBase
                 Debug.Log($"[AnimOverride] Applied {mapping.baseClipName} <- {mapping.addressableKey}");
             }
         }
+
+
+        AssignAttackPolicyForWeapon(newWeapon);
     }
 
+    private void AssignAttackPolicyForWeapon(WeaponData wd)
+    {
+        if (wd == null)
+        {
+            _attackPolicy = null;
+            Debug.Log("[Player] No weapon -> attack policy cleared");
+            return;
+        }
+
+        // 예: weaponPrefabKey나 abilitySet으로 구분. 프로젝트에 따라 변경하세요.
+        var key = wd.weaponPrefabKey?.ToLowerInvariant() ?? "";
+
+        if (key.Contains("bow") || key.Contains("arch") || (wd.abilitySet != null && wd.abilitySet.name.ToLower().Contains("bow")))
+        {
+            _attackPolicy = new BowAttackPolicy();
+            Debug.Log("[Player] Assigned BowAttackPolicy");
+        }
+        else
+        {
+            // 기본은 Sword 스타일
+            _attackPolicy = new SwordAttackPolicy();
+            Debug.Log("[Player] Assigned SwordAttackPolicy");
+        }
+    }
 
 
 
@@ -303,6 +336,26 @@ public class PlayerController : CharacterBase
     public void CloseComboWindow() => comboWindowOpen = false;
 
     public virtual void OnAttackAnimationEnd() => isAttacking = false;
+
+    // 히트스텝 처리 (WeaponData 연동용)
+    public void OnAttackHitStep(int stepIndex)
+    {
+        Debug.Log($"[Player] OnAttackHitStep: {stepIndex}");
+
+        // 예시: 현재 장비의 collider/effect 목록을 사용해 해당 스텝을 실행
+        var wd = WeaponManager.CurrentWeaponData;
+        if (wd == null) return;
+
+        // (임의 설계) effectDataList와 colliderDataList에서 stepIndex에 해당하는 항목 실행
+        // wd.effectDataList[stepIndex]?.Play(transform.position); // 프로젝트에 맞춰 구현
+    }
+
+    // 애니 이벤트 태그 처리 예시
+    public void OnAnimationEventTag(string tag)
+    {
+        Debug.Log($"[Player] AnimationEventTag: {tag}");
+        // tag 기반으로 추가 행동(이펙트 spawn, 사운드 재생 등)
+    }
 
     //============================================================
     // 유니티 생명주기
