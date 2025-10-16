@@ -488,7 +488,7 @@ ModelImporter:
     second: Unreal Take
   - first:
       74: 7400002
-    second: GhostSamurai_Ambush02_Root
+    second: NormalSkile_01
   - first:
       95: 9500000
     second: //RootNode
@@ -548,7 +548,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: GhostSamurai_Ambush02_Root
+      name: NormalSkile_01
       takeName: GhostSamurai_Ambush02_Root
       internalID: 0
       firstFrame: 0

@@ -18,27 +18,27 @@ MonoBehaviour:
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
   - m_GUID: ea88c1cbbc57198499ce3da9463baea4
-    m_Address: TestAttack_02
+    m_Address: NormalAttack_2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
-    m_Address: TestAttack_03
+    m_Address: NormalAttack_3
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
-    m_Address: TestAttack_01
+    m_Address: NormalAttack_1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
-    m_Address: Test_UltraSkill
+    m_Address: UltimateSkile_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 165130b8a71020641b870cab32d18c5e
-    m_Address: Test_Skill
+    m_Address: NormalSkile_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

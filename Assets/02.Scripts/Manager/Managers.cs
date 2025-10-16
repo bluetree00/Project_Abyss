@@ -163,11 +163,11 @@ public class Managers : MonoBehaviour
         // 예시 애니메이션 키 목록
         var animKeys = new List<string>
         {
-            "TestAttack_01",
-            "TestAttack_02",
-            "TestAttack_03",
-            "Test_Skill",
-            "Test_UltraSkill",
+            "NormalAttack_1",
+            "NormalAttack_2",
+            "NormalAttack_3",
+            "NormalSkile_01",
+            "UltimateSkile_01",
           
         };
 
