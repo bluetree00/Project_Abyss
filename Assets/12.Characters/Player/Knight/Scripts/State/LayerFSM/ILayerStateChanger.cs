@@ -1,7 +1,9 @@
-// /Scripts/FSM/LayerStateMachine.cs
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// 단일 레이어 상태머신
+/// </summary>
 public sealed class LayerStateMachine<TId> where TId : struct, Enum
 {
     private readonly Dictionary<TId, ILayerState<TId>> _map = new();
@@ -30,9 +32,15 @@ public sealed class LayerStateMachine<TId> where TId : struct, Enum
         state.Init(_controller, _changer);
     }
 
+    /// <summary>
+    /// 상태 변경
+    /// 동일 상태 전이는 무시 (Enter 재호출 방지)
+    /// </summary>
     public void Change(TId next)
     {
+        if (CurrentId.Equals(next)) return; // 동일 상태는 Enter 재호출 방지
         if (!_map.TryGetValue(next, out var s)) return;
+
         _current?.Exit();
         _current = s;
         CurrentId = next;

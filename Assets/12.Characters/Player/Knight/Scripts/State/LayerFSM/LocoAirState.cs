@@ -13,9 +13,7 @@ public class LocoAirState : ILayerState<LocoState>
 
     public void Update()
     {
-        var dir = _controller.IsMoveLocked ? Vector3.zero
-                                           : _controller.MoveDirection * _controller.MoveScale;
-        _controller.MoveAbility?.Move(_controller, dir);
+
 
         if (_controller.IsGrounded())
         {

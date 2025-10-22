@@ -15,7 +15,6 @@ public class ActSkillState : ILayerState<ActState>
     public void Enter()
     {
         _time = 0f;
-        _controller.AcquireMoveLock();
         _controller.SetMoveScale(0f);
         _controller.UseSkill(); // 스킬 어빌리티 실행(프로젝트에 맞게)
     }
@@ -29,7 +28,7 @@ public class ActSkillState : ILayerState<ActState>
 
     public void Exit()
     {
-        _controller.ReleaseMoveLock();
+
         _controller.SetMoveScale(1f);
     }
 }
