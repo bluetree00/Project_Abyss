@@ -16,7 +16,6 @@ public class LocoDodgeState : ILayerState<LocoState>
     {
         _time = 0f;
         _controller.DodgeAbility?.Dodge(_controller);
-        _controller.AcquireMoveLock();
         _controller.SetMoveScale(0f);
     }
 
@@ -25,7 +24,7 @@ public class LocoDodgeState : ILayerState<LocoState>
         _time += Time.deltaTime;
         if (_time >= _duration)
         {
-            _controller.ReleaseMoveLock();
+        
             _controller.SetMoveScale(1f);
             var next = !_controller.IsGrounded() ? LocoState.Air
                        : (_controller.MoveDirection.sqrMagnitude > 0.0001f ? LocoState.Move

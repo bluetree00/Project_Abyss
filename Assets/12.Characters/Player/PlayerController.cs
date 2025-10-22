@@ -21,8 +21,7 @@ public class PlayerController : CharacterBase
     [SerializeField] protected CharacterData characterData;
     public CharacterData CharacterData => characterData;
 
-    //public WeaponManagerSO weaponManagerSO;
-      // 플레이어가 가지는 무기 매니저 (인스펙터에서 붙이거나 런타임에 AddComponent)
+    // 플레이어가 가지는 무기 매니저 (인스펙터에서 붙이거나 런타임에 AddComponent)
     public PlayerWeaponManager WeaponManager;
 
     protected PlayerInputActions inputActions;
@@ -34,37 +33,33 @@ public class PlayerController : CharacterBase
     private bool isInventoryOpen = false;
     private bool isRunChecked = false;
     public bool IsRunChecked => isRunChecked;
-    protected bool isInputLocked = false;
-    private float _inputLockDuration = 2f;
-    private Coroutine _inputLockCoroutine;
-    
 
     // 입력 정책(무기 타입별: 소드/활 등)
     private IAttackInputPolicy _attackPolicy;
 
-    // 애니메이터 오버라이드 서비스(프로젝트의 구현체 사용)
+    // 애니메이터 오버라이드 서비스
     public AnimatorOverrideService _animSvc;
 
-    //애니메이션 이벤트 리시버 : 인벤트 타이밍에 맞게 러너를 실행해서 체크
-    private PlayerAnimationEventReceiver EventReceiver;
+    // 애니메이션 이벤트 리시버
+    public PlayerAnimationEventReceiver EventReceiver;
+    private bool _aeSubscribed = false;
 
     //============================================================
     // 레이어 FSM (Locomotion / Action)
     //============================================================
     protected LayerStateMachine<LocoState> locoSM;
-    protected LayerStateMachine<ActState>  actSM;
+    protected LayerStateMachine<ActState> actSM;
+    public LayerStateMachine<LocoState> LocoSM => locoSM;
 
     [Header("Debug (ReadOnly)")]
     [SerializeField] private LocoState locoStateDebug;
     [SerializeField] private ActState actStateDebug;
 
-    // 이동 제어 미들웨어(락 + 스케일)
-    private int _moveLockCount = 0;
-    public bool  IsMoveLocked => _moveLockCount > 0;
-    public float MoveScale    { get; private set; } = 1f;
-    public void AcquireMoveLock()        => _moveLockCount++;
-    public void ReleaseMoveLock()        => _moveLockCount = Math.Max(0, _moveLockCount - 1);
-    public void SetMoveScale(float s)    => MoveScale = Mathf.Clamp01(s);
+    //============================================================
+    // 이동 관련 스케일 (MoveLock 제거)
+    //============================================================
+    public float MoveScale { get; private set; } = 1f;
+    public void SetMoveScale(float s) => MoveScale = Mathf.Clamp01(s);
 
     [Header("Camera")]
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
@@ -73,19 +68,18 @@ public class PlayerController : CharacterBase
     // 입력 버퍼 & 시간축
     //============================================================
     protected IClock Clock { get; private set; }
-    public    InputBuffer InputBuffer { get; private set; }
+    public InputBuffer InputBuffer { get; private set; }
 
-    /// <summary>파생 클래스 헬퍼</summary>
     protected void EnqueueCommand(Command cmd) => InputBuffer?.Push(cmd);
 
     //============================================================
     // 어빌리티 모듈
     //============================================================
-    public IMoveAbility<PlayerController>   MoveAbility   { get; protected set; }
-    public IDodgeAbility<PlayerController>  DodgeAbility  { get; protected set; }
-    public ILightAttackAbility<PlayerController> LightAttackAbility  { get; protected set; }
-    public IHeavyAttackAbility<PlayerController> HeavyAttackAbility  { get; protected set; }
-    public IJumpAbility<PlayerController>   JumpAbility   { get; protected set; }
+    public IMoveAbility<PlayerController> MoveAbility { get; protected set; }
+    public IDodgeAbility<PlayerController> DodgeAbility { get; protected set; }
+    public ILightAttackAbility<PlayerController> LightAttackAbility { get; protected set; }
+    public IHeavyAttackAbility<PlayerController> HeavyAttackAbility { get; protected set; }
+    public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
 
     public Transform handTransform;
 
@@ -102,6 +96,8 @@ public class PlayerController : CharacterBase
 
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
+    
+
     //============================================================
     // 초기화
     //============================================================
@@ -111,11 +107,9 @@ public class PlayerController : CharacterBase
     {
         await base.InitAsync();
 
-        // 시간축/입력 버퍼
         Clock = new UnscaledClock();
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 40f);
 
-        // 핵심 컴포넌트 초기화
         InitCoreComponents();
         await InitCharacterDataAsync();
         InitInputActions();
@@ -123,101 +117,113 @@ public class PlayerController : CharacterBase
         InitWeaponManager();
         SetupCamera();
 
-        // FSM 초기화
         locoSM = new LayerStateMachine<LocoState>(this);
-        actSM  = new LayerStateMachine<ActState>(this);
+        actSM = new LayerStateMachine<ActState>(this);
         InitLayerFSMs();
         locoSM.Change(LocoState.Idle);
         actSM.Change(ActState.None);
 
-        // 애니메이터 오버라이드 서비스 초기화
         _animSvc = new AnimatorOverrideService(anim);
 
-        EventReceiver = GetComponent<PlayerAnimationEventReceiver>();
-        if (EventReceiver == null)
-            EventReceiver = gameObject.AddComponent<PlayerAnimationEventReceiver>();
-
+        EventReceiver = GetComponent<PlayerAnimationEventReceiver>() ?? GetComponentInChildren<PlayerAnimationEventReceiver>() ?? gameObject.AddComponent<PlayerAnimationEventReceiver>();
         EventReceiver.SetTarget(this);
+        SubscribeToAnimationReceiver(EventReceiver);
 
-        // WeaponManager 이벤트 구독: 장비 변경 시 애니메이션 적용
         if (WeaponManager != null)
         {
             WeaponManager.OnWeaponChanged += OnWeaponChangedApplyAnimation;
         }
 
-        // 입력 바인딩
+        AutoSetIdleIfNoAction();
+
         if (inputReady) BindInputActions();
     }
 
-    // ============================================================
-    // WeaponChanged 이벤트 콜백: 장비 교체 시 애니 적용
-    // ============================================================
+    private void AutoSetIdleIfNoAction()
+    {
+        if (actSM != null && actSM.CurrentId == ActState.None && !isAttacking)
+        {
+            if (locoSM.CurrentId != LocoState.Move && locoSM.CurrentId != LocoState.Air && locoSM.CurrentId != LocoState.Dodge)
+                locoSM.Change(LocoState.Idle);
+        }
+    }
+
+    //============================================================
+    // 구독 / 해제 헬퍼
+    //============================================================
+    private void SubscribeToAnimationReceiver(PlayerAnimationEventReceiver receiver)
+    {
+        if (receiver == null || _aeSubscribed) return;
+
+        receiver.OnAttackEnd += Safe_OnAttackAnimationEnd;
+        receiver.OnHitStep += Safe_OnHitStep;
+        receiver.OnOpenCombo += Safe_OpenCombo;
+        receiver.OnCloseCombo += Safe_CloseCombo;
+        receiver.OnGenericTag += Safe_GenericTag;
+
+        _aeSubscribed = true;
+    }
+
+    private void UnsubscribeFromAnimationReceiver(PlayerAnimationEventReceiver receiver)
+    {
+        if (receiver == null || !_aeSubscribed) return;
+
+        receiver.OnAttackEnd -= Safe_OnAttackAnimationEnd;
+        receiver.OnHitStep -= Safe_OnHitStep;
+        receiver.OnOpenCombo -= Safe_OpenCombo;
+        receiver.OnCloseCombo -= Safe_CloseCombo;
+        receiver.OnGenericTag -= Safe_GenericTag;
+
+        _aeSubscribed = false;
+    }
+
+    private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
+    private void OnDestroy()
+    {
+        UnsubscribeFromAnimationReceiver(EventReceiver);
+        if (WeaponManager != null)
+            WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyAnimation;
+    }
+
+    //============================================================
+    // WeaponChanged 이벤트 콜백
+    //============================================================
     private void OnWeaponChangedApplyAnimation(WeaponData newWeapon, GameObject weaponInstance)
     {
         if (newWeapon == null || _animSvc == null || newWeapon.animationSet == null || !Managers.AnimationResources.IsInitialized)
             return;
 
         var animSet = newWeapon.animationSet;
-
         foreach (var mapping in animSet.GetAllMappings())
         {
             var clip = Managers.AnimationResources.GetClip(mapping.addressableKey);
-            if (clip != null)
-            {
-                _animSvc.Override(mapping.baseClipName, clip);
-                Debug.Log($"[AnimOverride] Applied {mapping.baseClipName} <- {mapping.addressableKey}");
-            }
+            if (clip != null) _animSvc.Override(mapping.baseClipName, clip);
         }
-
 
         AssignAttackPolicyForWeapon(newWeapon);
     }
 
     private void AssignAttackPolicyForWeapon(WeaponData wd)
     {
-        if (wd == null)
-        {
-            _attackPolicy = null;
-            Debug.Log("[Player] No weapon -> attack policy cleared");
-            return;
-        }
+        if (wd == null) { _attackPolicy = null; return; }
 
-        // 예: weaponPrefabKey나 abilitySet으로 구분. 프로젝트에 따라 변경하세요.
         var key = wd.weaponPrefabKey?.ToLowerInvariant() ?? "";
-
         if (key.Contains("bow") || key.Contains("arch") || (wd.abilitySet != null && wd.abilitySet.name.ToLower().Contains("bow")))
-        {
             _attackPolicy = new BowAttackPolicy();
-            Debug.Log("[Player] Assigned BowAttackPolicy");
-        }
         else
-        {
-            // 기본은 Sword 스타일
             _attackPolicy = new SwordAttackPolicy();
-            Debug.Log("[Player] Assigned SwordAttackPolicy");
-        }
     }
-
-
 
     private void InitCoreComponents()
     {
         Managers.Player.SetPlayer(transform);
         handTransform = Util.FindDeepChild(transform, "WeaponSocket");
-        if (handTransform == null)
-            Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
+        if (handTransform == null) Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
     }
-    
+
     private void InitWeaponManager()
     {
-        // 이미 인스펙터에서 붙어있지 않으면 런타임에 생성
-        WeaponManager = GetComponent<PlayerWeaponManager>();
-        if (WeaponManager == null)
-        {
-            WeaponManager = gameObject.AddComponent<PlayerWeaponManager>();
-        }
-
-        // 플레이어 참조 전달 (선택 사항)
+        WeaponManager = GetComponent<PlayerWeaponManager>() ?? gameObject.AddComponent<PlayerWeaponManager>();
         WeaponManager.Initialize(this);
     }
 
@@ -232,7 +238,6 @@ public class PlayerController : CharacterBase
     private async UniTask LoadCharacterDataAsync(string characterName)
     {
         var utcs = new UniTaskCompletionSource<bool>();
-
         Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
         {
             if (data == null)
@@ -259,12 +264,10 @@ public class PlayerController : CharacterBase
 
     protected virtual void InitAbilities()
     {
-        MoveAbility  = new DefaultMoveAbility();
+        MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
-        JumpAbility  = new DefaultJumpAbility();
-        // Light/Heavy는 무기 장착 시 주입
+        JumpAbility = new DefaultJumpAbility();
     }
-
 
     public void ClearWeaponAbilities()
     {
@@ -272,90 +275,60 @@ public class PlayerController : CharacterBase
         HeavyAttackAbility = null;
     }
 
-
-
     //============================================================
-    // 입력 바인딩(훅은 Push만/정책 위임)
+    // 입력 바인딩
     //============================================================
     protected virtual void BindInputActions()
     {
         if (!inputReady) return;
 
-        // 공격 입력은 정책 위임 (전이는 레이어 FSM에서만)
-        inputActions.Player.Attack.started  += _ => _attackPolicy?.OnStarted(this);
+        inputActions.Player.Attack.started += _ => _attackPolicy?.OnStarted(this);
         inputActions.Player.Attack.canceled += _ => _attackPolicy?.OnCanceled(this);
 
-        inputActions.Player.Run.started   += _ => isRunChecked = true;
-        inputActions.Player.Run.canceled  += _ => isRunChecked = false;
+        inputActions.Player.Run.started += _ => isRunChecked = true;
+        inputActions.Player.Run.canceled += _ => isRunChecked = false;
 
-        // 회피/스킬/궁극: 즉시 버퍼 푸시
-        inputActions.Player.Dodge.performed    += _ => InputBuffer.Push(Command.Dodge);
-        inputActions.Player.Skill.performed    += _ => InputBuffer.Push(Command.Skill);
+        inputActions.Player.Dodge.performed += _ => InputBuffer.Push(Command.Dodge);
+        inputActions.Player.Skill.performed += _ => InputBuffer.Push(Command.Skill);
         inputActions.Player.Ultimate.performed += _ => InputBuffer.Push(Command.Skill);
 
-        // 달리기/점프/인벤토리/무기 교체
-        
-        inputActions.Player.Jump.performed            += _ => ProcessJump();
+        inputActions.Player.Jump.performed += _ => ProcessJump();
         inputActions.Player.InventoryToggle.performed += _ => { ToggleInventory(); if (isInventoryOpen) InputBuffer.Clear(); };
-        inputActions.Player.CloseInventory.performed  += _ => CloseInventory();
-        inputActions.Player.ChangeWeapon1.performed   += _ => ChangeWeapon(0);
-        inputActions.Player.ChangeWeapon2.performed   += _ => ChangeWeapon(1);
+        inputActions.Player.CloseInventory.performed += _ => CloseInventory();
+        inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
+        inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
     }
 
     //============================================================
     // 파생 훅
     //============================================================
-    protected virtual void InitLayerFSMs() { /* Knight 등 파생에서 등록 */ }
-
-    protected virtual void RouteInputsToLayers()
-    {
-
-    }
-
-    //기능은 어빌리티에서 가져올 예정
-
-    protected virtual void ProcessJump() { /* 파생에서 */ }
-    protected virtual void OnSkillAttack() { /* 파생에서 */ }
-
+    protected virtual void InitLayerFSMs() { }
+    protected virtual void RouteInputsToLayers() { }
+    protected virtual void ProcessJump() { }
+    protected virtual void OnSkillAttack() { }
+    protected virtual void OnUltimateAttack() { }
     public void UseSkill() => OnSkillAttack();
-    protected virtual void OnUltimateAttack() { /* 파생에서 */ }
 
-    // 애니 세트 스왑 (무기 SO + 지상/공중)
-    // PlayerController.cs (발췌)
+    //============================================================
+    // 콤보 관련
+    //============================================================
     public int LightMaxComboCount { get; private set; } = 1;
-    public float LightComboResetTime { get; private set; } = 1.5f;
+    public float LightComboResetTime { get; private set; } = 2f;
+    public float comboTimeRemaining = 0f;
     public IReadOnlyList<float> LightComboEndTimes { get; private set; }
 
-
-
-
-    // 콤보창 헬퍼(애니 이벤트에서 호출)
-    public bool comboWindowOpen  = false;
-    public int  currentComboStep = 0;
-    public void OpenComboWindow()  => comboWindowOpen = true;
+    public bool comboWindowOpen = false;
+    public int currentComboStep = 0;
+    public void OpenComboWindow()
+    {
+        comboWindowOpen = true;
+        comboTimeRemaining = LightComboResetTime;
+    }
     public void CloseComboWindow() => comboWindowOpen = false;
-
     public virtual void OnAttackAnimationEnd() => isAttacking = false;
 
-    // 히트스텝 처리 (WeaponData 연동용)
-    public void OnAttackHitStep(int stepIndex)
-    {
-        Debug.Log($"[Player] OnAttackHitStep: {stepIndex}");
-
-        // 예시: 현재 장비의 collider/effect 목록을 사용해 해당 스텝을 실행
-        var wd = WeaponManager.CurrentWeaponData;
-        if (wd == null) return;
-
-        // (임의 설계) effectDataList와 colliderDataList에서 stepIndex에 해당하는 항목 실행
-        // wd.effectDataList[stepIndex]?.Play(transform.position); // 프로젝트에 맞춰 구현
-    }
-
-    // 애니 이벤트 태그 처리 예시
-    public void OnAnimationEventTag(string tag)
-    {
-        Debug.Log($"[Player] AnimationEventTag: {tag}");
-        // tag 기반으로 추가 행동(이펙트 spawn, 사운드 재생 등)
-    }
+    public void OnAttackHitStep(int stepIndex) { /* 구현 */ }
+    public void OnAnimationEventTag(string tag) { /* 구현 */ }
 
     //============================================================
     // 유니티 생명주기
@@ -364,23 +337,28 @@ public class PlayerController : CharacterBase
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
-        // 0) 무기별 입력 정책 Tick (홀드/릴리즈 판정 → 버퍼 Push)
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
-
-        // 2) 버퍼 만료 정리
         InputBuffer?.TickPrune();
-
-        // 3) 버퍼 소비/전이 라우팅(파생에서 구현)
         RouteInputsToLayers();
 
-        // 4) 레이어 FSM 업데이트
         locoSM?.Update();
         actSM?.Update();
 
         if (locoSM != null) locoStateDebug = locoSM.CurrentId;
-        if (actSM  != null) actStateDebug  = actSM.CurrentId;
+        if (actSM != null) actStateDebug = actSM.CurrentId;
 
-
+       
+        comboTimeRemaining -= Time.unscaledDeltaTime;
+        if (comboTimeRemaining <= 0f)
+        {
+                // 시간 만료 시 콤보 초기화
+            currentComboStep = 0;
+            comboWindowOpen = false;
+            nextComboQueued = false;
+            isAttacking = false;
+            comboTimeRemaining = 0f;
+        }
+        
     }
 
     private void FixedUpdate()
@@ -395,13 +373,12 @@ public class PlayerController : CharacterBase
     //============================================================
     // 입력/물리 유틸
     //============================================================
-
     private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
         float rayLength = characterData.groundCheckDistance + 0.1f;
         isGrounded = Physics.Raycast(rayOrigin, Vector3.down, out var hit, rayLength, characterData.groundLayer)
-                  && hit.distance <= characterData.groundCheckDistance + 0.05f;
+                     && hit.distance <= characterData.groundCheckDistance + 0.05f;
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
     }
 
@@ -420,7 +397,6 @@ public class PlayerController : CharacterBase
     //============================================================
     protected virtual void ToggleInventory()
     {
-        if (isInputLocked) return;
         if (isInventoryOpen)
         {
             Managers.UI.CloseUI("UI_Inven");
@@ -430,7 +406,6 @@ public class PlayerController : CharacterBase
         {
             Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
             isInventoryOpen = true;
-            LockInput(_inputLockDuration);
         }
     }
 
@@ -443,20 +418,7 @@ public class PlayerController : CharacterBase
         }
     }
 
-    protected virtual void ChangeWeapon(int index) { /* 파생에서 */ }
-
-    private void LockInput(float sec)
-    {
-        if (_inputLockCoroutine != null) StopCoroutine(_inputLockCoroutine);
-        _inputLockCoroutine = StartCoroutine(LockInputCoroutine(sec));
-    }
-
-    private IEnumerator LockInputCoroutine(float sec)
-    {
-        isInputLocked = true;
-        yield return new WaitForSeconds(sec);
-        isInputLocked = false;
-    }
+    protected virtual void ChangeWeapon(int index) { }
 
     protected virtual void SetupCamera()
     {
@@ -489,4 +451,24 @@ public class PlayerController : CharacterBase
                 transform.rotation = Quaternion.LookRotation(lookDir);
         }
     }
+
+    //============================================================
+    // 안전 핸들러
+    //============================================================
+    private void Safe_OnAttackAnimationEnd()
+    {
+        isAttacking = false;
+        if (actSM.CurrentId == ActState.Attack || actSM.CurrentId == ActState.AttackReady)
+            actSM.Change(ActState.None);
+    }
+
+    private void Safe_OnHitStep(int stepIndex)
+    {
+        if (stepIndex < 0) return;
+        OnAttackHitStep(stepIndex);
+    }
+
+    private void Safe_OpenCombo() => OpenComboWindow();
+    private void Safe_CloseCombo() => CloseComboWindow();
+    private void Safe_GenericTag(string tag) => OnAnimationEventTag(tag);
 }

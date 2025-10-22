@@ -579,8 +579,8 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.19791833
-        functionName: SpawnSlashEffect1
+      - time: 1
+        functionName: AE_AttackEnd()
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0

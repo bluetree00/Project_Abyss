@@ -49,12 +49,15 @@ public class Knight : PlayerController
     }
 
     // 이동 입력 벡터 계산(기존 그대로)
+   // 이동 입력 벡터 계산
     private void CheckMovementInput()
     {
-        if (isInputLocked) { moveDirection = Vector3.zero; return; }
+        // isInputLocked 제거 → 항상 입력 벡터 계산
         var input   = inputActions.Player.Move.ReadValue<Vector2>();
         var forward = cinemachineCamera.transform.forward; forward.y = 0;
         var right   = cinemachineCamera.transform.right;   right.y   = 0;
+
+        // 정규화하여 moveDirection 저장
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
 
