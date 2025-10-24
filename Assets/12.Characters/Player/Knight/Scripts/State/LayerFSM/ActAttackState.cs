@@ -6,6 +6,13 @@ public class ActAttackState : ILayerState<ActState>
 {
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
+    private WeaponActionType determineAttackType()
+    {
+        // 현재 공격 타입 결정 로직 (예: 라이트, 헤비, 스킬 등)
+        // 여기서는 간단히 라이트 공격으로 가정
+        return WeaponActionType.Light;
+    }
+
 
     private int _maxCombo = 1;
     private float _comboExpiryTime = 0f;
@@ -32,6 +39,9 @@ public class ActAttackState : ILayerState<ActState>
             _controller.SetMoveScale(0f); // 속도만 줄임
         }
 
+        // --- 공격 타입 결정 ---
+        _controller.CurrentAttackTypeForEffect = determineAttackType(); // Light, Heavy, QSkill 등
+    
         // 무기 정보 기반 최대 콤보 계산
         var wd = _controller.WeaponManager?.CurrentWeaponData;
         bool isAir = !_controller.IsGrounded();

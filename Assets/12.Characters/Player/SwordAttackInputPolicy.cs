@@ -12,7 +12,6 @@ public sealed class SwordAttackInputPolicy : IAttackInputPolicy
         Controller.CharacterData.heavyAttackChargeTime = 0f;
         // Controller.isInChargingState = true;
         autoFired = false;
-        Controller.HeavyAttackAbility?.HeavyAttackStartCharging(Controller);
     }
 
     public void Tick(PlayerController Controller, float dt)
@@ -20,7 +19,6 @@ public sealed class SwordAttackInputPolicy : IAttackInputPolicy
         // if (!Controller.isInChargingState || Controller.isAttacking) return;
 
         Controller.CharacterData.heavyAttackChargeTime += Time.unscaledDeltaTime;
-        Controller.HeavyAttackAbility?.HeavyAttackUpdateCharging(Controller, Controller.CharacterData.heavyAttackChargeTime);
 
         // if (!autoFired && Controller.CharacterData.heavyAttackChargeTime >= Controller.heavyAttackChargeThreshold)
         // {
@@ -39,11 +37,9 @@ public sealed class SwordAttackInputPolicy : IAttackInputPolicy
             float held = Time.unscaledTime - Controller.CharacterData.attackInputTime;
             // 임계 미만 → 라이트
             Controller.InputBuffer.Push(Command.Light);
-            Controller.HeavyAttackAbility?.HeavyAttackUpdateCharging(Controller, held);
         }
 
         // 정리
-        Controller.HeavyAttackAbility?.HeavyAttackCancelCharging(Controller);
         Controller.CharacterData.attackInputTime = 0f;
         Controller.CharacterData.heavyAttackChargeTime = 0f;
         // Controller.isInChargingState = false;

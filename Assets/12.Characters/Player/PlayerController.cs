@@ -81,8 +81,6 @@ public class PlayerController : CharacterBase
     //============================================================
     public IMoveAbility<PlayerController> MoveAbility { get; protected set; }
     public IDodgeAbility<PlayerController> DodgeAbility { get; protected set; }
-    public ILightAttackAbility<PlayerController> LightAttackAbility { get; protected set; }
-    public IHeavyAttackAbility<PlayerController> HeavyAttackAbility { get; protected set; }
     public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
 
     public Transform handTransform;
@@ -99,6 +97,8 @@ public class PlayerController : CharacterBase
     public bool isJumping;
 
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
+
+    public WeaponActionType CurrentAttackTypeForEffect;
 
     
 
@@ -131,7 +131,7 @@ public class PlayerController : CharacterBase
         _animSvc = new AnimatorOverrideService(anim);
 
         // 이펙트 핸들러 초기화
-        EffectHandler = new WeaponEffectHandler();
+        EffectHandler = new WeaponEffectHandler(this);
 
         EventReceiver = GetComponent<PlayerAnimationEventReceiver>() ?? GetComponentInChildren<PlayerAnimationEventReceiver>() ?? gameObject.AddComponent<PlayerAnimationEventReceiver>();
         EventReceiver.SetTarget(this);
@@ -168,6 +168,7 @@ public class PlayerController : CharacterBase
         receiver.OnOpenCombo += Safe_OpenCombo;
         receiver.OnCloseCombo += Safe_CloseCombo;
         receiver.OnGenericTag += Safe_GenericTag;
+        receiver.OnEffectStep += safe_EffectStep;
 
         _aeSubscribed = true;
     }
@@ -181,6 +182,7 @@ public class PlayerController : CharacterBase
         receiver.OnOpenCombo -= Safe_OpenCombo;
         receiver.OnCloseCombo -= Safe_CloseCombo;
         receiver.OnGenericTag -= Safe_GenericTag;
+        receiver.OnEffectStep -= safe_EffectStep;
 
         _aeSubscribed = false;
     }
@@ -277,11 +279,6 @@ public class PlayerController : CharacterBase
         JumpAbility = new DefaultJumpAbility();
     }
 
-    public void ClearWeaponAbilities()
-    {
-        LightAttackAbility = null;
-        HeavyAttackAbility = null;
-    }
 
     //============================================================
     // 입력 바인딩
@@ -479,4 +476,17 @@ public class PlayerController : CharacterBase
     private void Safe_OpenCombo() => OpenComboWindow();
     private void Safe_CloseCombo() => CloseComboWindow();
     private void Safe_GenericTag(string tag) => OnAnimationEventTag(tag);
+    private void safe_EffectStep(int step)
+    {
+        Debug.Log($"[PlayerController] EffectStep received: {step}");
+        if (EffectHandler != null && WeaponManager.HasWeapon)
+        {
+            var group = isGrounded ? WeaponAnimGroup.Ground : WeaponAnimGroup.Air;
+            var actionType = CurrentAttackTypeForEffect; // Light, Heavy, QSkill 등
+            int effectIndex = currentComboStep;
+            Debug.Log($"[PlayerController] Playing effect: Group={group}, ActionType={actionType}, EffectIndex={effectIndex}, Step={step}");
+            EffectHandler.PlayEffect(group, actionType, effectIndex, step);
+        }
+    }
+
 }

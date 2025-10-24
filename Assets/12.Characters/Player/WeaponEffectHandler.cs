@@ -2,28 +2,44 @@ using UnityEngine;
 
 public class WeaponEffectHandler
 {
-    private WeaponData _weaponData;
-    private Transform _handTransform; // 플레이어 손 위치 등
+    private PlayerController _player;
 
-    /// <summary>
-    /// 공격 시 효과 생성
-    /// </summary>
+    public WeaponEffectHandler(PlayerController player)
+    {
+        _player = player;
+    }
+
     public void PlayEffect(WeaponAnimGroup group, WeaponActionType actionType, int effectIndex, int step = 0)
     {
-        if (_weaponData == null || _weaponData.effectPackage == null)
+        if (_player == null)
+        {
+            Debug.LogError("[WeaponEffectHandler] Player reference is null!");
+            return;
+        }
+
+        var weaponData = _player.WeaponManager?.CurrentWeaponData;
+        var handTransform = _player.handTransform;
+
+        if (weaponData == null || weaponData.effectPackage == null)
             return;
 
-        var effectSO = _weaponData.effectPackage.GetEffect(group, actionType, effectIndex, step);
+        var effectSO = weaponData.effectPackage.GetEffect(group, actionType, effectIndex, step);
         if (effectSO == null)
+        {
+            Debug.LogWarning($"EffectSO not found: {group}, {actionType}, {effectIndex}, {step}");
             return;
+        }
 
-            GameObject obj = Managers.ObjectPooler.SpawnFromPool(
-            effectSO.prefabKey,_handTransform.position + effectSO.spawnOffset,
+        if (handTransform == null)
+        {
+            Debug.LogError("[WeaponEffectHandler] Hand transform is null!");
+            return;
+        }
+
+        GameObject obj = Managers.ObjectPooler.SpawnFromPool(
+            effectSO.prefabKey,
+            handTransform.position + effectSO.spawnOffset,
             Quaternion.Euler(effectSO.defaultRotation)
         );
-
-
-        // 필요한 초기화가 있으면 IPooledObject에서 처리
-        // (ex: Damage 설정, Owner 설정 등)
     }
 }
