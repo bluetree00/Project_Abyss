@@ -42,6 +42,10 @@ public class PlayerController : CharacterBase
 
     // 애니메이션 이벤트 리시버
     public PlayerAnimationEventReceiver EventReceiver;
+
+    //장비 이펙트 생성을 관리하는 핸들러
+    public WeaponEffectHandler EffectHandler;
+
     private bool _aeSubscribed = false;
 
     //============================================================
@@ -123,7 +127,11 @@ public class PlayerController : CharacterBase
         locoSM.Change(LocoState.Idle);
         actSM.Change(ActState.None);
 
+        // 애니메이터 오버라이드 서비스 초기화
         _animSvc = new AnimatorOverrideService(anim);
+
+        // 이펙트 핸들러 초기화
+        EffectHandler = new WeaponEffectHandler();
 
         EventReceiver = GetComponent<PlayerAnimationEventReceiver>() ?? GetComponentInChildren<PlayerAnimationEventReceiver>() ?? gameObject.AddComponent<PlayerAnimationEventReceiver>();
         EventReceiver.SetTarget(this);

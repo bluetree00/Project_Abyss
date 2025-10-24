@@ -18,7 +18,12 @@ MonoBehaviour:
   m_GUID: a389e062f53c70a4da403658dd78396d
   m_SerializeEntries:
   - m_GUID: e921ba1a7fdb59647a6713ac02429b33
-    m_Address: Effect/Weapon/Slash_01
+    m_Address: SlashAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 68ede0dcc5b1be5499e0c70a760cd797
+    m_Address: TestMeteor
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

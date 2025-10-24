@@ -9,9 +9,20 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     // 인스턴스 이벤트 — 플레이어/다른 시스템이 구독
     public event Action OnAttackEnd;
     public event Action<int> OnHitStep;
+    public event Action<int> OnEffectStep;      // 새: VFX 재생용 step
+    public event Action<int> OnColliderStep;    // 새: 히트박스(콜라이더) 활성화용 step
     public event Action OnOpenCombo;
     public event Action OnCloseCombo;
     public event Action<string> OnGenericTag;
+
+    public void AE_EffectStep(int step)
+    {
+        EnsureTarget();
+        OnEffectStep?.Invoke(step);  // 플레이어가 구독 중이면 step 전달됨
+        Debug.Log($"[AE] EffectStep {step}");
+    }
+
+    public void AE_ColliderStep(int step)     { EnsureTarget(); OnColliderStep?.Invoke(step); Debug.Log($"[AE] ColliderStep {step}"); }
 
     #region Wiring
     public void SetTarget(PlayerController target)
@@ -67,4 +78,6 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
         OnGenericTag?.Invoke(tag);
         Debug.Log($"[AE] GenericTag '{tag}'");
     }
+
+
 }

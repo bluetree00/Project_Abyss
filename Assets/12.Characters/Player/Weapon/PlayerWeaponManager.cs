@@ -6,18 +6,6 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// 플레이어별 무기 매니저 (싱글톤 아님)
-/// - 슬롯 수: 2
-/// - Addressables.InstantiateAsync / ReleaseInstance 사용
-/// - ReplaceSlotAsync, SwapSlotsAsync 포함
-/// - 기존 장비는 비활성화, 새 장비는 활성화
-/// - 프리팹 Transform 원본 유지
-/// 
-/// 추가:
-/// - IWeaponProvider 인터페이스 구현
-/// - CurrentWeaponData/Instance 접근자, 유틸 메서드 제공
-/// </summary>
 public interface IWeaponProvider
 {
     WeaponData CurrentWeaponData { get; }
@@ -50,6 +38,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     private int currentSlotIndex = -1;
     private bool _isSwitching = false;
+
+    // 기본 풀 사이즈 (필요시 변경)
+    private const int defaultPoolSizeForEffects = 6;
 
     // 기존 이벤트 유지 (외부에서 구독)
     public event Action<WeaponData, GameObject> OnWeaponChanged;
@@ -127,7 +118,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     // ----------------------
-    // 무기 획득
+    // 무기 획득 (Addressables key)
     // ----------------------
     public async UniTask AcquireWeaponAsync(string weaponSOKey, bool autoEquip = true)
     {
@@ -141,9 +132,27 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         await AcquireWeaponAsync(runtime, autoEquip);
     }
 
+    // ----------------------
+    // 무기 획득 (이미 로드된 WeaponData)
+    // - 이곳에서 effectPackage가 있으면 Managers에게 풀 초기화 요청(대기)
+    // ----------------------
     public async UniTask AcquireWeaponAsync(WeaponData runtimeData, bool autoEquip = true)
     {
         if (runtimeData == null) return;
+
+        // 장비 획득 시점에 해당 장비 이펙트 풀 초기화 (await)
+        try
+        {
+            if (runtimeData.effectPackage != null)
+            {
+                await Managers.Instance.InitializeWeaponEffectPoolsAsync(runtimeData.effectPackage, defaultPoolSizeForEffects);
+                Debug.Log($"[PlayerWeaponManager] Initialized effect pools for {runtimeData.displayName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed: {ex.Message}");
+        }
 
         _owned.Add(runtimeData);
 
@@ -286,11 +295,26 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     public int GetCurrentSlotIndex() => currentSlotIndex;
 
     // ----------------------
-    // 장비 획득 처리
+    // 장비 획득 처리 (픽업 등 외부 호출)
+    // - HandlePickupAsync에서도 풀 초기화를 수행하도록 추가
     // ----------------------
     public async UniTask HandlePickupAsync(WeaponData runtimeData, bool autoEquip = true)
     {
         if (runtimeData == null) return;
+
+        // 획득 시점에서 풀 초기화 시도
+        try
+        {
+            if (runtimeData.effectPackage != null)
+            {
+                await Managers.Instance.InitializeWeaponEffectPoolsAsync(runtimeData.effectPackage, defaultPoolSizeForEffects);
+                Debug.Log($"[PlayerWeaponManager] Initialized effect pools for pickup {runtimeData.displayName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed during pickup: {ex.Message}");
+        }
 
         _owned.Add(runtimeData);
         int empty = GetFirstEmptySlotIndex();
