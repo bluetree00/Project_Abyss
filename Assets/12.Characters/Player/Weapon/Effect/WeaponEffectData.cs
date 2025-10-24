@@ -34,17 +34,17 @@ public class WeaponEffectData
     {
         if (so == null) throw new ArgumentNullException(nameof(so));
 
-        id = so.id;
-        addressableKey = so.addressableKey;
-        attachPoint = so.attachPoint;
-        localPosition = so.localPosition;
-        localEuler = so.localEuler;
-        localScale = so.localScale;
-        followAttach = so.followAttach;
-        lifetime = so.lifetime;
-        syncColliderId = so.syncColliderId;
-        variantTag = so.variantTag;
-        recommendedPoolSize = so.recommendedPoolSize;
+        // id = so.id;
+        // addressableKey = so.addressableKey;
+        // attachPoint = so.attachPoint;
+        // localPosition = so.localPosition;
+        // localEuler = so.localEuler;
+        // localScale = so.localScale;
+        // followAttach = so.followAttach;
+        // lifetime = so.lifetime;
+        // syncColliderId = so.syncColliderId;
+        // variantTag = so.variantTag;
+        // recommendedPoolSize = so.recommendedPoolSize;
     }
 
     /// <summary>

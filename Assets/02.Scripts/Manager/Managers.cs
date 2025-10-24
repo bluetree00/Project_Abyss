@@ -227,6 +227,27 @@ public class Managers : MonoBehaviour
         _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
         Debug.Log($"[ObjectPoolManager] '{effectPoolDataName}' 초기화 완료");
     }
+
+    // Managers에서 등록 하는 무기 이펙트 풀 초기화
+        public async UniTask InitializeWeaponEffectPoolsAsync(WeaponEffectPackageSO package, int defaultPoolSize = 5)
+    {
+        if (package == null) return;
+
+        var pools = await WeaponEffectPackagePoolInitializer.GetPoolsAsync(package, defaultPoolSize);
+        if (pools.Count == 0) return;
+
+        if (_objectPoolerManager == null)
+        {
+            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
+        }
+        else
+        {
+            _objectPoolerManager.RegisterPools(pools.ToArray()); // <-- 기존 풀에 병합
+        }
+
+        Debug.Log($"[Managers] 장비 풀 초기화 완료: {package.name} ({pools.Count} pools)");
+    }
+
     #endregion
 
     #region Save / Clear

@@ -18,7 +18,12 @@ MonoBehaviour:
   m_GUID: a89689c06a9ec6f4586663b808a34bd2
   m_SerializeEntries:
   - m_GUID: 8c18363245b2ef14d871d17e286d704b
-    m_Address: Assets/12.Characters/Player/Weapon/WeapoSO/TestSword/TestEffect.asset
+    m_Address: TestEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e24ea996a7cc6ad44b56b77417ff2f73
+    m_Address: TestEffect 1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
