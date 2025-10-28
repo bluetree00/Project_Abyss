@@ -499,11 +499,10 @@ public class PlayerController : CharacterBase
         Debug.Log($"[PlayerController] EffectStep received: {step}");
         if (EffectHandler != null && WeaponManager.HasWeapon)
         {
-            var group = isGrounded ? WeaponAnimGroup.Ground : WeaponAnimGroup.Air;
             var actionType = CurrentAttackTypeForEffect; // Light, Heavy, QSkill 등
             int effectIndex = currentComboStep;
-            Debug.Log($"[PlayerController] Playing effect: Group={group}, ActionType={actionType}, EffectIndex={effectIndex}, Step={step}");
-            EffectHandler.PlayEffect(group, actionType, effectIndex, step);
+            Debug.Log($"ActionType={actionType}, EffectIndex={effectIndex}, Step={step}");
+            EffectHandler.PlayEffect(actionType, effectIndex, step);
         }
     }
 
