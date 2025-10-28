@@ -1,5 +1,7 @@
 // ActAttackReadyState.cs
-using System.Diagnostics;
+using System;
+using UnityEngine;
+using Game.Inputs;
 
 public class ActAttackReadyState : ILayerState<ActState>
 {
@@ -7,20 +9,40 @@ public class ActAttackReadyState : ILayerState<ActState>
     private ILayerStateChanger<ActState> _stateChanger;
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
+    {
+        _controller = controller;
+        _stateChanger = stateChanger;
+    }
 
     public void Enter()
     {
-
-        // 컨텍스트별(지상/공중) 애니 세트 교체
         var isAir = !_controller.IsGrounded();
         _controller.SetMoveScale(0f);
 
-        // 현재 콤보 스텝으로 첫 타 실행
-        int step = _controller.currentComboStep;
-        _controller.Anim.CrossFade($"NormalAttack_{step + 1}", 0.05f);
+        // --- 입력 기반 PendingAttack 읽기 ---
+        if (_controller.HasPendingAttack)
+        {
+            var pending = _controller.PendingAttackCommand;
 
-        // 즉시 진행 상태로
+            // 매핑: (지상/공중) × (Light/Heavy) -> WeaponActionType
+            WeaponActionType atype;
+            if (isAir)
+                atype = (pending == Command.Heavy) ? WeaponActionType.AirHeavy : WeaponActionType.AirLight;
+            else
+                atype = (pending == Command.Heavy) ? WeaponActionType.GroundHeavy : WeaponActionType.GroundLight;
+
+            _controller.CurrentAttackTypeForEffect = atype;
+
+            // Pending 초기화
+            _controller.ClearPendingAttack();
+        }
+        else
+        {
+            // 안전장치: 기본 라이트/지상
+            _controller.CurrentAttackTypeForEffect = isAir ? WeaponActionType.AirLight : WeaponActionType.GroundLight;
+        }
+
+        // 즉시 Attack 상태로 전환
         _stateChanger.Change(ActState.Attack);
     }
 

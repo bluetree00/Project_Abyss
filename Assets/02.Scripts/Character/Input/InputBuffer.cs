@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Game.Inputs
 {
-    public enum Command { Dodge, Skill, Heavy, Light }
+    public enum Command { None, Dodge, Skill, Heavy, Light }
 
     public interface IClock { float Now { get; } float Delta { get; } }
     public sealed class UnscaledClock : IClock
@@ -15,12 +15,15 @@ namespace Game.Inputs
 
     /// <summary>
     /// 입력 버퍼
-    /// - 기존 기능 보존 (Push / TryConsume / TryConsumeAny / Clear / TickPrune)
-    /// - 디버깅/관찰용 API 추가:
+    /// - Push / TryConsume / TryConsumeAny / Clear / TickPrune 제공
+    /// - 디버깅/관찰 API:
     ///   * EnableDebugLogging
     ///   * OnPushed / OnConsumed 이벤트
-    ///   * GetEntries(): List&lt;EntryInfo&gt;
-    ///   * DebugDump(): 버퍼 상태 로그 출력
+    ///   * GetEntries() => List<EntryInfo>
+    ///   * DebugDump()
+    ///   * HasRecent(Command, withinSec)
+    ///   * RemoveAll(Command)
+    ///   * PeekLast(out Command)
     /// </summary>
     public sealed class InputBuffer
     {
@@ -75,6 +78,7 @@ namespace Game.Inputs
         // --------------------------
         // 기본 동작 (원래 API)
         // --------------------------
+        /// <summary>만료된(윈도우 초과) 항목을 제거합니다.</summary>
         public void TickPrune()
         {
             float now = _clock.Now;
@@ -83,7 +87,6 @@ namespace Game.Inputs
             {
                 ref var e = ref _buf[_head];
                 if (now - e.t <= _windowSec) break;
-                // 로그/이벤트: 오래된 항목 제거
                 if (EnableDebugLogging) Debug.Log($"[InputBuffer] Prune expired: {e.cmd} age={(now - e.t):F3}s");
                 PopFront();
                 anyPruned = true;
@@ -92,12 +95,13 @@ namespace Game.Inputs
             if (anyPruned && EnableDebugLogging) Debug.Log($"[InputBuffer] After prune count={_count}");
         }
 
+        /// <summary>새 입력을 푸시합니다. 용량 초과 시 우선순위가 낮은 항목을 희생하거나 새 입력을 버립니다.</summary>
         public void Push(Command c)
         {
             float now = _clock.Now;
             TickPrune();
 
-            // 연속 중복 억제
+            // 연속 중복 억제 (가장 최근 항목과 비교)
             if (_count > 0)
             {
                 int last = (_tail - 1 + _buf.Length) % _buf.Length;
@@ -140,6 +144,7 @@ namespace Game.Inputs
             OnPushed?.Invoke(c);
         }
 
+        /// <summary>헤드 항목이 원하는 커맨드면 소비하고 true 반환</summary>
         public bool TryConsume(Command want)
         {
             TickPrune();
@@ -156,6 +161,7 @@ namespace Game.Inputs
             return false;
         }
 
+        /// <summary>버퍼에서 wants 목록 중 첫 일치 항목을 찾아 제거(순서 보존)하고 true 반환</summary>
         public bool TryConsumeAny(params Command[] wants)
         {
             TickPrune();
@@ -246,20 +252,91 @@ namespace Game.Inputs
             return true;
         }
 
+        /// <summary>가장 최근(마지막) 항목 확인(소비하지 않음)</summary>
+        public bool PeekLast(out Command cmd)
+        {
+            if (_count == 0) { cmd = default; return false; }
+            int last = (_tail - 1 + _buf.Length) % _buf.Length;
+            cmd = _buf[last].cmd;
+            return true;
+        }
+
+        /// <summary>
+        /// 최근에 해당 커맨드가 삽입되었는지 검사.
+        /// withinSec: 검색할 시간 범위(초). 기본은 dedupeSec.
+        /// 뒤에서(가장 최근 항목부터) 검사하므로 빠릅니다.
+        /// </summary>
+        public bool HasRecent(Command c, float withinSec = -1f)
+        {
+            if (_count == 0) return false;
+            if (withinSec <= 0f) withinSec = _dedupeSec;
+
+            float now = _clock.Now;
+            int idx = (_tail - 1 + _buf.Length) % _buf.Length;
+            for (int i = 0; i < _count; i++)
+            {
+                var e = _buf[idx];
+                if (now - e.t <= withinSec)
+                {
+                    if (e.cmd == c) return true;
+                }
+                else
+                {
+                    // 더 오래된 항목이면 뒤로 갈 필요 없음 (시간순 삽입 가정)
+                    break;
+                }
+                idx = (idx - 1 + _buf.Length) % _buf.Length;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 버퍼에 있는 특정 커맨드를 모두 제거합니다.
+        /// 안전하게 재구성하여 순서를 보존합니다.
+        /// </summary>
+        public void RemoveAll(Command c)
+        {
+            if (_count == 0) return;
+
+            var temp = new List<Entry>(_count);
+            int idx = _head;
+            for (int i = 0; i < _count; i++)
+            {
+                var e = _buf[idx];
+                if (e.cmd != c) temp.Add(e);
+                idx = (idx + 1) % _buf.Length;
+            }
+
+            // 재구성
+            int newCap = _buf.Length;
+            Array.Clear(_buf, 0, _buf.Length);
+            for (int i = 0; i < temp.Count; i++)
+            {
+                _buf[i] = temp[i];
+            }
+            _head = 0;
+            _count = temp.Count;
+            _tail = _count % _buf.Length;
+
+            if (EnableDebugLogging) Debug.Log($"[InputBuffer] RemoveAll {c} done, newCount={_count}");
+        }
+
         // --------------------------
         // 내부 유틸
         // --------------------------
         private void PopFront()
         {
             if (_count == 0) return;
+            // NOTE: PopFront does not raise OnConsumed because Prune is not a deliberate consumption.
             _head = (_head + 1) % _buf.Length;
             _count--;
         }
 
+        /// <summary>pos 위치 항목을 제거(순서 보존). pos는 내부 인덱스(버퍼 배열 인덱스)</summary>
         private void RemoveAt(int pos)
         {
             if (_count == 0) return;
-            // 기록될 항목을 로그(디버그용)
+
             if (EnableDebugLogging)
             {
                 var ev = _buf[pos];
@@ -270,9 +347,12 @@ namespace Game.Inputs
             while (i != _tail)
             {
                 int next = (i + 1) % _buf.Length;
+                // next might equal tail (past-last) — in that case loop will assign tail slot to current pos,
+                // but that's intended because we'll move tail back afterwards.
                 _buf[i] = _buf[next];
                 i = next;
             }
+            // move tail backward
             _tail = (_tail - 1 + _buf.Length) % _buf.Length;
             _count--;
         }

@@ -18,17 +18,17 @@ MonoBehaviour:
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
   - m_GUID: ea88c1cbbc57198499ce3da9463baea4
-    m_Address: NormalAttack_2
+    m_Address: GroundLightAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
-    m_Address: NormalAttack_3
+    m_Address: GroundLightAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
-    m_Address: NormalAttack_1
+    m_Address: GroundLightAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

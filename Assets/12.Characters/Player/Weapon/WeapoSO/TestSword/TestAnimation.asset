@@ -15,16 +15,16 @@ MonoBehaviour:
   animGroups:
   - groupType: 0
     clipMappings:
-    - baseClipName: NormalAttack_1
-      addressableKey: NormalAttack_1
+    - baseClipName: GroundLightAttack_01
+      addressableKey: GroundLightAttack_01
       actionType: 1
       comboIndex: 0
-    - baseClipName: NormalAttack_2
-      addressableKey: NormalAttack_2
+    - baseClipName: GroundLightAttack_02
+      addressableKey: GroundLightAttack_02
       actionType: 1
       comboIndex: 0
-    - baseClipName: NormalAttack_3
-      addressableKey: NormalAttack_3
+    - baseClipName: GroundLightAttack_03
+      addressableKey: GroundLightAttack_03
       actionType: 1
       comboIndex: 0
     - baseClipName: UltimateSkile_01

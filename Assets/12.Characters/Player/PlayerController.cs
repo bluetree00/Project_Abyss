@@ -14,6 +14,26 @@ using System.Collections.Generic;
 
 public class PlayerController : CharacterBase
 {
+
+    
+    public Command PendingAttackCommand { get; private set; } = Command.None;
+    public bool HasPendingAttack => PendingAttackCommand != Command.None;
+    public WeaponActionType CurrentAttackTypeForEffect { get; set; }
+
+    // PendingAttack 설정
+    public void SetPendingAttack(Command cmd)
+    {
+        PendingAttackCommand = cmd;
+    }
+
+    // PendingAttack 초기화
+    public void ClearPendingAttack()
+    {
+        PendingAttackCommand = Command.None;
+    }
+
+
+
     //============================================================
     // 캐릭터 / 무기 / 입력
     //============================================================
@@ -98,9 +118,6 @@ public class PlayerController : CharacterBase
 
     private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
-    public WeaponActionType CurrentAttackTypeForEffect;
-
-    
 
     //============================================================
     // 초기화
@@ -112,7 +129,7 @@ public class PlayerController : CharacterBase
         await base.InitAsync();
 
         Clock = new UnscaledClock();
-        InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 40f);
+        InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 0.04f);
 
         InitCoreComponents();
         await InitCharacterDataAsync();
@@ -340,6 +357,7 @@ public class PlayerController : CharacterBase
     //============================================================
     protected override void Update()
     {
+        
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
