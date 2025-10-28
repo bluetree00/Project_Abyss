@@ -15,22 +15,24 @@ public static class WeaponEffectPackagePoolInitializer
         HashSet<string> addedTags = new HashSet<string>();
 
         foreach (var action in package.actions)
-            foreach (var indexEntry in action.effectIndices)
-                foreach (var step in indexEntry.steps)
-                {
-                    var effectSO = step.effectSO;
-                    if (effectSO == null || string.IsNullOrEmpty(effectSO.prefabKey)) continue;
-                    if (addedTags.Contains(effectSO.prefabKey)) continue;
+        {
+            foreach (var effectSO in action.effects)
+            {
+                if (effectSO == null || string.IsNullOrEmpty(effectSO.prefabKey)) 
+                    continue;
+                if (addedTags.Contains(effectSO.prefabKey)) 
+                    continue;
 
-                    pools.Add(new ObjectPoolerManager.Pool
-                    {
-                        tag = effectSO.prefabKey,
-                        resourcePath = effectSO.prefabKey,
-                        initialSize = defaultPoolSize,
-                        poolType = ObjectPoolerManager.PoolType.Effect
-                    });
-                    addedTags.Add(effectSO.prefabKey);
-                }
+                pools.Add(new ObjectPoolerManager.Pool
+                {
+                    tag = effectSO.prefabKey,
+                    resourcePath = effectSO.prefabKey,
+                    initialSize = defaultPoolSize,
+                    poolType = ObjectPoolerManager.PoolType.Effect
+                });
+                addedTags.Add(effectSO.prefabKey);
+            }
+        }
 
         await Task.Yield();
         return pools;
