@@ -38,15 +38,33 @@ public class Knight : PlayerController
     protected override void RouteInputsToLayers()
     {
         if (InputBuffer.TryConsume(Command.Dodge))
+        {
             locoSM.Change(LocoState.Dodge);
+            return;
+        }
 
         if (InputBuffer.TryConsume(Command.Skill))
+        {
             actSM.Change(ActState.Skill);
+            return;
+        }
 
-        if (InputBuffer.TryConsume(Command.Heavy) ||
-            InputBuffer.TryConsume(Command.Light))
+        // 공격 입력: Heavy 우선 검사, 발견 시 Pending에 기록 후 상태 전이
+        if (InputBuffer.TryConsume(Command.Heavy))
+        {
+            SetPendingAttack(Command.Heavy);
             actSM.Change(ActState.AttackReady);
+            return;
+        }
+
+        if (InputBuffer.TryConsume(Command.Light))
+        {
+            SetPendingAttack(Command.Light);
+            actSM.Change(ActState.AttackReady);
+            return;
+        }
     }
+
 
     // 이동 입력 벡터 계산(기존 그대로)
    // 이동 입력 벡터 계산

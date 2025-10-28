@@ -1,22 +1,16 @@
+// ActAttackState.cs
 using System;
 using UnityEngine;
 using Game.Inputs;
+using Game.Utility.Extensions;
 
 public class ActAttackState : ILayerState<ActState>
 {
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
-    private WeaponActionType determineAttackType()
-    {
-        // 현재 공격 타입 결정 로직 (예: 라이트, 헤비, 스킬 등)
-        // 여기서는 간단히 라이트 공격으로 가정
-        return WeaponActionType.Light;
-    }
-
-
+    private PlayerAnimationEventReceiver _receiver;
     private int _maxCombo = 1;
     private float _comboExpiryTime = 0f;
-    private PlayerAnimationEventReceiver _receiver;
 
     private float _comboWindowSec => Mathf.Max(0.05f, _controller?.LightComboResetTime ?? 0.18f);
 
@@ -28,7 +22,6 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Enter()
     {
-          
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
 
         if (!_controller.isAttacking)
@@ -36,12 +29,12 @@ public class ActAttackState : ILayerState<ActState>
             _controller.isAttacking = true;
             _controller.nextComboQueued = false;
             _controller.comboWindowOpen = false;
-            _controller.SetMoveScale(0f); // 속도만 줄임
+            _controller.SetMoveScale(0f); // 이동 제한
         }
 
-        // --- 공격 타입 결정 ---
-        _controller.CurrentAttackTypeForEffect = determineAttackType(); // Light, Heavy, QSkill 등
-    
+        // --- 공격 타입 이미 AttackReady에서 결정됨 ---
+        var action = _controller.CurrentAttackTypeForEffect;
+
         // 무기 정보 기반 최대 콤보 계산
         var wd = _controller.WeaponManager?.CurrentWeaponData;
         bool isAir = !_controller.IsGrounded();
@@ -56,9 +49,11 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Update()
     {
+        // 콤보 입력 처리
         if (_controller.comboWindowOpen && _controller.InputBuffer.TryConsume(Command.Light))
             _controller.nextComboQueued = true;
 
+        // 콤보 시간 만료
         if (_controller.comboWindowOpen && Time.unscaledTime >= _comboExpiryTime)
         {
             _controller.comboWindowOpen = false;
@@ -118,7 +113,7 @@ public class ActAttackState : ILayerState<ActState>
         if (_controller.currentComboStep >= _maxCombo)
         {
             _controller.currentComboStep = 0;
-            _controller.CloseComboWindow();   // 콤보 창 닫고 타이머 갱신
+            _controller.CloseComboWindow();
             _stateChanger.Change(ActState.None);
         }
     }
@@ -138,21 +133,14 @@ public class ActAttackState : ILayerState<ActState>
     private void PlayCurrentComboAnimation()
     {
         int step = _controller.currentComboStep;
-        string stateName = $"NormalAttack_{step + 1}";
+        var action = _controller.CurrentAttackTypeForEffect;
+        string prefix = action.ToString(); // "GroundLight", "AirHeavy" 등
+        string stepStr = (step + 1).ToString("00"); // 01, 02 ...
+        string stateName = $"{prefix}Attack_{stepStr}";
 
-        if (HasAnimatorClip(_controller.Anim, stateName))
+        if (_controller.Anim.HasClip(stateName))
             _controller.Anim.CrossFade(stateName, 0.08f);
         else
-            Debug.LogWarning($"[ActAttackState] '{stateName}' 클립 없음.");
-    }
-
-    private bool HasAnimatorClip(Animator animator, string clipName)
-    {
-        if (animator == null || string.IsNullOrEmpty(clipName)) return false;
-        var clips = animator.runtimeAnimatorController?.animationClips;
-        if (clips == null) return false;
-        foreach (var c in clips)
-            if (c != null && c.name == clipName) return true;
-        return false;
+            Debug.LogWarning($"Animator clip not found: {stateName}");
     }
 }

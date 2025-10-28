@@ -18,37 +18,22 @@ MonoBehaviour:
     baseDamage: 0
     knockbackMultiplier: 0
     selfMovement: {x: 0, y: 0, z: 0}
-    effectScaleMultiplier: 0
-    effectLifeMultiplier: 0
-    colliderSizeMultiplier: 0
-    colliderDurationMultiplier: 0
-    payloadKey: 
-    duration: 0
-    executeInFixedUpdate: 0
-    oneShot: 0
-  - stepIndex: 1
-    order: 0
-    baseDamage: 0
-    knockbackMultiplier: 0
-    selfMovement: {x: 0, y: 0, z: 0}
-    effectScaleMultiplier: 0
-    effectLifeMultiplier: 0
-    colliderSizeMultiplier: 0
-    colliderDurationMultiplier: 0
-    payloadKey: 
-    duration: 0
-    executeInFixedUpdate: 0
-    oneShot: 0
-  - stepIndex: 2
-    order: 0
-    baseDamage: 0
-    knockbackMultiplier: 0
-    selfMovement: {x: 0, y: 0, z: 0}
-    effectScaleMultiplier: 0
-    effectLifeMultiplier: 0
-    colliderSizeMultiplier: 0
-    colliderDurationMultiplier: 0
-    payloadKey: 
-    duration: 0
-    executeInFixedUpdate: 0
+    effect:
+      payloadKey: 
+      positionOffset: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      forwardOffset: {x: 0, y: 0, z: 0}
+      scaleMultiplier: 1
+      lifeTimeMultiplier: 1
+      behavior: {fileID: 0}
+    collider:
+      payloadKey: 
+      positionOffset: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      forwardOffset: {x: 0, y: 0, z: 0}
+      sizeMultiplier: 1
+      durationMultiplier: 1
+      damage: 0
+      hitInterval: 0.1
+      behavior: {fileID: 0}
     oneShot: 0
