@@ -16,8 +16,8 @@ MonoBehaviour:
   - group: 0
     actionType: 1
     effects:
-    - {fileID: 11400000, guid: 8c18363245b2ef14d871d17e286d704b, type: 2}
     - {fileID: 11400000, guid: e24ea996a7cc6ad44b56b77417ff2f73, type: 2}
   - group: 1
     actionType: 1
-    effects: []
+    effects:
+    - {fileID: 11400000, guid: 8c18363245b2ef14d871d17e286d704b, type: 2}

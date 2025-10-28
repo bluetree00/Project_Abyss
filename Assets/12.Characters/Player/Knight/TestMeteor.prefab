@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6024837220864552855}
   - component: {fileID: 6527366276755916872}
   - component: {fileID: 2585611103103872549}
+  - component: {fileID: -4827559607078291914}
   m_Layer: 0
   m_Name: TestMeteor
   m_TagString: Untagged
@@ -5042,6 +5043,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &-4827559607078291914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 813658189841236102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: baab346632ea9614d864288134d46a17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lifetime: 1
 --- !u!1 &1268314053870472297
 GameObject:
   m_ObjectHideFlags: 0

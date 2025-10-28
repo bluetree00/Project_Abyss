@@ -35,6 +35,8 @@ MonoBehaviour:
       durationMultiplier: 1
       damage: 0
       hitInterval: 0.1
+      duration: 2
+      shape: 1
       behavior: {fileID: 0}
       colliderPrefabKey: 
     oneShot: 0

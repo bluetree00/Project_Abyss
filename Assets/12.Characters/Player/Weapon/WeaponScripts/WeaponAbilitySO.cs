@@ -69,6 +69,14 @@ public class WeaponAbilitySO : ScriptableObject
         public EffectBehaviorSO behavior;
     }
 
+    // Collider 모양 enum
+    public enum ColliderShape
+    {
+        Box,
+        Sphere,
+        Capsule
+    }
+
     [Serializable]
     public class ColliderStep
     {
@@ -80,6 +88,8 @@ public class WeaponAbilitySO : ScriptableObject
         public float durationMultiplier = 1f;
         public float damage = 0f;
         public float hitInterval = 0.1f;
+        public float duration = 2f;
+        public ColliderShape shape = ColliderShape.Box;
 
         [Tooltip("특수 콜라이더 로직이 필요한 경우")]
         public ColliderBehaviorSO behavior;

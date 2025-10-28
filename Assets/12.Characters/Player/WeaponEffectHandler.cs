@@ -9,7 +9,7 @@ public class WeaponEffectHandler
         _player = player;
     }
 
-    public void PlayEffect(WeaponAnimGroup group, WeaponActionType actionType, int effectIndex, int step = 0)
+    public void PlayEffect(WeaponActionType actionType, int effectIndex, int step = 0)
     {
         if (_player == null) return;
 
@@ -62,17 +62,41 @@ public class WeaponEffectHandler
                     colliderObj.transform.position = handTransform.position + c.positionOffset;
                     colliderObj.transform.rotation = Quaternion.Euler(c.rotationEuler);
 
-                    var col = colliderObj.AddComponent<BoxCollider>();
-                    col.size = Vector3.one * c.sizeMultiplier;
+                    switch (c.shape)
+                    {
+                        case WeaponAbilitySO.ColliderShape.Box:
+                            var box = colliderObj.AddComponent<BoxCollider>();
+                            box.size = Vector3.one * c.sizeMultiplier;
+                            break;
+
+                        case WeaponAbilitySO.ColliderShape.Sphere:
+                            var sphere = colliderObj.AddComponent<SphereCollider>();
+                            sphere.radius = 0.5f * c.sizeMultiplier;
+                            break;
+
+                        case WeaponAbilitySO.ColliderShape.Capsule:
+                            var capsule = colliderObj.AddComponent<CapsuleCollider>();
+                            capsule.radius = 0.5f * c.sizeMultiplier;
+                            capsule.height = 2f * c.sizeMultiplier;
+                            break;
+                    }
+
 
                     var colliderInstance = colliderObj.AddComponent<ColliderInstance>();
                     colliderInstance.damage = c.damage;
                     colliderInstance.hitInterval = c.hitInterval;
+                    
+                    // 여기서 어빌리티 스텝 정보를 전달
+                    colliderInstance.owner = _player.gameObject;
+                    colliderInstance.actionType = actionType;
+                    colliderInstance.payloadKey = c.payloadKey;
+                    colliderInstance.knockbackMultiplier = c.durationMultiplier; // 필요하면 다른 값 매핑
+                    colliderInstance.gameObject.SetActive(true);
+                    colliderInstance.duration = c.duration;
                 }
 
                 c.behavior?.ApplyColliderBehavior(colliderObj, _player.transform);
             }
         }
     }
-
 }
