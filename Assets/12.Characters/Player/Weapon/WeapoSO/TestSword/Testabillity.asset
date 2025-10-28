@@ -19,7 +19,7 @@ MonoBehaviour:
     knockbackMultiplier: 0
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
-      payloadKey: 
+      payloadKey: SlashAttack
       positionOffset: {x: 0, y: 0, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
       forwardOffset: {x: 0, y: 0, z: 0}
@@ -36,4 +36,5 @@ MonoBehaviour:
       damage: 0
       hitInterval: 0.1
       behavior: {fileID: 0}
+      colliderPrefabKey: 
     oneShot: 0

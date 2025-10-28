@@ -58,13 +58,10 @@ public class WeaponData
         {
             foreach (var action in effectPackage.actions)
             {
-                foreach (var indexEntry in action.effectIndices)
+                foreach (var effectSO in action.effects)
                 {
-                    foreach (var stepEntry in indexEntry.steps)
-                    {
-                        if (stepEntry.effectSO != null)
-                            effectDataList.Add(new WeaponEffectData(stepEntry.effectSO));
-                    }
+                    if (effectSO != null)
+                        effectDataList.Add(new WeaponEffectData(effectSO));
                 }
             }
         }
