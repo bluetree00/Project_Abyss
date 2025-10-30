@@ -166,8 +166,8 @@ public class Managers : MonoBehaviour
             "GroundLightAttack_01",
             "GroundLightAttack_02",
             "GroundLightAttack_03",
-            "NormalSkile_01",
-            "UltimateSkile_01",
+            "ESkill_01",
+            "QSkill_01",
           
         };
 

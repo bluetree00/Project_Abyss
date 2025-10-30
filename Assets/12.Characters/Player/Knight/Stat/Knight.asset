@@ -32,10 +32,10 @@ MonoBehaviour:
   attackPowerBoostDuration: 10
   moveSpeedBoostAmount: 10
   moveSpeedBoostDuration: 3
-  jumpForce: 7
-  gravity: -30
+  jumpForce: 10
+  gravity: -5
   fallMultiplier: 2
-  groundCheckDistance: 20
+  groundCheckDistance: 0.1
   hardLandingTimeThreshold: 0.8
   groundLayer:
     serializedVersion: 2
@@ -43,5 +43,19 @@ MonoBehaviour:
   airControlMultiplier: 0.5
   groundDrag: 4
   airDrag: 0.5
-  equippedWeapon: {fileID: 0}
+  equippedWeapon:
+    WeaponDisplayKey: 
+    displayName: 
+    weaponPrefabKey: 
+    iconKey: 
+    baseAttack: 0
+    baseDefense: 0
+    groundEndCount: 0
+    airEndCount: 0
+    animationSet: {fileID: 0}
+    effectPackage: {fileID: 0}
+    colliderPackage: {fileID: 0}
+    abilitySet: {fileID: 0}
+    effectDataList: []
+    colliderDataList: []
   conClass: 0

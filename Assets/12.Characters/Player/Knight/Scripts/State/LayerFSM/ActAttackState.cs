@@ -130,17 +130,69 @@ public class ActAttackState : ILayerState<ActState>
         _controller.OnAnimationEventTag(tag);
     }
 
+    private const string ATTACK_PHASE_PARAM = "attackPhase"; // 0=start, 1=loop, 2=end
+    private const string ATTACK_INDEX_PARAM = "attackIndex"; // optional
+    private const string PLAY_AIR_TRIGGER = "playAir";      // optional
+
     private void PlayCurrentComboAnimation()
     {
+        if (_controller == null || _controller.Anim == null)
+            return;
+
         int step = _controller.currentComboStep;
         var action = _controller.CurrentAttackTypeForEffect;
-        string prefix = action.ToString(); // "GroundLight", "AirHeavy" 등
-        string stepStr = (step + 1).ToString("00"); // 01, 02 ...
-        string stateName = $"{prefix}Attack_{stepStr}";
+        bool isAir = !_controller.IsGrounded();
 
-        if (_controller.Anim.HasClip(stateName))
-            _controller.Anim.CrossFade(stateName, 0.08f);
+        string stepStr = (step + 1).ToString("00"); // 01, 02, ...
+        string groundStateName = $"{action}Attack_{stepStr}";
+        string airStateName = $"Air{action}Attack_{stepStr}";
+
+        Animator anim = _controller.Anim;
+        int layerIndex = 0; // Base Layer 기준, 필요 시 레이어 맞춤
+        int stateHash;
+        
+        if (!isAir)
+        {
+            // 지상 공격: 기존 clip 재생
+            stateHash = Animator.StringToHash(groundStateName);
+
+            if (anim.HasState(layerIndex, stateHash))
+            {
+                anim.CrossFade(stateHash, 0.08f);
+            }
+            else
+            {
+                Debug.LogWarning($"Animator state not found: {groundStateName}");
+            }
+        }
         else
-            Debug.LogWarning($"Animator clip not found: {stateName}");
+        {
+            // 공중 공격: BlendTree 상태 진입
+            stateHash = Animator.StringToHash(airStateName);
+
+            if (anim.HasState(layerIndex, stateHash))
+            {
+                anim.CrossFade(stateHash, 0.08f);
+
+                // BlendTree phase 초기화: Start
+                anim.SetInteger(ATTACK_PHASE_PARAM, 0);
+                // 현재 공격 스텝 저장(optional)
+                anim.SetInteger(ATTACK_INDEX_PARAM, step + 1);
+
+                // optional: trigger 사용 방식
+                // anim.SetTrigger(PLAY_AIR_TRIGGER);
+            }
+            else
+            {
+                Debug.LogWarning($"Air blend state not found: {airStateName}, fallback to ground state.");
+
+                // fallback: 지상 clip이 존재하면 재생
+                int fallbackHash = Animator.StringToHash(groundStateName);
+                if (anim.HasState(layerIndex, fallbackHash))
+                    anim.CrossFade(fallbackHash, 0.08f);
+            }
+        }
     }
+
+
 }

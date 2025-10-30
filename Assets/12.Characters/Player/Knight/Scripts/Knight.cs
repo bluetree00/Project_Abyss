@@ -7,7 +7,6 @@ public class Knight : PlayerController
     private async void Start()
     {
         await InitAsync();
-        InitLayerFSMs();
     }
 
     protected override async UniTask InitAsync()
@@ -28,7 +27,8 @@ public class Knight : PlayerController
         actSM.Register(ActState.None,        new ActNoneState());
         actSM.Register(ActState.AttackReady, new ActAttackReadyState());
         actSM.Register(ActState.Attack,      new ActAttackState());
-        actSM.Register(ActState.Skill,       new ActSkillState());
+        actSM.Register(ActState.QSkill,       new ActQSkillState());
+        actSM.Register(ActState.ESkill,       new ActESkillState());
 
         locoSM.Change(IsGrounded() ? LocoState.Idle : LocoState.Air);
         actSM.Change(ActState.None);
@@ -37,21 +37,49 @@ public class Knight : PlayerController
     // 입력 라우팅: 버퍼 소비 → 레이어 전이
     protected override void RouteInputsToLayers()
     {
+        
+        if (InputBuffer.TryConsume(Command.QSkill))
+        {
+            if (!CanAttack())
+            {
+                // 무기 없음 — 무시
+                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
+                return;
+            }
+           
+            actSM.Change(ActState.QSkill);
+            return;
+        }
+
+        if (InputBuffer.TryConsume(Command.ESkill))
+        {
+            if (!CanAttack())
+            {
+                // 무기 없음 — 무
+                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
+                return;
+            }
+
+            actSM.Change(ActState.ESkill);
+            return;
+        }
+
         if (InputBuffer.TryConsume(Command.Dodge))
         {
             locoSM.Change(LocoState.Dodge);
             return;
         }
 
-        if (InputBuffer.TryConsume(Command.Skill))
-        {
-            actSM.Change(ActState.Skill);
-            return;
-        }
 
-        // 공격 입력: Heavy 우선 검사, 발견 시 Pending에 기록 후 상태 전이
+            // 공격 입력: Heavy 우선 검사
         if (InputBuffer.TryConsume(Command.Heavy))
         {
+            if (!CanAttack())
+            {
+                // 무기 없음 — 무시
+                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
+                return;
+            }
             SetPendingAttack(Command.Heavy);
             actSM.Change(ActState.AttackReady);
             return;
@@ -59,6 +87,11 @@ public class Knight : PlayerController
 
         if (InputBuffer.TryConsume(Command.Light))
         {
+            if (!CanAttack())
+            {
+                Debug.Log("[RouteInputsToLayers] Light ignored - no weapon");
+                return;
+            }
             SetPendingAttack(Command.Light);
             actSM.Change(ActState.AttackReady);
             return;
@@ -70,6 +103,7 @@ public class Knight : PlayerController
    // 이동 입력 벡터 계산
     private void CheckMovementInput()
     {
+        if (locoSM.CurrentId == LocoState.Air) return; // 공중이면 무시
         // isInputLocked 제거 → 항상 입력 벡터 계산
         var input   = inputActions.Player.Move.ReadValue<Vector2>();
         var forward = cinemachineCamera.transform.forward; forward.y = 0;

@@ -27,11 +27,19 @@ MonoBehaviour:
       addressableKey: GroundLightAttack_03
       actionType: 1
       comboIndex: 0
-    - baseClipName: UltimateSkile_01
-      addressableKey: UltimateSkile_01
+    - baseClipName: QSkill_01
+      addressableKey: QSkill_01
       actionType: 3
       comboIndex: 0
-    - baseClipName: NormalSkile_01
-      addressableKey: NormalSkile_01
+    - baseClipName: ESkill_01
+      addressableKey: ESkill_01
       actionType: 4
+      comboIndex: 0
+    - baseClipName: ESkill_01
+      addressableKey: ESkill_01
+      actionType: 5
+      comboIndex: 0
+    - baseClipName: ESkill_01
+      addressableKey: ESkill_01
+      actionType: 5
       comboIndex: 0
