@@ -50,7 +50,7 @@ public class CharacterData : ScriptableObject
     public float fallMultiplier = 2f;
 
     [Header("지면 체크 및 착지 관련")]
-    public float groundCheckDistance = 0.3f;
+    public float groundCheckDistance = 1f;
     public float hardLandingTimeThreshold = 0.8f;
     public LayerMask groundLayer;
 

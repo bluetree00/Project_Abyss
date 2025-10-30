@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Game.Inputs
 {
-    public enum Command { None, Dodge, Skill, Heavy, Light }
+    public enum Command { None, Dodge, Heavy, Light, QSkill, ESkill }
 
     public interface IClock { float Now { get; } float Delta { get; } }
     public sealed class UnscaledClock : IClock
@@ -68,11 +68,13 @@ namespace Game.Inputs
             _buf = new Entry[Mathf.Max(4, capacity)];
             _priority = priority ?? (c => c switch
             {
-                Command.Dodge => 3,
-                Command.Skill => 2,
-                Command.Heavy => 1,
-                _ => 0 // Light
+                Command.Dodge => 4,
+                Command.QSkill => 3,
+                Command.ESkill => 3,
+                Command.Heavy => 2,
+                _ => 0 // Light, None...
             });
+
         }
 
         // --------------------------

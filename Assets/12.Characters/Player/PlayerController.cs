@@ -15,16 +15,29 @@ using System.Collections.Generic;
 public class PlayerController : CharacterBase
 {
 
+      // 무기 장착 여부 검사 유틸
+    public bool CanAttack()
+    {
+        return WeaponManager != null && WeaponManager.HasWeapon;
+    }
+     // PendingAttack 설정 (무기가 없으면 무시)
+    public void SetPendingAttack(Command cmd)
+    {
+        if (!CanAttack())
+        {
+            // (선택) 디버그 메시지 또는 UI 안내 호출
+            Debug.Log("[PlayerController] 공격 시도했지만 무기가 없습니다.");
+            return;
+        }
+
+        PendingAttackCommand = cmd;
+    }
+
     
     public Command PendingAttackCommand { get; private set; } = Command.None;
     public bool HasPendingAttack => PendingAttackCommand != Command.None;
     public WeaponActionType CurrentAttackTypeForEffect { get; set; }
 
-    // PendingAttack 설정
-    public void SetPendingAttack(Command cmd)
-    {
-        PendingAttackCommand = cmd;
-    }
 
     // PendingAttack 초기화
     public void ClearPendingAttack()
@@ -220,6 +233,21 @@ public class PlayerController : CharacterBase
         if (newWeapon == null || _animSvc == null || newWeapon.animationSet == null || !Managers.AnimationResources.IsInitialized)
             return;
 
+              // 애니메이션 적용 이전에 null 검사
+        if (newWeapon == null)
+        {
+            // 무기 해제 처리: attack policy 제거
+            _attackPolicy = null;
+            Debug.Log("[PlayerController] 무기 해제 - 공격 불가 상태로 전환");
+            return;
+        }
+
+        if (_animSvc == null || newWeapon.animationSet == null || !Managers.AnimationResources.IsInitialized)
+        {
+            AssignAttackPolicyForWeapon(newWeapon); // 정책은 그래도 설정
+            return;
+        }
+
         var animSet = newWeapon.animationSet;
         foreach (var mapping in animSet.GetAllMappings())
         {
@@ -304,6 +332,15 @@ public class PlayerController : CharacterBase
     {
         if (!inputReady) return;
 
+         // Attack.started/canceled는 내부에서 입력 정책을 쓰므로 여기서도 검사
+        inputActions.Player.Attack.started += ctx =>
+        {
+            if (CanAttack())
+                _attackPolicy?.OnStarted(this);
+            else
+                Debug.Log("[Input] Attack started ignored - no weapon");
+        };
+
         inputActions.Player.Attack.started += _ => _attackPolicy?.OnStarted(this);
         inputActions.Player.Attack.canceled += _ => _attackPolicy?.OnCanceled(this);
 
@@ -311,8 +348,8 @@ public class PlayerController : CharacterBase
         inputActions.Player.Run.canceled += _ => isRunChecked = false;
 
         inputActions.Player.Dodge.performed += _ => InputBuffer.Push(Command.Dodge);
-        inputActions.Player.Skill.performed += _ => InputBuffer.Push(Command.Skill);
-        inputActions.Player.Ultimate.performed += _ => InputBuffer.Push(Command.Skill);
+        inputActions.Player.QSkill.performed += _ => InputBuffer.Push(Command.QSkill);
+        inputActions.Player.ESkill.performed += _ => InputBuffer.Push(Command.ESkill);
 
         inputActions.Player.Jump.performed += _ => ProcessJump();
         inputActions.Player.InventoryToggle.performed += _ => { ToggleInventory(); if (isInventoryOpen) InputBuffer.Clear(); };
@@ -326,10 +363,7 @@ public class PlayerController : CharacterBase
     //============================================================
     protected virtual void InitLayerFSMs() { }
     protected virtual void RouteInputsToLayers() { }
-    protected virtual void ProcessJump() { }
-    protected virtual void OnSkillAttack() { }
-    protected virtual void OnUltimateAttack() { }
-    public void UseSkill() => OnSkillAttack();
+
 
     //============================================================
     // 콤보 관련
@@ -357,9 +391,10 @@ public class PlayerController : CharacterBase
     //============================================================
     protected override void Update()
     {
-        
+
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
+        
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
         RouteInputsToLayers();
@@ -389,13 +424,55 @@ public class PlayerController : CharacterBase
         if (characterData == null) return;
 
         UpdateGroundedCheck();
-        ApplyMassBasedGravity();
+        ApplyAirborneGravity();
         FreezeRotation();
     }
 
+     //============================================================
+    // 점프 / 공중 진입 플래그
     //============================================================
-    // 입력/물리 유틸
+    public bool EnterAirAsJump { get; private set; } = false;
+
+    [Header("Jump Settings")]
+    public float jumpForce = 6f; // 점프 힘
+
+    // 점프 입력 처리
+    public void ProcessJump()
+    {
+        // 이미 공중이면 점프 불가
+        if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
+
+        // 점프 의도 표시
+        EnterAirAsJump = true;
+        isJumping = true;
+
+        // Rigidbody로 점프 힘 적용
+        Rigid.velocity = new Vector3(Rigid.velocity.x, 0f, Rigid.velocity.z); // 기존 Y 속도 초기화
+        Rigid.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
+
+        // 상태 전환 요청: Air로 변경
+        locoSM.Change(LocoState.Air);
+    }
+
+    // LocoAirState에서 읽은 후 초기화
+    public void ConsumeEnterAirAsJump()
+    {
+        EnterAirAsJump = false;
+        isJumping = false; // 점프 시작 후 플래그 해제
+    }
+
     //============================================================
+    // 공중 블렌드 트리 관련 유틸
+    //============================================================
+    public void SetAirBlend(float value)
+    {
+        if (Anim != null)
+            Anim.SetFloat("JumpBlend", value); // Air 전용 파라미터
+    }
+
+    //============================================================
+    // Ground 체크
+
     private void UpdateGroundedCheck()
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
@@ -403,17 +480,29 @@ public class PlayerController : CharacterBase
         isGrounded = Physics.Raycast(rayOrigin, Vector3.down, out var hit, rayLength, characterData.groundLayer)
                      && hit.distance <= characterData.groundCheckDistance + 0.05f;
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
+
+        // 착지 시점에 점프 상태 초기화
+        if (isGrounded && isJumping)
+            isJumping = false;
     }
 
-    private void ApplyMassBasedGravity()
+    private void ApplyAirborneGravity()
     {
-        if (!isGrounded || isJumping)
-        {
-            float gravity = characterData.gravity;
-            if (Rigid.velocity.y < 0) gravity *= characterData.fallMultiplier;
-            Rigid.AddForce(Vector3.up * gravity, ForceMode.Force);
-        }
+        // 지상에 있으면 중력 적용 불필요
+        if (isGrounded || !Rigid) return;
+
+        // 중력 계산
+        float gravityMultiplier = characterData.gravity;
+        if (Rigid.velocity.y < 0) // 떨어질 때
+            gravityMultiplier *= characterData.fallMultiplier;
+
+        // Rigidbody에 Force 적용
+        Rigid.AddForce(Vector3.up * gravityMultiplier, ForceMode.Acceleration);
     }
+
+
+
+
 
     //============================================================
     // 인벤토리/무기/카메라
@@ -481,7 +570,7 @@ public class PlayerController : CharacterBase
     private void Safe_OnAttackAnimationEnd()
     {
         isAttacking = false;
-        if (actSM.CurrentId == ActState.Attack || actSM.CurrentId == ActState.AttackReady)
+        if (actSM.CurrentId == ActState.Attack || actSM.CurrentId == ActState.AttackReady || actSM.CurrentId == ActState.QSkill || actSM.CurrentId == ActState.ESkill)
             actSM.Change(ActState.None);
     }
 

@@ -33,12 +33,77 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
-    m_Address: UltimateSkile_01
+    m_Address: QSkill_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 165130b8a71020641b870cab32d18c5e
-    m_Address: NormalSkile_01
+    m_Address: ESkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 945b55edfc0ad224ca4acd04e340617f
+    m_Address: JumpStart
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cfb019d410ec3e548bdfbf114377a8dc
+    m_Address: JumpLoop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c0acc043cdafb04cb29f8187edbcfb3
+    m_Address: JumpEnd
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 862b2a1105d0db04c862f29bddb2a1d3
+    m_Address: AirLightAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 06306af089d828d42b8d956986d0566c
+    m_Address: AirLightAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 95a3de4be921e854a8d93709eabe7371
+    m_Address: AirLightAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0e6b9883ce9ea5f46a60f6a94290d9cd
+    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_Start.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4ae407e3a48e9b44eb8ef963014a80a0
+    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_Keep.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4155c6de8599c904e9088576d146c0ef
+    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_End.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 46f7d5a4a9a960142be33846939fb7c1
+    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Inplace/GhostSamurai_Bow_Shoot_Loop_Inplace.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e08d96c87ff6194a99fd0a1ab48d381
+    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Start_Root.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 068958b08f4995543b1b46e32cb79812
+    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Idle_Root.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0003fe2ffe5fa7447bf9fab759a85990
+    m_Address: Assets/02.Scripts/Character/Weapon/GhostSamurai_Bow_Shoot_SP_End_Inplace.FBX
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -33,7 +33,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Skill",
+                    "name": "ESkill",
                     "type": "Button",
                     "id": "7fd75c02-8cb8-4a71-a759-485c1a8d66c0",
                     "expectedControlType": "Button",
@@ -42,7 +42,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Ultimate",
+                    "name": "QSkill",
                     "type": "Button",
                     "id": "bf504e2c-c50c-45cb-bf0a-79c4b7fa518c",
                     "expectedControlType": "Button",
@@ -235,7 +235,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Skill",
+                    "action": "ESkill",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -246,7 +246,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Ultimate",
+                    "action": "QSkill",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
