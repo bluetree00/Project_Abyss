@@ -58,32 +58,32 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 862b2a1105d0db04c862f29bddb2a1d3
-    m_Address: AirLightAttack_01
+    m_Address: Air_Light_Step01_Start
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 06306af089d828d42b8d956986d0566c
-    m_Address: AirLightAttack_02
+    m_Address: Air_Light_Step01_Loop
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 95a3de4be921e854a8d93709eabe7371
-    m_Address: AirLightAttack_03
+    m_Address: Air_Light_Step01_End
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0e6b9883ce9ea5f46a60f6a94290d9cd
-    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_Start.FBX
+    m_Address: Air_Light_Step02_Start
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4ae407e3a48e9b44eb8ef963014a80a0
-    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_Keep.FBX
+    m_Address: Air_Light_Step02_Loop
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4155c6de8599c904e9088576d146c0ef
-    m_Address: Assets/ThirdParty/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_End.FBX
+    m_Address: Air_Light_Step02_End
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

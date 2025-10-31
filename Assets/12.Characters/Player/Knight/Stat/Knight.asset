@@ -35,7 +35,7 @@ MonoBehaviour:
   jumpForce: 10
   gravity: -5
   fallMultiplier: 2
-  groundCheckDistance: 0.1
+  groundCheckDistance: 0.2
   hardLandingTimeThreshold: 0.8
   groundLayer:
     serializedVersion: 2

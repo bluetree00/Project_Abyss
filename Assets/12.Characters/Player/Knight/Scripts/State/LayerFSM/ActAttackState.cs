@@ -130,9 +130,7 @@ public class ActAttackState : ILayerState<ActState>
         _controller.OnAnimationEventTag(tag);
     }
 
-    private const string ATTACK_PHASE_PARAM = "attackPhase"; // 0=start, 1=loop, 2=end
-    private const string ATTACK_INDEX_PARAM = "attackIndex"; // optional
-    private const string PLAY_AIR_TRIGGER = "playAir";      // optional
+    private const string ATTACK_PHASE_PARAM = "AirLightAttackValue"; // 0=start, 1=loop, 2=end
 
     private void PlayCurrentComboAnimation()
     {
@@ -145,7 +143,7 @@ public class ActAttackState : ILayerState<ActState>
 
         string stepStr = (step + 1).ToString("00"); // 01, 02, ...
         string groundStateName = $"{action}Attack_{stepStr}";
-        string airStateName = $"Air{action}Attack_{stepStr}";
+        string airStateName = $"{action}Attack_{stepStr}";
 
         Animator anim = _controller.Anim;
         int layerIndex = 0; // Base Layer 기준, 필요 시 레이어 맞춤
@@ -155,6 +153,8 @@ public class ActAttackState : ILayerState<ActState>
         {
             // 지상 공격: 기존 clip 재생
             stateHash = Animator.StringToHash(groundStateName);
+
+        
 
             if (anim.HasState(layerIndex, stateHash))
             {
@@ -170,17 +170,13 @@ public class ActAttackState : ILayerState<ActState>
             // 공중 공격: BlendTree 상태 진입
             stateHash = Animator.StringToHash(airStateName);
 
+             Debug.Log($"[ActAttackState] Playing ground attack animation: {groundStateName}");
+
             if (anim.HasState(layerIndex, stateHash))
             {
                 anim.CrossFade(stateHash, 0.08f);
 
-                // BlendTree phase 초기화: Start
-                anim.SetInteger(ATTACK_PHASE_PARAM, 0);
-                // 현재 공격 스텝 저장(optional)
-                anim.SetInteger(ATTACK_INDEX_PARAM, step + 1);
-
-                // optional: trigger 사용 방식
-                // anim.SetTrigger(PLAY_AIR_TRIGGER);
+                anim.SetFloat("AirLightAttackValue", 1); // BlendTree 파라미터 설정
             }
             else
             {
