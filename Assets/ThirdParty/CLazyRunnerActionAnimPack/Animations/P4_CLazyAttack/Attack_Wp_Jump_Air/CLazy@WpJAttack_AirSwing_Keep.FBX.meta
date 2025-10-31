@@ -437,7 +437,7 @@ ModelImporter:
     second: CLazyRunner
   - first:
       74: 7400000
-    second: AirLightAttack_02
+    second: Air_Light_Step01_Loop
   - first:
       95: 9500000
     second: //RootNode
@@ -523,7 +523,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: AirLightAttack_02
+      name: Air_Light_Step01_Loop
       takeName: Take 001
       internalID: 0
       firstFrame: 0

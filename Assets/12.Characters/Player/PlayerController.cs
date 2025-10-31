@@ -458,17 +458,8 @@ public class PlayerController : CharacterBase
     public void ConsumeEnterAirAsJump()
     {
         EnterAirAsJump = false;
-        isJumping = false; // 점프 시작 후 플래그 해제
     }
 
-    //============================================================
-    // 공중 블렌드 트리 관련 유틸
-    //============================================================
-    public void SetAirBlend(float value)
-    {
-        if (Anim != null)
-            Anim.SetFloat("JumpBlend", value); // Air 전용 파라미터
-    }
 
     //============================================================
     // Ground 체크

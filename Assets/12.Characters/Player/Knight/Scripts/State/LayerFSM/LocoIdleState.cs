@@ -30,11 +30,18 @@ public class LocoIdleState : ILayerState<LocoState>
         SetSpeedParam(_controller.Anim, target, 0.12f);
 
 
-        // 전이
-        if (!_controller.IsGrounded())
+          // Air 전이
+        if (!_controller.IsGrounded() && !_controller.isJumping)
+        {
             _stateChanger.Change(LocoState.Air);
-        else if (target > 0.05f) // 데드존
+            return;
+        }
+
+        // Move 전이
+        if (target > 0.05f)
+        {
             _stateChanger.Change(LocoState.Move);
+        }
     }
 
     public void Exit() { }
