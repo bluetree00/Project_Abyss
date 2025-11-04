@@ -88,7 +88,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 46f7d5a4a9a960142be33846939fb7c1
-    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Inplace/GhostSamurai_Bow_Shoot_Loop_Inplace.FBX
+    m_Address: GroundLightBowAttack
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

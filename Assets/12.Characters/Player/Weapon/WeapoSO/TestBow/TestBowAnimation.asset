@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
-  m_Name: TestAnimation
+  m_Name: TestBowAnimation
   m_EditorClassIdentifier: 
   animGroups:
   - groupType: 0
     clipMappings:
     - baseClipName: GroundLightAttack_01
-      addressableKey: GroundLightAttack_01
+      addressableKey: GroundLightBowAttack
       actionType: 1
       comboIndex: 0
     - baseClipName: GroundLightAttack_02
-      addressableKey: GroundLightAttack_02
+      addressableKey: GroundLightBowAttack
       actionType: 1
       comboIndex: 0
     - baseClipName: GroundLightAttack_03
-      addressableKey: GroundLightAttack_03
+      addressableKey: GroundLightBowAttack
       actionType: 1
       comboIndex: 0
     - baseClipName: QSkill_01

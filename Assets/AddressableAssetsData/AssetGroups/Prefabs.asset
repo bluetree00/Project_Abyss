@@ -41,12 +41,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0edad3c37966be74299f96a1835c9dee
-    m_Address: Basic_Arrow_01
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - default
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 374490bfe1bd07842b945c91025ffee1
     m_Address: Bow_Charge_Effect_Heavy
     m_ReadOnly: 0
