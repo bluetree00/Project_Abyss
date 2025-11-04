@@ -38,7 +38,16 @@ public class WeaponEffectHandler
                     );
                     effectObj.transform.localScale *= e.scaleMultiplier;
 
-                    e.behavior?.ApplyEffectBehavior(effectObj, _player.transform);
+                    // EffectBehaviour가 없으면 자동으로 붙임
+                    var effectBehaviour = effectObj.GetComponent<EffectBehaviour>();
+                    if (effectBehaviour == null)
+                    {
+                        effectBehaviour = effectObj.AddComponent<EffectBehaviour>();
+                    }
+
+                    EffectBehaviorSO so = e.behavior;
+
+                    effectBehaviour.Initialize(so, _player.transform, e.lifeTimeMultiplier);
                 }
             }
 
@@ -81,18 +90,15 @@ public class WeaponEffectHandler
                             break;
                     }
 
-
                     var colliderInstance = colliderObj.AddComponent<ColliderInstance>();
                     colliderInstance.damage = c.damage;
                     colliderInstance.hitInterval = c.hitInterval;
-                    
-                    // 여기서 어빌리티 스텝 정보를 전달
                     colliderInstance.owner = _player.gameObject;
                     colliderInstance.actionType = actionType;
                     colliderInstance.payloadKey = c.payloadKey;
-                    colliderInstance.knockbackMultiplier = c.durationMultiplier; // 필요하면 다른 값 매핑
-                    colliderInstance.gameObject.SetActive(true);
+                    colliderInstance.knockbackMultiplier = c.durationMultiplier;
                     colliderInstance.duration = c.duration;
+                    colliderInstance.gameObject.SetActive(true);
                 }
 
                 c.behavior?.ApplyColliderBehavior(colliderObj, _player.transform);

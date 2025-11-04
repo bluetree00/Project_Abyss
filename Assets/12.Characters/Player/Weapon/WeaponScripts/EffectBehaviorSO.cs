@@ -1,33 +1,41 @@
+// EffectBehaviorSO.cs (기본에 OnDespawn 추가)
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/EffectBehaviorSO")]
-public class EffectBehaviorSO : ScriptableObject
+public class EffectBehaviorSO : ScriptableObject //상속을 통해 내부 기능을 확장하는것으로 다양한 공격 구현
 {
     [Header("Optional Parameters")]
-    public float moveSpeed = 0f;      // 전진 속도
-    public Vector3 rotationPerSecond; // 지속 회전 속도
-    public bool followTarget = false; // 타겟 추적 여부
+    public float moveSpeed = 0f;
+    public Vector3 rotationPerSecond;
+    public bool followTarget = false;
 
-    /// <summary>
-    /// 런타임 이펙트에 적용되는 동작
-    /// </summary>
-    public virtual void ApplyEffectBehavior(GameObject effectInstance, Transform owner)
+    public virtual void OnSpawn(GameObject effectInstance, Transform owner) { }
+
+    public virtual void OnUpdate(GameObject effectInstance, Transform owner, float deltaTime)
     {
         if (effectInstance == null) return;
 
-        // 예시: 전진
-        if (moveSpeed != 0f)
-        {
-            effectInstance.transform.position += owner.forward * moveSpeed * Time.deltaTime;
-        }
+        if (moveSpeed != 0f && owner != null)
+            effectInstance.transform.position += owner.forward * moveSpeed * deltaTime;
 
-        // 예시: 회전
-        effectInstance.transform.Rotate(rotationPerSecond * Time.deltaTime, Space.Self);
+        if (rotationPerSecond != Vector3.zero)
+            effectInstance.transform.Rotate(rotationPerSecond * deltaTime, Space.Self);
 
-        // 타겟 추적 (선택적)
         if (followTarget && owner != null)
         {
-            effectInstance.transform.LookAt(owner.position + Vector3.up * 1f);
+            var targetPos = owner.position + Vector3.up * 1f;
+            var dir = (targetPos - effectInstance.transform.position);
+            if (dir.sqrMagnitude > 0.001f)
+            {
+                effectInstance.transform.rotation = Quaternion.Slerp(
+                    effectInstance.transform.rotation,
+                    Quaternion.LookRotation(dir.normalized),
+                    Mathf.Clamp01(deltaTime * 10f)
+                );
+            }
         }
     }
+
+    // 반환/정리 시 호출 (파티클 Stop 등)
+    public virtual void OnDespawn(GameObject effectInstance, Transform owner) { }
 }

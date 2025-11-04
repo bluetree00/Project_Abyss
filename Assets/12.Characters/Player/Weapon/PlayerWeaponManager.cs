@@ -353,17 +353,57 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         try
         {
+            if (slotIndex < 0 || slotIndex >= SlotCount) return null;
             var slot = slots[slotIndex];
             var old = slot.runtimeData;
 
-            // 기존 장비 비활성화
-            if (slot.instance != null) slot.instance.SetActive(false);
+            // ---------- 1) 새 무기의 이펙트 풀을 미리 초기화 ----------
+            if (newRuntime != null && newRuntime.effectPackage != null)
+            {
+                try
+                {
+                    await Managers.Instance.InitializeWeaponEffectPoolsAsync(newRuntime.effectPackage, defaultPoolSizeForEffects);
+                    Debug.Log($"[PlayerWeaponManager] Initialized effect pools for replacement {newRuntime.displayName}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed during replace: {ex.Message}");
+                }
+            }
 
+            // ---------- 2) 기존 인스턴스 정리 (Addressables 인스턴스는 ReleaseInstance 호출) ----------
+            if (slot.instance != null)
+            {
+                try
+                {
+                    if (slot.isAddressablesInstance)
+                    {
+                        Addressables.ReleaseInstance(slot.instance);
+                    }
+                    else
+                    {
+                        // 런타임 생성된 일반 인스턴스이면 파괴
+                        UnityEngine.Object.Destroy(slot.instance);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[PlayerWeaponManager] Failed to release/ destroy old weapon instance: {ex.Message}");
+                }
+                finally
+                {
+                    slot.instance = null;
+                    slot.isAddressablesInstance = false;
+                }
+            }
+
+            // ---------- 3) 슬롯 데이터 교체 ----------
             slot.runtimeData = newRuntime;
-            slot.instance = null;
-            slot.isAddressablesInstance = false;
 
+            // ---------- 4) 새 장비를 즉시 장착(활성화)하고 애니메이션/이벤트 트리거 발생시키기 ----------
+            // EquipToSlotAsync 내부에서 instance 생성 및 SetCurrentSlotInternalAsync 호출됨
             await EquipToSlotAsync(slotIndex, newRuntime, true);
+
             return old;
         }
         finally
@@ -371,6 +411,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             _isSwitching = false;
         }
     }
+
 
     // ----------------------
     // 슬롯 교환

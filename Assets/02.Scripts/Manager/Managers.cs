@@ -168,7 +168,12 @@ public class Managers : MonoBehaviour
             "GroundLightAttack_03",
             "ESkill_01",
             "QSkill_01",
-          
+            "Air_Light_Step01_Start",
+            "Air_Light_Step01_Loop",
+            "Air_Light_Step01_End",
+            "GroundLightBowAttack"
+
+
         };
 
         await AnimationResources.PreloadClipsAsync(animKeys);
