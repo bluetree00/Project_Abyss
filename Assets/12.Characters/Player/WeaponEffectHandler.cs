@@ -31,9 +31,10 @@ public class WeaponEffectHandler
                 var e = s.effect;
                 if (!string.IsNullOrEmpty(e.payloadKey))
                 {
+                    
                     GameObject effectObj = Managers.ObjectPooler.SpawnFromPool(
                         e.payloadKey,
-                        handTransform.position + e.positionOffset,
+                        _player.transform.position + e.positionOffset,
                         Quaternion.Euler(e.rotationEuler)
                     );
                     effectObj.transform.localScale *= e.scaleMultiplier;

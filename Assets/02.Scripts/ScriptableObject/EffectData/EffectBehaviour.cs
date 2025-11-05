@@ -1,15 +1,15 @@
-// EffectBehaviour.cs
 using UnityEngine;
 
 [RequireComponent(typeof(Transform))]
 public class EffectBehaviour : MonoBehaviour
 {
-    public float lifetime = 1f; // 기본 생존 시간
-    public EffectBehaviorSO behaviorSO; // 이펙트 동작 정의 (optional)
-    public Transform owner; // 보통 플레이어/무기 같은 것
+    public float lifetime = 1f;
+    public EffectBehaviorSO behaviorSO;
+    public Transform owner;
 
     private float _elapsed;
     private bool _running;
+    private Vector3 _moveDirection; // 스폰 시 고정된 이동 방향
 
     private void OnEnable()
     {
@@ -25,41 +25,22 @@ public class EffectBehaviour : MonoBehaviour
         float dt = Time.deltaTime;
         _elapsed += dt;
 
-        // SO의 업데이트 로직 호출
-        behaviorSO?.OnUpdate(gameObject, owner, dt);
-
-        // (추가) 자체적인 업데이트 로직도 가능
-        // 예: lifetime 외의 조건으로 꺼야할 때
+        // SO의 업데이트 실행
+        behaviorSO?.OnUpdate(gameObject, owner, dt, _moveDirection);
 
         if (_elapsed >= lifetime)
-        {
             StopAndReturnToPool();
-        }
     }
 
-    /// <summary>
-    /// 이 이펙트를 즉시 중지하고 풀로 반환합니다.
-    /// </summary>
     public void StopAndReturnToPool()
     {
         if (!_running) return;
         _running = false;
 
         behaviorSO?.OnDespawn(gameObject, owner);
-
-        // 풀로 반환 (Managers.ObjectPooler은 사용자 구현)
         Managers.ObjectPooler.ReturnToPool(gameObject);
     }
 
-    private void OnDisable()
-    {
-        // 풀에서 비활성화 될 때 추가 정리 필요하면 여기에
-        _running = false;
-    }
-
-    /// <summary>
-    /// 외부에서 초기화 편의용 메서드
-    /// </summary>
     public void Initialize(EffectBehaviorSO so, Transform ownerTransform, float life)
     {
         behaviorSO = so;
@@ -67,5 +48,13 @@ public class EffectBehaviour : MonoBehaviour
         lifetime = life;
         _elapsed = 0f;
         _running = true;
+
+        // 스폰 시 플레이어의 정면을 이동 방향으로 고정
+        _moveDirection = owner != null ? owner.forward.normalized : transform.forward.normalized;
+
+        //이펙트의 정면을 x축 기준으로 맞춤
+        transform.rotation = Quaternion.LookRotation(owner.forward, Vector3.up) * Quaternion.Euler(0, -90f, 0);
+
+        behaviorSO?.OnSpawn(gameObject, owner);
     }
 }
