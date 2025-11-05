@@ -60,6 +60,9 @@ public class PlayerController : CharacterBase
     protected PlayerInputActions inputActions;
     public bool inputReady = false;
 
+    // PlayerController.cs (입력 시 클릭 위치 저장)
+    private Vector3? _lastClickedPosition;
+
     protected Vector3 moveDirection;
     public Vector3 MoveDirection => moveDirection;
 
@@ -339,6 +342,9 @@ public class PlayerController : CharacterBase
                 _attackPolicy?.OnStarted(this);
             else
                 Debug.Log("[Input] Attack started ignored - no weapon");
+            
+            if (Physics.Raycast(Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue()), out var hit, 100f, LayerMask.GetMask("Ground")))
+            _lastClickedPosition = hit.point;
         };
 
         inputActions.Player.Attack.started += _ => _attackPolicy?.OnStarted(this);
@@ -545,6 +551,23 @@ public class PlayerController : CharacterBase
 
     public void RotateTowardsMousePosition()
     {
+        // 1) 먼저 입력으로 저장된 클릭 위치가 있는지 확인 (우선 사용)
+        if (_lastClickedPosition.HasValue)
+        {
+            Vector3 target = _lastClickedPosition.Value;
+            Vector3 lookDir = target - transform.position;
+            lookDir.y = 0f;
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                transform.rotation = Quaternion.LookRotation(lookDir);
+            }
+
+            // 사용 후 소비: 이후 자동 회전을 방지하려면 null 처리
+            _lastClickedPosition = null;
+            return;
+        }
+
+        // 2) 저장된 클릭 위치가 없으면 기존 마우스 기반 레이캐스트 방식(fallback)
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
         if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
         {
@@ -554,6 +577,7 @@ public class PlayerController : CharacterBase
                 transform.rotation = Quaternion.LookRotation(lookDir);
         }
     }
+
 
     //============================================================
     // 안전 핸들러

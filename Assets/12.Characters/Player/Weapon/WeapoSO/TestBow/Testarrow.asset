@@ -15,6 +15,3 @@ MonoBehaviour:
   moveSpeed: 10
   rotationPerSecond: {x: 0, y: 0, z: 0}
   followTarget: 0
-  moveType: 0
-  speed: 5
-  lifetime: 1.5

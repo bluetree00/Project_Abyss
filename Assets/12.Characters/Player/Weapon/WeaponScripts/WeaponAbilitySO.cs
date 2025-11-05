@@ -51,6 +51,9 @@ public class WeaponAbilitySO : ScriptableObject
 
         [Tooltip("한번만 실행되는 스텝 여부")]
         public bool oneShot = false;
+        
+        [Tooltip("이 스텝 시작 시 플레이어가 마우스 방향으로 회전할지 여부")]
+        public bool rotateToMouse = false;
 
         [NonSerialized] public bool triggeredThisActivation = false;
     }
