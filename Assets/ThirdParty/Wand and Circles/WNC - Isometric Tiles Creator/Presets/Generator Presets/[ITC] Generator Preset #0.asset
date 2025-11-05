@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: '[ITC] Generator Preset #0'
   m_EditorClassIdentifier: 
   size_WidthRandom: 0
-  size_Width: 100
+  size_Width: 20
   size_Width_Min: 20
   size_Width_Max: 100
   size_LengthRandom: 0
-  size_Length: 100
+  size_Length: 20
   size_Length_Min: 20
   size_Length_Max: 100
   height_HeightRandom: 0
-  height_Height: 0
+  height_Height: 15
   height_Height_Min: 0
   height_Height_Max: 30
   height_ContrastRandom: 0
@@ -33,16 +33,16 @@ MonoBehaviour:
   filling_roadsChance: 0
   filling_roadsFilling: 0
   filling_roadsFenceChance: 0
-  mixingType: 0
+  mixingType: 2
   biomes:
   - Standard
   - Water - Standard
-  - Winter - Snows
-  - Sands - Beach
-  biome_water_seaLevel: 0
+  - Standard
+  - Standard
+  biome_water_seaLevel: 0.25
   biome_sands_thickness: 0.25
-  biome_sands_smoothness: 0.7222222
-  biome_snow_snowLevel: 0
+  biome_sands_smoothness: 0
+  biome_snow_snowLevel: 0.25
   zones_Random: 1
   zones: 50
   zones_Min: 5
