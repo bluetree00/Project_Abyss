@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25cd96051c7787441b73408b168d2eda, type: 3}
   m_Name: Testarrow
   m_EditorClassIdentifier: 
-  moveSpeed: 2
+  moveSpeed: 10
   rotationPerSecond: {x: 0, y: 0, z: 0}

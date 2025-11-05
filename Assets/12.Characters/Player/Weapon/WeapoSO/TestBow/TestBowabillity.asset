@@ -24,7 +24,7 @@ MonoBehaviour:
       rotationEuler: {x: 0, y: 0, z: 0}
       forwardOffset: {x: 0, y: 0, z: 0}
       scaleMultiplier: 1
-      lifeTimeMultiplier: 1
+      lifeTimeMultiplier: 10
       behavior: {fileID: 11400000, guid: 1cd8a3726e338964692c4c74532d96d0, type: 2}
     collider:
       payloadKey: 
