@@ -43,9 +43,35 @@ public class ActAttackState : ILayerState<ActState>
         // 현재 콤보 보정
         _controller.currentComboStep = Mathf.Clamp(_controller.currentComboStep, 0, _maxCombo - 1);
 
-        SubscribeReceiver();
-        PlayCurrentComboAnimation();
-    }
+         
+            // --- 어빌리티의 스텝별 rotateToMouse 검사 (안전하게) ---
+        if (wd != null && wd.abilitySet != null)
+        {
+            int effectIndex = _controller.currentComboStep; // ability index 보통 콤보 스텝과 매칭
+            var ability = wd.abilitySet.GetAbility(action, effectIndex);
+            if (ability != null)
+            {
+                // 검사할 stepIndex: 여기서는 진입 시점의 stepIndex로 0을 사용.
+                int checkStepIndex = 0;
+                var abilitySteps = ability.GetSteps(checkStepIndex);
+                if (abilitySteps != null && abilitySteps.Count > 0)
+                {
+                    // 하나라도 rotateToMouse면 회전
+                    foreach (var s in abilitySteps)
+                    {
+                        if (s != null && s.rotateToMouse)
+                        {
+                            _controller.RotateTowardsMousePosition();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+            SubscribeReceiver();
+            PlayCurrentComboAnimation();
+        }
 
     public void Update()
     {
