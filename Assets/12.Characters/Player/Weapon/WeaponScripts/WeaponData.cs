@@ -28,6 +28,8 @@ public class WeaponData
 
     public WeaponAbilitySetSO abilitySet;
 
+    public WeaponType weaponType = WeaponType.None; // Sword / Bow 기본
+
     // Runtime copies of effect/collider data (deep copies)
     public List<WeaponEffectData> effectDataList;
     public List<WeaponColliderData> colliderDataList;

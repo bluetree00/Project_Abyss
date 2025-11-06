@@ -93,6 +93,7 @@ public class Knight : PlayerController
                 return;
             }
             SetPendingAttack(Command.Light);
+            Debug.Log("[RouteInputsToLayers] Light attack input received.");
             actSM.Change(ActState.AttackReady);
             return;
         }

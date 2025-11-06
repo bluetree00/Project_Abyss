@@ -40,3 +40,4 @@ MonoBehaviour:
       behavior: {fileID: 0}
       colliderPrefabKey: 
     oneShot: 0
+    rotateToMouse: 0
