@@ -25,4 +25,7 @@ public class WeaponSO : ScriptableObject
 
     [Header("Ability Set")]
     public WeaponAbilitySetSO abilitySet;
+
+     [Header("타입 & 정책")]
+    public WeaponType weaponType = WeaponType.Sword;      // Sword / Bow / 나중에 추가
 }

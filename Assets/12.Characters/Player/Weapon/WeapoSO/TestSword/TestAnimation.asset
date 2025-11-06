@@ -22,11 +22,11 @@ MonoBehaviour:
     - baseClipName: GroundLightAttack_02
       addressableKey: GroundLightAttack_02
       actionType: 1
-      comboIndex: 0
+      comboIndex: 1
     - baseClipName: GroundLightAttack_03
       addressableKey: GroundLightAttack_03
       actionType: 1
-      comboIndex: 0
+      comboIndex: 2
     - baseClipName: QSkill_01
       addressableKey: QSkill_01
       actionType: 3

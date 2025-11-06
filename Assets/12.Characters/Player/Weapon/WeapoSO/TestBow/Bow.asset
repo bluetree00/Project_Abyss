@@ -19,9 +19,10 @@ MonoBehaviour:
   iconKey: "\uC544\uC9C1\uC5C6\uC74C"
   baseAttack: 10
   baseDefense: 10
-  groundEndCount: 1
+  groundEndCount: 3
   airEndCount: 3
   animationSet: {fileID: 11400000, guid: 0c7956163cdeda94eaa93e73dce12eaa, type: 2}
   effectPackage: {fileID: 11400000, guid: 7604366b65b80e149900239bd5f56519, type: 2}
   colliderPackage: {fileID: 11400000, guid: 40ca726e49d81b34f935026c0057bcb6, type: 2}
   abilitySet: {fileID: 11400000, guid: 1123aee89c710c74885c8a9b9298cdfb, type: 2}
+  weaponType: 2

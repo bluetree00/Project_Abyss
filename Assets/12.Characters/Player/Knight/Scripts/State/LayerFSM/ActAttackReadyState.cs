@@ -16,6 +16,13 @@ public class ActAttackReadyState : ILayerState<ActState>
 
     public void Enter()
     {
+        if (_controller.isAttacking)
+        {
+            Debug.Log("[ActAttackReadyState] Already attacking, aborting Enter.");
+            _stateChanger.Change(ActState.None); // 공격 중이면 바로 None으로
+            return;
+        }
+
         var isAir = !_controller.IsGrounded();
         _controller.SetMoveScale(0f);
 
@@ -42,9 +49,13 @@ public class ActAttackReadyState : ILayerState<ActState>
             _controller.CurrentAttackTypeForEffect = isAir ? WeaponActionType.AirLight : WeaponActionType.GroundLight;
         }
 
+        Debug.Log($"[ActAttackReadyState] Entered. isAir: {isAir}, AttackType: {_controller.CurrentAttackTypeForEffect}");
+        
+
         // 즉시 Attack 상태로 전환
         _stateChanger.Change(ActState.Attack);
     }
+
 
     public void Update() { }
     public void Exit() { }

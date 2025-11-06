@@ -9,14 +9,14 @@ public class WeaponEffectHandler
         _player = player;
     }
 
-    public void PlayEffect(WeaponActionType actionType, int effectIndex, int step = 0)
+    public void PlayEffect(WeaponActionType actionType, int currentComboIndex, int step = 0)
     {
         if (_player == null) return;
 
         var weaponData = _player.WeaponManager?.CurrentWeaponData;
         if (weaponData == null) return;
 
-        var ability = weaponData.abilitySet.GetAbility(actionType, effectIndex);
+        var ability = weaponData.abilitySet.GetAbility(actionType, currentComboIndex);
         var abilitySteps = ability?.GetSteps(step);
         if (abilitySteps == null || abilitySteps.Count == 0) return;
 

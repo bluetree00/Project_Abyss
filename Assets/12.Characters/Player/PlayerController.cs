@@ -263,14 +263,34 @@ public class PlayerController : CharacterBase
 
     private void AssignAttackPolicyForWeapon(WeaponData wd)
     {
-        if (wd == null) { _attackPolicy = null; return; }
+        if (wd == null) 
+        { 
+            _attackPolicy = null; 
+            return; 
+        }
 
-        var key = wd.weaponPrefabKey?.ToLowerInvariant() ?? "";
-        if (key.Contains("bow") || key.Contains("arch") || (wd.abilitySet != null && wd.abilitySet.name.ToLower().Contains("bow")))
-            _attackPolicy = new BowAttackPolicy();
-        else
-            _attackPolicy = new SwordAttackPolicy();
+        switch (wd.weaponType)
+        {
+            case WeaponType.Sword:
+                _attackPolicy = new SwordAttackPolicy();
+                break;
+
+            case WeaponType.Bow:
+                _attackPolicy = new BowAttackPolicy();
+                break;
+
+            // 나중에 추가 타입
+            // case WeaponType.Axe:
+            //     _attackPolicy = new AxeAttackPolicy();
+            //     break;
+
+            default:
+                _attackPolicy = new SwordAttackPolicy();
+                Debug.LogWarning($"[PlayerController] 정의되지 않은 무기 타입({wd.weaponType}) - 기본 SwordAttackPolicy 적용");
+                break;
+        }
     }
+
 
     private void InitCoreComponents()
     {
@@ -604,9 +624,9 @@ public class PlayerController : CharacterBase
         if (EffectHandler != null && WeaponManager.HasWeapon)
         {
             var actionType = CurrentAttackTypeForEffect; // Light, Heavy, QSkill 등
-            int effectIndex = currentComboStep;
-            Debug.Log($"ActionType={actionType}, EffectIndex={effectIndex}, Step={step}");
-            EffectHandler.PlayEffect(actionType, effectIndex, step);
+            int currentComboIndex = currentComboStep;
+            Debug.Log($"ActionType={actionType}, EffectIndex={currentComboIndex}, Step={step}");
+            EffectHandler.PlayEffect(actionType, currentComboIndex, step);
         }
     }
 
