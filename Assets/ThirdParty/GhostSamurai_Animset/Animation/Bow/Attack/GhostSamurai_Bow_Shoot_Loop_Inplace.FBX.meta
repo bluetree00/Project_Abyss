@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: ea88c1cbbc57198499ce3da9463baea4
+guid: 75802d7dafb25944497bc20c3335734f
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable:
@@ -485,7 +485,7 @@ ModelImporter:
     second: root
   - first:
       74: 7400000
-    second: AutoBackup01
+    second: Take 001
   - first:
       74: 7400002
     second: GroundLightAttack_02
@@ -511,36 +511,34 @@ ModelImporter:
     rigImportErrors: 
     rigImportWarnings: "Copied Avatar Rig Configuration mis-match. Bone length in
       copied configuration does not match position in animation file:\n\t'calf_l'
-      : position error = 2.984782 mm\n\t'foot_l' : position error = 4.461095 mm\n\t'calf_r'
-      : position error = 4.205194 mm\n\t'foot_r' : position error = 4.025453 mm\n"
+      : position error = 1.173761 mm\n\t'foot_l' : position error = 1.667513 mm\n\t'calf_r'
+      : position error = 1.728105 mm\n\t'foot_r' : position error = 3.227152 mm\n"
     animationImportErrors: 
-    animationImportWarnings: "\nClip 'AutoBackup01' has import animation warnings
-      that might lower retargeting quality:\nNote: Activate translation DOF on avatar
+    animationImportWarnings: "\nClip 'Take 001' has import animation warnings that
+      might lower retargeting quality:\nNote: Activate translation DOF on avatar
       to improve retargeting quality.\n\t'spine_02' has translation animation that
       will be discarded.\n\t'clavicle_l' has translation animation that will be discarded.\n\t'upperarm_l'
       has translation animation that will be discarded.\n\t'lowerarm_l' has translation
       animation that will be discarded.\n\t'hand_l' has translation animation that
-      will be discarded.\n\t'index_01_l' has translation animation that will be discarded.\n\t'index_02_l'
-      has translation animation that will be discarded.\n\t'index_03_l' has translation
-      animation that will be discarded.\n\t'middle_01_l' has translation animation
-      that will be discarded.\n\t'middle_02_l' has translation animation that will
-      be discarded.\n\t'middle_03_l' has translation animation that will be discarded.\n\t'pinky_01_l'
-      has translation animation that will be discarded.\n\t'pinky_02_l' has translation
-      animation that will be discarded.\n\t'pinky_03_l' has translation animation
-      that will be discarded.\n\t'ring_01_l' has translation animation that will
-      be discarded.\n\t'ring_02_l' has translation animation that will be discarded.\n\t'ring_03_l'
-      has translation animation that will be discarded.\n\t'thumb_01_l' has translation
-      animation that will be discarded.\n\t'thumb_02_l' has translation animation
-      that will be discarded.\n\t'thumb_03_l' has translation animation that will
-      be discarded.\n\t'clavicle_r' has translation animation that will be discarded.\n\t'upperarm_r'
+      will be discarded.\n\t'clavicle_r' has translation animation that will be discarded.\n\t'upperarm_r'
       has translation animation that will be discarded.\n\t'lowerarm_r' has translation
       animation that will be discarded.\n\t'hand_r' has translation animation that
-      will be discarded.\n\t'head' has translation animation that will be discarded.\n\t'calf_l'
+      will be discarded.\n\t'index_01_r' has translation animation that will be discarded.\n\t'index_02_r'
+      has translation animation that will be discarded.\n\t'index_03_r' has translation
+      animation that will be discarded.\n\t'middle_01_r' has translation animation
+      that will be discarded.\n\t'middle_02_r' has translation animation that will
+      be discarded.\n\t'middle_03_r' has translation animation that will be discarded.\n\t'pinky_01_r'
+      has translation animation that will be discarded.\n\t'pinky_02_r' has translation
+      animation that will be discarded.\n\t'pinky_03_r' has translation animation
+      that will be discarded.\n\t'ring_01_r' has translation animation that will
+      be discarded.\n\t'ring_02_r' has translation animation that will be discarded.\n\t'ring_03_r'
+      has translation animation that will be discarded.\n\t'thumb_01_r' has translation
+      animation that will be discarded.\n\t'thumb_02_r' has translation animation
+      that will be discarded.\n\t'thumb_03_r' has translation animation that will
+      be discarded.\n\t'head' has translation animation that will be discarded.\n\t'calf_l'
       has translation animation that will be discarded.\n\t'foot_l' has translation
-      animation that will be discarded.\n\t'ball_l' has translation animation that
-      will be discarded.\n\t'calf_r' has translation animation that will be discarded.\n\t'foot_r'
-      has translation animation that will be discarded.\n\t'ball_r' has translation
-      animation that will be discarded.\n"
+      animation that will be discarded.\n\t'calf_r' has translation animation that
+      will be discarded.\n\t'foot_r' has translation animation that will be discarded.\n"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -555,10 +553,10 @@ ModelImporter:
     clipAnimations:
     - serializedVersion: 16
       name: GroundLightAttack_02
-      takeName: GhostSamurai_APose_Attack03_2_Inplace
+      takeName: GhostSamurai_Bow_Shoot_Loop_Inplace
       internalID: 0
-      firstFrame: 456
-      lastFrame: 636
+      firstFrame: 380
+      lastFrame: 460
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -578,15 +576,22 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.25373134
+      - time: 0.118120804
         functionName: AE_EffectStep
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.8885867
+      - time: 1
         functionName: AE_AttackEnd
+        data: 
+        objectReferenceParameter: {instanceID: 0}
+        floatParameter: 0
+        intParameter: 0
+        messageOptions: 0
+      - time: 0
+        functionName: AE_OpenCombo
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0

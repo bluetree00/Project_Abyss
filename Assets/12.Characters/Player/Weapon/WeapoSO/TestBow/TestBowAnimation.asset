@@ -16,17 +16,13 @@ MonoBehaviour:
   - groupType: 0
     clipMappings:
     - baseClipName: GroundLightAttack_01
-      addressableKey: GroundLightAttack_01
+      addressableKey: GroundLightBowAttack_01
       actionType: 1
       comboIndex: 0
     - baseClipName: GroundLightAttack_02
-      addressableKey: GroundLightAttack_02
+      addressableKey: GroundLightBowAttack_02
       actionType: 1
-      comboIndex: 0
-    - baseClipName: GroundLightAttack_03
-      addressableKey: GroundLightAttack_03
-      actionType: 1
-      comboIndex: 0
+      comboIndex: 1
     - baseClipName: QSkill_01
       addressableKey: QSkill_01
       actionType: 3
