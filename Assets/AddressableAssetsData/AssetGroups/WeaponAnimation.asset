@@ -88,7 +88,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 46f7d5a4a9a960142be33846939fb7c1
-    m_Address: GroundLightBowAttack
+    m_Address: GroundLightBowAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -104,6 +104,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0003fe2ffe5fa7447bf9fab759a85990
     m_Address: Assets/02.Scripts/Character/Weapon/GhostSamurai_Bow_Shoot_SP_End_Inplace.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 75802d7dafb25944497bc20c3335734f
+    m_Address: GroundLightBowAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

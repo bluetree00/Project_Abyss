@@ -171,7 +171,9 @@ public class Managers : MonoBehaviour
             "Air_Light_Step01_Start",
             "Air_Light_Step01_Loop",
             "Air_Light_Step01_End",
-            "GroundLightBowAttack"
+            "GroundLightBowAttack_01",
+            "GroundLightBowAttack_02"
+            
 
 
         };
@@ -282,6 +284,7 @@ public class Managers : MonoBehaviour
     }
 
     /// <summary>
+    /// 
     /// 매니저 초기화 해제
     /// </summary>
     public static void Clear()

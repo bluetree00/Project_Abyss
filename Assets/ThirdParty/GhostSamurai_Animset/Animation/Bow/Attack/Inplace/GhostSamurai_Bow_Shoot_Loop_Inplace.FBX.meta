@@ -488,7 +488,7 @@ ModelImporter:
     second: Take 001
   - first:
       74: 7400002
-    second: GhostSamurai_Bow_Shoot_Loop_Inplace
+    second: GroundLightAttack_01
   - first:
       95: 9500000
     second: //RootNode
@@ -552,7 +552,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: GhostSamurai_Bow_Shoot_Loop_Inplace
+      name: GroundLightAttack_01
       takeName: GhostSamurai_Bow_Shoot_Loop_Inplace
       internalID: 0
       firstFrame: 380
@@ -576,7 +576,7 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0
+      - time: 0.06621923
         functionName: AE_EffectStep
         data: 
         objectReferenceParameter: {instanceID: 0}

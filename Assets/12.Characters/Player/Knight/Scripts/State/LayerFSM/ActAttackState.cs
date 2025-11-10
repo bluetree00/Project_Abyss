@@ -1,5 +1,6 @@
-// ActAttackState.cs
+// ActAttackState.cs (콤보는 baseClipName 우선, addressableKey 무시 버전)
 using System;
+using System.Linq;
 using UnityEngine;
 using Game.Inputs;
 using Game.Utility.Extensions;
@@ -22,6 +23,7 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Enter()
     {
+         _attackEndHandled = false;
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
 
         if (!_controller.isAttacking)
@@ -32,29 +34,29 @@ public class ActAttackState : ILayerState<ActState>
             _controller.SetMoveScale(0f); // 이동 제한
         }
 
-        // --- 공격 타입 이미 AttackReady에서 결정됨 ---
         var action = _controller.CurrentAttackTypeForEffect;
-
-        // 무기 정보 기반 최대 콤보 계산
         var wd = _controller.WeaponManager?.CurrentWeaponData;
         bool isAir = !_controller.IsGrounded();
         _maxCombo = wd != null ? (isAir ? Mathf.Max(1, wd.airEndCount) : Mathf.Max(1, wd.groundEndCount)) : 1;
 
-        // 현재 콤보 보정
-        _controller.currentComboStep = Mathf.Clamp(_controller.currentComboStep, 0, _maxCombo - 1);
-
-
-            SubscribeReceiver();
-            PlayCurrentComboAnimation();
+         // <-- 여기서 콤보 창을 미리 연다 (애니 이벤트에 의존하지 않음)
+        // 이미 열려 있지 않다면 열고 만료시간 설정
+        if (!_controller.comboWindowOpen)
+        {
+            _controller.OpenComboWindow();
+            _comboExpiryTime = Time.unscaledTime + _comboWindowSec;
         }
+
+
+        SubscribeReceiver();
+        PlayCurrentComboAnimation();
+    }
 
     public void Update()
     {
-        // 콤보 입력 처리
         if (_controller.comboWindowOpen && _controller.InputBuffer.TryConsume(Command.Light))
             _controller.nextComboQueued = true;
 
-        // 콤보 시간 만료
         if (_controller.comboWindowOpen && Time.unscaledTime >= _comboExpiryTime)
         {
             _controller.comboWindowOpen = false;
@@ -65,11 +67,14 @@ public class ActAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
+
+        _attackEndHandled = false;
         _controller.isAttacking = false;
         _controller.nextComboQueued = false;
         _controller.comboWindowOpen = false;
         _controller.SetMoveScale(1f);
         _comboExpiryTime = 0f;
+
     }
 
     private void SubscribeReceiver()
@@ -95,10 +100,16 @@ public class ActAttackState : ILayerState<ActState>
     private void OnOpenCombo()
     {
         if (!_controller.isAttacking) return;
-        _controller.OpenComboWindow();
+
+        // idempotent: 이미 열려 있으면 만료시간만 연장
+        if (!_controller.comboWindowOpen)
+        {
+            _controller.OpenComboWindow();
+        }
+
+        // 애니에서 콤보 창을 열어주는 경우 만료시간 연장 또는 재설정
         _comboExpiryTime = Time.unscaledTime + _comboWindowSec;
     }
-
     private void OnCloseCombo()
     {
         if (!_controller.isAttacking) return;
@@ -106,18 +117,22 @@ public class ActAttackState : ILayerState<ActState>
         _comboExpiryTime = 0f;
     }
 
+        private bool _attackEndHandled = false;
+
     private void OnAttackEnd()
     {
+
         _controller.currentComboStep++;
 
-        // 최대 콤보 체크
         if (_controller.currentComboStep >= _maxCombo)
         {
             _controller.currentComboStep = 0;
             _controller.CloseComboWindow();
             _stateChanger.Change(ActState.None);
         }
+
     }
+
 
     private void OnHitStep(int stepIndex)
     {
@@ -131,68 +146,96 @@ public class ActAttackState : ILayerState<ActState>
         _controller.OnAnimationEventTag(tag);
     }
 
-
-
+    // --------- 수정된 Play 함수 (오직 baseClipName 또는 fallback 사용) ----------
     private void PlayCurrentComboAnimation()
     {
         if (_controller == null || _controller.Anim == null)
             return;
 
-        int step = _controller.currentComboStep;
+        int step = _controller.currentComboStep; // 0-based
         var action = _controller.CurrentAttackTypeForEffect;
         bool isAir = !_controller.IsGrounded();
 
-        string stepStr = (step + 1).ToString("00"); // 01, 02, ...
-        string groundStateName = $"{action}Attack_{stepStr}";
-        string airStateName = $"{action}Attack_{stepStr}";
+        // 1) 매핑에서 baseClipName을 찾아서 사용 (addressableKey 무시)
+        string mappedBaseName = TryGetMappedBaseClipName(step, action, isAir);
+
+        // 2) fallback 네이밍 (요구하신 형식)
+        string fallbackStateName = $"{action}Attack_{(step + 1).ToString("00")}";
+
+        string stateToPlay = !string.IsNullOrEmpty(mappedBaseName) ? mappedBaseName : fallbackStateName;
 
         Animator anim = _controller.Anim;
-        int layerIndex = 0; // Base Layer 기준, 필요 시 레이어 맞춤
-        int stateHash;
-        
+        int layerIndex = 0;
+        int stateHash = Animator.StringToHash(stateToPlay);
+
         if (!isAir)
         {
-            // 지상 공격: 기존 clip 재생
-            stateHash = Animator.StringToHash(groundStateName);
-
-        
-
             if (anim.HasState(layerIndex, stateHash))
             {
                 anim.CrossFade(stateHash, 0.08f);
-                // anim.Update(0f); // 즉시 적용
-                // anim.Play(stateHash, layerIndex, 0f); // 상태 초기화
-                // Debug.Log($"[ActAttackState] Forced play state: {groundStateName}");
             }
             else
             {
-                Debug.LogWarning($"Animator state not found: {groundStateName}");
+                // fallback이 이미 fallbackStateName이면 더이상 시도할 게 없음
+                if (stateToPlay != fallbackStateName)
+                {
+                    int fallbackHash = Animator.StringToHash(fallbackStateName);
+                    if (anim.HasState(layerIndex, fallbackHash))
+                    {
+                        anim.CrossFade(fallbackHash, 0.08f);
+                        Debug.Log($"[ActAttackState] Fallback to hardcoded ground state: {fallbackStateName}");
+                        return;
+                    }
+                }
+                Debug.LogWarning($"Animator state not found: {stateToPlay}");
             }
         }
         else
         {
-            // 공중 공격: BlendTree 상태 진입
-            stateHash = Animator.StringToHash(airStateName);
-
-             Debug.Log($"[ActAttackState] Playing ground attack animation: {groundStateName}");
-
             if (anim.HasState(layerIndex, stateHash))
             {
                 anim.CrossFade(stateHash, 0.08f);
-
-                anim.SetFloat("AirLightAttackValue", 1); // BlendTree 파라미터 설정
+                // 공중 블렌드 파라미터는 프로젝트에 따라 Animator에 정의되어 있어야 함.
+                // 파라미터가 없으면 Unity가 경고를 띄우지만 런타임 에러는 발생하지 않습니다.
+                anim.SetFloat("AirLightAttackValue", 1f);
             }
             else
             {
-                Debug.LogWarning($"Air blend state not found: {airStateName}, fallback to ground state.");
-
-                // fallback: 지상 clip이 존재하면 재생
-                int fallbackHash = Animator.StringToHash(groundStateName);
+                int fallbackHash = Animator.StringToHash(fallbackStateName);
                 if (anim.HasState(layerIndex, fallbackHash))
+                {
                     anim.CrossFade(fallbackHash, 0.08f);
+                    Debug.Log($"[ActAttackState] Air state not found ({stateToPlay}), fallback to ground {fallbackStateName}");
+                }
+                else
+                {
+                    Debug.LogWarning($"Air blend state not found: {stateToPlay} and fallback {fallbackStateName} not found.");
+                }
             }
         }
     }
 
+    /// <summary>
+    /// 매핑에서 baseClipName만 반환합니다. addressableKey는 무시.
+    /// comboStep은 0-based로 처리됩니다.
+    /// </summary>
+    private string TryGetMappedBaseClipName(int comboStep, WeaponActionType action, bool isAir)
+    {
+        var wd = _controller.WeaponManager?.CurrentWeaponData;
+        if (wd == null) return null;
 
+        // 실제 프로퍼티 이름을 프로젝트에 맞게 바꾸세요 (예: wd.animationSet 등)
+        var animSet = wd.animationSet as WeaponAnimationSetSO;
+        if (animSet == null) return null;
+
+        WeaponAnimGroup group = isAir ? WeaponAnimGroup.Air : WeaponAnimGroup.Ground;
+        var candidates = animSet.GetMappings(group, action);
+
+        // comboIndex가 0-based로 저장되어 있다고 가정
+        var mapping = candidates.FirstOrDefault(m => m.comboIndex == comboStep);
+        if (mapping != null && !string.IsNullOrEmpty(mapping.baseClipName))
+            return mapping.baseClipName;
+
+        return null;
+    }
 }
