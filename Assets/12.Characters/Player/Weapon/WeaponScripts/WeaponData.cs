@@ -3,6 +3,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum PromoteMode
+{
+    None,       // 차지/강화 없음
+    Stage,      // 단계별 강화
+    ChargeFull  // 일정 시간 누르면 최대 강화
+}
+
 /// <summary>
 /// 런타임 Weapon 데이터
 /// - ScriptableObject WeaponSO 기반 생성
@@ -17,6 +24,10 @@ public class WeaponData
     public string iconKey;
     public float baseAttack;
     public float baseDefense;
+    public float holdThreshold;
+
+    public PromoteMode promoteMode;    // 차지/강화 공격 단계 방식
+    public int chargeStages;           // 차지 공격 단계 수
 
     public int groundEndCount;
     public int airEndCount;
@@ -44,6 +55,12 @@ public class WeaponData
         iconKey = so.iconKey;
         baseAttack = so.baseAttack;
         baseDefense = so.baseDefense;
+        holdThreshold = so.holdThreshold;
+
+        promoteMode = so.promoteMode;   // 추가
+        chargeStages = so.chargeStages; // 추가
+
+        weaponType = so.weaponType;
 
         groundEndCount = so.groundEndCount;
         airEndCount = so.airEndCount;

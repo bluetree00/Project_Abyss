@@ -26,6 +26,11 @@ public class WeaponSO : ScriptableObject
     [Header("Ability Set")]
     public WeaponAbilitySetSO abilitySet;
 
-     [Header("타입 & 정책")]
+    [Header("타입 & 정책")]
     public WeaponType weaponType = WeaponType.Sword;      // Sword / Bow / 나중에 추가
+
+    [Header("차지/강화 공격 설정")]
+    public float holdThreshold;
+    public PromoteMode promoteMode = PromoteMode.None;    // None, Stage, ChargeFull
+    public int chargeStages = 1;                          // 차지 공격 단계 수
 }

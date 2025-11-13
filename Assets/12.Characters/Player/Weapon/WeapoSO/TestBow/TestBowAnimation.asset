@@ -51,3 +51,11 @@ MonoBehaviour:
       addressableKey: Air_Light_Step01_End
       actionType: 5
       comboIndex: 0
+    - baseClipName: Air_Light_Step01_End
+      addressableKey: Air_Light_Step01_End
+      actionType: 5
+      comboIndex: 0
+    - baseClipName: HeavyCharge
+      addressableKey: BowHeavyCharge
+      actionType: 2
+      comboIndex: 0

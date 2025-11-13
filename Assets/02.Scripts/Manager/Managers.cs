@@ -172,8 +172,12 @@ public class Managers : MonoBehaviour
             "Air_Light_Step01_Loop",
             "Air_Light_Step01_End",
             "GroundLightBowAttack_01",
-            "GroundLightBowAttack_02"
-            
+            "GroundLightBowAttack_02",
+            "HeavyCharge",
+            "GroundHeavyAttack",
+            "BowHeavyCharge",
+
+
 
 
         };
