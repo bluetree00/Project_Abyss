@@ -272,17 +272,24 @@ public class PlayerController : CharacterBase
         switch (wd.weaponType)
         {
             case WeaponType.Sword:
-                _attackPolicy = new SwordAttackPolicy();
+                // SwordData에서 holdThreshold, promoteMode 읽어 적용
+                if (wd is WeaponData swordData)
+                {
+                    _attackPolicy = new SwordAttackPolicy(
+                            enterThreshold: 2f,                 // 필요시 wd에서 읽어 사용
+                            fullThreshold: wd.holdThreshold,
+                            maxChargeStage: wd.chargeStages
+                    );
+                }
+                else
+                {
+                    _attackPolicy = new SwordAttackPolicy(); // fallback
+                }
                 break;
 
             case WeaponType.Bow:
                 _attackPolicy = new BowAttackPolicy();
                 break;
-
-            // 나중에 추가 타입
-            // case WeaponType.Axe:
-            //     _attackPolicy = new AxeAttackPolicy();
-            //     break;
 
             default:
                 _attackPolicy = new SwordAttackPolicy();

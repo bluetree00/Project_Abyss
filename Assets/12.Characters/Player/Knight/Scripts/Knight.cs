@@ -24,9 +24,11 @@ public class Knight : PlayerController
         locoSM.Register(LocoState.Dodge, new LocoDodgeState());
 
         // Action 상태 등록
-        actSM.Register(ActState.None,        new ActNoneState());
-        actSM.Register(ActState.AttackReady, new ActAttackReadyState());
-        actSM.Register(ActState.Attack,      new ActAttackState());
+        actSM.Register(ActState.None,         new ActNoneState());
+        actSM.Register(ActState.AttackReady,  new ActAttackReadyState());
+        actSM.Register(ActState.Attack,       new ActAttackState());
+        actSM.Register(ActState.Charge,       new ActAttackChargeState());
+        actSM.Register(ActState.HeavyAttack,  new ActHeavyAttackState());
         actSM.Register(ActState.QSkill,       new ActQSkillState());
         actSM.Register(ActState.ESkill,       new ActESkillState());
 
@@ -69,6 +71,19 @@ public class Knight : PlayerController
             locoSM.Change(LocoState.Dodge);
             return;
         }
+
+        // RouteInputsToLayers 또는 매 프레임 입력 라우팅 위치
+        if (InputBuffer != null && InputBuffer.TryConsume(Game.Inputs.Command.Charge))
+        {
+            if (!CanAttack())
+            {
+                Debug.Log("[RouteInputsToLayers] Charge ignored - no weapon");
+                return;
+            }
+            actSM.Change(ActState.Charge);
+            return; // Charge는 모으기 우선 처리
+        }
+
 
 
             // 공격 입력: Heavy 우선 검사

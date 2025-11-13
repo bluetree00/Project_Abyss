@@ -26,13 +26,14 @@ public class ActAttackReadyState : ILayerState<ActState>
         var isAir = !_controller.IsGrounded();
         _controller.SetMoveScale(0f);
 
+        // 매핑: (지상/공중) × (Light/Heavy) -> WeaponActionType
+        WeaponActionType atype;
+
         // --- 입력 기반 PendingAttack 읽기 ---
         if (_controller.HasPendingAttack)
         {
             var pending = _controller.PendingAttackCommand;
 
-            // 매핑: (지상/공중) × (Light/Heavy) -> WeaponActionType
-            WeaponActionType atype;
             if (isAir)
                 atype = (pending == Command.Heavy) ? WeaponActionType.AirHeavy : WeaponActionType.AirLight;
             else
@@ -46,16 +47,18 @@ public class ActAttackReadyState : ILayerState<ActState>
         else
         {
             // 안전장치: 기본 라이트/지상
-            _controller.CurrentAttackTypeForEffect = isAir ? WeaponActionType.AirLight : WeaponActionType.GroundLight;
+            atype = isAir ? WeaponActionType.AirLight : WeaponActionType.GroundLight;
+            _controller.CurrentAttackTypeForEffect = atype;
         }
 
         Debug.Log($"[ActAttackReadyState] Entered. isAir: {isAir}, AttackType: {_controller.CurrentAttackTypeForEffect}");
-        
 
-        // 즉시 Attack 상태로 전환
-        _stateChanger.Change(ActState.Attack);
+        // --- 여기서 분기: Heavy이면 Heavy 상태로, 아니면 일반 Attack 상태로 ---
+        if (atype == WeaponActionType.GroundHeavy || atype == WeaponActionType.AirHeavy)
+            _stateChanger.Change(ActState.HeavyAttack);
+        else
+            _stateChanger.Change(ActState.Attack);
     }
-
 
     public void Update() { }
     public void Exit() { }

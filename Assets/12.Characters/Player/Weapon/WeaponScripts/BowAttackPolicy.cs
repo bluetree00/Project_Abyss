@@ -1,22 +1,45 @@
 using System;
 using UnityEngine;
+using Game.Inputs;
+
 /// <summary>
-/// 활: 짧게 누르면 QuickShot(Light), 길게 당기면 Charged(Heavy) — 실전: started에서 charge start, canceled에서 판단
-/// - started: 시작 시간 저장
-/// - canceled: release 시점에서 Light/Heavy Push
-/// - Tick: (옵션) charge 진행도에 따라 이펙트/사운드
+/// SwordAttackPolicy - enterThreshold(모으기 진입 지연) + fullThreshold(강공격 확정)
+/// - enterThreshold 미만: 짧은 탭(바로 라이트)
+/// - enterThreshold 이상: 모으기 시작 표시 (한 번만 Command.Charge 푸시)
+/// - fullThreshold 도달: 강공격 확정 -> Pending(Heavy) 설정 (한 번만)
+/// - OnCanceled: 이미 강공격이 확정되었으면 중복 방지, 아니면 라이트 푸시(또는 Pending)
 /// </summary>
 public class BowAttackPolicy : IAttackInputPolicy
 {
+    private readonly float _enterThreshold;  
+    private readonly float _fullThreshold;   
+    private readonly int _maxChargeStage;
+
     private float _startTime;
     private bool _holding;
-    private readonly float _chargeThreshold = 0.5f; // 0.5초 이상이면 강한 샷(Heavy)
+    private bool _chargingStarted;
+    private bool _promoted;
+
+    private int _currentStage;
+    public int CurrentStage => _currentStage;
+
+    public BowAttackPolicy(float enterThreshold = 0.5f, float fullThreshold = 2f, int maxChargeStage = 2)
+    {
+        _enterThreshold = Mathf.Max(0f, enterThreshold);
+        _fullThreshold = Mathf.Max(0f, fullThreshold);
+        _maxChargeStage = Mathf.Max(1, maxChargeStage);
+    }
 
     public void OnStarted(PlayerController c)
     {
+        if (c.isAttacking)
+            return; // 공격 중이면 무시
+
         _holding = true;
         _startTime = Time.unscaledTime;
-        // 예: charge effect 시작
+        _chargingStarted = false;
+        _promoted = false;
+        _currentStage = 1;
     }
 
     public void OnCanceled(PlayerController c)
@@ -25,24 +48,44 @@ public class BowAttackPolicy : IAttackInputPolicy
         _holding = false;
 
         float held = Time.unscaledTime - _startTime;
-        if (held >= _chargeThreshold)
+
+        if (held >= _fullThreshold)
         {
-            // Charged shot => Heavy
-            c.InputBuffer.Push(Game.Inputs.Command.Heavy);
-            Debug.Log("[BowPolicy] Charged -> Heavy (held=" + held.ToString("F2") + ")");
+            _currentStage = _maxChargeStage;
+            c.SetPendingAttack(Command.Heavy);
+            c.InputBuffer.Push(Command.Heavy);
+            Debug.Log($"[BowPolicy] Released -> Heavy attack (held={held:F2})");
         }
         else
         {
-            // Quick shot => Light
-            c.InputBuffer.Push(Game.Inputs.Command.Light);
-            Debug.Log("[BowPolicy] Quick -> Light (held=" + held.ToString("F2") + ")");
+            _currentStage = 1;
+            c.SetPendingAttack(Command.Light);
+            c.InputBuffer.Push(Command.Light);
+            Debug.Log($"[BowPolicy] Released -> Light attack (held={held:F2})");
         }
     }
 
     public void Tick(PlayerController c, float dt)
     {
-        if (!_holding) return;
+        if (!_holding || c.isAttacking) return;
+
         float held = Time.unscaledTime - _startTime;
-        // (옵션) show charge progress, cap, play sound etc.
+
+        // 모으기 표시 (enterThreshold)
+        if (!_chargingStarted && held >= _enterThreshold)
+        {
+            _chargingStarted = true;
+            c.InputBuffer.Push(Command.Charge);
+            Debug.Log($"[BowPolicy] Charging started (held={held:F2})");
+        }
+
+        // 강공격 Pending 설정 (fullThreshold)
+        if (!_promoted && held >= _fullThreshold)
+        {
+            _promoted = true;
+            _currentStage = _maxChargeStage;
+            c.SetPendingAttack(Command.Heavy);
+            Debug.Log($"[BowPolicy] Full charge reached -> Heavy Pending (held={held:F2})");
+        }
     }
 }

@@ -55,3 +55,15 @@ MonoBehaviour:
       addressableKey: Air_Light_Step01_End
       actionType: 5
       comboIndex: 0
+    - baseClipName: HeavyCharge
+      addressableKey: HeavyCharge
+      actionType: 2
+      comboIndex: 0
+    - baseClipName: GroundHeavyAttack
+      addressableKey: GroundHeavyAttack
+      actionType: 2
+      comboIndex: 0
+    - baseClipName: GroundHeavyAttack
+      addressableKey: GroundHeavyAttack_01
+      actionType: 2
+      comboIndex: 0
