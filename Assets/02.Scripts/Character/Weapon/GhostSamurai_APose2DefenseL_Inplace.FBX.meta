@@ -488,7 +488,7 @@ ModelImporter:
     second: GhostSamurai_APose2DefenseL
   - first:
       74: 7400002
-    second: Heavycharge
+    second: HeavyCharge
   - first:
       95: 9500000
     second: //RootNode
@@ -555,7 +555,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: Heavycharge
+      name: HeavyCharge
       takeName: GhostSamurai_APose2DefenseL_Inplace
       internalID: 0
       firstFrame: 0

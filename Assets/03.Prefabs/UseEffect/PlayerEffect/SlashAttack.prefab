@@ -4938,7 +4938,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af094c05006c34a438ef04b8f5cafbb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  effectData: {fileID: 11400000, guid: 341f413cd2860484db58d0abb9eeb5e1, type: 2}
+  effectData:
+    id: 
+    addressableKey: 
+    attachPoint: 
+    localPosition: {x: 0, y: 0, z: 0}
+    localEuler: {x: 0, y: 0, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    followAttach: 0
+    lifetime: 0
+    syncColliderId: 
+    variantTag: 
+    recommendedPoolSize: 0
 --- !u!1 &8111811156769411746
 GameObject:
   m_ObjectHideFlags: 0

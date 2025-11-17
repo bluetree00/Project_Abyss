@@ -12,14 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bca08cd8f89b88545880059f2431a5b7, type: 3}
   m_Name: TestEffect
   m_EditorClassIdentifier: 
-  id: 
-  addressableKey: 
-  attachPoint: weapon_tip
-  localPosition: {x: 0, y: 0, z: 0}
-  localEuler: {x: 0, y: 0, z: 0}
-  localScale: {x: 1, y: 1, z: 1}
-  followAttach: 0
-  lifetime: 2
-  syncColliderId: 
-  variantTag: 
-  recommendedPoolSize: 4
+  effectName: TestMeteor
+  prefabKey: TestMeteor
+  autoDestroyTime: 3
+  defaultScale: {x: 1, y: 1, z: 1}
+  defaultRotation: {x: 0, y: 0, z: 0}
+  sfx: {fileID: 0}
+  spawnOffset: {x: 0, y: 0, z: 0}
+  followParent: 1

@@ -14,11 +14,11 @@ public class InputManager
 
     public void OnUpdate()
     {
-        if (EventSystem.current.IsPointerOverGameObject())
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
         if (Input.anyKey && KeyAction != null)
-				KeyAction.Invoke();
+            KeyAction.Invoke();
 
         if (MouseAction != null)
         {
@@ -51,4 +51,9 @@ public class InputManager
         KeyAction = null;
         MouseAction = null;
     }
+
+    // ────────────── 새로 추가 ──────────────
+    public bool GetKeyDown(KeyCode key) => Input.GetKeyDown(key);
+    public bool GetKey(KeyCode key) => Input.GetKey(key);
+    public bool GetKeyUp(KeyCode key) => Input.GetKeyUp(key);
 }

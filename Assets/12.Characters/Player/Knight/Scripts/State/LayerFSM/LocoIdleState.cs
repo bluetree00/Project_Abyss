@@ -6,7 +6,10 @@ public class LocoIdleState : ILayerState<LocoState>
     private ILayerStateChanger<LocoState> _stateChanger;
 
     public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
-    { _controller = c; _stateChanger = changer; }
+    {
+        _controller = c;
+        _stateChanger = changer;
+    }
 
     public void Enter()
     {
@@ -16,25 +19,34 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Update()
     {
-        var dir = _controller.IsMoveLocked ? Vector3.zero
-                                           : _controller.MoveDirection * _controller.MoveScale;
+        // MoveLock 제거: 항상 MoveDirection × MoveScale 적용
+        var dir = _controller.MoveDirection * _controller.MoveScale;
 
         // 실제 이동 처리
         _controller.MoveAbility?.Move(_controller, dir);
 
         // 블렌드 파라미터(0~1)
-        float target = dir.magnitude;                    // MoveDirection이 정규화라면 0~1
-        SetSpeedParam(_controller.Anim, target, 0.12f);  // 약간 느긋한 감속
+        float target = (_controller.isAttacking || !_controller.IsGrounded()) ? 0f : dir.magnitude;
+        SetSpeedParam(_controller.Anim, target, 0.12f);
 
-        // 전이
-        if (!_controller.IsGrounded())
+
+          // Air 전이
+        if (!_controller.IsGrounded() && !_controller.isJumping)
+        {
             _stateChanger.Change(LocoState.Air);
-        else if (target > 0.05f) // 데드존
+            return;
+        }
+
+        // Move 전이
+        if (target > 0.05f)
+        {
             _stateChanger.Change(LocoState.Move);
+        }
     }
+
     public void Exit() { }
 
-    // 유틸 (파일 상단으로 올려도 됨)
+    // 유틸
     static void SetSpeedParam(Animator anim, float target01, float damp = 0.1f)
         => anim.SetFloat("MoveSpeed", Mathf.Clamp01(target01), damp, Time.deltaTime);
 }

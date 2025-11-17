@@ -57,7 +57,7 @@ public class CharacterDataManager
         // 무기 효과 제거
         m_CharacterData.UnequipWeapon();
 
-        Debug.Log($"Unequipped weapon: {EquippedWeapon.weaponName}");
+   
     }
 
     // 캐릭터의 주요 스텟 조정 로직

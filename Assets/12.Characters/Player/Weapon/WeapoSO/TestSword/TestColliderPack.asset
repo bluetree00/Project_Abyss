@@ -19,12 +19,12 @@ MonoBehaviour:
     - effectIndex: 0
       steps:
       - step: 0
-        colliderSO: {fileID: 0}
+        colliderSO: {fileID: 11400000, guid: 9bb9e06c265b747409ac4dda67ba6db8, type: 2}
     - effectIndex: 1
       steps:
       - step: 0
-        colliderSO: {fileID: 0}
+        colliderSO: {fileID: 11400000, guid: 9bb9e06c265b747409ac4dda67ba6db8, type: 2}
     - effectIndex: 2
       steps:
       - step: 0
-        colliderSO: {fileID: 0}
+        colliderSO: {fileID: 11400000, guid: 9bb9e06c265b747409ac4dda67ba6db8, type: 2}

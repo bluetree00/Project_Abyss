@@ -485,7 +485,7 @@ ModelImporter:
     second: root
   - first:
       74: 7400000
-    second: NormalAttack_3
+    second: GroundLightAttack_03
   - first:
       95: 9500000
     second: //RootNode
@@ -552,7 +552,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: NormalAttack_3
+      name: GroundLightAttack_03
       takeName: GhostSamurai_APose_Attack01_3_Root
       internalID: 0
       firstFrame: 1700

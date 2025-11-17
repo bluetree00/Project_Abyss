@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6661ff4902369464499effdd30aa041a, type: 3}
+  m_Name: TestBowEffectPact
+  m_EditorClassIdentifier: 
+  actions:
+  - group: 0
+    actionType: 1
+    effects:
+    - {fileID: 11400000, guid: 9e06607d965f2ff449df5bddaec1a5db, type: 2}
+  - group: 1
+    actionType: 1
+    effects:
+    - {fileID: 11400000, guid: 8c18363245b2ef14d871d17e286d704b, type: 2}
