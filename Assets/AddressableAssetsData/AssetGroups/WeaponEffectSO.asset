@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: WeaponEffectSO
+  m_EditorClassIdentifier: 
+  m_GroupName: WeaponEffectSO
+  m_Data:
+    m_SerializedData: []
+  m_GUID: a89689c06a9ec6f4586663b808a34bd2
+  m_SerializeEntries:
+  - m_GUID: 8c18363245b2ef14d871d17e286d704b
+    m_Address: TestEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e24ea996a7cc6ad44b56b77417ff2f73
+    m_Address: TestEffect 1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 7d0ad871a21d15c43abe61db78cc7628, type: 2}
+    - {fileID: 11400000, guid: c99803cc6650d304a86c155d28be98ad, type: 2}

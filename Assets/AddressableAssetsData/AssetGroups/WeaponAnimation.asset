@@ -18,27 +18,112 @@ MonoBehaviour:
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
   - m_GUID: ea88c1cbbc57198499ce3da9463baea4
-    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_02
+    m_Address: GroundLightAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
-    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_03
+    m_Address: GroundLightAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
-    m_Address: Anim/Weapon/Ground/Sword_NomarSlash_01
+    m_Address: GroundLightAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
-    m_Address: Anim/Weapon/Ground/Sword_SpSlash_01
+    m_Address: QSkill_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 165130b8a71020641b870cab32d18c5e
-    m_Address: Anim/Weapon/Ground/Sword_ESlash_01
+    m_Address: ESkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 945b55edfc0ad224ca4acd04e340617f
+    m_Address: JumpStart
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cfb019d410ec3e548bdfbf114377a8dc
+    m_Address: JumpLoop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c0acc043cdafb04cb29f8187edbcfb3
+    m_Address: JumpEnd
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 862b2a1105d0db04c862f29bddb2a1d3
+    m_Address: Air_Light_Step01_Start
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 06306af089d828d42b8d956986d0566c
+    m_Address: Air_Light_Step01_Loop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 95a3de4be921e854a8d93709eabe7371
+    m_Address: Air_Light_Step01_End
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0e6b9883ce9ea5f46a60f6a94290d9cd
+    m_Address: Air_Light_Step02_Start
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4ae407e3a48e9b44eb8ef963014a80a0
+    m_Address: Air_Light_Step02_Loop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4155c6de8599c904e9088576d146c0ef
+    m_Address: Air_Light_Step02_End
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 46f7d5a4a9a960142be33846939fb7c1
+    m_Address: GroundLightBowAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e08d96c87ff6194a99fd0a1ab48d381
+    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Start_Root.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 068958b08f4995543b1b46e32cb79812
+    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Idle_Root.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0003fe2ffe5fa7447bf9fab759a85990
+    m_Address: Assets/02.Scripts/Character/Weapon/GhostSamurai_Bow_Shoot_SP_End_Inplace.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 75802d7dafb25944497bc20c3335734f
+    m_Address: GroundLightBowAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 686d6fee3c23524439553401966a5bab
+    m_Address: GroundHeavyAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aa3cafe26e9755440923cb36991911d1
+    m_Address: HeavyCharge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8b5fec27bfe3d4440b0f8b2799c6a034
+    m_Address: BowHeavyCharge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

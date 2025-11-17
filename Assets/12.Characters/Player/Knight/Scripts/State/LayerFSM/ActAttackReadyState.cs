@@ -1,31 +1,63 @@
 // ActAttackReadyState.cs
+using System;
+using UnityEngine;
+using Game.Inputs;
+
 public class ActAttackReadyState : ILayerState<ActState>
 {
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
+    {
+        _controller = controller;
+        _stateChanger = stateChanger;
+    }
 
     public void Enter()
     {
-        // 컨텍스트별(지상/공중) 애니 세트 교체
+        if (_controller.isAttacking)
+        {
+            Debug.Log("[ActAttackReadyState] Already attacking, aborting Enter.");
+            _stateChanger.Change(ActState.None); // 공격 중이면 바로 None으로
+            return;
+        }
+
         var isAir = !_controller.IsGrounded();
-
-
-        // 이동 제어(풀보디 공격 기준; 상체공격이면 0.2f 같은 감속으로)
-        _controller.AcquireMoveLock();
         _controller.SetMoveScale(0f);
 
-        // 현재 콤보 스텝으로 첫 타 실행
-        int step = _controller.currentComboStep;
-        _controller.Anim.CrossFade($"NormalAttack_{step + 1}", 0.05f);
+        // 매핑: (지상/공중) × (Light/Heavy) -> WeaponActionType
+        WeaponActionType atype;
 
-        // 어빌리티 호출(히트박스/이펙트 스폰 등은 애니 이벤트에 배치 권장)
-        // _controller.LightAttackAbility?.LightAttack(_controller, step);
+        // --- 입력 기반 PendingAttack 읽기 ---
+        if (_controller.HasPendingAttack)
+        {
+            var pending = _controller.PendingAttackCommand;
 
-        // 즉시 진행 상태로
-        _stateChanger.Change(ActState.Attack);
+            if (isAir)
+                atype = (pending == Command.Heavy) ? WeaponActionType.AirHeavy : WeaponActionType.AirLight;
+            else
+                atype = (pending == Command.Heavy) ? WeaponActionType.GroundHeavy : WeaponActionType.GroundLight;
+
+            _controller.CurrentAttackTypeForEffect = atype;
+
+            // Pending 초기화
+            _controller.ClearPendingAttack();
+        }
+        else
+        {
+            // 안전장치: 기본 라이트/지상
+            atype = isAir ? WeaponActionType.AirLight : WeaponActionType.GroundLight;
+            _controller.CurrentAttackTypeForEffect = atype;
+        }
+
+        Debug.Log($"[ActAttackReadyState] Entered. isAir: {isAir}, AttackType: {_controller.CurrentAttackTypeForEffect}");
+
+        // --- 여기서 분기: Heavy이면 Heavy 상태로, 아니면 일반 Attack 상태로 ---
+        if (atype == WeaponActionType.GroundHeavy || atype == WeaponActionType.AirHeavy)
+            _stateChanger.Change(ActState.HeavyAttack);
+        else
+            _stateChanger.Change(ActState.Attack);
     }
 
     public void Update() { }

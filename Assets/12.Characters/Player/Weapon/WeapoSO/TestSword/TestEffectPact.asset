@@ -15,27 +15,9 @@ MonoBehaviour:
   actions:
   - group: 0
     actionType: 1
-    effectIndices:
-    - effectIndex: 0
-      steps:
-      - step: 0
-        effectSO: {fileID: 0}
-      - step: 0
-        effectSO: {fileID: 0}
-    - effectIndex: 1
-      steps:
-      - step: 0
-        effectSO: {fileID: 0}
-    - effectIndex: 2
-      steps:
-      - step: 0
-        effectSO: {fileID: 0}
+    effects:
+    - {fileID: 11400000, guid: e24ea996a7cc6ad44b56b77417ff2f73, type: 2}
   - group: 1
     actionType: 1
-    effectIndices:
-    - effectIndex: 0
-      steps:
-      - step: 0
-        effectSO: {fileID: 0}
-      - step: 0
-        effectSO: {fileID: 0}
+    effects:
+    - {fileID: 11400000, guid: 8c18363245b2ef14d871d17e286d704b, type: 2}

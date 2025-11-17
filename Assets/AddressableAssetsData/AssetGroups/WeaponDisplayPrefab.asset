@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: WeaponDisplayPrefab
+  m_EditorClassIdentifier: 
+  m_GroupName: WeaponDisplayPrefab
+  m_Data:
+    m_SerializedData: []
+  m_GUID: 93128935b8a5efb428992e660ed4ca31
+  m_SerializeEntries:
+  - m_GUID: 83d2636d9fbb0d442a0cddaac7e6d048
+    m_Address: TestSwordDisplayPrefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cca606628889d9b4786433ef2703d92d
+    m_Address: TestBowDisplayPrefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: fe80c3df7a68b4b4592734f7a3428e7d, type: 2}
+    - {fileID: 11400000, guid: 1d7b4faa004428845a42405f116a318d, type: 2}

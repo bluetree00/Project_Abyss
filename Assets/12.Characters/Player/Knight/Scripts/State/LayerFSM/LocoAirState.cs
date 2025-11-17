@@ -1,4 +1,3 @@
-// LocoAirState.cs
 using UnityEngine;
 
 public class LocoAirState : ILayerState<LocoState>
@@ -6,24 +5,50 @@ public class LocoAirState : ILayerState<LocoState>
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
-    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
+    private bool _entered = false; // 중복 Enter 방지
 
-    public void Enter() { /* 점프/낙하 진입 처리 필요 시 */ }
+    // 블렌드 트리 값 (0 = Start, 1 = Keep)
+    private float _blendValue = 0f;
+    private float _blendSpeed = 0.01f;
+
+    public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
+    {
+        _controller = controller;
+        _stateChanger = stateChanger;
+    }
+
+    public void Enter()
+    {
+        _controller.SetMoveScale(0f);
+        _controller.Anim.CrossFade("JumpBlend", 0.1f);
+
+        _controller.isJumping = true;
+        _blendValue = _controller.EnterAirAsJump ? 0f : 1f;
+        Debug.Log($"LocoAirState Enter: EnterAirAsJump={_controller.EnterAirAsJump}, isJumping={_controller.isJumping}");
+
+        _controller.Anim.SetFloat("JumpValue", _blendValue);
+    }
+
 
     public void Update()
     {
-        var dir = _controller.IsMoveLocked ? Vector3.zero
-                                           : _controller.MoveDirection * _controller.MoveScale;
-        _controller.MoveAbility?.Move(_controller, dir);
-
+        // 착지 체크
         if (_controller.IsGrounded())
         {
-            var next = (_controller.MoveDirection.sqrMagnitude > 0.0001f)
-                ? LocoState.Move : LocoState.Idle;
-            _stateChanger.Change(next);
+            _controller.Anim.SetFloat("JumpValue", 2f);
+            _controller.Anim.SetFloat("AirLightAttackValue", 2f);
+            _controller.SetMoveScale(1f);
+            _stateChanger.Change(LocoState.Idle);
         }
     }
 
-    public void Exit() { /* 착지 처리 필요 시 */ }
+    public void Exit()
+    {
+        _entered = false; // Exit 시 다시 Enter 가능
+        _controller.SetMoveScale(1f);
+        _controller.ConsumeEnterAirAsJump();
+        _controller.isJumping = false;
+        _controller.Anim.SetFloat("JumpValue", 0f);
+        _controller.Anim.SetFloat("AirLightAttackValue", 0f);
+    }
 }
