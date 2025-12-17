@@ -6,16 +6,16 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/01.Scenes/Logo.unity
+    path: Assets/Abyss/Scenes/Logo.unity
     guid: 0f347859b0b563045ade5226b7eba638
   - enabled: 1
-    path: Assets/01.Scenes/Login.unity
+    path: Assets/Abyss/Scenes/Login.unity
     guid: d4153066ed87dad4bb47a33062d65076
   - enabled: 1
-    path: Assets/01.Scenes/Lobby.unity
+    path: Assets/Abyss/Scenes/Lobby.unity
     guid: cdbd8c9b3f2ec4c4687c2ec5c6a9e8a5
   - enabled: 1
-    path: Assets/01.Scenes/GameScene.unity
+    path: Assets/Abyss/Scenes/GameScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 9ab410270870c5d438a3caf7889cab42,
