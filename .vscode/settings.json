@@ -51,18 +51,17 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Project_A.sln",
+    "dotnet.defaultSolution": "Project_Abyss.sln",
     "todo-tree.general.tags": [
-    "BUG",
-    "TODO",
-    "FIXME",
-    "[ ]",
-    "[x]",
-    "NOTE",
-    "CHECKLIST",
-    "WARNING"
+        "BUG",
+        "TODO",
+        "FIXME",
+        "[ ]",
+        "[x]",
+        "NOTE",
+        "CHECKLIST",
+        "WARNING"
     ],
-
     "todo-tree.highlights.defaultHighlight": {
         "icon": "alert",
         "type": "text",
@@ -83,43 +82,43 @@
             "gutterIcon": true
         },
         "WARNING": {
-          "background": "#ffc404",
-          "foreground": "#ffffff",
-          "gutterIcon": true,
-          "icon": "alert",
-          "iconColour": "#ff9f04"
+            "background": "#ffc404",
+            "foreground": "#ffffff",
+            "gutterIcon": true,
+            "icon": "alert",
+            "iconColour": "#ff9f04"
         },
         "[ ]": {
-          "background": "#f87364",
-          "foreground": "#ffffff",
-          "gutterIcon": true,
-          "icon": "x",
-          "iconColour": "#f87364",
-          "type": "text"
+            "background": "#f87364",
+            "foreground": "#ffffff",
+            "gutterIcon": true,
+            "icon": "x",
+            "iconColour": "#f87364",
+            "type": "text"
         },
         "[x]": {
-          "background": "#20a904",
-          "foreground": "#ffffff",
-          "gutterIcon": true,
-          "icon": "check",
-          "iconColour": "#20a904",
-          "type": "text"
+            "background": "#20a904",
+            "foreground": "#ffffff",
+            "gutterIcon": true,
+            "icon": "check",
+            "iconColour": "#20a904",
+            "type": "text"
         },
         "CHECKLIST": {
-          "background": "#20a904",
-          "foreground": "#ffffff",
-          "gutterIcon": true,
-          "icon": "check-circle-fill",
-          "iconColour": "#20a904",
-          "type": "text"
+            "background": "#20a904",
+            "foreground": "#ffffff",
+            "gutterIcon": true,
+            "icon": "check-circle-fill",
+            "iconColour": "#20a904",
+            "type": "text"
         },
         "NOTE": {
-          "background": "#cc6363",
-          "foreground": "#ffffff",
-          "gutterIcon": true,
-          "icon": "star-fill",
-          "iconColour": "#ffc404",
-          "type": "text"
+            "background": "#cc6363",
+            "foreground": "#ffffff",
+            "gutterIcon": true,
+            "icon": "star-fill",
+            "iconColour": "#ffc404",
+            "type": "text"
         }
     }
 }
