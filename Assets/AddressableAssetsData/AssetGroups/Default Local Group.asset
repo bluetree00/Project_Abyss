@@ -53,12 +53,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b478a3c4c8ae3bb42a5785ab95bcf6d3
-    m_Address: Laser
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - default
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8afa8cef4fa478c4bb5a2d93d604719d
     m_Address: Stage_Event_02
     m_ReadOnly: 0

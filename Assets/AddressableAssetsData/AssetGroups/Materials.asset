@@ -35,30 +35,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - Mat
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 54e809e248f25bc47ba8bc38cc93abb8
-    m_Address: Assets/Suriyun/Characters/RedKnight/Materials/Skin&Hair&Face/skin.mat
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Mat
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2d230782b748ed7449096c196c384cc9
-    m_Address: Assets/03.Prefabs/Player/C_01/Dragoon/Materials/Skin&Hair&Face/hair01.mat
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Mat
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d71aa36bb1e8c19489535452a7eb67f5
-    m_Address: Assets/03.Prefabs/Player/C_01/Dragoon/Materials/Characters/F02.mat
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Mat
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9d9c5fedbbd5b3944abcc282bff84b26
-    m_Address: Trail87bcg
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Mat
-    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

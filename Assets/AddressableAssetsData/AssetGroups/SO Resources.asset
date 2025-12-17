@@ -23,12 +23,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - SO
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0016ea1f1ec94d1478eb444510df67ca
-    m_Address: Vagabond
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2079b83d448fcca489539999f72f264e
     m_Address: BaseTest
     m_ReadOnly: 0
@@ -37,18 +31,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6b2e54f869313fb4bbf387506b6972d7
     m_Address: BatEffectPool
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5c3dafdd6d7738842ad37bfc15a0594d
-    m_Address: NormalBat01_EffectSO
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - SO
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b28d136795157de48813a68896b5ca09
-    m_Address: Knight
     m_ReadOnly: 0
     m_SerializedLabels:
     - SO

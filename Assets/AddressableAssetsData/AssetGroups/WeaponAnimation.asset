@@ -42,21 +42,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 945b55edfc0ad224ca4acd04e340617f
-    m_Address: JumpStart
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cfb019d410ec3e548bdfbf114377a8dc
-    m_Address: JumpLoop
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4c0acc043cdafb04cb29f8187edbcfb3
-    m_Address: JumpEnd
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 862b2a1105d0db04c862f29bddb2a1d3
     m_Address: Air_Light_Step01_Start
     m_ReadOnly: 0
@@ -99,11 +84,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 068958b08f4995543b1b46e32cb79812
     m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Idle_Root.FBX
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0003fe2ffe5fa7447bf9fab759a85990
-    m_Address: Assets/02.Scripts/Character/Weapon/GhostSamurai_Bow_Shoot_SP_End_Inplace.FBX
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
