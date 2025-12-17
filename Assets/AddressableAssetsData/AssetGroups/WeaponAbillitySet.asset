@@ -16,12 +16,7 @@ MonoBehaviour:
   m_Data:
     m_SerializedData: []
   m_GUID: a71eb3244ff85474dbb4a062d596b9fd
-  m_SerializeEntries:
-  - m_GUID: ff28d03c9d5f86d46a4e5760ec8135c5
-    m_Address: SoData/Abillity/Weapon/Sword
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
+  m_SerializeEntries: []
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

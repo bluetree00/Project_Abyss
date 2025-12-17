@@ -16,12 +16,7 @@ MonoBehaviour:
   m_Data:
     m_SerializedData: []
   m_GUID: 8c2134209ad4a944d91f7a0f913aee20
-  m_SerializeEntries:
-  - m_GUID: b11c40e7008eefa4a965103378c5ef86
-    m_Address: SoData/Animaion/Weapon/Ground_Attack
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
+  m_SerializeEntries: []
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
