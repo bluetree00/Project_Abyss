@@ -1,36 +1,83 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
+/// <summary>
+/// 모든 UI의 공통 베이스 클래스
+/// - UI 내부 요소 바인딩
+/// - UI 생명주기 분리 (Init / Open / Close)
+/// - 데이터 지연 바인딩 지원
+/// </summary>
 public abstract class UI_Base : MonoBehaviour
 {
-	protected Dictionary<Type, UnityEngine.Object[]> _objects = new Dictionary<Type, UnityEngine.Object[]>();
-	public abstract void Init();
+	/// <summary>
+	/// 타입별 UI 오브젝트 캐시
+	/// </summary>
+	protected Dictionary<Type, UnityEngine.Object[]> _objects = new();
 
-	private void Start()
+	/// <summary>
+	/// 초기화 여부
+	/// </summary>
+	public bool IsInitialized { get; private set; }
+
+	#region Life Cycle
+
+	/// <summary>
+	/// UI 구조 초기화 (Bind 전용)
+	/// UIManager가 호출
+	/// </summary>
+	public virtual void Init()
 	{
-		Init();
+		IsInitialized = true;
 	}
 
-	protected void Bind<T>(Type type) where T : UnityEngine.Object
+	/// <summary>
+	/// 외부 데이터 바인딩
+	/// 데이터 준비 시점에 여러 번 호출 가능
+	/// </summary>
+	public virtual void BindData(object data)
 	{
-		// 이미 키가 존재하면 중복 방지
+		// 필요 시 override
+	}
+
+	/// <summary>
+	/// UI 표시
+	/// </summary>
+	public virtual void Open()
+	{
+		gameObject.SetActive(true);
+	}
+
+	/// <summary>
+	/// UI 숨김
+	/// </summary>
+	public virtual void Close()
+	{
+		gameObject.SetActive(false);
+	}
+
+	#endregion
+
+	#region Bind
+
+	/// <summary>
+	/// Enum 기반 UI 요소 바인딩
+	/// </summary>
+	protected void Bind<T>(Type enumType) where T : UnityEngine.Object
+	{
 		if (_objects.ContainsKey(typeof(T)))
 		{
-			Debug.LogWarning($"[{typeof(T)}] 타입이 이미 바인딩되었습니다. 중복 추가를 방지합니다.");
+			Debug.LogWarning($"[{nameof(UI_Base)}] {typeof(T)} 이미 바인딩됨");
 			return;
 		}
 
-		// Enum으로부터 이름을 가져와 UnityEngine.Object 배열 생성
-		string[] names = Enum.GetNames(type);
+		string[] names = Enum.GetNames(enumType);
 		UnityEngine.Object[] objects = new UnityEngine.Object[names.Length];
 		_objects.Add(typeof(T), objects);
 
-		// GameObject 또는 다른 타입에 따라 객체를 찾음
 		for (int i = 0; i < names.Length; i++)
 		{
 			if (typeof(T) == typeof(GameObject))
@@ -39,27 +86,42 @@ public abstract class UI_Base : MonoBehaviour
 				objects[i] = Util.FindChild<T>(gameObject, names[i], true);
 
 			if (objects[i] == null)
-				Debug.Log($"Failed to bind({names[i]})");
+				Debug.LogWarning($"[{nameof(UI_Base)}] Bind 실패 : {names[i]}");
 		}
 	}
 
+	#endregion
+
+	#region Get
 
 	protected T Get<T>(int idx) where T : UnityEngine.Object
 	{
-		UnityEngine.Object[] objects = null;
-		if (_objects.TryGetValue(typeof(T), out objects) == false)
+		if (_objects.TryGetValue(typeof(T), out var objects) == false)
+			return null;
+
+		if (idx < 0 || idx >= objects.Length)
 			return null;
 
 		return objects[idx] as T;
 	}
 
-	protected GameObject GetObject(int idx) { return Get<GameObject>(idx); }
-	protected Text GetText(int idx) { return Get<Text>(idx); }
-	protected TextMeshProUGUI GetTMPText(int idx) { return Get<TextMeshProUGUI>(idx); }
-	protected Button GetButton(int idx) { return Get<Button>(idx); }
-	protected Image GetImage(int idx) { return Get<Image>(idx); }
+	protected GameObject GetObject(int idx) => Get<GameObject>(idx);
+	protected Text GetText(int idx) => Get<Text>(idx);
+	protected TextMeshProUGUI GetTMPText(int idx) => Get<TextMeshProUGUI>(idx);
+	protected Button GetButton(int idx) => Get<Button>(idx);
+	protected Image GetImage(int idx) => Get<Image>(idx);
 
-	public static void BindEvent(GameObject go, Action<PointerEventData> action, Define.UIEvent type = Define.UIEvent.Click)
+	#endregion
+
+	#region Event
+
+	/// <summary>
+	/// UI 이벤트 바인딩
+	/// </summary>
+	public static void BindEvent(
+		GameObject go,
+		Action<PointerEventData> action,
+		Define.UIEvent type = Define.UIEvent.Click)
 	{
 		UI_EventHandler evt = Util.GetOrAddComponent<UI_EventHandler>(go);
 
@@ -69,10 +131,13 @@ public abstract class UI_Base : MonoBehaviour
 				evt.OnClickHandler -= action;
 				evt.OnClickHandler += action;
 				break;
+
 			case Define.UIEvent.Drag:
 				evt.OnDragHandler -= action;
 				evt.OnDragHandler += action;
 				break;
 		}
 	}
+
+	#endregion
 }
