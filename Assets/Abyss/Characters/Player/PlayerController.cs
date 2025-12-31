@@ -385,8 +385,6 @@ public class PlayerController : CharacterBase
         inputActions.Player.ESkill.performed += _ => InputBuffer.Push(Command.ESkill);
 
         inputActions.Player.Jump.performed += _ => ProcessJump();
-        inputActions.Player.InventoryToggle.performed += _ => { ToggleInventory(); if (isInventoryOpen) InputBuffer.Clear(); };
-        inputActions.Player.CloseInventory.performed += _ => CloseInventory();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
     }
@@ -531,28 +529,6 @@ public class PlayerController : CharacterBase
     //============================================================
     // 인벤토리/무기/카메라
     //============================================================
-    protected virtual void ToggleInventory()
-    {
-        if (isInventoryOpen)
-        {
-            Managers.UI.CloseUI("UI_Inven");
-            isInventoryOpen = false;
-        }
-        else
-        {
-            Managers.UI.ShowSceneUI<UI_Inven>("UI_Inven");
-            isInventoryOpen = true;
-        }
-    }
-
-    protected virtual void CloseInventory()
-    {
-        if (isInventoryOpen)
-        {
-            Managers.UI.CloseUI("UI_Inven");
-            isInventoryOpen = false;
-        }
-    }
 
     protected virtual void ChangeWeapon(int index) { }
 

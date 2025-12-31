@@ -42,7 +42,7 @@ public class Managers : MonoBehaviour
     private AddressableManager _addressableManager;
     private AnimationResourceManager _animationResources;
 
-    public StageManager _stageManager;
+    // public StageManager _stageManager;
     private UIManager _ui;
     private CharacterDataManager _characterDataManager;
     private GameEventManager gameEventManager;
@@ -58,7 +58,7 @@ public class Managers : MonoBehaviour
     public static ObjectPoolerManager ObjectPooler => Instance._objectPoolerManager;
     public static AddressableManager AddressableManager => Instance._addressableManager ??= new AddressableManager();
     public static AnimationResourceManager AnimationResources => Instance._animationResources ??= new AnimationResourceManager();
-    public static StageManager Stage => Instance._stageManager;
+    // public static StageManager Stage => Instance._stageManager;
     public static UIManager UI => Instance._ui ??= new UIManager();
     public static CharacterDataManager CharacterData => Instance._characterDataManager ??= new CharacterDataManager();
     public static GameEventManager GameEvent => Instance.gameEventManager ??= new GameEventManager();
@@ -118,11 +118,11 @@ public class Managers : MonoBehaviour
                 }
             }
 
-            // G: 스테이지 매니저 초기화
-            if (_input.GetKeyDown(KeyCode.G))
-            {
-                InitializeStageManagerAsync().Forget();
-            }
+            // // G: 스테이지 매니저 초기화
+            // if (_input.GetKeyDown(KeyCode.G))
+            // {
+            //     InitializeStageManagerAsync().Forget();
+            // }
 
         }
 
@@ -189,33 +189,33 @@ public class Managers : MonoBehaviour
     /// <summary>
     /// 스테이지 매니저 초기화
     /// </summary>
-    private async UniTask InitializeStageManagerAsync()
-    {
-        try
-        {
-            Debug.Log("스테이지 매니저 초기화 시작");
+    // private async UniTask InitializeStageManagerAsync()
+    // {
+    //     try
+    //     {
+    //         Debug.Log("스테이지 매니저 초기화 시작");
 
-            // Addressables 준비 확인
-            if (_addressableManager == null || !_addressableManager.IsInitialized)
-            {
-                _addressableManager ??= new AddressableManager();
-                await _addressableManager.InitAsync();
-            }
+    //         // Addressables 준비 확인
+    //         if (_addressableManager == null || !_addressableManager.IsInitialized)
+    //         {
+    //             _addressableManager ??= new AddressableManager();
+    //             await _addressableManager.InitAsync();
+    //         }
 
-            // 기존 스테이지 매니저 정리
-            _stageManager?.Cleanup();
+    //         // 기존 스테이지 매니저 정리
+    //         _stageManager?.Cleanup();
 
-            // 새 스테이지 매니저 생성 및 초기화
-            _stageManager = new StageManager();
-            await _stageManager.InitializeStageManager();
+    //         // 새 스테이지 매니저 생성 및 초기화
+    //         _stageManager = new StageManager();
+    //         await _stageManager.InitializeStageManager();
 
-            Debug.Log("스테이지 매니저 초기화 완료");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"스테이지 매니저 초기화 실패: {e.Message}");
-        }
-    }
+    //         Debug.Log("스테이지 매니저 초기화 완료");
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         Debug.LogError($"스테이지 매니저 초기화 실패: {e.Message}");
+    //     }
+    // }
 
     /// <summary>
     /// 오브젝트 풀 초기화 (Addressables 기반)

@@ -4,6 +4,7 @@ using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
 using MapGeneratorManager;
+using Cysharp.Threading.Tasks;
 
 public class UIManager
 {
@@ -14,8 +15,6 @@ public class UIManager
 
     // 특정 UI를 추적하기 위한 Dictionary
     Dictionary<string, GameObject> _uiObjects = new Dictionary<string, GameObject>();
-    private Dictionary<int, NodeIcon> _nodeIconMap = new Dictionary<int, NodeIcon>();//WARNING:임시 작성
-    private GameObject _nodeGraphPanel; //WARNING:임시 작성
     public GameObject Root
     {
         get
@@ -78,48 +77,69 @@ public class UIManager
         return Util.GetOrAddComponent<T>(go);
     }
 
-    public T MakeAugment<T>(Transform parent = null, string name = null) where T : UI_Base
+    public void ShowSceneUI<T>(string name = null) where T : UI_Scene
     {
         if (string.IsNullOrEmpty(name))
             name = typeof(T).Name;
 
-        GameObject go = Managers.Resource.Instantiate($"UI/Augments/{name}");
-        if (parent != null)
-            go.transform.SetParent(parent);
+        // 1️⃣ 이미 존재하면 재사용
+        if (_uiObjects.TryGetValue(name, out GameObject existing))
+        {
+            existing.SetActive(true);
+            _sceneUI = existing.GetComponent<T>();
+            return;
+        }
 
-        return Util.GetOrAddComponent<T>(go);
+        // 2️⃣ Addressables 로드
+        string addressKey = $"UI/Scene/{name}";
+        Managers.AddressableManager.LoadAsset<GameObject>(addressKey, prefab =>
+        {
+            GameObject go = GameObject.Instantiate(prefab, Root.transform);
+            go.name = name;
+
+            SetCanvas(go, true);
+
+            T sceneUI = Util.GetOrAddComponent<T>(go);
+            _sceneUI = sceneUI;
+
+            // 3️⃣ Dictionary에 추적 등록
+            _uiObjects[name] = go;
+        },
+        () =>
+        {
+            Debug.LogError($"Scene UI Load Failed : {name}");
+        });
     }
 
-    public T ShowSceneUI<T>(string name = null) where T : UI_Scene
+
+    public void ShowPopupUI<T>(string name = null) where T : UI_Popup
     {
         if (string.IsNullOrEmpty(name))
             name = typeof(T).Name;
 
-        GameObject go = Managers.Resource.Instantiate($"UI/Scene/{name}");
-        T sceneUI = Util.GetOrAddComponent<T>(go);
-        _sceneUI = sceneUI;
+        // 이미 열려 있으면 중복 방지
+        if (_uiObjects.TryGetValue(name, out GameObject existing))
+        {
+            existing.SetActive(true);
+            _popupStack.Push(existing.GetComponent<T>());
+            return;
+        }
 
-        go.transform.SetParent(Root.transform);
+        string addressKey = $"UI/Popup/{name}";
+        Managers.AddressableManager.LoadAsset<GameObject>(addressKey, prefab =>
+        {
+            GameObject go = GameObject.Instantiate(prefab, Root.transform);
+            go.name = name;
 
-        _uiObjects[name] = go;
+            SetCanvas(go, true);
 
-        return sceneUI;
+            T popup = Util.GetOrAddComponent<T>(go);
+            _popupStack.Push(popup);
+
+            _uiObjects[name] = go;
+        });
     }
 
-    public T ShowPopupUI<T>(string name = null) where T : UI_Popup
-    {
-        if (string.IsNullOrEmpty(name))
-            name = typeof(T).Name;
-
-        GameObject go = Managers.Resource.Instantiate($"UI/Popup/{name}");
-        T popup = Util.GetOrAddComponent<T>(go);
-        _popupStack.Push(popup);
-
-        go.transform.SetParent(Root.transform);
-
-
-        return popup;
-    }
 
     //TODO:다시 수정할 필요 있음
     // 팝업 UI를 표시하고 스택에 추가
@@ -129,30 +149,16 @@ public class UIManager
     }
 
 
-    public UI_Augment_Choice ShowAugmentChoiceUI(List<AugmentData> availableAugments)
-    {
-        UI_Augment_Choice augmentChoiceUI = ShowPopupUI<UI_Augment_Choice>();
-
-        // 증강 UI 초기화 및 선택 항목 표시
-        augmentChoiceUI.InitAugments(availableAugments);
-        augmentChoiceUI.ShowAugmentChoices(); // 선택 가능한 증강 UI 표시
-        return augmentChoiceUI;
-    }
-
     // 특정 UI 제거
     public void CloseUI(string name)
     {
-        if (!_uiObjects.ContainsKey(name))
-        {
-            Debug.LogWarning($"UI [{name}] 존재하지 않습니다.");
+        if (!_uiObjects.TryGetValue(name, out GameObject ui))
             return;
-        }
 
-        GameObject uiObject = _uiObjects[name];
-        _uiObjects.Remove(name); // Dictionary에서 제거
-        Managers.Resource.Destroy(uiObject);
+        ui.SetActive(false);
         _order--;
     }
+
 
 
     public void ClosePopupUI(UI_Popup popup)
@@ -191,6 +197,15 @@ public class UIManager
         CloseAllPopupUI();
         _sceneUI = null;
     }
+
+    public void ClearAllUI()
+    {
+        foreach (var ui in _uiObjects.Values)
+            GameObject.Destroy(ui);
+
+        _uiObjects.Clear();
+    }
+
 
     //인벤토리 아이템 추가 방식 uiType가 핵심 추가될 UI 형태 ex) UI_EquipmentItem 만약 다인 플레이시 자신의 이벤을 플레이어가 생성 저장필요
     public void InvenPushItem(string name, string uiType)
@@ -231,90 +246,6 @@ public class UIManager
         }
     }
 
-
-    //WARNING:임시 작성
-    public void InitializeNodeIcons(List<Node> nodes)
-    {
-        _nodeGraphPanel = GameObject.Find("NodeGraphPanel");
-        if (_nodeGraphPanel == null)
-        {
-            Debug.LogError("NodeGraphPanel not found in the scene!");
-            return;
-        }
-
-        // 기존 NodeIcon 맵 초기화
-        _nodeIconMap.Clear();
-
-        // NodeGraphPanel의 모든 NodeIcon 컴포넌트 찾기
-        NodeIcon[] nodeIcons = _nodeGraphPanel.GetComponentsInChildren<NodeIcon>();
-        foreach (var nodeIcon in nodeIcons)
-        {
-            if (nodeIcon.nodeId < 0)
-            {
-                Debug.LogWarning($"NodeIcon {nodeIcon.name} has invalid nodeId: {nodeIcon.nodeId}");
-                continue;
-            }
-
-            // 노드 ID로 노드 데이터 찾기
-            Node? node = nodes.Find(n => n.Id == nodeIcon.nodeId);
-            if (node.HasValue)
-            {
-                nodeIcon.SetNodeData(node.Value);
-                _nodeIconMap[nodeIcon.nodeId] = nodeIcon;
-
-                // 클릭 이벤트 바인딩
-                nodeIcon.BindClickEvent((clickedNode) =>
-                {
-                    Debug.Log($"Clicked Node: {clickedNode.GetLabel()} (ID: {clickedNode.Id})");
-                    var connectedNodes = Managers.Stage.GetConnectedNodes();
-                    if (connectedNodes.Contains(clickedNode))
-                    {
-                        Managers.Stage.MoveToNextStage(connectedNodes.IndexOf(clickedNode) == 0 ? -1 : 1);
-                    }
-                });
-
-            }
-            else
-            {
-                Debug.LogWarning($"No node found for NodeIcon with ID: {nodeIcon.nodeId}");
-            }
-        }
-
-        // 매핑되지 않은 노드 확인
-        foreach (var node in nodes)
-        {
-            if (!_nodeIconMap.ContainsKey(node.Id))
-            {
-                Debug.LogWarning($"No NodeIcon found for node {node.Id} ({node.GetLabel()})");
-            }
-        }
-    }
-    //WARNING:임시 작성
-    public void UpdateNodeIcon(int nodeId, Node nodeData)
-    {
-        if (_nodeIconMap.ContainsKey(nodeId))
-        {
-            _nodeIconMap[nodeId].SetNodeData(nodeData);
-            // 현재 노드 강조 (선택적)
-            HighlightNodeIcon(nodeId);
-        }
-        else
-        {
-            Debug.LogWarning($"NodeIcon for node {nodeId} not found.");
-        }
-    }
-    //WARNING:임시 작성
-    private void HighlightNodeIcon(int nodeId)
-    {
-        foreach (var icon in _nodeIconMap)
-        {
-            var image = icon.Value.GetComponent<UnityEngine.UI.Image>();
-            if (image != null)
-            {
-                image.color = icon.Key == nodeId ? Color.yellow : Color.white; // 현재 노드 강조
-            }
-        }
-    }
 
 
 }
