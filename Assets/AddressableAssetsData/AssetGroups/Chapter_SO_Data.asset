@@ -18,7 +18,12 @@ MonoBehaviour:
   m_GUID: 8799b864f583bad4485c000f90c397f5
   m_SerializeEntries:
   - m_GUID: b28d136795157de48813a68896b5ca09
-    m_Address: Assets/Abyss/Characters/Player/Knight/Stat/Knight.asset
+    m_Address: Knight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8867c0c57a4cb3148ba17943fa9638ba
+    m_Address: TestEffectSet
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
