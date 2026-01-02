@@ -374,7 +374,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.1628706, y: -0.31588057, z: -0.055258058, w: 0.9330805}
+  m_LocalRotation: {x: -0.16286597, y: -0.3158715, z: -0.055255514, w: 0.93308455}
   m_LocalPosition: {x: 0, y: 0.4, z: -1.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3721,7 +3721,7 @@ PrefabInstance:
         type: 3}
       propertyPath: abilitySetSO
       value: 
-      objectReference: {fileID: 11400000, guid: dc27e9312c9768f429922a9ac4aae21a,
+      objectReference: {fileID: 11400000, guid: 4e84fb1d7b92ee241becad490f570f27,
         type: 2}
     - target: {fileID: 2721112331854502123, guid: 2d87cebda5d67d64e906d47258aef8d1,
         type: 3}
