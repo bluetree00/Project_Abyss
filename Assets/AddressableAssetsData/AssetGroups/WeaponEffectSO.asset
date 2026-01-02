@@ -16,7 +16,17 @@ MonoBehaviour:
   m_Data:
     m_SerializedData: []
   m_GUID: a89689c06a9ec6f4586663b808a34bd2
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 8c18363245b2ef14d871d17e286d704b
+    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEFfect.asset
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e24ea996a7cc6ad44b56b77417ff2f73
+    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEffect 1.asset
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
