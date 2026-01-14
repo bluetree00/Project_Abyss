@@ -178,8 +178,6 @@ public class Managers : MonoBehaviour
             "BowHeavyCharge",
 
 
-
-
         };
 
         await AnimationResources.PreloadClipsAsync(animKeys);
