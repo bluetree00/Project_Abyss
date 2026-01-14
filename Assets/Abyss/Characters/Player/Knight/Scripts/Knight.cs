@@ -114,8 +114,6 @@ public class Knight : PlayerController
         }
     }
 
-
-    // 이동 입력 벡터 계산(기존 그대로)
    // 이동 입력 벡터 계산
     private void CheckMovementInput()
     {
@@ -158,9 +156,4 @@ public class Knight : PlayerController
         // Debug.Log("Combo reset due to timer expiration.");
     }
 
-    // 무기 변경도 액션 중립 상태에서만 허용 권장
-    protected override void ChangeWeapon(int index)
-    {
-
-    }
 }
