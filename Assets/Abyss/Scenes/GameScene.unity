@@ -262,7 +262,7 @@ PrefabInstance:
     - target: {fileID: 2949035020998705062, guid: f57b192be6f726644bd65ced8b6ebd1f,
         type: 3}
       propertyPath: m_Name
-      value: Warrior (1)
+      value: Warrior_01
       objectReference: {fileID: 0}
     - target: {fileID: 5998918430275889285, guid: f57b192be6f726644bd65ced8b6ebd1f,
         type: 3}
@@ -442,7 +442,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.1628476, y: -0.3158352, z: -0.055245377, w: 0.93310064}
+  m_LocalRotation: {x: -0.16284584, y: -0.3158317, z: -0.0552444, w: 0.9331022}
   m_LocalPosition: {x: 0, y: 0.4, z: -1.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3788,7 +3788,7 @@ PrefabInstance:
     - target: {fileID: 2949035020998705062, guid: f57b192be6f726644bd65ced8b6ebd1f,
         type: 3}
       propertyPath: m_Name
-      value: Warrior
+      value: Warrior_02
       objectReference: {fileID: 0}
     - target: {fileID: 5998918430275889285, guid: f57b192be6f726644bd65ced8b6ebd1f,
         type: 3}
