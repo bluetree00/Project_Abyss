@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
-  m_Name: Chapter1
+  m_Name: StagePrefabs
   m_EditorClassIdentifier: 
-  m_GroupName: Chapter1
+  m_GroupName: StagePrefabs
   m_Data:
     m_SerializedData: []
-  m_GUID: d4094ce9bf9b5764d8d2f86451146f33
+  m_GUID: 77834257986c1bb47a6977e30eca223c
   m_SerializeEntries: []
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: 6512e12c0ba7ef243bc89c6ef2e2ab5f, type: 2}
-    - {fileID: 11400000, guid: 64a508944d6e346408720914078714ec, type: 2}
+    - {fileID: 11400000, guid: 39ad3eb612859e34ba408efb5dc1c8ba, type: 2}
+    - {fileID: 11400000, guid: f8fc048ee64a58044b993b817d8854c8, type: 2}
