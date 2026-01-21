@@ -245,7 +245,4 @@ public class UIManager
             Debug.Log("닫혀있음");
         }
     }
-
-
-
 }
