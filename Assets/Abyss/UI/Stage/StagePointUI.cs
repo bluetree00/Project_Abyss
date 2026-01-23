@@ -3,30 +3,19 @@ using UnityEngine;
 
 public class StagePointUI : MonoBehaviour
 {
-    [Header("Graph")]
-    [SerializeField] private int pointId;
-    [SerializeField] private List<int> nextPointIds;
+    [SerializeField] private bool isStartPoint;
+    [SerializeField] int pointId;
+    [SerializeField] List<int> nextPointIds;
+    [SerializeField] StageCategory stageCategory;
+    [SerializeField] NormalRoomCategory normalRoomCategory;
 
-    [Header("Stage Request")]
-    [SerializeField] private ChapterId chapterId;
-    [SerializeField] private StageCategory stageCategory;
-    [SerializeField] private NormalRoomCategory normalRoomCategory;
-
-    public int PointId => pointId;
-    public IReadOnlyList<int> NextPointIds => nextPointIds;
-    public ChapterId ChapterId => chapterId;
-    public StageCategory StageCategory => stageCategory;
-    public NormalRoomCategory NormalRoomCategory => normalRoomCategory;
-
-    private void OnEnable()
+    public void Register(StagePointManager manager)
     {
-        Managers.GameRun.StagePointManager.Register(
+        manager.Register(
             pointId,
             stageCategory,
             nextPointIds,
             normalRoomCategory
         );
     }
-
-
 }

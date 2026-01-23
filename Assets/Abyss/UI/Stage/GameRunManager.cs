@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 
     /// <summary>
@@ -13,7 +14,6 @@ using UnityEngine;
         // -------------------------
         // 상태
         // -------------------------
-
         public bool IsRunning { get; private set; }
 
         public ChapterId CurrentChapter { get; private set; }
@@ -34,15 +34,50 @@ using UnityEngine;
         /// </summary>
         public void StartNewRun(ChapterId chapter)
         {
-            Debug.Log($"[GameRunManager] Start New Run - {chapter}");
-
-            IsRunning = true;
-            CurrentChapter = chapter;
-
-            // StagePointManager 생성
             StagePointManager = new StagePointManager();
             StagePointManager.Initialize(chapter);
+            
+
+            var points = Object.FindObjectsOfType<StagePointUI>();
+            foreach (var ui in points)
+            {
+                ui.Register(StagePointManager);
+            }
+
+            StagePointManager.ResolveAll();
+
+            CurrentStagePoint = StagePointManager.GetStartPoint();
+
+            if (CurrentStagePoint == null)
+            {
+                Debug.LogError("[GameRun] Start point not found");
+            }
+            else
+            {
+                Debug.Log($"[GameRun] Start at Point {CurrentStagePoint.PointId}");
+            }
+
 
         }
+
+
+        public bool TryMoveToStage(int targetPointId)
+        {
+            // 1. 현재 위치 기준으로만 판단
+            if (!CurrentStagePoint.NextPointIds.Contains(targetPointId))
+                return false;
+
+            // 2. 딱 필요한 것만 조회
+            var next = StagePointManager.GetContext(targetPointId);
+            if (next == null)
+                return false;
+
+            // 3. 이동
+            CurrentStagePoint = next;
+            return true;
+        }
+
+
+
         
     }

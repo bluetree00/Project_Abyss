@@ -470,6 +470,7 @@ public class PlayerController : CharacterBase
     // 점프 입력 처리
     public void ProcessJump()
     {
+        Managers.GameRun.StartNewRun(ChapterId.Chapter1);
         // 이미 공중이면 점프 불가
         if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
 
