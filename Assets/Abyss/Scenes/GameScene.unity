@@ -124,6 +124,50 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 23800000, guid: 0d23467cb5ed5304db524915165f4518, type: 2}
+--- !u!1 &18658502
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 18658504}
+  - component: {fileID: 18658503}
+  m_Layer: 0
+  m_Name: StagePointDebugView
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &18658503
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 18658502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf53e526c3c1dd14dbe1c9138ede4b72, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &18658504
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 18658502}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1298.0573, y: 666.88574, z: 25.393982}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &32953334
 GameObject:
   m_ObjectHideFlags: 3
@@ -304,6 +348,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isStartPoint: 0
   pointId: 3
   nextPointIds: 64000000
   stageCategory: 1
@@ -396,7 +441,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.16258578, y: -0.31531882, z: -0.055101078, w: 0.9333294}
+  m_LocalRotation: {x: -0.16258256, y: -0.31531253, z: -0.055099312, w: 0.9333322}
   m_LocalPosition: {x: 0, y: 0.4, z: -1.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -607,6 +652,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isStartPoint: 1
   pointId: 0
   nextPointIds: 0100000002000000
   stageCategory: 0
@@ -899,6 +945,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isStartPoint: 0
   pointId: 1
   nextPointIds: 03000000
   stageCategory: 1
@@ -1180,6 +1227,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: StageUI
+      objectReference: {fileID: 0}
+    - target: {fileID: 8519052083679706558, guid: db18c22cee80cc74487b0900361715f6,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8884314244123643335, guid: db18c22cee80cc74487b0900361715f6,
         type: 3}
@@ -2141,6 +2193,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isStartPoint: 0
   pointId: 2
   nextPointIds: 03000000
   stageCategory: 1
@@ -2293,6 +2346,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isStartPoint: 0
   pointId: 100
   nextPointIds: 
   stageCategory: 2
@@ -3725,7 +3779,7 @@ PrefabInstance:
     - target: {fileID: 3926761019246361657, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7217491866437943681, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
@@ -3891,3 +3945,4 @@ SceneRoots:
   - {fileID: 1834999872}
   - {fileID: 1428764871}
   - {fileID: 867780929}
+  - {fileID: 18658504}

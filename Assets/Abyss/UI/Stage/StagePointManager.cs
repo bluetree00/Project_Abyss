@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 
     /// <summary>
@@ -20,6 +21,14 @@ using UnityEngine;
         // pointId -> StagePointContext
         // =========================
         private readonly Dictionary<int, StagePointContext> _contexts = new();
+
+        public IReadOnlyDictionary<int, StagePointContext> Contexts => _contexts;
+
+        public IReadOnlyCollection<StagePointContext> GetAllContexts()
+        {
+            return _contexts.Values;
+        }
+
 
         // =========================
         // Initialize
@@ -42,28 +51,37 @@ using UnityEngine;
         /// <summary>
         /// UI 또는 외부에서 StagePoint 정보를 Context로 등록
         /// </summary>
-        public StagePointContext Register(
-            int pointId,
-            StageCategory stageCategory,
-            IReadOnlyList<int> nextPointIds,
-            NormalRoomCategory normalRoomCategory = NormalRoomCategory.Random)
+            public StagePointContext Register(
+        int pointId,
+        StageCategory stageCategory,
+        IReadOnlyList<int> nextPointIds,
+        NormalRoomCategory normalRoomCategory = NormalRoomCategory.Random)
+    {
+        if (_contexts.ContainsKey(pointId))
         {
-            if (_contexts.ContainsKey(pointId))
-            {
-                Debug.LogWarning($"[StagePointManager] Duplicate pointId: {pointId}");
-                return _contexts[pointId];
-            }
-
-            var context = new StagePointContext(
-                pointId,
-                stageCategory,
-                nextPointIds,
-                normalRoomCategory
-            );
-
-            _contexts.Add(pointId, context);
-            return context;
+            Debug.LogWarning($"[StagePointManager] Duplicate pointId: {pointId}");
+            return _contexts[pointId];
         }
+
+        var context = new StagePointContext(
+            pointId,
+            stageCategory,
+            nextPointIds,
+            normalRoomCategory
+        );
+
+        _contexts.Add(pointId, context);
+
+        Debug.Log(
+            $"[StagePointManager] Registered PointId={pointId}, " +
+            $"Category={stageCategory}, " +
+            $"Normal={normalRoomCategory}, " +
+            $"Next=[{string.Join(", ", nextPointIds)}]"
+        );
+
+        return context;
+    }
+
 
         public StagePointContext GetContext(int pointId)
         {
@@ -75,6 +93,13 @@ using UnityEngine;
         // =========================
         // Resolve
         // =========================
+
+        public StagePointContext GetStartPoint()
+        {
+            return _contexts.Values
+                .FirstOrDefault(c => c.StageCategory == StageCategory.Start);
+        }
+        
 
         public void ResolveAll()
         {
