@@ -32,7 +32,7 @@ public class WeaponEffectHandler
                 if (!string.IsNullOrEmpty(e.payloadKey))
                 {
                     
-                    GameObject effectObj = Managers.ObjectPooler.SpawnFromPool(
+                    GameObject effectObj = Managers.ObjectPooler.Spawn(
                         e.payloadKey,
                         _player.transform.position + e.positionOffset,
                         Quaternion.Euler(e.rotationEuler)
@@ -60,7 +60,7 @@ public class WeaponEffectHandler
 
                 if (!string.IsNullOrEmpty(c.colliderPrefabKey))
                 {
-                    colliderObj = Managers.ObjectPooler.SpawnFromPool(
+                    colliderObj = Managers.ObjectPooler.Spawn(
                         c.colliderPrefabKey,
                         handTransform.position + c.positionOffset,
                         Quaternion.Euler(c.rotationEuler)

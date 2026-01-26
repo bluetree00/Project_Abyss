@@ -1,11 +1,11 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Cysharp.Threading.Tasks;
+
+#region Debug Data
 
 [Serializable]
 public class LoadedAsset
@@ -14,221 +14,221 @@ public class LoadedAsset
     public AsyncOperationHandle handle;
 }
 
+#endregion
+
+/// <summary>
+/// Addressables를 안전하게 로드 / 생성 / 해제하는 로우 레벨 매니저
+/// - key 기반 로딩
+/// - handle 캐싱
+/// - lifecycle 관리
+/// ❌ 데이터 의미 / 포맷 / JSON 해석 책임 없음
+/// </summary>
 public class AddressableManager
 {
-    private Dictionary<string, AsyncOperationHandle> loadedAssets = new Dictionary<string, AsyncOperationHandle>();
-    public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
+    // -------------------------
+    // State
+    // -------------------------
 
-    // Task -> UniTask로 변경
+    private bool _initialized;
     private UniTask? _initTask;
-    private bool _isInitialized = false;
-    private bool _initFailed = false;
 
-    // Task -> UniTask로 변경
+    // -------------------------
+    // Loaded Handles
+    // -------------------------
+
+    private readonly Dictionary<string, AsyncOperationHandle> _handles
+        = new Dictionary<string, AsyncOperationHandle>();
+
+#if UNITY_EDITOR
+    public IReadOnlyDictionary<string, AsyncOperationHandle> LoadedHandles => _handles;
+    public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
+#endif
+
+    // -------------------------
+    // Initialization
+    // -------------------------
+
     public async UniTask InitAsync()
     {
-        if (_isInitialized) return;
+        if (_initialized)
+            return;
 
-        // 초기화가 이미 진행 중이면 기존 작업 대기
         if (_initTask.HasValue)
         {
             await _initTask.Value;
             return;
         }
 
-        try
-        {
-            _initTask = InitializeAddressablesAsync();
-            await _initTask.Value;
-            _isInitialized = true;
-            _initFailed = false;
-            Debug.Log("Addressables 초기화 성공");
-        }
-        catch (Exception ex)
-        {
-            _initFailed = true;
-            Debug.LogError($"Addressables 초기화 실패: {ex}");
-            throw;
-        }
+        _initTask = InitializeInternalAsync();
+        await _initTask.Value;
+        _initialized = true;
+
+        Debug.Log("[AddressableManager] Initialized");
     }
 
-    // Task -> UniTask로 변경
-    private async UniTask InitializeAddressablesAsync()
+    private async UniTask InitializeInternalAsync()
     {
-        try
-        {
-            var operation = Addressables.InitializeAsync();
-            // Task -> UniTask로 변경
-            await operation.ToUniTask();
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Addressables 초기화 중 오류: {ex.Message}");
-            throw;
-        }
+        var handle = Addressables.InitializeAsync();
+        await handle.ToUniTask();
+
+        if (handle.Status != AsyncOperationStatus.Succeeded)
+            throw new Exception("Addressables initialization failed");
     }
 
-    public bool IsInitialized => _isInitialized;
-    
-    // Task -> UniTask로 변경
     private async UniTask EnsureInitializedAsync()
     {
-        if (_isInitialized) return;
-
-        if (!_initTask.HasValue)
-        {
+        if (!_initialized)
             await InitAsync();
-        }
-        else
-        {
-            await _initTask.Value;
-        }
-
-        if (_initFailed)
-            throw new Exception("Addressables 초기화 실패");
     }
 
-    private void UpdateLoadedAssetsList()
+    // -------------------------
+    // Public Load API
+    // -------------------------
+
+    public async UniTask<T> LoadAssetAsync<T>(string key)
+        where T : UnityEngine.Object
     {
-        loadedAssetsList.Clear();
-        foreach (var kvp in loadedAssets)
+        await EnsureInitializedAsync();
+
+        return await LoadInternalAsync(
+            key,
+            () => Addressables.LoadAssetAsync<T>(key)
+        );
+    }
+
+    public async UniTask<GameObject> InstantiateAsync(string key)
+    {
+        await EnsureInitializedAsync();
+
+        return await LoadInternalAsync(
+            key,
+            () => Addressables.InstantiateAsync(key)
+        );
+    }
+
+    // -------------------------
+    // Internal Unified Loader
+    // -------------------------
+
+    private async UniTask<T> LoadInternalAsync<T>(
+        string key,
+        Func<AsyncOperationHandle<T>> loader
+    ) where T : UnityEngine.Object
+    {
+        if (_handles.TryGetValue(key, out var existing))
         {
-            loadedAssetsList.Add(new LoadedAsset { key = kvp.Key, handle = kvp.Value });
+            return (T)existing.Result;
         }
-    }
-    
-    /// <summary>
-    /// 어드레서블 시스템으로 데이터를 로드하는 함수
-    /// </summary>
-    public void LoadAsset<T>(string key, Action<T> onSuccess = null, Action onFailure = null) where T : UnityEngine.Object
-    {
-        Addressables.LoadAssetAsync<T>(key).Completed += handle =>
+
+        var handle = loader();
+        await handle.ToUniTask();
+
+        if (handle.Status != AsyncOperationStatus.Succeeded)
         {
-            HandleCompletion(handle, key, onSuccess, onFailure);
-        };
-    }
-     
-    //동기 버전으로 사용시
-    public T LoadAssetSync<T>(string key) where T : UnityEngine.Object
-    {
-        var handle = Addressables.LoadAssetAsync<T>(key);
-        handle.WaitForCompletion();  // 동기적으로 대기
+            Debug.LogError($"[AddressableManager] Load Failed: {key}");
+            throw new Exception($"Failed to load Addressable: {key}");
+        }
+
+        _handles[key] = handle;
+        UpdateDebugList();
+
         return handle.Result;
     }
 
-    /// <summary>
-    /// 어드레서블 시스템으로 데이터를 비동기적으로 로드하는 함수
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="key"></param>
-    /// <returns></returns>
-    // Task -> UniTask로 변경
-    public async UniTask<T> LoadAssetAsyncTask<T>(string key) where T : UnityEngine.Object
-    {
-        var handle = Addressables.LoadAssetAsync<T>(key);
-        // Task -> UniTask로 변경
-        await handle.ToUniTask();
-        if (handle.Status == AsyncOperationStatus.Succeeded)
-        {
-            loadedAssets[key] = handle;
-            UpdateLoadedAssetsList();
-            return handle.Result;
-        }
-        else
-        {
-            Debug.LogError($"Failed to load asset: {key}");
-            return null;
-        }
-    }
+    // -------------------------
+    // Release
+    // -------------------------
 
-    /// <summary>
-    /// 어드레서블 시스템으로 프리팹을 생성하는 함수
-    /// </summary>
-    /// <param name="key"></param>
-    /// <param name="onSuccess"></param>
-    /// <param name="onFailure"></param>
-    // Task -> UniTask로 변경
-    public async UniTask InstantiateAsync(string key, Action<GameObject> onSuccess, Action onFailure = null)
+    public void Release(string key)
     {
-        await EnsureInitializedAsync();
-        Addressables.InstantiateAsync(key).Completed += handle =>
+        if (!_handles.TryGetValue(key, out var handle))
         {
-            HandleCompletion(handle, key, onSuccess, onFailure);
-        };
-    }
+            Debug.LogWarning($"[AddressableManager] Release failed (not found): {key}");
+            return;
+        }
 
-    /// <summary>
-    /// 어드레서블 시스템으로 프리팹을 생성하는 비동기 함수
-    /// </summary>
-    /// <param name="key"></param>
-    // Task -> UniTask로 변경
-    public async UniTask<GameObject> InstantiateAsyncTask(string key)
-    {
-        await EnsureInitializedAsync();
-        try
-        {
-            var handle = Addressables.InstantiateAsync(key);
-            // Task -> UniTask로 변경
-            await handle.ToUniTask();
-            if (handle.Status == AsyncOperationStatus.Succeeded)
-                return handle.Result;
-            Debug.LogError($"Failed to instantiate: {key}");
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Exception during Addressables instantiate: {key} - {ex}");
-            return null;
-        }
-    }
-
-    private void HandleCompletion<T>(AsyncOperationHandle<T> handle, string key, Action<T> onSuccess, Action onFailure = null) where T : UnityEngine.Object
-    {
-        if (handle.Status == AsyncOperationStatus.Succeeded)
-        {
-            loadedAssets[key] = handle;
-            UpdateLoadedAssetsList();
-            onSuccess?.Invoke(handle.Result);
-        }
-        else
-        {
-            onFailure?.Invoke();
-        }
-    }
-
-    /// <summary>
-    /// 어드레서블 시스템으로 로드했던 리소스를 해제하는 함수
-    /// </summary>
-    /// <param name="key">해제할 리소스의 키</param>
-    public void ReleaseAsset(string key)
-    {
-        if (loadedAssets.TryGetValue(key, out AsyncOperationHandle handle))
-        {
-            Addressables.Release(handle);
-            Debug.Log($"<color=orange>리소스 데이터 : {key} 를 해제 </color>");
-            loadedAssets.Remove(key);
-            UpdateLoadedAssetsList();
-        }
-        else{
-            Debug.LogError("해당 키의 리소스가 없습니다.");
-        }
-    }
-
-    /// <summary>
-    /// 인스턴스화하여 생성시켰던 오브젝트를 삭제하는 함수
-    /// </summary>
-    /// <param name="key">삭제할 오브젝트의 키</param>
-    public void ReleaseInstance(string key)
-    {
-        if (loadedAssets.TryGetValue(key, out AsyncOperationHandle handle))
-        {
+        if (handle.Result is GameObject)
             Addressables.ReleaseInstance(handle);
-            Debug.Log($"<color=orange>오브젝트 : {key} 를 삭제 </color>");
-            loadedAssets.Remove(key);
-            UpdateLoadedAssetsList();
-        }
-        else{
-            Debug.LogError("해당 키의 오브젝트가 없습니다.");
-        }
+        else
+            Addressables.Release(handle);
+
+        _handles.Remove(key);
+        UpdateDebugList();
+
+        Debug.Log($"[AddressableManager] Released: {key}");
     }
+
+    public void ReleaseAll()
+    {
+        foreach (var kv in _handles)
+        {
+            var handle = kv.Value;
+
+            if (handle.Result is GameObject)
+                Addressables.ReleaseInstance(handle);
+            else
+                Addressables.Release(handle);
+        }
+
+        _handles.Clear();
+        UpdateDebugList();
+
+        Debug.Log("[AddressableManager] Released All");
+    }
+
+    // -------------------------
+    // Debug
+    // -------------------------
+
+    private void UpdateDebugList()
+    {
+#if UNITY_EDITOR
+        loadedAssetsList.Clear();
+        foreach (var kv in _handles)
+        {
+            loadedAssetsList.Add(new LoadedAsset
+            {
+                key = kv.Key,
+                handle = kv.Value
+            });
+        }
+#endif
+    }
+
+
+    //     //기존 코드 백업용 추후 콜백 방식을 async/await로 변경 필요
+    //     public async void LoadAsset<T>(
+    //     string key,
+    //     Action<T> onLoaded,
+    //     Action onFailed = null
+    // )
+    //     where T : UnityEngine.Object
+    // {
+    //     try
+    //     {
+    //         var asset = await LoadAssetAsync<T>(key);
+    //         onLoaded?.Invoke(asset);
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         Debug.LogError(e);
+    //         onFailed?.Invoke();
+    //     }
+    // }
+
+    public static async UniTask<GameObject> LoadPrefabAsync(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return null;
+
+        AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(key);
+        await handle.ToUniTask(); // Task -> UniTask 변환
+
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+            return handle.Result;
+
+        Debug.LogError($"[AddressablesManager] Prefab '{key}' 로드 실패");
+        return null;
+    }
+
+
 }

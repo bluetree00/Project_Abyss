@@ -322,23 +322,34 @@ public class PlayerController : CharacterBase
 
     private async UniTask LoadCharacterDataAsync(string characterName)
     {
-        var utcs = new UniTaskCompletionSource<bool>();
-        Managers.AddressableManager.LoadAsset<CharacterData>(characterName, data =>
+        if (string.IsNullOrEmpty(characterName))
         {
+            Debug.LogError("캐릭터 이름이 비어있습니다.");
+            return;
+        }
+
+        try
+        {
+            // UniTask 기반 Addressables 로드
+            CharacterData data = await Managers.AddressableManager.LoadAssetAsync<CharacterData>(characterName);
+
             if (data == null)
             {
-                Debug.LogError("캐릭터 데이터가 null입니다.");
-                utcs.TrySetResult(false);
+                Debug.LogError($"캐릭터 데이터 '{characterName}' 로드 실패");
                 return;
             }
 
             characterData = data;
             Managers.CharacterData.SetCharacterData(data);
-            utcs.TrySetResult(true);
-        });
 
-        await utcs.Task;
+            Debug.Log($"캐릭터 데이터 '{characterName}' 로드 완료");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"캐릭터 데이터 로드 중 예외 발생: {e.Message}");
+        }
     }
+
 
     private void InitInputActions()
     {

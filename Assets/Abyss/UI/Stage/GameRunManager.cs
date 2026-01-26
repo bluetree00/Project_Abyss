@@ -18,6 +18,10 @@ using System.Linq;
 
         public ChapterId CurrentChapter { get; private set; }
 
+         // -------------------------
+        // 캐시된 Stage Data
+        // -------------------------
+        private Dictionary<int, StageData> stageDataCache;
         // -------------------------
         // 하위 매니저
         // -------------------------
@@ -34,10 +38,15 @@ using System.Linq;
         /// </summary>
         public void StartNewRun(ChapterId chapter)
         {
+
+            IsRunning = true;
+            CurrentChapter = chapter;
+
+            LoadStageData();
+
             StagePointManager = new StagePointManager();
             StagePointManager.Initialize(chapter);
-            
-
+        
             var points = Object.FindObjectsOfType<StagePointUI>();
             foreach (var ui in points)
             {
@@ -75,6 +84,24 @@ using System.Linq;
             // 3. 이동
             CurrentStagePoint = next;
             return true;
+        }
+
+
+        private void LoadStageData()
+        {
+            var textAsset = Resources.Load<TextAsset>("Data/STAGEDATA");
+
+            if (textAsset == null)
+            {
+                Debug.LogError("[GameRun] STAGEDATA.json not found");
+                return;
+            }
+
+            var root = JsonUtility.FromJson<StageDataRoot>(textAsset.text);
+
+            stageDataCache = root.stages.ToDictionary(s => s.stageId, s => s);
+
+            Debug.Log($"[GameRun] StageData Loaded: {stageDataCache.Count}");
         }
 
 

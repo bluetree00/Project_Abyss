@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class StagePointUI : MonoBehaviour
 {
-    [SerializeField] private bool isStartPoint;
     [SerializeField] int pointId;
     [SerializeField] List<int> nextPointIds;
     [SerializeField] StageCategory stageCategory;

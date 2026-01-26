@@ -50,7 +50,6 @@ public class Managers : MonoBehaviour
     // 플레이어, 씬, 데이터, 몬스터
     private PlayerManager _playerManager = new PlayerManager();
     private SceneManagerEx _scene = new SceneManagerEx();
-    private DataManager _data = new DataManager();
     private MonsterDataManager _monsterDataManager;
 
     // Core manager static accessors
@@ -64,7 +63,6 @@ public class Managers : MonoBehaviour
     public static GameEventManager GameEvent => Instance._gameEventManager ??= new GameEventManager();
     public static PlayerManager Player => Instance._playerManager;
     public static SceneManagerEx Scene => Instance._scene;
-    public static DataManager Data => Instance._data;
     public static MonsterDataManager MonsterData => Instance._monsterDataManager ??= new MonsterDataManager();
     #endregion
 
@@ -159,24 +157,7 @@ public class Managers : MonoBehaviour
         Debug.Log("[Managers] AnimationResourceManager 초기화 완료");
     }
 
-    public async Task InitializeObjectPoolAsync(string effectPoolDataName)
-    {
-        if (string.IsNullOrEmpty(effectPoolDataName))
-        {
-            Debug.LogError("effectPoolDataName이 null 또는 빈 문자열입니다.");
-            return;
-        }
 
-        var initialPools = await ObjectPoolEffectInitializer.GetInitialPoolsAsync(effectPoolDataName);
-        if (initialPools == null || initialPools.Count == 0)
-        {
-            Debug.LogError($"'{effectPoolDataName}' 풀 데이터가 비어 있습니다.");
-            return;
-        }
-
-        _objectPoolerManager = new ObjectPoolerManager(initialPools.ToArray());
-        Debug.Log($"[ObjectPoolManager] '{effectPoolDataName}' 초기화 완료");
-    }
 
     public async UniTask InitializeWeaponEffectPoolsAsync(WeaponEffectPackageSO package, int defaultPoolSize = 5)
     {
@@ -214,4 +195,34 @@ public class Managers : MonoBehaviour
         }
     }
     #endregion
+
+
+
+    public class PoolManager : MonoBehaviour
+    {
+        private ObjectPoolerManager _objectPoolerManager;
+
+        /// <summary>
+        /// Addressables 또는 SO 기반 Pool 초기화
+        /// </summary>
+        public async UniTask InitializeObjectPoolsAsync(string addressableKey)
+        {
+            // PoolDataPackage 로드
+            PoolDataPackage package = await Managers.AddressableManager.LoadAssetAsync<PoolDataPackage>(addressableKey);
+            if (package == null || package.Pools.Count == 0)
+            {
+                Debug.LogError($"초기화할 풀 데이터가 없습니다! ({addressableKey})");
+                return;
+            }
+
+            // PoolDataPackage → ObjectPoolerManager용 리스트 변환
+            List<ObjectPoolerManager.Pool> pools = await ObjectPoolDataInitializer.GetPoolsAsync(addressableKey);
+
+            // ObjectPoolerManager 생성
+            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
+            Debug.Log($"[ObjectPoolerManager] 초기화 완료 ({pools.Count} pools)");
+        }
+
+        public ObjectPoolerManager GetObjectPooler() => _objectPoolerManager;
+    }
 }

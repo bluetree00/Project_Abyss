@@ -51,7 +51,6 @@ public abstract class MonsterController : CharacterBase
 
     protected abstract int MonsterId { get; }
 
-
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
@@ -66,11 +65,8 @@ public abstract class MonsterController : CharacterBase
         // AbilitySet 생성
         AbilitySet = abilitySetSO.CreateRuntimeSet(this);
 
-        // 오브젝트 풀 초기화 몬스터가 먼저 필드에 있으면 매니저랑 초기화 타이밍이 겹침 
-        string effectPoolKey = $"{Type}EffectPool";
-        Debug.Log($"[Monster Init] 자동 풀 키: {effectPoolKey}");
+        
 
-        await Managers.Instance.InitializeObjectPoolAsync("BaseTest");
     }
 
     private void OnEnable()

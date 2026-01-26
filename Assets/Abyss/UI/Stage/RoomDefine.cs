@@ -1,19 +1,9 @@
 
-    public enum ChapterId
-    {
-        Chapter1,
-        Chapter2,
-        Chapter3,
-        Chapter4,
-        Chapter5
-    }
+    using System.Collections.Generic;
 
-    public enum StageCategory
-    {
-        Start,
-        Normal,
-        Boss
-    }
+    
+    public enum ChapterId { Chapter1, Chapter2, Chapter3, Chapter4, Chapter5 }
+    public enum StageCategory { Start, Normal, Boss }
 
     public enum NormalRoomCategory
     {
@@ -47,4 +37,19 @@
     {
         NormalShop,
         RareShop
+    }
+
+
+    [System.Serializable]
+    public class StageDataRoot
+    {
+        public List<StageData> stages;
+    }
+
+    [System.Serializable]
+    public class StageData
+    {
+        public int stageId;
+        public StageCategory stageCategory;
+        public NormalRoomCategory normalRoomCategory;
     }
