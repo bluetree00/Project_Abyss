@@ -8,6 +8,7 @@ public class WeaponEffectPackageSO : ScriptableObject
     [Serializable]
     public class ActionEntry
     {
+         public string packageKey;
         [Header("Action Identity")]
         public WeaponAnimGroup group = WeaponAnimGroup.Ground;
         public WeaponActionType actionType;

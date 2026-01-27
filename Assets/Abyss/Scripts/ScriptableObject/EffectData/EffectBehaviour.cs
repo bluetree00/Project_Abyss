@@ -38,7 +38,7 @@ public class EffectBehaviour : MonoBehaviour
         _running = false;
 
         behaviorSO?.OnDespawn(gameObject, owner);
-        Managers.ObjectPooler.ReturnToPool(gameObject);
+        Managers.ObjectPooler.Despawn(gameObject);
     }
 
     public void Initialize(EffectBehaviorSO so, Transform ownerTransform, float life)
