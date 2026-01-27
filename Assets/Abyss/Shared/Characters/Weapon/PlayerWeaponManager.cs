@@ -140,20 +140,6 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     {
         if (runtimeData == null) return;
 
-        // 장비 획득 시점에 해당 장비 이펙트 풀 초기화 (await)
-        try
-        {
-            if (runtimeData.effectPackage != null)
-            {
-                await Managers.Instance.InitializeWeaponEffectPoolsAsync(runtimeData.effectPackage, defaultPoolSizeForEffects);
-                Debug.Log($"[PlayerWeaponManager] Initialized effect pools for {runtimeData.displayName}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed: {ex.Message}");
-        }
-
         _owned.Add(runtimeData);
 
         int empty = GetFirstEmptySlotIndex();
@@ -302,20 +288,6 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     {
         if (runtimeData == null) return;
 
-        // 획득 시점에서 풀 초기화 시도
-        try
-        {
-            if (runtimeData.effectPackage != null)
-            {
-                await Managers.Instance.InitializeWeaponEffectPoolsAsync(runtimeData.effectPackage, defaultPoolSizeForEffects);
-                Debug.Log($"[PlayerWeaponManager] Initialized effect pools for pickup {runtimeData.displayName}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed during pickup: {ex.Message}");
-        }
-
         _owned.Add(runtimeData);
         int empty = GetFirstEmptySlotIndex();
         if (autoEquip && empty >= 0)
@@ -357,19 +329,6 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             var slot = slots[slotIndex];
             var old = slot.runtimeData;
 
-            // ---------- 1) 새 무기의 이펙트 풀을 미리 초기화 ----------
-            if (newRuntime != null && newRuntime.effectPackage != null)
-            {
-                try
-                {
-                    await Managers.Instance.InitializeWeaponEffectPoolsAsync(newRuntime.effectPackage, defaultPoolSizeForEffects);
-                    Debug.Log($"[PlayerWeaponManager] Initialized effect pools for replacement {newRuntime.displayName}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[PlayerWeaponManager] InitializeWeaponEffectPoolsAsync failed during replace: {ex.Message}");
-                }
-            }
 
             // ---------- 2) 기존 인스턴스 정리 (Addressables 인스턴스는 ReleaseInstance 호출) ----------
             if (slot.instance != null)
