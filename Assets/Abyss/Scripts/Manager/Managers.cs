@@ -90,6 +90,8 @@ public class Managers : MonoBehaviour
         // 코어 매니저 초기화
         _addressableManager = new AddressableManager();
 
+        _objectPoolerManager = new ObjectPoolerManager();
+
         // Addressables 초기화 후 애니메이션 리소스 초기화
         InitializeAddressablesAsync().ContinueWith(async () =>
         {
@@ -118,8 +120,6 @@ public class Managers : MonoBehaviour
         SaveGameData();
     }
     #endregion
-
-    #region Initialization Methods
     private async UniTask InitializeAddressablesAsync()
     {
         try
@@ -157,28 +157,7 @@ public class Managers : MonoBehaviour
         Debug.Log("[Managers] AnimationResourceManager 초기화 완료");
     }
 
-
-
-    public async UniTask InitializeWeaponEffectPoolsAsync(WeaponEffectPackageSO package, int defaultPoolSize = 5)
-    {
-        if (package == null) return;
-
-        var pools = await WeaponEffectPackagePoolInitializer.GetPoolsAsync(package, defaultPoolSize);
-        if (pools.Count == 0) return;
-
-        if (_objectPoolerManager == null)
-        {
-            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
-        }
-        else
-        {
-            _objectPoolerManager.RegisterPools(pools.ToArray());
-        }
-
-        Debug.Log($"[Managers] 장비 풀 초기화 완료: {package.name} ({pools.Count} pools)");
-    }
-    #endregion
-
+   
     #region Save / Clear
     private void SaveGameData()
     {
@@ -196,33 +175,4 @@ public class Managers : MonoBehaviour
     }
     #endregion
 
-
-
-    public class PoolManager : MonoBehaviour
-    {
-        private ObjectPoolerManager _objectPoolerManager;
-
-        /// <summary>
-        /// Addressables 또는 SO 기반 Pool 초기화
-        /// </summary>
-        public async UniTask InitializeObjectPoolsAsync(string addressableKey)
-        {
-            // PoolDataPackage 로드
-            PoolDataPackage package = await Managers.AddressableManager.LoadAssetAsync<PoolDataPackage>(addressableKey);
-            if (package == null || package.Pools.Count == 0)
-            {
-                Debug.LogError($"초기화할 풀 데이터가 없습니다! ({addressableKey})");
-                return;
-            }
-
-            // PoolDataPackage → ObjectPoolerManager용 리스트 변환
-            List<ObjectPoolerManager.Pool> pools = await ObjectPoolDataInitializer.GetPoolsAsync(addressableKey);
-
-            // ObjectPoolerManager 생성
-            _objectPoolerManager = new ObjectPoolerManager(pools.ToArray());
-            Debug.Log($"[ObjectPoolerManager] 초기화 완료 ({pools.Count} pools)");
-        }
-
-        public ObjectPoolerManager GetObjectPooler() => _objectPoolerManager;
-    }
 }

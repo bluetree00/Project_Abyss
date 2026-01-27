@@ -1,4 +1,5 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 public class WeaponEffectHandler
 {
@@ -9,7 +10,7 @@ public class WeaponEffectHandler
         _player = player;
     }
 
-    public void PlayEffect(WeaponActionType actionType, int currentComboIndex, int step = 0)
+    public async UniTaskVoid PlayEffect(WeaponActionType actionType,int currentComboIndex,int step = 0)
     {
         if (_player == null) return;
 
@@ -25,34 +26,41 @@ public class WeaponEffectHandler
 
         foreach (var s in abilitySteps)
         {
-            // 1. Effect 생성 (어빌리티 키 사용)
+            // =========================
+            // 1. Effect (Pool Spawn)
+            // =========================
             if (s.effect != null)
             {
                 var e = s.effect;
                 if (!string.IsNullOrEmpty(e.payloadKey))
                 {
-                    
-                    GameObject effectObj = Managers.ObjectPooler.Spawn(
+                    GameObject effectObj = await Managers.ObjectPooler.SpawnAsync(
                         e.payloadKey,
+                        ObjectPoolerManager.PoolType.Effect,
                         _player.transform.position + e.positionOffset,
                         Quaternion.Euler(e.rotationEuler)
                     );
-                    effectObj.transform.localScale *= e.scaleMultiplier;
 
-                    // EffectBehaviour가 없으면 자동으로 붙임
+                    // 🔥 풀 재사용 대응 (누적 방지)
+                    effectObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+
                     var effectBehaviour = effectObj.GetComponent<EffectBehaviour>();
                     if (effectBehaviour == null)
                     {
                         effectBehaviour = effectObj.AddComponent<EffectBehaviour>();
                     }
 
-                    EffectBehaviorSO so = e.behavior;
-
-                    effectBehaviour.Initialize(so, _player.transform, e.lifeTimeMultiplier);
+                    effectBehaviour.Initialize(
+                        e.behavior,
+                        _player.transform,
+                        e.lifeTimeMultiplier
+                    );
                 }
             }
 
-            // 2. Collider 생성 (어빌리티 키 사용)
+            // =========================
+            // 2. Collider (Pool Spawn)
+            // =========================
             if (s.collider != null)
             {
                 var c = s.collider;
@@ -60,14 +68,34 @@ public class WeaponEffectHandler
 
                 if (!string.IsNullOrEmpty(c.colliderPrefabKey))
                 {
-                    colliderObj = Managers.ObjectPooler.Spawn(
+                    colliderObj = await Managers.ObjectPooler.SpawnAsync(
                         c.colliderPrefabKey,
+                        ObjectPoolerManager.PoolType.Effect,
                         handTransform.position + c.positionOffset,
                         Quaternion.Euler(c.rotationEuler)
                     );
+
+
+                    // 🔥 풀 재사용 대응
+                    var colliderInstance = colliderObj.GetComponent<ColliderInstance>();
+                    if (colliderInstance == null)
+                    {
+                        colliderInstance = colliderObj.AddComponent<ColliderInstance>();
+                    }
+
+                    colliderInstance.damage = c.damage;
+                    colliderInstance.hitInterval = c.hitInterval;
+                    colliderInstance.owner = _player.gameObject;
+                    colliderInstance.actionType = actionType;
+                    colliderInstance.payloadKey = c.payloadKey;
+                    colliderInstance.knockbackMultiplier = c.durationMultiplier;
+                    colliderInstance.duration = c.duration;
+
+                    colliderObj.SetActive(true);
                 }
                 else
                 {
+                    // 기존 Runtime Collider 로직 유지
                     colliderObj = new GameObject("RuntimeCollider");
                     colliderObj.transform.position = handTransform.position + c.positionOffset;
                     colliderObj.transform.rotation = Quaternion.Euler(c.rotationEuler);
@@ -99,7 +127,8 @@ public class WeaponEffectHandler
                     colliderInstance.payloadKey = c.payloadKey;
                     colliderInstance.knockbackMultiplier = c.durationMultiplier;
                     colliderInstance.duration = c.duration;
-                    colliderInstance.gameObject.SetActive(true);
+
+                    colliderObj.SetActive(true);
                 }
 
                 c.behavior?.ApplyColliderBehavior(colliderObj, _player.transform);
