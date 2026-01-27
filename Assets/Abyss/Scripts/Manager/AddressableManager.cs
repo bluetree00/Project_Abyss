@@ -195,27 +195,6 @@ public class AddressableManager
 #endif
     }
 
-
-    //     //기존 코드 백업용 추후 콜백 방식을 async/await로 변경 필요
-    //     public async void LoadAsset<T>(
-    //     string key,
-    //     Action<T> onLoaded,
-    //     Action onFailed = null
-    // )
-    //     where T : UnityEngine.Object
-    // {
-    //     try
-    //     {
-    //         var asset = await LoadAssetAsync<T>(key);
-    //         onLoaded?.Invoke(asset);
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         Debug.LogError(e);
-    //         onFailed?.Invoke();
-    //     }
-    // }
-
     public static async UniTask<GameObject> LoadPrefabAsync(string key)
     {
         if (string.IsNullOrEmpty(key)) return null;
@@ -229,6 +208,25 @@ public class AddressableManager
         Debug.LogError($"[AddressablesManager] Prefab '{key}' 로드 실패");
         return null;
     }
+
+
+    public async UniTask PreloadAsync(IEnumerable<string> keys)
+    {
+        await EnsureInitializedAsync();
+
+        foreach (var key in keys)
+        {
+            if (_handles.ContainsKey(key))
+                continue;
+
+            var handle = Addressables.LoadAssetAsync<UnityEngine.Object>(key);
+            await handle.ToUniTask();
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+                _handles[key] = handle;
+        }
+    }
+
 
 
 }
