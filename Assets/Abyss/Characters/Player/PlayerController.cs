@@ -14,7 +14,6 @@ using System.Collections.Generic;
 
 public class PlayerController : CharacterBase
 {
-
       // 무기 장착 여부 검사 유틸
     public bool CanAttack()
     {
@@ -478,10 +477,11 @@ public class PlayerController : CharacterBase
     [Header("Jump Settings")]
     public float jumpForce = 6f; // 점프 힘
 
+
     // 점프 입력 처리
     public void ProcessJump()
     {
-        Managers.GameRun.StartNewRun(ChapterId.Chapter1);
+     
         // 이미 공중이면 점프 불가
         if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
 

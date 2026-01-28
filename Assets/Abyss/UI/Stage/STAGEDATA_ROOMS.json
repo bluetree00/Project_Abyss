@@ -1,0 +1,117 @@
+{
+  "rooms": [
+    {
+      "roomId": "battle_001",
+      "name": "Slime Forest",
+      "category": "Battle",
+      "difficulty": 1,
+      "weight": 10,
+      "prefab": "Room_Battle_SlimeForest",
+      "tags": ["normal", "early"]
+    },
+    {
+      "roomId": "battle_002",
+      "name": "Goblin Camp",
+      "category": "Battle",
+      "difficulty": 2,
+      "weight": 8,
+      "prefab": "Room_Battle_GoblinCamp",
+      "tags": ["normal"]
+    },
+    {
+      "roomId": "battle_003",
+      "name": "Undead Crypt",
+      "category": "Battle",
+      "difficulty": 3,
+      "weight": 5,
+      "prefab": "Room_Battle_UndeadCrypt",
+      "tags": ["normal", "hard"]
+    },
+
+    {
+      "roomId": "elite_001",
+      "name": "Elite Goblin Knight",
+      "category": "Elite",
+      "difficulty": 3,
+      "weight": 5,
+      "prefab": "Room_Elite_GoblinKnight",
+      "tags": ["elite"]
+    },
+
+    {
+      "roomId": "event_001",
+      "name": "Mysterious Event",
+      "category": "Event",
+      "difficulty": 0,
+      "weight": 6,
+      "prefab": "Room_Event_Mystery",
+      "tags": ["story"]
+    },
+    {
+      "roomId": "event_002",
+      "name": "Treasure Room",
+      "category": "Event",
+      "difficulty": 0,
+      "weight": 4,
+      "prefab": "Room_Event_Treasure",
+      "tags": ["reward"]
+    },
+
+    {
+      "roomId": "shop_001",
+      "name": "Normal Shop",
+      "category": "Shop",
+      "difficulty": 0,
+      "weight": 7,
+      "prefab": "Room_Shop_Normal",
+      "tags": ["shop"]
+    },
+    {
+      "roomId": "shop_002",
+      "name": "Rare Shop",
+      "category": "Shop",
+      "difficulty": 0,
+      "weight": 3,
+      "prefab": "Room_Shop_Rare",
+      "tags": ["shop", "rare"]
+    },
+
+    {
+      "roomId": "start_001",
+      "name": "Campfire Start",
+      "category": "Start",
+      "difficulty": 0,
+      "weight": 10,
+      "prefab": "Room_Start_Campfire",
+      "tags": ["start"]
+    },
+    {
+      "roomId": "start_002",
+      "name": "Tutorial Start",
+      "category": "Start",
+      "difficulty": 0,
+      "weight": 6,
+      "prefab": "Room_Start_Tutorial",
+      "tags": ["start", "tutorial"]
+    },
+
+    {
+      "roomId": "boss_001",
+      "name": "Boss: Ancient Slime King",
+      "category": "Boss",
+      "difficulty": 0,
+      "weight": 10,
+      "prefab": "Room_Boss_SlimeKing",
+      "tags": ["boss"]
+    },
+    {
+      "roomId": "boss_002",
+      "name": "Boss: Goblin Warlord",
+      "category": "Boss",
+      "difficulty": 0,
+      "weight": 8,
+      "prefab": "Room_Boss_GoblinWarlord",
+      "tags": ["boss"]
+    }
+  ]
+}
