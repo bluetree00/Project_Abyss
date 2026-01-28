@@ -18,7 +18,12 @@ MonoBehaviour:
   m_GUID: c2fc2d31b26efff43bf40d41dd854055
   m_SerializeEntries:
   - m_GUID: 9d8cc533fb32d6e40a4ca366785b2804
-    m_Address: Assets/Abyss/UI/Stage/STAGEDATA.json
+    m_Address: STAGEDATA_ROOMS
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c17696832d6bc9448da2d76b5567563
+    m_Address: STAGEDATA_STAGE
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

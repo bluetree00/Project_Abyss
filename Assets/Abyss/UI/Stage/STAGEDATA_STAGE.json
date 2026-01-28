@@ -1,0 +1,24 @@
+{
+  "stages": [
+    {
+      "stageId": 1,
+      "stageCategory": "Start",
+      "normalRoomCategory": "Random"
+    },
+    {
+      "stageId": 2,
+      "stageCategory": "Normal",
+      "normalRoomCategory": "Battle"
+    },
+    {
+      "stageId": 3,
+      "stageCategory": "Normal",
+      "normalRoomCategory": "Shop"
+    },
+    {
+      "stageId": 4,
+      "stageCategory": "Boss",
+      "normalRoomCategory": "Random"
+    }
+  ]
+}
