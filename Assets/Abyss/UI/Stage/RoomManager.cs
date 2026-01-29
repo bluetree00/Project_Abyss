@@ -140,4 +140,41 @@ public sealed class RoomManager
 
         return rooms[^1];
     }
+
+
+    public bool HasCandidates(
+    RoomCategory category,
+    int? minDifficulty = null,
+    int? maxDifficulty = null,
+    IEnumerable<string> requiredTags = null)
+    {
+        if (!IsInitialized) return false;
+        if (!_byCategory.TryGetValue(category, out var list) || list.Count == 0) return false;
+
+        IEnumerable<RoomData> q = list;
+
+        if (minDifficulty.HasValue) q = q.Where(r => r.difficulty >= minDifficulty.Value);
+        if (maxDifficulty.HasValue) q = q.Where(r => r.difficulty <= maxDifficulty.Value);
+
+        if (requiredTags != null)
+        {
+            var tagSet = requiredTags
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (tagSet.Count > 0)
+            {
+                q = q.Where(r =>
+                    r.tags != null &&
+                    tagSet.All(rt => r.tags.Any(t => string.Equals(t, rt, StringComparison.OrdinalIgnoreCase)))
+                );
+            }
+        }
+
+        // weight > 0 후보가 있는지만 체크
+        return q.Any(r => r.weight > 0);
+    }
+
+
 }

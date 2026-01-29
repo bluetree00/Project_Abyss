@@ -48,6 +48,19 @@ public sealed class GameRunManager
         StagePointManager.SetStartAsCurrent();
     }
 
+    public void RegisterPoints(IEnumerable<StagePointUI> points)
+    {
+        foreach (var ui in points)
+            ui.Register(StagePointManager, RoomManager);
+    }
+
+    public void ResolveAllPointsAndSetStart()
+    {
+        StagePointManager.ResolveAll();
+        StagePointManager.SetStartAsCurrent();
+    }
+
+
     private async UniTask LoadStageDataAsync(string key)
     {
         TextAsset textAsset = null;

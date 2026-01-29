@@ -277,4 +277,37 @@ public sealed class StagePointManager
             }
         }
     }
+
+
+    public bool TryGetResolvedRoomId(int pointId, out string roomId)
+    {
+        roomId = null;
+
+        var ctx = GetContext(pointId);
+        if (ctx == null) return false;
+
+        // 방문 시점 Resolve 보장 로직이 있지만, 혹시 모르게 여기서도 보장
+        Resolve(ctx);
+
+        roomId = ctx.ResolvedRoomId; // (StagePointContext에 해당 프로퍼티가 있다고 가정)
+        return !string.IsNullOrEmpty(roomId);
+    }
+
+    public bool TryGetRoomPrefabKey(int pointId, out string prefabKey)
+    {
+        prefabKey = null;
+
+        if (_roomManager == null || !_roomManager.IsInitialized)
+            return false;
+
+        if (!TryGetResolvedRoomId(pointId, out var roomId))
+            return false;
+
+        var room = _roomManager.GetById(roomId);
+        if (room == null) return false;
+
+        prefabKey = room.prefab; //JSON의 prefab 필드
+        return !string.IsNullOrEmpty(prefabKey);
+    }
+
 }
