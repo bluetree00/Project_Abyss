@@ -449,7 +449,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.16256998, y: -0.31528774, z: -0.05509238, w: 0.93334323}
+  m_LocalRotation: {x: -0.16256127, y: -0.31527045, z: -0.055087563, w: 0.93335086}
   m_LocalPosition: {x: 0, y: 0.4, z: -1.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -943,6 +943,57 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 587577160}
   m_CullTransparentMesh: 1
+--- !u!1 &669045120
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 669045122}
+  - component: {fileID: 669045121}
+  m_Layer: 0
+  m_Name: StageMapSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &669045121
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 669045120}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aab82bbaac500b04fbbb50b45eeb3b66, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mapRoot: {fileID: 0}
+  playerSpawnPoint: {fileID: 0}
+  fadeCanvasGroup: {fileID: 0}
+  fadeOutDuration: 0.25
+  fadeInDuration: 0.25
+  minTransitionTime: 0.35
+  logDebug: 0
+--- !u!4 &669045122
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 669045120}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1130.9082, y: 34.892754, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &678808849 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1448802487505317936, guid: db18c22cee80cc74487b0900361715f6,
@@ -2226,6 +2277,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ebc3e78eaf9756f4185f48badaae4067, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  autoCreateRunBootstrapper: 1
+  logAutoCreateWarning: 1
 --- !u!4 &1235460880
 Transform:
   m_ObjectHideFlags: 0
@@ -2715,6 +2768,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startButton: {fileID: 0}
   chapter: 0
+  bootstrapper: {fileID: 0}
 --- !u!114 &1578154032
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4007,3 +4061,4 @@ SceneRoots:
   - {fileID: 1428764871}
   - {fileID: 867780929}
   - {fileID: 18658504}
+  - {fileID: 669045122}

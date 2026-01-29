@@ -1,20 +1,32 @@
+using System;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using System;
+using UnityEngine;
 
+/// <summary>
+/// Run(런) 단위 상태 관리자
+/// - RoomManager/StagePointManager 초기화
+/// - StagePointUI 등록(구독) → ResolveAll → Start 세팅
+/// - UI 클릭으로 이동 요청 처리 + 맵 스폰(Spawner) 호출
+/// </summary>
 public sealed class GameRunManager
 {
     private const string ROOMS_KEY = "STAGEDATA_ROOMS";
     private const string STAGE_KEY = "STAGEDATA_STAGE";
+
     public ChapterId CurrentChapter { get; private set; }
     public bool IsRunning { get; private set; }
+
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
 
-    private Dictionary<int, StageData> stageDataCache;
+    /// <summary>씬에서 생성되는 StageMapSpawner를 Bootstrapper가 주입</summary>
+    public StageMapSpawner Spawner { get; set; }
 
+    private Dictionary<int, StageData> _stageDataCache;
+
+    // -------------------- Run Start --------------------
     public async UniTask StartNewRunAsync(ChapterId chapter)
     {
         IsRunning = true;
@@ -30,37 +42,153 @@ public sealed class GameRunManager
         if (!RoomManager.IsInitialized)
         {
             Debug.LogError($"[GameRun] RoomManager init failed. Check Addressables Address='{ROOMS_KEY}'");
+            IsRunning = false;
             return;
         }
 
-        // 3) StagePoint
+        // 3) StagePoint (런 단위 상태)
         StagePointManager = new StagePointManager();
         StagePointManager.Initialize(chapter, RoomManager);
-
-        // 4) UI -> Register
-        var points = UnityEngine.Object.FindObjectsOfType<StagePointUI>();
-        foreach (var ui in points)
-            ui.Register(StagePointManager, RoomManager);
-
-
-        // 5) Resolve + Start
-        StagePointManager.ResolveAll();
-        StagePointManager.SetStartAsCurrent();
     }
 
+    // -------------------- Scene Bind --------------------
+    /// <summary>
+    /// 씬의 StagePointUI를 런 시스템에 등록(이벤트 구독 포함)
+    /// - 반드시 ResolveAll 전에 호출되어야 UI가 OnPointResolved를 받는다.
+    /// </summary>
     public void RegisterPoints(IEnumerable<StagePointUI> points)
     {
+        if (!IsRunning || StagePointManager == null || RoomManager == null)
+        {
+            Debug.LogWarning("[GameRun] RegisterPoints ignored: not ready");
+            return;
+        }
+
         foreach (var ui in points)
             ui.Register(StagePointManager, RoomManager);
     }
 
+    /// <summary>
+    /// 모든 노드 룸 확정 + Start 포인트를 현재로 세팅.
+    /// UI가 Register된 뒤 호출해야 UI 표시가 바로 갱신됨.
+    /// </summary>
     public void ResolveAllPointsAndSetStart()
     {
+        if (!IsRunning || StagePointManager == null)
+        {
+            Debug.LogWarning("[GameRun] ResolveAllPointsAndSetStart ignored: not ready");
+            return;
+        }
+
         StagePointManager.ResolveAll();
         StagePointManager.SetStartAsCurrent();
     }
 
+    // -------------------- Map Spawn / Movement --------------------
+    /// <summary>
+    /// 현재 포인트(현재 스테이지)의 맵을 스폰한다.
+    /// - CurrentPointId의 ResolvedRoomId → RoomData.prefab(Addressables key) → Spawner.ChangeMap
+    /// </summary>
+    public void SpawnCurrentPointMap()
+    {
+        if (!IsRunning || StagePointManager == null || RoomManager == null)
+        {
+            Debug.LogWarning("[GameRun] SpawnCurrentPointMap ignored: not ready");
+            return;
+        }
 
+        if (Spawner == null)
+        {
+            Debug.LogError("[GameRun] Spawner is not injected. (GameRunBootstrapper에서 주입 필요)");
+            return;
+        }
+
+        if (StagePointManager.CurrentPointId < 0)
+        {
+            Debug.LogWarning("[GameRun] CurrentPointId < 0. Start를 먼저 세팅하세요.");
+            return;
+        }
+
+        var ctx = StagePointManager.GetContext(StagePointManager.CurrentPointId);
+        if (ctx == null)
+        {
+            Debug.LogError($"[GameRun] Context not found. pointId={StagePointManager.CurrentPointId}");
+            return;
+        }
+
+        // 방문 시 Resolve 보장이 있지만, 안전하게 한 번 더
+        StagePointManager.Resolve(ctx);
+
+        var roomId = ctx.ResolvedRoomId;
+        if (string.IsNullOrEmpty(roomId))
+        {
+            Debug.LogError($"[GameRun] ResolvedRoomId is empty. pointId={ctx.PointId}");
+            return;
+        }
+
+        var room = RoomManager.GetById(roomId);
+        if (room == null)
+        {
+            Debug.LogError($"[GameRun] Room not found. roomId={roomId}");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(room.prefab))
+        {
+            Debug.LogError($"[GameRun] Room prefab key is empty. roomId={roomId}");
+            return;
+        }
+
+        Spawner.ChangeMap(room.prefab);
+    }
+
+    /// <summary>
+    /// UI 클릭 등으로 "해당 포인트로 이동"을 요청한다.
+    /// - 이동 성공 시 맵 교체까지 수행
+    /// </summary>
+    public void RequestMoveTo(int targetPointId)
+    {
+        if (!IsRunning || StagePointManager == null)
+        {
+            Debug.LogWarning("[GameRun] RequestMoveTo ignored: not running");
+            return;
+        }
+
+        if (!StagePointManager.CanMove(targetPointId))
+            return;
+
+        if (!StagePointManager.TryMoveTo(targetPointId))
+            return;
+
+        SpawnCurrentPointMap();
+    }
+
+    /// <summary>
+    /// 외부에서 특정 포인트를 스폰하고 싶을 때(선택)
+    /// </summary>
+    public void SpawnPointMap(int pointId)
+    {
+        if (!IsRunning || StagePointManager == null || RoomManager == null)
+            return;
+
+        if (Spawner == null)
+        {
+            Debug.LogError("[GameRun] Spawner is not injected.");
+            return;
+        }
+
+        var ctx = StagePointManager.GetContext(pointId);
+        if (ctx == null) return;
+
+        StagePointManager.Resolve(ctx);
+
+        var room = RoomManager.GetById(ctx.ResolvedRoomId);
+        if (room == null || string.IsNullOrEmpty(room.prefab)) return;
+
+        Spawner.ChangeMap(room.prefab);
+    }
+
+    // -------------------- Optional: Stage Data --------------------
     private async UniTask LoadStageDataAsync(string key)
     {
         TextAsset textAsset = null;
@@ -88,7 +216,7 @@ public sealed class GameRunManager
             return;
         }
 
-        stageDataCache = root.stages.ToDictionary(s => s.stageId, s => s);
-        Debug.Log($"[GameRun] StageData Loaded: {stageDataCache.Count}");
+        _stageDataCache = root.stages.ToDictionary(s => s.stageId, s => s);
+        Debug.Log($"[GameRun] StageData Loaded: {_stageDataCache.Count}");
     }
 }

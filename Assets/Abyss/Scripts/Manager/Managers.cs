@@ -70,6 +70,10 @@ public class Managers : MonoBehaviour
     // Run 단위 매니저: Stage, Player, Run 상태 추적
     private GameRunManager _gameRunManager;
     public static GameRunManager GameRun => Instance._gameRunManager ??= new GameRunManager();
+
+    [Header("Bootstrapper Auto-Create (Safety Net)")]
+    [SerializeField] private bool autoCreateRunBootstrapper = true;
+    [SerializeField] private bool logAutoCreateWarning = true;
     #endregion
 
     #region Unity Callbacks
@@ -97,6 +101,9 @@ public class Managers : MonoBehaviour
         {
             await InitializeAnimationsAsync();
         }).Forget();
+
+        // 첫 씬에서도 바로 확보(에디터 플레이 시 sceneLoaded 전에 필요할 때 대비)
+        EnsureGameRunBootstrapperInScene();
     }
 
     private void Update()
@@ -113,6 +120,25 @@ public class Managers : MonoBehaviour
                 UI.ShowPopupUI<UI_Pause>();
             }
         }
+    }
+
+     // -------------------------
+    // 핵심: Bootstrapper 확보
+    // -------------------------
+     private void EnsureGameRunBootstrapperInScene()
+    {
+        if (!autoCreateRunBootstrapper)
+            return;
+
+        var existing = FindObjectOfType<GameRunBootstrapper>(true);
+        if (existing != null)
+            return;
+
+        if (logAutoCreateWarning)
+            Debug.LogWarning("[Managers] GameRunBootstrapper not found in scene. Auto-created.");
+
+        var go = new GameObject("@GameRunBootstrapper");
+        go.AddComponent<GameRunBootstrapper>(); // Awake에서 Bind() 호출
     }
 
     private void OnApplicationQuit()

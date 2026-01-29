@@ -3,24 +3,47 @@ using Cysharp.Threading.Tasks;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
 {
-    [SerializeField] private ChapterId startChapter;
-    // [SerializeField] private StageMapSpawner spawner;
+    [SerializeField] private StageMapSpawner spawner;
 
-    // public void Bind(GameRunManager run)
-    // {
-    //     // spawner를 인스펙터로 못 넣는 경우도 있으니 보강
-    //     if (spawner == null)
-    //         spawner = FindObjectOfType<StageMapSpawner>(true);
+    private StagePointUI[] _points;
 
-    //     run.Spawner = spawner; // GameRunManager에 Spawner 프로퍼티 추가
-    // }
+    private void Awake()
+    {
+        Bind();
+    }
+     
+     public void Bind()
+    {
+        if (spawner == null)
+            spawner = FindObjectOfType<StageMapSpawner>(true);
 
-    // private async void Start()
-    // {
-    //     // 시작 런 자동 실행이 필요하면 여기서
-    //     await Managers.GameRun.StartNewRunAsync(startChapter);
+        Managers.GameRun.Spawner = spawner;
 
-    //     // Start 지점 맵 스폰까지 하고 싶으면:
-    //     Managers.GameRun.SpawnCurrentPointMap(); // 이런 식의 메서드로 분리 권장
-    // }
+        // (선택) 런이 이미 진행 중인데 씬이 다시 로드된 상황 대비
+        if (Managers.GameRun.IsRunning && Managers.GameRun.StagePointManager != null)
+        {
+            _points = FindObjectsOfType<StagePointUI>(true);
+            Managers.GameRun.RegisterPoints(_points);
+        }
+    }
+
+    public async UniTask StartRunAsync(ChapterId chapter)
+    {
+        // 1) 런 로직 초기화
+        await Managers.GameRun.StartNewRunAsync(chapter);
+
+        if (!Managers.GameRun.IsRunning || Managers.GameRun.RoomManager == null || !Managers.GameRun.RoomManager.IsInitialized)
+            return;
+
+        // 2) 씬 UI 등록 (구독 먼저!)
+        _points = FindObjectsOfType<StagePointUI>(true);
+        Managers.GameRun.RegisterPoints(_points); // <- GameRunManager에 추가해둔 메서드
+
+        // 3) 전체 Resolve + Start 세팅
+        Managers.GameRun.ResolveAllPointsAndSetStart(); // <- 이것도 GameRunManager에 추가
+
+        // 4) 시작 맵 스폰
+        Managers.GameRun.Spawner = spawner; // 주입(혹은 Bind에서 한 번)
+        Managers.GameRun.SpawnCurrentPointMap();
+    }
 }
