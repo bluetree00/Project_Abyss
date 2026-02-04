@@ -28,6 +28,7 @@ public sealed class GameRunManager
 
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
+    
 
     /// <summary>씬에서 생성되는 StageMapSpawner를 Bootstrapper가 주입</summary>
     public StageMapSpawner Spawner { get; private set; }
@@ -40,6 +41,8 @@ public sealed class GameRunManager
     /// HUD는 가능하면 이 상태를 구독해서 표시
     /// </summary>
     public PlayerRunState PlayerState { get; private set; }
+
+    public event Action<PlayerController> OnPlayerBound;
 
     /// <summary>런 도중 획득/변경된 영구 반영 후보(재화/아이템 등)</summary>
     public RunDelta RunDelta { get; private set; } = new RunDelta();
@@ -157,7 +160,12 @@ public sealed class GameRunManager
     public void BindPlayer(PlayerController player)
     {
         Player = player;
-        if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
+
+        if (Player == null)
+            Debug.LogWarning("[GameRun] BindPlayer: player is null");
+
+        // ✅ 여기서 HUD/시스템에 알림
+        OnPlayerBound?.Invoke(Player);
     }
 
     // =========================================================

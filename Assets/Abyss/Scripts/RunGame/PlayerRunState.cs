@@ -1,29 +1,45 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+using System;
 
-/// <summary>
-/// 인게임 전용 플레이어 런 상태(예시)
-/// - 실제 프로젝트에 맞게 HP/버프/스탯 등을 추가
-/// </summary>
 public sealed class PlayerRunState
 {
+    public int Hp { get; private set; }
+    public int MaxHp { get; private set; }
+
     public int TempGold { get; private set; }
 
-    public void AddTempGold(int amount) => TempGold += amount;
-}
+    public event Action<int, int> OnHpChanged;     // (hp, maxHp)
+    public event Action<int> OnGoldChanged;        // tempGold
 
-/// <summary>
-/// 아이템 스택(예시)
-/// </summary>
-public readonly struct ItemStack
-{
-    public readonly ItemId ItemId;
-    public readonly int Count;
-
-    public ItemStack(ItemId itemId, int count)
+    public PlayerRunState(int maxHp = 100)
     {
-        ItemId = itemId;
-        Count = count;
+        MaxHp = maxHp;
+        Hp = maxHp;
+    }
+
+    public void SetHp(int hp)
+    {
+        hp = Math.Clamp(hp, 0, MaxHp);
+        if (Hp == hp) return;
+        Hp = hp;
+        OnHpChanged?.Invoke(Hp, MaxHp);
+    }
+
+    public void SetMaxHp(int maxHp, bool healToFull = false)
+    {
+        maxHp = Math.Max(1, maxHp);
+        if (MaxHp == maxHp) return;
+
+        MaxHp = maxHp;
+        if (Hp > MaxHp) Hp = MaxHp;
+        if (healToFull) Hp = MaxHp;
+
+        OnHpChanged?.Invoke(Hp, MaxHp);
+    }
+
+    public void AddTempGold(int amount)
+    {
+        if (amount <= 0) return;
+        TempGold += amount;
+        OnGoldChanged?.Invoke(TempGold);
     }
 }
