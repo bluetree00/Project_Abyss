@@ -2990,10 +2990,10 @@ MonoBehaviour:
   characterData: {fileID: 0}
   WeaponManager: {fileID: 0}
   inputReady: 0
+  cinemachineCamera: {fileID: 0}
   EventReceiver: {fileID: 0}
   locoStateDebug: 0
   actStateDebug: 0
-  cinemachineCamera: {fileID: 0}
   handTransform: {fileID: 0}
   isAttacking: 0
   nextComboQueued: 0

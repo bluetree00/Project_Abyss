@@ -4,25 +4,84 @@ public sealed class HudPresenter : MonoBehaviour
 {
     [SerializeField] private HudView view;
 
-    private CharacterDataManager _character;
+    private GameRunManager _run;
     private UIHudDataProvider _provider;
 
-    public void Construct(CharacterDataManager character, UIHudDataProvider provider)
+    private PlayerController _player;
+
+    public void Construct(GameRunManager run, UIHudDataProvider provider)
     {
-        _character = character;
+        _run = run;
         _provider = provider;
 
-        // 초기 표시
-        Refresh();
+        if (_run == null || _provider == null)
+        {
+            Debug.LogError("[HudPresenter] Construct failed: run/provider is null.");
+            return;
+        }
 
-        // 데이터 변경되면 HUD 갱신
-        _character.OnChanged += Refresh;
+        _run.OnRunStarted -= OnRunStarted;
+        _run.OnRunEnded -= OnRunEnded;
+        _run.OnRunStarted += OnRunStarted;
+        _run.OnRunEnded += OnRunEnded;
+
+        // 이미 런 중이면 즉시 반영
+        if (_run.IsRunning) OnRunStarted();
+        else Refresh();
     }
 
     private void OnDestroy()
     {
-        if (_character != null)
-            _character.OnChanged -= Refresh;
+        UnbindPlayer();
+
+        if (_run != null)
+        {
+            _run.OnRunStarted -= OnRunStarted;
+            _run.OnRunEnded -= OnRunEnded;
+        }
+    }
+
+    private void OnRunStarted()
+    {
+        BindPlayer(_run.Player);   // 이 시점에 Player가 null일 수 있음(타이밍 이슈)
+        Refresh();
+    }
+
+    private void OnRunEnded(EndRunResult _)
+    {
+        UnbindPlayer();
+        Refresh();
+    }
+
+    private void BindPlayer(PlayerController player)
+    {
+        if (_player == player) return;
+
+        UnbindPlayer();
+        _player = player;
+
+        if (_player == null)
+        {
+            _provider.Unbind();
+            return;
+        }
+
+        // ✅ 너가 PlayerController에 만들어 둔 래핑 이벤트
+        _player.OnHudStatChanged += Refresh;
+
+        _provider.Bind(_player);
+    }
+
+    private void UnbindPlayer()
+    {
+        if (_player != null)
+        {
+            _player.OnHudStatChanged -= Refresh;
+        }
+
+        _player = null;
+
+        _provider?.Unbind();
     }
 
     private void Refresh()

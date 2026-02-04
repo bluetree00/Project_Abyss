@@ -25,17 +25,13 @@ public class LoadedAsset
 /// </summary>
 public class AddressableManager
 {
-    // -------------------------
-    // State
-    // -------------------------
-
     private bool _initialized;
     private UniTask? _initTask;
 
-    // -------------------------
-    // Loaded Handles
-    // -------------------------
-
+    /// <summary>
+    /// ✅ 타입 충돌 방지: "실제 로드 타입까지 포함한 캐시 키"를 사용
+    /// - 같은 address key라도 타입이 다르면 다른 캐시로 취급
+    /// </summary>
     private readonly Dictionary<string, AsyncOperationHandle> _handles
         = new Dictionary<string, AsyncOperationHandle>();
 
@@ -82,28 +78,72 @@ public class AddressableManager
     }
 
     // -------------------------
-    // Public Load API
+    // ✅ Key Convention Helpers
     // -------------------------
 
-    public async UniTask<T> LoadAssetAsync<T>(string key)
-        where T : UnityEngine.Object
+    /// <summary>캐시 키: "원본키|타입"으로 분리해서 충돌 방지</summary>
+    private static string MakeCacheKey<T>(string key) => $"{key}|{typeof(T).FullName}";
+
+    // -------------------------
+    // ✅ Explicit Public API
+    // -------------------------
+
+    /// <summary>
+    /// 가장 기본 로드: 지정한 key에서 지정한 타입을 로드
+    /// </summary>
+    public async UniTask<T> LoadAssetAsync<T>(string key) where T : UnityEngine.Object
+    {
+        await EnsureInitializedAsync();
+        return await LoadInternalAsync<T>(key, () => Addressables.LoadAssetAsync<T>(key));
+    }
+
+    /// <summary>
+    /// ✅ 프리팹 인스턴스 생성은 "Instantiate"로 명시 (프리팹 키 전용)
+    /// </summary>
+    public async UniTask<GameObject> InstantiateAsync(string prefabKey)
     {
         await EnsureInitializedAsync();
 
-        return await LoadInternalAsync(
-            key,
-            () => Addressables.LoadAssetAsync<T>(key)
+        // Instantiate는 "인스턴스 핸들"이므로 캐시를 따로 관리하는 게 안전하지만,
+        // 네 기존 정책을 유지하되 캐시 키를 분리해둔다.
+        return await LoadInternalAsync<GameObject>(
+            prefabKey,
+            () => Addressables.InstantiateAsync(prefabKey)
         );
     }
 
-    public async UniTask<GameObject> InstantiateAsync(string key)
+    /// <summary>
+    /// ✅ 명시 로드: 캐릭터 데이터는 DATA_ 키로만 로드한다는 의도를 코드에 남김
+    /// </summary>
+    public async UniTask<CharacterData> LoadCharacterDataAsync(string dataKey)
     {
-        await EnsureInitializedAsync();
+        if (string.IsNullOrEmpty(dataKey))
+        {
+            Debug.LogError("[AddressableManager] LoadCharacterDataAsync failed: dataKey is empty");
+            return null;
+        }
 
-        return await LoadInternalAsync(
-            key,
-            () => Addressables.InstantiateAsync(key)
-        );
+        // 필요하면 여기서 규칙 강제 가능:
+        // if (!dataKey.StartsWith("DATA_")) Debug.LogWarning(...);
+
+        return await LoadAssetAsync<CharacterData>(dataKey);
+    }
+
+    /// <summary>
+    /// ✅ 명시 로드: 플레이어 프리팹은 PREFAB_ 키로만 로드한다는 의도를 코드에 남김
+    /// </summary>
+    public async UniTask<GameObject> InstantiatePlayerAsync(string prefabKey)
+    {
+        if (string.IsNullOrEmpty(prefabKey))
+        {
+            Debug.LogError("[AddressableManager] InstantiatePlayerAsync failed: prefabKey is empty");
+            return null;
+        }
+
+        // 필요하면 규칙 강제 가능:
+        // if (!prefabKey.StartsWith("PREFAB_")) Debug.LogWarning(...);
+
+        return await InstantiateAsync(prefabKey);
     }
 
     // -------------------------
@@ -115,9 +155,18 @@ public class AddressableManager
         Func<AsyncOperationHandle<T>> loader
     ) where T : UnityEngine.Object
     {
-        if (_handles.TryGetValue(key, out var existing))
+        // ✅ 타입 포함 캐시 키로 충돌 방지
+        string cacheKey = MakeCacheKey<T>(key);
+
+        if (_handles.TryGetValue(cacheKey, out var existing))
         {
-            return (T)existing.Result;
+            // ✅ 캐시된 결과 타입 체크(안전)
+            if (existing.Result is T cached)
+                return cached;
+
+            Debug.LogError($"[AddressableManager] Cached type mismatch. key={key}, expected={typeof(T).Name}, actual={existing.Result?.GetType().Name}");
+            _handles.Remove(cacheKey);
+            UpdateDebugList();
         }
 
         var handle = loader();
@@ -125,13 +174,20 @@ public class AddressableManager
 
         if (handle.Status != AsyncOperationStatus.Succeeded)
         {
-            Debug.LogError($"[AddressableManager] Load Failed: {key}");
-            throw new Exception($"Failed to load Addressable: {key}");
+            Debug.LogError($"[AddressableManager] Load Failed: key={key}, type={typeof(T).Name}");
+            throw new Exception($"Failed to load Addressable: {key} ({typeof(T).Name})");
         }
 
-        _handles[key] = handle;
-        UpdateDebugList();
+        // ✅ 로드 성공했지만 실제 타입이 다르면 여기서 명확히 에러
+        UnityEngine.Object resultObj = handle.Result;
+        if (resultObj != null && resultObj is not T)
+        {
+            Debug.LogError($"[AddressableManager] Type mismatch. key={key}, expected={typeof(T).Name}, actual={resultObj.GetType().Name}");
+            throw new InvalidCastException($"Addressable type mismatch: key={key}, expected={typeof(T).Name}, actual={resultObj.GetType().Name}");
+        }
 
+        _handles[cacheKey] = handle;
+        UpdateDebugList();
         return handle.Result;
     }
 
@@ -139,11 +195,13 @@ public class AddressableManager
     // Release
     // -------------------------
 
-    public void Release(string key)
+    public void Release<T>(string key) where T : UnityEngine.Object
     {
-        if (!_handles.TryGetValue(key, out var handle))
+        string cacheKey = MakeCacheKey<T>(key);
+
+        if (!_handles.TryGetValue(cacheKey, out var handle))
         {
-            Debug.LogWarning($"[AddressableManager] Release failed (not found): {key}");
+            Debug.LogWarning($"[AddressableManager] Release failed (not found): {cacheKey}");
             return;
         }
 
@@ -152,10 +210,10 @@ public class AddressableManager
         else
             Addressables.Release(handle);
 
-        _handles.Remove(key);
+        _handles.Remove(cacheKey);
         UpdateDebugList();
 
-        Debug.Log($"[AddressableManager] Released: {key}");
+        Debug.Log($"[AddressableManager] Released: {cacheKey}");
     }
 
     public void ReleaseAll()
@@ -194,39 +252,4 @@ public class AddressableManager
         }
 #endif
     }
-
-    public static async UniTask<GameObject> LoadPrefabAsync(string key)
-    {
-        if (string.IsNullOrEmpty(key)) return null;
-
-        AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(key);
-        await handle.ToUniTask(); // Task -> UniTask 변환
-
-        if (handle.Status == AsyncOperationStatus.Succeeded)
-            return handle.Result;
-
-        Debug.LogError($"[AddressablesManager] Prefab '{key}' 로드 실패");
-        return null;
-    }
-
-
-    public async UniTask PreloadAsync(IEnumerable<string> keys)
-    {
-        await EnsureInitializedAsync();
-
-        foreach (var key in keys)
-        {
-            if (_handles.ContainsKey(key))
-                continue;
-
-            var handle = Addressables.LoadAssetAsync<UnityEngine.Object>(key);
-            await handle.ToUniTask();
-
-            if (handle.Status == AsyncOperationStatus.Succeeded)
-                _handles[key] = handle;
-        }
-    }
-
-
-
 }

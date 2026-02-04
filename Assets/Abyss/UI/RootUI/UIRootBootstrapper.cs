@@ -9,14 +9,11 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     [SerializeField] private Canvas popupCanvas;
 
     [Header("Roots")]
-    [SerializeField] private Transform hudRoot;   // @HUD
-    [SerializeField] private Transform popupRoot; // @Popup
+    [SerializeField] private Transform hudRoot;
+    [SerializeField] private Transform popupRoot;
 
     [Header("Bootstrappers")]
     [SerializeField] private HudBootstrapper hudBootstrapper;
-
-    // 예시: 프로젝트의 Managers 접근 방식에 맞게 교체
-    [SerializeField] private CharacterDataManager characterDataManager;
 
     public Canvas HudCanvas => hudCanvas;
     public Canvas PopupCanvas => popupCanvas;
@@ -34,14 +31,22 @@ public sealed class UIRootBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 필요하면 여기서 null 체크들
         if (hudBootstrapper == null)
             hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
 
-        // HUD 초기화(의존성 주입)
-        if (hudBootstrapper != null)
-            hudBootstrapper.Bind(characterDataManager);
-        else
+        if (hudBootstrapper == null)
             Debug.LogWarning("[UIRootBootstrapper] HudBootstrapper not found.");
+    }
+
+    // ✅ 런이 준비된 뒤 외부에서 호출
+    public void BindHudToRun(GameRunManager run)
+    {
+        if (hudBootstrapper == null)
+        {
+            Debug.LogWarning("[UIRootBootstrapper] BindHudToRun ignored: hudBootstrapper is null");
+            return;
+        }
+
+        hudBootstrapper.BindRun(run);
     }
 }
