@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6468025135628542795}
   - component: {fileID: 1750217117185334615}
   - component: {fileID: 3203719351395958456}
+  - component: {fileID: 8648607858371938668}
   m_Layer: 5
   m_Name: TestBoss
   m_TagString: Untagged
@@ -120,6 +121,31 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &8648607858371938668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 982251991190079628}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pointId: 100
+  stageCategory: 2
+  nextPointIds: 
+  normalRoomCategory: 0
+  minDifficulty: -1
+  maxDifficulty: -1
+  requiredTags: []
+  resolvedRoomId: 
+  resolvedRoomName: 
+  resolvedRoomCategory: 
+  resolvedDifficulty: 0
+  resolvedPrefab: 
+  resolvedTags: 
 --- !u!1 &1448802487505317936
 GameObject:
   m_ObjectHideFlags: 0
@@ -132,6 +158,7 @@ GameObject:
   - component: {fileID: 4912771591715042942}
   - component: {fileID: 3377011249941130096}
   - component: {fileID: 6549420093690512955}
+  - component: {fileID: 9136570040931675658}
   m_Layer: 5
   m_Name: TestStage_01
   m_TagString: Untagged
@@ -237,6 +264,167 @@ MonoBehaviour:
     m_DisabledTrigger: Disabled
   m_Interactable: 1
   m_TargetGraphic: {fileID: 3377011249941130096}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &9136570040931675658
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1448802487505317936}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pointId: 1
+  stageCategory: 1
+  nextPointIds: 03000000
+  normalRoomCategory: 0
+  minDifficulty: 1
+  maxDifficulty: 2
+  requiredTags: []
+  resolvedRoomId: 
+  resolvedRoomName: 
+  resolvedRoomCategory: 
+  resolvedDifficulty: 0
+  resolvedPrefab: 
+  resolvedTags: 
+--- !u!1 &1515383796435235114
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8976147431081523792}
+  - component: {fileID: 4739217295306556150}
+  - component: {fileID: 4158784963549507903}
+  - component: {fileID: 585183402802019315}
+  - component: {fileID: 6523570158532763993}
+  m_Layer: 5
+  m_Name: 'DebugRunPanel '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8976147431081523792
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515383796435235114}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8884314244123643335}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 1, y: 1}
+--- !u!222 &4739217295306556150
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515383796435235114}
+  m_CullTransparentMesh: 1
+--- !u!114 &4158784963549507903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515383796435235114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!114 &585183402802019315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515383796435235114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6150b3754548b5349a08120884c2d40f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  startButton: {fileID: 0}
+  chapter: 0
+  bootstrapper: {fileID: 0}
+--- !u!114 &6523570158532763993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1515383796435235114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 1
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 4158784963549507903}
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
@@ -402,6 +590,7 @@ GameObject:
   - component: {fileID: 4986393919200951846}
   - component: {fileID: 4300076089438250326}
   - component: {fileID: 8513816771320493330}
+  - component: {fileID: 5355273258809673017}
   m_Layer: 5
   m_Name: TestStart
   m_TagString: Untagged
@@ -510,6 +699,31 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &5355273258809673017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2982956538251370872}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pointId: 0
+  stageCategory: 0
+  nextPointIds: 0100000002000000
+  normalRoomCategory: 0
+  minDifficulty: -1
+  maxDifficulty: -1
+  requiredTags: []
+  resolvedRoomId: 
+  resolvedRoomName: 
+  resolvedRoomCategory: 
+  resolvedDifficulty: 0
+  resolvedPrefab: 
+  resolvedTags: 
 --- !u!1 &4272535021672717637
 GameObject:
   m_ObjectHideFlags: 0
@@ -522,8 +736,9 @@ GameObject:
   - component: {fileID: 1490496775254795470}
   - component: {fileID: 2553704904336459925}
   - component: {fileID: 8832426298496832612}
+  - component: {fileID: 4169892653466059593}
   m_Layer: 5
-  m_Name: TestStage_02
+  m_Name: TestStage_03
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -630,6 +845,31 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &4169892653466059593
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4272535021672717637}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pointId: 3
+  stageCategory: 1
+  nextPointIds: 64000000
+  normalRoomCategory: 0
+  minDifficulty: 0
+  maxDifficulty: 0
+  requiredTags: []
+  resolvedRoomId: 
+  resolvedRoomName: 
+  resolvedRoomCategory: 
+  resolvedDifficulty: 0
+  resolvedPrefab: 
+  resolvedTags: 
 --- !u!1 &4451590605782133855
 GameObject:
   m_ObjectHideFlags: 0
@@ -642,8 +882,9 @@ GameObject:
   - component: {fileID: 4403998806883338428}
   - component: {fileID: 7898175357687921517}
   - component: {fileID: 8378326342674513463}
+  - component: {fileID: 3397349312328864227}
   m_Layer: 5
-  m_Name: TestStage_03
+  m_Name: TestStage_02
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -750,6 +991,31 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3397349312328864227
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4451590605782133855}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45571124d27da9448e94b0cb074f16f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pointId: 2
+  stageCategory: 1
+  nextPointIds: 03000000
+  normalRoomCategory: 0
+  minDifficulty: 1
+  maxDifficulty: 3
+  requiredTags: []
+  resolvedRoomId: 
+  resolvedRoomName: 
+  resolvedRoomCategory: 
+  resolvedDifficulty: 0
+  resolvedPrefab: 
+  resolvedTags: 
 --- !u!1 &4586789171445105917
 GameObject:
   m_ObjectHideFlags: 0
@@ -1017,6 +1283,7 @@ RectTransform:
   - {fileID: 2904500629589640269}
   - {fileID: 333755851515863632}
   - {fileID: 5321252920401745231}
+  - {fileID: 8976147431081523792}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
