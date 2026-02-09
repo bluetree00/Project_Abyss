@@ -418,7 +418,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.23627199, y: 0.00006311963, z: 0.000036331825, w: 0.971687}
+  m_LocalRotation: {x: 0.23636378, y: 0.00023601839, z: 0.00013585121, w: 0.97166467}
   m_LocalPosition: {x: 6.34, y: 6.1, z: -7.91}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -959,7 +959,7 @@ MonoBehaviour:
   scatterRange: {x: 50, y: 30, z: 50}
   scatterYClamp: {x: 0, y: 6}
   animateReturn: 1
-  returnDuration: 1.6
+  returnDuration: 3
   travelJitter: 0.06
   jitterTimeScale: 1
   curveBend: 1.5
@@ -3137,22 +3137,22 @@ PrefabInstance:
     - target: {fileID: 3926761019246361657, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7217491866437943681, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: 4.08
       objectReference: {fileID: 0}
     - target: {fileID: 7217491866437943681, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 7217491866437943681, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 6.89
       objectReference: {fileID: 0}
     - target: {fileID: 7217491866437943681, guid: 931acccf6c82761459befc475179ea9a,
         type: 3}
