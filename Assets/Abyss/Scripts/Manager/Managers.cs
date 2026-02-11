@@ -47,6 +47,12 @@ public class Managers : MonoBehaviour
     private CharacterDataManager _characterDataManager;
     private GameEventManager _gameEventManager;
 
+    [Header("UIRoot Auto Create")]
+    [SerializeField] private bool autoCreateUIRoot = true;
+    [SerializeField] private string uiRootPrefabKey = "@UIRoot";
+
+     private bool _uiRootEnsured;
+
     // 플레이어, 씬, 데이터, 몬스터
     private PlayerManager _playerManager = new PlayerManager();
     private SceneManagerEx _scene = new SceneManagerEx();
@@ -139,6 +145,70 @@ public class Managers : MonoBehaviour
 
         var go = new GameObject("@GameRunBootstrapper");
         go.AddComponent<GameRunBootstrapper>(); // Awake에서 Bind() 호출
+    }
+
+      private async void Start()
+    {
+        // Addressables 초기화 보장
+        await AddressableManager.InitAsync();
+
+        // GameRunBootstrapper 안전망 (기존 코드 유지)
+        EnsureGameRunBootstrapperInScene();
+
+        // UIRoot 확보
+        await EnsureUIRootAsync();
+    }
+
+    /// <summary>
+    /// 씬에 UIRootBootstrapper가 없으면 Addressables에서 로드 후 생성
+    /// - 싱글톤 UI 전용
+    /// - LoadAssetAsync + Unity Instantiate 방식 (InstantiateAsync ❌)
+    /// </summary>
+    private async UniTask EnsureUIRootAsync()
+    {
+        if (!autoCreateUIRoot)
+            return;
+
+        if (_uiRootEnsured)
+            return;
+
+        // 1️⃣ 이미 존재하면 종료
+        var existing = FindObjectOfType<UIRootBootstrapper>(true);
+        if (existing != null)
+        {
+            _uiRootEnsured = true;
+            return;
+        }
+
+        Debug.LogWarning("[Managers] UIRoot not found. Creating from Addressables...");
+
+        // 2️⃣ 프리팹 로드 (Asset 캐시)
+        GameObject uiRootPrefab;
+        try
+        {
+            uiRootPrefab = await AddressableManager
+                .LoadAssetAsync<GameObject>(uiRootPrefabKey);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[Managers] Failed to load UIRoot prefab. key={uiRootPrefabKey}\n{e}");
+            return;
+        }
+
+        if (uiRootPrefab == null)
+        {
+            Debug.LogError($"[Managers] UIRoot prefab is null. key={uiRootPrefabKey}");
+            return;
+        }
+
+        // 3️⃣ Unity Instantiate (싱글톤이므로 Addressables Instantiate ❌)
+        var go = Instantiate(uiRootPrefab);
+        go.name = "@UIRoot";
+        DontDestroyOnLoad(go);
+
+        _uiRootEnsured = true;
+
+        Debug.Log("[Managers] UIRoot created successfully");
     }
 
     private void OnApplicationQuit()

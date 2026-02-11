@@ -15,7 +15,7 @@ public sealed class HudBootstrapper : MonoBehaviour
         if (presenter == null)
             Debug.LogError("[HudBootstrapper] presenter is null.");
 
-        _provider = new UIHudDataProvider();
+        _provider ??= new UIHudDataProvider();
     }
 
     public void BindRun(GameRunManager run)
@@ -30,8 +30,29 @@ public sealed class HudBootstrapper : MonoBehaviour
             Debug.LogError("[HudBootstrapper] BindRun failed: run is null.");
             return;
         }
+        if (ReferenceEquals(_run, run))
+            return;
+
+        Unbind();
 
         _run = run;
-        presenter.Construct(_run, _provider);
+
+        if (run.PlayerState == null)
+        {
+            Debug.LogWarning("[HudBootstrapper] PlayerState is null. HUD bind skipped.");
+            return;
+        }
+
+        _provider.Bind(run.PlayerState);
+        presenter.Construct(run, _provider);
     }
+
+    public void Unbind()
+    {
+        presenter?.Dispose();
+        _provider?.Unbind();
+        _run = null;
+    }
+
+    private void OnDestroy() => Unbind();
 }
