@@ -1,26 +1,31 @@
-using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public sealed class HudView : MonoBehaviour
 {
-    [SerializeField] private TMP_Text attackPowerText;
+    [Header("HP")]
+    [SerializeField] private Slider hpSlider;
     [SerializeField] private TMP_Text hpText;
 
-    public void Render(UIHudData data)
+    [Header("Gold")]
+    [SerializeField] private TMP_Text goldText;
+
+    public void SetHp(int hp, int maxHp)
     {
-        if (attackPowerText != null)
-            attackPowerText.text = data.AttackPower.ToString();
+        if (hpSlider != null)
+        {
+            hpSlider.maxValue = maxHp;
+            hpSlider.value = hp;
+        }
 
         if (hpText != null)
-            hpText.text = $"{data.Hp}/{data.MaxHp}";
+            hpText.text = $"{hp} / {maxHp}";
     }
 
-    public void Clear()
+    public void SetGold(int gold)
     {
-        if (attackPowerText != null)
-            attackPowerText.text = "-";
-
-        if (hpText != null)
-            hpText.text = "-/-";
+        if (goldText != null)
+            goldText.text = gold.ToString();
     }
 }

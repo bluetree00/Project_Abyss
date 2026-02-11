@@ -137,6 +137,8 @@ public sealed class GameRunManager
         OnRunEnded?.Invoke(result);
 
         // 런 상태 정리(선택: 참조 해제)
+
+        PlayerState?.Deactivate();
         RoomManager = null;
         StagePointManager = null;
         Player = null;

@@ -4,94 +4,61 @@ public sealed class HudPresenter : MonoBehaviour
 {
     [SerializeField] private HudView view;
 
-    private GameRunManager _run;
+    private PlayerRunState _state;
     private UIHudDataProvider _provider;
-
-    private PlayerController _player;
 
     public void Construct(GameRunManager run, UIHudDataProvider provider)
     {
-        _run = run;
+        // ✅ 중복 구독/재바인딩 방어
+        Dispose();
+
         _provider = provider;
+        _state = run?.PlayerState;
 
-        if (_run == null || _provider == null)
+        if (view == null)
         {
-            Debug.LogError("[HudPresenter] Construct failed: run/provider is null.");
+            Debug.LogError("[HudPresenter] view is null.");
             return;
         }
 
-        _run.OnRunStarted -= OnRunStarted;
-        _run.OnRunEnded -= OnRunEnded;
-        _run.OnRunStarted += OnRunStarted;
-        _run.OnRunEnded += OnRunEnded;
-
-        // 이미 런 중이면 즉시 반영
-        if (_run.IsRunning) OnRunStarted();
-        else Refresh();
-    }
-
-    private void OnDestroy()
-    {
-        UnbindPlayer();
-
-        if (_run != null)
+        if (_state == null || !_state.IsActive)
         {
-            _run.OnRunStarted -= OnRunStarted;
-            _run.OnRunEnded -= OnRunEnded;
-        }
-    }
-
-    private void OnRunStarted()
-    {
-        BindPlayer(_run.Player);   // 이 시점에 Player가 null일 수 있음(타이밍 이슈)
-        Refresh();
-    }
-
-    private void OnRunEnded(EndRunResult _)
-    {
-        UnbindPlayer();
-        Refresh();
-    }
-
-    private void BindPlayer(PlayerController player)
-    {
-        if (_player == player) return;
-
-        UnbindPlayer();
-        _player = player;
-
-        if (_player == null)
-        {
-            _provider.Unbind();
+            Debug.LogWarning("[HudPresenter] Construct ignored: PlayerState is null/inactive.");
             return;
         }
 
-        // ✅ 너가 PlayerController에 만들어 둔 래핑 이벤트
-        _player.OnHudStatChanged += Refresh;
-
-        _provider.Bind(_player);
-    }
-
-    private void UnbindPlayer()
-    {
-        if (_player != null)
+        // ✅ 초기 1회 반영 (스냅샷)
+        if (_provider != null && _provider.TryGet(out var data))
         {
-            _player.OnHudStatChanged -= Refresh;
+            view.SetHp(data.Hp, data.MaxHp);
+            view.SetGold(data.TempGold);
         }
-
-        _player = null;
-
-        _provider?.Unbind();
-    }
-
-    private void Refresh()
-    {
-        if (view == null || _provider == null)
-            return;
-
-        if (_provider.TryGet(out var data))
-            view.Render(data);
         else
-            view.Clear();
+        {
+            // provider가 없어도 state 직접 반영 가능
+            view.SetHp(_state.Hp, _state.MaxHp);
+            view.SetGold(_state.TempGold);
+        }
+
+        // ✅ 이벤트 구독
+        _state.OnHpChanged += HandleHpChanged;
+        _state.OnGoldChanged += HandleGoldChanged;
     }
+
+    public void Dispose()
+    {
+        if (_state != null)
+        {
+            _state.OnHpChanged -= HandleHpChanged;
+            _state.OnGoldChanged -= HandleGoldChanged;
+            _state = null;
+        }
+        _provider = null;
+    }
+
+    private void OnDisable() => Dispose();
+    private void OnDestroy() => Dispose();
+
+    private void HandleHpChanged(int hp, int maxHp) => view?.SetHp(hp, maxHp);
+    private void HandleGoldChanged(int gold) => view?.SetGold(gold);
 }

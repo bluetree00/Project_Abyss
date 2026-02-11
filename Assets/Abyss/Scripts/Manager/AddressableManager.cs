@@ -11,33 +11,41 @@ using Cysharp.Threading.Tasks;
 public class LoadedAsset
 {
     public string key;
-    public AsyncOperationHandle handle;
+    public string kind; // "Asset" or "Instance"
+    public string type;
+    public bool isValid;
 }
 
 #endregion
 
 /// <summary>
-/// Addressables를 안전하게 로드 / 생성 / 해제하는 로우 레벨 매니저
-/// - key 기반 로딩
-/// - handle 캐싱
-/// - lifecycle 관리
+/// Addressables를 안전하게 로드 / 인스턴스 생성 / 해제하는 로우 레벨 매니저
+/// - Asset 로드(handle 캐싱): key + type 기반 캐시
+/// - Instantiate(handle 추적): 인스턴스별 handle 저장 (캐시 ❌)
+/// - Release: Asset은 Release(handle), Instance는 ReleaseInstance(handle)
 /// ❌ 데이터 의미 / 포맷 / JSON 해석 책임 없음
 /// </summary>
-public class AddressableManager
+public sealed class AddressableManager
 {
     private bool _initialized;
     private UniTask? _initTask;
 
     /// <summary>
-    /// ✅ 타입 충돌 방지: "실제 로드 타입까지 포함한 캐시 키"를 사용
-    /// - 같은 address key라도 타입이 다르면 다른 캐시로 취급
+    /// ✅ Asset Handle 캐시 (key|type)
     /// </summary>
-    private readonly Dictionary<string, AsyncOperationHandle> _handles
-        = new Dictionary<string, AsyncOperationHandle>();
+    private readonly Dictionary<string, AsyncOperationHandle> _assetHandles = new();
+
+    /// <summary>
+    /// ✅ Instance Handle 추적 (instanceId -> handle)
+    /// - Addressables.InstantiateAsync()로 만든 인스턴스만 등록됨
+    /// - LoadAsset + Unity Instantiate 로 만든 인스턴스는 여기 등록되지 않음(일반 Destroy로 관리)
+    /// </summary>
+    private readonly Dictionary<int, AsyncOperationHandle<GameObject>> _instanceHandles = new();
 
 #if UNITY_EDITOR
-    public IReadOnlyDictionary<string, AsyncOperationHandle> LoadedHandles => _handles;
-    public List<LoadedAsset> loadedAssetsList = new List<LoadedAsset>();
+    public IReadOnlyDictionary<string, AsyncOperationHandle> LoadedAssetHandles => _assetHandles;
+    public IReadOnlyDictionary<int, AsyncOperationHandle<GameObject>> LoadedInstanceHandles => _instanceHandles;
+    public List<LoadedAsset> loadedAssetsList = new();
 #endif
 
     // -------------------------
@@ -46,8 +54,7 @@ public class AddressableManager
 
     public async UniTask InitAsync()
     {
-        if (_initialized)
-            return;
+        if (_initialized) return;
 
         if (_initTask.HasValue)
         {
@@ -57,8 +64,8 @@ public class AddressableManager
 
         _initTask = InitializeInternalAsync();
         await _initTask.Value;
-        _initialized = true;
 
+        _initialized = true;
         Debug.Log("[AddressableManager] Initialized");
     }
 
@@ -68,7 +75,7 @@ public class AddressableManager
         await handle.ToUniTask();
 
         if (handle.Status != AsyncOperationStatus.Succeeded)
-            throw new Exception("Addressables initialization failed");
+            throw new Exception("[AddressableManager] Addressables initialization failed");
     }
 
     private async UniTask EnsureInitializedAsync()
@@ -78,160 +85,184 @@ public class AddressableManager
     }
 
     // -------------------------
-    // ✅ Key Convention Helpers
+    // Key Helpers
     // -------------------------
 
-    /// <summary>캐시 키: "원본키|타입"으로 분리해서 충돌 방지</summary>
-    private static string MakeCacheKey<T>(string key) => $"{key}|{typeof(T).FullName}";
+    /// <summary>캐시 키: "원본키|타입"으로 충돌 방지</summary>
+    private static string MakeAssetCacheKey<T>(string key) => $"{key}|{typeof(T).FullName}";
 
     // -------------------------
-    // ✅ Explicit Public API
+    // Asset Load (캐시 O)
     // -------------------------
 
     /// <summary>
-    /// 가장 기본 로드: 지정한 key에서 지정한 타입을 로드
+    /// ✅ 가장 기본 로드: 지정한 key에서 지정한 타입을 로드 (캐시 O)
     /// </summary>
     public async UniTask<T> LoadAssetAsync<T>(string key) where T : UnityEngine.Object
     {
-        await EnsureInitializedAsync();
-        return await LoadInternalAsync<T>(key, () => Addressables.LoadAssetAsync<T>(key));
-    }
+        if (string.IsNullOrEmpty(key))
+            throw new ArgumentException("[AddressableManager] LoadAssetAsync failed: key is null/empty");
 
-    /// <summary>
-    /// ✅ 프리팹 인스턴스 생성은 "Instantiate"로 명시 (프리팹 키 전용)
-    /// </summary>
-    public async UniTask<GameObject> InstantiateAsync(string prefabKey)
-    {
         await EnsureInitializedAsync();
 
-        // Instantiate는 "인스턴스 핸들"이므로 캐시를 따로 관리하는 게 안전하지만,
-        // 네 기존 정책을 유지하되 캐시 키를 분리해둔다.
-        return await LoadInternalAsync<GameObject>(
-            prefabKey,
-            () => Addressables.InstantiateAsync(prefabKey)
-        );
-    }
+        string cacheKey = MakeAssetCacheKey<T>(key);
 
-    /// <summary>
-    /// ✅ 명시 로드: 캐릭터 데이터는 DATA_ 키로만 로드한다는 의도를 코드에 남김
-    /// </summary>
-    public async UniTask<CharacterData> LoadCharacterDataAsync(string dataKey)
-    {
-        if (string.IsNullOrEmpty(dataKey))
+        if (_assetHandles.TryGetValue(cacheKey, out var existing))
         {
-            Debug.LogError("[AddressableManager] LoadCharacterDataAsync failed: dataKey is empty");
-            return null;
-        }
-
-        // 필요하면 여기서 규칙 강제 가능:
-        // if (!dataKey.StartsWith("DATA_")) Debug.LogWarning(...);
-
-        return await LoadAssetAsync<CharacterData>(dataKey);
-    }
-
-    /// <summary>
-    /// ✅ 명시 로드: 플레이어 프리팹은 PREFAB_ 키로만 로드한다는 의도를 코드에 남김
-    /// </summary>
-    public async UniTask<GameObject> InstantiatePlayerAsync(string prefabKey)
-    {
-        if (string.IsNullOrEmpty(prefabKey))
-        {
-            Debug.LogError("[AddressableManager] InstantiatePlayerAsync failed: prefabKey is empty");
-            return null;
-        }
-
-        // 필요하면 규칙 강제 가능:
-        // if (!prefabKey.StartsWith("PREFAB_")) Debug.LogWarning(...);
-
-        return await InstantiateAsync(prefabKey);
-    }
-
-    // -------------------------
-    // Internal Unified Loader
-    // -------------------------
-
-    private async UniTask<T> LoadInternalAsync<T>(
-        string key,
-        Func<AsyncOperationHandle<T>> loader
-    ) where T : UnityEngine.Object
-    {
-        // ✅ 타입 포함 캐시 키로 충돌 방지
-        string cacheKey = MakeCacheKey<T>(key);
-
-        if (_handles.TryGetValue(cacheKey, out var existing))
-        {
-            // ✅ 캐시된 결과 타입 체크(안전)
-            if (existing.Result is T cached)
+            if (existing.IsValid() && existing.Result is T cached)
                 return cached;
 
-            Debug.LogError($"[AddressableManager] Cached type mismatch. key={key}, expected={typeof(T).Name}, actual={existing.Result?.GetType().Name}");
-            _handles.Remove(cacheKey);
+            // invalid or mismatch -> drop and reload
+            _assetHandles.Remove(cacheKey);
             UpdateDebugList();
         }
 
-        var handle = loader();
+        var handle = Addressables.LoadAssetAsync<T>(key);
         await handle.ToUniTask();
 
         if (handle.Status != AsyncOperationStatus.Succeeded)
-        {
-            Debug.LogError($"[AddressableManager] Load Failed: key={key}, type={typeof(T).Name}");
-            throw new Exception($"Failed to load Addressable: {key} ({typeof(T).Name})");
-        }
+            throw new Exception($"[AddressableManager] Load Failed: key={key}, type={typeof(T).Name}");
 
-        // ✅ 로드 성공했지만 실제 타입이 다르면 여기서 명확히 에러
-        UnityEngine.Object resultObj = handle.Result;
-        if (resultObj != null && resultObj is not T)
-        {
-            Debug.LogError($"[AddressableManager] Type mismatch. key={key}, expected={typeof(T).Name}, actual={resultObj.GetType().Name}");
-            throw new InvalidCastException($"Addressable type mismatch: key={key}, expected={typeof(T).Name}, actual={resultObj.GetType().Name}");
-        }
-
-        _handles[cacheKey] = handle;
+        _assetHandles[cacheKey] = handle;
         UpdateDebugList();
         return handle.Result;
     }
 
+    /// <summary>
+    /// (선택) 명시 로드: 캐릭터 데이터
+    /// </summary>
+    public UniTask<CharacterData> LoadCharacterDataAsync(string dataKey)
+        => LoadAssetAsync<CharacterData>(dataKey);
+
     // -------------------------
-    // Release
+    // Instantiate (캐시 X, 인스턴스 추적 O)
     // -------------------------
 
-    public void Release<T>(string key) where T : UnityEngine.Object
+    /// <summary>
+    /// ✅ Addressables.InstantiateAsync로 "새 인스턴스" 생성 (캐시 X)
+    /// - 생성된 인스턴스는 instanceId로 handle을 추적하여 ReleaseInstance가 가능
+    /// </summary>
+    public async UniTask<GameObject> InstantiateAsync(string prefabKey, Transform parent = null, bool inWorldSpace = false)
     {
-        string cacheKey = MakeCacheKey<T>(key);
+        if (string.IsNullOrEmpty(prefabKey))
+            throw new ArgumentException("[AddressableManager] InstantiateAsync failed: prefabKey is null/empty");
 
-        if (!_handles.TryGetValue(cacheKey, out var handle))
+        await EnsureInitializedAsync();
+
+        AsyncOperationHandle<GameObject> handle =
+            parent != null
+                ? Addressables.InstantiateAsync(prefabKey, parent, inWorldSpace)
+                : Addressables.InstantiateAsync(prefabKey);
+
+        await handle.ToUniTask();
+
+        if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+            throw new Exception($"[AddressableManager] Instantiate Failed: key={prefabKey}");
+
+        var go = handle.Result;
+        int id = go.GetInstanceID();
+        _instanceHandles[id] = handle;
+
+        UpdateDebugList();
+        return go;
+    }
+
+    /// <summary>
+    /// (선택) 명시 인스턴스: 플레이어 프리팹
+    /// </summary>
+    public UniTask<GameObject> InstantiatePlayerAsync(string prefabKey, Transform parent = null)
+        => InstantiateAsync(prefabKey, parent);
+
+    // -------------------------
+    // Release Asset (캐시 O 대상)
+    // -------------------------
+
+    public void ReleaseAsset<T>(string key) where T : UnityEngine.Object
+    {
+        string cacheKey = MakeAssetCacheKey<T>(key);
+
+        if (!_assetHandles.TryGetValue(cacheKey, out var handle))
         {
-            Debug.LogWarning($"[AddressableManager] Release failed (not found): {cacheKey}");
+            Debug.LogWarning($"[AddressableManager] ReleaseAsset failed (not found): {cacheKey}");
             return;
         }
 
-        if (handle.Result is GameObject)
-            Addressables.ReleaseInstance(handle);
-        else
+        if (handle.IsValid())
             Addressables.Release(handle);
 
-        _handles.Remove(cacheKey);
+        _assetHandles.Remove(cacheKey);
         UpdateDebugList();
 
-        Debug.Log($"[AddressableManager] Released: {cacheKey}");
+        Debug.Log($"[AddressableManager] Released Asset: {cacheKey}");
+    }
+
+    // -------------------------
+    // Release Instance (InstantiateAsync로 만든 것만)
+    // -------------------------
+
+    /// <summary>
+    /// ✅ InstantiateAsync로 생성된 인스턴스만 Addressables.ReleaseInstance가 가능
+    /// - LoadAsset + Unity Instantiate로 만든 오브젝트는 여기로 해제하지 말고 Destroy로 처리
+    /// </summary>
+    public bool ReleaseInstance(GameObject instance)
+    {
+        if (instance == null) return false;
+
+        int id = instance.GetInstanceID();
+
+        if (!_instanceHandles.TryGetValue(id, out var handle))
+        {
+            Debug.LogWarning($"[AddressableManager] ReleaseInstance ignored (not tracked). name={instance.name}");
+            return false;
+        }
+
+        if (handle.IsValid())
+            Addressables.ReleaseInstance(handle);
+
+        _instanceHandles.Remove(id);
+        UpdateDebugList();
+
+        return true;
+    }
+
+    // -------------------------
+    // Release All
+    // -------------------------
+
+    public void ReleaseAllInstances()
+    {
+        foreach (var kv in _instanceHandles)
+        {
+            var handle = kv.Value;
+            if (handle.IsValid())
+                Addressables.ReleaseInstance(handle);
+        }
+
+        _instanceHandles.Clear();
+        UpdateDebugList();
+
+        Debug.Log("[AddressableManager] Released All Instances");
+    }
+
+    public void ReleaseAllAssets()
+    {
+        foreach (var kv in _assetHandles)
+        {
+            var handle = kv.Value;
+            if (handle.IsValid())
+                Addressables.Release(handle);
+        }
+
+        _assetHandles.Clear();
+        UpdateDebugList();
+
+        Debug.Log("[AddressableManager] Released All Assets");
     }
 
     public void ReleaseAll()
     {
-        foreach (var kv in _handles)
-        {
-            var handle = kv.Value;
-
-            if (handle.Result is GameObject)
-                Addressables.ReleaseInstance(handle);
-            else
-                Addressables.Release(handle);
-        }
-
-        _handles.Clear();
-        UpdateDebugList();
-
-        Debug.Log("[AddressableManager] Released All");
+        ReleaseAllInstances();
+        ReleaseAllAssets();
     }
 
     // -------------------------
@@ -242,12 +273,28 @@ public class AddressableManager
     {
 #if UNITY_EDITOR
         loadedAssetsList.Clear();
-        foreach (var kv in _handles)
+
+        foreach (var kv in _assetHandles)
         {
+            var h = kv.Value;
             loadedAssetsList.Add(new LoadedAsset
             {
                 key = kv.Key,
-                handle = kv.Value
+                kind = "Asset",
+                type = h.Result != null ? h.Result.GetType().Name : "null",
+                isValid = h.IsValid()
+            });
+        }
+
+        foreach (var kv in _instanceHandles)
+        {
+            var h = kv.Value;
+            loadedAssetsList.Add(new LoadedAsset
+            {
+                key = $"InstanceId:{kv.Key}",
+                kind = "Instance",
+                type = h.Result != null ? h.Result.GetType().Name : "null",
+                isValid = h.IsValid()
             });
         }
 #endif

@@ -1,31 +1,31 @@
-using UnityEngine;
 
 public sealed class UIHudDataProvider
 {
-    private PlayerController _player;
+    private PlayerRunState _state;
 
-    public void Bind(PlayerController player)
+    public void Bind(PlayerRunState state)
     {
-        _player = player;
+        _state = state;
     }
 
     public void Unbind()
     {
-        _player = null;
+        _state = null;
     }
 
     public bool TryGet(out UIHudData data)
     {
         data = default;
 
-        if (_player == null || _player.RuntimeStats == null)
+        var s = _state;
+        if (s == null || !s.IsActive)
             return false;
 
         data = new UIHudData
         {
-            AttackPower = _player.RuntimeStats.AttackPower,
-            Hp = _player.RuntimeStats.Hp,
-            MaxHp = _player.RuntimeStats.MaxHp
+            Hp = s.Hp,
+            MaxHp = s.MaxHp,
+            TempGold = s.TempGold
         };
         return true;
     }
