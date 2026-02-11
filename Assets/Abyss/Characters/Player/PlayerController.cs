@@ -478,6 +478,7 @@ public class PlayerController : CharacterBase
 
     public void ProcessJump()
     {
+         Managers.GameRun.NotifyCombatStarted();
         // 이미 공중이면 점프 불가
         if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
 

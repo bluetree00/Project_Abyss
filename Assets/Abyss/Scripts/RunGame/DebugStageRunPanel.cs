@@ -48,6 +48,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         }
 
         await bootstrapper.StartRunAsync(chapter);
+    
+
     }
 
 }

@@ -160,56 +160,75 @@ public class Managers : MonoBehaviour
     }
 
     /// <summary>
-    /// 씬에 UIRootBootstrapper가 없으면 Addressables에서 로드 후 생성
-    /// - 싱글톤 UI 전용
-    /// - LoadAssetAsync + Unity Instantiate 방식 (InstantiateAsync ❌)
-    /// </summary>
-    private async UniTask EnsureUIRootAsync()
+/// 씬에 UIRootBootstrapper가 없으면 Addressables에서 로드 후 생성
+/// - 싱글톤 UI 전용
+/// - LoadAssetAsync + Unity Instantiate 방식 (InstantiateAsync ❌)
+/// - 생성/기존 여부와 관계없이 HUD를 현재 GameRun에 바인딩
+/// </summary>
+private async UniTask EnsureUIRootAsync()
+{
+    if (!autoCreateUIRoot)
+        return;
+
+    if (_uiRootEnsured)
     {
-        if (!autoCreateUIRoot)
-            return;
+        // 이미 확보되었더라도 HUD 바인딩은 한 번 더 시도 (안전)
+        UIRootBootstrapper.Instance?.BindHudToRun(Managers.GameRun);
+        return;
+    }
 
-        if (_uiRootEnsured)
-            return;
-
-        // 1️⃣ 이미 존재하면 종료
-        var existing = FindObjectOfType<UIRootBootstrapper>(true);
-        if (existing != null)
-        {
-            _uiRootEnsured = true;
-            return;
-        }
-
-        Debug.LogWarning("[Managers] UIRoot not found. Creating from Addressables...");
-
-        // 2️⃣ 프리팹 로드 (Asset 캐시)
-        GameObject uiRootPrefab;
-        try
-        {
-            uiRootPrefab = await AddressableManager
-                .LoadAssetAsync<GameObject>(uiRootPrefabKey);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[Managers] Failed to load UIRoot prefab. key={uiRootPrefabKey}\n{e}");
-            return;
-        }
-
-        if (uiRootPrefab == null)
-        {
-            Debug.LogError($"[Managers] UIRoot prefab is null. key={uiRootPrefabKey}");
-            return;
-        }
-
-        // 3️⃣ Unity Instantiate (싱글톤이므로 Addressables Instantiate ❌)
-        var go = Instantiate(uiRootPrefab);
-        go.name = "@UIRoot";
-        DontDestroyOnLoad(go);
-
+    // 1️⃣ 이미 존재하면 종료 + HUD 바인딩
+    var existing = FindObjectOfType<UIRootBootstrapper>(true);
+    if (existing != null)
+    {
         _uiRootEnsured = true;
 
-        Debug.Log("[Managers] UIRoot created successfully");
+        existing.BindHudToRun(Managers.GameRun);
+        return;
     }
+
+    Debug.LogWarning("[Managers] UIRoot not found. Creating from Addressables...");
+
+    // 2️⃣ 프리팹 로드 (Asset 캐시)
+    GameObject uiRootPrefab;
+    try
+    {
+        uiRootPrefab = await AddressableManager
+            .LoadAssetAsync<GameObject>(uiRootPrefabKey);
+    }
+    catch (System.Exception e)
+    {
+        Debug.LogError($"[Managers] Failed to load UIRoot prefab. key={uiRootPrefabKey}\n{e}");
+        return;
+    }
+
+    if (uiRootPrefab == null)
+    {
+        Debug.LogError($"[Managers] UIRoot prefab is null. key={uiRootPrefabKey}");
+        return;
+    }
+
+    // 3️⃣ Unity Instantiate (싱글톤이므로 Addressables Instantiate ❌)
+    var go = Instantiate(uiRootPrefab);
+    go.name = "@UIRoot";
+    DontDestroyOnLoad(go);
+
+    _uiRootEnsured = true;
+
+    Debug.Log("[Managers] UIRoot created successfully");
+
+    // 4️⃣ HUD를 현재 GameRun에 바인딩
+    var root = go.GetComponent<UIRootBootstrapper>();
+    if (root != null)
+    {
+        root.BindHudToRun(Managers.GameRun);
+    }
+    else
+    {
+        Debug.LogWarning("[Managers] UIRootBootstrapper not found on created UIRoot.");
+    }
+}
+
 
     private void OnApplicationQuit()
     {

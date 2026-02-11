@@ -1,3 +1,9 @@
+//============================================================
+// PlayerRunState.cs
+// - Run 동안만 유효한 플레이어 상태(HP/Gold 등)
+// - 이벤트 기반으로 HUD 갱신
+// - Deactivate()로 종료 후 이벤트/변경 차단
+//============================================================
 using System;
 
 public sealed class PlayerRunState
@@ -6,9 +12,6 @@ public sealed class PlayerRunState
     public int MaxHp { get; private set; }
     public int TempGold { get; private set; }
 
-    /// <summary>
-    /// 런이 유효한지(종료되면 false). 종료 후에는 상태 변경/이벤트 발행을 막는다.
-    /// </summary>
     public bool IsActive { get; private set; } = true;
 
     public event Action<int, int> OnHpChanged; // (hp, maxHp)
@@ -20,16 +23,11 @@ public sealed class PlayerRunState
         Hp = MaxHp;
     }
 
-    /// <summary>
-    /// 런 종료 시 호출 권장: 이후 상태 변경을 무시하고 이벤트 참조도 정리.
-    /// </summary>
     public void Deactivate()
     {
         if (!IsActive) return;
 
         IsActive = false;
-
-        // 이벤트 참조 해제(누수/중복 방지)
         OnHpChanged = null;
         OnGoldChanged = null;
     }
@@ -50,8 +48,6 @@ public sealed class PlayerRunState
         if (!IsActive) return;
 
         maxHp = Math.Max(1, maxHp);
-
-        // max만 동일해도 healToFull이면 반영해야 함
         if (MaxHp == maxHp && !healToFull) return;
 
         MaxHp = maxHp;
@@ -67,7 +63,6 @@ public sealed class PlayerRunState
         if (!IsActive) return;
         if (amount <= 0) return;
 
-        // overflow 방어
         if (TempGold > int.MaxValue - amount)
             TempGold = int.MaxValue;
         else
@@ -76,7 +71,6 @@ public sealed class PlayerRunState
         OnGoldChanged?.Invoke(TempGold);
     }
 
-    // 편의 API(전투 시스템에서 쓰기 좋음)
     public void Damage(int amount)
     {
         if (amount <= 0) return;
