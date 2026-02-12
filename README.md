@@ -43,6 +43,7 @@ Managers 디자인 패턴을 통한 매니저 모듈화.
 -UI 바인딩 구조를 사용한 필요 UI 자동 생성 구조 개발.
 
 -플레이어 인벤토리, 인벤토리 데이터 정보 확인 UI 개발.
+
 <img width="924" height="793" alt="image" src="https://github.com/user-attachments/assets/b9a3076c-5e51-4e69-9765-9649d443fa7b" />
 
 
