@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 About Project
+## About Project
 
 <strong>Project Abyss</strong>는  
 스테이지 클리어 기반의 로그라이크 액션 게임입니다.
@@ -17,16 +17,16 @@
 
 <br>
 
-### 🎯 Core Gameplay
+### Core Gameplay
 
-- ⚔️ 액션 중심 전투 구조
-- 🧩 퍼즐 기반 능력 강화 시스템
-- 🛡 장비 모듈화 성장 구조
-- 🔁 로그라이크 반복 플레이 설계
+- 액션 중심 전투 구조
+- 퍼즐 기반 능력 강화 시스템
+- 장비 모듈화 성장 구조
+- 로그라이크 반복 플레이 설계
 
 ---
 
-# 🛠 Tech Stack
+# Tech Stack
 
 <p>
   <img src="https://img.shields.io/badge/Engine-Unity-000000?style=for-the-badge&logo=unity"/>
@@ -38,9 +38,9 @@
 
 ---
 
-# 🧠 Architecture & Design
+# Architecture & Design
 
-## 1️⃣ Layer FSM 기반 캐릭터 구조
+## 1️.Layer FSM 기반 캐릭터 구조
 
 - 플레이어 / 몬스터 Layer 기반 FSM 설계
 - 상태 분리 구조로 확장성 확보
@@ -48,7 +48,7 @@
 
 ---
 
-## 2️⃣ Managers 패턴 기반 시스템 구조
+## 2️.Managers 패턴 기반 시스템 구조
 
 - 전역 매니저 통합 관리 구조 설계
 - GameRun 단위 생명주기 분리
