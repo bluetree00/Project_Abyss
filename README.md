@@ -22,7 +22,7 @@
 
 <hr/>
 
-## 🛠 Tech Stack
+## Tech Stack
 
 <p>
   <img src="https://img.shields.io/badge/Engine-Unity-000000?style=for-the-badge&logo=unity"/>
