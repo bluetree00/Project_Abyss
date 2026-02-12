@@ -7,18 +7,18 @@
 
 <hr/>
 
-## 📌 About Project
+## About Project
 
-<strong>Project Abyss</strong>는 스테이지 클리어 기반의 로그라이크 액션 PC 게임입니다.  
-플레이어는 전투를 통해 장비와 퍼즐을 획득하고 조합하여 캐릭터를 성장시키며, 최종 챕터 클리어를 목표로 진행합니다.
+<strong>Project Abyss</strong>는 스테이지 클리어 기반의 로그라이크 액션 PC 게임이다.  
+플레이어는 전투를 통해 장비와 퍼즐을 획득하고 조합하여 캐릭터를 성장시키며, 최종 챕터 클리어를 목표로 진행함.
 
 <br/>
 
-### 🎯 Core Gameplay
-- ⚔️ 액션 중심 전투 구조
-- 🧩 퍼즐 기반 능력 강화 시스템
-- 🛡 장비 모듈화 성장 구조
-- 🔁 로그라이크 반복 플레이 설계
+### Core Gameplay
+- 액션 중심 전투 구조
+- 퍼즐 기반 능력 강화 시스템
+- 장비 모듈화 성장 구조
+- 로그라이크 반복 플레이 설계
 
 <hr/>
 
@@ -34,7 +34,7 @@
 
 <hr/>
 
-## 🧠 Architecture & Design
+## Architecture & Design
 
 ### 1) Layer FSM 기반 캐릭터 구조
 - 플레이어/몬스터의 <b>LayerFSM</b> 구조 개발  
@@ -65,5 +65,5 @@ Managers
  │
  └── UI
       ├── HUDManager
-      ├── InventoryUIManager
+      ├── UIManager
       └── UIDataProvider        (UI 바인딩/갱신 데이터 제공)
