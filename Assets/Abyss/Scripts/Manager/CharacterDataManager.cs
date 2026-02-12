@@ -1,77 +1,101 @@
+using System;
 using UnityEngine;
 
-public class CharacterDataManager
+public sealed class CharacterDataManager
 {
-    private static CharacterData m_CharacterData; //현재 캐릭터의 데이터
-    public CharacterData M_CharacterData { get { return m_CharacterData; } }
-    private static MonsterData m_MonsterData; //현재 캐릭터의 데이터
-    public MonsterData M_MonsterData { get { return m_MonsterData; } }
-    private static WeaponData EquippedWeapon; //현재 무기의 데이터
+    private static CharacterData m_CharacterData;
+    public CharacterData M_CharacterData => m_CharacterData;
 
-    // 새로운 캐릭터 데이터를 메인으로 설정.
+    private static MonsterData m_MonsterData;
+    public MonsterData M_MonsterData => m_MonsterData;
+
+    private static WeaponData m_EquippedWeapon;
+    public WeaponData EquippedWeaponData => m_EquippedWeapon;
+
+    /// <summary>
+    /// 캐릭터/무기/스탯 등 HUD/UI가 갱신되어야 하는 변화가 발생했을 때 호출
+    /// </summary>
+    public event Action OnChanged;
+
     public void SetCharacterData(CharacterData characterData)
     {
         if (characterData == null)
         {
-            Debug.LogError("character data 를 로드하는데 실패했습니다, 현재 데이터가 null 입니다.");
+            Debug.LogError("[CharacterDataManager] CharacterData is null.");
             return;
         }
+
         m_CharacterData = characterData;
-        Debug.Log($"캐릭터 데이터를 로드(캐릭터데이터매니저): {m_CharacterData}");
+        Debug.Log($"[CharacterDataManager] CharacterData set: {m_CharacterData}");
+
+        OnChanged?.Invoke();
     }
 
     public void SetMonsterData(MonsterData monsterData)
     {
         if (monsterData == null)
         {
-            Debug.LogError("character data 를 로드하는데 실패했습니다, 현재 데이터가 null 입니다.");
+            Debug.LogError("[CharacterDataManager] MonsterData is null.");
             return;
         }
+
         m_MonsterData = monsterData;
-        Debug.Log($"캐릭터 데이터를 로드(캐릭터데이터매니저): {m_MonsterData}");
+        Debug.Log($"[CharacterDataManager] MonsterData set: {m_MonsterData}");
+
+        OnChanged?.Invoke();
     }
 
-
-    // 무기를 장착.
     public void EquipWeapon(WeaponData weaponData)
     {
         if (weaponData == null)
         {
-            Debug.LogError("WeaponData is null! Cannot equip weapon.");
+            Debug.LogError("[CharacterDataManager] WeaponData is null! Cannot equip.");
             return;
         }
 
-        // 무기 효과를 캐릭터에 반영 
+        if (m_CharacterData == null)
+        {
+            Debug.LogError("[CharacterDataManager] CharacterData is null! Cannot equip weapon.");
+            return;
+        }
+
+        m_EquippedWeapon = weaponData;
         m_CharacterData.EquipWeapon(weaponData);
+
+        OnChanged?.Invoke();
     }
 
-    // 무기를 해제.
     public void UnequipWeapon()
     {
-        if (EquippedWeapon == null)
+        if (m_CharacterData == null)
         {
-            Debug.LogWarning("No weapon is currently equipped.");
+            Debug.LogError("[CharacterDataManager] CharacterData is null! Cannot unequip weapon.");
             return;
         }
 
-        // 무기 효과 제거
+        if (m_EquippedWeapon == null)
+        {
+            Debug.LogWarning("[CharacterDataManager] No weapon is currently equipped.");
+            return;
+        }
+
+        m_EquippedWeapon = null;
         m_CharacterData.UnequipWeapon();
 
-   
+        OnChanged?.Invoke();
     }
 
-    // 캐릭터의 주요 스텟 조정 로직
-    /// <param name="statName">스텟 이름</param>
-    /// <param name="value">변경할 값</param>
+    /// <summary>
+    /// 스텟 조정(현재는 string 기반이지만, 추후 enum으로 바꾸는 걸 추천)
+    /// </summary>
     public void AdjustStat(string statName, int value)
     {
         if (m_CharacterData == null)
         {
-            Debug.LogError("No character data is set in CharacterDataManager!");
+            Debug.LogError("[CharacterDataManager] No CharacterData is set!");
             return;
         }
 
-        // 스텟 이름에 따라 값 조정
         switch (statName)
         {
             case "Health":
@@ -80,11 +104,11 @@ public class CharacterDataManager
             case "AttackPower":
                 m_CharacterData.attackPower += value;
                 break;
-            // 추가적인 스텟들을 여기에서 처리
             default:
-                Debug.LogWarning($"Stat {statName} not recognized.");
+                Debug.LogWarning($"[CharacterDataManager] Stat '{statName}' not recognized.");
                 break;
         }
-    }
 
+        OnChanged?.Invoke();
+    }
 }
