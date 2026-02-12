@@ -108,8 +108,6 @@ public class Managers : MonoBehaviour
             await InitializeAnimationsAsync();
         }).Forget();
 
-        // 첫 씬에서도 바로 확보(에디터 플레이 시 sceneLoaded 전에 필요할 때 대비)
-        EnsureGameRunBootstrapperInScene();
     }
 
     private void Update()
@@ -128,36 +126,6 @@ public class Managers : MonoBehaviour
         }
     }
 
-     // -------------------------
-    // 핵심: Bootstrapper 확보
-    // -------------------------
-     private void EnsureGameRunBootstrapperInScene()
-    {
-        if (!autoCreateRunBootstrapper)
-            return;
-
-        var existing = FindObjectOfType<GameRunBootstrapper>(true);
-        if (existing != null)
-            return;
-
-        if (logAutoCreateWarning)
-            Debug.LogWarning("[Managers] GameRunBootstrapper not found in scene. Auto-created.");
-
-        var go = new GameObject("@GameRunBootstrapper");
-        go.AddComponent<GameRunBootstrapper>(); // Awake에서 Bind() 호출
-    }
-
-      private async void Start()
-    {
-        // Addressables 초기화 보장
-        await AddressableManager.InitAsync();
-
-        // GameRunBootstrapper 안전망 (기존 코드 유지)
-        EnsureGameRunBootstrapperInScene();
-
-        // UIRoot 확보
-        await EnsureUIRootAsync();
-    }
 
     /// <summary>
 /// 씬에 UIRootBootstrapper가 없으면 Addressables에서 로드 후 생성
