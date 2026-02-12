@@ -124,50 +124,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 23800000, guid: 0d23467cb5ed5304db524915165f4518, type: 2}
---- !u!1 &18658502
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 18658504}
-  - component: {fileID: 18658503}
-  m_Layer: 0
-  m_Name: StagePointDebugView
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &18658503
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 18658502}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cf53e526c3c1dd14dbe1c9138ede4b72, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &18658504
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 18658502}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1298.0573, y: 666.88574, z: 25.393982}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &32953334
 GameObject:
   m_ObjectHideFlags: 3
@@ -418,7 +374,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.4658442, y: 0.0000055545447, z: 0.0000052740265, w: 0.88486683}
+  m_LocalRotation: {x: 0.46584767, y: 0.000015398533, z: 0.000014788443, w: 0.884865}
   m_LocalPosition: {x: 0, y: 4.998319, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3733,6 +3689,5 @@ SceneRoots:
   - {fileID: 1834999872}
   - {fileID: 1428764871}
   - {fileID: 867780929}
-  - {fileID: 18658504}
   - {fileID: 669045122}
   - {fileID: 1036936357}

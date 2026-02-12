@@ -163,7 +163,7 @@ MonoBehaviour:
   menuRoot: {fileID: 6647876622570790338}
   overlayRoot: {fileID: 5096365001350788271}
   worldRoot: {fileID: 1800340559896266154}
-  hudBootstrapper: {fileID: 0}
+  hudBootstrapper: {fileID: 1194872624671378815}
 --- !u!1 &7423581666626338443
 GameObject:
   m_ObjectHideFlags: 0
