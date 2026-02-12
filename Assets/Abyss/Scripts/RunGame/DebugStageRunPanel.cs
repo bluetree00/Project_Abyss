@@ -10,6 +10,9 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [Header("Optional")]
     [SerializeField] private GameRunBootstrapper bootstrapper;
 
+    [Header("Temp UI")]
+    [SerializeField] private GameObject stageUIRoot;   // 👈 추가
+
     private bool _clicked;
 
     private void Awake()
@@ -19,11 +22,10 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
         if (startButton == null)
         {
-            Debug.LogError("[DebugRunPanel] startButton is null. Button 컴포넌트를 연결하거나 같은 오브젝트에 붙여주세요.");
+            Debug.LogError("[DebugRunPanel] startButton is null.");
             return;
         }
 
-        // bootstrapper가 인스펙터에 없으면 씬에서 찾기
         if (bootstrapper == null)
             bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
 
@@ -31,6 +33,10 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         {
             if (_clicked) return;
             _clicked = true;
+
+            // 👇 버튼 눌리면 StageUI 비활성화
+            if (stageUIRoot != null)
+                stageUIRoot.SetActive(false);
 
             StartRun().Forget();
         });
@@ -43,13 +49,10 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
         if (bootstrapper == null)
         {
-            Debug.LogError("[DebugRunPanel] GameRunBootstrapper not found. Managers 자동생성(Ensure...)이 동작하는지 확인하세요.");
+            Debug.LogError("[DebugRunPanel] GameRunBootstrapper not found.");
             return;
         }
 
         await bootstrapper.StartRunAsync(chapter);
-    
-
     }
-
 }
