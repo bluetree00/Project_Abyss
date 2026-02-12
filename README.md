@@ -1,4 +1,4 @@
-<h1 align="center">🎮 Project Abyss</h1>
+<h1 align="center">Project Abyss</h1>
 <h3 align="center">Roguelike Action PC Game</h3>
 
 <p align="center">
