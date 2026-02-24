@@ -1207,10 +1207,11 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uAC8C\uC784\uC2DC\uC791"
+  m_text: "\u3147"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 878d7193acbe63c4982b00ac514099de, type: 2}
+  m_sharedMaterial: {fileID: 4280883817152586939, guid: 878d7193acbe63c4982b00ac514099de,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1312,13 +1313,18 @@ PrefabInstance:
         type: 3}
       propertyPath: m_fontAsset
       value: 
-      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee,
+      objectReference: {fileID: 11400000, guid: 878d7193acbe63c4982b00ac514099de,
         type: 2}
     - target: {fileID: 5047602805376227662, guid: 1c3d192ad24e32649b8ff63f8d6bde4c,
         type: 3}
       propertyPath: m_sharedMaterial
       value: 
       objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 5047602805376227662, guid: 1c3d192ad24e32649b8ff63f8d6bde4c,
+        type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6477522847713687544, guid: 1c3d192ad24e32649b8ff63f8d6bde4c,
         type: 3}
       propertyPath: m_Pivot.x
