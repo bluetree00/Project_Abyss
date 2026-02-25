@@ -16,6 +16,7 @@ TagManager:
   - FrontAttackHit
   - Orc
   - Specter
+  - ShapeBlock
   layers:
   - Default
   - TransparentFX
