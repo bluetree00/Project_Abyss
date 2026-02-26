@@ -7,6 +7,9 @@ public sealed class HudBootstrapper : MonoBehaviour
     private UIHudDataProvider _provider;
     private GameRunManager _run;
 
+    // ✅ Construct 중복 방지
+    private bool _constructed;
+
     private void Awake()
     {
         if (presenter == null)
@@ -33,14 +36,14 @@ public sealed class HudBootstrapper : MonoBehaviour
         if (ReferenceEquals(_run, run))
             return;
 
-        Unbind();
+        Unbind(); // ✅ 항상 깨끗하게 정리하고 바인딩
 
         _run = run;
 
-        // ✅ 1) HUD 모드 이벤트 구독 (Combat/Explore 전환을 여기서 받는다)
+        // ✅ 1) HUD 모드 이벤트 구독
         _run.OnHudModeChanged += HandleHudModeChanged;
 
-        // ✅ 2) 이미 현재 모드가 정해져 있으면 즉시 반영(늦게 뜬 HUD도 동기화)
+        // ✅ 2) 현재 모드 즉시 반영(늦게 뜬 HUD도 동기화)
         if (_run.TryGetHudMode(out var mode))
             presenter.SetMode(mode);
 
@@ -51,13 +54,16 @@ public sealed class HudBootstrapper : MonoBehaviour
             return;
         }
 
-        // ✅ 4) 아직이면 준비 이벤트를 기다린다 (HUD가 먼저 로드되어도 안전)
+        // ✅ 4) 아직이면 준비 이벤트 대기
         _run.OnPlayerStateReady += BindStateNow;
     }
 
     private void BindStateNow(PlayerRunState st)
     {
+        if (_constructed) return;
         if (_run == null || st == null) return;
+
+        _constructed = true;
 
         // ✅ 한번만
         _run.OnPlayerStateReady -= BindStateNow;
@@ -68,7 +74,6 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void HandleHudModeChanged(HUDIds.Mode mode)
     {
-        // 여기서 CombatPanel 토글이 일어남
         presenter.SetMode(mode);
     }
 
@@ -79,6 +84,8 @@ public sealed class HudBootstrapper : MonoBehaviour
             _run.OnPlayerStateReady -= BindStateNow;
             _run.OnHudModeChanged -= HandleHudModeChanged;
         }
+
+        _constructed = false;
 
         presenter?.Dispose();
         _provider?.Unbind();

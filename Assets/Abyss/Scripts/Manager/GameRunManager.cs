@@ -1,5 +1,5 @@
 //============================================================
-// GameRunManager.cs (Improved + HUD Mode Event Added)
+// GameRunManager.cs (Improved + HUD Mode Safe + Late Bind Friendly)
 //============================================================
 using System;
 using System.Collections.Generic;
@@ -44,11 +44,11 @@ public sealed class GameRunManager
     public event Action<PlayerController> OnPlayerBound;
     public event Action<StageMapSpawner> OnSpawnerBound;
 
-    // ✅ 추가: HUD 모드 변경 요청(게임 로직 -> UI 로직 분리)
+    // HUD mode
     public event Action<HUDIds.Mode> OnHudModeChanged;
 
-    // ✅ 추가: 현재 HUD 모드(늦게 붙는 UI가 즉시 동기화 가능)
     public HUDIds.Mode CurrentHudMode { get; private set; } = HUDIds.Mode.None;
+    private bool _hudModeSet = false;
 
     private Dictionary<int, StageData> _stageDataCache;
 
@@ -65,6 +65,10 @@ public sealed class GameRunManager
 
         Phase = RunPhase.Starting;
         CurrentChapter = chapter;
+
+        // HUD state reset for a new run
+        CurrentHudMode = HUDIds.Mode.None;
+        _hudModeSet = false;
 
         try
         {
@@ -86,13 +90,12 @@ public sealed class GameRunManager
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
 
-            // ✅ 준비 완료 이벤트
+            // PlayerState ready (HUD may already exist)
             OnPlayerStateReady?.Invoke(PlayerState);
 
-            // ✅ 추가: 기본 HUD 모드 요청 (런 시작 시 기본은 탐험)
+            // Default HUD mode (store + broadcast if listeners exist)
             RequestHudMode(HUDIds.Mode.Explore);
 
-            // ✅ 이제부터 Running
             Phase = RunPhase.Running;
 
             OnRunStarted?.Invoke();
@@ -125,16 +128,10 @@ public sealed class GameRunManager
 
         OnRunEnded?.Invoke(result);
 
-        try
-        {
-            PlayerState?.Deactivate();
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}");
-        }
+        try { PlayerState?.Deactivate(); }
+        catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
-        // ✅ 추가: 종료 시 HUD 모드 초기화(선택)
+        // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
 
         ClearRunReferences();
@@ -154,75 +151,54 @@ public sealed class GameRunManager
     {
         RoomManager = null;
         StagePointManager = null;
-
         Player = null;
         Spawner = null;
-
         PlayerState = null;
     }
 
     // =========================================================
-    // ✅ HUD Mode API (게임 로직이 UI를 직접 만지지 않게)
+    // HUD Mode API
     // =========================================================
-
-    /// <summary>
-    /// HUD 모드를 바꾸고 싶을 때 호출 (UI 직접 참조 금지)
-    /// - Running 전(Starting)에도 호출 허용: UI가 먼저 떠 있어도 반영 가능
-    /// </summary>
     public void RequestHudMode(HUDIds.Mode mode)
     {
-        Debug.Log($"2️⃣ RequestHudMode: {mode}");
+        // (Optional) ignore repeated requests
+        if (_hudModeSet && CurrentHudMode == mode)
+            return;
 
         CurrentHudMode = mode;
-        Debug.Log($"2️⃣ CurrentHudMode set: {CurrentHudMode}");
+        _hudModeSet = true;
 
-        Debug.Log($"2️⃣ OnHudModeChanged is null? {OnHudModeChanged == null}");
-
+        // listener could be 0 => null is normal
         OnHudModeChanged?.Invoke(mode);
     }
 
-
-    /// <summary>
-    /// 늦게 붙는 UI용: 현재 HUD 모드를 즉시 알려주는 유틸
-    /// </summary>
     public bool TryGetHudMode(out HUDIds.Mode mode)
     {
         mode = CurrentHudMode;
-        return Phase != RunPhase.NotRunning;
+        return _hudModeSet;
     }
 
-    // (선택) 자주 쓰는 래퍼: 호출부 가독성
-    public void NotifyCombatStarted()
-    {
-        Debug.Log("1️⃣ NotifyCombatStarted called");
-        RequestHudMode(HUDIds.Mode.Combat);
-    }
-
-    public void NotifyCombatEnded()    => RequestHudMode(HUDIds.Mode.Explore);
-    public void NotifyBossStarted()    => RequestHudMode(HUDIds.Mode.Boss);
-    public void NotifyCutsceneStarted()=> RequestHudMode(HUDIds.Mode.Cutscene);
-    public void NotifyCutsceneEnded()  => RequestHudMode(HUDIds.Mode.Explore);
+    // Convenience wrappers
+    public void NotifyCombatStarted()   => RequestHudMode(HUDIds.Mode.Combat);
+    public void NotifyCombatEnded()     => RequestHudMode(HUDIds.Mode.Explore);
+    public void NotifyBossStarted()     => RequestHudMode(HUDIds.Mode.Boss);
+    public void NotifyCutsceneStarted() => RequestHudMode(HUDIds.Mode.Cutscene);
+    public void NotifyCutsceneEnded()   => RequestHudMode(HUDIds.Mode.Explore);
 
     // =========================================================
-    // Scene Bind (Bootstrapper가 주입)
+    // Scene Bind (Bootstrapper injects)
     // =========================================================
     public void BindSpawner(StageMapSpawner spawner)
     {
         Spawner = spawner;
-
-        if (Spawner == null)
-            Debug.LogWarning("[GameRun] BindSpawner: spawner is null");
-
+        if (Spawner == null) Debug.LogWarning("[GameRun] BindSpawner: spawner is null");
         OnSpawnerBound?.Invoke(Spawner);
     }
 
     public void BindPlayer(PlayerController player)
     {
         Player = player;
-
-        if (Player == null)
-            Debug.LogWarning("[GameRun] BindPlayer: player is null");
-
+        if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
         OnPlayerBound?.Invoke(Player);
     }
 
@@ -244,9 +220,7 @@ public sealed class GameRunManager
         }
 
         if (points == null) return;
-
-        foreach (var ui in points)
-            ui.Register(StagePointManager, RoomManager);
+        foreach (var ui in points) ui.Register(StagePointManager, RoomManager);
     }
 
     public void ResolveAllPointsAndSetStart()
@@ -324,19 +298,15 @@ public sealed class GameRunManager
             return;
         }
 
-        if (!StagePointManager.CanMove(targetPointId))
-            return;
-
-        if (!StagePointManager.TryMoveTo(targetPointId))
-            return;
+        if (!StagePointManager.CanMove(targetPointId)) return;
+        if (!StagePointManager.TryMoveTo(targetPointId)) return;
 
         SpawnCurrentPointMap();
     }
 
     public void SpawnPointMap(int pointId)
     {
-        if (!IsRunning || StagePointManager == null || RoomManager == null)
-            return;
+        if (!IsRunning || StagePointManager == null || RoomManager == null) return;
 
         if (Spawner == null)
         {
@@ -382,10 +352,7 @@ public sealed class GameRunManager
     {
         TextAsset textAsset = null;
 
-        try
-        {
-            textAsset = await Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
-        }
+        try { textAsset = await Managers.AddressableManager.LoadAssetAsync<TextAsset>(key); }
         catch (Exception e)
         {
             Debug.LogWarning($"[GameRun] Stage data load failed (optional). key={key}, err={e.Message}");

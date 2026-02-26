@@ -1,8 +1,3 @@
-//============================================================
-// UIRootBootstrapper.cs (Improved)
-// - 기존 Root Transform 제공 유지
-// - HUD를 현재 Run에 바인딩하는 유틸 제공(선택)
-//============================================================
 using UnityEngine;
 
 public sealed class UIRootBootstrapper : MonoBehaviour
@@ -24,6 +19,9 @@ public sealed class UIRootBootstrapper : MonoBehaviour
 
     [Header("HUD Bootstrapper (optional)")]
     [SerializeField] private HudBootstrapper hudBootstrapper;
+
+    // ✅ 같은 Run에 중복 바인딩 방지용
+    private GameRunManager _boundRun;
 
     private void Awake()
     {
@@ -49,11 +47,22 @@ public sealed class UIRootBootstrapper : MonoBehaviour
             return;
         }
 
+        if (ReferenceEquals(_boundRun, run))
+            return;
+
+        _boundRun = run;
         hudBootstrapper.BindRun(run);
     }
 
     public void UnbindHud()
     {
         hudBootstrapper?.Unbind();
+        _boundRun = null;
+    }
+
+    private void OnDestroy()
+    {
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
     }
 }
