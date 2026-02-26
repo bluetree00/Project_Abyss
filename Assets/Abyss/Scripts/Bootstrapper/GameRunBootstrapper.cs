@@ -105,10 +105,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 4) 시작 맵 스폰
         run.SpawnCurrentPointMap();
 
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+
         // 5) 플레이어 스폰 + 런에 바인딩
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
             run.BindPlayer(player);
+
+        
     }
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)
