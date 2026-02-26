@@ -44,6 +44,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private async UniTaskVoid StartRun()
     {
+        await UniTask.WaitUntil(() => AppBootstrapper.Instance != null && AppBootstrapper.Instance.IsReady);
+
         if (bootstrapper == null)
             bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
 
@@ -52,6 +54,9 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             Debug.LogError("[DebugRunPanel] GameRunBootstrapper not found.");
             return;
         }
+
+        // 씬 오브젝트 바인딩 한 번 보장
+        bootstrapper.Bind();
 
         await bootstrapper.StartRunAsync(chapter);
     }
