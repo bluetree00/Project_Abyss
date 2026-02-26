@@ -14,12 +14,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private void Awake()
     {
-        // ✅ Run 생성 + 주입 (중요!)
         _run = new GameRunManager();
         Managers.SetGameRun(_run);
 
-        // 씬 오브젝트 바인딩은 Awake에서도 가능하지만,
-        // 생성 순서가 애매하면 Start에서 한 번 더 Bind 해도 됨.
+        // HUD가 이미 존재할 수 있으니 선-바인딩 (안전)
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+
         Bind();
     }
 
@@ -62,6 +62,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             _points = FindObjectsOfType<StagePointUI>(true);
             _run.RegisterPoints(_points);
         }
+        
     }
 
     public async UniTask StartRunAsync(ChapterId chapter)
@@ -105,7 +106,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 4) 시작 맵 스폰
         run.SpawnCurrentPointMap();
 
-        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        UIRootBootstrapper.Instance?.BindHudToRun(run);
 
         // 5) 플레이어 스폰 + 런에 바인딩
         var player = await SpawnPlayerAsync(playerPrefabKey);
