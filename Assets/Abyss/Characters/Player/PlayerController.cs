@@ -92,6 +92,16 @@ public class PlayerController : CharacterBase
 
     private bool _aeSubscribed = false;
 
+    // ============================================================
+    // Session Binding
+    // ============================================================
+    private GameRunSession _session;
+
+    public void BindSession(GameRunSession session)
+    {
+        _session = session;
+    }
+
     //============================================================
     // Input / Movement State
     //============================================================
@@ -478,7 +488,7 @@ public class PlayerController : CharacterBase
 
     public void ProcessJump()
     {
-         Managers.GameRun.NotifyCombatStarted();
+        _session?.NotifyCombatStarted();
         // 이미 공중이면 점프 불가
         if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
 

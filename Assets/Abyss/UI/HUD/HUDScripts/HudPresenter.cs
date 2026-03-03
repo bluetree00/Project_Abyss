@@ -36,7 +36,7 @@ public sealed class HudPresenter : MonoBehaviour
         SetMode(startMode);
     }
 
-    public void Construct(GameRunManager run, UIHudDataProvider provider)
+    public void Construct(GameRunSession run, UIHudDataProvider provider)
     {
         Dispose();
 

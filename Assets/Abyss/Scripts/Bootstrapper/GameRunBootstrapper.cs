@@ -3,19 +3,32 @@ using Cysharp.Threading.Tasks;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
 {
+    public static GameRunBootstrapper Instance { get; private set; }
+
     [SerializeField] private StageMapSpawner spawner;
     [SerializeField] private string playerPrefabKey = "Knight";
     [SerializeField] private Transform playerSpawnPoint;
 
+    [Header("In-Run UI (Optional)")]
+    [SerializeField] private GameObject mapUIRoot;      // RunState.Map 일 때 활성화
+    [SerializeField] private GameObject standbyUIRoot;  // Standby / GridSynergy 일 때 활성화
+
     private StagePointUI[] _points;
 
-    // ✅ Run을 이 부트스트래퍼가 소유
-    private GameRunManager _run;
+    private GameRunSession _run;
+    public GameRunSession Run => _run;
 
     private void Awake()
     {
-        _run = new GameRunManager();
-        Managers.SetGameRun(_run);
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
+        _run = new GameRunSession();
+        _run.OnRunStateChanged += HandleRunStateChanged;
 
         // HUD가 이미 존재할 수 있으니 선-바인딩 (안전)
         UIRootBootstrapper.Instance?.BindHudToRun(_run);
@@ -25,15 +38,27 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private void Start()
     {
-        // 안전하게 한 번 더(Spawner가 늦게 생기는 씬 대비)
         Bind();
+    }
+
+    private void HandleRunStateChanged(GameRunSession.RunState state)
+    {
+        if (mapUIRoot != null)
+            mapUIRoot.SetActive(state == GameRunSession.RunState.Map);
+
+        if (standbyUIRoot != null)
+            standbyUIRoot.SetActive(
+                state == GameRunSession.RunState.Standby ||
+                state == GameRunSession.RunState.GridSynergy);
     }
 
     private void OnDestroy()
     {
-        // 내가 주입한 Run이면 해제
-        if (ReferenceEquals(Managers.GameRun, _run))
-            Managers.SetGameRun(null);
+        if (_run != null)
+            _run.OnRunStateChanged -= HandleRunStateChanged;
+
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
 
         _run = null;
     }
@@ -62,16 +87,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             _points = FindObjectsOfType<StagePointUI>(true);
             _run.RegisterPoints(_points);
         }
-        
     }
 
     public async UniTask StartRunAsync(ChapterId chapter)
     {
-        // ✅ 로컬 캐시 + null 방어 (Managers.GameRun을 직접 계속 쓰지 말기)
-        var run = _run ?? Managers.GameRun;
+        var run = _run;
         if (run == null)
         {
-            Debug.LogError("[GameRunBootstrapper] StartRunAsync failed: run is null. (SetGameRun not called?)");
+            Debug.LogError("[GameRunBootstrapper] StartRunAsync failed: run is null.");
             return;
         }
 
@@ -88,7 +111,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         run.BindSpawner(spawner);
 
         // 1) 런 로직 초기화
-        await run.StartNewRunAsync(chapter);
+        await run.StartNewRunAsync(chapter, LoadTextAsset);
+
+        static UniTask<TextAsset> LoadTextAsset(string key) =>
+            Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
 
         if (!run.IsRunning || run.RoomManager == null || !run.RoomManager.IsInitialized)
         {
@@ -108,12 +134,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
 
-        // 5) 플레이어 스폰 + 런에 바인딩
+        // 5) 플레이어 스폰 + 런에 바인딩 + 세션 주입
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
+        {
             run.BindPlayer(player);
-
-        
+            player.BindSession(run);
+        }
     }
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)

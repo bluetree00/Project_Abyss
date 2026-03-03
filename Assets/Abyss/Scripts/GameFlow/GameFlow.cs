@@ -10,7 +10,7 @@ public enum GameFlowState
     Result,
 }
 
-public sealed class GameFlowManager
+public sealed class GameFlow
 {
     public GameFlowState CurrentState { get; private set; } = GameFlowState.None;
 
