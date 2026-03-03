@@ -7,7 +7,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-public sealed class GameRunManager
+public sealed class GameRunSession
 {
     private const string ROOMS_KEY = "STAGEDATA_ROOMS";
     private const string STAGE_KEY = "STAGEDATA_STAGE";
@@ -18,6 +18,22 @@ public sealed class GameRunManager
         Starting   = 1,
         Running    = 2,
         Ending     = 3
+    }
+
+    public enum RunState
+    {
+        None,
+        Map,          // 맵 선택 화면
+        CombatRoom,   // 전투방
+        ItemRoom,     // 아이템방
+        RewardRoom,   // 재화방
+        SpecialRoom,  // 특별방
+        BossRoom,     // 보스방
+        Standby,      // 방 클리어 후 대기
+        GridSynergy,  // 그리드 시너지 선택
+        ChapterClear, // 챕터 클리어 화면
+        RunClear,     // 런 클리어 (최종 보스 격파)
+        RunEnd,       // 런 종료 (사망)
     }
 
     public RunPhase Phase { get; private set; } = RunPhase.NotRunning;
@@ -47,6 +63,10 @@ public sealed class GameRunManager
     // HUD mode
     public event Action<HUDIds.Mode> OnHudModeChanged;
 
+    // Run state
+    public RunState CurrentRunState { get; private set; } = RunState.None;
+    public event Action<RunState> OnRunStateChanged;
+
     public HUDIds.Mode CurrentHudMode { get; private set; } = HUDIds.Mode.None;
     private bool _hudModeSet = false;
 
@@ -55,7 +75,7 @@ public sealed class GameRunManager
     // =========================================================
     // Run Lifecycle
     // =========================================================
-    public async UniTask StartNewRunAsync(ChapterId chapter)
+    public async UniTask StartNewRunAsync(ChapterId chapter, Func<string, UniTask<TextAsset>> loader)
     {
         if (Phase != RunPhase.NotRunning)
         {
@@ -72,10 +92,10 @@ public sealed class GameRunManager
 
         try
         {
-            await LoadStageDataAsync(STAGE_KEY);
+            await LoadStageDataAsync(STAGE_KEY, loader);
 
             RoomManager = new RoomManager();
-            await RoomManager.InitializeAsync(ROOMS_KEY);
+            await RoomManager.InitializeAsync(ROOMS_KEY, loader);
 
             if (!RoomManager.IsInitialized)
             {
@@ -93,10 +113,10 @@ public sealed class GameRunManager
             // PlayerState ready (HUD may already exist)
             OnPlayerStateReady?.Invoke(PlayerState);
 
-            // Default HUD mode (store + broadcast if listeners exist)
-            RequestHudMode(HUDIds.Mode.Explore);
-
             Phase = RunPhase.Running;
+
+            // 런 시작 = 맵 상태 (HUD Explore 포함)
+            ChangeRunState(RunState.Map);
 
             OnRunStarted?.Invoke();
             Debug.Log($"[GameRun] Started. chapter={CurrentChapter}");
@@ -117,6 +137,11 @@ public sealed class GameRunManager
         }
 
         Phase = RunPhase.Ending;
+
+        // 종료 상태 발행 (OnRunEnded 전에 구독자가 반응할 수 있도록)
+        var endState = isCleared ? RunState.RunClear : RunState.RunEnd;
+        CurrentRunState = endState;
+        OnRunStateChanged?.Invoke(endState);
 
         var result = new EndRunResult(
             isCleared: isCleared,
@@ -154,6 +179,67 @@ public sealed class GameRunManager
         Player = null;
         Spawner = null;
         PlayerState = null;
+        CurrentRunState = RunState.None;
+    }
+
+    // =========================================================
+    // Run State Machine
+    // =========================================================
+    private static HUDIds.Mode RunStateToHudMode(RunState state) => state switch
+    {
+        RunState.Map         => HUDIds.Mode.Explore,
+        RunState.CombatRoom  => HUDIds.Mode.Combat,
+        RunState.ItemRoom    => HUDIds.Mode.Explore,
+        RunState.RewardRoom  => HUDIds.Mode.Explore,
+        RunState.SpecialRoom => HUDIds.Mode.Explore,
+        RunState.BossRoom    => HUDIds.Mode.Boss,
+        RunState.Standby     => HUDIds.Mode.Explore,
+        RunState.GridSynergy => HUDIds.Mode.Puzzle,
+        _                    => HUDIds.Mode.None,
+    };
+
+    private void ChangeRunState(RunState newState)
+    {
+        if (CurrentRunState == newState) return;
+        CurrentRunState = newState;
+        RequestHudMode(RunStateToHudMode(newState));
+        OnRunStateChanged?.Invoke(newState);
+    }
+
+    public void EnterMap()
+    {
+        if (!IsRunning) return;
+        ChangeRunState(RunState.Map);
+    }
+
+    public void EnterRoom(RunState roomState)
+    {
+        if (!IsRunning) return;
+        ChangeRunState(roomState);
+    }
+
+    public void EnterStandby()
+    {
+        if (!IsRunning) return;
+        ChangeRunState(RunState.Standby);
+    }
+
+    public void EnterGridSynergy()
+    {
+        if (!IsRunning) return;
+        ChangeRunState(RunState.GridSynergy);
+    }
+
+    public void ExitGridSynergy()
+    {
+        if (!IsRunning) return;
+        ChangeRunState(RunState.Standby);
+    }
+
+    public void EnterChapterClear()
+    {
+        if (!IsRunning) return;
+        ChangeRunState(RunState.ChapterClear);
     }
 
     // =========================================================
@@ -179,11 +265,11 @@ public sealed class GameRunManager
     }
 
     // Convenience wrappers
-    public void NotifyCombatStarted()   => RequestHudMode(HUDIds.Mode.Combat);
-    public void NotifyCombatEnded()     => RequestHudMode(HUDIds.Mode.Explore);
-    public void NotifyBossStarted()     => RequestHudMode(HUDIds.Mode.Boss);
+    public void NotifyCombatStarted()   => EnterRoom(RunState.CombatRoom);
+    public void NotifyCombatEnded()     => EnterStandby();
+    public void NotifyBossStarted()     => EnterRoom(RunState.BossRoom);
     public void NotifyCutsceneStarted() => RequestHudMode(HUDIds.Mode.Cutscene);
-    public void NotifyCutsceneEnded()   => RequestHudMode(HUDIds.Mode.Explore);
+    public void NotifyCutsceneEnded()   => EnterMap();
 
     // =========================================================
     // Scene Bind (Bootstrapper injects)
@@ -348,11 +434,11 @@ public sealed class GameRunManager
     // =========================================================
     // Optional: Stage Data
     // =========================================================
-    private async UniTask LoadStageDataAsync(string key)
+    private async UniTask LoadStageDataAsync(string key, Func<string, UniTask<TextAsset>> loader)
     {
         TextAsset textAsset = null;
 
-        try { textAsset = await Managers.AddressableManager.LoadAssetAsync<TextAsset>(key); }
+        try { textAsset = await loader(key); }
         catch (Exception e)
         {
             Debug.LogWarning($"[GameRun] Stage data load failed (optional). key={key}, err={e.Message}");

@@ -8,7 +8,10 @@ public class UI_StageMap : UI_Scene
 
     public void RefreshStageMap()
     {
-        var stageMgr = Managers.GameRun.StagePointManager;
+        var bootstrapper = GameRunBootstrapper.Instance;
+        if (bootstrapper == null) return;
+
+        var stageMgr = bootstrapper.Run?.StagePointManager;
 
         // 이미 Resolve된 Context 기반으로 UI 구성
     }

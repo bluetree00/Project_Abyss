@@ -872,7 +872,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46616673, y: 0.0012009253, z: 0.0011602722, w: 0.88469535}
+  m_LocalRotation: {x: 0.4661741, y: 0.0012252904, z: 0.0011838303, w: 0.8846914}
   m_LocalPosition: {x: 0, y: 4.998319, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1945,6 +1945,8 @@ MonoBehaviour:
   spawner: {fileID: 669045121}
   playerPrefabKey: Knight
   playerSpawnPoint: {fileID: 0}
+  mapUIRoot: {fileID: 0}
+  standbyUIRoot: {fileID: 0}
 --- !u!1 &706426765
 GameObject:
   m_ObjectHideFlags: 0
@@ -2276,7 +2278,7 @@ PrefabInstance:
     - target: {fileID: 8519052083679706558, guid: db18c22cee80cc74487b0900361715f6,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8884314244123643335, guid: db18c22cee80cc74487b0900361715f6,
         type: 3}

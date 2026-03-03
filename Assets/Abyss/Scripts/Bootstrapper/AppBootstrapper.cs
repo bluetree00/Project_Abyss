@@ -34,10 +34,9 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
     [SerializeField] private Define.Scene startScene = Define.Scene.Title;
     [SerializeField] private GameFlowState startState = GameFlowState.Title;
-
     public bool IsReady { get; private set; }
 
-    private GameFlowManager _flow;
+    private GameFlow _flow;
     private SceneTransitionManager _scene;
 
     private void Awake()
@@ -79,24 +78,57 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (preloadAnimations)
             await PreloadAnimationsAsync();
 
-        // 4) (선택) UIRoot 확보
+        // 4) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)
+        {
             await EnsureUIRootAsync();
+
+            var uiRoot = UIRootBootstrapper.Instance;
+            if (uiRoot != null)
+                Managers.UI.SetRoots(uiRoot.MenuRoot, uiRoot.PopupRoot, uiRoot.OverlayRoot, uiRoot.WorldRoot);
+            else
+                Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
+        }
 
         // 5) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
         {
-            _flow = new GameFlowManager();
+            _flow = new GameFlow();
             _scene = new SceneTransitionManager(this);
 
             // ✅ 너가 이전에 쓴 방식이 Bind가 있는 구조라면 반드시 연결
             _flow.BindSceneTransition(_scene);
+            _flow.OnStateChanged += OnFlowStateChanged;
 
             // ✅ 한 번만 호출
             _flow.RequestLoad(startScene, startState);
         }
 
         IsReady = true;
+    }
+
+    private void OnFlowStateChanged(GameFlowState state)
+    {
+        Managers.UI.ClearOnSceneTransition();
+
+        switch (state)
+        {
+            case GameFlowState.Title:
+                Managers.UI.ShowMenuUI<UI_Title>();
+                break;
+
+            case GameFlowState.Lobby:
+                Managers.UI.ShowMenuUI<UI_Lobby>();
+                break;
+
+            case GameFlowState.InGame:
+                // HUD 바인딩은 GameRunBootstrapper → HudBootstrapper에서 처리
+                break;
+
+            case GameFlowState.Result:
+                Managers.UI.ShowMenuUI<UI_Result>();
+                break;
+        }
     }
 
     private async UniTask EnsureUIRootAsync()
