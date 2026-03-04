@@ -21,7 +21,7 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     [SerializeField] private HudBootstrapper hudBootstrapper;
 
     // ✅ 같은 Run에 중복 바인딩 방지용
-    private GameRunManager _boundRun;
+    private GameRunSession _boundRun;
 
     private void Awake()
     {
@@ -33,7 +33,7 @@ public sealed class UIRootBootstrapper : MonoBehaviour
             hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
     }
 
-    public void BindHudToRun(GameRunManager run)
+    public void BindHudToRun(GameRunSession run)
     {
         if (run == null)
         {

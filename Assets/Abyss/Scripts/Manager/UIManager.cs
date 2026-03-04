@@ -8,19 +8,43 @@ public class UIManager
     int _order = 10;
 
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
-    UI_Scene _sceneUI = null;
+    UI_Scene _menuUI = null;
 
     Dictionary<string, GameObject> _uiObjects = new Dictionary<string, GameObject>();
 
-    public GameObject Root
+    // @UIRoot 캔버스 루트 — AppBootstrapper에서 주입
+    private Transform _menuRoot;
+    private Transform _popupRoot;
+    private Transform _overlayRoot;
+    private Transform _worldRoot;
+
+    // 루트가 주입된 경우 DDOL 캔버스 자식으로, 아니면 레거시 @UI_Root 사용
+    private Transform MenuParent  => _menuRoot  != null ? _menuRoot  : GetLegacyRoot();
+    private Transform PopupParent => _popupRoot != null ? _popupRoot : GetLegacyRoot();
+
+    private bool IsRootInjected => _menuRoot != null;
+
+    /// <summary>
+    /// AppBootstrapper가 UIRoot 확보 후 주입
+    /// </summary>
+    public void SetRoots(Transform menuRoot, Transform popupRoot,
+                         Transform overlayRoot = null, Transform worldRoot = null)
     {
-        get
-        {
-            GameObject root = GameObject.Find("@UI_Root");
-            if (root == null)
-                root = new GameObject { name = "@UI_Root" };
-            return root;
-        }
+        _menuRoot    = menuRoot;
+        _popupRoot   = popupRoot;
+        _overlayRoot = overlayRoot;
+        _worldRoot   = worldRoot;
+    }
+
+    /// <summary>
+    /// 레거시 폴백: @UIRoot 미사용 환경(테스트 씬 등)에서 자체 Root 생성
+    /// </summary>
+    private Transform GetLegacyRoot()
+    {
+        GameObject root = GameObject.Find("@UI_Root");
+        if (root == null)
+            root = new GameObject { name = "@UI_Root" };
+        return root.transform;
     }
 
     #region Canvas
@@ -36,7 +60,7 @@ public class UIManager
 
     #endregion
 
-    #region World / Sub Item (기존 유지)
+    #region World / Sub Item
 
     public T MakeWorldSpaceUI<T>(Transform parent = null, string name = null)
         where T : UI_Base
@@ -44,8 +68,9 @@ public class UIManager
         name ??= typeof(T).Name;
 
         GameObject go = Managers.Resource.Instantiate($"UI/WorldSpace/{name}");
-        if (parent != null)
-            go.transform.SetParent(parent);
+        Transform target = parent != null ? parent : _worldRoot;
+        if (target != null)
+            go.transform.SetParent(target);
 
         Canvas canvas = go.GetOrAddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
@@ -68,56 +93,83 @@ public class UIManager
 
     #endregion
 
-    #region Scene UI
+    #region Overlay UI (사전 배치 + SetActive)
 
     /// <summary>
-    /// 외부용 API (기존 유지)
+    /// OverlayRoot 자식에서 사전 배치된 UI를 검색합니다.
     /// </summary>
-    public void ShowSceneUI<T>(string name = null)
-        where T : UI_Scene
+    public T GetOverlayUI<T>() where T : UI_Base
     {
-        ShowSceneUIAsync<T>(name).Forget();
+        if (_overlayRoot == null) return null;
+        return _overlayRoot.GetComponentInChildren<T>(true);
     }
 
-    /// <summary>
-    /// 실제 async 로직
-    /// </summary>
-    private async UniTask ShowSceneUIAsync<T>(string name = null)
+    public void ShowOverlayUI<T>() where T : UI_Base
+    {
+        GetOverlayUI<T>()?.gameObject.SetActive(true);
+    }
+
+    public void HideOverlayUI<T>() where T : UI_Base
+    {
+        GetOverlayUI<T>()?.gameObject.SetActive(false);
+    }
+
+    #endregion
+
+    #region Menu UI (Canvas_Menu / 런타임 생성)
+
+    public void ShowMenuUI<T>(string name = null)
+        where T : UI_Scene
+    {
+        ShowMenuUIAsync<T>(name).Forget();
+    }
+
+    private async UniTask ShowMenuUIAsync<T>(string name = null)
         where T : UI_Scene
     {
         name ??= typeof(T).Name;
 
         if (_uiObjects.TryGetValue(name, out GameObject existing))
         {
-            existing.SetActive(true);
-            _sceneUI = existing.GetComponent<T>();
-            return;
+            if (existing != null)
+            {
+                existing.SetActive(true);
+                _menuUI = existing.GetComponent<T>();
+                return;
+            }
+            _uiObjects.Remove(name);
         }
 
-        string addressKey = $"UI/Scene/{name}";
+        string addressKey = $"UI/Menu/{name}";
 
         try
         {
             GameObject prefab =
                 await Managers.AddressableManager.LoadAssetAsync<GameObject>(addressKey);
 
-            GameObject go = Object.Instantiate(prefab, Root.transform);
+            GameObject go = Object.Instantiate(prefab, MenuParent);
             go.name = name;
 
-            SetCanvas(go, true);
-
-            _sceneUI = Util.GetOrAddComponent<T>(go);
+            _menuUI = Util.GetOrAddComponent<T>(go);
+            _menuUI.Init();
             _uiObjects[name] = go;
         }
         catch
         {
-            Debug.LogError($"[UIManager] Scene UI Load Failed : {name}");
+            Debug.LogError($"[UIManager] Menu UI Load Failed : {name}");
         }
+    }
+
+    public void CloseMenuUI()
+    {
+        if (_menuUI == null) return;
+        _menuUI.Close();
+        _menuUI = null;
     }
 
     #endregion
 
-    #region Popup UI
+    #region Popup UI (Canvas_Popup / 런타임 생성)
 
     public void ShowPopupUI<T>(string name = null)
         where T : UI_Popup
@@ -132,9 +184,13 @@ public class UIManager
 
         if (_uiObjects.TryGetValue(name, out GameObject existing))
         {
-            existing.SetActive(true);
-            _popupStack.Push(existing.GetComponent<T>());
-            return;
+            if (existing != null)
+            {
+                existing.SetActive(true);
+                _popupStack.Push(existing.GetComponent<T>());
+                return;
+            }
+            _uiObjects.Remove(name);
         }
 
         string addressKey = $"UI/Popup/{name}";
@@ -144,12 +200,11 @@ public class UIManager
             GameObject prefab =
                 await Managers.AddressableManager.LoadAssetAsync<GameObject>(addressKey);
 
-            GameObject go = Object.Instantiate(prefab, Root.transform);
+            GameObject go = Object.Instantiate(prefab, PopupParent);
             go.name = name;
 
-            SetCanvas(go, true);
-
             T popup = Util.GetOrAddComponent<T>(go);
+            popup.Init();
             _popupStack.Push(popup);
 
             _uiObjects[name] = go;
@@ -169,7 +224,7 @@ public class UIManager
 
     public void CloseUI(string name)
     {
-        if (_uiObjects.TryGetValue(name, out GameObject ui))
+        if (_uiObjects.TryGetValue(name, out GameObject ui) && ui != null)
         {
             ui.SetActive(false);
             _order--;
@@ -206,13 +261,31 @@ public class UIManager
     public void Clear()
     {
         CloseAllPopupUI();
-        _sceneUI = null;
+        _menuUI = null;
+    }
+
+    /// <summary>
+    /// GameFlow 상태 전환 시 호출
+    /// - @UIRoot 주입 모드: UI 오브젝트가 DDOL이므로 캐시 유지, 화면만 닫음
+    /// - 레거시 모드: @UI_Root가 씬 전환 시 소멸되므로 캐시도 초기화
+    /// </summary>
+    public void ClearOnSceneTransition()
+    {
+        CloseAllPopupUI();
+        CloseMenuUI();
+        _order = 10;
+
+        if (!IsRootInjected)
+            _uiObjects.Clear();
     }
 
     public void ClearAllUI()
     {
         foreach (var ui in _uiObjects.Values)
-            Object.Destroy(ui);
+        {
+            if (ui != null)
+                Object.Destroy(ui);
+        }
 
         _uiObjects.Clear();
     }
