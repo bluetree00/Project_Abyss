@@ -185,6 +185,17 @@ public sealed class GameRunSession
     // =========================================================
     // Run State Machine
     // =========================================================
+    private static RunState CategoryToRunState(RoomCategory cat) => cat switch
+    {
+        RoomCategory.Battle  => RunState.CombatRoom,
+        RoomCategory.Elite   => RunState.CombatRoom,
+        RoomCategory.Boss    => RunState.BossRoom,
+        RoomCategory.Event   => RunState.SpecialRoom,
+        RoomCategory.Shop    => RunState.ItemRoom,
+        RoomCategory.Start   => RunState.Map,
+        _                    => RunState.Standby,
+    };
+
     private static HUDIds.Mode RunStateToHudMode(RunState state) => state switch
     {
         RunState.Map         => HUDIds.Mode.Explore,
@@ -201,7 +212,9 @@ public sealed class GameRunSession
     private void ChangeRunState(RunState newState)
     {
         if (CurrentRunState == newState) return;
+        var prev = CurrentRunState;
         CurrentRunState = newState;
+        Debug.Log($"[RunState] {prev} → {newState}  |  HudMode: {RunStateToHudMode(newState)}");
         RequestHudMode(RunStateToHudMode(newState));
         OnRunStateChanged?.Invoke(newState);
     }
@@ -373,7 +386,12 @@ public sealed class GameRunSession
             return;
         }
 
+        Debug.Log($"[SpawnMap] pointId={ctx.PointId}  room={room.name}  category={room.category}  prefab={room.prefab}");
         Spawner.ChangeMap(room.prefab);
+
+        // 방 카테고리 → RunState 자동 전환
+        var category = RoomCategoryUtil.Parse(room.category);
+        ChangeRunState(CategoryToRunState(category));
     }
 
     public void RequestMoveTo(int targetPointId)
