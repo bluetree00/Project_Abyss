@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 public class StagePointUI : MonoBehaviour
 {
@@ -50,6 +51,38 @@ public class StagePointUI : MonoBehaviour
     {
         if (_mgr != null)
             _mgr.OnPointResolved -= HandleResolved;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 클릭 (Button 컴포넌트의 OnClick 또는 코드에서 직접 호출)
+    // ─────────────────────────────────────────────────────────
+    public void OnPointClicked()
+    {
+        Debug.Log($"[StagePointUI] Clicked pointId={pointId}");
+
+        var run = GameRunBootstrapper.Instance?.Run;
+        if (run == null || !run.IsRunning)
+        {
+            Debug.LogWarning($"[StagePointUI] pointId={pointId} → run null or not running. run={run}, IsRunning={run?.IsRunning}");
+            return;
+        }
+        if (run.StagePointManager == null)
+        {
+            Debug.LogWarning($"[StagePointUI] pointId={pointId} → StagePointManager is null");
+            return;
+        }
+        if (!run.StagePointManager.CanMove(pointId))
+        {
+            var cur = run.StagePointManager.CurrentPointId;
+            Debug.LogWarning($"[StagePointUI] pointId={pointId} → CanMove=false  currentPointId={cur}");
+            return;
+        }
+
+        Debug.Log($"[StagePointUI] pointId={pointId} → RequestMoveTo 호출");
+        if (TransitionOverlay.Instance != null)
+            TransitionOverlay.Instance.PlayAsync(() => run.RequestMoveTo(pointId)).Forget();
+        else
+            run.RequestMoveTo(pointId);
     }
 
     private void HandleResolved(int resolvedPointId, string roomId)

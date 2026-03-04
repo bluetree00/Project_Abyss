@@ -10,8 +10,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [Header("Optional")]
     [SerializeField] private GameRunBootstrapper bootstrapper;
 
-    [Header("Temp UI")]
-    [SerializeField] private GameObject stageUIRoot;   // 👈 추가
+    [Header("Debug Keys")]
+    [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
 
     private bool _clicked;
 
@@ -33,13 +33,25 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         {
             if (_clicked) return;
             _clicked = true;
-
-            // 👇 버튼 눌리면 StageUI 비활성화
-            if (stageUIRoot != null)
-                stageUIRoot.SetActive(false);
-
             StartRun().Forget();
         });
+    }
+
+    private void Update()
+    {
+        if (!Input.GetKeyDown(clearRoomKey)) return;
+
+        var inst = bootstrapper != null ? bootstrapper : GameRunBootstrapper.Instance;
+        var run = inst != null ? inst.Run : null;
+        if (run == null || !run.IsRunning) return;
+        if (run.CurrentRunState == GameRunSession.RunState.Map) return;
+
+        var spm = run.StagePointManager;
+        if (spm != null && spm.CurrentPointId >= 0)
+            spm.MarkCleared(spm.CurrentPointId);
+
+        run.EnterMap();
+        Debug.Log($"[DebugRunPanel] {clearRoomKey} → 방 클리어 스킵, Map 전환");
     }
 
     private async UniTaskVoid StartRun()

@@ -9,10 +9,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private string playerPrefabKey = "Knight";
     [SerializeField] private Transform playerSpawnPoint;
 
-    [Header("In-Run UI (Optional)")]
-    [SerializeField] private GameObject mapUIRoot;      // RunState.Map 일 때 활성화
-    [SerializeField] private GameObject standbyUIRoot;  // Standby / GridSynergy 일 때 활성화
-
     private StagePointUI[] _points;
 
     private GameRunSession _run;
@@ -28,7 +24,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Instance = this;
 
         _run = new GameRunSession();
-        _run.OnRunStateChanged += HandleRunStateChanged;
 
         // HUD가 이미 존재할 수 있으니 선-바인딩 (안전)
         UIRootBootstrapper.Instance?.BindHudToRun(_run);
@@ -41,22 +36,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Bind();
     }
 
-    private void HandleRunStateChanged(GameRunSession.RunState state)
-    {
-        if (mapUIRoot != null)
-            mapUIRoot.SetActive(state == GameRunSession.RunState.Map);
-
-        if (standbyUIRoot != null)
-            standbyUIRoot.SetActive(
-                state == GameRunSession.RunState.Standby ||
-                state == GameRunSession.RunState.GridSynergy);
-    }
-
     private void OnDestroy()
     {
-        if (_run != null)
-            _run.OnRunStateChanged -= HandleRunStateChanged;
-
         if (ReferenceEquals(Instance, this))
             Instance = null;
 
