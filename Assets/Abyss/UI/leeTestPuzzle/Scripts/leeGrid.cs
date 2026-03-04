@@ -1,100 +1,98 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Runtime Grid instance.
+/// Data comes from LeeGridAssetSO (pattern + visual).
+/// This component should live on the ROOT of the Grid prefab.
+/// </summary>
 public class leeGrid : MonoBehaviour
 {
-    [Header("Grid Settings")]
-    // GridSquare 프리팹
-    public GameObject gridSquarePrefab;
-    // 그리드 크기(행/열)
-    public int columns = 8;
-    public int rows = 8;
-    // 칸 간 간격 (Canvas 좌표 기준)
-    public float squareGap = 3f;
-    // 첫 번째 칸의 시작 위치 (왼쪽 위 기준)
-    public Vector2 startPosition = new Vector2(-435f, 442f);
-    // GridSquare 프리팹 스케일
-    public float squareScale = 0.9f;
+    [Header("Grid Asset")]
+    public LeeGridAssetSO gridAsset;
 
-    // 0/1 패턴: 0 = 막힌 칸, 1 = 놓을 수 있는 칸
-    public int[,] cellTypes;
+    private readonly List<leeGridSquare> gridSquares = new();
 
-    // 생성된 GridSquare들을 담는 리스트
-    private List<leeGridSquare> gridSquares = new List<leeGridSquare>();
-
-    void Start()
+    /// <summary>
+    /// Called by LeeBoardManager right after instantiating the grid prefab.
+    /// Safe to call multiple times.
+    /// </summary>
+    public void Initialize(LeeGridAssetSO asset)
     {
-        InitCellTypes();
-        CreateGrid();
+        gridAsset = asset;
+        Rebuild();
     }
 
-    // cellTypes에 0/1 패턴을 정의 (여기서 모양 커스터마이즈)
-    void InitCellTypes()
-    {   
-        cellTypes = new int[,]
+    public void Rebuild()
+    {
+        if (gridAsset == null || gridAsset.pattern == null || gridAsset.visual == null)
         {
-            {0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0},
-            {0,0,1,1,0,0,0,0},
-            {0,1,1,1,0,0,0,0},
-            {0,0,0,1,0,1,1,0},
-            {0,0,0,1,0,1,1,0},
-            {0,0,0,0,0,0,0,0},
-        };
+            Debug.LogError($"{name}: gridAsset/pattern/visual is not set");
+            return;
+        }
+        if (gridAsset.visual.gridSquarePrefab == null)
+        {
+            Debug.LogError($"{name}: gridSquarePrefab is not set in visual SO");
+            return;
+        }
 
-    }
-
-    // 전체 그리드 생성 흐름
-    void CreateGrid()
-    {
-        SpawnGridSquares();
-        SetGridSquarePositions();
-    }
-    
-    // GridSquare 프리팹을 rows*columns 개수만큼 생성
-    void SpawnGridSquares()
-    {
+        ClearChildren();
         gridSquares.Clear();
 
-        int total = rows * columns;
-        for (int i = 0; i < total; i++)
-        {
-            GameObject squareObj = Instantiate(gridSquarePrefab, transform);
-            squareObj.transform.localScale = Vector3.one * squareScale;
+        int rows = gridAsset.pattern.rows;
+        int cols = gridAsset.pattern.columns;
+        float gap = gridAsset.visual.squareGap;
 
-            leeGridSquare square = squareObj.GetComponent<leeGridSquare>();
-            gridSquares.Add(square);
-        }
-    }
-
-    // 각 GridSquare의 위치 설정 + cellTypes 기반 placeable 설정
-    void SetGridSquarePositions()
-    {
-        for (int row = 0; row < rows; row++)
+        // Spawn squares
+        for (int r = 0; r < rows; r++)
         {
-            for (int col = 0; col < columns; col++)
+            for (int c = 0; c < cols; c++)
             {
-                int index = row * columns + col;
-                var square = (leeGridSquare)gridSquares[index];
+                var squareObj = Object.Instantiate(gridAsset.visual.gridSquarePrefab, transform);
+                squareObj.transform.localScale = Vector3.one * gridAsset.visual.squareScale;
 
-                float x = startPosition.x + col * (squareGap);
-                float y = startPosition.y - row * (squareGap);
+                var sq = squareObj.GetComponent<leeGridSquare>();
+                if (sq == null)
+                {
+                    Debug.LogError("GridSquare prefab must have leeGridSquare component");
+                    Destroy(squareObj);
+                    continue;
+                }
 
-                var rt = square.GetComponent<RectTransform>();
-                rt.anchoredPosition = new Vector2(x, y);
+                // Apply visual colors from SO
+                sq.placeableColor = gridAsset.visual.placeableColor;
+                sq.blockedColor = gridAsset.visual.blockedColor;
 
-                // 0/1 패턴으로 placeable 여부 결정
-                bool placeable = (cellTypes[row, col] == 1);
-                square.Init(row, col, placeable);
+                // Position
+                var rt = squareObj.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    Vector2 start = gridAsset.visual.startPosition;
+                    if (gridAsset.visual.autoCenter)
+                    {
+                        // Center grid around (0,0) of this grid root
+                        float width = (cols - 1) * gap;
+                        float height = (rows - 1) * gap;
+                        start = new Vector2(-width * 0.5f, height * 0.5f) + gridAsset.visual.centerOffset;
+                    }
+                    float x = start.x + c * gap;
+                    float y = start.y - r * gap;
+                    rt.anchoredPosition = new Vector2(x, y);
+                }
+
+                bool placeable = gridAsset.pattern.IsPlaceable(r, c);
+                sq.Init(r, c, placeable);
+
+                gridSquares.Add(sq);
             }
         }
     }
-    
-    // GridManager가 전체 칸 리스트를 얻을 때 사용
-    public List<leeGridSquare> GetGridSquares()
+
+    private void ClearChildren()
     {
-        return gridSquares;
+        for (int i = transform.childCount - 1; i >= 0; i--)
+            Destroy(transform.GetChild(i).gameObject);
     }
+
+    public List<leeGridSquare> GetGridSquares() => gridSquares;
 }
