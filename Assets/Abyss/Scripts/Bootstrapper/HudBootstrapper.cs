@@ -5,7 +5,7 @@ public sealed class HudBootstrapper : MonoBehaviour
     [SerializeField] private HudPresenter presenter;
 
     private UIHudDataProvider _provider;
-    private GameRunManager _run;
+    private GameRunSession _run;
 
     // ✅ Construct 중복 방지
     private bool _constructed;
@@ -21,7 +21,7 @@ public sealed class HudBootstrapper : MonoBehaviour
         _provider ??= new UIHudDataProvider();
     }
 
-    public void BindRun(GameRunManager run)
+    public void BindRun(GameRunSession run)
     {
         if (presenter == null)
         {
