@@ -58,12 +58,12 @@ public sealed class HudPresenter : MonoBehaviour
         // 초기 스냅샷
         if (_provider != null && _provider.TryGet(out var data))
         {
-            view.SetHp(data.Hp, data.MaxHp);
+            view.CombatPanel?.SetHp(data.Hp, data.MaxHp);
             view.SetGold(data.TempGold);
         }
         else
         {
-            view.SetHp(_state.Hp, _state.MaxHp);
+            view.CombatPanel?.SetHp(_state.Hp, _state.MaxHp);
             view.SetGold(_state.TempGold);
         }
 
@@ -86,7 +86,7 @@ public sealed class HudPresenter : MonoBehaviour
     private void OnDisable() => Dispose();
     private void OnDestroy() => Dispose();
 
-    private void HandleHpChanged(int hp, int maxHp) => view?.SetHp(hp, maxHp);
+    private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
 
     public void SetMode(HUDIds.Mode mode)

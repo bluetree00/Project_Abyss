@@ -6,7 +6,7 @@
       "category": "Battle",
       "difficulty": 1,
       "weight": 10,
-      "prefab": "Room_Battle_SlimeForest",
+      "prefab": "TestNomarStage_01",
       "tags": ["normal", "early"]
     },
     {
@@ -15,7 +15,7 @@
       "category": "Battle",
       "difficulty": 2,
       "weight": 8,
-      "prefab": "Room_Battle_GoblinCamp",
+      "prefab": "TestNomarStage_02",
       "tags": ["normal"]
     },
     {
@@ -24,7 +24,7 @@
       "category": "Battle",
       "difficulty": 3,
       "weight": 5,
-      "prefab": "Room_Battle_UndeadCrypt",
+      "prefab": "TestNomarStage_03",
       "tags": ["normal", "hard"]
     },
 
@@ -34,7 +34,7 @@
       "category": "Elite",
       "difficulty": 3,
       "weight": 5,
-      "prefab": "Room_Elite_GoblinKnight",
+      "prefab": "TestNomarStage_01",
       "tags": ["elite"]
     },
 
@@ -44,7 +44,7 @@
       "category": "Event",
       "difficulty": 0,
       "weight": 6,
-      "prefab": "Room_Event_Mystery",
+      "prefab": "TestNomarStage_02",
       "tags": ["story"]
     },
     {
@@ -53,7 +53,7 @@
       "category": "Event",
       "difficulty": 0,
       "weight": 4,
-      "prefab": "Room_Event_Treasure",
+      "prefab": "TestNomarStage_03",
       "tags": ["reward"]
     },
 
@@ -63,7 +63,7 @@
       "category": "Shop",
       "difficulty": 0,
       "weight": 7,
-      "prefab": "Room_Shop_Normal",
+      "prefab": "TestNomarStage_01",
       "tags": ["shop"]
     },
     {
@@ -72,7 +72,7 @@
       "category": "Shop",
       "difficulty": 0,
       "weight": 3,
-      "prefab": "Room_Shop_Rare",
+      "prefab": "TestNomarStage_02",
       "tags": ["shop", "rare"]
     },
 
@@ -82,7 +82,7 @@
       "category": "Start",
       "difficulty": 0,
       "weight": 10,
-      "prefab": "Room_Start_Campfire",
+      "prefab": "TestNomarStage_01",
       "tags": ["start"]
     },
     {
@@ -91,7 +91,7 @@
       "category": "Start",
       "difficulty": 0,
       "weight": 6,
-      "prefab": "Room_Start_Campfire",
+      "prefab": "TestNomarStage_01",
       "tags": ["start", "tutorial"]
     },
 
@@ -101,7 +101,7 @@
       "category": "Boss",
       "difficulty": 0,
       "weight": 10,
-      "prefab": "Room_Boss_SlimeKing",
+      "prefab": "TestBossStage",
       "tags": ["boss"]
     },
     {
@@ -110,7 +110,7 @@
       "category": "Boss",
       "difficulty": 0,
       "weight": 8,
-      "prefab": "Room_Boss_GoblinWarlord",
+      "prefab": "TestBossStage",
       "tags": ["boss"]
     }
   ]
