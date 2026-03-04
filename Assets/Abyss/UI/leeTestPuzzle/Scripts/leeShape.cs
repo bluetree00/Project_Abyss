@@ -1,128 +1,169 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using System.Collections.Generic;
+using UnityEngine.UI;
 
-public class leeShape : MonoBehaviour,IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+/// <summary>
+/// Runtime Shape root.
+/// - Built from LeeShapeAssetSO (block prefab + offsets).
+/// - Drag behavior from LeeShapeDragSO.
+/// IMPORTANT: Put this script on the ROOT of the shape prefab.
+/// Do NOT put drag scripts on child blocks.
+/// </summary>
+public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    // 한 칸짜리 블록(ShapeBlock) 프리팹
+    [Header("Assets")]
+    public LeeShapeAssetSO shapeAsset;
+    public LeeShapeDragSO dragAsset;
+
+    [Header("Fallback (used if SO is null)")]
     public GameObject shapeBlockPrefab;
-    // 이 Shape를 구성하는 블록의 상대 좌표 목록 (예: (0,0), (1,0) ...)
-    public List<Vector2Int> cellOffsets;
-     // 셀 간격
-    public float cellSize = 80f; 
-    
-    [Header("Drag Settings")]
-    // 드래그 중에 살짝 키워서 피드백 주는 스케일
-    public Vector3 selectedScale = new Vector3(1.1f, 1.1f, 1f);
-    // 손가락/마우스보다 조금 위에 보이게 하는 오프셋
-    public Vector2 pointerOffset = new Vector2(0f, 50f);
+    public List<Vector2Int> cellOffsets = new();
+    public float cellSize = 80f;
+
+    [SerializeField] private Vector2 homeAnchoredPos;
+    [SerializeField] private RectTransform homeParent;
 
     private Canvas canvas;
-    private RectTransform rectTransform;
-    private Vector3 startPosition;
-    private Vector3 startScale;
-    private bool isDraggable = true;
+    private RectTransform rt;
+    private Vector3 cachedStartLocalScale;
+    private Vector2 cachedStartAnchoredPos;
 
-    // 이 Shape가 현재 점유하고 있는 GridSquare 목록
-    private List<leeGridSquare> occupiedSquares = new List<leeGridSquare>();
-    public void SetOccupiedSquares(List<leeGridSquare> squares)
-    {
-        occupiedSquares = squares;
-    }
-    public List<leeGridSquare> GetOccupiedSquares()
-    {
-        return occupiedSquares;
-    }
+    private List<leeGridSquare> occupiedSquares = new();
+    private LayoutElement _layout;
+    private Vector2 startPos;
+    private RectTransform startParent;
 
     void Awake()
     {
-        rectTransform = GetComponent<RectTransform>();
+        rt = (RectTransform)transform;
         canvas = GetComponentInParent<Canvas>();
+        _layout = GetComponent<LayoutElement>();
+        CacheStartTransform();
 
-        // 초기 위치/스케일 저장 (실패 시 복귀용)
-        startPosition = rectTransform.position;
-        startScale = rectTransform.localScale;
-        
-        // cellOffsets를 기준으로 자식 블록들을 생성
+        // If asset already assigned in inspector, build now.
+        if (shapeAsset != null)
+            ApplyAsset(shapeAsset);
+        else
+            BuildShapeBlocks();
+    }
+
+    public void ApplyAsset(LeeShapeAssetSO asset)
+    {
+        shapeAsset = asset;
+        if (shapeAsset == null) return;
+
+        shapeBlockPrefab = shapeAsset.shapeBlockPrefab;
+        cellOffsets = new List<Vector2Int>(shapeAsset.cellOffsets ?? new Vector2Int[0]);
+        cellSize = shapeAsset.cellSize;
+
         BuildShapeBlocks();
     }
-    
-    // 현재 cellOffsets 정보를 기준으로 자식 ShapeBlock들을 만든다
-    void BuildShapeBlocks()
+
+    public void CacheStartTransform()
     {
-        // 기존 자식 있으면 정리
-        foreach (Transform child in transform)
-        {
-            Destroy(child.gameObject);
-        }
-
-        // 오프셋마다 블록 하나씩 생성
-        foreach (var offset in cellOffsets)
-        {
-            var blockObj = Instantiate(shapeBlockPrefab, transform);
-            var rt = blockObj.GetComponent<RectTransform>();
-            // (0,0)을 기준으로 오른쪽/아래 방향으로 배치
-            rt.anchoredPosition = new Vector2(offset.x * cellSize, offset.y * cellSize);
-        }
-    }
-    public void OnPointerDown(PointerEventData eventData)
-    {
-        // 필요하면 클릭 시 효과 추가 가능
-    }
-
-    public void OnBeginDrag(PointerEventData eventData)
-    {
-        if (!isDraggable) return;
-
-        // 드래그를 시작할 때, 이전에 점유하고 있던 칸 비우기
-        leeGridManager.Instance.ReleaseShape(this);
-
-        // 드래그 중에는 약간 키워서 피드백
-        rectTransform.localScale = selectedScale;
-    }
-
-    public void OnDrag(PointerEventData eventData)
-    {
-        if (!isDraggable) return;
-
-        // 스크린 좌표를 Canvas 로컬 좌표로 변환
-        Vector2 localPoint;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvas.transform as RectTransform,
-            eventData.position,
-            canvas.worldCamera,
-            out localPoint
-        );
-
-        // Canvas 기준 좌표를 월드 좌표로 변환하고, 오프셋 적용
-        Vector3 worldPos = canvas.transform.TransformPoint(localPoint);
-        worldPos += (Vector3)pointerOffset;
-        rectTransform.position = worldPos;
-    }
-
-    public void OnEndDrag(PointerEventData eventData)
-    {
-        
-        if (!isDraggable) return;
-        // 스케일 원래대로
-        rectTransform.localScale = startScale;
-
-        // Grid에 배치 시도
-        if (!leeGridManager.Instance.TryPlaceShape(this))
-        {
-             // 실패하면 시작 위치로 복귀 (보드에서 제거된 상태)
-            ReturnToStart();
-        }
-        else
-        {
-            // 성공 시에도 isDraggable은 그대로 둬서 재배치 가능
-        }
+        if (rt == null) rt = GetComponent<RectTransform>();
+        cachedStartAnchoredPos = rt.anchoredPosition;
+        cachedStartLocalScale = rt.localScale;
     }
 
     public void ReturnToStart()
     {
-        rectTransform.position = startPosition;
+        rt.anchoredPosition = cachedStartAnchoredPos;
+        rt.localScale = cachedStartLocalScale;
+    }
+
+    private void BuildShapeBlocks()
+    {
+        // Clear
+        for (int i = transform.childCount - 1; i >= 0; i--)
+            Destroy(transform.GetChild(i).gameObject);
+
+        if (shapeBlockPrefab == null) return;
+
+        foreach (var offset in cellOffsets)
+        {
+            var blockObj = Instantiate(shapeBlockPrefab, transform);
+            var brt = blockObj.GetComponent<RectTransform>();
+            if (brt != null)
+                brt.anchoredPosition = new Vector2(offset.x * cellSize, offset.y * cellSize);
+        }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        startPos = ((RectTransform)transform).anchoredPosition;
+        startParent = (RectTransform)transform.parent;
+        // Release occupied squares for re-place
+        if (leeGridManager.Instance != null)
+            leeGridManager.Instance.ReleaseShape(this);
+
+        // Visual feedback: scale multiplier
+        float mul = (dragAsset != null) ? dragAsset.selectedScale.x : 1.1f;
+        rt.localScale = cachedStartLocalScale * mul;
+
+        // Apply pointer offset ONCE at drag start (so it doesn't accumulate)
+        if (dragAsset != null && dragAsset.pointerOffset != Vector2.zero)
+        {
+            float scaleFactor = (canvas != null) ? canvas.scaleFactor : 1f;
+            rt.anchoredPosition += dragAsset.pointerOffset / Mathf.Max(0.0001f, scaleFactor);
+        }
+
+        if (GetOccupiedSquares() != null && GetOccupiedSquares().Count > 0)
+        {
+            leeGridManager.Instance.ReleaseShape(this);
+        }
+
+        if (_layout != null) _layout.ignoreLayout = true;
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (canvas == null) canvas = GetComponentInParent<Canvas>();
+        float scaleFactor = canvas != null ? canvas.scaleFactor : 1f;
+
+        Vector2 delta = eventData.delta / Mathf.Max(0.0001f, scaleFactor);
+        rt.anchoredPosition += delta;
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        // Restore base scale (placement manager will snap position)
+        rt.localScale = cachedStartLocalScale;
+
+        if (leeGridManager.Instance == null) { ReturnToStart(); return; }
+
+        bool placed = leeGridManager.Instance.TryPlaceShape(this);
+
+        if (!placed)
+            LeeBoardManager.Instance.ReSlotAndReturn(this);
+
+        if (_layout != null) _layout.ignoreLayout = false;
+    }
+
+    // Placement occupancy
+    public void SetOccupiedSquares(List<leeGridSquare> squares) => occupiedSquares = squares;
+    public List<leeGridSquare> GetOccupiedSquares() => occupiedSquares;
+
+    public void SetHome(RectTransform parent, Vector2 anchoredPos)
+    {
+        homeParent = parent;
+        homeAnchoredPos = anchoredPos;
+    }
+
+    public void ReturnHome()
+    {
+        if (rt == null) rt = (RectTransform)transform;
+
+        if (homeParent != null)
+            rt.SetParent(homeParent, false);
+
+        rt.anchoredPosition = homeAnchoredPos;
+    }
+    public void SetIgnoreLayout(bool ignore)
+    {
+        var le = GetComponent<LayoutElement>();
+        if (le != null)
+            le.ignoreLayout = ignore;
     }
 }
