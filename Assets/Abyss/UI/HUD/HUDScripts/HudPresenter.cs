@@ -14,7 +14,7 @@ public sealed class HudPresenter : MonoBehaviour
     [SerializeField] private float fadeDuration = 0.25f;
 
     [Header("HUD Mode")]
-    [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.Explore;
+    [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.None;
 
     private PlayerRunState _state;
     private UIHudDataProvider _provider;
@@ -102,11 +102,6 @@ public sealed class HudPresenter : MonoBehaviour
     {
         switch (mode)
         {
-            case HUDIds.Mode.Explore:
-                return HUDIds.Section.TopBar |
-                       HUDIds.Section.ExplorePanel |
-                       HUDIds.Section.SystemNotices;
-
             case HUDIds.Mode.Combat:
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |
