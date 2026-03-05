@@ -15,7 +15,8 @@
       "Bash(python -m json.tool)",
       "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":1,\"\"method\"\":\"\"tools/list\"\",\"\"params\"\":{}}')",
       "Bash(curl -s -X GET http://127.0.0.1:8080/mcp -H \"Accept: application/json, text/event-stream\")",
-      "Bash(curl -v -X POST \"http://127.0.0.1:8080/mcp\" -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":0,\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2024-11-05\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}}}')"
+      "Bash(curl -v -X POST \"http://127.0.0.1:8080/mcp\" -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":0,\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2024-11-05\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}}}')",
+      "Bash(grep -v \"propertyPath\\\\|rgba\\\\|Vector\\\\|Rect\\\\|size\\\\|anchor\\\\|pivot\\\\|scale\\\\|rotation\\\\|position\\\\|0\\\\.\\\\|1\\\\.\\\\|true\\\\|false\\\\|{file\\\\|fontSize\\\\|style\\\\|align\\\\|wrap\\\\|overflow\\\\|color\\\\|spacing\\\\|margin\\\\|padding\\\\| 0$\\\\| 1$\\\\| 2$\\\\| -\\\\|text\\\\|sprite\\\\|material\\\\|shader\\\\|raycast\\\\|sorting\\\\|render\\\\|layer\\\\|tag\\\\|active\\\\|enabled\\\\|visible\\\\|width\\\\|height\")"
     ]
   },
   "hooks": {
