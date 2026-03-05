@@ -16,10 +16,12 @@ public class Define
     public enum Scene
     {
         Unknown,
-        Title,
+        Logo,
         Login,
         Lobby,
-        Game,
+        StageMap,
+        GameScene,
+        Result,
     }
 
     public enum Sound

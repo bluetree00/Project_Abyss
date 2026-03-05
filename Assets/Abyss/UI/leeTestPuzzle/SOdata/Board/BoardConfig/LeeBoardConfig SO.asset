@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14c0875301105da4b90b6bd26fbb203e, type: 3}
+  m_Name: LeeBoardConfig SO
+  m_EditorClassIdentifier: 
+  startInSelectionMode: 1
+  gameplayUniformScale: 1
+  normalScale: {x: 1, y: 1, z: 1}
+  selectedScale: {x: 1.25, y: 1.25, z: 1}
+  bringToFrontOnSelect: 1
+  autoSelectFirstGrid: 0
+  spawnShapeOnSelect: 1
+  useAnchoredSpawn: 1
+  shapeSpawnAnchoredPos: {x: 0, y: 0}
+  shapeSpawnWorldPos: {x: 0, y: 0, z: 0}
+  randomShapeOnSelect: 1
+  spawnAllShapes: 1
+  shapeSpacing: 60

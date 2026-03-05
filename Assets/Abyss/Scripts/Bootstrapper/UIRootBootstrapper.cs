@@ -7,13 +7,13 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     [Header("Roots")]
     [SerializeField] private Transform hudRoot;     // Canvas_HUD/@HUD
     [SerializeField] private Transform popupRoot;   // Canvas_Popup/@Popup
-    [SerializeField] private Transform menuRoot;    // Canvas_Menu/@Menu
+    [SerializeField] private Transform sceneRoot;   // Canvas_Scene/@Scene
     [SerializeField] private Transform overlayRoot; // Canvas_Overlay/@Overlay
     [SerializeField] private Transform worldRoot;   // WorldSpaceRoot/@WorldUI
 
     public Transform HudRoot => hudRoot;
     public Transform PopupRoot => popupRoot;
-    public Transform MenuRoot => menuRoot;
+    public Transform SceneRoot => sceneRoot;
     public Transform OverlayRoot => overlayRoot;
     public Transform WorldRoot => worldRoot;
 
@@ -21,7 +21,7 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     [SerializeField] private HudBootstrapper hudBootstrapper;
 
     // ✅ 같은 Run에 중복 바인딩 방지용
-    private GameRunManager _boundRun;
+    private GameRunSession _boundRun;
 
     private void Awake()
     {
@@ -33,7 +33,7 @@ public sealed class UIRootBootstrapper : MonoBehaviour
             hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
     }
 
-    public void BindHudToRun(GameRunManager run)
+    public void BindHudToRun(GameRunSession run)
     {
         if (run == null)
         {

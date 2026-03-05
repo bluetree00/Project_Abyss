@@ -182,9 +182,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Now Loading...00%
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 26225151ba450e24ab0d094ca7e6eafc, type: 2}
-  m_sharedMaterial: {fileID: 230576177196781961, guid: 26225151ba450e24ab0d094ca7e6eafc,
-    type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -536,7 +535,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   progress: {fileID: 1086981802}
-  nextScene: 1
 --- !u!4 &864744142
 Transform:
   m_ObjectHideFlags: 0
@@ -1012,7 +1010,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0da638de9f1e6684f8933d09810d9f54, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 241fd658c6e03e34d8d6b05e30296bf2, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
