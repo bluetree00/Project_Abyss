@@ -4,7 +4,22 @@
       "mcp__UnityMCP__manage_scene",
       "mcp__UnityMCP__manage_editor",
       "Bash(sort -t'|' -k1 -n)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "mcp__mcp-for-unity__manage_editor",
+      "mcp__mcp-for-unity__batch_execute",
+      "Bash(python3 -c \" import sys, json data = json.load\\(sys.stdin\\) print\\(data[0][''text'']\\) \")"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /c/Users/User/Project_Abyss/Project_Abyss && git fetch origin -q 2>/dev/null; REMOTE=$(git rev-parse @{u} 2>/dev/null); LOCAL=$(git rev-parse HEAD 2>/dev/null); [ -n \"$REMOTE\" ] && [ \"$LOCAL\" != \"$REMOTE\" ] && echo '[Auto-Pull] 새 업데이트 발견! git pull 실행 중...' && git pull --ff-only || true"
+          }
+        ]
+      }
     ]
   }
 }
