@@ -31,8 +31,6 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
     private List<leeGridSquare> occupiedSquares = new();
     private LayoutElement _layout;
-    private Vector2 startPos;
-    private RectTransform startParent;
 
     void Awake()
     {
@@ -92,9 +90,6 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        startPos = ((RectTransform)transform).anchoredPosition;
-        startParent = (RectTransform)transform.parent;
-        // Release occupied squares for re-place
         if (leeGridManager.Instance != null)
             leeGridManager.Instance.ReleaseShape(this);
 

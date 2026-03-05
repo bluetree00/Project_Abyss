@@ -31,6 +31,9 @@ public class leeGridManager : MonoBehaviour
         grid = active;
     }
 
+    /// <summary>PlacementRules를 런타임에 교체한다 (LeeBoardManager.ApplyPlacementRules에서 호출).</summary>
+    public void SetPlacementRules(LeePlacementRulesSO rules) => placementRules = rules;
+
     public bool TryPlaceShape(leeShape shape)
     {
         if (grid == null || shape == null) return false;
