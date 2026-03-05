@@ -16,5 +16,7 @@ MonoBehaviour:
   visual: {fileID: 11400000, guid: d685d0d655cfa7b498f95c6393429722, type: 2}
   spawnableShapes:
   - {fileID: 11400000, guid: d3e6f70d97002554c8610cdfffbae902, type: 2}
-  - {fileID: 11400000, guid: e7db7678500b5f2488bc9ef813724965, type: 2}
   - {fileID: 11400000, guid: d162b4d8bcbf6bd4798d61b7ba6437b8, type: 2}
+  onAllPlaceableFilled:
+    m_PersistentCalls:
+      m_Calls: []
