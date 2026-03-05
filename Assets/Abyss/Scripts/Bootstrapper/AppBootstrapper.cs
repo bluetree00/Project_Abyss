@@ -32,9 +32,19 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
-    [SerializeField] private Define.Scene startScene = Define.Scene.Title;
-    [SerializeField] private GameFlowState startState = GameFlowState.Title;
+    [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
+
+    public void RequestLoad(Define.Scene scene)
+    {
+        if (_flow != null)
+            _flow.RequestLoad(scene);
+    }
+
+    public void RequestStartRun()
+    {
+        RequestLoad(Define.Scene.GameScene);
+    }
 
     private GameFlow _flow;
     private SceneTransitionManager _scene;
@@ -85,7 +95,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             var uiRoot = UIRootBootstrapper.Instance;
             if (uiRoot != null)
-                Managers.UI.SetRoots(uiRoot.MenuRoot, uiRoot.PopupRoot, uiRoot.OverlayRoot, uiRoot.WorldRoot);
+                Managers.UI.SetRoots(uiRoot.SceneRoot, uiRoot.PopupRoot, uiRoot.OverlayRoot, uiRoot.WorldRoot);
             else
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
@@ -96,12 +106,9 @@ public sealed class AppBootstrapper : MonoBehaviour
             _flow = new GameFlow();
             _scene = new SceneTransitionManager(this);
 
-            // ✅ 너가 이전에 쓴 방식이 Bind가 있는 구조라면 반드시 연결
             _flow.BindSceneTransition(_scene);
             _flow.OnStateChanged += OnFlowStateChanged;
-
-            // ✅ 한 번만 호출
-            _flow.RequestLoad(startScene, startState);
+            _flow.RequestLoad(startScene);
         }
 
         IsReady = true;
@@ -113,8 +120,12 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         switch (state)
         {
-            case GameFlowState.Title:
-                Managers.UI.ShowMenuUI<UI_Title>();
+            case GameFlowState.Logo:
+                // 로고 연출 처리 (별도 LogoBootstrapper 또는 씬 자체에서 처리)
+                break;
+
+            case GameFlowState.Login:
+                Managers.UI.ShowMenuUI<UI_Login>();
                 break;
 
             case GameFlowState.Lobby:
