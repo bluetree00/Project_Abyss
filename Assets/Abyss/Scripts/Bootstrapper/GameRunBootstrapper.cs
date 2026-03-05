@@ -23,17 +23,34 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         Instance = this;
 
-        _run = new GameRunSession();
+        // AppBootstrapper에 이미 런이 있으면 재사용, 없으면 새로 생성
+        var app = AppBootstrapper.Instance;
+        if (app != null && app.CurrentRun != null)
+        {
+            _run = app.CurrentRun;
+        }
+        else
+        {
+            _run = new GameRunSession();
+            if (app != null)
+                app.BeginRun(_run);
+        }
 
         // HUD가 이미 존재할 수 있으니 선-바인딩 (안전)
-        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        var uiRoot = UIRootBootstrapper.Instance;
+        if (uiRoot != null)
+            uiRoot.BindHudToRun(_run);
 
         Bind();
     }
 
-    private void Start()
+    private async void Start()
     {
         Bind();
+
+        // StageMap → GameScene 전환: 이미 실행 중인 런 → 전투 세팅만 수행
+        if (_run != null && _run.IsRunning)
+            await StartCombatAsync();
     }
 
     private void OnDestroy()
@@ -67,6 +84,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             _points = FindObjectsOfType<StagePointUI>(true);
             _run.RegisterPoints(_points);
+        }
+    }
+
+    /// <summary>
+    /// StageMap → GameScene 전환 후 호출.
+    /// 이미 실행 중인 런의 선택된 포인트 맵 스폰 + 플레이어 스폰만 수행합니다.
+    /// </summary>
+    public async UniTask StartCombatAsync()
+    {
+        var run = _run;
+        if (run == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] StartCombatAsync failed: run is null.");
+            return;
+        }
+
+        if (spawner == null)
+            spawner = FindObjectOfType<StageMapSpawner>(true);
+
+        if (spawner == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] StartCombatAsync failed: StageMapSpawner not found.");
+            return;
+        }
+
+        run.BindSpawner(spawner);
+        run.SpawnCurrentPointMap();
+
+        var uiRoot = UIRootBootstrapper.Instance;
+        if (uiRoot != null)
+            uiRoot.BindHudToRun(run);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            run.BindPlayer(player);
         }
     }
 
@@ -115,12 +168,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
 
-        // 5) 플레이어 스폰 + 런에 바인딩 + 세션 주입
+        // 5) 플레이어 스폰 + 런에 바인딩
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
         {
             run.BindPlayer(player);
-            player.BindSession(run);
         }
     }
 

@@ -60,10 +60,13 @@ public class StagePointUI : MonoBehaviour
     {
         Debug.Log($"[StagePointUI] Clicked pointId={pointId}");
 
-        var run = GameRunBootstrapper.Instance?.Run;
+        var app = AppBootstrapper.Instance;
+        if (app == null) return;
+
+        var run = app.CurrentRun;
         if (run == null || !run.IsRunning)
         {
-            Debug.LogWarning($"[StagePointUI] pointId={pointId} → run null or not running. run={run}, IsRunning={run?.IsRunning}");
+            Debug.LogWarning($"[StagePointUI] pointId={pointId} → run null or not running.");
             return;
         }
         if (run.StagePointManager == null)
@@ -71,18 +74,40 @@ public class StagePointUI : MonoBehaviour
             Debug.LogWarning($"[StagePointUI] pointId={pointId} → StagePointManager is null");
             return;
         }
-        if (!run.StagePointManager.CanMove(pointId))
-        {
-            var cur = run.StagePointManager.CurrentPointId;
-            Debug.LogWarning($"[StagePointUI] pointId={pointId} → CanMove=false  currentPointId={cur}");
-            return;
-        }
 
-        Debug.Log($"[StagePointUI] pointId={pointId} → RequestMoveTo 호출");
-        if (TransitionOverlay.Instance != null)
-            TransitionOverlay.Instance.PlayAsync(() => run.RequestMoveTo(pointId)).Forget();
+        // StageMap 씬: 포인트 선택만 기록 후 GameScene으로 전환
+        bool isStageMapScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+            == Define.Scene.StageMap.ToString();
+
+        if (isStageMapScene)
+        {
+            if (!run.SelectPoint(pointId))
+            {
+                Debug.LogWarning($"[StagePointUI] pointId={pointId} → SelectPoint 실패");
+                return;
+            }
+
+            Debug.Log($"[StagePointUI] pointId={pointId} → GameScene 전환");
+            if (TransitionOverlay.Instance != null)
+                TransitionOverlay.Instance.PlayAsync(() => app.RequestLoad(Define.Scene.GameScene)).Forget();
+            else
+                app.RequestLoad(Define.Scene.GameScene);
+        }
         else
-            run.RequestMoveTo(pointId);
+        {
+            // GameScene 내부: 기존처럼 맵 즉시 스폰
+            if (!run.StagePointManager.CanMove(pointId))
+            {
+                Debug.LogWarning($"[StagePointUI] pointId={pointId} → CanMove=false");
+                return;
+            }
+
+            Debug.Log($"[StagePointUI] pointId={pointId} → RequestMoveTo 호출");
+            if (TransitionOverlay.Instance != null)
+                TransitionOverlay.Instance.PlayAsync(() => run.RequestMoveTo(pointId)).Forget();
+            else
+                run.RequestMoveTo(pointId);
+        }
     }
 
     private void HandleResolved(int resolvedPointId, string roomId)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
 
 public sealed class AppBootstrapper : MonoBehaviour
@@ -35,15 +36,35 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
 
+    // ---- Run 수명 관리 ----
+    public GameRunSession CurrentRun { get; private set; }
+
+    public void BeginRun(GameRunSession session)
+    {
+        CurrentRun = session;
+    }
+
+    public void EndRun()
+    {
+        CurrentRun = null;
+    }
+
     public void RequestLoad(Define.Scene scene)
     {
         if (_flow != null)
+        {
             _flow.RequestLoad(scene);
+            return;
+        }
+
+        // startFlow = false 환경(테스트 씬): UI 정리 후 SceneManager 직접 로드
+        Managers.UI.ClearOnSceneTransition();
+        SceneManager.LoadScene(scene.ToString());
     }
 
     public void RequestStartRun()
     {
-        RequestLoad(Define.Scene.GameScene);
+        RequestLoad(Define.Scene.StageMap);
     }
 
     private GameFlow _flow;
@@ -110,14 +131,50 @@ public sealed class AppBootstrapper : MonoBehaviour
             _flow.OnStateChanged += OnFlowStateChanged;
             _flow.RequestLoad(startScene);
         }
+        else
+        {
+            // startFlow = false 일 때 (테스트 씬 직접 실행):
+            // 씬 전환마다 UI를 자동 활성화
+            SceneManager.sceneLoaded += OnSceneLoadedNoFlow;
+            AutoShowUIForCurrentScene();
+        }
 
         IsReady = true;
+    }
+
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoadedNoFlow;
+    }
+
+    private void OnSceneLoadedNoFlow(UnityEngine.SceneManagement.Scene scene, LoadSceneMode mode)
+    {
+        AutoShowUIForCurrentScene();
     }
 
     private void OnFlowStateChanged(GameFlowState state)
     {
         Managers.UI.ClearOnSceneTransition();
+        ApplyUIForState(state);
+    }
 
+    /// <summary>
+    /// startFlow = false 환경(테스트 씬 직접 실행)에서
+    /// 현재 씬 이름을 기반으로 UI를 자동 활성화합니다.
+    /// 씬→상태 매핑은 GameFlow.TryGetStateForScene을 재사용합니다.
+    /// </summary>
+    private void AutoShowUIForCurrentScene()
+    {
+        var sceneName = SceneManager.GetActiveScene().name;
+        if (!Enum.TryParse<Define.Scene>(sceneName, out var scene))
+            return;
+
+        if (GameFlow.TryGetStateForScene(scene, out var state))
+            ApplyUIForState(state);
+    }
+
+    private void ApplyUIForState(GameFlowState state)
+    {
         switch (state)
         {
             case GameFlowState.Logo:
@@ -130,6 +187,10 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             case GameFlowState.Lobby:
                 Managers.UI.ShowMenuUI<UI_Lobby>();
+                break;
+
+            case GameFlowState.StageMap:
+                Managers.UI.ShowMenuUI<UI_StageMap>();
                 break;
 
             case GameFlowState.InGame:

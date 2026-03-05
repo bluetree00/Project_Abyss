@@ -19,6 +19,7 @@ public class Define
         Logo,
         Login,
         Lobby,
+        StageMap,
         GameScene,
         Result,
     }

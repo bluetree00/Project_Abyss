@@ -198,13 +198,13 @@ public sealed class GameRunSession
 
     private static HUDIds.Mode RunStateToHudMode(RunState state) => state switch
     {
-        RunState.Map         => HUDIds.Mode.Explore,
+        RunState.Map         => HUDIds.Mode.None,    // StageMap 씬이 전담, GameScene HUD 없음
         RunState.CombatRoom  => HUDIds.Mode.Combat,
-        RunState.ItemRoom    => HUDIds.Mode.Explore,
-        RunState.RewardRoom  => HUDIds.Mode.Explore,
-        RunState.SpecialRoom => HUDIds.Mode.Explore,
+        RunState.ItemRoom    => HUDIds.Mode.Combat,
+        RunState.RewardRoom  => HUDIds.Mode.Combat,
+        RunState.SpecialRoom => HUDIds.Mode.Combat,
         RunState.BossRoom    => HUDIds.Mode.Boss,
-        RunState.Standby     => HUDIds.Mode.Explore,
+        RunState.Standby     => HUDIds.Mode.Combat,
         RunState.GridSynergy => HUDIds.Mode.Puzzle,
         _                    => HUDIds.Mode.None,
     };
@@ -406,6 +406,22 @@ public sealed class GameRunSession
         if (!StagePointManager.TryMoveTo(targetPointId)) return;
 
         SpawnCurrentPointMap();
+    }
+
+    /// <summary>
+    /// StageMap 씬에서 호출. 맵 스폰 없이 포인트 이동만 기록합니다.
+    /// 실제 맵 스폰은 GameScene 진입 후 GameRunBootstrapper가 담당합니다.
+    /// </summary>
+    public bool SelectPoint(int targetPointId)
+    {
+        if (!IsRunning || StagePointManager == null)
+        {
+            Debug.LogWarning("[GameRun] SelectPoint ignored: not running");
+            return false;
+        }
+
+        if (!StagePointManager.CanMove(targetPointId)) return false;
+        return StagePointManager.TryMoveTo(targetPointId);
     }
 
     public void SpawnPointMap(int pointId)

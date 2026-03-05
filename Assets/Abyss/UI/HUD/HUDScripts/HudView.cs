@@ -11,7 +11,6 @@ public sealed class HudView : MonoBehaviour
     [Header("Sections")]
     [SerializeField] private GameObject       topBarRoot;
     [SerializeField] private CombatPanelView  combatPanel;
-    [SerializeField] private GameObject       explorePanelRoot;
     [SerializeField] private GameObject       bossPanelRoot;
     [SerializeField] private GameObject       systemNoticesRoot;
 
@@ -28,11 +27,10 @@ public sealed class HudView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     public void SetSections(HUDIds.Section sections)
     {
-        SetActiveSafe(topBarRoot,       (sections & HUDIds.Section.TopBar)         != 0);
-        SetActiveSafe(combatPanel,      (sections & HUDIds.Section.CombatPanel)     != 0);
-        SetActiveSafe(explorePanelRoot, (sections & HUDIds.Section.ExplorePanel)    != 0);
-        SetActiveSafe(bossPanelRoot,    (sections & HUDIds.Section.BossPanel)       != 0);
-        SetActiveSafe(systemNoticesRoot,(sections & HUDIds.Section.SystemNotices)   != 0);
+        SetActiveSafe(topBarRoot,        (sections & HUDIds.Section.TopBar)        != 0);
+        SetActiveSafe(combatPanel,       (sections & HUDIds.Section.CombatPanel)   != 0);
+        SetActiveSafe(bossPanelRoot,     (sections & HUDIds.Section.BossPanel)     != 0);
+        SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
     }
 
     // ─────────────────────────────────────────────────────────

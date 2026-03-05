@@ -15,7 +15,6 @@ public static class HUDIds
     {
         None = 0,
 
-        Explore = 10,   // 탐험
         Combat = 20,    // 일반 전투
         Boss = 30,      // 보스전
         Cutscene = 40,  // 컷씬
@@ -33,7 +32,6 @@ public static class HUDIds
 
         TopBar        = 1 << 0,
         CombatPanel   = 1 << 1,
-        ExplorePanel  = 1 << 2,
         BossPanel     = 1 << 3,
         SystemNotices = 1 << 4,
     }
