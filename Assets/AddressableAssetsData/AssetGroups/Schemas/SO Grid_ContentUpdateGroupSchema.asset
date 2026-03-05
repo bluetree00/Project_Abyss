@@ -9,13 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f46e548fb47737748a0b082134c756f1, type: 3}
-  m_Name: Horizontal line
+  m_Script: {fileID: 11500000, guid: 5834b5087d578d24c926ce20cd31e6d6, type: 3}
+  m_Name: SO Grid_ContentUpdateGroupSchema
   m_EditorClassIdentifier: 
-  shapeBlockPrefab: {fileID: 7796692141648486092, guid: 8988b128bef29db41896ab3a0f9aadb0,
-    type: 3}
-  cellOffsets:
-  - {x: 0, y: 0}
-  - {x: 1, y: 0}
-  - {x: -1, y: 0}
-  cellSize: 90
+  m_Group: {fileID: 11400000, guid: 6680d083bf4db3d4daa7439548fb4eaf, type: 2}
+  m_StaticContent: 0
