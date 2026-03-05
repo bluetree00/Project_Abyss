@@ -13,24 +13,24 @@ public class UIManager
     Dictionary<string, GameObject> _uiObjects = new Dictionary<string, GameObject>();
 
     // @UIRoot 캔버스 루트 — AppBootstrapper에서 주입
-    private Transform _menuRoot;
-    private Transform _popupRoot;
-    private Transform _overlayRoot;
-    private Transform _worldRoot;
+    private Transform _sceneRoot;   // Canvas_Scene
+    private Transform _popupRoot;   // Canvas_Popup
+    private Transform _overlayRoot; // Canvas_Overlay
+    private Transform _worldRoot;   // Canvas_WorldSpace
 
     // 루트가 주입된 경우 DDOL 캔버스 자식으로, 아니면 레거시 @UI_Root 사용
-    private Transform MenuParent  => _menuRoot  != null ? _menuRoot  : GetLegacyRoot();
+    private Transform SceneParent => _sceneRoot != null ? _sceneRoot : GetLegacyRoot();
     private Transform PopupParent => _popupRoot != null ? _popupRoot : GetLegacyRoot();
 
-    private bool IsRootInjected => _menuRoot != null;
+    private bool IsRootInjected => _sceneRoot != null;
 
     /// <summary>
     /// AppBootstrapper가 UIRoot 확보 후 주입
     /// </summary>
-    public void SetRoots(Transform menuRoot, Transform popupRoot,
+    public void SetRoots(Transform sceneRoot, Transform popupRoot,
                          Transform overlayRoot = null, Transform worldRoot = null)
     {
-        _menuRoot    = menuRoot;
+        _sceneRoot   = sceneRoot;
         _popupRoot   = popupRoot;
         _overlayRoot = overlayRoot;
         _worldRoot   = worldRoot;
@@ -116,54 +116,39 @@ public class UIManager
 
     #endregion
 
-    #region Menu UI (Canvas_Menu / 런타임 생성)
+    #region Scene UI (Canvas_Scene / UIRoot 사전 배치 + SetActive)
 
-    public void ShowMenuUI<T>(string name = null)
-        where T : UI_Scene
+    /// <summary>
+    /// SceneRoot 자식에 미리 배치된 T를 찾아 활성화합니다.
+    /// 이전 씬 UI는 비활성화됩니다.
+    /// </summary>
+    public void ShowMenuUI<T>() where T : UI_Scene
     {
-        ShowMenuUIAsync<T>(name).Forget();
-    }
-
-    private async UniTask ShowMenuUIAsync<T>(string name = null)
-        where T : UI_Scene
-    {
-        name ??= typeof(T).Name;
-
-        if (_uiObjects.TryGetValue(name, out GameObject existing))
+        if (_sceneRoot == null)
         {
-            if (existing != null)
-            {
-                existing.SetActive(true);
-                _menuUI = existing.GetComponent<T>();
-                return;
-            }
-            _uiObjects.Remove(name);
+            Debug.LogError("[UIManager] SceneRoot is not set. Call SetRoots() first.");
+            return;
         }
 
-        string addressKey = $"UI/Menu/{name}";
-
-        try
+        var ui = _sceneRoot.GetComponentInChildren<T>(true);
+        if (ui == null)
         {
-            GameObject prefab =
-                await Managers.AddressableManager.LoadAssetAsync<GameObject>(addressKey);
-
-            GameObject go = Object.Instantiate(prefab, MenuParent);
-            go.name = name;
-
-            _menuUI = Util.GetOrAddComponent<T>(go);
-            _menuUI.Init();
-            _uiObjects[name] = go;
+            Debug.LogError($"[UIManager] {typeof(T).Name} not found in SceneRoot. Pre-place it in UIRoot prefab.");
+            return;
         }
-        catch
-        {
-            Debug.LogError($"[UIManager] Menu UI Load Failed : {name}");
-        }
+
+        if (_menuUI != null)
+            _menuUI.gameObject.SetActive(false);
+
+        ui.gameObject.SetActive(true);
+        ui.Init();
+        _menuUI = ui;
     }
 
     public void CloseMenuUI()
     {
         if (_menuUI == null) return;
-        _menuUI.Close();
+        _menuUI.gameObject.SetActive(false);
         _menuUI = null;
     }
 

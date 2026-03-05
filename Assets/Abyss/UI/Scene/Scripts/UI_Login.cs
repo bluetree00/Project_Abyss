@@ -1,4 +1,4 @@
-public class UI_Lobby : UI_Scene
+public class UI_Login : UI_Scene
 {
     public override void Init()
     {
