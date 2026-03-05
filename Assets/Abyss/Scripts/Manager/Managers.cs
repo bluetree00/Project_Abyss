@@ -42,8 +42,6 @@ public sealed class Managers : MonoBehaviour
     private readonly PlayerManager _playerManager = new PlayerManager();
     private MonsterDataManager _monsterDataManager;
 
-    private GameRunManager _gameRunManager;
-
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
     {
@@ -164,27 +162,6 @@ public sealed class Managers : MonoBehaviour
 
             return inst._monsterDataManager;
         }
-    }
-
-    public static GameRunManager GameRun
-    {
-        get
-        {
-            var inst = Instance;
-            return inst != null ? inst._gameRunManager : null;
-        }
-    }
-
-    public static void SetGameRun(GameRunManager run)
-    {
-        if (s_isQuitting)
-            return;
-
-        var inst = Instance;
-        if (inst == null)
-            return;
-
-        inst._gameRunManager = run;
     }
     #endregion
 

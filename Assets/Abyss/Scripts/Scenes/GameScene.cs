@@ -8,7 +8,7 @@ public class GameScene : BaseScene
     {
         base.Init();
 
-        SceneType = Define.Scene.Game;
+        SceneType = Define.Scene.GameScene;
        
         //Dictionary<int, Data.Stat> dict = Managers.Data.StatDict;
         //GameObject player = Managers.Game.Spawn(Define.WorldObject.Player, "UnityChan");

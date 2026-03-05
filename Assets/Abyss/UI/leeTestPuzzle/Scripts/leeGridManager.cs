@@ -1,19 +1,23 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Placement manager.
+/// Works with the ACTIVE runtime grid instance (set by LeeBoardManager).
+/// Uses anchored-position based distance checks to avoid world/scale issues.
+/// </summary>
 public class leeGridManager : MonoBehaviour
 {
-
-    // 싱글톤 인스턴스
     public static leeGridManager Instance { get; private set; }
 
-    // 이 매니저가 제어하는 그리드
+    [Header("Active Grid (set by LeeBoardManager)")]
     public leeGrid grid;
+
+    [Header("Rules (SO)")]
+    public LeePlacementRulesSO placementRules;
 
     void Awake()
     {
-         // 싱글톤 보장
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -22,113 +26,126 @@ public class leeGridManager : MonoBehaviour
         Instance = this;
     }
 
-    // Shape를 현재 위치에서 Grid 위에 배치할 수 있는지 시도
+    public void SetActiveGrid(leeGrid active)
+    {
+        grid = active;
+    }
+
+    /// <summary>PlacementRules를 런타임에 교체한다 (LeeBoardManager.ApplyPlacementRules에서 호출).</summary>
+    public void SetPlacementRules(LeePlacementRulesSO rules) => placementRules = rules;
+
     public bool TryPlaceShape(leeShape shape)
     {
+        if (grid == null || shape == null) return false;
+
         var candidateSquares = new List<leeGridSquare>();
 
-        // Shape의 자식 RectTransform들 (각 칸 블록들)
+        // Collect child blocks (RectTransforms under shape root)
         var blocks = shape.GetComponentsInChildren<RectTransform>();
-        int blockCount = 0;
+        RectTransform firstBlock = null;
+        RectTransform firstTarget = null;
 
         foreach (var block in blocks)
         {
-            // 루트(Shape 자기 자신)는 제외
             if (block == shape.transform) continue;
-            blockCount++;
+            if (firstBlock == null) firstBlock = block;
 
-            // 이 블록이 가장 가까운 GridSquare를 찾는다
-            leeGridSquare square = FindGridSquareUnderPosition(block.position);
+            leeGridSquare square = FindClosestSquare(block);
+            if (square == null) return false;
+            if (!square.isPlaceable) return false;
+            if (square.isOccupied) return false;
 
-            // 보드 밖이거나 허용 거리 밖이면 배치 실패
-            if (square == null)
-            {
-                return false;
-            }
-
-            // 막힌 칸이면 배치 불가
-            if (!square.isPlaceable)
-            {
-                return false;
-            }
-
-            // 이미 다른 Shape가 점유한 칸이면 배치 불가
-            if (square.isOccupied)
-            {
-                return false;
-            }
-            
             if (!candidateSquares.Contains(square))
                 candidateSquares.Add(square);
+
+            if (firstTarget == null)
+                firstTarget = square.GetComponent<RectTransform>();
         }
 
-        // 여기까지 왔으면 이 Shape의 모든 블록을 배치해도 됨
+        // Snap by delta (keeps multi-block shape aligned)
+        if (placementRules == null || placementRules.snapShapeToFirstSquare)
+        {
+        if (firstBlock != null && firstTarget != null)
+        {
+            var shapeRT = (RectTransform)shape.transform;
+            var shapeParent = (RectTransform)shapeRT.parent;
+
+            Vector3 worldDelta = firstTarget.position - firstBlock.position;
+
+            Vector3 localDelta3 = shapeParent.InverseTransformVector(worldDelta);
+
+            shapeRT.anchoredPosition += new Vector2(localDelta3.x, localDelta3.y);
+        }
+        }
+
+        // Mark occupied
         foreach (var sq in candidateSquares)
         {
             sq.SetOccupied(true);
             sq.SetHighlight(false);
         }
 
-        // Shape 전체를 첫 번째 칸 위치로 스냅
-        if (candidateSquares.Count > 0)
-        {
-            var first = candidateSquares[0];
-            shape.transform.position = first.transform.position;
-        }
-        
-        // 이 Shape가 점유하고 있는 칸 목록을 저장 (재배치/해제용)
         shape.SetOccupiedSquares(candidateSquares);
-
-        // 모든 placeable 칸이 채워졌는지 검사 (퍼즐 완료 체크)
         CheckAllPlaceableFilled();
-
         return true;
     }
-
-    // 월드 위치 기준으로 가장 가까운 GridSquare를 찾고,
-    // 너무 멀면 null 반환 (보드에 안 올라온 것으로 처리)
-    leeGridSquare FindGridSquareUnderPosition(Vector3 worldPos)
+    
+    private leeGridSquare FindClosestSquare(RectTransform blockRT)
     {
         float minDist = float.MaxValue;
         leeGridSquare result = null;
 
+        var gridRoot = (RectTransform)grid.transform;
+
+        Vector2 blockLocal = (Vector2)gridRoot.InverseTransformPoint(blockRT.position);
+
         foreach (var sq in grid.GetGridSquares())
         {
-            float d = Vector3.Distance(worldPos, sq.transform.position);
+            var sqRT = sq.GetComponent<RectTransform>();
+
+        
+            Vector2 sqLocal = (Vector2)gridRoot.InverseTransformPoint(sqRT.position);
+
+            float d = Vector2.Distance(blockLocal, sqLocal);
             if (d < minDist)
             {
                 minDist = d;
                 result = sq;
             }
         }
-        if (result == null){return result;}
-        var rt = result.GetComponent<RectTransform>();
-        float cellSize = rt.rect.size.x * result.transform.lossyScale.x;
 
-        // 셀 중심에서 일정 거리 이상 떨어져 있으면 "해당 칸 없음" 처리
-        float maxAllowedDist = cellSize * 0.5f;
-        if (minDist > maxAllowedDist){return null;}
-        
+        if (result == null) return null;
+
+        float gap = (grid.gridAsset != null && grid.gridAsset.visual != null) ? grid.gridAsset.visual.squareGap : 80f;
+        float maxAllowed = gap * ((placementRules != null) ? placementRules.maxAllowedDistMultiplier : 0.5f);
+        if (minDist > maxAllowed) return null;
+
         return result;
     }
 
-    // 모든 placeable 칸이 채워졌는지 확인하고, 채워졌다면 로그 출력
-    void CheckAllPlaceableFilled()
+    private static Vector2 GetAnchoredDelta(RectTransform fromBlock, RectTransform toSquare)
+    {
+        var gridRoot = toSquare.transform.parent as RectTransform;
+        if (gridRoot == null) return Vector2.zero;
+
+        // 동일 좌표계로 계산
+        Vector2 blockLocal = (Vector2)gridRoot.InverseTransformPoint(fromBlock.position);
+        Vector2 targetLocal = toSquare.anchoredPosition;
+
+        return (targetLocal - blockLocal);
+    }
+
+
+    private void CheckAllPlaceableFilled()
     {
         foreach (var sq in grid.GetGridSquares())
         {
-            if (sq.isPlaceable && !sq.isOccupied)
-            {
-                // 하나라도 비어 있으면 아직 미완성
-                return;
-            }
+            if (sq.isPlaceable && !sq.isOccupied) return;
         }
-        // 여기까지 왔으면 모든 placeable 칸이 채워진 상태
-        Debug.Log("모든 배치 가능한 칸이 채워졌습니다!");
-        // 나중에 여기서 클리어 연출/다음 스테이지 등 이벤트 호출 가능
+        if (LeeBoardManager.Instance != null && grid != null && grid.gridAsset != null)
+            LeeBoardManager.Instance.NotifyGridFilled(grid.gridAsset);
     }
 
-    // Shape를 다시 드래그하기 시작할 때, 기존에 점유하고 있던 칸을 비워준다
     public void ReleaseShape(leeShape shape)
     {
         var squares = shape.GetOccupiedSquares();
@@ -136,13 +153,10 @@ public class leeGridManager : MonoBehaviour
 
         foreach (var sq in squares)
         {
-            if (sq != null)
-            {
-                sq.SetOccupied(false);
-                sq.SetHighlight(false);
-            }
+            if (sq == null) continue;
+            sq.SetOccupied(false);
+            sq.SetHighlight(false);
         }
-        // 이제 Shape는 어떤 칸도 점유하지 않는 상태
         shape.SetOccupiedSquares(new List<leeGridSquare>());
     }
 }

@@ -14,7 +14,7 @@ public sealed class RoomManager
 
     public bool IsInitialized { get; private set; }
 
-    public async UniTask InitializeAsync(string addressableKey)
+    public async UniTask InitializeAsync(string addressableKey, Func<string, UniTask<TextAsset>> loader)
     {
         IsInitialized = false;
         _byId.Clear();
@@ -23,7 +23,7 @@ public sealed class RoomManager
         TextAsset textAsset = null;
         try
         {
-            textAsset = await Managers.AddressableManager.LoadAssetAsync<TextAsset>(addressableKey);
+            textAsset = await loader(addressableKey);
         }
         catch (Exception e)
         {

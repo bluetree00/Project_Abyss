@@ -14,7 +14,7 @@ public sealed class HudPresenter : MonoBehaviour
     [SerializeField] private float fadeDuration = 0.25f;
 
     [Header("HUD Mode")]
-    [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.Explore;
+    [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.None;
 
     private PlayerRunState _state;
     private UIHudDataProvider _provider;
@@ -36,7 +36,7 @@ public sealed class HudPresenter : MonoBehaviour
         SetMode(startMode);
     }
 
-    public void Construct(GameRunManager run, UIHudDataProvider provider)
+    public void Construct(GameRunSession run, UIHudDataProvider provider)
     {
         Dispose();
 
@@ -58,12 +58,12 @@ public sealed class HudPresenter : MonoBehaviour
         // 초기 스냅샷
         if (_provider != null && _provider.TryGet(out var data))
         {
-            view.SetHp(data.Hp, data.MaxHp);
+            view.CombatPanel?.SetHp(data.Hp, data.MaxHp);
             view.SetGold(data.TempGold);
         }
         else
         {
-            view.SetHp(_state.Hp, _state.MaxHp);
+            view.CombatPanel?.SetHp(_state.Hp, _state.MaxHp);
             view.SetGold(_state.TempGold);
         }
 
@@ -86,7 +86,7 @@ public sealed class HudPresenter : MonoBehaviour
     private void OnDisable() => Dispose();
     private void OnDestroy() => Dispose();
 
-    private void HandleHpChanged(int hp, int maxHp) => view?.SetHp(hp, maxHp);
+    private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
 
     public void SetMode(HUDIds.Mode mode)
@@ -102,11 +102,6 @@ public sealed class HudPresenter : MonoBehaviour
     {
         switch (mode)
         {
-            case HUDIds.Mode.Explore:
-                return HUDIds.Section.TopBar |
-                       HUDIds.Section.ExplorePanel |
-                       HUDIds.Section.SystemNotices;
-
             case HUDIds.Mode.Combat:
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |

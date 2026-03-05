@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
 
 public sealed class AppBootstrapper : MonoBehaviour
@@ -32,12 +33,41 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
-    [SerializeField] private Define.Scene startScene = Define.Scene.Title;
-    [SerializeField] private GameFlowState startState = GameFlowState.Title;
-
+    [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
 
-    private GameFlowManager _flow;
+    // ---- Run 수명 관리 ----
+    public GameRunSession CurrentRun { get; private set; }
+
+    public void BeginRun(GameRunSession session)
+    {
+        CurrentRun = session;
+    }
+
+    public void EndRun()
+    {
+        CurrentRun = null;
+    }
+
+    public void RequestLoad(Define.Scene scene)
+    {
+        if (_flow != null)
+        {
+            _flow.RequestLoad(scene);
+            return;
+        }
+
+        // startFlow = false 환경(테스트 씬): UI 정리 후 SceneManager 직접 로드
+        Managers.UI.ClearOnSceneTransition();
+        SceneManager.LoadScene(scene.ToString());
+    }
+
+    public void RequestStartRun()
+    {
+        RequestLoad(Define.Scene.StageMap);
+    }
+
+    private GameFlow _flow;
     private SceneTransitionManager _scene;
 
     private void Awake()
@@ -79,24 +109,98 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (preloadAnimations)
             await PreloadAnimationsAsync();
 
-        // 4) (선택) UIRoot 확보
+        // 4) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)
+        {
             await EnsureUIRootAsync();
+
+            var uiRoot = UIRootBootstrapper.Instance;
+            if (uiRoot != null)
+                Managers.UI.SetRoots(uiRoot.SceneRoot, uiRoot.PopupRoot, uiRoot.OverlayRoot, uiRoot.WorldRoot);
+            else
+                Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
+        }
 
         // 5) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
         {
-            _flow = new GameFlowManager();
+            _flow = new GameFlow();
             _scene = new SceneTransitionManager(this);
 
-            // ✅ 너가 이전에 쓴 방식이 Bind가 있는 구조라면 반드시 연결
             _flow.BindSceneTransition(_scene);
-
-            // ✅ 한 번만 호출
-            _flow.RequestLoad(startScene, startState);
+            _flow.OnStateChanged += OnFlowStateChanged;
+            _flow.RequestLoad(startScene);
+        }
+        else
+        {
+            // startFlow = false 일 때 (테스트 씬 직접 실행):
+            // 씬 전환마다 UI를 자동 활성화
+            SceneManager.sceneLoaded += OnSceneLoadedNoFlow;
+            AutoShowUIForCurrentScene();
         }
 
         IsReady = true;
+    }
+
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoadedNoFlow;
+    }
+
+    private void OnSceneLoadedNoFlow(UnityEngine.SceneManagement.Scene scene, LoadSceneMode mode)
+    {
+        AutoShowUIForCurrentScene();
+    }
+
+    private void OnFlowStateChanged(GameFlowState state)
+    {
+        Managers.UI.ClearOnSceneTransition();
+        ApplyUIForState(state);
+    }
+
+    /// <summary>
+    /// startFlow = false 환경(테스트 씬 직접 실행)에서
+    /// 현재 씬 이름을 기반으로 UI를 자동 활성화합니다.
+    /// 씬→상태 매핑은 GameFlow.TryGetStateForScene을 재사용합니다.
+    /// </summary>
+    private void AutoShowUIForCurrentScene()
+    {
+        var sceneName = SceneManager.GetActiveScene().name;
+        if (!Enum.TryParse<Define.Scene>(sceneName, out var scene))
+            return;
+
+        if (GameFlow.TryGetStateForScene(scene, out var state))
+            ApplyUIForState(state);
+    }
+
+    private void ApplyUIForState(GameFlowState state)
+    {
+        switch (state)
+        {
+            case GameFlowState.Logo:
+                // 로고 연출 처리 (별도 LogoBootstrapper 또는 씬 자체에서 처리)
+                break;
+
+            case GameFlowState.Login:
+                Managers.UI.ShowMenuUI<UI_Login>();
+                break;
+
+            case GameFlowState.Lobby:
+                Managers.UI.ShowMenuUI<UI_Lobby>();
+                break;
+
+            case GameFlowState.StageMap:
+                Managers.UI.ShowMenuUI<UI_StageMap>();
+                break;
+
+            case GameFlowState.InGame:
+                // HUD 바인딩은 GameRunBootstrapper → HudBootstrapper에서 처리
+                break;
+
+            case GameFlowState.Result:
+                Managers.UI.ShowMenuUI<UI_Result>();
+                break;
+        }
     }
 
     private async UniTask EnsureUIRootAsync()
@@ -113,7 +217,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         Debug.LogWarning("[AppBootstrapper] UIRoot not found. Creating from Addressables...");
 
-        var addr = Managers.AddressableManager;
+        var addr = Managers.AddressableManager; 
         if (addr == null)
         {
             Debug.LogError("[AppBootstrapper] EnsureUIRootAsync failed: AddressableManager is null.");
