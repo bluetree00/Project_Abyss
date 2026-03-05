@@ -68,6 +68,13 @@ public sealed class DevAutoLoginBootstrap : MonoBehaviour
     {
         if (_initialized) return true;
 
+        // AppBootstrapper가 이미 초기화한 경우 재사용
+        if (AppBootstrapper.IsBackendInitialized)
+        {
+            _initialized = true;
+            return true;
+        }
+
         var init = Backend.Initialize();
         if (!init.IsSuccess())
         {

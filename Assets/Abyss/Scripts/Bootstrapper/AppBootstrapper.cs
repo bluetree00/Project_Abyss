@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
+using BackEnd;
 
 public sealed class AppBootstrapper : MonoBehaviour
 {
@@ -21,7 +22,10 @@ public sealed class AppBootstrapper : MonoBehaviour
 #endif
 
     [Header("Core Init")]
+    [SerializeField] private bool initBackend = true;
     [SerializeField] private bool initAddressables = true;
+
+    public static bool IsBackendInitialized { get; private set; }
 
     [Header("Animation Preload (Test Friendly)")]
     [SerializeField] private bool preloadAnimations = true;
@@ -80,11 +84,23 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        SystemSetup();
+    }
+
+    private static void SystemSetup()
+    {
+        Application.runInBackground = true;
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+
+        int width = Screen.width;
+        int height = (int)(Screen.width * 9f / 16f);
+        Screen.SetResolution(width, height, true);
     }
 
     private async void Start()
     {
-        // 1) Managers 준비 보장
+        // 1) Managers 준비 보장 (서비스 로케이터)
         var mgr = Managers.Instance;
         if (mgr == null)
         {
@@ -92,7 +108,22 @@ public sealed class AppBootstrapper : MonoBehaviour
             return;
         }
 
-        // 2) Addressables 초기화
+        // 2) 뒤끝 초기화
+        if (initBackend && !IsBackendInitialized)
+        {
+            var bro = Backend.Initialize();
+            if (bro.IsSuccess())
+            {
+                IsBackendInitialized = true;
+                Debug.Log("[AppBootstrapper] Backend initialized.");
+            }
+            else
+            {
+                Debug.LogError($"[AppBootstrapper] Backend initialize failed: {bro.GetMessage()}");
+            }
+        }
+
+        // 3) Addressables 초기화
         if (initAddressables)
         {
             var addr = Managers.AddressableManager;
@@ -105,11 +136,11 @@ public sealed class AppBootstrapper : MonoBehaviour
             await addr.InitAsync();
         }
 
-        // 3) (선택) 애니메이션 선로딩
+        // 4) (선택) 애니메이션 선로딩
         if (preloadAnimations)
             await PreloadAnimationsAsync();
 
-        // 4) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
+        // 5) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)
         {
             await EnsureUIRootAsync();
@@ -121,7 +152,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
 
-        // 5) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
+        // 6) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
         {
             _flow = new GameFlow();
