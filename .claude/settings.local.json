@@ -4,7 +4,15 @@
       "mcp__UnityMCP__manage_scene",
       "mcp__UnityMCP__manage_editor",
       "Bash(sort -t'|' -k1 -n)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "WebFetch(domain:127.0.0.1)",
+      "Bash(xargs -I{} cat {})",
+      "Bash(claude mcp list)",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":1,\"\"method\"\":\"\"tools/list\"\",\"\"params\"\":{}}')",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":1,\"\"method\"\":\"\"tools/list\"\",\"\"params\"\":{}}')",
+      "Bash(curl -s -X GET http://127.0.0.1:8080/mcp -H \"Accept: application/json, text/event-stream\")",
+      "Bash(curl -v -X POST \"http://127.0.0.1:8080/mcp\" -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":0,\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2024-11-05\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}}}')"
     ]
   }
 }

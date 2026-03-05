@@ -40,7 +40,7 @@ public class Login : MonoBehaviour
             await Managers.MonsterData.InitializeAsync();
 
             SetMessage("데이터 불러오기 완료. 로비로 이동합니다.");
-            SceneUtilitys.LoadScene(SceneNames.Lobby);
+            AppBootstrapper.Instance.RequestLoad(Define.Scene.Lobby);
         }
         else
         {
