@@ -156,7 +156,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         Debug.LogWarning("[AppBootstrapper] UIRoot not found. Creating from Addressables...");
 
-        var addr = Managers.AddressableManager;
+        var addr = Managers.AddressableManager; 
         if (addr == null)
         {
             Debug.LogError("[AppBootstrapper] EnsureUIRootAsync failed: AddressableManager is null.");
