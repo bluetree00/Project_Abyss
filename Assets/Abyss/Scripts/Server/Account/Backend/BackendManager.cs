@@ -5,6 +5,13 @@ public class BackendManager : MonoBehaviour
 {
     private void Awake()
     {
+        // AppBootstrapper가 이미 초기화한 경우 중복 실행 방지
+        if (AppBootstrapper.IsBackendInitialized)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         DontDestroyOnLoad(gameObject);
         BackendSetup();
     }
