@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/WeaponAbilitySO (Steps with Effect/Collider)")]
@@ -10,13 +9,35 @@ public class WeaponAbilitySO : ScriptableObject
     [Tooltip("애니메이션 이벤트의 stepIndex에 매칭되는 스텝 리스트")]
     public List<AbilityStep> steps = new List<AbilityStep>();
 
-    /// <summary>
-    /// 해당 stepIndex에 매칭되는 스텝 리스트 반환
-    /// </summary>
-    public List<AbilityStep> GetSteps(int stepIndex)
+    // stepIndex → 정렬된 AbilityStep 리스트 (GC 없는 조회용)
+    private Dictionary<int, List<AbilityStep>> _stepCache;
+    private static readonly IReadOnlyList<AbilityStep> _emptySteps = Array.Empty<AbilityStep>();
+
+    private void OnEnable() => RebuildCache();
+
+    private void RebuildCache()
     {
-        if (steps == null || steps.Count == 0) return new List<AbilityStep>();
-        return steps.Where(s => s.stepIndex == stepIndex).OrderBy(s => s.order).ToList();
+        _stepCache = new Dictionary<int, List<AbilityStep>>();
+        if (steps == null) return;
+
+        foreach (var s in steps)
+        {
+            if (!_stepCache.TryGetValue(s.stepIndex, out var list))
+                _stepCache[s.stepIndex] = list = new List<AbilityStep>();
+            list.Add(s);
+        }
+
+        foreach (var list in _stepCache.Values)
+            list.Sort((a, b) => a.order.CompareTo(b.order));
+    }
+
+    /// <summary>
+    /// 해당 stepIndex에 매칭되는 스텝 리스트 반환 (캐시 기반, GC 없음)
+    /// </summary>
+    public IReadOnlyList<AbilityStep> GetSteps(int stepIndex)
+    {
+        if (_stepCache == null) RebuildCache();
+        return _stepCache.TryGetValue(stepIndex, out var list) ? list : _emptySteps;
     }
 
     /// <summary>
@@ -72,7 +93,14 @@ public class WeaponAbilitySO : ScriptableObject
         public EffectBehaviorSO behavior;
     }
 
-    // Collider 모양 enum
+    // 판정 실행 방식
+    public enum ColliderMode
+    {
+        Trail,   // 무기 Root→Tip SphereCast (기본 근접 공격, GC 없음)
+        Spawned, // 풀에서 오브젝트 스폰 (스킬, 장판, 투사체)
+    }
+
+    // Collider 모양 enum (Spawned 모드에서만 사용)
     public enum ColliderShape
     {
         Box,
@@ -83,13 +111,23 @@ public class WeaponAbilitySO : ScriptableObject
     [Serializable]
     public class ColliderStep
     {
+        [Header("판정 방식")]
+        public ColliderMode mode = ColliderMode.Trail;
+
+        [Header("공통")]
+        public float damage = 0f;
+
+        [Header("Trail 모드")]
+        [Tooltip("0이면 WeaponInstance.hitRadius 사용")]
+        public float trailRadiusOverride = 0f;
+
+        [Header("Spawned 모드")]
         public string payloadKey;
         public Vector3 positionOffset = Vector3.zero;
         public Vector3 rotationEuler = Vector3.zero;
         public Vector3 forwardOffset = Vector3.zero;
         public float sizeMultiplier = 1f;
         public float durationMultiplier = 1f;
-        public float damage = 0f;
         public float hitInterval = 0.1f;
         public float duration = 2f;
         public ColliderShape shape = ColliderShape.Box;
@@ -97,8 +135,8 @@ public class WeaponAbilitySO : ScriptableObject
         [Tooltip("특수 콜라이더 로직이 필요한 경우")]
         public ColliderBehaviorSO behavior;
 
-        [Tooltip("Prefab/Addressable Key, 있으면 이걸로 생성")]
-        public string colliderPrefabKey; 
+        [Tooltip("Prefab/Addressable Key, 있으면 이걸로 생성 (Spawned 모드)")]
+        public string colliderPrefabKey;
     }
 
 }

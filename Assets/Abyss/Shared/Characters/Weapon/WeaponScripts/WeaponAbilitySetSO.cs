@@ -8,7 +8,7 @@ public class WeaponAbilitySetSO : ScriptableObject
     [Serializable]
     public class AbilityGroup
     {
-        public WeaponActionType actionType;           // Light, Heavy, QSkill, etc.
+        public WeaponActionType actionType;
         public List<WeaponAbilitySO> abilities = new List<WeaponAbilitySO>();
 
         public WeaponAbilitySO GetAbilityForComboIndex(int comboIndex)
@@ -21,13 +21,21 @@ public class WeaponAbilitySetSO : ScriptableObject
 
     public List<AbilityGroup> groups = new List<AbilityGroup>();
 
+    private Dictionary<WeaponActionType, AbilityGroup> _groupCache;
+
+    private void OnEnable() => RebuildCache();
+
+    private void RebuildCache()
+    {
+        _groupCache = new Dictionary<WeaponActionType, AbilityGroup>();
+        if (groups == null) return;
+        foreach (var g in groups)
+            _groupCache.TryAdd(g.actionType, g);
+    }
+
     public WeaponAbilitySO GetAbility(WeaponActionType actionType, int comboIndex)
     {
-        foreach (var g in groups)
-        {
-            if (g.actionType == actionType)
-                return g.GetAbilityForComboIndex(comboIndex);
-        }
-        return null;
+        if (_groupCache == null) RebuildCache();
+        return _groupCache.TryGetValue(actionType, out var g) ? g.GetAbilityForComboIndex(comboIndex) : null;
     }
 }

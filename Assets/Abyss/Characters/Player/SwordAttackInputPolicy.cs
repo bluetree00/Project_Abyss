@@ -4,33 +4,32 @@ using UnityEngine;
 
 public sealed class SwordAttackInputPolicy : IAttackInputPolicy
 {
-    private bool autoFired;
+    private bool _autoFired;
+    private float _attackInputTime;
+    private float _heavyAttackChargeTime;
 
-    public void OnStarted(PlayerController Controller)
+    public void OnStarted(PlayerController controller)
     {
-        Controller.CharacterData.attackInputTime = Time.unscaledTime;
-        Controller.CharacterData.heavyAttackChargeTime = 0f;
-        // Controller.isInChargingState = true;
-        autoFired = false;
+        _attackInputTime = Time.unscaledTime;
+        _heavyAttackChargeTime = 0f;
+        _autoFired = false;
     }
 
-    public void Tick(PlayerController Controller, float dt)
+    public void Tick(PlayerController controller, float dt)
     {
-        Controller.CharacterData.heavyAttackChargeTime += Time.unscaledDeltaTime;
+        _heavyAttackChargeTime += dt;
     }
 
-    public void OnCanceled(PlayerController Controller)
+    public void OnCanceled(PlayerController controller)
     {
-        // 이미 자동 발사 됐으면 아무 것도 안 함(버퍼에 Heavy 들어갔음)
-        if (!autoFired)
+        if (!_autoFired)
         {
-            float held = Time.unscaledTime - Controller.CharacterData.attackInputTime;
-            // 임계 미만 → 라이트
-            Controller.InputBuffer.Push(Command.Light);
+            float held = Time.unscaledTime - _attackInputTime;
+            float threshold = controller.RuntimeStats.HeavyChargeThreshold;
+            controller.InputBuffer.Push(held >= threshold ? Command.Heavy : Command.Light);
         }
 
-        // 정리
-        Controller.CharacterData.attackInputTime = 0f;
-        Controller.CharacterData.heavyAttackChargeTime = 0f;
+        _attackInputTime = 0f;
+        _heavyAttackChargeTime = 0f;
     }
 }
