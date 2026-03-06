@@ -209,7 +209,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         switch (state)
         {
             case GameFlowState.Logo:
-                // 로고 연출 처리 (별도 LogoBootstrapper 또는 씬 자체에서 처리)
+                Managers.UI.ShowMenuUI<UI_Logo>();
                 break;
 
             case GameFlowState.Login:
