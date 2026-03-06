@@ -73,7 +73,7 @@ public class Knight : PlayerController
         }
 
         // RouteInputsToLayers 또는 매 프레임 입력 라우팅 위치
-        if (InputBuffer != null && InputBuffer.TryConsume(Game.Inputs.Command.Charge))
+        if (InputBuffer != null && InputBuffer.TryConsume(Command.Charge))
         {
             if (!CanAttack())
             {
@@ -139,21 +139,6 @@ public class Knight : PlayerController
         // 버퍼 만료 정리
         InputBuffer?.TickPrune();
 
-        // 콤보 타이머 같은 부가 로직이 있다면 여기서
-        if (characterData.comboTimer > 0f)
-        {
-            characterData.comboTimer -= Time.deltaTime;
-            if (characterData.comboTimer <= 0f) ResetCombo();
-        }
-
-    }
-
-    private void ResetCombo()
-    {
-        characterData.attackComboStep = 0;
-        characterData.comboTimer = 0;
-        nextComboQueued = false;
-        // Debug.Log("Combo reset due to timer expiration.");
     }
 
 }
