@@ -33,4 +33,24 @@ public class WeaponInstance : MonoBehaviour
     {
         TrailDetector?.EndTrail();
     }
+
+    private void OnDrawGizmos()
+    {
+        if (tipPoint == null || rootPoint == null) return;
+
+        bool active = TrailDetector != null && TrailDetector.IsActive;
+        Gizmos.color = active
+            ? new Color(1f, 0.1f, 0.1f, 0.8f)
+            : new Color(0.6f, 0.6f, 0.6f, 0.4f);
+
+        Gizmos.DrawWireSphere(rootPoint.position, hitRadius);
+        Gizmos.DrawWireSphere(tipPoint.position, hitRadius);
+#if UNITY_EDITOR
+        UnityEditor.Handles.color = Gizmos.color;
+        UnityEditor.Handles.DrawLine(rootPoint.position, tipPoint.position);
+        UnityEditor.Handles.color = Color.white;
+        UnityEditor.Handles.Label(rootPoint.position + Vector3.up * 0.05f, "Root");
+        UnityEditor.Handles.Label(tipPoint.position + Vector3.up * 0.05f, "Tip");
+#endif
+    }
 }
