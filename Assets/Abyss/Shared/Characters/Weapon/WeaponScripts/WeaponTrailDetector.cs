@@ -13,6 +13,7 @@ public class WeaponTrailDetector : MonoBehaviour
 
     private WeaponInstance _weapon;
     private bool _active;
+    public bool IsActive => _active;
 
     private Vector3 _prevTipPos;
     private Vector3 _prevRootPos;
