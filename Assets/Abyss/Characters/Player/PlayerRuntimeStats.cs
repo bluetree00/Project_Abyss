@@ -7,6 +7,7 @@ public sealed class PlayerRuntimeStats
     public int MaxHp { get; private set; }
     public int Hp { get; private set; }
     public int AttackPower { get; private set; }
+    public float HeavyChargeThreshold { get; private set; }
 
     public event Action OnChanged;
 
@@ -20,13 +21,17 @@ public sealed class PlayerRuntimeStats
 
         // SO는 템플릿. 런타임 값은 여기로 복사.
         MaxHp = Mathf.Max(1, data.maxHealth);
-
-        // 런 시작 시 풀피로 시작하는 정책
         Hp = MaxHp;
-
-        // SO 내부 totalAttackPower를 쓰려면 Initialize()로 계산되어 있어야 함
-        // (단, SO 자체 값을 바꾸지 않도록 주의)
         AttackPower = Mathf.Max(0, data.attackPower);
+        HeavyChargeThreshold = Mathf.Max(0f, data.heavyAttackChargeThreshold);
+        OnChanged?.Invoke();
+    }
+
+    public void SetHeavyChargeThreshold(float value)
+    {
+        value = Mathf.Max(0f, value);
+        if (Mathf.Approximately(HeavyChargeThreshold, value)) return;
+        HeavyChargeThreshold = value;
         OnChanged?.Invoke();
     }
 

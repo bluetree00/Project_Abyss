@@ -4,7 +4,6 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
-using UnityEngine.InputSystem;
 
 public interface IWeaponProvider
 {
@@ -107,14 +106,6 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     public void Initialize(PlayerController owner)
     {
         _owner = owner;
-    }
-
-    private void Update()
-    {
-        if (Keyboard.current == null) return;
-
-        if (Keyboard.current.digit1Key.wasPressedThisFrame) _ = SwitchToSlotAsync(0);
-        if (Keyboard.current.digit2Key.wasPressedThisFrame) _ = SwitchToSlotAsync(1);
     }
 
     // ----------------------

@@ -2,7 +2,6 @@
 // 네임스페이스 및 의존성
 //============================================================
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -536,7 +535,11 @@ public class PlayerController : CharacterBase
     //============================================================
     // Inventory / Weapon / Camera
     //============================================================
-    protected virtual void ChangeWeapon(int index) { }
+    protected virtual void ChangeWeapon(int index)
+    {
+        if (WeaponManager != null)
+            _ = WeaponManager.SwitchToSlotAsync(index);
+    }
 
     protected virtual void SetupCamera()
     {
@@ -598,6 +601,8 @@ public class PlayerController : CharacterBase
         receiver.OnCloseCombo += Safe_CloseCombo;
         receiver.OnGenericTag += Safe_GenericTag;
         receiver.OnEffectStep += safe_EffectStep;
+        receiver.OnBeginTrail += Safe_BeginTrail;
+        receiver.OnEndTrail += Safe_EndTrail;
 
         _aeSubscribed = true;
     }
@@ -612,6 +617,8 @@ public class PlayerController : CharacterBase
         receiver.OnCloseCombo -= Safe_CloseCombo;
         receiver.OnGenericTag -= Safe_GenericTag;
         receiver.OnEffectStep -= safe_EffectStep;
+        receiver.OnBeginTrail -= Safe_BeginTrail;
+        receiver.OnEndTrail -= Safe_EndTrail;
 
         _aeSubscribed = false;
     }
@@ -644,13 +651,58 @@ public class PlayerController : CharacterBase
 
     private void safe_EffectStep(int step)
     {
-        Debug.Log($"[PlayerController] EffectStep received: {step}");
         if (EffectHandler != null && WeaponManager.HasWeapon)
+            _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, currentComboStep, step);
+    }
+
+    private void Safe_BeginTrail()
+    {
+        if (WeaponManager == null) return;
+        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
+        if (wi == null || wi.TrailDetector == null) return;
+
+        float damage = 0f;
+        float knockback = 1f;
+        float radiusOverride = 0f;
+
+        var weaponData = WeaponManager.CurrentWeaponData;
+        if (weaponData != null && weaponData.abilitySet != null)
         {
-            var actionType = CurrentAttackTypeForEffect; // Light, Heavy, QSkill 등
-            int currentComboIndex = currentComboStep;
-            Debug.Log($"ActionType={actionType}, EffectIndex={currentComboIndex}, Step={step}");
-            EffectHandler.PlayEffect(actionType, currentComboIndex, step);
+            var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, currentComboStep);
+            if (ability != null)
+            {
+                foreach (var s in ability.steps)
+                {
+                    if (s.collider != null && s.collider.mode == WeaponAbilitySO.ColliderMode.Trail)
+                    {
+                        damage = s.baseDamage > 0f ? s.baseDamage : s.collider.damage;
+                        knockback = s.knockbackMultiplier;
+                        radiusOverride = s.collider.trailRadiusOverride;
+                        break;
+                    }
+                }
+            }
         }
+
+        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
+        wi.TrailDetector.OnTrailHit += OnWeaponTrailHit;
+        wi.TrailDetector.BeginTrail(damage, knockback, radiusOverride);
+    }
+
+    private void Safe_EndTrail()
+    {
+        if (WeaponManager == null) return;
+        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
+        if (wi == null || wi.TrailDetector == null) return;
+
+        wi.TrailDetector.EndTrail();
+        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
+    }
+
+    private void OnWeaponTrailHit(RaycastHit hit, float damage, float knockback)
+    {
+        if (hit.collider == null) return;
+        if (!hit.collider.TryGetComponent<IDamageable>(out var damageable)) return;
+        damageable.TakeDamage(damage, gameObject, knockback);
     }
 }
