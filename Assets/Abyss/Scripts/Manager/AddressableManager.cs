@@ -281,7 +281,7 @@ public sealed class AddressableManager
             {
                 key = kv.Key,
                 kind = "Asset",
-                type = h.Result != null ? h.Result.GetType().Name : "null",
+                type = h.IsValid() && h.Result != null ? h.Result.GetType().Name : "invalid",
                 isValid = h.IsValid()
             });
         }
@@ -293,7 +293,7 @@ public sealed class AddressableManager
             {
                 key = $"InstanceId:{kv.Key}",
                 kind = "Instance",
-                type = h.Result != null ? h.Result.GetType().Name : "null",
+                type = h.IsValid() && h.Result != null ? h.Result.GetType().Name : "invalid",
                 isValid = h.IsValid()
             });
         }

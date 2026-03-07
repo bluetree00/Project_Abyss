@@ -61,9 +61,41 @@ public sealed class AppBootstrapper : MonoBehaviour
             return;
         }
 
-        // startFlow = false 환경(테스트 씬): UI 정리 후 SceneManager 직접 로드
+        // startFlow = false 환경(테스트 씬): UI 정리 후 비동기 로드
         Managers.UI.ClearOnSceneTransition();
-        SceneManager.LoadScene(scene.ToString());
+        LoadSceneNoFlowAsync(scene).Forget();
+    }
+
+    private async UniTaskVoid LoadSceneNoFlowAsync(Define.Scene scene)
+    {
+        var loading = UI_SceneLoading.Instance;
+        if (loading != null) await loading.ShowAsync();
+
+        var op = SceneManager.LoadSceneAsync(scene.ToString());
+        op.allowSceneActivation = false;
+
+        float speed = loading != null ? loading.ProgressSpeed : 0.5f;
+        float display = 0f;
+        while (op.progress < 0.9f)
+        {
+            display = Mathf.MoveTowards(display, op.progress / 0.9f, Time.unscaledDeltaTime * speed);
+            loading?.SetProgress(display);
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+        // 표시 진행도를 1까지 천천히 채운 뒤 씬 활성화
+        while (display < 1f)
+        {
+            display = Mathf.MoveTowards(display, 1f, Time.unscaledDeltaTime * speed);
+            loading?.SetProgress(display);
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+        op.allowSceneActivation = true;
+        await UniTask.WaitUntil(() => op.isDone);
+    }
+
+    public void NotifySceneReady()
+    {
+        UI_SceneLoading.Instance?.HideAsync().Forget();
     }
 
     public void RequestStartRun()
@@ -210,26 +242,31 @@ public sealed class AppBootstrapper : MonoBehaviour
         {
             case GameFlowState.Logo:
                 Managers.UI.ShowMenuUI<UI_Logo>();
+                NotifySceneReady();
                 break;
 
             case GameFlowState.Login:
                 Managers.UI.ShowMenuUI<UI_Login>();
+                NotifySceneReady();
                 break;
 
             case GameFlowState.Lobby:
                 Managers.UI.ShowMenuUI<UI_Lobby>();
+                NotifySceneReady();
                 break;
 
             case GameFlowState.StageMap:
                 Managers.UI.ShowMenuUI<UI_StageMap>();
+                // StageMapBootstrapper가 비동기 초기화 완료 후 NotifySceneReady() 호출
                 break;
 
             case GameFlowState.InGame:
-                // HUD 바인딩은 GameRunBootstrapper → HudBootstrapper에서 처리
+                // GameRunBootstrapper가 비동기 초기화 완료 후 NotifySceneReady() 호출
                 break;
 
             case GameFlowState.Result:
                 Managers.UI.ShowMenuUI<UI_Result>();
+                NotifySceneReady();
                 break;
         }
     }

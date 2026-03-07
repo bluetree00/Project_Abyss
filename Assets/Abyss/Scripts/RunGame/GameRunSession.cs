@@ -44,7 +44,6 @@ public sealed class GameRunSession
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
 
-    public StageMapSpawner Spawner { get; private set; }
     public PlayerController Player { get; private set; }
 
     public PlayerRunState PlayerState { get; private set; }
@@ -58,7 +57,7 @@ public sealed class GameRunSession
 
     public event Action<PlayerRunState> OnPlayerStateReady;
     public event Action<PlayerController> OnPlayerBound;
-    public event Action<StageMapSpawner> OnSpawnerBound;
+    public event Action<string> OnMapSpawnRequested;
 
     // HUD mode
     public event Action<HUDIds.Mode> OnHudModeChanged;
@@ -177,7 +176,6 @@ public sealed class GameRunSession
         RoomManager = null;
         StagePointManager = null;
         Player = null;
-        Spawner = null;
         PlayerState = null;
         CurrentRunState = RunState.None;
     }
@@ -287,13 +285,6 @@ public sealed class GameRunSession
     // =========================================================
     // Scene Bind (Bootstrapper injects)
     // =========================================================
-    public void BindSpawner(StageMapSpawner spawner)
-    {
-        Spawner = spawner;
-        if (Spawner == null) Debug.LogWarning("[GameRun] BindSpawner: spawner is null");
-        OnSpawnerBound?.Invoke(Spawner);
-    }
-
     public void BindPlayer(PlayerController player)
     {
         Player = player;
@@ -337,17 +328,11 @@ public sealed class GameRunSession
     // =========================================================
     // Map Spawn / Movement
     // =========================================================
-    public void SpawnCurrentPointMap()
+    public void RequestSpawnCurrentPointMap()
     {
         if (!IsRunning || StagePointManager == null || RoomManager == null)
         {
-            Debug.LogWarning("[GameRun] SpawnCurrentPointMap ignored: not ready");
-            return;
-        }
-
-        if (Spawner == null)
-        {
-            Debug.LogError("[GameRun] Spawner is not bound. (GameRunBootstrapper에서 주입 필요)");
+            Debug.LogWarning("[GameRun] RequestSpawnCurrentPointMap ignored: not ready");
             return;
         }
 
@@ -387,11 +372,12 @@ public sealed class GameRunSession
         }
 
         Debug.Log($"[SpawnMap] pointId={ctx.PointId}  room={room.name}  category={room.category}  prefab={room.prefab}");
-        Spawner.ChangeMap(room.prefab);
 
         // 방 카테고리 → RunState 자동 전환
         var category = RoomCategoryUtil.Parse(room.category);
         ChangeRunState(CategoryToRunState(category));
+
+        OnMapSpawnRequested?.Invoke(room.prefab);
     }
 
     public void RequestMoveTo(int targetPointId)
@@ -405,7 +391,7 @@ public sealed class GameRunSession
         if (!StagePointManager.CanMove(targetPointId)) return;
         if (!StagePointManager.TryMoveTo(targetPointId)) return;
 
-        SpawnCurrentPointMap();
+        RequestSpawnCurrentPointMap();
     }
 
     /// <summary>
@@ -422,27 +408,6 @@ public sealed class GameRunSession
 
         if (!StagePointManager.CanMove(targetPointId)) return false;
         return StagePointManager.TryMoveTo(targetPointId);
-    }
-
-    public void SpawnPointMap(int pointId)
-    {
-        if (!IsRunning || StagePointManager == null || RoomManager == null) return;
-
-        if (Spawner == null)
-        {
-            Debug.LogError("[GameRun] Spawner is not bound.");
-            return;
-        }
-
-        var ctx = StagePointManager.GetContext(pointId);
-        if (ctx == null) return;
-
-        StagePointManager.Resolve(ctx);
-
-        var room = RoomManager.GetById(ctx.ResolvedRoomId);
-        if (room == null || string.IsNullOrEmpty(room.prefab)) return;
-
-        Spawner.ChangeMap(room.prefab);
     }
 
     // =========================================================
