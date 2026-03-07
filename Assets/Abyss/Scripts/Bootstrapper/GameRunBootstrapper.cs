@@ -5,11 +5,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 {
     public static GameRunBootstrapper Instance { get; private set; }
 
-    [SerializeField] private StageMapSpawner spawner;
     [SerializeField] private string playerPrefabKey = "Knight";
     [SerializeField] private Transform playerSpawnPoint;
+    [SerializeField] private Transform mapRoot;
 
     private StagePointUI[] _points;
+    private GameObject _currentMapGO;
+    private bool _isSpawning;
 
     private GameRunSession _run;
     public GameRunSession Run => _run;
@@ -23,7 +25,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         Instance = this;
 
-        // AppBootstrapper에 이미 런이 있으면 재사용, 없으면 새로 생성
         var app = AppBootstrapper.Instance;
         if (app != null && app.CurrentRun != null)
         {
@@ -36,21 +37,19 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 app.BeginRun(_run);
         }
 
-        // HUD가 이미 존재할 수 있으니 선-바인딩 (안전)
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(_run);
 
-        Bind();
+        _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
     }
 
     private async void Start()
     {
-        Bind();
-
-        // StageMap → GameScene 전환: 이미 실행 중인 런 → 전투 세팅만 수행
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
+
+        AppBootstrapper.Instance?.NotifySceneReady();
     }
 
     private void OnDestroy()
@@ -58,32 +57,44 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (ReferenceEquals(Instance, this))
             Instance = null;
 
+        if (_run != null)
+            _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
+
+        if (_currentMapGO != null && Managers.AddressableManager != null)
+        {
+            Managers.AddressableManager.ReleaseInstance(_currentMapGO);
+            _currentMapGO = null;
+        }
+
         _run = null;
     }
 
-    public void Bind()
+    private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();
+
+    private async UniTask SpawnMapAsync(string prefabKey)
     {
-        if (_run == null)
+        if (string.IsNullOrEmpty(prefabKey)) return;
+
+        if (_isSpawning)
         {
-            Debug.LogWarning("[GameRunBootstrapper] Bind ignored: run is null.");
+            Debug.LogWarning($"[GameRunBootstrapper] SpawnMapAsync ignored: already spawning. key={prefabKey}");
             return;
         }
 
-        if (spawner == null)
-            spawner = FindObjectOfType<StageMapSpawner>(true);
-
-        if (spawner == null)
+        _isSpawning = true;
+        try
         {
-            Debug.LogWarning("[GameRunBootstrapper] StageMapSpawner not found yet.");
-            return;
+            if (_currentMapGO != null)
+            {
+                Managers.AddressableManager.ReleaseInstance(_currentMapGO);
+                _currentMapGO = null;
+            }
+
+            _currentMapGO = await Managers.AddressableManager.InstantiateAsync(prefabKey, mapRoot);
         }
-
-        _run.BindSpawner(spawner);
-
-        if (_run.IsRunning && _run.StagePointManager != null)
+        finally
         {
-            _points = FindObjectsOfType<StagePointUI>(true);
-            _run.RegisterPoints(_points);
+            _isSpawning = false;
         }
     }
 
@@ -100,17 +111,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        if (spawner == null)
-            spawner = FindObjectOfType<StageMapSpawner>(true);
-
-        if (spawner == null)
-        {
-            Debug.LogError("[GameRunBootstrapper] StartCombatAsync failed: StageMapSpawner not found.");
-            return;
-        }
-
-        run.BindSpawner(spawner);
-        run.SpawnCurrentPointMap();
+        run.RequestSpawnCurrentPointMap();
 
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
@@ -118,9 +119,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
-        {
             run.BindPlayer(player);
-        }
     }
 
     public async UniTask StartRunAsync(ChapterId chapter)
@@ -132,19 +131,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // Spawner 확보/바인딩 보장
-        if (spawner == null)
-            spawner = FindObjectOfType<StageMapSpawner>(true);
-
-        if (spawner == null)
-        {
-            Debug.LogError("[GameRunBootstrapper] StartRunAsync failed: StageMapSpawner not found.");
-            return;
-        }
-
-        run.BindSpawner(spawner);
-
-        // 1) 런 로직 초기화
         await run.StartNewRunAsync(chapter, LoadTextAsset);
 
         static UniTask<TextAsset> LoadTextAsset(string key) =>
@@ -156,24 +142,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 2) 씬 UI 등록
         _points = FindObjectsOfType<StagePointUI>(true);
         run.RegisterPoints(_points);
-
-        // 3) Resolve + Start 세팅
         run.ResolveAllPointsAndSetStart();
-
-        // 4) 시작 맵 스폰
-        run.SpawnCurrentPointMap();
+        run.RequestSpawnCurrentPointMap();
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
 
-        // 5) 플레이어 스폰 + 런에 바인딩
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
-        {
             run.BindPlayer(player);
-        }
     }
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)

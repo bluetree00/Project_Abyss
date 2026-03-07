@@ -100,7 +100,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             return;
         }
 
-        bootstrapper.Bind();
         await bootstrapper.StartRunAsync(chapter);
     }
 

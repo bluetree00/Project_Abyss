@@ -49,11 +49,13 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         {
             app.CurrentRun.EnterMap();
             RefreshStageMapUI();
+            app.NotifySceneReady();
             return;
         }
 
         // 새 런 시작
         await StartNewRunAsync(app);
+        app.NotifySceneReady();
     }
 
     private async UniTask StartNewRunAsync(AppBootstrapper app)

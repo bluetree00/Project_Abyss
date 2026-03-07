@@ -368,7 +368,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46584538, y: 0.0000089028335, z: 0.000008510221, w: 0.8848662}
+  m_LocalRotation: {x: 0.46584716, y: 0.000013992249, z: 0.000013429239, w: 0.8848652}
   m_LocalPosition: {x: 0, y: 4.998319, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -762,34 +762,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 669045122}
-  - component: {fileID: 669045121}
   - component: {fileID: 669045123}
   m_Layer: 0
-  m_Name: StageMapSpawner
+  m_Name: '@GameRunBootstrapper'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &669045121
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 669045120}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aab82bbaac500b04fbbb50b45eeb3b66, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  mapRoot: {fileID: 0}
-  playerSpawnPoint: {fileID: 0}
-  fadeCanvasGroup: {fileID: 0}
-  fadeOutDuration: 0.25
-  fadeInDuration: 0.25
-  minTransitionTime: 0.35
-  logDebug: 0
 --- !u!4 &669045122
 Transform:
   m_ObjectHideFlags: 0
@@ -817,7 +797,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4c506c3bf4371748837bd380ff194f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawner: {fileID: 669045121}
+  spawner: {fileID: 0}
   playerPrefabKey: Knight
   playerSpawnPoint: {fileID: 0}
 --- !u!1 &776977292
