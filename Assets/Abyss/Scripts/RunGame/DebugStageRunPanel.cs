@@ -1,10 +1,8 @@
 using UnityEngine;
-using UnityEngine.UI;
 using Cysharp.Threading.Tasks;
 
 public sealed class DebugStageRunPanel : MonoBehaviour
 {
-    [SerializeField] private Button startButton;
     [SerializeField] private ChapterId chapter = ChapterId.Chapter1;
 
     [Header("Optional")]
@@ -14,28 +12,22 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
     [SerializeField] private KeyCode returnToStageMapKey = KeyCode.F6;
 
-    private bool _clicked;
+    private bool _started;
 
     private void Awake()
     {
-        if (startButton == null)
-            startButton = GetComponent<Button>();
-
-        if (startButton == null)
-        {
-            Debug.LogError("[DebugRunPanel] startButton is null.");
-            return;
-        }
-
         if (bootstrapper == null)
             bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
+    }
 
-        startButton.onClick.AddListener(() =>
-        {
-            if (_clicked) return;
-            _clicked = true;
-            StartRun().Forget();
-        });
+    private void Start()
+    {
+        var run = GetCurrentRun();
+        if (run != null && run.IsRunning) return;
+
+        if (_started) return;
+        _started = true;
+        StartRun().Forget();
     }
 
     private void Update()
@@ -85,7 +77,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         {
             await UniTask.WaitUntil(() => app.CurrentRun != null && app.CurrentRun.IsRunning);
             Debug.Log("[DebugRunPanel] StageMapBootstrapper 런 준비 완료.");
-            _clicked = false;
+            _started = false;
             return;
         }
 
@@ -96,7 +88,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         if (bootstrapper == null)
         {
             Debug.LogError("[DebugRunPanel] GameRunBootstrapper not found.");
-            _clicked = false;
+            _started = false;
             return;
         }
 

@@ -25,6 +25,11 @@ public class TopPanelViewer : MonoBehaviour
         BackendGameData.Instance.ongameDataLoadEvent.AddListener(UpdateGameData);
     }
 
+    private void OnDestroy()
+    {
+        BackendGameData.Instance.ongameDataLoadEvent.RemoveListener(UpdateGameData);
+    }
+
     public void UpdateNickname()
     {
         Debug.Log($"닉네임: {UserInfo.Data.nickname}, 게이머 ID: {UserInfo.Data.gamerId}");
