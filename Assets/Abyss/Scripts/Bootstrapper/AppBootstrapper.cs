@@ -117,6 +117,20 @@ public sealed class AppBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        if (initBackend && !IsBackendInitialized)
+        {
+            var bro = Backend.Initialize();
+            if (bro.IsSuccess())
+            {
+                IsBackendInitialized = true;
+                Debug.Log("[AppBootstrapper] Backend initialized.");
+            }
+            else
+            {
+                Debug.LogError($"[AppBootstrapper] Backend initialize failed: {bro.GetMessage()}");
+            }
+        }
+
         SystemSetup();
     }
 
