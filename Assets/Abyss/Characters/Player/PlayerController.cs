@@ -159,8 +159,6 @@ public class PlayerController : CharacterBase
     //============================================================
     // Unity Lifecycle / Initialization
     //============================================================
-    private async void Start() => await InitAsync();
-
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
@@ -244,8 +242,12 @@ public class PlayerController : CharacterBase
 
     private void OnDestroy()
     {
-        inputActions?.Disable();
-        inputActions?.Dispose();
+        if (inputActions != null)
+        {
+            inputActions.Player.Disable();
+            inputActions.Disable();
+            inputActions.Dispose();
+        }
 
         UnsubscribeFromAnimationReceiver(EventReceiver);
 
@@ -292,7 +294,7 @@ public class PlayerController : CharacterBase
         {
             Rigid.useGravity = false;
             if (characterData != null)
-                Rigid.drag = characterData.groundDrag;
+                Rigid.linearDamping = characterData.groundDrag;
         }
     }
 
@@ -490,7 +492,7 @@ public class PlayerController : CharacterBase
         isJumping = true;
 
         // Rigidbody로 점프 힘 적용
-        Rigid.velocity = new Vector3(Rigid.velocity.x, 0f, Rigid.velocity.z);
+        Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
         Rigid.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
 
         // 상태 전환 요청
@@ -526,7 +528,7 @@ public class PlayerController : CharacterBase
         if (isGrounded || !Rigid) return;
 
         float gravityMultiplier = characterData.gravity;
-        if (Rigid.velocity.y < 0)
+        if (Rigid.linearVelocity.y < 0)
             gravityMultiplier *= characterData.fallMultiplier;
 
         Rigid.AddForce(Vector3.up * gravityMultiplier, ForceMode.Acceleration);
@@ -558,7 +560,7 @@ public class PlayerController : CharacterBase
 
     public void StopHorizontalMovement()
     {
-        Rigid.velocity = new Vector3(0f, Rigid.velocity.y, 0f);
+        Rigid.linearVelocity = new Vector3(0f, Rigid.linearVelocity.y, 0f);
     }
 
     public void RotateTowardsMousePosition()
