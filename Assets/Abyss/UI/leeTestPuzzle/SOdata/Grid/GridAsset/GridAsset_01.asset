@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pattern: {fileID: 11400000, guid: edb2241fa3a0a5541a7fb302fba9a84c, type: 2}
   visual: {fileID: 11400000, guid: d685d0d655cfa7b498f95c6393429722, type: 2}
+  buttonSprite: {fileID: 21300000, guid: 3e1be8826b3217a47968b80f40880d34, type: 3}
   spawnableShapes:
   - {fileID: 11400000, guid: d3e6f70d97002554c8610cdfffbae902, type: 2}
-  - {fileID: 11400000, guid: d162b4d8bcbf6bd4798d61b7ba6437b8, type: 2}
   onAllPlaceableFilled:
     m_PersistentCalls:
       m_Calls: []

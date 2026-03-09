@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  version: 7
+  version: 10
 --- !u!114 &-7480980264468385884
 MonoBehaviour:
   m_ObjectHideFlags: 11
@@ -34,12 +34,13 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Floor2HSlit
-  m_Shader: {fileID: -6465566751694194690, guid: 456f62aa2a1d4b7448998cd3cc4f20d1, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 456f62aa2a1d4b7448998cd3cc4f20d1,
+    type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
+  m_ValidKeywords: []
+  m_InvalidKeywords:
   - _DISABLE_SSR_TRANSPARENT
-  m_InvalidKeywords: []
   m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -151,6 +152,7 @@ Material:
     - _Emission_color: {r: 1, g: 1, b: 1, a: 0}
     - _FlowSpeedXYPowerZHeightW: {r: 0.2, g: 0.2, b: 1, a: 0}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!114 &3922195310900622273
 MonoBehaviour:
   m_ObjectHideFlags: 11

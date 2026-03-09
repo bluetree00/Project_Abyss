@@ -17,6 +17,10 @@ public class LeeGridAssetSO : ScriptableObject
     public LeeGridPatternSO pattern;
     public LeeGridVisualSO visual;
 
+    [Header("Button")]
+    [Tooltip("Grid 선택 버튼에 표시할 이미지. null 이면 버튼 이미지를 변경하지 않음.")]
+    public Sprite buttonSprite;
+
     [Header("Shapes for this grid (spawn when selected)")]
     public LeeShapeAssetSO[] spawnableShapes;
 
