@@ -32,11 +32,11 @@ public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 
         while (Time.time < startTime + dashDuration)
         {
-            controller.Rigid.velocity = direction * dashSpeed;
+            controller.Rigid.linearVelocity = direction * dashSpeed;
             yield return null;
         }
 
-        controller.Rigid.velocity = Vector3.zero;
+        controller.Rigid.linearVelocity = Vector3.zero;
 
 
         yield return new WaitForSeconds(controller.CharacterData.dodgeCooldown);

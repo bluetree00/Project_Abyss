@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 /// <summary>
 /// Attach this to a small UI button/image in the Selection UI.
@@ -16,6 +17,20 @@ public class LeeGridSelectButton : MonoBehaviour, IPointerClickHandler
     public LeeGridAssetSO gridAsset;
 
     private LeeGridAssetData _runtimeData;
+
+    void Start()
+    {
+        ApplyButtonSprite();
+    }
+
+    /// <summary>gridAsset.buttonSprite 가 있으면 오브젝트의 Image 에 적용한다.</summary>
+    public void ApplyButtonSprite()
+    {
+        if (gridAsset == null || gridAsset.buttonSprite == null) return;
+        var img = GetComponent<Image>();
+        if (img != null)
+            img.sprite = gridAsset.buttonSprite;
+    }
 
     /// <summary>
     /// 런타임에 SO 없이 퍼즐 데이터를 직접 주입한다.

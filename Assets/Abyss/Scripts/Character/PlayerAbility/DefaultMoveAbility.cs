@@ -15,7 +15,7 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         Vector3 moveDir = direction.normalized;
         float speed = owner.CharacterData.baseMoveSpeed;
 
-        owner.Rigid.velocity = new Vector3(moveDir.x * speed, owner.Rigid.velocity.y, moveDir.z * speed);
+        owner.Rigid.linearVelocity = new Vector3(moveDir.x * speed, owner.Rigid.linearVelocity.y, moveDir.z * speed);
 
         Quaternion targetRot = Quaternion.LookRotation(moveDir);
         owner.transform.rotation = Quaternion.Slerp(owner.transform.rotation, targetRot, Time.deltaTime * 10f);
