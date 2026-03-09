@@ -5,15 +5,32 @@ using UnityEngine;
 public class LobbyScenario : MonoBehaviour
 {
     [SerializeField]
-    private UserInfo user; // UserInfo 인스턴스
+    private UserInfo user;
+    [SerializeField]
+    private TopPanelViewer topPanel;
 
     private void Awake()
     {
-        user.GetUserInfoFromBackend(); // 유저 정보 가져오기
+        user.onUserInfoEvent.AddListener(topPanel.UpdateNickname);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (!DevAutoLoginBootstrap.IsLoggedIn)
+            return; // DevAutoLoginBootstrap이 로그인 완료 후 FetchUserInfo()를 호출
+#endif
+        user.GetUserInfoFromBackend();
+    }
+
+    public void FetchUserInfo()
+    {
+        user.GetUserInfoFromBackend();
     }
 
     private void Start()
     {
-        BackendGameData.Instance.GameDataLoad(); // 게임 데이터 로드
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (!DevAutoLoginBootstrap.IsLoggedIn)
+            return; // DevAutoLoginBootstrap이 로그인 완료 후 GameDataLoad를 호출
+#endif
+        BackendGameData.Instance.GameDataLoad();
     }
 }

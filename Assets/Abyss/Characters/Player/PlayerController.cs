@@ -159,8 +159,6 @@ public class PlayerController : CharacterBase
     //============================================================
     // Unity Lifecycle / Initialization
     //============================================================
-    private async void Start() => await InitAsync();
-
     protected override async UniTask InitAsync()
     {
         await base.InitAsync();
@@ -244,8 +242,12 @@ public class PlayerController : CharacterBase
 
     private void OnDestroy()
     {
-        inputActions?.Disable();
-        inputActions?.Dispose();
+        if (inputActions != null)
+        {
+            inputActions.Player.Disable();
+            inputActions.Disable();
+            inputActions.Dispose();
+        }
 
         UnsubscribeFromAnimationReceiver(EventReceiver);
 
