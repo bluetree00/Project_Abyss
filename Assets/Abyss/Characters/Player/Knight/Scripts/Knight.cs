@@ -1,19 +1,8 @@
- using Cysharp.Threading.Tasks;
 using Game.Inputs;
 using UnityEngine;
 
 public class Knight : PlayerController
 {
-    private async void Start()
-    {
-        await InitAsync();
-    }
-
-    protected override async UniTask InitAsync()
-    {
-        await base.InitAsync();
-    }
-
     protected override void InitLayerFSMs()
     {
   

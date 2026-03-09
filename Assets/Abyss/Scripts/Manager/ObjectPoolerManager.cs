@@ -206,13 +206,17 @@ public class ObjectPoolerManager
             return null;
         }
 
-        if (queue.Count == 0)
+        GameObject instance = null;
+        while (instance == null)
         {
-            var obj = CreateInstance(_configs[key]);
-            queue.Enqueue(obj);
+            if (queue.Count == 0)
+            {
+                instance = CreateInstance(_configs[key]);
+                break;
+            }
+            instance = queue.Dequeue(); // 파괴된 오브젝트면 null → 다시 루프
         }
 
-        var instance = queue.Dequeue();
         instance.transform.SetPositionAndRotation(position, rotation);
         instance.SetActive(true);
 
