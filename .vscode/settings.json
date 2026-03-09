@@ -51,7 +51,7 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Project_Abyss.sln",
+    "dotnet.defaultSolution": "Project_Abyss.slnx",
     "todo-tree.general.tags": [
         "BUG",
         "TODO",
