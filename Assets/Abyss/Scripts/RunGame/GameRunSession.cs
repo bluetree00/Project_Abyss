@@ -463,6 +463,12 @@ public sealed class GameRunSession
 
     private PlayerRunState CreateInitialPlayerStateFromSession()
     {
-        return new PlayerRunState();
+        var charData = Managers.CharacterData?.M_CharacterData;
+        int maxHp = (charData != null && charData.maxHealth > 0) ? charData.maxHealth : 100;
+
+        if (charData == null)
+            Debug.LogWarning("[GameRun] CharacterData not set — PlayerRunState uses default maxHp=100.");
+
+        return new PlayerRunState(maxHp);
     }
 }

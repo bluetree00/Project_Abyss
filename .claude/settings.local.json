@@ -16,7 +16,19 @@
       "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":1,\"\"method\"\":\"\"tools/list\"\",\"\"params\"\":{}}')",
       "Bash(curl -s -X GET http://127.0.0.1:8080/mcp -H \"Accept: application/json, text/event-stream\")",
       "Bash(curl -v -X POST \"http://127.0.0.1:8080/mcp\" -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":0,\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2024-11-05\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}}}')",
-      "Bash(grep -v \"propertyPath\\\\|rgba\\\\|Vector\\\\|Rect\\\\|size\\\\|anchor\\\\|pivot\\\\|scale\\\\|rotation\\\\|position\\\\|0\\\\.\\\\|1\\\\.\\\\|true\\\\|false\\\\|{file\\\\|fontSize\\\\|style\\\\|align\\\\|wrap\\\\|overflow\\\\|color\\\\|spacing\\\\|margin\\\\|padding\\\\| 0$\\\\| 1$\\\\| 2$\\\\| -\\\\|text\\\\|sprite\\\\|material\\\\|shader\\\\|raycast\\\\|sorting\\\\|render\\\\|layer\\\\|tag\\\\|active\\\\|enabled\\\\|visible\\\\|width\\\\|height\")"
+      "Bash(grep -v \"propertyPath\\\\|rgba\\\\|Vector\\\\|Rect\\\\|size\\\\|anchor\\\\|pivot\\\\|scale\\\\|rotation\\\\|position\\\\|0\\\\.\\\\|1\\\\.\\\\|true\\\\|false\\\\|{file\\\\|fontSize\\\\|style\\\\|align\\\\|wrap\\\\|overflow\\\\|color\\\\|spacing\\\\|margin\\\\|padding\\\\| 0$\\\\| 1$\\\\| 2$\\\\| -\\\\|text\\\\|sprite\\\\|material\\\\|shader\\\\|raycast\\\\|sorting\\\\|render\\\\|layer\\\\|tag\\\\|active\\\\|enabled\\\\|visible\\\\|width\\\\|height\")",
+      "mcp__mcp-for-unity__manage_scene",
+      "mcp__mcp-for-unity__manage_components",
+      "mcp__mcp-for-unity__manage_gameobject",
+      "mcp__mcp-for-unity__read_console",
+      "mcp__mcp-for-unity__manage_prefabs",
+      "mcp__mcp-for-unity__find_gameobjects",
+      "mcp__mcp-for-unity__refresh_unity",
+      "mcp__mcp-for-unity__execute_menu_item",
+      "Bash(rm \"c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Editor/FixFontAtlasReadable.cs\")",
+      "Bash(rm \"c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Editor/FixFontAtlasReadable.cs.meta\")",
+      "mcp__mcp-for-unity__manage_script",
+      "Bash(xargs grep -l \"8998ea46efda4344f9720e3f49eecf12\\\\|dfd4acf0718f1a447bd8e08d6ae9992f\")"
     ]
   },
   "hooks": {
