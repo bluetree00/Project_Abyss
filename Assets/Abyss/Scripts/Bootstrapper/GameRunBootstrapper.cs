@@ -156,6 +156,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)
     {
+        // PrepPanel에서 선택한 캐릭터 키가 있으면 우선 사용
+        var overrideKey = Managers.CharacterData?.PlayerPrefabKey;
+        if (!string.IsNullOrEmpty(overrideKey))
+            prefabKey = overrideKey;
+
         if (string.IsNullOrEmpty(prefabKey))
         {
             Debug.LogError("[GameRunBootstrapper] SpawnPlayerAsync failed: prefabKey is empty");
