@@ -10,14 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dfa4e3b1b7c22944ea31ec5d1e642af8, type: 3}
-  m_Name: GridPattern_02
+  m_Name: GridPattern_03
   m_EditorClassIdentifier: 
-  rows: 6
+  rows: 3
   columns: 8
   rows01:
   - 00000000
-  - 01111100
-  - 00111000
-  - 00111000
-  - 00010000
+  - 01111110
   - 00000000
