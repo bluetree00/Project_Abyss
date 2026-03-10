@@ -90,6 +90,9 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        // 전역 배치 상태에서 제거 (슬롯으로 돌아올 수 있도록)
+        LeeBoardManager.Instance?.OnShapePickedUp(this);
+
         if (leeGridManager.Instance != null)
             leeGridManager.Instance.ReleaseShape(this);
 
@@ -130,8 +133,18 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
         bool placed = leeGridManager.Instance.TryPlaceShape(this);
 
-        if (!placed)
+        if (placed)
+        {
+            // 배치된 Shape는 scroll content 밖(gridHost)으로 이동 → 스크롤 시 따라 움직이지 않음
+            if (LeeBoardManager.Instance?.gridHost != null)
+                transform.SetParent(LeeBoardManager.Instance.gridHost, true);
+            // 슬롯 해제 → shapeHost 콘텐츠 높이 갱신
+            LeeBoardManager.Instance?.OnShapePlaced(this);
+        }
+        else
+        {
             LeeBoardManager.Instance.ReSlotAndReturn(this);
+        }
 
         if (_layout != null) _layout.ignoreLayout = false;
     }

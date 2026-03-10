@@ -1,7 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.Events;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
 /// Lee 퍼즐 시스템의 중심 매니저.
@@ -9,7 +12,8 @@ using UnityEngine.Events;
 /// [SO 방식]  Inspector에 LeeGridAssetSO 할당 → EnterGrid(SO) 호출
 /// [데이터 방식] LeeGridAssetData 코드 생성  → SetRuntimeData(data) or EnterGrid(data) 호출
 ///
-/// 두 방식 모두 하위 호환. 활성 SO에 AddShape/SetPattern 등 뮤테이터를 호출하면 실시간 반영됨.
+/// Shape는 Grid와 무관하게 공용 풀로 관리된다.
+/// 런타임에 S키를 누르면 어드레서블 Shape 그룹에서 랜덤으로 하나를 생성한다.
 /// </summary>
 public class LeeBoardManager : MonoBehaviour
 {
@@ -51,12 +55,14 @@ public class LeeBoardManager : MonoBehaviour
     public LeeGridAssetData initialRuntimeData;
 
     [Header("Shape 슬롯")]
-    [Tooltip("shapeHost 기준 첫 번째 슬롯 위치.")]
-    public Vector2 spawnOrigin = new Vector2(200, 400);
+    [Tooltip("첫 번째 슬롯의 X 위치 / Y는 shapeHost 상단으로부터의 패딩(px).")]
+    public Vector2 spawnOrigin = new Vector2(0f, 80f);
     [Tooltip("슬롯 간격 (Y축).")]
-    public float spawnSlotStepY = 160f;
-    [Tooltip("최대 슬롯 수.")]
-    public int maxSpawnSlots = 5;
+    public float spawnSlotStepY = 220f;
+
+    [Header("Addressables")]
+    [Tooltip("어드레서블 Shape SO 그룹 키 (레이블 또는 그룹명).")]
+    public string shapeGroupKey = "SO Shape";
 
     // ── 내부 세션 ─────────────────────────────────────────────────────
 
@@ -64,17 +70,21 @@ public class LeeBoardManager : MonoBehaviour
     private class GridSession
     {
         public leeGrid gridInstance;
-        public List<leeShape> shapeInstances = new();
         public bool filledEventFired = false;
-
-        public Dictionary<leeShape, int> shapeToSlot = new();
-        public HashSet<int> occupiedSlots = new();
 
         // 런타임 생성 SO 추적 (OnDestroy 시 Destroy 대상)
         public LeeGridPatternSO  runtimePatternSO;
         public LeeGridVisualSO   runtimeVisualSO;
         public LeeShapeAssetSO[] runtimeShapeSOs;
         public bool isRuntimeCreated = false;
+    }
+
+    // Shape의 전역 배치 상태 (어느 그리드에 배치됐는지 공유)
+    private class GlobalPlacement
+    {
+        public LeeGridAssetSO    grid;
+        public List<leeGridSquare> squares;
+        public Vector2           anchoredPosition;
     }
 
     // ── Inspector 이벤트 ──────────────────────────────────────────────
@@ -108,6 +118,21 @@ public class LeeBoardManager : MonoBehaviour
 
     private RectTransform cacheRoot;
 
+    // ── 공용 Shape 풀 ─────────────────────────────────────────────────
+
+    private readonly List<leeShape> _sharedShapes = new();
+    // 슬롯 Y 위치 (shapeHost 로컬, 음수 = 아래). 실제 높이 기반으로 누적 계산.
+    private readonly Dictionary<leeShape, float> _sharedShapeSlotY = new();
+    private float _slotCursorY = 0f;
+
+    // 전역 배치 상태: 어느 그리드에 배치됐는지 (null이면 슬롯에 있음)
+    private readonly Dictionary<leeShape, GlobalPlacement> _globalPlacements = new();
+
+    private List<LeeShapeAssetSO> _cachedShapeSOs;
+    private AsyncOperationHandle<IList<LeeShapeAssetSO>> _shapeLoadHandle;
+    private bool _shapeHandleValid;
+    private bool _shapeLoadInProgress;
+
     public event Action<LeeGridAssetSO> OnGridFilled;
 
     // ── 생명주기 ──────────────────────────────────────────────────────
@@ -138,6 +163,12 @@ public class LeeBoardManager : MonoBehaviour
             EnterGrid(initialRuntimeData);
     }
 
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.S))
+            StartCoroutine(SpawnRandomShapeCoroutine());
+    }
+
     void OnDestroy()
     {
         foreach (var kvp in _dataChangeHandlers)
@@ -160,13 +191,15 @@ public class LeeBoardManager : MonoBehaviour
 
         if (_runtimeBoardConfig    != null) Destroy(_runtimeBoardConfig);
         if (_runtimePlacementRules != null) Destroy(_runtimePlacementRules);
+
+        if (_shapeHandleValid && _shapeLoadHandle.IsValid())
+            Addressables.Release(_shapeLoadHandle);
     }
 
     // ── 공개 API ──────────────────────────────────────────────────────
 
     /// <summary>
     /// 런타임 데이터로 그리드를 초기화한다. 기존 활성 그리드가 있으면 교체된다.
-    /// 초기화 후 ActiveAsset에 뮤테이터를 호출해 셰이프/패턴을 추가로 변경할 수 있다.
     /// </summary>
     public void SetRuntimeData(LeeGridAssetData data)
     {
@@ -240,10 +273,8 @@ public class LeeBoardManager : MonoBehaviour
             if (sessions.TryGetValue(oldSO, out var oldSession))
             {
                 if (activeAsset == oldSO) activeAsset = null;
-                SetSessionActive(oldSession, false);
+                SetGridActive(oldSession, false);
                 if (oldSession.gridInstance != null) Destroy(oldSession.gridInstance.gameObject);
-                foreach (var s in oldSession.shapeInstances)
-                    if (s != null) Destroy(s.gameObject);
                 sessions.Remove(oldSO);
                 LeeSORuntimeFactory.DestroyRuntimeSOs(
                     oldSO,
@@ -299,7 +330,6 @@ public class LeeBoardManager : MonoBehaviour
         bool wasActive = activeAsset == asset;
         UnsubscribeSOChanges(asset);
 
-        // 런타임 SO 레퍼런스 보존 — asset.pattern/visual/spawnableShapes가 아직 참조 중이므로 파괴하지 않는다.
         LeeGridPatternSO  savedPat = null;
         LeeGridVisualSO   savedVis = null;
         LeeShapeAssetSO[] savedShp = null;
@@ -307,10 +337,18 @@ public class LeeBoardManager : MonoBehaviour
 
         if (sessions.TryGetValue(asset, out var old))
         {
-            SetSessionActive(old, false);
+            SetGridActive(old, false);
             if (old.gridInstance != null) Destroy(old.gridInstance.gameObject);
-            foreach (var s in old.shapeInstances)
-                if (s != null) Destroy(s.gameObject);
+
+            // 이 그리드에 배치된 Shape의 전역 배치 정보 초기화 (squares가 무효화됨)
+            foreach (var s in _sharedShapes)
+            {
+                if (_globalPlacements.TryGetValue(s, out var gp) && gp.grid == asset)
+                {
+                    _globalPlacements.Remove(s);
+                    s.SetOccupiedSquares(new List<leeGridSquare>());
+                }
+            }
 
             savedPat   = old.runtimePatternSO;
             savedVis   = old.runtimeVisualSO;
@@ -322,7 +360,6 @@ public class LeeBoardManager : MonoBehaviour
         if (wasActive) activeAsset = null;
         EnterGrid(asset);
 
-        // 새 세션에 런타임 SO 추적 정보 이어받기 (OnDestroy 정리용)
         if (wasRuntime && sessions.TryGetValue(asset, out var newSession))
         {
             newSession.runtimePatternSO = savedPat;
@@ -354,12 +391,96 @@ public class LeeBoardManager : MonoBehaviour
             if (entry.grid == asset) { entry.onFilled?.Invoke(); break; }
     }
 
+    /// <summary>
+    /// Shape가 그리드에 성공적으로 배치된 직후 호출.
+    /// 전역 배치 상태를 기록하고 슬롯을 해제한다.
+    /// </summary>
+    public void OnShapePlaced(leeShape shape)
+    {
+        if (activeAsset == null) return;
+
+        _globalPlacements[shape] = new GlobalPlacement
+        {
+            grid             = activeAsset,
+            squares          = new List<leeGridSquare>(shape.GetOccupiedSquares()),
+            anchoredPosition = ((RectTransform)shape.transform).anchoredPosition,
+        };
+
+        if (_sharedShapeSlotY.ContainsKey(shape))
+        {
+            _sharedShapeSlotY.Remove(shape);
+            ReflowSlots();
+        }
+    }
+
+    /// <summary>
+    /// Shape 드래그 시작 시 호출. 전역 배치 상태에서 제거해 다시 슬롯으로 돌아올 수 있게 한다.
+    /// </summary>
+    public void OnShapePickedUp(leeShape shape)
+    {
+        _globalPlacements.Remove(shape);
+    }
+
     /// <summary>드래그 실패 시 leeShape.OnEndDrag에서 호출. 셰이프를 슬롯으로 되돌린다.</summary>
     public void ReSlotAndReturn(leeShape shape)
     {
         if (activeAsset == null) return;
-        if (!sessions.TryGetValue(activeAsset, out var session)) return;
-        PlaceUnplacedShapeToSlot(session, shape);
+        if (!_sharedShapes.Contains(shape)) return;
+        PlaceSharedShapeToSlot(shape);
+    }
+
+    // ── Shape 스폰 (S키) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// 어드레서블 Shape 그룹에서 랜덤으로 하나를 로드해 공용 풀에 추가한다.
+    /// S키 입력 시 호출된다.
+    /// </summary>
+    private IEnumerator SpawnRandomShapeCoroutine()
+    {
+        if (_shapeLoadInProgress) yield break;
+
+        if (_cachedShapeSOs == null)
+        {
+            _shapeLoadInProgress = true;
+            _shapeLoadHandle = Addressables.LoadAssetsAsync<LeeShapeAssetSO>(shapeGroupKey, null);
+            _shapeHandleValid = true;
+            yield return _shapeLoadHandle;
+            _shapeLoadInProgress = false;
+
+            if (_shapeLoadHandle.Status == AsyncOperationStatus.Succeeded)
+                _cachedShapeSOs = new List<LeeShapeAssetSO>(_shapeLoadHandle.Result);
+            else
+            {
+                Debug.LogWarning($"[LeeBoardManager] Shape SO 로드 실패: 키={shapeGroupKey}");
+                yield break;
+            }
+        }
+
+        if (_cachedShapeSOs == null || _cachedShapeSOs.Count == 0) yield break;
+
+        var asset = _cachedShapeSOs[UnityEngine.Random.Range(0, _cachedShapeSOs.Count)];
+        SpawnSharedShape(asset);
+    }
+
+    /// <summary>Shape SO 하나로 공용 shape 인스턴스를 생성하고 풀에 추가한다.</summary>
+    private void SpawnSharedShape(LeeShapeAssetSO asset)
+    {
+        if (shapePrefab == null || asset == null) return;
+
+        var shape = Instantiate(shapePrefab, cacheRoot);
+        shape.ApplyAsset(asset);
+        if (shape.transform is RectTransform rt)
+        {
+            rt.localScale    = Vector3.one * GetGameplayScale();
+            rt.localRotation = Quaternion.identity;
+        }
+        shape.CacheStartTransform();
+        _sharedShapes.Add(shape);
+
+        if (activeAsset != null)
+            PlaceSharedShapeToSlot(shape);
+        else
+            shape.gameObject.SetActive(false);
     }
 
     // ── 내부 구현 ─────────────────────────────────────────────────────
@@ -387,25 +508,7 @@ public class LeeBoardManager : MonoBehaviour
         }
         session.gridInstance.Initialize(asset);
 
-        if (shapePrefab != null && asset.spawnableShapes != null)
-        {
-            foreach (var sAsset in asset.spawnableShapes)
-            {
-                if (sAsset == null) continue;
-                var shape = Instantiate(shapePrefab, cacheRoot);
-                shape.ApplyAsset(sAsset);
-                shape.CacheStartTransform();
-                var rt = shape.transform as RectTransform;
-                if (rt != null)
-                {
-                    rt.localScale    = Vector3.one * GetGameplayScale();
-                    rt.localRotation = Quaternion.identity;
-                }
-                session.shapeInstances.Add(shape);
-            }
-        }
-
-        SetSessionActive(session, false);
+        SetGridActive(session, false);
         return session;
     }
 
@@ -422,24 +525,46 @@ public class LeeBoardManager : MonoBehaviour
             gridRT.anchoredPosition = Vector2.zero;
             gridRT.localScale       = Vector3.one * GetGameplayScale();
         }
+        SetGridActive(session, true);
 
-        foreach (var s in session.shapeInstances)
+        // 콘텐츠 크기·스크롤 위치 초기화 → PlaceSharedShapeToSlot이 다시 계산
+        if (shapeHost != null)
+        {
+            shapeHost.sizeDelta        = new Vector2(shapeHost.sizeDelta.x, 0f);
+            shapeHost.anchoredPosition = Vector2.zero;
+        }
+
+        // 슬롯 초기화 후 전역 배치 상태 기준으로 Shape 처리
+        _sharedShapeSlotY.Clear();
+        _slotCursorY = -spawnOrigin.y;
+        foreach (var s in _sharedShapes)
         {
             if (s == null) continue;
-            bool placed = s.GetOccupiedSquares()?.Count > 0;
-            if (placed)
+
+            if (_globalPlacements.TryGetValue(s, out var gp))
             {
-                s.transform.SetParent(gridHost, true);
-                s.transform.localScale = Vector3.one * GetGameplayScale();
+                if (gp.grid == asset)
+                {
+                    // 이 그리드에 배치된 Shape: 위치 복원
+                    s.transform.SetParent(gridHost, false);
+                    var rt = (RectTransform)s.transform;
+                    rt.anchoredPosition = gp.anchoredPosition;
+                    rt.localRotation    = Quaternion.identity;
+                    rt.localScale       = Vector3.one * GetGameplayScale();
+                    foreach (var sq in gp.squares)
+                        sq?.SetOccupied(true);
+                    s.SetOccupiedSquares(gp.squares);
+                    s.gameObject.SetActive(true);
+                }
+                // 다른 그리드에 배치된 Shape: 슬롯에 추가하지 않고 숨김 유지
             }
             else
             {
-                PlaceUnplacedShapeToSlot(session, s);
+                // 배치되지 않은 Shape: 슬롯에 표시
+                s.gameObject.SetActive(true);
+                PlaceSharedShapeToSlot(s);
             }
-            s.gameObject.SetActive(true);
         }
-
-        SetSessionActive(session, true);
 
         if (leeGridManager.Instance != null)
             leeGridManager.Instance.SetActiveGrid(session.gridInstance);
@@ -451,7 +576,27 @@ public class LeeBoardManager : MonoBehaviour
     {
         if (!sessions.TryGetValue(asset, out var session)) return;
         UnsubscribeSOChanges(asset);
-        SetSessionActive(session, false);
+
+        // 이 그리드에 배치된 Shape의 최신 위치를 전역 배치 정보에 저장
+        foreach (var s in _sharedShapes)
+        {
+            if (s == null) continue;
+            if (_globalPlacements.TryGetValue(s, out var gp) && gp.grid == asset)
+                gp.anchoredPosition = ((RectTransform)s.transform).anchoredPosition;
+        }
+
+        // 모든 Shape를 cacheRoot로 이동 후 숨김 (슬롯 상태 초기화)
+        foreach (var s in _sharedShapes)
+        {
+            if (s == null) continue;
+            s.transform.SetParent(cacheRoot, false);
+            s.gameObject.SetActive(false);
+        }
+
+        _sharedShapeSlotY.Clear();
+        _slotCursorY = 0f;
+
+        SetGridActive(session, false);
     }
 
     private void SubscribeSOChanges(LeeGridAssetSO asset)
@@ -459,9 +604,8 @@ public class LeeBoardManager : MonoBehaviour
         if (asset == null || _dataChangeHandlers.ContainsKey(asset)) return;
         Action<LeeGridChangeType> handler = changeType =>
         {
-            if (changeType == LeeGridChangeType.Shapes)
-                SyncShapes(asset);
-            else
+            // Layout 변경(패턴/비주얼)만 처리 — Shape는 공용 풀로 관리하므로 SO 변경 불필요
+            if (changeType == LeeGridChangeType.Layout)
                 RefreshGrid(asset);
         };
         _dataChangeHandlers[asset] = handler;
@@ -476,119 +620,111 @@ public class LeeBoardManager : MonoBehaviour
         _dataChangeHandlers.Remove(asset);
     }
 
-    /// <summary>
-    /// Shape 추가/삭제 시 기존 배치 상태를 유지하면서 증분 동기화한다.
-    /// LeeGridAssetSO.AddShape / RemoveShape / SetShapes 호출 시 자동 발동.
-    /// </summary>
-    private void SyncShapes(LeeGridAssetSO asset)
-    {
-        if (!sessions.TryGetValue(asset, out var session)) return;
-
-        var targetAssets = asset.spawnableShapes ?? System.Array.Empty<LeeShapeAssetSO>();
-
-        // 기존 인스턴스를 SO별 Queue로 그룹화
-        var pool = new Dictionary<LeeShapeAssetSO, Queue<leeShape>>();
-        foreach (var s in session.shapeInstances)
-        {
-            if (s == null || s.shapeAsset == null) continue;
-            if (!pool.TryGetValue(s.shapeAsset, out var q))
-                pool[s.shapeAsset] = q = new Queue<leeShape>();
-            q.Enqueue(s);
-        }
-
-        // 새 목록 구성: 재사용 or 신규 생성
-        var newInstances = new List<leeShape>();
-        foreach (var sAsset in targetAssets)
-        {
-            if (sAsset == null) continue;
-            if (pool.TryGetValue(sAsset, out var q) && q.Count > 0)
-            {
-                newInstances.Add(q.Dequeue()); // 배치 상태 그대로 재사용
-            }
-            else
-            {
-                var shape = Instantiate(shapePrefab, cacheRoot);
-                shape.ApplyAsset(sAsset);
-                shape.CacheStartTransform();
-                if (shape.transform is RectTransform rt)
-                {
-                    rt.localScale    = Vector3.one * GetGameplayScale();
-                    rt.localRotation = Quaternion.identity;
-                }
-                newInstances.Add(shape);
-            }
-        }
-
-        // 제거된 Shape 정리
-        foreach (var q in pool.Values)
-        {
-            while (q.Count > 0)
-            {
-                var s = q.Dequeue();
-                if (s == null) continue;
-                if (s.GetOccupiedSquares()?.Count > 0 && leeGridManager.Instance != null)
-                    leeGridManager.Instance.ReleaseShape(s);
-                if (session.shapeToSlot.TryGetValue(s, out var slot))
-                {
-                    session.occupiedSlots.Remove(slot);
-                    session.shapeToSlot.Remove(s);
-                }
-                Destroy(s.gameObject);
-            }
-        }
-
-        session.shapeInstances = newInstances;
-
-        // 활성 상태면 새 Shape를 슬롯에 배치
-        if (activeAsset == asset)
-        {
-            foreach (var s in session.shapeInstances)
-            {
-                if (s == null) continue;
-                bool placed = s.GetOccupiedSquares()?.Count > 0;
-                if (!placed && !session.shapeToSlot.ContainsKey(s))
-                    PlaceUnplacedShapeToSlot(session, s);
-                s.gameObject.SetActive(true);
-            }
-        }
-    }
-
-    private static void SetSessionActive(GridSession session, bool active)
+    private static void SetGridActive(GridSession session, bool active)
     {
         if (session.gridInstance != null)
             session.gridInstance.gameObject.SetActive(active);
-        foreach (var s in session.shapeInstances)
-            if (s != null) s.gameObject.SetActive(active);
     }
 
-    private Vector2 GetSlotPos(int slotIndex) =>
-        new Vector2(spawnOrigin.x, spawnOrigin.y - spawnSlotStepY * slotIndex);
-
-    private int FindFirstFreeSlot(GridSession session)
+    private void PlaceSharedShapeToSlot(leeShape shape)
     {
-        for (int i = 0; i < maxSpawnSlots; i++)
-            if (!session.occupiedSlots.Contains(i)) return i;
-        return maxSpawnSlots - 1;
-    }
+        float scale = GetGameplayScale();
 
-    private void AssignSlotIfNeeded(GridSession session, leeShape shape)
-    {
-        if (session.shapeToSlot.ContainsKey(shape)) return;
-        int slot = FindFirstFreeSlot(session);
-        session.shapeToSlot[shape] = slot;
-        session.occupiedSlots.Add(slot);
-    }
+        if (!_sharedShapeSlotY.ContainsKey(shape))
+        {
+            float height    = GetShapeSlotHeight(shape) * scale;
+            float maxLocalY = GetShapeMaxLocalY(shape)  * scale;
+            // spawnSlotStepY = 원하는 슬롯 총 높이. shape보다 작으면 최소 20px 여백 확보.
+            float padding   = Mathf.Max(20f, spawnSlotStepY - height);
 
-    private void PlaceUnplacedShapeToSlot(GridSession session, leeShape shape)
-    {
-        AssignSlotIfNeeded(session, shape);
-        int slot = session.shapeToSlot[shape];
+            _sharedShapeSlotY[shape] = _slotCursorY - maxLocalY;
+            _slotCursorY -= height + padding;
+        }
+
         var rt = (RectTransform)shape.transform;
         shape.transform.SetParent(shapeHost, false);
-        rt.anchoredPosition = GetSlotPos(slot);
+        // 앵커를 상단 고정(0.5, 1)으로 설정 → shapeHost sizeDelta 변경 시 기존 Shape 위치 밀림 방지
+        rt.anchorMin        = new Vector2(0.5f, 1f);
+        rt.anchorMax        = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(spawnOrigin.x, _sharedShapeSlotY[shape]);
         rt.localRotation    = Quaternion.identity;
-        rt.localScale       = Vector3.one * GetGameplayScale();
+        rt.localScale       = Vector3.one * scale;
         shape.SetHome(shapeHost, rt.anchoredPosition);
+
+        RefreshShapeHostSize();
     }
-    
+
+    /// <summary>Shape의 실제 Y 범위 높이 (cellOffsets 최대 – 최소 + 1) × cellSize.</summary>
+    private float GetShapeSlotHeight(leeShape shape)
+    {
+        if (shape.cellOffsets == null || shape.cellOffsets.Count == 0)
+            return shape.cellSize;
+        int minOff = int.MaxValue, maxOff = int.MinValue;
+        foreach (var o in shape.cellOffsets)
+        {
+            if (o.y < minOff) minOff = o.y;
+            if (o.y > maxOff) maxOff = o.y;
+        }
+        return (maxOff - minOff + 1) * shape.cellSize;
+    }
+
+    /// <summary>Shape 피벗에서 최상단 블록 상단까지의 로컬 Y 거리.</summary>
+    private float GetShapeMaxLocalY(leeShape shape)
+    {
+        if (shape.cellOffsets == null || shape.cellOffsets.Count == 0)
+            return shape.cellSize * 0.5f;
+        int maxOff = int.MinValue;
+        foreach (var o in shape.cellOffsets) if (o.y > maxOff) maxOff = o.y;
+        return maxOff * shape.cellSize + shape.cellSize * 0.5f;
+    }
+
+    /// <summary>
+    /// 슬롯에 남아있는 Shape들을 위에서부터 빈틈 없이 재정렬한다.
+    /// Shape 배치로 중간/상단 슬롯이 비었을 때 호출된다.
+    /// </summary>
+    private void ReflowSlots()
+    {
+        if (_sharedShapeSlotY.Count == 0)
+        {
+            _slotCursorY = -spawnOrigin.y;
+            RefreshShapeHostSize();
+            return;
+        }
+
+        // 현재 Y 내림차순 정렬 → 화면 위쪽(덜 음수) Shape 먼저
+        var ordered = new List<leeShape>(_sharedShapeSlotY.Keys);
+        ordered.Sort((a, b) => _sharedShapeSlotY[b].CompareTo(_sharedShapeSlotY[a]));
+
+        float scale = GetGameplayScale();
+        _slotCursorY = -spawnOrigin.y;
+        _sharedShapeSlotY.Clear();
+
+        foreach (var s in ordered)
+        {
+            float height    = GetShapeSlotHeight(s) * scale;
+            float maxLocalY = GetShapeMaxLocalY(s)  * scale;
+            float padding   = Mathf.Max(20f, spawnSlotStepY - height);
+
+            float slotY = _slotCursorY - maxLocalY;
+            _sharedShapeSlotY[s] = slotY;
+            _slotCursorY -= height + padding;
+
+            var rt = (RectTransform)s.transform;
+            rt.anchoredPosition = new Vector2(spawnOrigin.x, slotY);
+            s.SetHome(shapeHost, rt.anchoredPosition);
+        }
+
+        RefreshShapeHostSize();
+    }
+
+    /// <summary>
+    /// shapeHost sizeDelta.y를 현재 슬롯 커서 기준으로 정확히 설정한다.
+    /// ScrollRect Content 높이를 슬롯 증감에 따라 동적으로 유지한다.
+    /// </summary>
+    private void RefreshShapeHostSize()
+    {
+        if (shapeHost == null) return;
+        float needed = _sharedShapeSlotY.Count > 0 ? -_slotCursorY : 0f;
+        shapeHost.sizeDelta = new Vector2(shapeHost.sizeDelta.x, needed);
+    }
 }
