@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class UI_Lobby : UI_Scene
 {
+    [SerializeField] private UI_PrepPanel prepPanel;
+
     enum Buttons
     {
         Btn_StartRun,
@@ -21,11 +23,17 @@ public class UI_Lobby : UI_Scene
         GetButton((int)Buttons.Btn_Continue).onClick.AddListener(OnClickContinue);
         GetButton((int)Buttons.Btn_Settings).onClick.AddListener(OnClickSettings);
         GetButton((int)Buttons.Btn_Exit).onClick.AddListener(OnClickExit);
+
+        if (prepPanel != null)
+        {
+            prepPanel.Init();
+            prepPanel.Close();
+        }
     }
 
     void OnClickStartRun()
     {
-        AppBootstrapper.Instance.RequestStartRun();
+        prepPanel?.Open();
     }
 
     void OnClickContinue()
