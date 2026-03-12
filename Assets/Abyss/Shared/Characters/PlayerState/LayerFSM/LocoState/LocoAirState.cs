@@ -22,7 +22,7 @@ public class LocoAirState : ILayerState<LocoState>
         _controller.SetMoveScale(0f);
         _controller.Anim.CrossFade("JumpBlend", 0.1f);
 
-        _controller.isJumping = true;
+        _controller.SetJumping(true);
         _blendValue = _controller.EnterAirAsJump ? 0f : 1f;
         Debug.Log($"LocoAirState Enter: EnterAirAsJump={_controller.EnterAirAsJump}, isJumping={_controller.isJumping}");
 
@@ -47,7 +47,7 @@ public class LocoAirState : ILayerState<LocoState>
         _entered = false; // Exit 시 다시 Enter 가능
         _controller.SetMoveScale(1f);
         _controller.ConsumeEnterAirAsJump();
-        _controller.isJumping = false;
+        _controller.SetJumping(false);
         _controller.Anim.SetFloat("JumpValue", 0f);
         _controller.Anim.SetFloat("AirLightAttackValue", 0f);
     }
