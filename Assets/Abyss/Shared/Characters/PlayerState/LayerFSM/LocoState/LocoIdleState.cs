@@ -26,7 +26,7 @@ public class LocoIdleState : ILayerState<LocoState>
         _controller.MoveAbility?.Move(_controller, dir);
 
         // 블렌드 파라미터(0~1)
-        float target = (_controller.isAttacking || !_controller.IsGrounded()) ? 0f : dir.magnitude;
+        float target = (_controller.Combo.IsAttacking || !_controller.IsGrounded()) ? 0f : dir.magnitude;
         SetSpeedParam(_controller.Anim, target, 0.12f);
 
 
