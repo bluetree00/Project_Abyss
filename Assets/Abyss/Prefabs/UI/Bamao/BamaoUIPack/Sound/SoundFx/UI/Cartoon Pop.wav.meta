@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: c8309f722ef22cd45be91ec8d559e133
+guid: 3157bab3f7ec79f41a8c993659a7eff1
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/Cartoon Pop.wav
+  uploadId: 740277

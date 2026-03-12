@@ -15,7 +15,7 @@ MonoBehaviour:
   characterName: Knight
   baseMoveSpeed: 7
   baseRunSpeed: 8
-  maxHealth: 0
+  maxHealth: 100
   attackPower: 10
   attackComboStep: 1
   comboTimer: -0.068115115
