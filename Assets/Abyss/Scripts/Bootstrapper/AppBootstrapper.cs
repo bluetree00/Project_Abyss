@@ -35,6 +35,9 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private string uiRootPrefabKey = "@UIRoot";
     private bool _uiRootEnsured;
 
+    [Header("Steam Login")]
+    [SerializeField] private bool useSteamLogin = false;
+
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
@@ -198,7 +201,23 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
 
-        // 6) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
+        // 6) (선택) Steam 로그인 — 성공 시 Login씬 스킵, Lobby로 직행
+        if (useSteamLogin)
+        {
+            var steamGo = new GameObject("@SteamManager");
+            steamGo.AddComponent<SteamManager>();
+
+            bool steamOk = await SteamLoginService.LoginAsync();
+            if (!steamOk)
+            {
+                Debug.LogError("[AppBootstrapper] Steam 로그인 실패. 게임을 시작할 수 없습니다.");
+                return;
+            }
+
+            startScene = Define.Scene.Lobby;
+        }
+
+        // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
         {
             _flow = new GameFlow();

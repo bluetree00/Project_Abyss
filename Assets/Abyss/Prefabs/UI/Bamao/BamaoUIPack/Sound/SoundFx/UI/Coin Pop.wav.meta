@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: fd08d4d351fde7841a701574ee54fbfe
+guid: b54d9f975873656479fcedbba7042834
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/Coin Pop.wav
+  uploadId: 740277

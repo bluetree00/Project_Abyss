@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: a1d1ddc2222a4db4598ae02b337f8353
+guid: d14dffc9365f64447a6e24bac1cf58e6
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/Object/forest-birds-singing.wav
+  uploadId: 740277

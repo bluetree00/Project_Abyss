@@ -101,7 +101,7 @@ namespace Game.CharacterStates.PlayerControllerStates
     /// <summary>
     /// 캐릭터가 달릴 때의 상태.
     /// </summary>
-    public class RuningState<T> : State<T> where T : PlayerController
+    public class RunningState<T> : State<T> where T : PlayerController
     {
         public override void Enter(T owner)
         {
@@ -110,7 +110,7 @@ namespace Game.CharacterStates.PlayerControllerStates
 
         public override void Execute(T owner)
         {
-            owner.Anim?.CrossFade("Runing", 0.1f);
+            owner.Anim?.CrossFade("Running", 0.1f);
         }
 
         public override void Exit(T owner) { }
