@@ -12,6 +12,14 @@ using UnityEngine.UI;
 /// </summary>
 public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    private static int _idCounter = 0;
+
+    [Header("Identity")]
+    [Tooltip("Shape SO에서 복사된 표시 이름. 여러 Shape가 같은 이름을 가질 수 있다.")]
+    public string shapeName;
+    [Tooltip("인스턴스 생성 시 자동 부여되는 고유 ID. ex) Shape_01")]
+    public string shapeId;
+
     [Header("Assets")]
     public LeeShapeAssetSO shapeAsset;
     public LeeShapeDragSO dragAsset;
@@ -34,6 +42,8 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
     void Awake()
     {
+        shapeId = $"Shape_{++_idCounter:D2}";
+
         rt = (RectTransform)transform;
         canvas = GetComponentInParent<Canvas>();
         _layout = GetComponent<LayoutElement>();
@@ -51,9 +61,10 @@ public class leeShape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
         shapeAsset = asset;
         if (shapeAsset == null) return;
 
+        shapeName        = shapeAsset.shapeName;
         shapeBlockPrefab = shapeAsset.shapeBlockPrefab;
-        cellOffsets = new List<Vector2Int>(shapeAsset.cellOffsets ?? new Vector2Int[0]);
-        cellSize = shapeAsset.cellSize;
+        cellOffsets      = new List<Vector2Int>(shapeAsset.cellOffsets ?? new Vector2Int[0]);
+        cellSize         = shapeAsset.cellSize;
 
         BuildShapeBlocks();
     }

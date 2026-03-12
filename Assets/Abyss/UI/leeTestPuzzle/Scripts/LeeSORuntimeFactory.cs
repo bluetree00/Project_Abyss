@@ -61,6 +61,7 @@ public static class LeeSORuntimeFactory
                 if (sd == null) continue;
                 var s = ScriptableObject.CreateInstance<LeeShapeAssetSO>();
                 s.name             = $"Runtime_Shape_{data.id}_{i}";
+                s.shapeName        = sd.shapeName;
                 s.shapeBlockPrefab = shapeBlockPrefab;
                 s.cellOffsets      = sd.cellOffsets != null
                     ? (Vector2Int[])sd.cellOffsets.Clone()

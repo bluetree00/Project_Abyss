@@ -30,6 +30,8 @@ public class LeeGridVisualData
 [Serializable]
 public class LeeShapeData
 {
+    /// <summary>Shape의 표시 이름. 여러 Shape가 같은 이름을 가질 수 있다.</summary>
+    public string       shapeName;
     /// <summary>각 블록의 그리드 셀 기준 상대 오프셋. (0,0)이 피벗.</summary>
     public Vector2Int[] cellOffsets;
     public float        cellSize = 90f;
