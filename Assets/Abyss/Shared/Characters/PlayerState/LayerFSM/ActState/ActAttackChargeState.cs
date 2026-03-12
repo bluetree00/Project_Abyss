@@ -22,7 +22,7 @@ public class ActAttackChargeState : ILayerState<ActState>
 
         // 이동/애니 제한
         _controller.SetMoveScale(0f);
-        _controller.isAttacking = true;
+        _controller.Combo.SetAttacking(true);
 
         // 애니 재생(예: 모으기 시작)
         _controller.Anim.CrossFade("HeavyCharge", 0.08f);
