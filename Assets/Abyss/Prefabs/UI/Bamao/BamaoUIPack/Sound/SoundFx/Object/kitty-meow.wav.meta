@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 046cc95f5f3b07a4da866841307ddb7d
+guid: f08f255a633bda24cbab8becf0d1f36e
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/Object/kitty-meow.wav
+  uploadId: 740277

@@ -17,6 +17,13 @@
       "dependencies": {},
       "hash": "f213ff497e4ff462a77319cf677cf20cc0860ca9"
     },
+    "com.rlabrecque.steamworks.net": {
+      "version": "https://github.com/rlabrecque/Steamworks.NET.git?path=com.rlabrecque.steamworks.net",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "a503766637901ac354c9d17aa0f5f822406043f1"
+    },
     "com.unity.addressables": {
       "version": "2.9.0",
       "depth": 0,

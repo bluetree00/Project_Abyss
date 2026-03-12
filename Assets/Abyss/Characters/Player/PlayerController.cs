@@ -154,8 +154,6 @@ public class PlayerController : CharacterBase
 
     public bool isJumping;
 
-    private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
-
     //============================================================
     // Unity Lifecycle / Initialization
     //============================================================

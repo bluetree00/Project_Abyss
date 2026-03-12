@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 8ef81647a0303314bbae04dba220a228
+guid: 8afe9efc15b3b124882fff6be30b21e9
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/UIHover.wav
+  uploadId: 740277
