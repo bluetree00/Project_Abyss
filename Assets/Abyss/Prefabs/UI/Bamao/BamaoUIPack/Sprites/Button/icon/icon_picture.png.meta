@@ -151,3 +151,10 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Button/icon/icon_picture.png
+  uploadId: 740277
