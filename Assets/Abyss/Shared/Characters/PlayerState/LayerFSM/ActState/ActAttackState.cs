@@ -50,6 +50,7 @@ public class ActAttackState : ILayerState<ActState>
 
         SubscribeReceiver();
         PlayCurrentComboAnimation();
+        _controller.BeginWeaponTrail();
     }
 
     public void Update()
@@ -67,6 +68,7 @@ public class ActAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
+        _controller.EndWeaponTrail();
 
         _attackEndHandled = false;
         _controller.isAttacking = false;

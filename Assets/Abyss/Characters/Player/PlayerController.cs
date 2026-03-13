@@ -657,6 +657,10 @@ public class PlayerController : CharacterBase
             _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, currentComboStep, step);
     }
 
+    /// <summary>공격 state에서 직접 호출 (AnimationEvent 불필요)</summary>
+    public void BeginWeaponTrail() => Safe_BeginTrail();
+    public void EndWeaponTrail()   => Safe_EndTrail();
+
     private void Safe_BeginTrail()
     {
         if (WeaponManager == null) return;

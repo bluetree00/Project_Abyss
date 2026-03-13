@@ -15,8 +15,8 @@ MonoBehaviour:
   steps:
   - stepIndex: 0
     order: 0
-    baseDamage: 0
-    knockbackMultiplier: 0
+    baseDamage: 20
+    knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
       payloadKey: Basic_Arrow_01

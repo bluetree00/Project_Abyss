@@ -28,7 +28,15 @@
       "Bash(rm \"c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Editor/FixFontAtlasReadable.cs\")",
       "Bash(rm \"c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Editor/FixFontAtlasReadable.cs.meta\")",
       "mcp__mcp-for-unity__manage_script",
-      "Bash(xargs grep -l \"8998ea46efda4344f9720e3f49eecf12\\\\|dfd4acf0718f1a447bd8e08d6ae9992f\")"
+      "Bash(xargs grep -l \"8998ea46efda4344f9720e3f49eecf12\\\\|dfd4acf0718f1a447bd8e08d6ae9992f\")",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")",
+      "Bash(xargs grep -l \"fd4936992be19e347ab8b1a3effc44d7\")",
+      "Bash(xargs grep -l \"class.*Chase\\\\|IMonsterAbility\")",
+      "Bash(xargs grep -l \"IMonsterAbility\\\\|MonsterAbilityType\")",
+      "Bash(xargs grep -l \"class.*Ability\\\\|IMonsterAbility\")",
+      "Bash(grep -i \"m_Bits\\\\|hitLayers\" Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/*.asset)",
+      "Bash(head -20 grep -n \"functionName\\\\|time:\" \"c:/Users/User/Project_Abyss/Project_Abyss/Assets/Abyss/Animations/Player/Test_01/Attack/NormalAttack_3.FBX.meta\")",
+      "Bash(xargs grep -l \"events:\")"
     ]
   },
   "hooks": {
