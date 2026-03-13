@@ -89,6 +89,12 @@ public class PlayerController : CharacterBase
     // 장비 이펙트 생성을 관리하는 핸들러
     public WeaponEffectHandler EffectHandler;
 
+    // 현재 활성화된 실행 컨텍스트 (공격/스킬 상태가 Enter 시 할당, Exit 시 해제)
+    public AbilityExecution ActiveExecution { get; set; }
+
+    // 회피 쿨다운 종료 시각 (Time.time 기준). 0이면 즉시 사용 가능
+    public float DodgeCooldownEnd { get; set; } = 0f;
+
     private bool _aeSubscribed = false;
 
 
@@ -163,7 +169,7 @@ public class PlayerController : CharacterBase
         await base.InitAsync();
 
         Clock = new UnscaledClock();
-        InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 0.04f);
+        InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.4f, dedupeSec: 0.04f);
         Combo = new ComboController();
 
         InitCoreComponents();
@@ -537,6 +543,25 @@ public class PlayerController : CharacterBase
         Rigid.linearVelocity = new Vector3(0f, Rigid.linearVelocity.y, 0f);
     }
 
+    /// <summary>
+    /// actSM이 None이 아니면 강제로 None으로 전환 (착지·회피 캔슬 시 사용)
+    /// </summary>
+    public void CancelActState()
+    {
+        if (actSM != null && actSM.CurrentId != ActState.None)
+            actSM.Change(ActState.None);
+        Combo?.ResetStep();
+    }
+
+    /// <summary>
+    /// 현재 이동 입력 방향으로 즉시 회전. 입력이 없으면 유지.
+    /// </summary>
+    public void RotateTowardsInput()
+    {
+        if (moveDirection.sqrMagnitude < 0.0001f) return;
+        transform.rotation = Quaternion.LookRotation(moveDirection);
+    }
+
     public void RotateTowardsMousePosition()
     {
         // 1) 입력으로 저장된 클릭 위치 우선 사용
@@ -628,7 +653,7 @@ public class PlayerController : CharacterBase
     private void safe_EffectStep(int step)
     {
         if (EffectHandler != null && WeaponManager.HasWeapon)
-            _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step);
+            _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step, ActiveExecution);
     }
 
     /// <summary>공격 state에서 직접 호출 (AnimationEvent 불필요)</summary>

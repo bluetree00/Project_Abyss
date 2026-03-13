@@ -9,6 +9,7 @@ public class ActHeavyAttackState : ILayerState<ActState>
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
     private PlayerAnimationEventReceiver _receiver;
+    private AbilityExecution _execution;
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
     {
@@ -18,6 +19,10 @@ public class ActHeavyAttackState : ILayerState<ActState>
 
     public void Enter()
     {
+        _execution = new AbilityExecution();
+        _controller.ActiveExecution = _execution;
+        _controller.RotateTowardsMousePosition();
+
         _controller.Combo.SetAttacking(true);
         _controller.SetMoveScale(0f); // 공격 중 이동 제한
 
@@ -36,6 +41,10 @@ public class ActHeavyAttackState : ILayerState<ActState>
         _controller.EndWeaponTrail();
         _controller.Combo.SetAttacking(false);
         _controller.SetMoveScale(1f);
+
+        _controller.ActiveExecution = null;
+        _execution?.Cleanup(forceEffects: false);
+        _execution = null;
     }
 
     private void SubscribeReceiver()
