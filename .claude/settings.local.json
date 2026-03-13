@@ -36,7 +36,8 @@
       "Bash(xargs grep -l \"class.*Ability\\\\|IMonsterAbility\")",
       "Bash(grep -i \"m_Bits\\\\|hitLayers\" Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/*.asset)",
       "Bash(head -20 grep -n \"functionName\\\\|time:\" \"c:/Users/User/Project_Abyss/Project_Abyss/Assets/Abyss/Animations/Player/Test_01/Attack/NormalAttack_3.FBX.meta\")",
-      "Bash(xargs grep -l \"events:\")"
+      "Bash(xargs grep -l \"events:\")",
+      "Bash(xargs grep:*)"
     ]
   },
   "hooks": {
