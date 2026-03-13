@@ -171,6 +171,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
                 {
                     slot.instance = instHandle.Result;
                     slot.isAddressablesInstance = true;
+
+                    var wi = slot.instance.GetComponent<WeaponInstance>();
+                    if (wi != null) wi.Initialize(runtimeData);
                 }
             }
             catch (Exception ex)
@@ -231,6 +234,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
                     {
                         target.instance = instHandle.Result;
                         target.isAddressablesInstance = true;
+
+                        var wi = target.instance.GetComponent<WeaponInstance>();
+                        if (wi != null) wi.Initialize(target.runtimeData);
                     }
                 }
                 catch (Exception ex)

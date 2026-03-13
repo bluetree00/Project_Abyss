@@ -15,6 +15,7 @@ public abstract class MonsterController : CharacterBase
         Chase,
         AttackReady,
         Attack,
+        GetHit,
         Die
     }
     [HideInInspector] public Define.AttackPurpose currentAttackPurpose;
