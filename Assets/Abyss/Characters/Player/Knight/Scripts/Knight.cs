@@ -28,62 +28,53 @@ public class Knight : PlayerController
     // 입력 라우팅: 버퍼 소비 → 레이어 전이
     protected override void RouteInputsToLayers()
     {
-        
+        bool isInSkill  = actSM.CurrentId == ActState.QSkill || actSM.CurrentId == ActState.ESkill;
+        bool isDodging  = locoSM.CurrentId == LocoState.Dodge;
+        bool isInAct    = actSM.CurrentId != ActState.None || isDodging;
+
+        // QSkill: 스킬 중에는 캔슬 불가, 공격 중에는 캔슬 가능
         if (InputBuffer.TryConsume(Command.QSkill))
         {
-            if (!CanAttack())
-            {
-                // 무기 없음 — 무시
-                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
-                return;
-            }
-           
-            actSM.Change(ActState.QSkill);
+            if (CanAttack() && !isInSkill)
+                actSM.Change(ActState.QSkill);
             return;
         }
 
+        // ESkill: 스킬 중에는 캔슬 불가, 공격 중에는 캔슬 가능
         if (InputBuffer.TryConsume(Command.ESkill))
         {
-            if (!CanAttack())
-            {
-                // 무기 없음 — 무
-                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
-                return;
-            }
-
-            actSM.Change(ActState.ESkill);
+            if (CanAttack() && !isInSkill)
+                actSM.Change(ActState.ESkill);
             return;
         }
 
+        // Dodge: 공격/스킬 캔슬 가능. 회피 중이거나 쿨다운 중이면 차단
         if (InputBuffer.TryConsume(Command.Dodge))
         {
-            locoSM.Change(LocoState.Dodge);
+            bool onCooldown = Time.time < DodgeCooldownEnd;
+
+            if (!isDodging && !onCooldown)
+            {
+                if (isInAct)
+                    actSM.Change(ActState.None);
+                locoSM.Change(LocoState.Dodge);
+            }
             return;
         }
 
-        // RouteInputsToLayers 또는 매 프레임 입력 라우팅 위치
-        if (InputBuffer != null && InputBuffer.TryConsume(Command.Charge))
+        // 이하 입력(Charge, Heavy, Light)은 행동 중 모두 차단
+        if (isInAct) return;
+
+        if (InputBuffer.TryConsume(Command.Charge))
         {
-            if (!CanAttack())
-            {
-                Debug.Log("[RouteInputsToLayers] Charge ignored - no weapon");
-                return;
-            }
+            if (!CanAttack()) return;
             actSM.Change(ActState.Charge);
-            return; // Charge는 모으기 우선 처리
+            return;
         }
 
-
-
-            // 공격 입력: Heavy 우선 검사
         if (InputBuffer.TryConsume(Command.Heavy))
         {
-            if (!CanAttack())
-            {
-                // 무기 없음 — 무시
-                Debug.Log("[RouteInputsToLayers] Heavy ignored - no weapon");
-                return;
-            }
+            if (!CanAttack()) return;
             SetPendingAttack(Command.Heavy);
             actSM.Change(ActState.AttackReady);
             return;
@@ -91,13 +82,8 @@ public class Knight : PlayerController
 
         if (InputBuffer.TryConsume(Command.Light))
         {
-            if (!CanAttack())
-            {
-                Debug.Log("[RouteInputsToLayers] Light ignored - no weapon");
-                return;
-            }
+            if (!CanAttack()) return;
             SetPendingAttack(Command.Light);
-            Debug.Log("[RouteInputsToLayers] Light attack input received.");
             actSM.Change(ActState.AttackReady);
             return;
         }

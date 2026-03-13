@@ -40,15 +40,6 @@ public class WeaponAbilitySO : ScriptableObject
         return _stepCache.TryGetValue(stepIndex, out var list) ? list : _emptySteps;
     }
 
-    /// <summary>
-    /// OneShot 초기화
-    /// </summary>
-    public void ResetOneShots()
-    {
-        if (steps == null) return;
-        foreach (var s in steps) s.triggeredThisActivation = false;
-    }
-
     [Serializable]
     public class AbilityStep
     {
@@ -70,22 +61,25 @@ public class WeaponAbilitySO : ScriptableObject
         [Header("Collider / Damage")]
         public ColliderStep collider;
 
-        [Tooltip("한번만 실행되는 스텝 여부")]
+        [Tooltip("실행 컨텍스트(AbilityExecution)당 한 번만 실행")]
         public bool oneShot = false;
-        
+
         [Tooltip("이 스텝 시작 시 플레이어가 마우스 방향으로 회전할지 여부")]
         public bool rotateToMouse = false;
-
-        [NonSerialized] public bool triggeredThisActivation = false;
     }
 
     [Serializable]
     public class EffectStep
     {
+        [Tooltip("Addressables 키 (EffectBehaviour가 붙은 프리팹)")]
         public string payloadKey;
+
+        [Tooltip("플레이어 로컬 스페이스 기준 위치 오프셋")]
         public Vector3 positionOffset = Vector3.zero;
+
+        [Tooltip("이펙트 회전 (오일러각)")]
         public Vector3 rotationEuler = Vector3.zero;
-        public Vector3 forwardOffset = Vector3.zero;
+
         public float scaleMultiplier = 1f;
         public float lifeTimeMultiplier = 1f;
 
@@ -93,14 +87,12 @@ public class WeaponAbilitySO : ScriptableObject
         public EffectBehaviorSO behavior;
     }
 
-    // 판정 실행 방식
     public enum ColliderMode
     {
-        Trail,   // 무기 Root→Tip SphereCast (기본 근접 공격, GC 없음)
+        Trail,   // 무기 Root→Tip SphereCast (기본 근접 공격)
         Spawned, // 풀에서 오브젝트 스폰 (스킬, 장판, 투사체)
     }
 
-    // Collider 모양 enum (Spawned 모드에서만 사용)
     public enum ColliderShape
     {
         Box,
@@ -114,7 +106,7 @@ public class WeaponAbilitySO : ScriptableObject
         [Header("판정 방식")]
         public ColliderMode mode = ColliderMode.Trail;
 
-        [Header("공통")]
+        [Header("공통 - 데미지")]
         public float damage = 0f;
 
         [Header("Trail 모드")]
@@ -122,21 +114,21 @@ public class WeaponAbilitySO : ScriptableObject
         public float trailRadiusOverride = 0f;
 
         [Header("Spawned 모드")]
-        public string payloadKey;
+        [Tooltip("Addressables 키 (ColliderInstance가 붙은 프리팹). 비어있으면 런타임 생성")]
+        public string colliderPrefabKey;
+
+        [Tooltip("핸드 트랜스폼 로컬 스페이스 기준 위치 오프셋")]
         public Vector3 positionOffset = Vector3.zero;
+
+        [Tooltip("콜라이더 회전 (오일러각)")]
         public Vector3 rotationEuler = Vector3.zero;
-        public Vector3 forwardOffset = Vector3.zero;
+
         public float sizeMultiplier = 1f;
-        public float durationMultiplier = 1f;
         public float hitInterval = 0.1f;
         public float duration = 2f;
         public ColliderShape shape = ColliderShape.Box;
 
         [Tooltip("특수 콜라이더 로직이 필요한 경우")]
         public ColliderBehaviorSO behavior;
-
-        [Tooltip("Prefab/Addressable Key, 있으면 이걸로 생성 (Spawned 모드)")]
-        public string colliderPrefabKey;
     }
-
 }
