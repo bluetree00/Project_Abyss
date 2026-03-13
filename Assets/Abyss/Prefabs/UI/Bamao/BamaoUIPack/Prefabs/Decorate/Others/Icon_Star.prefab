@@ -277,5 +277,5 @@ MonoBehaviour:
   AvoidExitSelectedStatus: 1
   MouseExitClip: {fileID: 0}
   MouseExitSoundVolume: 1
-  MouseClickClip: {fileID: 8300000, guid: 3157bab3f7ec79f41a8c993659a7eff1, type: 3}
+  MouseClickClip: {fileID: 0}
   MouseClickSoundVolume: 1
