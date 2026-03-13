@@ -134,7 +134,7 @@ MonoBehaviour:
   hitRadius: 0.1
   hitLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
 --- !u!1 &4420190487790187979
 GameObject:
   m_ObjectHideFlags: 0
