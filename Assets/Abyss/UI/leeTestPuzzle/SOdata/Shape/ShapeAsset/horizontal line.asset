@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f46e548fb47737748a0b082134c756f1, type: 3}
   m_Name: Horizontal line
   m_EditorClassIdentifier: 
+  shapeName: horizontal line
   shapeBlockPrefab: {fileID: 7796692141648486092, guid: 8988b128bef29db41896ab3a0f9aadb0,
     type: 3}
   cellOffsets:
