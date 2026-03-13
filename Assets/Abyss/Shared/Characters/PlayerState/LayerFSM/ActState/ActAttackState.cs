@@ -13,7 +13,7 @@ public class ActAttackState : ILayerState<ActState>
     private int _maxCombo = 1;
     private float _comboExpiryTime = 0f;
 
-    private float _comboWindowSec => Mathf.Max(0.05f, _controller?.LightComboResetTime ?? 0.18f);
+    private float _comboWindowSec => Mathf.Max(0.05f, _controller?.Combo?.ResetTime ?? 0.18f);
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
     {
@@ -26,11 +26,11 @@ public class ActAttackState : ILayerState<ActState>
          _attackEndHandled = false;
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
 
-        if (!_controller.isAttacking)
+        if (!_controller.Combo.IsAttacking)
         {
-            _controller.isAttacking = true;
-            _controller.nextComboQueued = false;
-            _controller.comboWindowOpen = false;
+            _controller.Combo.SetAttacking(true);
+            _controller.Combo.SetNextComboQueued(false);
+            _controller.Combo.CloseWindow();
             _controller.SetMoveScale(0f); // 이동 제한
         }
 
@@ -39,11 +39,10 @@ public class ActAttackState : ILayerState<ActState>
         bool isAir = !_controller.IsGrounded();
         _maxCombo = wd != null ? (isAir ? Mathf.Max(1, wd.airEndCount) : Mathf.Max(1, wd.groundEndCount)) : 1;
 
-         // <-- 여기서 콤보 창을 미리 연다 (애니 이벤트에 의존하지 않음)
-        // 이미 열려 있지 않다면 열고 만료시간 설정
-        if (!_controller.comboWindowOpen)
+        // 콤보 창을 미리 연다 (애니 이벤트에 의존하지 않음)
+        if (!_controller.Combo.ComboWindowOpen)
         {
-            _controller.OpenComboWindow();
+            _controller.Combo.OpenWindow();
             _comboExpiryTime = Time.unscaledTime + _comboWindowSec;
         }
 
@@ -55,12 +54,12 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Update()
     {
-        if (_controller.comboWindowOpen && _controller.InputBuffer.TryConsume(Command.Light))
-            _controller.nextComboQueued = true;
+        if (_controller.Combo.ComboWindowOpen && _controller.InputBuffer.TryConsume(Command.Light))
+            _controller.Combo.SetNextComboQueued(true);
 
-        if (_controller.comboWindowOpen && Time.unscaledTime >= _comboExpiryTime)
+        if (_controller.Combo.ComboWindowOpen && Time.unscaledTime >= _comboExpiryTime)
         {
-            _controller.comboWindowOpen = false;
+            _controller.Combo.CloseWindow();
             _stateChanger.Change(ActState.None);
         }
     }
@@ -71,9 +70,9 @@ public class ActAttackState : ILayerState<ActState>
         _controller.EndWeaponTrail();
 
         _attackEndHandled = false;
-        _controller.isAttacking = false;
-        _controller.nextComboQueued = false;
-        _controller.comboWindowOpen = false;
+        _controller.Combo.SetAttacking(false);
+        _controller.Combo.SetNextComboQueued(false);
+        _controller.Combo.CloseWindow();
         _controller.SetMoveScale(1f);
         _comboExpiryTime = 0f;
 
@@ -101,50 +100,44 @@ public class ActAttackState : ILayerState<ActState>
 
     private void OnOpenCombo()
     {
-        if (!_controller.isAttacking) return;
+        if (!_controller.Combo.IsAttacking) return;
 
-        // idempotent: 이미 열려 있으면 만료시간만 연장
-        if (!_controller.comboWindowOpen)
-        {
-            _controller.OpenComboWindow();
-        }
+        if (!_controller.Combo.ComboWindowOpen)
+            _controller.Combo.OpenWindow();
 
-        // 애니에서 콤보 창을 열어주는 경우 만료시간 연장 또는 재설정
         _comboExpiryTime = Time.unscaledTime + _comboWindowSec;
     }
+
     private void OnCloseCombo()
     {
-        if (!_controller.isAttacking) return;
-        _controller.CloseComboWindow();
+        if (!_controller.Combo.IsAttacking) return;
+        _controller.Combo.CloseWindow();
         _comboExpiryTime = 0f;
     }
 
-        private bool _attackEndHandled = false;
+    private bool _attackEndHandled = false;
 
     private void OnAttackEnd()
     {
+        _controller.Combo.IncrementStep();
 
-        _controller.currentComboStep++;
-
-        if (_controller.currentComboStep >= _maxCombo)
+        if (_controller.Combo.CurrentComboStep >= _maxCombo)
         {
-            _controller.currentComboStep = 0;
-            _controller.CloseComboWindow();
+            _controller.Combo.ResetStep();
+            _controller.Combo.CloseWindow();
             _stateChanger.Change(ActState.None);
         }
-
     }
-
 
     private void OnHitStep(int stepIndex)
     {
-        if (!_controller.isAttacking || stepIndex < 0) return;
+        if (!_controller.Combo.IsAttacking || stepIndex < 0) return;
         _controller.OnAttackHitStep(stepIndex);
     }
 
     private void OnGenericTag(string tag)
     {
-        if (!_controller.isAttacking) return;
+        if (!_controller.Combo.IsAttacking) return;
         _controller.OnAnimationEventTag(tag);
     }
 
@@ -154,7 +147,7 @@ public class ActAttackState : ILayerState<ActState>
         if (_controller == null || _controller.Anim == null)
             return;
 
-        int step = _controller.currentComboStep; // 0-based
+        int step = _controller.Combo.CurrentComboStep; // 0-based
         var action = _controller.CurrentAttackTypeForEffect;
         bool isAir = !_controller.IsGrounded();
 

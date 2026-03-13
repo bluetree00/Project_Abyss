@@ -72,7 +72,7 @@ public class PlayerController : CharacterBase
     //============================================================
 
     // 플레이어가 가지는 무기 매니저 (인스펙터에서 붙이거나 런타임에 AddComponent)
-    public PlayerWeaponManager WeaponManager;
+    public PlayerWeaponManager WeaponManager { get; private set; }
 
     protected PlayerInputActions inputActions;
     public bool inputReady = false;
@@ -81,7 +81,7 @@ public class PlayerController : CharacterBase
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
 
     // 애니메이터 오버라이드 서비스
-    public AnimatorOverrideService _animSvc;
+    private AnimatorOverrideService _animSvc;
 
     // 애니메이션 이벤트 리시버
     public PlayerAnimationEventReceiver EventReceiver;
@@ -101,8 +101,6 @@ public class PlayerController : CharacterBase
 
     protected Vector3 moveDirection;
     public Vector3 MoveDirection => moveDirection;
-
-    private bool isInventoryOpen = false;
 
     private bool isRunChecked = false;
     public bool IsRunChecked => isRunChecked;
@@ -144,17 +142,18 @@ public class PlayerController : CharacterBase
     public Transform handTransform;
 
     //============================================================
+    // Combo State (콤보 관련 상태는 ComboController에 위임)
+    //============================================================
+    public ComboController Combo { get; private set; }
+
+    //============================================================
     // Runtime Flags
     //============================================================
-    public bool isAttacking = false;
-    public bool nextComboQueued = false;
-
-    public bool isGrounded;
+    public bool isGrounded { get; private set; }
     public bool IsGrounded() => isGrounded;
 
-    public bool isJumping;
-
-    private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
+    public bool isJumping { get; private set; }
+    public void SetJumping(bool value) { isJumping = value; }
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -165,6 +164,7 @@ public class PlayerController : CharacterBase
 
         Clock = new UnscaledClock();
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.18f, dedupeSec: 0.04f);
+        Combo = new ComboController();
 
         InitCoreComponents();
         await InitCharacterDataAsync();
@@ -217,16 +217,7 @@ public class PlayerController : CharacterBase
         if (locoSM != null) locoStateDebug = locoSM.CurrentId;
         if (actSM != null) actStateDebug = actSM.CurrentId;
 
-        comboTimeRemaining -= Time.unscaledDeltaTime;
-        if (comboTimeRemaining <= 0f)
-        {
-            // 시간 만료 시 콤보 초기화
-            currentComboStep = 0;
-            comboWindowOpen = false;
-            nextComboQueued = false;
-            isAttacking = false;
-            comboTimeRemaining = 0f;
-        }
+        Combo.Tick(Time.unscaledDeltaTime);
     }
 
     private void FixedUpdate()
@@ -260,7 +251,7 @@ public class PlayerController : CharacterBase
     //============================================================
     private void AutoSetIdleIfNoAction()
     {
-        if (actSM != null && actSM.CurrentId == ActState.None && !isAttacking)
+        if (actSM != null && actSM.CurrentId == ActState.None && !Combo.IsAttacking)
         {
             if (locoSM.CurrentId != LocoState.Move &&
                 locoSM.CurrentId != LocoState.Air &&
@@ -286,10 +277,21 @@ public class PlayerController : CharacterBase
 
     private async UniTask InitCharacterDataAsync()
     {
-        string characterName = gameObject.name.Replace("(Clone)", "");
-        await LoadCharacterDataAsync(characterName);
+        // 로비에서 이미 선택된 데이터가 있으면 그걸 우선 사용 (Addressable 재로드 생략)
+        var preloaded = Managers.CharacterData.M_CharacterData;
+        if (preloaded != null)
+        {
+            characterData = preloaded;
+            characterData.Initialize();
+            RuntimeStats.InitializeFrom(characterData);
+            Debug.Log($"[PlayerController] 로비 선택 CharacterData 사용: {characterData.characterName}");
+        }
+        else
+        {
+            string characterName = gameObject.name.Replace("(Clone)", "");
+            await LoadCharacterDataAsync(characterName);
+        }
 
-        // characterData null 안전 처리
         if (Rigid != null)
         {
             Rigid.useGravity = false;
@@ -424,18 +426,11 @@ public class PlayerController : CharacterBase
         switch (wd.weaponType)
         {
             case WeaponType.Sword:
-                if (wd is WeaponData swordData)
-                {
-                    _attackPolicy = new SwordAttackPolicy(
-                        enterThreshold: 2f,
-                        fullThreshold: wd.holdThreshold,
-                        maxChargeStage: wd.chargeStages
-                    );
-                }
-                else
-                {
-                    _attackPolicy = new SwordAttackPolicy();
-                }
+                _attackPolicy = new SwordAttackPolicy(
+                    enterThreshold: 2f,
+                    fullThreshold: wd.holdThreshold,
+                    maxChargeStage: wd.chargeStages
+                );
                 break;
 
             case WeaponType.Bow:
@@ -448,27 +443,6 @@ public class PlayerController : CharacterBase
                 break;
         }
     }
-
-    //============================================================
-    // Combo
-    //============================================================
-    public int LightMaxComboCount { get; private set; } = 1;
-    public float LightComboResetTime { get; private set; } = 2f;
-
-    public float comboTimeRemaining = 0f;
-    public IReadOnlyList<float> LightComboEndTimes { get; private set; }
-
-    public bool comboWindowOpen = false;
-    public int currentComboStep = 0;
-
-    public void OpenComboWindow()
-    {
-        comboWindowOpen = true;
-        comboTimeRemaining = LightComboResetTime;
-    }
-
-    public void CloseComboWindow() => comboWindowOpen = false;
-    public virtual void OnAttackAnimationEnd() => isAttacking = false;
 
     public void OnAttackHitStep(int stepIndex) { /* 구현 */ }
     public void OnAnimationEventTag(string tag) { /* 구현 */ }
@@ -630,7 +604,7 @@ public class PlayerController : CharacterBase
     //============================================================
     private void Safe_OnAttackAnimationEnd()
     {
-        isAttacking = false;
+        Combo.SetAttacking(false);
 
         if (actSM.CurrentId == ActState.Attack ||
             actSM.CurrentId == ActState.AttackReady ||
@@ -647,14 +621,14 @@ public class PlayerController : CharacterBase
         OnAttackHitStep(stepIndex);
     }
 
-    private void Safe_OpenCombo() => OpenComboWindow();
-    private void Safe_CloseCombo() => CloseComboWindow();
+    private void Safe_OpenCombo()  => Combo?.OpenWindow();
+    private void Safe_CloseCombo() => Combo?.CloseWindow();
     private void Safe_GenericTag(string tag) => OnAnimationEventTag(tag);
 
     private void safe_EffectStep(int step)
     {
         if (EffectHandler != null && WeaponManager.HasWeapon)
-            _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, currentComboStep, step);
+            _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step);
     }
 
     /// <summary>공격 state에서 직접 호출 (AnimationEvent 불필요)</summary>
@@ -674,7 +648,7 @@ public class PlayerController : CharacterBase
         var weaponData = WeaponManager.CurrentWeaponData;
         if (weaponData != null && weaponData.abilitySet != null)
         {
-            var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, currentComboStep);
+            var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
             if (ability != null)
             {
                 foreach (var s in ability.steps)

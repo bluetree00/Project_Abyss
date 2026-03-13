@@ -6,9 +6,9 @@ public class DefaultJumpAbility : JumpAbilitySO
 {
     public override void Jump(PlayerController controller)
     {
-        if (!controller.isGrounded) return;
+        if (!controller.IsGrounded()) return;
 
-        controller.isJumping = true;
+        controller.SetJumping(true);
         controller.Rigid.linearVelocity = new Vector3(controller.Rigid.linearVelocity.x, 0, controller.Rigid.linearVelocity.z);
         controller.Rigid.AddForce(Vector3.up * controller.CharacterData.jumpForce, ForceMode.Impulse);
     }

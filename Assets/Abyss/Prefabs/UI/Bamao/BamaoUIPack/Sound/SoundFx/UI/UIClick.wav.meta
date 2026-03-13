@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 20635edc966b01a4aa62c5dc305c0693
+guid: f348d88c6d9b3934e9a9370c56c6c863
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/UIClick.wav
+  uploadId: 740277

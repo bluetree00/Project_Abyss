@@ -2,6 +2,7 @@
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.rlabrecque.steamworks.net": "https://github.com/rlabrecque/Steamworks.NET.git?path=com.rlabrecque.steamworks.net",
     "com.unity.addressables": "2.9.0",
     "com.unity.ai.navigation": "2.0.10",
     "com.unity.cinemachine": "2.10.5",
