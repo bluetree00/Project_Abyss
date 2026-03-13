@@ -1,46 +1,11 @@
-using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// 기본 회피 어빌리티.
+/// 이동/쿨다운 처리는 LocoDodgeState가 담당하므로 이 SO는 확장 훅용으로만 남깁니다.
+/// </summary>
 [CreateAssetMenu(fileName = "NewPlayerDodgeAbility", menuName = "Abilities/Player/DodgeAbility")]
 public class DefaultDodgeAbility : IDodgeAbility<PlayerController>
 {
-    private bool isDodging = false;
-
-    public void Dodge(PlayerController controller)
-    {
-        // if (isDodging || !controller.canDodge)
-        //     return;
-
-        controller.StartCoroutine(DodgeCoroutine(controller));
-    }
-
-    private IEnumerator DodgeCoroutine(PlayerController controller)
-    {
-        isDodging = true;
-        // controller.canDodge = false;
-
-        float dashDuration = controller.CharacterData.dashDuration;
-        float dashSpeed = controller.CharacterData.dashSpeed;
-
-        Vector3 direction = controller.MoveDirection != Vector3.zero
-            ? controller.MoveDirection
-            : controller.transform.forward;
-
-        float startTime = Time.time;
-
-        // controller.GotoDodgeState();
-
-        while (Time.time < startTime + dashDuration)
-        {
-            controller.Rigid.linearVelocity = direction * dashSpeed;
-            yield return null;
-        }
-
-        controller.Rigid.linearVelocity = Vector3.zero;
-
-
-        yield return new WaitForSeconds(controller.CharacterData.dodgeCooldown);
-        // controller.canDodge = true;
-        isDodging = false;
-    }
+    public void Dodge(PlayerController controller) { }
 }

@@ -10,6 +10,7 @@ public class ActAttackState : ILayerState<ActState>
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
     private PlayerAnimationEventReceiver _receiver;
+    private AbilityExecution _execution;
     private int _maxCombo = 1;
     private float _comboExpiryTime = 0f;
 
@@ -23,7 +24,11 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Enter()
     {
-         _attackEndHandled = false;
+        _attackEndHandled = false;
+        _execution = new AbilityExecution();
+        _controller.ActiveExecution = _execution;
+        _controller.RotateTowardsMousePosition();
+
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
 
         if (!_controller.Combo.IsAttacking)
@@ -76,6 +81,9 @@ public class ActAttackState : ILayerState<ActState>
         _controller.SetMoveScale(1f);
         _comboExpiryTime = 0f;
 
+        _controller.ActiveExecution = null;
+        _execution?.Cleanup(forceEffects: false);
+        _execution = null;
     }
 
     private void SubscribeReceiver()

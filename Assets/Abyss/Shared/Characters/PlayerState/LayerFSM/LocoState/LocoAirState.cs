@@ -45,6 +45,7 @@ public class LocoAirState : ILayerState<LocoState>
     public void Exit()
     {
         _entered = false; // Exit 시 다시 Enter 가능
+        _controller.CancelActState(); // 공중 공격 중 착지 시 actSM 정리
         _controller.SetMoveScale(1f);
         _controller.ConsumeEnterAirAsJump();
         _controller.SetJumping(false);
