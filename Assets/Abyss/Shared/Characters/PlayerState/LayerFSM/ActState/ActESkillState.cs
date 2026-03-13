@@ -1,32 +1,54 @@
-// ActSkillState.cs
+using System.Linq;
 using UnityEngine;
 
 public class ActESkillState : ILayerState<ActState>
 {
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
-
-    private float _time;
-    private float _duration = 0.6f; // 스킬 연출 시간
+    private AbilityExecution _execution;
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
-    { _controller = controller; _stateChanger = stateChanger; }
+    {
+        _controller = controller;
+        _stateChanger = stateChanger;
+    }
 
     public void Enter()
     {
-        _time = 0f;
+        _controller.CurrentAttackTypeForEffect = WeaponActionType.ESkill;
+
+        _execution = new AbilityExecution();
+        _controller.ActiveExecution = _execution;
+        _controller.RotateTowardsMousePosition();
+
         _controller.SetMoveScale(0f);
-        _controller.Anim.CrossFade("ESkill_01", 0.08f);
+        PlaySkillAnimation();
     }
 
-    public void Update()
-    {
-
-    }
+    public void Update() { }
 
     public void Exit()
     {
-
         _controller.SetMoveScale(1f);
+
+        _controller.ActiveExecution = null;
+        _execution?.Cleanup(forceEffects: false);
+        _execution = null;
+    }
+
+    private void PlaySkillAnimation()
+    {
+        string animName = "ESkill_01"; // fallback
+
+        var wd = _controller.WeaponManager?.CurrentWeaponData;
+        if (wd?.animationSet is WeaponAnimationSetSO animSet)
+        {
+            var mapping = animSet.GetMappings(WeaponAnimGroup.Ground, WeaponActionType.ESkill)
+                                 .FirstOrDefault(m => !string.IsNullOrEmpty(m.baseClipName));
+            if (mapping != null)
+                animName = mapping.baseClipName;
+        }
+
+        _controller.Anim.CrossFade(animName, 0.08f);
     }
 }
