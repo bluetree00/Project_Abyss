@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using Game.Inputs;
 
@@ -11,46 +10,37 @@ using Game.Inputs;
 /// </summary>
 public class SwordAttackPolicy : IAttackInputPolicy
 {
-    private readonly float _enterThreshold;  // 모으기 시작을 인식할 최소 시간 (예: 0.08s)
-    private readonly float _fullThreshold;   // 강공격 확정 시간 (예: 0.25s)
-    private readonly int _maxChargeStage;    // 확장용(현재는 2)
+    private readonly float _enterThreshold;  // 모으기 시작을 인식할 최소 시간
+    private readonly float _fullThreshold;   // 강공격 확정 시간
+    private readonly int _maxChargeStage;
 
     private float _startTime;
     private bool _holding;
+    private bool _wasAttacking;  // 공격 중에 눌린 경우 Tick에서 타이머 리셋용
 
-    private bool _chargingStarted;   // enterThreshold를 넘겨 모으기 표시를 이미 보냈는가
-    private bool _promoted;          // fullThreshold를 넘겨 강공격 Pending을 세팅했는가
+    private bool _chargingStarted;
+    private bool _promoted;
 
-    // 외부에서 필요하면 stage 정보 제공 가능
     private int _currentStage;
     public int CurrentStage => _currentStage;
 
-    //장비의 값으로 차지하게 추후 수정
     public SwordAttackPolicy(float enterThreshold = 2f, float fullThreshold = 3f, int maxChargeStage = 2)
     {
-
         _enterThreshold = Mathf.Max(0.0f, enterThreshold);
-        _fullThreshold = Mathf.Max(_enterThreshold, fullThreshold);
+        _fullThreshold  = Mathf.Max(_enterThreshold, fullThreshold);
         _maxChargeStage = Mathf.Max(1, maxChargeStage);
     }
 
     public void OnStarted(PlayerController c)
     {
-        if (c.isAttacking)
-        {
-            Debug.Log("[SwordPolicy] Already attacking -> ignore input");
-            return; // 공격 중이면 무시
-        }
-
-
-        _holding = true;
-        _startTime = Time.unscaledTime;
+        // IsAttacking 중에도 _holding = true — OnCanceled에서 Light 버퍼링 가능하게 함
+        // Charge 시작은 Tick에서 IsAttacking = false일 때만 진행
+        _holding        = true;
+        _startTime      = Time.unscaledTime;
         _chargingStarted = false;
-        _promoted = false;
-        _currentStage = 1;
-
-        // (옵션) 시작 VFX는 ChargeState에서 처리하도록 두거나, 여기서 시그널만 보냄
-        // Debug.Log("[SwordPolicy] OnStarted");
+        _promoted       = false;
+        _currentStage   = 1;
+        _wasAttacking   = c.Combo.IsAttacking;
     }
 
     public void OnCanceled(PlayerController c)
@@ -58,50 +48,48 @@ public class SwordAttackPolicy : IAttackInputPolicy
         if (!_holding) return;
         _holding = false;
 
-        // 이미 fullThreshold에서 promoted 되어 Pending이 올라갔으면 중복 처리 금지
         if (_promoted)
         {
             Debug.Log($"[SwordPolicy] Released after promoted -> nothing to do (stage={_currentStage})");
             return;
         }
 
-        if (c.isAttacking)
-        {
-            // 공격 중에는 모으기 진행 불가
-            return;
-        }
-
         float held = Time.unscaledTime - _startTime;
 
-        // 아직 promoted 되지 않았다면 release 시점으로 판단
         if (held >= _fullThreshold)
         {
-            // full 도달 (이 브랜치는 보통 Tick에서 처리되므로 드물게 실행)
             _currentStage = _maxChargeStage;
-            // 상태 흐름을 위해 Pending 설정
             c.SetPendingAttack(Command.Heavy);
-
-            // (선택) InputBuffer 기록
-            c.InputBuffer.Push(Game.Inputs.Command.Heavy);
+            c.InputBuffer.Push(Command.Heavy);
             Debug.Log($"[SwordPolicy] Released -> set pending Heavy (held={held:F2})");
         }
         else
         {
-            // full 미달 -> 라이트
             _currentStage = 1;
             c.SetPendingAttack(Command.Light);
-            c.InputBuffer.Push(Game.Inputs.Command.Light);
+            c.InputBuffer.Push(Command.Light);
             Debug.Log($"[SwordPolicy] Released -> set pending Light (held={held:F2})");
         }
     }
 
     public void Tick(PlayerController c, float dt)
     {
-        if (!_holding || c.isAttacking) return;
+        bool isAttacking = c.Combo.IsAttacking;
+
+        // 공격이 막 끝난 경우 → 타이머 리셋 (공격 중 홀드 시간이 차지로 오인되지 않도록)
+        if (_wasAttacking && !isAttacking && _holding)
+        {
+            _startTime       = Time.unscaledTime;
+            _chargingStarted = false;
+            _promoted        = false;
+            Debug.Log("[SwordPolicy] Attack ended mid-hold -> reset charge timer");
+        }
+        _wasAttacking = isAttacking;
+
+        if (!_holding || isAttacking) return;
 
         float held = Time.unscaledTime - _startTime;
 
-        // 모으기 표시
         if (!_chargingStarted && held >= _enterThreshold)
         {
             _chargingStarted = true;
@@ -109,7 +97,6 @@ public class SwordAttackPolicy : IAttackInputPolicy
             Debug.Log($"Charging started (held={held:F2})");
         }
 
-        // 강공격 Pending 설정 (fullThreshold)
         if (!_promoted && held >= _fullThreshold)
         {
             _promoted = true;
@@ -118,5 +105,4 @@ public class SwordAttackPolicy : IAttackInputPolicy
             Debug.Log($"Full charge reached -> Heavy Pending (held={held:F2})");
         }
     }
-
 }

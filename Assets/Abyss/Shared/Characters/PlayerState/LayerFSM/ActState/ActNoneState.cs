@@ -11,33 +11,16 @@ public class ActNoneState : ILayerState<ActState> //act 상태의 idle의 역활
 
     public void Enter()
     {
+        // 공격 플래그만 초기화 — LocoSM은 건드리지 않는다.
+        // (공중에서 공격이 끝나도 LocoState.Air는 유지되어야 착지 감지가 계속 동작)
+        _controller.Combo.SetAttacking(false);
 
-        // 1) 공격 관련 플래그 초기화
-        _controller.isAttacking = false;
-
-        // 2) Locomotion FSM을 Idle로 변경(이미 Idle이면 내부에서 무시될 것)
-        if (_controller.LocoSM.CurrentId != LocoState.Idle)
-            _controller.LocoSM.Change(LocoState.Idle);
-
-        // 3) Animator를 LocoIdleState가 기대하는 상태로 강제 정렬
-        var anim = _controller.Anim;
-        if (anim != null)
+        // 지상일 때만 MoveBlend로 부드럽게 복귀
+        if (_controller.IsGrounded())
         {
-            int layer = 0;
-
-            // MoveBlend로 덮어쓰기 — LocoIdleState.Enter와 일치
-            // CrossFade를 사용하면 transition 문제를 어느 정도 덮어쓸 수 있음.
-            const string moveBlendStateName = "MoveBlend";
-            if (!anim.IsInTransition(layer))
-            {
-                anim.CrossFade(moveBlendStateName, 0.08f, layer, 0f);
-            }
-            else
-            {
-                // 이미 transition 중이라면 즉시 상태 값을 보정
-                anim.Play(moveBlendStateName, layer, 0f);
-            }
-
+            var anim = _controller.Anim;
+            if (anim != null && !anim.IsInTransition(0))
+                anim.CrossFade("MoveBlend", 0.08f, 0, 0f);
         }
     }
 

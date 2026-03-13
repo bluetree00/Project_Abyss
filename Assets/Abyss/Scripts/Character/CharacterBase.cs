@@ -28,7 +28,7 @@ public class CharacterBase : MonoBehaviour
     public Transform playerTransform;
 
     // 리지드바디 회전 고정을 위해 각속도를 0으로 리셋하는 함수
-    private void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
+    protected void FreezeRotation() => Rigid.angularVelocity = Vector3.zero;
 
     //============================================================
     // 초기화 (비동기)

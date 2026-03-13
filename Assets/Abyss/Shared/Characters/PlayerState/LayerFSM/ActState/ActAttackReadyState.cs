@@ -16,7 +16,7 @@ public class ActAttackReadyState : ILayerState<ActState>
 
     public void Enter()
     {
-        if (_controller.isAttacking)
+        if (_controller.Combo.IsAttacking)
         {
             Debug.Log("[ActAttackReadyState] Already attacking, aborting Enter.");
             _stateChanger.Change(ActState.None); // 공격 중이면 바로 None으로

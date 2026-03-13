@@ -18,7 +18,7 @@ public class ActHeavyAttackState : ILayerState<ActState>
 
     public void Enter()
     {
-        _controller.isAttacking = true;
+        _controller.Combo.SetAttacking(true);
         _controller.SetMoveScale(0f); // 공격 중 이동 제한
 
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
@@ -34,7 +34,7 @@ public class ActHeavyAttackState : ILayerState<ActState>
     {
         UnsubscribeReceiver();
         _controller.EndWeaponTrail();
-        _controller.isAttacking = false;
+        _controller.Combo.SetAttacking(false);
         _controller.SetMoveScale(1f);
     }
 

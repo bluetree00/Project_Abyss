@@ -125,9 +125,6 @@ public class Knight : PlayerController
         // 입력 → 버퍼
         CheckMovementInput();
 
-        // 버퍼 만료 정리
-        InputBuffer?.TickPrune();
-
     }
 
 }
