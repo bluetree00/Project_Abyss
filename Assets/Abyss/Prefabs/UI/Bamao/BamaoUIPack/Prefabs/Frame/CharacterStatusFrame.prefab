@@ -272,7 +272,7 @@ MonoBehaviour:
   AvoidExitSelectedStatus: 1
   MouseExitClip: {fileID: 0}
   MouseExitSoundVolume: 1
-  MouseClickClip: {fileID: 8300000, guid: 3157bab3f7ec79f41a8c993659a7eff1, type: 3}
+  MouseClickClip: {fileID: 0}
   MouseClickSoundVolume: 1
 --- !u!1 &271459798375243953
 GameObject:
@@ -1203,7 +1203,7 @@ MonoBehaviour:
   AvoidExitSelectedStatus: 1
   MouseExitClip: {fileID: 0}
   MouseExitSoundVolume: 1
-  MouseClickClip: {fileID: 8300000, guid: 3157bab3f7ec79f41a8c993659a7eff1, type: 3}
+  MouseClickClip: {fileID: 0}
   MouseClickSoundVolume: 1
 --- !u!1 &1661241179428563344
 GameObject:
@@ -2224,12 +2224,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   AvoidEnterSelectedStatus: 0
-  MouseEnterClip: {fileID: 8300000, guid: f08f255a633bda24cbab8becf0d1f36e, type: 3}
+  MouseEnterClip: {fileID: 0}
   MouseEnterSoundVolume: 1
   AvoidExitSelectedStatus: 1
   MouseExitClip: {fileID: 0}
   MouseExitSoundVolume: 1
-  MouseClickClip: {fileID: 8300000, guid: f08f255a633bda24cbab8becf0d1f36e, type: 3}
+  MouseClickClip: {fileID: 0}
   MouseClickSoundVolume: 1
 --- !u!1 &2855619269390871346
 GameObject:
@@ -2615,7 +2615,7 @@ MonoBehaviour:
   AvoidExitSelectedStatus: 1
   MouseExitClip: {fileID: 0}
   MouseExitSoundVolume: 1
-  MouseClickClip: {fileID: 8300000, guid: 3157bab3f7ec79f41a8c993659a7eff1, type: 3}
+  MouseClickClip: {fileID: 0}
   MouseClickSoundVolume: 1
 --- !u!1 &3462718784709121163
 GameObject:
