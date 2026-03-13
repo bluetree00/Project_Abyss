@@ -1192,9 +1192,9 @@ GameObject:
   - component: {fileID: 5122791751604887389}
   - component: {fileID: 5122791751595274401}
   - component: {fileID: 2188393768869304326}
+  - component: {fileID: 8235754360531600667}
   - component: {fileID: 3043237404140478018}
   - component: {fileID: 403192067671223825}
-  - component: {fileID: -2285044469967458767}
   - component: {fileID: -1887833755547424377}
   m_Layer: 0
   m_Name: BatPADefault
@@ -1279,6 +1279,18 @@ MonoBehaviour:
   _debugState: 0
   returnDistance: 15
   arrivalDistance: 1.2
+--- !u!114 &8235754360531600667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5122791751604650877}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62d67c7af096d4a46b1ba84f5ffc8dc0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LeeAnimationEventReceiver
 --- !u!195 &3043237404140478018
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1328,18 +1340,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &-2285044469967458767
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5122791751604650877}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: be40c333b83dcda41aa374eb3545b4c0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BatAnimationEventReceiver
 --- !u!136 &-1887833755547424377
 CapsuleCollider:
   m_ObjectHideFlags: 0
