@@ -8,7 +8,8 @@ public class WeaponSO : ScriptableObject
     public string weaponKey;
     public string displayName;
     public string prefabKey;
-    public string iconKey;
+    public string iconKey;         // Addressables 비동기 로드용 키
+    public Sprite icon;            // HUD 즉시 표시용 직접 참조
     public float baseAttack;
     public float baseDefense;
 

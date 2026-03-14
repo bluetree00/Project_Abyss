@@ -1,6 +1,9 @@
 //============================================================
 // HudPresenter.cs
-// - Mode/Section 토글 + CanvasGroup Fade + PlayerState 이벤트 구독
+// - Mode/Section 토글 + CanvasGroup Fade
+// - PlayerRunState 이벤트 구독 (HP, Gold)
+// - PlayerRuntimeStats 이벤트 구독 (AttackPower)
+// - PlayerWeaponManager 이벤트 구독 (장비 슬롯)
 //============================================================
 using UnityEngine;
 using Cysharp.Threading.Tasks;
@@ -16,8 +19,13 @@ public sealed class HudPresenter : MonoBehaviour
     [Header("HUD Mode")]
     [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.None;
 
+    // ── Run 세션 기반 ─────────────────────────────────────────
     private PlayerRunState _state;
     private UIHudDataProvider _provider;
+
+    // ── 플레이어 직접 바인딩 ──────────────────────────────────
+    private PlayerRuntimeStats  _runtimeStats;
+    private PlayerWeaponManager _weaponManager;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
@@ -36,6 +44,9 @@ public sealed class HudPresenter : MonoBehaviour
         SetMode(startMode);
     }
 
+    // ─────────────────────────────────────────────────────────
+    // Run 세션 초기화 (기존 방식 유지)
+    // ─────────────────────────────────────────────────────────
     public void Construct(GameRunSession run, UIHudDataProvider provider)
     {
         Dispose();
@@ -55,7 +66,6 @@ public sealed class HudPresenter : MonoBehaviour
             return;
         }
 
-        // 초기 스냅샷
         if (_provider != null && _provider.TryGet(out var data))
         {
             view.CombatPanel?.SetHp(data.Hp, data.MaxHp);
@@ -67,28 +77,100 @@ public sealed class HudPresenter : MonoBehaviour
             view.SetGold(_state.TempGold);
         }
 
-        // 이벤트 구독
-        _state.OnHpChanged += HandleHpChanged;
+        _state.OnHpChanged   += HandleHpChanged;
         _state.OnGoldChanged += HandleGoldChanged;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // 플레이어 직접 바인딩 (씬에서 PlayerController 연결 시)
+    // ─────────────────────────────────────────────────────────
+    public void BindPlayer(PlayerController player)
+    {
+        UnbindPlayer();
+        if (player == null) return;
+
+        _runtimeStats  = player.RuntimeStats;
+        _weaponManager = player.WeaponManager;
+
+        // 초기 스냅샷
+        RefreshStats();
+        RefreshWeaponSlots();
+
+        _runtimeStats.OnChanged        += RefreshStats;
+        _weaponManager.OnWeaponChanged += HandleWeaponChanged;
+    }
+
+    public void UnbindPlayer()
+    {
+        if (_runtimeStats != null)
+        {
+            _runtimeStats.OnChanged -= RefreshStats;
+            _runtimeStats = null;
+        }
+        if (_weaponManager != null)
+        {
+            _weaponManager.OnWeaponChanged -= HandleWeaponChanged;
+            _weaponManager = null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 핸들러
+    // ─────────────────────────────────────────────────────────
+    private void HandleHpChanged(int hp, int maxHp)       => view?.CombatPanel?.SetHp(hp, maxHp);
+    private void HandleGoldChanged(int gold)               => view?.SetGold(gold);
+    private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
+
+    private void RefreshStats()
+    {
+        if (_runtimeStats == null || view?.CombatPanel == null) return;
+        view.CombatPanel.SetHp(_runtimeStats.Hp, _runtimeStats.MaxHp);
+        view.CombatPanel.SetAttack(_runtimeStats.AttackPower);
+    }
+
+    private void RefreshWeaponSlots()
+    {
+        if (_weaponManager == null || view?.CombatPanel == null) return;
+
+        for (int i = 0; i < _weaponManager.SlotCount; i++)
+        {
+            var slot = _weaponManager.slots[i];
+            var info = new WeaponSlotInfo();
+
+            if (slot != null && !slot.IsEmpty && slot.runtimeData != null)
+            {
+                info.HasWeapon = true;
+                info.Icon      = slot.runtimeData.icon;
+                info.Name      = slot.runtimeData.displayName;
+                info.Attack    = slot.runtimeData.baseAttack;
+                info.Defense   = slot.runtimeData.baseDefense;
+            }
+
+            view.CombatPanel.SetWeaponSlot(i, info);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 정리
+    // ─────────────────────────────────────────────────────────
     public void Dispose()
     {
         if (_state != null)
         {
-            _state.OnHpChanged -= HandleHpChanged;
+            _state.OnHpChanged   -= HandleHpChanged;
             _state.OnGoldChanged -= HandleGoldChanged;
             _state = null;
         }
         _provider = null;
+        UnbindPlayer();
     }
 
     private void OnDisable() => Dispose();
-    private void OnDestroy() => Dispose();
+    private void OnDestroy()  => Dispose();
 
-    private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
-    private void HandleGoldChanged(int gold) => view?.SetGold(gold);
-
+    // ─────────────────────────────────────────────────────────
+    // Mode / Visibility
+    // ─────────────────────────────────────────────────────────
     public void SetMode(HUDIds.Mode mode)
     {
         if (view == null) return;
@@ -136,8 +218,8 @@ public sealed class HudPresenter : MonoBehaviour
         if (immediate)
         {
             _fadeToken++;
-            canvasGroup.alpha = visible ? 1f : 0f;
-            canvasGroup.interactable = visible;
+            canvasGroup.alpha          = visible ? 1f : 0f;
+            canvasGroup.interactable   = visible;
             canvasGroup.blocksRaycasts = visible;
             return;
         }
@@ -155,7 +237,7 @@ public sealed class HudPresenter : MonoBehaviour
         float t = 0f;
 
         bool willBeVisible = targetAlpha > 0.5f;
-        canvasGroup.interactable = willBeVisible;
+        canvasGroup.interactable   = willBeVisible;
         canvasGroup.blocksRaycasts = willBeVisible;
 
         float dur = Mathf.Max(0.0001f, fadeDuration);
@@ -163,7 +245,6 @@ public sealed class HudPresenter : MonoBehaviour
         while (t < 1f)
         {
             if (token != _fadeToken) return;
-
             t += Time.unscaledDeltaTime / dur;
             canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, t);
             await UniTask.Yield();

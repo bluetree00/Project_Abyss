@@ -51,11 +51,19 @@ public sealed class HudBootstrapper : MonoBehaviour
         if (_run.TryGetPlayerState(out var st) && st != null)
         {
             BindStateNow(st);
-            return;
+        }
+        else
+        {
+            // ✅ 4) 아직이면 준비 이벤트 대기
+            _run.OnPlayerStateReady += BindStateNow;
         }
 
-        // ✅ 4) 아직이면 준비 이벤트 대기
-        _run.OnPlayerStateReady += BindStateNow;
+        // ✅ 5) 플레이어 스폰 이벤트 구독 (스탯·장비 HUD 연결)
+        _run.OnPlayerBound += HandlePlayerBound;
+
+        // 이미 스폰된 경우 즉시 반영
+        if (_run.Player != null)
+            presenter.BindPlayer(_run.Player);
     }
 
     private void BindStateNow(PlayerRunState st)
@@ -77,12 +85,18 @@ public sealed class HudBootstrapper : MonoBehaviour
         presenter.SetMode(mode);
     }
 
+    private void HandlePlayerBound(PlayerController player)
+    {
+        presenter.BindPlayer(player);
+    }
+
     public void Unbind()
     {
         if (_run != null)
         {
             _run.OnPlayerStateReady -= BindStateNow;
-            _run.OnHudModeChanged -= HandleHudModeChanged;
+            _run.OnHudModeChanged   -= HandleHudModeChanged;
+            _run.OnPlayerBound      -= HandlePlayerBound;
         }
 
         _constructed = false;
