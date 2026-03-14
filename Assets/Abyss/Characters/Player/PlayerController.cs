@@ -202,6 +202,7 @@ public class PlayerController : CharacterBase
         if (WeaponManager != null)
         {
             WeaponManager.OnWeaponChanged += OnWeaponChangedApplyAnimation;
+            WeaponManager.OnWeaponChanged += OnWeaponChangedApplyStats;
         }
 
         AutoSetIdleIfNoAction();
@@ -249,7 +250,10 @@ public class PlayerController : CharacterBase
         UnsubscribeFromAnimationReceiver(EventReceiver);
 
         if (WeaponManager != null)
+        {
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyAnimation;
+            WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyStats;
+        }
     }
 
     //============================================================
@@ -419,6 +423,16 @@ public class PlayerController : CharacterBase
         }
 
         AssignAttackPolicyForWeapon(newWeapon);
+    }
+
+    private void OnWeaponChangedApplyStats(WeaponData newWeapon, GameObject _)
+    {
+        if (newWeapon == null)
+        {
+            RuntimeStats.SetWeaponStats(0);
+            return;
+        }
+        RuntimeStats.SetWeaponStats((int)newWeapon.baseAttack);
     }
 
     private void AssignAttackPolicyForWeapon(WeaponData wd)

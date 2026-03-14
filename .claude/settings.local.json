@@ -37,7 +37,18 @@
       "Bash(grep -i \"m_Bits\\\\|hitLayers\" Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/*.asset)",
       "Bash(head -20 grep -n \"functionName\\\\|time:\" \"c:/Users/User/Project_Abyss/Project_Abyss/Assets/Abyss/Animations/Player/Test_01/Attack/NormalAttack_3.FBX.meta\")",
       "Bash(xargs grep -l \"events:\")",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(find Assets/Abyss/Shared/Characters/Weapon/ -type f -name *.cs)",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":1,\"\"\"\"method\"\"\"\":\"\"\"\"tools/list\"\"\"\",\"\"\"\"params\"\"\"\":{}}')",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"id\"\":0,\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2024-11-05\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}}}')",
+      "Bash(xargs cat:*)",
+      "Bash(find c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/HUD -name *.prefab)",
+      "Bash(find c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI -name @HUD* -o -name *HUD*.prefab)",
+      "Bash(grep -v \"m_Name: $\\\\|m_Name:$\")",
+      "Bash(find C:/Users/u/Documents/GitHub/Project_Abyss/Assets -name *.asset)",
+      "Bash(find C:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss -name *.png -o -name *.jpg -o -name *.sprite)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(head -5 grep \"spriteMode\\\\|textureType\" \"C:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Equipment/B_weapon.png.meta\")"
     ]
   },
   "hooks": {

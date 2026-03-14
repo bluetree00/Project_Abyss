@@ -48,6 +48,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
+        else
+            await StartCombatDirectAsync(); // 에디터 직접 실행 fallback
 
         AppBootstrapper.Instance?.NotifySceneReady();
     }
@@ -102,6 +104,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// StageMap → GameScene 전환 후 호출.
     /// 이미 실행 중인 런의 선택된 포인트 맵 스폰 + 플레이어 스폰만 수행합니다.
     /// </summary>
+    // 정상 런 없이 GameScene을 직접 실행할 때 (에디터 테스트용)
+    private async UniTask StartCombatDirectAsync()
+    {
+        var uiRoot = UIRootBootstrapper.Instance;
+        if (uiRoot != null)
+            uiRoot.BindHudToRun(_run);
+
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+            _run?.BindPlayer(player);
+    }
+
     public async UniTask StartCombatAsync()
     {
         var run = _run;
