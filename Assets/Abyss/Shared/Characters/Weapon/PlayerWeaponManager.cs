@@ -307,9 +307,15 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
     {
-        Debug.Log($"Inventory full! Replace weapon with: {newWeapon.displayName}? Simulated choice: slot 0");
-        await UniTask.Delay(TimeSpan.FromSeconds(1f));
-        return 0;
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
+        if (popup == null)
+        {
+            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 슬롯 0으로 대체");
+            return 0;
+        }
+
+        popup.Setup(newWeapon, slots);
+        return await popup.WaitForChoiceAsync();
     }
 
     // ----------------------

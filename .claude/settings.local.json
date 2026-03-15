@@ -48,7 +48,21 @@
       "Bash(find C:/Users/u/Documents/GitHub/Project_Abyss/Assets -name *.asset)",
       "Bash(find C:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss -name *.png -o -name *.jpg -o -name *.sprite)",
       "Bash(xargs -I{} basename {})",
-      "Bash(head -5 grep \"spriteMode\\\\|textureType\" \"C:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Equipment/B_weapon.png.meta\")"
+      "Bash(head -5 grep \"spriteMode\\\\|textureType\" \"C:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sprites/Equipment/B_weapon.png.meta\")",
+      "Bash(curl -v http://127.0.0.1:8080/mcp)",
+      "Bash(curl -s http://127.0.0.1:8080/mcp)",
+      "Bash(/dev/null find:*)",
+      "Bash(sort find:*)",
+      "mcp__mcp-for-unity-server__read_console",
+      "mcp__mcp-for-unity-server__manage_gameobject",
+      "mcp__mcp-for-unity-server__batch_execute",
+      "mcp__mcp-for-unity-server__refresh_unity",
+      "mcp__mcp-for-unity-server__manage_prefabs",
+      "Bash(grep -v \"m_Name: $\\\\|rgba\\\\|color\\\\|sprite\\\\|material\")",
+      "Bash(python3 -c \":*)",
+      "mcp__mcp-for-unity-server__manage_scene",
+      "mcp__mcp-for-unity-server__execute_menu_item",
+      "mcp__mcp-for-unity-server__manage_editor"
     ]
   },
   "hooks": {
