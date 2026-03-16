@@ -16,7 +16,7 @@ public enum PromoteMode
 [Serializable]
 public class WeaponData
 {
-    public string WeaponDisplayKey;
+    public string weaponDisplayKey;
     public string displayName;
     public string weaponPrefabKey;
     public string iconKey;
@@ -39,8 +39,8 @@ public class WeaponData
     {
         if (so == null) throw new ArgumentNullException(nameof(so));
 
-        WeaponDisplayKey = so.weaponDisplayKey;
-        weaponPrefabKey = so.weaponKey;
+        weaponDisplayKey = so.weaponDisplayKey;
+        weaponPrefabKey  = so.weaponPrefabKey;
         displayName = so.displayName;
         iconKey = so.iconKey;
         icon = so.icon;

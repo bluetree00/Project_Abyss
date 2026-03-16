@@ -57,6 +57,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     public void EndRun()
     {
         CurrentRun = null;
+        Loadout.Clear();
     }
 
     public void RequestLoad(Define.Scene scene)
