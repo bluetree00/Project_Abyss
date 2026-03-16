@@ -1,42 +1,129 @@
 using UnityEngine;
 
 /// <summary>
-/// 공통 Patrol 상태.
-/// - PatrolAbility로 순찰 이동
-/// - DetectAbility로 감지 → Chase 전환
+/// 배회 상태.
+/// 스폰 위치 기준으로 PatrolSO에 설정된 방식(가로/세로/랜덤)으로 왕복 이동.
+/// 플레이어가 감지 거리 안에 들어오면 Chase 상태로 전환.
 /// </summary>
-public class LeePatrolState : LeeMonsterStateBase
+public class LeePatrolState : ILeeMonsterState
 {
-    private IMonsterAbility _patrolAbility;
-    private IMonsterAbility _detectAbility;
+    // ── 내부 상태 ─────────────────────────────────────────
+    private Vector3 _waypointA;
+    private Vector3 _waypointB;
 
-    protected override void OnInit()
+    public void Enter(LeeMonsterContext ctx)
     {
-        _patrolAbility = Controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Patrol);
-        _detectAbility = Controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Detect);
+        float speed = ctx.Patrol.patrolSpeed > 0f
+            ? ctx.Patrol.patrolSpeed
+            : ctx.Stat.moveSpeed;
+
+        ctx.Agent.speed = speed;
+
+        // 배회 웨이포인트 계산 (스폰 위치 기준)
+        CalcWaypoints(ctx);
+
+        // 현재 방향에 맞는 목적지 설정
+        MoveToNextWaypoint(ctx);
+        PlayAnim(ctx, ctx.Animation.patrolStateName);
     }
 
-    protected override void OnEnter()
+    public void Update(LeeMonsterContext ctx)
     {
-        Controller.animator.CrossFade(LeeFSM?.AnimMove ?? "MoveBlend", 0.1f);
-    }
-
-    protected override void OnExit()
-    {
-        Controller.StopMoving();
-    }
-
-    protected override MonsterController.MonsterState OnUpdate()
-    {
-        _patrolAbility?.Execute();
-        _detectAbility?.Execute();
-
-        if (Controller.HasDetectedTarget)
+        // 플레이어 감지 → 즉시 Chase
+        if (IsPlayerDetected(ctx))
         {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
-            return MonsterController.MonsterState.Chase;
+            ctx.Monster.ChangeState(LeeMonsterStateType.Chase);
+            return;
         }
 
-        return MonsterController.MonsterState.Patrol;
+        // 웨이포인트 대기 중
+        if (ctx.Runtime.IsWaitingAtWaypoint)
+        {
+            ctx.Runtime.PatrolWaitTimer -= Time.deltaTime;
+            if (ctx.Runtime.PatrolWaitTimer <= 0f)
+            {
+                ctx.Runtime.IsWaitingAtWaypoint = false;
+                ctx.Runtime.PatrolDirection    *= -1;
+                MoveToNextWaypoint(ctx);
+                PlayAnim(ctx, ctx.Animation.patrolStateName);
+            }
+            return;
+        }
+
+        // Blend 파라미터 갱신 (BlendTree 이동 애니메이션 구동)
+        if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
+            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
+
+        // 목적지 도착 판정
+        if (!ctx.Agent.pathPending &&
+            ctx.Agent.remainingDistance <= ctx.Agent.stoppingDistance + 0.25f)
+        {
+            ctx.Runtime.IsWaitingAtWaypoint = true;
+            ctx.Runtime.PatrolWaitTimer     = ctx.Patrol.waypointWaitTime;
+            PlayAnim(ctx, ctx.Animation.idleStateName);
+        }
+    }
+
+    public void Exit(LeeMonsterContext ctx)
+    {
+        ctx.Agent.ResetPath();
+    }
+
+    // ── 내부 헬퍼 ─────────────────────────────────────────
+
+    private void CalcWaypoints(LeeMonsterContext ctx)
+    {
+        float   r      = ctx.Patrol.patrolRange;
+        Vector3 origin = ctx.Runtime.SpawnPosition;
+
+        switch (ctx.Patrol.patrolType)
+        {
+            case LeePatrolType.Vertical:
+                _waypointA = origin + Vector3.forward * r;
+                _waypointB = origin - Vector3.forward * r;
+                break;
+            case LeePatrolType.Random:
+                // 랜덤은 매번 새로 계산 (MoveToNextWaypoint에서 처리)
+                _waypointA = origin + Random.insideUnitSphere.normalized * r;
+                _waypointB = origin + Random.insideUnitSphere.normalized * r;
+                _waypointA.y = origin.y;
+                _waypointB.y = origin.y;
+                break;
+            default: // Horizontal
+                _waypointA = origin + Vector3.right  * r;
+                _waypointB = origin + Vector3.left   * r;
+                break;
+        }
+    }
+
+    private void MoveToNextWaypoint(LeeMonsterContext ctx)
+    {
+        // Random 패턴은 목적지를 새로 뽑는다
+        if (ctx.Patrol.patrolType == LeePatrolType.Random)
+        {
+            float   r      = ctx.Patrol.patrolRange;
+            Vector3 origin = ctx.Runtime.SpawnPosition;
+            Vector3 target = origin + Random.insideUnitSphere.normalized * r;
+            target.y = origin.y;
+            ctx.Agent.SetDestination(target);
+            return;
+        }
+
+        Vector3 dest = ctx.Runtime.PatrolDirection > 0 ? _waypointA : _waypointB;
+        ctx.Agent.SetDestination(dest);
+    }
+
+    private bool IsPlayerDetected(LeeMonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null) return false;
+        if (ctx.Monster.IsPlayerDead()) return false;
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        return dist <= ctx.Detection.detectionRange;
+    }
+
+    private static void PlayAnim(LeeMonsterContext ctx, string stateName)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
+        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
     }
 }

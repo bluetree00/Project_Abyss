@@ -1,51 +1,81 @@
 using UnityEngine;
 
 /// <summary>
-/// 공통 Chase 상태.
-/// - ChaseAbility로 플레이어 추적
-/// - 공격 범위 진입 → AttackReady 전환
-/// - [기존 개선] 감지 범위 이탈 → Patrol 복귀 (기존 SlimeChaseState에는 없던 처리)
+/// 추격 상태.
+/// 플레이어를 향해 NavMesh로 이동.
+/// - 공격 사정거리 이내 → AttackReady
+/// - 추격 포기 거리 초과 또는 플레이어 사망 → Patrol
 /// </summary>
-public class LeeChaseState : LeeMonsterStateBase
+public class LeeChaseState : ILeeMonsterState
 {
-    private IMonsterAbility _chaseAbility;
-    private IMonsterAbility _detectAbility;
-
-    protected override void OnInit()
+    public void Enter(LeeMonsterContext ctx)
     {
-        _chaseAbility  = Controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Chase);
-        _detectAbility = Controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Detect);
+        ctx.Agent.speed = ctx.Stat.moveSpeed;
+        ctx.Agent.stoppingDistance = ctx.Stat.attackRange * 0.9f;
+        PlayAnim(ctx, ctx.Animation.chaseStateName);
+
     }
 
-    protected override void OnEnter()
+    public void Update(LeeMonsterContext ctx)
     {
-        Controller.animator.CrossFade(LeeFSM?.AnimMove ?? "MoveBlend", 0.1f);
-    }
-
-    protected override void OnExit()
-    {
-        Controller.StopMoving();
-    }
-
-    protected override MonsterController.MonsterState OnUpdate()
-    {
-        _chaseAbility?.Execute();
-        _detectAbility?.Execute();
-
-        // 공격 범위 진입 → AttackReady
-        if (Controller.IsInAttackRange)
+        if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.AttackReady);
-            return MonsterController.MonsterState.AttackReady;
+            Debug.LogWarning(
+                $"[ChaseState] Patrol로 복귀 — Target={ctx.Runtime.PlayerTarget?.name ?? "NULL"}" +
+                $" | IsPlayerDead={ctx.Monster.IsPlayerDead()}");
+            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            return;
         }
 
-        // 타깃 상실 → Patrol 복귀 (기존 SlimeChaseState에는 없던 처리)
-        if (!Controller.HasDetectedTarget)
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+
+        // 공격 사정거리 이내 → 공격 준비
+        if (dist <= ctx.Stat.attackRange)
         {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Patrol);
-            return MonsterController.MonsterState.Patrol;
+            ctx.Monster.ChangeState(LeeMonsterStateType.AttackReady);
+            return;
         }
 
-        return MonsterController.MonsterState.Chase;
+        // 추격 포기 거리 초과 → 배회 복귀
+        if (dist > ctx.Detection.chaseGiveUpRange)
+        {
+            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            return;
+        }
+
+        // 추격 이동 + 회전
+        ctx.Agent.SetDestination(ctx.Runtime.PlayerTarget.position);
+        FaceTarget(ctx);
+
+        // 이동 속도 파라미터 갱신 (선택)
+        if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
+            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
+    }
+
+    public void Exit(LeeMonsterContext ctx)
+    {
+        ctx.Agent.ResetPath();
+
+        if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
+            ctx.Animator.SetFloat(ctx.Animation.speedParam, 0f);
+    }
+
+    // ── 헬퍼 ──────────────────────────────────────────────
+
+    private static void FaceTarget(LeeMonsterContext ctx)
+    {
+        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.001f) return;
+
+        Quaternion target = Quaternion.LookRotation(dir);
+        ctx.Transform.rotation = Quaternion.Slerp(
+            ctx.Transform.rotation, target, Time.deltaTime * 10f);
+    }
+
+    private static void PlayAnim(LeeMonsterContext ctx, string stateName)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
+        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
     }
 }

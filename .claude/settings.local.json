@@ -62,7 +62,8 @@
       "Bash(python3 -c \":*)",
       "mcp__mcp-for-unity-server__manage_scene",
       "mcp__mcp-for-unity-server__execute_menu_item",
-      "mcp__mcp-for-unity-server__manage_editor"
+      "mcp__mcp-for-unity-server__manage_editor",
+      "Bash(grep -E \"\\\\.cs$\")"
     ]
   },
   "hooks": {
