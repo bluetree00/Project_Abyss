@@ -3,92 +3,191 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 캐릭터 선택 패널.
-/// 1) 그리드에서 캐릭터 카드를 클릭하면
-/// 2) Bamao CharacterStatusFrame 기반의 캐릭터 스탯 팝업(CharInfoPopup)이 표시됩니다.
+/// 게임 준비 패널 — 3-스테이트 구조
+///
+/// [메인]  캐릭터 슬롯 + 무기 슬롯 → 게임 시작
+///   ↓ 캐릭터 슬롯 클릭
+/// [캐릭터 선택]  그리드 + 오른쪽 프리뷰/스탯 → 선택 완료
+///   ↓ 무기 슬롯 클릭
+/// [무기 선택]  그리드 + 오른쪽 프리뷰/스탯 → 무기 선택
 /// </summary>
 public class UI_PrepPanel : UI_Base
 {
-    [Header("데이터")]
+    // ── 서브 패널 ─────────────────────────────────────────
+    [Header("서브 패널 (3-State)")]
+    [SerializeField] private GameObject panelMain;
+    [SerializeField] private GameObject panelCharSelect;
+    [SerializeField] private GameObject panelWeaponSelect;
+
+    // ── 메인 패널 ─────────────────────────────────────────
+    [Header("메인 — 캐릭터 슬롯")]
+    [SerializeField] private Button   charSlotButton;
+    [SerializeField] private Image    charSlotPortrait;
+    [SerializeField] private TMP_Text charSlotName;
+
+    [Header("메인 — 무기 슬롯")]
+    [SerializeField] private Button   weaponSlotButton;
+    [SerializeField] private Image    weaponSlotIcon;
+    [SerializeField] private TMP_Text weaponSlotName;
+
+    [Header("메인 — 버튼")]
+    [SerializeField] private Button   gameStartButton;
+    [SerializeField] private Button   cancelButton;
+
+    // ── 캐릭터 선택 패널 ──────────────────────────────────
+    [Header("캐릭터 선택 — 데이터")]
     [SerializeField] private CharacterRoster roster;
 
-    [Header("캐릭터 목록 (그리드)")]
+    [Header("캐릭터 선택 — 그리드")]
     [SerializeField] private Transform characterListRoot;
     [SerializeField] private UI_CharacterSelectItem itemTemplate;
 
-    [Header("캐릭터 정보 팝업")]
-    [SerializeField] private GameObject charInfoPopup;
-    [SerializeField] private GameObject bgDim;
-
-    [Header("캐릭터 시트 (CharacterSheetFrame)")]
-    [SerializeField] private Image    charImage;       // Charactor_AMeow Image
-    [SerializeField] private TMP_Text charNameText;    // InfoText (TMP)
-
-    [Header("스탯 슬라이더 (CharacterStatusFrame)")]
+    [Header("캐릭터 선택 — 오른쪽 프리뷰")]
+    [SerializeField] private Image    charPreviewImage;
+    [SerializeField] private TMP_Text charPreviewName;
     [SerializeField] private Slider   sliderHp;
-    [SerializeField] private TMP_Text sliderHpText;    // SliderHeart/SliderValueText
-
+    [SerializeField] private TMP_Text sliderHpText;
     [SerializeField] private Slider   sliderAtk;
-    [SerializeField] private TMP_Text sliderAtkText;   // SliderAtk/SliderValueText
-
+    [SerializeField] private TMP_Text sliderAtkText;
     [SerializeField] private Slider   sliderSpd;
-    [SerializeField] private TMP_Text sliderSpdText;   // SliderStamina/SliderValueText
+    [SerializeField] private TMP_Text sliderSpdText;
 
-    [Header("버튼")]
-    [SerializeField] private Button confirmButton;    // 팝업 안 - 이 캐릭터로 시작
-    [SerializeField] private Button closePopupButton; // 팝업 닫기 (그리드로 복귀)
-    [SerializeField] private Button cancelButton;     // PrepPanel 전체 닫기 (로비 복귀)
+    [Header("캐릭터 선택 — 버튼")]
+    [SerializeField] private Button   charConfirmButton;
 
-    private UI_CharacterSelectItem _selectedItem;
+    // ── 무기 선택 패널 ────────────────────────────────────
+    [Header("무기 선택 — 데이터")]
+    [SerializeField] private WeaponRoster weaponRoster;
+
+    [Header("무기 선택 — 그리드")]
+    [SerializeField] private Transform weaponListRoot;
+    [SerializeField] private UI_WeaponSelectItem weaponItemTemplate;
+
+    [Header("무기 선택 — 오른쪽 프리뷰")]
+    [SerializeField] private Image    weaponPreviewImage;
+    [SerializeField] private TMP_Text weaponPreviewName;
+    [SerializeField] private TMP_Text weaponAtkText;
+    [SerializeField] private TMP_Text weaponAtkSpeedText;
+    [SerializeField] private TMP_Text weaponRangeText;
+
+    [Header("무기 선택 — 버튼")]
+    [SerializeField] private Button   weaponConfirmButton;
+
+    // ── 내부 상태 ─────────────────────────────────────────
+    private CharacterRoster.CharacterEntry _selectedCharEntry;
+    private WeaponRoster.WeaponEntry       _selectedWeaponEntry;
+    private UI_CharacterSelectItem         _selectedCharItem;
+    private UI_WeaponSelectItem            _selectedWeaponItem;
     private bool _built;
 
-    // 슬라이더 max 기준값
     private const float MaxHp  = 200f;
     private const float MaxAtk = 100f;
     private const float MaxSpd = 15f;
 
-    // ─────────────────────────────────────────────────────────
+    // ── UI_Base 생명주기 ──────────────────────────────────
+    public override void Init()
+    {
+        base.Init();
+
+        if (cancelButton        != null) cancelButton.onClick.AddListener(Close);
+        if (charSlotButton      != null) charSlotButton.onClick.AddListener(OpenCharSelect);
+        if (weaponSlotButton    != null) weaponSlotButton.onClick.AddListener(OpenWeaponSelect);
+        if (gameStartButton     != null) gameStartButton.onClick.AddListener(OnClickGameStart);
+        if (charConfirmButton   != null) charConfirmButton.onClick.AddListener(OnClickCharConfirm);
+        if (weaponConfirmButton != null) weaponConfirmButton.onClick.AddListener(OnClickWeaponConfirm);
+    }
+
     public override void Open()
     {
         gameObject.SetActive(true);
 
-        if (charInfoPopup != null) charInfoPopup.SetActive(false);
-        if (bgDim        != null) bgDim.SetActive(false);
-
         if (!_built)
         {
             BuildCharacterList();
+            BuildWeaponList();
             _built = true;
         }
 
-        RefreshConfirmButton();
+        ShowMain();
     }
 
     public override void Close()
     {
-        if (charInfoPopup != null) charInfoPopup.SetActive(false);
         gameObject.SetActive(false);
     }
 
-    public override void Init()
+    // ── 패널 전환 ─────────────────────────────────────────
+    private void ShowMain()
     {
-        base.Init();
-        if (confirmButton    != null) confirmButton.onClick.AddListener(OnClickConfirm);
-        if (closePopupButton != null) closePopupButton.onClick.AddListener(CloseInfoPopup);
-        if (cancelButton     != null) cancelButton.onClick.AddListener(Close);
+        SetPanel(panelMain, true);
+        SetPanel(panelCharSelect, false);
+        SetPanel(panelWeaponSelect, false);
+        RefreshMainSlots();
+        RefreshGameStartButton();
     }
 
-    // ─────────────────────────────────────────────────────────
+    private void OpenCharSelect()
+    {
+        SetPanel(panelMain, false);
+        SetPanel(panelCharSelect, true);
+        SetPanel(panelWeaponSelect, false);
+    }
+
+    private void OpenWeaponSelect()
+    {
+        SetPanel(panelMain, false);
+        SetPanel(panelCharSelect, false);
+        SetPanel(panelWeaponSelect, true);
+    }
+
+    private static void SetPanel(GameObject panel, bool active)
+    {
+        if (panel != null) panel.SetActive(active);
+    }
+
+    // ── 메인 패널 갱신 ────────────────────────────────────
+    private void RefreshMainSlots()
+    {
+        if (_selectedCharEntry != null)
+        {
+            if (charSlotPortrait != null)
+            {
+                charSlotPortrait.sprite = _selectedCharEntry.portrait;
+                charSlotPortrait.color  = _selectedCharEntry.portrait != null ? Color.white : Color.gray;
+            }
+            if (charSlotName != null)
+                charSlotName.text = _selectedCharEntry.data != null ? _selectedCharEntry.data.characterName : "";
+        }
+        else
+        {
+            if (charSlotPortrait != null) charSlotPortrait.color = Color.gray;
+            if (charSlotName     != null) charSlotName.text = "캐릭터 선택";
+        }
+
+        var weaponSO = _selectedWeaponEntry?.data;
+        var icon     = (_selectedWeaponEntry != null && _selectedWeaponEntry.icon != null)
+                        ? _selectedWeaponEntry.icon : weaponSO?.icon;
+        if (weaponSlotIcon != null)
+        {
+            weaponSlotIcon.sprite = icon;
+            weaponSlotIcon.color  = icon != null ? Color.white : Color.gray;
+        }
+        if (weaponSlotName != null)
+            weaponSlotName.text = weaponSO != null ? weaponSO.displayName : "무기 선택";
+    }
+
+    private void RefreshGameStartButton()
+    {
+        if (gameStartButton != null)
+            gameStartButton.interactable = (_selectedCharEntry != null && _selectedWeaponEntry != null);
+    }
+
+    // ── 캐릭터 선택 ───────────────────────────────────────
     private void BuildCharacterList()
     {
-        if (roster == null)
+        if (roster == null || characterListRoot == null || itemTemplate == null)
         {
-            Debug.LogError("[UI_PrepPanel] CharacterRoster가 연결되지 않았습니다.");
-            return;
-        }
-        if (itemTemplate == null)
-        {
-            Debug.LogError("[UI_PrepPanel] itemTemplate이 연결되지 않았습니다.");
+            Debug.LogWarning("[UI_PrepPanel] 캐릭터 리스트 참조 누락");
             return;
         }
 
@@ -97,54 +196,126 @@ public class UI_PrepPanel : UI_Base
         foreach (var entry in roster.characters)
         {
             if (entry == null || entry.data == null) continue;
-
             var item = Instantiate(itemTemplate, characterListRoot);
             item.gameObject.SetActive(true);
             item.Init();
-            item.Setup(entry, SelectItem);
+            item.Setup(entry, OnCharItemClicked);
         }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(characterListRoot as RectTransform);
     }
 
-    // ─────────────────────────────────────────────────────────
-    private void SelectItem(UI_CharacterSelectItem item)
+    private void OnCharItemClicked(UI_CharacterSelectItem item)
     {
-        if (_selectedItem != null) _selectedItem.SetSelected(false);
-
-        _selectedItem = item;
-        _selectedItem.SetSelected(true);
-
-        RefreshPreview(item.Entry);
-        RefreshConfirmButton();
-
-        if (bgDim        != null) bgDim.SetActive(true);
-        if (charInfoPopup != null) charInfoPopup.SetActive(true);
+        if (_selectedCharItem != null) _selectedCharItem.SetSelected(false);
+        _selectedCharItem = item;
+        _selectedCharItem.SetSelected(true);
+        RefreshCharPreview(item.Entry);
+        if (charConfirmButton != null) charConfirmButton.interactable = true;
     }
 
-    private void CloseInfoPopup()
-    {
-        if (charInfoPopup != null) charInfoPopup.SetActive(false);
-        if (bgDim        != null) bgDim.SetActive(false);
-    }
-
-    private void RefreshPreview(CharacterRoster.CharacterEntry entry)
+    private void RefreshCharPreview(CharacterRoster.CharacterEntry entry)
     {
         if (entry == null || entry.data == null) return;
         var d = entry.data;
 
-        if (charImage    != null)
+        if (charPreviewImage != null)
         {
-            charImage.sprite = entry.portrait;
-            charImage.color  = entry.portrait != null ? Color.white : Color.gray;
+            charPreviewImage.sprite = entry.portrait;
+            charPreviewImage.color  = entry.portrait != null ? Color.white : Color.gray;
         }
-        if (charNameText != null) charNameText.text = d.characterName;
+        if (charPreviewName != null) charPreviewName.text = d.characterName;
 
-        SetSlider(sliderHp,  sliderHpText,  d.maxHealth,      MaxHp,  "HP");
-        SetSlider(sliderAtk, sliderAtkText, d.attackPower,    MaxAtk, "ATK");
-        SetSlider(sliderSpd, sliderSpdText, d.baseMoveSpeed,  MaxSpd, "SPD");
+        SetSlider(sliderHp,  sliderHpText,  d.maxHealth,     MaxHp,  "체력");
+        SetSlider(sliderAtk, sliderAtkText, d.attackPower,   MaxAtk, "방어력");
+        SetSlider(sliderSpd, sliderSpdText, d.baseMoveSpeed, MaxSpd, "이동속도");
     }
 
+    private void OnClickCharConfirm()
+    {
+        if (_selectedCharItem == null) return;
+        _selectedCharEntry = _selectedCharItem.Entry;
+        ShowMain();
+    }
+
+    // ── 무기 선택 ─────────────────────────────────────────
+    private void BuildWeaponList()
+    {
+        if (weaponRoster == null || weaponListRoot == null || weaponItemTemplate == null)
+        {
+            Debug.LogWarning("[UI_PrepPanel] 무기 리스트 참조 누락");
+            return;
+        }
+
+        weaponItemTemplate.gameObject.SetActive(false);
+
+        foreach (var entry in weaponRoster.weapons)
+        {
+            if (entry == null || entry.data == null) continue;
+            var item = Instantiate(weaponItemTemplate, weaponListRoot);
+            item.gameObject.SetActive(true);
+            item.Init();
+            item.Setup(entry, OnWeaponItemClicked);
+        }
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(weaponListRoot as RectTransform);
+    }
+
+    private void OnWeaponItemClicked(UI_WeaponSelectItem item)
+    {
+        if (_selectedWeaponItem != null) _selectedWeaponItem.SetSelected(false);
+        _selectedWeaponItem = item;
+        _selectedWeaponItem.SetSelected(true);
+        RefreshWeaponPreview(item.Entry);
+        if (weaponConfirmButton != null) weaponConfirmButton.interactable = true;
+    }
+
+    private void RefreshWeaponPreview(WeaponRoster.WeaponEntry entry)
+    {
+        if (entry == null || entry.data == null) return;
+        var so   = entry.data;
+        var icon = entry.icon != null ? entry.icon : so.icon;
+
+        if (weaponPreviewImage != null)
+        {
+            weaponPreviewImage.sprite = icon;
+            weaponPreviewImage.color  = icon != null ? Color.white : Color.gray;
+        }
+        if (weaponPreviewName  != null) weaponPreviewName.text  = so.displayName;
+        if (weaponAtkText      != null) weaponAtkText.text      = $"공격력  {so.baseAttack:0}";
+        if (weaponAtkSpeedText != null) weaponAtkSpeedText.text = "공격속도  —";
+        if (weaponRangeText    != null) weaponRangeText.text    = "공격 거리  —";
+    }
+
+    private void OnClickWeaponConfirm()
+    {
+        if (_selectedWeaponItem == null) return;
+        _selectedWeaponEntry = _selectedWeaponItem.Entry;
+        ShowMain();
+    }
+
+    // ── 게임 시작 ─────────────────────────────────────────
+    private void OnClickGameStart()
+    {
+        if (_selectedCharEntry == null || _selectedWeaponEntry == null)
+        {
+            Debug.LogWarning("[UI_PrepPanel] 캐릭터 또는 무기가 선택되지 않았습니다.");
+            return;
+        }
+
+        Managers.CharacterData.SetCharacterData(_selectedCharEntry.data, _selectedCharEntry.prefabKey);
+
+        var app = AppBootstrapper.Instance;
+        if (app == null) return;
+
+        app.Loadout.SetCharacter(_selectedCharEntry.data, _selectedCharEntry.prefabKey);
+        app.Loadout.SetWeaponSlot0(_selectedWeaponEntry.data);
+
+        Close();
+        app.RequestStartRun();
+    }
+
+    // ── 유틸 ──────────────────────────────────────────────
     private static void SetSlider(Slider slider, TMP_Text label, float value, float maxVal, string prefix)
     {
         if (slider != null)
@@ -156,31 +327,6 @@ public class UI_PrepPanel : UI_Base
             slider.maxValue = maxVal;
             slider.value    = Mathf.Clamp(value, 0f, maxVal);
         }
-        if (label != null) label.text = $"{prefix} {value:0}";
-    }
-
-    private void RefreshConfirmButton()
-    {
-        if (confirmButton != null)
-            confirmButton.interactable = (_selectedItem != null && _selectedItem.Entry?.data != null);
-    }
-
-    // ─────────────────────────────────────────────────────────
-    private void OnClickConfirm()
-    {
-        if (_selectedItem == null || _selectedItem.Entry?.data == null)
-        {
-            Debug.LogWarning("[UI_PrepPanel] 캐릭터가 선택되지 않았습니다.");
-            return;
-        }
-
-        var entry = _selectedItem.Entry;
-        Managers.CharacterData.SetCharacterData(entry.data, entry.prefabKey);
-
-        var app = AppBootstrapper.Instance;
-        if (app == null) return;
-
-        Close();
-        app.RequestStartRun();
+        if (label != null) label.text = $"{prefix}  {value:0}";
     }
 }

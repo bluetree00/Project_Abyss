@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using Cinemachine;
 using Cysharp.Threading.Tasks;
@@ -367,6 +368,8 @@ public class PlayerController : CharacterBase
 
         inputActions.Player.Attack.started += ctx =>
         {
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
             if (CanAttack())
                 _attackPolicy?.OnStarted(this);
             else
@@ -376,7 +379,11 @@ public class PlayerController : CharacterBase
                 _lastClickedPosition = hit.point;
         };
 
-        inputActions.Player.Attack.canceled += _ => _attackPolicy?.OnCanceled(this);
+        inputActions.Player.Attack.canceled += _ =>
+        {
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+            _attackPolicy?.OnCanceled(this);
+        };
 
         inputActions.Player.Run.started += _ => isRunChecked = true;
         inputActions.Player.Run.canceled += _ => isRunChecked = false;
