@@ -7,40 +7,62 @@ using Cysharp.Threading.Tasks;
 public class WorldWeaponDisplay : MonoBehaviour
 {
     [Header("Weapon Data")]
-    public WeaponSO weaponSO; // 테스트용
+    public WeaponSO weaponSO; // 에디터 배치용
 
+    private WeaponData _runtimeData;  // 코드로 드랍된 무기 데이터
     private GameObject _weaponInstance;
-    private bool _pickedUp = false; // 중복 픽업 방지
+    private bool _pickedUp = false;
 
     private async void Start()
     {
-        if (weaponSO != null)
-        {
-            await SpawnWeaponPrefabAsync(weaponSO);
-        }
+        if (_runtimeData == null && weaponSO != null)
+            await SpawnDisplayAsync(weaponSO.weaponDisplayKey);
     }
 
-    private async UniTask SpawnWeaponPrefabAsync(WeaponSO so)
+    /// <summary>
+    /// 런타임 WeaponData로 초기화 (교체 드랍 시 사용)
+    /// </summary>
+    public void InitFromData(WeaponData data)
     {
-        if (string.IsNullOrEmpty(so.weaponDisplayKey)) return;
+        _runtimeData = data;
+        SpawnDisplayAsync(data.WeaponDisplayKey).Forget();
+    }
+
+    /// <summary>
+    /// 버린 무기를 월드에 스폰
+    /// </summary>
+    public static WorldWeaponDisplay SpawnFromData(WeaponData data, Vector3 position)
+    {
+        var go = new GameObject($"DroppedWeapon_{data.displayName}");
+        go.transform.position = position;
+
+        var col = go.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 1f;
+
+        var display = go.AddComponent<WorldWeaponDisplay>();
+        display.InitFromData(data);
+        return display;
+    }
+
+    private async UniTask SpawnDisplayAsync(string displayKey)
+    {
+        if (string.IsNullOrEmpty(displayKey)) return;
 
         if (_weaponInstance != null)
             Destroy(_weaponInstance);
 
-        var handle = Addressables.InstantiateAsync(so.weaponDisplayKey, transform.position, transform.rotation);
+        var handle = Addressables.InstantiateAsync(displayKey, transform.position, transform.rotation);
         await handle.Task;
 
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
             _weaponInstance = handle.Result;
             _weaponInstance.transform.SetParent(transform, true);
-
-            var wi = _weaponInstance.GetComponent<WeaponInstance>() ?? _weaponInstance.AddComponent<WeaponInstance>();
-            wi.Initialize(new WeaponData(so));
         }
         else
         {
-            Debug.LogError($"Weapon prefab 생성 실패: {so.weaponDisplayKey}");
+            Debug.LogWarning($"[WorldWeaponDisplay] 프리팹 로드 실패: {displayKey}");
         }
     }
 
@@ -49,21 +71,16 @@ public class WorldWeaponDisplay : MonoBehaviour
         if (_pickedUp) return;
 
         var player = other.GetComponent<PlayerController>();
-        if (player != null)
-        {
-            _pickedUp = true;
+        if (player == null) return;
 
-            // WeaponData 복사본 생성
-            var runtimeData = new WeaponData(weaponSO);
+        _pickedUp = true;
 
-            // PlayerWeaponManager에 전달
-            if (player.WeaponManager != null)
-            {
-                await player.WeaponManager.HandlePickupAsync(runtimeData, autoEquip: true);
-            }
+        var data = _runtimeData ?? (weaponSO != null ? new WeaponData(weaponSO) : null);
+        if (data == null) { _pickedUp = false; return; }
 
-            // 월드 오브젝트 제거
-            Destroy(gameObject);
-        }
+        if (player.WeaponManager != null)
+            await player.WeaponManager.HandlePickupAsync(data, autoEquip: true);
+
+        Destroy(gameObject);
     }
 }

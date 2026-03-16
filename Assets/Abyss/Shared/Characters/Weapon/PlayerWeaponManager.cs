@@ -332,6 +332,13 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             var slot = slots[slotIndex];
             var old = slot.runtimeData;
 
+            // ---------- 1) 버린 무기를 월드에 드랍 ----------
+            if (old != null && _owner != null)
+            {
+                var dropPos = _owner.transform.position + _owner.transform.right * 1.5f;
+                WorldWeaponDisplay.SpawnFromData(old, dropPos);
+            }
+            _owned.Remove(old);
 
             // ---------- 2) 기존 인스턴스 정리 (Addressables 인스턴스는 ReleaseInstance 호출) ----------
             if (slot.instance != null)
