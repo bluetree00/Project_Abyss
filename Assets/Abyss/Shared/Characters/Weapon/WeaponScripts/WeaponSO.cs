@@ -5,11 +5,10 @@ public class WeaponSO : ScriptableObject
 {
     [Header("기본 정보")]
     public string weaponDisplayKey;
-    public string weaponKey;
+    public string weaponPrefabKey;  // Addressables 무기 프리팹 키
     public string displayName;
-    public string prefabKey;
-    public string iconKey;         // Addressables 비동기 로드용 키
-    public Sprite icon;            // HUD 즉시 표시용 직접 참조
+    public string iconKey;          // Addressables 비동기 로드용 키
+    public Sprite icon;             // HUD 즉시 표시용 직접 참조
     public float baseAttack;
     public float baseDefense;
 
