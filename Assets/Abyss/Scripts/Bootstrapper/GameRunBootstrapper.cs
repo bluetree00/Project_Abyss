@@ -203,6 +203,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
+        // Loadout 슬롯 0 무기 장착
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        if (loadout != null && loadout.WeaponSlot0 != null)
+        {
+            // WeaponManager가 InitAsync 완료 후 존재하므로 다음 프레임까지 대기
+            await Cysharp.Threading.Tasks.UniTask.Yield();
+            if (player.WeaponManager != null)
+            {
+                var weaponData = new WeaponData(loadout.WeaponSlot0);
+                await player.WeaponManager.AcquireWeaponAsync(weaponData, autoEquip: true);
+                Debug.Log($"[GameRunBootstrapper] Loadout 무기 장착: {loadout.WeaponSlot0.displayName}");
+            }
+        }
+
         return player;
     }
 }
