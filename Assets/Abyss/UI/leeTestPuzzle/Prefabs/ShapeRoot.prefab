@@ -49,6 +49,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0f81d5f5d702d4a4d816322fe23124ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  shapeName: 
+  shapeId: 
   shapeAsset: {fileID: 0}
   dragAsset: {fileID: 11400000, guid: 2beb0ddf6033f2e4f8bf52e62b7d897c, type: 2}
   shapeBlockPrefab: {fileID: 7796692141648486092, guid: 8988b128bef29db41896ab3a0f9aadb0,

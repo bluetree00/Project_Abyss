@@ -43,6 +43,9 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
 
+    // ---- 로드아웃 (로비 선택 → InGame 전달) ----
+    public PlayerLoadout Loadout { get; private set; } = new PlayerLoadout();
+
     // ---- Run 수명 관리 ----
     public GameRunSession CurrentRun { get; private set; }
 
