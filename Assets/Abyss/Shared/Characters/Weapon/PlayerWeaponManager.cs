@@ -307,9 +307,15 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
     {
-        Debug.Log($"Inventory full! Replace weapon with: {newWeapon.displayName}? Simulated choice: slot 0");
-        await UniTask.Delay(TimeSpan.FromSeconds(1f));
-        return 0;
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
+        if (popup == null)
+        {
+            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 슬롯 0으로 대체");
+            return 0;
+        }
+
+        popup.Setup(newWeapon, slots);
+        return await popup.WaitForChoiceAsync();
     }
 
     // ----------------------
@@ -326,6 +332,13 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             var slot = slots[slotIndex];
             var old = slot.runtimeData;
 
+            // ---------- 1) 버린 무기를 월드에 드랍 ----------
+            if (old != null && _owner != null)
+            {
+                var dropPos = _owner.transform.position + _owner.transform.right * 1.5f;
+                WorldWeaponDisplay.SpawnFromData(old, dropPos);
+            }
+            _owned.Remove(old);
 
             // ---------- 2) 기존 인스턴스 정리 (Addressables 인스턴스는 ReleaseInstance 호출) ----------
             if (slot.instance != null)

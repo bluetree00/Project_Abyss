@@ -20,6 +20,7 @@ public class WeaponData
     public string displayName;
     public string weaponPrefabKey;
     public string iconKey;
+    public Sprite icon;            // HUD 표시용 직접 참조
     public float baseAttack;
     public float baseDefense;
     public float holdThreshold;
@@ -42,6 +43,7 @@ public class WeaponData
         weaponPrefabKey = so.weaponKey;
         displayName = so.displayName;
         iconKey = so.iconKey;
+        icon = so.icon;
         baseAttack = so.baseAttack;
         baseDefense = so.baseDefense;
         holdThreshold = so.holdThreshold;

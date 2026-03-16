@@ -159,10 +159,13 @@ public class UIManager
     public void ShowPopupUI<T>(string name = null)
         where T : UI_Popup
     {
-        ShowPopupUIAsync<T>(name).Forget();
+        ShowPopupUIAndGetAsync<T>(name).Forget();
     }
 
-    private async UniTask ShowPopupUIAsync<T>(string name = null)
+    /// <summary>
+    /// 팝업을 열고 인스턴스를 반환한다. 직접 제어가 필요한 경우(장비 교체 등) 사용.
+    /// </summary>
+    public async UniTask<T> ShowPopupUIAndGetAsync<T>(string name = null)
         where T : UI_Popup
     {
         name ??= typeof(T).Name;
@@ -172,8 +175,9 @@ public class UIManager
             if (existing != null)
             {
                 existing.SetActive(true);
-                _popupStack.Push(existing.GetComponent<T>());
-                return;
+                var cached = existing.GetComponent<T>();
+                _popupStack.Push(cached);
+                return cached;
             }
             _uiObjects.Remove(name);
         }
@@ -193,10 +197,12 @@ public class UIManager
             _popupStack.Push(popup);
 
             _uiObjects[name] = go;
+            return popup;
         }
         catch
         {
             Debug.LogError($"[UIManager] Popup UI Load Failed : {name}");
+            return null;
         }
     }
 
