@@ -1,97 +1,67 @@
 using UnityEngine;
 
 /// <summary>
-/// 공통 AttackReady 상태.
-/// - 이동 정지 후 공격 어빌리티 선택 및 애니메이션 오버라이드
-/// - 쿨타임 대기 중 타깃 방향 회전
-/// - 쿨타임 종료 → Attack 전환
-/// - 범위 이탈 → Chase 복귀
-///
-/// [기존 개선] AttackStyle / AttackPurpose를 생성자로 주입받아 하드코딩 제거.
-///   new LeeAttackReadyState()                                        → Melee / Normal01 (기본값)
-///   new LeeAttackReadyState(Define.AttackStyle.Ranged, ...)          → 원거리 공격 몬스터에 재사용
+/// 공격 준비 상태.
+/// - 이동 정지, attackDelay(1초) 대기 후 Attack 전환.
+/// - 대기 중 플레이어가 사정거리 밖으로 나가면 Chase 전환.
+/// - 플레이어 사망 시 Patrol 전환.
 /// </summary>
-public class LeeAttackReadyState : LeeMonsterStateBase
+public class LeeAttackReadyState : ILeeMonsterState
 {
-    private readonly Define.AttackStyle   _style;
-    private readonly Define.AttackPurpose _purpose;
-    private AttackAbilitySet _attackAbilitySet;
-
-    /// <param name="style">공격 스타일. 기본값: Melee.</param>
-    /// <param name="purpose">공격 의도. 기본값: Normal01.</param>
-    public LeeAttackReadyState(
-        Define.AttackStyle   style   = Define.AttackStyle.Melee,
-        Define.AttackPurpose purpose = Define.AttackPurpose.Normal01)
+    public void Enter(LeeMonsterContext ctx)
     {
-        _style   = style;
-        _purpose = purpose;
+        ctx.Agent.ResetPath();
+        ctx.Runtime.StateTimer = ctx.Stat.attackDelay;
+
+        PlayAnim(ctx, ctx.Animation.attackReadyStateName);
+        FacePlayer(ctx);
     }
 
-    protected override void OnInit()
+    public void Update(LeeMonsterContext ctx)
     {
-        var ability = Controller.AbilitySet.GetAbility<IMonsterAbility>(Define.MonsterAbilityType.Attack);
-        _attackAbilitySet = ability as AttackAbilitySet;
+        // 플레이어 사망
+        if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
+        {
+            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            return;
+        }
 
-        if (_attackAbilitySet == null)
-            Debug.LogError($"[{Controller.name}] AttackAbilitySet이 없습니다. AbilitySetSO를 확인하세요.");
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+
+        // 플레이어가 사정거리 밖으로 이탈 (1.3배 여유 허용)
+        if (dist > ctx.Stat.attackRange * 1.3f)
+        {
+            ctx.Monster.ChangeState(LeeMonsterStateType.Chase);
+            return;
+        }
+
+        FacePlayer(ctx);
+
+        ctx.Runtime.StateTimer -= Time.deltaTime;
+        if (ctx.Runtime.StateTimer <= 0f)
+            ctx.Monster.ChangeState(LeeMonsterStateType.Attack);
     }
 
-    protected override void OnEnter()
+    public void Exit(LeeMonsterContext ctx) { }
+
+    // ── 헬퍼 ──────────────────────────────────────────────
+
+    private static void FacePlayer(LeeMonsterContext ctx)
     {
-        Controller.StopMoving();
-        Controller.SetAttackReadyTime(0f); // 쿨타임 초기화 → 즉시 공격
-
-        var selectedAttack = _attackAbilitySet?.SelectAttackAbility(_style, _purpose);
-        if (selectedAttack != null)
-        {
-            Controller.SetCurrentAttackAbility(selectedAttack);
-            // NormalAttackAbility.OnAttackEnd 필터가 올바르게 동작하도록 purpose 동기화
-            Controller.currentAttackPurpose = selectedAttack.Purpose;
-
-            if (selectedAttack is IAnimClipProvider clipProvider)
-                Controller.OverrideAnimationClip("Attack", clipProvider.GetAttackAnimationClip());
-        }
-
-        Controller.animator.CrossFade(LeeFSM?.AnimAttackReady ?? "AttackReady", 0.1f);
-    }
-
-    protected override MonsterController.MonsterState OnUpdate()
-    {
-        if (Controller.playerTarget == null)
-        {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Patrol);
-            return MonsterController.MonsterState.Patrol;
-        }
-
-        float dist = Vector3.Distance(Controller.transform.position, Controller.playerTarget.position);
-        bool inRange = dist <= Controller.MyStat.attack_range;
-        Controller.SetInAttackRange(inRange);
-
-        // 범위 이탈 → Chase
-        if (!inRange)
-        {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
-            return MonsterController.MonsterState.Chase;
-        }
-
-        // 쿨타임 종료 → Attack
-        if (Controller.AttackReadyTime <= 0f)
-        {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Attack);
-            return MonsterController.MonsterState.Attack;
-        }
-
-        // 대기 중 타깃 방향 회전
-        Vector3 dir = Controller.playerTarget.position - Controller.transform.position;
+        if (ctx.Runtime.PlayerTarget == null) return;
+        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
-        if (dir != Vector3.zero)
-        {
-            Controller.transform.rotation = Quaternion.Slerp(
-                Controller.transform.rotation,
-                Quaternion.LookRotation(dir),
-                Time.deltaTime * 10f);
-        }
+        if (dir.sqrMagnitude < 0.001f) return;
 
-        return MonsterController.MonsterState.AttackReady;
+        ctx.Transform.rotation = Quaternion.Slerp(
+            ctx.Transform.rotation,
+            Quaternion.LookRotation(dir),
+            Time.deltaTime * 15f);
+    }
+
+    private static void PlayAnim(LeeMonsterContext ctx, string stateName)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
+        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
     }
 }

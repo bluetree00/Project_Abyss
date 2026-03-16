@@ -1,63 +1,82 @@
 using UnityEngine;
 
 /// <summary>
-/// 공통 Attack 상태.
-/// - Enter 시 CurrentAttackAbility.Execute() 호출
-/// - IsAttacking이 false가 되면 (애니메이션 이벤트로 해제) Chase로 복귀
-/// - 타임아웃: 이벤트가 미발동돼도 maxDuration 후 강제 탈출
-///   (BatAnimationEventReceiver가 자식에 있거나 AnimationEvent 미설정 시 안전장치)
+/// 공격 상태 (몸통박치기 등 근거리 공격).
+///
+/// 흐름:
+///  Enter → 공격 애니메이션 트리거 → damageApplyDelay 후 DealDamageToPlayer()
+///       → 1/attackRate 초 후 쿨다운 종료
+///       → 여전히 사정거리 안이면 AttackReady, 아니면 Chase
+///
+/// 데미지 타이밍은 두 가지를 지원:
+///  1) 타이머 방식 (기본) : MonsterCombatSO.damageApplyDelay
+///  2) 애니메이션 이벤트 방식 : LeeMonsterBase.OnAnimAttackHit() 가 직접 호출
+///     (이 경우 damageApplyDelay = 0 으로 설정해 타이머가 즉시 비활성화)
 /// </summary>
-public class LeeAttackState : LeeMonsterStateBase
+public class LeeAttackState : ILeeMonsterState
 {
-    private readonly float _maxDuration;
-    private float _elapsed;
+    private float _cooldownTimer;   // 다음 상태 전환까지 남은 시간
+    private float _damageTimer;     // 데미지 적용까지 남은 시간
+    private bool  _damageDealt;     // 이 공격에서 데미지를 이미 줬는지
 
-    /// <param name="maxDuration">이 시간(초) 안에 OnAttackEnd 이벤트가 안 오면 강제로 Chase 복귀. 기본 3초.</param>
-    public LeeAttackState(float maxDuration = 3f)
+    public void Enter(LeeMonsterContext ctx)
     {
-        _maxDuration = maxDuration;
+        ctx.Agent.ResetPath();
+
+        _cooldownTimer = 1f / Mathf.Max(0.01f, ctx.Stat.attackRate);
+        _damageTimer   = ctx.Combat.damageApplyDelay;
+        _damageDealt   = false;
+
+        ctx.Runtime.AttackHitDealt = false;
+
+        // 공격 애니메이션 (CrossFade로 직접 전환 — AnyState 트리거 불필요)
+        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.attackTrigger))
+            ctx.Animator.CrossFade(ctx.Animation.attackTrigger, 0.05f, 0, 0f);
+
+        // 공격 시 플레이어 방향 바라보기
+        FacePlayer(ctx);
     }
 
-    protected override void OnEnter()
+    public void Update(LeeMonsterContext ctx)
     {
-        _elapsed = 0f;
-        Controller.SetAttack(true);
-        // AnimAttack 이름으로 직접 CrossFade (Execute의 clip.name이 state 이름과 다를 수 있으므로)
-        Controller.animator.CrossFade(LeeFSM?.AnimAttack ?? "Attack", 0.1f);
-        Controller.CurrentAttackAbility?.Execute(); // 데미지/이펙트 처리
-    }
-
-    protected override void OnExit()
-    {
-        Controller.SetAttack(false);
-        // 이벤트 구독 성공 여부와 관계없이 쿨타임을 보장
-        // NormalAttackAbility.OnAttackEnd가 이미 설정했더라도 덮어쓰지 않도록 0일 때만 설정
-        if (Controller.AttackReadyTime <= 0f && Controller.MyStat != null)
-            Controller.SetAttackReadyTime(Controller.MyStat.attack_cooldown);
-    }
-
-    protected override MonsterController.MonsterState OnUpdate()
-    {
-        _elapsed += Time.deltaTime;
-
-        // 정상 종료: 애니메이션 이벤트(OnAttackEnd)가 IsAttacking을 false로 설정
-        if (!Controller.IsAttacking)
+        // 타이머 방식 데미지 적용
+        if (!_damageDealt && _damageTimer > 0f)
         {
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
-            return MonsterController.MonsterState.Chase;
+            _damageTimer -= Time.deltaTime;
+            if (_damageTimer <= 0f)
+            {
+                _damageDealt = true;
+                ctx.Monster.DealDamageToPlayer();
+            }
         }
 
-        // 안전장치: 이벤트 미발동 시 타임아웃으로 강제 탈출
-        if (_elapsed >= _maxDuration)
+        // 공격 쿨다운 경과 → 다음 상태 결정
+        _cooldownTimer -= Time.deltaTime;
+        if (_cooldownTimer > 0f) return;
+
+        if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
-            Debug.LogWarning($"[LeeAttackState] {Controller.name} 타임아웃 강제 탈출. " +
-                             "BatAnimationEventReceiver가 루트에 붙어 있는지, " +
-                             "Attack 애니메이션에 OnAttackEnd 이벤트가 설정됐는지 확인하세요.");
-            Controller.SetAttack(false);
-            StateChanger.RequestStateChange(MonsterController.MonsterState.Chase);
-            return MonsterController.MonsterState.Chase;
+            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            return;
         }
 
-        return MonsterController.MonsterState.Attack;
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        ctx.Monster.ChangeState(
+            dist <= ctx.Stat.attackRange
+                ? LeeMonsterStateType.AttackReady
+                : LeeMonsterStateType.Chase);
+    }
+
+    public void Exit(LeeMonsterContext ctx) { }
+
+    // ── 헬퍼 ──────────────────────────────────────────────
+
+    private static void FacePlayer(LeeMonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null) return;
+        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude > 0.001f)
+            ctx.Transform.rotation = Quaternion.LookRotation(dir);
     }
 }
