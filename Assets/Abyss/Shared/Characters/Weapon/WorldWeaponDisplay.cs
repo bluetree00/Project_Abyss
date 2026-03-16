@@ -25,7 +25,7 @@ public class WorldWeaponDisplay : MonoBehaviour
     public void InitFromData(WeaponData data)
     {
         _runtimeData = data;
-        SpawnDisplayAsync(data.WeaponDisplayKey).Forget();
+        SpawnDisplayAsync(data.weaponDisplayKey).Forget();
     }
 
     /// <summary>

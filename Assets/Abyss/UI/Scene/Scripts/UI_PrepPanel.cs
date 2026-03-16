@@ -227,7 +227,7 @@ public class UI_PrepPanel : UI_Base
         if (charPreviewName != null) charPreviewName.text = d.characterName;
 
         SetSlider(sliderHp,  sliderHpText,  d.maxHealth,     MaxHp,  "체력");
-        SetSlider(sliderAtk, sliderAtkText, d.attackPower,   MaxAtk, "방어력");
+        SetSlider(sliderAtk, sliderAtkText, d.attackPower,   MaxAtk, "공격력");
         SetSlider(sliderSpd, sliderSpdText, d.baseMoveSpeed, MaxSpd, "이동속도");
     }
 
