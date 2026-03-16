@@ -393,9 +393,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6150b3754548b5349a08120884c2d40f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startButton: {fileID: 0}
   chapter: 0
   bootstrapper: {fileID: 0}
+  clearRoomKey: 286
+  returnToStageMapKey: 287
 --- !u!114 &6523570158532763993
 MonoBehaviour:
   m_ObjectHideFlags: 0

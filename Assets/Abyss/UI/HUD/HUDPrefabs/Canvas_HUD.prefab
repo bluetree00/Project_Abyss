@@ -66,12 +66,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 0}
-  combatPanelRoot: {fileID: 0}
-  explorePanelRoot: {fileID: 0}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
-  hpSlider: {fileID: 0}
-  hpText: {fileID: 0}
   goldText: {fileID: 0}
 --- !u!1 &855046206462599360
 GameObject:
@@ -241,12 +238,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 0}
-  combatPanelRoot: {fileID: 0}
-  explorePanelRoot: {fileID: 0}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
-  hpSlider: {fileID: 0}
-  hpText: {fileID: 0}
   goldText: {fileID: 0}
 --- !u!1 &2167134208537305420
 GameObject:
@@ -316,10 +310,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d31b547364ae3a146ae56ea108616ad0, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   topBarRoot: {fileID: 2779226212273418108}
-  combatPanel: {fileID: 4932569758490963291}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 4746466043727673763}
   systemNoticesRoot: {fileID: 7225085929984170936}
   goldText: {fileID: 0}
@@ -389,12 +383,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 0}
-  combatPanelRoot: {fileID: 0}
-  explorePanelRoot: {fileID: 0}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
-  hpSlider: {fileID: 0}
-  hpText: {fileID: 0}
   goldText: {fileID: 0}
 --- !u!1 &4746466043727673763
 GameObject:
@@ -462,12 +453,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 0}
-  combatPanelRoot: {fileID: 0}
-  explorePanelRoot: {fileID: 0}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
-  hpSlider: {fileID: 0}
-  hpText: {fileID: 0}
   goldText: {fileID: 0}
 --- !u!1 &7225085929984170936
 GameObject:
@@ -535,10 +523,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 0}
-  combatPanelRoot: {fileID: 0}
-  explorePanelRoot: {fileID: 0}
+  combatPanel: {fileID: 0}
   bossPanelRoot: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
-  hpSlider: {fileID: 0}
-  hpText: {fileID: 0}
   goldText: {fileID: 0}
