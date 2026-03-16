@@ -23,10 +23,13 @@ public sealed class PlayerRuntimeStats
         MaxHp = Mathf.Max(1, data.maxHealth);
         Hp = MaxHp;
         _baseAttackPower = Mathf.Max(0, data.attackPower);
-        _weaponAttack = 0;
-        AttackPower = _baseAttackPower;
+        _weaponAttack    = 0;
+        _itemAttackBonus = 0;
+        _roomAttackBuff  = 0;
         HeavyChargeThreshold = Mathf.Max(0f, data.heavyAttackChargeThreshold);
-        OnChanged?.Invoke();
+
+        // 패시브 초기 적용
+        ApplyPassive(data.passive);   // RecalculateAttack + OnChanged 포함
     }
 
     public void SetHeavyChargeThreshold(float value)
@@ -57,6 +60,8 @@ public sealed class PlayerRuntimeStats
         SetHp(Hp + amount);
     }
 
+    /// <summary>직접 공격력 덮어쓰기 — 레이어 방식으로 대체됨. SetWeaponStats/RefreshItemBonuses 사용.</summary>
+    [System.Obsolete("Use SetWeaponStats / RefreshItemBonuses / RefreshRoomBuffs instead.")]
     public void SetAttackPower(int attackPower)
     {
         attackPower = Mathf.Max(0, attackPower);
@@ -65,18 +70,59 @@ public sealed class PlayerRuntimeStats
         OnChanged?.Invoke();
     }
 
-    // 캐릭터 기본 공격력 (CharacterData 기준, 변하지 않음)
-    private int _baseAttackPower;
-    // 현재 장착 무기의 공격력 (무기 교체 시 덮어씀)
-    private int _weaponAttack;
+    // ── 스탯 레이어 ──────────────────────────────────────────────────────────
+    // 최종 스탯 = Base (CharacterData)
+    //           + PassiveBonus  (캐릭터 패시브, 런 시작 시 1회)
+    //           + WeaponBonus   (장착 무기)
+    //           + ItemBonus     (아이템 누적, 런 내 영구)
+    //           + RoomBuff      (일시적, 방 단위)
 
-    /// <summary>
-    /// 무기 장착/해제 시 호출. baseAttack 기준으로 AttackPower를 재계산합니다.
-    /// </summary>
+    private int _baseAttackPower;   // CharacterData 원본
+    private int _passiveBonus;      // PassiveSO 적용분
+    private int _weaponAttack;      // 현재 장착 무기
+    private int _itemAttackBonus;   // RunItemInventory 누적분
+    private int _roomAttackBuff;    // RoomBuffHandler 일시 버프
+
+    // ── 무기 ─────────────────────────────────────────────────────────────────
+    /// <summary>무기 장착/해제 시 호출.</summary>
     public void SetWeaponStats(int weaponAttack)
     {
         _weaponAttack = Mathf.Max(0, weaponAttack);
-        AttackPower = _baseAttackPower + _weaponAttack;
+        RecalculateAttack();
+    }
+
+    // ── 패시브 ───────────────────────────────────────────────────────────────
+    /// <summary>런 시작 시 PassiveSO 적용. null이면 0으로 초기화.</summary>
+    public void ApplyPassive(PassiveSO passive)
+    {
+        _passiveBonus = 0;
+        if (passive != null)
+            foreach (var mod in passive.baseModifiers)
+                if (mod.Type == StatType.AttackPower) _passiveBonus += (int)mod.Value;
+        RecalculateAttack();
+    }
+
+    // ── 아이템 누적 ──────────────────────────────────────────────────────────
+    /// <summary>RunItemInventory.OnInventoryChanged 이벤트에 연결.</summary>
+    public void RefreshItemBonuses(RunItemInventory inventory)
+    {
+        _itemAttackBonus = inventory != null ? (int)inventory.GetTotal(StatType.AttackPower) : 0;
+        RecalculateAttack();
+    }
+
+    // ── 방 버프 ──────────────────────────────────────────────────────────────
+    /// <summary>RoomBuffHandler.OnBuffsChanged 이벤트에 연결.</summary>
+    public void RefreshRoomBuffs(RoomBuffHandler handler)
+    {
+        _roomAttackBuff = handler != null ? (int)handler.GetTotal(StatType.AttackPower) : 0;
+        RecalculateAttack();
+    }
+
+    // ── 내부 재계산 ──────────────────────────────────────────────────────────
+    private void RecalculateAttack()
+    {
+        AttackPower = Mathf.Max(0, _baseAttackPower + _passiveBonus + _weaponAttack
+                                   + _itemAttackBonus + _roomAttackBuff);
         OnChanged?.Invoke();
     }
 }
