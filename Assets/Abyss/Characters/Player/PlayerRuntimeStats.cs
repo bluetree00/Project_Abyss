@@ -22,7 +22,9 @@ public sealed class PlayerRuntimeStats
         // SO는 템플릿. 런타임 값은 여기로 복사.
         MaxHp = Mathf.Max(1, data.maxHealth);
         Hp = MaxHp;
-        AttackPower = Mathf.Max(0, data.attackPower);
+        _baseAttackPower = Mathf.Max(0, data.attackPower);
+        _weaponAttack = 0;
+        AttackPower = _baseAttackPower;
         HeavyChargeThreshold = Mathf.Max(0f, data.heavyAttackChargeThreshold);
         OnChanged?.Invoke();
     }
@@ -63,13 +65,18 @@ public sealed class PlayerRuntimeStats
         OnChanged?.Invoke();
     }
 
-    // (선택) 무기/버프를 런타임에서 반영하고 싶다면 이렇게 누적 방식으로 가는 걸 추천
-    private int _attackBonus;
-    public void AddAttackBonus(int bonus)
+    // 캐릭터 기본 공격력 (CharacterData 기준, 변하지 않음)
+    private int _baseAttackPower;
+    // 현재 장착 무기의 공격력 (무기 교체 시 덮어씀)
+    private int _weaponAttack;
+
+    /// <summary>
+    /// 무기 장착/해제 시 호출. baseAttack 기준으로 AttackPower를 재계산합니다.
+    /// </summary>
+    public void SetWeaponStats(int weaponAttack)
     {
-        if (bonus == 0) return;
-        _attackBonus += bonus;
-        AttackPower = Mathf.Max(0, AttackPower + bonus);
+        _weaponAttack = Mathf.Max(0, weaponAttack);
+        AttackPower = _baseAttackPower + _weaponAttack;
         OnChanged?.Invoke();
     }
 }

@@ -13,15 +13,40 @@ MonoBehaviour:
   m_Name: Default Local Group
   m_EditorClassIdentifier: 
   m_GroupName: Default Local Group
-  m_Data:
-    m_SerializedData: []
   m_GUID: f1076af87ac402947b621c4a9f046477
   m_SerializeEntries:
+  - m_GUID: 3c2a12c38afca0148926006ebf1a2deb
+    m_Address: '@UIRoot'
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87167b19fb4a32a4e8e4f2c5f40a40b3
+    m_Address: ShinySlash
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c8d6a64eb8c657e46b1dd6ae4dd4328f
+    m_Address: UI/Popup/UI_WeaponReplacePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
+    m_Address: BloodShot
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: db18c22cee80cc74487b0900361715f6
+    m_Address: StageUI
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: df8384e9e946c054099e3b4a01b82abc
     m_Address: FrontAttackHit
@@ -41,31 +66,9 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 87167b19fb4a32a4e8e4f2c5f40a40b3
-    m_Address: ShinySlash
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
-    m_Address: BloodShot
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3c2a12c38afca0148926006ebf1a2deb
-    m_Address: '@UIRoot'
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: db18c22cee80cc74487b0900361715f6
-    m_Address: StageUI
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: 0538f398efa519e449d1c9070e1008d3, type: 2}
     - {fileID: 11400000, guid: 2d2aa95da1df2864fb7fd0edefba8292, type: 2}
+    - {fileID: 11400000, guid: 0538f398efa519e449d1c9070e1008d3, type: 2}
