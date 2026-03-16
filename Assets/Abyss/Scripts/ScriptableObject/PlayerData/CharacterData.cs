@@ -47,6 +47,10 @@ public class CharacterData : ScriptableObject
     [Header("캐릭터 클래스")]
     public Define.CharacterClass conClass;
 
+    // 캐릭터 고유 패시브
+    [Header("패시브")]
+    public PassiveSO passive;
+
     // 총 공격력 반환 (EffectData 호환)
     public int GetTotalAttackPower() => attackPower;
 
