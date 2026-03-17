@@ -189,10 +189,6 @@ public sealed class AppBootstrapper : MonoBehaviour
             await addr.InitAsync();
         }
 
-        // 4) (선택) 애니메이션 선로딩
-        if (preloadAnimations)
-            await PreloadAnimationsAsync();
-
         // 5) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)
         {
@@ -354,40 +350,4 @@ public sealed class AppBootstrapper : MonoBehaviour
         Debug.Log("[AppBootstrapper] UIRoot created successfully");
     }
 
-    private async UniTask PreloadAnimationsAsync()
-    {
-        var animKeys = new List<string>
-        {
-            "GroundLightAttack_01",
-            "GroundLightAttack_02",
-            "GroundLightAttack_03",
-            "ESkill_01",
-            "QSkill_01",
-            "Air_Light_Step01_Start",
-            "Air_Light_Step01_Loop",
-            "Air_Light_Step01_End",
-            "GroundLightBowAttack_01",
-            "GroundLightBowAttack_02",
-            "HeavyCharge",
-            "GroundHeavyAttack",
-            "BowHeavyCharge",
-        };
-
-        try
-        {
-            var anim = Managers.AnimationResources;
-            if (anim == null)
-            {
-                Debug.LogError("[AppBootstrapper] AnimationResources is null.");
-                return;
-            }
-
-            await anim.PreloadClipsAsync(animKeys);
-            Debug.Log("[AppBootstrapper] AnimationResourceManager preload 완료");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[AppBootstrapper] Animation preload 실패: {e}");
-        }
-    }
 }

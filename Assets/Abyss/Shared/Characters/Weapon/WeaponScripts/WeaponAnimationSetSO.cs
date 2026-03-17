@@ -13,6 +13,12 @@ public class WeaponAnimationSetSO : ScriptableObject
         public string addressableKey;    // Addressables Key
         public WeaponActionType actionType;
         public int comboIndex = 0;       // 콤보 인덱스
+
+        [Header("낙하 공격")]
+        [Tooltip("체크 시 이 공격은 낙하 공격으로 동작합니다.")]
+        public bool isPlunge = false;
+        [Tooltip("낙하 속도. 0이면 기본값(ActPlungeState.DefaultPlungeSpeed) 사용")]
+        public float plungeFallSpeed = 0f;
     }
 
     [Serializable]
