@@ -66,7 +66,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         }
     }
 
-    private async void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
         if (_pickedUp) return;
 
@@ -75,12 +75,32 @@ public class WorldWeaponDisplay : MonoBehaviour
 
         _pickedUp = true;
 
+        var col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
         var data = _runtimeData ?? (weaponSO != null ? new WeaponData(weaponSO) : null);
-        if (data == null) { _pickedUp = false; return; }
+        if (data == null)
+        {
+            _pickedUp = false;
+            if (col != null) col.enabled = true;
+            return;
+        }
 
-        if (player.WeaponManager != null)
-            await player.WeaponManager.HandlePickupAsync(data, autoEquip: true);
+        player.RequestPickup(data, this);
+        // Destroy는 팝업 결과 후 ConfirmPickup()에서 처리
+    }
 
+    /// <summary>픽업 확정 — 월드 오브젝트 제거</summary>
+    public void ConfirmPickup()
+    {
         Destroy(gameObject);
+    }
+
+    /// <summary>픽업 취소 — 다시 주울 수 있도록 복원</summary>
+    public void CancelPickup()
+    {
+        _pickedUp = false;
+        var col = GetComponent<Collider>();
+        if (col != null) col.enabled = true;
     }
 }

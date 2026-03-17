@@ -17,6 +17,18 @@ public class AnimationResourceManager
         {
             if (_clipCache.ContainsKey(key)) continue;
 
+            // 키 존재 여부 먼저 확인 (InvalidKeyException 방지)
+            var locHandle = Addressables.LoadResourceLocationsAsync(key);
+            await locHandle.Task;
+            var locations = locHandle.Result;
+            Addressables.Release(locHandle);
+
+            if (locations == null || locations.Count == 0)
+            {
+                Debug.LogWarning($"[AnimResource] 키 없음, 건너뜀: {key}");
+                continue;
+            }
+
             var handle = Addressables.LoadAssetAsync<AnimationClip>(key);
             await handle.Task;
 
@@ -27,7 +39,8 @@ public class AnimationResourceManager
             }
             else
             {
-                Debug.LogWarning($"[AnimResource] Failed to load {key}");
+                Addressables.Release(handle);
+                Debug.LogWarning($"[AnimResource] 로드 실패: {key}");
             }
         }
 

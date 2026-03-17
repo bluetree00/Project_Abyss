@@ -20,6 +20,9 @@ public class Knight : PlayerController
         actSM.Register(ActState.HeavyAttack,  new ActHeavyAttackState());
         actSM.Register(ActState.QSkill,       new ActQSkillState());
         actSM.Register(ActState.ESkill,       new ActESkillState());
+        actSM.Register(ActState.RSkill,       new ActRSkillState());
+        actSM.Register(ActState.Plunge,       new ActPlungeState());
+        actSM.Register(ActState.Pickup,       new ActPickupState());
 
         locoSM.Change(IsGrounded() ? LocoState.Idle : LocoState.Air);
         actSM.Change(ActState.None);
@@ -28,7 +31,10 @@ public class Knight : PlayerController
     // 입력 라우팅: 버퍼 소비 → 레이어 전이
     protected override void RouteInputsToLayers()
     {
-        bool isInSkill  = actSM.CurrentId == ActState.QSkill || actSM.CurrentId == ActState.ESkill;
+        // 픽업 중에는 모든 입력 차단
+        if (actSM.CurrentId == ActState.Pickup) return;
+
+        bool isInSkill  = actSM.CurrentId == ActState.QSkill || actSM.CurrentId == ActState.ESkill || actSM.CurrentId == ActState.RSkill;
         bool isDodging  = locoSM.CurrentId == LocoState.Dodge;
         bool isInAct    = actSM.CurrentId != ActState.None || isDodging;
 
@@ -40,11 +46,19 @@ public class Knight : PlayerController
             return;
         }
 
-        // ESkill: 스킬 중에는 캔슬 불가, 공격 중에는 캔슬 가능
+        // ESkill: 메인 무기 E 스킬
         if (InputBuffer.TryConsume(Command.ESkill))
         {
             if (CanAttack() && !isInSkill)
                 actSM.Change(ActState.ESkill);
+            return;
+        }
+
+        // RSkill: 메인 무기 R 스킬
+        if (InputBuffer.TryConsume(Command.RSkill))
+        {
+            if (CanAttack() && !isInSkill)
+                actSM.Change(ActState.RSkill);
             return;
         }
 
