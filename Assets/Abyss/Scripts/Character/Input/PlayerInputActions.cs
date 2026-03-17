@@ -235,6 +235,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""RSkill"",
+                    ""type"": ""Button"",
+                    ""id"": ""af722d9e-8084-4c13-bee5-8097a90ac241"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -457,6 +466,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""testKey2"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""4d67cbeb-ab16-4030-aaae-b47cecd14ab8"",
+                    ""path"": ""<Keyboard>/r"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""RSkill"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -481,6 +501,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_CloseInventory = m_Player.FindAction("CloseInventory", throwIfNotFound: true);
         m_Player_testKey = m_Player.FindAction("testKey", throwIfNotFound: true);
         m_Player_testKey2 = m_Player.FindAction("testKey2", throwIfNotFound: true);
+        m_Player_RSkill = m_Player.FindAction("RSkill", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -577,6 +598,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_CloseInventory;
     private readonly InputAction m_Player_testKey;
     private readonly InputAction m_Player_testKey2;
+    private readonly InputAction m_Player_RSkill;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player ".
     /// </summary>
@@ -653,6 +675,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @testKey2 => m_Wrapper.m_Player_testKey2;
         /// <summary>
+        /// Provides access to the underlying input action "Player/RSkill".
+        /// </summary>
+        public InputAction @RSkill => m_Wrapper.m_Player_RSkill;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -726,6 +752,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @testKey2.started += instance.OnTestKey2;
             @testKey2.performed += instance.OnTestKey2;
             @testKey2.canceled += instance.OnTestKey2;
+            @RSkill.started += instance.OnRSkill;
+            @RSkill.performed += instance.OnRSkill;
+            @RSkill.canceled += instance.OnRSkill;
         }
 
         /// <summary>
@@ -785,6 +814,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @testKey2.started -= instance.OnTestKey2;
             @testKey2.performed -= instance.OnTestKey2;
             @testKey2.canceled -= instance.OnTestKey2;
+            @RSkill.started -= instance.OnRSkill;
+            @RSkill.performed -= instance.OnRSkill;
+            @RSkill.canceled -= instance.OnRSkill;
         }
 
         /// <summary>
@@ -937,5 +969,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnTestKey2(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "RSkill" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnRSkill(InputAction.CallbackContext context);
     }
 }

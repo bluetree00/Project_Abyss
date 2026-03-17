@@ -49,6 +49,16 @@ public sealed class GameRunSession
     public PlayerRunState PlayerState { get; private set; }
     public RunDelta RunDelta { get; private set; } = new RunDelta();
 
+    // 씬 전환 시 무기 슬롯 복원용
+    public WeaponData[] SavedWeaponSlots { get; private set; }
+    public int SavedCurrentSlotIndex { get; private set; } = -1;
+
+    public void SaveWeaponSlots(WeaponData[] slots, int currentIndex)
+    {
+        SavedWeaponSlots = slots;
+        SavedCurrentSlotIndex = currentIndex;
+    }
+
     // --------------------
     // Events
     // --------------------
@@ -178,6 +188,8 @@ public sealed class GameRunSession
         Player = null;
         PlayerState = null;
         CurrentRunState = RunState.None;
+        SavedWeaponSlots = null;
+        SavedCurrentSlotIndex = -1;
     }
 
     // =========================================================

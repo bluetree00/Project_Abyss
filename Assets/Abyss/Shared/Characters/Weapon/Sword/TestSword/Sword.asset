@@ -29,3 +29,4 @@ MonoBehaviour:
   holdThreshold: 4
   promoteMode: 0
   chargeStages: 2
+  airHeavyIsPlunge: 0

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Game.Inputs
 {
-    public enum Command { None, Dodge, Heavy, Light, Charge, QSkill, ESkill }
+    public enum Command { None, Dodge, Heavy, Light, Charge, QSkill, ESkill, RSkill }
 
     public interface IClock { float Now { get; } float Delta { get; } }
     public sealed class UnscaledClock : IClock
@@ -71,6 +71,7 @@ namespace Game.Inputs
                 Command.Dodge => 4,
                 Command.QSkill => 3,
                 Command.ESkill => 3,
+                Command.RSkill => 3,
                 Command.Heavy => 2,
                 Command.Charge => 1,   // <-- 추가: Charge는 낮은 우선순위
                 _ => 0 // Light, None...

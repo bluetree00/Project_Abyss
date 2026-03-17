@@ -391,6 +391,7 @@ public class PlayerController : CharacterBase
         inputActions.Player.Dodge.performed += _ => InputBuffer.Push(Command.Dodge);
         inputActions.Player.QSkill.performed += _ => InputBuffer.Push(Command.QSkill);
         inputActions.Player.ESkill.performed += _ => InputBuffer.Push(Command.ESkill);
+        inputActions.Player.RSkill.performed += _ => InputBuffer.Push(Command.RSkill);
 
         inputActions.Player.Jump.performed += _ => ProcessJump();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
@@ -564,6 +565,34 @@ public class PlayerController : CharacterBase
         Rigid.linearVelocity = new Vector3(0f, Rigid.linearVelocity.y, 0f);
     }
 
+    /// <summary>낙하 공격 상태인지 여부 (LocoAirState 착지 처리 분기용)</summary>
+    public bool IsPlunging => actSM?.CurrentId == ActState.Plunge;
+
+    /// <summary>픽업 대기 중인 무기 데이터 (WorldWeaponDisplay → ActPickupState 전달용)</summary>
+    public WeaponData PendingPickupWeapon { get; set; }
+
+    /// <summary>픽업 소스 오브젝트 (팝업 결과 후 확정/취소 처리용)</summary>
+    public WorldWeaponDisplay PendingPickupSource { get; set; }
+
+    /// <summary>무기 픽업 요청 — ActPickupState로 전환</summary>
+    public void RequestPickup(WeaponData data, WorldWeaponDisplay source = null)
+    {
+        if (data == null) return;
+        if (actSM == null) return;
+
+        PendingPickupWeapon = data;
+        PendingPickupSource = source;
+        actSM.Change(ActState.Pickup);
+    }
+
+    /// <summary>낙하 공격 진입 시 전달할 데이터 (공격 상태 → ActPlungeState)</summary>
+    public struct PlungeInfo
+    {
+        public string fallClipName;
+        public float  fallSpeed;
+    }
+    public PlungeInfo PendingPlunge { get; set; }
+
     /// <summary>
     /// actSM이 None이 아니면 강제로 None으로 전환 (착지·회피 캔슬 시 사용)
     /// </summary>
@@ -655,7 +684,8 @@ public class PlayerController : CharacterBase
         if (actSM.CurrentId == ActState.Attack ||
             actSM.CurrentId == ActState.AttackReady ||
             actSM.CurrentId == ActState.QSkill ||
-            actSM.CurrentId == ActState.ESkill)
+            actSM.CurrentId == ActState.ESkill ||
+            actSM.CurrentId == ActState.RSkill)
         {
             actSM.Change(ActState.None);
         }
