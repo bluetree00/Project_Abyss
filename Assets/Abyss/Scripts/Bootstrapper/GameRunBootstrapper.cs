@@ -60,7 +60,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Instance = null;
 
         if (_run != null)
+        {
             _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
+
+            // 씬 이탈 전 현재 무기 슬롯 저장
+            if (_run.IsRunning)
+            {
+                var player = _run.Player;
+                if (player != null && player.WeaponManager != null)
+                {
+                    var wm = player.WeaponManager;
+                    var slotData = new WeaponData[wm.SlotCount];
+                    for (int i = 0; i < wm.SlotCount; i++)
+                        slotData[i] = wm.slots[i]?.runtimeData;
+                    _run.SaveWeaponSlots(slotData, wm.CurrentSlotIndex);
+                    Debug.Log($"[GameRunBootstrapper] 무기 슬롯 저장: currentSlot={wm.CurrentSlotIndex}");
+                }
+            }
+        }
 
         if (_currentMapGO != null && Managers.AddressableManager != null)
         {
@@ -203,20 +220,66 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
-        // Loadout 슬롯 0 무기 장착
-        var loadout = AppBootstrapper.Instance?.Loadout;
-        if (loadout != null && loadout.WeaponSlot0 != null)
+        await Cysharp.Threading.Tasks.UniTask.Yield();
+
+        var run = AppBootstrapper.Instance?.CurrentRun;
+        var wm = player.WeaponManager;
+        if (wm != null)
         {
-            // WeaponManager가 InitAsync 완료 후 존재하므로 다음 프레임까지 대기
-            await Cysharp.Threading.Tasks.UniTask.Yield();
-            if (player.WeaponManager != null)
+            // 저장된 슬롯이 있으면 복원 (StageMap 복귀)
+            if (run?.SavedWeaponSlots != null)
             {
-                var weaponData = new WeaponData(loadout.WeaponSlot0);
-                await player.WeaponManager.AcquireWeaponAsync(weaponData, autoEquip: true);
-                Debug.Log($"[GameRunBootstrapper] Loadout 무기 장착: {loadout.WeaponSlot0.displayName}");
+                for (int i = 0; i < run.SavedWeaponSlots.Length; i++)
+                {
+                    if (run.SavedWeaponSlots[i] != null)
+                    {
+                        await PreloadWeaponClipsAsync(run.SavedWeaponSlots[i]);
+                        await wm.AcquireWeaponAsync(run.SavedWeaponSlots[i], autoEquip: true);
+                    }
+                }
+                if (run.SavedCurrentSlotIndex >= 0)
+                    await wm.SwitchToSlotAsync(run.SavedCurrentSlotIndex);
+                Debug.Log($"[GameRunBootstrapper] 무기 슬롯 복원: currentSlot={run.SavedCurrentSlotIndex}");
+            }
+            else
+            {
+                // 런 최초 진입: 로비에서 선택한 무기 장착
+                var loadout = AppBootstrapper.Instance?.Loadout;
+                if (loadout?.WeaponSlot0 != null)
+                {
+                    var weaponData = new WeaponData(loadout.WeaponSlot0);
+                    await PreloadWeaponClipsAsync(weaponData);
+                    await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
+                    Debug.Log($"[GameRunBootstrapper] 메인 무기 장착: {loadout.WeaponSlot0.displayName}");
+                }
+                // 서브 장비 장착
+                if (loadout?.WeaponSlot1 != null)
+                {
+                    var subData = new WeaponData(loadout.WeaponSlot1);
+                    await PreloadWeaponClipsAsync(subData);
+                    await wm.AcquireWeaponAsync(subData, autoEquip: true);
+                    Debug.Log($"[GameRunBootstrapper] 서브 장비 장착: {loadout.WeaponSlot1.displayName}");
+                }
             }
         }
 
         return player;
+    }
+
+    /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>
+    private static async UniTask PreloadWeaponClipsAsync(WeaponData data)
+    {
+        var animSet = data?.animationSet as WeaponAnimationSetSO;
+        if (animSet == null) return;
+
+        var keys = new System.Collections.Generic.List<string>();
+        foreach (var mapping in animSet.GetAllMappings())
+        {
+            if (!string.IsNullOrEmpty(mapping.addressableKey))
+                keys.Add(mapping.addressableKey);
+        }
+
+        if (keys.Count > 0)
+            await Managers.AnimationResources.PreloadClipsAsync(keys);
     }
 }

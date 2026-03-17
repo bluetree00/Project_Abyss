@@ -24,6 +24,25 @@ public class ActAttackState : ILayerState<ActState>
 
     public void Enter()
     {
+        // 공중 콤보 스텝이 낙하 공격으로 지정된 경우 ActPlungeState로 위임
+        if (!_controller.IsGrounded())
+        {
+            int plungeStep    = _controller.Combo.CurrentComboStep;
+            var plungeAction  = _controller.CurrentAttackTypeForEffect;
+            var plungeMapping = TryGetClipMapping(plungeStep, plungeAction, isAir: true);
+            if (plungeMapping != null && plungeMapping.isPlunge)
+            {
+                _controller.CurrentAttackTypeForEffect = WeaponActionType.AirPlunge;
+                _controller.PendingPlunge = new PlayerController.PlungeInfo
+                {
+                    fallClipName = plungeMapping.baseClipName,
+                    fallSpeed    = plungeMapping.plungeFallSpeed
+                };
+                _stateChanger.Change(ActState.Plunge);
+                return;
+            }
+        }
+
         _attackEndHandled = false;
         _execution = new AbilityExecution();
         _controller.ActiveExecution = _execution;
@@ -219,26 +238,25 @@ public class ActAttackState : ILayerState<ActState>
     }
 
     /// <summary>
-    /// 매핑에서 baseClipName만 반환합니다. addressableKey는 무시.
-    /// comboStep은 0-based로 처리됩니다.
+    /// 해당 콤보 스텝의 ClipMapping 전체를 반환합니다.
+    /// isPlunge 등 플래그 조회에 사용됩니다.
     /// </summary>
-    private string TryGetMappedBaseClipName(int comboStep, WeaponActionType action, bool isAir)
+    private WeaponAnimationSetSO.ClipMapping TryGetClipMapping(int comboStep, WeaponActionType action, bool isAir)
     {
-        var wd = _controller.WeaponManager?.CurrentWeaponData;
-        if (wd == null) return null;
-
-        // 실제 프로퍼티 이름을 프로젝트에 맞게 바꾸세요 (예: wd.animationSet 등)
-        var animSet = wd.animationSet as WeaponAnimationSetSO;
+        var wd      = _controller.WeaponManager?.CurrentWeaponData;
+        var animSet = wd?.animationSet as WeaponAnimationSetSO;
         if (animSet == null) return null;
 
         WeaponAnimGroup group = isAir ? WeaponAnimGroup.Air : WeaponAnimGroup.Ground;
-        var candidates = animSet.GetMappings(group, action);
+        return animSet.GetMappings(group, action).FirstOrDefault(m => m.comboIndex == comboStep);
+    }
 
-        // comboIndex가 0-based로 저장되어 있다고 가정
-        var mapping = candidates.FirstOrDefault(m => m.comboIndex == comboStep);
-        if (mapping != null && !string.IsNullOrEmpty(mapping.baseClipName))
-            return mapping.baseClipName;
-
-        return null;
+    /// <summary>baseClipName만 반환하는 편의 래퍼</summary>
+    private string TryGetMappedBaseClipName(int comboStep, WeaponActionType action, bool isAir)
+    {
+        var mapping = TryGetClipMapping(comboStep, action, isAir);
+        return (mapping != null && !string.IsNullOrEmpty(mapping.baseClipName))
+            ? mapping.baseClipName
+            : null;
     }
 }

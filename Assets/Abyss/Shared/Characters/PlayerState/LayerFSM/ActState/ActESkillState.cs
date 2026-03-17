@@ -40,7 +40,8 @@ public class ActESkillState : ILayerState<ActState>
     {
         string animName = "ESkill_01"; // fallback
 
-        var wd = _controller.WeaponManager?.CurrentWeaponData;
+        // E스킬은 메인 무기 기준
+        var wd = _controller.WeaponManager?.MainWeaponData;
         if (wd?.animationSet is WeaponAnimationSetSO animSet)
         {
             var mapping = animSet.GetMappings(WeaponAnimGroup.Ground, WeaponActionType.ESkill)
