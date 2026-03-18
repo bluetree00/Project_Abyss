@@ -154,6 +154,11 @@ public class PlayerController : CharacterBase
     public ComboController Combo { get; private set; }
 
     //============================================================
+    // Skill Cooldown
+    //============================================================
+    public SkillCooldownTracker CooldownTracker { get; private set; } = new SkillCooldownTracker();
+
+    //============================================================
     // Runtime Flags
     //============================================================
     public bool isGrounded { get; private set; }
@@ -226,6 +231,7 @@ public class PlayerController : CharacterBase
         if (actSM != null) actStateDebug = actSM.CurrentId;
 
         Combo.Tick(Time.unscaledDeltaTime);
+        CooldownTracker.Tick(Time.unscaledDeltaTime);
     }
 
     private void FixedUpdate()

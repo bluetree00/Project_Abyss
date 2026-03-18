@@ -8,6 +8,7 @@ public enum StatType
     MaxHp,
     MoveSpeed,
     AttackSpeed,
+    SkillCooldownReduction,  // 0.1 = 쿨다운 10% 감소 (아이템/버프 연동용)
 }
 
 /// <summary>
