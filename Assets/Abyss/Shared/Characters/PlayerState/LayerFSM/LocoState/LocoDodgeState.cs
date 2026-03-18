@@ -19,6 +19,7 @@ public class LocoDodgeState : ILayerState<LocoState>
 
         _controller.Anim.CrossFade("Dodge", 0.05f);
         _controller.SetMoveScale(0f);
+        _controller.FirePassive(PassiveTrigger.OnDodge, new PassiveContext());
     }
 
     public void Update()
