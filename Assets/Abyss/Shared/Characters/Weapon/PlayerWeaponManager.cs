@@ -128,7 +128,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         await handle.Task;
         if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null) return;
 
-        var runtime = new WeaponData(handle.Result);
+        var runtime = WeaponData.FromSO(handle.Result);
         await AcquireWeaponAsync(runtime, autoEquip);
     }
 
