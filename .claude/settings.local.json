@@ -80,7 +80,8 @@
       "Bash(grep \"\\\\.cs$\")",
       "Bash(grep -r \"/* 구현 \\\\*/\\\\|//구현\\\\|unimplemented\\\\|NotImplemented\\\\|Placeholder\\\\|WIP\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Characters/Player --include=\"*.cs\")",
       "Bash(ls -d Assets/Abyss/Animations/*)",
-      "mcp__mcp-for-unity-server__manage_asset"
+      "mcp__mcp-for-unity-server__manage_asset",
+      "mcp__mcp-for-unity__manage_asset"
     ]
   },
   "hooks": {
