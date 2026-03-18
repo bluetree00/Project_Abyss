@@ -15,6 +15,12 @@ public class ActQSkillState : ILayerState<ActState>
 
     public void Enter()
     {
+        if (!_controller.CooldownTracker.IsReady(SkillType.Q))
+        {
+            _stateChanger.Change(ActState.None);
+            return;
+        }
+
         _controller.CurrentAttackTypeForEffect = WeaponActionType.QSkill;
 
         _execution = new AbilityExecution();
@@ -34,6 +40,10 @@ public class ActQSkillState : ILayerState<ActState>
         _controller.ActiveExecution = null;
         _execution?.Cleanup(forceEffects: false);
         _execution = null;
+
+        float cd = _controller.WeaponManager?.SubWeaponData?.skillQCooldown ?? 0f;
+        if (cd > 0f)
+            _controller.CooldownTracker.StartCooldown(SkillType.Q, cd);
     }
 
     private void PlaySkillAnimation()

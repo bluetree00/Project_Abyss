@@ -19,6 +19,12 @@ public class ActRSkillState : ILayerState<ActState>
 
     public void Enter()
     {
+        if (!_controller.CooldownTracker.IsReady(SkillType.R))
+        {
+            _stateChanger.Change(ActState.None);
+            return;
+        }
+
         _controller.CurrentAttackTypeForEffect = WeaponActionType.RSkill;
 
         _execution = new AbilityExecution();
@@ -38,6 +44,10 @@ public class ActRSkillState : ILayerState<ActState>
         _controller.ActiveExecution = null;
         _execution?.Cleanup(forceEffects: false);
         _execution = null;
+
+        float cd = _controller.WeaponManager?.MainWeaponData?.skillRCooldown ?? 0f;
+        if (cd > 0f)
+            _controller.CooldownTracker.StartCooldown(SkillType.R, cd);
     }
 
     private void PlaySkillAnimation()
