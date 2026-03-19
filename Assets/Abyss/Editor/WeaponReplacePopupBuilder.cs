@@ -158,7 +158,17 @@ public static class WeaponReplacePopupBuilder
         TMP(lblGO, label, 12f, FontStyles.Normal,
             TextAlignmentOptions.Center, labelColor, font);
 
-        var iconGO = FlexChild(vlg.transform, "Icon", 80f);
+        // 아이콘: HLG 행으로 감싸서 고정 80×80 유지
+        var iconRowGO = FlexChild(vlg.transform, "IconRow", 88f);
+        var iconRowHlg = iconRowGO.AddComponent<HorizontalLayoutGroup>();
+        iconRowHlg.childAlignment       = TextAnchor.MiddleCenter;
+        iconRowHlg.childControlWidth    = false;
+        iconRowHlg.childControlHeight   = false;
+        iconRowHlg.childForceExpandWidth  = false;
+        iconRowHlg.childForceExpandHeight = false;
+
+        var iconGO = Obj("Icon", iconRowGO.transform);
+        iconGO.GetComponent<RectTransform>().sizeDelta = new Vector2(80f, 80f);
         var iconImg = iconGO.AddComponent<Image>();
         iconImg.color = new Color(1f, 1f, 1f, 0.12f);
 
