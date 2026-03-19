@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterRoster
   characters:
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
-    portrait: {fileID: 21300000, guid: 9447c815ae0a81743964d7cf9bb4014a, type: 3}
+    portrait: {fileID: 21300000, guid: 049d1403ca0954c6e8c805419a41f803, type: 3}
     prefabKey: Knight
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
-    portrait: {fileID: 21300000, guid: 8197c392e37daa34fa18fc5a08d4227b, type: 3}
+    portrait: {fileID: 21300000, guid: ad747883118aa4aefa7808b037d4564a, type: 3}
     prefabKey: Knight
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
-    portrait: {fileID: 21300000, guid: cc793fda1c7a35b48bf04418234bfa99, type: 3}
+    portrait: {fileID: 21300000, guid: ea0d15c8ad5814d68ba5d1f53bae6247, type: 3}
     prefabKey: Knight
