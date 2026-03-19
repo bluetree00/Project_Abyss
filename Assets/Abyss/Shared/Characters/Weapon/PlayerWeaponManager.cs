@@ -279,42 +279,49 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     // ----------------------
     // 장비 획득 처리 (픽업 등 외부 호출)
-    // - HandlePickupAsync에서도 풀 초기화를 수행하도록 추가
+    // weaponSlotType 기준으로 슬롯을 결정 (Main=0, Sub=1)
+    // 반환값: true = 획득함(픽업 오브젝트 제거 가능) / false = 버림(픽업 오브젝트 유지)
     // ----------------------
-    public async UniTask HandlePickupAsync(WeaponData runtimeData, bool autoEquip = true)
+    public async UniTask<bool> HandlePickupAsync(WeaponData runtimeData)
     {
-        if (runtimeData == null) return;
+        if (runtimeData == null) return false;
 
-        _owned.Add(runtimeData);
-        int empty = GetFirstEmptySlotIndex();
-        if (autoEquip && empty >= 0)
+        int slotIndex = (int)runtimeData.weaponSlotType;
+        var slot = slots[slotIndex];
+
+        // 해당 슬롯이 비어 있으면 바로 장착
+        if (slot.IsEmpty)
         {
-            await EquipToSlotAsync(empty, runtimeData, true);
-            return;
+            _owned.Add(runtimeData);
+            bool activate = currentSlotIndex < 0;
+            await EquipToSlotAsync(slotIndex, runtimeData, activate);
+            return true;
         }
 
-        int? chosenSlot = await ShowReplacePromptAsync(runtimeData);
-        if (chosenSlot.HasValue)
+        // 슬롯 차있음 → 1:1 비교 팝업
+        bool replace = await ShowReplacePromptAsync(slot.runtimeData, runtimeData, slotIndex);
+        if (replace)
         {
-            var replaced = await ReplaceSlotAsync(chosenSlot.Value, runtimeData);
-            if (replaced != null) Debug.Log($"Replaced {replaced.displayName}");
+            _owned.Add(runtimeData);
+            var replaced = await ReplaceSlotAsync(slotIndex, runtimeData);
+            if (replaced != null) Debug.Log($"Replaced: {replaced.displayName}");
+            return true;
         }
-        else
-        {
-            Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
-        }
+
+        Debug.Log($"Pickup discarded: {runtimeData.displayName}");
+        return false;
     }
 
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
+    private async UniTask<bool> ShowReplacePromptAsync(WeaponData currentWeapon, WeaponData newWeapon, int slotIndex)
     {
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
         if (popup == null)
         {
-            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 슬롯 0으로 대체");
-            return 0;
+            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 기본값 false");
+            return false;
         }
 
-        popup.Setup(newWeapon, slots);
+        popup.Setup(currentWeapon, newWeapon, slotIndex);
         return await popup.WaitForChoiceAsync();
     }
 

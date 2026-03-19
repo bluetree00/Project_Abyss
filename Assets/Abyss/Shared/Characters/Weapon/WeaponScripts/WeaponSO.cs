@@ -27,7 +27,8 @@ public class WeaponSO : ScriptableObject
     public WeaponAbilitySetSO abilitySet;
 
     [Header("타입 & 정책")]
-    public WeaponType weaponType = WeaponType.Sword;      // Sword / Bow / 나중에 추가
+    public WeaponType     weaponType     = WeaponType.Sword;      // Sword / Bow / 나중에 추가
+    public WeaponSlotType weaponSlotType = WeaponSlotType.Main;   // Main=0 / Sub=1
 
     [Header("차지/강화 공격 설정")]
     public float holdThreshold;
