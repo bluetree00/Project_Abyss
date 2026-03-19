@@ -1,5 +1,4 @@
-// WeaponReplacePopupBuilder.cs
-// Tools → "Build WeaponReplacePopup Prefab" 실행 시 프리팹을 완전히 재빌드합니다.
+// WeaponReplacePopupBuilder.cs  — Tools → "Build WeaponReplacePopup Prefab"
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,23 +14,23 @@ public static class WeaponReplacePopupBuilder
     private static readonly Color BgPanel      = new Color(0.10f, 0.11f, 0.15f, 1.00f);
     private static readonly Color BgBlocker    = new Color(0.00f, 0.00f, 0.00f, 0.65f);
     private static readonly Color BgSide       = new Color(1.00f, 1.00f, 1.00f, 0.04f);
+    private static readonly Color BgStats      = new Color(1.00f, 1.00f, 1.00f, 0.03f);
     private static readonly Color ColorGold    = new Color(1.00f, 0.85f, 0.40f, 1.00f);
     private static readonly Color ColorLabel   = new Color(0.65f, 0.65f, 0.65f, 1.00f);
-    private static readonly Color ColorDivider = new Color(1.00f, 1.00f, 1.00f, 0.12f);
+    private static readonly Color ColorDivider = new Color(1.00f, 1.00f, 1.00f, 0.10f);
     private static readonly Color BtnReplace   = new Color(0.18f, 0.55f, 0.28f, 1.00f);
     private static readonly Color BtnDiscard   = new Color(0.60f, 0.18f, 0.18f, 1.00f);
 
-    private const float PanelW = 920f;
-    private const float PanelH = 600f;
-    private const float PadTop = 120f;
-    private const float PadBot = 80f;
+    private const float PanelW   = 920f;
+    private const float PanelH   = 580f;
+    private const float HeaderH  = 200f; // 헤더(아이콘) 영역 높이
+    private const float BtnAreaH = 72f;
 
     [MenuItem("Tools/Build WeaponReplacePopup Prefab")]
     public static void Build()
     {
         var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-        if (font == null)
-            Debug.LogWarning($"[Builder] 폰트 없음: {FontPath}");
+        if (font == null) Debug.LogWarning($"[Builder] 폰트 없음: {FontPath}");
 
         using var scope = new PrefabUtility.EditPrefabContentsScope(PrefabPath);
         var root = scope.prefabContentsRoot;
@@ -39,104 +38,125 @@ public static class WeaponReplacePopupBuilder
         while (root.transform.childCount > 0)
             GameObject.DestroyImmediate(root.transform.GetChild(0).gameObject);
 
-        // ── 루트: 풀스크린 블로커 ─────────────────────────────────────
+        // ── 루트 블로커 ───────────────────────────────────────────────
         Stretch(root.GetComponent<RectTransform>());
-        EnsureImage(root).color = BgBlocker;
+        EnsureImg(root).color = BgBlocker;
 
         // ── Panel ─────────────────────────────────────────────────────
-        var panel = Obj("Panel", root.transform);
-        SetCenter(panel, PanelW, PanelH, 0, 0);
+        var panel = O("Panel", root.transform);
+        Center(panel, PanelW, PanelH, 0, 0);
         panel.AddComponent<Image>().color = BgPanel;
 
-        // ── Title ─────────────────────────────────────────────────────
-        var titleGO = Obj("Title", panel.transform);
-        AnchorTop(titleGO, PanelW - 40f, 46f, 0, -28f);
-        TMP(titleGO, "새 무기 획득!", 26f, FontStyles.Bold,
+        // ── Title / SlotLabel ─────────────────────────────────────────
+        var titleGO = O("Title", panel.transform);
+        AnchorTop(titleGO, PanelW - 40f, 44f, 0, -26f);
+        T(titleGO, "새 무기 획득!", 25f, FontStyles.Bold,
             TextAlignmentOptions.Center, Color.white, font);
 
-        // ── SlotLabel ─────────────────────────────────────────────────
-        var slotLabelGO = Obj("SlotLabel", panel.transform);
-        AnchorTop(slotLabelGO, PanelW - 40f, 28f, 0, -68f);
-        var slotLabelTmp = TMP(slotLabelGO, "─── 메인 무기 ───", 14f,
+        var slotLabelGO = O("SlotLabel", panel.transform);
+        AnchorTop(slotLabelGO, PanelW - 40f, 26f, 0, -64f);
+        var slotLabelTmp = T(slotLabelGO, "─── 메인 무기 ───", 14f,
             FontStyles.Normal, TextAlignmentOptions.Center, ColorGold, font);
 
-        // ── CompareArea ───────────────────────────────────────────────
-        float compareH = PanelH - PadTop - PadBot;
-        var compareGO = Obj("CompareArea", panel.transform);
-        SetCenter(compareGO, PanelW, compareH, 0, (PadBot - PadTop) * 0.5f);
+        // ── HeaderArea (좌/우 아이콘 영역) ────────────────────────────
+        float statsTop = -(88f + HeaderH);          // Title+SlotLabel 여백
+        var headerGO = O("HeaderArea", panel.transform);
+        AnchorTop(headerGO, PanelW, HeaderH, 0, -88f);
 
-        // 왼쪽 패널
-        var leftGO = Obj("LeftPanel", compareGO.transform);
-        AnchorSplit(leftGO, 0f, 0f, 0.5f, 1f);
+        var leftGO = O("LeftPanel", headerGO.transform);
+        Split(leftGO, 0f, 0f, 0.5f, 1f);
         leftGO.AddComponent<Image>().color = BgSide;
 
-        // 세로 구분선
-        var divV = Obj("DividerV", compareGO.transform);
-        AnchorSplit(divV, 0.5f, 0f, 0.5f, 1f);
+        var divV = O("DividerV", headerGO.transform);
+        Split(divV, 0.5f, 0f, 0.5f, 1f);
         divV.GetComponent<RectTransform>().sizeDelta = new Vector2(1f, 0f);
         divV.AddComponent<Image>().color = ColorDivider;
 
-        // 오른쪽 패널
-        var rightGO = Obj("RightPanel", compareGO.transform);
-        AnchorSplit(rightGO, 0.5f, 0f, 1f, 1f);
+        var rightGO = O("RightPanel", headerGO.transform);
+        Split(rightGO, 0.5f, 0f, 1f, 1f);
         rightGO.AddComponent<Image>().color = BgSide;
 
-        // ── 왼쪽 내용 ─────────────────────────────────────────────────
-        var (curIcon, curName)       = BuildHeader(leftGO.transform, "현재 장비", ColorLabel, font);
-        var (curMainSec, curAtk, curDef)
-                                     = BuildMainSection(leftGO.transform, font, isRight: false,
-                                           out _, out _);
-        var (curSubSec, curQName, curQCool, _, curQDesc)
-                                     = BuildSubSection(leftGO.transform, font, isRight: false,
-                                           out _);
+        var (curIcon, curName) = BuildHeader(leftGO.transform,  "현재 장비", ColorLabel, font);
+        var (newIcon, newName) = BuildHeader(rightGO.transform, "새 장비",   Color.white, font);
 
-        // ── 오른쪽 내용 ───────────────────────────────────────────────
-        var (newIcon, newName)       = BuildHeader(rightGO.transform, "새 장비", Color.white, font);
-        var (newMainSec, newAtk, newDef)
-                                     = BuildMainSection(rightGO.transform, font, isRight: true,
-                                           out var atkDelta, out var defDelta);
-        var (newSubSec, newQName, newQCool, qCoolDelta, newQDesc)
-                                     = BuildSubSection(rightGO.transform, font, isRight: true,
-                                           out _);
+        // ── 구분선 ────────────────────────────────────────────────────
+        var divH = O("DividerH", panel.transform);
+        AnchorTop(divH, PanelW, 1f, 0, statsTop);
+        divH.AddComponent<Image>().color = ColorDivider;
+
+        // ── 메인 스탯 섹션 ────────────────────────────────────────────
+        float statsAreaH = PanelH - 88f - HeaderH - 1f - BtnAreaH - 8f;
+        var mainSec = O("MainStatsSection", panel.transform);
+        AnchorTop(mainSec, PanelW, statsAreaH, 0, statsTop - 1f);
+        mainSec.AddComponent<Image>().color = BgStats;
+
+        var mainVlg = mainSec.AddComponent<VerticalLayoutGroup>();
+        mainVlg.padding = new RectOffset(24, 24, 12, 12);
+        mainVlg.spacing = 8f;
+        mainVlg.childAlignment       = TextAnchor.UpperCenter;
+        mainVlg.childControlWidth    = true;
+        mainVlg.childControlHeight   = false;
+        mainVlg.childForceExpandWidth  = true;
+        mainVlg.childForceExpandHeight = false;
+
+        var (atkCur, atkDelta, atkNew) = StatRow(mainSec.transform, "공격력", font);
+        var (defCur, defDelta, defNew) = StatRow(mainSec.transform, "방어력", font);
+
+        // ── 서브 스탯 섹션 ────────────────────────────────────────────
+        var subSec = O("SubStatsSection", panel.transform);
+        AnchorTop(subSec, PanelW, statsAreaH, 0, statsTop - 1f);
+        subSec.AddComponent<Image>().color = BgStats;
+        subSec.SetActive(false);
+
+        var subVlg = subSec.AddComponent<VerticalLayoutGroup>();
+        subVlg.padding = new RectOffset(24, 24, 12, 12);
+        subVlg.spacing = 8f;
+        subVlg.childAlignment       = TextAnchor.UpperCenter;
+        subVlg.childControlWidth    = true;
+        subVlg.childControlHeight   = false;
+        subVlg.childForceExpandWidth  = true;
+        subVlg.childForceExpandHeight = false;
+
+        var (qSkillCur, _, qSkillNew)    = LabelRow(subSec.transform, "Q 스킬", font);
+        var (qCoolCur, qCoolDelta, qCoolNew) = StatRow(subSec.transform, "Q 쿨다운", font);
+        var (qDescCur, qDescNew)         = DescRow(subSec.transform, font);
 
         // ── 버튼 영역 ─────────────────────────────────────────────────
-        var btnArea = Obj("ButtonArea", panel.transform);
-        AnchorBottom(btnArea, PanelW, PadBot, 0, 0);
+        var btnArea = O("ButtonArea", panel.transform);
+        AnchorBottom(btnArea, PanelW, BtnAreaH, 0, 0);
 
-        var replaceBtn = BuildBtn("ReplaceButton", btnArea.transform,
-            "교체하기", BtnReplace, font, -145f, 0f, 260f, 50f);
-        var discardBtn = BuildBtn("DiscardButton", btnArea.transform,
-            "버리기", BtnDiscard, font, 145f, 0f, 260f, 50f);
+        var replaceBtn = Btn("ReplaceButton", btnArea.transform,
+            "교체하기", BtnReplace, font, -150f, 0f, 260f, 50f);
+        var discardBtn = Btn("DiscardButton", btnArea.transform,
+            "버리기",   BtnDiscard, font,  150f, 0f, 260f, 50f);
 
         // ── 바인딩 ────────────────────────────────────────────────────
         var popup = root.GetComponent<UI_WeaponReplacePopup>()
                     ?? root.AddComponent<UI_WeaponReplacePopup>();
         var so = new SerializedObject(popup);
 
-        B(so, "slotLabelText",         slotLabelTmp);
-        B(so, "currentIcon",           curIcon);
-        B(so, "currentName",           curName);
-        B(so, "currentMainSection",    curMainSec);
-        B(so, "currentAtkText",        curAtk);
-        B(so, "currentDefText",        curDef);
-        B(so, "currentSubSection",     curSubSec);
-        B(so, "currentQSkillNameText", curQName);
-        B(so, "currentQCoolText",      curQCool);
-        B(so, "currentQDescText",      curQDesc);
-        B(so, "newIcon",               newIcon);
-        B(so, "newName",               newName);
-        B(so, "newMainSection",        newMainSec);
-        B(so, "newAtkText",            newAtk);
-        B(so, "atkDeltaText",          atkDelta);
-        B(so, "newDefText",            newDef);
-        B(so, "defDeltaText",          defDelta);
-        B(so, "newSubSection",         newSubSec);
-        B(so, "newQSkillNameText",     newQName);
-        B(so, "newQCoolText",          newQCool);
-        B(so, "qCoolDeltaText",        qCoolDelta);
-        B(so, "newQDescText",          newQDesc);
-        B(so, "replaceButton",         replaceBtn);
-        B(so, "discardButton",         discardBtn);
+        B(so, "slotLabelText",     slotLabelTmp);
+        B(so, "currentIcon",       curIcon);
+        B(so, "currentName",       curName);
+        B(so, "newIcon",           newIcon);
+        B(so, "newName",           newName);
+        B(so, "mainStatsSection",  mainSec);
+        B(so, "atkCurrentText",    atkCur);
+        B(so, "atkDeltaText",      atkDelta);
+        B(so, "atkNewText",        atkNew);
+        B(so, "defCurrentText",    defCur);
+        B(so, "defDeltaText",      defDelta);
+        B(so, "defNewText",        defNew);
+        B(so, "subStatsSection",   subSec);
+        B(so, "qSkillCurrentText", qSkillCur);
+        B(so, "qSkillNewText",     qSkillNew);
+        B(so, "qCoolCurrentText",  qCoolCur);
+        B(so, "qCoolDeltaText",    qCoolDelta);
+        B(so, "qCoolNewText",      qCoolNew);
+        B(so, "qDescCurrentText",  qDescCur);
+        B(so, "qDescNewText",      qDescNew);
+        B(so, "replaceButton",     replaceBtn);
+        B(so, "discardButton",     discardBtn);
 
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(root);
@@ -146,181 +166,149 @@ public static class WeaponReplacePopupBuilder
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // 섹션 빌더
+    // 섹션/행 빌더
     // ──────────────────────────────────────────────────────────────────
 
+    /// <summary>아이콘 + 이름 헤더 (단일 패널 내)</summary>
     private static (Image icon, TextMeshProUGUI name)
         BuildHeader(Transform parent, string label, Color labelColor, TMP_FontAsset font)
     {
-        var vlg = VLG(parent, "Header", 6f, new RectOffset(12, 12, 14, 8));
+        var vlg = parent.gameObject.AddComponent<VerticalLayoutGroup>();
+        vlg.padding = new RectOffset(8, 8, 12, 8);
+        vlg.spacing = 6f;
+        vlg.childAlignment       = TextAnchor.UpperCenter;
+        vlg.childControlWidth    = true;
+        vlg.childControlHeight   = false;
+        vlg.childForceExpandWidth  = true;
+        vlg.childForceExpandHeight = false;
 
-        var lblGO = FlexChild(vlg.transform, "_Lbl", 26f);
-        TMP(lblGO, label, 12f, FontStyles.Normal,
+        // 레이블 행
+        var lblGO = Flex(parent, "_Lbl", 24f);
+        T(lblGO, label, 12f, FontStyles.Normal,
             TextAlignmentOptions.Center, labelColor, font);
 
-        // 아이콘: HLG 행으로 감싸서 고정 80×80 유지
-        var iconRowGO = FlexChild(vlg.transform, "IconRow", 88f);
-        var iconRowHlg = iconRowGO.AddComponent<HorizontalLayoutGroup>();
-        iconRowHlg.childAlignment       = TextAnchor.MiddleCenter;
-        iconRowHlg.childControlWidth    = false;
-        iconRowHlg.childControlHeight   = false;
-        iconRowHlg.childForceExpandWidth  = false;
-        iconRowHlg.childForceExpandHeight = false;
+        // 아이콘 행 (HLG로 고정 크기 유지)
+        var iconRowGO = Flex(parent, "IconRow", 86f);
+        var hlg = iconRowGO.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
 
-        var iconGO = Obj("Icon", iconRowGO.transform);
+        var iconGO = O("Icon", iconRowGO.transform);
         iconGO.GetComponent<RectTransform>().sizeDelta = new Vector2(80f, 80f);
         var iconImg = iconGO.AddComponent<Image>();
         iconImg.color = new Color(1f, 1f, 1f, 0.12f);
 
-        var nameGO = FlexChild(vlg.transform, "Name", 34f);
-        var nameTmp = TMP(nameGO, "—", 14f, FontStyles.Bold,
+        // 이름 행
+        var nameGO = Flex(parent, "Name", 32f);
+        var nameTmp = T(nameGO, "—", 14f, FontStyles.Bold,
             TextAlignmentOptions.Center, Color.white, font);
 
         return (iconImg, nameTmp);
     }
 
-    private static (GameObject sec, TextMeshProUGUI atk, TextMeshProUGUI def)
-        BuildMainSection(Transform parent, TMP_FontAsset font, bool isRight,
-            out TextMeshProUGUI atkDelta, out TextMeshProUGUI defDelta)
+    /// <summary>스탯 행: [라벨] [현재값] [▲▼ 델타] [새값]</summary>
+    private static (TextMeshProUGUI cur, TextMeshProUGUI delta, TextMeshProUGUI next)
+        StatRow(Transform parent, string label, TMP_FontAsset font)
     {
-        atkDelta = null; defDelta = null;
-        var sec = VLG(parent, "MainSection", 4f, new RectOffset(12, 12, 8, 8));
+        var row = Flex(parent, "_SR_" + label, 30f);
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 0f;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = false; hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
 
-        Divider(sec.transform, "── 기본 스탯 ──", font);
-        var atkTmp = StatRow(sec.transform, "공격력", font, isRight, out atkDelta);
-        var defTmp = StatRow(sec.transform, "방어력", font, isRight, out defDelta);
+        var lbl   = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
+        var curGO = S(row.transform, "_C", 100f, 30f); var curTmp   = T(curGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
+        var dltGO = S(row.transform, "_D", 120f, 30f); var deltaTmp = T(dltGO,  "—", 14f, FontStyles.Normal, TextAlignmentOptions.MidlineCenter, ColorLabel,  font);
+        var newGO = S(row.transform, "_N", 100f, 30f); var newTmp   = T(newGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
 
-        return (sec.gameObject, atkTmp, defTmp);
+        return (curTmp, deltaTmp, newTmp);
     }
 
-    private static (GameObject sec,
-        TextMeshProUGUI qName, TextMeshProUGUI qCool,
-        TextMeshProUGUI qCoolDelta, TextMeshProUGUI qDesc)
-        BuildSubSection(Transform parent, TMP_FontAsset font, bool isRight,
-            out TextMeshProUGUI qCoolDeltaOut)
+    /// <summary>레이블 행 (Q 스킬명 등 델타 없음): [라벨] [현재] [→] [새]</summary>
+    private static (TextMeshProUGUI cur, TextMeshProUGUI arrow, TextMeshProUGUI next)
+        LabelRow(Transform parent, string label, TMP_FontAsset font)
     {
-        qCoolDeltaOut = null;
-        var sec = VLG(parent, "SubSection", 4f, new RectOffset(12, 12, 8, 8));
+        var row = Flex(parent, "_LR_" + label, 30f);
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 0f;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = false; hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
 
-        Divider(sec.transform, "── Q 스킬 ──", font);
-        var qNameTmp = LabelRow(sec.transform, "Q 스킬",  font);
-        var qCoolTmp = StatRow(sec.transform,  "Q 쿨다운", font, isRight, out var qCD);
+        var lbl  = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
+        var curGO = S(row.transform, "_C", 130f, 30f); var curTmp  = T(curGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
+        var arrGO = S(row.transform, "_A",  40f, 30f); var arrTmp  = T(arrGO,  "→", 13f, FontStyles.Normal, TextAlignmentOptions.MidlineCenter, ColorLabel,  font);
+        var newGO = S(row.transform, "_N", 130f, 30f); var newTmp  = T(newGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
 
-        var descGO = FlexChild(sec.transform, "QDesc", 58f);
-        var descTmp = TMP(descGO, "—", 11f, FontStyles.Normal,
+        return (curTmp, arrTmp, newTmp);
+    }
+
+    /// <summary>설명 행 (좌/우 텍스트): [현재설명] | [새설명]</summary>
+    private static (TextMeshProUGUI cur, TextMeshProUGUI next)
+        DescRow(Transform parent, TMP_FontAsset font)
+    {
+        var row = Flex(parent, "_DescRow", 52f);
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 8f;
+        hlg.childAlignment = TextAnchor.UpperCenter;
+        hlg.childControlWidth = false; hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+
+        var curGO = S(row.transform, "_DC", 390f, 52f);
+        var curTmp = T(curGO, "—", 11f, FontStyles.Normal,
+            TextAlignmentOptions.TopRight, ColorLabel, font);
+        curTmp.enableWordWrapping = true;
+
+        var divGO = S(row.transform, "_DD", 2f, 52f);
+        divGO.AddComponent<Image>().color = ColorDivider;
+
+        var newGO = S(row.transform, "_DN", 390f, 52f);
+        var newTmp = T(newGO, "—", 11f, FontStyles.Normal,
             TextAlignmentOptions.TopLeft, ColorLabel, font);
-        descTmp.enableWordWrapping = true;
+        newTmp.enableWordWrapping = true;
 
-        qCoolDeltaOut = qCD;
-        return (sec.gameObject, qNameTmp, qCoolTmp, qCD, descTmp);
-    }
-
-    // ──────────────────────────────────────────────────────────────────
-    // 행 빌더
-    // ──────────────────────────────────────────────────────────────────
-
-    private static TextMeshProUGUI StatRow(Transform parent, string label,
-        TMP_FontAsset font, bool isRight, out TextMeshProUGUI deltaTmp)
-    {
-        deltaTmp = null;
-        var row = FlexChild(parent, "_R_" + label, 26f);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 6f; hlg.childAlignment = TextAnchor.MiddleLeft;
-        hlg.childControlWidth = false; hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
-
-        var lbl = Sized(row.transform, "_L", 72f, 26f);
-        TMP(lbl, label, 12f, FontStyles.Normal,
-            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
-
-        var val = Sized(row.transform, "_V", 60f, 26f);
-        var valTmp = TMP(val, "—", 14f, FontStyles.Bold,
-            TextAlignmentOptions.MidlineLeft, Color.white, font);
-
-        if (isRight)
-        {
-            var d = Sized(row.transform, "_D", 88f, 26f);
-            deltaTmp = TMP(d, "—", 12f, FontStyles.Normal,
-                TextAlignmentOptions.MidlineLeft, ColorLabel, font);
-        }
-        return valTmp;
-    }
-
-    private static TextMeshProUGUI LabelRow(Transform parent, string label, TMP_FontAsset font)
-    {
-        var row = FlexChild(parent, "_LR_" + label, 26f);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 6f; hlg.childAlignment = TextAnchor.MiddleLeft;
-        hlg.childControlWidth = false; hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
-
-        var lbl = Sized(row.transform, "_L", 72f, 26f);
-        TMP(lbl, label, 12f, FontStyles.Normal,
-            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
-
-        var val = Sized(row.transform, "_V", 140f, 26f);
-        return TMP(val, "—", 13f, FontStyles.Bold,
-            TextAlignmentOptions.MidlineLeft, Color.white, font);
-    }
-
-    private static void Divider(Transform parent, string text, TMP_FontAsset font)
-    {
-        var go = FlexChild(parent, "_Div", 22f);
-        TMP(go, text, 10f, FontStyles.Normal,
-            TextAlignmentOptions.Center, ColorDivider, font);
+        return (curTmp, newTmp);
     }
 
     // ──────────────────────────────────────────────────────────────────
     // 레이아웃 헬퍼
     // ──────────────────────────────────────────────────────────────────
 
-    private static VerticalLayoutGroup VLG(Transform parent, string name,
-        float spacing, RectOffset padding = null)
+    private static GameObject Flex(Transform parent, string name, float h)
     {
-        var go = Obj(name, parent);
-        Stretch(go.GetComponent<RectTransform>());
-        var vlg = go.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = spacing;
-        vlg.childAlignment = TextAnchor.UpperCenter;
-        vlg.childControlWidth = true; vlg.childControlHeight = false;
-        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
-        if (padding != null) vlg.padding = padding;
-        return vlg;
-    }
-
-    private static GameObject FlexChild(Transform parent, string name, float h)
-    {
-        var go = Obj(name, parent);
+        var go = O(name, parent);
         go.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, h);
         var le = go.AddComponent<LayoutElement>();
         le.minHeight = h; le.preferredHeight = h;
         return go;
     }
 
-    private static GameObject Sized(Transform parent, string name, float w, float h)
+    private static GameObject S(Transform parent, string name, float w, float h)
     {
-        var go = Obj(name, parent);
+        var go = O(name, parent);
         go.GetComponent<RectTransform>().sizeDelta = new Vector2(w, h);
         return go;
     }
 
-    private static Button BuildBtn(string name, Transform parent,
+    private static Button Btn(string name, Transform parent,
         string label, Color bg, TMP_FontAsset font,
         float x, float y, float w, float h)
     {
-        var go = Obj(name, parent);
-        SetCenter(go, w, h, x, y);
+        var go = O(name, parent);
+        Center(go, w, h, x, y);
         go.AddComponent<Image>().color = bg;
         var btn = go.AddComponent<Button>();
         var nav = btn.navigation; nav.mode = Navigation.Mode.None; btn.navigation = nav;
-        var txtGO = Obj("BtnText", go.transform);
+        var txtGO = O("BtnText", go.transform);
         Stretch(txtGO.GetComponent<RectTransform>());
-        TMP(txtGO, label, 15f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white, font);
+        T(txtGO, label, 15f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white, font);
         return btn;
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // RectTransform 헬퍼
+    // RectTransform
     // ──────────────────────────────────────────────────────────────────
 
     private static void Stretch(RectTransform rt)
@@ -329,19 +317,18 @@ public static class WeaponReplacePopupBuilder
         rt.sizeDelta = Vector2.zero; rt.anchoredPosition = Vector2.zero;
     }
 
-    private static void SetCenter(GameObject go, float w, float h, float x, float y)
+    private static void Center(GameObject go, float w, float h, float x, float y)
     {
         var rt = go.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(w, h);
-        rt.anchoredPosition = new Vector2(x, y);
+        rt.sizeDelta = new Vector2(w, h); rt.anchoredPosition = new Vector2(x, y);
     }
 
     private static void AnchorTop(GameObject go, float w, float h, float x, float y)
     {
         var rt = go.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 1f);
         rt.sizeDelta = new Vector2(w, h); rt.anchoredPosition = new Vector2(x, y);
     }
 
@@ -353,28 +340,26 @@ public static class WeaponReplacePopupBuilder
         rt.sizeDelta = new Vector2(w, h); rt.anchoredPosition = new Vector2(x, y);
     }
 
-    private static void AnchorSplit(GameObject go,
+    private static void Split(GameObject go,
         float minX, float minY, float maxX, float maxY)
     {
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(minX, minY);
-        rt.anchorMax = new Vector2(maxX, maxY);
-        rt.sizeDelta = Vector2.zero;
-        rt.anchoredPosition = Vector2.zero;
+        rt.anchorMin = new Vector2(minX, minY); rt.anchorMax = new Vector2(maxX, maxY);
+        rt.sizeDelta = Vector2.zero; rt.anchoredPosition = Vector2.zero;
     }
 
     // ──────────────────────────────────────────────────────────────────
     // 기타
     // ──────────────────────────────────────────────────────────────────
 
-    private static GameObject Obj(string name, Transform parent)
+    private static GameObject O(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
         return go;
     }
 
-    private static TextMeshProUGUI TMP(GameObject go, string text, float size,
+    private static TextMeshProUGUI T(GameObject go, string text, float size,
         FontStyles style, TextAlignmentOptions align, Color color, TMP_FontAsset font)
     {
         var tmp = go.AddComponent<TextMeshProUGUI>();
@@ -384,10 +369,10 @@ public static class WeaponReplacePopupBuilder
         return tmp;
     }
 
-    private static Image EnsureImage(GameObject go)
+    private static Image EnsureImg(GameObject go)
     {
         var img = go.GetComponent<Image>();
-        return img != null ? img : go.AddComponent<Image>();
+        return img ? img : go.AddComponent<Image>();
     }
 
     private static void B(SerializedObject so, string field, Object value)
