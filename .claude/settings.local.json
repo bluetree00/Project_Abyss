@@ -81,7 +81,17 @@
       "Bash(grep -r \"/* 구현 \\\\*/\\\\|//구현\\\\|unimplemented\\\\|NotImplemented\\\\|Placeholder\\\\|WIP\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Characters/Player --include=\"*.cs\")",
       "Bash(ls -d Assets/Abyss/Animations/*)",
       "mcp__mcp-for-unity-server__manage_asset",
-      "mcp__mcp-for-unity__manage_asset"
+      "mcp__mcp-for-unity__manage_asset",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git pull:*)",
+      "Bash(curl -s --max-time 5 http://127.0.0.1:8080/mcp)",
+      "Bash(git add:*)",
+      "Bash(git merge:*)",
+      "Bash(git commit:*)",
+      "Bash(wc -l Assets/Abyss/UI/Popup/UI_*.prefab)",
+      "Bash(grep -v \"^--$\")"
     ]
   },
   "hooks": {

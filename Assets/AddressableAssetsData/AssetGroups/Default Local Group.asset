@@ -37,16 +37,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f3516090ec2f0fd42bf629e97b442df7
-    m_Address: UI/Popup/UI_MainWeaponReplacePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1b662a50f793e01418b37773f8bc3d59
-    m_Address: UI/Popup/UI_SubWeaponReplacePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca58b3c4bf8304440a7ab62986fce7ef
     m_Address: BloodShot
     m_ReadOnly: 0
