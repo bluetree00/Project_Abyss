@@ -2,8 +2,6 @@
 using System;
 using UnityEngine;
 
-public enum WeaponSlotType { Main, Sub }
-
 public enum PromoteMode
 {
     None,       // 차지/강화 없음
@@ -35,8 +33,8 @@ public class WeaponData
 
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
-    public WeaponType weaponType = WeaponType.None;
-    public WeaponSlotType slotType = WeaponSlotType.Main;
+    public WeaponType     weaponType = WeaponType.None;
+    public WeaponSlotType slotType   = WeaponSlotType.Main;
     public string skillName;
     public string skillDescription;
 
@@ -64,10 +62,10 @@ public class WeaponData
         promoteMode = so.promoteMode;
         chargeStages = so.chargeStages;
 
-        weaponType        = so.weaponType;
-        slotType          = so.slotType;
-        skillName         = so.skillName;
-        skillDescription  = so.skillDescription;
+        weaponType       = so.weaponType;
+        slotType         = so.slotType;
+        skillName        = so.skillName;
+        skillDescription = so.skillDescription;
 
         groundEndCount = so.groundEndCount;
         airEndCount = so.airEndCount;

@@ -289,75 +289,50 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     // ----------------------
     // 장비 획득 처리 (픽업 등 외부 호출)
-    // - HandlePickupAsync에서도 풀 초기화를 수행하도록 추가
+    // slotType 기준으로 슬롯을 결정 (Main=0, Sub=1)
+    // 반환값: true = 획득함(픽업 오브젝트 제거 가능) / false = 버림(픽업 오브젝트 유지)
     // ----------------------
-    public async UniTask HandlePickupAsync(WeaponData runtimeData, WorldWeaponDisplay source = null)
+    public async UniTask<bool> HandlePickupAsync(WeaponData runtimeData)
     {
-        if (runtimeData == null)
-        {
-            source?.CancelPickup();
-            return;
-        }
+        if (runtimeData == null) return false;
 
-        // slotType 기반 1대1 교체: Main → Slot 0, Sub → Slot 1
-        int targetSlot = runtimeData.slotType == WeaponSlotType.Sub ? SubSlot : MainSlot;
-        bool isMain    = targetSlot == MainSlot;
+        int slotIndex = (int)runtimeData.slotType;
+        var slot = slots[slotIndex];
 
-        if (slots[targetSlot].IsEmpty)
-        {
-            // 빈 슬롯: 바로 장착
-            _owned.Add(runtimeData);
-            source?.ConfirmPickup();
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: isMain);
-            return;
-        }
-
-        // 해당 슬롯에 이미 무기가 있으면 팝업 먼저 — source는 아직 살아있음
-        int? chosenSlot = await ShowReplacePromptAsync(runtimeData, targetSlot);
-        if (chosenSlot.HasValue)
+        // 해당 슬롯이 비어 있으면 바로 장착
+        if (slot.IsEmpty)
         {
             _owned.Add(runtimeData);
-            source?.ConfirmPickup();
-            var replaced = await ReplaceSlotAsync(chosenSlot.Value, runtimeData);
-            if (replaced != null) Debug.Log($"Replaced {replaced.displayName}");
+            bool activate = currentSlotIndex < 0;
+            await EquipToSlotAsync(slotIndex, runtimeData, activate);
+            return true;
         }
-        else
+
+        // 슬롯 차있음 → 1:1 비교 팝업
+        bool replace = await ShowReplacePromptAsync(slot.runtimeData, runtimeData, slotIndex);
+        if (replace)
         {
-            // 취소: 월드 아이템 복원
-            source?.CancelPickup();
-            Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
+            _owned.Add(runtimeData);
+            var replaced = await ReplaceSlotAsync(slotIndex, runtimeData);
+            if (replaced != null) Debug.Log($"Replaced: {replaced.displayName}");
+            return true;
         }
+
+        Debug.Log($"Pickup discarded: {runtimeData.displayName}");
+        return false;
     }
 
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon, int targetSlot)
+    private async UniTask<bool> ShowReplacePromptAsync(WeaponData currentWeapon, WeaponData newWeapon, int slotIndex)
     {
-        var currentWeapon = slots[targetSlot].runtimeData;
-        bool confirmed;
-
-        if (newWeapon.slotType == WeaponSlotType.Sub)
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
+        if (popup == null)
         {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_SubWeaponReplacePopup>();
-            if (popup == null)
-            {
-                Debug.LogWarning("[PlayerWeaponManager] UI_SubWeaponReplacePopup 로드 실패, 자동 교체");
-                return targetSlot;
-            }
-            popup.Setup(newWeapon, currentWeapon, targetSlot);
-            confirmed = await popup.WaitForChoiceAsync();
-        }
-        else
-        {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_MainWeaponReplacePopup>();
-            if (popup == null)
-            {
-                Debug.LogWarning("[PlayerWeaponManager] UI_MainWeaponReplacePopup 로드 실패, 자동 교체");
-                return targetSlot;
-            }
-            popup.Setup(newWeapon, currentWeapon, targetSlot);
-            confirmed = await popup.WaitForChoiceAsync();
+            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 기본값 false");
+            return false;
         }
 
-        return confirmed ? targetSlot : (int?)null;
+        popup.Setup(currentWeapon, newWeapon, slotIndex);
+        return await popup.WaitForChoiceAsync();
     }
 
     // ----------------------

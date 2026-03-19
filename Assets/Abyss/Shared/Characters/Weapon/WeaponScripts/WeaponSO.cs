@@ -27,8 +27,8 @@ public class WeaponSO : ScriptableObject
     public WeaponAbilitySetSO abilitySet;
 
     [Header("타입 & 정책")]
-    public WeaponType weaponType = WeaponType.Sword;      // Sword / Bow / 나중에 추가
-    public WeaponSlotType slotType = WeaponSlotType.Main; // Main: 일반 공격 + E/R스킬, Sub: Q스킬 전용
+    public WeaponType     weaponType = WeaponType.Sword;      // Sword / Bow / 나중에 추가
+    public WeaponSlotType slotType   = WeaponSlotType.Main;   // Main: 일반 공격 + E/R스킬, Sub: Q스킬 전용
 
     [Header("UI 설명")]
     public string skillName;        // 스킬 이름 (서브 장비: Q스킬 이름)
