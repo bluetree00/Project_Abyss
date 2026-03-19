@@ -220,7 +220,7 @@ public static class WeaponReplacePopupBuilder
 
         var lbl   = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
         var curGO = S(row.transform, "_C", 100f, 30f); var curTmp   = T(curGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
-        var dltGO = S(row.transform, "_D", 120f, 30f); var deltaTmp = T(dltGO,  "—", 14f, FontStyles.Normal, TextAlignmentOptions.MidlineCenter, ColorLabel,  font);
+        var dltGO = S(row.transform, "_D", 120f, 30f); var deltaTmp = T(dltGO,  "—", 14f, FontStyles.Normal, TextAlignmentOptions.Midline, ColorLabel,  font);
         var newGO = S(row.transform, "_N", 100f, 30f); var newTmp   = T(newGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
 
         return (curTmp, deltaTmp, newTmp);
@@ -239,7 +239,7 @@ public static class WeaponReplacePopupBuilder
 
         var lbl  = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
         var curGO = S(row.transform, "_C", 130f, 30f); var curTmp  = T(curGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
-        var arrGO = S(row.transform, "_A",  40f, 30f); var arrTmp  = T(arrGO,  "→", 13f, FontStyles.Normal, TextAlignmentOptions.MidlineCenter, ColorLabel,  font);
+        var arrGO = S(row.transform, "_A",  40f, 30f); var arrTmp  = T(arrGO,  "→", 13f, FontStyles.Normal, TextAlignmentOptions.Midline, ColorLabel,  font);
         var newGO = S(row.transform, "_N", 130f, 30f); var newTmp  = T(newGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
 
         return (curTmp, arrTmp, newTmp);
