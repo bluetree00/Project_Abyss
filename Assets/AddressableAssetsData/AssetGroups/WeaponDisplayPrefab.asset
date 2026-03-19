@@ -13,17 +13,15 @@ MonoBehaviour:
   m_Name: WeaponDisplayPrefab
   m_EditorClassIdentifier: 
   m_GroupName: WeaponDisplayPrefab
-  m_Data:
-    m_SerializedData: []
   m_GUID: 93128935b8a5efb428992e660ed4ca31
   m_SerializeEntries:
-  - m_GUID: 83d2636d9fbb0d442a0cddaac7e6d048
-    m_Address: TestSwordDisplayPrefab
+  - m_GUID: 7d34b013aae4f1443b71021021cf2e2c
+    m_Address: TestBowDisplayPrefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cca606628889d9b4786433ef2703d92d
-    m_Address: TestBowDisplayPrefab
+  - m_GUID: 83d2636d9fbb0d442a0cddaac7e6d048
+    m_Address: TestSwordDisplayPrefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
