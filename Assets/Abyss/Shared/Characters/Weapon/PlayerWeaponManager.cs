@@ -332,31 +332,16 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon, int targetSlot)
     {
         var currentWeapon = slots[targetSlot].runtimeData;
-        bool confirmed;
 
-        if (newWeapon.slotType == WeaponSlotType.Sub)
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
+        if (popup == null)
         {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_SubWeaponReplacePopup>();
-            if (popup == null)
-            {
-                Debug.LogWarning("[PlayerWeaponManager] UI_SubWeaponReplacePopup 로드 실패, 자동 교체");
-                return targetSlot;
-            }
-            popup.Setup(newWeapon, currentWeapon, targetSlot);
-            confirmed = await popup.WaitForChoiceAsync();
-        }
-        else
-        {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_MainWeaponReplacePopup>();
-            if (popup == null)
-            {
-                Debug.LogWarning("[PlayerWeaponManager] UI_MainWeaponReplacePopup 로드 실패, 자동 교체");
-                return targetSlot;
-            }
-            popup.Setup(newWeapon, currentWeapon, targetSlot);
-            confirmed = await popup.WaitForChoiceAsync();
+            Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 자동 교체");
+            return targetSlot;
         }
 
+        popup.Setup(currentWeapon, newWeapon, targetSlot);
+        bool confirmed = await popup.WaitForChoiceAsync();
         return confirmed ? targetSlot : (int?)null;
     }
 
