@@ -33,7 +33,8 @@ public class WeaponData
 
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
-    public WeaponType weaponType = WeaponType.None;
+    public WeaponType     weaponType     = WeaponType.None;
+    public WeaponSlotType weaponSlotType = WeaponSlotType.Main;
 
     public WeaponData(WeaponSO so)
     {
@@ -51,7 +52,8 @@ public class WeaponData
         promoteMode = so.promoteMode;
         chargeStages = so.chargeStages;
 
-        weaponType = so.weaponType;
+        weaponType     = so.weaponType;
+        weaponSlotType = so.weaponSlotType;
 
         groundEndCount = so.groundEndCount;
         airEndCount = so.airEndCount;

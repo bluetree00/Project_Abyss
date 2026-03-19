@@ -78,9 +78,32 @@ public class WorldWeaponDisplay : MonoBehaviour
         var data = _runtimeData ?? (weaponSO != null ? new WeaponData(weaponSO) : null);
         if (data == null) { _pickedUp = false; return; }
 
+        bool acquired = false;
         if (player.WeaponManager != null)
-            await player.WeaponManager.HandlePickupAsync(data, autoEquip: true);
+            acquired = await player.WeaponManager.HandlePickupAsync(data);
 
-        Destroy(gameObject);
+        if (acquired)
+        {
+            // 교체 완료 → 픽업 오브젝트 제거
+            Destroy(gameObject);
+        }
+        else
+        {
+            // 버리기 선택 → 콜라이더 일시 비활성화 후 바닥에 유지
+            // 플레이어가 겹쳐 있는 상태이므로 2초 후 다시 줍기 가능
+            var col = GetComponent<Collider>();
+            if (col != null) col.enabled = false;
+            await UniTask.Delay(2000);
+            if (this != null && gameObject != null)
+            {
+                if (col != null) col.enabled = true;
+                _pickedUp = false;
+
+                // 파티클 재시작
+                if (_weaponInstance != null)
+                    foreach (var ps in _weaponInstance.GetComponentsInChildren<ParticleSystem>(true))
+                        ps.Play();
+            }
+        }
     }
 }
