@@ -4,60 +4,71 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 무기 교체 팝업 — 현재 장착 무기 vs 새 무기 1:1 비교
+/// 무기 교체 팝업 — 헤더 좌우 분리 + 스탯 중앙 비교
 ///
-/// 레이아웃 구조:
-///   ┌──────────────────────────────────────┐
-///   │  새 무기 획득!                        │
-///   │  ─── 메인 무기 ───                   │
-///   │                                     │
-///   │  [현재]           [새 무기]           │
-///   │  아이콘            아이콘             │
-///   │  이름              이름              │
-///   │                                     │
-///   │  공격력   50  →  75   ▲ +25 (녹색)  │
-///   │  방어력   10  →   5   ▼  -5 (빨강)  │
-///   │                                     │
-///   │     [교체하기]      [버리기]          │
-///   └──────────────────────────────────────┘
+/// 레이아웃:
+///   ┌────────────────────┬─────────────────────────┐
+///   │    [현재 장비]      │       [새 장비]          │
+///   │      아이콘         │        아이콘            │
+///   │      이름           │        이름              │
+///   ├────────────────────┴─────────────────────────┤
+///   │  공격력    45        ▲ +27        72         │  ← 메인
+///   │  방어력    10        ▼  -5         5         │
+///   ├──────────────────────────────────────────────┤
+///   │  Q 스킬  화염의 화살    →    폭발의 화살      │  ← 서브
+///   │  Q 쿨    5.0s        ▲ -1.0s     4.0s       │
+///   └──────────────────────────────────────────────┘
 /// </summary>
 public class UI_WeaponReplacePopup : UI_Popup
 {
-    // ── 슬롯 레이블 ────────────────────────────────────────────────
-    [Header("슬롯 레이블")]
-    [SerializeField] private TMP_Text slotLabelText;        // "메인 무기" / "서브 무기"
+    // ── 공통 ──────────────────────────────────────────────────────────
+    [Header("공통")]
+    [SerializeField] private TMP_Text slotLabelText;
 
-    // ── 현재 무기 패널 ──────────────────────────────────────────────
-    [Header("현재 무기")]
+    // ── 헤더: 현재 장비 (왼쪽) ────────────────────────────────────────
+    [Header("현재 장비 헤더")]
     [SerializeField] private Image    currentIcon;
     [SerializeField] private TMP_Text currentName;
 
-    // ── 새 무기 패널 ────────────────────────────────────────────────
-    [Header("새 무기")]
+    // ── 헤더: 새 장비 (오른쪽) ────────────────────────────────────────
+    [Header("새 장비 헤더")]
     [SerializeField] private Image    newIcon;
     [SerializeField] private TMP_Text newName;
 
-    // ── 스탯 비교 — 공격력 ──────────────────────────────────────────
-    [Header("스탯 비교 — 공격력")]
-    [SerializeField] private TMP_Text atkCurrentText;       // 현재값
-    [SerializeField] private TMP_Text atkNewText;           // 새 값
-    [SerializeField] private TMP_Text atkDeltaText;         // ▲+25 / ▼-5 / —
+    // ── 스탯 비교: 메인 섹션 (전체 폭) ───────────────────────────────
+    // 행 구조: [라벨] [현재값] [▲▼ 델타] [새값]
+    [Header("메인 스탯 섹션")]
+    [SerializeField] private GameObject mainStatsSection;
+    [SerializeField] private TMP_Text   atkCurrentText;
+    [SerializeField] private TMP_Text   atkDeltaText;
+    [SerializeField] private TMP_Text   atkNewText;
+    [SerializeField] private TMP_Text   defCurrentText;
+    [SerializeField] private TMP_Text   defDeltaText;
+    [SerializeField] private TMP_Text   defNewText;
 
-    // ── 스탯 비교 — 방어력 ──────────────────────────────────────────
-    [Header("스탯 비교 — 방어력")]
-    [SerializeField] private TMP_Text defCurrentText;
-    [SerializeField] private TMP_Text defNewText;
-    [SerializeField] private TMP_Text defDeltaText;
+    // ── 스탯 비교: 서브 섹션 (전체 폭) ───────────────────────────────
+    // Q스킬명: [현재] [→] [새]
+    // Q쿨다운: [현재] [▲▼ 델타] [새]
+    // 스킬설명: [현재] | [새]
+    [Header("서브 스탯 섹션")]
+    [SerializeField] private GameObject subStatsSection;
+    [SerializeField] private TMP_Text   qSkillCurrentText;
+    [SerializeField] private TMP_Text   qSkillNewText;
+    [SerializeField] private TMP_Text   qCoolCurrentText;
+    [SerializeField] private TMP_Text   qCoolDeltaText;
+    [SerializeField] private TMP_Text   qCoolNewText;
+    [SerializeField] private TMP_Text   qDescCurrentText;
+    [SerializeField] private TMP_Text   qDescNewText;
 
-    // ── 버튼 ────────────────────────────────────────────────────────
+    // ── 버튼 ──────────────────────────────────────────────────────────
     [Header("버튼")]
-    [SerializeField] private Button replaceButton;          // 교체하기
-    [SerializeField] private Button discardButton;          // 버리기
+    [SerializeField] private Button replaceButton;
+    [SerializeField] private Button discardButton;
 
-    // ── 색상 상수 ────────────────────────────────────────────────────
-    private static readonly Color ColorUp      = new Color(0.20f, 0.90f, 0.30f); // 녹색
-    private static readonly Color ColorDown    = new Color(0.95f, 0.30f, 0.30f); // 빨강
-    private static readonly Color ColorNeutral = new Color(0.75f, 0.75f, 0.75f); // 회색
+    // ── 색상 상수 ─────────────────────────────────────────────────────
+    private static readonly Color ColorUp      = new Color(0.20f, 0.90f, 0.30f);
+    private static readonly Color ColorDown    = new Color(0.95f, 0.30f, 0.30f);
+    private static readonly Color ColorNeutral = new Color(0.75f, 0.75f, 0.75f);
 
     private UniTaskCompletionSource<bool> _tcs;
 
@@ -65,47 +76,62 @@ public class UI_WeaponReplacePopup : UI_Popup
     // Public API
     // ──────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// 팝업 데이터 세팅. WaitForChoiceAsync() 로 결과를 기다린다.
-    /// </summary>
-    /// <param name="current">현재 장착 무기 (null이면 "없음" 표시)</param>
-    /// <param name="incoming">새로 획득한 무기</param>
-    /// <param name="slotIndex">0=메인, 1=서브</param>
     public void Setup(WeaponData current, WeaponData incoming, int slotIndex)
     {
-        // 슬롯 레이블
-        if (slotLabelText != null)
-            slotLabelText.text = slotIndex == 0 ? "메인 무기" : "서브 무기";
+        bool isMain = slotIndex == 0;
 
-        // 아이콘 / 이름
+        SetText(slotLabelText, isMain ? "메인 무기" : "서브 장비");
+
         ApplyIcon(currentIcon, current?.icon);
         ApplyIcon(newIcon,     incoming?.icon);
-        if (currentName != null) currentName.text = current?.displayName  ?? "없음";
-        if (newName     != null) newName.text     = incoming?.displayName ?? "없음";
+        SetText(currentName, current?.displayName  ?? "없음");
+        SetText(newName,     incoming?.displayName ?? "없음");
 
-        // 스탯 비교
-        float curAtk = current?.baseAttack   ?? 0f;
-        float newAtk = incoming?.baseAttack  ?? 0f;
-        float curDef = current?.baseDefense  ?? 0f;
-        float newDef = incoming?.baseDefense ?? 0f;
+        mainStatsSection?.SetActive(isMain);
+        subStatsSection?.SetActive(!isMain);
 
-        ApplyStat(atkCurrentText, atkNewText, atkDeltaText, curAtk, newAtk);
-        ApplyStat(defCurrentText, defNewText, defDeltaText, curDef, newDef);
+        if (isMain) BindMainStats(current, incoming);
+        else        BindSubStats(current, incoming);
 
-        // 버튼
         _tcs = new UniTaskCompletionSource<bool>();
-
         replaceButton?.onClick.RemoveAllListeners();
         replaceButton?.onClick.AddListener(() => Complete(true));
-
         discardButton?.onClick.RemoveAllListeners();
         discardButton?.onClick.AddListener(() => Complete(false));
     }
 
-    /// <summary>
-    /// true = 교체하기 / false = 버리기(취소)
-    /// </summary>
     public UniTask<bool> WaitForChoiceAsync() => _tcs.Task;
+
+    // ──────────────────────────────────────────────────────────────────
+    // 바인딩
+    // ──────────────────────────────────────────────────────────────────
+
+    private void BindMainStats(WeaponData cur, WeaponData inc)
+    {
+        SetText(atkCurrentText, $"{cur?.baseAttack  ?? 0f:F0}");
+        SetText(atkNewText,     $"{inc?.baseAttack  ?? 0f:F0}");
+        ApplyDelta(atkDeltaText, cur?.baseAttack ?? 0f, inc?.baseAttack ?? 0f);
+
+        SetText(defCurrentText, $"{cur?.baseDefense ?? 0f:F0}");
+        SetText(defNewText,     $"{inc?.baseDefense ?? 0f:F0}");
+        ApplyDelta(defDeltaText, cur?.baseDefense ?? 0f, inc?.baseDefense ?? 0f);
+    }
+
+    private void BindSubStats(WeaponData cur, WeaponData inc)
+    {
+        SetText(qSkillCurrentText, cur?.skillName  ?? "—");
+        SetText(qSkillNewText,     inc?.skillName  ?? "—");
+
+        SetText(qCoolCurrentText, FormatCool(cur?.skillQCooldown));
+        SetText(qCoolNewText,     FormatCool(inc?.skillQCooldown));
+        ApplyDelta(qCoolDeltaText,
+            cur?.skillQCooldown ?? 0f,
+            inc?.skillQCooldown ?? 0f,
+            invertColor: true);
+
+        SetText(qDescCurrentText, cur?.skillDescription ?? "—");
+        SetText(qDescNewText,     inc?.skillDescription ?? "—");
+    }
 
     // ──────────────────────────────────────────────────────────────────
     // 내부
@@ -124,29 +150,21 @@ public class UI_WeaponReplacePopup : UI_Popup
         img.color  = sprite != null ? Color.white : new Color(1f, 1f, 1f, 0.15f);
     }
 
-    private void ApplyStat(TMP_Text curText, TMP_Text newText, TMP_Text deltaText,
-                            float curVal, float newVal)
+    private void ApplyDelta(TMP_Text t, float cur, float inc, bool invertColor = false)
     {
-        if (curText != null) curText.text = $"{curVal:F0}";
-        if (newText != null) newText.text = $"{newVal:F0}";
-
-        if (deltaText == null) return;
-
-        float delta = newVal - curVal;
+        if (t == null) return;
+        float delta = inc - cur;
         if (Mathf.Approximately(delta, 0f))
         {
-            deltaText.text  = "—";
-            deltaText.color = ColorNeutral;
+            t.text = "—"; t.color = ColorNeutral; return;
         }
-        else if (delta > 0f)
-        {
-            deltaText.text  = $"▲ +{delta:F0}";
-            deltaText.color = ColorUp;
-        }
-        else
-        {
-            deltaText.text  = $"▼ {delta:F0}";
-            deltaText.color = ColorDown;
-        }
+        bool positive = delta > 0f;
+        bool good     = invertColor ? !positive : positive;
+        t.text  = positive ? $"▲ +{delta:F1}" : $"▼ {delta:F1}";
+        t.color = good ? ColorUp : ColorDown;
     }
+
+    private static string FormatCool(float? v) => v.HasValue ? $"{v.Value:F1}s" : "—";
+
+    private static void SetText(TMP_Text t, string v) { if (t) t.text = v; }
 }

@@ -13,22 +13,15 @@ MonoBehaviour:
   m_Name: Chapter_SO_Data
   m_EditorClassIdentifier: 
   m_GroupName: Chapter_SO_Data
-  m_Data:
-    m_SerializedData: []
   m_GUID: 8799b864f583bad4485c000f90c397f5
   m_SerializeEntries:
-  - m_GUID: b28d136795157de48813a68896b5ca09
-    m_Address: Knight
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8867c0c57a4cb3148ba17943fa9638ba
-    m_Address: TestEffectSet
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5b5c6a8bc77593c4ab579c45b33e66aa
     m_Address: TestPool
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b28d136795157de48813a68896b5ca09
+    m_Address: Knight
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
