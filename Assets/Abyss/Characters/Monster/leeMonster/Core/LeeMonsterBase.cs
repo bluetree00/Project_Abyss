@@ -18,7 +18,7 @@ using UnityEngine.AI;
 ///   3) 빈 오브젝트에 해당 클래스 + Rigidbody + NavMeshAgent 추가
 ///   4) SO .asset 파일들 생성 후 Addressables 등록
 /// </summary>
-public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, IPooledObject
+public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
 {
     // ── 추상 멤버 (파생 클래스가 구현) ────────────────────
     /// <summary>Addressables에 등록된 MonsterConfigSO 주소.</summary>
@@ -372,30 +372,29 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, IPooledObject
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // IPooledObject — 풀 재사용 시 상태 초기화
+    // 풀 재사용 — OnEnable/OnDisable 콜백
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    void IPooledObject.OnSpawn(object param)
+    protected virtual void OnEnable()
     {
         // 첫 생성 직후 InitAsync가 아직 완료되지 않은 경우 스킵
-        // (Awake → InitAsync 가 초기화를 담당하므로 재진입 불필요)
         if (_config == null || _runtime == null) return;
 
         // 런타임 데이터 리셋
-        _runtime.CurrentHp          = _config.stat.maxHp;
-        _runtime.IsDead             = false;
-        _runtime.SpawnPosition      = transform.position;
-        _runtime.PatrolDirection    = 1;
+        _runtime.CurrentHp           = _config.stat.maxHp;
+        _runtime.IsDead              = false;
+        _runtime.SpawnPosition       = transform.position;
+        _runtime.PatrolDirection     = 1;
         _runtime.IsWaitingAtWaypoint = false;
-        _runtime.PatrolWaitTimer    = 0f;
-        _runtime.StateTimer         = 0f;
-        _runtime.AttackHitDealt     = false;
-        _runtime.IsFirstAttack      = true;
+        _runtime.PatrolWaitTimer     = 0f;
+        _runtime.StateTimer          = 0f;
+        _runtime.AttackHitDealt      = false;
+        _runtime.IsFirstAttack       = true;
 
         // NavMeshAgent 재활성화
         if (_agent != null) _agent.enabled = true;
 
-        // Rigidbody 재설정 (NavMeshAgent 제어 → kinematic 유지)
+        // Rigidbody 재설정
         var rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -411,16 +410,11 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, IPooledObject
         // FSM 순찰 상태로 재시작
         _fsm?.ChangeState(LeeMonsterStateType.Patrol);
 
-        // HP 바 재요청 (풀에서 꺼낼 때 새로 연결)
+        // HP 바 재요청
         RequestHPBarAsync().Forget();
     }
 
-    private async UniTaskVoid RequestHPBarAsync()
-    {
-        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
-    }
-
-    void IPooledObject.OnDespawn()
+    protected virtual void OnDisable()
     {
         // HP 바 반환
         if (_hpBar != null)
@@ -428,6 +422,11 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, IPooledObject
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
+    }
+
+    private async UniTaskVoid RequestHPBarAsync()
+    {
+        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
