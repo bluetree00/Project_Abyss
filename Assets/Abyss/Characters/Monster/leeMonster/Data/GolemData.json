@@ -1,0 +1,28 @@
+{
+  "monsterName": "어스 골렘",
+  "grade": "Normal",
+  "stat": {
+    "maxHp": 30,
+    "defense": 7.0,
+    "attackPower": 20.0,
+    "moveSpeed": 1.0,
+    "attackRange": 2.0,
+    "attackRadius": 2.0,
+    "attackRate": 1.0,
+    "attackDelay": 2.0,
+    "knockbackForce": 5.0
+  },
+  "detection": {
+    "detectionRange": 5.0,
+    "chaseGiveUpRange": 8.0
+  },
+  "patrol": {
+    "patrolType": "Random",
+    "patrolRange": 3.0,
+    "patrolSpeed": 1.0,
+    "waypointWaitTime": 0.5
+  },
+  "combat": {
+    "damageApplyDelay": 2.0
+  }
+}

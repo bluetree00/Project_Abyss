@@ -22,5 +22,7 @@
 public class FairyBatMonster : LeeMonsterBase
 {
     public const string PrefabAddress = "FairyBat/FairyBat";
-    protected override string ConfigAddress => "FairyBat/FairyBatConfig";
+    protected override string ConfigAddress    => "FairyBat/FairyBatConfig";
+    protected override string DataAddress      => "FairyBat/FairyBatData";
+    protected override float  HPBarHeadOffset  => 0.2f;
 }

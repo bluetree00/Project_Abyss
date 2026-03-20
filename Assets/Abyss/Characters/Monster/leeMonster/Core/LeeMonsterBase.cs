@@ -18,11 +18,23 @@ using UnityEngine.AI;
 ///   3) 빈 오브젝트에 해당 클래스 + Rigidbody + NavMeshAgent 추가
 ///   4) SO .asset 파일들 생성 후 Addressables 등록
 /// </summary>
-public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
+public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerManager.IPooledObject
 {
     // ── 추상 멤버 (파생 클래스가 구현) ────────────────────
     /// <summary>Addressables에 등록된 MonsterConfigSO 주소.</summary>
     protected abstract string ConfigAddress { get; }
+
+    /// <summary>
+    /// 서버(JSON) 데이터 파일의 Addressables 주소.
+    /// null 또는 빈 문자열이면 JSON 로드를 건너뛰고 SO 기본값 사용.
+    /// </summary>
+    protected abstract string DataAddress { get; }
+
+    /// <summary>
+    /// HP 바가 표시될 높이 오프셋 (콜라이더 상단 기준).
+    /// 몬스터 크기에 따라 파생 클래스에서 오버라이드.
+    /// </summary>
+    protected virtual float HPBarHeadOffset => 0.3f;
 
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO       _config;
@@ -31,6 +43,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     protected LeeMonsterRuntimeData _runtime;
     protected NavMeshAgent          _agent;
     protected Animator              _animator;
+    private   LeeMonsterHPBar       _hpBar;
 
     // Inspector 디버그용 (ReadOnly 어트리뷰트가 있으면 [ReadOnly] 사용)
     [SerializeField] private string _debugState;
@@ -63,7 +76,10 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
             return;
         }
 
-        // 2. NavMeshAgent 설정
+        // 2. JSON 데이터 로드 후 SO에 덮어쓰기
+        await LoadAndApplyJsonDataAsync();
+
+        // 3. NavMeshAgent 설정
         _agent = GetComponent<NavMeshAgent>();
         if (_agent == null)
         {
@@ -73,11 +89,16 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         _agent.speed            = _config.stat.moveSpeed;
         _agent.stoppingDistance = _config.stat.attackRange * 0.9f;
 
-        // 3. Animator 설정 (Addressables에서 AnimatorController 로드)
+        // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
+        // (non-kinematic이면 플레이어와 충돌 시 물리력이 발생해 날아감)
+        var _rb = GetComponent<Rigidbody>();
+        if (_rb != null) _rb.isKinematic = true;
+
+        // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
         await LoadAnimatorControllerAsync();
 
-        // 4. 런타임 데이터 초기화
+        // 5. 런타임 데이터 초기화
         _runtime = new LeeMonsterRuntimeData
         {
             CurrentHp        = _config.stat.maxHp,
@@ -85,7 +106,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
             PatrolDirection  = 1,
         };
 
-        // 5. 컨텍스트 조립
+        // 6. 컨텍스트 조립
         _ctx = new LeeMonsterContext
         {
             Monster   = this,
@@ -95,16 +116,20 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
             Runtime   = _runtime,
         };
 
-        // 6. 플레이어 타깃 등록
+        // 7. 플레이어 타깃 등록
         if (Managers.Player.PlayerTransform != null)
             _runtime.PlayerTarget = Managers.Player.PlayerTransform;
         else
             Managers.Player.OnPlayerSpawned += OnPlayerSpawned;
 
-        // 7. FSM 초기화
+        // 8. FSM 초기화
         var states = CreateStates();
         _fsm = new LeeMonsterFSM(_ctx, states);
         _fsm.ChangeState(LeeMonsterStateType.Patrol);
+
+        // 9. HP 바 요청 (비활성 상태면 풀 대기 중이므로 스킵 — OnSpawn에서 요청)
+        if (gameObject.activeInHierarchy)
+            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, HPBarHeadOffset);
 
         OnInitialized();
     }
@@ -244,6 +269,9 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         float actual = Mathf.Max(1f, amount - _config.stat.defense);
         _runtime.CurrentHp -= (int)actual;
 
+        // HP 바 갱신
+        _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
+
         if (_runtime.CurrentHp <= 0)
         {
             _runtime.CurrentHp = 0;
@@ -258,6 +286,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
                 var rb = GetComponent<Rigidbody>();
                 if (rb != null)
                 {
+                    rb.isKinematic = false; // 넉백을 위해 일시적으로 물리 활성화
                     Vector3 dir = (transform.position - instigator.transform.position).normalized;
                     rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
                 }
@@ -269,6 +298,28 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 내부 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private async UniTask LoadAndApplyJsonDataAsync()
+    {
+        if (string.IsNullOrEmpty(DataAddress)) return;
+
+        var textAsset = await Managers.AddressableManager.LoadAssetAsync<UnityEngine.TextAsset>(DataAddress);
+        if (textAsset == null)
+        {
+            Debug.LogWarning($"[LeeMonsterBase] JSON 데이터 로드 실패: {DataAddress}", this);
+            return;
+        }
+
+        var data = UnityEngine.JsonUtility.FromJson<MonsterJsonData>(textAsset.text);
+        if (data == null)
+        {
+            Debug.LogWarning($"[LeeMonsterBase] JSON 파싱 실패: {DataAddress}", this);
+            return;
+        }
+
+        data.ApplyToConfig(_config);
+        Debug.Log($"[LeeMonsterBase] JSON 데이터 적용 완료: {DataAddress}");
+    }
 
     private async UniTask LoadAnimatorControllerAsync()
     {
@@ -297,6 +348,64 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     {
         if (Managers.Player != null)
             Managers.Player.OnPlayerSpawned -= OnPlayerSpawned;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IPooledObject — 풀 재사용 시 상태 초기화
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    void ObjectPoolerManager.IPooledObject.OnSpawn(object param)
+    {
+        // 첫 생성 직후 InitAsync가 아직 완료되지 않은 경우 스킵
+        // (Awake → InitAsync 가 초기화를 담당하므로 재진입 불필요)
+        if (_config == null || _runtime == null) return;
+
+        // 런타임 데이터 리셋
+        _runtime.CurrentHp          = _config.stat.maxHp;
+        _runtime.IsDead             = false;
+        _runtime.SpawnPosition      = transform.position;
+        _runtime.PatrolDirection    = 1;
+        _runtime.IsWaitingAtWaypoint = false;
+        _runtime.PatrolWaitTimer    = 0f;
+        _runtime.StateTimer         = 0f;
+        _runtime.AttackHitDealt     = false;
+
+        // NavMeshAgent 재활성화
+        if (_agent != null) _agent.enabled = true;
+
+        // Rigidbody 재설정 (NavMeshAgent 제어 → kinematic 유지)
+        var rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic     = true;
+            rb.linearVelocity  = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        // 콜라이더 재활성화
+        foreach (var col in GetComponentsInChildren<Collider>())
+            col.enabled = true;
+
+        // FSM 순찰 상태로 재시작
+        _fsm?.ChangeState(LeeMonsterStateType.Patrol);
+
+        // HP 바 재요청 (풀에서 꺼낼 때 새로 연결)
+        RequestHPBarAsync().Forget();
+    }
+
+    private async UniTaskVoid RequestHPBarAsync()
+    {
+        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, HPBarHeadOffset);
+    }
+
+    void ObjectPoolerManager.IPooledObject.OnDespawn()
+    {
+        // HP 바 반환
+        if (_hpBar != null)
+        {
+            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
+            _hpBar = null;
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

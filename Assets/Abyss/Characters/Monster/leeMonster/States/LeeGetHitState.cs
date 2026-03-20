@@ -53,9 +53,14 @@ public class LeeGetHitState : ILeeMonsterState
     {
         if (ctx.Agent.enabled) return;
 
-        // 넉백으로 밀린 Rigidbody 속도를 정지시킨 후 NavMesh에 재스냅
+        // 넉백으로 밀린 Rigidbody 속도를 정지시킨 후 kinematic 복원 → NavMesh에 재스냅
         var rb = ctx.Monster.GetComponent<Rigidbody>();
-        if (rb != null) rb.linearVelocity = Vector3.zero;
+        if (rb != null)
+        {
+            rb.linearVelocity  = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic     = true;
+        }
 
         ctx.Agent.enabled = true;
         ctx.Agent.Warp(ctx.Monster.transform.position);

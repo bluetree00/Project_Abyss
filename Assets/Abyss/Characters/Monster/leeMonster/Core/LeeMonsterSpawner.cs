@@ -1,5 +1,5 @@
-using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -11,6 +11,9 @@ using UnityEngine.AI;
 ///   - maxMonsterCount : 동시 유지할 최대 마릿수
 ///   - spawnRadius     : 스포너 중심 기준 소환 반경
 ///   - spawnInterval   : 한 마리 소환 시도 간격 (초)
+///
+/// 생성: ObjectPoolerManager → Addressables 에서 프리팹 로드 후 풀 관리
+/// 반환: 몬스터 사망 시 LeeDieState 에서 ObjectPoolerManager.Despawn() 호출
 /// </summary>
 public class LeeMonsterSpawner : MonoBehaviour
 {
@@ -33,7 +36,7 @@ public class LeeMonsterSpawner : MonoBehaviour
 
     // ── 런타임 ─────────────────────────────────────────────
 
-    // null 엔트리 = 사망 후 Destroy된 몬스터
+    // 비활성(풀 반환) 또는 null 엔트리는 Purge로 제거
     private readonly List<LeeMonsterBase> _spawnedMonsters = new();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -48,45 +51,50 @@ public class LeeMonsterSpawner : MonoBehaviour
             return;
         }
 
-        StartCoroutine(SpawnLoop());
+        SpawnLoop().Forget();
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 소환 루프
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private IEnumerator SpawnLoop()
+    private async UniTaskVoid SpawnLoop()
     {
         while (true)
         {
-            yield return new WaitForSeconds(spawnInterval);
+            await UniTask.Delay(
+                System.TimeSpan.FromSeconds(spawnInterval),
+                cancellationToken: destroyCancellationToken);
 
-            PurgeDeadMonsters();
+            PurgeReturnedMonsters();
 
             if (_spawnedMonsters.Count < maxMonsterCount)
-                TrySpawnOne();
+                await TrySpawnOneAsync();
         }
     }
 
-    private void PurgeDeadMonsters()
+    /// <summary>풀에 반환(비활성화)됐거나 null인 참조를 리스트에서 제거한다.</summary>
+    private void PurgeReturnedMonsters()
     {
-        _spawnedMonsters.RemoveAll(m => m == null);
+        _spawnedMonsters.RemoveAll(m => m == null || !m.gameObject.activeInHierarchy);
     }
 
-    private void TrySpawnOne()
+    private async UniTask TrySpawnOneAsync()
     {
         LeeSpawnEntry entry = spawnTable.PickRandom();
         if (entry == null) return;
 
         if (!TryGetSpawnPosition(out Vector3 spawnPos)) return;
 
-        GameObject go      = Instantiate(entry.prefab, spawnPos, Quaternion.identity);
-        var        monster = go.GetComponent<LeeMonsterBase>();
+        var monster = await Managers.ObjectPooler.SpawnAsync<LeeMonsterBase>(
+            entry.addressableKey,
+            ObjectPoolerManager.PoolType.Monster,
+            spawnPos,
+            Quaternion.identity);
 
         if (monster == null)
         {
-            Debug.LogWarning($"[LeeMonsterSpawner] '{entry.prefab.name}'에 LeeMonsterBase 컴포넌트가 없습니다.", this);
-            Destroy(go);
+            Debug.LogWarning($"[LeeMonsterSpawner] '{entry.addressableKey}' 스폰 실패.", this);
             return;
         }
 
