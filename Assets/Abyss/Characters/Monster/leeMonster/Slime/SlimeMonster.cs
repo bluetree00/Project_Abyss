@@ -7,5 +7,5 @@ public class SlimeMonster : LeeMonsterBase
     public const string PrefabAddress = "Slime/Slime";
     protected override string ConfigAddress    => "Slime/SlimeConfig";
     protected override string DataAddress      => "Slime/SlimeData";
-    protected override float  HPBarHeadOffset  => 0.1f;
+    protected override float  HPBarHeadOffset  => 0.5f;
 }
