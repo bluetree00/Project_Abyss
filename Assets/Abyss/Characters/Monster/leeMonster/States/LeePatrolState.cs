@@ -55,7 +55,8 @@ public class LeePatrolState : ILeeMonsterState
             ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
 
         // 목적지 도착 판정
-        if (!ctx.Agent.pathPending &&
+        if (ctx.Agent.isOnNavMesh &&
+            !ctx.Agent.pathPending &&
             ctx.Agent.remainingDistance <= ctx.Agent.stoppingDistance + 0.25f)
         {
             ctx.Runtime.IsWaitingAtWaypoint = true;
@@ -98,6 +99,8 @@ public class LeePatrolState : ILeeMonsterState
 
     private void MoveToNextWaypoint(LeeMonsterContext ctx)
     {
+        if (!ctx.Agent.isActiveAndEnabled || !ctx.Agent.isOnNavMesh) return;
+
         // Random 패턴은 목적지를 새로 뽑는다
         if (ctx.Patrol.patrolType == LeePatrolType.Random)
         {

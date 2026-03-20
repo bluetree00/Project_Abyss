@@ -41,6 +41,7 @@ public sealed class Managers : MonoBehaviour
 
     private readonly PlayerManager _playerManager = new PlayerManager();
     private MonsterDataManager _monsterDataManager;
+    private LeeMonsterHPBarManager _monsterHPBar;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -161,6 +162,20 @@ public sealed class Managers : MonoBehaviour
                 inst._monsterDataManager = new MonsterDataManager();
 
             return inst._monsterDataManager;
+        }
+    }
+
+    public static LeeMonsterHPBarManager MonsterHPBar
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._monsterHPBar == null)
+                inst._monsterHPBar = new LeeMonsterHPBarManager();
+
+            return inst._monsterHPBar;
         }
     }
     #endregion
