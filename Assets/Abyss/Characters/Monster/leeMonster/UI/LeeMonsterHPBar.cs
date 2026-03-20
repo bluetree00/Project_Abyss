@@ -17,12 +17,13 @@ public class LeeMonsterHPBar : MonoBehaviour
     [SerializeField] private Slider _slider;
 
     [Header("위치 설정")]
-    [Tooltip("콜라이더 상단으로부터 추가 오프셋 (m)")]
-    [SerializeField] private float _headOffset = 0.3f;
+    [Tooltip("Head 본 위쪽 추가 오프셋 (m). 본이 없으면 콜라이더 상단 기준.")]
+    [SerializeField] private float _headOffset = 0.1f;
 
     // ── 런타임 ─────────────────────────────────────────────
     private LeeMonsterBase _monster;
-    private Collider        _collider;
+    private Transform       _headBone;      // 우선 사용
+    private Collider        _collider;      // 폴백용
     private Transform       _camTransform;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -30,10 +31,12 @@ public class LeeMonsterHPBar : MonoBehaviour
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>몬스터와 연결하고 HP 바를 활성화한다.</summary>
-    public void Link(LeeMonsterBase monster, int currentHp, int maxHp, float headOffset = 0.3f)
+    /// <param name="headBone">Head 본 Transform. null이면 콜라이더 상단 기준으로 폴백.</param>
+    public void Link(LeeMonsterBase monster, int currentHp, int maxHp, Transform headBone, float headOffset = 0.1f)
     {
         _monster      = monster;
-        _collider     = monster.GetComponentInChildren<Collider>();
+        _headBone     = headBone;
+        _collider     = headBone == null ? monster.GetComponentInChildren<Collider>() : null;
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         _headOffset   = headOffset;
 
@@ -45,6 +48,7 @@ public class LeeMonsterHPBar : MonoBehaviour
     public void Unlink()
     {
         _monster  = null;
+        _headBone = null;
         _collider = null;
         gameObject.SetActive(false);
     }
@@ -64,12 +68,12 @@ public class LeeMonsterHPBar : MonoBehaviour
     {
         if (_monster == null) return;
 
-        // 머리 위 위치 계산 (콜라이더 높이 + 추가 오프셋)
-        float height = _collider != null
-            ? _collider.bounds.size.y + _headOffset
-            : 2f + _headOffset;
+        // 위치 계산: Head 본이 있으면 본 위치 기준, 없으면 콜라이더 상단 기준
+        Vector3 basePos = _headBone != null
+            ? _headBone.position
+            : _monster.transform.position + Vector3.up * (_collider != null ? _collider.bounds.size.y : 2f);
 
-        transform.position = _monster.transform.position + Vector3.up * height;
+        transform.position = basePos + Vector3.up * _headOffset;
 
         // 카메라를 향해 빌보드 회전
         if (_camTransform != null)
