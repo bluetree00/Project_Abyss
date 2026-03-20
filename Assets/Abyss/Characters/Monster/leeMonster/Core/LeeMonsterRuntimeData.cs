@@ -33,4 +33,6 @@ public class LeeMonsterRuntimeData
     // ── 공격 ──────────────────────────────────────────────
     /// <summary>이번 Attack 상태에서 데미지를 이미 줬는지.</summary>
     public bool AttackHitDealt;
+    /// <summary>이번 조우에서 첫 번째 공격인지. true면 AttackReady 딜레이 없이 즉시 공격.</summary>
+    public bool IsFirstAttack = true;
 }

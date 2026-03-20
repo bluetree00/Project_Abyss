@@ -13,6 +13,9 @@ public class LeePatrolState : ILeeMonsterState
 
     public void Enter(LeeMonsterContext ctx)
     {
+        // 배회 복귀 시 다음 조우에서 다시 즉시 공격
+        ctx.Runtime.IsFirstAttack = true;
+
         float speed = ctx.Patrol.patrolSpeed > 0f
             ? ctx.Patrol.patrolSpeed
             : ctx.Stat.moveSpeed;
