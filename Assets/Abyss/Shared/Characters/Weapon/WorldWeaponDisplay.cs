@@ -66,7 +66,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         }
     }
 
-    private async void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
         if (_pickedUp) return;
 
@@ -76,11 +76,33 @@ public class WorldWeaponDisplay : MonoBehaviour
         _pickedUp = true;
 
         var data = _runtimeData ?? (weaponSO != null ? new WeaponData(weaponSO) : null);
-        if (data == null) { _pickedUp = false; return; }
+        if (data == null)
+        {
+            _pickedUp = false;
+            return;
+        }
 
-        if (player.WeaponManager != null)
-            await player.WeaponManager.HandlePickupAsync(data, autoEquip: true);
+        player.RequestPickup(data, this);
+        // Destroy는 팝업 결과 후 ConfirmPickup()에서 처리
+    }
 
+    /// <summary>플레이어가 트리거 밖으로 나가면 다시 픽업 가능하도록 리셋</summary>
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.GetComponent<PlayerController>() == null) return;
+        _pickedUp = false;
+    }
+
+    /// <summary>픽업 확정 — 월드 오브젝트 제거</summary>
+    public void ConfirmPickup()
+    {
         Destroy(gameObject);
+    }
+
+    /// <summary>픽업 취소 — _pickedUp은 플레이어가 나갈 때(OnTriggerExit)까지 유지</summary>
+    public void CancelPickup()
+    {
+        // 콜라이더 조작 없이 _pickedUp이 true인 채로 유지
+        // → 팝업 종료 직후 재발동 방지, 플레이어가 나갔다 오면 OnTriggerEnter 재발동 가능
     }
 }
