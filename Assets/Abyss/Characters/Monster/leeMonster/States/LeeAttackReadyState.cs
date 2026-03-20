@@ -11,7 +11,10 @@ public class LeeAttackReadyState : ILeeMonsterState
     public void Enter(LeeMonsterContext ctx)
     {
         ctx.Agent.ResetPath();
-        ctx.Runtime.StateTimer = ctx.Stat.attackDelay;
+
+        // 첫 조우 시 딜레이 없이 즉시 공격, 이후부터 attackDelay 적용
+        ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack ? 0f : ctx.Stat.attackDelay;
+        ctx.Runtime.IsFirstAttack = false;
 
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);
         FacePlayer(ctx);

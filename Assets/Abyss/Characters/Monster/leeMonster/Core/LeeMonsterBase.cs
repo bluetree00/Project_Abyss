@@ -390,6 +390,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
         _runtime.PatrolWaitTimer    = 0f;
         _runtime.StateTimer         = 0f;
         _runtime.AttackHitDealt     = false;
+        _runtime.IsFirstAttack      = true;
 
         // NavMeshAgent 재활성화
         if (_agent != null) _agent.enabled = true;
