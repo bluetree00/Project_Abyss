@@ -31,10 +31,14 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
     protected abstract string DataAddress { get; }
 
     /// <summary>
-    /// HP 바가 표시될 높이 오프셋 (콜라이더 상단 기준).
-    /// 몬스터 크기에 따라 파생 클래스에서 오버라이드.
+    /// HP 바 위치의 기준이 될 Head 본 이름.
+    /// 파생 클래스에서 실제 본 이름으로 오버라이드.
+    /// null이면 콜라이더 상단 기준 폴백.
     /// </summary>
-    protected virtual float HPBarHeadOffset => 0.3f;
+    protected virtual string HeadBoneName => "Head";
+
+    /// <summary>Head 본 위에서 추가로 올릴 오프셋 (m).</summary>
+    protected virtual float HPBarHeadOffset => 0.1f;
 
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO       _config;
@@ -47,7 +51,8 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
 
     // Inspector 디버그용 (ReadOnly 어트리뷰트가 있으면 [ReadOnly] 사용)
     [SerializeField] private string _debugState;
-    private float _diagTimer;
+    private float     _diagTimer;
+    private Transform _headBone;   // HeadBoneName으로 탐색한 본
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
@@ -98,6 +103,10 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
         _animator = GetComponentInChildren<Animator>();
         await LoadAnimatorControllerAsync();
 
+        // 4-1. Head 본 탐색
+        if (!string.IsNullOrEmpty(HeadBoneName))
+            _headBone = FindBoneRecursive(transform, HeadBoneName);
+
         // 5. 런타임 데이터 초기화
         _runtime = new LeeMonsterRuntimeData
         {
@@ -129,7 +138,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
 
         // 9. HP 바 요청 (비활성 상태면 풀 대기 중이므로 스킵 — OnSpawn에서 요청)
         if (gameObject.activeInHierarchy)
-            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, HPBarHeadOffset);
+            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
 
         OnInitialized();
     }
@@ -299,6 +308,18 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
     // 내부 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>transform 하위를 재귀 탐색해 boneName과 이름이 일치하는 Transform을 반환한다.</summary>
+    private static Transform FindBoneRecursive(Transform parent, string boneName)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == boneName) return child;
+            var found = FindBoneRecursive(child, boneName);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private async UniTask LoadAndApplyJsonDataAsync()
     {
         if (string.IsNullOrEmpty(DataAddress)) return;
@@ -395,7 +416,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
 
     private async UniTaskVoid RequestHPBarAsync()
     {
-        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, HPBarHeadOffset);
+        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
     }
 
     void ObjectPoolerManager.IPooledObject.OnDespawn()

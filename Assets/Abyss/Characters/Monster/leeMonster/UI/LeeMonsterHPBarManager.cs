@@ -19,7 +19,8 @@ public class LeeMonsterHPBarManager
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>몬스터에게 HP 바를 할당하고 반환한다.</summary>
-    public async UniTask<LeeMonsterHPBar> RequestHPBarAsync(LeeMonsterBase monster, int currentHp, int maxHp, float headOffset = 0.3f)
+    /// <param name="headBone">Head 본 Transform. null이면 콜라이더 상단 기준 폴백.</param>
+    public async UniTask<LeeMonsterHPBar> RequestHPBarAsync(LeeMonsterBase monster, int currentHp, int maxHp, Transform headBone, float headOffset = 0.1f)
     {
         var bar = await GetFromPoolAsync();
         if (bar == null)
@@ -28,7 +29,7 @@ public class LeeMonsterHPBarManager
             return null;
         }
 
-        bar.Link(monster, currentHp, maxHp, headOffset);
+        bar.Link(monster, currentHp, maxHp, headBone, headOffset);
         return bar;
     }
 
