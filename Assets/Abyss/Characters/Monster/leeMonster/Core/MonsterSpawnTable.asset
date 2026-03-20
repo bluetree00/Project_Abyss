@@ -14,27 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LeeMonsterSpawnTableSO
   entries:
   - displayName: FairyBatMonster
-    prefab: {fileID: 7827164377420338988, guid: e62b361af2e4ad546b787e698e4f1980,
-      type: 3}
+    addressableKey: FairyBat/FairyBat
     weight: 1
     enabled: 1
   - displayName: GolemMonster
-    prefab: {fileID: 1799362445048974850, guid: eb91a8aa618099943b87eb93e38c493d,
-      type: 3}
+    addressableKey: Golem/Golem
     weight: 1
     enabled: 1
   - displayName: SkeletonMonster
-    prefab: {fileID: 6187865333247696146, guid: 413e73f0a507a804db2dfa3a3aece1dc,
-      type: 3}
+    addressableKey: Skeleton/Skeleton
     weight: 1
     enabled: 1
   - displayName: SlimeMonster
-    prefab: {fileID: 5103102461142805445, guid: b9d6463a19728bd44af2befb11a890c3,
-      type: 3}
+    addressableKey: Slime/Slime
     weight: 1
     enabled: 1
   - displayName: SnailMonster
-    prefab: {fileID: 6568172559181222209, guid: 594c3ebae07f756428b1fd62cca7a1bf,
-      type: 3}
+    addressableKey: Snail/Snail
     weight: 1
     enabled: 1

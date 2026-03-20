@@ -13,8 +13,6 @@ MonoBehaviour:
   m_Name: WeaponColliderPrefab
   m_EditorClassIdentifier: 
   m_GroupName: WeaponColliderPrefab
-  m_Data:
-    m_SerializedData: []
   m_GUID: 0404fd53c2ae7f64b9adf669d8202dcf
   m_SerializeEntries:
   - m_GUID: 7941080ed78535c4cad4a88a59e09ae4

@@ -32,14 +32,14 @@ public class LeeGetHitState : ILeeMonsterState
             float dist = Vector3.Distance(
                 ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
 
-            ctx.Monster.ChangeState(
-                dist <= ctx.Detection.chaseGiveUpRange
-                    ? LeeMonsterStateType.Chase
-                    : LeeMonsterStateType.Patrol);
+            if (dist <= ctx.Detection.chaseGiveUpRange)
+                ctx.Monster.ChangeState<LeeChaseState>();
+            else
+                ctx.Monster.ChangeState<LeePatrolState>();
         }
         else
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            ctx.Monster.ChangeState<LeePatrolState>();
         }
     }
 
