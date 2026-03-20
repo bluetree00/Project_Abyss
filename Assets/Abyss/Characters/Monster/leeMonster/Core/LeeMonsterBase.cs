@@ -18,7 +18,7 @@ using UnityEngine.AI;
 ///   3) 빈 오브젝트에 해당 클래스 + Rigidbody + NavMeshAgent 추가
 ///   4) SO .asset 파일들 생성 후 Addressables 등록
 /// </summary>
-public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerManager.IPooledObject
+public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, IPooledObject
 {
     // ── 추상 멤버 (파생 클래스가 구현) ────────────────────
     /// <summary>Addressables에 등록된 MonsterConfigSO 주소.</summary>
@@ -375,7 +375,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
     // IPooledObject — 풀 재사용 시 상태 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    void ObjectPoolerManager.IPooledObject.OnSpawn(object param)
+    void IPooledObject.OnSpawn(object param)
     {
         // 첫 생성 직후 InitAsync가 아직 완료되지 않은 경우 스킵
         // (Awake → InitAsync 가 초기화를 담당하므로 재진입 불필요)
@@ -420,7 +420,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable, ObjectPoolerM
         _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
     }
 
-    void ObjectPoolerManager.IPooledObject.OnDespawn()
+    void IPooledObject.OnDespawn()
     {
         // HP 바 반환
         if (_hpBar != null)
