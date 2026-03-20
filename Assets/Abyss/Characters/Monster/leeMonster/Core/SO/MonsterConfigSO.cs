@@ -25,4 +25,14 @@ public class MonsterConfigSO : ScriptableObject
     public MonsterPatrolSO    patrol;
     public MonsterCombatSO    combat;
     public MonsterAnimationSO animation;
+
+    [Header("특수 상태 데이터 — 제약 타입별 (없으면 비워둠)")]
+    [Tooltip("중단 불가 특수 상태 데이터 SO")]
+    public SpecialStateDataBase unInterruptibleStateData;
+    [Tooltip("이동 잠금 특수 상태 데이터 SO")]
+    public SpecialStateDataBase movementLockedStateData;
+    [Tooltip("완전 잠금 특수 상태 데이터 SO")]
+    public SpecialStateDataBase fullLockStateData;
+    [Tooltip("무적 특수 상태 데이터 SO")]
+    public SpecialStateDataBase invincibleStateData;
 }

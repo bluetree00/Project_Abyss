@@ -13,10 +13,38 @@ MonoBehaviour:
   m_Name: SO Resources
   m_EditorClassIdentifier: 
   m_GroupName: SO Resources
-  m_Data:
-    m_SerializedData: []
   m_GUID: 038469164471c0c4c93a81077acc929e
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 28772a41c9d0d3f498b05e1a751ede75
+    m_Address: GridAsset_05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6d8eba2f86beb9546ae0f9178432c165
+    m_Address: GridAsset_06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 875b374f2b39b664197445e6e3d15e23
+    m_Address: GridAsset_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a05aaf1819284674db1d368932598f3c
+    m_Address: GirdAsset_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cf02b5aef73ae8b4183a70c00d533f71
+    m_Address: GridAsset_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d0145a07dd84167429c07c374149a315
+    m_Address: GridAsset_04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

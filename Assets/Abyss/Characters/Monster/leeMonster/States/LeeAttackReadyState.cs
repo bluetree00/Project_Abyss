@@ -25,7 +25,7 @@ public class LeeAttackReadyState : ILeeMonsterState
         // 플레이어 사망
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            ctx.Monster.ChangeState<LeePatrolState>();
             return;
         }
 
@@ -34,7 +34,7 @@ public class LeeAttackReadyState : ILeeMonsterState
         // 플레이어가 사정거리 밖으로 이탈 (1.3배 여유 허용)
         if (dist > ctx.Stat.attackRange * 1.3f)
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Chase);
+            ctx.Monster.ChangeState<LeeChaseState>();
             return;
         }
 
@@ -42,7 +42,7 @@ public class LeeAttackReadyState : ILeeMonsterState
 
         ctx.Runtime.StateTimer -= Time.deltaTime;
         if (ctx.Runtime.StateTimer <= 0f)
-            ctx.Monster.ChangeState(LeeMonsterStateType.Attack);
+            ctx.Monster.ChangeState<LeeAttackState>();
     }
 
     public void Exit(LeeMonsterContext ctx) { }

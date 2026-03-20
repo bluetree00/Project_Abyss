@@ -49,7 +49,22 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     protected Animator              _animator;
     private   LeeMonsterHPBar       _hpBar;
 
-    // Inspector 디버그용 (ReadOnly 어트리뷰트가 있으면 [ReadOnly] 사용)
+    // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
+    private LeeSpecialStateBase _specialUnInterruptible;
+    private LeeSpecialStateBase _specialMovementLocked;
+    private LeeSpecialStateBase _specialFullLock;
+    private LeeSpecialStateBase _specialInvincible;
+
+    /// <summary>중단 불가 특수 상태 인스턴스. 파생 클래스에서 TryGetSpecialState에 활용.</summary>
+    protected LeeSpecialStateBase SpecialUnInterruptible => _specialUnInterruptible;
+    /// <summary>이동 잠금 특수 상태 인스턴스.</summary>
+    protected LeeSpecialStateBase SpecialMovementLocked  => _specialMovementLocked;
+    /// <summary>완전 잠금 특수 상태 인스턴스.</summary>
+    protected LeeSpecialStateBase SpecialFullLock        => _specialFullLock;
+    /// <summary>무적 특수 상태 인스턴스.</summary>
+    protected LeeSpecialStateBase SpecialInvincible      => _specialInvincible;
+
+    // Inspector 디버그용
     [SerializeField] private string _debugState;
     private float     _diagTimer;
     private Transform _headBone;   // HeadBoneName으로 탐색한 본
@@ -132,9 +147,9 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
             Managers.Player.OnPlayerSpawned += OnPlayerSpawned;
 
         // 8. FSM 초기화
-        var states = CreateStates();
-        _fsm = new LeeMonsterFSM(_ctx, states);
-        _fsm.ChangeState(LeeMonsterStateType.Patrol);
+        _fsm = new LeeMonsterFSM(_ctx);
+        RegisterStates();
+        _fsm.ChangeState<LeePatrolState>();
 
         // 9. HP 바 요청 (비활성 상태면 풀 대기 중이므로 스킵 — OnSpawn에서 요청)
         if (gameObject.activeInHierarchy)
@@ -147,20 +162,23 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     protected virtual void OnInitialized() { }
 
     /// <summary>
-    /// FSM 상태 딕셔너리를 반환한다.
-    /// 특정 상태만 교체하고 싶은 파생 클래스에서 오버라이드할 수 있다.
+    /// 공용 상태를 FSM에 등록한다.
+    /// 특정 상태를 교체하거나 특수 상태를 추가할 때 오버라이드.
     /// </summary>
-    protected virtual Dictionary<LeeMonsterStateType, ILeeMonsterState> CreateStates()
+    protected virtual void RegisterStates()
     {
-        return new Dictionary<LeeMonsterStateType, ILeeMonsterState>
-        {
-            { LeeMonsterStateType.Patrol,      new LeePatrolState()      },
-            { LeeMonsterStateType.Chase,       new LeeChaseState()       },
-            { LeeMonsterStateType.AttackReady, new LeeAttackReadyState() },
-            { LeeMonsterStateType.Attack,      new LeeAttackState()      },
-            { LeeMonsterStateType.GetHit,      new LeeGetHitState()      },
-            { LeeMonsterStateType.Die,         new LeeDieState()         },
-        };
+        _fsm.Register(new LeePatrolState());
+        _fsm.Register(new LeeChaseState());
+        _fsm.Register(new LeeAttackReadyState());
+        _fsm.Register(new LeeAttackState());
+        _fsm.Register(new LeeGetHitState());
+        _fsm.Register(new LeeDieState());
+
+        // 특수 상태: SO 슬롯에 데이터가 있으면 자동으로 인스턴스 생성
+        _specialUnInterruptible = _config.unInterruptibleStateData?.CreateState();
+        _specialMovementLocked  = _config.movementLockedStateData?.CreateState();
+        _specialFullLock        = _config.fullLockStateData?.CreateState();
+        _specialInvincible      = _config.invincibleStateData?.CreateState();
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -174,10 +192,21 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         // 매 프레임 가장 가까운 PlayerController를 타깃으로 갱신
         _runtime.PlayerTarget = FindClosestPlayerTarget();
 
+        // 공용 상태에서만 특수 상태 진입 체크 (특수 상태 중엔 스킵)
+        if (_fsm != null && _fsm.CurrentConstraints == SpecialStateConstraint.None)
+        {
+            var special = TryGetSpecialState(_ctx);
+            if (special != null)
+            {
+                _fsm.ChangeState(special);
+                return;
+            }
+        }
+
         _fsm?.Update();
 
 #if UNITY_EDITOR
-        _debugState = _fsm?.CurrentType.ToString();
+        _debugState = _fsm?.CurrentType?.Name;
 
         _diagTimer -= Time.deltaTime;
         if (_diagTimer <= 0f)
@@ -223,8 +252,45 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     // 공개 API (상태 클래스 → 몬스터 베이스 콜백)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>FSM 상태 전환 요청.</summary>
-    public void ChangeState(LeeMonsterStateType type) => _fsm?.ChangeState(type);
+    /// <summary>공용 상태 전환 — 타입으로 조회.</summary>
+    public void ChangeState<T>() where T : ILeeMonsterState => _fsm?.ChangeState<T>();
+
+    /// <summary>특수 상태 전환 — 인스턴스 직접 전달.</summary>
+    public void ChangeState(ILeeMonsterState state) => _fsm?.ChangeState(state);
+
+    // ── 조건 훅 (공용 상태가 위임, 파생 클래스에서 오버라이드 가능) ────────
+
+    /// <summary>Patrol → Chase 전환 조건. 오버라이드로 몬스터별 감지 로직 교체.</summary>
+    public virtual bool ShouldStartChase(LeeMonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null) return false;
+        if (IsPlayerDead()) return false;
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        return dist <= ctx.Detection.detectionRange;
+    }
+
+    /// <summary>Chase → Patrol 전환 조건. 오버라이드로 포기 거리·조건 교체.</summary>
+    public virtual bool ShouldGiveUpChase(LeeMonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null || IsPlayerDead()) return true;
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        return dist > ctx.Detection.chaseGiveUpRange;
+    }
+
+    /// <summary>Chase → AttackReady 전환 조건. 오버라이드로 공격 진입 거리 교체.</summary>
+    public virtual bool ShouldEnterAttackReady(LeeMonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null) return false;
+        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        return dist <= ctx.Stat.attackRange;
+    }
+
+    /// <summary>
+    /// 매 프레임 공용 상태 Update 이전에 호출.
+    /// 특수 상태 진입이 필요하면 해당 인스턴스를 반환; 아니면 null.
+    /// GolemMonster 등에서 오버라이드해 분노 상태 등 특수 상태를 주입한다.
+    /// </summary>
+    public virtual ILeeMonsterState TryGetSpecialState(LeeMonsterContext ctx) => null;
 
     /// <summary>
     /// 공격 히트 판정: 반경 내 플레이어에게 데미지 + 넉백 적용.
@@ -274,33 +340,39 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     {
         if (_runtime == null || _runtime.IsDead) return;
 
+        // 특수 상태 제약 체크
+        var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
+
+        // 무적 상태 — 데미지 자체 무시
+        if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
         // 방어력 적용 (최소 1 데미지)
         float actual = Mathf.Max(1f, amount - _config.stat.defense);
         _runtime.CurrentHp -= (int)actual;
-
-        // HP 바 갱신
         _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
 
         if (_runtime.CurrentHp <= 0)
         {
             _runtime.CurrentHp = 0;
             _runtime.IsDead    = true;
-            ChangeState(LeeMonsterStateType.Die);  // Die 상태에서 Rigidbody 처리
+            ChangeState<LeeDieState>();
         }
         else
         {
-            // 생존 시에만 넉백 적용 (사망 타격에서 밀려나지 않도록)
+            // 중단 불가 상태 — 데미지는 들어오되 상태 전환·넉백 없음
+            if ((constraints & SpecialStateConstraint.UnInterruptible) != 0) return;
+
             if (instigator != null)
             {
                 var rb = GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    rb.isKinematic = false; // 넉백을 위해 일시적으로 물리 활성화
+                    rb.isKinematic = false;
                     Vector3 dir = (transform.position - instigator.transform.position).normalized;
                     rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
                 }
             }
-            ChangeState(LeeMonsterStateType.GetHit);
+            ChangeState<LeeGetHitState>();
         }
     }
 
@@ -408,7 +480,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
             col.enabled = true;
 
         // FSM 순찰 상태로 재시작
-        _fsm?.ChangeState(LeeMonsterStateType.Patrol);
+        _fsm?.ChangeState<LeePatrolState>();
 
         // HP 바 재요청
         RequestHPBarAsync().Forget();

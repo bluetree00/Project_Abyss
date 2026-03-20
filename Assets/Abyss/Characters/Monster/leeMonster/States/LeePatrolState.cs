@@ -33,9 +33,9 @@ public class LeePatrolState : ILeeMonsterState
     public void Update(LeeMonsterContext ctx)
     {
         // 플레이어 감지 → 즉시 Chase
-        if (IsPlayerDetected(ctx))
+        if (ctx.Monster.ShouldStartChase(ctx))
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Chase);
+            ctx.Monster.ChangeState<LeeChaseState>();
             return;
         }
 
@@ -117,14 +117,6 @@ public class LeePatrolState : ILeeMonsterState
 
         Vector3 dest = ctx.Runtime.PatrolDirection > 0 ? _waypointA : _waypointB;
         ctx.Agent.SetDestination(dest);
-    }
-
-    private bool IsPlayerDetected(LeeMonsterContext ctx)
-    {
-        if (ctx.Runtime.PlayerTarget == null) return false;
-        if (ctx.Monster.IsPlayerDead()) return false;
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        return dist <= ctx.Detection.detectionRange;
     }
 
     private static void PlayAnim(LeeMonsterContext ctx, string stateName)

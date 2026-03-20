@@ -56,15 +56,15 @@ public class LeeAttackState : ILeeMonsterState
 
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            ctx.Monster.ChangeState<LeePatrolState>();
             return;
         }
 
         float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        ctx.Monster.ChangeState(
-            dist <= ctx.Stat.attackRange
-                ? LeeMonsterStateType.AttackReady
-                : LeeMonsterStateType.Chase);
+        if (dist <= ctx.Stat.attackRange)
+            ctx.Monster.ChangeState<LeeAttackReadyState>();
+        else
+            ctx.Monster.ChangeState<LeeChaseState>();
     }
 
     public void Exit(LeeMonsterContext ctx) { }

@@ -1,5 +1,5 @@
 {
-  "monsterName": "어스 골렘",
+  "monsterName": "Golem",
   "grade": "Normal",
   "stat": {
     "maxHp": 30,
@@ -8,8 +8,8 @@
     "moveSpeed": 1.0,
     "attackRange": 2.0,
     "attackRadius": 2.0,
-    "attackRate": 1.0,
-    "attackDelay": 2.0,
+    "attackRate": 0.5,
+    "attackDelay": 1.0,
     "knockbackForce": 5.0
   },
   "detection": {
@@ -23,6 +23,6 @@
     "waypointWaitTime": 0.5
   },
   "combat": {
-    "damageApplyDelay": 2.0
+    "damageApplyDelay": 0.8
   }
 }
