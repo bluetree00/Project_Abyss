@@ -34,41 +34,22 @@ public static class SteamLoginService
         return result;
     }
 
-    private static async UniTask<string> GetAuthTicketAsync()
+    private static UniTask<string> GetAuthTicketAsync()
     {
-        var tcs = new UniTaskCompletionSource<string>();
+        byte[] buffer = new byte[1024];
+        var identity = new SteamNetworkingIdentity();
+        identity.SetSteamID(SteamUser.GetSteamID());
+        HAuthTicket handle = SteamUser.GetAuthSessionTicket(buffer, buffer.Length, out uint ticketSize, ref identity);
 
-        Callback<GetTicketForWebApiResponse_t> cb = null;
-        cb = Callback<GetTicketForWebApiResponse_t>.Create(response =>
+        if (handle == HAuthTicket.Invalid || ticketSize == 0)
         {
-            cb.Dispose();
-            Debug.Log($"[SteamLogin] 티켓 콜백 수신 | result={response.m_eResult} size={response.m_cubTicket}");
-
-            if (response.m_eResult == EResult.k_EResultOK)
-            {
-                string hex = BitConverter.ToString(response.m_rgubTicket, 0, response.m_cubTicket).Replace("-", "").ToLower();
-                tcs.TrySetResult(hex);
-            }
-            else
-            {
-                Debug.LogError($"[SteamLogin] GetAuthTicketForWebApi 실패: {response.m_eResult}");
-                tcs.TrySetResult(null);
-            }
-        });
-
-        Debug.Log("[SteamLogin] GetAuthTicketForWebApi 호출...");
-        SteamUser.GetAuthTicketForWebApi("");
-
-        // 10초 타임아웃
-        var timeoutTask = UniTask.Delay(10000).ContinueWith(() => (string)null);
-        var (winIndex, ticketResult, _) = await UniTask.WhenAny(tcs.Task, timeoutTask);
-        if (winIndex == 1)
-        {
-            cb.Dispose();
-            Debug.LogError("[SteamLogin] 티켓 콜백 타임아웃 (10초 초과)");
-            return null;
+            Debug.LogError("[SteamLogin] GetAuthSessionTicket 실패 — 티켓 핸들 무효");
+            return UniTask.FromResult<string>(null);
         }
-        return ticketResult;
+
+        string hex = BitConverter.ToString(buffer, 0, (int)ticketSize).Replace("-", "").ToLower();
+        Debug.Log($"[SteamLogin] 세션 티켓 획득 완료 | size={ticketSize} prefix={hex.Substring(0, Math.Min(32, hex.Length))}");
+        return UniTask.FromResult(hex);
     }
 
     private static UniTask<bool> FederationLoginAsync(string ticket)
