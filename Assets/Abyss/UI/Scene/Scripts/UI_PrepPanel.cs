@@ -52,6 +52,11 @@ public class UI_PrepPanel : UI_Base
     [SerializeField] private Slider   sliderSpd;
     [SerializeField] private TMP_Text sliderSpdText;
 
+    [Header("캐릭터 선택 — 능력 아이콘")]
+    [SerializeField] private Image abilityIcon0;
+    [SerializeField] private Image abilityIcon1;
+    [SerializeField] private Image abilityIcon2;
+
     [Header("캐릭터 선택 — 버튼")]
     [SerializeField] private Button   charConfirmButton;
 
@@ -229,6 +234,17 @@ public class UI_PrepPanel : UI_Base
         SetSlider(sliderHp,  sliderHpText,  d.maxHealth,     MaxHp,  "체력");
         SetSlider(sliderAtk, sliderAtkText, d.attackPower,   MaxAtk, "공격력");
         SetSlider(sliderSpd, sliderSpdText, d.baseMoveSpeed, MaxSpd, "이동속도");
+
+        SetAbilityIcon(abilityIcon0, entry.abilityIcon0);
+        SetAbilityIcon(abilityIcon1, entry.abilityIcon1);
+        SetAbilityIcon(abilityIcon2, entry.abilityIcon2);
+    }
+
+    private static void SetAbilityIcon(Image img, Sprite sprite)
+    {
+        if (img == null) return;
+        img.sprite = sprite;
+        img.color  = sprite != null ? Color.white : new Color(1f, 1f, 1f, 0.25f);
     }
 
     private void OnClickCharConfirm()
