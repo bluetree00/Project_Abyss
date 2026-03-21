@@ -20,6 +20,21 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 377f41e1ac02e584e8cb5c24f18529cd
+    m_Address: Golem/GolemData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51ffdc8042a44324ca9a704f11bc99b9
+    m_Address: Skeleton/SkeletonData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 56f9f06011374d045bfa1008823e8f58
+    m_Address: Slime/SlimeData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 62818761c3bbc554c8f2c9960f1e6f8f
     m_Address: Slime/SlimeAnimatorController
     m_ReadOnly: 0
@@ -45,11 +60,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bee0000200000007000000000000ee01
-    m_Address: Golem/GolemConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bee0000200000009000000000000ee01
     m_Address: Golem/GolemAnimatorController
     m_ReadOnly: 0
@@ -62,6 +72,26 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bee0000300000009000000000000ee01
     m_Address: Skeleton/SkeletonAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cfccff0ff643ab04aa57c30e18e66499
+    m_Address: Golem/GolemConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9cee3f905981c64597f67e2db989497
+    m_Address: FairyBat/FairyBatData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbb6900a8e7483f4193acd4932b9a9c9
+    m_Address: Snail/SnailData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9fb4b08f17a0e6489490f87b3679fb0
+    m_Address: LeeHPBar
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

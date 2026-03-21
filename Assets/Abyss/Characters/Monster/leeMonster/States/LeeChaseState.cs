@@ -23,23 +23,21 @@ public class LeeChaseState : ILeeMonsterState
             Debug.LogWarning(
                 $"[ChaseState] Patrol로 복귀 — Target={ctx.Runtime.PlayerTarget?.name ?? "NULL"}" +
                 $" | IsPlayerDead={ctx.Monster.IsPlayerDead()}");
-            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            ctx.Monster.ChangeState<LeePatrolState>();
             return;
         }
-
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
 
         // 공격 사정거리 이내 → 공격 준비
-        if (dist <= ctx.Stat.attackRange)
+        if (ctx.Monster.ShouldEnterAttackReady(ctx))
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.AttackReady);
+            ctx.Monster.ChangeState<LeeAttackReadyState>();
             return;
         }
 
-        // 추격 포기 거리 초과 → 배회 복귀
-        if (dist > ctx.Detection.chaseGiveUpRange)
+        // 추격 포기 → 배회 복귀
+        if (ctx.Monster.ShouldGiveUpChase(ctx))
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Patrol);
+            ctx.Monster.ChangeState<LeePatrolState>();
             return;
         }
 

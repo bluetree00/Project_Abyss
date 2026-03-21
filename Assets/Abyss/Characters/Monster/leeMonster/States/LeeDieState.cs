@@ -3,9 +3,9 @@ using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// 사망 상태.
-/// - NavMeshAgent 비활성화, 콜라이더 제거
+/// - NavMeshAgent 비활성화, 콜라이더 비활성화
 /// - 사망 애니메이션 재생
-/// - 3초 후 오브젝트 파괴
+/// - 3초 후 ObjectPoolerManager에 반환
 /// </summary>
 public class LeeDieState : ILeeMonsterState
 {
@@ -52,6 +52,6 @@ public class LeeDieState : ILeeMonsterState
             cancellationToken: monster.destroyCancellationToken);
 
         if (monster != null)
-            Object.Destroy(monster.gameObject);
+            Managers.ObjectPooler.Despawn(monster.gameObject);
     }
 }

@@ -8,14 +8,14 @@ using UnityEngine;
 ///
 /// "Auto-Populate" 버튼을 누르면 현재 어셈블리에서
 /// LeeMonsterBase를 상속하면서 public const PrefabAddress 를 가진
-/// 모든 구체 클래스를 스캔해 엔트리 행(displayName만)을 자동으로 추가한다.
-/// 프리팹 슬롯은 이후 한 번만 채워주면 모든 스포너에 공유된다.
+/// 모든 구체 클래스를 스캔해 엔트리 행을 자동으로 추가한다.
+/// displayName과 addressableKey가 모두 자동으로 채워진다.
 ///
 /// 새 몬스터 추가 흐름:
 ///   1) MonsterName : LeeMonsterBase 작성
-///   2) public const string PrefabAddress = "..." 추가 (어셈블리 식별용)
-///   3) 프리팹 생성
-///   4) SpawnTableSO Inspector → Auto-Populate → 생긴 행에 프리팹 드래그
+///   2) public const string PrefabAddress = "..." 추가 (Addressables에 등록된 키)
+///   3) 프리팹 생성 후 Addressables에 해당 키로 등록
+///   4) SpawnTableSO Inspector → Auto-Populate
 /// </summary>
 [CustomEditor(typeof(LeeMonsterSpawnTableSO))]
 public class LeeMonsterSpawnTableEditor : Editor
@@ -27,7 +27,7 @@ public class LeeMonsterSpawnTableEditor : Editor
         EditorGUILayout.Space(8);
         EditorGUILayout.HelpBox(
             "Auto-Populate: 어셈블리를 스캔해 LeeMonsterBase 서브클래스를 찾아 엔트리 행을 추가합니다.\n" +
-            "추가된 행의 Prefab 슬롯에 해당 몬스터 프리팹을 드래그해주세요.\n" +
+            "PrefabAddress 상수가 addressableKey로 자동 입력됩니다.\n" +
             "이미 같은 이름의 엔트리가 있으면 중복 추가하지 않습니다.",
             MessageType.Info);
 
@@ -64,16 +64,17 @@ public class LeeMonsterSpawnTableEditor : Editor
                 if (field == null || field.FieldType != typeof(string)) continue;
 
                 string className = type.Name;
+                string address  = (string)field.GetValue(null);
 
                 // 같은 displayName이 이미 있으면 스킵
                 if (so.entries.Exists(e => e.displayName == className)) continue;
 
                 so.entries.Add(new LeeSpawnEntry
                 {
-                    displayName = className,
-                    prefab      = null,   // 프리팹은 사용자가 직접 할당
-                    weight      = 1f,
-                    enabled     = true,
+                    displayName    = className,
+                    addressableKey = address,
+                    weight         = 1f,
+                    enabled        = true,
                 });
                 added++;
             }
@@ -83,7 +84,7 @@ public class LeeMonsterSpawnTableEditor : Editor
         {
             EditorUtility.SetDirty(so);
             AssetDatabase.SaveAssets();
-            Debug.Log($"[SpawnTable] {added}개 몬스터 엔트리 행 추가. 각 행의 Prefab 슬롯을 채워주세요.");
+            Debug.Log($"[SpawnTable] {added}개 몬스터 엔트리 행 추가. Addressables에 프리팹을 등록했는지 확인해주세요.");
         }
         else
         {

@@ -13,6 +13,9 @@ public class LeePatrolState : ILeeMonsterState
 
     public void Enter(LeeMonsterContext ctx)
     {
+        // 배회 복귀 시 다음 조우에서 다시 즉시 공격
+        ctx.Runtime.IsFirstAttack = true;
+
         float speed = ctx.Patrol.patrolSpeed > 0f
             ? ctx.Patrol.patrolSpeed
             : ctx.Stat.moveSpeed;
@@ -30,9 +33,9 @@ public class LeePatrolState : ILeeMonsterState
     public void Update(LeeMonsterContext ctx)
     {
         // 플레이어 감지 → 즉시 Chase
-        if (IsPlayerDetected(ctx))
+        if (ctx.Monster.ShouldStartChase(ctx))
         {
-            ctx.Monster.ChangeState(LeeMonsterStateType.Chase);
+            ctx.Monster.ChangeState<LeeChaseState>();
             return;
         }
 
@@ -55,7 +58,8 @@ public class LeePatrolState : ILeeMonsterState
             ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
 
         // 목적지 도착 판정
-        if (!ctx.Agent.pathPending &&
+        if (ctx.Agent.isOnNavMesh &&
+            !ctx.Agent.pathPending &&
             ctx.Agent.remainingDistance <= ctx.Agent.stoppingDistance + 0.25f)
         {
             ctx.Runtime.IsWaitingAtWaypoint = true;
@@ -98,6 +102,8 @@ public class LeePatrolState : ILeeMonsterState
 
     private void MoveToNextWaypoint(LeeMonsterContext ctx)
     {
+        if (!ctx.Agent.isActiveAndEnabled || !ctx.Agent.isOnNavMesh) return;
+
         // Random 패턴은 목적지를 새로 뽑는다
         if (ctx.Patrol.patrolType == LeePatrolType.Random)
         {
@@ -111,14 +117,6 @@ public class LeePatrolState : ILeeMonsterState
 
         Vector3 dest = ctx.Runtime.PatrolDirection > 0 ? _waypointA : _waypointB;
         ctx.Agent.SetDestination(dest);
-    }
-
-    private bool IsPlayerDetected(LeeMonsterContext ctx)
-    {
-        if (ctx.Runtime.PlayerTarget == null) return false;
-        if (ctx.Monster.IsPlayerDead()) return false;
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        return dist <= ctx.Detection.detectionRange;
     }
 
     private static void PlayAnim(LeeMonsterContext ctx, string stateName)

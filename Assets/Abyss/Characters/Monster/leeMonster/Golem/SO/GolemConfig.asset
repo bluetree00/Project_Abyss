@@ -12,13 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
   m_Name: GolemConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
-  monsterName: "\uC5B4\uC2A4 \uACE8\uB818"
+  monsterName: Golem
   grade: 0
   playerLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 0
   stat: {fileID: 11400000, guid: bee0000200000002000000000000ee01, type: 2}
   detection: {fileID: 11400000, guid: bee0000200000003000000000000ee01, type: 2}
   patrol: {fileID: 11400000, guid: bee0000200000004000000000000ee01, type: 2}
   combat: {fileID: 11400000, guid: bee0000200000005000000000000ee01, type: 2}
   animation: {fileID: 11400000, guid: bee0000200000006000000000000ee01, type: 2}
+  unInterruptibleStateData: {fileID: 11400000, guid: 5849b7db4e4a0d84e870a40877ed02d5,
+    type: 2}
+  movementLockedStateData: {fileID: 0}
+  fullLockStateData: {fileID: 0}
+  invincibleStateData: {fileID: 0}

@@ -31,7 +31,7 @@ public class LeeMonsterSpawnTableSO : ScriptableObject
     {
         float total = 0f;
         foreach (var e in entries)
-            if (e.enabled && e.prefab != null)
+            if (e.enabled && !string.IsNullOrEmpty(e.addressableKey))
                 total += Mathf.Max(0f, e.weight);
 
         if (total <= 0f) return null;
@@ -41,7 +41,7 @@ public class LeeMonsterSpawnTableSO : ScriptableObject
 
         foreach (var e in entries)
         {
-            if (!e.enabled || e.prefab == null) continue;
+            if (!e.enabled || string.IsNullOrEmpty(e.addressableKey)) continue;
             cumulative += Mathf.Max(0f, e.weight);
             if (roll < cumulative) return e;
         }
@@ -57,8 +57,8 @@ public class LeeSpawnEntry
     [Tooltip("표시 이름 (식별용, Auto-Populate로 자동 채워짐)")]
     public string displayName;
 
-    [Tooltip("소환할 몬스터 프리팹")]
-    public GameObject prefab;
+    [Tooltip("소환할 몬스터 Addressable 주소 (Auto-Populate로 자동 채워짐)")]
+    public string addressableKey;
 
     [Tooltip("스폰 가중치. 높을수록 더 자주 선택됨 (1 이상 권장)")]
     [Min(0f)]

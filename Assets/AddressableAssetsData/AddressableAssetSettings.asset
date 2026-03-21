@@ -61,11 +61,11 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
-  - {fileID: 11400000, guid: 584cc860ae1193140a25db05653694b4, type: 2}
   - {fileID: 11400000, guid: ec45ef2050d2d5c4c89d7162d4b40bb8, type: 2}
+  - {fileID: 11400000, guid: 8fba3f65f45da8842b2778e00d58f827, type: 2}
   - {fileID: 11400000, guid: 479adf4089027c04985f6218339cea18, type: 2}
-  - {fileID: 11400000, guid: 6680d083bf4db3d4daa7439548fb4eaf, type: 2}
   - {fileID: 11400000, guid: 56a333c2768647c4690d88b094949e77, type: 2}
+  - {fileID: 11400000, guid: 6680d083bf4db3d4daa7439548fb4eaf, type: 2}
   - {fileID: 11400000, guid: 1898f8680f265404a86a2e2e189c6d97, type: 2}
   - {fileID: 11400000, guid: 2fbad037ee89f0947a87e5da1c1cf120, type: 2}
   - {fileID: 11400000, guid: c74dbcd647270c545a0371326adc4d34, type: 2}
@@ -77,6 +77,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4c8f9885c838a234ea6e4e147dcc334e, type: 2}
   - {fileID: 11400000, guid: ebe7e2344044e2a448c31bef261f97a6, type: 2}
   - {fileID: 11400000, guid: cf9a00bd82302a646b400ea8f8b62c91, type: 2}
+  - {fileID: 0}
   - {fileID: 11400000, guid: 63ced6f8722d08140999b5da88fd4264, type: 2}
   - {fileID: 11400000, guid: 3ceb29d8f8e250f4398295d4b94611d2, type: 2}
   - {fileID: 11400000, guid: 67d571593b38b614d9f2805a28607bcf, type: 2}
@@ -127,6 +128,8 @@ MonoBehaviour:
     - Mat
     - SO
     - Chapter1
+    - SO Grids
+    - SO Shape
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 799fe80f69a5e774aae68b9e2a6babfb, type: 2}
