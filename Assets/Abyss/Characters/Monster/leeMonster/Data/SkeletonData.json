@@ -1,0 +1,28 @@
+{
+  "monsterName": "Skeleton",
+  "grade": "Normal",
+  "stat": {
+    "maxHp": 20,
+    "defense": 5.0,
+    "attackPower": 10.0,
+    "moveSpeed": 3.0,
+    "attackRange": 2.0,
+    "attackRadius": 1.0,
+    "attackRate": 2.0,
+    "attackDelay": 1.0,
+    "knockbackForce": 5.0
+  },
+  "detection": {
+    "detectionRange": 7.0,
+    "chaseGiveUpRange": 10.0
+  },
+  "patrol": {
+    "patrolType": "Horizontal",
+    "patrolRange": 5.0,
+    "patrolSpeed": 3.0,
+    "waypointWaitTime": 0.5
+  },
+  "combat": {
+    "damageApplyDelay": 1.0
+  }
+}

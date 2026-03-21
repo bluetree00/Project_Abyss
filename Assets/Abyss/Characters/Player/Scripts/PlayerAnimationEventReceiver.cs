@@ -94,4 +94,9 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
         Debug.Log("[AE] EndTrail");
     }
 
+    // 슬래시 이펙트 애니메이션 이벤트 — 번호별로 EffectStep에 매핑
+    public void SpawnSlashEffect2() => AE_EffectStep(2);
+    public void SpawnSlashEffect3() => AE_EffectStep(3);
+    public void SpawnSlashEffect4() => AE_EffectStep(4);
+
 }

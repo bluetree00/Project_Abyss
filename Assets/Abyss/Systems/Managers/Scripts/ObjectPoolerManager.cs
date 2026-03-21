@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
+public interface IPooledObject
+{
+    void OnSpawn(object param = null);
+    void OnDespawn();
+}
+
 /// <summary>
 /// 실무형 ObjectPooler
 /// - Spawn 요청 시 Pool 없으면 Addressables 통해 자동 로드
@@ -35,12 +41,6 @@ public class ObjectPoolerManager
     private class PooledObjectInfo : MonoBehaviour
     {
         public string key;
-    }
-
-    public interface IPooledObject
-    {
-        void OnSpawn(object param = null);
-        void OnDespawn();
     }
 
     // =========================

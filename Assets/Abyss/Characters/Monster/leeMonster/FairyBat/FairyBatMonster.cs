@@ -22,5 +22,8 @@
 public class FairyBatMonster : LeeMonsterBase
 {
     public const string PrefabAddress = "FairyBat/FairyBat";
-    protected override string ConfigAddress => "FairyBat/FairyBatConfig";
+    protected override string ConfigAddress    => "FairyBat/FairyBatConfig";
+    protected override string DataAddress      => "FairyBat/FairyBatData";
+    protected override string HeadBoneName     => null;   // Head 본 없음 → 콜라이더 상단 폴백
+    protected override float  HPBarHeadOffset  => 0.2f;
 }

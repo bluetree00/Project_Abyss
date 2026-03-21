@@ -13,20 +13,18 @@ MonoBehaviour:
   m_Name: Prefabs
   m_EditorClassIdentifier: 
   m_GroupName: Prefabs
-  m_Data:
-    m_SerializedData: []
   m_GUID: f61eda09f507db44c87b7289dfa55356
   m_SerializeEntries:
+  - m_GUID: 2a8c7216b9c8e1247b775da67a540847
+    m_Address: Basic_Arrow_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 537b48c693566ce4781a27f730612c04
     m_Address: Basic_Knight_03
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2a8c7216b9c8e1247b775da67a540847
-    m_Address: Basic_Arrow_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 931acccf6c82761459befc475179ea9a
     m_Address: Knight
