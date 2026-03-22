@@ -21,5 +21,10 @@ public class CharacterRoster : ScriptableObject
 
         [Tooltip("GameRunBootstrapper에서 스폰할 Addressable 프리팹 키")]
         public string prefabKey;
+
+        [Tooltip("캐릭터 고유 능력 아이콘 슬롯 (최대 3개)")]
+        public Sprite abilityIcon0;
+        public Sprite abilityIcon1;
+        public Sprite abilityIcon2;
     }
 }
