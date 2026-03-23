@@ -18,5 +18,22 @@ public class GolemRoarData : SpecialStateDataBase
     [Tooltip("포효 애니메이션 상태 이름 (Animator State 이름과 일치)")]
     public string roarStateName = "Roar";
 
+    [Header("포효 충격파 (주변 날려버리기)")]
+    [Tooltip("충격파 반경 (m)")]
+    public float knockbackRadius = 6f;
+
+    [Tooltip("날려버리는 힘 배율 (TakeDamage knockbackMultiplier)")]
+    public float knockbackForce = 5f;
+
+    [Tooltip("충격파로 주는 데미지")]
+    public float knockbackDamage = 5f;
+
+    [Header("포효 후 분노 추격")]
+    [Tooltip("포효 종료 후 빠른 추격 지속 시간 (초)")]
+    public float rageChaseDuration = 6f;
+
+    [Tooltip("분노 추격 중 이동 속도 배율")]
+    public float rageSpeedMultiplier = 1.8f;
+
     public override LeeSpecialStateBase CreateState() => new GolemRoarState(this);
 }

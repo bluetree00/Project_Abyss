@@ -48,21 +48,14 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     protected NavMeshAgent          _agent;
     protected Animator              _animator;
     private   LeeMonsterHPBar       _hpBar;
+    private   bool                  _hpBarRequesting;
 
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
-    private LeeSpecialStateBase _specialUnInterruptible;
-    private LeeSpecialStateBase _specialMovementLocked;
-    private LeeSpecialStateBase _specialFullLock;
-    private LeeSpecialStateBase _specialInvincible;
+    private readonly List<LeeSpecialStateBase> _specialStates = new();
 
-    /// <summary>중단 불가 특수 상태 인스턴스. 파생 클래스에서 TryGetSpecialState에 활용.</summary>
-    protected LeeSpecialStateBase SpecialUnInterruptible => _specialUnInterruptible;
-    /// <summary>이동 잠금 특수 상태 인스턴스.</summary>
-    protected LeeSpecialStateBase SpecialMovementLocked  => _specialMovementLocked;
-    /// <summary>완전 잠금 특수 상태 인스턴스.</summary>
-    protected LeeSpecialStateBase SpecialFullLock        => _specialFullLock;
-    /// <summary>무적 특수 상태 인스턴스.</summary>
-    protected LeeSpecialStateBase SpecialInvincible      => _specialInvincible;
+    /// <summary>인덱스로 특수 상태 인스턴스를 가져온다. 파생 클래스의 TryGetSpecialState에서 활용.</summary>
+    protected LeeSpecialStateBase GetSpecialState(int index)
+        => index < _specialStates.Count ? _specialStates[index] : null;
 
     // Inspector 디버그용
     [SerializeField] private string _debugState;
@@ -163,7 +156,18 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>
     /// 공용 상태를 FSM에 등록한다.
-    /// 특정 상태를 교체하거나 특수 상태를 추가할 때 오버라이드.
+    ///
+    /// ━━ 오버라이드 패턴 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ///  base.RegisterStates() 호출 후 필요한 상태만 교체/추가.
+    ///
+    ///  ① 공용 상태 교체 (특정 상태에서만 특수 상태 진입 등):
+    ///     _fsm.RegisterAs&lt;LeeChaseState&gt;(new GolemChaseState(_roarState));
+    ///     → ChangeState&lt;LeeChaseState&gt;() 호출이 GolemChaseState를 실행.
+    ///
+    ///  ② 새 상태 추가 (특수 상태 등):
+    ///     _fsm.Register(_roarState);   // 인스턴스 직접 등록
+    ///     또는 TryGetSpecialState 오버라이드로 주입.
+    /// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     /// </summary>
     protected virtual void RegisterStates()
     {
@@ -174,11 +178,17 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         _fsm.Register(new LeeGetHitState());
         _fsm.Register(new LeeDieState());
 
-        // 특수 상태: SO 슬롯에 데이터가 있으면 자동으로 인스턴스 생성
-        _specialUnInterruptible = _config.unInterruptibleStateData?.CreateState();
-        _specialMovementLocked  = _config.movementLockedStateData?.CreateState();
-        _specialFullLock        = _config.fullLockStateData?.CreateState();
-        _specialInvincible      = _config.invincibleStateData?.CreateState();
+        // 특수 상태: 슬롯에 데이터가 있으면 자동으로 인스턴스 생성
+        _specialStates.Clear();
+        foreach (var data in new[] {
+            _config.specialState0,
+            _config.specialState1,
+            _config.specialState2,
+            _config.specialState3 })
+        {
+            if (data != null)
+                _specialStates.Add(data.CreateState());
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -207,22 +217,6 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
 
 #if UNITY_EDITOR
         _debugState = _fsm?.CurrentType?.Name;
-
-        _diagTimer -= Time.deltaTime;
-        if (_diagTimer <= 0f)
-        {
-            _diagTimer = 1f;
-            Transform tgt = _runtime.PlayerTarget;
-            float dist = tgt != null
-                ? Vector3.Distance(transform.position, tgt.position)
-                : -1f;
-            Debug.Log(
-                $"[FairyBat] State={_fsm?.CurrentType} | Target={tgt?.name ?? "NULL"}" +
-                $" | Dist={dist:F1}" +
-                $" | DetectRange={_config?.detection?.detectionRange}" +
-                $" | IsPlayerDead={IsPlayerDead()}",
-                this);
-        }
 #endif
     }
 
@@ -257,6 +251,10 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>특수 상태 전환 — 인스턴스 직접 전달.</summary>
     public void ChangeState(ILeeMonsterState state) => _fsm?.ChangeState(state);
+
+    /// <summary>현재 FullLockState 등 특수 상태(Constraints != None)가 실행 중이면 true.</summary>
+    public bool IsInSpecialState
+        => _fsm != null && _fsm.CurrentConstraints != SpecialStateConstraint.None;
 
     // ── 조건 훅 (공용 상태가 위임, 파생 클래스에서 오버라이드 가능) ────────
 
@@ -308,7 +306,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         var player = _runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage((int)_config.stat.attackPower);
+        player.TakeDamage((int)(_config.stat.attackPower * _runtime.AttackMultiplier));
 
         var rb = _runtime.PlayerTarget.GetComponent<Rigidbody>();
         if (rb != null)
@@ -346,8 +344,8 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
-        // 방어력 적용 (최소 1 데미지)
-        float actual = Mathf.Max(1f, amount - _config.stat.defense);
+        // 방어력 + 데미지 배율 적용 (최소 1 데미지)
+        float actual = Mathf.Max(1f, (amount - _config.stat.defense) * _runtime.DamageMultiplier);
         _runtime.CurrentHp -= (int)actual;
         _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
 
@@ -411,7 +409,6 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         }
 
         data.ApplyToConfig(_config);
-        Debug.Log($"[LeeMonsterBase] JSON 데이터 적용 완료: {DataAddress}");
     }
 
     private async UniTask LoadAnimatorControllerAsync()
@@ -462,6 +459,9 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         _runtime.StateTimer          = 0f;
         _runtime.AttackHitDealt      = false;
         _runtime.IsFirstAttack       = true;
+        _runtime.SpeedMultiplier     = 1f;
+        _runtime.AttackMultiplier    = 1f;
+        _runtime.DamageMultiplier    = 1f;
 
         // NavMeshAgent 재활성화
         if (_agent != null) _agent.enabled = true;
@@ -489,6 +489,7 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
     protected virtual void OnDisable()
     {
         // HP 바 반환
+        _hpBarRequesting = false;
         if (_hpBar != null)
         {
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
@@ -496,9 +497,23 @@ public abstract class LeeMonsterBase : MonoBehaviour, IDamageable
         }
     }
 
+    /// <summary>런타임 HP 변경(회복 등) 후 HP 바를 동기화한다. 특수 상태에서 호출.</summary>
+    public void NotifyHPChanged()
+        => _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
+
     private async UniTaskVoid RequestHPBarAsync()
     {
+        // 이미 요청 중이면 중복 방지
+        if (_hpBarRequesting) return;
+        _hpBarRequesting = true;
+
+        if (_hpBar != null)
+        {
+            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
+            _hpBar = null;
+        }
         _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
+        _hpBarRequesting = false;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

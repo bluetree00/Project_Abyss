@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
   m_Name: SnailConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
-  monsterName: "\uC678\uB208 \uB2EC\uD32D\uC774"
+  monsterName: Snail
   grade: 0
   playerLayer:
     serializedVersion: 2
@@ -22,3 +22,7 @@ MonoBehaviour:
   patrol: {fileID: 11400000, guid: bee0000100000004000000000000ee01, type: 2}
   combat: {fileID: 11400000, guid: bee0000100000005000000000000ee01, type: 2}
   animation: {fileID: 11400000, guid: bee0000100000006000000000000ee01, type: 2}
+  specialState0: {fileID: 11400000, guid: c78d01e84bab0ac4d9a5ae44c5b8012e, type: 2}
+  specialState1: {fileID: 0}
+  specialState2: {fileID: 0}
+  specialState3: {fileID: 0}

@@ -44,12 +44,12 @@ public abstract class FullLockState<TData> : LeeSpecialStateBase
     protected FullLockState(TData data) { Data = data; }
 }
 
-/// <summary>무적 (TakeDamage 자체 무시 + 이동 잠금)</summary>
+/// <summary>무적 (TakeDamage 자체 무시, 이동은 허용)</summary>
 public abstract class InvincibleState<TData> : LeeSpecialStateBase
     where TData : SpecialStateDataBase
 {
     public override SpecialStateConstraint Constraints =>
-        SpecialStateConstraint.Invincible | SpecialStateConstraint.MovementLocked;
+        SpecialStateConstraint.Invincible;
     protected readonly TData Data;
     protected InvincibleState(TData data) { Data = data; }
 }

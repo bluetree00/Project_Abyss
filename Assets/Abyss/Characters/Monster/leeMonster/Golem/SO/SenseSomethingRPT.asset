@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88b031d7b9353e2498fe9f15d7718c80, type: 3}
-  m_Name: GolemRoarData
+  m_Name: SenseSomethingRPT
   m_EditorClassIdentifier: Assembly-CSharp::GolemRoarData
   hpThreshold: 0.5
-  roarDuration: 2
+  roarDuration: 4
   roarStateName: Roar

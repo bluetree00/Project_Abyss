@@ -41,6 +41,21 @@ public class LeeMonsterFSM
     public void Register<T>(T state) where T : ILeeMonsterState
         => _states[typeof(T)] = state;
 
+    /// <summary>
+    /// 오버라이드 등록 — TKey 타입으로 조회되지만 실제 인스턴스는 파생 클래스.
+    /// 파생 몬스터에서 공용 상태를 교체할 때 사용.
+    /// <code>
+    /// // GolemMonster.RegisterStates()
+    /// protected override void RegisterStates()
+    /// {
+    ///     base.RegisterStates();
+    ///     _fsm.RegisterAs&lt;LeeChaseState&gt;(new GolemChaseState(_roarState));
+    /// }
+    /// </code>
+    /// </summary>
+    public void RegisterAs<TKey>(ILeeMonsterState state) where TKey : ILeeMonsterState
+        => _states[typeof(TKey)] = state;
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 상태 전환
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

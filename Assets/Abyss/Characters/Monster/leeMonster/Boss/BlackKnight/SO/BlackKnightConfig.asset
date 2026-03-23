@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: BlackKnightConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: BlackKnight
+  grade: 2
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  stat: {fileID: 11400000, guid: 73592fd233e0a3b49950dcc756a89ac5, type: 2}
+  detection: {fileID: 11400000, guid: 207cf9c44feea8d47b4dea77efa55eb4, type: 2}
+  patrol: {fileID: 11400000, guid: c3803eb8d90171d4396cd4cea2e5afe9, type: 2}
+  combat: {fileID: 11400000, guid: e7407e8914bfaa04ca28c9c27f3b2947, type: 2}
+  animation: {fileID: 11400000, guid: a9c4071f2b01ad940b09d76de2803ca3, type: 2}
+  specialState0: {fileID: 11400000, guid: 7919bfa7d4836b649b4f50cba42e9db4, type: 2}
+  specialState1: {fileID: 0}
+  specialState2: {fileID: 0}
+  specialState3: {fileID: 0}

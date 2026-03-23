@@ -21,7 +21,7 @@ public class LeeMonsterHPBar : MonoBehaviour
     [SerializeField] private float _headOffset = 0.1f;
 
     // ── 런타임 ─────────────────────────────────────────────
-    private LeeMonsterBase _monster;
+    private MonoBehaviour _monster;
     private Transform       _headBone;      // 우선 사용
     private Collider        _collider;      // 폴백용
     private Transform       _camTransform;
@@ -32,7 +32,7 @@ public class LeeMonsterHPBar : MonoBehaviour
 
     /// <summary>몬스터와 연결하고 HP 바를 활성화한다.</summary>
     /// <param name="headBone">Head 본 Transform. null이면 콜라이더 상단 기준으로 폴백.</param>
-    public void Link(LeeMonsterBase monster, int currentHp, int maxHp, Transform headBone, float headOffset = 0.1f)
+    public void Link(MonoBehaviour monster, int currentHp, int maxHp, Transform headBone, float headOffset = 0.1f)
     {
         _monster      = monster;
         _headBone     = headBone;

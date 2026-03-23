@@ -35,4 +35,12 @@ public class LeeMonsterRuntimeData
     public bool AttackHitDealt;
     /// <summary>이번 조우에서 첫 번째 공격인지. true면 AttackReady 딜레이 없이 즉시 공격.</summary>
     public bool IsFirstAttack = true;
+
+    // ── 특수 상태 배율 ─────────────────────────────────────
+    /// <summary>이동 속도 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>
+    public float SpeedMultiplier  = 1f;
+    /// <summary>공격력 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>
+    public float AttackMultiplier = 1f;
+    /// <summary>받는 데미지 배율. 방어 상태 등에서 임시 감소에 사용. 기본값 1.</summary>
+    public float DamageMultiplier = 1f;
 }
