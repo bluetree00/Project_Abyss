@@ -19,11 +19,38 @@
 ///   MonsterConfig  →  "FairyBat/FairyBatConfig"
 ///   AnimController →  "FairyBat/FairyBatAnimatorController" (선택)
 /// </summary>
+/// <summary>
+/// 페어리박쥐 몬스터.
+/// 특수 상태: HP 40% 이하 도달 시 1회 도주 (FairyBatFleeState).
+/// </summary>
 public class FairyBatMonster : LeeMonsterBase
 {
     public const string PrefabAddress = "FairyBat/FairyBat";
     protected override string ConfigAddress    => "FairyBat/FairyBatConfig";
     protected override string DataAddress      => "FairyBat/FairyBatData";
-    protected override string HeadBoneName     => null;   // Head 본 없음 → 콜라이더 상단 폴백
+    protected override string HeadBoneName     => null;
     protected override float  HPBarHeadOffset  => 0.2f;
+
+    private bool _hasFled;
+
+    protected override void OnEnable()
+    {
+        _hasFled = false;
+        base.OnEnable();
+    }
+
+    public override ILeeMonsterState TryGetSpecialState(LeeMonsterContext ctx)
+    {
+        var state = GetSpecialState(0);
+        if (state == null || _hasFled) return null;
+        if (_config.specialState0 is not FairyBatFleeData fleeData) return null;
+
+        float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Config.stat.maxHp;
+        if (hpRatio <= fleeData.hpThreshold)
+        {
+            _hasFled = true;
+            return state;
+        }
+        return null;
+    }
 }

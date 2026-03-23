@@ -22,8 +22,7 @@ MonoBehaviour:
   patrol: {fileID: 11400000, guid: bee0000200000004000000000000ee01, type: 2}
   combat: {fileID: 11400000, guid: bee0000200000005000000000000ee01, type: 2}
   animation: {fileID: 11400000, guid: bee0000200000006000000000000ee01, type: 2}
-  unInterruptibleStateData: {fileID: 11400000, guid: 5849b7db4e4a0d84e870a40877ed02d5,
-    type: 2}
-  movementLockedStateData: {fileID: 0}
-  fullLockStateData: {fileID: 0}
-  invincibleStateData: {fileID: 0}
+  specialState0: {fileID: 11400000, guid: 5849b7db4e4a0d84e870a40877ed02d5, type: 2}
+  specialState1: {fileID: 0}
+  specialState2: {fileID: 0}
+  specialState3: {fileID: 0}

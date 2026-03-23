@@ -10,29 +10,50 @@ public class GolemMonster : LeeMonsterBase
     protected override string DataAddress     => "Golem/GolemData";
     protected override float  HPBarHeadOffset => 1.0f;
 
-    private bool _hasRoared;
+    private bool  _hasRoared;
+    private float _rageTimer;
+
+    // ── 매 프레임 ─────────────────────────────────────────
+
+    protected override void Update()
+    {
+        if (_rageTimer > 0f)
+        {
+            _rageTimer -= UnityEngine.Time.deltaTime;
+            if (_rageTimer <= 0f)
+            {
+                _runtime.SpeedMultiplier = 1f;
+                _agent.speed = _config.stat.moveSpeed;
+            }
+        }
+        base.Update();
+    }
 
     // ── 특수 상태 진입 훅 ──────────────────────────────────
 
     public override ILeeMonsterState TryGetSpecialState(LeeMonsterContext ctx)
     {
-        if (SpecialInvincible == null || _hasRoared) return null;
-        if (_config.invincibleStateData is not GolemRoarData roarData) return null;
+        var state = GetSpecialState(0);
+        if (state == null || _hasRoared) return null;
+        if (_config.specialState0 is not GolemRoarData roarData) return null;
 
         float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Config.stat.maxHp;
         if (hpRatio <= roarData.hpThreshold)
         {
             _hasRoared = true;
-            return SpecialInvincible;
+            return state;
         }
         return null;
     }
+
+    public void StartRageChase(float duration) => _rageTimer = duration;
 
     // ── 풀 재사용 시 플래그 리셋 ──────────────────────────
 
     protected override void OnEnable()
     {
         _hasRoared = false;
+        _rageTimer = 0f;
         base.OnEnable();
     }
 }

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
   m_Name: SkeletonConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
-  monsterName: "\uC2A4\uCF08\uB808\uD1A4 \uB098\uC774\uD2B8"
+  monsterName: Skeleton
   grade: 0
   playerLayer:
     serializedVersion: 2
@@ -22,3 +22,7 @@ MonoBehaviour:
   patrol: {fileID: 11400000, guid: bee0000300000004000000000000ee01, type: 2}
   combat: {fileID: 11400000, guid: bee0000300000005000000000000ee01, type: 2}
   animation: {fileID: 11400000, guid: bee0000300000006000000000000ee01, type: 2}
+  specialState0: {fileID: 11400000, guid: 8b470148a9d4f5d4eb88f4b9ce495013, type: 2}
+  specialState1: {fileID: 0}
+  specialState2: {fileID: 0}
+  specialState3: {fileID: 0}

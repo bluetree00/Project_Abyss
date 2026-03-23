@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
   m_Name: FairyBatConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
-  monsterName: "\uD398\uC5B4\uB9AC \uBC15\uC950"
+  monsterName: FairyBat
   grade: 0
   playerLayer:
     serializedVersion: 2
@@ -22,3 +22,7 @@ MonoBehaviour:
   patrol: {fileID: 11400000, guid: 4a4852ccf9c5d93408691901a82dbb6f, type: 2}
   combat: {fileID: 11400000, guid: 4bf6f1ab2922faf4fb1428c53e107324, type: 2}
   animation: {fileID: 11400000, guid: c86466897d3717c40975b0afe6896a3d, type: 2}
+  specialState0: {fileID: 11400000, guid: 747d185ca60fa2a41ae66b4d1372c260, type: 2}
+  specialState1: {fileID: 0}
+  specialState2: {fileID: 0}
+  specialState3: {fileID: 0}

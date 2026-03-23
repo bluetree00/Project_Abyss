@@ -10,7 +10,7 @@ public class LeeChaseState : ILeeMonsterState
 {
     public void Enter(LeeMonsterContext ctx)
     {
-        ctx.Agent.speed = ctx.Stat.moveSpeed;
+        ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
         ctx.Agent.stoppingDistance = ctx.Stat.attackRange * 0.9f;
         PlayAnim(ctx, ctx.Animation.chaseStateName);
 
@@ -20,9 +20,6 @@ public class LeeChaseState : ILeeMonsterState
     {
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
-            Debug.LogWarning(
-                $"[ChaseState] Patrol로 복귀 — Target={ctx.Runtime.PlayerTarget?.name ?? "NULL"}" +
-                $" | IsPlayerDead={ctx.Monster.IsPlayerDead()}");
             ctx.Monster.ChangeState<LeePatrolState>();
             return;
         }
