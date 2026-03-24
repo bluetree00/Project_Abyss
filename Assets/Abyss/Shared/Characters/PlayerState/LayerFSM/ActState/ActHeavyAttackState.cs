@@ -29,7 +29,8 @@ public class ActHeavyAttackState : ILayerState<ActState>
                 _controller.PendingPlunge = new PlayerController.PlungeInfo
                 {
                     fallClipName = mapping.baseClipName,
-                    fallSpeed    = mapping.plungeFallSpeed
+                    fallSpeed    = mapping.plungeFallSpeed,
+                    descendAt    = mapping.plungeDescendAt
                 };
                 _stateChanger.Change(ActState.Plunge);
                 return;

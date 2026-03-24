@@ -249,6 +249,8 @@ public class PlayerController : CharacterBase
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
         CheckMovementInput();
+        // Combo.Tick을 FSM Update보다 먼저 실행해 actSM이 최신 창 상태를 즉시 반영하도록 한다
+        Combo.Tick(Time.unscaledDeltaTime);
         RouteInputsToLayers();
 
         locoSM?.Update();
@@ -257,7 +259,6 @@ public class PlayerController : CharacterBase
         if (locoSM != null) locoStateDebug = locoSM.CurrentId;
         if (actSM != null) actStateDebug = actSM.CurrentId;
 
-        Combo.Tick(Time.unscaledDeltaTime);
         CooldownTracker.Tick(Time.unscaledDeltaTime);
     }
 
@@ -655,6 +656,7 @@ public class PlayerController : CharacterBase
     {
         public string fallClipName;
         public float  fallSpeed;
+        public float  descendAt;   // 하강 시작 normalizedTime (0 = 즉시)
     }
     public PlungeInfo PendingPlunge { get; set; }
 
@@ -711,14 +713,15 @@ public class PlayerController : CharacterBase
     {
         if (receiver == null || _aeSubscribed) return;
 
-        receiver.OnAttackEnd += Safe_OnAttackAnimationEnd;
-        receiver.OnHitStep += Safe_OnHitStep;
-        receiver.OnOpenCombo += Safe_OpenCombo;
-        receiver.OnCloseCombo += Safe_CloseCombo;
+        // OnAttackEnd: ActAttackState는 normalizedTime 폴링으로 자체 처리 → 구독 안 함
+        // OnOpenCombo / OnCloseCombo: ActAttackState가 폴링으로 처리 → 구독 안 함
+        // 아래는 PlayerController가 직접 처리해야 하는 시각적/전역 이벤트만 유지
+        receiver.OnAttackEnd  += Safe_OnAttackAnimationEnd; // 스킬 상태 종료용
+        receiver.OnHitStep    += Safe_OnHitStep;
         receiver.OnGenericTag += Safe_GenericTag;
         receiver.OnEffectStep += safe_EffectStep;
         receiver.OnBeginTrail += Safe_BeginTrail;
-        receiver.OnEndTrail += Safe_EndTrail;
+        receiver.OnEndTrail   += Safe_EndTrail;
 
         _aeSubscribed = true;
     }
@@ -727,14 +730,12 @@ public class PlayerController : CharacterBase
     {
         if (receiver == null || !_aeSubscribed) return;
 
-        receiver.OnAttackEnd -= Safe_OnAttackAnimationEnd;
-        receiver.OnHitStep -= Safe_OnHitStep;
-        receiver.OnOpenCombo -= Safe_OpenCombo;
-        receiver.OnCloseCombo -= Safe_CloseCombo;
+        receiver.OnAttackEnd  -= Safe_OnAttackAnimationEnd;
+        receiver.OnHitStep    -= Safe_OnHitStep;
         receiver.OnGenericTag -= Safe_GenericTag;
         receiver.OnEffectStep -= safe_EffectStep;
         receiver.OnBeginTrail -= Safe_BeginTrail;
-        receiver.OnEndTrail -= Safe_EndTrail;
+        receiver.OnEndTrail   -= Safe_EndTrail;
 
         _aeSubscribed = false;
     }
@@ -742,16 +743,38 @@ public class PlayerController : CharacterBase
     //============================================================
     // Safe Handlers
     //============================================================
+
+    /// <summary>
+    /// AE_AttackEnd 애니메이션 이벤트 수신 — 스킬 상태 종료 전용.
+    /// ActState.Attack 및 ActState.HeavyAttack은 각 상태가 자체 처리하므로 스킵한다.
+    /// </summary>
     private void Safe_OnAttackAnimationEnd()
     {
-        if (Combo.IsAttacking)
-            FirePassive(PassiveTrigger.OnComboFinish,
-                new PassiveContext { comboStep = Combo.CurrentComboStep });
+        // Attack / HeavyAttack은 각 State가 자체적으로 종료를 처리한다
+        if (actSM.CurrentId == ActState.Attack ||
+            actSM.CurrentId == ActState.HeavyAttack)
+            return;
 
         Combo.SetAttacking(false);
 
         if (IsInAttackOrSkillState())
             actSM.Change(ActState.None);
+    }
+
+    /// <summary>
+    /// 콤보가 최대 스텝까지 완료됐을 때 ActAttackState에서 호출된다.
+    /// 파생 캐릭터는 override해 캐릭터 전용 로직을 추가할 수 있다.
+    /// </summary>
+    
+    public void NotifyComboFinished(int finalStep)
+    {
+        OnComboFinished(finalStep);
+    }
+
+    protected virtual void OnComboFinished(int finalStep)
+    {
+        FirePassive(PassiveTrigger.OnComboFinish,
+            new PassiveContext { comboStep = finalStep });
     }
 
     private void Safe_OnHitStep(int stepIndex)
@@ -760,8 +783,6 @@ public class PlayerController : CharacterBase
         OnAttackHitStep(stepIndex);
     }
 
-    private void Safe_OpenCombo()  => Combo?.OpenWindow();
-    private void Safe_CloseCombo() => Combo?.CloseWindow();
     private void Safe_GenericTag(string tag) => OnAnimationEventTag(tag);
 
     private void safe_EffectStep(int step)

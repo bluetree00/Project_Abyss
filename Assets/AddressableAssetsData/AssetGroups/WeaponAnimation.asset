@@ -14,7 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_GroupName: WeaponAnimation
   m_GUID: e022b22868950144f9a5f9bdc5770e86
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 52c2de492ef1443458626e80a78b7c99
+    m_Address: GroundLightAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 77fc626278dbd774a9e6b1fee68562c4
+    m_Address: GroundLightAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8decc86bf4985ea42b3005926975955f
+    m_Address: GroundLightAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

@@ -60,16 +60,6 @@ public sealed class PlayerRuntimeStats
         SetHp(Hp + amount);
     }
 
-    /// <summary>직접 공격력 덮어쓰기 — 레이어 방식으로 대체됨. SetWeaponStats/RefreshItemBonuses 사용.</summary>
-    [System.Obsolete("Use SetWeaponStats / RefreshItemBonuses / RefreshRoomBuffs instead.")]
-    public void SetAttackPower(int attackPower)
-    {
-        attackPower = Mathf.Max(0, attackPower);
-        if (AttackPower == attackPower) return;
-        AttackPower = attackPower;
-        OnChanged?.Invoke();
-    }
-
     // ── 스탯 레이어 ──────────────────────────────────────────────────────────
     // 최종 스탯 = Base (CharacterData)
     //           + PassiveBonus  (캐릭터 패시브, 런 시작 시 1회)

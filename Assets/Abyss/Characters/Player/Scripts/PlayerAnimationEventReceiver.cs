@@ -10,8 +10,6 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     public event Action OnAttackEnd;
     public event Action<int> OnHitStep;
     public event Action<int> OnEffectStep;
-    public event Action OnOpenCombo;
-    public event Action OnCloseCombo;
     public event Action<string> OnGenericTag;
     public event Action OnBeginTrail;
     public event Action OnEndTrail;
@@ -43,20 +41,6 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     #endregion
 
     // AE 메서드들은 이제 이벤트만 발행
-    public void AE_OpenCombo()
-    {
-        EnsureTarget();
-        OnOpenCombo?.Invoke();
-        Debug.Log("[AE] OpenCombo");
-    }
-
-    public void AE_CloseCombo()
-    {
-        EnsureTarget();
-        OnCloseCombo?.Invoke();
-        Debug.Log("[AE] CloseCombo");
-    }
-
     public void AE_AttackEnd()
     {
         EnsureTarget();
@@ -95,6 +79,8 @@ public class PlayerAnimationEventReceiver : MonoBehaviour
     }
 
     // 슬래시 이펙트 애니메이션 이벤트 — 번호별로 EffectStep에 매핑
+    public void SpawnSlashEffect0() => AE_EffectStep(0);
+    public void SpawnSlashEffect1() => AE_EffectStep(1);
     public void SpawnSlashEffect2() => AE_EffectStep(2);
     public void SpawnSlashEffect3() => AE_EffectStep(3);
     public void SpawnSlashEffect4() => AE_EffectStep(4);
