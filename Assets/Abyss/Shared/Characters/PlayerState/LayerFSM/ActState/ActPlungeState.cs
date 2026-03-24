@@ -18,6 +18,9 @@ public class ActPlungeState : ILayerState<ActState>
     private AbilityExecution _execution;
 
     private float _plungeSpeed;
+    private float _plungeDescendAt;
+    private int   _prepStateHash;
+    private bool  _descending;
     private bool  _landed;
     private float _recoveryTimer;
     private const float RecoveryTimeout = 1.5f; // OnAttackEnd 누락 시 안전 탈출
@@ -31,12 +34,14 @@ public class ActPlungeState : ILayerState<ActState>
     public void Enter()
     {
         _landed        = false;
+        _descending    = false;
         _recoveryTimer = 0f;
 
-        // PendingPlunge에서 클립명·속도 읽기
-        var info      = _controller.PendingPlunge;
-        _plungeSpeed  = info.fallSpeed > 0f ? info.fallSpeed : DefaultPlungeSpeed;
-        string clip   = string.IsNullOrEmpty(info.fallClipName) ? "PlungeFall" : info.fallClipName;
+        // PendingPlunge에서 클립명·속도·하강 타이밍 읽기
+        var info         = _controller.PendingPlunge;
+        _plungeSpeed     = info.fallSpeed   > 0f ? info.fallSpeed   : DefaultPlungeSpeed;
+        _plungeDescendAt = info.descendAt;
+        string clip      = string.IsNullOrEmpty(info.fallClipName) ? "PlungeFall" : info.fallClipName;
         _controller.PendingPlunge = default; // 소비
 
         _execution = new AbilityExecution();
@@ -51,13 +56,20 @@ public class ActPlungeState : ILayerState<ActState>
         SubscribeReceiver();
 
         _controller.Anim.CrossFade(clip, 0.1f);
+        _prepStateHash = Animator.StringToHash(clip);
         _controller.BeginWeaponTrail();
 
-        ApplyPlungeVelocity();
+        // descendAt == 0이면 즉시 하강, 아니면 Update()에서 폴링 후 하강
+        if (_plungeDescendAt <= 0f)
+        {
+            _descending = true;
+            ApplyPlungeVelocity();
+        }
     }
 
     public void Update()
     {
+        // 착지 후 회복 대기
         if (_landed)
         {
             _recoveryTimer += UnityEngine.Time.deltaTime;
@@ -66,6 +78,31 @@ public class ActPlungeState : ILayerState<ActState>
             return;
         }
 
+        // 하강 준비 단계: normalizedTime이 descendAt에 도달할 때까지 공중 정지
+        if (!_descending)
+        {
+            var anim      = _controller.Anim;
+            var stateInfo = anim.IsInTransition(0)
+                ? anim.GetNextAnimatorStateInfo(0)
+                : anim.GetCurrentAnimatorStateInfo(0);
+
+            if (stateInfo.shortNameHash == _prepStateHash &&
+                stateInfo.normalizedTime >= _plungeDescendAt)
+            {
+                _descending = true;
+                ApplyPlungeVelocity();
+            }
+            else
+            {
+                // 공중 정지: 수직 속도를 0으로 유지
+                var vel = _controller.Rigid.linearVelocity;
+                vel.y = 0f;
+                _controller.Rigid.linearVelocity = vel;
+            }
+            return;
+        }
+
+        // 하강 중
         if (!_controller.IsGrounded())
         {
             ApplyPlungeVelocity();
@@ -93,6 +130,7 @@ public class ActPlungeState : ILayerState<ActState>
         _execution = null;
 
         _landed        = false;
+        _descending    = false;
         _recoveryTimer = 0f;
     }
 

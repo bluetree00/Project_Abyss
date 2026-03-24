@@ -55,7 +55,7 @@ public class WeaponEffectHandler
                     e.payloadKey,
                     ObjectPoolerManager.PoolType.Effect,
                     playerTransform.TransformPoint(e.positionOffset),
-                    Quaternion.Euler(e.rotationEuler)
+                    playerTransform.rotation * Quaternion.Euler(e.rotationEuler)
                 );
 
                 if (_player == null || effectObj == null) return;
@@ -98,7 +98,7 @@ public class WeaponEffectHandler
                         c.colliderPrefabKey,
                         ObjectPoolerManager.PoolType.Effect,
                         handTransform.TransformPoint(c.positionOffset),
-                        Quaternion.Euler(c.rotationEuler)
+                        handTransform.rotation * Quaternion.Euler(c.rotationEuler)
                     );
 
                     if (_player == null || colliderObj == null) return;
@@ -108,7 +108,7 @@ public class WeaponEffectHandler
                     // prefabKey 없을 때 런타임 생성 (임시 fallback)
                     colliderObj = new GameObject("RuntimeCollider");
                     colliderObj.transform.position = handTransform.TransformPoint(c.positionOffset);
-                    colliderObj.transform.rotation = Quaternion.Euler(c.rotationEuler);
+                    colliderObj.transform.rotation = playerTransform.rotation * Quaternion.Euler(c.rotationEuler);
 
                     switch (c.shape)
                     {
