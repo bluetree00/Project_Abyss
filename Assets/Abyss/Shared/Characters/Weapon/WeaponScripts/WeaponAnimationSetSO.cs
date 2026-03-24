@@ -19,6 +19,13 @@ public class WeaponAnimationSetSO : ScriptableObject
         public bool isPlunge = false;
         [Tooltip("낙하 속도. 0이면 기본값(ActPlungeState.DefaultPlungeSpeed) 사용")]
         public float plungeFallSpeed = 0f;
+        [Range(0f, 1f), Tooltip("하강 시작 normalizedTime. 이 시점 전까지는 공중에 정지 (0 = 즉시 하강)")]
+        public float plungeDescendAt = 0f;
+
+        [Header("콤보 타이밍 Override (0~1 normalized, -1 = AnimSet 기본값 사용)")]
+        [Range(-1f, 1f)] public float comboWindowOpen  = -1f;
+        [Range(-1f, 1f)] public float comboWindowClose = -1f;
+        [Range(-1f, 1f)] public float attackEndAt      = -1f;
     }
 
     [Serializable]
@@ -34,6 +41,11 @@ public class WeaponAnimationSetSO : ScriptableObject
                 if (m.actionType == action) yield return m;
         }
     }
+
+    [Header("콤보 타이밍 기본값 (ClipMapping override가 -1일 때 사용)")]
+    [Range(0f, 1f)] public float defaultComboWindowOpen  = 0.25f;
+    [Range(0f, 1f)] public float defaultComboWindowClose = 0.75f;
+    [Range(0f, 1f)] public float defaultAttackEndAt      = 0.85f;
 
     // Ground / Air 그룹 리스트
     public List<AnimGroupMapping> animGroups = new List<AnimGroupMapping>();
