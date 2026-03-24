@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: TestBowAnimation
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   animGroups:
   - groupType: 0
     clipMappings:
@@ -31,29 +31,17 @@ MonoBehaviour:
       addressableKey: ESkill_01
       actionType: 4
       comboIndex: 0
-    - baseClipName: ESkill_01
-      addressableKey: ESkill_01
-      actionType: 5
-      comboIndex: 0
-    - baseClipName: ESkill_01
-      addressableKey: ESkill_01
-      actionType: 5
-      comboIndex: 0
     - baseClipName: Air_Light_Step01_Start
       addressableKey: Air_Light_Step01_Start
-      actionType: 5
+      actionType: 6
       comboIndex: 0
     - baseClipName: Air_Light_Step01_Loop
       addressableKey: Air_Light_Step01_Loop
-      actionType: 5
+      actionType: 6
       comboIndex: 0
     - baseClipName: Air_Light_Step01_End
       addressableKey: Air_Light_Step01_End
-      actionType: 5
-      comboIndex: 0
-    - baseClipName: Air_Light_Step01_End
-      addressableKey: Air_Light_Step01_End
-      actionType: 5
+      actionType: 6
       comboIndex: 0
     - baseClipName: HeavyCharge
       addressableKey: BowHeavyCharge
