@@ -78,6 +78,11 @@ public class UI_PrepPanel : UI_Base
     [Header("무기 선택 — 버튼")]
     [SerializeField] private Button   weaponConfirmButton;
 
+    // ── 플레이스홀더 스프라이트 ───────────────────────────
+    [Header("플레이스홀더")]
+    [SerializeField] private Sprite defaultCharSprite;
+    [SerializeField] private Sprite defaultWeaponSprite;
+
     // ── 내부 상태 ─────────────────────────────────────────
     private CharacterRoster.CharacterEntry _selectedCharEntry;
     private WeaponRoster.WeaponEntry       _selectedWeaponEntry;
@@ -165,8 +170,12 @@ public class UI_PrepPanel : UI_Base
         }
         else
         {
-            if (charSlotPortrait != null) charSlotPortrait.color = Color.gray;
-            if (charSlotName     != null) charSlotName.text = "캐릭터 선택";
+            if (charSlotPortrait != null)
+            {
+                charSlotPortrait.sprite = defaultCharSprite;
+                charSlotPortrait.color  = defaultCharSprite != null ? Color.white : Color.gray;
+            }
+            if (charSlotName != null) charSlotName.text = "캐릭터 선택";
         }
 
         var weaponSO = _selectedWeaponEntry?.data;
@@ -174,8 +183,8 @@ public class UI_PrepPanel : UI_Base
                         ? _selectedWeaponEntry.icon : weaponSO?.icon;
         if (weaponSlotIcon != null)
         {
-            weaponSlotIcon.sprite = icon;
-            weaponSlotIcon.color  = icon != null ? Color.white : Color.gray;
+            weaponSlotIcon.sprite = icon != null ? icon : defaultWeaponSprite;
+            weaponSlotIcon.color  = (icon != null || defaultWeaponSprite != null) ? Color.white : Color.gray;
         }
         if (weaponSlotName != null)
             weaponSlotName.text = weaponSO != null ? weaponSO.displayName : "무기 선택";
@@ -226,8 +235,9 @@ public class UI_PrepPanel : UI_Base
 
         if (charPreviewImage != null)
         {
-            charPreviewImage.sprite = entry.portrait;
-            charPreviewImage.color  = entry.portrait != null ? Color.white : Color.gray;
+            var portrait = entry.portrait != null ? entry.portrait : defaultCharSprite;
+            charPreviewImage.sprite = portrait;
+            charPreviewImage.color  = portrait != null ? Color.white : Color.gray;
         }
         if (charPreviewName != null) charPreviewName.text = d.characterName;
 
@@ -294,8 +304,9 @@ public class UI_PrepPanel : UI_Base
 
         if (weaponPreviewImage != null)
         {
-            weaponPreviewImage.sprite = icon;
-            weaponPreviewImage.color  = icon != null ? Color.white : Color.gray;
+            var preview = icon != null ? icon : defaultWeaponSprite;
+            weaponPreviewImage.sprite = preview;
+            weaponPreviewImage.color  = preview != null ? Color.white : Color.gray;
         }
         if (weaponPreviewName  != null) weaponPreviewName.text  = so.displayName;
         if (weaponAtkText      != null) weaponAtkText.text      = $"공격력  {so.baseAttack:0}";
