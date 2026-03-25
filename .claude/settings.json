@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find c:UsersUserProject_AbyssProject_AbyssAssetsAbyssUI -name *HUDIds* -o -name *hudIds*)",
+      "Bash(find c:UsersUserProject_AbyssProject_AbyssAssetsAbyssCharactersMonster -name *.cs -path *Core*)",
+      "Bash(grep -r cf0756612a842cb4ba09ad101dd6bcb3 c:/Users/User/Project_Abyss/Project_Abyss/Assets --include=*.meta -l)"
+    ]
+  }
+}

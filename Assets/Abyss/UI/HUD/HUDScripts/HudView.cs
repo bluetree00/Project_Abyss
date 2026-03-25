@@ -11,7 +11,7 @@ public sealed class HudView : MonoBehaviour
     [Header("Sections")]
     [SerializeField] private GameObject       topBarRoot;
     [SerializeField] private CombatPanelView  combatPanel;
-    [SerializeField] private GameObject       bossPanelRoot;
+    [SerializeField] private BossPanelView    bossPanelView;
     [SerializeField] private GameObject       systemNoticesRoot;
 
     [Header("TopBar — Gold")]
@@ -21,6 +21,7 @@ public sealed class HudView : MonoBehaviour
     // 패널 접근자 (HudPresenter → 패널별 데이터 전달 시 사용)
     // ─────────────────────────────────────────────────────────
     public CombatPanelView CombatPanel => combatPanel;
+    public BossPanelView   BossPanel   => bossPanelView;
 
     // ─────────────────────────────────────────────────────────
     // Section 제어
@@ -29,7 +30,7 @@ public sealed class HudView : MonoBehaviour
     {
         SetActiveSafe(topBarRoot,        (sections & HUDIds.Section.TopBar)        != 0);
         SetActiveSafe(combatPanel,       (sections & HUDIds.Section.CombatPanel)   != 0);
-        SetActiveSafe(bossPanelRoot,     (sections & HUDIds.Section.BossPanel)     != 0);
+        SetActiveSafe(bossPanelView,     (sections & HUDIds.Section.BossPanel)     != 0);
         SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
     }
 
