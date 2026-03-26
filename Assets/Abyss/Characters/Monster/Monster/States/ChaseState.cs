@@ -11,7 +11,7 @@ namespace Abyss.Monster
 /// </summary>
 public class ChaseState : IMonsterState
 {
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
         ctx.Agent.stoppingDistance = ctx.Stat.attackRange * 0.9f;
@@ -19,7 +19,7 @@ public class ChaseState : IMonsterState
 
     }
 
-    public void Update(MonsterContext ctx)
+    public virtual void Update(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
@@ -50,7 +50,7 @@ public class ChaseState : IMonsterState
             ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
     }
 
-    public void Exit(MonsterContext ctx)
+    public virtual void Exit(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
 
@@ -60,7 +60,7 @@ public class ChaseState : IMonsterState
 
     // ── 헬퍼 ──────────────────────────────────────────────
 
-    private static void FaceTarget(MonsterContext ctx)
+    protected static void FaceTarget(MonsterContext ctx)
     {
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
@@ -71,7 +71,7 @@ public class ChaseState : IMonsterState
             ctx.Transform.rotation, target, Time.deltaTime * 10f);
     }
 
-    private static void PlayAnim(MonsterContext ctx, string stateName)
+    protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);

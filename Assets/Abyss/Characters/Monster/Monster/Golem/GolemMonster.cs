@@ -35,19 +35,18 @@ public class GolemMonster : MonsterBase
 
     // ── 특수 상태 진입 훅 ──────────────────────────────────
 
-    public override IMonsterState TryGetSpecialState(MonsterContext ctx)
+    protected override void OnDamageTaken()
     {
         var state = GetSpecialState(0);
-        if (state == null || _hasRoared) return null;
-        if (_config.specialState0 is not GolemRoarData roarData) return null;
+        if (state == null || _hasRoared) return;
+        if (_config.specialState0 is not GolemRoarData roarData) return;
 
-        float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Config.stat.maxHp;
+        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
         if (hpRatio <= roarData.hpThreshold)
         {
             _hasRoared = true;
-            return state;
+            ChangeState(state);
         }
-        return null;
     }
 
     public void StartRageChase(float duration) => _rageTimer = duration;

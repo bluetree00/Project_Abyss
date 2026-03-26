@@ -203,17 +203,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 매 프레임 가장 가까운 PlayerController를 타깃으로 갱신
         _runtime.PlayerTarget = FindClosestPlayerTarget();
 
-        // 공용 상태에서만 특수 상태 진입 체크 (특수 상태 중엔 스킵)
-        if (_fsm != null && _fsm.CurrentConstraints == SpecialStateConstraint.None)
-        {
-            var special = TryGetSpecialState(_ctx);
-            if (special != null)
-            {
-                _fsm.ChangeState(special);
-                return;
-            }
-        }
-
         _fsm?.Update();
 
 #if UNITY_EDITOR
@@ -284,10 +273,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// 매 프레임 공용 상태 Update 이전에 호출.
-    /// 특수 상태 진입이 필요하면 해당 인스턴스를 반환; 아니면 null.
+    /// 데미지를 받아 HP가 감소한 직후, GetHitState 전환 전에 호출된다.
+    /// 파생 클래스에서 오버라이드해 HP 임계값 기반 특수 상태 진입을 구현한다.
+    /// 이 메서드 안에서 ChangeState(specialState) 를 호출하면
+    /// 이후 GetHitState 전환이 자동으로 스킵된다.
     /// </summary>
-    public virtual IMonsterState TryGetSpecialState(MonsterContext ctx) => null;
+    protected virtual void OnDamageTaken() { }
 
     /// <summary>
     /// 공격 히트 판정: 반경 내 플레이어에게 데미지 + 넉백 적용.
@@ -367,7 +358,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                     rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
                 }
             }
-            ChangeState<GetHitState>();
+
+            // HP 임계값 특수 상태 진입 훅 — 파생 클래스에서 ChangeState(special) 호출 가능
+            OnDamageTaken();
+
+            // 특수 상태로 전환됐으면 GetHitState 스킵
+            if (!IsInSpecialState)
+                ChangeState<GetHitState>();
         }
     }
 

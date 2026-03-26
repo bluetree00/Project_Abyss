@@ -14,7 +14,7 @@ public class PatrolState : IMonsterState
     private Vector3 _waypointA;
     private Vector3 _waypointB;
 
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         // 배회 복귀 시 다음 조우에서 다시 즉시 공격
         ctx.Runtime.IsFirstAttack = true;
@@ -33,7 +33,7 @@ public class PatrolState : IMonsterState
         PlayAnim(ctx, ctx.Animation.patrolStateName);
     }
 
-    public void Update(MonsterContext ctx)
+    public virtual void Update(MonsterContext ctx)
     {
         // 플레이어 감지 → 즉시 Chase
         if (ctx.Monster.ShouldStartChase(ctx))
@@ -71,14 +71,14 @@ public class PatrolState : IMonsterState
         }
     }
 
-    public void Exit(MonsterContext ctx)
+    public virtual void Exit(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
     }
 
     // ── 내부 헬퍼 ─────────────────────────────────────────
 
-    private void CalcWaypoints(MonsterContext ctx)
+    protected virtual void CalcWaypoints(MonsterContext ctx)
     {
         float   r      = ctx.Patrol.patrolRange;
         Vector3 origin = ctx.Runtime.SpawnPosition;
@@ -103,7 +103,7 @@ public class PatrolState : IMonsterState
         }
     }
 
-    private void MoveToNextWaypoint(MonsterContext ctx)
+    protected virtual void MoveToNextWaypoint(MonsterContext ctx)
     {
         if (!ctx.Agent.isActiveAndEnabled || !ctx.Agent.isOnNavMesh) return;
 
@@ -122,7 +122,7 @@ public class PatrolState : IMonsterState
         ctx.Agent.SetDestination(dest);
     }
 
-    private static void PlayAnim(MonsterContext ctx, string stateName)
+    protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);

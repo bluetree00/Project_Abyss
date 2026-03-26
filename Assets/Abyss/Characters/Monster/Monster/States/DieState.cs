@@ -14,7 +14,7 @@ public class DieState : IMonsterState
 {
     private const float DespawnDelay = 3f;
 
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         ctx.Runtime.IsDead = true;
 
@@ -42,9 +42,9 @@ public class DieState : IMonsterState
         DespawnAsync(ctx.Monster).Forget();
     }
 
-    public void Update(MonsterContext ctx) { }
+    public virtual void Update(MonsterContext ctx) { }
 
-    public void Exit(MonsterContext ctx) { }
+    public virtual void Exit(MonsterContext ctx) { }
 
     // ── 비동기 파괴 ────────────────────────────────────────
 

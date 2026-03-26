@@ -9,7 +9,7 @@ using UnityEngine.AI;
 /// CanExecute: chargeMinDist ≤ dist ≤ chargeMaxDist AND ChargeCooldown ≤ 0
 /// 완료 시 직접 ChaseState 로 복귀.
 /// </summary>
-public class BKChargeAttackState : FullLockState<BlackKnightPatternData>
+public class BKChargeAttackState : FullLockState<BKChargeAttackPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
 
@@ -22,7 +22,7 @@ public class BKChargeAttackState : FullLockState<BlackKnightPatternData>
 
     private BossWarningIndicator _indicator;
 
-    public BKChargeAttackState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKChargeAttackState(BKChargeAttackPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }

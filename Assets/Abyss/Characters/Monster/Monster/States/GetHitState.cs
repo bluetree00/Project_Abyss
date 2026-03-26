@@ -11,7 +11,7 @@ public class GetHitState : IMonsterState
 {
     private const float StunDuration = 0.4f;
 
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         // NavMeshAgent를 끄고 Rigidbody에게 넉백 물리를 맡긴다.
         ctx.Agent.enabled = false;
@@ -21,7 +21,7 @@ public class GetHitState : IMonsterState
             ctx.Animator.CrossFade(ctx.Animation.getHitTrigger, 0.05f, 0, 0f);
     }
 
-    public void Update(MonsterContext ctx)
+    public virtual void Update(MonsterContext ctx)
     {
         ctx.Runtime.StateTimer -= Time.deltaTime;
         if (ctx.Runtime.StateTimer > 0f) return;
@@ -45,13 +45,13 @@ public class GetHitState : IMonsterState
         }
     }
 
-    public void Exit(MonsterContext ctx)
+    public virtual void Exit(MonsterContext ctx)
     {
         // Update 도중 전환이 아닌 경로(예: Die)로 빠져나올 경우 대비
         RestoreAgent(ctx);
     }
 
-    private static void RestoreAgent(MonsterContext ctx)
+    protected static void RestoreAgent(MonsterContext ctx)
     {
         if (ctx.Agent.enabled) return;
 

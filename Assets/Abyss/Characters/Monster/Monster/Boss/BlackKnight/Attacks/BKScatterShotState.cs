@@ -13,7 +13,7 @@ using UnityEngine;
 ///   ④ 2차 발사 — scatterAngleOffset 만큼 회전한 부채꼴
 ///   ⑤ ChaseState 복귀
 /// </summary>
-public class BKScatterShotState : FullLockState<BlackKnightPatternData>
+public class BKScatterShotState : FullLockState<BKScatterShotPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
     private          BKProjectilePool     _pool1; // 1차 발사 전용
@@ -35,7 +35,7 @@ public class BKScatterShotState : FullLockState<BlackKnightPatternData>
     private Vector3              _aimDir;
     private Vector3              _spawnPos;
 
-    public BKScatterShotState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKScatterShotState(BKScatterShotPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }

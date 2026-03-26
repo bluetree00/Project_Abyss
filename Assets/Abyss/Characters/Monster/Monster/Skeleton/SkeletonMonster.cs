@@ -38,19 +38,18 @@ public class SkeletonMonster : MonsterBase
         }
     }
 
-    public override IMonsterState TryGetSpecialState(MonsterContext ctx)
+    protected override void OnDamageTaken()
     {
         var state = GetSpecialState(0);
-        if (state == null || _hasEnraged) return null;
-        if (_config.specialState0 is not SkeletonEnrageData enrageData) return null;
+        if (state == null || _hasEnraged) return;
+        if (_config.specialState0 is not SkeletonEnrageData enrageData) return;
 
-        float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Config.stat.maxHp;
+        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
         if (hpRatio <= enrageData.hpThreshold)
         {
             _hasEnraged = true;
-            return state;
+            ChangeState(state);
         }
-        return null;
     }
 }
 }

@@ -43,19 +43,18 @@ public class FairyBatMonster : MonsterBase
         base.OnEnable();
     }
 
-    public override IMonsterState TryGetSpecialState(MonsterContext ctx)
+    protected override void OnDamageTaken()
     {
         var state = GetSpecialState(0);
-        if (state == null || _hasFled) return null;
-        if (_config.specialState0 is not FairyBatFleeData fleeData) return null;
+        if (state == null || _hasFled) return;
+        if (_config.specialState0 is not FairyBatFleeData fleeData) return;
 
-        float hpRatio = (float)ctx.Runtime.CurrentHp / ctx.Config.stat.maxHp;
+        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
         if (hpRatio <= fleeData.hpThreshold)
         {
             _hasFled = true;
-            return state;
+            ChangeState(state);
         }
-        return null;
     }
 }
 }
