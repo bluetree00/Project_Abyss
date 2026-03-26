@@ -13,12 +13,14 @@ public class BKCooldownConditionSO : BossConditionSO
         var bb = ctx.Blackboard;
         return cooldownType switch
         {
-            BKCooldownType.Charge   => bb.ChargeCooldown   <= 0f,
-            BKCooldownType.Overhead => bb.OverheadCooldown <= 0f,
-            BKCooldownType.Rain     => bb.RainCooldown     <= 0f,
-            BKCooldownType.Scatter  => bb.ScatterCooldown  <= 0f,
-            BKCooldownType.Leap     => bb.LeapCooldown     <= 0f,
-            _                       => false,
+            BKCooldownType.Charge    => bb.ChargeCooldown    <= 0f,
+            BKCooldownType.Overhead  => bb.OverheadCooldown  <= 0f,
+            BKCooldownType.Rain      => bb.RainCooldown      <= 0f,
+            BKCooldownType.Scatter   => bb.ScatterCooldown   <= 0f,
+            BKCooldownType.Leap      => bb.LeapCooldown      <= 0f,
+            BKCooldownType.Backstep  => bb.BackstepCooldown  <= 0f,
+            BKCooldownType.DashSlash => bb.DashSlashCooldown <= 0f,
+            _                        => false,
         };
     }
 }
@@ -30,4 +32,6 @@ public enum BKCooldownType
     Rain,
     Scatter,
     Leap,
+    Backstep,
+    DashSlash,
 }

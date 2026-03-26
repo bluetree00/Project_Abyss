@@ -26,23 +26,108 @@ MonoBehaviour:
   specialState1: {fileID: 0}
   specialState2: {fileID: 0}
   specialState3: {fileID: 0}
-  patternBreakDurationMin: 2.5
-  patternBreakDurationMax: 5
-  patternRepeatPenaltyDuration: 20
-  patternRepeatPenaltyMult: 0.1
+  patternBreakDurationMin: 1.5
+  patternBreakDurationMax: 3.5
+  patternRepeatPenaltyDuration: 15
+  patternRepeatPenaltyMult: 0.15
   patternEntries:
+  # ── 0. [강제] 스핀 슬래시 인터럽트 ──────────────────────────────────
+  # HP 임계값 도달 시 즉시 끊고 실행 (forceExecute=1)
   - conditions:
     - {fileID: 11400000, guid: ccc5fd88bc3965045a30601a3af3e980, type: 2}
     patterns:
     - {fileID: 11400000, guid: 4f2cdf14106a4fc46b1eebd3e973a565, type: 2}
     selectionMode: 0
     forceExecute: 1
-  - conditions: []
+  # ── 1. [일반] Phase 2 각성 (HP<40%, 최초 1회) ───────────────────────
+  # CanExecute=false 후 → null 반환 → 다음 엔트리로 자동 통과
+  - conditions:
+    - {fileID: 11400000, guid: 68de4da35bf1b6447b143e7fc0cd9c22, type: 2}
     patterns:
+    - {fileID: 11400000, guid: 86bf28e0e7f308542aa4984ccebc9a42, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 2. [일반] Backstep 후 + 원거리 연계 ─────────────────────────────
+  # 후퇴로 거리 벌린 뒤 플레이어가 멀면 → 돌진 or 점프로 급습
+  - conditions:
+    - {fileID: 11400000, guid: a08b58ac9a2220e4a98d182901ff2916, type: 2}
+    - {fileID: 11400000, guid: 09824b7eea56b474ca9240b3517c5220, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
     - {fileID: 11400000, guid: eacf3a756e644d042b0d59b223e88bf0, type: 2}
-    - {fileID: 11400000, guid: e6ed030c75f9d0a4bb0458dcac39130c, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 3. [일반] Backstep 후 근거리 연계 ───────────────────────────────
+  # 후퇴했는데 플레이어가 바로 붙어있으면 → 돌진/강타
+  - conditions:
+    - {fileID: 11400000, guid: a08b58ac9a2220e4a98d182901ff2916, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: df25bca1c05b4764aaab072f23bbafee, type: 2}
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
+    - {fileID: 11400000, guid: 5c07d64adc7b2ea43b5ba469477b17a9, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 4. [일반] Phase 2 + 원거리 ──────────────────────────────────────
+  # 각성 후 플레이어가 멀리 있으면 → 빠른 급습 위주
+  - conditions:
+    - {fileID: 11400000, guid: 68de4da35bf1b6447b143e7fc0cd9c22, type: 2}
+    - {fileID: 11400000, guid: 09824b7eea56b474ca9240b3517c5220, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
+    - {fileID: 11400000, guid: eacf3a756e644d042b0d59b223e88bf0, type: 2}
     - {fileID: 11400000, guid: e4a2611462b849c47b1f61f59018e3a6, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 5. [일반] Phase 2 + 근거리 ──────────────────────────────────────
+  # 각성 후 플레이어가 가까이 있으면 → 공격적 근접 + 후퇴
+  - conditions:
+    - {fileID: 11400000, guid: 68de4da35bf1b6447b143e7fc0cd9c22, type: 2}
+    - {fileID: 11400000, guid: d0e14223a4ef0fa4697685109d680cb5, type: 2}
+    patterns:
     - {fileID: 11400000, guid: df25bca1c05b4764aaab072f23bbafee, type: 2}
     - {fileID: 11400000, guid: 5c07d64adc7b2ea43b5ba469477b17a9, type: 2}
+    - {fileID: 11400000, guid: 06b92f43aeb188947bd8a51146be182e, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 6. [일반] Phase 2 기본 ───────────────────────────────────────────
+  # 각성 후 거리 무관 → 빠른 패턴 위주 (운석 같은 느린 패턴 제외)
+  - conditions:
+    - {fileID: 11400000, guid: 68de4da35bf1b6447b143e7fc0cd9c22, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: df25bca1c05b4764aaab072f23bbafee, type: 2}
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
+    - {fileID: 11400000, guid: e4a2611462b849c47b1f61f59018e3a6, type: 2}
+    - {fileID: 11400000, guid: 06b92f43aeb188947bd8a51146be182e, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 7. [일반] 원거리 (거리 > 5m) ────────────────────────────────────
+  # 플레이어가 멀면 → 거리를 좁히는 패턴 or 원거리 공격
+  - conditions:
+    - {fileID: 11400000, guid: 09824b7eea56b474ca9240b3517c5220, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: eacf3a756e644d042b0d59b223e88bf0, type: 2}
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
+    - {fileID: 11400000, guid: e4a2611462b849c47b1f61f59018e3a6, type: 2}
+    - {fileID: 11400000, guid: e6ed030c75f9d0a4bb0458dcac39130c, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 8. [일반] 근거리 (거리 < 3.5m) ─────────────────────────────────
+  # 플레이어가 너무 가까우면 → 후퇴해서 거리 확보, 강타
+  - conditions:
+    - {fileID: 11400000, guid: d0e14223a4ef0fa4697685109d680cb5, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: 06b92f43aeb188947bd8a51146be182e, type: 2}
+    - {fileID: 11400000, guid: 5c07d64adc7b2ea43b5ba469477b17a9, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  # ── 9. [일반] 기본 (조건 없음) ──────────────────────────────────────
+  # 중거리 ~ 모든 상황 커버. 균형 잡힌 패턴 풀.
+  - conditions: []
+    patterns:
+    - {fileID: 11400000, guid: df25bca1c05b4764aaab072f23bbafee, type: 2}
+    - {fileID: 11400000, guid: 5c07d64adc7b2ea43b5ba469477b17a9, type: 2}
+    - {fileID: 11400000, guid: e4a2611462b849c47b1f61f59018e3a6, type: 2}
+    - {fileID: 11400000, guid: e6ed030c75f9d0a4bb0458dcac39130c, type: 2}
+    - {fileID: 11400000, guid: 95f8d89b198d41a43ae6233b59fe87a4, type: 2}
     selectionMode: 0
     forceExecute: 0
