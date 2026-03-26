@@ -11,7 +11,7 @@ namespace Abyss.Monster
 /// </summary>
 public class AttackReadyState : IMonsterState
 {
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
 
@@ -23,7 +23,7 @@ public class AttackReadyState : IMonsterState
         FacePlayer(ctx);
     }
 
-    public void Update(MonsterContext ctx)
+    public virtual void Update(MonsterContext ctx)
     {
         // 플레이어 사망
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
@@ -48,11 +48,11 @@ public class AttackReadyState : IMonsterState
             ctx.Monster.ChangeState<AttackState>();
     }
 
-    public void Exit(MonsterContext ctx) { }
+    public virtual void Exit(MonsterContext ctx) { }
 
     // ── 헬퍼 ──────────────────────────────────────────────
 
-    private static void FacePlayer(MonsterContext ctx)
+    protected static void FacePlayer(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
@@ -65,7 +65,7 @@ public class AttackReadyState : IMonsterState
             Time.deltaTime * 15f);
     }
 
-    private static void PlayAnim(MonsterContext ctx, string stateName)
+    protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);

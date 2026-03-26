@@ -18,7 +18,7 @@ using UnityEngine;
 /// 동시 낙하는 BKConcurrentDrop (fire-and-forget) 으로 처리.
 /// 추적 낙하: 경고 시간 70% 동안 플레이어 추적 → 30% 고정 → 피해.
 /// </summary>
-public class BKRainAttackState : FullLockState<BlackKnightPatternData>
+public class BKRainAttackState : FullLockState<BKRainAttackPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
 
@@ -71,7 +71,7 @@ public class BKRainAttackState : FullLockState<BlackKnightPatternData>
         new(-0.707f,  0.707f), new(-0.707f, -0.707f)
     };
 
-    public BKRainAttackState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKRainAttackState(BKRainAttackPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }

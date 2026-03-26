@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
   m_Name: BlackKnightConfig
-  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  m_EditorClassIdentifier: Abyss.Monster::BossConfigSO
   monsterName: BlackKnight
   grade: 2
   playerLayer:
@@ -22,7 +22,27 @@ MonoBehaviour:
   patrol: {fileID: 11400000, guid: c3803eb8d90171d4396cd4cea2e5afe9, type: 2}
   combat: {fileID: 11400000, guid: e7407e8914bfaa04ca28c9c27f3b2947, type: 2}
   animation: {fileID: 11400000, guid: a9c4071f2b01ad940b09d76de2803ca3, type: 2}
-  specialState0: {fileID: 11400000, guid: 7919bfa7d4836b649b4f50cba42e9db4, type: 2}
+  specialState0: {fileID: 0}
   specialState1: {fileID: 0}
   specialState2: {fileID: 0}
   specialState3: {fileID: 0}
+  patternBreakDurationMin: 2.5
+  patternBreakDurationMax: 5
+  patternRepeatPenaltyDuration: 20
+  patternRepeatPenaltyMult: 0.1
+  patternEntries:
+  - conditions:
+    - {fileID: 11400000, guid: ccc5fd88bc3965045a30601a3af3e980, type: 2}
+    patterns:
+    - {fileID: 11400000, guid: 4f2cdf14106a4fc46b1eebd3e973a565, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: []
+    patterns:
+    - {fileID: 11400000, guid: eacf3a756e644d042b0d59b223e88bf0, type: 2}
+    - {fileID: 11400000, guid: e6ed030c75f9d0a4bb0458dcac39130c, type: 2}
+    - {fileID: 11400000, guid: e4a2611462b849c47b1f61f59018e3a6, type: 2}
+    - {fileID: 11400000, guid: df25bca1c05b4764aaab072f23bbafee, type: 2}
+    - {fileID: 11400000, guid: 5c07d64adc7b2ea43b5ba469477b17a9, type: 2}
+    selectionMode: 0
+    forceExecute: 0

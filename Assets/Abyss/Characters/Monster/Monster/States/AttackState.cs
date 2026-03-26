@@ -22,7 +22,7 @@ public class AttackState : IMonsterState
     private float _damageTimer;     // 데미지 적용까지 남은 시간
     private bool  _damageDealt;     // 이 공격에서 데미지를 이미 줬는지
 
-    public void Enter(MonsterContext ctx)
+    public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
 
@@ -40,7 +40,7 @@ public class AttackState : IMonsterState
         FacePlayer(ctx);
     }
 
-    public void Update(MonsterContext ctx)
+    public virtual void Update(MonsterContext ctx)
     {
         // 타이머 방식 데미지 적용
         if (!_damageDealt && _damageTimer > 0f)
@@ -70,11 +70,11 @@ public class AttackState : IMonsterState
             ctx.Monster.ChangeState<ChaseState>();
     }
 
-    public void Exit(MonsterContext ctx) { }
+    public virtual void Exit(MonsterContext ctx) { }
 
     // ── 헬퍼 ──────────────────────────────────────────────
 
-    private static void FacePlayer(MonsterContext ctx)
+    protected static void FacePlayer(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;

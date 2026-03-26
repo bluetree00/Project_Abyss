@@ -13,7 +13,7 @@ using UnityEngine;
 ///  Phase 2 — 회전   (20% ~ 80%) : 연속 AoE + 진행도에 따라 가속하는 섬광
 ///  Phase 3 — 마무리 (80% ~100%) : 붉은 여운 소멸
 /// </summary>
-public class BKSpinSlashState : FullLockState<BlackKnightPatternData>
+public class BKSpinSlashState : FullLockState<BKSpinSlashPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
 
@@ -36,7 +36,7 @@ public class BKSpinSlashState : FullLockState<BlackKnightPatternData>
 
     private BossWarningIndicator _indicator;
 
-    public BKSpinSlashState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKSpinSlashState(BKSpinSlashPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }

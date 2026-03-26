@@ -8,7 +8,7 @@ using UnityEngine;
 /// CanExecute: OverheadCooldown ≤ 0
 /// 완료 시 직접 ChaseState 로 복귀.
 /// </summary>
-public class BKOverheadSlashState : FullLockState<BlackKnightPatternData>
+public class BKOverheadSlashState : FullLockState<BKOverheadSlashPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
 
@@ -17,7 +17,7 @@ public class BKOverheadSlashState : FullLockState<BlackKnightPatternData>
 
     private BossWarningIndicator _indicator;
 
-    public BKOverheadSlashState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKOverheadSlashState(BKOverheadSlashPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }

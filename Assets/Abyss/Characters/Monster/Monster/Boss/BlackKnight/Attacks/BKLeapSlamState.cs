@@ -15,7 +15,7 @@ using UnityEngine.AI;
 ///   ⑤ Recovery (0.5 초) — 착지 후 짧은 경직
 ///   ⑥ ChaseState 복귀
 /// </summary>
-public class BKLeapSlamState : FullLockState<BlackKnightPatternData>
+public class BKLeapSlamState : FullLockState<BKLeapSlamPatternSO>
 {
     private readonly BossAttackBlackboard _bb;
 
@@ -40,7 +40,7 @@ public class BKLeapSlamState : FullLockState<BlackKnightPatternData>
 
     public void SetVfxPool(BKEffectPool pool) => _vfxPool = pool;
 
-    public BKLeapSlamState(BlackKnightPatternData data, BossAttackBlackboard bb) : base(data)
+    public BKLeapSlamState(BKLeapSlamPatternSO data, BossAttackBlackboard bb) : base(data)
     {
         _bb = bb;
     }
