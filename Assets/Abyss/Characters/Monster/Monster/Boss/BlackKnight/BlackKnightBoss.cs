@@ -134,13 +134,16 @@ public class BlackKnightBoss : MonsterBase
                 switch (pattern)
                 {
                     case BKLeapSlamPatternSO leap:
-                        _bb.LeapCooldown    = Mathf.Max(_bb.LeapCooldown,    leap.leapCooldown);
+                        _bb.LeapCooldown       = Mathf.Max(_bb.LeapCooldown,       leap.leapCooldown);
                         break;
                     case BKRainAttackPatternSO rain:
-                        _bb.RainCooldown    = Mathf.Max(_bb.RainCooldown,    rain.rainCooldown    * 0.5f);
+                        _bb.RainCooldown       = Mathf.Max(_bb.RainCooldown,       rain.rainCooldown      * 0.5f);
                         break;
                     case BKScatterShotPatternSO scatter:
-                        _bb.ScatterCooldown = Mathf.Max(_bb.ScatterCooldown, scatter.scatterCooldown * 0.5f);
+                        _bb.ScatterCooldown    = Mathf.Max(_bb.ScatterCooldown,    scatter.scatterCooldown * 0.5f);
+                        break;
+                    case BKDashSlashPatternSO dash:
+                        _bb.DashSlashCooldown  = Mathf.Max(_bb.DashSlashCooldown,  dash.dashCooldown       * 0.5f);
                         break;
                 }
             }
@@ -174,9 +177,13 @@ public class BlackKnightBoss : MonsterBase
             }
             else
             {
-                _patternBreakCooldown = UnityEngine.Random.Range(
-                    _bossConfig.patternBreakDurationMin,
-                    _bossConfig.patternBreakDurationMax);
+                // 직전 패턴에 breakOverride 가 설정돼 있으면 고정값, 아니면 Config 의 랜덤 범위 사용
+                if (_lastPatternSO != null && _lastPatternSO.breakOverride >= 0f)
+                    _patternBreakCooldown = _lastPatternSO.breakOverride;
+                else
+                    _patternBreakCooldown = UnityEngine.Random.Range(
+                        _bossConfig.patternBreakDurationMin,
+                        _bossConfig.patternBreakDurationMax);
             }
         }
         _wasInPattern = inPattern;
@@ -388,8 +395,9 @@ public class BlackKnightBoss : MonsterBase
         var state = pattern.GetRuntimeState();
         if (state == null) return;
         ChangeState(state);
-        _lastPatternSO   = pattern;
-        _lastPatternTime = Time.time;
+        _lastPatternSO     = pattern;
+        _lastPatternTime   = Time.time;
+        _bb.LastPatternTag = pattern.patternTag;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -455,6 +463,8 @@ public class BlackKnightBoss : MonsterBase
                         maxRange = Mathf.Max(maxRange, c.chargeMaxDist);
                     else if (p is BKScatterShotPatternSO s)
                         maxRange = Mathf.Max(maxRange, s.scatterRange);
+                    else if (p is BKDashSlashPatternSO d)
+                        maxRange = Mathf.Max(maxRange, d.dashMaxDist);
                 }
             }
         }

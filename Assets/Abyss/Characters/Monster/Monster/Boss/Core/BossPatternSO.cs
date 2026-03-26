@@ -27,6 +27,13 @@ public abstract class BossPatternSO : SpecialStateDataBase
     [Tooltip("패턴 선택 가중치 (높을수록 자주 선택됨, WeightedRandom 모드에서 적용)")]
     public float weight = 1f;
 
+    [Header("패턴 연계")]
+    [Tooltip("이 패턴 실행 후 Blackboard.LastPatternTag 에 기록되는 태그. BKLastPatternTagConditionSO 에서 참조.")]
+    public string patternTag = "";
+
+    [Tooltip("≥ 0: 이 패턴 완료 후 사용할 브레이크 쿨다운 고정값 (초). -1: Config의 기본 랜덤 사용.")]
+    public float breakOverride = -1f;
+
     /// <summary>
     /// 보스 초기화 시 1회 호출된다.
     /// 파생 클래스에서 런타임 상태 인스턴스와 오브젝트 풀을 생성한다.
