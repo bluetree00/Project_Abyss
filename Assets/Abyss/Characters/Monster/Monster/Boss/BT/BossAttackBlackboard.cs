@@ -16,6 +16,10 @@ public class BossAttackBlackboard
     public float LeapCooldown;
     public float BackstepCooldown;
     public float DashSlashCooldown;
+    public float PressureCooldown;
+
+    /// <summary>HP 이정표(75%·50%)를 지날 때마다 증가하는 추격 속도 배율. 기본 1.0.</summary>
+    public float ChaseSpeedMult = 1f;
 
     /// <summary>마지막 특수 상태 종료 후 평타 모드로 경과한 시간 (초).</summary>
     public float NormalModeTimer;
@@ -44,6 +48,7 @@ public class BossAttackBlackboard
         if (LeapCooldown      > 0f) LeapCooldown      -= deltaTime;
         if (BackstepCooldown  > 0f) BackstepCooldown  -= deltaTime;
         if (DashSlashCooldown > 0f) DashSlashCooldown -= deltaTime;
+        if (PressureCooldown  > 0f) PressureCooldown  -= deltaTime;
     }
 
     public void Reset()
@@ -55,6 +60,8 @@ public class BossAttackBlackboard
         LeapCooldown      = 0f;
         BackstepCooldown  = 0f;
         DashSlashCooldown = 0f;
+        PressureCooldown  = 0f;
+        ChaseSpeedMult    = 1f;
         NormalModeTimer   = 0f;
         RainPhase         = 0;
         LastPatternTag    = "";

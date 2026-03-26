@@ -60,6 +60,9 @@ public class BlackKnightBoss : MonsterBase
     private BossPatternSO _lastPatternSO;
     private float         _lastPatternTime;
 
+    // ── HP 이정표 (75%·50% 이동속도 증폭) ─────────────────
+    private readonly bool[] _hpMilestones = new bool[2];
+
     // ── Sequential 모드 인덱스 추적 ──────────────────────
     private readonly Dictionary<BossPatternEntry, int> _seqIndex = new();
 
@@ -69,6 +72,17 @@ public class BlackKnightBoss : MonsterBase
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // FSM 상태 등록
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    protected override void RegisterStates()
+    {
+        base.RegisterStates();
+        // 기본 ChaseState 를 선회 추격 버전으로 교체
+        _fsm.RegisterAs<ChaseState>(new BKOrbitalChaseState(this));
+    }
 
     protected override async UniTask InitAsync()
     {
@@ -424,6 +438,32 @@ public class BlackKnightBoss : MonsterBase
         return result;
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // HP 이정표 반응
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    protected override void OnDamageTaken()
+    {
+        if (_bossConfig == null || _runtime == null || _config == null) return;
+
+        float ratio = _config.stat.maxHp > 0
+            ? (float)_runtime.CurrentHp / _config.stat.maxHp
+            : 1f;
+
+        // 75% 이하 — 이동속도 +12%
+        if (!_hpMilestones[0] && ratio <= 0.75f)
+        {
+            _hpMilestones[0]   = true;
+            _bb.ChaseSpeedMult = Mathf.Min(_bb.ChaseSpeedMult + 0.12f, 1.5f);
+        }
+        // 50% 이하 — 이동속도 추가 +15%
+        if (!_hpMilestones[1] && ratio <= 0.50f)
+        {
+            _hpMilestones[1]   = true;
+            _bb.ChaseSpeedMult = Mathf.Min(_bb.ChaseSpeedMult + 0.15f, 1.5f);
+        }
+    }
+
     private void UnbindHud()
     {
         _hudBound = false;
@@ -484,6 +524,7 @@ public class BlackKnightBoss : MonsterBase
         _pendingForce         = default;
         _lastPatternSO        = null;
         _seqIndex.Clear();
+        System.Array.Clear(_hpMilestones, 0, _hpMilestones.Length);
 
         BKConcurrentDrop.ResetActiveCount();
 
@@ -525,6 +566,82 @@ public class BlackKnightBoss : MonsterBase
         }
         _audioPool?.Dispose();
         _audioPool = null;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 선회 추격 상태 (내부 클래스)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>
+    /// 패턴 브레이크 대기 중 일정 거리 범위에서 플레이어 주위를 선회한다.
+    ///
+    /// 소울류 보스의 "기회를 노리는" 행동 구현:
+    ///   • 패턴 브레이크 쿨다운이 1.2초 이상 남아있고 거리가 3.5~8m 이면 → 선회 모드
+    ///   • 그 외 → 일반 ChaseState 직진 추격
+    ///   • 선회 방향은 1.8~3.2초 마다 무작위로 바뀜 (예측 불가 이동)
+    ///   • ChaseSpeedMult 가 선회/추격 속도 모두에 반영됨 (HP 이정표 가속 적용)
+    /// </summary>
+    private class BKOrbitalChaseState : ChaseState
+    {
+        private readonly BlackKnightBoss _bk;
+        private float _orbitDir      = 1f;
+        private float _switchTimer   = 0f;
+
+        public BKOrbitalChaseState(BlackKnightBoss bk) => _bk = bk;
+
+        public override void Update(MonsterContext ctx)
+        {
+            if (ctx.Runtime.PlayerTarget == null) { base.Update(ctx); return; }
+
+            float dist = Vector3.Distance(ctx.Transform.position,
+                                          ctx.Runtime.PlayerTarget.position);
+            bool shouldOrbit = _bk._patternBreakCooldown > 1.2f
+                            && dist >= 3.5f && dist <= 8f;
+
+            if (shouldOrbit)
+                Orbit(ctx, dist);
+            else
+                Chase(ctx);
+        }
+
+        // ── 선회 ──────────────────────────────────────────
+        private void Orbit(MonsterContext ctx, float curDist)
+        {
+            _switchTimer -= Time.deltaTime;
+            if (_switchTimer <= 0f)
+            {
+                _orbitDir    = UnityEngine.Random.value > 0.5f ? 1f : -1f;
+                _switchTimer = UnityEngine.Random.Range(1.8f, 3.2f);
+            }
+
+            Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+            toPlayer.y = 0f;
+            Vector3 norm = toPlayer.normalized;
+
+            // 수직 이동 벡터 + 이상 거리(5.5m) 보정
+            Vector3 perp         = new Vector3(-norm.z, 0f, norm.x) * _orbitDir;
+            float   distCorrect  = (curDist - 5.5f) * 0.35f;
+            Vector3 target       = ctx.Transform.position + perp * 3f + norm * distCorrect;
+
+            ctx.Agent.SetDestination(target);
+            ctx.Agent.speed = ctx.Config.stat.moveSpeed * 0.65f * _bk._bb.ChaseSpeedMult;
+
+            // 항상 플레이어를 바라봄
+            if (norm.sqrMagnitude > 0.001f)
+                ctx.Transform.rotation = Quaternion.Slerp(
+                    ctx.Transform.rotation,
+                    Quaternion.LookRotation(norm),
+                    Time.deltaTime * 6f);
+        }
+
+        // ── 직진 추격 (ChaseSpeedMult 적용) ──────────────
+        private void Chase(MonsterContext ctx)
+        {
+            // base.Update 가 속도를 Config.stat.moveSpeed 로 고정하므로
+            // ChaseSpeedMult 는 여기서 사전 적용
+            ctx.Agent.speed = ctx.Config.stat.moveSpeed * _bk._bb.ChaseSpeedMult;
+            base.Update(ctx);
+        }
     }
 }
 }
