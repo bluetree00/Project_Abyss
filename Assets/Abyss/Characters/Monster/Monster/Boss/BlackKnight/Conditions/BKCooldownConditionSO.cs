@@ -20,6 +20,7 @@ public class BKCooldownConditionSO : BossConditionSO
             BKCooldownType.Leap      => bb.LeapCooldown      <= 0f,
             BKCooldownType.Backstep  => bb.BackstepCooldown  <= 0f,
             BKCooldownType.DashSlash => bb.DashSlashCooldown <= 0f,
+            BKCooldownType.Pressure  => bb.PressureCooldown  <= 0f,
             _                        => false,
         };
     }
@@ -34,4 +35,5 @@ public enum BKCooldownType
     Leap,
     Backstep,
     DashSlash,
+    Pressure,
 }
