@@ -72,11 +72,11 @@ public class BKDashSlashState : FullLockState<BKDashSlashPatternSO>
         _dashDir = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : ctx.Transform.forward;
         ctx.Transform.rotation = Quaternion.LookRotation(_dashDir);
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         ctx.Agent.enabled = false;
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.dashSfx, 0.5f);
-        ctx.Animator?.CrossFade(Data.dashAnimState, 0.05f);
+        ctx.Animator?.CrossFade(Data.dashAnimState, 0.05f, 0, 0f);
 
         // 경고 인디케이터 — 돌진 예정 경로 표시
         float dashLength = Data.dashSpeed * Data.dashDuration * _bb.AttackSpeedMult;

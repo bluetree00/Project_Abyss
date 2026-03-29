@@ -17,12 +17,52 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  stat: {fileID: 11400000, guid: bee0000300000002000000000000ee01, type: 2}
-  detection: {fileID: 11400000, guid: bee0000300000003000000000000ee01, type: 2}
-  patrol: {fileID: 11400000, guid: bee0000300000004000000000000ee01, type: 2}
-  combat: {fileID: 11400000, guid: bee0000300000005000000000000ee01, type: 2}
-  animation: {fileID: 11400000, guid: bee0000300000006000000000000ee01, type: 2}
-  specialState0: {fileID: 11400000, guid: 8b470148a9d4f5d4eb88f4b9ce495013, type: 2}
-  specialState1: {fileID: 0}
-  specialState2: {fileID: 0}
-  specialState3: {fileID: 0}
+  stat:
+    maxHp: 20
+    defense: 5
+    attackPower: 10
+    moveSpeed: 3
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 2
+    attackDelay: 1
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 7
+    chaseGiveUpRange: 10
+  patrol:
+    patrolType: 0
+    patrolRange: 5
+    patrolSpeed: 3
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 1
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Skeleton/SkeletonAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingRPT
+    speedParam: Blend
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  specialStates:
+  - conditions:
+    - {fileID: 11400000, guid: 7f12c79cbd951484e87f8b810a55058d, type: 2}
+    state: {fileID: 11400000, guid: 8b470148a9d4f5d4eb88f4b9ce495013, type: 2}
+    oneShot: 1
+  chaseState: {fileID: 0}
+  patrolState: {fileID: 0}
+  attackReadyState: {fileID: 0}
+  attackState: {fileID: 0}
+  getHitState: {fileID: 0}
+  dieState: {fileID: 0}
+  stateOverrides: []

@@ -42,13 +42,13 @@ public class BKOverheadSlashState : FullLockState<BKOverheadSlashPatternSO>
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.overheadSfx, 0.5f);
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         FacePlayer(ctx);
 
         // 경고 장판: 히트 타임까지 표시
         _indicator?.ShowCircle(ctx.Transform, Data.overheadRadius, Data.overheadHitTime);
 
-        ctx.Animator?.CrossFade(Data.overheadAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.overheadAnimState, 0.1f, 0, 0f);
     }
 
     public override void Update(MonsterContext ctx)

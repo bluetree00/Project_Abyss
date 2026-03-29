@@ -46,6 +46,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>월드 스페이스 HP 바 사용 여부. 보스처럼 HUD에서 체력을 표시하는 경우 false로 오버라이드.</summary>
     protected virtual bool UseWorldHPBar => true;
 
+    // ── 설정 SO 캐시 (주소별 1개 인스턴스, JSON 적용 완료 상태로 보관) ──
+    // 동종 몬스터가 여러 마리여도 Instantiate 1회 + JSON 적용 1회만 수행.
+    // 플레이 세션마다 초기화되므로 에디터 SO 원본은 절대 오염되지 않는다.
+    static readonly Dictionary<string, MonsterConfigSO> _configCache = new();
+
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ClearConfigCache() => _configCache.Clear();
+
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
     protected MonsterFSM         _fsm;
@@ -67,9 +75,25 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
     private readonly List<SpecialStateBase> _specialStates = new();
 
-    /// <summary>인덱스로 특수 상태 인스턴스를 가져온다. 파생 클래스의 TryGetSpecialState에서 활용.</summary>
-    protected SpecialStateBase GetSpecialState(int index)
+    // ── 원소 상태 인스턴스 (원소별 고정 슬롯) ─────────────
+    private readonly SpecialStateBase[] _elementalStates = new SpecialStateBase[ElementTypeUtil.Count];
+
+    // ── HP 트리거 발동 추적 (oneShot 트리거 중복 방지) ────
+    private readonly HashSet<int> _firedHpTriggers = new();
+
+    /// <summary>인덱스로 특수 상태 인스턴스를 가져온다. StateOverrideSO 내부 상태에서 접근 가능.</summary>
+    public SpecialStateBase GetSpecialState(int index)
         => index < _specialStates.Count ? _specialStates[index] : null;
+
+    // ── OnEnable 콜백 (StateOverrideSO 가 쿨다운 리셋 등을 등록) ─
+    private readonly List<System.Action> _onEnabledCallbacks = new();
+
+    /// <summary>풀 재사용(OnEnable) 시 호출할 콜백을 등록한다. StateOverrideSO.RegisterOverrides() 에서 사용.</summary>
+    public void RegisterOnEnabledCallback(System.Action callback) => _onEnabledCallbacks.Add(callback);
+
+    // ── 캐싱 ──────────────────────────────────────────────
+    private Rigidbody  _rb;
+    private Collider[] _cachedColliders;
 
     // Inspector 디버그용
     [SerializeField] private string _debugState;
@@ -87,24 +111,27 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     protected virtual async UniTask InitAsync()
     {
-        // 1. MonsterConfigSO 로드 (Addressables)
-        _config = await Managers.AddressableManager.LoadAssetAsync<MonsterConfigSO>(ConfigAddress);
-
-        if (_config == null)
+        // 1. MonsterConfigSO 로드 (주소별 캐시 — 동종 몬스터는 Instantiate·JSON 적용을 1회만 수행)
+        if (!_configCache.TryGetValue(ConfigAddress, out _config))
         {
-            Debug.LogError($"[MonsterBase] ConfigSO 로드 실패: {ConfigAddress}", this);
-            return;
-        }
+            var loaded = await Managers.AddressableManager.LoadAssetAsync<MonsterConfigSO>(ConfigAddress);
+            if (loaded == null)
+            {
+                Debug.LogError($"[MonsterBase] ConfigSO 로드 실패: {ConfigAddress}", this);
+                return;
+            }
 
-        if (_config.stat == null || _config.detection == null ||
-            _config.patrol == null || _config.combat == null || _config.animation == null)
-        {
-            Debug.LogError($"[MonsterBase] ConfigSO '{ConfigAddress}' 의 서브 SO 중 null 항목이 있습니다.", this);
-            return;
-        }
+            // await 중 동종 몬스터가 먼저 캐시를 채웠을 수 있으므로 재확인
+            if (!_configCache.TryGetValue(ConfigAddress, out _config))
+            {
+                // 원본 SO 를 보호하기 위해 복사본 생성 후 JSON 적용
+                _config = UnityEngine.Object.Instantiate(loaded);
+                _configCache[ConfigAddress] = _config;
 
-        // 2. JSON 데이터 로드 후 SO에 덮어쓰기
-        await LoadAndApplyJsonDataAsync();
+                // 2. JSON 데이터 로드 후 복사본에 덮어쓰기 (캐시 등록 전에 1회만 실행)
+                await LoadAndApplyJsonDataAsync();
+            }
+        }
 
         // 3. NavMeshAgent 설정
         _agent = GetComponent<NavMeshAgent>();
@@ -117,12 +144,17 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _agent.stoppingDistance = _config.stat.attackRange * 0.9f;
 
         // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
-        var _rb = GetComponent<Rigidbody>();
+        _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
 
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
+        if (_animator == null)
+            Debug.LogWarning($"[MonsterBase] {name}: Animator 컴포넌트를 찾을 수 없습니다. 프리팹 구조를 확인하세요.", this);
         await LoadAnimatorControllerAsync();
+
+        // Collider 배열 캐싱 (OnEnable에서 GetComponentsInChildren 반복 방지)
+        _cachedColliders = GetComponentsInChildren<Collider>(true);
 
         // 4-1. Head 본 탐색
         if (!string.IsNullOrEmpty(HeadBoneName))
@@ -148,7 +180,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 7. 플레이어 타깃 등록
         if (Managers.Player.PlayerTransform != null)
-            _runtime.PlayerTarget = Managers.Player.PlayerTransform;
+            SetPlayerTarget(Managers.Player.PlayerTransform);
         else
             Managers.Player.OnPlayerSpawned += OnPlayerSpawned;
 
@@ -172,23 +204,34 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// </summary>
     protected virtual void RegisterStates()
     {
-        _fsm.Register(new PatrolState());
-        _fsm.Register(new ChaseState());
-        _fsm.Register(new AttackReadyState());
-        _fsm.Register(new AttackState());
-        _fsm.Register(new GetHitState());
-        _fsm.Register(new DieState());
+        // ── 공용 상태 등록 ─────────────────────────────────────────
+        // SO 슬롯이 null이면 기본 공용 상태를 사용.
+        // 파생 SO가 설정된 경우 해당 SO의 Create()가 커스텀 상태를 반환한다.
+        _fsm.RegisterAs<PatrolState>     (_config.patrolState?.Create(this)      ?? new PatrolState());
+        _fsm.RegisterAs<ChaseState>      (_config.chaseState?.Create(this)       ?? new ChaseState());
+        _fsm.RegisterAs<AttackReadyState>(_config.attackReadyState?.Create(this) ?? new AttackReadyState());
+        _fsm.RegisterAs<AttackState>     (_config.attackState?.Create(this)      ?? new AttackState());
+        _fsm.RegisterAs<GetHitState>     (_config.getHitState?.Create(this)      ?? new GetHitState());
+        _fsm.RegisterAs<DieState>        (_config.dieState?.Create(this)         ?? new DieState());
 
-        // 특수 상태: 슬롯에 데이터가 있으면 자동으로 인스턴스 생성
+        // ── 특수 상태: 엔트리의 state SO → 런타임 인스턴스 생성 ───
         _specialStates.Clear();
-        foreach (var data in new[] {
-            _config.specialState0,
-            _config.specialState1,
-            _config.specialState2,
-            _config.specialState3 })
+        if (_config.specialStates != null)
+            foreach (var entry in _config.specialStates)
+                _specialStates.Add(entry?.state?.CreateState());
+
+        // ── 복합 행동 오버라이드 (다중 상태 공유 로직, 특수 상태 생성 이후에 실행) ─
+        if (_config.stateOverrides != null)
+            foreach (var ovr in _config.stateOverrides)
+                ovr?.RegisterOverrides(_fsm, this);
+
+        // ── 원소 상태 등록 (null = DefaultElementalState, SO 있으면 커스텀) ──
+        for (int i = 0; i < ElementTypeUtil.Count; i++)
         {
-            if (data != null)
-                _specialStates.Add(data.CreateState());
+            var elementType = (ElementType)i;
+            var entry = _config.elemental.Get(elementType);
+            _elementalStates[i] = entry?.overrideState?.Create(this)
+                                   ?? new DefaultElementalState(elementType);
         }
     }
 
@@ -200,35 +243,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (_config == null || _runtime == null || _runtime.IsDead) return;
 
-        // 매 프레임 가장 가까운 PlayerController를 타깃으로 갱신
-        _runtime.PlayerTarget = FindClosestPlayerTarget();
+        // PlayerManager에서 최신 타깃을 O(1)로 갱신 (FindObjectsOfType 제거)
+        var latestTarget = Managers.Player.PlayerTransform;
+        if (latestTarget != _runtime.PlayerTarget)
+            SetPlayerTarget(latestTarget);
+
+        // 거리를 1회만 계산해 런타임에 저장 → 각 상태에서 재계산 불필요
+        _runtime.DistToPlayer = _runtime.PlayerTarget != null
+            ? Vector3.Distance(transform.position, _runtime.PlayerTarget.position)
+            : float.MaxValue;
 
         _fsm?.Update();
 
 #if UNITY_EDITOR
         _debugState = _fsm?.CurrentType?.Name;
 #endif
-    }
-
-    /// <summary>씬에서 이 몬스터와 가장 가까운 살아있는 PlayerController Transform을 반환한다.</summary>
-    private Transform FindClosestPlayerTarget()
-    {
-        var all = Object.FindObjectsOfType<PlayerController>();
-        Transform closestAlive = null;
-        Transform closestAny   = null;
-        float     minAliveDist = float.MaxValue;
-        float     minAnyDist   = float.MaxValue;
-
-        foreach (var pc in all)
-        {
-            float d     = Vector3.Distance(transform.position, pc.transform.position);
-            bool  alive = pc.RuntimeStats != null && pc.RuntimeStats.Hp > 0;
-
-            if (d < minAnyDist)   { minAnyDist   = d; closestAny   = pc.transform; }
-            if (alive && d < minAliveDist) { minAliveDist = d; closestAlive = pc.transform; }
-        }
-
-        return closestAlive ?? closestAny ?? Managers.Player.PlayerTransform;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -252,24 +281,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
         if (IsPlayerDead()) return false;
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        return dist <= ctx.Detection.detectionRange;
+        return ctx.Runtime.DistToPlayer <= ctx.Detection.detectionRange;
     }
 
     /// <summary>Chase → Patrol 전환 조건. 오버라이드로 포기 거리·조건 교체.</summary>
     public virtual bool ShouldGiveUpChase(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null || IsPlayerDead()) return true;
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        return dist > ctx.Detection.chaseGiveUpRange;
+        return ctx.Runtime.DistToPlayer > ctx.Detection.chaseGiveUpRange;
     }
 
     /// <summary>Chase → AttackReady 전환 조건. 오버라이드로 공격 진입 거리 교체.</summary>
     public virtual bool ShouldEnterAttackReady(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
-        float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        return dist <= ctx.Stat.attackRange;
+        return ctx.Runtime.DistToPlayer <= ctx.Stat.attackRange;
     }
 
     /// <summary>
@@ -278,7 +304,47 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// 이 메서드 안에서 ChangeState(specialState) 를 호출하면
     /// 이후 GetHitState 전환이 자동으로 스킵된다.
     /// </summary>
-    protected virtual void OnDamageTaken() { }
+    protected virtual void OnDamageTaken()
+    {
+        if (_config.specialStates == null || _config.specialStates.Count == 0) return;
+
+        for (int i = 0; i < _config.specialStates.Count; i++)
+        {
+            var entry = _config.specialStates[i];
+            if (entry == null || entry.state == null) continue;
+
+            // conditions 가 비어있으면 코드 직접 발동 전용 — OnDamageTaken 에서 스킵
+            if (entry.conditions == null || entry.conditions.Count == 0) continue;
+
+            if (entry.oneShot && _firedHpTriggers.Contains(i)) continue;
+
+            bool allMet = true;
+            foreach (var cond in entry.conditions)
+            {
+                if (cond != null && !cond.Evaluate(_ctx)) { allMet = false; break; }
+            }
+            if (!allMet) continue;
+
+            var state = GetSpecialState(i);
+            if (state == null) continue;
+
+            if (entry.oneShot) _firedHpTriggers.Add(i);
+            ChangeState(state);
+            return;
+        }
+
+        // ── 원소 누적치 임계값 체크 ──────────────────────────
+        for (int i = 0; i < ElementTypeUtil.Count; i++)
+        {
+            var entry = _config.elemental.Get((ElementType)i);
+            if (entry == null) continue;
+            if (_runtime.ElementAccumulation[i] < _config.elemental.accumulationThreshold) continue;
+
+            _runtime.ElementAccumulation[i] = 0f;   // 누적치 리셋
+            ChangeState(_elementalStates[i]);
+            return;
+        }
+    }
 
     /// <summary>
     /// 공격 히트 판정: 반경 내 플레이어에게 데미지 + 넉백 적용.
@@ -288,21 +354,27 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (_runtime?.PlayerTarget == null || _config == null) return;
 
+        int   damage         = (int)(_config.stat.attackPower * _runtime.AttackMultiplier);
+        float knockbackForce = _config.stat.knockbackForce;
+
+        // attackShape SO가 있으면 위임, 없으면 기본 구체 판정
+        if (_config.stat.attackShape != null)
+        {
+            _config.stat.attackShape.Execute(_ctx, damage, knockbackForce);
+            return;
+        }
+
         float dist = Vector3.Distance(transform.position, _runtime.PlayerTarget.position);
         if (dist > _config.stat.attackRadius) return;
 
         var player = _runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage((int)(_config.stat.attackPower * _runtime.AttackMultiplier));
+        player.TakeDamage(damage);
 
-        var rb = _runtime.PlayerTarget.GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            Vector3 dir = (_runtime.PlayerTarget.position - transform.position).normalized;
-            dir.y = 0.3f;
-            rb.AddForce(dir.normalized * _config.stat.knockbackForce, ForceMode.Impulse);
-        }
+        Vector3 dir = (_runtime.PlayerTarget.position - transform.position).normalized;
+        dir.y = 0.3f;
+        player.ApplyKnockback(dir.normalized * knockbackForce);
     }
 
     /// <summary>애니메이션 이벤트에서 호출 (MonsterAnimEventReceiver 경유).</summary>
@@ -311,9 +383,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>플레이어가 사망했는지 확인.</summary>
     public bool IsPlayerDead()
     {
-        if (_runtime?.PlayerTarget == null) return true;
-        var pc = _runtime.PlayerTarget.GetComponent<PlayerController>();
-        if (pc == null) return false;
+        var pc = _runtime?.CachedPlayer;
+        if (pc == null) return true;
         if (pc.RuntimeStats == null) return false;
         return pc.RuntimeStats.Hp <= 0;
     }
@@ -322,7 +393,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // IDamageable — 플레이어 공격에 맞을 때 호출됨
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f)
+    public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f,
+                           ElementType element = ElementType.None, float elementAmount = 0f)
     {
         if (_runtime == null || _runtime.IsDead) return;
 
@@ -330,6 +402,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
+        // 원소 누적치 갱신 (무적 상태가 아닐 때만)
+        if (element.IsValid() && elementAmount > 0f)
+        {
+            var entry = _config.elemental.Get(element);
+            float scaled = elementAmount * (entry?.resistance ?? 1f);
+            _runtime.ElementAccumulation[element.ToIndex()] += scaled;
+        }
 
         // 방어력 + 데미지 배율 적용 (최소 1 데미지)
         float actual = Mathf.Max(1f, (amount - _config.stat.defense) * _runtime.DamageMultiplier);
@@ -348,23 +428,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             // 중단 불가 상태 — 데미지는 들어오되 상태 전환·넉백 없음
             if ((constraints & SpecialStateConstraint.UnInterruptible) != 0) return;
 
-            if (instigator != null)
-            {
-                var rb = GetComponent<Rigidbody>();
-                if (rb != null)
-                {
-                    rb.isKinematic = false;
-                    Vector3 dir = (transform.position - instigator.transform.position).normalized;
-                    rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
-                }
-            }
-
             // HP 임계값 특수 상태 진입 훅 — 파생 클래스에서 ChangeState(special) 호출 가능
             OnDamageTaken();
 
-            // 특수 상태로 전환됐으면 GetHitState 스킵
-            if (!IsInSpecialState)
-                ChangeState<GetHitState>();
+            // 특수 상태(포효 등)로 전환됐으면 넉백·GetHitState 모두 스킵
+            // (isKinematic을 false로 두지 않아야 특수 상태 중 물리 이탈을 막는다)
+            if (IsInSpecialState) return;
+
+            if (instigator != null && _rb != null)
+            {
+                _rb.isKinematic = false;
+                Vector3 dir = (transform.position - instigator.transform.position).normalized;
+                _rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
+            }
+
+            ChangeState<GetHitState>();
         }
     }
 
@@ -406,7 +484,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     private async UniTask LoadAnimatorControllerAsync()
     {
-        if (_config.animation == null) return;
         string addr = _config.animation.animatorControllerAddress;
         if (string.IsNullOrEmpty(addr)) return;
 
@@ -418,10 +495,16 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _animator.runtimeAnimatorController = overrideCtrl;
     }
 
+    private void SetPlayerTarget(Transform player)
+    {
+        if (_runtime == null) return;
+        _runtime.PlayerTarget = player;
+        _runtime.CachedPlayer = player != null ? player.GetComponent<PlayerController>() : null;
+    }
+
     private void OnPlayerSpawned(Transform player)
     {
-        if (_runtime != null)
-            _runtime.PlayerTarget = player;
+        SetPlayerTarget(player);
         Managers.Player.OnPlayerSpawned -= OnPlayerSpawned;
     }
 
@@ -454,17 +537,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         if (_agent != null) _agent.enabled = true;
 
-        var rb = GetComponent<Rigidbody>();
-        if (rb != null)
+        if (_rb != null)
         {
-            rb.isKinematic     = true;
-            rb.linearVelocity  = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic     = true;
+            _rb.linearVelocity  = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
         }
 
-        foreach (var col in GetComponentsInChildren<Collider>())
-            col.enabled = true;
+        if (_cachedColliders != null)
+            foreach (var col in _cachedColliders)
+                if (col != null) col.enabled = true;
 
+        _firedHpTriggers.Clear();
+        System.Array.Clear(_runtime.ElementAccumulation, 0, _runtime.ElementAccumulation.Length);
+
+        foreach (var cb in _onEnabledCallbacks) cb?.Invoke();
         _fsm?.ChangeState<PatrolState>();
 
         RequestHPBarAsync().Forget();

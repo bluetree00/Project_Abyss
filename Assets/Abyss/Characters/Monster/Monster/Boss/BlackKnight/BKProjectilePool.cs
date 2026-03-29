@@ -25,7 +25,12 @@ public class BKProjectilePool
     public BKBossProjectile Get(Vector3 position, Quaternion rotation)
     {
         BKBossProjectile proj = _idle.Count > 0 ? _idle.Dequeue() : CreateNew();
+        proj.transform.SetParent(null);  // 월드 공간으로 분리 → 보스 회전 영향 차단
         proj.transform.SetPositionAndRotation(position, rotation);
+
+        // Rigidbody constraints 초기화 (잔류 FreezeAll 방지)
+        foreach (var rb in proj.GetComponentsInChildren<Rigidbody>(true))
+            rb.constraints = RigidbodyConstraints.None;
 
         // TrailRenderer: SetActive 이전에 Clear → 활성화 첫 프레임에 이전 궤적이 렌더되는 것 방지
         foreach (var tr in proj.GetComponentsInChildren<TrailRenderer>(true))
@@ -72,10 +77,10 @@ public class BKProjectilePool
         go.SetActive(false);
 
         // Hovl Studio 컴포넌트 전체 비활성화
-        // HS_ProjectileMover: disabled 상태에서도 OnCollisionEnter 물리 콜백이 실행되어
-        //   rb.constraints = FreezeAll 을 걸어 끝부분에서 투사체가 휘는 원인이 됨
+        // HS_ProjectileMover: OnCollisionEnter 에서 rb.constraints = FreezeAll 을 걸어
+        //   끝부분에서 투사체가 휘는 원인이 됨 → Destroy 로 완전 제거
         foreach (var mover in go.GetComponentsInChildren<HS_ProjectileMover>(true))
-            mover.enabled = false;
+            Object.Destroy(mover);
 
         // HS_Poolable: rejoinMode=Auto + delayBeforeAutoRejoin=1 → SetActive 후 1초만에 강제 비활성화
         foreach (var poolable in go.GetComponentsInChildren<CGT.Pooling.HS_Poolable>(true))
@@ -101,6 +106,7 @@ public class BKProjectilePool
     private void Enqueue(BKBossProjectile proj)
     {
         proj.gameObject.SetActive(false);
+        proj.transform.SetParent(_container);  // 풀 컨테이너로 복귀
         _idle.Enqueue(proj);
     }
 }

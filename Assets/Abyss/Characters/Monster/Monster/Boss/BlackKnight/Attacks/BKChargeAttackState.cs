@@ -49,7 +49,7 @@ public class BKChargeAttackState : FullLockState<BKChargeAttackPatternSO>
 
         _startY = ctx.Transform.position.y; // 돌진 중 Y 고정 기준
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         ctx.Agent.enabled = false; // 돌진 중 NavMesh 제어 해제
 
         if (ctx.Runtime.PlayerTarget != null)
@@ -66,7 +66,7 @@ public class BKChargeAttackState : FullLockState<BKChargeAttackPatternSO>
         _indicator?.ShowCharge(ctx.Transform.position, _chargeDir,
                                chargeLength, Data.chargeRadius * 2f, windUpTime);
 
-        ctx.Animator?.CrossFade(Data.chargeAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.chargeAnimState, 0.1f, 0, 0f);
     }
 
     public override void Update(MonsterContext ctx)

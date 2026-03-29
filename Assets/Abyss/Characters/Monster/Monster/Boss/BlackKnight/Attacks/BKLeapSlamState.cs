@@ -57,12 +57,12 @@ public class BKLeapSlamState : FullLockState<BKLeapSlamPatternSO>
         _leapStartPos = ctx.Transform.position;
         _lockedPosSet = false;
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         ctx.Agent.enabled = false;
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.leapJumpSfx, 0.5f);
 
-        ctx.Animator?.CrossFade(Data.leapAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.leapAnimState, 0.1f, 0, 0f);
 
         _phase = Phase.LeapUp;
         _timer = LeapUpDuration;

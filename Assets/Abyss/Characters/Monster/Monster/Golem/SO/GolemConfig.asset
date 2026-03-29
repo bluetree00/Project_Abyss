@@ -16,13 +16,53 @@ MonoBehaviour:
   grade: 0
   playerLayer:
     serializedVersion: 2
-    m_Bits: 0
-  stat: {fileID: 11400000, guid: bee0000200000002000000000000ee01, type: 2}
-  detection: {fileID: 11400000, guid: bee0000200000003000000000000ee01, type: 2}
-  patrol: {fileID: 11400000, guid: bee0000200000004000000000000ee01, type: 2}
-  combat: {fileID: 11400000, guid: bee0000200000005000000000000ee01, type: 2}
-  animation: {fileID: 11400000, guid: bee0000200000006000000000000ee01, type: 2}
-  specialState0: {fileID: 11400000, guid: 5849b7db4e4a0d84e870a40877ed02d5, type: 2}
-  specialState1: {fileID: 0}
-  specialState2: {fileID: 0}
-  specialState3: {fileID: 0}
+    m_Bits: 64
+  stat:
+    maxHp: 30
+    defense: 7
+    attackPower: 20
+    moveSpeed: 1
+    attackRange: 2
+    attackRadius: 2
+    attackRate: 1
+    attackDelay: 0.5
+    knockbackForce: 8
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 5
+    chaseGiveUpRange: 8
+  patrol:
+    patrolType: 2
+    patrolRange: 3
+    patrolSpeed: 0.8
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Golem/GolemAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingRPT
+    speedParam: Blend
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  specialStates:
+  - conditions:
+    - {fileID: 11400000, guid: 9512f9f2c18746747b7af36a7a904160, type: 2}
+    state: {fileID: 11400000, guid: 795c45acbb174a64fac1b1c64082fb10, type: 2}
+    oneShot: 1
+  chaseState: {fileID: 0}
+  patrolState: {fileID: 0}
+  attackReadyState: {fileID: 0}
+  attackState: {fileID: 0}
+  getHitState: {fileID: 0}
+  dieState: {fileID: 0}
+  stateOverrides: []

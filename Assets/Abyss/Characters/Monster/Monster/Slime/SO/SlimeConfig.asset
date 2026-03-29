@@ -17,12 +17,68 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  stat: {fileID: 11400000, guid: aec1234500000004000000000000ee01, type: 2}
-  detection: {fileID: 11400000, guid: aec1234500000005000000000000ee01, type: 2}
-  patrol: {fileID: 11400000, guid: aec1234500000006000000000000ee01, type: 2}
-  combat: {fileID: 11400000, guid: aec1234500000007000000000000ee01, type: 2}
-  animation: {fileID: 11400000, guid: aec1234500000008000000000000ee01, type: 2}
-  specialState0: {fileID: 11400000, guid: 4937e10bf4dd8544188acfbf958bc615, type: 2}
-  specialState1: {fileID: 0}
-  specialState2: {fileID: 0}
-  specialState3: {fileID: 0}
+  stat:
+    maxHp: 10
+    defense: 1
+    attackPower: 10
+    moveSpeed: 1
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 1
+    attackDelay: 1
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 5
+    chaseGiveUpRange: 8
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 1
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Slime/SlimeAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingRPT
+    speedParam: Blend
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates:
+  - conditions: []
+    state: {fileID: 11400000, guid: 4937e10bf4dd8544188acfbf958bc615, type: 2}
+    oneShot: 1
+  chaseState: {fileID: 0}
+  patrolState: {fileID: 11400000, guid: 5d0482fd5eb61a943adb4ef7c84fc133, type: 2}
+  attackReadyState: {fileID: 0}
+  attackState: {fileID: 0}
+  getHitState: {fileID: 0}
+  dieState: {fileID: 0}
+  stateOverrides: []

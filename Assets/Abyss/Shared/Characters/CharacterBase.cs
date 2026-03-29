@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Game.CharacterStates;
 
 //============================================================
 // CharacterBase 클래스

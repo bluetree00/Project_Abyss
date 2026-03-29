@@ -57,7 +57,7 @@ public class BKRainAttackPatternSO : BossPatternSO
     public float rainConcurrentInterval = 1.8f;
 
     [Header("RainAttack Phase 2 (+/X 패턴 동시 낙하)")]
-    public int   rainPatternCount   = 2;
+    public int   rainPatternCount   = 4;
     public float rainPatternSpacing = 3f;
     public float rainPatternRadius  = 3f;
 

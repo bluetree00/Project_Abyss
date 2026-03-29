@@ -16,7 +16,7 @@ public class FairyBatFleeState : UnInterruptibleState<FairyBatFleeData>
     {
         _timer = Data.fleeDuration;
         ctx.Agent.speed = ctx.Config.stat.moveSpeed * Data.fleeSpeedMult;
-        ctx.Animator.CrossFade("MoveBlend", 0.15f);
+        ctx.Animator?.CrossFade("MoveBlend", 0.15f);
     }
 
     public override void Update(MonsterContext ctx)

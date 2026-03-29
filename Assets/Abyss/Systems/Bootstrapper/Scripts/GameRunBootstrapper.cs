@@ -48,8 +48,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
-        else
-            await StartCombatDirectAsync(); // 에디터 직접 실행 fallback
+        else if (Object.FindFirstObjectByType<DebugStageRunPanel>() == null)
+            await StartCombatDirectAsync(); // 에디터 직접 실행 fallback (DebugStageRunPanel 없을 때만)
 
         AppBootstrapper.Instance?.NotifySceneReady();
     }
@@ -220,7 +220,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
-        await Cysharp.Threading.Tasks.UniTask.Yield();
+        // CharacterBase.Awake()가 async void이므로 InitAsync가 완료될 때까지 대기
+        // (WeaponManager는 InitAsync 중에 설정되므로 null이 아닐 때 초기화 완료)
+        await Cysharp.Threading.Tasks.UniTask.WaitUntil(
+            () => player.WeaponManager != null,
+            cancellationToken: destroyCancellationToken);
 
         var run = AppBootstrapper.Instance?.CurrentRun;
         var wm = player.WeaponManager;

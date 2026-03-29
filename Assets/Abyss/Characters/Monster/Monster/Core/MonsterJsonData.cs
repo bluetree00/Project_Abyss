@@ -20,6 +20,8 @@ public class MonsterJsonData
     public DetectionData detection;
     public PatrolData    patrol;
     public CombatData    combat;
+    public AnimationData animation;
+    public ElementalData elemental;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 중첩 데이터 클래스
@@ -62,6 +64,36 @@ public class MonsterJsonData
         public float damageApplyDelay;
     }
 
+    [Serializable]
+    public class AnimationData
+    {
+        /// <summary>Addressables에 등록된 AnimatorOverrideController 주소. 비어있으면 덮어쓰지 않음.</summary>
+        public string animatorControllerAddress;
+        public string idleStateName;
+        public string patrolStateName;
+        public string chaseStateName;
+        public string attackReadyStateName;
+        public string attackTrigger;
+        public string getHitTrigger;
+        public string dieTrigger;
+        public string detectTrigger;
+        public string speedParam;
+        public float  speedDampTime;
+        public float  crossFadeDuration;
+    }
+
+    [Serializable]
+    public class ElementalData
+    {
+        public float accumulationThreshold;
+        /// <summary>0.0=면역 / 0.5=반감 / 1.0=보통 / 2.0=약점. 0이면 덮어쓰지 않음.</summary>
+        public float lightningResistance;
+        public float waterResistance;
+        public float fireResistance;
+        public float grassResistance;
+        public float earthResistance;
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // SO 적용
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -83,28 +115,28 @@ public class MonsterJsonData
             config.grade = parsedGrade;
 
         // ── 스탯
-        if (stat != null && config.stat != null)
+        if (stat != null)
         {
-            if (stat.maxHp        > 0) config.stat.maxHp         = stat.maxHp;
-            if (stat.defense      > 0) config.stat.defense        = stat.defense;
-            if (stat.attackPower  > 0) config.stat.attackPower    = stat.attackPower;
-            if (stat.moveSpeed    > 0) config.stat.moveSpeed      = stat.moveSpeed;
-            if (stat.attackRange  > 0) config.stat.attackRange    = stat.attackRange;
-            if (stat.attackRadius > 0) config.stat.attackRadius   = stat.attackRadius;
-            if (stat.attackRate   > 0) config.stat.attackRate     = stat.attackRate;
-            if (stat.attackDelay  > 0) config.stat.attackDelay    = stat.attackDelay;
-            if (stat.knockbackForce > 0) config.stat.knockbackForce = stat.knockbackForce;
+            if (stat.maxHp          > 0) config.stat.maxHp          = stat.maxHp;
+            if (stat.defense        > 0) config.stat.defense         = stat.defense;
+            if (stat.attackPower    > 0) config.stat.attackPower     = stat.attackPower;
+            if (stat.moveSpeed      > 0) config.stat.moveSpeed       = stat.moveSpeed;
+            if (stat.attackRange    > 0) config.stat.attackRange     = stat.attackRange;
+            if (stat.attackRadius   > 0) config.stat.attackRadius    = stat.attackRadius;
+            if (stat.attackRate     > 0) config.stat.attackRate      = stat.attackRate;
+            if (stat.attackDelay    > 0) config.stat.attackDelay     = stat.attackDelay;
+            if (stat.knockbackForce > 0) config.stat.knockbackForce  = stat.knockbackForce;
         }
 
         // ── 감지
-        if (detection != null && config.detection != null)
+        if (detection != null)
         {
-            if (detection.detectionRange  > 0) config.detection.detectionRange  = detection.detectionRange;
+            if (detection.detectionRange   > 0) config.detection.detectionRange   = detection.detectionRange;
             if (detection.chaseGiveUpRange > 0) config.detection.chaseGiveUpRange = detection.chaseGiveUpRange;
         }
 
         // ── 배회
-        if (patrol != null && config.patrol != null)
+        if (patrol != null)
         {
             if (!string.IsNullOrEmpty(patrol.patrolType) &&
                 System.Enum.TryParse<PatrolType>(patrol.patrolType, out var pt))
@@ -116,9 +148,48 @@ public class MonsterJsonData
         }
 
         // ── 전투 타이밍
-        if (combat != null && config.combat != null)
+        if (combat != null)
         {
             if (combat.damageApplyDelay > 0) config.combat.damageApplyDelay = combat.damageApplyDelay;
+        }
+
+        // ── 애니메이션
+        if (animation != null)
+        {
+            if (!string.IsNullOrEmpty(animation.animatorControllerAddress))
+                config.animation.animatorControllerAddress = animation.animatorControllerAddress;
+            if (!string.IsNullOrEmpty(animation.idleStateName))
+                config.animation.idleStateName        = animation.idleStateName;
+            if (!string.IsNullOrEmpty(animation.patrolStateName))
+                config.animation.patrolStateName      = animation.patrolStateName;
+            if (!string.IsNullOrEmpty(animation.chaseStateName))
+                config.animation.chaseStateName       = animation.chaseStateName;
+            if (!string.IsNullOrEmpty(animation.attackReadyStateName))
+                config.animation.attackReadyStateName = animation.attackReadyStateName;
+            if (!string.IsNullOrEmpty(animation.attackTrigger))
+                config.animation.attackTrigger        = animation.attackTrigger;
+            if (!string.IsNullOrEmpty(animation.getHitTrigger))
+                config.animation.getHitTrigger        = animation.getHitTrigger;
+            if (!string.IsNullOrEmpty(animation.dieTrigger))
+                config.animation.dieTrigger           = animation.dieTrigger;
+            if (!string.IsNullOrEmpty(animation.detectTrigger))
+                config.animation.detectTrigger        = animation.detectTrigger;
+            if (!string.IsNullOrEmpty(animation.speedParam))
+                config.animation.speedParam           = animation.speedParam;
+            if (animation.speedDampTime    > 0) config.animation.speedDampTime    = animation.speedDampTime;
+            if (animation.crossFadeDuration > 0) config.animation.crossFadeDuration = animation.crossFadeDuration;
+        }
+
+        // ── 원소
+        if (elemental != null)
+        {
+            if (elemental.accumulationThreshold > 0)
+                config.elemental.accumulationThreshold = elemental.accumulationThreshold;
+            if (elemental.lightningResistance > 0) config.elemental.lightning.resistance = elemental.lightningResistance;
+            if (elemental.waterResistance     > 0) config.elemental.water.resistance     = elemental.waterResistance;
+            if (elemental.fireResistance      > 0) config.elemental.fire.resistance      = elemental.fireResistance;
+            if (elemental.grassResistance     > 0) config.elemental.grass.resistance     = elemental.grassResistance;
+            if (elemental.earthResistance     > 0) config.elemental.earth.resistance     = elemental.earthResistance;
         }
     }
 }

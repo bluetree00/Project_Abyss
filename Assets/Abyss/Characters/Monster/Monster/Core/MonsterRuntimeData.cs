@@ -13,9 +13,19 @@ public class MonsterRuntimeData
     public int  CurrentHp;
     public bool IsDead;
 
+    // ── 원소 누적치 (인덱스: ElementType) ─────────────────
+    /// <summary>원소별 현재 누적치. 인덱스는 ElementType.ToIndex() 사용.</summary>
+    public float[] ElementAccumulation = new float[ElementTypeUtil.Count];
+
     // ── 타깃 ──────────────────────────────────────────────
     /// <summary>현재 추적 중인 플레이어 Transform.</summary>
     public Transform PlayerTarget;
+
+    /// <summary>PlayerTarget 의 PlayerController 캐시. GetComponent 반복 방지.</summary>
+    public PlayerController CachedPlayer;
+
+    /// <summary>이번 Update에서 계산된 몬스터 → 플레이어 거리. 각 상태에서 재계산 없이 사용.</summary>
+    public float DistToPlayer = float.MaxValue;
 
     // ── 위치 ──────────────────────────────────────────────
     /// <summary>스폰(배치) 위치 — 귀환 기준점.</summary>

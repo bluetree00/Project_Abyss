@@ -55,11 +55,11 @@ public class BKBackstepState : FullLockState<BKBackstepPatternSO>
             _backstepDir = -ctx.Transform.forward;
         }
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         ctx.Agent.enabled = false;
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.backstepSfx, 0.5f);
-        ctx.Animator?.CrossFade(Data.backstepAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.backstepAnimState, 0.1f, 0, 0f);
 
         _phase = Phase.WindUp;
         _timer = Data.backstepWindUp;

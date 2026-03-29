@@ -6,6 +6,12 @@ namespace Abyss.Monster
 /// </summary>
 public class BossPatternContext
 {
+    /// <summary>
+    /// 보스 인터페이스 — HpRatio, Blackboard 등 조건 평가에 필요한 보스 상태 접근.
+    /// BossHpConditionSO, BossLastTagConditionSO 등에서 사용.
+    /// </summary>
+    public IBoss Boss;
+
     /// <summary>몬스터 공용 컨텍스트 (Transform, Agent, Animator, Config, Runtime).</summary>
     public MonsterContext Ctx;
 

@@ -14,11 +14,8 @@ public class SkeletonMonster : MonsterBase
     protected override string DataAddress      => "Skeleton/SkeletonData";
     protected override float  HPBarHeadOffset  => 0.7f;
 
-    private bool _hasEnraged;
-
     protected override void OnEnable()
     {
-        _hasEnraged = false;
         ResetTint();
         base.OnEnable();
     }
@@ -38,18 +35,5 @@ public class SkeletonMonster : MonsterBase
         }
     }
 
-    protected override void OnDamageTaken()
-    {
-        var state = GetSpecialState(0);
-        if (state == null || _hasEnraged) return;
-        if (_config.specialState0 is not SkeletonEnrageData enrageData) return;
-
-        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
-        if (hpRatio <= enrageData.hpThreshold)
-        {
-            _hasEnraged = true;
-            ChangeState(state);
-        }
-    }
 }
 }

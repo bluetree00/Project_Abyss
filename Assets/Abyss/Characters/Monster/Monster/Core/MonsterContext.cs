@@ -21,12 +21,12 @@ public class MonsterContext
     // ── 런타임 ────────────────────────────────────────────
     public MonsterRuntimeData    Runtime;
 
-    // ── 자주 쓰는 SO 단축 프로퍼티 ────────────────────────
-    public MonsterStatSO      Stat      => Config.stat;
-    public MonsterDetectionSO Detection => Config.detection;
-    public MonsterPatrolSO    Patrol    => Config.patrol;
-    public MonsterCombatSO    Combat    => Config.combat;
-    public MonsterAnimationSO Animation => Config.animation;
+    // ── 자주 쓰는 데이터 단축 프로퍼티 (기존 코드 호환) ────
+    public MonsterStatData      Stat      => Config.stat;
+    public MonsterDetectionData Detection => Config.detection;
+    public MonsterPatrolData    Patrol    => Config.patrol;
+    public MonsterCombatData    Combat    => Config.combat;
+    public MonsterAnimationData Animation => Config.animation;
 
     // ── Transform 단축 ────────────────────────────────────
     public Transform Transform => Monster.transform;

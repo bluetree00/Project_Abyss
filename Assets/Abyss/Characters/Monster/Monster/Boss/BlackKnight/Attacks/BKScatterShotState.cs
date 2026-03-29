@@ -52,7 +52,7 @@ public class BKScatterShotState : FullLockState<BKScatterShotPatternSO>
         _phase      = Phase.WindUp;
         _timer      = Data.scatterShotDelay;
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         FacePlayer(ctx);
 
         // 조준 방향 저장
@@ -72,7 +72,7 @@ public class BKScatterShotState : FullLockState<BKScatterShotPatternSO>
         // 경고: 1차 투사체 궤적만 표시 (startOffset=1.5f: 투사체 스폰 오프셋과 끝점 일치)
         _indicator?.ShowScatterLines(_spawnPos, ComputeDirections(0f), Data.scatterRange, Data.scatterShotDelay, 1.5f);
 
-        ctx.Animator?.CrossFade(Data.scatterAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.scatterAnimState, 0.1f, 0, 0f);
     }
 
     public override void Update(MonsterContext ctx)

@@ -98,9 +98,9 @@ public class BKRainAttackState : FullLockState<BKRainAttackPatternSO>
 
         _bossPos = ctx.Transform.position;
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         FacePlayer(ctx);
-        ctx.Animator?.CrossFade(Data.rainAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.rainAnimState, 0.1f, 0, 0f);
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.rainSfx, 0.5f);
 
@@ -128,7 +128,7 @@ public class BKRainAttackState : FullLockState<BKRainAttackPatternSO>
         if (ctx.Animator != null && !ctx.Animator.IsInTransition(0))
         {
             if (!ctx.Animator.GetCurrentAnimatorStateInfo(0).IsName(Data.rainAnimState))
-                ctx.Animator.CrossFade(Data.rainAnimState, 0.05f);
+                ctx.Animator.CrossFade(Data.rainAnimState, 0.05f, 0, 0f);
         }
 
         // ── 메인 낙하 상태머신 ─────────────────────────

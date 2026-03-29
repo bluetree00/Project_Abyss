@@ -11,12 +11,16 @@ namespace Abyss.Monster
 /// </summary>
 public class ChaseState : IMonsterState
 {
+    // SetDestination은 플레이어가 이 거리 이상 이동했을 때만 재호출 (매 프레임 경로 재계산 방지)
+    private const float DestinationUpdateThresholdSq = 0.09f; // 0.3m²
+    private Vector3 _lastDestination = Vector3.positiveInfinity;
+
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
         ctx.Agent.stoppingDistance = ctx.Stat.attackRange * 0.9f;
+        _lastDestination = Vector3.positiveInfinity; // 진입 시 즉시 경로 계산 보장
         PlayAnim(ctx, ctx.Animation.chaseStateName);
-
     }
 
     public virtual void Update(MonsterContext ctx)
@@ -41,21 +45,24 @@ public class ChaseState : IMonsterState
             return;
         }
 
-        // 추격 이동 + 회전
-        ctx.Agent.SetDestination(ctx.Runtime.PlayerTarget.position);
+        // 추격 이동 + 회전 — 플레이어가 충분히 이동했을 때만 경로 재계산
+        Vector3 targetPos = ctx.Runtime.PlayerTarget.position;
+        if ((targetPos - _lastDestination).sqrMagnitude > DestinationUpdateThresholdSq)
+        {
+            ctx.Agent.SetDestination(targetPos);
+            _lastDestination = targetPos;
+        }
         FaceTarget(ctx);
 
-        // 이동 속도 파라미터 갱신 (선택)
+        // 이동 속도 파라미터 갱신 — 댐핑으로 블렌드 트리 부드럽게 전환
         if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
-            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
+            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude,
+                ctx.Animation.speedDampTime, Time.deltaTime);
     }
 
     public virtual void Exit(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
-
-        if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
-            ctx.Animator.SetFloat(ctx.Animation.speedParam, 0f);
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────

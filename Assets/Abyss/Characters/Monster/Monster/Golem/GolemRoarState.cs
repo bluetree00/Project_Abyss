@@ -59,12 +59,12 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
 
     private void ApplyRoarBlast(MonsterContext ctx)
     {
+        var selfDamageable = ctx.Monster as IDamageable;
         var colliders = Physics.OverlapSphere(ctx.Transform.position, Data.knockbackRadius);
         foreach (var col in colliders)
         {
-            // 자기 자신(골렘) 스킵
-            if (col.transform.IsChildOf(ctx.Transform) || col.transform == ctx.Transform)
-                continue;
+            // 자기 자신(골렘) 스킵 — transform 계층 + IDamageable 이중 체크
+            if (col.transform.IsChildOf(ctx.Transform)) continue;
 
             Vector3 rawDir = col.transform.position - ctx.Transform.position;
             rawDir.y = 0f;
@@ -76,16 +76,16 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
                       ?? col.GetComponentInParent<PlayerController>();
             if (player != null)
             {
-                player.TakeDamage((int)Data.knockbackDamage);
-                player.Rigid?.AddForce(blastDir * Data.knockbackForce * 3f, ForceMode.Impulse);
+                player.ApplyKnockback(blastDir * Data.knockbackForce * 3f, 0.4f);
                 continue;
             }
 
-            // IDamageable (다른 몬스터 등)
+            // IDamageable (다른 몬스터 등) — 자기 자신 제외
             var damageable = col.GetComponent<IDamageable>()
                           ?? col.GetComponentInParent<IDamageable>();
             if (damageable != null)
             {
+                if (damageable == selfDamageable) continue;
                 damageable.TakeDamage(Data.knockbackDamage, ctx.Monster.gameObject, Data.knockbackForce);
                 continue;
             }

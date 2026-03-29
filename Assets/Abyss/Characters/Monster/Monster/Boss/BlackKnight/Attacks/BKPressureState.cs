@@ -56,11 +56,11 @@ public class BKPressureState : FullLockState<BKPressurePatternSO>
         _startY    = ctx.Transform.position.y;
         _hit1Dealt = _hit2Dealt = _hit3Dealt = false;
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         FacePlayer(ctx);
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.pressureWindUpSfx, 0.5f);
-        ctx.Animator?.CrossFade(Data.hit1AnimState, 0.05f);
+        ctx.Animator?.CrossFade(Data.hit1AnimState, 0.05f, 0, 0f);
 
         _phase = Phase.WindUp;
         _timer = Data.windUpDuration;
@@ -98,7 +98,7 @@ public class BKPressureState : FullLockState<BKPressurePatternSO>
                 }
                 if (_timer <= 0f)
                 {
-                    ctx.Animator?.CrossFade(Data.hit2AnimState, 0.05f);
+                    ctx.Animator?.CrossFade(Data.hit2AnimState, 0.05f, 0, 0f);
                     _phase = Phase.Step;
                     _timer = 0.1f;
                 }
@@ -133,7 +133,7 @@ public class BKPressureState : FullLockState<BKPressurePatternSO>
                     // 각성 시 3타 추가
                     if (_bb.HasEnraged)
                     {
-                        ctx.Animator?.CrossFade(Data.hit3AnimState, 0.05f);
+                        ctx.Animator?.CrossFade(Data.hit3AnimState, 0.05f, 0, 0f);
                         _phase = Phase.StepFwd2;
                         _timer = 0.08f;
                     }
