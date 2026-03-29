@@ -16,7 +16,7 @@ MonoBehaviour:
   patternTag: Backstep
   breakOverride: 0.45
   backstepSfx: {fileID: 0}
-  backstepAnimState: Dodge
+  backstepAnimState: WalkBWD
   backstepCooldown: 6
   backstepDistance: 4.5
   backstepDuration: 0.4

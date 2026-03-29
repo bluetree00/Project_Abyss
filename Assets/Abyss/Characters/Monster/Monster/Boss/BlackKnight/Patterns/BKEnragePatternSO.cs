@@ -20,7 +20,7 @@ public class BKEnragePatternSO : BossPatternSO
 
     // ── Enrage 데이터 ─────────────────────────────────────
     [Header("Enrage")]
-    public string enrageAnimState    = "Roar";
+    public string enrageAnimState    = "Taunting";
     [Tooltip("각성 연출 정지 시간 (초) — 적을 바라보며 잠시 멈춤")]
     public float  enrageWindUp       = 0.6f;
     [Tooltip("포효 자세 유지 시간 (초)")]

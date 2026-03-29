@@ -119,26 +119,6 @@ public class Define
 
     }
 
-    public enum MonsterState
-    {
-        Idle,
-        Patrol,
-        Chase,
-        Attack,
-        Die
-    }
-
-    public enum MonsterAbilityType
-    {
-        None, // 기본값
-        Detect,
-        Patrol,
-        Chase,
-        Attack,
-
-        // ...
-    }
-
     public enum PlayerAbilityType
     {
         Dodge,

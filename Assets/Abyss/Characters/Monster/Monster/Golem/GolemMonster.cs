@@ -14,7 +14,6 @@ public class GolemMonster : MonsterBase
     protected override string DataAddress     => "Golem/GolemData";
     protected override float  HPBarHeadOffset => 1.0f;
 
-    private bool  _hasRoared;
     private float _rageTimer;
 
     // ── 매 프레임 ─────────────────────────────────────────
@@ -33,29 +32,12 @@ public class GolemMonster : MonsterBase
         base.Update();
     }
 
-    // ── 특수 상태 진입 훅 ──────────────────────────────────
-
-    protected override void OnDamageTaken()
-    {
-        var state = GetSpecialState(0);
-        if (state == null || _hasRoared) return;
-        if (_config.specialState0 is not GolemRoarData roarData) return;
-
-        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
-        if (hpRatio <= roarData.hpThreshold)
-        {
-            _hasRoared = true;
-            ChangeState(state);
-        }
-    }
-
     public void StartRageChase(float duration) => _rageTimer = duration;
 
-    // ── 풀 재사용 시 플래그 리셋 ──────────────────────────
+    // ── 풀 재사용 시 타이머 리셋 ──────────────────────────
 
     protected override void OnEnable()
     {
-        _hasRoared = false;
         _rageTimer = 0f;
         base.OnEnable();
     }

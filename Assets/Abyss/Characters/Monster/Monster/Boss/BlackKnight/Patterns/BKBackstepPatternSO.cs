@@ -17,7 +17,7 @@ public class BKBackstepPatternSO : BossPatternSO
 
     // ── Backstep 데이터 ───────────────────────────────────
     [Header("Backstep")]
-    public string backstepAnimState  = "Dodge";
+    public string backstepAnimState  = "Dodge_BackStep";
     [Tooltip("후퇴 발동 쿨다운 (초)")]
     public float  backstepCooldown   = 6f;
     [Tooltip("후퇴 이동 거리 (m)")]

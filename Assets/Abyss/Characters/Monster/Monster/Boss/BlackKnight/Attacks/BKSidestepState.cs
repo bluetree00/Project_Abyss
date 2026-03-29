@@ -28,6 +28,7 @@ public class BKSidestepState : FullLockState<BKSidestepPatternSO>
     private float   _timer;
     private Vector3 _stepDir;
     private float   _startY;
+    private bool    _isRight;
 
     public BKSidestepState(BKSidestepPatternSO data, BossAttackBlackboard bb) : base(data)
     {
@@ -57,13 +58,15 @@ public class BKSidestepState : FullLockState<BKSidestepPatternSO>
         toPlayer.Normalize();
 
         float side = Random.value > 0.5f ? 1f : -1f;
+        _isRight = side > 0f;
         _stepDir = new Vector3(-toPlayer.z * side, 0f, toPlayer.x * side);
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         ctx.Agent.enabled = false;
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.sidestepSfx, 0.4f);
-        ctx.Animator?.CrossFade(Data.sidestepAnimState, 0.05f);
+        string anim = _isRight ? Data.sidestepRightAnimState : Data.sidestepLeftAnimState;
+        ctx.Animator?.CrossFade(anim, 0.05f, 0, 0f);
 
         _phase = Phase.Sidestep;
         _timer = Data.sidestepDuration;

@@ -45,11 +45,11 @@ public class BKEnrageState : FullLockState<BKEnragePatternSO>
         _renderers   = ctx.Transform.GetComponentsInChildren<Renderer>(true);
         _statsApplied = false;
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         FacePlayer(ctx);
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.enrageSfx, 0.8f);
-        ctx.Animator?.CrossFade(Data.enrageAnimState, 0.05f);
+        ctx.Animator?.CrossFade(Data.enrageAnimState, 0.05f, 0, 0f);
 
         _phase = Phase.WindUp;
         _timer = Data.enrageWindUp;

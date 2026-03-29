@@ -35,26 +35,5 @@ public class FairyBatMonster : MonsterBase
     protected override string HeadBoneName     => null;
     protected override float  HPBarHeadOffset  => 0.2f;
 
-    private bool _hasFled;
-
-    protected override void OnEnable()
-    {
-        _hasFled = false;
-        base.OnEnable();
-    }
-
-    protected override void OnDamageTaken()
-    {
-        var state = GetSpecialState(0);
-        if (state == null || _hasFled) return;
-        if (_config.specialState0 is not FairyBatFleeData fleeData) return;
-
-        float hpRatio = (float)_runtime.CurrentHp / _config.stat.maxHp;
-        if (hpRatio <= fleeData.hpThreshold)
-        {
-            _hasFled = true;
-            ChangeState(state);
-        }
-    }
 }
 }

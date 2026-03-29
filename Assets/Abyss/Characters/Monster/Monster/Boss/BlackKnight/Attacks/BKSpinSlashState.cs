@@ -74,6 +74,10 @@ public class BKSpinSlashState : FullLockState<BKSpinSlashPatternSO>
     // ── FSM Enter/Update/Exit ────────────────────────────
     public override void Enter(MonsterContext ctx)
     {
+        // 임계값을 Enter에서 즉시 소모 → 같은 프레임에 HandleForceInterrupts가 재평가해도
+        // IsHpThresholdMet()가 false를 반환하므로 중복 예약(두 번 발동)이 방지된다.
+        _nextThresholdIndex++;
+
         _timer            = Data.spinDuration;
         _hitIntervalTimer = 0f;
         _spinning         = false;
@@ -82,7 +86,7 @@ public class BKSpinSlashState : FullLockState<BKSpinSlashPatternSO>
 
         _bb.AudioPool?.Play(ctx.Transform.position, Data.spinSfx, 0.5f);
 
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
 
         // 경고 장판: 차지 구간 동안만 표시
         _indicator?.ShowCircle(ctx.Transform, Data.spinRadius, Data.spinDuration * Data.spinChargeRatio);
@@ -92,7 +96,7 @@ public class BKSpinSlashState : FullLockState<BKSpinSlashPatternSO>
             : "Animator null";
         Debug.Log($"[SpinSlash] ▶ Enter | anim={Data.spinAnimState} | ctrl={ctrlName} | HP={ctx.Runtime.CurrentHp}/{ctx.Config.stat.maxHp}");
 
-        ctx.Animator?.CrossFade(Data.spinAnimState, 0.1f);
+        ctx.Animator?.CrossFade(Data.spinAnimState, 0.1f, 0, 0f);
     }
 
     public override void Update(MonsterContext ctx)
@@ -139,7 +143,7 @@ public class BKSpinSlashState : FullLockState<BKSpinSlashPatternSO>
     {
         _indicator?.HideCircle();
         ClearTint(_renderers);
-        _nextThresholdIndex++;
+        // _nextThresholdIndex 는 Enter() 에서 이미 증가시킴
         // 스핀 슬래시 완료마다 운석 페이즈 상승 (최대 2)
         if (_bb.RainPhase < 2) _bb.RainPhase++;
     }

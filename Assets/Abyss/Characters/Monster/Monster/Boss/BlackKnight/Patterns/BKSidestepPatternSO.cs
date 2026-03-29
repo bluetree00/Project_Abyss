@@ -21,7 +21,10 @@ public class BKSidestepPatternSO : BossPatternSO
 
     // ── Sidestep 데이터 ───────────────────────────────────
     [Header("Sidestep")]
-    public string sidestepAnimState  = "Dodge";
+    [Tooltip("오른쪽으로 이동할 때 사용할 애니메이션")]
+    public string sidestepRightAnimState = "WalkRight";
+    [Tooltip("왼쪽으로 이동할 때 사용할 애니메이션")]
+    public string sidestepLeftAnimState  = "WalkLeft";
     [Tooltip("발동 최대 거리 (m)")]
     public float  sidestepRange      = 5f;
     [Tooltip("BackstepCooldown 에 설정될 값 (초)")]

@@ -12,6 +12,5 @@ public enum SpecialStateConstraint
     UnInterruptible = 1 << 0,  // GetHit 상태 전환 차단 (데미지는 들어옴)
     MovementLocked  = 1 << 1,  // NavMeshAgent 이동 정지
     Invincible      = 1 << 2,  // TakeDamage 자체 무시
-    RotationLocked  = 1 << 3,  // 회전 불가
 }
 }

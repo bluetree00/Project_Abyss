@@ -56,9 +56,10 @@ public class PatrolState : IMonsterState
             return;
         }
 
-        // Blend 파라미터 갱신 (BlendTree 이동 애니메이션 구동)
+        // Blend 파라미터 갱신 — 댐핑으로 블렌드 트리 부드럽게 전환
         if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
-            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude);
+            ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude,
+                ctx.Animation.speedDampTime, Time.deltaTime);
 
         // 목적지 도착 판정
         if (ctx.Agent.isOnNavMesh &&
@@ -125,6 +126,7 @@ public class PatrolState : IMonsterState
     protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
+        if (!ctx.Animator.gameObject.activeInHierarchy) return;
         ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
     }
 }

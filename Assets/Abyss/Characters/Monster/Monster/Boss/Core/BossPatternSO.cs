@@ -50,6 +50,13 @@ public abstract class BossPatternSO : SpecialStateDataBase
     public abstract bool CanExecute(BossPatternContext ctx);
 
     /// <summary>
+    /// 강제 실행 엔트리에서 이 패턴을 지금 인터럽트할 수 있으면 true.
+    /// 기본 구현: CanExecute(ctx) 에 위임.
+    /// 특수 패턴(예: SpinSlash)은 거리 무관 HP 임계값만 체크하도록 오버라이드한다.
+    /// </summary>
+    public virtual bool CanForceInterrupt(BossPatternContext ctx) => CanExecute(ctx);
+
+    /// <summary>
     /// Initialize 이후 유효한 런타임 상태 인스턴스를 반환한다.
     /// 보스가 ChangeState(state)를 호출할 때 사용.
     /// </summary>

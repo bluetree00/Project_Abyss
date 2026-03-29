@@ -23,7 +23,7 @@ public class BKSpinSlashPatternSO : BossPatternSO
 
     // ── SpinSlash 데이터 ──────────────────────────────────
     [Header("SpinSlash")]
-    public string spinAnimState     = "Attack02";
+    public string spinAnimState     = "SpinAttack";
     [Tooltip("전체 지속 시간 (초)")]
     public float  spinDuration      = 10f;
     [Tooltip("차지 구간 비율 (0~1)")]
@@ -67,16 +67,20 @@ public class BKSpinSlashPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
         => _state != null && _state.CanExecute(ctx.Ctx);
 
+    /// <summary>
+    /// 강제 인터럽트 판정 — 거리 무관, HP 임계값만 체크.
+    /// Force 엔트리에서 현재 패턴이 끝나는 즉시 SpinSlash 로 진입할지 결정한다.
+    /// </summary>
+    public override bool CanForceInterrupt(BossPatternContext ctx)
+        => _state != null && _state.IsHpThresholdMet(ctx.Ctx);
+
     public override SpecialStateBase GetRuntimeState() => _state;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // SpinSlash 전용 API
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>
-    /// 거리 무관하게 HP 임계값 충족 여부만 확인.
-    /// BKSpinPhaseConditionSO 에서 페이즈 인터럽트 판정에 사용.
-    /// </summary>
+    /// <summary>거리 무관하게 HP 임계값 충족 여부만 확인.</summary>
     public bool IsHpThresholdMet(BossPatternContext ctx)
         => _state != null && _state.IsHpThresholdMet(ctx.Ctx);
 }

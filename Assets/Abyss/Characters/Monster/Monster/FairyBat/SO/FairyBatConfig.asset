@@ -17,12 +17,52 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  stat: {fileID: 11400000, guid: 5e5fd27df6d0fb9469b12d174b10d513, type: 2}
-  detection: {fileID: 11400000, guid: 8839ad1cd89a7a949811d5a23d36bb71, type: 2}
-  patrol: {fileID: 11400000, guid: 4a4852ccf9c5d93408691901a82dbb6f, type: 2}
-  combat: {fileID: 11400000, guid: 4bf6f1ab2922faf4fb1428c53e107324, type: 2}
-  animation: {fileID: 11400000, guid: c86466897d3717c40975b0afe6896a3d, type: 2}
-  specialState0: {fileID: 11400000, guid: 747d185ca60fa2a41ae66b4d1372c260, type: 2}
-  specialState1: {fileID: 0}
-  specialState2: {fileID: 0}
-  specialState3: {fileID: 0}
+  stat:
+    maxHp: 10
+    defense: 1
+    attackPower: 10
+    moveSpeed: 3
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 1
+    attackDelay: 0.2
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 5
+    chaseGiveUpRange: 8
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1.5
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: FairyBat/FairyBatAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomething
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  specialStates:
+  - conditions:
+    - {fileID: 11400000, guid: 38efe0d8eaabc0b4580d8205554ff856, type: 2}
+    state: {fileID: 11400000, guid: 747d185ca60fa2a41ae66b4d1372c260, type: 2}
+    oneShot: 1
+  chaseState: {fileID: 0}
+  patrolState: {fileID: 0}
+  attackReadyState: {fileID: 0}
+  attackState: {fileID: 0}
+  getHitState: {fileID: 0}
+  dieState: {fileID: 0}
+  stateOverrides: []
