@@ -15,7 +15,9 @@
       "WebFetch(domain:backnd.com)",
       "WebFetch(domain:namu.wiki)",
       "Bash(git fetch:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude"
