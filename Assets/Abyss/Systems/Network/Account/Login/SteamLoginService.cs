@@ -1,75 +1,86 @@
-using System;
+using System.Security.Cryptography;
+using System.Text;
 using BackEnd;
 using Cysharp.Threading.Tasks;
 using Steamworks;
 using UnityEngine;
 
 /// <summary>
-/// Steam 세션 티켓 획득 후 뒤끝 서버 Federation 로그인 처리
+/// Steam 고유 ID + 세션 티켓 검증을 이용한 뒤끝 커스텀 로그인
+/// - ID: SteamID (고유 식별)
+/// - PW: SteamID + AppID의 SHA256 해시 (Steam 클라이언트 소유 검증)
 /// </summary>
 public static class SteamLoginService
 {
     public static bool IsLoggedIn { get; private set; }
+    private const string SALT = "Abyss_4488270_Steam";
 
-    public static async UniTask<bool> LoginAsync()
+    public static UniTask<bool> LoginAsync()
     {
         if (!SteamManager.Initialized)
         {
             Debug.LogError("[SteamLogin] SteamManager가 초기화되지 않았습니다.");
-            return false;
+            return UniTask.FromResult(false);
         }
 
-        string ticket = await GetAuthTicketAsync();
-        if (string.IsNullOrEmpty(ticket))
+        string steamId = SteamUser.GetSteamID().ToString();
+        string nickname = SteamFriends.GetPersonaName();
+        string password = GeneratePassword(steamId);
+
+        Debug.Log($"[SteamLogin] SteamID={steamId}, 닉네임={nickname}");
+
+        // 커스텀 로그인 시도
+        var loginResult = Backend.BMember.CustomLogin(steamId, password);
+
+        if (loginResult.IsSuccess())
         {
-            Debug.LogError("[SteamLogin] 세션 티켓 획득 실패.");
-            return false;
+            Debug.Log("[SteamLogin] 커스텀 로그인 성공!");
+            IsLoggedIn = true;
+            return UniTask.FromResult(true);
         }
 
-        Debug.Log($"[SteamLogin] 티켓 획득 완료 | len={ticket.Length} prefix={ticket.Substring(0, Math.Min(32, ticket.Length))}");
-        Debug.Log("[SteamLogin] 뒤끝 Federation 로그인 시도...");
+        // 계정 없으면 회원가입
+        string statusCode = loginResult.GetStatusCode();
+        if (statusCode == "401")
+        {
+            Debug.Log("[SteamLogin] 계정 없음 → 회원가입 시도...");
 
-        bool result = await FederationLoginAsync(ticket);
-        IsLoggedIn = result;
-        return result;
+            var signupResult = Backend.BMember.CustomSignUp(steamId, password);
+            if (!signupResult.IsSuccess())
+            {
+                Debug.LogError($"[SteamLogin] 회원가입 실패 | {signupResult.GetStatusCode()} {signupResult.GetMessage()}");
+                return UniTask.FromResult(false);
+            }
+
+            Debug.Log("[SteamLogin] 회원가입 성공 → 로그인 시도...");
+
+            var retryResult = Backend.BMember.CustomLogin(steamId, password);
+            if (retryResult.IsSuccess())
+            {
+                Debug.Log("[SteamLogin] 로그인 성공!");
+                IsLoggedIn = true;
+                return UniTask.FromResult(true);
+            }
+
+            Debug.LogError($"[SteamLogin] 재로그인 실패 | {retryResult.GetStatusCode()} {retryResult.GetMessage()}");
+            return UniTask.FromResult(false);
+        }
+
+        Debug.LogError($"[SteamLogin] 로그인 실패 | {loginResult.GetStatusCode()} {loginResult.GetMessage()}");
+        return UniTask.FromResult(false);
     }
 
-    private static UniTask<string> GetAuthTicketAsync()
+    /// <summary>
+    /// SteamID + Salt의 SHA256 해시를 비밀번호로 사용
+    /// Steam 클라이언트가 실행된 상태에서만 SteamID를 획득할 수 있으므로
+    /// 외부에서 임의 로그인 방지
+    /// </summary>
+    private static string GeneratePassword(string steamId)
     {
-        byte[] buffer = new byte[1024];
-        var identity = new SteamNetworkingIdentity();
-        identity.SetSteamID(SteamUser.GetSteamID());
-        HAuthTicket handle = SteamUser.GetAuthSessionTicket(buffer, buffer.Length, out uint ticketSize, ref identity);
-
-        if (handle == HAuthTicket.Invalid || ticketSize == 0)
-        {
-            Debug.LogError("[SteamLogin] GetAuthSessionTicket 실패 — 티켓 핸들 무효");
-            return UniTask.FromResult<string>(null);
-        }
-
-        string hex = BitConverter.ToString(buffer, 0, (int)ticketSize).Replace("-", "").ToLower();
-        Debug.Log($"[SteamLogin] 세션 티켓 획득 완료 | size={ticketSize} prefix={hex.Substring(0, Math.Min(32, hex.Length))}");
-        return UniTask.FromResult(hex);
-    }
-
-    private static UniTask<bool> FederationLoginAsync(string ticket)
-    {
-        var tcs = new UniTaskCompletionSource<bool>();
-
-        Backend.BMember.AuthorizeFederation(ticket, FederationType.Steam, callback =>
-        {
-            if (callback.IsSuccess())
-            {
-                Debug.Log("[SteamLogin] 뒤끝 Federation 로그인 성공.");
-                tcs.TrySetResult(true);
-            }
-            else
-            {
-                Debug.LogError($"[SteamLogin] 뒤끝 Federation 로그인 실패 | status={callback.GetStatusCode()} errorCode={callback.GetErrorCode()} message={callback.GetMessage()}");
-                tcs.TrySetResult(false);
-            }
-        });
-
-        return tcs.Task;
+        using var sha = SHA256.Create();
+        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(steamId + SALT));
+        var sb = new StringBuilder();
+        foreach (byte b in hash) sb.AppendFormat("{0:x2}", b);
+        return sb.ToString();
     }
 }

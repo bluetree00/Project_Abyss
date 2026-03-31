@@ -6,8 +6,7 @@ public class ActRSkillState : ActSkillStateBase<ActState>
 
     private AbilityExecution _execution;
 
-    protected override float GetCooldown()
-        => _controller.WeaponManager?.MainWeaponData?.skillRCooldown ?? 0f;
+    protected override float GetCooldown() => 0f;
 
     protected override void OnEnter()
     {

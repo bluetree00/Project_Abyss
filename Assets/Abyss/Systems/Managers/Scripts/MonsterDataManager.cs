@@ -73,15 +73,40 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
 
     private async UniTask LoadFromServerAsync()
     {
-        var bro = Backend.Chart.GetChartContents(ChartId);
-
-        if (!bro.IsSuccess())
+        // CDN 차트 테이블 목록 → 다운로드 → 로컬 저장 → 로드
+        var tableResult = Backend.CDN.Content.Table.Get();
+        if (!tableResult.IsSuccess())
         {
-            Debug.LogError($"몬스터 데이터 서버 요청 실패: {bro.GetStatusCode()}");
+            Debug.LogError($"몬스터 데이터 테이블 조회 실패: {tableResult.GetStatusCode()}");
             return;
         }
 
-        var rows = bro.FlattenRows();
+        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
+        if (!contentResult.IsSuccess())
+        {
+            Debug.LogError($"몬스터 데이터 다운로드 실패: {contentResult.GetStatusCode()}");
+            return;
+        }
+
+        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
+        var localResult = Backend.CDN.Content.Local.Load();
+        if (!localResult.IsSuccess())
+        {
+            Debug.LogError($"몬스터 데이터 로컬 로드 실패");
+            return;
+        }
+
+        var dic = localResult.GetContentDictionarySortByChartId();
+        if (!dic.ContainsKey(ChartId))
+        {
+            Debug.LogError($"ChartId {ChartId} not found in CDN content");
+            return;
+        }
+
+        var jsonStr = dic[ChartId].contentJson.ToString();
+        var json = LitJson.JsonMapper.ToObject(jsonStr);
+        var rows = new List<object>();
+        foreach (LitJson.JsonData item in json) rows.Add(item);
         int updateCount = 0;
 
         foreach (var rowObj in rows)
