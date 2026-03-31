@@ -16,7 +16,7 @@ MonoBehaviour:
   weaponPrefabKey: TestBowPrefab
   displayName: "\uB300\uB2E8\uD55C \uD65C"
   iconKey: "\uC544\uC9C1\uC5C6\uC74C"
-  icon: {fileID: 21300000, guid: 962d8365913f04935b5da32f81c41988, type: 3}
+  icon: {fileID: 21300000, guid: 317ea84782703cb458223b3543bc2c79, type: 3}
   baseAttack: 10
   baseDefense: 10
   groundEndCount: 2
@@ -26,6 +26,9 @@ MonoBehaviour:
   colliderPackage: {fileID: 11400000, guid: 40ca726e49d81b34f935026c0057bcb6, type: 2}
   abilitySet: {fileID: 11400000, guid: 1123aee89c710c74885c8a9b9298cdfb, type: 2}
   weaponType: 2
+  slotType: 0
+  skillName: 
+  skillDescription: 
   holdThreshold: 0
   promoteMode: 0
   chargeStages: 1

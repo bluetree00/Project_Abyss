@@ -154,7 +154,7 @@ public class UIManager
 
     #endregion
 
-    #region Popup UI (Canvas_Popup / 런타임 생성)
+    #region Popup UI (Canvas_Popup)
 
     public void ShowPopupUI<T>(string name = null)
         where T : UI_Popup

@@ -31,8 +31,12 @@ public class WeaponSO : ScriptableObject
     public WeaponSlotType slotType = WeaponSlotType.Main; // Main: 일반 공격 + E/R스킬, Sub: Q스킬 전용
 
     [Header("UI 설명")]
-    public string skillName;        // 스킬 이름 (서브 장비: Q스킬 이름)
-    public string skillDescription; // 스킬 설명 (서브 장비 교체 팝업용)
+    public string skillName;
+    public string skillDescription;
+
+    [Header("스킬 아이콘")]
+    public Sprite skillQIcon;       // Q 스킬 아이콘
+    public Sprite skillEIcon;       // E 스킬 아이콘
 
     [Header("차지/강화 공격 설정")]
     public float holdThreshold;

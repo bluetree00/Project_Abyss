@@ -7,7 +7,7 @@ public class ActESkillState : ActSkillStateBase<ActState>
     private AbilityExecution _execution;
 
     protected override float GetCooldown()
-        => _controller.WeaponManager?.MainWeaponData?.skillECooldown ?? 0f;
+        => _controller.WeaponManager?.CurrentWeaponData?.skillECooldown ?? 0f;
 
     protected override void OnEnter()
     {
@@ -33,7 +33,7 @@ public class ActESkillState : ActSkillStateBase<ActState>
     {
         string animName = "ESkill_01";
 
-        var wd = _controller.WeaponManager?.MainWeaponData;
+        var wd = _controller.WeaponManager?.CurrentWeaponData;
         if (wd?.animationSet is WeaponAnimationSetSO animSet)
         {
             var mapping = animSet.GetMappings(WeaponAnimGroup.Ground, WeaponActionType.ESkill)

@@ -14,7 +14,8 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private GameObject       bossPanelRoot;
     [SerializeField] private GameObject       systemNoticesRoot;
 
-    [Header("TopBar — Gold")]
+    [Header("TopBar — Info")]
+    [SerializeField] private TMP_Text nicknameText;
     [SerializeField] private TMP_Text goldText;
 
     // ─────────────────────────────────────────────────────────
@@ -36,6 +37,12 @@ public sealed class HudView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     // TopBar 데이터 갱신 (HudPresenter → 여기)
     // ─────────────────────────────────────────────────────────
+    public void SetNickname(string nickname)
+    {
+        if (nicknameText != null)
+            nicknameText.text = nickname;
+    }
+
     public void SetGold(int gold)
     {
         if (goldText != null)

@@ -1,0 +1,52 @@
+[@HUD] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=-
+  [Panel_TopBar] pos=(-10.00, -10.00) size=(160.00, 40.00) anchorMin=(1.00, 1.00) anchorMax=(1.00, 1.00) pivot=(1.00, 1.00) | img=button short dark
+    [HUD_Map] pos=(-30.00, -30.00) size=(150.00, 150.00) anchorMin=(1.00, 1.00) anchorMax=(1.00, 1.00) pivot=(1.00, 1.00) | img=-
+    [HUD_SetUp] pos=(30.00, -30.00) size=(150.00, 150.00) anchorMin=(0.00, 1.00) anchorMax=(0.00, 1.00) pivot=(0.00, 1.00) | img=icon white_setting
+    [GoldIcon] pos=(20.00, 0.00) size=(28.00, 28.00) anchorMin=(0.00, 0.50) anchorMax=(0.00, 0.50) pivot=(0.50, 0.50) | img=Icon_coin
+  [Panel_Combat] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=-
+    [CombatStatusRoot] pos=(0.00, 15.00) size=(650.00, 130.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.00) | img=button short dark
+      [HUD_Hp] pos=(184.00, 103.00) size=(152.00, 24.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=-
+        [Background] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=State_blank
+        [Fill Area] pos=(-5.00, 0.00) size=(-20.00, 0.00) anchorMin=(0.00, 0.25) anchorMax=(1.00, 0.75) pivot=(0.50, 0.50) | img=-
+          [Fill] pos=(0.00, 0.00) size=(10.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=State_red
+        [HUD_HpText] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=-
+        [HP_Icon] pos=(-16.00, 0.00) size=(24.00, 24.00) anchorMin=(0.00, 0.50) anchorMax=(0.00, 0.50) pivot=(0.50, 0.50) | img=State_HP2
+      [WeaponPanel] pos=(0.00, 84.00) size=(170.00, 78.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=-
+        [Weapon_01] pos=(-46.00, 0.00) size=(78.00, 78.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=E_BG
+          [Icon] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+          [EmptyRoot] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+          [EmptySlot] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.10, 0.10) anchorMax=(0.90, 0.90) pivot=(0.50, 0.50) | img=E_Blank
+        [Weapon_02] pos=(46.00, 0.00) size=(78.00, 78.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=E_BG
+          [Icon] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+          [EmptyRoot] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+          [EmptySlot] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.10, 0.10) anchorMax=(0.90, 0.90) pivot=(0.50, 0.50) | img=E_Blank
+      [HUD_QSkile] pos=(138.00, 50.80) size=(68.00, 68.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=C_circle
+        [SkillIcon] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.15, 0.15) anchorMax=(0.85, 0.85) pivot=(0.50, 0.50) | img=-
+        [Cooldown_BG] pos=(30.80, -10.50) size=(28.00, 16.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(0.50, 0.50) | img=number background dark
+        [KeyLabel] pos=(32.80, -12.50) size=(24.00, 20.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(0.50, 0.50) | img=-
+      [HUD_ESkile] pos=(212.00, 50.80) size=(68.00, 68.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=C_circle
+        [SkillIcon] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.15, 0.15) anchorMax=(0.85, 0.85) pivot=(0.50, 0.50) | img=-
+        [Cooldown_BG] pos=(39.50, -12.10) size=(28.00, 16.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(0.50, 0.50) | img=number background dark
+        [KeyLabel] pos=(41.50, -14.10) size=(24.00, 20.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(0.50, 0.50) | img=-
+      [HUD_Active_01] pos=(-240.30, 49.00) size=(50.00, 50.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=F_Red
+        [SkillIcon] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.10, 0.10) anchorMax=(0.90, 0.90) pivot=(0.50, 0.50) | img=-
+        [KeyLabel] pos=(50.00, 2.00) size=(18.00, 16.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(1.00, 0.00) | img=-
+      [HUD_Active_02] pos=(-182.30, 49.00) size=(50.00, 50.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=F_Red
+        [SkillIcon] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.10, 0.10) anchorMax=(0.90, 0.90) pivot=(0.50, 0.50) | img=-
+        [KeyLabel] pos=(50.00, 2.00) size=(18.00, 16.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(1.00, 0.00) | img=-
+      [HUD_Active_03] pos=(-124.30, 49.00) size=(50.00, 50.00) anchorMin=(0.50, 0.00) anchorMax=(0.50, 0.00) pivot=(0.50, 0.50) | img=F_Red
+        [SkillIcon] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.10, 0.10) anchorMax=(0.90, 0.90) pivot=(0.50, 0.50) | img=-
+        [KeyLabel] pos=(50.00, 2.00) size=(18.00, 16.00) anchorMin=(0.00, 0.00) anchorMax=(0.00, 0.00) pivot=(1.00, 0.00) | img=-
+  [Panel_Grid] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=-
+    [Puzzle] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+      [SelectionRoot] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [LeeGridRoder] pos=(50.00, -50.00) size=(100.00, 100.00) anchorMin=(0.00, 1.00) anchorMax=(0.00, 1.00) pivot=(0.50, 0.50) | img=-
+      [GameplayRoot] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [GridHost] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [ShapeHost] pos=(100.33, 57.35) size=(100.00, 0.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [ShapeScrollView] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [BackButton] pos=(800.00, -500.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=2_1
+        [leeGridManagerObj] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+        [LeeBoardManagerObj] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-
+  [Panel_explore] pos=(0.00, 0.00) size=(0.00, 0.00) anchorMin=(0.00, 0.00) anchorMax=(1.00, 1.00) pivot=(0.50, 0.50) | img=-
+  [Panel_boss] pos=(0.00, 0.00) size=(100.00, 100.00) anchorMin=(0.50, 0.50) anchorMax=(0.50, 0.50) pivot=(0.50, 0.50) | img=-

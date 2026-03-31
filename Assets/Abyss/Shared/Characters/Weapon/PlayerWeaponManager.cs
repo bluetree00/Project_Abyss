@@ -19,8 +19,8 @@ public interface IWeaponProvider
 
 public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 {
-    public const int MainSlot = 0;  // 메인 무기: 일반 공격 + E/R 스킬
-    public const int SubSlot  = 1;  // 서브 장비: Q 스킬 전용
+    public const int MainSlot = 0;  // 메인 무기 슬롯 0
+    public const int SubSlot  = 1;  // 메인 무기 슬롯 1
 
     public int SlotCount => 2;
 
@@ -41,10 +41,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     private int currentSlotIndex = -1;
     private bool _isSwitching = false;
 
-    /// <summary>메인 무기 데이터 (공격 + E/R 스킬)</summary>
+    /// <summary>슬롯 0 무기 데이터</summary>
     public WeaponData MainWeaponData => slots[MainSlot]?.runtimeData;
 
-    /// <summary>서브 장비 데이터 (Q 스킬 전용)</summary>
+    /// <summary>슬롯 1 무기 데이터</summary>
     public WeaponData SubWeaponData  => slots[SubSlot]?.runtimeData;
 
     // 기본 풀 사이즈 (필요시 변경)
@@ -144,9 +144,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (autoEquip)
         {
-            int targetSlot = runtimeData.slotType == WeaponSlotType.Sub ? SubSlot : MainSlot;
-            bool isMain    = targetSlot == MainSlot;
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: isMain);
+            int targetSlot = GetFirstEmptySlotIndex();
+            if (targetSlot < 0) targetSlot = MainSlot;
+            await EquipToSlotAsync(targetSlot, runtimeData, setActive: targetSlot == MainSlot);
         }
     }
 
@@ -299,16 +299,15 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             return;
         }
 
-        // slotType 기반 1대1 교체: Main → Slot 0, Sub → Slot 1
-        int targetSlot = runtimeData.slotType == WeaponSlotType.Sub ? SubSlot : MainSlot;
-        bool isMain    = targetSlot == MainSlot;
+        int targetSlot = GetFirstEmptySlotIndex();
+        if (targetSlot < 0) targetSlot = MainSlot;
 
         if (slots[targetSlot].IsEmpty)
         {
             // 빈 슬롯: 바로 장착
             _owned.Add(runtimeData);
             source?.ConfirmPickup();
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: isMain);
+            await EquipToSlotAsync(targetSlot, runtimeData, setActive: targetSlot == MainSlot);
             return;
         }
 
