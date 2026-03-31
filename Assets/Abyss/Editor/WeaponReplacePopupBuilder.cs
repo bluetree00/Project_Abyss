@@ -1,4 +1,5 @@
 // WeaponReplacePopupBuilder.cs  — Tools → "Build WeaponReplacePopup Prefab"
+// V2: 상단 새 장비 + 하단 슬롯 2개 비교 + 델타 표시
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,18 +14,16 @@ public static class WeaponReplacePopupBuilder
     // ── 색상 ──────────────────────────────────────────────────────────
     private static readonly Color BgPanel      = new Color(0.10f, 0.11f, 0.15f, 1.00f);
     private static readonly Color BgBlocker    = new Color(0.00f, 0.00f, 0.00f, 0.65f);
-    private static readonly Color BgSide       = new Color(1.00f, 1.00f, 1.00f, 0.04f);
-    private static readonly Color BgStats      = new Color(1.00f, 1.00f, 1.00f, 0.03f);
+    private static readonly Color BgCard       = new Color(1.00f, 1.00f, 1.00f, 0.04f);
+    private static readonly Color BgNewWeapon  = new Color(1.00f, 0.95f, 0.80f, 0.08f);
     private static readonly Color ColorGold    = new Color(1.00f, 0.85f, 0.40f, 1.00f);
     private static readonly Color ColorLabel   = new Color(0.65f, 0.65f, 0.65f, 1.00f);
     private static readonly Color ColorDivider = new Color(1.00f, 1.00f, 1.00f, 0.10f);
     private static readonly Color BtnReplace   = new Color(0.18f, 0.55f, 0.28f, 1.00f);
     private static readonly Color BtnDiscard   = new Color(0.60f, 0.18f, 0.18f, 1.00f);
 
-    private const float PanelW   = 920f;
-    private const float PanelH   = 580f;
-    private const float HeaderH  = 200f; // 헤더(아이콘) 영역 높이
-    private const float BtnAreaH = 72f;
+    private const float PanelW = 920f;
+    private const float PanelH = 620f;
 
     [MenuItem("Tools/Build WeaponReplacePopup Prefab")]
     public static void Build()
@@ -47,250 +46,272 @@ public static class WeaponReplacePopupBuilder
         Center(panel, PanelW, PanelH, 0, 0);
         panel.AddComponent<Image>().color = BgPanel;
 
-        // ── Title / SlotLabel ─────────────────────────────────────────
+        // ── Title ─────────────────────────────────────────────────────
         var titleGO = O("Title", panel.transform);
-        AnchorTop(titleGO, PanelW - 40f, 44f, 0, -26f);
-        T(titleGO, "새 무기 획득!", 25f, FontStyles.Bold,
+        AnchorTop(titleGO, PanelW - 40f, 40f, 0, -16f);
+        T(titleGO, "장비 교체", 24f, FontStyles.Bold,
             TextAlignmentOptions.Center, Color.white, font);
 
-        var slotLabelGO = O("SlotLabel", panel.transform);
-        AnchorTop(slotLabelGO, PanelW - 40f, 26f, 0, -64f);
-        var slotLabelTmp = T(slotLabelGO, "─── 메인 무기 ───", 14f,
-            FontStyles.Normal, TextAlignmentOptions.Center, ColorGold, font);
+        // ══════════════════════════════════════════════════════════════
+        // 상단: 새 장비 카드 (가로 배치 — 아이콘 왼쪽, 스탯 오른쪽)
+        // ══════════════════════════════════════════════════════════════
+        var newArea = O("NewWeaponArea", panel.transform);
+        AnchorTop(newArea, PanelW - 40f, 160f, 0, -62f);
+        newArea.AddComponent<Image>().color = BgNewWeapon;
 
-        // ── HeaderArea (좌/우 아이콘 영역) ────────────────────────────
-        float statsTop = -(88f + HeaderH);          // Title+SlotLabel 여백
-        var headerGO = O("HeaderArea", panel.transform);
-        AnchorTop(headerGO, PanelW, HeaderH, 0, -88f);
+        // 새 장비 라벨
+        var newLblGO = O("NewLabel", newArea.transform);
+        Split(newLblGO, 0f, 0.82f, 1f, 1f);
+        T(newLblGO, "★ 새로운 장비 ★", 14f, FontStyles.Bold,
+            TextAlignmentOptions.Center, ColorGold, font);
 
-        var leftGO = O("LeftPanel", headerGO.transform);
-        Split(leftGO, 0f, 0f, 0.5f, 1f);
-        leftGO.AddComponent<Image>().color = BgSide;
+        // 아이콘
+        var newIconGO = O("NewIcon", newArea.transform);
+        Split(newIconGO, 0.04f, 0.08f, 0.25f, 0.78f);
+        var newIconImg = newIconGO.AddComponent<Image>();
+        newIconImg.color = new Color(1, 1, 1, 0.12f);
+        newIconImg.preserveAspect = true;
 
-        var divV = O("DividerV", headerGO.transform);
-        Split(divV, 0.5f, 0f, 0.5f, 1f);
-        divV.GetComponent<RectTransform>().sizeDelta = new Vector2(1f, 0f);
-        divV.AddComponent<Image>().color = ColorDivider;
+        // 이름
+        var newNameGO = O("NewName", newArea.transform);
+        Split(newNameGO, 0.28f, 0.58f, 0.95f, 0.78f);
+        var newNameTmp = T(newNameGO, "—", 18f, FontStyles.Bold,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-        var rightGO = O("RightPanel", headerGO.transform);
-        Split(rightGO, 0.5f, 0f, 1f, 1f);
-        rightGO.AddComponent<Image>().color = BgSide;
+        // ATK
+        var newAtkGO = O("NewAtk", newArea.transform);
+        Split(newAtkGO, 0.28f, 0.38f, 0.60f, 0.56f);
+        var newAtkTmp = T(newAtkGO, "ATK: 0", 15f, FontStyles.Normal,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-        var (curIcon, curName) = BuildHeader(leftGO.transform,  "현재 장비", ColorLabel, font);
-        var (newIcon, newName) = BuildHeader(rightGO.transform, "새 장비",   Color.white, font);
+        // DEF
+        var newDefGO = O("NewDef", newArea.transform);
+        Split(newDefGO, 0.28f, 0.18f, 0.60f, 0.36f);
+        var newDefTmp = T(newDefGO, "DEF: 0", 15f, FontStyles.Normal,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-        // ── 구분선 ────────────────────────────────────────────────────
-        var divH = O("DividerH", panel.transform);
-        AnchorTop(divH, PanelW, 1f, 0, statsTop);
-        divH.AddComponent<Image>().color = ColorDivider;
+        // Skill text
+        var newSkillGO = O("NewSkill", newArea.transform);
+        Split(newSkillGO, 0.28f, 0.02f, 0.55f, 0.18f);
+        var newSkillTmp = T(newSkillGO, "---", 13f, FontStyles.Italic,
+            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
 
-        // ── 메인 스탯 섹션 ────────────────────────────────────────────
-        float statsAreaH = PanelH - 88f - HeaderH - 1f - BtnAreaH - 8f;
-        var mainSec = O("MainStatsSection", panel.transform);
-        AnchorTop(mainSec, PanelW, statsAreaH, 0, statsTop - 1f);
-        mainSec.AddComponent<Image>().color = BgStats;
+        // Q/E 스킬 아이콘 (새 장비)
+        var newQIcon = O("NewQSkillIcon", newArea.transform);
+        Split(newQIcon, 0.68f, 0.02f, 0.82f, 0.18f);
+        var newQIconImg = newQIcon.AddComponent<Image>();
+        newQIconImg.color = new Color(1, 1, 1, 0.2f); newQIconImg.preserveAspect = true;
 
-        var mainVlg = mainSec.AddComponent<VerticalLayoutGroup>();
-        mainVlg.padding = new RectOffset(24, 24, 12, 12);
-        mainVlg.spacing = 8f;
-        mainVlg.childAlignment       = TextAnchor.UpperCenter;
-        mainVlg.childControlWidth    = true;
-        mainVlg.childControlHeight   = false;
-        mainVlg.childForceExpandWidth  = true;
-        mainVlg.childForceExpandHeight = false;
+        var newEIcon = O("NewESkillIcon", newArea.transform);
+        Split(newEIcon, 0.84f, 0.02f, 0.98f, 0.18f);
+        var newEIconImg = newEIcon.AddComponent<Image>();
+        newEIconImg.color = new Color(1, 1, 1, 0.2f); newEIconImg.preserveAspect = true;
 
-        var (atkCur, atkDelta, atkNew) = StatRow(mainSec.transform, "공격력", font);
-        var (defCur, defDelta, defNew) = StatRow(mainSec.transform, "방어력", font);
+        // ── 프롬프트 ──────────────────────────────────────────────────
+        var promptGO = O("Prompt", panel.transform);
+        AnchorTop(promptGO, PanelW - 40f, 28f, 0, -228f);
+        T(promptGO, "어떤 장비와 교체하시겠습니까?", 14f, FontStyles.Normal,
+            TextAlignmentOptions.Center, ColorLabel, font);
 
-        // ── 서브 스탯 섹션 ────────────────────────────────────────────
-        var subSec = O("SubStatsSection", panel.transform);
-        AnchorTop(subSec, PanelW, statsAreaH, 0, statsTop - 1f);
-        subSec.AddComponent<Image>().color = BgStats;
-        subSec.SetActive(false);
+        // ══════════════════════════════════════════════════════════════
+        // 하단: 슬롯 0 / 슬롯 1 카드 (좌우 배치)
+        // ══════════════════════════════════════════════════════════════
+        float slotAreaTop = -260f;
+        float slotAreaH   = 250f;
+        float slotW       = (PanelW - 60f) / 2f; // 각 슬롯 카드 폭
 
-        var subVlg = subSec.AddComponent<VerticalLayoutGroup>();
-        subVlg.padding = new RectOffset(24, 24, 12, 12);
-        subVlg.spacing = 8f;
-        subVlg.childAlignment       = TextAnchor.UpperCenter;
-        subVlg.childControlWidth    = true;
-        subVlg.childControlHeight   = false;
-        subVlg.childForceExpandWidth  = true;
-        subVlg.childForceExpandHeight = false;
+        // --- Slot 0 (왼쪽) ---
+        var slot0Card = O("Slot0Card", panel.transform);
+        AnchorTop(slot0Card, slotW, slotAreaH, -(slotW / 2f + 10f), slotAreaTop);
+        slot0Card.AddComponent<Image>().color = BgCard;
 
-        var (qSkillCur, _, qSkillNew)    = LabelRow(subSec.transform, "Q 스킬", font);
-        var (qCoolCur, qCoolDelta, qCoolNew) = StatRow(subSec.transform, "Q 쿨다운", font);
-        var (qDescCur, qDescNew)         = DescRow(subSec.transform, font);
+        var (s0Icon, s0Name, s0Atk, s0AtkDelta, s0Def, s0DefDelta, s0Skill, s0QIcon, s0EIcon) =
+            BuildSlotCard(slot0Card.transform, "슬롯 1", font);
 
-        // ── 버튼 영역 ─────────────────────────────────────────────────
-        var btnArea = O("ButtonArea", panel.transform);
-        AnchorBottom(btnArea, PanelW, BtnAreaH, 0, 0);
+        var s0Btn = Btn("Slot0ReplaceBtn", slot0Card.transform,
+            "교체", BtnReplace, font, 0f, -slotAreaH / 2f + 30f, slotW - 40f, 42f);
 
-        var replaceBtn = Btn("ReplaceButton", btnArea.transform,
-            "교체하기", BtnReplace, font, -150f, 0f, 260f, 50f);
-        var discardBtn = Btn("DiscardButton", btnArea.transform,
-            "버리기",   BtnDiscard, font,  150f, 0f, 260f, 50f);
+        // --- Slot 1 (오른쪽) ---
+        var slot1Card = O("Slot1Card", panel.transform);
+        AnchorTop(slot1Card, slotW, slotAreaH, slotW / 2f + 10f, slotAreaTop);
+        slot1Card.AddComponent<Image>().color = BgCard;
 
-        // ── 바인딩 ────────────────────────────────────────────────────
+        var (s1Icon, s1Name, s1Atk, s1AtkDelta, s1Def, s1DefDelta, s1Skill, s1QIcon, s1EIcon) =
+            BuildSlotCard(slot1Card.transform, "슬롯 2", font);
+
+        var s1Btn = Btn("Slot1ReplaceBtn", slot1Card.transform,
+            "교체", BtnReplace, font, 0f, -slotAreaH / 2f + 30f, slotW - 40f, 42f);
+
+        // ── 버리기 버튼 (맨 아래) ─────────────────────────────────────
+        var discardBtn = Btn("DiscardButton", panel.transform,
+            "버리기", BtnDiscard, font, 0f, -PanelH / 2f + 30f, 280f, 42f);
+
+        // ══════════════════════════════════════════════════════════════
+        // 툴팁 패널 (스킬 아이콘 호버 시 표시)
+        // ══════════════════════════════════════════════════════════════
+        var tooltip = O("TooltipPanel", root.transform);
+        var tooltipRT = tooltip.GetComponent<RectTransform>();
+        tooltipRT.anchorMin = tooltipRT.anchorMax = tooltipRT.pivot = new Vector2(0f, 0f);
+        tooltipRT.sizeDelta = new Vector2(280f, 120f);
+        tooltip.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.12f, 0.95f);
+        tooltip.SetActive(false);
+
+        // 위에 배치될 수 있도록 Canvas 오버라이드
+        var tooltipCanvas = tooltip.AddComponent<Canvas>();
+        tooltipCanvas.overrideSorting = true;
+        tooltipCanvas.sortingOrder = 100;
+        tooltip.AddComponent<GraphicRaycaster>();
+
+        var tooltipVLG = tooltip.AddComponent<VerticalLayoutGroup>();
+        tooltipVLG.padding = new RectOffset(10, 10, 8, 8);
+        tooltipVLG.spacing = 4f;
+        tooltipVLG.childControlWidth = true;
+        tooltipVLG.childControlHeight = false;
+        tooltipVLG.childForceExpandWidth = true;
+        tooltipVLG.childForceExpandHeight = false;
+
+        var ttNameGO = O("TT_Name", tooltip.transform);
+        ttNameGO.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 24);
+        ttNameGO.AddComponent<LayoutElement>().preferredHeight = 24;
+        var ttNameTmp = T(ttNameGO, "스킬 이름", 16f, FontStyles.Bold,
+            TextAlignmentOptions.TopLeft, Color.white, font);
+
+        var ttDescGO = O("TT_Desc", tooltip.transform);
+        ttDescGO.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 50);
+        ttDescGO.AddComponent<LayoutElement>().preferredHeight = 50;
+        var ttDescTmp = T(ttDescGO, "설명", 12f, FontStyles.Normal,
+            TextAlignmentOptions.TopLeft, ColorLabel, font);
+        ttDescTmp.enableWordWrapping = true;
+
+        var ttCoolGO = O("TT_Cooldown", tooltip.transform);
+        ttCoolGO.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 20);
+        ttCoolGO.AddComponent<LayoutElement>().preferredHeight = 20;
+        var ttCoolTmp = T(ttCoolGO, "쿨다운: 0초", 12f, FontStyles.Normal,
+            TextAlignmentOptions.TopLeft, ColorGold, font);
+
+        // ══════════════════════════════════════════════════════════════
+        // 바인딩
+        // ══════════════════════════════════════════════════════════════
         var popup = root.GetComponent<UI_WeaponReplacePopup>()
                     ?? root.AddComponent<UI_WeaponReplacePopup>();
         var so = new SerializedObject(popup);
 
-        B(so, "slotLabelText",     slotLabelTmp);
-        B(so, "currentIcon",       curIcon);
-        B(so, "currentName",       curName);
-        B(so, "newIcon",           newIcon);
-        B(so, "newName",           newName);
-        B(so, "mainStatsSection",  mainSec);
-        B(so, "atkCurrentText",    atkCur);
-        B(so, "atkDeltaText",      atkDelta);
-        B(so, "atkNewText",        atkNew);
-        B(so, "defCurrentText",    defCur);
-        B(so, "defDeltaText",      defDelta);
-        B(so, "defNewText",        defNew);
-        B(so, "subStatsSection",   subSec);
-        B(so, "qSkillCurrentText", qSkillCur);
-        B(so, "qSkillNewText",     qSkillNew);
-        B(so, "qCoolCurrentText",  qCoolCur);
-        B(so, "qCoolDeltaText",    qCoolDelta);
-        B(so, "qCoolNewText",      qCoolNew);
-        B(so, "qDescCurrentText",  qDescCur);
-        B(so, "qDescNewText",      qDescNew);
-        B(so, "replaceButton",     replaceBtn);
-        B(so, "discardButton",     discardBtn);
+        B(so, "slot0Icon",          s0Icon);
+        B(so, "slot0Name",          s0Name);
+        B(so, "slot0AtkText",       s0Atk);
+        B(so, "slot0AtkDelta",      s0AtkDelta);
+        B(so, "slot0DefText",       s0Def);
+        B(so, "slot0DefDelta",      s0DefDelta);
+        B(so, "slot0SkillText",     s0Skill);
+        B(so, "slot0QSkillIcon",   s0QIcon);
+        B(so, "slot0ESkillIcon",   s0EIcon);
+        B(so, "slot0ReplaceButton", s0Btn);
+
+        B(so, "newIcon",            newIconImg);
+        B(so, "newName",            newNameTmp);
+        B(so, "newAtkText",         newAtkTmp);
+        B(so, "newDefText",         newDefTmp);
+        B(so, "newSkillText",       newSkillTmp);
+        B(so, "newQSkillIcon",     newQIconImg);
+        B(so, "newESkillIcon",     newEIconImg);
+        B(so, "discardButton",      discardBtn);
+
+        B(so, "slot1Icon",          s1Icon);
+        B(so, "slot1Name",          s1Name);
+        B(so, "slot1AtkText",       s1Atk);
+        B(so, "slot1AtkDelta",      s1AtkDelta);
+        B(so, "slot1DefText",       s1Def);
+        B(so, "slot1DefDelta",      s1DefDelta);
+        B(so, "slot1SkillText",     s1Skill);
+        B(so, "slot1QSkillIcon",   s1QIcon);
+        B(so, "slot1ESkillIcon",   s1EIcon);
+        B(so, "slot1ReplaceButton", s1Btn);
+
+        B(so, "tooltipPanel",      tooltip);
+        B(so, "tooltipName",       ttNameTmp);
+        B(so, "tooltipDesc",       ttDescTmp);
+        B(so, "tooltipCooldown",   ttCoolTmp);
 
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(root);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[WeaponReplacePopupBuilder] 재빌드 완료.");
+        Debug.Log("[WeaponReplacePopupBuilder] V2 재빌드 완료.");
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // 섹션/행 빌더
+    // 슬롯 카드 빌더 (아이콘 왼쪽 + 이름/스탯 오른쪽 + 델타)
     // ──────────────────────────────────────────────────────────────────
 
-    /// <summary>아이콘 + 이름 헤더 (단일 패널 내)</summary>
-    private static (Image icon, TextMeshProUGUI name)
-        BuildHeader(Transform parent, string label, Color labelColor, TMP_FontAsset font)
+    private static (Image icon, TextMeshProUGUI name,
+        TextMeshProUGUI atk, TextMeshProUGUI atkDelta,
+        TextMeshProUGUI def, TextMeshProUGUI defDelta,
+        TextMeshProUGUI skill, Image qSkillIcon, Image eSkillIcon)
+        BuildSlotCard(Transform parent, string label, TMP_FontAsset font)
     {
-        var vlg = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset(8, 8, 12, 8);
-        vlg.spacing = 6f;
-        vlg.childAlignment       = TextAnchor.UpperCenter;
-        vlg.childControlWidth    = true;
-        vlg.childControlHeight   = false;
-        vlg.childForceExpandWidth  = true;
-        vlg.childForceExpandHeight = false;
+        // 라벨
+        var lblGO = O("Label", parent);
+        Split(lblGO, 0f, 0.88f, 1f, 1f);
+        T(lblGO, label, 13f, FontStyles.Bold, TextAlignmentOptions.Center, ColorGold, font);
 
-        // 레이블 행
-        var lblGO = Flex(parent, "_Lbl", 24f);
-        T(lblGO, label, 12f, FontStyles.Normal,
-            TextAlignmentOptions.Center, labelColor, font);
-
-        // 아이콘 행 (HLG로 고정 크기 유지)
-        var iconRowGO = Flex(parent, "IconRow", 86f);
-        var hlg = iconRowGO.AddComponent<HorizontalLayoutGroup>();
-        hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.childControlWidth = hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
-
-        var iconGO = O("Icon", iconRowGO.transform);
-        iconGO.GetComponent<RectTransform>().sizeDelta = new Vector2(80f, 80f);
+        // 아이콘
+        var iconGO = O("Icon", parent);
+        Split(iconGO, 0.04f, 0.35f, 0.32f, 0.85f);
         var iconImg = iconGO.AddComponent<Image>();
-        iconImg.color = new Color(1f, 1f, 1f, 0.12f);
+        iconImg.color = new Color(1, 1, 1, 0.12f);
+        iconImg.preserveAspect = true;
 
-        // 이름 행
-        var nameGO = Flex(parent, "Name", 32f);
-        var nameTmp = T(nameGO, "—", 14f, FontStyles.Bold,
-            TextAlignmentOptions.Center, Color.white, font);
+        // 이름
+        var nameGO = O("Name", parent);
+        Split(nameGO, 0.35f, 0.72f, 0.95f, 0.85f);
+        var nameTmp = T(nameGO, "—", 15f, FontStyles.Bold,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-        return (iconImg, nameTmp);
-    }
+        // ATK + Delta
+        var atkGO = O("Atk", parent);
+        Split(atkGO, 0.35f, 0.55f, 0.68f, 0.70f);
+        var atkTmp = T(atkGO, "ATK: 0", 13f, FontStyles.Normal,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-    /// <summary>스탯 행: [라벨] [현재값] [▲▼ 델타] [새값]</summary>
-    private static (TextMeshProUGUI cur, TextMeshProUGUI delta, TextMeshProUGUI next)
-        StatRow(Transform parent, string label, TMP_FontAsset font)
-    {
-        var row = Flex(parent, "_SR_" + label, 30f);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 0f;
-        hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.childControlWidth = false; hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        var atkDeltaGO = O("AtkDelta", parent);
+        Split(atkDeltaGO, 0.68f, 0.55f, 0.98f, 0.70f);
+        var atkDeltaTmp = T(atkDeltaGO, "", 12f, FontStyles.Bold,
+            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
 
-        var lbl   = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
-        var curGO = S(row.transform, "_C", 100f, 30f); var curTmp   = T(curGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
-        var dltGO = S(row.transform, "_D", 120f, 30f); var deltaTmp = T(dltGO,  "—", 14f, FontStyles.Normal, TextAlignmentOptions.Midline, ColorLabel,  font);
-        var newGO = S(row.transform, "_N", 100f, 30f); var newTmp   = T(newGO,  "—", 15f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
+        // DEF + Delta
+        var defGO = O("Def", parent);
+        Split(defGO, 0.35f, 0.38f, 0.68f, 0.53f);
+        var defTmp = T(defGO, "DEF: 0", 13f, FontStyles.Normal,
+            TextAlignmentOptions.MidlineLeft, Color.white, font);
 
-        return (curTmp, deltaTmp, newTmp);
-    }
+        var defDeltaGO = O("DefDelta", parent);
+        Split(defDeltaGO, 0.68f, 0.38f, 0.98f, 0.53f);
+        var defDeltaTmp = T(defDeltaGO, "", 12f, FontStyles.Bold,
+            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
 
-    /// <summary>레이블 행 (Q 스킬명 등 델타 없음): [라벨] [현재] [→] [새]</summary>
-    private static (TextMeshProUGUI cur, TextMeshProUGUI arrow, TextMeshProUGUI next)
-        LabelRow(Transform parent, string label, TMP_FontAsset font)
-    {
-        var row = Flex(parent, "_LR_" + label, 30f);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 0f;
-        hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.childControlWidth = false; hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        // Skill text
+        var skillGO = O("Skill", parent);
+        Split(skillGO, 0.35f, 0.22f, 0.68f, 0.37f);
+        var skillTmp = T(skillGO, "---", 12f, FontStyles.Italic,
+            TextAlignmentOptions.MidlineLeft, ColorLabel, font);
 
-        var lbl  = S(row.transform, "_L",  90f, 30f); T(lbl,  label, 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft,   ColorLabel,  font);
-        var curGO = S(row.transform, "_C", 130f, 30f); var curTmp  = T(curGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineRight,  Color.white, font);
-        var arrGO = S(row.transform, "_A",  40f, 30f); var arrTmp  = T(arrGO,  "→", 13f, FontStyles.Normal, TextAlignmentOptions.Midline, ColorLabel,  font);
-        var newGO = S(row.transform, "_N", 130f, 30f); var newTmp  = T(newGO,  "—", 13f, FontStyles.Bold,   TextAlignmentOptions.MidlineLeft,   Color.white, font);
+        // Q/E 스킬 아이콘
+        var qIconGO = O("QSkillIcon", parent);
+        Split(qIconGO, 0.70f, 0.22f, 0.84f, 0.37f);
+        var qIconImg = qIconGO.AddComponent<Image>();
+        qIconImg.color = new Color(1, 1, 1, 0.2f); qIconImg.preserveAspect = true;
 
-        return (curTmp, arrTmp, newTmp);
-    }
+        var eIconGO = O("ESkillIcon", parent);
+        Split(eIconGO, 0.86f, 0.22f, 1.0f, 0.37f);
+        var eIconImg = eIconGO.AddComponent<Image>();
+        eIconImg.color = new Color(1, 1, 1, 0.2f); eIconImg.preserveAspect = true;
 
-    /// <summary>설명 행 (좌/우 텍스트): [현재설명] | [새설명]</summary>
-    private static (TextMeshProUGUI cur, TextMeshProUGUI next)
-        DescRow(Transform parent, TMP_FontAsset font)
-    {
-        var row = Flex(parent, "_DescRow", 52f);
-        var hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 8f;
-        hlg.childAlignment = TextAnchor.UpperCenter;
-        hlg.childControlWidth = false; hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
-
-        var curGO = S(row.transform, "_DC", 390f, 52f);
-        var curTmp = T(curGO, "—", 11f, FontStyles.Normal,
-            TextAlignmentOptions.TopRight, ColorLabel, font);
-        curTmp.enableWordWrapping = true;
-
-        var divGO = S(row.transform, "_DD", 2f, 52f);
-        divGO.AddComponent<Image>().color = ColorDivider;
-
-        var newGO = S(row.transform, "_DN", 390f, 52f);
-        var newTmp = T(newGO, "—", 11f, FontStyles.Normal,
-            TextAlignmentOptions.TopLeft, ColorLabel, font);
-        newTmp.enableWordWrapping = true;
-
-        return (curTmp, newTmp);
+        return (iconImg, nameTmp, atkTmp, atkDeltaTmp, defTmp, defDeltaTmp, skillTmp, qIconImg, eIconImg);
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // 레이아웃 헬퍼
+    // 헬퍼
     // ──────────────────────────────────────────────────────────────────
-
-    private static GameObject Flex(Transform parent, string name, float h)
-    {
-        var go = O(name, parent);
-        go.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, h);
-        var le = go.AddComponent<LayoutElement>();
-        le.minHeight = h; le.preferredHeight = h;
-        return go;
-    }
-
-    private static GameObject S(Transform parent, string name, float w, float h)
-    {
-        var go = O(name, parent);
-        go.GetComponent<RectTransform>().sizeDelta = new Vector2(w, h);
-        return go;
-    }
 
     private static Button Btn(string name, Transform parent,
         string label, Color bg, TMP_FontAsset font,
@@ -306,10 +327,6 @@ public static class WeaponReplacePopupBuilder
         T(txtGO, label, 15f, FontStyles.Bold, TextAlignmentOptions.Center, Color.white, font);
         return btn;
     }
-
-    // ──────────────────────────────────────────────────────────────────
-    // RectTransform
-    // ──────────────────────────────────────────────────────────────────
 
     private static void Stretch(RectTransform rt)
     {
@@ -332,14 +349,6 @@ public static class WeaponReplacePopupBuilder
         rt.sizeDelta = new Vector2(w, h); rt.anchoredPosition = new Vector2(x, y);
     }
 
-    private static void AnchorBottom(GameObject go, float w, float h, float x, float y)
-    {
-        var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(w, h); rt.anchoredPosition = new Vector2(x, y);
-    }
-
     private static void Split(GameObject go,
         float minX, float minY, float maxX, float maxY)
     {
@@ -347,10 +356,6 @@ public static class WeaponReplacePopupBuilder
         rt.anchorMin = new Vector2(minX, minY); rt.anchorMax = new Vector2(maxX, maxY);
         rt.sizeDelta = Vector2.zero; rt.anchoredPosition = Vector2.zero;
     }
-
-    // ──────────────────────────────────────────────────────────────────
-    // 기타
-    // ──────────────────────────────────────────────────────────────────
 
     private static GameObject O(string name, Transform parent)
     {

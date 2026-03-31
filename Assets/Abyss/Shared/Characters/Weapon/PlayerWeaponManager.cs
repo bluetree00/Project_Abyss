@@ -299,20 +299,19 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             return;
         }
 
-        int targetSlot = GetFirstEmptySlotIndex();
-        if (targetSlot < 0) targetSlot = MainSlot;
+        int emptySlot = GetFirstEmptySlotIndex();
 
-        if (slots[targetSlot].IsEmpty)
+        if (emptySlot >= 0)
         {
-            // 빈 슬롯: 바로 장착
+            // 빈 슬롯 있음: 바로 장착
             _owned.Add(runtimeData);
             source?.ConfirmPickup();
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: targetSlot == MainSlot);
+            await EquipToSlotAsync(emptySlot, runtimeData, setActive: emptySlot == currentSlotIndex || currentSlotIndex < 0);
             return;
         }
 
-        // 해당 슬롯에 이미 무기가 있으면 팝업 먼저 — source는 아직 살아있음
-        int? chosenSlot = await ShowReplacePromptAsync(runtimeData, targetSlot);
+        // 슬롯 2개 모두 차 있음 → 양쪽 비교 팝업
+        int? chosenSlot = await ShowReplacePromptAsync(runtimeData);
         if (chosenSlot.HasValue)
         {
             _owned.Add(runtimeData);
@@ -322,26 +321,23 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         }
         else
         {
-            // 취소: 월드 아이템 복원
+            // 버리기: 월드 아이템 복원
             source?.CancelPickup();
             Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
         }
     }
 
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon, int targetSlot)
+    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
     {
-        var currentWeapon = slots[targetSlot].runtimeData;
-
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
         if (popup == null)
         {
             Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 자동 교체");
-            return targetSlot;
+            return MainSlot;
         }
 
-        popup.Setup(currentWeapon, newWeapon, targetSlot);
-        bool confirmed = await popup.WaitForChoiceAsync();
-        return confirmed ? targetSlot : (int?)null;
+        popup.Setup(slots[MainSlot].runtimeData, slots[SubSlot].runtimeData, newWeapon);
+        return await popup.WaitForChoiceAsync();
     }
 
     // ----------------------

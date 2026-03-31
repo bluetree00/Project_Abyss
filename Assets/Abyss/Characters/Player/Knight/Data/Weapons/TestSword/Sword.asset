@@ -16,7 +16,7 @@ MonoBehaviour:
   weaponPrefabKey: TestSwordPrefab
   displayName: "\uB300\uB2E8\uD55C\uAC80"
   iconKey: "\uC544\uC9C1\uC5C6\uC74C"
-  icon: {fileID: 21300000, guid: b3346822f5293bf4c98f710730ba5990, type: 3}
+  icon: {fileID: 21300000, guid: 5932011b449ac234197ea8c6600fb8fe, type: 3}
   baseAttack: 10
   baseDefense: 10
   groundEndCount: 3
@@ -26,7 +26,9 @@ MonoBehaviour:
   colliderPackage: {fileID: 11400000, guid: 40ca726e49d81b34f935026c0057bcb6, type: 2}
   abilitySet: {fileID: 11400000, guid: ff28d03c9d5f86d46a4e5760ec8135c5, type: 2}
   weaponType: 1
+  slotType: 0
+  skillQ: {fileID: 11400000, guid: 859b365590674694fadb91cf6215256d, type: 2}
+  skillE: {fileID: 11400000, guid: 0cc39b87f297e2847a220de9bd7a76b8, type: 2}
   holdThreshold: 4
   promoteMode: 0
   chargeStages: 2
-  airHeavyIsPlunge: 0

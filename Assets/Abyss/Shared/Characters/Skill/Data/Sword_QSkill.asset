@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fe6bb86c17bdbf49b30d604a6cabd56, type: 3}
+  m_Name: Sword_QSkill
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillName: "\uD654\uC5FC \uBCA0\uAE30"
+  description: "\uC804\uBC29\uC5D0 \uAC15\uB825\uD55C \uD654\uC5FC \uD30C\uB3D9\uC744
+    \uC77C\uC73C\uCF1C \uC801\uC5D0\uAC8C \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
+  icon: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}
+  cooldown: 8
