@@ -13,7 +13,6 @@ public enum PromoteMode
 
 /// <summary>
 /// 런타임 Weapon 데이터 (WeaponSO 기반 생성)
-/// 실행 경로: abilitySet → WeaponAbilitySetSO → WeaponAbilitySO → AbilityStep
 /// </summary>
 [Serializable]
 public class WeaponData
@@ -37,18 +36,20 @@ public class WeaponData
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
     public WeaponSlotType slotType = WeaponSlotType.Main;
-    public string skillName;
-    public string skillDescription;
 
-    // ── 스킬 아이콘 ───────────────────────────────────────────────────────────
-    public Sprite skillQIcon;
-    public Sprite skillEIcon;
+    // ── 스킬 SO 참조 ─────────────────────────────────────────────────
+    public SkillSO skillQ;
+    public SkillSO skillE;
 
-    // ── 스킬 쿨다운 ──────────────────────────────────────────────────────────
-    public float skillQCooldown;
-    public float skillECooldown;
+    // ── 하위 호환 편의 접근자 ─────────────────────────────────────────
+    public string skillName        => skillQ?.skillName;
+    public string skillDescription => skillQ?.description;
+    public Sprite skillQIcon       => skillQ?.icon;
+    public Sprite skillEIcon       => skillE?.icon;
+    public float  skillQCooldown   => skillQ?.cooldown ?? 0f;
+    public float  skillECooldown   => skillE?.cooldown ?? 0f;
 
-    /// <summary>WeaponSO 기반 생성 (공통 필드만 복사)</summary>
+    /// <summary>WeaponSO 기반 생성</summary>
     public WeaponData(WeaponSO so)
     {
         if (so == null) throw new ArgumentNullException(nameof(so));
@@ -65,13 +66,11 @@ public class WeaponData
         promoteMode  = so.promoteMode;
         chargeStages = so.chargeStages;
 
-        weaponType       = so.weaponType;
-        slotType         = so.slotType;
-        skillName        = so.skillName;
-        skillDescription = so.skillDescription;
+        weaponType = so.weaponType;
+        slotType   = so.slotType;
 
-        skillQIcon = so.skillQIcon;
-        skillEIcon = so.skillEIcon;
+        skillQ = so.skillQ;
+        skillE = so.skillE;
 
         groundEndCount = so.groundEndCount;
         airEndCount    = so.airEndCount;
@@ -80,17 +79,6 @@ public class WeaponData
         abilitySet   = so.abilitySet;
     }
 
-    /// <summary>MainWeaponSO 기반 생성 — Q/E 쿨다운 포함</summary>
-    public WeaponData(MainWeaponSO so) : this((WeaponSO)so)
-    {
-        skillQCooldown = so.skillQCooldown;
-        skillECooldown = so.skillECooldown;
-    }
-
     /// <summary>SO 타입을 자동 판별해 적절한 WeaponData를 생성하는 팩토리</summary>
-    public static WeaponData FromSO(WeaponSO so) => so switch
-    {
-        MainWeaponSO main => new WeaponData(main),
-        _                 => new WeaponData(so),
-    };
+    public static WeaponData FromSO(WeaponSO so) => new WeaponData(so);
 }
