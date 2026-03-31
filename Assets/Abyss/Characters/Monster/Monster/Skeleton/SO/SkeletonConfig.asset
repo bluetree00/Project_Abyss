@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: SkeletonConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: Skeleton
+  grade: 0
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 20
+    defense: 5
+    attackPower: 10
+    moveSpeed: 3
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 2
+    attackDelay: 1
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 7
+    chaseGiveUpRange: 10
+  patrol:
+    patrolType: 0
+    patrolRange: 5
+    patrolSpeed: 3
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 1
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Skeleton/SkeletonAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingRPT
+    speedParam: Blend
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  specialStates:
+  - conditions:
+    - {fileID: 11400000, guid: 7f12c79cbd951484e87f8b810a55058d, type: 2}
+    state: {fileID: 11400000, guid: 8b470148a9d4f5d4eb88f4b9ce495013, type: 2}
+    oneShot: 1
+  chaseState: {fileID: 0}
+  patrolState: {fileID: 0}
+  attackReadyState: {fileID: 0}
+  attackState: {fileID: 0}
+  getHitState: {fileID: 0}
+  dieState: {fileID: 0}
+  stateOverrides: []

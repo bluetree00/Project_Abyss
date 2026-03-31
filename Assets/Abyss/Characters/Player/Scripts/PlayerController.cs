@@ -137,6 +137,19 @@ public class PlayerController : CharacterBase
     public void SetMoveScale(float s) => MoveScale = Mathf.Clamp01(s);
 
     //============================================================
+    // Knockback
+    //============================================================
+    private float _knockbackTimer;
+    public bool IsKnockback => _knockbackTimer > 0f;
+
+    /// <summary>외부 힘(넉백)을 가하고 일정 시간 동안 수평 이동 잠금을 스킵한다.</summary>
+    public void ApplyKnockback(Vector3 force, float duration = 0.3f)
+    {
+        Rigid?.AddForce(force, ForceMode.Impulse);
+        _knockbackTimer = duration;
+    }
+
+    //============================================================
     // Input Buffer & Time
     //============================================================
     protected IClock Clock { get; private set; }
@@ -246,6 +259,7 @@ public class PlayerController : CharacterBase
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
+        _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
         CheckMovementInput();

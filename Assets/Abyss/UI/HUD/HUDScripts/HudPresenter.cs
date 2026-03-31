@@ -7,6 +7,7 @@
 //============================================================
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using Abyss.Monster;
 
 public sealed class HudPresenter : MonoBehaviour
 {
@@ -30,6 +31,9 @@ public sealed class HudPresenter : MonoBehaviour
 
     // ── 로비 바인딩 ──────────────────────────────────────────
     private UserInfo _userInfo;
+
+    // ── 보스 바인딩 ───────────────────────────────────────────
+    private MonsterBase _boss;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
@@ -155,6 +159,38 @@ public sealed class HudPresenter : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────
+    // 보스 바인딩
+    // ─────────────────────────────────────────────────────────
+    public void BindBoss(MonsterBase boss)
+    {
+        UnbindBoss();
+        if (boss == null) return;
+
+        _boss = boss;
+        _boss.OnHPChanged += HandleBossHPChanged;
+
+        // 초기 스냅샷 — config가 준비됐으면 이름도 설정
+        int maxHp     = boss.BossMaxHp;
+        string name   = boss.BossName;
+        view?.BossPanel?.Init(maxHp, name);
+
+        SetMode(HUDIds.Mode.Boss);
+    }
+
+    public void UnbindBoss()
+    {
+        if (_boss != null)
+        {
+            _boss.OnHPChanged -= HandleBossHPChanged;
+            _boss = null;
+        }
+
+        // Boss 패널 숨기고 일반 전투 모드로 복귀
+        if (_currentMode == HUDIds.Mode.Boss)
+            SetMode(HUDIds.Mode.Combat);
+    }
+
+    // ─────────────────────────────────────────────────────────
     // 핸들러
     // ─────────────────────────────────────────────────────────
     private void HandleHpChanged(int hp, int maxHp)       => view?.CombatPanel?.SetHp(hp, maxHp);
@@ -162,6 +198,11 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
+    private void HandleBossHPChanged(int hp, int maxHp)
+    {
+        view?.BossPanel?.SetHP(hp, maxHp);
+        if (hp <= 0) UnbindBoss();
+    }
 
     private void RefreshStats()
     {
@@ -210,6 +251,7 @@ public sealed class HudPresenter : MonoBehaviour
         _provider = null;
         UnbindPlayer();
         UnbindLobby();
+        UnbindBoss();
     }
 
     private void OnDisable() => Dispose();
