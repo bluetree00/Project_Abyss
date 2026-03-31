@@ -6,6 +6,9 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 {
     public void Move(PlayerController  owner, Vector3 direction)
     {
+        // 넉백 중에는 이동 처리 전체를 스킵 — 물리 impulse가 override되지 않도록
+        if (owner.IsKnockback) return;
+
         if (direction.sqrMagnitude < 0.01f)
         {
             owner.StopHorizontalMovement();

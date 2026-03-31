@@ -93,6 +93,10 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         }
 
         await bootstrapper.StartRunAsync(chapter);
+
+        // StageMap 선택 단계를 건너뛰므로 직접 전투 모드로 전환
+        // (정상 플로우에서는 방 선택 시 NotifyCombatStarted()가 호출됨)
+        bootstrapper.Run?.NotifyCombatStarted();
     }
 
     /// <summary>

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 013ac277152a91747a0121b1ce81735a, type: 3}
+  m_Name: BK_Pattern_DashSlash
+  m_EditorClassIdentifier: Assembly-CSharp::BKDashSlashPatternSO
+  weight: 1.2
+  patternTag: DashSlash
+  breakOverride: -1
+  dashSfx: {fileID: 0}
+  slashSfx: {fileID: 0}
+  dashAnimState: Attack02
+  dashCooldown: 10
+  dashMinDist: 3
+  dashMaxDist: 12
+  dashSpeed: 22
+  dashWindUp: 0.18
+  dashDuration: 0.35
+  slashRadius: 2.5
+  slashDamageMul: 1.8
+  slashDuration: 0.3
+  knockbackY: 0.4
+  knockbackMul: 2.2
