@@ -474,9 +474,9 @@ public class PlayerController : CharacterBase
         actSM.Register(ActState.Attack,      new ActAttackState());
         actSM.Register(ActState.Charge,      new ActAttackChargeState());
         actSM.Register(ActState.HeavyAttack, new ActHeavyAttackState());
-        actSM.Register(ActState.QSkill,      new ActQSkillState());
-        actSM.Register(ActState.ESkill,      new ActESkillState());
-        actSM.Register(ActState.RSkill,      new ActRSkillState());
+        actSM.Register(ActState.QSkill,      new ActSkillState(SkillType.Q, WeaponActionType.QSkill));
+        actSM.Register(ActState.ESkill,      new ActSkillState(SkillType.E, WeaponActionType.ESkill));
+        actSM.Register(ActState.RSkill,      new ActSkillState(SkillType.R, WeaponActionType.RSkill));
         actSM.Register(ActState.Plunge,      new ActPlungeState());
         actSM.Register(ActState.Pickup,      new ActPickupState());
 

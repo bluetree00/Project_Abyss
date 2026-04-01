@@ -14,4 +14,8 @@ public class SkillSO : ScriptableObject
 
     [Header("쿨다운")]
     public float cooldown = 5f;
+
+    [Header("실행 행동")]
+    [Tooltip("스킬의 실행 로직을 정의하는 SO. null이면 기본 애니메이션 재생만 수행")]
+    public SkillBehaviorSO behavior;
 }
