@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Weapons
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Weapons
+  m_GUID: 669c734a370aaa44f8942a6bfd790a32
+  m_SerializeEntries:
+  - m_GUID: 537b48c693566ce4781a27f730612c04
+    m_Address: Basic_Knight_03
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7941080ed78535c4cad4a88a59e09ae4
+    m_Address: Assets/Abyss/Shared/Characters/Weapon/WeaponShared/Collider/TestCollider.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d34b013aae4f1443b71021021cf2e2c
+    m_Address: TestBowDisplayPrefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 83d2636d9fbb0d442a0cddaac7e6d048
+    m_Address: TestSwordDisplayPrefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c8ac457690045be4f89e74126a0b1227
+    m_Address: TestBowPrefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c8d6a64eb8c657e46b1dd6ae4dd4328f
+    m_Address: UI/Popup/UI_WeaponReplacePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 3f393358ea702ee4db17d6f53c1c3cc7, type: 2}
+    - {fileID: 11400000, guid: 93f941fe1ebfe8d4097e9a6d842fcf21, type: 2}
