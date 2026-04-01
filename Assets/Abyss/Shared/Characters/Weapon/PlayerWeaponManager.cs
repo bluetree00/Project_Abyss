@@ -194,9 +194,13 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (slot.instance != null)
         {
-            // 프리팹 Transform 그대로 handTransform에 붙이되 위치/회전 유지
-            slot.instance.transform.SetParent(_owner != null ? _owner.handTransform : null, true);
+            var parent = _owner != null ? _owner.handTransform : null;
+            slot.instance.transform.SetParent(parent, false);
             slot.instance.SetActive(setActive);
+
+            // 등장 연출
+            if (setActive)
+                DissolveEffect.PlayAppear(slot.instance, 0.4f);
         }
 
         if (setActive)
@@ -257,8 +261,12 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
             if (target.instance != null)
             {
-                target.instance.transform.SetParent(_owner != null ? _owner.handTransform : null, true);
+                var parent = _owner != null ? _owner.handTransform : null;
+                target.instance.transform.SetParent(parent, false);
                 target.instance.SetActive(true);
+
+                // 무기 전환 시 디졸브 등장 연출
+                DissolveEffect.PlayAppear(target.instance, 0.4f);
             }
 
             await SetCurrentSlotInternalAsync(slotIndex);

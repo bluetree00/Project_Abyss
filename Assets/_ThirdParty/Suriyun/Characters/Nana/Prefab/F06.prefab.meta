@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 0276fd68d2eb8e64aa562b0c13ae1bf9
+timeCreated: 1524734229
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/Suriyun/Characters/Nana/Prefab/F06.prefab
+  uploadId: 834578

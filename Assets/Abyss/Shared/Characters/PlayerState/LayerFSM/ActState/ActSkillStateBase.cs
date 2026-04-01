@@ -49,7 +49,7 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
     {
         float cd = GetCooldown();
         if (cd > 0f)
-            _controller.CooldownTracker.StartCooldown(Slot, cd);
+            _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
 
         OnExit();
     }

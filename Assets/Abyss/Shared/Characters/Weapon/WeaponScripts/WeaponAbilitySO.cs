@@ -61,11 +61,33 @@ public class WeaponAbilitySO : ScriptableObject
         [Header("Collider / Damage")]
         public ColliderStep collider;
 
+        [Space(5)]
+        [Header("Hit Effect")]
+        [Tooltip("타격 시 생성할 이펙트 Addressable 키 (피격 위치에 스폰)")]
+        public string hitEffectKey;
+        public float hitEffectScale = 1f;
+
         [Tooltip("실행 컨텍스트(AbilityExecution)당 한 번만 실행")]
         public bool oneShot = false;
 
         [Tooltip("이 스텝 시작 시 플레이어가 마우스 방향으로 회전할지 여부")]
         public bool rotateToMouse = false;
+    }
+
+    /// <summary>이펙트 생성 기준점</summary>
+    public enum EffectSocket
+    {
+        Player,       // 캐릭터 중심
+        WeaponMount,  // 무기 장착점
+        WeaponTip,    // 무기 끝 (베기/찌르기)
+        WeaponRoot,   // 무기 손잡이
+    }
+
+    /// <summary>이펙트 생성 후 부모 설정</summary>
+    public enum EffectSpace
+    {
+        World,  // 월드에 독립 (발사체, 슬래시, 폭발)
+        Local,  // 소켓에 부모로 부착 (오라, 무기 강화)
     }
 
     [Serializable]
@@ -74,10 +96,18 @@ public class WeaponAbilitySO : ScriptableObject
         [Tooltip("Addressables 키 (EffectBehaviour가 붙은 프리팹)")]
         public string payloadKey;
 
-        [Tooltip("플레이어 로컬 스페이스 기준 위치 오프셋")]
+        [Header("스폰 기준")]
+        [Tooltip("어디를 기준으로 생성할지")]
+        public EffectSocket socket = EffectSocket.Player;
+
+        [Tooltip("생성 후 독립(World) vs 부모에 부착(Local)")]
+        public EffectSpace space = EffectSpace.World;
+
+        [Header("오프셋")]
+        [Tooltip("소켓 로컬 기준 위치 오프셋")]
         public Vector3 positionOffset = Vector3.zero;
 
-        [Tooltip("이펙트 회전 (오일러각)")]
+        [Tooltip("소켓 로컬 기준 회전 오프셋 (오일러각)")]
         public Vector3 rotationEuler = Vector3.zero;
 
         public float scaleMultiplier = 1f;

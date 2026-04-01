@@ -17,7 +17,14 @@
       "Bash(git fetch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "mcp__mcp-for-unity__find_in_file",
+      "Bash(git rm:*)",
+      "Bash(git pull:*)",
+      "mcp__mcp-for-unity__manage_animation"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude"

@@ -51,13 +51,15 @@ public class LocoAirState : ILayerState<LocoState>
     public void Exit()
     {
         _entered = false;
-        // 낙하 공격 중 착지 시 ActPlungeState가 스스로 종료 — CancelActState 건너뜀
+
+        // 낙하 공격 중 → ActPlungeState가 착지를 직접 처리
+        // 그 외 모든 경우 (공중 공격 포함) → 착지 시 ActState 초기화
         if (!_controller.IsPlunging)
             _controller.CancelActState();
+
         _controller.SetMoveScale(1f);
         _controller.ConsumeEnterAirAsJump();
         _controller.SetJumping(false);
         _controller.Anim.SetFloat("JumpValue", 0f);
-        _controller.Anim.SetFloat("AirLightAttackValue", 0f);
     }
 }
