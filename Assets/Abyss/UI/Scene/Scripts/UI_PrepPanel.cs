@@ -30,6 +30,25 @@ public class UI_PrepPanel : UI_Base
     [SerializeField] private Image    weaponSlotIcon;
     [SerializeField] private TMP_Text weaponSlotName;
 
+    [Header("메인 — 캐릭터 스탯")]
+    [SerializeField] private TMP_Text mainHpLabel;
+    [SerializeField] private TMP_Text mainDefLabel;
+    [SerializeField] private Image    mainAbilityIcon0;
+    [SerializeField] private Image    mainAbilityIcon1;
+    [SerializeField] private Image    mainAbilityIcon2;
+
+    [Header("메인 — 무기 스킬")]
+    [SerializeField] private TMP_Text mainWeaponParamsTitle;
+    [SerializeField] private TMP_Text mainWeaponAtk;
+    [SerializeField] private TMP_Text mainWeaponSpd;
+    [SerializeField] private TMP_Text mainWeaponRng;
+
+    [Header("메인 — 툴팁")]
+    [SerializeField] private GameObject tooltipPanel;
+    [SerializeField] private TMP_Text   tooltipName;
+    [SerializeField] private TMP_Text   tooltipDesc;
+    [SerializeField] private TMP_Text   tooltipCooldown;
+
     [Header("메인 — 버튼")]
     [SerializeField] private Button   gameStartButton;
     [SerializeField] private Button   cancelButton;
@@ -74,6 +93,8 @@ public class UI_PrepPanel : UI_Base
     [SerializeField] private TMP_Text weaponAtkText;
     [SerializeField] private TMP_Text weaponAtkSpeedText;
     [SerializeField] private TMP_Text weaponRangeText;
+    [SerializeField] private Image    weaponQSkillIcon;
+    [SerializeField] private Image    weaponESkillIcon;
 
     [Header("무기 선택 — 버튼")]
     [SerializeField] private Button   weaponConfirmButton;
@@ -188,6 +209,49 @@ public class UI_PrepPanel : UI_Base
         }
         if (weaponSlotName != null)
             weaponSlotName.text = weaponSO != null ? weaponSO.displayName : "무기 선택";
+
+        // 캐릭터 스탯 표시
+        if (_selectedCharEntry?.data != null)
+        {
+            var d = _selectedCharEntry.data;
+            if (mainHpLabel != null)  mainHpLabel.text  = $"체력  {d.maxHealth}";
+            if (mainDefLabel != null) mainDefLabel.text = $"방어력  {d.attackPower}";
+            SetAbilityIcon(mainAbilityIcon0, _selectedCharEntry.abilityIcon0);
+            SetAbilityIcon(mainAbilityIcon1, _selectedCharEntry.abilityIcon1);
+            SetAbilityIcon(mainAbilityIcon2, _selectedCharEntry.abilityIcon2);
+
+            // 패시브 툴팁
+            if (d.passive != null)
+            {
+                SetupTooltip(mainAbilityIcon0, d.passive.passiveName, d.passive.description, 0);
+                SetupTooltip(mainAbilityIcon1, d.passive.passiveName, d.passive.description, 0);
+                SetupTooltip(mainAbilityIcon2, d.passive.passiveName, d.passive.description, 0);
+            }
+        }
+
+        // 무기 스탯/스킬 표시
+        if (weaponSO != null)
+        {
+            if (mainWeaponAtk != null) mainWeaponAtk.text = $"ATK: {weaponSO.baseAttack:0}";
+            if (mainWeaponSpd != null) mainWeaponSpd.text = $"SPD: —";
+            if (mainWeaponRng != null) mainWeaponRng.text = $"RNG: —";
+
+            // Q/E 스킬 아이콘 (Slot_Weapon 하위에서 직접 찾기)
+            if (weaponSlotIcon != null)
+            {
+                var slotWeapon = weaponSlotIcon.transform.parent;
+                var qIcon = slotWeapon?.Find("QSkillIcon")?.GetComponent<Image>();
+                var eIcon = slotWeapon?.Find("ESkillIcon")?.GetComponent<Image>();
+                SetAbilityIcon(qIcon, weaponSO.skillQ?.icon);
+                SetAbilityIcon(eIcon, weaponSO.skillE?.icon);
+
+                // 스킬 툴팁
+                if (weaponSO.skillQ != null)
+                    SetupTooltip(qIcon, weaponSO.skillQ.skillName, weaponSO.skillQ.description, weaponSO.skillQ.cooldown);
+                if (weaponSO.skillE != null)
+                    SetupTooltip(eIcon, weaponSO.skillE.skillName, weaponSO.skillE.description, weaponSO.skillE.cooldown);
+            }
+        }
     }
 
     private void RefreshGameStartButton()
@@ -248,6 +312,15 @@ public class UI_PrepPanel : UI_Base
         SetAbilityIcon(abilityIcon0, entry.abilityIcon0);
         SetAbilityIcon(abilityIcon1, entry.abilityIcon1);
         SetAbilityIcon(abilityIcon2, entry.abilityIcon2);
+    }
+
+    private void SetupTooltip(Image icon, string name, string desc, float cooldown)
+    {
+        if (icon == null) return;
+        var trigger = icon.GetComponent<SkillTooltipTrigger>();
+        if (trigger == null) trigger = icon.gameObject.AddComponent<SkillTooltipTrigger>();
+        trigger.SetData(name, desc, cooldown);
+        trigger.SetTooltipPanel(tooltipPanel, tooltipName, tooltipDesc, tooltipCooldown);
     }
 
     private static void SetAbilityIcon(Image img, Sprite sprite)
@@ -312,6 +385,10 @@ public class UI_PrepPanel : UI_Base
         if (weaponAtkText      != null) weaponAtkText.text      = $"공격력  {so.baseAttack:0}";
         if (weaponAtkSpeedText != null) weaponAtkSpeedText.text = "공격속도  —";
         if (weaponRangeText    != null) weaponRangeText.text    = "공격 거리  —";
+
+        // Q/E 스킬 아이콘
+        SetAbilityIcon(weaponQSkillIcon, so.skillQ?.icon);
+        SetAbilityIcon(weaponESkillIcon, so.skillE?.icon);
     }
 
     private void OnClickWeaponConfirm()

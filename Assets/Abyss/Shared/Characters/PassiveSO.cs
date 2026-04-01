@@ -13,6 +13,7 @@ public class PassiveSO : ScriptableObject
     [Header("패시브 기본 정보")]
     public string passiveName;
     [TextArea] public string description;
+    public Sprite icon;
 
     [Header("기본 스탯 보정 (런 시작 시 1회 적용)")]
     public List<StatModifier> baseModifiers = new List<StatModifier>();

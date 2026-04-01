@@ -24,6 +24,13 @@ public class SkillTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointer
         _cooldown = skill.cooldown;
     }
 
+    public void SetData(string name, string desc, float cooldown)
+    {
+        _name = name ?? "---";
+        _desc = desc ?? "";
+        _cooldown = cooldown;
+    }
+
     public void SetTooltipPanel(GameObject panel, TMP_Text nameText, TMP_Text descText, TMP_Text cooldownText)
     {
         _tooltipPanel    = panel;

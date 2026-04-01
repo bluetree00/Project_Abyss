@@ -16,9 +16,18 @@ MonoBehaviour:
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
     portrait: {fileID: 21300000, guid: 9447c815ae0a81743964d7cf9bb4014a, type: 3}
     prefabKey: Knight
+    abilityIcon0: {fileID: 21300000, guid: 6450f506fba52a44f9b358a5f71dc41c, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 636c3f677cdf64846962ea5687092f14, type: 3}
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
     portrait: {fileID: 21300000, guid: 8197c392e37daa34fa18fc5a08d4227b, type: 3}
     prefabKey: Knight
+    abilityIcon0: {fileID: 21300000, guid: 6450f506fba52a44f9b358a5f71dc41c, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 636c3f677cdf64846962ea5687092f14, type: 3}
   - data: {fileID: 11400000, guid: b28d136795157de48813a68896b5ca09, type: 2}
     portrait: {fileID: 21300000, guid: cc793fda1c7a35b48bf04418234bfa99, type: 3}
     prefabKey: Knight
+    abilityIcon0: {fileID: 21300000, guid: 6450f506fba52a44f9b358a5f71dc41c, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 636c3f677cdf64846962ea5687092f14, type: 3}
