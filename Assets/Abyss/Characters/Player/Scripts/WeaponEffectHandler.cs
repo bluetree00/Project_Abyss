@@ -44,23 +44,35 @@ public class WeaponEffectHandler
             bool colliderHandledByCombined = false;
 
             // =====================================================
-            // 1. 이펙트 스폰
-            //    스폰 후 ColliderInstance가 있으면 → 합쳐진 프리팹 모드
-            //    데미지 데이터를 주입하고 별도 콜라이더 스폰은 생략
+            // 1. 이펙트 스폰 — socket/space 기반
             // =====================================================
             if (s.effect != null && !string.IsNullOrEmpty(s.effect.payloadKey))
             {
                 var e = s.effect;
+
+                // 소켓 트랜스폼 결정
+                Transform socketTransform = ResolveSocket(e.socket, playerTransform, handTransform);
+
+                // 스폰 위치/회전 계산
+                Vector3 spawnPos = socketTransform.TransformPoint(e.positionOffset);
+                Quaternion spawnRot = socketTransform.rotation * Quaternion.Euler(e.rotationEuler);
+
                 var effectObj = await Managers.ObjectPooler.SpawnAsync(
                     e.payloadKey,
                     ObjectPoolerManager.PoolType.Effect,
-                    playerTransform.TransformPoint(e.positionOffset),
-                    playerTransform.rotation * Quaternion.Euler(e.rotationEuler)
+                    spawnPos,
+                    spawnRot
                 );
 
                 if (_player == null || effectObj == null) return;
 
                 effectObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+
+                // Local space → 소켓에 부착
+                if (e.space == WeaponAbilitySO.EffectSpace.Local)
+                {
+                    effectObj.transform.SetParent(socketTransform, true);
+                }
 
                 if (!effectObj.TryGetComponent<EffectBehaviour>(out var effectBehaviour))
                 {
@@ -68,12 +80,36 @@ public class WeaponEffectHandler
                     Managers.ObjectPooler.Despawn(effectObj);
                     continue;
                 }
-                effectBehaviour.Initialize(e.behavior, playerTransform, e.lifeTimeMultiplier);
 
-                // 합쳐진 프리팹: 같은 오브젝트에 ColliderInstance가 있으면 데이터 주입
-                if (s.collider != null && effectObj.TryGetComponent<ColliderInstance>(out var embedded))
+                // 소켓의 forward를 이동 방향으로 전달
+                Vector3 spawnForward = socketTransform.forward;
+                effectBehaviour.Initialize(e.behavior, playerTransform, e.lifeTimeMultiplier, spawnForward);
+
+                // 합쳐진 프리팹: 같은 오브젝트에 ColliderInstance가 있으면 데미지 주입
+                bool hasCI = effectObj.TryGetComponent<ColliderInstance>(out var embedded);
+                Debug.Log($"[EffectHandler] Effect spawned: {effectObj.name}, hasColliderInstance={hasCI}, collider={s.collider != null}");
+                if (hasCI)
                 {
-                    SetupColliderInstance(embedded, s, actionType);
+                    if (s.collider != null)
+                        SetupColliderInstance(embedded, s, actionType);
+                    else
+                    {
+                        embedded.damage = s.baseDamage;
+                        embedded.knockbackMultiplier = s.knockbackMultiplier;
+                        embedded.owner = _player.gameObject;
+                        embedded.actionType = actionType;
+                        embedded.hitEffectKey = s.hitEffectKey;
+                        embedded.hitEffectScale = s.hitEffectScale;
+                        embedded.attackId = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
+
+                        var wd = _player.WeaponManager?.CurrentWeaponData;
+                        if (wd != null)
+                        {
+                            var kind = wd.weaponType.GetAttackStatKind();
+                            embedded.damage = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.GetEffectiveAttack(kind));
+                        }
+                    }
+                    embedded.Activate();
                     colliderHandledByCombined = true;
                 }
 
@@ -82,8 +118,6 @@ public class WeaponEffectHandler
 
             // =====================================================
             // 2. 별도 콜라이더 스폰
-            //    합쳐진 프리팹에서 이미 처리된 경우 생략
-            //    Trail 모드는 WeaponTrailDetector가 처리하므로 생략
             // =====================================================
             if (!colliderHandledByCombined &&
                 s.collider != null &&
@@ -105,7 +139,6 @@ public class WeaponEffectHandler
                 }
                 else
                 {
-                    // prefabKey 없을 때 런타임 생성 (임시 fallback)
                     colliderObj = new GameObject("RuntimeCollider");
                     colliderObj.transform.position = handTransform.TransformPoint(c.positionOffset);
                     colliderObj.transform.rotation = playerTransform.rotation * Quaternion.Euler(c.rotationEuler);
@@ -139,6 +172,7 @@ public class WeaponEffectHandler
                 }
 
                 SetupColliderInstance(colliderInstance, s, actionType);
+                colliderInstance.Activate();
                 colliderObj.SetActive(true);
                 execution?.RegisterCollider(colliderObj);
 
@@ -148,15 +182,51 @@ public class WeaponEffectHandler
         }
     }
 
+    /// <summary>EffectSocket → 실제 Transform 변환</summary>
+    private Transform ResolveSocket(WeaponAbilitySO.EffectSocket socket, Transform playerTransform, Transform handTransform)
+    {
+        switch (socket)
+        {
+            case WeaponAbilitySO.EffectSocket.WeaponMount:
+                return handTransform;
+
+            case WeaponAbilitySO.EffectSocket.WeaponTip:
+                var wi = _player.WeaponManager?.GetCurrentWeaponComponent<WeaponInstance>();
+                if (wi != null && wi.tipPoint != null) return wi.tipPoint;
+                return handTransform;
+
+            case WeaponAbilitySO.EffectSocket.WeaponRoot:
+                var wiRoot = _player.WeaponManager?.GetCurrentWeaponComponent<WeaponInstance>();
+                if (wiRoot != null && wiRoot.rootPoint != null) return wiRoot.rootPoint;
+                return handTransform;
+
+            case WeaponAbilitySO.EffectSocket.Player:
+            default:
+                return playerTransform;
+        }
+    }
+
     private void SetupColliderInstance(ColliderInstance ci, WeaponAbilitySO.AbilityStep s, WeaponActionType actionType)
     {
         var c = s.collider;
-        ci.damage              = s.baseDamage > 0f ? s.baseDamage : c.damage;
+        float rawDamage = s.baseDamage > 0f ? s.baseDamage : c.damage;
+
+        var weaponData = _player.WeaponManager?.CurrentWeaponData;
+        if (weaponData != null)
+        {
+            var kind = weaponData.weaponType.GetAttackStatKind();
+            rawDamage = DamageFormula.Calculate(rawDamage, _player.RuntimeStats.GetEffectiveAttack(kind));
+        }
+
+        ci.damage              = rawDamage;
         ci.knockbackMultiplier = s.knockbackMultiplier;
         ci.hitInterval         = c.hitInterval;
         ci.owner               = _player.gameObject;
         ci.actionType          = actionType;
         ci.payloadKey          = c.colliderPrefabKey;
         ci.duration            = c.duration;
+        ci.hitEffectKey        = s.hitEffectKey;
+        ci.hitEffectScale      = s.hitEffectScale;
+        ci.attackId            = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
     }
 }

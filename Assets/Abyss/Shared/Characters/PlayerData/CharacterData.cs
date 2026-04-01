@@ -12,7 +12,14 @@ public class CharacterData : ScriptableObject
     public float baseMoveSpeed;
     public float baseRunSpeed;
     public int maxHealth;
-    public int attackPower;
+
+    [Header("공격력 (근거리/원거리)")]
+    public int baseMeleeAttack;
+    public int baseRangedAttack;
+
+    [Header("방어/행운")]
+    public int baseDefense;
+    public int baseLuck;
 
     // 공격, 콤보 관련 수치
     [Header("공격, 콤보 관련 수치")]
@@ -51,8 +58,8 @@ public class CharacterData : ScriptableObject
     [Header("패시브")]
     public PassiveSO passive;
 
-    // 총 공격력 반환 (EffectData 호환)
-    public int GetTotalAttackPower() => attackPower;
+    // 레거시 호환 — EffectData 등에서 사용
+    public int GetTotalAttackPower() => UnityEngine.Mathf.Max(baseMeleeAttack, baseRangedAttack);
 
     // PlayerController.InitCharacterDataAsync에서 호출
     public void Initialize() { }

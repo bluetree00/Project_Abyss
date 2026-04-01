@@ -15,32 +15,41 @@ public class AnimationResourceManager
     {
         foreach (var key in keys)
         {
+            if (string.IsNullOrEmpty(key)) continue;
             if (_clipCache.ContainsKey(key)) continue;
 
-            // 키 존재 여부 먼저 확인 (InvalidKeyException 방지)
-            var locHandle = Addressables.LoadResourceLocationsAsync(key);
-            await locHandle.Task;
-            var locations = locHandle.Result;
-            Addressables.Release(locHandle);
-
-            if (locations == null || locations.Count == 0)
+            try
             {
-                Debug.LogWarning($"[AnimResource] 키 없음, 건너뜀: {key}");
-                continue;
+                // 위치 확인
+                var locHandle = Addressables.LoadResourceLocationsAsync(key, typeof(AnimationClip));
+                await locHandle.Task;
+                var locations = locHandle.Result;
+                Addressables.Release(locHandle);
+
+                if (locations == null || locations.Count == 0)
+                {
+                    Debug.LogWarning($"[AnimResource] 키 없음, 건너뜀: {key}");
+                    continue;
+                }
+
+                // 클립 로드
+                var handle = Addressables.LoadAssetAsync<AnimationClip>(key);
+                await handle.Task;
+
+                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
+                {
+                    _clipCache[key] = handle.Result;
+                    Debug.Log($"[AnimResource] Loaded {key}");
+                }
+                else
+                {
+                    Addressables.Release(handle);
+                    Debug.LogWarning($"[AnimResource] 로드 실패: {key}");
+                }
             }
-
-            var handle = Addressables.LoadAssetAsync<AnimationClip>(key);
-            await handle.Task;
-
-            if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
+            catch (Exception e)
             {
-                _clipCache[key] = handle.Result;
-                Debug.Log($"[AnimResource] Loaded {key}");
-            }
-            else
-            {
-                Addressables.Release(handle);
-                Debug.LogWarning($"[AnimResource] 로드 실패: {key}");
+                Debug.LogWarning($"[AnimResource] 건너뜀: {key} ({e.GetType().Name})");
             }
         }
 
@@ -49,6 +58,7 @@ public class AnimationResourceManager
 
     public AnimationClip GetClip(string key)
     {
+        if (string.IsNullOrEmpty(key)) return null;
         _clipCache.TryGetValue(key, out var clip);
         return clip;
     }

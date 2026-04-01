@@ -215,7 +215,7 @@ public class UI_PrepPanel : UI_Base
         {
             var d = _selectedCharEntry.data;
             if (mainHpLabel != null)  mainHpLabel.text  = $"체력  {d.maxHealth}";
-            if (mainDefLabel != null) mainDefLabel.text = $"방어력  {d.attackPower}";
+            if (mainDefLabel != null) mainDefLabel.text = $"방어력  {d.baseDefense}";
             SetAbilityIcon(mainAbilityIcon0, _selectedCharEntry.abilityIcon0);
             SetAbilityIcon(mainAbilityIcon1, _selectedCharEntry.abilityIcon1);
             SetAbilityIcon(mainAbilityIcon2, _selectedCharEntry.abilityIcon2);
@@ -306,12 +306,21 @@ public class UI_PrepPanel : UI_Base
         if (charPreviewName != null) charPreviewName.text = d.characterName;
 
         SetSlider(sliderHp,  sliderHpText,  d.maxHealth,     MaxHp,  "체력");
-        SetSlider(sliderAtk, sliderAtkText, d.attackPower,   MaxAtk, "공격력");
+        SetSlider(sliderAtk, sliderAtkText, d.GetTotalAttackPower(), MaxAtk, "공격력");
         SetSlider(sliderSpd, sliderSpdText, d.baseMoveSpeed, MaxSpd, "이동속도");
 
         SetAbilityIcon(abilityIcon0, entry.abilityIcon0);
         SetAbilityIcon(abilityIcon1, entry.abilityIcon1);
         SetAbilityIcon(abilityIcon2, entry.abilityIcon2);
+
+        // 선택 창 패시브 툴팁
+        if (d.passive != null)
+        {
+            SetupTooltip(abilityIcon0, d.passive.passiveName, d.passive.description, 0);
+            // 특성2, 3은 PassiveSO에 개별 필드가 없으므로 동일 패시브 설명 공유
+            SetupTooltip(abilityIcon1, d.passive.passiveName, d.passive.description, 0);
+            SetupTooltip(abilityIcon2, d.passive.passiveName, d.passive.description, 0);
+        }
     }
 
     private void SetupTooltip(Image icon, string name, string desc, float cooldown)
@@ -386,9 +395,14 @@ public class UI_PrepPanel : UI_Base
         if (weaponAtkSpeedText != null) weaponAtkSpeedText.text = "공격속도  —";
         if (weaponRangeText    != null) weaponRangeText.text    = "공격 거리  —";
 
-        // Q/E 스킬 아이콘
+        // Q/E 스킬 아이콘 + 툴팁
         SetAbilityIcon(weaponQSkillIcon, so.skillQ?.icon);
         SetAbilityIcon(weaponESkillIcon, so.skillE?.icon);
+
+        if (so.skillQ != null)
+            SetupTooltip(weaponQSkillIcon, so.skillQ.skillName, so.skillQ.description, so.skillQ.cooldown);
+        if (so.skillE != null)
+            SetupTooltip(weaponESkillIcon, so.skillE.skillName, so.skillE.description, so.skillE.cooldown);
     }
 
     private void OnClickWeaponConfirm()

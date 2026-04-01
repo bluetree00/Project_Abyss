@@ -27,14 +27,6 @@ public class Hovl_Laser : MonoBehaviour
     private ParticleSystem[] Effects;
     private ParticleSystem[] Hit;
 
-    void OnEnable()
-    {
-        LaserSaver = false;
-        UpdateSaver = false;
-        // 필요한 경우, ParticleSystem이나 LineRenderer의 상태도 초기화
-    }
-
-
     void Start ()
     {
         //Get LineRender and ParticleSystem components from current prefab;  

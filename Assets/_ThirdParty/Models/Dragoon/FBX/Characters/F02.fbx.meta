@@ -2516,7 +2516,8 @@ ModelImporter:
     - name: ToesEnd_R
       parentName: Toes_R
       position: {x: -0.02448291, y: -1.949829e-14, z: 0.000000061952235}
-      rotation: {x: -0.00000016856937, y: 0.000000022584569, z: 0.000000046007692, w: 1}
+      rotation: {x: -0.00000016856937, y: 0.000000022584569, z: 0.000000046007692,
+        w: 1}
       scale: {x: 1.0000006, y: 0.99999994, z: 1.0000005}
     - name: RootPart1_M
       parentName: Root_M
@@ -3401,3 +3402,10 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/_ThirdParty/Models/Dragoon/FBX/Characters/F02.fbx
+  uploadId: 834578

@@ -81,3 +81,10 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/_ThirdParty/Models/RedKnight/FBX/Weapon/Sword_M05.fbx
+  uploadId: 834578

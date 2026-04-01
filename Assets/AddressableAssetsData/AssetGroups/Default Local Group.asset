@@ -15,8 +15,23 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: f1076af87ac402947b621c4a9f046477
   m_SerializeEntries:
+  - m_GUID: 39ccc23cef14bfc4fab16530b8ec845b
+    m_Address: Mage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3c2a12c38afca0148926006ebf1a2deb
     m_Address: '@UIRoot'
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 46339d9a70aebad4bb4d5f1d9afa3fe2
+    m_Address: AirLightAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 658a3ff725e785b4d8685777b3c3dbfd
+    m_Address: SwordHitSlash
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -26,11 +41,26 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8fc3055e4345da8439787a4a3f8ed725
+    m_Address: AirLightAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b01e38b868b87e944937920d911995d8
+    m_Address: Berserker
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b11fcb48d5bbbd34b86b1e73a9ff93bc
+    m_Address: SwordHitSpark
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c8d6a64eb8c657e46b1dd6ae4dd4328f
     m_Address: UI/Popup/UI_WeaponReplacePopup
@@ -42,6 +72,21 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cab22952fbb160641be425b713d28514
+    m_Address: HitSpark
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ccf8398431c6b7b49b55be6ccda46a09
+    m_Address: AirLightAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d648b40cfb9bcc5438d279859600ef15
+    m_Address: SwordHitImpact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db18c22cee80cc74487b0900361715f6
     m_Address: StageUI

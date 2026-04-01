@@ -75,6 +75,13 @@ public class ActAttackState : ILayerState<ActState>
             ? (isAir ? Mathf.Max(1, wd.airEndCount) : Mathf.Max(1, wd.groundEndCount))
             : 1;
 
+        // 공중 공격 진입 시 즉시 체공 + 사용 플래그
+        if (isAir)
+        {
+            _controller.StartAirHover();
+            _controller.AirAttackUsed = true;
+        }
+
         _waitingForComboInput = false;
 
         SubscribeReceiver();
@@ -198,6 +205,7 @@ public class ActAttackState : ILayerState<ActState>
     private void OnAttackEnd()
     {
         _controller.Combo.IncrementStep();
+        bool isAir = !_controller.IsGrounded();
 
         if (_controller.Combo.CurrentComboStep >= _maxCombo)
         {
@@ -209,6 +217,24 @@ public class ActAttackState : ILayerState<ActState>
             return;
         }
 
+        // 공중: 콤보 대기 없이 입력이 있으면 즉시 다음 타, 없으면 종료
+        if (isAir)
+        {
+            if (_controller.Combo.NextComboQueued)
+            {
+                _controller.Combo.SetNextComboQueued(false);
+                _controller.StartAirHover();
+                PlayCurrentComboAnimation();
+            }
+            else
+            {
+                _controller.Combo.ResetStep();
+                _stateChanger.Change(ActState.None);
+            }
+            return;
+        }
+
+        // 지상: 기존 콤보 로직
         if (_controller.Combo.NextComboQueued)
         {
             _controller.Combo.SetNextComboQueued(false);
@@ -255,6 +281,8 @@ public class ActAttackState : ILayerState<ActState>
                                    ? mappedBaseName
                                    : fallbackStateName;
 
+        // Debug.Log($"[ActAttackState] Play: step={step}, action={action}, isAir={isAir}, mapped={mappedBaseName ?? "null"}, fallback={fallbackStateName}, final={stateToPlay}");
+
         Animator anim       = _controller.Anim;
         int      layerIndex = 0;
         int      stateHash  = Animator.StringToHash(stateToPlay);
@@ -291,7 +319,6 @@ public class ActAttackState : ILayerState<ActState>
             if (anim.HasState(layerIndex, stateHash))
             {
                 anim.CrossFade(stateHash, 0.08f);
-                anim.SetFloat(AirLightAttackValueHash, 1f);
                 playedHash = stateHash;
             }
             else
