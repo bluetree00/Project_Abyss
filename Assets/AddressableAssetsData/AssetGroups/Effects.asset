@@ -15,13 +15,58 @@ MonoBehaviour:
   m_GroupName: Effects
   m_GUID: 9312e00a4bcb9af4bb0b7e7c943aa1c8
   m_SerializeEntries:
+  - m_GUID: 284aa8115675f03488377d544e50cbf5
+    m_Address: IasenDashLaser
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 33cfc2755a55b7e4c86c9d7018efbaaa
+    m_Address: IasenHitRed
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3af328b9a7e29044bade7641dd722166
+    m_Address: WindBlast
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3fee2e03e4bdc854bb38f7bcbca7c75d
+    m_Address: DoubleSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 54e43f480dec28e40ae0e065be4aac5f
     m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEffectPact.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6028b5b4fbbf45e45a362de709aa2e18
+    m_Address: IasenLaserTrail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 658a3ff725e785b4d8685777b3c3dbfd
     m_Address: SwordHitSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c21e7a6e514dd9499418cbbb66211cf
+    m_Address: MultiSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 756d37cf3b5f8964cae715a9e54bd4e9
+    m_Address: DashTrail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7f11cfb7c95c8df45beb2209791430c4
+    m_Address: IasenFinishFlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 800cddb992d3f5e4eb2348b90447f4a7
+    m_Address: IasenHitBlackFire
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -47,8 +92,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2b2a3fc6a4c3444db01e70f094d7cdd
+    m_Address: BlueShootHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b5c49b7d08769594c855059bca8bebf5
+    m_Address: IasenDashTrail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cab22952fbb160641be425b713d28514
     m_Address: HitSpark
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cfe0c511fa8d1cf4abf31f2f48dfe4f9
+    m_Address: IasenHitRedLaser
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -76,6 +136,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e921ba1a7fdb59647a6713ac02429b33
     m_Address: SlashAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f82a1a892a042c1438f8f4704a37e11b
+    m_Address: IasenDashFire
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
