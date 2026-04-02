@@ -4,12 +4,6 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 게임 준비 패널 — 3-스테이트 구조
-///
-/// [메인]  캐릭터 슬롯 + 무기 슬롯 → 게임 시작
-///   ↓ 캐릭터 슬롯 클릭
-/// [캐릭터 선택]  그리드 + 오른쪽 프리뷰/스탯 → 선택 완료
-///   ↓ 무기 슬롯 클릭
-/// [무기 선택]  그리드 + 오른쪽 프리뷰/스탯 → 무기 선택
 /// </summary>
 public class UI_PrepPanel : UI_Base
 {
@@ -99,7 +93,7 @@ public class UI_PrepPanel : UI_Base
     [Header("무기 선택 — 버튼")]
     [SerializeField] private Button   weaponConfirmButton;
 
-    // ── 플레이스홀더 스프라이트 ───────────────────────────
+    // ── 플레이스홀더 ───────────────────────────────────────
     [Header("플레이스홀더")]
     [SerializeField] private Sprite defaultCharSprite;
     [SerializeField] private Sprite defaultWeaponSprite;
@@ -111,7 +105,7 @@ public class UI_PrepPanel : UI_Base
     private UI_WeaponSelectItem            _selectedWeaponItem;
     private bool _built;
 
-    private const float MaxHp  = 200f;
+    private const float MaxHp  = 500f;
     private const float MaxAtk = 100f;
     private const float MaxSpd = 15f;
 
@@ -179,39 +173,33 @@ public class UI_PrepPanel : UI_Base
     // ── 메인 패널 갱신 ────────────────────────────────────
     private void RefreshMainSlots()
     {
-        if (_selectedCharEntry != null)
+        // ── 캐릭터 슬롯 ──
+        bool hasChar = _selectedCharEntry?.data != null;
+
+        if (charSlotPortrait != null)
         {
-            if (charSlotPortrait != null)
+            if (hasChar && _selectedCharEntry.portrait != null)
             {
                 charSlotPortrait.sprite = _selectedCharEntry.portrait;
-                charSlotPortrait.color  = _selectedCharEntry.portrait != null ? Color.white : Color.gray;
+                charSlotPortrait.color  = Color.white;
             }
-            if (charSlotName != null)
-                charSlotName.text = _selectedCharEntry.data != null ? _selectedCharEntry.data.characterName : "";
-        }
-        else
-        {
-            if (charSlotPortrait != null)
+            else
             {
                 charSlotPortrait.sprite = defaultCharSprite;
-                charSlotPortrait.color  = defaultCharSprite != null ? Color.white : Color.gray;
+                charSlotPortrait.color  = new Color(0.5f, 0.5f, 0.5f, 0.3f);
             }
-            if (charSlotName != null) charSlotName.text = "캐릭터 선택";
         }
 
-        var weaponSO = _selectedWeaponEntry?.data;
-        var icon     = (_selectedWeaponEntry != null && _selectedWeaponEntry.icon != null)
-                        ? _selectedWeaponEntry.icon : weaponSO?.icon;
-        if (weaponSlotIcon != null)
-        {
-            weaponSlotIcon.sprite = icon != null ? icon : defaultWeaponSprite;
-            weaponSlotIcon.color  = (icon != null || defaultWeaponSprite != null) ? Color.white : Color.gray;
-        }
-        if (weaponSlotName != null)
-            weaponSlotName.text = weaponSO != null ? weaponSO.displayName : "무기 선택";
+        if (charSlotName != null)
+            charSlotName.text = hasChar ? _selectedCharEntry.data.characterName : "클릭하여 캐릭터 선택";
 
-        // 캐릭터 스탯 표시
-        if (_selectedCharEntry?.data != null)
+        // 캐릭터 스탯 — 미선택 시 개별 숨김
+        SetGOActive(mainHpLabel, hasChar);
+        SetGOActive(mainDefLabel, hasChar);
+        SetGOActive(mainAbilityIcon0, hasChar);
+        SetGOActive(mainAbilityIcon1, hasChar);
+        SetGOActive(mainAbilityIcon2, hasChar);
+        if (hasChar)
         {
             var d = _selectedCharEntry.data;
             if (mainHpLabel != null)  mainHpLabel.text  = $"체력  {d.maxHealth}";
@@ -220,7 +208,6 @@ public class UI_PrepPanel : UI_Base
             SetAbilityIcon(mainAbilityIcon1, _selectedCharEntry.abilityIcon1);
             SetAbilityIcon(mainAbilityIcon2, _selectedCharEntry.abilityIcon2);
 
-            // 패시브 툴팁
             if (d.passive != null)
             {
                 SetupTooltip(mainAbilityIcon0, d.passive.passiveName, d.passive.description, 0);
@@ -229,14 +216,40 @@ public class UI_PrepPanel : UI_Base
             }
         }
 
-        // 무기 스탯/스킬 표시
-        if (weaponSO != null)
+        // ── 무기 슬롯 ──
+        var weaponSO = _selectedWeaponEntry?.data;
+        bool hasWeapon = weaponSO != null;
+        var weaponIcon = (_selectedWeaponEntry != null && _selectedWeaponEntry.icon != null)
+                          ? _selectedWeaponEntry.icon : weaponSO?.icon;
+
+        if (weaponSlotIcon != null)
+        {
+            if (hasWeapon && weaponIcon != null)
+            {
+                weaponSlotIcon.sprite = weaponIcon;
+                weaponSlotIcon.color  = Color.white;
+            }
+            else
+            {
+                weaponSlotIcon.sprite = defaultWeaponSprite;
+                weaponSlotIcon.color  = new Color(0.5f, 0.5f, 0.5f, 0.3f);
+            }
+        }
+
+        if (weaponSlotName != null)
+            weaponSlotName.text = hasWeapon ? weaponSO.displayName : "클릭하여 무기 선택";
+
+        // 무기 스탯 — 미선택 시 개별 숨김
+        SetGOActive(mainWeaponParamsTitle, hasWeapon);
+        SetGOActive(mainWeaponAtk, hasWeapon);
+        SetGOActive(mainWeaponSpd, hasWeapon);
+        SetGOActive(mainWeaponRng, hasWeapon);
+        if (hasWeapon)
         {
             if (mainWeaponAtk != null) mainWeaponAtk.text = $"ATK: {weaponSO.baseAttack:0}";
-            if (mainWeaponSpd != null) mainWeaponSpd.text = $"SPD: —";
-            if (mainWeaponRng != null) mainWeaponRng.text = $"RNG: —";
+            if (mainWeaponSpd != null) mainWeaponSpd.text = $"SPD: {weaponSO.attackSpeed:0.0}/s";
+            if (mainWeaponRng != null) mainWeaponRng.text = $"RNG: {weaponSO.attackRange:0}m";
 
-            // Q/E 스킬 아이콘 (Slot_Weapon 하위에서 직접 찾기)
             if (weaponSlotIcon != null)
             {
                 var slotWeapon = weaponSlotIcon.transform.parent;
@@ -244,20 +257,36 @@ public class UI_PrepPanel : UI_Base
                 var eIcon = slotWeapon?.Find("ESkillIcon")?.GetComponent<Image>();
                 SetAbilityIcon(qIcon, weaponSO.skillQ?.icon);
                 SetAbilityIcon(eIcon, weaponSO.skillE?.icon);
+                SetGOActive(qIcon, true);
+                SetGOActive(eIcon, true);
 
-                // 스킬 툴팁
                 if (weaponSO.skillQ != null)
                     SetupTooltip(qIcon, weaponSO.skillQ.skillName, weaponSO.skillQ.description, weaponSO.skillQ.cooldown);
                 if (weaponSO.skillE != null)
                     SetupTooltip(eIcon, weaponSO.skillE.skillName, weaponSO.skillE.description, weaponSO.skillE.cooldown);
             }
         }
+        else if (weaponSlotIcon != null)
+        {
+            // 미선택 시 Q/E 스킬 아이콘 숨김
+            var slotWeapon = weaponSlotIcon.transform.parent;
+            SetGOActive(slotWeapon?.Find("QSkillIcon")?.GetComponent<Image>(), false);
+            SetGOActive(slotWeapon?.Find("ESkillIcon")?.GetComponent<Image>(), false);
+        }
     }
 
     private void RefreshGameStartButton()
     {
+        bool canStart = _selectedCharEntry != null && _selectedWeaponEntry != null;
         if (gameStartButton != null)
-            gameStartButton.interactable = (_selectedCharEntry != null && _selectedWeaponEntry != null);
+        {
+            gameStartButton.interactable = canStart;
+
+            // 시작 버튼 텍스트 변경
+            var btnText = gameStartButton.GetComponentInChildren<TMP_Text>();
+            if (btnText != null)
+                btnText.text = canStart ? "게임 시작" : "캐릭터와 무기를 선택하세요";
+        }
     }
 
     // ── 캐릭터 선택 ───────────────────────────────────────
@@ -313,11 +342,9 @@ public class UI_PrepPanel : UI_Base
         SetAbilityIcon(abilityIcon1, entry.abilityIcon1);
         SetAbilityIcon(abilityIcon2, entry.abilityIcon2);
 
-        // 선택 창 패시브 툴팁
         if (d.passive != null)
         {
             SetupTooltip(abilityIcon0, d.passive.passiveName, d.passive.description, 0);
-            // 특성2, 3은 PassiveSO에 개별 필드가 없으므로 동일 패시브 설명 공유
             SetupTooltip(abilityIcon1, d.passive.passiveName, d.passive.description, 0);
             SetupTooltip(abilityIcon2, d.passive.passiveName, d.passive.description, 0);
         }
@@ -330,13 +357,6 @@ public class UI_PrepPanel : UI_Base
         if (trigger == null) trigger = icon.gameObject.AddComponent<SkillTooltipTrigger>();
         trigger.SetData(name, desc, cooldown);
         trigger.SetTooltipPanel(tooltipPanel, tooltipName, tooltipDesc, tooltipCooldown);
-    }
-
-    private static void SetAbilityIcon(Image img, Sprite sprite)
-    {
-        if (img == null) return;
-        img.sprite = sprite;
-        img.color  = sprite != null ? Color.white : new Color(1f, 1f, 1f, 0.25f);
     }
 
     private void OnClickCharConfirm()
@@ -392,10 +412,9 @@ public class UI_PrepPanel : UI_Base
         }
         if (weaponPreviewName  != null) weaponPreviewName.text  = so.displayName;
         if (weaponAtkText      != null) weaponAtkText.text      = $"공격력  {so.baseAttack:0}";
-        if (weaponAtkSpeedText != null) weaponAtkSpeedText.text = "공격속도  —";
-        if (weaponRangeText    != null) weaponRangeText.text    = "공격 거리  —";
+        if (weaponAtkSpeedText != null) weaponAtkSpeedText.text = $"공격속도  {so.attackSpeed:0.0}/s";
+        if (weaponRangeText    != null) weaponRangeText.text    = $"사거리  {so.attackRange:0}m";
 
-        // Q/E 스킬 아이콘 + 툴팁
         SetAbilityIcon(weaponQSkillIcon, so.skillQ?.icon);
         SetAbilityIcon(weaponESkillIcon, so.skillE?.icon);
 
@@ -434,6 +453,25 @@ public class UI_PrepPanel : UI_Base
     }
 
     // ── 유틸 ──────────────────────────────────────────────
+    private static void SetGOActive(Component comp, bool active)
+    {
+        if (comp != null) comp.gameObject.SetActive(active);
+    }
+
+    private static void SetAbilityIcon(Image img, Sprite sprite)
+    {
+        if (img == null) return;
+        img.sprite = sprite;
+        img.color  = sprite != null ? Color.white : new Color(1f, 1f, 1f, 0.15f);
+    }
+
+    private static void ClearAbilityIcon(Image img)
+    {
+        if (img == null) return;
+        img.sprite = null;
+        img.color  = new Color(1f, 1f, 1f, 0.08f);
+    }
+
     private static void SetSlider(Slider slider, TMP_Text label, float value, float maxVal, string prefix)
     {
         if (slider != null)

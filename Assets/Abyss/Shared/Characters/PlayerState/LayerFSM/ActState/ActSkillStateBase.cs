@@ -33,10 +33,12 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
     {
         if (!_controller.CooldownTracker.IsReady(Slot))
         {
+            UnityEngine.Debug.Log($"[SkillBase] {Slot} blocked by cooldown");
             _stateChanger.Change(default);   // None(0) 으로 복귀
             return;
         }
 
+        UnityEngine.Debug.Log($"[SkillBase] {Slot} Enter");
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
             new PassiveContext { skillUsed = Slot });
 
@@ -47,9 +49,10 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
     public void Exit()
     {
-        float cd = GetCooldown();
-        if (cd > 0f)
-            _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
+        // 테스트: 쿨다운 비활성화
+        // float cd = GetCooldown();
+        // if (cd > 0f)
+        //     _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
 
         OnExit();
     }

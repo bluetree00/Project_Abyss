@@ -24,6 +24,9 @@ public class WeaponData
     public Sprite icon;            // HUD 표시용 직접 참조
     public float baseAttack;
     public float baseDefense;
+    public float attackSpeed;
+    public float attackRange;
+    public float areaOfEffect;
     public float holdThreshold;
 
     public PromoteMode promoteMode;
@@ -61,6 +64,9 @@ public class WeaponData
         icon             = so.icon;
         baseAttack       = so.baseAttack;
         baseDefense      = so.baseDefense;
+        attackSpeed      = so.attackSpeed;
+        attackRange      = so.attackRange;
+        areaOfEffect     = so.areaOfEffect;
         holdThreshold    = so.holdThreshold;
 
         promoteMode  = so.promoteMode;
