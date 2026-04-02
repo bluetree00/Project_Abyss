@@ -4790,6 +4790,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 09b4ce3140709214d891c32fdea6004c, type: 2}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -4855,7 +4856,7 @@ GameObject:
   - component: {fileID: 114740368715151560}
   - component: {fileID: 199290412375127048}
   - component: {fileID: 108340316821141184}
-  - component: {fileID: 5245381309687449878}
+  - component: {fileID: -1154050823520573641}
   m_Layer: 0
   m_Name: Projectile 22 cute star
   m_TagString: Untagged
@@ -9710,7 +9711,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: 0, z: 0}
   useOnlyRotationOffset: 1
   UseFirePointRotation: 0
-  DestoyMainEffect: 0
+  DestoyMainEffect: 1
 --- !u!199 &199290412375127048
 ParticleSystemRenderer:
   serializedVersion: 6
@@ -9848,7 +9849,7 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
---- !u!114 &5245381309687449878
+--- !u!114 &-1154050823520573641
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -14719,6 +14720,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 9509d65f44bec55498ba99d0a564e28b, type: 2}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -19619,6 +19621,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 7dad299f9caed054ea10097fd11f0a54, type: 2}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -24461,6 +24464,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 9509d65f44bec55498ba99d0a564e28b, type: 2}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -29361,6 +29365,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 09b4ce3140709214d891c32fdea6004c, type: 2}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

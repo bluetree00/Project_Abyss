@@ -50,16 +50,15 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: MagicCircle27bcg
-  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329,
-    type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _BUILTIN_SURFACE_TYPE_TRANSPARENT
+  - _ENABLE_FOG_ON_TRANSPARENT
   - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords:
   - _DOUBLESIDED_ON
-  - _ENABLE_FOG_ON_TRANSPARENT
   - _USECENTERGLOW_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -178,10 +177,14 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 10
+    - _DstBlend2: 0
+    - _DstBlendAlpha: 10
     - _Emission: 6
     - _EnableBlendModePreserveSpecularLighting: 0
     - _EnableFogOnTransparent: 1
     - _ExcludeFromTUAndAA: 0
+    - _Fresnelpower: 3
+    - _Fresnelscale: 3
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
@@ -190,18 +193,21 @@ Material:
     - _MainTexVspeed: 0
     - _Metallic: 0
     - _Mode: 0
+    - _Multiply_texture: 1
     - _NoiseUspeed: 0
     - _NoiseVspeed: 0
     - _OcclusionStrength: 1
     - _Opacity: 1
     - _OpaqueCullMode: 2
     - _Parallax: 0.02
+    - _PerPixelSorting: 0
     - _QueueControl: 0
     - _QueueOffset: 0
     - _RenderQueueType: 3
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 5
+    - _SrcBlendAlpha: 1
     - _StencilRef: 0
     - _StencilRefDepth: 1
     - _StencilRefDistortionVec: 4
@@ -212,6 +218,7 @@ Material:
     - _StencilWriteMaskMV: 43
     - _Surface: 1
     - _SurfaceType: 1
+    - _Textureopacity: 0
     - _TransparentBackfaceEnable: 0
     - _TransparentCullMode: 2
     - _TransparentDepthPostpassEnable: 0
@@ -219,12 +226,17 @@ Material:
     - _TransparentSortPriority: 0
     - _TransparentWritingMotionVec: 0
     - _TransparentZWrite: 0
+    - _Triplanar_blend: 1
+    - _Triplanar_tiling: 1
     - _UVSec: 0
     - _UseShadowThreshold: 0
+    - _Use_fresnel: 0
+    - _Use_triplanar: 0
     - _Usealphacenterglow: 0
     - _Usecenterglow: 1
     - _Usedepth: 0
     - _Usedistortion: 1
+    - _Useonlycolor: 0
     - _ZTest: 4
     - _ZTestDepthEqualForOpaque: 4
     - _ZTestTransparent: 4

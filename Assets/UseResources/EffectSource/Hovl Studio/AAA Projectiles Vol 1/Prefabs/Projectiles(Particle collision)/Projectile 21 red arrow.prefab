@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 114481800312329402}
   - component: {fileID: 199337154022612766}
   - component: {fileID: 108636099739108412}
-  - component: {fileID: 5447705440159676742}
+  - component: {fileID: 6513367368684132122}
   m_Layer: 0
   m_Name: Projectile 21 red arrow
   m_TagString: Untagged
@@ -4850,7 +4850,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: 0, z: 0}
   useOnlyRotationOffset: 1
   UseFirePointRotation: 0
-  DestoyMainEffect: 0
+  DestoyMainEffect: 1
 --- !u!199 &199337154022612766
 ParticleSystemRenderer:
   serializedVersion: 6
@@ -4988,7 +4988,7 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
---- !u!114 &5447705440159676742
+--- !u!114 &6513367368684132122
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

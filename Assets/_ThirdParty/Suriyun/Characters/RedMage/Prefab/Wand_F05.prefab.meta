@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 9861f5041cdedfc41929c2aa29bfeaa0
+timeCreated: 1495126438
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/Suriyun/Characters/RedMage/Prefab/Wand_F05.prefab
+  uploadId: 834578

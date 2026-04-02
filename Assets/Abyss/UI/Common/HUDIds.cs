@@ -15,6 +15,7 @@ public static class HUDIds
     {
         None = 0,
 
+        Lobby  = 10,    // 로비
         Combat = 20,    // 일반 전투
         Boss = 30,      // 보스전
         Cutscene = 40,  // 컷씬

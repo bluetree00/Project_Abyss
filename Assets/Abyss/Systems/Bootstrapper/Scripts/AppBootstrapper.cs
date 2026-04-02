@@ -36,7 +36,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     private bool _uiRootEnsured;
 
     [Header("Steam Login")]
-    [SerializeField] private bool useSteamLogin = false;
+    [SerializeField] private bool useSteamLogin = true;
 
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false

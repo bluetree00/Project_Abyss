@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: e1bd12166d33c3548a5a697463bd6dcb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133704
+  packageName: RPG VFX Bundle
+  packageVersion: 6.0.2
+  assetPath: Assets/UseResources/EffectSource/Hovl Studio/RPG VFX Bundle/Random effect
+    prefabs/Buff heal.prefab
+  uploadId: 883360

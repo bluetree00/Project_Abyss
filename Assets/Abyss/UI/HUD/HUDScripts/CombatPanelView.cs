@@ -1,8 +1,9 @@
 //============================================================
 // CombatPanelView.cs
 // - HP 슬라이더/텍스트
-// - 공격력 텍스트
-// - 장비 슬롯 × 2 (아이콘, 이름, 공격력)
+// - 장비 슬롯 × 2 (아이콘)
+// - Q/E 스킬 슬롯 (아이콘, 쿨다운)
+// - Active 슬롯 × 3
 //============================================================
 using System;
 using UnityEngine;
@@ -15,12 +16,16 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Slider   hpSlider;
     [SerializeField] private TMP_Text hpText;
 
-    [Header("Status — Attack")]
-    [SerializeField] private TMP_Text attackText;
-
     [Header("Weapon Slots")]
     [SerializeField] private WeaponSlotUI slot0;
     [SerializeField] private WeaponSlotUI slot1;
+
+    [Header("Skill Slots — Q / E")]
+    [SerializeField] private SkillSlotUI skillQ;
+    [SerializeField] private SkillSlotUI skillE;
+
+    [Header("Active Slots")]
+    [SerializeField] private ActiveSlotUI[] activeSlots = new ActiveSlotUI[3];
 
     // ─────────────────────────────────────────────────────────
     // HP
@@ -37,15 +42,6 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────
-    // 공격력
-    // ─────────────────────────────────────────────────────────
-    public void SetAttack(int attack)
-    {
-        if (attackText != null)
-            attackText.text = $"ATK {attack}";
-    }
-
-    // ─────────────────────────────────────────────────────────
     // 장비 슬롯
     // ─────────────────────────────────────────────────────────
     public void SetWeaponSlot(int index, WeaponSlotInfo info)
@@ -55,39 +51,110 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────
-    // 슬롯 UI 단위 (Inspector 바인딩)
+    // 스킬 슬롯
+    // ─────────────────────────────────────────────────────────
+    public void SetSkillIcon(SkillType skill, Sprite icon)
+    {
+        GetSkillSlot(skill)?.SetIcon(icon);
+    }
+
+    public void SetSkillCooldown(SkillType skill, float remaining, float total)
+    {
+        GetSkillSlot(skill)?.SetCooldown(remaining, total);
+    }
+
+    private SkillSlotUI GetSkillSlot(SkillType skill) => skill switch
+    {
+        SkillType.Q => skillQ,
+        SkillType.E => skillE,
+        _           => null,
+    };
+
+    // ─────────────────────────────────────────────────────────
+    // Active 슬롯
+    // ─────────────────────────────────────────────────────────
+    public void SetActiveSlot(int index, Sprite icon)
+    {
+        if (index >= 0 && index < activeSlots.Length)
+            activeSlots[index]?.SetIcon(icon);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 무기 슬롯 UI (Inspector 바인딩)
     // ─────────────────────────────────────────────────────────
     [Serializable]
     public sealed class WeaponSlotUI
     {
-        [SerializeField] private GameObject emptyRoot;    // 장비 없을 때 표시할 빈 슬롯 이미지
+        [SerializeField] private GameObject emptyRoot;
         [SerializeField] private Image      iconImage;
-        [SerializeField] private TMP_Text   nameText;
-        [SerializeField] private TMP_Text   attackText;
 
         public void Apply(WeaponSlotInfo info)
         {
-            // emptyRoot: 장비 없을 때 표시하는 빈 슬롯 이미지
             SetActive(emptyRoot, !info.HasWeapon);
 
-            // 개별 요소는 장비가 있을 때만 표시
             if (iconImage != null)
             {
                 iconImage.gameObject.SetActive(info.HasWeapon && info.Icon != null);
-                if (info.HasWeapon) iconImage.sprite = info.Icon;
+                if (info.HasWeapon && info.Icon != null) iconImage.sprite = info.Icon;
             }
-            if (nameText   != null) nameText.gameObject.SetActive(info.HasWeapon);
-            if (attackText != null) attackText.gameObject.SetActive(info.HasWeapon);
-
-            if (!info.HasWeapon) return;
-
-            if (nameText   != null) nameText.text  = info.Name;
-            if (attackText != null) attackText.text = $"ATK {info.Attack:F0}";
         }
 
         private static void SetActive(GameObject go, bool on)
         {
             if (go != null && go.activeSelf != on) go.SetActive(on);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 스킬 슬롯 UI (Inspector 바인딩)
+    // ─────────────────────────────────────────────────────────
+    [Serializable]
+    public sealed class SkillSlotUI
+    {
+        [SerializeField] private Image      iconImage;
+        [SerializeField] private GameObject cooldownBg;
+        [SerializeField] private TMP_Text   cooldownText;
+        /// <summary>선택: Radial360 FillMethod 설정된 Image — 쿨다운 진행 오버레이.</summary>
+        [SerializeField] private Image      cooldownOverlay;
+
+        public void SetIcon(Sprite icon)
+        {
+            if (iconImage == null) return;
+            iconImage.sprite = icon;
+            iconImage.gameObject.SetActive(icon != null);
+        }
+
+        public void SetCooldown(float remaining, float total)
+        {
+            bool onCooldown = remaining > 0.05f;
+
+            if (cooldownBg != null && cooldownBg.activeSelf != onCooldown)
+                cooldownBg.SetActive(onCooldown);
+
+            if (cooldownText != null)
+                cooldownText.text = onCooldown ? Mathf.CeilToInt(remaining).ToString() : string.Empty;
+
+            if (cooldownOverlay != null)
+            {
+                cooldownOverlay.gameObject.SetActive(onCooldown);
+                cooldownOverlay.fillAmount = (onCooldown && total > 0f) ? remaining / total : 0f;
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Active 슬롯 UI (Inspector 바인딩)
+    // ─────────────────────────────────────────────────────────
+    [Serializable]
+    public sealed class ActiveSlotUI
+    {
+        [SerializeField] private Image iconImage;
+
+        public void SetIcon(Sprite icon)
+        {
+            if (iconImage == null) return;
+            iconImage.sprite = icon;
+            iconImage.gameObject.SetActive(icon != null);
         }
     }
 }

@@ -3,12 +3,16 @@
 /// </summary>
 public enum StatType
 {
-    AttackPower,
+    AttackPower,                // 레거시 — 범용 공격력 아이템/버프용 (Melee+Ranged 동시 적용)
     Defense,
     MaxHp,
     MoveSpeed,
     AttackSpeed,
-    SkillCooldownReduction,  // 0.1 = 쿨다운 10% 감소 (아이템/버프 연동용)
+    SkillCooldownReduction,     // 0.1 = 쿨다운 10% 감소 (아이템/버프 연동용)
+    MeleeAttack,                // 근거리 공격력
+    RangedAttack,               // 원거리 공격력
+    Luck,                       // 행운력
+    ActiveItemCooldownReduction, // 액티브 아이템 쿨다운 감소
 }
 
 /// <summary>

@@ -17,21 +17,12 @@ MonoBehaviour:
   baseRunSpeed: 8
   maxHealth: 100
   attackPower: 10
-  attackComboStep: 1
-  comboTimer: -0.068115115
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
-  heldDuration: 0
-  attackInputTime: 0
-  heavyAttackChargeTime: 0
   heavyAttackReleaseTime: 0.4
   dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 0.5
-  attackPowerBoostAmount: 72.5
-  attackPowerBoostDuration: 10
-  moveSpeedBoostAmount: 10
-  moveSpeedBoostDuration: 3
   jumpForce: 10
   gravity: -5
   fallMultiplier: 2
@@ -43,19 +34,5 @@ MonoBehaviour:
   airControlMultiplier: 0.5
   groundDrag: 4
   airDrag: 0.5
-  equippedWeapon:
-    WeaponDisplayKey: 
-    displayName: 
-    weaponPrefabKey: 
-    iconKey: 
-    baseAttack: 0
-    baseDefense: 0
-    groundEndCount: 0
-    airEndCount: 0
-    animationSet: {fileID: 0}
-    effectPackage: {fileID: 0}
-    colliderPackage: {fileID: 0}
-    abilitySet: {fileID: 0}
-    effectDataList: []
-    colliderDataList: []
   conClass: 0
+  passive: {fileID: 11400000, guid: bb91a65d4029d4b4f98f823d98830b98, type: 2}

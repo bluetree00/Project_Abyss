@@ -274,6 +274,11 @@ public class PlayerController : CharacterBase
         if (actSM != null) actStateDebug = actSM.CurrentId;
 
         CooldownTracker.Tick(Time.unscaledDeltaTime);
+
+        // ITickablePassive 틱 (시간 기반 스택 만료 등)
+        foreach (var p in _passives)
+            if (p is ITickablePassive tickable)
+                tickable.Tick(Time.deltaTime);
     }
 
     private void FixedUpdate()
@@ -324,8 +329,9 @@ public class PlayerController : CharacterBase
     private void InitCoreComponents()
     {
         Managers.Player.SetPlayer(transform);
-        handTransform = Util.FindDeepChild(transform, "WeaponSocket");
-        if (handTransform == null) Debug.LogWarning("WeaponSocket 트랜스폼을 찾지 못했습니다.");
+        handTransform = Util.FindDeepChild(transform, "WeaponMount")
+                     ?? Util.FindDeepChild(transform, "WeaponSocket");
+        if (handTransform == null) Debug.LogWarning("WeaponMount/WeaponSocket 트랜스폼을 찾지 못했습니다.");
     }
 
     private void InitWeaponManager()
@@ -453,6 +459,91 @@ public class PlayerController : CharacterBase
     protected virtual void RouteInputsToLayers() { }
 
     /// <summary>
+    /// 기본 FSM 등록 — 모든 캐릭터가 공유하는 Loco/Act 상태 세트.
+    /// 캐릭터별 InitLayerFSMs()에서 호출.
+    /// </summary>
+    protected void RegisterDefaultFSMs()
+    {
+        locoSM.Register(LocoState.Idle,  new LocoIdleState());
+        locoSM.Register(LocoState.Move,  new LocoMoveState());
+        locoSM.Register(LocoState.Air,   new LocoAirState());
+        locoSM.Register(LocoState.Dodge, new LocoDodgeState());
+
+        actSM.Register(ActState.None,        new ActNoneState());
+        actSM.Register(ActState.AttackReady, new ActAttackReadyState());
+        actSM.Register(ActState.Attack,      new ActAttackState());
+        actSM.Register(ActState.Charge,      new ActAttackChargeState());
+        actSM.Register(ActState.HeavyAttack, new ActHeavyAttackState());
+        actSM.Register(ActState.QSkill,      new ActSkillState(SkillType.Q, WeaponActionType.QSkill));
+        actSM.Register(ActState.ESkill,      new ActSkillState(SkillType.E, WeaponActionType.ESkill));
+        actSM.Register(ActState.RSkill,      new ActSkillState(SkillType.R, WeaponActionType.RSkill));
+        actSM.Register(ActState.Plunge,      new ActPlungeState());
+        actSM.Register(ActState.Pickup,      new ActPickupState());
+
+        locoSM.Change(IsGrounded() ? LocoState.Idle : LocoState.Air);
+        actSM.Change(ActState.None);
+    }
+
+    /// <summary>
+    /// 기본 입력 라우팅 — 무기 기반 스킬 전환 (캐릭터 공통).
+    /// 캐릭터별 RouteInputsToLayers()에서 호출.
+    /// </summary>
+    protected void DefaultRouteInputsToLayers()
+    {
+        if (actSM.CurrentId == ActState.Pickup) return;
+
+        bool isInSkill = actSM.CurrentId == ActState.QSkill ||
+                         actSM.CurrentId == ActState.ESkill ||
+                         actSM.CurrentId == ActState.RSkill;
+        bool isDodging = locoSM.CurrentId == LocoState.Dodge;
+        bool isInAct   = actSM.CurrentId != ActState.None || isDodging;
+
+        if (InputBuffer.TryConsume(Game.Inputs.Command.QSkill))
+        {
+            if (CanAttack() && !isInSkill) actSM.Change(ActState.QSkill);
+            return;
+        }
+        if (InputBuffer.TryConsume(Game.Inputs.Command.ESkill))
+        {
+            if (CanAttack() && !isInSkill) actSM.Change(ActState.ESkill);
+            return;
+        }
+        if (InputBuffer.TryConsume(Game.Inputs.Command.RSkill))
+        {
+            if (CanAttack() && !isInSkill) actSM.Change(ActState.RSkill);
+            return;
+        }
+
+        if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
+        {
+            if (!isDodging && UnityEngine.Time.time >= DodgeCooldownEnd)
+            {
+                if (isInAct) actSM.Change(ActState.None);
+                locoSM.Change(LocoState.Dodge);
+            }
+            return;
+        }
+
+        if (isInAct) return;
+
+        if (InputBuffer.TryConsume(Game.Inputs.Command.Charge))
+        {
+            if (CanAttack()) actSM.Change(ActState.Charge);
+            return;
+        }
+        if (InputBuffer.TryConsume(Game.Inputs.Command.Heavy))
+        {
+            if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Heavy); actSM.Change(ActState.AttackReady); }
+            return;
+        }
+        if (InputBuffer.TryConsume(Game.Inputs.Command.Light))
+        {
+            if (CanAttack()) { SetPendingAttack(Game.Inputs.Command.Light); actSM.Change(ActState.AttackReady); }
+            return;
+        }
+    }
+
+    /// <summary>
     /// 카메라 기준 이동 방향 계산 → moveDirection 갱신.
     /// 공중 상태에서는 지상 방향 갱신을 생략한다.
     /// 다른 이동 방식이 필요한 캐릭터는 override.
@@ -513,10 +604,14 @@ public class PlayerController : CharacterBase
     {
         if (newWeapon == null)
         {
-            RuntimeStats.SetWeaponStats(0);
+            RuntimeStats.SetWeaponStats(0, 0, 0);
             return;
         }
-        RuntimeStats.SetWeaponStats((int)newWeapon.baseAttack);
+
+        var kind = newWeapon.weaponType.GetAttackStatKind();
+        int melee  = kind == AttackStatKind.Melee  ? (int)newWeapon.baseAttack : 0;
+        int ranged = kind == AttackStatKind.Ranged ? (int)newWeapon.baseAttack : 0;
+        RuntimeStats.SetWeaponStats(melee, ranged, (int)newWeapon.baseDefense);
     }
 
     private void AssignAttackPolicyForWeapon(WeaponData wd)
@@ -560,6 +655,9 @@ public class PlayerController : CharacterBase
     //============================================================
     public bool EnterAirAsJump { get; private set; } = false;
 
+    /// <summary>공중 공격 1사이클 사용 여부. 착지 시 리셋.</summary>
+    public bool AirAttackUsed { get; set; } = false;
+
     [Header("Jump Settings")]
     public float jumpForce = 6f;
 
@@ -600,9 +698,23 @@ public class PlayerController : CharacterBase
 
         Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
 
-        // 착지 시점에 점프 상태 초기화
+        // 착지 시점에 점프/공중공격 상태 초기화
         if (isGrounded && isJumping)
             isJumping = false;
+        if (isGrounded)
+            AirAttackUsed = false;
+    }
+
+    /// <summary>공중 공격 중 체공을 위한 중력 감소 비율 (0 = 무중력, 1 = 정상)</summary>
+    private const float AirAttackGravityScale = 0.05f;
+
+    /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>
+    public void StartAirHover()
+    {
+        if (Rigid != null && !isGrounded)
+        {
+            Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
+        }
     }
 
     private void ApplyAirborneGravity()
@@ -612,6 +724,15 @@ public class PlayerController : CharacterBase
         float gravityMultiplier = characterData.gravity;
         if (Rigid.linearVelocity.y < 0)
             gravityMultiplier *= characterData.fallMultiplier;
+
+        // 공중 공격 중이면 체공 — AirAttackUsed(공중에서 공격 시작)이고 아직 공격 중일 때만
+        bool isAirAttacking = AirAttackUsed && Combo != null && Combo.IsAttacking;
+        if (isAirAttacking)
+        {
+            gravityMultiplier *= AirAttackGravityScale;
+            if (Rigid.linearVelocity.y < -1f)
+                Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, -1f, Rigid.linearVelocity.z);
+        }
 
         Rigid.AddForce(Vector3.up * gravityMultiplier, ForceMode.Acceleration);
     }
@@ -836,6 +957,10 @@ public class PlayerController : CharacterBase
                     }
                 }
             }
+
+            // 캐릭터 공격 스탯 반영
+            var kind = weaponData.weaponType.GetAttackStatKind();
+            damage = DamageFormula.Calculate(damage, RuntimeStats.GetEffectiveAttack(kind));
         }
 
         wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
@@ -860,11 +985,46 @@ public class PlayerController : CharacterBase
 
         damageable.TakeDamage(damage, gameObject, knockback);
 
-        var ctx = new PassiveContext { target = hit.collider.gameObject, damage = damage };
+        // 타격 이펙트 스폰
+        SpawnTrailHitEffect(hit.point);
+
+        var wt = WeaponManager?.CurrentWeaponData?.weaponType;
+        var ctx = new PassiveContext { target = hit.collider.gameObject, damage = damage, weaponType = wt };
         FirePassive(PassiveTrigger.OnAttackHit, ctx);
 
-        // 몬스터가 IKillable을 구현하면 처치 패시브 발동
         if (hit.collider.TryGetComponent<IKillable>(out var killable) && killable.IsDead)
             FirePassive(PassiveTrigger.OnKill, ctx);
+    }
+
+    private async void SpawnTrailHitEffect(Vector3 hitPoint)
+    {
+        var weaponData = WeaponManager?.CurrentWeaponData;
+        if (weaponData?.abilitySet == null) return;
+
+        var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
+        if (ability == null) return;
+
+        // 현재 스텝의 hitEffectKey 찾기
+        string hitKey = null;
+        float hitScale = 1f;
+        foreach (var step in ability.steps)
+        {
+            if (!string.IsNullOrEmpty(step.hitEffectKey))
+            {
+                hitKey = step.hitEffectKey;
+                hitScale = step.hitEffectScale;
+                break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(hitKey)) return;
+
+        var effectObj = await Managers.ObjectPooler.SpawnAsync(
+            hitKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity);
+        if (effectObj == null) return;
+
+        effectObj.transform.localScale = Vector3.one * hitScale;
+        if (effectObj.TryGetComponent<EffectBehaviour>(out var eb))
+            eb.Initialize(eb.behaviorSO, null, 1f);
     }
 }

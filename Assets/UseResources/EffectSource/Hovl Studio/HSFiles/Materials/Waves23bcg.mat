@@ -37,8 +37,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Waves23bcg
-  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329,
-    type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -90,7 +89,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: beea0694d337e23449c7d21e4dfef1cb, type: 3}
         m_Scale: {x: 0.6, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Mask:
@@ -162,6 +161,7 @@ Material:
     - _BUILTIN_ZWriteControl: 0
     - _Blend: 0
     - _BlendMode: 0
+    - _Boolean: 0
     - _BumpScale: 1
     - _CastShadows: 0
     - _ConservativeDepthOffsetEnable: 0
@@ -177,6 +177,7 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 10
+    - _DstBlendAlpha: 10
     - _Emission: 5
     - _EnableBlendModePreserveSpecularLighting: 0
     - _EnableFogOnTransparent: 1
@@ -196,6 +197,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 5
+    - _SrcBlendAlpha: 1
     - _StencilRef: 0
     - _StencilRefDepth: 1
     - _StencilRefDistortionVec: 4

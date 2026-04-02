@@ -21,8 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: "Gradient17\u0441g"
-  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329,
-    type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 00191177e5fd5c4468ad546ce87ef329, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -158,6 +157,7 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 1
+    - _DstBlend2: 0
     - _DstBlendAlpha: 1
     - _DstMode: 10
     - _Emission: 4
@@ -173,6 +173,7 @@ Material:
     - _Opacity: 3
     - _OpaqueCullMode: 2
     - _Parallax: 0.02
+    - _PerPixelSorting: 0
     - _QueueControl: 0
     - _QueueOffset: 0
     - _RenderQueueType: 3

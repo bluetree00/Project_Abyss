@@ -20,72 +20,82 @@ public class Hovl_DemoLasers : MonoBehaviour
 
     private int Prefab;
     private GameObject Instance;
-    private Hovl_Laser LaserScript;
-    private Hovl_Laser2 LaserScript2;
 
-    //Double-click protection
+    // Store laser components without hard references to types
+    private Component LaserScript;
+    private Component LaserScript2;
+
+    // Double-click protection
     private float buttonSaver = 0f;
 
-    void Start ()
+    void Start()
     {
-        //LaserEndPoint = new Vector3(0, 0, 0);
         if (Screen.dpi < 1) windowDpi = 1;
         if (Screen.dpi < 200) windowDpi = 1;
         else windowDpi = Screen.dpi / 200f;
+
         Counter(0);
     }
 
     void Update()
     {
-        //Enable lazer
+        // Enable laser
         if (Input.GetMouseButtonDown(0))
         {
-            Destroy(Instance);
+            if (Instance != null)
+                Destroy(Instance);
+
             Instance = Instantiate(Prefabs[Prefab], FirePoint.transform.position, FirePoint.transform.rotation);
             Instance.transform.parent = transform;
-            LaserScript = Instance.GetComponent<Hovl_Laser>();
-            LaserScript2 = Instance.GetComponent<Hovl_Laser2>();
+
+            // Try to find scripts by name without compile dependency
+            LaserScript = Instance.GetComponent("Hovl_Laser");
+            LaserScript2 = Instance.GetComponent("Hovl_Laser2");
         }
 
-        //Disable lazer prefab
+        // Disable laser prefab
         if (Input.GetMouseButtonUp(0))
         {
-            if (LaserScript) LaserScript.DisablePrepare();
-            if (LaserScript2) LaserScript2.DisablePrepare();
-            Destroy(Instance,1);
+            if (LaserScript != null)
+                LaserScript.SendMessage("DisablePrepare", SendMessageOptions.DontRequireReceiver);
+
+            if (LaserScript2 != null)
+                LaserScript2.SendMessage("DisablePrepare", SendMessageOptions.DontRequireReceiver);
+
+            if (Instance != null)
+                Destroy(Instance, 1f);
         }
 
-        //To change lazers
-        if ((Input.GetKey(KeyCode.A) || Input.GetAxis("Horizontal") < 0) && buttonSaver >= 0.4f)// left button
+        // To change lasers
+        if ((Input.GetKey(KeyCode.A) || Input.GetAxis("Horizontal") < 0) && buttonSaver >= 0.4f)
         {
             buttonSaver = 0f;
             Counter(-1);
         }
-        if ((Input.GetKey(KeyCode.D) || Input.GetAxis("Horizontal") > 0) && buttonSaver >= 0.4f)// right button
+
+        if ((Input.GetKey(KeyCode.D) || Input.GetAxis("Horizontal") > 0) && buttonSaver >= 0.4f)
         {
             buttonSaver = 0f;
-            Counter(+1);         
+            Counter(+1);
         }
-        buttonSaver += Time.deltaTime;
-        
 
-        //Current fire point
+        buttonSaver += Time.deltaTime;
+
+        // Current fire point
         if (Cam != null)
         {
-            RaycastHit hit; //DELATE THIS IF YOU WANT TO USE LASERS IN 2D
+            RaycastHit hit;
             var mousePos = Input.mousePosition;
             RayMouse = Cam.ScreenPointToRay(mousePos);
-            //ADD THIS IF YOU WANT TO USE LASERS IN 2D: RaycastHit2D hit = Physics2D.Raycast(RayMouse.origin, RayMouse.direction, MaxLength);
-            if (Physics.Raycast(RayMouse.origin, RayMouse.direction, out hit, MaxLength)) //CHANGE THIS IF YOU WANT TO USE LASERRS IN 2D: if (hit.collider != null)
+
+            if (Physics.Raycast(RayMouse.origin, RayMouse.direction, out hit, MaxLength))
             {
                 RotateToMouseDirection(gameObject, hit.point);
-                //LaserEndPoint = hit.point;
             }
             else
             {
                 var pos = RayMouse.GetPoint(MaxLength);
                 RotateToMouseDirection(gameObject, pos);
-                //LaserEndPoint = pos;
             }
         }
         else
@@ -94,32 +104,28 @@ public class Hovl_DemoLasers : MonoBehaviour
         }
     }
 
-    //GUI Text
     void OnGUI()
     {
-        GUI.Label(new Rect(10 * windowDpi, 5 * windowDpi, 400 * windowDpi, 20 * windowDpi), "Use the keyboard buttons A/<- and D/-> to change lazers!");
-        GUI.Label(new Rect(10 * windowDpi, 20 * windowDpi, 400 * windowDpi, 20 * windowDpi), "Use left mouse button for shooting!");
+        GUI.Label(new Rect(10 * windowDpi, 5 * windowDpi, 400 * windowDpi, 20 * windowDpi),
+            "Use the keyboard buttons A/<- and D/-> to change lazers!");
+        GUI.Label(new Rect(10 * windowDpi, 20 * windowDpi, 400 * windowDpi, 20 * windowDpi),
+            "Use left mouse button for shooting!");
     }
 
-    //To change prefabs (count - prefab number)
     void Counter(int count)
     {
         Prefab += count;
+
         if (Prefab > Prefabs.Length - 1)
-        {
             Prefab = 0;
-        }
         else if (Prefab < 0)
-        {
             Prefab = Prefabs.Length - 1;
-        }
     }
-  
-    //To rotate fire point
-    void RotateToMouseDirection (GameObject obj, Vector3 destination)
+
+    void RotateToMouseDirection(GameObject obj, Vector3 destination)
     {
         direction = destination - obj.transform.position;
-        rotation = Quaternion.LookRotation(direction);     
+        rotation = Quaternion.LookRotation(direction);
         obj.transform.localRotation = Quaternion.Lerp(obj.transform.rotation, rotation, 1);
     }
 }

@@ -17,4 +17,7 @@ public struct PassiveContext
 
     /// <summary>콤보 단계 (OnComboFinish, OnAttackHit)</summary>
     public int comboStep;
+
+    /// <summary>공격에 사용된 무기 타입 (OnAttackHit, OnKill)</summary>
+    public WeaponType? weaponType;
 }
