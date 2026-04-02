@@ -204,15 +204,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// </summary>
     protected virtual void RegisterStates()
     {
-        // ── 공용 상태 등록 ─────────────────────────────────────────
-        // SO 슬롯이 null이면 기본 공용 상태를 사용.
-        // 파생 SO가 설정된 경우 해당 SO의 Create()가 커스텀 상태를 반환한다.
-        _fsm.RegisterAs<PatrolState>     (_config.patrolState?.Create(this)      ?? new PatrolState());
-        _fsm.RegisterAs<ChaseState>      (_config.chaseState?.Create(this)       ?? new ChaseState());
-        _fsm.RegisterAs<AttackReadyState>(_config.attackReadyState?.Create(this) ?? new AttackReadyState());
-        _fsm.RegisterAs<AttackState>     (_config.attackState?.Create(this)      ?? new AttackState());
-        _fsm.RegisterAs<GetHitState>     (_config.getHitState?.Create(this)      ?? new GetHitState());
-        _fsm.RegisterAs<DieState>        (_config.dieState?.Create(this)         ?? new DieState());
+        // ── 1단계: 기본 공용 상태 등록 ────────────────────────────
+        _fsm.RegisterAs<PatrolState>     (new PatrolState());
+        _fsm.RegisterAs<ChaseState>      (new ChaseState());
+        _fsm.RegisterAs<AttackReadyState>(new AttackReadyState());
+        _fsm.RegisterAs<AttackState>     (new AttackState());
+        _fsm.RegisterAs<GetHitState>     (new GetHitState());
+        _fsm.RegisterAs<DieState>        (new DieState());
 
         // ── 특수 상태: 엔트리의 state SO → 런타임 인스턴스 생성 ───
         _specialStates.Clear();
@@ -220,7 +218,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             foreach (var entry in _config.specialStates)
                 _specialStates.Add(entry?.state?.CreateState());
 
-        // ── 복합 행동 오버라이드 (다중 상태 공유 로직, 특수 상태 생성 이후에 실행) ─
+        // ── 2단계: 상태 오버라이드 (특수 상태 생성 이후에 실행) ───
+        // 각 SO가 RegisterAs<T>()로 필요한 공용 상태만 덮어씌운다.
         if (_config.stateOverrides != null)
             foreach (var ovr in _config.stateOverrides)
                 ovr?.RegisterOverrides(_fsm, this);

@@ -54,6 +54,23 @@ MonoBehaviour:
     speedParam: Blend
     speedDampTime: 0.1
     crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
   specialStates:
   - conditions: []
     state: {fileID: 11400000, guid: c78d01e84bab0ac4d9a5ae44c5b8012e, type: 2}
