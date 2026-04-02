@@ -14,3 +14,12 @@ public interface ICharacterPassive
     /// <summary>실제 패시브 효과 적용.</summary>
     void Apply(PlayerController ctrl, in PassiveContext ctx);
 }
+
+/// <summary>
+/// 매 프레임 Tick이 필요한 패시브 (시간 기반 스택 만료 등).
+/// ICharacterPassive와 함께 구현하면 PlayerController.Update()에서 자동 호출.
+/// </summary>
+public interface ITickablePassive
+{
+    void Tick(float deltaTime);
+}

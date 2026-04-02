@@ -4,12 +4,24 @@ using UnityEngine;
 [Serializable]
 public sealed class PlayerRuntimeStats
 {
+    // ── 공개 스탯 ────────────────────────────────────────────────────────────────
     public int MaxHp { get; private set; }
     public int Hp { get; private set; }
-    public int AttackPower { get; private set; }
+    public int MeleeAttack { get; private set; }
+    public int RangedAttack { get; private set; }
+    public int Defense { get; private set; }
+    public int Luck { get; private set; }
+    public float AttackSpeedMultiplier { get; private set; } = 1f;
+    public float SkillCooldownReduction { get; private set; }
+    public float ActiveItemCooldownReduction { get; private set; }
     public float HeavyChargeThreshold { get; private set; }
 
+    /// <summary>레거시 호환 — Max(Melee, Ranged). 범용 공격력이 필요한 곳에서 사용.</summary>
+    public int AttackPower => Mathf.Max(MeleeAttack, RangedAttack);
+
     public event Action OnChanged;
+
+    // ── 초기화 ───────────────────────────────────────────────────────────────────
 
     public void InitializeFrom(CharacterData data)
     {
@@ -19,26 +31,45 @@ public sealed class PlayerRuntimeStats
             return;
         }
 
-        // SO는 템플릿. 런타임 값은 여기로 복사.
         MaxHp = Mathf.Max(1, data.maxHealth);
         Hp = MaxHp;
-        _baseAttackPower = Mathf.Max(0, data.attackPower);
-        _weaponAttack    = 0;
-        _itemAttackBonus = 0;
-        _roomAttackBuff  = 0;
+
+        _baseMelee  = Mathf.Max(0, data.baseMeleeAttack);
+        _baseRanged = Mathf.Max(0, data.baseRangedAttack);
+        _baseDefense = Mathf.Max(0, data.baseDefense);
+        _baseLuck    = Mathf.Max(0, data.baseLuck);
+
+        _weaponMelee = 0;
+        _weaponRanged = 0;
+        _weaponDefense = 0;
+
+        _passiveMelee = 0;
+        _passiveRanged = 0;
+        _passiveDefense = 0;
+        _passiveLuck = 0;
+        _passiveSkillCdr = 0f;
+        _passiveActiveItemCdr = 0f;
+
+        _itemMelee = 0;
+        _itemRanged = 0;
+        _itemDefense = 0;
+        _itemLuck = 0;
+        _itemSkillCdr = 0f;
+        _itemActiveItemCdr = 0f;
+
+        _roomMelee = 0;
+        _roomRanged = 0;
+        _roomDefense = 0;
+
+        _bonusAttackSpeed = 0f;
+
         HeavyChargeThreshold = Mathf.Max(0f, data.heavyAttackChargeThreshold);
 
         // 패시브 초기 적용
-        ApplyPassive(data.passive);   // RecalculateAttack + OnChanged 포함
+        ApplyPassive(data.passive);   // Recalculate + OnChanged 포함
     }
 
-    public void SetHeavyChargeThreshold(float value)
-    {
-        value = Mathf.Max(0f, value);
-        if (Mathf.Approximately(HeavyChargeThreshold, value)) return;
-        HeavyChargeThreshold = value;
-        OnChanged?.Invoke();
-    }
+    // ── HP ────────────────────────────────────────────────────────────────────────
 
     public void SetHp(int hp)
     {
@@ -60,59 +91,189 @@ public sealed class PlayerRuntimeStats
         SetHp(Hp + amount);
     }
 
-    // ── 스탯 레이어 ──────────────────────────────────────────────────────────
+    public void SetHeavyChargeThreshold(float value)
+    {
+        value = Mathf.Max(0f, value);
+        if (Mathf.Approximately(HeavyChargeThreshold, value)) return;
+        HeavyChargeThreshold = value;
+        OnChanged?.Invoke();
+    }
+
+    // ── 편의 메서드 ──────────────────────────────────────────────────────────────
+
+    /// <summary>무기 타입에 따라 MeleeAttack 또는 RangedAttack 반환.</summary>
+    public int GetEffectiveAttack(AttackStatKind kind) =>
+        kind == AttackStatKind.Ranged ? RangedAttack : MeleeAttack;
+
+    // ── 스탯 레이어 (내부) ───────────────────────────────────────────────────────
     // 최종 스탯 = Base (CharacterData)
     //           + PassiveBonus  (캐릭터 패시브, 런 시작 시 1회)
     //           + WeaponBonus   (장착 무기)
     //           + ItemBonus     (아이템 누적, 런 내 영구)
     //           + RoomBuff      (일시적, 방 단위)
 
-    private int _baseAttackPower;   // CharacterData 원본
-    private int _passiveBonus;      // PassiveSO 적용분
-    private int _weaponAttack;      // 현재 장착 무기
-    private int _itemAttackBonus;   // RunItemInventory 누적분
-    private int _roomAttackBuff;    // RoomBuffHandler 일시 버프
+    // -- Base --
+    private int _baseMelee;
+    private int _baseRanged;
+    private int _baseDefense;
+    private int _baseLuck;
 
-    // ── 무기 ─────────────────────────────────────────────────────────────────
+    // -- Passive (PassiveSO) --
+    private int _passiveMelee;
+    private int _passiveRanged;
+    private int _passiveDefense;
+    private int _passiveLuck;
+    private float _passiveSkillCdr;
+    private float _passiveActiveItemCdr;
+
+    // -- Weapon --
+    private int _weaponMelee;
+    private int _weaponRanged;
+    private int _weaponDefense;
+
+    // -- Item --
+    private int _itemMelee;
+    private int _itemRanged;
+    private int _itemDefense;
+    private int _itemLuck;
+    private float _itemSkillCdr;
+    private float _itemActiveItemCdr;
+
+    // -- Room Buff --
+    private int _roomMelee;
+    private int _roomRanged;
+    private int _roomDefense;
+
+    // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
+    private float _bonusAttackSpeed;
+
+    // ── 무기 ─────────────────────────────────────────────────────────────────────
+
     /// <summary>무기 장착/해제 시 호출.</summary>
-    public void SetWeaponStats(int weaponAttack)
+    public void SetWeaponStats(int melee, int ranged, int defense)
     {
-        _weaponAttack = Mathf.Max(0, weaponAttack);
-        RecalculateAttack();
+        _weaponMelee   = Mathf.Max(0, melee);
+        _weaponRanged  = Mathf.Max(0, ranged);
+        _weaponDefense = Mathf.Max(0, defense);
+        Recalculate();
     }
 
-    // ── 패시브 ───────────────────────────────────────────────────────────────
+    // ── 패시브 ───────────────────────────────────────────────────────────────────
+
     /// <summary>런 시작 시 PassiveSO 적용. null이면 0으로 초기화.</summary>
     public void ApplyPassive(PassiveSO passive)
     {
-        _passiveBonus = 0;
+        _passiveMelee = 0;
+        _passiveRanged = 0;
+        _passiveDefense = 0;
+        _passiveLuck = 0;
+        _passiveSkillCdr = 0f;
+        _passiveActiveItemCdr = 0f;
+
         if (passive != null)
+        {
             foreach (var mod in passive.baseModifiers)
-                if (mod.Type == StatType.AttackPower) _passiveBonus += (int)mod.Value;
-        RecalculateAttack();
+            {
+                switch (mod.Type)
+                {
+                    case StatType.AttackPower:
+                        // 범용 AttackPower → Melee + Ranged 동시 적용
+                        _passiveMelee  += (int)mod.Value;
+                        _passiveRanged += (int)mod.Value;
+                        break;
+                    case StatType.MeleeAttack:
+                        _passiveMelee += (int)mod.Value;
+                        break;
+                    case StatType.RangedAttack:
+                        _passiveRanged += (int)mod.Value;
+                        break;
+                    case StatType.Defense:
+                        _passiveDefense += (int)mod.Value;
+                        break;
+                    case StatType.MaxHp:
+                        MaxHp = Mathf.Max(1, MaxHp + (int)mod.Value);
+                        Hp = Mathf.Min(Hp, MaxHp);
+                        break;
+                    case StatType.Luck:
+                        _passiveLuck += (int)mod.Value;
+                        break;
+                    case StatType.SkillCooldownReduction:
+                        _passiveSkillCdr += mod.Value;
+                        break;
+                    case StatType.ActiveItemCooldownReduction:
+                        _passiveActiveItemCdr += mod.Value;
+                        break;
+                }
+            }
+        }
+
+        Recalculate();
     }
 
-    // ── 아이템 누적 ──────────────────────────────────────────────────────────
+    // ── 아이템 누적 ──────────────────────────────────────────────────────────────
+
     /// <summary>RunItemInventory.OnInventoryChanged 이벤트에 연결.</summary>
     public void RefreshItemBonuses(RunItemInventory inventory)
     {
-        _itemAttackBonus = inventory != null ? (int)inventory.GetTotal(StatType.AttackPower) : 0;
-        RecalculateAttack();
+        if (inventory == null)
+        {
+            _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
+            _itemSkillCdr = _itemActiveItemCdr = 0f;
+        }
+        else
+        {
+            _itemMelee   = (int)(inventory.GetTotal(StatType.MeleeAttack) + inventory.GetTotal(StatType.AttackPower));
+            _itemRanged  = (int)(inventory.GetTotal(StatType.RangedAttack) + inventory.GetTotal(StatType.AttackPower));
+            _itemDefense = (int)inventory.GetTotal(StatType.Defense);
+            _itemLuck    = (int)inventory.GetTotal(StatType.Luck);
+            _itemSkillCdr = inventory.GetTotal(StatType.SkillCooldownReduction);
+            _itemActiveItemCdr = inventory.GetTotal(StatType.ActiveItemCooldownReduction);
+        }
+
+        Recalculate();
     }
 
-    // ── 방 버프 ──────────────────────────────────────────────────────────────
+    // ── 방 버프 ──────────────────────────────────────────────────────────────────
+
     /// <summary>RoomBuffHandler.OnBuffsChanged 이벤트에 연결.</summary>
     public void RefreshRoomBuffs(RoomBuffHandler handler)
     {
-        _roomAttackBuff = handler != null ? (int)handler.GetTotal(StatType.AttackPower) : 0;
-        RecalculateAttack();
+        if (handler == null)
+        {
+            _roomMelee = _roomRanged = _roomDefense = 0;
+        }
+        else
+        {
+            _roomMelee   = (int)(handler.GetTotal(StatType.MeleeAttack) + handler.GetTotal(StatType.AttackPower));
+            _roomRanged  = (int)(handler.GetTotal(StatType.RangedAttack) + handler.GetTotal(StatType.AttackPower));
+            _roomDefense = (int)handler.GetTotal(StatType.Defense);
+        }
+
+        Recalculate();
     }
 
-    // ── 내부 재계산 ──────────────────────────────────────────────────────────
-    private void RecalculateAttack()
+    // ── 공격 속도 (패시브/특성에서 직접 조작) ────────────────────────────────────
+
+    /// <summary>패시브 등에서 공격 속도 보너스를 직접 설정 (0.0 = 0%, 0.25 = +25%)</summary>
+    public void SetBonusAttackSpeed(float bonus)
     {
-        AttackPower = Mathf.Max(0, _baseAttackPower + _passiveBonus + _weaponAttack
-                                   + _itemAttackBonus + _roomAttackBuff);
+        _bonusAttackSpeed = bonus;
+        Recalculate();
+    }
+
+    // ── 내부 재계산 ──────────────────────────────────────────────────────────────
+
+    private void Recalculate()
+    {
+        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee);
+        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged);
+        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense);
+        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck);
+
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr);
+        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
+
         OnChanged?.Invoke();
     }
 }

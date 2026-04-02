@@ -25,8 +25,12 @@ public sealed class HudPresenter : MonoBehaviour
     private UIHudDataProvider _provider;
 
     // ── 플레이어 직접 바인딩 ──────────────────────────────────
-    private PlayerRuntimeStats  _runtimeStats;
-    private PlayerWeaponManager _weaponManager;
+    private PlayerRuntimeStats    _runtimeStats;
+    private PlayerWeaponManager   _weaponManager;
+    private SkillCooldownTracker  _cooldownTracker;
+
+    // ── 로비 바인딩 ──────────────────────────────────────────
+    private UserInfo _userInfo;
 
     // ── 보스 바인딩 ───────────────────────────────────────────
     private MonsterBase _boss;
@@ -93,8 +97,9 @@ public sealed class HudPresenter : MonoBehaviour
         UnbindPlayer();
         if (player == null) return;
 
-        _runtimeStats  = player.RuntimeStats;
-        _weaponManager = player.WeaponManager;
+        _runtimeStats    = player.RuntimeStats;
+        _weaponManager   = player.WeaponManager;
+        _cooldownTracker = player.CooldownTracker;
 
         // 초기 스냅샷
         RefreshStats();
@@ -102,6 +107,7 @@ public sealed class HudPresenter : MonoBehaviour
 
         _runtimeStats.OnChanged        += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
+        _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
     }
 
     public void UnbindPlayer()
@@ -116,6 +122,40 @@ public sealed class HudPresenter : MonoBehaviour
             _weaponManager.OnWeaponChanged -= HandleWeaponChanged;
             _weaponManager = null;
         }
+        if (_cooldownTracker != null)
+        {
+            _cooldownTracker.OnCooldownChanged -= HandleCooldownChanged;
+            _cooldownTracker = null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 로비 바인딩
+    // ─────────────────────────────────────────────────────────
+    public void BindLobby(UserInfo userInfo)
+    {
+        UnbindLobby();
+        if (userInfo == null) return;
+
+        _userInfo = userInfo;
+        _userInfo.onUserInfoEvent.AddListener(HandleNicknameChanged);
+
+        SetMode(HUDIds.Mode.Lobby);
+    }
+
+    public void UnbindLobby()
+    {
+        if (_userInfo != null)
+        {
+            _userInfo.onUserInfoEvent.RemoveListener(HandleNicknameChanged);
+            _userInfo = null;
+        }
+    }
+
+    private void HandleNicknameChanged()
+    {
+        var nickname = UserInfo.Data.nickname ?? UserInfo.Data.gamerId;
+        view?.SetNickname(nickname);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -153,9 +193,11 @@ public sealed class HudPresenter : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     // 핸들러
     // ─────────────────────────────────────────────────────────
-    private void HandleHpChanged(int hp, int maxHp)                    => view?.CombatPanel?.SetHp(hp, maxHp);
-    private void HandleGoldChanged(int gold)                            => view?.SetGold(gold);
-    private void HandleWeaponChanged(WeaponData _, GameObject __)       => RefreshWeaponSlots();
+    private void HandleHpChanged(int hp, int maxHp)       => view?.CombatPanel?.SetHp(hp, maxHp);
+    private void HandleGoldChanged(int gold)               => view?.SetGold(gold);
+    private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
+    private void HandleCooldownChanged(SkillType skill, float remaining, float total)
+        => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
     private void HandleBossHPChanged(int hp, int maxHp)
     {
         view?.BossPanel?.SetHP(hp, maxHp);
@@ -166,7 +208,6 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (_runtimeStats == null || view?.CombatPanel == null) return;
         view.CombatPanel.SetHp(_runtimeStats.Hp, _runtimeStats.MaxHp);
-        view.CombatPanel.SetAttack(_runtimeStats.AttackPower);
     }
 
     private void RefreshWeaponSlots()
@@ -189,6 +230,11 @@ public sealed class HudPresenter : MonoBehaviour
 
             view.CombatPanel.SetWeaponSlot(i, info);
         }
+
+        // 현재 장착 무기 기준으로 Q/E 스킬 아이콘 갱신
+        var current = _weaponManager.CurrentWeaponData;
+        view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -204,6 +250,7 @@ public sealed class HudPresenter : MonoBehaviour
         }
         _provider = null;
         UnbindPlayer();
+        UnbindLobby();
         UnbindBoss();
     }
 
@@ -226,6 +273,9 @@ public sealed class HudPresenter : MonoBehaviour
     {
         switch (mode)
         {
+            case HUDIds.Mode.Lobby:
+                return HUDIds.Section.TopBar;
+
             case HUDIds.Mode.Combat:
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |

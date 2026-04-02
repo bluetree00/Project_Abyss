@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 741110d5309a46244bf8015858e4b17e
+timeCreated: 1524554204
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/Suriyun/Characters/Nana/Materials/Characters/F06.mat
+  uploadId: 834578

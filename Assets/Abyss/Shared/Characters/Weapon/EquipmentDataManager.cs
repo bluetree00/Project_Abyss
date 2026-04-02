@@ -149,15 +149,39 @@ public class EquipmentDataManager
     // 서버에서 Chart 내용을 받아와 부분 갱신 또는 전체 갱신 수행
     private async UniTask LoadFromServerAsync()
     {
-        var bro = Backend.Chart.GetChartContents(ChartId);
-
-        if (!bro.IsSuccess())
+        var tableResult = Backend.CDN.Content.Table.Get();
+        if (!tableResult.IsSuccess())
         {
-            Debug.LogError($"[EquipmentDataManager] 장비 데이터 서버 요청 실패: {bro.GetStatusCode()}");
+            Debug.LogError($"[EquipmentDataManager] 차트 테이블 조회 실패: {tableResult.GetStatusCode()}");
             return;
         }
 
-        var rows = bro.FlattenRows();
+        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
+        if (!contentResult.IsSuccess())
+        {
+            Debug.LogError($"[EquipmentDataManager] 차트 다운로드 실패: {contentResult.GetStatusCode()}");
+            return;
+        }
+
+        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
+        var localResult = Backend.CDN.Content.Local.Load();
+        if (!localResult.IsSuccess())
+        {
+            Debug.LogError($"[EquipmentDataManager] 로컬 로드 실패");
+            return;
+        }
+
+        var dic = localResult.GetContentDictionarySortByChartId();
+        if (!dic.ContainsKey(ChartId))
+        {
+            Debug.LogError($"[EquipmentDataManager] ChartId {ChartId} not found in CDN content");
+            return;
+        }
+
+        var jsonStr = dic[ChartId].contentJson.ToString();
+        var json = LitJson.JsonMapper.ToObject(jsonStr);
+        var rows = new List<object>();
+        foreach (LitJson.JsonData item in json) rows.Add(item);
         int updateCount = 0;
         int addCount = 0;
 

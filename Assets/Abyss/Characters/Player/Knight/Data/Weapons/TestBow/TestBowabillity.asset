@@ -20,24 +20,24 @@ MonoBehaviour:
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
       payloadKey: Basic_Arrow_01
+      socket: 2
+      space: 0
       positionOffset: {x: 0, y: 0, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
-      forwardOffset: {x: 0, y: 0, z: 0}
       scaleMultiplier: 1
       lifeTimeMultiplier: 10
       behavior: {fileID: 11400000, guid: 1cd8a3726e338964692c4c74532d96d0, type: 2}
     collider:
-      payloadKey: 
+      mode: 0
+      damage: 0
+      trailRadiusOverride: 0
+      colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
       rotationEuler: {x: 0, y: 0, z: 0}
-      forwardOffset: {x: 0, y: 0, z: 0}
       sizeMultiplier: 1
-      durationMultiplier: 1
-      damage: 0
       hitInterval: 0.1
       duration: 2
       shape: 1
       behavior: {fileID: 0}
-      colliderPrefabKey: 
     oneShot: 0
     rotateToMouse: 1

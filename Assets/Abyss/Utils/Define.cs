@@ -65,13 +65,15 @@ public class Define
         Unique
     }
 
-    public enum CharacterClass  // 각 캐릭터의 클래스를 알아보기 위한 Enum
-    {     
-        Knight,
+    public enum CharacterClass
+    {
+        Knight,      // 레거시 — Default와 동일
         Mage,
         Hunter,
         Rogue,
         Guardian,
+        Default,     // 기본 캐릭터
+        Berserker,   // 광전사
     }
 
     public enum EquipmentSlotType
@@ -107,7 +109,9 @@ public class Define
         
     }
 
-     // 무기 타입
+    // 무기 타입 — 실제 사용하는 enum은 WeaponType.cs (전역 네임스페이스).
+    // 이 enum은 레거시이며 참조 코드가 없으므로 제거 예정.
+    [System.Obsolete("Use global WeaponType enum instead")]
     public enum WeaponType
     {
         Sword,
@@ -115,8 +119,7 @@ public class Define
         Staff,
         Dagger,
         Axe,
-        BaseTest, // 테스트용
-
+        BaseTest,
     }
 
     public enum PlayerAbilityType

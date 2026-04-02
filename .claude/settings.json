@@ -1,10 +1,33 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find c:UsersUserProject_AbyssProject_AbyssAssetsAbyssUI -name *HUDIds* -o -name *hudIds*)",
-      "Bash(find c:UsersUserProject_AbyssProject_AbyssAssetsAbyssCharactersMonster -name *.cs -path *Core*)",
-      "Bash(grep -r cf0756612a842cb4ba09ad101dd6bcb3 c:/Users/User/Project_Abyss/Project_Abyss/Assets --include=*.meta -l)",
-      "Bash(grep \"m_Script\\\\|m_Name\" \"c:/Users/User/Project_Abyss/Project_Abyss/Assets/Abyss/Characters/Monster/Monster/Boss/BlackKnight/SO/Patterns/\"*.asset)"
+      "Bash(python -c \":*)",
+      "mcp__mcp-for-unity__create_script",
+      "mcp__mcp-for-unity__delete_script",
+      "WebSearch",
+      "WebFetch(domain:docs.thebackend.io)",
+      "WebFetch(domain:docs.backnd.com)",
+      "WebFetch(domain:community.thebackend.io)",
+      "WebFetch(domain:partner.steamgames.com)",
+      "WebFetch(domain:blog.thebackend.io)",
+      "WebFetch(domain:developer.thebackend.io)",
+      "WebFetch(domain:steamcommunity.com)",
+      "WebFetch(domain:backnd.com)",
+      "WebFetch(domain:namu.wiki)",
+      "Bash(git fetch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "mcp__mcp-for-unity__find_in_file",
+      "Bash(git rm:*)",
+      "Bash(git pull:*)",
+      "mcp__mcp-for-unity__manage_animation"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude"
     ]
   }
 }

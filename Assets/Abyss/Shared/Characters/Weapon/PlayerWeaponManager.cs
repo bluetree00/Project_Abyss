@@ -19,8 +19,8 @@ public interface IWeaponProvider
 
 public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 {
-    public const int MainSlot = 0;  // 메인 무기: 일반 공격 + E/R 스킬
-    public const int SubSlot  = 1;  // 서브 장비: Q 스킬 전용
+    public const int MainSlot = 0;  // 메인 무기 슬롯 0
+    public const int SubSlot  = 1;  // 메인 무기 슬롯 1
 
     public int SlotCount => 2;
 
@@ -41,10 +41,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     private int currentSlotIndex = -1;
     private bool _isSwitching = false;
 
-    /// <summary>메인 무기 데이터 (공격 + E/R 스킬)</summary>
+    /// <summary>슬롯 0 무기 데이터</summary>
     public WeaponData MainWeaponData => slots[MainSlot]?.runtimeData;
 
-    /// <summary>서브 장비 데이터 (Q 스킬 전용)</summary>
+    /// <summary>슬롯 1 무기 데이터</summary>
     public WeaponData SubWeaponData  => slots[SubSlot]?.runtimeData;
 
     // 기본 풀 사이즈 (필요시 변경)
@@ -144,9 +144,9 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (autoEquip)
         {
-            int targetSlot = runtimeData.slotType == WeaponSlotType.Sub ? SubSlot : MainSlot;
-            bool isMain    = targetSlot == MainSlot;
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: isMain);
+            int targetSlot = GetFirstEmptySlotIndex();
+            if (targetSlot < 0) targetSlot = MainSlot;
+            await EquipToSlotAsync(targetSlot, runtimeData, setActive: targetSlot == MainSlot);
         }
     }
 
@@ -194,9 +194,13 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (slot.instance != null)
         {
-            // 프리팹 Transform 그대로 handTransform에 붙이되 위치/회전 유지
-            slot.instance.transform.SetParent(_owner != null ? _owner.handTransform : null, true);
+            var parent = _owner != null ? _owner.handTransform : null;
+            slot.instance.transform.SetParent(parent, false);
             slot.instance.SetActive(setActive);
+
+            // 등장 연출
+            if (setActive)
+                DissolveEffect.PlayAppear(slot.instance, 0.4f);
         }
 
         if (setActive)
@@ -257,8 +261,12 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
             if (target.instance != null)
             {
-                target.instance.transform.SetParent(_owner != null ? _owner.handTransform : null, true);
+                var parent = _owner != null ? _owner.handTransform : null;
+                target.instance.transform.SetParent(parent, false);
                 target.instance.SetActive(true);
+
+                // 무기 전환 시 디졸브 등장 연출
+                DissolveEffect.PlayAppear(target.instance, 0.4f);
             }
 
             await SetCurrentSlotInternalAsync(slotIndex);
@@ -299,21 +307,19 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             return;
         }
 
-        // slotType 기반 1대1 교체: Main → Slot 0, Sub → Slot 1
-        int targetSlot = runtimeData.slotType == WeaponSlotType.Sub ? SubSlot : MainSlot;
-        bool isMain    = targetSlot == MainSlot;
+        int emptySlot = GetFirstEmptySlotIndex();
 
-        if (slots[targetSlot].IsEmpty)
+        if (emptySlot >= 0)
         {
-            // 빈 슬롯: 바로 장착
+            // 빈 슬롯 있음: 바로 장착
             _owned.Add(runtimeData);
             source?.ConfirmPickup();
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: isMain);
+            await EquipToSlotAsync(emptySlot, runtimeData, setActive: emptySlot == currentSlotIndex || currentSlotIndex < 0);
             return;
         }
 
-        // 해당 슬롯에 이미 무기가 있으면 팝업 먼저 — source는 아직 살아있음
-        int? chosenSlot = await ShowReplacePromptAsync(runtimeData, targetSlot);
+        // 슬롯 2개 모두 차 있음 → 양쪽 비교 팝업
+        int? chosenSlot = await ShowReplacePromptAsync(runtimeData);
         if (chosenSlot.HasValue)
         {
             _owned.Add(runtimeData);
@@ -323,26 +329,23 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         }
         else
         {
-            // 취소: 월드 아이템 복원
+            // 버리기: 월드 아이템 복원
             source?.CancelPickup();
             Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
         }
     }
 
-    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon, int targetSlot)
+    private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)
     {
-        var currentWeapon = slots[targetSlot].runtimeData;
-
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponReplacePopup>();
         if (popup == null)
         {
             Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 자동 교체");
-            return targetSlot;
+            return MainSlot;
         }
 
-        popup.Setup(currentWeapon, newWeapon, targetSlot);
-        bool confirmed = await popup.WaitForChoiceAsync();
-        return confirmed ? targetSlot : (int?)null;
+        popup.Setup(slots[MainSlot].runtimeData, slots[SubSlot].runtimeData, newWeapon);
+        return await popup.WaitForChoiceAsync();
     }
 
     // ----------------------

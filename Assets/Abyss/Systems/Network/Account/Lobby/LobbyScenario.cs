@@ -6,12 +6,11 @@ public class LobbyScenario : MonoBehaviour
 {
     [SerializeField]
     private UserInfo user;
-    [SerializeField]
-    private TopPanelViewer topPanel;
 
     private void Awake()
     {
-        user.onUserInfoEvent.AddListener(topPanel.UpdateNickname);
+        var hud = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        if (hud != null) hud.BindLobby(user);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (!DevAutoLoginBootstrap.IsLoggedIn && !SteamLoginService.IsLoggedIn)

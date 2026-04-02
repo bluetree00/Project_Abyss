@@ -9,7 +9,7 @@ public class EffectBehaviour : MonoBehaviour
 
     private float _elapsed;
     private bool _running;
-    private Vector3 _moveDirection; // 스폰 시 고정된 이동 방향
+    private Vector3 _moveDirection;
 
     private void OnEnable()
     {
@@ -25,10 +25,19 @@ public class EffectBehaviour : MonoBehaviour
         float dt = Time.deltaTime;
         _elapsed += dt;
 
-        // SO의 업데이트 실행
         behaviorSO?.OnUpdate(gameObject, owner, dt, _moveDirection);
 
-        if (_elapsed >= lifetime)
+        // Scale lerp
+        if (behaviorSO != null && behaviorSO.startScale != behaviorSO.endScale)
+        {
+            float effectDuration = behaviorSO.duration > 0f ? behaviorSO.duration : lifetime;
+            float t = Mathf.Clamp01(_elapsed / Mathf.Max(effectDuration, 0.01f));
+            float s = Mathf.Lerp(behaviorSO.startScale, behaviorSO.endScale, t);
+            transform.localScale = Vector3.one * s;
+        }
+
+        float maxLife = (behaviorSO != null && behaviorSO.duration > 0f) ? behaviorSO.duration : lifetime;
+        if (maxLife > 0f && _elapsed >= maxLife)
             StopAndReturnToPool();
     }
 
@@ -41,20 +50,36 @@ public class EffectBehaviour : MonoBehaviour
         Managers.ObjectPooler.Despawn(gameObject);
     }
 
-    public void Initialize(EffectBehaviorSO so, Transform ownerTransform, float life)
+    /// <summary>
+    /// WeaponEffectHandler에서 호출. 소켓 기준 방향을 moveDirection으로 설정.
+    /// </summary>
+    public void Initialize(EffectBehaviorSO so, Transform ownerTransform, float lifeMultiplier,
+                           Vector3? spawnForward = null)
     {
         behaviorSO = so;
         owner = ownerTransform;
-        lifetime = life;
         _elapsed = 0f;
         _running = true;
 
-        // 스폰 시 플레이어의 정면을 이동 방향으로 고정
-        _moveDirection = owner != null ? owner.forward.normalized : transform.forward.normalized;
+        // 수명 설정
+        if (so != null && so.duration > 0f)
+            lifetime = so.duration * lifeMultiplier;
+        else
+            lifetime = lifeMultiplier;
 
-        //이펙트의 정면을 x축 기준으로 맞춤
-        transform.rotation = Quaternion.LookRotation(owner.forward, Vector3.up) * Quaternion.Euler(0, -90f, 0);
+        // 이동 방향: 전달받은 spawnForward 우선, 없으면 owner.forward
+        _moveDirection = spawnForward ?? (owner != null ? owner.forward.normalized : transform.forward.normalized);
 
-        behaviorSO?.OnSpawn(gameObject, owner);
+        // Scale 초기화
+        if (so != null)
+            transform.localScale = Vector3.one * so.startScale;
+
+        so?.OnSpawn(gameObject, owner);
+    }
+
+    // 레거시 호환 오버로드
+    public void Initialize(EffectBehaviorSO so, Transform ownerTransform, float lifeMultiplier)
+    {
+        Initialize(so, ownerTransform, lifeMultiplier, null);
     }
 }
