@@ -500,6 +500,7 @@ public class PlayerController : CharacterBase
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.QSkill))
         {
+            Debug.Log($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={actSM.CurrentId}");
             if (CanAttack() && !isInSkill) actSM.Change(ActState.QSkill);
             return;
         }
@@ -625,20 +626,30 @@ public class PlayerController : CharacterBase
         switch (wd.weaponType)
         {
             case WeaponType.Sword:
+            case WeaponType.Katana:
                 _attackPolicy = new SwordAttackPolicy(
-                    enterThreshold: 2f,
+                    enterThreshold: 1.5f,
+                    fullThreshold: wd.holdThreshold,
+                    maxChargeStage: wd.chargeStages
+                );
+                break;
+
+            case WeaponType.Greatsword:
+                _attackPolicy = new SwordAttackPolicy(
+                    enterThreshold: 3f,
                     fullThreshold: wd.holdThreshold,
                     maxChargeStage: wd.chargeStages
                 );
                 break;
 
             case WeaponType.Bow:
+            case WeaponType.LongBow:
+            case WeaponType.ShortBow:
                 _attackPolicy = new BowAttackPolicy();
                 break;
 
             default:
                 _attackPolicy = new SwordAttackPolicy();
-                Debug.LogWarning($"[PlayerController] 정의되지 않은 무기 타입({wd.weaponType}) - 기본 SwordAttackPolicy 적용");
                 break;
         }
     }

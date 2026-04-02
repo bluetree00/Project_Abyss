@@ -12,6 +12,11 @@ public class WeaponSO : ScriptableObject
     public float baseAttack;
     public float baseDefense;
 
+    [Header("전투 스탯")]
+    public float attackSpeed = 1f;    // 초당 공격 횟수
+    public float attackRange = 1f;    // 공격 사거리 (m)
+    public float areaOfEffect = 1f;   // 공격 범위 (m)
+
     [Header("콤보 정보")]
     public int groundEndCount;
     public int airEndCount;

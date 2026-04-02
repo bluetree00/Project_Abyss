@@ -12,8 +12,10 @@ public static class WeaponTypeExtensions
 {
     public static AttackStatKind GetAttackStatKind(this WeaponType type) => type switch
     {
-        WeaponType.Bow   => AttackStatKind.Ranged,
-        WeaponType.Staff => AttackStatKind.Ranged,
-        _                => AttackStatKind.Melee,
+        WeaponType.Bow      => AttackStatKind.Ranged,
+        WeaponType.Staff    => AttackStatKind.Ranged,
+        WeaponType.LongBow  => AttackStatKind.Ranged,
+        WeaponType.ShortBow => AttackStatKind.Ranged,
+        _                   => AttackStatKind.Melee,
     };
 }

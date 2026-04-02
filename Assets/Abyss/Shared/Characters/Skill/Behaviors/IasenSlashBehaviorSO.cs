@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -205,8 +207,19 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             if (string.IsNullOrEmpty(key)) return;
             var obj = await Managers.ObjectPooler.SpawnAsync(
                 key, ObjectPoolerManager.PoolType.Effect, pos, ctx.PlayerTransform.rotation);
-            if (obj != null && obj.TryGetComponent<EffectBehaviour>(out var eb))
+            if (obj == null) return;
+            if (obj.TryGetComponent<EffectBehaviour>(out var eb))
                 eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, lifetime);
+            else
+                DespawnAfter(obj, lifetime);
+        }
+
+        private static async void DespawnAfter(GameObject obj, float delay)
+        {
+            await Cysharp.Threading.Tasks.UniTask.Delay(
+                (int)(delay * 1000), cancellationToken: obj.GetCancellationTokenOnDestroy());
+            if (obj != null && obj.activeInHierarchy)
+                Managers.ObjectPooler.Despawn(obj);
         }
 
         // ── Player Trail (Local 부착) ──

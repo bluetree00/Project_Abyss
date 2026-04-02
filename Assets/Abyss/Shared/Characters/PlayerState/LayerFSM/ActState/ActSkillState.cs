@@ -42,6 +42,7 @@ public class ActSkillState : ActSkillStateBase<ActState>
 
         var skillSO = GetSkillSO();
         var behavior = skillSO?.behavior;
+        Debug.Log($"[ActSkillState] {_slot} OnEnter: skillSO={skillSO?.name ?? "NULL"}, behavior={behavior?.name ?? "NULL"}");
 
         if (behavior != null)
         {
@@ -71,7 +72,16 @@ public class ActSkillState : ActSkillStateBase<ActState>
         {
             _runtime.OnUpdate(_ctx);
             if (_ended)
+            {
+                Debug.Log($"[ActSkillState] {_slot} ended → ActState.None");
                 _stateChanger.Change(ActState.None);
+            }
+        }
+        else
+        {
+            // behavior가 null이면 (레거시) 일정 시간 후 자동 종료
+            _ended = true;
+            _stateChanger.Change(ActState.None);
         }
     }
 
