@@ -6,9 +6,6 @@ namespace Abyss.Monster
 /// BlackKnight 전용 추격 상태 SO.
 /// 기본 직진 ChaseState 를 선회 추격 버전(OrbitalChaseState)으로 교체한다.
 ///
-/// SO 계층: ChaseStateSO → BKChaseStateSO
-/// 상태 계층: ChaseState  → OrbitalChaseState (이 SO 의 내부 클래스)
-///
 /// 소울류 보스 "기회를 노리는" 행동:
 ///   • 패턴 브레이크 쿨다운이 breakThreshold 이상 남아있고
 ///     거리가 minOrbitDist ~ maxOrbitDist 사이이면 → 선회 모드
@@ -17,7 +14,7 @@ namespace Abyss.Monster
 ///   • ChaseSpeedMult(HP 이정표 가속)가 선회/추격 모두에 반영됨
 /// </summary>
 [CreateAssetMenu(fileName = "BKChaseState", menuName = "Abyss/Boss/BlackKnight/ChaseState")]
-public class BKChaseStateSO : ChaseStateSO
+public class BKChaseStateSO : MonsterStateOverrideSO
 {
     [Header("선회 진입 조건")]
     [Tooltip("남은 패턴 브레이크 쿨다운이 이 값 이상일 때 선회 모드 진입")]
@@ -38,13 +35,12 @@ public class BKChaseStateSO : ChaseStateSO
     public float switchTimerMax  = 3.2f;
 
     // ─────────────────────────────────────────────────────────────
-    public override ChaseState Create(MonsterBase monster)
+    public override void RegisterOverrides(MonsterFSM fsm, MonsterBase monster)
     {
         if (monster is BlackKnightBoss bk)
-            return new OrbitalChaseState(bk, this);
-
-        Debug.LogWarning("[BKChaseStateSO] BlackKnightBoss 가 아닌 몬스터에 사용됨. 기본 ChaseState 반환.", this);
-        return new ChaseState();
+            fsm.RegisterAs<ChaseState>(new OrbitalChaseState(bk, this));
+        else
+            Debug.LogWarning("[BKChaseStateSO] BlackKnightBoss 가 아닌 몬스터에 사용됨. 기본 ChaseState 를 그대로 사용.", this);
     }
 
     // ── 선회 추격 상태 (내부 클래스) ──────────────────────────────

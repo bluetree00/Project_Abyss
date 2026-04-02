@@ -13,13 +13,7 @@ namespace Abyss.Monster
 ///  보스 코드(BuildConditions)에서 키 → ICondition 인스턴스로 변환한다.
 ///  조건 파라미터 수치는 아래 condXxx 필드에서 읽어온다 (JSON 덮어쓰기 가능).
 ///
-///  기본 제공 조건 키:
-///   Phase2        — HP ≤ condPhase2HpThreshold
-///   Dist_Close    — 플레이어 거리 ≤ condDistClose
-///   Dist_Far      — 플레이어 거리 ≥ condDistFar
-///   AfterBackstep — 직전 패턴 태그 == "backstep"
-///   AfterSidestep — 직전 패턴 태그 == "sidestep"
-///   TimePressure  — NormalModeTimer ≥ condTimePressureSecs
+///  사용 가능한 조건 키는 BossConditionKey 열거형을 참조한다.
 /// </summary>
 [CreateAssetMenu(fileName = "BossConfig", menuName = "Abyss/Boss/BossConfig")]
 public class BossConfigSO : MonsterConfigSO
@@ -55,15 +49,34 @@ public class BossConfigSO : MonsterConfigSO
 }
 
 /// <summary>
+/// 패턴 엔트리에서 선택할 수 있는 조건 키.
+/// BossConfigSO.condXxx 필드에서 수치를 읽어 ICondition 인스턴스로 변환된다.
+/// </summary>
+public enum BossConditionKey
+{
+    /// <summary>HP 비율 ≤ condPhase2HpThreshold</summary>
+    Phase2,
+    /// <summary>플레이어 거리 ≤ condDistClose</summary>
+    Dist_Close,
+    /// <summary>플레이어 거리 ≥ condDistFar</summary>
+    Dist_Far,
+    /// <summary>직전 패턴 태그 == "backstep"</summary>
+    AfterBackstep,
+    /// <summary>직전 패턴 태그 == "sidestep"</summary>
+    AfterSidestep,
+    /// <summary>패턴 미사용 경과 시간 ≥ condTimePressureSecs</summary>
+    TimePressure,
+}
+
+/// <summary>
 /// 조건과 패턴을 연결하는 하나의 엔트리.
 /// conditions 의 모든 조건이 참일 때 patterns 에서 패턴을 선택해 실행한다.
 /// </summary>
 [System.Serializable]
 public class BossPatternEntry
 {
-    [Tooltip("AND 조건 키 목록. 비어있으면 항상 참 (fallback 엔트리).\n" +
-             "Phase2 / Dist_Close / Dist_Far / AfterBackstep / AfterSidestep / TimePressure")]
-    public List<string> conditions = new();
+    [Tooltip("AND 조건 키 목록. 비어있으면 항상 참 (fallback 엔트리).")]
+    public List<BossConditionKey> conditions = new();
 
     /// <summary>
     /// BuildConditions() 이후 유효한 ICondition 배열.

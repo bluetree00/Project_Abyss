@@ -163,23 +163,20 @@ public class BlackKnightBoss : MonsterBase, IBoss
             }
             var list = new System.Collections.Generic.List<ICondition>(entry.conditions.Count);
             foreach (var key in entry.conditions)
-            {
-                var cond = KeyToCondition(key, cfg);
-                if (cond != null) list.Add(cond);
-            }
+                list.Add(KeyToCondition(key, cfg));
             entry.BuiltConditions = list.ToArray();
         }
     }
 
-    private ICondition KeyToCondition(string key, BossConfigSO cfg) => key switch
+    private ICondition KeyToCondition(BossConditionKey key, BossConfigSO cfg) => key switch
     {
-        "Phase2"         => new HpBelowCondition(cfg.condPhase2HpThreshold),
-        "Dist_Close"     => new MaxRangeCondition(cfg.condDistClose),
-        "Dist_Far"       => new MinRangeCondition(cfg.condDistFar),
-        "AfterBackstep"  => new LastTagCondition("backstep"),
-        "AfterSidestep"  => new LastTagCondition("sidestep"),
-        "TimePressure"   => new NormalModeTimerCondition(cfg.condTimePressureSecs),
-        _                => null,
+        BossConditionKey.Phase2        => new HpBelowCondition(cfg.condPhase2HpThreshold),
+        BossConditionKey.Dist_Close    => new MaxRangeCondition(cfg.condDistClose),
+        BossConditionKey.Dist_Far      => new MinRangeCondition(cfg.condDistFar),
+        BossConditionKey.AfterBackstep => new LastTagCondition("backstep"),
+        BossConditionKey.AfterSidestep => new LastTagCondition("sidestep"),
+        BossConditionKey.TimePressure  => new NormalModeTimerCondition(cfg.condTimePressureSecs),
+        _                              => new AlwaysTrue(),
     };
 
     private void SetInitialCooldowns()
