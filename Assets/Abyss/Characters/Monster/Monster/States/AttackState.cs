@@ -1,48 +1,34 @@
 using UnityEngine;
 
-
 namespace Abyss.Monster
 {
 /// <summary>
-/// 공격 상태 (몸통박치기 등 근거리 공격).
-///
-/// 흐름:
-///  Enter → 공격 애니메이션 트리거 → damageApplyDelay 후 DealDamageToPlayer()
-///       → 1/attackRate 초 후 쿨다운 종료
-///       → 여전히 사정거리 안이면 AttackReady, 아니면 Chase
-///
-/// 데미지 타이밍은 두 가지를 지원:
-///  1) 타이머 방식 (기본) : MonsterCombatSO.damageApplyDelay
-///  2) 애니메이션 이벤트 방식 : MonsterBase.OnAnimAttackHit() 가 직접 호출
-///     (이 경우 damageApplyDelay = 0 으로 설정해 타이머가 즉시 비활성화)
+/// Common melee attack state.
+/// Applies hit after delay and then transitions back to ready/chase.
 /// </summary>
 public class AttackState : IMonsterState
 {
-    private float _cooldownTimer;   // 다음 상태 전환까지 남은 시간
-    private float _damageTimer;     // 데미지 적용까지 남은 시간
-    private bool  _damageDealt;     // 이 공격에서 데미지를 이미 줬는지
+    private float _cooldownTimer;
+    private float _damageTimer;
+    private bool _damageDealt;
+    private bool _waitForAttackAnimFinish;
 
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.ResetPath();
 
         _cooldownTimer = 1f / Mathf.Max(0.01f, ctx.Stat.attackRate);
-        _damageTimer   = ctx.Combat.damageApplyDelay;
-        _damageDealt   = false;
+        _damageTimer = ctx.Combat.damageApplyDelay;
+        _damageDealt = false;
+        _waitForAttackAnimFinish = ShouldWaitForAttackAnimation(ctx);
 
         ctx.Runtime.AttackHitDealt = false;
-
-        // 공격 애니메이션 (CrossFade로 직접 전환 — AnyState 트리거 불필요)
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.attackTrigger))
-            ctx.Animator.CrossFade(ctx.Animation.attackTrigger, 0.05f, 0, 0f);
-
-        // 공격 시 플레이어 방향 바라보기
+        PlayAttackAnim(ctx);
         FacePlayer(ctx);
     }
 
     public virtual void Update(MonsterContext ctx)
     {
-        // 타이머 방식 데미지 적용
         if (!_damageDealt && _damageTimer > 0f)
         {
             _damageTimer -= Time.deltaTime;
@@ -53,9 +39,13 @@ public class AttackState : IMonsterState
             }
         }
 
-        // 공격 쿨다운 경과 → 다음 상태 결정
         _cooldownTimer -= Time.deltaTime;
         if (_cooldownTimer > 0f) return;
+
+        // If the attack animation exists as a state, wait until it nearly finishes
+        // to avoid stiff snapping at the end of the motion.
+        if (_waitForAttackAnimFinish && !IsAttackAnimNearlyFinished(ctx))
+            return;
 
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
@@ -64,15 +54,13 @@ public class AttackState : IMonsterState
         }
 
         float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        if (dist <= ctx.Stat.attackRange)
+        if (dist <= ctx.Monster.GetCombatStopDistance(ctx))
             ctx.Monster.ChangeState<AttackReadyState>();
         else
             ctx.Monster.ChangeState<ChaseState>();
     }
 
     public virtual void Exit(MonsterContext ctx) { }
-
-    // ── 헬퍼 ──────────────────────────────────────────────
 
     protected static void FacePlayer(MonsterContext ctx)
     {
@@ -81,6 +69,69 @@ public class AttackState : IMonsterState
         dir.y = 0f;
         if (dir.sqrMagnitude > 0.001f)
             ctx.Transform.rotation = Quaternion.LookRotation(dir);
+    }
+
+    private static void PlayAttackAnim(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackTrigger)) return;
+
+        var animator = ctx.Animator;
+        animator.speed = 1f;
+        string key = ctx.Animation.attackTrigger;
+
+        if (HasState(animator, key))
+        {
+            float fade = Mathf.Max(0.1f, ctx.Animation.crossFadeDuration);
+            animator.CrossFade(key, fade, 0, 0f);
+            return;
+        }
+
+        if (HasTrigger(animator, key))
+            animator.SetTrigger(key);
+    }
+
+    private static bool HasState(Animator animator, string stateName)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName)) return false;
+        return animator.HasState(0, Animator.StringToHash(stateName));
+    }
+
+    private static bool HasTrigger(Animator animator, string triggerName)
+    {
+        if (animator == null || string.IsNullOrEmpty(triggerName)) return false;
+
+        var parameters = animator.parameters;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var p = parameters[i];
+            if (p.type == AnimatorControllerParameterType.Trigger && p.name == triggerName)
+                return true;
+        }
+        return false;
+    }
+
+    private static bool ShouldWaitForAttackAnimation(MonsterContext ctx)
+    {
+        return ctx.Animator != null
+               && !string.IsNullOrEmpty(ctx.Animation.attackTrigger)
+               && HasState(ctx.Animator, ctx.Animation.attackTrigger);
+    }
+
+    private static bool IsAttackAnimNearlyFinished(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackTrigger))
+            return true;
+
+        int attackHash = Animator.StringToHash(ctx.Animation.attackTrigger);
+        if (!ctx.Animator.HasState(0, attackHash))
+            return true;
+
+        var state = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+        if (state.shortNameHash != attackHash && state.fullPathHash != attackHash)
+            return true;
+
+        float normalized = state.normalizedTime % 1f;
+        return normalized >= 0.92f;
     }
 }
 }

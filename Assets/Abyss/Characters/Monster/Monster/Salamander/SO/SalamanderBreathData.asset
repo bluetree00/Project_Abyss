@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbaaa75f1d9cda84f9dc1d171ccb100c, type: 3}
+  m_Name: SalamanderBreathData
+  m_EditorClassIdentifier: Assembly-CSharp::SalamanderBreathData
+  hpThreshold: 0.7
+  breathDuration: 2
+  breathStateName: Salamander_Attack03
+  breathRadius: 4
+  breathAngle: 60
+  breathDamage: 12
+  damageTick: 0.4

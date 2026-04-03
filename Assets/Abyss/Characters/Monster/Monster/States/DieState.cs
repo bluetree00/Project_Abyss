@@ -17,6 +17,7 @@ public class DieState : IMonsterState
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Runtime.IsDead = true;
+        ctx.Monster.HideWorldHPBar();
 
         // 이동 중지
         ctx.Agent.enabled = false;

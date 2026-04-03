@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: BeholderConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: Beholder
+  grade: 1
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 180
+    defense: 2
+    attackPower: 15
+    moveSpeed: 1.8
+    attackRange: 3.2
+    attackRadius: 1.6
+    attackRate: 0.65
+    attackDelay: 0.25
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 8
+    chaseGiveUpRange: 12
+  patrol:
+    patrolType: 2
+    patrolRange: 4
+    patrolSpeed: 1.5
+    waypointWaitTime: 1
+  combat:
+    damageApplyDelay: 0.4
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: 
+    idleStateName: IdleNormal
+    patrolStateName: WalkFWD
+    chaseStateName: Run
+    attackReadyStateName: IdleBattle
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingST
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates: []
+  stateOverrides:
+  - {fileID: 11400000, guid: e3d1293529d84e9bab3e90c0d9899f13, type: 2}
