@@ -35,7 +35,7 @@ public class AttackReadyState : IMonsterState
         float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
 
         // 플레이어가 사정거리 밖으로 이탈 (1.3배 여유 허용)
-        if (dist > ctx.Stat.attackRange * 1.3f)
+        if (dist > ctx.Monster.GetCombatStopDistance(ctx) * 1.3f)
         {
             ctx.Monster.ChangeState<ChaseState>();
             return;
@@ -67,8 +67,18 @@ public class AttackReadyState : IMonsterState
 
     protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
-        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
-        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
+        if (ctx.Animator == null) return;
+
+        string fallback = ctx.Animation.idleStateName;
+        string finalState = !string.IsNullOrEmpty(stateName) && ctx.Animator.HasState(0, Animator.StringToHash(stateName))
+            ? stateName
+            : (!string.IsNullOrEmpty(fallback) && ctx.Animator.HasState(0, Animator.StringToHash(fallback))
+                ? fallback
+                : null);
+
+        if (string.IsNullOrEmpty(finalState)) return;
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFade(finalState, ctx.Animation.crossFadeDuration);
     }
 }
 }

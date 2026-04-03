@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.AI;
+using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
@@ -6,8 +8,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public static GameRunBootstrapper Instance { get; private set; }
 
     [SerializeField] private string playerPrefabKey = "Knight";
+    [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
     [SerializeField] private Transform mapRoot;
+    [SerializeField] private bool buildRuntimeNavMesh = true;
+    [SerializeField] private bool disableSceneBakedNavMeshOnStart = true;
 
     private StagePointUI[] _points;
     private GameObject _currentMapGO;
@@ -40,6 +45,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(_run);
+
+        if (disableSceneBakedNavMeshOnStart)
+            DisableSceneBakedNavMesh();
 
         _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
     }
@@ -110,10 +118,41 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
 
             _currentMapGO = await Managers.AddressableManager.InstantiateAsync(prefabKey, mapRoot);
+            BuildMapNavMesh(_currentMapGO);
         }
         finally
         {
             _isSpawning = false;
+        }
+    }
+
+    private void BuildMapNavMesh(GameObject mapRootObject)
+    {
+        if (!buildRuntimeNavMesh || mapRootObject == null)
+            return;
+
+        var surface = mapRootObject.GetComponent<NavMeshSurface>();
+        if (surface == null)
+            surface = mapRootObject.AddComponent<NavMeshSurface>();
+
+        surface.collectObjects = CollectObjects.Children;
+        surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+        surface.layerMask = ~0;
+        surface.BuildNavMesh();
+    }
+
+    private static void DisableSceneBakedNavMesh()
+    {
+        // Clear pre-baked NavMesh in scene so monsters are not constrained to old small areas.
+        NavMesh.RemoveAllNavMeshData();
+
+        var surfaces = Resources.FindObjectsOfTypeAll<NavMeshSurface>();
+        for (int i = 0; i < surfaces.Length; i++)
+        {
+            var surface = surfaces[i];
+            if (surface == null) continue;
+            if (!surface.gameObject.scene.IsValid()) continue;
+            surface.enabled = false;
         }
     }
 
@@ -130,9 +169,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         _run?.RequestHudMode(HUDIds.Mode.Combat);
 
+        if (!string.IsNullOrEmpty(directCombatMapPrefabKey))
+            await SpawnMapAsync(directCombatMapPrefabKey);
+
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
             _run?.BindPlayer(player);
+
+        // Guard: force combat HUD once more after player/map bootstrap settles.
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
     }
 
     public async UniTask StartCombatAsync()
@@ -150,9 +195,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (uiRoot != null)
             uiRoot.BindHudToRun(run);
 
+        run.RequestHudMode(HUDIds.Mode.Combat);
+
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
             run.BindPlayer(player);
+
+        // Guard: some room/bootstrap flows can override HUD mode after early request.
+        run.RequestHudMode(HUDIds.Mode.Combat);
     }
 
     public async UniTask StartRunAsync(ChapterId chapter)
@@ -181,10 +231,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         run.RequestSpawnCurrentPointMap();
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
+        run.RequestHudMode(HUDIds.Mode.Combat);
 
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
             run.BindPlayer(player);
+
+        // Guard: ensure HUD remains in combat mode after late binds complete.
+        run.RequestHudMode(HUDIds.Mode.Combat);
     }
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)

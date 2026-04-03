@@ -22,8 +22,8 @@ MonoBehaviour:
     defense: 7
     attackPower: 20
     moveSpeed: 1
-    attackRange: 2
-    attackRadius: 2
+    attackRange: 1
+    attackRadius: 1
     attackRate: 1
     attackDelay: 0.5
     knockbackForce: 8
@@ -71,9 +71,6 @@ MonoBehaviour:
     earth:
       resistance: 1
       overrideState: {fileID: 0}
-  specialStates:
-  - conditions:
-    - {fileID: 11400000, guid: 9512f9f2c18746747b7af36a7a904160, type: 2}
-    state: {fileID: 11400000, guid: 795c45acbb174a64fac1b1c64082fb10, type: 2}
-    oneShot: 1
-  stateOverrides: []
+  specialStates: []
+  stateOverrides:
+  - {fileID: 11400000, guid: 271f2275c7dd44f8b10cb793882e0f6f, type: 2}

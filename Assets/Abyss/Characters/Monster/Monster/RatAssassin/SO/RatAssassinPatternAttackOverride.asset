@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: RatAssassinPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  selectionMode: 1
+  engageDistance: 1.3
+  patterns:
+  - name: Slash
+    animationStateName: Attack01
+    minDistance: 0
+    maxDistance: 1.4
+    priority: 0
+    cooldown: 0
+    damageDelay: 0.2
+    attackDuration: 0.7
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 0}
+    warningRadius: 0
+    warningDuration: 0
+  - name: Lunge
+    animationStateName: Attack01
+    minDistance: 1
+    maxDistance: 2.2
+    priority: 1
+    cooldown: 1.4
+    damageDelay: 0.25
+    attackDuration: 0.85
+    damageMultiplier: 1.1
+    knockbackMultiplier: 1.15
+    attackShapeOverride: {fileID: 11400000, guid: 478d4d8475e54a4c925f2737e9668c34, type: 2}
+    warningRadius: 0
+    warningDuration: 0

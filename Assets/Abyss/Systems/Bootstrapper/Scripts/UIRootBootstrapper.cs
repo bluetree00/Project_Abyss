@@ -42,13 +42,13 @@ public sealed class UIRootBootstrapper : MonoBehaviour
         }
 
         if (hudBootstrapper == null)
+            hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
+
+        if (hudBootstrapper == null)
         {
             Debug.LogWarning("[UIRoot] HudBootstrapper not found under UIRoot.");
             return;
         }
-
-        if (ReferenceEquals(_boundRun, run))
-            return;
 
         _boundRun = run;
         hudBootstrapper.BindRun(run);

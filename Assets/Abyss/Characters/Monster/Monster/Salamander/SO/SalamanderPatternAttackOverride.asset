@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: SalamanderPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  selectionMode: 1
+  engageDistance: 1.45
+  patterns:
+  - name: Bite
+    animationStateName: Salamander_Attack01
+    minDistance: 0
+    maxDistance: 1.45
+    priority: 0
+    cooldown: 0.2
+    damageDelay: 0.32
+    attackDuration: 0.9
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 0}
+    warningRadius: 0
+    warningDuration: 0
+  - name: ChargeBite
+    animationStateName: Salamander_Attack01
+    minDistance: 0
+    maxDistance: 1.45
+    priority: 0
+    cooldown: 1.15
+    damageDelay: 0.5
+    attackDuration: 1.15
+    damageMultiplier: 1.1
+    knockbackMultiplier: 1.1
+    attackShapeOverride: {fileID: 11400000, guid: b5a02fef3860406f9dadb7441362f503, type: 2}
+    warningRadius: 0
+    warningDuration: 0

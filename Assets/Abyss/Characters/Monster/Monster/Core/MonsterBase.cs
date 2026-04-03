@@ -39,6 +39,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// null이면 콜라이더 상단 기준 폴백.
     /// </summary>
     protected virtual string HeadBoneName => "Head";
+    protected virtual string HPBarAnchorName => "UI_HPAnchor";
 
     /// <summary>Head 본 위에서 추가로 올릴 오프셋 (m).</summary>
     protected virtual float HPBarHeadOffset => 0.1f;
@@ -63,6 +64,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     protected Animator           _animator;
     private   MonsterHPBar       _hpBar;
     private   bool               _hpBarRequesting;
+    private   bool               _worldHPBarSuppressed;
 
     // ── HP 변경 이벤트 (보스 UI 등 외부에서 구독) ─────────
     /// <summary>HP가 변경될 때마다 발행. (currentHp, maxHp)</summary>
@@ -98,6 +100,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // Inspector 디버그용
     [SerializeField] private string _debugState;
     private float     _diagTimer;
+    private Transform _hpBarAnchor;
     private Transform _headBone;   // HeadBoneName으로 탐색한 본
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -141,7 +144,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             _agent = gameObject.AddComponent<NavMeshAgent>();
         }
         _agent.speed            = _config.stat.moveSpeed;
-        _agent.stoppingDistance = _config.stat.attackRange * 0.9f;
+        _agent.stoppingDistance = _config.stat.attackRange;
 
         // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
         _rb = GetComponent<Rigidbody>();
@@ -157,6 +160,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _cachedColliders = GetComponentsInChildren<Collider>(true);
 
         // 4-1. Head 본 탐색
+        if (!string.IsNullOrEmpty(HPBarAnchorName))
+            _hpBarAnchor = FindBoneRecursive(transform, HPBarAnchorName);
+
         if (!string.IsNullOrEmpty(HeadBoneName))
             _headBone = FindBoneRecursive(transform, HeadBoneName);
 
@@ -190,8 +196,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _fsm.ChangeState<PatrolState>();
 
         // 9. HP 바 요청 (보스 등 UseWorldHPBar == false면 건너뜀)
-        if (UseWorldHPBar && gameObject.activeInHierarchy)
-            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
+        if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
+            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
 
         OnInitialized();
     }
@@ -280,6 +286,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
         if (IsPlayerDead()) return false;
+
+        // If we cannot move on NavMesh, allow engage only when target is already in melee stop range.
+        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh)
+            return ctx.Runtime.DistToPlayer <= GetCombatStopDistance(ctx);
+
         return ctx.Runtime.DistToPlayer <= ctx.Detection.detectionRange;
     }
 
@@ -287,6 +298,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public virtual bool ShouldGiveUpChase(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null || IsPlayerDead()) return true;
+
+        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh)
+            return ctx.Runtime.DistToPlayer > GetCombatStopDistance(ctx);
+
         return ctx.Runtime.DistToPlayer > ctx.Detection.chaseGiveUpRange;
     }
 
@@ -294,8 +309,19 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public virtual bool ShouldEnterAttackReady(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
-        return ctx.Runtime.DistToPlayer <= ctx.Stat.attackRange;
+        return ctx.Runtime.DistToPlayer <= GetCombatStopDistance(ctx);
     }
+
+    public virtual float GetCombatStopDistance(MonsterContext ctx)
+    {
+        if (ctx?.Agent != null && ctx.Agent.stoppingDistance > 0.05f)
+            return ctx.Agent.stoppingDistance;
+
+        return ctx.Stat.attackRange;
+    }
+
+    public virtual float GetCombatHitDistance(MonsterContext ctx)
+        => Mathf.Max(GetCombatStopDistance(ctx), ctx.Stat.attackRadius);
 
     /// <summary>
     /// 데미지를 받아 HP가 감소한 직후, GetHitState 전환 전에 호출된다.
@@ -364,7 +390,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         }
 
         float dist = Vector3.Distance(transform.position, _runtime.PlayerTarget.position);
-        if (dist > _config.stat.attackRadius) return;
+        if (dist > GetCombatHitDistance(_ctx)) return;
 
         var player = _runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
@@ -392,8 +418,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // IDamageable — 플레이어 공격에 맞을 때 호출됨
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f,
-                           ElementType element = ElementType.None, float elementAmount = 0f)
+    public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f,
+                                   ElementType element = ElementType.None, float elementAmount = 0f)
     {
         if (_runtime == null || _runtime.IsDead) return;
 
@@ -434,7 +460,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             // (isKinematic을 false로 두지 않아야 특수 상태 중 물리 이탈을 막는다)
             if (IsInSpecialState) return;
 
-            if (instigator != null && _rb != null)
+            if (_runtime.IsDormant && _runtime.HasBeenAttacked)
+            {
+                ChangeState<ChaseState>();
+                return;
+            }
+
+            // NavMeshAgent가 활성화된 몬스터는 Agent가 위치를 제어하므로 Rigidbody 넉백 생략
+            // (isKinematic ↔ Agent 충돌로 발생하는 "Setting linear velocity of kinematic body" 경고 방지)
+            if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled))
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;
@@ -530,6 +564,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.StateTimer          = 0f;
         _runtime.AttackHitDealt      = false;
         _runtime.IsFirstAttack       = true;
+        _runtime.HasBeenAttacked     = false;
+        _runtime.IsDormant           = false;
         _runtime.SpeedMultiplier     = 1f;
         _runtime.AttackMultiplier    = 1f;
         _runtime.DamageMultiplier    = 1f;
@@ -573,9 +609,33 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
     }
 
+    /// <summary>월드 HP 바를 즉시 숨긴다. 잠복 상태 등에서 사용.</summary>
+    public void HideWorldHPBar()
+    {
+        if (!UseWorldHPBar) return;
+        _worldHPBarSuppressed = true;
+        _hpBarRequesting = false;
+
+        if (_hpBar != null)
+        {
+            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
+            _hpBar = null;
+        }
+    }
+
+    /// <summary>월드 HP 바를 다시 표시한다. 숨김 해제 후 호출.</summary>
+    public void ShowWorldHPBar()
+    {
+        if (!UseWorldHPBar) return;
+        if (!gameObject.activeInHierarchy) return;
+        _worldHPBarSuppressed = false;
+        RequestHPBarAsync().Forget();
+    }
+
     private async UniTaskVoid RequestHPBarAsync()
     {
         if (!UseWorldHPBar) return;
+        if (_worldHPBarSuppressed) return;
         if (_hpBarRequesting) return;
         _hpBarRequesting = true;
 
@@ -584,7 +644,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
-        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _headBone, HPBarHeadOffset);
+        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+        if (_worldHPBarSuppressed && _hpBar != null)
+        {
+            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
+            _hpBar = null;
+        }
         _hpBarRequesting = false;
     }
 

@@ -29,10 +29,24 @@ public sealed class HudView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     public void SetSections(HUDIds.Section sections)
     {
+        bool showCombat = (sections & HUDIds.Section.CombatPanel) != 0;
+
         SetActiveSafe(topBarRoot,        (sections & HUDIds.Section.TopBar)        != 0);
-        SetActiveSafe(combatPanel,       (sections & HUDIds.Section.CombatPanel)   != 0);
+        SetActiveSafe(combatPanel,       showCombat);
         SetActiveSafe(bossPanelView,     (sections & HUDIds.Section.BossPanel)     != 0);
         SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
+
+        if (showCombat)
+            EnsureCombatPanelVisible();
+    }
+
+    public void EnsureCombatPanelVisible()
+    {
+        SetActiveSafe(combatPanel, true);
+
+        var panelCombat = FindChildRecursive(transform, "Panel_Combat");
+        if (panelCombat != null && !panelCombat.gameObject.activeSelf)
+            panelCombat.gameObject.SetActive(true);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -64,5 +78,19 @@ public sealed class HudView : MonoBehaviour
         if (go == null) return;
         if (go.activeSelf == on) return;
         go.SetActive(on);
+    }
+
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root == null) return null;
+        if (root.name == name) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var found = FindChildRecursive(root.GetChild(i), name);
+            if (found != null) return found;
+        }
+
+        return null;
     }
 }

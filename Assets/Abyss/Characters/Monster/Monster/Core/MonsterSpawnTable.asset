@@ -33,3 +33,107 @@ MonoBehaviour:
     addressableKey: Snail/Snail
     weight: 1
     enabled: 1
+  - displayName: SpiderMonster
+    addressableKey: Spider/Spider
+    weight: 1
+    enabled: 1
+  - displayName: MonsterPlantMonster
+    addressableKey: MonsterPlant/MonsterPlant
+    weight: 1
+    enabled: 1
+  - displayName: EvilMageMonster
+    addressableKey: EvilMage/EvilMage
+    weight: 1
+    enabled: 1
+  - displayName: OrcMonster
+    addressableKey: Orc/Orc
+    weight: 1
+    enabled: 1
+  - displayName: DragonMonster
+    addressableKey: Dragon/Dragon
+    weight: 1
+    enabled: 1
+  - displayName: BeholderMonster
+    addressableKey: Beholder/Beholder
+    weight: 1
+    enabled: 1
+  - displayName: ChestMonsterMonster
+    addressableKey: ChestMonster/ChestMonster
+    weight: 1
+    enabled: 1
+  - displayName: CrabMonsterMonster
+    addressableKey: CrabMonster/CrabMonster
+    weight: 1
+    enabled: 1
+  - displayName: FlyingDemonMonster
+    addressableKey: FlyingDemon/FlyingDemon
+    weight: 1
+    enabled: 1
+  - displayName: LizardWarriorMonster
+    addressableKey: LizardWarrior/LizardWarrior
+    weight: 1
+    enabled: 1
+  - displayName: RatAssassinMonster
+    addressableKey: RatAssassin/RatAssassin
+    weight: 1
+    enabled: 1
+  - displayName: SpecterMonster
+    addressableKey: Specter/Specter
+    weight: 1
+    enabled: 1
+  - displayName: WerewolfMonster
+    addressableKey: Werewolf/Werewolf
+    weight: 1
+    enabled: 1
+  - displayName: WormMonsterMonster
+    addressableKey: WormMonster/WormMonster
+    weight: 1
+    enabled: 1
+  - displayName: BattleBeeMonster
+    addressableKey: BattleBee/BattleBee
+    weight: 1
+    enabled: 1
+  - displayName: BishopKnightMonster
+    addressableKey: BishopKnight/BishopKnight
+    weight: 1
+    enabled: 1
+  - displayName: BlackKnightMonster
+    addressableKey: BlackKnight/BlackKnight
+    weight: 1
+    enabled: 1
+  - displayName: CactusMonster
+    addressableKey: Cactus/Cactus
+    weight: 1
+    enabled: 1
+  - displayName: CyclopsMonster
+    addressableKey: Cyclops/Cyclops
+    weight: 1
+    enabled: 1
+  - displayName: DemonKingMonster
+    addressableKey: DemonKing/DemonKing
+    weight: 1
+    enabled: 1
+  - displayName: FishmanMonster
+    addressableKey: Fishman/Fishman
+    weight: 1
+    enabled: 1
+  - displayName: MushroomAngryMonster
+    addressableKey: MushroomAngry/MushroomAngry
+    weight: 1
+    enabled: 1
+  - displayName: MushroomSmileMonster
+    addressableKey: MushroomSmile/MushroomSmile
+    weight: 1
+    enabled: 0
+  - displayName: NagaWizardMonster
+    addressableKey: NagaWizard/NagaWizard
+    weight: 1
+    enabled: 1
+  - displayName: SalamanderMonster
+    addressableKey: Salamander/Salamander
+    weight: 1
+    enabled: 1
+  - displayName: StingRayMonster
+    addressableKey: StingRay/StingRay
+    weight: 1
+    enabled: 1

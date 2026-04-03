@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99583b55a4236c1469f51e482162f82a, type: 3}
+  m_Name: MushroomAngrySporeData
+  m_EditorClassIdentifier: Assembly-CSharp::MushroomAngrySporeData
+  hpThreshold: 0.5
+  sporeStateName: Mushroom_Attack03Angry
+  sporeDuration: 1.5
+  sporeRadius: 4
+  sporeDamage: 10
+  sporeEffectPrefab: {fileID: 1156591902748042, guid: 55b36a9461ee12b4b9ed1546b95e8ba4,
+    type: 3}

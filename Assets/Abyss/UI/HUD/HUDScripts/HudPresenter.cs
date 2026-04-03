@@ -254,7 +254,6 @@ public sealed class HudPresenter : MonoBehaviour
         UnbindBoss();
     }
 
-    private void OnDisable() => Dispose();
     private void OnDestroy()  => Dispose();
 
     // ─────────────────────────────────────────────────────────
@@ -263,6 +262,13 @@ public sealed class HudPresenter : MonoBehaviour
     public void SetMode(HUDIds.Mode mode)
     {
         if (view == null) return;
+
+        bool shouldBeVisible = mode != HUDIds.Mode.None;
+        SetVisible(shouldBeVisible, true);
+
+        if (mode == HUDIds.Mode.Combat || mode == HUDIds.Mode.Boss)
+            view.EnsureCombatPanelVisible();
+
         if (_currentMode == mode) return;
 
         _currentMode = mode;

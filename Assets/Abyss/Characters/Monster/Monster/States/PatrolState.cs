@@ -74,7 +74,8 @@ public class PatrolState : IMonsterState
 
     public virtual void Exit(MonsterContext ctx)
     {
-        ctx.Agent.ResetPath();
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+            ctx.Agent.ResetPath();
     }
 
     // ── 내부 헬퍼 ─────────────────────────────────────────
@@ -125,9 +126,19 @@ public class PatrolState : IMonsterState
 
     protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
-        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
+        if (ctx.Animator == null) return;
         if (!ctx.Animator.gameObject.activeInHierarchy) return;
-        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
+
+        string fallback = ctx.Animation.idleStateName;
+        string finalState = !string.IsNullOrEmpty(stateName) && ctx.Animator.HasState(0, Animator.StringToHash(stateName))
+            ? stateName
+            : (!string.IsNullOrEmpty(fallback) && ctx.Animator.HasState(0, Animator.StringToHash(fallback))
+                ? fallback
+                : null);
+
+        if (string.IsNullOrEmpty(finalState)) return;
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFade(finalState, ctx.Animation.crossFadeDuration);
     }
 }
 }

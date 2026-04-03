@@ -18,7 +18,7 @@ public class ChaseState : IMonsterState
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
-        ctx.Agent.stoppingDistance = ctx.Stat.attackRange * 0.9f;
+        ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
         _lastDestination = Vector3.positiveInfinity; // 진입 시 즉시 경로 계산 보장
         PlayAnim(ctx, ctx.Animation.chaseStateName);
     }
@@ -53,6 +53,7 @@ public class ChaseState : IMonsterState
             _lastDestination = targetPos;
         }
         FaceTarget(ctx);
+        KeepChaseAnimation(ctx);
 
         // 이동 속도 파라미터 갱신 — 댐핑으로 블렌드 트리 부드럽게 전환
         if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
@@ -80,8 +81,34 @@ public class ChaseState : IMonsterState
 
     protected static void PlayAnim(MonsterContext ctx, string stateName)
     {
-        if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
-        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
+        if (ctx.Animator == null) return;
+
+        string fallback = ctx.Animation.patrolStateName;
+        string finalState = !string.IsNullOrEmpty(stateName) && ctx.Animator.HasState(0, Animator.StringToHash(stateName))
+            ? stateName
+            : (!string.IsNullOrEmpty(fallback) && ctx.Animator.HasState(0, Animator.StringToHash(fallback))
+                ? fallback
+                : null);
+
+        if (string.IsNullOrEmpty(finalState)) return;
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFade(finalState, ctx.Animation.crossFadeDuration);
+    }
+
+    protected static void KeepChaseAnimation(MonsterContext ctx)
+    {
+        if (ctx.Animator == null) return;
+        if (ctx.Animator.IsInTransition(0)) return;
+        if (string.IsNullOrEmpty(ctx.Animation.chaseStateName)) return;
+
+        int chaseHash = Animator.StringToHash(ctx.Animation.chaseStateName);
+        if (!ctx.Animator.HasState(0, chaseHash)) return;
+
+        var current = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+        if (current.shortNameHash == chaseHash) return;
+
+        ctx.Animator.speed = 1f;
+        ctx.Animator.CrossFade(ctx.Animation.chaseStateName, Mathf.Min(0.08f, ctx.Animation.crossFadeDuration));
     }
 }
 }

@@ -436,7 +436,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: cb0f8e4416a3d9b4a81f44bb22fa30ce, type: 3}
-  m_Type: 1
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -2076,7 +2076,7 @@ MonoBehaviour:
   bossPanelView: {fileID: 0}
   systemNoticesRoot: {fileID: 0}
   nicknameText: {fileID: 3397901793256520361}
-  goldText: {fileID: 0}
+  goldText: {fileID: 6959999493937585633}
 --- !u!1 &2460553339345271598
 GameObject:
   m_ObjectHideFlags: 0
@@ -2606,7 +2606,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &6524514585146229360
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3280,7 +3280,7 @@ RectTransform:
   m_GameObject: {fileID: 3861830606067769825}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1643941080553862375}
@@ -6507,7 +6507,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: ed96b7d45c0a0c844baf1c0163865b0d, type: 3}
-  m_Type: 1
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
