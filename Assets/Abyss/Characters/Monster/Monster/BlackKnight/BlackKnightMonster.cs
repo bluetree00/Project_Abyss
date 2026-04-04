@@ -1,8 +1,8 @@
 namespace Abyss.Monster
 {
 /// <summary>
-/// 일반 몬스터 버전 블랙나이트.
-/// 기존 보스 임시 에셋 주소를 재사용하되 MonsterBase 기반으로 동작한다.
+/// BlackKnight addressable asset wrapper.
+/// 현재는 보스 구현체가 아니라 일반 MonsterBase 파생 몬스터로만 사용된다.
 /// </summary>
 public class BlackKnightMonster : MonsterBase
 {

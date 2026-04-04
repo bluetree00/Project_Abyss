@@ -53,7 +53,7 @@ public class MonsterProjectile : MonoBehaviour
     {
         if (!_initialized || _hit) return;
         if (Vector3.Distance(_originPos, transform.position) >= _maxRange)
-            Destroy(gameObject);
+            ReleaseSelf();
     }
 
     // isTrigger=true 경로 (정상 경로)
@@ -82,7 +82,7 @@ public class MonsterProjectile : MonoBehaviour
         player.ApplyKnockback(dir.normalized * _knockbackForce);
 
         PlayHitEffect();
-        Destroy(gameObject);
+        ReleaseSelf();
     }
 
     private void PlayHitEffect()
@@ -93,5 +93,13 @@ public class MonsterProjectile : MonoBehaviour
         _hitEffect.transform.SetParent(null);
         _hitEffect.Play();
         Destroy(_hitEffect.gameObject, _hitEffect.main.duration + 0.5f);
+    }
+
+    private void ReleaseSelf()
+    {
+        if (TryGetComponent<Abyss.Monster.BossPooledEffect>(out _))
+            Abyss.Monster.BossEffectPool.Release(gameObject);
+        else
+            Destroy(gameObject);
     }
 }

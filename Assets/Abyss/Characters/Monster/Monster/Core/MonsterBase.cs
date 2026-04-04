@@ -71,6 +71,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public event System.Action<int, int> OnHPChanged;
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
+    public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
     public int    BossMaxHp => _config != null ? _config.stat.maxHp : 0;
     public string BossName  => _config != null ? _config.monsterName : string.Empty;
 
@@ -539,6 +540,26 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         SetPlayerTarget(player);
         Managers.Player.OnPlayerSpawned -= OnPlayerSpawned;
+    }
+
+    protected void BindBossHud()
+    {
+        if (_config == null || _runtime == null) return;
+
+        var presenter = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        if (presenter == null) return;
+
+        presenter.BindBoss(this);
+        NotifyHPChanged();
+    }
+
+    protected void UnbindBossHudIfBound()
+    {
+        var presenter = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        if (presenter == null) return;
+        if (!ReferenceEquals(presenter.BoundBoss, this)) return;
+
+        presenter.UnbindBoss();
     }
 
     private void OnDestroy()

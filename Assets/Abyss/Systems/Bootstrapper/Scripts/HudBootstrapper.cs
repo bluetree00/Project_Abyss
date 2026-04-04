@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
+using Abyss.Monster;
 
 public sealed class HudBootstrapper : MonoBehaviour
 {
@@ -45,7 +46,32 @@ public sealed class HudBootstrapper : MonoBehaviour
         if (!IsInGameScene()) return;
 
         EnsureHudHierarchyVisible();
-        presenter?.SetMode(HUDIds.Mode.Combat);
+        if (presenter != null)
+        {
+            if (presenter.HasBoundBoss)
+            {
+                presenter.SetMode(HUDIds.Mode.Boss);
+                presenter.RefreshBoundBossPanel();
+            }
+            else if (TryBindAnyActiveBoss())
+            {
+                presenter.SetMode(HUDIds.Mode.Boss);
+                presenter.RefreshBoundBossPanel();
+            }
+            else if (_run != null && _run.TryGetHudMode(out var mode))
+            {
+                var normalized = NormalizeMode(mode);
+                if (normalized == HUDIds.Mode.Boss)
+                    normalized = HUDIds.Mode.Combat;
+
+                presenter.SetMode(normalized);
+            }
+            else
+            {
+                presenter.SetMode(HUDIds.Mode.Combat);
+            }
+        }
+
         SyncCombatHpText();
     }
 
@@ -74,7 +100,7 @@ public sealed class HudBootstrapper : MonoBehaviour
         {
             EnsureHudHierarchyVisible();
             if (_run.TryGetHudMode(out var currentMode))
-                presenter.SetMode(NormalizeMode(currentMode));
+                presenter.SetMode(ResolveMode(currentMode));
             else if (IsInGameScene())
                 presenter.SetMode(HUDIds.Mode.Combat);
 
@@ -96,7 +122,7 @@ public sealed class HudBootstrapper : MonoBehaviour
 
         // ✅ 2) 현재 모드 즉시 반영(늦게 뜬 HUD도 동기화)
         if (_run.TryGetHudMode(out var mode))
-            presenter.SetMode(NormalizeMode(mode));
+            presenter.SetMode(ResolveMode(mode));
         else if (IsInGameScene())
             presenter.SetMode(HUDIds.Mode.Combat);
 
@@ -133,17 +159,39 @@ public sealed class HudBootstrapper : MonoBehaviour
 
         _provider.Bind(st);
         presenter.Construct(_run, _provider);
+        TryBindAnyActiveBoss();
     }
 
     private void HandleHudModeChanged(HUDIds.Mode mode)
     {
         EnsureHudHierarchyVisible();
-        presenter.SetMode(NormalizeMode(mode));
+        presenter.SetMode(ResolveMode(mode));
     }
 
     private void HandlePlayerBound(PlayerController player)
     {
         presenter.BindPlayer(player);
+        TryBindAnyActiveBoss();
+    }
+
+    private bool TryBindAnyActiveBoss()
+    {
+        if (presenter == null || presenter.HasBoundBoss) return false;
+
+        var monsters = FindObjectsByType<MonsterBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        if (monsters == null) return false;
+
+        for (int i = 0; i < monsters.Length; i++)
+        {
+            var monster = monsters[i];
+            if (monster == null || !monster.isActiveAndEnabled) continue;
+            if (monster is not IBoss) continue;
+
+            presenter.BindBoss(monster);
+            return true;
+        }
+
+        return false;
     }
 
     public void Unbind()
@@ -210,6 +258,15 @@ public sealed class HudBootstrapper : MonoBehaviour
             return HUDIds.Mode.Combat;
 
         return requestedMode;
+    }
+
+    private HUDIds.Mode ResolveMode(HUDIds.Mode requestedMode)
+    {
+        var normalized = NormalizeMode(requestedMode);
+        if (normalized == HUDIds.Mode.Boss && (presenter == null || !presenter.HasBoundBoss))
+            return HUDIds.Mode.Combat;
+
+        return normalized;
     }
 
     private static bool IsInGameScene()
@@ -325,16 +382,16 @@ public sealed class HudBootstrapper : MonoBehaviour
         int maxHp = 0;
         bool hasValue = false;
 
-        if (_run != null && _run.TryGetPlayerState(out var state) && state != null)
-        {
-            hp = state.Hp;
-            maxHp = state.MaxHp;
-            hasValue = true;
-        }
-        else if (_run?.Player != null && _run.Player.RuntimeStats != null)
+        if (_run?.Player != null && _run.Player.RuntimeStats != null)
         {
             hp = _run.Player.RuntimeStats.Hp;
             maxHp = _run.Player.RuntimeStats.MaxHp;
+            hasValue = true;
+        }
+        else if (_run != null && _run.TryGetPlayerState(out var state) && state != null)
+        {
+            hp = state.Hp;
+            maxHp = state.MaxHp;
             hasValue = true;
         }
         else
