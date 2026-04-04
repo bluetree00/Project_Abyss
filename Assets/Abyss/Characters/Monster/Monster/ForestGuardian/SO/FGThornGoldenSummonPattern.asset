@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55f9929a5d0134d46bb75edc1e5331f1, type: 3}
+  m_Name: FGThornGoldenSummonPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGThornGoldenSummonPatternSO
+  weight: 1
+  patternTag: 
+  breakOverride: -1
+  animStateName: Summon
+  crossFade: 0.15
+  vfxSummon: {fileID: 100100000, guid: a91a44d8fe830874cb776823c2ba3e9f, type: 2}
+  summonRadius: 2.5
+  warningDuration: 1.5
