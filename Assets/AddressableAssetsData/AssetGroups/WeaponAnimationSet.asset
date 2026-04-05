@@ -18,7 +18,7 @@ MonoBehaviour:
   m_GUID: 8c2134209ad4a944d91f7a0f913aee20
   m_SerializeEntries:
   - m_GUID: b11c40e7008eefa4a965103378c5ef86
-    m_Address: Assets/Abyss/Characters/Player/Weapon/Sword/TestSword/TestAnimation.asset
+    m_Address: Assets/Abyss/Weapon/Sword/Data/TestSword/TestAnimation.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
