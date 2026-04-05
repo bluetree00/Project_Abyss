@@ -22,7 +22,7 @@ MonoBehaviour:
     - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7941080ed78535c4cad4a88a59e09ae4
-    m_Address: Assets/Abyss/Shared/Characters/Weapon/WeaponShared/Collider/TestCollider.prefab
+    m_Address: Assets/Abyss/Weapon/Shared/TestCollider.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -18,7 +18,7 @@ MonoBehaviour:
   m_GUID: 80d09f53e379fd94b8ba2b41ea0c88d5
   m_SerializeEntries:
   - m_GUID: 40ca726e49d81b34f935026c0057bcb6
-    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestColliderPack.asset
+    m_Address: Assets/Abyss/Weapon/Sword/Data/TestSword/TestColliderPack.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
