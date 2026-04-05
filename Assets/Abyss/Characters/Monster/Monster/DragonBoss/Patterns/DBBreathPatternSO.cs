@@ -49,6 +49,42 @@ public class DBBreathPatternSO : BossPatternSO
         private Vector3 _beamTarget;
         private bool _originalUpdatePosition;
         private bool _originalUpdateRotation;
+        private Transform _beamTransform;
+        private Material _beamMat;
+
+        private void CreateBeam(Color color)
+        {
+            var cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cylinder.name = "[BreathBeam]";
+            Object.Destroy(cylinder.GetComponent<Collider>());
+            _beamMat = new Material(cylinder.GetComponent<Renderer>().sharedMaterial);
+            if (_beamMat.HasProperty("_BaseColor")) _beamMat.SetColor("_BaseColor", color);
+            if (_beamMat.HasProperty("_Color"))     _beamMat.SetColor("_Color",     color);
+            cylinder.GetComponent<Renderer>().material = _beamMat;
+            _beamTransform = cylinder.transform;
+        }
+
+        private void UpdateBeam(Vector3 start, Vector3 end)
+        {
+            if (_beamTransform == null) return;
+            Vector3 dir = end - start;
+            float len = dir.magnitude;
+            if (len < 0.01f) return;
+            _beamTransform.position = (start + end) * 0.5f;
+            _beamTransform.up = dir.normalized;
+            _beamTransform.localScale = new Vector3(Data.beamWidth, len * 0.5f, Data.beamWidth);
+        }
+
+        private void DestroyBeam()
+        {
+            if (_beamTransform != null)
+            {
+                Object.Destroy(_beamMat);
+                Object.Destroy(_beamTransform.gameObject);
+                _beamTransform = null;
+                _beamMat = null;
+            }
+        }
 
         private void DrawBeamTrail(Vector3 groundFrom, Vector3 groundTo, Color color)
         {
