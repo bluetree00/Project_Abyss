@@ -65,4 +65,5 @@ MonoBehaviour:
   attackState: {fileID: 0}
   getHitState: {fileID: 0}
   dieState: {fileID: 0}
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: a8b3035ce79fac648bc2e25ed25ab970, type: 2}

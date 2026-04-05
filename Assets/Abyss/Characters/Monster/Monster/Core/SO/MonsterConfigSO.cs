@@ -38,24 +38,13 @@ public class MonsterConfigSO : ScriptableObject
     [Tooltip("특수 상태 목록. 조건이 있으면 OnDamageTaken 시 평가. 비어있으면 코드에서 직접 발동.")]
     public List<SpecialStateEntry> specialStates = new();
 
-    // ── 공용 상태 커스텀 슬롯 ────────────────────────────────────
-    [Header("공용 상태 커스텀 (null = 기본 상태 사용)")]
-    [Tooltip("null이면 기본 공용 상태를 사용한다.\n" +
-             "파생 SO (예: BKChaseStateSO)를 설정하면 해당 SO가 생성하는 커스텀 상태로 교체된다.\n\n" +
-             "SO 계층: ChaseStateSO → BKChaseStateSO\n" +
-             "상태 계층: ChaseState  → OrbitalChaseState (SO 내부 클래스)\n\n" +
-             "이것이 진정한 모듈화: SO를 상속하고, 그 안에 공용 상태를 상속한 클래스를 보유한다.")]
-    public ChaseStateSO       chaseState;
-    public PatrolStateSO      patrolState;
-    public AttackReadyStateSO attackReadyState;
-    public AttackStateSO      attackState;
-    public GetHitStateSO      getHitState;
-    public DieStateSO         dieState;
-
-    // ── 복합 행동 오버라이드 (다중 상태 공유 로직이 필요한 경우에만) ─
-    [Header("복합 행동 오버라이드 (다중 상태가 하나의 런타임 객체를 공유해야 할 때만 사용)")]
-    [Tooltip("예: SnailShell처럼 Chase/AttackReady/Attack 세 상태가 하나의 쿨다운 타이머를 공유하는 경우.\n" +
-             "단순 상태 교체는 위의 개별 슬롯을 사용한다.")]
+    // ── 상태 오버라이드 ────────────────────────────────────────
+    [Header("상태 오버라이드 (필요한 공용 상태만 교체)")]
+    [Tooltip("기본 상태(Patrol/Chase/AttackReady/Attack/GetHit/Die)는 자동 등록된다.\n" +
+             "특정 상태를 교체하거나 여러 상태가 런타임 객체를 공유해야 할 때 이 리스트에 추가한다.\n\n" +
+             "예)\n" +
+             "  • BKChaseStateSO  → ChaseState 하나만 선회 추격으로 교체\n" +
+             "  • SnailShellOverrideSO → Chase/AttackReady/Attack 세 상태가 SharedTimer 공유")]
     public List<MonsterStateOverrideSO> stateOverrides;
 }
 

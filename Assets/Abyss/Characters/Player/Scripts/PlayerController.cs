@@ -53,6 +53,8 @@ public class PlayerController : CharacterBase
     //============================================================
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
+    [Header("Debug")]
+    [SerializeField] private bool debugInvincible = true;
     public CharacterData CharacterData => characterData;
 
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
@@ -61,6 +63,9 @@ public class PlayerController : CharacterBase
     // 테스트용: 피격/회복
     public void TakeDamage(int dmg)
     {
+        if (debugInvincible)
+            return;
+
         RuntimeStats.Damage(dmg);
         FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = dmg });
     }
@@ -80,7 +85,7 @@ public class PlayerController : CharacterBase
     public PlayerWeaponManager WeaponManager { get; private set; }
 
     protected PlayerInputActions inputActions;
-    public bool inputReady = false;
+    [System.NonSerialized] public bool inputReady = false;
 
     [Header("Camera")]
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
@@ -135,6 +140,15 @@ public class PlayerController : CharacterBase
     //============================================================
     public float MoveScale { get; private set; } = 1f;
     public void SetMoveScale(float s) => MoveScale = Mathf.Clamp01(s);
+
+    private float _slowTimer;
+
+    /// <summary>이동 속도를 scale 배율로 duration초 동안 감소시킨다. 종료 시 자동으로 1f로 복구.</summary>
+    public void ApplySlow(float scale, float duration)
+    {
+        SetMoveScale(scale);
+        _slowTimer = Mathf.Max(_slowTimer, duration);
+    }
 
     //============================================================
     // Knockback
@@ -260,6 +274,12 @@ public class PlayerController : CharacterBase
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
+        if (_slowTimer > 0f)
+        {
+            _slowTimer = Mathf.Max(0f, _slowTimer - Time.deltaTime);
+            if (_slowTimer <= 0f)
+                SetMoveScale(1f);
+        }
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
         CheckMovementInput();
@@ -401,6 +421,12 @@ public class PlayerController : CharacterBase
 
     private void InitInputActions()
     {
+        if (inputActions != null)
+        {
+            inputActions.Player.Disable();
+            inputActions.Disable();
+            inputActions.Dispose();
+        }
         inputActions = new PlayerInputActions();
         inputActions.Enable();
         inputReady = true;
@@ -553,6 +579,7 @@ public class PlayerController : CharacterBase
     {
         if (locoSM?.CurrentId == LocoState.Air) return;
         if (cinemachineCamera == null) return;
+        if (inputActions == null) return;
 
         var input   = inputActions.Player.Move.ReadValue<Vector2>();
         var forward = cinemachineCamera.transform.forward; forward.y = 0f;

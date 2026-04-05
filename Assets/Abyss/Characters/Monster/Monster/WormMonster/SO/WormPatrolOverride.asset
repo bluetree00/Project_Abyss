@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cbec65f4bc98af43af0f19525c0ebb1, type: 3}
+  m_Name: WormPatrolOverride
+  m_EditorClassIdentifier: Assembly-CSharp::WormPatrolOverrideSO
+  burrowDepth: 0.6
+  hideRenderersWhileBurrowed: 1
+  burrowEffectPrefab: {fileID: 1505840697445172, guid: 2ad5c1a0f3dfb2a479c897ce5c0c6d82,
+    type: 3}
+  undergroundMoveEffectPrefab: {fileID: 1904339252476707756, guid: 5c5fb16356e8b8c40bfe2d1637b4f15e,
+    type: 3}
+  undergroundMoveEffectInterval: 0.35
+  emergeEffectPrefab: {fileID: 1117273264044518, guid: bb82163de313d09469f964543a10922a,
+    type: 3}

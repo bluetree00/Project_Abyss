@@ -49,6 +49,11 @@ public class MonsterRuntimeData
     /// <summary>이번 조우에서 첫 번째 공격인지. true면 AttackReady 딜레이 없이 즉시 공격.</summary>
     public bool IsFirstAttack = true;
 
+    // ── 위장 감지 ──────────────────────────────────────────
+    /// <summary>위장 상태에서 플레이어에게 공격당한 적 있는지. 미믹 등 공격 감지형 몬스터에서 사용.</summary>
+    public bool HasBeenAttacked;
+    public bool IsDormant;
+
     // ── 특수 상태 배율 ─────────────────────────────────────
     /// <summary>이동 속도 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>
     public float SpeedMultiplier  = 1f;

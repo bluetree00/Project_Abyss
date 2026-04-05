@@ -24,13 +24,6 @@ public class MonsterConfigSOEditor : Editor
     private SerializedProperty _monsterName;
     private SerializedProperty _grade;
     private SerializedProperty _playerLayer;
-    // 공용 상태 커스텀 슬롯
-    private SerializedProperty _chaseState;
-    private SerializedProperty _patrolState;
-    private SerializedProperty _attackReadyState;
-    private SerializedProperty _attackState;
-    private SerializedProperty _getHitState;
-    private SerializedProperty _dieState;
     private SerializedProperty _specialStates;
     private SerializedProperty _stateOverrides;
     // 원소 상태
@@ -41,18 +34,12 @@ public class MonsterConfigSOEditor : Editor
 
     protected virtual void OnEnable()
     {
-        _monsterName      = serializedObject.FindProperty("monsterName");
-        _grade            = serializedObject.FindProperty("grade");
-        _playerLayer      = serializedObject.FindProperty("playerLayer");
-        _chaseState       = serializedObject.FindProperty("chaseState");
-        _patrolState      = serializedObject.FindProperty("patrolState");
-        _attackReadyState = serializedObject.FindProperty("attackReadyState");
-        _attackState      = serializedObject.FindProperty("attackState");
-        _getHitState      = serializedObject.FindProperty("getHitState");
-        _dieState         = serializedObject.FindProperty("dieState");
-        _specialStates    = serializedObject.FindProperty("specialStates");
-        _stateOverrides   = serializedObject.FindProperty("stateOverrides");
-        _elemental        = serializedObject.FindProperty("elemental");
+        _monsterName    = serializedObject.FindProperty("monsterName");
+        _grade          = serializedObject.FindProperty("grade");
+        _playerLayer    = serializedObject.FindProperty("playerLayer");
+        _specialStates  = serializedObject.FindProperty("specialStates");
+        _stateOverrides = serializedObject.FindProperty("stateOverrides");
+        _elemental      = serializedObject.FindProperty("elemental");
 
         _prefId = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(target));
 
@@ -80,23 +67,15 @@ public class MonsterConfigSOEditor : Editor
             EditorGUILayout.PropertyField(_playerLayer);
         });
 
-        DrawSection("공용 상태 커스텀 (null = 기본 사용)", ref _foldCommonStates, "_cmn", () =>
+        DrawSection("상태 오버라이드", ref _foldCommonStates, "_cmn", () =>
         {
             EditorGUILayout.HelpBox(
-                "null이면 기본 공용 상태 사용.\n" +
-                "파생 SO를 설정하면 해당 SO가 생성하는 커스텀 상태로 교체됩니다.\n" +
-                "예: SlimeRegenPatrolStateSO → RegenPatrolState",
+                "기본 상태(Patrol/Chase/AttackReady/Attack/GetHit/Die)는 자동 등록됩니다.\n" +
+                "특정 상태를 교체하거나 여러 상태가 런타임 객체를 공유해야 할 때 추가하세요.\n" +
+                "예) BKChaseStateSO → ChaseState만 선회 추격으로 교체\n" +
+                "예) SnailShellOverrideSO → Chase/AttackReady/Attack이 SharedTimer 공유",
                 MessageType.Info);
-            EditorGUILayout.PropertyField(_chaseState,       new GUIContent("Chase"));
-            EditorGUILayout.PropertyField(_patrolState,      new GUIContent("Patrol"));
-            EditorGUILayout.PropertyField(_attackReadyState, new GUIContent("AttackReady"));
-            EditorGUILayout.PropertyField(_attackState,      new GUIContent("Attack"));
-            EditorGUILayout.PropertyField(_getHitState,      new GUIContent("GetHit"));
-            EditorGUILayout.PropertyField(_dieState,         new GUIContent("Die"));
-            EditorGUILayout.Space(4);
-            EditorGUILayout.PropertyField(_stateOverrides, new GUIContent(
-                "복합 행동 오버라이드",
-                "다중 상태가 하나의 런타임 객체를 공유해야 하는 경우에만 사용 (예: SnailShell)."), true);
+            EditorGUILayout.PropertyField(_stateOverrides, new GUIContent("State Overrides"), true);
         });
 
         DrawSection("특수 상태 (조건 + 상태 SO)", ref _foldSpecial, "_special", () =>

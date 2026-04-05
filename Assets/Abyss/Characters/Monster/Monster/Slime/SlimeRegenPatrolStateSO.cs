@@ -3,15 +3,14 @@ using UnityEngine;
 namespace Abyss.Monster
 {
 /// <summary>
-/// 슬라임 — 배회 중 일정 주기마다 HP 회복 특수 상태로 진입하는 PatrolState 팩토리 SO.
+/// 슬라임 — 배회 중 일정 주기마다 HP 회복 특수 상태로 진입하도록 PatrolState를 교체하는 SO.
 ///
-/// 기존 SlimeRegenOverrideSO(MonsterStateOverrideSO) 대체.
-/// 슬라임은 PatrolState 하나만 교체하면 되므로 stateOverrides 가 불필요하다.
-/// → MonsterConfigSO.patrolState 슬롯에 이 SO 를 할당하면 된다.
+/// MonsterConfigSO.stateOverrides 리스트에 이 SO를 추가하면
+/// PatrolState 하나만 커스텀 버전으로 덮어씌운다.
 /// </summary>
 [CreateAssetMenu(fileName = "SlimeRegenPatrolState",
                  menuName  = "Lee/Monster/States/Patrol/SlimeRegen")]
-public class SlimeRegenPatrolStateSO : PatrolStateSO
+public class SlimeRegenPatrolStateSO : MonsterStateOverrideSO
 {
     [Header("발동 주기 (초)")]
     public float interval = 8f;
@@ -28,17 +27,17 @@ public class SlimeRegenPatrolStateSO : PatrolStateSO
     [Tooltip("발동할 특수 상태의 인덱스 (specialStates 리스트 기준)")]
     public int specialStateIndex = 0;
 
-    public override PatrolState Create(MonsterBase monster)
+    public override void RegisterOverrides(MonsterFSM fsm, MonsterBase monster)
     {
         var state = new RegenPatrolState(monster, this);
         monster.RegisterOnEnabledCallback(state.ResetCooldown);
-        return state;
+        fsm.RegisterAs<PatrolState>(state);
     }
 
     // ── 오버라이드 상태 ────────────────────────────────────────
     private class RegenPatrolState : PatrolState
     {
-        private readonly MonsterBase           _owner;
+        private readonly MonsterBase             _owner;
         private readonly SlimeRegenPatrolStateSO _data;
         private float _cooldown;
 
@@ -65,8 +64,8 @@ public class SlimeRegenPatrolStateSO : PatrolStateSO
             {
                 _cooldown = _data.interval;
 
-                int   maxHp    = ctx.Stat.maxHp;
-                float hpRatio  = maxHp > 0 ? (float)ctx.Runtime.CurrentHp / maxHp : 1f;
+                int   maxHp   = ctx.Stat.maxHp;
+                float hpRatio = maxHp > 0 ? (float)ctx.Runtime.CurrentHp / maxHp : 1f;
                 if (hpRatio <= _data.regenHpThreshold)
                 {
                     var special = _owner.GetSpecialState(_data.specialStateIndex);

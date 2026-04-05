@@ -22,7 +22,7 @@ MonoBehaviour:
     defense: 5
     attackPower: 10
     moveSpeed: 3
-    attackRange: 2
+    attackRange: 1
     attackRadius: 1
     attackRate: 2
     attackDelay: 1
@@ -65,4 +65,5 @@ MonoBehaviour:
   attackState: {fileID: 0}
   getHitState: {fileID: 0}
   dieState: {fileID: 0}
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: 0efd193ad5134310bddc71ddcb336c76, type: 2}
