@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dea6aa88b885594a87b06f9b133b75f, type: 3}
   m_Name: Golem_HpCondition
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.MonsterHpConditionSO
-  threshold: 0.5
+  threshold: 0.56

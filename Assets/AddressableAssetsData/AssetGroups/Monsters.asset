@@ -20,13 +20,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d6d8143b1bc0b4c4eb8c31b9bc3d3839
-    m_Address: BlackKnight/BlackKnightConfig
+  - m_GUID: fb86e93ed90b470f922e65147d6981c0
+    m_Address: BlackKnight/BlackKnightController
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fb86e93ed90b470f922e65147d6981c0
-    m_Address: BlackKnight/BlackKnightController
+  - m_GUID: 64f8b6f04fb14802a8c829766243f2ab
+    m_Address: BlackKnight/BlackKnightConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: FishmanConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: Fishman
+  grade: 0
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 10
+    defense: 2
+    attackPower: 15
+    moveSpeed: 3
+    attackRange: 6
+    attackRadius: 0.5
+    attackRate: 0.8
+    attackDelay: 0.5
+    knockbackForce: 5
+    attackShape: {fileID: 11400000, guid: 532509ab448154d4390fa0e25033392b, type: 2}
+  detection:
+    detectionRange: 9
+    chaseGiveUpRange: 13
+  patrol:
+    patrolType: 2
+    patrolRange: 4
+    patrolSpeed: 1.8
+    waypointWaitTime: 1
+  combat:
+    damageApplyDelay: 0.5
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: 
+    idleStateName: Fishman_IdleNormal
+    patrolStateName: Fishman_WalkFWD
+    chaseStateName: Fishman_RunFWD
+    attackReadyStateName: Fishman_IdleBattle
+    attackTrigger: Fishman_Attack01
+    getHitTrigger: Fishman_GetHit
+    dieTrigger: Fishman_Die
+    detectTrigger: Fishman_SenseSomethingStart
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates: []
+  stateOverrides:
+  - {fileID: 11400000, guid: 08eb0f48dab54f28a2d38125e0f4a2e7, type: 2}

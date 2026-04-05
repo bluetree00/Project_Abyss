@@ -75,10 +75,5 @@ MonoBehaviour:
   - conditions: []
     state: {fileID: 11400000, guid: 4937e10bf4dd8544188acfbf958bc615, type: 2}
     oneShot: 1
-  chaseState: {fileID: 0}
-  patrolState: {fileID: 11400000, guid: 5d0482fd5eb61a943adb4ef7c84fc133, type: 2}
-  attackReadyState: {fileID: 0}
-  attackState: {fileID: 0}
-  getHitState: {fileID: 0}
-  dieState: {fileID: 0}
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: 5d0482fd5eb61a943adb4ef7c84fc133, type: 2}

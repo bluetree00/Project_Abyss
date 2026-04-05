@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: SpecterConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: Specter
+  grade: 1
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 150
+    defense: 1
+    attackPower: 18
+    moveSpeed: 4
+    attackRange: 1.8
+    attackRadius: 1.8
+    attackRate: 0.8
+    attackDelay: 0.3
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 9
+    chaseGiveUpRange: 13
+  patrol:
+    patrolType: 2
+    patrolRange: 5
+    patrolSpeed: 2
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.3
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: 
+    idleStateName: IdleNormal
+    patrolStateName: WalkFWD
+    chaseStateName: Run
+    attackReadyStateName: IdleBattle
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingST
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates:
+  - conditions:
+    - {fileID: 11400000, guid: 6ee64b496e86fc94d82077c8d41176ce, type: 2}
+    state: {fileID: 11400000, guid: b8d51834a63853d4388a45109c5120aa, type: 2}
+    oneShot: 1
+  stateOverrides:
+  - {fileID: 11400000, guid: 4b89709f91b54bb1bf0de4e7eff7be02, type: 2}

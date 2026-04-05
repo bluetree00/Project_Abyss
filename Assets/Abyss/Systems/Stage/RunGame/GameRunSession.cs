@@ -45,6 +45,7 @@ public sealed class GameRunSession
     public StagePointManager StagePointManager { get; private set; }
 
     public PlayerController Player { get; private set; }
+    private PlayerController _playerStateSource;
 
     public PlayerRunState PlayerState { get; private set; }
     public RunDelta RunDelta { get; private set; } = new RunDelta();
@@ -183,6 +184,7 @@ public sealed class GameRunSession
 
     private void ClearRunReferences()
     {
+        UnsubscribePlayerStateSource();
         RoomManager = null;
         StagePointManager = null;
         Player = null;
@@ -299,8 +301,11 @@ public sealed class GameRunSession
     // =========================================================
     public void BindPlayer(PlayerController player)
     {
+        UnsubscribePlayerStateSource();
         Player = player;
         if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
+
+        SubscribePlayerStateSource(Player);
         OnPlayerBound?.Invoke(Player);
     }
 
@@ -482,5 +487,33 @@ public sealed class GameRunSession
             Debug.LogWarning("[GameRun] CharacterData not set — PlayerRunState uses default maxHp=100.");
 
         return new PlayerRunState(maxHp);
+    }
+
+    private void SubscribePlayerStateSource(PlayerController player)
+    {
+        if (player?.RuntimeStats == null || PlayerState == null)
+            return;
+
+        _playerStateSource = player;
+        _playerStateSource.RuntimeStats.OnChanged += SyncPlayerStateFromRuntimeStats;
+        SyncPlayerStateFromRuntimeStats();
+    }
+
+    private void UnsubscribePlayerStateSource()
+    {
+        if (_playerStateSource?.RuntimeStats != null)
+            _playerStateSource.RuntimeStats.OnChanged -= SyncPlayerStateFromRuntimeStats;
+
+        _playerStateSource = null;
+    }
+
+    private void SyncPlayerStateFromRuntimeStats()
+    {
+        if (_playerStateSource?.RuntimeStats == null || PlayerState == null || !PlayerState.IsActive)
+            return;
+
+        var stats = _playerStateSource.RuntimeStats;
+        PlayerState.SetMaxHp(stats.MaxHp);
+        PlayerState.SetHp(stats.Hp);
     }
 }

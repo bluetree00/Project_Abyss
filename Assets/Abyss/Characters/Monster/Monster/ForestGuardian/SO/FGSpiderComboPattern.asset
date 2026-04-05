@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a7f6f75c03eaf144ae237b605899fd2, type: 3}
+  m_Name: FGSpiderComboPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGSpiderComboPatternSO
+  weight: 1
+  patternTag: 
+  breakOverride: -1
+  animSpin: SpinAttack
+  animJumpBack: JumpBack
+  animSlam: FrontSlam
+  crossFade: 0.15
+  vfxSpin: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6, type: 3}
+  vfxShockwave: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
+  vfxFrontBlast: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
+  phase0Duration: 3
+  phase0Radius: 2.5
+  phase1Radius: 3.5
+  phase2FrontOffset: 2
+  phase2BlastRadius: 1
+  phase2FrontRange: 3

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: OrcPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  selectionMode: 1
+  engageDistance: 1.2
+  patterns:
+  - name: Slash
+    animationStateName: Attack01
+    minDistance: 0
+    maxDistance: 1.35
+    priority: 0
+    cooldown: 0
+    damageDelay: 0.45
+    attackDuration: 1.15
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9, type: 2}
+    warningRadius: 0
+    warningDuration: 0
+  - name: Spin
+    animationStateName: Attack01
+    minDistance: 0
+    maxDistance: 1.35
+    priority: 1
+    cooldown: 2.8
+    damageDelay: 0.75
+    attackDuration: 1.7
+    damageMultiplier: 1.15
+    knockbackMultiplier: 1.2
+    attackShapeOverride: {fileID: 11400000, guid: 1ab75c36f2d6472f8569ac7f53f2d7e7, type: 2}
+    warningRadius: 1.8
+    warningDuration: 0.5

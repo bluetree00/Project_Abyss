@@ -15,6 +15,7 @@ public sealed class CombatPanelView : MonoBehaviour
     [Header("Status — HP")]
     [SerializeField] private Slider   hpSlider;
     [SerializeField] private TMP_Text hpText;
+    [SerializeField] private Image    hpFillImage;
 
     [Header("Weapon Slots")]
     [SerializeField] private WeaponSlotUI slot0;
@@ -32,13 +33,25 @@ public sealed class CombatPanelView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     public void SetHp(int hp, int maxHp)
     {
+        int clampedMax = Mathf.Max(1, maxHp);
+        int clampedHp  = Mathf.Clamp(hp, 0, clampedMax);
+
         if (hpSlider != null)
         {
-            hpSlider.maxValue = Mathf.Max(1, maxHp);
-            hpSlider.value    = Mathf.Clamp(hp, 0, maxHp);
+            hpSlider.minValue = 0f;
+            hpSlider.maxValue = clampedMax;
+            hpSlider.value = clampedHp;
+            hpSlider.normalizedValue = clampedHp / (float)clampedMax;
         }
+
+        var fill = hpFillImage;
+        if (fill == null && hpSlider != null && hpSlider.fillRect != null)
+            fill = hpSlider.fillRect.GetComponent<Image>();
+        if (fill != null)
+            fill.fillAmount = clampedHp / (float)clampedMax;
+
         if (hpText != null)
-            hpText.text = $"{hp} / {maxHp}";
+            hpText.text = $"{clampedHp} / {clampedMax}";
     }
 
     // ─────────────────────────────────────────────────────────

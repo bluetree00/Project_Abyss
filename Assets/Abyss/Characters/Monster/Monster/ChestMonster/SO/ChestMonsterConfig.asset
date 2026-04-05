@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: ChestMonsterConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: ChestMonster
+  grade: 1
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 45
+    defense: 3
+    attackPower: 30
+    moveSpeed: 2.5
+    attackRange: 2
+    attackRadius: 2
+    attackRate: 0.6
+    attackDelay: 0.5
+    knockbackForce: 8
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 8
+    chaseGiveUpRange: 12
+  patrol:
+    patrolType: 2
+    patrolRange: 4
+    patrolSpeed: 1.5
+    waypointWaitTime: 1
+  combat:
+    damageApplyDelay: 0.5
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: 
+    idleStateName: IdleChest
+    patrolStateName: WalkFWD
+    chaseStateName: Run
+    attackReadyStateName: IdleBattle
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingST
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates: []
+  stateOverrides:
+  - {fileID: 11400000, guid: c286a7a146af4ae8afe1783b33ac8d66, type: 2}

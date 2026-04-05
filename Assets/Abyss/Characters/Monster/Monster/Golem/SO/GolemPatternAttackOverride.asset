@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: GolemPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  selectionMode: 1
+  engageDistance: 1.2
+  patterns:
+  - name: Smash
+    animationStateName: Attack
+    minDistance: 0
+    maxDistance: 1.35
+    priority: 0
+    cooldown: 0.35
+    damageDelay: 0.35
+    attackDuration: 0.95
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9, type: 2}
+    warningRadius: 0
+    warningDuration: 0
+  - name: Slam
+    animationStateName: Attack
+    minDistance: 0
+    maxDistance: 1.75
+    priority: 0
+    cooldown: 1.9
+    damageDelay: 0.95
+    attackDuration: 1.85
+    damageMultiplier: 1.2
+    knockbackMultiplier: 1.25
+    attackShapeOverride: {fileID: 11400000, guid: 8fcb4fbc689e4f5fb99e64bd7a2ce2f0, type: 2}
+    warningRadius: 1.8
+    warningDuration: 0.6
