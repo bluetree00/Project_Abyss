@@ -24,7 +24,8 @@
       "mcp__mcp-for-unity__find_in_file",
       "Bash(git rm:*)",
       "Bash(git pull:*)",
-      "mcp__mcp-for-unity__manage_animation"
+      "mcp__mcp-for-unity__manage_animation",
+      "mcp__mcp-for-unity__manage_texture"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude"
