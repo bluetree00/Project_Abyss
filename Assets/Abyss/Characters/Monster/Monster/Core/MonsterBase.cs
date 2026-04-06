@@ -461,7 +461,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             // (isKinematic을 false로 두지 않아야 특수 상태 중 물리 이탈을 막는다)
             if (IsInSpecialState) return;
 
-            if (_runtime.IsDormant && _runtime.HasBeenAttacked)
+            if ((_runtime.IsDormant || _runtime.IsReturning) && _runtime.HasBeenAttacked)
             {
                 ChangeState<ChaseState>();
                 return;
@@ -516,18 +516,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         data.ApplyToConfig(_config);
     }
 
-    private async UniTask LoadAnimatorControllerAsync()
-    {
-        string addr = _config.animation.animatorControllerAddress;
-        if (string.IsNullOrEmpty(addr)) return;
-
-        var overrideCtrl = await Managers.AddressableManager
-            .LoadAssetAsync<AnimatorOverrideController>(addr);
-
-        if (overrideCtrl == null || _animator == null) return;
-
-        _animator.runtimeAnimatorController = overrideCtrl;
-    }
+    // Animator Controller는 프리팹에 직접 할당 — 런타임 로드 불필요
+    private UniTask LoadAnimatorControllerAsync() => UniTask.CompletedTask;
 
     private void SetPlayerTarget(Transform player)
     {
@@ -587,6 +577,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.IsFirstAttack       = true;
         _runtime.HasBeenAttacked     = false;
         _runtime.IsDormant           = false;
+        _runtime.IsReturning         = false;
+        _runtime.TargetCleared       = true;
         _runtime.SpeedMultiplier     = 1f;
         _runtime.AttackMultiplier    = 1f;
         _runtime.DamageMultiplier    = 1f;

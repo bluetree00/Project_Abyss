@@ -21,7 +21,7 @@ MonoBehaviour:
     maxHp: 10
     defense: 6
     attackPower: 15
-    moveSpeed: 1.5
+    moveSpeed: 4.5
     attackRange: 1
     attackRadius: 1
     attackRate: 0.6
@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: 
-    idleStateName: IdleNormal
-    patrolStateName: WalkFWD
+    idleStateName: Idle
+    patrolStateName: Walk
     chaseStateName: Run
-    attackReadyStateName: IdleBattle
-    attackTrigger: Attack01
-    getHitTrigger: GetHit
-    dieTrigger: Die
-    detectTrigger: SenseSomethingST
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

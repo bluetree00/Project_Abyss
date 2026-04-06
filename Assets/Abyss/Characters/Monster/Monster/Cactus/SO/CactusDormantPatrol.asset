@@ -15,3 +15,4 @@ MonoBehaviour:
   hideWorldHpBar: 1
   freezeAnimator: 1
   overrideIdleStateName: Cactus_IdlePlant
+  wakeUpMode: 2

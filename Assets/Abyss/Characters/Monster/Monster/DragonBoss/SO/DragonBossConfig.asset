@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 0
   animation:
-    animatorControllerAddress: 
     idleStateName: Idle
     patrolStateName: Walk
     chaseStateName: Run
     attackReadyStateName: AttackReady
-    attackTrigger: Attack01
-    getHitTrigger: GetHit
-    dieTrigger: Die
-    detectTrigger: SenseSomething
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
