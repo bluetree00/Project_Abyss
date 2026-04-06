@@ -2,8 +2,6 @@
 using System;
 using UnityEngine;
 
-public enum WeaponSlotType { Main }
-
 public enum PromoteMode
 {
     None,       // 차지/강화 없음
@@ -38,7 +36,6 @@ public class WeaponData
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
-    public WeaponSlotType slotType = WeaponSlotType.Main;
 
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
@@ -73,7 +70,6 @@ public class WeaponData
         chargeStages = so.chargeStages;
 
         weaponType = so.weaponType;
-        slotType   = so.slotType;
 
         skillQ = so.skillQ;
         skillE = so.skillE;

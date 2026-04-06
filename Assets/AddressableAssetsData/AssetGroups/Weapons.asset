@@ -46,6 +46,46 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b12bcf6cbd9761c489488d993a61d7ee
+    m_Address: T1_Katana_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: db65e169d1514aa4293acaeed3b85e05
+    m_Address: T1_Katana_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7c8370041c29b49429590be913056358
+    m_Address: T1_Greatsword_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cbf7b96bd6742054bb98dad9531eed5c
+    m_Address: T1_Greatsword_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5279127e5b4a74d449a54cc17a40cf33
+    m_Address: T1_Crossbow_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 17a98e96d47361a4ca35cd86c94aa717
+    m_Address: T1_Crossbow_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 979839e72c78e9e4f84dd5d875aac364
+    m_Address: T1_Bow_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f0efb6449c18a9f4c91b65e5321f9697
+    m_Address: T1_Bow_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

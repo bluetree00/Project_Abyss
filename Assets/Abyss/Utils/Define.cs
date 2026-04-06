@@ -78,8 +78,8 @@ public class Define
 
     public enum EquipmentSlotType
     {
-        Weapon,
-        SubWeapon,
+        Weapon0,
+        Weapon1,
         Armor,
         Helmet,
         Gloves,

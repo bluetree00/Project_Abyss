@@ -14,8 +14,7 @@ public static class WeaponTypeExtensions
     {
         WeaponType.Bow      => AttackStatKind.Ranged,
         WeaponType.Staff    => AttackStatKind.Ranged,
-        WeaponType.LongBow  => AttackStatKind.Ranged,
-        WeaponType.ShortBow => AttackStatKind.Ranged,
+        WeaponType.Crossbow => AttackStatKind.Ranged,
         _                   => AttackStatKind.Melee,
     };
 }

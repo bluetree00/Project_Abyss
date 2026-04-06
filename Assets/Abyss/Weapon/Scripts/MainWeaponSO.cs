@@ -8,8 +8,4 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Game/Weapon/MainWeaponSO")]
 public class MainWeaponSO : WeaponSO
 {
-    private void OnValidate()
-    {
-        slotType = WeaponSlotType.Main;
-    }
 }
