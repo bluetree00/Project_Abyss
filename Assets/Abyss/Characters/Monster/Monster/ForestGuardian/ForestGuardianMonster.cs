@@ -127,7 +127,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         var entries = cfg.patternEntries;
         AssignIfExists(entries, 0, new ICondition[] { new FormChangePendingCondition(_fgBlackboard) });
         AssignIfExists(entries, 1, new ICondition[] { new MaxRangeCondition(2f) });
-        AssignIfExists(entries, 2, new ICondition[] { new MinRangeCondition(4f) });
+        AssignIfExists(entries, 2, new ICondition[0]); // 기획서: 정면 방어에 거리 조건 없음
         AssignIfExists(entries, 3, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Liche) });
         AssignIfExists(entries, 4, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Spider) });
         AssignIfExists(entries, 5, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Thorn) });

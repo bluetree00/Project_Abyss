@@ -36,8 +36,8 @@ public class DieState : IMonsterState
             col.enabled = false;
 
         // 사망 애니메이션 즉시 전환
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.dieTrigger))
-            ctx.Animator.CrossFade(ctx.Animation.dieTrigger, 0.1f, 0, 0f);
+        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.dieStateName))
+            ctx.Animator.CrossFade(ctx.Animation.dieStateName, 0.1f, 0, 0f);
 
         // 지연 파괴
         DespawnAsync(ctx.Monster).Forget();

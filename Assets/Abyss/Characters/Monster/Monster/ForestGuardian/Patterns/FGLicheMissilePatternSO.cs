@@ -64,7 +64,7 @@ public class FGLicheMissilePatternSO : BossPatternSO
                 _firedCount++;
             }
 
-            float totalDuration = (Data.missileCount - 1) * Data.missileInterval + 0.5f;
+            float totalDuration = 2f; // 기획서: 공격 지속 시간 2초
             if (_elapsed >= totalDuration)
                 ctx.Monster.ChangeState<PatrolState>();
         }

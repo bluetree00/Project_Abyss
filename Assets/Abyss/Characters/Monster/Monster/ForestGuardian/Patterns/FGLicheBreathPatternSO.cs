@@ -71,6 +71,27 @@ public class FGLicheBreathPatternSO : BossPatternSO
             _elapsed   += Time.deltaTime;
             _tickTimer += Time.deltaTime;
 
+            // 기획서: 플레이어 움직임을 따라간다
+            if (ctx.Runtime.PlayerTarget != null)
+            {
+                Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+                toPlayer.y = 0f;
+                if (toPlayer.sqrMagnitude > 0.01f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(toPlayer);
+                    ctx.Transform.rotation = Quaternion.RotateTowards(
+                        ctx.Transform.rotation, targetRot, 90f * Time.deltaTime);
+                }
+            }
+
+            // VFX 위치 갱신 (현재 forward 기준)
+            if (_vfxInstance != null)
+            {
+                _vfxInstance.transform.position = ctx.Transform.position
+                    + ctx.Transform.forward * (Data.breathLength * 0.5f);
+                _vfxInstance.transform.rotation = ctx.Transform.rotation;
+            }
+
             if (_tickTimer >= Data.tickInterval)
             {
                 _tickTimer = 0f;

@@ -22,7 +22,8 @@ public class FGSpiderDashPatternSO : BossPatternSO
     [Header("대시 설정")]
     [SerializeField] private float dashWidthHalf  = 1.5f;  // 폭 3m → 반 1.5m
     [SerializeField] private float dashTimeout    = 0.8f;  // 대시 1회 최대 시간
-    [SerializeField] private float speedMult      = 2f;    // moveSpeed 배율
+    [SerializeField] private float dashSpeed      = 3f;    // 고정 이동속도 (기획서: 3m/초)
+    [SerializeField] private float dashMaxRange   = 10f;   // 최대 돌진 거리 (기획서: 10m)
 
     private FGSpiderDashState _state;
 
@@ -47,7 +48,9 @@ public class FGSpiderDashPatternSO : BossPatternSO
 
         public override void Enter(MonsterContext ctx)
         {
-            _totalDashes   = Random.Range(1, 4);  // 1~3회
+            // 기획서: 1회(40%) / 2회(30%) / 3회(30%)
+            float roll = Random.value;
+            _totalDashes = roll < 0.4f ? 1 : roll < 0.7f ? 2 : 3;
             _dashCount     = 0;
             _originalSpeed = ctx.Agent.speed;
             StartDash(ctx);
@@ -92,11 +95,20 @@ public class FGSpiderDashPatternSO : BossPatternSO
             _dashTimer = 0f;
             _hit       = false;
 
-            ctx.Agent.speed = ctx.Stat.moveSpeed * Data.speedMult;
+            ctx.Agent.speed = Data.dashSpeed;
 
-            Vector3 target = ctx.Runtime.PlayerTarget != null
-                ? ctx.Runtime.PlayerTarget.position
-                : ctx.Transform.position + ctx.Transform.forward * 5f;
+            Vector3 target;
+            if (ctx.Runtime.PlayerTarget != null)
+            {
+                Vector3 offset = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+                if (offset.magnitude > Data.dashMaxRange)
+                    offset = offset.normalized * Data.dashMaxRange;
+                target = ctx.Transform.position + offset;
+            }
+            else
+            {
+                target = ctx.Transform.position + ctx.Transform.forward * 5f;
+            }
 
             if (ctx.Agent.isOnNavMesh)
             {

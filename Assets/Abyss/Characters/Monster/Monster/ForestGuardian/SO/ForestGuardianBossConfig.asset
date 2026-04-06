@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 0
   animation:
-    animatorControllerAddress: 
-    idleStateName: IdleNormal
-    patrolStateName: MoveBlend
-    chaseStateName: MoveBlend
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
     attackReadyStateName: AttackReady
-    attackTrigger: Attack01
-    getHitTrigger: GetHit
-    dieTrigger: Die
-    detectTrigger: SenseSomething
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
@@ -73,8 +71,8 @@ MonoBehaviour:
       overrideState: {fileID: 0}
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 1.5
-  patternBreakDurationMax: 3
+  patternBreakDurationMin: 2
+  patternBreakDurationMax: 2
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.4
@@ -105,17 +103,19 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 98f354cbc1f0d3d4fafc4ae200b44d0d, type: 2}
     selectionMode: 0
     forceExecute: 0
-  - conditions: 
+  - conditions:
     patterns:
     - {fileID: 11400000, guid: 7a95979a40d43b241b08f5dfe6e0942c, type: 2}
-    - {fileID: 11400000, guid: 4eca6f9e89ba5eb4a9597fd9c04502a9, type: 2}
-    selectionMode: 2
+    - {fileID: 11400000, guid: 0c94021a9e9efcd478e14e418ef50b69, type: 2}
+    - {fileID: 11400000, guid: eaaff42e9bfd78b4d9296c6924bc8d46, type: 2}
+    - {fileID: 11400000, guid: b2d5451bd01427846aceaea680344df2, type: 2}
+    selectionMode: 0
     forceExecute: 0
-  - conditions: 
+  - conditions:
     patterns:
     - {fileID: 11400000, guid: 11c683da016317a4f8afcc7a66b91a26, type: 2}
-    - {fileID: 11400000, guid: 493fbe99c070d144c826eddeb2465311, type: 2}
-    - {fileID: 11400000, guid: 3213372d1f928da42af326fbacd08a23, type: 2}
+    - {fileID: 11400000, guid: 07b7e2ceae4a219438752155f2402b91, type: 2}
+    - {fileID: 11400000, guid: 860bf8ce8cf623a439004c840945bb1c, type: 2}
     - {fileID: 11400000, guid: 682610b755a17ac48bc2a3de95769a4c, type: 2}
     selectionMode: 0
     forceExecute: 0

@@ -27,8 +27,7 @@ public class FGFrontalDefensePatternSO : BossPatternSO
         _state = new FGFrontalDefenseState(this);
     }
 
-    public override bool CanExecute(BossPatternContext ctx)
-        => ctx.Ctx.Runtime.DistToPlayer >= 4f;
+    public override bool CanExecute(BossPatternContext ctx) => true;
 
     public override SpecialStateBase GetRuntimeState() => _state;
 
