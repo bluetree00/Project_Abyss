@@ -652,7 +652,6 @@ public class PlayerController : CharacterBase
 
         switch (wd.weaponType)
         {
-            case WeaponType.Sword:
             case WeaponType.Katana:
                 _attackPolicy = new SwordAttackPolicy(
                     enterThreshold: 1.5f,
@@ -670,8 +669,7 @@ public class PlayerController : CharacterBase
                 break;
 
             case WeaponType.Bow:
-            case WeaponType.LongBow:
-            case WeaponType.ShortBow:
+            case WeaponType.Crossbow:
                 _attackPolicy = new BowAttackPolicy();
                 break;
 

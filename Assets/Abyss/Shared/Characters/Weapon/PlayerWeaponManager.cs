@@ -19,8 +19,8 @@ public interface IWeaponProvider
 
 public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 {
-    public const int MainSlot = 0;  // 메인 무기 슬롯 0
-    public const int SubSlot  = 1;  // 메인 무기 슬롯 1
+    public const int Slot0 = 0;
+    public const int Slot1 = 1;
 
     public int SlotCount => 2;
 
@@ -42,10 +42,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     private bool _isSwitching = false;
 
     /// <summary>슬롯 0 무기 데이터</summary>
-    public WeaponData MainWeaponData => slots[MainSlot]?.runtimeData;
+    public WeaponData Weapon0Data => slots[Slot0]?.runtimeData;
 
     /// <summary>슬롯 1 무기 데이터</summary>
-    public WeaponData SubWeaponData  => slots[SubSlot]?.runtimeData;
+    public WeaponData Weapon1Data  => slots[Slot1]?.runtimeData;
 
     // 기본 풀 사이즈 (필요시 변경)
     private const int defaultPoolSizeForEffects = 6;
@@ -145,8 +145,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (autoEquip)
         {
             int targetSlot = GetFirstEmptySlotIndex();
-            if (targetSlot < 0) targetSlot = MainSlot;
-            await EquipToSlotAsync(targetSlot, runtimeData, setActive: targetSlot == MainSlot);
+            if (targetSlot < 0) targetSlot = Slot0;
+            await EquipToSlotAsync(targetSlot, runtimeData, setActive: true);
         }
     }
 
@@ -314,7 +314,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             // 빈 슬롯 있음: 바로 장착
             _owned.Add(runtimeData);
             source?.ConfirmPickup();
-            await EquipToSlotAsync(emptySlot, runtimeData, setActive: emptySlot == currentSlotIndex || currentSlotIndex < 0);
+            await EquipToSlotAsync(emptySlot, runtimeData, setActive: true);
             return;
         }
 
@@ -341,10 +341,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (popup == null)
         {
             Debug.LogWarning("[PlayerWeaponManager] UI_WeaponReplacePopup 로드 실패, 자동 교체");
-            return MainSlot;
+            return Slot0;
         }
 
-        popup.Setup(slots[MainSlot].runtimeData, slots[SubSlot].runtimeData, newWeapon);
+        popup.Setup(slots[Slot0].runtimeData, slots[Slot1].runtimeData, newWeapon);
         return await popup.WaitForChoiceAsync();
     }
 

@@ -1,10 +1,19 @@
 ---
 name: 무기 슬롯 시스템 + 교체 팝업 복구 가이드
-description: dev/KBG-N의 commit 23b93ad1 작업 내용 — KBG-D 기반으로 재구현 시 참고
+description: dev/KBG-N의 commit 23b93ad1 작업 내용 — 레거시 참조용 (메인-메인 구조 전환 완료)
 type: project
 ---
 
 # 무기 슬롯 시스템 + 교체 팝업 재구현 가이드
+
+> **[2026-04-06 구조 변경]** 메인/서브 슬롯 구분을 폐기하고 **메인-메인 (Slot0/Slot1) 동등 구조**로 전환 완료.
+> - `WeaponSlotType` enum 제거
+> - `slotType` 필드 제거 (WeaponSO, WeaponData)
+> - `MainSlot`/`SubSlot` → `Slot0`/`Slot1`
+> - `MainWeaponData`/`SubWeaponData` → `Weapon0Data`/`Weapon1Data`
+> - `EquipmentSlotType.SubWeapon` → `Weapon1`
+>
+> 아래 내용은 **원본 커밋 참조용**으로만 보존합니다. 현재 코드와 다릅니다.
 
 **원본 커밋**: `23b93ad1` (dev/KBG-N, 2026-03-19)
 **제목**: feat: 메인/서브 무기 슬롯 시스템 및 교체 팝업 1:1 비교 UI 구현

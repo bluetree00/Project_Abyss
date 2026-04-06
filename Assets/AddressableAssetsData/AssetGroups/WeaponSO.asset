@@ -17,13 +17,23 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: 59fff0af195fcd84fafd247299abf2c3
   m_SerializeEntries:
-  - m_GUID: dddede8cb39c4504780e46a0a5b2f309
-    m_Address: Bow
+  - m_GUID: dad215bb626832f4cbf0767639d63223
+    m_Address: T1_Katana
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ce33b8db8ce9e60429dbb81af6976781
-    m_Address: Sword
+  - m_GUID: 0d8b8950bf4141849b02fd45cdbb4974
+    m_Address: T1_Greatsword
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c33f8f85d5659fa48bd05821ab3bf5d2
+    m_Address: T1_Crossbow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7058b68ce90bece428b74c8efe68b2f1
+    m_Address: T1_Bow
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
