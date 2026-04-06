@@ -14,6 +14,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private bool buildRuntimeNavMesh = true;
     [SerializeField] private bool disableSceneBakedNavMeshOnStart = true;
 
+    [Header("Block Map Gen")]
+    [SerializeField] private BlockPalette blockPalette;
+    [SerializeField] private float blockCellSize = 1f;
+
     private StagePointUI[] _points;
     private GameObject _currentMapGO;
     private bool _isSpawning;
@@ -54,6 +58,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async void Start()
     {
+        // MapDataManager 초기화 (오프라인 JSON 폴백)
+        await InitMapDataAsync();
+
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
         else if (Object.FindFirstObjectByType<DebugStageRunPanel>() == null)
@@ -96,6 +103,32 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run = null;
     }
 
+    private async UniTask InitMapDataAsync()
+    {
+        var mapData = Managers.MapData;
+        if (mapData == null || mapData.IsInitialized) return;
+
+        try
+        {
+            await mapData.InitializeAsync();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] MapData CDN 예외: {e.Message}");
+        }
+
+        // CDN 로드 실패 또는 0개면 오프라인 JSON 폴백
+        if (mapData.GetAll().Count == 0)
+        {
+            Debug.Log("[GameRunBootstrapper] MapData 0개 — Resources/STAGEDATA_MAP.json 폴백");
+            var textAsset = Resources.Load<TextAsset>("STAGEDATA_MAP");
+            if (textAsset != null)
+                mapData.InitializeFromJson(textAsset.text);
+            else
+                Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json not found in Resources");
+        }
+    }
+
     private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();
 
     private async UniTask SpawnMapAsync(string prefabKey)
@@ -117,6 +150,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 _currentMapGO = null;
             }
 
+            // ── 블록 맵 생성 시도 ──
+            var mapData = Managers.MapData;
+            MapRoomEntry roomEntry = mapData?.GetById(prefabKey);
+
+            if (roomEntry != null && !string.IsNullOrEmpty(roomEntry.grid_csv) && blockPalette != null)
+            {
+                await SpawnBlockMapAsync(roomEntry);
+                return;
+            }
+
+            // ── 기존 프리팹 맵 로드 ──
             _currentMapGO = await Managers.AddressableManager.InstantiateAsync(prefabKey, mapRoot);
             BuildMapNavMesh(_currentMapGO);
         }
@@ -124,6 +168,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             _isSpawning = false;
         }
+    }
+
+    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry)
+    {
+        var grid = MapDataLoader.Parse(roomEntry.grid_csv);
+        if (grid == null)
+        {
+            Debug.LogError($"[GameRunBootstrapper] grid_csv 파싱 실패: {roomEntry.room_id}");
+            return;
+        }
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+
+        // 맵 루트
+        var mapGO = new GameObject($"BlockMap_{roomEntry.room_id}");
+        mapGO.transform.SetParent(mapRoot, false);
+        _currentMapGO = mapGO;
+
+        // 투명 바닥 (플레이어 추락 방지)
+        var safeFloor = MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, mapGO.transform);
+
+        // 블록 생성
+        var blocks = MapBuilder.Build(grid, blockPalette, mapGO.transform, blockCellSize, 0f);
+        Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
+
+        // Scatter → Return 연출
+        await MapPresenter.PlayEntrance(
+            blocks,
+            roomEntry.scatter_range,
+            roomEntry.return_duration);
+
+        // 투명 바닥 유지 (빈 공간 추락 방지)
+
+        // NavMesh 빌드
+        BuildMapNavMesh(mapGO);
     }
 
     private void BuildMapNavMesh(GameObject mapRootObject)

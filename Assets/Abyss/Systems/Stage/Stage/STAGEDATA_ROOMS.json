@@ -6,7 +6,7 @@
       "category": "Battle",
       "difficulty": 1,
       "weight": 10,
-      "prefab": "TestNomarStage_01",
+      "prefab": "battle_001",
       "tags": ["normal", "early"]
     },
     {
@@ -15,7 +15,7 @@
       "category": "Battle",
       "difficulty": 2,
       "weight": 8,
-      "prefab": "TestNomarStage_02",
+      "prefab": "battle_002",
       "tags": ["normal"]
     },
     {
@@ -24,7 +24,7 @@
       "category": "Battle",
       "difficulty": 3,
       "weight": 5,
-      "prefab": "TestNomarStage_03",
+      "prefab": "battle_003",
       "tags": ["normal", "hard"]
     },
 
@@ -34,7 +34,7 @@
       "category": "Elite",
       "difficulty": 3,
       "weight": 5,
-      "prefab": "TestNomarStage_01",
+      "prefab": "elite_001",
       "tags": ["elite"]
     },
 
@@ -44,7 +44,7 @@
       "category": "Event",
       "difficulty": 0,
       "weight": 6,
-      "prefab": "TestNomarStage_02",
+      "prefab": "event_001",
       "tags": ["story"]
     },
     {
@@ -53,7 +53,7 @@
       "category": "Event",
       "difficulty": 0,
       "weight": 4,
-      "prefab": "TestNomarStage_03",
+      "prefab": "event_002",
       "tags": ["reward"]
     },
 
@@ -63,17 +63,8 @@
       "category": "Shop",
       "difficulty": 0,
       "weight": 7,
-      "prefab": "TestNomarStage_01",
+      "prefab": "shop_001",
       "tags": ["shop"]
-    },
-    {
-      "roomId": "shop_002",
-      "name": "Rare Shop",
-      "category": "Shop",
-      "difficulty": 0,
-      "weight": 3,
-      "prefab": "TestNomarStage_02",
-      "tags": ["shop", "rare"]
     },
 
     {
@@ -82,17 +73,8 @@
       "category": "Start",
       "difficulty": 0,
       "weight": 10,
-      "prefab": "TestNomarStage_01",
+      "prefab": "start_001",
       "tags": ["start"]
-    },
-    {
-      "roomId": "start_002",
-      "name": "Tutorial Start",
-      "category": "Start",
-      "difficulty": 0,
-      "weight": 6,
-      "prefab": "TestNomarStage_01",
-      "tags": ["start", "tutorial"]
     },
 
     {
@@ -101,16 +83,7 @@
       "category": "Boss",
       "difficulty": 0,
       "weight": 10,
-      "prefab": "TestBossStage",
-      "tags": ["boss"]
-    },
-    {
-      "roomId": "boss_002",
-      "name": "Boss: Goblin Warlord",
-      "category": "Boss",
-      "difficulty": 0,
-      "weight": 8,
-      "prefab": "TestBossStage",
+      "prefab": "boss_001",
       "tags": ["boss"]
     }
   ]

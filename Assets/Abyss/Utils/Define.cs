@@ -9,7 +9,7 @@ public class Define
     public enum Layer
     {
         Monster = 8,
-        Ground = 9,
+        Ground = 3,
         Block = 10,
     }
 
