@@ -76,11 +76,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8c18363245b2ef14d871d17e286d704b
-    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEFfect.asset
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0
@@ -122,11 +117,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e24ea996a7cc6ad44b56b77417ff2f73
-    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEffect 1.asset
-    m_ReadOnly: 0
-    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e71e3e83b252509489dbb4e6432dbdfb
     m_Address: FrontAttack

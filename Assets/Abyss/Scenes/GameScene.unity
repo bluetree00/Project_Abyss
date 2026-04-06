@@ -1346,6 +1346,8 @@ MonoBehaviour:
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
   disableSceneBakedNavMeshOnStart: 1
+  blockPalette: {fileID: 11400000, guid: 4f37ed8cc553a734cbe922020c290fc8, type: 2}
+  blockCellSize: 1
 --- !u!1 &776977292
 GameObject:
   m_ObjectHideFlags: 0

@@ -25,10 +25,16 @@
       "Bash(git rm:*)",
       "Bash(git pull:*)",
       "mcp__mcp-for-unity__manage_animation",
-      "mcp__mcp-for-unity__manage_texture"
+      "mcp__mcp-for-unity__manage_texture",
+      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.json\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json\")",
+      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.json.meta\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json.meta\")",
+      "Bash(mv \"Assets/Abyss/Resources/SampleMapData.json\" \"Assets/Abyss/Resources/STAGEDATA_MAP.json\")",
+      "Bash(mv \"Assets/Abyss/Resources/SampleMapData.json.meta\" \"Assets/Abyss/Resources/STAGEDATA_MAP.json.meta\")",
+      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.csv\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.csv\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude"
+      "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude",
+      "C:\\Users\\u\\Desktop"
     ]
   }
 }
