@@ -42,6 +42,8 @@ public sealed class Managers : MonoBehaviour
     private readonly PlayerManager _playerManager = new PlayerManager();
     private MonsterDataManager _monsterDataManager;
     private MapDataManager _mapDataManager;
+    private PlayerDataManager _playerDataManager;
+    private ServerEquipmentDataManager _serverEquipmentDataManager;
     private MonsterHPBarManager _monsterHPBar;
 
     // ---- Static Accessors (C# 9 Safe) ----
@@ -163,6 +165,34 @@ public sealed class Managers : MonoBehaviour
                 inst._monsterDataManager = new MonsterDataManager();
 
             return inst._monsterDataManager;
+        }
+    }
+
+    public static PlayerDataManager PlayerData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._playerDataManager == null)
+                inst._playerDataManager = new PlayerDataManager();
+
+            return inst._playerDataManager;
+        }
+    }
+
+    public static ServerEquipmentDataManager ServerEquipment
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._serverEquipmentDataManager == null)
+                inst._serverEquipmentDataManager = new ServerEquipmentDataManager();
+
+            return inst._serverEquipmentDataManager;
         }
     }
 
