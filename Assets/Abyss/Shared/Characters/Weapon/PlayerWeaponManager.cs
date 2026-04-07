@@ -129,6 +129,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null) return;
 
         var runtime = WeaponData.FromSO(handle.Result);
+        ApplyServerOverride(runtime);
         await AcquireWeaponAsync(runtime, autoEquip);
     }
 
@@ -307,6 +308,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             return;
         }
 
+        ApplyServerOverride(runtimeData);
+
         int emptySlot = GetFirstEmptySlotIndex();
 
         if (emptySlot >= 0)
@@ -455,6 +458,52 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         {
             _isSwitching = false;
         }
+    }
+
+    // ----------------------
+    // 서버 수치 오버라이드
+    // ----------------------
+    /// <summary>
+    /// WeaponData의 수치를 서버 EquipmentEntry로 오버라이드.
+    /// SO의 에셋 참조(animation, ability, skill)는 유지하고 수치만 교체.
+    /// </summary>
+    private static void ApplyServerOverride(WeaponData data)
+    {
+        if (data == null) return;
+
+        var mgr = Managers.ServerEquipment;
+        if (mgr == null || !mgr.IsInitialized) return;
+
+        // weaponPrefabKey 또는 displayName으로 서버 데이터 조회
+        EquipmentEntry entry = null;
+
+        // 모든 서버 장비를 순회하여 prefabKey 또는 이름 매칭
+        foreach (var kv in mgr.GetAll())
+        {
+            var e = kv.Value;
+            if (e.weapon_prefab_key == data.weaponPrefabKey
+                || e.weapon_display_key == data.weaponDisplayKey
+                || e.weapon_id == data.weaponPrefabKey)
+            {
+                entry = e;
+                break;
+            }
+        }
+
+        if (entry == null) return;
+
+        // 수치만 오버라이드 (SO 에셋 참조는 유지)
+        data.baseAttack    = entry.base_attack;
+        data.baseDefense   = entry.base_defense;
+        data.attackSpeed   = entry.attack_speed;
+        data.attackRange   = entry.attack_range;
+        data.areaOfEffect  = entry.area_of_effect;
+        data.holdThreshold = entry.hold_threshold;
+        data.chargeStages  = entry.charge_stages;
+        data.groundEndCount = entry.ground_combo_count;
+        data.airEndCount   = entry.air_combo_count;
+
+        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} (ATK:{entry.base_attack}, SPD:{entry.attack_speed})");
     }
 
     // ----------------------
