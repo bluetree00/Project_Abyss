@@ -77,20 +77,35 @@ public class WeaponEffectHandler
                 // BasicArrow 발사체 처리
                 if (effectObj.TryGetComponent<BasicArrow>(out var arrow))
                 {
-                    // 발사 방향: 플레이어 forward (rotateToMouse 이후)
-                    Vector3 fireDir = playerTransform.forward;
-                    fireDir.y = 0f;
-                    fireDir.Normalize();
-
-                    // 발사 위치: 플레이어 위치 + 앞 1m + 위 1m + AbilityStep offset
-                    Vector3 firePos = playerTransform.position + fireDir * 1f + Vector3.up * 1f
+                    Vector3 fireDir;
+                    Vector3 firePos = playerTransform.position + playerTransform.forward * 1f + Vector3.up * 1f
                                     + playerTransform.TransformDirection(e.positionOffset);
+
+                    if (!_player.IsGrounded())
+                    {
+                        // 공중: 마우스가 가리키는 지면 지점을 향해 발사
+                        Vector3 targetPoint = GetMouseWorldPoint();
+                        fireDir = (targetPoint - firePos).normalized;
+                    }
+                    else
+                    {
+                        // 지상: 수평 forward
+                        fireDir = playerTransform.forward;
+                        fireDir.y = 0f;
+                        fireDir.Normalize();
+                    }
+
                     effectObj.transform.position = firePos;
                     effectObj.transform.rotation = Quaternion.LookRotation(fireDir);
 
                     float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.AttackPower);
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
+
+                    // 공중 발사 시 짧은 체공
+                    if (!_player.IsGrounded())
+                        _player.StartAirHover();
+
                     continue;
                 }
 
@@ -224,6 +239,24 @@ public class WeaponEffectHandler
             default:
                 return playerTransform;
         }
+    }
+
+    /// <summary>마우스 커서가 가리키는 월드 지점 (지면 레이캐스트)</summary>
+    private Vector3 GetMouseWorldPoint()
+    {
+        var cam = Camera.main;
+        if (cam == null) return _player.transform.position + _player.transform.forward * 10f;
+
+        Ray ray = cam.ScreenPointToRay(UnityEngine.Input.mousePosition);
+        if (Physics.Raycast(ray, out var hit, 200f))
+            return hit.point;
+
+        // 레이캐스트 실패 시 Y=0 평면과 교차
+        var plane = new Plane(Vector3.up, Vector3.zero);
+        if (plane.Raycast(ray, out float dist))
+            return ray.GetPoint(dist);
+
+        return _player.transform.position + _player.transform.forward * 10f;
     }
 
     private void SetupColliderInstance(ColliderInstance ci, WeaponAbilitySO.AbilityStep s, WeaponActionType actionType)

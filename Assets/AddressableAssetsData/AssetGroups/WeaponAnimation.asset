@@ -40,8 +40,48 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24b7b5caf37a46ef9a39bc8e30415847
+    m_Address: BowQSkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 94e0a9c1e45a4bea9bf72452306bc5dc
+    m_Address: BowQSkill_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fc56cd5ad784484184e9a87a1bc7fd47
+    m_Address: BowQSkill_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 14256027a4ac4e13be1ec0c8dbac1cb6
+    m_Address: BowESkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dad1a61f9a9f4992bd184068b197ec67
+    m_Address: BowESkill_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b132447a1ddc45868b1188980a28bcc3
     m_Address: GroundLightBowAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b7b344e22e4b411aacf1bd0cf8300c64
+    m_Address: BowAirAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da32f5e02f9941d38a0fb67b5759ab81
+    m_Address: BowAirAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a967b6c6732e47e889caede9727da1d8
+    m_Address: BowAirAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

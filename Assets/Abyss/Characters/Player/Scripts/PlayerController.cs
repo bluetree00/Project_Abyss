@@ -178,6 +178,7 @@ public class PlayerController : CharacterBase
     public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
 
     public Transform handTransform;
+    public Transform handTransformLeft;
 
     //============================================================
     // Combo State (콤보 관련 상태는 ComboController에 위임)
@@ -351,6 +352,10 @@ public class PlayerController : CharacterBase
         Managers.Player.SetPlayer(transform);
         handTransform = Util.FindDeepChild(transform, "WeaponMount")
                      ?? Util.FindDeepChild(transform, "WeaponSocket");
+        handTransformLeft = Util.FindDeepChild(transform, "WeaponMountLeft")
+                         ?? Util.FindDeepChild(transform, "Cup_L")
+                         ?? Util.FindDeepChild(transform, "Weapon_l")
+                         ?? Util.FindDeepChild(transform, "hand_l");
         if (handTransform == null) Debug.LogWarning("WeaponMount/WeaponSocket 트랜스폼을 찾지 못했습니다.");
     }
 
@@ -490,6 +495,12 @@ public class PlayerController : CharacterBase
         {
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
 
+            // 스킬 중에는 공격 입력 무시
+            bool inSkill = actSM.CurrentId == ActState.QSkill
+                        || actSM.CurrentId == ActState.ESkill
+                        || actSM.CurrentId == ActState.RSkill;
+            if (inSkill) return;
+
             if (CanAttack())
                 _attackPolicy?.OnStarted(this);
             else
@@ -502,6 +513,10 @@ public class PlayerController : CharacterBase
         inputActions.Player.Attack.canceled += _ =>
         {
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+            bool inSkill = actSM.CurrentId == ActState.QSkill
+                        || actSM.CurrentId == ActState.ESkill
+                        || actSM.CurrentId == ActState.RSkill;
+            if (inSkill) return;
             _attackPolicy?.OnCanceled(this);
         };
 
@@ -579,6 +594,14 @@ public class PlayerController : CharacterBase
         {
             if (CanAttack() && !isInSkill) actSM.Change(ActState.RSkill);
             return;
+        }
+
+        // 스킬 중에는 공격 관련 입력 소비하고 무시
+        if (isInSkill)
+        {
+            InputBuffer.TryConsume(Game.Inputs.Command.Light);
+            InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
+            InputBuffer.TryConsume(Game.Inputs.Command.Charge);
         }
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))

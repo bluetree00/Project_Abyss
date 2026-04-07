@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0fe6bb86c17bdbf49b30d604a6cabd56, type: 3}
   m_Name: Bow_QSkill
   m_EditorClassIdentifier: Assembly-CSharp::SkillSO
-  skillName: "\uAD00\uD1B5 \uD654\uC0B4"
-  description: "\uC801\uC744 \uAD00\uD1B5\uD558\uB294 \uAC15\uB825\uD55C \uD654\uC0B4\uC744
+  skillName: "\uAD81\uC218\uC758 \uC9D1\uC911"
+  description: "1\uCD08\uAC04 \uCC28\uC9D5 \uD6C4 \uAC15\uD55C \uD654\uC0B4\uC744
     \uBC1C\uC0AC\uD569\uB2C8\uB2E4."
   icon: {fileID: 21300000, guid: 636c3f677cdf64846962ea5687092f14, type: 3}
-  cooldown: 6
+  cooldown: 10
+  behavior: {fileID: 11400000, guid: c0563d45c9e64794b3dbb0732ee3d9b2, type: 2}

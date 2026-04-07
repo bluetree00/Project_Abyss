@@ -25,8 +25,8 @@ public class LocoIdleState : ILayerState<LocoState>
         // 실제 이동 처리
         _controller.MoveAbility?.Move(_controller, dir);
 
-        // 블렌드 파라미터(0~1)
-        float target = (_controller.Combo.IsAttacking || !_controller.IsGrounded()) ? 0f : dir.magnitude;
+        // 블렌드 파라미터(0~1) — 공격/스킬 중이거나 MoveScale=0이면 이동 표현 안 함
+        float target = (_controller.Combo.IsAttacking || !_controller.IsGrounded() || _controller.MoveScale < 0.01f) ? 0f : dir.magnitude;
         SetSpeedParam(_controller.Anim, target, 0.12f);
 
 
