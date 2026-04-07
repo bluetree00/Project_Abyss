@@ -106,6 +106,16 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     // ----------------------
     // 내부
     // ----------------------
+    /// <summary>무기 타입에 따라 장착할 손 결정</summary>
+    private Transform ResolveHandTransform(WeaponData data)
+    {
+        if (_owner == null) return null;
+        bool useLeft = data != null
+            && (data.weaponType == WeaponType.Bow || data.weaponType == WeaponType.Crossbow)
+            && _owner.handTransformLeft != null;
+        return useLeft ? _owner.handTransformLeft : _owner.handTransform;
+    }
+
     private void Awake()
     {
         for (int i = 0; i < slots.Length; i++)
@@ -175,8 +185,16 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         {
             try
             {
-                var instHandle = Addressables.InstantiateAsync(runtimeData.weaponPrefabKey,
-                    _owner != null ? _owner.handTransform : null);
+                // 활/석궁은 왼손, 나머지는 오른손
+                bool useLeftHand = runtimeData.weaponType == WeaponType.Bow
+                                || runtimeData.weaponType == WeaponType.Crossbow;
+                Transform mountPoint = _owner != null
+                    ? (useLeftHand && _owner.handTransformLeft != null
+                        ? _owner.handTransformLeft
+                        : _owner.handTransform)
+                    : null;
+                Debug.Log($"[WeaponManager] Mount: type={runtimeData.weaponType}, useLeft={useLeftHand}, leftHand={_owner?.handTransformLeft?.name ?? "null"}, mount={mountPoint?.name ?? "null"}");
+                var instHandle = Addressables.InstantiateAsync(runtimeData.weaponPrefabKey, mountPoint);
                 await instHandle.Task;
                 if (instHandle.Status == AsyncOperationStatus.Succeeded && instHandle.Result != null)
                 {
@@ -195,7 +213,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (slot.instance != null)
         {
-            var parent = _owner != null ? _owner.handTransform : null;
+            var parent = ResolveHandTransform(runtimeData);
             slot.instance.transform.SetParent(parent, false);
             slot.instance.SetActive(setActive);
 
@@ -243,7 +261,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
                 try
                 {
                     var instHandle = Addressables.InstantiateAsync(target.runtimeData.weaponPrefabKey,
-                        _owner != null ? _owner.handTransform : null);
+                        ResolveHandTransform(target.runtimeData));
                     await instHandle.Task;
                     if (instHandle.Status == AsyncOperationStatus.Succeeded && instHandle.Result != null)
                     {
@@ -262,7 +280,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
             if (target.instance != null)
             {
-                var parent = _owner != null ? _owner.handTransform : null;
+                var parent = ResolveHandTransform(target.runtimeData);
                 target.instance.transform.SetParent(parent, false);
                 target.instance.SetActive(true);
 

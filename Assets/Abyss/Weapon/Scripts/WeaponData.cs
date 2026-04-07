@@ -27,6 +27,8 @@ public class WeaponData
     public float areaOfEffect;
     public float holdThreshold;
 
+    public int tier = 1;
+
     public PromoteMode promoteMode;
     public int chargeStages;
 
@@ -65,6 +67,7 @@ public class WeaponData
         attackRange      = so.attackRange;
         areaOfEffect     = so.areaOfEffect;
         holdThreshold    = so.holdThreshold;
+        tier             = so.tier;
 
         promoteMode  = so.promoteMode;
         chargeStages = so.chargeStages;
@@ -105,6 +108,7 @@ public class WeaponData
             attackRange      = entry.attack_range,
             areaOfEffect     = entry.area_of_effect,
             holdThreshold    = entry.hold_threshold,
+            tier             = entry.tier,
             promoteMode      = ParsePromoteMode(entry.promote_mode),
             chargeStages     = entry.charge_stages,
             groundEndCount   = entry.ground_combo_count,

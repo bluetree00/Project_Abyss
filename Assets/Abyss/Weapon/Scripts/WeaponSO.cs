@@ -9,6 +9,8 @@ public class WeaponSO : ScriptableObject
     public string displayName;
     public string iconKey;          // Addressables 비동기 로드용 키
     public Sprite icon;             // HUD 즉시 표시용 직접 참조
+    [Tooltip("장비 티어 (1~3). 스킬 해금 단계에 사용")]
+    public int tier = 1;
     public float baseAttack;
     public float baseDefense;
 

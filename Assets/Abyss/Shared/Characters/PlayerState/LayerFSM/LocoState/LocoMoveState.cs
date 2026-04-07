@@ -41,8 +41,8 @@ public class LocoMoveState : ILayerState<LocoState>
     // 전이
     if (!_controller.IsGrounded())
         _stateChanger.Change(LocoState.Air);
-    else if (target > 0.05f)
-        _stateChanger.Change(LocoState.Move);
+    else if (target < 0.01f)
+        _stateChanger.Change(LocoState.Idle);
 }
 
 

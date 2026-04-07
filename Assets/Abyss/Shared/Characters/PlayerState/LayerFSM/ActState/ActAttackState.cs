@@ -75,10 +75,13 @@ public class ActAttackState : ILayerState<ActState>
             ? (isAir ? Mathf.Max(1, wd.airEndCount) : Mathf.Max(1, wd.groundEndCount))
             : 1;
 
-        // 공중 공격 진입 시 즉시 체공 + 사용 플래그
+        // 공중 공격 진입 시 체공 + 사용 플래그
         if (isAir)
         {
-            _controller.StartAirHover();
+            // 활: 화살 발사 시점에만 체공 (WeaponEffectHandler에서 처리)
+            bool isBow = wd != null && (wd.weaponType == WeaponType.Bow || wd.weaponType == WeaponType.Crossbow);
+            if (!isBow)
+                _controller.StartAirHover();
             _controller.AirAttackUsed = true;
         }
 
@@ -181,6 +184,10 @@ public class ActAttackState : ILayerState<ActState>
         _controller.Combo.CloseWindow();
         _controller.SetMoveScale(1f);
 
+        // 공중 공격 종료 후 체공 애니메이션 복귀
+        if (!_controller.IsGrounded())
+            _controller.Anim.CrossFade("JumpBlend", 0.1f);
+
         _controller.ActiveExecution = null;
         _execution?.Cleanup(forceEffects: false);
         _execution = null;
@@ -223,7 +230,10 @@ public class ActAttackState : ILayerState<ActState>
             if (_controller.Combo.NextComboQueued)
             {
                 _controller.Combo.SetNextComboQueued(false);
-                _controller.StartAirHover();
+                var wd2 = _controller.WeaponManager?.CurrentWeaponData;
+                bool isBow2 = wd2 != null && (wd2.weaponType == WeaponType.Bow || wd2.weaponType == WeaponType.Crossbow);
+                if (!isBow2)
+                    _controller.StartAirHover();
                 PlayCurrentComboAnimation();
             }
             else

@@ -40,6 +40,11 @@ public class ActSkillState : ActSkillStateBase<ActState>
         _controller.SetMoveScale(0f);
         _ended = false;
 
+        // 스킬 진입 시 잔여 공격 입력 제거
+        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Light);
+        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
+        _controller.InputBuffer.TryConsume(Game.Inputs.Command.Charge);
+
         var skillSO = GetSkillSO();
         var behavior = skillSO?.behavior;
         Debug.Log($"[ActSkillState] {_slot} OnEnter: skillSO={skillSO?.name ?? "NULL"}, behavior={behavior?.name ?? "NULL"}");
