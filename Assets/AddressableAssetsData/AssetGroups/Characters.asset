@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: Characters
   m_GUID: b0930bf1af79c624a8497762c3e7fc29
   m_SerializeEntries:
-  - m_GUID: 84de1bafbe51fef4fb85ae142188201d
+  - m_GUID: e3d581ee3dd828f4fa05678debfe60f7
     m_Address: Basic_Arrow_01
     m_ReadOnly: 0
     m_SerializedLabels: []

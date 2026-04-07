@@ -78,6 +78,8 @@ public class WeaponEffectHandler
                 if (effectObj.TryGetComponent<BasicArrow>(out var arrow))
                 {
                     Vector3 fireDir = playerTransform.forward;
+                    // 활 위치에서 약간 앞으로 오프셋하여 발사
+                    effectObj.transform.position = spawnPos + fireDir * 0.5f;
                     float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.AttackPower);
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
