@@ -362,27 +362,27 @@ public class PlayerController : CharacterBase
 
     private async UniTask InitCharacterDataAsync()
     {
-        // 1순위: 서버 데이터 (PlayerDataManager)
-        if (TryInitFromServer())
-            goto AfterCharData;
-
-        // 2순위: 로비에서 선택된 CharacterData SO
-        var preloaded = Managers.CharacterData.M_CharacterData;
+        // CharacterData SO 확보 (서버 데이터 사용 여부와 무관하게 필요)
+        var preloaded = Managers.CharacterData?.M_CharacterData;
         if (preloaded != null)
         {
             characterData = preloaded;
             characterData.Initialize();
-            RuntimeStats.InitializeFrom(characterData);
-            Debug.Log($"[PlayerController] 로비 선택 CharacterData 사용: {characterData.characterName}");
         }
         else
         {
-            // 3순위: Addressables에서 SO 로드
+            // SO가 없으면 Addressables에서 로드
             string characterName = gameObject.name.Replace("(Clone)", "");
             await LoadCharacterDataAsync(characterName);
         }
 
-        AfterCharData:
+        // 스탯 초기화: 서버 우선 → SO 폴백
+        bool serverApplied = TryInitFromServer();
+        if (!serverApplied && characterData != null)
+        {
+            RuntimeStats.InitializeFrom(characterData);
+            Debug.Log($"[PlayerController] SO 데이터 사용: {characterData.characterName}");
+        }
 
         if (Rigid != null)
         {
