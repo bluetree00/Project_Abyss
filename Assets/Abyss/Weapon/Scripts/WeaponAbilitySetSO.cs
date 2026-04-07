@@ -14,7 +14,7 @@ public class WeaponAbilitySetSO : ScriptableObject
         public WeaponAbilitySO GetAbilityForComboIndex(int comboIndex)
         {
             if (abilities == null || abilities.Count == 0) return null;
-            int idx = Mathf.Clamp(comboIndex - 1, 0, abilities.Count - 1);
+            int idx = Mathf.Clamp(comboIndex, 0, abilities.Count - 1);
             return abilities[idx];
         }
     }

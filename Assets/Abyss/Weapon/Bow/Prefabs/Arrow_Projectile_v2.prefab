@@ -108,6 +108,9 @@ MonoBehaviour:
   speed: 30
   damage: 20
   lifetime: 5
+  modelRotationOffset: {x: 0, y: -90, z: 0}
+  hitEffectKey: ArrowHitYellow
+  hitEffectScale: 0.5
 --- !u!136 &7642504002979757083
 CapsuleCollider:
   m_ObjectHideFlags: 0

@@ -294,13 +294,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 if (weaponSO != null)
                 {
                     var wd = WeaponData.FromSO(weaponSO);
+                    await PreloadWeaponClipsAsync(wd);
                     await player.WeaponManager.AcquireWeaponAsync(wd);
                     Debug.Log($"[GameRunBootstrapper] 테스트: 로드아웃 무기 장착 ({weaponSO.displayName})");
                 }
                 else
                 {
                     Debug.Log($"[GameRunBootstrapper] 테스트: 기본 무기 장착 ({weaponKey})");
-                    await player.WeaponManager.AcquireWeaponAsync(weaponKey);
+                    var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>(weaponKey);
+                    await handle.Task;
+                    if (handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded && handle.Result != null)
+                    {
+                        var wd = WeaponData.FromSO(handle.Result);
+                        await PreloadWeaponClipsAsync(wd);
+                        await player.WeaponManager.AcquireWeaponAsync(wd);
+                    }
                 }
             }
         }
@@ -371,7 +379,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
                 Debug.Log("[GameRunBootstrapper] StartRunAsync: 기본 무기 장착");
-                await player.WeaponManager.AcquireWeaponAsync("T1_Bow");
+                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>("T1_Bow");
+                await handle.Task;
+                if (handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded && handle.Result != null)
+                {
+                    var wd = WeaponData.FromSO(handle.Result);
+                    await PreloadWeaponClipsAsync(wd);
+                    await player.WeaponManager.AcquireWeaponAsync(wd);
+                }
             }
         }
 
