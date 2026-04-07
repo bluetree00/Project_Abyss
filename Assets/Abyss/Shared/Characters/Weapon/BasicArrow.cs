@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class BasicArrow : MonoBehaviour
@@ -7,6 +5,9 @@ public class BasicArrow : MonoBehaviour
     [SerializeField] private float speed = 30f;
     [SerializeField] private float damage = 20f;
     [SerializeField] private float lifetime = 5f;
+    [SerializeField] private Vector3 modelRotationOffset = new Vector3(0f, -90f, 0f);
+    [SerializeField] private string hitEffectKey = "BlueShootHit";
+    [SerializeField] private float hitEffectScale = 0.5f;
     private Vector3 direction;
     private GameObject _instigator;
     private float _timer;
@@ -19,9 +20,8 @@ public class BasicArrow : MonoBehaviour
         _timer = lifetime;
         gameObject.SetActive(true);
 
-        // 발사 방향으로 회전
         if (direction != Vector3.zero)
-            transform.rotation = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(modelRotationOffset);
     }
 
     private void Update()
@@ -42,6 +42,20 @@ public class BasicArrow : MonoBehaviour
         if (other.TryGetComponent<IDamageable>(out var damageable))
             damageable.TakeDamage(damage, _instigator);
 
+        SpawnHitEffect(other);
         gameObject.SetActive(false);
+    }
+
+    private async void SpawnHitEffect(Collider other)
+    {
+        if (string.IsNullOrEmpty(hitEffectKey)) return;
+
+        Vector3 hitPos = other.ClosestPoint(transform.position);
+        var fx = await Managers.ObjectPooler.SpawnAsync(
+            hitEffectKey, ObjectPoolerManager.PoolType.Effect,
+            hitPos, Quaternion.identity);
+
+        if (fx == null) return;
+        fx.transform.localScale = Vector3.one * hitEffectScale;
     }
 }

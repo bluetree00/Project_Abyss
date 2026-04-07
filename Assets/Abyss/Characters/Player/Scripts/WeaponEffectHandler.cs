@@ -82,8 +82,9 @@ public class WeaponEffectHandler
                     fireDir.y = 0f;
                     fireDir.Normalize();
 
-                    // 발사 위치: 플레이어 위치 + 앞 1m + 위 1m
-                    Vector3 firePos = playerTransform.position + fireDir * 1f + Vector3.up * 1f;
+                    // 발사 위치: 플레이어 위치 + 앞 1m + 위 1m + AbilityStep offset
+                    Vector3 firePos = playerTransform.position + fireDir * 1f + Vector3.up * 1f
+                                    + playerTransform.TransformDirection(e.positionOffset);
                     effectObj.transform.position = firePos;
                     effectObj.transform.rotation = Quaternion.LookRotation(fireDir);
 

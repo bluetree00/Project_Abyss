@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: TestBowAnimation
   m_EditorClassIdentifier:
+  defaultComboWindowOpen: 0.15
+  defaultComboWindowClose: 0.5
+  defaultAttackEndAt: 0.55
   animGroups:
   - groupType: 0
     clipMappings:
@@ -23,6 +26,10 @@ MonoBehaviour:
       addressableKey: GroundLightBowAttack_02
       actionType: 1
       comboIndex: 1
+    - baseClipName: GroundLightAttack_03
+      addressableKey: GroundLightBowAttack_03
+      actionType: 1
+      comboIndex: 2
     - baseClipName: QSkill_01
       addressableKey: QSkill_01
       actionType: 3
