@@ -280,7 +280,30 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
+        {
             _run?.BindPlayer(player);
+
+            // 에디터 직접 실행 시 기본 무기 자동 장착
+            if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
+            {
+                // 로비에서 선택한 무기가 있으면 복원, 없으면 기본 무기
+                var loadout = AppBootstrapper.Instance?.Loadout;
+                var weaponSO = loadout?.WeaponSlot0;
+                string weaponKey = weaponSO != null ? null : "Sword";
+
+                if (weaponSO != null)
+                {
+                    var wd = WeaponData.FromSO(weaponSO);
+                    await player.WeaponManager.AcquireWeaponAsync(wd);
+                    Debug.Log($"[GameRunBootstrapper] 테스트: 로드아웃 무기 장착 ({weaponSO.displayName})");
+                }
+                else
+                {
+                    Debug.Log($"[GameRunBootstrapper] 테스트: 기본 무기 장착 ({weaponKey})");
+                    await player.WeaponManager.AcquireWeaponAsync(weaponKey);
+                }
+            }
+        }
 
         // Guard: force combat HUD once more after player/map bootstrap settles.
         _run?.RequestHudMode(HUDIds.Mode.Combat);
@@ -341,7 +364,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
+        {
             run.BindPlayer(player);
+
+            // 무기가 없으면 기본 무기 자동 장착
+            if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
+            {
+                Debug.Log("[GameRunBootstrapper] StartRunAsync: 기본 무기 장착");
+                await player.WeaponManager.AcquireWeaponAsync("Sword");
+            }
+        }
 
         // Guard: ensure HUD remains in combat mode after late binds complete.
         run.RequestHudMode(HUDIds.Mode.Combat);

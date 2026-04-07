@@ -1341,7 +1341,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerPrefabKey: Knight
-  directCombatMapPrefabKey: TestNomarStage_01
+  directCombatMapPrefabKey: battle_001
   playerSpawnPoint: {fileID: 0}
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
