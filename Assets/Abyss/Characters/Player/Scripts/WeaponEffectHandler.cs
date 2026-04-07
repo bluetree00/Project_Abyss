@@ -77,9 +77,16 @@ public class WeaponEffectHandler
                 // BasicArrow 발사체 처리
                 if (effectObj.TryGetComponent<BasicArrow>(out var arrow))
                 {
+                    // 발사 방향: 플레이어 forward (rotateToMouse 이후)
                     Vector3 fireDir = playerTransform.forward;
-                    // 활 위치에서 약간 앞으로 오프셋하여 발사
-                    effectObj.transform.position = spawnPos + fireDir * 0.5f;
+                    fireDir.y = 0f;
+                    fireDir.Normalize();
+
+                    // 발사 위치: 플레이어 위치 + 앞 1m + 위 1m
+                    Vector3 firePos = playerTransform.position + fireDir * 1f + Vector3.up * 1f;
+                    effectObj.transform.position = firePos;
+                    effectObj.transform.rotation = Quaternion.LookRotation(fireDir);
+
                     float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.AttackPower);
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
