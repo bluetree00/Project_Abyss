@@ -289,7 +289,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 // 로비에서 선택한 무기가 있으면 복원, 없으면 기본 무기
                 var loadout = AppBootstrapper.Instance?.Loadout;
                 var weaponSO = loadout?.WeaponSlot0;
-                string weaponKey = weaponSO != null ? null : "Sword";
+                string weaponKey = weaponSO != null ? null : "T1_Katana";
 
                 if (weaponSO != null)
                 {
@@ -371,7 +371,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
                 Debug.Log("[GameRunBootstrapper] StartRunAsync: 기본 무기 장착");
-                await player.WeaponManager.AcquireWeaponAsync("Sword");
+                await player.WeaponManager.AcquireWeaponAsync("T1_Katana");
             }
         }
 
