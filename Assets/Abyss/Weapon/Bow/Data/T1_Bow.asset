@@ -22,15 +22,15 @@ MonoBehaviour:
   attackSpeed: 1.8
   attackRange: 5
   areaOfEffect: 0.5
-  groundEndCount: 3
+  groundEndCount: 2
   airEndCount: 3
-  animationSet: {fileID: 0}
-  effectPackage: {fileID: 0}
-  colliderPackage: {fileID: 0}
-  abilitySet: {fileID: 0}
+  animationSet: {fileID: 11400000, guid: 0c7956163cdeda94eaa93e73dce12eaa, type: 2}
+  effectPackage: {fileID: 11400000, guid: 7604366b65b80e149900239bd5f56519, type: 2}
+  colliderPackage: {fileID: 11400000, guid: 40ca726e49d81b34f935026c0057bcb6, type: 2}
+  abilitySet: {fileID: 11400000, guid: 1123aee89c710c74885c8a9b9298cdfb, type: 2}
   weaponType: 2
-  skillQ: {fileID: 0}
-  skillE: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: f8ed2817829c9e448b483cd3c381c397, type: 2}
+  skillE: {fileID: 11400000, guid: 31982dfcf2ce0e74ea006f2cfb53741e, type: 2}
   holdThreshold: 0
   promoteMode: 0
   chargeStages: 1
