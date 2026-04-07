@@ -17,4 +17,4 @@ MonoBehaviour:
     \uB2E4\uC218 \uD0C0\uACA9\uD558\uB294 \uC5F0\uC18D \uACF5\uACA9\uC785\uB2C8\uB2E4."
   icon: {fileID: 0}
   cooldown: 9
-  behavior: {fileID: 11400000, guid: c15a61535ffd7f149816170dbaf538a9, type: 2}
+  behavior: {fileID: 11400000, guid: 18e152d2bf0e4c458a4025f70eee98ee, type: 2}

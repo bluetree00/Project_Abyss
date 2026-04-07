@@ -190,6 +190,56 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 26bee6af42a0e9f44b2aa8742e6bbbbd
+    m_Address: KatanaDashLine
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76de6a5888d85b149893cb89ef3b6847
+    m_Address: KatanaSlashHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 026db729cc472d143869e7605498ec72
+    m_Address: KatanaDashMuzzle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a73108d561dbdf34ba462e73e97ed541
+    m_Address: KatanaLightningBurst
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6042f989cc140942a980eadd962e2db
+    m_Address: OrangeExplosion
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5740ae2e014a8b14886dad7e67951070
+    m_Address: NovaOrangeHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb82163de313d09469f964543a10922a
+    m_Address: CircleBombHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 08d33953409183b44ad66f3e52b7f5ea
+    m_Address: MissileExplosion
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 174b164cad6fbdb4eb2769a452399510
+    m_Address: LightningDashLine
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6028b5b4fbbf45e45a362de709aa2e18
+    m_Address: RedLaserBeam
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
