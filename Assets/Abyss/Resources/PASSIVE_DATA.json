@@ -1,0 +1,70 @@
+{
+  "passives": [
+    {
+      "passive_id": "passive_knight",
+      "slot": 1,
+      "effect_type": "HealingReceived",
+      "trigger": "Always",
+      "value": 0.2,
+      "max_stack": 0,
+      "duration": 0,
+      "description": "받는 치유량 20% 증가",
+      "stat_version": 1
+    },
+    {
+      "passive_id": "passive_knight",
+      "slot": 2,
+      "effect_type": "Defense",
+      "trigger": "Always",
+      "value": 5,
+      "max_stack": 0,
+      "duration": 0,
+      "description": "방어력 5 증가",
+      "stat_version": 1
+    },
+    {
+      "passive_id": "passive_berserker",
+      "slot": 1,
+      "effect_type": "Lifesteal",
+      "trigger": "OnHit",
+      "value": 0.1,
+      "max_stack": 0,
+      "duration": 0,
+      "description": "공격 시 피해의 10% 흡혈",
+      "stat_version": 1
+    },
+    {
+      "passive_id": "passive_berserker",
+      "slot": 2,
+      "effect_type": "AttackSpeed",
+      "trigger": "OnHit",
+      "value": 0.05,
+      "max_stack": 5,
+      "duration": 1,
+      "description": "공격 시 공속 5% 증가 (최대 5중첩 1초)",
+      "stat_version": 1
+    },
+    {
+      "passive_id": "passive_mage",
+      "slot": 1,
+      "effect_type": "SkillCooldownReduction",
+      "trigger": "Always",
+      "value": 0.2,
+      "max_stack": 0,
+      "duration": 0,
+      "description": "스킬 쿨다운 20% 감소",
+      "stat_version": 1
+    },
+    {
+      "passive_id": "passive_mage",
+      "slot": 2,
+      "effect_type": "ActiveItemCooldownReduction",
+      "trigger": "Always",
+      "value": 0.3,
+      "max_stack": 0,
+      "duration": 0,
+      "description": "액티브 아이템 쿨다운 30% 감소",
+      "stat_version": 1
+    }
+  ]
+}
