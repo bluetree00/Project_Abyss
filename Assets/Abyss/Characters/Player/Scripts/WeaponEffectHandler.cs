@@ -74,6 +74,16 @@ public class WeaponEffectHandler
                     effectObj.transform.SetParent(socketTransform, true);
                 }
 
+                // BasicArrow 발사체 처리
+                if (effectObj.TryGetComponent<BasicArrow>(out var arrow))
+                {
+                    Vector3 fireDir = playerTransform.forward;
+                    float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.AttackPower);
+                    arrow.Fire(fireDir, _player.gameObject, dmg);
+                    execution?.RegisterEffect(effectObj);
+                    continue;
+                }
+
                 if (!effectObj.TryGetComponent<EffectBehaviour>(out var effectBehaviour))
                 {
                     Debug.LogWarning($"[WeaponEffectHandler] '{effectObj.name}'에 EffectBehaviour가 없습니다. 프리팹을 확인하세요.");
