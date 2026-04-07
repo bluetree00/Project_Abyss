@@ -10,7 +10,7 @@
       "attack_speed": 1.5,
       "attack_range": 1,
       "area_of_effect": 1,
-      "ground_combo_count": 4,
+      "ground_combo_count": 3,
       "air_combo_count": 3,
       "hold_threshold": 4,
       "promote_mode": "None",
