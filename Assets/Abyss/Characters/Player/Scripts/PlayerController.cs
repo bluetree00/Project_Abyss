@@ -362,7 +362,11 @@ public class PlayerController : CharacterBase
 
     private async UniTask InitCharacterDataAsync()
     {
-        // 로비에서 이미 선택된 데이터가 있으면 그걸 우선 사용 (Addressable 재로드 생략)
+        // 1순위: 서버 데이터 (PlayerDataManager)
+        if (TryInitFromServer())
+            goto AfterCharData;
+
+        // 2순위: 로비에서 선택된 CharacterData SO
         var preloaded = Managers.CharacterData.M_CharacterData;
         if (preloaded != null)
         {
@@ -373,9 +377,12 @@ public class PlayerController : CharacterBase
         }
         else
         {
+            // 3순위: Addressables에서 SO 로드
             string characterName = gameObject.name.Replace("(Clone)", "");
             await LoadCharacterDataAsync(characterName);
         }
+
+        AfterCharData:
 
         if (Rigid != null)
         {
@@ -383,6 +390,39 @@ public class PlayerController : CharacterBase
             if (characterData != null)
                 Rigid.linearDamping = characterData.groundDrag;
         }
+    }
+
+    /// <summary>서버 PlayerStatEntry로 RuntimeStats 초기화 시도. 성공하면 true.</summary>
+    private bool TryInitFromServer()
+    {
+        var mgr = Managers.PlayerData;
+        if (mgr == null || !mgr.IsInitialized || mgr.GetAllPlayers().Count == 0)
+            return false;
+
+        // 캐릭터 ID 결정: 로비 선택 or 프리팹 이름
+        string charId = null;
+        var preloaded = Managers.CharacterData?.M_CharacterData;
+        if (preloaded != null)
+            charId = preloaded.conClass.ToString().ToLower(); // Knight → knight
+        if (string.IsNullOrEmpty(charId))
+            charId = gameObject.name.Replace("(Clone)", "").ToLower();
+
+        var entry = mgr.GetPlayer(charId);
+        if (entry == null)
+            return false;
+
+        var passives = mgr.GetPassives(entry.passive_id);
+        RuntimeStats.InitializeFromServer(entry, passives);
+
+        // SO도 여전히 로드해둠 (이동속도, 점프 등 SO 전용 값 필요)
+        if (preloaded != null)
+        {
+            characterData = preloaded;
+            characterData.Initialize();
+        }
+
+        Debug.Log($"[PlayerController] 서버 데이터 사용: {entry.char_id} (HP:{entry.max_health}, Melee:{entry.base_melee_attack})");
+        return true;
     }
 
     private async UniTask LoadCharacterDataAsync(string characterName)

@@ -83,4 +83,59 @@ public class WeaponData
 
     /// <summary>SO 타입을 자동 판별해 적절한 WeaponData를 생성하는 팩토리</summary>
     public static WeaponData FromSO(WeaponSO so) => new WeaponData(so);
+
+    /// <summary>
+    /// 서버 EquipmentEntry 기반 생성.
+    /// SO 참조(animationSet, abilitySet, skillQ/E, icon)는 null — 별도 바인딩 필요.
+    /// </summary>
+    public static WeaponData FromServer(EquipmentEntry entry)
+    {
+        if (entry == null) throw new ArgumentNullException(nameof(entry));
+
+        var data = new WeaponData
+        {
+            weaponDisplayKey = entry.weapon_display_key,
+            weaponPrefabKey  = entry.weapon_prefab_key,
+            displayName      = entry.weapon_name,
+            iconKey          = entry.icon_key,
+            icon             = null, // Addressables로 별도 로드
+            baseAttack       = entry.base_attack,
+            baseDefense      = entry.base_defense,
+            attackSpeed      = entry.attack_speed,
+            attackRange      = entry.attack_range,
+            areaOfEffect     = entry.area_of_effect,
+            holdThreshold    = entry.hold_threshold,
+            promoteMode      = ParsePromoteMode(entry.promote_mode),
+            chargeStages     = entry.charge_stages,
+            groundEndCount   = entry.ground_combo_count,
+            airEndCount      = entry.air_combo_count,
+            weaponType       = ParseWeaponType(entry.weapon_type),
+            // SO 참조는 null — WeaponSO에서 바인딩하거나 Addressables로 로드
+            animationSet     = null,
+            abilitySet       = null,
+            skillQ           = null,
+            skillE           = null,
+        };
+        return data;
+    }
+
+    /// <summary>SO 없이 빈 WeaponData 생성 (서버 팩토리용)</summary>
+    private WeaponData() { }
+
+    private static PromoteMode ParsePromoteMode(string s) => s switch
+    {
+        "Stage"      => PromoteMode.Stage,
+        "ChargeFull" => PromoteMode.ChargeFull,
+        _            => PromoteMode.None,
+    };
+
+    private static WeaponType ParseWeaponType(string s) => s switch
+    {
+        "Katana"     => WeaponType.Katana,
+        "Greatsword" => WeaponType.Greatsword,
+        "Crossbow"   => WeaponType.Crossbow,
+        "Bow"        => WeaponType.Bow,
+        "Staff"      => WeaponType.Staff,
+        _            => WeaponType.None,
+    };
 }

@@ -69,6 +69,65 @@ public sealed class PlayerRuntimeStats
         ApplyPassive(data.passive);   // Recalculate + OnChanged 포함
     }
 
+    /// <summary>서버 PlayerStatEntry 기반 초기화.</summary>
+    public void InitializeFromServer(PlayerStatEntry entry, System.Collections.Generic.List<PassiveEntry> passives = null)
+    {
+        if (entry == null)
+        {
+            Debug.LogError("[PlayerRuntimeStats] PlayerStatEntry is null.");
+            return;
+        }
+
+        MaxHp = Mathf.Max(1, entry.max_health);
+        Hp = MaxHp;
+
+        _baseMelee   = Mathf.Max(0, entry.base_melee_attack);
+        _baseRanged  = Mathf.Max(0, entry.base_ranged_attack);
+        _baseDefense = Mathf.Max(0, entry.base_defense);
+        _baseLuck    = Mathf.Max(0, entry.base_luck);
+
+        _weaponMelee = 0; _weaponRanged = 0; _weaponDefense = 0;
+        _passiveMelee = 0; _passiveRanged = 0; _passiveDefense = 0;
+        _passiveLuck = 0; _passiveSkillCdr = 0f; _passiveActiveItemCdr = 0f;
+        _itemMelee = 0; _itemRanged = 0; _itemDefense = 0;
+        _itemLuck = 0; _itemSkillCdr = 0f; _itemActiveItemCdr = 0f;
+        _roomMelee = 0; _roomRanged = 0; _roomDefense = 0;
+        _bonusAttackSpeed = 0f;
+
+        HeavyChargeThreshold = Mathf.Max(0f, entry.heavy_charge_threshold);
+
+        // 서버 패시브 적용 (Always 트리거만 — 조건부는 코드 패시브에서 처리)
+        if (passives != null)
+        {
+            foreach (var p in passives)
+            {
+                if (string.IsNullOrEmpty(p.effect_type)) continue;
+                if (p.trigger != "Always") continue;
+
+                switch (p.effect_type)
+                {
+                    case "MeleeAttack":  _passiveMelee  += (int)p.value; break;
+                    case "RangedAttack": _passiveRanged += (int)p.value; break;
+                    case "Defense":      _passiveDefense += (int)p.value; break;
+                    case "MaxHp":
+                        MaxHp += (int)p.value;
+                        Hp = Mathf.Min(Hp, MaxHp);
+                        break;
+                    case "Luck":         _passiveLuck += (int)p.value; break;
+                    case "AttackSpeed":  _bonusAttackSpeed += p.value; break;
+                    case "SkillCooldownReduction":       _passiveSkillCdr += p.value; break;
+                    case "ActiveItemCooldownReduction":   _passiveActiveItemCdr += p.value; break;
+                    case "AttackPower":
+                        _passiveMelee  += (int)p.value;
+                        _passiveRanged += (int)p.value;
+                        break;
+                }
+            }
+        }
+
+        Recalculate();
+    }
+
     // ── HP ────────────────────────────────────────────────────────────────────────
 
     public void SetHp(int hp)

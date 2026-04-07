@@ -58,8 +58,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async void Start()
     {
-        // MapDataManager 초기화 (오프라인 JSON 폴백)
+        // 데이터 매니저 초기화
         await InitMapDataAsync();
+        await InitPlayerDataAsync();
 
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
@@ -67,6 +68,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await StartCombatDirectAsync(); // 에디터 직접 실행 fallback (DebugStageRunPanel 없을 때만)
 
         AppBootstrapper.Instance?.NotifySceneReady();
+
+        // 디버그 스탯 UI 생성
+        if (Object.FindFirstObjectByType<DebugStatsBootstrap>() == null)
+        {
+            var debugGO = new GameObject("@DebugStatsBootstrap");
+            debugGO.AddComponent<DebugStatsBootstrap>();
+        }
     }
 
     private void OnDestroy()
@@ -126,6 +134,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 mapData.InitializeFromJson(textAsset.text);
             else
                 Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json not found in Resources");
+        }
+    }
+
+    private async UniTask InitPlayerDataAsync()
+    {
+        var playerData = Managers.PlayerData;
+        if (playerData == null || playerData.IsInitialized) return;
+
+        try { await playerData.InitializeAsync(); }
+        catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] PlayerData 예외: {e.Message}"); }
+
+        Debug.Log($"[GameRunBootstrapper] PlayerData: {playerData.GetAllPlayers().Count}명");
+
+        var equipData = Managers.ServerEquipment;
+        if (equipData != null && !equipData.IsInitialized)
+        {
+            try { await equipData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] EquipmentData 예외: {e.Message}"); }
         }
     }
 
