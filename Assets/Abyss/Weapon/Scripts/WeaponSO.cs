@@ -26,10 +26,6 @@ public class WeaponSO : ScriptableObject
     [Header("애니메이션")]
     public WeaponAnimationSetSO animationSet;
 
-    [Header("이펙트 & 콜라이더")]
-    public WeaponEffectPackageSO effectPackage;
-    public WeaponColliderPackageSO colliderPackage;
-
     [Header("Ability Set")]
     public WeaponAbilitySetSO abilitySet;
 
