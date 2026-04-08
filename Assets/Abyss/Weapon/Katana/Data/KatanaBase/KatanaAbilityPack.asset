@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 202e942b773d4964e8b1acd184aa7fea, type: 3}
-  m_Name: TestabillityPack
+  m_Name: KatanaAbilityPack
   m_EditorClassIdentifier: 
   groups:
   - actionType: 1

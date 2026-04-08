@@ -15,8 +15,48 @@ MonoBehaviour:
   m_GroupName: Effects
   m_GUID: 9312e00a4bcb9af4bb0b7e7c943aa1c8
   m_SerializeEntries:
+  - m_GUID: 026db729cc472d143869e7605498ec72
+    m_Address: KatanaDashMuzzle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 079de72b89b92fc45920409aa3f61598
+    m_Address: BowETier3Hit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 08d33953409183b44ad66f3e52b7f5ea
+    m_Address: MissileExplosion
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 174b164cad6fbdb4eb2769a452399510
+    m_Address: LightningDashLine
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1be2572052efd584296895036cceb277
+    m_Address: BowQMuzzleFlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 26bee6af42a0e9f44b2aa8742e6bbbbd
+    m_Address: KatanaDashLine
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 284aa8115675f03488377d544e50cbf5
     m_Address: IasenDashLaser
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e19f1a46fda1c5428b94948caf1ca15
+    m_Address: BowQProjectile
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2ec0f779be4a3cb469d85da7fe4da447
+    m_Address: BowQTier2Muzzle
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -35,8 +75,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 54e43f480dec28e40ae0e065be4aac5f
-    m_Address: Assets/Abyss/Shared/Characters/Weapon/Sword/TestSword/TestEffectPact.asset
+  - m_GUID: 5740ae2e014a8b14886dad7e67951070
+    m_Address: NovaOrangeHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5d754b1d818037d4da92b879c18838cc
+    m_Address: BowETier2Muzzle
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -50,6 +95,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6863ce4e345ba8947ad4e877ee1d1fc4
+    m_Address: BowQTier3Hit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6c21e7a6e514dd9499418cbbb66211cf
     m_Address: MultiSlash
     m_ReadOnly: 0
@@ -57,6 +107,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 756d37cf3b5f8964cae715a9e54bd4e9
     m_Address: DashTrail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76de6a5888d85b149893cb89ef3b6847
+    m_Address: KatanaSlashHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -76,11 +131,21 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 90b685dd555e0c848806f1fb6209e1e9
+    m_Address: BowEProjectile
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a73108d561dbdf34ba462e73e97ed541
+    m_Address: KatanaLightningBurst
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b11fcb48d5bbbd34b86b1e73a9ff93bc
     m_Address: SwordHitSpark
@@ -97,6 +162,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb82163de313d09469f964543a10922a
+    m_Address: CircleBombHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cab22952fbb160641be425b713d28514
     m_Address: HitSpark
     m_ReadOnly: 0
@@ -104,6 +174,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cfe0c511fa8d1cf4abf31f2f48dfe4f9
     m_Address: IasenHitRedLaser
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d2bf40a98ef3560439f0badec6115db3
+    m_Address: BowEMuzzleFlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6042f989cc140942a980eadd962e2db
+    m_Address: OrangeExplosion
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -118,6 +198,11 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e23741b3f14f27e46a31d8d542a2033e
+    m_Address: BowChargeEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e71e3e83b252509489dbb4e6432dbdfb
     m_Address: FrontAttack
     m_ReadOnly: 0
@@ -126,6 +211,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e921ba1a7fdb59647a6713ac02429b33
     m_Address: SlashAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f1aeeba2f9003904da5c0a24ba150198
+    m_Address: ArrowHitYellow
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -140,98 +230,48 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f1aeeba2f9003904da5c0a24ba150198
-    m_Address: ArrowHitYellow
+  - m_GUID: 74c549d1b06b6b140a1fd9536eea637f
+    m_Address: BasicSlashBlue
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e23741b3f14f27e46a31d8d542a2033e
-    m_Address: BowChargeEffect
+  - m_GUID: 8436419d5cd706242bb810378b8a8835
+    m_Address: ExplosionSlash
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1be2572052efd584296895036cceb277
-    m_Address: BowQMuzzleFlash
+  - m_GUID: d79f03dd3c9b07c41a430faecdcdf500
+    m_Address: EnergyExplosion
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d2bf40a98ef3560439f0badec6115db3
-    m_Address: BowEMuzzleFlash
+  - m_GUID: f5507a8c6a22c404ab324980c4e8a11b
+    m_Address: GreatswordHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2ec0f779be4a3cb469d85da7fe4da447
-    m_Address: BowQTier2Muzzle
+  - m_GUID: 39e6808e995d14e46aae8b87bde2a278
+    m_Address: MeteorHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6863ce4e345ba8947ad4e877ee1d1fc4
-    m_Address: BowQTier3Hit
+  - m_GUID: 07757cf211bd45044a1f1917658b9e66
+    m_Address: PunchHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5d754b1d818037d4da92b879c18838cc
-    m_Address: BowETier2Muzzle
+  - m_GUID: fb2df51e77abde1429eb83c0317784af
+    m_Address: DragonPunch
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 079de72b89b92fc45920409aa3f61598
-    m_Address: BowETier3Hit
+  - m_GUID: 1c3dac94110955943a4e5707f432c392
+    m_Address: KnifeHit
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2e19f1a46fda1c5428b94948caf1ca15
-    m_Address: BowQProjectile
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 90b685dd555e0c848806f1fb6209e1e9
-    m_Address: BowEProjectile
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 26bee6af42a0e9f44b2aa8742e6bbbbd
-    m_Address: KatanaDashLine
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 76de6a5888d85b149893cb89ef3b6847
-    m_Address: KatanaSlashHit
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 026db729cc472d143869e7605498ec72
-    m_Address: KatanaDashMuzzle
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a73108d561dbdf34ba462e73e97ed541
-    m_Address: KatanaLightningBurst
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d6042f989cc140942a980eadd962e2db
-    m_Address: OrangeExplosion
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5740ae2e014a8b14886dad7e67951070
-    m_Address: NovaOrangeHit
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bb82163de313d09469f964543a10922a
-    m_Address: CircleBombHit
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 08d33953409183b44ad66f3e52b7f5ea
-    m_Address: MissileExplosion
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 174b164cad6fbdb4eb2769a452399510
-    m_Address: LightningDashLine
+  - m_GUID: ec3f674830402cc45bce805cf6493db7
+    m_Address: GreatswordImpact
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
