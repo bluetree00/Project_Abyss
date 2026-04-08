@@ -1,9 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \":*)",
-      "mcp__mcp-for-unity__create_script",
-      "mcp__mcp-for-unity__delete_script",
       "WebSearch",
       "WebFetch(domain:docs.thebackend.io)",
       "WebFetch(domain:docs.backnd.com)",
@@ -14,6 +11,12 @@
       "WebFetch(domain:steamcommunity.com)",
       "WebFetch(domain:backnd.com)",
       "WebFetch(domain:namu.wiki)",
+      "WebFetch(domain:docs.unity3d.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:unity.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:forum.unity.com)",
       "Bash(git fetch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
@@ -21,23 +24,27 @@
       "Bash(git push:*)",
       "Bash(git checkout:*)",
       "Bash(git stash:*)",
-      "mcp__mcp-for-unity__find_in_file",
       "Bash(git rm:*)",
       "Bash(git pull:*)",
+      "Bash(gh api:*)",
+      "mcp__mcp-for-unity__create_script",
+      "mcp__mcp-for-unity__delete_script",
+      "mcp__mcp-for-unity__find_in_file",
       "mcp__mcp-for-unity__manage_animation",
-      "mcp__mcp-for-unity__manage_texture",
-      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.json\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json\")",
-      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.json.meta\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json.meta\")",
-      "Bash(mv \"Assets/Abyss/Resources/SampleMapData.json\" \"Assets/Abyss/Resources/STAGEDATA_MAP.json\")",
-      "Bash(mv \"Assets/Abyss/Resources/SampleMapData.json.meta\" \"Assets/Abyss/Resources/STAGEDATA_MAP.json.meta\")",
-      "Bash(mv \"Assets/Abyss/Systems/Stage/MapGen/SampleMapData.csv\" \"Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.csv\")",
-      "Bash(cp \"Assets/_ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Inplace/GhostSamurai_Bow_Shoot_SP05_Inplace.FBX\" \"Assets/Abyss/Animations/Player/Test_01/Attack/\")",
-      "Bash(cp \"Assets/Abyss/Animations/Player/Test_01/Attack/GhostSamurai_Bow_Shoot_SP01_Inplace.FBX.meta\" \"Assets/Abyss/Animations/Player/Test_01/Attack/GhostSamurai_Bow_Shoot_SP05_Inplace.FBX.meta\")"
-    ],
-    "additionalDirectories": [
-      "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude",
-      "C:\\Users\\u\\Desktop",
-      "c:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\Assets\\Abyss\\Systems\\Managers\\Scripts"
+      "mcp__mcp-for-unity__manage_texture"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; case \"$FILE\" in *.cs) echo '[RULE-CHECK] .cs 파일 수정 — .claude/rules/unity-csharp.md 규칙 준수 확인 필수' ;; esac"
+          }
+        ]
+      }
     ]
   }
 }

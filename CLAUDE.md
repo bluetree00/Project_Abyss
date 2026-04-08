@@ -37,18 +37,28 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 - MVP: HudPresenter ↔ HudView ↔ CombatPanelView
 
 ## 코드 컨벤션 (필수 준수)
-- **비동기**: `UniTask` 사용 (코루틴 사용 금지)
+- **비동기**: `UniTask` 사용 (코루틴 사용 금지), `CancellationToken` 전달 및 `OperationCanceledException` catch 필수
 - **리소스 로드**: `AddressableManager` 경유 (Resources.Load 사용 금지)
-- **이벤트**: C# `event Action` 기반 (UnityEvent 지양)
+- **이벤트**: C# `event Action` 기반 (UnityEvent 지양), `OnEnable`에서 구독 / `OnDisable`에서 해제
 - **UI 데이터 흐름**: `Provider → Presenter → View` 3단 구조 준수
-- **ScriptableObject**: 정적 데이터(설정값)만 사용, 런타임 상태 저장 금지
+- **ScriptableObject**: 정적 데이터(설정값)만 사용, 런타임 상태 저장 금지, `[CreateAssetMenu]` 필수
 - **Canvas 기준**: 1920×1080, Scale With Screen Size, Match 0.5
 - **씬 조작**: MCP HTTP 호출만 사용 (에디터 스크립트로 씬 수정 금지)
 
+## Unity C# 규칙 (IMPORTANT)
+- **직렬화**: `[SerializeField] private` only — Inspector용 public 필드 금지, 외부 접근은 public read-only 프로퍼티
+- **컴포넌트 캐싱**: `Awake()`/`Start()`에서 캐싱 — `Update`/`FixedUpdate`/`LateUpdate`에서 `GetComponent`/`FindObjectOfType`/`GameObject.Find` 절대 금지
+- **Null 안전**: 컴포넌트 존재 불확실 시 `TryGetComponent<T>()` 사용
+- **할당 금지**: Update 루프에서 `new` 힙 할당, 문자열 접합(`+`) 금지
+- **.meta 파일**: 직접 생성/수정/삭제 절대 금지 — Unity가 자동 관리
+- **스레딩**: 백그라운드 스레드에서 Unity API 호출 금지
+- **클래스 멤버 순서**: `Constants` → `Static` → `[SerializeField]` → `Private` → `Properties` → `Lifecycle`(Awake→OnEnable→Start→Update→OnDestroy) → `Public Methods` → `Private Methods` → `Event Handlers`
+- **Animator**: 새 상태 추가 시 `writeDefaultValues = false` 필수
+
 ## 현재 개발 상태
-- **Phase 1 (인게임 루프)** 진행 중 — 상세: `Assets/Abyss/Docs/DevTracker.md`
-- **복구 필요 작업**: 무기 슬롯 교체 팝업 — 상세: `Assets/Abyss/Docs/WeaponSlotSystem_Recovery.md`
+- **Phase 1 (인게임 루프)** 진행 중
 - **참고 문서**: `Assets/Abyss/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
+- **주의**: `DevTracker.md`는 2026-03-16 기준으로 outdated — 최신 상태는 git log 확인
 
 ## 에이전트 팀 구조
 역할 정의 파일은 `.claude/agents/`에 위치:
