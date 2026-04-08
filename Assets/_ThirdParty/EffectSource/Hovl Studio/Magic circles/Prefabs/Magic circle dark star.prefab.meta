@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: bb12e0787e7c29d40855b3c6772ae5f3
+guid: 66a2969d1ec1bd04699f8255fe42af28
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     circle dark star.prefab
   uploadId: 883360

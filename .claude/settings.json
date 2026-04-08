@@ -31,7 +31,8 @@
       "mcp__mcp-for-unity__delete_script",
       "mcp__mcp-for-unity__find_in_file",
       "mcp__mcp-for-unity__manage_animation",
-      "mcp__mcp-for-unity__manage_texture"
+      "mcp__mcp-for-unity__manage_texture",
+      "Read(//c/Users/u/Documents/GitHub/Project_Abyss/**)"
     ]
   },
   "hooks": {

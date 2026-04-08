@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: c84f5e7ac98d3b9479163a1ef5bf84f2
+guid: 26ca230b5e25e7a4394b9883f13f4527
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic circle sun loop.prefab
   uploadId: 883360

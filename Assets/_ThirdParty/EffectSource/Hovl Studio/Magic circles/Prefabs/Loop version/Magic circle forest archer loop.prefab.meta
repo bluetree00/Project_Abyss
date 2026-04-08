@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 976978128c8a15840ab957da90669619
+guid: ab872fa9fd895d44d8a5fa026496a8c3
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic circle forest archer loop.prefab
   uploadId: 883360

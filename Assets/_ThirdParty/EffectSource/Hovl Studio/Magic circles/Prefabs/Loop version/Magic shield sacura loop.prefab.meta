@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 9639ff0f63421024582a09f763a7ef44
+guid: 358481e3e18a42940904124588a1e42e
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic shield sacura loop.prefab
   uploadId: 883360

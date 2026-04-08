@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 64beb4d0ed4311449b29ef5c5b386413
+guid: 760bdebee4688c54580fb25eeabca9fd
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     shield sakura.prefab
   uploadId: 883360

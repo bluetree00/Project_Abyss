@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: dba4bde6e78fc944fa125be5ded03493
+guid: 3f30c0442b887064bb00401ceb9a8816
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     shield holy.prefab
   uploadId: 883360

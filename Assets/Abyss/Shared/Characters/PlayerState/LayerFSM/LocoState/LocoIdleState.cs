@@ -13,8 +13,10 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Enter()
     {
-        _controller.Anim.CrossFade("MoveBlend", 0.1f);
-        SetSpeedParam(_controller.Anim, 0f); // 진입 시 0으로 수렴
+        // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
+        if (!_controller.Combo.IsAttacking)
+            _controller.Anim.CrossFade("MoveBlend", 0.1f);
+        SetSpeedParam(_controller.Anim, 0f);
     }
 
     public void Update()

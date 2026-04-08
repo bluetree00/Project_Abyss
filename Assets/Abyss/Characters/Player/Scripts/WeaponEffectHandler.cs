@@ -102,6 +102,10 @@ public class WeaponEffectHandler
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
 
+                    // 추가 발사 버프 (Q스킬 등)
+                    if (_player.ExtraShotCount > 0)
+                        SpawnExtraShots(e, s, firePos, fireDir, dmg, execution);
+
                     // 공중 발사 시 짧은 체공
                     if (!_player.IsGrounded())
                         _player.StartAirHover();
@@ -281,5 +285,48 @@ public class WeaponEffectHandler
         ci.hitEffectKey        = s.hitEffectKey;
         ci.hitEffectScale      = s.hitEffectScale;
         ci.attackId            = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
+    }
+
+    /// <summary>ExtraShotCount 버프에 의한 추가 화살 발사</summary>
+    private async void SpawnExtraShots(
+        WeaponAbilitySO.EffectStep e,
+        WeaponAbilitySO.AbilityStep s,
+        Vector3 basePos, Vector3 baseDir, float dmg,
+        AbilityExecution execution)
+    {
+        int count = _player.ExtraShotCount;
+        for (int i = 0; i < count; i++)
+        {
+            try
+            {
+                await UniTask.Delay(80, cancellationToken: _player.gameObject.GetCancellationTokenOnDestroy());
+            }
+            catch (System.OperationCanceledException) { return; }
+
+            if (_player == null) return;
+
+            // 방향 + 위치 랜덤으로 여러발 나가는 느낌
+            float spread = Random.Range(-8f, 8f);
+            Vector3 dir = Quaternion.Euler(0f, spread, 0f) * baseDir;
+            Vector3 right = Vector3.Cross(Vector3.up, baseDir).normalized;
+            Vector3 spawnPos = basePos
+                + right * Random.Range(-0.4f, 0.4f)
+                + Vector3.up * Random.Range(-0.2f, 0.2f);
+
+            var extraObj = await Managers.ObjectPooler.SpawnAsync(
+                e.payloadKey, ObjectPoolerManager.PoolType.Effect, spawnPos, Quaternion.LookRotation(dir));
+            if (extraObj == null || _player == null) return;
+
+            extraObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+
+            if (extraObj.TryGetComponent<BasicArrow>(out var extraArrow))
+            {
+                extraArrow.Fire(dir, _player.gameObject, dmg);
+                execution?.RegisterEffect(extraObj);
+            }
+
+            if (extraObj.TryGetComponent<EffectBehaviour>(out var eb))
+                eb.Initialize(e.behavior, _player.transform, e.lifeTimeMultiplier);
+        }
     }
 }

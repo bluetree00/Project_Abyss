@@ -87,6 +87,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/3D Lasers Pack/Demo scene
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/3D Lasers Pack/Demo scene
     lasers/Lightmap-0_comp_light.exr
   uploadId: 883360

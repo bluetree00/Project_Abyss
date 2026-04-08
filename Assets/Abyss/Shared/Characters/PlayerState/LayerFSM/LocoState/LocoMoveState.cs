@@ -20,9 +20,9 @@ public class LocoMoveState : ILayerState<LocoState>
 
     public void Enter()
     {
-        // 같은 블렌드 트리 유지
-        _controller.Anim.CrossFade("MoveBlend", 0.05f);
-        // Enter 시 현재 isRunChecked 상태를 기반으로 초기화 (선택)
+        // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
+        if (!_controller.Combo.IsAttacking)
+            _controller.Anim.CrossFade("MoveBlend", 0.05f);
         _runBlend = _controller.IsRunChecked ? 1f : 0f;
     }
 

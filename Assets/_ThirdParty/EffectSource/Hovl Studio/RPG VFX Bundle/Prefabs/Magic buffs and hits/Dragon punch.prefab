@@ -44167,9 +44167,7 @@ GameObject:
   - component: {fileID: 4833421747575682}
   - component: {fileID: 198646846901175090}
   - component: {fileID: 199569954839013096}
-  - component: {fileID: 333791094901215969}
-  - component: {fileID: 6093523568314929128}
-  - component: {fileID: 946761056858822901}
+  - component: {fileID: 5159160551145954410}
   m_Layer: 0
   m_Name: Dragon punch
   m_TagString: Untagged
@@ -49081,7 +49079,7 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
---- !u!114 &333791094901215969
+--- !u!114 &5159160551145954410
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -49096,49 +49094,6 @@ MonoBehaviour:
   lifetime: 1
   behaviorSO: {fileID: 0}
   owner: {fileID: 0}
---- !u!135 &6093523568314929128
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1873886433987638}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 2
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &946761056858822901
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1873886433987638}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bebca0709195feb4dbff993ad0d877ac, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ColliderInstance
-  payloadKey: 
-  damage: 0
-  knockbackMultiplier: 0
-  hitInterval: 0
-  actionType: 0
-  owner: {fileID: 0}
-  duration: 1
-  attackId: 0
-  hitEffectKey: 
-  hitEffectScale: 1
 --- !u!1 &1931102524043194
 GameObject:
   m_ObjectHideFlags: 0
