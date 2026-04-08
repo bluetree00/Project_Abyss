@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fe6bb86c17bdbf49b30d604a6cabd56, type: 3}
+  m_Name: Greatsword_QSkill
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillName: "\uCD5C\uD6C4\uC758 \uC77C\uACA9"
+  description: "\uC81C\uC790\uB9AC\uC5D0\uC11C \uC804\uBC29 3m \uBC18\uC6D0 \uBC94\uC704
+    \uB0B4 \uC801\uC744 1\uD68C \uACF5\uACA9\uD55C\uB2E4."
+  icon: {fileID: 0}
+  cooldown: 9
+  behavior: {fileID: 11400000, guid: ac505e8a632b605409e7d8ececdaf3ea, type: 2}
