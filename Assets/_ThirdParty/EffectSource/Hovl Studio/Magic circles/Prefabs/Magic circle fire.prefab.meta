@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 4f0b822dba83ea2499a05cbd8576d0fd
+guid: b056e80a15927884a8d19c5ec18a6de9
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     circle fire.prefab
   uploadId: 883360

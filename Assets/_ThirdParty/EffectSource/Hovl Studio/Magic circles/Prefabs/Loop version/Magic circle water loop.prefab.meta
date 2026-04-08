@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: e9e9e241d32170542823783d7b7dbe09
+guid: fba65961026dc9645916176ab380ddc1
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic circle water loop.prefab
   uploadId: 883360

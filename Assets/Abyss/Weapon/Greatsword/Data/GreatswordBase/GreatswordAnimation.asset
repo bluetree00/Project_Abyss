@@ -49,7 +49,7 @@ MonoBehaviour:
       comboWindowClose: -1
       attackEndAt: 0.9
     - baseClipName: QSkill_Iasen
-      addressableKey: GreatswordAttack_03
+      addressableKey: GreatswordQSkill
       actionType: 3
       comboIndex: 0
       isPlunge: 0
@@ -59,7 +59,7 @@ MonoBehaviour:
       comboWindowClose: -1
       attackEndAt: -1
     - baseClipName: ESkill_01
-      addressableKey: GreatswordAttack_01
+      addressableKey: GreatswordESkill
       actionType: 4
       comboIndex: 0
       isPlunge: 0

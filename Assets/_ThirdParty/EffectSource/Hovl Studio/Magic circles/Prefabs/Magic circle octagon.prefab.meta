@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 9cfc3ab6dc0db674fb6d6f409ee09a56
+guid: 12fdf9e1c493b194bbde3ad04e9ec0c5
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     circle octagon.prefab
   uploadId: 883360

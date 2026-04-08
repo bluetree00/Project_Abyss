@@ -13,17 +13,16 @@ MonoBehaviour:
   m_Name: PerimeterGuard
   m_EditorClassIdentifier: Assembly-CSharp::PerimeterGuardBehaviorSO
   baseDamage: 25
-  detectRadius: 2
-  detectForwardOffset: 1
+  detectRadius: 3.5
   knockbackMultiplier: 1.5
-  castInterval: 0.6
-  swordWaveDamage: 15
-  swordWaveRadius: 2.5
-  swordWaveDelay: 0.2
-  swordWaveEffectKey: ExplosionSlash
-  swordWaveEffectScale: 0.8
+  castInterval: 0.5
+  expandDamage: 20
+  expandRadius: 4
+  expandDelay: 0.15
+  expandEffectKey: GreatswordEFinish
+  expandEffectScale: 2
   slashEffectKey: BasicSlashBlue
-  slashEffectScale: 1
+  slashEffectScale: 0.7
   hitEffectKey: GreatswordImpact
   hitEffectScale: 0.5
   endDelay: 0.3

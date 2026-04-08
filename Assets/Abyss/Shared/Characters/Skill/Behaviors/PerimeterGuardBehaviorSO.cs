@@ -4,10 +4,10 @@ using UnityEngine;
 
 /// <summary>
 /// 주변경계 — 대검 E스킬.
-/// 전방 2m 주변 적을 원형으로 벤다.
-///   1단계: 1회 시전
-///   2단계: 2회 시전
-///   3단계: 2회 시전 + 매 시전마다 칼의 궤적을 따라 원형 검기 발사
+/// 플레이어 중심 360° 원형으로 검을 휘둘러 피해를 준다.
+///   1단계: 360° 1회 휘두르기
+///   2단계: 360° 2회 연속 휘두르기
+///   3단계: 2회 휘두르기 + 퍼지는 이펙트가 확산하며 추가 데미지
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Skill/PerimeterGuardBehavior")]
 public class PerimeterGuardBehaviorSO : SkillBehaviorSO
@@ -15,22 +15,21 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
     [Header("기본 공격 (전 티어)")]
     [SerializeField] private float baseDamage = 25f;
     [SerializeField] private float detectRadius = 2f;
-    [SerializeField] private float detectForwardOffset = 1f;
     [SerializeField] private float knockbackMultiplier = 1.5f;
 
     [Header("시전")]
-    [SerializeField] private float castInterval = 0.6f;
+    [SerializeField] private float castInterval = 0.5f;
 
-    [Header("3단계: 원형 검기")]
-    [SerializeField] private float swordWaveDamage = 15f;
-    [SerializeField] private float swordWaveRadius = 2.5f;
-    [SerializeField] private float swordWaveDelay = 0.2f;
-    [SerializeField] private string swordWaveEffectKey = "ExplosionSlash";
-    [SerializeField] private float swordWaveEffectScale = 0.8f;
+    [Header("3단계: 확산 공격")]
+    [SerializeField] private float expandDamage = 20f;
+    [SerializeField] private float expandRadius = 4f;
+    [SerializeField] private float expandDelay = 0.3f;
+    [SerializeField] private string expandEffectKey = "MeteorHit";
+    [SerializeField] private float expandEffectScale = 0.8f;
 
     [Header("이펙트")]
     [SerializeField] private string slashEffectKey = "BasicSlashBlue";
-    [SerializeField] private float slashEffectScale = 1f;
+    [SerializeField] private float slashEffectScale = 1.2f;
     [SerializeField] private string hitEffectKey = "GreatswordImpact";
     [SerializeField] private float hitEffectScale = 0.5f;
 
@@ -45,29 +44,42 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
     private class Runtime : ISkillRuntime
     {
         private readonly PerimeterGuardBehaviorSO _data;
-        private enum Phase { Cast, SwordWave, End }
+        private enum Phase { Cast, Expand, End }
         private Phase _phase;
         private float _timer;
         private int _castIndex;
         private int _maxCasts;
         private int _skillTier;
+        private int _expandWave;
+        private const int MaxExpandWaves = 3;
         private readonly HashSet<GameObject> _hitPerCast = new();
+        private readonly HashSet<GameObject> _hitByExpand = new();
 
         public Runtime(PerimeterGuardBehaviorSO data) => _data = data;
 
         public void OnEnter(SkillExecutionContext ctx)
         {
             _skillTier = Mathf.Clamp(ctx.WeaponData?.tier ?? 1, 1, 3);
-            _maxCasts = _skillTier >= 2 ? 2 : 1;
+
+            // 3단계: 3파에 걸쳐 검기가 커지며 공격
+            _maxCasts = _skillTier >= 3 ? 3 : (_skillTier >= 2 ? 2 : 1);
+
             _castIndex = 0;
             _timer = 0f;
             _phase = Phase.Cast;
 
             ctx.RotateToMouse();
             ctx.SetMoveScale(0f);
-            PlayAnimation(ctx);
 
-            // 첫 시전 즉시 실행
+            _expandWave = 0;
+            _hitByExpand.Clear();
+
+            // 첫 시전: T1은 기본공격 애니메이션, T2+는 스킬 애니메이션
+            if (_skillTier <= 1)
+                ctx.Animator.Play("GroundLightAttack_01", 0, 0f);
+            else
+                PlayAnimation(ctx);
+
             ExecuteCast(ctx);
             _castIndex++;
 
@@ -80,9 +92,9 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             _timer += Time.deltaTime;
             switch (_phase)
             {
-                case Phase.Cast:      UpdateCast(ctx);      break;
-                case Phase.SwordWave: UpdateSwordWave(ctx); break;
-                case Phase.End:       UpdateEnd(ctx);       break;
+                case Phase.Cast:   UpdateCast(ctx);   break;
+                case Phase.Expand: UpdateExpand(ctx);  break;
+                case Phase.End:    UpdateEnd(ctx);     break;
             }
         }
 
@@ -98,6 +110,11 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             {
                 _timer = 0f;
                 _hitPerCast.Clear();
+
+                // T3 2타째에만 애니메이션 재생 (1타는 OnEnter에서 이미 재생)
+                if (_skillTier >= 3 && _castIndex == 1)
+                    PlayAnimation(ctx);
+
                 ExecuteCast(ctx);
                 _castIndex++;
             }
@@ -105,37 +122,46 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
             if (_castIndex >= _maxCasts && _timer >= _data.castInterval)
             {
                 _timer = 0f;
-                if (_skillTier >= 3)
-                    _phase = Phase.SwordWave;
-                else
-                    _phase = Phase.End;
+                _phase = Phase.End;
             }
         }
 
-        private void UpdateSwordWave(SkillExecutionContext ctx)
+        // ── 3단계: 다단계 확산 공격 (3파) ──
+        private void UpdateExpand(SkillExecutionContext ctx)
         {
-            if (_timer >= _data.swordWaveDelay)
+            if (_timer >= _data.expandDelay)
             {
                 _timer = 0f;
+                _expandWave++;
 
-                var center = ctx.PlayerTransform.position
-                    + ctx.PlayerTransform.forward * _data.detectForwardOffset
-                    + Vector3.up * 0.5f;
+                var center = ctx.PlayerTransform.position;
+                float waveRadius = _data.expandRadius * (_expandWave / (float)MaxExpandWaves);
+                float waveScale = _data.expandEffectScale * (0.5f + _expandWave * 0.3f);
 
-                // 원형 검기 데미지
-                float dmg = ctx.CalculateDamage(_data.swordWaveDamage);
-                var colliders = Physics.OverlapSphere(center, _data.swordWaveRadius);
+                // 해당 파의 범위 내 데미지
+                float dmg = ctx.CalculateDamage(_data.expandDamage);
+                var colliders = Physics.OverlapSphere(center, waveRadius);
                 foreach (var col in colliders)
                 {
                     if (col.gameObject == ctx.Controller.gameObject) continue;
+                    if (_hitByExpand.Contains(col.gameObject)) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
-                        d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 1.5f);
+                    {
+                        d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 2f);
+                        _hitByExpand.Add(col.gameObject);
+
+                        SpawnEffect(ctx, _data.hitEffectKey,
+                            col.transform.position + Vector3.up * 0.8f,
+                            _data.hitEffectScale * 1.5f, 0.5f);
+                    }
                 }
 
-                // 검기 이펙트
-                SpawnEffect(ctx, _data.swordWaveEffectKey, center, _data.swordWaveEffectScale, 1f);
+                // 확산 이펙트 — 플레이어 위치에 생성
+                SpawnEffect(ctx, _data.expandEffectKey,
+                    ctx.PlayerTransform.position + Vector3.up * 0.5f, waveScale, 1.5f);
 
-                _phase = Phase.End;
+                if (_expandWave >= MaxExpandWaves)
+                    _phase = Phase.End;
             }
         }
 
@@ -145,14 +171,18 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 ctx.RequestEnd();
         }
 
+        // ── 360° 원형 공격 ──
         private void ExecuteCast(SkillExecutionContext ctx)
         {
-            var center = ctx.PlayerTransform.position
-                + ctx.PlayerTransform.forward * _data.detectForwardOffset;
+            var center = ctx.PlayerTransform.position;
+            bool isTier3 = _skillTier >= 3;
 
-            // 범위 내 적 감지 및 데미지
+            // 3단계 3타만 범위 확대
+            bool isLastWave = isTier3 && _castIndex == _maxCasts - 1;
+            float radius = isLastWave ? _data.detectRadius * 1.6f : _data.detectRadius;
+
             float dmg = ctx.CalculateDamage(_data.baseDamage);
-            var colliders = Physics.OverlapSphere(center, _data.detectRadius);
+            var colliders = Physics.OverlapSphere(center, radius);
             foreach (var col in colliders)
             {
                 if (col.gameObject == ctx.Controller.gameObject) continue;
@@ -162,18 +192,40 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                     d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
                     _hitPerCast.Add(col.gameObject);
 
-                    // 피격 이펙트
                     SpawnEffect(ctx, _data.hitEffectKey,
                         col.transform.position + Vector3.up * 0.8f,
                         _data.hitEffectScale, 0.5f);
                 }
             }
 
-            // 베기 이펙트 — 원형으로 배치
-            var pos = center + Vector3.up * 1f;
-            float angle = _castIndex * 180f;
-            var rot = ctx.PlayerTransform.rotation * Quaternion.Euler(0f, angle, 0f);
-            SpawnEffectRotated(ctx, _data.slashEffectKey, pos, rot, _data.slashEffectScale, 0.6f);
+            if (isLastWave)
+            {
+                // 3타: 6개 검격 중첩 — 플레이어 중심에서 방사
+                int effectCount = 6;
+                float scale = _data.slashEffectScale * 1.8f;
+                for (int i = 0; i < effectCount; i++)
+                {
+                    float angle = i * 60f + Random.Range(-10f, 10f);
+                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+                    Vector3 pos = center + dir * (radius * 0.4f) + Vector3.up * 1f;
+                    Quaternion rot = Quaternion.LookRotation(dir) * Quaternion.Euler(0f, 0f, Random.Range(-30f, 30f));
+                    SpawnEffectRotated(ctx, _data.slashEffectKey, pos, rot, scale, 0.8f);
+                }
+            }
+            else
+            {
+                // 1, 2타: 3개 검격 — 플레이어 가까이에 모아서
+                int effectCount = 3;
+                float scale = _data.slashEffectScale;
+                for (int i = 0; i < effectCount; i++)
+                {
+                    float angle = (_castIndex * 60f) + (i * 120f);
+                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+                    Vector3 pos = center + dir * 0.3f + Vector3.up * 1f;
+                    Quaternion rot = Quaternion.LookRotation(dir);
+                    SpawnEffectRotated(ctx, _data.slashEffectKey, pos, rot, scale, 0.6f);
+                }
+            }
         }
 
         private void PlayAnimation(SkillExecutionContext ctx)
@@ -198,7 +250,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 }
             }
 
-            ctx.Animator.CrossFade(animName, 0.05f);
+            ctx.Animator.Play(animName, 0, 0f);
         }
 
         private static async void SpawnEffect(SkillExecutionContext ctx, string key,

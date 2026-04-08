@@ -17,6 +17,7 @@ MonoBehaviour:
   displayName: "\uAE30\uBCF8 \uC11D\uAD81"
   iconKey: T1_CrossbowIcon
   icon: {fileID: 21300000, guid: f8812c8b8c4fbcf43b333cf968a94855, type: 3}
+  tier: 3
   baseAttack: 25
   baseDefense: 2
   attackSpeed: 0.8
@@ -24,13 +25,11 @@ MonoBehaviour:
   areaOfEffect: 0.5
   groundEndCount: 2
   airEndCount: 2
-  animationSet: {fileID: 0}
-  effectPackage: {fileID: 0}
-  colliderPackage: {fileID: 0}
-  abilitySet: {fileID: 0}
+  animationSet: {fileID: 11400000, guid: 13c9508a14118774a854c352a7399486, type: 2}
+  abilitySet: {fileID: 11400000, guid: 1d00c30a7d27c9f45998d431e3ee7f75, type: 2}
   weaponType: 6
-  skillQ: {fileID: 0}
-  skillE: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: f13606e204e18f64ea72e2d77f8d9ee1, type: 2}
+  skillE: {fileID: 11400000, guid: cdd3c33e1f408f94bb84c42b02776fa7, type: 2}
   holdThreshold: 2
   promoteMode: 2
   chargeStages: 2

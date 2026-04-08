@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 0d184d0fdd2506a45b7557f6d4e8107d
+guid: 7608f194af776dc43a2297374e2a57e5
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -143,5 +143,5 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/Hovl Studio/HSFiles/Textures/Noise35.png
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Textures/Noise35.png
   uploadId: 883360

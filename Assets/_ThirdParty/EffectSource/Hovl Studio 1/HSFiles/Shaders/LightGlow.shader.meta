@@ -12,5 +12,5 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/Hovl Studio/HSFiles/Shaders/LightGlow.shader
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Shaders/LightGlow.shader
   uploadId: 883360

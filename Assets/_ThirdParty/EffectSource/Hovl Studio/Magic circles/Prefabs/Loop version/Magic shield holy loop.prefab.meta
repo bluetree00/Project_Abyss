@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 782d6856f717e88438d1edc73cca7003
+guid: 4142df55bc257a045bfc97c60ca08f7b
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic shield holy loop.prefab
   uploadId: 883360

@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 24936d8164cbd754b9cb68c17fff2257
+guid: 9b1a36113f606f14f9342eed5ab596e2
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 2100000
@@ -11,5 +11,5 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/Hovl Studio/HSFiles/Materials/Smoke20cc2.mat
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Materials/Smoke20cc2.mat
   uploadId: 883360

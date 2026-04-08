@@ -10,6 +10,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/RPG VFX Bundle/Random effect
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/RPG VFX Bundle/Random effect
     prefabs/Wheat explosion.prefab
   uploadId: 883360

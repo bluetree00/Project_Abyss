@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d4ca0a45e56444145b750a21bfe482dd
+guid: 7468574a5eea1a04caab3b9547f9fd5b
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Magic
     shield yingyang.prefab
   uploadId: 883360

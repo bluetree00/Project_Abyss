@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 67e152d0fccc48b44a5818a3165090a3
+guid: aafb963400638ab46a33e9fe42afa648
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic circle electro loop.prefab
   uploadId: 883360

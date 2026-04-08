@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: a0590583441d7c24cb41b0bba7c784d7
+guid: fb191d08b35702c4790aec46d6117dab
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 100100000
@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/Magic circles/Prefabs/Loop
     version/Magic circle blood loop.prefab
   uploadId: 883360

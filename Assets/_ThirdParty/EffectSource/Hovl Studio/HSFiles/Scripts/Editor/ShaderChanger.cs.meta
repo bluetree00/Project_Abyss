@@ -14,5 +14,5 @@ AssetOrigin:
   productId: 133704
   packageName: RPG VFX Bundle
   packageVersion: 6.0.2
-  assetPath: Assets/UseResources/EffectSource/Hovl Studio/HSFiles/Scripts/Editor/ShaderChanger.cs
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio/HSFiles/Scripts/Editor/ShaderChanger.cs
   uploadId: 883360

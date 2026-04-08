@@ -19,6 +19,8 @@ public class ActAttackState : ILayerState<ActState>
     private float _comboOpen;
     private float _comboClose;
     private float _attackEnd;
+    private float _stateElapsed;
+    private const float StateTimeout = 1f;
 
     private static readonly int AirLightAttackValueHash =
         Animator.StringToHash("AirLightAttackValue");
@@ -65,6 +67,7 @@ public class ActAttackState : ILayerState<ActState>
             _controller.Combo.SetAttacking(true);
             _controller.Combo.SetNextComboQueued(false);
             _controller.Combo.CloseWindow();
+
             _controller.SetMoveScale(0f);
         }
 
@@ -86,6 +89,7 @@ public class ActAttackState : ILayerState<ActState>
         }
 
         _waitingForComboInput = false;
+        _stateElapsed = 0f;
 
         SubscribeReceiver();
         PlayCurrentComboAnimation();
@@ -106,6 +110,8 @@ public class ActAttackState : ILayerState<ActState>
     /// </summary>
     private void PollAnimationTiming()
     {
+        _stateElapsed += Time.deltaTime;
+
         if (_currentStateHash == 0) return;
 
         var anim      = _controller.Anim;
@@ -113,7 +119,16 @@ public class ActAttackState : ILayerState<ActState>
             ? anim.GetNextAnimatorStateInfo(0)
             : anim.GetCurrentAnimatorStateInfo(0);
 
-        if (stateInfo.shortNameHash != _currentStateHash) return;
+        if (stateInfo.shortNameHash != _currentStateHash)
+        {
+            // 상태 해시 불일치 시 타임아웃으로 강제 종료
+            if (_stateElapsed >= StateTimeout)
+            {
+                Debug.LogWarning("[ActAttackState] State hash mismatch timeout — forcing exit.");
+                _stateChanger.Change(ActState.None);
+            }
+            return;
+        }
 
         float t = stateInfo.normalizedTime;
 
@@ -352,6 +367,7 @@ public class ActAttackState : ILayerState<ActState>
         _comboWindowOpened = false;
         _comboWindowClosed = false;
         _attackEndFired    = false;
+        _stateElapsed      = 0f;
 
         var mapping = TryGetClipMapping(step, action, isAir);
         var animSet = _controller.WeaponManager?.CurrentWeaponData?.animationSet

@@ -60,6 +60,9 @@ public class PlayerController : CharacterBase
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
 
+    // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
+    public int ExtraShotCount { get; set; }
+
     // 테스트용: 피격/회복
     public void TakeDamage(int dmg)
     {
