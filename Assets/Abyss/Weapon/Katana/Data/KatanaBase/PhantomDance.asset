@@ -37,4 +37,4 @@ MonoBehaviour:
   hitEffectScale: 0.5
   finishEffectKey: IasenFinishFlash
   finishEffectScale: 1
-  animationOverride: QSkill_Iasen
+  animationOverride: QSkill_01

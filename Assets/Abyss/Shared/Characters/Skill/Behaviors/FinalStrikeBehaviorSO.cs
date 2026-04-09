@@ -231,7 +231,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
         {
             string animName = !string.IsNullOrEmpty(_data.animationOverride)
                 ? _data.animationOverride
-                : "QSkill_Iasen";
+                : "QSkill_01";
 
             if (string.IsNullOrEmpty(_data.animationOverride))
             {
