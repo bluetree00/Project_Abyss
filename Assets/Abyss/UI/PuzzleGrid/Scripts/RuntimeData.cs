@@ -45,6 +45,7 @@ public class GridAssetData
     /// 같은 id로 EnterGrid를 재호출하면 캐시된 세션을 재사용한다.
     /// </summary>
     public string id;
+    public string displayName;
 
     public GridPatternData pattern = new GridPatternData();
     public GridVisualData  visual  = new GridVisualData();

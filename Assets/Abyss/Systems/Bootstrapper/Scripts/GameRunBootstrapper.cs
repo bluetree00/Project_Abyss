@@ -61,6 +61,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 데이터 매니저 초기화
         await InitMapDataAsync();
         await InitPlayerDataAsync();
+        await InitItemDataAsync();
+
+        // 블록 시너지 그리드 구성 (UIRoot @HUD에 있는 Bridge 사용)
+        var bridge = BlockSynergyBridge.Instance;
+        if (bridge == null)
+            bridge = Object.FindFirstObjectByType<BlockSynergyBridge>(FindObjectsInactive.Include);
+        if (bridge != null)
+            bridge.InitializeGridsFromServer();
 
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
@@ -152,6 +160,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             try { await equipData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] EquipmentData 예외: {e.Message}"); }
+        }
+    }
+
+    private async UniTask InitItemDataAsync()
+    {
+        var itemData = Managers.ItemData;
+        if (itemData != null && !itemData.IsInitialized)
+        {
+            try { await itemData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ItemData 예외: {e.Message}"); }
+        }
+
+        var blockData = Managers.BlockData;
+        if (blockData != null && !blockData.IsInitialized)
+        {
+            try { await blockData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BlockData 예외: {e.Message}"); }
         }
     }
 

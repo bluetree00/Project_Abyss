@@ -60,6 +60,10 @@ public class BoardManager : MonoBehaviour
     [Tooltip("슬롯 간격 (Y축).")]
     public float spawnSlotStepY = 220f;
 
+    [Header("Grid Name UI")]
+    [Tooltip("현재 그리드 이름을 표시하는 텍스트 (옵션).")]
+    public TMPro.TMP_Text gridNameText;
+
     [Header("Addressables")]
     [Tooltip("어드레서블 Shape SO 그룹 키 (레이블 또는 그룹명).")]
     public string shapeGroupKey = "SO Shape";
@@ -142,6 +146,15 @@ public class BoardManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
+        // gridNameText 자동 탐색
+        if (gridNameText == null)
+        {
+            var found = GetComponentInParent<Canvas>(true)?.GetComponentsInChildren<TMPro.TMP_Text>(true);
+            if (found != null)
+                foreach (var t in found)
+                    if (t.gameObject.name == "GridNameText") { gridNameText = t; break; }
+        }
+
         var go = new GameObject("CacheRoot", typeof(RectTransform));
         cacheRoot = (RectTransform)go.transform;
         cacheRoot.SetParent(transform, false);
@@ -163,11 +176,12 @@ public class BoardManager : MonoBehaviour
             EnterGrid(initialRuntimeData);
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.S))
-            StartCoroutine(SpawnRandomShapeCoroutine());
-    }
+    // void Update()
+    // {
+    //     // 레거시 S키 Shape 스폰 (서버 데이터 방식에서는 BlockSynergyBridge가 담당)
+    //     if (Input.GetKeyDown(KeyCode.S))
+    //         StartCoroutine(SpawnRandomShapeCoroutine());
+    // }
 
     void OnDestroy()
     {
@@ -225,6 +239,7 @@ public class BoardManager : MonoBehaviour
             sessions[gridAsset] = CreateSession(gridAsset);
 
         ActivateSession(gridAsset);
+        UpdateGridNameUI(gridAsset.name);
     }
 
     /// <summary>데이터 방식 그리드 진입. 같은 id 재호출 시 캐시된 세션을 재사용한다.</summary>
@@ -261,6 +276,7 @@ public class BoardManager : MonoBehaviour
 
         activeAsset = gridSO;
         ActivateSession(gridSO);
+        UpdateGridNameUI(data.displayName);
     }
 
     /// <summary>동일 id의 퍼즐을 새 데이터로 완전 교체한다. 기존 SO/세션을 모두 재생성한다.</summary>
@@ -484,6 +500,12 @@ public class BoardManager : MonoBehaviour
     }
 
     // ── 내부 구현 ─────────────────────────────────────────────────────
+
+    private void UpdateGridNameUI(string name)
+    {
+        if (gridNameText != null)
+            gridNameText.text = name ?? "";
+    }
 
     private void SetModeSelection(bool selectionMode)
     {

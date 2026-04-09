@@ -534,6 +534,18 @@ public class PlayerController : CharacterBase
         inputActions.Player.Jump.performed += _ => ProcessJump();
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
+        inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
+    }
+
+    private void TogglePuzzleGrid()
+    {
+        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        if (run == null || !run.IsRunning) return;
+
+        if (run.CurrentRunState == GameRunSession.RunState.GridSynergy)
+            run.ExitGridSynergy();
+        else
+            run.EnterGridSynergy();
     }
 
     //============================================================

@@ -11,6 +11,7 @@ public sealed class HudView : MonoBehaviour
     [Header("Sections")]
     [SerializeField] private GameObject topBarRoot;
     [SerializeField] private CombatPanelView combatPanel;
+    [SerializeField] private GameObject gridPanel;
     [SerializeField] private BossPanelView bossPanelView;
     [SerializeField] private GameObject systemNoticesRoot;
 
@@ -32,6 +33,13 @@ public sealed class HudView : MonoBehaviour
             if (bossRoot != null)
                 bossPanelView = bossRoot.GetComponent<BossPanelView>() ?? bossRoot.gameObject.AddComponent<BossPanelView>();
         }
+
+        if (gridPanel == null)
+        {
+            var gridRoot = FindChildRecursive(transform, "Panel_Grid");
+            if (gridRoot != null)
+                gridPanel = gridRoot.gameObject;
+        }
     }
 
     public void SetSections(HUDIds.Section sections)
@@ -40,6 +48,7 @@ public sealed class HudView : MonoBehaviour
 
         SetActiveSafe(topBarRoot, (sections & HUDIds.Section.TopBar) != 0);
         SetActiveSafe(combatPanel, showCombat);
+        SetActiveSafe(gridPanel, (sections & HUDIds.Section.GridPanel) != 0);
         SetActiveSafe(bossPanelView, (sections & HUDIds.Section.BossPanel) != 0);
         SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
 

@@ -33,6 +33,7 @@ public static class HUDIds
 
         TopBar        = 1 << 0,
         CombatPanel   = 1 << 1,
+        GridPanel     = 1 << 2,
         BossPanel     = 1 << 3,
         SystemNotices = 1 << 4,
     }

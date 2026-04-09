@@ -1,0 +1,8 @@
+{
+  "items": [
+    {"item_id":"ring_atk_01","item_name":"힘의 반지","rarity":"Common","category":"Ring","slot":1,"effect_type":"MeleeAttack","trigger":"Always","value":5,"value2":0,"value3":0,"max_stack":0,"duration":0,"cooldown":0,"shape_id":2,"icon_key":"","description":"근거리 공격력 5 증가","stat_version":1},
+    {"item_id":"ring_def_01","item_name":"수호의 반지","rarity":"Common","category":"Ring","slot":1,"effect_type":"Defense","trigger":"Always","value":3,"value2":0,"value3":0,"max_stack":0,"duration":0,"cooldown":0,"shape_id":1,"icon_key":"","description":"방어력 3 증가","stat_version":1},
+    {"item_id":"charm_luck_01","item_name":"행운의 부적","rarity":"Common","category":"Charm","slot":1,"effect_type":"Luck","trigger":"Always","value":5,"value2":0,"value3":0,"max_stack":0,"duration":0,"cooldown":0,"shape_id":1,"icon_key":"","description":"행운 5 증가","stat_version":1},
+    {"item_id":"potion_heal_01","item_name":"회복 물약","rarity":"Common","category":"Active","slot":1,"effect_type":"Heal","trigger":"OnUse","value":30,"value2":0,"value3":0,"max_stack":0,"duration":0,"cooldown":15,"shape_id":1,"icon_key":"","description":"HP 30 회복 (쿨타임 15초)","stat_version":1}
+  ]
+}
