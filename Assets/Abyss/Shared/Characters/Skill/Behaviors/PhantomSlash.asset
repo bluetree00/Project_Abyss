@@ -25,4 +25,4 @@ MonoBehaviour:
   hitEffectScale: 0.3
   finishEffectKey: ShinySlash
   finishEffectScale: 0.5
-  animationOverride: QSkill_Iasen
+  animationOverride: QSkill_01

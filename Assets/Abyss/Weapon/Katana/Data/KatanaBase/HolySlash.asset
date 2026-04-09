@@ -42,4 +42,4 @@ MonoBehaviour:
   tier3DashLineExtraKey: IasenDashLaser
   tier3DashLineExtraScale: 1.5
   useWeaponTrail: 1
-  animationOverride: QSkill_Iasen
+  animationOverride: QSkill_01

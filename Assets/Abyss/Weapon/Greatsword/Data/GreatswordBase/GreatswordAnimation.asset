@@ -48,7 +48,7 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: 0.9
-    - baseClipName: QSkill_Iasen
+    - baseClipName: QSkill_01
       addressableKey: GreatswordQSkill
       actionType: 3
       comboIndex: 0
