@@ -1,0 +1,8 @@
+{
+  "grids": [
+    {"grid_id":"grid_power_01","grid_name":"힘의 문양","order":1,"rows":3,"cols":3,"g1":"111","g2":"111","g3":"111","g4":"","g5":"","g6":"","g7":"","g8":"","slot":1,"effect_type":"AttackPower","trigger":"Always","value":10,"value2":0,"value3":0,"max_stack":0,"duration":0,"description":"공격력 10 증가","stat_version":1},
+    {"grid_id":"grid_guard_01","grid_name":"수호의 문양","order":2,"rows":3,"cols":2,"g1":"11","g2":"11","g3":"11","g4":"","g5":"","g6":"","g7":"","g8":"","slot":1,"effect_type":"Defense","trigger":"Always","value":8,"value2":0,"value3":0,"max_stack":0,"duration":0,"description":"방어력 8 증가","stat_version":1},
+    {"grid_id":"grid_guard_01","grid_name":"","order":0,"rows":0,"cols":0,"g1":"","g2":"","g3":"","g4":"","g5":"","g6":"","g7":"","g8":"","slot":2,"effect_type":"MaxHp","trigger":"Always","value":30,"value2":0,"value3":0,"max_stack":0,"duration":0,"description":"최대 HP 30 증가","stat_version":1},
+    {"grid_id":"grid_swift_01","grid_name":"신속의 문양","order":3,"rows":2,"cols":4,"g1":"1111","g2":"1111","g3":"","g4":"","g5":"","g6":"","g7":"","g8":"","slot":1,"effect_type":"AttackSpeed","trigger":"Always","value":0.1,"value2":0,"value3":0,"max_stack":0,"duration":0,"description":"공격 속도 10% 증가","stat_version":1}
+  ]
+}

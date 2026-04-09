@@ -10,13 +10,37 @@ using UnityEngine;
 public class ItemSO : ScriptableObject
 {
     [Header("기본 정보")]
-    public string itemId;           // 고유 식별자 (ex. "item_sword_shard")
+    public string itemId;           // 고유 식별자 (ex. "ring_atk_01")
     public string displayName;      // UI 표시 이름
     public Sprite icon;
+    public string iconKey;          // Addressables 아이콘 키
+
+    [Header("분류")]
+    public ItemRarity rarity;
+    public ItemCategory category;
+
+    [Header("블록")]
+    [Tooltip("BLOCK_SHAPE_DATA의 shape_id 참조. 0이면 블록 없음.")]
+    public int shapeId;
 
     [Header("스탯 수정자")]
     public List<StatModifier> modifiers = new List<StatModifier>();
-    // 예시:
-    //   AttackPower +5
-    //   MaxHp       +20
+}
+
+public enum ItemRarity
+{
+    Common,
+    Rare,
+    Epic
+}
+
+public enum ItemCategory
+{
+    Ring,
+    Necklace,
+    Boots,
+    Gloves,
+    Belt,
+    Charm,
+    Active
 }

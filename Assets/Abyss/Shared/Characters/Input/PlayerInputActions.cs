@@ -244,6 +244,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""PuzzleToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""b3c7a1e2-5f8d-4a2b-9e1c-6d4f3a2b1c0d"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -477,6 +486,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""RSkill"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a1b2c3d4-e5f6-7890-abcd-ef1234567890"",
+                    ""path"": ""<Keyboard>/tab"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""PuzzleToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -502,6 +522,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_testKey = m_Player.FindAction("testKey", throwIfNotFound: true);
         m_Player_testKey2 = m_Player.FindAction("testKey2", throwIfNotFound: true);
         m_Player_RSkill = m_Player.FindAction("RSkill", throwIfNotFound: true);
+        m_Player_PuzzleToggle = m_Player.FindAction("PuzzleToggle", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -599,6 +620,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_testKey;
     private readonly InputAction m_Player_testKey2;
     private readonly InputAction m_Player_RSkill;
+    private readonly InputAction m_Player_PuzzleToggle;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player ".
     /// </summary>
@@ -679,6 +701,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @RSkill => m_Wrapper.m_Player_RSkill;
         /// <summary>
+        /// Provides access to the underlying input action "Player/PuzzleToggle".
+        /// </summary>
+        public InputAction @PuzzleToggle => m_Wrapper.m_Player_PuzzleToggle;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -755,6 +781,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @RSkill.started += instance.OnRSkill;
             @RSkill.performed += instance.OnRSkill;
             @RSkill.canceled += instance.OnRSkill;
+            @PuzzleToggle.started += instance.OnPuzzleToggle;
+            @PuzzleToggle.performed += instance.OnPuzzleToggle;
+            @PuzzleToggle.canceled += instance.OnPuzzleToggle;
         }
 
         /// <summary>
@@ -817,6 +846,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @RSkill.started -= instance.OnRSkill;
             @RSkill.performed -= instance.OnRSkill;
             @RSkill.canceled -= instance.OnRSkill;
+            @PuzzleToggle.started -= instance.OnPuzzleToggle;
+            @PuzzleToggle.performed -= instance.OnPuzzleToggle;
+            @PuzzleToggle.canceled -= instance.OnPuzzleToggle;
         }
 
         /// <summary>
@@ -976,5 +1008,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRSkill(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PuzzleToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPuzzleToggle(InputAction.CallbackContext context);
     }
 }

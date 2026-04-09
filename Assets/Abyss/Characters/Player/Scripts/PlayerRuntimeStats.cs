@@ -203,6 +203,16 @@ public sealed class PlayerRuntimeStats
     private int _roomRanged;
     private int _roomDefense;
 
+    // -- Grid Synergy --
+    private int _synergyMelee;
+    private int _synergyRanged;
+    private int _synergyDefense;
+    private int _synergyLuck;
+    private int _synergyMaxHp;
+    private float _synergySkillCdr;
+    private float _synergyActiveItemCdr;
+    private float _synergyAttackSpeed;
+
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
 
@@ -324,15 +334,59 @@ public sealed class PlayerRuntimeStats
 
     private void Recalculate()
     {
-        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee);
-        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged);
-        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense);
-        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck);
+        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _synergyMelee);
+        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _synergyRanged);
+        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _synergyDefense);
+        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck + _synergyLuck);
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr);
-        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr);
+        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
 
         OnChanged?.Invoke();
+    }
+
+    // ── 시너지 ──────────────────────────────────────────────────────────────────
+
+    /// <summary>그리드 시너지 효과 적용. effect_type 문자열 기반.</summary>
+    public void ApplySynergyEffect(string effectType, float value)
+    {
+        switch (effectType)
+        {
+            case "MeleeAttack":   _synergyMelee  += (int)value; break;
+            case "RangedAttack":  _synergyRanged += (int)value; break;
+            case "AttackPower":
+                _synergyMelee  += (int)value;
+                _synergyRanged += (int)value;
+                break;
+            case "Defense":       _synergyDefense += (int)value; break;
+            case "MaxHp":
+                _synergyMaxHp += (int)value;
+                MaxHp = Mathf.Max(1, MaxHp + (int)value);
+                Hp = Mathf.Min(Hp, MaxHp);
+                break;
+            case "Luck":          _synergyLuck += (int)value; break;
+            case "AttackSpeed":   _synergyAttackSpeed += value; break;
+            case "MoveSpeed":     break; // TODO: 이동속도 레이어 추가 시
+            case "SkillCooldownReduction":       _synergySkillCdr += value; break;
+            case "ActiveItemCooldownReduction":  _synergyActiveItemCdr += value; break;
+        }
+
+        Recalculate();
+    }
+
+    /// <summary>모든 시너지 효과 초기화.</summary>
+    public void ClearSynergyEffects()
+    {
+        _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
+        _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
+
+        if (_synergyMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp - _synergyMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        Recalculate();
     }
 }
