@@ -2094,6 +2094,7 @@ MonoBehaviour:
   puzzlePrefab: {fileID: 3243770689857458355, guid: a7d3c1adae069124b8f75cec782d5e34,
     type: 3}
   boardManager: {fileID: 0}
+  thumbnailFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
 --- !u!1 &2460553339345271598
 GameObject:
   m_ObjectHideFlags: 0
@@ -8785,6 +8786,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 664543707926312876}
     m_Modifications:
+    - target: {fileID: 393384489012336071, guid: a7d3c1adae069124b8f75cec782d5e34,
+        type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 556537878614734768, guid: a7d3c1adae069124b8f75cec782d5e34,
         type: 3}
       propertyPath: m_AnchorMax.y

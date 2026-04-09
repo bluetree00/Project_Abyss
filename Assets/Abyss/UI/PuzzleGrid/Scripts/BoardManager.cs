@@ -64,6 +64,10 @@ public class BoardManager : MonoBehaviour
     [Tooltip("현재 그리드 이름을 표시하는 텍스트 (옵션).")]
     public TMPro.TMP_Text gridNameText;
 
+    [Header("Back Button")]
+    [Tooltip("선택 화면으로 돌아가는 버튼 (옵션, 없으면 자동 탐색).")]
+    [SerializeField] private UnityEngine.UI.Button backButton;
+
     [Header("Addressables")]
     [Tooltip("어드레서블 Shape SO 그룹 키 (레이블 또는 그룹명).")]
     public string shapeGroupKey = "SO Shape";
@@ -155,6 +159,20 @@ public class BoardManager : MonoBehaviour
                     if (t.gameObject.name == "GridNameText") { gridNameText = t; break; }
         }
 
+        // BackButton 자동 탐색 및 연결
+        if (backButton == null)
+        {
+            var canvas = GetComponentInParent<Canvas>(true);
+            if (canvas != null)
+            {
+                var buttons = canvas.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+                foreach (var btn in buttons)
+                    if (btn.gameObject.name == "BackButton") { backButton = btn; break; }
+            }
+        }
+        if (backButton != null)
+            backButton.onClick.AddListener(BackToSelection);
+
         var go = new GameObject("CacheRoot", typeof(RectTransform));
         cacheRoot = (RectTransform)go.transform;
         cacheRoot.SetParent(transform, false);
@@ -185,6 +203,9 @@ public class BoardManager : MonoBehaviour
 
     void OnDestroy()
     {
+        if (backButton != null)
+            backButton.onClick.RemoveListener(BackToSelection);
+
         foreach (var kvp in _dataChangeHandlers)
         {
             var so = kvp.Key;
