@@ -15,8 +15,11 @@ public class DBThunderShieldPatternSO : BossPatternSO
 
     [Header("Shield")]
     [SerializeField] private float shieldDuration = 3f;
-    [SerializeField] private float reflectRadius = 2f;
+    [SerializeField] private float reflectRadius = 3.5f;
     [SerializeField] private float reflectTickInterval = 0.5f;
+
+    [Header("Barrier Visual")]
+    [SerializeField] private float barrierLineWidth = 0.2f;
 
     private ThunderShieldState _state;
 
@@ -28,12 +31,16 @@ public class DBThunderShieldPatternSO : BossPatternSO
 
     private sealed class ThunderShieldState : InvincibleState<DBThunderShieldPatternSO>
     {
+        private const int BarrierSegments = 64;
+
         private float _timer;
         private float _shieldTimer;
         private float _reflectTick;
         private int _phase;
         private float _phaseDuration;
         private GameObject _activeVfx;
+        private LineRenderer _barrierLine;
+        private Material     _barrierMat;
 
         public ThunderShieldState(DBThunderShieldPatternSO data) : base(data) { }
 
@@ -50,12 +57,22 @@ public class DBThunderShieldPatternSO : BossPatternSO
             if (dragon != null)
                 dragon.DBBlackboard.ThunderShieldActive = true;
 
-            MonsterGroundWarning.SpawnGrid(
-                ctx.Transform.position,
-                ctx.Transform.forward,
-                MonsterGroundWarning.GridShape.Around8,
-                0.6f,
-                new Color(1f, 0.9f, 0.1f));
+            // ── 보스 주위를 감싸는 원형 배리어 LineRenderer ────────
+            var lineGo = new GameObject("[ThunderBarrier]");
+            lineGo.transform.position = ctx.Transform.position;
+
+            _barrierMat = new Material(Shader.Find("Sprites/Default"));
+            _barrierLine = lineGo.AddComponent<LineRenderer>();
+            _barrierLine.loop               = true;
+            _barrierLine.useWorldSpace      = true;
+            _barrierLine.positionCount      = BarrierSegments;
+            _barrierLine.widthMultiplier    = Data.barrierLineWidth;
+            _barrierLine.material           = _barrierMat;
+            _barrierLine.startColor         = new Color(1f, 0.9f, 0.1f, 1f);
+            _barrierLine.endColor           = new Color(1f, 0.9f, 0.1f, 1f);
+            _barrierLine.shadowCastingMode  = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _barrierLine.receiveShadows     = false;
+            UpdateBarrierRing(ctx.Transform.position);
 
             if (Data.vfxPrefab != null)
             {
@@ -80,6 +97,19 @@ public class DBThunderShieldPatternSO : BossPatternSO
 
             if (_activeVfx != null)
                 _activeVfx.transform.position = ctx.Transform.position;
+
+            // 배리어 링 보스 위치 추종 + 깜빡임
+            if (_barrierLine != null)
+            {
+                UpdateBarrierRing(ctx.Transform.position);
+                float blink = (Mathf.Sin(_shieldTimer * 6f) + 1f) * 0.5f; // 0~1 부드러운 펄스
+                Color bc = Color.Lerp(
+                    new Color(1f, 0.9f, 0.1f, 0.6f),
+                    new Color(1f, 1f,   0.4f, 1.0f),
+                    blink);
+                _barrierLine.startColor = bc;
+                _barrierLine.endColor   = bc;
+            }
 
             if (_reflectTick >= Data.reflectTickInterval)
             {
@@ -116,6 +146,32 @@ public class DBThunderShieldPatternSO : BossPatternSO
             {
                 BossEffectPool.Release(_activeVfx);
                 _activeVfx = null;
+            }
+
+            if (_barrierLine != null)
+            {
+                Object.Destroy(_barrierLine.gameObject);
+                _barrierLine = null;
+            }
+            if (_barrierMat != null)
+            {
+                Object.Destroy(_barrierMat);
+                _barrierMat = null;
+            }
+        }
+
+        private void UpdateBarrierRing(Vector3 center)
+        {
+            if (_barrierLine == null) return;
+            float r    = Data.reflectRadius;
+            float midY = center.y + 1.2f; // 보스 허리 높이
+            for (int i = 0; i < BarrierSegments; i++)
+            {
+                float a = (float)i / BarrierSegments * Mathf.PI * 2f;
+                _barrierLine.SetPosition(i,
+                    new Vector3(center.x + Mathf.Cos(a) * r,
+                                midY,
+                                center.z + Mathf.Sin(a) * r));
             }
         }
 

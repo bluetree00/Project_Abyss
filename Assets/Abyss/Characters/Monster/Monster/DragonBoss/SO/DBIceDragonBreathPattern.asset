@@ -17,10 +17,20 @@ MonoBehaviour:
   breakOverride: -1
   animName: Attack01
   crossFade: 0.1
-  vfxPrefab: {fileID: 8648715740624708647, guid: a0dfb90cc2903b94d936a6f54996db36, type: 3}
-  iceColumnVfxPrefab: {fileID: 687977002765671694, guid: 34984b1e598f313429cd5eb799c9592a, type: 3}
-  warningDuration: 2
-  columnRadius: 1.5
-  columnSpacing: 2.5
+  vfxPrefab: {fileID: 8648715740624708647, guid: a0dfb90cc2903b94d936a6f54996db36,
+    type: 3}
+  iceColumnVfxPrefab: {fileID: 687977002765671694, guid: 34984b1e598f313429cd5eb799c9592a,
+    type: 3}
+  warningDuration: 1.2
+  breathDuration: 5
+  breathTickInterval: 0.25
+  columnTickInterval: 1.2
+  columnDuration: 3
+  columnRadius: 2.5
+  columnRingRadius: 8
   breathCastRadius: 1.2
-  breathCastMaxDist: 10
+  riseHeight: 8
+  beamApproachRadius: 8
+  beamTrackSpeed: 3
+  beamWidth: 0.6
+  patternCooldown: 20

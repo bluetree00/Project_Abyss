@@ -17,12 +17,20 @@ MonoBehaviour:
   breakOverride: -1
   animName: Attack01
   crossFade: 0.1
-  vfxPrefab: {fileID: 3455203728533863914, guid: 53c0d1cb440e2eb45995d485f1510532, type: 3}
-  lightningVfxPrefab: {fileID: 100100000, guid: b87545f0bb40e5f4d910e8c21aacafb7, type: 2}
-  warningDuration: 2
-  lightningRadius: 1.5
-  lightningSpacing: 3
-  breathDuration: 2
-  breathTickInterval: 0.3
+  vfxPrefab: {fileID: 3455203728533863914, guid: 53c0d1cb440e2eb45995d485f1510532,
+    type: 3}
+  lightningVfxPrefab: {fileID: 100100000, guid: b87545f0bb40e5f4d910e8c21aacafb7,
+    type: 3}
+  warningDuration: 1.2
+  breathDuration: 5
+  breathTickInterval: 0.25
+  lightningTickInterval: 1.2
+  lightningDuration: 3
+  lightningRadius: 2.5
+  lightningRingRadius: 8
   castRadius: 1.2
-  castMaxDist: 10
+  riseHeight: 8
+  beamApproachRadius: 8
+  beamTrackSpeed: 3
+  beamWidth: 0.6
+  patternCooldown: 20

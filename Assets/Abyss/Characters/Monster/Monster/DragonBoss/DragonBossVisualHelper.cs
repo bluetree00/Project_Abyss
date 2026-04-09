@@ -52,6 +52,18 @@ public static class DragonBossVisualHelper
         }
     }
 
+    /// <summary>
+    /// 지정 위치에서 위로 10m 올려 아래 방향으로 레이캐스트해 실제 지면 y를 반환.
+    /// Trigger 콜라이더는 무시. 감지 실패 시 pos.y 반환.
+    /// </summary>
+    public static float GetGroundY(Vector3 pos)
+    {
+        Vector3 origin = pos + Vector3.up * 10f;
+        if (Physics.Raycast(origin, Vector3.down, out var hit, 30f, -1, QueryTriggerInteraction.Ignore))
+            return hit.point.y;
+        return pos.y;
+    }
+
     public static void ApplyEffectTint(GameObject root, Color color)
     {
         if (root == null) return;

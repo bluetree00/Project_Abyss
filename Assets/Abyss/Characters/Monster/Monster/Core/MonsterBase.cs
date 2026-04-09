@@ -191,7 +191,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         else
             Managers.Player.OnPlayerSpawned += OnPlayerSpawned;
 
-        // 8. FSM 초기화
+        // 8. NavMesh 준비 대기 — 런타임 NavMesh 생성 시 agent가 배치될 때까지 폴링
+        await WaitForNavMeshAsync();
+
+        // 9. FSM 초기화
         _fsm = new MonsterFSM(_ctx);
         RegisterStates();
         _fsm.ChangeState<PatrolState>();
@@ -205,6 +208,41 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>초기화 완료 후 파생 클래스에서 추가 처리가 필요한 경우 오버라이드.</summary>
     protected virtual void OnInitialized() { }
+
+    /// <summary>
+    /// NavMeshAgent가 NavMesh 위에 올라올 때까지 최대 10초 대기한다.
+    /// 런타임에 NavMesh가 생성되는 씬(지형 런타임 빌드 등)에서 필요.
+    /// </summary>
+    private async UniTask WaitForNavMeshAsync()
+    {
+        if (_agent == null) return;
+        if (_agent.isOnNavMesh) return;
+
+        var token = this.GetCancellationTokenOnDestroy();
+        float elapsed = 0f;
+        const float timeout   = 10f;
+        const float pollMs    = 100;
+        const float sampleRadius = 5f;
+
+        while (elapsed < timeout)
+        {
+            token.ThrowIfCancellationRequested();
+
+            if (NavMesh.SamplePosition(transform.position, out var hit, sampleRadius, NavMesh.AllAreas))
+            {
+                _agent.Warp(hit.position);
+                // Warp 후 한 프레임 대기해 isOnNavMesh 갱신
+                await UniTask.Yield(token);
+                if (_agent.isOnNavMesh) return;
+            }
+
+            elapsed += pollMs / 1000f;
+            await UniTask.Delay((int)pollMs, cancellationToken: token);
+        }
+
+        Debug.LogWarning($"[MonsterBase] {name}: NavMesh 대기 타임아웃 ({timeout}s). " +
+                         "NavMesh가 이 위치를 포함하는지 확인하세요.", this);
+    }
 
     /// <summary>
     /// 공용 상태를 FSM에 등록한다.

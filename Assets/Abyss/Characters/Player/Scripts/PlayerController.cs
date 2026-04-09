@@ -167,6 +167,14 @@ public class PlayerController : CharacterBase
     }
 
     //============================================================
+    // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
+    //============================================================
+
+    /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
+    public void ApplyThunderGroggy(float duration)
+        => Abyss.Monster.ThunderGroggyVignetteView.Trigger(duration);
+
+    //============================================================
     // Input Buffer & Time
     //============================================================
     protected IClock Clock { get; private set; }
@@ -314,7 +322,23 @@ public class PlayerController : CharacterBase
         FreezeRotation();
     }
 
-    private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
+    private void OnEnable()
+    {
+        // OnDisable에서 Disable한 경우 재활성화
+        if (inputReady && inputActions != null)
+        {
+            inputActions.Enable();
+            inputActions.Player.Enable();
+        }
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeFromAnimationReceiver(EventReceiver);
+        // 씬 전환 / 오브젝트 비활성화 시에도 반드시 Disable (Finalizer 경고 방지)
+        inputActions?.Player.Disable();
+        inputActions?.Disable();
+    }
 
     private void OnDestroy()
     {

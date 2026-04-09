@@ -14,11 +14,11 @@ public class DBDivePatternSO : BossPatternSO
     [SerializeField] private GameObject vfxPrefab;
 
     [Header("Dive")]
-    [SerializeField] private float warningDuration = 0.8f;
-    [SerializeField] private float diveDuration = 1.1f;
-    [SerializeField] private float jumpHeight = 6f;
-    [SerializeField] private float hitBoxWidth = 2f;
-    [SerializeField] private float hitBoxLength = 1f;
+    [SerializeField] private float warningDuration = 1.0f;
+    [SerializeField] private float diveDuration = 0.55f;   // 빠른 돌진
+    [SerializeField] private float jumpHeight = 0.8f;      // 낮은 호버(거의 수평)
+    [SerializeField] private float hitBoxWidth = 2.5f;
+    [SerializeField] private float hitBoxLength = 2f;
     [SerializeField] private float selfDamageRatioOnCrash = 0.08f;
 
     private DiveState _state;
@@ -67,10 +67,13 @@ public class DBDivePatternSO : BossPatternSO
             if (ctx.Animator != null)
                 ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
-            MonsterGroundWarning.SpawnGrid(
-                _targetPos,
+            // 돌진 경로 전체를 직사각형 경고로 표시 (보스 → 플레이어 방향)
+            float diveLen = Vector3.Distance(_startPos, _targetPos);
+            MonsterGroundWarning.SpawnRect(
+                _startPos,
                 _diveDir,
-                MonsterGroundWarning.GridShape.Front2,
+                Data.hitBoxWidth * 2f,
+                Mathf.Max(2f, diveLen + 2f),
                 Data.warningDuration,
                 new Color(1f, 0.5f, 0f));
 
@@ -134,7 +137,10 @@ public class DBDivePatternSO : BossPatternSO
         private void UpdateDivePose(MonsterContext ctx)
         {
             float t = Mathf.Clamp01(_timer / Mathf.Max(0.01f, Data.diveDuration));
-            Vector3 horizontal = Vector3.Lerp(_startPos, _targetPos, t);
+            // ease-out: 초반 빠르게 → 목표 근처 감속, 수평 돌진처럼 보임
+            float easeT = 1f - (1f - t) * (1f - t);
+            Vector3 horizontal = Vector3.Lerp(_startPos, _targetPos, easeT);
+            // 살짝 낮은 호버로 지면 스치는 느낌
             float height = Mathf.Sin(t * Mathf.PI) * Data.jumpHeight;
             ctx.Transform.position = horizontal + Vector3.up * height;
 
