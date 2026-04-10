@@ -13,11 +13,16 @@ MonoBehaviour:
   m_Name: DBMiniDragonSummonPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DBMiniDragonSummonPatternSO
   weight: 1
-  patternTag: 
+  patternTag:
   breakOverride: -1
   animName: FlyFWD
   crossFade: 0.15
   vfxPrefab: {fileID: 0}
   miniDragonPrefab: {fileID: 0}
+  miniDragonScale: 0.5
   spawnRadius: 4
   summonDelay: 1.2
+  takeOffDuration: 0.6
+  landDuration: 0.7
+  flightHeight: 10
+  iceLandingPattern: {fileID: 11400000, guid: e88da48cb9c4a9641acc707086b24237, type: 2}
