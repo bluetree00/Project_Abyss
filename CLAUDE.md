@@ -55,6 +55,12 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 - **클래스 멤버 순서**: `Constants` → `Static` → `[SerializeField]` → `Private` → `Properties` → `Lifecycle`(Awake→OnEnable→Start→Update→OnDestroy) → `Public Methods` → `Private Methods` → `Event Handlers`
 - **Animator**: 새 상태 추가 시 `writeDefaultValues = false` 필수
 
+## 컴파일 검증 규칙 (필수)
+- 모든 .cs 파일 수정 작업이 끝난 후, 반드시 `refresh_unity` → `read_console`로 컴파일 에러 확인
+- 에러가 있으면 즉시 수정 후 다시 `refresh_unity` → `read_console` 확인
+- 에러가 0이 될 때까지 반복한다
+- 매 파일 수정마다가 아니라, 한 질문(작업 단위)이 끝난 시점에 1회 수행한다
+
 ## 현재 개발 상태
 - **Phase 1 (인게임 루프)** 진행 중
 - **참고 문서**: `Assets/Abyss/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
