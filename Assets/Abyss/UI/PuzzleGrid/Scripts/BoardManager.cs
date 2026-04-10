@@ -118,6 +118,14 @@ public class BoardManager : MonoBehaviour
     /// <summary>현재 활성화된 그리드 SO. 뮤테이터(AddShape, SetPattern 등) 호출에 사용.</summary>
     public GridAssetSO ActiveAsset => activeAsset;
 
+    /// <summary>data.id로 캐시된 GridAssetSO의 세션에서 GridSquare 목록을 반환한다.</summary>
+    public System.Collections.Generic.List<GridSquare> GetGridSquares(string dataId)
+    {
+        if (!_runtimeSOCache.TryGetValue(dataId, out var so)) return null;
+        if (!sessions.TryGetValue(so, out var session)) return null;
+        return session.gridInstance != null ? session.gridInstance.GetGridSquares() : null;
+    }
+
     private readonly Dictionary<string, GridAssetSO> _runtimeSOCache = new();
     private BoardConfigSO    _runtimeBoardConfig;
     private PlacementRulesSO _runtimePlacementRules;
@@ -342,6 +350,8 @@ public class BoardManager : MonoBehaviour
             GridManager.Instance.placementRules = _runtimePlacementRules;
     }
 
+    public event System.Action OnBackToSelection;
+
     /// <summary>선택 화면으로 돌아간다.</summary>
     public void BackToSelection()
     {
@@ -354,6 +364,7 @@ public class BoardManager : MonoBehaviour
             GridManager.Instance.SetActiveGrid(null);
 
         SetModeSelection(true);
+        OnBackToSelection?.Invoke();
     }
 
     /// <summary>

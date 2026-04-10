@@ -13,6 +13,7 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
     // ── Constants ──
     private static readonly Color PLACEABLE_COLOR = new(0.3f, 0.7f, 1f, 0.85f);
     private static readonly Color BLOCKED_COLOR = new(0.15f, 0.15f, 0.2f, 0.4f);
+    private static readonly Color OCCUPIED_COLOR = new(0.2f, 0.9f, 0.3f, 0.9f);
     private static readonly Color SELECTED_BORDER_COLOR = new(1f, 0.85f, 0.3f, 1f);
     private static readonly Color NORMAL_BORDER_COLOR = new(0.4f, 0.4f, 0.5f, 0.6f);
 
@@ -27,6 +28,9 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
     private BoardManager _boardManager;
     private string _gridId;
     private bool _isSelected;
+    private Image[,] _cellImages;
+    private int _rows;
+    private int _cols;
 
     // ── Properties ──
     public string GridId => _gridId;
@@ -73,6 +77,32 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
             borderImage.color = selected ? SELECTED_BORDER_COLOR : NORMAL_BORDER_COLOR;
     }
 
+    /// <summary>
+    /// 그리드의 점유 상태를 썸네일에 반영한다.
+    /// </summary>
+    public void RefreshOccupied(System.Collections.Generic.List<GridSquare> squares)
+    {
+        if (_cellImages == null || squares == null) return;
+
+        // 먼저 모든 셀을 원래 색으로 리셋
+        for (int r = 0; r < _rows; r++)
+            for (int c = 0; c < _cols; c++)
+            {
+                if (_cellImages[r, c] == null) continue;
+                bool placeable = IsPlaceable(_runtimeData?.pattern, r, c);
+                _cellImages[r, c].color = placeable ? PLACEABLE_COLOR : BLOCKED_COLOR;
+            }
+
+        // 점유된 셀을 OCCUPIED_COLOR로 표시
+        foreach (var sq in squares)
+        {
+            if (sq == null || !sq.isOccupied) continue;
+            int r = sq.row, c = sq.col;
+            if (r >= 0 && r < _rows && c >= 0 && c < _cols && _cellImages[r, c] != null)
+                _cellImages[r, c].color = OCCUPIED_COLOR;
+        }
+    }
+
     // ── Private Methods ──
 
     private void BuildMiniGrid(GridPatternData pattern)
@@ -107,6 +137,10 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
         float startX = -totalW * 0.5f + cellSize * 0.5f;
         float startY = totalH * 0.5f - cellSize * 0.5f;
 
+        _rows = rows;
+        _cols = cols;
+        _cellImages = new Image[rows, cols];
+
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < cols; c++)
@@ -126,6 +160,8 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
                 var img = cellGO.GetComponent<Image>();
                 img.color = placeable ? PLACEABLE_COLOR : BLOCKED_COLOR;
                 img.raycastTarget = false;
+
+                _cellImages[r, c] = img;
             }
         }
     }
