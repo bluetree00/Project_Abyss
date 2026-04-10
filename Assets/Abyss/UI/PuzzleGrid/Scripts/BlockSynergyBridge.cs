@@ -52,7 +52,10 @@ public class BlockSynergyBridge : MonoBehaviour
     private void OnDestroy()
     {
         if (boardManager != null)
+        {
             boardManager.OnGridFilled -= HandleGridFilled;
+            boardManager.OnBackToSelection -= RefreshAllThumbnails;
+        }
 
         if (_puzzleInstance != null)
             Destroy(_puzzleInstance);
@@ -101,6 +104,8 @@ public class BlockSynergyBridge : MonoBehaviour
 
         boardManager.OnGridFilled -= HandleGridFilled;
         boardManager.OnGridFilled += HandleGridFilled;
+        boardManager.OnBackToSelection -= RefreshAllThumbnails;
+        boardManager.OnBackToSelection += RefreshAllThumbnails;
 
         RegisterAllGrids(blockData);
     }
@@ -339,6 +344,21 @@ public class BlockSynergyBridge : MonoBehaviour
     {
         // 자신(@HUD)의 하위에서 Panel_Grid 검색
         return FindChildRecursive(transform, "Panel_Grid");
+    }
+
+    // ── 썸네일 점유 상태 갱신 ──
+
+    /// <summary>모든 썸네일의 점유 상태를 현재 세션 데이터로 갱신한다.</summary>
+    public void RefreshAllThumbnails()
+    {
+        if (boardManager == null) return;
+
+        foreach (var thumb in _thumbnails)
+        {
+            if (thumb == null) continue;
+            var squares = boardManager.GetGridSquares(thumb.GridId);
+            thumb.RefreshOccupied(squares);
+        }
     }
 
     // ── 아이템 획득 시 블록(Shape) 등록 ──
