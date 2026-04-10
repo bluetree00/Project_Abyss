@@ -48,7 +48,10 @@ public sealed class HudView : MonoBehaviour
 
         SetActiveSafe(topBarRoot, (sections & HUDIds.Section.TopBar) != 0);
         SetActiveSafe(combatPanel, showCombat);
-        SetActiveSafe(gridPanel, (sections & HUDIds.Section.GridPanel) != 0);
+        bool showGrid = (sections & HUDIds.Section.GridPanel) != 0;
+        if (showGrid && gridPanel == null)
+            Debug.LogWarning("[HudView] gridPanel is null! Panel_Grid를 찾을 수 없음");
+        SetActiveSafe(gridPanel, showGrid);
         SetActiveSafe(bossPanelView, (sections & HUDIds.Section.BossPanel) != 0);
         SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
 

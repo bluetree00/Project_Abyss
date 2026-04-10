@@ -63,6 +63,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await InitPlayerDataAsync();
         await InitItemDataAsync();
 
+        // UIRoot 로드 대기 (BlockSynergyBridge가 @HUD에 있음)
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+
         // 블록 시너지 그리드 구성 (UIRoot @HUD에 있는 Bridge 사용)
         var bridge = BlockSynergyBridge.Instance;
         if (bridge == null)
@@ -294,6 +298,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     // 정상 런 없이 GameScene을 직접 실행할 때 (에디터 테스트용)
     private async UniTask StartCombatDirectAsync()
     {
+        // 에디터 직접 실행 시 Phase를 Running으로 설정 (Tab 등 입력 활성화)
+        _run?.ForceRunningForTest();
+
+        // UIRoot가 아직 로드 안 됐으면 대기
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(_run);

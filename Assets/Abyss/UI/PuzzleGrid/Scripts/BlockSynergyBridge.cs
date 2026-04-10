@@ -93,6 +93,9 @@ public class BlockSynergyBridge : MonoBehaviour
             return;
         }
 
+        // Puzzle 루트 RectTransform 보정 (Canvas 제거 후 scale 0 방지)
+        EnsurePuzzleRectTransform();
+
         boardManager.OnGridFilled -= HandleGridFilled;
         boardManager.OnGridFilled += HandleGridFilled;
 
@@ -445,6 +448,48 @@ public class BlockSynergyBridge : MonoBehaviour
             visual = new GridVisualData(),
             spawnableShapes = System.Array.Empty<ShapeData>(),
         };
+    }
+
+    private void EnsurePuzzleRectTransform()
+    {
+        // Panel_Grid → Puzzle → GameplayRoot → LeeBoardManagerObj
+        // boardManager.parent = GameplayRoot, GameplayRoot.parent = Puzzle
+        var gameplayRoot = boardManager.transform.parent;
+        var puzzleRoot = gameplayRoot?.parent;
+        var panelGrid = puzzleRoot?.parent;
+
+        Debug.Log($"[BlockSynergyBridge] EnsureRT: board={boardManager.name}" +
+                  $" gameplay={gameplayRoot?.name}" +
+                  $" puzzle={puzzleRoot?.name}(scale={puzzleRoot?.localScale})" +
+                  $" panelGrid={panelGrid?.name}");
+
+        // Panel_Grid, Puzzle, GameplayRoot, SelectionRoot 모두 보정
+        FixRectTransform(panelGrid);
+        FixRectTransform(puzzleRoot);
+
+        if (puzzleRoot != null)
+        {
+            foreach (Transform child in puzzleRoot)
+                FixRectTransform(child);
+        }
+    }
+
+    private static void FixRectTransform(Transform t)
+    {
+        if (t == null) return;
+        var rt = t.GetComponent<RectTransform>();
+        if (rt == null) return;
+
+        if (rt.localScale.sqrMagnitude < 0.01f)
+        {
+            Debug.Log($"[BlockSynergyBridge] FixRT: {t.name} scale was {rt.localScale} → (1,1,1)");
+            rt.localScale = Vector3.one;
+        }
+
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
