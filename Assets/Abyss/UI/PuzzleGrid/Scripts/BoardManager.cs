@@ -1,10 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 using UnityEngine.Events;
-using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
 /// 퍼즐 시스템의 중심 매니저.
@@ -67,10 +64,6 @@ public class BoardManager : MonoBehaviour
     [Header("Back Button")]
     [Tooltip("선택 화면으로 돌아가는 버튼 (옵션, 없으면 자동 탐색).")]
     [SerializeField] private UnityEngine.UI.Button backButton;
-
-    [Header("Addressables")]
-    [Tooltip("어드레서블 Shape SO 그룹 키 (레이블 또는 그룹명).")]
-    public string shapeGroupKey = "SO Shape";
 
     // ── 내부 세션 ─────────────────────────────────────────────────────
 
@@ -144,11 +137,6 @@ public class BoardManager : MonoBehaviour
     // 전역 배치 상태: 어느 그리드에 배치됐는지 (null이면 슬롯에 있음)
     private readonly Dictionary<Shape, GlobalPlacement> _globalPlacements = new();
 
-    private List<ShapeAssetSO> _cachedShapeSOs;
-    private AsyncOperationHandle<IList<ShapeAssetSO>> _shapeLoadHandle;
-    private bool _shapeHandleValid;
-    private bool _shapeLoadInProgress;
-
     public event Action<GridAssetSO> OnGridFilled;
 
     // ── 생명주기 ──────────────────────────────────────────────────────
@@ -202,13 +190,6 @@ public class BoardManager : MonoBehaviour
             EnterGrid(initialRuntimeData);
     }
 
-    // void Update()
-    // {
-    //     // 레거시 S키 Shape 스폰 (서버 데이터 방식에서는 BlockSynergyBridge가 담당)
-    //     if (Input.GetKeyDown(KeyCode.S))
-    //         StartCoroutine(SpawnRandomShapeCoroutine());
-    // }
-
     void OnDestroy()
     {
         if (backButton != null)
@@ -234,9 +215,6 @@ public class BoardManager : MonoBehaviour
 
         if (_runtimeBoardConfig    != null) Destroy(_runtimeBoardConfig);
         if (_runtimePlacementRules != null) Destroy(_runtimePlacementRules);
-
-        if (_shapeHandleValid && _shapeLoadHandle.IsValid())
-            Addressables.Release(_shapeLoadHandle);
     }
 
     // ── 공개 API ──────────────────────────────────────────────────────
@@ -251,7 +229,7 @@ public class BoardManager : MonoBehaviour
         EnterGrid(data);
     }
 
-    /// <summary>SO 방식 그리드 진입. GridSelectButton 등에서 호출.</summary>
+    /// <summary>SO 방식 그리드 진입.</summary>
     public void EnterGrid(GridAssetSO gridAsset)
     {
         if (gridAsset == null) return;
@@ -477,40 +455,6 @@ public class BoardManager : MonoBehaviour
         PlaceSharedShapeToSlot(shape);
     }
 
-    // ── Shape 스폰 (S키) ──────────────────────────────────────────────
-
-    /// <summary>
-    /// 어드레서블 Shape 그룹에서 랜덤으로 하나를 로드해 공용 풀에 추가한다.
-    /// S키 입력 시 호출된다.
-    /// </summary>
-    private IEnumerator SpawnRandomShapeCoroutine()
-    {
-        if (_shapeLoadInProgress) yield break;
-
-        if (_cachedShapeSOs == null)
-        {
-            _shapeLoadInProgress = true;
-            _shapeLoadHandle = Addressables.LoadAssetsAsync<ShapeAssetSO>(shapeGroupKey, null);
-            _shapeHandleValid = true;
-            yield return _shapeLoadHandle;
-            _shapeLoadInProgress = false;
-
-            if (_shapeLoadHandle.Status == AsyncOperationStatus.Succeeded)
-                _cachedShapeSOs = new List<ShapeAssetSO>(_shapeLoadHandle.Result);
-            else
-            {
-                Debug.LogWarning($"[BoardManager] Shape SO 로드 실패: 키={shapeGroupKey}");
-                yield break;
-            }
-        }
-
-        if (_cachedShapeSOs == null || _cachedShapeSOs.Count == 0) yield break;
-
-        var asset = _cachedShapeSOs[UnityEngine.Random.Range(0, _cachedShapeSOs.Count)];
-        SpawnSharedShape(asset);
-    }
-
-    /// <summary>Shape SO 하나로 공용 shape 인스턴스를 생성하고 풀에 추가한다.</summary>
     /// <summary>Shape SO로 공용 풀에 Shape 인스턴스를 생성한다. 활성 그리드 없어도 동작.</summary>
     public void SpawnSharedShape(ShapeAssetSO asset)
     {
