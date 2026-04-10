@@ -363,6 +363,7 @@ public class BlockSynergyBridge : MonoBehaviour
         // ShapeAssetSO를 런타임 생성
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
         shapeSO.shapeName = shapeEntry.shape_name;
+        shapeSO.shapeBlockPrefab = boardManager.defaultShapeBlockPrefab;
         shapeSO.cellOffsets = offsets;
         shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : 90f;
 
@@ -477,14 +478,11 @@ public class BlockSynergyBridge : MonoBehaviour
         StretchFill(panelGrid);
         StretchFill(puzzleRoot);
 
-        // SelectionRoot만 stretch (GameplayRoot 자식은 원래 레이아웃 유지)
+        // SelectionRoot만 stretch (GameplayRoot와 자식은 원래 레이아웃 유지)
         if (puzzleRoot != null)
         {
             var selectionRoot = boardManager.selectionRoot?.GetComponent<RectTransform>();
             StretchFill(selectionRoot);
-
-            // GameplayRoot도 stretch
-            StretchFill(gameplayRoot);
         }
     }
 
