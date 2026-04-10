@@ -1,31 +1,26 @@
 using UnityEngine;
+using Cinemachine;
 using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// 게임 카메라 컨트롤러.
-/// - 시작 연출: 멀리서 줌인 → 플레이어 위치로 이동
-/// - 이후: 플레이어를 따라가며 현재 오프셋/회전 유지
+/// - 씬 시작 시 카메라를 멀리 배치
+/// - OnPlayerBound 이벤트 수신 → 인트로 애니메이션 → Cinemachine에 제어권 반환
 /// </summary>
 public class GameCameraController : MonoBehaviour
 {
-    // ── Constants ──
-    private static readonly Vector3 DEFAULT_OFFSET = new(0f, 5f, -2f);
-
     // ── SerializeField ──
-    [Header("Follow")]
-    [SerializeField] private float followSmooth = 8f;
-
     [Header("Intro")]
-    [SerializeField] private float introStartHeight = 25f;
-    [SerializeField] private float introStartDistance = 15f;
-    [SerializeField] private float introDuration = 2f;
+    [SerializeField] private float introExtraHeight = 30f;
+    [SerializeField] private float introExtraBack = 10f;
+    [SerializeField] private float introDuration = 3f;
+    [SerializeField] private float introDelay = 0.3f;
 
     // ── Private ──
-    private Transform _target;
-    private Vector3 _offset;
-    private Quaternion _rotation;
-    private bool _introPlaying;
-    private bool _following;
+    private Vector3 _originalPosition;
+    private Quaternion _originalRotation;
+    private CinemachineFreeLook _cinemachine;
+    private CinemachineBrain _brain;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
@@ -37,79 +32,127 @@ public class GameCameraController : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // 현재 카메라의 오프셋/회전을 기준값으로 저장
-        _offset = transform.localPosition.sqrMagnitude > 0.01f
-            ? transform.localPosition
-            : DEFAULT_OFFSET;
-        _rotation = transform.rotation;
-    }
+        // 원래 카메라 세팅 저장
+        _originalPosition = transform.position;
+        _originalRotation = transform.rotation;
 
-    private void LateUpdate()
-    {
-        if (!_following || _target == null || _introPlaying) return;
+        _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        _brain = GetComponent<CinemachineBrain>();
 
-        Vector3 desired = _target.position + _offset;
-        transform.position = Vector3.Lerp(transform.position, desired, followSmooth * Time.deltaTime);
+        // 즉시 멀리 배치 (게임 시작부터 하늘에서 시작)
+        MoveToIntroPosition();
+
+        // Cinemachine 즉시 비활성화 (인트로 끝날 때까지)
+        if (_brain != null) _brain.enabled = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        // 이벤트 구독
+        SubscribePlayerBound();
     }
 
     private void OnDestroy()
     {
+        UnsubscribePlayerBound();
         if (Instance == this) Instance = null;
-    }
-
-    // ── Public Methods ──
-
-    /// <summary>플레이어 바인딩 + 시작 연출.</summary>
-    public void BindTarget(Transform target, bool playIntro = true)
-    {
-        _target = target;
-
-        if (playIntro)
-            PlayIntroAsync().Forget();
-        else
-            SnapToTarget();
-    }
-
-    /// <summary>즉시 플레이어 위치로 스냅.</summary>
-    public void SnapToTarget()
-    {
-        if (_target == null) return;
-        transform.position = _target.position + _offset;
-        transform.rotation = _rotation;
-        _following = true;
     }
 
     // ── Private Methods ──
 
-    private async UniTaskVoid PlayIntroAsync()
+    private void MoveToIntroPosition()
     {
-        if (_target == null) return;
-        _introPlaying = true;
-        _following = false;
-
-        // 시작 위치: 플레이어 위 + 뒤로 멀리
-        Vector3 targetPos = _target.position + _offset;
-        Vector3 introOffset = new Vector3(0f, introStartHeight, -introStartDistance);
-        Vector3 startPos = _target.position + introOffset;
+        Vector3 startPos = _originalPosition + new Vector3(0f, introExtraHeight, -introExtraBack);
+        Vector3 lookDir = _originalPosition - startPos;
+        Quaternion startRot = lookDir.sqrMagnitude > 0.01f
+            ? Quaternion.LookRotation(lookDir, Vector3.up)
+            : _originalRotation;
 
         transform.position = startPos;
-        transform.rotation = _rotation;
+        transform.rotation = startRot;
+    }
 
-        // 줌인 (멀리서 → 플레이어 오프셋 위치로)
+    private void SubscribePlayerBound()
+    {
+        // GameRunBootstrapper → GameRunSession.OnPlayerBound 구독
+        var bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
+        if (bootstrapper != null && bootstrapper.Run != null)
+        {
+            bootstrapper.Run.OnPlayerBound += OnPlayerBound;
+            return;
+        }
+
+        // 아직 Run이 없으면 폴링
+        WaitAndSubscribeAsync().Forget();
+    }
+
+    private async UniTaskVoid WaitAndSubscribeAsync()
+    {
+        await UniTask.WaitUntil(() =>
+            GameRunBootstrapper.Instance != null &&
+            GameRunBootstrapper.Instance.Run != null);
+
+        GameRunBootstrapper.Instance.Run.OnPlayerBound += OnPlayerBound;
+    }
+
+    private void UnsubscribePlayerBound()
+    {
+        if (GameRunBootstrapper.Instance?.Run != null)
+            GameRunBootstrapper.Instance.Run.OnPlayerBound -= OnPlayerBound;
+    }
+
+    // ── Event Handlers ──
+
+    private void OnPlayerBound(PlayerController player)
+    {
+        if (player == null) return;
+        PlayIntroAsync(player.transform).Forget();
+    }
+
+    private async UniTaskVoid PlayIntroAsync(Transform target)
+    {
+        // Cinemachine 확실히 비활성
+        if (_cinemachine == null)
+            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_brain == null)
+            _brain = GetComponent<CinemachineBrain>();
+
+        if (_brain != null) _brain.enabled = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        // 시작 위치 (현재 이미 멀리 가 있음)
+        Vector3 startPos = transform.position;
+        Quaternion startRot = transform.rotation;
+
+        // 최종 위치 (원래 카메라 세팅 기준 + 플레이어 위치 반영)
+        Vector3 offset = _originalPosition; // 씬에 설정된 카메라 위치가 곧 오프셋
+        Vector3 endPos = target.position + (offset - Vector3.zero); // 플레이어가 원점이 아닐 수 있음
+        Quaternion endRot = _originalRotation;
+
+        // 잠시 대기 (맵 렌더링)
+        await UniTask.Delay(
+            System.TimeSpan.FromSeconds(introDelay),
+            ignoreTimeScale: true);
+
+        // 줌인 애니메이션
         float elapsed = 0f;
         while (elapsed < introDuration)
         {
+            if (target == null) break;
             elapsed += Time.deltaTime;
-            float t = elapsed / introDuration;
-            // EaseOutCubic
+            float t = Mathf.Clamp01(elapsed / introDuration);
             float ease = 1f - (1f - t) * (1f - t) * (1f - t);
 
-            transform.position = Vector3.Lerp(startPos, targetPos, ease);
+            Vector3 currentEnd = target.position + offset;
+            transform.position = Vector3.Lerp(startPos, currentEnd, ease);
+            transform.rotation = Quaternion.Slerp(startRot, endRot, ease);
             await UniTask.Yield();
         }
 
-        transform.position = targetPos;
-        _introPlaying = false;
-        _following = true;
+        // 최종 스냅
+        transform.position = target.position + offset;
+        transform.rotation = endRot;
+
+        // Cinemachine 활성화 → follow 재개
+        if (_cinemachine != null) _cinemachine.enabled = true;
+        if (_brain != null) _brain.enabled = true;
     }
 }
