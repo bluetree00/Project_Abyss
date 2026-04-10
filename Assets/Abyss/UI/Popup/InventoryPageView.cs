@@ -77,11 +77,10 @@ public class InventoryPageView : MonoBehaviour
         gridGO.transform.SetParent(transform, false);
 
         _gridRoot = gridGO.GetComponent<RectTransform>();
-        _gridRoot.anchorMin = new Vector2(0, 1);
-        _gridRoot.anchorMax = new Vector2(1, 1);
-        _gridRoot.pivot = new Vector2(0.5f, 1);
-        _gridRoot.anchoredPosition = new Vector2(0, -10);
-        _gridRoot.sizeDelta = new Vector2(0, 0);
+        _gridRoot.anchorMin = Vector2.zero;
+        _gridRoot.anchorMax = Vector2.one;
+        _gridRoot.offsetMin = new Vector2(10, 10);
+        _gridRoot.offsetMax = new Vector2(-10, -10);
 
         var layout = gridGO.GetComponent<GridLayoutGroup>();
         layout.cellSize = Vector2.one * SLOT_SIZE;
@@ -180,7 +179,27 @@ public class InventoryPageView : MonoBehaviour
         exitEntry.callback.AddListener(e => HideTooltip());
         trigger.triggers.Add(exitEntry);
 
+        // 우클릭으로 아이템 제거
+        var clickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+        clickEntry.callback.AddListener(e =>
+        {
+            var pe = (PointerEventData)e;
+            if (pe.button == PointerEventData.InputButton.Right)
+                RemoveItem(capturedItem);
+        });
+        trigger.triggers.Add(clickEntry);
+
         _slots.Add(slotGO);
+    }
+
+    private void RemoveItem(RuntimeItemData item)
+    {
+        if (_inventory == null || item == null) return;
+
+        HideTooltip();
+        _inventory.RemoveItem(item);
+        // OnInventoryChanged → Refresh 자동 호출
+        // 스탯도 RefreshPlayerItemStats 자동 호출
     }
 
     private void ShowTooltip(RuntimeItemData item, RectTransform slotRT)

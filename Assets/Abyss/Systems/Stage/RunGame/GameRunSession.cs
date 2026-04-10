@@ -322,7 +322,20 @@ public sealed class GameRunSession
         if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
 
         SubscribePlayerStateSource(Player);
+
+        // 인벤토리 ↔ 스탯 연동 (추가/제거 시 자동 재계산)
+        if (Player?.RuntimeStats != null)
+        {
+            ItemInventory.OnInventoryChanged -= RefreshPlayerItemStats;
+            ItemInventory.OnInventoryChanged += RefreshPlayerItemStats;
+        }
+
         OnPlayerBound?.Invoke(Player);
+    }
+
+    private void RefreshPlayerItemStats()
+    {
+        Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)
