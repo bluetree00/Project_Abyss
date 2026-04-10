@@ -83,9 +83,9 @@ public class InventoryPageView : MonoBehaviour
         gridGO.transform.SetParent(transform, false);
 
         _gridRoot = gridGO.GetComponent<RectTransform>();
-        // 책의 오른쪽 페이지 영역 (전체의 오른쪽 절반, 여백 포함)
-        _gridRoot.anchorMin = new Vector2(0.52f, 0.08f);
-        _gridRoot.anchorMax = new Vector2(0.95f, 0.92f);
+        // 책의 오른쪽 페이지 영역
+        _gridRoot.anchorMin = new Vector2(0.52f, 0.05f);
+        _gridRoot.anchorMax = new Vector2(0.97f, 0.88f);
         _gridRoot.offsetMin = Vector2.zero;
         _gridRoot.offsetMax = Vector2.zero;
 
@@ -94,11 +94,11 @@ public class InventoryPageView : MonoBehaviour
         layout.spacing = Vector2.one * SLOT_SPACING;
         layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         layout.constraintCount = COLUMNS;
-        layout.childAlignment = TextAnchor.UpperCenter;
-        layout.padding = new RectOffset(10, 10, 10, 10);
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.padding = new RectOffset(15, 15, 15, 15);
 
-        var fitter = gridGO.GetComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        // ContentSizeFitter 제거 — 고정 영역 내에서 배치
+        Object.Destroy(gridGO.GetComponent<ContentSizeFitter>());
     }
 
     private void EnsureTooltip()
