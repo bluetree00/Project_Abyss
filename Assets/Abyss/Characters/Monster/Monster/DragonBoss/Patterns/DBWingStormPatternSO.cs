@@ -109,6 +109,8 @@ public class DBWingStormPatternSO : BossPatternSO
 
             if (Data.vfxPrefab != null)
                 BossEffectPool.SpawnOneShot(Data.vfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
+            else
+                SpawnWindVfx(ctx);
 
             // 직사각형 중심: 보스 위치에서 stormForward 방향으로 stormLength * 0.5f
             Vector3 boxCenter = ctx.Transform.position
@@ -151,6 +153,45 @@ public class DBWingStormPatternSO : BossPatternSO
                         player.ApplyKnockback(dir.normalized * kbForce, 0.3f);
                         break;
                 }
+            }
+        }
+
+        // vfxPrefab이 없을 때 코드 기반으로 바람 슬래시 이펙트 생성
+        private void SpawnWindVfx(MonsterContext ctx)
+        {
+            const int slashCount = 7;
+            Color wc = new Color(0.85f, 0.95f, 1f, 0.75f);
+
+            for (int i = 0; i < slashCount; i++)
+            {
+                float spread = Mathf.Lerp(-25f, 25f, (float)i / (slashCount - 1));
+                Vector3 slashDir = Quaternion.Euler(0f, spread, 0f) * _stormForward;
+
+                float heightOffset = 0.4f + i * 0.35f;
+                Vector3 start = ctx.Transform.position + Vector3.up * heightOffset;
+                float   len   = Data.stormLength * (0.5f + (i % 3) * 0.2f);
+                Vector3 end   = start + slashDir * len;
+
+                Vector3 dir = end - start;
+                float   mag = dir.magnitude;
+                if (mag < 0.01f) continue;
+
+                var cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                cyl.name = "[WingStormSlash]";
+                Object.Destroy(cyl.GetComponent<Collider>());
+
+                cyl.transform.position   = (start + end) * 0.5f;
+                cyl.transform.up         = dir.normalized;
+                cyl.transform.localScale = new Vector3(0.12f, mag * 0.5f, 0.12f);
+
+                var mat = new Material(cyl.GetComponent<Renderer>().sharedMaterial);
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", wc);
+                if (mat.HasProperty("_Color"))     mat.SetColor("_Color",     wc);
+                cyl.GetComponent<Renderer>().material = mat;
+
+                float lifetime = 0.2f + (i % 3) * 0.12f;
+                Object.Destroy(cyl, lifetime);
+                Object.Destroy(mat, lifetime + 0.05f);
             }
         }
 

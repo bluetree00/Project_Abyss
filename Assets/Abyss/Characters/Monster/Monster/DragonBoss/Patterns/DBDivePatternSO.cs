@@ -15,7 +15,7 @@ public class DBDivePatternSO : BossPatternSO
 
     [Header("Dive")]
     [SerializeField] private float warningDuration = 1.0f;
-    [SerializeField] private float diveDuration = 0.55f;   // 빠른 돌진
+    [SerializeField] private float diveDuration = 0.35f;   // 빠른 돌진
     [SerializeField] private float hitBoxWidth = 2.5f;
     [SerializeField] private float hitBoxLength = 2f;
     [SerializeField] private float selfDamageRatioOnCrash = 0.08f;
@@ -179,21 +179,27 @@ public class DBDivePatternSO : BossPatternSO
             }
         }
 
-        // 벽 충돌 시에만 보스 자기 데미지 (플레이어 충돌은 제외)
+        // 벽 충돌 시에만 보스 자기 데미지 (플레이어/자기 콜라이더 제외)
         private void CheckCrash(MonsterContext ctx)
         {
             float dist = Vector3.Distance(_startPos, _targetPos);
             if (dist <= 0.5f) return;
 
-            // 현재 위치 기준 전방 SphereCast
+            // 현재 위치 기준 전방 SphereCast (Trigger 무시)
             var ray = new Ray(ctx.Transform.position + Vector3.up * 0.5f, _diveDir);
-            if (!Physics.SphereCast(ray, 0.6f, out RaycastHit hit, 2f)) return;
+            if (!Physics.SphereCast(ray, 0.6f, out RaycastHit hit, 2f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return;
 
+            // 보스 자신의 콜라이더이면 무시
+            if (hit.collider.transform == ctx.Transform ||
+                hit.collider.transform.IsChildOf(ctx.Transform)) return;
+
+            // 플레이어 충돌은 무시
             var player = hit.collider.GetComponent<PlayerController>()
                 ?? hit.collider.GetComponentInParent<PlayerController>();
-            if (player != null) return; // 플레이어 충돌은 무시
+            if (player != null) return;
 
-            // 벽/맵 오브젝트에 박힌 경우 → 자기 데미지
+            // 벽/맵 오브젝트 → 자기 데미지
             _crashResolved = true;
             int selfDamage = Mathf.Max(1, Mathf.RoundToInt(ctx.Stat.maxHp * Data.selfDamageRatioOnCrash));
             ctx.Monster.TakeDamage(selfDamage, ctx.Monster.gameObject, 0f);

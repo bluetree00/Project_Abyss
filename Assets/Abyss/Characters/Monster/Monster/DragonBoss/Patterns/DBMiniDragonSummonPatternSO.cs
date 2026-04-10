@@ -22,12 +22,9 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
     [SerializeField] private float landDuration     = 0.7f;
     [SerializeField] private float flightHeight     = 10f;
 
-    [Header("Landing Hit")]
-    [SerializeField] private float landingHitRadius   = 5f;
-    [SerializeField] private float columnRingRadius   = 6f;
-    [SerializeField] private float columnDuration     = 2.5f;
-    [SerializeField] private float columnRadius       = 1.5f;
-    [SerializeField] private GameObject landingVfxPrefab;
+    [Header("Landing")]
+    [Tooltip("미니드래곤 전멸 후 재사용할 얼음 착지 패턴. 쿨타임 중이면 그냥 PatrolState로 복귀.")]
+    [SerializeField] private DBIceLandingPatternSO iceLandingPattern;
 
     private SummonState _state;
 
@@ -55,15 +52,11 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
         private int     _phase;
         private Vector3 _groundPos;
         private Vector3 _airPos;
-        private Vector3 _landingPos;
         private bool    _originalUpdatePosition;
         private bool    _originalUpdateRotation;
         private Renderer[] _renderers;
         private float   _lockedThreshold;
         private DragonBossBlackboard.DragonElement _element;
-
-        // 착지 충격파용 8방향 기둥 각도 (12시~시계방향)
-        private static readonly float[] s_colAngles = { 0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f };
 
         public SummonState(DBMiniDragonSummonPatternSO data) : base(data) { }
 
@@ -139,33 +132,18 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
                     if (dragon == null) break;
                     if (dragon.DBBlackboard.ActiveMiniDragonCount > 0) return;
 
-                    // 모두 처치됨 → 착지 목표 결정
-                    _landingPos = ctx.Runtime.PlayerTarget != null
-                        ? ctx.Runtime.PlayerTarget.position
-                        : _groundPos;
-                    _landingPos.y = _groundPos.y;
-
-                    // 착지 경고 장판
-                    var elemColor = DragonBossVisualHelper.GetElementColor(_element);
-                    MonsterGroundWarning.Spawn(_landingPos, Data.landingHitRadius, Data.landDuration, elemColor);
-
+                    // 모두 처치됨 → 렌더러/Agent 복구
                     SetRenderersEnabled(true);
-                    _phase = 3;
-                    _timer = 0f;
+                    RestoreAgentTracking(ctx);
+
+                    // IceLanding 패턴 재사용 (쿨타임 중이면 그냥 Patrol)
+                    var iceLanding = Data.iceLandingPattern;
+                    if (iceLanding != null && !iceLanding.IsOnCooldown)
+                        ctx.Monster.ChangeState(iceLanding.GetRuntimeState());
+                    else
+                        ctx.Monster.ChangeState<PatrolState>();
                     break;
                 }
-
-                // Phase 3: 착지 강하
-                case 3:
-                    LerpPosition(ctx, _airPos, _landingPos, _timer / Mathf.Max(0.01f, Data.landDuration));
-                    if (_timer < Data.landDuration) return;
-
-                    ctx.Transform.position = _landingPos;
-                    DoLandingShockwave(ctx);
-                    RestoreAgentTracking(ctx);
-                    ctx.Agent.Warp(_landingPos);
-                    ctx.Monster.ChangeState<PatrolState>();
-                    break;
             }
         }
 
@@ -206,52 +184,6 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
                 }
 
                 mini.Init(dragon, ctx.Runtime.PlayerTarget, _element);
-            }
-        }
-
-        // ── 착지 충격파 (IceLanding과 유사한 원소별 패턴) ──────────────
-
-        private void DoLandingShockwave(MonsterContext ctx)
-        {
-            int   damage   = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 1.2f);
-            float kbForce  = ctx.Stat.knockbackForce;
-            // 소환 착지 충격파는 항상 얼음 속성
-            var   elemColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
-
-            // 착지 VFX
-            var vfxSrc = Data.landingVfxPrefab ?? Data.vfxPrefab;
-            if (vfxSrc != null)
-                BossEffectPool.SpawnOneShot(vfxSrc, _landingPos, ctx.Transform.rotation);
-
-            // 근거리 플레이어 피해
-            var hits = Physics.OverlapSphere(_landingPos, Data.landingHitRadius);
-            foreach (var col in hits)
-            {
-                var player = col.GetComponent<PlayerController>()
-                    ?? col.GetComponentInParent<PlayerController>();
-                if (player == null) continue;
-
-                Vector3 dir = (col.transform.position - _landingPos).normalized;
-                dir.y = 0.3f;
-                player.TakeDamage(damage);
-                player.ApplyKnockback(dir.normalized * kbForce, 0.35f);
-            }
-
-            // 원소별 8방향 기둥 — 3초 유지 hazard
-            for (int i = 0; i < s_colAngles.Length; i++)
-            {
-                Vector3 dir = Quaternion.Euler(0f, s_colAngles[i], 0f) * Vector3.forward;
-                Vector3 pos = _landingPos + dir * Data.columnRingRadius;
-                pos.y = DragonBossVisualHelper.GetGroundY(pos);
-
-                MonsterGroundWarning.Spawn(pos, Data.columnRadius, Data.columnDuration, elemColor);
-                BossColumnHazard.Spawn(
-                    pos,
-                    Data.columnRadius,
-                    Data.columnDuration,
-                    0.5f,
-                    (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 0.5f),
-                    DragonBossBlackboard.DragonElement.Ice);
             }
         }
 

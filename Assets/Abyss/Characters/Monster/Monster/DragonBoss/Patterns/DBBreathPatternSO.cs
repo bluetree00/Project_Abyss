@@ -215,9 +215,10 @@ public class DBBreathPatternSO : BossPatternSO
         {
             Vector3 fwd = GetFlatForward(ctx);
 
-            // 보스 자신의 콜라이더에 맞지 않도록 전방 중간 지점에서 지면 y 탐지
-            Vector3 midPoint = ctx.Transform.position + fwd * (Data.castMaxDist * 0.5f);
-            float groundY = DragonBossVisualHelper.GetGroundY(midPoint);
+            // SpawnY를 기준으로 지면 y 결정 — GetGroundY가 보스 콜라이더를 맞출 위험 방지
+            var dragon = ctx.Monster as DragonBossMonster;
+            float groundY = dragon?.DBBlackboard?.SpawnY
+                ?? DragonBossVisualHelper.GetGroundY(ctx.Transform.position + fwd * (Data.castMaxDist * 0.5f));
 
             Vector3 origin = ctx.Transform.position;
             origin.y = groundY;

@@ -41,6 +41,7 @@ public class DBIceLandingPatternSO : BossPatternSO
     }
 
     internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
+    internal bool IsOnCooldown    => Time.time < _cooldownEndTime;
 
     public override SpecialStateBase GetRuntimeState() => _state;
 
