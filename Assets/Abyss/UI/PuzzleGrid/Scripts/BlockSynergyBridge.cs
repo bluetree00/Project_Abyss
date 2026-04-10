@@ -429,15 +429,43 @@ public class BlockSynergyBridge : MonoBehaviour
         var player = run?.Player;
         if (player == null) return;
 
+        var stats = player.RuntimeStats;
+
         foreach (var entry in entries)
         {
             if (string.IsNullOrEmpty(entry.effect_type)) continue;
 
-            // Always 트리거: 즉시 스탯 적용
-            if (entry.trigger == "Always")
-                player.RuntimeStats.ApplySynergyEffect(entry.effect_type, entry.value);
+            switch (entry.trigger)
+            {
+                case "Always":
+                    stats.ApplySynergyEffect(entry.effect_type, entry.value);
+                    break;
 
-            Debug.Log($"[BlockSynergyBridge] 시너지 발동: {gridId} → {entry.effect_type} +{entry.value}");
+                case "OnHit":
+                    stats.RegisterConditionalSynergy(new ConditionalSynergy
+                    {
+                        gridId     = gridId,
+                        effectType = entry.effect_type,
+                        trigger    = "OnHit",
+                        value      = entry.value,
+                        maxStack   = entry.max_stack > 0 ? entry.max_stack : 1,
+                        duration   = entry.duration,
+                    });
+                    break;
+
+                case "OnLowHp":
+                    stats.RegisterConditionalSynergy(new ConditionalSynergy
+                    {
+                        gridId     = gridId,
+                        effectType = entry.effect_type,
+                        trigger    = "OnLowHp",
+                        value      = entry.value,
+                        threshold  = entry.value2 > 0f ? entry.value2 : 0.3f,
+                    });
+                    break;
+            }
+
+            Debug.Log($"[BlockSynergyBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
         }
     }
 
