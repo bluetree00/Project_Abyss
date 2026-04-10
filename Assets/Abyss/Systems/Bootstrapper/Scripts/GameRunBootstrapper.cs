@@ -58,6 +58,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async void Start()
     {
+        // 카메라 인트로 준비 (즉시 멀리 배치 + OnPlayerBound 이벤트 대기)
+        EnsureCameraController();
+
         // 데이터 매니저 초기화
         await InitMapDataAsync();
         await InitPlayerDataAsync();
@@ -519,22 +522,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
         }
 
-        // 카메라 바인딩 (시작 연출 포함)
-        BindCameraToPlayer(player.transform);
-
         return player;
     }
 
-    private static void BindCameraToPlayer(Transform playerTransform)
+    private static void EnsureCameraController()
     {
         var cam = Camera.main;
+        if (cam == null) cam = Object.FindFirstObjectByType<Camera>();
         if (cam == null) return;
 
-        var controller = cam.GetComponent<GameCameraController>();
-        if (controller == null)
-            controller = cam.gameObject.AddComponent<GameCameraController>();
-
-        controller.BindTarget(playerTransform, playIntro: true);
+        if (cam.GetComponent<GameCameraController>() == null)
+            cam.gameObject.AddComponent<GameCameraController>();
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>
