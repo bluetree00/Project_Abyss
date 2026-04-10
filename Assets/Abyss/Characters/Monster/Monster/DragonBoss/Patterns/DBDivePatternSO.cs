@@ -68,6 +68,12 @@ public class DBDivePatternSO : BossPatternSO
             else
                 _diveDir.Normalize();
 
+            // Enter 시점에서 즉시 off — Phase 0 동안 NavMesh가 transform을 오버라이드하지 않도록
+            _originalUpdatePosition = ctx.Agent.updatePosition;
+            _originalUpdateRotation = ctx.Agent.updateRotation;
+            ctx.Agent.updatePosition = false;
+            ctx.Agent.updateRotation = false;
+
             if (ctx.Animator != null)
                 ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
@@ -81,8 +87,6 @@ public class DBDivePatternSO : BossPatternSO
                 Data.warningDuration,
                 new Color(1f, 0.5f, 0f));
 
-            _originalUpdatePosition = ctx.Agent.updatePosition;
-            _originalUpdateRotation = ctx.Agent.updateRotation;
             _hitDealt      = false;
             _crashResolved = false;
             _phase         = 0;
@@ -99,9 +103,7 @@ public class DBDivePatternSO : BossPatternSO
                 case 0:
                     if (_timer < _phaseDuration) return;
 
-                    _timer = 0f;
-                    ctx.Agent.updatePosition = false;
-                    ctx.Agent.updateRotation = false;
+                    _timer         = 0f;
                     _phase         = 1;
                     _phaseDuration = Data.diveDuration;
                     break;

@@ -215,7 +215,8 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
         {
             int   damage   = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 1.2f);
             float kbForce  = ctx.Stat.knockbackForce;
-            var   elemColor = DragonBossVisualHelper.GetElementColor(_element);
+            // 소환 착지 충격파는 항상 얼음 속성
+            var   elemColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
 
             // 착지 VFX
             var vfxSrc = Data.landingVfxPrefab ?? Data.vfxPrefab;
@@ -250,7 +251,7 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
                     Data.columnDuration,
                     0.5f,
                     (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 0.5f),
-                    _element);
+                    DragonBossBlackboard.DragonElement.Ice);
             }
         }
 

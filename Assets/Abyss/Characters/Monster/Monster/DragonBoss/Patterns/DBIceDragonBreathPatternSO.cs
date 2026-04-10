@@ -227,7 +227,7 @@ public class DBIceDragonBreathPatternSO : BossPatternSO
             {
                 _breathTick -= Data.breathTickInterval;
                 Vector3 warnPos = _beamTarget;
-                warnPos.y = _anchorPosition.y;
+                warnPos.y = DragonBossVisualHelper.GetGroundY(_beamTarget);
                 var iceWarnColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
                 MonsterGroundWarning.Spawn(warnPos, Data.breathCastRadius, Data.breathTickInterval + 0.05f, iceWarnColor);
                 DoBreathHit(ctx);

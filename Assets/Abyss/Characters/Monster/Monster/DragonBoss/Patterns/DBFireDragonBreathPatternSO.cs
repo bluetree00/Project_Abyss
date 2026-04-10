@@ -241,7 +241,7 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
             {
                 _breathTick -= Data.breathTickInterval;
                 Vector3 warnPos = _beamTarget;
-                warnPos.y = _anchorPosition.y;
+                warnPos.y = DragonBossVisualHelper.GetGroundY(_beamTarget);
                 var fireWarnColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
                 MonsterGroundWarning.Spawn(warnPos, Data.castRadius, Data.breathTickInterval + 0.05f, fireWarnColor);
                 DoBreathHit(ctx);

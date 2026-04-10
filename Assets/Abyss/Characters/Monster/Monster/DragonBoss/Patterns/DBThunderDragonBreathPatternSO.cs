@@ -226,7 +226,7 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
             {
                 _breathTick -= Data.breathTickInterval;
                 Vector3 warnPos = _beamTarget;
-                warnPos.y = _anchorPosition.y;
+                warnPos.y = DragonBossVisualHelper.GetGroundY(_beamTarget);
                 var thunderWarnColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
                 MonsterGroundWarning.Spawn(warnPos, Data.castRadius, Data.breathTickInterval + 0.05f, thunderWarnColor);
                 DoBreathHit(ctx);
@@ -299,7 +299,7 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
                     ?? col.GetComponentInParent<PlayerController>();
                 if (player == null) continue;
                 player.TakeDamage(damage);
-                player.ApplyKnockback(Vector3.zero, 0.5f);
+                player.ApplyThunderGroggy(2f);
                 break;
             }
         }
