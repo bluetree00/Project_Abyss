@@ -483,7 +483,7 @@ public class BlockSynergyBridge : MonoBehaviour
                 // Awake/Start가 즉시 실행됨
                 if (!wasActive)
                     panelGrid.gameObject.SetActive(false);
-                Debug.Log("[BlockSynergyBridge] BoardManager Awake 강제 실행 완료");
+                // Awake 트리거 완료
             }
         }
     }
