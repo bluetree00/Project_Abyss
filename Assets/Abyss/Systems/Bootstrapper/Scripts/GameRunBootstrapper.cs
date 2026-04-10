@@ -87,6 +87,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var debugGO = new GameObject("@DebugStatsBootstrap");
             debugGO.AddComponent<DebugStatsBootstrap>();
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // 디버그 그리드 치트 패널 생성
+        if (Object.FindFirstObjectByType<DebugGridCheatPanel>(FindObjectsInactive.Include) == null)
+        {
+            var cheatGO = new GameObject("@DebugGridCheatPanel");
+            cheatGO.AddComponent<DebugGridCheatPanel>();
+        }
+#endif
     }
 
     private void OnDestroy()

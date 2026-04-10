@@ -346,6 +346,15 @@ public class BlockSynergyBridge : MonoBehaviour
         return FindChildRecursive(transform, "Panel_Grid");
     }
 
+    // ── 치트 ──
+
+    /// <summary>디버그용: 특정 그리드의 시너지를 강제 발동한다.</summary>
+    public void CheatTriggerSynergy(string gridId)
+    {
+        ApplySynergyEffects(gridId);
+        RefreshAllThumbnails();
+    }
+
     // ── 썸네일 점유 상태 갱신 ──
 
     /// <summary>모든 썸네일의 점유 상태를 현재 세션 데이터로 갱신한다.</summary>
