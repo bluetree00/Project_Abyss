@@ -500,7 +500,8 @@ public class BoardManager : MonoBehaviour
     }
 
     /// <summary>Shape SO 하나로 공용 shape 인스턴스를 생성하고 풀에 추가한다.</summary>
-    private void SpawnSharedShape(ShapeAssetSO asset)
+    /// <summary>Shape SO로 공용 풀에 Shape 인스턴스를 생성한다. 활성 그리드 없어도 동작.</summary>
+    public void SpawnSharedShape(ShapeAssetSO asset)
     {
         if (shapePrefab == null || asset == null) return;
 
