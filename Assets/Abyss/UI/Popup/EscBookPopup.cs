@@ -47,9 +47,17 @@ public sealed class EscBookPopup : UI_Popup
     public void OpenPopup()
     {
         gameObject.SetActive(true);
+        EnsureInventoryView();
         _currentTab = 0;
         SetPageImmediate(0);
         Time.timeScale = 0f;
+    }
+
+    private void EnsureInventoryView()
+    {
+        if (pageInventory == null) return;
+        if (pageInventory.GetComponent<InventoryPageView>() == null)
+            pageInventory.AddComponent<InventoryPageView>();
     }
 
     public void ClosePopup()

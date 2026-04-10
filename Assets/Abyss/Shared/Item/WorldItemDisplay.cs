@@ -116,7 +116,10 @@ public class WorldItemDisplay : MonoBehaviour
                 bridge.RegisterShapeFromItem(_runtimeData.shapeId);
         }
 
-        // TODO: RunItemInventory 연결 (GameRunSession에 소유권 추가 후)
+        // 인벤토리에 추가
+        var run = GameRunBootstrapper.Instance?.Run;
+        run?.ItemInventory.AddItem(_runtimeData);
+
         Debug.Log($"[WorldItemDisplay] 아이템 획득: {_runtimeData.displayName} ({_runtimeData.rarity}) shape={_runtimeData.shapeId}");
         ConfirmPickup();
     }
@@ -126,9 +129,10 @@ public class WorldItemDisplay : MonoBehaviour
         // 이미 획득 확정된 경우 리셋하지 않음
     }
 
-    /// <summary>픽업 확정 — 오브젝트 제거.</summary>
+    /// <summary>픽업 확정 — 오브젝트 즉시 비활성화 후 제거.</summary>
     public void ConfirmPickup()
     {
+        gameObject.SetActive(false);
         Destroy(gameObject);
     }
 
