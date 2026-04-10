@@ -72,7 +72,6 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
             float baseY = (ctx.Monster as DragonBossMonster)?.DBBlackboard?.SpawnY ?? _groundPos.y;
             _groundPos.y = baseY;
             _airPos      = _groundPos + Vector3.up * Data.flightHeight;
-            _landingPos  = _groundPos;
             _renderers   = ctx.Transform.GetComponentsInChildren<Renderer>(true);
 
             _originalUpdatePosition = ctx.Agent.updatePosition;
