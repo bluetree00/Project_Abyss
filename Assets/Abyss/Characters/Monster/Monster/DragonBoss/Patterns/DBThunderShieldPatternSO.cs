@@ -25,7 +25,11 @@ public class DBThunderShieldPatternSO : BossPatternSO
 
     public override void Initialize(BossPatternContext ctx) => _state = new ThunderShieldState(this);
 
-    public override bool CanExecute(BossPatternContext ctx) => true;
+    public override bool CanExecute(BossPatternContext ctx)
+    {
+        var dragon = ctx.Boss as DragonBossMonster;
+        return dragon == null || dragon.DBBlackboard.CurrentElement == DragonBossBlackboard.DragonElement.Thunder;
+    }
 
     public override SpecialStateBase GetRuntimeState() => _state;
 

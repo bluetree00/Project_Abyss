@@ -40,7 +40,12 @@ public class DBIceDragonBreathPatternSO : BossPatternSO
 
     public override void Initialize(BossPatternContext ctx) => _state = new IceDragonBreathState(this);
 
-    public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
+    public override bool CanExecute(BossPatternContext ctx)
+    {
+        if (Time.time < _cooldownEndTime) return false;
+        var dragon = ctx.Boss as DragonBossMonster;
+        return dragon == null || dragon.DBBlackboard.CurrentElement == DragonBossBlackboard.DragonElement.Ice;
+    }
 
     internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
 

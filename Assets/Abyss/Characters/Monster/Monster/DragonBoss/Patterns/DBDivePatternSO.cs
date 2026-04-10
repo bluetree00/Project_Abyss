@@ -16,7 +16,6 @@ public class DBDivePatternSO : BossPatternSO
     [Header("Dive")]
     [SerializeField] private float warningDuration = 1.0f;
     [SerializeField] private float diveDuration = 0.55f;   // 빠른 돌진
-    [SerializeField] private float jumpHeight = 0.8f;      // 낮은 호버(거의 수평)
     [SerializeField] private float hitBoxWidth = 2.5f;
     [SerializeField] private float hitBoxLength = 2f;
     [SerializeField] private float selfDamageRatioOnCrash = 0.08f;
@@ -51,11 +50,16 @@ public class DBDivePatternSO : BossPatternSO
                 ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
 
-            _startPos = ctx.Transform.position;
+            // 지면 y에 스냅 — 이전 패턴이 공중에서 끝났더라도 수평 돌진 보장
+            float groundY  = DragonBossVisualHelper.GetGroundY(ctx.Transform.position);
+            _startPos       = ctx.Transform.position;
+            _startPos.y     = groundY;
+            ctx.Transform.position = _startPos;
+
             _targetPos = ctx.Runtime.PlayerTarget != null
                 ? ctx.Runtime.PlayerTarget.position
                 : ctx.Transform.position + ctx.Transform.forward * Data.hitBoxLength * 4f;
-            _targetPos.y = _startPos.y;
+            _targetPos.y = groundY;
 
             _diveDir = _targetPos - _startPos;
             _diveDir.y = 0f;
@@ -67,7 +71,7 @@ public class DBDivePatternSO : BossPatternSO
             if (ctx.Animator != null)
                 ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
-            // 돌진 경로 전체를 직사각형 경고로 표시 (보스 → 플레이어 방향)
+            // 돌진 경로 전체 직사각형 경고
             float diveLen = Vector3.Distance(_startPos, _targetPos);
             MonsterGroundWarning.SpawnRect(
                 _startPos,
@@ -79,10 +83,10 @@ public class DBDivePatternSO : BossPatternSO
 
             _originalUpdatePosition = ctx.Agent.updatePosition;
             _originalUpdateRotation = ctx.Agent.updateRotation;
-            _hitDealt = false;
+            _hitDealt      = false;
             _crashResolved = false;
-            _phase = 0;
-            _timer = 0f;
+            _phase         = 0;
+            _timer         = 0f;
             _phaseDuration = Data.warningDuration;
         }
 
@@ -98,7 +102,7 @@ public class DBDivePatternSO : BossPatternSO
                     _timer = 0f;
                     ctx.Agent.updatePosition = false;
                     ctx.Agent.updateRotation = false;
-                    _phase = 1;
+                    _phase         = 1;
                     _phaseDuration = Data.diveDuration;
                     break;
 
@@ -113,8 +117,8 @@ public class DBDivePatternSO : BossPatternSO
 
                     if (_timer < _phaseDuration) return;
 
-                    _timer = 0f;
-                    _phase = 2;
+                    _timer         = 0f;
+                    _phase         = 2;
                     _phaseDuration = 0.25f;
                     break;
 
@@ -134,15 +138,12 @@ public class DBDivePatternSO : BossPatternSO
             RestoreAgentTracking(ctx);
         }
 
+        // 완전 수평 돌진 — arc 없음
         private void UpdateDivePose(MonsterContext ctx)
         {
-            float t = Mathf.Clamp01(_timer / Mathf.Max(0.01f, Data.diveDuration));
-            // ease-out: 초반 빠르게 → 목표 근처 감속, 수평 돌진처럼 보임
-            float easeT = 1f - (1f - t) * (1f - t);
-            Vector3 horizontal = Vector3.Lerp(_startPos, _targetPos, easeT);
-            // 살짝 낮은 호버로 지면 스치는 느낌
-            float height = Mathf.Sin(t * Mathf.PI) * Data.jumpHeight;
-            ctx.Transform.position = horizontal + Vector3.up * height;
+            float t     = Mathf.Clamp01(_timer / Mathf.Max(0.01f, Data.diveDuration));
+            float easeT = 1f - (1f - t) * (1f - t); // ease-out: 초반 빠르게 감속
+            ctx.Transform.position = Vector3.Lerp(_startPos, _targetPos, easeT);
 
             if (_diveDir.sqrMagnitude > 0.001f)
                 ctx.Transform.rotation = Quaternion.LookRotation(_diveDir);
@@ -150,7 +151,8 @@ public class DBDivePatternSO : BossPatternSO
 
         private void CheckDiveHit(MonsterContext ctx)
         {
-            Vector3 center = _targetPos + _diveDir * Data.hitBoxLength;
+            // 현재 위치 기준 전방 박스로 플레이어 판정
+            Vector3 center = ctx.Transform.position + _diveDir * Data.hitBoxLength;
             var hits = Physics.OverlapBox(
                 center,
                 new Vector3(Data.hitBoxWidth, 1f, Data.hitBoxLength),
@@ -162,36 +164,34 @@ public class DBDivePatternSO : BossPatternSO
                     ?? col.GetComponentInParent<PlayerController>();
                 if (player == null) continue;
 
-                int damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
-                float kbForce = ctx.Stat.knockbackForce;
+                int   damage   = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
+                float kbForce  = ctx.Stat.knockbackForce;
 
                 if (Data.vfxPrefab != null)
-                {
-                    BossEffectPool.SpawnOneShot(
-                        Data.vfxPrefab,
-                        _targetPos,
-                        ctx.Transform.rotation);
-                }
+                    BossEffectPool.SpawnOneShot(Data.vfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
 
                 ApplyElementalDamage(ctx, player, damage, kbForce, _diveDir);
-                _hitDealt = true;
+                _hitDealt      = true;
                 _crashResolved = true;
                 break;
             }
         }
 
+        // 벽 충돌 시에만 보스 자기 데미지 (플레이어 충돌은 제외)
         private void CheckCrash(MonsterContext ctx)
         {
             float dist = Vector3.Distance(_startPos, _targetPos);
             if (dist <= 0.5f) return;
 
-            var ray = new Ray(_startPos + Vector3.up * 0.5f, _diveDir);
-            if (!Physics.SphereCast(ray, 0.6f, out RaycastHit hit, dist)) return;
+            // 현재 위치 기준 전방 SphereCast
+            var ray = new Ray(ctx.Transform.position + Vector3.up * 0.5f, _diveDir);
+            if (!Physics.SphereCast(ray, 0.6f, out RaycastHit hit, 2f)) return;
 
             var player = hit.collider.GetComponent<PlayerController>()
                 ?? hit.collider.GetComponentInParent<PlayerController>();
-            if (player != null) return;
+            if (player != null) return; // 플레이어 충돌은 무시
 
+            // 벽/맵 오브젝트에 박힌 경우 → 자기 데미지
             _crashResolved = true;
             int selfDamage = Mathf.Max(1, Mathf.RoundToInt(ctx.Stat.maxHp * Data.selfDamageRatioOnCrash));
             ctx.Monster.TakeDamage(selfDamage, ctx.Monster.gameObject, 0f);
@@ -204,7 +204,7 @@ public class DBDivePatternSO : BossPatternSO
             float kbForce,
             Vector3 dir)
         {
-            var dragon = ctx.Monster as DragonBossMonster;
+            var dragon  = ctx.Monster as DragonBossMonster;
             var element = dragon?.DBBlackboard?.CurrentElement
                 ?? DragonBossBlackboard.DragonElement.Ice;
 
@@ -212,13 +212,13 @@ public class DBDivePatternSO : BossPatternSO
             switch (element)
             {
                 case DragonBossBlackboard.DragonElement.Ice:
-                    player.ApplyKnockback(Vector3.zero, 2f); // 빙결 2초
+                    player.ApplyKnockback(Vector3.zero, 2f);
                     break;
                 case DragonBossBlackboard.DragonElement.Thunder:
-                    player.ApplyKnockback(Vector3.zero, 0.5f); // 그로기 0.5초
+                    player.ApplyKnockback(Vector3.zero, 0.5f);
                     break;
                 default: // Fire
-                    player.ApplySlow(0.4f, 2f); // 이동속도 감소 2초
+                    player.ApplySlow(0.4f, 2f);
                     break;
             }
         }
