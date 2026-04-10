@@ -519,7 +519,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
         }
 
+        // 카메라 바인딩 (시작 연출 포함)
+        BindCameraToPlayer(player.transform);
+
         return player;
+    }
+
+    private static void BindCameraToPlayer(Transform playerTransform)
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        var controller = cam.GetComponent<GameCameraController>();
+        if (controller == null)
+            controller = cam.gameObject.AddComponent<GameCameraController>();
+
+        controller.BindTarget(playerTransform, playIntro: true);
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>
