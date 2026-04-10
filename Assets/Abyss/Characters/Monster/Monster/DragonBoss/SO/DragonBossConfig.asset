@@ -82,7 +82,6 @@ MonoBehaviour:
   condDistFar: 3.01
   condTimePressureSecs: 8
   patternEntries:
-  # ── 소환 (HP 트리거, 강제 인터럽트) ──────────────────────
   - conditions: 06000000
     patterns:
     - {fileID: 11400000, guid: a227430f21506144a8fe947935d26787, type: 2}
@@ -98,13 +97,11 @@ MonoBehaviour:
     - {fileID: 11400000, guid: a227430f21506144a8fe947935d26787, type: 2}
     selectionMode: 2
     forceExecute: 1
-  # ── 근거리 기본 공격 (발톱 휘두르기) ──────────────────────
   - conditions: 01000000
     patterns:
     - {fileID: 11400000, guid: 453d9b416b476cb40a03567420b08ddf, type: 2}
     selectionMode: 2
     forceExecute: 0
-  # ── 속성 전용 패턴 (CanExecute에서 원소 필터) ─────────────
   - conditions:
     patterns:
     - {fileID: 11400000, guid: 41175da11e278694e80ffab624bcbf57, type: 2}
@@ -114,7 +111,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: c3c242a1c5719f34bbc3b6931aa05b8b, type: 2}
     selectionMode: 0
     forceExecute: 0
-  # ── 공통 패턴 (속성 패턴 모두 쿨타임일 때 fallback) ───────
   - conditions:
     patterns:
     - {fileID: 11400000, guid: c5f32855b26b7f64092f7b279201d277, type: 2}
