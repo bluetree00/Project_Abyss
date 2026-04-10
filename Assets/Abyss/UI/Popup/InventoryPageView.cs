@@ -23,6 +23,7 @@ public class InventoryPageView : MonoBehaviour
     private GameObject _tooltip;
     private TMP_Text _tooltipText;
     private readonly List<GameObject> _slots = new();
+    private RuntimeItemData _hoveredItem;
     private bool _bound;
 
     // ── Lifecycle ──
@@ -36,6 +37,11 @@ public class InventoryPageView : MonoBehaviour
     private void OnDisable()
     {
         HideTooltip();
+    }
+
+    private void Update()
+    {
+        UpdateTooltipPosition();
     }
 
     // ── Public Methods ──
@@ -77,10 +83,11 @@ public class InventoryPageView : MonoBehaviour
         gridGO.transform.SetParent(transform, false);
 
         _gridRoot = gridGO.GetComponent<RectTransform>();
-        _gridRoot.anchorMin = Vector2.zero;
-        _gridRoot.anchorMax = Vector2.one;
-        _gridRoot.offsetMin = new Vector2(10, 10);
-        _gridRoot.offsetMax = new Vector2(-10, -10);
+        // 책의 오른쪽 페이지 영역 (전체의 오른쪽 절반, 여백 포함)
+        _gridRoot.anchorMin = new Vector2(0.52f, 0.08f);
+        _gridRoot.anchorMax = new Vector2(0.95f, 0.92f);
+        _gridRoot.offsetMin = Vector2.zero;
+        _gridRoot.offsetMax = Vector2.zero;
 
         var layout = gridGO.GetComponent<GridLayoutGroup>();
         layout.cellSize = Vector2.one * SLOT_SIZE;
@@ -98,9 +105,11 @@ public class InventoryPageView : MonoBehaviour
     {
         if (_tooltip != null) return;
 
-        // 툴팁 패널
+        // 툴팁 패널 — 책 팝업의 최상위 Canvas에 배치 (가려지지 않도록)
+        var tooltipParent = GetComponentInParent<Canvas>(true)?.transform ?? transform.parent;
         _tooltip = new GameObject("ItemTooltip", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
-        _tooltip.transform.SetParent(transform.root, false);
+        _tooltip.transform.SetParent(tooltipParent, false);
+        _tooltip.transform.SetAsLastSibling();
 
         var tooltipRT = _tooltip.GetComponent<RectTransform>();
         tooltipRT.sizeDelta = new Vector2(TOOLTIP_WIDTH, 0);
@@ -205,6 +214,7 @@ public class InventoryPageView : MonoBehaviour
     private void ShowTooltip(RuntimeItemData item, RectTransform slotRT)
     {
         if (_tooltip == null || _tooltipText == null) return;
+        _hoveredItem = item;
 
         // 내용 구성
         string rarityColor = item.rarity switch
@@ -230,20 +240,33 @@ public class InventoryPageView : MonoBehaviour
         if (item.shapeId > 0)
             text += $"\n<size=10><color=#88AAFF>블록 Shape #{item.shapeId}</color></size>";
 
+        text += "\n<size=9><color=#666666>우클릭: 버리기</color></size>";
+
         _tooltipText.text = text;
-
-        // 위치 (슬롯 오른쪽)
-        var tooltipRT = _tooltip.GetComponent<RectTransform>();
-        Vector3 worldPos = slotRT.position;
-        tooltipRT.position = worldPos + new Vector3(SLOT_SIZE * 0.6f, 0, 0);
-
+        _tooltip.transform.SetAsLastSibling();
         _tooltip.SetActive(true);
+
+        UpdateTooltipPosition();
     }
 
     private void HideTooltip()
     {
+        _hoveredItem = null;
         if (_tooltip != null)
             _tooltip.SetActive(false);
+    }
+
+    private void UpdateTooltipPosition()
+    {
+        if (_tooltip == null || !_tooltip.activeSelf) return;
+
+        var tooltipRT = _tooltip.GetComponent<RectTransform>();
+        Vector2 mousePos = Input.mousePosition;
+
+        // 마우스 오른쪽 위에 표시
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            tooltipRT.parent as RectTransform, mousePos, null, out var localPos);
+        tooltipRT.anchoredPosition = localPos + new Vector2(15, 15);
     }
 
     private void ClearSlots()
