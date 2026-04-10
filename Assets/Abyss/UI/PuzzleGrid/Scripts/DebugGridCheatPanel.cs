@@ -6,8 +6,8 @@ using TMPro;
 
 /// <summary>
 /// 디버그용 그리드 시너지 치트 패널.
-/// 각 그리드별 "완성" 버튼 → 시너지 즉시 발동.
-/// 화면 우하단에 토글 버튼으로 열기/닫기.
+/// 각 그리드별 토글 버튼 → ON: 시너지 활성, OFF: 비활성.
+/// 토글 시 전체 시너지 Clear → 활성화된 그리드만 재적용.
 /// </summary>
 public class DebugGridCheatPanel : MonoBehaviour
 {
@@ -17,10 +17,15 @@ public class DebugGridCheatPanel : MonoBehaviour
     private const float SPACING = 4f;
     private const float PADDING = 8f;
 
+    private static readonly Color COLOR_OFF = new(0.4f, 0.4f, 0.4f, 0.9f);
+    private static readonly Color COLOR_ON  = new(0.2f, 0.7f, 0.2f, 0.9f);
+
     // ── Private ──
     private GameObject _panel;
-    private readonly List<Button> _buttons = new();
     private bool _isOpen;
+    private readonly HashSet<string> _activeGrids = new();
+    private readonly Dictionary<string, Image> _btnImages = new();
+    private readonly Dictionary<string, TMP_Text> _btnTexts = new();
 
     // ── Lifecycle ──
 
@@ -36,7 +41,6 @@ public class DebugGridCheatPanel : MonoBehaviour
         var canvas = FindOverlayCanvas();
         if (canvas == null) return;
 
-        // 토글 버튼 (우하단)
         var toggleGO = new GameObject("GridCheatToggle", typeof(RectTransform), typeof(Image), typeof(Button));
         toggleGO.transform.SetParent(canvas.transform, false);
 
@@ -47,22 +51,21 @@ public class DebugGridCheatPanel : MonoBehaviour
         toggleRT.anchoredPosition = new Vector2(-10, 10);
         toggleRT.sizeDelta = new Vector2(100, 30);
 
-        var toggleBg = toggleGO.GetComponent<Image>();
-        toggleBg.color = new Color(0.2f, 0.2f, 0.6f, 0.8f);
+        toggleGO.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.6f, 0.8f);
 
-        var toggleTextGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-        toggleTextGO.transform.SetParent(toggleGO.transform, false);
-        var toggleTextRT = toggleTextGO.GetComponent<RectTransform>();
-        toggleTextRT.anchorMin = Vector2.zero;
-        toggleTextRT.anchorMax = Vector2.one;
-        toggleTextRT.offsetMin = Vector2.zero;
-        toggleTextRT.offsetMax = Vector2.zero;
+        var textGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textGO.transform.SetParent(toggleGO.transform, false);
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
 
-        var toggleText = toggleTextGO.GetComponent<TextMeshProUGUI>();
-        toggleText.text = "Grid Cheat";
-        toggleText.fontSize = 12;
-        toggleText.alignment = TextAlignmentOptions.Center;
-        toggleText.color = Color.white;
+        var text = textGO.GetComponent<TextMeshProUGUI>();
+        text.text = "Grid Cheat";
+        text.fontSize = 12;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.white;
 
         toggleGO.GetComponent<Button>().onClick.AddListener(TogglePanel);
     }
@@ -86,7 +89,6 @@ public class DebugGridCheatPanel : MonoBehaviour
 
         var sortedIds = blockData.GetGridIdsSortedByOrder();
 
-        // 패널 배경
         float panelH = PADDING * 2 + sortedIds.Count * (BTN_HEIGHT + SPACING);
         _panel = new GameObject("GridCheatPanel", typeof(RectTransform), typeof(Image));
         _panel.transform.SetParent(canvas.transform, false);
@@ -98,16 +100,13 @@ public class DebugGridCheatPanel : MonoBehaviour
         panelRT.anchoredPosition = new Vector2(-10, 45);
         panelRT.sizeDelta = new Vector2(BTN_WIDTH + PADDING * 2, panelH);
 
-        var panelBg = _panel.GetComponent<Image>();
-        panelBg.color = new Color(0, 0, 0, 0.75f);
+        _panel.GetComponent<Image>().color = new Color(0, 0, 0, 0.75f);
 
-        // 그리드별 버튼 생성
         for (int i = 0; i < sortedIds.Count; i++)
         {
             var gridId = sortedIds[i];
             var meta = blockData.GetGridMeta(gridId);
             string label = meta != null ? meta.grid_name : gridId;
-
             CreateGridButton(_panel.transform, gridId, label, i);
         }
 
@@ -127,7 +126,7 @@ public class DebugGridCheatPanel : MonoBehaviour
         btnRT.anchoredPosition = new Vector2(0, -(PADDING + index * (BTN_HEIGHT + SPACING)));
 
         var btnBg = btnGO.GetComponent<Image>();
-        btnBg.color = new Color(0.3f, 0.5f, 0.3f, 0.9f);
+        btnBg.color = COLOR_OFF;
 
         var textGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         textGO.transform.SetParent(btnGO.transform, false);
@@ -137,46 +136,55 @@ public class DebugGridCheatPanel : MonoBehaviour
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
 
-        var text = textGO.GetComponent<TextMeshProUGUI>();
-        text.text = $"✓ {label}";
-        text.fontSize = 11;
-        text.alignment = TextAlignmentOptions.Center;
-        text.color = Color.white;
+        var btnText = textGO.GetComponent<TextMeshProUGUI>();
+        btnText.text = $"[ ] {label}";
+        btnText.fontSize = 11;
+        btnText.alignment = TextAlignmentOptions.Center;
+        btnText.color = Color.white;
+
+        _btnImages[gridId] = btnBg;
+        _btnTexts[gridId] = btnText;
 
         string capturedId = gridId;
-        btnGO.GetComponent<Button>().onClick.AddListener(() => CheatCompleteGrid(capturedId, btnBg));
-        _buttons.Add(btnGO.GetComponent<Button>());
+        string capturedLabel = label;
+        btnGO.GetComponent<Button>().onClick.AddListener(() => ToggleGrid(capturedId, capturedLabel));
     }
 
-    private void CheatCompleteGrid(string gridId, Image btnBg)
+    private void ToggleGrid(string gridId, string label)
+    {
+        if (_activeGrids.Contains(gridId))
+            _activeGrids.Remove(gridId);
+        else
+            _activeGrids.Add(gridId);
+
+        // UI 갱신
+        bool isOn = _activeGrids.Contains(gridId);
+        if (_btnImages.TryGetValue(gridId, out var img))
+            img.color = isOn ? COLOR_ON : COLOR_OFF;
+        if (_btnTexts.TryGetValue(gridId, out var txt))
+            txt.text = isOn ? $"[✓] {label}" : $"[ ] {label}";
+
+        // 전체 시너지 Clear → 활성화된 것만 재적용
+        ReapplyAllSynergies();
+    }
+
+    private void ReapplyAllSynergies()
     {
         var bridge = BlockSynergyBridge.Instance;
-        if (bridge == null)
-        {
-            Debug.LogWarning("[GridCheat] BlockSynergyBridge not found");
-            return;
-        }
+        if (bridge == null) return;
 
-        // BoardManager에서 해당 그리드의 SO를 찾아 NotifyGridFilled 호출
-        var boardManager = Object.FindFirstObjectByType<BoardManager>(FindObjectsInactive.Include);
-        if (boardManager == null) return;
+        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        var player = run?.Player;
+        if (player == null) return;
 
-        var squares = boardManager.GetGridSquares(gridId);
-        if (squares != null)
-        {
-            // 실제 세션이 있으면 모든 칸 점유 처리
-            foreach (var sq in squares)
-                if (sq != null && sq.isPlaceable)
-                    sq.SetOccupied(true);
-        }
+        // 전체 초기화
+        player.RuntimeStats.ClearSynergyEffects();
 
-        // 시너지 효과 직접 발동
-        bridge.CheatTriggerSynergy(gridId);
+        // 활성화된 그리드만 재적용
+        foreach (var gridId in _activeGrids)
+            bridge.CheatTriggerSynergy(gridId);
 
-        // 버튼 색상 변경 (완료 표시)
-        btnBg.color = new Color(0.2f, 0.7f, 0.2f, 0.9f);
-
-        Debug.Log($"[GridCheat] 그리드 완성 치트: {gridId}");
+        Debug.Log($"[GridCheat] 시너지 재적용: {_activeGrids.Count}개 활성");
     }
 
     private static Canvas FindOverlayCanvas()

@@ -471,16 +471,17 @@ public sealed class PlayerRuntimeStats
     /// <summary>모든 시너지 효과 초기화.</summary>
     public void ClearSynergyEffects()
     {
-        _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
-        _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
-        _synergyLifesteal = 0f;
-        _conditionalSynergies.Clear();
-
+        // MaxHp 복원 (초기화 전에 처리)
         if (_synergyMaxHp != 0)
         {
             MaxHp = Mathf.Max(1, MaxHp - _synergyMaxHp);
             Hp = Mathf.Min(Hp, MaxHp);
         }
+
+        _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
+        _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
+        _synergyLifesteal = 0f;
+        _conditionalSynergies.Clear();
 
         Recalculate();
     }
