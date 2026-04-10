@@ -295,12 +295,30 @@ public sealed class PlayerRuntimeStats
         }
         else
         {
-            _itemMelee   = (int)(inventory.GetTotal(StatType.MeleeAttack) + inventory.GetTotal(StatType.AttackPower));
-            _itemRanged  = (int)(inventory.GetTotal(StatType.RangedAttack) + inventory.GetTotal(StatType.AttackPower));
-            _itemDefense = (int)inventory.GetTotal(StatType.Defense);
-            _itemLuck    = (int)inventory.GetTotal(StatType.Luck);
-            _itemSkillCdr = inventory.GetTotal(StatType.SkillCooldownReduction);
-            _itemActiveItemCdr = inventory.GetTotal(StatType.ActiveItemCooldownReduction);
+            _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
+            _itemSkillCdr = _itemActiveItemCdr = 0f;
+
+            foreach (var item in inventory.Items)
+            {
+                if (item.effects == null) continue;
+                foreach (var eff in item.effects)
+                {
+                    if (string.IsNullOrEmpty(eff.effectType) || eff.trigger != "Always") continue;
+                    switch (eff.effectType)
+                    {
+                        case "MeleeAttack":  _itemMelee  += (int)eff.value; break;
+                        case "RangedAttack": _itemRanged += (int)eff.value; break;
+                        case "AttackPower":
+                            _itemMelee  += (int)eff.value;
+                            _itemRanged += (int)eff.value;
+                            break;
+                        case "Defense":      _itemDefense += (int)eff.value; break;
+                        case "Luck":         _itemLuck    += (int)eff.value; break;
+                        case "SkillCooldownReduction":      _itemSkillCdr += eff.value; break;
+                        case "ActiveItemCooldownReduction": _itemActiveItemCdr += eff.value; break;
+                    }
+                }
+            }
         }
 
         Recalculate();
