@@ -48,6 +48,7 @@ public sealed class GameRunSession
     private PlayerController _playerStateSource;
 
     public PlayerRunState PlayerState { get; private set; }
+    public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
 
     // 씬 전환 시 무기 슬롯 복원용
