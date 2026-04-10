@@ -194,6 +194,21 @@ public sealed class GameRunSession
         SavedCurrentSlotIndex = -1;
     }
 
+    /// <summary>
+    /// 에디터 직접 실행 시 Phase를 Running으로 강제 설정.
+    /// StartNewRunAsync를 거치지 않고 테스트할 때 사용.
+    /// </summary>
+    public void ForceRunningForTest()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (Phase == RunPhase.NotRunning)
+        {
+            Phase = RunPhase.Running;
+            Debug.Log("[GameRun] ForceRunningForTest: Phase → Running");
+        }
+#endif
+    }
+
     // =========================================================
     // Run State Machine
     // =========================================================
