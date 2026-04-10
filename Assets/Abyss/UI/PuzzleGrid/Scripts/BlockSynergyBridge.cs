@@ -96,6 +96,9 @@ public class BlockSynergyBridge : MonoBehaviour
         // Puzzle 루트 RectTransform 보정 (Canvas 제거 후 scale 0 방지)
         EnsurePuzzleRectTransform();
 
+        // BoardManager.Awake 강제 실행 (Panel_Grid 비활성 시 Awake 미실행 방지)
+        EnsureBoardManagerAwake();
+
         boardManager.OnGridFilled -= HandleGridFilled;
         boardManager.OnGridFilled += HandleGridFilled;
 
@@ -357,22 +360,15 @@ public class BlockSynergyBridge : MonoBehaviour
 
         var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
 
-        // BoardManager의 활성 GridAssetSO에 ShapeAssetSO를 동적 추가
-        var activeAsset = boardManager.ActiveAsset;
-        if (activeAsset == null)
-        {
-            Debug.LogWarning("[BlockSynergyBridge] 활성 Grid 없음, Shape 등록 실패");
-            return;
-        }
-
         // ShapeAssetSO를 런타임 생성
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
         shapeSO.shapeName = shapeEntry.shape_name;
         shapeSO.cellOffsets = offsets;
         shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : 90f;
 
-        activeAsset.AddShape(shapeSO);
-        Debug.Log($"[BlockSynergyBridge] Shape 추가: {shapeEntry.shape_name} (id={shapeId})");
+        // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
+        boardManager.SpawnSharedShape(shapeSO);
+        Debug.Log($"[BlockSynergyBridge] Shape 추가(공용풀): {shapeEntry.shape_name} (id={shapeId})");
     }
 
     // ── Grid 완성 시 시너지 효과 적용 ──
@@ -450,42 +446,59 @@ public class BlockSynergyBridge : MonoBehaviour
         };
     }
 
+    private void EnsureBoardManagerAwake()
+    {
+        if (boardManager == null) return;
+
+        // Panel_Grid이 비활성이면 BoardManager.Awake가 안 돌았을 수 있음
+        // 임시 활성화 → Awake 트리거 → 복원
+        if (!boardManager.gameObject.activeInHierarchy)
+        {
+            var panelGrid = FindPanelGrid();
+            if (panelGrid != null)
+            {
+                bool wasActive = panelGrid.gameObject.activeSelf;
+                panelGrid.gameObject.SetActive(true);
+                // Awake/Start가 즉시 실행됨
+                if (!wasActive)
+                    panelGrid.gameObject.SetActive(false);
+                Debug.Log("[BlockSynergyBridge] BoardManager Awake 강제 실행 완료");
+            }
+        }
+    }
+
     private void EnsurePuzzleRectTransform()
     {
-        // Panel_Grid → Puzzle → GameplayRoot → LeeBoardManagerObj
-        // boardManager.parent = GameplayRoot, GameplayRoot.parent = Puzzle
         var gameplayRoot = boardManager.transform.parent;
         var puzzleRoot = gameplayRoot?.parent;
         var panelGrid = puzzleRoot?.parent;
 
-        Debug.Log($"[BlockSynergyBridge] EnsureRT: board={boardManager.name}" +
-                  $" gameplay={gameplayRoot?.name}" +
-                  $" puzzle={puzzleRoot?.name}(scale={puzzleRoot?.localScale})" +
-                  $" panelGrid={panelGrid?.name}");
+        // Panel_Grid, Puzzle, SelectionRoot만 stretch-fill (컨테이너 역할)
+        StretchFill(panelGrid);
+        StretchFill(puzzleRoot);
 
-        // Panel_Grid, Puzzle, GameplayRoot, SelectionRoot 모두 보정
-        FixRectTransform(panelGrid);
-        FixRectTransform(puzzleRoot);
-
+        // SelectionRoot만 stretch (GameplayRoot 자식은 원래 레이아웃 유지)
         if (puzzleRoot != null)
         {
-            foreach (Transform child in puzzleRoot)
-                FixRectTransform(child);
+            var selectionRoot = boardManager.selectionRoot?.GetComponent<RectTransform>();
+            StretchFill(selectionRoot);
+
+            // GameplayRoot도 stretch
+            StretchFill(gameplayRoot);
         }
     }
 
-    private static void FixRectTransform(Transform t)
+    private static void StretchFill(Transform t)
     {
         if (t == null) return;
-        var rt = t.GetComponent<RectTransform>();
+        StretchFill(t.GetComponent<RectTransform>());
+    }
+
+    private static void StretchFill(RectTransform rt)
+    {
         if (rt == null) return;
-
         if (rt.localScale.sqrMagnitude < 0.01f)
-        {
-            Debug.Log($"[BlockSynergyBridge] FixRT: {t.name} scale was {rt.localScale} → (1,1,1)");
             rt.localScale = Vector3.one;
-        }
-
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
