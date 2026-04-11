@@ -5,7 +5,8 @@ namespace Abyss.Monster
 /// <summary>
 /// 드래곤 보스 — 지상 브레스.
 /// ① 조준(warningDuration): 빠르게 플레이어 방향으로 고개를 돌리며 직사각형 경고 장판 표시
-/// ② 브레스(breathDuration): 원통 빔 + 직사각형 경고 유지. 반동 표현을 위해 추적 회전 느리게.
+/// ② 브레스(breathDuration): _beamEnd가 플레이어를 향해 서서히 이동(레이저 구조).
+///    몸체는 빔 방향으로 60°/s 회전(반동 표현). 직사각형 경고는 빔 방향 갱신.
 /// </summary>
 [CreateAssetMenu(fileName = "DBBreathPatternSO",
                  menuName = "Abyss/Boss/DragonBoss/Breath")]
@@ -29,8 +30,10 @@ public class DBBreathPatternSO : BossPatternSO
     [SerializeField] private float beamWidth        = 0.8f;   // 원통 빔 굵기
 
     [Header("Rotation")]
-    [SerializeField] private float aimTurnSpeed    = 120f;  // 조준 중 회전 속도
-    [SerializeField] private float breathTurnSpeed = 20f;   // 브레스 중 회전 속도 (반동 표현)
+    [SerializeField] private float aimTurnSpeed    = 120f;   // 조준 중 회전 속도
+
+    [Header("Beam Tracking")]
+    [SerializeField] private float beamTrackSpeed  = 3f;     // 빔 끝점이 플레이어 향해 이동하는 속도 (ThunderBreath 동일)
 
     [Header("Approach")]
     [SerializeField] private float approachSpeed    = 1.5f;  // 브레스 중 접근 속도 (m/s)
@@ -42,7 +45,7 @@ public class DBBreathPatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private GroundBreathState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new GroundBreathState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new GroundBreathState(this); }
     public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
     public override SpecialStateBase GetRuntimeState() => _state;
     internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
@@ -53,9 +56,10 @@ public class DBBreathPatternSO : BossPatternSO
         private float      _tickTimer;
         private int        _phase;
         private Color      _breathColor;
-        private GameObject _activeVfx;     // 브레스 파티클 VFX
-        private Transform  _beamTransform; // 원통 빔
+        private GameObject _activeVfx;
+        private Transform  _beamTransform;
         private Material   _beamMat;
+        private Vector3    _beamEnd;        // 레이저 구조: 빔 끝점 (서서히 플레이어 추적)
 
         public GroundBreathState(DBBreathPatternSO data) : base(data) { }
 
@@ -106,6 +110,11 @@ public class DBBreathPatternSO : BossPatternSO
             var element = dragon?.DBBlackboard?.CurrentElement ?? DragonBossBlackboard.DragonElement.Ice;
             _breathColor = DragonBossVisualHelper.GetElementColor(element);
 
+            // 빔 끝점 초기화: 현재 전방 최대 사거리
+            Vector3 mouthPos = GetMouthPos(ctx);
+            _beamEnd   = mouthPos + GetFlatForward(ctx) * Data.castMaxDist;
+            _beamEnd.y = mouthPos.y;
+
             _phase     = 0;
             _timer     = 0f;
             _tickTimer = 0f;
@@ -120,7 +129,11 @@ public class DBBreathPatternSO : BossPatternSO
             {
                 FacePlayer(ctx, Data.aimTurnSpeed);
 
-                // 조준 중 직사각형 경고 장판 갱신
+                // 조준 중 빔 끝점을 전방 방향으로 갱신 (경고 장판이 고개와 함께 돌아감)
+                Vector3 mp = GetMouthPos(ctx);
+                _beamEnd   = mp + GetFlatForward(ctx) * Data.castMaxDist;
+                _beamEnd.y = mp.y;
+
                 _tickTimer += Time.deltaTime;
                 if (_tickTimer >= 0.2f)
                 {
@@ -131,7 +144,6 @@ public class DBBreathPatternSO : BossPatternSO
                 if (_timer < Data.warningDuration) return;
 
                 // ── 브레스 시작 ─────────────────────────────────────
-                // NavMesh 천천히 접근 활성화
                 if (ctx.Agent.isOnNavMesh)
                 {
                     ctx.Agent.speed            = Data.approachSpeed;
@@ -164,19 +176,32 @@ public class DBBreathPatternSO : BossPatternSO
             }
 
             // ── phase 1: 브레스 발사 ──────────────────────────────────
-            // 반동 표현: 회전 속도 느리게
-            FacePlayer(ctx, Data.breathTurnSpeed);
+            // 빔 끝점: 플레이어를 향해 서서히 이동 (레이저 구조, ThunderDragonBreath 동일)
+            Vector3 mouthPos = GetMouthPos(ctx);
+            if (ctx.Runtime.PlayerTarget != null)
+            {
+                Vector3 playerFlat = ctx.Runtime.PlayerTarget.position;
+                playerFlat.y = mouthPos.y;  // 수평 유지
+                _beamEnd = Vector3.MoveTowards(_beamEnd, playerFlat, Data.beamTrackSpeed * Time.deltaTime);
+            }
+
+            // 몸체: 빔 방향으로 60°/s 회전 (반동 표현)
+            Vector3 beamDir = _beamEnd - mouthPos;
+            beamDir.y = 0f;
+            if (beamDir.sqrMagnitude > 0.01f)
+            {
+                ctx.Transform.rotation = Quaternion.RotateTowards(
+                    ctx.Transform.rotation,
+                    Quaternion.LookRotation(beamDir.normalized),
+                    60f * Time.deltaTime);
+            }
 
             // 천천히 플레이어 방향으로 접근
             if (ctx.Agent.isOnNavMesh && ctx.Runtime.PlayerTarget != null)
                 ctx.Agent.SetDestination(ctx.Runtime.PlayerTarget.position);
 
-            // 빔 원통: 입 위치 → 전방 사거리 끝
-            Vector3 mouthPos = GetMouthPos(ctx);
-            Vector3 fwd      = GetFlatForward(ctx);
-            Vector3 beamEnd  = mouthPos + fwd * Data.castMaxDist;
-            beamEnd.y = mouthPos.y; // 수평으로 뻗음
-            UpdateBeam(mouthPos, beamEnd);
+            // 빔 원통 갱신
+            UpdateBeam(mouthPos, _beamEnd);
 
             _tickTimer += Time.deltaTime;
             if (_tickTimer >= Data.tickInterval)
@@ -199,7 +224,6 @@ public class DBBreathPatternSO : BossPatternSO
             }
             DestroyBeam();
 
-            // NavMesh 속도/정지거리 원복
             if (ctx.Agent.isOnNavMesh)
             {
                 ctx.Agent.speed            = ctx.Stat.moveSpeed;
@@ -210,36 +234,36 @@ public class DBBreathPatternSO : BossPatternSO
             Data.StartCooldown();
         }
 
-        // ── 직사각형 경고 장판 ────────────────────────────────────────
+        // ── 직사각형 경고 장판 (빔 끝점 방향 기준) ──────────────────────
         private void SpawnBreathRect(MonsterContext ctx, float duration)
         {
-            Vector3 fwd = GetFlatForward(ctx);
+            Vector3 mouthPos = GetMouthPos(ctx);
+            Vector3 toEnd    = _beamEnd - mouthPos;
+            toEnd.y = 0f;
+            float   dist = Mathf.Min(toEnd.magnitude, Data.castMaxDist);
+            Vector3 fwd  = toEnd.sqrMagnitude > 0.001f ? toEnd.normalized : GetFlatForward(ctx);
 
-            // SpawnY를 기준으로 지면 y 결정 — GetGroundY가 보스 콜라이더를 맞출 위험 방지
-            var dragon = ctx.Monster as DragonBossMonster;
+            var dragon  = ctx.Monster as DragonBossMonster;
             float groundY = dragon?.DBBlackboard?.SpawnY
-                ?? DragonBossVisualHelper.GetGroundY(ctx.Transform.position + fwd * (Data.castMaxDist * 0.5f));
+                ?? DragonBossVisualHelper.GetGroundY(ctx.Transform.position + fwd * (dist * 0.5f));
 
             Vector3 origin = ctx.Transform.position;
             origin.y = groundY;
 
-            MonsterGroundWarning.SpawnRect(
-                origin,
-                fwd,
-                Data.castRadius * 2f,
-                Data.castMaxDist,
-                duration,
-                _breathColor);
+            MonsterGroundWarning.SpawnRect(origin, fwd, Data.castRadius * 2f, dist, duration, _breathColor);
         }
 
-        // ── 데미지 ───────────────────────────────────────────────────
+        // ── 데미지 (빔 끝점 방향으로 SphereCast) ────────────────────────
         private void DoBreathHit(MonsterContext ctx)
         {
-            Vector3 origin = GetMouthPos(ctx);
-            Vector3 fwd    = GetFlatForward(ctx);
-            int damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 0.5f);
+            Vector3 origin  = GetMouthPos(ctx);
+            Vector3 toEnd   = _beamEnd - origin;
+            toEnd.y = 0f;
+            float   dist    = Mathf.Min(toEnd.magnitude, Data.castMaxDist);
+            Vector3 fwd     = toEnd.sqrMagnitude > 0.001f ? toEnd.normalized : GetFlatForward(ctx);
+            int     damage  = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 0.5f);
 
-            var hits = Physics.SphereCastAll(origin, Data.castRadius, fwd, Data.castMaxDist);
+            var hits = Physics.SphereCastAll(origin, Data.castRadius, fwd, dist);
             foreach (var hit in hits)
             {
                 var player = hit.collider.GetComponent<PlayerController>()

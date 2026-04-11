@@ -82,34 +82,49 @@ MonoBehaviour:
   condDistFar: 3.01
   condTimePressureSecs: 8
   patternEntries:
-  - conditions: 06000000
+  - conditions:
+    - 6
     patterns:
     - {fileID: 11400000, guid: a227430f21506144a8fe947935d26787, type: 2}
     selectionMode: 2
     forceExecute: 1
-  - conditions: 07000000
+  - conditions:
+    - 7
     patterns:
     - {fileID: 11400000, guid: a227430f21506144a8fe947935d26787, type: 2}
     selectionMode: 2
     forceExecute: 1
-  - conditions: 08000000
+  - conditions:
+    - 8
     patterns:
     - {fileID: 11400000, guid: a227430f21506144a8fe947935d26787, type: 2}
     selectionMode: 2
     forceExecute: 1
-  - conditions: 01000000
+  - conditions:
+    - 1
     patterns:
     - {fileID: 11400000, guid: 453d9b416b476cb40a03567420b08ddf, type: 2}
     selectionMode: 2
     forceExecute: 0
   - conditions:
+    - 9
     patterns:
     - {fileID: 11400000, guid: 41175da11e278694e80ffab624bcbf57, type: 2}
     - {fileID: 11400000, guid: e88da48cb9c4a9641acc707086b24237, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions:
+    - 10
+    patterns:
     - {fileID: 11400000, guid: b7fdfebbab2b57c43abc01cb51181e5e, type: 2}
     - {fileID: 11400000, guid: 83838d0fd9fd44b4ea8131c8f583b31b, type: 2}
-    - {fileID: 11400000, guid: c3c242a1c5719f34bbc3b6931aa05b8b, type: 2}
     selectionMode: 0
+    forceExecute: 0
+  - conditions:
+    - 11
+    patterns:
+    - {fileID: 11400000, guid: c3c242a1c5719f34bbc3b6931aa05b8b, type: 2}
+    selectionMode: 2
     forceExecute: 0
   - conditions:
     patterns:

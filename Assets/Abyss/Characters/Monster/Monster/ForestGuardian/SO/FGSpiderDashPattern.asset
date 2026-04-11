@@ -11,13 +11,20 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 601737f2abc4c434388442935a0f9eaa, type: 3}
   m_Name: FGSpiderDashPattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGSpiderDashPatternSO
-  weight: 1
-  patternTag: 
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGSpinKickPatternSO
+  weight: 1.2
+  patternTag: spin_kick
   breakOverride: -1
-  animDash: Dash
+  animWindup: 360SpinKick
+  animSpinning: 720SpinKick
   crossFade: 0.1
-  vfxDash: {fileID: 8572855343360454552, guid: 65a437729a8abb041b36a21ff844e745, type: 3}
-  dashWidthHalf: 1.5
-  dashTimeout: 0.8
-  speedMult: 2
+  p1_moveSpeed: 3
+  p1_duration: 3
+  p1_hitRadius: 4
+  p1_windupDuration: 0.8
+  p2_moveSpeed: 6
+  p2_duration: 2
+  p2_hitRadius: 6
+  p2_windupDuration: 0.3
+  tickInterval: 0.2
+  patternCooldown: 7

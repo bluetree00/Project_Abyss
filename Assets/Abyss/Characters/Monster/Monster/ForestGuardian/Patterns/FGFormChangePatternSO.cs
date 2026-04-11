@@ -3,13 +3,14 @@ using UnityEngine;
 namespace Abyss.Monster
 {
 /// <summary>
-/// 폼 전환 패턴.
-/// FormChangePending == true 일 때 forceExecute 엔트리에서 발동.
-/// 피로 애니("TiredStart") 2초 재생 후 폼 전환 → 즉시 패턴 재개(breakOverride = 0).
+/// 페이즈 전환 패턴.
+/// HP ≤ 50%로 PhaseChangePending == true 가 되면 forceExecute 엔트리에서 발동.
+/// TiredStart 애니 3초 재생 → VFX → Phase2 전환 완료 → TiredStop.
+/// 전환 중 무적(InvincibleState), 전환 직후 breakOverride = 0 (즉시 패턴 재개).
 /// </summary>
 [CreateAssetMenu(fileName = "FGFormChangePatternSO",
-                 menuName  = "Abyss/Boss/ForestGuardian/FormChange")]
-public class FGFormChangePatternSO : BossPatternSO
+                 menuName  = "Abyss/Boss/ForestGuardian/PhaseTransition")]
+public class FGPhaseTransitionPatternSO : BossPatternSO
 {
     [Header("애니메이션")]
     [SerializeField] private string animTiredStart = "TiredStart";
@@ -17,50 +18,45 @@ public class FGFormChangePatternSO : BossPatternSO
     [SerializeField] private string animIdle       = "IdleNormal";
     [SerializeField] private float  crossFade      = 0.15f;
 
-    [Header("폼 전환 설정")]
-    [SerializeField] private float tiredDuration = 2f;
+    [Header("전환 설정")]
+    [SerializeField] private float transitionDuration = 3f;   // 기획서: 임시 3초
 
     [Header("VFX")]
-    [SerializeField] private GameObject vfxFormChange;
+    [SerializeField] private GameObject vfxPhaseChange;
 
-    private FGFormChangeState _state;
+    private FGPhaseTransitionState _state;
 
     public override void Initialize(BossPatternContext ctx)
     {
         breakOverride = 0f;   // 전환 직후 즉시 패턴 선택
-        _state = new FGFormChangeState(this);
+        _state = new FGPhaseTransitionState(this);
     }
 
     public override bool CanExecute(BossPatternContext ctx)
     {
         var fg = (ctx.Ctx.Monster as ForestGuardianMonster)?.FGBlackboard;
-        return fg != null && fg.FormChangePending;
+        return fg != null && fg.PhaseChangePending;
     }
 
     public override bool CanForceInterrupt(BossPatternContext ctx) => CanExecute(ctx);
 
     public override SpecialStateBase GetRuntimeState() => _state;
 
-    // ── 내부 상태 ────────────────────────────────────────────────────
+    // ── 내부 상태 ───────────────────────────────────────────────────────
 
-    private sealed class FGFormChangeState : InvincibleState<FGFormChangePatternSO>
+    private sealed class FGPhaseTransitionState : InvincibleState<FGPhaseTransitionPatternSO>
     {
-        private float                             _timer;
-        private bool                              _changed;
-        private ForestGuardianBlackboard.BossForm _nextForm;
+        private float _timer;
+        private bool  _transitioned;
 
-        public FGFormChangeState(FGFormChangePatternSO data) : base(data) { }
+        public FGPhaseTransitionState(FGPhaseTransitionPatternSO data) : base(data) { }
 
         public override void Enter(MonsterContext ctx)
         {
             ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
-            _timer   = 0f;
-            _changed = false;
-
-            // 다음 폼 미리 결정
-            var fgBb = (ctx.Monster as ForestGuardianMonster)?.FGBlackboard;
-            _nextForm = fgBb?.RollNextForm() ?? ForestGuardianBlackboard.BossForm.Liche;
+            _timer       = 0f;
+            _transitioned = false;
 
             if (ctx.Animator != null && !string.IsNullOrEmpty(Data.animTiredStart))
                 ctx.Animator.CrossFade(Data.animTiredStart, Data.crossFade);
@@ -70,26 +66,22 @@ public class FGFormChangePatternSO : BossPatternSO
         {
             _timer += Time.deltaTime;
 
-            if (!_changed && _timer >= Data.tiredDuration)
+            if (!_transitioned && _timer >= Data.transitionDuration)
             {
-                _changed = true;
+                _transitioned = true;
 
-                // 폼 전환 VFX
-                if (Data.vfxFormChange != null)
-                    BossEffectPool.SpawnOneShot(Data.vfxFormChange,
+                if (Data.vfxPhaseChange != null)
+                    BossEffectPool.SpawnOneShot(Data.vfxPhaseChange,
                         ctx.Transform.position, ctx.Transform.rotation);
 
-                // 블랙보드 업데이트
-                var fgBb = (ctx.Monster as ForestGuardianMonster)?.FGBlackboard;
-                fgBb?.OnFormChanged(_nextForm);
+                var fg = (ctx.Monster as ForestGuardianMonster)?.FGBlackboard;
+                fg?.OnPhaseTransitionComplete();
 
-                // TiredStop 애니 → 이후 자동 idle 전환 예정
                 if (ctx.Animator != null && !string.IsNullOrEmpty(Data.animTiredStop))
                     ctx.Animator.CrossFade(Data.animTiredStop, Data.crossFade);
             }
 
-            // TiredStop 짧게 재생 후 Patrol로 복귀 (0.3초 여유)
-            if (_changed && _timer >= Data.tiredDuration + 0.3f)
+            if (_transitioned && _timer >= Data.transitionDuration + 0.3f)
                 ctx.Monster.ChangeState<PatrolState>();
         }
 

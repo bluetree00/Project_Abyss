@@ -29,8 +29,7 @@ public class DBWingStormPatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private WingStormState _state;
 
-    public override void Initialize(BossPatternContext ctx)
-        => _state = new WingStormState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new WingStormState(this); }
 
     public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
 
@@ -55,8 +54,10 @@ public class DBWingStormPatternSO : BossPatternSO
             if (ctx.Animator != null)
                 ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
-            // 현재 플레이어 방향 고정 (경고 표시에 사용)
+            // 현재 플레이어 방향 고정 (경고~공격 내내 유지)
             _stormForward = GetPlayerDir(ctx);
+            if (_stormForward.sqrMagnitude > 0.001f)
+                ctx.Transform.rotation = Quaternion.LookRotation(_stormForward);
 
             // 직사각형 경고 장판 (보스 위치에서 플레이어 방향으로 뻗음)
             var warnColor = new Color(0.9f, 0.7f, 0f);
@@ -79,11 +80,9 @@ public class DBWingStormPatternSO : BossPatternSO
             switch (_phase)
             {
                 case 0:
-                    // 경고 대기 — 이 동안 서서히 플레이어 방향 회전
-                    FacePlayer(ctx, 45f);
+                    // 경고 대기 — 회전 고정 (Enter에서 잠근 방향 유지)
                     if (_timer < Data.warningDuration) return;
 
-                    _stormForward = GetPlayerDir(ctx);
                     DoBlast(ctx);
                     _phase = 1;
                     _timer = 0f;
@@ -109,8 +108,7 @@ public class DBWingStormPatternSO : BossPatternSO
 
             if (Data.vfxPrefab != null)
                 BossEffectPool.SpawnOneShot(Data.vfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
-            else
-                SpawnWindVfx(ctx);
+            SpawnWindVfx(ctx);
 
             // 직사각형 중심: 보스 위치에서 stormForward 방향으로 stormLength * 0.5f
             Vector3 boxCenter = ctx.Transform.position

@@ -69,6 +69,8 @@ public class MonsterGroundWarning : MonoBehaviour
     private void SetupFill(Vector3 worldPos, float radius, float duration, Color fillColor, Color outerColor)
     {
         transform.position = worldPos + Vector3.up * 0.05f;
+
+        // 외곽 경계선 — 자식 오브젝트에 LineRenderer (같은 GO에 두 개 추가 불가)
         _fillMode      = true;
         _fillDuration  = Mathf.Max(0.1f, duration);
         _fillElapsed   = 0f;
@@ -76,8 +78,6 @@ public class MonsterGroundWarning : MonoBehaviour
         _fillColor     = fillColor;
         _fillOuterColor = outerColor;
         _remaining     = duration + 0.15f; // 약간 여유
-
-        // 외곽 경계선 — 자식 오브젝트에 LineRenderer (같은 GO에 두 개 추가 불가)
         var outerGo = new GameObject("OuterLine");
         outerGo.transform.SetParent(transform, false);
         _outerLine = outerGo.AddComponent<LineRenderer>();

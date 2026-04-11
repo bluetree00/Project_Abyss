@@ -11,20 +11,24 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1a7f6f75c03eaf144ae237b605899fd2, type: 3}
   m_Name: FGSpiderComboPattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGSpiderComboPatternSO
-  weight: 1
-  patternTag: 
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGChargePatternSO
+  weight: 1.2
+  patternTag: charge
   breakOverride: -1
-  animSpin: SpinAttack
-  animJumpBack: JumpBack
-  animSlam: FrontSlam
-  crossFade: 0.15
-  vfxSpin: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6, type: 3}
-  vfxShockwave: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
-  vfxFrontBlast: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
-  phase0Duration: 3
-  phase0Radius: 2.5
-  phase1Radius: 3.5
-  phase2FrontOffset: 2
-  phase2BlastRadius: 1
-  phase2FrontRange: 3
+  animCharge: ChargeTackleStart
+  animRecover: ChargeTackleStop
+  animIdle: IdleNormal
+  crossFade: 0.1
+  p1_speed: 12
+  p1_maxDist: 18
+  p1_hitWidth: 3
+  p1_recoverDuration: 1.5
+  p1_warningDuration: 0.5
+  p2_speed: 18
+  p2_maxDist: 22
+  p2_hitWidth: 4
+  p2_recoverDuration: 0.8
+  p2_warningDuration: 0.35
+  p2_trackDuration: 0.4
+  vfxImpact: {fileID: 0}
+  patternCooldown: 8

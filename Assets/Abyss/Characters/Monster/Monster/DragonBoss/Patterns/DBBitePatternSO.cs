@@ -33,7 +33,7 @@ public class DBBitePatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private BiteState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new BiteState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new BiteState(this); }
     public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
     public override SpecialStateBase GetRuntimeState() => _state;
 
@@ -69,7 +69,7 @@ public class DBBitePatternSO : BossPatternSO
             _sub        = Sub.Rising;
             _timer      = 0f;
             // 목표 공중 y를 Enter에서 한 번만 계산 (매 프레임 재계산 금지)
-            float groundY  = GetStaticGroundY(ctx.Transform.position);
+            float groundY  = DragonBossVisualHelper.GetGroundY(ctx.Transform.position);
             _targetAirY    = groundY + Data.flyHeight;
         }
 
@@ -207,7 +207,7 @@ public class DBBitePatternSO : BossPatternSO
             Vector3 pos = ctx.Runtime.PlayerTarget != null
                 ? ctx.Runtime.PlayerTarget.position
                 : ctx.Transform.position;
-            pos.y = GetStaticGroundY(pos);
+            pos.y = DragonBossVisualHelper.GetGroundY(pos);
             return pos;
         }
 
@@ -246,24 +246,6 @@ public class DBBitePatternSO : BossPatternSO
                 }
                 break;
             }
-        }
-
-        /// 보스 자신의 콜라이더를 제외하고 지면 y를 구한다.
-        /// 보스 중심에서 위로 10m → 아래 방향 레이캐스트, 보스 콜라이더 무시.
-        private static float GetStaticGroundY(Vector3 pos)
-        {
-            Vector3 origin = pos + Vector3.up * 10f;
-            // 반경 0.05짜리 SphereCast로 자기 콜라이더를 건너뛰는 대신
-            // 충분히 높은 위에서 아래로 Raycast — 보스보다 위에서 시작하므로
-            // 보스 콜라이더에 맞을 가능성이 낮음. 맞더라도 0.0 이하가 아닌 값 반환.
-            if (Physics.Raycast(origin, Vector3.down, out var hit, 30f, -1, QueryTriggerInteraction.Ignore))
-            {
-                // y가 보스 시작 위치보다 낮은 지면만 유효 (보스 자신 제외)
-                if (hit.point.y < pos.y - 0.5f)
-                    return hit.point.y;
-            }
-            // 레이캐스트 실패 또는 보스 자신에 맞은 경우: y=0 가정
-            return 0f;
         }
 
         private void FacePlayer(MonsterContext ctx)

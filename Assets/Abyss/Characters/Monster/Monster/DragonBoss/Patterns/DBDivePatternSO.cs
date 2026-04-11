@@ -15,19 +15,28 @@ public class DBDivePatternSO : BossPatternSO
 
     [Header("Dive")]
     [SerializeField] private float warningDuration = 1.0f;
-    [SerializeField] private float diveDuration = 0.35f;   // 빠른 돌진
+    [SerializeField] private float diveDuration = 1.0f;
+    [SerializeField] private float speedMultiplier = 3f;
     [SerializeField] private float hitBoxWidth = 2.5f;
     [SerializeField] private float hitBoxLength = 2f;
-    [SerializeField] private float selfDamageRatioOnCrash = 0.08f;
+    [SerializeField] private float selfDamageRatioOnCrash = 0.03f;
+    [SerializeField] private float maxDiveDistance = 20f;
+    [SerializeField] private float recoverDuration = 0.8f;
+    [SerializeField] private float wallProbeRadius = 0.7f;
 
+    [Header("Cooldown")]
+    [SerializeField] private float patternCooldown = 10f;
+
+    private float _cooldownEndTime = -999f;
     private DiveState _state;
 
-    public override void Initialize(BossPatternContext ctx)
-        => _state = new DiveState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new DiveState(this); }
 
-    public override bool CanExecute(BossPatternContext ctx) => true;
+    public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
 
     public override SpecialStateBase GetRuntimeState() => _state;
+
+    internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
 
     private sealed class DiveState : FullLockState<DBDivePatternSO>
     {
@@ -37,6 +46,9 @@ public class DBDivePatternSO : BossPatternSO
         private Vector3 _diveDir;
         private Vector3 _startPos;
         private Vector3 _targetPos;
+        private float _speed;
+        private float _distTravelled;
+        private float _maxDist;
         private bool _hitDealt;
         private bool _crashResolved;
         private bool _originalUpdatePosition;
@@ -68,6 +80,11 @@ public class DBDivePatternSO : BossPatternSO
             else
                 _diveDir.Normalize();
 
+            float targetDist = Vector3.Distance(_startPos, _targetPos);
+            _speed = Mathf.Max(0.01f, ctx.Stat.moveSpeed * Data.speedMultiplier);
+            _maxDist = Mathf.Clamp(targetDist + Data.hitBoxLength * 2f, 6f, Data.maxDiveDistance);
+            _distTravelled = 0f;
+
             // Enter 시점에서 즉시 off — Phase 0 동안 NavMesh가 transform을 오버라이드하지 않도록
             _originalUpdatePosition = ctx.Agent.updatePosition;
             _originalUpdateRotation = ctx.Agent.updateRotation;
@@ -83,7 +100,7 @@ public class DBDivePatternSO : BossPatternSO
                 _startPos,
                 _diveDir,
                 Data.hitBoxWidth * 2f,
-                Mathf.Max(2f, diveLen + 2f),
+                Mathf.Max(6f, Mathf.Min(Data.maxDiveDistance, diveLen + 2f)),
                 Data.warningDuration,
                 new Color(1f, 0.5f, 0f));
 
@@ -109,26 +126,27 @@ public class DBDivePatternSO : BossPatternSO
                     break;
 
                 case 1:
+                    if (TryResolveWallCrash(ctx))
+                    {
+                        StartRecover();
+                        return;
+                    }
+
                     UpdateDivePose(ctx);
 
-                    if (!_hitDealt && _timer >= Data.diveDuration * 0.85f)
+                    if (!_hitDealt)
                         CheckDiveHit(ctx);
 
-                    if (!_crashResolved)
-                        CheckCrash(ctx);
+                    if (_distTravelled < _maxDist && _timer < _phaseDuration) return;
 
-                    if (_timer < _phaseDuration) return;
-
-                    _timer         = 0f;
-                    _phase         = 2;
-                    _phaseDuration = 0.25f;
+                    StartRecover();
                     break;
 
                 case 2:
                     if (_timer < _phaseDuration) return;
 
                     RestoreAgentTracking(ctx);
-                    ctx.Agent.Warp(_targetPos);
+                    ctx.Agent.Warp(ctx.Transform.position);
                     ctx.Agent.ResetPath();
                     ctx.Monster.ChangeState<PatrolState>();
                     break;
@@ -138,14 +156,21 @@ public class DBDivePatternSO : BossPatternSO
         public override void Exit(MonsterContext ctx)
         {
             RestoreAgentTracking(ctx);
+            Data.StartCooldown();
         }
 
-        // 완전 수평 돌진 — arc 없음
+        private void StartRecover()
+        {
+            _timer         = 0f;
+            _phase         = 2;
+            _phaseDuration = Data.recoverDuration;
+        }
+
         private void UpdateDivePose(MonsterContext ctx)
         {
-            float t     = Mathf.Clamp01(_timer / Mathf.Max(0.01f, Data.diveDuration));
-            float easeT = 1f - (1f - t) * (1f - t); // ease-out: 초반 빠르게 감속
-            ctx.Transform.position = Vector3.Lerp(_startPos, _targetPos, easeT);
+            float step = _speed * Time.deltaTime;
+            ctx.Transform.position += _diveDir * step;
+            _distTravelled += step;
 
             if (_diveDir.sqrMagnitude > 0.001f)
                 ctx.Transform.rotation = Quaternion.LookRotation(_diveDir);
@@ -157,7 +182,7 @@ public class DBDivePatternSO : BossPatternSO
             Vector3 center = ctx.Transform.position + _diveDir * Data.hitBoxLength;
             var hits = Physics.OverlapBox(
                 center,
-                new Vector3(Data.hitBoxWidth, 1f, Data.hitBoxLength),
+                new Vector3(Data.hitBoxWidth * 0.5f, 1f, Data.hitBoxLength),
                 ctx.Transform.rotation);
 
             foreach (var col in hits)
@@ -173,36 +198,35 @@ public class DBDivePatternSO : BossPatternSO
                     BossEffectPool.SpawnOneShot(Data.vfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
 
                 ApplyElementalDamage(ctx, player, damage, kbForce, _diveDir);
-                _hitDealt      = true;
-                _crashResolved = true;
+                _hitDealt = true;
                 break;
             }
         }
 
-        // 벽 충돌 시에만 보스 자기 데미지 (플레이어/자기 콜라이더 제외)
-        private void CheckCrash(MonsterContext ctx)
+        private bool TryResolveWallCrash(MonsterContext ctx)
         {
-            float dist = Vector3.Distance(_startPos, _targetPos);
-            if (dist <= 0.5f) return;
+            if (_crashResolved) return true;
 
-            // 현재 위치 기준 전방 SphereCast (Trigger 무시)
+            float probeDistance = Mathf.Max(0.8f, _speed * Time.deltaTime + Data.hitBoxLength);
+
             var ray = new Ray(ctx.Transform.position + Vector3.up * 0.5f, _diveDir);
-            if (!Physics.SphereCast(ray, 0.6f, out RaycastHit hit, 2f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return;
+            if (!Physics.SphereCast(ray, Data.wallProbeRadius, out RaycastHit hit, probeDistance,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return false;
 
-            // 보스 자신의 콜라이더이면 무시
             if (hit.collider.transform == ctx.Transform ||
-                hit.collider.transform.IsChildOf(ctx.Transform)) return;
+                hit.collider.transform.IsChildOf(ctx.Transform))
+                return false;
 
-            // 플레이어 충돌은 무시
             var player = hit.collider.GetComponent<PlayerController>()
                 ?? hit.collider.GetComponentInParent<PlayerController>();
-            if (player != null) return;
+            if (player != null) return false;
 
-            // 벽/맵 오브젝트 → 자기 데미지
             _crashResolved = true;
-            int selfDamage = Mathf.Max(1, Mathf.RoundToInt(ctx.Stat.maxHp * Data.selfDamageRatioOnCrash));
-            ctx.Monster.TakeDamage(selfDamage, ctx.Monster.gameObject, 0f);
+            int currentHp = Mathf.Max(1, ctx.Runtime.CurrentHp);
+            float rawSelfDamage = Mathf.Ceil(currentHp * Data.selfDamageRatioOnCrash + ctx.Stat.defense);
+            ctx.Monster.TakeDamage(rawSelfDamage, ctx.Monster.gameObject, 0f);
+            return true;
         }
 
         private static void ApplyElementalDamage(

@@ -11,13 +11,13 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0b9fc8c8beb9a834a8bff3a8e91a0737, type: 3}
   m_Name: FGFormChangePattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGFormChangePatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGPhaseTransitionPatternSO
   weight: 1
-  patternTag: 
-  breakOverride: -1
+  patternTag: phase_transition
+  breakOverride: 0
   animTiredStart: TiredStart
   animTiredStop: TiredStop
   animIdle: IdleNormal
   crossFade: 0.15
-  tiredDuration: 2
-  vfxFormChange: {fileID: 815897628672023783, guid: c1937f972ff9beb43a6c954f5a39a304, type: 3}
+  transitionDuration: 3
+  vfxPhaseChange: {fileID: 0}

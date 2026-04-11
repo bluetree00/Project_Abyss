@@ -31,7 +31,7 @@ public class DBIceLandingPatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private IceLandingState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new IceLandingState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new IceLandingState(this); }
 
     public override bool CanExecute(BossPatternContext ctx)
     {

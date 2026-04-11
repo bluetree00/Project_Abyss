@@ -28,7 +28,7 @@ public class DBClawSwipePatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private ClawSwipeState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new ClawSwipeState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new ClawSwipeState(this); }
     public override bool CanExecute(BossPatternContext ctx) => Time.time >= _cooldownEndTime;
     public override SpecialStateBase GetRuntimeState() => _state;
     internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;

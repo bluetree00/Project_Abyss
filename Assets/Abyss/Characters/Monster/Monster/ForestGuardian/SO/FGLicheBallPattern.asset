@@ -11,12 +11,17 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 53785ad3a25ecb74bafe39c3032ba61a, type: 3}
   m_Name: FGLicheBallPattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGLicheBallPatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGRockThrowPatternSO
   weight: 1
-  patternTag: 
+  patternTag: rock_throw
   breakOverride: -1
-  animStateName: Magic01
-  crossFade: 0.15
-  vfxPrefab: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
-  attackRadius: 7
-  warningDuration: 2
+  animWindup: MagicAttack1
+  animThrow: MagicAttack2
+  crossFade: 0.1
+  windupDuration: 1.2
+  projectileSpeed: 15
+  projectileRadius: 2.5
+  warningDuration: 0.3
+  vfxProjectile: {fileID: 0}
+  vfxImpact: {fileID: 0}
+  patternCooldown: 8

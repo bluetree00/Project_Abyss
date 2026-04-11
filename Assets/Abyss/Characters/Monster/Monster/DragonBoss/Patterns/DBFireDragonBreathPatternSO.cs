@@ -41,7 +41,7 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
     private float _cooldownEndTime = -999f;
     private FireDragonBreathState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new FireDragonBreathState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new FireDragonBreathState(this); }
 
     public override bool CanExecute(BossPatternContext ctx)
     {

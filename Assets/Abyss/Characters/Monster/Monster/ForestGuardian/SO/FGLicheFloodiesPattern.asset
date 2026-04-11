@@ -11,14 +11,19 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7bfe2d20cf91994d9292b3d23537fcb, type: 3}
   m_Name: FGLicheFloodiesPattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGLicheFloodiesPatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGBreathPatternSO
   weight: 1
-  patternTag: 
+  patternTag: breath
   breakOverride: -1
-  animStateName: Magic03
-  crossFade: 0.15
-  vfxTrapPrefab: {fileID: 100100000, guid: d79f03dd3c9b07c41a430faecdcdf500, type: 2}
-  trapRadius: 4
-  trapDuration: 3
-  offsetRangeMin: 1.5
-  offsetRangeMax: 4
+  animName: MagicAttack3
+  crossFade: 0.1
+  vfxBreath: {fileID: 0}
+  breathLocalOffset: {x: 0, y: 1.2, z: 1.5}
+  warningDuration: 1
+  breathDuration: 3.5
+  castRadius: 0.5
+  castMaxDist: 10
+  tickInterval: 0.2
+  aimTurnSpeed: 120
+  breathTurnSpeed: 60
+  patternCooldown: 15

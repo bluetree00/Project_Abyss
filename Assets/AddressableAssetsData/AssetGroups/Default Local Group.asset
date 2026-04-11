@@ -95,11 +95,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 44a1a6b087dd9af45a51d72d04c1c2b4
-    m_Address: MushroomSmile/MushroomSmile
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 46e25d08f06a5ed429ecdab9e3b50a77
     m_Address: EvilMage/EvilMage
     m_ReadOnly: 0
@@ -177,11 +172,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 925ef72c387dc7149a2a66a8b694caf3
     m_Address: Salamander/Salamander
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 945fee88846bc664d963a4ddcaa0014c
-    m_Address: MushroomSmile/MushroomSmileConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -79,11 +79,8 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
             ctx.Agent.updatePosition = false;
             ctx.Agent.updateRotation = false;
 
-            // 현재 원소 캐싱 (소환 중에 원소가 바뀔 수 있어서 고정)
+            // HP 임계값 결정 → 임계값 기준으로 원소 고정 (얼음→번개→불 순서 보장)
             var dragon = ctx.Monster as DragonBossMonster;
-            _element = dragon?.DBBlackboard?.CurrentElement ?? DragonBossBlackboard.DragonElement.Ice;
-
-            // HP 임계값 결정 및 즉시 사용 표시
             if (dragon != null)
             {
                 float hp = dragon.HpRatio;
@@ -92,6 +89,13 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
                 else                                                                   _lockedThreshold = 0.8f;
                 dragon.DBBlackboard.MarkSummonUsed(_lockedThreshold);
             }
+
+            // 소환 회차(임계값)에 따라 원소 고정 — 현재 HP 원소와 무관
+            _element = _lockedThreshold <= 0.11f
+                ? DragonBossBlackboard.DragonElement.Fire
+                : _lockedThreshold <= 0.51f
+                    ? DragonBossBlackboard.DragonElement.Thunder
+                    : DragonBossBlackboard.DragonElement.Ice;
 
             _phase = 0;
             _timer = 0f;
