@@ -559,12 +559,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         string addr = _config.animation.animatorControllerAddress;
         if (string.IsNullOrEmpty(addr)) return;
 
-        var overrideCtrl = await Managers.AddressableManager
-            .LoadAssetAsync<AnimatorOverrideController>(addr);
+        var ctrl = await Managers.AddressableManager
+            .LoadAssetAsync<RuntimeAnimatorController>(addr);
 
-        if (overrideCtrl == null || _animator == null) return;
+        if (ctrl == null || _animator == null) return;
 
-        _animator.runtimeAnimatorController = overrideCtrl;
+        _animator.runtimeAnimatorController = ctrl;
     }
 
     private void SetPlayerTarget(Transform player)
