@@ -1,0 +1,20 @@
+fileFormatVersion: 2
+guid: 15ad9a2f83fc44e22b7f523d7029cbd9
+timeCreated: 1512953076
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 204664
+  packageName: Treant Monster Creature - Fantasy RPG
+  packageVersion: 4.3.2
+  assetPath: Assets/Magic Pig Games (Infinity PBR)/Shared Files/Shared Files - Characters/Demo
+    Scripts/SFB_HumanDemoModel.cs
+  uploadId: 885694

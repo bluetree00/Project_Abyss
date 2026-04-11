@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: a586cf93dc19b28488308d7488b8de20
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 173450
+  packageName: Sword slashes PRO
+  packageVersion: 3.0
+  assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Models/Scripts/For
+    demo scenes/HS_CameraHolder.cs
+  uploadId: 865410
