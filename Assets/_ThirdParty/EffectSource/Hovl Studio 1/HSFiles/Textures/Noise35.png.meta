@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 7608f194af776dc43a2297374e2a57e5
+guid: 792a0902f59bacf489adfd0c92de003a
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -140,8 +140,8 @@ TextureImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 133704
-  packageName: RPG VFX Bundle
-  packageVersion: 6.0.2
+  productId: 173450
+  packageName: Sword slashes PRO
+  packageVersion: 3.0
   assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Textures/Noise35.png
-  uploadId: 883360
+  uploadId: 865410

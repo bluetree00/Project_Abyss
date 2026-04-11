@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 1955cbee4bb4b484f8e38a56218a678c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 204664
+  packageName: Treant Monster Creature - Fantasy RPG
+  packageVersion: 4.3.2
+  assetPath: Assets/Magic Pig Games (Infinity PBR)/Shared Files/Scripts/InfinityExtensions.cs
+  uploadId: 885694
