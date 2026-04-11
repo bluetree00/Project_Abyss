@@ -38,5 +38,5 @@ MonoBehaviour:
   tier3ExtraHitScale: 1.5
   muzzleEffectKey: BowQMuzzleFlash
   endDelay: 0.3
-  animationOverride: QSkill_Iasen
+  animationOverride: QSkill_01
   fireAnimationOverride: QSkill_02

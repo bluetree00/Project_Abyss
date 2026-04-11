@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a9b67a03b2254ba428bc56a3829e6be2
+timeCreated: 1552286852
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 141712
+  packageName: Skill Indicator
+  packageVersion: 1.1.0
+  assetPath: Assets/taecgLibrary/SkillIndicator/Examples/DEMO02.unity
+  uploadId: 373292

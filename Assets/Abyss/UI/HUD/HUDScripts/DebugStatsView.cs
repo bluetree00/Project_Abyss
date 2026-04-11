@@ -27,6 +27,8 @@ public class DebugStatsView : MonoBehaviour
         var wm = _player?.WeaponManager;
         var wd = wm?.CurrentWeaponData;
 
+        int condCount = _stats.ConditionalSynergies?.Count ?? 0;
+
         statsText.text =
 $@"<b>=== Debug Stats ===</b>
 <b>HP</b>: {_stats.Hp} / {_stats.MaxHp}
@@ -35,6 +37,8 @@ $@"<b>=== Debug Stats ===</b>
 <b>AtkSpeed</b>: {_stats.AttackSpeedMultiplier:F2}x
 <b>SkillCDR</b>: {_stats.SkillCooldownReduction:P0}
 <b>ItemCDR</b>: {_stats.ActiveItemCooldownReduction:P0}
+<b>Lifesteal</b>: {_stats.LifestealRate:P0}
+<b>Synergy</b>: {condCount} conditional
 ---
 <b>Weapon</b>: {(wd != null ? wd.displayName : "None")}
 <b>ATK</b>: {wd?.baseAttack ?? 0}  <b>DEF</b>: {wd?.baseDefense ?? 0}

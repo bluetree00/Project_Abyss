@@ -45,6 +45,8 @@ public sealed class Managers : MonoBehaviour
     private PlayerDataManager _playerDataManager;
     private ServerEquipmentDataManager _serverEquipmentDataManager;
     private MonsterHPBarManager _monsterHPBar;
+    private ItemDataManager _itemDataManager;
+    private BlockDataManager _blockDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -221,6 +223,34 @@ public sealed class Managers : MonoBehaviour
                 inst._monsterHPBar = new MonsterHPBarManager();
 
             return inst._monsterHPBar;
+        }
+    }
+
+    public static ItemDataManager ItemData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._itemDataManager == null)
+                inst._itemDataManager = new ItemDataManager();
+
+            return inst._itemDataManager;
+        }
+    }
+
+    public static BlockDataManager BlockData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._blockDataManager == null)
+                inst._blockDataManager = new BlockDataManager();
+
+            return inst._blockDataManager;
         }
     }
     #endregion

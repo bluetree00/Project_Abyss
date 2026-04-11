@@ -48,6 +48,7 @@ public sealed class GameRunSession
     private PlayerController _playerStateSource;
 
     public PlayerRunState PlayerState { get; private set; }
+    public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
 
     // 씬 전환 시 무기 슬롯 복원용
@@ -194,6 +195,21 @@ public sealed class GameRunSession
         SavedCurrentSlotIndex = -1;
     }
 
+    /// <summary>
+    /// 에디터 직접 실행 시 Phase를 Running으로 강제 설정.
+    /// StartNewRunAsync를 거치지 않고 테스트할 때 사용.
+    /// </summary>
+    public void ForceRunningForTest()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (Phase == RunPhase.NotRunning)
+        {
+            Phase = RunPhase.Running;
+            Debug.Log("[GameRun] ForceRunningForTest: Phase → Running");
+        }
+#endif
+    }
+
     // =========================================================
     // Run State Machine
     // =========================================================
@@ -306,7 +322,20 @@ public sealed class GameRunSession
         if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
 
         SubscribePlayerStateSource(Player);
+
+        // 인벤토리 ↔ 스탯 연동 (추가/제거 시 자동 재계산)
+        if (Player?.RuntimeStats != null)
+        {
+            ItemInventory.OnInventoryChanged -= RefreshPlayerItemStats;
+            ItemInventory.OnInventoryChanged += RefreshPlayerItemStats;
+        }
+
         OnPlayerBound?.Invoke(Player);
+    }
+
+    private void RefreshPlayerItemStats()
+    {
+        Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)

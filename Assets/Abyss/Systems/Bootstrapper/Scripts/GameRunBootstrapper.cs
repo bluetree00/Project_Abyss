@@ -58,9 +58,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async void Start()
     {
+        // 카메라 인트로 준비 (즉시 멀리 배치 + OnPlayerBound 이벤트 대기)
+        EnsureCameraController();
+
         // 데이터 매니저 초기화
         await InitMapDataAsync();
         await InitPlayerDataAsync();
+        await InitItemDataAsync();
+
+        // UIRoot 로드 대기 (BlockSynergyBridge가 @HUD에 있음)
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+
+        // 블록 시너지 그리드 구성 (UIRoot @HUD에 있는 Bridge 사용)
+        var bridge = BlockSynergyBridge.Instance;
+        if (bridge == null)
+            bridge = Object.FindFirstObjectByType<BlockSynergyBridge>(FindObjectsInactive.Include);
+        if (bridge != null)
+            bridge.InitializeGridsFromServer();
 
         if (_run != null && _run.IsRunning)
             await StartCombatAsync();
@@ -75,6 +90,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var debugGO = new GameObject("@DebugStatsBootstrap");
             debugGO.AddComponent<DebugStatsBootstrap>();
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // 디버그 그리드 치트 패널 생성
+        if (Object.FindFirstObjectByType<DebugGridCheatPanel>(FindObjectsInactive.Include) == null)
+        {
+            var cheatGO = new GameObject("@DebugGridCheatPanel");
+            cheatGO.AddComponent<DebugGridCheatPanel>();
+        }
+#endif
     }
 
     private void OnDestroy()
@@ -152,6 +176,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             try { await equipData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] EquipmentData 예외: {e.Message}"); }
+        }
+    }
+
+    private async UniTask InitItemDataAsync()
+    {
+        var itemData = Managers.ItemData;
+        if (itemData != null && !itemData.IsInitialized)
+        {
+            try { await itemData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ItemData 예외: {e.Message}"); }
+        }
+
+        var blockData = Managers.BlockData;
+        if (blockData != null && !blockData.IsInitialized)
+        {
+            try { await blockData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BlockData 예외: {e.Message}"); }
         }
     }
 
@@ -269,6 +310,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     // 정상 런 없이 GameScene을 직접 실행할 때 (에디터 테스트용)
     private async UniTask StartCombatDirectAsync()
     {
+        // 에디터 직접 실행 시 Phase를 Running으로 설정 (Tab 등 입력 활성화)
+        _run?.ForceRunningForTest();
+
+        // UIRoot가 아직 로드 안 됐으면 대기
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(_run);
@@ -475,6 +523,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         return player;
+    }
+
+    private static void EnsureCameraController()
+    {
+        var cam = Camera.main;
+        if (cam == null) cam = Object.FindFirstObjectByType<Camera>();
+        if (cam == null) return;
+
+        if (cam.GetComponent<GameCameraController>() == null)
+            cam.gameObject.AddComponent<GameCameraController>();
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>

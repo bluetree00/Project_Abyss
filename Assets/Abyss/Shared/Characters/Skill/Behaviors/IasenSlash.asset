@@ -28,4 +28,4 @@ MonoBehaviour:
   useWeaponTrail: 0
   playerTrailKey: 
   playerTrailScale: 1
-  animationOverride: QSkill_Iasen
+  animationOverride: QSkill_01

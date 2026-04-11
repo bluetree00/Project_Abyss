@@ -321,6 +321,11 @@ public sealed class HudPresenter : MonoBehaviour
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.SystemNotices;
 
+            case HUDIds.Mode.Puzzle:
+                return HUDIds.Section.TopBar |
+                       HUDIds.Section.GridPanel |
+                       HUDIds.Section.SystemNotices;
+
             default:
                 return HUDIds.Section.None;
         }

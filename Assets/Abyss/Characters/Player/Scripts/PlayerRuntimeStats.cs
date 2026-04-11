@@ -203,6 +203,20 @@ public sealed class PlayerRuntimeStats
     private int _roomRanged;
     private int _roomDefense;
 
+    // -- Grid Synergy (Always) --
+    private int _synergyMelee;
+    private int _synergyRanged;
+    private int _synergyDefense;
+    private int _synergyLuck;
+    private int _synergyMaxHp;
+    private float _synergySkillCdr;
+    private float _synergyActiveItemCdr;
+    private float _synergyAttackSpeed;
+
+    // -- Grid Synergy (조건부) --
+    private float _synergyLifesteal;
+    private readonly System.Collections.Generic.List<ConditionalSynergy> _conditionalSynergies = new();
+
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
 
@@ -281,12 +295,30 @@ public sealed class PlayerRuntimeStats
         }
         else
         {
-            _itemMelee   = (int)(inventory.GetTotal(StatType.MeleeAttack) + inventory.GetTotal(StatType.AttackPower));
-            _itemRanged  = (int)(inventory.GetTotal(StatType.RangedAttack) + inventory.GetTotal(StatType.AttackPower));
-            _itemDefense = (int)inventory.GetTotal(StatType.Defense);
-            _itemLuck    = (int)inventory.GetTotal(StatType.Luck);
-            _itemSkillCdr = inventory.GetTotal(StatType.SkillCooldownReduction);
-            _itemActiveItemCdr = inventory.GetTotal(StatType.ActiveItemCooldownReduction);
+            _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
+            _itemSkillCdr = _itemActiveItemCdr = 0f;
+
+            foreach (var item in inventory.Items)
+            {
+                if (item.effects == null) continue;
+                foreach (var eff in item.effects)
+                {
+                    if (string.IsNullOrEmpty(eff.effectType) || eff.trigger != "Always") continue;
+                    switch (eff.effectType)
+                    {
+                        case "MeleeAttack":  _itemMelee  += (int)eff.value; break;
+                        case "RangedAttack": _itemRanged += (int)eff.value; break;
+                        case "AttackPower":
+                            _itemMelee  += (int)eff.value;
+                            _itemRanged += (int)eff.value;
+                            break;
+                        case "Defense":      _itemDefense += (int)eff.value; break;
+                        case "Luck":         _itemLuck    += (int)eff.value; break;
+                        case "SkillCooldownReduction":      _itemSkillCdr += eff.value; break;
+                        case "ActiveItemCooldownReduction": _itemActiveItemCdr += eff.value; break;
+                    }
+                }
+            }
         }
 
         Recalculate();
@@ -324,15 +356,151 @@ public sealed class PlayerRuntimeStats
 
     private void Recalculate()
     {
-        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee);
-        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged);
-        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense);
-        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck);
+        // 조건부 시너지 누적
+        int condMelee = 0, condRanged = 0;
+        float condAttackSpeed = 0f;
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr);
-        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
+        foreach (var s in _conditionalSynergies)
+        {
+            float multiplier = 0f;
+
+            if (s.trigger == "OnHit" && s.currentStacks > 0)
+                multiplier = s.currentStacks;
+            else if (s.trigger == "OnLowHp" && s.isActive)
+                multiplier = 1f;
+
+            if (multiplier <= 0f) continue;
+
+            switch (s.effectType)
+            {
+                case "AttackPower":
+                    condMelee  += (int)(s.value * multiplier);
+                    condRanged += (int)(s.value * multiplier);
+                    break;
+                case "MeleeAttack":  condMelee  += (int)(s.value * multiplier); break;
+                case "RangedAttack": condRanged += (int)(s.value * multiplier); break;
+                case "AttackSpeed":  condAttackSpeed += s.value * multiplier; break;
+            }
+        }
+
+        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _synergyMelee + condMelee);
+        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _synergyRanged + condRanged);
+        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _synergyDefense);
+        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck + _synergyLuck);
+
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + condAttackSpeed);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr);
+        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
 
         OnChanged?.Invoke();
+    }
+
+    // ── 시너지 ──────────────────────────────────────────────────────────────────
+
+    /// <summary>Always 트리거 시너지 — 즉시 영구 스탯 적용.</summary>
+    public void ApplySynergyEffect(string effectType, float value)
+    {
+        switch (effectType)
+        {
+            case "MeleeAttack":   _synergyMelee  += (int)value; break;
+            case "RangedAttack":  _synergyRanged += (int)value; break;
+            case "AttackPower":
+                _synergyMelee  += (int)value;
+                _synergyRanged += (int)value;
+                break;
+            case "Defense":       _synergyDefense += (int)value; break;
+            case "MaxHp":
+                _synergyMaxHp += (int)value;
+                MaxHp = Mathf.Max(1, MaxHp + (int)value);
+                Hp = Mathf.Min(Hp, MaxHp);
+                break;
+            case "Luck":          _synergyLuck += (int)value; break;
+            case "AttackSpeed":   _synergyAttackSpeed += value; break;
+            case "Lifesteal":     _synergyLifesteal += value; break;
+            case "MoveSpeed":     break; // TODO: 이동속도 레이어 추가 시
+            case "SkillCooldownReduction":       _synergySkillCdr += value; break;
+            case "ActiveItemCooldownReduction":  _synergyActiveItemCdr += value; break;
+        }
+
+        Recalculate();
+    }
+
+    /// <summary>조건부 시너지 등록 (OnHit, OnLowHp 등).</summary>
+    public void RegisterConditionalSynergy(ConditionalSynergy synergy)
+    {
+        if (synergy == null) return;
+        _conditionalSynergies.Add(synergy);
+    }
+
+    /// <summary>흡혈 비율 (OnHit Lifesteal 포함).</summary>
+    public float LifestealRate => _synergyLifesteal;
+
+    /// <summary>조건부 시너지 목록 (읽기 전용).</summary>
+    public System.Collections.Generic.IReadOnlyList<ConditionalSynergy> ConditionalSynergies => _conditionalSynergies;
+
+    /// <summary>OnHit 트리거 발동 — 공격 적중 시 호출.</summary>
+    public void TriggerOnHit()
+    {
+        foreach (var s in _conditionalSynergies)
+        {
+            if (s.trigger != "OnHit") continue;
+            s.currentStacks = Mathf.Min(s.currentStacks + 1, s.maxStack > 0 ? s.maxStack : 1);
+            s.remainingDuration = s.duration;
+        }
+
+        Recalculate();
+    }
+
+    /// <summary>OnLowHp 체크 — HP 비율 기반 조건부 효과 활성화.</summary>
+    public void CheckOnLowHp()
+    {
+        float hpRatio = MaxHp > 0 ? (float)Hp / MaxHp : 1f;
+
+        foreach (var s in _conditionalSynergies)
+        {
+            if (s.trigger != "OnLowHp") continue;
+            s.isActive = hpRatio <= s.threshold;
+        }
+
+        Recalculate();
+    }
+
+    /// <summary>조건부 시너지 시간 경과 — Update에서 호출.</summary>
+    public void TickConditionalSynergies(float deltaTime)
+    {
+        bool changed = false;
+        foreach (var s in _conditionalSynergies)
+        {
+            if (s.trigger != "OnHit" || s.currentStacks <= 0) continue;
+            if (s.duration <= 0f) continue;
+
+            s.remainingDuration -= deltaTime;
+            if (s.remainingDuration <= 0f)
+            {
+                s.currentStacks = 0;
+                s.remainingDuration = 0f;
+                changed = true;
+            }
+        }
+
+        if (changed) Recalculate();
+    }
+
+    /// <summary>모든 시너지 효과 초기화.</summary>
+    public void ClearSynergyEffects()
+    {
+        // MaxHp 복원 (초기화 전에 처리)
+        if (_synergyMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp - _synergyMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
+        _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
+        _synergyLifesteal = 0f;
+        _conditionalSynergies.Clear();
+
+        Recalculate();
     }
 }

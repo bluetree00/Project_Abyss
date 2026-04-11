@@ -1208,7 +1208,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
@@ -2012,6 +2012,7 @@ GameObject:
   - component: {fileID: 1643941080553862375}
   - component: {fileID: 1723741337109115109}
   - component: {fileID: 4176978844670123923}
+  - component: {fileID: 3302298203259958368}
   m_Layer: 5
   m_Name: '@HUD'
   m_TagString: Untagged
@@ -2073,10 +2074,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   topBarRoot: {fileID: 1791177030736014941}
   combatPanel: {fileID: 4614899163122891727}
+  gridPanel: {fileID: 0}
   bossPanelView: {fileID: 8851437550282875643}
   systemNoticesRoot: {fileID: 0}
   nicknameText: {fileID: 3397901793256520361}
   goldText: {fileID: 6959999493937585633}
+--- !u!114 &3302298203259958368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2331022459059282029}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 332ae2533d1b2d2428dc10a4eaac8bb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BlockSynergyBridge
+  puzzlePrefab: {fileID: 3243770689857458355, guid: a7d3c1adae069124b8f75cec782d5e34,
+    type: 3}
+  boardManager: {fileID: 0}
+  thumbnailFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
 --- !u!1 &2460553339345271598
 GameObject:
   m_ObjectHideFlags: 0
@@ -2649,6 +2667,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hpSlider: {fileID: 6798471382147016799}
   hpText: {fileID: 6498474881468806239}
+  hpFillImage: {fileID: 0}
   slot0:
     emptyRoot: {fileID: 6211475292025033642}
     iconImage: {fileID: 4822132296351577287}
@@ -3367,6 +3386,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   presenter: {fileID: 1723741337109115109}
+  hudVisualRoot: {fileID: 0}
 --- !u!1 &4234942637334364466
 GameObject:
   m_ObjectHideFlags: 0
@@ -5210,7 +5230,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
@@ -6474,7 +6494,7 @@ RectTransform:
   m_Father: {fileID: 8602338140042218605}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -8766,6 +8786,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 664543707926312876}
     m_Modifications:
+    - target: {fileID: 393384489012336071, guid: a7d3c1adae069124b8f75cec782d5e34,
+        type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 556537878614734768, guid: a7d3c1adae069124b8f75cec782d5e34,
         type: 3}
       propertyPath: m_AnchorMax.y
