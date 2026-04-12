@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 2ac6a6024a3312e41866d2b5f11c637d
+guid: d699c7cae7431dd458b34bba5c05be45
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -115,10 +115,3 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 84283
-  packageName: Unka the Dragon
-  packageVersion: 4.0
-  assetPath: Assets/Malbers Animations/Dragons/Common/Eyes/Textures/Realistic/18.png
-  uploadId: 778054

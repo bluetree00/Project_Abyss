@@ -325,6 +325,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!23 &115272141
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -511,6 +514,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!23 &186265443
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1201,6 +1207,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!23 &487247458
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2138,6 +2147,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!23 &1150250079
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2483,7 +2495,7 @@ PrefabInstance:
     - target: {fileID: 1799362445048974850, guid: ca57a31cdc40b2545be737603b78ed55,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4085554191472230939, guid: ca57a31cdc40b2545be737603b78ed55,
         type: 3}

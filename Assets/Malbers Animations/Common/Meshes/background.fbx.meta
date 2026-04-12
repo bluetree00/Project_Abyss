@@ -1,11 +1,11 @@
 fileFormatVersion: 2
-guid: 906ef9f611e6177418327a2d223bab91
+guid: 2758cc400fd3fba4696af3fd46b9e70b
 ModelImporter:
-  serializedVersion: 22200
+  serializedVersion: 24200
   internalIDToNameTable: []
   externalObjects: {}
   materials:
-    materialImportMode: 0
+    materialImportMode: 2
     materialName: 0
     materialSearch: 1
     materialLocation: 1
@@ -56,6 +56,9 @@ ModelImporter:
     maxBonesPerVertex: 4
     minBoneWeight: 0.001
     optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -105,10 +108,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 84283
-  packageName: Unka the Dragon
-  packageVersion: 4.0
-  assetPath: Assets/Malbers Animations/Common/Meshes/background.fbx
-  uploadId: 778054

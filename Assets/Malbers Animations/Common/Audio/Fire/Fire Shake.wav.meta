@@ -1,44 +1,23 @@
 fileFormatVersion: 2
-guid: fbc19e6d86ed3d142b0b531b232852de
-timeCreated: 1509594547
-licenseType: Store
+guid: b7c4cdf1999a41448a2a9ed65324ee29
 AudioImporter:
-  serializedVersion: 6
+  externalObjects: {}
+  serializedVersion: 8
   defaultSettings:
+    serializedVersion: 2
     loadType: 0
     sampleRateSetting: 0
     sampleRateOverride: 44100
     compressionFormat: 1
     quality: 1
     conversionMode: 0
-  platformSettingOverrides:
-    1:
-      loadType: 0
-      sampleRateSetting: 1
-      sampleRateOverride: 44100
-      compressionFormat: 2
-      quality: 1
-      conversionMode: 0
-    7:
-      loadType: 0
-      sampleRateSetting: 1
-      sampleRateOverride: 44100
-      compressionFormat: 2
-      quality: 1
-      conversionMode: 0
-  forceToMono: 1
+    preloadAudioData: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
   normalize: 1
-  preloadAudioData: 1
-  loadInBackground: 1
+  loadInBackground: 0
   ambisonic: 0
   3D: 1
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 84283
-  packageName: Unka the Dragon
-  packageVersion: 4.0
-  assetPath: Assets/Malbers Animations/Common/Audio/Fire/Fire Shake.wav
-  uploadId: 778054

@@ -27,6 +27,10 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     protected override float  HPBarHeadOffset => 0.3f;
     protected override bool   UseWorldHPBar   => false;
 
+    [Header("페이즈 머티리얼")]
+    [SerializeField] private Material[] _phase1Materials;
+    [SerializeField] private Material[] _phase2Materials;
+
     // ── IBoss ─────────────────────────────────────────────────
     public float HpRatio =>
         (_runtime != null && _config != null && _config.stat.maxHp > 0)
@@ -47,6 +51,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     private bool                     _phase2SpeedApplied;
     private float                    _phase1BreakMin;
     private float                    _phase1BreakMax;
+    private SkinnedMeshRenderer      _meshRenderer;
 
     // ── 커스텀 ICondition ────────────────────────────────────────
 
@@ -88,6 +93,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         _phase2SpeedApplied = false;
         _phase1BreakMin     = bossConfig.patternBreakDurationMin;
         _phase1BreakMax     = bossConfig.patternBreakDurationMax;
+
+        _meshRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+        ApplyMaterials(_phase1Materials);
 
         _patternCtx = new BossPatternContext
         {
@@ -223,6 +231,12 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         }
     }
 
+    private void ApplyMaterials(Material[] mats)
+    {
+        if (_meshRenderer == null || mats == null || mats.Length == 0) return;
+        _meshRenderer.sharedMaterials = mats;
+    }
+
     /// <summary>Phase2 진입 시 NavAgent 이동속도·Animator 속도 배율 적용.</summary>
     private void ApplyPhase2Multipliers()
     {
@@ -241,6 +255,8 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             _bossConfig.patternBreakDurationMin = ForestGuardianBlackboard.Phase2BreakDurationMin;
             _bossConfig.patternBreakDurationMax = ForestGuardianBlackboard.Phase2BreakDurationMax;
         }
+
+        ApplyMaterials(_phase2Materials);
     }
 
     // ── 풀 재사용 ─────────────────────────────────────────────
@@ -266,6 +282,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             _bossConfig.patternBreakDurationMax = _phase1BreakMax;
         }
 
+        ApplyMaterials(_phase1Materials);
         BindBossHud();
     }
 
