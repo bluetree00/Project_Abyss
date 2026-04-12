@@ -1,15 +1,8 @@
 fileFormatVersion: 2
-guid: e5f0dba9ae6ae46cf8395627b65d579f
-timeCreated: 1488837124
-licenseType: Store
+guid: 06d00969b936c634a8f3c96deb547ac8
 NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 54494
-  packageName: Realistic Fire VFX
-  packageVersion: 3.5
-  assetPath: Assets/Luke Peek/_Common/Demo Scene/Floor.mat
-  uploadId: 424903
