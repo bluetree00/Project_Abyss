@@ -45,7 +45,8 @@
       "mcp__mcp-for-unity__find_gameobjects",
       "Bash(python3 -c ':*)",
       "Bash(grep -A 30 \"m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/PuzzleGrid/Prefabs/Puzzle.prefab)",
-      "Bash(curl -L https://github.com/WhiteBless/MjprojectBBB/raw/main/Assets/InfinityPBR/_InfinityPBR%20-%20Treant/Model/Treant_Body.fbx -o 'c:/Users/u/Documents/GitHub/Project_Abyss/Assets/ExternalAssets/_InfinityPBR - Treant/Model/Treant_Body.fbx')"
+      "Bash(curl -L https://github.com/WhiteBless/MjprojectBBB/raw/main/Assets/InfinityPBR/_InfinityPBR%20-%20Treant/Model/Treant_Body.fbx -o 'c:/Users/u/Documents/GitHub/Project_Abyss/Assets/ExternalAssets/_InfinityPBR - Treant/Model/Treant_Body.fbx')",
+      "mcp__mcp-for-unity__manage_asset"
     ],
     "additionalDirectories": [
       "c:\\Users\\u\\Desktop"

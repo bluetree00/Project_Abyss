@@ -73,19 +73,29 @@ public class InventoryPageView : MonoBehaviour
         EnsureGridRoot();
         EnsureTooltip();
         _bound = true;
+
+        Debug.Log($"[InventoryPageView] Bound. parent={transform.name} " +
+                  $"gridRoot={(_gridRoot != null ? _gridRoot.name : "null")} " +
+                  $"parentChain={transform.parent?.name}/{transform.parent?.parent?.name} " +
+                  $"items={_inventory.Count}");
     }
 
     private void EnsureGridRoot()
     {
         if (_gridRoot != null) return;
 
-        var gridGO = new GameObject("ItemGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        // 기존 것 삭제 (이전 세션 잔재 방지)
+        var existing = transform.Find("ItemGrid");
+        if (existing != null)
+            Destroy(existing.gameObject);
+
+        // 항상 새로 생성
+        var gridGO = new GameObject("ItemGrid", typeof(RectTransform), typeof(GridLayoutGroup));
         gridGO.transform.SetParent(transform, false);
 
         _gridRoot = gridGO.GetComponent<RectTransform>();
-        // 책의 오른쪽 페이지 영역
-        _gridRoot.anchorMin = new Vector2(0.52f, 0.05f);
-        _gridRoot.anchorMax = new Vector2(0.97f, 0.88f);
+        _gridRoot.anchorMin = new Vector2(0.55f, 0.18f);
+        _gridRoot.anchorMax = new Vector2(0.93f, 0.78f);
         _gridRoot.offsetMin = Vector2.zero;
         _gridRoot.offsetMax = Vector2.zero;
 
@@ -94,11 +104,9 @@ public class InventoryPageView : MonoBehaviour
         layout.spacing = Vector2.one * SLOT_SPACING;
         layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         layout.constraintCount = COLUMNS;
+        layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        layout.startAxis = GridLayoutGroup.Axis.Horizontal;
         layout.childAlignment = TextAnchor.UpperLeft;
-        layout.padding = new RectOffset(15, 15, 15, 15);
-
-        // ContentSizeFitter 제거 — 고정 영역 내에서 배치
-        Object.Destroy(gridGO.GetComponent<ContentSizeFitter>());
     }
 
     private void EnsureTooltip()

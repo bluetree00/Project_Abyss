@@ -125,6 +125,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63418a5331367b04287574885f39e9ac
+    m_Address: dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6425f3820b1cdb0438ea5ac456fed98d
     m_Address: Cactus/CactusConfig
     m_ReadOnly: 0
@@ -152,6 +157,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7cd08aff3f4c9774b9bcec62b93a7a9b
     m_Address: RatAssassin/RatAssassinConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d70eb2b598c6fe47a2073d65c24ce90
+    m_Address: sword_1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -200,6 +210,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aa767a21a4d31ba4189f56a14d9b3993
+    m_Address: skeleton_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: abba52759e998eb48a4901aba11335ec
     m_Address: Dragon/Dragon
     m_ReadOnly: 0
@@ -241,6 +256,16 @@ MonoBehaviour:
     m_SerializedLabels:
     - default
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d2a916698e17fec469ca26283564ad78
+    m_Address: flag_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d4380da49cd4618468e9419a8c78e8d9
+    m_Address: chest_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d75dd926990e5814e9401ae28dafa20a
     m_Address: EvilMage/EvilMageConfig
     m_ReadOnly: 0
@@ -248,6 +273,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db18c22cee80cc74487b0900361715f6
     m_Address: StageUI
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dd9b59138192edc40aa4c86e871a6ecc
+    m_Address: symbol_1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
