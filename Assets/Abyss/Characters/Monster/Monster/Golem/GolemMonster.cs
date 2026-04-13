@@ -1,4 +1,3 @@
-g
 namespace Abyss.Monster
 {
 /// <summary>

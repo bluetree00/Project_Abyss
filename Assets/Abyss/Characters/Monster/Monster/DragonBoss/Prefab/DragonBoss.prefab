@@ -191,15 +191,31 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 95508172315779234, guid: cdd4e3a2332963c4396732c03fcd7597,
         type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: 59fd36d5cdbc30841b33bc0bf97dd3a6, type: 3}
+    - target: {fileID: 95508172315779234, guid: cdd4e3a2332963c4396732c03fcd7597,
+        type: 3}
       propertyPath: m_Controller
-      value:
+      value: 
       objectReference: {fileID: 9100000, guid: a12083c929e5b26469527ca1d11edcf3, type: 2}
     - target: {fileID: 95508172315779234, guid: cdd4e3a2332963c4396732c03fcd7597,
         type: 3}
-      propertyPath: m_Avatar
-      value:
-      objectReference: {fileID: 9000000, guid: 59fd36d5cdbc30841b33bc0bf97dd3a6, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 137236375710360112, guid: cdd4e3a2332963c4396732c03fcd7597,
+        type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 658530225979787746, guid: 59fd36d5cdbc30841b33bc0bf97dd3a6,
+        type: 3}
+    - target: {fileID: 137236375710360112, guid: cdd4e3a2332963c4396732c03fcd7597,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 480859049b6336749963574b5578b160, type: 2}
+    - target: {fileID: 137493555571646872, guid: cdd4e3a2332963c4396732c03fcd7597,
         type: 3}
       propertyPath: m_Mesh
       value: 
