@@ -503,4 +503,49 @@ public sealed class PlayerRuntimeStats
 
         Recalculate();
     }
+
+    /// <summary>
+    /// 시너지 레코드 목록으로부터 전체 재계산.
+    /// ClearSynergyEffects() 후 순회 적용하므로 항상 정확한 상태.
+    /// 씬 전환 후 BindPlayer 시점에서 호출.
+    /// </summary>
+    public void RestoreSynergies(System.Collections.Generic.IReadOnlyList<SynergyRecord> records)
+    {
+        ClearSynergyEffects();
+
+        if (records == null) return;
+
+        foreach (var r in records)
+        {
+            if (string.IsNullOrEmpty(r.effectType)) continue;
+
+            switch (r.trigger)
+            {
+                case "Always":
+                    ApplySynergyEffect(r.effectType, r.value);
+                    break;
+                case "OnHit":
+                    RegisterConditionalSynergy(new ConditionalSynergy
+                    {
+                        gridId     = r.gridId,
+                        effectType = r.effectType,
+                        trigger    = "OnHit",
+                        value      = r.value,
+                        maxStack   = r.maxStack > 0 ? r.maxStack : 1,
+                        duration   = r.duration,
+                    });
+                    break;
+                case "OnLowHp":
+                    RegisterConditionalSynergy(new ConditionalSynergy
+                    {
+                        gridId     = r.gridId,
+                        effectType = r.effectType,
+                        trigger    = "OnLowHp",
+                        value      = r.value,
+                        threshold  = r.value2 > 0f ? r.value2 : 0.3f,
+                    });
+                    break;
+            }
+        }
+    }
 }
