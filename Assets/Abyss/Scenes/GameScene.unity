@@ -1174,12 +1174,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
   itemSO: {fileID: 11400000, guid: 680f98c660ec347459624302ae230a58, type: 2}
-  rotateSpeed: 90
-  bobAmplitude: 0.2
-  bobFrequency: 1.5
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
+  vfxConfig: {fileID: 0}
+  vfxYOffset: -0.5
 --- !u!23 &394606658
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1683,12 +1682,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
   itemSO: {fileID: 11400000, guid: 31679b470b1e67944b05e524e1ea3528, type: 2}
-  rotateSpeed: 90
-  bobAmplitude: 0.2
-  bobFrequency: 1.5
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
+  vfxConfig: {fileID: 0}
+  vfxYOffset: -0.5
 --- !u!23 &546954163
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3375,12 +3373,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
   itemSO: {fileID: 11400000, guid: ac336c8ffdc012946b921d31be5d336b, type: 2}
-  rotateSpeed: 90
-  bobAmplitude: 0.2
-  bobFrequency: 1.5
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
+  vfxConfig: {fileID: 0}
+  vfxYOffset: -0.5
 --- !u!23 &1389539095
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3889,6 +3886,7 @@ MonoBehaviour:
   bootstrapper: {fileID: 0}
   clearRoomKey: 286
   returnToStageMapKey: 287
+  spawnItemKey: 288
 --- !u!114 &1881724120
 MonoBehaviour:
   m_ObjectHideFlags: 0

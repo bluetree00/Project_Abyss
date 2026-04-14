@@ -36,7 +36,10 @@ public class BasicArrow : MonoBehaviour
         direction = dir.normalized;
         _instigator = instigator;
         if (dmg >= 0f) damage = dmg;
-        _timer = lifetime;
+        // 아이템 사거리 보너스: speed 기반으로 lifetime 연장
+        float rangeBonus = GameRunBootstrapper.Instance?.Run?.Player?.RuntimeStats?.RangedRangeBonus ?? 0f;
+        float bonusTime = speed > 0f ? rangeBonus / speed : 0f;
+        _timer = lifetime + bonusTime;
 
         _pierce = false;
         _explode = false;
@@ -130,7 +133,23 @@ public class BasicArrow : MonoBehaviour
         if (_pierce && _pierced != null && _pierced.Contains(other.gameObject)) return;
 
         if (other.TryGetComponent<IDamageable>(out var damageable))
-            damageable.TakeDamage(damage, _instigator);
+        {
+            var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+            var pkt = new DamagePacket(damage, _instigator, other.gameObject);
+            mgr?.OnPreDealDamage(ref pkt);
+
+            float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
+            damageable.TakeDamage(finalDmg, _instigator);
+
+            var report = new DamageReport
+            {
+                DamageDealt = finalDmg,
+                Attacker = _instigator,
+                Target = other.gameObject,
+                HitPosition = other.ClosestPoint(transform.position),
+            };
+            mgr?.OnPostDealDamage(report);
+        }
 
         SpawnHitEffect(other);
 

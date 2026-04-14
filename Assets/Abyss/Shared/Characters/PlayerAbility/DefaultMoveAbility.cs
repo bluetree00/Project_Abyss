@@ -16,7 +16,7 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         }
 
         Vector3 moveDir = direction.normalized;
-        float speed = owner.CharacterData.baseMoveSpeed;
+        float speed = owner.CharacterData.baseMoveSpeed * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
 
         owner.Rigid.linearVelocity = new Vector3(moveDir.x * speed, owner.Rigid.linearVelocity.y, moveDir.z * speed);
 

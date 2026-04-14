@@ -109,9 +109,26 @@ public class ColliderInstance : MonoBehaviour
     private void ApplyDamage(Collider other)
     {
         if (!other.TryGetComponent<IDamageable>(out var damageable)) return;
-        damageable.TakeDamage(damage, owner, knockbackMultiplier);
 
-        Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={damage:F0} | atk={actionType} | id={attackId}");
+        // 아이템 효과: 공격 전 데미지 수정
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        var pkt = new DamagePacket(damage, owner, other.gameObject);
+        mgr?.OnPreDealDamage(ref pkt);
+
+        float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
+        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier);
+
+        // 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
+        var report = new DamageReport
+        {
+            DamageDealt = finalDmg,
+            Attacker = owner,
+            Target = other.gameObject,
+            HitPosition = other.ClosestPoint(transform.position),
+        };
+        mgr?.OnPostDealDamage(report);
+
+        Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={finalDmg:F0} | atk={actionType} | id={attackId}");
 
         if (!string.IsNullOrEmpty(hitEffectKey))
             SpawnHitEffect(other.ClosestPoint(transform.position));

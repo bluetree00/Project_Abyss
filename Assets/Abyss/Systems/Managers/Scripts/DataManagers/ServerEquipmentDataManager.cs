@@ -105,50 +105,17 @@ public class ServerEquipmentDataManager
 
     private async UniTask LoadFromServerAsync()
     {
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess())
-        {
-            Debug.LogWarning($"[ServerEquipmentDataManager] 차트 테이블 조회 실패: {tableResult.GetStatusCode()}");
-            return;
-        }
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess())
-        {
-            Debug.LogWarning("[ServerEquipmentDataManager] 차트 다운로드 실패");
-            return;
-        }
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess())
-        {
-            Debug.LogWarning("[ServerEquipmentDataManager] 로컬 로드 실패");
-            return;
-        }
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-        if (!dic.ContainsKey(ChartId))
-        {
-            Debug.LogWarning($"[ServerEquipmentDataManager] ChartId {ChartId} 없음");
-            return;
-        }
-
-        var json = LitJson.JsonMapper.ToObject(dic[ChartId].contentJson.ToString());
-        int count = 0;
-
-        foreach (LitJson.JsonData row in json)
+        int loaded = ChartLoader.Load("EQUIPMENT_DATA", row =>
         {
             var entry = ParseRow(row);
-            if (entry == null) continue;
+            if (entry == null) return;
             if (_byId.TryGetValue(entry.weapon_id, out var existing) && entry.stat_version <= existing.stat_version)
-                continue;
+                return;
             Register(entry);
-            count++;
-        }
+        });
 
-        SaveToJson();
-        Debug.Log($"[ServerEquipmentDataManager] 서버에서 {count}개 갱신");
+        if (loaded > 0) SaveToJson();
+
         await UniTask.CompletedTask;
     }
 

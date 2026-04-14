@@ -50,6 +50,8 @@ public sealed class GameRunSession
     public PlayerRunState PlayerState { get; private set; }
     public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
+    public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
+    public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
 
     // ── 시너지 이력 (씬 전환에도 생존) ──
     private readonly List<SynergyRecord> _appliedSynergies = new();
@@ -211,6 +213,10 @@ public sealed class GameRunSession
     private void ClearRunReferences()
     {
         UnsubscribePlayerStateSource();
+        ItemInventory.OnInventoryChanged -= RebuildItemEffects;
+        EffectManager.Cleanup();
+        BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
+        BuffHandler.ClearAll();
         RoomManager = null;
         StagePointManager = null;
         Player = null;
@@ -288,6 +294,10 @@ public sealed class GameRunSession
     public void EnterStandby()
     {
         if (!IsRunning) return;
+
+        // 아이템 효과: 방 클리어 hook
+        EffectManager?.OnRoomClear();
+
         ChangeRunState(RunState.Standby);
     }
 
@@ -306,6 +316,10 @@ public sealed class GameRunSession
     public void EnterChapterClear()
     {
         if (!IsRunning) return;
+
+        // 아이템 효과: 보스 클리어 hook
+        EffectManager?.OnBossClear();
+
         ChangeRunState(RunState.ChapterClear);
     }
 
@@ -355,8 +369,20 @@ public sealed class GameRunSession
             ItemInventory.OnInventoryChanged -= RefreshPlayerItemStats;
             ItemInventory.OnInventoryChanged += RefreshPlayerItemStats;
 
+            // 방 버프 ↔ 스탯 연동
+            BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
+            BuffHandler.OnBuffsChanged += RefreshPlayerRoomBuffs;
+
+            // ItemEffectManager 초기화
+            ItemInventory.OnInventoryChanged -= RebuildItemEffects;
+            ItemInventory.OnInventoryChanged += RebuildItemEffects;
+            EffectManager.Initialize(Player, this, ItemInventory);
+
             // 현재 인벤토리 아이템 보너스 즉시 적용 (씬 전환 후 복원)
             RefreshPlayerItemStats();
+
+            // 방 버프 즉시 적용
+            RefreshPlayerRoomBuffs();
 
             // 시너지 이력 복원 (씬 전환 후 복원)
             if (_appliedSynergies.Count > 0)
@@ -369,6 +395,17 @@ public sealed class GameRunSession
     private void RefreshPlayerItemStats()
     {
         Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
+    }
+
+    private void RefreshPlayerRoomBuffs()
+    {
+        Player?.RuntimeStats?.RefreshRoomBuffs(BuffHandler);
+    }
+
+    private void RebuildItemEffects()
+    {
+        EffectManager.RefreshContext(Player, this);
+        EffectManager.Rebuild();
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)

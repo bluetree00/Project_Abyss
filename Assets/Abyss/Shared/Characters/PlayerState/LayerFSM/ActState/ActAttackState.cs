@@ -199,6 +199,10 @@ public class ActAttackState : ILayerState<ActState>
         _controller.Combo.CloseWindow();
         _controller.SetMoveScale(1f);
 
+        // Animator speed 복원
+        if (_controller.Anim != null)
+            _controller.Anim.speed = 1f;
+
         // 공중 공격 종료 후 체공 애니메이션 복귀
         if (!_controller.IsGrounded())
             _controller.Anim.CrossFade("JumpBlend", 0.1f);
@@ -373,6 +377,9 @@ public class ActAttackState : ILayerState<ActState>
         var animSet = _controller.WeaponManager?.CurrentWeaponData?.animationSet
                       as WeaponAnimationSetSO;
         (_comboOpen, _comboClose, _attackEnd) = ResolveTiming(mapping, animSet);
+
+        // 아이템 공격속도 배율 → Animator speed
+        anim.speed = _controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f;
     }
 
     // ── 타이밍 해석 ──────────────────────────────────────────────────────────

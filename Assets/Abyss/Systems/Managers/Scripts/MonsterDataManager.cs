@@ -73,47 +73,17 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
 
     private async UniTask LoadFromServerAsync()
     {
-        // CDN 차트 테이블 목록 → 다운로드 → 로컬 저장 → 로드
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess())
+        int loaded = ChartLoader.Load("MONSTER_STAT_DATA", row =>
         {
-            Debug.LogError($"몬스터 데이터 테이블 조회 실패: {tableResult.GetStatusCode()}");
-            return;
-        }
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess())
-        {
-            Debug.LogError($"몬스터 데이터 다운로드 실패: {contentResult.GetStatusCode()}");
-            return;
-        }
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess())
-        {
-            Debug.LogError($"몬스터 데이터 로컬 로드 실패");
-            return;
-        }
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-        if (!dic.ContainsKey(ChartId))
-        {
-            Debug.LogError($"ChartId {ChartId} not found in CDN content");
-            return;
-        }
-
-        var jsonStr = dic[ChartId].contentJson.ToString();
-        var json = LitJson.JsonMapper.ToObject(jsonStr);
-        var rows = new List<object>();
-        foreach (LitJson.JsonData item in json) rows.Add(item);
-        int updateCount = 0;
-
-        foreach (var rowObj in rows)
-        {
-            if (rowObj is not JsonData row) continue;
-
             int.TryParse(row["monster_id"].ToString(), out int monsterId);
+            int.TryParse(row["stat_version"].ToString(), out int statVersion);
+
+            if (_monsterDataDict.TryGetValue(monsterId, out var existing))
+            {
+                if (statVersion <= existing.stat_version)
+                    return;
+            }
+
             string type = row["type"].ToString();
             string monsterName = row["monster_name"].ToString();
             int.TryParse(row["level"].ToString(), out int level);
@@ -123,15 +93,8 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
             float.TryParse(row["attack_range"].ToString(), out float attackRange);
             float.TryParse(row["attack_cooldown"].ToString(), out float attackCooldown);
             int.TryParse(row["def"].ToString(), out int def);
-            int.TryParse(row["stat_version"].ToString(), out int statVersion);
 
-            if (_monsterDataDict.TryGetValue(monsterId, out var existing))
-            {
-                if (statVersion <= existing.stat_version)
-                    continue; // 기존 버전이 최신이므로 스킵
-            }
-
-            var monster = new MonsterStat
+            _monsterDataDict[monsterId] = new MonsterStat
             {
                 monster_id = monsterId,
                 type = type,
@@ -145,13 +108,9 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
                 def = def,
                 stat_version = statVersion,
             };
+        });
 
-            _monsterDataDict[monsterId] = monster;
-            updateCount++;
-        }
-
-        SaveToJson();
-        Debug.Log($"서버에서 받아온 몬스터 중 {updateCount}개가 갱신됨");
+        if (loaded > 0) SaveToJson();
     }
 
     public MonsterStat GetStatById(int monsterId)
