@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: c15b9f1eb5d7589498e1f41093d0bd44
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 241404
+  packageName: Item Pickup VFX - URP
+  packageVersion: 1.0.20232
+  assetPath: Assets/Vefects/Item Pickup VFX URP/VFX/Shaders/Vefects_Item_Pickup_VFX_URP_2D_Shaders_Materials.unitypackage
+  uploadId: 771219

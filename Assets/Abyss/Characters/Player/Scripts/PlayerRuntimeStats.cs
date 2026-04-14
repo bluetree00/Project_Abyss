@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -15,6 +16,25 @@ public sealed class PlayerRuntimeStats
     public float SkillCooldownReduction { get; private set; }
     public float ActiveItemCooldownReduction { get; private set; }
     public float HeavyChargeThreshold { get; private set; }
+    public float MoveSpeedMultiplier { get; private set; } = 1f;
+    public int BonusProjectile { get; private set; }
+
+    // ── 아이템 확장 스탯 (AccumulatedStats 기반) ─────────────────────────────────
+    // 전투
+    public float RollCooldownBonus { get; private set; }
+    public float RollDistanceBonus { get; private set; }
+    public float RangedRangeBonus { get; private set; }
+    public float HealingReceivedBonus { get; private set; }
+    public float DebuffResistance { get; private set; }
+    public float AllDamagePercent { get; private set; }
+    public float DamageReduction { get; private set; }
+    public float ItemLifesteal { get; private set; }
+    // 시스템
+    public float AllElementBonus { get; private set; }
+    public float SpecialRoomChance { get; private set; }
+    public float HighGradeItemChance { get; private set; }
+    public int ConsumableSlotBonus { get; private set; }
+    public float DebuffDurationBonus { get; private set; }
 
     /// <summary>레거시 호환 — Max(Melee, Ranged). 범용 공격력이 필요한 곳에서 사용.</summary>
     public int AttackPower => Mathf.Max(MeleeAttack, RangedAttack);
@@ -60,6 +80,9 @@ public sealed class PlayerRuntimeStats
         _roomMelee = 0;
         _roomRanged = 0;
         _roomDefense = 0;
+        _roomMoveSpeed = 0f;
+        _roomAttackSpeed = 0f;
+        _roomProjectile = 0;
 
         _bonusAttackSpeed = 0f;
 
@@ -92,6 +115,7 @@ public sealed class PlayerRuntimeStats
         _itemMelee = 0; _itemRanged = 0; _itemDefense = 0;
         _itemLuck = 0; _itemSkillCdr = 0f; _itemActiveItemCdr = 0f;
         _roomMelee = 0; _roomRanged = 0; _roomDefense = 0;
+        _roomMoveSpeed = 0f; _roomAttackSpeed = 0f; _roomProjectile = 0;
         _bonusAttackSpeed = 0f;
 
         HeavyChargeThreshold = Mathf.Max(0f, entry.heavy_charge_threshold);
@@ -197,11 +221,31 @@ public sealed class PlayerRuntimeStats
     private int _itemLuck;
     private float _itemSkillCdr;
     private float _itemActiveItemCdr;
+    private int _itemMaxHp;
+    private float _itemMoveSpeed;
+    private float _itemAttackSpeed;
+    private float _itemAllDamagePercent;
+    private float _itemAllStatsPercent;
+    private float _itemRollCooldown;
+    private float _itemRollDistance;
+    private float _itemRangedRange;
+    private float _itemHealingReceived;
+    private float _itemDebuffResistance;
+    private float _itemDamageReduction;
+    private float _itemLifesteal;
+    private float _itemAllElementBonus;
+    private float _itemSpecialRoomChance;
+    private float _itemHighGradeItemChance;
+    private int   _itemConsumableSlotBonus;
+    private float _itemDebuffDuration;
 
     // -- Room Buff --
     private int _roomMelee;
     private int _roomRanged;
     private int _roomDefense;
+    private float _roomMoveSpeed;      // 퍼센트 가산 (0.1 = +10%)
+    private float _roomAttackSpeed;    // 퍼센트 가산
+    private int _roomProjectile;       // 투사체 가산
 
     // -- Grid Synergy (Always) --
     private int _synergyMelee;
@@ -285,41 +329,58 @@ public sealed class PlayerRuntimeStats
 
     // ── 아이템 누적 ──────────────────────────────────────────────────────────────
 
-    /// <summary>RunItemInventory.OnInventoryChanged 이벤트에 연결.</summary>
+    /// <summary>
+    /// RunItemInventory.OnInventoryChanged 이벤트에 연결.
+    /// ItemEffectManager.GetAccumulatedStats() 경유.
+    /// </summary>
+    /// <summary>
+    /// RunItemInventory.OnInventoryChanged 이벤트에 연결.
+    /// ItemEffectManager가 있으면 새 구조, 없으면 레거시 폴백.
+    /// </summary>
     public void RefreshItemBonuses(RunItemInventory inventory)
     {
-        if (inventory == null)
-        {
-            _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
-            _itemSkillCdr = _itemActiveItemCdr = 0f;
-        }
-        else
-        {
-            _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
-            _itemSkillCdr = _itemActiveItemCdr = 0f;
+        _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
+        _itemSkillCdr = _itemActiveItemCdr = 0f;
+        _itemMaxHp = 0; _itemMoveSpeed = 0f; _itemAttackSpeed = 0f;
+        _itemAllDamagePercent = 0f; _itemAllStatsPercent = 0f; _itemRollCooldown = 0f; _itemRollDistance = 0f;
+        _itemRangedRange = 0f; _itemHealingReceived = 0f; _itemDebuffResistance = 0f;
+        _itemDamageReduction = 0f; _itemLifesteal = 0f; _itemAllElementBonus = 0f;
+        _itemSpecialRoomChance = 0f; _itemHighGradeItemChance = 0f;
+        _itemConsumableSlotBonus = 0; _itemDebuffDuration = 0f;
 
-            foreach (var item in inventory.Items)
-            {
-                if (item.effects == null) continue;
-                foreach (var eff in item.effects)
-                {
-                    if (string.IsNullOrEmpty(eff.effectType) || eff.trigger != "Always") continue;
-                    switch (eff.effectType)
-                    {
-                        case "MeleeAttack":  _itemMelee  += (int)eff.value; break;
-                        case "RangedAttack": _itemRanged += (int)eff.value; break;
-                        case "AttackPower":
-                            _itemMelee  += (int)eff.value;
-                            _itemRanged += (int)eff.value;
-                            break;
-                        case "Defense":      _itemDefense += (int)eff.value; break;
-                        case "Luck":         _itemLuck    += (int)eff.value; break;
-                        case "SkillCooldownReduction":      _itemSkillCdr += eff.value; break;
-                        case "ActiveItemCooldownReduction": _itemActiveItemCdr += eff.value; break;
-                    }
-                }
-            }
+        // ItemEffectManager 경유
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        if (mgr == null || mgr.ActiveEffects.Count == 0)
+        {
+            Recalculate();
+            return;
         }
+
+        var acc = mgr.GetAccumulatedStats();
+
+        _itemMelee   = acc.MeleeDamage + (int)acc.AllDamageFlat;
+        _itemRanged  = acc.RangedDamage + (int)acc.AllDamageFlat;
+        _itemDefense = acc.Defense;
+        _itemLuck    = acc.Luck;
+        _itemSkillCdr = acc.SkillCooldownReduction;
+        _itemActiveItemCdr = acc.ActiveItemCooldownReduction;
+        _itemMaxHp = acc.MaxHP;
+        _itemMoveSpeed = acc.MoveSpeed;
+        _itemAttackSpeed = acc.AttackSpeed;
+        _itemAllDamagePercent = acc.AllDamagePercent + acc.AllStatsPercent;
+        _itemAllStatsPercent = acc.AllStatsPercent;
+        _itemRollCooldown = acc.RollCooldown;
+        _itemRollDistance = acc.RollDistance;
+        _itemRangedRange = acc.RangedRange;
+        _itemHealingReceived = acc.HealingReceived;
+        _itemDebuffResistance = acc.DebuffResistance;
+        _itemDamageReduction = acc.DamageReduction;
+        _itemLifesteal = acc.Lifesteal;
+        _itemAllElementBonus = acc.AllElementBonus;
+        _itemSpecialRoomChance = acc.SpecialRoomChance;
+        _itemHighGradeItemChance = acc.HighGradeItemChance;
+        _itemConsumableSlotBonus = acc.ConsumableSlotBonus;
+        _itemDebuffDuration = acc.DebuffDuration;
 
         Recalculate();
     }
@@ -332,12 +393,31 @@ public sealed class PlayerRuntimeStats
         if (handler == null)
         {
             _roomMelee = _roomRanged = _roomDefense = 0;
+            _roomMoveSpeed = _roomAttackSpeed = 0f;
+            _roomProjectile = 0;
         }
         else
         {
-            _roomMelee   = (int)(handler.GetTotal(StatType.MeleeAttack) + handler.GetTotal(StatType.AttackPower));
-            _roomRanged  = (int)(handler.GetTotal(StatType.RangedAttack) + handler.GetTotal(StatType.AttackPower));
-            _roomDefense = (int)handler.GetTotal(StatType.Defense);
+            // Flat 가산
+            float flatMelee  = handler.GetFlatTotal(StatType.MeleeAttack) + handler.GetFlatTotal(StatType.AttackPower);
+            float flatRanged = handler.GetFlatTotal(StatType.RangedAttack) + handler.GetFlatTotal(StatType.AttackPower);
+            float flatDef    = handler.GetFlatTotal(StatType.Defense);
+
+            // Percent 가산 (기본 스탯 기준)
+            float pctMelee  = handler.GetPercentTotal(StatType.MeleeAttack) + handler.GetPercentTotal(StatType.AttackPower);
+            float pctRanged = handler.GetPercentTotal(StatType.RangedAttack) + handler.GetPercentTotal(StatType.AttackPower);
+            float pctDef    = handler.GetPercentTotal(StatType.Defense);
+
+            _roomMelee   = (int)(flatMelee  + _baseMelee  * pctMelee);
+            _roomRanged  = (int)(flatRanged + _baseRanged * pctRanged);
+            _roomDefense = (int)(flatDef    + _baseDefense * pctDef);
+
+            // MoveSpeed, AttackSpeed — 퍼센트만 (이동/공속은 퍼센트 기반)
+            _roomMoveSpeed   = handler.GetPercentTotal(StatType.MoveSpeed);
+            _roomAttackSpeed = handler.GetPercentTotal(StatType.AttackSpeed);
+
+            // Projectile — Flat 가산만
+            _roomProjectile = (int)handler.GetFlatTotal(StatType.Projectile);
         }
 
         Recalculate();
@@ -383,14 +463,54 @@ public sealed class PlayerRuntimeStats
             }
         }
 
-        MeleeAttack  = Mathf.Max(0, _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _synergyMelee + condMelee);
-        RangedAttack = Mathf.Max(0, _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _synergyRanged + condRanged);
-        Defense      = Mathf.Max(0, _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _synergyDefense);
-        Luck         = Mathf.Max(0, _baseLuck + _passiveLuck + _itemLuck + _synergyLuck);
+        // % 보너스 배율
+        float dmgMul  = 1f + _itemAllDamagePercent;     // AllDamage% + AllStats% → 공격력
+        float defMul  = 1f + _itemAllStatsPercent;       // AllStats%만 → 방어력
+        float luckMul = 1f + _itemAllStatsPercent;       // AllStats%만 → 행운
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + condAttackSpeed);
+        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _synergyMelee + condMelee;
+        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _synergyRanged + condRanged;
+        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _synergyDefense;
+        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck;
+
+        MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
+        RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMul));
+        Defense      = Mathf.Max(0, Mathf.RoundToInt(baseDefSum * defMul));
+        Luck         = Mathf.Max(0, Mathf.RoundToInt(baseLuckSum * luckMul));
+
+        // MaxHp 아이템 보너스
+        if (_itemMaxHp != 0)
+        {
+            int newMax = Mathf.Max(1, MaxHp + _itemMaxHp);
+            if (newMax != MaxHp)
+            {
+                MaxHp = newMax;
+                Hp = Mathf.Min(Hp, MaxHp);
+            }
+        }
+
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _itemAttackSpeed + condAttackSpeed);
+        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _itemMoveSpeed);
+        BonusProjectile      = Mathf.Max(0, _roomProjectile);
         SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
+
+        // 확장 스탯 공개 프로퍼티 갱신
+        RollCooldownBonus   = _itemRollCooldown;
+        RollDistanceBonus   = _itemRollDistance;
+        RangedRangeBonus    = _itemRangedRange;
+        HealingReceivedBonus = _itemHealingReceived;
+        DebuffResistance    = _itemDebuffResistance;
+        AllDamagePercent    = _itemAllDamagePercent;
+        DamageReduction     = _itemDamageReduction;
+        ItemLifesteal       = _itemLifesteal + LifestealRate;
+
+        // 시스템 스탯
+        AllElementBonus     = _itemAllElementBonus;
+        SpecialRoomChance   = _itemSpecialRoomChance;
+        HighGradeItemChance = _itemHighGradeItemChance;
+        ConsumableSlotBonus = _itemConsumableSlotBonus;
+        DebuffDurationBonus = _itemDebuffDuration;
 
         OnChanged?.Invoke();
     }

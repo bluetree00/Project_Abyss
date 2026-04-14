@@ -15,7 +15,13 @@ public class LocoDodgeState : ILayerState<LocoState>
     {
         _controller.RotateTowardsInput();
         _dodgeDir = _controller.transform.forward;
-        _moveEndTime = Time.time + _controller.CharacterData.dashDuration;
+
+        // 기본 거리 = dashSpeed × dashDuration, 보너스 거리만큼 duration 연장
+        float baseSpeed = _controller.CharacterData.dashSpeed;
+        float baseDuration = _controller.CharacterData.dashDuration;
+        float distBonus = _controller.RuntimeStats?.RollDistanceBonus ?? 0f;
+        float bonusDuration = baseSpeed > 0f ? distBonus / baseSpeed : 0f;
+        _moveEndTime = Time.time + baseDuration + bonusDuration;
 
         _controller.Anim.CrossFade("Dodge", 0.05f);
         _controller.SetMoveScale(0f);
@@ -51,7 +57,19 @@ public class LocoDodgeState : ILayerState<LocoState>
 
     public void Exit()
     {
-        _controller.DodgeCooldownEnd = Time.time + _controller.CharacterData.dodgeCooldown;
+        // 아이템 효과: 구르기 쿨다운 보너스 적용
+        float baseCooldown = _controller.CharacterData.dodgeCooldown;
+        float bonus = _controller.RuntimeStats?.RollCooldownBonus ?? 0f;
+        _controller.DodgeCooldownEnd = Time.time + baseCooldown * (1f + bonus);
+
         _controller.SetMoveScale(1f);
+
+        // 아이템 효과: 구르기 종료 hook
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        mgr?.OnRollEnd();
+
+        // 착지 hook — 지상일 때만
+        if (_controller.IsGrounded())
+            mgr?.OnRollLand(_controller.transform.position);
     }
 }
