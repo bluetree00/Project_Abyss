@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e85c1f6261c97a7459aa252d4881ef4f, type: 3}
+  m_Name: Roster
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterRoster
+  characters:
+  - data: {fileID: 11400000, guid: 09aa7ea839b97374a83ebc8650cc6524, type: 2}
+    portrait: {fileID: 21300000, guid: 5752829a159ee2f4a9f7b48d3cc16242, type: 3}
+    prefabKey: Knight
+    abilityIcon0: {fileID: 21300000, guid: e560a39767340e1429aa614f80214f55, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: 6b7565862117b4a4c824976310c6dd3f, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 6b7565862117b4a4c824976310c6dd3f, type: 3}
+  - data: {fileID: 11400000, guid: ee75a8eac91d2f042b7ebeac86307a13, type: 2}
+    portrait: {fileID: 21300000, guid: a1637c711ef3f4249b71a8a6d36ed887, type: 3}
+    prefabKey: Berserker
+    abilityIcon0: {fileID: 21300000, guid: 064eccfe04d11374b93ed3b3455abb54, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: 5a164c95c5096634da38954b233b4750, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 6b7565862117b4a4c824976310c6dd3f, type: 3}
+  - data: {fileID: 11400000, guid: 76886d098064fa34b949e31d57f32f9a, type: 2}
+    portrait: {fileID: 21300000, guid: 02aba0bb79d61b3438b04816aaa0d526, type: 3}
+    prefabKey: Mage
+    abilityIcon0: {fileID: 21300000, guid: c174454ba4cef894a923c44b968876f5, type: 3}
+    abilityIcon1: {fileID: 21300000, guid: c174454ba4cef894a923c44b968876f5, type: 3}
+    abilityIcon2: {fileID: 21300000, guid: 6b7565862117b4a4c824976310c6dd3f, type: 3}

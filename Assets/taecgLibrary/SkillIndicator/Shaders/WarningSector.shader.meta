@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 72beee40b6b178d44b2e3f86888273ac
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 141712
+  packageName: Skill Indicator
+  packageVersion: 1.1.0
+  assetPath: Assets/taecgLibrary/SkillIndicator/Shaders/WarningSector.shader
+  uploadId: 373292

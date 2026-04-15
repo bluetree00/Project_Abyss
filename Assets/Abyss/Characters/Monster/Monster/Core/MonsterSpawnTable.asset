@@ -1,0 +1,147 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4097396c80f57114384a5d6a1ef872ba, type: 3}
+  m_Name: MonsterSpawnTable
+  m_EditorClassIdentifier: Assembly-CSharp::LeeMonsterSpawnTableSO
+  entries:
+  - displayName: FairyBatMonster
+    addressableKey: FairyBat/FairyBat
+    weight: 1
+    enabled: 1
+  - displayName: GolemMonster
+    addressableKey: Golem/Golem
+    weight: 1
+    enabled: 1
+  - displayName: SkeletonMonster
+    addressableKey: Skeleton/Skeleton
+    weight: 1
+    enabled: 1
+  - displayName: SlimeMonster
+    addressableKey: Slime/Slime
+    weight: 1
+    enabled: 1
+  - displayName: SnailMonster
+    addressableKey: Snail/Snail
+    weight: 1
+    enabled: 1
+  - displayName: SpiderMonster
+    addressableKey: Spider/Spider
+    weight: 1
+    enabled: 1
+  - displayName: MonsterPlantMonster
+    addressableKey: MonsterPlant/MonsterPlant
+    weight: 1
+    enabled: 1
+  - displayName: EvilMageMonster
+    addressableKey: EvilMage/EvilMage
+    weight: 1
+    enabled: 1
+  - displayName: OrcMonster
+    addressableKey: Orc/Orc
+    weight: 1
+    enabled: 1
+  - displayName: DragonMonster
+    addressableKey: Dragon/Dragon
+    weight: 1
+    enabled: 1
+  - displayName: BeholderMonster
+    addressableKey: Beholder/Beholder
+    weight: 1
+    enabled: 1
+  - displayName: ChestMonsterMonster
+    addressableKey: ChestMonster/ChestMonster
+    weight: 1
+    enabled: 1
+  - displayName: CrabMonsterMonster
+    addressableKey: CrabMonster/CrabMonster
+    weight: 1
+    enabled: 1
+  - displayName: FlyingDemonMonster
+    addressableKey: FlyingDemon/FlyingDemon
+    weight: 1
+    enabled: 1
+  - displayName: LizardWarriorMonster
+    addressableKey: LizardWarrior/LizardWarrior
+    weight: 1
+    enabled: 1
+  - displayName: RatAssassinMonster
+    addressableKey: RatAssassin/RatAssassin
+    weight: 1
+    enabled: 1
+  - displayName: SpecterMonster
+    addressableKey: Specter/Specter
+    weight: 1
+    enabled: 1
+  - displayName: WerewolfMonster
+    addressableKey: Werewolf/Werewolf
+    weight: 1
+    enabled: 1
+  - displayName: WormMonsterMonster
+    addressableKey: WormMonster/WormMonster
+    weight: 1
+    enabled: 1
+  - displayName: BattleBeeMonster
+    addressableKey: BattleBee/BattleBee
+    weight: 1
+    enabled: 1
+  - displayName: BishopKnightMonster
+    addressableKey: BishopKnight/BishopKnight
+    weight: 1
+    enabled: 1
+  - displayName: BlackKnightMonster
+    addressableKey: BlackKnight/BlackKnight
+    weight: 1
+    enabled: 1
+  - displayName: CactusMonster
+    addressableKey: Cactus/Cactus
+    weight: 1
+    enabled: 1
+  - displayName: CyclopsMonster
+    addressableKey: Cyclops/Cyclops
+    weight: 1
+    enabled: 1
+  - displayName: DemonKingMonster
+    addressableKey: DemonKing/DemonKing
+    weight: 1
+    enabled: 1
+  - displayName: FishmanMonster
+    addressableKey: Fishman/Fishman
+    weight: 1
+    enabled: 1
+  - displayName: MushroomAngryMonster
+    addressableKey: MushroomAngry/MushroomAngry
+    weight: 1
+    enabled: 1
+  - displayName: MushroomSmileMonster
+    addressableKey: MushroomSmile/MushroomSmile
+    weight: 1
+    enabled: 0
+  - displayName: NagaWizardMonster
+    addressableKey: NagaWizard/NagaWizard
+    weight: 1
+    enabled: 1
+  - displayName: SalamanderMonster
+    addressableKey: Salamander/Salamander
+    weight: 1
+    enabled: 1
+  - displayName: StingRayMonster
+    addressableKey: StingRay/StingRay
+    weight: 1
+    enabled: 1
+  - displayName: ForestGuardianMonster
+    addressableKey: ForestGuardian/ForestGuardian
+    weight: 1
+    enabled: 1
+  - displayName: DragonBossMonster
+    addressableKey: DragonBoss/DragonBoss
+    weight: 1
+    enabled: 1

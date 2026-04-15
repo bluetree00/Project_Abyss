@@ -1,0 +1,78 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.thebackend.io)",
+      "WebFetch(domain:docs.backnd.com)",
+      "WebFetch(domain:community.thebackend.io)",
+      "WebFetch(domain:partner.steamgames.com)",
+      "WebFetch(domain:blog.thebackend.io)",
+      "WebFetch(domain:developer.thebackend.io)",
+      "WebFetch(domain:steamcommunity.com)",
+      "WebFetch(domain:backnd.com)",
+      "WebFetch(domain:namu.wiki)",
+      "WebFetch(domain:docs.unity3d.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:unity.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:forum.unity.com)",
+      "Bash(git fetch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git rm:*)",
+      "Bash(git pull:*)",
+      "Bash(gh api:*)",
+      "mcp__mcp-for-unity__create_script",
+      "mcp__mcp-for-unity__delete_script",
+      "mcp__mcp-for-unity__find_in_file",
+      "mcp__mcp-for-unity__manage_animation",
+      "mcp__mcp-for-unity__manage_texture",
+      "Read(//c/Users/u/Documents/GitHub/Project_Abyss/**)",
+      "mcp__mcp-for-unity__refresh_unity",
+      "mcp__mcp-for-unity__execute_menu_item",
+      "Bash(xargs grep:*)",
+      "Bash(grep -l \"FirePassive\\\\|RegisterPassive\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Characters/Player/Scripts/*.cs)",
+      "Read(//c/Users/u/Desktop/**)",
+      "mcp__mcp-for-unity__manage_gameobject",
+      "mcp__mcp-for-unity__manage_components",
+      "mcp__mcp-for-unity__read_console",
+      "mcp__mcp-for-unity__manage_prefabs",
+      "mcp__mcp-for-unity__find_gameobjects",
+      "Bash(python3 -c ':*)",
+      "Bash(grep -A 30 \"m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/PuzzleGrid/Prefabs/Puzzle.prefab)",
+      "Bash(curl -L https://github.com/WhiteBless/MjprojectBBB/raw/main/Assets/InfinityPBR/_InfinityPBR%20-%20Treant/Model/Treant_Body.fbx -o 'c:/Users/u/Documents/GitHub/Project_Abyss/Assets/ExternalAssets/_InfinityPBR - Treant/Model/Treant_Body.fbx')",
+      "mcp__mcp-for-unity__manage_asset"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\u\\Desktop"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; case \"$FILE\" in *.cs) echo '[RULE-CHECK] .cs 파일 수정 — .claude/rules/unity-csharp.md 규칙 준수 확인 필수' ;; esac"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git status --porcelain 2>/dev/null | grep '.cs'; then echo '[COMPILE-GATE] .cs 파일이 변경됨. 응답 종료 전 반드시 refresh_unity -> read_console로 컴파일 에러를 확인하라. 에러가 있으면 수정 후 재확인. 에러 0 확인 후에만 종료하라.'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

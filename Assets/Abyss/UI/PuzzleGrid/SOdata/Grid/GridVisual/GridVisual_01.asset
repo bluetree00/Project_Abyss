@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 750caa0afec20d3488152e1442922e01, type: 3}
+  m_Name: GridVisual_01
+  m_EditorClassIdentifier: 
+  gridSquarePrefab: {fileID: 5508013396526201781, guid: e6831cb4778745e4cb1c4ab6434c6c68,
+    type: 3}
+  squareGap: 90
+  autoCenter: 1
+  startPosition: {x: 0, y: 0}
+  squareScale: 0.9
+  centerOffset: {x: 0, y: 0}
+  placeableColor: {r: 1, g: 1, b: 1, a: 1}
+  blockedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}

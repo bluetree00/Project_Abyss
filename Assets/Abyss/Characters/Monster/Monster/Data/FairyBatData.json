@@ -1,0 +1,28 @@
+{
+  "monsterName": "FairyBat",
+  "grade": "Normal",
+  "stat": {
+    "maxHp": 10,
+    "defense": 1.0,
+    "attackPower": 10.0,
+    "moveSpeed": 3.0,
+    "attackRange": 2.0,
+    "attackRadius": 1.0,
+    "attackRate": 1.0,
+    "attackDelay": 1.0,
+    "knockbackForce": 5.0
+  },
+  "detection": {
+    "detectionRange": 5.0,
+    "chaseGiveUpRange": 8.0
+  },
+  "patrol": {
+    "patrolType": "Horizontal",
+    "patrolRange": 3.0,
+    "patrolSpeed": 1.5,
+    "waypointWaitTime": 0.5
+  },
+  "combat": {
+    "damageApplyDelay": 0.4
+  }
+}

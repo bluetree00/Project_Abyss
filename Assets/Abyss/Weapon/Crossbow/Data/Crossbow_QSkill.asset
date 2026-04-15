@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fe6bb86c17bdbf49b30d604a6cabd56, type: 3}
+  m_Name: Crossbow_QSkill
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSO
+  skillName: "\uB354 \uBE68\uB9AC\uC3D8\uAE30"
+  description: "5\uCD08\uAC04 \uAE30\uBCF8\uACF5\uACA9\uC5D0 \uCD94\uAC00 \uACF5\uACA9\uC774
+    \uBC1C\uC0DD\uD55C\uB2E4."
+  icon: {fileID: 0}
+  cooldown: 15
+  behavior: {fileID: 11400000, guid: 930a5081da587e647a16a932b84bf849, type: 2}

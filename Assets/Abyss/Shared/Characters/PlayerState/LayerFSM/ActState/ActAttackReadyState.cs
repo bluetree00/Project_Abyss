@@ -16,7 +16,7 @@ public class ActAttackReadyState : ILayerState<ActState>
 
     public void Enter()
     {
-        if (_controller.isAttacking)
+        if (_controller.Combo.IsAttacking)
         {
             Debug.Log("[ActAttackReadyState] Already attacking, aborting Enter.");
             _stateChanger.Change(ActState.None); // 공격 중이면 바로 None으로
@@ -24,6 +24,14 @@ public class ActAttackReadyState : ILayerState<ActState>
         }
 
         var isAir = !_controller.IsGrounded();
+
+        // 공중 공격 1사이클 제한: 이미 사용했으면 공중 공격 불가
+        if (isAir && _controller.AirAttackUsed)
+        {
+            _stateChanger.Change(ActState.None);
+            return;
+        }
+
         _controller.SetMoveScale(0f);
 
         // 매핑: (지상/공중) × (Light/Heavy) -> WeaponActionType

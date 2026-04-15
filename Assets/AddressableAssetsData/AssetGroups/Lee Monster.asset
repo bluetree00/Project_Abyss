@@ -1,0 +1,113 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Lee Monster
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Lee Monster
+  m_GUID: c449ee153bbbb34478f6d43925a0db7b
+  m_SerializeEntries:
+  - m_GUID: 148bc6c6ce8697444a7358405e51cadb
+    m_Address: FairyBat/FairyBatConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 377f41e1ac02e584e8cb5c24f18529cd
+    m_Address: Golem/GolemData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51ffdc8042a44324ca9a704f11bc99b9
+    m_Address: Skeleton/SkeletonData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 56f9f06011374d045bfa1008823e8f58
+    m_Address: Slime/SlimeData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 62818761c3bbc554c8f2c9960f1e6f8f
+    m_Address: Slime/SlimeAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a5ad6568c49b61947beeb3bddcd81849
+    m_Address: FairyBat/FairyBatAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aec1234500000009000000000000ee01
+    m_Address: Slime/SlimeConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee0000100000007000000000000ee01
+    m_Address: Snail/SnailConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee0000100000009000000000000ee01
+    m_Address: Snail/SnailAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee0000200000009000000000000ee01
+    m_Address: Golem/GolemAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee0000300000007000000000000ee01
+    m_Address: Skeleton/SkeletonConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee0000300000009000000000000ee01
+    m_Address: Skeleton/SkeletonAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cfccff0ff643ab04aa57c30e18e66499
+    m_Address: Golem/GolemConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9cee3f905981c64597f67e2db989497
+    m_Address: FairyBat/FairyBatData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbb6900a8e7483f4193acd4932b9a9c9
+    m_Address: Snail/SnailData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9fb4b08f17a0e6489490f87b3679fb0
+    m_Address: LeeHPBar
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca0af3dfcf7f51f47b33ae8e2e900031
+    m_Address: ForestGuardian/ForestGuardianConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 43a98ec3e3ca3634a9f1d8d6920d2ed8
+    m_Address: DragonBoss/DragonBossConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: d187cb347d65668499cbaaf2e37262bf, type: 2}
+    - {fileID: 11400000, guid: e4bb40fd33265cc44a78d3667dab07c6, type: 2}

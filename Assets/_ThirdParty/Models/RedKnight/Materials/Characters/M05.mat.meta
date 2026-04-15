@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 0957fffbd8f7ab84a9075733b67fed01
+timeCreated: 1494915799
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/_ThirdParty/Models/RedKnight/Materials/Characters/M05.mat
+  uploadId: 834578

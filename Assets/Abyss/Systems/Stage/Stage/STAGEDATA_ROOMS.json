@@ -1,0 +1,90 @@
+{
+  "rooms": [
+    {
+      "roomId": "battle_001",
+      "name": "Slime Forest",
+      "category": "Battle",
+      "difficulty": 1,
+      "weight": 10,
+      "prefab": "battle_001",
+      "tags": ["normal", "early"]
+    },
+    {
+      "roomId": "battle_002",
+      "name": "Goblin Camp",
+      "category": "Battle",
+      "difficulty": 2,
+      "weight": 8,
+      "prefab": "battle_002",
+      "tags": ["normal"]
+    },
+    {
+      "roomId": "battle_003",
+      "name": "Undead Crypt",
+      "category": "Battle",
+      "difficulty": 3,
+      "weight": 5,
+      "prefab": "battle_003",
+      "tags": ["normal", "hard"]
+    },
+
+    {
+      "roomId": "elite_001",
+      "name": "Elite Goblin Knight",
+      "category": "Elite",
+      "difficulty": 3,
+      "weight": 5,
+      "prefab": "elite_001",
+      "tags": ["elite"]
+    },
+
+    {
+      "roomId": "event_001",
+      "name": "Mysterious Event",
+      "category": "Event",
+      "difficulty": 0,
+      "weight": 6,
+      "prefab": "event_001",
+      "tags": ["story"]
+    },
+    {
+      "roomId": "event_002",
+      "name": "Treasure Room",
+      "category": "Event",
+      "difficulty": 0,
+      "weight": 4,
+      "prefab": "event_002",
+      "tags": ["reward"]
+    },
+
+    {
+      "roomId": "shop_001",
+      "name": "Normal Shop",
+      "category": "Shop",
+      "difficulty": 0,
+      "weight": 7,
+      "prefab": "shop_001",
+      "tags": ["shop"]
+    },
+
+    {
+      "roomId": "start_001",
+      "name": "Campfire Start",
+      "category": "Start",
+      "difficulty": 0,
+      "weight": 10,
+      "prefab": "start_001",
+      "tags": ["start"]
+    },
+
+    {
+      "roomId": "boss_001",
+      "name": "Boss: Ancient Slime King",
+      "category": "Boss",
+      "difficulty": 0,
+      "weight": 10,
+      "prefab": "boss_001",
+      "tags": ["boss"]
+    }
+  ]
+}

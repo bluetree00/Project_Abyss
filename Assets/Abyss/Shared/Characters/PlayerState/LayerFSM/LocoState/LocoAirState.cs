@@ -22,7 +22,7 @@ public class LocoAirState : ILayerState<LocoState>
         _controller.SetMoveScale(0f);
         _controller.Anim.CrossFade("JumpBlend", 0.1f);
 
-        _controller.isJumping = true;
+        _controller.SetJumping(true);
         _blendValue = _controller.EnterAirAsJump ? 0f : 1f;
         Debug.Log($"LocoAirState Enter: EnterAirAsJump={_controller.EnterAirAsJump}, isJumping={_controller.isJumping}");
 
@@ -35,20 +35,31 @@ public class LocoAirState : ILayerState<LocoState>
         // 착지 체크
         if (_controller.IsGrounded())
         {
-            _controller.Anim.SetFloat("JumpValue", 2f);
-            _controller.Anim.SetFloat("AirLightAttackValue", 2f);
             _controller.SetMoveScale(1f);
+
+            // 낙하 공격 중이면 ActPlungeState가 착지를 직접 처리
+            // → JumpBlend 착지 애니 및 CancelActState 건너뜀
+            if (!_controller.IsPlunging)
+            {
+                _controller.Anim.SetFloat("JumpValue", 2f);
+            }
+
             _stateChanger.Change(LocoState.Idle);
         }
     }
 
     public void Exit()
     {
-        _entered = false; // Exit 시 다시 Enter 가능
+        _entered = false;
+
+        // 낙하 공격 중 → ActPlungeState가 착지를 직접 처리
+        // 그 외 모든 경우 (공중 공격 포함) → 착지 시 ActState 초기화
+        if (!_controller.IsPlunging)
+            _controller.CancelActState();
+
         _controller.SetMoveScale(1f);
         _controller.ConsumeEnterAirAsJump();
-        _controller.isJumping = false;
+        _controller.SetJumping(false);
         _controller.Anim.SetFloat("JumpValue", 0f);
-        _controller.Anim.SetFloat("AirLightAttackValue", 0f);
     }
 }

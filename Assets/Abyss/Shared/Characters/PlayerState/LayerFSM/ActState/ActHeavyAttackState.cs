@@ -9,6 +9,7 @@ public class ActHeavyAttackState : ILayerState<ActState>
     private PlayerController _controller;
     private ILayerStateChanger<ActState> _stateChanger;
     private PlayerAnimationEventReceiver _receiver;
+    private AbilityExecution _execution;
 
     public void Init(PlayerController controller, ILayerStateChanger<ActState> stateChanger)
     {
@@ -18,13 +19,36 @@ public class ActHeavyAttackState : ILayerState<ActState>
 
     public void Enter()
     {
-        _controller.isAttacking = true;
-        _controller.SetMoveScale(0f); // 공격 중 이동 제한
+        // 공중이고 ClipMapping에 isPlunge가 설정된 경우 낙하 공격으로 위임
+        if (!_controller.IsGrounded())
+        {
+            var mapping = GetAirHeavyMapping();
+            if (mapping != null && mapping.isPlunge)
+            {
+                _controller.CurrentAttackTypeForEffect = WeaponActionType.AirPlunge;
+                _controller.PendingPlunge = new PlayerController.PlungeInfo
+                {
+                    fallClipName = mapping.baseClipName,
+                    fallSpeed    = mapping.plungeFallSpeed,
+                    descendAt    = mapping.plungeDescendAt
+                };
+                _stateChanger.Change(ActState.Plunge);
+                return;
+            }
+        }
+
+        _execution = new AbilityExecution();
+        _controller.ActiveExecution = _execution;
+        _controller.RotateTowardsMousePosition();
+
+        _controller.Combo.SetAttacking(true);
+        _controller.SetMoveScale(0f);
 
         _receiver = _controller.EventReceiver ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
         SubscribeReceiver();
 
         PlayHeavyAnimation();
+        _controller.BeginWeaponTrail();
     }
 
     public void Update() { }
@@ -32,8 +56,13 @@ public class ActHeavyAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
-        _controller.isAttacking = false;
+        _controller.EndWeaponTrail();
+        _controller.Combo.SetAttacking(false);
         _controller.SetMoveScale(1f);
+
+        _controller.ActiveExecution = null;
+        _execution?.Cleanup(forceEffects: false);
+        _execution = null;
     }
 
     private void SubscribeReceiver()
@@ -62,10 +91,20 @@ public class ActHeavyAttackState : ILayerState<ActState>
 
     private void PlayHeavyAnimation()
     {
-        var action = _controller.CurrentAttackTypeForEffect; // GroundHeavy / AirHeavy
-        bool isAir = !_controller.IsGrounded();
-        string animName = $"{action}Attack"; // 콤보 없이 단발
+        var action = _controller.CurrentAttackTypeForEffect;
+        string animName = $"{action}Attack";
         Debug.Log($"[ActHeavyAttackState] PlayHeavyAnimation - {animName}");
         _controller.Anim.CrossFade(animName, 0.08f);
+    }
+
+    private WeaponAnimationSetSO.ClipMapping GetAirHeavyMapping()
+    {
+        var wd      = _controller.WeaponManager?.CurrentWeaponData;
+        var animSet = wd?.animationSet as WeaponAnimationSetSO;
+        if (animSet == null) return null;
+
+        foreach (var m in animSet.GetMappings(WeaponAnimGroup.Air, WeaponActionType.AirHeavy))
+            return m;
+        return null;
     }
 }

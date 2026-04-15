@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 8fa1c2dc99f1ab742aa0133d96d59a4b
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 141712
+  packageName: Skill Indicator
+  packageVersion: 1.1.0
+  assetPath: Assets/taecgLibrary/SkillIndicator/Shaders/WarningArrow.shader
+  uploadId: 373292

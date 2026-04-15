@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ca431500256e58b4c86ed1d87d75bd9e
+timeCreated: 1490773459
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/_ThirdParty/Models/Dragoon/Prefab/Sword_dragon.prefab
+  uploadId: 834578

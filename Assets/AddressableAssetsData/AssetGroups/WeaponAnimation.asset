@@ -13,97 +13,100 @@ MonoBehaviour:
   m_Name: WeaponAnimation
   m_EditorClassIdentifier: 
   m_GroupName: WeaponAnimation
-  m_Data:
-    m_SerializedData: []
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
-  - m_GUID: ea88c1cbbc57198499ce3da9463baea4
-    m_Address: GroundLightAttack_02
+  - m_GUID: 14256027a4ac4e13be1ec0c8dbac1cb6
+    m_Address: BowESkill_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 54109ccbe0735284cabdeac03f8d81e6
-    m_Address: GroundLightAttack_03
+  - m_GUID: 24b7b5caf37a46ef9a39bc8e30415847
+    m_Address: BowQSkill_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7677665cdf35ddc4c920b392e1735dc0
+  - m_GUID: 52c2de492ef1443458626e80a78b7c99
     m_Address: GroundLightAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
-    m_Address: QSkill_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 165130b8a71020641b870cab32d18c5e
-    m_Address: ESkill_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 862b2a1105d0db04c862f29bddb2a1d3
-    m_Address: Air_Light_Step01_Start
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 06306af089d828d42b8d956986d0566c
-    m_Address: Air_Light_Step01_Loop
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 95a3de4be921e854a8d93709eabe7371
-    m_Address: Air_Light_Step01_End
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0e6b9883ce9ea5f46a60f6a94290d9cd
-    m_Address: Air_Light_Step02_Start
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4ae407e3a48e9b44eb8ef963014a80a0
-    m_Address: Air_Light_Step02_Loop
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4155c6de8599c904e9088576d146c0ef
-    m_Address: Air_Light_Step02_End
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 46f7d5a4a9a960142be33846939fb7c1
+  - m_GUID: 716123e21a96467da4b4c11c96aa7410
     m_Address: GroundLightBowAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7e08d96c87ff6194a99fd0a1ab48d381
-    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Start_Root.FBX
+  - m_GUID: 77fc626278dbd774a9e6b1fee68562c4
+    m_Address: GroundLightAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 068958b08f4995543b1b46e32cb79812
-    m_Address: Assets/ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Root/GhostSamurai_Bow_Shoot_SP_Idle_Root.FBX
+  - m_GUID: 8decc86bf4985ea42b3005926975955f
+    m_Address: GroundLightAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 75802d7dafb25944497bc20c3335734f
+  - m_GUID: 94e0a9c1e45a4bea9bf72452306bc5dc
+    m_Address: BowQSkill_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9aff12e81a584ef0a0cef85928bb129f
     m_Address: GroundLightBowAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 686d6fee3c23524439553401966a5bab
-    m_Address: GroundHeavyAttack
+  - m_GUID: a967b6c6732e47e889caede9727da1d8
+    m_Address: BowAirAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: aa3cafe26e9755440923cb36991911d1
-    m_Address: HeavyCharge
+  - m_GUID: b132447a1ddc45868b1188980a28bcc3
+    m_Address: GroundLightBowAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8b5fec27bfe3d4440b0f8b2799c6a034
-    m_Address: BowHeavyCharge
+  - m_GUID: b7b344e22e4b411aacf1bd0cf8300c64
+    m_Address: BowAirAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da32f5e02f9941d38a0fb67b5759ab81
+    m_Address: BowAirAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dad1a61f9a9f4992bd184068b197ec67
+    m_Address: BowESkill_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fc56cd5ad784484184e9a87a1bc7fd47
+    m_Address: BowQSkill_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: def216b09d67fab43b1bd39f7748917d
+    m_Address: GreatswordAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8db0371537281ae46a56f734712ccdd9
+    m_Address: GreatswordAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b3ab8d439420950498be32a805f2bee6
+    m_Address: GreatswordAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 841790aa24d3b714a9a34d231d93282d
+    m_Address: GreatswordQSkill
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4f6bfedccb7aeda4d8a1954468050ea6
+    m_Address: GreatswordESkill
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

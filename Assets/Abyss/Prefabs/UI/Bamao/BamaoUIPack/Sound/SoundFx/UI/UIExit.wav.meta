@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 1cb74b80b4395644a8cfae4c60d54308
+guid: f7ebcb1b65ca2d4419b5233c083745bc
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/SoundFx/UI/UIExit.wav
+  uploadId: 740277

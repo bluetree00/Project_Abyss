@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 670dbf108a043074dbf30fe9555a432f, type: 3}
+  m_Name: FanArrowShot
+  m_EditorClassIdentifier:
+  arrowCount: 3
+  spreadAngle: 60
+  arrowKey: Basic_Arrow_01
+  baseDamagePerArrow: 25
+  fireDelay: 0.2
+  forwardOffset: 1
+  upOffset: 1
+  pierceMaxCount: 5
+  explodeRadius: 2
+  explodeDamageRatio: 0.5
+  explodeEffectKey: FrontAttackHit
+  explodeEffectScale: 1
+  projectileEffectKey: BowEProjectile
+  projectileEffectScale: 1
+  tier2ExtraMuzzleKey: BowETier2Muzzle
+  tier2ExtraMuzzleScale: 1
+  tier3ExtraHitKey: BowETier3Hit
+  tier3ExtraHitScale: 1.5
+  muzzleEffectKey: BowEMuzzleFlash
+  muzzleEffectScale: 1
+  endDelay: 0.3
+  animationOverride:

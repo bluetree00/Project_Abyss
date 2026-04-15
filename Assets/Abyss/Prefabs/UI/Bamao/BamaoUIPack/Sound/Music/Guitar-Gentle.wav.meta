@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 12f3404b169f1f84ab055be837152afc
+guid: 7b1e6d51dd2d1a34b816debbb230ec6d
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
@@ -21,3 +21,10 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 299336
+  packageName: Bamao's Fantastic UI Pack
+  packageVersion: 1.0.0
+  assetPath: Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Sound/Music/Guitar-Gentle.wav
+  uploadId: 740277

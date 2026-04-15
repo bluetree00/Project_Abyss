@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: SlimeConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: "\uC678\uB208\uC2AC\uB77C\uC784"
+  grade: 0
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 10
+    defense: 1
+    attackPower: 10
+    moveSpeed: 1
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 1
+    attackDelay: 1
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+  detection:
+    detectionRange: 5
+    chaseGiveUpRange: 8
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 1
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Slime/SlimeAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
+    attackReadyStateName: AttackReady
+    attackTrigger: Attack
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingRPT
+    speedParam: Blend
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    accumulationThreshold: 100
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  specialStates:
+  - conditions: []
+    state: {fileID: 11400000, guid: 4937e10bf4dd8544188acfbf958bc615, type: 2}
+    oneShot: 1
+  stateOverrides:
+  - {fileID: 11400000, guid: 5d0482fd5eb61a943adb4ef7c84fc133, type: 2}

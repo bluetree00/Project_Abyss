@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83cc2e9e382750246821a823d7c999a6, type: 3}
+  m_Name: RapidFire
+  m_EditorClassIdentifier: Assembly-CSharp::RapidFireBehaviorSO
+  buffDuration: 5
+  tier1SpeedBonus: 0.3
+  tier2SpeedBonus: 0.5
+  tier3SpeedBonus: 0.7
+  buffEffectKey: BowChargeEffect
+  buffEffectScale: 0.5
+  animationOverride: 
