@@ -107,11 +107,48 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         if (run.CurrentRunState == GameRunSession.RunState.Map) return;
 
         var spm = run.StagePointManager;
-        if (spm != null && spm.CurrentPointId >= 0)
-            spm.MarkCleared(spm.CurrentPointId);
+        if (spm == null || spm.CurrentPointId < 0) return;
+
+        var ctx = spm.GetContext(spm.CurrentPointId);
+        spm.MarkCleared(spm.CurrentPointId);
+
+        // 보스 방이면 다음 챕터로 전환
+        if (ctx != null && ctx.StageCategory == StageCategory.Boss)
+        {
+            HandleBossClearAsync(run).Forget();
+            return;
+        }
 
         run.EnterMap();
         Debug.Log($"[DebugRunPanel] {clearRoomKey} → 방 클리어 스킵, Map 전환");
+    }
+
+    private async Cysharp.Threading.Tasks.UniTaskVoid HandleBossClearAsync(GameRunSession run)
+    {
+        run.EnterChapterClear();
+
+        Debug.Log($"[DebugRunPanel] 보스 클리어! 챕터 {run.CurrentChapter} → 다음 챕터 전환");
+
+        // 페이드 → 다음 챕터 StageMap으로 전환
+        if (run.AdvanceToNextChapter())
+        {
+            var app = AppBootstrapper.Instance;
+            if (app != null)
+            {
+                if (TransitionOverlay.Instance != null)
+                    await TransitionOverlay.Instance.PlayAsync(() => app.RequestLoad(Define.Scene.StageMap));
+                else
+                    app.RequestLoad(Define.Scene.StageMap);
+            }
+        }
+        else
+        {
+            Debug.Log("[DebugRunPanel] 마지막 챕터 클리어! 런 종료.");
+            // TODO: 런 클리어 결과 화면으로 전환
+            var app = AppBootstrapper.Instance;
+            if (app != null)
+                app.RequestLoad(Define.Scene.Result);
+        }
     }
 
     private void HandleSpawnItem()
@@ -192,10 +229,18 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var run = GetCurrentRun();
         if (run == null || !run.IsRunning) return;
 
-        // 현재 포인트 클리어 처리
         var spm = run.StagePointManager;
-        if (spm != null && spm.CurrentPointId >= 0)
-            spm.MarkCleared(spm.CurrentPointId);
+        if (spm == null || spm.CurrentPointId < 0) return;
+
+        var ctx = spm.GetContext(spm.CurrentPointId);
+        spm.MarkCleared(spm.CurrentPointId);
+
+        // 보스 방이면 다음 챕터로 전환
+        if (ctx != null && ctx.StageCategory == StageCategory.Boss)
+        {
+            HandleBossClearAsync(run).Forget();
+            return;
+        }
 
         Debug.Log($"[DebugRunPanel] {returnToStageMapKey} → 전투 클리어, StageMap 씬 전환");
         AppBootstrapper.Instance.RequestLoad(Define.Scene.StageMap);

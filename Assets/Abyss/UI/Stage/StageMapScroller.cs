@@ -14,7 +14,7 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 {
     [Header("스크롤 설정")]
     [Tooltip("맵 콘텐츠 높이 (화면보다 큰 값, 너비는 화면에 맞춤)")]
-    [SerializeField] private float contentHeight = 4320f;
+    [SerializeField] private float contentHeight = 5400f;
 
     [Header("관성")]
     [SerializeField] private bool useInertia = true;
