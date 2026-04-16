@@ -59,15 +59,16 @@ public class WorldItemDisplay : MonoBehaviour
     // ── Public Methods ──────────────────────────────────────
 
     /// <summary>런타임 데이터로 초기화 (코드 드롭 시).</summary>
-    public void InitFromData(RuntimeItemData data, TMP_FontAsset font = null, ItemVfxConfig config = null)
+    public void InitFromData(RuntimeItemData data, ItemSO so = null, TMP_FontAsset font = null, ItemVfxConfig config = null)
     {
         _runtimeData = data;
+        if (so != null) itemSO = so;
         if (font != null) worldTextFont = font;
         if (config != null) vfxConfig = config;
     }
 
     /// <summary>런타임 데이터로 월드에 스폰.</summary>
-    public static WorldItemDisplay SpawnFromData(RuntimeItemData data, Vector3 position, ItemVfxConfig config = null)
+    public static WorldItemDisplay SpawnFromData(RuntimeItemData data, Vector3 position, ItemSO so = null, ItemVfxConfig config = null)
     {
         var go = new GameObject($"DroppedItem_{data.displayName}");
         go.transform.position = position;
@@ -77,7 +78,7 @@ public class WorldItemDisplay : MonoBehaviour
         col.radius = 1f;
 
         var display = go.AddComponent<WorldItemDisplay>();
-        display.InitFromData(data, config: config);
+        display.InitFromData(data, so: so, config: config);
         return display;
     }
 
@@ -104,6 +105,15 @@ public class WorldItemDisplay : MonoBehaviour
         if (player == null) return;
         if (_runtimeData == null) return;
 
+        var run = GameRunBootstrapper.Instance?.Run;
+
+        // 이미 보유 중인 아이템이면 픽업 차단
+        if (run?.ItemInventory != null && run.ItemInventory.HasItem(_runtimeData.itemId))
+        {
+            Debug.Log($"[WorldItemDisplay] 이미 보유 중: {_runtimeData.displayName}");
+            return;
+        }
+
         _pickedUp = true;
 
         var col = GetComponent<Collider>();
@@ -116,7 +126,6 @@ public class WorldItemDisplay : MonoBehaviour
                 bridge.RegisterShapeFromItem(_runtimeData.shapeId);
         }
 
-        var run = GameRunBootstrapper.Instance?.Run;
         run?.ItemInventory.AddItem(_runtimeData);
 
         // 아이템 효과: OnItemPickup hook

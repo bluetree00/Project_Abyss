@@ -180,6 +180,13 @@ public sealed class ItemEffectManager
                 eff.OnRollLand(_ctx, position);
     }
 
+    public void OnJumpLand(Vector3 position)
+    {
+        foreach (var eff in _activeEffects)
+            if (eff.IsActive(_ctx))
+                eff.OnJumpLand(_ctx, position);
+    }
+
     // ── 진행 ────────────────────────────────────────────────
 
     public void OnRoomClear()

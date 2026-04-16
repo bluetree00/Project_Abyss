@@ -135,11 +135,13 @@ public class BasicArrow : MonoBehaviour
         if (other.TryGetComponent<IDamageable>(out var damageable))
         {
             var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
-            var pkt = new DamagePacket(damage, _instigator, other.gameObject);
+            var weaponElem = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData?.element ?? WeaponElement.None;
+            var pkt = new DamagePacket(damage, _instigator, other.gameObject, weaponElem);
             mgr?.OnPreDealDamage(ref pkt);
 
             float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
-            damageable.TakeDamage(finalDmg, _instigator);
+            var elemType = pkt.Element.ToElementType();
+            damageable.TakeDamage(finalDmg, _instigator, 1f, elemType, finalDmg);
 
             var report = new DamageReport
             {

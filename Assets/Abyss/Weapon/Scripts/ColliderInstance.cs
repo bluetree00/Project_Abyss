@@ -112,11 +112,13 @@ public class ColliderInstance : MonoBehaviour
 
         // 아이템 효과: 공격 전 데미지 수정
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
-        var pkt = new DamagePacket(damage, owner, other.gameObject);
+        var weaponElem = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData?.element ?? WeaponElement.None;
+        var pkt = new DamagePacket(damage, owner, other.gameObject, weaponElem);
         mgr?.OnPreDealDamage(ref pkt);
 
         float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
-        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier);
+        var elemType = pkt.Element.ToElementType();
+        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, elemType, finalDmg);
 
         // 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
         var report = new DamageReport

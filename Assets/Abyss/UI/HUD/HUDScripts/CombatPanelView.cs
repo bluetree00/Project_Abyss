@@ -198,12 +198,10 @@ public sealed class CombatPanelView : MonoBehaviour
             {
                 if (_noticeTimer <= 0f)
                 {
-                    // 완전히 사라짐
                     buffNoticeText.gameObject.SetActive(false);
                 }
                 else if (_noticeTimer < NoticeFadeTime)
                 {
-                    // 페이드아웃 구간
                     float alpha = _noticeTimer / NoticeFadeTime;
                     var c = buffNoticeText.color;
                     c.a = alpha;
@@ -211,6 +209,9 @@ public sealed class CombatPanelView : MonoBehaviour
                 }
             }
         }
+
+        if (_itemNotices.Count > 0)
+            UpdateItemNotices();
     }
 
     /// <summary>버프 획득/발동 시 화면 알림 (2초 표시 + 0.5초 페이드아웃).</summary>
@@ -313,6 +314,113 @@ public sealed class CombatPanelView : MonoBehaviour
         string remaining = buff.RoomsRemaining > 0 ? $" [{buff.RoomsRemaining}방]" : "";
 
         return $"{typeName} {valueStr}{remaining}";
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 아이템 효과 발동 알림 (스택형, 왼쪽 하단)
+    // ─────────────────────────────────────────────────────────
+
+    private const float ItemNoticeDuration = 2f;
+    private const float ItemNoticeFadeTime = 0.5f;
+    private const int MaxItemNotices = 5;
+
+    private Transform _itemNoticeRoot;
+    private readonly List<ItemNoticeEntry> _itemNotices = new();
+
+    private struct ItemNoticeEntry
+    {
+        public GameObject go;
+        public TMP_Text text;
+        public float timer;
+    }
+
+    /// <summary>아이템 효과 발동 시 왼쪽에 스택형 알림 표시.</summary>
+    public void ShowItemEffectNotice(string message)
+    {
+        EnsureItemNoticeRoot();
+        if (_itemNoticeRoot == null) return;
+
+        // 최대 개수 초과 시 가장 오래된 것 제거
+        if (_itemNotices.Count >= MaxItemNotices)
+        {
+            if (_itemNotices[0].go != null)
+                Destroy(_itemNotices[0].go);
+            _itemNotices.RemoveAt(0);
+        }
+
+        var go = new GameObject($"ItemNotice_{_itemNotices.Count}", typeof(RectTransform));
+        go.transform.SetParent(_itemNoticeRoot, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(280f, 22f);
+
+        var text = go.AddComponent<TextMeshProUGUI>();
+        text.text = message;
+        text.fontSize = 13f;
+        text.color = new Color(1f, 0.85f, 0.4f);
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+
+        var outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
+        outline.effectDistance = new Vector2(1f, -1f);
+
+        _itemNotices.Add(new ItemNoticeEntry
+        {
+            go = go,
+            text = text,
+            timer = ItemNoticeDuration + ItemNoticeFadeTime,
+        });
+    }
+
+    private void UpdateItemNotices()
+    {
+        for (int i = _itemNotices.Count - 1; i >= 0; i--)
+        {
+            var entry = _itemNotices[i];
+            entry.timer -= Time.deltaTime;
+            _itemNotices[i] = entry;
+
+            if (entry.timer <= 0f)
+            {
+                if (entry.go != null) Destroy(entry.go);
+                _itemNotices.RemoveAt(i);
+            }
+            else if (entry.timer < ItemNoticeFadeTime && entry.text != null)
+            {
+                float alpha = entry.timer / ItemNoticeFadeTime;
+                var c = entry.text.color;
+                c.a = alpha;
+                entry.text.color = c;
+            }
+        }
+    }
+
+    private void EnsureItemNoticeRoot()
+    {
+        if (_itemNoticeRoot != null) return;
+
+        var go = new GameObject("ItemNoticeRoot", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.3f);
+        rect.anchorMax = new Vector2(0f, 0.3f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(10f, 0f);
+        rect.sizeDelta = new Vector2(290f, 200f);
+
+        var layout = go.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 2f;
+        layout.childAlignment = TextAnchor.LowerLeft;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+
+        var fitter = go.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        _itemNoticeRoot = go.transform;
     }
 
     // ── 자동 생성 (Inspector 미연결 시 런타임 폴백) ──

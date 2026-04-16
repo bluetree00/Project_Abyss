@@ -59,6 +59,7 @@ public abstract class ItemEffectBase : IItemEffect
             case "OnRecipeComplete":
             case "OnRollEnd":
             case "OnRollLand":
+            case "OnJumpLand":
             case "OnNearDeath":
             case "OnItemPickup":
             case "OnPickup":
@@ -83,6 +84,7 @@ public abstract class ItemEffectBase : IItemEffect
     public virtual bool OnNearDeath(ItemEffectContext ctx, ref float healPercent, ref float invincibleDuration) => false;
     public virtual void OnRollEnd(ItemEffectContext ctx) { }
     public virtual void OnRollLand(ItemEffectContext ctx, Vector3 position) { }
+    public virtual void OnJumpLand(ItemEffectContext ctx, Vector3 position) { }
     public virtual void OnRoomClear(ItemEffectContext ctx) { }
     public virtual void OnBossClear(ItemEffectContext ctx) { }
     public virtual void OnRecipeComplete(ItemEffectContext ctx) { }
