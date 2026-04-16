@@ -17,4 +17,6 @@ public enum TileType
     Trap,           // T — 함정
     Chest,          // C — 보물상자
     Empty,          // . — 빈 칸 (구멍)
+    BuffBox,        // R — 버프 상자 (상호작용으로 발동)
+    BuffPedestal,   // D — 버프 발판 (밟으면 즉시 발동)
 }

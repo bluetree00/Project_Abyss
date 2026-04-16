@@ -38,6 +38,7 @@ public class WeaponData
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
+    public WeaponElement element = WeaponElement.None;
 
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
@@ -73,6 +74,7 @@ public class WeaponData
         chargeStages = so.chargeStages;
 
         weaponType = so.weaponType;
+        element    = so.element;
 
         skillQ = so.skillQ;
         skillE = so.skillE;
@@ -114,6 +116,7 @@ public class WeaponData
             groundEndCount   = entry.ground_combo_count,
             airEndCount      = entry.air_combo_count,
             weaponType       = ParseWeaponType(entry.weapon_type),
+            element          = ParseElement(entry),
             // SO 참조는 null — WeaponSO에서 바인딩하거나 Addressables로 로드
             animationSet     = null,
             abilitySet       = null,
@@ -132,6 +135,21 @@ public class WeaponData
         "ChargeFull" => PromoteMode.ChargeFull,
         _            => PromoteMode.None,
     };
+
+    private static WeaponElement ParseElement(EquipmentEntry entry)
+    {
+        // EquipmentEntry에 element 필드가 있으면 사용, 없으면 None
+        var s = entry != null ? (entry.element ?? "") : "";
+        return s switch
+        {
+            "Water"     => WeaponElement.Water,
+            "Fire"      => WeaponElement.Fire,
+            "Grass"     => WeaponElement.Grass,
+            "Earth"     => WeaponElement.Earth,
+            "Lightning" => WeaponElement.Lightning,
+            _           => WeaponElement.None,
+        };
+    }
 
     private static WeaponType ParseWeaponType(string s) => s switch
     {

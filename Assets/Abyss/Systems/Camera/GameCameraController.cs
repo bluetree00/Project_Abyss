@@ -116,12 +116,14 @@ public class GameCameraController : MonoBehaviour
 
     private void OnPlayerBound(PlayerController player)
     {
-        if (player == null) return;
+        if (this == null || player == null) return;
         PlayIntroAsync(player.transform).Forget();
     }
 
     private async UniTaskVoid PlayIntroAsync(Transform target)
     {
+        if (this == null) return;
+
         // Cinemachine 확실히 OFF
         if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
         if (_brain == null) _brain = GetComponent<CinemachineBrain>();
@@ -147,7 +149,7 @@ public class GameCameraController : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < introDuration)
         {
-            if (target == null) break;
+            if (this == null || target == null) break;
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / introDuration);
             float ease = 1f - (1f - t) * (1f - t) * (1f - t);
@@ -167,9 +169,14 @@ public class GameCameraController : MonoBehaviour
             await UniTask.Yield();
         }
 
+        if (this == null) return;
+
         // 완료
-        transform.position = target.position + offset;
-        transform.rotation = endRot;
+        if (target != null)
+        {
+            transform.position = target.position + offset;
+            transform.rotation = endRot;
+        }
 
         if (_fadeOverlay != null)
             _fadeOverlay.color = Color.clear;

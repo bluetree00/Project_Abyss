@@ -63,16 +63,56 @@ public class PlayerController : CharacterBase
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }
 
-    // 테스트용: 피격/회복
     public void TakeDamage(int dmg)
     {
         if (debugInvincible)
             return;
 
-        RuntimeStats.Damage(dmg);
-        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = dmg });
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+
+        // 피격 전 — 무효화/감소 처리
+        var pkt = new DamagePacket(dmg, attacker: null, target: gameObject);
+        mgr?.OnPreTakeDamage(ref pkt);
+
+        if (pkt.Negated)
+        {
+            FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = 0 });
+            return;
+        }
+
+        int finalDmg = Mathf.Max(0, (int)pkt.FinalDamage);
+
+        // 사망 직전 체크
+        if (RuntimeStats.Hp - finalDmg <= 0 && mgr != null)
+        {
+            if (mgr.OnNearDeath(out float healPct, out float invDur))
+            {
+                int healHp = Mathf.Max(1, (int)(RuntimeStats.MaxHp * healPct));
+                RuntimeStats.SetHp(healHp);
+                // TODO: invDur > 0 이면 무적 상태 부여
+                return;
+            }
+        }
+
+        RuntimeStats.Damage(finalDmg);
+
+        // 피격 후 — 반사/방버프 등
+        var report = new DamageReport
+        {
+            DamageDealt = finalDmg,
+            Target = gameObject,
+        };
+        mgr?.OnPostTakeDamage(report);
+
+        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = finalDmg });
     }
-    public void Heal(int amount) => RuntimeStats.Heal(amount);
+
+    public void Heal(int amount)
+    {
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        mgr?.ModifyHeal(ref amount);
+        RuntimeStats.Heal(amount);
+    }
 
     public event Action OnHudStatChanged
     {

@@ -161,58 +161,23 @@ public class MapDataManager
 
     private async UniTask LoadFromServerAsync()
     {
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess())
-        {
-            Debug.LogWarning($"[MapDataManager] 차트 테이블 조회 실패: {tableResult.GetStatusCode()} — Resources 폴백 사용");
-            return;
-        }
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess())
-        {
-            Debug.LogError($"[MapDataManager] 차트 다운로드 실패: {contentResult.GetStatusCode()}");
-            return;
-        }
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess())
-        {
-            Debug.LogError("[MapDataManager] 로컬 로드 실패");
-            return;
-        }
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-        if (!dic.ContainsKey(ChartId))
-        {
-            Debug.LogWarning($"[MapDataManager] ChartId {ChartId} not found — 서버에 차트 미등록?");
-            return;
-        }
-
-        var jsonStr = dic[ChartId].contentJson.ToString();
-        var json = LitJson.JsonMapper.ToObject(jsonStr);
-
-        int updateCount = 0;
-
-        foreach (LitJson.JsonData row in json)
+        int loaded = ChartLoader.Load("STAGE_DATA", row =>
         {
             var entry = ParseRow(row);
-            if (entry == null) continue;
+            if (entry == null) return;
 
-            // 버전 비교
             if (_byId.TryGetValue(entry.room_id, out var existing))
             {
                 if (entry.stat_version <= existing.stat_version)
-                    continue;
+                    return;
             }
 
             Register(entry);
-            updateCount++;
-        }
+        });
 
-        SaveToJson();
-        Debug.Log($"[MapDataManager] 서버에서 {updateCount}개 갱신됨");
+        if (loaded > 0) SaveToJson();
+
+        await UniTask.CompletedTask;
     }
 
     private static MapRoomEntry ParseRow(JsonData row)

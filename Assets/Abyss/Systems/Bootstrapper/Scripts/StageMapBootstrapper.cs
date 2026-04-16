@@ -48,6 +48,13 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (app.CurrentRun != null && app.CurrentRun.IsRunning)
         {
             app.CurrentRun.EnterMap();
+
+            var points = FindObjectsOfType<StagePointUI>(true);
+            app.CurrentRun.RegisterPoints(points);
+
+            foreach (var p in points)
+                p.RefreshIconFromResolved();
+
             RefreshStageMapUI();
             app.NotifySceneReady();
             return;
@@ -86,6 +93,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         var ui = FindObjectOfType<UI_StageMap>(true);
         if (ui != null)
             ui.RefreshStageMap();
+
+        var connector = FindObjectOfType<StageLineConnector>(true);
+        if (connector != null)
+            connector.RefreshLineStates();
     }
 
     private static UniTask<TextAsset> LoadTextAsset(string key) =>

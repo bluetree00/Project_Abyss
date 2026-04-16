@@ -102,7 +102,12 @@ public class WeaponEffectHandler
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
 
-                    // 추가 발사 버프 (Q스킬 등)
+                    // 아이템 패시브: 고정 부채꼴 추가 투사체
+                    int bonusProjectile = _player.RuntimeStats.BonusProjectile;
+                    if (bonusProjectile > 0)
+                        SpawnFanShots(e, s, firePos, fireDir, dmg, bonusProjectile, execution);
+
+                    // 스킬 버프: 랜덤 spread 추가 투사체
                     if (_player.ExtraShotCount > 0)
                         SpawnExtraShots(e, s, firePos, fireDir, dmg, execution);
 
@@ -287,7 +292,62 @@ public class WeaponEffectHandler
         ci.attackId            = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
     }
 
-    /// <summary>ExtraShotCount 버프에 의한 추가 화살 발사</summary>
+    /// <summary>
+    /// 아이템 패시브 BonusProjectile에 의한 고정 부채꼴 추가 투사체.
+    /// 원본 발사 방향을 기준으로 균등 간격으로 퍼짐.
+    /// +1: 좌/우 각 1발 (±angleStep)
+    /// +2: 좌/우 각 1발 + 중앙 1발은 이미 원본이므로 ±angleStep, ±angleStep*2 에서 2발
+    /// → 총 투사체 = 1(원본) + bonusCount
+    /// </summary>
+    private async void SpawnFanShots(
+        WeaponAbilitySO.EffectStep e,
+        WeaponAbilitySO.AbilityStep s,
+        Vector3 basePos, Vector3 baseDir, float dmg,
+        int bonusCount,
+        AbilityExecution execution)
+    {
+        const float angleStep = 15f;  // 투사체 간 각도 간격
+
+        // 각도 배열 생성: +1이면 [-15, +15], +2이면 [-15, +15], +3이면 [-30, -15, +15, +30] ...
+        // 원본(0도)은 이미 발사됐으므로 제외
+        var angles = new System.Collections.Generic.List<float>();
+        for (int i = 1; i <= bonusCount; i++)
+        {
+            // 홀수번째: 좌, 짝수번째: 우 교대 배치
+            if (i % 2 == 1)
+                angles.Add(-angleStep * ((i + 1) / 2));
+            else
+                angles.Add(angleStep * (i / 2));
+        }
+
+        for (int i = 0; i < angles.Count; i++)
+        {
+            if (_player == null) return;
+
+            Vector3 dir = Quaternion.Euler(0f, angles[i], 0f) * baseDir;
+            // 부채꼴 위치 오프셋: 각도 방향으로 약간 벌림
+            Vector3 right = Vector3.Cross(Vector3.up, baseDir).normalized;
+            float lateralOffset = Mathf.Sin(angles[i] * Mathf.Deg2Rad) * 0.3f;
+            Vector3 spawnPos = basePos + right * lateralOffset;
+
+            var fanObj = await Managers.ObjectPooler.SpawnAsync(
+                e.payloadKey, ObjectPoolerManager.PoolType.Effect, spawnPos, Quaternion.LookRotation(dir));
+            if (fanObj == null || _player == null) return;
+
+            fanObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+
+            if (fanObj.TryGetComponent<BasicArrow>(out var fanArrow))
+            {
+                fanArrow.Fire(dir, _player.gameObject, dmg);
+                execution?.RegisterEffect(fanObj);
+            }
+
+            if (fanObj.TryGetComponent<EffectBehaviour>(out var eb))
+                eb.Initialize(e.behavior, _player.transform, e.lifeTimeMultiplier);
+        }
+    }
+
+    /// <summary>ExtraShotCount 스킬 버프에 의한 랜덤 spread 추가 화살 발사</summary>
     private async void SpawnExtraShots(
         WeaponAbilitySO.EffectStep e,
         WeaponAbilitySO.AbilityStep s,

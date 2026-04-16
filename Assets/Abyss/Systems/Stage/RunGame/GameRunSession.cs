@@ -50,6 +50,12 @@ public sealed class GameRunSession
     public PlayerRunState PlayerState { get; private set; }
     public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
+    public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
+    public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
+
+    // ── 시너지 이력 (씬 전환에도 생존) ──
+    private readonly List<SynergyRecord> _appliedSynergies = new();
+    public IReadOnlyList<SynergyRecord> AppliedSynergies => _appliedSynergies;
 
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
@@ -82,6 +88,24 @@ public sealed class GameRunSession
     private bool _hudModeSet = false;
 
     private Dictionary<int, StageData> _stageDataCache;
+
+    // =========================================================
+    // Synergy Record
+    // =========================================================
+
+    /// <summary>시너지 효과 기록 추가.</summary>
+    public void RecordSynergy(SynergyRecord record)
+    {
+        if (record == null) return;
+        _appliedSynergies.Add(record);
+    }
+
+    /// <summary>특정 그리드의 시너지 철회 (아이템 제거로 그리드 미완성 시).</summary>
+    public void RemoveSynergiesByGrid(string gridId)
+    {
+        if (string.IsNullOrEmpty(gridId)) return;
+        _appliedSynergies.RemoveAll(r => r.gridId == gridId);
+    }
 
     // =========================================================
     // Run Lifecycle
@@ -167,6 +191,9 @@ public sealed class GameRunSession
         try { PlayerState?.Deactivate(); }
         catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
+        // BlockSynergyBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
+        BlockSynergyBridge.Instance?.ClearAppliedGrids();
+
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
 
@@ -186,6 +213,10 @@ public sealed class GameRunSession
     private void ClearRunReferences()
     {
         UnsubscribePlayerStateSource();
+        ItemInventory.OnInventoryChanged -= RebuildItemEffects;
+        EffectManager.Cleanup();
+        BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
+        BuffHandler.ClearAll();
         RoomManager = null;
         StagePointManager = null;
         Player = null;
@@ -193,6 +224,7 @@ public sealed class GameRunSession
         CurrentRunState = RunState.None;
         SavedWeaponSlots = null;
         SavedCurrentSlotIndex = -1;
+        _appliedSynergies.Clear();
     }
 
     /// <summary>
@@ -262,6 +294,10 @@ public sealed class GameRunSession
     public void EnterStandby()
     {
         if (!IsRunning) return;
+
+        // 아이템 효과: 방 클리어 hook
+        EffectManager?.OnRoomClear();
+
         ChangeRunState(RunState.Standby);
     }
 
@@ -280,6 +316,10 @@ public sealed class GameRunSession
     public void EnterChapterClear()
     {
         if (!IsRunning) return;
+
+        // 아이템 효과: 보스 클리어 hook
+        EffectManager?.OnBossClear();
+
         ChangeRunState(RunState.ChapterClear);
     }
 
@@ -328,6 +368,25 @@ public sealed class GameRunSession
         {
             ItemInventory.OnInventoryChanged -= RefreshPlayerItemStats;
             ItemInventory.OnInventoryChanged += RefreshPlayerItemStats;
+
+            // 방 버프 ↔ 스탯 연동
+            BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
+            BuffHandler.OnBuffsChanged += RefreshPlayerRoomBuffs;
+
+            // ItemEffectManager 초기화
+            ItemInventory.OnInventoryChanged -= RebuildItemEffects;
+            ItemInventory.OnInventoryChanged += RebuildItemEffects;
+            EffectManager.Initialize(Player, this, ItemInventory);
+
+            // 현재 인벤토리 아이템 보너스 즉시 적용 (씬 전환 후 복원)
+            RefreshPlayerItemStats();
+
+            // 방 버프 즉시 적용
+            RefreshPlayerRoomBuffs();
+
+            // 시너지 이력 복원 (씬 전환 후 복원)
+            if (_appliedSynergies.Count > 0)
+                Player.RuntimeStats.RestoreSynergies(_appliedSynergies);
         }
 
         OnPlayerBound?.Invoke(Player);
@@ -336,6 +395,17 @@ public sealed class GameRunSession
     private void RefreshPlayerItemStats()
     {
         Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
+    }
+
+    private void RefreshPlayerRoomBuffs()
+    {
+        Player?.RuntimeStats?.RefreshRoomBuffs(BuffHandler);
+    }
+
+    private void RebuildItemEffects()
+    {
+        EffectManager.RefreshContext(Player, this);
+        EffectManager.Rebuild();
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)

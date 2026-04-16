@@ -15,7 +15,7 @@ public class ItemDataManager
     private const string DataFileName = "item_data.json";
     private string FilePath => Path.Combine(Application.persistentDataPath, DataFileName);
 
-    private const string ItemChartId = "235418";
+    private const string ItemChartId = "236201";
 
     private Dictionary<string, List<ItemEntry>> _itemById = new();
 
@@ -40,11 +40,16 @@ public class ItemDataManager
                 if (col?.items != null)
                     foreach (var entry in col.items)
                     {
-                        if (string.IsNullOrEmpty(entry.item_id)) continue;
-                        if (!_itemById.TryGetValue(entry.item_id, out var list))
+                        // 새 CSV 호환
+                        if (string.IsNullOrEmpty(entry.item_id) && !string.IsNullOrEmpty(entry.passive_id))
+                            entry.item_id = entry.passive_id;
+
+                        var id = entry.ResolvedId;
+                        if (string.IsNullOrEmpty(id)) continue;
+                        if (!_itemById.TryGetValue(id, out var list))
                         {
                             list = new List<ItemEntry>();
-                            _itemById[entry.item_id] = list;
+                            _itemById[id] = list;
                         }
                         list.Add(entry);
                     }
@@ -88,11 +93,15 @@ public class ItemDataManager
             _itemById.Clear();
             foreach (var entry in col.items)
             {
-                if (string.IsNullOrEmpty(entry.item_id)) continue;
-                if (!_itemById.TryGetValue(entry.item_id, out var list))
+                if (string.IsNullOrEmpty(entry.item_id) && !string.IsNullOrEmpty(entry.passive_id))
+                    entry.item_id = entry.passive_id;
+
+                var id = entry.ResolvedId;
+                if (string.IsNullOrEmpty(id)) continue;
+                if (!_itemById.TryGetValue(id, out var list))
                 {
                     list = new List<ItemEntry>();
-                    _itemById[entry.item_id] = list;
+                    _itemById[id] = list;
                 }
                 list.Add(entry);
             }
@@ -112,39 +121,22 @@ public class ItemDataManager
 
     private async UniTask LoadFromServerAsync()
     {
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess()) return;
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess()) return;
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess()) return;
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-
-        if (dic.ContainsKey(ItemChartId))
+        int loaded = ChartLoader.Load("ITEM_DATA", row =>
         {
-            var json = JsonMapper.ToObject(dic[ItemChartId].contentJson.ToString());
-            int count = 0;
-            foreach (JsonData row in json)
-            {
-                var entry = ParseRow(row);
-                if (entry == null || string.IsNullOrEmpty(entry.item_id)) continue;
+            var entry = ParseRow(row);
+            var id = entry?.ResolvedId;
+            if (entry == null || string.IsNullOrEmpty(id)) return;
 
-                if (!_itemById.TryGetValue(entry.item_id, out var list))
-                {
-                    list = new List<ItemEntry>();
-                    _itemById[entry.item_id] = list;
-                }
-                list.RemoveAll(e => e.slot == entry.slot);
-                list.Add(entry);
-                count++;
+            if (!_itemById.TryGetValue(id, out var list))
+            {
+                list = new List<ItemEntry>();
+                _itemById[id] = list;
             }
-            SaveToJson();
-            Debug.Log($"[ItemDataManager] 아이템 {count}행 갱신");
-        }
+            list.RemoveAll(e => e.slot == entry.slot);
+            list.Add(entry);
+        });
+
+        if (loaded > 0) SaveToJson();
 
         await UniTask.CompletedTask;
     }
@@ -153,9 +145,10 @@ public class ItemDataManager
     {
         try
         {
-            return new ItemEntry
+            var entry = new ItemEntry
             {
                 item_id      = row.TryGetString("item_id"),
+                passive_id   = row.TryGetString("passive_id"),
                 item_name    = row.TryGetString("item_name"),
                 rarity       = row.TryGetString("rarity"),
                 category     = row.TryGetString("category"),
@@ -173,6 +166,12 @@ public class ItemDataManager
                 description  = row.TryGetString("description"),
                 stat_version = row.TryGetInt("stat_version"),
             };
+
+            // 새 CSV 호환: passive_id만 있고 item_id가 비었으면 복사
+            if (string.IsNullOrEmpty(entry.item_id) && !string.IsNullOrEmpty(entry.passive_id))
+                entry.item_id = entry.passive_id;
+
+            return entry;
         }
         catch { return null; }
     }

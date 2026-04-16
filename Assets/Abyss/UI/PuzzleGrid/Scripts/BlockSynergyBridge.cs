@@ -40,6 +40,7 @@ public class BlockSynergyBridge : MonoBehaviour
     private readonly Dictionary<string, string> _gridIdBySOName = new();
     private readonly Dictionary<string, GridAssetData> _registeredGrids = new();
     private readonly List<GridThumbnail> _thumbnails = new();
+    private readonly HashSet<string> _appliedGridIds = new();
     private GameObject _puzzleInstance;
     private bool _initialized;
 
@@ -428,17 +429,22 @@ public class BlockSynergyBridge : MonoBehaviour
 
     private void ApplySynergyEffects(string gridId)
     {
+        // 이미 적용된 그리드는 중복 적용하지 않음
+        if (_appliedGridIds.Contains(gridId)) return;
+
         var blockData = Managers.BlockData;
         if (blockData == null) return;
 
         var entries = blockData.GetGrid(gridId);
         if (entries == null) return;
 
-        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        var run = AppBootstrapper.Instance?.CurrentRun;
         var player = run?.Player;
         if (player == null) return;
 
         var stats = player.RuntimeStats;
+
+        _appliedGridIds.Add(gridId);
 
         foreach (var entry in entries)
         {
@@ -474,8 +480,26 @@ public class BlockSynergyBridge : MonoBehaviour
                     break;
             }
 
+            // GameRunSession에 이력 기록 (씬 전환 시 복원용)
+            run?.RecordSynergy(new SynergyRecord
+            {
+                gridId     = gridId,
+                effectType = entry.effect_type,
+                trigger    = entry.trigger,
+                value      = entry.value,
+                value2     = entry.value2,
+                maxStack   = entry.max_stack,
+                duration   = entry.duration,
+            });
+
             Debug.Log($"[BlockSynergyBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
         }
+    }
+
+    /// <summary>런 종료 시 적용 이력 초기화. 외부에서 호출.</summary>
+    public void ClearAppliedGrids()
+    {
+        _appliedGridIds.Clear();
     }
 
     // ── 변환 유틸 ──
