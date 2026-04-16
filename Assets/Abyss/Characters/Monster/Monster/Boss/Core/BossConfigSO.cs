@@ -26,18 +26,26 @@ public class BossConfigSO : MonsterConfigSO
 
 public enum BossConditionKey
 {
-    Phase2,
-    Dist_Close,
-    Dist_Far,
-    AfterBackstep,
-    AfterSidestep,
-    TimePressure,
-    Dragon_Summon80,
-    Dragon_Summon50,
-    Dragon_Summon10,
-    Dragon_ElementIce,
-    Dragon_ElementThunder,
-    Dragon_ElementFire,
+    // ── 공용 (모든 보스) ──────────────────────────────────────────
+    Phase2        = 0,   // HpBelowCondition(condPhase2HpThreshold)
+    Dist_Close    = 1,   // MaxRangeCondition(condDistClose)
+    Dist_Far      = 2,   // MinRangeCondition(condDistFar)
+    AfterBackstep = 3,   // LastTagCondition("backstep")
+    AfterSidestep = 4,   // LastTagCondition("sidestep")
+    TimePressure  = 5,   // NormalModeTimerCondition(condTimePressureSecs)
+
+    // ── DragonBoss 전용 ──────────────────────────────────────────
+    Dragon_Summon80       = 6,
+    Dragon_Summon50       = 7,
+    Dragon_Summon10       = 8,
+    Dragon_ElementIce     = 9,
+    Dragon_ElementThunder = 10,
+    Dragon_ElementFire    = 11,
+
+    // ── ForestGuardian 전용 ──────────────────────────────────────
+    FG_PhaseChangePending = 12,  // 페이즈 전환 대기 중 (HP ≤ 50% && !IsPhase2)
+    FG_IsPhase2           = 13,  // 2페이즈 완전 진입 상태
+    FG_IsGroggy           = 14,  // 그로기(경직) 상태 중
 }
 
 [System.Serializable]

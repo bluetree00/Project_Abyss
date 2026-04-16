@@ -11,11 +11,17 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: af7abe61e320c374eb7be5725e3eb80f, type: 3}
   m_Name: FGFrontalDefensePattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGFrontalDefensePatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGroundSlamPatternSO
   weight: 1
-  patternTag: 
+  patternTag: ground_slam
   breakOverride: -1
-  animStateName: DefenseST
-  animIdleName: IdleNormal
-  crossFade: 0.15
-  defenseDuration: 2
+  animAttack: SmashAttack
+  crossFade: 0.1
+  p1_radius: 5
+  p1_warningDuration: 0.5
+  p1_shockwaveDuration: 0.8
+  p2_radius: 7
+  p2_warningDuration: 0.4
+  p2_shockwaveDuration: 1
+  vfxImpact: {fileID: 0}
+  patternCooldown: 6

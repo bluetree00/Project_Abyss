@@ -11,16 +11,18 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7539161e65876674783b903b582189d9, type: 3}
   m_Name: FGLicheMissilePattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGLicheMissilePatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGroundSlashPatternSO
   weight: 1
-  patternTag: 
+  patternTag: ground_slash
   breakOverride: -1
-  animStateName: Magic04
-  crossFade: 0.15
-  missilePrefab: {fileID: 0}
-  missileCount: 5
-  missileInterval: 0.2
-  missileSpeed: 10
-  missileRange: 5
-  spreadAngle: 45
-  missileHeight: 1.2
+  animAttack: VerticalAttack
+  crossFade: 0.1
+  strikeCount: 3
+  strikeInterval: 0.4
+  strikeDist: 5
+  baseWidth: 4
+  widthIncrease: 1
+  hazardDuration: 1.5
+  windupDuration: 0.5
+  vfxStrike: {fileID: 0}
+  patternCooldown: 10

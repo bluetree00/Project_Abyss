@@ -114,6 +114,14 @@ public class PlayerController : CharacterBase
         RuntimeStats.Heal(amount);
     }
 
+    //============================================================
+    // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
+    //============================================================
+
+    /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
+    public void ApplyThunderGroggy(float duration)
+        => Abyss.Monster.ThunderGroggyVignetteView.Trigger(duration);
+
     public event Action OnHudStatChanged
     {
         add => RuntimeStats.OnChanged += value;

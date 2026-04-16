@@ -7,20 +7,24 @@ namespace Abyss.Monster
 public class DBMiniDragonSummonPatternSO : BossPatternSO
 {
     [Header("Animation")]
-    [SerializeField] private string animName = "FlyFWD";
-    [SerializeField] private float crossFade = 0.15f;
+    [SerializeField] private string animName    = "FlyFWD";
+    [SerializeField] private float  crossFade   = 0.15f;
 
     [Header("VFX")]
     [SerializeField] private GameObject vfxPrefab;
 
     [Header("Summon")]
-    [SerializeField] private MiniDragonController miniDragonPrefab;
-    [SerializeField] private float spawnRadius = 4f;
-    [SerializeField] private float summonDelay = 1.2f;
-    [SerializeField] private float takeOffDuration = 0.6f;
-    [SerializeField] private float landDuration = 0.7f;
-    [SerializeField] private float flightHeight = 10f;
-    [SerializeField] private float landingHitRadius = 4f;
+    [SerializeField] private GameObject miniDragonPrefab; // MiniDragonController 있는 프리팹
+    [SerializeField] private float miniDragonScale  = 0.5f;
+    [SerializeField] private float spawnRadius      = 4f;
+    [SerializeField] private float summonDelay      = 1.2f;
+    [SerializeField] private float takeOffDuration  = 0.6f;
+    [SerializeField] private float landDuration     = 0.7f;
+    [SerializeField] private float flightHeight     = 10f;
+
+    [Header("Landing")]
+    [Tooltip("미니드래곤 전멸 후 재사용할 얼음 착지 패턴. 쿨타임 중이면 그냥 PatrolState로 복귀.")]
+    [SerializeField] private DBIceLandingPatternSO iceLandingPattern;
 
     private SummonState _state;
 
@@ -44,22 +48,21 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
 
     private sealed class SummonState : InvincibleState<DBMiniDragonSummonPatternSO>
     {
-        private float _timer;
-        private int _phase;
+        private float   _timer;
+        private int     _phase;
         private Vector3 _groundPos;
         private Vector3 _airPos;
-        private Vector3 _landingPos;
-        private bool _originalUpdatePosition;
-        private bool _originalUpdateRotation;
+        private bool    _originalUpdatePosition;
+        private bool    _originalUpdateRotation;
         private Renderer[] _renderers;
-        private float _lockedThreshold;
+        private float   _lockedThreshold;
+        private DragonBossBlackboard.DragonElement _element;
 
         public SummonState(DBMiniDragonSummonPatternSO data) : base(data) { }
 
         public override void Enter(MonsterContext ctx)
         {
-            if (ctx.Agent.isOnNavMesh)
-                ctx.Agent.ResetPath();
+            if (ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
 
             if (ctx.Animator != null)
@@ -68,29 +71,31 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
             _groundPos = ctx.Transform.position;
             float baseY = (ctx.Monster as DragonBossMonster)?.DBBlackboard?.SpawnY ?? _groundPos.y;
             _groundPos.y = baseY;
-            _airPos = _groundPos + Vector3.up * Data.flightHeight;
-            _landingPos = _groundPos;
-            _renderers = ctx.Transform.GetComponentsInChildren<Renderer>(true);
+            _airPos      = _groundPos + Vector3.up * Data.flightHeight;
+            _renderers   = ctx.Transform.GetComponentsInChildren<Renderer>(true);
 
             _originalUpdatePosition = ctx.Agent.updatePosition;
             _originalUpdateRotation = ctx.Agent.updateRotation;
             ctx.Agent.updatePosition = false;
             ctx.Agent.updateRotation = false;
 
-            // 즉시 사용 표시 — 다음 틱부터 IsSummonTriggered가 true를 반환하여
-            // HandleForceInterrupts가 동일 패턴을 _pendingForce에 큐잉하지 않도록 방지
+            // HP 임계값 결정 → 임계값 기준으로 원소 고정 (얼음→번개→불 순서 보장)
             var dragon = ctx.Monster as DragonBossMonster;
             if (dragon != null)
             {
                 float hp = dragon.HpRatio;
-                if (hp <= 0.1f && !dragon.DBBlackboard.IsSummonTriggered(0.1f))
-                    _lockedThreshold = 0.1f;
-                else if (hp <= 0.5f && !dragon.DBBlackboard.IsSummonTriggered(0.5f))
-                    _lockedThreshold = 0.5f;
-                else
-                    _lockedThreshold = 0.8f;
+                if      (hp <= 0.1f && !dragon.DBBlackboard.IsSummonTriggered(0.1f)) _lockedThreshold = 0.1f;
+                else if (hp <= 0.5f && !dragon.DBBlackboard.IsSummonTriggered(0.5f)) _lockedThreshold = 0.5f;
+                else                                                                   _lockedThreshold = 0.8f;
                 dragon.DBBlackboard.MarkSummonUsed(_lockedThreshold);
             }
+
+            // 소환 회차(임계값)에 따라 원소 고정 — 현재 HP 원소와 무관
+            _element = _lockedThreshold <= 0.11f
+                ? DragonBossBlackboard.DragonElement.Fire
+                : _lockedThreshold <= 0.51f
+                    ? DragonBossBlackboard.DragonElement.Thunder
+                    : DragonBossBlackboard.DragonElement.Ice;
 
             _phase = 0;
             _timer = 0f;
@@ -102,55 +107,46 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
 
             switch (_phase)
             {
+                // Phase 0: 이륙
                 case 0:
-                    UpdateFlight(ctx, _groundPos, _airPos, _timer / Mathf.Max(0.01f, Data.takeOffDuration));
+                    LerpPosition(ctx, _groundPos, _airPos, _timer / Mathf.Max(0.01f, Data.takeOffDuration));
                     if (_timer < Data.takeOffDuration) return;
 
                     SetRenderersEnabled(false);
                     ctx.Transform.position = _airPos;
                     if (Data.vfxPrefab != null)
-                    {
-                        BossEffectPool.SpawnOneShot(
-                            Data.vfxPrefab,
-                            _groundPos,
-                            ctx.Transform.rotation);
-                    }
+                        BossEffectPool.SpawnOneShot(Data.vfxPrefab, _groundPos, ctx.Transform.rotation);
                     SpawnMiniDragons(ctx);
                     _phase = 1;
                     _timer = 0f;
                     break;
 
+                // Phase 1: 소환 연출 대기
                 case 1:
                     if (_timer < Data.summonDelay) return;
                     _phase = 2;
                     _timer = 0f;
                     break;
 
+                // Phase 2: 미니 드래곤 전멸 대기 (보스 공중 대기, 무적)
                 case 2:
+                {
                     var dragon = ctx.Monster as DragonBossMonster;
                     if (dragon == null) break;
                     if (dragon.DBBlackboard.ActiveMiniDragonCount > 0) return;
 
-                    _landingPos = ctx.Runtime.PlayerTarget != null
-                        ? ctx.Runtime.PlayerTarget.position
-                        : _groundPos;
-                    _landingPos.y = _groundPos.y;
+                    // 모두 처치됨 → 렌더러/Agent 복구
                     SetRenderersEnabled(true);
-                    _phase = 3;
-                    _timer = 0f;
-                    break;
-
-                case 3:
-                    UpdateFlight(ctx, _airPos, _landingPos, _timer / Mathf.Max(0.01f, Data.landDuration));
-                    if (_timer < Data.landDuration) return;
-
-                    ctx.Transform.position = _landingPos;
-                    BossEffectPool.SpawnOneShot(Data.vfxPrefab, _landingPos, ctx.Transform.rotation);
-                    DoLandingHit(ctx);
                     RestoreAgentTracking(ctx);
-                    ctx.Agent.Warp(_landingPos);
-                    ctx.Monster.ChangeState<PatrolState>();
+
+                    // IceLanding 패턴 재사용 (쿨타임 중이면 그냥 Patrol)
+                    var iceLanding = Data.iceLandingPattern;
+                    if (iceLanding != null && !iceLanding.IsOnCooldown)
+                        ctx.Monster.ChangeState(iceLanding.GetRuntimeState());
+                    else
+                        ctx.Monster.ChangeState<PatrolState>();
                     break;
+                }
             }
         }
 
@@ -160,7 +156,43 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
             RestoreAgentTracking(ctx);
         }
 
-        private void UpdateFlight(MonsterContext ctx, Vector3 from, Vector3 to, float t)
+        // ── 미니 드래곤 소환 ────────────────────────────────────────────
+
+        private void SpawnMiniDragons(MonsterContext ctx)
+        {
+            var dragon = ctx.Monster as DragonBossMonster;
+            if (dragon == null) return;
+
+            const int count = 3;
+            dragon.DBBlackboard.ActiveMiniDragonCount = count;
+
+            for (int i = 0; i < count; i++)
+            {
+                float   angle    = i * (360f / count);
+                Vector3 offset   = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.spawnRadius;
+                Vector3 spawnPos = _groundPos + offset;
+                spawnPos.y = DragonBossVisualHelper.GetGroundY(spawnPos);
+
+                MiniDragonController mini;
+                if (Data.miniDragonPrefab != null)
+                {
+                    var go  = Object.Instantiate(Data.miniDragonPrefab, spawnPos, Quaternion.identity);
+                    go.transform.localScale = Vector3.one * Data.miniDragonScale;
+                    mini = go.GetComponent<MiniDragonController>();
+                    if (mini == null) mini = go.AddComponent<MiniDragonController>();
+                }
+                else
+                {
+                    mini = MiniDragonController.CreateFallback(spawnPos);
+                }
+
+                mini.Init(dragon, ctx.Runtime.PlayerTarget, _element);
+            }
+        }
+
+        // ── 유틸 ────────────────────────────────────────────────────────
+
+        private void LerpPosition(MonsterContext ctx, Vector3 from, Vector3 to, float t)
         {
             t = Mathf.Clamp01(t);
             ctx.Transform.position = Vector3.Lerp(from, to, t);
@@ -171,55 +203,11 @@ public class DBMiniDragonSummonPatternSO : BossPatternSO
                 ctx.Transform.rotation = Quaternion.LookRotation(dir.normalized);
         }
 
-        private void SpawnMiniDragons(MonsterContext ctx)
-        {
-            var dragon = ctx.Monster as DragonBossMonster;
-            if (dragon == null) return;
-
-            // _lockedThreshold는 Enter()에서 이미 결정 및 MarkSummonUsed 완료
-            const int count = 3;
-            dragon.DBBlackboard.ActiveMiniDragonCount = count;
-
-            for (int i = 0; i < count; i++)
-            {
-                float angle = i * (360f / count);
-                Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.spawnRadius;
-                Vector3 spawnPos = _groundPos + offset;
-
-                var mini = Data.miniDragonPrefab != null
-                    ? Object.Instantiate(Data.miniDragonPrefab, spawnPos, Quaternion.identity)
-                    : MiniDragonController.CreateFallback(spawnPos);
-                mini.Init(dragon, ctx.Runtime.PlayerTarget);
-            }
-        }
-
-        private void DoLandingHit(MonsterContext ctx)
-        {
-            int damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
-            float kbForce = ctx.Stat.knockbackForce;
-
-            var hits = Physics.OverlapSphere(_landingPos, Data.landingHitRadius);
-            foreach (var col in hits)
-            {
-                var player = col.GetComponent<PlayerController>()
-                    ?? col.GetComponentInParent<PlayerController>();
-                if (player == null) continue;
-
-                Vector3 dir = (col.transform.position - _landingPos).normalized;
-                dir.y = 0.3f;
-                player.TakeDamage(damage);
-                player.ApplyKnockback(dir.normalized * kbForce, 0.35f);
-            }
-        }
-
         private void SetRenderersEnabled(bool enabled)
         {
             if (_renderers == null) return;
-            foreach (var renderer in _renderers)
-            {
-                if (renderer != null)
-                    renderer.enabled = enabled;
-            }
+            foreach (var r in _renderers)
+                if (r != null) r.enabled = enabled;
         }
 
         private void RestoreAgentTracking(MonsterContext ctx)
