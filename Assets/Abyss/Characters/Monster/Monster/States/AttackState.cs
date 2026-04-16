@@ -15,7 +15,7 @@ public class AttackState : IMonsterState
 
     public virtual void Enter(MonsterContext ctx)
     {
-        ctx.Agent.ResetPath();
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
 
         _cooldownTimer = 1f / Mathf.Max(0.01f, ctx.Stat.attackRate);
         _damageTimer = ctx.Combat.damageApplyDelay;

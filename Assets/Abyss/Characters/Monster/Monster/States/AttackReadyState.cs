@@ -13,7 +13,7 @@ public class AttackReadyState : IMonsterState
 {
     public virtual void Enter(MonsterContext ctx)
     {
-        ctx.Agent.ResetPath();
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
 
         // 첫 조우 시 딜레이 없이 즉시 공격, 이후부터 attackDelay 적용
         ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack ? 0f : ctx.Stat.attackDelay;

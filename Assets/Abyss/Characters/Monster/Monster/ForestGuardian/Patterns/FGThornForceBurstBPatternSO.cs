@@ -48,7 +48,7 @@ public class FGThornForceBurstBPatternSO : BossPatternSO
 
         public override void Enter(MonsterContext ctx)
         {
-            ctx.Agent.ResetPath();
+            if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
             _shotIndex = 0;
             _timer     = 0f;
