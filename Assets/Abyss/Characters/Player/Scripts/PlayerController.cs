@@ -57,6 +57,12 @@ public class PlayerController : CharacterBase
     [SerializeField] private bool debugInvincible = true;
     public CharacterData CharacterData => characterData;
 
+    // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
+    private float _invincibleEnd;
+
+    // 아이템 효과: 다음 1회 공격에 원소 부여 (RecipeSynergyNextAttack)
+    public WeaponElement NextAttackElement { get; set; } = WeaponElement.None;
+
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
 
@@ -65,7 +71,7 @@ public class PlayerController : CharacterBase
 
     public void TakeDamage(int dmg)
     {
-        if (debugInvincible)
+        if (debugInvincible || Time.time < _invincibleEnd)
             return;
 
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
@@ -89,7 +95,12 @@ public class PlayerController : CharacterBase
             {
                 int healHp = Mathf.Max(1, (int)(RuntimeStats.MaxHp * healPct));
                 RuntimeStats.SetHp(healHp);
-                // TODO: invDur > 0 이면 무적 상태 부여
+                if (invDur > 0f)
+                {
+                    _invincibleEnd = Time.time + invDur;
+                    ItemEffectVfxHelper.AttachLoopVfx("VFX_DeathNegateAura", transform, invDur).Forget();
+                    ItemEffectVfxHelper.ShowNotice($"<color=#FF4444>사망 무효!</color> {invDur:F0}초 무적");
+                }
                 return;
             }
         }
@@ -226,7 +237,7 @@ public class PlayerController : CharacterBase
     //============================================================
     public IMoveAbility<PlayerController> MoveAbility { get; protected set; }
     public IDodgeAbility<PlayerController> DodgeAbility { get; protected set; }
-    public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
+    public IJumpAbility JumpAbility { get; protected set; }
 
     public Transform handTransform;
     public Transform handTransformLeft;
@@ -263,13 +274,13 @@ public class PlayerController : CharacterBase
     protected virtual void InitPassives() { }
 
     //============================================================
-    // Runtime Flags
+    // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
     //============================================================
-    public bool isGrounded { get; private set; }
-    public bool IsGrounded() => isGrounded;
+    public bool IsGrounded() => JumpAbility?.IsGrounded ?? true;
+    public bool IsJumping => JumpAbility?.IsJumping ?? false;
 
-    public bool isJumping { get; private set; }
-    public void SetJumping(bool value) { isJumping = value; }
+    /// <summary>착지 애니메이션 재생 중 여부. LocoAirState가 관리.</summary>
+    public bool IsLanding { get; set; }
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -357,8 +368,8 @@ public class PlayerController : CharacterBase
     {
         if (characterData == null) return;
 
-        UpdateGroundedCheck();
-        ApplyAirborneGravity();
+        JumpAbility?.UpdateGroundCheck(this);
+        JumpAbility?.ApplyGravity(this);
         FreezeRotation();
     }
 
@@ -532,7 +543,7 @@ public class PlayerController : CharacterBase
     {
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
-        JumpAbility = new DefaultJumpAbility();
+        JumpAbility = new DefaultJumpAbility(characterData);
     }
 
     //============================================================
@@ -813,90 +824,33 @@ public class PlayerController : CharacterBase
     public void OnAnimationEventTag(string tag) { /* 구현 */ }
 
     //============================================================
-    // Jump / Air Entry Flag
+    // Jump (모듈에 위임)
     //============================================================
-    public bool EnterAirAsJump { get; private set; } = false;
 
     /// <summary>공중 공격 1사이클 사용 여부. 착지 시 리셋.</summary>
     public bool AirAttackUsed { get; set; } = false;
 
-    [Header("Jump Settings")]
-    public float jumpForce = 6f;
-
     public void ProcessJump()
     {
-        if (Rigid == null) return;
-        // 이미 공중이면 점프 불가
-        if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
+        if (!IsGrounded()) return;
 
-        // 점프 의도 표시
-        EnterAirAsJump = true;
-        isJumping = true;
+        JumpAbility?.Jump(this);
 
-        // Rigidbody로 점프 힘 적용
-        Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
-        Rigid.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
+        // Jump가 쿨다운에 의해 무시됐으면 애니메이션도 스킵
+        if (!IsJumping) return;
 
-        // 상태 전환 요청
-        locoSM.Change(LocoState.Air);
+        // 즉시 점프 애니메이션 시작 (AirState 전이를 기다리지 않음)
+        Anim.SetFloat("JumpValue", 0f);
+        Anim.CrossFade("JumpBlend", 0.05f);
     }
-
-    public void ConsumeEnterAirAsJump()
-    {
-        EnterAirAsJump = false;
-    }
-
-    //============================================================
-    // Ground Check / Gravity
-    //============================================================
-    private void UpdateGroundedCheck()
-    {
-        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-        float rayLength = characterData.groundCheckDistance + 0.1f;
-
-        isGrounded =
-            Physics.Raycast(rayOrigin, Vector3.down, out var hit, rayLength, characterData.groundLayer) &&
-            hit.distance <= characterData.groundCheckDistance + 0.05f;
-
-        Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
-
-        // 착지 시점에 점프/공중공격 상태 초기화
-        if (isGrounded && isJumping)
-            isJumping = false;
-        if (isGrounded)
-            AirAttackUsed = false;
-    }
-
-    /// <summary>공중 공격 중 체공을 위한 중력 감소 비율 (0 = 무중력, 1 = 정상)</summary>
-    private const float AirAttackGravityScale = 0.05f;
 
     /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>
     public void StartAirHover()
     {
-        if (Rigid != null && !isGrounded)
+        if (Rigid != null && !IsGrounded())
         {
             Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
         }
-    }
-
-    private void ApplyAirborneGravity()
-    {
-        if (isGrounded || !Rigid) return;
-
-        float gravityMultiplier = characterData.gravity;
-        if (Rigid.linearVelocity.y < 0)
-            gravityMultiplier *= characterData.fallMultiplier;
-
-        // 공중 공격 중이면 체공 — AirAttackUsed(공중에서 공격 시작)이고 아직 공격 중일 때만
-        bool isAirAttacking = AirAttackUsed && Combo != null && Combo.IsAttacking;
-        if (isAirAttacking)
-        {
-            gravityMultiplier *= AirAttackGravityScale;
-            if (Rigid.linearVelocity.y < -1f)
-                Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, -1f, Rigid.linearVelocity.z);
-        }
-
-        Rigid.AddForce(Vector3.up * gravityMultiplier, ForceMode.Acceleration);
     }
 
     //============================================================

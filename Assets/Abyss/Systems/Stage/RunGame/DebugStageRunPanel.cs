@@ -12,6 +12,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
     [SerializeField] private KeyCode returnToStageMapKey = KeyCode.F6;
     [SerializeField] private KeyCode spawnItemKey = KeyCode.F7;
+    [SerializeField] private KeyCode cycleElementKey = KeyCode.F8;
 
     private bool _started;
 
@@ -39,8 +40,16 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         "item_wolf_claw",              // HP50%이하 공격력+20% (HPBelow50)
         "item_hansel_cookie",          // 방 클리어 시 체력3 회복 (OnRoomClear)
         "item_sleeping_beauty_spindle",// 피격 시 5% 무효화 (OnHit)
+        "item_snow_white_mirror",      // 피해 10% 반사 (OnHit)
+        "item_aladdin_carpet",         // 점프 착지 범위 피해 (OnJumpLand)
+        "item_black_wings",            // 사망무효 + 10초 무적 (OnNearDeath)
+        "item_excalibur_fragment",     // 10% 확률 추가 타격 (OnHit)
+        "item_ifrit_ring",             // 불 무기+스킬 → 화염 폭발 (WithFireWeapon)
+        "item_thor_hammer_fragment",   // 번개 무기+스킬 → 번개 강타 (WithLightningWeapon)
+        "item_three_witches_thread",   // 시너지 완성 → 다음 공격 원소 (OnRecipeComplete)
     };
     private int _spawnIndex;
+    private readonly System.Collections.Generic.HashSet<string> _spawnedIds = new();
 
     private void Update()
     {
@@ -50,6 +59,45 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             HandleReturnToStageMap();
         else if (Input.GetKeyDown(spawnItemKey))
             HandleSpawnItem();
+        else if (Input.GetKeyDown(cycleElementKey))
+            HandleCycleElement();
+    }
+
+    private static readonly WeaponElement[] ElementCycle =
+    {
+        WeaponElement.None,
+        WeaponElement.Fire,
+        WeaponElement.Water,
+        WeaponElement.Grass,
+        WeaponElement.Earth,
+        WeaponElement.Lightning,
+    };
+    private int _elementIndex;
+
+    private void HandleCycleElement()
+    {
+        var run = GetCurrentRun();
+        if (run?.Player?.WeaponManager == null) return;
+
+        var wd = run.Player.WeaponManager.CurrentWeaponData;
+        if (wd == null) return;
+
+        _elementIndex = (_elementIndex + 1) % ElementCycle.Length;
+        wd.element = ElementCycle[_elementIndex];
+
+        // 아이템 효과 컨텍스트 갱신
+        run.EffectManager?.RefreshContext(run.Player, run);
+
+        string name = ElementCycle[_elementIndex] switch
+        {
+            WeaponElement.Fire      => "불",
+            WeaponElement.Water     => "물",
+            WeaponElement.Grass     => "풀",
+            WeaponElement.Earth     => "땅",
+            WeaponElement.Lightning => "번개",
+            _                       => "무속성",
+        };
+        Debug.Log($"[DebugPanel] F8 → 무기 속성: {name}");
     }
 
     private void HandleClearRoom()
@@ -71,8 +119,28 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var run = GetCurrentRun();
         if (run == null || !run.IsRunning || run.Player == null) return;
 
-        string itemId = DebugSpawnItems[_spawnIndex % DebugSpawnItems.Length];
-        _spawnIndex++;
+        // 인벤토리 보유 또는 이미 스폰된 아이템을 건너뛰고 순환
+        var inventory = run.ItemInventory;
+        string itemId = null;
+        for (int i = 0; i < DebugSpawnItems.Length; i++)
+        {
+            string candidate = DebugSpawnItems[_spawnIndex % DebugSpawnItems.Length];
+            _spawnIndex++;
+
+            if (_spawnedIds.Contains(candidate)) continue;
+            if (inventory != null && inventory.HasItem(candidate)) continue;
+
+            itemId = candidate;
+            break;
+        }
+
+        if (itemId == null)
+        {
+            Debug.Log("[DebugSpawn] 모든 디버그 아이템을 이미 보유/스폰 중");
+            return;
+        }
+
+        _spawnedIds.Add(itemId);
 
         // ItemDataManager에서 데이터 조회
         var entries = Managers.ItemData?.GetItem(itemId);
@@ -93,12 +161,15 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
         if (data == null) return;
 
+        // SO 조회
+        var so = ItemSORegistry.Find(itemId);
+
         // 플레이어 앞 5m에 스폰
         var playerT = run.Player.transform;
         Vector3 spawnPos = playerT.position + playerT.forward * 5f + Vector3.up * 0.5f;
 
-        WorldItemDisplay.SpawnFromData(data, spawnPos);
-        Debug.Log($"[DebugSpawn] F7 → {data.displayName} ({data.effects.Count}개 효과) at {spawnPos}");
+        WorldItemDisplay.SpawnFromData(data, spawnPos, so: so);
+        Debug.Log($"[DebugSpawn] F7 → {data.displayName} ({data.effects.Count}개 효과) SO={so != null} at {spawnPos}");
     }
 
     private static RuntimeItemData CreateFallbackItem(string itemId)
@@ -161,6 +232,41 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         // StageMap 선택 단계를 건너뛰므로 직접 전투 모드로 전환
         // (정상 플로우에서는 방 선택 시 NotifyCombatStarted()가 호출됨)
         bootstrapper.Run?.NotifyCombatStarted();
+    }
+
+    // ── 디버그 키 가이드 UI ────────────────────────────────
+
+    private void OnGUI()
+    {
+        var run = GetCurrentRun();
+        if (run == null || !run.IsRunning) return;
+
+        string element = "무속성";
+        var wd = run.Player?.WeaponManager?.CurrentWeaponData;
+        if (wd != null)
+        {
+            element = wd.element switch
+            {
+                WeaponElement.Fire      => "<color=#FF6622>불</color>",
+                WeaponElement.Water     => "<color=#4488FF>물</color>",
+                WeaponElement.Grass     => "<color=#44CC44>풀</color>",
+                WeaponElement.Earth     => "<color=#CC8844>땅</color>",
+                WeaponElement.Lightning => "<color=#44CCFF>번개</color>",
+                _                       => "무속성",
+            };
+        }
+
+        var style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 13,
+            richText = true,
+        };
+        style.normal.textColor = Color.white;
+
+        float x = 10f, y = Screen.height - 120f;
+        GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5]</b> 방 클리어  <b>[F6]</b> StageMap", style);
+        GUI.Label(new Rect(x, y + 20, 300, 20), $"<b>[F7]</b> 아이템 스폰", style);
+        GUI.Label(new Rect(x, y + 40, 300, 20), $"<b>[F8]</b> 무기 속성 변경: {element}", style);
     }
 
     /// <summary>

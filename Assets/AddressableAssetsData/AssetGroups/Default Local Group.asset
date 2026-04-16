@@ -25,6 +25,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 07757cf211bd45044a1f1917658b9e66
+    m_Address: VFX_ExtraAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0987dfb5814de5043844d6dba2e8f3cf
+    m_Address: ItemSODatabase
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0bdc4f93d54360d49b90f631f2fafda8
     m_Address: MushroomAngry/MushroomAngryConfig
     m_ReadOnly: 0
@@ -82,6 +92,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3c2a12c38afca0148926006ebf1a2deb
     m_Address: '@UIRoot'
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4142df55bc257a045bfc97c60ca08f7b
+    m_Address: VFX_DeathNegateAura
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -170,6 +185,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a915dbbc4b23bf4f931629039cfbf6f
+    m_Address: VFX_FireExplosion
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8cde3e9432e4f0f4f820c950b41fa90f
     m_Address: MushroomAngry/MushroomAngry
     m_ReadOnly: 0
@@ -217,6 +237,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: abba52759e998eb48a4901aba11335ec
     m_Address: Dragon/Dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ac3815a3a11e2d84eaa1152c92adad04
+    m_Address: VFX_DamageReflect
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -271,6 +296,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d79f03dd3c9b07c41a430faecdcdf500
+    m_Address: VFX_JumpLandingDamage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db18c22cee80cc74487b0900361715f6
     m_Address: StageUI
     m_ReadOnly: 0
@@ -283,6 +313,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: de8e8903180e44f43b3c16a0e06a0765
     m_Address: NagaWizard/NagaWizardConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dfabbd05c7735314e97de47b3d7695c4
+    m_Address: VFX_LightningStrike
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

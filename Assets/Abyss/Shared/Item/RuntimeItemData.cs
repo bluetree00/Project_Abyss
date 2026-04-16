@@ -55,7 +55,7 @@ public class RuntimeItemData
         return data;
     }
 
-    /// <summary>서버 ItemEntry 목록에서 생성.</summary>
+    /// <summary>서버 ItemEntry 목록에서 생성. SO가 있으면 표시 정보 병합.</summary>
     public static RuntimeItemData FromServer(List<ItemEntry> entries)
     {
         if (entries == null || entries.Count == 0) return null;
@@ -74,26 +74,49 @@ public class RuntimeItemData
             cooldown    = meta.cooldown,
         };
 
-        // rarity 파싱
-        switch (meta.rarity)
+        // CSV rarity 파싱 (값이 있으면 적용)
+        bool hasCSVRarity = !string.IsNullOrEmpty(meta.rarity);
+        if (hasCSVRarity)
         {
-            case "Common": data.rarity = ItemRarity.Common; break;
-            case "Rare":   data.rarity = ItemRarity.Rare;   break;
-            case "Epic":   data.rarity = ItemRarity.Epic;    break;
-            default:       data.rarity = ItemRarity.Common;  break;
+            data.rarity = meta.rarity switch
+            {
+                "Rare" => ItemRarity.Rare,
+                "Epic" => ItemRarity.Epic,
+                _      => ItemRarity.Common,
+            };
         }
 
-        // category 파싱
-        switch (meta.category)
+        // CSV category 파싱 (값이 있으면 적용)
+        bool hasCSVCategory = !string.IsNullOrEmpty(meta.category);
+        if (hasCSVCategory)
         {
-            case "Ring":     data.category = ItemCategory.Ring;     break;
-            case "Necklace": data.category = ItemCategory.Necklace; break;
-            case "Boots":    data.category = ItemCategory.Boots;    break;
-            case "Gloves":   data.category = ItemCategory.Gloves;   break;
-            case "Belt":     data.category = ItemCategory.Belt;     break;
-            case "Charm":    data.category = ItemCategory.Charm;    break;
-            case "Active":   data.category = ItemCategory.Active;   break;
-            default:         data.category = ItemCategory.Ring;      break;
+            data.category = meta.category switch
+            {
+                "Necklace" => ItemCategory.Necklace,
+                "Boots"    => ItemCategory.Boots,
+                "Gloves"   => ItemCategory.Gloves,
+                "Belt"     => ItemCategory.Belt,
+                "Charm"    => ItemCategory.Charm,
+                "Active"   => ItemCategory.Active,
+                _          => ItemCategory.Ring,
+            };
+        }
+
+        // SO 병합 — CSV에 없는 표시 정보를 SO에서 채움
+        var so = ItemSORegistry.Find(meta.ResolvedId);
+        if (so != null)
+        {
+            if (so.icon != null) data.icon = so.icon;
+            if (!string.IsNullOrEmpty(so.iconKey) && string.IsNullOrEmpty(data.iconKey))
+                data.iconKey = so.iconKey;
+            if (string.IsNullOrEmpty(data.displayName))
+                data.displayName = so.displayName;
+            if (!hasCSVRarity)
+                data.rarity = so.rarity;
+            if (!hasCSVCategory)
+                data.category = so.category;
+            if (data.shapeId == 0 && so.shapeId > 0)
+                data.shapeId = so.shapeId;
         }
 
         // 효과 슬롯
