@@ -22,13 +22,32 @@ AnimatorController:
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
-
-# ── 기본 상태 ────────────────────────────────────────────────
-# Clip 매핑:
-#   AngryIdle           guid: 650fd53f5d8edcc4393c3fecf0676754  (대기)
-#   AngryIdleBreak      guid: 3f6dabf8afa51fc41be044418efca342  (전환/수비/마법 준비)
-#   Charge              guid: 38a80ffdbd66cad46a9559f4b30531a3  (모든 공격)
-#   SlowWalkToStandIdle guid: 119a7af9fbf49744da3af593c08c856b  (이동/착지/회복)
+# ── 클립 출처: Assets/_ThirdParty/Magic Pig Games (Infinity PBR)/Characters/Treant/Animations/ ──
+# 매핑표:
+#  Idle_Normal / IdleNormal / AttackReady → Treant@AngryIdle
+#  MoveBlend                              → Treant@SlowWalk
+#  Attack01                               → Treant@PunchBig
+#  Attack02                               → Treant@PunchSmall
+#  GetHit                                 → Treant@GotHit01-Right
+#  Die                                    → Treant@Death01
+#  PunchBig                               → Treant@PunchBig
+#  PunchSmall                             → Treant@PunchSmall
+#  SmashAttack                            → Treant@GorillaSmashAttack
+#  MagicAttack1/2/3                       → Treant@MagicAttack1/2/3
+#  GrabAndThrowAttack                     → Treant@GrabAndThrowAttack
+#  GrabBiteShakeSpit                      → Treant@GrabBiteShakeSpit
+#  VerticalAttack                         → Treant@VerticalAttack
+#  ChargeTackleStart                      → Treant@ChargeTackle01
+#  ChargeTackleStop                       → Treant@ChargeTackle03
+#  360SpinKick / 720SpinKick              → Treant@360SpinKick / 720SpinKick
+#  JumpUp                                 → Treant@ClapAttack
+#  FallDown                               → Treant@Charge
+#  Land                                   → Treant@SlowWalkToStandingIdle
+#  Explode                                → Treant@PunchSmash
+#  BurstAttack                            → Treant@PunchSwing
+#  Summon                                 → Treant@Taunt
+#  TiredStart                             → Treant@AngryIdleTired
+#  TiredStop                              → Treant@SlowWalkToStandingIdle
 
 --- !u!1102 &2000000001
 AnimatorState:
@@ -50,7 +69,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 650fd53f5d8edcc4393c3fecf0676754, type: 3}
+  m_Motion: {fileID: 7400000, guid: 6299a097c77cf5e48a54fcca4098dc73, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -76,7 +95,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 119a7af9fbf49744da3af593c08c856b, type: 3}
+  m_Motion: {fileID: 7400000, guid: bd27c7331fae14c42b4518bffc443f42, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -102,7 +121,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 650fd53f5d8edcc4393c3fecf0676754, type: 3}
+  m_Motion: {fileID: 7400000, guid: 6299a097c77cf5e48a54fcca4098dc73, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -128,7 +147,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 095c429787212a24ca7d75ff17542d45, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -154,7 +173,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 2f7a8312ed0335948bf37ee269f36d76, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -180,7 +199,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: f082f5a41feb5484a8d6f5806b7c8890, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -206,14 +225,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 119a7af9fbf49744da3af593c08c856b, type: 3}
+  m_Motion: {fileID: 7400000, guid: 0b94c21961e8b2043b595eb1106500c3, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGFrontalStrike ───────────────────────────────
 --- !u!1102 &2000000009
 AnimatorState:
   serializedVersion: 6
@@ -234,7 +251,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 095c429787212a24ca7d75ff17542d45, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -260,14 +277,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 2f7a8312ed0335948bf37ee269f36d76, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGFrontalDefense ──────────────────────────────
 --- !u!1102 &2000000011
 AnimatorState:
   serializedVersion: 6
@@ -288,14 +303,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 3d93abfccac92f44a9204a8f68a1c887, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGLicheBall ───────────────────────────────────
 --- !u!1102 &2000000012
 AnimatorState:
   serializedVersion: 6
@@ -316,7 +329,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: 81b3f191c610ea54caedb4d56a1a0b0e, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -342,14 +355,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: ecf59fa7cf679c1499de08ac93a9b625, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGLicheFloodIES ──────────────────────────────
 --- !u!1102 &2000000014
 AnimatorState:
   serializedVersion: 6
@@ -370,14 +381,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: b033368d5a7e12d499fffdb16b902853, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGLicheBreath ─────────────────────────────────
 --- !u!1102 &2000000015
 AnimatorState:
   serializedVersion: 6
@@ -398,7 +407,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 5a1f3fdb5545d2f4fa4b649758b9de07, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -424,14 +433,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: a4408b3fa76c10c4a9cb5fc379e825d4, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGLicheMissile ────────────────────────────────
 --- !u!1102 &2000000017
 AnimatorState:
   serializedVersion: 6
@@ -452,14 +459,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 68a1365853b7dab4882a4412714b5b12, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGSpiderCombo ─────────────────────────────────
 --- !u!1102 &2000000018
 AnimatorState:
   serializedVersion: 6
@@ -480,7 +485,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 5adc946b14e4a59419cd380dbf1dc166, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -506,14 +511,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 119a7af9fbf49744da3af593c08c856b, type: 3}
+  m_Motion: {fileID: 7400000, guid: d68a513f9c1cc544aad750cda76ccd66, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FormChange ────────────────────────────────────
 --- !u!1102 &2000000020
 AnimatorState:
   serializedVersion: 6
@@ -534,14 +537,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 650fd53f5d8edcc4393c3fecf0676754, type: 3}
+  m_Motion: {fileID: 7400000, guid: 6299a097c77cf5e48a54fcca4098dc73, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGSpiderDash ──────────────────────────────────
 --- !u!1102 &2000000021
 AnimatorState:
   serializedVersion: 6
@@ -562,7 +563,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 43b96b8d51ee4764aa61e53269315e49, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -588,14 +589,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: e2493696baa439a428e07d996eb84aca, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGThornAirDrop / FGThornForceBurstA ──────────
 --- !u!1102 &2000000023
 AnimatorState:
   serializedVersion: 6
@@ -616,7 +615,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: 8b5ac254b41555048b976e7f420c7501, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -642,7 +641,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: da58ab236db3f4f45be6fb597f97918c, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -668,14 +667,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 119a7af9fbf49744da3af593c08c856b, type: 3}
+  m_Motion: {fileID: 7400000, guid: 75dfda9b1425648f79c3d8f1917d8dff, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGThornForceBurstA ───────────────────────────
 --- !u!1102 &2000000026
 AnimatorState:
   serializedVersion: 6
@@ -696,14 +693,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: 02731bb34fe53c049ba1331e796d2417, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGThornForceBurstB ───────────────────────────
 --- !u!1102 &2000000027
 AnimatorState:
   serializedVersion: 6
@@ -724,14 +719,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 38a80ffdbd66cad46a9559f4b30531a3, type: 3}
+  m_Motion: {fileID: 7400000, guid: fe76b41d008a7d949b13bb241962ed51, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGThornGoldenSummon ──────────────────────────
 --- !u!1102 &2000000028
 AnimatorState:
   serializedVersion: 6
@@ -752,14 +745,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: 39e5e2c5294c48949b38f0104a7f363a, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── 패턴 상태: FGFormChange (페이즈 전환) ───────────────────
 --- !u!1102 &2000000029
 AnimatorState:
   serializedVersion: 6
@@ -780,7 +771,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 3f6dabf8afa51fc41be044418efca342, type: 3}
+  m_Motion: {fileID: 7400000, guid: eb9900f17c74efa49a11e802061e9fa4, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
@@ -806,14 +797,12 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 119a7af9fbf49744da3af593c08c856b, type: 3}
+  m_Motion: {fileID: 7400000, guid: 75dfda9b1425648f79c3d8f1917d8dff, type: 3}
   m_Tag:
   m_SpeedParameter:
   m_MirrorParameter:
   m_CycleOffsetParameter:
   m_TimeParameter:
-
-# ── StateMachine ─────────────────────────────────────────────
 --- !u!1107 &2000000008
 AnimatorStateMachine:
   serializedVersion: 6
