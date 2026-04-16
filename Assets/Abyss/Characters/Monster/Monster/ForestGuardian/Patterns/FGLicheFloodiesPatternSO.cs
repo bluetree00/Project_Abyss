@@ -3,127 +3,186 @@ using UnityEngine;
 namespace Abyss.Monster
 {
 /// <summary>
-/// 리체 폼 패턴 — 리체 플러디즈.
-/// 플레이어 주변 랜덤 오프셋 2개 위치에 트랩 소환(반경 4m, 3초 유지 후 피해).
+/// 브레스 패턴 (2페이즈 전용).
+///
+/// 보스 정면으로 브레스를 직선 발사하며 플레이어 방향으로 회전 추적.
+/// 사정거리 10m, 가로 1m, 회전 속도 60°/s, 지속 3.5초.
+/// 플레이어는 달려야 피할 수 있음.
 /// </summary>
 [CreateAssetMenu(fileName = "FGLicheFloodiesPatternSO",
-                 menuName  = "Abyss/Boss/ForestGuardian/Liche/LicheFloodies")]
-public class FGLicheFloodiesPatternSO : BossPatternSO
+                 menuName  = "Abyss/Boss/ForestGuardian/Breath")]
+public class FGBreathPatternSO : BossPatternSO
 {
     [Header("애니메이션")]
-    [SerializeField] private string animStateName = "Magic03";
-    [SerializeField] private float  crossFade     = 0.15f;
+    [SerializeField] private string animName  = "MagicAttack3";
+    [SerializeField] private float  crossFade = 0.1f;
 
     [Header("VFX")]
-    [SerializeField] private GameObject vfxTrapPrefab;
+    [SerializeField] private GameObject vfxBreath;
+    [SerializeField] private Vector3    breathLocalOffset = new Vector3(0f, 1.2f, 1.5f);
 
-    [Header("트랩 설정")]
-    [SerializeField] private float trapRadius       = 4f;
-    [SerializeField] private float trapDuration     = 3f;
-    [SerializeField] private float offsetRangeMin   = 1.5f;
-    [SerializeField] private float offsetRangeMax   = 4f;
+    [Header("브레스 설정")]
+    [SerializeField] private float warningDuration  = 1.0f;
+    [SerializeField] private float breathDuration   = 3.5f;
+    [SerializeField] private float castRadius       = 0.5f;    // SphereCast 반경 (가로 1m)
+    [SerializeField] private float castMaxDist      = 10f;
+    [SerializeField] private float tickInterval     = 0.2f;
 
-    private FGLicheFloodiesState _state;
+    [Header("회전")]
+    [SerializeField] private float aimTurnSpeed    = 120f;
+    [SerializeField] private float breathTurnSpeed = 60f;      // 추적 회전 속도
+
+    [Header("쿨다운")]
+    [SerializeField] private float patternCooldown = 15f;
+
+    private float _cooldownEndTime = float.MinValue;
+    private FGBreathState _state;
 
     public override void Initialize(BossPatternContext ctx)
-        => _state = new FGLicheFloodiesState(this);
+    {
+        _cooldownEndTime = float.MinValue;
+        _state = new FGBreathState(this);
+    }
 
-    public override bool CanExecute(BossPatternContext ctx) => true;
+    public override bool CanExecute(BossPatternContext ctx)
+    {
+        if (Time.time < _cooldownEndTime) return false;
+        // 2페이즈 전용
+        var fg = (ctx.Ctx.Monster as ForestGuardianMonster)?.FGBlackboard;
+        return fg != null && fg.IsPhase2;
+    }
 
     public override SpecialStateBase GetRuntimeState() => _state;
+    internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
 
-    // ── 내부 상태 ────────────────────────────────────────────────────
+    // ── 내부 상태 ─────────────────────────────────────────────────────
 
-    private sealed class FGLicheFloodiesState : FullLockState<FGLicheFloodiesPatternSO>
+    private sealed class FGBreathState : FullLockState<FGBreathPatternSO>
     {
-        private float   _timer;
-        private bool    _attacked;
-        private Vector3 _pos1;
-        private Vector3 _pos2;
-        private GameObject _vfx1;
-        private GameObject _vfx2;
+        private int        _phase;        // 0=조준, 1=브레스
+        private float      _timer;
+        private float      _tickTimer;
+        private GameObject _activeVfx;
 
-        public FGLicheFloodiesState(FGLicheFloodiesPatternSO data) : base(data) { }
+        public FGBreathState(FGBreathPatternSO data) : base(data) { }
 
         public override void Enter(MonsterContext ctx)
         {
             ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
-            _timer   = 0f;
-            _attacked = false;
 
-            // 플레이어 위치 기준 랜덤 오프셋 2개
-            Vector3 playerPos = ctx.Runtime.PlayerTarget != null
-                ? ctx.Runtime.PlayerTarget.position
-                : ctx.Transform.position + ctx.Transform.forward * 3f;
+            if (ctx.Animator != null)
+                ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
-            _pos1 = playerPos + RandomOffset(Data.offsetRangeMin, Data.offsetRangeMax);
-            _pos2 = playerPos + RandomOffset(Data.offsetRangeMin, Data.offsetRangeMax);
-
-            // 경고 원 2개
-            MonsterGroundWarning.Spawn(_pos1, Data.trapRadius, Data.trapDuration,
-                new Color(0.8f, 0.2f, 1f, 0.9f));
-            MonsterGroundWarning.Spawn(_pos2, Data.trapRadius, Data.trapDuration,
-                new Color(0.8f, 0.2f, 1f, 0.9f));
-
-            // VFX 소환
-            if (Data.vfxTrapPrefab != null)
-            {
-                _vfx1 = BossEffectPool.Spawn(Data.vfxTrapPrefab, _pos1, Quaternion.identity);
-                _vfx2 = BossEffectPool.Spawn(Data.vfxTrapPrefab, _pos2, Quaternion.identity);
-            }
-
-            if (ctx.Animator != null && !string.IsNullOrEmpty(Data.animStateName))
-                ctx.Animator.CrossFade(Data.animStateName, Data.crossFade);
+            _phase     = 0;
+            _timer     = 0f;
+            _tickTimer = 0f;
         }
 
         public override void Update(MonsterContext ctx)
         {
             _timer += Time.deltaTime;
 
-            if (!_attacked && _timer >= Data.trapDuration)
+            // ── phase 0: 조준 ─────────────────────────────────────
+            if (_phase == 0)
             {
-                _attacked = true;
-                ApplyHit(ctx, _pos1);
-                ApplyHit(ctx, _pos2);
+                FacePlayer(ctx, Data.aimTurnSpeed);
+                SpawnBreathWarning(ctx, 0.25f);
 
-                if (_vfx1 != null) BossEffectPool.Release(_vfx1);
-                if (_vfx2 != null) BossEffectPool.Release(_vfx2);
+                if (_timer < Data.warningDuration) return;
+
+                // 브레스 VFX 활성화
+                if (Data.vfxBreath != null)
+                {
+                    _activeVfx = BossEffectPool.Spawn(
+                        Data.vfxBreath,
+                        ctx.Transform.position,
+                        ctx.Transform.rotation,
+                        ctx.Transform,
+                        false);
+                    if (_activeVfx != null)
+                    {
+                        _activeVfx.transform.localPosition = Data.breathLocalOffset;
+                        _activeVfx.transform.localRotation = Quaternion.identity;
+                    }
+                }
+
+                _phase     = 1;
+                _timer     = 0f;
+                _tickTimer = 0f;
+                return;
             }
 
-            if (_timer >= Data.trapDuration + 0.4f)
+            // ── phase 1: 브레스 발사 ──────────────────────────────
+            FacePlayer(ctx, Data.breathTurnSpeed);
+
+            _tickTimer += Time.deltaTime;
+            if (_tickTimer >= Data.tickInterval)
+            {
+                _tickTimer = 0f;
+                SpawnBreathWarning(ctx, Data.tickInterval + 0.05f);
+                DoBreathHit(ctx);
+            }
+
+            if (_timer >= Data.breathDuration)
                 ctx.Monster.ChangeState<PatrolState>();
         }
 
         public override void Exit(MonsterContext ctx)
         {
-            if (_vfx1 != null) BossEffectPool.Release(_vfx1);
-            if (_vfx2 != null) BossEffectPool.Release(_vfx2);
+            if (_activeVfx != null)
+            {
+                BossEffectPool.Release(_activeVfx);
+                _activeVfx = null;
+            }
+            Data.StartCooldown();
         }
 
-        private void ApplyHit(MonsterContext ctx, Vector3 pos)
+        private void SpawnBreathWarning(MonsterContext ctx, float duration)
         {
-            int   damage  = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
-            float kbForce = ctx.Stat.knockbackForce;
-            var hits = Physics.OverlapSphere(pos, Data.trapRadius);
-            foreach (var col in hits)
-            {
-                var player = col.GetComponent<PlayerController>()
-                          ?? col.GetComponentInParent<PlayerController>();
-                if (player == null) continue;
+            Vector3 fwd = GetFlatForward(ctx);
+            Vector3 origin = ctx.Transform.position;
+            MonsterGroundWarning.SpawnRect(
+                origin, fwd,
+                Data.castRadius * 2f, Data.castMaxDist,
+                duration,
+                new Color(0.2f, 0.8f, 0.2f, 0.7f));
+        }
 
+        private void DoBreathHit(MonsterContext ctx)
+        {
+            Vector3 origin = ctx.Transform.position + Vector3.up * 1.2f + ctx.Transform.forward * 1f;
+            Vector3 fwd    = GetFlatForward(ctx);
+            int damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * 0.4f);
+
+            var hits = Physics.SphereCastAll(origin, Data.castRadius, fwd, Data.castMaxDist);
+            foreach (var hit in hits)
+            {
+                var player = hit.collider.GetComponent<PlayerController>()
+                          ?? hit.collider.GetComponentInParent<PlayerController>();
+                if (player == null) continue;
                 player.TakeDamage(damage);
-                Vector3 dir = (col.transform.position - pos).normalized;
-                dir.y = 0.3f;
-                player.ApplyKnockback(dir.normalized * kbForce);
+                break;
             }
         }
 
-        private static Vector3 RandomOffset(float minR, float maxR)
+        private static void FacePlayer(MonsterContext ctx, float speed)
         {
-            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-            float dist  = Random.Range(minR, maxR);
-            return new Vector3(Mathf.Cos(angle) * dist, 0f, Mathf.Sin(angle) * dist);
+            if (ctx.Runtime.PlayerTarget == null) return;
+            Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.001f) return;
+            ctx.Transform.rotation = Quaternion.RotateTowards(
+                ctx.Transform.rotation,
+                Quaternion.LookRotation(dir.normalized),
+                speed * Time.deltaTime);
+        }
+
+        private static Vector3 GetFlatForward(MonsterContext ctx)
+        {
+            Vector3 fwd = ctx.Transform.forward;
+            fwd.y = 0f;
+            return fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
         }
     }
 }

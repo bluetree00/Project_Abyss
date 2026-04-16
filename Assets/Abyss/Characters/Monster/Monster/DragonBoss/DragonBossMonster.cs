@@ -74,6 +74,8 @@ public class DragonBossMonster : MonsterBase, IBoss
 
         _dbBlackboard = new DragonBossBlackboard();
         _dbBlackboard.Init(() => HpRatio);
+        // OnInitialized는 WaitForNavMeshAsync 완료 후 호출되므로
+        // 이 시점의 transform.position은 NavMesh 위에 Warp된 실제 위치
         _dbBlackboard.SpawnPosition = transform.position;
         _dbBlackboard.SpawnY = transform.position.y;
         _coreBlackboard = new BossAttackBlackboard();

@@ -35,11 +35,22 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
     [SerializeField] private float tornadoStartRadius = 12f;
     [SerializeField] private float tornadoSpeed = 3.5f;
 
+    [Header("Cooldown")]
+    [SerializeField] private float patternCooldown = 25f;
+
+    private float _cooldownEndTime = -999f;
     private FireDragonBreathState _state;
 
-    public override void Initialize(BossPatternContext ctx) => _state = new FireDragonBreathState(this);
+    public override void Initialize(BossPatternContext ctx) { _cooldownEndTime = float.MinValue; _state = new FireDragonBreathState(this); }
 
-    public override bool CanExecute(BossPatternContext ctx) => true;
+    public override bool CanExecute(BossPatternContext ctx)
+    {
+        if (Time.time < _cooldownEndTime) return false;
+        var dragon = ctx.Boss as DragonBossMonster;
+        return dragon == null || dragon.DBBlackboard.CurrentElement == DragonBossBlackboard.DragonElement.Fire;
+    }
+
+    internal void StartCooldown() => _cooldownEndTime = Time.time + patternCooldown;
 
     public override SpecialStateBase GetRuntimeState() => _state;
 
@@ -118,11 +129,13 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
             var fireColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
 
 
-            // 8방향 토네이도 시작 위치 사전 계산 + 경고 장판
+            // 8방향 토네이도 시작 위치 사전 계산 + 경고 장판 (실제 지면 y에 스냅)
             for (int i = 0; i < s_angles.Length; i++)
             {
                 Vector3 dir = Quaternion.Euler(0f, s_angles[i], 0f) * Vector3.forward;
-                _tornadoPositions[i] = center + dir * Data.tornadoStartRadius;
+                Vector3 rawPos = center + dir * Data.tornadoStartRadius;
+                rawPos.y = DragonBossVisualHelper.GetGroundY(rawPos);
+                _tornadoPositions[i] = rawPos;
                 MonsterGroundWarning.Spawn(
                     _tornadoPositions[i],
                     Data.tornadoRadius,
@@ -228,7 +241,7 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
             {
                 _breathTick -= Data.breathTickInterval;
                 Vector3 warnPos = _beamTarget;
-                warnPos.y = _anchorPosition.y;
+                warnPos.y = DragonBossVisualHelper.GetGroundY(_beamTarget);
                 var fireWarnColor = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
                 MonsterGroundWarning.Spawn(warnPos, Data.castRadius, Data.breathTickInterval + 0.05f, fireWarnColor);
                 DoBreathHit(ctx);
@@ -264,6 +277,7 @@ public class DBFireDragonBreathPatternSO : BossPatternSO
             }
 
             DestroyBeam();
+            Data.StartCooldown();
         }
 
         private void UpdateTornadoes(MonsterContext ctx)

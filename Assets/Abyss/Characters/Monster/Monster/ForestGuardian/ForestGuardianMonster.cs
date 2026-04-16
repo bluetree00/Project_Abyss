@@ -4,10 +4,18 @@ using UnityEngine;
 namespace Abyss.Monster
 {
 /// <summary>
-/// 숲의 정원사꾼 (ForestGuardian) 보스 MonoBehaviour.
+/// 왕의 정원 파수꾼 (ForestGuardian) 보스 MonoBehaviour.
 ///
-/// 3가지 폼(리체/스파이더/가시)을 가지며, 2패턴마다 폼 전환을 수행한다.
-/// HP 80% 이하부터 폼 전환이 활성화된다.
+/// ─ 페이즈 ─────────────────────────────────────────────────────
+///  Phase1 (HP 100%~50%) → Phase2 (HP 50%~0%)
+///  HP ≤ 50% 감지 시 PhaseChangePending = true → forceExecute 엔트리가 FGPhaseTransitionPatternSO 발동
+///  Phase2 진입 후 이동속도 1.25x, 애니 속도 1.2x 적용
+///
+/// ─ 패턴 엔트리 ─────────────────────────────────────────────────
+///  Entry 0 (forceExecute) : PhaseChangePending → FGPhaseTransitionPatternSO
+///  Entry 1 (Close ≤5m)    : Punch, GroundSlam, GrabThrow
+///  Entry 2 (Far  ≥5m)     : SpinKick, Charge, RockThrow, Breath, GroundSlash
+///  Entry 3 (fallback)     : SpinKick, Punch  — 조건 없음, 항상 평가
 /// </summary>
 public class ForestGuardianMonster : MonsterBase, IBoss
 {
@@ -19,7 +27,11 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     protected override float  HPBarHeadOffset => 0.3f;
     protected override bool   UseWorldHPBar   => false;
 
-    // ── IBoss ────────────────────────────────────────────────────────
+    [Header("페이즈 머티리얼")]
+    [SerializeField] private Material[] _phase1Materials;
+    [SerializeField] private Material[] _phase2Materials;
+
+    // ── IBoss ─────────────────────────────────────────────────
     public float HpRatio =>
         (_runtime != null && _config != null && _config.stat.maxHp > 0)
         ? (float)_runtime.CurrentHp / _config.stat.maxHp
@@ -27,38 +39,44 @@ public class ForestGuardianMonster : MonsterBase, IBoss
 
     public BossAttackBlackboard Blackboard => _coreBlackboard;
 
-    // ── ForestGuardian 전용 ──────────────────────────────────────────
-    /// <summary>폼 및 패턴 카운트 블랙보드. 패턴 SO에서 폼 판단 시 접근.</summary>
+    // ── ForestGuardian 전용 ────────────────────────────────────
+    /// <summary>패턴 SO에서 페이즈 판단 및 그로기 접근 시 사용.</summary>
     public ForestGuardianBlackboard FGBlackboard => _fgBlackboard;
 
     private ForestGuardianBlackboard _fgBlackboard;
     private BossAttackBlackboard     _coreBlackboard;
     private BossPatternRunner        _runner;
     private BossPatternContext       _patternCtx;
+    private BossConfigSO             _bossConfig;
+    private bool                     _phase2SpeedApplied;
+    private float                    _phase1BreakMin;
+    private float                    _phase1BreakMax;
+    private SkinnedMeshRenderer      _meshRenderer;
 
-    // ── 커스텀 ICondition ────────────────────────────────────────────
+    // ── 커스텀 ICondition ────────────────────────────────────────
 
-    /// <summary>FormChangePending == true 일 때 참.</summary>
-    private sealed class FormChangePendingCondition : ICondition
+    private sealed class FGPhaseChangePendingCondition : ICondition
     {
         private readonly ForestGuardianBlackboard _bb;
-        public FormChangePendingCondition(ForestGuardianBlackboard bb) => _bb = bb;
-        public bool Evaluate(BossPatternContext ctx) => _bb.FormChangePending;
+        public FGPhaseChangePendingCondition(ForestGuardianBlackboard bb) => _bb = bb;
+        public bool Evaluate(BossPatternContext ctx) => _bb.PhaseChangePending;
     }
 
-    /// <summary>CurrentForm == 지정 폼일 때 참.</summary>
-    private sealed class CurrentFormCondition : ICondition
+    private sealed class FGIsPhase2Condition : ICondition
     {
-        private readonly ForestGuardianBlackboard          _bb;
-        private readonly ForestGuardianBlackboard.BossForm _form;
-        public CurrentFormCondition(
-            ForestGuardianBlackboard bb,
-            ForestGuardianBlackboard.BossForm form)
-        { _bb = bb; _form = form; }
-        public bool Evaluate(BossPatternContext ctx) => _bb.CurrentForm == _form;
+        private readonly ForestGuardianBlackboard _bb;
+        public FGIsPhase2Condition(ForestGuardianBlackboard bb) => _bb = bb;
+        public bool Evaluate(BossPatternContext ctx) => _bb.IsPhase2;
     }
 
-    // ── 초기화 ──────────────────────────────────────────────────────
+    private sealed class FGIsGroggyCondition : ICondition
+    {
+        private readonly ForestGuardianBlackboard _bb;
+        public FGIsGroggyCondition(ForestGuardianBlackboard bb) => _bb = bb;
+        public bool Evaluate(BossPatternContext ctx) => _bb.IsGroggy;
+    }
+
+    // ── 초기화 ───────────────────────────────────────────────────
 
     protected override void OnInitialized()
     {
@@ -69,8 +87,15 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             return;
         }
 
-        _fgBlackboard   = new ForestGuardianBlackboard();
-        _coreBlackboard = new BossAttackBlackboard();
+        _bossConfig         = bossConfig;
+        _fgBlackboard       = new ForestGuardianBlackboard();
+        _coreBlackboard     = new BossAttackBlackboard();
+        _phase2SpeedApplied = false;
+        _phase1BreakMin     = bossConfig.patternBreakDurationMin;
+        _phase1BreakMax     = bossConfig.patternBreakDurationMax;
+
+        _meshRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+        ApplyMaterials(_phase1Materials);
 
         _patternCtx = new BossPatternContext
         {
@@ -79,10 +104,8 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             Blackboard = _coreBlackboard,
         };
 
-        // BuiltConditions 직접 조립
         BuildPatternConditions(bossConfig);
 
-        // 각 패턴 SO Initialize
         if (bossConfig.patternEntries != null)
         {
             foreach (var entry in bossConfig.patternEntries)
@@ -101,46 +124,75 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             changeState: s  => ChangeState(s),
             onExecuted:  p  =>
             {
-                _coreBlackboard.LastPatternTag = p.patternTag;
+                _coreBlackboard.LastPatternTag  = p.patternTag;
                 _coreBlackboard.NormalModeTimer = 0f;
-                _fgBlackboard.OnPatternExecuted(HpRatio);
             });
 
         BindBossHud();
     }
 
     /// <summary>
-    /// patternEntries 인덱스별 BuiltConditions 조립.
+    /// Config asset의 entry.conditions(BossConditionKey 열거형 리스트)를 읽어
+    /// 런타임 ICondition[] 배열로 조립. DragonBossMonster와 동일한 방식.
     ///
-    /// Entry 0 (forceExecute): 폼 전환  — FormChangePending
-    /// Entry 1               : 정면 타격 — DistToPlayer &lt;= 2m
-    /// Entry 2               : 정면 방어 — DistToPlayer >= 4m
-    /// Entry 3               : 리체 패턴 — CurrentForm == Liche
-    /// Entry 4               : 스파이더  — CurrentForm == Spider
-    /// Entry 5               : 가시 패턴 — CurrentForm == Thorn
-    /// Entry 6               : fallback  — 항상 참 (BuiltConditions 비움)
+    /// 공용 키 (0~5) : Phase2, Dist_Close, Dist_Far, AfterBackstep, AfterSidestep, TimePressure
+    /// FG 전용 키    : FG_PhaseChangePending(12), FG_IsPhase2(13), FG_IsGroggy(14)
     /// </summary>
     private void BuildPatternConditions(BossConfigSO cfg)
     {
-        if (cfg.patternEntries == null || cfg.patternEntries.Count == 0) return;
+        if (cfg.patternEntries == null) return;
 
-        var entries = cfg.patternEntries;
-        AssignIfExists(entries, 0, new ICondition[] { new FormChangePendingCondition(_fgBlackboard) });
-        AssignIfExists(entries, 1, new ICondition[] { new MaxRangeCondition(2f) });
-        AssignIfExists(entries, 2, new ICondition[] { new MinRangeCondition(4f) });
-        AssignIfExists(entries, 3, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Liche) });
-        AssignIfExists(entries, 4, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Spider) });
-        AssignIfExists(entries, 5, new ICondition[] { new CurrentFormCondition(_fgBlackboard, ForestGuardianBlackboard.BossForm.Thorn) });
-        // Entry 6: fallback — BuiltConditions 비워두면 EvaluateConditions()가 항상 true 반환
+        foreach (var entry in cfg.patternEntries)
+        {
+            if (entry == null || entry.conditions == null || entry.conditions.Count == 0)
+            {
+                entry.BuiltConditions = null;
+                continue;
+            }
+
+            var built = new List<ICondition>(entry.conditions.Count);
+            foreach (var key in entry.conditions)
+            {
+                var c = BuildCondition(cfg, key);
+                if (c != null) built.Add(c);
+            }
+
+            entry.BuiltConditions = built.Count > 0 ? built.ToArray() : null;
+        }
     }
 
-    private static void AssignIfExists(List<BossPatternEntry> entries, int index, ICondition[] conditions)
+    private ICondition BuildCondition(BossConfigSO cfg, BossConditionKey key)
     {
-        if (index < entries.Count)
-            entries[index].BuiltConditions = conditions;
+        switch (key)
+        {
+            // ── 공용 ──────────────────────────────────────────────
+            case BossConditionKey.Phase2:
+                return new HpBelowCondition(cfg.condPhase2HpThreshold);
+            case BossConditionKey.Dist_Close:
+                return new MaxRangeCondition(cfg.condDistClose);
+            case BossConditionKey.Dist_Far:
+                return new MinRangeCondition(cfg.condDistFar);
+            case BossConditionKey.AfterBackstep:
+                return new LastTagCondition("backstep");
+            case BossConditionKey.AfterSidestep:
+                return new LastTagCondition("sidestep");
+            case BossConditionKey.TimePressure:
+                return new NormalModeTimerCondition(cfg.condTimePressureSecs);
+
+            // ── ForestGuardian 전용 ──────────────────────────────
+            case BossConditionKey.FG_PhaseChangePending:
+                return new FGPhaseChangePendingCondition(_fgBlackboard);
+            case BossConditionKey.FG_IsPhase2:
+                return new FGIsPhase2Condition(_fgBlackboard);
+            case BossConditionKey.FG_IsGroggy:
+                return new FGIsGroggyCondition(_fgBlackboard);
+
+            default:
+                return null;
+        }
     }
 
-    // ── 매 프레임 ────────────────────────────────────────────────────
+    // ── 매 프레임 ─────────────────────────────────────────────
 
     protected override void Update()
     {
@@ -149,14 +201,65 @@ public class ForestGuardianMonster : MonsterBase, IBoss
 
         _runner.Tick(Time.deltaTime);
         _coreBlackboard?.TickCooldowns(Time.deltaTime);
+        _fgBlackboard?.TickGroggy(Time.deltaTime);
+
+        // HP ≤ 50% → Phase2 전환 예약
+        if (_fgBlackboard != null && !_fgBlackboard.IsPhase2 && !_fgBlackboard.PhaseChangePending)
+        {
+            if (HpRatio <= 0.5f)
+                _fgBlackboard.TryTriggerPhase2();
+        }
+
+        // Phase2 진입 후 이동속도·애니 속도 1회 적용
+        if (_fgBlackboard != null && _fgBlackboard.IsPhase2 && !_phase2SpeedApplied)
+        {
+            _phase2SpeedApplied = true;
+            ApplyPhase2Multipliers();
+        }
 
         if (_runner.IsPatternActive)
             _coreBlackboard.NormalModeTimer = 0f;
         else
             _coreBlackboard.NormalModeTimer += Time.deltaTime;
+
+        // Phase2 Animator 속도를 1.2x로 유지 (ChaseState 등이 매 전환마다 1.0으로 리셋하므로)
+        if (_fgBlackboard != null && _fgBlackboard.IsPhase2
+            && _ctx?.Animator != null && !_runner.IsPatternActive)
+        {
+            if (_ctx.Animator.speed < ForestGuardianBlackboard.Phase2AnimSpeed - 0.01f)
+                _ctx.Animator.speed = ForestGuardianBlackboard.Phase2AnimSpeed;
+        }
     }
 
-    // ── 풀 재사용 ────────────────────────────────────────────────────
+    private void ApplyMaterials(Material[] mats)
+    {
+        if (_meshRenderer == null || mats == null || mats.Length == 0) return;
+        _meshRenderer.sharedMaterials = mats;
+    }
+
+    /// <summary>Phase2 진입 시 NavAgent 이동속도·Animator 속도 배율 적용.</summary>
+    private void ApplyPhase2Multipliers()
+    {
+        // SpeedMultiplier 설정 → ChaseState.Enter() 에서 speed = moveSpeed * SpeedMultiplier로 반영됨
+        _runtime.SpeedMultiplier = ForestGuardianBlackboard.Phase2SpeedMult;
+
+        if (_ctx.Agent != null && _ctx.Agent.isOnNavMesh)
+            _ctx.Agent.speed = _config.stat.moveSpeed * ForestGuardianBlackboard.Phase2SpeedMult;
+
+        if (_ctx.Animator != null)
+            _ctx.Animator.speed = ForestGuardianBlackboard.Phase2AnimSpeed;
+
+        // 패턴 브레이크 딜레이를 Phase2 기획값(0.2~0.7초)으로 갱신
+        if (_bossConfig != null)
+        {
+            _bossConfig.patternBreakDurationMin = ForestGuardianBlackboard.Phase2BreakDurationMin;
+            _bossConfig.patternBreakDurationMax = ForestGuardianBlackboard.Phase2BreakDurationMax;
+        }
+
+        ApplyMaterials(_phase2Materials);
+    }
+
+    // ── 풀 재사용 ─────────────────────────────────────────────
 
     protected override void OnEnable()
     {
@@ -164,6 +267,22 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         _runner?.Reset();
         _coreBlackboard?.Reset();
         _fgBlackboard?.Reset();
+        _phase2SpeedApplied = false;
+
+        // 속도 초기화 (SpeedMultiplier는 base.OnEnable()→RuntimeReset에서 1f로 이미 리셋)
+        if (_ctx?.Agent != null && _config != null)
+            _ctx.Agent.speed = _config.stat.moveSpeed;
+        if (_ctx?.Animator != null)
+            _ctx.Animator.speed = 1f;
+
+        // 패턴 브레이크 딜레이를 Phase1 기본값으로 복원
+        if (_bossConfig != null && _phase1BreakMin > 0f)
+        {
+            _bossConfig.patternBreakDurationMin = _phase1BreakMin;
+            _bossConfig.patternBreakDurationMax = _phase1BreakMax;
+        }
+
+        ApplyMaterials(_phase1Materials);
         BindBossHud();
     }
 
