@@ -46,10 +46,23 @@
       "Bash(python3 -c ':*)",
       "Bash(grep -A 30 \"m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/PuzzleGrid/Prefabs/Puzzle.prefab)",
       "Bash(curl -L https://github.com/WhiteBless/MjprojectBBB/raw/main/Assets/InfinityPBR/_InfinityPBR%20-%20Treant/Model/Treant_Body.fbx -o 'c:/Users/u/Documents/GitHub/Project_Abyss/Assets/ExternalAssets/_InfinityPBR - Treant/Model/Treant_Body.fbx')",
-      "mcp__mcp-for-unity__manage_asset"
+      "mcp__mcp-for-unity__manage_asset",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(grep -i \".prefab$\")",
+      "mcp__mcp-for-unity__batch_execute",
+      "Bash(grep -v \"meta$\")",
+      "Bash(grep \".asset$\")",
+      "Bash(ls \"c:/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/Shared/Item/SOdata/Item_\"*)",
+      "Bash(grep -l \"category:\" \"Assets/Abyss/Shared/Item/SOdata/item_\"*.asset)",
+      "Bash(grep -h \"rarity:\" Assets/Abyss/Shared/Item/SOdata/item_*.asset)",
+      "Bash(python3 -c \" import json, sys data = json.load\\(sys.stdin\\) seen = set\\(\\) for item in data['items']: pid = item.get\\('passive_id'\\) or item.get\\('item_id'\\) or '' if not pid or pid in seen: continue seen.add\\(pid\\) r = item.get\\('rarity',''\\) t = item.get\\('trigger',''\\) print\\(f'{pid}|{r}|{t}'\\) \")",
+      "Bash(mkdir -p Common/Combat Common/Movement Common/Passive Common/Progress Common/Survival Common/Pickup)",
+      "Bash(mkdir -p Rare/Combat Rare/Movement Rare/Passive Rare/Progress Rare/Survival Rare/Pickup)",
+      "Bash(mkdir -p Epic/Combat Epic/Movement Epic/Passive Epic/Progress Epic/Survival Epic/Pickup)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\u\\Desktop"
+      "c:\\Users\\u\\Desktop",
+      "c:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\Assets\\Abyss\\Shared\\Item\\SOdata"
     ]
   },
   "hooks": {

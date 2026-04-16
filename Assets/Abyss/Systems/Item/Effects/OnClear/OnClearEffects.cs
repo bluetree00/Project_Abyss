@@ -83,7 +83,28 @@ public sealed class RecipeSynergyNextAttackEffect : ItemEffectBase
 
     public override void OnRecipeComplete(ItemEffectContext ctx)
     {
-        // TODO: 다음 공격에 원소 효과 추가 플래그
-        Debug.Log("[RecipeSynergyNextAttack] 다음 공격에 원소 효과 추가");
+        if (ctx.Player == null) return;
+
+        // 현재 무기 원소를 다음 공격에 부여 (무속성이면 랜덤)
+        var element = ctx.WeaponElement;
+        if (element == WeaponElement.None)
+        {
+            var elements = new[] { WeaponElement.Fire, WeaponElement.Water, WeaponElement.Grass,
+                                   WeaponElement.Earth, WeaponElement.Lightning };
+            element = elements[Random.Range(0, elements.Length)];
+        }
+
+        ctx.Player.NextAttackElement = element;
+        ItemEffectVfxHelper.ShowNotice($"<color=#EEDD44>다음 공격에 원소 부여!</color>");
+        Debug.Log($"[RecipeSynergyNextAttack] 다음 공격 원소: {element}");
+    }
+
+    public override void OnPreDealDamage(ItemEffectContext ctx, ref DamagePacket pkt)
+    {
+        if (ctx.Player == null) return;
+        if (ctx.Player.NextAttackElement == WeaponElement.None) return;
+
+        pkt.Element = ctx.Player.NextAttackElement;
+        ctx.Player.NextAttackElement = WeaponElement.None; // 1회 소비
     }
 }

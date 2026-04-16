@@ -184,6 +184,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async UniTask InitItemDataAsync()
     {
+        // ItemSO 레지스트리 초기화 (Addressable)
+        try
+        {
+            var dbPrefab = await Managers.AddressableManager.LoadAssetAsync<ItemSODatabase>("ItemSODatabase");
+            if (dbPrefab != null) dbPrefab.RegisterAll();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] ItemSODatabase 로드 실패 (SO 없이 진행): {e.Message}");
+        }
+
         var itemData = Managers.ItemData;
         if (itemData != null && !itemData.IsInitialized)
         {

@@ -13,9 +13,18 @@ public sealed class RunItemInventory
     public IReadOnlyList<RuntimeItemData> Items => _items;
     public int Count => _items.Count;
 
+    public bool HasItem(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return false;
+        foreach (var item in _items)
+            if (item.itemId == itemId) return true;
+        return false;
+    }
+
     public void AddItem(RuntimeItemData item)
     {
         if (item == null) return;
+        if (HasItem(item.itemId)) return; // 중복 방지
         _items.Add(item);
         OnInventoryChanged?.Invoke();
     }

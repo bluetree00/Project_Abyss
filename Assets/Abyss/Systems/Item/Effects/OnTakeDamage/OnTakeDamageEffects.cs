@@ -21,15 +21,25 @@ public sealed class DamageNegateEffect : ItemEffectBase
 
 public sealed class DamageReflectEffect : ItemEffectBase
 {
+    private const string VfxKey = "VFX_DamageReflect";
+
     public DamageReflectEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (report.Attacker == null) return;
         float reflect = report.DamageDealt * _value;
-        // TODO: 공격자에게 반사 데미지
-        // report.Attacker.GetComponent<IDamageable>()?.TakeDamage(reflect);
-        Debug.Log($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
+        if (reflect <= 0f) return;
+
+        if (report.Attacker.TryGetComponent<IDamageable>(out var damageable))
+        {
+            var instigator = ctx.Player != null ? ctx.Player.gameObject : null;
+            damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
+
+            ItemEffectVfxHelper.SpawnOneShotAt(VfxKey, report.Attacker.transform.position);
+            ItemEffectVfxHelper.ShowNotice($"<color=#88CCFF>피해 반사</color> {reflect:F0} → {report.Attacker.name}");
+            Debug.Log($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
+        }
     }
 }
 

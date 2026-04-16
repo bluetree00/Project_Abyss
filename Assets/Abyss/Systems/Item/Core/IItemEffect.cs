@@ -42,6 +42,7 @@ public interface IItemEffect
     // ── 이동/회피 ───────────────────────────────────────────
     void OnRollEnd(ItemEffectContext ctx);
     void OnRollLand(ItemEffectContext ctx, Vector3 position);
+    void OnJumpLand(ItemEffectContext ctx, Vector3 position);
 
     // ── 진행 ────────────────────────────────────────────────
     void OnRoomClear(ItemEffectContext ctx);
