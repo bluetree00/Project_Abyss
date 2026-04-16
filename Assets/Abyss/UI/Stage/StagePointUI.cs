@@ -40,6 +40,11 @@ public class StagePointUI : MonoBehaviour
     private Image _image;
     private CanvasGroup _canvasGroup;
 
+    // ── Glow ──
+    private Outline _glowOutline;
+    private bool _glowActive;
+    private float _glowPhase;
+
     private void Awake()
     {
         _image = GetComponent<Image>();
@@ -327,5 +332,43 @@ public class StagePointUI : MonoBehaviour
         }
 
         _canvasGroup.alpha = 1f;
+    }
+
+    // ── Glow 연출 (도달 가능 노드 — 테두리만 펄스) ──
+
+    private void Update()
+    {
+        if (!_glowActive || _glowOutline == null) return;
+
+        _glowPhase += Time.unscaledDeltaTime * 3f;
+        float alpha = 0.15f + 0.25f * (0.5f + 0.5f * Mathf.Sin(_glowPhase));
+        _glowOutline.effectColor = new Color(1f, 0.85f, 0.3f, alpha);
+    }
+
+    /// <summary>도달 가능 여부에 따라 glow on/off.</summary>
+    public void SetGlow(bool active)
+    {
+        _glowActive = active;
+
+        if (active)
+        {
+            EnsureGlow();
+            _glowOutline.enabled = true;
+        }
+        else if (_glowOutline != null)
+        {
+            _glowOutline.enabled = false;
+        }
+    }
+
+    private void EnsureGlow()
+    {
+        if (_glowOutline != null) return;
+        if (_image == null) return;
+
+        _glowOutline = _image.gameObject.AddComponent<Outline>();
+        _glowOutline.effectColor = new Color(1f, 0.85f, 0.3f, 0.25f);
+        _glowOutline.effectDistance = new Vector2(2f, -2f);
+        _glowOutline.useGraphicAlpha = false;
     }
 }
