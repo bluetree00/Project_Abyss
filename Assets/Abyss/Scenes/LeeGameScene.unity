@@ -887,6 +887,8 @@ MonoBehaviour:
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
   disableSceneBakedNavMeshOnStart: 1
+  blockPalette: {fileID: 0}
+  blockCellSize: 1
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1660,6 +1662,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: TestItemDisplay (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 546786026332055624, guid: 6ba27faff0e05e14e83790871d764767,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1066941603680114911, guid: 6ba27faff0e05e14e83790871d764767,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -1749,6 +1756,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   weaponSO: {fileID: 11400000, guid: dddede8cb39c4504780e46a0a5b2f309, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!114 &1428764874
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1994,6 +2004,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: TestItemDisplay
       objectReference: {fileID: 0}
+    - target: {fileID: 546786026332055624, guid: 6ba27faff0e05e14e83790871d764767,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1066941603680114911, guid: 6ba27faff0e05e14e83790871d764767,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -2083,6 +2098,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   weaponSO: {fileID: 11400000, guid: ce33b8db8ce9e60429dbb81af6976781, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!114 &1834999880
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2277,6 +2295,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: TestItemDisplay (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 546786026332055624, guid: 6ba27faff0e05e14e83790871d764767,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1066941603680114911, guid: 6ba27faff0e05e14e83790871d764767,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -2366,6 +2389,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   weaponSO: {fileID: 11400000, guid: dddede8cb39c4504780e46a0a5b2f309, type: 2}
+  worldTextFont: {fileID: 0}
+  textHeight: 1.2
+  textSize: 3
 --- !u!114 &1915030341
 MonoBehaviour:
   m_ObjectHideFlags: 0
