@@ -72,7 +72,7 @@ public class FGRockThrowPatternSO : BossPatternSO
 
         public override void Enter(MonsterContext ctx)
         {
-            ctx.Agent.ResetPath();
+            if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
 
             FacePlayer(ctx);

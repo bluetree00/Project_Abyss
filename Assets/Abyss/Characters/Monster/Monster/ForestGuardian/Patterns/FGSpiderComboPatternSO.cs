@@ -111,7 +111,7 @@ public class FGChargePatternSO : BossPatternSO
             // 돌진 중 NavAgent 수동 제어
             _originalUpdatePosition = ctx.Agent.updatePosition;
             _originalUpdateRotation = ctx.Agent.updateRotation;
-            ctx.Agent.ResetPath();
+            if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
             ctx.Agent.updatePosition = false;
             ctx.Agent.updateRotation = false;

@@ -142,7 +142,7 @@ public class FGThornAirDropPatternSO : BossPatternSO
             if (ctx.Agent.isOnNavMesh)
             {
                 ctx.Agent.Warp(ctx.Transform.position);
-                ctx.Agent.ResetPath();
+                if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             }
         }
 

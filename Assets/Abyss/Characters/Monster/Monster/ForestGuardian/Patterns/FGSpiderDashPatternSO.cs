@@ -83,7 +83,7 @@ public class FGSpinKickPatternSO : BossPatternSO
             _hitRadius   = _isPhase2 ? Data.p2_hitRadius : Data.p1_hitRadius;
             _spinDuration = _isPhase2 ? Data.p2_duration : Data.p1_duration;
 
-            ctx.Agent.ResetPath();
+            if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
 
             if (ctx.Animator != null)
@@ -168,7 +168,7 @@ public class FGSpinKickPatternSO : BossPatternSO
             {
                 ctx.Agent.speed            = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
                 ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
-                ctx.Agent.ResetPath();
+                if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             }
             Data.StartCooldown();
         }
