@@ -209,59 +209,33 @@ public class BlockDataManager
 
     private async UniTask LoadFromServerAsync()
     {
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess()) return;
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess()) return;
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess()) return;
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-
         // Shape 데이터
-        if (dic.ContainsKey(ShapeChartId))
+        int shapeLoaded = ChartLoader.Load("BLOCK_SHAPE_DATA", row =>
         {
-            var json = JsonMapper.ToObject(dic[ShapeChartId].contentJson.ToString());
-            int count = 0;
-            foreach (JsonData row in json)
-            {
-                var entry = ParseShapeRow(row);
-                if (entry == null) continue;
-                if (_shapeById.TryGetValue(entry.shape_id, out var existing) &&
-                    entry.stat_version <= existing.stat_version)
-                    continue;
-                _shapeById[entry.shape_id] = entry;
-                count++;
-            }
-            SaveShapesToJson();
-            Debug.Log($"[BlockDataManager] Shape {count}개 갱신");
-        }
+            var entry = ParseShapeRow(row);
+            if (entry == null) return;
+            if (_shapeById.TryGetValue(entry.shape_id, out var existing) &&
+                entry.stat_version <= existing.stat_version)
+                return;
+            _shapeById[entry.shape_id] = entry;
+        });
+        if (shapeLoaded > 0) SaveShapesToJson();
 
         // Grid 데이터
-        if (dic.ContainsKey(GridChartId))
+        int gridLoaded = ChartLoader.Load("BLOCK_SYNERGY_DATA", row =>
         {
-            var json = JsonMapper.ToObject(dic[GridChartId].contentJson.ToString());
-            int count = 0;
-            foreach (JsonData row in json)
-            {
-                var entry = ParseGridRow(row);
-                if (entry == null || string.IsNullOrEmpty(entry.grid_id)) continue;
+            var entry = ParseGridRow(row);
+            if (entry == null || string.IsNullOrEmpty(entry.grid_id)) return;
 
-                if (!_gridById.TryGetValue(entry.grid_id, out var list))
-                {
-                    list = new List<BlockGridEntry>();
-                    _gridById[entry.grid_id] = list;
-                }
-                list.RemoveAll(g => g.slot == entry.slot);
-                list.Add(entry);
-                count++;
+            if (!_gridById.TryGetValue(entry.grid_id, out var list))
+            {
+                list = new List<BlockGridEntry>();
+                _gridById[entry.grid_id] = list;
             }
-            SaveGridsToJson();
-            Debug.Log($"[BlockDataManager] Grid {count}행 갱신");
-        }
+            list.RemoveAll(g => g.slot == entry.slot);
+            list.Add(entry);
+        });
+        if (gridLoaded > 0) SaveGridsToJson();
 
         await UniTask.CompletedTask;
     }

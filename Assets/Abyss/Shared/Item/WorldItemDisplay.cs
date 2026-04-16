@@ -1,133 +1,87 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using TMPro;
 
 /// <summary>
 /// 월드에 드롭된 아이템 표시 + 픽업 처리.
-/// WorldWeaponDisplay와 동일 패턴.
+/// 등급별 VFX 이펙트를 Addressable로 로드하여 표시.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class WorldItemDisplay : MonoBehaviour
 {
+    // ── 직렬화 필드 ─────────────────────────────────────────
     [Header("에디터 배치용")]
     [SerializeField] private ItemSO itemSO;
-
-    [Header("비주얼")]
-    [SerializeField] private float rotateSpeed = 90f;
-    [SerializeField] private float bobAmplitude = 0.2f;
-    [SerializeField] private float bobFrequency = 1.5f;
 
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textHeight = 0.8f;
     [SerializeField] private float textSize = 3f;
 
+    [Header("VFX 설정")]
+    [SerializeField] private ItemVfxConfig vfxConfig;
+    [SerializeField] private float vfxYOffset = -0.5f;
+
+    // ── 비공개 필드 ─────────────────────────────────────────
+    private const float VfxAudioVolume = 0.15f;
+
     private RuntimeItemData _runtimeData;
     private TextMeshPro _worldText;
     private Transform _camTransform;
     private bool _pickedUp;
-    private Vector3 _startPos;
+    private GameObject _vfxInstance;
+    private float _spawnTime;
+
+    // ── Lifecycle ───────────────────────────────────────────
 
     private void Start()
     {
-        _startPos = transform.position;
+        _spawnTime = Time.time;
         _camTransform = Camera.main != null ? Camera.main.transform : null;
 
         if (_runtimeData == null && itemSO != null)
             _runtimeData = RuntimeItemData.FromSO(itemSO);
 
+        // 기존에 붙어있는 메시 제거 (에디터 배치 프리팹에 Sphere 등이 있을 수 있음)
+        StripMeshComponents(gameObject);
+
+        CreateVfxVisualAsync().Forget();
         CreateWorldText();
     }
 
     private void Update()
     {
-        // 회전 + 부유 연출
-        transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime, Space.World);
-        var pos = _startPos;
-        pos.y += Mathf.Sin(Time.time * bobFrequency * Mathf.PI * 2f) * bobAmplitude;
-        transform.position = pos;
-
-        // 텍스트 빌보드 (카메라를 향함)
+        // 텍스트 빌보드
         if (_worldText != null && _camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
     }
 
+    // ── Public Methods ──────────────────────────────────────
+
     /// <summary>런타임 데이터로 초기화 (코드 드롭 시).</summary>
-    public void InitFromData(RuntimeItemData data, TMP_FontAsset font = null)
+    public void InitFromData(RuntimeItemData data, TMP_FontAsset font = null, ItemVfxConfig config = null)
     {
         _runtimeData = data;
-        if (font != null)
-            worldTextFont = font;
+        if (font != null) worldTextFont = font;
+        if (config != null) vfxConfig = config;
     }
 
     /// <summary>런타임 데이터로 월드에 스폰.</summary>
-    public static WorldItemDisplay SpawnFromData(RuntimeItemData data, Vector3 position)
+    public static WorldItemDisplay SpawnFromData(RuntimeItemData data, Vector3 position, ItemVfxConfig config = null)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        go.name = $"DroppedItem_{data.displayName}";
+        var go = new GameObject($"DroppedItem_{data.displayName}");
         go.transform.position = position;
-        go.transform.localScale = Vector3.one * 0.5f;
-
-        // 기존 콜라이더를 트리거로 교체
-        var existingCol = go.GetComponent<Collider>();
-        if (existingCol != null) Object.Destroy(existingCol);
 
         var col = go.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        col.radius = 2f;
-
-        // 색상으로 등급 표시
-        var renderer = go.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            var mat = renderer.material;
-            switch (data.rarity)
-            {
-                case ItemRarity.Common: mat.color = Color.white;  break;
-                case ItemRarity.Rare:   mat.color = Color.cyan;   break;
-                case ItemRarity.Epic:   mat.color = new Color(0.6f, 0.2f, 1f); break;
-            }
-        }
+        col.radius = 1f;
 
         var display = go.AddComponent<WorldItemDisplay>();
-        display.InitFromData(data);
+        display.InitFromData(data, config: config);
         return display;
     }
 
-    private void OnTriggerEnter(Collider other)
-    {
-        if (_pickedUp) return;
-
-        var player = other.GetComponent<PlayerController>();
-        if (player == null) return;
-
-        if (_runtimeData == null) return;
-
-        _pickedUp = true;
-
-        // 즉시 콜라이더 비활성화 (중복 트리거 방지)
-        var col = GetComponent<Collider>();
-        if (col != null) col.enabled = false;
-
-        // 블록 등록: shape_id가 있으면 퍼즐 그리드에 Shape 추가
-        if (_runtimeData.shapeId > 0)
-        {
-            var bridge = BlockSynergyBridge.Instance;
-            if (bridge != null)
-                bridge.RegisterShapeFromItem(_runtimeData.shapeId);
-        }
-
-        // 인벤토리에 추가
-        var run = GameRunBootstrapper.Instance?.Run;
-        run?.ItemInventory.AddItem(_runtimeData);
-
-        Debug.Log($"[WorldItemDisplay] 아이템 획득: {_runtimeData.displayName} ({_runtimeData.rarity}) shape={_runtimeData.shapeId}");
-        ConfirmPickup();
-    }
-
-    private void OnTriggerExit(Collider other)
-    {
-        // 이미 획득 확정된 경우 리셋하지 않음
-    }
+    public RuntimeItemData GetRuntimeData() => _runtimeData;
 
     /// <summary>픽업 확정 — 오브젝트 즉시 비활성화 후 제거.</summary>
     public void ConfirmPickup()
@@ -137,14 +91,133 @@ public class WorldItemDisplay : MonoBehaviour
     }
 
     /// <summary>픽업 취소.</summary>
-    public void CancelPickup()
+    public void CancelPickup() { }
+
+    // ── Event Handlers ──────────────────────────────────────
+
+    private void OnTriggerEnter(Collider other)
     {
-        // _pickedUp은 OnTriggerExit까지 유지
+        if (_pickedUp) return;
+        if (Time.time - _spawnTime < 1f) return; // 스폰 후 1초 보호
+
+        var player = other.GetComponent<PlayerController>();
+        if (player == null) return;
+        if (_runtimeData == null) return;
+
+        _pickedUp = true;
+
+        var col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        if (_runtimeData.shapeId > 0)
+        {
+            var bridge = BlockSynergyBridge.Instance;
+            if (bridge != null)
+                bridge.RegisterShapeFromItem(_runtimeData.shapeId);
+        }
+
+        var run = GameRunBootstrapper.Instance?.Run;
+        run?.ItemInventory.AddItem(_runtimeData);
+
+        // 아이템 효과: OnItemPickup hook
+        run?.EffectManager?.OnItemPickup(_runtimeData);
+
+        // HUD 알림
+        ShowPickupNotice();
+
+        Debug.Log($"[WorldItemDisplay] 아이템 획득: {_runtimeData.displayName} ({_runtimeData.rarity}) shape={_runtimeData.shapeId}");
+        ConfirmPickup();
     }
 
-    public RuntimeItemData GetRuntimeData() => _runtimeData;
+    private void ShowPickupNotice()
+    {
+        var hud = UnityEngine.Object.FindObjectOfType<HudPresenter>(true);
+        if (hud == null || _runtimeData == null) return;
 
-    // ── Private Methods ──
+        string color = _runtimeData.rarity switch
+        {
+            ItemRarity.Rare => "#00FFFF",
+            ItemRarity.Epic => "#CC66FF",
+            _               => "#FFFFFF",
+        };
+
+        // 효과 요약
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<color={color}>{_runtimeData.displayName}</color> 획득!");
+
+        foreach (var eff in _runtimeData.effects)
+        {
+            if (string.IsNullOrEmpty(eff.effectType)) continue;
+            string sign = eff.value >= 0 ? "+" : "";
+            sb.Append($"\n  {eff.effectType} {sign}{eff.value}");
+            if (eff.trigger != "Always")
+                sb.Append($" ({eff.trigger})");
+        }
+
+        hud.ShowBuffNotice(sb.ToString());
+    }
+
+    // ── Private Methods ─────────────────────────────────────
+
+    private async UniTaskVoid CreateVfxVisualAsync()
+    {
+        if (_runtimeData == null) return;
+
+        string vfxKey = ResolveVfxKey(_runtimeData.rarity);
+
+        if (!string.IsNullOrEmpty(vfxKey))
+        {
+            try
+            {
+                var prefab = await Managers.AddressableManager.LoadAssetAsync<GameObject>(vfxKey);
+                if (prefab != null && this != null && gameObject != null)
+                {
+                    _vfxInstance = Instantiate(prefab, transform);
+                    _vfxInstance.transform.localPosition = new Vector3(0f, vfxYOffset, 0f);
+                    _vfxInstance.name = "VFX_Display";
+                    ReduceAudioVolume(_vfxInstance);
+                    return;
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[WorldItemDisplay] VFX 로드 실패 ({vfxKey}): {e.Message} — 폴백 사용");
+            }
+        }
+
+        // VFX 로드 실패 시 빈 오브젝트 (시각 없음, 콜라이더만 남음)
+    }
+
+    private string ResolveVfxKey(ItemRarity rarity)
+    {
+        if (vfxConfig != null)
+            return vfxConfig.GetDisplayVfxKey(rarity);
+
+        return rarity switch
+        {
+            ItemRarity.Common => "VFX_Item_Common",
+            ItemRarity.Rare   => "VFX_Item_Rare",
+            ItemRarity.Epic   => "VFX_Item_Epic",
+            _                 => "VFX_Item_Common",
+        };
+    }
+
+    private static void ReduceAudioVolume(GameObject vfx)
+    {
+        var sources = vfx.GetComponentsInChildren<AudioSource>(true);
+        foreach (var src in sources)
+            src.volume = VfxAudioVolume;
+    }
+
+    /// <summary>오브젝트 본체의 MeshRenderer/MeshFilter 제거 (자식 VFX는 유지).</summary>
+    private static void StripMeshComponents(GameObject go)
+    {
+        var meshRenderer = go.GetComponent<MeshRenderer>();
+        if (meshRenderer != null) Destroy(meshRenderer);
+
+        var meshFilter = go.GetComponent<MeshFilter>();
+        if (meshFilter != null) Destroy(meshFilter);
+    }
 
     private void CreateWorldText()
     {
@@ -164,19 +237,15 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.enableWordWrapping = false;
         _worldText.sortingOrder = 10;
 
-        // 텍스트가 아이템과 함께 회전하지 않도록 독립 rotation
         if (_camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
     }
 
-    private static Color GetRarityColor(ItemRarity rarity)
+    private static Color GetRarityColor(ItemRarity rarity) => rarity switch
     {
-        return rarity switch
-        {
-            ItemRarity.Common => Color.white,
-            ItemRarity.Rare   => Color.cyan,
-            ItemRarity.Epic   => new Color(0.8f, 0.4f, 1f),
-            _                 => Color.white,
-        };
-    }
+        ItemRarity.Common => Color.white,
+        ItemRarity.Rare   => Color.cyan,
+        ItemRarity.Epic   => new Color(0.8f, 0.4f, 1f),
+        _                 => Color.white,
+    };
 }

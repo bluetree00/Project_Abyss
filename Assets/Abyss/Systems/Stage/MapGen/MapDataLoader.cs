@@ -130,6 +130,8 @@ public static class MapDataLoader
         "T" => TileType.Trap,
         "C" => TileType.Chest,
         "." => TileType.Empty,
+        "R" => TileType.BuffBox,
+        "D" => TileType.BuffPedestal,
         _   => TileType.Floor,
     };
 
@@ -148,6 +150,8 @@ public static class MapDataLoader
         TileType.Trap         => "T",
         TileType.Chest        => "C",
         TileType.Empty        => ".",
+        TileType.BuffBox      => "R",
+        TileType.BuffPedestal => "D",
         _                     => "F",
     };
 }

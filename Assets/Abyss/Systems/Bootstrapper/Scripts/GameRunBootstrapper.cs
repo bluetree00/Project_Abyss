@@ -61,7 +61,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 카메라 인트로 준비 (즉시 멀리 배치 + OnPlayerBound 이벤트 대기)
         EnsureCameraController();
 
-        // 데이터 매니저 초기화
+        // AppBootstrapper 준비 대기 (자동 로그인 포함)
+        await UniTask.WaitUntil(() => AppBootstrapper.Instance != null && AppBootstrapper.Instance.IsReady);
+
+        // 데이터 매니저 초기화 (로그인 완료 후 CDN 사용 가능)
         await InitMapDataAsync();
         await InitPlayerDataAsync();
         await InitItemDataAsync();
@@ -193,6 +196,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             try { await blockData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BlockData 예외: {e.Message}"); }
+        }
+
+        var buffData = Managers.BuffData;
+        if (buffData != null && !buffData.IsInitialized)
+        {
+            try { await buffData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BuffData 예외: {e.Message}"); }
         }
     }
 

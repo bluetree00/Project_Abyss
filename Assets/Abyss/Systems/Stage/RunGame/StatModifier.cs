@@ -13,6 +13,8 @@ public enum StatType
     RangedAttack,               // 원거리 공격력
     Luck,                       // 행운력
     ActiveItemCooldownReduction, // 액티브 아이템 쿨다운 감소
+    Projectile,                 // 투사체 추가 개수 (가산)
+    InstantDamage,              // 즉시 피해 (버프가 아닌 즉발 효과)
 }
 
 /// <summary>

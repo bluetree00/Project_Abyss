@@ -26,6 +26,7 @@ public sealed class HudPresenter : MonoBehaviour
     private PlayerRuntimeStats _runtimeStats;
     private PlayerWeaponManager _weaponManager;
     private SkillCooldownTracker _cooldownTracker;
+    private RoomBuffHandler _buffHandler;
 
     private UserInfo _userInfo;
 
@@ -62,6 +63,14 @@ public sealed class HudPresenter : MonoBehaviour
         _provider = provider;
         _state = run?.PlayerState;
 
+        // 버프 핸들러 구독
+        UnbindBuffHandler();
+        if (run?.BuffHandler != null)
+        {
+            _buffHandler = run.BuffHandler;
+            _buffHandler.OnBuffsChanged += HandleBuffsChanged;
+        }
+
         if (view == null)
         {
             Debug.LogError("[HudPresenter] view is null.");
@@ -87,6 +96,9 @@ public sealed class HudPresenter : MonoBehaviour
 
         _state.OnHpChanged += HandleHpChanged;
         _state.OnGoldChanged += HandleGoldChanged;
+
+        // 현재 버프 즉시 반영
+        HandleBuffsChanged();
     }
 
     public void BindPlayer(PlayerController player)
@@ -205,6 +217,10 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
+    private void HandleBuffsChanged() => view?.CombatPanel?.RefreshBuffList(_buffHandler?.ActiveBuffs);
+
+    /// <summary>버프 획득 알림 텍스트 표시.</summary>
+    public void ShowBuffNotice(string message) => view?.CombatPanel?.ShowBuffNotice(message);
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
 
@@ -269,6 +285,16 @@ public sealed class HudPresenter : MonoBehaviour
         _provider = null;
         UnbindPlayer();
         UnbindLobby();
+        UnbindBuffHandler();
+    }
+
+    private void UnbindBuffHandler()
+    {
+        if (_buffHandler != null)
+        {
+            _buffHandler.OnBuffsChanged -= HandleBuffsChanged;
+            _buffHandler = null;
+        }
     }
 
     private void OnDestroy()

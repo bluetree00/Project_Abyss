@@ -72,6 +72,7 @@ public class EquipmentEntry
     public string weapon_id;
     public string weapon_name;
     public string weapon_type;      // Katana, Greatsword, Crossbow, Bow
+    public string element;          // None, Water, Fire, Grass, Earth, Lightning
     public int    tier;
     public float  base_attack;
     public float  base_defense;

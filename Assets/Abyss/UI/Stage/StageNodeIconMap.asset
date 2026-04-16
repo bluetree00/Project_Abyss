@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c54bee7a175c5bf488e482be5b526806, type: 3}
+  m_Name: StageNodeIconMap
+  m_EditorClassIdentifier: Assembly-CSharp::StageNodeIconMap
+  startIconKey: flag_1
+  bossIconKey: dragon
+  battleIconKey: sword_1
+  eliteIconKey: skeleton_1
+  eventIconKey: symbol_1
+  shopIconKey: chest_1
+  defaultIconKey: flag_1

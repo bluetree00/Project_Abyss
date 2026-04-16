@@ -141,71 +141,32 @@ public class PlayerDataManager
 
     private async UniTask LoadFromServerAsync()
     {
-        var tableResult = Backend.CDN.Content.Table.Get();
-        if (!tableResult.IsSuccess())
-        {
-            Debug.LogWarning($"[PlayerDataManager] 차트 테이블 조회 실패: {tableResult.GetStatusCode()}");
-            return;
-        }
-
-        var contentResult = Backend.CDN.Content.Get(tableResult.GetContentTableItemList());
-        if (!contentResult.IsSuccess())
-        {
-            Debug.LogWarning($"[PlayerDataManager] 차트 다운로드 실패");
-            return;
-        }
-
-        Backend.CDN.Content.Local.Save(contentResult.GetContentList(), out _);
-        var localResult = Backend.CDN.Content.Local.Load();
-        if (!localResult.IsSuccess())
-        {
-            Debug.LogWarning("[PlayerDataManager] 로컬 로드 실패");
-            return;
-        }
-
-        var dic = localResult.GetContentDictionarySortByChartId();
-
         // Player 데이터
-        if (dic.ContainsKey(PlayerChartId))
+        int playerLoaded = ChartLoader.Load("PLAYER_DATA", row =>
         {
-            var json = LitJson.JsonMapper.ToObject(dic[PlayerChartId].contentJson.ToString());
-            int count = 0;
-            foreach (LitJson.JsonData row in json)
-            {
-                var entry = ParsePlayerRow(row);
-                if (entry == null) continue;
-                if (_playerById.TryGetValue(entry.char_id, out var existing) && entry.stat_version <= existing.stat_version)
-                    continue;
-                _playerById[entry.char_id] = entry;
-                count++;
-            }
-            SavePlayersToJson();
-            Debug.Log($"[PlayerDataManager] 캐릭터 {count}개 갱신");
-        }
+            var entry = ParsePlayerRow(row);
+            if (entry == null) return;
+            if (_playerById.TryGetValue(entry.char_id, out var existing) && entry.stat_version <= existing.stat_version)
+                return;
+            _playerById[entry.char_id] = entry;
+        });
+        if (playerLoaded > 0) SavePlayersToJson();
 
         // Passive 데이터
-        if (dic.ContainsKey(PassiveChartId))
+        int passiveLoaded = ChartLoader.Load("PASSIVE_DATA", row =>
         {
-            var json = LitJson.JsonMapper.ToObject(dic[PassiveChartId].contentJson.ToString());
-            int count = 0;
-            foreach (LitJson.JsonData row in json)
-            {
-                var entry = ParsePassiveRow(row);
-                if (entry == null || string.IsNullOrEmpty(entry.effect_type)) continue;
+            var entry = ParsePassiveRow(row);
+            if (entry == null || string.IsNullOrEmpty(entry.effect_type)) return;
 
-                if (!_passiveById.TryGetValue(entry.passive_id, out var list))
-                {
-                    list = new List<PassiveEntry>();
-                    _passiveById[entry.passive_id] = list;
-                }
-                // 슬롯 중복 제거
-                list.RemoveAll(p => p.slot == entry.slot);
-                list.Add(entry);
-                count++;
+            if (!_passiveById.TryGetValue(entry.passive_id, out var list))
+            {
+                list = new List<PassiveEntry>();
+                _passiveById[entry.passive_id] = list;
             }
-            SavePassivesToJson();
-            Debug.Log($"[PlayerDataManager] 패시브 {count}개 갱신");
-        }
+            list.RemoveAll(p => p.slot == entry.slot);
+            list.Add(entry);
+        });
+        if (passiveLoaded > 0) SavePassivesToJson();
 
         await UniTask.CompletedTask;
     }

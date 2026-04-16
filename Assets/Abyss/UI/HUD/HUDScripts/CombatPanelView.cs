@@ -4,8 +4,10 @@
 // - 장비 슬롯 × 2 (아이콘)
 // - Q/E 스킬 슬롯 (아이콘, 쿨다운)
 // - Active 슬롯 × 3
+// - 버프 목록 + 획득 알림
 //============================================================
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -27,6 +29,14 @@ public sealed class CombatPanelView : MonoBehaviour
 
     [Header("Active Slots")]
     [SerializeField] private ActiveSlotUI[] activeSlots = new ActiveSlotUI[3];
+
+    [Header("Buff Display")]
+    [SerializeField] private Transform buffListRoot;
+    [SerializeField] private TMP_Text buffNoticeText;
+
+    // ── 버프 UI 런타임 ──
+    private readonly List<GameObject> _buffEntries = new();
+    private float _noticeTimer;
 
     // ─────────────────────────────────────────────────────────
     // HP
@@ -169,5 +179,197 @@ public sealed class CombatPanelView : MonoBehaviour
             iconImage.sprite = icon;
             iconImage.gameObject.SetActive(icon != null);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 버프 목록 + 획득 알림
+    // ─────────────────────────────────────────────────────────
+
+    private const float NoticeDuration = 2f;
+    private const float NoticeFadeTime = 0.5f;
+
+    private void Update()
+    {
+        if (_noticeTimer > 0f)
+        {
+            _noticeTimer -= Time.deltaTime;
+
+            if (buffNoticeText != null)
+            {
+                if (_noticeTimer <= 0f)
+                {
+                    // 완전히 사라짐
+                    buffNoticeText.gameObject.SetActive(false);
+                }
+                else if (_noticeTimer < NoticeFadeTime)
+                {
+                    // 페이드아웃 구간
+                    float alpha = _noticeTimer / NoticeFadeTime;
+                    var c = buffNoticeText.color;
+                    c.a = alpha;
+                    buffNoticeText.color = c;
+                }
+            }
+        }
+    }
+
+    /// <summary>버프 획득/발동 시 화면 알림 (2초 표시 + 0.5초 페이드아웃).</summary>
+    public void ShowBuffNotice(string message)
+    {
+        if (buffNoticeText == null)
+        {
+            EnsureBuffNoticeText();
+            if (buffNoticeText == null) return;
+        }
+
+        buffNoticeText.text = message;
+        buffNoticeText.gameObject.SetActive(true);
+
+        // 알파 복원
+        var c = buffNoticeText.color;
+        c.a = 1f;
+        buffNoticeText.color = c;
+
+        _noticeTimer = NoticeDuration + NoticeFadeTime;
+    }
+
+    /// <summary>현재 활성 버프 목록 전체 갱신.</summary>
+    public void RefreshBuffList(IReadOnlyList<ActiveRoomBuff> buffs)
+    {
+        if (buffListRoot == null)
+        {
+            EnsureBuffListRoot();
+            if (buffListRoot == null) return;
+        }
+
+        // 기존 엔트리 정리
+        foreach (var go in _buffEntries)
+            if (go != null) Destroy(go);
+        _buffEntries.Clear();
+
+        if (buffs == null || buffs.Count == 0) return;
+
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var buff = buffs[i];
+            var entry = CreateBuffEntry(buff, i);
+            _buffEntries.Add(entry);
+        }
+    }
+
+    private GameObject CreateBuffEntry(ActiveRoomBuff buff, int index)
+    {
+        var go = new GameObject($"BuffEntry_{index}", typeof(RectTransform));
+        go.transform.SetParent(buffListRoot, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(200f, 24f);
+
+        // 배경
+        var bg = go.AddComponent<Image>();
+        bg.color = buff.IsDebuff
+            ? new Color(0.6f, 0.15f, 0.15f, 0.7f)
+            : new Color(0.15f, 0.35f, 0.6f, 0.7f);
+
+        // 텍스트
+        var textGo = new GameObject("Text", typeof(RectTransform));
+        textGo.transform.SetParent(go.transform, false);
+
+        var textRect = textGo.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(6f, 0f);
+        textRect.offsetMax = new Vector2(-4f, 0f);
+
+        var text = textGo.AddComponent<TextMeshProUGUI>();
+        text.text = FormatBuff(buff);
+        text.fontSize = 14f;
+        text.color = Color.white;
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+
+        return go;
+    }
+
+    private static string FormatBuff(ActiveRoomBuff buff)
+    {
+        string typeName = buff.Modifier.Type switch
+        {
+            StatType.MoveSpeed    => "이동속도",
+            StatType.AttackPower  => "공격력",
+            StatType.MeleeAttack  => "근접공격",
+            StatType.RangedAttack => "원거리공격",
+            StatType.Defense      => "방어력",
+            StatType.AttackSpeed  => "공격속도",
+            StatType.Projectile   => "투사체",
+            _                     => buff.Modifier.Type.ToString(),
+        };
+
+        string sign = buff.Modifier.Value >= 0 ? "+" : "";
+
+        string valueStr = buff.IsPercent
+            ? $"{sign}{buff.Modifier.Value * 100f:F0}%"
+            : $"{sign}{buff.Modifier.Value:F0}";
+
+        string remaining = buff.RoomsRemaining > 0 ? $" [{buff.RoomsRemaining}방]" : "";
+
+        return $"{typeName} {valueStr}{remaining}";
+    }
+
+    // ── 자동 생성 (Inspector 미연결 시 런타임 폴백) ──
+
+    private void EnsureBuffListRoot()
+    {
+        if (buffListRoot != null) return;
+
+        var go = new GameObject("BuffListRoot", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.5f);
+        rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = new Vector2(10f, 0f);
+        rect.sizeDelta = new Vector2(210f, 400f);
+
+        var layout = go.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+
+        var fitter = go.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        buffListRoot = go.transform;
+    }
+
+    private void EnsureBuffNoticeText()
+    {
+        if (buffNoticeText != null) return;
+
+        var go = new GameObject("BuffNoticeText", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.7f);
+        rect.anchorMax = new Vector2(0.5f, 0.7f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(400f, 40f);
+
+        buffNoticeText = go.AddComponent<TextMeshProUGUI>();
+        buffNoticeText.fontSize = 22f;
+        buffNoticeText.color = Color.yellow;
+        buffNoticeText.alignment = TextAlignmentOptions.Center;
+        buffNoticeText.fontStyle = FontStyles.Bold;
+
+        // Outline 효과
+        var outline = go.AddComponent<Outline>();
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(1f, -1f);
+
+        go.SetActive(false);
     }
 }

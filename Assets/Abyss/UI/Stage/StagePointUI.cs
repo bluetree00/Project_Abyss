@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using Cysharp.Threading.Tasks;
 
 public class StagePointUI : MonoBehaviour
@@ -11,6 +12,9 @@ public class StagePointUI : MonoBehaviour
 
     [Header("Normal 노드 룸 카테고리(Inspector에서 결정)")]
     [SerializeField] private NormalRoomCategory normalRoomCategory = NormalRoomCategory.Battle;
+
+    [Header("아이콘")]
+    [SerializeField] private StageNodeIconMap iconMap;
 
     [Header("필터(선택) - -1이면 미사용")]
     [SerializeField] private int minDifficulty = -1;
@@ -25,8 +29,117 @@ public class StagePointUI : MonoBehaviour
     [SerializeField] private string resolvedPrefab;
     [SerializeField] private string resolvedTags;
 
+    // ── Properties (외부 읽기용) ──
+    public int PointId => pointId;
+    public IReadOnlyList<int> NextPointIds => nextPointIds;
+    public StageCategory StageCategoryValue => stageCategory;
+    public NormalRoomCategory NormalRoomCategoryValue => normalRoomCategory;
+
     private StagePointManager _mgr;
     private RoomManager _roomMgr;
+    private Image _image;
+    private CanvasGroup _canvasGroup;
+
+    private void Awake()
+    {
+        _image = GetComponent<Image>();
+
+        // 아이콘 로드 전: 완전 투명 + 클릭 차단
+        if (_image != null)
+            _image.color = Color.clear;
+
+        _canvasGroup = GetComponent<CanvasGroup>();
+        if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        _canvasGroup.blocksRaycasts = false;
+    }
+
+    /// <summary>런타임에 방 카테고리를 변경 (랜덤 배정 시).</summary>
+    public void SetNormalRoomCategory(NormalRoomCategory category)
+    {
+        normalRoomCategory = category;
+    }
+
+    /// <summary>아이콘 로드가 완료되었는지 여부.</summary>
+    public bool IsIconReady { get; private set; }
+
+    /// <summary>현재 카테고리 기준으로 아이콘을 Addressable에서 비동기 로드.</summary>
+    public void RefreshIcon()
+    {
+        IsIconReady = false;
+        LoadIconAsync().Forget();
+    }
+
+    /// <summary>Resolved된 방 카테고리 기준으로 아이콘 갱신 (복귀 시).</summary>
+    public void RefreshIconFromResolved()
+    {
+        if (string.IsNullOrEmpty(resolvedRoomCategory))
+        {
+            RefreshIcon();
+            return;
+        }
+
+        // resolvedRoomCategory → NormalRoomCategory 변환
+        var resolved = resolvedRoomCategory switch
+        {
+            "Battle" => NormalRoomCategory.Battle,
+            "Elite"  => NormalRoomCategory.Elite,
+            "Event"  => NormalRoomCategory.Event,
+            "Shop"   => NormalRoomCategory.Shop,
+            _        => normalRoomCategory,
+        };
+        normalRoomCategory = resolved;
+        RefreshIcon();
+    }
+
+    private async UniTaskVoid LoadIconAsync()
+    {
+        if (iconMap == null || _image == null) return;
+
+        var key = iconMap.GetIconKey(stageCategory, normalRoomCategory);
+        if (string.IsNullOrEmpty(key)) return;
+
+        try
+        {
+            // Sprite 직접 로드 시도
+            Sprite sprite = null;
+            try
+            {
+                sprite = await Managers.AddressableManager.LoadAssetAsync<Sprite>(key);
+            }
+            catch { }
+
+            // Sprite 실패 시 Texture2D로 폴백 → Sprite 생성
+            if (sprite == null)
+            {
+                var tex = await Managers.AddressableManager.LoadAssetAsync<Texture2D>(key);
+                if (tex != null)
+                    sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), 100f);
+            }
+
+            if (sprite != null && _image != null)
+            {
+                _image.sprite = sprite;
+                _image.SetNativeSize();
+                _image.color = Color.white;
+            }
+
+            IsIconReady = true;
+            if (_canvasGroup != null)
+            {
+                _canvasGroup.blocksRaycasts = true;
+                FadeInAsync().Forget();
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StagePointUI] 아이콘 로드 실패: key={key}, err={e.Message}");
+            IsIconReady = true;
+            if (_canvasGroup != null)
+                _canvasGroup.blocksRaycasts = true;
+        }
+    }
 
     public void Register(StagePointManager mgr, RoomManager roomMgr)
     {
@@ -45,6 +158,13 @@ public class StagePointUI : MonoBehaviour
 
         mgr.OnPointResolved -= HandleResolved;
         mgr.OnPointResolved += HandleResolved;
+
+        // 이미 Resolve된 상태면 즉시 아이콘 갱신 (복귀 시)
+        var ctx = mgr.GetContext(pointId);
+        if (ctx != null && ctx.IsResolved)
+            HandleResolved(pointId, ctx.ResolvedRoomId);
+        else if (!IsIconReady)
+            RefreshIcon(); // Resolve 전이라도 stageCategory 기반 기본 아이콘 로드
     }
 
     private void OnDisable()
@@ -88,10 +208,7 @@ public class StagePointUI : MonoBehaviour
             }
 
             Debug.Log($"[StagePointUI] pointId={pointId} → GameScene 전환");
-            if (TransitionOverlay.Instance != null)
-                TransitionOverlay.Instance.PlayAsync(() => app.RequestLoad(Define.Scene.GameScene)).Forget();
-            else
-                app.RequestLoad(Define.Scene.GameScene);
+            PlayExitAndLoadAsync(app).Forget();
         }
         else
         {
@@ -124,6 +241,7 @@ public class StagePointUI : MonoBehaviour
             resolvedDifficulty = 0;
             resolvedPrefab = "";
             resolvedTags = "";
+            RefreshIcon();
             return;
         }
 
@@ -132,5 +250,82 @@ public class StagePointUI : MonoBehaviour
         resolvedDifficulty = room.difficulty;
         resolvedPrefab = room.prefab;
         resolvedTags = (room.tags == null) ? "" : string.Join(", ", room.tags);
+
+        // Resolve 결과의 카테고리로 아이콘 갱신
+        RefreshIconFromResolved();
+    }
+
+    // ── 퇴장 연출 + 씬 전환 ──
+
+    private async UniTaskVoid PlayExitAndLoadAsync(AppBootstrapper app)
+    {
+        // 입력 차단
+        if (_canvasGroup != null) _canvasGroup.blocksRaycasts = false;
+
+        // 선택 노드로 포커스
+        var scroller = GetComponentInParent<StageMapScroller>(true);
+        if (scroller == null)
+            scroller = FindObjectOfType<StageMapScroller>(true);
+
+        if (scroller != null)
+            scroller.FocusOn(GetComponent<RectTransform>());
+
+        // 줌인 연출 (클릭한 노드 중심으로)
+        var content = scroller != null ? scroller.ContentTransform : null;
+        var myRT = GetComponent<RectTransform>();
+
+        if (content != null)
+            await ZoomIntoNodeAsync(content, myRT);
+
+        // 페이드 → 씬 전환
+        if (TransitionOverlay.Instance != null)
+            await TransitionOverlay.Instance.PlayAsync(() => app.RequestLoad(Define.Scene.GameScene));
+        else
+            app.RequestLoad(Define.Scene.GameScene);
+    }
+
+    /// <summary>클릭한 노드를 중심으로 맵을 확대. 노드가 화면 중앙에 유지됨.</summary>
+    private async UniTask ZoomIntoNodeAsync(RectTransform content, RectTransform node)
+    {
+        if (content == null || node == null) return;
+
+        float duration = 0.8f;
+        float targetScale = 2.2f;
+        float elapsed = 0f;
+
+        Vector2 nodePos = node.anchoredPosition;
+
+        while (elapsed < duration && content != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float ease = t * t;
+            float scale = Mathf.Lerp(1f, targetScale, ease);
+
+            content.localScale = Vector3.one * scale;
+            content.anchoredPosition = -nodePos * scale;
+
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+    }
+
+    // ── 노드 페이드인 ──
+
+    private async UniTaskVoid FadeInAsync()
+    {
+        if (_canvasGroup == null) return;
+        _canvasGroup.alpha = 0f;
+
+        float duration = 0.4f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _canvasGroup.alpha = Mathf.Clamp01(elapsed / duration);
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+
+        _canvasGroup.alpha = 1f;
     }
 }

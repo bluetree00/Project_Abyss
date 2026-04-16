@@ -26,6 +26,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private bool initAddressables = true;
 
     public static bool IsBackendInitialized { get; private set; }
+    public static bool IsAutoLoggedIn { get; private set; }
 
     [Header("Animation Preload (Test Friendly)")]
     [SerializeField] private bool preloadAnimations = true;
@@ -37,6 +38,9 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     [Header("Steam Login")]
     [SerializeField] private bool useSteamLogin = false;
+
+    [Header("Auto Login (Device ID)")]
+    [SerializeField] private bool useAutoLogin = true;
 
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
@@ -217,6 +221,23 @@ public sealed class AppBootstrapper : MonoBehaviour
             startScene = Define.Scene.Lobby;
         }
 
+        // 6-b) 디바이스 ID 자동 로그인 — Login 씬 스킵
+        if (useAutoLogin && !useSteamLogin)
+        {
+            bool autoOk = await DeviceAutoLoginAsync();
+            if (autoOk)
+            {
+                IsAutoLoggedIn = true;
+                Debug.Log("[AppBootstrapper] 자동 로그인 성공 → Login 스킵");
+                if (startScene == Define.Scene.Login || startScene == Define.Scene.Logo)
+                    startScene = Define.Scene.Lobby;
+            }
+            else
+            {
+                Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Login 씬으로 이동");
+            }
+        }
+
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
         {
@@ -302,6 +323,59 @@ public sealed class AppBootstrapper : MonoBehaviour
                 NotifySceneReady();
                 break;
         }
+    }
+
+    /// <summary>
+    /// 디바이스 고유 ID로 자동 로그인.
+    /// 계정 없으면 자동 회원가입 후 재로그인.
+    /// </summary>
+    private static async UniTask<bool> DeviceAutoLoginAsync()
+    {
+        string deviceId = SystemInfo.deviceUniqueIdentifier;
+        // 뒤끝 ID 제한에 맞게 접두사 + 해시
+        string id = "dev_" + deviceId;
+        if (id.Length > 20) id = id.Substring(0, 20);
+        string pw = deviceId;
+        if (pw.Length > 20) pw = pw.Substring(0, 20);
+
+        Debug.Log($"[AutoLogin] 디바이스 로그인 시도: {id}");
+
+        // 1차: 로그인 시도
+        var loginResult = await TryCustomLoginAsync(id, pw);
+        if (loginResult) return true;
+
+        // 2차: 계정 없으면 회원가입
+        Debug.Log("[AutoLogin] 계정 없음 → 회원가입 시도");
+        var signupResult = Backend.BMember.CustomSignUp(id, pw);
+        if (!signupResult.IsSuccess())
+        {
+            Debug.LogError($"[AutoLogin] 회원가입 실패: {signupResult.GetMessage()}");
+            return false;
+        }
+
+        // 3차: 재로그인
+        return await TryCustomLoginAsync(id, pw);
+    }
+
+    private static UniTask<bool> TryCustomLoginAsync(string id, string pw)
+    {
+        var tcs = new UniTaskCompletionSource<bool>();
+
+        Backend.BMember.CustomLogin(id, pw, callback =>
+        {
+            if (callback.IsSuccess())
+            {
+                Debug.Log($"[AutoLogin] 로그인 성공: gamerId={Backend.BMember.GetUserInfo()?.GetReturnValuetoJSON()?["row"]?["gamerId"]}");
+                tcs.TrySetResult(true);
+            }
+            else
+            {
+                Debug.LogWarning($"[AutoLogin] 로그인 실패: {callback.GetStatusCode()} {callback.GetMessage()}");
+                tcs.TrySetResult(false);
+            }
+        });
+
+        return tcs.Task;
     }
 
     private async UniTask EnsureUIRootAsync()
