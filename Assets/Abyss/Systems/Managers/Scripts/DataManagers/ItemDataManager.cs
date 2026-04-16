@@ -121,22 +121,28 @@ public class ItemDataManager
 
     private async UniTask LoadFromServerAsync()
     {
+        var serverData = new Dictionary<string, List<ItemEntry>>();
+
         int loaded = ChartLoader.Load("ITEM_DATA", row =>
         {
             var entry = ParseRow(row);
             var id = entry?.ResolvedId;
             if (entry == null || string.IsNullOrEmpty(id)) return;
 
-            if (!_itemById.TryGetValue(id, out var list))
+            if (!serverData.TryGetValue(id, out var list))
             {
                 list = new List<ItemEntry>();
-                _itemById[id] = list;
+                serverData[id] = list;
             }
-            list.RemoveAll(e => e.slot == entry.slot);
             list.Add(entry);
         });
 
-        if (loaded > 0) SaveToJson();
+        // 서버에서 1건이라도 받으면 전체 교체 (삭제/변경 반영)
+        if (loaded > 0)
+        {
+            _itemById = serverData;
+            SaveToJson();
+        }
 
         await UniTask.CompletedTask;
     }

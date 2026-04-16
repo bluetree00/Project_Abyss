@@ -221,6 +221,9 @@ public sealed class HudPresenter : MonoBehaviour
 
     /// <summary>버프 획득 알림 텍스트 표시.</summary>
     public void ShowBuffNotice(string message) => view?.CombatPanel?.ShowBuffNotice(message);
+
+    /// <summary>아이템 효과 발동 알림 (왼쪽 스택형).</summary>
+    public void ShowItemEffectNotice(string message) => view?.CombatPanel?.ShowItemEffectNotice(message);
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
 

@@ -44,13 +44,26 @@ public sealed class FreezeEffect : ItemEffectBase
 
 public sealed class ExtraAttackEffect : ItemEffectBase
 {
+    private const string VfxKey = "VFX_ExtraAttack";
+
     public ExtraAttackEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (Random.value >= _value) return;
-        // TODO: 동일 타격 판정 1회 추가 발동
-        Debug.Log($"[ExtraAttack] 추가 공격 발동!");
+        if (report.Target == null || ctx.Player == null) return;
+
+        if (report.Target.TryGetComponent<IDamageable>(out var damageable))
+        {
+            damageable.TakeDamage(report.DamageDealt, ctx.Player.gameObject, knockbackMultiplier: 0f);
+
+            var hitPos = report.HitPosition != Vector3.zero
+                ? report.HitPosition
+                : report.Target.transform.position;
+            ItemEffectVfxHelper.SpawnOneShotAt(VfxKey, hitPos);
+            ItemEffectVfxHelper.ShowNotice($"<color=#FFDD55>추가 타격</color> {report.DamageDealt:F0} → {report.Target.name}");
+            Debug.Log($"[ExtraAttack] 추가 타격 {report.DamageDealt:F0} → {report.Target.name}");
+        }
     }
 }
 

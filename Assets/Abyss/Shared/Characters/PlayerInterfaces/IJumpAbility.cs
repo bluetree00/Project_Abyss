@@ -1,4 +1,9 @@
-public interface IJumpAbility<T> where T : PlayerController
+public interface IJumpAbility
 {
-    void Jump(T controller);
+    bool IsGrounded { get; }
+    bool IsJumping { get; }
+
+    void Jump(PlayerController controller);
+    void UpdateGroundCheck(PlayerController controller);
+    void ApplyGravity(PlayerController controller);
 }

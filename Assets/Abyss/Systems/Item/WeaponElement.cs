@@ -54,4 +54,15 @@ public static class ElementRelation
 
     /// <summary>trigger가 원소 조건인지 여부.</summary>
     public static bool IsElementTrigger(string trigger) => TriggerToElement(trigger) != WeaponElement.None;
+
+    /// <summary>WeaponElement → ElementType 변환.</summary>
+    public static ElementType ToElementType(this WeaponElement we) => we switch
+    {
+        WeaponElement.Water     => ElementType.Water,
+        WeaponElement.Fire      => ElementType.Fire,
+        WeaponElement.Grass     => ElementType.Grass,
+        WeaponElement.Earth     => ElementType.Earth,
+        WeaponElement.Lightning => ElementType.Lightning,
+        _                       => ElementType.None,
+    };
 }

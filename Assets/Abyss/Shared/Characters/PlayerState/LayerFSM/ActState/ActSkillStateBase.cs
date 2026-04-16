@@ -42,6 +42,10 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
             new PassiveContext { skillUsed = Slot });
 
+        // 아이템 효과: 스킬 사용 hook (FireExplosion, Lightning 등)
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        mgr?.OnSkillUse(Slot);
+
         OnEnter();
     }
 

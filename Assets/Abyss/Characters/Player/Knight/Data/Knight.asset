@@ -23,7 +23,7 @@ MonoBehaviour:
   dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 0.5
-  jumpForce: 10
+  jumpForce: 5
   gravity: -5
   fallMultiplier: 2
   groundCheckDistance: 0.2

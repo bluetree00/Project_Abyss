@@ -36,7 +36,7 @@ public class CharacterData : ScriptableObject
     public float dodgeCooldown = 2f;
 
     [Header("점프 및 중력 설정")]
-    public float jumpForce = 7f;
+    public float jumpForce = 5f;
     public float gravity = -30f;
     public float fallMultiplier = 2f;
 

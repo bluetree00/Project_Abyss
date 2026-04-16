@@ -1173,7 +1173,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b6275991b1b1b047878140160b766cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
-  itemSO: {fileID: 11400000, guid: 680f98c660ec347459624302ae230a58, type: 2}
+  itemSO: {fileID: 11400000, guid: 69f52fc6a4b403f4a92ce64dacf10e3a, type: 2}
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
@@ -1681,7 +1681,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b6275991b1b1b047878140160b766cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
-  itemSO: {fileID: 11400000, guid: 31679b470b1e67944b05e524e1ea3528, type: 2}
+  itemSO: {fileID: 11400000, guid: 940b23289d8ea1641bea30f0bf638ec9, type: 2}
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
@@ -3372,7 +3372,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b6275991b1b1b047878140160b766cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldItemDisplay
-  itemSO: {fileID: 11400000, guid: ac336c8ffdc012946b921d31be5d336b, type: 2}
+  itemSO: {fileID: 11400000, guid: c16119d947e8f8545b77e7aa4767f126, type: 2}
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 0.8
   textSize: 3
@@ -3887,6 +3887,7 @@ MonoBehaviour:
   clearRoomKey: 286
   returnToStageMapKey: 287
   spawnItemKey: 288
+  cycleElementKey: 289
 --- !u!114 &1881724120
 MonoBehaviour:
   m_ObjectHideFlags: 0
