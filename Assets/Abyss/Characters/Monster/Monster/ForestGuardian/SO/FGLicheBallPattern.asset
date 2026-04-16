@@ -22,6 +22,6 @@ MonoBehaviour:
   projectileSpeed: 15
   projectileRadius: 2.5
   warningDuration: 0.3
-  vfxProjectile: {fileID: 0}
-  vfxImpact: {fileID: 0}
+  vfxProjectile: {fileID: 100100000, guid: d901313d00610f14981ccc932d3d95f7, type: 3}
+  vfxImpact: {fileID: 100100000, guid: 826ae61451417b94897e4b852dec721d, type: 3}
   patternCooldown: 8

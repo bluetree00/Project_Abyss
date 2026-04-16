@@ -30,5 +30,5 @@ MonoBehaviour:
   p2_recoverDuration: 0.8
   p2_warningDuration: 0.35
   p2_trackDuration: 0.4
-  vfxImpact: {fileID: 0}
+  vfxImpact: {fileID: 100100000, guid: 230d5948f7f21664b8286d5fc398b986, type: 3}
   patternCooldown: 8

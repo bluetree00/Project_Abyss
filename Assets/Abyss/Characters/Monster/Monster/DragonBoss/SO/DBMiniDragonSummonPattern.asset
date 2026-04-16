@@ -17,8 +17,8 @@ MonoBehaviour:
   breakOverride: -1
   animName: FlyFWD
   crossFade: 0.15
-  vfxPrefab: {fileID: 0}
-  miniDragonPrefab: {fileID: 0}
+  vfxPrefab: {fileID: 100100000, guid: a66ac8cc7bfe6f7449bdb1d44b77fe3e, type: 3}
+  miniDragonPrefab: {fileID: 100100000, guid: 29b6eed2069bcfc459cc1653d399680e, type: 3}
   miniDragonScale: 0.5
   spawnRadius: 4
   summonDelay: 1.2

@@ -17,7 +17,7 @@ MonoBehaviour:
   breakOverride: -1
   animName: MagicAttack3
   crossFade: 0.1
-  vfxBreath: {fileID: 0}
+  vfxBreath: {fileID: 100100000, guid: c15e6ae34ba4f4342aaea160e0d30071, type: 3}
   breathLocalOffset: {x: 0, y: 1.2, z: 1.5}
   warningDuration: 1
   breathDuration: 3.5

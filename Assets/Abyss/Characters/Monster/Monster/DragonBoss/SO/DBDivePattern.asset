@@ -17,9 +17,14 @@ MonoBehaviour:
   breakOverride: -1
   animName: Attack02
   crossFade: 0.1
-  vfxPrefab: {fileID: 1673707391571236, guid: f326479f7cef0794d95f29731f4bbdb3, type: 3}
+  vfxPrefab: {fileID: 100100000, guid: d4af488d06927654a9be45b66a1bfc22, type: 3}
   warningDuration: 0.8
   diveDuration: 1.5
   speedMultiplier: 3
   hitBoxWidth: 2
   hitBoxLength: 1
+  selfDamageRatioOnCrash: 0.03
+  maxDiveDistance: 20
+  recoverDuration: 0.8
+  wallProbeRadius: 0.7
+  patternCooldown: 10

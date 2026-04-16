@@ -17,8 +17,17 @@ MonoBehaviour:
   breakOverride: -1
   animName: Attack01
   crossFade: 0.1
-  vfxPrefab: {fileID: 3455203728533863914, guid: 53c0d1cb440e2eb45995d485f1510532, type: 3}
+  vfxPrefab: {fileID: 100100000, guid: e0159d7c05382534e92cb4361d3e94d2, type: 3}
+  breathLocalOffset: {x: 0, y: 1.2, z: 2.2}
+  breathLocalScale: {x: 1.6, y: 1.6, z: 5.5}
+  warningDuration: 1.5
   breathDuration: 5
   tickInterval: 0.3
   castRadius: 1.2
   castMaxDist: 10
+  beamWidth: 0.8
+  aimTurnSpeed: 120
+  beamTrackSpeed: 3
+  approachSpeed: 1.5
+  approachStopDist: 5
+  patternCooldown: 18
