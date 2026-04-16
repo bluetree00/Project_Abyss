@@ -17,12 +17,20 @@ MonoBehaviour:
   breakOverride: -1
   animName: FlyFWD
   crossFade: 0.15
-  breathVfxPrefab: {fileID: 3455203728533863914, guid: a7089a16ec2f12747b8e92ab6cec9451, type: 3}
-  fireExplosionVfxPrefab: {fileID: 6533228452991066826, guid: f9604ed79c6db494fb939d0a585130a6, type: 3}
+  breathVfxPrefab: {fileID: 3455203728533863914, guid: a7089a16ec2f12747b8e92ab6cec9451,
+    type: 3}
+  fireExplosionVfxPrefab: {fileID: 100100000, guid: e26f9e0b6f93d1842b15824e6ff2f21c, type: 3}
+  warningDuration: 1
   breathDuration: 10
   breathTickInterval: 0.3
   castRadius: 1.2
   castMaxDist: 12
-  fireExplosionInterval: 1
-  fireExplosionRadius: 2
-  fireExplosionDistance: 12
+  riseHeight: 8
+  beamApproachRadius: 8
+  beamTrackSpeed: 3
+  beamWidth: 0.6
+  tornadoDuration: 7
+  tornadoRadius: 1.8
+  tornadoStartRadius: 12
+  tornadoSpeed: 3.5
+  patternCooldown: 25

@@ -23,5 +23,5 @@ MonoBehaviour:
   p2_radius: 7
   p2_warningDuration: 0.4
   p2_shockwaveDuration: 1
-  vfxImpact: {fileID: 0}
+  vfxImpact: {fileID: 100100000, guid: 230d5948f7f21664b8286d5fc398b986, type: 3}
   patternCooldown: 6

@@ -20,4 +20,4 @@ MonoBehaviour:
   animIdle: IdleNormal
   crossFade: 0.15
   transitionDuration: 3
-  vfxPhaseChange: {fileID: 0}
+  vfxPhaseChange: {fileID: 100100000, guid: 9ffed2368353595408da89eccf2f2094, type: 3}

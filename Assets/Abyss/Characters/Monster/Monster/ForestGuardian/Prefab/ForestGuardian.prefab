@@ -122,8 +122,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.ForestGuardianMonster
   _debugState: 
   _phase1Materials:
-  - {fileID: 2100000, guid: 83fc17e3c57f24b5399153fd10da8793, type: 2}
-  - {fileID: 2100000, guid: 1df3497d03b6c4f3aaa74b359c4a9ff1, type: 2}
+  - {fileID: 2100000, guid: 4959f8d07a7004754901ced3678409ec, type: 2}
+  - {fileID: 2100000, guid: f8e6db393315b4ae3885e57f74a1a0f3, type: 2}
   _phase2Materials:
   - {fileID: 2100000, guid: aa934c0a5ec344c09b4f680d773b4c2e, type: 2}
   - {fileID: 2100000, guid: 6f50317c9464c4be48e76b6279ef0d61, type: 2}

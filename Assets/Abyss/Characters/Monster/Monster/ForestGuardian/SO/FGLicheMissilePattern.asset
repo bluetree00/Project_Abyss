@@ -24,5 +24,5 @@ MonoBehaviour:
   widthIncrease: 1
   hazardDuration: 1.5
   windupDuration: 0.5
-  vfxStrike: {fileID: 0}
+  vfxStrike: {fileID: 100100000, guid: 96c30f207bdbb3243abb88e8d5255d1e, type: 3}
   patternCooldown: 10
