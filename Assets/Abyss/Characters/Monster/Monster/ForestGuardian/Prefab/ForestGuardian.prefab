@@ -122,11 +122,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.ForestGuardianMonster
   _debugState: 
   _phase1Materials:
-  - {fileID: 2100000, guid: 4959f8d07a7004754901ced3678409ec, type: 2}
-  - {fileID: 2100000, guid: f8e6db393315b4ae3885e57f74a1a0f3, type: 2}
+  - {fileID: 2100000, guid: 58bfc59c1ab052b43b38cce9b64a35e3, type: 2}
+  - {fileID: 2100000, guid: 96162f20837102c44943376a88f0991e, type: 2}
   _phase2Materials:
-  - {fileID: 2100000, guid: aa934c0a5ec344c09b4f680d773b4c2e, type: 2}
-  - {fileID: 2100000, guid: 6f50317c9464c4be48e76b6279ef0d61, type: 2}
+  - {fileID: 2100000, guid: f96de2de592b20149aff01b921d2b08d, type: 2}
+  - {fileID: 2100000, guid: 209791a6fc64362449577035cdff216c, type: 2}
 --- !u!1001 &7243408000188889010
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -214,18 +214,18 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: 2586022629300929075, guid: b9be81f39ef7f5043ac5e4e66630cb6a,
+      objectReference: {fileID: 2586022629300929075, guid: f465362b93bb3e245898f0abaa5cec22,
         type: 3}
     - target: {fileID: 9132747518925091172, guid: 66e2c8f2358d1439ba242c755c263fa0,
         type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 4959f8d07a7004754901ced3678409ec, type: 2}
+      objectReference: {fileID: 2100000, guid: 58bfc59c1ab052b43b38cce9b64a35e3, type: 2}
     - target: {fileID: 9132747518925091172, guid: 66e2c8f2358d1439ba242c755c263fa0,
         type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
-      objectReference: {fileID: 2100000, guid: f8e6db393315b4ae3885e57f74a1a0f3, type: 2}
+      objectReference: {fileID: 2100000, guid: 96162f20837102c44943376a88f0991e, type: 2}
     m_RemovedComponents:
     - {fileID: 919132149161813880, guid: 66e2c8f2358d1439ba242c755c263fa0, type: 3}
     - {fileID: 192527473036206022, guid: 66e2c8f2358d1439ba242c755c263fa0, type: 3}
