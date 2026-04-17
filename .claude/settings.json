@@ -60,7 +60,9 @@
       "Bash(mkdir -p Rare/Combat Rare/Movement Rare/Passive Rare/Progress Rare/Survival Rare/Pickup)",
       "Bash(mkdir -p Epic/Combat Epic/Movement Epic/Passive Epic/Progress Epic/Survival Epic/Pickup)",
       "Bash(curl -s http://localhost:7700/refresh_unity)",
-      "Bash(grep -r \"DoScale\\\\|DOScale\\\\|localScale\\\\|anchoredPosition\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/Stage/*.cs --include=\"*.cs\" -n)"
+      "Bash(grep -r \"DoScale\\\\|DOScale\\\\|localScale\\\\|anchoredPosition\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/Stage/*.cs --include=\"*.cs\" -n)",
+      "Bash(git restore *)",
+      "Bash(grep -i \"StageUI\\\\|@UIRoot\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/AddressableAssetsData/AssetGroups/*.asset)"
     ],
     "additionalDirectories": [
       "c:\\Users\\u\\Desktop",

@@ -171,14 +171,14 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (layout != null)
             layout.SetLayerSizes(middlePattern);
 
-        // 콘텐츠 크기 조정 (피크층 노드 수에 따라 동적 계산)
+        // 콘텐츠 크기 조정 (피크층 + 향후 확장 여유)
         int totalLayers = middleLayers + 2;
         float layerSpacing = 800f;
-        float nodeSpacingX = 400f;
-        float marginY = 600f;
-        float marginX = 600f;
+        float nodeSpacingX = 500f;
+        float marginY = 800f;
+        float marginX = 1200f;
         float height = totalLayers * layerSpacing + marginY;
-        float width = Mathf.Max(1920f, peakLayer * nodeSpacingX + marginX);
+        float width = Mathf.Max(2400f, peakLayer * nodeSpacingX + marginX);
         scroller.SetContentSize(width, height);
 
         // 배경 적용
@@ -278,24 +278,34 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         return point;
     }
 
-    /// <summary>이전 층과 현재 층 노드를 비율 기반으로 연결.</summary>
+    private const int MaxConnectionsPerNode = 2;
+
+    /// <summary>이전 층과 현재 층 노드를 비율 기반으로 연결. 노드당 최대 2개.</summary>
     private static void ConnectLayers(List<StagePointUI> fromNodes, List<StagePointUI> toNodes)
     {
-        // 비율 기반 매핑 + 인접 분기
         for (int fi = 0; fi < fromNodes.Count; fi++)
         {
             float ratio = fromNodes.Count > 1 ? (float)fi / (fromNodes.Count - 1) : 0.5f;
             int primary = Mathf.Clamp(Mathf.RoundToInt(ratio * (toNodes.Count - 1)), 0, toNodes.Count - 1);
 
+            // 1번째 연결: 비율 기반 주 타겟
             fromNodes[fi].AddNextPointId(toNodes[primary].PointId);
 
-            if (primary > 0 && fromNodes.Count > 1)
-                fromNodes[fi].AddNextPointId(toNodes[primary - 1].PointId);
-            if (primary < toNodes.Count - 1 && fromNodes.Count > 1)
-                fromNodes[fi].AddNextPointId(toNodes[primary + 1].PointId);
+            // 2번째 연결: 인접 노드 중 하나 (랜덤 방향)
+            if (fromNodes[fi].NextPointIds.Count < MaxConnectionsPerNode)
+            {
+                bool tryRight = Random.value > 0.5f;
+                int secondary = tryRight ? primary + 1 : primary - 1;
+
+                if (secondary < 0 || secondary >= toNodes.Count)
+                    secondary = tryRight ? primary - 1 : primary + 1;
+
+                if (secondary >= 0 && secondary < toNodes.Count && secondary != primary)
+                    fromNodes[fi].AddNextPointId(toNodes[secondary].PointId);
+            }
         }
 
-        // 고아 방지: 연결 안 된 to 노드 보장
+        // 고아 방지: 연결 안 된 to 노드는 가장 가까운 from에서 연결
         for (int ti = 0; ti < toNodes.Count; ti++)
         {
             bool connected = false;

@@ -16,9 +16,11 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     [Tooltip("맵 콘텐츠 높이 (화면보다 큰 값, 너비는 화면에 맞춤)")]
     [SerializeField] private float contentHeight = 5400f;
 
-    [Header("마우스 휠")]
-    [Tooltip("휠 한 틱당 이동 거리")]
-    [SerializeField] private float scrollStep = 40f;
+    [Header("마우스 휠 줌")]
+    [Tooltip("휠 한 틱당 줌 변화량")]
+    [SerializeField] private float zoomStep = 0.1f;
+    [SerializeField] private float zoomMin = 0.4f;
+    [SerializeField] private float zoomMax = 1.0f;
 
     [Header("관성")]
     [SerializeField] private bool useInertia = true;
@@ -125,6 +127,7 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
             if (diff.sqrMagnitude > 0.01f)
                 _contentRT.anchoredPosition = Vector2.Lerp(_contentRT.anchoredPosition, clamped, elasticity);
         }
+
     }
 
     // ── Drag Handlers ──
@@ -145,7 +148,6 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
             _viewportRT, eventData.position, eventData.pressEventCamera, out Vector2 localPos);
 
         Vector2 delta = localPos - _prevDragPos;
-        delta.x = 0f; // 수직 스크롤만 허용
         _prevDragPos = localPos;
 
         if (useInertia)
@@ -163,11 +165,10 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     {
         if (_contentRT == null) return;
 
-        // 방향만 사용, 고정 이동량
-        float dir = eventData.scrollDelta.y > 0f ? -1f : 1f;
-        Vector2 delta = new Vector2(0f, dir * scrollStep);
-        ApplyMovement(delta);
-        _velocity = Vector2.zero;
+        float dir = eventData.scrollDelta.y > 0f ? 1f : -1f;
+        float newScale = _contentRT.localScale.x + dir * zoomStep;
+        newScale = Mathf.Clamp(newScale, zoomMin, zoomMax);
+        _contentRT.localScale = Vector3.one * newScale;
     }
 
     // ── Public ──
@@ -217,11 +218,18 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     private Vector2 ClampPosition(Vector2 pos)
     {
         float viewH = _viewportRT.rect.height;
+        float viewW = _viewportRT.rect.width;
 
-        // 콘텐츠 중심 기준 스크롤 범위: ±(contentHeight - viewH) / 2
-        float scrollRange = Mathf.Max(0f, (contentHeight - viewH) * 0.5f);
+        float scale = _contentRT != null ? _contentRT.localScale.x : 1f;
+        float scaledW = _contentRT != null ? _contentRT.sizeDelta.x * scale : viewW;
+        float scaledH = _contentRT != null ? _contentRT.sizeDelta.y * scale : viewH;
 
-        return new Vector2(0f, Mathf.Clamp(pos.y, -scrollRange, scrollRange));
+        float scrollRangeX = Mathf.Max(0f, (scaledW - viewW) * 0.5f);
+        float scrollRangeY = Mathf.Max(0f, (scaledH - viewH) * 0.5f);
+
+        return new Vector2(
+            Mathf.Clamp(pos.x, -scrollRangeX, scrollRangeX),
+            Mathf.Clamp(pos.y, -scrollRangeY, scrollRangeY));
     }
 
     private void BuildContentContainer()
