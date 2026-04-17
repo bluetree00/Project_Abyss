@@ -83,6 +83,14 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
     private async UniTask StartNewRunAsync(AppBootstrapper app)
     {
+        // 챕터 데이터 서버 로드
+        var chapterData = Managers.ChapterData;
+        if (chapterData != null && !chapterData.IsInitialized)
+        {
+            try { await chapterData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[StageMapBootstrapper] ChapterData 예외: {e.Message}"); }
+        }
+
         var session = new GameRunSession();
         app.BeginRun(session);
 
@@ -132,11 +140,17 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         foreach (var node in existingNodes)
             DestroyImmediate(node.gameObject);
 
-        // 챕터 데이터에서 층 설정 조회
+        // 챕터 데이터에서 층 설정 조회 (서버 → SO 폴백)
         int middleLayers = 5;
         int peakLayer = 3;
 
-        if (chapterRegistry != null)
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        if (serverEntry != null && serverEntry.total_layers > 0)
+        {
+            middleLayers = serverEntry.total_layers - 2;
+            peakLayer = serverEntry.peak_layer;
+        }
+        else if (chapterRegistry != null)
         {
             var data = chapterRegistry.Get(chapter);
             if (data != null)
