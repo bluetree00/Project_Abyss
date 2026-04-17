@@ -431,6 +431,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   startChapter: 0
+  chapterRegistry: {fileID: 0}
+  iconMap: {fileID: 0}
+  defaultMapBackground: {fileID: 21300000, guid: f63d1ecd00b1d2f42bdd25139bc38507, type: 3}
 --- !u!4 &2086454417
 Transform:
   m_ObjectHideFlags: 0

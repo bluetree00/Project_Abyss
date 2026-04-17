@@ -58,6 +58,23 @@ public class StagePointUI : MonoBehaviour
         _canvasGroup.blocksRaycasts = false;
     }
 
+    /// <summary>동적 생성 시 초기 설정. iconMapRef가 null이면 기존 값 유지.</summary>
+    public void Init(int id, StageCategory category, NormalRoomCategory normal, StageNodeIconMap iconMapRef = null)
+    {
+        pointId = id;
+        stageCategory = category;
+        normalRoomCategory = normal;
+        nextPointIds = new List<int>();
+        if (iconMapRef != null) iconMap = iconMapRef;
+    }
+
+    /// <summary>동적 생성 시 다음 노드 연결 추가.</summary>
+    public void AddNextPointId(int nextId)
+    {
+        if (!nextPointIds.Contains(nextId))
+            nextPointIds.Add(nextId);
+    }
+
     /// <summary>런타임에 방 카테고리를 변경 (랜덤 배정 시).</summary>
     public void SetNormalRoomCategory(NormalRoomCategory category)
     {

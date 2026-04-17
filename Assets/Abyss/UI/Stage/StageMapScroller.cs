@@ -10,11 +10,15 @@ using UnityEngine.UI;
 ///
 /// 드래그로 맵을 자유롭게 이동하며, 관성(inertia)을 지원한다.
 /// </summary>
-public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 {
     [Header("스크롤 설정")]
     [Tooltip("맵 콘텐츠 높이 (화면보다 큰 값, 너비는 화면에 맞춤)")]
     [SerializeField] private float contentHeight = 5400f;
+
+    [Header("마우스 휠")]
+    [Tooltip("휠 한 틱당 이동 거리")]
+    [SerializeField] private float scrollStep = 40f;
 
     [Header("관성")]
     [SerializeField] private bool useInertia = true;
@@ -38,10 +42,12 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     private void Awake()
     {
         _viewportRT = GetComponent<RectTransform>();
-
         BuildContentContainer();
+    }
 
-        // 노드 랜덤 배치 → 라인 생성 → 시작 노드 포커스
+    /// <summary>노드 생성 후 외부에서 호출. 레이아웃 → 라인 → 포커스.</summary>
+    public void RebuildMap()
+    {
         var layout = GetComponent<StageNodeLayout>();
         if (layout != null)
             layout.ApplyLayout();
@@ -50,22 +56,37 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
         if (lineConnector != null)
             lineConnector.Rebuild();
 
-        FocusOnStartNode();
+        FocusOnCurrentNode();
     }
 
-    /// <summary>Start 카테고리 노드를 찾아서 초기 포커스.</summary>
-    private void FocusOnStartNode()
+    /// <summary>동적 층 수에 맞게 콘텐츠 크기 조정. 배경은 타일링으로 채움.</summary>
+    public void SetContentSize(float width, float height)
+    {
+        contentHeight = height;
+        if (_contentRT != null)
+            _contentRT.sizeDelta = new Vector2(width, height);
+
+        if (_contentRT == null) return;
+
+        var mapPanel = _contentRT.Find("MapPanel");
+        if (mapPanel == null) return;
+
+        var panelRT = mapPanel.GetComponent<RectTransform>();
+        if (panelRT != null)
+            panelRT.sizeDelta = new Vector2(width, height);
+
+        var image = mapPanel.GetComponent<Image>();
+        if (image != null)
+            image.type = Image.Type.Simple;
+    }
+
+    /// <summary>현재 노드 기준으로 포커스.</summary>
+    public void FocusOnCurrentNode()
     {
         if (_contentRT == null) return;
 
         var points = _contentRT.GetComponentsInChildren<StagePointUI>(true);
-        foreach (var p in points)
-        {
-            // StagePointUI에 stageCategory 접근이 필요 → public 프로퍼티 추가 필요
-            // 대안: AppBootstrapper.CurrentRun에서 StagePointManager.CurrentPointId로 찾기
-        }
 
-        // 현재 노드(보통 Start) 기준으로 포커스
         var run = AppBootstrapper.Instance?.CurrentRun;
         int currentId = run?.StagePointManager?.CurrentPointId ?? -1;
 
@@ -81,7 +102,6 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
             }
         }
 
-        // 런이 없으면 첫 번째 노드 기준
         if (points.Length > 0)
             FocusOn(points[0].GetComponent<RectTransform>());
     }
@@ -137,6 +157,17 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     public void OnEndDrag(PointerEventData eventData)
     {
         _isDragging = false;
+    }
+
+    public void OnScroll(PointerEventData eventData)
+    {
+        if (_contentRT == null) return;
+
+        // 방향만 사용, 고정 이동량
+        float dir = eventData.scrollDelta.y > 0f ? -1f : 1f;
+        Vector2 delta = new Vector2(0f, dir * scrollStep);
+        ApplyMovement(delta);
+        _velocity = Vector2.zero;
     }
 
     // ── Public ──
@@ -279,11 +310,12 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 /// 드래그 이벤트를 StageMapScroller로 전달하는 헬퍼.
 /// MapPanel 배경에 붙여서 배경 드래그 시 스크롤이 동작하도록 한다.
 /// </summary>
-public class DragForwarder : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class DragForwarder : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 {
     public StageMapScroller Target { get; set; }
 
     public void OnBeginDrag(PointerEventData eventData) => Target?.OnBeginDrag(eventData);
     public void OnDrag(PointerEventData eventData) => Target?.OnDrag(eventData);
     public void OnEndDrag(PointerEventData eventData) => Target?.OnEndDrag(eventData);
+    public void OnScroll(PointerEventData eventData) => Target?.OnScroll(eventData);
 }

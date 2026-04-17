@@ -112,6 +112,8 @@ public class ChapterRuntimeData
         if (server.monster_count_scale > 0) monsterCountScale = server.monster_count_scale;
         if (server.gold_multiplier > 0) goldMultiplier = server.gold_multiplier;
         if (server.item_drop_multiplier > 0) itemDropMultiplier = server.item_drop_multiplier;
+        if (server.total_layers > 0) middleLayers = server.total_layers - 2;
+        if (server.peak_layer > 0) peakLayer = server.peak_layer;
     }
 }
 
@@ -129,4 +131,8 @@ public class ChapterServerEntry
     public string monster_pool_tag;
     public float gold_multiplier;
     public float item_drop_multiplier;
+
+    // 맵 노드 구성
+    public int total_layers;
+    public int peak_layer;
 }

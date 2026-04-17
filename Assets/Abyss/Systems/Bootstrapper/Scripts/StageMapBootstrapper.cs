@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -6,13 +7,21 @@ using Cysharp.Threading.Tasks;
 /// - 새 런 시작 시 GameRunSession을 초기화하고 AppBootstrapper에 등록
 /// - 기존 런이 있으면 재사용 (GameScene → StageMap 복귀 시)
 /// - 맵 UI 초기화만 담당 (전투/플레이어 스폰은 GameRunBootstrapper 담당)
+/// - 챕터 데이터 기반으로 동적 노드 생성
 /// </summary>
 public sealed class StageMapBootstrapper : MonoBehaviour
 {
     public static StageMapBootstrapper Instance { get; private set; }
 
+    [Header("챕터")]
     [SerializeField] private ChapterId startChapter = ChapterId.Chapter1;
     [SerializeField] private ChapterRegistry chapterRegistry;
+
+    [Header("노드 생성")]
+    [SerializeField] private StageNodeIconMap iconMap;
+
+    [Header("맵 배경")]
+    [SerializeField] private Sprite defaultMapBackground;
 
     private void Awake()
     {
@@ -50,21 +59,19 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         {
             app.CurrentRun.EnterMap();
 
+            GenerateAndLayoutNodes(app.CurrentRun.CurrentChapter);
+
             var points = FindObjectsOfType<StagePointUI>(true);
             app.CurrentRun.RegisterPoints(points);
 
-            // 새 챕터 진입이면 노드 재배치
             var spm = app.CurrentRun.StagePointManager;
             if (spm != null && spm.CurrentPointId < 0)
-            {
                 app.CurrentRun.ResolveAllPointsAndSetStart();
-            }
 
             foreach (var p in points)
                 p.RefreshIconFromResolved();
 
             RefreshStageMapUI();
-            ApplyChapterBackground(app.CurrentRun.CurrentChapter);
             app.NotifySceneReady();
             return;
         }
@@ -88,6 +95,8 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             return;
         }
 
+        GenerateAndLayoutNodes(startChapter);
+
         var points = FindObjectsOfType<StagePointUI>(true);
         session.RegisterPoints(points);
         session.ResolveAllPointsAndSetStart();
@@ -96,6 +105,224 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         Debug.Log("[StageMapBootstrapper] 새 런 시작 완료.");
     }
+
+    // ── 노드 생성 ──
+
+    /// <summary>기존 노드 제거 → 동적 노드 생성 + 배치 → 라인 생성.</summary>
+    private void GenerateAndLayoutNodes(ChapterId chapter)
+    {
+        var scroller = FindObjectOfType<StageMapScroller>(true);
+        if (scroller == null || scroller.ContentTransform == null)
+        {
+            Debug.LogError("[StageMapBootstrapper] StageMapScroller or ContentTransform not found.");
+            return;
+        }
+
+        var contentParent = scroller.ContentTransform;
+
+        // 기존 노드에서 템플릿 캡처 후 즉시 제거
+        var existingNodes = contentParent.GetComponentsInChildren<StagePointUI>(true);
+        GameObject template = null;
+        if (existingNodes.Length > 0)
+        {
+            template = Instantiate(existingNodes[0].gameObject, contentParent, false);
+            template.SetActive(false);
+            template.name = "NodeTemplate";
+        }
+        foreach (var node in existingNodes)
+            DestroyImmediate(node.gameObject);
+
+        // 챕터 데이터에서 층 설정 조회
+        int middleLayers = 5;
+        int peakLayer = 3;
+
+        if (chapterRegistry != null)
+        {
+            var data = chapterRegistry.Get(chapter);
+            if (data != null)
+            {
+                middleLayers = data.middleLayers;
+                peakLayer = data.peakLayer;
+            }
+        }
+
+        // 패턴 계산: 중간층만 (Start/Boss 제외)
+        int[] middlePattern = BuildMiddlePattern(middleLayers, peakLayer);
+
+        // 노드 생성 + 연결
+        GenerateNodes(contentParent, middlePattern, template);
+
+        // 레이아웃 패턴 설정
+        var layout = scroller.GetComponent<StageNodeLayout>();
+        if (layout != null)
+            layout.SetLayerSizes(middlePattern);
+
+        // 콘텐츠 크기 조정 (피크층 노드 수에 따라 동적 계산)
+        int totalLayers = middleLayers + 2;
+        float layerSpacing = 800f;
+        float nodeSpacingX = 400f;
+        float marginY = 600f;
+        float marginX = 600f;
+        float height = totalLayers * layerSpacing + marginY;
+        float width = Mathf.Max(1920f, peakLayer * nodeSpacingX + marginX);
+        scroller.SetContentSize(width, height);
+
+        // 배경 적용
+        ApplyMapBackground(scroller, chapter);
+
+        // 레이아웃 + 라인 + 포커스
+        scroller.RebuildMap();
+    }
+
+    /// <summary>
+    /// 중간층 패턴 생성 (Start/Boss 제외).
+    /// middleLayers=5, peakLayer=3 → {2, 3, 4, 3, 2}
+    /// 전체: Start(1) + {2, 3, 4, 3, 2} + Boss(1) = {1, 2, 3, 4, 3, 2, 1}
+    /// </summary>
+    private static int[] BuildMiddlePattern(int middleLayers, int peakLayer)
+    {
+        middleLayers = Mathf.Max(1, middleLayers);
+        peakLayer = Mathf.Clamp(peakLayer, 1, middleLayers);
+
+        var pattern = new int[middleLayers];
+        int peakIdx = peakLayer - 1;
+
+        for (int i = 0; i < middleLayers; i++)
+        {
+            if (i <= peakIdx)
+                pattern[i] = i + 2;
+            else
+                pattern[i] = 2 * peakLayer - i;
+
+            pattern[i] = Mathf.Max(1, pattern[i]);
+        }
+
+        return pattern;
+    }
+
+    /// <summary>Start + 중간 + Boss 노드 생성 및 연결.</summary>
+    private void GenerateNodes(Transform parent, int[] middlePattern, GameObject template)
+    {
+        int pointId = 1;
+
+        // Start (pointId = 0)
+        var startNode = CreateNode(parent, template, 0, StageCategory.Start, NormalRoomCategory.Battle);
+
+        var prevLayerNodes = new List<StagePointUI> { startNode };
+
+        // 중간 층
+        for (int li = 0; li < middlePattern.Length; li++)
+        {
+            int count = middlePattern[li];
+            var layerNodes = new List<StagePointUI>();
+
+            for (int n = 0; n < count; n++)
+            {
+                var category = PickCategory(li, middlePattern.Length);
+                var node = CreateNode(parent, template, pointId, StageCategory.Normal, category);
+                layerNodes.Add(node);
+                pointId++;
+            }
+
+            ConnectLayers(prevLayerNodes, layerNodes);
+            prevLayerNodes = layerNodes;
+        }
+
+        // Boss (pointId = 100)
+        var bossNode = CreateNode(parent, template, 100, StageCategory.Boss, NormalRoomCategory.Battle);
+        ConnectLayers(prevLayerNodes, new List<StagePointUI> { bossNode });
+
+        // 템플릿 정리
+        if (template != null)
+            Destroy(template);
+    }
+
+    private StagePointUI CreateNode(Transform parent, GameObject template, int pointId, StageCategory stage, NormalRoomCategory normal)
+    {
+        GameObject go;
+        if (template != null)
+        {
+            go = Instantiate(template, parent, false);
+            go.name = $"Node_{pointId}";
+        }
+        else
+        {
+            go = new GameObject($"Node_{pointId}",
+                typeof(RectTransform), typeof(UnityEngine.UI.Image),
+                typeof(UnityEngine.UI.Button), typeof(CanvasGroup));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<RectTransform>().sizeDelta = new Vector2(80f, 80f);
+        }
+
+        go.SetActive(true);
+
+        var point = go.GetComponent<StagePointUI>();
+        if (point == null)
+            point = go.AddComponent<StagePointUI>();
+
+        point.Init(pointId, stage, normal, iconMap);
+        return point;
+    }
+
+    /// <summary>이전 층과 현재 층 노드를 비율 기반으로 연결.</summary>
+    private static void ConnectLayers(List<StagePointUI> fromNodes, List<StagePointUI> toNodes)
+    {
+        // 비율 기반 매핑 + 인접 분기
+        for (int fi = 0; fi < fromNodes.Count; fi++)
+        {
+            float ratio = fromNodes.Count > 1 ? (float)fi / (fromNodes.Count - 1) : 0.5f;
+            int primary = Mathf.Clamp(Mathf.RoundToInt(ratio * (toNodes.Count - 1)), 0, toNodes.Count - 1);
+
+            fromNodes[fi].AddNextPointId(toNodes[primary].PointId);
+
+            if (primary > 0 && fromNodes.Count > 1)
+                fromNodes[fi].AddNextPointId(toNodes[primary - 1].PointId);
+            if (primary < toNodes.Count - 1 && fromNodes.Count > 1)
+                fromNodes[fi].AddNextPointId(toNodes[primary + 1].PointId);
+        }
+
+        // 고아 방지: 연결 안 된 to 노드 보장
+        for (int ti = 0; ti < toNodes.Count; ti++)
+        {
+            bool connected = false;
+            foreach (var fn in fromNodes)
+            {
+                if (fn.NextPointIds != null)
+                {
+                    foreach (var nid in fn.NextPointIds)
+                    {
+                        if (nid == toNodes[ti].PointId) { connected = true; break; }
+                    }
+                }
+                if (connected) break;
+            }
+
+            if (!connected && fromNodes.Count > 0)
+            {
+                float ratio = toNodes.Count > 1 ? (float)ti / (toNodes.Count - 1) : 0.5f;
+                int bestFrom = Mathf.Clamp(Mathf.RoundToInt(ratio * (fromNodes.Count - 1)), 0, fromNodes.Count - 1);
+                fromNodes[bestFrom].AddNextPointId(toNodes[ti].PointId);
+            }
+        }
+    }
+
+    /// <summary>진행도에 따른 방 카테고리 랜덤 선택.</summary>
+    private static NormalRoomCategory PickCategory(int layerIdx, int totalMiddleLayers)
+    {
+        float progress = totalMiddleLayers > 1 ? (float)layerIdx / (totalMiddleLayers - 1) : 0.5f;
+        float roll = Random.value;
+
+        if (progress < 0.3f)
+            return roll < 0.7f ? NormalRoomCategory.Battle : NormalRoomCategory.Event;
+        if (progress < 0.6f)
+            return roll < 0.4f ? NormalRoomCategory.Battle :
+                   roll < 0.7f ? NormalRoomCategory.Event :
+                   roll < 0.85f ? NormalRoomCategory.Shop : NormalRoomCategory.Elite;
+        return roll < 0.5f ? NormalRoomCategory.Battle :
+               roll < 0.75f ? NormalRoomCategory.Elite : NormalRoomCategory.Event;
+    }
+
+    // ── UI 갱신 ──
 
     private void RefreshStageMapUI()
     {
@@ -107,37 +334,15 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (connector != null)
             connector.RefreshLineStates();
 
-        // 줌/스크롤 상태 리셋 (GameScene 복귀 시 확대 상태 방지)
-        ResetMapZoom();
-
-        // 도달 가능 노드 glow 갱신
-        RefreshNodeGlow();
-    }
-
-    private void ResetMapZoom()
-    {
         var scroller = FindObjectOfType<StageMapScroller>(true);
-        if (scroller == null || scroller.ContentTransform == null) return;
-
-        var content = scroller.ContentTransform;
-        content.localScale = Vector3.one;
-
-        // 현재 노드로 포커스
-        var run = AppBootstrapper.Instance?.CurrentRun;
-        int currentId = run?.StagePointManager?.CurrentPointId ?? -1;
-
-        if (currentId >= 0)
+        if (scroller != null)
         {
-            var points = content.GetComponentsInChildren<StagePointUI>(true);
-            foreach (var p in points)
-            {
-                if (p.PointId == currentId)
-                {
-                    scroller.FocusOn(p.GetComponent<RectTransform>());
-                    return;
-                }
-            }
+            if (scroller.ContentTransform != null)
+                scroller.ContentTransform.localScale = Vector3.one;
+            scroller.FocusOnCurrentNode();
         }
+
+        RefreshNodeGlow();
     }
 
     private void RefreshNodeGlow()
@@ -152,9 +357,8 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             p.SetGlow(mgr.CanMove(p.PointId));
     }
 
-    private void ApplyChapterBackground(ChapterId chapter)
+    private void ApplyMapBackground(StageMapScroller scroller, ChapterId chapter)
     {
-        var scroller = FindObjectOfType<StageMapScroller>(true);
         if (scroller == null || scroller.ContentTransform == null) return;
 
         var mapPanel = scroller.ContentTransform.Find("MapPanel");
@@ -163,27 +367,51 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         var image = mapPanel.GetComponent<UnityEngine.UI.Image>();
         if (image == null) return;
 
-        // ChapterRegistry에서 데이터 조회
+        // 챕터별 배경 우선, 없으면 기본 배경
         var chapterData = chapterRegistry != null ? chapterRegistry.Get(chapter) : null;
 
-        if (chapterData != null)
+        if (chapterData != null && chapterData.mapBackground != null)
         {
-            if (chapterData.mapBackground != null)
-                image.sprite = chapterData.mapBackground;
+            image.sprite = chapterData.mapBackground;
             image.color = chapterData.mapBackgroundTint;
+        }
+        else if (defaultMapBackground != null)
+        {
+            image.sprite = defaultMapBackground;
+            image.color = Color.white;
         }
         else
         {
-            // 레지스트리 없을 때 폴백
-            image.color = chapter switch
+            // 폴백: Addressable에서 기본 배경 로드
+            LoadDefaultBackgroundAsync(image).Forget();
+        }
+    }
+
+    private static async UniTaskVoid LoadDefaultBackgroundAsync(UnityEngine.UI.Image image)
+    {
+        try
+        {
+            var sprite = await Managers.AddressableManager.LoadAssetAsync<Sprite>("map_3");
+            if (sprite != null && image != null)
             {
-                ChapterId.Chapter1 => new Color(0.75f, 0.70f, 0.55f),
-                ChapterId.Chapter2 => new Color(0.55f, 0.60f, 0.70f),
-                ChapterId.Chapter3 => new Color(0.50f, 0.45f, 0.55f),
-                ChapterId.Chapter4 => new Color(0.70f, 0.55f, 0.45f),
-                ChapterId.Chapter5 => new Color(0.40f, 0.40f, 0.50f),
-                _ => Color.white,
-            };
+                image.sprite = sprite;
+                image.color = Color.white;
+                return;
+            }
+
+            // Sprite 실패 시 Texture2D로 폴백
+            var tex = await Managers.AddressableManager.LoadAssetAsync<Texture2D>("map_3");
+            if (tex != null && image != null)
+            {
+                image.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f), 100f);
+                image.color = Color.white;
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StageMapBootstrapper] 기본 배경 로드 실패: {e.Message}");
         }
     }
 
