@@ -23,7 +23,7 @@ public class StageNodeLayout : MonoBehaviour
     [SerializeField] private float topY = 2400f;
 
     [Tooltip("같은 층 노드 간 X 간격")]
-    [SerializeField] private float nodeSpacingX = 400f;
+    [SerializeField] private float nodeSpacingX = 500f;
 
     [Tooltip("X 랜덤 오프셋 최대값")]
     [SerializeField] private float randomOffsetX = 40f;
