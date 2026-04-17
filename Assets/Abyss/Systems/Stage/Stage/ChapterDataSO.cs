@@ -135,4 +135,7 @@ public class ChapterServerEntry
     // 맵 노드 구성
     public int total_layers;
     public int peak_layer;
+
+    // 버전
+    public int stat_version;
 }

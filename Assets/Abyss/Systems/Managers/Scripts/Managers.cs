@@ -48,6 +48,7 @@ public sealed class Managers : MonoBehaviour
     private ItemDataManager _itemDataManager;
     private BlockDataManager _blockDataManager;
     private BuffDataManager _buffDataManager;
+    private ChapterDataManager _chapterDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -266,6 +267,20 @@ public sealed class Managers : MonoBehaviour
                 inst._buffDataManager = new BuffDataManager();
 
             return inst._buffDataManager;
+        }
+    }
+
+    public static ChapterDataManager ChapterData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._chapterDataManager == null)
+                inst._chapterDataManager = new ChapterDataManager();
+
+            return inst._chapterDataManager;
         }
     }
     #endregion
