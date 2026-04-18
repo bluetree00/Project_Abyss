@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Cinemachine;
@@ -26,9 +27,14 @@ public class GameCameraController : MonoBehaviour
     private CinemachineBrain _brain;
     private Image _fadeOverlay;
     private Canvas _fadeCanvas;
+    private bool _introStarted;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
+
+    // ── Events ──
+    /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
+    public event Action OnIntroComplete;
 
     // ── Lifecycle ──
 
@@ -117,6 +123,8 @@ public class GameCameraController : MonoBehaviour
     private void OnPlayerBound(PlayerController player)
     {
         if (this == null || player == null) return;
+        if (_introStarted) return;
+        _introStarted = true;
         PlayIntroAsync(player.transform).Forget();
     }
 
@@ -188,6 +196,9 @@ public class GameCameraController : MonoBehaviour
             _fadeCanvas = null;
             _fadeOverlay = null;
         }
+
+        // 인트로 완료 알림 (플레이어 등장 연출 트리거)
+        OnIntroComplete?.Invoke();
 
         // Cinemachine 복귀
         if (_cinemachine != null) _cinemachine.enabled = true;

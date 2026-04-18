@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: DemonKingConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: DemonKing
-  grade: 2
+  grade: 3
   playerLayer:
     serializedVersion: 2
     m_Bits: 64

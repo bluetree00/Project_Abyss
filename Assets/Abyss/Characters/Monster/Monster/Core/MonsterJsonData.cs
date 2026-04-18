@@ -12,7 +12,7 @@ public class MonsterJsonData
 {
     // ── 기본 정보 ──────────────────────────────────────────
     public string monsterName;
-    /// <summary>"Normal" | "Elite" | "Boss"</summary>
+    /// <summary>"Common" | "Rare" | "Elite" | "Boss"</summary>
     public string grade;
 
     // ── 서브 데이터 ────────────────────────────────────────

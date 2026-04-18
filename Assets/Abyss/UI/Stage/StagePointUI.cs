@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using Cysharp.Threading.Tasks;
 
-public class StagePointUI : MonoBehaviour
+public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Graph Config (Inspector 입력)")]
     [SerializeField] private int pointId;
@@ -40,6 +41,11 @@ public class StagePointUI : MonoBehaviour
     private Image _image;
     private CanvasGroup _canvasGroup;
 
+    // ── Glow ──
+    private Outline _glowOutline;
+    private bool _glowActive;
+    private float _glowPhase;
+
     private void Awake()
     {
         _image = GetComponent<Image>();
@@ -51,6 +57,23 @@ public class StagePointUI : MonoBehaviour
         _canvasGroup = GetComponent<CanvasGroup>();
         if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
         _canvasGroup.blocksRaycasts = false;
+    }
+
+    /// <summary>동적 생성 시 초기 설정. iconMapRef가 null이면 기존 값 유지.</summary>
+    public void Init(int id, StageCategory category, NormalRoomCategory normal, StageNodeIconMap iconMapRef = null)
+    {
+        pointId = id;
+        stageCategory = category;
+        normalRoomCategory = normal;
+        nextPointIds = new List<int>();
+        if (iconMapRef != null) iconMap = iconMapRef;
+    }
+
+    /// <summary>동적 생성 시 다음 노드 연결 추가.</summary>
+    public void AddNextPointId(int nextId)
+    {
+        if (!nextPointIds.Contains(nextId))
+            nextPointIds.Add(nextId);
     }
 
     /// <summary>런타임에 방 카테고리를 변경 (랜덤 배정 시).</summary>
@@ -321,11 +344,122 @@ public class StagePointUI : MonoBehaviour
 
         while (elapsed < duration)
         {
+            if (_canvasGroup == null) return;
             elapsed += Time.unscaledDeltaTime;
             _canvasGroup.alpha = Mathf.Clamp01(elapsed / duration);
             await UniTask.Yield(PlayerLoopTiming.Update);
         }
 
-        _canvasGroup.alpha = 1f;
+        if (_canvasGroup != null)
+            _canvasGroup.alpha = 1f;
+    }
+
+    // ── Glow 연출 (도달 가능 노드 — 테두리만 펄스) ──
+
+    private void Update()
+    {
+        if (!_glowActive || _glowOutline == null) return;
+
+        _glowPhase += Time.unscaledDeltaTime * 3f;
+        float alpha = 0.15f + 0.25f * (0.5f + 0.5f * Mathf.Sin(_glowPhase));
+        _glowOutline.effectColor = new Color(1f, 0.85f, 0.3f, alpha);
+    }
+
+    /// <summary>도달 가능 여부에 따라 glow on/off.</summary>
+    public void SetGlow(bool active)
+    {
+        _glowActive = active;
+
+        if (active)
+        {
+            EnsureGlow();
+            _glowOutline.enabled = true;
+        }
+        else if (_glowOutline != null)
+        {
+            _glowOutline.enabled = false;
+        }
+    }
+
+    private void EnsureGlow()
+    {
+        if (_glowOutline != null) return;
+        if (_image == null) return;
+
+        _glowOutline = _image.gameObject.AddComponent<Outline>();
+        _glowOutline.effectColor = new Color(1f, 0.85f, 0.3f, 0.25f);
+        _glowOutline.effectDistance = new Vector2(2f, -2f);
+        _glowOutline.useGraphicAlpha = false;
+    }
+
+    // ── 호버 툴팁 ──
+
+    private static GameObject _tooltipGO;
+    private static TMPro.TextMeshProUGUI _tooltipText;
+    private static RectTransform _tooltipRT;
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        EnsureTooltip();
+        if (_tooltipGO == null) return;
+
+        string category = stageCategory switch
+        {
+            StageCategory.Start => "Start",
+            StageCategory.Boss => "Boss",
+            _ => normalRoomCategory.ToString(),
+        };
+
+        string info = stageCategory == StageCategory.Normal
+            ? $"{category}\nID: {pointId}"
+            : $"{category}";
+
+        _tooltipText.text = info;
+        _tooltipGO.SetActive(true);
+
+        // 노드 위쪽에 배치
+        var rt = GetComponent<RectTransform>();
+        if (rt != null && _tooltipRT != null)
+        {
+            _tooltipRT.SetParent(rt.parent, false);
+            _tooltipRT.anchoredPosition = rt.anchoredPosition + new Vector2(0f, 60f);
+        }
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_tooltipGO != null)
+            _tooltipGO.SetActive(false);
+    }
+
+    private static void EnsureTooltip()
+    {
+        if (_tooltipGO != null) return;
+
+        _tooltipGO = new GameObject("NodeTooltip", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        _tooltipRT = _tooltipGO.GetComponent<RectTransform>();
+        _tooltipRT.sizeDelta = new Vector2(180f, 60f);
+        _tooltipRT.pivot = new Vector2(0.5f, 0f);
+
+        var bg = _tooltipGO.GetComponent<Image>();
+        bg.color = new Color(0.15f, 0.12f, 0.08f, 0.85f);
+        bg.raycastTarget = false;
+
+        var textGO = new GameObject("Text", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
+        textGO.transform.SetParent(_tooltipGO.transform, false);
+
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = new Vector2(8f, 4f);
+        textRT.offsetMax = new Vector2(-8f, -4f);
+
+        _tooltipText = textGO.GetComponent<TMPro.TextMeshProUGUI>();
+        _tooltipText.fontSize = 22f;
+        _tooltipText.color = new Color(0.95f, 0.9f, 0.75f);
+        _tooltipText.alignment = TMPro.TextAlignmentOptions.Center;
+        _tooltipText.raycastTarget = false;
+
+        _tooltipGO.SetActive(false);
     }
 }

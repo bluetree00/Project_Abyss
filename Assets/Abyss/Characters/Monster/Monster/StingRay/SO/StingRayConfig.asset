@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StingRayConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: StingRay
-  grade: 0
+  grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64

@@ -323,6 +323,23 @@ public sealed class GameRunSession
         ChangeRunState(RunState.ChapterClear);
     }
 
+    /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
+    public bool AdvanceToNextChapter()
+    {
+        if (!IsRunning) return false;
+
+        var next = CurrentChapter + 1;
+        if (next > ChapterId.Chapter5) return false;
+
+        CurrentChapter = next;
+
+        // StagePointManager 재초기화 (새 챕터 노드 배치)
+        StagePointManager.Initialize(next, RoomManager);
+
+        ChangeRunState(RunState.Map);
+        return true;
+    }
+
     // =========================================================
     // HUD Mode API
     // =========================================================

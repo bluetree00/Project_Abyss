@@ -59,11 +59,18 @@
       "Bash(mkdir -p Common/Combat Common/Movement Common/Passive Common/Progress Common/Survival Common/Pickup)",
       "Bash(mkdir -p Rare/Combat Rare/Movement Rare/Passive Rare/Progress Rare/Survival Rare/Pickup)",
       "Bash(mkdir -p Epic/Combat Epic/Movement Epic/Passive Epic/Progress Epic/Survival Epic/Pickup)",
+<<<<<<< HEAD
       "Bash(python)",
       "Bash(awk '{print $2}')",
       "Bash(curl -s -X POST http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"refresh_unity\",\"arguments\":{}}}')",
       "Bash(find \"C:\\\\Users\\\\User\\\\Project_Abyss\\\\Project_Abyss\\\\Assets\\\\Abyss\" -name \"IDodgeAbility.cs\" -exec cat {} \\\\;)",
       "Read(//c/Users/User/Project_Abyss/Project_Abyss/**)"
+=======
+      "Bash(curl -s http://localhost:7700/refresh_unity)",
+      "Bash(grep -r \"DoScale\\\\|DOScale\\\\|localScale\\\\|anchoredPosition\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/Stage/*.cs --include=\"*.cs\" -n)",
+      "Bash(git restore *)",
+      "Bash(grep -i \"StageUI\\\\|@UIRoot\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/AddressableAssetsData/AssetGroups/*.asset)"
+>>>>>>> 71138792a37b8f3c9a721248a6b223fdc2551b0f
     ],
     "additionalDirectories": [
       "c:\\Users\\u\\Desktop",
