@@ -4,8 +4,8 @@ using Abyss.Monster;
 using UnityEngine;
 
 
-/// <summary>몬스터 등급.</summary>
-public enum MonsterGrade { Normal, Elite, Boss }
+/// <summary>몬스터 등급. 기존 Normal(0)을 Common(0)으로 개명 + Rare/Elite/Boss 재정렬.</summary>
+public enum MonsterGrade { Common = 0, Rare = 1, Elite = 2, Boss = 3 }
 
 /// <summary>
 /// 몬스터 마스터 설정 SO.
@@ -18,7 +18,7 @@ public class MonsterConfigSO : ScriptableObject
 {
     [Header("기본 정보")]
     public string       monsterName;
-    public MonsterGrade grade = MonsterGrade.Normal;
+    public MonsterGrade grade = MonsterGrade.Common;
 
     [Header("레이어")]
     [Tooltip("플레이어 레이어 마스크 (감지 및 공격 판정에 공통 사용)")]

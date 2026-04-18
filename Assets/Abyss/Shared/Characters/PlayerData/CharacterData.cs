@@ -58,6 +58,10 @@ public class CharacterData : ScriptableObject
     [Header("패시브")]
     public PassiveSO passive;
 
+    // 씬 진입 시 등장 연출 (null이면 GameRunBootstrapper의 기본 연출 사용)
+    [Header("등장 연출")]
+    public PlayerEntranceBehaviourSO playerEntrance;
+
     // 레거시 호환 — EffectData 등에서 사용
     public int GetTotalAttackPower() => UnityEngine.Mathf.Max(baseMeleeAttack, baseRangedAttack);
 

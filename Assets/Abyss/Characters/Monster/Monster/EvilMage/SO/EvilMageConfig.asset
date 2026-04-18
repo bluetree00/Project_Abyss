@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: EvilMageConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: EvilMage
-  grade: 1
+  grade: 2
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
