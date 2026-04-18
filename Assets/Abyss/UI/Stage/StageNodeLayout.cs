@@ -17,23 +17,29 @@ public class StageNodeLayout : MonoBehaviour
 {
     [Header("레이아웃 설정")]
     [Tooltip("층 간 Y 간격")]
-    [SerializeField] private float layerSpacing = 640f;
+    [SerializeField] private float layerSpacing = 800f;
 
     [Tooltip("첫 번째 층의 Y 위치 (콘텐츠 중심 기준, 양수 = 위)")]
-    [SerializeField] private float topY = 1600f;
+    [SerializeField] private float topY = 2400f;
 
     [Tooltip("같은 층 노드 간 X 간격")]
-    [SerializeField] private float nodeSpacingX = 300f;
+    [SerializeField] private float nodeSpacingX = 500f;
 
     [Tooltip("X 랜덤 오프셋 최대값")]
-    [SerializeField] private float randomOffsetX = 60f;
+    [SerializeField] private float randomOffsetX = 40f;
 
     [Tooltip("Y 랜덤 오프셋 최대값")]
-    [SerializeField] private float randomOffsetY = 30f;
+    [SerializeField] private float randomOffsetY = 20f;
 
     [Header("층 구성 (자동 감지 안 될 때 수동 지정)")]
     [Tooltip("각 층의 노드 수. 비어있으면 자동 배분.")]
     [SerializeField] private int[] manualLayerSizes;
+
+    /// <summary>동적 생성 시 층별 노드 수를 외부에서 설정.</summary>
+    public void SetLayerSizes(int[] sizes)
+    {
+        manualLayerSizes = sizes;
+    }
 
     /// <summary>노드를 층별로 랜덤 배치한다. Start 전에 호출.</summary>
     public void ApplyLayout()

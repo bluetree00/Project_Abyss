@@ -194,6 +194,9 @@ public class StageLineConnector : MonoBehaviour
         }
     }
 
+    [Header("선 여백")]
+    [SerializeField] private float lineMargin = 20f;
+
     private void CreateLine(RectTransform from, RectTransform to, int fromId, int toId, int behindIndex)
     {
         var go = new GameObject($"Line_{fromId}_{toId}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -216,10 +219,22 @@ public class StageLineConnector : MonoBehaviour
         Vector2 toPos = to.anchoredPosition;
 
         Vector2 dir = toPos - fromPos;
-        float distance = dir.magnitude;
+        float fullDistance = dir.magnitude;
+
+        if (fullDistance < lineMargin * 2f)
+        {
+            // 노드가 너무 가까우면 선 생략
+            Destroy(go);
+            return;
+        }
+
+        // 양쪽 노드에서 margin만큼 안쪽으로 줄임
+        Vector2 dirNorm = dir / fullDistance;
+        Vector2 startPos = fromPos + dirNorm * lineMargin;
+        float distance = fullDistance - lineMargin * 2f;
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
-        rt.anchoredPosition = fromPos;
+        rt.anchoredPosition = startPos;
         rt.sizeDelta = new Vector2(distance, lineThickness);
         rt.localRotation = Quaternion.Euler(0f, 0f, angle);
         rt.localScale = Vector3.one;

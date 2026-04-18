@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: DragonBossConfig
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
   monsterName: DragonBoss
-  grade: 2
+  grade: 3
   playerLayer:
     serializedVersion: 2
     m_Bits: 64

@@ -48,6 +48,7 @@ public sealed class EscBookPopup : UI_Popup
     {
         gameObject.SetActive(true);
         EnsureInventoryView();
+        EnsureCharacterInfoView();
         _currentTab = 0;
         SetPageImmediate(0);
         Time.timeScale = 0f;
@@ -58,6 +59,13 @@ public sealed class EscBookPopup : UI_Popup
         if (pageInventory == null) return;
         if (pageInventory.GetComponent<InventoryPageView>() == null)
             pageInventory.AddComponent<InventoryPageView>();
+    }
+
+    private void EnsureCharacterInfoView()
+    {
+        if (pageSkill == null) return;
+        if (pageSkill.GetComponent<CharacterInfoPageView>() == null)
+            pageSkill.AddComponent<CharacterInfoPageView>();
     }
 
     public void ClosePopup()
