@@ -14,6 +14,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private bool buildRuntimeNavMesh = true;
     [SerializeField] private bool disableSceneBakedNavMeshOnStart = true;
 
+    [Header("Player Entrance")]
+    [SerializeField, Tooltip("캐릭터 데이터에 개별 연출이 없을 때 사용할 기본 등장 연출 SO")]
+    private PlayerEntranceBehaviourSO defaultPlayerEntrance;
+
     [Header("Block Map Gen")]
     [SerializeField] private BlockPalette blockPalette;
     [SerializeField] private float blockCellSize = 1f;
@@ -350,8 +354,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
         {
-            _run?.BindPlayer(player);
-
             // 에디터 직접 실행 시 기본 무기 자동 장착
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
@@ -380,6 +382,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     }
                 }
             }
+
+            // 무기 장착 완료 후 숨김 → 카메라 인트로 → 등장 연출
+            SetupEntrance(player);
+            _run?.BindPlayer(player);
         }
 
         // Guard: force combat HUD once more after player/map bootstrap settles.
@@ -405,7 +411,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
+        {
+            SetupEntrance(player);
             run.BindPlayer(player);
+        }
 
         // Guard: some room/bootstrap flows can override HUD mode after early request.
         run.RequestHudMode(HUDIds.Mode.Combat);
@@ -442,8 +451,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var player = await SpawnPlayerAsync(playerPrefabKey);
         if (player != null)
         {
-            run.BindPlayer(player);
-
             // 무기가 없으면 기본 무기 자동 장착
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
@@ -457,6 +464,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     await player.WeaponManager.AcquireWeaponAsync(wd);
                 }
             }
+
+            // 무기 장착 완료 후 숨김 → 카메라 인트로 → 등장 연출
+            SetupEntrance(player);
+            run.BindPlayer(player);
         }
 
         // Guard: ensure HUD remains in combat mode after late binds complete.
@@ -544,6 +555,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         return player;
+    }
+
+    /// <summary>플레이어에 등장 연출 컨트롤러를 부착하고 초기화한다.</summary>
+    private void SetupEntrance(PlayerController player)
+    {
+        if (player == null) return;
+
+        // 캐릭터 고유 연출 우선, 없으면 기본 연출로 폴백
+        var behaviour = player.CharacterData?.playerEntrance ?? defaultPlayerEntrance;
+
+        var entrance = player.GetComponent<PlayerEntranceController>();
+        if (entrance == null)
+            entrance = player.gameObject.AddComponent<PlayerEntranceController>();
+        entrance.Initialize(player, behaviour);
     }
 
     private static void EnsureCameraController()
