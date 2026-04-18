@@ -230,7 +230,6 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleBossHPChanged(int hp, int maxHp)
     {
         view?.BossPanel?.SetHP(hp, maxHp);
-        if (hp <= 0) UnbindBoss();
     }
 
     private static int GetBossMaxHp(MonsterBase boss)

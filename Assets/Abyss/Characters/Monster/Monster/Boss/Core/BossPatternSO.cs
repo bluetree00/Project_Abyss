@@ -27,6 +27,14 @@ public abstract class BossPatternSO : SpecialStateDataBase
     [Tooltip("패턴 선택 가중치 (높을수록 자주 선택됨, WeightedRandom 모드에서 적용)")]
     public float weight = 1f;
 
+    [Header("이펙트")]
+    [Tooltip("패턴 실행 시 스폰할 이펙트 프리팹. null 이면 이펙트 없음.")]
+    public UnityEngine.GameObject effectPrefab;
+
+    [Header("Player Status Effect")]
+    [Tooltip("Optional player status effect applied by the pattern. Leave null when the pattern should not apply one.")]
+    public PlayerStatusEffectSO playerStatusEffect;
+
     [Header("패턴 연계")]
     [Tooltip("이 패턴 실행 후 Blackboard.LastPatternTag 에 기록되는 태그. BKLastPatternTagConditionSO 에서 참조.")]
     public string patternTag = "";

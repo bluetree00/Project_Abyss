@@ -212,6 +212,13 @@ public class PlayerController : CharacterBase
         _slowTimer = Mathf.Max(_slowTimer, duration);
     }
 
+    private float _freezeTimer;
+    public bool IsFrozen => _freezeTimer > 0f;
+
+    /// <summary>빙결: duration초 동안 이동·행동·입력을 완전히 차단한다. 연속 피격 시 남은 시간을 연장.</summary>
+    public void ApplyFreeze(float duration)
+        => _freezeTimer = Mathf.Max(_freezeTimer, duration);
+
     //============================================================
     // Knockback
     //============================================================
@@ -342,6 +349,12 @@ public class PlayerController : CharacterBase
             _slowTimer = Mathf.Max(0f, _slowTimer - Time.deltaTime);
             if (_slowTimer <= 0f)
                 SetMoveScale(1f);
+        }
+        if (_freezeTimer > 0f)
+        {
+            _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.deltaTime);
+            moveDirection = Vector3.zero;
+            return;
         }
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();

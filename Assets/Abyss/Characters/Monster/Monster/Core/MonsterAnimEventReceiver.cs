@@ -51,4 +51,11 @@ public class MonsterAnimEventReceiver : MonoBehaviour
     public void OnGetHitEnd() { }
 
     public void OnDieEnd() { }
+
+    // Third-party clips (Malbers) fire this event; silently ignore.
+    public void PlaySound() { }
+
+    // Malbers audio event aliases
+    public void PlaySound(int index) { }
+    public void StopSound() { }
 }

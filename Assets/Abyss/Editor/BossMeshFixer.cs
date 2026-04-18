@@ -81,17 +81,7 @@ public static class BossMeshFixer
             Debug.Log("[BossMeshFixer] ForestGuardian SkinnedMeshRenderer 연결 완료.");
         }
 
-        // ── Phase1 / Phase2 머티리얼 연결 ─────────────────────────
-        var fgMonster = root.GetComponent<Abyss.Monster.ForestGuardianMonster>();
-        if (fgMonster == null) { Debug.LogWarning("[BossMeshFixer] ForestGuardianMonster 컴포넌트를 찾을 수 없습니다."); return; }
-
-        var so = new SerializedObject(fgMonster);
-
-        SetMaterialArray(so.FindProperty("_phase1Materials"), matA, matALimbs);
-        SetMaterialArray(so.FindProperty("_phase2Materials"), matB, matBLimbs);
-
-        so.ApplyModifiedProperties();
-        Debug.Log("[BossMeshFixer] ForestGuardian Phase1/2 Materials 연결 완료.");
+        Debug.Log("[BossMeshFixer] ForestGuardian SkinnedMeshRenderer 연결 완료 (Phase 머티리얼은 ForestGuardianMonster 구현 후 자동 연결됩니다).");
     }
 
     static void SetMaterialArray(SerializedProperty prop, Material m0, Material m1)
