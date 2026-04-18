@@ -1,62 +1,34 @@
-using System;
-using UnityEngine;
-
 namespace Abyss.Monster
 {
-public class DragonBossBlackboard
+/// <summary>
+/// DragonBoss 전용 블랙보드.
+/// 공용 쿨다운/타이머 외에 드래곤 고유 상태 플래그를 추가한다.
+/// </summary>
+public class DragonBossBlackboard : BossAttackBlackboard
 {
-    public enum DragonElement { Ice, Thunder, Fire }
+    /// <summary>드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.</summary>
+    public enum DragonElement { Fire, Ice, Thunder }
 
-    private Func<float> _hpRatioGetter;
+    public bool HasSummonedAt80;
+    public bool HasSummonedAt50;
+    public bool HasSummonedAt10;
+    public bool IsAirborne;
+    public float AirBiteCooldown;
 
-    public Vector3 SpawnPosition { get; set; }
-    public float SpawnY { get; set; }
-
-    public DragonElement CurrentElement
+    public new void TickCooldowns(float deltaTime)
     {
-        get
-        {
-            float r = _hpRatioGetter != null ? _hpRatioGetter() : 1f;
-            if (r > 0.7f) return DragonElement.Ice;
-            if (r > 0.4f) return DragonElement.Thunder;
-            return DragonElement.Fire;
-        }
+        base.TickCooldowns(deltaTime);
+        if (AirBiteCooldown > 0f) AirBiteCooldown -= deltaTime;
     }
 
-    private bool _summon80Used;
-    private bool _summon50Used;
-    private bool _summon10Used;
-
-    public int ActiveMiniDragonCount = 0;
-    public bool ThunderShieldActive = false;
-    public string LastPatternTag = "";
-    public float NormalModeTimer = 0f;
-
-    public void Init(Func<float> hpRatioGetter) => _hpRatioGetter = hpRatioGetter;
-
-    public bool IsSummonTriggered(float threshold)
+    public new void Reset()
     {
-        if (threshold >= 0.79f) return _summon80Used;
-        if (threshold >= 0.49f) return _summon50Used;
-        return _summon10Used;
-    }
-
-    public void MarkSummonUsed(float threshold)
-    {
-        if (threshold >= 0.79f) _summon80Used = true;
-        else if (threshold >= 0.49f) _summon50Used = true;
-        else _summon10Used = true;
-    }
-
-    public void Reset()
-    {
-        _summon80Used = false;
-        _summon50Used = false;
-        _summon10Used = false;
-        ActiveMiniDragonCount = 0;
-        ThunderShieldActive = false;
-        LastPatternTag = "";
-        NormalModeTimer = 0f;
+        base.Reset();
+        HasSummonedAt80 = false;
+        HasSummonedAt50 = false;
+        HasSummonedAt10 = false;
+        IsAirborne      = false;
+        AirBiteCooldown = 0f;
     }
 }
 }

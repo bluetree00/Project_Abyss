@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9eafdbd7300e4aa1a66ed990bde51b1f, type: 3}
+  m_Name: DragonAirBitePattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonAirBitePatternSO
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: air_bite
+  breakOverride: -1
+  _biteCount: 3
+  _cooldown: 30
+  _takeoffDuration: 0.55
+  _takeoffHeight: 3
+  _hoverHeight: 3
+  _approachSpeed: 3
+  _approachDuration: 0.46
+  _maxApproachDuration: 2.5
+  _recoveryDuration: 0.9
+  _airTurnAngleThreshold: 21
+  _airChaseRotationSpeed: 3.2
+  _airTurnMoveMultiplier: 0.58
+  _cameraViewportY: 0.68
+  _cameraSideOffset: 1
+  _minAnchorDistance: 2.4
+  _maxAnchorDistance: 4.2
+  _fallbackForwardOffset: 3.49
+  _biteDuration: 1.2
+  _warningTime: 0.28
+  _hitTime: 0.62
+  _biteAttackHeight: 3
+  _biteTriggerDistance: 3.15
+  _attackRadius: 2.35
+  _attackCenterForwardOffset: 1.35
+  _attackDamage: 24
+  _warningMarkerPrefab: {fileID: 1173698457435006, guid: a8b2d1c44c0f47ac9aab7c77d9f3b891,
+    type: 3}
+  _warningMarkerScale: 1
+  _warningMarkerLifetime: 0.9
+  _warningMarkerHeightOffset: 0.18
+  _takeoffStateName: Takeoff
+  _airChaseStateName: AirChase
+  _airChaseLeftStateName: AirChaseLeft
+  _airChaseRightStateName: AirChaseRight
+  _biteStateName: AirBite
+  _landingStateName: Landing

@@ -40,11 +40,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ca57a31cdc40b2545be737603b78ed55
-    m_Address: ForestGuardian/ForestGuardian
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 29b6eed2069bcfc459cc1653d399680e
     m_Address: DragonBoss/DragonBoss
     m_ReadOnly: 0
