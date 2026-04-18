@@ -1830,6 +1830,8 @@ MonoBehaviour:
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
   disableSceneBakedNavMeshOnStart: 1
+  defaultPlayerEntrance: {fileID: 11400000, guid: fbf55aa93a915964f99df6e70b8668b3,
+    type: 2}
   blockPalette: {fileID: 11400000, guid: 4f37ed8cc553a734cbe922020c290fc8, type: 2}
   blockCellSize: 1
 --- !u!1 &750723827
