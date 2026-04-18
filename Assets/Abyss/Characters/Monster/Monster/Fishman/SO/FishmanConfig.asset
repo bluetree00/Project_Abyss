@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: FishmanConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: Fishman
-  grade: 0
+  grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64

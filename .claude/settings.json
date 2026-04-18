@@ -58,7 +58,11 @@
       "Bash(python3 -c \" import json, sys data = json.load\\(sys.stdin\\) seen = set\\(\\) for item in data['items']: pid = item.get\\('passive_id'\\) or item.get\\('item_id'\\) or '' if not pid or pid in seen: continue seen.add\\(pid\\) r = item.get\\('rarity',''\\) t = item.get\\('trigger',''\\) print\\(f'{pid}|{r}|{t}'\\) \")",
       "Bash(mkdir -p Common/Combat Common/Movement Common/Passive Common/Progress Common/Survival Common/Pickup)",
       "Bash(mkdir -p Rare/Combat Rare/Movement Rare/Passive Rare/Progress Rare/Survival Rare/Pickup)",
-      "Bash(mkdir -p Epic/Combat Epic/Movement Epic/Passive Epic/Progress Epic/Survival Epic/Pickup)"
+      "Bash(mkdir -p Epic/Combat Epic/Movement Epic/Passive Epic/Progress Epic/Survival Epic/Pickup)",
+      "Bash(curl -s http://localhost:7700/refresh_unity)",
+      "Bash(grep -r \"DoScale\\\\|DOScale\\\\|localScale\\\\|anchoredPosition\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/Abyss/UI/Stage/*.cs --include=\"*.cs\" -n)",
+      "Bash(git restore *)",
+      "Bash(grep -i \"StageUI\\\\|@UIRoot\" /c/Users/u/Documents/GitHub/Project_Abyss/Assets/AddressableAssetsData/AssetGroups/*.asset)"
     ],
     "additionalDirectories": [
       "c:\\Users\\u\\Desktop",
