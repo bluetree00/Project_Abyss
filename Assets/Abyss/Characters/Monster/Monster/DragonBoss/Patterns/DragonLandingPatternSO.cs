@@ -47,7 +47,7 @@ public class DragonLandingPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
-        return bb.IsAirborne;
+        return bb.BodyState == BodyState.Airborne;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -122,7 +122,7 @@ internal sealed class DragonLandingState : FullLockState<DragonLandingPatternSO>
         }
 
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
-            bb.IsAirborne = false;
+            bb.BodyState = BodyState.Grounded;
 
         _phase = Phase.Done;
         ReturnToGround(ctx);

@@ -2,8 +2,8 @@ namespace Abyss.Monster
 {
 /// <summary>
 /// 보스 물리 상태 — 지상/공중.
-/// 장래 L4 전이 패턴(Takeoff/Landing) 만이 이 값을 플립하도록 설계.
-/// 현재는 DragonBodyStateCondition 이 레거시 IsAirborne 플래그에서 파생 (P7 에서 전환).
+/// 공중 공격 패턴 계열과 DragonBodyStateCondition 의 단일 진실 값.
+/// Takeoff/Landing 전이 패턴이 이 값을 플립한다.
 /// </summary>
 public enum BodyState
 {
@@ -23,7 +23,24 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public bool HasSummonedAt80;
     public bool HasSummonedAt50;
     public bool HasSummonedAt10;
-    public bool IsAirborne;
+
+    /// <summary>
+    /// 현재 바디 상태 — 지상/공중 판정의 단일 진실 값.
+    /// DragonBodyStateCondition · 공중 공격 패턴들이 이 값을 기준으로 분기한다.
+    /// </summary>
+    public BodyState BodyState;
+
+    /// <summary>
+    /// Legacy 호환 proxy — 기존 코드의 `bb.IsAirborne = true/false` 설정을
+    /// 그대로 유지하면서 내부적으로는 BodyState 를 갱신한다.
+    /// 신규 코드는 BodyState 를 직접 사용할 것.
+    /// </summary>
+    public bool IsAirborne
+    {
+        get => BodyState == BodyState.Airborne;
+        set => BodyState = value ? BodyState.Airborne : BodyState.Grounded;
+    }
+
     public float AirBiteCooldown;
     public float IceSlamCooldown;
 
@@ -40,7 +57,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
         HasSummonedAt80 = false;
         HasSummonedAt50 = false;
         HasSummonedAt10 = false;
-        IsAirborne      = false;
+        BodyState       = BodyState.Grounded;
         AirBiteCooldown = 0f;
         IceSlamCooldown = 0f;
     }
