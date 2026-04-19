@@ -1112,7 +1112,17 @@ public class PlayerController : CharacterBase
         if (hit.collider == null) return;
         if (!hit.collider.TryGetComponent<IDamageable>(out var damageable)) return;
 
-        damageable.TakeDamage(damage, gameObject, knockback);
+        // 원소 결정: NextAttackElement 아이템 효과 > 무기 기본 원소
+        var weaponData = WeaponManager?.CurrentWeaponData;
+        WeaponElement finalWeaponElem = NextAttackElement != WeaponElement.None
+            ? NextAttackElement
+            : (weaponData?.element ?? WeaponElement.None);
+        if (NextAttackElement != WeaponElement.None) NextAttackElement = WeaponElement.None;
+
+        ElementType elemType    = finalWeaponElem.ToElementType();
+        float       elemAmount  = GetCurrentElementAmount(weaponData);
+
+        damageable.TakeDamage(damage, gameObject, knockback, elemType, elemAmount);
 
         // 타격 이펙트 스폰
         SpawnTrailHitEffect(hit.point);
@@ -1123,6 +1133,20 @@ public class PlayerController : CharacterBase
 
         if (hit.collider.TryGetComponent<IKillable>(out var killable) && killable.IsDead)
             FirePassive(PassiveTrigger.OnKill, ctx);
+    }
+
+    /// <summary>현재 공격 타입에 맞는 원소 부여량 반환.</summary>
+    private float GetCurrentElementAmount(WeaponData wd)
+    {
+        if (wd == null) return 0f;
+        return CurrentAttackTypeForEffect switch
+        {
+            WeaponActionType.GroundHeavy or WeaponActionType.AirHeavy or WeaponActionType.AirPlunge
+                => wd.elementAmountHeavy,
+            WeaponActionType.AirLight
+                => wd.elementAmountAir > 0f ? wd.elementAmountAir : wd.elementAmountBasic,
+            _   => wd.elementAmountBasic,
+        };
     }
 
     private async void SpawnTrailHitEffect(Vector3 hitPoint)
