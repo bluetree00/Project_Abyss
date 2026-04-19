@@ -14,11 +14,13 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public bool HasSummonedAt10;
     public bool IsAirborne;
     public float AirBiteCooldown;
+    public float IceSlamCooldown;
 
     public new void TickCooldowns(float deltaTime)
     {
         base.TickCooldowns(deltaTime);
         if (AirBiteCooldown > 0f) AirBiteCooldown -= deltaTime;
+        if (IceSlamCooldown > 0f) IceSlamCooldown -= deltaTime;
     }
 
     public new void Reset()
@@ -29,6 +31,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
         HasSummonedAt10 = false;
         IsAirborne      = false;
         AirBiteCooldown = 0f;
+        IceSlamCooldown = 0f;
     }
 }
 }

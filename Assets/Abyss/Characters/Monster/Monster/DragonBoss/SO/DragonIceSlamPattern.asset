@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a77315dc4b65f1418de3b12f612e192, type: 3}
+  m_Name: DragonIceSlamPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonIceSlamPatternSO
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
+  patternTag: 
+  breakOverride: -1
+  _cooldown: 35
+  _hoverHeight: 8
+  _moveSpeed: 7
+  _centerReachedDistance: 0.6
+  _airRotationSpeed: 4
+  _warningDuration: 3
+  _dangerZonePrefab: {fileID: 1173698457435006, guid: a8b2d1c44c0f47ac9aab7c77d9f3b891,
+    type: 3}
+  _dangerZoneScale: 4.5
+  _dangerZoneHeightOffset: 0.1
+  _icePillarPrefab: {fileID: 6530448752386012335, guid: c3467a660c4fd4f429b33f697302408c,
+    type: 3}
+  _pillarCount: 8
+  _pillarRadius: 5
+  _pillarTintColor: {r: 0.4, g: 0.8, b: 1, a: 1}
+  _flyDownSpeed: 14
+  _slamDamage: 40
+  _slamRadius: 8
+  _slamEffectPrefab: {fileID: 96566848741554304, guid: c5809d1ce520247448f43b81810d55de,
+    type: 3}
+  _slamEffectScale: 5
+  _takeoffStateName: Takeoff
+  _airChaseStateName: AirChase
+  _flyDownStateName: UR Fly Down
+  _landingStateName: Landing
