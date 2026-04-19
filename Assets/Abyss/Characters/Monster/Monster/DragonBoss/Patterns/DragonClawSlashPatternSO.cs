@@ -142,7 +142,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             ctx.Agent.enabled = true;
             ctx.Agent.Warp(ctx.Transform.position);
         }
-        ctx.Agent.isStopped = false;
+        if (ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
     }
 
     // ── Jump ────────────────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private void FinishPattern(MonsterContext ctx)
     {
         _phase = Phase.Done;
-        if (ctx.Agent != null) ctx.Agent.isStopped = false;
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
         ctx.Monster.ChangeState<ChaseState>();
     }
 
