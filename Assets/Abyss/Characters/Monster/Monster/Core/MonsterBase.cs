@@ -147,6 +147,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _agent.speed            = _config.stat.moveSpeed;
         _agent.stoppingDistance = _config.stat.attackRange;
 
+        // Agent 를 가장 가까운 NavMesh 로 스냅. baseOffset=0 + voxel 오차로
+        // isOnNavMesh=false 로 시작하는 경우를 방지한다.
+        if (!_agent.isOnNavMesh)
+            _agent.Warp(transform.position);
+
         // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
