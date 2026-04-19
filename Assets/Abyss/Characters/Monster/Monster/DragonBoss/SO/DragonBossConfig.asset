@@ -83,7 +83,8 @@ MonoBehaviour:
   condTimePressureSecs: 8
   patternEntries:
   - conditions: 
-    patterns: []
+    patterns:
+    - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
     selectionMode: 0
     forceExecute: 0
   - conditions: 09000000
@@ -93,6 +94,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
     - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
     - {fileID: 11400000, guid: 43ab687a0aeda1041aa1299750583028, type: 2}
+    - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
     selectionMode: 0
     forceExecute: 0
   - conditions: 0a000000

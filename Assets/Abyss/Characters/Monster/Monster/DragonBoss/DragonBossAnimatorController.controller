@@ -26,6 +26,32 @@ AnimatorState:
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
+--- !u!1102 &-6312028778454648977
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: USleep Idle
+  m_Speed: 1
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 1
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 7400002, guid: 80a955d549024bf46b8682408aaaed1d, type: 3}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
 --- !u!1102 &-6008129915256229081
 AnimatorState:
   serializedVersion: 6
@@ -265,7 +291,7 @@ AnimatorStateMachine:
     m_Position: {x: 1010, y: 400, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 1100000011}
-    m_Position: {x: 1050, y: 470, z: 0}
+    m_Position: {x: 1020, y: 470, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 4805202627257287907}
     m_Position: {x: 800, y: 950, z: 0}
@@ -274,7 +300,7 @@ AnimatorStateMachine:
     m_Position: {x: 830, y: 1020, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 3112847563901234561}
-    m_Position: {x: 1170, y: 260, z: 0}
+    m_Position: {x: 1170, y: 270, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 3112847563901234562}
     m_Position: {x: 1200, y: 330, z: 0}
@@ -286,7 +312,19 @@ AnimatorStateMachine:
     m_Position: {x: 1420, y: 270, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 7777777777777777772}
-    m_Position: {x: 1430, y: 330, z: 0}
+    m_Position: {x: 1420, y: 330, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: 356658588068580855}
+    m_Position: {x: 1650, y: 270, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: 2104525347756343575}
+    m_Position: {x: 1870, y: 260, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: -6312028778454648977}
+    m_Position: {x: 1880, y: 340, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: 1353582537714704098}
+    m_Position: {x: 1890, y: 420, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions: []
   m_EntryTransitions: []
@@ -583,6 +621,58 @@ AnimatorState:
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
+--- !u!1102 &356658588068580855
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: URFly Down
+  m_Speed: 1
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 0
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 7400056, guid: 01c2243a113498e4babe4fdfedbce860, type: 3}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
+--- !u!1102 &1353582537714704098
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: USleep Start
+  m_Speed: 1
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 1
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 7400000, guid: 80a955d549024bf46b8682408aaaed1d, type: 3}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
 --- !u!1102 &1858361591006244660
 AnimatorState:
   serializedVersion: 6
@@ -604,6 +694,32 @@ AnimatorState:
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
   m_Motion: {fileID: 7400000, guid: 37e6d12ce35807449af40762eab4b015, type: 3}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
+--- !u!1102 &2104525347756343575
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: USleep End
+  m_Speed: 1
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 1
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 7400004, guid: 80a955d549024bf46b8682408aaaed1d, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
