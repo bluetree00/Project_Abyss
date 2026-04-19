@@ -143,6 +143,7 @@ public class DragonWalkChaseState : IMonsterState
         float speedMult = dragon != null ? dragon.WalkChaseSpeedMult : 0.5f;
         if (ctx.Agent != null)
         {
+            EnsureAgentReady(ctx);
             _savedAngularSpeed         = ctx.Agent.angularSpeed;
             ctx.Agent.speed            = ctx.Stat.moveSpeed * speedMult * ctx.Runtime.SpeedMultiplier;
             ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
@@ -151,6 +152,25 @@ public class DragonWalkChaseState : IMonsterState
         _lastDest    = Vector3.positiveInfinity;
         _currentAnim = null;
         UpdateDirectionAnim(ctx);
+    }
+
+    private static void EnsureAgentReady(MonsterContext ctx)
+    {
+        if (ctx.Agent == null) return;
+        if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
+        if (ctx.Agent.isOnNavMesh) return;
+
+        bool sampled = UnityEngine.AI.NavMesh.SamplePosition(
+            ctx.Transform.position, out var hit, 10f, UnityEngine.AI.NavMesh.AllAreas);
+        if (sampled)
+        {
+            bool warped = ctx.Agent.Warp(hit.position);
+            Debug.Log($"[DragonWalkChase] Warp to {hit.position} warped={warped} isOnNavMesh={ctx.Agent.isOnNavMesh}");
+        }
+        else
+        {
+            Debug.LogWarning($"[DragonWalkChase] NavMesh.SamplePosition FAILED from {ctx.Transform.position}");
+        }
     }
 
     public void Update(MonsterContext ctx)
@@ -211,7 +231,14 @@ public class DragonWalkChaseState : IMonsterState
 
     private void Move(MonsterContext ctx)
     {
-        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh) return;
+        if (ctx.Agent == null) return;
+        if (!ctx.Agent.isOnNavMesh)
+        {
+            if (UnityEngine.AI.NavMesh.SamplePosition(
+                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+                ctx.Agent.Warp(hit.position);
+            if (!ctx.Agent.isOnNavMesh) return;
+        }
 
         var dragon = ctx.Monster as DragonBossMonster;
         bool isDirectional = _currentAnim != null
@@ -263,6 +290,7 @@ public class DragonRunChaseState : IMonsterState
         var dragon = ctx.Monster as DragonBossMonster;
         if (ctx.Agent != null)
         {
+            EnsureAgentReady(ctx);
             _savedAngularSpeed         = ctx.Agent.angularSpeed;
             ctx.Agent.speed            = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
             ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
@@ -271,6 +299,18 @@ public class DragonRunChaseState : IMonsterState
         _lastDest    = Vector3.positiveInfinity;
         _currentAnim = null;
         UpdateDirectionAnim(ctx);
+    }
+
+    private static void EnsureAgentReady(MonsterContext ctx)
+    {
+        if (ctx.Agent == null) return;
+        if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
+        if (!ctx.Agent.isOnNavMesh
+            && UnityEngine.AI.NavMesh.SamplePosition(
+                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+        {
+            ctx.Agent.Warp(hit.position);
+        }
     }
 
     public void Update(MonsterContext ctx)
@@ -331,7 +371,14 @@ public class DragonRunChaseState : IMonsterState
 
     private void Move(MonsterContext ctx)
     {
-        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh) return;
+        if (ctx.Agent == null) return;
+        if (!ctx.Agent.isOnNavMesh)
+        {
+            if (UnityEngine.AI.NavMesh.SamplePosition(
+                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+                ctx.Agent.Warp(hit.position);
+            if (!ctx.Agent.isOnNavMesh) return;
+        }
 
         var dragon = ctx.Monster as DragonBossMonster;
         bool isDirectional = _currentAnim != null
@@ -373,6 +420,20 @@ public class DragonBossAttackReadyState : IMonsterState
 
     public void Enter(MonsterContext ctx)
     {
+        // 지상 상태 진입 시 Agent 가 이전 공중 패턴으로 disabled 되어 있으면 복구한다.
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb
+            && bb.BodyState == BodyState.Grounded
+            && ctx.Agent != null)
+        {
+            if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
+            if (!ctx.Agent.isOnNavMesh
+                && UnityEngine.AI.NavMesh.SamplePosition(
+                    ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                ctx.Agent.Warp(hit.position);
+            }
+        }
+
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);
     }
