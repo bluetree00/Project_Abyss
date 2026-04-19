@@ -231,6 +231,9 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.Dragon_ElementIce     => new DragonElementPhaseCondition(DragonElementPhase.Ice),
             BossConditionKey.Dragon_ElementThunder => new DragonElementPhaseCondition(DragonElementPhase.Thunder),
             BossConditionKey.Dragon_ElementFire    => new DragonElementPhaseCondition(DragonElementPhase.Fire),
+            // 바디 상태: 지상/공중 — 공중·지상 패턴 풀 필터링용
+            BossConditionKey.Dragon_Body_Grounded  => new DragonBodyStateCondition(BodyState.Grounded),
+            BossConditionKey.Dragon_Body_Airborne  => new DragonBodyStateCondition(BodyState.Airborne),
             _                                      => new AlwaysTrue(),
         };
     }

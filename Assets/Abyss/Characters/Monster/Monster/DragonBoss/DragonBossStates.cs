@@ -59,6 +59,28 @@ internal sealed class DragonElementPhaseCondition : ICondition
 internal enum DragonElementPhase { Ice, Thunder, Fire }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DragonBoss 바디 상태 조건 (Grounded / Airborne)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// <summary>
+/// 현재 BodyState 가 지정한 값과 일치하면 참.
+/// P2 브리지: 레거시 IsAirborne 플래그에서 BodyState 파생.
+/// P7 마이그레이션 후 DragonBossBlackboard.BodyState 필드 직접 조회로 전환 예정.
+/// </summary>
+internal sealed class DragonBodyStateCondition : ICondition
+{
+    private readonly BodyState _required;
+    internal DragonBodyStateCondition(BodyState required) => _required = required;
+
+    public bool Evaluate(BossPatternContext ctx)
+    {
+        if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
+        var current = bb.IsAirborne ? BodyState.Airborne : BodyState.Grounded;
+        return current == _required;
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 상태 — 기본(Idle)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

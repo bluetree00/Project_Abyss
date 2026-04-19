@@ -46,6 +46,10 @@ public enum BossConditionKey
     FG_PhaseChangePending = 12,  // 페이즈 전환 대기 중 (HP ≤ 50% && !IsPhase2)
     FG_IsPhase2           = 13,  // 2페이즈 완전 진입 상태
     FG_IsGroggy           = 14,  // 그로기(경직) 상태 중
+
+    // ── DragonBoss 바디 상태 ─────────────────────────────────────
+    Dragon_Body_Grounded  = 15,  // 지상 상태 (BodyState == Grounded)
+    Dragon_Body_Airborne  = 16,  // 공중 상태 (BodyState == Airborne)
 }
 
 [System.Serializable]
