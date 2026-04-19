@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61ef757d02b3a7843bd3b26879aca9dd, type: 3}
+  m_Name: DragonGroundBreathPattern_Thunder
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonGroundBreathPatternSO
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  _breathStartStateName: UAttack FireBreath L
+  _breathLoopStateName: UAttack FireBreath Loop
+  _prepareDuration: 2
+  _breathDuration: 5
+  _rotateSpeedPrepare: 70
+  _rotateSpeedBreath: 35
+  _breathRange: 12
+  _breathRadius: 0.8
+  _breathDamagePerSec: 20
+  _breathEffectPrefab: {fileID: 189272, guid: a99a0208643f5f048be748ca15ce6eb1, type: 3}
+  _warningEffectPrefab: {fileID: 0}
+  _breathColor: {r: 0.65, g: 0.3, b: 1, a: 1}
+  _statusEffect: {fileID: 11400000, guid: 13fc451eb7c351a498e908777b2ba39d, type: 2}
