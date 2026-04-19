@@ -301,7 +301,13 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void OnDestroy()
     {
-        UnbindBoss();
+        // UnbindBoss 의 SetMode(Combat) cascade 는 파괴 중인 GameObject 에
+        // SetActive 를 호출해 Unity 예외를 유발하므로 이벤트 해제만 수행한다.
+        if (_boss != null)
+        {
+            _boss.OnHPChanged -= HandleBossHPChanged;
+            _boss = null;
+        }
         Dispose();
     }
 
