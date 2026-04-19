@@ -174,7 +174,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             ctx.Agent.enabled = true;
             ctx.Agent.Warp(ctx.Transform.position);
         }
-        if (ctx.Agent != null) ctx.Agent.isStopped = true;
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+            ctx.Agent.isStopped = true;
 
         // Face player exactly before attacking
         if (ctx.Runtime.PlayerTarget != null)
