@@ -125,6 +125,14 @@ public class PlayerController : CharacterBase
         RuntimeStats.Heal(amount);
     }
 
+    //============================================================
+    // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
+    //============================================================
+
+    /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
+    public void ApplyThunderGroggy(float duration)
+        => Abyss.Monster.ThunderGroggyVignetteView.Trigger(duration);
+
     public event Action OnHudStatChanged
     {
         add => RuntimeStats.OnChanged += value;
@@ -203,6 +211,13 @@ public class PlayerController : CharacterBase
         SetMoveScale(scale);
         _slowTimer = Mathf.Max(_slowTimer, duration);
     }
+
+    private float _freezeTimer;
+    public bool IsFrozen => _freezeTimer > 0f;
+
+    /// <summary>빙결: duration초 동안 이동·행동·입력을 완전히 차단한다. 연속 피격 시 남은 시간을 연장.</summary>
+    public void ApplyFreeze(float duration)
+        => _freezeTimer = Mathf.Max(_freezeTimer, duration);
 
     //============================================================
     // Knockback
@@ -334,6 +349,12 @@ public class PlayerController : CharacterBase
             _slowTimer = Mathf.Max(0f, _slowTimer - Time.deltaTime);
             if (_slowTimer <= 0f)
                 SetMoveScale(1f);
+        }
+        if (_freezeTimer > 0f)
+        {
+            _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.deltaTime);
+            moveDirection = Vector3.zero;
+            return;
         }
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
