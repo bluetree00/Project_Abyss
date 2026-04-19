@@ -30,7 +30,7 @@ MonoBehaviour:
     attackShape: {fileID: 0}
   detection:
     detectionRange: 5
-    chaseGiveUpRange: 8
+    chaseGiveUpRange: 15
   patrol:
     patrolType: 0
     patrolRange: 3
@@ -91,7 +91,7 @@ MonoBehaviour:
     patterns:
     - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
     selectionMode: 0
-    forceExecute: 0
+    forceExecute: 1
   - conditions: 090000000f000000
     patterns:
     - {fileID: 11400000, guid: 18e5301f1cf53974280d1b3f1f18bd35, type: 2}
