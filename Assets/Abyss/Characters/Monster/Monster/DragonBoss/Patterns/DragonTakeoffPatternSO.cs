@@ -49,7 +49,7 @@ public class DragonTakeoffPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
-        return !bb.IsAirborne;
+        return bb.BodyState == BodyState.Grounded;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -98,11 +98,11 @@ internal sealed class DragonTakeoffState : FullLockState<DragonTakeoffPatternSO>
             _inRise = true;
         }
 
-        // 임계치 도달 → Airborne 플립 + Hover 애니 + 종료
+        // 임계치 도달 → BodyState 플립 + Hover 애니 + 종료
         if (_liftAccum >= Data.AirborneThreshold)
         {
             if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
-                bb.IsAirborne = true;
+                bb.BodyState = BodyState.Airborne;
 
             PlayAnim(ctx, Data.HoverStateName, 0.2f);
             ctx.Monster.ChangeState<AttackReadyState>();
