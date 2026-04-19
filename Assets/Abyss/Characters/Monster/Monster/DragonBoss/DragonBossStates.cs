@@ -211,6 +211,8 @@ public class DragonWalkChaseState : IMonsterState
 
     private void Move(MonsterContext ctx)
     {
+        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh) return;
+
         var dragon = ctx.Monster as DragonBossMonster;
         bool isDirectional = _currentAnim != null
             && _currentAnim != dragon?.WalkChaseStateName;
@@ -329,6 +331,8 @@ public class DragonRunChaseState : IMonsterState
 
     private void Move(MonsterContext ctx)
     {
+        if (ctx.Agent == null || !ctx.Agent.isOnNavMesh) return;
+
         var dragon = ctx.Monster as DragonBossMonster;
         bool isDirectional = _currentAnim != null
             && _currentAnim != dragon?.RunChaseStateName;
