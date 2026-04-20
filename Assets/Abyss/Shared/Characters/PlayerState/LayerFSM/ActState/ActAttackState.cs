@@ -93,7 +93,6 @@ public class ActAttackState : ILayerState<ActState>
 
         SubscribeReceiver();
         PlayCurrentComboAnimation();
-        _controller.BeginWeaponTrail();
     }
 
     // ── Update ───────────────────────────────────────────────────────────────
@@ -188,7 +187,6 @@ public class ActAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
-        _controller.EndWeaponTrail();
 
         _waitingForComboInput = false;
         _currentStateHash     = 0;

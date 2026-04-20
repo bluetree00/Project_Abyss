@@ -63,9 +63,6 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
     public string tier3DashLineExtraKey = "";
     public float tier3DashLineExtraScale = 1.5f;
 
-    [Header("트레일")]
-    public bool useWeaponTrail = true;
-
     [Header("애니메이션")]
     public string animationOverride;
 
@@ -124,8 +121,6 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 SpawnEffectScaled(ctx, _data.tier2DashMuzzleKey,
                     ctx.PlayerTransform.position + Vector3.up * 1f, _data.tier2DashMuzzleScale, 1f);
 
-            if (_data.useWeaponTrail)
-                ctx.Controller.BeginWeaponTrail();
         }
 
         public void OnUpdate(SkillExecutionContext ctx)
@@ -168,9 +163,6 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             if (t >= 1f)
             {
                 _timer = 0f;
-
-                if (_data.useWeaponTrail)
-                    ctx.Controller.EndWeaponTrail();
 
                 // 대시 완료 이펙트
                 SpawnEffect(ctx, _data.dashEffectKey,
