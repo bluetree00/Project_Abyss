@@ -160,16 +160,17 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             }
         }
 
-        // 패턴 계산: 중간층만 (Start/Boss 제외)
-        int[] middlePattern = BuildMiddlePattern(middleLayers, peakLayer);
+        // 그래프 생성 (Refined: X좌표 단조 매칭)
+        IStageMapGenerator generator = new RefinedStageMapGenerator();
+        var graph = generator.Generate(new StageMapGenerationRequest(middleLayers, peakLayer));
 
-        // 노드 생성 + 연결
-        GenerateNodes(contentParent, middlePattern, template);
+        // 그래프 데이터를 기반으로 UI 노드 인스턴스화
+        InstantiateNodesFromGraph(contentParent, graph, template);
 
         // 레이아웃 패턴 설정
         var layout = scroller.GetComponent<StageNodeLayout>();
         if (layout != null)
-            layout.SetLayerSizes(middlePattern);
+            layout.SetLayerSizes(graph.MiddlePattern);
 
         // 콘텐츠 크기 조정 (피크층 + 향후 확장 여유)
         int totalLayers = middleLayers + 2;
@@ -188,65 +189,24 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         scroller.RebuildMap();
     }
 
-    /// <summary>
-    /// 중간층 패턴 생성 (Start/Boss 제외).
-    /// middleLayers=5, peakLayer=3 → {2, 3, 4, 3, 2}
-    /// 전체: Start(1) + {2, 3, 4, 3, 2} + Boss(1) = {1, 2, 3, 4, 3, 2, 1}
-    /// </summary>
-    private static int[] BuildMiddlePattern(int middleLayers, int peakLayer)
+    /// <summary>Generator가 만든 그래프 데이터로 StagePointUI를 인스턴스화하고 연결 적용.</summary>
+    private void InstantiateNodesFromGraph(Transform parent, StageMapGraph graph, GameObject template)
     {
-        middleLayers = Mathf.Max(1, middleLayers);
-        peakLayer = Mathf.Clamp(peakLayer, 1, middleLayers);
+        var uiByPointId = new Dictionary<int, StagePointUI>(graph.Nodes.Count);
 
-        var pattern = new int[middleLayers];
-        int peakIdx = peakLayer - 1;
-
-        for (int i = 0; i < middleLayers; i++)
+        foreach (var node in graph.Nodes)
         {
-            if (i <= peakIdx)
-                pattern[i] = i + 2;
-            else
-                pattern[i] = 2 * peakLayer - i;
-
-            pattern[i] = Mathf.Max(1, pattern[i]);
+            var ui = CreateNode(parent, template, node.PointId, node.Stage, node.Normal);
+            uiByPointId[node.PointId] = ui;
         }
 
-        return pattern;
-    }
-
-    /// <summary>Start + 중간 + Boss 노드 생성 및 연결.</summary>
-    private void GenerateNodes(Transform parent, int[] middlePattern, GameObject template)
-    {
-        int pointId = 1;
-
-        // Start (pointId = 0)
-        var startNode = CreateNode(parent, template, 0, StageCategory.Start, NormalRoomCategory.Battle);
-
-        var prevLayerNodes = new List<StagePointUI> { startNode };
-
-        // 중간 층
-        for (int li = 0; li < middlePattern.Length; li++)
+        foreach (var node in graph.Nodes)
         {
-            int count = middlePattern[li];
-            var layerNodes = new List<StagePointUI>();
-
-            for (int n = 0; n < count; n++)
-            {
-                var category = PickCategory(li, middlePattern.Length);
-                var node = CreateNode(parent, template, pointId, StageCategory.Normal, category);
-                layerNodes.Add(node);
-                pointId++;
-            }
-
-            ConnectLayers(prevLayerNodes, layerNodes);
-            prevLayerNodes = layerNodes;
+            if (!uiByPointId.TryGetValue(node.PointId, out var ui)) continue;
+            foreach (var nextId in node.NextPointIds)
+                ui.AddNextPointId(nextId);
         }
 
-        // Boss (pointId = 100)
-        var bossNode = CreateNode(parent, template, 100, StageCategory.Boss, NormalRoomCategory.Battle);
-        ConnectLayers(prevLayerNodes, new List<StagePointUI> { bossNode });
-
-        // 템플릿 정리
         if (template != null)
             Destroy(template);
     }
@@ -276,74 +236,6 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         point.Init(pointId, stage, normal, iconMap);
         return point;
-    }
-
-    private const int MaxConnectionsPerNode = 2;
-
-    /// <summary>이전 층과 현재 층 노드를 비율 기반으로 연결. 노드당 최대 2개.</summary>
-    private static void ConnectLayers(List<StagePointUI> fromNodes, List<StagePointUI> toNodes)
-    {
-        for (int fi = 0; fi < fromNodes.Count; fi++)
-        {
-            float ratio = fromNodes.Count > 1 ? (float)fi / (fromNodes.Count - 1) : 0.5f;
-            int primary = Mathf.Clamp(Mathf.RoundToInt(ratio * (toNodes.Count - 1)), 0, toNodes.Count - 1);
-
-            // 1번째 연결: 비율 기반 주 타겟
-            fromNodes[fi].AddNextPointId(toNodes[primary].PointId);
-
-            // 2번째 연결: 인접 노드 중 하나 (랜덤 방향)
-            if (fromNodes[fi].NextPointIds.Count < MaxConnectionsPerNode)
-            {
-                bool tryRight = Random.value > 0.5f;
-                int secondary = tryRight ? primary + 1 : primary - 1;
-
-                if (secondary < 0 || secondary >= toNodes.Count)
-                    secondary = tryRight ? primary - 1 : primary + 1;
-
-                if (secondary >= 0 && secondary < toNodes.Count && secondary != primary)
-                    fromNodes[fi].AddNextPointId(toNodes[secondary].PointId);
-            }
-        }
-
-        // 고아 방지: 연결 안 된 to 노드는 가장 가까운 from에서 연결
-        for (int ti = 0; ti < toNodes.Count; ti++)
-        {
-            bool connected = false;
-            foreach (var fn in fromNodes)
-            {
-                if (fn.NextPointIds != null)
-                {
-                    foreach (var nid in fn.NextPointIds)
-                    {
-                        if (nid == toNodes[ti].PointId) { connected = true; break; }
-                    }
-                }
-                if (connected) break;
-            }
-
-            if (!connected && fromNodes.Count > 0)
-            {
-                float ratio = toNodes.Count > 1 ? (float)ti / (toNodes.Count - 1) : 0.5f;
-                int bestFrom = Mathf.Clamp(Mathf.RoundToInt(ratio * (fromNodes.Count - 1)), 0, fromNodes.Count - 1);
-                fromNodes[bestFrom].AddNextPointId(toNodes[ti].PointId);
-            }
-        }
-    }
-
-    /// <summary>진행도에 따른 방 카테고리 랜덤 선택.</summary>
-    private static NormalRoomCategory PickCategory(int layerIdx, int totalMiddleLayers)
-    {
-        float progress = totalMiddleLayers > 1 ? (float)layerIdx / (totalMiddleLayers - 1) : 0.5f;
-        float roll = Random.value;
-
-        if (progress < 0.3f)
-            return roll < 0.7f ? NormalRoomCategory.Battle : NormalRoomCategory.Event;
-        if (progress < 0.6f)
-            return roll < 0.4f ? NormalRoomCategory.Battle :
-                   roll < 0.7f ? NormalRoomCategory.Event :
-                   roll < 0.85f ? NormalRoomCategory.Shop : NormalRoomCategory.Elite;
-        return roll < 0.5f ? NormalRoomCategory.Battle :
-               roll < 0.75f ? NormalRoomCategory.Elite : NormalRoomCategory.Event;
     }
 
     // ── UI 갱신 ──
