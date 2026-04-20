@@ -40,6 +40,11 @@ public class WeaponData
     public WeaponType weaponType = WeaponType.None;
     public WeaponElement element = WeaponElement.None;
 
+    // ── 원소 누적치 부여량 ───────────────────────────────────────────
+    public float elementAmountBasic = 0f;
+    public float elementAmountHeavy = 0f;
+    public float elementAmountAir   = 0f;
+
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
     public SkillSO skillE;
@@ -115,8 +120,11 @@ public class WeaponData
             chargeStages     = entry.charge_stages,
             groundEndCount   = entry.ground_combo_count,
             airEndCount      = entry.air_combo_count,
-            weaponType       = ParseWeaponType(entry.weapon_type),
-            element          = ParseElement(entry),
+            weaponType           = ParseWeaponType(entry.weapon_type),
+            element              = ParseElement(entry),
+            elementAmountBasic   = entry.element_amount_basic,
+            elementAmountHeavy   = entry.element_amount_heavy,
+            elementAmountAir     = entry.element_amount_air,
             // SO 참조는 null — WeaponSO에서 바인딩하거나 Addressables로 로드
             animationSet     = null,
             abilitySet       = null,
@@ -135,6 +143,8 @@ public class WeaponData
         "ChargeFull" => PromoteMode.ChargeFull,
         _            => PromoteMode.None,
     };
+
+    public static WeaponElement ParseElementPublic(EquipmentEntry entry) => ParseElement(entry);
 
     private static WeaponElement ParseElement(EquipmentEntry entry)
     {

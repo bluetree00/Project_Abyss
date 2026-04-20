@@ -521,7 +521,12 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         data.groundEndCount = entry.ground_combo_count;
         data.airEndCount   = entry.air_combo_count;
 
-        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} (ATK:{entry.base_attack}, SPD:{entry.attack_speed})");
+        data.element             = WeaponData.ParseElementPublic(entry);
+        data.elementAmountBasic  = entry.element_amount_basic;
+        data.elementAmountHeavy  = entry.element_amount_heavy;
+        data.elementAmountAir    = entry.element_amount_air;
+
+        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} (ATK:{entry.base_attack}, SPD:{entry.attack_speed}, Elem:{data.element}/{data.elementAmountBasic})");
     }
 
     // ----------------------
