@@ -5,20 +5,22 @@ using UnityEngine.UI;
 /// 공격 테스트용 허수아비.
 /// 데미지를 받으면 HP가 줄어들고, 일정 시간 후 자동 회복.
 /// 절대 죽지 않음 (IKillable.IsDead = false).
-/// 원소 발동 시 ELEMENT_EFFECT_DATA 테이블 기반 효과 적용.
+/// 원소 효과는 ElementBuildup 컴포넌트가 처리하며, IElementTarget 콜백으로 본 클래스가 상태를 받는다.
 /// </summary>
-public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
+[RequireComponent(typeof(ElementBuildup))]
+public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarget
 {
     // ── Constants ───────────────────────────────────────────────────
     private static readonly string[] ElementLabels = { "⚡", "💧", "🔥", "🌿", "🪨" };
 
-    private struct ActiveEffect
+    private static readonly Color[] ElementColors =
     {
-        public ElementEffectEntry Data;
-        public float RemainingDuration;
-        public float TickTimer;
-        public bool  IsActive;
-    }
+        new(1.00f, 0.92f, 0.23f, 1f), // Lightning - yellow
+        new(0.13f, 0.59f, 0.95f, 1f), // Water     - blue
+        new(0.96f, 0.26f, 0.21f, 1f), // Fire      - red
+        new(0.30f, 0.69f, 0.31f, 1f), // Grass     - green
+        new(0.55f, 0.43f, 0.39f, 1f), // Earth     - brown
+    };
 
     // ── [SerializeField] ────────────────────────────────────────────
     [Header("Stats")]
@@ -26,62 +28,73 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
     [SerializeField] private float regenDelay = 3f;
     [SerializeField] private float regenPerSecond = 100f;
 
-    [Header("Element")]
-    [SerializeField] private float accumulationThreshold = 100f;
-    [SerializeField] private float accumDecayPerSecond = 10f;
-
     [Header("UI")]
     [SerializeField] private Slider hpBar;
     [SerializeField] private TMPro.TMP_Text hpText;
     [SerializeField] private TMPro.TMP_Text damageText;
     [SerializeField] private TMPro.TMP_Text elementAccumText;
 
+    [Header("Element Gauge (HP 위 단일 공유 게이지)")]
+    [SerializeField] private Image elementGaugeFill;
+    [SerializeField] private TMPro.TMP_Text elementGaugeLabel;
+
     [Header("Hit Animation")]
     [SerializeField] private Animator animator;
 
-    [Header("Hit Color Flash")]
-    [SerializeField] private Renderer[] renderers;
-
     // ── Private ─────────────────────────────────────────────────────
     private static readonly int HitHash = Animator.StringToHash("Hit");
-    private static readonly int ColorID = Shader.PropertyToID("_BaseColor");
+
+    private ElementBuildup _buildup;
+    private ElementVisualFeedback _visualFeedback;
 
     private float _currentHp;
     private float _lastHitTime;
     private float _totalDamageShown;
-    private float _lastTriggerDamage;
-    private Color _originalColor = Color.white;
-    private MaterialPropertyBlock _mpb;
 
-    private readonly float[]        _elementAccum  = new float[ElementTypeUtil.Count];
-    private readonly ActiveEffect[] _activeEffects  = new ActiveEffect[ElementTypeUtil.Count];
-
-    // 효과 누적 상태 배율
-    private float _incomingDamageMultiplier  = 1f;  // Grass poison
-    private float _lightningAccumMultiplier  = 1f;  // Water wet
-    private bool  _isPetrified;                     // Earth petrify
+    // IElementTarget 콜백으로 갱신되는 상태
+    private float _incomingDamageMultiplier = 1f;
+    private bool  _isPetrified;
 
     // ── Properties ──────────────────────────────────────────────────
-    public bool IsDead => false;
+    public bool       IsDead     => false;
+    public Transform  Transform  => transform;
+    public GameObject GameObject => gameObject;
+    public float      MaxHp      => maxHp;
 
     // ── Lifecycle ───────────────────────────────────────────────────
     private void Awake()
     {
         _currentHp = maxHp;
-        _mpb = new MaterialPropertyBlock();
+
+        _buildup        = GetComponent<ElementBuildup>();
+        _visualFeedback = GetComponent<ElementVisualFeedback>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
-        if (renderers == null || renderers.Length == 0)
-            renderers = GetComponentsInChildren<Renderer>();
 
         UpdateUI();
     }
 
+    private void OnEnable()
+    {
+        if (_buildup != null)
+        {
+            _buildup.OnTriggered += HandleTriggered;
+            _buildup.OnExpired   += HandleExpired;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (_buildup != null)
+        {
+            _buildup.OnTriggered -= HandleTriggered;
+            _buildup.OnExpired   -= HandleExpired;
+        }
+    }
+
     private void Update()
     {
-        ProcessActiveEffects();
-
         bool regenActive = !_isPetrified
                            && Time.time - _lastHitTime > regenDelay
                            && _currentHp < maxHp;
@@ -89,13 +102,6 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         {
             _currentHp = Mathf.Min(maxHp, _currentHp + regenPerSecond * Time.deltaTime);
             _totalDamageShown = 0f;
-        }
-
-        // 피격 공백 후 누적치 자연 감소
-        if (Time.time - _lastHitTime > regenDelay)
-        {
-            for (int i = 0; i < _elementAccum.Length; i++)
-                _elementAccum[i] = Mathf.Max(0f, _elementAccum[i] - accumDecayPerSecond * Time.deltaTime);
         }
 
         UpdateUI();
@@ -108,7 +114,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         }
     }
 
-    // ── Public Methods ───────────────────────────────────────────────
+    // ── Public Methods (IDamageable) ─────────────────────────────────
     public void TakeDamage(float amount, GameObject instigator,
                            float knockbackMultiplier = 1f,
                            ElementType element = ElementType.None,
@@ -117,38 +123,20 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         if (_isPetrified) return;
         if (amount <= 0f) return;
 
-        // Grass poison — 받는 피해 증가
         amount *= _incomingDamageMultiplier;
 
         _currentHp = Mathf.Max(0f, _currentHp - amount);
         _lastHitTime = Time.time;
-        _lastTriggerDamage = amount;
         _totalDamageShown += amount;
 
-        // 원소 누적치
-        if (element.IsValid() && elementAmount > 0f)
-        {
-            int idx = element.ToIndex();
-
-            // Water wet — Lightning 누적치 증가
-            float accum = elementAmount;
-            if (element == ElementType.Lightning && _activeEffects[(int)ElementType.Water].IsActive)
-                accum *= _lightningAccumMultiplier;
-
-            _elementAccum[idx] = Mathf.Min(_elementAccum[idx] + accum, accumulationThreshold * 2f);
-
-            if (_elementAccum[idx] >= accumulationThreshold)
-            {
-                TriggerElement(element);
-                _elementAccum[idx] = 0f;
-            }
-        }
+        if (_buildup != null)
+            _buildup.AddBuildup(element, elementAmount, amount);
 
         if (animator != null)
             animator.SetTrigger(HitHash);
 
-        StopAllCoroutines();
-        StartCoroutine(HitColorFlash());
+        // 일반 히트 플래시 (원소 무관) — 시각 피드백 컴포넌트로 위임
+        _visualFeedback?.FlashHit(Color.red);
 
         UpdateUI();
 
@@ -156,134 +144,34 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
             ResetDummy();
     }
 
-    // ── Private Methods ──────────────────────────────────────────────
-    private void TriggerElement(ElementType element)
+    // ── Public Methods (IElementTarget) ──────────────────────────────
+    public void TakeElementalDoT(float damage, ElementType source)
     {
-        var entry = Managers.ElementEffectData?.Get(element);
-        if (entry == null)
-        {
-            Debug.LogWarning($"[Dummy] ElementEffectData 없음: {element}");
-            return;
-        }
-
-        int idx = element.ToIndex();
-
-        // 기존 효과 만료 처리 후 새 효과 적용
-        if (_activeEffects[idx].IsActive)
-            ClearEffectModifiers(element, _activeEffects[idx].Data);
-
-        _activeEffects[idx] = new ActiveEffect
-        {
-            Data              = entry,
-            RemainingDuration = entry.duration,
-            TickTimer         = entry.tick_interval > 0f ? entry.tick_interval : float.MaxValue,
-            IsActive          = true,
-        };
-
-        ApplyEffectModifiers(element, entry);
-
-        // Lightning — 즉시 체인 데미지
-        if (element == ElementType.Lightning)
-            ApplyLightningChain(entry);
-
-        Debug.Log($"[Dummy] 원소 발동! {element} → {entry.effect_id} ({entry.description})");
-    }
-
-    private void ApplyEffectModifiers(ElementType element, ElementEffectEntry entry)
-    {
-        if (element == ElementType.Grass)
-            _incomingDamageMultiplier = 1f + entry.magnitude_b;   // 15% 증가
-        else if (element == ElementType.Water)
-            _lightningAccumMultiplier = entry.magnitude_b;         // 2배
-        else if (element == ElementType.Earth)
-            _isPetrified = true;
-    }
-
-    private void ClearEffectModifiers(ElementType element, ElementEffectEntry entry)
-    {
-        if (element == ElementType.Grass)
-            _incomingDamageMultiplier = 1f;
-        else if (element == ElementType.Water)
-            _lightningAccumMultiplier = 1f;
-        else if (element == ElementType.Earth)
-            _isPetrified = false;
-    }
-
-    private void ProcessActiveEffects()
-    {
-        for (int i = 0; i < _activeEffects.Length; i++)
-        {
-            if (!_activeEffects[i].IsActive) continue;
-
-            _activeEffects[i].RemainingDuration -= Time.deltaTime;
-
-            if (_activeEffects[i].RemainingDuration <= 0f)
-            {
-                ClearEffectModifiers((ElementType)i, _activeEffects[i].Data);
-                _activeEffects[i] = default;
-                continue;
-            }
-
-            // DoT 틱
-            if (_activeEffects[i].Data.tick_interval > 0f)
-            {
-                _activeEffects[i].TickTimer -= Time.deltaTime;
-                if (_activeEffects[i].TickTimer <= 0f)
-                {
-                    ApplyDoTTick((ElementType)i, _activeEffects[i].Data);
-                    _activeEffects[i].TickTimer = _activeEffects[i].Data.tick_interval;
-                }
-            }
-        }
-    }
-
-    private void ApplyDoTTick(ElementType element, ElementEffectEntry entry)
-    {
-        float damage = element switch
-        {
-            ElementType.Fire  => maxHp * entry.magnitude_a,   // 최대 HP 5%
-            ElementType.Grass => entry.magnitude_a,            // 고정 5 데미지
-            _                 => 0f,
-        };
         if (damage <= 0f) return;
-
         _currentHp = Mathf.Max(0f, _currentHp - damage);
         _totalDamageShown += damage;
         _lastHitTime = Time.time;
 
-        Debug.Log($"[Dummy] DoT tick: {element} -{damage:F1}  HP={_currentHp:F0}/{maxHp}");
+        // DoT 데미지도 원소 색 팝업으로 표시
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
+
+        Debug.Log($"[Dummy] DoT tick: {source} -{damage:F1}  HP={_currentHp:F0}/{maxHp}");
         UpdateUI();
     }
 
-    private void ApplyLightningChain(ElementEffectEntry entry)
-    {
-        float radius     = entry.magnitude_b;   // 3m
-        float chainRatio = entry.magnitude_a;   // 0.3 = 30%
-        float chainDmg   = _lastTriggerDamage * chainRatio;
-        if (chainDmg <= 0f) return;
+    public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMultiplier = multi;
 
-        var hits = Physics.OverlapSphere(transform.position, radius);
-        foreach (var col in hits)
-        {
-            if (col.gameObject == gameObject) continue;
-            if (col.TryGetComponent<IDamageable>(out var target))
-            {
-                target.TakeDamage(chainDmg, gameObject, 1f, ElementType.None, 0f);
-                Debug.Log($"[Dummy] Lightning chain → {col.name} ({chainDmg:F1})");
-            }
-        }
-    }
+    public void SetMovementMultiplier(float multi) { /* 더미는 안 움직이므로 no-op */ }
 
+    public void SetPetrified(bool active) => _isPetrified = active;
+
+    // ── Private Methods ──────────────────────────────────────────────
     private void ResetDummy()
     {
+        // HP만 리필 — 누적치/액티브 효과/석화 상태는 그대로 유지
         _currentHp = maxHp;
         _totalDamageShown = 0f;
-        System.Array.Clear(_elementAccum, 0, _elementAccum.Length);
-        System.Array.Clear(_activeEffects, 0, _activeEffects.Length);
-        _incomingDamageMultiplier = 1f;
-        _lightningAccumMultiplier = 1f;
-        _isPetrified = false;
-        Debug.Log("[Dummy] Reset! Full HP restored.");
+        Debug.Log("[Dummy] HP refilled (누적치·효과 유지)");
         UpdateUI();
     }
 
@@ -306,50 +194,57 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
     private void UpdateElementUI()
     {
-        if (elementAccumText == null) return;
+        if (_buildup == null) return;
 
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < ElementTypeUtil.Count; i++)
+        var lastElement = _buildup.LastElement;
+
+        if (elementGaugeFill != null)
         {
-            var   elemType = (ElementType)i;
-            float accum    = _elementAccum[i];
-            float ratio    = accum / accumulationThreshold;
-            string bar     = BuildBar(ratio, 10);
-
-            string effectTag = "";
-            if (_activeEffects[i].IsActive)
-            {
-                float rem = _activeEffects[i].RemainingDuration;
-                effectTag = $" <color=yellow>[{_activeEffects[i].Data.effect_id} {rem:F1}s]</color>";
-            }
-
-            sb.AppendLine($"{ElementLabels[i]} [{bar}] {accum:F0}/{accumulationThreshold:F0}{effectTag}");
+            elementGaugeFill.fillAmount = _buildup.Ratio;
+            elementGaugeFill.color = ColorOf(lastElement);
         }
 
-        if (_isPetrified)
-            sb.AppendLine("<color=#aaaaaa>[석화 - 무적]</color>");
+        if (elementGaugeLabel != null)
+        {
+            string label = lastElement.IsValid()
+                ? $"{ElementLabels[(int)lastElement]} {_buildup.Accum:F0}/{_buildup.Threshold:F0}"
+                : $"- {_buildup.Accum:F0}/{_buildup.Threshold:F0}";
+            elementGaugeLabel.text = label;
+        }
 
-        elementAccumText.text = sb.ToString().TrimEnd();
+        if (elementAccumText != null)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < ElementTypeUtil.Count; i++)
+            {
+                var e = (ElementType)i;
+                if (!_buildup.IsEffectActive(e)) continue;
+                var entry = _buildup.GetActiveEntry(e);
+                float rem = _buildup.GetRemaining(e);
+                sb.AppendLine($"<color=yellow>{ElementLabels[i]} {entry.effect_id} {rem:F1}s</color>");
+            }
+            if (_isPetrified)
+                sb.AppendLine("<color=#aaaaaa>[석화 - 무적]</color>");
+            elementAccumText.text = sb.ToString().TrimEnd();
+        }
     }
 
-    private static string BuildBar(float ratio, int width)
+    private static Color ColorOf(ElementType element)
     {
-        int filled = Mathf.RoundToInt(Mathf.Clamp01(ratio) * width);
-        return new string('■', filled) + new string('□', width - filled);
+        if (!element.IsValid()) return Color.gray;
+        int idx = (int)element;
+        if (idx < 0 || idx >= ElementColors.Length) return Color.gray;
+        return ElementColors[idx];
     }
 
-    private System.Collections.IEnumerator HitColorFlash()
+    // ── Event Handlers ───────────────────────────────────────────────
+    private void HandleTriggered(ElementType element, ElementEffectEntry entry)
     {
-        SetColor(Color.red);
-        yield return new WaitForSeconds(0.08f);
-        SetColor(_originalColor);
+        Debug.Log($"[Dummy] 원소 발동! {element} → {entry.effect_id} ({entry.description})");
     }
 
-    private void SetColor(Color color)
+    private void HandleExpired(ElementType element, ElementEffectEntry entry)
     {
-        if (renderers == null || _mpb == null) return;
-        _mpb.SetColor(ColorID, color);
-        foreach (var r in renderers)
-            if (r != null) r.SetPropertyBlock(_mpb);
+        Debug.Log($"[Dummy] 원소 효과 만료: {element} → {entry.effect_id}");
     }
 }

@@ -27,6 +27,10 @@ public class WeaponData
     public float areaOfEffect;
     public float holdThreshold;
 
+    // ── 치명타 ───────────────────────────────────────────────────────
+    public float critChance = 25f;   // % 단위 (0~100)
+    public float critDamage = 1.25f; // 배율 (1.25 = +25%)
+
     public int tier = 1;
 
     public PromoteMode promoteMode;
@@ -73,6 +77,8 @@ public class WeaponData
         attackRange      = so.attackRange;
         areaOfEffect     = so.areaOfEffect;
         holdThreshold    = so.holdThreshold;
+        critChance       = so.critChance;
+        critDamage       = so.critDamage > 0f ? so.critDamage : 1.25f;
         tier             = so.tier;
 
         promoteMode  = so.promoteMode;
@@ -115,6 +121,8 @@ public class WeaponData
             attackRange      = entry.attack_range,
             areaOfEffect     = entry.area_of_effect,
             holdThreshold    = entry.hold_threshold,
+            critChance       = entry.crit_chance,
+            critDamage       = entry.crit_damage > 0f ? entry.crit_damage : 1.25f,
             tier             = entry.tier,
             promoteMode      = ParsePromoteMode(entry.promote_mode),
             chargeStages     = entry.charge_stages,
@@ -131,6 +139,7 @@ public class WeaponData
             skillQ           = null,
             skillE           = null,
         };
+        UnityEngine.Debug.Log($"[WeaponData.FromServer] {entry.weapon_id} ({entry.weapon_name}) | Elem={data.element} (raw='{entry.element}') | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
         return data;
     }
 

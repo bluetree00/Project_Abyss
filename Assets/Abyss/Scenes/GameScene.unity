@@ -4142,6 +4142,16 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 241631613439158140, guid: 5504f41c9e9f9264791014bbdfbd08f3,
+        type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 954406085867395583, guid: 5504f41c9e9f9264791014bbdfbd08f3,
+        type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 1314714949140697633, guid: 5504f41c9e9f9264791014bbdfbd08f3,
         type: 3}
       propertyPath: m_AdditionalShaderChannelsFlag

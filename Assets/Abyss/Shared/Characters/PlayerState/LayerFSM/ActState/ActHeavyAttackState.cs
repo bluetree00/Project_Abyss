@@ -48,7 +48,6 @@ public class ActHeavyAttackState : ILayerState<ActState>
         SubscribeReceiver();
 
         PlayHeavyAnimation();
-        _controller.BeginWeaponTrail();
     }
 
     public void Update() { }
@@ -56,7 +55,6 @@ public class ActHeavyAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
-        _controller.EndWeaponTrail();
         _controller.Combo.SetAttacking(false);
         _controller.SetMoveScale(1f);
 
