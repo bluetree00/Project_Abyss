@@ -219,6 +219,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             try { await buffData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BuffData 예외: {e.Message}"); }
         }
+
+        var elementEffectData = Managers.ElementEffectData;
+        if (elementEffectData != null && !elementEffectData.IsInitialized)
+        {
+            try { await elementEffectData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ElementEffectData 예외: {e.Message}"); }
+        }
     }
 
     private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();

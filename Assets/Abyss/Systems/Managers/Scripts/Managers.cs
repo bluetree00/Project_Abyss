@@ -49,6 +49,7 @@ public sealed class Managers : MonoBehaviour
     private BlockDataManager _blockDataManager;
     private BuffDataManager _buffDataManager;
     private ChapterDataManager _chapterDataManager;
+    private ElementEffectDataManager _elementEffectDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -281,6 +282,20 @@ public sealed class Managers : MonoBehaviour
                 inst._chapterDataManager = new ChapterDataManager();
 
             return inst._chapterDataManager;
+        }
+    }
+
+    public static ElementEffectDataManager ElementEffectData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._elementEffectDataManager == null)
+                inst._elementEffectDataManager = new ElementEffectDataManager();
+
+            return inst._elementEffectDataManager;
         }
     }
     #endregion
