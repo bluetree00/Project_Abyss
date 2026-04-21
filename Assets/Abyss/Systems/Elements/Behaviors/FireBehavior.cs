@@ -1,4 +1,5 @@
-/// <summary>Fire — burn DoT (최대 HP × magnitude_a 만큼 tick_interval 마다 데미지).</summary>
+/// <summary>Fire — burn: duration 동안 tick_interval 마다 대상 MaxHp × magnitude_a 데미지.
+/// CSV: magnitude_a=0.02, tick_interval=1.0, duration=3 → 초당 2% 화염 데미지 × 3회.</summary>
 public class FireBehavior : ElementBehavior
 {
     public override ElementType Element => ElementType.Fire;

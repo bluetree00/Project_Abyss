@@ -455,8 +455,8 @@ public static class MonsterBatchFactory
         anim.FindPropertyRelative("speedDampTime").floatValue         = 0.1f;
         anim.FindPropertyRelative("crossFadeDuration").floatValue     = 0.15f;
 
-        // Elemental (기본값)
-        so.FindProperty("elemental").FindPropertyRelative("accumulationThreshold").floatValue = 100f;
+        // Elemental (기본 배율 1.0 = 서버 데이터 없을 때 기준)
+        so.FindProperty("elemental").FindPropertyRelative("maxAccumulationScale").floatValue = 1f;
 
         so.ApplyModifiedProperties();
         AssetDatabase.CreateAsset(config, configPath);

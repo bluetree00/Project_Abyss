@@ -42,6 +42,21 @@ public class ServerMonsterStatDataManager
 
         IsInitialized = true;
         Debug.Log($"[ServerMonsterStatDataManager] 초기화 완료. 몬스터 {_byId.Count}종");
+
+        // 연결 검증용 — 등급별 max_accumulation 배율 분포 요약
+        var byGrade = new Dictionary<string, (int count, float min, float max)>();
+        foreach (var kv in _byId)
+        {
+            var e = kv.Value;
+            if (!byGrade.TryGetValue(e.grade, out var v))
+                v = (0, float.MaxValue, float.MinValue);
+            v.count++;
+            if (e.max_accumulation < v.min) v.min = e.max_accumulation;
+            if (e.max_accumulation > v.max) v.max = e.max_accumulation;
+            byGrade[e.grade] = v;
+        }
+        foreach (var kv in byGrade)
+            Debug.Log($"  · {kv.Key,-8} {kv.Value.count,2}종 | max_accumulation 범위 {kv.Value.min:F2} ~ {kv.Value.max:F2}");
     }
 
     // ── 조회 ──────────────────────────────────
@@ -113,6 +128,7 @@ public class ServerMonsterStatDataManager
                 base_attack      = row.TryGetFloat("base_attack"),
                 base_defense     = row.TryGetFloat("base_defense"),
                 max_accumulation = row.TryGetFloat("max_accumulation"),
+                monster_pool_tag = row.TryGetString("monster_pool_tag"),
                 stat_version     = row.TryGetInt("stat_version"),
             };
         }

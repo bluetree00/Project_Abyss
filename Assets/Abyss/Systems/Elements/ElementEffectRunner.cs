@@ -50,21 +50,4 @@ public static class ElementEffectRunner
                 Managers.AddressableManager.ReleaseInstance(go);
         }
     }
-
-    /// <summary>Lightning chain — origin 주변 radius 이내 IDamageable에 damage 전파.</summary>
-    public static void LightningChain(IElementTarget origin, float radius, float damage)
-    {
-        if (origin == null || radius <= 0f || damage <= 0f) return;
-
-        var hits = Physics.OverlapSphere(origin.Transform.position, radius);
-        foreach (var col in hits)
-        {
-            if (col == null) continue;
-            if (col.gameObject == origin.GameObject) continue;
-            if (col.TryGetComponent<IDamageable>(out var t))
-            {
-                t.TakeDamage(damage, origin.GameObject, 1f, ElementType.None, 0f);
-            }
-        }
-    }
 }

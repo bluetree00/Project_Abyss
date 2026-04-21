@@ -53,7 +53,9 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     // IElementTarget 콜백으로 갱신되는 상태
     private float _incomingDamageMultiplier = 1f;
-    private bool  _isPetrified;
+    private float _movementMultiplier       = 1f;
+    private float _attackSpeedMultiplier    = 1f;
+    private float _defenseMultiplier        = 1f;
 
     // ── Properties ──────────────────────────────────────────────────
     public bool       IsDead     => false;
@@ -95,8 +97,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     private void Update()
     {
-        bool regenActive = !_isPetrified
-                           && Time.time - _lastHitTime > regenDelay
+        bool regenActive = Time.time - _lastHitTime > regenDelay
                            && _currentHp < maxHp;
         if (regenActive)
         {
@@ -120,7 +121,6 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
                            ElementType element = ElementType.None,
                            float elementAmount = 0f)
     {
-        if (_isPetrified) return;
         if (amount <= 0f) return;
 
         amount *= _incomingDamageMultiplier;
@@ -161,9 +161,11 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMultiplier = multi;
 
-    public void SetMovementMultiplier(float multi) { /* 더미는 안 움직이므로 no-op */ }
+    public void SetMovementMultiplier(float multi) => _movementMultiplier = multi;
 
-    public void SetPetrified(bool active) => _isPetrified = active;
+    public void SetAttackSpeedMultiplier(float multi) => _attackSpeedMultiplier = multi;
+
+    public void SetDefenseMultiplier(float multi) => _defenseMultiplier = multi;
 
     // ── Private Methods ──────────────────────────────────────────────
     private void ResetDummy()
@@ -209,6 +211,10 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
             string label = lastElement.IsValid()
                 ? $"{ElementLabels[(int)lastElement]} {_buildup.Accum:F0}/{_buildup.Threshold:F0}"
                 : $"- {_buildup.Accum:F0}/{_buildup.Threshold:F0}";
+
+            if (lastElement == ElementType.Grass && _buildup.PoisonStacks > 0)
+                label += $" x{_buildup.PoisonStacks}";
+
             elementGaugeLabel.text = label;
         }
 
@@ -223,8 +229,12 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
                 float rem = _buildup.GetRemaining(e);
                 sb.AppendLine($"<color=yellow>{ElementLabels[i]} {entry.effect_id} {rem:F1}s</color>");
             }
-            if (_isPetrified)
-                sb.AppendLine("<color=#aaaaaa>[석화 - 무적]</color>");
+            if (_movementMultiplier <= 0f)
+                sb.AppendLine("<color=#aaaaaa>[이동 정지]</color>");
+            if (_attackSpeedMultiplier <= 0f)
+                sb.AppendLine("<color=#aaaaaa>[공격 정지]</color>");
+            if (_defenseMultiplier < 1f)
+                sb.AppendLine($"<color=#aaaaaa>[방어력 x{_defenseMultiplier:F2}]</color>");
             elementAccumText.text = sb.ToString().TrimEnd();
         }
     }

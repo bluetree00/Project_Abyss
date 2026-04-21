@@ -41,6 +41,13 @@ public class ElementEffectDataManager
 
         IsInitialized = true;
         Debug.Log($"[ElementEffectDataManager] 초기화 완료. 원소 효과 {_byElement.Count}개");
+
+        // 연결 검증용 — 각 원소 주요 수치 요약
+        foreach (var kv in _byElement)
+        {
+            var e = kv.Value;
+            Debug.Log($"  · {e.element,-10} | {e.effect_type,-16} dur={e.duration:F1}s mA={e.magnitude_a:F2} mB={e.magnitude_b:F2} tick={e.tick_interval:F1} gauge={e.activation_gauge:F0}");
+        }
     }
 
     // ── 조회 ──────────────────────────────────

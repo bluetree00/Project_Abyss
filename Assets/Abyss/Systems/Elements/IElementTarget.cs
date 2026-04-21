@@ -14,12 +14,15 @@ public interface IElementTarget
     /// <summary>DoT 등 원소 효과로 인한 데미지.</summary>
     void TakeElementalDoT(float damage, ElementType source);
 
-    /// <summary>받는 데미지 배율 (Grass poison).</summary>
+    /// <summary>받는 데미지 배율 (미사용 가능, 레거시).</summary>
     void SetIncomingDamageMultiplier(float multi);
 
-    /// <summary>이동 속도 배율 (Water slow). 더미 등은 no-op 가능.</summary>
+    /// <summary>이동 속도 배율 (0 = 정지). Water slow / Earth petrify / Lightning paralyze.</summary>
     void SetMovementMultiplier(float multi);
 
-    /// <summary>석화 상태 (Earth petrify).</summary>
-    void SetPetrified(bool active);
+    /// <summary>공격 속도 배율 (0 = 공격 불가). Water slow / Lightning paralyze.</summary>
+    void SetAttackSpeedMultiplier(float multi);
+
+    /// <summary>방어력 배율 (1.0 = 기본, 0.9 = -10%). Earth petrify.</summary>
+    void SetDefenseMultiplier(float multi);
 }
