@@ -28,6 +28,10 @@ public class MonsterStatData
     public float attackPower   = 10f;
     public float moveSpeed     = 3f;
 
+    [Header("원소 속성 (공격 원소 / 네이티브 원소)")]
+    [Tooltip("몬스터가 가진 원소 속성. 공격 부여 원소 및 저항/약점 판정에 활용.")]
+    public ElementType nativeElement = ElementType.None;
+
     [Header("공격 수치")]
     [Tooltip("공격 준비를 시작하는 거리 (m)")]
     public float attackRange   = 2f;

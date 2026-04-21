@@ -13,6 +13,19 @@ public class MonsterHPBar : MonoBehaviour
     [Header("UI References")]
     [SerializeField] private Slider _slider;
 
+    [Header("Element Gauge (HP 위)")]
+    [SerializeField] private Image _elementFill;
+    [SerializeField] private TMPro.TMP_Text _elementLabel;
+
+    private static readonly Color[] _elementColors =
+    {
+        new(1.00f, 0.92f, 0.23f, 1f), // Lightning
+        new(0.13f, 0.59f, 0.95f, 1f), // Water
+        new(0.96f, 0.26f, 0.21f, 1f), // Fire
+        new(0.30f, 0.69f, 0.31f, 1f), // Grass
+        new(0.55f, 0.43f, 0.39f, 1f), // Earth
+    };
+
     [Header("Position")]
     [SerializeField] private float _headOffset = 0.1f;
     [SerializeField] private float _minAutoOffset = 0.12f;
@@ -65,6 +78,31 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_slider == null) return;
         _slider.value = maxHp > 0 ? (float)currentHp / maxHp : 0f;
+    }
+
+    /// <summary>원소 누적치 게이지 갱신. element=None 이면 흐리게 표시.</summary>
+    public void UpdateElement(float ratio, float accum, float threshold, ElementType element)
+    {
+        if (_elementFill != null)
+        {
+            _elementFill.fillAmount = Mathf.Clamp01(ratio);
+            _elementFill.color = ColorOf(element);
+        }
+
+        if (_elementLabel != null)
+        {
+            _elementLabel.text = element.IsValid()
+                ? $"{accum:F0}/{threshold:F0}"
+                : $"- {accum:F0}/{threshold:F0}";
+        }
+    }
+
+    private static Color ColorOf(ElementType element)
+    {
+        if (!element.IsValid()) return new Color(0.5f, 0.5f, 0.5f, 1f);
+        int idx = (int)element;
+        if (idx < 0 || idx >= _elementColors.Length) return Color.white;
+        return _elementColors[idx];
     }
 
     private void Update()

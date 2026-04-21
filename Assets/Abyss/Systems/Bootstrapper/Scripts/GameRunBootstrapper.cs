@@ -184,6 +184,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             try { await equipData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] EquipmentData 예외: {e.Message}"); }
         }
+
+        var monsterStatData = Managers.ServerMonsterStat;
+        if (monsterStatData != null && !monsterStatData.IsInitialized)
+        {
+            try { await monsterStatData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] MonsterStatData 예외: {e.Message}"); }
+        }
     }
 
     private async UniTask InitItemDataAsync()
@@ -293,11 +300,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var blocks = MapBuilder.Build(grid, blockPalette, mapGO.transform, blockCellSize, 0f);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
-        // Scatter → Return 연출
-        await MapPresenter.PlayEntrance(
+        // 등장 연출 (entrance 필드로 스타일 분기)
+        var entrance = MapEntranceRegistry.Resolve(roomEntry.entrance);
+        await entrance.PlayAsync(
             blocks,
-            roomEntry.scatter_range,
-            roomEntry.return_duration);
+            new MapEntranceContext(roomEntry),
+            this.GetCancellationTokenOnDestroy());
 
         // 투명 바닥 유지 (빈 공간 추락 방지)
 

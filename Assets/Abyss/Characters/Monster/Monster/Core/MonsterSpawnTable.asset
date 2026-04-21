@@ -137,10 +137,6 @@ MonoBehaviour:
     addressableKey: StingRay/StingRay
     weight: 1
     enabled: 1
-  - displayName: ForestGuardianMonster
-    addressableKey: ForestGuardian/ForestGuardian
-    weight: 1
-    enabled: 1
   - displayName: DragonBossMonster
     addressableKey: DragonBoss/DragonBoss
     weight: 1

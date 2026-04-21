@@ -21,7 +21,7 @@ namespace Abyss.Monster
 ///   3) 빈 오브젝트에 해당 클래스 + Rigidbody + NavMeshAgent 추가
 ///   4) SO .asset 파일들 생성 후 Addressables 등록
 /// </summary>
-public abstract class MonsterBase : MonoBehaviour, IDamageable
+public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 {
     // ── 추상 멤버 (파생 클래스가 구현) ────────────────────
     /// <summary>Addressables에 등록된 MonsterConfigSO 주소.</summary>
@@ -32,6 +32,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// null 또는 빈 문자열이면 JSON 로드를 건너뛰고 SO 기본값 사용.
     /// </summary>
     protected abstract string DataAddress { get; }
+
+    /// <summary>
+    /// MONSTER_ELEMENT_STAT_DATA 테이블의 monster_id. 서버 스탯 오버라이드에 사용.
+    /// 기본 구현은 ConfigAddress 의 '/' 앞 부분을 사용 (예: "WormMonster/WormMonsterConfig" → "WormMonster").
+    /// 매핑이 다르면 파생 클래스에서 오버라이드.
+    /// </summary>
+    protected virtual string ServerStatId
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(ConfigAddress)) return string.Empty;
+            int idx = ConfigAddress.IndexOf('/');
+            return idx > 0 ? ConfigAddress.Substring(0, idx) : ConfigAddress;
+        }
+    }
 
     /// <summary>
     /// HP 바 위치의 기준이 될 Head 본 이름.
@@ -65,6 +80,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private   MonsterHPBar       _hpBar;
     private   bool               _hpBarRequesting;
     private   bool               _worldHPBarSuppressed;
+
+    // ── 원소 시스템 ───────────────────────────────────────
+    private ElementBuildup         _elementBuildup;
+    private ElementVisualFeedback  _elementVisual;
+    private float                  _baseAgentSpeed;
+    private float                  _incomingDamageMulti = 1f;
+    private bool                   _isPetrified;
 
     // ── HP 변경 이벤트 (보스 UI 등 외부에서 구독) ─────────
     /// <summary>HP가 변경될 때마다 발행. (currentHp, maxHp)</summary>
@@ -134,6 +156,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
                 // 2. JSON 데이터 로드 후 복사본에 덮어쓰기 (캐시 등록 전에 1회만 실행)
                 await LoadAndApplyJsonDataAsync();
+
+                // 2-1. 서버 CDN(MONSTER_ELEMENT_STAT_DATA) 으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
+                ApplyServerStatOverride();
             }
         }
 
@@ -146,10 +171,18 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         }
         _agent.speed            = _config.stat.moveSpeed;
         _agent.stoppingDistance = _config.stat.attackRange;
+        _baseAgentSpeed         = _config.stat.moveSpeed;
 
         // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
+
+        // 원소 시스템 자동 부착 (없으면 생성)
+        _elementBuildup = GetComponent<ElementBuildup>();
+        if (_elementBuildup == null) _elementBuildup = gameObject.AddComponent<ElementBuildup>();
+        _elementVisual  = GetComponent<ElementVisualFeedback>();
+        if (_elementVisual == null)  _elementVisual  = gameObject.AddComponent<ElementVisualFeedback>();
+        _elementBuildup.OnTriggered += HandleElementTriggered;
 
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
@@ -259,6 +292,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             ? Vector3.Distance(transform.position, _runtime.PlayerTarget.position)
             : float.MaxValue;
 
+        // 원소 누적치 게이지 UI 갱신
+        if (_hpBar != null && _elementBuildup != null)
+            _hpBar.UpdateElement(_elementBuildup.Ratio, _elementBuildup.Accum, _elementBuildup.Threshold, _elementBuildup.LastElement);
+
         _fsm?.Update();
 
 #if UNITY_EDITOR
@@ -359,17 +396,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             return;
         }
 
-        // ── 원소 누적치 임계값 체크 ──────────────────────────
-        for (int i = 0; i < ElementTypeUtil.Count; i++)
-        {
-            var entry = _config.elemental.Get((ElementType)i);
-            if (entry == null) continue;
-            if (_runtime.ElementAccumulation[i] < _config.elemental.accumulationThreshold) continue;
-
-            _runtime.ElementAccumulation[i] = 0f;   // 누적치 리셋
-            ChangeState(_elementalStates[i]);
-            return;
-        }
+        // 원소 누적치 처리는 ElementBuildup 으로 이전 (HandleElementTriggered 이벤트 참조)
     }
 
     /// <summary>
@@ -426,20 +453,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
 
-        // 무적 상태 — 데미지 자체 무시
+        // 무적 또는 석화 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+        if (_isPetrified) return;
 
-        // 원소 누적치 갱신 (무적 상태가 아닐 때만)
-        if (element.IsValid() && elementAmount > 0f)
+        // 방어력 + 데미지 배율 + Grass poison 배율 적용 (최소 1 데미지)
+        float actual = Mathf.Max(1f, (amount - _config.stat.defense) * _runtime.DamageMultiplier * _incomingDamageMulti);
+        _runtime.CurrentHp -= (int)actual;
+
+        // 원소 누적치는 ElementBuildup 으로 위임 (resistance 반영)
+        if (element.IsValid() && elementAmount > 0f && _elementBuildup != null)
         {
             var entry = _config.elemental.Get(element);
             float scaled = elementAmount * (entry?.resistance ?? 1f);
-            _runtime.ElementAccumulation[element.ToIndex()] += scaled;
+            _elementBuildup.AddBuildup(element, scaled, actual);
         }
-
-        // 방어력 + 데미지 배율 적용 (최소 1 데미지)
-        float actual = Mathf.Max(1f, (amount - _config.stat.defense) * _runtime.DamageMultiplier);
-        _runtime.CurrentHp -= (int)actual;
         _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
         OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
 
@@ -515,6 +543,46 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         data.ApplyToConfig(_config);
     }
+
+    /// <summary>
+    /// MONSTER_ELEMENT_STAT_DATA 서버 값으로 _config 수치 덮어쓰기.
+    /// HP / 공격력 / 방어력 / 누적치 임계값 / 네이티브 원소.
+    /// 서버 데이터가 없거나 매니저 미초기화 시 SO 기본값 유지.
+    /// </summary>
+    private void ApplyServerStatOverride()
+    {
+        var mgr = Managers.ServerMonsterStat;
+        if (mgr == null || !mgr.IsInitialized) return;
+
+        var id = ServerStatId;
+        if (string.IsNullOrEmpty(id)) return;
+
+        var entry = mgr.GetById(id);
+        if (entry == null)
+        {
+            Debug.LogWarning($"[MonsterBase] 서버 스탯 없음 — id='{id}' (SO 기본값 유지)", this);
+            return;
+        }
+
+        if (entry.max_hp > 0)           _config.stat.maxHp         = entry.max_hp;
+        if (entry.base_attack > 0f)     _config.stat.attackPower   = entry.base_attack;
+        if (entry.base_defense >= 0f)   _config.stat.defense       = entry.base_defense;
+        if (entry.max_accumulation > 0f) _config.elemental.accumulationThreshold = entry.max_accumulation;
+
+        _config.stat.nativeElement = ParseElementType(entry.element);
+
+        Debug.Log($"[MonsterBase] 서버 스탯 적용: {id} ({entry.monster_name}) | HP={entry.max_hp} ATK={entry.base_attack} DEF={entry.base_defense} | Elem={_config.stat.nativeElement} Accum={entry.max_accumulation}");
+    }
+
+    private static ElementType ParseElementType(string s) => s switch
+    {
+        "Lightning" => ElementType.Lightning,
+        "Water"     => ElementType.Water,
+        "Fire"      => ElementType.Fire,
+        "Grass"     => ElementType.Grass,
+        "Earth"     => ElementType.Earth,
+        _           => ElementType.None,
+    };
 
     private async UniTask LoadAnimatorControllerAsync()
     {
@@ -607,6 +675,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _firedHpTriggers.Clear();
         System.Array.Clear(_runtime.ElementAccumulation, 0, _runtime.ElementAccumulation.Length);
 
+        // 원소 상태/버프 리셋
+        _incomingDamageMulti = 1f;
+        _isPetrified         = false;
+        _elementBuildup?.ResetAll();
+        if (_agent != null) _agent.speed = _baseAgentSpeed;
+
         foreach (var cb in _onEnabledCallbacks) cb?.Invoke();
         _fsm?.ChangeState<PatrolState>();
 
@@ -618,7 +692,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _hpBarRequesting = false;
         if (_hpBar != null)
         {
-            Managers.MonsterHPBar.ReturnHPBar(_hpBar);
+            // Managers 가 먼저 파괴된 경우 (씬 종료/플레이 종료) 로 NRE 방지
+            Managers.MonsterHPBar?.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
     }
@@ -699,6 +774,49 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             Gizmos.color = Color.green;
             Gizmos.DrawWireCube(_runtime.SpawnPosition, Vector3.one * 0.3f);
         }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IElementTarget 구현
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    Transform IElementTarget.Transform => transform;
+    GameObject IElementTarget.GameObject => gameObject;
+    float IElementTarget.MaxHp => _config != null ? _config.stat.maxHp : 0f;
+
+    public void TakeElementalDoT(float damage, ElementType source)
+    {
+        if (_runtime == null || _runtime.IsDead || damage <= 0f) return;
+        _runtime.CurrentHp -= Mathf.Max(1, (int)damage);
+        if (_runtime.CurrentHp <= 0)
+        {
+            _runtime.CurrentHp = 0;
+            _runtime.IsDead    = true;
+            ChangeState<DieState>();
+        }
+        _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
+
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
+    }
+
+    public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMulti = Mathf.Max(0f, multi);
+
+    public void SetMovementMultiplier(float multi)
+    {
+        if (_agent == null) return;
+        _agent.speed = _baseAgentSpeed * Mathf.Max(0f, multi);
+    }
+
+    public void SetPetrified(bool active)
+    {
+        _isPetrified = active;
+        if (_agent != null && _agent.isOnNavMesh) _agent.isStopped = active;
+    }
+
+    private void HandleElementTriggered(ElementType element, ElementEffectEntry entry)
+    {
+        Debug.Log($"[Monster:{name}] 원소 발동 → {element} ({entry.effect_id}) dur={entry.duration}s");
     }
 }
 }

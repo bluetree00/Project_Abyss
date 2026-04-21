@@ -10,30 +10,44 @@ public static class ElementEffectRunner
 {
     private const float DefaultVfxLifetime = 3f;
 
-    /// <summary>vfx_key 기반 Addressable 인스턴스 스폰 후 일정 시간 뒤 자동 해제.</summary>
+    /// <summary>vfx_key 기반 Addressable 인스턴스 스폰 후 일정 시간 뒤 자동 해제. position 사용.</summary>
     public static void SpawnVFX(string vfxKey, Vector3 position, float lifetime = DefaultVfxLifetime)
     {
         if (string.IsNullOrEmpty(vfxKey)) return;
-        SpawnVFXAsync(vfxKey, position, lifetime).Forget();
+        SpawnVFXAsync(vfxKey, null, position, Vector3.up * 0.5f, lifetime).Forget();
     }
 
-    private static async UniTaskVoid SpawnVFXAsync(string vfxKey, Vector3 position, float lifetime)
+    /// <summary>parent 에 부착하여 함께 움직이는 VFX. parent가 도중에 사라지면 즉시 해제.</summary>
+    public static void SpawnVFXAttached(string vfxKey, Transform parent, float lifetime = DefaultVfxLifetime, Vector3? localOffset = null)
     {
+        if (string.IsNullOrEmpty(vfxKey) || parent == null) return;
+        SpawnVFXAsync(vfxKey, parent, parent.position, localOffset ?? Vector3.up * 0.5f, lifetime).Forget();
+    }
+
+    private static async UniTaskVoid SpawnVFXAsync(string vfxKey, Transform parent, Vector3 fallbackPos, Vector3 offset, float lifetime)
+    {
+        GameObject go = null;
         try
         {
-            var go = await Managers.AddressableManager.InstantiateAsync(vfxKey);
+            go = await Managers.AddressableManager.InstantiateAsync(vfxKey, parent, false);
             if (go == null) return;
-            go.transform.position = position;
+
+            if (parent != null)
+                go.transform.localPosition = offset;
+            else
+                go.transform.position = fallbackPos + offset;
 
             await UniTask.Delay(TimeSpan.FromSeconds(lifetime));
-
-            if (go != null)
-                Managers.AddressableManager.ReleaseInstance(go);
         }
         catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Debug.LogWarning($"[ElementEffectRunner] VFX 스폰 실패: {vfxKey} ({e.Message})");
+        }
+        finally
+        {
+            if (go != null)
+                Managers.AddressableManager.ReleaseInstance(go);
         }
     }
 

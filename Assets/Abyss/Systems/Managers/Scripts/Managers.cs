@@ -50,6 +50,7 @@ public sealed class Managers : MonoBehaviour
     private BuffDataManager _buffDataManager;
     private ChapterDataManager _chapterDataManager;
     private ElementEffectDataManager _elementEffectDataManager;
+    private ServerMonsterStatDataManager _serverMonsterStatDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -296,6 +297,20 @@ public sealed class Managers : MonoBehaviour
                 inst._elementEffectDataManager = new ElementEffectDataManager();
 
             return inst._elementEffectDataManager;
+        }
+    }
+
+    public static ServerMonsterStatDataManager ServerMonsterStat
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._serverMonsterStatDataManager == null)
+                inst._serverMonsterStatDataManager = new ServerMonsterStatDataManager();
+
+            return inst._serverMonsterStatDataManager;
         }
     }
     #endregion

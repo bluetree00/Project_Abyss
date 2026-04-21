@@ -39,6 +39,8 @@ public class MonsterSpawner : MonoBehaviour
 
     // 비활성(풀 반환) 또는 null 엔트리는 Purge로 제거
     private readonly List<MonsterBase> _spawnedMonsters = new();
+    // 스폰 실패한 키는 다시 시도하지 않음 (런타임 캐시)
+    private readonly HashSet<string> _disabledKeys = new();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
@@ -85,17 +87,31 @@ public class MonsterSpawner : MonoBehaviour
         SpawnEntry entry = spawnTable.PickRandom();
         if (entry == null) return;
 
+        // 잘못된 엔트리(이전에 스폰 실패)는 비활성화 처리해 다음 PickRandom 에서 제외
+        if (_disabledKeys.Contains(entry.addressableKey)) return;
+
         if (!TryGetSpawnPosition(out Vector3 spawnPos)) return;
 
-        var monster = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(
-            entry.addressableKey,
-            ObjectPoolerManager.PoolType.Monster,
-            spawnPos,
-            Quaternion.identity);
+        MonsterBase monster = null;
+        try
+        {
+            monster = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(
+                entry.addressableKey,
+                ObjectPoolerManager.PoolType.Monster,
+                spawnPos,
+                Quaternion.identity);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[MonsterSpawner] '{entry.addressableKey}' 스폰 예외 — 엔트리 비활성화: {ex.Message}", this);
+            _disabledKeys.Add(entry.addressableKey);
+            return;
+        }
 
         if (monster == null)
         {
-            Debug.LogWarning($"[MonsterSpawner] '{entry.addressableKey}' 스폰 실패.", this);
+            Debug.LogWarning($"[MonsterSpawner] '{entry.addressableKey}' 스폰 실패 — 엔트리 비활성화.", this);
+            _disabledKeys.Add(entry.addressableKey);
             return;
         }
 
