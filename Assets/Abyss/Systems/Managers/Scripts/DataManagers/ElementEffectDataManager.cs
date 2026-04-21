@@ -118,6 +118,7 @@ public class ElementEffectDataManager
                 counter_multiplier  = row.TryGetFloat("counter_multiplier"),
                 reverse_multiplier  = row.TryGetFloat("reverse_multiplier"),
                 same_multiplier     = row.TryGetFloat("same_multiplier"),
+                activation_gauge    = row.TryGetFloat("Activation_gauge"),
                 vfx_key             = row.TryGetString("vfx_key"),
                 sfx_key             = row.TryGetString("sfx_key"),
                 description         = row.TryGetString("description"),
