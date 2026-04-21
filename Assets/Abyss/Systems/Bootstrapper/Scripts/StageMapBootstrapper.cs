@@ -172,14 +172,24 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (layout != null)
             layout.SetLayerSizes(graph.MiddlePattern);
 
-        // 콘텐츠 크기 조정 (피크층 + 향후 확장 여유)
+        // 콘텐츠 크기 조정: 가장 넓은 층(피크) 기준. peakLayer는 "층 번호"이고
+        // 해당 층 노드 수는 MiddlePattern의 최댓값(=peakLayer+1)임. 한 칸 부족 버그 회피용.
         int totalLayers = middleLayers + 2;
         float layerSpacing = 800f;
         float nodeSpacingX = 500f;
         float marginY = 800f;
         float marginX = 1200f;
+
+        int maxNodesInLayer = 1;
+        if (graph.MiddlePattern != null)
+        {
+            for (int i = 0; i < graph.MiddlePattern.Length; i++)
+                if (graph.MiddlePattern[i] > maxNodesInLayer)
+                    maxNodesInLayer = graph.MiddlePattern[i];
+        }
+
         float height = totalLayers * layerSpacing + marginY;
-        float width = Mathf.Max(2400f, peakLayer * nodeSpacingX + marginX);
+        float width = Mathf.Max(2400f, (maxNodesInLayer - 1) * nodeSpacingX + marginX);
         scroller.SetContentSize(width, height);
 
         // 배경 적용
@@ -196,7 +206,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         foreach (var node in graph.Nodes)
         {
-            var ui = CreateNode(parent, template, node.PointId, node.Stage, node.Normal);
+            var ui = CreateNode(parent, template, node);
             uiByPointId[node.PointId] = ui;
         }
 
@@ -211,30 +221,45 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             Destroy(template);
     }
 
-    private StagePointUI CreateNode(Transform parent, GameObject template, int pointId, StageCategory stage, NormalRoomCategory normal)
+    private StagePointUI CreateNode(Transform parent, GameObject template, StageMapNode node)
     {
         GameObject go;
         if (template != null)
         {
             go = Instantiate(template, parent, false);
-            go.name = $"Node_{pointId}";
+            go.name = $"Node_{node.PointId}";
         }
         else
         {
-            go = new GameObject($"Node_{pointId}",
+            go = new GameObject($"Node_{node.PointId}",
                 typeof(RectTransform), typeof(UnityEngine.UI.Image),
                 typeof(UnityEngine.UI.Button), typeof(CanvasGroup));
             go.transform.SetParent(parent, false);
-            go.GetComponent<RectTransform>().sizeDelta = new Vector2(80f, 80f);
         }
 
         go.SetActive(true);
+
+        // 템플릿은 씬/프리팹의 기존 노드를 복제한 것이라 scale/position/anchor가
+        // 오염돼 있을 수 있음. Layout이 위치를 결정할 수 있도록 기준값으로 리셋.
+        var rt = go.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.localScale = Vector3.one;
+            rt.localRotation = Quaternion.identity;
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            if (template == null)
+                rt.sizeDelta = new Vector2(80f, 80f);
+        }
 
         var point = go.GetComponent<StagePointUI>();
         if (point == null)
             point = go.AddComponent<StagePointUI>();
 
-        point.Init(pointId, stage, normal, iconMap);
+        point.Init(node.PointId, node.Stage, node.Normal, iconMap);
+        point.SetLayerMeta(node.LayerIndex, node.IndexInLayer);
         return point;
     }
 
