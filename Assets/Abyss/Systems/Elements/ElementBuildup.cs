@@ -172,7 +172,9 @@ public class ElementBuildup : MonoBehaviour
         };
 
         behavior.Apply(_target, this, entry);
-        ElementEffectRunner.SpawnVFX(entry.vfx_key, _target.Transform.position, Mathf.Max(entry.duration, 1f));
+
+        // VFX는 대상의 Transform에 부착해 함께 따라오게 한다 (이동 중 적에 자연스럽게 유지).
+        ElementEffectRunner.SpawnVFXAttached(entry.vfx_key, _target.Transform, Mathf.Max(entry.duration, 1f));
 
         OnTriggered?.Invoke(element, entry);
     }

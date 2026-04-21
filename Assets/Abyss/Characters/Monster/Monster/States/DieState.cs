@@ -23,11 +23,15 @@ public class DieState : IMonsterState
         ctx.Agent.enabled = false;
 
         // Rigidbody 속도 초기화 후 kinematic 전환 (사망 시 밀려남 방지)
+        // kinematic 상태에서는 velocity 할당이 경고를 내므로 비활성화 상태에서만 초기화.
         var rb = ctx.Monster.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
             rb.isKinematic = true;
         }
 

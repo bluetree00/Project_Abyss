@@ -63,19 +63,19 @@ public static class HitFeelService
 
     private static System.Collections.IEnumerator HitStopRoutine(float scale, float duration)
     {
-        float prev = Time.timeScale;
+        // 동시 호출 시 누적 캡처 방지 — 항상 _baseTimeScale (=1.0) 로 복원.
         Time.timeScale = scale;
-        // unscaled 시간으로 대기 — timeScale 영향 받지 않음
         yield return new WaitForSecondsRealtime(duration);
-        Time.timeScale = prev > 0f ? prev : 1f;
+        Time.timeScale = _baseTimeScale;
         _stopCo = null;
     }
 
     private static System.Collections.IEnumerator ShakeRoutine(float amplitude, float duration)
     {
-        // 카메라가 이동하는 게임이라면 매 프레임 originalLocalPos를 갱신
+        // 동시 호출 시 흔들린 위치를 origin으로 캡처하지 않도록 EnsureCamera 시점의 _camOriginalLocalPos 사용.
         var cam = _cachedCam.transform;
-        Vector3 origin = cam.localPosition;
+        Vector3 origin = _camOriginalLocalPos;
+        cam.localPosition = origin;  // 이전 쉐이크 잔존 오프셋 즉시 정리
         float t = 0f;
         while (t < duration)
         {
