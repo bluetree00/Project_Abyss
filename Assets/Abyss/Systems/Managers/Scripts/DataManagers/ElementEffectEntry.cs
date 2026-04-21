@@ -17,6 +17,7 @@ public class ElementEffectEntry
     public float  counter_multiplier;  // 상성 유리 원소 피격 시 누적 배율
     public float  reverse_multiplier;  // 상성 불리 원소 피격 시 누적 배율
     public float  same_multiplier;     // 동일 원소 피격 시 누적 배율
+    public float  activation_gauge;    // 이 원소의 발동 임계치 (몬스터 max_accumulation 배율과 곱해 사용)
     public string vfx_key;             // VFX Addressable 키
     public string sfx_key;             // SFX 키
     public string description;
