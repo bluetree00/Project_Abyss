@@ -85,8 +85,34 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     private ElementBuildup         _elementBuildup;
     private ElementVisualFeedback  _elementVisual;
     private float                  _baseAgentSpeed;
+    private float                  _baseDefense;
     private float                  _incomingDamageMulti = 1f;
-    private bool                   _isPetrified;
+    // 원소 효과로 인한 일시 배율 (Water slow/Earth petrify/Lightning paralyze)
+    private float                  _defenseMulti        = 1f;
+    private float                  _attackSpeedMulti    = 1f;
+    // 네이티브 원소 패시브 보너스 (인스턴스별 — Config 공유 캐시 오염 방지)
+    private float                  _nativeAttackMulti   = 1f;
+    private float                  _nativeHpMulti       = 1f;
+    private float                  _nativeDefenseMulti  = 1f;
+    private float                  _nativeRateMulti     = 1f;
+    private float                  _grassRegenTimer;
+    // 스폰 시 랜덤으로 결정되는 인스턴스 고유 원소. ElementType.None 포함 6종 중 하나.
+    private ElementType            _effectiveElement    = ElementType.None;
+
+    /// <summary>공격 상태/어빌리티가 쿨다운 계산 시 곱할 배율. 0 = 공격 불가.</summary>
+    public float AttackSpeedMultiplier => _attackSpeedMulti;
+
+    /// <summary>이 몬스터 인스턴스에 실제 적용된 원소. 스폰 시 SetRandomNativeElement로 결정.</summary>
+    public ElementType EffectiveElement => _effectiveElement;
+
+    /// <summary>네이티브 보너스와 원소 효과 배율이 모두 반영된 유효 공격력.</summary>
+    public float EffectiveAttackPower => _config != null ? _config.stat.attackPower * _nativeAttackMulti : 0f;
+
+    /// <summary>네이티브 보너스가 반영된 유효 최대 HP (반올림).</summary>
+    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _nativeHpMulti) : 0;
+
+    /// <summary>네이티브 보너스가 반영된 유효 공격 속도.</summary>
+    public float EffectiveAttackRate => _config != null ? _config.stat.attackRate * _nativeRateMulti : 0f;
 
     // ── HP 변경 이벤트 (보스 UI 등 외부에서 구독) ─────────
     /// <summary>HP가 변경될 때마다 발행. (currentHp, maxHp)</summary>
@@ -94,7 +120,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
-    public int    BossMaxHp => _config != null ? _config.stat.maxHp : 0;
+    public int    BossMaxHp => EffectiveMaxHp;
     public string BossName  => _config != null ? _config.monsterName : string.Empty;
 
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
@@ -157,10 +183,23 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
                 // 2. JSON 데이터 로드 후 복사본에 덮어쓰기 (캐시 등록 전에 1회만 실행)
                 await LoadAndApplyJsonDataAsync();
 
+                // 2-0. 구버전 .asset 값(절대 100~1000) → 배율(1.0~10.0) 자동 마이그레이션.
+                // 새 필드 maxAccumulationScale은 "배율"이라 10을 초과하면 구버전 저장값으로 간주.
+                if (_config.elemental.maxAccumulationScale > 10f)
+                    _config.elemental.maxAccumulationScale /= 100f;
+
                 // 2-1. 서버 CDN(MONSTER_ELEMENT_STAT_DATA) 으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
                 ApplyServerStatOverride();
             }
         }
+
+        // 2-2. base 스탯 캐싱 (ApplyNativeElementBonus 로그가 올바른 DEF를 찍도록 선행)
+        _baseDefense = _config.stat.defense;
+
+        // 2-3. 인스턴스 고유 원소를 Config 기본값으로 초기화 + 보너스 배율 세팅.
+        // (MonsterSpawner가 스폰 직후 SetRandomNativeElement로 6원소 중 랜덤 덮어씀)
+        _effectiveElement = _config.stat.nativeElement;
+        ApplyNativeElementBonus();
 
         // 3. NavMeshAgent 설정
         _agent = GetComponent<NavMeshAgent>();
@@ -177,11 +216,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
 
-        // 원소 시스템 자동 부착 (없으면 생성)
+        // 원소 시스템 자동 부착 (없으면 생성) + 배율 주입
         _elementBuildup = GetComponent<ElementBuildup>();
         if (_elementBuildup == null) _elementBuildup = gameObject.AddComponent<ElementBuildup>();
         _elementVisual  = GetComponent<ElementVisualFeedback>();
         if (_elementVisual == null)  _elementVisual  = gameObject.AddComponent<ElementVisualFeedback>();
+        _elementBuildup.SetMonsterMaxAccumulationScale(_config.elemental.maxAccumulationScale);
         _elementBuildup.OnTriggered += HandleElementTriggered;
 
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
@@ -203,7 +243,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         // 5. 런타임 데이터 초기화
         _runtime = new MonsterRuntimeData
         {
-            CurrentHp        = _config.stat.maxHp,
+            CurrentHp        = EffectiveMaxHp,
             SpawnPosition    = transform.position,
             PatrolDirection  = 1,
         };
@@ -231,7 +271,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         // 9. HP 바 요청 (보스 등 UseWorldHPBar == false면 건너뜀)
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
-            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
 
         OnInitialized();
     }
@@ -292,9 +332,29 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             ? Vector3.Distance(transform.position, _runtime.PlayerTarget.position)
             : float.MaxValue;
 
-        // 원소 누적치 게이지 UI 갱신
+        // 원소 누적치 게이지 UI 갱신 (독 게이지일 때 스택 수 포함)
         if (_hpBar != null && _elementBuildup != null)
-            _hpBar.UpdateElement(_elementBuildup.Ratio, _elementBuildup.Accum, _elementBuildup.Threshold, _elementBuildup.LastElement);
+            _hpBar.UpdateElement(_elementBuildup.Ratio, _elementBuildup.Accum, _elementBuildup.Threshold,
+                                 _elementBuildup.LastElement, _elementBuildup.PoisonStacks);
+
+        // 네이티브 Grass — 2초마다 최대HP의 5% 재생
+        if (_effectiveElement == ElementType.Grass && _runtime.CurrentHp < EffectiveMaxHp)
+        {
+            _grassRegenTimer += Time.deltaTime;
+            if (_grassRegenTimer >= 2f)
+            {
+                _grassRegenTimer -= 2f;
+                int effMax = EffectiveMaxHp;
+                int heal = Mathf.Max(1, Mathf.RoundToInt(effMax * 0.05f));
+                int newHp = Mathf.Min(effMax, _runtime.CurrentHp + heal);
+                if (newHp != _runtime.CurrentHp)
+                {
+                    _runtime.CurrentHp = newHp;
+                    _hpBar?.UpdateHP(newHp, effMax);
+                    OnHPChanged?.Invoke(newHp, effMax);
+                }
+            }
+        }
 
         _fsm?.Update();
 
@@ -453,12 +513,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
 
-        // 무적 또는 석화 상태 — 데미지 자체 무시
+        // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
-        if (_isPetrified) return;
 
-        // 방어력 + 데미지 배율 + Grass poison 배율 적용 (최소 1 데미지)
-        float actual = Mathf.Max(1f, (amount - _config.stat.defense) * _runtime.DamageMultiplier * _incomingDamageMulti);
+        // 방어력(네이티브 보너스 + 원소 효과 배율) + 데미지 배율 + 받는 데미지 배율 (최소 1 데미지)
+        float defense = _baseDefense * _nativeDefenseMulti * _defenseMulti;
+        float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti);
         _runtime.CurrentHp -= (int)actual;
 
         // 원소 누적치는 ElementBuildup 으로 위임 (resistance 반영)
@@ -468,8 +528,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             float scaled = elementAmount * (entry?.resistance ?? 1f);
             _elementBuildup.AddBuildup(element, scaled, actual);
         }
-        _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
-        OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
+        int effMax = EffectiveMaxHp;
+        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
 
         if (_runtime.CurrentHp <= 0)
         {
@@ -567,11 +628,87 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (entry.max_hp > 0)           _config.stat.maxHp         = entry.max_hp;
         if (entry.base_attack > 0f)     _config.stat.attackPower   = entry.base_attack;
         if (entry.base_defense >= 0f)   _config.stat.defense       = entry.base_defense;
-        if (entry.max_accumulation > 0f) _config.elemental.accumulationThreshold = entry.max_accumulation;
+        if (entry.max_accumulation > 0f) _config.elemental.maxAccumulationScale = entry.max_accumulation;
 
         _config.stat.nativeElement = ParseElementType(entry.element);
 
-        Debug.Log($"[MonsterBase] 서버 스탯 적용: {id} ({entry.monster_name}) | HP={entry.max_hp} ATK={entry.base_attack} DEF={entry.base_defense} | Elem={_config.stat.nativeElement} Accum={entry.max_accumulation}");
+        Debug.Log($"[MonsterBase] 서버 스탯 적용: {id} ({entry.monster_name}) | HP={entry.max_hp} ATK={entry.base_attack} DEF={entry.base_defense} | Elem={_config.stat.nativeElement} AccumScale={entry.max_accumulation}");
+    }
+
+    /// <summary>
+    /// 인스턴스 원소에 따른 패시브 보너스를 배율 필드에 적용.
+    /// Config를 직접 수정하지 않으므로 동종 몬스터 간 공유 캐시가 오염되지 않는다.
+    ///   Fire      → 공격력 +10%
+    ///   Water     → 최대HP +10%
+    ///   Lightning → 공격속도 +10%
+    ///   Earth     → 방어력 +10%
+    ///   Grass     → 2초마다 최대HP의 5% 체력 재생 (Update 루프에서 처리)
+    ///   None      → 보너스 없음
+    /// </summary>
+    private void ApplyNativeElementBonus()
+    {
+        const float Bonus = 0.1f;
+        // 기본값 리셋 — 재사용(풀) 시 이전 속성 배율 잔존 방지
+        _nativeAttackMulti  = 1f;
+        _nativeHpMulti      = 1f;
+        _nativeDefenseMulti = 1f;
+        _nativeRateMulti    = 1f;
+
+        switch (_effectiveElement)
+        {
+            case ElementType.Fire:
+                _nativeAttackMulti = 1f + Bonus;
+                break;
+            case ElementType.Water:
+                _nativeHpMulti = 1f + Bonus;
+                break;
+            case ElementType.Lightning:
+                _nativeRateMulti = 1f + Bonus;
+                break;
+            case ElementType.Earth:
+                _nativeDefenseMulti = 1f + Bonus;
+                break;
+            case ElementType.Grass:
+                // 재생은 Update 루프에서 nativeElement 체크로 처리
+                break;
+            default:
+                return; // None — 보너스 없음
+        }
+
+        Debug.Log($"[MonsterBase] 네이티브 원소 보너스: {name} Element={_effectiveElement} → HP={EffectiveMaxHp} ATK={EffectiveAttackPower:F1} DEF={_baseDefense * _nativeDefenseMulti:F1} Rate={EffectiveAttackRate:F2}");
+    }
+
+    /// <summary>스폰 시 6원소(None 포함) 중 균등 랜덤으로 인스턴스 원소 결정 + 보너스/틴트 재적용.
+    /// 같은 Config 공유 캐시를 쓰므로 여러 인스턴스가 서로 다른 원소 variant가 될 수 있다.
+    /// InitAsync 진행 중이면 완료될 때까지 대기 후 적용.</summary>
+    public void SetRandomNativeElement()
+    {
+        // None(-1) 포함 6개. (int)값이 -1~4이므로 Random.Range(-1, 5)
+        int r = UnityEngine.Random.Range(-1, ElementTypeUtil.Count);
+        ApplyElementWhenReady((ElementType)r).Forget();
+    }
+
+    private async UniTaskVoid ApplyElementWhenReady(ElementType element)
+    {
+        // Config/runtime이 아직 null이면 InitAsync가 진행 중. 완료 대기.
+        while ((_config == null || _runtime == null) && this != null && gameObject != null)
+            await UniTask.Yield(destroyCancellationToken);
+        if (this == null || gameObject == null) return;
+        SetNativeElement(element);
+    }
+
+    /// <summary>특정 원소로 강제 설정. 방별 테마 스폰 등 특수 케이스용.</summary>
+    public void SetNativeElement(ElementType element)
+    {
+        _effectiveElement = element;
+        ApplyNativeElementBonus();
+        _grassRegenTimer = 0f; // 원소 바뀌면 재생 타이머 초기화
+
+        // HP 배율이 바뀌면 CurrentHp도 비례 조정 (풀피 기준 유지)
+        if (_runtime != null && !_runtime.IsDead)
+            _runtime.CurrentHp = EffectiveMaxHp;
+
+        _hpBar?.UpdateHP(_runtime != null ? _runtime.CurrentHp : 0, EffectiveMaxHp);
     }
 
     private static ElementType ParseElementType(string s) => s switch
@@ -644,7 +781,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     {
         if (_config == null || _runtime == null) return;
 
-        _runtime.CurrentHp           = _config.stat.maxHp;
+        _runtime.CurrentHp           = EffectiveMaxHp;
         _runtime.IsDead              = false;
         _runtime.SpawnPosition       = transform.position;
         _runtime.PatrolDirection     = 1;
@@ -675,9 +812,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _firedHpTriggers.Clear();
         System.Array.Clear(_runtime.ElementAccumulation, 0, _runtime.ElementAccumulation.Length);
 
-        // 원소 상태/버프 리셋
+        // 원소 상태/버프 리셋 (일시 배율만 — 네이티브 보너스 배율은 SetRandomNativeElement에서 재설정)
         _incomingDamageMulti = 1f;
-        _isPetrified         = false;
+        _defenseMulti        = 1f;
+        _attackSpeedMulti    = 1f;
+        _grassRegenTimer     = 0f;
         _elementBuildup?.ResetAll();
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
@@ -701,8 +840,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     /// <summary>런타임 HP 변경(회복 등) 후 HP 바를 동기화한다. 특수 상태에서 호출.</summary>
     public void NotifyHPChanged()
     {
-        _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
-        OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
+        int effMax = EffectiveMaxHp;
+        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
     }
 
     /// <summary>월드 HP 바를 즉시 숨긴다. 잠복 상태 등에서 사용.</summary>
@@ -740,7 +880,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
-        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, _config.stat.maxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+        _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
         if (_worldHPBarSuppressed && _hpBar != null)
         {
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
@@ -782,7 +922,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     Transform IElementTarget.Transform => transform;
     GameObject IElementTarget.GameObject => gameObject;
-    float IElementTarget.MaxHp => _config != null ? _config.stat.maxHp : 0f;
+    float IElementTarget.MaxHp => EffectiveMaxHp;
 
     public void TakeElementalDoT(float damage, ElementType source)
     {
@@ -794,8 +934,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             _runtime.IsDead    = true;
             ChangeState<DieState>();
         }
-        _hpBar?.UpdateHP(_runtime.CurrentHp, _config.stat.maxHp);
-        OnHPChanged?.Invoke(_runtime.CurrentHp, _config.stat.maxHp);
+        int effMax = EffectiveMaxHp;
+        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
     }
@@ -808,10 +949,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _agent.speed = _baseAgentSpeed * Mathf.Max(0f, multi);
     }
 
-    public void SetPetrified(bool active)
+    public void SetAttackSpeedMultiplier(float multi)
     {
-        _isPetrified = active;
-        if (_agent != null && _agent.isOnNavMesh) _agent.isStopped = active;
+        _attackSpeedMulti = Mathf.Max(0f, multi);
+    }
+
+    public void SetDefenseMultiplier(float multi)
+    {
+        _defenseMulti = Mathf.Max(0f, multi);
     }
 
     private void HandleElementTriggered(ElementType element, ElementEffectEntry entry)

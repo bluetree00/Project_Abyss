@@ -85,7 +85,8 @@ public class MonsterJsonData
     [Serializable]
     public class ElementalData
     {
-        public float accumulationThreshold;
+        /// <summary>누적치 저항 배율. 실제 임계치 = element.activation_gauge × 이 값. 0이면 덮어쓰지 않음.</summary>
+        public float maxAccumulationScale;
         /// <summary>0.0=면역 / 0.5=반감 / 1.0=보통 / 2.0=약점. 0이면 덮어쓰지 않음.</summary>
         public float lightningResistance;
         public float waterResistance;
@@ -183,8 +184,8 @@ public class MonsterJsonData
         // ── 원소
         if (elemental != null)
         {
-            if (elemental.accumulationThreshold > 0)
-                config.elemental.accumulationThreshold = elemental.accumulationThreshold;
+            if (elemental.maxAccumulationScale > 0)
+                config.elemental.maxAccumulationScale = elemental.maxAccumulationScale;
             if (elemental.lightningResistance > 0) config.elemental.lightning.resistance = elemental.lightningResistance;
             if (elemental.waterResistance     > 0) config.elemental.water.resistance     = elemental.waterResistance;
             if (elemental.fireResistance      > 0) config.elemental.fire.resistance      = elemental.fireResistance;

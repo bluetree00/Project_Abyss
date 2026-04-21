@@ -80,8 +80,9 @@ public class MonsterHPBar : MonoBehaviour
         _slider.value = maxHp > 0 ? (float)currentHp / maxHp : 0f;
     }
 
-    /// <summary>원소 누적치 게이지 갱신. element=None 이면 흐리게 표시.</summary>
-    public void UpdateElement(float ratio, float accum, float threshold, ElementType element)
+    /// <summary>원소 누적치 게이지 갱신. element=None 이면 흐리게 표시.
+    /// poisonStacks가 양수이고 현재 element=Grass이면 라벨 끝에 "xN" 스택 수 표시.</summary>
+    public void UpdateElement(float ratio, float accum, float threshold, ElementType element, int poisonStacks = 0)
     {
         if (_elementFill != null)
         {
@@ -91,9 +92,14 @@ public class MonsterHPBar : MonoBehaviour
 
         if (_elementLabel != null)
         {
-            _elementLabel.text = element.IsValid()
+            string text = element.IsValid()
                 ? $"{accum:F0}/{threshold:F0}"
                 : $"- {accum:F0}/{threshold:F0}";
+
+            if (element == ElementType.Grass && poisonStacks > 0)
+                text += $" x{poisonStacks}";
+
+            _elementLabel.text = text;
         }
     }
 

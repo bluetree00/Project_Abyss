@@ -15,129 +15,211 @@ MonoBehaviour:
   entries:
   - displayName: FairyBatMonster
     addressableKey: FairyBat/FairyBat
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: GolemMonster
     addressableKey: Golem/Golem
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SkeletonMonster
     addressableKey: Skeleton/Skeleton
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SlimeMonster
     addressableKey: Slime/Slime
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SnailMonster
     addressableKey: Snail/Snail
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SpiderMonster
     addressableKey: Spider/Spider
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: MonsterPlantMonster
     addressableKey: MonsterPlant/MonsterPlant
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: EvilMageMonster
     addressableKey: EvilMage/EvilMage
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: OrcMonster
     addressableKey: Orc/Orc
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: DragonMonster
     addressableKey: Dragon/Dragon
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: BeholderMonster
     addressableKey: Beholder/Beholder
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: ChestMonsterMonster
     addressableKey: ChestMonster/ChestMonster
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: CrabMonsterMonster
     addressableKey: CrabMonster/CrabMonster
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: FlyingDemonMonster
     addressableKey: FlyingDemon/FlyingDemon
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: LizardWarriorMonster
     addressableKey: LizardWarrior/LizardWarrior
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: RatAssassinMonster
     addressableKey: RatAssassin/RatAssassin
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SpecterMonster
     addressableKey: Specter/Specter
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: WerewolfMonster
     addressableKey: Werewolf/Werewolf
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: WormMonsterMonster
     addressableKey: WormMonster/WormMonster
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: BattleBeeMonster
     addressableKey: BattleBee/BattleBee
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: BishopKnightMonster
     addressableKey: BishopKnight/BishopKnight
+    nativeElement: -1
+    poolTags: 0400000005000000
     weight: 1
     enabled: 1
   - displayName: BlackKnightMonster
     addressableKey: BlackKnight/BlackKnight
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: CactusMonster
     addressableKey: Cactus/Cactus
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: CyclopsMonster
     addressableKey: Cyclops/Cyclops
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: DemonKingMonster
     addressableKey: DemonKing/DemonKing
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
   - displayName: FishmanMonster
     addressableKey: Fishman/Fishman
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: MushroomAngryMonster
     addressableKey: MushroomAngry/MushroomAngry
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: MushroomSmileMonster
     addressableKey: MushroomSmile/MushroomSmile
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 0
   - displayName: NagaWizardMonster
     addressableKey: NagaWizard/NagaWizard
+    nativeElement: -1
+    poolTags: 02000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: SalamanderMonster
     addressableKey: Salamander/Salamander
+    nativeElement: -1
+    poolTags: 0100000002000000030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: StingRayMonster
     addressableKey: StingRay/StingRay
+    nativeElement: -1
+    poolTags: 030000000400000005000000
     weight: 1
     enabled: 1
   - displayName: DragonBossMonster
     addressableKey: DragonBoss/DragonBoss
+    nativeElement: -1
+    poolTags: 
+    weight: 1
+    enabled: 1
+  - displayName: ChestMonster
+    addressableKey: ChestMonster/ChestMonster
+    nativeElement: -1
+    poolTags: 
+    weight: 1
+    enabled: 1
+  - displayName: CrabMonster
+    addressableKey: CrabMonster/CrabMonster
+    nativeElement: -1
+    poolTags: 
+    weight: 1
+    enabled: 1
+  - displayName: WormMonster
+    addressableKey: WormMonster/WormMonster
+    nativeElement: -1
+    poolTags: 
     weight: 1
     enabled: 1
