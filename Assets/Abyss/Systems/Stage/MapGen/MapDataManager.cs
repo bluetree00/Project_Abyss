@@ -197,6 +197,7 @@ public class MapDataManager
             entry.scatter_range  = row.TryGetFloat("scatter_range");
             entry.return_duration= row.TryGetFloat("return_duration");
             entry.stat_version   = row.TryGetInt("stat_version");
+            entry.max_active_spawners = row.TryGetInt("max_active_spawners");
             return entry;
         }
         catch (Exception e)

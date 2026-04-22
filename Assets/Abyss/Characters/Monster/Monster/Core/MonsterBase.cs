@@ -84,6 +84,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     // ── 원소 시스템 ───────────────────────────────────────
     private ElementBuildup         _elementBuildup;
     private ElementVisualFeedback  _elementVisual;
+    private ElementNativePalette   _elementPalette;
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
     private float                  _incomingDamageMulti = 1f;
@@ -117,6 +118,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     // ── HP 변경 이벤트 (보스 UI 등 외부에서 구독) ─────────
     /// <summary>HP가 변경될 때마다 발행. (currentHp, maxHp)</summary>
     public event System.Action<int, int> OnHPChanged;
+
+    /// <summary>몬스터 사망 시 1회 발행. RoomClearController 등 외부 수명주기가 구독.</summary>
+    public event System.Action<MonsterBase> OnDied;
+
+    /// <summary>DieState.Enter에서 호출. 외부 구독자가 사망을 감지할 수 있도록 이벤트 래핑.</summary>
+    public void RaiseDied() => OnDied?.Invoke(this);
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
@@ -223,6 +230,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (_elementVisual == null)  _elementVisual  = gameObject.AddComponent<ElementVisualFeedback>();
         _elementBuildup.SetMonsterMaxAccumulationScale(_config.elemental.maxAccumulationScale);
         _elementBuildup.OnTriggered += HandleElementTriggered;
+        _elementPalette = GetComponent<ElementNativePalette>();
+        if (_elementPalette == null) _elementPalette = gameObject.AddComponent<ElementNativePalette>();
 
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
@@ -271,7 +280,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         // 9. HP 바 요청 (보스 등 UseWorldHPBar == false면 건너뜀)
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
+        {
             _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
+            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
+        }
 
         OnInitialized();
     }
@@ -703,12 +715,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _effectiveElement = element;
         ApplyNativeElementBonus();
         _grassRegenTimer = 0f; // 원소 바뀌면 재생 타이머 초기화
+        _elementPalette?.Apply(element);
 
         // HP 배율이 바뀌면 CurrentHp도 비례 조정 (풀피 기준 유지)
         if (_runtime != null && !_runtime.IsDead)
             _runtime.CurrentHp = EffectiveMaxHp;
 
         _hpBar?.UpdateHP(_runtime != null ? _runtime.CurrentHp : 0, EffectiveMaxHp);
+        if (_config != null)
+            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
     }
 
     private static ElementType ParseElementType(string s) => s switch
@@ -820,6 +835,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _elementBuildup?.ResetAll();
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
+        // 풀 재사용 시 이전 Die에서 설정된 HP바 숨김 플래그/요청중 플래그를 리셋 —
+        // 리셋 없이는 RequestHPBarAsync가 조기 탈출해 HP바/이름/속성 라벨이 영구 미표시됨.
+        _worldHPBarSuppressed = false;
+        _hpBarRequesting      = false;
+
         foreach (var cb in _onEnabledCallbacks) cb?.Invoke();
         _fsm?.ChangeState<PatrolState>();
 
@@ -886,6 +906,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             Managers.MonsterHPBar.ReturnHPBar(_hpBar);
             _hpBar = null;
         }
+        if (_config != null)
+            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
         _hpBarRequesting = false;
     }
 

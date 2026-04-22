@@ -84,6 +84,19 @@ public class MonsterCombatData
     public LayerMask targetLayer;
 }
 
+/// <summary>사망 시 드롭 데이터. 현재는 골드 코인만 지원. coinMax == 0 이면 드롭 없음.</summary>
+[Serializable]
+public class MonsterDropData
+{
+    [Header("골드 코인 드롭")]
+    [Tooltip("드롭할 코인 최소 개수 (inclusive)")]
+    [Min(0)] public int coinMin = 5;
+    [Tooltip("드롭할 코인 최대 개수 (inclusive)")]
+    [Min(0)] public int coinMax = 8;
+    [Tooltip("코인 1개당 지급 골드")]
+    [Min(1)] public int coinValue = 1;
+}
+
 /// <summary>몬스터 애니메이션 설정 데이터.</summary>
 [Serializable]
 public class MonsterAnimationData

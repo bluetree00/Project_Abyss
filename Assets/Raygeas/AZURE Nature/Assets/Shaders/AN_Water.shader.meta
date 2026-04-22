@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: faaeb4a0622f3594095e9e1327bca9e2
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 167725
+  packageName: AZURE Nature
+  packageVersion: 1.2.0
+  assetPath: Assets/Raygeas/AZURE Nature/Assets/Shaders/AN_Water.shader
+  uploadId: 821202

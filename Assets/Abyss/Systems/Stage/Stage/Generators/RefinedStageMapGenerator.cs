@@ -9,6 +9,8 @@ using UnityEngine;
 /// </summary>
 public sealed class RefinedStageMapGenerator : IStageMapGenerator
 {
+    private const int MinShopPerChapter = 2;
+
     public StageMapGraph Generate(in StageMapGenerationRequest request)
     {
         int middleLayers = Mathf.Max(1, request.MiddleLayers);
@@ -64,6 +66,8 @@ public sealed class RefinedStageMapGenerator : IStageMapGenerator
         };
         nodes.Add(bossNode);
         ConnectLayers(prevLayer, new List<StageMapNode> { bossNode });
+
+        EnsureMinShops(nodes, MinShopPerChapter);
 
         return new StageMapGraph
         {
@@ -136,5 +140,95 @@ public sealed class RefinedStageMapGenerator : IStageMapGenerator
     {
         if (!from.NextPointIds.Contains(to.PointId))
             from.NextPointIds.Add(to.PointId);
+    }
+
+    /// <summary>
+    /// 한 챕터에 Shop 노드를 최소 <paramref name="minCount"/>개 보장.
+    /// Roller가 배치한 Battle/Event를 우선, 부족하면 Elite까지 승격.
+    /// 가능하면 서로 다른 층에 분산.
+    /// </summary>
+    private static void EnsureMinShops(List<StageMapNode> nodes, int minCount)
+    {
+        if (minCount <= 0 || nodes == null) return;
+
+        int shopCount = 0;
+        var primary = new List<StageMapNode>();   // Battle/Event — 우선 교체
+        var secondary = new List<StageMapNode>(); // Elite — 부족할 때만
+        var shopLayers = new HashSet<int>();
+
+        foreach (var n in nodes)
+        {
+            if (n.Stage != StageCategory.Normal) continue;
+            switch (n.Normal)
+            {
+                case NormalRoomCategory.Shop:
+                    shopCount++;
+                    shopLayers.Add(n.LayerIndex);
+                    break;
+                case NormalRoomCategory.Battle:
+                case NormalRoomCategory.Event:
+                    primary.Add(n);
+                    break;
+                case NormalRoomCategory.Elite:
+                    secondary.Add(n);
+                    break;
+            }
+        }
+
+        int needed = minCount - shopCount;
+        if (needed <= 0) return;
+
+        Shuffle(primary);
+        Shuffle(secondary);
+
+        // 1차: Shop 없는 층 우선, primary(Battle/Event)만
+        int placed = PromoteToShop(primary, shopLayers, needed, requireDifferentLayer: true);
+        needed -= placed;
+
+        // 2차: primary에서 층 제약 풀고 채움
+        if (needed > 0)
+        {
+            placed = PromoteToShop(primary, shopLayers, needed, requireDifferentLayer: false);
+            needed -= placed;
+        }
+
+        // 3차: Elite까지 동원
+        if (needed > 0)
+        {
+            placed = PromoteToShop(secondary, shopLayers, needed, requireDifferentLayer: false);
+            needed -= placed;
+        }
+
+        if (needed > 0)
+            Debug.LogWarning($"[RefinedStageMapGenerator] Shop 최소 {minCount}개 확보 실패: 후보 부족 (남은 {needed}개)");
+    }
+
+    private static int PromoteToShop(
+        List<StageMapNode> candidates,
+        HashSet<int> shopLayers,
+        int needed,
+        bool requireDifferentLayer)
+    {
+        int placed = 0;
+        for (int i = 0; i < candidates.Count && placed < needed; i++)
+        {
+            var node = candidates[i];
+            if (node.Normal == NormalRoomCategory.Shop) continue;
+            if (requireDifferentLayer && shopLayers.Contains(node.LayerIndex)) continue;
+
+            node.Normal = NormalRoomCategory.Shop;
+            shopLayers.Add(node.LayerIndex);
+            placed++;
+        }
+        return placed;
+    }
+
+    private static void Shuffle<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
     }
 }

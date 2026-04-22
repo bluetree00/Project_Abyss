@@ -43,9 +43,12 @@ public class MapBuilder
                 if (type == TileType.Empty) continue;
 
                 bool isBuffTile = type == TileType.BuffBox || type == TileType.BuffPedestal;
+                bool isShopTile = type == TileType.ShopStall;
+                bool isMonsterSpawnTile = type == TileType.MonsterSpawn || type == TileType.MonsterSpawnCandidate;
+                bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile;
 
-                // 버프 타일: 바닥 블록을 먼저 깔고 그 위에 버프 오브젝트 배치
-                var renderType = isBuffTile ? TileType.Floor : type;
+                // 오버레이 타일(버프/상점/몬스터스폰): 바닥 블록을 먼저 깔고 그 위에 기능 오브젝트 배치
+                var renderType = isOverlayTile ? TileType.Floor : type;
                 var blockDef = palette.Pick(renderType);
                 if (blockDef == null)
                 {
@@ -99,6 +102,58 @@ public class MapBuilder
                     }
 
                     result.Add(buffBlock);
+                }
+                // 상점 타일: 전용 프리팹이 있으면 사용, 없으면 기본 진열대 오브젝트 생성
+                else if (isShopTile)
+                {
+                    var shopDef = palette.Pick(type);
+                    PlacedBlock shopBlock;
+
+                    if (shopDef != null)
+                    {
+                        var shopGo = Object.Instantiate(shopDef.prefab, targetPos, Quaternion.identity, parent);
+                        shopGo.name = $"ShopStall_{x}_{z}";
+                        AttachShopStallInteraction(shopGo, cellSize);
+                        shopBlock = new PlacedBlock
+                        {
+                            instance = shopGo,
+                            targetPosition = targetPos,
+                            targetRotationY = 0f,
+                            tileType = type,
+                            cell = new Vector2Int(x, z),
+                        };
+                        Debug.Log($"[MapBuilder] 상점 타일 배치 (프리팹): ({x},{z}) pos={targetPos}");
+                    }
+                    else
+                    {
+                        shopBlock = CreateDefaultShopStallObject(x, z, targetPos, cellSize, parent);
+                        Debug.Log($"[MapBuilder] 상점 타일 배치 (임시큐브): ({x},{z}) pos={targetPos}");
+                    }
+
+                    result.Add(shopBlock);
+                }
+                // 몬스터 스폰 타일: 스포너 프리팹(MonsterSpawner 컴포넌트 포함)을 바닥 위에 배치
+                else if (isMonsterSpawnTile)
+                {
+                    // 확정(MonsterSpawn) / 후보(MonsterSpawnCandidate) 동일 프리팹 사용 — BD_MonsterSpawn 하나만 유지
+                    var spawnerDef = palette.Pick(TileType.MonsterSpawn);
+                    if (spawnerDef != null && spawnerDef.prefab != null)
+                    {
+                        var spawnerGo = Object.Instantiate(spawnerDef.prefab, targetPos, Quaternion.identity, parent);
+                        spawnerGo.name = $"MonsterSpawner_{x}_{z}";
+                        result.Add(new PlacedBlock
+                        {
+                            instance = spawnerGo,
+                            targetPosition = targetPos,
+                            targetRotationY = 0f,
+                            tileType = type,
+                            cell = new Vector2Int(x, z),
+                        });
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[MapBuilder] MonsterSpawn 타일 ({x},{z}) — 팔레트에 BlockDef 없음, 스포너 미배치", parent);
+                    }
                 }
             }
         }
@@ -167,6 +222,64 @@ public class MapBuilder
         // 트리거 콜라이더 보장
         var col = go.GetComponent<Collider>();
         if (col != null) col.isTrigger = true;
+    }
+
+    private static void AttachShopStallInteraction(GameObject go, float cellSize)
+    {
+        if (go.GetComponent<ShopStallInteraction>() == null)
+            go.AddComponent<ShopStallInteraction>();
+
+        // 트리거 콜라이더 보장 (없으면 추가)
+        var col = go.GetComponent<Collider>();
+        if (col == null)
+        {
+            var box = go.AddComponent<BoxCollider>();
+            box.isTrigger = true;
+            box.size = new Vector3(cellSize * 1.2f, cellSize * 1.5f, cellSize * 1.2f);
+            box.center = new Vector3(0f, cellSize * 0.5f, 0f);
+        }
+        else
+        {
+            col.isTrigger = true;
+        }
+    }
+
+    /// <summary>상점 진열대 프리팹이 없을 때 기본 시각 오브젝트 생성.</summary>
+    private static PlacedBlock CreateDefaultShopStallObject(
+        int x, int z, Vector3 pos, float cellSize, Transform parent)
+    {
+        var go = new GameObject($"ShopStall_{x}_{z}");
+        go.transform.SetParent(parent, false);
+        go.transform.position = pos + Vector3.up * 0.5f;
+
+        // 트리거 콜라이더 (상호작용 범위)
+        var col = go.AddComponent<BoxCollider>();
+        col.isTrigger = true;
+        col.size = new Vector3(cellSize * 1.4f, cellSize * 1.6f, cellSize * 1.4f);
+
+        // 시각용 큐브 (진열대)
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        visual.transform.SetParent(go.transform, false);
+        visual.transform.localScale = new Vector3(cellSize * 0.7f, cellSize * 0.6f, cellSize * 0.7f);
+        visual.transform.localPosition = new Vector3(0f, -cellSize * 0.2f, 0f);
+
+        var visualCol = visual.GetComponent<Collider>();
+        if (visualCol != null) Object.Destroy(visualCol);
+
+        var renderer = visual.GetComponent<Renderer>();
+        if (renderer != null)
+            renderer.material.color = new Color(0.9f, 0.6f, 0.2f, 1f); // 나무색 진열대
+
+        go.AddComponent<ShopStallInteraction>();
+
+        return new PlacedBlock
+        {
+            instance = go,
+            targetPosition = go.transform.position,
+            targetRotationY = 0f,
+            tileType = TileType.ShopStall,
+            cell = new Vector2Int(x, z),
+        };
     }
 
     /// <summary>그리드 크기에 맞는 투명 바닥 콜라이더 생성.</summary>

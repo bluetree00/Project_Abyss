@@ -19,6 +19,12 @@ public class DieState : IMonsterState
         ctx.Runtime.IsDead = true;
         ctx.Monster.HideWorldHPBar();
 
+        // 외부 수명주기 구독자(방 클리어 카운터 등)에 사망 통지
+        ctx.Monster.RaiseDied();
+
+        // 골드 코인 드롭
+        SpawnGoldDrop(ctx);
+
         // 이동 중지
         ctx.Agent.enabled = false;
 
@@ -50,6 +56,24 @@ public class DieState : IMonsterState
     public virtual void Update(MonsterContext ctx) { }
 
     public virtual void Exit(MonsterContext ctx) { }
+
+    // ── 드롭 ──────────────────────────────────────────────
+
+    private static void SpawnGoldDrop(MonsterContext ctx)
+    {
+        var config = ctx.Config;
+        if (config == null) return;
+
+        var drop = config.drop;
+        if (drop == null || drop.coinMax <= 0 || drop.coinValue <= 0) return;
+
+        int min = Mathf.Max(0, drop.coinMin);
+        int max = Mathf.Max(min, drop.coinMax);
+        int count = UnityEngine.Random.Range(min, max + 1);
+        if (count <= 0) return;
+
+        GoldCoinPickup.SpawnDrops(ctx.Monster.transform.position, count, drop.coinValue);
+    }
 
     // ── 비동기 파괴 ────────────────────────────────────────
 

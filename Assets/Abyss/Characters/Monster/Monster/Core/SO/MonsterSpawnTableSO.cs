@@ -76,6 +76,10 @@ public class SpawnEntry
     [Tooltip("소환할 몬스터 Addressable 주소 (Auto-Populate로 자동 채워짐)")]
     public string addressableKey;
 
+    [Tooltip("몬스터의 등급. 티어 스포너가 이 값으로 필터링. (Auto-Populate가 MonsterConfigSO.grade에서 자동 채움)\n" +
+             "Boss 등급은 일반 스포너에서 자동 제외됨 — 보스는 전용 소환 연출 사용.")]
+    public MonsterGrade grade = MonsterGrade.Common;
+
     [Tooltip("몬스터의 네이티브 원소. 스포너 원소 필터와 매칭됨. (Auto-Populate로 자동 채워짐)")]
     public ElementType nativeElement = ElementType.None;
 
