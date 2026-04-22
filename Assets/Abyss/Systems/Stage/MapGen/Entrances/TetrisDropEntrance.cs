@@ -12,9 +12,11 @@ public sealed class TetrisDropEntrance : IMapEntrance
 {
     private const float DefaultDropHeight = 15f;
     private const float RowDelay = 0.04f;
-    private const float FallDuration = 0.35f;
-    private const float BounceTime = 0.1f;
-    private const float BounceAmp = 0.15f;
+    private const float FallDuration = 0.45f;
+    private const float BounceTime = 0.22f;
+    private const float BounceAmp = 0.22f;
+    // 바운스 중 bottom 고정용. cellSize=1 + 센터 피봇 가정. 바닥 피봇이면 0으로 두면 된다.
+    private const float HalfHeight = 0.5f;
 
     public async UniTask PlayAsync(
         IReadOnlyList<MapBuilder.PlacedBlock> blocks,
@@ -81,13 +83,14 @@ public sealed class TetrisDropEntrance : IMapEntrance
                 }
                 else if (localT < FallDuration + BounceTime)
                 {
-                    // 착지 바운스
+                    // 착지 바운스 — 센터 피봇 블록의 bottom을 target에 고정해 "바닥에 눌리는" 느낌
                     float k = (localT - FallDuration) / BounceTime;
                     float wave = Mathf.Sin(k * Mathf.PI);
                     float squashY = 1f - BounceAmp * wave;
                     float stretchXZ = 1f + BounceAmp * 0.3f * wave;
+                    float yOffset = -(1f - squashY) * HalfHeight;
 
-                    b.instance.transform.position = targets[i];
+                    b.instance.transform.position = targets[i] + new Vector3(0f, yOffset, 0f);
                     b.instance.transform.localScale = new Vector3(stretchXZ, squashY, stretchXZ);
                 }
                 else

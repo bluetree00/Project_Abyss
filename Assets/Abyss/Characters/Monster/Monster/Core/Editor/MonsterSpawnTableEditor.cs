@@ -44,6 +44,25 @@ public class MonsterSpawnTableEditor : Editor
             AutoPopulate((MonsterSpawnTableSO)target);
     }
 
+    /// <summary>프로젝트의 모든 MonsterSpawnTableSO에 Auto-Populate를 일괄 실행.
+    /// 새 grade 필드를 기존 테이블에 주입할 때 유용.
+    /// 메뉴: Abyss/Monster/Auto-Populate All Spawn Tables</summary>
+    [MenuItem("Abyss/Monster/Auto-Populate All Spawn Tables")]
+    public static void AutoPopulateAll()
+    {
+        var guids = AssetDatabase.FindAssets("t:MonsterSpawnTableSO");
+        int count = 0;
+        foreach (var guid in guids)
+        {
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            var so = AssetDatabase.LoadAssetAtPath<MonsterSpawnTableSO>(path);
+            if (so == null) continue;
+            AutoPopulate(so);
+            count++;
+        }
+        Debug.Log($"[SpawnTable] Auto-Populate 일괄 실행 완료 ({count}개 테이블).");
+    }
+
     private static void AutoPopulate(MonsterSpawnTableSO so)
     {
         var baseType = typeof(MonsterBase);
@@ -84,14 +103,16 @@ public class MonsterSpawnTableEditor : Editor
                     : className;
                 string address     = (string)field.GetValue(null);
                 ElementType native = LookupNativeElement(configByName, lookupKey);
+                MonsterGrade grade = LookupGrade(configByName, lookupKey);
                 int[] poolTags     = LookupPoolTags(statById, lookupKey);
 
                 var existing = so.entries.Find(e => e.displayName == className);
                 if (existing != null)
                 {
-                    // 기존 엔트리 — nativeElement, poolTags만 최신값으로 덮어씀 (weight/enabled 등 유지)
+                    // 기존 엔트리 — nativeElement, grade, poolTags만 최신값으로 덮어씀 (weight/enabled 등 유지)
                     bool changed = false;
                     if (existing.nativeElement != native) { existing.nativeElement = native; changed = true; }
+                    if (existing.grade != grade) { existing.grade = grade; changed = true; }
                     if (!AreEqual(existing.poolTags, poolTags)) { existing.poolTags = poolTags; changed = true; }
                     if (changed) updated++;
                     continue;
@@ -102,6 +123,7 @@ public class MonsterSpawnTableEditor : Editor
                     displayName    = className,
                     addressableKey = address,
                     nativeElement  = native,
+                    grade          = grade,
                     poolTags       = poolTags,
                     weight         = 1f,
                     enabled        = true,
@@ -150,6 +172,13 @@ public class MonsterSpawnTableEditor : Editor
         if (index.TryGetValue(className, out var cfg) && cfg != null)
             return cfg.stat.nativeElement;
         return ElementType.None;
+    }
+
+    private static MonsterGrade LookupGrade(Dictionary<string, MonsterConfigSO> index, string className)
+    {
+        if (index.TryGetValue(className, out var cfg) && cfg != null)
+            return cfg.grade;
+        return MonsterGrade.Common;
     }
 
     /// <summary>Resources/MONSTER_ELEMENT_STAT_DATA.json 을 로드하여 monster_id → PoolTags 맵 생성.
