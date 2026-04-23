@@ -108,3 +108,70 @@ public sealed class RecipeSynergyNextAttackEffect : ItemEffectBase
         ctx.Player.NextAttackElement = WeaponElement.None; // 1회 소비
     }
 }
+
+public sealed class SkillCooldownFlatEffect : ItemEffectBase
+{
+    public SkillCooldownFlatEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnRecipeComplete(ItemEffectContext ctx)
+    {
+        var tracker = ctx.Player?.CooldownTracker;
+        if (tracker == null) return;
+
+        float seconds = Mathf.Abs(_value); // value -2 → 2초 감소
+        tracker.ReduceAllCooldowns(seconds);
+        Debug.Log($"[SkillCooldownFlat] 모든 스킬 쿨타임 -{seconds}초");
+    }
+}
+
+public sealed class DefensePermStackEffect : ItemEffectBase
+{
+    private const string StackKey = "DefensePermStack";
+
+    public DefensePermStackEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnRecipeComplete(ItemEffectContext ctx)
+    {
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        if (mgr == null) return;
+
+        int stacks = mgr.GetPersistentStack(StackKey);
+        mgr.SetPersistentStack(StackKey, stacks + 1);
+        Debug.Log($"[DefensePermStack] 방어력 +{_value} 영구 중첩 ({stacks + 1}스택)");
+    }
+
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats)
+    {
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        int stacks = mgr?.GetPersistentStack(StackKey) ?? 0;
+        stats.Defense += (int)(_value * stacks);
+    }
+}
+
+public sealed class HPRegenOnBossEnterEffect : ItemEffectBase
+{
+    public HPRegenOnBossEnterEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnBossEnter(ItemEffectContext ctx)
+    {
+        ctx.Player?.Heal((int)_value);
+        Debug.Log($"[HPRegenOnBossEnter] 보스방 진입 — 체력 {_value} 회복");
+    }
+}
+
+public sealed class MaxHPDecreasePerRoomEffect : ItemEffectBase
+{
+    public MaxHPDecreasePerRoomEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnRoomEnter(ItemEffectContext ctx)
+    {
+        if (ctx.Player == null) return;
+
+        // value -0.05 = 현재 최대체력의 5% 감소
+        int currentMaxHp = ctx.Player.RuntimeStats != null ? ctx.Player.RuntimeStats.MaxHp : 0;
+        if (currentMaxHp <= 1) return;
+        int decrease = Mathf.Max(1, Mathf.RoundToInt(currentMaxHp * Mathf.Abs(_value)));
+        // TODO: MaxHP 영구 감소 API 연결. 현재는 로그만.
+        Debug.Log($"[MaxHPDecreasePerRoom] 최대 체력 -{decrease} (현재 {currentMaxHp})");
+    }
+}

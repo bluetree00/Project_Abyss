@@ -54,7 +54,9 @@ public abstract class ItemEffectBase : IItemEffect
             // 이벤트 트리거 — 이벤트 발생 시점에 호출되므로 항상 true
             case "OnHit":
             case "OnKill":
+            case "OnRoomEnter":
             case "OnRoomClear":
+            case "OnBossEnter":
             case "OnBossClear":
             case "OnRecipeComplete":
             case "OnRollEnd":
@@ -63,6 +65,9 @@ public abstract class ItemEffectBase : IItemEffect
             case "OnNearDeath":
             case "OnItemPickup":
             case "OnPickup":
+            case "OnOverheal":
+            case "OnNextChapterStart":
+            case "OnSkillUse":
             case "OnUse":
                 return true;
 
@@ -85,7 +90,9 @@ public abstract class ItemEffectBase : IItemEffect
     public virtual void OnRollEnd(ItemEffectContext ctx) { }
     public virtual void OnRollLand(ItemEffectContext ctx, Vector3 position) { }
     public virtual void OnJumpLand(ItemEffectContext ctx, Vector3 position) { }
+    public virtual void OnRoomEnter(ItemEffectContext ctx) { }
     public virtual void OnRoomClear(ItemEffectContext ctx) { }
+    public virtual void OnBossEnter(ItemEffectContext ctx) { }
     public virtual void OnBossClear(ItemEffectContext ctx) { }
     public virtual void OnRecipeComplete(ItemEffectContext ctx) { }
     public virtual void OnItemPickup(ItemEffectContext ctx, RuntimeItemData pickedItem) { }

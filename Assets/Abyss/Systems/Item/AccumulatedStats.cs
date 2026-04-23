@@ -28,9 +28,14 @@ public struct AccumulatedStats
     public float AllElementBonus;             // 모든 원소 보너스%
     public float DebuffDuration;              // 디버프 지속시간 가산 (방)
     public float SpecialRoomChance;           // 특수방 등장 확률 가산
+    public float ShopRoomChance;              // 상점방 등장 확률 가산
     public float HighGradeItemChance;         // 고등급 아이템 확률 가산
     public int ConsumableSlotBonus;           // 소모품 슬롯 보너스
     public float Lifesteal;                   // 흡혈 비율 (패시브, OnHit과 별도)
+    public float GoldGainRate;                // 골드 획득 배율 (0.1 = +10%)
+    public float SkillDamagePercent;          // 스킬 데미지 % 가산 (0.1 = +10%)
+    public int ProjectilePierceBonus;         // 투사체 관통 +개수
+    public int ProjectileCountBonus;          // 투사체 추가 개수 (멀티샷)
 
     /// <summary>모든 값을 0으로 초기화.</summary>
     public void Clear()

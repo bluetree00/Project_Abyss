@@ -15,15 +15,15 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.55, g: 0.65, b: 0.6, a: 1}
+  m_FogColor: {r: 0.35, g: 0.4, b: 0.38, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.005
+  m_FogDensity: 0.006
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.55, g: 0.7, b: 0.8, a: 1}
-  m_AmbientEquatorColor: {r: 0.45, g: 0.45, b: 0.4, a: 1}
-  m_AmbientGroundColor: {r: 0.35, g: 0.3, b: 0.2, a: 1}
-  m_AmbientIntensity: 1
+  m_AmbientSkyColor: {r: 0.28, g: 0.36, b: 0.42, a: 1}
+  m_AmbientEquatorColor: {r: 0.22, g: 0.22, b: 0.2, a: 1}
+  m_AmbientGroundColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+  m_AmbientIntensity: 0.55
   m_AmbientMode: 3
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
   m_SkyboxMaterial: {fileID: 2100000, guid: e099c52e891ff4149b275a48fa02f27d, type: 2}

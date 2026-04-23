@@ -272,7 +272,12 @@ public class MonsterSpawner : MonoBehaviour
 
         // 원소 적용은 반드시 렌더러 머티리얼이 최종 상태일 때 수행해야 색상·속성 UI가 안정적.
         // 디졸브가 활성이면 렌더러 머티리얼이 일시 교체되므로, 디졸브 완료 콜백에서 원소 적용.
+        //
+        // 풀 재사용 Race 방어: 몬스터가 디졸브 중 사망·반환되어 다른 방에서 재사용된 상태라면,
+        // 뒤늦게 firing되는 onComplete가 새 인스턴스의 원소를 덮어쓰는 사고가 발생할 수 있다.
+        // 캡처한 GenerationId로 동일 lifecycle인지 검증한다.
         var capturedMonster = monster;
+        int capturedGen = capturedMonster != null ? capturedMonster.GenerationId : -1;
         if (spawnDissolveDuration > 0f && monster != null)
         {
             DissolveEffect.PlayAppear(
@@ -280,8 +285,10 @@ public class MonsterSpawner : MonoBehaviour
                 spawnDissolveDuration,
                 onComplete: () =>
                 {
-                    if (capturedMonster != null)
-                        capturedMonster.SetRandomNativeElement();
+                    if (capturedMonster == null) return;
+                    if (!capturedMonster.gameObject.activeInHierarchy) return;
+                    if (capturedMonster.GenerationId != capturedGen) return; // 풀 재사용 후라면 무시
+                    capturedMonster.SetRandomNativeElement();
                 });
         }
         else

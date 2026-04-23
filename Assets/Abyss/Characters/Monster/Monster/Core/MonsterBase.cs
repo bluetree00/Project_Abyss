@@ -99,6 +99,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     private float                  _grassRegenTimer;
     // 스폰 시 랜덤으로 결정되는 인스턴스 고유 원소. ElementType.None 포함 6종 중 하나.
     private ElementType            _effectiveElement    = ElementType.None;
+    // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
+    // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
+    // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
+    private int                    _generationId;
+
+    /// <summary>외부 비동기 콜백이 풀 재사용 이전 세대에 대한 것인지 검증할 때 비교하는 값. OnEnable마다 +1.</summary>
+    public int GenerationId => _generationId;
 
     /// <summary>공격 상태/어빌리티가 쿨다운 계산 시 곱할 배율. 0 = 공격 불가.</summary>
     public float AttackSpeedMultiplier => _attackSpeedMulti;
@@ -697,15 +704,21 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     {
         // None(-1) 포함 6개. (int)값이 -1~4이므로 Random.Range(-1, 5)
         int r = UnityEngine.Random.Range(-1, ElementTypeUtil.Count);
-        ApplyElementWhenReady((ElementType)r).Forget();
+        int gen = _generationId;
+        ApplyElementWhenReady((ElementType)r, gen).Forget();
     }
 
-    private async UniTaskVoid ApplyElementWhenReady(ElementType element)
+    private async UniTaskVoid ApplyElementWhenReady(ElementType element, int expectedGen)
     {
         // Config/runtime이 아직 null이면 InitAsync가 진행 중. 완료 대기.
         while ((_config == null || _runtime == null) && this != null && gameObject != null)
+        {
+            if (_generationId != expectedGen) return; // 대기 중 풀 재사용 → 무시
             await UniTask.Yield(destroyCancellationToken);
+        }
         if (this == null || gameObject == null) return;
+        if (_generationId != expectedGen) return;        // 완료 시점에 재사용됐어도 무시
+        if (!gameObject.activeInHierarchy) return;
         SetNativeElement(element);
     }
 
@@ -794,6 +807,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     protected virtual void OnEnable()
     {
+        // 세대 카운터는 _config 유무와 무관하게 먼저 증가 — 아직 InitAsync 미완 상태에서도
+        // 외부 콜백이 풀 재사용을 감지할 수 있도록.
+        _generationId++;
+
         if (_config == null || _runtime == null) return;
 
         _runtime.CurrentHp           = EffectiveMaxHp;

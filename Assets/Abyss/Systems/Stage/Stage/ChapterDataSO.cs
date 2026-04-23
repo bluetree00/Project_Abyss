@@ -18,6 +18,10 @@ public class ChapterDataSO : ScriptableObject
     public Color mapBackgroundTint = Color.white;
     public string mapBackgroundKey;
 
+    [Header("맵 장식")]
+    [Tooltip("배경 위·노드 아래 레이어에 스캐터할 장식 스프라이트 목록. 비우면 Bootstrapper의 defaultDecorationSprites 폴백.")]
+    public Sprite[] decorationSprites;
+
     [Header("사운드")]
     public string bgmKey;
 
