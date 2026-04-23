@@ -74,15 +74,17 @@ public class RuntimeItemData
             cooldown    = meta.cooldown,
         };
 
-        // CSV rarity 파싱 (값이 있으면 적용)
-        bool hasCSVRarity = !string.IsNullOrEmpty(meta.rarity);
+        // CSV rarity/grade 파싱 (값이 있으면 적용)
+        var resolvedRarity = meta.ResolvedRarity;
+        bool hasCSVRarity = !string.IsNullOrEmpty(resolvedRarity);
         if (hasCSVRarity)
         {
-            data.rarity = meta.rarity switch
+            data.rarity = resolvedRarity switch
             {
-                "Rare" => ItemRarity.Rare,
-                "Epic" => ItemRarity.Epic,
-                _      => ItemRarity.Common,
+                "Rare"      => ItemRarity.Rare,
+                "Epic"      => ItemRarity.Epic,
+                "Legendary" => ItemRarity.Legendary,
+                _           => ItemRarity.Common,
             };
         }
 

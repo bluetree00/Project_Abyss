@@ -83,8 +83,18 @@ public class ElementNativePalette : MonoBehaviour
         if (renderers == null || renderers.Length == 0)
             renderers = GetComponentsInChildren<Renderer>(true);
 
+        if (renderers == null || renderers.Length == 0)
+        {
+            Debug.LogWarning($"[ElementPalette] '{gameObject.name}': Renderer 0개 — Apply 스킵");
+            return;
+        }
+
         EnsureInstancedMaterials();
-        if (_instancedMaterials == null) return;
+        if (_instancedMaterials == null)
+        {
+            Debug.LogWarning($"[ElementPalette] '{gameObject.name}': _instancedMaterials null — Apply 스킵");
+            return;
+        }
 
         // 매 Apply마다 원본부터 다시 시작 — 풀 재사용 시 이전 원소 색 누적 방지
         RestoreOriginal();
@@ -93,6 +103,7 @@ public class ElementNativePalette : MonoBehaviour
 
         Color c = ElementPalette[(int)element];
         float t = Mathf.Clamp01(tintStrength);
+        int paletteHits = 0;
 
         for (int i = 0; i < _instancedMaterials.Length; i++)
         {
@@ -115,6 +126,7 @@ public class ElementNativePalette : MonoBehaviour
                         blended.a = orig.a; // 알파는 원본 보존
                         mat.SetColor(paletteIds[k], blended);
                     }
+                    paletteHits += n;
                 }
 
                 // Emission 보강 — 셰이더가 _EmissionColor를 지원할 때만
@@ -126,6 +138,13 @@ public class ElementNativePalette : MonoBehaviour
                     mat.EnableKeyword("_EMISSION");
                 }
             }
+        }
+
+        if (paletteHits == 0)
+        {
+            Debug.LogWarning($"[ElementPalette] '{gameObject.name}': 원소 {element} 적용됐지만 팔레트 프로퍼티 0개. " +
+                             $"쉐이더가 PAMaskTint 호환이 아니거나 _originalColors 스냅샷이 비었을 가능성. " +
+                             $"renderer수={renderers.Length}, mat수={(_instancedMaterials?.Length ?? 0)}");
         }
     }
 

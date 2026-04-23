@@ -77,6 +77,11 @@ public static class ItemEffectRegistry
         Register("HighGradeItemChance",        s => new HighGradeItemChanceEffect(s));
         Register("ConsumableSlot",             s => new ConsumableSlotEffect(s));
         Register("DebuffDuration",             s => new DebuffDurationEffect(s));
+        Register("GoldGain",                   s => new GoldGainEffect(s));
+        Register("ShopRoomChance",             s => new ShopRoomChanceEffect(s));
+        Register("SkillDamage",                s => new SkillDamageEffect(s));
+        Register("ProjectilePierce",           s => new ProjectilePierceEffect(s));
+        Register("ProjectileCount",            s => new ProjectileCountEffect(s));
 
         // ── OnHit: 공격 적중 ────────────────────────────────
         Register("Lifesteal",                  s => new LifestealEffect(s));
@@ -85,11 +90,14 @@ public static class ItemEffectRegistry
         Register("ExtraAttack",                s => new ExtraAttackEffect(s));
         Register("TeleportSwap",               s => new TeleportSwapEffect(s));
         Register("HPRegenOnHit",               s => new HPRegenOnHitEffect(s));
+        Register("Petrify",                    s => new PetrifyEffect(s));
+        Register("Stun",                       s => new StunEffect(s));
 
         // ── OnTakeDamage: 피격 ──────────────────────────────
         Register("DamageNegate",               s => new DamageNegateEffect(s));
         Register("DamageReflect",              s => new DamageReflectEffect(s));
         Register("DefenseOnHit",               s => new DefenseOnHitEffect(s));
+        Register("ExtraDamageOnHit",           s => new ExtraDamageOnHitEffect(s));
 
         // ── OnKill: 처치 ────────────────────────────────────
         Register("GoldOnKill",                 s => new GoldOnKillEffect(s));
@@ -112,6 +120,12 @@ public static class ItemEffectRegistry
         Register("HPRegenOnRecipe",            s => new HPRegenOnRecipeEffect(s));
         Register("AllDamageOnRecipe",          s => new AllDamageOnRecipeEffect(s));
         Register("RecipeSynergyNextAttack",    s => new RecipeSynergyNextAttackEffect(s));
+        Register("SkillCooldownFlat",          s => new SkillCooldownFlatEffect(s));
+        Register("DefensePermStack",           s => new DefensePermStackEffect(s));
+
+        // ── OnRoomEnter / OnBossEnter: 방 진입 ──────────────
+        Register("HPRegenOnBossEnter",         s => new HPRegenOnBossEnterEffect(s));
+        Register("MaxHPDecreasePerRoom",       s => new MaxHPDecreasePerRoomEffect(s));
 
         // ── OnSkill: 스킬 ──────────────────────────────────
         Register("FireExplosionOnSkill",       s => new FireExplosionOnSkillEffect(s));

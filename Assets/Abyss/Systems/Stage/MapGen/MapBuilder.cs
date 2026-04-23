@@ -282,7 +282,11 @@ public class MapBuilder
         };
     }
 
-    /// <summary>그리드 크기에 맞는 투명 바닥 콜라이더 생성.</summary>
+    /// <summary>
+    /// 그리드 Floor 영역과 동일한 크기의 투명 바닥 콜라이더 생성.
+    /// 외곽 벽 밖(방 경계 이탈)에서는 존재하지 않으므로, 플레이어가 벽을 뚫고 나가면
+    /// SafeFloor 없이 바로 낙하 → FallRecoveryController가 _lastSafe로 복구.
+    /// </summary>
     public static GameObject CreateSafeFloor(int width, int height, float cellSize, float baseY, Transform parent)
     {
         var go = new GameObject("SafeFloor");
@@ -291,7 +295,7 @@ public class MapBuilder
         go.transform.position = new Vector3(0f, baseY - 0.05f, 0f);
 
         var col = go.AddComponent<BoxCollider>();
-        col.size = new Vector3(width * cellSize + 2f, 0.1f, height * cellSize + 2f);
+        col.size = new Vector3(width * cellSize, 0.1f, height * cellSize);
 
         return go;
     }

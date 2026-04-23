@@ -438,8 +438,24 @@ MonoBehaviour:
   startChapter: 0
   chapterRegistry: {fileID: 0}
   iconMap: {fileID: 0}
+  nodeTemplatePrefab: {fileID: 0}
   defaultMapBackground: {fileID: 21300000, guid: f63d1ecd00b1d2f42bdd25139bc38507,
     type: 3}
+  defaultDecorationSprites:
+  - {fileID: 21300000, guid: 470d582566555e5468e10e9507782aee, type: 3}
+  - {fileID: 21300000, guid: 15edf8c1a5c2f8641a92cd7bf815665f, type: 3}
+  - {fileID: 21300000, guid: 3069dbcd9c7161c44b9fff232fc65384, type: 3}
+  - {fileID: 21300000, guid: 42f410ed7faf3b84c9c04e2920670ce9, type: 3}
+  - {fileID: 21300000, guid: d9fbf6d1bb0d95d4b84ca790ef22273b, type: 3}
+  - {fileID: 21300000, guid: 7275053dfce775248adb30a0b49525c8, type: 3}
+  - {fileID: 21300000, guid: c70b21681fff46e4780ef840c03fa808, type: 3}
+  - {fileID: 21300000, guid: 5ab6ab5a6a1a02248b7f79eb7254564f, type: 3}
+  - {fileID: 21300000, guid: 3bb2a2a9536f0f04fa63b0ebca0db720, type: 3}
+  decorationCount: 55
+  decorationNodeClearance: 180
+  decorationMinSpacing: 75
+  decorationScaleRange: {x: 0.7, y: 1.3}
+  decorationMaxRotation: 8
 --- !u!4 &2086454417
 Transform:
   m_ObjectHideFlags: 0

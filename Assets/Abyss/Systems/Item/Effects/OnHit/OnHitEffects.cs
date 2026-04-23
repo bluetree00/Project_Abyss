@@ -94,3 +94,27 @@ public sealed class HPRegenOnHitEffect : ItemEffectBase
             ctx.Player.Heal((int)_value);
     }
 }
+
+public sealed class PetrifyEffect : ItemEffectBase
+{
+    public PetrifyEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (Random.value >= _value) return;
+        // TODO: 상태이상 시스템 연결 (석화 = 일정 시간 완전 무력화)
+        Debug.Log($"[Petrify] 석화 적용! 대상={report.Target?.name}, 지속={_duration}초");
+    }
+}
+
+public sealed class StunEffect : ItemEffectBase
+{
+    public StunEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (Random.value >= _value) return;
+        // TODO: 상태이상 시스템 연결 (기절)
+        Debug.Log($"[Stun] 기절 적용! 대상={report.Target?.name}, 지속={_duration}초");
+    }
+}

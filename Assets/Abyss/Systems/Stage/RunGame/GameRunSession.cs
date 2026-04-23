@@ -44,6 +44,13 @@ public sealed class GameRunSession
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
 
+    // 챕터 단위로 생성된 맵 그래프 캐시 — StageMap 씬 재진입 시 Generator 재실행 없이 UI를 복원해
+    // 노드 연결·방문 기록이 유지되도록 한다. AdvanceToNextChapter 시 무효화.
+    public StageMapGraph CachedStageGraph { get; private set; }
+
+    public void CacheStageGraph(StageMapGraph graph) => CachedStageGraph = graph;
+    public void InvalidateStageGraph() => CachedStageGraph = null;
+
     public PlayerController Player { get; private set; }
     private PlayerController _playerStateSource;
 
@@ -219,6 +226,7 @@ public sealed class GameRunSession
         BuffHandler.ClearAll();
         RoomManager = null;
         StagePointManager = null;
+        CachedStageGraph = null;
         Player = null;
         PlayerState = null;
         CurrentRunState = RunState.None;
@@ -288,6 +296,14 @@ public sealed class GameRunSession
     public void EnterRoom(RunState roomState)
     {
         if (!IsRunning) return;
+
+        // 아이템 효과: 방/보스방 진입 hook
+        if (roomState == RunState.BossRoom)
+            EffectManager?.OnBossEnter();
+        else if (roomState == RunState.CombatRoom || roomState == RunState.ItemRoom ||
+                 roomState == RunState.RewardRoom  || roomState == RunState.SpecialRoom)
+            EffectManager?.OnRoomEnter();
+
         ChangeRunState(roomState);
     }
 
@@ -335,6 +351,9 @@ public sealed class GameRunSession
 
         // StagePointManager 재초기화 (새 챕터 노드 배치)
         StagePointManager.Initialize(next, RoomManager);
+
+        // 이전 챕터의 그래프는 폐기 — 다음 StageMap 진입 시 새로 생성
+        InvalidateStageGraph();
 
         ChangeRunState(RunState.Map);
         return true;

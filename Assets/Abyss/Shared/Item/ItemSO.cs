@@ -31,7 +31,8 @@ public enum ItemRarity
 {
     Common,
     Rare,
-    Epic
+    Epic,
+    Legendary
 }
 
 public enum ItemCategory

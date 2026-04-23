@@ -125,6 +125,17 @@ public class PlayerController : CharacterBase
         RuntimeStats.Heal(amount);
     }
 
+    /// <summary>외부에서 일시 무적 상태로 설정. 기존 무적이 남아있으면 더 긴 쪽을 유지.
+    /// 사용처: 낙사 리스폰(FallRecoveryController), 부활 아이템 등.</summary>
+    public void SetInvincible(float duration)
+    {
+        if (duration <= 0f) return;
+        _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + duration);
+    }
+
+    /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
+    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
     //============================================================
