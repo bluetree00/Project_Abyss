@@ -127,11 +127,25 @@ public class ColliderInstance : MonoBehaviour
 
         damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, elemType, elemAmount);
 
-        // 데미지 팝업 + 타격감
-        Vector3 popupPos = other.ClosestPoint(transform.position);
-        DamagePopupSpawner.Spawn(popupPos, finalDmg, isCrit, elemType);
-        if (isCrit) HitFeelService.Crit();
-        else        HitFeelService.Light();
+        // 데미지 팝업 + 타격감 (HitFeedbackService 허브 경유 → 기존 HitFeel + 구독자 전파)
+        Vector3 hitPoint = other.ClosestPoint(transform.position);
+        DamagePopupSpawner.Spawn(hitPoint, finalDmg, isCrit, elemType);
+
+        Vector3 attackDir = owner != null
+            ? (other.transform.position - owner.transform.position)
+            : (other.transform.position - transform.position);
+
+        var hitInfo = new HitInfo(
+            attacker:        owner,
+            target:          other.gameObject,
+            hitPoint:        hitPoint,
+            attackDirection: attackDir,
+            damage:          finalDmg,
+            element:         elemType,
+            isCritical:      isCrit,
+            actionType:      actionType);
+
+        HitFeedbackService.RaiseHit(hitInfo);
 
         // 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
         var report = new DamageReport

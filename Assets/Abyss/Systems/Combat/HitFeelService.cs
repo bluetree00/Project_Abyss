@@ -38,11 +38,11 @@ public static class HitFeelService
     }
 
     /// <summary>일반 히트 피드백 — 약한 hit stop + 작은 shake.</summary>
-    public static void Light()  { HitStop(0.1f,  0.04f); CameraShake(0.04f, 0.08f); }
+    public static void Light()  { HitStop(0.1f,  0.04f); CameraShake(0.04f, 0.06f); }
     /// <summary>강한 히트 (크리티컬 등) — 더 깊은 stop + 큰 shake.</summary>
-    public static void Heavy()  { HitStop(0.05f, 0.08f); CameraShake(0.12f, 0.18f); }
+    public static void Heavy()  { HitStop(0.05f, 0.08f); CameraShake(0.12f, 0.14f); }
     /// <summary>크리티컬 전용.</summary>
-    public static void Crit()   { HitStop(0.02f, 0.10f); CameraShake(0.18f, 0.22f); }
+    public static void Crit()   { HitStop(0.02f, 0.10f); CameraShake(0.18f, 0.18f); }
 
     // ── Private ─────────────────────────────────────────────────────
     private static void EnsureHost()
