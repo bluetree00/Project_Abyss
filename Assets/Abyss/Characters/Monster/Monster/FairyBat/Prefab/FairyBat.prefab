@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2346930281679568472}
   - component: {fileID: 7063786434697784241}
   - component: {fileID: 1592445290610987240}
+  - component: {fileID: 4475776685423486684}
   m_Layer: 0
   m_Name: FairyBat
   m_TagString: Untagged
@@ -121,6 +122,21 @@ CapsuleCollider:
   m_Height: 1
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &4475776685423486684
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7827164377420338988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0e9e334564d5e47b9a97b702a469ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VictimHitFeedback
+  _profile: {fileID: 11400000, guid: 5eee06183984ee24e82f32127f2de518, type: 2}
+  _explicitRenderers: []
+  _pulseLight: {fileID: 0}
 --- !u!1001 &3837691741510985166
 PrefabInstance:
   m_ObjectHideFlags: 0

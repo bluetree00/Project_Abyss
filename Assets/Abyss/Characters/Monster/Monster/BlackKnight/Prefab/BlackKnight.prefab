@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 3643602930592943158}
   - component: {fileID: 3545507539297304266}
   - component: {fileID: 4828941930290875507}
+  - component: {fileID: 4561734463736867615}
   m_Layer: 0
   m_Name: BlackKnight
   m_TagString: Untagged
@@ -121,6 +122,21 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 1, z: 0}
+--- !u!114 &4561734463736867615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3943179642670735398}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0e9e334564d5e47b9a97b702a469ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VictimHitFeedback
+  _profile: {fileID: 11400000, guid: 308c05f9fa80c0a4597d48ca6ffb065b, type: 2}
+  _explicitRenderers: []
+  _pulseLight: {fileID: 0}
 --- !u!1001 &8413494928779629907
 PrefabInstance:
   m_ObjectHideFlags: 0
