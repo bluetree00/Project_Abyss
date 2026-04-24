@@ -17,8 +17,8 @@ public class GetHitState : IMonsterState
         ctx.Agent.enabled = false;
         ctx.Runtime.StateTimer = StunDuration;
 
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.getHitTrigger))
-            ctx.Animator.CrossFade(ctx.Animation.getHitTrigger, 0.05f, 0, 0f);
+        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.getHitStateName))
+            ctx.Animator.CrossFade(ctx.Animation.getHitStateName, 0.05f, 0, 0f);
     }
 
     public virtual void Update(MonsterContext ctx)

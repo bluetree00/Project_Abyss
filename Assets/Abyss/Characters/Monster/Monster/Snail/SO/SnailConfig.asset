@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: Snail/SnailAnimatorController
-    idleStateName: Idle_Normal
-    patrolStateName: MoveBlend
-    chaseStateName: MoveBlend
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
     attackReadyStateName: AttackReady
-    attackTrigger: Attack
-    getHitTrigger: GetHit
-    dieTrigger: Die
-    detectTrigger: SenseSomethingRPT
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: Blend
     speedDampTime: 0.1
     crossFadeDuration: 0.15

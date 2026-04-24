@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: 
-    idleStateName: Mushroom_IdlePlant
-    patrolStateName: Mushroom_walkFWDAngry
-    chaseStateName: Mushroom_runFWDAngry
-    attackReadyStateName: Mushroom_IdleBattleAngry
-    attackTrigger: Mushroom_Attack01Angry
-    getHitTrigger: Mushroom_GetHitAngry
-    dieTrigger: Mushroom_DieAngry
-    detectTrigger: Mushroom_IdlePlantToBattleAngry
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
