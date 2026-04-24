@@ -58,6 +58,11 @@ public class ElementVisualFeedback : MonoBehaviour
 
     private void OnEnable()
     {
+        // 풀 재사용 시 이전 인스턴스의 MPB 잔존이 ElementNativePalette의 주입색을
+        // 덮어쓰는 것을 방지. 이벤트 구독 전에 MPB를 비워 머티리얼 원본 상태로 되돌린다.
+        ClearPropertyBlocks();
+        _dominantElement = ElementType.None;
+
         if (_buildup == null) return;
         _buildup.OnTriggered += HandleTriggered;
         _buildup.OnExpired   += HandleExpired;
@@ -66,12 +71,15 @@ public class ElementVisualFeedback : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_buildup == null) return;
-        _buildup.OnTriggered -= HandleTriggered;
-        _buildup.OnExpired   -= HandleExpired;
-        _buildup.OnTick      -= HandleTick;
+        if (_buildup != null)
+        {
+            _buildup.OnTriggered -= HandleTriggered;
+            _buildup.OnExpired   -= HandleExpired;
+            _buildup.OnTick      -= HandleTick;
+        }
         StopAllCoroutines();
-        ApplyColor(_baseColor);
+        ClearPropertyBlocks(); // MPB 제거 → ElementNativePalette가 주입한 머티리얼 색으로 복원
+        _pulseCo = null;
     }
 
     // ── Public Methods ───────────────────────────────────────────────
@@ -122,7 +130,7 @@ public class ElementVisualFeedback : MonoBehaviour
         if (_dominantElement.IsValid())
             ApplyColor(Color.Lerp(_baseColor, ColorOf(_dominantElement), sustainStrength));
         else
-            ApplyColor(_baseColor);
+            ClearPropertyBlocks(); // 활성 효과 없음 → MPB 제거 → 네이티브 팔레트 색 노출
     }
 
     private void StartPulse(Color targetColor, float strength, float duration)
@@ -162,6 +170,15 @@ public class ElementVisualFeedback : MonoBehaviour
         _mpb.SetColor(_colorPropID, color);
         foreach (var r in renderers)
             if (r != null) r.SetPropertyBlock(_mpb);
+    }
+
+    /// <summary>모든 렌더러에서 MPB를 제거해 머티리얼 원본 색(ElementNativePalette 주입값 포함)으로 되돌림.</summary>
+    private void ClearPropertyBlocks()
+    {
+        if (renderers == null) return;
+        _mpb?.Clear();
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null) renderers[i].SetPropertyBlock(null);
     }
 
     private static Color ColorOf(ElementType element)

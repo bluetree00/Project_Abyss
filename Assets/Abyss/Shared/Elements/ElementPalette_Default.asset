@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4de6db2627d532409df863414c453b7, type: 3}
+  m_Name: ElementPalette_Default
+  m_EditorClassIdentifier: Assembly-CSharp::ElementPaletteSO
+  entries:
+  - element: 0
+    tintColor: {r: 1, g: 0.92, b: 0.23, a: 1}
+    tintStrength: 0.7
+    applyEmission: 1
+    emissionIntensity: 0.6
+    useCustomEmissionColor: 0
+    customEmissionColor: {r: 0, g: 0, b: 0, a: 0}
+  - element: 1
+    tintColor: {r: 0.13, g: 0.59, b: 0.95, a: 1}
+    tintStrength: 0.7
+    applyEmission: 1
+    emissionIntensity: 0.6
+    useCustomEmissionColor: 0
+    customEmissionColor: {r: 0, g: 0, b: 0, a: 0}
+  - element: 2
+    tintColor: {r: 0.96, g: 0.26, b: 0.21, a: 1}
+    tintStrength: 0.7
+    applyEmission: 1
+    emissionIntensity: 0.6
+    useCustomEmissionColor: 0
+    customEmissionColor: {r: 0, g: 0, b: 0, a: 0}
+  - element: 3
+    tintColor: {r: 0.3, g: 0.69, b: 0.31, a: 1}
+    tintStrength: 0.7
+    applyEmission: 1
+    emissionIntensity: 0.6
+    useCustomEmissionColor: 0
+    customEmissionColor: {r: 0, g: 0, b: 0, a: 0}
+  - element: 4
+    tintColor: {r: 0.55, g: 0.43, b: 0.39, a: 1}
+    tintStrength: 0.7
+    applyEmission: 1
+    emissionIntensity: 0.6
+    useCustomEmissionColor: 0
+    customEmissionColor: {r: 0, g: 0, b: 0, a: 0}

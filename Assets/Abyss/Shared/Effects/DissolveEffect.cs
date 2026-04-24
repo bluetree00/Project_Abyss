@@ -171,14 +171,17 @@ public class DissolveEffect : MonoBehaviour
                     if (orig.HasProperty(BaseColorID) && inst.HasProperty(BaseColorID))
                         inst.SetColor(BaseColorID, orig.GetColor(BaseColorID));
 
-                    // Polyart/Tint 계열은 _BaseColor가 비어있고 _Color01 / _Color 등을 씀 → 그 값으로 덮어씀
+                    // Polyart/Tint 계열은 _BaseColor가 비어있고 _Color01 / _Color 등을 씀 → 그 값으로 덮어씀.
+                    // PAMaskTint는 팔레트 색의 alpha를 0으로 저장하는 관례가 있어 alpha 체크는 금지 —
+                    // RGB가 유효하면 사용 (검정에 가까우면만 skip).
                     if (inst.HasProperty(BaseColorID))
                     {
                         foreach (var propName in FallbackColorProps)
                         {
                             if (!orig.HasProperty(propName)) continue;
                             var c = orig.GetColor(propName);
-                            if (c.a <= 0.01f) continue; // 알파 0이면 의미 없음
+                            if (c.r + c.g + c.b < 0.01f) continue; // RGB가 사실상 검정이면 skip
+                            c.a = 1f; // BaseColor는 불투명 강제 — alpha=0이 디졸브 블렌딩에 사고내지 않도록
                             inst.SetColor(BaseColorID, c);
                             break;
                         }

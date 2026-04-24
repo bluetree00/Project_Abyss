@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
   themeMatch: "*"
   blocks:
-  - {fileID: 11400000, guid: 6bfba40b082f66549bb9192b1f434331, type: 2}
-  - {fileID: 11400000, guid: 6210a5df7c32f604e86b821372770ad1, type: 2}
-  - {fileID: 11400000, guid: c978396847b4f5448b4fa16aef0bd7d5, type: 2}
+  - {fileID: 11400000, guid: 94a14fa013e401448ab5e1ddd546d093, type: 2}
+  - {fileID: 11400000, guid: 258b2e752cd469c4383375a3b0785d1c, type: 2}
+  - {fileID: 11400000, guid: 2de8e15fa4a862a44a32a6e4c89d5d2c, type: 2}
   - {fileID: 11400000, guid: d267a1c98cac4da4491fad6466729dc4, type: 2}
   - {fileID: 11400000, guid: 41da9f765c0fa0e4ba5db242685baa9e, type: 2}
   - {fileID: 11400000, guid: d9d3d6e5e7a99af41b567bbfbfbca59b, type: 2}

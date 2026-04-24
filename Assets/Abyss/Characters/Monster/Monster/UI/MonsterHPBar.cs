@@ -84,23 +84,13 @@ public class MonsterHPBar : MonoBehaviour
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 
-    /// <summary>몬스터 이름 + 원소를 한 라벨에 표시. 이름은 흰색, 원소는 원소색으로 suffix.</summary>
+    /// <summary>몬스터 이름 표시. 원소 표시는 쉐이더 테두리로 이관되어 UI에는 더 이상 나타내지 않는다.
+    /// element 파라미터는 호출부 호환을 위해 유지하되 실제로는 무시됨.</summary>
     public void SetMonsterInfo(string monsterName, ElementType element)
     {
         EnsureNameLabel();
         if (_nameLabel == null) return;
-
-        if (element.IsValid())
-        {
-            Color c = ElementColorOf(element);
-            string hex = ColorUtility.ToHtmlStringRGB(c);
-            string label = LocalizeElement(element);
-            _nameLabel.text = $"{monsterName} <size=75%><color=#{hex}>[{label}]</color></size>";
-        }
-        else
-        {
-            _nameLabel.text = monsterName ?? string.Empty;
-        }
+        _nameLabel.text = monsterName ?? string.Empty;
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 

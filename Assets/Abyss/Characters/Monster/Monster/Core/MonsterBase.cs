@@ -97,8 +97,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     private float                  _nativeDefenseMulti  = 1f;
     private float                  _nativeRateMulti     = 1f;
     private float                  _grassRegenTimer;
-    // 스폰 시 랜덤으로 결정되는 인스턴스 고유 원소. ElementType.None 포함 6종 중 하나.
-    private ElementType            _effectiveElement    = ElementType.None;
+
+    [Header("Runtime Element (현재 속성)")]
+    [Tooltip("스폰 시 SetRandomNativeElement로 자동 주입됨. 플레이 중 Inspector에서 값을 바꾸면 " +
+             "OnValidate가 SetNativeElement를 호출해 tinted/Rim 머티리얼 + 보너스 스탯이 즉시 재적용된다.")]
+    [SerializeField] private ElementType _effectiveElement = ElementType.None;
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
@@ -719,6 +722,18 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (this == null || gameObject == null) return;
         if (_generationId != expectedGen) return;        // 완료 시점에 재사용됐어도 무시
         if (!gameObject.activeInHierarchy) return;
+
+        // 여러 몬스터가 같은 프레임에 디졸브 종료 → 동시 Apply 시 renderer.materials 복제 스파이크 발생.
+        // 0~2 프레임 랜덤 지연으로 Apply 호출을 분산해 프레임당 부담을 1/3로 경감.
+        int jitterFrames = UnityEngine.Random.Range(0, 3);
+        for (int i = 0; i < jitterFrames; i++)
+        {
+            if (this == null || gameObject == null) return;
+            if (_generationId != expectedGen) return;
+            await UniTask.Yield(destroyCancellationToken);
+        }
+        if (!gameObject.activeInHierarchy) return;
+
         SetNativeElement(element);
     }
 
@@ -726,6 +741,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     public void SetNativeElement(ElementType element)
     {
         _effectiveElement = element;
+#if UNITY_EDITOR
+        _lastInspectorElement = element; // OnValidate 중복 트리거 방지
+#endif
         ApplyNativeElementBonus();
         _grassRegenTimer = 0f; // 원소 바뀌면 재생 타이머 초기화
         _elementPalette?.Apply(element);
@@ -800,6 +818,25 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (Managers.Player != null)
             Managers.Player.OnPlayerSpawned -= OnPlayerSpawned;
     }
+
+#if UNITY_EDITOR
+    // Inspector에서 _effectiveElement를 직접 바꿔 쉐이더/머티리얼 연출을 즉시 확인할 수 있게 한다.
+    // 코드 경로로 값이 바뀌는 경우(Awake, SetNativeElement 등)는 _lastInspectorElement 동기화로 중복 호출 방지.
+    private ElementType _lastInspectorElement = ElementType.None;
+
+    private void OnValidate()
+    {
+        if (!Application.isPlaying) return;
+        if (_effectiveElement == _lastInspectorElement) return;
+
+        var newElement = _effectiveElement;
+        _lastInspectorElement = newElement;
+
+        // Awake 이전/Config 미로드 상태에서는 Apply 경로 스킵 — Awake가 이후 정상 초기화.
+        if (_elementPalette == null || _config == null || _runtime == null) return;
+        SetNativeElement(newElement);
+    }
+#endif
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 풀 재사용 — OnEnable/OnDisable 콜백

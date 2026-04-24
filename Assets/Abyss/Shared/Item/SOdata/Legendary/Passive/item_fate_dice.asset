@@ -19,4 +19,7 @@ MonoBehaviour:
   rarity: 3
   category: 0
   shapeId: 0
+  effectVfxKey: 
+  pickupVfxKey: VFX_LevelUp
+  auraVfxKey: 
   modifiers: []

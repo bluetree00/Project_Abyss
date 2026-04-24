@@ -318,7 +318,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var safeFloor = MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, mapGO.transform);
 
         // 블록 생성 — blockBaseY로 피봇 보정 (센터 피봇 큐브는 -0.5로 top을 Y=0에 맞춤)
-        var activePalette = PickBlockPalette(roomEntry.theme);
+        // 테마: 챕터(ActiveTheme) 우선 → 방별(roomEntry.theme) → Default 팔레트 폴백
+        string effectiveTheme = ResolveRoomTheme(roomEntry.theme);
+        var activePalette = PickBlockPalette(effectiveTheme);
         var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
@@ -366,7 +368,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
         // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
-        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry);
+        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, effectiveTheme);
 
         // 상점 방이면 ShopRoomController 부착 및 카탈로그 주입
         if (IsShopCategory(roomEntry.category))
@@ -446,15 +448,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         GameObject mapGO,
         TileType[,] grid,
         System.Collections.Generic.IReadOnlyDictionary<Vector2Int, string> decorationInfos,
-        MapRoomEntry roomEntry)
+        MapRoomEntry roomEntry,
+        string themeOverride = null)
     {
         if (mapGO == null || grid == null || decorationInfos == null || decorationInfos.Count == 0) return;
         if (decorationCatalogs == null || decorationCatalogs.Length == 0) return;
 
-        var catalog = PickDecorationCatalog(roomEntry.theme);
+        string theme = !string.IsNullOrEmpty(themeOverride) ? themeOverride : roomEntry.theme;
+        var catalog = PickDecorationCatalog(theme);
         if (catalog == null)
         {
-            Debug.LogWarning($"[GameRunBootstrapper] Decoration 카탈로그 없음 (theme='{roomEntry.theme}') — {decorationInfos.Count}개 장식 셀 미배치");
+            Debug.LogWarning($"[GameRunBootstrapper] Decoration 카탈로그 없음 (theme='{theme}') — {decorationInfos.Count}개 장식 셀 미배치");
             return;
         }
 
@@ -490,7 +494,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             placed++;
         }
 
-        Debug.Log($"[GameRunBootstrapper] Decoration 배치 — {placed}개 성공 / {missing}개 카탈로그 미스 (theme={roomEntry.theme}, catalog={catalog.name})");
+        Debug.Log($"[GameRunBootstrapper] Decoration 배치 — {placed}개 성공 / {missing}개 카탈로그 미스 (theme={theme}, catalog={catalog.name})");
     }
 
     private static void AttachNavMeshIgnore(GameObject root)
@@ -524,6 +528,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         for (int i = 0; i < blockPalettes.Length; i++)
             if (blockPalettes[i] != null) return true;
         return false;
+    }
+
+    /// <summary>챕터 테마(ActiveTheme) 우선, 없으면 방별 roomTheme 사용. 둘 다 비면 빈 문자열 → PickBlockPalette가 Default로 폴백.</summary>
+    private string ResolveRoomTheme(string roomTheme)
+    {
+        var chapterTheme = _run != null ? _run.ActiveTheme : null;
+        return !string.IsNullOrEmpty(chapterTheme) ? chapterTheme : roomTheme;
     }
 
     /// <summary>방 테마에 맞는 BlockPalette 선택. 정확한 매칭 우선, 범용 "*" 폴백, 최후엔 단일 blockPalette.</summary>

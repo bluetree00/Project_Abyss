@@ -168,10 +168,10 @@ public sealed class MaxHPDecreasePerRoomEffect : ItemEffectBase
         if (ctx.Player == null) return;
 
         // value -0.05 = 현재 최대체력의 5% 감소
-        int currentMaxHp = ctx.Player.RuntimeStats != null ? ctx.Player.RuntimeStats.MaxHp : 0;
-        if (currentMaxHp <= 1) return;
-        int decrease = Mathf.Max(1, Mathf.RoundToInt(currentMaxHp * Mathf.Abs(_value)));
-        // TODO: MaxHP 영구 감소 API 연결. 현재는 로그만.
-        Debug.Log($"[MaxHPDecreasePerRoom] 최대 체력 -{decrease} (현재 {currentMaxHp})");
+        var stats = ctx.Player.RuntimeStats;
+        if (stats == null || stats.MaxHp <= 1) return;
+        int decrease = Mathf.Max(1, Mathf.RoundToInt(stats.MaxHp * Mathf.Abs(_value)));
+        stats.DecreaseMaxHp(decrease);
+        Debug.Log($"[MaxHPDecreasePerRoom] 최대 체력 -{decrease} (남은 {stats.MaxHp})");
     }
 }
