@@ -27,7 +27,7 @@ public sealed class FirstAttackAfterRollEffect : ItemEffectBase
 public sealed class RollLandingDamageEffect : ItemEffectBase
 {
     private const float DefaultRadius = 3f;
-    private const string VfxKey = "VFX_JumpLandingDamage";
+    private const string DefaultVfxKey = "VFX_JumpLandingDamage";
 
     public RollLandingDamageEffect(ItemEffectSlot s) : base(s) { }
 
@@ -53,7 +53,7 @@ public sealed class RollLandingDamageEffect : ItemEffectBase
             }
         }
 
-        ItemEffectVfxHelper.SpawnOneShotAt(VfxKey, position);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), position);
         ItemEffectVfxHelper.ShowNotice($"<color=#FFAA44>착지 충격</color> {damage:F0} 데미지");
         Debug.Log($"[JumpLandingDamage] 착지 범위 피해 {damage:F0} (반경 {radius}m)");
     }

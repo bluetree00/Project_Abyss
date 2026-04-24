@@ -71,6 +71,18 @@ public sealed class PlayerRunState
         OnGoldChanged?.Invoke(TempGold);
     }
 
+    /// <summary>골드를 차감한다. 잔액 부족이면 false 반환(차감 없음).</summary>
+    public bool TrySpendGold(int amount)
+    {
+        if (!IsActive) return false;
+        if (amount <= 0) return false;
+        if (TempGold < amount) return false;
+
+        TempGold -= amount;
+        OnGoldChanged?.Invoke(TempGold);
+        return true;
+    }
+
     public void Damage(int amount)
     {
         if (amount <= 0) return;

@@ -28,6 +28,10 @@ public class MonsterStatData
     public float attackPower   = 10f;
     public float moveSpeed     = 3f;
 
+    [Header("원소 속성 (공격 원소 / 네이티브 원소)")]
+    [Tooltip("몬스터가 가진 원소 속성. 공격 부여 원소 및 저항/약점 판정에 활용.")]
+    public ElementType nativeElement = ElementType.None;
+
     [Header("공격 수치")]
     [Tooltip("공격 준비를 시작하는 거리 (m)")]
     public float attackRange   = 2f;
@@ -78,6 +82,19 @@ public class MonsterCombatData
     public float     damageApplyDelay = 0.4f;
     [Tooltip("공격 히트 판정 대상 레이어 (Player 레이어 설정)")]
     public LayerMask targetLayer;
+}
+
+/// <summary>사망 시 드롭 데이터. 현재는 골드 코인만 지원. coinMax == 0 이면 드롭 없음.</summary>
+[Serializable]
+public class MonsterDropData
+{
+    [Header("골드 코인 드롭")]
+    [Tooltip("드롭할 코인 최소 개수 (inclusive)")]
+    [Min(0)] public int coinMin = 5;
+    [Tooltip("드롭할 코인 최대 개수 (inclusive)")]
+    [Min(0)] public int coinMax = 8;
+    [Tooltip("코인 1개당 지급 골드")]
+    [Min(1)] public int coinValue = 1;
 }
 
 /// <summary>몬스터 애니메이션 설정 데이터.</summary>

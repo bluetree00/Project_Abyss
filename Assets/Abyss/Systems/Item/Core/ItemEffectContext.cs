@@ -8,6 +8,8 @@ public sealed class ItemEffectContext
     public PlayerController Player { get; private set; }
     public PlayerRuntimeStats Stats { get; private set; }
     public WeaponElement WeaponElement { get; private set; }
+    public WeaponType WeaponType { get; private set; }
+    public Define.CharacterClass CharacterClass { get; private set; }
     public float HpRatio { get; private set; }
     public bool HasShield { get; private set; }
     public GameRunSession Session { get; private set; }
@@ -20,6 +22,8 @@ public sealed class ItemEffectContext
 
         var weaponData = player?.WeaponManager?.CurrentWeaponData;
         WeaponElement = weaponData?.element ?? WeaponElement.None;
+        WeaponType = weaponData?.weaponType ?? WeaponType.None;
+        CharacterClass = player?.CharacterData?.conClass ?? Define.CharacterClass.Default;
         HasShield = false; // 추후 방패 시스템 추가 시
 
         if (Stats != null && Stats.MaxHp > 0)

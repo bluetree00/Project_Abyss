@@ -58,6 +58,21 @@ public class SkillCooldownTracker
         OnCooldownChanged?.Invoke(skill, 0f, 0f);
     }
 
+    /// <summary>
+    /// 모든 스킬의 남은 쿨다운을 즉시 seconds 만큼 감소 (아이템 SkillCooldownFlat 전용).
+    /// 0 아래로는 내려가지 않는다.
+    /// </summary>
+    public void ReduceAllCooldowns(float seconds)
+    {
+        if (seconds <= 0f) return;
+        for (int i = 0; i < _remaining.Length; i++)
+        {
+            if (_remaining[i] <= 0f) continue;
+            _remaining[i] = Mathf.Max(0f, _remaining[i] - seconds);
+            OnCooldownChanged?.Invoke((SkillType)i, _remaining[i], _total[i]);
+        }
+    }
+
     /// <summary>현재 남은 쿨다운 시간 (0이면 사용 가능).</summary>
     public float GetRemaining(SkillType skill) => _remaining[(int)skill];
 

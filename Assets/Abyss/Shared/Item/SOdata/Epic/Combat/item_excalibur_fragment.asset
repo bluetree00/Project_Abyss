@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e48fd0d2efb3ecf46b9e9813c20a85af, type: 3}
+  m_Name: item_excalibur_fragment
+  m_EditorClassIdentifier: Assembly-CSharp::ItemSO
+  itemId: item_excalibur_fragment
+  displayName: "\uADFC\uAC70\uB9AC \uACF5\uACA9 \uC2DC 10% \uD655\uB960\uB85C \uCD94\uAC00
+    \uACF5\uACA9"
+  icon: {fileID: 0}
+  iconKey: 
+  rarity: 2
+  category: 0
+  shapeId: 0
+  effectVfxKey: VFX_ExtraAttack
+  pickupVfxKey: 
+  auraVfxKey: 
+  modifiers: []

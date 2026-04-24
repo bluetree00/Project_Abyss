@@ -19,8 +19,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private PlayerEntranceBehaviourSO defaultPlayerEntrance;
 
     [Header("Block Map Gen")]
-    [SerializeField] private BlockPalette blockPalette;
+    [SerializeField, Tooltip("단일 팔레트 (fallback). blockPalettes에 테마 매칭이 없으면 이 값 사용.")]
+    private BlockPalette blockPalette;
+
+    [SerializeField, Tooltip("테마별 블록 팔레트 배열. MapRoomEntry.theme와 BlockPalette.themeMatch가 일치하는 첫 항목이 사용됨.")]
+    private BlockPalette[] blockPalettes;
+
     [SerializeField] private float blockCellSize = 1f;
+
+    [SerializeField, Tooltip("블록 배치 Y 오프셋. 피봇이 센터인 큐브(cellSize=1)에서 타일이 떠보이면 -0.5. 프리팹 피봇이 바닥이면 0.")]
+    private float blockBaseY = -0.5f;
+
+    [Header("Shop Room")]
+    [SerializeField, Min(0)] private int shopSlotCount = 3;
+
+    [Header("Decoration")]
+    [Tooltip("방 테마별 장식 카탈로그. 방 진입 시 MapRoomEntry.theme와 themeMatch가 일치하는 첫 항목 사용. " +
+             "일치 없으면 themeMatch=\"*\" 범용 카탈로그로 폴백.")]
+    [SerializeField] private DecorationCatalogSO[] decorationCatalogs;
 
     private StagePointUI[] _points;
     private GameObject _currentMapGO;
@@ -184,6 +200,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             try { await equipData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] EquipmentData 예외: {e.Message}"); }
         }
+
+        var monsterStatData = Managers.ServerMonsterStat;
+        if (monsterStatData != null && !monsterStatData.IsInitialized)
+        {
+            try { await monsterStatData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] MonsterStatData 예외: {e.Message}"); }
+        }
     }
 
     private async UniTask InitItemDataAsync()
@@ -219,6 +242,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             try { await buffData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BuffData 예외: {e.Message}"); }
         }
+
+        var elementEffectData = Managers.ElementEffectData;
+        if (elementEffectData != null && !elementEffectData.IsInitialized)
+        {
+            try { await elementEffectData.InitializeAsync(); }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ElementEffectData 예외: {e.Message}"); }
+        }
     }
 
     private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();
@@ -246,7 +276,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var mapData = Managers.MapData;
             MapRoomEntry roomEntry = mapData?.GetById(prefabKey);
 
-            if (roomEntry != null && !string.IsNullOrEmpty(roomEntry.grid_csv) && blockPalette != null)
+            if (roomEntry != null && !string.IsNullOrEmpty(roomEntry.grid_csv) && HasAnyPalette())
             {
                 await SpawnBlockMapAsync(roomEntry);
                 return;
@@ -264,12 +294,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry)
     {
-        var grid = MapDataLoader.Parse(roomEntry.grid_csv);
+        var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
+        var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
+        var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos, decorationInfos);
         if (grid == null)
         {
             Debug.LogError($"[GameRunBootstrapper] grid_csv 파싱 실패: {roomEntry.room_id}");
             return;
         }
+
+        // 스포너 배치 계획: 확정(M)은 유지, 후보(m) 중 (max - 확정수)개만 랜덤 선택, 나머지는 Floor 치환
+        ApplyMonsterSpawnerPlan(grid, roomEntry.max_active_spawners);
 
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -279,23 +314,343 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         mapGO.transform.SetParent(mapRoot, false);
         _currentMapGO = mapGO;
 
-        // 투명 바닥 (플레이어 추락 방지)
+        // 투명 바닥 (플레이어 추락 방지) — 플레이어 이동 기준 Y(=0)에 얇은 판으로 항상 존재
         var safeFloor = MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, mapGO.transform);
 
-        // 블록 생성
-        var blocks = MapBuilder.Build(grid, blockPalette, mapGO.transform, blockCellSize, 0f);
+        // 블록 생성 — blockBaseY로 피봇 보정 (센터 피봇 큐브는 -0.5로 top을 Y=0에 맞춤)
+        // 테마: 챕터(ActiveTheme) 우선 → 방별(roomEntry.theme) → Default 팔레트 폴백
+        string effectiveTheme = ResolveRoomTheme(roomEntry.theme);
+        var activePalette = PickBlockPalette(effectiveTheme);
+        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
-        // Scatter → Return 연출
-        await MapPresenter.PlayEntrance(
-            blocks,
-            roomEntry.scatter_range,
-            roomEntry.return_duration);
+        // 각 스포너 인스턴스에 셀별 설정(maxGrade, totalCount) 주입 (Start() 호출 직전)
+        ConfigureMonsterSpawners(blocks, spawnInfos);
+
+        // 방 클리어 카운터 부착 — 모든 스포너의 maxTotalSpawns 합이 킬 목표
+        AttachRoomClearController(mapGO, blocks);
+
+        // 등장 연출 — Wall은 높이가 커 기본 연출과 섞이면 부자연스럽기 때문에 분리한다.
+        //   1) 즉시: 벽을 상공에 Prewarm 배치 → main 연출 중에 벽이 최종 위치에 노출되지 않음
+        //   2) mainBlocks(Floor/Obstacle/스포너 등): entrance 필드로 지정된 기본 연출
+        //   3) wallBlocks: z축(뒤→앞) row 순차 낙하 + 착지 바운스
+        var mainBlocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>(blocks.Count);
+        var wallBlocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>(64);
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            if (blocks[i].tileType == TileType.Wall) wallBlocks.Add(blocks[i]);
+            else                                     mainBlocks.Add(blocks[i]);
+        }
+
+        // 벽 선배치 — MapBuilder가 Instantiate한 뒤 첫 프레임이 렌더되기 전에 상공으로 옮겨
+        // 플레이어는 벽이 "처음부터 위에서 내려오는" 모습만 보게 된다.
+        WallDropEntrance.Prewarm(wallBlocks);
+
+        var entranceCtx = new MapEntranceContext(roomEntry);
+        var ct = this.GetCancellationTokenOnDestroy();
+
+        // 1) 기본 연출 — Wall 제외 전체 블록
+        var entrance = MapEntranceRegistry.Resolve(roomEntry.entrance);
+        await entrance.PlayAsync(mainBlocks, entranceCtx, ct);
+
+        // 2) Wall 전용 낙하 연출 — 기본 연출이 끝난 뒤 실행
+        if (wallBlocks.Count > 0)
+        {
+            var wallEntrance = new WallDropEntrance();
+            await wallEntrance.PlayAsync(wallBlocks, entranceCtx, ct);
+        }
 
         // 투명 바닥 유지 (빈 공간 추락 방지)
 
-        // NavMesh 빌드
+        // NavMesh 빌드 — Wall이 자리잡은 후에 수행해야 정확한 경계가 생성됨.
+        // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
         BuildMapNavMesh(mapGO);
+
+        // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
+        // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
+        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, effectiveTheme);
+
+        // 상점 방이면 ShopRoomController 부착 및 카탈로그 주입
+        if (IsShopCategory(roomEntry.category))
+            await SetupShopRoomAsync(mapGO, roomEntry);
+    }
+
+    private static bool IsShopCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Shop", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
+    /// 선택되지 않은 후보는 Floor로 치환된다.
+    /// 규칙:
+    ///   · max ≤ 0           : 모든 M/m 전체 활성 (제한 없음)
+    ///   · 확정 0 + 후보 0   : 아무것도 안 함 (max > 0이어도 스포너 미생성)
+    ///   · 확정 ≥ max        : 확정 전부 유지, 후보 전부 Floor 치환
+    ///   · 확정 &lt; max       : 확정 유지 + 후보 중 (max - 확정수)개 랜덤 선택
+    /// </summary>
+    private static void ApplyMonsterSpawnerPlan(TileType[,] grid, int max)
+    {
+        if (grid == null) return;
+
+        var fixedSpots     = MapDataLoader.FindAll(grid, TileType.MonsterSpawn);
+        var candidateSpots = MapDataLoader.FindAll(grid, TileType.MonsterSpawnCandidate);
+
+        if (fixedSpots.Count == 0 && candidateSpots.Count == 0)
+        {
+            if (max > 0)
+                Debug.Log($"[GameRunBootstrapper] 스포너 타일 0개 — max={max} 무시, 스포너 사용 안 함");
+            return;
+        }
+
+        // max ≤ 0: 무제한. 후보는 전부 확정 타입으로 승격시켜 MapBuilder가 동일 처리하게 함
+        if (max <= 0)
+        {
+            foreach (var c in candidateSpots) grid[c.x, c.y] = TileType.MonsterSpawn;
+            Debug.Log($"[GameRunBootstrapper] 스포너 max 제한 없음 — 확정 {fixedSpots.Count} + 후보 {candidateSpots.Count} 전부 활성");
+            return;
+        }
+
+        // 확정이 이미 max 이상이면 후보 전부 Floor
+        if (fixedSpots.Count >= max)
+        {
+            foreach (var c in candidateSpots) grid[c.x, c.y] = TileType.Floor;
+            Debug.LogWarning($"[GameRunBootstrapper] 확정 스포너 {fixedSpots.Count}개가 max={max}를 초과/충족 — 후보 {candidateSpots.Count}개 모두 비활성");
+            return;
+        }
+
+        // 후보 중 필요한 개수만 Fisher-Yates로 선택, 나머지는 Floor 치환 후 선택된 것은 확정으로 승격
+        int need = Mathf.Min(max - fixedSpots.Count, candidateSpots.Count);
+
+        for (int i = candidateSpots.Count - 1; i > 0; i--)
+        {
+            int j = UnityEngine.Random.Range(0, i + 1);
+            (candidateSpots[i], candidateSpots[j]) = (candidateSpots[j], candidateSpots[i]);
+        }
+
+        for (int i = 0; i < need; i++)
+        {
+            var c = candidateSpots[i];
+            grid[c.x, c.y] = TileType.MonsterSpawn; // 확정 승격 — MapBuilder가 오버레이 처리
+        }
+        for (int i = need; i < candidateSpots.Count; i++)
+        {
+            var c = candidateSpots[i];
+            grid[c.x, c.y] = TileType.Floor;
+        }
+
+        Debug.Log($"[GameRunBootstrapper] 스포너 계획 적용 — 확정 {fixedSpots.Count} + 후보 {need}/{candidateSpots.Count} 활성 (max={max})");
+    }
+
+    /// <summary>장식(Decoration) 셀에 카탈로그 프리팹을 Instantiate. 테마 일치 카탈로그 우선, 없으면 "*" 폴백.
+    /// MapBuilder는 d* 셀을 Floor로 배치하므로 이미 바닥은 깔려있고, 그 위에 오버레이로 얹힌다.</summary>
+    private void SpawnDecorations(
+        GameObject mapGO,
+        TileType[,] grid,
+        System.Collections.Generic.IReadOnlyDictionary<Vector2Int, string> decorationInfos,
+        MapRoomEntry roomEntry,
+        string themeOverride = null)
+    {
+        if (mapGO == null || grid == null || decorationInfos == null || decorationInfos.Count == 0) return;
+        if (decorationCatalogs == null || decorationCatalogs.Length == 0) return;
+
+        string theme = !string.IsNullOrEmpty(themeOverride) ? themeOverride : roomEntry.theme;
+        var catalog = PickDecorationCatalog(theme);
+        if (catalog == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] Decoration 카탈로그 없음 (theme='{theme}') — {decorationInfos.Count}개 장식 셀 미배치");
+            return;
+        }
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * blockCellSize, 0f, (h - 1) * 0.5f * blockCellSize);
+
+        int placed = 0, missing = 0;
+        foreach (var kv in decorationInfos)
+        {
+            var cell = kv.Key;
+            var entry = catalog.Get(kv.Value);
+            if (entry == null || entry.prefab == null) { missing++; continue; }
+
+            var pos = new Vector3(
+                cell.x * blockCellSize - offset.x,
+                blockBaseY + 0.5f + entry.yOffset, // 바닥 블록 상단에 얹기
+                cell.y * blockCellSize - offset.z);
+
+            Quaternion rot = entry.randomYRotation
+                ? Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f)
+                : Quaternion.identity;
+
+            var go = Object.Instantiate(entry.prefab, pos, rot, mapGO.transform);
+            go.name = $"Deco_{cell.x}_{cell.y}_{kv.Value}";
+            if (entry.scale != 1f)
+                go.transform.localScale *= entry.scale;
+
+            // NavMesh 빌드에서 제외 — 나무 등 외부 FBX의 Read/Write OFF 메시로 인한 런타임 실패 방지.
+            // 루트 + 모든 MeshRenderer 자식에 NavMeshModifier 부착.
+            AttachNavMeshIgnore(go);
+
+            placed++;
+        }
+
+        Debug.Log($"[GameRunBootstrapper] Decoration 배치 — {placed}개 성공 / {missing}개 카탈로그 미스 (theme={theme}, catalog={catalog.name})");
+    }
+
+    private static void AttachNavMeshIgnore(GameObject root)
+    {
+        if (root == null) return;
+        EnsureNavMeshIgnore(root);
+
+        // 자식 중 Renderer가 있는 GameObject에도 부착 — NavMeshSurface가 자식 렌더러를 스캔하므로.
+        var renderers = root.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var r = renderers[i];
+            if (r == null) continue;
+            EnsureNavMeshIgnore(r.gameObject);
+        }
+    }
+
+    private static void EnsureNavMeshIgnore(GameObject go)
+    {
+        var mod = go.GetComponent<Unity.AI.Navigation.NavMeshModifier>();
+        if (mod == null)
+            mod = go.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
+        mod.ignoreFromBuild = true;
+    }
+
+    /// <summary>적어도 한 개의 BlockPalette가 연결되어 있는지.</summary>
+    private bool HasAnyPalette()
+    {
+        if (blockPalette != null) return true;
+        if (blockPalettes == null) return false;
+        for (int i = 0; i < blockPalettes.Length; i++)
+            if (blockPalettes[i] != null) return true;
+        return false;
+    }
+
+    /// <summary>챕터 테마(ActiveTheme) 우선, 없으면 방별 roomTheme 사용. 둘 다 비면 빈 문자열 → PickBlockPalette가 Default로 폴백.</summary>
+    private string ResolveRoomTheme(string roomTheme)
+    {
+        var chapterTheme = _run != null ? _run.ActiveTheme : null;
+        return !string.IsNullOrEmpty(chapterTheme) ? chapterTheme : roomTheme;
+    }
+
+    /// <summary>방 테마에 맞는 BlockPalette 선택. 정확한 매칭 우선, 범용 "*" 폴백, 최후엔 단일 blockPalette.</summary>
+    private BlockPalette PickBlockPalette(string theme)
+    {
+        if (blockPalettes != null)
+        {
+            BlockPalette wildcard = null;
+            for (int i = 0; i < blockPalettes.Length; i++)
+            {
+                var p = blockPalettes[i];
+                if (p == null) continue;
+                if (p.MatchesTheme(theme) && !string.IsNullOrEmpty(p.ThemeMatch) && p.ThemeMatch != "*")
+                    return p; // 정확 매칭 우선
+                if (p.ThemeMatch == "*" || string.IsNullOrEmpty(p.ThemeMatch))
+                    wildcard = p;
+            }
+            if (wildcard != null) return wildcard;
+        }
+        return blockPalette; // 하위호환 fallback
+    }
+
+    private DecorationCatalogSO PickDecorationCatalog(string theme)
+    {
+        if (decorationCatalogs == null) return null;
+
+        DecorationCatalogSO fallback = null;
+        foreach (var cat in decorationCatalogs)
+        {
+            if (cat == null) continue;
+            if (cat.MatchesTheme(theme) && !string.IsNullOrEmpty(cat.ThemeMatch) && cat.ThemeMatch != "*")
+                return cat; // 정확한 테마 매칭 우선
+            if (cat.ThemeMatch == "*" || string.IsNullOrEmpty(cat.ThemeMatch))
+                fallback = cat;
+        }
+        return fallback;
+    }
+
+    /// <summary>방 클리어 카운터를 맵 루트에 부착. PlacedBlock에서 MonsterSpawner를 수집해 Initialize.
+    /// 스포너가 0개면 컨트롤러를 생성하지 않는다 (상점/이벤트 방 등).</summary>
+    private void AttachRoomClearController(
+        GameObject mapGO,
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        if (mapGO == null || blocks == null || _run == null) return;
+
+        var spawners = new System.Collections.Generic.List<MonsterSpawner>();
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var b = blocks[i];
+            if (b.tileType != TileType.MonsterSpawn && b.tileType != TileType.MonsterSpawnCandidate)
+                continue;
+            if (b.instance == null) continue;
+
+            var sp = b.instance.GetComponent<MonsterSpawner>();
+            if (sp != null) spawners.Add(sp);
+        }
+
+        if (spawners.Count == 0) return;
+
+        var controller = mapGO.AddComponent<RoomClearController>();
+        controller.Initialize(_run, spawners);
+    }
+
+    /// <summary>MapBuilder.Build 결과 중 스포너 오브젝트에 CellSpawnInfo를 주입.
+    /// Start() 호출 전(같은 프레임)에 실행되어야 MonsterSpawner가 올바른 설정으로 SpawnLoop을 시작한다.</summary>
+    private static void ConfigureMonsterSpawners(
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks,
+        System.Collections.Generic.IReadOnlyDictionary<Vector2Int, MapDataLoader.CellSpawnInfo> infos)
+    {
+        if (blocks == null || infos == null) return;
+
+        int applied = 0;
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var b = blocks[i];
+            if (b.tileType != TileType.MonsterSpawn && b.tileType != TileType.MonsterSpawnCandidate)
+                continue;
+            if (b.instance == null) continue;
+
+            var spawner = b.instance.GetComponent<MonsterSpawner>();
+            if (spawner == null) continue;
+
+            // 후보에서 승격된 셀(MonsterSpawn)이라도 원래 기록된 후보 infos는 좌표 기준으로 찾음
+            if (!infos.TryGetValue(b.cell, out var info)) continue;
+
+            spawner.Configure(info.maxGrade, info.totalCount);
+            applied++;
+        }
+
+        if (applied > 0)
+            Debug.Log($"[GameRunBootstrapper] MonsterSpawner 설정 주입 — {applied}개");
+    }
+
+    private async UniTask SetupShopRoomAsync(GameObject mapGO, MapRoomEntry roomEntry)
+    {
+        var controller = mapGO.AddComponent<ShopRoomController>();
+        var catalog = await LoadShopCatalogAsync(roomEntry.room_id);
+
+        if (catalog == null)
+            Debug.LogWarning($"[GameRunBootstrapper] ShopCatalog 로드 실패: {roomEntry.room_id}. 진열대가 비어 있게 됩니다.");
+
+        controller.Initialize(_run, catalog, shopSlotCount);
+    }
+
+    private async UniTask<ShopCatalogSO> LoadShopCatalogAsync(string roomId)
+    {
+        var mgr = Managers.AddressableManager;
+
+        if (!string.IsNullOrEmpty(roomId))
+        {
+            var primary = await mgr.TryLoadAssetAsync<ShopCatalogSO>($"ShopCatalog_{roomId}");
+            if (primary != null) return primary;
+        }
+
+        return await mgr.TryLoadAssetAsync<ShopCatalogSO>("ShopCatalog_Default");
     }
 
     private void BuildMapNavMesh(GameObject mapRootObject)
@@ -308,7 +663,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             surface = mapRootObject.AddComponent<NavMeshSurface>();
 
         surface.collectObjects = CollectObjects.Children;
-        surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+        // PhysicsColliders 기반 — FBX Read/Write OFF 메시(AZURE Cliff/Rock 등)를 우회하고
+        // BoxCollider 기반으로 NavMesh를 빌드. Player 빌드에서도 안전하게 동작.
+        surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         surface.layerMask = ~0;
         surface.BuildNavMesh();
     }

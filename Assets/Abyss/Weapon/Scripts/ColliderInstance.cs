@@ -112,13 +112,40 @@ public class ColliderInstance : MonoBehaviour
 
         // 아이템 효과: 공격 전 데미지 수정
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
-        var weaponElem = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData?.element ?? WeaponElement.None;
+        var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+        var weaponElem = weaponData?.element ?? WeaponElement.None;
         var pkt = new DamagePacket(damage, owner, other.gameObject, weaponElem);
         mgr?.OnPreDealDamage(ref pkt);
 
-        float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
-        var elemType = pkt.Element.ToElementType();
-        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, elemType, finalDmg);
+        float baseFinal  = pkt.Negated ? 0f : pkt.FinalDamage;
+        var   elemType   = pkt.Element.ToElementType();
+        float elemAmount = GetElementAmountFor(weaponData, actionType);
+
+        // 크리티컬 굴림
+        float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
+        pkt.IsCrit = isCrit;
+
+        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, elemType, elemAmount);
+
+        // 데미지 팝업 + 타격감 (HitFeedbackService 허브 경유 → 기존 HitFeel + 구독자 전파)
+        Vector3 hitPoint = other.ClosestPoint(transform.position);
+        DamagePopupSpawner.Spawn(hitPoint, finalDmg, isCrit, elemType);
+
+        Vector3 attackDir = owner != null
+            ? (other.transform.position - owner.transform.position)
+            : (other.transform.position - transform.position);
+
+        var hitInfo = new HitInfo(
+            attacker:        owner,
+            target:          other.gameObject,
+            hitPoint:        hitPoint,
+            attackDirection: attackDir,
+            damage:          finalDmg,
+            element:         elemType,
+            isCritical:      isCrit,
+            actionType:      actionType);
+
+        HitFeedbackService.RaiseHit(hitInfo);
 
         // 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
         var report = new DamageReport
@@ -153,5 +180,19 @@ public class ColliderInstance : MonoBehaviour
             Managers.ObjectPooler.Despawn(gameObject);
         else
             Destroy(gameObject);
+    }
+
+    /// <summary>WeaponData + 공격 타입 → 원소 누적치 부여량.</summary>
+    private static float GetElementAmountFor(WeaponData wd, WeaponActionType type)
+    {
+        if (wd == null) return 0f;
+        return type switch
+        {
+            WeaponActionType.GroundHeavy
+            or WeaponActionType.AirHeavy
+            or WeaponActionType.AirPlunge => wd.elementAmountHeavy,
+            WeaponActionType.AirLight     => wd.elementAmountAir > 0f ? wd.elementAmountAir : wd.elementAmountBasic,
+            _                             => wd.elementAmountBasic,
+        };
     }
 }

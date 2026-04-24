@@ -6,7 +6,7 @@ using UnityEngine;
 
 public sealed class FireExplosionOnSkillEffect : ItemEffectBase
 {
-    private const string VfxKey = "VFX_FireExplosion";
+    private const string DefaultVfxKey = "VFX_FireExplosion";
     private const float Radius = 4f;
 
     public FireExplosionOnSkillEffect(ItemEffectSlot s) : base(s) { }
@@ -31,7 +31,7 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
                 damageable.TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.5f);
         }
 
-        ItemEffectVfxHelper.SpawnOneShotAt(VfxKey, center);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center);
         ItemEffectVfxHelper.ShowNotice($"<color=#FF6622>화염 폭발</color> {damage:F0} 데미지");
         Debug.Log($"[FireExplosionOnSkill] 화염 폭발 {damage:F0} (반경 {Radius}m)");
     }
@@ -39,7 +39,7 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
 
 public sealed class LightningOnSkillEffect : ItemEffectBase
 {
-    private const string VfxKey = "VFX_LightningStrike";
+    private const string DefaultVfxKey = "VFX_LightningStrike";
     private const float Radius = 3f;
 
     public LightningOnSkillEffect(ItemEffectSlot s) : base(s) { }
@@ -63,7 +63,7 @@ public sealed class LightningOnSkillEffect : ItemEffectBase
                 damageable.TakeDamage(damage, ctx.Player.gameObject, knockbackMultiplier: 0.3f);
         }
 
-        ItemEffectVfxHelper.SpawnOneShotAt(VfxKey, center);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), center);
         ItemEffectVfxHelper.ShowNotice($"<color=#44CCFF>번개 강타</color> {damage:F0} 데미지");
         Debug.Log($"[LightningOnSkill] 번개 강타 {damage:F0} (반경 {Radius}m)");
     }

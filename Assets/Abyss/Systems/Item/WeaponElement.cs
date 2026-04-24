@@ -47,8 +47,9 @@ public static class ElementRelation
         "WithWaterWeapon"     => WeaponElement.Water,
         "WithFireWeapon"      => WeaponElement.Fire,
         "WithGrassWeapon"     => WeaponElement.Grass,
-        "WithMagicWeapon"     => WeaponElement.Earth,
+        "WithEarthWeapon"     => WeaponElement.Earth,
         "WithLightningWeapon" => WeaponElement.Lightning,
+        // WithMagicWeapon은 원소가 아니라 무기 종류(Staff) 조건 — 여기서 제외
         _                     => WeaponElement.None,
     };
 
