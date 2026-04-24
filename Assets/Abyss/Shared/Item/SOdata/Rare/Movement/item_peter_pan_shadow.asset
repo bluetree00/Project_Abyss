@@ -20,4 +20,7 @@ MonoBehaviour:
   rarity: 1
   category: 0
   shapeId: 0
+  effectVfxKey: VFX_Buff
+  pickupVfxKey: 
+  auraVfxKey: 
   modifiers: []

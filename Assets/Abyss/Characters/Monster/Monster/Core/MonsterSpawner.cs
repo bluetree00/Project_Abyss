@@ -160,6 +160,17 @@ public class MonsterSpawner : MonoBehaviour
 
     private async UniTaskVoid SpawnLoop()
     {
+        // 여러 스포너가 같은 프레임에 Start()되어도 첫 스폰 시점이 균등하게 분산되도록
+        // [0, spawnInterval) 범위 지터 추가 — 초기 스폰 폭주 방지.
+        try
+        {
+            float initialJitter = UnityEngine.Random.Range(0f, spawnInterval);
+            await UniTask.Delay(
+                System.TimeSpan.FromSeconds(initialJitter),
+                cancellationToken: destroyCancellationToken);
+        }
+        catch (System.OperationCanceledException) { return; }
+
         while (true)
         {
             try

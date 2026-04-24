@@ -41,6 +41,24 @@ public sealed class GameRunSession
 
     public ChapterId CurrentChapter { get; private set; }
 
+    /// <summary>현재 챕터의 블록 테마. ChapterDataSO.theme에서 해석된 값. 빈 문자열이면 방별 theme 또는 Default 팔레트 폴백.</summary>
+    public string ActiveTheme { get; private set; } = string.Empty;
+
+    private ChapterRegistry _chapterRegistry;
+
+    /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
+    public void BindChapterRegistry(ChapterRegistry registry)
+    {
+        _chapterRegistry = registry;
+        ResolveActiveTheme();
+    }
+
+    private void ResolveActiveTheme()
+    {
+        var data = _chapterRegistry != null ? _chapterRegistry.Get(CurrentChapter) : null;
+        ActiveTheme = data != null && !string.IsNullOrEmpty(data.theme) ? data.theme : string.Empty;
+    }
+
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
 
@@ -127,6 +145,7 @@ public sealed class GameRunSession
 
         Phase = RunPhase.Starting;
         CurrentChapter = chapter;
+        ResolveActiveTheme();
 
         // HUD state reset for a new run
         CurrentHudMode = HUDIds.Mode.None;
@@ -233,6 +252,7 @@ public sealed class GameRunSession
         SavedWeaponSlots = null;
         SavedCurrentSlotIndex = -1;
         _appliedSynergies.Clear();
+        ActiveTheme = string.Empty;
     }
 
     /// <summary>
@@ -348,6 +368,7 @@ public sealed class GameRunSession
         if (next > ChapterId.Chapter5) return false;
 
         CurrentChapter = next;
+        ResolveActiveTheme();
 
         // StagePointManager 재초기화 (새 챕터 노드 배치)
         StagePointManager.Initialize(next, RoomManager);

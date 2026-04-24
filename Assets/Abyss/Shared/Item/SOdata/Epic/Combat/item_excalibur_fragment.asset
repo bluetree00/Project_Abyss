@@ -20,4 +20,7 @@ MonoBehaviour:
   rarity: 2
   category: 0
   shapeId: 0
+  effectVfxKey: VFX_ExtraAttack
+  pickupVfxKey: 
+  auraVfxKey: 
   modifiers: []

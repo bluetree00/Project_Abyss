@@ -96,6 +96,7 @@ public static class ItemEffectRegistry
         // ── OnTakeDamage: 피격 ──────────────────────────────
         Register("DamageNegate",               s => new DamageNegateEffect(s));
         Register("DamageReflect",              s => new DamageReflectEffect(s));
+        Register("FireReflect",                s => new FireReflectEffect(s));
         Register("DefenseOnHit",               s => new DefenseOnHitEffect(s));
         Register("ExtraDamageOnHit",           s => new ExtraDamageOnHitEffect(s));
 

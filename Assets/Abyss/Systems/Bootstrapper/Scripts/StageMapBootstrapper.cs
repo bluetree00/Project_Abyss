@@ -123,6 +123,9 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         var session = new GameRunSession();
         app.BeginRun(session);
 
+        // 챕터→테마 해석을 위해 레지스트리를 StartNewRunAsync 이전에 주입
+        session.BindChapterRegistry(chapterRegistry);
+
         await session.StartNewRunAsync(startChapter, LoadTextAsset);
 
         if (!session.IsRunning)
