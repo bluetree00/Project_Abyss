@@ -18,6 +18,14 @@ public class ChapterDataSO : ScriptableObject
     public Color mapBackgroundTint = Color.white;
     public string mapBackgroundKey;
 
+    [Header("맵 장식")]
+    [Tooltip("배경 위·노드 아래 레이어에 스캐터할 장식 스프라이트 목록. 비우면 Bootstrapper의 defaultDecorationSprites 폴백.")]
+    public Sprite[] decorationSprites;
+
+    [Header("맵 테마")]
+    [Tooltip("인게임 방 렌더링 시 BlockPalette/DecorationCatalog 매칭 키 (예: Forest, Cave, Abyss). 비우면 방별 theme 또는 Default 팔레트 폴백.")]
+    public string theme;
+
     [Header("사운드")]
     public string bgmKey;
 
@@ -54,6 +62,7 @@ public class ChapterDataSO : ScriptableObject
             mapBackground    = mapBackground,
             mapBackgroundTint = mapBackgroundTint,
             mapBackgroundKey = mapBackgroundKey,
+            theme            = theme,
             bgmKey           = bgmKey,
             difficultyScale  = difficultyScale,
             monsterCountScale = monsterCountScale,
@@ -83,6 +92,9 @@ public class ChapterRuntimeData
     public Color mapBackgroundTint = Color.white;
     public string mapBackgroundKey;
 
+    // 테마
+    public string theme;
+
     // 사운드
     public string bgmKey;
 
@@ -106,6 +118,7 @@ public class ChapterRuntimeData
         if (!string.IsNullOrEmpty(server.chapter_name)) chapterName = server.chapter_name;
         if (!string.IsNullOrEmpty(server.description)) description = server.description;
         if (!string.IsNullOrEmpty(server.map_bg_key)) mapBackgroundKey = server.map_bg_key;
+        if (!string.IsNullOrEmpty(server.theme)) theme = server.theme;
         if (!string.IsNullOrEmpty(server.bgm_key)) bgmKey = server.bgm_key;
         if (!string.IsNullOrEmpty(server.monster_pool_tag)) monsterPoolTag = server.monster_pool_tag;
         if (server.difficulty_scale > 0) difficultyScale = server.difficulty_scale;
@@ -125,6 +138,7 @@ public class ChapterServerEntry
     public string chapter_name;
     public string description;
     public string map_bg_key;
+    public string theme;
     public string bgm_key;
     public float difficulty_scale;
     public float monster_count_scale;

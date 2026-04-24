@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fca197032da92624dad13766f5d4c427, type: 3}
   m_Name: BD_ShopStall
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
-  prefab: {fileID: 8424954414724241395, guid: d7dffdf24bce5414384c916a4793da78, type: 3}
-  tileType: 6
+  prefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8, type: 3}
+  tileType: 7
   facingRule: 1
   weight: 1

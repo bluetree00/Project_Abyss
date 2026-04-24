@@ -58,7 +58,10 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
         if (lineConnector != null)
             lineConnector.Rebuild();
 
-        FocusOnCurrentNode();
+        // 씬 진입/재진입 시 Start 노드를 항상 동일한 뷰포트 위치에 고정.
+        // CurrentPointId 기준 포커스를 쓰면 재진입마다 "시작 노드"가 화면에서 다른 자리에 보여서
+        // 위치가 바뀐 것처럼 느껴지는 문제가 있음.
+        FocusOnStartNode();
     }
 
     /// <summary>동적 층 수에 맞게 콘텐츠 크기 조정. 배경은 타일링으로 채움.</summary>
@@ -106,6 +109,32 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 
         if (points.Length > 0)
             FocusOn(points[0].GetComponent<RectTransform>());
+    }
+
+    /// <summary>Start 노드로 포커스. 없으면 첫 노드로 폴백.
+    /// 씬 (재)진입 시 Start가 항상 같은 뷰포트 위치에 보이도록 할 때 사용.
+    /// @UIRoot가 DDOL이라 content.localScale/anchoredPosition이 이전 씬에서
+    /// 남아있을 수 있어, 포커스 직전 scale=1/velocity=0으로 강제 리셋한다.</summary>
+    public void FocusOnStartNode()
+    {
+        if (_contentRT == null) return;
+
+        var points = _contentRT.GetComponentsInChildren<StagePointUI>(true);
+        if (points.Length == 0) return;
+
+        _contentRT.localScale = Vector3.one;
+        _velocity = Vector2.zero;
+
+        foreach (var p in points)
+        {
+            if (p.StageCategoryValue == StageCategory.Start)
+            {
+                FocusOn(p.GetComponent<RectTransform>());
+                return;
+            }
+        }
+
+        FocusOn(points[0].GetComponent<RectTransform>());
     }
 
     private void Update()

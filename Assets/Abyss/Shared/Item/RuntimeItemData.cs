@@ -49,6 +49,7 @@ public class RuntimeItemData
                 effectType = mod.Type.ToString(),
                 trigger    = "Always",
                 value      = mod.Value,
+                vfxKey     = so.effectVfxKey,
             });
         }
 
@@ -74,15 +75,17 @@ public class RuntimeItemData
             cooldown    = meta.cooldown,
         };
 
-        // CSV rarity 파싱 (값이 있으면 적용)
-        bool hasCSVRarity = !string.IsNullOrEmpty(meta.rarity);
+        // CSV rarity/grade 파싱 (값이 있으면 적용)
+        var resolvedRarity = meta.ResolvedRarity;
+        bool hasCSVRarity = !string.IsNullOrEmpty(resolvedRarity);
         if (hasCSVRarity)
         {
-            data.rarity = meta.rarity switch
+            data.rarity = resolvedRarity switch
             {
-                "Rare" => ItemRarity.Rare,
-                "Epic" => ItemRarity.Epic,
-                _      => ItemRarity.Common,
+                "Rare"      => ItemRarity.Rare,
+                "Epic"      => ItemRarity.Epic,
+                "Legendary" => ItemRarity.Legendary,
+                _           => ItemRarity.Common,
             };
         }
 
@@ -119,7 +122,8 @@ public class RuntimeItemData
                 data.shapeId = so.shapeId;
         }
 
-        // 효과 슬롯
+        // 효과 슬롯 — ItemSO의 VFX 키를 각 슬롯에 주입 (SO override)
+        string soVfxKey = so?.effectVfxKey;
         foreach (var e in entries)
         {
             if (string.IsNullOrEmpty(e.effect_type)) continue;
@@ -133,6 +137,7 @@ public class RuntimeItemData
                 value3     = e.value3,
                 maxStack   = e.max_stack,
                 duration   = e.duration,
+                vfxKey     = soVfxKey,
             });
         }
 
@@ -157,4 +162,10 @@ public class ItemEffectSlot
     public float  value3;
     public int    maxStack;
     public float  duration;
+
+    /// <summary>
+    /// 이 슬롯의 VFX Addressable 키. 빈 값이면 Effect 클래스의 기본 키 사용.
+    /// ItemSO.effectVfxKey에서 RuntimeItemData 생성 시 복사됨.
+    /// </summary>
+    public string vfxKey;
 }

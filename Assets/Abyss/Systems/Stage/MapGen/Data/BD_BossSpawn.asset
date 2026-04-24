@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: BD_BossSpawn
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
   prefab: {fileID: 5040475063202128142, guid: 38333e7c30def2648a5247f197644d3b, type: 3}
-  tileType: 5
+  tileType: 6
   facingRule: 0
   weight: 1

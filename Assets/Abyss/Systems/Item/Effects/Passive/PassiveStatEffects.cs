@@ -156,3 +156,33 @@ public sealed class DebuffDurationEffect : ItemEffectBase
     public DebuffDurationEffect(ItemEffectSlot s) : base(s) { }
     public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.DebuffDuration += _value;
 }
+
+public sealed class GoldGainEffect : ItemEffectBase
+{
+    public GoldGainEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.GoldGainRate += _value;
+}
+
+public sealed class ShopRoomChanceEffect : ItemEffectBase
+{
+    public ShopRoomChanceEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.ShopRoomChance += _value;
+}
+
+public sealed class SkillDamageEffect : ItemEffectBase
+{
+    public SkillDamageEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.SkillDamagePercent += _value;
+}
+
+public sealed class ProjectilePierceEffect : ItemEffectBase
+{
+    public ProjectilePierceEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.ProjectilePierceBonus += (int)_value;
+}
+
+public sealed class ProjectileCountEffect : ItemEffectBase
+{
+    public ProjectileCountEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.ProjectileCountBonus += (int)_value;
+}

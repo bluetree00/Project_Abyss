@@ -174,6 +174,18 @@ public sealed class PlayerRuntimeStats
         SetHp(Hp + amount);
     }
 
+    /// <summary>
+    /// 최대 체력 영구 감소. 현재 HP가 새 MaxHP를 초과하면 같이 내려간다.
+    /// MaxHp는 최소 1로 클램프.
+    /// </summary>
+    public void DecreaseMaxHp(int amount)
+    {
+        if (amount <= 0) return;
+        MaxHp = Mathf.Max(1, MaxHp - amount);
+        if (Hp > MaxHp) Hp = MaxHp;
+        OnChanged?.Invoke();
+    }
+
     public void SetHeavyChargeThreshold(float value)
     {
         value = Mathf.Max(0f, value);

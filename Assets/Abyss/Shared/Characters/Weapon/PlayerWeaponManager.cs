@@ -225,7 +225,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (setActive)
             await SetCurrentSlotInternalAsync(slotIndex);
 
-        Debug.Log($"Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive})");
+        Debug.Log($"[WeaponManager] Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive}) | Elem={runtimeData.element} | Amt(B/H/A)={runtimeData.elementAmountBasic}/{runtimeData.elementAmountHeavy}/{runtimeData.elementAmountAir}");
     }
 
     // ----------------------
@@ -520,8 +520,15 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         data.chargeStages  = entry.charge_stages;
         data.groundEndCount = entry.ground_combo_count;
         data.airEndCount   = entry.air_combo_count;
+        data.critChance    = entry.crit_chance;
+        data.critDamage    = entry.crit_damage > 0f ? entry.crit_damage : 1.25f;
 
-        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} (ATK:{entry.base_attack}, SPD:{entry.attack_speed})");
+        data.element             = WeaponData.ParseElementPublic(entry);
+        data.elementAmountBasic  = entry.element_amount_basic;
+        data.elementAmountHeavy  = entry.element_amount_heavy;
+        data.elementAmountAir    = entry.element_amount_air;
+
+        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} | ATK={entry.base_attack} SPD={entry.attack_speed} | Elem={data.element} | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
     }
 
     // ----------------------

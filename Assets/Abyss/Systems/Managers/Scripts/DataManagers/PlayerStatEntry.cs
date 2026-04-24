@@ -76,6 +76,7 @@ public class EquipmentEntry
     public float  base_attack;
     public float  base_defense;
     public float  crit_chance;      // 치명타 확률 (%, 0~100)
+    public float  crit_damage;      // 치명타 발생 시 데미지 배율 (1.0 = 기본 데미지, 1.25 = +25%, 2.0 = 2배)
     public float  attack_speed;
     public float  attack_range;
     public float  area_of_effect;

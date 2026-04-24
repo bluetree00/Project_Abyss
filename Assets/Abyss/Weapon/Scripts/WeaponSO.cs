@@ -19,6 +19,10 @@ public class WeaponSO : ScriptableObject
     public float attackRange = 1f;    // 공격 사거리 (m)
     public float areaOfEffect = 1f;   // 공격 범위 (m)
 
+    [Header("치명타")]
+    public float critChance = 25f;    // % (0~100)
+    public float critDamage = 1.25f;  // 배율 (1.25 = +25%)
+
     [Header("콤보 정보")]
     public int groundEndCount;
     public int airEndCount;

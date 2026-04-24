@@ -1,16 +1,37 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// grid_csv 문자열 ↔ TileType[,] 변환.
 /// 행 구분: ;(세미콜론)  열 구분: ,(쉼마)
 ///
-/// 예: "W,W,W;W,F,W;W,W,W"
-///   → 3×3 그리드, 가운데만 Floor
+/// 기본 타일: F/W/O/P/B/S/N/E/X/T/C/./R/D (단일 문자)
+/// 스포너 토큰: [Mm][cre]\d+  (예: Mc3, mr5, Me8)
+///   - 첫 글자: M=확정, m=후보
+///   - 두 번째:  c=Common, r=Rare, e=Elite (등급 상한)
+///   - 나머지:   마릿수 (0=무제한)
+/// 장식 토큰: d<code> (예: dt=Big Tree, dp=Small Tree, df=Fog, dl=Leaves, dm=Magic Lights)
+///   - 파싱 시 TileType은 Floor로 기록되고 decorationInfos[cell] = "<code>" 저장
+///   - 실제 장식 오브젝트는 Bootstrapper가 DecorationCatalog를 통해 후처리 스폰
+/// 단독 "M" = "Mc0" 별칭 (하위호환).
 /// </summary>
 public static class MapDataLoader
 {
-    /// <summary>grid_csv → TileType 2D 배열. 좌하단이 (0,0).</summary>
-    public static TileType[,] Parse(string gridCsv)
+    /// <summary>스포너 타일의 부가 메타. grid_csv 셀 토큰에서 파싱.</summary>
+    public struct CellSpawnInfo
+    {
+        public MonsterGrade maxGrade;
+        public int totalCount; // 0 = 무제한
+    }
+
+    /// <summary>grid_csv → TileType 2D 배열. 좌하단이 (0,0).
+    /// spawnInfos에 스포너 셀(M/m 계열)의 메타 정보가 채워진다.
+    /// decorationInfos에 장식 셀(d&lt;code&gt;)의 code 문자열이 채워진다.
+    /// 장식 셀의 TileType은 Floor로 기록 — MapBuilder는 바닥만 깔고, 장식은 Bootstrapper가 후처리.</summary>
+    public static TileType[,] Parse(
+        string gridCsv,
+        Dictionary<Vector2Int, CellSpawnInfo> spawnInfos = null,
+        Dictionary<Vector2Int, string> decorationInfos = null)
     {
         if (string.IsNullOrWhiteSpace(gridCsv))
             return null;
@@ -27,11 +48,31 @@ public static class MapDataLoader
             int rowZ = h - 1 - z; // csv 첫 줄 = 맨 윗줄 → z 반전
 
             for (int x = 0; x < Mathf.Min(cells.Length, w); x++)
-                grid[x, rowZ] = SymbolToTile(cells[x].Trim());
+            {
+                string raw = cells[x].Trim();
+
+                // 장식 토큰 d<code> — Floor로 기록 후 별도 dictionary에 code 저장
+                if (decorationInfos != null && raw.Length >= 2 && raw[0] == 'd' && !IsBaseDecorationSymbol(raw))
+                {
+                    decorationInfos[new Vector2Int(x, rowZ)] = raw.Substring(1);
+                    grid[x, rowZ] = TileType.Floor;
+                    continue;
+                }
+
+                var tile = SymbolToTile(raw, out var info);
+                grid[x, rowZ] = tile;
+
+                if (spawnInfos != null &&
+                    (tile == TileType.MonsterSpawn || tile == TileType.MonsterSpawnCandidate))
+                    spawnInfos[new Vector2Int(x, rowZ)] = info;
+            }
         }
 
         return grid;
     }
+
+    /// <summary>단독 "d" 같이 base 기호와 충돌하는 케이스를 걸러냄. 현재 base 기호에 소문자 d는 없어 항상 false.</summary>
+    private static bool IsBaseDecorationSymbol(string s) => false;
 
     /// <summary>TileType 2D 배열 → grid_csv 문자열.</summary>
     public static string Serialize(TileType[,] grid)
@@ -115,25 +156,78 @@ public static class MapDataLoader
 
     // ── 기호 ↔ TileType 변환 ──────────────────────
 
-    private static TileType SymbolToTile(string s) => s switch
+    /// <summary>셀 문자열을 TileType + (스포너 셀일 경우) CellSpawnInfo로 변환.</summary>
+    private static TileType SymbolToTile(string s, out CellSpawnInfo info)
     {
-        "F" => TileType.Floor,
-        "W" => TileType.Wall,
-        "O" => TileType.Obstacle,
-        "M" => TileType.MonsterSpawn,
-        "P" => TileType.PlayerSpawn,
-        "B" => TileType.BossSpawn,
-        "S" => TileType.ShopStall,
-        "N" => TileType.NPCSpawn,
-        "E" => TileType.Entrance,
-        "X" => TileType.Exit,
-        "T" => TileType.Trap,
-        "C" => TileType.Chest,
-        "." => TileType.Empty,
-        "R" => TileType.BuffBox,
-        "D" => TileType.BuffPedestal,
-        _   => TileType.Floor,
-    };
+        info = default;
+        if (string.IsNullOrEmpty(s)) return TileType.Floor;
+
+        // 스포너 토큰 [Mm][cre]?\d*  — 단독 "M" = "Mc0" 별칭
+        if (s.Length >= 1 && (s[0] == 'M' || s[0] == 'm'))
+        {
+            if (TryParseSpawnerToken(s, out var tile, out info))
+                return tile;
+        }
+
+        return s switch
+        {
+            "F" => TileType.Floor,
+            "W" => TileType.Wall,
+            "O" => TileType.Obstacle,
+            "P" => TileType.PlayerSpawn,
+            "B" => TileType.BossSpawn,
+            "S" => TileType.ShopStall,
+            "N" => TileType.NPCSpawn,
+            "E" => TileType.Entrance,
+            "X" => TileType.Exit,
+            "T" => TileType.Trap,
+            "C" => TileType.Chest,
+            "." => TileType.Empty,
+            "R" => TileType.BuffBox,
+            "D" => TileType.BuffPedestal,
+            _   => TileType.Floor,
+        };
+    }
+
+    /// <summary>[Mm][cre]?\d* 토큰 파싱. 실패 시 false. 단독 M/m은 Common + count 0(무제한).</summary>
+    private static bool TryParseSpawnerToken(string s, out TileType tile, out CellSpawnInfo info)
+    {
+        tile = default;
+        info = default;
+        if (s.Length == 0) return false;
+
+        bool isCandidate = s[0] == 'm';
+        if (!isCandidate && s[0] != 'M') return false;
+
+        // 단독 M/m → Mc0 / mc0 별칭
+        if (s.Length == 1)
+        {
+            info = new CellSpawnInfo { maxGrade = MonsterGrade.Common, totalCount = 0 };
+            tile = isCandidate ? TileType.MonsterSpawnCandidate : TileType.MonsterSpawn;
+            return true;
+        }
+
+        MonsterGrade grade;
+        switch (s[1])
+        {
+            case 'c': case 'C': grade = MonsterGrade.Common; break;
+            case 'r': case 'R': grade = MonsterGrade.Rare;   break;
+            case 'e': case 'E': grade = MonsterGrade.Elite;  break;
+            default: return false;
+        }
+
+        int count = 0;
+        for (int i = 2; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c < '0' || c > '9') return false;
+            count = count * 10 + (c - '0');
+        }
+
+        info = new CellSpawnInfo { maxGrade = grade, totalCount = count };
+        tile = isCandidate ? TileType.MonsterSpawnCandidate : TileType.MonsterSpawn;
+        return true;
+    }
 
     private static string TileToSymbol(TileType t) => t switch
     {

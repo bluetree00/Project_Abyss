@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 4083062266879023044}
   - component: {fileID: 1639276695310854976}
   - component: {fileID: 8021281636087948607}
+  - component: {fileID: 3940304952463568678}
   m_Layer: 0
   m_Name: Slime
   m_TagString: Untagged
@@ -33,7 +34,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 4311451937160107959}
+  - {fileID: 8622666088390017674}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5647161401065319890
@@ -121,7 +122,22 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
---- !u!1001 &2989428164939048479
+--- !u!114 &3940304952463568678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5103102461142805445}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0e9e334564d5e47b9a97b702a469ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VictimHitFeedback
+  _profile: {fileID: 11400000, guid: 6a65ea15409581f44b3b56761bdab774, type: 2}
+  _explicitRenderers: []
+  _pulseLight: {fileID: 0}
+--- !u!1001 &1663579268327678148
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -129,91 +145,69 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5126650643118974913}
     m_Modifications:
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6969136263848371978, guid: 13b61134d0a3411ebea69a98547f2559,
+        type: 3}
+      propertyPath: m_Name
+      value: SlimePAMaskTint
+      objectReference: {fileID: 0}
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalRotation.w
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+    - target: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 5963655101086539573, guid: 828b58872868f9b4292e49d2befaa94d,
-        type: 3}
-      propertyPath: m_Name
-      value: NormalSlimeFSM
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 5963655101086539573, guid: 828b58872868f9b4292e49d2befaa94d,
-        type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8694442584110886365}
-  m_SourcePrefab: {fileID: 100100000, guid: 828b58872868f9b4292e49d2befaa94d, type: 3}
---- !u!4 &4311451937160107959 stripped
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 13b61134d0a3411ebea69a98547f2559, type: 3}
+--- !u!4 &8622666088390017674 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: 1344834259783020968, guid: 828b58872868f9b4292e49d2befaa94d,
+  m_CorrespondingSourceObject: {fileID: 6971543191592591950, guid: 13b61134d0a3411ebea69a98547f2559,
     type: 3}
-  m_PrefabInstance: {fileID: 2989428164939048479}
+  m_PrefabInstance: {fileID: 1663579268327678148}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &8917054301361731882 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5963655101086539573, guid: 828b58872868f9b4292e49d2befaa94d,
-    type: 3}
-  m_PrefabInstance: {fileID: 2989428164939048479}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &8694442584110886365
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8917054301361731882}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: de75a8c02625a2244ab91e9a7844500d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LeeMonsterAnimEventReceiver

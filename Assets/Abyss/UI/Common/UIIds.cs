@@ -85,7 +85,8 @@ public static class UIIds
         LoadingBlocker = 20,
         CutsceneBars = 30,
         ScreenMessage = 40,
-        TutorialBlocker = 50
+        TutorialBlocker = 50,
+        FXLayer = 60,        // Phase 4 — HitFx UI Layer (Flash / Zoom-Line / Damage Vignette)
     }
 
     // ---------------------------------------------------------
