@@ -15,13 +15,13 @@ MonoBehaviour:
   m_GroupName: Monsters
   m_GUID: 12bf64871dac4db4f9561b3ca9ee2e40
   m_SerializeEntries:
-  - m_GUID: 5ea57571c64f89147a52103bb579cff9
-    m_Address: BlackKnight/BlackKnight
+  - m_GUID: 4590cad17e23b5944a25be813b758007
+    m_Address: MonsterBase
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fb86e93ed90b470f922e65147d6981c0
-    m_Address: BlackKnight/BlackKnightController
+  - m_GUID: 5ea57571c64f89147a52103bb579cff9
+    m_Address: BlackKnight/BlackKnight
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

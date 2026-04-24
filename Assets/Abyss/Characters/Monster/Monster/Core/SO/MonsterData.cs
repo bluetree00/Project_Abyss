@@ -84,22 +84,14 @@ public class MonsterCombatData
 [Serializable]
 public class MonsterAnimationData
 {
-    [Header("Animator Controller")]
-    [Tooltip("Addressables 에 등록된 AnimatorOverrideController 주소.\n" +
-             "비어있으면 프리팹 Animator 에 붙은 Controller 를 그대로 사용.")]
-    public string animatorControllerAddress;
-
-    [Header("CrossFade 상태 이름")]
-    public string idleStateName        = "Idle_Normal";
-    public string patrolStateName      = "MoveBlend";
-    public string chaseStateName       = "MoveBlend";
+    [Header("상태 이름 (공용 Base Controller 기준 — 프리팹 Animator에 직접 세팅)")]
+    public string idleStateName        = "Idle";
+    public string patrolStateName      = "Walk";
+    public string chaseStateName       = "Run";
     public string attackReadyStateName = "AttackReady";
-
-    [Header("Trigger 파라미터 이름")]
-    public string attackTrigger  = "Attack01";
-    public string getHitTrigger  = "GetHit";
-    public string dieTrigger     = "Die";
-    public string detectTrigger  = "SenseSomething";
+    public string attackStateName      = "Attack";
+    public string getHitStateName      = "GetHit";
+    public string dieStateName         = "Die";
 
     [Header("블렌드 파라미터")]
     [Tooltip("이동 속도 Float 파라미터. 사용 안 하면 비워두기.")]

@@ -172,7 +172,7 @@ public class DragonMonster : MonsterBase
             ctx.Runtime.AttackHitDealt = false;
             FacePlayer(ctx, 100f);
 
-            var attackAnim = _useRangedAttack ? _owner._rangedAttackAnim : ctx.Animation.attackTrigger;
+            var attackAnim = _useRangedAttack ? _owner._rangedAttackAnim : ctx.Animation.attackStateName;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
             ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
         }

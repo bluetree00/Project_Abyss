@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: 
-    idleStateName: Cactus_IdlePlant
-    patrolStateName: Cactus_WalkFWD
-    chaseStateName: Cactus_RunFWD
-    attackReadyStateName: Cactus_IdleBattle
-    attackTrigger: Cactus_Attack01
-    getHitTrigger: Cactus_GetHit
-    dieTrigger: Cactus_Die
-    detectTrigger: Cactus_IdlePlantToBattle
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

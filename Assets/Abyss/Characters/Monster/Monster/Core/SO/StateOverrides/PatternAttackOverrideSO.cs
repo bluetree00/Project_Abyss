@@ -51,6 +51,10 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public float proceduralBeamLength = 3f;
         public float proceduralBeamWidth = 0.16f;
         public Color proceduralBeamColor = new Color(1f, 0.2f, 0.2f, 0.95f);
+
+        [Header("Debuff (Optional)")]
+        public float slowScale;
+        public float slowDuration;
     }
 
     [Tooltip("Ordered list of attack patterns. Highest priority among valid patterns wins.")]
@@ -162,7 +166,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         var animator = ctx.Animator;
         string key = stateName;
         if (string.IsNullOrEmpty(key))
-            key = ctx.Animation.attackTrigger;
+            key = ctx.Animation.attackStateName;
         if (string.IsNullOrEmpty(key))
             return;
 
@@ -170,21 +174,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         float fadeDuration = Mathf.Max(0.08f, ctx.Animation.crossFadeDuration);
 
         if (animator.HasState(0, Animator.StringToHash(key)))
-        {
             animator.CrossFade(key, fadeDuration);
-            return;
-        }
-
-        var parameters = animator.parameters;
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            var p = parameters[i];
-            if (p.type == AnimatorControllerParameterType.Trigger && p.name == key)
-            {
-                animator.SetTrigger(key);
-                return;
-            }
-        }
     }
 
     private static void ExecutePatternAttack(MonsterContext ctx, AttackPattern pattern)
@@ -198,7 +188,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         if (!(shape is MonsterRangedAttackSO))
         {
             var gridShape = ResolveWarningShape(pattern, shape);
-            if (TryExecuteGridHit(ctx, gridShape, damage, knockback))
+            if (TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration))
                 return;
         }
 
@@ -217,6 +207,8 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         if (player == null) return;
 
         player.TakeDamage(damage);
+        if (pattern.slowDuration > 0f)
+            player.ApplySlow(pattern.slowScale, pattern.slowDuration);
 
         Vector3 dir = (ctx.Runtime.PlayerTarget.position - ctx.Transform.position).normalized;
         dir.y = 0.3f;
@@ -227,7 +219,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         MonsterContext ctx,
         MonsterGroundWarning.GridShape shape,
         int damage,
-        float knockback)
+        float knockback,
+        float slowScale = 0f,
+        float slowDuration = 0f)
     {
         if (ctx.Runtime?.PlayerTarget == null) return false;
 
@@ -239,6 +233,8 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         if (player == null) return false;
 
         player.TakeDamage(damage);
+        if (slowDuration > 0f)
+            player.ApplySlow(slowScale, slowDuration);
         Vector3 dir = (target.position - ctx.Transform.position).normalized;
         dir.y = 0.3f;
         player.ApplyKnockback(dir.normalized * knockback);
@@ -657,7 +653,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _castVfxInstance = SpawnPatternVfx(ctx, _pattern);
 
             string animState = string.IsNullOrEmpty(_pattern.animationStateName)
-                ? ctx.Animation.attackTrigger
+                ? ctx.Animation.attackStateName
                 : _pattern.animationStateName;
             PlayAttackAnimation(ctx, animState);
         }
