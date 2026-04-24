@@ -147,6 +147,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _agent.speed            = _config.stat.moveSpeed;
         _agent.stoppingDistance = _config.stat.attackRange;
 
+        // Agent 를 가장 가까운 NavMesh 로 스냅. baseOffset=0 + voxel 오차로
+        // isOnNavMesh=false 로 시작하는 경우를 방지한다. SamplePosition 기반 재시도.
+        TrySnapAgentToNavMesh();
+
         // NavMeshAgent가 위치를 제어하므로 Rigidbody는 kinematic 유지
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
@@ -591,7 +595,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.AttackMultiplier    = 1f;
         _runtime.DamageMultiplier    = 1f;
 
-        if (_agent != null) _agent.enabled = true;
+        if (_agent != null)
+        {
+            _agent.enabled = true;
+            TrySnapAgentToNavMesh();
+        }
 
         if (_rb != null)
         {
@@ -672,6 +680,24 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             _hpBar = null;
         }
         _hpBarRequesting = false;
+    }
+
+    /// <summary>
+    /// Agent 를 가장 가까운 NavMesh 위치로 스냅한다.
+    /// 직접 Warp(transform.position) 이 NavMesh 와의 미세 오프셋으로 실패하는 경우를
+    /// 대비해 NavMesh.SamplePosition 으로 5m 반경 nearest 포인트를 찾아 Warp 한다.
+    /// </summary>
+    protected bool TrySnapAgentToNavMesh()
+    {
+        if (_agent == null || !_agent.enabled) return false;
+        if (_agent.isOnNavMesh) return true;
+
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
+        {
+            _agent.Warp(hit.position);
+            return _agent.isOnNavMesh;
+        }
+        return false;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
