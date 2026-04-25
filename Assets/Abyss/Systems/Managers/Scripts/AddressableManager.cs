@@ -129,6 +129,48 @@ public sealed class AddressableManager
     }
 
     /// <summary>
+    /// ✅ 안전 로드: 키가 Addressable 카탈로그에 없거나 로드 실패해도 예외를 던지지 않고 null을 반환.
+    /// (Addressables는 존재하지 않는 키에 대해 InvalidKeyException을 LogException까지 해버리므로
+    ///  위치 존재 여부를 LoadResourceLocationsAsync로 먼저 확인한다.)
+    /// </summary>
+    public async UniTask<T> TryLoadAssetAsync<T>(string key) where T : UnityEngine.Object
+    {
+        if (string.IsNullOrEmpty(key)) return null;
+
+        await EnsureInitializedAsync();
+
+        string cacheKey = MakeAssetCacheKey<T>(key);
+
+        if (_assetHandles.TryGetValue(cacheKey, out var existing))
+        {
+            if (existing.IsValid() && existing.Result is T cached)
+                return cached;
+
+            _assetHandles.Remove(cacheKey);
+            UpdateDebugList();
+        }
+
+        // 키 존재 사전 체크 — 없으면 빈 결과, 예외/로그 없음
+        var locHandle = Addressables.LoadResourceLocationsAsync(key, typeof(T));
+        await locHandle.ToUniTask();
+        bool exists = locHandle.Status == AsyncOperationStatus.Succeeded
+                      && locHandle.Result != null && locHandle.Result.Count > 0;
+        Addressables.Release(locHandle);
+
+        if (!exists) return null;
+
+        var handle = Addressables.LoadAssetAsync<T>(key);
+        await handle.ToUniTask();
+
+        if (handle.Status != AsyncOperationStatus.Succeeded)
+            return null;
+
+        _assetHandles[cacheKey] = handle;
+        UpdateDebugList();
+        return handle.Result;
+    }
+
+    /// <summary>
     /// (선택) 명시 로드: 캐릭터 데이터
     /// </summary>
     public UniTask<CharacterData> LoadCharacterDataAsync(string dataKey)

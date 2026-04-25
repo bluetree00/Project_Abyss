@@ -157,6 +157,7 @@ public class ItemDataManager
                 passive_id   = row.TryGetString("passive_id"),
                 item_name    = row.TryGetString("item_name"),
                 rarity       = row.TryGetString("rarity"),
+                grade        = row.TryGetString("grade"),
                 category     = row.TryGetString("category"),
                 slot         = row.TryGetInt("slot"),
                 effect_type  = row.TryGetString("effect_type"),

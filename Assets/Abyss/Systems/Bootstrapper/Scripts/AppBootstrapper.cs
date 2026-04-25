@@ -42,6 +42,10 @@ public sealed class AppBootstrapper : MonoBehaviour
     [Header("Auto Login (Device ID)")]
     [SerializeField] private bool useAutoLogin = true;
 
+    [Header("Element Palette (원소별 쉐이더 수치 전역 설정)")]
+    [Tooltip("모든 몬스터가 공유하는 원소 팔레트. 비워두면 ElementNativePalette 내장 기본값 사용.")]
+    [SerializeField] private ElementPaletteSO elementPalette;
+
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
@@ -127,6 +131,10 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // 첫 몬스터 스폰(및 프리워밍) 이전에 원소 팔레트 주입 — Addressable 로드 비용 없이 Inspector 참조.
+        if (elementPalette != null)
+            ElementNativePalette.SetPaletteSO(elementPalette);
 
         if (initBackend && !IsBackendInitialized)
         {

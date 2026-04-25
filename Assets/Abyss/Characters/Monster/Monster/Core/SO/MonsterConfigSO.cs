@@ -32,6 +32,7 @@ public class MonsterConfigSO : ScriptableObject
     public MonsterCombatData    combat    = new MonsterCombatData();
     public MonsterAnimationData animation = new MonsterAnimationData();
     public MonsterElementalData elemental = new MonsterElementalData();
+    public MonsterDropData      drop      = new MonsterDropData();
 
     // ── 특수 상태 ─────────────────────────────────────────
     [Header("특수 상태 (조건 + 상태 SO 쌍으로 구성)")]

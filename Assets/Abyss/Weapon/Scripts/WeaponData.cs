@@ -27,6 +27,10 @@ public class WeaponData
     public float areaOfEffect;
     public float holdThreshold;
 
+    // ── 치명타 ───────────────────────────────────────────────────────
+    public float critChance = 25f;   // % 단위 (0~100)
+    public float critDamage = 1.25f; // 배율 (1.25 = +25%)
+
     public int tier = 1;
 
     public PromoteMode promoteMode;
@@ -39,6 +43,11 @@ public class WeaponData
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
     public WeaponElement element = WeaponElement.None;
+
+    // ── 원소 누적치 부여량 ───────────────────────────────────────────
+    public float elementAmountBasic = 0f;
+    public float elementAmountHeavy = 0f;
+    public float elementAmountAir   = 0f;
 
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
@@ -68,6 +77,8 @@ public class WeaponData
         attackRange      = so.attackRange;
         areaOfEffect     = so.areaOfEffect;
         holdThreshold    = so.holdThreshold;
+        critChance       = so.critChance;
+        critDamage       = so.critDamage > 0f ? so.critDamage : 1.25f;
         tier             = so.tier;
 
         promoteMode  = so.promoteMode;
@@ -110,19 +121,25 @@ public class WeaponData
             attackRange      = entry.attack_range,
             areaOfEffect     = entry.area_of_effect,
             holdThreshold    = entry.hold_threshold,
+            critChance       = entry.crit_chance,
+            critDamage       = entry.crit_damage > 0f ? entry.crit_damage : 1.25f,
             tier             = entry.tier,
             promoteMode      = ParsePromoteMode(entry.promote_mode),
             chargeStages     = entry.charge_stages,
             groundEndCount   = entry.ground_combo_count,
             airEndCount      = entry.air_combo_count,
-            weaponType       = ParseWeaponType(entry.weapon_type),
-            element          = ParseElement(entry),
+            weaponType           = ParseWeaponType(entry.weapon_type),
+            element              = ParseElement(entry),
+            elementAmountBasic   = entry.element_amount_basic,
+            elementAmountHeavy   = entry.element_amount_heavy,
+            elementAmountAir     = entry.element_amount_air,
             // SO 참조는 null — WeaponSO에서 바인딩하거나 Addressables로 로드
             animationSet     = null,
             abilitySet       = null,
             skillQ           = null,
             skillE           = null,
         };
+        UnityEngine.Debug.Log($"[WeaponData.FromServer] {entry.weapon_id} ({entry.weapon_name}) | Elem={data.element} (raw='{entry.element}') | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
         return data;
     }
 
@@ -135,6 +152,8 @@ public class WeaponData
         "ChargeFull" => PromoteMode.ChargeFull,
         _            => PromoteMode.None,
     };
+
+    public static WeaponElement ParseElementPublic(EquipmentEntry entry) => ParseElement(entry);
 
     private static WeaponElement ParseElement(EquipmentEntry entry)
     {

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 18857b064544b3b43950f849c90e8c00
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 167725
+  packageName: AZURE Nature
+  packageVersion: 1.2.0
+  assetPath: Assets/Raygeas/AZURE Nature/Assets/Terrain Layers/Summer/AN_Sum_Ground_2.terrainlayer
+  uploadId: 821202

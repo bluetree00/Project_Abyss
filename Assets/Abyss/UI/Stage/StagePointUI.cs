@@ -11,6 +11,10 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     [SerializeField] private StageCategory stageCategory;
     [SerializeField] private List<int> nextPointIds = new();
 
+    [Header("Layer Meta (동적 생성 시 Generator가 주입)")]
+    [SerializeField] private int layerIndex = -1;
+    [SerializeField] private int indexInLayer = -1;
+
     [Header("Normal 노드 룸 카테고리(Inspector에서 결정)")]
     [SerializeField] private NormalRoomCategory normalRoomCategory = NormalRoomCategory.Battle;
 
@@ -35,6 +39,8 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     public IReadOnlyList<int> NextPointIds => nextPointIds;
     public StageCategory StageCategoryValue => stageCategory;
     public NormalRoomCategory NormalRoomCategoryValue => normalRoomCategory;
+    public int LayerIndex => layerIndex;
+    public int IndexInLayer => indexInLayer;
 
     private StagePointManager _mgr;
     private RoomManager _roomMgr;
@@ -67,6 +73,13 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
         normalRoomCategory = normal;
         nextPointIds = new List<int>();
         if (iconMapRef != null) iconMap = iconMapRef;
+    }
+
+    /// <summary>Generator가 만든 레이어 메타데이터 주입. Layout이 X/Y 배치 시 사용.</summary>
+    public void SetLayerMeta(int layerIdx, int indexInLyr)
+    {
+        layerIndex = layerIdx;
+        indexInLayer = indexInLyr;
     }
 
     /// <summary>동적 생성 시 다음 노드 연결 추가.</summary>

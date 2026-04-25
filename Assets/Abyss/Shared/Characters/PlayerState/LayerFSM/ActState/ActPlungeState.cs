@@ -57,7 +57,6 @@ public class ActPlungeState : ILayerState<ActState>
 
         _controller.Anim.CrossFade(clip, 0.1f);
         _prepStateHash = Animator.StringToHash(clip);
-        _controller.BeginWeaponTrail();
 
         // descendAt == 0이면 즉시 하강, 아니면 Update()에서 폴링 후 하강
         if (_plungeDescendAt <= 0f)
@@ -114,7 +113,6 @@ public class ActPlungeState : ILayerState<ActState>
         _controller.StopHorizontalMovement();
         _controller.Anim.CrossFade("PlungeLand", 0.05f);
         _controller.OnAttackHitStep(0);
-        _controller.EndWeaponTrail();
 
         Debug.Log("[ActPlungeState] 착지 — PlungeLand 재생");
     }
@@ -122,7 +120,6 @@ public class ActPlungeState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
-        _controller.EndWeaponTrail();
         _controller.SetMoveScale(1f);
 
         _controller.ActiveExecution = null;

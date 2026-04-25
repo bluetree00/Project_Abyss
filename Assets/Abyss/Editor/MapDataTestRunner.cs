@@ -132,8 +132,9 @@ public static class MapDataTestRunner
         var blocks = MapBuilder.Build(grid, palette, mapRoot, cellSize: 1f, baseY: 0f);
         Debug.Log($"[MapDataTest] {blocks.Count}개 블록 생성 완료. 연출 시작...");
 
-        // 7. Scatter → Return 연출
-        await MapPresenter.PlayEntrance(blocks, room.scatter_range, room.return_duration);
+        // 7. 등장 연출 (entrance 필드로 스타일 분기)
+        var entrance = MapEntranceRegistry.Resolve(room.entrance);
+        await entrance.PlayAsync(blocks, new MapEntranceContext(room), default);
 
         // 8. 투명 바닥 제거
         Object.Destroy(safeFloor);

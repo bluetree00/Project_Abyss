@@ -37,7 +37,8 @@ public sealed class StagePointManager
     {
         if (_contexts.ContainsKey(pointId))
         {
-            Debug.LogWarning($"[StagePointManager] Duplicate pointId: {pointId}");
+            // 재진입 시(StageMap ↔ GameScene 왕복) 동일 그래프로 UI만 재생성되는 정상 케이스.
+            // 기존 컨텍스트를 그대로 반환해 방문 기록·Resolve 결과를 유지한다.
             return _contexts[pointId];
         }
 

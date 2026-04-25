@@ -132,6 +132,7 @@ public class ServerEquipmentDataManager
                 base_attack       = row.TryGetFloat("base_attack"),
                 base_defense      = row.TryGetFloat("base_defense"),
                 crit_chance       = row.TryGetFloat("crit_chance"),
+                crit_damage       = row.TryGetFloat("crit_damage"),
                 attack_speed      = row.TryGetFloat("attack_speed"),
                 attack_range      = row.TryGetFloat("attack_range"),
                 area_of_effect    = row.TryGetFloat("area_of_effect"),

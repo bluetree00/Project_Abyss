@@ -125,6 +125,17 @@ public class PlayerController : CharacterBase
         RuntimeStats.Heal(amount);
     }
 
+    /// <summary>외부에서 일시 무적 상태로 설정. 기존 무적이 남아있으면 더 긴 쪽을 유지.
+    /// 사용처: 낙사 리스폰(FallRecoveryController), 부활 아이템 등.</summary>
+    public void SetInvincible(float duration)
+    {
+        if (duration <= 0f) return;
+        _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + duration);
+    }
+
+    /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
+    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
     //============================================================
@@ -984,8 +995,6 @@ public class PlayerController : CharacterBase
         receiver.OnHitStep    += Safe_OnHitStep;
         receiver.OnGenericTag += Safe_GenericTag;
         receiver.OnEffectStep += safe_EffectStep;
-        receiver.OnBeginTrail += Safe_BeginTrail;
-        receiver.OnEndTrail   += Safe_EndTrail;
 
         _aeSubscribed = true;
     }
@@ -998,8 +1007,6 @@ public class PlayerController : CharacterBase
         receiver.OnHitStep    -= Safe_OnHitStep;
         receiver.OnGenericTag -= Safe_GenericTag;
         receiver.OnEffectStep -= safe_EffectStep;
-        receiver.OnBeginTrail -= Safe_BeginTrail;
-        receiver.OnEndTrail   -= Safe_EndTrail;
 
         _aeSubscribed = false;
     }
@@ -1055,105 +1062,4 @@ public class PlayerController : CharacterBase
             _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step, ActiveExecution);
     }
 
-    /// <summary>공격 state에서 직접 호출 (AnimationEvent 불필요)</summary>
-    public void BeginWeaponTrail() => Safe_BeginTrail();
-    public void EndWeaponTrail()   => Safe_EndTrail();
-
-    private void Safe_BeginTrail()
-    {
-        if (WeaponManager == null) return;
-        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
-        if (wi == null || wi.TrailDetector == null) return;
-
-        float damage = 0f;
-        float knockback = 1f;
-        float radiusOverride = 0f;
-
-        var weaponData = WeaponManager.CurrentWeaponData;
-        if (weaponData != null && weaponData.abilitySet != null)
-        {
-            var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
-            if (ability != null)
-            {
-                foreach (var s in ability.steps)
-                {
-                    if (s.collider != null && s.collider.mode == WeaponAbilitySO.ColliderMode.Trail)
-                    {
-                        damage = s.baseDamage > 0f ? s.baseDamage : s.collider.damage;
-                        knockback = s.knockbackMultiplier;
-                        radiusOverride = s.collider.trailRadiusOverride;
-                        break;
-                    }
-                }
-            }
-
-            // 캐릭터 공격 스탯 반영
-            var kind = weaponData.weaponType.GetAttackStatKind();
-            damage = DamageFormula.Calculate(damage, RuntimeStats.GetEffectiveAttack(kind));
-        }
-
-        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
-        wi.TrailDetector.OnTrailHit += OnWeaponTrailHit;
-        wi.TrailDetector.BeginTrail(damage, knockback, radiusOverride);
-    }
-
-    private void Safe_EndTrail()
-    {
-        if (WeaponManager == null) return;
-        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
-        if (wi == null || wi.TrailDetector == null) return;
-
-        wi.TrailDetector.EndTrail();
-        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
-    }
-
-    private void OnWeaponTrailHit(RaycastHit hit, float damage, float knockback)
-    {
-        if (hit.collider == null) return;
-        if (!hit.collider.TryGetComponent<IDamageable>(out var damageable)) return;
-
-        damageable.TakeDamage(damage, gameObject, knockback);
-
-        // 타격 이펙트 스폰
-        SpawnTrailHitEffect(hit.point);
-
-        var wt = WeaponManager?.CurrentWeaponData?.weaponType;
-        var ctx = new PassiveContext { target = hit.collider.gameObject, damage = damage, weaponType = wt };
-        FirePassive(PassiveTrigger.OnAttackHit, ctx);
-
-        if (hit.collider.TryGetComponent<IKillable>(out var killable) && killable.IsDead)
-            FirePassive(PassiveTrigger.OnKill, ctx);
-    }
-
-    private async void SpawnTrailHitEffect(Vector3 hitPoint)
-    {
-        var weaponData = WeaponManager?.CurrentWeaponData;
-        if (weaponData?.abilitySet == null) return;
-
-        var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
-        if (ability == null) return;
-
-        // 현재 스텝의 hitEffectKey 찾기
-        string hitKey = null;
-        float hitScale = 1f;
-        foreach (var step in ability.steps)
-        {
-            if (!string.IsNullOrEmpty(step.hitEffectKey))
-            {
-                hitKey = step.hitEffectKey;
-                hitScale = step.hitEffectScale;
-                break;
-            }
-        }
-
-        if (string.IsNullOrEmpty(hitKey)) return;
-
-        var effectObj = await Managers.ObjectPooler.SpawnAsync(
-            hitKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity);
-        if (effectObj == null) return;
-
-        effectObj.transform.localScale = Vector3.one * hitScale;
-        if (effectObj.TryGetComponent<EffectBehaviour>(out var eb))
-            eb.Initialize(eb.behaviorSO, null, 1f);
-    }
 }
