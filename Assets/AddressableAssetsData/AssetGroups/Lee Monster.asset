@@ -20,6 +20,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e293ebadada2f74a9c1980e1b79dac1
+    m_Address: ForestGuardian/ForestGuardianConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 377f41e1ac02e584e8cb5c24f18529cd
     m_Address: Golem/GolemData
     m_ReadOnly: 0
@@ -35,8 +40,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a12083c929e5b26469527ca1d11edcf3
+    m_Address: DragonBoss/DragonBossAnimatorController
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: aec1234500000009000000000000ee01
     m_Address: Slime/SlimeConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: be8e9be51a2571644818f30229a901e6
+    m_Address: DragonBossConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -55,6 +70,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6dc64b6a2da88d4c963e1d049f3c1b9
+    m_Address: ForestGuardian/Materials/TreantD
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d9cee3f905981c64597f67e2db989497
     m_Address: FairyBat/FairyBatData
     m_ReadOnly: 0
@@ -70,13 +90,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: be8e9be51a2571644818f30229a901e6
-    m_Address: DragonBossConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a12083c929e5b26469527ca1d11edcf3
-    m_Address: DragonBoss/DragonBossAnimatorController
+  - m_GUID: fcf135bdc92138544a76c952c26959fc
+    m_Address: ForestGuardian/Materials/TreantDLimbs
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

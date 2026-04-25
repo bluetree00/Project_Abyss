@@ -17,6 +17,7 @@ TagManager:
   - Orc
   - Specter
   - ShapeBlock
+  - Monster
   layers:
   - Default
   - TransparentFX

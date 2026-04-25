@@ -112,9 +112,8 @@ public class DBIceDragonBreathPatternSO : BossPatternSO
             ctx.Agent.updateRotation = false;
 
             // 맵 중앙(보스 스폰 지점) 기준으로 비행
-            var dragon = ctx.Monster as DragonBossMonster;
-            _mapCenter = dragon?.DBBlackboard?.SpawnPosition ?? ctx.Transform.position;
-            _mapCenter.y = dragon?.DBBlackboard?.SpawnY ?? ctx.Transform.position.y;
+            _mapCenter = ctx.Runtime.SpawnPosition;
+            _mapCenter.y = ctx.Runtime.SpawnPosition.y;
             _flyPosition = _mapCenter + Vector3.up * Data.riseHeight;
 
             if (ctx.Animator != null)
