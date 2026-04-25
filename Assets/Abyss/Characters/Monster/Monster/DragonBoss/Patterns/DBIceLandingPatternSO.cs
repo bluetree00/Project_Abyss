@@ -61,9 +61,8 @@ public class DBIceLandingPatternSO : BossPatternSO
                 ctx.Animator.CrossFade(Data.animName, Data.crossFade);
 
             // 맵 중앙 = 착지 지점
-            var dragon = ctx.Monster as DragonBossMonster;
-            _targetPos = dragon?.DBBlackboard?.SpawnPosition ?? ctx.Transform.position;
-            _targetPos.y = dragon?.DBBlackboard?.SpawnY ?? ctx.Transform.position.y;
+            _targetPos = ctx.Runtime.SpawnPosition;
+            _targetPos.y = ctx.Runtime.SpawnPosition.y;
 
             _startPos = ctx.Transform.position;
             _flyPos = _targetPos + Vector3.up * Data.riseHeight;

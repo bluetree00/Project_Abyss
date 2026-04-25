@@ -111,9 +111,8 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
             ctx.Agent.updatePosition = false;
             ctx.Agent.updateRotation = false;
 
-            var dragon = ctx.Monster as DragonBossMonster;
-            _mapCenter = dragon?.DBBlackboard?.SpawnPosition ?? ctx.Transform.position;
-            _mapCenter.y = dragon?.DBBlackboard?.SpawnY ?? ctx.Transform.position.y;
+            _mapCenter = ctx.Runtime.SpawnPosition;
+            _mapCenter.y = ctx.Runtime.SpawnPosition.y;
             _flyPosition = _mapCenter + Vector3.up * Data.riseHeight;
 
             if (ctx.Animator != null)
