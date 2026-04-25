@@ -32,8 +32,6 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
     public float hitEffectScale = 0.3f;
 
     [Header("트레일")]
-    [Tooltip("대시 중 무기 히트 트레일 활성화")]
-    public bool useWeaponTrail = true;
     [Tooltip("대시 중 플레이어에 부착할 트레일 이펙트 Addressable 키 (비어있으면 사용 안 함)")]
     public string playerTrailKey;
     public float playerTrailScale = 1f;
@@ -76,10 +74,8 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             _timer = 0f;
             _phase = Phase.Dash;
 
-            // 대시 시작 이펙트 + 무기 트레일
+            // 대시 시작 이펙트
             SpawnEffect(ctx, _data.dashTrailKey, ctx.PlayerTransform.position + Vector3.up * 0.5f, 0.8f);
-            if (_data.useWeaponTrail)
-                ctx.Controller.BeginWeaponTrail();
             SpawnPlayerTrail(ctx);
         }
 
@@ -125,8 +121,6 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
                 _timer = 0f;
                 _phase = Phase.Slash;
 
-                if (_data.useWeaponTrail)
-                    ctx.Controller.EndWeaponTrail();
                 DespawnPlayerTrail();
 
                 // 대시 완료 이펙트

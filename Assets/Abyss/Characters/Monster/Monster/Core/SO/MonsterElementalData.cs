@@ -1,6 +1,7 @@
 using System;
 using Abyss.Monster;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// 원소 속성 하나의 설정 데이터.
@@ -21,14 +22,17 @@ public class ElementEntry
 
 /// <summary>
 /// MonsterConfigSO 에 인라인으로 포함되는 원소 설정 블록.
-/// 누적치 임계값은 전체 원소 공통 1개 값 사용.
+/// 원소별 누적치는 각 원소의 activation_gauge 테이블값을 사용하며,
+/// 이 몬스터에는 아래 배율(maxAccumulationScale)을 곱해 실제 임계치를 얻는다.
 /// 5종 원소(번개·물·불·풀·땅) 각각의 저항·오버라이드 상태를 보유한다.
 /// </summary>
 [Serializable]
 public class MonsterElementalData
 {
-    [Tooltip("전체 원소 공통 누적치 임계값. 이 값 이상 누적되면 원소 효과 발동.")]
-    public float accumulationThreshold = 100f;
+    [Tooltip("이 몬스터의 누적치 저항 배율. 실제 임계치 = element.activation_gauge × 이 값.\n" +
+             "서버 MONSTER_ELEMENT_STAT_DATA의 max_accumulation 값으로 런타임에 덮어쓰여짐.")]
+    [FormerlySerializedAs("accumulationThreshold")]
+    public float maxAccumulationScale = 1f;
 
     public ElementEntry lightning = new();
     public ElementEntry water     = new();

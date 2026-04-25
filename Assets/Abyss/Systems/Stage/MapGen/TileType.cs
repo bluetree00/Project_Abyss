@@ -7,7 +7,8 @@ public enum TileType
     Floor,          // F — 바닥
     Wall,           // W — 벽
     Obstacle,       // O — 장애물
-    MonsterSpawn,   // M — 몬스터 스폰 (바닥 + 마커)
+    MonsterSpawn,   // M — 확정 몬스터 스폰 (항상 활성)
+    MonsterSpawnCandidate, // m — 후보 몬스터 스폰 (active_monster_spawners개만 랜덤 활성)
     PlayerSpawn,    // P — 플레이어 시작
     BossSpawn,      // B — 보스 스폰
     ShopStall,      // S — 상점

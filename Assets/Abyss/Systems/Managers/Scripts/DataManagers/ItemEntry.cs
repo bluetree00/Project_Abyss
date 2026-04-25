@@ -14,7 +14,8 @@ public class ItemEntry
     public string item_id;          // 기존 item_id 또는 새 passive_id
     public string passive_id;       // 새 CSV 호환 — item_id가 비면 이 값 사용
     public string item_name;
-    public string rarity;           // Common / Rare / Epic
+    public string rarity;           // Common / Rare / Epic / Legendary (구 CSV)
+    public string grade;            // 신 CSV에서는 grade 컬럼 사용 (rarity와 호환)
     public string category;         // Ring, Necklace, Boots, Gloves, Belt, Charm, Active
     public int    slot;
     public string effect_type;      // MeleeAttack, MeleeDamage, Lifesteal, Heal, ...
@@ -32,6 +33,18 @@ public class ItemEntry
 
     /// <summary>item_id 또는 passive_id 중 유효한 값 반환.</summary>
     public string ResolvedId => !string.IsNullOrEmpty(item_id) ? item_id : passive_id;
+
+    /// <summary>rarity 또는 grade 중 유효한 값 반환 (대소문자 정규화).</summary>
+    public string ResolvedRarity
+    {
+        get
+        {
+            var raw = !string.IsNullOrEmpty(rarity) ? rarity : grade;
+            if (string.IsNullOrEmpty(raw)) return null;
+            // 첫 글자 대문자로 정규화 (common → Common, legendary → Legendary)
+            return char.ToUpperInvariant(raw[0]) + raw.Substring(1).ToLowerInvariant();
+        }
+    }
 }
 
 [System.Serializable]

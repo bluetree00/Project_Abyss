@@ -11,6 +11,7 @@ public struct DamagePacket
     public GameObject Target;
     public WeaponElement Element;
     public bool Negated;           // true면 데미지 0으로 처리
+    public bool IsCrit;            // 크리티컬 발생 여부
 
     public DamagePacket(float damage, GameObject attacker = null, GameObject target = null, WeaponElement element = WeaponElement.None)
     {
@@ -20,6 +21,7 @@ public struct DamagePacket
         Target = target;
         Element = element;
         Negated = false;
+        IsCrit = false;
     }
 }
 

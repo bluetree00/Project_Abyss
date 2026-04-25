@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e48fd0d2efb3ecf46b9e9813c20a85af, type: 3}
+  m_Name: item_snow_white_mirror
+  m_EditorClassIdentifier: Assembly-CSharp::ItemSO
+  itemId: item_snow_white_mirror
+  displayName: "\uD53C\uACA9 \uC2DC \uBC1B\uC740 \uD53C\uD574\uC758 10% \uBC18\uC0AC"
+  icon: {fileID: 0}
+  iconKey: 
+  rarity: 1
+  category: 0
+  shapeId: 0
+  effectVfxKey: VFX_DamageReflect
+  pickupVfxKey: 
+  auraVfxKey: 
+  modifiers: []

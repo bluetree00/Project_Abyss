@@ -24,11 +24,15 @@ public class WorldItemDisplay : MonoBehaviour
 
     // ── 비공개 필드 ─────────────────────────────────────────
     private const float VfxAudioVolume = 0.15f;
+    private const float PromptOffsetY = 1.4f;
 
     private RuntimeItemData _runtimeData;
     private TextMeshPro _worldText;
     private Transform _camTransform;
     private bool _pickedUp;
+    private bool _playerInRange;
+    private GameObject _promptGo;
+    private TextMeshPro _promptText;
     private GameObject _vfxInstance;
     private float _spawnTime;
 
@@ -54,6 +58,19 @@ public class WorldItemDisplay : MonoBehaviour
         // 텍스트 빌보드
         if (_worldText != null && _camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
+
+        if (_promptGo != null && _promptGo.activeSelf && _camTransform != null)
+            _promptGo.transform.rotation = _camTransform.rotation;
+
+        if (_pickedUp || !_playerInRange) return;
+
+        if (Input.GetKeyDown(KeyCode.F))
+            TryPickup();
+    }
+
+    private void OnDestroy()
+    {
+        if (_promptGo != null) Destroy(_promptGo);
     }
 
     // ── Public Methods ──────────────────────────────────────
@@ -75,7 +92,7 @@ public class WorldItemDisplay : MonoBehaviour
 
         var col = go.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        col.radius = 1f;
+        col.radius = 1.5f;
 
         var display = go.AddComponent<WorldItemDisplay>();
         display.InitFromData(data, so: so, config: config);
@@ -99,10 +116,22 @@ public class WorldItemDisplay : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (_pickedUp) return;
-        if (Time.time - _spawnTime < 1f) return; // 스폰 후 1초 보호
+        if (!IsPlayer(other)) return;
 
-        var player = other.GetComponent<PlayerController>();
-        if (player == null) return;
+        _playerInRange = true;
+        RefreshPrompt();
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (!IsPlayer(other)) return;
+        _playerInRange = false;
+        ShowPrompt(false);
+    }
+
+    private void TryPickup()
+    {
+        if (_pickedUp) return;
         if (_runtimeData == null) return;
 
         var run = GameRunBootstrapper.Instance?.Run;
@@ -115,6 +144,7 @@ public class WorldItemDisplay : MonoBehaviour
         }
 
         _pickedUp = true;
+        ShowPrompt(false);
 
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
@@ -136,6 +166,11 @@ public class WorldItemDisplay : MonoBehaviour
 
         Debug.Log($"[WorldItemDisplay] 아이템 획득: {_runtimeData.displayName} ({_runtimeData.rarity}) shape={_runtimeData.shapeId}");
         ConfirmPickup();
+    }
+
+    private static bool IsPlayer(Collider col)
+    {
+        return col.GetComponentInParent<PlayerController>() != null;
     }
 
     private void ShowPickupNotice()
@@ -246,6 +281,8 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.enableWordWrapping = false;
         _worldText.sortingOrder = 10;
 
+        TMPOutlineHelper.ApplyDefault(_worldText);
+
         if (_camTransform != null)
             _worldText.transform.rotation = _camTransform.rotation;
     }
@@ -257,4 +294,52 @@ public class WorldItemDisplay : MonoBehaviour
         ItemRarity.Epic   => new Color(0.8f, 0.4f, 1f),
         _                 => Color.white,
     };
+
+    // ── 월드 프롬프트 ([F] 얻기) ────────────────────────────
+
+    private void RefreshPrompt()
+    {
+        if (_promptGo == null) CreatePrompt();
+        UpdatePromptText();
+        ShowPrompt(true);
+    }
+
+    private void ShowPrompt(bool show)
+    {
+        if (_promptGo == null) return;
+        _promptGo.SetActive(show && !_pickedUp);
+    }
+
+    private void CreatePrompt()
+    {
+        _promptGo = new GameObject("InteractPrompt");
+        _promptGo.transform.SetParent(transform, false);
+        _promptGo.transform.localPosition = Vector3.up * PromptOffsetY;
+
+        _promptText = _promptGo.AddComponent<TextMeshPro>();
+        if (worldTextFont != null)
+            _promptText.font = worldTextFont;
+        _promptText.fontSize = 4f;
+        _promptText.alignment = TextAlignmentOptions.Center;
+        _promptText.color = Color.white;
+        _promptText.enableWordWrapping = false;
+        _promptText.sortingOrder = 11;
+
+        TMPOutlineHelper.ApplyDefault(_promptText);
+
+        _promptGo.SetActive(false);
+    }
+
+    private void UpdatePromptText()
+    {
+        if (_promptText == null) return;
+        if (_runtimeData == null) { _promptText.text = string.Empty; return; }
+
+        var run = GameRunBootstrapper.Instance?.Run;
+        bool owned = run?.ItemInventory != null && run.ItemInventory.HasItem(_runtimeData.itemId);
+
+        _promptText.text = owned
+            ? "<color=#888888>이미 보유 중</color>"
+            : "<color=#FFD700>[F]</color> 얻기";
+    }
 }

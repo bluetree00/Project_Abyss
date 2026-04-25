@@ -18,6 +18,13 @@ public abstract class ItemEffectBase : IItemEffect
     public string EffectType => _slot?.effectType ?? "";
     public string Trigger => _trigger;
 
+    /// <summary>
+    /// 슬롯에 저장된 VFX 키가 있으면 그것을, 없으면 기본 키 반환.
+    /// ItemSO.effectVfxKey에서 주입된다.
+    /// </summary>
+    protected string ResolveVfxKey(string defaultKey)
+        => !string.IsNullOrEmpty(_slot?.vfxKey) ? _slot.vfxKey : defaultKey;
+
     public ItemEffectBase(ItemEffectSlot slot)
     {
         _slot = slot;
@@ -45,16 +52,23 @@ public abstract class ItemEffectBase : IItemEffect
             case "WithFireWeapon":    return ctx.WeaponElement == WeaponElement.Fire;
             case "WithWaterWeapon":   return ctx.WeaponElement == WeaponElement.Water;
             case "WithGrassWeapon":   return ctx.WeaponElement == WeaponElement.Grass;
-            case "WithMagicWeapon":   return ctx.WeaponElement == WeaponElement.Earth;
+            case "WithEarthWeapon":   return ctx.WeaponElement == WeaponElement.Earth;
             case "WithLightningWeapon": return ctx.WeaponElement == WeaponElement.Lightning;
+            case "WithBowWeapon":     return ctx.WeaponType == WeaponType.Bow
+                                          || ctx.WeaponType == WeaponType.Crossbow;
+            case "WithMagicWeapon":   return ctx.WeaponType == WeaponType.Staff;
             case "WithShield":        return ctx.HasShield;
             case "HPBelow50":         return ctx.HpRatio <= 0.5f;
             case "HPBelow30":         return ctx.HpRatio <= 0.3f;
+            case "CharacterShield":   return ctx.CharacterClass == Define.CharacterClass.Guardian;
+            case "CharacterRanger":   return ctx.CharacterClass == Define.CharacterClass.Hunter;
 
             // 이벤트 트리거 — 이벤트 발생 시점에 호출되므로 항상 true
             case "OnHit":
             case "OnKill":
+            case "OnRoomEnter":
             case "OnRoomClear":
+            case "OnBossEnter":
             case "OnBossClear":
             case "OnRecipeComplete":
             case "OnRollEnd":
@@ -63,6 +77,9 @@ public abstract class ItemEffectBase : IItemEffect
             case "OnNearDeath":
             case "OnItemPickup":
             case "OnPickup":
+            case "OnOverheal":
+            case "OnNextChapterStart":
+            case "OnSkillUse":
             case "OnUse":
                 return true;
 
@@ -85,7 +102,9 @@ public abstract class ItemEffectBase : IItemEffect
     public virtual void OnRollEnd(ItemEffectContext ctx) { }
     public virtual void OnRollLand(ItemEffectContext ctx, Vector3 position) { }
     public virtual void OnJumpLand(ItemEffectContext ctx, Vector3 position) { }
+    public virtual void OnRoomEnter(ItemEffectContext ctx) { }
     public virtual void OnRoomClear(ItemEffectContext ctx) { }
+    public virtual void OnBossEnter(ItemEffectContext ctx) { }
     public virtual void OnBossClear(ItemEffectContext ctx) { }
     public virtual void OnRecipeComplete(ItemEffectContext ctx) { }
     public virtual void OnItemPickup(ItemEffectContext ctx, RuntimeItemData pickedItem) { }

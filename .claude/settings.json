@@ -28,7 +28,21 @@
       "Bash(git pull:*)",
       "mcp__mcp-for-unity__manage_animation",
       "mcp__mcp-for-unity__manage_material",
-      "Bash([ -d \"$dir/SO\" ])"
+      "mcp__mcp-for-unity__manage_texture",
+      "mcp__mcp-for-unity__refresh_unity",
+      "mcp__mcp-for-unity__execute_menu_item",
+      "mcp__mcp-for-unity__manage_gameobject",
+      "mcp__mcp-for-unity__manage_components",
+      "mcp__mcp-for-unity__read_console",
+      "mcp__mcp-for-unity__manage_prefabs",
+      "mcp__mcp-for-unity__find_gameobjects",
+      "mcp__mcp-for-unity__manage_asset",
+      "mcp__mcp-for-unity__batch_execute",
+      "Read(//c/Users/User/Project_Abyss/Project_Abyss/**)",
+      "Bash([ -d \"$dir/SO\" ])",
+      "Bash(git restore *)",
+      "Bash(python)",
+      "Bash(awk '{print $2}')"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude",

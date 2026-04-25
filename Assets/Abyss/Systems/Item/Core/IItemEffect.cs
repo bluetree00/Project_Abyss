@@ -45,7 +45,9 @@ public interface IItemEffect
     void OnJumpLand(ItemEffectContext ctx, Vector3 position);
 
     // ── 진행 ────────────────────────────────────────────────
+    void OnRoomEnter(ItemEffectContext ctx);
     void OnRoomClear(ItemEffectContext ctx);
+    void OnBossEnter(ItemEffectContext ctx);
     void OnBossClear(ItemEffectContext ctx);
     void OnRecipeComplete(ItemEffectContext ctx);
     void OnItemPickup(ItemEffectContext ctx, RuntimeItemData pickedItem);
