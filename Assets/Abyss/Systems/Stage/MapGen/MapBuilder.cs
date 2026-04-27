@@ -20,12 +20,14 @@ public class MapBuilder
     /// <summary>
     /// 그리드 기반으로 블록을 인스턴스화.
     /// </summary>
+    /// <param name="shopStallPrefab">상점 매대 프리팹(Block_ShopStall). null이면 임시 큐브로 폴백.</param>
     public static List<PlacedBlock> Build(
         TileType[,] grid,
         BlockPalette palette,
         Transform parent,
         float cellSize = 1f,
-        float baseY = 0f)
+        float baseY = 0f,
+        GameObject shopStallPrefab = null)
     {
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -43,7 +45,9 @@ public class MapBuilder
                 if (type == TileType.Empty) continue;
 
                 bool isBuffTile = type == TileType.BuffBox || type == TileType.BuffPedestal;
-                bool isShopTile = type == TileType.ShopStall;
+                bool isShopTile = type == TileType.ShopStall
+                                  || type == TileType.ShopStallWeapon
+                                  || type == TileType.ShopStallItem;
                 bool isMonsterSpawnTile = type == TileType.MonsterSpawn || type == TileType.MonsterSpawnCandidate;
                 bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile;
 
@@ -103,17 +107,19 @@ public class MapBuilder
 
                     result.Add(buffBlock);
                 }
-                // 상점 타일: 전용 프리팹이 있으면 사용, 없으면 기본 진열대 오브젝트 생성
+                // 상점 타일: shopStallPrefab(Block_ShopStall)을 인스턴스화하고
+                // TileType에 따라 ShopStallInteraction.category를 자동 부여.
+                // shopStallPrefab이 null인 경우에만 팔레트/임시큐브로 폴백.
                 else if (isShopTile)
                 {
-                    var shopDef = palette.Pick(type);
                     PlacedBlock shopBlock;
+                    var category = ResolveCategory(type);
 
-                    if (shopDef != null)
+                    if (shopStallPrefab != null)
                     {
-                        var shopGo = Object.Instantiate(shopDef.prefab, targetPos, Quaternion.identity, parent);
-                        shopGo.name = $"ShopStall_{x}_{z}";
-                        AttachShopStallInteraction(shopGo, cellSize);
+                        var shopGo = Object.Instantiate(shopStallPrefab, targetPos, Quaternion.identity, parent);
+                        shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                        AttachShopStallInteraction(shopGo, cellSize, category);
                         shopBlock = new PlacedBlock
                         {
                             instance = shopGo,
@@ -122,12 +128,33 @@ public class MapBuilder
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 상점 타일 배치 (프리팹): ({x},{z}) pos={targetPos}");
+                        Debug.Log($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={targetPos}");
                     }
                     else
                     {
-                        shopBlock = CreateDefaultShopStallObject(x, z, targetPos, cellSize, parent);
-                        Debug.Log($"[MapBuilder] 상점 타일 배치 (임시큐브): ({x},{z}) pos={targetPos}");
+                        // 폴백 1: 팔레트에 등록된 별도 프리팹
+                        var shopDef = palette.Pick(type);
+                        if (shopDef != null && shopDef.prefab != null)
+                        {
+                            var shopGo = Object.Instantiate(shopDef.prefab, targetPos, Quaternion.identity, parent);
+                            shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                            AttachShopStallInteraction(shopGo, cellSize, category);
+                            shopBlock = new PlacedBlock
+                            {
+                                instance = shopGo,
+                                targetPosition = targetPos,
+                                targetRotationY = 0f,
+                                tileType = type,
+                                cell = new Vector2Int(x, z),
+                            };
+                            Debug.Log($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={targetPos}");
+                        }
+                        else
+                        {
+                            // 폴백 2: 임시 큐브
+                            shopBlock = CreateDefaultShopStallObject(x, z, type, targetPos, cellSize, parent, category);
+                            Debug.LogWarning($"[MapBuilder] 상점 타일 배치 (임시큐브 폴백 — Block_ShopStall 프리팹 미할당): ({x},{z}) {type} cat={category}");
+                        }
                     }
 
                     result.Add(shopBlock);
@@ -224,14 +251,19 @@ public class MapBuilder
         if (col != null) col.isTrigger = true;
     }
 
-    private static void AttachShopStallInteraction(GameObject go, float cellSize)
+    /// <summary>
+    /// 인스턴스에 ShopStallInteraction 컴포넌트 보장 + 카테고리 주입 + 트리거 콜라이더 보장.
+    /// 프리팹에 컴포넌트가 이미 부착돼 있으면 그대로 사용하고, 없으면 안전망으로 AddComponent.
+    /// </summary>
+    private static void AttachShopStallInteraction(GameObject go, float cellSize, ShopCategory category)
     {
-        if (go.GetComponent<ShopStallInteraction>() == null)
-            go.AddComponent<ShopStallInteraction>();
+        if (!go.TryGetComponent<ShopStallInteraction>(out var interaction))
+            interaction = go.AddComponent<ShopStallInteraction>();
+
+        interaction.SetCategory(category);
 
         // 트리거 콜라이더 보장 (없으면 추가)
-        var col = go.GetComponent<Collider>();
-        if (col == null)
+        if (!go.TryGetComponent<Collider>(out var col))
         {
             var box = go.AddComponent<BoxCollider>();
             box.isTrigger = true;
@@ -244,11 +276,23 @@ public class MapBuilder
         }
     }
 
-    /// <summary>상점 진열대 프리팹이 없을 때 기본 시각 오브젝트 생성.</summary>
-    private static PlacedBlock CreateDefaultShopStallObject(
-        int x, int z, Vector3 pos, float cellSize, Transform parent)
+    /// <summary>TileType → ShopCategory 매핑 (레거시 ShopStall은 Item 폴백).</summary>
+    private static ShopCategory ResolveCategory(TileType type)
     {
-        var go = new GameObject($"ShopStall_{x}_{z}");
+        switch (type)
+        {
+            case TileType.ShopStallWeapon: return ShopCategory.Weapon;
+            case TileType.ShopStallItem:   return ShopCategory.Item;
+            case TileType.ShopStall:       return ShopCategory.Item; // 레거시 호환
+            default:                       return ShopCategory.Item;
+        }
+    }
+
+    /// <summary>상점 진열대 프리팹이 모두 없을 때 기본 시각 오브젝트 생성 (최후 폴백).</summary>
+    private static PlacedBlock CreateDefaultShopStallObject(
+        int x, int z, TileType type, Vector3 pos, float cellSize, Transform parent, ShopCategory category)
+    {
+        var go = new GameObject($"ShopStall_{x}_{z}_{type}");
         go.transform.SetParent(parent, false);
         go.transform.position = pos + Vector3.up * 0.5f;
 
@@ -270,14 +314,15 @@ public class MapBuilder
         if (renderer != null)
             renderer.material.color = new Color(0.9f, 0.6f, 0.2f, 1f); // 나무색 진열대
 
-        go.AddComponent<ShopStallInteraction>();
+        var interaction = go.AddComponent<ShopStallInteraction>();
+        interaction.SetCategory(category);
 
         return new PlacedBlock
         {
             instance = go,
             targetPosition = go.transform.position,
             targetRotationY = 0f,
-            tileType = TileType.ShopStall,
+            tileType = type,
             cell = new Vector2Int(x, z),
         };
     }

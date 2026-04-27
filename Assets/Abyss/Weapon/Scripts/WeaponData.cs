@@ -32,6 +32,8 @@ public class WeaponData
     public float critDamage = 1.25f; // 배율 (1.25 = +25%)
 
     public int tier = 1;
+    // 아이템 추첨 시스템과 통합된 등급. tier와 병행 유지(점진적 마이그레이션).
+    public ItemRarity rarity = ItemRarity.Common;
 
     public PromoteMode promoteMode;
     public int chargeStages;
@@ -80,6 +82,7 @@ public class WeaponData
         critChance       = so.critChance;
         critDamage       = so.critDamage > 0f ? so.critDamage : 1.25f;
         tier             = so.tier;
+        rarity           = so.Rarity;
 
         promoteMode  = so.promoteMode;
         chargeStages = so.chargeStages;
@@ -99,6 +102,37 @@ public class WeaponData
 
     /// <summary>SO 타입을 자동 판별해 적절한 WeaponData를 생성하는 팩토리</summary>
     public static WeaponData FromSO(WeaponSO so) => new WeaponData(so);
+
+    /// <summary>
+    /// 차트(EquipmentEntry) stats로 SO 디폴트값을 덮어쓴다.
+    /// 차트가 마스터이므로 무기 획득 시 SO 로드 후 반드시 호출.
+    /// SO 참조(animationSet, abilitySet, skillQ/E, icon, weaponType, displayName, prefabKey 등)는 보존.
+    /// </summary>
+    public void ApplyServerOverride(EquipmentEntry entry)
+    {
+        if (entry == null) return;
+
+        baseAttack         = entry.base_attack;
+        baseDefense        = entry.base_defense;
+        critChance         = entry.crit_chance;
+        critDamage         = entry.crit_damage > 0f ? entry.crit_damage : 1.25f;
+        attackSpeed        = entry.attack_speed;
+        attackRange        = entry.attack_range;
+        areaOfEffect       = entry.area_of_effect;
+        holdThreshold      = entry.hold_threshold;
+        groundEndCount     = entry.ground_combo_count;
+        airEndCount        = entry.air_combo_count;
+        promoteMode        = ParsePromoteMode(entry.promote_mode);
+        chargeStages       = entry.charge_stages;
+        element            = ParseElement(entry);
+        elementAmountBasic = entry.element_amount_basic;
+        elementAmountHeavy = entry.element_amount_heavy;
+        elementAmountAir   = entry.element_amount_air;
+        tier               = entry.tier;
+        rarity             = ParseRarity(entry.rarity, entry.tier);
+        // weaponType, displayName, weaponPrefabKey, weaponDisplayKey, iconKey,
+        // animationSet, abilitySet, skillQ/E 는 SO 값 유지
+    }
 
     /// <summary>
     /// 서버 EquipmentEntry 기반 생성.
@@ -124,6 +158,7 @@ public class WeaponData
             critChance       = entry.crit_chance,
             critDamage       = entry.crit_damage > 0f ? entry.crit_damage : 1.25f,
             tier             = entry.tier,
+            rarity           = ParseRarity(entry.rarity, entry.tier),
             promoteMode      = ParsePromoteMode(entry.promote_mode),
             chargeStages     = entry.charge_stages,
             groundEndCount   = entry.ground_combo_count,
@@ -151,6 +186,27 @@ public class WeaponData
         "Stage"      => PromoteMode.Stage,
         "ChargeFull" => PromoteMode.ChargeFull,
         _            => PromoteMode.None,
+    };
+
+    /// <summary>
+    /// 서버 rarity 문자열을 ItemRarity로 파싱.
+    /// 비어있거나 파싱 실패 시 tier 기반 폴백.
+    /// </summary>
+    private static ItemRarity ParseRarity(string s, int tier)
+    {
+        if (string.IsNullOrEmpty(s)) return MapTierToRarity(tier);
+        if (Enum.TryParse<ItemRarity>(s, ignoreCase: true, out var r)) return r;
+        return MapTierToRarity(tier);
+    }
+
+    /// <summary>tier(1~4) → ItemRarity 매핑. 잘못된 값은 Common으로 폴백.</summary>
+    private static ItemRarity MapTierToRarity(int tier) => tier switch
+    {
+        1 => ItemRarity.Common,
+        2 => ItemRarity.Rare,
+        3 => ItemRarity.Epic,
+        4 => ItemRarity.Legendary,
+        _ => ItemRarity.Common,
     };
 
     public static WeaponElement ParseElementPublic(EquipmentEntry entry) => ParseElement(entry);

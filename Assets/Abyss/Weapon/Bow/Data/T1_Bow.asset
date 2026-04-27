@@ -17,7 +17,8 @@ MonoBehaviour:
   displayName: "\uAE30\uBCF8 \uBCF4\uC6B0"
   iconKey: T1_BowIcon
   icon: {fileID: 21300000, guid: 97861ee1fe7412345a84d437284bf4c8, type: 3}
-  tier: 3
+  tier: 1
+  rarity: 0
   baseAttack: 18
   baseDefense: 2
   attackSpeed: 2.5

@@ -11,7 +11,9 @@ public enum TileType
     MonsterSpawnCandidate, // m — 후보 몬스터 스폰 (active_monster_spawners개만 랜덤 활성)
     PlayerSpawn,    // P — 플레이어 시작
     BossSpawn,      // B — 보스 스폰
-    ShopStall,      // S — 상점
+    ShopStall,      // S — 상점 (레거시 호환, 단일 매대)
+    ShopStallWeapon,// Sw — 상점 장비 매대
+    ShopStallItem,  // Si — 상점 아이템 매대
     NPCSpawn,       // N — NPC
     Entrance,       // E — 입구
     Exit,           // X — 출구
