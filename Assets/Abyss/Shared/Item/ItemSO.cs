@@ -19,6 +19,12 @@ public class ItemSO : ScriptableObject
     public ItemRarity rarity;
     public ItemCategory category;
 
+    [Header("스택 정책")]
+    [Tooltip("같은 itemId를 인벤토리에 보유할 수 있는 최대 수. " +
+             "일반 아이템은 1(중복 보유 X), 소비형(Active)은 디자이너가 인스펙터에서 3 등으로 조정. " +
+             "최소 1로 보정된다.")]
+    [SerializeField] private int maxStack = 1;
+
     [Header("블록")]
     [Tooltip("BLOCK_SHAPE_DATA의 shape_id 참조. 0이면 블록 없음.")]
     public int shapeId;
@@ -33,6 +39,9 @@ public class ItemSO : ScriptableObject
 
     [Header("스탯 수정자")]
     public List<StatModifier> modifiers = new List<StatModifier>();
+
+    /// <summary>같은 itemId를 인벤토리에 보유 가능한 최대 수. 1 이상으로 보정.</summary>
+    public int MaxStack => Mathf.Max(1, maxStack);
 }
 
 public enum ItemRarity

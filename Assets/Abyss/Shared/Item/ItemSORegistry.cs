@@ -35,6 +35,21 @@ public static class ItemSORegistry
     /// <summary>등록 수.</summary>
     public static int Count => _map.Count;
 
+    /// <summary>등록된 모든 ItemSO 열거 (호출자는 readonly로 사용).</summary>
+    public static IEnumerable<ItemSO> All => _map.Values;
+
+    /// <summary>지정 등급에 해당하는 ItemSO 후보 리스트 반환. 매번 새 리스트를 생성한다.</summary>
+    public static List<ItemSO> GetByRarity(ItemRarity rarity)
+    {
+        var result = new List<ItemSO>(_map.Count);
+        foreach (var so in _map.Values)
+        {
+            if (so == null) continue;
+            if (so.rarity == rarity) result.Add(so);
+        }
+        return result;
+    }
+
     /// <summary>캐시 초기화.</summary>
     public static void Clear() => _map.Clear();
 }

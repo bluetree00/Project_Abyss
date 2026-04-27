@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -139,7 +140,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null) return;
 
         var runtime = WeaponData.FromSO(handle.Result);
-        ApplyServerOverride(runtime);
+        // 차트 마스터 정책: weaponSOKey == weapon_id 컨벤션을 따라 차트 stats 덮어쓰기
+        ApplyServerOverrideIfAvailable(runtime, weaponSOKey);
         await AcquireWeaponAsync(runtime, autoEquip);
     }
 
@@ -314,6 +316,40 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
     public int GetCurrentSlotIndex() => currentSlotIndex;
 
+    /// <summary>
+    /// 주어진 weapon_id(=서버 EquipmentEntry.weapon_id)에 해당하는 무기를 슬롯에 보유 중인지.
+    /// 슬롯의 weaponPrefabKey/weaponDisplayKey와 EquipmentEntry의 동일 필드를 비교하여 매칭한다.
+    /// 상점 등에서 중복 보유 차단용.
+    /// </summary>
+    public bool HasWeaponId(string weaponId)
+    {
+        if (string.IsNullOrEmpty(weaponId)) return false;
+
+        // 서버 데이터에서 prefab_key/display_key 조회 (없으면 weaponId 자체로 비교)
+        string prefabKey = weaponId;
+        string displayKey = null;
+        var equipMgr = Managers.ServerEquipment;
+        if (equipMgr != null)
+        {
+            var entry = equipMgr.GetById(weaponId);
+            if (entry != null)
+            {
+                if (!string.IsNullOrEmpty(entry.weapon_prefab_key)) prefabKey = entry.weapon_prefab_key;
+                displayKey = entry.weapon_display_key;
+            }
+        }
+
+        for (int i = 0; i < SlotCount; i++)
+        {
+            var s = slots[i];
+            if (s == null || s.runtimeData == null) continue;
+
+            if (!string.IsNullOrEmpty(prefabKey) && s.runtimeData.weaponPrefabKey == prefabKey) return true;
+            if (!string.IsNullOrEmpty(displayKey) && s.runtimeData.weaponDisplayKey == displayKey) return true;
+        }
+        return false;
+    }
+
     // ----------------------
     // 장비 획득 처리 (픽업 등 외부 호출)
     // - HandlePickupAsync에서도 풀 초기화를 수행하도록 추가
@@ -353,6 +389,66 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             // 버리기: 월드 아이템 복원
             source?.CancelPickup();
             Debug.Log($"Pickup cancelled: {runtimeData.displayName}");
+        }
+    }
+
+    /// <summary>
+    /// 무기 획득 + 교체 팝업 통합 진입점.
+    /// 빈 슬롯 있으면 자동 장착 → true.
+    /// 꽉 차면 교체 팝업 띄우고 사용자 선택 시 교체 → true.
+    /// 사용자가 버리기/취소 시 false (호출자가 환불 처리).
+    /// </summary>
+    public async UniTask<bool> TryAcquireWeaponWithReplaceAsync(string weaponSOKey, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(weaponSOKey)) return false;
+
+        AsyncOperationHandle<WeaponSO> handle = default;
+        try
+        {
+            handle = Addressables.LoadAssetAsync<WeaponSO>(weaponSOKey);
+            await handle.Task.AsUniTask().AttachExternalCancellation(ct);
+
+            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+                return false;
+
+            var runtime = WeaponData.FromSO(handle.Result);
+            // 차트 마스터 정책: weaponSOKey == weapon_id 컨벤션을 따라 차트 stats 덮어쓰기
+            ApplyServerOverrideIfAvailable(runtime, weaponSOKey);
+
+            ct.ThrowIfCancellationRequested();
+
+            int emptySlot = GetFirstEmptySlotIndex();
+            if (emptySlot >= 0)
+            {
+                _owned.Add(runtime);
+                await EquipToSlotAsync(emptySlot, runtime, setActive: true);
+                return true;
+            }
+
+            // 꽉 참 → 교체 팝업
+            int? chosenSlot = await ShowReplacePromptAsync(runtime);
+            ct.ThrowIfCancellationRequested();
+
+            if (!chosenSlot.HasValue)
+            {
+                Debug.Log($"[PlayerWeaponManager] 무기 획득 취소(버리기): {runtime.displayName}");
+                return false;
+            }
+
+            _owned.Add(runtime);
+            var replaced = await ReplaceSlotAsync(chosenSlot.Value, runtime);
+            if (replaced != null) Debug.Log($"[PlayerWeaponManager] Replaced {replaced.displayName}");
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.Log("[PlayerWeaponManager] TryAcquireWeaponWithReplaceAsync 취소됨");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] TryAcquireWeaponWithReplaceAsync 실패: {ex.Message}");
+            return false;
         }
     }
 
@@ -479,11 +575,35 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     // ----------------------
-    // 서버 수치 오버라이드
+    // 서버 수치 오버라이드 (차트 마스터 정책)
     // ----------------------
+
     /// <summary>
-    /// WeaponData의 수치를 서버 EquipmentEntry로 오버라이드.
-    /// SO의 에셋 참조(animation, ability, skill)는 유지하고 수치만 교체.
+    /// 차트 stats(EquipmentEntry)로 WeaponData를 덮어쓴다.
+    /// weaponId가 weaponSOKey == EquipmentEntry.weapon_id 컨벤션을 따른다.
+    /// 차트에 엔트리가 없으면 SO 디폴트값을 그대로 사용한다(경고 로그).
+    /// </summary>
+    private static void ApplyServerOverrideIfAvailable(WeaponData runtime, string weaponId)
+    {
+        if (runtime == null || string.IsNullOrEmpty(weaponId)) return;
+
+        var equipMgr = Managers.ServerEquipment;
+        if (equipMgr == null) return;
+
+        var entry = equipMgr.GetById(weaponId);
+        if (entry == null)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] EquipmentEntry 없음 → SO 값 사용: {weaponId}");
+            return;
+        }
+
+        runtime.ApplyServerOverride(entry);
+        Debug.Log($"[PlayerWeaponManager] {weaponId} stats 덮어쓰기: atk={runtime.baseAttack}, def={runtime.baseDefense}, tier={runtime.tier}, rarity={runtime.rarity} | Elem={runtime.element} | Amt(B/H/A)={runtime.elementAmountBasic}/{runtime.elementAmountHeavy}/{runtime.elementAmountAir}");
+    }
+
+    /// <summary>
+    /// weapon_id를 알 수 없는 진입점(픽업 등)을 위한 fallback.
+    /// weaponPrefabKey/weaponDisplayKey/weapon_id == prefabKey 매칭으로 EquipmentEntry를 찾아 덮어쓴다.
     /// </summary>
     private static void ApplyServerOverride(WeaponData data)
     {
@@ -492,10 +612,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         var mgr = Managers.ServerEquipment;
         if (mgr == null || !mgr.IsInitialized) return;
 
-        // weaponPrefabKey 또는 displayName으로 서버 데이터 조회
         EquipmentEntry entry = null;
-
-        // 모든 서버 장비를 순회하여 prefabKey 또는 이름 매칭
         foreach (var kv in mgr.GetAll())
         {
             var e = kv.Value;
@@ -510,25 +627,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (entry == null) return;
 
-        // 수치만 오버라이드 (SO 에셋 참조는 유지)
-        data.baseAttack    = entry.base_attack;
-        data.baseDefense   = entry.base_defense;
-        data.attackSpeed   = entry.attack_speed;
-        data.attackRange   = entry.attack_range;
-        data.areaOfEffect  = entry.area_of_effect;
-        data.holdThreshold = entry.hold_threshold;
-        data.chargeStages  = entry.charge_stages;
-        data.groundEndCount = entry.ground_combo_count;
-        data.airEndCount   = entry.air_combo_count;
-        data.critChance    = entry.crit_chance;
-        data.critDamage    = entry.crit_damage > 0f ? entry.crit_damage : 1.25f;
-
-        data.element             = WeaponData.ParseElementPublic(entry);
-        data.elementAmountBasic  = entry.element_amount_basic;
-        data.elementAmountHeavy  = entry.element_amount_heavy;
-        data.elementAmountAir    = entry.element_amount_air;
-
-        Debug.Log($"[WeaponManager] 서버 수치 적용: {entry.weapon_name} | ATK={entry.base_attack} SPD={entry.attack_speed} | Elem={data.element} | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
+        data.ApplyServerOverride(entry);
+        Debug.Log($"[PlayerWeaponManager] (pickup fallback) 서버 수치 적용: {entry.weapon_id} ({entry.weapon_name}) | ATK={entry.base_attack} SPD={entry.attack_speed} | Elem={data.element} | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
     }
 
     // ----------------------

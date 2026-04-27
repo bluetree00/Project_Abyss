@@ -17,7 +17,8 @@ MonoBehaviour:
   displayName: "\uAE30\uBCF8 \uCE74\uD0C0\uB098"
   iconKey: T1_KatanaIcon
   icon: {fileID: 21300000, guid: 5932011b449ac234197ea8c6600fb8fe, type: 3}
-  tier: 3
+  tier: 1
+  rarity: 0
   baseAttack: 30
   baseDefense: 3
   attackSpeed: 2
