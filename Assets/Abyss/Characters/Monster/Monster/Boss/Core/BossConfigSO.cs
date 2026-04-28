@@ -50,6 +50,10 @@ public enum BossConditionKey
     // ── DragonBoss 바디 상태 ─────────────────────────────────────
     Dragon_Body_Grounded  = 15,  // 지상 상태 (BodyState == Grounded)
     Dragon_Body_Airborne  = 16,  // 공중 상태 (BodyState == Airborne)
+
+    // ── ForestGuardian HP 범위 ────────────────────────────────────
+    FG_Phase1 = 17,   // HpAboveCondition(condPhase2HpThreshold) — 1페이즈 (HP > 50%)
+    FG_Phase2 = 18,   // HpBelowCondition(condPhase2HpThreshold) — 2페이즈 HP 범위 (HP ≤ 50%)
 }
 
 [System.Serializable]

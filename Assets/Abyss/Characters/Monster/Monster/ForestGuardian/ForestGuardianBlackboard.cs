@@ -17,17 +17,28 @@ public class ForestGuardianBlackboard
     public const float NormalHitDamage    = 8f;
     public const float BigWindowHitDamage = 40f;
 
+    // ── 방어도(Poise) 상수 ───────────────────────────────
+    public const float MaxPoise          = 50f;
+    public const float NormalPoiseDamage = 20f;  // 일반 피격: 3회 적중 시 파괴
+    public const float HeavyPoiseDamage  = 50f;  // 빅윈도우 피격: 1회에 즉시 파괴
+    public const float PoiseStaggerTime  = 0.7f; // 방어도 파괴 시 경직 지속 시간
+
     // ── 강인도 ────────────────────────────────────────────
     public float Toughness    { get; private set; } = MaxToughness;
     public bool  IsGroggy     { get; private set; }
     public float GroggyTimer  { get; private set; }
+
+    // ── 방어도(Poise) ────────────────────────────────────
+    public float Poise         { get; private set; } = MaxPoise;
+    public bool  IsPoiseBroken { get; private set; }
 
     // ── 빅어택 윈도우 ─────────────────────────────────────
     public float BigAttackWindow { get; private set; }
     public bool  IsBigWindowOpen => BigAttackWindow > 0f;
 
     // ── 페이즈 ────────────────────────────────────────────
-    public bool IsPhase2 { get; private set; }
+    public bool  IsPhase2      { get; private set; }
+    public float AnimSpeedMult { get; private set; } = 1f;
 
     // ── 피격 방향 ─────────────────────────────────────────
     public enum HitDirection { Front, Back, Left, Right, Heavy }
@@ -68,6 +79,9 @@ public class ForestGuardianBlackboard
         GroggyTimer     = 0f;
         BigAttackWindow = 0f;
         IsPhase2        = false;
+        AnimSpeedMult   = 1f;
+        Poise           = MaxPoise;
+        IsPoiseBroken   = false;
     }
 
     /// <summary>
@@ -112,6 +126,30 @@ public class ForestGuardianBlackboard
         }
     }
 
+    /// <summary>
+    /// 방어도 데미지 적용. 방어도가 0 이하면 파괴 상태로 전환 후 즉시 회복.
+    /// isHeavy=true (빅윈도우 피격)이면 HeavyPoiseDamage 적용 → 1회에 파괴.
+    /// 그로기 중이면 적용하지 않는다.
+    /// </summary>
+    /// <returns>방어도가 파괴됐으면 true.</returns>
+    public bool ApplyPoiseDamage(bool isHeavy)
+    {
+        if (IsGroggy) return false;
+        if (IsPoiseBroken) return false;
+
+        Poise -= isHeavy ? HeavyPoiseDamage : NormalPoiseDamage;
+        if (Poise <= 0f)
+        {
+            Poise         = MaxPoise;   // 파괴 즉시 회복 → 경직 중 추가 파괴 방지
+            IsPoiseBroken = true;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>GetHitState 경직 종료 시 호출해 방어도 파괴 플래그를 해제한다.</summary>
+    public void ClearPoiseBroken() => IsPoiseBroken = false;
+
     /// <summary>빅어택 윈도우를 BigWindowDuration 만큼 열어준다.</summary>
     public void TriggerBigAttackWindow()
     {
@@ -121,7 +159,8 @@ public class ForestGuardianBlackboard
     /// <summary>2페이즈 전환 완료 시 호출.</summary>
     public void SetPhase2()
     {
-        IsPhase2 = true;
+        IsPhase2      = true;
+        AnimSpeedMult = 1.2f;
     }
 }
 }

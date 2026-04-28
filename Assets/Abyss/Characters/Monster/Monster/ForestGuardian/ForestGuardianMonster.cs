@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -90,6 +90,17 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         public bool Evaluate(BossPatternContext ctx) => _bb.IsGroggy;
     }
 
+    private sealed class FGPhaseChangePendingCondition : ICondition
+    {
+        private readonly ForestGuardianBlackboard _bb;
+        public FGPhaseChangePendingCondition(ForestGuardianBlackboard bb) => _bb = bb;
+        public bool Evaluate(BossPatternContext ctx)
+        {
+            var fg = ctx.Boss as ForestGuardianMonster;
+            return fg != null && fg.HpRatio <= 0.5f && !_bb.IsPhase2;
+        }
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 레이어드 FSM 상태 등록
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -127,6 +138,12 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             Ctx        = _ctx,
             Blackboard = _coreBB,
         };
+
+        // Inspector 미할당 시 SkinnedMeshRenderer 자동 탐색
+        if (_bodyRenderers == null || _bodyRenderers.Length == 0)
+            _bodyRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        if (_limbRenderers == null || _limbRenderers.Length == 0)
+            _limbRenderers = _bodyRenderers;
 
         BuildConditions(bossConfig);
         InitializePatterns(bossConfig);
@@ -172,8 +189,8 @@ public class ForestGuardianMonster : MonsterBase, IBoss
 
         _runner?.Tick(dt);
 
-        // 페이즈 전환 체크
-        if (!_fgBB.IsPhase2 && HpRatio < Phase2HpThreshold)
+        // 페이즈 전환 체크 — 패턴 실행 중일 땐 패턴이 직접 트리거하도록 위임
+        if (!_fgBB.IsPhase2 && HpRatio < Phase2HpThreshold && !IsInSpecialState)
             EnterPhase2Async().Forget();
 
         // 그로기 상태 진입
@@ -203,11 +220,22 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     {
         if (_fgBB == null) return;
 
-        bool isBigWindowHit = _fgBB.IsBigWindowOpen;
-        _fgBB.ApplyToughnessDamage(ForestGuardianBlackboard.NormalHitDamage, isBigWindowHit);
+        bool isHeavy = _fgBB.IsBigWindowOpen;
+
+        // 강인도 데미지 (그로기 판정)
+        _fgBB.ApplyToughnessDamage(ForestGuardianBlackboard.NormalHitDamage, isHeavy);
 
         if (_fgBB.IsGroggy)
-            ChangeState<GetHitState>();
+        {
+            // 그로기 우선 — 방어도 억제 없이 base의 ChangeState<GetHitState>() 에 위임
+            return;
+        }
+
+        // 방어도 데미지 — 파괴되면 GetHit 방향 경직 발동, 그렇지 않으면 추적 유지
+        bool poiseBroke = _fgBB.ApplyPoiseDamage(isHeavy);
+        if (!poiseBroke)
+            _suppressGetHitThisHit = true;   // base의 ChangeState<GetHitState>() 스킵
+        // poiseBroke=true 이면 _suppressGetHitThisHit = false 유지 → base가 GetHitState 진입
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -221,6 +249,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         _coreBB?.Reset();
         _fgBB?.Reset();
         _weightRecoveries.Clear();
+        _phase2Transitioning = false;
         BindBossHud();
     }
 
@@ -231,6 +260,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     }
 
     public void UnbindBossHudIfBoundPublic() => UnbindBossHudIfBound();
+
+    /// <summary>2페이즈 전환을 패턴에서 직접 트리거할 때 사용. 머터리얼·속도 교체 포함.</summary>
+    public void TriggerPhase2() => EnterPhase2Async().Forget();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 보스룸 전용: 플레이어가 있으면 항상 추적
@@ -284,9 +316,11 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             BossConditionKey.Dist_Close      => new MaxRangeCondition(config.condDistClose),
             BossConditionKey.Dist_Far        => new MinRangeCondition(config.condDistFar),
             BossConditionKey.TimePressure    => new NormalModeTimerCondition(config.condTimePressureSecs),
-            BossConditionKey.FG_IsPhase2     => new FGPhase2Condition(_fgBB),
-            BossConditionKey.FG_IsGroggy     => new FGGroggyCondition(_fgBB),
-            _                                => new AlwaysTrue(),
+            BossConditionKey.FG_Phase1             => new HpAboveCondition(config.condPhase2HpThreshold),
+            BossConditionKey.FG_PhaseChangePending => new FGPhaseChangePendingCondition(_fgBB),
+            BossConditionKey.FG_IsPhase2           => new FGPhase2Condition(_fgBB),
+            BossConditionKey.FG_IsGroggy           => new FGGroggyCondition(_fgBB),
+            _                                      => new AlwaysTrue(),
         };
     }
 
@@ -341,6 +375,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         if (_phase2Transitioning) return;
         _phase2Transitioning = true;
 
+        Debug.Log($"[FG] Phase2 시작 — HP={_runtime?.CurrentHp}/{EffectiveMaxHp} ratio={HpRatio:F2}", this);
         _fgBB.SetPhase2();
 
         // 이동속도, 애니메이션 속도 적용
@@ -363,10 +398,17 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             var matBody = await Managers.AddressableManager.LoadAssetAsync<Material>(Phase2BodyMatAddress);
             var matLimb = await Managers.AddressableManager.LoadAssetAsync<Material>(Phase2LimbMatAddress);
 
+            Debug.Log($"[FG] 머티리얼 로드 — body={matBody?.name ?? "NULL"}, limb={matLimb?.name ?? "NULL"}, bodyRenderers={_bodyRenderers?.Length ?? 0}", this);
+
             if (!destroyCancellationToken.IsCancellationRequested)
             {
                 ApplyMaterials(_bodyRenderers, matBody, 0);
                 ApplyMaterials(_limbRenderers, matLimb, 1);
+                Debug.Log("[FG] 머티리얼 교체 완료", this);
+            }
+            else
+            {
+                Debug.LogWarning("[FG] 머티리얼 교체 취소됨 (destroyCancellationToken)", this);
             }
         }
         catch (System.OperationCanceledException)
