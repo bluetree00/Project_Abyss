@@ -11,6 +11,12 @@ public class WeaponSO : ScriptableObject
     public Sprite icon;             // HUD 즉시 표시용 직접 참조
     [Tooltip("장비 티어 (1~3). 스킬 해금 단계에 사용")]
     public int tier = 1;
+
+    [Header("등급/티어")]
+    [SerializeField, Tooltip("아이템 추첨 시스템과 통합된 등급. 기본 매핑: T1=Common, T2=Rare, T3=Epic, T4=Legendary")]
+    private ItemRarity rarity = ItemRarity.Common;
+    public ItemRarity Rarity => rarity;
+
     public float baseAttack;
     public float baseDefense;
 

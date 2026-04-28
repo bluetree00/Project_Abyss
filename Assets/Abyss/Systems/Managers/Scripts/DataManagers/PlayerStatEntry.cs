@@ -72,6 +72,7 @@ public class EquipmentEntry
     public string weapon_id;
     public string weapon_name;
     public string weapon_type;      // Katana, Greatsword, Crossbow, Bow
+    public string rarity;           // Common, Rare, Epic, Legendary (신설; 비어있으면 tier로 폴백)
     public int    tier;
     public float  base_attack;
     public float  base_defense;

@@ -1,0 +1,8 @@
+﻿luck_level,min_luck,max_luck,common_weight,rare_weight,epic_weight,legendary_weight,drop_chance,stat_version
+0,0,10,100,0,0,0,0.6,1
+1,10,25,45,33,20,2,0.6,1
+2,25,40,30,40,25,5,0.6,1
+3,40,55,19,30,41,10,0.6,1
+4,55,70,18,25,33,24,0.6,1
+5,70,85,17,20,29,34,0.6,1
+6,85,100,9,17,34,40,0.6,1
