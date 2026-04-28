@@ -17,10 +17,11 @@ public sealed class PlayerRunState
     public event Action<int, int> OnHpChanged; // (hp, maxHp)
     public event Action<int> OnGoldChanged;    // tempGold
 
-    public PlayerRunState(int maxHp = 100)
+    public PlayerRunState(int maxHp = 100, int startGold = 0)
     {
         MaxHp = Math.Max(1, maxHp);
         Hp = MaxHp;
+        TempGold = Math.Max(0, startGold);
     }
 
     public void Deactivate()

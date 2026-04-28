@@ -128,6 +128,7 @@ public class ServerEquipmentDataManager
                 weapon_id         = row.TryGetString("weapon_id"),
                 weapon_name       = row.TryGetString("weapon_name"),
                 weapon_type       = row.TryGetString("weapon_type"),
+                rarity            = row.TryGetString("rarity"),
                 tier              = row.TryGetInt("tier"),
                 base_attack       = row.TryGetFloat("base_attack"),
                 base_defense      = row.TryGetFloat("base_defense"),

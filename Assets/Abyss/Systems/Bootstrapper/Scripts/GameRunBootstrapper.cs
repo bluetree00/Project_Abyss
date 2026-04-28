@@ -33,6 +33,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Header("Shop Room")]
     [SerializeField, Min(0)] private int shopSlotCount = 3;
 
+    [Tooltip("상점 매대 프리팹 (Block_ShopStall). MapBuilder가 ShopStall 타일에서 인스턴스화하고 " +
+             "TileType(ShopStallWeapon/ShopStallItem)에 따라 ShopStallInteraction.category를 자동 설정.")]
+    [SerializeField] private GameObject blockShopStallPrefab;
+
+    [Tooltip("상점 등급별 기본가 SO. ShopDataManager 초기화에 사용. " +
+             "비어있으면 ResolvePrice는 price_override만 적용 + 기본가 0 폴백.")]
+    [SerializeField] private ShopPriceTableSO shopPriceTable;
+
+    [Tooltip("행운치 기반 등급 추첨 테이블. 상점 매대 등급 추첨에 사용.")]
+    [SerializeField] private LuckRollTableSO luckRollTable;
+
     [Header("Decoration")]
     [Tooltip("방 테마별 장식 카탈로그. 방 진입 시 MapRoomEntry.theme와 themeMatch가 일치하는 첫 항목 사용. " +
              "일치 없으면 themeMatch=\"*\" 범용 카탈로그로 폴백.")]
@@ -40,6 +51,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private StagePointUI[] _points;
     private GameObject _currentMapGO;
+    // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
+    // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
+    private Vector3? _pendingPlayerSpawnPos;
     private bool _isSpawning;
 
     private GameRunSession _run;
@@ -250,6 +264,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             try { await elementEffectData.InitializeAsync(); }
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ElementEffectData 예외: {e.Message}"); }
         }
+
+        // 상점 데이터(SHOP_PRICE_DATA) 초기화 — Item/Equipment 레지스트리 로드 이후여야 등급 인덱싱이 정상 작동
+        var shopData = Managers.ShopData;
+        if (shopData != null && !shopData.IsInitialized)
+        {
+            if (shopPriceTable == null)
+                Debug.LogWarning("[GameRunBootstrapper] shopPriceTable 미할당 — 상점 기본가는 0으로 폴백 (price_override만 적용)");
+
+            try
+            {
+                var ct = this.GetCancellationTokenOnDestroy();
+                await shopData.InitializeAsync(shopPriceTable, ct);
+            }
+            catch (System.OperationCanceledException) { /* 정상 취소 */ }
+            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ShopData 예외: {e.Message}"); }
+        }
     }
 
     private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();
@@ -310,6 +340,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
 
+        // grid_csv의 P 토큰 위치를 월드 좌표로 변환 → SpawnPlayerAsync에서 소비
+        var spawnCell = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
+        if (spawnCell.x >= 0)
+        {
+            _pendingPlayerSpawnPos = new Vector3(
+                (spawnCell.x - w / 2f + 0.5f) * blockCellSize,
+                0f,
+                (spawnCell.y - h / 2f + 0.5f) * blockCellSize
+            );
+            Debug.Log($"[GameRunBootstrapper] PlayerSpawn 셀 ({spawnCell.x},{spawnCell.y}) → world {_pendingPlayerSpawnPos}");
+        }
+        else
+        {
+            _pendingPlayerSpawnPos = null;
+            Debug.LogWarning($"[GameRunBootstrapper] grid에 PlayerSpawn(P) 토큰 없음 — playerSpawnPoint Transform 폴백 사용: {roomEntry.room_id}");
+        }
+
         // 맵 루트
         var mapGO = new GameObject($"BlockMap_{roomEntry.room_id}");
         mapGO.transform.SetParent(mapRoot, false);
@@ -322,7 +369,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 테마: 챕터(ActiveTheme) 우선 → 방별(roomEntry.theme) → Default 팔레트 폴백
         string effectiveTheme = ResolveRoomTheme(roomEntry.theme);
         var activePalette = PickBlockPalette(effectiveTheme);
-        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY);
+        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
         // 각 스포너 인스턴스에 셀별 설정(maxGrade, totalCount) 주입 (Start() 호출 직전)
@@ -597,7 +644,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (spawners.Count == 0) return;
 
         var controller = mapGO.AddComponent<RoomClearController>();
-        controller.Initialize(_run, spawners);
+        controller.Initialize(_run, spawners, luckRollTable);
     }
 
     /// <summary>MapBuilder.Build 결과 중 스포너 오브젝트에 CellSpawnInfo를 주입.
@@ -633,12 +680,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTask SetupShopRoomAsync(GameObject mapGO, MapRoomEntry roomEntry)
     {
         var controller = mapGO.AddComponent<ShopRoomController>();
+
+        // 신규 경로: SHOP_PRICE_DATA + LuckRollTable 기반 추첨 (catalog는 fallback용)
         var catalog = await LoadShopCatalogAsync(roomEntry.room_id);
 
-        if (catalog == null)
-            Debug.LogWarning($"[GameRunBootstrapper] ShopCatalog 로드 실패: {roomEntry.room_id}. 진열대가 비어 있게 됩니다.");
+        if (luckRollTable == null)
+            Debug.LogWarning("[GameRunBootstrapper] LuckRollTable 미할당 — 상점 매대는 fallback 카탈로그를 사용합니다.");
 
-        controller.Initialize(_run, catalog, shopSlotCount);
+        if (catalog == null && luckRollTable == null)
+            Debug.LogWarning($"[GameRunBootstrapper] ShopCatalog/LuckRollTable 모두 없음: {roomEntry.room_id}. 진열대가 비어 있게 됩니다.");
+
+        controller.Initialize(_run, catalog, luckRollTable, shopSlotCount);
     }
 
     private async UniTask<ShopCatalogSO> LoadShopCatalogAsync(string roomId)
@@ -852,7 +904,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
-        Vector3 pos = playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero;
+        // grid_csv의 P 토큰 위치 우선 — 없으면 인스펙터 playerSpawnPoint Transform 폴백
+        Vector3 pos;
+        if (_pendingPlayerSpawnPos.HasValue)
+        {
+            pos = _pendingPlayerSpawnPos.Value;
+            _pendingPlayerSpawnPos = null;
+        }
+        else
+        {
+            pos = playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero;
+        }
         Quaternion rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
 
         var go = Instantiate(prefab, pos, rot);

@@ -51,6 +51,7 @@ public sealed class Managers : MonoBehaviour
     private ChapterDataManager _chapterDataManager;
     private ElementEffectDataManager _elementEffectDataManager;
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
+    private ShopDataManager _shopDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -311,6 +312,20 @@ public sealed class Managers : MonoBehaviour
                 inst._serverMonsterStatDataManager = new ServerMonsterStatDataManager();
 
             return inst._serverMonsterStatDataManager;
+        }
+    }
+
+    public static ShopDataManager ShopData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._shopDataManager == null)
+                inst._shopDataManager = new ShopDataManager();
+
+            return inst._shopDataManager;
         }
     }
     #endregion

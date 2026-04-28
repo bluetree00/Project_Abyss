@@ -13,18 +13,20 @@ using UnityEngine.Rendering.Universal;
 ///
 /// 하는 일
 ///   1) Assets/Abyss/Settings/GameVolumeProfile.asset 생성(없으면) + 오버라이드 일괄 세팅
-///      Bloom / Vignette / ColorAdjustments / ChromaticAberration / Tonemapping(ACES) / FilmGrain
-///   2) 현재 씬에 @GlobalVolume 오브젝트 없으면 생성하여 Global Volume 으로 프로파일 연결
-///   3) 씬 내 모든 Camera의 UniversalAdditionalCameraData.renderPostProcessing = true
+///      Bloom / Vignette / ColorAdjustments / LiftGammaGain / Tonemapping(ACES)
+///      ※ Azure Nature 의 AN_PostProcessing_Volume 구성을 기반으로 강도 톤다운
+///      ※ MotionBlur 는 제외 (VolumePulseService 의 피격 펄스와 충돌)
+///   2) 씬 내 모든 Camera의 UniversalAdditionalCameraData.renderPostProcessing = true
 ///
-/// 하지 않는 일 (Renderer Data 조작은 위험하므로 수동)
-///   · SSAO Renderer Feature 추가 → URP Renderer Data 선택 → Add Renderer Feature → Screen Space Ambient Occlusion
+/// 하지 않는 일 (씬 디자인을 침해하므로 수동)
+///   · @GlobalVolume 오브젝트 생성 → Volume은 씬마다 직접 배치하여 프로파일 연결
+///   · Directional Light 강도/색/그림자 일괄 튜닝 → 라이트 디자인은 씬마다 수동
+///   · SSAO Renderer Feature 추가 → 메뉴 'Abyss/Setup/Add SSAO to All URP Renderers' 사용
 /// </summary>
 public static class SetupCinematicLook
 {
     private const string ProfileFolder = "Assets/Abyss/Settings";
     private const string ProfilePath   = ProfileFolder + "/GameVolumeProfile.asset";
-    private const string VolumeName    = "@GlobalVolume";
 
     [MenuItem("Abyss/Setup/Apply Cinematic Look (Current Scene)")]
     public static void Apply()
@@ -33,9 +35,7 @@ public static class SetupCinematicLook
         ClearAndPopulate(profile);
         EditorUtility.SetDirty(profile);
 
-        var volumeGO = EnsureGlobalVolumeInScene(profile);
         int camCount = EnablePostProcessingOnCameras();
-        int lightCount = TuneDirectionalLights();
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -43,34 +43,10 @@ public static class SetupCinematicLook
 
         Debug.Log(
             $"[SetupCinematicLook] 적용 완료\n" +
-            $"  · Profile: {ProfilePath} (오버라이드 6종)\n" +
-            $"  · Volume Object: {volumeGO.name} (씬={volumeGO.scene.name})\n" +
+            $"  · Profile: {ProfilePath} (오버라이드 5종, AN 기반 톤다운)\n" +
             $"  · Post-Processing 활성화된 Camera: {camCount}개\n" +
-            $"  · Directional Light 튜닝: {lightCount}개\n" +
+            $"  · Volume 배치는 씬에 직접 (Volume 컴포넌트 + sharedProfile = GameVolumeProfile)\n" +
             $"  · SSAO 추가는 메뉴 'Abyss/Setup/Add SSAO to All URP Renderers' 참고");
-    }
-
-    // ─────────────────────────────────────────────
-    // 4. Directional Light tuning
-    // ─────────────────────────────────────────────
-
-    private static int TuneDirectionalLights()
-    {
-        int count = 0;
-        foreach (var light in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-        {
-            if (light.type != LightType.Directional) continue;
-
-            light.intensity     = 0.9f;
-            light.color         = new Color(1f, 0.96f, 0.88f, 1f); // 살짝 웜
-            light.shadows       = LightShadows.Soft;
-            light.shadowStrength= 0.75f;
-            light.shadowBias    = 0.05f;
-            light.shadowNormalBias = 0.4f;
-            EditorUtility.SetDirty(light);
-            count++;
-        }
-        return count;
     }
 
     // ─────────────────────────────────────────────
@@ -94,71 +70,62 @@ public static class SetupCinematicLook
         var existing = new List<VolumeComponent>(profile.components);
         foreach (var comp in existing)
         {
+            if (comp == null) continue;
             profile.Remove(comp.GetType());
             Object.DestroyImmediate(comp, true);
         }
+        profile.components.Clear();
 
-        // Bloom — 이펙트·아이템·Emission 빛남
-        var bloom = profile.Add<Bloom>(true);
-        bloom.threshold.overrideState = true; bloom.threshold.value = 1.05f;
-        bloom.intensity.overrideState = true; bloom.intensity.value = 0.55f;
-        bloom.scatter.overrideState   = true; bloom.scatter.value   = 0.72f;
-        bloom.tint.overrideState      = true; bloom.tint.value      = Color.white;
+        // Bloom — AN 기반 + 뿌연 느낌 줄임 (threshold ↑, intensity ↓)
+        var bloom = AddOverride<Bloom>(profile);
+        bloom.threshold.overrideState = true; bloom.threshold.value = 0.7f;
+        bloom.intensity.overrideState = true; bloom.intensity.value = 0.25f;
+        bloom.scatter.overrideState   = true; bloom.scatter.value   = 0.6f;
+        bloom.tint.overrideState      = true; bloom.tint.value      = new Color(1f, 0.904989f, 0.8066038f, 1f);
 
-        // Vignette — 화면 모서리 어둡게 (시선 집중)
-        var vign = profile.Add<Vignette>(true);
-        vign.intensity.overrideState  = true; vign.intensity.value  = 0.32f;
-        vign.smoothness.overrideState = true; vign.smoothness.value = 0.45f;
-        vign.color.overrideState      = true; vign.color.value      = new Color(0.03f, 0.02f, 0.05f, 1f);
+        // Vignette — AN 원본 값 그대로
+        var vign = AddOverride<Vignette>(profile);
+        vign.intensity.overrideState  = true; vign.intensity.value  = 0.35f;
+        vign.smoothness.overrideState = true; vign.smoothness.value = 0.35f;
 
-        // Color Adjustments — 톤 통일 (대비·채도 살짝 강화)
-        var ca = profile.Add<ColorAdjustments>(true);
-        ca.postExposure.overrideState = true; ca.postExposure.value = 0.15f;
+        // Color Adjustments — AN 원본 + colorFilter 살짝 웜으로 따뜻함 보강
+        var ca = AddOverride<ColorAdjustments>(profile);
+        ca.postExposure.overrideState = true; ca.postExposure.value = 0.8f;
         ca.contrast.overrideState     = true; ca.contrast.value     = 10f;
-        ca.saturation.overrideState   = true; ca.saturation.value   = 10f;
-        ca.colorFilter.overrideState  = true; ca.colorFilter.value  = new Color(1f, 0.98f, 0.94f, 1f); // 살짝 웜
+        ca.saturation.overrideState   = true; ca.saturation.value   = 2f;
+        ca.colorFilter.overrideState  = true; ca.colorFilter.value  = new Color(1f, 0.98f, 0.94f, 1f); // 살짝 웜 캐스트
 
-        // Chromatic Aberration — 아주 약하게 (스타일)
-        var chrom = profile.Add<ChromaticAberration>(true);
-        chrom.intensity.overrideState = true; chrom.intensity.value = 0.12f;
+        // Lift Gamma Gain — AN 원본 값 그대로 (그림자 따뜻한 시그니처)
+        var lgg = AddOverride<LiftGammaGain>(profile);
+        lgg.lift.overrideState = true; lgg.lift.value = new Vector4(1f, 0.9612974f, 0.9404001f, 0.01986097f);
 
-        // Tonemapping — ACES로 시네마틱 필름룩
-        var tm = profile.Add<Tonemapping>(true);
+        // Tonemapping — ACES (AN 그대로)
+        var tm = AddOverride<Tonemapping>(profile);
         tm.mode.overrideState = true; tm.mode.value = TonemappingMode.ACES;
 
-        // Film Grain — 아주 약하게 (질감)
-        var fg = profile.Add<FilmGrain>(true);
-        fg.type.overrideState      = true; fg.type.value      = FilmGrainLookup.Thin1;
-        fg.intensity.overrideState = true; fg.intensity.value = 0.18f;
-        fg.response.overrideState  = true; fg.response.value  = 0.85f;
+        // Motion Blur — AN 0.5 → 0.2 톤다운 (뿌연 느낌 줄임)
+        // 주의: VolumePulseService 가 피격 시 별도 Volume(priority 10)으로 MotionBlur 펄스 적용.
+        var mb = AddOverride<MotionBlur>(profile);
+        mb.quality.overrideState   = true; mb.quality.value   = MotionBlurQuality.High;
+        mb.intensity.overrideState = true; mb.intensity.value = 0.2f;
+        mb.clamp.overrideState     = true; mb.clamp.value     = 0.05f;
     }
 
-    // ─────────────────────────────────────────────
-    // 2. Scene Volume
-    // ─────────────────────────────────────────────
-
-    private static GameObject EnsureGlobalVolumeInScene(VolumeProfile profile)
+    // VolumeProfile.Add<T>() 만으로는 sub-asset 등록이 안 되어 직렬화 시 fileID:0 깨짐 발생.
+    // 명시적으로 AddObjectToAsset 호출하여 프로파일 자산의 하위 자산으로 묶는다.
+    private static T AddOverride<T>(VolumeProfile profile) where T : VolumeComponent
     {
-        GameObject go = GameObject.Find(VolumeName);
-        if (go == null)
+        var comp = profile.Add<T>(true);
+        comp.hideFlags = HideFlags.HideInHierarchy;
+        if (AssetDatabase.Contains(profile) && !AssetDatabase.Contains(comp))
         {
-            go = new GameObject(VolumeName);
-            EditorSceneManager.MoveGameObjectToScene(go, EditorSceneManager.GetActiveScene());
+            AssetDatabase.AddObjectToAsset(comp, profile);
         }
-
-        var volume = go.GetComponent<Volume>();
-        if (volume == null) volume = go.AddComponent<Volume>();
-        volume.isGlobal  = true;
-        volume.priority  = 0f;
-        volume.weight    = 1f;
-        volume.profile   = profile;
-        EditorUtility.SetDirty(go);
-
-        return go;
+        return comp;
     }
 
     // ─────────────────────────────────────────────
-    // 3. Camera PP
+    // 2. Camera PP
     // ─────────────────────────────────────────────
 
     private static int EnablePostProcessingOnCameras()
@@ -179,7 +146,7 @@ public static class SetupCinematicLook
     }
 
     // ─────────────────────────────────────────────
-    // 5. SSAO Renderer Feature
+    // 3. SSAO Renderer Feature
     // ─────────────────────────────────────────────
 
     /// <summary>프로젝트 내 모든 UniversalRendererData 에셋에 Screen Space Ambient Occlusion Feature를 추가.
