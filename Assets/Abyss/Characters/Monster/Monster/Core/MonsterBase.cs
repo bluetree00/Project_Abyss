@@ -156,6 +156,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     // ── OnEnable 콜백 (StateOverrideSO 가 쿨다운 리셋 등을 등록) ─
     private readonly List<System.Action> _onEnabledCallbacks = new();
 
+    // ── GetHit 억제 플래그 (파생 클래스에서 OnDamageTaken 안에 true 설정 → GetHitState 전환 스킵) ─
+    protected bool _suppressGetHitThisHit;
+
     /// <summary>풀 재사용(OnEnable) 시 호출할 콜백을 등록한다. StateOverrideSO.RegisterOverrides() 에서 사용.</summary>
     public void RegisterOnEnabledCallback(System.Action callback) => _onEnabledCallbacks.Add(callback);
 
@@ -570,11 +573,16 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             if ((constraints & SpecialStateConstraint.UnInterruptible) != 0) return;
 
             // HP 임계값 특수 상태 진입 훅 — 파생 클래스에서 ChangeState(special) 호출 가능
+            // 파생 클래스가 _suppressGetHitThisHit = true 를 설정하면 GetHitState 전환을 스킵한다
+            _suppressGetHitThisHit = false;
             OnDamageTaken();
 
             // 특수 상태(포효 등)로 전환됐으면 넉백·GetHitState 모두 스킵
             // (isKinematic을 false로 두지 않아야 특수 상태 중 물리 이탈을 막는다)
             if (IsInSpecialState) return;
+
+            // 방어도 등 파생 클래스가 GetHit 억제 요청 시 스킵
+            if (_suppressGetHitThisHit) return;
 
             if ((_runtime.IsDormant || _runtime.IsReturning) && _runtime.HasBeenAttacked)
             {
@@ -771,18 +779,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _           => ElementType.None,
     };
 
-    private async UniTask LoadAnimatorControllerAsync()
-    {
-        string addr = _config.animation.animatorControllerAddress;
-        if (string.IsNullOrEmpty(addr)) return;
-
-        var overrideCtrl = await Managers.AddressableManager
-            .LoadAssetAsync<AnimatorOverrideController>(addr);
-
-        if (overrideCtrl == null || _animator == null) return;
-
-        _animator.runtimeAnimatorController = overrideCtrl;
-    }
+    // Animator Controller는 프리팹에 직접 할당 — 런타임 로드 불필요
+    private UniTask LoadAnimatorControllerAsync() => UniTask.CompletedTask;
 
     private void SetPlayerTarget(Transform player)
     {
@@ -980,7 +978,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     /// 직접 Warp(transform.position) 이 NavMesh 와의 미세 오프셋으로 실패하는 경우를
     /// 대비해 NavMesh.SamplePosition 으로 5m 반경 nearest 포인트를 찾아 Warp 한다.
     /// </summary>
-    protected bool TrySnapAgentToNavMesh()
+    public bool TrySnapAgentToNavMesh()
     {
         if (_agent == null || !_agent.enabled) return false;
         if (_agent.isOnNavMesh) return true;

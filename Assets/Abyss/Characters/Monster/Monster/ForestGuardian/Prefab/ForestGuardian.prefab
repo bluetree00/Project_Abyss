@@ -853,6 +853,7 @@ GameObject:
   - component: {fileID: 1900666322484256491}
   - component: {fileID: 8195131473398459489}
   - component: {fileID: 6438078730164102200}
+  - component: {fileID: 7771273134277826}
   m_Layer: 7
   m_Name: ForestGuardian
   m_TagString: Monster
@@ -983,11 +984,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fea448ba90791f7489bb078c40421615, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.ForestGuardianMonster
+  _effectiveElement: -1
   _debugState: 
   _bodyRenderers:
   - {fileID: 8730490655656807039}
   _limbRenderers:
   - {fileID: 8730490655656807039}
+--- !u!114 &7771273134277826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3107424503361241529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de75a8c02625a2244ab91e9a7844500d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterAnimEventReceiver
 --- !u!1 &3435683657705458524
 GameObject:
   m_ObjectHideFlags: 0

@@ -172,38 +172,47 @@ public class FGAttackState : IMonsterState
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GetHit (그로기 포함)
+// GetHit (방어도 파괴 경직 · 그로기 포함)
+//
+// ─ IsGroggy = true  : GroggyAnim + GroggyDuration (기존 그로기 시스템)
+// ─ IsPoiseBroken = true : 방향 GetHit 애님 + PoiseStaggerTime (방어도 파괴 경직)
+//   방어도 파괴 경직이 끝나면 ClearPoiseBroken() 호출 후 추적 복귀.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 public class FGGetHitState : GetHitState
 {
-    private const string GroggyAnim    = "Groggy";
-    private const string HitFrontAnim  = "GetHit_Front";
-    private const string HitBackAnim   = "GetHit_Back";
-    private const string HitLeftAnim   = "GetHit_Left";
-    private const string HitRightAnim  = "GetHit_Right";
-    private const string HitHeavyAnim  = "GetHit_Heavy";
-    private const float  NormalStun    = 0.4f;
+    private const string GroggyAnim   = "Groggy";
+    private const string HitFrontAnim = "GetHit_Front";
+    private const string HitBackAnim  = "GetHit_Back";
+    private const string HitLeftAnim  = "GetHit_Left";
+    private const string HitRightAnim = "GetHit_Right";
+    private const string HitHeavyAnim = "GetHit_Heavy";
 
     private bool _isGroggy;
+    private bool _isPoiseBreak;
 
     public override void Enter(MonsterContext ctx)
     {
         ctx.Agent.enabled = false;
 
         var fg = ctx.Monster as ForestGuardianMonster;
-        _isGroggy = fg != null && fg.FGBlackboard.IsGroggy;
+        _isGroggy     = fg != null && fg.FGBlackboard.IsGroggy;
+        _isPoiseBreak = fg != null && fg.FGBlackboard.IsPoiseBroken;
 
         if (_isGroggy)
         {
             ctx.Runtime.StateTimer = ForestGuardianBlackboard.GroggyDuration;
             PlayAnim(ctx, GroggyAnim, 0.1f);
         }
+        else if (_isPoiseBreak)
+        {
+            ctx.Runtime.StateTimer = ForestGuardianBlackboard.PoiseStaggerTime;
+            PlayAnim(ctx, GetDirectionalAnim(fg), 0.05f);
+        }
         else
         {
-            ctx.Runtime.StateTimer = NormalStun;
-            string anim = GetDirectionalAnim(fg);
-            PlayAnim(ctx, anim, 0.05f);
+            // 방어도·그로기 모두 아닌 경우 (발생하지 않아야 하나 안전망)
+            ctx.Runtime.StateTimer = 0f;
         }
     }
 
@@ -220,12 +229,24 @@ public class FGGetHitState : GetHitState
             if (ctx.Runtime.StateTimer > 0f) return;
         }
 
+        // 방어도 파괴 플래그 해제
+        if (_isPoiseBreak)
+            (ctx.Monster as ForestGuardianMonster)?.FGBlackboard.ClearPoiseBroken();
+
         RestoreAgent(ctx);
 
         if (ctx.Runtime.PlayerTarget != null && !ctx.Monster.IsPlayerDead())
             ctx.Monster.ChangeState<ChaseState>();
         else
             ctx.Monster.ChangeState<PatrolState>();
+    }
+
+    public override void Exit(MonsterContext ctx)
+    {
+        // 상태가 외부 전환(사망 등)으로 종료될 경우에도 플래그 정리
+        if (_isPoiseBreak)
+            (ctx.Monster as ForestGuardianMonster)?.FGBlackboard.ClearPoiseBroken();
+        base.Exit(ctx);
     }
 
     private static string GetDirectionalAnim(ForestGuardianMonster fg)

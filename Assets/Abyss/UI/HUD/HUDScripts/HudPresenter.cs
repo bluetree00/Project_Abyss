@@ -48,7 +48,8 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void Start()
     {
-        SetMode(startMode);
+        if (_currentMode == HUDIds.Mode.None)
+            SetMode(startMode);
     }
 
     public void Construct(GameRunSession run, UIHudDataProvider provider)
