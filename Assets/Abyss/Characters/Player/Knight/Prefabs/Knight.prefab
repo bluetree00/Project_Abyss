@@ -156,6 +156,7 @@ MonoBehaviour:
   rb: {fileID: 0}
   playerTransform: {fileID: 0}
   characterData: {fileID: 0}
+  debugInvincible: 0
   inputReady: 0
   cinemachineCamera: {fileID: 0}
   EventReceiver: {fileID: 0}

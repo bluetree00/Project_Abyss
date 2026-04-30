@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5b67262f8fe11f4aae7ec3d5cdff533, type: 3}
+  m_Name: FG_GroundSlashPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGroundSlashPatternSO
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  maxRange: 8
+  warningDuration: 0.5
+  strikeAnimDuration: 0.8
+  vfxDelay: 0.4
+  hitInterval: 0.4
+  recoveryDuration: 0.5
+  hitRanges:
+  - 5
+  - 10
+  - 15
+  hitWidths:
+  - 4
+  - 5
+  - 6
+  hitVfxScales:
+  - 3
+  - 6
+  - 9
+  damageMultiplier: 1.2
+  launchUpForce: 4
+  launchOutForce: 3
+  launchAirTime: 0.7
+  warningDiscPrefab: {fileID: 4051324956554267991, guid: 28cd29da49582cb4aaf1ba4bb59fedf1,
+    type: 3}
+  slamVfxPrefab: {fileID: 8719263370430895187, guid: cfcf1b1a67677664b8243dfeeeeb152e,
+    type: 3}
+  vfxLifetime: 2
