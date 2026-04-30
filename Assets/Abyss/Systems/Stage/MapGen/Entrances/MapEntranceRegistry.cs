@@ -4,17 +4,18 @@
 /// </summary>
 public static class MapEntranceRegistry
 {
-    /// <summary>ID 매칭 실패 또는 빈 값이면 Scatter(기본)로 폴백.</summary>
+    /// <summary>ID 매칭 실패 또는 빈 값이면 Dissolve(기본)로 폴백.</summary>
     public static IMapEntrance Resolve(string id)
     {
-        if (string.IsNullOrWhiteSpace(id)) return new ScatterEntrance();
+        if (string.IsNullOrWhiteSpace(id)) return new DissolveEntrance();
 
         return id.Trim() switch
         {
+            "Dissolve"   => new DissolveEntrance(),
             "Scatter"    => new ScatterEntrance(),
             "TetrisDrop" => new TetrisDropEntrance(),
             "Shockwave"  => new ShockwaveEntrance(),
-            _            => new ScatterEntrance(),
+            _            => new DissolveEntrance(),
         };
     }
 }

@@ -24,7 +24,7 @@ MonoBehaviour:
     moveSpeed: 3
     attackRange: 2
     attackRadius: 2
-    attackRate: 1
+    attackRate: 0.35
     attackDelay: 0.8
     knockbackForce: 5
     attackShape: {fileID: 0}
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: IdleNormal
+    patrolStateName: IdleNormal
+    chaseStateName: IdleNormal
+    attackReadyStateName: IdleBattle
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomethingST
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
