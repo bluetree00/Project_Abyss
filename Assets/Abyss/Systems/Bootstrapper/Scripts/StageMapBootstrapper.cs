@@ -403,6 +403,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             image.sprite = defaultMapBackground;
             image.color = Color.white;
         }
+        else if (chapterData != null && !string.IsNullOrEmpty(chapterData.mapBackgroundKey))
+        {
+            LoadChapterBackgroundAsync(image, chapterData.mapBackgroundKey, chapterData.mapBackgroundTint).Forget();
+        }
         else
         {
             // 폴백: Addressable에서 기본 배경 로드
@@ -550,11 +554,38 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         img.SetNativeSize();
     }
 
+    private static async UniTaskVoid LoadChapterBackgroundAsync(UnityEngine.UI.Image image, string key, Color tint)
+    {
+        try
+        {
+            // TryLoadAssetAsync: 키 미등록 시 예외/로그 없이 null 반환
+            var sprite = await Managers.AddressableManager.TryLoadAssetAsync<Sprite>(key);
+            if (sprite != null && image != null)
+            {
+                image.sprite = sprite;
+                image.color = tint;
+                return;
+            }
+            var tex = await Managers.AddressableManager.TryLoadAssetAsync<Texture2D>(key);
+            if (tex != null && image != null)
+            {
+                image.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                image.color = tint;
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StageMapBootstrapper] 챕터 배경 로드 실패 ({key}): {e.Message}");
+        }
+    }
+
     private static async UniTaskVoid LoadDefaultBackgroundAsync(UnityEngine.UI.Image image)
     {
         try
         {
-            var sprite = await Managers.AddressableManager.LoadAssetAsync<Sprite>("map_3");
+            // TryLoadAssetAsync: 키 미등록 시 예외/로그 없이 null 반환
+            var sprite = await Managers.AddressableManager.TryLoadAssetAsync<Sprite>("map_3");
             if (sprite != null && image != null)
             {
                 image.sprite = sprite;
@@ -563,7 +594,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             }
 
             // Sprite 실패 시 Texture2D로 폴백
-            var tex = await Managers.AddressableManager.LoadAssetAsync<Texture2D>("map_3");
+            var tex = await Managers.AddressableManager.TryLoadAssetAsync<Texture2D>("map_3");
             if (tex != null && image != null)
             {
                 image.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),

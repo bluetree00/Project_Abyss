@@ -73,10 +73,10 @@ public class MonsterJsonData
         public string patrolStateName;
         public string chaseStateName;
         public string attackReadyStateName;
-        public string attackStateName;
-        public string getHitStateName;
-        public string dieStateName;
-        public string detectStateName;
+        public string attackTrigger;
+        public string getHitTrigger;
+        public string dieTrigger;
+        public string detectTrigger;
         public string speedParam;
         public float  speedDampTime;
         public float  crossFadeDuration;
@@ -157,6 +157,8 @@ public class MonsterJsonData
         // ── 애니메이션
         if (animation != null)
         {
+            if (!string.IsNullOrEmpty(animation.animatorControllerAddress))
+                config.animation.animatorControllerAddress = animation.animatorControllerAddress;
             if (!string.IsNullOrEmpty(animation.idleStateName))
                 config.animation.idleStateName        = animation.idleStateName;
             if (!string.IsNullOrEmpty(animation.patrolStateName))
@@ -165,12 +167,14 @@ public class MonsterJsonData
                 config.animation.chaseStateName       = animation.chaseStateName;
             if (!string.IsNullOrEmpty(animation.attackReadyStateName))
                 config.animation.attackReadyStateName = animation.attackReadyStateName;
-            if (!string.IsNullOrEmpty(animation.attackStateName))
-                config.animation.attackStateName      = animation.attackStateName;
-            if (!string.IsNullOrEmpty(animation.getHitStateName))
-                config.animation.getHitStateName      = animation.getHitStateName;
-            if (!string.IsNullOrEmpty(animation.dieStateName))
-                config.animation.dieStateName         = animation.dieStateName;
+            if (!string.IsNullOrEmpty(animation.attackTrigger))
+                config.animation.attackTrigger        = animation.attackTrigger;
+            if (!string.IsNullOrEmpty(animation.getHitTrigger))
+                config.animation.getHitTrigger        = animation.getHitTrigger;
+            if (!string.IsNullOrEmpty(animation.dieTrigger))
+                config.animation.dieTrigger           = animation.dieTrigger;
+            if (!string.IsNullOrEmpty(animation.detectTrigger))
+                config.animation.detectTrigger        = animation.detectTrigger;
             if (!string.IsNullOrEmpty(animation.speedParam))
                 config.animation.speedParam           = animation.speedParam;
             if (animation.speedDampTime    > 0) config.animation.speedDampTime    = animation.speedDampTime;

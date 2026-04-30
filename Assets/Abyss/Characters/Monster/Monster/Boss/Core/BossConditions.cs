@@ -80,22 +80,6 @@ public sealed class HpBelowCondition : ICondition
     }
 }
 
-/// <summary>현재 HP 비율 > threshold (0~1) 이면 참.</summary>
-public sealed class HpAboveCondition : ICondition
-{
-    private readonly float _threshold;
-    public HpAboveCondition(float threshold) => _threshold = threshold;
-
-    public bool Evaluate(BossPatternContext ctx)
-    {
-        var rt  = ctx.Ctx.Runtime;
-        var cfg = ctx.Ctx.Config;
-        if (cfg?.stat == null || cfg.stat.maxHp == 0) return false;
-        float ratio = (float)rt.CurrentHp / cfg.stat.maxHp;
-        return ratio > _threshold;
-    }
-}
-
 // ── 직전 패턴 태그 ─────────────────────────────────────────
 /// <summary>Blackboard.LastPatternTag == tag 이면 참.</summary>
 public sealed class LastTagCondition : ICondition

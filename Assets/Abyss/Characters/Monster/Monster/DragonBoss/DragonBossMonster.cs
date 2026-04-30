@@ -8,13 +8,13 @@ namespace Abyss.Monster
 ///
 /// ━━ 설정 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  공통 스탯·패턴은 BossConfigSO (Addressables "DragonBossConfig") 에서 로드.
-///  드래곤 고유 수치(걷기/달리기 임계값 등)는 프리팹 [SerializeField] 로 설정.
-///  공중 이륙/체공/착지는 각 공중 공격 패턴 SO 내부 FullLockState 가 담당.
+///  드래곤 고유 수치(비행 높이, 걷기/달리기 임계값 등)는 프리팹 [SerializeField] 로 설정.
 ///
 /// ━━ 상태 구성 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  공통: Idle(PatrolState) · WalkChase(ChaseState) ·
 ///        RunChase(별도 타입) · AttackReady · AttackState(안전망) ·
 ///        GetHit · Die
+///  드래곤 전용: Takeoff · AirChase · Landing
 ///
 /// ━━ 패턴 시스템 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  BossPatternRunner 가 Update() 에서 틱되어 BossConfigSO 의
@@ -26,6 +26,9 @@ public class DragonBossMonster : MonsterBase, IBoss
     [Header("Dragon — 애니메이션 상태 이름")]
     [SerializeField] private string _walkChaseStateName  = "WalkChase";
     [SerializeField] private string _runChaseStateName   = "RunChase";
+    [SerializeField] private string _takeoffStateName    = "Takeoff";
+    [SerializeField] private string _airChaseStateName   = "AirChase";
+    [SerializeField] private string _landingStateName    = "Landing";
     [SerializeField] private string _walkLeftStateName  = "WalkLeft";
     [SerializeField] private string _walkRightStateName = "WalkRight";
     [SerializeField] private string _runLeftStateName   = "RunLeft";
@@ -41,9 +44,20 @@ public class DragonBossMonster : MonsterBase, IBoss
     [Tooltip("방향 전환 애니 재생 중 이동 속도 배율")]
     [SerializeField] private float _turnSpeedMult = 0.4f;
 
+    [Header("Dragon — 비행")]
+    [Tooltip("공중 추적 유지 시간 (초)")]
+    [SerializeField] private float _airChaseDuration = 8f;
+    [Tooltip("비행 시 Y 오프셋 (m)")]
+    [SerializeField] private float _airChaseHeight = 4f;
+    [Tooltip("비행 이동 속도 배율 (moveSpeed 대비)")]
+    [SerializeField] private float _airChaseSpeedMult = 1.4f;
+
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
     public string RunChaseStateName    => _runChaseStateName;
+    public string TakeoffStateName     => _takeoffStateName;
+    public string AirChaseStateName    => _airChaseStateName;
+    public string LandingStateName     => _landingStateName;
     public string WalkLeftStateName   => _walkLeftStateName;
     public string WalkRightStateName  => _walkRightStateName;
     public string RunLeftStateName    => _runLeftStateName;
@@ -52,6 +66,9 @@ public class DragonBossMonster : MonsterBase, IBoss
     public float  ChaseAngularSpeed   => _chaseAngularSpeed;
     public float  WalkChaseSpeedMult  => _walkChaseSpeedMult;
     public float  TurnSpeedMult       => _turnSpeedMult;
+    public float  AirChaseDuration    => _airChaseDuration;
+    public float  AirChaseHeight      => _airChaseHeight;
+    public float  AirChaseSpeedMult   => _airChaseSpeedMult;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -231,9 +248,6 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.Dragon_ElementIce     => new DragonElementPhaseCondition(DragonElementPhase.Ice),
             BossConditionKey.Dragon_ElementThunder => new DragonElementPhaseCondition(DragonElementPhase.Thunder),
             BossConditionKey.Dragon_ElementFire    => new DragonElementPhaseCondition(DragonElementPhase.Fire),
-            // 바디 상태: 지상/공중 — 공중·지상 패턴 풀 필터링용
-            BossConditionKey.Dragon_Body_Grounded  => new DragonBodyStateCondition(BodyState.Grounded),
-            BossConditionKey.Dragon_Body_Airborne  => new DragonBodyStateCondition(BodyState.Airborne),
             _                                      => new AlwaysTrue(),
         };
     }

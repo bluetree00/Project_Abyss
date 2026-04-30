@@ -41,16 +41,3 @@ MonoBehaviour:
     attackShapeOverride: {fileID: 11400000, guid: 478d4d8475e54a4c925f2737e9668c34, type: 2}
     warningRadius: 0
     warningDuration: 0
-  - name: Spin
-    animationStateName: Attack01
-    minDistance: 0
-    maxDistance: 1.5
-    priority: 0
-    cooldown: 2.5
-    damageDelay: 0.3
-    attackDuration: 1.0
-    damageMultiplier: 1.3
-    knockbackMultiplier: 1.2
-    attackShapeOverride: {fileID: 11400000, guid: 1ab75c36f2d6472f8569ac7f53f2d7e7, type: 2}
-    warningRadius: 1.5
-    warningDuration: 0.3

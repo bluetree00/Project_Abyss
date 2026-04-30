@@ -21,7 +21,7 @@ MonoBehaviour:
     maxHp: 200
     defense: 5
     attackPower: 22
-    moveSpeed: 4.5
+    moveSpeed: 2.5
     attackRange: 2
     attackRadius: 1
     attackRate: 0.7
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: BishopKnight_IdleNormal
+    patrolStateName: BishopKnight_WalkFWD
+    chaseStateName: BishopKnight_RunFWD
+    attackReadyStateName: BishopKnight_IdleBattle
+    attackTrigger: BishopKnight_Attack01
+    getHitTrigger: BishopKnight_GetHit
+    dieTrigger: BishopKnight_Die
+    detectTrigger: BishopKnight_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

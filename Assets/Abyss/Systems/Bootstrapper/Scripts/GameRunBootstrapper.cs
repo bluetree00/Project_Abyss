@@ -96,8 +96,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         EnsureCameraController();
 
         // AppBootstrapper 준비 대기 (자동 로그인 포함)
-        // null인 경우(씬 직접 실행)는 즉시 통과
-        await UniTask.WaitUntil(() => AppBootstrapper.Instance == null || AppBootstrapper.Instance.IsReady);
+        await UniTask.WaitUntil(() => AppBootstrapper.Instance != null && AppBootstrapper.Instance.IsReady);
 
         // 데이터 매니저 초기화 (로그인 완료 후 CDN 사용 가능)
         await InitMapDataAsync();

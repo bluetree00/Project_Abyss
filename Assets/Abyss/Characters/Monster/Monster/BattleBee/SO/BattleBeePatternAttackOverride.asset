@@ -28,8 +28,6 @@ MonoBehaviour:
     attackShapeOverride: {fileID: 0}
     warningRadius: 0
     warningDuration: 0
-    slowScale: 0.4
-    slowDuration: 3
   - name: DashSting
     animationStateName: BattleBee_Attack01
     minDistance: 0.9
@@ -43,5 +41,3 @@ MonoBehaviour:
     attackShapeOverride: {fileID: 11400000, guid: 8fda11f6c0e24547b88a823bd4f7147b, type: 2}
     warningRadius: 0
     warningDuration: 0
-    slowScale: 0.4
-    slowDuration: 3

@@ -183,7 +183,7 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
             ctx.Runtime.AttackHitDealt = false;
             RotateTowardPlayer(ctx, 100f);
 
-            var attackAnim = _useRangedAttack ? _data.sonicAnimTrigger : ctx.Animation.attackStateName;
+            var attackAnim = _useRangedAttack ? _data.sonicAnimTrigger : ctx.Animation.attackTrigger;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
                 ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
         }

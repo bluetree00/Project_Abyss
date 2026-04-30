@@ -21,7 +21,7 @@ MonoBehaviour:
     maxHp: 150
     defense: 3
     attackPower: 22
-    moveSpeed: 4.5
+    moveSpeed: 3
     attackRange: 2
     attackRadius: 2
     attackRate: 0.7
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: Salamander_IdleNormal
+    patrolStateName: Salamander_WalkFWD
+    chaseStateName: Salamander_RunFWD
+    attackReadyStateName: Salamander_IdleBattle
+    attackTrigger: Salamander_Attack01
+    getHitTrigger: Salamander_GetHit
+    dieTrigger: Salamander_Die
+    detectTrigger: Salamander_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
