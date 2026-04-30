@@ -597,6 +597,8 @@ public class BlockSynergyBridge : MonoBehaviour
             float scale = Mathf.Min(hostW * 0.85f / naturalW, hostH * 0.85f / naturalH);
             gridRT.localScale       = Vector3.one * scale;
             gridRT.anchoredPosition = Vector2.zero;
+            // 셰이프도 같은 스케일로 동기화 (배치 판정 일치를 위해 필수)
+            boardManager.ApplyFittedScale(scale);
 
             Debug.Log($"[BlockSynergyBridge] Grid 스케일: {scale:F3} (host {hostW:F0}×{hostH:F0}, natural {naturalW:F0}×{naturalH:F0})");
         }
