@@ -43,7 +43,8 @@ public sealed class HudBootstrapper : MonoBehaviour
         if (_panelGuardTimer > 0f) return;
 
         _panelGuardTimer = 0.2f;
-        if (!IsInGameScene()) return;
+        // 바운드 보스가 있으면 씬 이름 무관하게 Boss HUD 유지
+        if (!IsInGameScene() && (presenter == null || !presenter.HasBoundBoss)) return;
 
         EnsureHudHierarchyVisible();
         if (presenter != null)
@@ -263,6 +264,11 @@ public sealed class HudBootstrapper : MonoBehaviour
     private HUDIds.Mode ResolveMode(HUDIds.Mode requestedMode)
     {
         var normalized = NormalizeMode(requestedMode);
+
+        // 보스가 바인딩된 상태에서 Combat 요청이 오면 Boss 모드 유지
+        if (normalized == HUDIds.Mode.Combat && presenter != null && presenter.HasBoundBoss)
+            return HUDIds.Mode.Boss;
+
         if (normalized == HUDIds.Mode.Boss && (presenter == null || !presenter.HasBoundBoss))
             return HUDIds.Mode.Combat;
 

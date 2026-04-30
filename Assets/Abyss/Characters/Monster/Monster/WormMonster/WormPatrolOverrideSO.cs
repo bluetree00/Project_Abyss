@@ -303,6 +303,12 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
             _burrowController.Emerge(ctx);
             base.Enter(ctx);
         }
+
+        public override void Exit(MonsterContext ctx)
+        {
+            _burrowController.Burrow(ctx);
+            base.Exit(ctx);
+        }
     }
 }
 

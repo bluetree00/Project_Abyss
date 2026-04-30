@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24a63ae3055e30448ae226d3f11b1ba8, type: 3}
+  m_Name: FG_ThrowRockPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGThrowRockPatternSO
+  weight: 0.2038719
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  minRange: 5
+  maxRange: 10
+  throwNormalizedTime: 0.3
+  throwExtraDelay: 1
+  recoveryDuration: 0.5
+  projectileSpeed: 15
+  throwHand: 18
+  damageMultiplier: 1.5
+  knockbackMultiplier: 2
+  rockPrefab: {fileID: 5989109738682827018, guid: c29dda9756feca746b286fd129764121,
+    type: 3}
+  rockScale: {x: 2, y: 2, z: 2}
+  warningZonePrefab: {fileID: 2000000, guid: 93093be1b61c0bc41af9f61b0c6b1c06, type: 3}
+  warningRadius: 2.5
+  impactEffectPrefab: {fileID: 3299158172022118399, guid: de1f55fdbeff202478d49f736dfc0c84,
+    type: 3}

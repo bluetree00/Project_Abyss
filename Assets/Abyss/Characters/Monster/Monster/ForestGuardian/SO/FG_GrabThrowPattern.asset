@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d9ca387c80397243a49337595412ae4, type: 3}
+  m_Name: FG_GrabThrowPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGrabThrowPatternSO
+  weight: 0.042604934
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  range: 4
+  arcHalfAngle: 22.5
+  grabTime: 1
+  slam1Offset: 1.4
+  slam2Offset: 2
+  throwOffset: 4
+  recoveryDuration: 1
+  slamDamageMultiplier: 1.2
+  throwDamageMultiplier: 1.5
+  throwKnockbackForce: 10
+  throwKnockbackDuration: 0.8
+  juggleSpeed: 12
+  juggleCatchRadius: 0.4
+  juggleArcUp: 0.8
+  warningZonePrefab: {fileID: 3000000, guid: d135e9ccf3685a94d80cff9190380b1b, type: 3}

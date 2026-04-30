@@ -17,5 +17,29 @@ public static class DragonBossVisualHelper
             _                                          => new Color(1.0f, 0.4f, 0.1f),
         };
     }
+
+    public static void ApplyEffectTint(GameObject go, Color tint)
+    {
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            foreach (var mat in r.materials)
+            {
+                if (mat.HasProperty("_BaseColor"))     mat.SetColor("_BaseColor",     tint);
+                if (mat.HasProperty("_Color"))         mat.SetColor("_Color",         tint);
+                if (mat.HasProperty("_TintColor"))     mat.SetColor("_TintColor",     tint);
+                if (mat.HasProperty("_MainColor"))     mat.SetColor("_MainColor",     tint);
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    mat.SetColor("_EmissionColor", tint * 0.4f);
+                    mat.EnableKeyword("_EMISSION");
+                }
+            }
+        }
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(tint);
+        }
+    }
 }
 }
