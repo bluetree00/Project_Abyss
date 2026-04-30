@@ -52,6 +52,9 @@ public class MonsterAnimEventReceiver : MonoBehaviour
 
     public void OnDieEnd() { }
 
+    // MagicAttack1 클립의 CastSpell 이벤트 — ThrowRock은 타이머 기반으로 발사하므로 무시.
+    public void CastSpell() { }
+
     // Third-party clips (Malbers) fire this event; silently ignore.
     public void PlaySound() { }
 

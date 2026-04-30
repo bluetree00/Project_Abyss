@@ -16,3 +16,5 @@ MonoBehaviour:
   projectileSpeed: 9
   projectileMaxRange: 8
   launchHeightOffset: 0.8
+  slowScale: 0.4
+  slowDuration: 2

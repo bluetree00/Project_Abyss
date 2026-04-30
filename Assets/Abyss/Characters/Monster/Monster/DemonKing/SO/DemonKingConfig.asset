@@ -42,15 +42,13 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: 
-    idleStateName: DemonKing_IdleNormal
-    patrolStateName: DemonKing_WalkFWD
-    chaseStateName: DemonKing_RunFWD
-    attackReadyStateName: DemonKing_IdleBattle
-    attackTrigger: DemonKing_Attack01
-    getHitTrigger: DemonKing_GetHit
-    dieTrigger: DemonKing_Die
-    detectTrigger: DemonKing_SenseSomethingStart
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
