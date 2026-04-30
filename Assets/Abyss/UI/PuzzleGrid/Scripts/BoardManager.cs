@@ -330,6 +330,9 @@ public class BoardManager : MonoBehaviour
 
     public event System.Action OnBackToSelection;
 
+    /// <summary>그리드 세션이 GridHost에 활성화된 직후 발생. Grid 인스턴스를 인수로 전달.</summary>
+    public event Action<Grid> OnGridSessionActivated;
+
     /// <summary>선택 화면으로 돌아간다.</summary>
     public void BackToSelection()
     {
@@ -569,6 +572,7 @@ public class BoardManager : MonoBehaviour
             GridManager.Instance.SetActiveGrid(session.gridInstance);
 
         SubscribeSOChanges(asset);
+        OnGridSessionActivated?.Invoke(session.gridInstance);
     }
 
     private void DeactivateSession(GridAssetSO asset)

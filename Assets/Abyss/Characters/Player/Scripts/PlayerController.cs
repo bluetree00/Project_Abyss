@@ -704,6 +704,7 @@ public class PlayerController : CharacterBase
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
         {
+            if (isInSkill) return; // 스킬 중에는 회피로 캔슬 불가
             if (!isDodging && UnityEngine.Time.time >= DodgeCooldownEnd)
             {
                 if (isInAct) actSM.Change(ActState.None);
