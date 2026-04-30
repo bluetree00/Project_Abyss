@@ -22,7 +22,7 @@ MonoBehaviour:
     defense: 4
     attackPower: 25
     moveSpeed: 2
-    attackRange: 5
+    attackRange: 10
     attackRadius: 0.5
     attackRate: 0.4
     attackDelay: 0.7
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: Cyclops_IdleNormal
+    patrolStateName: Cyclops_WalkFWD
+    chaseStateName: Cyclops_RunFWD
+    attackReadyStateName: Cyclops_IdleBattle
+    attackTrigger: Cyclops_Attack01
+    getHitTrigger: Cyclops_GetHit
+    dieTrigger: Cyclops_Die
+    detectTrigger: Cyclops_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

@@ -21,13 +21,6 @@ public class MonsterRangedAttackSO : MonsterAttackShapeSO
     [Tooltip("발사 높이 오프셋. 발사 위치 = 몬스터 위치 + (0, launchHeightOffset, 0).")]
     public float launchHeightOffset = 1f;
 
-    [Header("Debuff (Optional)")]
-    [Tooltip("피격 시 슬로우 배율 (0=미적용, 0.5=50% 감속).")]
-    public float slowScale;
-
-    [Tooltip("슬로우 지속 시간 (초).")]
-    public float slowDuration;
-
     public override void Execute(MonsterContext ctx, int damage, float knockbackForce)
     {
         if (projectilePrefab == null || ctx.Runtime?.PlayerTarget == null) return;
@@ -37,6 +30,6 @@ public class MonsterRangedAttackSO : MonsterAttackShapeSO
         Vector3 direction = (targetPos - origin).normalized;
 
         var proj = Object.Instantiate(projectilePrefab, origin, Quaternion.LookRotation(direction));
-        proj.Init(direction, projectileSpeed, projectileMaxRange, damage, knockbackForce, slowScale, slowDuration);
+        proj.Init(direction, projectileSpeed, projectileMaxRange, damage, knockbackForce);
     }
 }

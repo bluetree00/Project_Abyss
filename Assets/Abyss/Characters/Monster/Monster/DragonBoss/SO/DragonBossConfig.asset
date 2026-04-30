@@ -30,7 +30,7 @@ MonoBehaviour:
     attackShape: {fileID: 0}
   detection:
     detectionRange: 5
-    chaseGiveUpRange: 15
+    chaseGiveUpRange: 8
   patrol:
     patrolType: 0
     patrolRange: 3
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 0
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
+    animatorControllerAddress: 
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
     attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Death
+    detectTrigger: SenseSomething
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
@@ -78,60 +80,38 @@ MonoBehaviour:
   condPhase2HpThreshold: 0.4
   condDistClose: 3.5
   condDistFar: 5
-  condTimePressureSecs: 3
+  condTimePressureSecs: 8
   patternEntries:
-<<<<<<< HEAD
   - conditions: 
-    patterns: []
-=======
-  - conditions: 0f00000005000000
     patterns:
-    - {fileID: 11400000, guid: ceeafc3c15fb0a74ea297c4a28a371ed, type: 2}
->>>>>>> 285dd61ca88bdc221308f421a1ebecb4a0b84728
+    - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
     selectionMode: 0
     forceExecute: 0
-  - conditions: 1000000005000000
-    patterns:
-    - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
-    selectionMode: 0
-    forceExecute: 1
-  - conditions: 090000000f000000
+  - conditions: 09000000
     patterns:
     - {fileID: 11400000, guid: 18e5301f1cf53974280d1b3f1f18bd35, type: 2}
-    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
-    selectionMode: 0
-    forceExecute: 0
-  - conditions: 0900000010000000
-    patterns:
     - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
     - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
     - {fileID: 11400000, guid: 43ab687a0aeda1041aa1299750583028, type: 2}
     - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
     selectionMode: 0
     forceExecute: 0
-  - conditions: 0a0000000f000000
+  - conditions: 0a000000
     patterns:
     - {fileID: 11400000, guid: f3bb9b012aab7ff4385a5b1163c66220, type: 2}
-    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
-    selectionMode: 0
-    forceExecute: 0
-  - conditions: 0a00000010000000
-    patterns:
     - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
     - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
     - {fileID: 11400000, guid: 492216fbc76924b4981b1bb524cb1401, type: 2}
     selectionMode: 0
     forceExecute: 0
-  - conditions: 0b0000000f000000
+  - conditions: 0b000000
     patterns:
     - {fileID: 11400000, guid: 23094d91072ce764598c863739042d99, type: 2}
-    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
-    selectionMode: 0
-    forceExecute: 0
-  - conditions: 0b00000010000000
-    patterns:
     - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
     - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
     - {fileID: 11400000, guid: b2b426fa510a49d4d8cd658230b19d68, type: 2}
     selectionMode: 0
     forceExecute: 0

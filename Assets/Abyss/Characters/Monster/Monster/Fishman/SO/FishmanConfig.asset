@@ -22,7 +22,7 @@ MonoBehaviour:
     defense: 2
     attackPower: 15
     moveSpeed: 3
-    attackRange: 1
+    attackRange: 6
     attackRadius: 0.5
     attackRate: 0.8
     attackDelay: 0.5
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: Fishman_IdleNormal
+    patrolStateName: Fishman_WalkFWD
+    chaseStateName: Fishman_RunFWD
+    attackReadyStateName: Fishman_IdleBattle
+    attackTrigger: Fishman_Attack01
+    getHitTrigger: Fishman_GetHit
+    dieTrigger: Fishman_Die
+    detectTrigger: Fishman_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

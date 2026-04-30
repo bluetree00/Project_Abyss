@@ -23,23 +23,18 @@ public class MonsterProjectile : MonoBehaviour
     private float   _maxRange;
     private int     _damage;
     private float   _knockbackForce;
-    private float   _slowScale;
-    private float   _slowDuration;
 
     private Vector3 _originPos;
     private bool    _initialized;
     private bool    _hit;
 
-    public void Init(Vector3 direction, float speed, float maxRange, int damage, float knockbackForce,
-                     float slowScale = 0f, float slowDuration = 0f)
+    public void Init(Vector3 direction, float speed, float maxRange, int damage, float knockbackForce)
     {
         _direction      = direction;
         _speed          = speed;
         _maxRange       = maxRange;
         _damage         = damage;
         _knockbackForce = knockbackForce;
-        _slowScale      = slowScale;
-        _slowDuration   = slowDuration;
         _originPos      = transform.position;
         _initialized    = true;
         _hit            = false;
@@ -81,9 +76,6 @@ public class MonsterProjectile : MonoBehaviour
         _hit = true;
 
         player.TakeDamage(_damage);
-
-        if (_slowDuration > 0f)
-            player.ApplySlow(_slowScale, _slowDuration);
 
         Vector3 dir = (hitObject.transform.position - transform.position).normalized;
         dir.y = 0.3f;
