@@ -8322,6 +8322,16 @@ MonoBehaviour:
     type: 3}
   boardManager: {fileID: 0}
   thumbnailFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
+  boardBackgroundSprite: {fileID: 21300000, guid: c6243fcb96de09649b65dc990f1f4bfe, type: 3}
+  thumbnailCardSprites:
+  - {fileID: 21300000, guid: a8b9232c8f7ac36459607bafbe10295a, type: 3}
+  decorationPrefabs:
+  - {fileID: 662922530722728346, guid: 6054b786f5270aa46ba49be918e74540, type: 3}
+  - {fileID: 7171446768605253056, guid: 6a404b0b582da0c45a239aba271c2f79, type: 3}
+  - {fileID: 3567226606377152341, guid: 09f9f99831ca5024fbb9724969de82cf, type: 3}
+  - {fileID: 5765908414231749099, guid: 15f316e3618b3e841aeb3671a577f1fd, type: 3}
+  - {fileID: 4708865141609604925, guid: cd2e58dd11818d34db7b8ef77ec4f116, type: 3}
+  - {fileID: 1778030784212188853, guid: e424f9c1106ee534d82fc38424276901, type: 3}
 --- !u!1 &2339155571575690763
 GameObject:
   m_ObjectHideFlags: 0
