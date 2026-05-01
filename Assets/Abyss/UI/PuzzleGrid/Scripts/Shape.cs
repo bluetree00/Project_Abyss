@@ -95,7 +95,15 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             var blockObj = Instantiate(shapeBlockPrefab, transform);
             var brt = blockObj.GetComponent<RectTransform>();
             if (brt != null)
+            {
+                // 블록 시각 크기를 그리드 gap(cellSize)에 맞춤 — 크기 불일치 시 호버 영역 오감지 방지
+                brt.sizeDelta = new Vector2(cellSize, cellSize);
                 brt.anchoredPosition = new Vector2(offset.x * cellSize, offset.y * cellSize);
+            }
+
+            // BoxCollider2D 크기도 cellSize 기준으로 동기화 (약 80% 인셋)
+            if (blockObj.TryGetComponent<BoxCollider2D>(out var col))
+                col.size = new Vector2(cellSize * 0.8f, cellSize * 0.8f);
         }
     }
 
@@ -104,8 +112,13 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         // 전역 배치 상태에서 제거 (슬롯으로 돌아올 수 있도록)
         BoardManager.Instance?.OnShapePickedUp(this);
 
-        if (GridManager.Instance != null)
-            GridManager.Instance.ReleaseShape(this);
+        GridManager.Instance?.ReleaseShape(this);
+
+        // ShapeScrollView 의 RectMask2D 클리핑 방지:
+        // 드래그 중 GameplayRoot 로 리패런트 → 격자 방향으로 스냅해도 잘리지 않음
+        var gameplayRoot = BoardManager.Instance?.gameplayRoot?.transform;
+        if (gameplayRoot != null && transform.parent != gameplayRoot)
+            transform.SetParent(gameplayRoot, true); // worldPositionStays=true
 
         // Visual feedback: scale multiplier
         float mul = (dragAsset != null) ? dragAsset.selectedScale.x : 1.1f;
@@ -118,11 +131,6 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             rt.anchoredPosition += dragAsset.pointerOffset / Mathf.Max(0.0001f, scaleFactor);
         }
 
-        if (GetOccupiedSquares() != null && GetOccupiedSquares().Count > 0)
-        {
-            GridManager.Instance.ReleaseShape(this);
-        }
-
         if (_layout != null) _layout.ignoreLayout = true;
     }
 
@@ -133,12 +141,17 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         Vector2 delta = eventData.delta / Mathf.Max(0.0001f, scaleFactor);
         rt.anchoredPosition += delta;
+
+        // 격자 근처이면 프리뷰만 표시 — 스냅은 손을 놓을 때만 (TryPlaceShape)
+        GridManager.Instance?.TryPreviewAndSnap(this, out _);
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
         // Restore base scale (placement manager will snap position)
         rt.localScale = cachedStartLocalScale;
+
+        GridManager.Instance?.ClearPreview();
 
         if (GridManager.Instance == null) { ReturnToStart(); return; }
 

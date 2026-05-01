@@ -102,6 +102,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
             RefreshStageMapUI();
             app.NotifySceneReady();
+
+            var introScroller = FindObjectOfType<StageMapScroller>(true);
+            if (introScroller != null)
+                await introScroller.PlayCurrentNodeZoomIntroAsync(this.GetCancellationTokenOnDestroy());
             return;
         }
 
