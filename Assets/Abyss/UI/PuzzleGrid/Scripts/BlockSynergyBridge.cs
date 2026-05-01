@@ -23,6 +23,8 @@ public class BlockSynergyBridge : MonoBehaviour
     private const float THUMBNAIL_HEIGHT = 295f;
     private const float THUMBNAIL_SPACING = 14f;
     private const int THUMBNAIL_COLUMNS = 5;
+    // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
+    private const float GRID_CELL_SIZE = 120f;
 
     // ── Static ──
     public static BlockSynergyBridge Instance { get; private set; }
@@ -215,33 +217,33 @@ public class BlockSynergyBridge : MonoBehaviour
             {
                 gameplayRT.anchorMin = Vector2.zero;
                 gameplayRT.anchorMax = Vector2.one;
-                gameplayRT.offsetMin = Vector2.zero;
-                gameplayRT.offsetMax = Vector2.zero;
+                gameplayRT.offsetMin = new Vector2(40f, 40f);
+                gameplayRT.offsetMax = new Vector2(-40f, -40f);
                 gameplayRT.pivot = new Vector2(0.5f, 0.5f);
             }
 
             EnsureBoardBackground(boardManager.gameplayRoot);
             EnsureDecorations(boardManager.gameplayRoot);
 
-            // GridHost: 좌측 68% × 상하 80% — 그리드 편집 영역
+            // GridHost: 좌측 62% × 상하 90% — 그리드 편집 영역
             if (boardManager.gridHost != null)
             {
-                boardManager.gridHost.anchorMin = new Vector2(0.02f, 0.1f);
-                boardManager.gridHost.anchorMax = new Vector2(0.68f, 0.9f);
+                boardManager.gridHost.anchorMin = new Vector2(0.02f, 0.05f);
+                boardManager.gridHost.anchorMax = new Vector2(0.62f, 0.95f);
                 boardManager.gridHost.offsetMin = Vector2.zero;
                 boardManager.gridHost.offsetMax = Vector2.zero;
                 boardManager.gridHost.pivot = new Vector2(0.5f, 0.5f);
             }
 
-            // ShapeScrollView: 우측 패널(72%~98%) — 스크롤 뷰포트 영역
+            // ShapeScrollView: 우측 패널(63%~94%) — 스크롤 뷰포트 영역
             var shapeSSV = boardManager.gameplayRoot.GetComponentInChildren<ShapeScrollView>(true);
             if (shapeSSV != null)
             {
                 var ssvRT = shapeSSV.transform as RectTransform;
                 if (ssvRT != null)
                 {
-                    ssvRT.anchorMin = new Vector2(0.70f, 0.1f);
-                    ssvRT.anchorMax = new Vector2(0.98f, 0.9f);
+                    ssvRT.anchorMin = new Vector2(0.63f, 0.05f);
+                    ssvRT.anchorMax = new Vector2(0.94f, 0.95f);
                     ssvRT.offsetMin = Vector2.zero;
                     ssvRT.offsetMax = Vector2.zero;
                     ssvRT.pivot = new Vector2(0.5f, 0.5f);
@@ -263,8 +265,8 @@ public class BlockSynergyBridge : MonoBehaviour
             else if (boardManager.shapeHost != null)
             {
                 // ShapeScrollView 없을 때 폴백
-                boardManager.shapeHost.anchorMin = new Vector2(0.70f, 0.1f);
-                boardManager.shapeHost.anchorMax = new Vector2(0.98f, 0.9f);
+                boardManager.shapeHost.anchorMin = new Vector2(0.63f, 0.05f);
+                boardManager.shapeHost.anchorMax = new Vector2(0.94f, 0.95f);
                 boardManager.shapeHost.offsetMin = Vector2.zero;
                 boardManager.shapeHost.offsetMax = Vector2.zero;
                 boardManager.shapeHost.pivot = new Vector2(0.5f, 1f);
@@ -272,9 +274,31 @@ public class BlockSynergyBridge : MonoBehaviour
 
             // spawnOrigin 수정: X=0(중앙), Y=80(상단 80px 아래서 시작)
             boardManager.spawnOrigin = new Vector2(0f, 80f);
+
+            // 그리드 영역 배경
+            EnsureAreaBackground(boardManager.gameplayRoot, "GridAreaBG",
+                new Vector2(0.02f, 0.05f), new Vector2(0.62f, 0.95f),
+                new Color(0f, 0f, 0f, 0.18f));
+
+            // 셰이프 패널 배경
+            EnsureAreaBackground(boardManager.gameplayRoot, "ShapeAreaBG",
+                new Vector2(0.63f, 0.05f), new Vector2(0.94f, 0.95f),
+                new Color(0f, 0f, 0f, 0.18f));
         }
 
         boardManager.BackToSelection();
+
+        // BackToSelection 이후(SelectionRoot 활성화 후)에 레이아웃 강제 계산
+        // → 첫 클릭 시 GridLayoutGroup 위치가 올바르게 적용됨 (더블클릭 방지)
+        if (boardManager.selectionRoot != null)
+        {
+            var selRT = boardManager.selectionRoot.GetComponent<RectTransform>();
+            if (selRT != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                LayoutRebuilder.ForceRebuildLayoutImmediate(selRT);
+            }
+        }
     }
 
     // ── 썸네일 UI 생성 ──
@@ -528,81 +552,35 @@ public class BlockSynergyBridge : MonoBehaviour
         return FindChildRecursive(transform, "Panel_Grid");
     }
 
-    // ── Grid 자동 스케일 ──
+    private void HandleGridSessionActivated(Grid gridInstance) { }
 
-    /// <summary>그리드 세션 활성화 시 호출 — 1프레임 후 GridHost에 맞춰 스케일.</summary>
-    private void HandleGridSessionActivated(Grid gridInstance)
+    /// <summary>
+    /// GameplayRoot 아래에 반투명 배경 Image를 생성한다.
+    /// 이미 같은 이름이 있으면 스킵.
+    /// </summary>
+    private static void EnsureAreaBackground(GameObject root, string name,
+        Vector2 anchorMin, Vector2 anchorMax, Color color)
     {
-        FitGridToHostAsync(gridInstance, this.GetCancellationTokenOnDestroy()).Forget();
-    }
+        if (root == null) return;
+        if (root.transform.Find(name) != null) return;
 
-    private async UniTaskVoid FitGridToHostAsync(Grid grid, System.Threading.CancellationToken ct)
-    {
-        try
-        {
-            // Canvas 레이아웃 계산 완료까지 1프레임 대기
-            await UniTask.Yield(ct);
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(root.transform, false);
+        go.transform.SetAsFirstSibling();
 
-            if (grid == null || boardManager?.gridHost == null) return;
-            var gridRT = grid.transform as RectTransform;
-            if (gridRT == null) return;
-            if (!boardManager.gridHost.gameObject.activeInHierarchy) return;
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
 
-            float hostW = boardManager.gridHost.rect.width;
-            float hostH = boardManager.gridHost.rect.height;
+        var img = go.GetComponent<Image>();
+        img.color         = color;
+        img.raycastTarget = false;
 
-            // rect가 아직 0이면 강제 리빌드 후 한 번 더 대기
-            if (hostW <= 1f || hostH <= 1f)
-            {
-                var parent = boardManager.gridHost.parent as RectTransform;
-                if (parent != null) LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
-                await UniTask.Yield(ct);
-                hostW = boardManager.gridHost.rect.width;
-                hostH = boardManager.gridHost.rect.height;
-            }
-            if (hostW <= 1f || hostH <= 1f) return;
-
-            // Grid를 scale=1로 리셋하여 자연 바운딩 박스 계산
-            gridRT.localScale = Vector3.one;
-
-            float minX = float.MaxValue, maxX = float.MinValue;
-            float minY = float.MaxValue, maxY = float.MinValue;
-            bool hasChild = false;
-
-            foreach (Transform child in grid.transform)
-            {
-                var childRT = child as RectTransform;
-                if (childRT == null) continue;
-
-                // localScale 반영한 실제 반치수 (부모 좌표계 기준)
-                float scl = child.localScale.x;
-                float hw  = childRT.sizeDelta.x * scl * 0.5f;
-                float hh  = childRT.sizeDelta.y * scl * 0.5f;
-                var   pos = childRT.anchoredPosition;
-
-                if (pos.x - hw < minX) minX = pos.x - hw;
-                if (pos.x + hw > maxX) maxX = pos.x + hw;
-                if (pos.y - hh < minY) minY = pos.y - hh;
-                if (pos.y + hh > maxY) maxY = pos.y + hh;
-                hasChild = true;
-            }
-
-            if (!hasChild) return;
-
-            float naturalW = maxX - minX;
-            float naturalH = maxY - minY;
-            if (naturalW <= 0f || naturalH <= 0f) return;
-
-            // 85% 채움 (여백 확보)
-            float scale = Mathf.Min(hostW * 0.85f / naturalW, hostH * 0.85f / naturalH);
-            gridRT.localScale       = Vector3.one * scale;
-            gridRT.anchoredPosition = Vector2.zero;
-            // 셰이프도 같은 스케일로 동기화 (배치 판정 일치를 위해 필수)
-            boardManager.ApplyFittedScale(scale);
-
-            Debug.Log($"[BlockSynergyBridge] Grid 스케일: {scale:F3} (host {hostW:F0}×{hostH:F0}, natural {naturalW:F0}×{naturalH:F0})");
-        }
-        catch (System.OperationCanceledException) { }
+        var le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
     }
 
     // ── 치트 ──
@@ -653,7 +631,7 @@ public class BlockSynergyBridge : MonoBehaviour
         shapeSO.shapeName = shapeEntry.shape_name;
         shapeSO.shapeBlockPrefab = boardManager.defaultShapeBlockPrefab;
         shapeSO.cellOffsets = offsets;
-        shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : 90f;
+        shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
 
         // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
         boardManager.SpawnSharedShape(shapeSO);
@@ -781,7 +759,7 @@ public class BlockSynergyBridge : MonoBehaviour
                 columns = colCount,
                 rows01 = rows01,
             },
-            visual = new GridVisualData(),
+            visual = new GridVisualData { squareGap = GRID_CELL_SIZE, squareScale = 0.9f },
             spawnableShapes = System.Array.Empty<ShapeData>(),
         };
     }
