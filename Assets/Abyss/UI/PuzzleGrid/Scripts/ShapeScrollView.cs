@@ -117,13 +117,14 @@ public class ShapeScrollView : MonoBehaviour
         sbRoot.transform.SetParent(transform.parent, false);
         var sbRT = (RectTransform)sbRoot.transform;
 
-        sbRT.anchorMin        = Vector2.zero;
-        sbRT.anchorMax        = Vector2.zero;
+        // 앵커 기반 배치: GameplayRoot 기준으로 shapes 패널 우측 끝에 붙임
+        // ShapeScrollView가 (0.63~0.94), 스크롤바는 그 바로 오른쪽 (0.937~0.955)
+        sbRT.anchorMin        = new Vector2(0.937f, 0.05f);
+        sbRT.anchorMax        = new Vector2(0.955f, 0.95f);
+        sbRT.offsetMin        = Vector2.zero;
+        sbRT.offsetMax        = Vector2.zero;
         sbRT.pivot            = new Vector2(0.5f, 0.5f);
-        // Y는 항상 0 (씬에 직렬화된 이전 값을 무시하고 코드로 고정)
-        sbRT.anchoredPosition = new Vector2(scrollbarPosition.x, 0f);
-        sbRT.sizeDelta        = new Vector2(scrollbarWidth, 100f); // 높이는 Scale Y 로 조절
-        sbRoot.transform.localScale = scrollbarScale;
+        sbRoot.transform.localScale = Vector3.one;
 
         sbRoot.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.3f);
 
