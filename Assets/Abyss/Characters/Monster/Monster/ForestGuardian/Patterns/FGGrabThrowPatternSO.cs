@@ -256,8 +256,9 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         toPlayer.y = 0f;
 
         if (toPlayer.sqrMagnitude > Data.range * Data.range) return;
+        // Enter() 시점의 forward를 사용해 경고장판 시각과 판정 방향을 일치시킴
         if (toPlayer.sqrMagnitude > 0.001f &&
-            Vector3.Angle(ctx.Transform.forward, toPlayer) > Data.arcHalfAngle) return;
+            Vector3.Angle(_bossForward, toPlayer) > Data.arcHalfAngle) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;

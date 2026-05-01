@@ -1686,6 +1686,9 @@ MonoBehaviour:
   blockCellSize: 1
   blockBaseY: -0.5
   shopSlotCount: 3
+  blockShopStallPrefab: {fileID: 0}
+  shopPriceTable: {fileID: 0}
+  luckRollTable: {fileID: 0}
   decorationCatalogs:
   - {fileID: 11400000, guid: a0e4b1bdd0e55524e81ee90adceeda4f, type: 2}
   - {fileID: 11400000, guid: 8da2fca1ba714d8c974c330efda6c05c, type: 2}

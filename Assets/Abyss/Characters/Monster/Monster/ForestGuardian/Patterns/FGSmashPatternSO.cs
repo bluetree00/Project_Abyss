@@ -62,6 +62,9 @@ public class FGSmashPatternSO : BossPatternSO
     [Tooltip("충격파 이펙트 크기 배율 (기본 1)")]
     public float shockwaveScale = 1f;
 
+    [Tooltip("충격파 이펙트가 실제 소멸하기까지 추가 대기 시간 (초). 타격 후 잔상 유지용.")]
+    public float shockwaveLingerDuration = 1.5f;
+
     [Header("Smash — Impact Offset")]
     [Tooltip("왼손/오른손 좌우 오프셋 (m). 보스 right 기준, 오른손이면 +, 왼손이면 -로 자동 반전.")]
     public float handSideOffset = 0.6f;
@@ -296,7 +299,7 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
     private void DespawnShockwave()
     {
         if (_shockwaveGO == null) return;
-        Object.Destroy(_shockwaveGO);
+        Object.Destroy(_shockwaveGO, Data.shockwaveLingerDuration);
         _shockwaveGO = null;
     }
 

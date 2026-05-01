@@ -212,7 +212,13 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
 
-        float dist       = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+        // XZ 평면 거리로 판정 — 공중에 뜬 플레이어의 Y가 링 범위를 벗어나는 문제 방지
+        Vector3 bossPos   = ctx.Transform.position;
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        float   dx        = playerPos.x - bossPos.x;
+        float   dz        = playerPos.z - bossPos.z;
+        float   dist      = Mathf.Sqrt(dx * dx + dz * dz);
+
         float outerRange = Data.GetHitRange(hitIndex);
         float innerRange = Data.GetHitInnerRange(hitIndex);
 
@@ -225,7 +231,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         player.TakeDamage(dmg);
 
         // 위로 + 보스에서 멀어지는 방향으로 발사
-        Vector3 outDir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        Vector3 outDir = playerPos - bossPos;
         outDir.y = 0f;
         if (outDir.sqrMagnitude > 0.001f) outDir.Normalize();
 
