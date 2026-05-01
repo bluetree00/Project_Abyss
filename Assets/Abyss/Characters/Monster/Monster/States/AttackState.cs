@@ -73,28 +73,56 @@ public class AttackState : IMonsterState
 
     private static void PlayAttackAnim(MonsterContext ctx)
     {
-        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackStateName)) return;
+        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackTrigger)) return;
 
-        string key = ctx.Animation.attackStateName;
-        float fade = Mathf.Max(0.1f, ctx.Animation.crossFadeDuration);
+        var animator = ctx.Animator;
+        animator.speed = 1f;
+        string key = ctx.Animation.attackTrigger;
 
-        if (ctx.Animator.HasState(0, Animator.StringToHash(key)))
-            ctx.Animator.CrossFade(key, fade, 0, 0f);
+        if (HasState(animator, key))
+        {
+            float fade = Mathf.Max(0.1f, ctx.Animation.crossFadeDuration);
+            animator.CrossFade(key, fade, 0, 0f);
+            return;
+        }
+
+        if (HasTrigger(animator, key))
+            animator.SetTrigger(key);
+    }
+
+    private static bool HasState(Animator animator, string stateName)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName)) return false;
+        return animator.HasState(0, Animator.StringToHash(stateName));
+    }
+
+    private static bool HasTrigger(Animator animator, string triggerName)
+    {
+        if (animator == null || string.IsNullOrEmpty(triggerName)) return false;
+
+        var parameters = animator.parameters;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var p = parameters[i];
+            if (p.type == AnimatorControllerParameterType.Trigger && p.name == triggerName)
+                return true;
+        }
+        return false;
     }
 
     private static bool ShouldWaitForAttackAnimation(MonsterContext ctx)
     {
         return ctx.Animator != null
-               && !string.IsNullOrEmpty(ctx.Animation.attackStateName)
-               && ctx.Animator.HasState(0, Animator.StringToHash(ctx.Animation.attackStateName));
+               && !string.IsNullOrEmpty(ctx.Animation.attackTrigger)
+               && HasState(ctx.Animator, ctx.Animation.attackTrigger);
     }
 
     private static bool IsAttackAnimNearlyFinished(MonsterContext ctx)
     {
-        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackStateName))
+        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackTrigger))
             return true;
 
-        int attackHash = Animator.StringToHash(ctx.Animation.attackStateName);
+        int attackHash = Animator.StringToHash(ctx.Animation.attackTrigger);
         if (!ctx.Animator.HasState(0, attackHash))
             return true;
 

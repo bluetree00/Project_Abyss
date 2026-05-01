@@ -133,6 +133,8 @@ public class BoardManager : MonoBehaviour
     // 슬롯 Y 위치 (shapeHost 로컬, 음수 = 아래). 실제 높이 기반으로 누적 계산.
     private readonly Dictionary<Shape, float> _sharedShapeSlotY = new();
     private float _slotCursorY = 0f;
+    // FitGridToHostAsync가 계산한 그리드 피팅 스케일 (0=미설정 → boardConfig 사용)
+    private float _fittedScale = 0f;
 
     // 전역 배치 상태: 어느 그리드에 배치됐는지 (null이면 슬롯에 있음)
     private readonly Dictionary<Shape, GlobalPlacement> _globalPlacements = new();
@@ -330,6 +332,9 @@ public class BoardManager : MonoBehaviour
 
     public event System.Action OnBackToSelection;
 
+    /// <summary>그리드 세션이 GridHost에 활성화된 직후 발생. Grid 인스턴스를 인수로 전달.</summary>
+    public event Action<Grid> OnGridSessionActivated;
+
     /// <summary>선택 화면으로 돌아간다.</summary>
     public void BackToSelection()
     {
@@ -491,7 +496,57 @@ public class BoardManager : MonoBehaviour
     }
 
     private float GetGameplayScale() =>
+        _fittedScale > 0f ? _fittedScale :
         boardConfig != null ? Mathf.Max(0.0001f, boardConfig.gameplayUniformScale) : 1f;
+
+    /// <summary>
+    /// FitGridToHostAsync가 계산한 그리드 스케일을 셰이프에도 동기화한다.
+    /// 그리드와 셰이프 블록이 동일 스케일이어야 배치 판정이 정확하다.
+    /// </summary>
+    public void ApplyFittedScale(float scale)
+    {
+        _fittedScale = Mathf.Max(0.0001f, scale);
+        float s = GetGameplayScale();
+
+        // 슬롯에 있는 셰이프: localScale 갱신 + 위치 재계산
+        if (_sharedShapeSlotY.Count > 0)
+        {
+            var ordered = new List<Shape>(_sharedShapeSlotY.Keys);
+            ordered.Sort((a, b) => _sharedShapeSlotY[b].CompareTo(_sharedShapeSlotY[a]));
+
+            _slotCursorY = -spawnOrigin.y;
+            _sharedShapeSlotY.Clear();
+
+            foreach (var shape in ordered)
+            {
+                if (shape == null) continue;
+                var rt = (RectTransform)shape.transform;
+                rt.localScale = Vector3.one * s;
+
+                float height    = GetShapeSlotHeight(shape) * s;
+                float maxLocalY = GetShapeMaxLocalY(shape)  * s;
+                float padding   = Mathf.Max(20f, spawnSlotStepY - height);
+
+                float slotY = _slotCursorY - maxLocalY;
+                _sharedShapeSlotY[shape] = slotY;
+                _slotCursorY -= height + padding;
+
+                rt.anchoredPosition = new Vector2(spawnOrigin.x, slotY);
+                shape.SetHome(shapeHost, rt.anchoredPosition);
+            }
+            RefreshShapeHostSize();
+        }
+
+        // 현재 활성 그리드에 배치된 셰이프도 스케일 갱신
+        if (activeAsset != null)
+        {
+            foreach (var pair in _globalPlacements)
+            {
+                if (pair.Key == null || pair.Value.grid != activeAsset) continue;
+                ((RectTransform)pair.Key.transform).localScale = Vector3.one * s;
+            }
+        }
+    }
 
     private GridSession CreateSession(GridAssetSO asset)
     {
@@ -569,6 +624,7 @@ public class BoardManager : MonoBehaviour
             GridManager.Instance.SetActiveGrid(session.gridInstance);
 
         SubscribeSOChanges(asset);
+        OnGridSessionActivated?.Invoke(session.gridInstance);
     }
 
     private void DeactivateSession(GridAssetSO asset)
@@ -709,6 +765,7 @@ public class BoardManager : MonoBehaviour
             _slotCursorY -= height + padding;
 
             var rt = (RectTransform)s.transform;
+            rt.localScale       = Vector3.one * scale;
             rt.anchoredPosition = new Vector2(spawnOrigin.x, slotY);
             s.SetHome(shapeHost, rt.anchoredPosition);
         }

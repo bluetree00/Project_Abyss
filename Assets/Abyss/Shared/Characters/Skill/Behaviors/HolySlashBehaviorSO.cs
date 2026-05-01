@@ -172,6 +172,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
 
                 // 대시 데미지 적용 (1단계)
                 ApplyDamageToAll(ctx, _data.baseDashDamage);
+                SpawnHitEffects(ctx);
 
                 // 티어별 분기
                 if (_skillTier >= 2 && _hitTargets.Count > 0)

@@ -11,20 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
   m_Name: Default Local Group
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   m_GroupName: Default Local Group
   m_GUID: f1076af87ac402947b621c4a9f046477
   m_SerializeEntries:
-  - m_GUID: 074a2f4e12d24944c990399e8cbb3120
-    m_Address: Cyclops/CyclopsConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0763376cb9d15144399a2e1c38c7d595
-    m_Address: Salamander/SalamanderConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 07757cf211bd45044a1f1917658b9e66
     m_Address: VFX_ExtraAttack
     m_ReadOnly: 0
@@ -32,11 +22,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0987dfb5814de5043844d6dba2e8f3cf
     m_Address: ItemSODatabase
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0bdc4f93d54360d49b90f631f2fafda8
-    m_Address: MushroomAngry/MushroomAngryConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -55,58 +40,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 13b1c37ed73f09342b831b1ff830f353
-    m_Address: WormMonster/WormMonsterConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 13b7fdb99d291054ab23ba24b4c37776
     m_Address: VFX_MonsterSpawn
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1aa3cb80f76301b4aac2369418f80831
-    m_Address: BishopKnight/BishopKnightConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1df01960c24e86543bdbc588f3a50e19
-    m_Address: Specter/SpecterConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1ea87ab785205b447910d7ba1b45eb0d
-    m_Address: Cactus/Cactus
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 20a592a2173063643806f4669caf0844
-    m_Address: CrabMonster/CrabMonster
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 29e9b8585c6d9e84db9d8ed5a5ff2da4
-    m_Address: DemonKing/DemonKing
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2d49536119641744c8ad2c97b6a7bba8
-    m_Address: BishopKnight/BishopKnight
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2d9a2d35675aedc44b8a59ed43b912e0
-    m_Address: CrabMonster/CrabMonsterConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 30137d4796da7224397d593e9970acb8
-    m_Address: WormMonster/WormMonster
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 335a92f0a2951e4469da18fbd998f07b
-    m_Address: DemonKing/DemonKingConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -125,43 +60,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 41c21fa0ebd3df841a78da67ad0ed521
-    m_Address: Spider/SpiderConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4341160762248e044bcdf91d6dc0d528
-    m_Address: FlyingDemon/FlyingDemonConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 46e25d08f06a5ed429ecdab9e3b50a77
-    m_Address: EvilMage/EvilMage
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4aff92fc7b576c04b95088623c278dc9
-    m_Address: LizardWarrior/LizardWarriorConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4e6081780a9e62542b9a255ee9a20222
-    m_Address: ChestMonster/ChestMonster
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 51f58a7ac453dab48a238fee31899d31
     m_Address: VFX_GoldDot
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 57ee1e2962232aa46ad6a0e0f9458909
-    m_Address: Orc/Orc
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5c49ed58df99374429759c1c2aa75cca
-    m_Address: Beholder/BeholderConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -170,28 +70,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6425f3820b1cdb0438ea5ac456fed98d
-    m_Address: Cactus/CactusConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6481c5c0c72f67f4690371218aff6bf6
-    m_Address: Specter/Specter
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 721cfe8018b2cd04abd0748143d2a312
     m_Address: VFX_Heal
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 771f39e1a3a756d42b6df85945fae00c
-    m_Address: MonsterPlant/MonsterPlantConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 772b743943217764598caa2c12f198cf
-    m_Address: Werewolf/Werewolf
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -200,23 +80,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7bc15658de2d30e45a86f154a51ecd62
-    m_Address: Cyclops/Cyclops
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7cd08aff3f4c9774b9bcec62b93a7a9b
-    m_Address: RatAssassin/RatAssassinConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7d70eb2b598c6fe47a2073d65c24ce90
     m_Address: sword_1
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8645fe2099851b0408a3467544a7d11c
-    m_Address: StingRay/StingRay
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -225,83 +90,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8cde3e9432e4f0f4f820c950b41fa90f
-    m_Address: MushroomAngry/MushroomAngry
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8e2e8c2499a6a234ab16d6dc1ef1278d
-    m_Address: StingRay/StingRayConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8fb076c166019e64c8551d4dfb926232
-    m_Address: FlyingDemon/FlyingDemon
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 925ef72c387dc7149a2a66a8b694caf3
-    m_Address: Salamander/Salamander
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 96e62469075469e4bb0e88ca125c1ef9
-    m_Address: Fishman/Fishman
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9776ec5ed64f21346a8522f6ecd62210
-    m_Address: BattleBee/BattleBee
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9a4cf4b62d5771b4f8c4b423d3be4e5d
-    m_Address: Fishman/FishmanConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: aa767a21a4d31ba4189f56a14d9b3993
     m_Address: skeleton_1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: abba52759e998eb48a4901aba11335ec
-    m_Address: Dragon/Dragon
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ac3815a3a11e2d84eaa1152c92adad04
     m_Address: VFX_DamageReflect
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b2353c5ce536da541b34c68d024adedc
-    m_Address: NagaWizard/NagaWizard
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b612e98d532d07043b78187ef90c9612
-    m_Address: Orc/OrcConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b6eab075b92907a40be390b353433cf9
-    m_Address: ChestMonster/ChestMonsterConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bb0ebae74e8ef634485f509986be936c
-    m_Address: MonsterPlant/MonsterPlant
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bb174a4bda865994eb28c1089bb22dab
-    m_Address: Spider/Spider
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c9de92b052f94714db08a578ab12498c
-    m_Address: BattleBee/BattleBeeConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -318,11 +113,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d4380da49cd4618468e9419a8c78e8d9
     m_Address: chest_1
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d75dd926990e5814e9401ae28dafa20a
-    m_Address: EvilMage/EvilMageConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -346,38 +136,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: de8e8903180e44f43b3c16a0e06a0765
-    m_Address: NagaWizard/NagaWizardConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dfabbd05c7735314e97de47b3d7695c4
     m_Address: VFX_LightningStrike
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e0a0bf062861c1847813fcc1017e7f1e
-    m_Address: RatAssassin/RatAssassin
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e7cf1fa1155528d4ca10955f2df449c5
-    m_Address: LizardWarrior/LizardWarrior
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ecf4ed863a20b0e479b51e8b22fed3be
-    m_Address: Beholder/Beholder
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f567fa6c5df310c42bc16bd40b2813e8
-    m_Address: Werewolf/WerewolfConfig
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f5a126dc3b3073e43afde8b8ed31c25b
-    m_Address: Dragon/DragonConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
