@@ -11,8 +11,8 @@ using TMPro;
 public class GridThumbnail : MonoBehaviour, IPointerClickHandler
 {
     // ── Constants ──
-    private static readonly Color PLACEABLE_COLOR = new(0.3f, 0.7f, 1f, 0.85f);
-    private static readonly Color BLOCKED_COLOR = new(0.15f, 0.15f, 0.2f, 0.4f);
+    private static readonly Color PLACEABLE_COLOR = new(0.3f, 0.7f, 1f, 0.9f);
+    private static readonly Color BLOCKED_COLOR = new(0f, 0f, 0f, 0f); // 투명 — 그리드 모양만 보이도록
     private static readonly Color OCCUPIED_COLOR = new(0.2f, 0.9f, 0.3f, 0.9f);
     private static readonly Color SELECTED_BORDER_COLOR = new(1f, 0.85f, 0.3f, 1f);
     private static readonly Color NORMAL_BORDER_COLOR = new(0.4f, 0.4f, 0.5f, 0.6f);
@@ -161,6 +161,14 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
                 img.color = placeable ? PLACEABLE_COLOR : BLOCKED_COLOR;
                 img.raycastTarget = false;
 
+                // placeable 셀에만 테두리 (그리드 모양이 또렷이 보이도록 — blocked는 투명)
+                if (placeable)
+                {
+                    var outline = cellGO.AddComponent<Outline>();
+                    outline.effectColor = new Color(0.05f, 0.05f, 0.1f, 0.9f);
+                    outline.effectDistance = new Vector2(1.5f, -1.5f);
+                }
+
                 _cellImages[r, c] = img;
             }
         }
@@ -178,7 +186,8 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
         if (pattern.rows01 == null) return true;
         if (row >= pattern.rows01.Length) return false;
         if (col >= pattern.rows01[row].Length) return false;
-        return pattern.rows01[row][col] == 1;
+        // rows01[row][col]은 char ('1' 또는 '0'). char vs int 비교는 항상 false라 char로 비교
+        return pattern.rows01[row][col] == '1';
     }
 
     // ── Event Handlers ──

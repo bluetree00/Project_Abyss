@@ -282,6 +282,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fabdc41743036b945ade90d43535856b
+    m_Address: VFX_Item_Legendary
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b5c49b7d08769594c855059bca8bebf5
     m_Address: IasenDashTrail
     m_ReadOnly: 0
