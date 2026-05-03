@@ -44,6 +44,9 @@ public sealed class GameRunSession
     /// <summary>현재 챕터의 블록 테마. ChapterDataSO.theme에서 해석된 값. 빈 문자열이면 방별 theme 또는 Default 팔레트 폴백.</summary>
     public string ActiveTheme { get; private set; } = string.Empty;
 
+    /// <summary>현재 챕터의 필드 구조물 프리팹 Addressables 키.</summary>
+    public string ActiveFieldPrefabKey { get; private set; } = string.Empty;
+
     private ChapterRegistry _chapterRegistry;
 
     /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
@@ -57,6 +60,7 @@ public sealed class GameRunSession
     {
         var data = _chapterRegistry != null ? _chapterRegistry.Get(CurrentChapter) : null;
         ActiveTheme = data != null && !string.IsNullOrEmpty(data.theme) ? data.theme : string.Empty;
+        ActiveFieldPrefabKey = data != null ? data.fieldPrefabKey ?? string.Empty : string.Empty;
     }
 
     public RoomManager RoomManager { get; private set; }
@@ -253,6 +257,7 @@ public sealed class GameRunSession
         SavedCurrentSlotIndex = -1;
         _appliedSynergies.Clear();
         ActiveTheme = string.Empty;
+        ActiveFieldPrefabKey = string.Empty;
     }
 
     /// <summary>
