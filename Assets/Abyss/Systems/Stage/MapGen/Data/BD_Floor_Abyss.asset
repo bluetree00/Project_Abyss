@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fca197032da92624dad13766f5d4c427, type: 3}
-  m_Name: BD_Wall_Forest
+  m_Name: BD_Floor_Abyss
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
-  prefab: {fileID: 7529731657897958428, guid: d52a106e1d346b14a8851b1268c109ef, type: 3}
-  tileType: 1
+  prefab: {fileID: 2906908962528274904, guid: 3651b86077e05054082d999ee0177f41, type: 3}
+  tileType: 0
   facingRule: 0
   weight: 1

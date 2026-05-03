@@ -28,3 +28,4 @@ MonoBehaviour:
   itemDropMultiplier: 1
   middleLayers: 5
   peakLayer: 4
+  fieldPrefabKey: FieldPrefab_Forest

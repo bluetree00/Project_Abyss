@@ -1,3 +1,4 @@
+using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
@@ -366,9 +367,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var safeFloor = MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, mapGO.transform);
 
         // 블록 생성 — blockBaseY로 피봇 보정 (센터 피봇 큐브는 -0.5로 top을 Y=0에 맞춤)
-        // 테마: 챕터(ActiveTheme) 우선 → 방별(roomEntry.theme) → Default 팔레트 폴백
-        string effectiveTheme = ResolveRoomTheme(roomEntry.theme);
-        var activePalette = PickBlockPalette(effectiveTheme);
+        // 팔레트 우선순위: 챕터 ActiveTheme → roomEntry.palette → roomEntry.theme → Inspector 배열 폴백
+        BlockPalette activePalette = null;
+        var activeTheme = _run?.ActiveTheme;
+        string paletteKey = !string.IsNullOrEmpty(activeTheme) ? activeTheme
+            : !string.IsNullOrEmpty(roomEntry.palette) ? roomEntry.palette
+            : roomEntry.theme;
+        if (!string.IsNullOrEmpty(paletteKey))
+            activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
+        if (activePalette == null)
+            activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
         var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
@@ -378,10 +386,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 방 클리어 카운터 부착 — 모든 스포너의 maxTotalSpawns 합이 킬 목표
         AttachRoomClearController(mapGO, blocks);
 
-        // 등장 연출 — Wall은 높이가 커 기본 연출과 섞이면 부자연스럽기 때문에 분리한다.
-        //   1) 즉시: 벽을 상공에 Prewarm 배치 → main 연출 중에 벽이 최종 위치에 노출되지 않음
-        //   2) mainBlocks(Floor/Obstacle/스포너 등): entrance 필드로 지정된 기본 연출
-        //   3) wallBlocks: z축(뒤→앞) row 순차 낙하 + 착지 바운스
+        // 등장 연출 — Wall은 기본 연출과 시차를 두어 맵이 깔린 뒤 디졸브로 나타난다.
+        //   1) mainBlocks(Floor/Obstacle/스포너 등): entrance 필드로 지정된 기본 연출
+        //   2) wallBlocks: 기본 연출 완료 후 대각선 디졸브
         var mainBlocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>(blocks.Count);
         var wallBlocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>(64);
         for (int i = 0; i < blocks.Count; i++)
@@ -390,22 +397,40 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             else                                     mainBlocks.Add(blocks[i]);
         }
 
-        // 벽 선배치 — MapBuilder가 Instantiate한 뒤 첫 프레임이 렌더되기 전에 상공으로 옮겨
-        // 플레이어는 벽이 "처음부터 위에서 내려오는" 모습만 보게 된다.
-        WallDropEntrance.Prewarm(wallBlocks);
-
         var entranceCtx = new MapEntranceContext(roomEntry);
         var ct = this.GetCancellationTokenOnDestroy();
+
+        // 디졸브 머티리얼 사전 캐시 + 벽 렌더러 숨김 (메인 연출 전까지 보이지 않게)
+        await DissolveEffect.WarmupAsync(ct);
+        for (int i = 0; i < wallBlocks.Count; i++)
+        {
+            var b = wallBlocks[i];
+            if (b.instance == null) continue;
+            foreach (var r in b.instance.GetComponentsInChildren<Renderer>(true))
+                r.enabled = false;
+        }
 
         // 1) 기본 연출 — Wall 제외 전체 블록
         var entrance = MapEntranceRegistry.Resolve(roomEntry.entrance);
         await entrance.PlayAsync(mainBlocks, entranceCtx, ct);
 
-        // 2) Wall 전용 낙하 연출 — 기본 연출이 끝난 뒤 실행
+        // 2) Wall 디졸브 등장 — 기본 연출이 끝난 뒤 제자리에서 전체 동시 디졸브 출현
         if (wallBlocks.Count > 0)
         {
-            var wallEntrance = new WallDropEntrance();
-            await wallEntrance.PlayAsync(wallBlocks, entranceCtx, ct);
+            var wallTasks = new System.Collections.Generic.List<UniTask>(wallBlocks.Count);
+            for (int i = 0; i < wallBlocks.Count; i++)
+            {
+                var b = wallBlocks[i];
+                if (b.instance == null) continue;
+                b.instance.transform.position = b.targetPosition;
+                b.instance.transform.rotation = Quaternion.Euler(0f, b.targetRotationY, 0f);
+                MapEntranceUtil.SetCollidersEnabled(b.instance, true);
+                ApplyWallTransparency(b.instance, 0.72f);
+                foreach (var r in b.instance.GetComponentsInChildren<Renderer>(true))
+                    r.enabled = true;
+                wallTasks.Add(DissolveEffect.PlayAppearAsync(b.instance, 0.4f, ct));
+            }
+            await UniTask.WhenAll(wallTasks);
         }
 
         // 투명 바닥 유지 (빈 공간 추락 방지)
@@ -416,11 +441,34 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
         // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
-        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, effectiveTheme);
+        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, ResolveRoomTheme(roomEntry.theme));
+
+        // 챕터 필드 구조물 스폰 (디졸브 등장)
+        await SpawnFieldPrefabAsync(mapGO, ct);
 
         // 상점 방이면 ShopRoomController 부착 및 카탈로그 주입
         if (IsShopCategory(roomEntry.category))
             await SetupShopRoomAsync(mapGO, roomEntry);
+    }
+
+    private async UniTask SpawnFieldPrefabAsync(GameObject mapParent, CancellationToken ct)
+    {
+        var key = _run?.ActiveFieldPrefabKey;
+        if (string.IsNullOrEmpty(key)) return;
+
+        var prefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(key);
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] FieldPrefab '{key}' 로드 실패 — 스킵");
+            return;
+        }
+
+        ct.ThrowIfCancellationRequested();
+
+        var instance = Instantiate(prefab, mapParent.transform);
+        instance.name = $"FieldStructure_{key}";
+
+        await DissolveEffect.PlayAppearAsync(instance, 0.6f, ct);
     }
 
     private static bool IsShopCategory(string category)
@@ -576,6 +624,25 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         for (int i = 0; i < blockPalettes.Length; i++)
             if (blockPalettes[i] != null) return true;
         return false;
+    }
+
+    /// <summary>벽 블록 렌더러에 반투명 머티리얼 인스턴스를 적용한다. URP Lit Transparent 모드로 전환.</summary>
+    private static void ApplyWallTransparency(GameObject wall, float alpha)
+    {
+        foreach (var r in wall.GetComponentsInChildren<Renderer>())
+        {
+            var mat = new Material(r.sharedMaterial);
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetFloat("_SrcBlend", 5f);
+            mat.SetFloat("_DstBlend", 10f);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = 3000;
+            var col = mat.GetColor("_BaseColor");
+            mat.SetColor("_BaseColor", new Color(col.r, col.g, col.b, alpha));
+            r.material = mat;
+        }
     }
 
     /// <summary>챕터 테마(ActiveTheme) 우선, 없으면 방별 roomTheme 사용. 둘 다 비면 빈 문자열 → PickBlockPalette가 Default로 폴백.</summary>
