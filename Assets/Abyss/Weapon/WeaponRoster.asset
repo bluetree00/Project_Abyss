@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponRoster
   weapons:
   - data: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 97861ee1fe7412345a84d437284bf4c8, type: 3}
   - data: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: f8812c8b8c4fbcf43b333cf968a94855, type: 3}
   - data: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 48fa0a512f0e58144ab04be80d7e4816, type: 3}
   - data: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 5932011b449ac234197ea8c6600fb8fe, type: 3}

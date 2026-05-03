@@ -452,6 +452,18 @@ public class BoardManager : MonoBehaviour
         _globalPlacements.Remove(shape);
     }
 
+    /// <summary>그리드 활성화 후 기존 Shape들의 블록 간격을 grid gap에 맞게 재빌드.</summary>
+    private void RebuildShapesWithGridGap()
+    {
+        if (GridManager.Instance == null || !GridManager.Instance.HasGrid) return;
+        float gap = GridManager.Instance.GetGap();
+        foreach (var s in _sharedShapes)
+        {
+            if (s == null) continue;
+            s.RebuildWithCellSize(gap);
+        }
+    }
+
     /// <summary>드래그 실패 시 Shape.OnEndDrag에서 호출. 셰이프를 슬롯으로 되돌린다.</summary>
     public void ReSlotAndReturn(Shape shape)
     {
@@ -621,7 +633,10 @@ public class BoardManager : MonoBehaviour
         }
 
         if (GridManager.Instance != null)
+        {
             GridManager.Instance.SetActiveGrid(session.gridInstance);
+            RebuildShapesWithGridGap();
+        }
 
         SubscribeSOChanges(asset);
         OnGridSessionActivated?.Invoke(session.gridInstance);

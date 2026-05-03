@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b0c3a74d232eda46aab9f9984eb60e0, type: 3}
+  m_Name: BlockPalette_Cave
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
+  themeMatch: Cave
+  blocks:
+  - {fileID: 11400000, guid: 93afa8f895c85bf4f96570ae5c3ed1e8, type: 2}
+  - {fileID: 11400000, guid: 796314963f87a4646aca71b4dcab22c7, type: 2}
+  - {fileID: 11400000, guid: 258b2e752cd469c4383375a3b0785d1c, type: 2}
+  - {fileID: 11400000, guid: d267a1c98cac4da4491fad6466729dc4, type: 2}
+  - {fileID: 11400000, guid: 41da9f765c0fa0e4ba5db242685baa9e, type: 2}
+  - {fileID: 11400000, guid: d9d3d6e5e7a99af41b567bbfbfbca59b, type: 2}
+  - {fileID: 11400000, guid: cdd01111ae2827d4c82f03699eb2da52, type: 2}
