@@ -10,6 +10,8 @@ public class GridManager : MonoBehaviour
 {
     public static GridManager Instance { get; private set; }
 
+    public bool HasGrid => grid != null && grid.gridAsset != null && grid.gridAsset.visual != null;
+
     [Header("Active Grid (set by BoardManager)")]
     public Grid grid;
 
@@ -102,9 +104,9 @@ public class GridManager : MonoBehaviour
         _previewSquares.Clear();
     }
 
-    private float GetGap() =>
-        (grid.gridAsset != null && grid.gridAsset.visual != null)
-            ? grid.gridAsset.visual.squareGap : 80f;
+    public float GetGap() =>
+        (grid != null && grid.gridAsset != null && grid.gridAsset.visual != null)
+            ? grid.gridAsset.visual.squareGap : 90f;
 
     public bool TryPlaceShape(Shape shape)
     {

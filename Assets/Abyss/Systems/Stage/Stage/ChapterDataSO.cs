@@ -22,6 +22,10 @@ public class ChapterDataSO : ScriptableObject
     [Tooltip("배경 위·노드 아래 레이어에 스캐터할 장식 스프라이트 목록. 비우면 Bootstrapper의 defaultDecorationSprites 폴백.")]
     public Sprite[] decorationSprites;
 
+    [Header("필드 구조물")]
+    [Tooltip("인게임 방 배경에 스폰할 테마 환경 프리팹 Addressables 키. 비우면 스폰 안 함.")]
+    public string fieldPrefabKey;
+
     [Header("맵 테마")]
     [Tooltip("인게임 방 렌더링 시 BlockPalette/DecorationCatalog 매칭 키 (예: Forest, Cave, Abyss). 비우면 방별 theme 또는 Default 팔레트 폴백.")]
     public string theme;
@@ -63,6 +67,7 @@ public class ChapterDataSO : ScriptableObject
             mapBackgroundTint = mapBackgroundTint,
             mapBackgroundKey = mapBackgroundKey,
             theme            = theme,
+            fieldPrefabKey   = fieldPrefabKey,
             bgmKey           = bgmKey,
             difficultyScale  = difficultyScale,
             monsterCountScale = monsterCountScale,
@@ -94,6 +99,7 @@ public class ChapterRuntimeData
 
     // 테마
     public string theme;
+    public string fieldPrefabKey;
 
     // 사운드
     public string bgmKey;
