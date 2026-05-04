@@ -415,6 +415,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             // 차트 마스터 정책: weaponSOKey == weapon_id 컨벤션을 따라 차트 stats 덮어쓰기
             ApplyServerOverrideIfAvailable(runtime, weaponSOKey);
 
+            await PreloadWeaponClipsAsync(runtime, ct);
             ct.ThrowIfCancellationRequested();
 
             int emptySlot = GetFirstEmptySlotIndex();
@@ -450,6 +451,22 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             Debug.LogWarning($"[PlayerWeaponManager] TryAcquireWeaponWithReplaceAsync 실패: {ex.Message}");
             return false;
         }
+    }
+
+    private static async UniTask PreloadWeaponClipsAsync(WeaponData data, CancellationToken ct)
+    {
+        var animSet = data?.animationSet;
+        if (animSet == null || !Managers.AnimationResources.IsInitialized) return;
+
+        var keys = new List<string>();
+        foreach (var mapping in animSet.GetAllMappings())
+        {
+            if (!string.IsNullOrEmpty(mapping.addressableKey))
+                keys.Add(mapping.addressableKey);
+        }
+
+        if (keys.Count > 0)
+            await Managers.AnimationResources.PreloadClipsAsync(keys).AttachExternalCancellation(ct);
     }
 
     private async UniTask<int?> ShowReplacePromptAsync(WeaponData newWeapon)

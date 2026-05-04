@@ -28,3 +28,4 @@ MonoBehaviour:
   itemDropMultiplier: 1
   middleLayers: 7
   peakLayer: 5
+  fieldPrefabKey: FieldPrefab_Cave
