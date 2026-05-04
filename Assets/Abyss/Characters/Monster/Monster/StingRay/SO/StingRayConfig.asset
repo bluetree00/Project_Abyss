@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: StingRay_IdleNormal
+    patrolStateName: StingRay_FlyFWD
+    chaseStateName: StingRay_FlyFWDFast
+    attackReadyStateName: StingRay_IdleBattle
+    attackTrigger: StingRay_Attack01
+    getHitTrigger: StingRay_GetHit
+    dieTrigger: StingRay_Die
+    detectTrigger: StingRay_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

@@ -80,6 +80,10 @@ public class Grid : MonoBehaviour
                     rt.anchoredPosition = new Vector2(x, y);
                 }
 
+                // BoxCollider2D 크기를 gap 기준으로 동기화 (ShapeBlock과 동일한 80% 인셋)
+                if (squareObj.TryGetComponent<BoxCollider2D>(out var col))
+                    col.size = new Vector2(gap * 0.8f, gap * 0.8f);
+
                 bool placeable = gridAsset.pattern.IsPlaceable(r, c);
                 sq.Init(r, c, placeable);
 

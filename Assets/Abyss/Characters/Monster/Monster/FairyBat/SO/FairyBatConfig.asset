@@ -21,7 +21,7 @@ MonoBehaviour:
     maxHp: 10
     defense: 1
     attackPower: 10
-    moveSpeed: 4.5
+    moveSpeed: 3
     attackRange: 2
     attackRadius: 1
     attackRate: 1
@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
+    animatorControllerAddress: FairyBat/FairyBatAnimatorController
+    idleStateName: Idle_Normal
+    patrolStateName: MoveBlend
+    chaseStateName: MoveBlend
     attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    attackTrigger: Attack01
+    getHitTrigger: GetHit
+    dieTrigger: Die
+    detectTrigger: SenseSomething
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

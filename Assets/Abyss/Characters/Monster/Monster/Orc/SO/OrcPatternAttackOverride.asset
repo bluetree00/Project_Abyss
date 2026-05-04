@@ -31,7 +31,7 @@ MonoBehaviour:
   - name: Spin
     animationStateName: Attack01
     minDistance: 0
-    maxDistance: 2.8
+    maxDistance: 1.35
     priority: 1
     cooldown: 2.8
     damageDelay: 0.75

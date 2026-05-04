@@ -39,16 +39,24 @@ public class FGIdleState : IMonsterState
 
 public class FGChaseState : IMonsterState
 {
-    private const float FaceSpeed = 8f;
+    private const float FaceSpeed      = 8f;
+    private const float EngageDistance = 2.5f;
+    private const float ChaseStopDist  = 1.0f;
 
     public void Enter(MonsterContext ctx)
     {
         if (ctx.Agent != null)
         {
-            ctx.Agent.enabled         = true;
+            ctx.Agent.enabled = true;
+            if (!ctx.Agent.isOnNavMesh) ctx.Monster.TrySnapAgentToNavMesh();
+            ctx.Agent.updatePosition  = true;
             ctx.Agent.updateRotation  = false;
-            if (ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
-            ctx.Agent.speed           = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
+            if (ctx.Agent.isOnNavMesh)
+            {
+                ctx.Agent.isStopped        = false;
+                ctx.Agent.stoppingDistance = ChaseStopDist;
+            }
+            ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
         }
         ApplyAnimSpeed(ctx);
         PlayAnim(ctx, ctx.Animation.chaseStateName);
@@ -62,7 +70,7 @@ public class FGChaseState : IMonsterState
             return;
         }
 
-        if (ctx.Runtime.DistToPlayer <= ctx.Monster.GetCombatHitDistance(ctx))
+        if (ctx.Runtime.DistToPlayer <= EngageDistance)
         {
             ctx.Monster.ChangeState<AttackReadyState>();
             return;
@@ -114,7 +122,9 @@ public class FGChaseState : IMonsterState
 
 public class FGAttackReadyState : IMonsterState
 {
-    private const float FaceSpeed = 3f;
+    private const float FaceSpeed      = 3f;
+    // FGChaseState.EngageDistance * 1.5f — 동일 상수 유지
+    private const float ChaseBackDist  = 2.5f * 1.5f;
 
     public void Enter(MonsterContext ctx)
     {
@@ -130,7 +140,7 @@ public class FGAttackReadyState : IMonsterState
             return;
         }
 
-        if (ctx.Runtime.DistToPlayer > ctx.Monster.GetCombatHitDistance(ctx) * 1.3f)
+        if (ctx.Runtime.DistToPlayer > ChaseBackDist)
         {
             ctx.Monster.ChangeState<ChaseState>();
             return;
@@ -155,7 +165,8 @@ public class FGAttackReadyState : IMonsterState
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         if (!ctx.Animator.HasState(0, Animator.StringToHash(stateName))) return;
-        ctx.Animator.speed = 1f;
+        var fg = ctx.Monster as ForestGuardianMonster;
+        ctx.Animator.speed = fg?.FGBlackboard.AnimSpeedMult ?? 1f;
         ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
     }
 }
@@ -193,7 +204,13 @@ public class FGGetHitState : GetHitState
 
     public override void Enter(MonsterContext ctx)
     {
-        ctx.Agent.enabled = false;
+        // enabled=false 대신 isStopped 사용 — 재활성화 시 NavMesh Warp 스냅 텔레포트 방지
+        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped = true;
+            ctx.Agent.velocity  = Vector3.zero;
+            ctx.Agent.ResetPath();
+        }
 
         var fg = ctx.Monster as ForestGuardianMonster;
         _isGroggy     = fg != null && fg.FGBlackboard.IsGroggy;
@@ -243,10 +260,12 @@ public class FGGetHitState : GetHitState
 
     public override void Exit(MonsterContext ctx)
     {
-        // 상태가 외부 전환(사망 등)으로 종료될 경우에도 플래그 정리
         if (_isPoiseBreak)
             (ctx.Monster as ForestGuardianMonster)?.FGBlackboard.ClearPoiseBroken();
-        base.Exit(ctx);
+
+        // Agent를 disabled하지 않았으므로 isStopped만 해제 (base.Exit의 Warp 생략)
+        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+            ctx.Agent.isStopped = false;
     }
 
     private static string GetDirectionalAnim(ForestGuardianMonster fg)

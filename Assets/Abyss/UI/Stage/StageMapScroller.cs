@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -227,6 +228,59 @@ public class StageMapScroller : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 
     /// <summary>MapContent RectTransform 반환 (StageLineConnector 등에서 사용).</summary>
     public RectTransform ContentTransform => _contentRT;
+
+    /// <summary>
+    /// 전투 후 복귀 시 인트로 연출: 현재 노드를 확대 상태로 보여주다가 기본 스케일로 줌아웃.
+    /// CurrentPointId가 유효하지 않으면 즉시 반환.
+    /// </summary>
+    public async UniTask PlayCurrentNodeZoomIntroAsync(System.Threading.CancellationToken ct)
+    {
+        if (_contentRT == null) return;
+
+        var run = AppBootstrapper.Instance?.CurrentRun;
+        int currentId = run?.StagePointManager?.CurrentPointId ?? -1;
+        if (currentId < 0) return;
+
+        RectTransform targetRT = null;
+        var points = _contentRT.GetComponentsInChildren<StagePointUI>(true);
+        foreach (var p in points)
+        {
+            if (p.PointId == currentId)
+            {
+                targetRT = p.GetComponent<RectTransform>();
+                break;
+            }
+        }
+        if (targetRT == null) return;
+
+        const float startScale = 2.2f;
+        const float duration = 0.8f;
+
+        Vector2 nodePos = targetRT.anchoredPosition;
+        Vector2 startPos = -nodePos * startScale;
+        Vector2 endPos = new Vector2(0f, -nodePos.y);
+
+        _contentRT.localScale = Vector3.one * startScale;
+        _contentRT.anchoredPosition = startPos;
+        _velocity = Vector2.zero;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float ease = 1f - (1f - t) * (1f - t); // ease out quad
+
+            _contentRT.localScale = Vector3.one * Mathf.Lerp(startScale, 1f, ease);
+            _contentRT.anchoredPosition = Vector2.Lerp(startPos, endPos, ease);
+
+            try { await UniTask.Yield(PlayerLoopTiming.Update, ct); }
+            catch (System.OperationCanceledException) { return; }
+        }
+
+        _contentRT.localScale = Vector3.one;
+        FocusOn(targetRT);
+    }
 
     // ── Private Methods ──
 

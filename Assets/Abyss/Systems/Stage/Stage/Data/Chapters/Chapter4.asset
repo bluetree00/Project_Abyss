@@ -13,14 +13,14 @@ MonoBehaviour:
   m_Name: Chapter4
   m_EditorClassIdentifier: Assembly-CSharp::ChapterDataSO
   chapterId: 3
-  chapterName: "\uC800\uC8FC\uBC1B\uC740 \uC131\uCC44"
+  chapterName: "\uC2EC\uC5F0\uC758 \uD611\uACE1"
   description: "\uC774 \uACB0\uACFC\uB294 \uB204\uAD6C\uC758 \uC695\uB9DD\uC778\uAC00"
   mapBackground: {fileID: 0}
   mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}
   mapBackgroundKey: map_12
   decorationSprites: []
-  theme: Castle
-  bgmKey: bgm_castle
+  theme: Abyss
+  bgmKey: bgm_abyss
   difficultyScale: 2.2
   monsterCountScale: 1.6
   monsterPoolTag: 4
@@ -28,3 +28,4 @@ MonoBehaviour:
   itemDropMultiplier: 1
   middleLayers: 11
   peakLayer: 7
+  fieldPrefabKey: FieldPrefab_Abyss

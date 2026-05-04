@@ -23,6 +23,8 @@ MonoBehaviour:
   throwExtraDelay: 1
   recoveryDuration: 0.5
   projectileSpeed: 15
+  throwHandBoneName: TreantLPalm
+  grabThreshold: 1
   throwHand: 18
   damageMultiplier: 1.5
   knockbackMultiplier: 2

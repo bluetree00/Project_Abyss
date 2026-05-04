@@ -18,10 +18,13 @@ using TMPro;
 public class BlockSynergyBridge : MonoBehaviour
 {
     // ── Constants ──
-    private const float THUMBNAIL_WIDTH = 160f;
-    private const float THUMBNAIL_HEIGHT = 200f;
-    private const float THUMBNAIL_SPACING = 12f;
-    private const int THUMBNAIL_COLUMNS = 3;
+    // Sheet2 원본 비율 551x709 (~0.78:1 세로형) 유지
+    private const float THUMBNAIL_WIDTH = 230f;
+    private const float THUMBNAIL_HEIGHT = 295f;
+    private const float THUMBNAIL_SPACING = 14f;
+    private const int THUMBNAIL_COLUMNS = 5;
+    // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
+    private const float GRID_CELL_SIZE = 120f;
 
     // ── Static ──
     public static BlockSynergyBridge Instance { get; private set; }
@@ -35,6 +38,14 @@ public class BlockSynergyBridge : MonoBehaviour
 
     [Header("썸네일 폰트")]
     [SerializeField] private TMP_FontAsset thumbnailFont;
+
+    [Header("Bamao 디자인 — Inspector에서 할당")]
+    [Tooltip("SelectionRoot 전체 배경 (예: BoardPaperFrame sprite, 9-slice 권장)")]
+    [SerializeField] private Sprite boardBackgroundSprite;
+    [Tooltip("그리드 썸네일 카드 배경 (예: Note1~4 sprite). 여러 개면 순서대로 번갈아 사용")]
+    [SerializeField] private Sprite[] thumbnailCardSprites;
+    [Tooltip("보드 장식 prefab (Bird, Feather, Nail 등). BoardBackground 위 / 카드 뒤에 깔린다.")]
+    [SerializeField] private GameObject[] decorationPrefabs;
 
     // ── Private ──
     private readonly Dictionary<string, string> _gridIdBySOName = new();
@@ -56,6 +67,7 @@ public class BlockSynergyBridge : MonoBehaviour
         {
             boardManager.OnGridFilled -= HandleGridFilled;
             boardManager.OnBackToSelection -= RefreshAllThumbnails;
+            boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
         }
 
         if (_puzzleInstance != null)
@@ -107,6 +119,8 @@ public class BlockSynergyBridge : MonoBehaviour
         boardManager.OnGridFilled += HandleGridFilled;
         boardManager.OnBackToSelection -= RefreshAllThumbnails;
         boardManager.OnBackToSelection += RefreshAllThumbnails;
+        boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
+        boardManager.OnGridSessionActivated += HandleGridSessionActivated;
 
         RegisterAllGrids(blockData);
     }
@@ -193,7 +207,98 @@ public class BlockSynergyBridge : MonoBehaviour
 
         // 썸네일 UI 생성 → 선택 모드로 시작
         BuildThumbnails(sortedIds, blockData);
+
+        // GameplayRoot(편집 화면) 레이아웃 구성
+        if (boardManager.gameplayRoot != null)
+        {
+            // GameplayRoot: 부모 stretch fill (Puzzle.prefab 기본값 100×100 → 전체 화면)
+            var gameplayRT = boardManager.gameplayRoot.GetComponent<RectTransform>();
+            if (gameplayRT != null)
+            {
+                gameplayRT.anchorMin = Vector2.zero;
+                gameplayRT.anchorMax = Vector2.one;
+                gameplayRT.offsetMin = new Vector2(40f, 40f);
+                gameplayRT.offsetMax = new Vector2(-40f, -40f);
+                gameplayRT.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            EnsureBoardBackground(boardManager.gameplayRoot);
+            EnsureDecorations(boardManager.gameplayRoot);
+
+            // GridHost: 좌측 62% × 상하 90% — 그리드 편집 영역
+            if (boardManager.gridHost != null)
+            {
+                boardManager.gridHost.anchorMin = new Vector2(0.02f, 0.05f);
+                boardManager.gridHost.anchorMax = new Vector2(0.62f, 0.95f);
+                boardManager.gridHost.offsetMin = Vector2.zero;
+                boardManager.gridHost.offsetMax = Vector2.zero;
+                boardManager.gridHost.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            // ShapeScrollView: 우측 패널(63%~94%) — 스크롤 뷰포트 영역
+            var shapeSSV = boardManager.gameplayRoot.GetComponentInChildren<ShapeScrollView>(true);
+            if (shapeSSV != null)
+            {
+                var ssvRT = shapeSSV.transform as RectTransform;
+                if (ssvRT != null)
+                {
+                    ssvRT.anchorMin = new Vector2(0.63f, 0.05f);
+                    ssvRT.anchorMax = new Vector2(0.94f, 0.95f);
+                    ssvRT.offsetMin = Vector2.zero;
+                    ssvRT.offsetMax = Vector2.zero;
+                    ssvRT.pivot = new Vector2(0.5f, 0.5f);
+                }
+
+                // ShapeHost를 ShapeScrollView 내부로 리패런트 (RectMask2D 클리핑 적용)
+                if (boardManager.shapeHost != null &&
+                    boardManager.shapeHost.parent != shapeSSV.transform)
+                {
+                    boardManager.shapeHost.SetParent(shapeSSV.transform, false);
+                    // ScrollRect Content 표준 앵커: 너비=부모 전체, 상단 고정
+                    boardManager.shapeHost.anchorMin = new Vector2(0f, 1f);
+                    boardManager.shapeHost.anchorMax = new Vector2(1f, 1f);
+                    boardManager.shapeHost.pivot     = new Vector2(0.5f, 1f);
+                    boardManager.shapeHost.offsetMin = Vector2.zero;
+                    boardManager.shapeHost.offsetMax = Vector2.zero;
+                }
+            }
+            else if (boardManager.shapeHost != null)
+            {
+                // ShapeScrollView 없을 때 폴백
+                boardManager.shapeHost.anchorMin = new Vector2(0.63f, 0.05f);
+                boardManager.shapeHost.anchorMax = new Vector2(0.94f, 0.95f);
+                boardManager.shapeHost.offsetMin = Vector2.zero;
+                boardManager.shapeHost.offsetMax = Vector2.zero;
+                boardManager.shapeHost.pivot = new Vector2(0.5f, 1f);
+            }
+
+            // spawnOrigin 수정: X=0(중앙), Y=80(상단 80px 아래서 시작)
+            boardManager.spawnOrigin = new Vector2(0f, 80f);
+
+            // 그리드 영역 배경
+            EnsureAreaBackground(boardManager.gameplayRoot, "GridAreaBG",
+                new Vector2(0.02f, 0.05f), new Vector2(0.62f, 0.95f),
+                new Color(0f, 0f, 0f, 0.18f));
+
+            // 셰이프 패널 배경
+            EnsureAreaBackground(boardManager.gameplayRoot, "ShapeAreaBG",
+                new Vector2(0.63f, 0.05f), new Vector2(0.94f, 0.95f),
+                new Color(0f, 0f, 0f, 0.18f));
+        }
+
         boardManager.BackToSelection();
+
+        // BackToSelection 이후(SelectionRoot 활성화 후)에 레이아웃 강제 계산
+        // → 첫 클릭 시 GridLayoutGroup 위치가 올바르게 적용됨 (더블클릭 방지)
+        if (boardManager.selectionRoot != null)
+        {
+            var selRT = boardManager.selectionRoot.GetComponent<RectTransform>();
+            if (selRT != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                LayoutRebuilder.ForceRebuildLayoutImmediate(selRT);
+            }
+        }
     }
 
     // ── 썸네일 UI 생성 ──
@@ -215,11 +320,12 @@ public class BlockSynergyBridge : MonoBehaviour
 
         var selectionRT = selectionRoot.GetComponent<RectTransform>();
 
-        // SelectionRoot를 부모에 스트레치 (클릭 영역 보장)
+        // CharacterBG_Board (BamaoScene)와 동일: 부모 stretch fill, offset 0
         selectionRT.anchorMin = Vector2.zero;
         selectionRT.anchorMax = Vector2.one;
         selectionRT.offsetMin = Vector2.zero;
         selectionRT.offsetMax = Vector2.zero;
+        selectionRT.pivot = new Vector2(0.5f, 0.5f);
 
         // 기존 레거시 자식 제거 (GridLoader 등)
         for (int i = selectionRT.childCount - 1; i >= 0; i--)
@@ -253,20 +359,101 @@ public class BlockSynergyBridge : MonoBehaviour
         var oldGrid = root.GetComponent<GridLayoutGroup>();
         if (oldGrid != null) Destroy(oldGrid);
 
-        // GridLayoutGroup 추가 (3열)
+        // 보드 배경 (선택적 — Inspector 할당 시)
+        EnsureBoardBackground(root);
+
+        // 장식 prefab들 (Bird, Feather 등) — 카드보다 뒤에 깔림
+        EnsureDecorations(root);
+
+        // GridLayoutGroup 추가 (3열, 행 가변 — 그리드 추가 시 자동 확장)
         var gridLayout = root.AddComponent<GridLayoutGroup>();
         gridLayout.cellSize = new Vector2(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
         gridLayout.spacing = Vector2.one * THUMBNAIL_SPACING;
         gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         gridLayout.constraintCount = THUMBNAIL_COLUMNS;
         gridLayout.childAlignment = TextAnchor.UpperCenter;
-        gridLayout.padding = new RectOffset(20, 20, 20, 20);
+        gridLayout.padding = new RectOffset(120, 120, 100, 100);
 
         // ContentSizeFitter 확보
         if (!root.TryGetComponent<ContentSizeFitter>(out var fitter))
             fitter = root.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+    }
+
+    /// <summary>
+    /// SelectionRoot 자체에 Bamao 보드 sprite를 깐다 (Inspector 할당 시).
+    /// SelectionRoot 자식 0번으로 들어가 카드보다 뒤에 그려짐.
+    /// </summary>
+    private void EnsureBoardBackground(GameObject root)
+    {
+        if (boardBackgroundSprite == null) return;
+
+        // 이미 추가된 배경이 있으면 스킵
+        var existing = root.transform.Find("BoardBackground");
+        if (existing != null) return;
+
+        var bgGo = new GameObject("BoardBackground", typeof(RectTransform), typeof(Image));
+        bgGo.transform.SetParent(root.transform, false);
+        bgGo.transform.SetAsFirstSibling();
+
+        var bgRT = bgGo.GetComponent<RectTransform>();
+        // SelectionRoot보다 사방 150px 더 크게 — 적당한 확장
+        bgRT.anchorMin = Vector2.zero;
+        bgRT.anchorMax = Vector2.one;
+        bgRT.offsetMin = new Vector2(-150f, -150f);
+        bgRT.offsetMax = new Vector2(150f, 150f);
+
+        var bgImg = bgGo.GetComponent<Image>();
+        bgImg.sprite = boardBackgroundSprite;
+        bgImg.type = Image.Type.Simple;
+        bgImg.preserveAspect = true; // 비율 유지
+        bgImg.raycastTarget = false;
+
+        // GridLayoutGroup이 배경을 카드 아이템으로 취급하지 않도록
+        var le = bgGo.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+    }
+
+    /// <summary>
+    /// 데모 씬의 장식 prefab(Bird/Feather/Nail 등)을 SelectionRoot에 인스턴스화한다.
+    /// 카드보다 뒤(sibling 1)에 배치하여 가리지 않도록 한다.
+    /// </summary>
+    private void EnsureDecorations(GameObject root)
+    {
+        if (decorationPrefabs == null || decorationPrefabs.Length == 0) return;
+
+        var existing = root.transform.Find("BoardDecorations");
+        if (existing != null) return;
+
+        var decRoot = new GameObject("BoardDecorations", typeof(RectTransform));
+        decRoot.transform.SetParent(root.transform, false);
+        // BoardBackground(0) 다음, 카드(GridLayoutGroup이 채우는 부분)보다 앞에 배치 → 카드 뒤로 그려짐
+        decRoot.transform.SetSiblingIndex(1);
+
+        var decRT = decRoot.GetComponent<RectTransform>();
+        decRT.anchorMin = Vector2.zero;
+        decRT.anchorMax = Vector2.one;
+        decRT.offsetMin = Vector2.zero;
+        decRT.offsetMax = Vector2.zero;
+
+        var decLE = decRoot.AddComponent<LayoutElement>();
+        decLE.ignoreLayout = true;
+
+        foreach (var prefab in decorationPrefabs)
+        {
+            if (prefab == null) continue;
+            var instObj = Instantiate(prefab);
+            if (instObj is GameObject inst)
+            {
+                inst.transform.SetParent(decRoot.transform, false);
+            }
+            else
+            {
+                Debug.LogWarning($"[BlockSynergyBridge] Decoration prefab is not a GameObject: {prefab.name}");
+                if (instObj != null) Destroy(instObj);
+            }
+        }
     }
 
     private GridThumbnail CreateThumbnail(RectTransform parent, string gridId,
@@ -279,9 +466,27 @@ public class BlockSynergyBridge : MonoBehaviour
         var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = new Vector2(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
 
-        // 배경
+        // 배경 — Bamao Note sprite 순환 사용 (Inspector 할당 시), 미할당 시 단색 폴백
         var bg = go.GetComponent<Image>();
-        bg.color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
+        if (thumbnailCardSprites != null && thumbnailCardSprites.Length > 0)
+        {
+            var spr = thumbnailCardSprites[_thumbnails.Count % thumbnailCardSprites.Length];
+            if (spr != null)
+            {
+                bg.sprite = spr;
+                bg.type = Image.Type.Simple;
+                bg.preserveAspect = true;
+                bg.color = Color.white;
+            }
+            else
+            {
+                bg.color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
+            }
+        }
+        else
+        {
+            bg.color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
+        }
 
         // 이름 텍스트 (상단)
         var nameGO = new GameObject("NameText", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -304,14 +509,15 @@ public class BlockSynergyBridge : MonoBehaviour
         if (thumbnailFont != null)
             nameText.font = thumbnailFont;
 
-        // 그리드 프리뷰 컨테이너 (하단)
+        // 그리드 프리뷰 컨테이너 — NameText(상단 15%) 제외한 나머지에 좌우 대칭으로 중앙 정렬
         var containerGO = new GameObject("GridPreview", typeof(RectTransform));
         containerGO.transform.SetParent(go.transform, false);
         var containerRT = containerGO.GetComponent<RectTransform>();
-        containerRT.anchorMin = new Vector2(0.1f, 0.05f);
-        containerRT.anchorMax = new Vector2(0.9f, 0.8f);
+        containerRT.anchorMin = new Vector2(0.15f, 0.1f);
+        containerRT.anchorMax = new Vector2(0.85f, 0.85f);
         containerRT.offsetMin = Vector2.zero;
         containerRT.offsetMax = Vector2.zero;
+        containerRT.pivot = new Vector2(0.5f, 0.5f);
 
         // 보더 이미지 (선택 피드백용)
         var borderGO = new GameObject("Border", typeof(RectTransform), typeof(Image));
@@ -323,10 +529,9 @@ public class BlockSynergyBridge : MonoBehaviour
         borderRT.offsetMin = Vector2.zero;
         borderRT.offsetMax = Vector2.zero;
         var borderImg = borderGO.GetComponent<Image>();
-        borderImg.color = new Color(0.4f, 0.4f, 0.5f, 0.6f);
+        // Sheet2 sprite를 가리지 않도록 평소엔 투명. GridThumbnail의 RefreshOccupied 등에서 시각 피드백 시점에 색을 켠다.
+        borderImg.color = new Color(1f, 1f, 1f, 0f);
         borderImg.raycastTarget = false;
-        // 배경보다 뒤로 (outline 효과)
-        bg.color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
 
         // GridThumbnail 컴포넌트 설정
         var thumbnail = go.GetComponent<GridThumbnail>();
@@ -345,6 +550,37 @@ public class BlockSynergyBridge : MonoBehaviour
     {
         // 자신(@HUD)의 하위에서 Panel_Grid 검색
         return FindChildRecursive(transform, "Panel_Grid");
+    }
+
+    private void HandleGridSessionActivated(Grid gridInstance) { }
+
+    /// <summary>
+    /// GameplayRoot 아래에 반투명 배경 Image를 생성한다.
+    /// 이미 같은 이름이 있으면 스킵.
+    /// </summary>
+    private static void EnsureAreaBackground(GameObject root, string name,
+        Vector2 anchorMin, Vector2 anchorMax, Color color)
+    {
+        if (root == null) return;
+        if (root.transform.Find(name) != null) return;
+
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(root.transform, false);
+        go.transform.SetAsFirstSibling();
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+
+        var img = go.GetComponent<Image>();
+        img.color         = color;
+        img.raycastTarget = false;
+
+        var le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
     }
 
     // ── 치트 ──
@@ -395,7 +631,7 @@ public class BlockSynergyBridge : MonoBehaviour
         shapeSO.shapeName = shapeEntry.shape_name;
         shapeSO.shapeBlockPrefab = boardManager.defaultShapeBlockPrefab;
         shapeSO.cellOffsets = offsets;
-        shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : 90f;
+        shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
 
         // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
         boardManager.SpawnSharedShape(shapeSO);
@@ -523,7 +759,7 @@ public class BlockSynergyBridge : MonoBehaviour
                 columns = colCount,
                 rows01 = rows01,
             },
-            visual = new GridVisualData(),
+            visual = new GridVisualData { squareGap = GRID_CELL_SIZE, squareScale = 0.9f },
             spawnableShapes = System.Array.Empty<ShapeData>(),
         };
     }

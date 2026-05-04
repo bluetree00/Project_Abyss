@@ -28,3 +28,4 @@ MonoBehaviour:
   itemDropMultiplier: 1
   middleLayers: 13
   peakLayer: 8
+  fieldPrefabKey: FieldPrefab_Throne

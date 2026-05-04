@@ -1445,6 +1445,10 @@ MonoBehaviour:
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}
+  - {fileID: 11400000, guid: c28724d86258ce245b7c343b35b395d5, type: 2}
+  - {fileID: 11400000, guid: c5f04f220d9b1c044b3e58d1d7ab4814, type: 2}
+  - {fileID: 11400000, guid: 7aa3846ec9ea42e43b63bfacd7efbfa5, type: 2}
+  - {fileID: 11400000, guid: 81ae8eb0cb06d8948960d5dda7f139c7, type: 2}
   - {fileID: 11400000, guid: 4f37ed8cc553a734cbe922020c290fc8, type: 2}
   blockCellSize: 1
   blockBaseY: -0.5
