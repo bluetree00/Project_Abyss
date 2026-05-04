@@ -151,7 +151,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         _runner = new BossPatternRunner(
             bossConfig,
             _patternCtx,
-            isAlive:     () => _runtime != null && !_runtime.IsDead && !IsPlayerDead(),
+            isAlive:     () => _runtime != null && !_runtime.IsDead && !IsPlayerDead() && !(_fgBB?.IsGroggy ?? false),
             isInRange:   () => _runtime?.PlayerTarget != null,
             changeState: s  => ChangeState(s),
             onExecuted:  OnPatternExecuted);
@@ -317,6 +317,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             BossConditionKey.Dist_Far        => new MinRangeCondition(config.condDistFar),
             BossConditionKey.TimePressure    => new NormalModeTimerCondition(config.condTimePressureSecs),
             BossConditionKey.FG_Phase1             => new HpAboveCondition(config.condPhase2HpThreshold),
+            BossConditionKey.FG_Phase2             => new FGPhase2Condition(_fgBB),
             BossConditionKey.FG_PhaseChangePending => new FGPhaseChangePendingCondition(_fgBB),
             BossConditionKey.FG_IsPhase2           => new FGPhase2Condition(_fgBB),
             BossConditionKey.FG_IsGroggy           => new FGGroggyCondition(_fgBB),
@@ -336,14 +337,23 @@ public class ForestGuardianMonster : MonsterBase, IBoss
 
         pattern.weight = 0f;
 
-        var entry = new WeightRecoveryEntry
+        // 기존 회복 항목 제거 — 부분 회복 중 재발동 시 OriginalWeight가 계속 감소하는 버그 방지
+        // 이전 항목에 더 높은 원래 값이 있으면 그 값으로 복원
+        for (int i = _weightRecoveries.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(_weightRecoveries[i].Pattern, pattern)) continue;
+            if (_weightRecoveries[i].OriginalWeight > original)
+                original = _weightRecoveries[i].OriginalWeight;
+            _weightRecoveries.RemoveAt(i);
+        }
+
+        _weightRecoveries.Add(new WeightRecoveryEntry
         {
             Pattern        = pattern,
             OriginalWeight = original,
             Timer          = 0f,
             Duration       = Random.Range(WeightRecoveryMin, WeightRecoveryMax),
-        };
-        _weightRecoveries.Add(entry);
+        });
     }
 
     private void TickWeightRecoveries(float dt)

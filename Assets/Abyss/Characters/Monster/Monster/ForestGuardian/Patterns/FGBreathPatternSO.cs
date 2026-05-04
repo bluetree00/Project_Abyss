@@ -327,8 +327,9 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         _breathVfxGO = Object.Instantiate(Data.breathVfxPrefab);
         UpdateBreathVfxTransform(ctx);
 
-        if (_breathVfxGO.TryGetComponent<ParticleSystem>(out var ps))
-            ps.Play(withChildren: true);
+        // 루트에 ParticleSystem이 없는 BeamVfx 구조도 지원: 자식까지 포함해 Play
+        foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
+            ps.Play(withChildren: false);
     }
 
     /// <summary>보스 왼손 위치에 VFX를 배치하고 보스 정면 방향으로 회전.</summary>
@@ -336,7 +337,11 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     {
         if (_breathVfxGO == null || ctx.Animator == null) return;
 
-        var handBone = ctx.Animator.GetBoneTransform(HumanBodyBones.LeftHand);
+        // Humanoid 리그일 때만 GetBoneTransform 사용, Generic 리그는 이름으로 검색
+        Transform handBone = ctx.Animator.isHuman
+            ? ctx.Animator.GetBoneTransform(HumanBodyBones.LeftHand)
+            : FindBoneByName(ctx.Transform, "TreantLPalm", "LeftHand", "Hand_L", "L_Hand", "hand_l", "hand.L");
+
         Vector3 origin = handBone != null
             ? handBone.position
             : ctx.Transform.position + ctx.Transform.right * -0.5f + Vector3.up * 1.2f;
@@ -344,22 +349,29 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         _breathVfxGO.transform.SetPositionAndRotation(
             origin,
             Quaternion.LookRotation(ctx.Transform.forward));
+
+        // BeamBody Z 스케일을 사정거리에 맞춰 설정 (BeamVfx 코루틴 없이 빔 길이 직접 제어)
+        var beamBody = _breathVfxGO.transform.Find("BeamBody");
+        if (beamBody != null)
+        {
+            Vector3 s = beamBody.localScale;
+            s.z = Data.range;
+            beamBody.localScale = s;
+        }
     }
 
     private void StopBreathVfx()
     {
         if (_breathVfxGO == null) return;
 
-        if (_breathVfxGO.TryGetComponent<ParticleSystem>(out var ps))
+        float maxLifetime = 0f;
+        foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
         {
-            ps.Stop(withChildren: true, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
-            Object.Destroy(_breathVfxGO, ps.main.startLifetime.constantMax + 0.5f);
-        }
-        else
-        {
-            Object.Destroy(_breathVfxGO);
+            ps.Stop(withChildren: false, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
+            maxLifetime = Mathf.Max(maxLifetime, ps.main.startLifetime.constantMax);
         }
 
+        Object.Destroy(_breathVfxGO, maxLifetime > 0f ? maxLifetime + 0.5f : 0f);
         _breathVfxGO = null;
     }
 
@@ -376,6 +388,20 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
             return;
         }
         ctx.Animator.CrossFade(stateName, crossFade, 0, 0f);
+    }
+
+    /// <summary>Generic 리그에서 후보 이름 중 일치하는 첫 번째 본을 반환한다.</summary>
+    private static Transform FindBoneByName(Transform root, params string[] names)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        {
+            foreach (var n in names)
+            {
+                if (t.name.Equals(n, System.StringComparison.OrdinalIgnoreCase))
+                    return t;
+            }
+        }
+        return null;
     }
 }
 }

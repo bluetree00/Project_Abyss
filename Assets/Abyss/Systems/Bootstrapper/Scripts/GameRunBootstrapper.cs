@@ -778,16 +778,23 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (!buildRuntimeNavMesh || mapRootObject == null)
             return;
 
-        var surface = mapRootObject.GetComponent<NavMeshSurface>();
-        if (surface == null)
-            surface = mapRootObject.AddComponent<NavMeshSurface>();
-
-        surface.collectObjects = CollectObjects.Children;
-        // PhysicsColliders 기반 — FBX Read/Write OFF 메시(AZURE Cliff/Rock 등)를 우회하고
-        // BoxCollider 기반으로 NavMesh를 빌드. Player 빌드에서도 안전하게 동작.
-        surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
-        surface.layerMask = ~0;
-        surface.BuildNavMesh();
+        // PhysicsColliders 기반 — FBX Read/Write OFF 메시(AZURE Cliff/Rock 등)를 우회.
+        // All로 씬 전체 물리 콜라이더를 포함하되, Player·Monster 레이어를 제외해
+        // 캐릭터 캡슐 콜라이더가 NavMesh에 구멍을 내지 않도록 한다.
+        // 프로젝트에 등록된 모든 AgentType에 대해 NavMesh를 빌드해 타입 불일치로
+        // isOnNavMesh=false가 되는 현상을 방지한다.
+        int excludeMask = ~((1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("Monster")));
+        int agentCount  = NavMesh.GetSettingsCount();
+        for (int i = 0; i < agentCount; i++)
+        {
+            var agentSettings = NavMesh.GetSettingsByIndex(i);
+            var surface = mapRootObject.AddComponent<NavMeshSurface>();
+            surface.agentTypeID    = agentSettings.agentTypeID;
+            surface.collectObjects = CollectObjects.All;
+            surface.useGeometry    = NavMeshCollectGeometry.PhysicsColliders;
+            surface.layerMask      = excludeMask;
+            surface.BuildNavMesh();
+        }
     }
 
     private static void DisableSceneBakedNavMesh()
