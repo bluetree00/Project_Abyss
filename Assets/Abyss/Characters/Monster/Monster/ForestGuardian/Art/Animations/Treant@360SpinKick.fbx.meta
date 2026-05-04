@@ -671,7 +671,7 @@ ModelImporter:
   lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: 9a073b32d5dfb3c48835fa9cd30cf9aa,
     type: 3}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 3
+  animationType: 2
   humanoidOversampling: 1
   avatarSetup: 2
   addHumanoidExtraRootOnlyWhenUsingAvatar: 0

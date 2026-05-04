@@ -40,10 +40,10 @@ public class FGGroundSlashPatternSO : BossPatternSO
 
     // ── 히트 데이터 (배열 인덱스 = 타격 순서 0·1·2) ──────
     [Header("GroundSlash — Hits")]
-    [Tooltip("데미지 판정 링 외곽 반경 (m). 기본: 5·10·15")]
+    [Tooltip("경고장판 크기 · 피격 판정 링 외곽 반경 (m). 기본: 5·10·15")]
     public float[] hitRanges = { 5f, 10f, 15f };
 
-    [Tooltip("VFX·경고장판 균일 스케일. 기본: 3·6·9")]
+    [Tooltip("임팩트 VFX 균일 스케일. 기본: 3·6·9")]
     public float[] hitVfxScales = { 3f, 6f, 9f };
 
     // ── 데미지 ────────────────────────────────────────────
@@ -88,9 +88,9 @@ public class FGGroundSlashPatternSO : BossPatternSO
 
     public override SpecialStateBase GetRuntimeState() => _state;
 
-    public int   HitCount             => hitRanges?.Length ?? 0;
-    public float GetHitRange(int i)    => (hitRanges    != null && i < hitRanges.Length)    ? hitRanges[i]    : 5f;
-    public float GetHitVfxScale(int i) => (hitVfxScales != null && i < hitVfxScales.Length) ? hitVfxScales[i] : 1f;
+    public int   HitCount               => hitRanges?.Length ?? 0;
+    public float GetHitRange(int i)      => (hitRanges    != null && i < hitRanges.Length)    ? hitRanges[i]    : 5f;
+    public float GetHitVfxScale(int i)   => (hitVfxScales != null && i < hitVfxScales.Length) ? hitVfxScales[i] : 1f;
     public float GetHitInnerRange(int i) => i > 0 ? GetHitRange(i - 1) : 0f;
 }
 
@@ -205,18 +205,20 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         PlayAnim(ctx, AnimAttackReady, 0.1f);
     }
 
-    // ── 데미지 (링 판정) ──────────────────────────────────
-    // hitIndex별 링: [innerRange, outerRange]
-    // 맞은 플레이어를 위로 띄우고 다음 링 방향으로 발사
+    // ── 데미지 (전체 디스크 판정) ────────────────────────
+    // 1~3타 모두 0~outerRange 전체 범위 — 경고장판 위에 있으면 반드시 피격
     private void TryDealDamage(MonsterContext ctx, int hitIndex)
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
 
-        float dist       = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-        float outerRange = Data.GetHitRange(hitIndex);
-        float innerRange = Data.GetHitInnerRange(hitIndex);
+        // XZ 평면 거리로 판정 — 공중에 뜬 플레이어의 Y가 링 범위를 벗어나는 문제 방지
+        Vector3 bossPos   = ctx.Transform.position;
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        float   dx        = playerPos.x - bossPos.x;
+        float   dz        = playerPos.z - bossPos.z;
+        float   dist      = Mathf.Sqrt(dx * dx + dz * dz);
 
-        if (dist > outerRange || dist < innerRange) return;
+        if (dist > Data.GetHitRange(hitIndex)) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
@@ -225,7 +227,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         player.TakeDamage(dmg);
 
         // 위로 + 보스에서 멀어지는 방향으로 발사
-        Vector3 outDir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        Vector3 outDir = playerPos - bossPos;
         outDir.y = 0f;
         if (outDir.sqrMagnitude > 0.001f) outDir.Normalize();
 
@@ -241,10 +243,9 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
     {
         if (Data.warningDiscPrefab == null) return;
 
-        // 1타: 0에서 targetScale로 확장
-        // 2·3타: 1타(scale0)에서 targetScaleN으로 확장 → 이전 링 바깥부터 보이게
-        float startS  = hitIndex > 0 ? Data.GetHitVfxScale(0) : 0f;
-        float targetS = Data.GetHitVfxScale(hitIndex);
+        // 1~3타 모두 0부터 전체 디스크 확장 — 경고장판 = 피격 범위 일치
+        float startS  = 0f;
+        float targetS = Data.GetHitRange(hitIndex);
         _warningStartScale  = new Vector3(startS,  1f, startS);
         _warningTargetScale = new Vector3(targetS, 1f, targetS);
 

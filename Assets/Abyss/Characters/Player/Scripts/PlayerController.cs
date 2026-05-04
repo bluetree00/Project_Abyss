@@ -53,8 +53,7 @@ public class PlayerController : CharacterBase
     //============================================================
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
-    [Header("Debug")]
-    [SerializeField] private bool debugInvincible = false;
+    private bool debugInvincible = false;
     public CharacterData CharacterData => characterData;
 
     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
@@ -704,6 +703,7 @@ public class PlayerController : CharacterBase
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
         {
+            if (isInSkill) return; // 스킬 중에는 회피로 캔슬 불가
             if (!isDodging && UnityEngine.Time.time >= DodgeCooldownEnd)
             {
                 if (isInAct) actSM.Change(ActState.None);

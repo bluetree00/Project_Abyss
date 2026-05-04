@@ -110,6 +110,16 @@ public class MonsterAnimationData
     public string getHitStateName      = "GetHit";
     public string dieStateName         = "Die";
 
+    [Header("트리거 / ThirdParty 컨트롤러 상태 이름")]
+    [Tooltip("공격 상태 이름 또는 트리거. ThirdParty 컨트롤러 사용 시 실제 상태명 입력 (예: BattleBee_Attack01)")]
+    public string attackTrigger  = "";
+    [Tooltip("피격 상태 이름 또는 트리거.")]
+    public string getHitTrigger  = "";
+    [Tooltip("사망 상태 이름 또는 트리거.")]
+    public string dieTrigger     = "";
+    [Tooltip("감지 상태 이름 또는 트리거.")]
+    public string detectTrigger  = "";
+
     [Header("블렌드 파라미터")]
     [Tooltip("이동 속도 Float 파라미터. 사용 안 하면 비워두기.")]
     public string speedParam     = "";

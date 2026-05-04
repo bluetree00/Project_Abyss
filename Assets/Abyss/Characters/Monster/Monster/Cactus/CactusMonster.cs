@@ -20,7 +20,7 @@ public class CactusMonster : MonsterBase
     {
         if (_runtime == null) return;
 
-        if (_runtime.IsDormant || _runtime.IsReturning)
+        if (_runtime.IsDormant)
             _runtime.HasBeenAttacked = true;
 
         base.TakeDamage(amount, instigator, knockbackMultiplier, element, elementAmount);

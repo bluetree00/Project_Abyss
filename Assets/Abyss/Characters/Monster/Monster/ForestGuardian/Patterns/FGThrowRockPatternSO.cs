@@ -37,8 +37,11 @@ public class FGThrowRockPatternSO : BossPatternSO
     [Tooltip("투사체 비행 속도 (m/s)")]
     public float projectileSpeed = 15f;
 
-    [Tooltip("던지는 손 bone")]
-    public HumanBodyBones throwHand = HumanBodyBones.RightHand;
+    [Tooltip("던지는 손 본 이름 (Generic 아바타용, 예: TreantLPalm)")]
+    public string throwHandBoneName = "Hand_R";
+
+    [Tooltip("손이 바위에 이 거리 이내로 들어오면 잡기 (m)")]
+    public float grabThreshold = 1.0f;
 
     // ── 데미지 ────────────────────────────────────────────
     [Header("ThrowRock — Damage")]
@@ -111,14 +114,18 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private Vector3            _warningTargetScale;
     private float              _warningGrowDuration; // 경고 장판 확장 기준 시간
     private float              _warningGrowTimer;    // 확장 시작 시점부터의 경과 시간
+    private Transform          _handBone;           // 손 본 캐시 (Generic 아바타용)
+    private bool               _grabbed;            // 바위가 손에 부착됐는지
 
     public FGThrowRockState(FGThrowRockPatternSO data) : base(data) { }
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase = Phase.Windup;
-        _timer = 0f;
-        _proj  = null;
+        _phase    = Phase.Windup;
+        _timer    = 0f;
+        _proj     = null;
+        _grabbed  = false;
+        _handBone = FindBoneRecursive(ctx.Transform, Data.throwHandBoneName);
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -152,7 +159,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         switch (_phase)
         {
             case Phase.Windup:
-                MoveRockToHand(ctx, _windupDuration > 0f ? _timer / _windupDuration : 1f);
+                TryGrabRock();   // 손이 바위에 충분히 가까워지면 부착
                 FacePlayer(ctx);
 
                 if (_timer >= _windupDuration)
@@ -210,7 +217,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         _phase = Phase.Recovery;
     }
 
-    // ── 돌 생성 ─────────────────────────────────────────
+    // ── 돌 생성 (보스 앞 바닥에 배치) ──────────────────────
     private void SpawnRock(MonsterContext ctx)
     {
         if (Data.rockPrefab == null) return;
@@ -224,17 +231,16 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
             _rockGO.transform.localScale = s;
     }
 
-    // ── 돌을 손 위치로 이동 ─────────────────────────────
-    private void MoveRockToHand(MonsterContext ctx, float t)
+    // ── 손이 바위에 닿으면 부착 ──────────────────────────
+    private void TryGrabRock()
     {
-        if (_rockGO == null || ctx.Animator == null) return;
+        if (_grabbed || _rockGO == null || _handBone == null) return;
 
-        var handBone = ctx.Animator.GetBoneTransform(Data.throwHand);
-        Vector3 target = handBone != null
-            ? handBone.position
-            : ctx.Transform.position + ctx.Transform.forward * 1f + Vector3.up * 1.5f;
+        float dist = Vector3.Distance(_rockGO.transform.position, _handBone.position);
+        if (dist > Data.grabThreshold) return;
 
-        _rockGO.transform.position = Vector3.Lerp(_rockSpawnPos, target, t);
+        _rockGO.transform.SetParent(_handBone, worldPositionStays: true);
+        _grabbed = true;
     }
 
     // ── 투사체 발사 ─────────────────────────────────────
@@ -246,6 +252,9 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         SpawnWarning(_landingPos);
 
         if (_rockGO == null) return;
+
+        // 손 본에서 분리하여 독립 투사체로 전환
+        _rockGO.transform.SetParent(null);
 
         Vector3 toTarget = _landingPos - _rockGO.transform.position;
         _launchDist = toTarget.magnitude;
@@ -348,6 +357,18 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     {
         var fg = ctx.Monster as ForestGuardianMonster;
         return fg?.FGBlackboard.AnimSpeedMult ?? 1f;
+    }
+
+    private static Transform FindBoneRecursive(Transform parent, string boneName)
+    {
+        if (string.IsNullOrEmpty(boneName)) return null;
+        foreach (Transform child in parent)
+        {
+            if (child.name == boneName) return child;
+            var found = FindBoneRecursive(child, boneName);
+            if (found != null) return found;
+        }
+        return null;
     }
 }
 }

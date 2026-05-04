@@ -42,13 +42,15 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    idleStateName: Idle
-    patrolStateName: Walk
-    chaseStateName: Run
-    attackReadyStateName: AttackReady
-    attackStateName: Attack
-    getHitStateName: GetHit
-    dieStateName: Die
+    animatorControllerAddress: 
+    idleStateName: BattleBee_IdleNormal
+    patrolStateName: BattleBee_FlyFWD
+    chaseStateName: BattleBee_FlyFWDFast
+    attackReadyStateName: BattleBee_IdleBattle
+    attackTrigger: BattleBee_Attack01
+    getHitTrigger: BattleBee_GetHit
+    dieTrigger: BattleBee_Die
+    detectTrigger: BattleBee_SenseSomethingStart
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15

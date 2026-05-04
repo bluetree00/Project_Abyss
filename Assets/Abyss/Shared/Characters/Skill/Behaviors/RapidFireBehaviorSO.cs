@@ -97,6 +97,16 @@ public class RapidFireBehaviorSO : SkillBehaviorSO
             if (obj == null) return;
             obj.transform.localScale = Vector3.one * 0.5f;
             obj.transform.SetParent(ctx.PlayerTransform, true);
+
+            // 루프 강제 OFF — 한 사이클만 재생
+            foreach (var ps in obj.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.loop = false;
+                ps.Clear(true);
+                ps.Play(true);
+            }
+
             if (obj.TryGetComponent<EffectBehaviour>(out var eb))
                 eb.Initialize(eb.behaviorSO, ctx.PlayerTransform, 5f);
             else

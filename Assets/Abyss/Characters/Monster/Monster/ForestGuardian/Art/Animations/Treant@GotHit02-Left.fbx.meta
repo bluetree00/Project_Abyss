@@ -20,7 +20,11 @@ ModelImporter:
     removeConstantScaleCurves: 0
     motionNodeName: 
     animationImportErrors: 
-    animationImportWarnings: 
+    animationImportWarnings: "\nClip 'GotHit02' has import animation warnings that
+      might lower retargeting quality:\nNote: Activate translation DOF on avatar
+      to improve retargeting quality.\n\t'TreantRibcage' is inbetween humanoid transforms
+      and has rotation animation that will be discarded.\n\t'TreantHead' has scale
+      animation that will be discarded.\n"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -679,7 +683,7 @@ ModelImporter:
   lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: 3f6e234d5dd582e41baf973e109feaa5,
     type: 3}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 3
+  animationType: 2
   humanoidOversampling: 1
   avatarSetup: 2
   addHumanoidExtraRootOnlyWhenUsingAvatar: 0

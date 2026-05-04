@@ -15,6 +15,6 @@ MonoBehaviour:
   skillName: "\uB354 \uBE68\uB9AC\uC3D8\uAE30"
   description: "5\uCD08\uAC04 \uAE30\uBCF8\uACF5\uACA9\uC5D0 \uCD94\uAC00 \uACF5\uACA9\uC774
     \uBC1C\uC0DD\uD55C\uB2E4."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f8812c8b8c4fbcf43b333cf968a94855, type: 3}
   cooldown: 15
   behavior: {fileID: 11400000, guid: 930a5081da587e647a16a932b84bf849, type: 2}

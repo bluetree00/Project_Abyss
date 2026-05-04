@@ -17,8 +17,8 @@ public class GetHitState : IMonsterState
         ctx.Agent.enabled = false;
         ctx.Runtime.StateTimer = StunDuration;
 
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.getHitStateName))
-            ctx.Animator.CrossFade(ctx.Animation.getHitStateName, 0.05f, 0, 0f);
+        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.getHitTrigger))
+            ctx.Animator.CrossFade(ctx.Animation.getHitTrigger, 0.05f, 0, 0f);
     }
 
     public virtual void Update(MonsterContext ctx)
@@ -55,6 +55,7 @@ public class GetHitState : IMonsterState
     {
         if (ctx.Agent.enabled) return;
 
+        // 넉백으로 밀린 Rigidbody 속도를 정지시킨 후 kinematic 복원 → NavMesh에 재스냅
         var rb = ctx.Monster.GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -64,9 +65,7 @@ public class GetHitState : IMonsterState
         }
 
         ctx.Agent.enabled = true;
-        // GetHit 루트모션이 Y를 밀었을 수 있으므로, Warp(transform.position) 대신
-        // NavMesh.SamplePosition 기반 스냅으로 올바른 지면 위치에 복원한다.
-        ctx.Monster.TrySnapAgentToNavMesh();
+        ctx.Agent.Warp(ctx.Monster.transform.position);
     }
 }
 }

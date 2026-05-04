@@ -71,8 +71,17 @@ public class GridSquare : MonoBehaviour
     {
         isHighlighted = on;
         if (hoverImage != null)
-        {
             hoverImage.enabled = isHighlighted;
+    }
+
+    // 셰이프 전체 단위 프리뷰 하이라이트 (색상 지정)
+    public void SetPreviewHighlight(bool on, Color color)
+    {
+        isHighlighted = on;
+        if (hoverImage != null)
+        {
+            hoverImage.enabled = on;
+            if (on) hoverImage.color = color;
         }
     }
 
@@ -82,23 +91,21 @@ public class GridSquare : MonoBehaviour
     // ShapeBlock이 이 칸의 Trigger 영역에 들어왔을 때
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("ShapeBlock"))
-        {
-            overlapCount++;
-            // 놓을 수 있는 칸이고 아직 비어 있으면 하이라이트
-            if (isPlaceable && !isOccupied)
-                SetHighlight(true);
-        }
+        if (!other.CompareTag("ShapeBlock")) return;
+        overlapCount++;
+        // 셰이프 단위 프리뷰가 활성 중이면 물리 트리거 하이라이트를 건너뜀
+        if (GridManager.Instance != null && GridManager.Instance.IsPreviewingShape) return;
+        if (isPlaceable && !isOccupied)
+            SetHighlight(true);
     }
 
     // ShapeBlock이 이 칸 위에 머무르는 동안 (안전하게 계속 켜두기)
     void OnTriggerStay2D(Collider2D other)
     {
-        if (other.CompareTag("ShapeBlock"))
-        {
-            if (isPlaceable && !isOccupied)
-                SetHighlight(true);
-        }
+        if (!other.CompareTag("ShapeBlock")) return;
+        if (GridManager.Instance != null && GridManager.Instance.IsPreviewingShape) return;
+        if (isPlaceable && !isOccupied)
+            SetHighlight(true);
     }
 
 
