@@ -3,49 +3,48 @@ using UnityEngine;
 namespace Abyss.Monster
 {
 /// <summary>
-/// ForestGuardian 돌진 (Charge) 패턴.
+/// FG 돌진 패턴.
 ///
-/// 흐름  : AttackReady(경고장판 채우기) → Charge 1회 돌진(경고장판 길이) → Recovery
-/// 이동  : FullLock — agent 비활성, Warp 이동
+/// ━━ 흐름 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+///  Warning  : 추적 정지 + AttackReady + 경고장판(chargeRange 길이) 채우기
+///  Charging : Root Motion 비활성화 → 제자리 Charge 애니 재생
+///             → 클립 종료 시 chargeRange 거리 지점으로 워프
 /// </summary>
 [CreateAssetMenu(menuName = "Abyss/Boss/ForestGuardian/FG_ChargePattern", fileName = "FG_ChargePattern")]
 public class FGChargePatternSO : BossPatternSO
 {
-    [Header("Charge — Condition")]
-    [Tooltip("돌진 최소 발동 거리 (m)")]
+    [Header("Condition")]
+    [Tooltip("최소 발동 거리 (m)")]
     public float minDistance = 8f;
-    [Tooltip("돌진 최대 발동 거리 (m)")]
+    [Tooltip("최대 발동 거리 (m)")]
     public float maxDistance = 18f;
 
-    [Header("Charge — Warning")]
-    [Tooltip("경고 장판 채우기 시간 (초)")]
+    [Header("Warning")]
+    [Tooltip("경고장판 채우기 시간 (초) — 이 시간 동안 AttackReady 애니 재생")]
     public float warningDuration = 1.2f;
-    [Tooltip("공격 폭 (m)")]
+    [Tooltip("경고장판 폭 (m)")]
     public float chargeWidth = 3f;
-    [Tooltip("직사각형 경고 장판 프리팹 (RectWarning)")]
+    [Tooltip("RectWarning 프리팹")]
     public GameObject warningPrefab;
 
-    [Header("Charge — Movement")]
-    [Tooltip("돌진 속도 (m/s)")]
-    public float chargeSpeed = 12f;
+    [Header("Charge")]
+    [Tooltip("돌진 거리 (m) — 경고장판 길이이자 클립 종료 시 워프 목표 거리.\n" +
+             "애니메이션 클립의 실제 Root Motion 이동량에 맞게 조정하세요.")]
+    public float chargeRange = 10f;
+    [Tooltip("Charge 클립 길이 감지 실패 시 사용하는 폴백 시간 (초)")]
+    public float chargeDurationFallback = 0.8f;
 
-    [Header("Charge — Damage")]
-    [Tooltip("기본 attackPower 배율")]
-    public float damageMultiplier = 1.2f;
-    [Tooltip("넉백 힘 배율")]
-    public float knockbackMultiplier = 1.8f;
-
-    [Header("Charge — Recovery")]
-    [Tooltip("돌진 완료 후 ChaseState 전환까지 대기 시간 (초). Chase 애니로 크로스페이드 후 전환.")]
-    public float recoverDuration = 0.15f;
-
-    [Header("Charge — VFX")]
-    [Tooltip("돌진 중 보스 몸에 부착할 바람 이펙트 프리팹. null이면 재생 안 함.")]
+    [Header("Charge VFX")]
+    [Tooltip("돌진 중 보스 몸에 붙는 바람 이펙트 프리팹. null이면 재생 안 함.")]
     public GameObject chargeWindVfxPrefab;
-    [Tooltip("보스 피벗 기준 이펙트 로컬 오프셋 (몸 중심 조정용, Y값으로 높이 조절)")]
+    [Tooltip("보스 중심 기준 오프셋 (몸통 중앙에 맞게 조정)")]
     public Vector3 vfxBodyOffset = Vector3.zero;
-    [Tooltip("이펙트 로컬 스케일")]
-    public Vector3 vfxScale = Vector3.one;
+    [Tooltip("이펙트 스케일")]
+    public Vector3 vfxScale = new Vector3(3f, 3f, 3f);
+
+    [Header("Damage")]
+    public float damageMultiplier    = 1.2f;
+    public float knockbackMultiplier = 1.8f;
 
     private FGChargeState _state;
 
@@ -55,9 +54,7 @@ public class FGChargePatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
-        float dist = Vector3.Distance(
-            ctx.Ctx.Transform.position,
-            ctx.Ctx.Runtime.PlayerTarget.position);
+        float dist = Vector3.Distance(ctx.Ctx.Transform.position, ctx.Ctx.Runtime.PlayerTarget.position);
         return dist >= minDistance && dist <= maxDistance;
     }
 
@@ -65,7 +62,7 @@ public class FGChargePatternSO : BossPatternSO
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// FGChargeState — FullLock (이동 + 중단 불가)
+// FGChargeState
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 public class FGChargeState : FullLockState<FGChargePatternSO>
@@ -73,51 +70,53 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
     private const string AnimAttackReady = "AttackReady";
     private const string AnimCharge      = "Charge";
 
-    private enum Phase { Warning, Charging, Recover }
+    private enum Phase { Warning, Charging }
 
     private Phase       _phase;
     private float       _timer;
-    private bool        _hasDamaged;
     private Vector3     _chargeDir;
     private Vector3     _chargeStartPos;
     private Vector3     _chargeEndPos;
-    private float       _targetDist;
+    private float       _chargeDuration;
     private GameObject  _warningGO;
     private RectWarning _rectWarning;
     private GameObject  _windVfxGO;
+    private Vector3     _vfxStartPos;
+    private Vector3     _vfxEndPos;
 
     public FGChargeState(FGChargePatternSO data) : base(data) { }
 
+    // ── 진입 ────────────────────────────────────────────────────
     public override void Enter(MonsterContext ctx)
     {
-        _phase      = Phase.Warning;
-        _timer      = 0f;
-        _hasDamaged = false;
+        _phase = Phase.Warning;
+        _timer = 0f;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
         {
             ctx.Agent.isStopped = true;
             ctx.Agent.ResetPath();
         }
 
-        if (ctx.Runtime.PlayerTarget != null)
-        {
-            Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-            toPlayer.y = 0f;
-            _chargeDir = toPlayer.sqrMagnitude > 0.001f ? toPlayer.normalized : ctx.Transform.forward;
-        }
-        else
-        {
-            _chargeDir = ctx.Transform.forward;
-        }
+        // 플레이어 방향 계산 (Y 제외)
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget != null
+            ? ctx.Runtime.PlayerTarget.position - ctx.Transform.position
+            : ctx.Transform.forward;
+        toPlayer.y = 0f;
+        float playerDist = toPlayer.magnitude;
+        _chargeDir = playerDist > 0.001f ? toPlayer / playerDist : ctx.Transform.forward;
 
         ctx.Transform.rotation = Quaternion.LookRotation(_chargeDir);
         _chargeStartPos = ctx.Transform.position;
+        // chargeRange 거리로 도착지점 고정 — 플레이어 거리와 무관
+        _chargeEndPos = _chargeStartPos + _chargeDir * Data.chargeRange;
 
-        SpawnWarning(ctx);
+        // Warning 중 AttackReady 애니 재생
         PlayAnim(ctx, AnimAttackReady, 0.1f);
+        SpawnWarning(ctx);
     }
 
+    // ── 매 프레임 ────────────────────────────────────────────────
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime * SpeedMult(ctx);
@@ -126,117 +125,112 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
         {
             case Phase.Warning:
                 _rectWarning?.SetFillProgress(_timer / Data.warningDuration);
-
                 if (_timer >= Data.warningDuration)
-                {
-                    DespawnWarning();
-                    _chargeStartPos = ctx.Transform.position;
-                    _timer = 0f;
-                    _phase = Phase.Charging;
-                    SpawnWindVfx(ctx);
-                    PlayAnim(ctx, AnimCharge, 0.05f);
-                }
+                    BeginCharge(ctx);
                 break;
 
             case Phase.Charging:
-                Vector3 delta = _chargeDir * Data.chargeSpeed * Time.deltaTime;
-                if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-                    ctx.Agent.Warp(ctx.Transform.position + delta);
-                else
-                    ctx.Transform.position += delta;
-
-                if (!_hasDamaged && ctx.Runtime.PlayerTarget != null)
-                    TryDamage(ctx);
-
-                float traveled = Vector3.Distance(_chargeStartPos, ctx.Transform.position);
-                if (traveled >= _targetDist)
+                // VFX를 클립 진행률에 맞춰 시작→도착 위치로 이동
+                if (_windVfxGO != null && _chargeDuration > 0f)
                 {
-                    _timer = 0f;
-                    _phase = Phase.Recover;
-                    DespawnWindVfx();
-
-                    // 즉시 Agent 재개 + Chase 애니 크로스페이드 → 경직 없이 자연스럽게 연결
-                    if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-                    {
-                        ctx.Agent.Warp(ctx.Transform.position);
-                        ctx.Agent.isStopped = false;
-                    }
-                    PlayAnim(ctx, ctx.Animation.chaseStateName, 0.2f);
+                    float vfxT = Mathf.Clamp01(_timer / _chargeDuration);
+                    _windVfxGO.transform.position = Vector3.Lerp(_vfxStartPos, _vfxEndPos, vfxT);
                 }
-                break;
 
-            case Phase.Recover:
-                if (_timer >= Data.recoverDuration)
-                    ctx.Monster.ChangeState<ChaseState>();
+                if (_timer >= _chargeDuration)
+                    EndCharge(ctx);
                 break;
         }
     }
 
+    // ── 종료 ────────────────────────────────────────────────────
     public override void Exit(MonsterContext ctx)
     {
         DespawnWarning();
-        DespawnWindVfx();
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.Warp(ctx.Transform.position);
-            ctx.Agent.isStopped = false;
-        }
+        StopWindVfx();
+        RestoreRootMotion(ctx);
+        RestoreAgent(ctx);
     }
 
-    // ── 위치 고정 ─────────────────────────────────────────────
-    private void AnchorPosition(MonsterContext ctx)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 페이즈 전환
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void BeginCharge(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        DespawnWarning();
+        _timer = 0f;
+        _phase = Phase.Charging;
+
+        float clipLen = GetClipLength(ctx, AnimCharge);
+        _chargeDuration = clipLen > 0.01f ? clipLen : Data.chargeDurationFallback;
+
+        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped = true;
+            ctx.Agent.velocity  = Vector3.zero;
+            ctx.Agent.ResetPath();
+        }
+
+        // 애니메이션 종료까지 제자리 재생 — 클립 완료 후 텔레포트
+        if (ctx.Animator != null)
+            ctx.Animator.applyRootMotion = false;
+
+        SpawnWindVfx(ctx);
+        PlayAnim(ctx, AnimCharge, 0.05f);
+    }
+
+    private void EndCharge(MonsterContext ctx)
+    {
+        // Root Motion 비활성화 상태 그대로 워프 (복원은 Exit에서 처리)
+        if (ctx.Agent != null && ctx.Agent.enabled && ctx.Agent.isOnNavMesh)
             ctx.Agent.Warp(_chargeEndPos);
         else
             ctx.Transform.position = _chargeEndPos;
+
+        TryDamageOnArrival(ctx);
+        ctx.Monster.ChangeState<ChaseState>();
     }
 
-    // ── 데미지 판정 ───────────────────────────────────────────
-    private void TryDamage(MonsterContext ctx)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 데미지 (경고장판 경로 내 플레이어 판정)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void TryDamageOnArrival(MonsterContext ctx)
     {
+        if (ctx.Runtime.PlayerTarget == null || ctx.Config?.stat == null) return;
+
         Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - _chargeStartPos;
         float along    = Vector3.Dot(toPlayer, _chargeDir);
         float perpDist = (toPlayer - _chargeDir * along).magnitude;
 
-        if (along < 0f || along > _targetDist) return;
+        if (along < 0f || along > Data.chargeRange) return;
         if (perpDist > Data.chargeWidth * 0.5f) return;
 
-        float traveled = Vector3.Distance(_chargeStartPos, ctx.Transform.position);
-        if (traveled >= along)
-        {
-            _hasDamaged = true;
-            DealDamage(ctx);
-        }
-    }
-
-    private void DealDamage(MonsterContext ctx)
-    {
-        if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
         int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
         player.TakeDamage(dmg);
 
-        Vector3 dir = new Vector3(_chargeDir.x, 0.2f, _chargeDir.z).normalized;
-        player.ApplyKnockback(dir * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
+        Vector3 kbDir = new Vector3(_chargeDir.x, 0.2f, _chargeDir.z).normalized;
+        player.ApplyKnockback(kbDir * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
     }
 
-    // ── 경고 장판 ─────────────────────────────────────────────
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 경고장판
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
     private void SpawnWarning(MonsterContext ctx)
     {
         if (Data.warningPrefab == null) return;
-
-        _targetDist = ctx.Runtime.PlayerTarget != null
-            ? Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position)
-            : Data.chargeSpeed * 1.5f;
 
         Vector3 pos = ctx.Transform.position;
         pos.y += 0.02f;
 
         _warningGO = Object.Instantiate(Data.warningPrefab, pos, Quaternion.LookRotation(_chargeDir));
-        _warningGO.transform.localScale = new Vector3(Data.chargeWidth, 1f, _targetDist);
+        // chargeRange를 장판 길이로 사용 — 플레이어 거리와 무관
+        _warningGO.transform.localScale = new Vector3(Data.chargeWidth, 1f, Data.chargeRange);
 
         _rectWarning = _warningGO.GetComponent<RectWarning>();
         _rectWarning?.SetFillProgress(0f);
@@ -250,53 +244,85 @@ public class FGChargeState : FullLockState<FGChargePatternSO>
         _rectWarning = null;
     }
 
-    // ── 바람 이펙트 (돌진 중 보스 몸 부착) ───────────────────────
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 바람 VFX
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
     private void SpawnWindVfx(MonsterContext ctx)
     {
         if (Data.chargeWindVfxPrefab == null) return;
 
+        // 보스 회전 기준 월드 오프셋 계산 (vfxBodyOffset은 로컬 좌표)
+        Vector3 worldOffset = ctx.Transform.rotation * Data.vfxBodyOffset;
+        _vfxStartPos = _chargeStartPos + worldOffset;
+        _vfxEndPos   = _chargeEndPos   + worldOffset;
+
+        // 부모 없이 월드 좌표로 생성 — Update에서 직접 이동
         _windVfxGO = Object.Instantiate(
             Data.chargeWindVfxPrefab,
-            ctx.Transform.position,
-            ctx.Transform.rotation,
-            ctx.Transform);
+            _vfxStartPos,
+            ctx.Transform.rotation);
+        _windVfxGO.transform.localScale = Data.vfxScale;
 
-        _windVfxGO.transform.localPosition = Data.vfxBodyOffset;
-        _windVfxGO.transform.localScale    = Data.vfxScale;
-
-        if (_windVfxGO.TryGetComponent<ParticleSystem>(out var ps))
-            ps.Play(withChildren: true);
+        foreach (var ps in _windVfxGO.GetComponentsInChildren<ParticleSystem>(true))
+            ps.Play(withChildren: false);
     }
 
-    private void DespawnWindVfx()
+    private void StopWindVfx()
     {
         if (_windVfxGO == null) return;
 
-        // 파티클이 있으면 정지 후 남은 파티클이 자연스럽게 소멸하도록 부모 해제 후 Destroy
-        if (_windVfxGO.TryGetComponent<ParticleSystem>(out var ps))
+        float maxLifetime = 0f;
+        foreach (var ps in _windVfxGO.GetComponentsInChildren<ParticleSystem>(true))
         {
-            _windVfxGO.transform.SetParent(null);
-            ps.Stop(withChildren: true, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
-            Object.Destroy(_windVfxGO, ps.main.startLifetime.constantMax + 0.5f);
-        }
-        else
-        {
-            Object.Destroy(_windVfxGO);
+            ps.Stop(withChildren: false, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
+            maxLifetime = Mathf.Max(maxLifetime, ps.main.startLifetime.constantMax);
         }
 
+        Object.Destroy(_windVfxGO, maxLifetime > 0f ? maxLifetime + 0.3f : 0f);
         _windVfxGO = null;
     }
 
-    // ── 애니메이션 ─────────────────────────────────────────────
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 유틸
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private static void RestoreRootMotion(MonsterContext ctx)
+    {
+        if (ctx.Animator != null)
+            ctx.Animator.applyRootMotion = true;
+    }
+
+    private static void RestoreAgent(MonsterContext ctx)
+    {
+        if (ctx.Agent == null) return;
+        if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
+        if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+            ctx.Agent.Warp(ctx.Transform.position);
+        else
+            ctx.Monster.TrySnapAgentToNavMesh();
+        if (ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
+    }
+
     private static void PlayAnim(MonsterContext ctx, string stateName, float crossFade)
     {
         if (ctx.Animator == null) return;
         if (!ctx.Animator.HasState(0, Animator.StringToHash(stateName)))
         {
-            Debug.LogWarning($"[FGCharge] Animator state not found: '{stateName}'", ctx.Monster);
+            Debug.LogWarning($"[FGCharge] Animator state '{stateName}' not found", ctx.Monster);
             return;
         }
         ctx.Animator.CrossFade(stateName, crossFade, 0, 0f);
+    }
+
+    private static float GetClipLength(MonsterContext ctx, string clipName)
+    {
+        if (ctx.Animator == null) return 0f;
+        var clips = ctx.Animator.runtimeAnimatorController?.animationClips;
+        if (clips == null) return 0f;
+        foreach (var clip in clips)
+            if (clip.name == clipName) return clip.length;
+        return 0f;
     }
 
     private static float SpeedMult(MonsterContext ctx)

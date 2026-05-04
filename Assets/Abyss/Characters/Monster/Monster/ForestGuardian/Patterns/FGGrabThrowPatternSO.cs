@@ -121,6 +121,10 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private GameObject       _warningGO;
     private Vector3          _warningTargetScale;
 
+    // Generic 리그 손 본 캐시 (GetBoneTransform은 Humanoid 전용이므로 이름 탐색 사용)
+    private Transform _rightHandBone;
+    private Transform _leftHandBone;
+
     // 저글링 이동
     private bool    _isJuggling;
     private Vector3 _juggleStartPos;
@@ -150,7 +154,13 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         FacePlayer(ctx);
         _bossForward = ctx.Transform.forward;
 
+        // Generic 리그 손 본 캐시 (뼈 이름은 FBX skeleton 기준)
+        _rightHandBone = FindBone(ctx.Animator.transform, "TreantRPalm");
+        _leftHandBone  = FindBone(ctx.Animator.transform, "TreantLPalm");
+
         SpawnWarning(ctx);
+        if (ctx.Animator != null)
+            ctx.Animator.speed = SpeedMult(ctx);
         PlayAnim(ctx, AnimGrab);
     }
 
@@ -201,7 +211,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                     if (_grabbed)
                     {
                         DealSlamDamage(ctx);
-                        StartJuggle(ctx, HumanBodyBones.LeftHand);
+                        StartJuggle(_leftHandBone, ctx);
                     }
                 }
 
@@ -212,7 +222,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                     if (_grabbed)
                     {
                         DealSlamDamage(ctx);
-                        StartJuggle(ctx, HumanBodyBones.RightHand);
+                        StartJuggle(_rightHandBone, ctx);
                     }
                 }
 
@@ -243,8 +253,12 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         DespawnWarning();
         ReleasePlayer();
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        if (ctx.Agent != null)
+        {
             ctx.Agent.isStopped = false;
+            if (!ctx.Agent.isOnNavMesh)
+                ctx.Monster.TrySnapAgentToNavMesh();
+        }
     }
 
     // ── 잡기 판정 ─────────────────────────────────────────
@@ -273,14 +287,13 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     // ── RightHand → LeftHand → RightHand 순서로 손바닥 위치에 고정 ──
     private void HoldPlayerAtHand(MonsterContext ctx)
     {
-        if (_heldPlayer == null || ctx.Animator == null) return;
+        if (_heldPlayer == null) return;
 
         // slam1 전: RightHand / slam1~slam2: LeftHand / slam2 후: RightHand
-        HumanBodyBones hand = !_slam1Done ? HumanBodyBones.RightHand
-                            : !_slam2Done ? HumanBodyBones.LeftHand
-                            : HumanBodyBones.RightHand;
+        Transform bone = !_slam1Done ? _rightHandBone
+                       : !_slam2Done ? _leftHandBone
+                       : _rightHandBone;
 
-        var bone = ctx.Animator.GetBoneTransform(hand);
         Vector3 targetPos = bone != null
             ? bone.position
             : ctx.Transform.position + _bossForward * 1.2f + Vector3.up * 1.0f;
@@ -312,13 +325,12 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     }
 
     // ── 저글링 시작 — 현재 위치 → targetBone 으로 arc 이동 ─
-    private void StartJuggle(MonsterContext ctx, HumanBodyBones targetBone)
+    private void StartJuggle(Transform targetBone, MonsterContext ctx)
     {
-        if (_heldPlayer == null || ctx.Animator == null) return;
+        if (_heldPlayer == null) return;
 
-        var bone = ctx.Animator.GetBoneTransform(targetBone);
-        Vector3 target = bone != null
-            ? bone.position
+        Vector3 target = targetBone != null
+            ? targetBone.position
             : ctx.Transform.position + _bossForward * 1.2f + Vector3.up;
 
         _juggleStartPos = _heldPlayer.transform.position;
@@ -390,6 +402,18 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         if (_warningGO == null) return;
         Object.Destroy(_warningGO);
         _warningGO = null;
+    }
+
+    // ── 뼈 탐색 (Generic 리그용 — GetBoneTransform 대체) ─
+    private static Transform FindBone(Transform root, string boneName)
+    {
+        if (root.name == boneName) return root;
+        foreach (Transform child in root)
+        {
+            var found = FindBone(child, boneName);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     // ── 플레이어 방향 회전 ────────────────────────────────

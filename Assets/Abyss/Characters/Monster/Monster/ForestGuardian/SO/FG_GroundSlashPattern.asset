@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5b67262f8fe11f4aae7ec3d5cdff533, type: 3}
   m_Name: FG_GroundSlashPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGroundSlashPatternSO
-  weight: 1
+  weight: 0.07196936
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
@@ -24,17 +24,13 @@ MonoBehaviour:
   hitInterval: 0.4
   recoveryDuration: 0.5
   hitRanges:
+  - 3
   - 5
-  - 10
-  - 15
-  hitWidths:
-  - 4
-  - 5
-  - 6
+  - 7
   hitVfxScales:
   - 3
-  - 6
-  - 9
+  - 5
+  - 7
   damageMultiplier: 1.2
   launchUpForce: 4
   launchOutForce: 3

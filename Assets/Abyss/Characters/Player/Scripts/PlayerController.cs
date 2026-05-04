@@ -53,8 +53,7 @@ public class PlayerController : CharacterBase
     //============================================================
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
-    [Header("Debug")]
-    [SerializeField] private bool debugInvincible = true;
+    private bool debugInvincible = false;
     public CharacterData CharacterData => characterData;
 
     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
