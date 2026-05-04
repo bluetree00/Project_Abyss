@@ -27,7 +27,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     [Header("Fallback (used if SO is null)")]
     public GameObject shapeBlockPrefab;
     public List<Vector2Int> cellOffsets = new();
-    public float cellSize = 80f;
+    public float cellSize = 90f;
 
     [SerializeField] private Vector2 homeAnchoredPos;
     [SerializeField] private RectTransform homeParent;
@@ -64,7 +64,9 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         shapeName        = shapeAsset.shapeName;
         shapeBlockPrefab = shapeAsset.shapeBlockPrefab;
         cellOffsets      = new List<Vector2Int>(shapeAsset.cellOffsets ?? new Vector2Int[0]);
-        cellSize         = shapeAsset.cellSize;
+        cellSize         = (GridManager.Instance != null && GridManager.Instance.HasGrid)
+                           ? GridManager.Instance.GetGap()
+                           : shapeAsset.cellSize;
 
         BuildShapeBlocks();
     }
@@ -176,6 +178,12 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // Placement occupancy
     public void SetOccupiedSquares(List<GridSquare> squares) => occupiedSquares = squares;
     public List<GridSquare> GetOccupiedSquares() => occupiedSquares;
+
+    public void RebuildWithCellSize(float newCellSize)
+    {
+        cellSize = newCellSize;
+        BuildShapeBlocks();
+    }
 
     public void SetHome(RectTransform parent, Vector2 anchoredPos)
     {
