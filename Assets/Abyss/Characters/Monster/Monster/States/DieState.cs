@@ -45,9 +45,15 @@ public class DieState : IMonsterState
         foreach (var col in ctx.Monster.GetComponentsInChildren<Collider>())
             col.enabled = false;
 
-        // 사망 애니메이션 즉시 전환
-        if (ctx.Animator != null && !string.IsNullOrEmpty(ctx.Animation.dieTrigger))
-            ctx.Animator.CrossFade(ctx.Animation.dieTrigger, 0.1f, 0, 0f);
+        // 사망 애니메이션 즉시 전환 (dieTrigger 미설정 시 dieStateName으로 fallback)
+        string dieAnim = !string.IsNullOrEmpty(ctx.Animation.dieTrigger)
+            ? ctx.Animation.dieTrigger
+            : ctx.Animation.dieStateName;
+        if (ctx.Animator != null && !string.IsNullOrEmpty(dieAnim))
+        {
+            ctx.Animator.speed = 1f;
+            ctx.Animator.CrossFade(dieAnim, 0.1f, 0, 0f);
+        }
 
         // 지연 파괴
         DespawnAsync(ctx.Monster).Forget();
