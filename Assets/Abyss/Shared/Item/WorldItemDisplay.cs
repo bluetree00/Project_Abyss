@@ -149,13 +149,6 @@ public class WorldItemDisplay : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        if (_runtimeData.shapeId > 0)
-        {
-            var bridge = BlockSynergyBridge.Instance;
-            if (bridge != null)
-                bridge.RegisterShapeFromItem(_runtimeData.shapeId);
-        }
-
         run?.ItemInventory.AddItem(_runtimeData);
 
         // 아이템 효과: OnItemPickup hook
