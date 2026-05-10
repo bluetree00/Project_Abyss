@@ -83,6 +83,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     private async UniTaskVoid LoadSceneNoFlowAsync(Define.Scene scene)
     {
+        Managers.Sound?.StopBgm();
+
         var loading = UI_SceneLoading.Instance;
         if (loading != null) await loading.ShowAsync();
 

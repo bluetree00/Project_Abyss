@@ -1,4 +1,5 @@
 using Abyss.Monster;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -55,10 +56,15 @@ public class MonsterAnimEventReceiver : MonoBehaviour
     // MagicAttack1 클립의 CastSpell 이벤트 — ThrowRock은 타이머 기반으로 발사하므로 무시.
     public void CastSpell() { }
 
-    // Third-party clips (Malbers) fire this event; silently ignore.
-    public void PlaySound() { }
+    // Third-party clips (Malbers) fire this event with a string key.
+    public void PlaySound(string key)
+    {
+        if (!string.IsNullOrEmpty(key))
+            Managers.Sound?.PlayEffectAsync(key).Forget();
+    }
 
-    // Malbers audio event aliases
+    // Malbers: no-arg or index-based overloads — no key, silently ignore.
+    public void PlaySound() { }
     public void PlaySound(int index) { }
     public void StopSound() { }
 }

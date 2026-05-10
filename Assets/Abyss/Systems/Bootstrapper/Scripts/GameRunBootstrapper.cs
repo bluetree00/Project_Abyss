@@ -899,6 +899,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     // 정상 런 없이 GameScene을 직접 실행할 때 (에디터 테스트용)
     private async UniTask StartCombatDirectAsync()
     {
+        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+
         // 에디터 직접 실행 시 Phase를 Running으로 설정 (Tab 등 입력 활성화)
         _run?.ForceRunningForTest();
 
@@ -1033,6 +1035,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Debug.LogError("[GameRunBootstrapper] StartCombatAsync failed: run is null.");
             return;
         }
+
+        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
 
         run.RequestSpawnCurrentPointMap();
 
