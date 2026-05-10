@@ -36,9 +36,9 @@ public class StageLineConnector : MonoBehaviour
     [SerializeField] private float activeGlowPulseSpeed = 2f;
 
     [Header("비활성 경로 (갈 수 없는 노드)")]
-    [SerializeField] private Color inactiveColor = new Color(0.25f, 0.2f, 0.15f, 0.4f);
-    [SerializeField] private float inactiveDashCount = 6f;
-    [SerializeField] private float inactiveDashRatio = 0.4f;
+    [SerializeField] private Color inactiveColor = new Color(0.55f, 0.5f, 0.4f, 0.85f);
+    [SerializeField] private float inactiveDashCount = 4f;
+    [SerializeField] private float inactiveDashRatio = 0.65f;
     [SerializeField] private float inactiveScrollSpeed = 0f;
 
     // ── Private ──
@@ -195,7 +195,7 @@ public class StageLineConnector : MonoBehaviour
     }
 
     [Header("선 여백")]
-    [SerializeField] private float lineMargin = 20f;
+    [SerializeField] private float lineMargin = 30f;
 
     private void CreateLine(RectTransform from, RectTransform to, int fromId, int toId, int behindIndex)
     {

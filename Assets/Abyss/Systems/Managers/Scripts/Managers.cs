@@ -31,10 +31,10 @@ public sealed class Managers : MonoBehaviour
 
     #region Core Managers
     private InputManager _input;
-    private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
     private AddressableManager _addressableManager;
     private AnimationResourceManager _animationResources;
+    private SoundManager _soundManager;
 
     private UIManager _ui;
     private CharacterDataManager _characterDataManager;
@@ -65,20 +65,6 @@ public sealed class Managers : MonoBehaviour
                 inst._input = new InputManager();
 
             return inst._input;
-        }
-    }
-
-    public static ResourceManager Resource
-    {
-        get
-        {
-            var inst = Instance;
-            if (inst == null) return null;
-
-            if (inst._resource == null)
-                inst._resource = new ResourceManager();
-
-            return inst._resource;
         }
     }
 
@@ -121,6 +107,20 @@ public sealed class Managers : MonoBehaviour
                 inst._animationResources = new AnimationResourceManager();
 
             return inst._animationResources;
+        }
+    }
+
+    public static SoundManager Sound
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._soundManager == null)
+                inst._soundManager = new SoundManager();
+
+            return inst._soundManager;
         }
     }
 

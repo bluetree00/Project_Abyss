@@ -74,6 +74,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e9e0cbf9a4d8bd04cb883021b96b5cbf, type: 2}
   - {fileID: 11400000, guid: 7a010912c4d17de4abfd70e92c5081d7, type: 2}
   - {fileID: 11400000, guid: 17a95df554352f14da43380824cc584b, type: 2}
+  - {fileID: 11400000, guid: 3d13224affaf4ca49887e1da05619e1c, type: 2}
   - {fileID: 11400000, guid: ebe7e2344044e2a448c31bef261f97a6, type: 2}
   - {fileID: 11400000, guid: bc35fb09cb8e546408392a11b170b000, type: 2}
   - {fileID: 11400000, guid: 63ced6f8722d08140999b5da88fd4264, type: 2}
@@ -133,7 +134,7 @@ MonoBehaviour:
   m_CertificateHandlerType:
     m_AssemblyName: 
     m_ClassName: 
-  m_ActivePlayerDataBuilderIndex: 0
+  m_ActivePlayerDataBuilderIndex: 2
   m_DataBuilders:
   - {fileID: 11400000, guid: de8d28c0976cd4341bd3f6b2694bcca9, type: 2}
   - {fileID: 11400000, guid: 722970232482b164ba7570f92e184050, type: 2}

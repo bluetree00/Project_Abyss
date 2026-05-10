@@ -13,13 +13,13 @@ public class UI_Inven : UI_Scene
         base.Init();
 
         // ScriptableObject 데이터 로드
-        InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
+        InvenData invenData = Resources.Load<InvenData>("Data/ItemData/Inven/InvenData");
         if (invenData == null)
         {
             Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
             return;
         }
-        
+
         // 초기 UI 생성
         RefreshInventory();
     }
@@ -28,7 +28,7 @@ public class UI_Inven : UI_Scene
     public void RefreshInventory()
     {
         // ScriptableObject 데이터 로드
-        InvenData invenData = Managers.Resource.Load<InvenData>("Data/ItemData/Inven/InvenData");
+        InvenData invenData = Resources.Load<InvenData>("Data/ItemData/Inven/InvenData");
         if (invenData == null)
         {
             Debug.LogError("인벤토리 데이터를 로드하지 못했습니다!");
@@ -44,7 +44,7 @@ public class UI_Inven : UI_Scene
         // 기존 아이템 UI 삭제
         foreach (Transform child in gridPanel.transform)
         {
-            Managers.Resource.Destroy(child.gameObject);
+            UnityEngine.Object.Destroy(child.gameObject);
         }
 
         // 현재 인벤토리 데이터 기반으로 UI 다시 생성

@@ -254,7 +254,9 @@ private static readonly Color ColorNeutral = new Color(0.75f, 0.75f, 0.75f); // 
 
 ## 7. WeaponReplacePopupBuilder 에디터 툴
 
-**파일**: `Assets/Abyss/Editor/WeaponReplacePopupBuilder.cs`
+> ⚠️ **[2026-05-11 삭제됨]** `WeaponReplacePopupBuilder.cs` 는 프리팹 빌드 완료 후 일회성 도구로 삭제됐습니다. 아래 내용은 참조용 기록으로만 보존.
+
+**파일**: `Assets/Abyss/Editor/WeaponReplacePopupBuilder.cs` (삭제됨)
 **메뉴**: `Tools → Build WeaponReplacePopup Prefab`
 
 프리팹 경로: `Assets/Abyss/UI/Popup/UI_WeaponReplacePopup.prefab`

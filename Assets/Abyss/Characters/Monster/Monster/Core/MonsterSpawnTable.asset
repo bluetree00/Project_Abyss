@@ -255,6 +255,13 @@ MonoBehaviour:
     addressableKey: WormMonster/WormMonster
     grade: 0
     nativeElement: -1
-    poolTags: 
+    poolTags:
+    weight: 1
+    enabled: 1
+  - displayName: ForestGuardianMonster
+    addressableKey: ForestGuardian/ForestGuardian
+    grade: 3
+    nativeElement: -1
+    poolTags:
     weight: 1
     enabled: 1

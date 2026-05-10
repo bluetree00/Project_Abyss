@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
@@ -106,9 +108,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
     private int                    _generationId;
+    // OnDisable에서 취소되어 DissolveEffect의 복원 콜백을 차단한다.
+    private CancellationTokenSource _activationCts;
 
     /// <summary>외부 비동기 콜백이 풀 재사용 이전 세대에 대한 것인지 검증할 때 비교하는 값. OnEnable마다 +1.</summary>
     public int GenerationId => _generationId;
+
+    /// <summary>이 활성화 수명 동안 유효한 토큰. OnDisable에서 취소 — 풀 반환 시 DissolveEffect 복원 차단에 사용.</summary>
+    public CancellationToken ActivationToken => _activationCts?.Token ?? CancellationToken.None;
 
     /// <summary>공격 상태/어빌리티가 쿨다운 계산 시 곱할 배율. 0 = 공격 불가.</summary>
     public float AttackSpeedMultiplier => _attackSpeedMulti;
@@ -217,7 +224,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _baseDefense = _config.stat.defense;
 
         // 2-3. 인스턴스 고유 원소를 Config 기본값으로 초기화 + 보너스 배율 세팅.
-        // (MonsterSpawner가 스폰 직후 SetRandomNativeElement로 6원소 중 랜덤 덮어씀)
+        // (MonsterSpawner가 스폰 직후 SetRandomNativeElement로 원소 결정:
+        //  테이블에 원소 지정 시 고정, None이면 5원소 중 랜덤)
         _effectiveElement = _config.stat.nativeElement;
         ApplyNativeElementBonus();
 
@@ -712,41 +720,47 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         Debug.Log($"[MonsterBase] 네이티브 원소 보너스: {name} Element={_effectiveElement} → HP={EffectiveMaxHp} ATK={EffectiveAttackPower:F1} DEF={_baseDefense * _nativeDefenseMulti:F1} Rate={EffectiveAttackRate:F2}");
     }
 
-    /// <summary>스폰 시 6원소(None 포함) 중 균등 랜덤으로 인스턴스 원소 결정 + 보너스/틴트 재적용.
-    /// 같은 Config 공유 캐시를 쓰므로 여러 인스턴스가 서로 다른 원소 variant가 될 수 있다.
-    /// InitAsync 진행 중이면 완료될 때까지 대기 후 적용.</summary>
+    /// <summary>스폰 시 5원소(Lightning~Earth) 중 랜덤으로 인스턴스 원소 결정 + 보너스/틴트 재적용.
+    /// None은 절대 선택되지 않아 모든 스폰 몬스터는 유효 원소를 가진다.
+    /// 같은 Config를 공유하는 인스턴스끼리도 서로 다른 원소 variant가 되도록 인스턴스별 독립 롤.
+    /// InitAsync 진행 중이면 완료될 때까지 대기 후 롤·적용.</summary>
     public void SetRandomNativeElement()
     {
-        // None(-1) 포함 6개. (int)값이 -1~4이므로 Random.Range(-1, 5)
-        int r = UnityEngine.Random.Range(-1, ElementTypeUtil.Count);
-        int gen = _generationId;
-        ApplyElementWhenReady((ElementType)r, gen).Forget();
+        ApplyElementWhenReady(_generationId).Forget();
     }
 
-    private async UniTaskVoid ApplyElementWhenReady(ElementType element, int expectedGen)
+    private async UniTaskVoid ApplyElementWhenReady(int expectedGen)
     {
-        // Config/runtime이 아직 null이면 InitAsync가 진행 중. 완료 대기.
-        while ((_config == null || _runtime == null) && this != null && gameObject != null)
+        try
         {
-            if (_generationId != expectedGen) return; // 대기 중 풀 재사용 → 무시
-            await UniTask.Yield(destroyCancellationToken);
-        }
-        if (this == null || gameObject == null) return;
-        if (_generationId != expectedGen) return;        // 완료 시점에 재사용됐어도 무시
-        if (!gameObject.activeInHierarchy) return;
-
-        // 여러 몬스터가 같은 프레임에 디졸브 종료 → 동시 Apply 시 renderer.materials 복제 스파이크 발생.
-        // 0~2 프레임 랜덤 지연으로 Apply 호출을 분산해 프레임당 부담을 1/3로 경감.
-        int jitterFrames = UnityEngine.Random.Range(0, 3);
-        for (int i = 0; i < jitterFrames; i++)
-        {
+            // Config/runtime이 아직 null이면 InitAsync가 진행 중. 완료 대기.
+            while ((_config == null || _runtime == null) && this != null && gameObject != null)
+            {
+                if (_generationId != expectedGen) return; // 대기 중 풀 재사용 → 무시
+                await UniTask.Yield(destroyCancellationToken);
+            }
             if (this == null || gameObject == null) return;
-            if (_generationId != expectedGen) return;
-            await UniTask.Yield(destroyCancellationToken);
-        }
-        if (!gameObject.activeInHierarchy) return;
+            if (_generationId != expectedGen) return;        // 완료 시점에 재사용됐어도 무시
+            if (!gameObject.activeInHierarchy) return;
 
-        SetNativeElement(element);
+            // 공유 Config(_config.stat.nativeElement)를 읽지 않고 인스턴스별 독립 롤.
+            // None(-1) 제외 — 모든 스폰 몬스터는 반드시 유효 원소를 갖는다.
+            ElementType element = (ElementType)UnityEngine.Random.Range(0, ElementTypeUtil.Count);
+
+            // 여러 몬스터가 같은 프레임에 디졸브 종료 → 동시 Apply 시 renderer.materials 복제 스파이크 발생.
+            // 0~2 프레임 랜덤 지연으로 Apply 호출을 분산해 프레임당 부담을 1/3로 경감.
+            int jitterFrames = UnityEngine.Random.Range(0, 3);
+            for (int i = 0; i < jitterFrames; i++)
+            {
+                if (this == null || gameObject == null) return;
+                if (_generationId != expectedGen) return;
+                await UniTask.Yield(destroyCancellationToken);
+            }
+            if (!gameObject.activeInHierarchy) return;
+
+            SetNativeElement(element);
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>특정 원소로 강제 설정. 방별 테마 스폰 등 특수 케이스용.</summary>
@@ -850,6 +864,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         // 외부 콜백이 풀 재사용을 감지할 수 있도록.
         _generationId++;
 
+        // 활성화 토큰 갱신 — 이전 DissolveEffect 복원 태스크를 차단
+        _activationCts?.Cancel();
+        _activationCts?.Dispose();
+        _activationCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+
         if (_config == null || _runtime == null) return;
 
         _runtime.CurrentHp           = EffectiveMaxHp;
@@ -910,6 +929,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     protected virtual void OnDisable()
     {
+        // 비활성화 시 활성화 토큰을 취소 — 풀 반환 중 남아있는 DissolveEffect 복원 태스크를 차단한다.
+        _activationCts?.Cancel();
+        _activationCts?.Dispose();
+        _activationCts = null;
+
         _hpBarRequesting = false;
         if (_hpBar != null)
         {

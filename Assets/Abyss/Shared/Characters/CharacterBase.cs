@@ -34,6 +34,8 @@ public class CharacterBase : MonoBehaviour
     //============================================================
     private async void Awake()
     {
+        // enabled=false는 전시(Display) 목적으로 비활성화된 인스턴스 — 초기화 불필요
+        if (!enabled) return;
         await InitAsync();
     }
 

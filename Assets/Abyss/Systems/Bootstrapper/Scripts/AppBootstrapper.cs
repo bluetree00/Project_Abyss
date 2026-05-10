@@ -115,7 +115,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     public void RequestStartRun()
     {
-        RequestLoad(Define.Scene.StageMap);
+        RequestLoad(Define.Scene.GameScene);
     }
 
     private GameFlow _flow;
@@ -200,6 +200,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             await addr.InitAsync();
         }
+
+        Managers.Sound?.Init();
 
         // 5) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)

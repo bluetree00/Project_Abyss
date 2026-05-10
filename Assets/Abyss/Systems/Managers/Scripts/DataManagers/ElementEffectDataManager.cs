@@ -29,8 +29,8 @@ public class ElementEffectDataManager
 
         if (_byElement.Count == 0)
         {
-            Debug.Log("[ElementEffectDataManager] CDN 실패 — Resources 폴백");
-            var textAsset = Resources.Load<TextAsset>("ELEMENT_EFFECT_DATA");
+            Debug.Log("[ElementEffectDataManager] CDN 실패 — Addressables 폴백");
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("ELEMENT_EFFECT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<ElementEffectEntryCollection>(textAsset.text);

@@ -26,11 +26,16 @@ public static class DissolveEffect
     // ─────────────────── 공개 API ───────────────────
 
     /// <summary>디졸브로 등장 (소멸 → 완전 등장 후 원본 복원).
-    /// 완료 시 onComplete 호출. 렌더러 머티리얼이 원본으로 복원된 이후 시점이 보장됨.</summary>
-    public static void PlayAppear(GameObject target, float duration = 0.5f, Action onComplete = null)
+    /// activationToken: 풀 반환 시 취소되는 토큰 (MonsterBase.ActivationToken). 전달 시 풀 반환 후
+    /// 남은 복원 태스크가 원소 셰이더를 덮어쓰는 레이스를 방지한다. 완료 시 onComplete 호출.</summary>
+    public static void PlayAppear(
+        GameObject target,
+        float duration = 0.5f,
+        Action onComplete = null,
+        CancellationToken activationToken = default)
     {
         if (target == null) { onComplete?.Invoke(); return; }
-        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), onComplete).Forget();
+        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), activationToken, onComplete).Forget();
     }
 
     /// <summary>디졸브로 등장. await 가능.</summary>
@@ -38,9 +43,7 @@ public static class DissolveEffect
         GameObject target, float duration = 0.5f, CancellationToken ct = default)
     {
         if (target == null) return;
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
-            target.GetCancellationTokenOnDestroy(), ct);
-        await DissolveInAsync(target, duration, cts.Token, null);
+        await DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), ct, null);
     }
 
     /// <summary>디졸브로 퇴장 (완전 등장 → 소멸). 완료 시 onComplete 호출.</summary>
@@ -91,8 +94,16 @@ public static class DissolveEffect
     // ─────────────────── 내부 구현 ───────────────────
 
     private static async UniTask DissolveInAsync(
-        GameObject target, float duration, CancellationToken ct, Action onComplete)
+        GameObject target, float duration,
+        CancellationToken destroyCt, CancellationToken activationToken,
+        Action onComplete)
     {
+        CancellationTokenSource linkedCts = activationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(destroyCt, activationToken)
+            : null;
+        CancellationToken ct = linkedCts?.Token ?? destroyCt;
+
+        List<Material> instances = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -117,7 +128,7 @@ public static class DissolveEffect
             for (int i = 0; i < renderers.Length; i++)
                 origMats[i] = renderers[i].sharedMaterials;
 
-            var instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
             SetDissolveValue(instances, 1f);
 
             float mainDur = Mathf.Max(0.01f, duration * (1f - EdgeFadePortion));
@@ -152,11 +163,19 @@ public static class DissolveEffect
             onComplete?.Invoke();
         }
         catch (OperationCanceledException) { }
+        finally
+        {
+            linkedCts?.Dispose();
+            if (instances != null)
+                foreach (var m in instances)
+                    if (m != null) UnityEngine.Object.Destroy(m);
+        }
     }
 
     private static async UniTask DissolveOutAsync(
         GameObject target, float duration, CancellationToken ct, Action onComplete)
     {
+        List<Material> instances = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -172,7 +191,7 @@ public static class DissolveEffect
             var renderers = target.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
 
-            var instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
             SetDissolveValue(instances, 0f);
             SetEdgeWidth(instances, MaxEdgeWidth);
 
@@ -188,6 +207,12 @@ public static class DissolveEffect
             onComplete?.Invoke();
         }
         catch (OperationCanceledException) { }
+        finally
+        {
+            if (instances != null)
+                foreach (var m in instances)
+                    if (m != null) UnityEngine.Object.Destroy(m);
+        }
     }
 
     private static List<Material> ReplaceMaterials(
