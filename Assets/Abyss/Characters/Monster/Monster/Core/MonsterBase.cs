@@ -140,7 +140,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     public event System.Action<MonsterBase> OnDied;
 
     /// <summary>DieState.Enter에서 호출. 외부 구독자가 사망을 감지할 수 있도록 이벤트 래핑.</summary>
-    public void RaiseDied() => OnDied?.Invoke(this);
+    public void RaiseDied()
+    {
+        OnDied?.Invoke(this);
+        QuestEvents.ReportKill(_config?.monsterName ?? "Unknown");
+    }
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
