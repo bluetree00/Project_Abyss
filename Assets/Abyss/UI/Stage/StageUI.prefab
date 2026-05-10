@@ -148,6 +148,8 @@ MonoBehaviour:
   pointId: 7
   stageCategory: 1
   nextPointIds: 0800000009000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -307,6 +309,8 @@ MonoBehaviour:
   pointId: 100
   stageCategory: 2
   nextPointIds: 
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -411,6 +415,8 @@ MonoBehaviour:
   bootstrapper: {fileID: 0}
   clearRoomKey: 286
   returnToStageMapKey: 287
+  spawnItemKey: 288
+  cycleElementKey: 289
 --- !u!114 &6523570158532763993
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -603,6 +609,8 @@ MonoBehaviour:
   pointId: 9
   stageCategory: 1
   nextPointIds: 64000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -762,6 +770,8 @@ MonoBehaviour:
   pointId: 0
   stageCategory: 0
   nextPointIds: 0100000002000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -921,6 +931,8 @@ MonoBehaviour:
   pointId: 8
   stageCategory: 1
   nextPointIds: 64000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1080,6 +1092,8 @@ MonoBehaviour:
   pointId: 3
   stageCategory: 1
   nextPointIds: 06000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1239,6 +1253,8 @@ MonoBehaviour:
   pointId: 5
   stageCategory: 1
   nextPointIds: 07000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1398,6 +1414,8 @@ MonoBehaviour:
   pointId: 2
   stageCategory: 1
   nextPointIds: 0400000005000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1557,6 +1575,8 @@ MonoBehaviour:
   pointId: 6
   stageCategory: 1
   nextPointIds: 08000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1716,6 +1736,8 @@ MonoBehaviour:
   pointId: 4
   stageCategory: 1
   nextPointIds: 0600000007000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1875,6 +1897,8 @@ MonoBehaviour:
   pointId: 1
   stageCategory: 1
   nextPointIds: 0300000004000000
+  layerIndex: -1
+  indexInLayer: -1
   normalRoomCategory: 0
   iconMap: {fileID: 11400000, guid: 5216668e820a35542b61cad079c6f5a3, type: 2}
   minDifficulty: -1
@@ -1963,6 +1987,46 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &3640335498134844091
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8519052083679706558}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
+--- !u!114 &3124384808115202208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8519052083679706558}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!114 &7448092115948755528
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1986,10 +2050,11 @@ MonoBehaviour:
   activeGlowWidth: 0.15
   activeGlowIntensity: 1.5
   activeGlowPulseSpeed: 2
-  inactiveColor: {r: 0.25, g: 0.2, b: 0.15, a: 0.4}
-  inactiveDashCount: 6
-  inactiveDashRatio: 0.4
+  inactiveColor: {r: 0.55, g: 0.5, b: 0.4, a: 0.85}
+  inactiveDashCount: 4
+  inactiveDashRatio: 0.65
   inactiveScrollSpeed: 0
+  lineMargin: 30
 --- !u!114 &8340123934622972923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2003,6 +2068,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StageMapScroller
   contentHeight: 4320
+  zoomStep: 0.1
+  zoomMin: 0.4
+  zoomMax: 1
   useInertia: 1
   decelerationRate: 0.135
   elasticity: 0.1
@@ -2024,6 +2092,7 @@ MonoBehaviour:
   topY: 1600
   nodeSpacingX: 300
   randomOffsetX: 60
+  safeOffsetRatio: 0.12
   randomOffsetY: 30
   manualLayerSizes: 02000000030000000200000002000000
 --- !u!1 &9206666103511909603
@@ -2101,43 +2170,3 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &3640335498134844091
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8519052083679706558}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  m_UiScaleMode: 0
-  m_ReferencePixelsPerUnit: 100
-  m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
-  m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
-  m_PhysicalUnit: 3
-  m_FallbackScreenDPI: 96
-  m_DefaultSpriteDPI: 96
-  m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
---- !u!114 &3124384808115202208
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8519052083679706558}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  m_IgnoreReversedGraphics: 1
-  m_BlockingObjects: 0
-  m_BlockingMask:
-    serializedVersion: 2
-    m_Bits: 4294967295

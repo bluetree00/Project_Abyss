@@ -67,7 +67,7 @@ public class UIManager
     {
         name ??= typeof(T).Name;
 
-        GameObject go = Managers.Resource.Instantiate($"UI/WorldSpace/{name}");
+        GameObject go = Object.Instantiate(Resources.Load<GameObject>($"Prefabs/UI/WorldSpace/{name}"));
         Transform target = parent != null ? parent : _worldRoot;
         if (target != null)
             go.transform.SetParent(target);
@@ -84,7 +84,7 @@ public class UIManager
     {
         name ??= typeof(T).Name;
 
-        GameObject go = Managers.Resource.Instantiate($"UI/SubItem/{name}");
+        GameObject go = Object.Instantiate(Resources.Load<GameObject>($"Prefabs/UI/SubItem/{name}"));
         if (parent != null)
             go.transform.SetParent(parent);
 
@@ -239,7 +239,7 @@ public class UIManager
             return;
 
         UI_Popup popup = _popupStack.Pop();
-        Managers.Resource.Destroy(popup.gameObject);
+        Object.Destroy(popup.gameObject);
         _order--;
     }
 

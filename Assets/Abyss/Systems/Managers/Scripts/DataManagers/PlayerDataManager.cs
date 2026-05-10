@@ -40,15 +40,15 @@ public class PlayerDataManager
         // 0건이면 Resources 폴백
         if (_playerById.Count == 0)
         {
-            Debug.Log("[PlayerDataManager] CDN 실패 — Resources 폴백");
-            var playerJson = Resources.Load<TextAsset>("PLAYER_DATA");
+            Debug.Log("[PlayerDataManager] CDN 실패 — Addressables 폴백");
+            var playerJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("PLAYER_DATA");
             if (playerJson != null)
             {
                 var col = JsonUtility.FromJson<PlayerStatEntryCollection>(playerJson.text);
                 if (col?.players != null)
                     foreach (var p in col.players) _playerById[p.char_id] = p;
             }
-            var passiveJson = Resources.Load<TextAsset>("PASSIVE_DATA");
+            var passiveJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("PASSIVE_DATA");
             if (passiveJson != null)
             {
                 var col = JsonUtility.FromJson<PassiveEntryCollection>(passiveJson.text);

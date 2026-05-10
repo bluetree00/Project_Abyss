@@ -26,7 +26,9 @@ public class Define
 
     public enum Sound
     {
-        // 사운드 관련 식별자들을 추가
+        Bgm,
+        Effect,
+        MaxCount,
     }
     
     public enum WorldObject

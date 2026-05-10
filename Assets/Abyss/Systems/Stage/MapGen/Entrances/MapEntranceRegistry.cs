@@ -9,13 +9,6 @@ public static class MapEntranceRegistry
     {
         if (string.IsNullOrWhiteSpace(id)) return new DissolveEntrance();
 
-        return id.Trim() switch
-        {
-            "Dissolve"   => new DissolveEntrance(),
-            "Scatter"    => new ScatterEntrance(),
-            "TetrisDrop" => new TetrisDropEntrance(),
-            "Shockwave"  => new ShockwaveEntrance(),
-            _            => new DissolveEntrance(),
-        };
+        return new DissolveEntrance();
     }
 }

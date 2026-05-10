@@ -16,7 +16,7 @@ public abstract class BaseScene : MonoBehaviour
     {
         Object obj = GameObject.FindObjectOfType(typeof(EventSystem));
         if (obj == null)
-            Managers.Resource.Instantiate("UI/EventSystem").name = "@EventSystem";
+            Object.Instantiate(Resources.Load<GameObject>("Prefabs/UI/EventSystem")).name = "@EventSystem";
     }
 
     public abstract void Clear();

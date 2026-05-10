@@ -32,8 +32,8 @@ public class ItemDataManager
 
         if (_itemById.Count == 0)
         {
-            Debug.Log("[ItemDataManager] CDN 실패 — Resources 폴백");
-            var json = Resources.Load<TextAsset>("ITEM_DATA");
+            Debug.Log("[ItemDataManager] CDN 실패 — Addressables 폴백");
+            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("ITEM_DATA");
             if (json != null)
             {
                 var col = JsonUtility.FromJson<ItemEntryCollection>(json.text);

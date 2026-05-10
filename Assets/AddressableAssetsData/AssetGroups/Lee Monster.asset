@@ -50,6 +50,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 453ef7639b7bc764ab71f1ee6dde7794
+    m_Address: ForestGuardian/ForestGuardian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1e293ebadada2f74a9c1980e1b79dac1
     m_Address: ForestGuardian/ForestGuardianConfig
     m_ReadOnly: 0

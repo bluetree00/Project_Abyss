@@ -118,6 +118,46 @@ public class GameCameraController : MonoBehaviour
             GameRunBootstrapper.Instance.Run.OnPlayerBound -= OnPlayerBound;
     }
 
+    // ── Public Methods ──
+
+    /// <summary>
+    /// 스타트 방(Wisp) 진입 시 호출.
+    /// 검정 오버레이를 즉시 제거하고 Cinemachine이 Wisp를 추적하도록 설정한다.
+    /// </summary>
+    public void ActivateForStartRoom(Transform wispTarget)
+    {
+        if (_introStarted) return;
+        _introStarted = true;
+
+        if (_cinemachine == null)
+            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_brain == null)
+            _brain = GetComponent<CinemachineBrain>();
+
+        if (_fadeCanvas != null)
+        {
+            Destroy(_fadeCanvas.gameObject);
+            _fadeCanvas = null;
+            _fadeOverlay = null;
+        }
+
+        if (wispTarget != null && _cinemachine != null)
+        {
+            _cinemachine.Follow = wispTarget;
+            _cinemachine.LookAt = wispTarget;
+            _cinemachine.enabled = true;
+        }
+        else if (wispTarget != null)
+        {
+            transform.position = wispTarget.position + _originalPosition;
+            transform.rotation = _originalRotation;
+            Debug.LogWarning("[GameCameraController] CinemachineFreeLook not found. Using direct camera fallback for Wisp.");
+        }
+
+        if (_brain != null)
+            _brain.enabled = true;
+    }
+
     // ── Event Handlers ──
 
     private void OnPlayerBound(PlayerController player)

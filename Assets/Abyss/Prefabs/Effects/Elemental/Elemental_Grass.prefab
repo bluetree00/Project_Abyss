@@ -17,7 +17,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &6566303712620729322
 Transform:
   m_ObjectHideFlags: 0
@@ -9805,7 +9805,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &4962040503961835487
 Transform:
   m_ObjectHideFlags: 0
@@ -14697,7 +14697,7 @@ GameObject:
   - component: {fileID: 2067794291701508732}
   - component: {fileID: 8170616291888237298}
   m_Layer: 0
-  m_Name: WindBlast
+  m_Name: Elemental_Grass
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -19657,7 +19657,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3737175073091103256}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0a960bc488c2f3048a90116f91a3eaea, type: 3}
   m_Name: 
@@ -19674,7 +19674,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3737175073091103256}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 86361429be8c3a8429bb99c19a4d6b70, type: 3}
   m_Name: 
@@ -19697,7 +19697,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7679612614789068360
 Transform:
   m_ObjectHideFlags: 0

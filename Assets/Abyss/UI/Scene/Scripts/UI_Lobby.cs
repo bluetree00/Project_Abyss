@@ -33,7 +33,7 @@ public class UI_Lobby : UI_Scene
 
     void OnClickStartRun()
     {
-        prepPanel?.Open();
+        AppBootstrapper.Instance?.RequestStartRun();
     }
 
     void OnClickContinue()

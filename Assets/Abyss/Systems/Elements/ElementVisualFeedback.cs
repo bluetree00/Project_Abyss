@@ -1,4 +1,6 @@
-using System.Collections;
+using Cysharp.Threading.Tasks;
+using System;
+using System.Threading;
 using UnityEngine;
 
 /// <summary>
@@ -44,7 +46,7 @@ public class ElementVisualFeedback : MonoBehaviour
 
     // 가장 최근 트리거된 활성 원소 — 지속 틴트의 색
     private ElementType _dominantElement = ElementType.None;
-    private Coroutine _pulseCo;
+    private CancellationTokenSource _pulseCts;
 
     // ── Lifecycle ───────────────────────────────────────────────────
     private void Awake()
@@ -77,9 +79,8 @@ public class ElementVisualFeedback : MonoBehaviour
             _buildup.OnExpired   -= HandleExpired;
             _buildup.OnTick      -= HandleTick;
         }
-        StopAllCoroutines();
+        CancelPulse();
         ClearPropertyBlocks(); // MPB 제거 → ElementNativePalette가 주입한 머티리얼 색으로 복원
-        _pulseCo = null;
     }
 
     // ── Public Methods ───────────────────────────────────────────────
@@ -110,7 +111,7 @@ public class ElementVisualFeedback : MonoBehaviour
             _dominantElement = FindAnyActiveElement();
 
         // 펄스 중이 아니면 즉시 sustained 색 갱신
-        if (_pulseCo == null)
+        if (_pulseCts == null)
             ApplySustained();
     }
 
@@ -135,33 +136,51 @@ public class ElementVisualFeedback : MonoBehaviour
 
     private void StartPulse(Color targetColor, float strength, float duration)
     {
-        if (_pulseCo != null) StopCoroutine(_pulseCo);
-        _pulseCo = StartCoroutine(PulseRoutine(targetColor, strength, duration));
+        CancelPulse();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        _pulseCts = cts;
+        PulseAsync(targetColor, strength, duration, cts).Forget();
     }
 
-    private IEnumerator PulseRoutine(Color targetColor, float strength, float duration)
+    private void CancelPulse()
     {
-        // 즉시 강한 색으로
-        Color peakColor = Color.Lerp(_baseColor, targetColor, strength);
-        ApplyColor(peakColor);
+        if (_pulseCts == null) return;
+        _pulseCts.Cancel();
+        _pulseCts.Dispose();
+        _pulseCts = null;
+    }
 
-        // duration 동안 sustained 색으로 페이드
-        float t = 0f;
-        Color startColor = peakColor;
-        Color endColor   = _dominantElement.IsValid()
-            ? Color.Lerp(_baseColor, ColorOf(_dominantElement), sustainStrength)
-            : _baseColor;
-
-        while (t < duration)
+    private async UniTaskVoid PulseAsync(Color targetColor, float strength, float duration, CancellationTokenSource cts)
+    {
+        try
         {
-            t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / duration);
-            ApplyColor(Color.Lerp(startColor, endColor, k));
-            yield return null;
-        }
+            Color peakColor = Color.Lerp(_baseColor, targetColor, strength);
+            ApplyColor(peakColor);
 
-        ApplySustained();
-        _pulseCo = null;
+            float elapsed = 0f;
+            Color startColor = peakColor;
+            Color endColor = _dominantElement.IsValid()
+                ? Color.Lerp(_baseColor, ColorOf(_dominantElement), sustainStrength)
+                : _baseColor;
+
+            while (elapsed < duration)
+            {
+                await UniTask.Yield(cts.Token);
+                elapsed += Time.deltaTime;
+                ApplyColor(Color.Lerp(startColor, endColor, Mathf.Clamp01(elapsed / duration)));
+            }
+
+            ApplySustained();
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (ReferenceEquals(_pulseCts, cts))
+            {
+                cts.Dispose();
+                _pulseCts = null;
+            }
+        }
     }
 
     private void ApplyColor(Color color)
