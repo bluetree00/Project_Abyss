@@ -8,6 +8,8 @@ public sealed class SoundManager
     private const string EffectPoolRootName = "EffectPool";
     private const int InitialEffectPoolSize = 16;
     private const float MinReleaseDelay = 0.05f;
+    private const string kBgmVolKey    = "sound_bgm_vol";
+    private const string kEffectVolKey = "sound_effect_vol";
 
     private readonly AudioSource[] _audioSources = new AudioSource[(int)Define.Sound.MaxCount];
     private readonly Dictionary<string, AudioClip> _audioClips = new();
@@ -18,6 +20,11 @@ public sealed class SoundManager
     private int _bgmRequestVersion;
     private int _effectPoolVersion;
     private int _nextPoolId;
+    private float _bgmVolume    = 1f;
+    private float _effectVolume = 1f;
+
+    public float BgmVolume    => _bgmVolume;
+    public float EffectVolume => _effectVolume;
 
     private sealed class PooledAudioSource
     {
@@ -25,18 +32,38 @@ public sealed class SoundManager
         public int Version;
     }
 
+    public void SetBgmVolume(float volume)
+    {
+        _bgmVolume = Mathf.Clamp01(volume);
+        var src = GetAudioSource(Define.Sound.Bgm);
+        if (src != null) src.volume = _bgmVolume;
+        PlayerPrefs.SetFloat(kBgmVolKey, _bgmVolume);
+        PlayerPrefs.Save();
+    }
+
+    public void SetEffectVolume(float volume)
+    {
+        _effectVolume = Mathf.Clamp01(volume);
+        PlayerPrefs.SetFloat(kEffectVolKey, _effectVolume);
+        PlayerPrefs.Save();
+    }
+
     public void Init()
     {
+        _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    1f);
+        _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 1f);
+
         var root = GameObject.Find(RootName);
         if (root == null)
-        {
             root = new GameObject(RootName);
-        }
 
         Object.DontDestroyOnLoad(root);
         EnsureAudioSource(root.transform, Define.Sound.Bgm, loop: true);
         EnsureAudioSource(root.transform, Define.Sound.Effect, loop: false);
         EnsureEffectPool(root.transform);
+
+        var bgmSrc = GetAudioSource(Define.Sound.Bgm);
+        if (bgmSrc != null) bgmSrc.volume = _bgmVolume;
     }
 
     public void Clear()
@@ -114,7 +141,7 @@ public sealed class SoundManager
             return;
 
         audioSource.pitch = pitch;
-        audioSource.volume = volume;
+        audioSource.volume = type == Define.Sound.Bgm ? volume * _bgmVolume : volume;
 
         if (type == Define.Sound.Bgm)
         {
@@ -280,7 +307,7 @@ public sealed class SoundManager
         source.gameObject.SetActive(true);
         source.transform.position = position ?? Vector3.zero;
         source.clip = audioClip;
-        source.volume = volume;
+        source.volume = volume * _effectVolume;
         source.pitch = pitch;
         source.loop = false;
         source.playOnAwake = false;
