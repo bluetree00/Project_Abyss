@@ -52,6 +52,7 @@ public sealed class Managers : MonoBehaviour
     private ElementEffectDataManager _elementEffectDataManager;
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
     private ShopDataManager _shopDataManager;
+    private QuestManager _questManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -326,6 +327,20 @@ public sealed class Managers : MonoBehaviour
                 inst._shopDataManager = new ShopDataManager();
 
             return inst._shopDataManager;
+        }
+    }
+
+    public static QuestManager Quest
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._questManager == null)
+                inst._questManager = new QuestManager();
+
+            return inst._questManager;
         }
     }
     #endregion

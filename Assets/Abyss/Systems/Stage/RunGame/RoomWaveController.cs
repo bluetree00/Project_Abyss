@@ -288,6 +288,7 @@ public sealed class RoomWaveController : MonoBehaviour
     {
         if (_cleared) return;
         _cleared = true;
+        QuestEvents.ReportRoomClear("Normal");
 
         string modeTag = _waveMode ? $"웨이브 {_totalWaves}/{_totalWaves}" : $"{_killed}/{_targetKillCount}";
         Debug.Log($"[RoomWave] 방 클리어 달성 ({modeTag}) — 포탈 등장 시퀀스 시작", this);
