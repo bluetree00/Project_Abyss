@@ -18,6 +18,12 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Slider   hpSlider;
     [SerializeField] private TMP_Text hpText;
     [SerializeField] private Image    hpFillImage;
+    [SerializeField] private Image    hpGhostFillImage;
+
+    [Header("HP 애니메이션")]
+    [SerializeField] private float hpLerpSpeed   = 3f;
+    [SerializeField] private float ghostDelay    = 0.35f;
+    [SerializeField] private float ghostLerpSpeed = 1.2f;
 
     [Header("Weapon Slots")]
     [SerializeField] private WeaponSlotUI slot0;
@@ -34,6 +40,14 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Transform buffListRoot;
     [SerializeField] private TMP_Text buffNoticeText;
 
+    // ── HP 애니메이션 런타임 ──
+    private float _hpTargetRatio;
+    private float _hpDisplayRatio;
+    private float _ghostRatio;
+    private float _ghostTimer;
+    private bool  _ghostActive;
+    private bool  _hpInitialized;
+
     // ── 버프 UI 런타임 ──
     private readonly List<GameObject> _buffEntries = new();
     private float _noticeTimer;
@@ -45,23 +59,73 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         int clampedMax = Mathf.Max(1, maxHp);
         int clampedHp  = Mathf.Clamp(hp, 0, clampedMax);
+        float newRatio = (float)clampedHp / clampedMax;
 
         if (hpSlider != null)
         {
             hpSlider.minValue = 0f;
             hpSlider.maxValue = clampedMax;
-            hpSlider.value = clampedHp;
-            hpSlider.normalizedValue = clampedHp / (float)clampedMax;
+            // value는 UpdateHpAnimation에서 부드럽게 갱신
         }
 
-        var fill = hpFillImage;
-        if (fill == null && hpSlider != null && hpSlider.fillRect != null)
-            fill = hpSlider.fillRect.GetComponent<Image>();
-        if (fill != null)
-            fill.fillAmount = clampedHp / (float)clampedMax;
+        if (!_hpInitialized)
+        {
+            _hpTargetRatio  = newRatio;
+            _hpDisplayRatio = newRatio;
+            _ghostRatio     = newRatio;
+            _hpInitialized  = true;
+            ApplyHpFill(newRatio);
+        }
+        else
+        {
+            if (newRatio < _hpTargetRatio - 0.001f)
+            {
+                _ghostRatio  = _hpDisplayRatio;
+                _ghostTimer  = ghostDelay;
+                _ghostActive = true;
+            }
+            _hpTargetRatio = newRatio;
+        }
 
         if (hpText != null)
             hpText.text = $"{clampedHp} / {clampedMax}";
+    }
+
+    private void ApplyHpFill(float ratio)
+    {
+        if (hpSlider != null)
+            hpSlider.value = ratio * hpSlider.maxValue;
+
+        if (hpFillImage != null)
+            hpFillImage.fillAmount = ratio;
+
+        if (hpGhostFillImage != null)
+            hpGhostFillImage.fillAmount = Mathf.Max(_ghostRatio, ratio);
+    }
+
+    private void UpdateHpAnimation()
+    {
+        float dt = Time.deltaTime;
+        _hpDisplayRatio = Mathf.MoveTowards(_hpDisplayRatio, _hpTargetRatio, hpLerpSpeed * dt);
+
+        if (_ghostActive)
+        {
+            if (_ghostTimer > 0f)
+            {
+                _ghostTimer -= dt;
+            }
+            else
+            {
+                _ghostRatio = Mathf.MoveTowards(_ghostRatio, _hpTargetRatio, ghostLerpSpeed * dt);
+                if (Mathf.Abs(_ghostRatio - _hpTargetRatio) < 0.002f)
+                {
+                    _ghostRatio  = _hpTargetRatio;
+                    _ghostActive = false;
+                }
+            }
+        }
+
+        ApplyHpFill(_hpDisplayRatio);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -190,6 +254,9 @@ public sealed class CombatPanelView : MonoBehaviour
 
     private void Update()
     {
+        if (_hpInitialized)
+            UpdateHpAnimation();
+
         if (_noticeTimer > 0f)
         {
             _noticeTimer -= Time.deltaTime;
