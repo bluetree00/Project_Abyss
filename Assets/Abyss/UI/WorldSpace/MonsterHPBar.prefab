@@ -554,7 +554,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -853,7 +853,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1058,9 +1058,6 @@ MonoBehaviour:
   _hpLerpSpeed: 1.8
   _ghostDelay: 0.35
   _ghostLerpSpeed: 0.35
-  _colorHigh: {r: 0.18, g: 0.85, b: 0.35, a: 1}
-  _colorMid: {r: 0.95, g: 0.72, b: 0.08, a: 1}
-  _colorLow: {r: 0.9, g: 0.15, b: 0.12, a: 1}
   _ghostColor: {r: 1, g: 0.75, b: 0.2, a: 0.7}
   _nameLabelYOffset: 4
   _nameLabelSize: {x: 180, y: 24}

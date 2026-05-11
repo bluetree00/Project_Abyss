@@ -279,14 +279,14 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         frameRT.offsetMin = Vector2.zero;
         frameRT.offsetMax = Vector2.zero;
 
-        // 초상화 이미지 (내부)
-        var portrait = characterData?.portrait;
+        // 로스터 일러스트 (없으면 초상화 폴백)
+        var illust = characterData?.rosterIllust ?? characterData?.portrait;
         var innerGO  = new GameObject("PortraitInner");
         innerGO.transform.SetParent(frameGO.transform, false);
         var innerImg = innerGO.AddComponent<Image>();
-        innerImg.sprite         = portrait;
-        innerImg.preserveAspect = portrait != null;
-        innerImg.color          = portrait != null ? Color.white : new Color(0.15f, 0.15f, 0.2f, 1f);
+        innerImg.sprite         = illust;
+        innerImg.preserveAspect = illust != null;
+        innerImg.color          = illust != null ? Color.white : new Color(0.15f, 0.15f, 0.2f, 1f);
         var innerRT  = innerGO.GetComponent<RectTransform>();
         innerRT.anchorMin = new Vector2(0.03f, 0.03f);
         innerRT.anchorMax = new Vector2(0.97f, 0.97f);

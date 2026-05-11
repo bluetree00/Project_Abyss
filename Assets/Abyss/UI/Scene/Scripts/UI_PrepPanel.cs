@@ -56,6 +56,7 @@ public class UI_PrepPanel : UI_Base
     [SerializeField] private UI_CharacterSelectItem itemTemplate;
 
     [Header("캐릭터 선택 — 오른쪽 프리뷰")]
+    [SerializeField] private Image    charIllustImage;
     [SerializeField] private Image    charPreviewImage;
     [SerializeField] private TMP_Text charPreviewName;
     [SerializeField] private Slider   sliderHp;
@@ -325,6 +326,15 @@ public class UI_PrepPanel : UI_Base
     {
         if (entry == null || entry.data == null) return;
         var d = entry.data;
+
+        if (charIllustImage != null)
+        {
+            var illust = entry.rosterIllust != null ? entry.rosterIllust
+                       : entry.portrait    != null ? entry.portrait
+                       : defaultCharSprite;
+            charIllustImage.sprite = illust;
+            charIllustImage.color  = illust != null ? Color.white : Color.gray;
+        }
 
         if (charPreviewImage != null)
         {
