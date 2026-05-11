@@ -22,12 +22,16 @@ MonoBehaviour:
     defense: 4
     attackPower: 25
     moveSpeed: 2
+    nativeElement: -1
     attackRange: 10
     attackRadius: 0.5
     attackRate: 0.4
     attackDelay: 0.7
     knockbackForce: 8
     attackShape: {fileID: 11400000, guid: 8c0a63a80bb026547876bf1492c06441, type: 2}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 12
     chaseGiveUpRange: 16
@@ -37,16 +41,19 @@ MonoBehaviour:
     patrolSpeed: 1.5
     waypointWaitTime: 1
   combat:
-    damageApplyDelay: 0.7
+    damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: 
     idleStateName: Cyclops_IdleNormal
     patrolStateName: Cyclops_WalkFWD
     chaseStateName: Cyclops_RunFWD
     attackReadyStateName: Cyclops_IdleBattle
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
     attackTrigger: Cyclops_Attack01
     getHitTrigger: Cyclops_GetHit
     dieTrigger: Cyclops_Die
@@ -55,7 +62,7 @@ MonoBehaviour:
     speedDampTime: 0.1
     crossFadeDuration: 0.15
   elemental:
-    accumulationThreshold: 100
+    maxAccumulationScale: 100
     lightning:
       resistance: 1
       overrideState: {fileID: 0}
@@ -71,5 +78,10 @@ MonoBehaviour:
     earth:
       resistance: 1
       overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
   specialStates: []
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: 82571f71f4bee1f4e84271c7c1fe4cf9, type: 2}

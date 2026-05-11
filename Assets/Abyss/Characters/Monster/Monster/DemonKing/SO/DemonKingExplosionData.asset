@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da1644aae6b906c44ba0e9fc7f12f25a, type: 3}
   m_Name: DemonKingExplosionData
   m_EditorClassIdentifier: Assembly-CSharp::DemonKingExplosionData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: d531676cb6b4ae449a61fdd0e8820b00,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.4
   explosionDuration: 2
   explosionStateName: DemonKing_Taunting

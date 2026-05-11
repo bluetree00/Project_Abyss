@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 88b031d7b9353e2498fe9f15d7718c80, type: 3}
   m_Name: GolemRoarData
   m_EditorClassIdentifier: Assembly-CSharp::GolemRoarData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 8324277a8ce8c5e40b782f363e8a0460,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.5
   roarDuration: 2
   roarStateName: Roar

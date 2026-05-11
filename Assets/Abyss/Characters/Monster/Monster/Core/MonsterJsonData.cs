@@ -157,6 +157,8 @@ public class MonsterJsonData
         // ── 애니메이션
         if (animation != null)
         {
+            if (!string.IsNullOrEmpty(animation.animatorControllerAddress))
+                config.animation.animatorControllerAddress = animation.animatorControllerAddress;
             if (!string.IsNullOrEmpty(animation.idleStateName))
                 config.animation.idleStateName        = animation.idleStateName;
             if (!string.IsNullOrEmpty(animation.patrolStateName))

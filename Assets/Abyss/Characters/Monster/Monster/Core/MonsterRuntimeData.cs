@@ -48,6 +48,10 @@ public class MonsterRuntimeData
     public bool AttackHitDealt;
     /// <summary>이번 조우에서 첫 번째 공격인지. true면 AttackReady 딜레이 없이 즉시 공격.</summary>
     public bool IsFirstAttack = true;
+    /// <summary>다중 발사 시퀀스(FireSequenceAsync)가 진행 중인지. true이면 AttackState 쿨다운을 중단하지 않는다.</summary>
+    public bool IsExecutingAttackSequence;
+    /// <summary>현재 AttackState 진입 이후 AnimEvent로 발생한 히트 수. Enter()마다 0으로 초기화.</summary>
+    public int AttackHitCount;
 
     // ── 위장 감지 ──────────────────────────────────────────
     /// <summary>위장 상태에서 플레이어에게 공격당한 적 있는지. 미믹 등 공격 감지형 몬스터에서 사용.</summary>

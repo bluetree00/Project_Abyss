@@ -512,6 +512,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         var player = _runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
+        SpawnHitVfx();
         player.TakeDamage(damage);
 
         Vector3 dir = (_runtime.PlayerTarget.position - transform.position).normalized;
@@ -519,8 +520,53 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         player.ApplyKnockback(dir.normalized * knockbackForce);
     }
 
+    private void SpawnHitVfx()
+    {
+        var prefab = _config?.stat?.hitVfxPrefab;
+        if (prefab == null) return;
+
+        Vector3 pos = transform.position + _config.stat.hitVfxOffset;
+        var go = Instantiate(prefab, pos, Quaternion.identity);
+        go.transform.localScale = Vector3.one * Mathf.Max(0.001f, _config.stat.hitVfxScale);
+
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+
+        var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
+        Destroy(go, lifetime);
+    }
+
     /// <summary>애니메이션 이벤트에서 호출 (MonsterAnimEventReceiver 경유).</summary>
-    public void OnAnimAttackHit() => DealDamageToPlayer();
+    public void OnAnimAttackHit()
+    {
+        if (_runtime == null) return;
+
+        // 방어·특수 상태(MovementLocked 이상) 진입 후 CrossFade 블렌딩 중에
+        // 이전 Attack 애니메이션의 AnimEvent가 실행되는 것을 차단한다.
+        var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
+        if (constraints != SpecialStateConstraint.None) return;
+
+        int maxHits = _config?.combat.maxHitsPerAttack ?? 0;
+        if (maxHits > 0 && _runtime.AttackHitCount >= maxHits) return;
+
+        _runtime.AttackHitCount++;
+
+        // 발사마다 현재 플레이어 방향으로 재조준
+        if (_runtime.PlayerTarget != null)
+        {
+            Vector3 dir = _runtime.PlayerTarget.position - transform.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude > 0.001f)
+                transform.rotation = Quaternion.LookRotation(dir);
+        }
+
+        DealDamageToPlayer();
+    }
 
     /// <summary>플레이어가 사망했는지 확인.</summary>
     public bool IsPlayerDead()
@@ -780,13 +826,55 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     };
 
     // Animator Controller는 프리팹에 직접 할당 — 런타임 로드 불필요
-    private UniTask LoadAnimatorControllerAsync() => UniTask.CompletedTask;
+    private async UniTask LoadAnimatorControllerAsync()
+    {
+        if (_animator == null || _config == null)
+            return;
+
+        string address = _config.animation.animatorControllerAddress;
+        if (string.IsNullOrWhiteSpace(address))
+            return;
+
+        var controllerObject = await Managers.AddressableManager.TryLoadAssetAsync<UnityEngine.Object>(address);
+        var controller = controllerObject as RuntimeAnimatorController;
+        if (controller == null)
+        {
+            Debug.LogWarning(
+                $"[MonsterBase] {name}: AnimatorController load skipped. Invalid address or type: {address}",
+                this);
+            return;
+        }
+
+        if (_animator.runtimeAnimatorController == controller)
+            return;
+
+        _animator.runtimeAnimatorController = controller;
+        _animator.applyRootMotion = false;
+        _animator.Rebind();
+        _animator.Update(0f);
+    }
 
     private void SetPlayerTarget(Transform player)
     {
         if (_runtime == null) return;
         _runtime.PlayerTarget = player;
         _runtime.CachedPlayer = player != null ? player.GetComponent<PlayerController>() : null;
+        if (player != null) IgnorePlayerCollision(player);
+    }
+
+    private void IgnorePlayerCollision(Transform player)
+    {
+        if (_cachedColliders == null) return;
+        var playerColliders = player.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < _cachedColliders.Length; i++)
+        {
+            if (_cachedColliders[i] == null) continue;
+            for (int j = 0; j < playerColliders.Length; j++)
+            {
+                if (playerColliders[j] == null) continue;
+                Physics.IgnoreCollision(_cachedColliders[i], playerColliders[j], true);
+            }
+        }
     }
 
     private void OnPlayerSpawned(Transform player)

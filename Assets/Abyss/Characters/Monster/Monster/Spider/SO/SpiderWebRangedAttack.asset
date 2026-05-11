@@ -12,7 +12,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a9afdd5dc8632045930ece3688e7cfb, type: 3}
   m_Name: SpiderWebRangedAttack
   m_EditorClassIdentifier: Assembly-CSharp::MonsterRangedAttackSO
-  projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e, type: 3}
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 85783e48308df744c82e345490ed2a93,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
+    type: 3}
   projectileSpeed: 9
   projectileMaxRange: 8
   launchHeightOffset: 0.8
+  vfxProjectilePrefab: {fileID: 9103632281160831739, guid: 6ae0b1e447ab1b64883a5527dd566d1d,
+    type: 3}
+  vfxProjectileScale: 0.3
+  vfxProjectileHitRadius: 0.6
+  vfxHitEffectPrefab: {fileID: 8683933021285538514, guid: 57d8c8b2232a80d48b3c00067115e6a9,
+    type: 3}
+  vfxHitEffectScale: 0.3
+  projectileCount: 1
+  postFireWait: 0
+  projectileInterval: 0.15
+  returnToIdleBetweenShots: 0
+  slowScale: 0
+  slowDuration: 0

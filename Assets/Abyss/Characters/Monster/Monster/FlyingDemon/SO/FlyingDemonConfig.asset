@@ -74,3 +74,4 @@ MonoBehaviour:
   specialStates: []
   stateOverrides:
   - {fileID: 11400000, guid: 47662965fed562143a4b191ffaeda8e9, type: 2}
+  - {fileID: 11400000, guid: 379bfe4565fd4cb4ae133b6d06177b72, type: 2}

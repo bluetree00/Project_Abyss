@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f9204d426f2b5240adccf06b26797a8, type: 3}
   m_Name: StingRayDischargeData
   m_EditorClassIdentifier: Assembly-CSharp::StingRayDischargeData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 19b15871274bdc946aa9911658802fa7,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hitThreshold: 3
   dischargeStateName: StingRay_Attack02
   dischargeDuration: 1.2

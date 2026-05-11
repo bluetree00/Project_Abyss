@@ -12,4 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 990e5cc310a595041af699ff64ca46aa, type: 3}
   m_Name: WerewolfHeavySphere
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSphereAttackSO
+  _vfxPrefab: {fileID: 4186470608034871016, guid: ee411655572c67c438c58425673204c2,
+    type: 3}
+  _vfxScale: 0.65
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   radiusOverride: 2.2

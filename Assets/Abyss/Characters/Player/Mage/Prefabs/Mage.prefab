@@ -166,6 +166,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Mage
   rb: {fileID: 0}
   playerTransform: {fileID: 0}
+  _hitBloodVfxPrefab: {fileID: 3914852966663086068, guid: be3f7c5e1e1cf5d46a70f78f3aaedf5e, type: 3}
+  _hitBloodVfxScale: 0.2
+  _hitBloodVfxHeightOffset: 1
   characterData: {fileID: 0}
   inputReady: 0
   cinemachineCamera: {fileID: 0}

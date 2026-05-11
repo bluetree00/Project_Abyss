@@ -12,22 +12,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
   m_Name: LizardWarriorPatternAttackOverride
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
-  selectionMode: 1
-  engageDistance: 1.35
   patterns:
   - name: Slash
     animationStateName: Attack01
     minDistance: 0
     maxDistance: 1.8
     priority: 0
-    cooldown: 0
+    cooldown: 1
     damageDelay: 0.4
     attackDuration: 0.95
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 0}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 4186470608034871016, guid: cfe2a7b784818ec4da0dc15bf3fa5f81,
+      type: 3}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   - name: Thrust
     animationStateName: Attack01
     minDistance: 1
@@ -38,6 +54,28 @@ MonoBehaviour:
     attackDuration: 1.05
     damageMultiplier: 1.1
     knockbackMultiplier: 1.1
-    attackShapeOverride: {fileID: 11400000, guid: 4cb7f47e720b4d24a2b2f4cbcdd0d664, type: 2}
+    attackShapeOverride: {fileID: 11400000, guid: 4cb7f47e720b4d24a2b2f4cbcdd0d664,
+      type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 4186470608034871016, guid: cfe2a7b784818ec4da0dc15bf3fa5f81,
+      type: 3}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 1
+  engageDistance: 1.35
+  engageDistanceScale: 0.85

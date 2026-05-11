@@ -23,6 +23,7 @@ public class DragonRoarState : InvincibleState<DragonRoarData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.roarStateName))
             ctx.Animator.CrossFade(Data.roarStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyRoarBlast(ctx);
     }
 

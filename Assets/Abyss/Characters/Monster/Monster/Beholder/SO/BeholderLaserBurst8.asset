@@ -12,4 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba008974faa6e0440929557f0964c61a, type: 3}
   m_Name: BeholderLaserBurst8
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSphereAttackSO
+  _vfxPrefab: {fileID: 4550076289710732121, guid: 115c845e096dbc44c8da446ef941b73b,
+    type: 3}
+  _vfxScale: 0.1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   radiusOverride: 1.6

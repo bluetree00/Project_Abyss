@@ -19,6 +19,7 @@ public class CactusThornRetaliateState : UnInterruptibleState<CactusThornData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.thornStateName))
             ctx.Animator.CrossFade(Data.thornStateName, 0.05f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyAreaDamage(ctx, Data.thornRadius, Data.thornDamage);
     }
 

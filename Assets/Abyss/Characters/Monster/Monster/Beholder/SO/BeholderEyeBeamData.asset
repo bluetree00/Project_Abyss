@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95c3828c6044b114baca6be289d2be3a, type: 3}
   m_Name: BeholderEyeBeamData
   m_EditorClassIdentifier: Assembly-CSharp::BeholderEyeBeamData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: f92c4148f2683324f8197c7ab18ba32f,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.6
   chargeDuration: 0.8
   beamDuration: 1.5
@@ -20,3 +25,4 @@ MonoBehaviour:
   beamRadius: 5
   beamDamage: 15
   damageTick: 0.3
+  beamVfxPrefab: {fileID: 0}
