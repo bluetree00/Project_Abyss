@@ -53,6 +53,15 @@ public class RuntimeItemData
             });
         }
 
+        // shapeId가 SO에 미설정이면 서버 데이터에서 보완 (ItemSO 인스펙터 할당 누락 대응)
+        if (data.shapeId == 0 && !string.IsNullOrEmpty(data.itemId))
+        {
+            var entries = Managers.ItemData?.GetItem(data.itemId);
+            if (entries != null)
+                foreach (var e in entries)
+                    if (e.shape_id > 0) { data.shapeId = e.shape_id; break; }
+        }
+
         return data;
     }
 

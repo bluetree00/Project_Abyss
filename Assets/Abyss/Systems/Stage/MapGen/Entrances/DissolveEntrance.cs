@@ -38,6 +38,8 @@ public sealed class DissolveEntrance : IMapEntrance
             MapEntranceUtil.SetCollidersEnabled(b.instance, true);
 
             var rs = b.instance.GetComponentsInChildren<Renderer>(true);
+            if (rs.Length == 0) continue;   // MonsterSpawner 등 Renderer 없는 기능 오브젝트 스킵
+
             foreach (var r in rs) r.enabled = false;   // 선로드 전까지 숨김
 
             int diagKey = b.cell.x + b.cell.y;

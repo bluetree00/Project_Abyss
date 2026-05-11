@@ -206,7 +206,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e9fb4b08f17a0e6489490f87b3679fb0
-    m_Address: LeeHPBar
+    m_Address: MonsterHPBar
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

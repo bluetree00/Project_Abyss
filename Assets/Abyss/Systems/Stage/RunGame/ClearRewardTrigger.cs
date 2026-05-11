@@ -159,8 +159,6 @@ public class ClearRewardTrigger : MonoBehaviour
         foreach (var (data, _) in _rewards)
         {
             if (data == null) continue;
-            if (data.shapeId > 0)
-                BlockSynergyBridge.Instance?.RegisterShapeFromItem(data.shapeId);
             _run.ItemInventory.AddItem(data);
             _run.EffectManager?.OnItemPickup(data);
             Debug.Log($"[ClearRewardTrigger] 아이템 지급: {data.displayName}");
@@ -273,7 +271,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var cardGO = new GameObject("ItemCard");
         cardGO.transform.SetParent(parent, false);
         var cardRT = cardGO.AddComponent<RectTransform>();
-        cardRT.sizeDelta = new Vector2(140f, 180f);
+        cardRT.sizeDelta = new Vector2(140f, 200f);
         cardGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
 
         // 등급 배경
@@ -285,8 +283,8 @@ public class ClearRewardTrigger : MonoBehaviour
         bgRT.anchorMin        = new Vector2(0.5f, 0.5f);
         bgRT.anchorMax        = new Vector2(0.5f, 0.5f);
         bgRT.pivot            = new Vector2(0.5f, 0.5f);
-        bgRT.sizeDelta        = new Vector2(120f, 120f);
-        bgRT.anchoredPosition = new Vector2(0f, 25f);
+        bgRT.sizeDelta        = new Vector2(100f, 100f);
+        bgRT.anchoredPosition = new Vector2(0f, 42f);
 
         // 아이콘 (ItemSO.icon 직접 참조 — 상점과 동일 방식)
         var sprite = so?.icon ?? data?.icon;
@@ -304,6 +302,17 @@ public class ClearRewardTrigger : MonoBehaviour
             iconRT.offsetMax = new Vector2(-8f, -8f);
         }
 
+        // 블록 그리드 모양 미리보기
+        if (data != null && data.shapeId > 0)
+        {
+            var shapeEntry = Managers.BlockData?.GetShape(data.shapeId);
+            if (shapeEntry != null)
+            {
+                var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+                SpawnShapeMini(cardGO.transform, offsets, new Vector2(0f, -22f));
+            }
+        }
+
         // 아이템 이름
         var nameGO  = new GameObject("Name");
         nameGO.transform.SetParent(cardGO.transform, false);
@@ -316,8 +325,8 @@ public class ClearRewardTrigger : MonoBehaviour
         nameRT.anchorMin        = new Vector2(0.5f, 0.5f);
         nameRT.anchorMax        = new Vector2(0.5f, 0.5f);
         nameRT.pivot            = new Vector2(0.5f, 0.5f);
-        nameRT.sizeDelta        = new Vector2(130f, 30f);
-        nameRT.anchoredPosition = new Vector2(0f, -65f);
+        nameRT.sizeDelta        = new Vector2(130f, 25f);
+        nameRT.anchoredPosition = new Vector2(0f, -68f);
 
         // 등급 텍스트
         var rarityGO  = new GameObject("Rarity");
@@ -332,8 +341,80 @@ public class ClearRewardTrigger : MonoBehaviour
         rarityRT.anchorMin        = new Vector2(0.5f, 0.5f);
         rarityRT.anchorMax        = new Vector2(0.5f, 0.5f);
         rarityRT.pivot            = new Vector2(0.5f, 0.5f);
-        rarityRT.sizeDelta        = new Vector2(130f, 25f);
-        rarityRT.anchoredPosition = new Vector2(0f, -85f);
+        rarityRT.sizeDelta        = new Vector2(130f, 20f);
+        rarityRT.anchoredPosition = new Vector2(0f, -88f);
+    }
+
+    private static void SpawnShapeMini(Transform parent, Vector2Int[] offsets, Vector2 anchoredPos)
+    {
+        if (offsets == null || offsets.Length == 0) return;
+
+        int minC = int.MaxValue, maxC = int.MinValue;
+        int minR = int.MaxValue, maxR = int.MinValue;
+
+        foreach (var o in offsets)
+        {
+            int c = o.x;
+            int r = -o.y;
+            if (c < minC) minC = c;
+            if (c > maxC) maxC = c;
+            if (r < minR) minR = r;
+            if (r > maxR) maxR = r;
+        }
+
+        int cols = maxC - minC + 1;
+        int rows = maxR - minR + 1;
+
+        const float CellSize = 9f;
+        const float Gap      = 1f;
+        const float Step     = CellSize + Gap;
+
+        float totalW = cols * CellSize + (cols - 1) * Gap;
+        float totalH = rows * CellSize + (rows - 1) * Gap;
+
+        var containerGO = new GameObject("ShapeMini");
+        containerGO.transform.SetParent(parent, false);
+        var containerRT = containerGO.AddComponent<RectTransform>();
+        containerRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        containerRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        containerRT.pivot            = new Vector2(0.5f, 0.5f);
+        containerRT.sizeDelta        = new Vector2(totalW, totalH);
+        containerRT.anchoredPosition = anchoredPos;
+
+        // 빈 셀 배경 (어두운 격자)
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                var bgCell = new GameObject("BgCell");
+                bgCell.transform.SetParent(containerGO.transform, false);
+                bgCell.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
+                var rt = bgCell.GetComponent<RectTransform>();
+                rt.anchorMin        = new Vector2(0f, 1f);
+                rt.anchorMax        = new Vector2(0f, 1f);
+                rt.pivot            = new Vector2(0f, 1f);
+                rt.sizeDelta        = new Vector2(CellSize, CellSize);
+                rt.anchoredPosition = new Vector2(c * Step, -r * Step);
+            }
+        }
+
+        // 채워진 셀 (파란색)
+        var fillColor = new Color(0.35f, 0.65f, 1f, 0.95f);
+        foreach (var o in offsets)
+        {
+            int c = o.x - minC;
+            int r = -o.y - minR;
+
+            var cell = new GameObject("Cell");
+            cell.transform.SetParent(containerGO.transform, false);
+            cell.AddComponent<Image>().color = fillColor;
+            var rt = cell.GetComponent<RectTransform>();
+            rt.anchorMin        = new Vector2(0f, 1f);
+            rt.anchorMax        = new Vector2(0f, 1f);
+            rt.pivot            = new Vector2(0f, 1f);
+            rt.sizeDelta        = new Vector2(CellSize, CellSize);
+            rt.anchoredPosition = new Vector2(c * Step, -r * Step);
+        }
     }
 
     private UniTask WaitForResultConfirmAsync()
