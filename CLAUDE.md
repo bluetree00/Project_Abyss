@@ -3,7 +3,7 @@
 ## 세션 시작 시 자동 실행
 - 대화 시작 시 `git fetch origin`으로 원격 패치를 확인한다
 - 업데이트가 있으면 `git pull --ff-only`로 자동 풀 받는다
-- 현재 브랜치: `dev/lee-SO`, 메인 브랜치: `main`, 통합 브랜치: `develop`
+- 현재 브랜치: `dev/KBG-D`, 메인 브랜치: `main`, 통합 브랜치: `develop`
 
 ## 커밋 컨벤션
 - `feat:` 새 기능
@@ -64,7 +64,7 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 ## 현재 개발 상태
 - **Phase 1 (인게임 루프)** 진행 중
 - **참고 문서**: `Assets/Abyss/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
-- **주의**: `DevTracker.md`는 2026-03-16 기준으로 outdated — 최신 상태는 git log 확인
+- **참고**: `DevTracker.md` 2026-05-11 업데이트 완료. ResourceManager 제거, Addressables 전환 반영됨
 
 ## 에이전트 팀 구조
 역할 정의 파일은 `.claude/agents/`에 위치:

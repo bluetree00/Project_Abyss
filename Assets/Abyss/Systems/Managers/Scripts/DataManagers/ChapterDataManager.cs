@@ -29,8 +29,8 @@ public class ChapterDataManager
 
         if (_byId.Count == 0)
         {
-            Debug.Log("[ChapterDataManager] CDN 실패 — Resources 폴백");
-            var json = Resources.Load<TextAsset>("CHAPTER_DATA");
+            Debug.Log("[ChapterDataManager] CDN 실패 — Addressables 폴백");
+            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("CHAPTER_DATA");
             if (json != null) InitializeFromJson(json.text);
         }
 

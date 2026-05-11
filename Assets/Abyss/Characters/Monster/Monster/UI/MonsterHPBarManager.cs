@@ -4,11 +4,11 @@ using UnityEngine;
 
 /// <summary>
 /// 몬스터 HP 바 오브젝트 풀 매니저.
-/// 프리팹은 Addressables에 "LeeHPBar" 키로 등록.
+/// 프리팹은 Addressables에 "MonsterHPBar" 키로 등록.
 /// </summary>
 public class MonsterHPBarManager
 {
-    private const string AddressableKey = "LeeHPBar";
+    private const string AddressableKey = "MonsterHPBar";
 
     private readonly Queue<MonsterHPBar> _pool = new();
     private GameObject _prefab;      // 첫 로드 후 캐싱

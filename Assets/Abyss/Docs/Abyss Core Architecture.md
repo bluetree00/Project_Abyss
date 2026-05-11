@@ -2,7 +2,7 @@
 
 > Project Abyss
 > Roguelike Action PC Game
-> Last Updated: 2026-03-03
+> Last Updated: 2026-05-11
 
 ---
 
@@ -49,7 +49,7 @@
 | Manager | Responsibility |
 |----------|---------------|
 | InputManager | 입력 업데이트 / 키 체크 (버퍼 제거 예정) |
-| ResourceManager | 기존 리소스 관리 (Addressables 도입으로 제거 예정) |
+| ~~ResourceManager~~ | ~~기존 리소스 관리~~ — **제거됨** (2026-05-11, Addressables 전환 완료) |
 | AddressableManager | Addressables 로드 / 초기화 |
 | ObjectPoolerManager | 오브젝트 풀링 서비스 |
 | AnimationResourceManager | 애니메이션 클립 프리로드 / 조회 |

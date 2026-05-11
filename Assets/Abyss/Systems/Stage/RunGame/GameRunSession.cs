@@ -598,6 +598,7 @@ public sealed class GameRunSession
 
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
+        QuestEvents.ReportGold(amount);
     }
 
     public void AddItem(ItemId itemId, int count)

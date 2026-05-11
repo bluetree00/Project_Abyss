@@ -45,6 +45,11 @@ public sealed class RunItemInventory
         if (currentCount >= maxStack) return false;
 
         _items.Add(item);
+        QuestEvents.ReportItemCollect(item?.itemId ?? "Unknown");
+
+        if (item.shapeId > 0)
+            BlockSynergyBridge.Instance?.RegisterShapeFromItem(item.shapeId);
+
         OnInventoryChanged?.Invoke();
         return true;
     }

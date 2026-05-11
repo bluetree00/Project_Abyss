@@ -176,6 +176,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aae8f0f888f36fb4294032a50f519abe
+    m_Address: UI/Popup/UI_ClearReward
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3defb73d0de15bf438a5b9bfda84e670
+    m_Address: UI/Popup/UI_ClearResult
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cbf7b96bd6742054bb98dad9531eed5c
     m_Address: T1_Greatsword_Display
     m_ReadOnly: 0

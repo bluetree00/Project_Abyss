@@ -10,6 +10,10 @@ public class WorldWeaponDisplay : MonoBehaviour
     [Header("Weapon Data")]
     public WeaponSO weaponSO; // 에디터 배치용
 
+    [Header("Start Room")]
+    [SerializeField, Tooltip("스타트 방 진열대 모드. true면 픽업 시 Loadout에 등록하고 팝업 없이 즉시 획득.")]
+    private bool isStartRoomPickup = false;
+
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textHeight = 1.2f;
@@ -139,8 +143,45 @@ public class WorldWeaponDisplay : MonoBehaviour
         _pickedUp = true;
         ShowPrompt(false);
 
+        if (isStartRoomPickup)
+        {
+            // 스타트 방: 팝업 없이 Loadout에 등록 후 즉시 장착
+            var loadout = AppBootstrapper.Instance?.Loadout;
+            if (loadout == null || !loadout.IsReady)
+            {
+                Debug.LogWarning("[WorldWeaponDisplay] 캐릭터를 먼저 선택하세요.");
+                _pickedUp = false;
+                ShowPrompt(true);
+                return;
+            }
+            loadout.SetWeaponSlot0(weaponSO);
+            var player = _cachedPlayer;
+            GameRunBootstrapper.EquipWeaponToPlayerAsync(weaponSO, player).Forget();
+
+            // 나머지 스타트 방 무기 픽업 디졸브 퇴장
+            var allDisplays = FindObjectsByType<WorldWeaponDisplay>(FindObjectsSortMode.None);
+            foreach (var display in allDisplays)
+            {
+                if (display == this) continue;
+                display.DismissStartRoomPickup();
+            }
+
+            Debug.Log($"[WorldWeaponDisplay] 스타트 방 무기 등록 및 즉시 장착: {weaponSO?.displayName}");
+            ConfirmPickup();
+            return;
+        }
+
         _cachedPlayer.RequestPickup(data, this);
         // Destroy는 팝업 결과 후 ConfirmPickup()에서 처리
+    }
+
+    /// <summary>다른 무기가 선택됐을 때 이 픽업을 디졸브로 퇴장시킨다. 스타트 방 전용.</summary>
+    public void DismissStartRoomPickup()
+    {
+        if (!isStartRoomPickup || _pickedUp) return;
+        _pickedUp = true;
+        ShowPrompt(false);
+        DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
     }
 
     /// <summary>픽업 확정 — 월드 오브젝트 제거</summary>

@@ -27,6 +27,12 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var run = GetCurrentRun();
         if (run != null && run.IsRunning) return;
 
+        // 스타트 방 모드: Wisp가 캐릭터를 선택하기 전이므로 자동 실행하지 않음
+        var bootstrapperInstance = bootstrapper != null
+            ? bootstrapper
+            : FindObjectOfType<GameRunBootstrapper>(true);
+        if (bootstrapperInstance != null && bootstrapperInstance.IsInStartRoom) return;
+
         if (_started) return;
         _started = true;
         StartRun().Forget();
@@ -226,6 +232,15 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private void HandleReturnToStageMap()
     {
+        // 스타트 방 씬이면 캐릭터/무기 선택 여부와 무관하게 StageMap으로 스킵 (테스트용)
+        var bootstrapperInst = bootstrapper != null ? bootstrapper : GameRunBootstrapper.Instance;
+        if (bootstrapperInst != null && bootstrapperInst.IsStartRoomScene)
+        {
+            Debug.Log("[DebugRunPanel] F6 → 스타트 방 스킵, StageMap 씬 전환");
+            AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
+            return;
+        }
+
         var run = GetCurrentRun();
         if (run == null || !run.IsRunning) return;
 
@@ -283,6 +298,24 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private void OnGUI()
     {
+        var style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 13,
+            richText = true,
+        };
+        style.normal.textColor = Color.white;
+
+        float x = 10f, y = Screen.height - 120f;
+
+        var bootstrapperInst = bootstrapper != null ? bootstrapper : GameRunBootstrapper.Instance;
+        bool inStartRoom = bootstrapperInst != null && bootstrapperInst.IsStartRoomScene;
+
+        if (inStartRoom)
+        {
+            GUI.Label(new Rect(x, y, 300, 20), "<b>[F6]</b> StageMap으로 스킵", style);
+            return;
+        }
+
         var run = GetCurrentRun();
         if (run == null || !run.IsRunning) return;
 
@@ -301,14 +334,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             };
         }
 
-        var style = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 13,
-            richText = true,
-        };
-        style.normal.textColor = Color.white;
-
-        float x = 10f, y = Screen.height - 120f;
         GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5]</b> 방 클리어  <b>[F6]</b> StageMap", style);
         GUI.Label(new Rect(x, y + 20, 300, 20), $"<b>[F7]</b> 아이템 스폰", style);
         GUI.Label(new Rect(x, y + 40, 300, 20), $"<b>[F8]</b> 무기 속성 변경: {element}", style);

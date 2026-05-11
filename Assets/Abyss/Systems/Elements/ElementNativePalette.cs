@@ -24,6 +24,10 @@ using UnityEngine.Rendering;
 public class ElementNativePalette : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────────────
+    /// <summary>Rim 색 = 원소 tintColor × 이 배율. HDR 강도 조정용. 모든 프리팹에서 동일 값을 사용해
+    /// static _rimMatCache가 일관된 머티리얼을 공유할 수 있도록 const로 고정.</summary>
+    private const float RimColorMultiplier = 1.5f;
+
     /// <summary>팔레트 주입 대상에서 제외할 프로퍼티 이름의 부분 문자열.
     /// Emission/Outline/Specular/Tint 같은 색은 건드리지 않는다.</summary>
     private static readonly string[] ExcludedKeywords =
@@ -61,9 +65,6 @@ public class ElementNativePalette : MonoBehaviour
     [Header("Rim 오버레이 (Fresnel 원소 발광)")]
     [Tooltip("Apply 시 sharedMaterials 마지막 슬롯에 원소별 Rim 머티리얼을 자동 추가한다. submesh 1개 케이스에만 적용.")]
     [SerializeField] private bool useRim = true;
-
-    [Tooltip("Rim 색 = 원소 tintColor × 이 배율. HDR 강도 조정용.")]
-    [SerializeField, Range(0.1f, 5f)] private float rimColorMultiplier = 1.5f;
 
     // ── Private ─────────────────────────────────────────────────────
     // 몬스터별 원본 sharedMaterials 스냅샷 — 풀 재사용/원소 변경 시에도 참조 안정.
@@ -132,7 +133,8 @@ public class ElementNativePalette : MonoBehaviour
 
             // Rim 오버레이는 Multi-material Multi-submesh 규칙 상 submesh 1개 Renderer에만 안전하게 적용.
             // 원본 material이 2개 이상이면 Rim은 마지막 submesh에만 덮히므로 Rim 비적용.
-            bool applyRim = useRim && wantsTint && originals.Length == 1;
+            // None 원소도 Rim 쉐이더를 적용한다 (색상은 원본 유지, Rim만 추가).
+            bool applyRim = useRim && originals.Length == 1;
 
             var working = applyRim ? _workingMaterialsWithRim[i] : _workingMaterials[i];
             if (working == null) continue;
@@ -262,7 +264,7 @@ public class ElementNativePalette : MonoBehaviour
     }
 
     /// <summary>이 몬스터의 모든 원본 material × 유효 원소 5종 조합을 미리 생성해 캐시에 적재.
-    /// Rim 머티리얼 5종도 전역 static 캐시에 미리 적재 (전 몬스터 공유이므로 첫 몬스터에서 1회면 충분).
+    /// Rim 머티리얼은 None 포함 6종을 전역 static 캐시에 미리 적재 (전 몬스터 공유이므로 첫 몬스터에서 1회면 충분).
     /// 풀 첫 생성 시점(Awake)에 1회 수행 → 런타임 Apply는 순수 바인딩만 수행.</summary>
     private void PrewarmAllElements()
     {
@@ -285,6 +287,7 @@ public class ElementNativePalette : MonoBehaviour
 
         if (useRim)
         {
+            GetOrCreateRimMaterial(ElementType.None); // None도 Rim 프리워밍
             for (int e = 0; e < ElementTypeUtil.Count; e++)
                 GetOrCreateRimMaterial((ElementType)e);
         }
@@ -360,8 +363,8 @@ public class ElementNativePalette : MonoBehaviour
         var entry = ResolveEntry(element);
         var mat = new Material(_rimShader) { name = $"ElementRim__{element}" };
 
-        // HDR 강도를 위해 tintColor × rimColorMultiplier. alpha는 1로 고정해 Fresnel 투명도만 작용.
-        Color rimColor = entry.tintColor * rimColorMultiplier;
+        // HDR 강도를 위해 tintColor × RimColorMultiplier. alpha는 1로 고정해 Fresnel 투명도만 작용.
+        Color rimColor = entry.tintColor * RimColorMultiplier;
         rimColor.a = 1f;
         mat.SetColor(BaseColorID, rimColor);
         // 쉐이더 내부 원소별 애니메이션 분기 식별자 — 쉐이더의 ElementModulation이 사용.
@@ -384,6 +387,7 @@ public class ElementNativePalette : MonoBehaviour
     {
         switch (element)
         {
+            case ElementType.None:      return new ElementPaletteSO.Entry { element = element, tintColor = new Color(0.82f, 0.82f, 0.82f, 1f), tintStrength = 0f, applyEmission = false, emissionIntensity = 0f };
             case ElementType.Lightning: return new ElementPaletteSO.Entry { element = element, tintColor = new Color(1.00f, 0.92f, 0.23f, 1f), tintStrength = 0.7f, applyEmission = true, emissionIntensity = 0.6f };
             case ElementType.Water:     return new ElementPaletteSO.Entry { element = element, tintColor = new Color(0.13f, 0.59f, 0.95f, 1f), tintStrength = 0.7f, applyEmission = true, emissionIntensity = 0.6f };
             case ElementType.Fire:      return new ElementPaletteSO.Entry { element = element, tintColor = new Color(0.96f, 0.26f, 0.21f, 1f), tintStrength = 0.7f, applyEmission = true, emissionIntensity = 0.6f };

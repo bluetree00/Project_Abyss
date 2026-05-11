@@ -49,7 +49,8 @@ public class MapBuilder
                                   || type == TileType.ShopStallWeapon
                                   || type == TileType.ShopStallItem;
                 bool isMonsterSpawnTile = type == TileType.MonsterSpawn || type == TileType.MonsterSpawnCandidate;
-                bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile;
+                bool isBossSpawnTile   = type == TileType.BossSpawn;
+                bool isOverlayTile = isBuffTile || isShopTile || isMonsterSpawnTile || isBossSpawnTile;
 
                 // 오버레이 타일(버프/상점/몬스터스폰): 바닥 블록을 먼저 깔고 그 위에 기능 오브젝트 배치
                 var renderType = isOverlayTile ? TileType.Floor : type;
@@ -180,6 +181,27 @@ public class MapBuilder
                     else
                     {
                         Debug.LogWarning($"[MapBuilder] MonsterSpawn 타일 ({x},{z}) — 팔레트에 BlockDef 없음, 스포너 미배치", parent);
+                    }
+                }
+                else if (isBossSpawnTile)
+                {
+                    var bossSpawnerDef = palette.Pick(TileType.BossSpawn);
+                    if (bossSpawnerDef != null && bossSpawnerDef.prefab != null)
+                    {
+                        var bossGo = Object.Instantiate(bossSpawnerDef.prefab, targetPos, Quaternion.identity, parent);
+                        bossGo.name = $"BossSpawner_{x}_{z}";
+                        result.Add(new PlacedBlock
+                        {
+                            instance = bossGo,
+                            targetPosition = targetPos,
+                            targetRotationY = 0f,
+                            tileType = type,
+                            cell = new Vector2Int(x, z),
+                        });
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[MapBuilder] BossSpawn 타일 ({x},{z}) — 팔레트에 BossSpawn BlockDef 없음, 보스 스포너 미배치", parent);
                     }
                 }
             }

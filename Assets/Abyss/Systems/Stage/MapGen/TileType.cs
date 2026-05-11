@@ -22,4 +22,7 @@ public enum TileType
     Empty,          // . — 빈 칸 (구멍)
     BuffBox,        // R — 버프 상자 (상호작용으로 발동)
     BuffPedestal,   // D — 버프 발판 (밟으면 즉시 발동)
+    CharacterPickup, // CP — 스타트 방 캐릭터 픽업
+    WeaponPickup,    // WP — 스타트 방 무기 픽업
+    StartGate,       // SG — 스타트 방 탈출 게이트
 }

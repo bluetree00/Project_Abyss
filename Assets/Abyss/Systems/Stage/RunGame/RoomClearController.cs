@@ -34,30 +34,42 @@ public sealed class RoomClearController : MonoBehaviour
     private bool _active;
     private bool _cleared;
     private readonly List<MonsterSpawner> _spawners = new();
+    private BossSpawner _bossSpawner;
 
-    /// <summary>Bootstrapper에서 방 빌드 직후 호출. 무제한 스포너가 포함되면 비활성.</summary>
-    public void Initialize(GameRunSession run, IList<MonsterSpawner> spawners, LuckRollTableSO luckTable)
+    /// <summary>Bootstrapper에서 방 빌드 직후 호출. 무제한 스포너가 포함되면 비활성.
+    /// bossSpawner는 null 허용 — 보스 방이 아닐 경우 null을 전달한다.</summary>
+    public void Initialize(GameRunSession run, IList<MonsterSpawner> spawners, BossSpawner bossSpawner, LuckRollTableSO luckTable)
     {
         _run = run;
         _luckTable = luckTable;
 
-        if (spawners == null || spawners.Count == 0)
+        int sum = 0;
+
+        if (spawners != null)
+        {
+            foreach (var s in spawners)
+            {
+                if (s == null) continue;
+                if (s.MaxTotalSpawns <= 0)
+                {
+                    Debug.LogWarning($"[RoomClear] 무제한 스포너 '{s.name}' 포함 — 킬 목표 계산 불가, 클리어 조건 비활성");
+                    return;
+                }
+                sum += s.MaxTotalSpawns;
+                _spawners.Add(s);
+            }
+        }
+
+        if (bossSpawner != null)
+        {
+            sum += bossSpawner.MaxTotalSpawns; // 항상 1
+            _bossSpawner = bossSpawner;
+        }
+
+        if (sum == 0)
         {
             Debug.Log("[RoomClear] 스포너 0개 — 클리어 조건 없음 (비활성)");
             return;
-        }
-
-        int sum = 0;
-        foreach (var s in spawners)
-        {
-            if (s == null) continue;
-            if (s.MaxTotalSpawns <= 0)
-            {
-                Debug.LogWarning($"[RoomClear] 무제한 스포너 '{s.name}' 포함 — 킬 목표 계산 불가, 클리어 조건 비활성");
-                return;
-            }
-            sum += s.MaxTotalSpawns;
-            _spawners.Add(s);
         }
 
         _targetKillCount = sum;
@@ -66,7 +78,11 @@ public sealed class RoomClearController : MonoBehaviour
         foreach (var s in _spawners)
             s.OnMonsterSpawned += HandleMonsterSpawned;
 
-        Debug.Log($"[RoomClear] 초기화 완료 — 킬 목표 {_targetKillCount}마리 ({_spawners.Count}개 스포너)");
+        if (_bossSpawner != null)
+            _bossSpawner.OnMonsterSpawned += HandleMonsterSpawned;
+
+        string bossTag = _bossSpawner != null ? " + 보스 1" : "";
+        Debug.Log($"[RoomClear] 초기화 완료 — 킬 목표 {_targetKillCount}마리 ({_spawners.Count}개 스포너{bossTag})");
     }
 
     private void OnDestroy()
@@ -74,6 +90,9 @@ public sealed class RoomClearController : MonoBehaviour
         foreach (var s in _spawners)
             if (s != null) s.OnMonsterSpawned -= HandleMonsterSpawned;
         _spawners.Clear();
+
+        if (_bossSpawner != null)
+            _bossSpawner.OnMonsterSpawned -= HandleMonsterSpawned;
     }
 
     private void HandleMonsterSpawned(MonsterBase monster)
