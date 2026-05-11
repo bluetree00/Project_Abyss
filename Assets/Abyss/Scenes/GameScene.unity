@@ -165,6 +165,7 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   allowedElements: 
+  _waveEntries: []
 --- !u!4 &13670620
 Transform:
   m_ObjectHideFlags: 0
@@ -327,7 +328,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &115272139
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -385,6 +386,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -528,6 +530,7 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   allowedElements: 
+  _waveEntries: []
 --- !u!4 &117726861
 Transform:
   m_ObjectHideFlags: 0
@@ -576,7 +579,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &186265441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -634,6 +637,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -746,6 +750,7 @@ GameObject:
   - component: {fileID: 330585547}
   - component: {fileID: 330585548}
   - component: {fileID: 330585549}
+  - component: {fileID: 330585550}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1013,6 +1018,26 @@ MonoBehaviour:
   m_CameraActivatedEvent:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &330585550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5074b8df85b97ac47b69d6076ee0b7f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameCameraController
+  introExtraHeight: 30
+  introExtraBack: 10
+  introDuration: 2.5
+  fadeInStart: 0.2
+  fadeInDuration: 1.5
+  wispOrbitTop: {x: 17, y: 4}
+  wispOrbitMiddle: {x: 12, y: 5}
+  wispOrbitBottom: {x: 6, y: 4}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234,7 +1259,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &487247456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1292,6 +1317,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -1434,14 +1460,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4c506c3bf4371748837bd380ff194f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerPrefabKey: Knight
-  directCombatMapPrefabKey: battle_001
+  playerPrefabKey: 
+  directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 0}
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
   disableSceneBakedNavMeshOnStart: 1
   defaultPlayerEntrance: {fileID: 11400000, guid: fbf55aa93a915964f99df6e70b8668b3,
     type: 2}
+  startRoomMapKey: start_001
+  characterPickupPrefabs:
+  - {fileID: 5942164450736926565, guid: 8fe63d43c6026cd4f90eca3739353cc8, type: 3}
+  - {fileID: 1615712682993080270, guid: 989e640551bac104aa8e91ad9c6991ee, type: 3}
+  - {fileID: 4835396908360923906, guid: 571ae1f959d38544f8ed1b2256fafff1, type: 3}
+  weaponPickupPrefabs:
+  - {fileID: 6690277064601983092, guid: ebcb55c7fe8fe1e4db6c3312e7953481, type: 3}
+  - {fileID: 3282498442510412308, guid: 70db2f5a193e2c44288aeeaa9562b402, type: 3}
+  - {fileID: 4475404787651935498, guid: b235161e39eab2a4ebe0e5e154be0da0, type: 3}
+  - {fileID: 211444737294688988, guid: b301e4af27f588b4294ba3ce4a5c5628, type: 3}
+  startGatePrefab: {fileID: 3370721773177374504, guid: 6fbc55cf5fb2d504382e9cc2bb096150,
+    type: 3}
+  wispPrefab: {fileID: 6090908717942830731, guid: aa5ed5db87064a74abe5c9c54978eacf,
+    type: 3}
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}
@@ -1451,12 +1491,16 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 81ae8eb0cb06d8948960d5dda7f139c7, type: 2}
   - {fileID: 11400000, guid: 4f37ed8cc553a734cbe922020c290fc8, type: 2}
   blockCellSize: 1
-  blockBaseY: -0.5
+  blockBaseY: -0.1
   shopSlotCount: 3
   blockShopStallPrefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8,
     type: 3}
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}
+  clearEndEffectPrefab: {fileID: 8117584988822686635, guid: a61117abe58ca5e4984969cb5c8e33b6,
+    type: 3}
+  clearEndEffect2Prefab: {fileID: 3606566459220164321, guid: 1f4f93d25102e9f49884560a79fc4185,
+    type: 3}
   decorationCatalogs:
   - {fileID: 11400000, guid: a0e4b1bdd0e55524e81ee90adceeda4f, type: 2}
   - {fileID: 11400000, guid: 8da2fca1ba714d8c974c330efda6c05c, type: 2}
@@ -2002,7 +2046,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1150250077
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2060,6 +2104,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3

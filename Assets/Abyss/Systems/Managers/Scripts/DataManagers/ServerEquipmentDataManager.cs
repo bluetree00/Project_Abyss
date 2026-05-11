@@ -34,8 +34,8 @@ public class ServerEquipmentDataManager
         // 0건이면 Resources 폴백
         if (_byId.Count == 0)
         {
-            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — Resources 폴백");
-            var textAsset = Resources.Load<TextAsset>("EQUIPMENT_DATA");
+            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — Addressables 폴백");
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("EQUIPMENT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<EquipmentEntryCollection>(textAsset.text);

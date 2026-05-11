@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DefaultPlayerEntranceSO
   activateDelay: 0.8
   vfxDuration: 1.2
-  vfxPrefab: {fileID: 2605316480486226868, guid: 114ab6919cf39484e946697e02cfa078, type: 3}
+  vfxPrefab: {fileID: 1282364566017586, guid: 38e2ad2405a73b94ca4acff97076788a, type: 3}
   animationTrigger: Entrance

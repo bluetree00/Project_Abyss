@@ -1,15 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
+// ReSharper disable SwitchStatementMissingSomeEnumCasesNoDefault
 
 /// <summary>
 /// grid_csv 문자열 ↔ TileType[,] 변환.
 /// 행 구분: ;(세미콜론)  열 구분: ,(쉼마)
 ///
 /// 기본 타일: F/W/O/P/B/S/N/E/X/T/C/./R/D (단일 문자)
-/// 스포너 토큰: [Mm][cre]\d+  (예: Mc3, mr5, Me8)
+/// 스포너 토큰: [Mm]([cre]\d*)+
 ///   - 첫 글자: M=확정, m=후보
-///   - 두 번째:  c=Common, r=Rare, e=Elite (등급 상한)
-///   - 나머지:   마릿수 (0=무제한)
+///   - 세그먼트: [cre]\d*  c=Common / r=Rare / e=Elite + 마릿수(생략 시 0=무제한)
+///   - 세그먼트 1개: Mc3  → 단일 등급·수량 (레거시 루프 모드 또는 1-웨이브)
+///   - 세그먼트 2개+: Mc3r5e2 → 웨이브 배열 (웨이브 수 = 세그먼트 수)
 /// 장식 토큰: d<code> (예: dt=Big Tree, dp=Small Tree, df=Fog, dl=Leaves, dm=Magic Lights)
 ///   - 파싱 시 TileType은 Floor로 기록되고 decorationInfos[cell] = "<code>" 저장
 ///   - 실제 장식 오브젝트는 Bootstrapper가 DecorationCatalog를 통해 후처리 스폰
@@ -17,11 +19,21 @@ using UnityEngine;
 /// </summary>
 public static class MapDataLoader
 {
-    /// <summary>스포너 타일의 부가 메타. grid_csv 셀 토큰에서 파싱.</summary>
+    /// <summary>웨이브 하나의 등급+마릿수. CellSpawnInfo.waves 배열 원소.</summary>
+    public struct WaveCellConfig
+    {
+        public MonsterGrade grade;
+        public int count; // 0 = 무제한 (레거시)
+    }
+
+    /// <summary>스포너 타일의 부가 메타. grid_csv 셀 토큰에서 파싱.
+    /// waves가 null이면 레거시 단일 등급/수량 모드 (maxGrade, totalCount 사용).
+    /// waves가 non-null이면 웨이브 배열 모드 — maxGrade/totalCount는 무시.</summary>
     public struct CellSpawnInfo
     {
-        public MonsterGrade maxGrade;
-        public int totalCount; // 0 = 무제한
+        public MonsterGrade maxGrade;  // 레거시 호환 (waves==null 일 때)
+        public int totalCount;         // 레거시 호환 (waves==null 일 때)
+        public WaveCellConfig[] waves; // null=레거시, 길이≥2=웨이브 모드
     }
 
     /// <summary>grid_csv → TileType 2D 배열. 좌하단이 (0,0).
@@ -185,13 +197,19 @@ public static class MapDataLoader
             "T" => TileType.Trap,
             "C" => TileType.Chest,
             "." => TileType.Empty,
-            "R" => TileType.BuffBox,
-            "D" => TileType.BuffPedestal,
-            _   => TileType.Floor,
+            "R"  => TileType.BuffBox,
+            "D"  => TileType.BuffPedestal,
+            "CP" => TileType.CharacterPickup,
+            "WP" => TileType.WeaponPickup,
+            "SG" => TileType.StartGate,
+            _    => TileType.Floor,
         };
     }
 
-    /// <summary>[Mm][cre]?\d* 토큰 파싱. 실패 시 false. 단독 M/m은 Common + count 0(무제한).</summary>
+    /// <summary>[Mm]([cre]\d*)+ 토큰 파싱. 실패 시 false.
+    /// 단독 M/m → Common count 0 (무제한 레거시).
+    /// 세그먼트 1개 → 레거시 모드 (waves=null).
+    /// 세그먼트 2개+ → 웨이브 배열 모드 (waves 채움, maxGrade/totalCount 레거시 필드는 미사용).</summary>
     private static bool TryParseSpawnerToken(string s, out TileType tile, out CellSpawnInfo info)
     {
         tile = default;
@@ -201,33 +219,63 @@ public static class MapDataLoader
         bool isCandidate = s[0] == 'm';
         if (!isCandidate && s[0] != 'M') return false;
 
-        // 단독 M/m → Mc0 / mc0 별칭
+        tile = isCandidate ? TileType.MonsterSpawnCandidate : TileType.MonsterSpawn;
+
+        // 단독 M/m → Mc0 레거시
         if (s.Length == 1)
         {
-            info = new CellSpawnInfo { maxGrade = MonsterGrade.Common, totalCount = 0 };
-            tile = isCandidate ? TileType.MonsterSpawnCandidate : TileType.MonsterSpawn;
+            info = new CellSpawnInfo { maxGrade = MonsterGrade.Common, totalCount = 0, waves = null };
             return true;
         }
 
-        MonsterGrade grade;
-        switch (s[1])
+        // [cre]\d* 세그먼트를 반복 파싱
+        var waveList = new List<WaveCellConfig>();
+        int pos = 1;
+        while (pos < s.Length)
         {
-            case 'c': case 'C': grade = MonsterGrade.Common; break;
-            case 'r': case 'R': grade = MonsterGrade.Rare;   break;
-            case 'e': case 'E': grade = MonsterGrade.Elite;  break;
-            default: return false;
+            MonsterGrade grade;
+            switch (s[pos])
+            {
+                case 'c': case 'C': grade = MonsterGrade.Common; break;
+                case 'r': case 'R': grade = MonsterGrade.Rare;   break;
+                case 'e': case 'E': grade = MonsterGrade.Elite;  break;
+                default: return false;
+            }
+            pos++;
+
+            int count = 0;
+            while (pos < s.Length && s[pos] >= '0' && s[pos] <= '9')
+            {
+                count = count * 10 + (s[pos] - '0');
+                pos++;
+            }
+
+            waveList.Add(new WaveCellConfig { grade = grade, count = count });
         }
 
-        int count = 0;
-        for (int i = 2; i < s.Length; i++)
+        if (waveList.Count == 0) return false;
+
+        if (waveList.Count == 1)
         {
-            char c = s[i];
-            if (c < '0' || c > '9') return false;
-            count = count * 10 + (c - '0');
+            // 세그먼트 1개 → 레거시 단일 등급/수량 (기존 동작 유지)
+            info = new CellSpawnInfo
+            {
+                maxGrade   = waveList[0].grade,
+                totalCount = waveList[0].count,
+                waves      = null,
+            };
+        }
+        else
+        {
+            // 세그먼트 2개+ → 웨이브 배열 모드
+            info = new CellSpawnInfo
+            {
+                maxGrade   = waveList[0].grade, // 참고용 (실제 사용 안 함)
+                totalCount = 0,
+                waves      = waveList.ToArray(),
+            };
         }
 
-        info = new CellSpawnInfo { maxGrade = grade, totalCount = count };
-        tile = isCandidate ? TileType.MonsterSpawnCandidate : TileType.MonsterSpawn;
         return true;
     }
 
@@ -248,8 +296,11 @@ public static class MapDataLoader
         TileType.Trap         => "T",
         TileType.Chest        => "C",
         TileType.Empty        => ".",
-        TileType.BuffBox      => "R",
-        TileType.BuffPedestal => "D",
-        _                     => "F",
+        TileType.BuffBox         => "R",
+        TileType.BuffPedestal    => "D",
+        TileType.CharacterPickup => "CP",
+        TileType.WeaponPickup    => "WP",
+        TileType.StartGate       => "SG",
+        _                        => "F",
     };
 }

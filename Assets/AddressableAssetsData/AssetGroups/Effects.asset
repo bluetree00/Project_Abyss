@@ -115,11 +115,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 38e2ad2405a73b94ca4acff97076788a
-    m_Address: SoftBlueBuff
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 39e6808e995d14e46aae8b87bde2a278
     m_Address: MeteorHit
     m_ReadOnly: 0
@@ -282,11 +277,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fabdc41743036b945ade90d43535856b
-    m_Address: VFX_Item_Legendary
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b5c49b7d08769594c855059bca8bebf5
     m_Address: IasenDashTrail
     m_ReadOnly: 0
@@ -384,6 +374,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fabdc41743036b945ade90d43535856b
+    m_Address: VFX_Item_Legendary
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fb2df51e77abde1429eb83c0317784af
     m_Address: DragonPunch

@@ -3,6 +3,7 @@ Shader "Abyss/Elements/ElementRim"
     // URP Unlit 기반 Fresnel Rim Glow + 원소별 애니메이션 분기.
     // _ElementType 값에 따라 Fresnel 강도가 시간/위치 함수로 다르게 변조되어
     // 원소마다 고유한 느낌을 준다:
+    //  -1 None      : 완전 정적 (무속성 — 원본 색 유지, 애니메이션 없음)
     //   0 Lightning : 빠르고 불규칙한 flicker
     //   1 Water     : 위치(y) 기반 부드러운 파동
     //   2 Fire      : 강한 박동 + 타는 흔들림
@@ -106,8 +107,13 @@ Shader "Abyss/Elements/ElementRim"
                 // Earth: 거의 정적. 미세한 저주파 진동으로 "살아있음"만 표현
                 float earth = 0.92 + 0.08 * sin(t * 0.8);
 
-                // 분기 최소화: step/lerp 체인으로 분기 비용 낮춤
-                float m = lightning;
+                // None(-1): 완전 정적. 애니메이션 없이 Rim만 표시.
+                float none = 1.0;
+
+                // 분기 최소화: step/lerp 체인으로 분기 비용 낮춤.
+                // etype=-1(None)이 기본값 → lightning은 명시적으로 분기.
+                float m = none;
+                m = (etype == 0) ? lightning : m;
                 m = (etype == 1) ? water    : m;
                 m = (etype == 2) ? fire     : m;
                 m = (etype == 3) ? grass    : m;
@@ -139,5 +145,5 @@ Shader "Abyss/Elements/ElementRim"
         }
     }
 
-    FallBack Off
+    FallBack "Sprites/Default"
 }

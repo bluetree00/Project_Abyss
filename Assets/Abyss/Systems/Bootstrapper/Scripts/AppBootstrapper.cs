@@ -83,6 +83,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     private async UniTaskVoid LoadSceneNoFlowAsync(Define.Scene scene)
     {
+        Managers.Sound?.StopBgm();
+
         var loading = UI_SceneLoading.Instance;
         if (loading != null) await loading.ShowAsync();
 
@@ -115,7 +117,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     public void RequestStartRun()
     {
-        RequestLoad(Define.Scene.StageMap);
+        RequestLoad(Define.Scene.GameScene);
     }
 
     private GameFlow _flow;
@@ -200,6 +202,11 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             await addr.InitAsync();
         }
+
+        Managers.Sound?.Init();
+
+        // 4-b) QuestManager 초기화 — QuestDatabase / AchievementDatabase Addressables 로드
+        await InitQuestManagerAsync();
 
         // 5) (선택) UIRoot 확보 + UIManager에 캔버스 루트 주입
         if (autoCreateUIRoot)
@@ -384,6 +391,26 @@ public sealed class AppBootstrapper : MonoBehaviour
         });
 
         return tcs.Task;
+    }
+
+    private async UniTask InitQuestManagerAsync()
+    {
+        var addr = Managers.AddressableManager;
+        if (addr == null) return;
+
+        QuestDatabase questDb = null;
+        QuestDatabase achievementDb = null;
+
+        try { questDb       = await addr.TryLoadAssetAsync<QuestDatabase>("QuestDatabase"); }
+        catch (Exception e) { Debug.LogWarning($"[AppBootstrapper] QuestDatabase 로드 실패: {e.Message}"); }
+
+        try { achievementDb = await addr.TryLoadAssetAsync<QuestDatabase>("AchievementDatabase"); }
+        catch (Exception e) { Debug.LogWarning($"[AppBootstrapper] AchievementDatabase 로드 실패: {e.Message}"); }
+
+        if (questDb != null || achievementDb != null)
+            Managers.Quest.Initialize(questDb, achievementDb);
+        else
+            Debug.Log("[AppBootstrapper] QuestDatabase 없음 — Quest 시스템 대기 상태 유지");
     }
 
     private async UniTask EnsureUIRootAsync()

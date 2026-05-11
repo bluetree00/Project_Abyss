@@ -30,16 +30,24 @@ public sealed class StageMapBootstrapper : MonoBehaviour
     [Header("맵 배경 장식 (폴백)")]
     [Tooltip("ChapterData에 decorationSprites 없을 때 사용할 기본 장식 스프라이트 목록.")]
     [SerializeField] private Sprite[] defaultDecorationSprites;
-    [Tooltip("맵에 뿌릴 장식 개수.")]
-    [SerializeField] private int decorationCount = 22;
-    [Tooltip("노드 주위 회피 반경. 이 반경 안쪽엔 장식 배치 안 함 (노드 가림·클릭 방해 방지).")]
-    [SerializeField] private float decorationNodeClearance = 200f;
-    [Tooltip("장식 간 최소 간격. 군집 방지.")]
-    [SerializeField] private float decorationMinSpacing = 110f;
-    [Tooltip("장식 스케일 범위 (min~max).")]
-    [SerializeField] private Vector2 decorationScaleRange = new Vector2(0.7f, 1.3f);
+
+    [Header("지형 군집")]
+    [Tooltip("맵에 배치할 지형 군집 개수. 각 군집은 같은 스프라이트를 사용해 숲·바위구역처럼 표현.")]
+    [SerializeField] private int terrainZoneCount = 14;
+    [Tooltip("군집당 스프라이트 개수.")]
+    [SerializeField] private int decorationsPerZone = 11;
+    [Tooltip("군집 반경(픽셀). 군집 중심에서 이 반경 내에 스프라이트를 배치.")]
+    [SerializeField] private float terrainZoneRadius = 420f;
+    [Tooltip("노드 주위 회피 반경. 이 반경 안쪽엔 군집 중심·스프라이트를 배치 안 함.")]
+    [SerializeField] private float decorationNodeClearance = 160f;
+    [Tooltip("군집 내 스프라이트 간 최소 간격. 작을수록 자연스럽게 겹침.")]
+    [SerializeField] private float intraZoneMinSpacing = 22f;
+    [Tooltip("장식 최대 픽셀 크기. 스프라이트 원본이 이보다 크면 축소.")]
+    [SerializeField] private float decorationMaxSize = 65f;
+    [Tooltip("장식 스케일 범위 (min~max). 군집 중심에 가까울수록 크게 렌더.")]
+    [SerializeField] private Vector2 decorationScaleRange = new Vector2(0.75f, 1.4f);
     [Tooltip("장식 회전 범위 (±도).")]
-    [SerializeField] private float decorationMaxRotation = 8f;
+    [SerializeField] private float decorationMaxRotation = 25f;
 
     private void Awake()
     {
@@ -76,6 +84,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (app.CurrentRun != null && app.CurrentRun.IsRunning)
         {
             app.CurrentRun.EnterMap();
+            PlayChapterBgm(app.CurrentRun.CurrentChapter);
 
             // [DIAG] 재진입 시점의 상태 로그 — 그래프 캐시 유지 여부 확인
             var diagRun = app.CurrentRun;
@@ -140,6 +149,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         }
 
         GenerateAndLayoutNodes(startChapter);
+        PlayChapterBgm(startChapter);
 
         var points = FindObjectsOfType<StagePointUI>(true);
         session.RegisterPoints(points);
@@ -337,7 +347,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = Vector2.zero;
             if (template == null)
-                rt.sizeDelta = new Vector2(80f, 80f);
+                rt.sizeDelta = new Vector2(120f, 120f);
         }
 
         var point = go.GetComponent<StagePointUI>();
@@ -418,20 +428,41 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         }
     }
 
+    private void PlayChapterBgm(ChapterId chapter)
+    {
+        string bgmKey = null;
+
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        if (serverEntry != null && !string.IsNullOrEmpty(serverEntry.bgm_key))
+            bgmKey = serverEntry.bgm_key;
+
+        if (string.IsNullOrEmpty(bgmKey) && chapterRegistry != null)
+        {
+            var chapterData = chapterRegistry.Get(chapter);
+            if (chapterData != null && !string.IsNullOrEmpty(chapterData.bgmKey))
+                bgmKey = chapterData.bgmKey;
+        }
+
+        if (string.IsNullOrEmpty(bgmKey))
+            return;
+
+        Managers.Sound?.PlayBgmAsync(bgmKey).Forget();
+    }
+
     /// <summary>
     /// 배경 위·노드 아래 레이어에 장식 스프라이트를 스캐터 배치.
     /// ChapterDataSO.decorationSprites 우선, 없으면 Bootstrapper의 defaultDecorationSprites 사용.
-    /// 각 노드 주위 decorationNodeClearance 반경을 회피, 장식끼리도 decorationMinSpacing 유지.
+    /// 각 노드 주위 decorationNodeClearance 반경을 회피, 군집 내부는 intraZoneMinSpacing 유지.
     /// 호출 시점: scroller.RebuildMap() 이후 (노드 anchoredPosition이 레이아웃으로 채워진 상태).
     /// </summary>
     private void PopulateMapDecorations(StageMapScroller scroller, ChapterId chapter, float contentWidth, float contentHeight)
     {
         if (scroller == null || scroller.ContentTransform == null) return;
-        if (decorationCount <= 0) return;
+        if (terrainZoneCount <= 0 || decorationsPerZone <= 0) return;
 
         var content = scroller.ContentTransform;
 
-        // 장식 소스 결정: 챕터 데이터 우선
+        // 스프라이트 소스 결정: 챕터 데이터 우선
         Sprite[] sprites = null;
         var chapterData = chapterRegistry != null ? chapterRegistry.Get(chapter) : null;
         if (chapterData != null && chapterData.decorationSprites != null && chapterData.decorationSprites.Length > 0)
@@ -463,12 +494,11 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         {
             layerRT = (RectTransform)layerT;
             layerRT.sizeDelta = new Vector2(contentWidth, contentHeight);
-
             for (int i = layerT.childCount - 1; i >= 0; i--)
                 DestroyImmediate(layerT.GetChild(i).gameObject);
         }
 
-        // 노드 위치 수집 (MapContent 내부 StagePointUI들, anchoredPosition 기준)
+        // 노드 위치 수집
         var nodeUIs = content.GetComponentsInChildren<StagePointUI>(true);
         var nodePositions = new List<Vector2>(nodeUIs.Length);
         for (int i = 0; i < nodeUIs.Length; i++)
@@ -477,67 +507,92 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             if (rt != null) nodePositions.Add(rt.anchoredPosition);
         }
 
-        // 배치 영역: 콘텐츠 가장자리에서 안쪽으로 약간 패딩
-        float padX = 60f;
-        float padY = 60f;
+        float padX = 80f;
+        float padY = 80f;
         float halfW = Mathf.Max(0f, contentWidth * 0.5f - padX);
         float halfH = Mathf.Max(0f, contentHeight * 0.5f - padY);
         if (halfW <= 0f || halfH <= 0f) return;
 
-        float nodeClearSq = decorationNodeClearance * decorationNodeClearance;
-        float minSpacingSq = decorationMinSpacing * decorationMinSpacing;
+        float nodeClearSq     = decorationNodeClearance * decorationNodeClearance;
+        float intraSpacingSq  = intraZoneMinSpacing * intraZoneMinSpacing;
+        // 군집 중심끼리는 반경의 45% 이상 떨어지도록 (군집 수가 많으므로 완화)
+        float zoneSepSq       = (terrainZoneRadius * 0.45f) * (terrainZoneRadius * 0.45f);
 
-        // 이미 배치된 장식 좌표 (장식끼리 군집 방지용)
-        var placedPositions = new List<Vector2>(decorationCount);
-
-        // 시도 예산: 개당 최대 50회 재표집 (빽빽한 설정에서 거부율 대응)
-        int maxAttemptsPerItem = 50;
-        int placed = 0;
-
-        for (int i = 0; i < decorationCount; i++)
+        // ── 1단계: 군집 중심 선정 ──
+        var zoneCenters = new List<Vector2>(terrainZoneCount);
+        for (int z = 0; z < terrainZoneCount; z++)
         {
-            Vector2 pos = Vector2.zero;
-            bool accepted = false;
-
-            for (int attempt = 0; attempt < maxAttemptsPerItem; attempt++)
+            for (int attempt = 0; attempt < 80; attempt++)
             {
-                pos = new Vector2(Random.Range(-halfW, halfW), Random.Range(-halfH, halfH));
+                var center = new Vector2(Random.Range(-halfW, halfW), Random.Range(-halfH, halfH));
 
-                bool tooClose = false;
+                bool reject = false;
+                for (int n = 0; n < nodePositions.Count; n++)
+                {
+                    if ((center - nodePositions[n]).sqrMagnitude < nodeClearSq)
+                    { reject = true; break; }
+                }
+                if (reject) continue;
+
+                for (int c = 0; c < zoneCenters.Count; c++)
+                {
+                    if ((center - zoneCenters[c]).sqrMagnitude < zoneSepSq)
+                    { reject = true; break; }
+                }
+                if (reject) continue;
+
+                zoneCenters.Add(center);
+                break;
+            }
+        }
+
+        // ── 2단계: 군집별 스프라이트 배치 ──
+        // 같은 군집은 같은 스프라이트 → 숲/바위 구역처럼 보임
+        int placed = 0;
+        var allPlaced = new List<Vector2>(zoneCenters.Count * decorationsPerZone);
+
+        for (int z = 0; z < zoneCenters.Count; z++)
+        {
+            var center     = zoneCenters[z];
+            var zoneSprite = sprites[z % sprites.Length];
+
+            for (int i = 0; i < decorationsPerZone; i++)
+            {
+                // 극좌표 기반 배치: sqrt(Random.value)로 균등 분포
+                float angle  = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                float radius = Mathf.Sqrt(Random.value) * terrainZoneRadius;
+                var pos      = center + new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
+                pos.x = Mathf.Clamp(pos.x, -halfW, halfW);
+                pos.y = Mathf.Clamp(pos.y, -halfH, halfH);
+
+                bool reject = false;
                 for (int n = 0; n < nodePositions.Count; n++)
                 {
                     if ((pos - nodePositions[n]).sqrMagnitude < nodeClearSq)
-                    {
-                        tooClose = true; break;
-                    }
+                    { reject = true; break; }
                 }
-                if (tooClose) continue;
+                if (reject) continue;
 
-                for (int p = 0; p < placedPositions.Count; p++)
+                for (int p = 0; p < allPlaced.Count; p++)
                 {
-                    if ((pos - placedPositions[p]).sqrMagnitude < minSpacingSq)
-                    {
-                        tooClose = true; break;
-                    }
+                    if ((pos - allPlaced[p]).sqrMagnitude < intraSpacingSq)
+                    { reject = true; break; }
                 }
-                if (tooClose) continue;
+                if (reject) continue;
 
-                accepted = true;
-                break;
+                // 중심에 가까울수록 크게 (원근감)
+                float distRatio = Mathf.Clamp01(radius / terrainZoneRadius);
+                float s = Mathf.Lerp(decorationScaleRange.y, decorationScaleRange.x, distRatio * 0.6f);
+                s = Mathf.Clamp(s + Random.Range(-0.08f, 0.08f), decorationScaleRange.x, decorationScaleRange.y);
+
+                SpawnDecoration(layerRT, zoneSprite, pos, placed, s);
+                allPlaced.Add(pos);
+                placed++;
             }
-
-            if (!accepted) continue;
-
-            var sprite = sprites[Random.Range(0, sprites.Length)];
-            if (sprite == null) continue;
-
-            SpawnDecoration(layerRT, sprite, pos, placed);
-            placedPositions.Add(pos);
-            placed++;
         }
     }
 
-    private void SpawnDecoration(RectTransform parent, Sprite sprite, Vector2 pos, int index)
+    private void SpawnDecoration(RectTransform parent, Sprite sprite, Vector2 pos, int index, float scale)
     {
         var go = new GameObject($"Decor_{index}", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
         var rt = (RectTransform)go.transform;
@@ -547,8 +602,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
 
-        float s = Random.Range(decorationScaleRange.x, decorationScaleRange.y);
-        rt.localScale = new Vector3(s, s, 1f);
+        rt.localScale = new Vector3(scale, scale, 1f);
         rt.localRotation = Quaternion.Euler(0f, 0f, Random.Range(-decorationMaxRotation, decorationMaxRotation));
 
         var img = go.GetComponent<UnityEngine.UI.Image>();
@@ -556,6 +610,13 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         img.raycastTarget = false;
         img.preserveAspect = true;
         img.SetNativeSize();
+
+        // 스프라이트 원본이 노드(80px)보다 크지 않도록 상한 적용
+        if (rt.sizeDelta.x > decorationMaxSize || rt.sizeDelta.y > decorationMaxSize)
+        {
+            float ratio = Mathf.Min(decorationMaxSize / rt.sizeDelta.x, decorationMaxSize / rt.sizeDelta.y);
+            rt.sizeDelta *= ratio;
+        }
     }
 
     private static async UniTaskVoid LoadChapterBackgroundAsync(UnityEngine.UI.Image image, string key, Color tint)

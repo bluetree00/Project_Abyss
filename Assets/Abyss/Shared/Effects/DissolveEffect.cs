@@ -26,11 +26,16 @@ public static class DissolveEffect
     // ─────────────────── 공개 API ───────────────────
 
     /// <summary>디졸브로 등장 (소멸 → 완전 등장 후 원본 복원).
-    /// 완료 시 onComplete 호출. 렌더러 머티리얼이 원본으로 복원된 이후 시점이 보장됨.</summary>
-    public static void PlayAppear(GameObject target, float duration = 0.5f, Action onComplete = null)
+    /// activationToken: 풀 반환 시 취소되는 토큰 (MonsterBase.ActivationToken). 전달 시 풀 반환 후
+    /// 남은 복원 태스크가 원소 셰이더를 덮어쓰는 레이스를 방지한다. 완료 시 onComplete 호출.</summary>
+    public static void PlayAppear(
+        GameObject target,
+        float duration = 0.5f,
+        Action onComplete = null,
+        CancellationToken activationToken = default)
     {
         if (target == null) { onComplete?.Invoke(); return; }
-        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), onComplete).Forget();
+        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), activationToken, onComplete).Forget();
     }
 
     /// <summary>디졸브로 등장. await 가능.</summary>
@@ -38,9 +43,7 @@ public static class DissolveEffect
         GameObject target, float duration = 0.5f, CancellationToken ct = default)
     {
         if (target == null) return;
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
-            target.GetCancellationTokenOnDestroy(), ct);
-        await DissolveInAsync(target, duration, cts.Token, null);
+        await DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), ct, null);
     }
 
     /// <summary>디졸브로 퇴장 (완전 등장 → 소멸). 완료 시 onComplete 호출.</summary>
@@ -91,8 +94,19 @@ public static class DissolveEffect
     // ─────────────────── 내부 구현 ───────────────────
 
     private static async UniTask DissolveInAsync(
-        GameObject target, float duration, CancellationToken ct, Action onComplete)
+        GameObject target, float duration,
+        CancellationToken destroyCt, CancellationToken activationToken,
+        Action onComplete)
     {
+        CancellationTokenSource linkedCts = activationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(destroyCt, activationToken)
+            : null;
+        CancellationToken ct = linkedCts?.Token ?? destroyCt;
+
+        // try 밖에 선언 — catch 블록에서 취소 시 원본 복원에 접근 가능하도록
+        Renderer[]      renderers = null;
+        Material[][]    origMats  = null;
+        List<Material>  instances = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -105,7 +119,8 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = target.GetComponentsInChildren<Renderer>();
+            // includeInactive: true — 비활성 렌더러(LOD 등)도 포함해 디졸브 소재 일관성 유지
+            renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0)
             {
                 Debug.LogWarning($"[DissolveEffect] '{target.name}' Renderer 없음 — 등장 디졸브 스킵");
@@ -113,11 +128,11 @@ public static class DissolveEffect
                 return;
             }
 
-            var origMats = new Material[renderers.Length][];
+            origMats = new Material[renderers.Length][];
             for (int i = 0; i < renderers.Length; i++)
                 origMats[i] = renderers[i].sharedMaterials;
 
-            var instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
             SetDissolveValue(instances, 1f);
 
             float mainDur = Mathf.Max(0.01f, duration * (1f - EdgeFadePortion));
@@ -151,12 +166,26 @@ public static class DissolveEffect
 
             onComplete?.Invoke();
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // 취소(풀 반환·파괴) 시 원본 복원 — instances는 finally에서 Destroy되므로 먼저 복원
+            if (target != null && renderers != null && origMats != null)
+                for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                    if (renderers[i] != null) renderers[i].sharedMaterials = origMats[i];
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+            if (instances != null)
+                foreach (var m in instances)
+                    if (m != null) UnityEngine.Object.Destroy(m);
+        }
     }
 
     private static async UniTask DissolveOutAsync(
         GameObject target, float duration, CancellationToken ct, Action onComplete)
     {
+        List<Material> instances = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -169,10 +198,10 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = target.GetComponentsInChildren<Renderer>();
+            var renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
 
-            var instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
             SetDissolveValue(instances, 0f);
             SetEdgeWidth(instances, MaxEdgeWidth);
 
@@ -188,6 +217,12 @@ public static class DissolveEffect
             onComplete?.Invoke();
         }
         catch (OperationCanceledException) { }
+        finally
+        {
+            if (instances != null)
+                foreach (var m in instances)
+                    if (m != null) UnityEngine.Object.Destroy(m);
+        }
     }
 
     private static List<Material> ReplaceMaterials(

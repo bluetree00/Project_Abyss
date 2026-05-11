@@ -1,8 +1,20 @@
 using Abyss.Monster;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
+
+/// <summary>웨이브 모드에서 한 스포너의 단일 웨이브 설정.</summary>
+[System.Serializable]
+public struct WaveEntry
+{
+    [Tooltip("이 웨이브에서 이 스포너가 소환할 몬스터 마릿수.")]
+    [Min(0)] public int spawnCount;
+
+    [Tooltip("이 웨이브에서 허용할 최대 등급 상한. 스폰 테이블 필터에 적용됨.")]
+    public MonsterGrade maxGrade;
+}
 
 /// <summary>티어 스포너의 등급 매칭 모드.</summary>
 public enum GradeMatchMode
@@ -89,6 +101,11 @@ public class MonsterSpawner : MonoBehaviour
     [Tooltip("특정 원소 테마 방에서 사용. None(무속성)을 허용하려면 명시적으로 추가.")]
     [SerializeField] private List<ElementType> allowedElements;
 
+    [Header("웨이브 모드 설정 (비어있으면 자동 루프 모드)")]
+    [Tooltip("배열 길이 = 총 웨이브 수. RoomWaveController가 웨이브별 SpawnWaveAsync를 호출한다.\n" +
+             "비어있으면 기존 자동 루프 모드(maxTotalSpawns 기반)로 동작.")]
+    [SerializeField] private WaveEntry[] _waveEntries;
+
     // ── 런타임 ─────────────────────────────────────────────
 
     // 비활성(풀 반환) 또는 null 엔트리는 Purge로 제거
@@ -105,6 +122,9 @@ public class MonsterSpawner : MonoBehaviour
     /// <summary>Inspector에 설정된 누적 스폰 상한. 0 이하 = 무제한.
     /// 방 클리어 카운터가 Σ로 합산해 킬 목표 수를 계산할 때 사용.</summary>
     public int MaxTotalSpawns => maxTotalSpawns;
+
+    /// <summary>웨이브 모드의 총 웨이브 수. 0이면 자동 루프 모드.</summary>
+    public int WaveCount => _waveEntries?.Length ?? 0;
 
     /// <summary>몬스터가 실제로 스폰된 직후 발행. (풀에서 꺼낸 MonsterBase 인스턴스 전달)
     /// RoomClearController가 몬스터 OnDied를 체이닝하는 데 사용.</summary>
@@ -125,17 +145,41 @@ public class MonsterSpawner : MonoBehaviour
         if (autoApplyChapterGroup)
             ApplyCurrentChapterGroup();
 
+        // 웨이브 모드이면 자동 루프 미실행 — RoomWaveController가 SpawnWaveAsync로 제어
+        if (WaveCount > 0) return;
+
         SpawnLoop().Forget();
     }
 
-    /// <summary>외부(MapBuilder/Bootstrapper)에서 스포너 설정을 주입.
-    /// Start() 전에 호출되어야 함 — 프리팹 Instantiate 직후가 안전.
-    /// gradeMode는 AtMost로 고정됨 (등급 상한 해석).</summary>
+    /// <summary>외부(MapBuilder/Bootstrapper)에서 레거시 단일 등급/수량 설정 주입.
+    /// Start() 전에 호출되어야 함. gradeMode는 AtMost로 고정.
+    /// 웨이브 모드(WaveCount > 0)에서는 totalCount가 무시된다.</summary>
     public void Configure(MonsterGrade maxGrade, int totalCount)
     {
-        targetGrade    = maxGrade;
-        gradeMode      = GradeMatchMode.AtMost;
-        maxTotalSpawns = Mathf.Max(0, totalCount);
+        targetGrade = maxGrade;
+        gradeMode   = GradeMatchMode.AtMost;
+        if (WaveCount == 0)
+            maxTotalSpawns = Mathf.Max(0, totalCount);
+    }
+
+    /// <summary>외부(Bootstrapper)에서 웨이브 배열을 주입. Start() 전에 호출.
+    /// Inspector의 _waveEntries를 덮어쓴다 — CSV 토큰 기반 데이터가 Inspector 수동 설정보다 우선됨.</summary>
+    public void ConfigureWaves(MapDataLoader.WaveCellConfig[] waves)
+    {
+        if (waves == null || waves.Length == 0) return;
+
+        _waveEntries = new WaveEntry[waves.Length];
+        for (int i = 0; i < waves.Length; i++)
+            _waveEntries[i] = new WaveEntry { spawnCount = waves[i].count, maxGrade = waves[i].grade };
+
+        gradeMode = GradeMatchMode.AtMost;
+
+        // Start()보다 먼저 SpawnWaveAsync가 호출될 수 있으므로 챕터 그룹을 여기서 즉시 적용.
+        if (autoApplyChapterGroup)
+            ApplyCurrentChapterGroup();
+
+        Debug.Log($"[MonsterSpawner:{name}] 웨이브 {waves.Length}개 주입 — " +
+                  string.Join(" | ", System.Array.ConvertAll(waves, w => $"{w.grade}×{w.count}")), this);
     }
 
     /// <summary>현재 런의 챕터 번호(Chapter1 → 1, Chapter5 → 5)를 allowedPoolGroups에 주입.
@@ -201,7 +245,36 @@ public class MonsterSpawner : MonoBehaviour
         _spawnedMonsters.RemoveAll(m => m == null || !m.gameObject.activeInHierarchy);
     }
 
-    private async UniTask TrySpawnOneAsync()
+    /// <summary>웨이브 모드에서 지정 웨이브 인덱스의 설정 마릿수만큼 스폰. 실제 스폰된 수를 반환.
+    /// 웨이브별 maxGrade를 적용하며 ct가 취소되면 즉시 중단.</summary>
+    public async UniTask<int> SpawnWaveAsync(int waveIndex, CancellationToken ct)
+    {
+        if (_waveEntries == null || waveIndex < 0 || waveIndex >= _waveEntries.Length)
+        {
+            Debug.LogWarning($"[MonsterSpawner:{name}] SpawnWaveAsync: 유효하지 않은 waveIndex={waveIndex}", this);
+            return 0;
+        }
+
+        var entry = _waveEntries[waveIndex];
+        int target = entry.spawnCount;
+
+        // 이 웨이브 동안 targetGrade를 일시 교체 — TrySpawnOneAsync의 PassesGradeFilter에 반영됨.
+        // SpawnWaveAsync는 같은 인스턴스에 대해 순차 실행되므로 동시성 문제 없음.
+        var prevGrade = targetGrade;
+        targetGrade   = entry.maxGrade;
+
+        int spawned = 0;
+        for (int i = 0; i < target; i++)
+        {
+            if (ct.IsCancellationRequested) break;
+            if (await TrySpawnOneAsync()) spawned++;
+        }
+
+        targetGrade = prevGrade; // 복원
+        return spawned;
+    }
+
+    private async UniTask<bool> TrySpawnOneAsync()
     {
         SpawnEntry entry = spawnTable.PickRandom(PassesAllFilters);
         if (entry == null)
@@ -241,13 +314,13 @@ public class MonsterSpawner : MonoBehaviour
                     $"  · 테이블 엔트리 총 {total}개 (풀통과 {passPool} / 등급통과 {passGrade} / 원소통과 {passElem} / 모두통과 {passAll})\n" +
                     $"  → SpawnTable Inspector에서 Auto-Populate를 눌러 grade/poolTags가 채워졌는지 확인하세요.", this);
             }
-            return;
+            return false;
         }
 
         // 잘못된 엔트리(이전에 스폰 실패)는 비활성화 처리해 다음 PickRandom 에서 제외
-        if (_disabledKeys.Contains(entry.addressableKey)) return;
+        if (_disabledKeys.Contains(entry.addressableKey)) return false;
 
-        if (!TryGetSpawnPosition(out Vector3 spawnPos)) return;
+        if (!TryGetSpawnPosition(out Vector3 spawnPos)) return false;
 
         MonsterBase monster = null;
         try
@@ -262,20 +335,20 @@ public class MonsterSpawner : MonoBehaviour
         {
             Debug.LogWarning($"[MonsterSpawner] '{entry.addressableKey}' 스폰 예외 — 엔트리 비활성화: {ex.Message}", this);
             _disabledKeys.Add(entry.addressableKey);
-            return;
+            return false;
         }
 
         if (monster == null)
         {
             Debug.LogWarning($"[MonsterSpawner] '{entry.addressableKey}' 스폰 실패 — 엔트리 비활성화.", this);
             _disabledKeys.Add(entry.addressableKey);
-            return;
+            return false;
         }
 
         _spawnedMonsters.Add(monster);
         _totalSpawned++;
 
-        // 외부 수명주기 구독자(RoomClearController 등)에게 통지 — OnDied 체이닝 기회 제공
+        // 외부 수명주기 구독자(RoomWaveController 등)에게 통지 — OnDied 체이닝 기회 제공
         OnMonsterSpawned?.Invoke(monster);
 
         // 스폰 연출 이펙트 (fire-and-forget — 몬스터 루프는 블로킹하지 않음)
@@ -300,12 +373,14 @@ public class MonsterSpawner : MonoBehaviour
                     if (!capturedMonster.gameObject.activeInHierarchy) return;
                     if (capturedMonster.GenerationId != capturedGen) return; // 풀 재사용 후라면 무시
                     capturedMonster.SetRandomNativeElement();
-                });
+                },
+                activationToken: monster.ActivationToken);
         }
         else
         {
             monster.SetRandomNativeElement();
         }
+        return true;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

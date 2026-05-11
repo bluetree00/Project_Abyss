@@ -30,8 +30,8 @@ public class ServerMonsterStatDataManager
 
         if (_byId.Count == 0)
         {
-            Debug.Log("[ServerMonsterStatDataManager] CDN 실패 — Resources 폴백");
-            var textAsset = Resources.Load<TextAsset>("MONSTER_ELEMENT_STAT_DATA");
+            Debug.Log("[ServerMonsterStatDataManager] CDN 실패 — Addressables 폴백");
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MONSTER_ELEMENT_STAT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<MonsterElementStatEntryCollection>(textAsset.text);
