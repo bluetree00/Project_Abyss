@@ -46,6 +46,7 @@ public sealed class RunItemInventory
 
         _items.Add(item);
         QuestEvents.ReportItemCollect(item?.itemId ?? "Unknown");
+        Managers.Sound?.PlayEvent(SoundEvent.ItemPickup);
 
         if (item.shapeId > 0)
             BlockSynergyBridge.Instance?.RegisterShapeFromItem(item.shapeId);
