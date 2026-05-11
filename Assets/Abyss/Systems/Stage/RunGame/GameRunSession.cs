@@ -599,6 +599,7 @@ public sealed class GameRunSession
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
         QuestEvents.ReportGold(amount);
+        Managers.Sound?.PlayEvent(SoundEvent.GoldPickup);
     }
 
     public void AddItem(ItemId itemId, int count)

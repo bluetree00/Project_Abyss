@@ -204,6 +204,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         }
 
         Managers.Sound?.Init();
+        await InitSoundTableAsync();
 
         // 4-b) QuestManager 초기화 — QuestDatabase / AchievementDatabase Addressables 로드
         await InitQuestManagerAsync();
@@ -391,6 +392,25 @@ public sealed class AppBootstrapper : MonoBehaviour
         });
 
         return tcs.Task;
+    }
+
+    private async UniTask InitSoundTableAsync()
+    {
+        var addr = Managers.AddressableManager;
+        if (addr == null) return;
+
+        try
+        {
+            var table = await addr.TryLoadAssetAsync<SoundEventTableSO>("SoundEventTable");
+            if (table != null)
+                Managers.Sound?.SetEventTable(table);
+            else
+                Debug.Log("[AppBootstrapper] SoundEventTable 없음 — 이벤트 사운드 비활성");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[AppBootstrapper] SoundEventTable 로드 실패: {e.Message}");
+        }
     }
 
     private async UniTask InitQuestManagerAsync()
