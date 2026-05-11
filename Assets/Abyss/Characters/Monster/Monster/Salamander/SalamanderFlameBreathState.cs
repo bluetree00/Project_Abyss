@@ -23,6 +23,8 @@ public class SalamanderFlameBreathState : MovementLockedState<SalamanderBreathDa
 
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.breathStateName))
             ctx.Animator.CrossFade(Data.breathStateName, 0.1f);
+
+        Data.SpawnVFX(ctx.Transform);
     }
 
     public override void Update(MonsterContext ctx)

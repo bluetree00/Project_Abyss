@@ -12,7 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a9afdd5dc8632045930ece3688e7cfb, type: 3}
   m_Name: EvilMageRangedAttack
   m_EditorClassIdentifier: Assembly-CSharp::MonsterRangedAttackSO
-  projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e, type: 3}
+  _vfxPrefab: {fileID: 4186470608034871016, guid: ae443af1856adb64ab924dbe22c87a8c,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
+    type: 3}
   projectileSpeed: 10
   projectileMaxRange: 20
   launchHeightOffset: 1.2
+  vfxProjectilePrefab: {fileID: 8378503196372639160, guid: eba308ccea377c240875846f985bde69,
+    type: 3}
+  vfxProjectileScale: 1
+  vfxProjectileHitRadius: 0.6
+  vfxHitEffectPrefab: {fileID: 8172394614802003838, guid: 0b26647559bc6f14f8fa248ebf66bc31,
+    type: 3}
+  vfxHitEffectScale: 1
+  slowScale: 0
+  slowDuration: 0

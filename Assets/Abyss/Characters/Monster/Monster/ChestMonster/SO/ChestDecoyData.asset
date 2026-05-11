@@ -12,5 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 736903bf958b3984699cec9855e2a55a, type: 3}
   m_Name: ChestDecoyData
   m_EditorClassIdentifier: Assembly-CSharp::ChestDecoyData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 73574472ff86e944ca9a2fc2daacdbe4,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   idleStateName: IdleChest
   activateRange: 3

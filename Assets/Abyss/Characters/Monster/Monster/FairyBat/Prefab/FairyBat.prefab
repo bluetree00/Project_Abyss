@@ -215,6 +215,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: BatPAMaskTint
       objectReference: {fileID: 0}
+    - target: {fileID: 2164510317250172977, guid: babd5fd8b0564e898602d31e29677f4e,
+        type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: e582f2ccaecb19b419516b8915a7c151, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

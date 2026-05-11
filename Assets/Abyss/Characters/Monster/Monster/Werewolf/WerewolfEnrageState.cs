@@ -25,6 +25,7 @@ public class WerewolfEnrageState : FullLockState<WerewolfEnrageData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.enrageStateName))
             ctx.Animator.CrossFade(Data.enrageStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyTint(ctx.Transform, EnrageColor);
     }
 

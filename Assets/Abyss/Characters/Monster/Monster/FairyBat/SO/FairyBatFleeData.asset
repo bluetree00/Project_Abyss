@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 02b0de4d9ec5b0541926933437682cb6, type: 3}
   m_Name: FairyBatFleeData
   m_EditorClassIdentifier: Assembly-CSharp::FairyBatFleeData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: d5cfd2a4af422fe4bb2e668f041693e8,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.4
   fleeDuration: 5
   fleeSpeedMult: 1.5

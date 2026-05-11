@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abbea0fe785b4f644ba653dc143dea11, type: 3}
   m_Name: SlimeRegenData
   m_EditorClassIdentifier: Assembly-CSharp::SlimeRegenData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 9d7f90d11abd55a47af727024becad99,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   interval: 8
   duration: 3
   healPerSec: 5

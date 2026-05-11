@@ -12,4 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba008974faa6e0440929557f0964c61a, type: 3}
   m_Name: OrcSpinSphere
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSphereAttackSO
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 583839747b958ac4f96e7f9b1d85bc36,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   radiusOverride: 2.8

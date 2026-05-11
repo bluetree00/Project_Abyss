@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c31405047e01b241b88061acff1a762, type: 3}
   m_Name: MushroomSmileTrapData
   m_EditorClassIdentifier: Assembly-CSharp::MushroomSmileTrapData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 1a0997e5d85eb524fa265d48ab7ca870,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   idleStateName: Mushroom_IdlePlant
   burstStateName: Mushroom_Attack01Smile
   activateRange: 2.5
@@ -20,3 +25,4 @@ MonoBehaviour:
   burstDelay: 0.4
   explosionEffectPrefab: {fileID: 1889697189104820, guid: 918bed4b1a6905d4aaa25af94c2caa31,
     type: 3}
+  explosionEffectScale: 1

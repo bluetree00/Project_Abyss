@@ -30,5 +30,8 @@ public class MushroomSmileTrapData : SpecialStateDataBase
     [Tooltip("폭발 시 재생할 이펙트 프리팹 (null이면 생략)")]
     public GameObject explosionEffectPrefab;
 
+    [Tooltip("폭발 이펙트 스케일 배율")]
+    public float explosionEffectScale = 1f;
+
     public override SpecialStateBase CreateState() => new MushroomSmileTrapBurstState(this);
 }

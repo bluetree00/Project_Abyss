@@ -25,6 +25,7 @@ public class SpecterPhaseState : InvincibleState<SpecterPhaseData>
 
         ctx.Agent.ResetPath();
         ctx.Animator?.CrossFade(Data.phaseStateName, 0.1f);
+        Data.SpawnVFX(ctx.Transform);
         ApplyTint(ctx.Transform, GhostColor);
     }
 
