@@ -1,4 +1,5 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// 스타트 방 전용 Wisp 플레이어 컨트롤러.
@@ -12,8 +13,12 @@ public class WispController : MonoBehaviour
     [SerializeField] private float rotateSpeed = 720f;
     [SerializeField] private float interactRadius = 2.2f;
 
+    [Header("Visual")]
+    [SerializeField] private string vfxAddressableKey;
+
     private Rigidbody _rb;
     private IWispInteractable _nearbyStand;
+    private GameObject _vfxInstance;
 
     private void Awake()
     {
@@ -21,6 +26,32 @@ public class WispController : MonoBehaviour
         _rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
         _rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+    }
+
+    private void Start()
+    {
+        if (!string.IsNullOrEmpty(vfxAddressableKey))
+            LoadVfxAsync().Forget();
+    }
+
+    private void OnDestroy()
+    {
+        if (_vfxInstance != null)
+            Managers.AddressableManager?.ReleaseInstance(_vfxInstance);
+    }
+
+    private async UniTaskVoid LoadVfxAsync()
+    {
+        try
+        {
+            _vfxInstance = await Managers.AddressableManager.InstantiateAsync(
+                vfxAddressableKey, transform, inWorldSpace: false);
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[WispController] VFX 로드 실패: {e.Message}");
+        }
     }
 
     private void Update()

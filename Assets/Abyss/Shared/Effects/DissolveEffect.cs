@@ -103,7 +103,10 @@ public static class DissolveEffect
             : null;
         CancellationToken ct = linkedCts?.Token ?? destroyCt;
 
-        List<Material> instances = null;
+        // try 밖에 선언 — catch 블록에서 취소 시 원본 복원에 접근 가능하도록
+        Renderer[]      renderers = null;
+        Material[][]    origMats  = null;
+        List<Material>  instances = null;
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -116,7 +119,8 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = target.GetComponentsInChildren<Renderer>();
+            // includeInactive: true — 비활성 렌더러(LOD 등)도 포함해 디졸브 소재 일관성 유지
+            renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0)
             {
                 Debug.LogWarning($"[DissolveEffect] '{target.name}' Renderer 없음 — 등장 디졸브 스킵");
@@ -124,7 +128,7 @@ public static class DissolveEffect
                 return;
             }
 
-            var origMats = new Material[renderers.Length][];
+            origMats = new Material[renderers.Length][];
             for (int i = 0; i < renderers.Length; i++)
                 origMats[i] = renderers[i].sharedMaterials;
 
@@ -162,7 +166,13 @@ public static class DissolveEffect
 
             onComplete?.Invoke();
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // 취소(풀 반환·파괴) 시 원본 복원 — instances는 finally에서 Destroy되므로 먼저 복원
+            if (target != null && renderers != null && origMats != null)
+                for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                    if (renderers[i] != null) renderers[i].sharedMaterials = origMats[i];
+        }
         finally
         {
             linkedCts?.Dispose();
@@ -188,7 +198,7 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = target.GetComponentsInChildren<Renderer>();
+            var renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
 
             instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));

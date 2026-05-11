@@ -122,10 +122,32 @@ public class WeaponDisplayStand : MonoBehaviour
         _selected = true;
         ShowPrompt(false);
         loadout.SetWeaponSlot0(weaponSO);
-        Debug.Log($"[WeaponDisplayStand] 무기 선택: {weaponSO?.displayName}");
+
+        // 스타트 방에서 즉시 장착 — 로컬 변수로 캡처 후 fire-and-forget
+        var player = _cachedPlayer;
+        GameRunBootstrapper.EquipWeaponToPlayerAsync(weaponSO, player).Forget();
+
+        // 나머지 무기 진열대 디졸브 퇴장
+        var allStands = FindObjectsByType<WeaponDisplayStand>(FindObjectsSortMode.None);
+        foreach (var stand in allStands)
+        {
+            if (stand == this) continue;
+            stand.DismissStand();
+        }
+
+        Debug.Log($"[WeaponDisplayStand] 무기 선택 및 즉시 장착: {weaponSO?.displayName}");
 
         if (_weaponInstance != null) Destroy(_weaponInstance);
         Destroy(gameObject);
+    }
+
+    /// <summary>다른 무기가 선택됐을 때 이 진열대를 디졸브로 퇴장시킨다.</summary>
+    public void DismissStand()
+    {
+        if (_selected) return;
+        _selected = true;
+        ShowPrompt(false);
+        DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
     }
 
     // ── World UI ─────────────────────────────────────────────────

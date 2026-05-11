@@ -145,7 +145,7 @@ public class WorldWeaponDisplay : MonoBehaviour
 
         if (isStartRoomPickup)
         {
-            // 스타트 방: 팝업 없이 Loadout에 등록 후 즉시 제거
+            // 스타트 방: 팝업 없이 Loadout에 등록 후 즉시 장착
             var loadout = AppBootstrapper.Instance?.Loadout;
             if (loadout == null || !loadout.IsReady)
             {
@@ -155,13 +155,33 @@ public class WorldWeaponDisplay : MonoBehaviour
                 return;
             }
             loadout.SetWeaponSlot0(weaponSO);
-            Debug.Log($"[WorldWeaponDisplay] 스타트 방 무기 등록: {weaponSO?.displayName}");
+            var player = _cachedPlayer;
+            GameRunBootstrapper.EquipWeaponToPlayerAsync(weaponSO, player).Forget();
+
+            // 나머지 스타트 방 무기 픽업 디졸브 퇴장
+            var allDisplays = FindObjectsByType<WorldWeaponDisplay>(FindObjectsSortMode.None);
+            foreach (var display in allDisplays)
+            {
+                if (display == this) continue;
+                display.DismissStartRoomPickup();
+            }
+
+            Debug.Log($"[WorldWeaponDisplay] 스타트 방 무기 등록 및 즉시 장착: {weaponSO?.displayName}");
             ConfirmPickup();
             return;
         }
 
         _cachedPlayer.RequestPickup(data, this);
         // Destroy는 팝업 결과 후 ConfirmPickup()에서 처리
+    }
+
+    /// <summary>다른 무기가 선택됐을 때 이 픽업을 디졸브로 퇴장시킨다. 스타트 방 전용.</summary>
+    public void DismissStartRoomPickup()
+    {
+        if (!isStartRoomPickup || _pickedUp) return;
+        _pickedUp = true;
+        ShowPrompt(false);
+        DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
     }
 
     /// <summary>픽업 확정 — 월드 오브젝트 제거</summary>

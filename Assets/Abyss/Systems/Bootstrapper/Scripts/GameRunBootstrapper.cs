@@ -53,8 +53,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [SerializeField] private float blockCellSize = 1f;
 
-    [SerializeField, Tooltip("블록 배치 Y 오프셋. 피봇이 센터인 큐브(cellSize=1)에서 타일이 떠보이면 -0.5. 프리팹 피봇이 바닥이면 0.")]
-    private float blockBaseY = -0.5f;
+    [SerializeField, Tooltip("블록 배치 Y 오프셋. 바닥 블록 scale.y=0.2(반높이 0.1)이면 -0.1. 프리팹 피봇이 바닥이면 0.")]
+    private float blockBaseY = -0.1f;
 
     [Header("Shop Room")]
     [SerializeField, Min(0)] private int shopSlotCount = 3;
@@ -419,14 +419,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 각 스포너 인스턴스에 셀별 설정(maxGrade, totalCount) 주입 (Start() 호출 직전)
         ConfigureMonsterSpawners(blocks, spawnInfos);
 
+        // 입장 디졸브 연출 중 몬스터 스폰 방지 — 첫 await 전 같은 프레임에 비활성화해 Start() 호출을 지연
+        var deferredSpawners = DisableSpawnersBeforeEntrance(blocks);
+
         // NavMesh 빌드 — MapBuilder.Build 직후(Wall 배치 완료) 수행.
         // AttachRoomClearController → RoomWaveController.StartWaveAsync는 같은 프레임에 동기적으로
         // TryGetSpawnPosition(NavMesh.SamplePosition)을 호출하므로, NavMesh가 먼저 준비되어야 한다.
         // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
         BuildMapNavMesh(mapGO);
-
-        // 방 클리어 카운터 부착 — 모든 스포너의 maxTotalSpawns 합이 킬 목표
-        AttachRoomClearController(mapGO, blocks);
 
         var ct = this.GetCancellationTokenOnDestroy();
 
@@ -437,9 +437,28 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 ApplyWallTransparency(blocks[i].instance, 0.72f);
         }
 
-        await DissolveEffect.WarmupAsync(ct);
+        // 렌더러 선숨김 — 카메라 페이드인 중 블록이 팝업으로 보이지 않도록.
+        // DissolveEntrance도 동일하게 숨기지만, 그 전에 화면이 열리면 순간 팝업이 발생한다.
+        HideAllBlockRenderers(blocks);
+
+        // IntroFade(sortingOrder=9999)가 아직 불투명하게 UI_SceneLoading을 덮고 있는 이 시점에
+        // 로딩 커버를 해제한다. IntroFade 뒤에서 UI_SceneLoading이 조용히 사라지므로 플레이어 눈에 안 보임.
+        AppBootstrapper.Instance?.NotifySceneReady();
+
+        // 카메라 페이드인 + Dissolve 머티리얼 프리로드를 병렬로 수행
+        // → 화면이 열린 상태에서 맵 등장 디졸브를 플레이어가 볼 수 있도록
+        var mapCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
+        await UniTask.WhenAll(
+            DissolveEffect.WarmupAsync(ct),
+            GameCameraController.Instance?.PrepareMapViewAsync(mapCenter, 0.4f, ct) ?? UniTask.CompletedTask);
+
         var entranceCtx = new MapEntranceContext(roomEntry);
         await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+
+        // 입장 연출 완료 후 방 클리어 컨트롤러 부착 + 스포너 활성화 → Start() 실행 → 몬스터 스폰 시작
+        AttachRoomClearController(mapGO, blocks);
+        for (int i = 0; i < deferredSpawners.Count; i++)
+            if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
 
         // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
         // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
@@ -791,6 +810,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         controller.Initialize(_run, spawners, bossSpawner, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
     }
 
+    /// <summary>입장 연출 전 MonsterSpawner·BossSpawner를 비활성화해 Start() 호출을 연출 종료 이후로 지연시킨다.</summary>
+    private static System.Collections.Generic.List<MonoBehaviour> DisableSpawnersBeforeEntrance(
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        var list = new System.Collections.Generic.List<MonoBehaviour>();
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var b = blocks[i];
+            if (b.instance == null) continue;
+
+            if (b.tileType == TileType.MonsterSpawn || b.tileType == TileType.MonsterSpawnCandidate)
+            {
+                if (b.instance.TryGetComponent<MonsterSpawner>(out var ms))
+                { ms.enabled = false; list.Add(ms); }
+            }
+            else if (b.tileType == TileType.BossSpawn)
+            {
+                if (b.instance.TryGetComponent<BossSpawner>(out var bs))
+                { bs.enabled = false; list.Add(bs); }
+            }
+        }
+        return list;
+    }
+
+    private static void HideAllBlockRenderers(
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            if (blocks[i].instance == null) continue;
+            var rs = blocks[i].instance.GetComponentsInChildren<Renderer>(true);
+            for (int j = 0; j < rs.Length; j++)
+                rs[j].enabled = false;
+        }
+    }
+
     /// <summary>MapBuilder.Build 결과 중 스포너 오브젝트에 CellSpawnInfo를 주입.
     /// Start() 호출 전(같은 프레임)에 실행되어야 MonsterSpawner가 올바른 설정으로 SpawnLoop을 시작한다.</summary>
     private static void ConfigureMonsterSpawners(
@@ -965,13 +1020,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask StartRoomAsync()
     {
-        await InitMapDataAsync();
-        await InitPlayerDataAsync();
-        await InitItemDataAsync();
-
-        if (UIRootBootstrapper.Instance == null)
-            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
-
         await SpawnMapAsync(startRoomMapKey);
 
         if (wispPrefab != null)
@@ -1014,13 +1062,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // InitAsync 완료 대기 (SetupCamera 포함)
+        // InitAsync 완료 대기 (SetupCamera 포함 — Cinemachine 타겟이 player로 전환됨)
         await UniTask.WaitUntil(
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
 
-        // SetupCamera()가 이미 실행됨 → FreeLook이 player를 추적 중
-        // Wisp 제거 (camera가 이미 캐릭터로 전환됐으므로 안전)
+        // Wisp 위치에서 player 쪽으로 카메라 줌인 연출
+        GameCameraController.Instance?.PlayStartRoomIntroAsync(player.transform).Forget();
+
+        // Wisp 제거 (카메라 인트로가 시작된 후 — 인트로는 현재 카메라 위치에서 시작하므로 순서 중요)
         if (wisp != null)
             Destroy(wisp.gameObject);
 
@@ -1038,7 +1088,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
 
+        // 맵 스폰을 awaited로 처리 — 맵 생성 완료 후 몬스터 스포너가 초기화되므로
+        // 플레이어 스폰 전에 반드시 맵이 준비되어야 한다.
+        // RequestSpawnCurrentPointMap의 RunState 전환 side effect를 유지하면서
+        // SpawnMapAsync는 직접 await한다.
+        UniTask mapTask = UniTask.CompletedTask;
+        _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
+        void captureMap(string key) { mapTask = SpawnMapAsync(key); }
+        _run.OnMapSpawnRequested += captureMap;
         run.RequestSpawnCurrentPointMap();
+        _run.OnMapSpawnRequested -= captureMap;
+        _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
+        await mapTask;
 
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
@@ -1232,6 +1293,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (cam.GetComponent<GameCameraController>() == null)
             cam.gameObject.AddComponent<GameCameraController>();
+    }
+
+    /// <summary>스타트 방에서 무기 선택 즉시 해당 플레이어에게 장착.</summary>
+    public static async UniTask EquipWeaponToPlayerAsync(WeaponSO weaponSO, PlayerController player)
+    {
+        var wm = player?.WeaponManager;
+        if (wm == null || weaponSO == null) return;
+        var weaponData = new WeaponData(weaponSO);
+        await PreloadWeaponClipsAsync(weaponData);
+        await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>

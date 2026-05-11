@@ -18,7 +18,7 @@ public class MultiShotBehaviorSO : SkillBehaviorSO
     [SerializeField] private int tier3ExtraShots = 3;
 
     [Header("이펙트 (단계별)")]
-    [SerializeField] private string tier1EffectKey = "SoftBlueBuff";
+    [SerializeField] private string tier1EffectKey = "GoldDot";
     [SerializeField] private string tier2EffectKey = "Buff5";
     [SerializeField] private string tier3EffectKey = "MagicSparks";
     [SerializeField] private float buffEffectScale = 0.5f;

@@ -194,6 +194,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     protected virtual async UniTask InitAsync()
     {
+        // ElementNativePalette를 첫 await 전(동기 구간)에 부착 — Awake가 원본 sharedMaterial을 캡처해야
+        // 나중에 DissolveEffect가 임시 머티리얼로 교체해도 원소 틴트 복원 기준이 오염되지 않는다.
+        _elementPalette = GetComponent<ElementNativePalette>();
+        if (_elementPalette == null) _elementPalette = gameObject.AddComponent<ElementNativePalette>();
+
         // 1. MonsterConfigSO 로드 (주소별 캐시 — 동종 몬스터는 Instantiate·JSON 적용을 1회만 수행)
         if (!_configCache.TryGetValue(ConfigAddress, out _config))
         {
@@ -259,8 +264,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (_elementVisual == null)  _elementVisual  = gameObject.AddComponent<ElementVisualFeedback>();
         _elementBuildup.SetMonsterMaxAccumulationScale(_config.elemental.maxAccumulationScale);
         _elementBuildup.OnTriggered += HandleElementTriggered;
-        _elementPalette = GetComponent<ElementNativePalette>();
-        if (_elementPalette == null) _elementPalette = gameObject.AddComponent<ElementNativePalette>();
+        // _elementPalette: InitAsync 최상단(첫 await 전)에서 이미 부착됨
 
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
