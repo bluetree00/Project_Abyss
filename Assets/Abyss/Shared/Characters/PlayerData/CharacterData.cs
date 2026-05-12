@@ -68,6 +68,12 @@ public class CharacterData : ScriptableObject
     [Header("등장 연출")]
     public PlayerEntranceBehaviourSO playerEntrance;
 
+    // 스타트 방 캐릭터 획득 시 재생할 대사
+    // CSV 우선 (시퀀스 ID: {characterPrefabKey}_Pickup), 없으면 이 SO 사용
+    [Header("획득 대사")]
+    [SerializeField] private DialogueSequenceSO acquisitionDialogue;
+    public DialogueSequenceSO AcquisitionDialogue => acquisitionDialogue;
+
     // 레거시 호환 — EffectData 등에서 사용
     public int GetTotalAttackPower() => UnityEngine.Mathf.Max(baseMeleeAttack, baseRangedAttack);
 

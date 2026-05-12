@@ -53,6 +53,7 @@ public sealed class Managers : MonoBehaviour
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
     private ShopDataManager _shopDataManager;
     private QuestManager _questManager;
+    private DialogueDataManager _dialogueDataManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -341,6 +342,20 @@ public sealed class Managers : MonoBehaviour
                 inst._questManager = new QuestManager();
 
             return inst._questManager;
+        }
+    }
+
+    public static DialogueDataManager DialogueData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._dialogueDataManager == null)
+                inst._dialogueDataManager = new DialogueDataManager();
+
+            return inst._dialogueDataManager;
         }
     }
     #endregion
