@@ -1231,13 +1231,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var wm = player.WeaponManager;
         if (wm != null)
         {
-            // 저장된 슬롯이 있으면 복원 (StageMap 복귀)
+            // 저장된 슬롯이 있으면 복원 (StageMap 복귀 or 이어하기)
             if (run?.SavedWeaponSlots != null)
             {
                 for (int i = 0; i < run.SavedWeaponSlots.Length; i++)
                 {
                     if (run.SavedWeaponSlots[i] != null)
                     {
+                        PlayerWeaponManager.ApplyServerOverride(run.SavedWeaponSlots[i]);
                         await PreloadWeaponClipsAsync(run.SavedWeaponSlots[i]);
                         await wm.AcquireWeaponAsync(run.SavedWeaponSlots[i], autoEquip: true);
                     }
@@ -1253,6 +1254,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 if (loadout?.WeaponSlot0 != null)
                 {
                     var weaponData = new WeaponData(loadout.WeaponSlot0);
+                    PlayerWeaponManager.ApplyServerOverride(weaponData);
                     await PreloadWeaponClipsAsync(weaponData);
                     await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
                     Debug.Log($"[GameRunBootstrapper] 메인 무기 장착: {loadout.WeaponSlot0.displayName}");
@@ -1261,6 +1263,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 if (loadout?.WeaponSlot1 != null)
                 {
                     var subData = new WeaponData(loadout.WeaponSlot1);
+                    PlayerWeaponManager.ApplyServerOverride(subData);
                     await PreloadWeaponClipsAsync(subData);
                     await wm.AcquireWeaponAsync(subData, autoEquip: true);
                     Debug.Log($"[GameRunBootstrapper] 서브 장비 장착: {loadout.WeaponSlot1.displayName}");

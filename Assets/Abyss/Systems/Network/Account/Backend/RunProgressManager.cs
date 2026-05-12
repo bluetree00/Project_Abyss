@@ -156,16 +156,16 @@ public class RunProgressManager : MonoBehaviour
         await tcs.Task;
     }
 
-    /// <summary>런 종료 시 호출. 해당 슬롯의 hasActiveRun을 false로 설정한다.</summary>
+    /// <summary>런 종료 또는 슬롯 삭제 시 호출. 모든 필드를 기본값으로 초기화한다.</summary>
     public async UniTask ClearAsync(int slotIndex)
     {
         if (!IsValidSlot(slotIndex)) return;
 
-        Saves[slotIndex].hasActiveRun = false;
+        Saves[slotIndex] = MakeEmpty(slotIndex);
 
         if (string.IsNullOrEmpty(_rowInDates[slotIndex])) return;
 
-        var param = new Param { { "hasActiveRun", false } };
+        var param = ToParam(MakeEmpty(slotIndex));
         var tcs   = new UniTaskCompletionSource();
 
         Backend.GameData.UpdateV2(TABLE, _rowInDates[slotIndex], Backend.UserInDate, param, cb =>

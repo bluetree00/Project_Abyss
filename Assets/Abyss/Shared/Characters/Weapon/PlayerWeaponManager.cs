@@ -619,10 +619,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     /// <summary>
-    /// weapon_id를 알 수 없는 진입점(픽업 등)을 위한 fallback.
+    /// weapon_id를 알 수 없는 진입점(픽업/복원/초기 장착 등)을 위한 fallback.
     /// weaponPrefabKey/weaponDisplayKey/weapon_id == prefabKey 매칭으로 EquipmentEntry를 찾아 덮어쓴다.
     /// </summary>
-    private static void ApplyServerOverride(WeaponData data)
+    public static void ApplyServerOverride(WeaponData data)
     {
         if (data == null) return;
 
