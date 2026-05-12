@@ -29,6 +29,7 @@ public class DemonKingExplosionState : InvincibleState<DemonKingExplosionData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.explosionStateName))
             ctx.Animator.CrossFade(Data.explosionStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyTint(_renderers, ExplosionColor);
         ApplyAreaDamage(ctx, Data.explosionRadius, Data.explosionDamage, Data.knockbackForce);
     }

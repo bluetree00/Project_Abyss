@@ -57,6 +57,8 @@ public class CharacterData : ScriptableObject
     // 캐릭터 초상화
     [Header("초상화")]
     public Sprite portrait;
+    [Tooltip("캐릭터 선택 팝업에 표시할 전신 로스터 일러스트")]
+    public Sprite rosterIllust;
 
     // 캐릭터 고유 패시브
     [Header("패시브")]

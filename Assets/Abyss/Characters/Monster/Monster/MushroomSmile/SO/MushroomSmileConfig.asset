@@ -75,4 +75,5 @@ MonoBehaviour:
   - conditions: []
     state: {fileID: 11400000, guid: 420afed3bf97ea1419c20fe9ea4f3646, type: 2}
     oneShot: 1
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: dface05d23964a4083c40acf9bc0a4b2, type: 2}

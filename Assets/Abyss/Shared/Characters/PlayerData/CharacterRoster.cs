@@ -19,6 +19,9 @@ public class CharacterRoster : ScriptableObject
         [Tooltip("선택 UI에 표시할 초상화")]
         public Sprite portrait;
 
+        [Tooltip("캐릭터 선택 패널 프리뷰에 표시할 전신 일러스트")]
+        public Sprite rosterIllust;
+
         [Tooltip("GameRunBootstrapper에서 스폰할 Addressable 프리팹 키")]
         public string prefabKey;
 

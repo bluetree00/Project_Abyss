@@ -28,6 +28,10 @@ public class MonsterConeAttackSO : MonsterAttackShapeSO
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
+        float warningForwardOffset = Mathf.Clamp(range * 0.55f, 0.4f, 2.2f);
+        Vector3 warningCenter = ctx.Transform.position + ctx.Transform.forward * warningForwardOffset;
+        SpawnVFX(ctx.Transform, warningCenter);
+
         player.TakeDamage(damage);
 
         Vector3 dir = toPlayer.normalized;

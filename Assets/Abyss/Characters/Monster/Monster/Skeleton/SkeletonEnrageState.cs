@@ -22,6 +22,7 @@ public class SkeletonEnrageState : FullLockState<SkeletonEnrageData>
         ctx.Agent.ResetPath();
         _timer = Data.lockDuration;
         ctx.Animator.CrossFade("Enrage", 0.1f);
+        Data.SpawnVFX(ctx.Transform);
         ApplyTint(ctx.Transform, EnrageColor);
     }
 

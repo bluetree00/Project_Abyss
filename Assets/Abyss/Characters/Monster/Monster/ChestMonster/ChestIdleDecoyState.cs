@@ -15,6 +15,7 @@ public class ChestIdleDecoyState : InvincibleState<ChestDecoyData>
         if (ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
             ctx.Agent.ResetPath();
         ctx.Animator?.CrossFade(Data.idleStateName, 0.1f);
+        Data.SpawnVFX(ctx.Transform);
     }
 
     public override void Update(MonsterContext ctx)

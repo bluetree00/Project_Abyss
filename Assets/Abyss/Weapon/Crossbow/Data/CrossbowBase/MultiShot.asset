@@ -16,6 +16,8 @@ MonoBehaviour:
   tier1ExtraShots: 1
   tier2ExtraShots: 2
   tier3ExtraShots: 3
-  buffEffectKey: BowChargeEffect
+  tier1EffectKey: Buff2
+  tier2EffectKey: Buff5
+  tier3EffectKey: MagicSparks
   buffEffectScale: 0.7
-  animationOverride: 
+  animationOverride:

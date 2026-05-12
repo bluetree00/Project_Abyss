@@ -78,3 +78,4 @@ MonoBehaviour:
     oneShot: 0
   stateOverrides:
   - {fileID: 11400000, guid: 7cd9d571a18b4a41bd90a51952750242, type: 2}
+  - {fileID: 11400000, guid: d7a14bdbdf7f4f6fb8d5aef117efa329, type: 2}

@@ -51,6 +51,14 @@ public class PlayerController : CharacterBase
     //============================================================
     // Character / Runtime Stats (HUD)
     //============================================================
+    [Header("Hit VFX")]
+    [Tooltip("피격 시 스폰할 VolumetricBlood VFX 프리팹.")]
+    [SerializeField] private GameObject _hitBloodVfxPrefab;
+    [Tooltip("Blood VFX 스케일 배율.")]
+    [SerializeField] private float _hitBloodVfxScale = 1f;
+    [Tooltip("플레이어 발 기준 Blood VFX 높이 오프셋.")]
+    [SerializeField] private float _hitBloodVfxHeightOffset = 1f;
+
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
     private bool debugInvincible = false;
@@ -105,6 +113,8 @@ public class PlayerController : CharacterBase
         }
 
         RuntimeStats.Damage(finalDmg);
+
+        if (finalDmg > 0) SpawnHitBloodVfx();
 
         // 피격 후 — 반사/방버프 등
         var report = new DamageReport
@@ -1060,6 +1070,25 @@ public class PlayerController : CharacterBase
     {
         if (EffectHandler != null && WeaponManager.HasWeapon)
             _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step, ActiveExecution);
+    }
+
+    private void SpawnHitBloodVfx()
+    {
+        if (_hitBloodVfxPrefab == null) return;
+        Vector3 pos = transform.position + Vector3.up * _hitBloodVfxHeightOffset;
+        var go = Instantiate(_hitBloodVfxPrefab, pos, _hitBloodVfxPrefab.transform.rotation, transform);
+        go.transform.localScale = Vector3.one * _hitBloodVfxScale;
+
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+
+        var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
+        Destroy(go, lifetime);
     }
 
 }

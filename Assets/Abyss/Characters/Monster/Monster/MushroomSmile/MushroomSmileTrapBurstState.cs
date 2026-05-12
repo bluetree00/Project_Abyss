@@ -40,6 +40,19 @@ public class MushroomSmileTrapBurstState : InvincibleState<MushroomSmileTrapData
             _delayTimer -= Time.deltaTime;
             if (_delayTimer <= 0f)
             {
+                if (Data.explosionEffectPrefab != null)
+                {
+                    var vfxGo = Object.Instantiate(Data.explosionEffectPrefab,
+                        ctx.Transform.position, Quaternion.identity);
+                    vfxGo.transform.localScale = Vector3.one * Data.explosionEffectScale;
+                    var ps = vfxGo.GetComponent<ParticleSystem>()
+                          ?? vfxGo.GetComponentInChildren<ParticleSystem>();
+                    float lifetime = ps != null
+                        ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f
+                        : 3f;
+                    Object.Destroy(vfxGo, lifetime);
+                }
+
                 ApplyAreaDamage(ctx, Data.burstRadius, Data.burstDamage);
                 ctx.Monster.ChangeState<DieState>();
             }

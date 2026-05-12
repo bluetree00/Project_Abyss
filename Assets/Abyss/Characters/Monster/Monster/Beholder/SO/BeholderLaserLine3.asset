@@ -12,5 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43fb30c6dda2f7c48981a68a8f000b3b, type: 3}
   m_Name: BeholderLaserLine3
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConeAttackSO
+  _vfxPrefab: {fileID: 4550076289710732121, guid: 4c39a6c991d146645a3f17d017dcda9b,
+    type: 3}
+  _vfxScale: 0.1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   range: 3
   halfAngle: 12

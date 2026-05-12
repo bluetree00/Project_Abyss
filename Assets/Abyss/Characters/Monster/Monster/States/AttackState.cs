@@ -12,6 +12,8 @@ public class AttackState : IMonsterState
     private float _damageTimer;
     private bool _damageDealt;
     private bool _waitForAttackAnimFinish;
+    // CrossFade 방식: Enter에서 확정 / Trigger 방식: 전환 완료 후 Update에서 확정 (0 = 미확정)
+    private int _attackStateHash;
 
     public virtual void Enter(MonsterContext ctx)
     {
@@ -20,15 +22,31 @@ public class AttackState : IMonsterState
         _cooldownTimer = 1f / Mathf.Max(0.01f, ctx.Stat.attackRate);
         _damageTimer = ctx.Combat.damageApplyDelay;
         _damageDealt = false;
-        _waitForAttackAnimFinish = ShouldWaitForAttackAnimation(ctx);
+        _attackStateHash = 0;
+
+        string key = ctx.Animation.attackTrigger;
+        bool hasAnim = ctx.Animator != null && !string.IsNullOrEmpty(key);
+        _waitForAttackAnimFinish = hasAnim;
+
+        // CrossFade 방식이면 상태 해시를 바로 확정
+        if (hasAnim && HasState(ctx.Animator, key))
+            _attackStateHash = Animator.StringToHash(key);
 
         ctx.Runtime.AttackHitDealt = false;
+        ctx.Runtime.AttackHitCount = 0;
         PlayAttackAnim(ctx);
         FacePlayer(ctx);
     }
 
     public virtual void Update(MonsterContext ctx)
     {
+        // Trigger 방식: 전환이 끝난 첫 프레임에 실제 공격 상태 해시 확정
+        if (_waitForAttackAnimFinish && _attackStateHash == 0 && ctx.Animator != null
+            && !ctx.Animator.IsInTransition(0))
+        {
+            _attackStateHash = ctx.Animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
+        }
+
         if (!_damageDealt && _damageTimer > 0f)
         {
             _damageTimer -= Time.deltaTime;
@@ -40,11 +58,16 @@ public class AttackState : IMonsterState
         }
 
         _cooldownTimer -= Time.deltaTime;
-        if (_cooldownTimer > 0f) return;
+        if (ctx.Runtime.IsExecutingAttackSequence) return;
 
-        // If the attack animation exists as a state, wait until it nearly finishes
-        // to avoid stiff snapping at the end of the motion.
-        if (_waitForAttackAnimFinish && !IsAttackAnimNearlyFinished(ctx))
+        int maxHits = ctx.Combat.maxHitsPerAttack;
+        bool allHitsDealt = maxHits > 0 && ctx.Runtime.AttackHitCount >= maxHits;
+
+        // maxHitsPerAttack이 설정된 경우 모든 히트 완료 시 쿨다운 무시, 애니메이션 끝만 대기
+        if (!allHitsDealt && _cooldownTimer > 0f) return;
+
+        // 애니메이션 1사이클이 끝날 때까지 대기 (루핑 방지)
+        if (_waitForAttackAnimFinish && !IsAttackAnimFinished(ctx))
             return;
 
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
@@ -110,28 +133,16 @@ public class AttackState : IMonsterState
         return false;
     }
 
-    private static bool ShouldWaitForAttackAnimation(MonsterContext ctx)
+    private bool IsAttackAnimFinished(MonsterContext ctx)
     {
-        return ctx.Animator != null
-               && !string.IsNullOrEmpty(ctx.Animation.attackTrigger)
-               && HasState(ctx.Animator, ctx.Animation.attackTrigger);
-    }
-
-    private static bool IsAttackAnimNearlyFinished(MonsterContext ctx)
-    {
-        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.attackTrigger))
-            return true;
-
-        int attackHash = Animator.StringToHash(ctx.Animation.attackTrigger);
-        if (!ctx.Animator.HasState(0, attackHash))
-            return true;
+        if (ctx.Animator == null) return true;
+        if (_attackStateHash == 0) return false;  // 아직 공격 상태 미확정 → 대기
 
         var state = ctx.Animator.GetCurrentAnimatorStateInfo(0);
-        if (state.shortNameHash != attackHash && state.fullPathHash != attackHash)
-            return true;
+        if (state.shortNameHash != _attackStateHash && state.fullPathHash != _attackStateHash)
+            return true;  // 공격 상태를 벗어났으면 완료
 
-        float normalized = state.normalizedTime % 1f;
-        return normalized >= 0.92f;
+        return (state.normalizedTime % 1f) >= 0.92f;
     }
 }
 }

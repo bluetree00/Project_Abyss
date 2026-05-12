@@ -12,8 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a9afdd5dc8632045930ece3688e7cfb, type: 3}
   m_Name: FishmanRangedAttack
   m_EditorClassIdentifier: Assembly-CSharp::MonsterRangedAttackSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
     type: 3}
   projectileSpeed: 10
   projectileMaxRange: 20
   launchHeightOffset: 1.2
+  vfxProjectilePrefab: {fileID: 5364765115475002985, guid: 8f389528e461f7c408298a06fa44b9a8,
+    type: 3}
+  vfxProjectileScale: 1
+  vfxProjectileHitRadius: 0.6
+  vfxHitEffectPrefab: {fileID: 6085527230289597312, guid: 56e26746bbd218543bee3498fb4ac520,
+    type: 3}
+  vfxHitEffectScale: 1
+  slowScale: 0
+  slowDuration: 0

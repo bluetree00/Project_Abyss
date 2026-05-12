@@ -22,6 +22,7 @@ public class StingRayDischargeState : UnInterruptibleState<StingRayDischargeData
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.dischargeStateName))
             ctx.Animator.CrossFade(Data.dischargeStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyAreaDamage(ctx, Data.dischargeRadius, Data.dischargeDamage);
     }
 

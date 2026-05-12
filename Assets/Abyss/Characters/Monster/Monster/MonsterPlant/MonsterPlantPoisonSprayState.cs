@@ -22,6 +22,7 @@ public class MonsterPlantPoisonSprayState : FullLockState<MonsterPlantSprayData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.sprayStateName))
             ctx.Animator.CrossFade(Data.sprayStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
         ApplyAreaDamage(ctx, Data.sprayRadius, Data.sprayDamage);
     }
 

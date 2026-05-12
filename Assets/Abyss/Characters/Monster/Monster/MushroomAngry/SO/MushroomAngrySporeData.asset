@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99583b55a4236c1469f51e482162f82a, type: 3}
   m_Name: MushroomAngrySporeData
   m_EditorClassIdentifier: Assembly-CSharp::MushroomAngrySporeData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 15501c4effd8377448667522242859bf,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.5
   sporeStateName: Mushroom_Attack03Angry
   sporeDuration: 1.5
@@ -19,3 +24,4 @@ MonoBehaviour:
   sporeDamage: 10
   sporeEffectPrefab: {fileID: 1156591902748042, guid: 55b36a9461ee12b4b9ed1546b95e8ba4,
     type: 3}
+  sporeEffectScale: 1

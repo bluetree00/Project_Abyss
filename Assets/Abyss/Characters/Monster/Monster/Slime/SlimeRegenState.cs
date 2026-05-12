@@ -20,6 +20,7 @@ public class SlimeRegenState : MovementLockedState<SlimeRegenData>
         _timer    = Data.duration;
         _healAccum = 0f;
         ctx.Animator.CrossFade("Idle_Normal", 0.15f);
+        Data.SpawnVFX(ctx.Transform);
     }
 
     public override void Update(MonsterContext ctx)

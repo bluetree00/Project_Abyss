@@ -42,7 +42,7 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 64
   animation:
-    animatorControllerAddress: Slime/SlimeAnimatorController
+    animatorControllerAddress: 
     idleStateName: Idle_Normal
     patrolStateName: MoveBlend
     chaseStateName: MoveBlend
@@ -77,3 +77,4 @@ MonoBehaviour:
     oneShot: 1
   stateOverrides:
   - {fileID: 11400000, guid: 5d0482fd5eb61a943adb4ef7c84fc133, type: 2}
+  - {fileID: 11400000, guid: 030417643d15475abeed8b77ec7fc499, type: 2}

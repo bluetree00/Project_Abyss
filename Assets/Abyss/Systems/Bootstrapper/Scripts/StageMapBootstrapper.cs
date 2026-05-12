@@ -80,9 +80,11 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             await UniTask.WaitUntil(() => app.IsReady);
         }
 
-        // 이미 진행 중인 런이 있으면 재사용 (전투 후 복귀 또는 챕터 전환)
+        // 이미 진행 중인 런이 있으면 재사용 (전투 후 복귀, 챕터 전환, 이어하기 복원)
         if (app.CurrentRun != null && app.CurrentRun.IsRunning)
         {
+            // 이어하기 복원 세션은 레지스트리가 바인딩되지 않은 상태이므로 항상 재바인딩
+            app.CurrentRun.BindChapterRegistry(chapterRegistry);
             app.CurrentRun.EnterMap();
             PlayChapterBgm(app.CurrentRun.CurrentChapter);
 
@@ -111,6 +113,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
             RefreshStageMapUI();
             app.NotifySceneReady();
+
+            // 맵 복귀 시점 저장 (방 사이 세이브 포인트)
+            var rpm = RunProgressManager.Instance;
+            SaveCheckpointAsync(app.CurrentRun, rpm).Forget();
 
             var introScroller = FindObjectOfType<StageMapScroller>(true);
             if (introScroller != null)
@@ -156,6 +162,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         session.ResolveAllPointsAndSetStart();
 
         RefreshStageMapUI();
+
+        // 새 런 초기 상태 저장 (retryCount +1)
+        var rpm2 = RunProgressManager.Instance;
+        SaveCheckpointAsync(session, rpm2, isNewRun: true).Forget();
 
         Debug.Log("[StageMapBootstrapper] 새 런 시작 완료.");
     }
@@ -676,4 +686,24 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
     private static UniTask<TextAsset> LoadTextAsset(string key) =>
         Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
+
+    /// <summary>
+    /// 방 클리어 체크포인트 저장.
+    /// RUN_PROGRESS와 USER_DATA를 병렬로 저장해 저장 타이밍을 일치시킨다.
+    /// </summary>
+    private static async UniTaskVoid SaveCheckpointAsync(
+        GameRunSession session,
+        RunProgressManager rpm,
+        bool isNewRun = false)
+    {
+        var saveRun  = rpm != null
+            ? rpm.SaveAsync(session, rpm.ActiveSlotIndex, isNewRun)
+            : UniTask.CompletedTask;
+
+        var saveUser = BackendGameData.Instance != null
+            ? BackendGameData.Instance.SaveAsync()
+            : UniTask.CompletedTask;
+
+        await UniTask.WhenAll(saveRun, saveUser);
+    }
 }

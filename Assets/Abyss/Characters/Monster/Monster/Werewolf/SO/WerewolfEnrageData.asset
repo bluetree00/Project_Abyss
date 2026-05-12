@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a45edaaae34d2a94cbbfcb705ad3a202, type: 3}
   m_Name: WerewolfEnrageData
   m_EditorClassIdentifier: Assembly-CSharp::WerewolfEnrageData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 3737527d5846fa346a211ec4c18e8d18,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.4
   lockDuration: 1.5
   enrageStateName: Taunting

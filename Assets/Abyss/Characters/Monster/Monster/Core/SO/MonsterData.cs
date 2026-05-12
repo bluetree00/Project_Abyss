@@ -47,6 +47,14 @@ public class MonsterStatData
     [Header("공격 형태 (없으면 기본 구체 판정 사용)")]
     [Tooltip("공격 판정 형태 SO. 비워두면 attackRadius 기반 구체 판정.")]
     public MonsterAttackShapeSO attackShape;
+
+    [Header("히트 VFX (기본 공격 명중 시)")]
+    [Tooltip("공격이 맞았을 때 스폰할 VFX 프리팹. null이면 생략.")]
+    public GameObject hitVfxPrefab;
+    [Tooltip("히트 VFX 스케일 배율.")]
+    public float hitVfxScale = 1f;
+    [Tooltip("몬스터 위치 기준 VFX 스폰 오프셋.")]
+    public Vector3 hitVfxOffset = Vector3.zero;
 }
 
 /// <summary>몬스터 감지·추격 포기 데이터.</summary>
@@ -80,6 +88,9 @@ public class MonsterCombatData
     [Tooltip("공격 애니메이션 시작 후 실제 데미지 판정까지 지연 시간 (s). " +
              "애니메이션 이벤트로 데미지를 주는 경우 0으로 설정.")]
     public float     damageApplyDelay = 0.4f;
+    [Tooltip("하나의 AttackState 진입당 허용되는 최대 AnimEvent 히트 수. " +
+             "0 = 무제한. 루핑 애니메이션에서 과다 발사를 방지할 때 사용.")]
+    public int       maxHitsPerAttack = 0;
     [Tooltip("공격 히트 판정 대상 레이어 (Player 레이어 설정)")]
     public LayerMask targetLayer;
 }
@@ -101,6 +112,9 @@ public class MonsterDropData
 [Serializable]
 public class MonsterAnimationData
 {
+    [Header("Addressables")]
+    [Tooltip("Addressables에 등록된 AnimatorController/AnimatorOverrideController 주소. 비어 있으면 프리팹 Animator를 그대로 사용.")]
+    public string animatorControllerAddress = "";
     [Header("상태 이름 (공용 Base Controller 기준 — 프리팹 Animator에 직접 세팅)")]
     public string idleStateName        = "Idle";
     public string patrolStateName      = "Walk";
