@@ -59,13 +59,33 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     public void BeginRun(GameRunSession session)
     {
+        if (CurrentRun != null)
+            CurrentRun.OnRunEnded -= HandleRunEnded;
+
         CurrentRun = session;
+        CurrentRun.OnRunEnded += HandleRunEnded;
     }
 
     public void EndRun()
     {
+        if (CurrentRun != null)
+            CurrentRun.OnRunEnded -= HandleRunEnded;
+
+        var rpm = RunProgressManager.Instance;
+        rpm?.ClearAsync(rpm.ActiveSlotIndex).Forget();
         CurrentRun = null;
         Loadout.Clear();
+    }
+
+    private static void HandleRunEnded(EndRunResult result)
+    {
+        HandleRunEndedAsync(result).Forget();
+    }
+
+    private static async UniTaskVoid HandleRunEndedAsync(EndRunResult result)
+    {
+        if (BackendGameData.Instance != null)
+            await BackendGameData.Instance.ApplyRunResultAsync(result);
     }
 
     public void RequestLoad(Define.Scene scene)
@@ -120,6 +140,81 @@ public sealed class AppBootstrapper : MonoBehaviour
         RequestLoad(Define.Scene.GameScene);
     }
 
+    /// <summary>
+    /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.
+    /// StageMapBootstrapper는 CurrentRun.IsRunning=true를 감지해 재진입 경로로 처리한다.
+    /// </summary>
+    public void RequestRestoreRun()
+    {
+        RequestRestoreRunAsync().Forget();
+    }
+
+    private async UniTaskVoid RequestRestoreRunAsync()
+    {
+        var rpm = RunProgressManager.Instance;
+        if (rpm == null) return;
+
+        int slot = rpm.ActiveSlotIndex;
+        var save = rpm.Saves[slot];
+        if (save == null || !save.hasActiveRun)
+        {
+            Debug.LogWarning($"[AppBootstrapper] RequestRestoreRun: slot {slot}에 유효한 저장 없음");
+            return;
+        }
+
+        Loadout.SetCharacter(null, save.characterKey);
+
+        // WeaponSO 로드 — 실패해도 복원 흐름은 계속 진행
+        WeaponSO ws0 = null, ws1 = null;
+
+        if (!string.IsNullOrEmpty(save.weapon0PrefabKey))
+        {
+            try
+            {
+                ws0 = await Managers.AddressableManager.TryLoadAssetAsync<WeaponSO>(save.weapon0PrefabKey);
+                if (ws0 != null) Loadout.SetWeaponSlot0(ws0);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AppBootstrapper] RestoreRun: 무기0 로드 실패: {e.Message}");
+            }
+        }
+
+        if (!string.IsNullOrEmpty(save.weapon1PrefabKey))
+        {
+            try
+            {
+                ws1 = await Managers.AddressableManager.TryLoadAssetAsync<WeaponSO>(save.weapon1PrefabKey);
+                if (ws1 != null) Loadout.SetWeaponSlot1(ws1);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AppBootstrapper] RestoreRun: 무기1 로드 실패: {e.Message}");
+            }
+        }
+
+        var session = new GameRunSession();
+        await session.RestoreFromSaveAsync(save, LoadTextAsset);
+
+        if (!session.IsRunning)
+        {
+            Debug.LogError("[AppBootstrapper] RequestRestoreRun: 세션 복원 실패.");
+            return;
+        }
+
+        // 체크포인트 저장 시 weapon key 보존 — FromSO로 생성한 WeaponData 사용
+        var w0 = ws0 != null ? WeaponData.FromSO(ws0) : null;
+        var w1 = ws1 != null ? WeaponData.FromSO(ws1) : null;
+        if (w0 != null || w1 != null)
+            session.SaveWeaponSlots(new WeaponData[] { w0, w1 }, 0);
+
+        BeginRun(session);
+        RequestLoad(Define.Scene.StageMap);
+    }
+
+    private static UniTask<TextAsset> LoadTextAsset(string key) =>
+        Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
+
     private GameFlow _flow;
     private SceneTransitionManager _scene;
 
@@ -133,6 +228,20 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // RunProgressManager (이어하기 저장) — 뒤끝 로그인 전부터 인스턴스 준비
+        if (RunProgressManager.Instance == null)
+        {
+            var rpmGo = new GameObject("@RunProgressManager");
+            rpmGo.AddComponent<RunProgressManager>();
+        }
+
+        // BackendGameData (유저 데이터 저장) — 로그인 전부터 인스턴스 준비
+        if (BackendGameData.Instance == null)
+        {
+            var bgdGo = new GameObject("@BackendGameData");
+            bgdGo.AddComponent<BackendGameData>();
+        }
 
         // 첫 몬스터 스폰(및 프리워밍) 이전에 원소 팔레트 주입 — Addressable 로드 비용 없이 Inspector 참조.
         if (elementPalette != null)
@@ -244,6 +353,10 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (autoOk)
             {
                 IsAutoLoggedIn = true;
+                await UniTask.WhenAll(
+                    RunProgressManager.Instance.LoadAsync(),
+                    BackendGameData.Instance.LoadAsync()
+                );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공 → Login 스킵");
                 if (startScene == Define.Scene.Login || startScene == Define.Scene.Logo)
                     startScene = Define.Scene.Lobby;

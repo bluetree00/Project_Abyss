@@ -39,8 +39,12 @@ public class UI_Login : UI_Scene
 
         if (loginSuccess)
         {
-            SetMessage("로그인 성공! 몬스터 데이터 불러오는 중...");
-            await Managers.MonsterData.InitializeAsync();
+            SetMessage("로그인 성공! 데이터 불러오는 중...");
+            await UniTask.WhenAll(
+                Managers.MonsterData.InitializeAsync(),
+                RunProgressManager.Instance.LoadAsync(),
+                BackendGameData.Instance.LoadAsync()
+            );
             SetMessage("데이터 불러오기 완료. 로비로 이동합니다.");
             AppBootstrapper.Instance.RequestLoad(Define.Scene.Lobby);
         }

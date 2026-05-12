@@ -1,115 +1,193 @@
+using System;
 using BackEnd;
+using Cysharp.Threading.Tasks;
+using LitJson;
 using UnityEngine;
 
+/// <summary>
+/// USER_DATA 테이블 관리 싱글톤 (DDOL).
+/// 로비 재화(level/gold/jewel/heart)와 인게임 누적 통계(totalRuns/totalClears 등)를 서버에 저장한다.
+///
+/// ■ 호출 흐름
+///   로그인 성공          → LoadAsync()
+///   회원가입 완료        → InsertAsync()
+///   런 종료              → ApplyRunResultAsync(EndRunResult)
+///   재화 직접 변경 후    → SaveAsync()
+/// </summary>
 public class BackendGameData : MonoBehaviour
 {
-    [System.Serializable]
-    public class GameDataLoadEvent : UnityEngine.Events.UnityEvent { }
-    public GameDataLoadEvent ongameDataLoadEvent = new GameDataLoadEvent();
+    // ── Singleton ──────────────────────────────────────────────────────────
+    public static BackendGameData Instance { get; private set; }
 
-    private static BackendGameData instance;
-    public static BackendGameData Instance
+    // ── State ──────────────────────────────────────────────────────────────
+    public UserGameData Data { get; private set; } = new UserGameData();
+
+    /// <summary>Load 완료 또는 ApplyRunResult 저장 완료 시 발행.</summary>
+    public event Action OnDataLoaded;
+
+    private string _rowInDate;
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+    private void Awake()
     {
-        get
+        if (Instance != null && Instance != this)
         {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<BackendGameData>();
-                if (instance == null)
-                {
-                    GameObject obj = new GameObject("BackendGameData");
-                    instance = obj.AddComponent<BackendGameData>();
-                    DontDestroyOnLoad(obj); // 씬 전환 시에도 유지
-                }
-            }
-            return instance;
+            Destroy(this);
+            return;
         }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
-
-    private UserGameData userGameData = new UserGameData();
-    public UserGameData UsergameData => userGameData;
-
-    private string gameDataRowInData = string.Empty;
-
-    /// <summary>
-    /// 서버의 테이블에 새로운 유저 정보 추가
-    /// </summary>
-    public void GameDataInsert()
+    private void OnDestroy()
     {
-
-        // 유저 정보를 초기값으로 설정
-        userGameData.Reset();
-
-        //테이블에 추가할 데이터로 가공
-        Param param = new Param()
-        {
-            {"level", userGameData.level },
-            {"exp", userGameData.experience },
-            {"gold", userGameData.gold },
-            {"jewel", userGameData.jewel },
-            {"heart", userGameData.heart },
-        };
-
-        //첫번쨰 매개변수는 서버의 콘솔의 "게임 정보 관리" 탭에 생성한 테이블 이름
-        Backend.GameData.Insert("USER_DATA", param, callback =>
-        {
-            if (callback.IsSuccess())
-            {
-                gameDataRowInData = callback.GetInDate();
-
-                Debug.Log("게임 데이터 추가 성공" + callback.GetInDate());
-            }
-            else
-            {
-                Debug.Log("게임 데이터 추가 실패" + callback.GetMessage());
-            }
-        });
-
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
     }
-   
-    //서버 테이블에서 유저 정보를 불러올떄 호출
-    public void GameDataLoad()
+
+    // ── Public API ─────────────────────────────────────────────────────────
+
+    /// <summary>서버에서 USER_DATA를 로드한다. 데이터가 없으면 자동으로 Insert.</summary>
+    public async UniTask LoadAsync()
     {
+        var tcs = new UniTaskCompletionSource();
+
         Backend.GameData.GetMyData("USER_DATA", new Where(), callback =>
         {
             if (callback.IsSuccess())
             {
-                Debug.Log($"게임 정보 데이터 불러오기 성공 : {callback}");
-                
                 try
                 {
-                    LitJson.JsonData gameDataJson = callback.FlattenRows();
+                    var json = callback.FlattenRows();
 
-                    if( gameDataJson.Count <= 0)
+                    if (json.Count <= 0)
                     {
-                        Debug.Log("게임 데이터가 없습니다.");
-                    
+                        Debug.Log("[BackendGameData] USER_DATA 없음 — Insert 실행");
+                        InsertAsync().Forget();
                     }
                     else
                     {
-                        gameDataRowInData = gameDataJson[0]["inDate"].ToString();
-                        //불러온 게임 정보를 userGameData에 저장
-                        userGameData.level = int.Parse(gameDataJson[0]["level"].ToString());
-                        userGameData.experience = int.Parse(gameDataJson[0]["exp"].ToString());
-                        userGameData.gold = int.Parse(gameDataJson[0]["gold"].ToString());
-                        userGameData.jewel = int.Parse(gameDataJson[0]["jewel"].ToString());
-                        userGameData.heart = int.Parse(gameDataJson[0]["heart"].ToString());
-
-                        ongameDataLoadEvent?.Invoke();
+                        _rowInDate = json[0]["inDate"].ToString();
+                        ParseRow(json[0]);
+                        Debug.Log("[BackendGameData] Load 성공");
+                        OnDataLoaded?.Invoke();
                     }
                 }
-                catch (System.Exception e)
+                catch (Exception e)
                 {
-                    userGameData.Reset();
-                    Debug.LogError($"게임 데이터 불러오기 실패 : {e}");
+                    Data.Reset();
+                    Debug.LogError($"[BackendGameData] Load 파싱 실패: {e}");
                 }
             }
             else
             {
-                Debug.Log("게임 데이터 불러오기 실패" + callback.GetMessage());
+                Debug.LogError($"[BackendGameData] Load 실패: {callback.GetMessage()}");
             }
+
+            tcs.TrySetResult();
         });
 
+        await tcs.Task;
+    }
+
+    /// <summary>회원가입 완료 시 호출. USER_DATA 테이블에 초기 row를 삽입한다.</summary>
+    public async UniTask InsertAsync()
+    {
+        Data.Reset();
+        var param = BuildParam();
+
+        var tcs = new UniTaskCompletionSource();
+
+        Backend.GameData.Insert("USER_DATA", param, callback =>
+        {
+            if (callback.IsSuccess())
+            {
+                _rowInDate = callback.GetInDate();
+                Debug.Log($"[BackendGameData] Insert 성공: rowInDate={_rowInDate}");
+                OnDataLoaded?.Invoke();
+            }
+            else
+            {
+                Debug.LogError($"[BackendGameData] Insert 실패: {callback.GetMessage()}");
+            }
+
+            tcs.TrySetResult();
+        });
+
+        await tcs.Task;
+    }
+
+    /// <summary>현재 Data를 서버에 반영(UpdateV2). 재화 직접 변경 후에도 호출 가능.</summary>
+    public async UniTask SaveAsync()
+    {
+        if (string.IsNullOrEmpty(_rowInDate))
+        {
+            Debug.LogWarning("[BackendGameData] SaveAsync: rowInDate 없음 — Insert로 대체");
+            await InsertAsync();
+            return;
+        }
+
+        var param = BuildParam();
+        var tcs   = new UniTaskCompletionSource();
+
+        Backend.GameData.UpdateV2("USER_DATA", _rowInDate, Backend.UserInDate, param, callback =>
+        {
+            if (callback.IsSuccess())
+                Debug.Log("[BackendGameData] Save 성공");
+            else
+                Debug.LogError($"[BackendGameData] Save 실패: {callback.GetMessage()}");
+
+            tcs.TrySetResult();
+        });
+
+        await tcs.Task;
+    }
+
+    /// <summary>런 종료 결과를 영구 데이터에 반영하고 서버에 저장한다.</summary>
+    public async UniTask ApplyRunResultAsync(EndRunResult result)
+    {
+        Data.ApplyRunResult(result);
+        await SaveAsync();
+        OnDataLoaded?.Invoke();
+    }
+
+    // ── Private ────────────────────────────────────────────────────────────
+
+    private void ParseRow(JsonData row)
+    {
+        Data.level           = SafeInt(row,   "level",          1);
+        Data.experience      = SafeFloat(row, "exp",            0f);
+        Data.gold            = SafeInt(row,   "gold",           0);
+        Data.jewel           = SafeInt(row,   "jewel",          0);
+        Data.heart           = SafeInt(row,   "heart",          30);
+        Data.totalRuns       = SafeInt(row,   "totalRuns",      0);
+        Data.totalClears     = SafeInt(row,   "totalClears",    0);
+        Data.highestChapter  = SafeInt(row,   "highestChapter", 0);
+        Data.totalGoldEarned = SafeInt(row,   "totalGoldEarned",0);
+    }
+
+    private Param BuildParam() => new Param
+    {
+        { "level",           Data.level           },
+        { "exp",             Data.experience      },
+        { "gold",            Data.gold            },
+        { "jewel",           Data.jewel           },
+        { "heart",           Data.heart           },
+        { "totalRuns",       Data.totalRuns       },
+        { "totalClears",     Data.totalClears     },
+        { "highestChapter",  Data.highestChapter  },
+        { "totalGoldEarned", Data.totalGoldEarned },
+    };
+
+    private static int SafeInt(JsonData row, string key, int fallback)
+    {
+        try { return row.ContainsKey(key) ? int.Parse(row[key].ToString()) : fallback; }
+        catch { return fallback; }
+    }
+
+    private static float SafeFloat(JsonData row, string key, float fallback)
+    {
+        try { return row.ContainsKey(key) ? float.Parse(row[key].ToString()) : fallback; }
+        catch { return fallback; }
     }
 }
