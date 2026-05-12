@@ -105,7 +105,7 @@ public static class CreateDialoguePopupPrefab
         tbGO.AddComponent<CanvasRenderer>();
         var tbImg = tbGO.AddComponent<Image>();
         tbImg.sprite = tbSprite;
-        tbImg.type = Image.Type.Sliced;
+        tbImg.type = Image.Type.Simple;
         tbImg.raycastTarget = false;
         var tbRT = tbGO.GetComponent<RectTransform>();
         tbRT.anchorMin = new Vector2(0f, 0f);
