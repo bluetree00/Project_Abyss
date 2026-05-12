@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d703209476217ff40b215bad110e6bdf, type: 3}
   m_Name: SkeletonEnrageData
   m_EditorClassIdentifier: Assembly-CSharp::SkeletonEnrageData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 1556aaf0a377b2a45b34cb4d5c6c11cc,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.5
   lockDuration: 1.5
   speedMultiplier: 1.4

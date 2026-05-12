@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: CyclopsPatternAttack
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  selectionMode: 0
+  engageDistance: 8
+  patterns:
+  - name: RangedShot
+    animationStateName: Cyclops_Attack01
+    minDistance: 0
+    maxDistance: 10
+    priority: 0
+    cooldown: 2.5
+    damageDelay: 0.5
+    attackDuration: 2.0
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8c0a63a80bb026547876bf1492c06441, type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0

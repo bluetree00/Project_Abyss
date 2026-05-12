@@ -86,6 +86,15 @@ public sealed class GameRunSession
     private readonly List<SynergyRecord> _appliedSynergies = new();
     public IReadOnlyList<SynergyRecord> AppliedSynergies => _appliedSynergies;
 
+    // ── 방 클리어 이력 ──
+    private readonly List<RoomClearRecord> _roomClearRecords = new();
+    public IReadOnlyList<RoomClearRecord> RoomClearRecords => _roomClearRecords;
+
+    // 방 진입 시 스냅샷 (클리어 시 방 내 획득분 계산에 사용)
+    private int _snapGold;
+    private int _snapItemCount;
+    private int _snapSynergyCount;
+
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
     public int SavedCurrentSlotIndex { get; private set; } = -1;
@@ -134,6 +143,44 @@ public sealed class GameRunSession
     {
         if (string.IsNullOrEmpty(gridId)) return;
         _appliedSynergies.RemoveAll(r => r.gridId == gridId);
+    }
+
+    // =========================================================
+    // Room Clear Recording
+    // =========================================================
+
+    /// <summary>방 진입 시 호출. 이 방에서 얻은 양을 계산하기 위한 스냅샷.</summary>
+    private void SnapshotRoomEntry()
+    {
+        _snapGold         = PlayerState?.TempGold ?? 0;
+        _snapItemCount    = ItemInventory.Items.Count;
+        _snapSynergyCount = _appliedSynergies.Count;
+    }
+
+    /// <summary>방 클리어 시 호출. 현재 상태와 스냅샷의 차이로 방 내 획득 정보를 기록한다.</summary>
+    private void RecordRoomClear(int pointId, RunState clearedState)
+    {
+        if (!IsRunning) return;
+
+        int goldAfter  = PlayerState?.TempGold ?? 0;
+        int itemCount  = ItemInventory.Items.Count;
+        int synCount   = _appliedSynergies.Count;
+
+        _roomClearRecords.Add(new RoomClearRecord
+        {
+            pointId              = pointId,
+            chapter              = (int)CurrentChapter,
+            runState             = clearedState.ToString(),
+            hpAfter              = PlayerState?.Hp    ?? 0,
+            maxHp                = PlayerState?.MaxHp ?? 0,
+            goldAfter            = goldAfter,
+            goldGainedInRoom     = goldAfter - _snapGold,
+            itemsGainedCount     = itemCount - _snapItemCount,
+            totalItemCount       = itemCount,
+            synergiesGainedCount = synCount  - _snapSynergyCount,
+            totalSynergyCount    = synCount,
+            clearedAt            = DateTime.UtcNow.ToString("o"),
+        });
     }
 
     // =========================================================
@@ -191,6 +238,125 @@ public sealed class GameRunSession
             Debug.LogError($"[GameRun] StartNewRunAsync failed: {e}");
             ResetToNotRunning();
         }
+    }
+
+    // =========================================================
+    // Restore (이어하기)
+    // =========================================================
+
+    /// <summary>
+    /// 저장 슬롯 데이터로 세션을 완전 복원한다.
+    /// StartNewRunAsync와 달리 랜덤 맵 생성 없이 graphJson에서 그래프를 재구성하고,
+    /// HP/골드/아이템/시너지를 저장 값으로 채운다.
+    /// </summary>
+    public async UniTask RestoreFromSaveAsync(RunSaveData save, Func<string, UniTask<TextAsset>> loader)
+    {
+        if (Phase != RunPhase.NotRunning)
+        {
+            Debug.LogWarning($"[GameRun] RestoreFromSaveAsync ignored: phase={Phase}");
+            return;
+        }
+
+        Phase = RunPhase.Starting;
+        CurrentChapter = (ChapterId)save.chapter;
+        ResolveActiveTheme();
+        CurrentHudMode = HUDIds.Mode.None;
+        _hudModeSet = false;
+
+        try
+        {
+            await LoadStageDataAsync(STAGE_KEY, loader);
+
+            RoomManager = new RoomManager();
+            await RoomManager.InitializeAsync(ROOMS_KEY, loader);
+
+            if (!RoomManager.IsInitialized)
+            {
+                Debug.LogError("[GameRun] RestoreFromSaveAsync: RoomManager init failed.");
+                ResetToNotRunning();
+                return;
+            }
+
+            StagePointManager = new StagePointManager();
+            StagePointManager.Initialize(CurrentChapter, RoomManager);
+
+            if (!string.IsNullOrEmpty(save.graphJson))
+            {
+                var savedGraph = JsonUtility.FromJson<SavedStageGraph>(save.graphJson);
+                if (savedGraph?.nodes != null)
+                {
+                    StagePointManager.RestoreFromSaved(savedGraph, save.currentPointId);
+                    CachedStageGraph = GraphFromSaved(savedGraph);
+                }
+            }
+
+            PlayerState = new PlayerRunState(save.maxHp, save.runGold);
+            PlayerState.SetHp(save.currentHp);
+
+            RunDelta = new RunDelta();
+
+            if (!string.IsNullOrEmpty(save.itemsJson))
+            {
+                var itemWrapper = JsonUtility.FromJson<ItemListWrapper>(save.itemsJson);
+                if (itemWrapper?.items != null)
+                    ItemInventory.RestoreItems(itemWrapper.items);
+            }
+
+            if (!string.IsNullOrEmpty(save.synergiesJson))
+            {
+                var synWrapper = JsonUtility.FromJson<SynergyListWrapper>(save.synergiesJson);
+                if (synWrapper?.items != null)
+                {
+                    foreach (var record in synWrapper.items)
+                        if (record != null) _appliedSynergies.Add(record);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(save.roomLogsJson))
+            {
+                var logWrapper = JsonUtility.FromJson<RoomClearLogWrapper>(save.roomLogsJson);
+                if (logWrapper?.records != null)
+                    _roomClearRecords.AddRange(logWrapper.records);
+            }
+
+            Phase = RunPhase.Running;
+            ChangeRunState(RunState.Map);
+
+            OnPlayerStateReady?.Invoke(PlayerState);
+            OnRunStarted?.Invoke();
+
+            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}, pointId={save.currentPointId}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[GameRun] RestoreFromSaveAsync failed: {e}");
+            ResetToNotRunning();
+        }
+    }
+
+    private static StageMapGraph GraphFromSaved(SavedStageGraph saved)
+    {
+        var nodes = new List<StageMapNode>(saved.nodes.Length);
+        foreach (var n in saved.nodes)
+        {
+            nodes.Add(new StageMapNode
+            {
+                PointId      = n.pointId,
+                Stage        = (StageCategory)n.stageCategory,
+                Normal       = (NormalRoomCategory)n.normalRoomCategory,
+                LayerIndex   = n.layerIndex,
+                IndexInLayer = n.indexInLayer,
+                NextPointIds = n.nextPointIds != null
+                    ? new List<int>(n.nextPointIds)
+                    : new List<int>(),
+            });
+        }
+        return new StageMapGraph
+        {
+            FullPattern   = saved.fullPattern,
+            MiddlePattern = saved.middlePattern,
+            Nodes         = nodes,
+        };
     }
 
     public EndRunResult EndRun(bool isCleared, string reason = null)
@@ -256,6 +422,7 @@ public sealed class GameRunSession
         SavedWeaponSlots = null;
         SavedCurrentSlotIndex = -1;
         _appliedSynergies.Clear();
+        _roomClearRecords.Clear();
         ActiveTheme = string.Empty;
         ActiveFieldPrefabKey = string.Empty;
     }
@@ -322,6 +489,8 @@ public sealed class GameRunSession
     {
         if (!IsRunning) return;
 
+        SnapshotRoomEntry();
+
         // 아이템 효과: 방/보스방 진입 hook
         if (roomState == RunState.BossRoom)
             EffectManager?.OnBossEnter();
@@ -335,6 +504,8 @@ public sealed class GameRunSession
     public void EnterStandby()
     {
         if (!IsRunning) return;
+
+        RecordRoomClear(StagePointManager?.CurrentPointId ?? -1, CurrentRunState);
 
         // 아이템 효과: 방 클리어 hook
         EffectManager?.OnRoomClear();
@@ -599,6 +770,7 @@ public sealed class GameRunSession
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
         QuestEvents.ReportGold(amount);
+        Managers.Sound?.PlayEvent(SoundEvent.GoldPickup);
     }
 
     public void AddItem(ItemId itemId, int count)

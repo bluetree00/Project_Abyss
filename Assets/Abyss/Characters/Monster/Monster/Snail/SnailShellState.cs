@@ -25,6 +25,7 @@ public class SnailShellState : MovementLockedState<SnailShellData>
         _timer = Data.duration;
         ctx.Runtime.DamageMultiplier = Data.damageMultiplier;
         ctx.Animator.CrossFade("Defend", 0.15f);
+        Data.SpawnVFX(ctx.Transform);
 
         _renderers = ctx.Transform.GetComponentsInChildren<Renderer>(true);
         ApplyTint(_renderers, ShellColor);

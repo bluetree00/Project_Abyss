@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2252ff164a2a60d4191f1eb32c68a021, type: 3}
   m_Name: MonsterPlantSprayData
   m_EditorClassIdentifier: Assembly-CSharp::MonsterPlantSprayData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 4c13e1447df23a946a0a13500812d406,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.7
   sprayStateName: Attack02
   sprayDuration: 2

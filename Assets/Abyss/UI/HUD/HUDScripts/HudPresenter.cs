@@ -33,6 +33,7 @@ public sealed class HudPresenter : MonoBehaviour
     private MonsterBase _boss;
     public MonsterBase BoundBoss => _boss;
     public bool HasBoundBoss => _boss != null;
+    public CanvasGroup MainCanvasGroup => canvasGroup;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;

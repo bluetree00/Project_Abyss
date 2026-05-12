@@ -22,6 +22,7 @@ public sealed class SoundManager
     private int _nextPoolId;
     private float _bgmVolume    = 1f;
     private float _effectVolume = 1f;
+    private SoundEventTableSO _eventTable;
 
     public float BgmVolume    => _bgmVolume;
     public float EffectVolume => _effectVolume;
@@ -46,6 +47,14 @@ public sealed class SoundManager
         _effectVolume = Mathf.Clamp01(volume);
         PlayerPrefs.SetFloat(kEffectVolKey, _effectVolume);
         PlayerPrefs.Save();
+    }
+
+    public void SetEventTable(SoundEventTableSO table) => _eventTable = table;
+
+    public void PlayEvent(string eventId)
+    {
+        if (_eventTable == null || !_eventTable.TryGet(eventId, out var sfxKey, out var volume)) return;
+        PlayEffectAsync(sfxKey, volume).Forget();
     }
 
     public void Init()

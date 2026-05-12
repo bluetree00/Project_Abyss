@@ -42,6 +42,7 @@ public class MushroomAngrySporeBlastState : UnInterruptibleState<MushroomAngrySp
 
         var obj = Object.Instantiate(Data.sporeEffectPrefab,
                                      ctx.Transform.position, Quaternion.identity);
+        obj.transform.localScale = Vector3.one * Data.sporeEffectScale;
         var ps = obj.GetComponent<ParticleSystem>() ?? obj.GetComponentInChildren<ParticleSystem>();
         float lifetime = ps != null ? ps.main.duration + 0.5f : 3f;
         Object.Destroy(obj, lifetime);

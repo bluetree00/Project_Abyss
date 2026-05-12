@@ -12,5 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43fb30c6dda2f7c48981a68a8f000b3b, type: 3}
   m_Name: SpecterLungeCone
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConeAttackSO
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 58bd197edf7e5864baf190b97cd6cbb2,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   range: 2.2
   halfAngle: 22

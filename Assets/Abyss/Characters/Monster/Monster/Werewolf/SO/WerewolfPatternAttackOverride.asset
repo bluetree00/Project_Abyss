@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -20,12 +20,13 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 1.8
     priority: 0
-    cooldown: 0
+    cooldown: 1.0
     damageDelay: 0.35
     attackDuration: 0.95
     damageMultiplier: 1
     knockbackMultiplier: 1
-    attackShapeOverride: {fileID: 0}
+    attackShapeOverride: {fileID: 11400000, guid: 35f1c3ca1c8d4a33a99730ca2fc30427, type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
   - name: HeavySwipe
@@ -39,5 +40,6 @@ MonoBehaviour:
     damageMultiplier: 1.2
     knockbackMultiplier: 1.25
     attackShapeOverride: {fileID: 11400000, guid: 59d91c5197fe4b13b8d3a0fdc7eec3e8, type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0

@@ -26,9 +26,6 @@ public class MonsterHPBar : MonoBehaviour
     [SerializeField] private float _ghostLerpSpeed = 0.35f;
 
     [Header("Colors")]
-    [SerializeField] private Color _colorHigh = new Color(0.18f, 0.85f, 0.35f);
-    [SerializeField] private Color _colorMid  = new Color(0.95f, 0.72f, 0.08f);
-    [SerializeField] private Color _colorLow  = new Color(0.90f, 0.15f, 0.12f);
     [SerializeField] private Color _ghostColor = new Color(1.00f, 0.75f, 0.20f, 0.70f);
 
     [Header("Name Label")]
@@ -199,16 +196,6 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_hpFill == null) return;
         _hpFill.fillAmount = ratio;
-
-        Color c;
-        if (ratio > 0.6f)
-            c = Color.Lerp(_colorMid, _colorHigh, (ratio - 0.6f) / 0.4f);
-        else if (ratio > 0.3f)
-            c = Color.Lerp(_colorLow, _colorMid, (ratio - 0.3f) / 0.3f);
-        else
-            c = _colorLow;
-
-        _hpFill.color = c;
     }
 
     private void ApplyGhostFill(float ratio)

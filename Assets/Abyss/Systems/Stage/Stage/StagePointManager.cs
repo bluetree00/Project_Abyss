@@ -311,4 +311,38 @@ public sealed class StagePointManager
         return !string.IsNullOrEmpty(prefabKey);
     }
 
+    // ---------- Restore ----------
+
+    /// <summary>
+    /// 저장된 그래프 데이터로 StagePointManager 상태를 완전 복원한다.
+    /// Initialize() 직후에 호출해야 한다 (_contexts가 비어 있는 상태 전제).
+    /// </summary>
+    public void RestoreFromSaved(SavedStageGraph saved, int currentPointId)
+    {
+        if (saved?.nodes == null) return;
+
+        foreach (var n in saved.nodes)
+        {
+            int? minDiff = n.minDifficulty >= 0 ? (int?)n.minDifficulty : null;
+            int? maxDiff = n.maxDifficulty >= 0 ? (int?)n.maxDifficulty : null;
+
+            var ctx = Register(
+                n.pointId,
+                (StageCategory)n.stageCategory,
+                n.nextPointIds,
+                (NormalRoomCategory)n.normalRoomCategory,
+                minDiff,
+                maxDiff,
+                null
+            );
+
+            ctx.SetState((StagePointState)n.state);
+
+            if (n.isResolved && !string.IsNullOrEmpty(n.resolvedRoomId))
+                ctx.SetResolvedRoomId(n.resolvedRoomId);
+        }
+
+        CurrentPointId = currentPointId;
+    }
+
 }

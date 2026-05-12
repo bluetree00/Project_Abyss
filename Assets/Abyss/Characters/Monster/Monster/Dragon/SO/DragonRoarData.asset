@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4931c20d34860544a869d9c1b7e0a64, type: 3}
   m_Name: DragonRoarData
   m_EditorClassIdentifier: Assembly-CSharp::DragonRoarData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: a073812afbe1f7541a8f2c1e0b6ffc05,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.5
   roarDuration: 2.5
   roarStateName: Taunting

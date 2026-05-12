@@ -51,7 +51,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 38e2ad2405a73b94ca4acff97076788a
-    m_Address: VFX_LandEffect
+    m_Address: SoftBlueBuff
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -128,6 +128,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d79f03dd3c9b07c41a430faecdcdf500
     m_Address: VFX_JumpLandingDamage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9467a10b94fb3b428cc539326c9579b
+    m_Address: Buff2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

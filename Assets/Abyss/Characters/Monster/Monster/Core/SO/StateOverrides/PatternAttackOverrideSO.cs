@@ -38,6 +38,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public float damageMultiplier = 1f;
         public float knockbackMultiplier = 1f;
         public MonsterAttackShapeSO attackShapeOverride;
+        public bool disableWarning = false;
         public float warningRadius = 0f;
         public float warningDuration = 0f;
         public WarningShapeType warningShape = WarningShapeType.Auto;
@@ -55,6 +56,14 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         [Header("Debuff (Optional)")]
         public float slowScale;
         public float slowDuration;
+
+        [Header("Hit VFX")]
+        [Tooltip("공격이 실제로 맞았을 때 스폰할 VFX 프리팹. null이면 생략.")]
+        public GameObject hitVfxPrefab;
+        [Tooltip("Hit VFX 스케일 배율.")]
+        public float hitVfxScale = 1f;
+        [Tooltip("피격 위치 기준 오프셋.")]
+        public Vector3 hitVfxOffset = Vector3.zero;
     }
 
     [Tooltip("Ordered list of attack patterns. Highest priority among valid patterns wins.")]
@@ -136,14 +145,42 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             return highestPriorityIndices[UnityEngine.Random.Range(0, highestPriorityIndices.Count)];
         }
 
+        return -1;
+    }
+
+    private bool ShouldChaseForCloserPattern(MonsterContext ctx, PatternRuntime runtime)
+    {
+        float dist = ctx.Runtime.DistToPlayer;
         for (int i = 0; i < patterns.Count; i++)
         {
-            var pattern = patterns[i];
-            if (dist >= pattern.minDistance && dist <= pattern.maxDistance)
-                return i;
+            if (runtime.IsCoolingDown(i))
+                continue;
+
+            if (dist > patterns[i].maxDistance)
+                return true;
         }
 
-        return -1;
+        return false;
+    }
+
+    private float GetCloserPatternStoppingDistance(MonsterContext ctx, PatternRuntime runtime)
+    {
+        float dist = ctx.Runtime.DistToPlayer;
+        float desired = GetEffectiveEngageDistance();
+
+        for (int i = 0; i < patterns.Count; i++)
+        {
+            if (runtime.IsCoolingDown(i))
+                continue;
+
+            var pattern = patterns[i];
+            if (dist <= pattern.maxDistance)
+                continue;
+
+            desired = Mathf.Min(desired, pattern.maxDistance);
+        }
+
+        return Mathf.Max(0.1f, desired);
     }
 
     private static void FacePlayer(MonsterContext ctx, float turnSpeed)
@@ -174,10 +211,10 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         float fadeDuration = Mathf.Max(0.08f, ctx.Animation.crossFadeDuration);
 
         if (animator.HasState(0, Animator.StringToHash(key)))
-            animator.CrossFade(key, fadeDuration);
+            animator.CrossFade(key, fadeDuration, 0, 0f);
     }
 
-    private static void ExecutePatternAttack(MonsterContext ctx, AttackPattern pattern)
+    private static void ExecutePatternAttack(MonsterContext ctx, AttackPattern pattern, Vector3 warningCenter)
     {
         int damage = Mathf.RoundToInt(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier * pattern.damageMultiplier);
         float knockback = ctx.Stat.knockbackForce * pattern.knockbackMultiplier;
@@ -189,12 +226,17 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         {
             var gridShape = ResolveWarningShape(pattern, shape);
             if (TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration))
+            {
+                shape?.SpawnVFX(ctx.Transform, warningCenter);
+                SpawnPatternHitVfx(ctx, pattern, warningCenter);
                 return;
+            }
         }
 
         if (shape != null)
         {
             shape.Execute(ctx, damage, knockback);
+            SpawnPatternHitVfx(ctx, pattern, warningCenter);
             return;
         }
 
@@ -213,6 +255,54 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         Vector3 dir = (ctx.Runtime.PlayerTarget.position - ctx.Transform.position).normalized;
         dir.y = 0.3f;
         player.ApplyKnockback(dir.normalized * knockback);
+        SpawnPatternHitVfx(ctx, pattern, warningCenter);
+    }
+
+    private static Vector3 GetWarningCenterPosition(MonsterContext ctx, AttackPattern pattern)
+    {
+        var shape = pattern.attackShapeOverride != null ? pattern.attackShapeOverride : ctx.Stat.attackShape;
+        if (shape is MonsterConeAttackSO cone && pattern.warningShape == AttackPattern.WarningShapeType.Auto)
+        {
+            float forwardOffset = Mathf.Clamp(cone.range * 0.55f, 0.4f, 2.2f);
+            return ctx.Transform.position + ctx.Transform.forward * forwardOffset;
+        }
+        return ctx.Transform.position;
+    }
+
+    private static void ApplyVfxHierarchyScaling(GameObject go)
+    {
+        if (go == null) return;
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+    }
+
+    private static void SpawnPatternHitVfx(MonsterContext ctx, AttackPattern pattern, Vector3 warningCenter)
+    {
+        // 패턴 전용 VFX가 있으면 사용, 없으면 config stat의 공통 VFX로 폴백
+        var prefab = pattern.hitVfxPrefab != null ? pattern.hitVfxPrefab : ctx.Stat.hitVfxPrefab;
+        if (prefab == null) return;
+
+        float scale = pattern.hitVfxPrefab != null ? pattern.hitVfxScale : ctx.Stat.hitVfxScale;
+        Vector3 offset = pattern.hitVfxPrefab != null ? pattern.hitVfxOffset : ctx.Stat.hitVfxOffset;
+        Vector3 pos = warningCenter + offset;
+
+        var go = UnityEngine.Object.Instantiate(prefab, pos, Quaternion.identity);
+        go.transform.localScale = Vector3.one * Mathf.Max(0.001f, scale);
+
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        }
+
+        var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
+        UnityEngine.Object.Destroy(go, lifetime);
     }
 
     private static bool TryExecuteGridHit(
@@ -299,6 +389,8 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
     private static void SpawnPatternWarning(MonsterContext ctx, AttackPattern pattern)
     {
+        if (pattern.disableWarning) return;
+
         Vector3 warningPos = ctx.Transform.position;
         float warningDuration = pattern.warningDuration > 0f
             ? pattern.warningDuration
@@ -375,6 +467,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
         float scale = pattern.castVfxScale > 0.001f ? pattern.castVfxScale : 1f;
         instance.transform.localScale *= scale;
+        ApplyVfxHierarchyScaling(instance);
         ForcePlayVfx(instance);
 
         float life = pattern.castVfxDuration;
@@ -530,7 +623,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public override void Enter(MonsterContext ctx)
         {
             base.Enter(ctx);
-            ctx.Agent.stoppingDistance = Mathf.Max(0.05f, _owner.GetEffectiveEngageDistance());
+            ctx.Agent.stoppingDistance = _owner.GetCloserPatternStoppingDistance(ctx, _runtime);
         }
 
         public override void Update(MonsterContext ctx)
@@ -545,7 +638,6 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
             if (ctx.Runtime.DistToPlayer <= _owner.GetEffectiveEngageDistance())
             {
-                // Enter attack-ready only when at least one pattern is currently selectable.
                 int selected = _owner.SelectPattern(ctx, _runtime);
                 if (selected >= 0)
                 {
@@ -553,9 +645,35 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                     ctx.Monster.ChangeState<AttackReadyState>();
                     return;
                 }
+
+                if (!_owner.ShouldChaseForCloserPattern(ctx, _runtime))
+                {
+                    ctx.Monster.ChangeState<AttackReadyState>();
+                    return;
+                }
             }
 
-            base.Update(ctx);
+            if (ctx.Monster.ShouldGiveUpChase(ctx))
+            {
+                ctx.Monster.ChangeState<PatrolState>();
+                return;
+            }
+
+            ctx.Agent.stoppingDistance = _owner.GetCloserPatternStoppingDistance(ctx, _runtime);
+
+            Vector3 targetPos = ctx.Runtime.PlayerTarget.position;
+            ctx.Agent.SetDestination(targetPos);
+            FaceTarget(ctx);
+            KeepChaseAnimation(ctx);
+
+            if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
+            {
+                ctx.Animator.SetFloat(
+                    ctx.Animation.speedParam,
+                    ctx.Agent.velocity.magnitude,
+                    ctx.Animation.speedDampTime,
+                    Time.deltaTime);
+            }
         }
     }
 
@@ -596,7 +714,10 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _runtime.SelectedPatternIndex = _owner.SelectPattern(ctx, _runtime);
             if (_runtime.SelectedPatternIndex < 0)
             {
-                ctx.Monster.ChangeState<ChaseState>();
+                if (_owner.ShouldChaseForCloserPattern(ctx, _runtime))
+                    ctx.Monster.ChangeState<ChaseState>();
+                else
+                    PatternAttackOverrideSO.FacePlayer(ctx, 15f);
                 return;
             }
             PatternAttackOverrideSO.FacePlayer(ctx, 15f);
@@ -616,6 +737,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         private bool _damageDealt;
         private AttackPattern _pattern;
         private GameObject _castVfxInstance;
+        private Vector3 _cachedWarningCenter;
+        private bool _waitForAnimFinish;
+        private string _currentAnimState;
 
         public PatternAttackState(PatternAttackOverrideSO owner, PatternRuntime runtime)
         {
@@ -649,6 +773,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             ctx.Runtime.AttackHitDealt = false;
             PatternAttackOverrideSO.FacePlayer(ctx, 100f);
 
+            // 경고장판 위치를 Enter 시점에 고정 캐싱 — 이후 몬스터 회전과 무관하게 유지
+            _cachedWarningCenter = GetWarningCenterPosition(ctx, _pattern);
+
             SpawnPatternWarning(ctx, _pattern);
             _castVfxInstance = SpawnPatternVfx(ctx, _pattern);
 
@@ -656,6 +783,10 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 ? ctx.Animation.attackStateName
                 : _pattern.animationStateName;
             PlayAttackAnimation(ctx, animState);
+            _currentAnimState = animState;
+            _waitForAnimFinish = ctx.Animator != null
+                && !string.IsNullOrEmpty(animState)
+                && ctx.Animator.HasState(0, Animator.StringToHash(animState));
         }
 
         public void Update(MonsterContext ctx)
@@ -668,12 +799,15 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 if (_damageTimer <= 0f)
                 {
                     _damageDealt = true;
-                    ExecutePatternAttack(ctx, _pattern);
+                    ExecutePatternAttack(ctx, _pattern, _cachedWarningCenter);
                 }
             }
 
             _cooldownTimer -= Time.deltaTime;
             if (_cooldownTimer > 0f) return;
+
+            if (_waitForAnimFinish && !IsAnimNearlyFinished(ctx))
+                return;
 
             if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
             {
@@ -695,6 +829,16 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 _castVfxInstance = null;
             }
             _runtime.SelectedPatternIndex = -1;
+        }
+
+        private bool IsAnimNearlyFinished(MonsterContext ctx)
+        {
+            if (ctx.Animator == null || string.IsNullOrEmpty(_currentAnimState)) return true;
+            int hash = Animator.StringToHash(_currentAnimState);
+            if (!ctx.Animator.HasState(0, hash)) return true;
+            var state = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+            if (state.shortNameHash != hash && state.fullPathHash != hash) return true;
+            return state.normalizedTime >= 0.92f;
         }
     }
 
