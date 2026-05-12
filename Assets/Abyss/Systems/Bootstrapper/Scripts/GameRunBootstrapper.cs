@@ -1026,10 +1026,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask StartRoomAsync()
     {
-        await SpawnMapAsync(startRoomMapKey);
-
         // 대화·위스프 구간 동안 HUD 숨김 — 캐릭터 획득 시점에 복원
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
+
+        await SpawnMapAsync(startRoomMapKey);
 
         await ShowStartRoomDialogueAsync();
 

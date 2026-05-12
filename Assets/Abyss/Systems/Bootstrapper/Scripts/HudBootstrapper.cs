@@ -55,6 +55,8 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_startRoomSuppressed) return;
+
         _panelGuardTimer -= Time.unscaledDeltaTime;
         if (_panelGuardTimer > 0f) return;
 
