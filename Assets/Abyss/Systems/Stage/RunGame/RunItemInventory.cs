@@ -75,4 +75,16 @@ public sealed class RunItemInventory
         _items.Clear();
         OnInventoryChanged?.Invoke();
     }
+
+    /// <summary>이어하기 복원용. 퀘스트/사운드 부작용 없이 아이템을 일괄 복원한다.</summary>
+    public void RestoreItems(System.Collections.Generic.IEnumerable<RuntimeItemData> items)
+    {
+        if (items == null) return;
+        foreach (var item in items)
+        {
+            if (item != null) _items.Add(item);
+        }
+        if (_items.Count > 0)
+            OnInventoryChanged?.Invoke();
+    }
 }

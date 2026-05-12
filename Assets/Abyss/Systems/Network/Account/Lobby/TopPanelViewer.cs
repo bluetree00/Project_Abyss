@@ -1,50 +1,50 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using Unity.VisualScripting;
-using BackEnd;
 
 public class TopPanelViewer : MonoBehaviour
 {
-    [SerializeField]
-    private TextMeshProUGUI textNickname; // 닉네임 텍스트
+    [SerializeField] private TextMeshProUGUI textNickname;
+    [SerializeField] private TextMeshProUGUI textLevel;
+    [SerializeField] private Slider          sliderExperience;
+    [SerializeField] private TextMeshProUGUI textHeart;
+    [SerializeField] private TextMeshProUGUI textGold;
+    [SerializeField] private TextMeshProUGUI textJewel;
 
-    [SerializeField]
-    private TextMeshProUGUI textLevel; // 레벨 텍스트
-    [SerializeField]
-    private Slider sliderExperience; // 경험치 슬라이더
-    [SerializeField]
-    private TextMeshProUGUI textHeart; // 하트 텍스트
-    [SerializeField]
-    private TextMeshProUGUI textGold; // 골드 텍스트
-    [SerializeField]
-    private TextMeshProUGUI textJewel; // 보석 텍스트
-
-    private void Awake()
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+    private void OnEnable()
     {
-        BackendGameData.Instance.ongameDataLoadEvent.AddListener(UpdateGameData);
+        if (BackendGameData.Instance != null)
+            BackendGameData.Instance.OnDataLoaded += Refresh;
     }
 
-    private void OnDestroy()
+    private void OnDisable()
     {
-        BackendGameData.Instance.ongameDataLoadEvent.RemoveListener(UpdateGameData);
+        if (BackendGameData.Instance != null)
+            BackendGameData.Instance.OnDataLoaded -= Refresh;
     }
+
+    // ── Public Methods ─────────────────────────────────────────────────────
 
     public void UpdateNickname()
     {
-        Debug.Log($"닉네임: {UserInfo.Data.nickname}, 게이머 ID: {UserInfo.Data.gamerId}");
-
-        textNickname.text = UserInfo.Data.nickname == null ?
-                            UserInfo.Data.gamerId : UserInfo.Data.nickname;
+        if (textNickname == null) return;
+        textNickname.text = string.IsNullOrEmpty(UserInfo.Data.nickname)
+            ? UserInfo.Data.gamerId
+            : UserInfo.Data.nickname;
     }
 
-    public void UpdateGameData()
-    {
-        textLevel.text = $"{BackendGameData.Instance.UsergameData.level}";
-        sliderExperience.value = BackendGameData.Instance.UsergameData.experience / 100f; // 경험치 슬라이더 값 설정
-        textHeart.text = $"{BackendGameData.Instance.UsergameData.heart} /30";
-        textGold.text = $"{BackendGameData.Instance.UsergameData.gold}";
-        textJewel.text = $"{BackendGameData.Instance.UsergameData.jewel}";
+    // ── Private Methods ────────────────────────────────────────────────────
 
+    private void Refresh()
+    {
+        var d = BackendGameData.Instance?.Data;
+        if (d == null) return;
+
+        if (textLevel        != null) textLevel.text        = $"{d.level}";
+        if (sliderExperience != null) sliderExperience.value = d.experience / 100f;
+        if (textHeart        != null) textHeart.text        = $"{d.heart}/30";
+        if (textGold         != null) textGold.text         = $"{d.gold}";
+        if (textJewel        != null) textJewel.text        = $"{d.jewel}";
     }
 }
