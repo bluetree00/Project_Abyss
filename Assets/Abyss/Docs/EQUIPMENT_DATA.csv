@@ -1,0 +1,13 @@
+﻿weapon_id,weapon_name,weapon_type,rarity,tier,base_attack,base_defense,crit_chance,attack_speed,attack_range,area_of_effect,ground_combo_count,air_combo_count,hold_threshold,promote_mode,charge_stages,weapon_prefab_key,weapon_display_key,icon_key,skill_q_name,skill_q_cooldown,skill_e_name,skill_e_cooldown,element,element_amount_basic,element_amount_heavy,element_amount_air,skill_q_element_override,skill_q_element_amount,skill_e_element_override,skill_e_element_amount,stat_version
+T1_Katana,기본 카타나,Katana,Common,1,40,5,10,1.5,1,1,5,3,4,None,2,T1_Katana_Weapon,T1_Katana_Display,T1_KatanaIcon,환영베기,10,섬광베기,5,Fire,12,30,10,None,0,None,0,1
+T2_Katana,강화된 카타나,Katana,Rare,2,60,5,10,1.5,1,1,5,3,4,None,2,T2_Katana_Weapon,T2_Katana_Display,T2_KatanaIcon,환영베기,10,섬광베기,5,Water,14,36,12,None,0,None,0,1
+T3_Katana,전설의 카타나,Katana,Epic,3,80,5,10,1.5,1,1,5,3,4,None,2,T3_Katana_Weapon,T3_Katana_Display,T3_KatanaIcon,환영베기,10,섬광베기,5,Lightning,18,45,15,None,0,None,0,1
+T1_Greatsword,기본 대검,Greatsword,Common,1,60,10,25,1,1.2,1.2,3,2,3,Stage,2,T1_Greatsword_Weapon,T1_Greatsword_Display,T1_GreatswordIcon,최후의 일격,12,주변경계,5,Earth,20,50,18,None,0,None,0,1
+T2_Greatsword,강화된 대검,Greatsword,Rare,2,90,10,25,1,1.2,1.2,3,2,3,Stage,2,T2_Greatsword_Weapon,T2_Greatsword_Display,T2_GreatswordIcon,최후의 일격,12,주변경계,5,Fire,24,60,22,None,0,None,0,1
+T3_Greatsword,전설의 대검,Greatsword,Epic,3,120,10,25,1,1.2,1.2,3,2,3,Stage,2,T3_Greatsword_Weapon,T3_Greatsword_Display,T3_GreatswordIcon,최후의 일격,12,주변경계,5,Grass,30,75,27,None,0,None,0,1
+T1_Crossbow,기본 석궁,Crossbow,Common,1,35,3,20,1,8,0.5,2,2,2,ChargeFull,2,T1_Crossbow_Weapon,T1_Crossbow_Display,T1_CrossbowIcon,궁수의 집중,10,갈래화살,3,Lightning,10,35,8,None,0,None,0,1
+T2_Crossbow,강화된 석궁,Crossbow,Rare,2,55,3,20,1,8,0.5,2,2,2,ChargeFull,2,T2_Crossbow_Weapon,T2_Crossbow_Display,T2_CrossbowIcon,궁수의 집중,10,갈래화살,3,Fire,12,42,10,None,0,None,0,1
+T3_Crossbow,전설의 석궁,Crossbow,Epic,3,75,3,20,1,8,0.5,2,2,2,ChargeFull,2,T3_Crossbow_Weapon,T3_Crossbow_Display,T3_CrossbowIcon,궁수의 집중,10,갈래화살,3,Water,15,53,12,None,0,None,0,1
+T1_Bow,기본 보우,Bow,Common,1,25,3,5,1.8,5,0.5,2,3,0,None,1,T1_Bow_Weapon,T1_Bow_Display,T1_BowIcon,속도의 한계,15,빨리쏘기,10,Grass,8,20,10,None,0,None,0,1
+T2_Bow,강화된 보우,Bow,Rare,2,30,3,5,1.8,5,0.5,2,3,0,None,1,T2_Bow_Weapon,T2_Bow_Display,T2_BowIcon,속도의 한계,15,빨리쏘기,10,Earth,10,24,12,None,0,None,0,1
+T3_Bow,전설의 보우,Bow,Epic,3,35,3,5,1.8,5,0.5,2,3,0,None,1,T3_Bow_Weapon,T3_Bow_Display,T3_BowIcon,속도의 한계,15,빨리쏘기,10,Lightning,12,30,15,None,0,None,0,1

@@ -33,6 +33,7 @@ public sealed class HudPresenter : MonoBehaviour
     private MonsterBase _boss;
     public MonsterBase BoundBoss => _boss;
     public bool HasBoundBoss => _boss != null;
+    public CanvasGroup MainCanvasGroup => canvasGroup;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
@@ -48,7 +49,8 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void Start()
     {
-        SetMode(startMode);
+        if (_currentMode == HUDIds.Mode.None)
+            SetMode(startMode);
     }
 
     public void Construct(GameRunSession run, UIHudDataProvider provider)
@@ -221,13 +223,15 @@ public sealed class HudPresenter : MonoBehaviour
 
     /// <summary>버프 획득 알림 텍스트 표시.</summary>
     public void ShowBuffNotice(string message) => view?.CombatPanel?.ShowBuffNotice(message);
+
+    /// <summary>아이템 효과 발동 알림 (왼쪽 스택형).</summary>
+    public void ShowItemEffectNotice(string message) => view?.CombatPanel?.ShowItemEffectNotice(message);
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
 
     private void HandleBossHPChanged(int hp, int maxHp)
     {
         view?.BossPanel?.SetHP(hp, maxHp);
-        if (hp <= 0) UnbindBoss();
     }
 
     private static int GetBossMaxHp(MonsterBase boss)
@@ -299,7 +303,13 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void OnDestroy()
     {
-        UnbindBoss();
+        // UnbindBoss 의 SetMode(Combat) cascade 는 파괴 중인 GameObject 에
+        // SetActive 를 호출해 Unity 예외를 유발하므로 이벤트 해제만 수행한다.
+        if (_boss != null)
+        {
+            _boss.OnHPChanged -= HandleBossHPChanged;
+            _boss = null;
+        }
         Dispose();
     }
 

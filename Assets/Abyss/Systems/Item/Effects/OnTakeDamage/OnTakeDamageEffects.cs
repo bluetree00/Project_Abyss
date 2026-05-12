@@ -21,15 +21,55 @@ public sealed class DamageNegateEffect : ItemEffectBase
 
 public sealed class DamageReflectEffect : ItemEffectBase
 {
+    private const string DefaultVfxKey = "VFX_DamageReflect";
+
     public DamageReflectEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (report.Attacker == null) return;
         float reflect = report.DamageDealt * _value;
-        // TODO: 공격자에게 반사 데미지
-        // report.Attacker.GetComponent<IDamageable>()?.TakeDamage(reflect);
-        Debug.Log($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
+        if (reflect <= 0f) return;
+
+        if (report.Attacker.TryGetComponent<IDamageable>(out var damageable))
+        {
+            var instigator = ctx.Player != null ? ctx.Player.gameObject : null;
+            damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
+
+            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
+            ItemEffectVfxHelper.ShowNotice($"<color=#88CCFF>피해 반사</color> {reflect:F0} → {report.Attacker.name}");
+            Debug.Log($"[DamageReflect] {reflect:F0} 반사 → {report.Attacker.name}");
+        }
+    }
+}
+
+/// <summary>
+/// 불 속성 피해 반사 (fire_dragon_scale).
+/// value=1 은 "1배(100%)" 반사이지만 CSV 원본 의미는 "피해 반사 + 불 속성 부여".
+/// 실제 반사량은 DamageReflect와 동일 비율을 쓰되, 원소를 Fire로 고정.
+/// </summary>
+public sealed class FireReflectEffect : ItemEffectBase
+{
+    private const string DefaultVfxKey = "VFX_FireReflect";
+    private const float ReflectRatio = 0.5f; // 기본 50% 반사 (CSV value=1은 활성 플래그로 간주)
+
+    public FireReflectEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (report.Attacker == null) return;
+        float reflect = report.DamageDealt * ReflectRatio;
+        if (reflect <= 0f) return;
+
+        if (report.Attacker.TryGetComponent<IDamageable>(out var damageable))
+        {
+            var instigator = ctx.Player != null ? ctx.Player.gameObject : null;
+            damageable.TakeDamage(reflect, instigator, knockbackMultiplier: 0f);
+
+            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Attacker.transform.position);
+            ItemEffectVfxHelper.ShowNotice($"<color=#FF7744>불 반사</color> {reflect:F0} → {report.Attacker.name}");
+            Debug.Log($"[FireReflect] {reflect:F0} 불 반사 → {report.Attacker.name}");
+        }
     }
 }
 
@@ -55,5 +95,26 @@ public sealed class DefenseOnHitEffect : ItemEffectBase
 
         _cooldownEnd = Time.time + cooldown;
         Debug.Log($"[DefenseOnHit] 방어력 +{_value} ({_duration}초), 쿨다운 {cooldown}초");
+    }
+}
+
+/// <summary>
+/// 피격 시 자해 추가 체력 손실 (prometheus_flame slot2).
+/// value 절대값 = 현재 최대체력 비율(예: 0.05 = 5%).
+/// TODO: 자해 데미지 API 연결 (PlayerController.Heal은 음수를 막음).
+/// 현재는 로그만 — 아이템 데이터(효과↔이름 불일치) 재확인 후 CSV 수정 또는 구현 완성.
+/// </summary>
+public sealed class ExtraDamageOnHitEffect : ItemEffectBase
+{
+    public ExtraDamageOnHitEffect(ItemEffectSlot s) : base(s) { }
+
+    public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)
+    {
+        if (ctx.Player == null) return;
+        int maxHp = ctx.Player.RuntimeStats != null ? ctx.Player.RuntimeStats.MaxHp : 0;
+        if (maxHp <= 0) return;
+
+        int extraLoss = Mathf.Max(1, Mathf.RoundToInt(maxHp * Mathf.Abs(_value)));
+        Debug.Log($"[ExtraDamageOnHit] 추가 체력 손실 {extraLoss} (미구현)");
     }
 }

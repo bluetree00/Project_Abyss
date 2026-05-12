@@ -38,4 +38,7 @@ MonoBehaviour:
   groundDrag: 4
   airDrag: 0.5
   conClass: 1
+  portrait: {fileID: 0}
+  rosterIllust: {fileID: 21300000, guid: 02aba0bb79d61b3438b04816aaa0d526, type: 3}
   passive: {fileID: 11400000, guid: 33f88de9663a8e74d9f08fe98d47408a, type: 2}
+  playerEntrance: {fileID: 0}

@@ -107,7 +107,7 @@ CapsuleCollider:
   m_Radius: 0.5
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!114 &7899402541359678491
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -120,6 +120,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfcaca170bddb114ca6c1adc5ed98f82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonMonster
+  _rangedAttackSO: {fileID: 11400000, guid: d89fa4b7036d4af2a91cf1a1863cd7e5, type: 2}
   _rangedProjectile: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e, type: 3}
   _rangedAttackRange: 10
   _rangedAttackSpeed: 14

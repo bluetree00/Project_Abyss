@@ -4,7 +4,7 @@
 
 ```
 CSV 테이블 (ITEM_DATA)
-  → ItemDataManager (CDN/Resources 로드)
+  → ItemDataManager (CDN → Addressables 폴백 로드)
     → RuntimeItemData (런타임 데이터)
       → RunItemInventory (보유 아이템)
         → ItemEffectManager (효과 관리 허브)

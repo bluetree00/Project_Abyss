@@ -21,19 +21,17 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Update()
     {
-        // MoveLock 제거: 항상 MoveDirection × MoveScale 적용
         var dir = _controller.MoveDirection * _controller.MoveScale;
 
         // 실제 이동 처리
         _controller.MoveAbility?.Move(_controller, dir);
 
-        // 블렌드 파라미터(0~1) — 공격/스킬 중이거나 MoveScale=0이면 이동 표현 안 함
+        // 블렌드 파라미터
         float target = (_controller.Combo.IsAttacking || !_controller.IsGrounded() || _controller.MoveScale < 0.01f) ? 0f : dir.magnitude;
         SetSpeedParam(_controller.Anim, target, 0.12f);
 
-
-          // Air 전이
-        if (!_controller.IsGrounded() && !_controller.isJumping)
+        // Air 전이
+        if (!_controller.IsGrounded())
         {
             _stateChanger.Change(LocoState.Air);
             return;
@@ -48,7 +46,6 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Exit() { }
 
-    // 유틸
     static void SetSpeedParam(Animator anim, float target01, float damp = 0.1f)
         => anim.SetFloat("MoveSpeed", Mathf.Clamp01(target01), damp, Time.deltaTime);
 }

@@ -41,8 +41,37 @@ public sealed class GameRunSession
 
     public ChapterId CurrentChapter { get; private set; }
 
+    /// <summary>현재 챕터의 블록 테마. ChapterDataSO.theme에서 해석된 값. 빈 문자열이면 방별 theme 또는 Default 팔레트 폴백.</summary>
+    public string ActiveTheme { get; private set; } = string.Empty;
+
+    /// <summary>현재 챕터의 필드 구조물 프리팹 Addressables 키.</summary>
+    public string ActiveFieldPrefabKey { get; private set; } = string.Empty;
+
+    private ChapterRegistry _chapterRegistry;
+
+    /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
+    public void BindChapterRegistry(ChapterRegistry registry)
+    {
+        _chapterRegistry = registry;
+        ResolveActiveTheme();
+    }
+
+    private void ResolveActiveTheme()
+    {
+        var data = _chapterRegistry != null ? _chapterRegistry.Get(CurrentChapter) : null;
+        ActiveTheme = data != null && !string.IsNullOrEmpty(data.theme) ? data.theme : string.Empty;
+        ActiveFieldPrefabKey = data != null ? data.fieldPrefabKey ?? string.Empty : string.Empty;
+    }
+
     public RoomManager RoomManager { get; private set; }
     public StagePointManager StagePointManager { get; private set; }
+
+    // 챕터 단위로 생성된 맵 그래프 캐시 — StageMap 씬 재진입 시 Generator 재실행 없이 UI를 복원해
+    // 노드 연결·방문 기록이 유지되도록 한다. AdvanceToNextChapter 시 무효화.
+    public StageMapGraph CachedStageGraph { get; private set; }
+
+    public void CacheStageGraph(StageMapGraph graph) => CachedStageGraph = graph;
+    public void InvalidateStageGraph() => CachedStageGraph = null;
 
     public PlayerController Player { get; private set; }
     private PlayerController _playerStateSource;
@@ -56,6 +85,15 @@ public sealed class GameRunSession
     // ── 시너지 이력 (씬 전환에도 생존) ──
     private readonly List<SynergyRecord> _appliedSynergies = new();
     public IReadOnlyList<SynergyRecord> AppliedSynergies => _appliedSynergies;
+
+    // ── 방 클리어 이력 ──
+    private readonly List<RoomClearRecord> _roomClearRecords = new();
+    public IReadOnlyList<RoomClearRecord> RoomClearRecords => _roomClearRecords;
+
+    // 방 진입 시 스냅샷 (클리어 시 방 내 획득분 계산에 사용)
+    private int _snapGold;
+    private int _snapItemCount;
+    private int _snapSynergyCount;
 
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
@@ -108,6 +146,44 @@ public sealed class GameRunSession
     }
 
     // =========================================================
+    // Room Clear Recording
+    // =========================================================
+
+    /// <summary>방 진입 시 호출. 이 방에서 얻은 양을 계산하기 위한 스냅샷.</summary>
+    private void SnapshotRoomEntry()
+    {
+        _snapGold         = PlayerState?.TempGold ?? 0;
+        _snapItemCount    = ItemInventory.Items.Count;
+        _snapSynergyCount = _appliedSynergies.Count;
+    }
+
+    /// <summary>방 클리어 시 호출. 현재 상태와 스냅샷의 차이로 방 내 획득 정보를 기록한다.</summary>
+    private void RecordRoomClear(int pointId, RunState clearedState)
+    {
+        if (!IsRunning) return;
+
+        int goldAfter  = PlayerState?.TempGold ?? 0;
+        int itemCount  = ItemInventory.Items.Count;
+        int synCount   = _appliedSynergies.Count;
+
+        _roomClearRecords.Add(new RoomClearRecord
+        {
+            pointId              = pointId,
+            chapter              = (int)CurrentChapter,
+            runState             = clearedState.ToString(),
+            hpAfter              = PlayerState?.Hp    ?? 0,
+            maxHp                = PlayerState?.MaxHp ?? 0,
+            goldAfter            = goldAfter,
+            goldGainedInRoom     = goldAfter - _snapGold,
+            itemsGainedCount     = itemCount - _snapItemCount,
+            totalItemCount       = itemCount,
+            synergiesGainedCount = synCount  - _snapSynergyCount,
+            totalSynergyCount    = synCount,
+            clearedAt            = DateTime.UtcNow.ToString("o"),
+        });
+    }
+
+    // =========================================================
     // Run Lifecycle
     // =========================================================
     public async UniTask StartNewRunAsync(ChapterId chapter, Func<string, UniTask<TextAsset>> loader)
@@ -120,6 +196,7 @@ public sealed class GameRunSession
 
         Phase = RunPhase.Starting;
         CurrentChapter = chapter;
+        ResolveActiveTheme();
 
         // HUD state reset for a new run
         CurrentHudMode = HUDIds.Mode.None;
@@ -161,6 +238,125 @@ public sealed class GameRunSession
             Debug.LogError($"[GameRun] StartNewRunAsync failed: {e}");
             ResetToNotRunning();
         }
+    }
+
+    // =========================================================
+    // Restore (이어하기)
+    // =========================================================
+
+    /// <summary>
+    /// 저장 슬롯 데이터로 세션을 완전 복원한다.
+    /// StartNewRunAsync와 달리 랜덤 맵 생성 없이 graphJson에서 그래프를 재구성하고,
+    /// HP/골드/아이템/시너지를 저장 값으로 채운다.
+    /// </summary>
+    public async UniTask RestoreFromSaveAsync(RunSaveData save, Func<string, UniTask<TextAsset>> loader)
+    {
+        if (Phase != RunPhase.NotRunning)
+        {
+            Debug.LogWarning($"[GameRun] RestoreFromSaveAsync ignored: phase={Phase}");
+            return;
+        }
+
+        Phase = RunPhase.Starting;
+        CurrentChapter = (ChapterId)save.chapter;
+        ResolveActiveTheme();
+        CurrentHudMode = HUDIds.Mode.None;
+        _hudModeSet = false;
+
+        try
+        {
+            await LoadStageDataAsync(STAGE_KEY, loader);
+
+            RoomManager = new RoomManager();
+            await RoomManager.InitializeAsync(ROOMS_KEY, loader);
+
+            if (!RoomManager.IsInitialized)
+            {
+                Debug.LogError("[GameRun] RestoreFromSaveAsync: RoomManager init failed.");
+                ResetToNotRunning();
+                return;
+            }
+
+            StagePointManager = new StagePointManager();
+            StagePointManager.Initialize(CurrentChapter, RoomManager);
+
+            if (!string.IsNullOrEmpty(save.graphJson))
+            {
+                var savedGraph = JsonUtility.FromJson<SavedStageGraph>(save.graphJson);
+                if (savedGraph?.nodes != null)
+                {
+                    StagePointManager.RestoreFromSaved(savedGraph, save.currentPointId);
+                    CachedStageGraph = GraphFromSaved(savedGraph);
+                }
+            }
+
+            PlayerState = new PlayerRunState(save.maxHp, save.runGold);
+            PlayerState.SetHp(save.currentHp);
+
+            RunDelta = new RunDelta();
+
+            if (!string.IsNullOrEmpty(save.itemsJson))
+            {
+                var itemWrapper = JsonUtility.FromJson<ItemListWrapper>(save.itemsJson);
+                if (itemWrapper?.items != null)
+                    ItemInventory.RestoreItems(itemWrapper.items);
+            }
+
+            if (!string.IsNullOrEmpty(save.synergiesJson))
+            {
+                var synWrapper = JsonUtility.FromJson<SynergyListWrapper>(save.synergiesJson);
+                if (synWrapper?.items != null)
+                {
+                    foreach (var record in synWrapper.items)
+                        if (record != null) _appliedSynergies.Add(record);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(save.roomLogsJson))
+            {
+                var logWrapper = JsonUtility.FromJson<RoomClearLogWrapper>(save.roomLogsJson);
+                if (logWrapper?.records != null)
+                    _roomClearRecords.AddRange(logWrapper.records);
+            }
+
+            Phase = RunPhase.Running;
+            ChangeRunState(RunState.Map);
+
+            OnPlayerStateReady?.Invoke(PlayerState);
+            OnRunStarted?.Invoke();
+
+            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}, pointId={save.currentPointId}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[GameRun] RestoreFromSaveAsync failed: {e}");
+            ResetToNotRunning();
+        }
+    }
+
+    private static StageMapGraph GraphFromSaved(SavedStageGraph saved)
+    {
+        var nodes = new List<StageMapNode>(saved.nodes.Length);
+        foreach (var n in saved.nodes)
+        {
+            nodes.Add(new StageMapNode
+            {
+                PointId      = n.pointId,
+                Stage        = (StageCategory)n.stageCategory,
+                Normal       = (NormalRoomCategory)n.normalRoomCategory,
+                LayerIndex   = n.layerIndex,
+                IndexInLayer = n.indexInLayer,
+                NextPointIds = n.nextPointIds != null
+                    ? new List<int>(n.nextPointIds)
+                    : new List<int>(),
+            });
+        }
+        return new StageMapGraph
+        {
+            FullPattern   = saved.fullPattern,
+            MiddlePattern = saved.middlePattern,
+            Nodes         = nodes,
+        };
     }
 
     public EndRunResult EndRun(bool isCleared, string reason = null)
@@ -219,12 +415,16 @@ public sealed class GameRunSession
         BuffHandler.ClearAll();
         RoomManager = null;
         StagePointManager = null;
+        CachedStageGraph = null;
         Player = null;
         PlayerState = null;
         CurrentRunState = RunState.None;
         SavedWeaponSlots = null;
         SavedCurrentSlotIndex = -1;
         _appliedSynergies.Clear();
+        _roomClearRecords.Clear();
+        ActiveTheme = string.Empty;
+        ActiveFieldPrefabKey = string.Empty;
     }
 
     /// <summary>
@@ -288,12 +488,24 @@ public sealed class GameRunSession
     public void EnterRoom(RunState roomState)
     {
         if (!IsRunning) return;
+
+        SnapshotRoomEntry();
+
+        // 아이템 효과: 방/보스방 진입 hook
+        if (roomState == RunState.BossRoom)
+            EffectManager?.OnBossEnter();
+        else if (roomState == RunState.CombatRoom || roomState == RunState.ItemRoom ||
+                 roomState == RunState.RewardRoom  || roomState == RunState.SpecialRoom)
+            EffectManager?.OnRoomEnter();
+
         ChangeRunState(roomState);
     }
 
     public void EnterStandby()
     {
         if (!IsRunning) return;
+
+        RecordRoomClear(StagePointManager?.CurrentPointId ?? -1, CurrentRunState);
 
         // 아이템 효과: 방 클리어 hook
         EffectManager?.OnRoomClear();
@@ -321,6 +533,27 @@ public sealed class GameRunSession
         EffectManager?.OnBossClear();
 
         ChangeRunState(RunState.ChapterClear);
+    }
+
+    /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
+    public bool AdvanceToNextChapter()
+    {
+        if (!IsRunning) return false;
+
+        var next = CurrentChapter + 1;
+        if (next > ChapterId.Chapter5) return false;
+
+        CurrentChapter = next;
+        ResolveActiveTheme();
+
+        // StagePointManager 재초기화 (새 챕터 노드 배치)
+        StagePointManager.Initialize(next, RoomManager);
+
+        // 이전 챕터의 그래프는 폐기 — 다음 StageMap 진입 시 새로 생성
+        InvalidateStageGraph();
+
+        ChangeRunState(RunState.Map);
+        return true;
     }
 
     // =========================================================
@@ -536,6 +769,8 @@ public sealed class GameRunSession
 
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
+        QuestEvents.ReportGold(amount);
+        Managers.Sound?.PlayEvent(SoundEvent.GoldPickup);
     }
 
     public void AddItem(ItemId itemId, int count)
@@ -585,7 +820,9 @@ public sealed class GameRunSession
         if (charData == null)
             Debug.LogWarning("[GameRun] CharacterData not set — PlayerRunState uses default maxHp=100.");
 
-        return new PlayerRunState(maxHp);
+        // 디버그/테스트용 시작 골드 — 출시 전 정책. 추후 0 또는 메타-프로그레션 값으로 교체.
+        const int DebugStartGold = 99999;
+        return new PlayerRunState(maxHp, DebugStartGold);
     }
 
     private void SubscribePlayerStateSource(PlayerController player)

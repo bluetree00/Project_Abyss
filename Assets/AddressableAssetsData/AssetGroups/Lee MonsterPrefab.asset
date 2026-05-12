@@ -40,13 +40,133 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ca57a31cdc40b2545be737603b78ed55
-    m_Address: ForestGuardian/ForestGuardian
+  - m_GUID: 29b6eed2069bcfc459cc1653d399680e
+    m_Address: DragonBoss/DragonBoss
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 29b6eed2069bcfc459cc1653d399680e
-    m_Address: DragonBoss/DragonBoss
+  - m_GUID: bb174a4bda865994eb28c1089bb22dab
+    m_Address: Spider/Spider
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb0ebae74e8ef634485f509986be936c
+    m_Address: MonsterPlant/MonsterPlant
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 46e25d08f06a5ed429ecdab9e3b50a77
+    m_Address: EvilMage/EvilMage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 57ee1e2962232aa46ad6a0e0f9458909
+    m_Address: Orc/Orc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: abba52759e998eb48a4901aba11335ec
+    m_Address: Dragon/Dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ecf4ed863a20b0e479b51e8b22fed3be
+    m_Address: Beholder/Beholder
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4e6081780a9e62542b9a255ee9a20222
+    m_Address: ChestMonster/ChestMonster
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 20a592a2173063643806f4669caf0844
+    m_Address: CrabMonster/CrabMonster
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8fb076c166019e64c8551d4dfb926232
+    m_Address: FlyingDemon/FlyingDemon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e7cf1fa1155528d4ca10955f2df449c5
+    m_Address: LizardWarrior/LizardWarrior
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e0a0bf062861c1847813fcc1017e7f1e
+    m_Address: RatAssassin/RatAssassin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6481c5c0c72f67f4690371218aff6bf6
+    m_Address: Specter/Specter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9776ec5ed64f21346a8522f6ecd62210
+    m_Address: BattleBee/BattleBee
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2d49536119641744c8ad2c97b6a7bba8
+    m_Address: BishopKnight/BishopKnight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1ea87ab785205b447910d7ba1b45eb0d
+    m_Address: Cactus/Cactus
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7bc15658de2d30e45a86f154a51ecd62
+    m_Address: Cyclops/Cyclops
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 29e9b8585c6d9e84db9d8ed5a5ff2da4
+    m_Address: DemonKing/DemonKing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96e62469075469e4bb0e88ca125c1ef9
+    m_Address: Fishman/Fishman
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8cde3e9432e4f0f4f820c950b41fa90f
+    m_Address: MushroomAngry/MushroomAngry
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 44a1a6b087dd9af45a51d72d04c1c2b4
+    m_Address: MushroomSmile/MushroomSmile
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2353c5ce536da541b34c68d024adedc
+    m_Address: NagaWizard/NagaWizard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 925ef72c387dc7149a2a66a8b694caf3
+    m_Address: Salamander/Salamander
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 30137d4796da7224397d593e9970acb8
+    m_Address: WormMonster/WormMonster
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 772b743943217764598caa2c12f198cf
+    m_Address: Werewolf/Werewolf
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8645fe2099851b0408a3467544a7d11c
+    m_Address: StingRay/StingRay
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

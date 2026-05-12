@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -26,6 +26,7 @@ MonoBehaviour:
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9, type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
   - name: BodyBash
@@ -39,6 +40,7 @@ MonoBehaviour:
     damageMultiplier: 1.15
     knockbackMultiplier: 1.2
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9, type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
   - name: WebShot
@@ -52,5 +54,6 @@ MonoBehaviour:
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: e680df75a2ae4d8890c0d1fe4c19c80f, type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0

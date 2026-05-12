@@ -48,11 +48,24 @@ public class MonsterRuntimeData
     public bool AttackHitDealt;
     /// <summary>이번 조우에서 첫 번째 공격인지. true면 AttackReady 딜레이 없이 즉시 공격.</summary>
     public bool IsFirstAttack = true;
+    /// <summary>다중 발사 시퀀스(FireSequenceAsync)가 진행 중인지. true이면 AttackState 쿨다운을 중단하지 않는다.</summary>
+    public bool IsExecutingAttackSequence;
+    /// <summary>현재 AttackState 진입 이후 AnimEvent로 발생한 히트 수. Enter()마다 0으로 초기화.</summary>
+    public int AttackHitCount;
 
     // ── 위장 감지 ──────────────────────────────────────────
     /// <summary>위장 상태에서 플레이어에게 공격당한 적 있는지. 미믹 등 공격 감지형 몬스터에서 사용.</summary>
     public bool HasBeenAttacked;
+    /// <summary>잠복 대기 중인지.</summary>
     public bool IsDormant;
+    /// <summary>스폰 위치로 귀환 중인지. 잠복/귀환 모두 비전투 모드.</summary>
+    public bool IsReturning;
+    /// <summary>
+    /// 비전투 재진입 후 플레이어가 감지 범위를 한 번 벗어났는지.
+    /// false면 아직 이전 조우의 잔존 타겟이므로 거리 기반 재감지를 차단한다.
+    /// 피격에 의한 전투 전환은 이 플래그와 무관하게 항상 허용된다.
+    /// </summary>
+    public bool TargetCleared;
 
     // ── 특수 상태 배율 ─────────────────────────────────────
     /// <summary>이동 속도 배율. 광폭화 등 영구 버프에 사용. 기본값 1.</summary>

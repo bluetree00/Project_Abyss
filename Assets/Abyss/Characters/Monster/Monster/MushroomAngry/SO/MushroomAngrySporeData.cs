@@ -27,5 +27,8 @@ public class MushroomAngrySporeData : SpecialStateDataBase
     [Tooltip("포자 폭발 시 재생할 이펙트 프리팹 (null이면 생략)")]
     public GameObject sporeEffectPrefab;
 
+    [Tooltip("포자 이펙트 스케일 배율")]
+    public float sporeEffectScale = 1f;
+
     public override SpecialStateBase CreateState() => new MushroomAngrySporeBlastState(this);
 }

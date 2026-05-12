@@ -128,13 +128,15 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
 
             _visualRoot = FindVisualRoot(_monsterRoot);
             _originalLocalPos = _visualRoot != null ? _visualRoot.localPosition : Vector3.zero;
-            _renderers = _visualRoot != null
-                ? _visualRoot.GetComponentsInChildren<Renderer>(true)
-                : _monsterRoot.GetComponentsInChildren<Renderer>(true);
+            _renderers = _monsterRoot.GetComponentsInChildren<Renderer>(true);
         }
 
         private static Transform FindVisualRoot(Transform root)
         {
+            var animator = root.GetComponentInChildren<Animator>(true);
+            if (animator != null && animator.transform != root)
+                return animator.transform;
+
             for (int i = 0; i < root.childCount; i++)
             {
                 var child = root.GetChild(i);
@@ -276,10 +278,8 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
         public override void Enter(MonsterContext ctx)
         {
             base.Enter(ctx);
-            // Preserve current surfaced state during chained melee attacks.
-            // Only keep the worm buried here when it is approaching from underground.
             if (_burrowController.IsBurrowed)
-                _burrowController.Burrow(ctx);
+                _burrowController.Emerge(ctx);
         }
 
         public override void Update(MonsterContext ctx)
@@ -302,6 +302,12 @@ public class WormPatrolOverrideSO : MonsterStateOverrideSO
         {
             _burrowController.Emerge(ctx);
             base.Enter(ctx);
+        }
+
+        public override void Exit(MonsterContext ctx)
+        {
+            _burrowController.Burrow(ctx);
+            base.Exit(ctx);
         }
     }
 }

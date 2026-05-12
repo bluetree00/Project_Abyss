@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6fe15aafd9c7284b93f88ba87d13875, type: 3}
+  m_Name: ShopPriceTable
+  m_EditorClassIdentifier: Assembly-CSharp::ShopPriceTableSO
+  itemCommon: 50
+  itemRare: 150
+  itemEpic: 400
+  itemLegendary: 1000
+  weaponCommon: 100
+  weaponRare: 300
+  weaponEpic: 700
+  weaponLegendary: 1500

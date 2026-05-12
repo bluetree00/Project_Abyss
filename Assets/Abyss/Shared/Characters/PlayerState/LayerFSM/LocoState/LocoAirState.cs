@@ -2,14 +2,15 @@ using UnityEngine;
 
 public class LocoAirState : ILayerState<LocoState>
 {
+    private enum AirPhase { Start, Loop, Landing }
+
+    private const float LandingDuration = 0.15f;
+
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
-    private bool _entered = false; // 중복 Enter 방지
-
-    // 블렌드 트리 값 (0 = Start, 1 = Keep)
-    private float _blendValue = 0f;
-    private float _blendSpeed = 0.01f;
+    private AirPhase _phase;
+    private float _landingTimer;
 
     public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
     {
@@ -19,47 +20,74 @@ public class LocoAirState : ILayerState<LocoState>
 
     public void Enter()
     {
-        _controller.SetMoveScale(0f);
-        _controller.Anim.CrossFade("JumpBlend", 0.1f);
+        _phase = AirPhase.Start;
+        _landingTimer = 0f;
 
-        _controller.SetJumping(true);
-        _blendValue = _controller.EnterAirAsJump ? 0f : 1f;
-        Debug.Log($"LocoAirState Enter: EnterAirAsJump={_controller.EnterAirAsJump}, isJumping={_controller.isJumping}");
-
-        _controller.Anim.SetFloat("JumpValue", _blendValue);
+        // ProcessJump에서 이미 CrossFade 했으므로,
+        // 낙하 진입(점프 없이 떨어진 경우)만 여기서 처리
+        if (!_controller.IsJumping)
+        {
+            _phase = AirPhase.Loop;
+            _controller.Anim.SetFloat("JumpValue", 1f);
+            _controller.Anim.CrossFade("JumpBlend", 0.1f);
+        }
     }
-
 
     public void Update()
     {
-        // 착지 체크
-        if (_controller.IsGrounded())
+        switch (_phase)
         {
-            _controller.SetMoveScale(1f);
+            case AirPhase.Start:
+                if (_controller.Rigid.linearVelocity.y <= 0f)
+                {
+                    _phase = AirPhase.Loop;
+                    _controller.Anim.SetFloat("JumpValue", 1f);
+                }
+                break;
 
-            // 낙하 공격 중이면 ActPlungeState가 착지를 직접 처리
-            // → JumpBlend 착지 애니 및 CancelActState 건너뜀
-            if (!_controller.IsPlunging)
-            {
-                _controller.Anim.SetFloat("JumpValue", 2f);
-            }
+            case AirPhase.Loop:
+                if (_controller.IsGrounded())
+                {
+                    EnterLanding();
+                }
+                break;
 
-            _stateChanger.Change(LocoState.Idle);
+            case AirPhase.Landing:
+                // 착지 중 재점프 → 즉시 Start 단계로 리셋
+                if (_controller.IsJumping)
+                {
+                    _controller.IsLanding = false;
+                    _phase = AirPhase.Start;
+                    break;
+                }
+
+                _landingTimer -= Time.deltaTime;
+                if (_landingTimer <= 0f)
+                {
+                    float speed = _controller.MoveDirection.magnitude * _controller.MoveScale;
+                    _stateChanger.Change(speed > 0.05f ? LocoState.Move : LocoState.Idle);
+                }
+                break;
         }
     }
 
     public void Exit()
     {
-        _entered = false;
+        _controller.IsLanding = false;
+    }
 
-        // 낙하 공격 중 → ActPlungeState가 착지를 직접 처리
-        // 그 외 모든 경우 (공중 공격 포함) → 착지 시 ActState 초기화
-        if (!_controller.IsPlunging)
-            _controller.CancelActState();
+    private void EnterLanding()
+    {
+        _phase = AirPhase.Landing;
+        _landingTimer = LandingDuration;
 
-        _controller.SetMoveScale(1f);
-        _controller.ConsumeEnterAirAsJump();
-        _controller.SetJumping(false);
-        _controller.Anim.SetFloat("JumpValue", 0f);
+        _controller.IsLanding = true;
+
+        // 공중 공격 중이든 아니든, 착지 애니메이션 강제 재생
+        _controller.Anim.CrossFade("JumpLand", 0.05f);
+
+        // 아이템 효과: 점프 착지 hook
+        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
+        mgr?.OnJumpLand(_controller.transform.position);
     }
 }

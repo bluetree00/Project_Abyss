@@ -20,6 +20,10 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Abyss/Scenes/StageMap.unity
     guid: 635dbfbeba406604d9a739f5e3d48f28
+  - enabled: 1
+    path: Assets/Abyss/Scenes/StartScene.unity
+    guid: 8b0456c15b8edfa4a9d55ad3cbf46bb2
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 9ab410270870c5d438a3caf7889cab42,
       type: 2}
+  m_UseUCBPForAssetBundles: 0

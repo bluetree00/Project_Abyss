@@ -93,7 +93,6 @@ public class ActAttackState : ILayerState<ActState>
 
         SubscribeReceiver();
         PlayCurrentComboAnimation();
-        _controller.BeginWeaponTrail();
     }
 
     // ── Update ───────────────────────────────────────────────────────────────
@@ -188,7 +187,6 @@ public class ActAttackState : ILayerState<ActState>
     public void Exit()
     {
         UnsubscribeReceiver();
-        _controller.EndWeaponTrail();
 
         _waitingForComboInput = false;
         _currentStateHash     = 0;
@@ -378,8 +376,8 @@ public class ActAttackState : ILayerState<ActState>
                       as WeaponAnimationSetSO;
         (_comboOpen, _comboClose, _attackEnd) = ResolveTiming(mapping, animSet);
 
-        // 아이템 공격속도 배율 → Animator speed
-        anim.speed = _controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f;
+        // 아이템 공격속도 배율 × 베이스 보정 1.2 → Animator speed
+        anim.speed = (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * 1.2f;
     }
 
     // ── 타이밍 해석 ──────────────────────────────────────────────────────────

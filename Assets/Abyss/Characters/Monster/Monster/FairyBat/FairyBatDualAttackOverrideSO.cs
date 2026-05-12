@@ -12,6 +12,21 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
     [Tooltip("Projectile prefab used for the sonic wave attack.")]
     public MonsterProjectile sonicWaveProjectile;
 
+    [Tooltip("Optional VFX-only projectile setup used instead of the legacy temporary projectile.")]
+    public GameObject sonicVfxProjectilePrefab;
+
+    [Tooltip("Scale applied to the VFX projectile.")]
+    public float sonicVfxProjectileScale = 1f;
+
+    [Tooltip("Distance from the player at which the VFX projectile counts as a hit.")]
+    public float sonicVfxHitRadius = 0.6f;
+
+    [Tooltip("Optional hit effect spawned when the VFX projectile lands.")]
+    public GameObject sonicVfxHitEffectPrefab;
+
+    [Tooltip("Scale applied to the VFX hit effect.")]
+    public float sonicVfxHitEffectScale = 1f;
+
     [Tooltip("Projectile speed in meters per second.")]
     public float sonicSpeed = 12f;
 
@@ -32,22 +47,50 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
     }
 
     private float GetMaxAttackRange(MonsterContext ctx)
-        => Mathf.Max(ctx.Stat.attackRange, sonicWaveProjectile != null ? sonicMaxRange : 0f);
+    {
+        bool hasRangedAttack = sonicWaveProjectile != null || sonicVfxProjectilePrefab != null;
+        return Mathf.Max(ctx.Stat.attackRange, hasRangedAttack ? sonicMaxRange : 0f);
+    }
 
     private bool ShouldUseRangedAttack(MonsterContext ctx)
-        => sonicWaveProjectile != null
+        => (sonicWaveProjectile != null || sonicVfxProjectilePrefab != null)
         && ctx.Runtime.PlayerTarget != null
         && ctx.Runtime.DistToPlayer > ctx.Stat.attackRange;
 
     private void FireSonicWave(MonsterContext ctx)
     {
-        if (sonicWaveProjectile == null || ctx.Runtime.PlayerTarget == null) return;
+        if (ctx.Runtime.PlayerTarget == null) return;
 
         var damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
         var knockback = ctx.Stat.knockbackForce;
         var origin = ctx.Transform.position + Vector3.up * launchHeightOffset;
         var targetPos = ctx.Runtime.PlayerTarget.position + Vector3.up * launchHeightOffset;
         var direction = (targetPos - origin).normalized;
+
+        if (sonicVfxProjectilePrefab != null)
+        {
+            var go = Object.Instantiate(sonicVfxProjectilePrefab, origin, Quaternion.LookRotation(direction));
+            go.transform.localScale = Vector3.one * Mathf.Max(0.001f, sonicVfxProjectileScale);
+
+            if (!go.TryGetComponent<MonsterVfxProjectile>(out var vfxProjectile))
+                vfxProjectile = go.AddComponent<MonsterVfxProjectile>();
+
+            vfxProjectile.Init(
+                direction,
+                sonicSpeed,
+                sonicMaxRange,
+                damage,
+                knockback,
+                0f,
+                0f,
+                sonicVfxHitRadius,
+                ctx.Runtime.PlayerTarget,
+                sonicVfxHitEffectPrefab,
+                sonicVfxHitEffectScale);
+            return;
+        }
+
+        if (sonicWaveProjectile == null) return;
 
         var proj = Object.Instantiate(sonicWaveProjectile, origin, Quaternion.LookRotation(direction));
         proj.Init(direction, sonicSpeed, sonicMaxRange, damage, knockback);
@@ -183,7 +226,10 @@ public class FairyBatDualAttackOverrideSO : MonsterStateOverrideSO
             ctx.Runtime.AttackHitDealt = false;
             RotateTowardPlayer(ctx, 100f);
 
-            var attackAnim = _useRangedAttack ? _data.sonicAnimTrigger : ctx.Animation.attackTrigger;
+            var meleeAnim = !string.IsNullOrEmpty(ctx.Animation.attackStateName)
+                ? ctx.Animation.attackStateName
+                : ctx.Animation.attackTrigger;
+            var attackAnim = _useRangedAttack ? _data.sonicAnimTrigger : meleeAnim;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
                 ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
         }

@@ -72,10 +72,12 @@ public class EquipmentEntry
     public string weapon_id;
     public string weapon_name;
     public string weapon_type;      // Katana, Greatsword, Crossbow, Bow
-    public string element;          // None, Water, Fire, Grass, Earth, Lightning
+    public string rarity;           // Common, Rare, Epic, Legendary (신설; 비어있으면 tier로 폴백)
     public int    tier;
     public float  base_attack;
     public float  base_defense;
+    public float  crit_chance;      // 치명타 확률 (%, 0~100)
+    public float  crit_damage;      // 치명타 발생 시 데미지 배율 (1.0 = 기본 데미지, 1.25 = +25%, 2.0 = 2배)
     public float  attack_speed;
     public float  attack_range;
     public float  area_of_effect;
@@ -91,6 +93,17 @@ public class EquipmentEntry
     public float  skill_q_cooldown;
     public string skill_e_name;
     public float  skill_e_cooldown;
+
+    // ── 원소 (None, Water, Fire, Grass, Earth, Lightning) ──
+    public string element;
+    public float  element_amount_basic;   // 기본공격 1히트당 원소 누적치
+    public float  element_amount_heavy;   // 차지공격 1히트당
+    public float  element_amount_air;     // 공중공격 1히트당
+    public string skill_q_element_override;   // Q스킬 원소 오버라이드 (None=무기 원소 따름)
+    public float  skill_q_element_amount;
+    public string skill_e_element_override;
+    public float  skill_e_element_amount;
+
     public int    stat_version;
 }
 

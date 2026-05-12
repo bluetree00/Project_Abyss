@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StingRayConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: StingRay
-  grade: 0
+  grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -75,4 +75,5 @@ MonoBehaviour:
   - conditions: []
     state: {fileID: 11400000, guid: f0d8ed5df90fff84293b55ce423cee3d, type: 2}
     oneShot: 0
-  stateOverrides: []
+  stateOverrides:
+  - {fileID: 11400000, guid: b6d6e4264e2b44b5962b6683b474fc86, type: 2}

@@ -31,6 +31,8 @@ public class GolemRoarState : InvincibleState<GolemRoarData>
         if (ctx.Animator != null && !string.IsNullOrEmpty(Data.roarStateName))
             ctx.Animator.CrossFade(Data.roarStateName, 0.1f);
 
+        Data.SpawnVFX(ctx.Transform);
+
         // 포효 충격파 — 주변 오브젝트 날리기
         ApplyRoarBlast(ctx);
     }

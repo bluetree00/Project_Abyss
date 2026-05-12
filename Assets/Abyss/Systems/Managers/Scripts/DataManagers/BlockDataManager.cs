@@ -37,8 +37,8 @@ public class BlockDataManager
 
         if (_shapeById.Count == 0)
         {
-            Debug.Log("[BlockDataManager] CDN 실패 — Resources 폴백");
-            var shapeJson = Resources.Load<TextAsset>("BLOCK_SHAPE_DATA");
+            Debug.Log("[BlockDataManager] CDN 실패 — Addressables 폴백");
+            var shapeJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BLOCK_SHAPE_DATA");
             if (shapeJson != null)
             {
                 var col = JsonUtility.FromJson<BlockShapeEntryCollection>(shapeJson.text);
@@ -46,7 +46,7 @@ public class BlockDataManager
                     foreach (var s in col.shapes)
                         _shapeById[s.shape_id] = s;
             }
-            var gridJson = Resources.Load<TextAsset>("BLOCK_GRID_DATA");
+            var gridJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BLOCK_GRID_DATA");
             if (gridJson != null)
             {
                 var col = JsonUtility.FromJson<BlockGridEntryCollection>(gridJson.text);

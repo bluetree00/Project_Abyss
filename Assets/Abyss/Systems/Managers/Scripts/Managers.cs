@@ -31,10 +31,10 @@ public sealed class Managers : MonoBehaviour
 
     #region Core Managers
     private InputManager _input;
-    private ResourceManager _resource;
     private ObjectPoolerManager _objectPoolerManager;
     private AddressableManager _addressableManager;
     private AnimationResourceManager _animationResources;
+    private SoundManager _soundManager;
 
     private UIManager _ui;
     private CharacterDataManager _characterDataManager;
@@ -48,6 +48,11 @@ public sealed class Managers : MonoBehaviour
     private ItemDataManager _itemDataManager;
     private BlockDataManager _blockDataManager;
     private BuffDataManager _buffDataManager;
+    private ChapterDataManager _chapterDataManager;
+    private ElementEffectDataManager _elementEffectDataManager;
+    private ServerMonsterStatDataManager _serverMonsterStatDataManager;
+    private ShopDataManager _shopDataManager;
+    private QuestManager _questManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -61,20 +66,6 @@ public sealed class Managers : MonoBehaviour
                 inst._input = new InputManager();
 
             return inst._input;
-        }
-    }
-
-    public static ResourceManager Resource
-    {
-        get
-        {
-            var inst = Instance;
-            if (inst == null) return null;
-
-            if (inst._resource == null)
-                inst._resource = new ResourceManager();
-
-            return inst._resource;
         }
     }
 
@@ -117,6 +108,20 @@ public sealed class Managers : MonoBehaviour
                 inst._animationResources = new AnimationResourceManager();
 
             return inst._animationResources;
+        }
+    }
+
+    public static SoundManager Sound
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._soundManager == null)
+                inst._soundManager = new SoundManager();
+
+            return inst._soundManager;
         }
     }
 
@@ -266,6 +271,76 @@ public sealed class Managers : MonoBehaviour
                 inst._buffDataManager = new BuffDataManager();
 
             return inst._buffDataManager;
+        }
+    }
+
+    public static ChapterDataManager ChapterData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._chapterDataManager == null)
+                inst._chapterDataManager = new ChapterDataManager();
+
+            return inst._chapterDataManager;
+        }
+    }
+
+    public static ElementEffectDataManager ElementEffectData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._elementEffectDataManager == null)
+                inst._elementEffectDataManager = new ElementEffectDataManager();
+
+            return inst._elementEffectDataManager;
+        }
+    }
+
+    public static ServerMonsterStatDataManager ServerMonsterStat
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._serverMonsterStatDataManager == null)
+                inst._serverMonsterStatDataManager = new ServerMonsterStatDataManager();
+
+            return inst._serverMonsterStatDataManager;
+        }
+    }
+
+    public static ShopDataManager ShopData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._shopDataManager == null)
+                inst._shopDataManager = new ShopDataManager();
+
+            return inst._shopDataManager;
+        }
+    }
+
+    public static QuestManager Quest
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._questManager == null)
+                inst._questManager = new QuestManager();
+
+            return inst._questManager;
         }
     }
     #endregion

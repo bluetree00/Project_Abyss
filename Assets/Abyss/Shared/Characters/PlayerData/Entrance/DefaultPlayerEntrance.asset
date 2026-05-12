@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a1ee4ada17d25a4fa0eaa64db9a673a, type: 3}
+  m_Name: DefaultPlayerEntrance
+  m_EditorClassIdentifier: Assembly-CSharp::DefaultPlayerEntranceSO
+  activateDelay: 0.8
+  vfxDuration: 1.2
+  vfxPrefab: {fileID: 1282364566017586, guid: 38e2ad2405a73b94ca4acff97076788a, type: 3}
+  animationTrigger: Entrance

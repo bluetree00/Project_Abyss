@@ -63,7 +63,7 @@ public class ChaseState : IMonsterState
 
     public virtual void Exit(MonsterContext ctx)
     {
-        ctx.Agent.ResetPath();
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────

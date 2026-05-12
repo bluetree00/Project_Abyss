@@ -14,6 +14,8 @@ public class DragonMonster : MonsterBase
     protected override string HeadBoneName    => null;
 
     [Header("Ranged Attack")]
+    [Tooltip("이 SO를 할당하면 원거리 공격 이펙트/투사체를 SO에서 제어할 수 있습니다.")]
+    [SerializeField] private MonsterRangedAttackSO _rangedAttackSO;
     [SerializeField] private MonsterProjectile _rangedProjectile;
     [SerializeField] private float _rangedAttackRange = 10f;
     [SerializeField] private float _rangedAttackSpeed = 14f;
@@ -36,19 +38,36 @@ public class DragonMonster : MonsterBase
     }
 
     private float GetMaxAttackRange()
-        => Mathf.Max(_config.stat.attackRange, _rangedProjectile != null ? _rangedAttackRange : 0f);
+    {
+        bool hasRangedAttack = _rangedAttackSO != null || _rangedProjectile != null;
+        if (!hasRangedAttack)
+            return _config.stat.attackRange;
+
+        float rangedRange = _rangedAttackRange;
+        if (_rangedAttackSO != null)
+            rangedRange = Mathf.Max(rangedRange, _rangedAttackSO.projectileMaxRange);
+
+        return Mathf.Max(_config.stat.attackRange, rangedRange);
+    }
 
     private bool ShouldUseRangedAttack(MonsterContext ctx)
-        => _rangedProjectile != null
+        => (_rangedAttackSO != null || _rangedProjectile != null)
         && ctx.Runtime.PlayerTarget != null
         && ctx.Runtime.DistToPlayer > ctx.Stat.attackRange * 1.1f;
 
     private void FireRangedAttack(MonsterContext ctx)
     {
+        int damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
+        float knockback = ctx.Stat.knockbackForce;
+
+        if (_rangedAttackSO != null)
+        {
+            _rangedAttackSO.Execute(ctx, damage, knockback);
+            return;
+        }
+
         if (_rangedProjectile == null || ctx.Runtime.PlayerTarget == null) return;
 
-        var damage = (int)(ctx.Stat.attackPower * ctx.Runtime.AttackMultiplier);
-        var knockback = ctx.Stat.knockbackForce;
         var origin = ctx.Transform.position + Vector3.up * _rangedLaunchHeightOffset;
         var targetPos = ctx.Runtime.PlayerTarget.position + Vector3.up * _rangedLaunchHeightOffset;
         var direction = (targetPos - origin).normalized;
@@ -172,9 +191,12 @@ public class DragonMonster : MonsterBase
             ctx.Runtime.AttackHitDealt = false;
             FacePlayer(ctx, 100f);
 
-            var attackAnim = _useRangedAttack ? _owner._rangedAttackAnim : ctx.Animation.attackTrigger;
+            var meleeAnim = !string.IsNullOrEmpty(ctx.Animation.attackStateName)
+                ? ctx.Animation.attackStateName
+                : ctx.Animation.attackTrigger;
+            var attackAnim = _useRangedAttack ? _owner._rangedAttackAnim : meleeAnim;
             if (ctx.Animator != null && !string.IsNullOrEmpty(attackAnim))
-            ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
+                ctx.Animator.CrossFade(attackAnim, Mathf.Max(0.08f, ctx.Animation.crossFadeDuration));
         }
 
         public void Update(MonsterContext ctx)

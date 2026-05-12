@@ -134,12 +134,27 @@ public class BasicArrow : MonoBehaviour
 
         if (other.TryGetComponent<IDamageable>(out var damageable))
         {
-            var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
-            var pkt = new DamagePacket(damage, _instigator, other.gameObject);
+            var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
+            var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+            var weaponElem = weaponData?.element ?? WeaponElement.None;
+            var pkt = new DamagePacket(damage, _instigator, other.gameObject, weaponElem);
             mgr?.OnPreDealDamage(ref pkt);
 
-            float finalDmg = pkt.Negated ? 0f : pkt.FinalDamage;
-            damageable.TakeDamage(finalDmg, _instigator);
+            float baseFinal  = pkt.Negated ? 0f : pkt.FinalDamage;
+            var   elemType   = pkt.Element.ToElementType();
+            float elemAmount = weaponData?.elementAmountBasic ?? 0f;
+
+            // 크리티컬 굴림
+            float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
+            pkt.IsCrit = isCrit;
+
+            damageable.TakeDamage(finalDmg, _instigator, 1f, elemType, elemAmount);
+
+            // 데미지 팝업 + 타격감
+            Vector3 popupPos = other.ClosestPoint(transform.position);
+            DamagePopupSpawner.Spawn(popupPos, finalDmg, isCrit, elemType);
+            if (isCrit) HitFeelService.Crit();
+            else        HitFeelService.Light();
 
             var report = new DamageReport
             {

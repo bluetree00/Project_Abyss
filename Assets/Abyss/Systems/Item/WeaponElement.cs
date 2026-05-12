@@ -47,11 +47,23 @@ public static class ElementRelation
         "WithWaterWeapon"     => WeaponElement.Water,
         "WithFireWeapon"      => WeaponElement.Fire,
         "WithGrassWeapon"     => WeaponElement.Grass,
-        "WithMagicWeapon"     => WeaponElement.Earth,
+        "WithEarthWeapon"     => WeaponElement.Earth,
         "WithLightningWeapon" => WeaponElement.Lightning,
+        // WithMagicWeapon은 원소가 아니라 무기 종류(Staff) 조건 — 여기서 제외
         _                     => WeaponElement.None,
     };
 
     /// <summary>trigger가 원소 조건인지 여부.</summary>
     public static bool IsElementTrigger(string trigger) => TriggerToElement(trigger) != WeaponElement.None;
+
+    /// <summary>WeaponElement → ElementType 변환.</summary>
+    public static ElementType ToElementType(this WeaponElement we) => we switch
+    {
+        WeaponElement.Water     => ElementType.Water,
+        WeaponElement.Fire      => ElementType.Fire,
+        WeaponElement.Grass     => ElementType.Grass,
+        WeaponElement.Earth     => ElementType.Earth,
+        WeaponElement.Lightning => ElementType.Lightning,
+        _                       => ElementType.None,
+    };
 }

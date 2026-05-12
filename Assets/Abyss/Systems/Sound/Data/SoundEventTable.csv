@@ -1,0 +1,12 @@
+eventId,sfxKey,volume
+room_clear,sfx_room_clear,1.0
+door_open,sfx_door_open,0.8
+boss_appear,sfx_boss_appear,1.0
+player_die,sfx_player_die,1.0
+player_hit,sfx_player_hit,0.9
+monster_die,sfx_monster_die,0.9
+monster_hit,sfx_monster_hit,0.8
+item_pickup,sfx_item_pickup,0.8
+gold_pickup,sfx_gold_pickup,0.7
+ui_click,sfx_ui_click,0.6
+ui_hover,sfx_ui_hover,0.4

@@ -28,6 +28,10 @@ public class MonsterStatData
     public float attackPower   = 10f;
     public float moveSpeed     = 3f;
 
+    [Header("원소 속성 (공격 원소 / 네이티브 원소)")]
+    [Tooltip("몬스터가 가진 원소 속성. 공격 부여 원소 및 저항/약점 판정에 활용.")]
+    public ElementType nativeElement = ElementType.None;
+
     [Header("공격 수치")]
     [Tooltip("공격 준비를 시작하는 거리 (m)")]
     public float attackRange   = 2f;
@@ -43,6 +47,14 @@ public class MonsterStatData
     [Header("공격 형태 (없으면 기본 구체 판정 사용)")]
     [Tooltip("공격 판정 형태 SO. 비워두면 attackRadius 기반 구체 판정.")]
     public MonsterAttackShapeSO attackShape;
+
+    [Header("히트 VFX (기본 공격 명중 시)")]
+    [Tooltip("공격이 맞았을 때 스폰할 VFX 프리팹. null이면 생략.")]
+    public GameObject hitVfxPrefab;
+    [Tooltip("히트 VFX 스케일 배율.")]
+    public float hitVfxScale = 1f;
+    [Tooltip("몬스터 위치 기준 VFX 스폰 오프셋.")]
+    public Vector3 hitVfxOffset = Vector3.zero;
 }
 
 /// <summary>몬스터 감지·추격 포기 데이터.</summary>
@@ -76,30 +88,51 @@ public class MonsterCombatData
     [Tooltip("공격 애니메이션 시작 후 실제 데미지 판정까지 지연 시간 (s). " +
              "애니메이션 이벤트로 데미지를 주는 경우 0으로 설정.")]
     public float     damageApplyDelay = 0.4f;
+    [Tooltip("하나의 AttackState 진입당 허용되는 최대 AnimEvent 히트 수. " +
+             "0 = 무제한. 루핑 애니메이션에서 과다 발사를 방지할 때 사용.")]
+    public int       maxHitsPerAttack = 0;
     [Tooltip("공격 히트 판정 대상 레이어 (Player 레이어 설정)")]
     public LayerMask targetLayer;
+}
+
+/// <summary>사망 시 드롭 데이터. 현재는 골드 코인만 지원. coinMax == 0 이면 드롭 없음.</summary>
+[Serializable]
+public class MonsterDropData
+{
+    [Header("골드 코인 드롭")]
+    [Tooltip("드롭할 코인 최소 개수 (inclusive)")]
+    [Min(0)] public int coinMin = 5;
+    [Tooltip("드롭할 코인 최대 개수 (inclusive)")]
+    [Min(0)] public int coinMax = 8;
+    [Tooltip("코인 1개당 지급 골드")]
+    [Min(1)] public int coinValue = 1;
 }
 
 /// <summary>몬스터 애니메이션 설정 데이터.</summary>
 [Serializable]
 public class MonsterAnimationData
 {
-    [Header("Animator Controller")]
-    [Tooltip("Addressables 에 등록된 AnimatorOverrideController 주소.\n" +
-             "비어있으면 프리팹 Animator 에 붙은 Controller 를 그대로 사용.")]
-    public string animatorControllerAddress;
-
-    [Header("CrossFade 상태 이름")]
-    public string idleStateName        = "Idle_Normal";
-    public string patrolStateName      = "MoveBlend";
-    public string chaseStateName       = "MoveBlend";
+    [Header("Addressables")]
+    [Tooltip("Addressables에 등록된 AnimatorController/AnimatorOverrideController 주소. 비어 있으면 프리팹 Animator를 그대로 사용.")]
+    public string animatorControllerAddress = "";
+    [Header("상태 이름 (공용 Base Controller 기준 — 프리팹 Animator에 직접 세팅)")]
+    public string idleStateName        = "Idle";
+    public string patrolStateName      = "Walk";
+    public string chaseStateName       = "Run";
     public string attackReadyStateName = "AttackReady";
+    public string attackStateName      = "Attack";
+    public string getHitStateName      = "GetHit";
+    public string dieStateName         = "Die";
 
-    [Header("Trigger 파라미터 이름")]
-    public string attackTrigger  = "Attack01";
-    public string getHitTrigger  = "GetHit";
-    public string dieTrigger     = "Die";
-    public string detectTrigger  = "SenseSomething";
+    [Header("트리거 / ThirdParty 컨트롤러 상태 이름")]
+    [Tooltip("공격 상태 이름 또는 트리거. ThirdParty 컨트롤러 사용 시 실제 상태명 입력 (예: BattleBee_Attack01)")]
+    public string attackTrigger  = "";
+    [Tooltip("피격 상태 이름 또는 트리거.")]
+    public string getHitTrigger  = "";
+    [Tooltip("사망 상태 이름 또는 트리거.")]
+    public string dieTrigger     = "";
+    [Tooltip("감지 상태 이름 또는 트리거.")]
+    public string detectTrigger  = "";
 
     [Header("블렌드 파라미터")]
     [Tooltip("이동 속도 Float 파라미터. 사용 안 하면 비워두기.")]

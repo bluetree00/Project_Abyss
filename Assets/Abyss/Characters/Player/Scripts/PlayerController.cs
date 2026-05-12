@@ -51,11 +51,24 @@ public class PlayerController : CharacterBase
     //============================================================
     // Character / Runtime Stats (HUD)
     //============================================================
+    [Header("Hit VFX")]
+    [Tooltip("피격 시 스폰할 VolumetricBlood VFX 프리팹.")]
+    [SerializeField] private GameObject _hitBloodVfxPrefab;
+    [Tooltip("Blood VFX 스케일 배율.")]
+    [SerializeField] private float _hitBloodVfxScale = 1f;
+    [Tooltip("플레이어 발 기준 Blood VFX 높이 오프셋.")]
+    [SerializeField] private float _hitBloodVfxHeightOffset = 1f;
+
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
-    [Header("Debug")]
-    [SerializeField] private bool debugInvincible = true;
+    private bool debugInvincible = false;
     public CharacterData CharacterData => characterData;
+
+    // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
+    private float _invincibleEnd;
+
+    // 아이템 효과: 다음 1회 공격에 원소 부여 (RecipeSynergyNextAttack)
+    public WeaponElement NextAttackElement { get; set; } = WeaponElement.None;
 
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
@@ -65,7 +78,7 @@ public class PlayerController : CharacterBase
 
     public void TakeDamage(int dmg)
     {
-        if (debugInvincible)
+        if (debugInvincible || Time.time < _invincibleEnd)
             return;
 
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
@@ -89,12 +102,19 @@ public class PlayerController : CharacterBase
             {
                 int healHp = Mathf.Max(1, (int)(RuntimeStats.MaxHp * healPct));
                 RuntimeStats.SetHp(healHp);
-                // TODO: invDur > 0 이면 무적 상태 부여
+                if (invDur > 0f)
+                {
+                    _invincibleEnd = Time.time + invDur;
+                    ItemEffectVfxHelper.AttachLoopVfx("VFX_DeathNegateAura", transform, invDur).Forget();
+                    ItemEffectVfxHelper.ShowNotice($"<color=#FF4444>사망 무효!</color> {invDur:F0}초 무적");
+                }
                 return;
             }
         }
 
         RuntimeStats.Damage(finalDmg);
+
+        if (finalDmg > 0) SpawnHitBloodVfx();
 
         // 피격 후 — 반사/방버프 등
         var report = new DamageReport
@@ -113,6 +133,25 @@ public class PlayerController : CharacterBase
         mgr?.ModifyHeal(ref amount);
         RuntimeStats.Heal(amount);
     }
+
+    /// <summary>외부에서 일시 무적 상태로 설정. 기존 무적이 남아있으면 더 긴 쪽을 유지.
+    /// 사용처: 낙사 리스폰(FallRecoveryController), 부활 아이템 등.</summary>
+    public void SetInvincible(float duration)
+    {
+        if (duration <= 0f) return;
+        _invincibleEnd = Mathf.Max(_invincibleEnd, Time.time + duration);
+    }
+
+    /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
+    public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+
+    //============================================================
+    // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
+    //============================================================
+
+    /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
+    public void ApplyThunderGroggy(float duration)
+        => Abyss.Monster.ThunderGroggyVignetteView.Trigger(duration);
 
     public event Action OnHudStatChanged
     {
@@ -193,6 +232,13 @@ public class PlayerController : CharacterBase
         _slowTimer = Mathf.Max(_slowTimer, duration);
     }
 
+    private float _freezeTimer;
+    public bool IsFrozen => _freezeTimer > 0f;
+
+    /// <summary>빙결: duration초 동안 이동·행동·입력을 완전히 차단한다. 연속 피격 시 남은 시간을 연장.</summary>
+    public void ApplyFreeze(float duration)
+        => _freezeTimer = Mathf.Max(_freezeTimer, duration);
+
     //============================================================
     // Knockback
     //============================================================
@@ -218,7 +264,7 @@ public class PlayerController : CharacterBase
     //============================================================
     public IMoveAbility<PlayerController> MoveAbility { get; protected set; }
     public IDodgeAbility<PlayerController> DodgeAbility { get; protected set; }
-    public IJumpAbility<PlayerController> JumpAbility { get; protected set; }
+    public IJumpAbility JumpAbility { get; protected set; }
 
     public Transform handTransform;
     public Transform handTransformLeft;
@@ -255,13 +301,13 @@ public class PlayerController : CharacterBase
     protected virtual void InitPassives() { }
 
     //============================================================
-    // Runtime Flags
+    // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
     //============================================================
-    public bool isGrounded { get; private set; }
-    public bool IsGrounded() => isGrounded;
+    public bool IsGrounded() => JumpAbility?.IsGrounded ?? true;
+    public bool IsJumping => JumpAbility?.IsJumping ?? false;
 
-    public bool isJumping { get; private set; }
-    public void SetJumping(bool value) { isJumping = value; }
+    /// <summary>착지 애니메이션 재생 중 여부. LocoAirState가 관리.</summary>
+    public bool IsLanding { get; set; }
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -324,6 +370,12 @@ public class PlayerController : CharacterBase
             if (_slowTimer <= 0f)
                 SetMoveScale(1f);
         }
+        if (_freezeTimer > 0f)
+        {
+            _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.deltaTime);
+            moveDirection = Vector3.zero;
+            return;
+        }
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
         InputBuffer?.TickPrune();
         CheckMovementInput();
@@ -349,8 +401,8 @@ public class PlayerController : CharacterBase
     {
         if (characterData == null) return;
 
-        UpdateGroundedCheck();
-        ApplyAirborneGravity();
+        JumpAbility?.UpdateGroundCheck(this);
+        JumpAbility?.ApplyGravity(this);
         FreezeRotation();
     }
 
@@ -524,7 +576,7 @@ public class PlayerController : CharacterBase
     {
         MoveAbility = new DefaultMoveAbility();
         DodgeAbility = new DefaultDodgeAbility();
-        JumpAbility = new DefaultJumpAbility();
+        JumpAbility = new DefaultJumpAbility(characterData);
     }
 
     //============================================================
@@ -661,6 +713,7 @@ public class PlayerController : CharacterBase
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
         {
+            if (isInSkill) return; // 스킬 중에는 회피로 캔슬 불가
             if (!isDodging && UnityEngine.Time.time >= DodgeCooldownEnd)
             {
                 if (isInAct) actSM.Change(ActState.None);
@@ -805,90 +858,33 @@ public class PlayerController : CharacterBase
     public void OnAnimationEventTag(string tag) { /* 구현 */ }
 
     //============================================================
-    // Jump / Air Entry Flag
+    // Jump (모듈에 위임)
     //============================================================
-    public bool EnterAirAsJump { get; private set; } = false;
 
     /// <summary>공중 공격 1사이클 사용 여부. 착지 시 리셋.</summary>
     public bool AirAttackUsed { get; set; } = false;
 
-    [Header("Jump Settings")]
-    public float jumpForce = 6f;
-
     public void ProcessJump()
     {
-        if (Rigid == null) return;
-        // 이미 공중이면 점프 불가
-        if (!isGrounded || locoSM.CurrentId == LocoState.Air) return;
+        if (!IsGrounded()) return;
 
-        // 점프 의도 표시
-        EnterAirAsJump = true;
-        isJumping = true;
+        JumpAbility?.Jump(this);
 
-        // Rigidbody로 점프 힘 적용
-        Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
-        Rigid.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
+        // Jump가 쿨다운에 의해 무시됐으면 애니메이션도 스킵
+        if (!IsJumping) return;
 
-        // 상태 전환 요청
-        locoSM.Change(LocoState.Air);
+        // 즉시 점프 애니메이션 시작 (AirState 전이를 기다리지 않음)
+        Anim.SetFloat("JumpValue", 0f);
+        Anim.CrossFade("JumpBlend", 0.05f);
     }
-
-    public void ConsumeEnterAirAsJump()
-    {
-        EnterAirAsJump = false;
-    }
-
-    //============================================================
-    // Ground Check / Gravity
-    //============================================================
-    private void UpdateGroundedCheck()
-    {
-        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-        float rayLength = characterData.groundCheckDistance + 0.1f;
-
-        isGrounded =
-            Physics.Raycast(rayOrigin, Vector3.down, out var hit, rayLength, characterData.groundLayer) &&
-            hit.distance <= characterData.groundCheckDistance + 0.05f;
-
-        Debug.DrawRay(rayOrigin, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
-
-        // 착지 시점에 점프/공중공격 상태 초기화
-        if (isGrounded && isJumping)
-            isJumping = false;
-        if (isGrounded)
-            AirAttackUsed = false;
-    }
-
-    /// <summary>공중 공격 중 체공을 위한 중력 감소 비율 (0 = 무중력, 1 = 정상)</summary>
-    private const float AirAttackGravityScale = 0.05f;
 
     /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>
     public void StartAirHover()
     {
-        if (Rigid != null && !isGrounded)
+        if (Rigid != null && !IsGrounded())
         {
             Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, 0f, Rigid.linearVelocity.z);
         }
-    }
-
-    private void ApplyAirborneGravity()
-    {
-        if (isGrounded || !Rigid) return;
-
-        float gravityMultiplier = characterData.gravity;
-        if (Rigid.linearVelocity.y < 0)
-            gravityMultiplier *= characterData.fallMultiplier;
-
-        // 공중 공격 중이면 체공 — AirAttackUsed(공중에서 공격 시작)이고 아직 공격 중일 때만
-        bool isAirAttacking = AirAttackUsed && Combo != null && Combo.IsAttacking;
-        if (isAirAttacking)
-        {
-            gravityMultiplier *= AirAttackGravityScale;
-            if (Rigid.linearVelocity.y < -1f)
-                Rigid.linearVelocity = new Vector3(Rigid.linearVelocity.x, -1f, Rigid.linearVelocity.z);
-        }
-
-        Rigid.AddForce(Vector3.up * gravityMultiplier, ForceMode.Acceleration);
     }
 
     //============================================================
@@ -1009,8 +1005,6 @@ public class PlayerController : CharacterBase
         receiver.OnHitStep    += Safe_OnHitStep;
         receiver.OnGenericTag += Safe_GenericTag;
         receiver.OnEffectStep += safe_EffectStep;
-        receiver.OnBeginTrail += Safe_BeginTrail;
-        receiver.OnEndTrail   += Safe_EndTrail;
 
         _aeSubscribed = true;
     }
@@ -1023,8 +1017,6 @@ public class PlayerController : CharacterBase
         receiver.OnHitStep    -= Safe_OnHitStep;
         receiver.OnGenericTag -= Safe_GenericTag;
         receiver.OnEffectStep -= safe_EffectStep;
-        receiver.OnBeginTrail -= Safe_BeginTrail;
-        receiver.OnEndTrail   -= Safe_EndTrail;
 
         _aeSubscribed = false;
     }
@@ -1080,105 +1072,23 @@ public class PlayerController : CharacterBase
             _ = EffectHandler.PlayEffect(CurrentAttackTypeForEffect, Combo.CurrentComboStep, step, ActiveExecution);
     }
 
-    /// <summary>공격 state에서 직접 호출 (AnimationEvent 불필요)</summary>
-    public void BeginWeaponTrail() => Safe_BeginTrail();
-    public void EndWeaponTrail()   => Safe_EndTrail();
-
-    private void Safe_BeginTrail()
+    private void SpawnHitBloodVfx()
     {
-        if (WeaponManager == null) return;
-        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
-        if (wi == null || wi.TrailDetector == null) return;
+        if (_hitBloodVfxPrefab == null) return;
+        Vector3 pos = transform.position + Vector3.up * _hitBloodVfxHeightOffset;
+        var go = Instantiate(_hitBloodVfxPrefab, pos, _hitBloodVfxPrefab.transform.rotation, transform);
+        go.transform.localScale = Vector3.one * _hitBloodVfxScale;
 
-        float damage = 0f;
-        float knockback = 1f;
-        float radiusOverride = 0f;
-
-        var weaponData = WeaponManager.CurrentWeaponData;
-        if (weaponData != null && weaponData.abilitySet != null)
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
         {
-            var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
-            if (ability != null)
-            {
-                foreach (var s in ability.steps)
-                {
-                    if (s.collider != null && s.collider.mode == WeaponAbilitySO.ColliderMode.Trail)
-                    {
-                        damage = s.baseDamage > 0f ? s.baseDamage : s.collider.damage;
-                        knockback = s.knockbackMultiplier;
-                        radiusOverride = s.collider.trailRadiusOverride;
-                        break;
-                    }
-                }
-            }
-
-            // 캐릭터 공격 스탯 반영
-            var kind = weaponData.weaponType.GetAttackStatKind();
-            damage = DamageFormula.Calculate(damage, RuntimeStats.GetEffectiveAttack(kind));
+            var main = systems[i].main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
         }
 
-        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
-        wi.TrailDetector.OnTrailHit += OnWeaponTrailHit;
-        wi.TrailDetector.BeginTrail(damage, knockback, radiusOverride);
+        var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
+        float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
+        Destroy(go, lifetime);
     }
 
-    private void Safe_EndTrail()
-    {
-        if (WeaponManager == null) return;
-        var wi = WeaponManager.GetCurrentWeaponComponent<WeaponInstance>();
-        if (wi == null || wi.TrailDetector == null) return;
-
-        wi.TrailDetector.EndTrail();
-        wi.TrailDetector.OnTrailHit -= OnWeaponTrailHit;
-    }
-
-    private void OnWeaponTrailHit(RaycastHit hit, float damage, float knockback)
-    {
-        if (hit.collider == null) return;
-        if (!hit.collider.TryGetComponent<IDamageable>(out var damageable)) return;
-
-        damageable.TakeDamage(damage, gameObject, knockback);
-
-        // 타격 이펙트 스폰
-        SpawnTrailHitEffect(hit.point);
-
-        var wt = WeaponManager?.CurrentWeaponData?.weaponType;
-        var ctx = new PassiveContext { target = hit.collider.gameObject, damage = damage, weaponType = wt };
-        FirePassive(PassiveTrigger.OnAttackHit, ctx);
-
-        if (hit.collider.TryGetComponent<IKillable>(out var killable) && killable.IsDead)
-            FirePassive(PassiveTrigger.OnKill, ctx);
-    }
-
-    private async void SpawnTrailHitEffect(Vector3 hitPoint)
-    {
-        var weaponData = WeaponManager?.CurrentWeaponData;
-        if (weaponData?.abilitySet == null) return;
-
-        var ability = weaponData.abilitySet.GetAbility(CurrentAttackTypeForEffect, Combo.CurrentComboStep);
-        if (ability == null) return;
-
-        // 현재 스텝의 hitEffectKey 찾기
-        string hitKey = null;
-        float hitScale = 1f;
-        foreach (var step in ability.steps)
-        {
-            if (!string.IsNullOrEmpty(step.hitEffectKey))
-            {
-                hitKey = step.hitEffectKey;
-                hitScale = step.hitEffectScale;
-                break;
-            }
-        }
-
-        if (string.IsNullOrEmpty(hitKey)) return;
-
-        var effectObj = await Managers.ObjectPooler.SpawnAsync(
-            hitKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity);
-        if (effectObj == null) return;
-
-        effectObj.transform.localScale = Vector3.one * hitScale;
-        if (effectObj.TryGetComponent<EffectBehaviour>(out var eb))
-            eb.Initialize(eb.behaviorSO, null, 1f);
-    }
 }

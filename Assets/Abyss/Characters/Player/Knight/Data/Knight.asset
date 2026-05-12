@@ -16,14 +16,17 @@ MonoBehaviour:
   baseMoveSpeed: 7
   baseRunSpeed: 8
   maxHealth: 100
-  attackPower: 10
+  baseMeleeAttack: 0
+  baseRangedAttack: 0
+  baseDefense: 0
+  baseLuck: 0
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
   dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 0.5
-  jumpForce: 10
+  jumpForce: 5
   gravity: -5
   fallMultiplier: 2
   groundCheckDistance: 0.2
@@ -35,4 +38,7 @@ MonoBehaviour:
   groundDrag: 4
   airDrag: 0.5
   conClass: 0
+  portrait: {fileID: 0}
+  rosterIllust: {fileID: 21300000, guid: 5752829a159ee2f4a9f7b48d3cc16242, type: 3}
   passive: {fileID: 11400000, guid: bb91a65d4029d4b4f98f823d98830b98, type: 2}
+  playerEntrance: {fileID: 0}

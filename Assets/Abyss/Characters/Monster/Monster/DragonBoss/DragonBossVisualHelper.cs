@@ -2,103 +2,43 @@ using UnityEngine;
 
 namespace Abyss.Monster
 {
+/// <summary>
+/// DragonBoss 시각 효과 헬퍼.
+/// 원소 종류에 따른 색상 반환 등 공통 비주얼 유틸리티를 제공한다.
+/// </summary>
 public static class DragonBossVisualHelper
 {
-    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-    private static readonly int ColorId = Shader.PropertyToID("_Color");
-    private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
-
     public static Color GetElementColor(DragonBossBlackboard.DragonElement element)
     {
-        switch (element)
+        return element switch
         {
-            case DragonBossBlackboard.DragonElement.Ice:
-                return new Color(0.40f, 0.78f, 1f, 1f);
-            case DragonBossBlackboard.DragonElement.Thunder:
-                return new Color(1f, 0.86f, 0.25f, 1f);
-            default:
-                return new Color(1f, 0.38f, 0.18f, 1f);
-        }
+            DragonBossBlackboard.DragonElement.Ice     => new Color(0.4f, 0.8f, 1.0f),
+            DragonBossBlackboard.DragonElement.Thunder => new Color(1.0f, 0.9f, 0.2f),
+            _                                          => new Color(1.0f, 0.4f, 0.1f),
+        };
     }
 
-    public static void ApplyRendererTint(Renderer[] renderers, Color color)
+    public static void ApplyEffectTint(GameObject go, Color tint)
     {
-        if (renderers == null) return;
-
-        foreach (var renderer in renderers)
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
         {
-            if (renderer == null) continue;
-
-            var materials = renderer.materials;
-            for (int i = 0; i < materials.Length; i++)
+            foreach (var mat in r.materials)
             {
-                var material = materials[i];
-                if (material == null) continue;
-
-                if (material.HasProperty(BaseColorId))
-                    material.SetColor(BaseColorId, color);
-                if (material.HasProperty(ColorId))
-                    material.SetColor(ColorId, color);
-                if (material.HasProperty(EmissionColorId))
-                    material.SetColor(EmissionColorId, color * 0.35f);
+                if (mat.HasProperty("_BaseColor"))     mat.SetColor("_BaseColor",     tint);
+                if (mat.HasProperty("_Color"))         mat.SetColor("_Color",         tint);
+                if (mat.HasProperty("_TintColor"))     mat.SetColor("_TintColor",     tint);
+                if (mat.HasProperty("_MainColor"))     mat.SetColor("_MainColor",     tint);
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    mat.SetColor("_EmissionColor", tint * 0.4f);
+                    mat.EnableKeyword("_EMISSION");
+                }
             }
-
-            var block = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(block);
-            block.SetColor(BaseColorId, color);
-            block.SetColor(ColorId, color);
-            block.SetColor(EmissionColorId, color * 0.35f);
-            renderer.SetPropertyBlock(block);
         }
-    }
-
-    public static void ApplyEffectTint(GameObject root, Color color)
-    {
-        if (root == null) return;
-
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
-            if (renderer == null) continue;
-
-            var materials = renderer.materials;
-            for (int i = 0; i < materials.Length; i++)
-            {
-                var material = materials[i];
-                if (material == null) continue;
-
-                if (material.HasProperty(BaseColorId))
-                    material.SetColor(BaseColorId, color);
-                if (material.HasProperty(ColorId))
-                    material.SetColor(ColorId, color);
-                if (material.HasProperty(EmissionColorId))
-                    material.SetColor(EmissionColorId, color * 0.5f);
-            }
-
-            var block = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(block);
-            block.SetColor(BaseColorId, color);
-            block.SetColor(ColorId, color);
-            block.SetColor(EmissionColorId, color * 0.5f);
-            renderer.SetPropertyBlock(block);
-        }
-
-        foreach (var trail in root.GetComponentsInChildren<TrailRenderer>(true))
-        {
-            if (trail == null) continue;
-            trail.startColor = color;
-            trail.endColor = new Color(color.r, color.g, color.b, 0f);
-        }
-
-        foreach (var particle in root.GetComponentsInChildren<ParticleSystem>(true))
-        {
-            var main = particle.main;
-            main.startColor = color;
-        }
-
-        foreach (var light in root.GetComponentsInChildren<Light>(true))
-        {
-            if (light != null)
-                light.color = color;
+            var main = ps.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(tint);
         }
     }
 }

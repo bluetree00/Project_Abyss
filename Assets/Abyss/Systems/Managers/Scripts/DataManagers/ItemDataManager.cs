@@ -32,8 +32,8 @@ public class ItemDataManager
 
         if (_itemById.Count == 0)
         {
-            Debug.Log("[ItemDataManager] CDN 실패 — Resources 폴백");
-            var json = Resources.Load<TextAsset>("ITEM_DATA");
+            Debug.Log("[ItemDataManager] CDN 실패 — Addressables 폴백");
+            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("ITEM_DATA");
             if (json != null)
             {
                 var col = JsonUtility.FromJson<ItemEntryCollection>(json.text);
@@ -121,22 +121,28 @@ public class ItemDataManager
 
     private async UniTask LoadFromServerAsync()
     {
+        var serverData = new Dictionary<string, List<ItemEntry>>();
+
         int loaded = ChartLoader.Load("ITEM_DATA", row =>
         {
             var entry = ParseRow(row);
             var id = entry?.ResolvedId;
             if (entry == null || string.IsNullOrEmpty(id)) return;
 
-            if (!_itemById.TryGetValue(id, out var list))
+            if (!serverData.TryGetValue(id, out var list))
             {
                 list = new List<ItemEntry>();
-                _itemById[id] = list;
+                serverData[id] = list;
             }
-            list.RemoveAll(e => e.slot == entry.slot);
             list.Add(entry);
         });
 
-        if (loaded > 0) SaveToJson();
+        // 서버에서 1건이라도 받으면 전체 교체 (삭제/변경 반영)
+        if (loaded > 0)
+        {
+            _itemById = serverData;
+            SaveToJson();
+        }
 
         await UniTask.CompletedTask;
     }
@@ -151,6 +157,7 @@ public class ItemDataManager
                 passive_id   = row.TryGetString("passive_id"),
                 item_name    = row.TryGetString("item_name"),
                 rarity       = row.TryGetString("rarity"),
+                grade        = row.TryGetString("grade"),
                 category     = row.TryGetString("category"),
                 slot         = row.TryGetInt("slot"),
                 effect_type  = row.TryGetString("effect_type"),

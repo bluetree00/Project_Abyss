@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b08eb620f62a3604d882f24f4d00ce78, type: 3}
   m_Name: BishopShieldData
   m_EditorClassIdentifier: Assembly-CSharp::BishopShieldData
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 96a11b15d810b3648b2bbcc021e8bda6,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   hpThreshold: 0.5
   guardStateName: BishopKnight_Defend
   counterStateName: BishopKnight_Attack02

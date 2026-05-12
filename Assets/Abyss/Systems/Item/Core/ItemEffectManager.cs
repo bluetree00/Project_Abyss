@@ -180,13 +180,34 @@ public sealed class ItemEffectManager
                 eff.OnRollLand(_ctx, position);
     }
 
+    public void OnJumpLand(Vector3 position)
+    {
+        foreach (var eff in _activeEffects)
+            if (eff.IsActive(_ctx))
+                eff.OnJumpLand(_ctx, position);
+    }
+
     // ── 진행 ────────────────────────────────────────────────
+
+    public void OnRoomEnter()
+    {
+        foreach (var eff in _activeEffects)
+            if (eff.IsActive(_ctx))
+                eff.OnRoomEnter(_ctx);
+    }
 
     public void OnRoomClear()
     {
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnRoomClear(_ctx);
+    }
+
+    public void OnBossEnter()
+    {
+        foreach (var eff in _activeEffects)
+            if (eff.IsActive(_ctx))
+                eff.OnBossEnter(_ctx);
     }
 
     public void OnBossClear()

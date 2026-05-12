@@ -15,7 +15,7 @@ public class ServerEquipmentDataManager
     private const string DataFileName = "equipment_data.json";
     private string FilePath => Path.Combine(Application.persistentDataPath, DataFileName);
 
-    private const string ChartId = "234856";
+    private const string ChartId = "236844";
 
     private Dictionary<string, EquipmentEntry> _byId = new();
     private Dictionary<string, List<EquipmentEntry>> _byType = new();
@@ -34,8 +34,8 @@ public class ServerEquipmentDataManager
         // 0건이면 Resources 폴백
         if (_byId.Count == 0)
         {
-            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — Resources 폴백");
-            var textAsset = Resources.Load<TextAsset>("EQUIPMENT_DATA");
+            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — Addressables 폴백");
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("EQUIPMENT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<EquipmentEntryCollection>(textAsset.text);
@@ -128,9 +128,12 @@ public class ServerEquipmentDataManager
                 weapon_id         = row.TryGetString("weapon_id"),
                 weapon_name       = row.TryGetString("weapon_name"),
                 weapon_type       = row.TryGetString("weapon_type"),
+                rarity            = row.TryGetString("rarity"),
                 tier              = row.TryGetInt("tier"),
                 base_attack       = row.TryGetFloat("base_attack"),
                 base_defense      = row.TryGetFloat("base_defense"),
+                crit_chance       = row.TryGetFloat("crit_chance"),
+                crit_damage       = row.TryGetFloat("crit_damage"),
                 attack_speed      = row.TryGetFloat("attack_speed"),
                 attack_range      = row.TryGetFloat("attack_range"),
                 area_of_effect    = row.TryGetFloat("area_of_effect"),
@@ -146,6 +149,17 @@ public class ServerEquipmentDataManager
                 skill_q_cooldown  = row.TryGetFloat("skill_q_cooldown"),
                 skill_e_name      = row.TryGetString("skill_e_name"),
                 skill_e_cooldown  = row.TryGetFloat("skill_e_cooldown"),
+
+                // 원소
+                element                  = row.TryGetString("element"),
+                element_amount_basic     = row.TryGetFloat("element_amount_basic"),
+                element_amount_heavy     = row.TryGetFloat("element_amount_heavy"),
+                element_amount_air       = row.TryGetFloat("element_amount_air"),
+                skill_q_element_override = row.TryGetString("skill_q_element_override"),
+                skill_q_element_amount   = row.TryGetFloat("skill_q_element_amount"),
+                skill_e_element_override = row.TryGetString("skill_e_element_override"),
+                skill_e_element_amount   = row.TryGetFloat("skill_e_element_amount"),
+
                 stat_version      = row.TryGetInt("stat_version"),
             };
         }

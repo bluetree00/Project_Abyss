@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: CrabMonsterConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: CrabMonster
-  grade: 1
+  grade: 2
   playerLayer:
     serializedVersion: 2
     m_Bits: 64

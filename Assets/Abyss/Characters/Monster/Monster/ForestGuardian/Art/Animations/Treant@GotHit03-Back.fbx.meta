@@ -1,0 +1,694 @@
+fileFormatVersion: 2
+guid: c2387819cd9f5684bb2bbf3cd4ca90b1
+ModelImporter:
+  serializedVersion: 24200
+  internalIDToNameTable:
+  - first:
+      74: 3928109290100221397
+    second: GotHit03-Back
+  externalObjects: {}
+  materials:
+    materialImportMode: 1
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
+    motionNodeName: 
+    animationImportErrors: 
+    animationImportWarnings: "\nClip 'GotHit03' has import animation warnings that
+      might lower retargeting quality:\nNote: Activate translation DOF on avatar
+      to improve retargeting quality.\n\t'TreantRibcage' is inbetween humanoid transforms
+      and has rotation animation that will be discarded.\n"
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 3
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations:
+    - serializedVersion: 16
+      name: GotHit03-Back
+      takeName: GotHit03
+      internalID: 0
+      firstFrame: 940
+      lastFrame: 966
+      wrapMode: 0
+      orientationOffsetY: 0
+      level: 0
+      cycleOffset: 0
+      loop: 0
+      hasAdditiveReferencePose: 0
+      loopTime: 0
+      loopBlend: 0
+      loopBlendOrientation: 1
+      loopBlendPositionY: 1
+      loopBlendPositionXZ: 0
+      keepOriginalOrientation: 0
+      keepOriginalPositionY: 1
+      keepOriginalPositionXZ: 0
+      heightFromFeet: 0
+      mirror: 0
+      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+      curves: []
+      events: []
+      transformMask: []
+      maskType: 3
+      maskSource: {instanceID: 0}
+      additiveReferencePoseFrame: 940
+    isReadable: 0
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    nodeNameCollisionStrategy: 0
+    fileIdsGeneration: 2
+    swapUVChannels: 0
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    keepQuads: 0
+    weldVertices: 1
+    bakeAxisConversion: 0
+    preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15.000001
+    secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
+    secondaryUVPackMargin: 4
+    useFileScale: 1
+    strictVertexDataChecks: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  referencedClips: []
+  importAnimation: 1
+  humanDescription:
+    serializedVersion: 3
+    human:
+    - boneName: TreantPelvis
+      humanName: Hips
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLThigh
+      humanName: LeftUpperLeg
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRThigh
+      humanName: RightUpperLeg
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLCalf
+      humanName: LeftLowerLeg
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRCalf
+      humanName: RightLowerLeg
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLFoot
+      humanName: LeftFoot
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRFoot
+      humanName: RightFoot
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantSpine1
+      humanName: Spine
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantSpine2
+      humanName: Chest
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantNeck
+      humanName: Neck
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantHead
+      humanName: Head
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLCollarbone
+      humanName: LeftShoulder
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRCollarbone
+      humanName: RightShoulder
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLUpperarm
+      humanName: LeftUpperArm
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRUpperarm
+      humanName: RightUpperArm
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLForearm
+      humanName: LeftLowerArm
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRForearm
+      humanName: RightLowerArm
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLPalm
+      humanName: LeftHand
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRPalm
+      humanName: RightHand
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLToe
+      humanName: LeftToes
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRToe
+      humanName: RightToes
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantJaw
+      humanName: Jaw
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit11
+      humanName: Left Index Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit12
+      humanName: Left Index Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit13
+      humanName: Left Index Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit21
+      humanName: Left Middle Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit22
+      humanName: Left Middle Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit23
+      humanName: Left Middle Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit31
+      humanName: Left Little Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit32
+      humanName: Left Little Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantLDigit33
+      humanName: Left Little Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit11
+      humanName: Right Index Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit12
+      humanName: Right Index Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit13
+      humanName: Right Index Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit21
+      humanName: Right Middle Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit22
+      humanName: Right Middle Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit23
+      humanName: Right Middle Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit31
+      humanName: Right Little Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit32
+      humanName: Right Little Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantRDigit33
+      humanName: Right Little Distal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: TreantSpine3
+      humanName: UpperChest
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    skeleton:
+    - name: Treant_Body(Clone)
+      parentName: 
+      position: {x: 0, y: 0, z: 0}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1}
+    - name: Treant
+      parentName: Treant_Body(Clone)
+      position: {x: -1.0453502, y: 1.8154856, z: 0.21544914}
+      rotation: {x: 0, y: -0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantPelvis
+      parentName: Treant_Body(Clone)
+      position: {x: 0.00000007837809, y: 1.5536864, z: -0.11791774}
+      rotation: {x: 0.49912703, y: -0.50087154, z: -0.49912694, w: 0.5008715}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantLThigh
+      parentName: TreantPelvis
+      position: {x: 0.046746213, y: 0.07659564, z: 0.23980562}
+      rotation: {x: -0.09680067, y: 0.99021417, z: -0.023683175, w: 0.09769703}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantLCalf
+      parentName: TreantLThigh
+      position: {x: -0.60513014, y: 0.00000015258789, z: 0}
+      rotation: {x: -0.0017925581, y: 0.054188367, z: 0.28333825, w: 0.9574862}
+      scale: {x: 0.9999997, y: 1.0000004, z: 1.0000001}
+    - name: TreantLFoot
+      parentName: TreantLCalf
+      position: {x: -0.8126429, y: -0.000000038146972, z: 0}
+      rotation: {x: -0.02102502, y: 0.04149522, z: -0.64037293, w: 0.7666542}
+      scale: {x: 1.0000001, y: 0.9999994, z: 1.0000001}
+    - name: TreantLToe
+      parentName: TreantLFoot
+      position: {x: -0.24501604, y: 0.000000007152557, z: 0}
+      rotation: {x: 0.000048988946, y: -0.0001713573, z: -0.27454132, w: 0.9615753}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: TreantSpine1
+      parentName: TreantPelvis
+      position: {x: -0.07482696, y: -0.00572504, z: -0.00000001420859}
+      rotation: {x: 0.000000019893777, y: -0.00000010701053, z: -0.14410546, w: 0.98956233}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantSpine2
+      parentName: TreantSpine1
+      position: {x: -0.31151947, y: 0.000000038146972, z: -0.00000007070646}
+      rotation: {x: -0.00000003748313, y: 0.00000007098758, z: 0.06733619, w: 0.9977304}
+      scale: {x: 1.0000001, y: 1, z: 1}
+    - name: TreantSpine3
+      parentName: TreantSpine2
+      position: {x: -0.26537308, y: -0.000000019073486, z: 0.00000012460838}
+      rotation: {x: 0.000000012454646, y: -0.00000010143183, z: 0.056482, w: 0.9984036}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: TreantRibcage
+      parentName: TreantSpine3
+      position: {x: -0.285177, y: 0.000000023841856, z: -0.00000027162284}
+      rotation: {x: 0.0000000028245655, y: 0.0000002341799, z: 0.018964138, w: 0.9998202}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    - name: TreantLCollarbone
+      parentName: TreantRibcage
+      position: {x: 0.028418425, y: 0.046394214, z: 0.04930134}
+      rotation: {x: 0.0098061375, y: 0.70162284, z: 0.004062553, w: 0.71246946}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantLUpperarm
+      parentName: TreantLCollarbone
+      position: {x: -0.5333021, y: -0.00000007152557, z: -0.0000007629394}
+      rotation: {x: -0.032094333, y: 0.032939788, z: -0.0099433055, w: 0.9988924}
+      scale: {x: 0.9999994, y: 1, z: 1.0000007}
+    - name: TreantLForearm
+      parentName: TreantLUpperarm
+      position: {x: -0.6807752, y: -0.00000022888183, z: -0.00000015258789}
+      rotation: {x: 0.08208475, y: -0.014201807, z: -0.024664193, w: 0.9962189}
+      scale: {x: 0.9999999, y: 1.0000005, z: 0.99999976}
+    - name: TreantLPalm
+      parentName: TreantLForearm
+      position: {x: -0.6064528, y: 0.00000022888183, z: 0.00000045776366}
+      rotation: {x: -0.44068137, y: 0.08343507, z: 0.05837153, w: 0.8918696}
+      scale: {x: 1.0000002, y: 0.99999994, z: 1.0000001}
+    - name: TreantLDigit11
+      parentName: TreantLPalm
+      position: {x: -0.14804168, y: -0.048858643, z: 0.17264144}
+      rotation: {x: 0.6201124, y: -0.025069885, z: -0.08263162, w: 0.7797462}
+      scale: {x: 1.0000006, y: 1.0000001, z: 0.9999994}
+    - name: TreantLDigit12
+      parentName: TreantLDigit11
+      position: {x: -0.12009132, y: -0.000000076293944, z: 0}
+      rotation: {x: 0.0060220337, y: 0.000018490471, z: 0.03181197, w: 0.9994757}
+      scale: {x: 1.0000007, y: 1.0000001, z: 0.99999934}
+    - name: TreantLDigit13
+      parentName: TreantLDigit12
+      position: {x: -0.124664456, y: 0, z: -0.00000030517577}
+      rotation: {x: -0.023675494, y: 0.014640306, z: 0.22073613, w: 0.9749363}
+      scale: {x: 1.0000002, y: 1.000001, z: 0.9999991}
+    - name: TreantLDigit21
+      parentName: TreantLPalm
+      position: {x: -0.2919519, y: 0.07707596, z: -0.011617126}
+      rotation: {x: 0.05088256, y: -0.008950424, z: -0.05456892, w: 0.99717253}
+      scale: {x: 1.0000005, y: 0.99999976, z: 1}
+    - name: TreantLDigit22
+      parentName: TreantLDigit21
+      position: {x: -0.087282255, y: 0, z: 0.000000076293944}
+      rotation: {x: -0.005086994, y: 0.00020031903, z: 0.035389952, w: 0.9993606}
+      scale: {x: 1.0000008, y: 0.9999994, z: 1}
+    - name: TreantLDigit23
+      parentName: TreantLDigit22
+      position: {x: -0.09861, y: 0.000000076293944, z: -0.000000076293944}
+      rotation: {x: -0.0005923336, y: -0.014470446, z: 0.08534323, w: 0.9962464}
+      scale: {x: 1.0000004, y: 0.9999998, z: 1}
+    - name: TreantLDigit31
+      parentName: TreantLPalm
+      position: {x: -0.24989021, y: 0.026735991, z: -0.184384}
+      rotation: {x: -0.1384128, y: -0.04308072, z: -0.07187552, w: 0.98682314}
+      scale: {x: 1.0000002, y: 0.9999994, z: 1.0000005}
+    - name: TreantLDigit32
+      parentName: TreantLDigit31
+      position: {x: -0.11073273, y: -0.00000015258789, z: 0}
+      rotation: {x: -0.0059286496, y: 0.006209909, z: 0.033919755, w: 0.99938774}
+      scale: {x: 1.0000005, y: 0.9999991, z: 1.0000005}
+    - name: TreantLDigit33
+      parentName: TreantLDigit32
+      position: {x: -0.11367302, y: 0, z: 0.00000015258789}
+      rotation: {x: -0.056574717, y: 0.04834304, z: 0.054396298, w: 0.9957426}
+      scale: {x: 1.0000006, y: 0.9999991, z: 1.0000005}
+    - name: TreantRCollarbone
+      parentName: TreantRibcage
+      position: {x: 0.028418425, y: 0.04639422, z: -0.04930142}
+      rotation: {x: -0.009737922, y: -0.70162356, z: 0.0041295816, w: 0.7124693}
+      scale: {x: 1, y: 1, z: 1}
+    - name: TreantRUpperarm
+      parentName: TreantRCollarbone
+      position: {x: -0.53330207, y: 0.00000007152557, z: -0.00000061035155}
+      rotation: {x: 0.032093618, y: -0.0329405, z: -0.009941618, w: 0.9988924}
+      scale: {x: 1.0000007, y: 1, z: 0.9999994}
+    - name: TreantRForearm
+      parentName: TreantRUpperarm
+      position: {x: -0.68077505, y: 0.00000022888183, z: 0}
+      rotation: {x: -0.08208411, y: 0.014201282, z: -0.024665054, w: 0.9962189}
+      scale: {x: 1.0000002, y: 0.99999964, z: 1.0000001}
+    - name: TreantRPalm
+      parentName: TreantRForearm
+      position: {x: -0.606453, y: -0.00000022888183, z: 0.00000030517577}
+      rotation: {x: 0.44068134, y: -0.08343425, z: 0.05837127, w: 0.89186966}
+      scale: {x: 0.99999994, y: 1, z: 1.0000001}
+    - name: TreantRDigit11
+      parentName: TreantRPalm
+      position: {x: -0.14804153, y: -0.048858643, z: -0.17264144}
+      rotation: {x: -0.620112, y: 0.025069546, z: -0.082630254, w: 0.7797467}
+      scale: {x: 0.9999994, y: 1.0000002, z: 1.0000005}
+    - name: TreantRDigit12
+      parentName: TreantRDigit11
+      position: {x: -0.120091096, y: 0.000000038146972, z: 0.00000015258789}
+      rotation: {x: -0.006023228, y: -0.000015592203, z: 0.03181122, w: 0.9994758}
+      scale: {x: 0.99999946, y: 1.0000002, z: 1.0000005}
+    - name: TreantRDigit13
+      parentName: TreantRDigit12
+      position: {x: -0.124664225, y: -0.00000015258789, z: -0.00000030517577}
+      rotation: {x: 0.023675293, y: -0.0146399615, z: 0.22073655, w: 0.9749362}
+      scale: {x: 1.0000001, y: 0.99999946, z: 1.0000007}
+    - name: TreantRDigit21
+      parentName: TreantRPalm
+      position: {x: -0.29195204, y: 0.07707641, z: 0.011617279}
+      rotation: {x: -0.050881475, y: 0.008952618, z: -0.054571323, w: 0.9971725}
+      scale: {x: 0.9999996, y: 1.0000004, z: 1.0000002}
+    - name: TreantRDigit22
+      parentName: TreantRDigit21
+      position: {x: -0.0872821, y: -0.00000015258789, z: -0.00000015258789}
+      rotation: {x: 0.005085919, y: -0.00020095985, z: 0.035388626, w: 0.9993607}
+      scale: {x: 0.99999917, y: 1.0000007, z: 1.0000002}
+    - name: TreantRDigit23
+      parentName: TreantRDigit22
+      position: {x: -0.09860977, y: -0.000000076293944, z: 0}
+      rotation: {x: 0.0005892537, y: 0.014469897, z: 0.08534371, w: 0.99624634}
+      scale: {x: 0.99999964, y: 1.0000002, z: 1.0000001}
+    - name: TreantRDigit31
+      parentName: TreantRPalm
+      position: {x: -0.24989036, y: 0.02673645, z: 0.18438408}
+      rotation: {x: 0.13841215, y: 0.043080796, z: -0.07187297, w: 0.98682344}
+      scale: {x: 0.9999998, y: 1.0000006, z: 0.9999998}
+    - name: TreantRDigit32
+      parentName: TreantRDigit31
+      position: {x: -0.11073273, y: 0, z: 0.000000076293944}
+      rotation: {x: 0.005928396, y: -0.006209778, z: 0.03391679, w: 0.99938786}
+      scale: {x: 0.9999995, y: 1.0000008, z: 0.99999994}
+    - name: TreantRDigit33
+      parentName: TreantRDigit32
+      position: {x: -0.11367294, y: 0, z: 0.000000076293944}
+      rotation: {x: 0.05657455, y: -0.04834269, z: 0.05439628, w: 0.9957426}
+      scale: {x: 0.99999946, y: 1.0000008, z: 1.0000001}
+    - name: TreantNeck
+      parentName: TreantRibcage
+      position: {x: 0.003497467, y: 0.14155985, z: -0.000000057066497}
+      rotation: {x: -0.0000004781363, y: 0.00000023041015, z: -0.22632174, w: 0.97405267}
+      scale: {x: 0.9999999, y: 1.0000001, z: 1}
+    - name: TreantHead
+      parentName: TreantNeck
+      position: {x: -0.42717054, y: 0.00000015258789, z: 1.4551915e-13}
+      rotation: {x: 0.000000024129314, y: -0.0000004054541, z: 0.620976, w: 0.7838296}
+      scale: {x: 0.99999994, y: 1.0000002, z: 1}
+    - name: TreantJaw
+      parentName: TreantHead
+      position: {x: 0.06596069, y: 0.07044247, z: -0.000000013715547}
+      rotation: {x: -7.670005e-13, y: 7.171536e-14, z: 0.97320604, w: -0.2299347}
+      scale: {x: 0.9999991, y: 1.0000011, z: 1}
+    - name: TreantRThigh
+      parentName: TreantPelvis
+      position: {x: 0.046746213, y: 0.07659564, z: -0.23980562}
+      rotation: {x: -0.09680064, y: 0.9902141, z: 0.02368319, w: -0.09769711}
+      scale: {x: 1, y: 1, z: 0.99999994}
+    - name: TreantRCalf
+      parentName: TreantRThigh
+      position: {x: -0.60513014, y: 0.000000038146972, z: 0.00000015258789}
+      rotation: {x: 0.0018118743, y: -0.05425187, z: 0.28336424, w: 0.9574749}
+      scale: {x: 0.9999999, y: 0.99999946, z: 0.9999999}
+    - name: TreantRFoot
+      parentName: TreantRCalf
+      position: {x: -0.81264305, y: 0.000000019073486, z: -0.000000038146972}
+      rotation: {x: 0.021114334, y: -0.041285455, z: -0.64043075, w: 0.76661474}
+      scale: {x: 1.0000002, y: 1.0000008, z: 0.9999999}
+    - name: TreantRToe
+      parentName: TreantRFoot
+      position: {x: -0.24501607, y: 0.000000014305114, z: 0}
+      rotation: {x: 0.000008109068, y: -0.000028551565, z: -0.27449283, w: 0.96158916}
+      scale: {x: 1, y: 0.99999994, z: 1}
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    globalScale: 1
+    rootMotionBoneName: 
+    hasTranslationDoF: 0
+    hasExtraRoot: 1
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: 3f6e234d5dd582e41baf973e109feaa5,
+    type: 3}
+  autoGenerateAvatarMappingIfUnspecified: 1
+  animationType: 2
+  humanoidOversampling: 1
+  avatarSetup: 2
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 0
+  importBlendShapeDeformPercent: 0
+  remapMaterialsIfMaterialImportModeIsNone: 1
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

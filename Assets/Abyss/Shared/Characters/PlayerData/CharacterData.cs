@@ -36,7 +36,7 @@ public class CharacterData : ScriptableObject
     public float dodgeCooldown = 2f;
 
     [Header("점프 및 중력 설정")]
-    public float jumpForce = 7f;
+    public float jumpForce = 5f;
     public float gravity = -30f;
     public float fallMultiplier = 2f;
 
@@ -54,9 +54,19 @@ public class CharacterData : ScriptableObject
     [Header("캐릭터 클래스")]
     public Define.CharacterClass conClass;
 
+    // 캐릭터 초상화
+    [Header("초상화")]
+    public Sprite portrait;
+    [Tooltip("캐릭터 선택 팝업에 표시할 전신 로스터 일러스트")]
+    public Sprite rosterIllust;
+
     // 캐릭터 고유 패시브
     [Header("패시브")]
     public PassiveSO passive;
+
+    // 씬 진입 시 등장 연출 (null이면 GameRunBootstrapper의 기본 연출 사용)
+    [Header("등장 연출")]
+    public PlayerEntranceBehaviourSO playerEntrance;
 
     // 레거시 호환 — EffectData 등에서 사용
     public int GetTotalAttackPower() => UnityEngine.Mathf.Max(baseMeleeAttack, baseRangedAttack);

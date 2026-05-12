@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: CactusConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: Cactus
-  grade: 0
+  grade: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -77,3 +77,4 @@ MonoBehaviour:
     oneShot: 0
   stateOverrides:
   - {fileID: 11400000, guid: 0dd4fd3ae5f44b84b92f10d15c46d94c, type: 2}
+  - {fileID: 11400000, guid: e42c5ef64b4d4a3a8ce522b3fca20edf, type: 2}

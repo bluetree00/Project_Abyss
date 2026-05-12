@@ -22,6 +22,7 @@ public class BishopShieldGuardState : MovementLockedState<BishopShieldData>
         _phase = Phase.Guard;
         _timer = Data.guardDuration;
         ctx.Animator?.CrossFade(Data.guardStateName, 0.1f);
+        Data.SpawnVFX(ctx.Transform);
     }
 
     public override void Update(MonsterContext ctx)

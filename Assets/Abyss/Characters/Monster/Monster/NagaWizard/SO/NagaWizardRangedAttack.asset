@@ -12,8 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a9afdd5dc8632045930ece3688e7cfb, type: 3}
   m_Name: NagaWizardRangedAttack
   m_EditorClassIdentifier: Assembly-CSharp::MonsterRangedAttackSO
+  _vfxPrefab: {fileID: 4186470608034871016, guid: 2e09401fc9ee4c749a2bbda96cd0818f,
+    type: 3}
+  _vfxScale: 0.5
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   projectilePrefab: {fileID: 6356737226436246457, guid: e6e26bca3a7fb264dbb7398de856a31e,
     type: 3}
   projectileSpeed: 10
   projectileMaxRange: 20
   launchHeightOffset: 1.2
+  vfxProjectilePrefab: {fileID: 2580380945974098950, guid: e3fb4b8da5515254a818c3d969b62e14,
+    type: 3}
+  vfxProjectileScale: 1
+  vfxProjectileHitRadius: 0.6
+  vfxHitEffectPrefab: {fileID: 2585137204373214539, guid: e789624d1a22b214fa6c22a961a3bcd1,
+    type: 3}
+  vfxHitEffectScale: 1
+  slowScale: 0
+  slowDuration: 0

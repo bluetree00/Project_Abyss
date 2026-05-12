@@ -17,10 +17,11 @@ public sealed class PlayerRunState
     public event Action<int, int> OnHpChanged; // (hp, maxHp)
     public event Action<int> OnGoldChanged;    // tempGold
 
-    public PlayerRunState(int maxHp = 100)
+    public PlayerRunState(int maxHp = 100, int startGold = 0)
     {
         MaxHp = Math.Max(1, maxHp);
         Hp = MaxHp;
+        TempGold = Math.Max(0, startGold);
     }
 
     public void Deactivate()
@@ -69,6 +70,18 @@ public sealed class PlayerRunState
             TempGold += amount;
 
         OnGoldChanged?.Invoke(TempGold);
+    }
+
+    /// <summary>골드를 차감한다. 잔액 부족이면 false 반환(차감 없음).</summary>
+    public bool TrySpendGold(int amount)
+    {
+        if (!IsActive) return false;
+        if (amount <= 0) return false;
+        if (TempGold < amount) return false;
+
+        TempGold -= amount;
+        OnGoldChanged?.Invoke(TempGold);
+        return true;
     }
 
     public void Damage(int amount)

@@ -12,7 +12,7 @@ public class MonsterJsonData
 {
     // ── 기본 정보 ──────────────────────────────────────────
     public string monsterName;
-    /// <summary>"Normal" | "Elite" | "Boss"</summary>
+    /// <summary>"Common" | "Rare" | "Elite" | "Boss"</summary>
     public string grade;
 
     // ── 서브 데이터 ────────────────────────────────────────
@@ -73,10 +73,10 @@ public class MonsterJsonData
         public string patrolStateName;
         public string chaseStateName;
         public string attackReadyStateName;
-        public string attackTrigger;
-        public string getHitTrigger;
-        public string dieTrigger;
-        public string detectTrigger;
+        public string attackStateName;
+        public string getHitStateName;
+        public string dieStateName;
+        public string detectStateName;
         public string speedParam;
         public float  speedDampTime;
         public float  crossFadeDuration;
@@ -85,7 +85,8 @@ public class MonsterJsonData
     [Serializable]
     public class ElementalData
     {
-        public float accumulationThreshold;
+        /// <summary>누적치 저항 배율. 실제 임계치 = element.activation_gauge × 이 값. 0이면 덮어쓰지 않음.</summary>
+        public float maxAccumulationScale;
         /// <summary>0.0=면역 / 0.5=반감 / 1.0=보통 / 2.0=약점. 0이면 덮어쓰지 않음.</summary>
         public float lightningResistance;
         public float waterResistance;
@@ -166,14 +167,12 @@ public class MonsterJsonData
                 config.animation.chaseStateName       = animation.chaseStateName;
             if (!string.IsNullOrEmpty(animation.attackReadyStateName))
                 config.animation.attackReadyStateName = animation.attackReadyStateName;
-            if (!string.IsNullOrEmpty(animation.attackTrigger))
-                config.animation.attackTrigger        = animation.attackTrigger;
-            if (!string.IsNullOrEmpty(animation.getHitTrigger))
-                config.animation.getHitTrigger        = animation.getHitTrigger;
-            if (!string.IsNullOrEmpty(animation.dieTrigger))
-                config.animation.dieTrigger           = animation.dieTrigger;
-            if (!string.IsNullOrEmpty(animation.detectTrigger))
-                config.animation.detectTrigger        = animation.detectTrigger;
+            if (!string.IsNullOrEmpty(animation.attackStateName))
+                config.animation.attackStateName      = animation.attackStateName;
+            if (!string.IsNullOrEmpty(animation.getHitStateName))
+                config.animation.getHitStateName      = animation.getHitStateName;
+            if (!string.IsNullOrEmpty(animation.dieStateName))
+                config.animation.dieStateName         = animation.dieStateName;
             if (!string.IsNullOrEmpty(animation.speedParam))
                 config.animation.speedParam           = animation.speedParam;
             if (animation.speedDampTime    > 0) config.animation.speedDampTime    = animation.speedDampTime;
@@ -183,8 +182,8 @@ public class MonsterJsonData
         // ── 원소
         if (elemental != null)
         {
-            if (elemental.accumulationThreshold > 0)
-                config.elemental.accumulationThreshold = elemental.accumulationThreshold;
+            if (elemental.maxAccumulationScale > 0)
+                config.elemental.maxAccumulationScale = elemental.maxAccumulationScale;
             if (elemental.lightningResistance > 0) config.elemental.lightning.resistance = elemental.lightningResistance;
             if (elemental.waterResistance     > 0) config.elemental.water.resistance     = elemental.waterResistance;
             if (elemental.fireResistance      > 0) config.elemental.fire.resistance      = elemental.fireResistance;

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ChestMonsterConfig
   m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
   monsterName: ChestMonster
-  grade: 1
+  grade: 2
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -74,3 +74,4 @@ MonoBehaviour:
   specialStates: []
   stateOverrides:
   - {fileID: 11400000, guid: c286a7a146af4ae8afe1783b33ac8d66, type: 2}
+  - {fileID: 11400000, guid: 1234e25591724ff1ac18d8395ff82366, type: 2}
