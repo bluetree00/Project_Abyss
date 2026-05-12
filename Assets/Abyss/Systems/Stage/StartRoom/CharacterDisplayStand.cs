@@ -200,11 +200,11 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         loadout.SetCharacter(characterData, characterPrefabKey);
         Managers.CharacterData?.SetCharacterData(characterData, characterPrefabKey);
 
-        // 캐릭터 획득 시점에 HUD 복원
-        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
-
         // 캐릭터별 획득 대사 (정보 팝업 닫힌 후, 캐릭터 스폰 전)
         await ShowAcquisitionDialogueAsync();
+
+        // 획득 대사 종료 후 HUD 복원
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
 
         GameRunBootstrapper.Instance?.SpawnCharacterInStartRoomAsync(
             characterPrefabKey,
