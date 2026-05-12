@@ -56,6 +56,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     // ---- Run 수명 관리 ----
     public GameRunSession CurrentRun { get; private set; }
+    public bool IsNewRunPending { get; private set; }
 
     public void BeginRun(GameRunSession session)
     {
@@ -137,19 +138,30 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     public void RequestStartRun()
     {
+        IsNewRunPending = true;
+        var rpm = RunProgressManager.Instance;
+        if (rpm != null)
+            rpm.ClearAsync(rpm.ActiveSlotIndex).Forget();
         RequestLoad(Define.Scene.GameScene);
+    }
+
+    public bool ConsumeNewRunPending()
+    {
+        bool was = IsNewRunPending;
+        IsNewRunPending = false;
+        return was;
     }
 
     /// <summary>
     /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.
     /// StageMapBootstrapper는 CurrentRun.IsRunning=true를 감지해 재진입 경로로 처리한다.
     /// </summary>
-    public void RequestRestoreRun()
+    public void RequestRestoreRun(Action onFailed = null)
     {
-        RequestRestoreRunAsync().Forget();
+        RequestRestoreRunAsync(onFailed).Forget();
     }
 
-    private async UniTaskVoid RequestRestoreRunAsync()
+    private async UniTaskVoid RequestRestoreRunAsync(Action onFailed = null)
     {
         var rpm = RunProgressManager.Instance;
         if (rpm == null) return;
@@ -159,10 +171,28 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (save == null || !save.hasActiveRun)
         {
             Debug.LogWarning($"[AppBootstrapper] RequestRestoreRun: slot {slot}에 유효한 저장 없음");
+            onFailed?.Invoke();
             return;
         }
 
-        Loadout.SetCharacter(null, save.characterKey);
+        // CharacterData SO 로드 — 이어하기 시 캐릭터 스탯 복원에 필요
+        CharacterData charData = null;
+        if (!string.IsNullOrEmpty(save.characterKey))
+        {
+            try
+            {
+                charData = await Managers.AddressableManager.TryLoadAssetAsync<CharacterData>(save.characterKey + "Data");
+                if (charData != null)
+                    Managers.CharacterData?.SetCharacterData(charData, save.characterKey);
+                else
+                    Debug.LogWarning($"[AppBootstrapper] RestoreRun: CharacterData '{save.characterKey}Data' 로드 실패");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AppBootstrapper] RestoreRun: CharacterData 로드 예외: {e.Message}");
+            }
+        }
+        Loadout.SetCharacter(charData, save.characterKey);
 
         // WeaponSO 로드 — 실패해도 복원 흐름은 계속 진행
         WeaponSO ws0 = null, ws1 = null;
@@ -199,6 +229,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (!session.IsRunning)
         {
             Debug.LogError("[AppBootstrapper] RequestRestoreRun: 세션 복원 실패.");
+            onFailed?.Invoke();
             return;
         }
 

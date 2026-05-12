@@ -23,6 +23,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("로비에서 바로 GameScene 진입 시 로드할 스타트 방 맵 키. 비워두면 기존 에디터 직접 실행 fallback으로 동작.")]
     [SerializeField] private string startRoomMapKey = "";
 
+    [Tooltip("스타트 방 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
+    [SerializeField] private DialogueSequenceSO startRoomDialogueSO;
+
+    /// <summary>서버에서 로드하는 대화 시퀀스 ID. 비워두면 서버 데이터를 사용하지 않음.</summary>
+    private const string StartRoomSequenceId = "StartRoom";
+
     /// <summary>스타트 방 씬으로 진입한 상태. Loadout 준비 여부와 무관. 디버그 스킵 등에 사용.</summary>
     public bool IsStartRoomScene => AppBootstrapper.Instance != null
         && !string.IsNullOrEmpty(startRoomMapKey);
@@ -1022,10 +1028,36 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         await SpawnMapAsync(startRoomMapKey);
 
+        // 대화·위스프 구간 동안 HUD 숨김 — 캐릭터 획득 시점에 복원
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
+
+        await ShowStartRoomDialogueAsync();
+
         if (wispPrefab != null)
             SpawnWisp();
         else
             Debug.LogError("[GameRunBootstrapper] wispPrefab 미할당 — 스타트 방에서 캐릭터를 생성할 수 없습니다.");
+    }
+
+    private async UniTask ShowStartRoomDialogueAsync()
+    {
+        // 서버 CSV 우선, 없으면 인스펙터 SO 폴백
+        var dlgMgr = Managers.DialogueData;
+        if (dlgMgr != null && !dlgMgr.IsInitialized)
+            await dlgMgr.InitializeAsync();
+
+        DialogueLine[] lines = dlgMgr?.GetLines(StartRoomSequenceId)
+                               ?? startRoomDialogueSO?.Lines;
+        if (lines == null || lines.Length == 0) return;
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+        if (popup == null) return;
+
+        try
+        {
+            await popup.ShowAsync(lines);
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     private void SpawnWisp()
@@ -1231,13 +1263,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var wm = player.WeaponManager;
         if (wm != null)
         {
-            // 저장된 슬롯이 있으면 복원 (StageMap 복귀)
+            // 저장된 슬롯이 있으면 복원 (StageMap 복귀 or 이어하기)
             if (run?.SavedWeaponSlots != null)
             {
                 for (int i = 0; i < run.SavedWeaponSlots.Length; i++)
                 {
                     if (run.SavedWeaponSlots[i] != null)
                     {
+                        PlayerWeaponManager.ApplyServerOverride(run.SavedWeaponSlots[i]);
                         await PreloadWeaponClipsAsync(run.SavedWeaponSlots[i]);
                         await wm.AcquireWeaponAsync(run.SavedWeaponSlots[i], autoEquip: true);
                     }
@@ -1253,6 +1286,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 if (loadout?.WeaponSlot0 != null)
                 {
                     var weaponData = new WeaponData(loadout.WeaponSlot0);
+                    PlayerWeaponManager.ApplyServerOverride(weaponData);
                     await PreloadWeaponClipsAsync(weaponData);
                     await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
                     Debug.Log($"[GameRunBootstrapper] 메인 무기 장착: {loadout.WeaponSlot0.displayName}");
@@ -1261,6 +1295,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 if (loadout?.WeaponSlot1 != null)
                 {
                     var subData = new WeaponData(loadout.WeaponSlot1);
+                    PlayerWeaponManager.ApplyServerOverride(subData);
                     await PreloadWeaponClipsAsync(subData);
                     await wm.AcquireWeaponAsync(subData, autoEquip: true);
                     Debug.Log($"[GameRunBootstrapper] 서브 장비 장착: {loadout.WeaponSlot1.displayName}");

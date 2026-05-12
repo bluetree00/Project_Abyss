@@ -115,8 +115,10 @@ public sealed class StageMapBootstrapper : MonoBehaviour
             app.NotifySceneReady();
 
             // 맵 복귀 시점 저장 (방 사이 세이브 포인트)
+            // GameScene 스타트룸을 거쳐온 새 런은 IsNewRunPending=true → retryCount 증가
             var rpm = RunProgressManager.Instance;
-            SaveCheckpointAsync(app.CurrentRun, rpm).Forget();
+            bool isNewRun = app.ConsumeNewRunPending();
+            SaveCheckpointAsync(app.CurrentRun, rpm, isNewRun: isNewRun).Forget();
 
             var introScroller = FindObjectOfType<StageMapScroller>(true);
             if (introScroller != null)

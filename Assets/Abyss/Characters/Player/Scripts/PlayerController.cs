@@ -471,9 +471,9 @@ public class PlayerController : CharacterBase
         }
         else
         {
-            // SO가 없으면 Addressables에서 로드
+            // SO가 없으면 Addressables에서 로드 (키 형식: "MageData", "KnightData" 등)
             string characterName = gameObject.name.Replace("(Clone)", "");
-            await LoadCharacterDataAsync(characterName);
+            await LoadCharacterDataAsync(characterName + "Data");
         }
 
         // 스탯 초기화: 서버 우선 → SO 폴백

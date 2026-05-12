@@ -119,7 +119,7 @@ public class UI_SaveSlotPanel : UI_Base
         Close();
 
         if (hasSave)
-            AppBootstrapper.Instance?.RequestRestoreRun();
+            AppBootstrapper.Instance?.RequestRestoreRun(onFailed: Open);
         else
             AppBootstrapper.Instance?.RequestStartRun();
     }
