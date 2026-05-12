@@ -45,8 +45,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1f33e38f004dea4459c7e28969c59464
+    m_Address: Illust_God_Default
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 34b67c9097fda7840a1a2cf55fc0c6b1
     m_Address: VFX_WindBuff
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 37261ed02c0b7c649b572232dfd21f30
+    m_Address: Illust_Shadow_Default
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -72,6 +82,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63418a5331367b04287574885f39e9ac
     m_Address: dragon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 643fac2164c3b8e4e8b73afbbb274127
+    m_Address: UI/Popup/UI_DialoguePopup
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -153,6 +168,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dfabbd05c7735314e97de47b3d7695c4
     m_Address: VFX_LightningStrike
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4cb61af80a22f6409945eaa346f0208
+    m_Address: DIALOGUE_DATA
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
