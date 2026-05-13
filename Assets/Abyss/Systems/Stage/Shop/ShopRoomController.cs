@@ -437,6 +437,12 @@ public class ShopRoomController : MonoBehaviour
                 return;
             }
             Debug.Log($"[ShopRoom] 무기 구매 성공: {targetIdForLog} ({price}G)");
+
+            // 다음 방에서 장비가 유지되도록 세션에 즉시 저장
+            var slotData = new WeaponData[wm.SlotCount];
+            for (int i = 0; i < wm.SlotCount; i++)
+                slotData[i] = wm.slots[i]?.runtimeData;
+            _run.SaveWeaponSlots(slotData, wm.CurrentSlotIndex);
         }
         catch (OperationCanceledException)
         {
