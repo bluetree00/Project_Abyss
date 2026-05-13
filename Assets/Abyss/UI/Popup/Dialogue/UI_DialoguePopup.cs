@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
@@ -17,7 +19,7 @@ public class UI_DialoguePopup : UI_Popup
     // ─────────────────────────────────────────────────────────
 
     [Header("Portrait")]
-    [SerializeField] private Image portrait;  // 좌측 고정 일러스트 — 라인마다 Addressables로 교체
+    [SerializeField] private Image portrait;
 
     [Header("Text Box")]
     [SerializeField] private TextMeshProUGUI speakerNameText;
@@ -33,6 +35,9 @@ public class UI_DialoguePopup : UI_Popup
     [Header("Typewriter")]
     [SerializeField, Min(0.01f)] private float charDelay = 0.03f;
 
+    [Header("Illustration")]
+    [SerializeField, Min(0f)] private float illustFadeIn = 0.25f;
+
     // ─────────────────────────────────────────────────────────
     // Private
     // ─────────────────────────────────────────────────────────
@@ -40,6 +45,9 @@ public class UI_DialoguePopup : UI_Popup
     private bool _isTyping;
     private bool _skipRequested;
     private UniTaskCompletionSource _advanceTcs;
+
+    private readonly Dictionary<string, Sprite> _illustCache = new();
+    private readonly List<Action> _releaseActions = new();
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
@@ -62,6 +70,7 @@ public class UI_DialoguePopup : UI_Popup
     {
         if (advanceButton != null)
             advanceButton.onClick.RemoveListener(OnAdvanceClicked);
+        ReleaseIllustrations();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -83,17 +92,16 @@ public class UI_DialoguePopup : UI_Popup
 
         var ct = this.GetCancellationTokenOnDestroy();
 
-        for (int i = 0; i < lines.Length; i++)
+        if (portrait != null) portrait.color = new Color(1f, 1f, 1f, 0f);
+
+        try
         {
-            try
-            {
+            await PreloadIllustrationsAsync(lines, ct);
+            for (int i = 0; i < lines.Length; i++)
                 await ShowLineAsync(lines[i], ct);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
         }
+        catch (OperationCanceledException) { return; }
+        finally { ReleaseIllustrations(); }
 
         ClosePopupUI();
     }
@@ -102,10 +110,55 @@ public class UI_DialoguePopup : UI_Popup
     // Private Methods
     // ─────────────────────────────────────────────────────────
 
+    /// <summary>시퀀스 시작 시 등장하는 고유 키를 한 번 순회해 일괄 로드.</summary>
+    private async UniTask PreloadIllustrationsAsync(DialogueLine[] lines, CancellationToken ct)
+    {
+        var keys = lines
+            .Select(l => l.illustrationKey)
+            .Where(k => !string.IsNullOrEmpty(k))
+            .Distinct();
+
+        foreach (var key in keys)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var sprite = await Managers.AddressableManager.TryLoadAssetAsync<Sprite>(key);
+            if (sprite != null)
+            {
+                _illustCache[key] = sprite;
+                var k = key;
+                _releaseActions.Add(() => Managers.AddressableManager.ReleaseAsset<Sprite>(k));
+                continue;
+            }
+
+            // PNG가 Texture2D 주 타입으로 등록된 경우 폴백
+            var tex = await Managers.AddressableManager.TryLoadAssetAsync<Texture2D>(key);
+            if (tex != null)
+            {
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0f), 100f);
+                _illustCache[key] = sprite;
+                var k = key;
+                _releaseActions.Add(() => Managers.AddressableManager.ReleaseAsset<Texture2D>(k));
+            }
+            else
+            {
+                Debug.LogWarning($"[UI_DialoguePopup] 일러스트 키 없음: {key}");
+            }
+        }
+    }
+
+    private void ReleaseIllustrations()
+    {
+        foreach (var release in _releaseActions)
+            release();
+        _releaseActions.Clear();
+        _illustCache.Clear();
+    }
+
     private async UniTask ShowLineAsync(DialogueLine line, CancellationToken ct)
     {
         SetSpeakerName(line.speaker);
-        await LoadIllustrationAsync(line.illustrationKey, ct);
+        ApplyIllustration(line.illustrationKey, ct);
 
         if (bodyText != null)
             bodyText.text = string.Empty;
@@ -116,27 +169,45 @@ public class UI_DialoguePopup : UI_Popup
 
         TypewriterAsync(line.text, ct).Forget();
 
-        await _advanceTcs.Task;
+        await _advanceTcs.Task.AttachExternalCancellation(ct);
     }
 
-    private async UniTask LoadIllustrationAsync(string key, CancellationToken ct)
+    private void ApplyIllustration(string key, CancellationToken ct)
     {
-        if (portrait == null || string.IsNullOrEmpty(key)) return;
+        if (portrait == null) return;
+        if (string.IsNullOrEmpty(key))
+        {
+            portrait.sprite = null;
+            portrait.color = new Color(1f, 1f, 1f, 0f);
+            return;
+        }
+        if (_illustCache.TryGetValue(key, out var sprite))
+        {
+            portrait.sprite = sprite;
+            FadeIllustrationAsync(ct).Forget();
+        }
+    }
+
+    private async UniTaskVoid FadeIllustrationAsync(CancellationToken ct)
+    {
+        if (portrait == null) return;
+
+        float elapsed = 0f;
+        float startAlpha = portrait.color.a;
+
         try
         {
-            var sprite = await Managers.AddressableManager.TryLoadAssetAsync<Sprite>(key);
-            ct.ThrowIfCancellationRequested();
-            if (sprite != null)
-                portrait.sprite = sprite;
+            while (elapsed < illustFadeIn)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / illustFadeIn);
+                portrait.color = new Color(1f, 1f, 1f, Mathf.Lerp(startAlpha, 1f, t));
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken: ct);
+            }
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[UI_DialoguePopup] 일러스트 로드 실패: {key} — {e.Message}");
-        }
+        catch (OperationCanceledException) { return; }
+
+        portrait.color = Color.white;
     }
 
     private async UniTaskVoid TypewriterAsync(string text, CancellationToken ct)
