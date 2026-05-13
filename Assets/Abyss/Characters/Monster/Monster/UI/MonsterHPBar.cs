@@ -87,6 +87,8 @@ public class MonsterHPBar : MonoBehaviour
     private float _elementBurstTimer;
     private bool _elementWasFull;
 
+    private TMPro.TMP_Text _subLabel;
+
     private MonoBehaviour _monster;
     private Transform _anchor;
     private Renderer[] _renderers;
@@ -142,6 +144,19 @@ public class MonsterHPBar : MonoBehaviour
         ApplyHpFill(_displayRatio);
         ApplyGhostFill(_displayRatio);
 
+        // 원소 게이지 리셋
+        _elementTargetRatio  = 0f;
+        _elementDisplayRatio = 0f;
+        _elementWasFull      = false;
+        _elementBurstActive  = false;
+        if (_elementGaugeRoot != null)
+        {
+            _elementGaugeRoot.SetActive(false);
+            _elementGaugeRoot.transform.localScale = Vector3.one;
+        }
+
+        if (_subLabel != null) _subLabel.text = string.Empty;
+
         EnsureNameLabel();
         gameObject.SetActive(true);
     }
@@ -153,7 +168,17 @@ public class MonsterHPBar : MonoBehaviour
         _renderers = null;
         _colliders = null;
         _hasLastPosition = false;
+        if (_subLabel != null) _subLabel.text = string.Empty;
         gameObject.SetActive(false);
+    }
+
+    /// <summary>HP바 아래 보조 텍스트 (DPS 등 더미 전용). 빈 문자열이면 숨긴다.</summary>
+    public void SetSubLabel(string text)
+    {
+        EnsureSubLabel();
+        if (_subLabel == null) return;
+        _subLabel.text = text ?? string.Empty;
+        _subLabel.gameObject.SetActive(!string.IsNullOrEmpty(text));
     }
 
     /// <summary>몬스터 이름을 체력바 위 라벨에 표시. 검정 테두리로 가독성 확보.</summary>
@@ -317,6 +342,34 @@ public class MonsterHPBar : MonoBehaviour
         if (_ghostFill == null) return;
         _ghostFill.fillAmount = ratio;
         _ghostFill.color = _ghostColor;
+    }
+
+    private void EnsureSubLabel()
+    {
+        if (_subLabel != null) return;
+
+        var parentRT = _barRoot != null ? _barRoot : (RectTransform)transform;
+        if (parentRT == null) return;
+
+        var go = new GameObject("SubLabel", typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(parentRT, false);
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, -3f);
+        rt.sizeDelta = new Vector2(200f, 20f);
+
+        _subLabel = go.AddComponent<TMPro.TextMeshProUGUI>();
+        _subLabel.alignment          = TMPro.TextAlignmentOptions.Center;
+        _subLabel.color              = new Color(1f, 0.85f, 0.4f, 1f);
+        _subLabel.fontSize           = 11f;
+        _subLabel.enableWordWrapping = false;
+        _subLabel.overflowMode       = TMPro.TextOverflowModes.Overflow;
+        _subLabel.raycastTarget      = false;
+        TMPOutlineHelper.ApplyDefault(_subLabel);
+        go.SetActive(false);
     }
 
     private void EnsureNameLabel()

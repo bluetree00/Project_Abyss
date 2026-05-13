@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
@@ -26,6 +27,8 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     // ── Private ─────────────────────────────────────────────────────
 
+    private const float DpsWindow = 3f;
+
     private static readonly int HitHash = Animator.StringToHash("Hit");
 
     private ElementBuildup        _buildup;
@@ -34,6 +37,9 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     private float _currentHp;
     private float _lastHitTime;
+
+    private readonly Queue<(float time, float damage)> _damageLog = new();
+    private float _damageInWindow;
 
     private float _incomingDamageMultiplier = 1f;
     private float _movementMultiplier       = 1f;
@@ -101,6 +107,8 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
         if (_buildup != null && _hpBar != null)
             _hpBar.UpdateElement(_buildup.Ratio, _buildup.Accum, _buildup.Threshold, _buildup.LastElement, _buildup.PoisonStacks);
+
+        UpdateDps();
     }
 
     // ── Public Methods (IDamageable) ─────────────────────────────────
@@ -115,6 +123,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
         amount      *= _incomingDamageMultiplier;
         _currentHp   = Mathf.Max(0f, _currentHp - amount);
         _lastHitTime = Time.time;
+        LogDamage(amount);
 
         if (_buildup != null)
             _buildup.AddBuildup(element, elementAmount, amount);
@@ -134,6 +143,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
         _currentHp   = Mathf.Max(0f, _currentHp - damage);
         _lastHitTime = Time.time;
+        LogDamage(damage);
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
@@ -145,6 +155,26 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
     public void SetDefenseMultiplier(float multi)        => _defenseMultiplier        = multi;
 
     // ── Private Methods ──────────────────────────────────────────────
+
+    private void LogDamage(float amount)
+    {
+        _damageLog.Enqueue((Time.time, amount));
+        _damageInWindow += amount;
+    }
+
+    private void UpdateDps()
+    {
+        float now = Time.time;
+        while (_damageLog.Count > 0 && now - _damageLog.Peek().time > DpsWindow)
+        {
+            var (_, d) = _damageLog.Dequeue();
+            _damageInWindow -= d;
+        }
+
+        if (_hpBar == null) return;
+        float dps = _damageInWindow / DpsWindow;
+        _hpBar.SetSubLabel(dps >= 1f ? $"DPS  {dps:F0}" : string.Empty);
+    }
 
     private async UniTaskVoid InitHPBarAsync(CancellationToken ct)
     {
