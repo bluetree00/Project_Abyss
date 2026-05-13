@@ -15,8 +15,8 @@ public static class CreateDialoguePopupPrefab
     [MenuItem("Abyss/Dialogue/Register Illustrations")]
     public static void RegisterIllustrations()
     {
-        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/1RwGb.png", "Illust_God_Default");
-        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/dWhY5.png", "Illust_Shadow_Default");
+        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/Illust_God_Default.png", "Illust_God_Default");
+        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/Illust_Shadow_Default.png", "Illust_Shadow_Default");
         Debug.Log("[Dialogue] 일러스트 Addressables 등록 완료 — Illust_God_Default / Illust_Shadow_Default");
     }
 
@@ -76,23 +76,18 @@ public static class CreateDialoguePopupPrefab
         bg.color = new Color(0f, 0f, 0f, 0.72f);
         Stretch(bg.rectTransform);
 
-        // ── Portrait Left — 신(God) ─────────────────────────────────
-        var godSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
-            "Assets/Abyss/UI/Popup/Quest/1RwGb.png");
-        var godImg = MakeImage(root.transform, "PortraitLeft");
-        godImg.sprite = godSprite;
+        // ── Portrait — Addressables에서 런타임 로드 (기본 스프라이트 없음) ──
+        var godImg = MakeImage(root.transform, "Portrait");
         godImg.preserveAspect = true;
         godImg.raycastTarget = false;
         SetRect(godImg.rectTransform, new Vector2(0, 0), new Vector2(0, 0),
-            new Vector2(0, 0), new Vector2(30, 0), new Vector2(420, 630));
+            new Vector2(0, 0), new Vector2(255, 30), new Vector2(470, 600));
 
-        // ── Portrait Right — 심연(Abyss) ───────────────────────────
-        var abyssSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
-            "Assets/Abyss/UI/Popup/Quest/dWhY5.png");
+        // PortraitRight는 비활성 상태로 유지 (레거시 호환)
         var abyssImg = MakeImage(root.transform, "PortraitRight");
-        abyssImg.sprite = abyssSprite;
         abyssImg.preserveAspect = true;
         abyssImg.raycastTarget = false;
+        abyssImg.gameObject.SetActive(false);
         SetRect(abyssImg.rectTransform, new Vector2(1, 0), new Vector2(1, 0),
             new Vector2(1, 0), new Vector2(-30, 0), new Vector2(420, 630));
 
@@ -166,8 +161,7 @@ public static class CreateDialoguePopupPrefab
         // ── SerializeField 연결 ──────────────────────────────────────
         var popup = root.GetComponent<UI_DialoguePopup>();
         var so    = new SerializedObject(popup);
-        so.FindProperty("portraitLeft").objectReferenceValue   = godImg;
-        so.FindProperty("portraitRight").objectReferenceValue  = abyssImg;
+        so.FindProperty("portrait").objectReferenceValue       = godImg;
         so.FindProperty("speakerNameText").objectReferenceValue = nameTMP;
         so.FindProperty("bodyText").objectReferenceValue       = bodyTMP;
         so.FindProperty("advanceButton").objectReferenceValue  = btn;
