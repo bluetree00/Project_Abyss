@@ -286,6 +286,7 @@ public class MonsterSpawner : MonoBehaviour
         {
             if (ct.IsCancellationRequested) return;
             if (!entry.enabled || string.IsNullOrEmpty(entry.addressableKey)) continue;
+            if (entry.grade == MonsterGrade.Boss) continue; // 보스는 BossSpawner가 별도 처리
 
             await Managers.ObjectPooler.PrewarmAsync(
                 entry.addressableKey,
