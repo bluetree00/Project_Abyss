@@ -112,7 +112,7 @@ public sealed class RoomWaveController : MonoBehaviour
         _active = true;
         Debug.Log($"[RoomWave] 웨이브 모드 초기화 완료 — {_totalWaves}웨이브 / 스포너 {_spawners.Count}개", this);
 
-        PrewarmThenStartAsync().Forget();
+        StartWaveAsync(0).Forget();
     }
 
     private void InitLegacyMode()
@@ -167,26 +167,6 @@ public sealed class RoomWaveController : MonoBehaviour
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 웨이브 모드
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    private async UniTaskVoid PrewarmThenStartAsync()
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        try
-        {
-            var tasks = new UniTask[_spawners.Count];
-            for (int i = 0; i < _spawners.Count; i++)
-            {
-                var s = _spawners[i];
-                tasks[i] = s != null
-                    ? s.PrewarmPoolsAsync(3, ct)
-                    : UniTask.CompletedTask;
-            }
-            await UniTask.WhenAll(tasks);
-        }
-        catch (OperationCanceledException) { return; }
-
-        StartWaveAsync(0).Forget();
-    }
 
     private async UniTaskVoid StartWaveAsync(int waveIndex)
     {
