@@ -11,6 +11,21 @@ using UnityEngine.UI;
 public class MonsterHPBar : MonoBehaviour
 {
     // ─────────────────────────────────────────────────────────────
+    // Constants
+    // ─────────────────────────────────────────────────────────────
+
+    private static readonly Color[] ElementColors =
+    {
+        new(1.00f, 0.92f, 0.23f, 1f), // Lightning — yellow
+        new(0.13f, 0.59f, 0.95f, 1f), // Water     — blue
+        new(0.96f, 0.26f, 0.21f, 1f), // Fire      — red
+        new(0.30f, 0.69f, 0.31f, 1f), // Grass     — green
+        new(0.55f, 0.43f, 0.39f, 1f), // Earth     — brown
+    };
+
+    private static readonly string[] ElementIcons = { "⚡", "💧", "🔥", "🌿", "🪨" };
+
+    // ─────────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────────
 
@@ -20,19 +35,25 @@ public class MonsterHPBar : MonoBehaviour
     [SerializeField] private RectTransform _barRoot;
     [SerializeField] private TMPro.TMP_Text _nameLabel;
 
+    [Header("Element Gauge")]
+    [SerializeField] private GameObject _elementGaugeRoot;
+    [SerializeField] private Image _elementGaugeFill;
+    [SerializeField] private TMPro.TMP_Text _elementGaugeLabel;
+
     [Header("HP Animation")]
     [SerializeField] private float _hpLerpSpeed = 1.8f;
     [SerializeField] private float _ghostDelay = 0.35f;
     [SerializeField] private float _ghostLerpSpeed = 0.35f;
 
     [Header("Colors")]
-    [SerializeField] private Color _ghostColor = new Color(1.00f, 0.75f, 0.20f, 0.70f);
+    [SerializeField] private Color _hpColor    = new(0.88f, 0.18f, 0.18f, 1f);
+    [SerializeField] private Color _ghostColor = new(1.00f, 0.75f, 0.20f, 0.65f);
 
     [Header("Name Label")]
     [Tooltip("비워두면 Link 시점에 자동 생성된다.")]
     [SerializeField] private float _nameLabelYOffset = 4f;
-    [SerializeField] private Vector2 _nameLabelSize = new(180f, 24f);
-    [SerializeField] private float _nameLabelFontSize = 16f;
+    [SerializeField] private Vector2 _nameLabelSize = new(200f, 26f);
+    [SerializeField] private float _nameLabelFontSize = 14f;
 
     [Header("Position")]
     [SerializeField] private float _headOffset = 0.1f;
@@ -133,13 +154,13 @@ public class MonsterHPBar : MonoBehaviour
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 
-    /// <summary>몬스터 이름 표시. 원소 표시는 쉐이더 테두리로 이관되어 UI에는 더 이상 나타내지 않는다.
-    /// element 파라미터는 호출부 호환을 위해 유지하되 실제로는 무시됨.</summary>
+    /// <summary>몬스터 이름 및 고유 속성 표시. 속성 아이콘을 이름 앞에 붙인다.</summary>
     public void SetMonsterInfo(string monsterName, ElementType element)
     {
         EnsureNameLabel();
         if (_nameLabel == null) return;
-        _nameLabel.text = monsterName ?? string.Empty;
+        string icon = element.IsValid() ? $"{ElementIcons[(int)element]} " : "";
+        _nameLabel.text = icon + (monsterName ?? string.Empty);
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 
@@ -155,10 +176,36 @@ public class MonsterHPBar : MonoBehaviour
         _targetRatio = newRatio;
     }
 
-    /// <summary>원소 누적치 게이지 갱신. 원소 표시는 쉐이더 테두리로 이관되어 stub만 유지.</summary>
+    /// <summary>원소 누적치 게이지 갱신. 누적이 없으면 게이지를 숨긴다.</summary>
     public void UpdateElement(float ratio, float accum, float threshold, ElementType element, int poisonStacks = 0)
     {
-        // 원소 표시는 쉐이더 테두리로 이관됨 — UI에서는 처리하지 않음
+        bool hasBuildup = element.IsValid() && ratio > 0.001f;
+
+        if (_elementGaugeRoot != null)
+            _elementGaugeRoot.SetActive(hasBuildup);
+
+        if (!hasBuildup) return;
+
+        if (_elementGaugeFill != null)
+        {
+            _elementGaugeFill.fillAmount = ratio;
+            _elementGaugeFill.color = ElementColorOf(element);
+        }
+
+        if (_elementGaugeLabel != null)
+        {
+            string label = $"{ElementIcons[(int)element]} {accum:F0} / {threshold:F0}";
+            if (element == ElementType.Grass && poisonStacks > 0)
+                label += $"  ×{poisonStacks}";
+            _elementGaugeLabel.text = label;
+        }
+    }
+
+    private static Color ElementColorOf(ElementType element)
+    {
+        if (!element.IsValid()) return Color.gray;
+        int idx = (int)element;
+        return idx >= 0 && idx < ElementColors.Length ? ElementColors[idx] : Color.gray;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -196,6 +243,7 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_hpFill == null) return;
         _hpFill.fillAmount = ratio;
+        _hpFill.color = _hpColor;
     }
 
     private void ApplyGhostFill(float ratio)
