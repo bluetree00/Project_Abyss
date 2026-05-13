@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
+using Abyss.Monster;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
 {
@@ -97,6 +98,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private GameRunSession _run;
     public GameRunSession Run => _run;
+
+    // 미니맵 스포너 이벤트 구독 추적 (새 방 진입 시 해제)
+    private readonly System.Collections.Generic.List<MonsterSpawner> _minimapSpawnerSubs = new();
 
     private void Awake()
     {
@@ -458,11 +462,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             DissolveEffect.WarmupAsync(ct),
             GameCameraController.Instance?.PrepareMapViewAsync(mapCenter, 0.4f, ct) ?? UniTask.CompletedTask);
 
+        // 입장 연출 중에 스포너 풀을 병렬로 프리웜 — 연출이 끝나기 전에 Instantiate 부하를 분산시킴
         var entranceCtx = new MapEntranceContext(roomEntry);
-        await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+        await UniTask.WhenAll(
+            MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct),
+            PrewarmSpawnersFromBlocksAsync(blocks, ct));
 
         // 입장 연출 완료 후 방 클리어 컨트롤러 부착 + 스포너 활성화 → Start() 실행 → 몬스터 스폰 시작
         AttachRoomClearController(mapGO, blocks);
+        InitializeMinimapForRoom(mapGO, w, h, blocks);
         for (int i = 0; i < deferredSpawners.Count; i++)
             if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
 
@@ -779,6 +787,27 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 fallback = cat;
         }
         return fallback;
+    }
+
+    /// <summary>블록 목록에서 MonsterSpawner를 찾아 스폰 테이블의 모든 풀을 미리 채운다.
+    /// 입장 연출 재생 중 병렬 실행해 첫 스폰 프레임 드랍을 방지한다.</summary>
+    private async UniTask PrewarmSpawnersFromBlocksAsync(
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks,
+        CancellationToken ct)
+    {
+        if (blocks == null) return;
+
+        var tasks = new System.Collections.Generic.List<UniTask>();
+        foreach (var block in blocks)
+        {
+            if (block.instance == null) continue;
+            var spawner = block.instance.GetComponent<MonsterSpawner>();
+            if (spawner != null)
+                tasks.Add(spawner.PrewarmPoolsAsync(3, ct));
+        }
+
+        if (tasks.Count > 0)
+            await UniTask.WhenAll(tasks);
     }
 
     /// <summary>방 클리어 카운터를 맵 루트에 부착. PlacedBlock에서 MonsterSpawner/BossSpawner를 수집해 Initialize.
@@ -1355,5 +1384,56 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (keys.Count > 0)
             await Managers.AnimationResources.PreloadClipsAsync(keys);
+    }
+
+    // ── Minimap ───────────────────────────────────────────────
+
+    private void InitializeMinimapForRoom(
+        GameObject mapGO,
+        int gridW, int gridH,
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        var minimap = UIRootBootstrapper.Instance?.GetMinimapView();
+        if (minimap == null) return;
+
+        // 이전 방 스포너 구독 해제
+        UnsubscribeMinimapSpawners(minimap);
+
+        var roomCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
+        var roomSize   = new Vector2(gridW * blockCellSize, gridH * blockCellSize);
+        minimap.Initialize(roomCenter, roomSize);
+
+        if (blocks == null) return;
+
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var b = blocks[i];
+            if (b.instance == null) continue;
+
+            if (!b.instance.TryGetComponent<MonsterSpawner>(out var spawner)) continue;
+
+            var capturedMinimap = minimap;
+            spawner.OnMonsterSpawned += monster => OnMinimapMonsterSpawned(capturedMinimap, monster);
+            _minimapSpawnerSubs.Add(spawner);
+        }
+    }
+
+    private void UnsubscribeMinimapSpawners(MinimapView minimap)
+    {
+        // 람다 기반 구독은 직접 해제 불가 — Initialize()의 ClearAllMarkers로 마커 정리,
+        // 스포너 자체는 씬 언로드 시 파괴되므로 이벤트도 자동 해제됨.
+        _minimapSpawnerSubs.Clear();
+    }
+
+    private static void OnMinimapMonsterSpawned(MinimapView minimap, MonsterBase monster)
+    {
+        if (minimap == null || monster == null) return;
+
+        var type = monster is IBoss ? MinimapMarkerType.Boss : MinimapMarkerType.Monster;
+
+        var marker = minimap.AddMarker(monster.transform, type);
+        if (marker == null) return;
+
+        monster.OnDied += died => minimap.RemoveMarker(died != null ? died.transform : null);
     }
 }
