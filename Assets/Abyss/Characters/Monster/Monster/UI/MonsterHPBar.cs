@@ -39,6 +39,9 @@ public class MonsterHPBar : MonoBehaviour
     [SerializeField] private GameObject _elementGaugeRoot;
     [SerializeField] private Image _elementGaugeFill;
     [SerializeField] private TMPro.TMP_Text _elementGaugeLabel;
+    [SerializeField] private float _elementLerpSpeed    = 1.5f;
+    [SerializeField] private float _elementBurstDuration = 0.5f;
+    [SerializeField] private float _elementBurstScale   = 1.35f;
 
     [Header("HP Animation")]
     [SerializeField] private float _hpLerpSpeed = 1.8f;
@@ -77,6 +80,13 @@ public class MonsterHPBar : MonoBehaviour
     private float _ghostTimer;
     private bool _ghostActive;
 
+    private float _elementTargetRatio;
+    private float _elementDisplayRatio;
+    private Color _elementCurrentColor = Color.gray;
+    private bool _elementBurstActive;
+    private float _elementBurstTimer;
+    private bool _elementWasFull;
+
     private MonoBehaviour _monster;
     private Transform _anchor;
     private Renderer[] _renderers;
@@ -100,6 +110,7 @@ public class MonsterHPBar : MonoBehaviour
         if (_monster == null) return;
 
         UpdateHpAnimation();
+        UpdateElementAnimation();
         UpdatePosition();
     }
 
@@ -184,21 +195,76 @@ public class MonsterHPBar : MonoBehaviour
         if (_elementGaugeRoot != null)
             _elementGaugeRoot.SetActive(hasBuildup);
 
-        if (!hasBuildup) return;
-
-        if (_elementGaugeFill != null)
+        if (!hasBuildup)
         {
-            _elementGaugeFill.fillAmount = ratio;
-            _elementGaugeFill.color = ElementColorOf(element);
+            _elementTargetRatio = 0f;
+            return;
         }
+
+        _elementTargetRatio  = ratio;
+        _elementCurrentColor = ElementColorOf(element);
 
         if (_elementGaugeLabel != null)
+            _elementGaugeLabel.gameObject.SetActive(false);
+    }
+
+    private void UpdateElementAnimation()
+    {
+        if (_elementGaugeFill == null) return;
+
+        float dt = Time.deltaTime;
+
+        // 발동 후 리셋: 가득 찼다가 갑자기 0 근처로 떨어지면 즉시 스냅
+        if (_elementWasFull && _elementTargetRatio < 0.1f)
         {
-            string label = $"{ElementIcons[(int)element]} {accum:F0} / {threshold:F0}";
-            if (element == ElementType.Grass && poisonStacks > 0)
-                label += $"  ×{poisonStacks}";
-            _elementGaugeLabel.text = label;
+            _elementWasFull      = false;
+            _elementDisplayRatio = 0f;
+            _elementBurstActive  = false;
+            if (_elementGaugeRoot != null)
+                _elementGaugeRoot.transform.localScale = Vector3.one;
         }
+
+        _elementDisplayRatio = Mathf.MoveTowards(_elementDisplayRatio, _elementTargetRatio, _elementLerpSpeed * dt);
+
+        // 100% 도달 → 버스트 발동
+        if (!_elementWasFull && _elementDisplayRatio >= 0.99f && _elementTargetRatio >= 0.99f)
+        {
+            _elementWasFull = true;
+            TriggerElementBurst();
+        }
+
+        // 버스트 연출: 스케일 → 1, 색상 white → 원소색
+        if (_elementBurstActive)
+        {
+            _elementBurstTimer += dt;
+            float t = Mathf.Clamp01(_elementBurstTimer / _elementBurstDuration);
+
+            if (_elementGaugeRoot != null)
+                _elementGaugeRoot.transform.localScale = Vector3.one * Mathf.Lerp(_elementBurstScale, 1f, t);
+
+            _elementGaugeFill.color = Color.Lerp(Color.white, _elementCurrentColor, t);
+
+            if (t >= 1f) _elementBurstActive = false;
+        }
+        else
+        {
+            _elementGaugeFill.color = _elementCurrentColor;
+        }
+
+        _elementGaugeFill.fillAmount = _elementDisplayRatio;
+    }
+
+    private void TriggerElementBurst()
+    {
+        _elementBurstActive  = true;
+        _elementBurstTimer   = 0f;
+        _elementDisplayRatio = 1f;
+
+        _elementGaugeFill.fillAmount = 1f;
+        _elementGaugeFill.color      = Color.white;
+
+        if (_elementGaugeRoot != null)
+            _elementGaugeRoot.transform.localScale = Vector3.one * _elementBurstScale;
     }
 
     private static Color ElementColorOf(ElementType element)
