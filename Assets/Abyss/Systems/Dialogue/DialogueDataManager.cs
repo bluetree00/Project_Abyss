@@ -89,8 +89,8 @@ public class DialogueDataManager
 
             string seqId           = cols[0].Trim();
             string speaker         = cols[2].Trim();
-            string illustrationKey = cols[3].Trim().Trim('"');
-            string text            = cols[4].Trim().Trim('"');
+            string illustrationKey = cols[3].Trim();
+            string text            = cols[4].Trim();
 
             if (!Enum.TryParse<DialogueSpeaker>(speaker, ignoreCase: true, out var spkEnum))
                 spkEnum = DialogueSpeaker.None;
@@ -107,24 +107,56 @@ public class DialogueDataManager
         }
     }
 
-    /// <summary>따옴표 내부 쉼표를 보호하는 간단한 CSV 열 분리.</summary>
+    /// <summary>따옴표 내부 쉼표 및 "" 이스케이프를 처리하는 CSV 열 분리.</summary>
     private static string[] SplitCsvRow(string row)
     {
         var result = new List<string>();
+        var field = new System.Text.StringBuilder();
         bool inQuotes = false;
-        int start = 0;
 
         for (int i = 0; i < row.Length; i++)
         {
             char c = row[i];
-            if (c == '"') { inQuotes = !inQuotes; continue; }
-            if (c == ',' && !inQuotes)
+
+            if (inQuotes)
             {
-                result.Add(row[start..i]);
-                start = i + 1;
+                if (c == '"')
+                {
+                    // "" → 리터럴 " (이스케이프), 아니면 따옴표 닫힘
+                    if (i + 1 < row.Length && row[i + 1] == '"')
+                    {
+                        field.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = false;
+                    }
+                }
+                else
+                {
+                    field.Append(c);
+                }
+            }
+            else
+            {
+                if (c == '"')
+                {
+                    inQuotes = true;
+                }
+                else if (c == ',')
+                {
+                    result.Add(field.ToString());
+                    field.Clear();
+                }
+                else
+                {
+                    field.Append(c);
+                }
             }
         }
-        result.Add(row[start..]);
+
+        result.Add(field.ToString());
         return result.ToArray();
     }
 }
