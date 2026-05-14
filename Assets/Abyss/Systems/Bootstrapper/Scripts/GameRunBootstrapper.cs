@@ -456,7 +456,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         AppBootstrapper.Instance?.NotifySceneReady();
 
         // 카메라 페이드인 + Dissolve 머티리얼 프리로드 + 몬스터 풀 프리웜을 병렬로 수행.
-        // 프리웜을 카메라 준비 시간(~0.4s) 안에 함께 처리해 로딩 화면 연장 없이 입장 연출 전 준비 완료.
+        // StageMap에서 선행 프리웜이 완료된 경우 PrewarmSpawnersFromBlocksAsync는 즉시 반환 → 카메라 준비만 기다림.
+        // 미완료 시에도 카메라 준비(~0.4s) 안에 함께 처리되어 입장 연출 전까지 보장된다.
         var mapCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
         await UniTask.WhenAll(
             DissolveEffect.WarmupAsync(ct),
