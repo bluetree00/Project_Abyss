@@ -66,7 +66,12 @@ public class ObjectPoolerManager
     {
         _root = GameObject.Find("@Pools")?.transform;
         if (_root == null)
+        {
             _root = new GameObject("@Pools").transform;
+            // 풀 오브젝트가 씬 전환으로 파괴되지 않도록 DDOL 등록.
+            // StageMap 선행 프리웜으로 생성된 인스턴스가 GameScene에서도 재사용된다.
+            UnityEngine.Object.DontDestroyOnLoad(_root.gameObject);
+        }
 
         foreach (PoolType type in Enum.GetValues(typeof(PoolType)))
         {

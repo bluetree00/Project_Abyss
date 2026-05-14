@@ -61,6 +61,13 @@ public class BlockPalette : ScriptableObject
         return _cache.ContainsKey(type) && _cache[type].Count > 0;
     }
 
+    /// <summary>특정 TileType에 등록된 모든 BlockDef를 반환. 없으면 빈 배열.</summary>
+    public IReadOnlyList<BlockDef> GetAll(TileType type)
+    {
+        BuildCacheIfNeeded();
+        return _cache.TryGetValue(type, out var list) ? list : System.Array.Empty<BlockDef>();
+    }
+
     private void BuildCacheIfNeeded()
     {
         if (_cache != null) return;
