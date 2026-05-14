@@ -94,7 +94,6 @@ public class ObjectPoolerManager
     )
     {
         await EnsurePoolAsync(resourceKey, category, initialSize);
-
         return SpawnInternal(resourceKey, position, rotation, param);
     }
 
@@ -134,13 +133,31 @@ public class ObjectPoolerManager
     }
 
     // =========================
+    // Prewarm (공개 API)
+    // =========================
+
+    /// <summary>
+    /// 방 진입 전 호출해 풀을 미리 채워 첫 스폰 프레임 드랍을 방지한다.
+    /// 이미 풀이 존재하면 no-op.
+    /// </summary>
+    public async UniTask PrewarmAsync(
+        string key,
+        PoolType category,
+        int size,
+        System.Threading.CancellationToken ct = default)
+    {
+        await EnsurePoolAsync(key, category, size, ct);
+    }
+
+    // =========================
     // Pool Ensure (핵심)
     // =========================
 
     private async UniTask EnsurePoolAsync(
         string key,
         PoolType category,
-        int initialSize
+        int initialSize,
+        System.Threading.CancellationToken ct = default
     )
     {
         if (_pools.ContainsKey(key))
@@ -165,14 +182,14 @@ public class ObjectPoolerManager
             poolType = category
         };
 
-        RegisterPool(config);
+        await RegisterPoolAsync(config, ct);
     }
 
     // =========================
     // Pool Registration
     // =========================
 
-    private void RegisterPool(PoolConfig config)
+    private async UniTask RegisterPoolAsync(PoolConfig config, System.Threading.CancellationToken ct = default)
     {
         if (_configs.ContainsKey(config.key))
             return;
@@ -180,10 +197,14 @@ public class ObjectPoolerManager
         _configs[config.key] = config;
         _pools[config.key] = new Queue<GameObject>();
 
+        const int yieldEvery = 3;
         for (int i = 0; i < config.initialSize; i++)
         {
+            if (ct.IsCancellationRequested) break;
             var obj = CreateInstance(config);
             ReturnToPool(obj);
+            if ((i + 1) % yieldEvery == 0)
+                await UniTask.Yield();
         }
 
         Debug.Log($"[Pooler] Pool initialized: {config.key} ({config.poolType})");

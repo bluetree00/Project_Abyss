@@ -36,5 +36,6 @@ public static class HUDIds
         GridPanel     = 1 << 2,
         BossPanel     = 1 << 3,
         SystemNotices = 1 << 4,
+        Minimap       = 1 << 5,
     }
 }

@@ -11,6 +11,21 @@ using UnityEngine.UI;
 public class MonsterHPBar : MonoBehaviour
 {
     // ─────────────────────────────────────────────────────────────
+    // Constants
+    // ─────────────────────────────────────────────────────────────
+
+    private static readonly Color[] ElementColors =
+    {
+        new(1.00f, 0.92f, 0.23f, 1f), // Lightning — yellow
+        new(0.13f, 0.59f, 0.95f, 1f), // Water     — blue
+        new(0.96f, 0.26f, 0.21f, 1f), // Fire      — red
+        new(0.30f, 0.69f, 0.31f, 1f), // Grass     — green
+        new(0.55f, 0.43f, 0.39f, 1f), // Earth     — brown
+    };
+
+    private static readonly string[] ElementIcons = { "⚡", "💧", "🔥", "🌿", "🪨" };
+
+    // ─────────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────────
 
@@ -20,19 +35,28 @@ public class MonsterHPBar : MonoBehaviour
     [SerializeField] private RectTransform _barRoot;
     [SerializeField] private TMPro.TMP_Text _nameLabel;
 
+    [Header("Element Gauge")]
+    [SerializeField] private GameObject _elementGaugeRoot;
+    [SerializeField] private Image _elementGaugeFill;
+    [SerializeField] private TMPro.TMP_Text _elementGaugeLabel;
+    [SerializeField] private float _elementLerpSpeed    = 1.5f;
+    [SerializeField] private float _elementBurstDuration = 0.5f;
+    [SerializeField] private float _elementBurstScale   = 1.35f;
+
     [Header("HP Animation")]
     [SerializeField] private float _hpLerpSpeed = 1.8f;
     [SerializeField] private float _ghostDelay = 0.35f;
     [SerializeField] private float _ghostLerpSpeed = 0.35f;
 
     [Header("Colors")]
-    [SerializeField] private Color _ghostColor = new Color(1.00f, 0.75f, 0.20f, 0.70f);
+    [SerializeField] private Color _hpColor    = new(0.88f, 0.18f, 0.18f, 1f);
+    [SerializeField] private Color _ghostColor = new(1.00f, 0.75f, 0.20f, 0.65f);
 
     [Header("Name Label")]
     [Tooltip("비워두면 Link 시점에 자동 생성된다.")]
     [SerializeField] private float _nameLabelYOffset = 4f;
-    [SerializeField] private Vector2 _nameLabelSize = new(180f, 24f);
-    [SerializeField] private float _nameLabelFontSize = 16f;
+    [SerializeField] private Vector2 _nameLabelSize = new(200f, 26f);
+    [SerializeField] private float _nameLabelFontSize = 14f;
 
     [Header("Position")]
     [SerializeField] private float _headOffset = 0.1f;
@@ -55,6 +79,15 @@ public class MonsterHPBar : MonoBehaviour
     private float _ghostRatio;
     private float _ghostTimer;
     private bool _ghostActive;
+
+    private float _elementTargetRatio;
+    private float _elementDisplayRatio;
+    private Color _elementCurrentColor = Color.gray;
+    private bool _elementBurstActive;
+    private float _elementBurstTimer;
+    private bool _elementWasFull;
+
+    private TMPro.TMP_Text _subLabel;
 
     private MonoBehaviour _monster;
     private Transform _anchor;
@@ -79,6 +112,7 @@ public class MonsterHPBar : MonoBehaviour
         if (_monster == null) return;
 
         UpdateHpAnimation();
+        UpdateElementAnimation();
         UpdatePosition();
     }
 
@@ -110,6 +144,19 @@ public class MonsterHPBar : MonoBehaviour
         ApplyHpFill(_displayRatio);
         ApplyGhostFill(_displayRatio);
 
+        // 원소 게이지 리셋
+        _elementTargetRatio  = 0f;
+        _elementDisplayRatio = 0f;
+        _elementWasFull      = false;
+        _elementBurstActive  = false;
+        if (_elementGaugeRoot != null)
+        {
+            _elementGaugeRoot.SetActive(false);
+            _elementGaugeRoot.transform.localScale = Vector3.one;
+        }
+
+        if (_subLabel != null) _subLabel.text = string.Empty;
+
         EnsureNameLabel();
         gameObject.SetActive(true);
     }
@@ -121,7 +168,17 @@ public class MonsterHPBar : MonoBehaviour
         _renderers = null;
         _colliders = null;
         _hasLastPosition = false;
+        if (_subLabel != null) _subLabel.text = string.Empty;
         gameObject.SetActive(false);
+    }
+
+    /// <summary>HP바 아래 보조 텍스트 (DPS 등 더미 전용). 빈 문자열이면 숨긴다.</summary>
+    public void SetSubLabel(string text)
+    {
+        EnsureSubLabel();
+        if (_subLabel == null) return;
+        _subLabel.text = text ?? string.Empty;
+        _subLabel.gameObject.SetActive(!string.IsNullOrEmpty(text));
     }
 
     /// <summary>몬스터 이름을 체력바 위 라벨에 표시. 검정 테두리로 가독성 확보.</summary>
@@ -133,13 +190,13 @@ public class MonsterHPBar : MonoBehaviour
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 
-    /// <summary>몬스터 이름 표시. 원소 표시는 쉐이더 테두리로 이관되어 UI에는 더 이상 나타내지 않는다.
-    /// element 파라미터는 호출부 호환을 위해 유지하되 실제로는 무시됨.</summary>
+    /// <summary>몬스터 이름 및 고유 속성 표시. 속성 아이콘을 이름 앞에 붙인다.</summary>
     public void SetMonsterInfo(string monsterName, ElementType element)
     {
         EnsureNameLabel();
         if (_nameLabel == null) return;
-        _nameLabel.text = monsterName ?? string.Empty;
+        string icon = element.IsValid() ? $"{ElementIcons[(int)element]} " : "";
+        _nameLabel.text = icon + (monsterName ?? string.Empty);
         TMPOutlineHelper.ApplyDefault(_nameLabel);
     }
 
@@ -155,10 +212,91 @@ public class MonsterHPBar : MonoBehaviour
         _targetRatio = newRatio;
     }
 
-    /// <summary>원소 누적치 게이지 갱신. 원소 표시는 쉐이더 테두리로 이관되어 stub만 유지.</summary>
+    /// <summary>원소 누적치 게이지 갱신. 누적이 없으면 게이지를 숨긴다.</summary>
     public void UpdateElement(float ratio, float accum, float threshold, ElementType element, int poisonStacks = 0)
     {
-        // 원소 표시는 쉐이더 테두리로 이관됨 — UI에서는 처리하지 않음
+        bool hasBuildup = element.IsValid() && ratio > 0.001f;
+
+        if (_elementGaugeRoot != null)
+            _elementGaugeRoot.SetActive(hasBuildup);
+
+        if (!hasBuildup)
+        {
+            _elementTargetRatio = 0f;
+            return;
+        }
+
+        _elementTargetRatio  = ratio;
+        _elementCurrentColor = ElementColorOf(element);
+
+        if (_elementGaugeLabel != null)
+            _elementGaugeLabel.gameObject.SetActive(false);
+    }
+
+    private void UpdateElementAnimation()
+    {
+        if (_elementGaugeFill == null) return;
+
+        float dt = Time.deltaTime;
+
+        // 발동 후 리셋: 가득 찼다가 갑자기 0 근처로 떨어지면 즉시 스냅
+        if (_elementWasFull && _elementTargetRatio < 0.1f)
+        {
+            _elementWasFull      = false;
+            _elementDisplayRatio = 0f;
+            _elementBurstActive  = false;
+            if (_elementGaugeRoot != null)
+                _elementGaugeRoot.transform.localScale = Vector3.one;
+        }
+
+        _elementDisplayRatio = Mathf.MoveTowards(_elementDisplayRatio, _elementTargetRatio, _elementLerpSpeed * dt);
+
+        // 100% 도달 → 버스트 발동
+        if (!_elementWasFull && _elementDisplayRatio >= 0.99f && _elementTargetRatio >= 0.99f)
+        {
+            _elementWasFull = true;
+            TriggerElementBurst();
+        }
+
+        // 버스트 연출: 스케일 → 1, 색상 white → 원소색
+        if (_elementBurstActive)
+        {
+            _elementBurstTimer += dt;
+            float t = Mathf.Clamp01(_elementBurstTimer / _elementBurstDuration);
+
+            if (_elementGaugeRoot != null)
+                _elementGaugeRoot.transform.localScale = Vector3.one * Mathf.Lerp(_elementBurstScale, 1f, t);
+
+            _elementGaugeFill.color = Color.Lerp(Color.white, _elementCurrentColor, t);
+
+            if (t >= 1f) _elementBurstActive = false;
+        }
+        else
+        {
+            _elementGaugeFill.color = _elementCurrentColor;
+        }
+
+        _elementGaugeFill.fillAmount = _elementDisplayRatio;
+    }
+
+    private void TriggerElementBurst()
+    {
+        _elementBurstActive  = true;
+        _elementBurstTimer   = 0f;
+        _elementDisplayRatio = 1f;
+
+        _elementGaugeFill.fillAmount = 1f;
+        _elementGaugeFill.color      = Color.white;
+
+        if (_elementGaugeRoot != null)
+            _elementGaugeRoot.transform.localScale = Vector3.one * _elementBurstScale;
+    }
+
+    private static Color ElementColorOf(ElementType element)
+    {
+        if (!element.IsValid()) return Color.gray;
+        int idx = (int)element;
+        return idx >= 0 && idx < ElementColors.Length ? ElementColors[idx] : Color.gray;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -196,6 +334,7 @@ public class MonsterHPBar : MonoBehaviour
     {
         if (_hpFill == null) return;
         _hpFill.fillAmount = ratio;
+        _hpFill.color = _hpColor;
     }
 
     private void ApplyGhostFill(float ratio)
@@ -203,6 +342,34 @@ public class MonsterHPBar : MonoBehaviour
         if (_ghostFill == null) return;
         _ghostFill.fillAmount = ratio;
         _ghostFill.color = _ghostColor;
+    }
+
+    private void EnsureSubLabel()
+    {
+        if (_subLabel != null) return;
+
+        var parentRT = _barRoot != null ? _barRoot : (RectTransform)transform;
+        if (parentRT == null) return;
+
+        var go = new GameObject("SubLabel", typeof(RectTransform), typeof(CanvasRenderer));
+        go.transform.SetParent(parentRT, false);
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, -3f);
+        rt.sizeDelta = new Vector2(200f, 20f);
+
+        _subLabel = go.AddComponent<TMPro.TextMeshProUGUI>();
+        _subLabel.alignment          = TMPro.TextAlignmentOptions.Center;
+        _subLabel.color              = new Color(1f, 0.85f, 0.4f, 1f);
+        _subLabel.fontSize           = 11f;
+        _subLabel.enableWordWrapping = false;
+        _subLabel.overflowMode       = TMPro.TextOverflowModes.Overflow;
+        _subLabel.raycastTarget      = false;
+        TMPOutlineHelper.ApplyDefault(_subLabel);
+        go.SetActive(false);
     }
 
     private void EnsureNameLabel()
