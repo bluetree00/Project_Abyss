@@ -202,7 +202,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         // 1. MonsterConfigSO 로드 (주소별 캐시 — 동종 몬스터는 Instantiate·JSON 적용을 1회만 수행)
         if (!_configCache.TryGetValue(ConfigAddress, out _config))
         {
-            var loaded = await Managers.AddressableManager.LoadAssetAsync<MonsterConfigSO>(ConfigAddress);
+            var loaded = await Managers.AddressableManager.TryLoadAssetAsync<MonsterConfigSO>(ConfigAddress);
             if (loaded == null)
             {
                 Debug.LogError($"[MonsterBase] ConfigSO 로드 실패: {ConfigAddress}", this);

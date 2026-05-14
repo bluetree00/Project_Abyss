@@ -13,6 +13,8 @@ public sealed class HudBootstrapper : MonoBehaviour
     private float _panelGuardTimer;
     private bool _startRoomSuppressed;
 
+    public MinimapView MinimapView => presenter != null ? presenter.MinimapView : null;
+
     // ✅ Construct 중복 방지
     private bool _constructed;
 
@@ -191,6 +193,7 @@ public sealed class HudBootstrapper : MonoBehaviour
     {
         presenter.BindPlayer(player);
         TryBindAnyActiveBoss();
+        presenter?.MinimapView?.SetPlayerTransform(player != null ? player.transform : null);
     }
 
     private bool TryBindAnyActiveBoss()

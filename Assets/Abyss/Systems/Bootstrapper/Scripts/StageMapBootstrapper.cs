@@ -165,9 +165,9 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         RefreshStageMapUI();
 
-        // 새 런 초기 상태 저장 (retryCount +1)
+        // 새 런 초기 상태 저장 (retryCount +1). StageMap 도착 시점이므로 isInStartRoom=false.
         var rpm2 = RunProgressManager.Instance;
-        SaveCheckpointAsync(session, rpm2, isNewRun: true).Forget();
+        SaveCheckpointAsync(session, rpm2, isNewRun: true, isInStartRoom: false).Forget();
 
         Debug.Log("[StageMapBootstrapper] 새 런 시작 완료.");
     }
@@ -696,10 +696,11 @@ public sealed class StageMapBootstrapper : MonoBehaviour
     private static async UniTaskVoid SaveCheckpointAsync(
         GameRunSession session,
         RunProgressManager rpm,
-        bool isNewRun = false)
+        bool isNewRun = false,
+        bool isInStartRoom = false)
     {
         var saveRun  = rpm != null
-            ? rpm.SaveAsync(session, rpm.ActiveSlotIndex, isNewRun)
+            ? rpm.SaveAsync(session, rpm.ActiveSlotIndex, isNewRun, isInStartRoom)
             : UniTask.CompletedTask;
 
         var saveUser = BackendGameData.Instance != null

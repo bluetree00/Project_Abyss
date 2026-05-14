@@ -294,7 +294,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 12
+  m_fontSize: 11
   m_fontSizeBase: 12
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -404,7 +404,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -547,7 +547,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.75, b: 0.2, a: 0.7}
+  m_Color: {r: 1, g: 0.75, b: 0.2, a: 0.65}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -733,7 +733,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.6}
+  m_Color: {r: 0.06, g: 0.06, b: 0.08, a: 0.85}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -786,7 +786,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 180, y: 12}
+  m_SizeDelta: {x: 180, y: 7}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &6892750859099844358
 GameObject:
@@ -846,7 +846,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.18, g: 0.85, b: 0.35, a: 1}
+  m_Color: {r: 0.88, g: 0.18, b: 0.18, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -921,7 +921,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.05, g: 0.05, b: 0.07, a: 0.88}
+  m_Color: {r: 0.06, g: 0.06, b: 0.08, a: 0.92}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -974,7 +974,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 18}
-  m_SizeDelta: {x: 144, y: 10}
+  m_SizeDelta: {x: 144, y: 6}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &8961234909531251215
 GameObject:
@@ -1055,9 +1055,13 @@ MonoBehaviour:
   _ghostFill: {fileID: 1990742732528601656}
   _barRoot: {fileID: 1853499703510814620}
   _nameLabel: {fileID: 0}
+  _elementGaugeRoot: {fileID: 8652543990465130457}
+  _elementGaugeFill: {fileID: 4415076121478621284}
+  _elementGaugeLabel: {fileID: 2350130922184408383}
   _hpLerpSpeed: 1.8
   _ghostDelay: 0.35
   _ghostLerpSpeed: 0.35
+  _hpColor: {r: 0.88, g: 0.18, b: 0.18, a: 1}
   _ghostColor: {r: 1, g: 0.75, b: 0.2, a: 0.7}
   _nameLabelYOffset: 4
   _nameLabelSize: {x: 180, y: 24}
