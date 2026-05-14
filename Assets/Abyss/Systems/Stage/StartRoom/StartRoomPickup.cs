@@ -1,4 +1,3 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 public enum StartRoomPickupType { Character, Weapon }
@@ -42,17 +41,7 @@ public class StartRoomPickup : MonoBehaviour
         {
             loadout.SetWeaponSlot0(weaponSO);
             Debug.Log($"[StartRoom] 무기 선택: {weaponSO?.displayName}");
-            SaveProgressAsync().Forget();
+            // 게이트 통과 시점에 저장하므로 픽업 즉시 저장하지 않음
         }
-    }
-
-    // 스타트방에서 게임을 종료해도 무기가 유지되도록 픽업 즉시 서버 저장
-    private static async UniTaskVoid SaveProgressAsync()
-    {
-        var rp      = RunProgressManager.Instance;
-        var session = GameRunBootstrapper.Instance?.Run;
-        if (rp == null || session == null || !session.IsRunning) return;
-
-        await rp.SaveAsync(session, rp.ActiveSlotIndex);
     }
 }

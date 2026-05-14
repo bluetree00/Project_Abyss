@@ -68,3 +68,65 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+    - baseClipName: HeavyCharge
+      addressableKey: GreatswordHeavyCharge
+      actionType: 2
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+    - baseClipName: GroundHeavyAttack
+      addressableKey: GreatswordHeavyAttack_01
+      actionType: 2
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+  - groupType: 1
+    clipMappings:
+    - baseClipName: AirLightAttack_01
+      addressableKey: GreatswordAirLight_01
+      actionType: 6
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: 0.5
+      comboWindowClose: 0.85
+      attackEndAt: 0.9
+    - baseClipName: AirLightAttack_02
+      addressableKey: GreatswordAirLight_02
+      actionType: 6
+      comboIndex: 1
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: 0.9
+    - baseClipName: AirHeavyAttack
+      addressableKey: GreatswordAirHeavy
+      actionType: 7
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+    - baseClipName: AirPlungeAttack
+      addressableKey: GreatswordAirPlunge
+      actionType: 8
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1

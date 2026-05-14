@@ -100,7 +100,11 @@ public sealed class StagePointManager
         {
             case StageCategory.Start:
             {
-                picked = _roomManager.Pick(RoomCategory.Start, ctx.MinDifficulty, ctx.MaxDifficulty, ctx.RequiredTags);
+                // Chapter1 = 캐릭터·무기 선택 (StartRoom), Chapter2+ = 쉬어가는 방 (RestRoom)
+                var roomCat = CurrentChapter == ChapterId.Chapter1
+                    ? RoomCategory.Start
+                    : RoomCategory.Rest;
+                picked = _roomManager.Pick(roomCat, ctx.MinDifficulty, ctx.MaxDifficulty, ctx.RequiredTags);
                 break;
             }
 

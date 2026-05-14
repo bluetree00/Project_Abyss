@@ -30,6 +30,7 @@ public class RunSaveData
     public string synergiesJson;     // SynergyListWrapper JSON
     public string roomLogsJson;      // RoomClearLogWrapper JSON
     public string savedAt;           // ISO8601 UTC
+    public bool   isInStartRoom;     // true = 스타트룸 미퇴장 상태 (이어하기 시 StartRoom 재진입)
 }
 
 /// <summary>

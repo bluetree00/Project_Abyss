@@ -130,3 +130,23 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: 0.9
+    - baseClipName: AirHeavyAttack
+      addressableKey: AirHeavyAttack
+      actionType: 7
+      comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+    - baseClipName: AirPlungeAttack
+      addressableKey: AirPlungeAttack
+      actionType: 8
+      comboIndex: 0
+      isPlunge: 1
+      plungeFallSpeed: 18
+      plungeDescendAt: 0.3
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1

@@ -34,6 +34,7 @@ public sealed class HudPresenter : MonoBehaviour
     public MonsterBase BoundBoss => _boss;
     public bool HasBoundBoss => _boss != null;
     public CanvasGroup MainCanvasGroup => canvasGroup;
+    public MinimapView  MinimapView => view != null ? view.MinimapView : null;
 
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
@@ -342,13 +343,15 @@ public sealed class HudPresenter : MonoBehaviour
             case HUDIds.Mode.Combat:
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |
-                       HUDIds.Section.SystemNotices;
+                       HUDIds.Section.SystemNotices |
+                       HUDIds.Section.Minimap;
 
             case HUDIds.Mode.Boss:
                 return HUDIds.Section.TopBar |
                        HUDIds.Section.CombatPanel |
                        HUDIds.Section.BossPanel |
-                       HUDIds.Section.SystemNotices;
+                       HUDIds.Section.SystemNotices |
+                       HUDIds.Section.Minimap;
 
             case HUDIds.Mode.Cutscene:
                 return HUDIds.Section.SystemNotices;

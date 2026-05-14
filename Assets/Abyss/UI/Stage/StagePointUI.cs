@@ -121,9 +121,18 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
             "Elite"  => NormalRoomCategory.Elite,
             "Event"  => NormalRoomCategory.Event,
             "Shop"   => NormalRoomCategory.Shop,
+            "Rest"   => NormalRoomCategory.Random, // Rest: 쉬어가는 방 (iconMap.restIconKey 사용)
             _        => normalRoomCategory,
         };
         normalRoomCategory = resolved;
+
+        // Rest/Start/Boss는 iconMap에 별도 키가 있으면 우선 사용
+        var overrideKey = iconMap?.GetIconKeyOverride(resolvedRoomCategory);
+        if (!string.IsNullOrEmpty(overrideKey))
+        {
+            LoadIconByKeyAsync(overrideKey).Forget();
+            return;
+        }
         RefreshIcon();
     }
 
@@ -174,6 +183,37 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
             IsIconReady = true;
             if (_canvasGroup != null)
                 _canvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private async UniTaskVoid LoadIconByKeyAsync(string key)
+    {
+        if (string.IsNullOrEmpty(key) || _image == null) return;
+        try
+        {
+            Sprite sprite = null;
+            try { sprite = await Managers.AddressableManager.LoadAssetAsync<Sprite>(key); } catch { }
+            if (sprite == null)
+            {
+                var tex = await Managers.AddressableManager.LoadAssetAsync<Texture2D>(key);
+                if (tex != null)
+                    sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            }
+            if (sprite != null && _image != null)
+            {
+                _image.sprite = sprite;
+                _image.SetNativeSize();
+                _image.color = Color.white;
+            }
+            IsIconReady = true;
+            if (_canvasGroup != null) { _canvasGroup.blocksRaycasts = true; FadeInAsync().Forget(); }
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StagePointUI] override 아이콘 로드 실패: key={key}, err={e.Message}");
+            IsIconReady = true;
+            if (_canvasGroup != null) _canvasGroup.blocksRaycasts = true;
         }
     }
 
