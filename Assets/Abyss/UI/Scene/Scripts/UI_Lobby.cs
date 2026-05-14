@@ -3,7 +3,16 @@ using UnityEngine.UI;
 
 public class UI_Lobby : UI_Scene
 {
-    [SerializeField] private UI_PrepPanel prepPanel;
+    // ─────────────────────────────────────────────────────────
+    // SerializeField
+    // ─────────────────────────────────────────────────────────
+
+    [Header("서브 패널")]
+    [SerializeField] private UI_SaveSlotPanel saveSlotPanel;
+
+    // ─────────────────────────────────────────────────────────
+    // Lifecycle
+    // ─────────────────────────────────────────────────────────
 
     enum Buttons
     {
@@ -24,29 +33,36 @@ public class UI_Lobby : UI_Scene
         GetButton((int)Buttons.Btn_Settings).onClick.AddListener(OnClickSettings);
         GetButton((int)Buttons.Btn_Exit).onClick.AddListener(OnClickExit);
 
-        if (prepPanel != null)
+        if (saveSlotPanel != null)
         {
-            prepPanel.Init();
-            prepPanel.Close();
+            saveSlotPanel.Init();
+            saveSlotPanel.Close();
         }
     }
 
-    void OnClickStartRun()
+    // ─────────────────────────────────────────────────────────
+    // Private Methods — Event Handlers
+    // ─────────────────────────────────────────────────────────
+
+    private void OnClickStartRun()
     {
-        AppBootstrapper.Instance?.RequestStartRun();
+        if (saveSlotPanel != null)
+            saveSlotPanel.Open();
+        else
+            AppBootstrapper.Instance?.RequestStartRun();
     }
 
-    void OnClickContinue()
+    private void OnClickContinue()
     {
         Managers.UI.ShowMenuUI<UI_Inven>();
     }
 
-    void OnClickSettings()
+    private void OnClickSettings()
     {
         Managers.UI.ShowPopupUI<UI_Pause>();
     }
 
-    void OnClickExit()
+    private void OnClickExit()
     {
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;

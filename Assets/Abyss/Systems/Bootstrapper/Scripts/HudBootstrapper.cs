@@ -11,9 +11,25 @@ public sealed class HudBootstrapper : MonoBehaviour
     private UIHudDataProvider _provider;
     private GameRunSession _run;
     private float _panelGuardTimer;
+    private bool _startRoomSuppressed;
 
     // ✅ Construct 중복 방지
     private bool _constructed;
+
+    /// <summary>스타트 방 대화/위스프 구간에서 HUD를 숨길 때 true. false로 복원하면 즉시 표시.</summary>
+    public void SetStartRoomSuppressed(bool suppress)
+    {
+        _startRoomSuppressed = suppress;
+        if (suppress)
+        {
+            var target = hudVisualRoot != null ? hudVisualRoot : presenter?.transform;
+            if (target != null) target.gameObject.SetActive(false);
+        }
+        else
+        {
+            EnsureHudHierarchyVisible();
+        }
+    }
 
     private void Awake()
     {
@@ -39,6 +55,8 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_startRoomSuppressed) return;
+
         _panelGuardTimer -= Time.unscaledDeltaTime;
         if (_panelGuardTimer > 0f) return;
 
@@ -216,6 +234,8 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void EnsureHudHierarchyVisible()
     {
+        if (_startRoomSuppressed) return;
+
         Transform target = null;
         if (presenter != null)
             target = hudVisualRoot != null ? hudVisualRoot : presenter.transform;

@@ -54,6 +54,10 @@ public sealed class UIRootBootstrapper : MonoBehaviour
         hudBootstrapper.BindRun(run);
     }
 
+    /// <summary>스타트 방 구간(대화·위스프) 동안 HUD를 숨긴다. false로 복원하면 즉시 표시.</summary>
+    public void SetHudStartRoomSuppressed(bool suppress)
+        => hudBootstrapper?.SetStartRoomSuppressed(suppress);
+
     public void UnbindHud()
     {
         hudBootstrapper?.Unbind();

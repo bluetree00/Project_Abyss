@@ -1,80 +1,73 @@
+using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// 공격 테스트용 허수아비.
-/// 데미지를 받으면 HP가 줄어들고, 일정 시간 후 자동 회복.
+/// MonsterHPBar 풀을 그대로 사용하며, 데미지를 받으면 HP가 줄고 일정 시간 후 자동 회복한다.
 /// 절대 죽지 않음 (IKillable.IsDead = false).
-/// 원소 효과는 ElementBuildup 컴포넌트가 처리하며, IElementTarget 콜백으로 본 클래스가 상태를 받는다.
 /// </summary>
 [RequireComponent(typeof(ElementBuildup))]
 public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarget
 {
-    // ── Constants ───────────────────────────────────────────────────
-    private static readonly string[] ElementLabels = { "⚡", "💧", "🔥", "🌿", "🪨" };
-
-    private static readonly Color[] ElementColors =
-    {
-        new(1.00f, 0.92f, 0.23f, 1f), // Lightning - yellow
-        new(0.13f, 0.59f, 0.95f, 1f), // Water     - blue
-        new(0.96f, 0.26f, 0.21f, 1f), // Fire      - red
-        new(0.30f, 0.69f, 0.31f, 1f), // Grass     - green
-        new(0.55f, 0.43f, 0.39f, 1f), // Earth     - brown
-    };
-
     // ── [SerializeField] ────────────────────────────────────────────
+
     [Header("Stats")]
-    [SerializeField] private float maxHp = 500f;
-    [SerializeField] private float regenDelay = 3f;
-    [SerializeField] private float regenPerSecond = 100f;
+    [SerializeField] private float maxHp          = 500f;
+    [SerializeField] private float regenDelay      = 3f;
+    [SerializeField] private float regenPerSecond  = 100f;
 
     [Header("UI")]
-    [SerializeField] private Slider hpBar;
-    [SerializeField] private TMPro.TMP_Text hpText;
-    [SerializeField] private TMPro.TMP_Text damageText;
-    [SerializeField] private TMPro.TMP_Text elementAccumText;
-
-    [Header("Element Gauge (HP 위 단일 공유 게이지)")]
-    [SerializeField] private Image elementGaugeFill;
-    [SerializeField] private TMPro.TMP_Text elementGaugeLabel;
+    [SerializeField] private string displayName    = "허수아비";
+    [SerializeField] private float  hpBarHeadOffset = 0.3f;
 
     [Header("Hit Animation")]
     [SerializeField] private Animator animator;
 
     // ── Private ─────────────────────────────────────────────────────
+
+    private const float DpsWindow = 3f;
+
     private static readonly int HitHash = Animator.StringToHash("Hit");
 
-    private ElementBuildup _buildup;
+    private ElementBuildup        _buildup;
     private ElementVisualFeedback _visualFeedback;
+    private MonsterHPBar          _hpBar;
 
     private float _currentHp;
     private float _lastHitTime;
-    private float _totalDamageShown;
 
-    // IElementTarget 콜백으로 갱신되는 상태
+    private readonly Queue<(float time, float damage)> _damageLog = new();
+    private float _damageInWindow;
+
     private float _incomingDamageMultiplier = 1f;
     private float _movementMultiplier       = 1f;
     private float _attackSpeedMultiplier    = 1f;
     private float _defenseMultiplier        = 1f;
 
     // ── Properties ──────────────────────────────────────────────────
+
     public bool       IsDead     => false;
     public Transform  Transform  => transform;
     public GameObject GameObject => gameObject;
     public float      MaxHp      => maxHp;
 
     // ── Lifecycle ───────────────────────────────────────────────────
+
     private void Awake()
     {
-        _currentHp = maxHp;
-
+        _currentHp      = maxHp;
         _buildup        = GetComponent<ElementBuildup>();
         _visualFeedback = GetComponent<ElementVisualFeedback>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+    }
 
-        UpdateUI();
+    private void Start()
+    {
+        InitHPBarAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
 
     private void OnEnable()
@@ -95,39 +88,42 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
         }
     }
 
-    private void Update()
+    private void OnDestroy()
     {
-        bool regenActive = Time.time - _lastHitTime > regenDelay
-                           && _currentHp < maxHp;
-        if (regenActive)
+        if (_hpBar != null)
         {
-            _currentHp = Mathf.Min(maxHp, _currentHp + regenPerSecond * Time.deltaTime);
-            _totalDamageShown = 0f;
-        }
-
-        UpdateUI();
-
-        if (hpBar != null)
-        {
-            var cam = Camera.main;
-            if (cam != null)
-                hpBar.transform.parent.rotation = cam.transform.rotation;
+            Managers.MonsterHPBar?.ReturnHPBar(_hpBar);
+            _hpBar = null;
         }
     }
 
+    private void Update()
+    {
+        bool regenActive = Time.time - _lastHitTime > regenDelay && _currentHp < maxHp;
+        if (regenActive)
+            _currentHp = Mathf.Min(maxHp, _currentHp + regenPerSecond * Time.deltaTime);
+
+        _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
+
+        if (_buildup != null && _hpBar != null)
+            _hpBar.UpdateElement(_buildup.Ratio, _buildup.Accum, _buildup.Threshold, _buildup.LastElement, _buildup.PoisonStacks);
+
+        UpdateDps();
+    }
+
     // ── Public Methods (IDamageable) ─────────────────────────────────
+
     public void TakeDamage(float amount, GameObject instigator,
                            float knockbackMultiplier = 1f,
-                           ElementType element = ElementType.None,
-                           float elementAmount = 0f)
+                           ElementType element       = ElementType.None,
+                           float elementAmount       = 0f)
     {
         if (amount <= 0f) return;
 
-        amount *= _incomingDamageMultiplier;
-
-        _currentHp = Mathf.Max(0f, _currentHp - amount);
+        amount      *= _incomingDamageMultiplier;
+        _currentHp   = Mathf.Max(0f, _currentHp - amount);
         _lastHitTime = Time.time;
-        _totalDamageShown += amount;
+        LogDamage(amount);
 
         if (_buildup != null)
             _buildup.AddBuildup(element, elementAmount, amount);
@@ -135,122 +131,67 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
         if (animator != null)
             animator.SetTrigger(HitHash);
 
-        // 일반 히트 플래시 (원소 무관) — 시각 피드백 컴포넌트로 위임
         _visualFeedback?.FlashHit(Color.red);
-
-        UpdateUI();
-
-        if (_currentHp <= 0f)
-            ResetDummy();
+        _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
     }
 
     // ── Public Methods (IElementTarget) ──────────────────────────────
+
     public void TakeElementalDoT(float damage, ElementType source)
     {
         if (damage <= 0f) return;
-        _currentHp = Mathf.Max(0f, _currentHp - damage);
-        _totalDamageShown += damage;
+
+        _currentHp   = Mathf.Max(0f, _currentHp - damage);
         _lastHitTime = Time.time;
+        LogDamage(damage);
 
-        // DoT 데미지도 원소 색 팝업으로 표시
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
-
-        Debug.Log($"[Dummy] DoT tick: {source} -{damage:F1}  HP={_currentHp:F0}/{maxHp}");
-        UpdateUI();
+        _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
     }
 
     public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMultiplier = multi;
-
-    public void SetMovementMultiplier(float multi) => _movementMultiplier = multi;
-
-    public void SetAttackSpeedMultiplier(float multi) => _attackSpeedMultiplier = multi;
-
-    public void SetDefenseMultiplier(float multi) => _defenseMultiplier = multi;
+    public void SetMovementMultiplier(float multi)       => _movementMultiplier       = multi;
+    public void SetAttackSpeedMultiplier(float multi)    => _attackSpeedMultiplier    = multi;
+    public void SetDefenseMultiplier(float multi)        => _defenseMultiplier        = multi;
 
     // ── Private Methods ──────────────────────────────────────────────
-    private void ResetDummy()
+
+    private void LogDamage(float amount)
     {
-        // HP만 리필 — 누적치/액티브 효과/석화 상태는 그대로 유지
-        _currentHp = maxHp;
-        _totalDamageShown = 0f;
-        Debug.Log("[Dummy] HP refilled (누적치·효과 유지)");
-        UpdateUI();
+        _damageLog.Enqueue((Time.time, amount));
+        _damageInWindow += amount;
     }
 
-    private void UpdateUI()
+    private void UpdateDps()
     {
-        if (hpBar != null)
+        float now = Time.time;
+        while (_damageLog.Count > 0 && now - _damageLog.Peek().time > DpsWindow)
         {
-            hpBar.maxValue = maxHp;
-            hpBar.value = _currentHp;
+            var (_, d) = _damageLog.Dequeue();
+            _damageInWindow -= d;
         }
 
-        if (hpText != null)
-            hpText.text = $"{_currentHp:F0} / {maxHp:F0}";
-
-        if (damageText != null)
-            damageText.text = _totalDamageShown > 0f ? $"DMG: {_totalDamageShown:F0}" : "";
-
-        UpdateElementUI();
+        if (_hpBar == null) return;
+        float dps = _damageInWindow / DpsWindow;
+        _hpBar.SetSubLabel(dps >= 1f ? $"DPS  {dps:F0}" : string.Empty);
     }
 
-    private void UpdateElementUI()
+    private async UniTaskVoid InitHPBarAsync(CancellationToken ct)
     {
-        if (_buildup == null) return;
-
-        var lastElement = _buildup.LastElement;
-
-        if (elementGaugeFill != null)
+        try
         {
-            elementGaugeFill.fillAmount = _buildup.Ratio;
-            elementGaugeFill.color = ColorOf(lastElement);
+            _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(
+                this, (int)_currentHp, (int)maxHp, null, hpBarHeadOffset);
+            _hpBar?.SetMonsterName(displayName);
         }
-
-        if (elementGaugeLabel != null)
-        {
-            string label = lastElement.IsValid()
-                ? $"{ElementLabels[(int)lastElement]} {_buildup.Accum:F0}/{_buildup.Threshold:F0}"
-                : $"- {_buildup.Accum:F0}/{_buildup.Threshold:F0}";
-
-            if (lastElement == ElementType.Grass && _buildup.PoisonStacks > 0)
-                label += $" x{_buildup.PoisonStacks}";
-
-            elementGaugeLabel.text = label;
-        }
-
-        if (elementAccumText != null)
-        {
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < ElementTypeUtil.Count; i++)
-            {
-                var e = (ElementType)i;
-                if (!_buildup.IsEffectActive(e)) continue;
-                var entry = _buildup.GetActiveEntry(e);
-                float rem = _buildup.GetRemaining(e);
-                sb.AppendLine($"<color=yellow>{ElementLabels[i]} {entry.effect_id} {rem:F1}s</color>");
-            }
-            if (_movementMultiplier <= 0f)
-                sb.AppendLine("<color=#aaaaaa>[이동 정지]</color>");
-            if (_attackSpeedMultiplier <= 0f)
-                sb.AppendLine("<color=#aaaaaa>[공격 정지]</color>");
-            if (_defenseMultiplier < 1f)
-                sb.AppendLine($"<color=#aaaaaa>[방어력 x{_defenseMultiplier:F2}]</color>");
-            elementAccumText.text = sb.ToString().TrimEnd();
-        }
-    }
-
-    private static Color ColorOf(ElementType element)
-    {
-        if (!element.IsValid()) return Color.gray;
-        int idx = (int)element;
-        if (idx < 0 || idx >= ElementColors.Length) return Color.gray;
-        return ElementColors[idx];
+        catch (System.OperationCanceledException) { }
     }
 
     // ── Event Handlers ───────────────────────────────────────────────
+
     private void HandleTriggered(ElementType element, ElementEffectEntry entry)
     {
-        Debug.Log($"[Dummy] 원소 발동! {element} → {entry.effect_id} ({entry.description})");
+        Debug.Log($"[Dummy] 원소 발동! {element} → {entry.effect_id}");
     }
 
     private void HandleExpired(ElementType element, ElementEffectEntry entry)
