@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 76ef10b4704ef8f49b84eb4b12893fbc
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Shaders/DawnShader/EyesGradianShader.shader
+  uploadId: 467556
