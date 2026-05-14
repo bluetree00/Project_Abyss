@@ -36,14 +36,16 @@ public class RoomClearGate : MonoBehaviour
     // ── Private fields ─────────────────────────────────────────
     private GameRunSession _run;
     private bool _activated;
+    private bool _isBossRoom;
 
     // ── Public Methods ─────────────────────────────────────────
 
     /// <summary>RoomWaveController에서 호출. run/luckTable/이펙트 프리팹 주입.</summary>
     public void Initialize(GameRunSession run, LuckRollTableSO table,
-        GameObject endEffect = null, GameObject endEffect2 = null)
+        GameObject endEffect = null, GameObject endEffect2 = null, bool isBossRoom = false)
     {
-        _run = run;
+        _run        = run;
+        _isBossRoom = isBossRoom;
         if (table      != null) luckTable        = table;
         if (endEffect  != null) endEffectPrefab  = endEffect;
         if (endEffect2 != null) endEffect2Prefab = endEffect2;
@@ -88,7 +90,7 @@ public class RoomClearGate : MonoBehaviour
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
         var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)> { (itemData, itemSO) };
-        trigger.Initialize(_run, rewards);
+        trigger.Initialize(_run, rewards, _isBossRoom);
     }
 
     private (RuntimeItemData data, ItemSO so) RollRewardItem()

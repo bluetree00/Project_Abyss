@@ -119,7 +119,7 @@ public class RunProgressManager : MonoBehaviour
     /// StageMap 진입 시 호출. 현재 런 상태를 직렬화해 지정 슬롯에 저장한다.
     /// isNewRun=true이면 retryCount를 먼저 1 증가시킨다.
     /// </summary>
-    public async UniTask SaveAsync(GameRunSession session, int slotIndex, bool isNewRun = false)
+    public async UniTask SaveAsync(GameRunSession session, int slotIndex, bool isNewRun = false, bool isInStartRoom = false)
     {
         if (session == null || !session.IsRunning) return;
         if (!IsValidSlot(slotIndex)) return;
@@ -127,7 +127,7 @@ public class RunProgressManager : MonoBehaviour
         if (isNewRun)
             Saves[slotIndex].retryCount++;
 
-        Saves[slotIndex] = BuildSaveData(session, slotIndex, Saves[slotIndex].retryCount, Saves[slotIndex]);
+        Saves[slotIndex] = BuildSaveData(session, slotIndex, Saves[slotIndex].retryCount, isInStartRoom, Saves[slotIndex]);
 
         var param = ToParam(Saves[slotIndex]);
         var tcs   = new UniTaskCompletionSource();
@@ -182,7 +182,7 @@ public class RunProgressManager : MonoBehaviour
     // Private Methods — Build
     // ─────────────────────────────────────────────────────────
 
-    private static RunSaveData BuildSaveData(GameRunSession session, int slotIndex, int retryCount, RunSaveData prevSave = null)
+    private static RunSaveData BuildSaveData(GameRunSession session, int slotIndex, int retryCount, bool isInStartRoom = false, RunSaveData prevSave = null)
     {
         var ps = session.PlayerState;
 
@@ -207,6 +207,16 @@ public class RunProgressManager : MonoBehaviour
                             ?? prevSave?.characterName
                             ?? string.Empty;
 
+        // 무기 키: WeaponSO 이름(= Addressable 주소)을 저장해 이어하기 복원 시 WeaponSO 재로드에 사용한다.
+        // 우선순위: session.SavedWeaponSlots.weaponSOKey → Loadout SO.name → prevSave → 빈 문자열
+        string weapon0Key = ExtractWeaponSOKey(session, 0);
+        if (string.IsNullOrEmpty(weapon0Key))
+            weapon0Key = loadout?.WeaponSlot0?.name ?? prevSave?.weapon0PrefabKey ?? string.Empty;
+
+        string weapon1Key = ExtractWeaponSOKey(session, 1);
+        if (string.IsNullOrEmpty(weapon1Key))
+            weapon1Key = loadout?.WeaponSlot1?.name ?? prevSave?.weapon1PrefabKey ?? string.Empty;
+
         return new RunSaveData
         {
             slotIndex        = slotIndex,
@@ -223,13 +233,14 @@ public class RunProgressManager : MonoBehaviour
             roomClearCount   = session.RoomClearRecords.Count,
             characterKey     = charKey,
             characterName    = charName,
-            weapon0PrefabKey = ExtractWeaponKey(session, 0),
-            weapon1PrefabKey = ExtractWeaponKey(session, 1),
+            weapon0PrefabKey = weapon0Key,
+            weapon1PrefabKey = weapon1Key,
             graphJson        = BuildGraphJson(session),
             itemsJson        = JsonUtility.ToJson(itemWrapper),
             synergiesJson    = JsonUtility.ToJson(synWrapper),
             roomLogsJson     = JsonUtility.ToJson(logWrapper),
             savedAt          = DateTime.UtcNow.ToString("o"),
+            isInStartRoom    = isInStartRoom,
         };
     }
 
@@ -240,11 +251,14 @@ public class RunProgressManager : MonoBehaviour
         return Mathf.Clamp(((int)chapter - 1) * 20, 0, 100);
     }
 
-    private static string ExtractWeaponKey(GameRunSession session, int slot)
+    private static string ExtractWeaponSOKey(GameRunSession session, int slot)
     {
         if (session.SavedWeaponSlots == null || session.SavedWeaponSlots.Length <= slot)
             return string.Empty;
-        return session.SavedWeaponSlots[slot]?.weaponPrefabKey ?? string.Empty;
+        var data = session.SavedWeaponSlots[slot];
+        // weaponSOKey 우선, 없으면 weaponPrefabKey 폴백 (이전 세이브 호환)
+        return !string.IsNullOrEmpty(data?.weaponSOKey) ? data.weaponSOKey
+             : data?.weaponPrefabKey ?? string.Empty;
     }
 
     private static string BuildGraphJson(GameRunSession session)
@@ -307,6 +321,7 @@ public class RunProgressManager : MonoBehaviour
         { "synergiesJson",    d.synergiesJson },
         { "roomLogsJson",     d.roomLogsJson },
         { "savedAt",          d.savedAt },
+        { "isInStartRoom",    d.isInStartRoom },
     };
 
     // ─────────────────────────────────────────────────────────
@@ -338,6 +353,7 @@ public class RunProgressManager : MonoBehaviour
             synergiesJson    = ParseString(row, "synergiesJson"),
             roomLogsJson     = ParseString(row, "roomLogsJson"),
             savedAt          = ParseString(row, "savedAt"),
+            isInStartRoom    = ParseBool(row,   "isInStartRoom"),
         };
     }
 

@@ -455,22 +455,27 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 로딩 커버를 해제한다. IntroFade 뒤에서 UI_SceneLoading이 조용히 사라지므로 플레이어 눈에 안 보임.
         AppBootstrapper.Instance?.NotifySceneReady();
 
-        // 카메라 페이드인 + Dissolve 머티리얼 프리로드를 병렬로 수행
-        // → 화면이 열린 상태에서 맵 등장 디졸브를 플레이어가 볼 수 있도록
+        // 카메라 페이드인 + Dissolve 머티리얼 프리로드 + 몬스터 풀 프리웜을 병렬로 수행.
+        // 프리웜을 카메라 준비 시간(~0.4s) 안에 함께 처리해 로딩 화면 연장 없이 입장 연출 전 준비 완료.
         var mapCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
         await UniTask.WhenAll(
             DissolveEffect.WarmupAsync(ct),
-            GameCameraController.Instance?.PrepareMapViewAsync(mapCenter, 0.4f, ct) ?? UniTask.CompletedTask);
-
-        // 입장 연출 중에 스포너 풀을 병렬로 프리웜 — 연출이 끝나기 전에 Instantiate 부하를 분산시킴
-        var entranceCtx = new MapEntranceContext(roomEntry);
-        await UniTask.WhenAll(
-            MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct),
+            GameCameraController.Instance?.PrepareMapViewAsync(mapCenter, 0.4f, ct) ?? UniTask.CompletedTask,
             PrewarmSpawnersFromBlocksAsync(blocks, ct));
 
-        // 입장 연출 완료 후 방 클리어 컨트롤러 부착 + 스포너 활성화 → Start() 실행 → 몬스터 스폰 시작
-        AttachRoomClearController(mapGO, blocks);
+        // 입장 연출 (풀이 이미 프리웜된 상태이므로 연출 중 Instantiate 없음)
+        var entranceCtx = new MapEntranceContext(roomEntry);
+        await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+
+        // 미니맵 구독을 RoomWaveController 초기화보다 먼저 수행.
+        // InitWaveMode → StartWaveAsync → SpawnWaveAsync가 프리웜된 풀에서 동기적으로 OnMonsterSpawned를
+        // 발행할 수 있으므로, 구독이 먼저 완료되어야 첫 스폰 마커를 놓치지 않는다.
         InitializeMinimapForRoom(mapGO, w, h, blocks);
+
+        // 방 클리어 컨트롤러 부착 — Initialize에서 웨이브 스폰이 시작되므로 미니맵 구독 이후여야 한다.
+        AttachRoomClearController(mapGO, blocks);
+
+        // 스포너 활성화 → Start() 실행 → 자동 루프 스폰 시작
         for (int i = 0; i < deferredSpawners.Count; i++)
             if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
 

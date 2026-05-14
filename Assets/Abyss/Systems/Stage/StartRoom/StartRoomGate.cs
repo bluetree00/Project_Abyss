@@ -1,8 +1,10 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
 /// 스타트 방 출구 게이트.
 /// 캐릭터 + 무기가 모두 선택된 상태이면 StageMap으로 전환한다.
+/// 게이트 통과 직전에 isInStartRoom=false를 서버에 저장해 이어하기 시 StartRoom 재진입을 방지한다.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class StartRoomGate : MonoBehaviour
@@ -45,7 +47,26 @@ public class StartRoomGate : MonoBehaviour
 
         _triggered = true;
         Debug.Log("[StartRoomGate] 준비 완료 — StageMap 전환");
-        AppBootstrapper.Instance.RequestLoad(Define.Scene.StageMap);
+        ExitStartRoomAsync().Forget();
+    }
+
+    private async UniTaskVoid ExitStartRoomAsync()
+    {
+        var rp      = RunProgressManager.Instance;
+        var session = GameRunBootstrapper.Instance?.Run;
+
+        if (rp != null && session != null && session.IsRunning)
+        {
+            // Start 노드 클리어 처리 — Visited 상태에서 Cleared로 올려야 맵 UI에서 정상 표시됨
+            var spm = session.StagePointManager;
+            if (spm != null && spm.CurrentPointId >= 0)
+                spm.MarkCleared(spm.CurrentPointId);
+
+            // 게이트 통과 = 스타트룸 퇴장 → isInStartRoom=false로 저장
+            await rp.SaveAsync(session, rp.ActiveSlotIndex, isInStartRoom: false);
+        }
+
+        AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
     }
 
     private void OnTriggerExit(Collider other)
