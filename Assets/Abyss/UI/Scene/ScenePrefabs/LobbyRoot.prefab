@@ -10,7 +10,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1002}
   - component: {fileID: 1003}
-  - component: {fileID: 1004}
+  - component: {fileID: 3976185033744211784}
+  - component: {fileID: 1894587382981359774}
   m_Layer: 5
   m_Name: BG
   m_TagString: Untagged
@@ -45,7 +46,43 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1001}
   m_CullTransparentMesh: 1
---- !u!114 &1004
+--- !u!328 &3976185033744211784
+VideoPlayer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_VideoClip: {fileID: 0}
+  m_TargetCameraAlpha: 1
+  m_TargetCamera3DLayout: 0
+  m_TargetCamera: {fileID: 0}
+  m_TargetTexture: {fileID: 0}
+  m_TimeReference: 0
+  m_TargetMaterialRenderer: {fileID: 0}
+  m_TargetMaterialProperty: <noninit>
+  m_RenderMode: 2
+  m_AspectRatio: 2
+  m_DataSource: 0
+  m_TimeUpdateMode: 2
+  m_PlaybackSpeed: 1
+  m_AudioOutputMode: 2
+  m_TargetAudioSources:
+  - {fileID: 0}
+  m_DirectAudioVolumes:
+  - 1
+  m_Url: 
+  m_EnabledAudioTracks: 01
+  m_DirectAudioMutes: 00
+  m_ControlledAudioTrackCount: 1
+  m_PlayOnAwake: 0
+  m_SkipOnDrop: 1
+  m_Looping: 0
+  m_WaitForFirstFrame: 1
+  m_FrameReadyEventEnabled: 0
+  m_VideoShaders: []
+--- !u!114 &1894587382981359774
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -54,27 +91,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 1001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 2a05102aadcce0547a80c71ae23e8bcb, type: 3}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_Texture: {fileID: 0}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
 --- !u!1 &2001
 GameObject:
   m_ObjectHideFlags: 0
@@ -86,6 +120,7 @@ GameObject:
   - component: {fileID: 2002}
   - component: {fileID: 2003}
   - component: {fileID: 2004}
+  - component: {fileID: 2588262005956664583}
   m_Layer: 5
   m_Name: DarkOverlay
   m_TagString: Untagged
@@ -150,6 +185,18 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!225 &2588262005956664583
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2001}
+  m_Enabled: 1
+  m_Alpha: 0
+  m_Interactable: 0
+  m_BlocksRaycasts: 0
+  m_IgnoreParentGroups: 0
 --- !u!1 &3001
 GameObject:
   m_ObjectHideFlags: 0
@@ -159,6 +206,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3002}
+  - component: {fileID: 7257358397920051643}
   m_Layer: 5
   m_Name: LeftPanel
   m_TagString: Untagged
@@ -189,6 +237,18 @@ RectTransform:
   m_AnchoredPosition: {x: 1588, y: 0}
   m_SizeDelta: {x: 700, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &7257358397920051643
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3001}
+  m_Enabled: 1
+  m_Alpha: 0
+  m_Interactable: 0
+  m_BlocksRaycasts: 0
+  m_IgnoreParentGroups: 0
 --- !u!1 &3011
 GameObject:
   m_ObjectHideFlags: 0
@@ -498,6 +558,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4002}
+  - component: {fileID: 1078845691901372570}
   m_Layer: 5
   m_Name: MenuPanel
   m_TagString: Untagged
@@ -530,6 +591,18 @@ RectTransform:
   m_AnchoredPosition: {x: -1323, y: 0}
   m_SizeDelta: {x: 520, y: 700}
   m_Pivot: {x: 1, y: 0.5}
+--- !u!225 &1078845691901372570
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4001}
+  m_Enabled: 1
+  m_Alpha: 0
+  m_Interactable: 0
+  m_BlocksRaycasts: 0
+  m_IgnoreParentGroups: 0
 --- !u!1 &4011
 GameObject:
   m_ObjectHideFlags: 0
@@ -1173,6 +1246,7 @@ GameObject:
   - component: {fileID: 9004}
   - component: {fileID: 9005}
   - component: {fileID: 9006}
+  - component: {fileID: 6573956090703573080}
   m_Layer: 5
   m_Name: LobbyRoot
   m_TagString: Untagged
@@ -1280,6 +1354,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prepPanel: {fileID: 5607687143205871841}
+--- !u!114 &6573956090703573080
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9840d8452e30f6a479d6e19618c6411d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyIntroPlayer
+  _introClip: {fileID: 32900000, guid: 96177af6304423445848f728e8d3af81, type: 3}
+  _loopClip: {fileID: 32900000, guid: 468028823d3ecf944ac11cb29647099b, type: 3}
+  _hudFadeBeforeEnd: 2
+  _hudFadeDuration: 1.5
 --- !u!1 &72145194537844041
 GameObject:
   m_ObjectHideFlags: 0
@@ -12224,6 +12314,7 @@ MonoBehaviour:
   roster: {fileID: 11400000, guid: 9dfd327e1982b094fbe216cfd2f7fc41, type: 2}
   characterListRoot: {fileID: 679971334437795202}
   itemTemplate: {fileID: 6208248199904998932}
+  charIllustImage: {fileID: 0}
   charPreviewImage: {fileID: 8593367162563969844}
   charPreviewName: {fileID: 7548754986498737698}
   sliderHp: {fileID: 1884525226219742704}
