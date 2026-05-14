@@ -350,6 +350,10 @@ public class StagePointUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
         var content = scroller != null ? scroller.ContentTransform : null;
         var myRT = GetComponent<RectTransform>();
 
+        // 줌인+페이드 연출(~1초) 동안 다음 방 몬스터 풀을 백그라운드 프리웜.
+        // AppBootstrapper(DDOL)의 토큰을 사용하므로 씬 전환 중에도 계속 실행된다.
+        app.StartRoomPrewarm();
+
         if (content != null)
             await ZoomIntoNodeAsync(content, myRT);
 
