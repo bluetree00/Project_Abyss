@@ -180,12 +180,15 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         if (_popupGO != null) { Destroy(_popupGO); _popupGO = null; }
     }
 
-    private void ConfirmSelect()
+    // 버튼 리스너에서 호출 — UniTaskVoid를 Forget으로 처리
+    private void ConfirmSelect() => ConfirmSelectAsync().Forget();
+
+    private async UniTaskVoid ConfirmSelectAsync()
     {
         if (_selected || _pendingWisp == null) return;
 
         var wisp = _pendingWisp;
-        ClosePopup();
+        ClosePopup();   // 캐릭터 정보 팝업 먼저 닫기
 
         _selected = true;
         if (interactPrompt != null) interactPrompt.SetActive(false);
@@ -196,6 +199,12 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
 
         loadout.SetCharacter(characterData, characterPrefabKey);
         Managers.CharacterData?.SetCharacterData(characterData, characterPrefabKey);
+
+        // 캐릭터별 획득 대사 (정보 팝업 닫힌 후, 캐릭터 스폰 전)
+        await ShowAcquisitionDialogueAsync();
+
+        // 획득 대사 종료 후 HUD 복원
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
 
         GameRunBootstrapper.Instance?.SpawnCharacterInStartRoomAsync(
             characterPrefabKey,
@@ -215,6 +224,28 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         }
 
         Debug.Log($"[CharacterDisplayStand] 캐릭터 선택: {characterData.characterName} ({characterPrefabKey})");
+    }
+
+    /// <summary>
+    /// CSV 우선 ({characterPrefabKey}_Pickup 시퀀스), 없으면 CharacterData.AcquisitionDialogue SO 폴백.
+    /// 둘 다 없으면 즉시 반환.
+    /// </summary>
+    private async UniTask ShowAcquisitionDialogueAsync()
+    {
+        var dlgMgr = Managers.DialogueData;
+        if (dlgMgr != null && !dlgMgr.IsInitialized)
+            await dlgMgr.InitializeAsync();
+
+        var lines = dlgMgr?.GetLines($"{characterPrefabKey}_Pickup")
+                    ?? characterData?.AcquisitionDialogue?.Lines;
+
+        if (lines == null || lines.Length == 0) return;
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+        if (popup == null) return;
+
+        try { await popup.ShowAsync(lines); }
+        catch (System.OperationCanceledException) { }
     }
 
     /// <summary>다른 캐릭터가 선택됐을 때 이 진열대를 디졸브로 퇴장시킨다.</summary>

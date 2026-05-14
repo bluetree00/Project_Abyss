@@ -1,5 +1,6 @@
 using UnityEngine;
 using BackEnd;
+using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// DEV 전용: 게임 시작 시 뒤끝 자동 로그인 → (선택) 게임데이터 로드까지 트리거
@@ -126,18 +127,20 @@ public sealed class DevAutoLoginBootstrap : MonoBehaviour
     // --------------------
     private void LoadGameData()
     {
-        // 데이터 로드 완료 시점에만 후처리하고 싶어서 1회 리스너 패턴 사용
-        void OnLoaded()
-        {
-            BackendGameData.Instance.ongameDataLoadEvent.RemoveListener(OnLoaded);
-            Log("GameData Load OK (event)");
-            OnReady();
-        }
+        LoadGameDataAsync().Forget();
+    }
 
-        BackendGameData.Instance.ongameDataLoadEvent.AddListener(OnLoaded);
-
+    private async UniTaskVoid LoadGameDataAsync()
+    {
         Log("GameData Load...");
-        BackendGameData.Instance.GameDataLoad();
+        await UniTask.WhenAll(
+            BackendGameData.Instance.LoadAsync(),
+            RunProgressManager.Instance != null
+                ? RunProgressManager.Instance.LoadAsync()
+                : UniTask.CompletedTask
+        );
+        Log("GameData Load OK");
+        OnReady();
     }
 
     private void OnReady()

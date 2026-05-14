@@ -15,11 +15,6 @@ MonoBehaviour:
   m_GroupName: Characters
   m_GUID: b0930bf1af79c624a8497762c3e7fc29
   m_SerializeEntries:
-  - m_GUID: e3d581ee3dd828f4fa05678debfe60f7
-    m_Address: Basic_Arrow_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 39ccc23cef14bfc4fab16530b8ec845b
     m_Address: Mage
     m_ReadOnly: 0
@@ -27,6 +22,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 68ede0dcc5b1be5499e0c70a760cd797
     m_Address: TestMeteor
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76886d098064fa34b949e31d57f32f9a
+    m_Address: MageData
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -42,6 +42,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b01e38b868b87e944937920d911995d8
     m_Address: Berserker
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e3d581ee3dd828f4fa05678debfe60f7
+    m_Address: Basic_Arrow_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ee75a8eac91d2f042b7ebeac86307a13
+    m_Address: BerserkerData
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

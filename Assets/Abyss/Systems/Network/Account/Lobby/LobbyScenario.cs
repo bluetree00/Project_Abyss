@@ -1,12 +1,11 @@
-
-using BackEnd;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 public class LobbyScenario : MonoBehaviour
 {
-    [SerializeField]
-    private UserInfo user;
+    [SerializeField] private UserInfo user;
 
+    // ── Lifecycle ──────────────────────────────────────────────────────────
     private void Awake()
     {
         var hud = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
@@ -14,22 +13,29 @@ public class LobbyScenario : MonoBehaviour
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (!DevAutoLoginBootstrap.IsLoggedIn && !SteamLoginService.IsLoggedIn)
-            return; // 로그인 완료 후 FetchUserInfo() 호출
+            return;
 #endif
         user.GetUserInfoFromBackend();
     }
+
+    private async void Start()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (!DevAutoLoginBootstrap.IsLoggedIn && !SteamLoginService.IsLoggedIn)
+            return;
+#endif
+        await UniTask.WhenAll(
+            BackendGameData.Instance.LoadAsync(),
+            RunProgressManager.Instance != null
+                ? RunProgressManager.Instance.LoadAsync()
+                : UniTask.CompletedTask
+        );
+    }
+
+    // ── Public Methods ─────────────────────────────────────────────────────
 
     public void FetchUserInfo()
     {
         user.GetUserInfoFromBackend();
-    }
-
-    private void Start()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (!DevAutoLoginBootstrap.IsLoggedIn && !SteamLoginService.IsLoggedIn)
-            return; // 로그인 완료 후 GameDataLoad 호출
-#endif
-        BackendGameData.Instance.GameDataLoad();
     }
 }
