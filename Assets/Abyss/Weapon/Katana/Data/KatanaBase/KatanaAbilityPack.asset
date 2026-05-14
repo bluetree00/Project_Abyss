@@ -31,3 +31,9 @@ MonoBehaviour:
   - actionType: 6
     abilities:
     - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 7
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 8
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
