@@ -12,12 +12,11 @@ public class LobbyIntroPlayer : MonoBehaviour
     [SerializeField] private VideoClip _loopClip;
 
     [Header("HUD Fade")]
-    [SerializeField] private float _hudFadeInStartTime = 10f;
+    [SerializeField] private float _hudFadeBeforeEnd = 2f;
     [SerializeField] private float _hudFadeDuration = 1.5f;
 
     private VideoPlayer _videoPlayer;
     private RawImage _bgRawImage;
-    private AudioSource _audioSource;
     private CanvasGroup[] _fadeTargets;
     private CanvasGroup _hudCanvasGroup;
     private RenderTexture _renderTexture;
@@ -26,15 +25,34 @@ public class LobbyIntroPlayer : MonoBehaviour
     private void Awake()
     {
         var bgTr = transform.Find("BG");
-        _bgRawImage = bgTr?.GetComponent<RawImage>();
         _videoPlayer = bgTr?.GetComponent<VideoPlayer>();
-        _audioSource = GetComponent<AudioSource>();
+        _bgRawImage = bgTr?.GetComponent<RawImage>();
+
+        if (bgTr != null)
+        {
+            var bgRect = bgTr.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+        }
 
         _renderTexture = new RenderTexture(1920, 1080, 0);
         if (_videoPlayer != null)
+        {
+            _videoPlayer.renderMode = VideoRenderMode.RenderTexture;
             _videoPlayer.targetTexture = _renderTexture;
+        }
         if (_bgRawImage != null)
             _bgRawImage.texture = _renderTexture;
+    }
+
+    private static CanvasGroup GetOrAddCanvasGroup(Transform parent, string childName)
+    {
+        var tr = parent.Find(childName);
+        if (tr == null) return null;
+        var cg = tr.GetComponent<CanvasGroup>();
+        return cg != null ? cg : tr.gameObject.AddComponent<CanvasGroup>();
     }
 
     private void Start()
@@ -44,15 +62,14 @@ public class LobbyIntroPlayer : MonoBehaviour
 
         _fadeTargets = new CanvasGroup[]
         {
-            transform.Find("DarkOverlay")?.GetComponent<CanvasGroup>(),
-            transform.Find("LeftPanel")?.GetComponent<CanvasGroup>(),
-            transform.Find("MenuPanel")?.GetComponent<CanvasGroup>()
+            GetOrAddCanvasGroup(transform, "DarkOverlay"),
+            GetOrAddCanvasGroup(transform, "LeftPanel"),
+            GetOrAddCanvasGroup(transform, "MenuPanel"),
         };
 
         HideAll();
 
         _cts = new CancellationTokenSource();
-        DelayPlayBgmAsync(_cts.Token).Forget();
         PlaySequenceAsync(_cts.Token).Forget();
     }
 
@@ -85,16 +102,6 @@ public class LobbyIntroPlayer : MonoBehaviour
         cg.blocksRaycasts = interactive;
     }
 
-    private async UniTaskVoid DelayPlayBgmAsync(CancellationToken token)
-    {
-        try
-        {
-            await UniTask.Delay(TimeSpan.FromSeconds(0.5f), cancellationToken: token);
-            _audioSource?.Play();
-        }
-        catch (OperationCanceledException) { }
-    }
-
     private async UniTaskVoid PlaySequenceAsync(CancellationToken token)
     {
         try
@@ -108,7 +115,8 @@ public class LobbyIntroPlayer : MonoBehaviour
             await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
             _videoPlayer.Play();
 
-            await UniTask.Delay(TimeSpan.FromSeconds(_hudFadeInStartTime), cancellationToken: token);
+            float fadeStartDelay = Mathf.Max(0f, (float)_introClip.length - _hudFadeBeforeEnd);
+            await UniTask.Delay(TimeSpan.FromSeconds(fadeStartDelay), cancellationToken: token);
             FadeInAllAsync(token).Forget();
 
             await WaitForVideoEndAsync(_videoPlayer, token);
