@@ -20,6 +20,7 @@ public enum RoomCategory
     Shop,
     Start,
     Boss,
+    Rest,     // 챕터 2+ 시작 노드 — 쉬어가는 방
     Unknown
 }
 
@@ -48,6 +49,7 @@ public static class RoomCategoryUtil
             "shop"   => RoomCategory.Shop,
             "start"  => RoomCategory.Start,
             "boss"   => RoomCategory.Boss,
+            "rest"   => RoomCategory.Rest,
             _ => RoomCategory.Unknown
         };
     }

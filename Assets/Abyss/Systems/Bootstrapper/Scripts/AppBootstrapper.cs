@@ -175,6 +175,16 @@ public sealed class AppBootstrapper : MonoBehaviour
             return;
         }
 
+        // 스타트룸 미퇴장 상태에서 종료 → 선택 초기화 후 새로 시작
+        if (save.isInStartRoom)
+        {
+            Debug.Log("[AppBootstrapper] RestoreRun: isInStartRoom=true — 세이브 초기화 후 새로 시작");
+            Loadout.Clear();
+            rpm.ClearAsync(slot).Forget();
+            RequestLoad(Define.Scene.GameScene);
+            return;
+        }
+
         // CharacterData SO 로드 — 이어하기 시 캐릭터 스탯 복원에 필요
         CharacterData charData = null;
         if (!string.IsNullOrEmpty(save.characterKey))

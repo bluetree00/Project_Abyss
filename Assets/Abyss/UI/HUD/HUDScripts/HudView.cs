@@ -14,6 +14,7 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private GameObject gridPanel;
     [SerializeField] private BossPanelView bossPanelView;
     [SerializeField] private GameObject systemNoticesRoot;
+    [SerializeField] private GameObject minimapPanel;
 
     [Header("TopBar Info")]
     [SerializeField] private TMP_Text nicknameText;
@@ -21,6 +22,7 @@ public sealed class HudView : MonoBehaviour
 
     public CombatPanelView CombatPanel => combatPanel;
     public BossPanelView BossPanel => bossPanelView;
+    public MinimapView MinimapView { get; private set; }
 
     private void Awake()
     {
@@ -40,6 +42,16 @@ public sealed class HudView : MonoBehaviour
             if (gridRoot != null)
                 gridPanel = gridRoot.gameObject;
         }
+
+        if (minimapPanel == null)
+        {
+            var mapRoot = FindChildRecursive(transform, "Panel_Minimap");
+            if (mapRoot != null)
+                minimapPanel = mapRoot.gameObject;
+        }
+
+        if (minimapPanel != null)
+            MinimapView = minimapPanel.GetComponentInChildren<MinimapView>(true);
     }
 
     public void SetSections(HUDIds.Section sections)
@@ -51,6 +63,7 @@ public sealed class HudView : MonoBehaviour
         SetActiveSafe(gridPanel, (sections & HUDIds.Section.GridPanel) != 0);
         SetActiveSafe(bossPanelView, (sections & HUDIds.Section.BossPanel) != 0);
         SetActiveSafe(systemNoticesRoot, (sections & HUDIds.Section.SystemNotices) != 0);
+        SetActiveSafe(minimapPanel, (sections & HUDIds.Section.Minimap) != 0);
 
         if (showCombat)
             EnsureCombatPanelVisible();

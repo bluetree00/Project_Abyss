@@ -18,6 +18,8 @@ public class WeaponData
     public string weaponDisplayKey;
     public string displayName;
     public string weaponPrefabKey;
+    /// <summary>WeaponSO 에셋 이름 = Addressable 주소. 이어하기 복원 시 WeaponSO 로드에 사용한다.</summary>
+    public string weaponSOKey;
     public string iconKey;
     public Sprite icon;            // HUD 표시용 직접 참조
     public float baseAttack;
@@ -70,6 +72,7 @@ public class WeaponData
 
         weaponDisplayKey = so.weaponDisplayKey;
         weaponPrefabKey  = so.weaponPrefabKey;
+        weaponSOKey      = so.name;
         displayName      = so.displayName;
         iconKey          = so.iconKey;
         icon             = so.icon;

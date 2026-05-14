@@ -28,6 +28,7 @@ public class ClearRewardTrigger : MonoBehaviour
     private Transform _camTransform;
     private bool _playerInRange;
     private bool _rewarded;
+    private bool _isBossRoom;
 
     private GameObject _promptGO;
     private GameObject _worldIndicatorGO;
@@ -41,10 +42,11 @@ public class ClearRewardTrigger : MonoBehaviour
 
     // ── Public Methods ─────────────────────────────────────────
 
-    public void Initialize(GameRunSession run, List<(RuntimeItemData data, ItemSO so)> rewards)
+    public void Initialize(GameRunSession run, List<(RuntimeItemData data, ItemSO so)> rewards, bool isBossRoom = false)
     {
-        _run     = run;
-        _rewards = rewards;
+        _run        = run;
+        _rewards    = rewards;
+        _isBossRoom = isBossRoom;
 
         if (!TryGetComponent<SphereCollider>(out var col))
             col = gameObject.AddComponent<SphereCollider>();
@@ -148,6 +150,13 @@ public class ClearRewardTrigger : MonoBehaviour
         var spm = _run?.StagePointManager;
         if (spm != null && spm.CurrentPointId >= 0)
             spm.MarkCleared(spm.CurrentPointId);
+
+        if (_isBossRoom && _run != null)
+        {
+            _run.EnterChapterClear();
+            bool advanced = _run.AdvanceToNextChapter();
+            Debug.Log($"[ClearRewardTrigger] 보스방 클리어 — 챕터 전환 {(advanced ? "성공" : "마지막 챕터")}");
+        }
 
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
         Destroy(gameObject);

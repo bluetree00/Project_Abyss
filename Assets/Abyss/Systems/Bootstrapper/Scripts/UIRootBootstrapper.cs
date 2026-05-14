@@ -58,6 +58,8 @@ public sealed class UIRootBootstrapper : MonoBehaviour
     public void SetHudStartRoomSuppressed(bool suppress)
         => hudBootstrapper?.SetStartRoomSuppressed(suppress);
 
+    public MinimapView GetMinimapView() => hudBootstrapper?.MinimapView;
+
     public void UnbindHud()
     {
         hudBootstrapper?.Unbind();

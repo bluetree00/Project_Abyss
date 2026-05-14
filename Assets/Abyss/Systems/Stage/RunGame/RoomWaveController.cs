@@ -302,7 +302,7 @@ public sealed class RoomWaveController : MonoBehaviour
             _run?.EnterStandby();
 
             var gate = GetComponent<RoomClearGate>() ?? gameObject.AddComponent<RoomClearGate>();
-            gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab);
+            gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null);
             gate.Activate(transform.position);
         }
         catch (OperationCanceledException) { }

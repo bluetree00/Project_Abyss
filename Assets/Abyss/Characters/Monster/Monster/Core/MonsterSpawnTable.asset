@@ -232,9 +232,9 @@ MonoBehaviour:
     enabled: 1
   - displayName: DragonBossMonster
     addressableKey: DragonBoss/DragonBoss
-    grade: 0
+    grade: 3
     nativeElement: -1
-    poolTags: 
+    poolTags:
     weight: 1
     enabled: 1
   - displayName: ChestMonster
