@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 30a6a21e6aa4f8c4d876f85ecadfe9e9
+timeCreated: 1502451489
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Animator/Expression3.controller
+  uploadId: 467556
