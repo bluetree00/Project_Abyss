@@ -42,7 +42,8 @@
       "Bash([ -d \"$dir/SO\" ])",
       "Bash(git restore *)",
       "Bash(python)",
-      "Bash(awk '{print $2}')"
+      "Bash(awk '{print $2}')",
+      "Bash(python -c ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude",

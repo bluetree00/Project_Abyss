@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
@@ -138,11 +139,27 @@ public sealed class AppBootstrapper : MonoBehaviour
 
     public void RequestStartRun()
     {
-        IsNewRunPending = true;
-        var rpm = RunProgressManager.Instance;
-        if (rpm != null)
-            rpm.ClearAsync(rpm.ActiveSlotIndex).Forget();
-        RequestLoad(Define.Scene.GameScene);
+        RequestStartRunAsync(destroyCancellationToken).Forget();
+    }
+
+    private async UniTaskVoid RequestStartRunAsync(CancellationToken token)
+    {
+        try
+        {
+            IsNewRunPending = true;
+            var rpm = RunProgressManager.Instance;
+            if (rpm != null)
+                await rpm.ClearAsync(rpm.ActiveSlotIndex);
+
+            var vp = UIRootBootstrapper.Instance != null
+                ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
+                : null;
+            if (vp != null)
+                await vp.PlayAsync(token);
+
+            RequestLoad(Define.Scene.GameScene);
+        }
+        catch (OperationCanceledException) { }
     }
 
     public bool ConsumeNewRunPending()
