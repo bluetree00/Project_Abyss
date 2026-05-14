@@ -274,6 +274,28 @@ public class MonsterSpawner : MonoBehaviour
         return spawned;
     }
 
+    /// <summary>
+    /// 이 스포너의 spawnTable에 등록된 모든 몬스터 풀을 미리 채운다.
+    /// RoomWaveController가 첫 웨이브 전에 호출해 스폰 시 프레임 드랍을 방지한다.
+    /// </summary>
+    public async UniTask PrewarmPoolsAsync(int sizePerMonster, CancellationToken ct)
+    {
+        if (spawnTable?.entries == null) return;
+
+        foreach (var entry in spawnTable.entries)
+        {
+            if (ct.IsCancellationRequested) return;
+            if (!entry.enabled || string.IsNullOrEmpty(entry.addressableKey)) continue;
+            if (entry.grade == MonsterGrade.Boss) continue; // 보스는 BossSpawner가 별도 처리
+
+            await Managers.ObjectPooler.PrewarmAsync(
+                entry.addressableKey,
+                ObjectPoolerManager.PoolType.Monster,
+                sizePerMonster,
+                ct);
+        }
+    }
+
     private async UniTask<bool> TrySpawnOneAsync()
     {
         SpawnEntry entry = spawnTable.PickRandom(PassesAllFilters);

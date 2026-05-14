@@ -11,7 +11,8 @@ public class StageNodeIconMap : ScriptableObject
 {
     [Header("StageCategory 기본 아이콘")]
     [SerializeField] private string startIconKey = "flag_1";
-    [SerializeField] private string bossIconKey = "dragon";
+    [SerializeField] private string bossIconKey  = "dragon";
+    [SerializeField] private string restIconKey  = "";   // 챕터 2+ 쉬어가는 방 (미설정 시 startIconKey 사용)
 
     [Header("NormalRoomCategory 아이콘")]
     [SerializeField] private string battleIconKey = "sword_1";
@@ -40,6 +41,17 @@ public class StageNodeIconMap : ScriptableObject
                 return defaultIconKey;
         }
     }
+
+    /// <summary>
+    /// resolvedRoomCategory 문자열로 override 키를 반환. null/empty = override 없음 → 기존 경로 사용.
+    /// </summary>
+    public string GetIconKeyOverride(string resolvedCategory) => resolvedCategory switch
+    {
+        "Rest"  => !string.IsNullOrEmpty(restIconKey) ? restIconKey : startIconKey,
+        "Start" => startIconKey,
+        "Boss"  => bossIconKey,
+        _ => null,
+    };
 
     private string GetNormalIconKey(NormalRoomCategory normal)
     {
