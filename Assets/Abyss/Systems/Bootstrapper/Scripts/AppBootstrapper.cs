@@ -253,6 +253,49 @@ public sealed class AppBootstrapper : MonoBehaviour
         RequestLoad(Define.Scene.StageMap);
     }
 
+    /// <summary>
+    /// StageMap에서 다음 방 진입 직전에 호출.
+    /// 현재 챕터 팔레트의 MonsterSpawn 블록에서 스폰 테이블을 읽어 몬스터 풀을 백그라운드 프리웜한다.
+    /// AppBootstrapper는 DDOL이므로 씬 전환 중에도 프리웜이 계속 실행된다.
+    /// </summary>
+    public void StartRoomPrewarm()
+    {
+        var paletteKey = CurrentRun?.ActiveTheme;
+        if (string.IsNullOrEmpty(paletteKey)) return;
+        PrewarmFromPaletteAsync(paletteKey, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private static async UniTaskVoid PrewarmFromPaletteAsync(string paletteKey, System.Threading.CancellationToken ct)
+    {
+        try
+        {
+            var palette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
+            if (palette == null || ct.IsCancellationRequested) return;
+
+            var tileTypes = new[] { TileType.MonsterSpawn, TileType.MonsterSpawnCandidate };
+            foreach (var tileType in tileTypes)
+            {
+                var defs = palette.GetAll(tileType);
+                foreach (var def in defs)
+                {
+                    if (def?.prefab == null) continue;
+                    var spawners = def.prefab.GetComponentsInChildren<MonsterSpawner>(true);
+                    foreach (var spawner in spawners)
+                    {
+                        if (ct.IsCancellationRequested) return;
+                        await spawner.PrewarmPoolsAsync(3, ct);
+                    }
+                }
+            }
+            Debug.Log($"[AppBootstrapper] 백그라운드 프리웜 완료 — palette={paletteKey}");
+        }
+        catch (System.OperationCanceledException) { }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[AppBootstrapper] 방 프리웜 실패: {e.Message}");
+        }
+    }
+
     private static UniTask<TextAsset> LoadTextAsset(string key) =>
         Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
 

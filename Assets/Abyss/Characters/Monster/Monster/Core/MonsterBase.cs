@@ -203,6 +203,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (!_configCache.TryGetValue(ConfigAddress, out _config))
         {
             var loaded = await Managers.AddressableManager.TryLoadAssetAsync<MonsterConfigSO>(ConfigAddress);
+
+            // await 복귀 시점에 오브젝트가 파괴되어 있을 수 있다 (씬 전환 타이밍 등).
+            if (this == null) return;
+
             if (loaded == null)
             {
                 Debug.LogError($"[MonsterBase] ConfigSO 로드 실패: {ConfigAddress}", this);
@@ -218,6 +222,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
                 // 2. JSON 데이터 로드 후 복사본에 덮어쓰기 (캐시 등록 전에 1회만 실행)
                 await LoadAndApplyJsonDataAsync();
+
+                if (this == null) return;
 
                 // 2-0. 구버전 .asset 값(절대 100~1000) → 배율(1.0~10.0) 자동 마이그레이션.
                 // 새 필드 maxAccumulationScale은 "배율"이라 10을 초과하면 구버전 저장값으로 간주.
