@@ -19,8 +19,8 @@ public class ActNoneState : ILayerState<ActState> //act 상태의 idle의 역활
         if (_controller.IsGrounded())
         {
             var anim = _controller.Anim;
-            if (anim != null && !anim.IsInTransition(0))
-                anim.CrossFade("MoveBlend", 0.08f, 0, 0f);
+            if (anim != null)
+                anim.CrossFade("MoveBlend", 0.15f, 0, 0f);
         }
     }
 

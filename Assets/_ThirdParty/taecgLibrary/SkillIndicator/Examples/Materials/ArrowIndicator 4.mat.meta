@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: dd78317ebe2a49b4b835150dbc736f91
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 141712
+  packageName: Skill Indicator
+  packageVersion: 1.1.0
+  assetPath: Assets/taecgLibrary/SkillIndicator/Examples/Materials/ArrowIndicator
+    4.mat
+  uploadId: 373292

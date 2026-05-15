@@ -9,9 +9,23 @@ public static class FixGhostSamuraiClips
         "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack04_Inplace.FBX",
     };
 
-    [MenuItem("Tools/Fix GhostSamurai Katana Clips (Humanoid CreateFromThis)")]
+    // 같은 리그를 쓰는 작동 중인 FBX — humanDescription 복사 소스
+    private const string HumanDescSourcePath =
+        "Assets/Abyss/Animations/Player/Test_01/Attack/NormalAttack_1.FBX";
+
+    [MenuItem("Tools/Fix GhostSamurai Katana Clips (Copy humanDescription)")]
     public static void Fix()
     {
+        var srcImporter = AssetImporter.GetAtPath(HumanDescSourcePath) as ModelImporter;
+        if (srcImporter == null)
+        {
+            Debug.LogError($"[FixGhostSamurai] 소스 FBX 없음: {HumanDescSourcePath}");
+            return;
+        }
+
+        HumanDescription humanDesc = srcImporter.humanDescription;
+        Debug.Log($"[FixGhostSamurai] humanDescription 로드 완료: human={humanDesc.human?.Length ?? 0}개 뼈, skeleton={humanDesc.skeleton?.Length ?? 0}개");
+
         int fixedCount = 0;
         foreach (string path in TargetClips)
         {
@@ -22,21 +36,15 @@ public static class FixGhostSamuraiClips
                 continue;
             }
 
-            if (importer.animationType == ModelImporterAnimationType.Human
-                && importer.avatarSetup == ModelImporterAvatarSetup.CreateFromThisModel)
-            {
-                Debug.Log($"[FixGhostSamurai] 이미 Human+CreateFromThis: {path}");
-                continue;
-            }
-
             importer.animationType = ModelImporterAnimationType.Human;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            importer.humanDescription = humanDesc;
             importer.SaveAndReimport();
-            Debug.Log($"[FixGhostSamurai] Humanoid+CreateFromThis 변경 완료: {path}");
+            Debug.Log($"[FixGhostSamurai] humanDescription 적용: {path}");
             fixedCount++;
         }
 
         Debug.Log($"[FixGhostSamurai] 완료: {fixedCount}/{TargetClips.Length}개 변경");
-        EditorUtility.DisplayDialog("Fix 완료", $"{fixedCount}개 클립을 Humanoid(CreateFromThis)로 변경했습니다.", "확인");
+        EditorUtility.DisplayDialog("Fix 완료", $"{fixedCount}개 클립에 GhostSamurai humanDescription 적용 완료", "확인");
     }
 }

@@ -4,10 +4,10 @@ using UnityEngine;
 public static class AddHeavyAttackEvents
 {
     private const string AttackFbxPath =
-        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack04_Inplace.FBX";
+        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_SPAttack02_Inplace.FBX";
 
     private const string ChargeFbxPath =
-        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Defense/Root/HeavyCharge.FBX";
+        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Defense/Inplace/GhostSamurai_DefenseR_Loop_Inplace.FBX";
 
     [MenuItem("Tools/Fix HeavyAttack Root Motion + Events")]
     public static void Fix()
@@ -21,7 +21,9 @@ public static class AddHeavyAttackEvents
         var importer = AssetImporter.GetAtPath(ChargeFbxPath) as ModelImporter;
         if (importer == null) { Debug.LogError($"[HeavyEvents] 없음: {ChargeFbxPath}"); return; }
 
-        var clips = importer.defaultClipAnimations;
+        var clips = importer.clipAnimations;
+        if (clips == null || clips.Length == 0)
+            clips = importer.defaultClipAnimations;
         if (clips == null || clips.Length == 0) { Debug.LogError("[HeavyEvents] HeavyCharge 클립 없음"); return; }
 
         ApplyRootLock(clips[0]);
@@ -31,7 +33,7 @@ public static class AddHeavyAttackEvents
 
         importer.clipAnimations = clips;
         importer.SaveAndReimport();
-        Debug.Log($"[HeavyEvents] HeavyCharge 루트모션 고정 완료 (frames {clips[0].firstFrame}-{clips[0].lastFrame})");
+        Debug.Log($"[HeavyEvents] HeavyCharge 루트모션 고정 완료: {clips[0].name}");
     }
 
     private static void FixAttack()
@@ -39,23 +41,25 @@ public static class AddHeavyAttackEvents
         var importer = AssetImporter.GetAtPath(AttackFbxPath) as ModelImporter;
         if (importer == null) { Debug.LogError($"[HeavyEvents] 없음: {AttackFbxPath}"); return; }
 
-        var clips = importer.defaultClipAnimations;
-        if (clips == null || clips.Length == 0) { Debug.LogError("[HeavyEvents] Attack04 클립 없음"); return; }
+        var clips = importer.clipAnimations;
+        if (clips == null || clips.Length == 0)
+            clips = importer.defaultClipAnimations;
+        if (clips == null || clips.Length == 0) { Debug.LogError("[HeavyEvents] SPAttack02 클립 없음"); return; }
 
         ApplyRootLock(clips[0]);
         clips[0].loop = false;
         clips[0].loopTime = false;
+        // time = normalized (0~1). 초(seconds) 아님.
+        // SpawnSlashEffect0=0.417(41.7%), AE_AttackEnd=0.707(70.7%)
         clips[0].events = new AnimationEvent[]
         {
-            new AnimationEvent { time = 0.25f, functionName = "SpawnSlashEffect0" },
-            new AnimationEvent { time = 0.25f, functionName = "AE_BeginTrail" },
-            new AnimationEvent { time = 0.65f, functionName = "AE_EndTrail" },
-            new AnimationEvent { time = 0.88f, functionName = "AE_AttackEnd" },
+            new AnimationEvent { time = 0.417f,     functionName = "SpawnSlashEffect0" },
+            new AnimationEvent { time = 0.7074689f, functionName = "AE_AttackEnd" },
         };
 
         importer.clipAnimations = clips;
         importer.SaveAndReimport();
-        Debug.Log($"[HeavyEvents] GroundHeavyAttack 루트모션 고정+이벤트 완료 (frames {clips[0].firstFrame}-{clips[0].lastFrame})");
+        Debug.Log($"[HeavyEvents] GroundHeavyAttack 이벤트 등록 완료: {clips[0].name}");
     }
 
     private static void ApplyRootLock(ModelImporterClipAnimation clip)

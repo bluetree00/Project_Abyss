@@ -43,7 +43,7 @@ public class ActAttackReadyState : ILayerState<ActState>
             var pending = _controller.PendingAttackCommand;
 
             if (isAir)
-                atype = (pending == Command.Heavy) ? WeaponActionType.AirHeavy : WeaponActionType.AirLight;
+                atype = WeaponActionType.AirLight;
             else
                 atype = (pending == Command.Heavy) ? WeaponActionType.GroundHeavy : WeaponActionType.GroundLight;
 

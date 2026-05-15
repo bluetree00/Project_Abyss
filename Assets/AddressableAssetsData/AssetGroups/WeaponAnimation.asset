@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: WeaponAnimation
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
-  - m_GUID: 0e596d56ec3f32d428a9beb80139d0d6
+  - m_GUID: 2a21a05dcf4ecb0419ca78f4ad49a83f
     m_Address: HeavyCharge
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -75,6 +75,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 679a031c10fa6e74c89b97a739405d0b
+    m_Address: GroundHeavyAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a967b6c6732e47e889caede9727da1d8
     m_Address: BowAirAttack_03
     m_ReadOnly: 0
@@ -107,11 +112,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: def216b09d67fab43b1bd39f7748917d
     m_Address: GreatswordAttack_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f4245523208011b468a4e160f07b8f7e
-    m_Address: GroundHeavyAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
