@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: f3ef28464e007404e8f51723fe1769d2
+timeCreated: 1521329769
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 197971
+  packageName: GhostSamurai_Bundle
+  packageVersion: 1.0
+  assetPath: Assets/GhostSamurai_Animset/Scene/Preview_Kanata.controller
+  uploadId: 445517
