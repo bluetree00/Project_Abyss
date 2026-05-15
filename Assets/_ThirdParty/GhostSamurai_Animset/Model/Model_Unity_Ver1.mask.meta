@@ -6,3 +6,10 @@ NativeFormatImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 197971
+  packageName: GhostSamurai_Bundle
+  packageVersion: 1.0
+  assetPath: Assets/_ThirdParty/GhostSamurai_Animset/Model/Model_Unity_Ver1.mask
+  uploadId: 445517

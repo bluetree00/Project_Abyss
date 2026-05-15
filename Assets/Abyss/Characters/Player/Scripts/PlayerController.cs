@@ -825,7 +825,7 @@ public class PlayerController : CharacterBase
         {
             case WeaponType.Katana:
                 _attackPolicy = new SwordAttackPolicy(
-                    enterThreshold: 1.5f,
+                    enterThreshold: 0.4f,
                     fullThreshold: wd.holdThreshold,
                     maxChargeStage: wd.chargeStages
                 );
@@ -918,6 +918,15 @@ public class PlayerController : CharacterBase
 
     /// <summary>낙하 공격 상태인지 여부 (LocoAirState 착지 처리 분기용)</summary>
     public bool IsPlunging => actSM?.CurrentId == ActState.Plunge;
+
+    /// <summary>강공격 실행 중 여부 — SwordPolicy.OnCanceled에서 릴리즈 중복 처리 억제에 사용</summary>
+    public bool IsInHeavyAttackState => actSM?.CurrentId == ActState.HeavyAttack;
+
+    /// <summary>차지 불가 상태: 공격 중·공중·회피 중. SwordAttackPolicy 타이머 리셋 조건에 사용</summary>
+    public bool IsChargeBlocked =>
+        Combo.IsAttacking ||
+        !IsGrounded() ||
+        locoSM?.CurrentId == LocoState.Dodge;
 
     /// <summary>픽업 대기 중인 무기 데이터 (WorldWeaponDisplay → ActPickupState 전달용)</summary>
     public WeaponData PendingPickupWeapon { get; set; }
@@ -1060,7 +1069,7 @@ public class PlayerController : CharacterBase
 
     private void Safe_OnHitStep(int stepIndex)
     {
-        if (stepIndex < 0) return;
+        if (stepIndex < 0 || !Combo.IsAttacking) return;
         OnAttackHitStep(stepIndex);
     }
 

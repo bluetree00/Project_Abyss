@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Knight.controller의 HeavyCharge / GroundHeavyAttack 상태에 연결된
+/// PlayerBase.controller의 HeavyCharge / GroundHeavyAttack 상태에 연결된
 /// base clip 이름을 KatanaAnimation.asset의 baseClipName과 일치시킨다.
 ///
 /// AnimatorOverrideService.Override(keyName, clip) 은 base clip 이름으로 매칭하므로,
@@ -10,9 +10,9 @@ using UnityEngine;
 /// </summary>
 public static class FixControllerBaseClipNames
 {
-    // HeavyCharge 상태의 base clip: BowHeavyCharge.FBX → 클립 이름 "HeavyCharge"로 변경
+    // HeavyCharge 상태의 base clip: GhostSamurai_APose_Idle.FBX → 클립 이름 "HeavyCharge"로 변경
     private const string HeavyChargeFbx =
-        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/Bow/Attack/Pose/BowHeavyCharge.FBX";
+        "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/GhostSamurai_APose_Idle.FBX";
 
     // GroundHeavyAttack 상태의 base clip: SPAttack01.FBX → 클립 이름 "GroundHeavyAttack"로 변경
     private const string GroundHeavyFbx =
@@ -21,9 +21,9 @@ public static class FixControllerBaseClipNames
     [MenuItem("Tools/Fix Controller Base Clip Names")]
     public static void Fix()
     {
-        FixClipName(HeavyChargeFbx, "HeavyCharge");
-        FixClipName(GroundHeavyFbx, "GroundHeavyAttack");
-        Debug.Log("[FixBaseClips] 완료. Knight.controller Override 매칭 가능 상태.");
+        FixClipName(HeavyChargeFbx, "HeavyCharge");       // APose_Idle → "HeavyCharge"
+        FixClipName(GroundHeavyFbx, "GroundHeavyAttack"); // SPAttack01 → "GroundHeavyAttack"
+        Debug.Log("[FixBaseClips] 완료. PlayerBase.controller Override 매칭 가능 상태.");
     }
 
     private static void FixClipName(string fbxPath, string targetName)

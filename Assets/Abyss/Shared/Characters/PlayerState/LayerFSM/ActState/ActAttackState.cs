@@ -210,18 +210,17 @@ public class ActAttackState : ILayerState<ActState>
         _execution = null;
     }
 
-    // ── 이벤트 구독 (HitStep / GenericTag만 유지) ────────────────────────────
+    // ── 이벤트 구독 ────────────────────────────────────────────────────────
+    // OnHitStep은 PlayerController.Safe_OnHitStep이 전역 처리 → 중복 구독 제거
     private void SubscribeReceiver()
     {
         if (_receiver == null) return;
-        _receiver.OnHitStep    += OnHitStep;
         _receiver.OnGenericTag += OnGenericTag;
     }
 
     private void UnsubscribeReceiver()
     {
         if (_receiver == null) return;
-        _receiver.OnHitStep    -= OnHitStep;
         _receiver.OnGenericTag -= OnGenericTag;
     }
 
@@ -279,11 +278,7 @@ public class ActAttackState : ILayerState<ActState>
         }
     }
 
-    private void OnHitStep(int stepIndex)
-    {
-        if (!_controller.Combo.IsAttacking || stepIndex < 0) return;
-        _controller.OnAttackHitStep(stepIndex);
-    }
+
 
     private void OnGenericTag(string tag)
     {

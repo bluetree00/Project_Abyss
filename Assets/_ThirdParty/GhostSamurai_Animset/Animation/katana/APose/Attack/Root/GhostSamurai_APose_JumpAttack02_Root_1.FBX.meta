@@ -198,8 +198,8 @@ ModelImporter:
       be discarded.\n\t'middle_03_l' has translation animation that will be discarded.\n\t'pinky_01_l'
       has translation animation that will be discarded.\n\t'pinky_02_l' has translation
       animation that will be discarded.\n\t'pinky_03_l' has translation animation
-      that will be discarded.\n\t'ring_01_l' has translation animation that will be
-      discarded.\n\t'ring_02_l' has translation animation that will be discarded.\n\t'ring_03_l'
+      that will be discarded.\n\t'ring_01_l' has translation animation that will
+      be discarded.\n\t'ring_02_l' has translation animation that will be discarded.\n\t'ring_03_l'
       has translation animation that will be discarded.\n\t'thumb_01_l' has translation
       animation that will be discarded.\n\t'thumb_02_l' has translation animation
       that will be discarded.\n\t'thumb_03_l' has translation animation that will
@@ -208,15 +208,15 @@ ModelImporter:
       animation that will be discarded.\n\t'hand_r' has translation animation that
       will be discarded.\n\t'index_01_r' has translation animation that will be discarded.\n\t'middle_01_r'
       has translation animation that will be discarded.\n\t'pinky_01_r' has translation
-      animation that will be discarded.\n\t'ring_01_r' has translation animation that
-      will be discarded.\n\t'thumb_01_r' has translation animation that will be discarded.\n\t'thumb_02_r'
-      has translation animation that will be discarded.\n\t'thumb_03_r' has translation
-      animation that will be discarded.\n\t'head' has translation animation that will
-      be discarded.\n\t'calf_l' has translation animation that will be discarded.\n\t'foot_l'
-      has translation animation that will be discarded.\n\t'ball_l' has translation
-      animation that will be discarded.\n\t'calf_r' has translation animation that
-      will be discarded.\n\t'foot_r' has translation animation that will be discarded.\n\t'ball_r'
-      has translation animation that will be discarded.\n"
+      animation that will be discarded.\n\t'ring_01_r' has translation animation
+      that will be discarded.\n\t'thumb_01_r' has translation animation that will
+      be discarded.\n\t'thumb_02_r' has translation animation that will be discarded.\n\t'thumb_03_r'
+      has translation animation that will be discarded.\n\t'head' has translation
+      animation that will be discarded.\n\t'calf_l' has translation animation that
+      will be discarded.\n\t'foot_l' has translation animation that will be discarded.\n\t'ball_l'
+      has translation animation that will be discarded.\n\t'calf_r' has translation
+      animation that will be discarded.\n\t'foot_r' has translation animation that
+      will be discarded.\n\t'ball_r' has translation animation that will be discarded.\n"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -1137,3 +1137,10 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 197971
+  packageName: GhostSamurai_Bundle
+  packageVersion: 1.0
+  assetPath: Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Root/GhostSamurai_APose_JumpAttack02_Root_1.FBX
+  uploadId: 445517

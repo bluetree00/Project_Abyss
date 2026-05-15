@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 27197ace075db4788a23710f85704011
+timeCreated: 1553957270
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 141712
+  packageName: Skill Indicator
+  packageVersion: 1.1.0
+  assetPath: Assets/taecgLibrary/SkillIndicator/QuickGuides.pdf
+  uploadId: 373292
