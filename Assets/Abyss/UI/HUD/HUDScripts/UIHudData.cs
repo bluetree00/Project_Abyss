@@ -7,6 +7,7 @@ public struct WeaponSlotInfo
     public string Name;
     public float Attack;
     public float Defense;
+    public WeaponType Type;
 }
 
 public struct UIHudData

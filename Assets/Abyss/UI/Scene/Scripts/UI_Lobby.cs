@@ -11,16 +11,19 @@ public class UI_Lobby : UI_Scene
     [SerializeField] private UI_SaveSlotPanel saveSlotPanel;
 
     // ─────────────────────────────────────────────────────────
-    // Lifecycle
+    // Enums
     // ─────────────────────────────────────────────────────────
 
-    enum Buttons
+    private enum Buttons
     {
         Btn_StartRun,
-        Btn_Continue,
         Btn_Settings,
         Btn_Exit,
     }
+
+    // ─────────────────────────────────────────────────────────
+    // Lifecycle
+    // ─────────────────────────────────────────────────────────
 
     public override void Init()
     {
@@ -29,7 +32,6 @@ public class UI_Lobby : UI_Scene
         Bind<Button>(typeof(Buttons));
 
         GetButton((int)Buttons.Btn_StartRun).onClick.AddListener(OnClickStartRun);
-        GetButton((int)Buttons.Btn_Continue).onClick.AddListener(OnClickContinue);
         GetButton((int)Buttons.Btn_Settings).onClick.AddListener(OnClickSettings);
         GetButton((int)Buttons.Btn_Exit).onClick.AddListener(OnClickExit);
 
@@ -41,7 +43,7 @@ public class UI_Lobby : UI_Scene
     }
 
     // ─────────────────────────────────────────────────────────
-    // Private Methods — Event Handlers
+    // Event Handlers
     // ─────────────────────────────────────────────────────────
 
     private void OnClickStartRun()
@@ -50,11 +52,6 @@ public class UI_Lobby : UI_Scene
             saveSlotPanel.Open();
         else
             AppBootstrapper.Instance?.RequestStartRun();
-    }
-
-    private void OnClickContinue()
-    {
-        Managers.UI.ShowMenuUI<UI_Inven>();
     }
 
     private void OnClickSettings()

@@ -16,7 +16,7 @@ MonoBehaviour:
   weaponPrefabKey: T3_Greatsword_Weapon
   displayName: "전설의 대검"
   iconKey: T3_GreatswordIcon
-  icon: {fileID: 21300000, guid: 48fa0a512f0e58144ab04be80d7e4816, type: 3}
+  icon: {fileID: 21300000, guid: 241382dec3ea95c4b9172945626373fb, type: 3}
   tier: 3
   rarity: 2
   baseAttack: 55

@@ -40,6 +40,9 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Transform buffListRoot;
     [SerializeField] private TMP_Text buffNoticeText;
 
+    [Header("슬롯 레이블 폰트 (NotoSansKR 권장)")]
+    [SerializeField] private TMP_FontAsset slotLabelFont;
+
     // ── HP 애니메이션 런타임 ──
     private float _hpTargetRatio;
     private float _hpDisplayRatio;
@@ -175,16 +178,42 @@ public sealed class CombatPanelView : MonoBehaviour
         [SerializeField] private GameObject emptyRoot;
         [SerializeField] private Image      iconImage;
 
+        [Header("무기 타입 기본 아이콘 (WeaponSO icon이 없을 때 폴백)")]
+        [SerializeField] private Sprite iconKatana;
+        [SerializeField] private Sprite iconSword;
+        [SerializeField] private Sprite iconBow;
+        [SerializeField] private Sprite iconCrossbow;
+
         public void Apply(WeaponSlotInfo info)
         {
             SetActive(emptyRoot, !info.HasWeapon);
 
             if (iconImage != null)
             {
-                iconImage.gameObject.SetActive(info.HasWeapon && info.Icon != null);
-                if (info.HasWeapon && info.Icon != null) iconImage.sprite = info.Icon;
+                if (info.HasWeapon)
+                {
+                    Sprite resolved = info.Icon != null ? info.Icon : ResolveTypeIcon(info.Type);
+                    iconImage.sprite = resolved;
+                    iconImage.gameObject.SetActive(resolved != null);
+                }
+                else
+                {
+                    iconImage.gameObject.SetActive(false);
+                }
             }
         }
+
+        private Sprite ResolveTypeIcon(WeaponType type) => type switch
+        {
+            WeaponType.Katana     => iconKatana,
+            WeaponType.Greatsword => iconSword,
+#pragma warning disable CS0618
+            WeaponType.Sword      => iconSword,
+#pragma warning restore CS0618
+            WeaponType.Bow        => iconBow,
+            WeaponType.Crossbow   => iconCrossbow,
+            _                     => null,
+        };
 
         private static void SetActive(GameObject go, bool on)
         {
@@ -203,6 +232,8 @@ public sealed class CombatPanelView : MonoBehaviour
         [SerializeField] private TMP_Text   cooldownText;
         /// <summary>선택: Radial360 FillMethod 설정된 Image — 쿨다운 진행 오버레이.</summary>
         [SerializeField] private Image      cooldownOverlay;
+        /// <summary>슬롯 우측 하단 키 레이블 (Q / E). Inspector 또는 런타임 생성.</summary>
+        [SerializeField] internal TMP_Text  keyLabel;
 
         public void SetIcon(Sprite icon)
         {
@@ -236,6 +267,8 @@ public sealed class CombatPanelView : MonoBehaviour
     public sealed class ActiveSlotUI
     {
         [SerializeField] private Image iconImage;
+        /// <summary>슬롯 우측 하단 숫자 레이블 (1 / 2 / 3). Inspector 또는 런타임 생성.</summary>
+        [SerializeField] internal TMP_Text indexLabel;
 
         public void SetIcon(Sprite icon)
         {
@@ -251,6 +284,109 @@ public sealed class CombatPanelView : MonoBehaviour
 
     private const float NoticeDuration = 2f;
     private const float NoticeFadeTime = 0.5f;
+
+    private void Awake()
+    {
+        EnsureSlotLabels();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 슬롯 레이블 초기화 (Q/E/1/2/3)
+    // ─────────────────────────────────────────────────────────
+    private static readonly string[] ActiveLabelTexts = { "1", "2", "3" };
+    private static readonly string[] SkillLabelTexts  = { "Q", "E" };
+
+    private void EnsureSlotLabels()
+    {
+        EnsureSkillLabel(skillQ, SkillLabelTexts[0]);
+        EnsureSkillLabel(skillE, SkillLabelTexts[1]);
+
+        for (int i = 0; i < activeSlots.Length && i < ActiveLabelTexts.Length; i++)
+            EnsureActiveLabel(activeSlots[i], ActiveLabelTexts[i]);
+    }
+
+    private void EnsureSkillLabel(SkillSlotUI slot, string text)
+    {
+        if (slot == null) return;
+        if (slot.keyLabel != null)
+        {
+            slot.keyLabel.text = text;
+            return;
+        }
+
+        // 스킬 슬롯 부모 Transform을 검색
+        // SkillSlotUI는 Serializable이므로 Transform 직접 참조가 없어
+        // CombatStatusRoot 자식에서 이름으로 검색
+        string goName = text == "Q" ? "HUD_QSkile" : "HUD_ESkile";
+        var slotGo = FindChildRecursive(transform, goName);
+        if (slotGo == null) return;
+
+        slot.keyLabel = CreateCornerLabel(slotGo, text);
+    }
+
+    private void EnsureActiveLabel(ActiveSlotUI slot, string text)
+    {
+        if (slot == null) return;
+        if (slot.indexLabel != null)
+        {
+            slot.indexLabel.text = text;
+            return;
+        }
+
+        string goName = text switch
+        {
+            "1" => "HUD_Active_01",
+            "2" => "HUD_Active_02",
+            "3" => "HUD_Active_03",
+            _   => null,
+        };
+        if (goName == null) return;
+
+        var slotGo = FindChildRecursive(transform, goName);
+        if (slotGo == null) return;
+
+        slot.indexLabel = CreateCornerLabel(slotGo, text);
+    }
+
+    /// <summary>
+    /// 슬롯 오브젝트 우측 하단 외부에 작은 레이블 TMP_Text를 생성한다.
+    /// anchoredPosition을 슬롯 우측 하단 바깥쪽으로 배치한다.
+    /// </summary>
+    private TMP_Text CreateCornerLabel(Transform slotRoot, string text)
+    {
+        var go = new GameObject($"Label_{text}", typeof(RectTransform));
+        go.transform.SetParent(slotRoot, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin  = new Vector2(1f, 0f);
+        rect.anchorMax  = new Vector2(1f, 0f);
+        rect.pivot      = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(2f, -2f);
+        rect.sizeDelta  = new Vector2(20f, 20f);
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.text      = text;
+        tmp.fontSize  = 14f;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color     = new Color(1f, 0.9f, 0.6f, 1f);
+        tmp.alignment = TextAlignmentOptions.TopLeft;
+
+        if (slotLabelFont != null)
+            tmp.font = slotLabelFont;
+
+        return tmp;
+    }
+
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        foreach (Transform child in root)
+        {
+            var found = FindChildRecursive(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
 
     private void Update()
     {
