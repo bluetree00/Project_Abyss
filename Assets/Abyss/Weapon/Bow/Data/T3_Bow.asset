@@ -16,7 +16,7 @@ MonoBehaviour:
   weaponPrefabKey: T3_Bow_Weapon
   displayName: "전설의 보우"
   iconKey: T3_BowIcon
-  icon: {fileID: 21300000, guid: 97861ee1fe7412345a84d437284bf4c8, type: 3}
+  icon: {fileID: 21300000, guid: c8fabe273cb5a504f8844f06c5eedcdc, type: 3}
   tier: 3
   rarity: 2
   baseAttack: 18

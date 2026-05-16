@@ -1,13 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 using TMPro;
 using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// 씬 전환 시 화면을 가려주는 로딩 오버레이.
 /// - UIRoot(@UIRoot) 하위에 배치하여 DontDestroyOnLoad
-/// - ShowAsync(): 페이드인 + 입력 차단
-/// - HideAsync(): 페이드아웃
+/// - ShowAsync(): 영상 재생 + 페이드인 + 입력 차단
+/// - HideAsync(): 영상 즉시 정지 + 페이드아웃
 /// - SetProgress(): 로딩바 업데이트 (선택)
 /// </summary>
 public sealed class UI_SceneLoading : MonoBehaviour
@@ -16,18 +17,21 @@ public sealed class UI_SceneLoading : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private CanvasGroup canvasGroup;
-    [SerializeField] private Slider progressBar;        // 선택 (없으면 무시)
-    [SerializeField] private TMP_Text percentText;      // 선택 (없으면 무시)
+    [SerializeField] private Slider progressBar;
+    [SerializeField] private TMP_Text percentText;
+    [SerializeField] private VideoPlayer _videoPlayer;
+    [SerializeField] private RawImage _videoBg;
 
     [Header("Timing")]
     [SerializeField] private float fadeInDuration  = 0.4f;
     [SerializeField] private float fadeOutDuration = 0.5f;
-    [SerializeField] private float minDisplayTime  = 1.5f;   // 너무 빨리 끝나면 깜빡임 방지
-    [SerializeField] private float progressSpeed   = 0.5f;   // 진행바 이동 속도 (1/s)
+    [SerializeField] private float minDisplayTime  = 1.5f;
+    [SerializeField] private float progressSpeed   = 0.5f;
 
     public float ProgressSpeed => progressSpeed;
 
     private float _showStartTime;
+    private RenderTexture _rt;
 
     private void Awake()
     {
@@ -39,7 +43,17 @@ public sealed class UI_SceneLoading : MonoBehaviour
 
         Instance = this;
 
-        // 초기 상태: 완전히 숨김
+        if (_videoPlayer != null && _videoBg != null)
+        {
+            _rt = new RenderTexture(1920, 1080, 0);
+            _videoPlayer.renderMode    = VideoRenderMode.RenderTexture;
+            _videoPlayer.targetTexture = _rt;
+            _videoPlayer.playOnAwake   = false;
+            _videoPlayer.isLooping     = false;
+            _videoBg.texture           = _rt;
+            _videoPlayer.loopPointReached += OnVideoEnded;
+        }
+
         if (canvasGroup != null)
         {
             canvasGroup.alpha          = 0f;
@@ -54,6 +68,15 @@ public sealed class UI_SceneLoading : MonoBehaviour
     {
         if (ReferenceEquals(Instance, this))
             Instance = null;
+
+        if (_videoPlayer != null)
+            _videoPlayer.loopPointReached -= OnVideoEnded;
+
+        if (_rt != null)
+        {
+            _rt.Release();
+            Destroy(_rt);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -63,18 +86,44 @@ public sealed class UI_SceneLoading : MonoBehaviour
     public async UniTask ShowAsync()
     {
         gameObject.SetActive(true);
+
+        // 레이아웃 리빌드가 끝난 뒤 Prepare 시작해 같은 프레임 작업 분산
+        await UniTask.Yield(PlayerLoopTiming.Update);
+
         SetProgress(0f);
+
+        if (_videoPlayer != null)
+            _videoPlayer.Prepare();
 
         if (canvasGroup != null)
             canvasGroup.blocksRaycasts = true;
 
         await FadeAsync(1f, fadeInDuration);
 
+        if (_videoPlayer != null)
+        {
+            // Prepare 미완료 시 최대 2초 대기 — 느린 기기에서 첫 프레임 누락 방지
+            float elapsed = 0f;
+            while (!_videoPlayer.isPrepared && elapsed < 2f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                await UniTask.Yield(PlayerLoopTiming.Update);
+            }
+            _videoPlayer.Play();
+        }
+
         _showStartTime = Time.realtimeSinceStartup;
     }
 
     public async UniTask HideAsync()
     {
+        if (_videoPlayer != null)
+        {
+            _videoPlayer.Stop();
+            _videoPlayer.time = 0;
+            ClearRenderTexture();   // 다음 Show 시 이전 프레임 잔상 방지
+        }
+
         // 최소 표시 시간 보장
         float elapsed = Time.realtimeSinceStartup - _showStartTime;
         float remain  = minDisplayTime - elapsed;
@@ -101,6 +150,27 @@ public sealed class UI_SceneLoading : MonoBehaviour
 
     // -------------------------------------------------------------------------
     // Internal
+    // -------------------------------------------------------------------------
+
+    private void ClearRenderTexture()
+    {
+        if (_rt == null) return;
+        var prev = RenderTexture.active;
+        RenderTexture.active = _rt;
+        GL.Clear(true, true, Color.black);
+        RenderTexture.active = prev;
+    }
+
+    // -------------------------------------------------------------------------
+    // Event Handlers
+    // -------------------------------------------------------------------------
+
+    private void OnVideoEnded(VideoPlayer vp)
+    {
+        // 로딩이 아직 끝나지 않았을 때 영상이 먼저 끝나면 마지막 프레임에 정지
+        vp.Pause();
+    }
+
     // -------------------------------------------------------------------------
 
     private async UniTask FadeAsync(float targetAlpha, float duration)

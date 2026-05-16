@@ -362,7 +362,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             // ── 기존 프리팹 맵 로드 ──
             _currentMapGO = await Managers.AddressableManager.InstantiateAsync(prefabKey, mapRoot);
-            BuildMapNavMesh(_currentMapGO);
+            await BuildMapNavMeshAsync(_currentMapGO);
         }
         finally
         {
@@ -436,15 +436,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // AttachRoomClearController → RoomWaveController.StartWaveAsync는 같은 프레임에 동기적으로
         // TryGetSpawnPosition(NavMesh.SamplePosition)을 호출하므로, NavMesh가 먼저 준비되어야 한다.
         // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
-        BuildMapNavMesh(mapGO);
+        await BuildMapNavMeshAsync(mapGO);
 
         var ct = this.GetCancellationTokenOnDestroy();
 
-        // 벽 투명도 사전 적용
+        // 벽 투명도 사전 적용 — Material 생성 비용이 있으므로 8개마다 프레임을 반환한다
+        int wallCount = 0;
         for (int i = 0; i < blocks.Count; i++)
         {
             if (blocks[i].tileType == TileType.Wall && blocks[i].instance != null)
+            {
                 ApplyWallTransparency(blocks[i].instance, 0.72f);
+                if (++wallCount % 8 == 0)
+                    await UniTask.Yield(PlayerLoopTiming.Update);
+            }
         }
 
         // 렌더러 선숨김 — 카메라 페이드인 중 블록이 팝업으로 보이지 않도록.
@@ -949,16 +954,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return await mgr.TryLoadAssetAsync<ShopCatalogSO>("ShopCatalog_Default");
     }
 
-    private void BuildMapNavMesh(GameObject mapRootObject)
+    // TODO: NavMeshSurface.BuildNavMesh()는 메인 스레드를 블로킹한다.
+    //       완전한 비동기 처리는 NavMeshBuilder.UpdateNavMeshDataAsync() 전환이 필요하다.
+    //       현재는 에이전트 타입 간 UniTask.Yield()로 프레임 분산만 적용한다.
+    private async UniTask BuildMapNavMeshAsync(GameObject mapRootObject)
     {
         if (!buildRuntimeNavMesh || mapRootObject == null)
             return;
 
-        // PhysicsColliders 기반 — FBX Read/Write OFF 메시(AZURE Cliff/Rock 등)를 우회.
-        // All로 씬 전체 물리 콜라이더를 포함하되, Player·Monster 레이어를 제외해
-        // 캐릭터 캡슐 콜라이더가 NavMesh에 구멍을 내지 않도록 한다.
-        // 프로젝트에 등록된 모든 AgentType에 대해 NavMesh를 빌드해 타입 불일치로
-        // isOnNavMesh=false가 되는 현상을 방지한다.
         int excludeMask = ~((1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("Monster")));
         int agentCount  = NavMesh.GetSettingsCount();
         for (int i = 0; i < agentCount; i++)
@@ -970,6 +973,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             surface.useGeometry    = NavMeshCollectGeometry.PhysicsColliders;
             surface.layerMask      = excludeMask;
             surface.BuildNavMesh();
+
+            // 에이전트 타입이 여러 개일 때 빌드 사이에 프레임을 반환한다
+            if (i < agentCount - 1)
+                await UniTask.Yield(PlayerLoopTiming.Update);
         }
     }
 
@@ -1133,6 +1140,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await UniTask.WaitUntil(
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
+
+        // HUD를 플레이어에 바인딩 — 무기 선택 시 HUD 슬롯이 즉시 갱신되도록
+        _run?.BindPlayer(player);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
 
         // Wisp 위치에서 player 쪽으로 카메라 줌인 연출
         GameCameraController.Instance?.PlayStartRoomIntroAsync(player.transform).Forget();

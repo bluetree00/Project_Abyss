@@ -268,6 +268,7 @@ public sealed class HudPresenter : MonoBehaviour
                 info.Name = slot.runtimeData.displayName;
                 info.Attack = slot.runtimeData.baseAttack;
                 info.Defense = slot.runtimeData.baseDefense;
+                info.Type = slot.runtimeData.weaponType;
             }
 
             view.CombatPanel.SetWeaponSlot(i, info);
