@@ -237,7 +237,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         }
         else if (chapterRegistry != null)
         {
-            var data = chapterRegistry.Get(chapter);
+            var data = chapterRegistry.GetData(chapter);
             if (data != null)
             {
                 middleLayers = data.middleLayers;
@@ -417,7 +417,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
         if (image == null) return;
 
         // 챕터별 배경 우선, 없으면 기본 배경
-        var chapterData = chapterRegistry != null ? chapterRegistry.Get(chapter) : null;
+        var chapterData = chapterRegistry != null ? chapterRegistry.GetData(chapter) : null;
 
         if (chapterData != null && chapterData.mapBackground != null)
         {
@@ -450,7 +450,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         if (string.IsNullOrEmpty(bgmKey) && chapterRegistry != null)
         {
-            var chapterData = chapterRegistry.Get(chapter);
+            var chapterData = chapterRegistry.GetData(chapter);
             if (chapterData != null && !string.IsNullOrEmpty(chapterData.bgmKey))
                 bgmKey = chapterData.bgmKey;
         }
@@ -476,7 +476,7 @@ public sealed class StageMapBootstrapper : MonoBehaviour
 
         // 스프라이트 소스 결정: 챕터 데이터 우선
         Sprite[] sprites = null;
-        var chapterData = chapterRegistry != null ? chapterRegistry.Get(chapter) : null;
+        var chapterData = chapterRegistry != null ? chapterRegistry.GetData(chapter) : null;
         if (chapterData != null && chapterData.decorationSprites != null && chapterData.decorationSprites.Length > 0)
             sprites = chapterData.decorationSprites;
         else if (defaultDecorationSprites != null && defaultDecorationSprites.Length > 0)

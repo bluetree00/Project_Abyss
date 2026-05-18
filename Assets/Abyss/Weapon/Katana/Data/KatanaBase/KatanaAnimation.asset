@@ -11,7 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: KatanaAnimation
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
+  lightAttackAnimSpeed: 1.2
+  heavyAttackAnimSpeed: 1.7
   defaultComboWindowOpen: 0.25
   defaultComboWindowClose: 0.75
   defaultAttackEndAt: 0.85

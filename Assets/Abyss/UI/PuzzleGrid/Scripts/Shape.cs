@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// IMPORTANT: Put this script on the ROOT of the shape prefab.
 /// Do NOT put drag scripts on child blocks.
 /// </summary>
-public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
     private static int _idCounter = 0;
 
@@ -31,6 +31,9 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     [SerializeField] private Vector2 homeAnchoredPos;
     [SerializeField] private RectTransform homeParent;
+
+    /// <summary>이 Shape에 연결된 아이템 데이터. 배치/제거 시 RunItemInventory와 동기화.</summary>
+    public RuntimeItemData ItemData { get; private set; }
 
     private Canvas canvas;
     private RectTransform rt;
@@ -174,6 +177,20 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         if (_layout != null) _layout.ignoreLayout = false;
     }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        // 드래그 중이 아닌 순수 클릭 → 우측 아이템 정보 패널 갱신 (시나리오 5)
+        if (eventData.dragging) return;
+        if (ItemData != null)
+            GridManager.Instance?.NotifyItemSelected(ItemData);
+    }
+
+    /// <summary>아이템 데이터를 이 Shape에 연결한다. StagingAreaView에서 보관함 아이템 드래그 시 호출.</summary>
+    public void BindItem(RuntimeItemData item) => ItemData = item;
+
+    /// <summary>아이템 연결 해제. 보관함 반환 또는 폐기 시 호출.</summary>
+    public void UnbindItem() => ItemData = null;
 
     // Placement occupancy
     public void SetOccupiedSquares(List<GridSquare> squares) => occupiedSquares = squares;

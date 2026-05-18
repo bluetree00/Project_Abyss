@@ -54,6 +54,7 @@ public class BlockSynergyBridge : MonoBehaviour
     private readonly HashSet<string> _appliedGridIds = new();
     private GameObject _puzzleInstance;
     private bool _initialized;
+    private Transform _panelGridCached;
 
     private void Awake()
     {
@@ -736,6 +737,31 @@ public class BlockSynergyBridge : MonoBehaviour
     public void ClearAppliedGrids()
     {
         _appliedGridIds.Clear();
+    }
+
+    /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView/GridEditView에서 참조.</summary>
+    public IReadOnlyDictionary<string, GridAssetData> GetRegisteredGrids()
+        => _registeredGrids;
+
+    /// <summary>편집 뷰 진입 시 Panel_Grid를 활성화한다. UI_GridPanel에서 호출.</summary>
+    public void ActivatePanelGrid()
+    {
+        var pg = GetOrFindPanelGrid();
+        if (pg != null) pg.gameObject.SetActive(true);
+    }
+
+    /// <summary>편집 뷰 종료 시 Panel_Grid를 비활성화한다. UI_GridPanel에서 호출.</summary>
+    public void DeactivatePanelGrid()
+    {
+        var pg = GetOrFindPanelGrid();
+        if (pg != null) pg.gameObject.SetActive(false);
+    }
+
+    private Transform GetOrFindPanelGrid()
+    {
+        if (_panelGridCached != null) return _panelGridCached;
+        _panelGridCached = FindPanelGrid();
+        return _panelGridCached;
     }
 
     // ── 변환 유틸 ──

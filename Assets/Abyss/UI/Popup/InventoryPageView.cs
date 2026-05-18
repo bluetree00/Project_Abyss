@@ -82,7 +82,9 @@ public class InventoryPageView : MonoBehaviour
 
         ClearSlots();
 
-        foreach (var item in _inventory.Items)
+        foreach (var item in _inventory.PlacedItems)
+            CreateSlot(item);
+        foreach (var item in _inventory.StagingItems)
             CreateSlot(item);
 
         // 기본 선택: 최신(마지막) 아이템, 없으면 상세 패널 비움
@@ -99,8 +101,10 @@ public class InventoryPageView : MonoBehaviour
         if (run == null) return;
 
         _inventory = run.ItemInventory;
-        _inventory.OnInventoryChanged -= Refresh;
-        _inventory.OnInventoryChanged += Refresh;
+        _inventory.OnPlacedChanged  -= Refresh;
+        _inventory.OnPlacedChanged  += Refresh;
+        _inventory.OnStagingChanged -= Refresh;
+        _inventory.OnStagingChanged += Refresh;
 
         EnsureGridRoot();
         EnsureDetailPanel();
@@ -420,7 +424,8 @@ public class InventoryPageView : MonoBehaviour
 
     private void AutoSelectDefault()
     {
-        if (_inventory == null || _inventory.Count == 0)
+        int totalCount = _inventory == null ? 0 : _inventory.PlacedCount + _inventory.StagingCount;
+        if (totalCount == 0)
         {
             _selectedItem = null;
             _selectedSlotGO = null;
@@ -428,9 +433,11 @@ public class InventoryPageView : MonoBehaviour
             return;
         }
 
-        // 최신(마지막) 아이템 자동 선택
-        int lastIdx = _inventory.Count - 1;
-        var lastItem = _inventory.Items[lastIdx];
+        // 최신(마지막) 아이템 자동 선택 (Placed → Staging 순)
+        int lastIdx = totalCount - 1;
+        var lastItem = lastIdx < _inventory.PlacedCount
+            ? _inventory.PlacedItems[lastIdx]
+            : _inventory.StagingItems[lastIdx - _inventory.PlacedCount];
         var lastSlot = lastIdx < _slots.Count ? _slots[lastIdx] : null;
 
         if (lastSlot != null)
@@ -524,10 +531,11 @@ public class InventoryPageView : MonoBehaviour
         if (_selectedItem != null && _inventory != null)
         {
             bool found = false;
-            foreach (var item in _inventory.Items)
-            {
+            foreach (var item in _inventory.PlacedItems)
                 if (item == _selectedItem) { found = true; break; }
-            }
+            if (!found)
+                foreach (var item in _inventory.StagingItems)
+                    if (item == _selectedItem) { found = true; break; }
             if (!found) AutoSelectDefault();
         }
     }
@@ -654,8 +662,11 @@ public class InventoryPageView : MonoBehaviour
 
         HideTooltip();
         DropItemToWorld(item);
-        _inventory.RemoveItem(item);
-        // OnInventoryChanged → Refresh 자동 호출
+        if (_inventory.IsPlaced(item.instanceId))
+            _inventory.RemovePlaced(item);
+        else
+            _inventory.DiscardFromStaging(item);
+        // OnPlacedChanged / OnStagingChanged → Refresh 자동 호출
     }
 
     private void DropItemToWorld(RuntimeItemData item)
@@ -740,7 +751,10 @@ public class InventoryPageView : MonoBehaviour
     private void OnDestroy()
     {
         if (_inventory != null)
-            _inventory.OnInventoryChanged -= Refresh;
+        {
+            _inventory.OnPlacedChanged  -= Refresh;
+            _inventory.OnStagingChanged -= Refresh;
+        }
     }
 
     // ── Static Helpers ──

@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: GreatswordAnimation
   m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimationSetSO
+  useGuardCharge: 1
+  lightAttackAnimSpeed: 1
+  heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.5
   defaultComboWindowClose: 0.85
   defaultAttackEndAt: 0.9
@@ -58,7 +61,7 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
-    - baseClipName: ESkill_01
+    - baseClipName: Attack_5Combo_2_Inplace
       addressableKey: GreatswordESkill
       actionType: 4
       comboIndex: 0
@@ -68,8 +71,18 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+    - baseClipName: Attack_5Combo_5
+      addressableKey: GreatswordESkill_T3
+      actionType: 4
+      comboIndex: 2
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
     - baseClipName: HeavyCharge
-      addressableKey: GreatswordHeavyCharge
+      addressableKey: GreatswordGuardLoop
       actionType: 2
       comboIndex: 0
       isPlunge: 0
@@ -79,9 +92,19 @@ MonoBehaviour:
       comboWindowClose: -1
       attackEndAt: -1
     - baseClipName: GroundHeavyAttack
-      addressableKey: GreatswordHeavyAttack_01
+      addressableKey: GreatswordGuardAttack
       actionType: 2
       comboIndex: 0
+      isPlunge: 0
+      plungeFallSpeed: 0
+      plungeDescendAt: 0
+      comboWindowOpen: -1
+      comboWindowClose: -1
+      attackEndAt: -1
+    - baseClipName: HeavyChargeAccept
+      addressableKey: GreatswordGuardAccept
+      actionType: 2
+      comboIndex: 1
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
