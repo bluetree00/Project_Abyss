@@ -79,12 +79,12 @@ MonoBehaviour:
     knockbackMultiplier: 1.8
     selfMovement: {x: 0, y: 0, z: 1.2}
     effect:
-      payloadKey: DragonPunch
+      payloadKey: BasicSlashBlue
       socket: 0
       space: 0
-      positionOffset: {x: 0, y: 1, z: 1.0}
-      rotationEuler: {x: 0, y: 0, z: 0}
-      scaleMultiplier: 0.7
+      positionOffset: {x: 0.2, y: 1, z: 0.5}
+      rotationEuler: {x: 180, y: 180, z: -60}
+      scaleMultiplier: 1.0
       lifeTimeMultiplier: 1
       behavior: {fileID: 0}
     collider:

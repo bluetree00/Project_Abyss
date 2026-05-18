@@ -258,7 +258,7 @@ public class ShopRoomController : MonoBehaviour
         if (_eventsHooked || _run == null) return;
 
         if (_run.ItemInventory != null)
-            _run.ItemInventory.OnInventoryChanged += OnInventoryChanged;
+            _run.ItemInventory.OnStagingChanged += OnInventoryChanged;
 
         // 무기 매니저는 플레이어 스폰 시점에 따라 늦게 붙을 수 있음 → OnPlayerBound로 후크
         TryHookWeaponManager(_run.Player);
@@ -273,7 +273,7 @@ public class ShopRoomController : MonoBehaviour
         _eventsHooked = false;
 
         if (_run?.ItemInventory != null)
-            _run.ItemInventory.OnInventoryChanged -= OnInventoryChanged;
+            _run.ItemInventory.OnStagingChanged -= OnInventoryChanged;
 
         if (_run != null)
             _run.OnPlayerBound -= OnPlayerBound;
@@ -409,7 +409,7 @@ public class ShopRoomController : MonoBehaviour
             playerState.AddTempGold(price); // 차감 환불
             return false;
         }
-        bool added = _run.ItemInventory != null && _run.ItemInventory.AddItem(runtimeItem);
+        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
         if (!added)
         {
             Debug.Log($"[ShopRoom] 인벤토리 가득 참 — 환불: {entry.target_id}");
@@ -476,7 +476,7 @@ public class ShopRoomController : MonoBehaviour
             return false;
         }
 
-        bool added = _run.ItemInventory != null && _run.ItemInventory.AddItem(runtimeItem);
+        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
         if (!added)
         {
             Debug.Log($"[ShopRoom] (레거시) 인벤토리 가득 참 — 환불: {itemSO.itemId}");

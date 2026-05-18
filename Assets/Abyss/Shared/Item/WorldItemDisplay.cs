@@ -149,7 +149,7 @@ public class WorldItemDisplay : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        run?.ItemInventory.AddItem(_runtimeData);
+        run?.ItemInventory.AddToStaging(_runtimeData);
 
         // 아이템 효과: OnItemPickup hook
         run?.EffectManager?.OnItemPickup(_runtimeData);

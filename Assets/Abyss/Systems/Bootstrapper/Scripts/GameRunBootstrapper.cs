@@ -329,6 +329,26 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
     }
 
+    // ── 새 단일-세계 구조용 공개 API ────────────────────────────────────────────
+
+    /// <summary>
+    /// 지정 roomId의 맵을 worldCenter 위치에 생성한다.
+    /// RoomOpenSequencer에서 호출. 기존 맵(다른 방)은 해제하지 않는다.
+    /// </summary>
+    public async UniTask SpawnBlockMapAtAsync(string roomId, Vector3 worldCenter, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(roomId)) return;
+
+        var roomEntry = Managers.MapData?.GetById(roomId);
+        if (roomEntry == null || string.IsNullOrEmpty(roomEntry.grid_csv))
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] SpawnBlockMapAtAsync: roomId '{roomId}' 없음 또는 grid_csv 비어있음");
+            return;
+        }
+
+        await SpawnBlockMapAsync(roomEntry, worldCenter, ct);
+    }
+
     private void OnMapSpawnRequestedHandler(string prefabKey) => SpawnMapAsync(prefabKey).Forget();
 
     private async UniTask SpawnMapAsync(string prefabKey)
@@ -370,8 +390,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
     }
 
-    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry)
+    // worldCenter 기본값 = Vector3.zero → 기존 동작 유지
+    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default)
     {
+        ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
         var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
         var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos, decorationInfos);
@@ -391,7 +413,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var spawnCell = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
         if (spawnCell.x >= 0)
         {
-            _pendingPlayerSpawnPos = new Vector3(
+            // worldCenter 오프셋을 더해 단일-세계 배치 지원
+            _pendingPlayerSpawnPos = worldCenter + new Vector3(
                 (spawnCell.x - w / 2f + 0.5f) * blockCellSize,
                 0f,
                 (spawnCell.y - h / 2f + 0.5f) * blockCellSize
@@ -404,9 +427,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Debug.LogWarning($"[GameRunBootstrapper] grid에 PlayerSpawn(P) 토큰 없음 — playerSpawnPoint Transform 폴백 사용: {roomEntry.room_id}");
         }
 
-        // 맵 루트
+        // 맵 루트 — worldCenter가 있으면 해당 위치에 배치 (단일-세계 구조)
         var mapGO = new GameObject($"BlockMap_{roomEntry.room_id}");
         mapGO.transform.SetParent(mapRoot, false);
+        mapGO.transform.position = worldCenter;
         _currentMapGO = mapGO;
 
         // 투명 바닥 (플레이어 추락 방지) — 플레이어 이동 기준 Y(=0)에 얇은 판으로 항상 존재
@@ -437,8 +461,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // TryGetSpawnPosition(NavMesh.SamplePosition)을 호출하므로, NavMesh가 먼저 준비되어야 한다.
         // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
         BuildMapNavMesh(mapGO);
-
-        var ct = this.GetCancellationTokenOnDestroy();
 
         // 벽 투명도 사전 적용
         for (int i = 0; i < blocks.Count; i++)

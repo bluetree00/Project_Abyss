@@ -371,8 +371,10 @@ public class ActAttackState : ILayerState<ActState>
                       as WeaponAnimationSetSO;
         (_comboOpen, _comboClose, _attackEnd) = ResolveTiming(mapping, animSet);
 
-        // 아이템 공격속도 배율 × 베이스 보정 1.2 → Animator speed
-        anim.speed = (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f) * 1.2f;
+        float baseSpeed = animSet?.lightAttackAnimSpeed ?? 1.0f;
+        anim.speed = _controller.GlobalAttackAnimSpeedScale
+                   * (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f)
+                   * baseSpeed;
     }
 
     // ── 타이밍 해석 ──────────────────────────────────────────────────────────

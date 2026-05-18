@@ -59,6 +59,12 @@ public class PlayerController : CharacterBase
     [Tooltip("플레이어 발 기준 Blood VFX 높이 오프셋.")]
     [SerializeField] private float _hitBloodVfxHeightOffset = 1f;
 
+    [Header("Combat Tuning")]
+    [Tooltip("모든 공격 애니메이션 속도에 곱해지는 전역 배율. 레벨 디자인용 (기본값 1.0).")]
+    [Range(0.1f, 3f)]
+    [SerializeField] private float _globalAttackAnimSpeedScale = 1f;
+    public float GlobalAttackAnimSpeedScale => _globalAttackAnimSpeedScale;
+
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
     private bool debugInvincible = false;
@@ -114,7 +120,11 @@ public class PlayerController : CharacterBase
 
         RuntimeStats.Damage(finalDmg);
 
-        if (finalDmg > 0) SpawnHitBloodVfx();
+        if (finalDmg > 0)
+        {
+            SpawnHitBloodVfx();
+            OnDamageTaken?.Invoke();
+        }
 
         // 피격 후 — 반사/방버프 등
         var report = new DamageReport
@@ -152,6 +162,8 @@ public class PlayerController : CharacterBase
     /// <summary>번개 그로기: duration초 동안 비네트로 시야를 좁힌다.</summary>
     public void ApplyThunderGroggy(float duration)
         => Abyss.Monster.ThunderGroggyVignetteView.Trigger(duration);
+
+    public event Action OnDamageTaken;
 
     public event Action OnHudStatChanged
     {
@@ -833,7 +845,7 @@ public class PlayerController : CharacterBase
 
             case WeaponType.Greatsword:
                 _attackPolicy = new SwordAttackPolicy(
-                    enterThreshold: 3f,
+                    enterThreshold: 0.5f,
                     fullThreshold: wd.holdThreshold,
                     maxChargeStage: wd.chargeStages
                 );

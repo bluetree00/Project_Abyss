@@ -80,6 +80,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 58a8524c4e5019b4690d56aa62608a80
+    m_Address: UI/Popup/UI_ItemAcquisitionPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63418a5331367b04287574885f39e9ac
     m_Address: dragon
     m_ReadOnly: 0

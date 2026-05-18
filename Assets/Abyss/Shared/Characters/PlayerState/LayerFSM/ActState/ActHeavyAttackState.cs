@@ -33,7 +33,9 @@ public class ActHeavyAttackState : ILayerState<ActState>
         _exitFired = false;
         _elapsed   = 0f;
 
-        _controller.Anim.speed = 1.7f;
+        var animSet = _controller.WeaponManager?.CurrentWeaponData?.animationSet as WeaponAnimationSetSO;
+        _controller.Anim.speed = _controller.GlobalAttackAnimSpeedScale
+                               * (animSet?.heavyAttackAnimSpeed ?? 1.7f);
         PlayHeavyAnimation();
     }
 

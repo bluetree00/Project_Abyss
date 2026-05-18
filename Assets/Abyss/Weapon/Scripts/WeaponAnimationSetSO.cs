@@ -42,6 +42,14 @@ public class WeaponAnimationSetSO : ScriptableObject
         }
     }
 
+    [Header("가드 차지 시스템")]
+    [Tooltip("체크 시 강공격 차지 중 피격을 Guard Accept로 처리합니다 (Greatsword 전용).")]
+    public bool useGuardCharge = false;
+
+    [Header("애니메이션 속도 배율 (Animator.speed = 이 값 × 아이템 공격속도)")]
+    [Range(0.1f, 3f)] public float lightAttackAnimSpeed  = 1.0f;
+    [Range(0.1f, 3f)] public float heavyAttackAnimSpeed  = 1.0f;
+
     [Header("콤보 타이밍 기본값 (ClipMapping override가 -1일 때 사용)")]
     [Range(0f, 1f)] public float defaultComboWindowOpen  = 0.25f;
     [Range(0f, 1f)] public float defaultComboWindowClose = 0.75f;
