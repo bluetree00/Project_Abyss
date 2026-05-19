@@ -61,17 +61,18 @@ public class MapBuilder
                     if (blockDef == null) continue;
                 }
 
-                var targetPos = new Vector3(x * cellSize - offset.x, baseY, z * cellSize - offset.z);
-                float rotY = CalcRotation(blockDef.facingRule, targetPos, gridCenter);
+                var localPos = new Vector3(x * cellSize - offset.x, baseY, z * cellSize - offset.z);
+                var worldPos = parent.TransformPoint(localPos);
+                float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter);
 
-                var go = Object.Instantiate(blockDef.prefab, targetPos, Quaternion.Euler(0, rotY, 0), parent);
+                var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
                 go.name = $"Block_{x}_{z}_{renderType}";
                 SetLayerRecursive(go, 3); // Ground layer (TagManager layer 3)
 
                 result.Add(new PlacedBlock
                 {
                     instance = go,
-                    targetPosition = targetPos,
+                    targetPosition = worldPos,
                     targetRotationY = rotY,
                     tileType = renderType,
                     cell = new Vector2Int(x, z),
@@ -85,24 +86,24 @@ public class MapBuilder
 
                     if (buffDef != null)
                     {
-                        var buffGo = Object.Instantiate(buffDef.prefab, targetPos, Quaternion.identity, parent);
+                        var buffGo = Object.Instantiate(buffDef.prefab, worldPos, Quaternion.identity, parent);
                         buffGo.name = $"Buff_{x}_{z}_{type}";
                         AttachBuffInteraction(buffGo, type);
                         buffBlock = new PlacedBlock
                         {
                             instance = buffGo,
-                            targetPosition = targetPos,
+                            targetPosition = worldPos,
                             targetRotationY = 0f,
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={targetPos}");
+                        Debug.Log($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
                     else
                     {
-                        buffBlock = CreateDefaultBuffObject(x, z, type, targetPos, cellSize, parent);
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={targetPos}");
+                        buffBlock = CreateDefaultBuffObject(x, z, type, worldPos, cellSize, parent);
+                        Debug.Log($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
 
@@ -118,18 +119,18 @@ public class MapBuilder
 
                     if (shopStallPrefab != null)
                     {
-                        var shopGo = Object.Instantiate(shopStallPrefab, targetPos, Quaternion.identity, parent);
+                        var shopGo = Object.Instantiate(shopStallPrefab, worldPos, Quaternion.identity, parent);
                         shopGo.name = $"ShopStall_{x}_{z}_{type}";
                         AttachShopStallInteraction(shopGo, cellSize, category);
                         shopBlock = new PlacedBlock
                         {
                             instance = shopGo,
-                            targetPosition = targetPos,
+                            targetPosition = worldPos,
                             targetRotationY = 0f,
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={targetPos}");
+                        Debug.Log($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={worldPos}");
                     }
                     else
                     {
@@ -137,23 +138,23 @@ public class MapBuilder
                         var shopDef = palette.Pick(type);
                         if (shopDef != null && shopDef.prefab != null)
                         {
-                            var shopGo = Object.Instantiate(shopDef.prefab, targetPos, Quaternion.identity, parent);
+                            var shopGo = Object.Instantiate(shopDef.prefab, worldPos, Quaternion.identity, parent);
                             shopGo.name = $"ShopStall_{x}_{z}_{type}";
                             AttachShopStallInteraction(shopGo, cellSize, category);
                             shopBlock = new PlacedBlock
                             {
                                 instance = shopGo,
-                                targetPosition = targetPos,
+                                targetPosition = worldPos,
                                 targetRotationY = 0f,
                                 tileType = type,
                                 cell = new Vector2Int(x, z),
                             };
-                            Debug.Log($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={targetPos}");
+                            Debug.Log($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={worldPos}");
                         }
                         else
                         {
                             // 폴백 2: 임시 큐브
-                            shopBlock = CreateDefaultShopStallObject(x, z, type, targetPos, cellSize, parent, category);
+                            shopBlock = CreateDefaultShopStallObject(x, z, type, worldPos, cellSize, parent, category);
                             Debug.LogWarning($"[MapBuilder] 상점 타일 배치 (임시큐브 폴백 — Block_ShopStall 프리팹 미할당): ({x},{z}) {type} cat={category}");
                         }
                     }
@@ -167,12 +168,12 @@ public class MapBuilder
                     var spawnerDef = palette.Pick(TileType.MonsterSpawn);
                     if (spawnerDef != null && spawnerDef.prefab != null)
                     {
-                        var spawnerGo = Object.Instantiate(spawnerDef.prefab, targetPos, Quaternion.identity, parent);
+                        var spawnerGo = Object.Instantiate(spawnerDef.prefab, worldPos, Quaternion.identity, parent);
                         spawnerGo.name = $"MonsterSpawner_{x}_{z}";
                         result.Add(new PlacedBlock
                         {
                             instance = spawnerGo,
-                            targetPosition = targetPos,
+                            targetPosition = worldPos,
                             targetRotationY = 0f,
                             tileType = type,
                             cell = new Vector2Int(x, z),
@@ -188,12 +189,12 @@ public class MapBuilder
                     var bossSpawnerDef = palette.Pick(TileType.BossSpawn);
                     if (bossSpawnerDef != null && bossSpawnerDef.prefab != null)
                     {
-                        var bossGo = Object.Instantiate(bossSpawnerDef.prefab, targetPos, Quaternion.identity, parent);
+                        var bossGo = Object.Instantiate(bossSpawnerDef.prefab, worldPos, Quaternion.identity, parent);
                         bossGo.name = $"BossSpawner_{x}_{z}";
                         result.Add(new PlacedBlock
                         {
                             instance = bossGo,
-                            targetPosition = targetPos,
+                            targetPosition = worldPos,
                             targetRotationY = 0f,
                             tileType = type,
                             cell = new Vector2Int(x, z),
@@ -359,7 +360,7 @@ public class MapBuilder
         var go = new GameObject("SafeFloor");
         go.layer = 3; // Ground (TagManager layer 3)
         go.transform.SetParent(parent, false);
-        go.transform.position = new Vector3(0f, baseY - 0.05f, 0f);
+        go.transform.localPosition = new Vector3(0f, baseY - 0.05f, 0f);
 
         var col = go.AddComponent<BoxCollider>();
         col.size = new Vector3(width * cellSize, 0.1f, height * cellSize);

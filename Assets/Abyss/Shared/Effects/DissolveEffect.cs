@@ -160,9 +160,13 @@ public static class DissolveEffect
 
             await UniTask.Yield(ct); // 1프레임 보호
 
+            // 디졸브 완료 즉시 해당 오브젝트의 모든 렌더러를 원본으로 복구
             if (target != null)
+            {
                 for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
-                    renderers[i].sharedMaterials = origMats[i];
+                    if (renderers[i] != null)
+                        renderers[i].sharedMaterials = origMats[i];
+            }
 
             onComplete?.Invoke();
         }
