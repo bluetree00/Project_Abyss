@@ -99,7 +99,8 @@ public class DragonAirBitePatternSO : BossPatternSO
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
         if (ctx.Blackboard is not DragonBossBlackboard bb) return false;
-        return bb.AirBiteCooldown <= 0f;
+        return bb.BodyState == BodyState.Airborne
+               && bb.AirBiteCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -124,7 +125,6 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     private int _completedBites;
     private bool _warningShown;
     private bool _damageApplied;
-    private Vector3 _takeoffStartPos;
     private Vector3 _hoverAnchorPos;
     private Vector3 _biteTargetGroundPos;
     private Vector3 _biteAttackPos;
@@ -147,28 +147,21 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        if (ctx.Agent != null)
-            ctx.Agent.enabled = false;
-
-        _phase = Phase.Takeoff;
+        _phase = Phase.Approach;
         _phaseTimer = 0f;
         _completedBites = 0;
         _warningShown = false;
         _damageApplied = false;
-        _takeoffStartPos = ctx.Transform.position;
         _hoverAnchorPos = BuildAirAnchor(ctx, 0);
-        _lockedAttackY = ctx.Runtime.SpawnPosition.y + Data.BiteAttackHeight;
+        _lockedAttackY = Mathf.Max(
+            ctx.Transform.position.y,
+            ctx.Runtime.SpawnPosition.y + Data.BiteAttackHeight);
         _hasStartedBiteSequence = false;
-        _takeoffHash = Animator.StringToHash(Data.TakeoffStateName);
-        _landingHash = Animator.StringToHash(Data.LandingStateName);
-
-        if (ctx.Monster is DragonBossMonster dragon)
-            dragon.DragonBlackboard.IsAirborne = true;
 
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
             bb.AirBiteCooldown = Data.Cooldown;
 
-        PlayAnim(ctx, Data.TakeoffStateName, 0.1f);
+        UpdateAirChaseAnimation(ctx, _hoverAnchorPos, force: true);
     }
 
     public override void Update(MonsterContext ctx)
@@ -177,9 +170,6 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 
         switch (_phase)
         {
-            case Phase.Takeoff:
-                UpdateTakeoff(ctx);
-                break;
             case Phase.Approach:
                 UpdateApproach(ctx);
                 break;
@@ -189,18 +179,10 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             case Phase.Recovery:
                 UpdateRecovery(ctx);
                 break;
-            case Phase.Landing:
-                UpdateLanding(ctx);
-                break;
         }
     }
 
-    public override void Exit(MonsterContext ctx)
-    {
-        RestoreAgent(ctx);
-        if (ctx.Monster is DragonBossMonster dragon)
-            dragon.DragonBlackboard.IsAirborne = false;
-    }
+    public override void Exit(MonsterContext ctx) { }
 
     private void UpdateTakeoff(MonsterContext ctx)
     {
@@ -265,7 +247,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _completedBites++;
         if (_completedBites >= Mathf.Max(1, Data.BiteCount))
         {
-            StartLanding(ctx);
+            ReturnToAirCombat(ctx);
             return;
         }
 
@@ -294,7 +276,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             return;
 
         RestoreAgent(ctx);
-        ReturnToCombat(ctx);
+        ReturnToAirCombat(ctx);
     }
 
     private void StartApproach(MonsterContext ctx)
@@ -347,20 +329,15 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 
     private void SpawnWarningMarker(MonsterContext ctx)
     {
-        if (Data.WarningMarkerPrefab == null)
-            return;
-
         Vector3 pos = _biteTargetGroundPos;
-        pos.y = ctx.Runtime.SpawnPosition.y + Data.WarningMarkerHeightOffset;
-
-        var marker = BossEffectPool.SpawnOneShot(
-            Data.WarningMarkerPrefab,
+        pos.y = ctx.Runtime.SpawnPosition.y;
+        DragonBossWarningZone.CreateCircle(
+            "DragonAirBiteWarning",
             pos,
-            Quaternion.identity,
-            fallbackLifetime: Data.WarningMarkerLifetime);
-
-        if (marker != null)
-            marker.transform.localScale = Vector3.one * Data.WarningMarkerScale;
+            Data.AttackRadius,
+            new Color(1f, 0.28f, 0.18f, 0.85f),
+            Data.WarningMarkerLifetime,
+            Data.WarningMarkerHeightOffset);
     }
 
     private void ApplyHit()
@@ -579,7 +556,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         ctx.Agent.Warp(ctx.Transform.position);
     }
 
-    private static void ReturnToCombat(MonsterContext ctx)
+    private static void ReturnToAirCombat(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
@@ -587,16 +564,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             return;
         }
 
-        if (ctx.Monster is not DragonBossMonster dragon)
-        {
-            ctx.Monster.ChangeState<ChaseState>();
-            return;
-        }
-
-        if (ctx.Runtime.DistToPlayer > dragon.WalkToRunThreshold)
-            ctx.Monster.ChangeState<DragonRunChaseState>();
-        else
-            ctx.Monster.ChangeState<ChaseState>();
+        ctx.Monster.ChangeState<AttackReadyState>();
     }
 }
 }

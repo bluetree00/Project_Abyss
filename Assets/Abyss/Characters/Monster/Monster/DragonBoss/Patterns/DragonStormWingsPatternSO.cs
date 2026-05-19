@@ -62,7 +62,9 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
-        return (ctx.Blackboard?.LeapCooldown ?? 0f) <= 0f;
+        return ctx.Blackboard is DragonBossBlackboard bb
+               && bb.BodyState == BodyState.Airborne
+               && bb.LeapCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -106,15 +108,15 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     public override void Enter(MonsterContext ctx)
     {
-        if (ctx.Agent != null) ctx.Agent.enabled = false;
-
-        _phase            = Phase.Takeoff;
+        _phase            = Phase.Hover;
         _timer            = 0f;
         _windBlastSpawned = false;
         _takeoffHash      = Animator.StringToHash(Data.TakeoffStateName);
         _landingHash      = Animator.StringToHash(Data.LandingStateName);
+        _hoverPos         = ctx.Transform.position;
+        _hoverPos.y       = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.HoverHeight);
 
-        PlayAnim(ctx, Data.TakeoffStateName);
+        PlayAnim(ctx, Data.HoverStateName);
 
         var bb = (ctx.Monster as IBoss)?.Blackboard;
         if (bb != null) bb.LeapCooldown = Data.Cooldown;
@@ -135,12 +137,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     }
 
     public override void Exit(MonsterContext ctx)
-    {
-        DestroyWarning();
-        RestoreAgent(ctx);
-        var bb = GetDragonBB(ctx);
-        if (bb != null) bb.IsAirborne = false;
-    }
+        => DestroyWarning();
 
     // ── Takeoff ───────────────────────────────────────────────────────────────
 
@@ -287,9 +284,9 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
         if (_timer < Data.AttackAnimDuration) return;
 
-        _phase = Phase.Landing;
+        _phase = Phase.Done;
         _timer = 0f;
-        PlayAnim(ctx, Data.LandingStateName);
+        ctx.Monster.ChangeState<AttackReadyState>();
     }
 
     // ── Landing ───────────────────────────────────────────────────────────────

@@ -118,7 +118,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     {
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
-        _phase         = Phase.Takeoff;
+        bool alreadyAirborne = (ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb
+                               && dragonBb.BodyState == BodyState.Airborne;
+        _phase         = alreadyAirborne ? Phase.MoveToCenter : Phase.Takeoff;
         _phaseTimer    = 0f;
         _damageApplied = false;
         _spawnedPillars.Clear();
@@ -137,7 +139,17 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
             bb.IceSlamCooldown = Data.Cooldown;
 
-        PlayAnim(ctx, Data.TakeoffStateName, 0.1f);
+        if (alreadyAirborne)
+        {
+            Vector3 pos = ctx.Transform.position;
+            pos.y = _targetY;
+            ctx.Transform.position = pos;
+            PlayAnim(ctx, Data.AirChaseStateName, 0.1f);
+        }
+        else
+        {
+            PlayAnim(ctx, Data.TakeoffStateName, 0.1f);
+        }
     }
 
     public override void Update(MonsterContext ctx)
@@ -278,18 +290,15 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     private void SpawnDangerZone(MonsterContext ctx)
     {
-        if (Data.DangerZonePrefab == null) return;
-
-        float   groundY  = ctx.Runtime.SpawnPosition.y;
-        Vector3 pos      = new Vector3(_centerPos.x, groundY + Data.DangerZoneHeightOffset, _centerPos.z);
-        float   lifetime = Data.WarningDuration + 5f;
-
-        var zone = BossEffectPool.SpawnOneShot(
-            Data.DangerZonePrefab, pos, Quaternion.identity,
-            fallbackLifetime: lifetime);
-
-        if (zone != null)
-            zone.transform.localScale = Vector3.one * Data.DangerZoneScale;
+        float groundY = ctx.Runtime.SpawnPosition.y;
+        Vector3 pos = new Vector3(_centerPos.x, groundY, _centerPos.z);
+        DragonBossWarningZone.CreateCircle(
+            "DragonIceSlamWarning",
+            pos,
+            Data.SlamRadius,
+            new Color(0.55f, 0.85f, 1f, 0.85f),
+            Data.WarningDuration + 5f,
+            Data.DangerZoneHeightOffset);
     }
 
     private void SpawnIcePillars(MonsterContext ctx)

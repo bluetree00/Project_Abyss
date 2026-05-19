@@ -29,6 +29,10 @@ public class DragonBossBlackboard : BossAttackBlackboard
     /// DragonBodyStateCondition · 공중 공격 패턴들이 이 값을 기준으로 분기한다.
     /// </summary>
     public BodyState BodyState;
+    public int GroundedPatternStreak;
+    public int AirbornePatternStreak;
+    public float TakeoffBaseWeight = 1f;
+    public float LandingBaseWeight = 1f;
 
     /// <summary>
     /// Legacy 호환 proxy — 기존 코드의 `bb.IsAirborne = true/false` 설정을
@@ -57,9 +61,13 @@ public class DragonBossBlackboard : BossAttackBlackboard
         HasSummonedAt80 = false;
         HasSummonedAt50 = false;
         HasSummonedAt10 = false;
-        BodyState       = BodyState.Grounded;
-        AirBiteCooldown = 0f;
-        IceSlamCooldown = 0f;
+        BodyState             = BodyState.Grounded;
+        GroundedPatternStreak = 0;
+        AirbornePatternStreak = 0;
+        TakeoffBaseWeight     = 1f;
+        LandingBaseWeight     = 1f;
+        AirBiteCooldown       = 0f;
+        IceSlamCooldown       = 0f;
     }
 }
 }

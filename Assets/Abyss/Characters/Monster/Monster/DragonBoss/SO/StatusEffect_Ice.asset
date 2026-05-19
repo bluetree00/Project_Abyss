@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StatusEffect_Ice
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PlayerStatusEffectSO
   effectType: 0
-  duration: 2.5
+  duration: 2
   slowScale: 0.3
   _effectPrefab: {fileID: 1198433312203469917, guid: 4e0461f4812c7234989081e6a21ebc9e,
     type: 3}

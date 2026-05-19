@@ -62,7 +62,9 @@ public class DragonClawSlashPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
-        return (ctx.Blackboard?.LeapCooldown ?? 0f) <= 0f;
+        return ctx.Blackboard is DragonBossBlackboard bb
+               && bb.BodyState == BodyState.Grounded
+               && bb.LeapCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -244,12 +246,15 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     private void SpawnDangerZone(MonsterContext ctx)
     {
-        if (Data.DangerZonePrefab == null) return;
         Vector3 pos = ctx.Transform.position
             + ctx.Transform.forward * (Data.AttackRadius * 0.6f);
         pos.y = ctx.Transform.position.y;
-        BossEffectPool.SpawnOneShot(Data.DangerZonePrefab, pos, Quaternion.identity,
-            fallbackLifetime: Data.HitTime + 0.2f);
+        DragonBossWarningZone.CreateCircle(
+            "DragonClawWarning",
+            pos,
+            Data.AttackRadius,
+            new Color(1f, 0.25f, 0.18f, 0.85f),
+            Data.HitTime + 0.2f);
     }
 
     private void ApplyHit(MonsterContext ctx)

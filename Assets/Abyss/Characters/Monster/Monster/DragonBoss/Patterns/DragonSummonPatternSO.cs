@@ -172,6 +172,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     public override void Enter(MonsterContext ctx)
     {
         var bb = GetDragonBB(ctx);
+        bool alreadyAirborne = bb != null && bb.BodyState == BodyState.Airborne;
         if (bb != null)
         {
             Data.SetSummonFlag(bb, true);
@@ -180,13 +181,23 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
-        _phase          = Phase.Takeoff;
+        _phase          = alreadyAirborne ? Phase.Hover : Phase.Takeoff;
         _timer          = 0f;
         _minionsSpawned = 0;
         _minionsAlive   = 0;
         _takeoffHash    = Animator.StringToHash(Data.TakeoffStateName);
+        _hoverPos       = ctx.Transform.position;
+        _hoverPos.y     = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.HoverHeight);
 
-        PlayAnim(ctx, Data.TakeoffStateName);
+        if (alreadyAirborne)
+        {
+            ctx.Transform.position = _hoverPos;
+            SpawnEggs(ctx);
+        }
+        else
+        {
+            PlayAnim(ctx, Data.TakeoffStateName);
+        }
     }
 
     public override void Update(MonsterContext ctx)

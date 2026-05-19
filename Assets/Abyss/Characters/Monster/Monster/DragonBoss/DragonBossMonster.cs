@@ -30,6 +30,9 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private string _walkRightStateName = "WalkRight";
     [SerializeField] private string _runLeftStateName   = "RunLeft";
     [SerializeField] private string _runRightStateName  = "RunRight";
+    [SerializeField] private string _airChaseStateName = "AirChase";
+    [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
+    [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
 
     [Header("Dragon — 이동")]
     [Tooltip("이 거리 초과 시 RunChase, 이하 시 WalkChase")]
@@ -40,6 +43,10 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private float _chaseAngularSpeed = 35f;
     [Tooltip("방향 전환 애니 재생 중 이동 속도 배율")]
     [SerializeField] private float _turnSpeedMult = 0.4f;
+    [SerializeField] private float _airChaseHeight = 4f;
+    [SerializeField] private float _airChaseSpeedMult = 1.4f;
+    [SerializeField] private float _airTurnAngleThreshold = 40f;
+    [SerializeField] private float _airTransitionWeightMultiplier = 8f;
 
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
@@ -48,10 +55,16 @@ public class DragonBossMonster : MonsterBase, IBoss
     public string WalkRightStateName  => _walkRightStateName;
     public string RunLeftStateName    => _runLeftStateName;
     public string RunRightStateName   => _runRightStateName;
+    public string AirChaseStateName   => _airChaseStateName;
+    public string AirChaseLeftStateName => _airChaseLeftStateName;
+    public string AirChaseRightStateName => _airChaseRightStateName;
     public float  WalkToRunThreshold  => _walkToRunThreshold;
     public float  ChaseAngularSpeed   => _chaseAngularSpeed;
     public float  WalkChaseSpeedMult  => _walkChaseSpeedMult;
     public float  TurnSpeedMult       => _turnSpeedMult;
+    public float  AirChaseHeight      => _airChaseHeight;
+    public float  AirChaseSpeedMult   => _airChaseSpeedMult;
+    public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -115,7 +128,9 @@ public class DragonBossMonster : MonsterBase, IBoss
             isAlive:     () => !_runtime.IsDead && !IsPlayerDead(),
             isInRange:   IsInEngagementRange,
             changeState: ChangeState,
-            onExecuted:  p => _dragonBB.LastPatternTag = p.patternTag);
+            onExecuted:  OnPatternExecuted);
+
+        UpdateTransitionPatternWeights();
     }
 
     protected override void OnInitialized() => BindBossHud();
@@ -139,6 +154,7 @@ public class DragonBossMonster : MonsterBase, IBoss
                 _dragonBB.NormalModeTimer = 0f;
         }
 
+        UpdateTransitionPatternWeights();
         _runner?.Tick(Time.deltaTime);
     }
 
@@ -151,6 +167,8 @@ public class DragonBossMonster : MonsterBase, IBoss
         base.OnEnable();
         _dragonBB?.Reset();
         _runner?.Reset();
+        CacheTransitionPatternBaseWeights();
+        UpdateTransitionPatternWeights();
         BindBossHud();
     }
 
@@ -185,6 +203,35 @@ public class DragonBossMonster : MonsterBase, IBoss
         => _runtime?.PlayerTarget != null
            && _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
 
+    private void OnPatternExecuted(BossPatternSO pattern)
+    {
+        if (_dragonBB == null || pattern == null)
+            return;
+
+        _dragonBB.LastPatternTag = pattern.patternTag;
+
+        if (pattern is DragonTakeoffPatternSO
+            || pattern is DragonLandingPatternSO
+            || pattern is DragonSummonPatternSO
+            || pattern is DragonIceSlamPatternSO)
+        {
+            _dragonBB.GroundedPatternStreak = 0;
+            _dragonBB.AirbornePatternStreak = 0;
+        }
+        else if (_dragonBB.BodyState == BodyState.Airborne)
+        {
+            _dragonBB.AirbornePatternStreak++;
+            _dragonBB.GroundedPatternStreak = 0;
+        }
+        else
+        {
+            _dragonBB.GroundedPatternStreak++;
+            _dragonBB.AirbornePatternStreak = 0;
+        }
+
+        UpdateTransitionPatternWeights();
+    }
+
     private void InitializePatterns(BossConfigSO config)
     {
         if (config.patternEntries == null) return;
@@ -193,6 +240,55 @@ public class DragonBossMonster : MonsterBase, IBoss
             if (entry?.patterns == null) continue;
             foreach (var p in entry.patterns)
                 p?.Initialize(_patternCtx);
+        }
+
+        CacheTransitionPatternBaseWeights();
+    }
+
+    private void CacheTransitionPatternBaseWeights()
+    {
+        if (_dragonBB == null || _config is not BossConfigSO bossConfig || bossConfig.patternEntries == null)
+            return;
+
+        foreach (var entry in bossConfig.patternEntries)
+        {
+            if (entry?.patterns == null)
+                continue;
+
+            foreach (var pattern in entry.patterns)
+            {
+                if (pattern is DragonTakeoffPatternSO)
+                    _dragonBB.TakeoffBaseWeight = Mathf.Max(0.01f, pattern.weight);
+                else if (pattern is DragonLandingPatternSO)
+                    _dragonBB.LandingBaseWeight = Mathf.Max(0.01f, pattern.weight);
+            }
+        }
+    }
+
+    private void UpdateTransitionPatternWeights()
+    {
+        if (_dragonBB == null || _config is not BossConfigSO bossConfig || bossConfig.patternEntries == null)
+            return;
+
+        float takeoffMult = _dragonBB.GroundedPatternStreak >= 2
+            ? _airTransitionWeightMultiplier
+            : 1f;
+        float landingMult = _dragonBB.AirbornePatternStreak >= 2
+            ? _airTransitionWeightMultiplier
+            : 1f;
+
+        foreach (var entry in bossConfig.patternEntries)
+        {
+            if (entry?.patterns == null)
+                continue;
+
+            foreach (var pattern in entry.patterns)
+            {
+                if (pattern is DragonTakeoffPatternSO)
+                    pattern.weight = _dragonBB.TakeoffBaseWeight * takeoffMult;
+                else if (pattern is DragonLandingPatternSO)
+                    pattern.weight = _dragonBB.LandingBaseWeight * landingMult;
+            }
         }
     }
 

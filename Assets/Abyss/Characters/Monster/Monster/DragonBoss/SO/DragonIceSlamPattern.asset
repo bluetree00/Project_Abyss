@@ -40,5 +40,5 @@ MonoBehaviour:
   _slamEffectScale: 5
   _takeoffStateName: Takeoff
   _airChaseStateName: AirChase
-  _flyDownStateName: UR Fly Down
+  _flyDownStateName: URFly Down
   _landingStateName: Landing
