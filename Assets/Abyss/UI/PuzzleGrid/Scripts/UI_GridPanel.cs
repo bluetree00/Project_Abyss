@@ -14,12 +14,17 @@ public sealed class UI_GridPanel : UI_Base
 {
     public static UI_GridPanel Instance { get; private set; }
 
+    public RectTransform BoardContainer => boardContainer;
+
     // ── SerializeField ──
     [Header("Sub-Views")]
     [SerializeField] private GridGalleryView galleryView;
     [SerializeField] private GridEditView    editView;
     [SerializeField] private StagingAreaView stagingArea;
     [SerializeField] private ItemInfoPanel   itemInfoPanel;
+
+    [Header("보드 컨테이너 (puzzlePrefab 스폰 위치, editView 밖에 배치)")]
+    [SerializeField] private RectTransform boardContainer;
 
     [Header("Buttons")]
     [SerializeField] private UnityEngine.UI.Button confirmButton;
@@ -142,7 +147,6 @@ public sealed class UI_GridPanel : UI_Base
         HideConfirmDialog();
 
         editView?.Deactivate();
-        BlockSynergyBridge.Instance?.DeactivatePanelGrid();
 
         gameObject.SetActive(false);
     }
@@ -151,7 +155,7 @@ public sealed class UI_GridPanel : UI_Base
 
     public void EnterGalleryMode()
     {
-        BlockSynergyBridge.Instance?.DeactivatePanelGrid();
+        boardContainer?.gameObject.SetActive(false);
         galleryView?.gameObject.SetActive(true);
         editView?.gameObject.SetActive(false);
         galleryView?.Refresh();
@@ -159,7 +163,7 @@ public sealed class UI_GridPanel : UI_Base
 
     public void EnterEditMode(string gridId)
     {
-        BlockSynergyBridge.Instance?.ActivatePanelGrid();
+        boardContainer?.gameObject.SetActive(true);
         galleryView?.gameObject.SetActive(false);
         editView?.gameObject.SetActive(true);
         editView?.Activate(gridId);
