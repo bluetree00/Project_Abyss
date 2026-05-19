@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d552c2883e1491479aa50a1dcd26738, type: 3}
   m_Name: DragonTakeoffPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonTakeoffPatternSO
-  weight: 1
+  weight: 0.2
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
-  patternTag: 
+  patternTag: takeoff
   breakOverride: -1
   _airborneThreshold: 4
   _liftSpeed: 6

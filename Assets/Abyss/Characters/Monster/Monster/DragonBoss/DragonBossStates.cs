@@ -417,25 +417,23 @@ public class DragonRunChaseState : IMonsterState
 public class DragonBossAttackReadyState : IMonsterState
 {
     private const float FaceSpeed = 2.5f;
+    private string _currentAirAnim;
 
     public void Enter(MonsterContext ctx)
     {
         // 지상 상태 진입 시 Agent 가 이전 공중 패턴으로 disabled 되어 있으면 복구한다.
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb
-            && bb.BodyState == BodyState.Grounded
-            && ctx.Agent != null)
+            && bb.BodyState == BodyState.Grounded)
         {
-            if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
-            if (!ctx.Agent.isOnNavMesh
-                && UnityEngine.AI.NavMesh.SamplePosition(
-                    ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
-            {
-                ctx.Agent.Warp(hit.position);
-            }
+            RestoreGroundAgent(ctx);
+            if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
+            PlayAnim(ctx, ctx.Animation.attackReadyStateName);
+            return;
         }
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
-        PlayAnim(ctx, ctx.Animation.attackReadyStateName);
+        if (ctx.Agent != null && ctx.Agent.enabled) ctx.Agent.enabled = false;
+        _currentAirAnim = null;
+        UpdateAirChaseAnimation(ctx, true);
     }
 
     public void Update(MonsterContext ctx)
@@ -443,6 +441,12 @@ public class DragonBossAttackReadyState : IMonsterState
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
             ctx.Monster.ChangeState<PatrolState>();
+            return;
+        }
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb
+            && bb.BodyState == BodyState.Airborne)
+        {
+            UpdateAirChase(ctx);
             return;
         }
         if (ctx.Runtime.DistToPlayer > ctx.Monster.GetCombatStopDistance(ctx) * 2.5f)
@@ -455,19 +459,83 @@ public class DragonBossAttackReadyState : IMonsterState
                 ctx.Monster.ChangeState<ChaseState>();
             return;
         }
-        FacePlayer(ctx);
+        FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed);
     }
 
-    public void Exit(MonsterContext ctx) { }
-
-    private static void FacePlayer(MonsterContext ctx)
+    public void Exit(MonsterContext ctx)
     {
-        if (ctx.Runtime.PlayerTarget == null) return;
+        _currentAirAnim = null;
+    }
+
+    private void UpdateAirChase(MonsterContext ctx)
+    {
+        if (ctx.Monster is not DragonBossMonster dragon || ctx.Runtime.PlayerTarget == null)
+        {
+            if (ctx.Runtime.PlayerTarget != null)
+                FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed);
+            return;
+        }
+
+        Vector3 targetPos = ctx.Runtime.PlayerTarget.position;
+        targetPos.y = ctx.Runtime.SpawnPosition.y + dragon.AirChaseHeight;
+
+        UpdateAirChaseAnimation(ctx, false);
+        ctx.Transform.position = Vector3.MoveTowards(
+            ctx.Transform.position,
+            targetPos,
+            ctx.Stat.moveSpeed * dragon.AirChaseSpeedMult * Time.deltaTime);
+        FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed * 2f);
+    }
+
+    private void UpdateAirChaseAnimation(MonsterContext ctx, bool force)
+    {
+        if (ctx.Monster is not DragonBossMonster dragon || ctx.Runtime.PlayerTarget == null)
+            return;
+
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.001f)
+            return;
+
+        float angle = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
+        string next;
+        if (angle <= -dragon.AirTurnAngleThreshold)
+            next = dragon.AirChaseRightStateName;
+        else if (angle >= dragon.AirTurnAngleThreshold)
+            next = dragon.AirChaseLeftStateName;
+        else
+            next = dragon.AirChaseStateName;
+
+        if (!force && _currentAirAnim == next)
+            return;
+
+        _currentAirAnim = next;
+        PlayAnim(ctx, next);
+    }
+
+    private static void RestoreGroundAgent(MonsterContext ctx)
+    {
+        if (ctx.Agent == null)
+            return;
+
+        if (!ctx.Agent.enabled)
+            ctx.Agent.enabled = true;
+
+        if (!ctx.Agent.isOnNavMesh
+            && UnityEngine.AI.NavMesh.SamplePosition(
+                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+        {
+            ctx.Agent.Warp(hit.position);
+        }
+    }
+
+    private static void FaceTarget(MonsterContext ctx, Vector3 targetPos, float speed)
+    {
+        Vector3 dir = targetPos - ctx.Transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.001f) return;
         ctx.Transform.rotation = Quaternion.Slerp(
-            ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * FaceSpeed);
+            ctx.Transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * speed);
     }
 
     private static void PlayAnim(MonsterContext ctx, string stateName)

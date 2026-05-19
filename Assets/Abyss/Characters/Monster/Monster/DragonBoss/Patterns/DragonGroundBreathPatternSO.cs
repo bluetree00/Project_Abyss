@@ -59,7 +59,9 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public override void OnRecycled() => _runtimeState?.Reset();
 
     public override bool CanExecute(BossPatternContext ctx)
-        => ctx.Ctx.Runtime.PlayerTarget != null;
+        => ctx.Ctx.Runtime.PlayerTarget != null
+           && ctx.Blackboard is DragonBossBlackboard bb
+           && bb.BodyState == BodyState.Grounded;
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }

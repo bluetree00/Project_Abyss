@@ -165,6 +165,7 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   allowedElements: 
+  _waveEntries: []
 --- !u!4 &13670620
 Transform:
   m_ObjectHideFlags: 0
@@ -641,6 +642,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -784,6 +786,7 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   allowedElements: 
+  _waveEntries: []
 --- !u!4 &117726861
 Transform:
   m_ObjectHideFlags: 0
@@ -1036,6 +1039,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -2040,6 +2044,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -2341,6 +2346,12 @@ MonoBehaviour:
   disableSceneBakedNavMeshOnStart: 1
   defaultPlayerEntrance: {fileID: 11400000, guid: fbf55aa93a915964f99df6e70b8668b3,
     type: 2}
+  startRoomMapKey: 
+  startRoomDialogueSO: {fileID: 0}
+  characterPickupPrefabs: []
+  weaponPickupPrefabs: []
+  startGatePrefab: {fileID: 0}
+  wispPrefab: {fileID: 0}
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}
@@ -2351,9 +2362,79 @@ MonoBehaviour:
   blockShopStallPrefab: {fileID: 0}
   shopPriceTable: {fileID: 0}
   luckRollTable: {fileID: 0}
+  clearEndEffectPrefab: {fileID: 0}
+  clearEndEffect2Prefab: {fileID: 0}
   decorationCatalogs:
   - {fileID: 11400000, guid: a0e4b1bdd0e55524e81ee90adceeda4f, type: 2}
   - {fileID: 11400000, guid: 8da2fca1ba714d8c974c330efda6c05c, type: 2}
+--- !u!1001 &691779391
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3246159262785727669, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
+      propertyPath: m_Name
+      value: DragonBoss
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 29b6eed2069bcfc459cc1653d399680e, type: 3}
 --- !u!1001 &701035586
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3773,6 +3854,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
+  isStartRoomPickup: 0
   worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
   textHeight: 3
   textSize: 3
@@ -6083,3 +6165,4 @@ SceneRoots:
   - {fileID: 648508282}
   - {fileID: 144003383}
   - {fileID: 1642380862}
+  - {fileID: 691779391}

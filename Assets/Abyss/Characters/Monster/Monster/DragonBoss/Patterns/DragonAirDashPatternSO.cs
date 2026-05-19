@@ -76,7 +76,9 @@ public class DragonAirDashPatternSO : BossPatternSO
     public override bool CanExecute(BossPatternContext ctx)
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
-        return (ctx.Blackboard?.DashSlashCooldown ?? 0f) <= 0f;
+        return ctx.Blackboard is DragonBossBlackboard bb
+               && bb.BodyState == BodyState.Airborne
+               && bb.DashSlashCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
@@ -125,17 +127,14 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        if (ctx.Agent != null)
-            ctx.Agent.enabled = false;
-
-        _phase = Phase.Takeoff;
+        _phase = Phase.Warning;
         _phaseTimer = 0f;
         _traveledDistance = 0f;
         _playerHit = false;
         _selfDamageApplied = false;
         _takeoffStartPos = ctx.Transform.position;
         _hoverPos = _takeoffStartPos;
-        _hoverPos.y = ctx.Runtime.SpawnPosition.y + Data.WarningHoverHeight;
+        _hoverPos.y = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.WarningHoverHeight);
 
         _takeoffHash = Animator.StringToHash(Data.TakeoffStateName);
         _crashHash = Animator.StringToHash(Data.CrashStateName);
@@ -146,10 +145,9 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         if ((ctx.Monster as IBoss)?.Blackboard is BossAttackBlackboard bb)
             bb.DashSlashCooldown = Data.Cooldown;
 
-        if (ctx.Monster is DragonBossMonster dragon)
-            dragon.DragonBlackboard.IsAirborne = true;
-
-        PlayAnim(ctx, Data.TakeoffStateName, 0.1f);
+        _dashDirection = GetHorizontalDirectionToPlayer(ctx);
+        PlayAnim(ctx, Data.WarningHoverStateName, 0.1f);
+        SpawnWarningMarker(ctx);
     }
 
     public override void Update(MonsterContext ctx)
@@ -184,10 +182,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        RestoreAgent(ctx);
         DestroyRangeIndicator();
-        if (ctx.Monster is DragonBossMonster dragon)
-            dragon.DragonBlackboard.IsAirborne = false;
     }
 
     private void UpdateTakeoff(MonsterContext ctx)
@@ -241,7 +236,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         TryHitPlayer(ctx);
 
         if (_traveledDistance >= Data.DashDistance)
-            StartLanding(ctx);
+            ReturnToAirCombat(ctx);
     }
 
     private void UpdateCrash(MonsterContext ctx)
@@ -275,7 +270,9 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
             return;
 
         RestoreAgent(ctx);
-        ReturnToCombat(ctx);
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.BodyState = BodyState.Grounded;
+        ReturnToGroundCombat(ctx);
     }
 
     private void UpdateLanding(MonsterContext ctx)
@@ -289,7 +286,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
             return;
 
         RestoreAgent(ctx);
-        ReturnToCombat(ctx);
+        ReturnToGroundCombat(ctx);
     }
 
     private void StartWarning(MonsterContext ctx)
@@ -357,28 +354,18 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     private void SpawnRangeIndicator(MonsterContext ctx)
     {
-        _rangeIndicator = new GameObject("DashRangeWarning");
-        var lr = _rangeIndicator.AddComponent<LineRenderer>();
-
-        lr.useWorldSpace     = true;
-        lr.positionCount     = 2;
-        lr.startWidth        = Data.DashHitRadius * 2f;
-        lr.endWidth          = Data.DashHitRadius * 2f;
-        lr.numCapVertices    = 4;
-        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows    = false;
-
-        Color c = Data.WarningLineColor;
-        var mat = new Material(Shader.Find("Sprites/Default"));
-        mat.color   = c;
-        lr.material = mat;
-        lr.startColor = c;
-        lr.endColor   = new Color(c.r, c.g, c.b, c.a * 0.3f);
-
-        float groundY = ctx.Runtime.SpawnPosition.y + 0.05f;
+        float groundY = ctx.Runtime.SpawnPosition.y;
         Vector3 origin = new Vector3(_hoverPos.x, groundY, _hoverPos.z);
-        lr.SetPosition(0, origin);
-        lr.SetPosition(1, origin + _dashDirection * Data.DashDistance);
+        Vector3 center = origin + _dashDirection * (Data.DashDistance * 0.5f);
+        _rangeIndicator = DragonBossWarningZone.CreateRectangle(
+            "DashRangeWarning",
+            center,
+            Quaternion.LookRotation(_dashDirection, Vector3.up),
+            Data.DashHitRadius * 2f,
+            Data.DashDistance,
+            Data.WarningLineColor,
+            Data.WarningDuration + 0.2f,
+            Data.WarningMarkerHeightOffset).gameObject;
     }
 
     private void DestroyRangeIndicator()
@@ -509,7 +496,18 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         ctx.Agent.Warp(ctx.Transform.position);
     }
 
-    private static void ReturnToCombat(MonsterContext ctx)
+    private static void ReturnToAirCombat(MonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
+        {
+            ctx.Monster.ChangeState<PatrolState>();
+            return;
+        }
+
+        ctx.Monster.ChangeState<AttackReadyState>();
+    }
+
+    private static void ReturnToGroundCombat(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {

@@ -74,6 +74,9 @@ public class LobbyIntroPlayer : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_videoPlayer != null)
+            _videoPlayer.loopPointReached -= OnLoopEnd;
+
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
@@ -105,34 +108,49 @@ public class LobbyIntroPlayer : MonoBehaviour
     {
         try
         {
-            if (_videoPlayer == null || _introClip == null) return;
+            if (_videoPlayer == null) return;
 
-            _videoPlayer.source = VideoSource.VideoClip;
-            _videoPlayer.clip = _introClip;
-            _videoPlayer.isLooping = false;
-            _videoPlayer.Prepare();
-            await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
-            _videoPlayer.Play();
+            if (_introClip != null)
+            {
+                _videoPlayer.source = VideoSource.VideoClip;
+                _videoPlayer.clip = _introClip;
+                _videoPlayer.isLooping = false;
+                _videoPlayer.Prepare();
+                await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
+                _videoPlayer.Play();
 
-            float fadeStartDelay = Mathf.Max(0f, (float)_introClip.length - _hudFadeBeforeEnd);
-            await UniTask.Delay(TimeSpan.FromSeconds(fadeStartDelay), cancellationToken: token);
-            FadeInAllAsync(token).Forget();
+                float fadeStartDelay = Mathf.Max(0f, (float)_introClip.length - _hudFadeBeforeEnd);
+                await UniTask.Delay(TimeSpan.FromSeconds(fadeStartDelay), cancellationToken: token);
+                FadeInAllAsync(token).Forget();
 
-            await WaitForVideoEndAsync(_videoPlayer, token);
+                await WaitForVideoEndAsync(_videoPlayer, token);
+                _videoPlayer.Stop();
+                await UniTask.Yield(token);
+            }
+            else
+            {
+                FadeInAllAsync(token).Forget();
+            }
 
             if (_loopClip == null) return;
 
-            _videoPlayer.Stop();
-            await UniTask.Yield(token);
-
             _videoPlayer.source = VideoSource.VideoClip;
             _videoPlayer.clip = _loopClip;
-            _videoPlayer.isLooping = true;
+            _videoPlayer.isLooping = false;
             _videoPlayer.Prepare();
             await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
+
+            // loopPointReached로 수동 재시작 — isLooping=true는 비기준 H.264에서 중간에 멈추는 Unity 버그가 있음
+            _videoPlayer.loopPointReached += OnLoopEnd;
             _videoPlayer.Play();
         }
         catch (OperationCanceledException) { }
+    }
+
+    private void OnLoopEnd(VideoPlayer vp)
+    {
+        vp.time = 0;
+        vp.Play();
     }
 
     private static async UniTask WaitForVideoEndAsync(VideoPlayer player, CancellationToken token)

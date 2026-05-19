@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: StatusEffect_Fire
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PlayerStatusEffectSO
   effectType: 2
-  duration: 3
+  duration: 2
   slowScale: 0.4
   _effectPrefab: {fileID: 1579383094300634310, guid: 0ee1e50150b2a4641be2b72c6588eccb,
     type: 3}
-  _effectScale: 0.2
+  _effectScale: 1
