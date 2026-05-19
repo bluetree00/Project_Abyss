@@ -9670,6 +9670,7 @@ RectTransform:
   - {fileID: 7496213102518187640}
   - {fileID: 3110162938134470068}
   - {fileID: 9190774615689102025}
+  - {fileID: 5552343440067149677}
   m_Father: {fileID: 5096365001350788271}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -9693,6 +9694,7 @@ MonoBehaviour:
   editView: {fileID: 2413985062220411027}
   stagingArea: {fileID: 3729087541754386040}
   itemInfoPanel: {fileID: 5878817386586282700}
+  boardContainer: {fileID: 5552343440067149677}
   confirmButton: {fileID: 9090130441988981929}
   confirmDialog: {fileID: 7896873417378437300}
   confirmDialogKeepBtn: {fileID: 6928260215804727258}
@@ -18251,6 +18253,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a65366a2891d4e4e919c62c7c3c1335, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EscKeyListener
+--- !u!1 &7578177812672986676
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5552343440067149677}
+  m_Layer: 0
+  m_Name: BoardContainer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &5552343440067149677
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7578177812672986676}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2809443642725612036}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &7582892939946048283
 GameObject:
   m_ObjectHideFlags: 0

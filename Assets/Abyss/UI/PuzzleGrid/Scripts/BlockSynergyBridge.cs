@@ -9,9 +9,9 @@ using TMPro;
 /// GameScene에 배치하여 사용.
 ///
 /// 역할:
-/// 1. Panel_Grid에 Puzzle.prefab을 동적 로드하여 BoardManager 확보
+/// 1. UI_GridPanel.BoardContainer(DDOL 계층 직속 자식)에 Puzzle.prefab을 동적 스폰하여 BoardManager 확보
 /// 2. BlockDataManager에서 Grid 데이터 → GridAssetData → BoardManager에 등록
-/// 3. SelectionRoot에 6개 썸네일 생성 → 클릭 시 확대 뷰 전환
+/// 3. SelectionRoot에 썸네일 생성 → 클릭 시 확대 뷰 전환
 /// 4. 아이템 획득 시 shape_id → ShapeData → BoardManager에 Shape 등록
 /// 5. BoardManager.OnGridFilled 구독 → 시너지 효과 PlayerRuntimeStats에 적용
 /// </summary>
@@ -33,7 +33,7 @@ public class BlockSynergyBridge : MonoBehaviour
     [Header("Puzzle 프리팹 (직접 참조)")]
     [SerializeField] private GameObject puzzlePrefab;
 
-    [Header("수동 참조 (없으면 Panel_Grid에서 동적 생성)")]
+    [Header("수동 참조 (없으면 UI_GridPanel.BoardContainer에 동적 스폰)")]
     [SerializeField] private BoardManager boardManager;
 
     [Header("썸네일 폰트")]
@@ -54,7 +54,6 @@ public class BlockSynergyBridge : MonoBehaviour
     private readonly HashSet<string> _appliedGridIds = new();
     private GameObject _puzzleInstance;
     private bool _initialized;
-    private Transform _panelGridCached;
 
     private void Awake()
     {
@@ -80,7 +79,7 @@ public class BlockSynergyBridge : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    // ── 초기화: Panel_Grid에 Puzzle UI 생성 + 서버 Grid 등록 ──
+    // ── 초기화: UI_GridPanel.BoardContainer에 Puzzle UI 생성 + 서버 Grid 등록 ──
 
     /// <summary>
     /// BlockDataManager에서 모든 Grid 데이터를 읽어 BoardManager에 등록한다.
@@ -97,58 +96,47 @@ public class BlockSynergyBridge : MonoBehaviour
             return;
         }
 
-        // BoardManager 자동 탐색 (이미 내장된 Puzzle 프리팹에서)
-        if (boardManager == null)
+        // boardManager가 Inspector에서 직접 할당된 경우 바로 등록
+        if (boardManager != null)
         {
-            boardManager = GetComponentInChildren<BoardManager>(true);
-        }
+            boardManager.OnGridFilled -= HandleGridFilled;
+            boardManager.OnGridFilled += HandleGridFilled;
+            boardManager.OnBackToSelection -= RefreshAllThumbnails;
+            boardManager.OnBackToSelection += RefreshAllThumbnails;
+            boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
+            boardManager.OnGridSessionActivated += HandleGridSessionActivated;
 
-        // 그래도 없으면 Panel_Grid에 Puzzle.prefab 동적 로드
-        if (boardManager == null)
-        {
-            SpawnPuzzleAndInitAsync().Forget();
+            RegisterAllGrids(blockData);
             return;
         }
 
-        // Puzzle 루트 RectTransform 보정 (Canvas 제거 후 scale 0 방지)
-        EnsurePuzzleRectTransform();
-
-        // BoardManager.Awake 강제 실행 (Panel_Grid 비활성 시 Awake 미실행 방지)
-        EnsureBoardManagerAwake();
-
-        boardManager.OnGridFilled -= HandleGridFilled;
-        boardManager.OnGridFilled += HandleGridFilled;
-        boardManager.OnBackToSelection -= RefreshAllThumbnails;
-        boardManager.OnBackToSelection += RefreshAllThumbnails;
-        boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
-        boardManager.OnGridSessionActivated += HandleGridSessionActivated;
-
-        RegisterAllGrids(blockData);
+        // UI_GridPanel.BoardContainer에 puzzlePrefab을 동적 스폰
+        SpawnPuzzleAndInitAsync().Forget();
     }
 
     private async UniTaskVoid SpawnPuzzleAndInitAsync()
     {
-        // Panel_Grid 찾기 (HudView 하위, 비활성 포함)
-        var panelGrid = FindPanelGrid();
-        if (panelGrid == null)
-        {
-            Debug.LogWarning("[BlockSynergyBridge] Panel_Grid를 찾을 수 없음");
-            return;
-        }
-
         if (puzzlePrefab == null)
         {
             Debug.LogWarning("[BlockSynergyBridge] puzzlePrefab이 할당되지 않음");
             return;
         }
 
-        // Panel_Grid를 일시 활성화 (Instantiate + Start() 실행 보장)
-        bool wasActive = panelGrid.gameObject.activeSelf;
-        if (!wasActive) panelGrid.gameObject.SetActive(true);
+        // UI_GridPanel.boardContainer(DDOL 계층, UI_GridPanel 직속 자식)에 직접 스폰
+        var container = UI_GridPanel.Instance?.BoardContainer;
+        if (container == null)
+        {
+            Debug.LogWarning("[BlockSynergyBridge] UI_GridPanel.BoardContainer를 찾을 수 없음");
+            return;
+        }
 
-        _puzzleInstance = Instantiate(puzzlePrefab, panelGrid);
+        // UI_GridPanel이 비활성이면 일시 활성화 (Awake/Start 보장)
+        var uiPanel = UI_GridPanel.Instance.gameObject;
+        bool wasActive = uiPanel.activeSelf;
+        if (!wasActive) uiPanel.SetActive(true);
 
-        // RectTransform 풀 스트레치
+        _puzzleInstance = Instantiate(puzzlePrefab, container);
+
         var rt = _puzzleInstance.GetComponent<RectTransform>();
         if (rt != null)
         {
@@ -159,12 +147,11 @@ public class BlockSynergyBridge : MonoBehaviour
             rt.localScale = Vector3.one;
         }
 
-        // BoardManager 참조 확보
         boardManager = _puzzleInstance.GetComponentInChildren<BoardManager>(true);
         if (boardManager == null)
         {
             Debug.LogError("[BlockSynergyBridge] Puzzle 프리팹에 BoardManager 없음");
-            if (!wasActive) panelGrid.gameObject.SetActive(false);
+            if (!wasActive) uiPanel.SetActive(false);
             return;
         }
 
@@ -177,10 +164,9 @@ public class BlockSynergyBridge : MonoBehaviour
         if (blockData != null && blockData.IsInitialized)
             RegisterAllGrids(blockData);
 
-        // 원래 비활성이었으면 다시 비활성 (Tab키로 열 때 활성화)
-        if (!wasActive) panelGrid.gameObject.SetActive(false);
+        if (!wasActive) uiPanel.SetActive(false);
 
-        Debug.Log("[BlockSynergyBridge] Puzzle UI 생성 + 서버 Grid 등록 완료");
+        Debug.Log("[BlockSynergyBridge] Puzzle UI 생성 완료 (UI_GridPanel.BoardContainer)");
     }
 
     private void RegisterAllGrids(BlockDataManager blockData)
@@ -547,12 +533,6 @@ public class BlockSynergyBridge : MonoBehaviour
         return thumbnail;
     }
 
-    private Transform FindPanelGrid()
-    {
-        // 자신(@HUD)의 하위에서 Panel_Grid 검색
-        return FindChildRecursive(transform, "Panel_Grid");
-    }
-
     private void HandleGridSessionActivated(Grid gridInstance) { }
 
     /// <summary>
@@ -743,26 +723,6 @@ public class BlockSynergyBridge : MonoBehaviour
     public IReadOnlyDictionary<string, GridAssetData> GetRegisteredGrids()
         => _registeredGrids;
 
-    /// <summary>편집 뷰 진입 시 Panel_Grid를 활성화한다. UI_GridPanel에서 호출.</summary>
-    public void ActivatePanelGrid()
-    {
-        var pg = GetOrFindPanelGrid();
-        if (pg != null) pg.gameObject.SetActive(true);
-    }
-
-    /// <summary>편집 뷰 종료 시 Panel_Grid를 비활성화한다. UI_GridPanel에서 호출.</summary>
-    public void DeactivatePanelGrid()
-    {
-        var pg = GetOrFindPanelGrid();
-        if (pg != null) pg.gameObject.SetActive(false);
-    }
-
-    private Transform GetOrFindPanelGrid()
-    {
-        if (_panelGridCached != null) return _panelGridCached;
-        _panelGridCached = FindPanelGrid();
-        return _panelGridCached;
-    }
 
     // ── 변환 유틸 ──
 
@@ -788,45 +748,6 @@ public class BlockSynergyBridge : MonoBehaviour
             visual = new GridVisualData { squareGap = GRID_CELL_SIZE, squareScale = 0.9f },
             spawnableShapes = System.Array.Empty<ShapeData>(),
         };
-    }
-
-    private void EnsureBoardManagerAwake()
-    {
-        if (boardManager == null) return;
-
-        // Panel_Grid이 비활성이면 BoardManager.Awake가 안 돌았을 수 있음
-        // 임시 활성화 → Awake 트리거 → 복원
-        if (!boardManager.gameObject.activeInHierarchy)
-        {
-            var panelGrid = FindPanelGrid();
-            if (panelGrid != null)
-            {
-                bool wasActive = panelGrid.gameObject.activeSelf;
-                panelGrid.gameObject.SetActive(true);
-                // Awake/Start가 즉시 실행됨
-                if (!wasActive)
-                    panelGrid.gameObject.SetActive(false);
-                // Awake 트리거 완료
-            }
-        }
-    }
-
-    private void EnsurePuzzleRectTransform()
-    {
-        var gameplayRoot = boardManager.transform.parent;
-        var puzzleRoot = gameplayRoot?.parent;
-        var panelGrid = puzzleRoot?.parent;
-
-        // Panel_Grid, Puzzle, SelectionRoot만 stretch-fill (컨테이너 역할)
-        StretchFill(panelGrid);
-        StretchFill(puzzleRoot);
-
-        // SelectionRoot만 stretch (GameplayRoot와 자식은 원래 레이아웃 유지)
-        if (puzzleRoot != null)
-        {
-            var selectionRoot = boardManager.selectionRoot?.GetComponent<RectTransform>();
-            StretchFill(selectionRoot);
-        }
     }
 
     private static void StretchFill(Transform t)
