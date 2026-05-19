@@ -118,7 +118,7 @@ public class StageNodeGenerator : MonoBehaviour
 
         if (chapterRegistry != null)
         {
-            var data = chapterRegistry.Get(chapter);
+            var data = chapterRegistry.GetData(chapter);
             if (data != null)
             {
                 middleLayers = data.middleLayers;

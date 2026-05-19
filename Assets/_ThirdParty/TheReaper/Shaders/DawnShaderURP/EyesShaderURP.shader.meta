@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 0198d56d0ceb5e944b0525319c272d41
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Shaders/DawnShaderURP/EyesShaderURP.shader
+  uploadId: 467556

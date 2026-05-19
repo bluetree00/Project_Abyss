@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 26f59cfb530a55f4ba0164c041ca4ffa
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Shaders/DawnShader/HairShaderV2.shader
+  uploadId: 467556

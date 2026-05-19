@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c6710fc4925049b489716304e8c8a7d9
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Shaders/DawnShaderURP/ClothingShaderURP.shader
+  uploadId: 467556

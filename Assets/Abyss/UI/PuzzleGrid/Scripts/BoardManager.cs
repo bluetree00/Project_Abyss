@@ -473,9 +473,9 @@ public class BoardManager : MonoBehaviour
     }
 
     /// <summary>Shape SO로 공용 풀에 Shape 인스턴스를 생성한다. 활성 그리드 없어도 동작.</summary>
-    public void SpawnSharedShape(ShapeAssetSO asset)
+    public Shape SpawnSharedShape(ShapeAssetSO asset)
     {
-        if (shapePrefab == null || asset == null) return;
+        if (shapePrefab == null || asset == null) return null;
 
         var shape = Instantiate(shapePrefab, cacheRoot);
         shape.ApplyAsset(asset);
@@ -491,6 +491,19 @@ public class BoardManager : MonoBehaviour
             PlaceSharedShapeToSlot(shape);
         else
             shape.gameObject.SetActive(false);
+
+        return shape;
+    }
+
+    /// <summary>공용 풀에서 Shape를 제거하고 파괴한다. 보관함 아이템 폐기 시 호출.</summary>
+    public void RemoveSharedShape(Shape shape)
+    {
+        if (shape == null) return;
+        _sharedShapes.Remove(shape);
+        _sharedShapeSlotY.Remove(shape);
+        _globalPlacements.Remove(shape);
+        Destroy(shape.gameObject);
+        ReflowSlots();
     }
 
     // ── 내부 구현 ─────────────────────────────────────────────────────

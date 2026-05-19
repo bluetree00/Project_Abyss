@@ -8,27 +8,45 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "ChapterRegistry", menuName = "Stage/Chapter Registry")]
 public class ChapterRegistry : ScriptableObject
 {
-    [SerializeField] private List<ChapterDataSO> chapters = new();
+    [Header("챕터 기본 데이터 (테마·난이도·사운드)")]
+    [SerializeField] private List<ChapterDataSO>   chapters = new();
 
-    private Dictionary<ChapterId, ChapterDataSO> _lookup;
+    [Header("챕터 지형 레이아웃 (12방 배치·배리어)")]
+    [SerializeField] private List<ChapterLayoutSO> layouts  = new();
 
-    public ChapterDataSO Get(ChapterId id)
+    private Dictionary<ChapterId, ChapterDataSO>   _dataLookup;
+    private Dictionary<ChapterId, ChapterLayoutSO> _layoutLookup;
+
+    // ── ChapterDataSO 조회 ─────────────────────
+    public ChapterDataSO GetData(ChapterId id)
     {
-        if (_lookup == null) BuildLookup();
-        return _lookup.TryGetValue(id, out var data) ? data : null;
+        if (_dataLookup == null) BuildLookups();
+        return _dataLookup.TryGetValue(id, out var v) ? v : null;
     }
 
-    public IReadOnlyList<ChapterDataSO> All => chapters;
-
-    private void BuildLookup()
+    // ── ChapterLayoutSO 조회 ───────────────────
+    public ChapterLayoutSO GetLayout(ChapterId id)
     {
-        _lookup = new Dictionary<ChapterId, ChapterDataSO>();
+        if (_layoutLookup == null) BuildLookups();
+        return _layoutLookup.TryGetValue(id, out var v) ? v : null;
+    }
+
+    public IReadOnlyList<ChapterDataSO>   AllData    => chapters;
+    public IReadOnlyList<ChapterLayoutSO> AllLayouts => layouts;
+
+    private void BuildLookups()
+    {
+        _dataLookup   = new Dictionary<ChapterId, ChapterDataSO>();
+        _layoutLookup = new Dictionary<ChapterId, ChapterLayoutSO>();
+
         foreach (var ch in chapters)
-        {
-            if (ch != null && !_lookup.ContainsKey(ch.chapterId))
-                _lookup.Add(ch.chapterId, ch);
-        }
+            if (ch != null && !_dataLookup.ContainsKey(ch.chapterId))
+                _dataLookup.Add(ch.chapterId, ch);
+
+        foreach (var lay in layouts)
+            if (lay != null && !_layoutLookup.ContainsKey(lay.ChapterId))
+                _layoutLookup.Add(lay.ChapterId, lay);
     }
 
-    private void OnEnable() => _lookup = null;
+    private void OnEnable() { _dataLookup = null; _layoutLookup = null; }
 }

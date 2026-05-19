@@ -28,6 +28,21 @@ public class GridManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>Shape가 그리드에 배치됐을 때. 연결된 RuntimeItemData를 인수로 전달.</summary>
+    public event System.Action<RuntimeItemData> OnItemPlaced;
+
+    /// <summary>Shape가 그리드에서 제거됐을 때. 연결된 RuntimeItemData를 인수로 전달.</summary>
+    public event System.Action<RuntimeItemData> OnItemRemoved;
+
+    /// <summary>배치된 Shape가 클릭(선택)됐을 때. Shape.OnPointerClick이 발생시킨다.</summary>
+    public event System.Action<RuntimeItemData> OnItemSelected;
+
+    public void NotifyItemSelected(RuntimeItemData item)
+    {
+        if (item != null)
+            OnItemSelected?.Invoke(item);
+    }
+
     public void SetActiveGrid(Grid active)
     {
         grid = active;
@@ -162,6 +177,10 @@ public class GridManager : MonoBehaviour
 
         shape.SetOccupiedSquares(candidateSquares);
         CheckAllPlaceableFilled();
+
+        if (shape.ItemData != null)
+            OnItemPlaced?.Invoke(shape.ItemData);
+
         return true;
     }
 
@@ -227,5 +246,8 @@ public class GridManager : MonoBehaviour
             sq.SetHighlight(false);
         }
         shape.SetOccupiedSquares(new List<GridSquare>());
+
+        if (shape.ItemData != null)
+            OnItemRemoved?.Invoke(shape.ItemData);
     }
 }

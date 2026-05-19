@@ -118,7 +118,7 @@ public class ClearRewardTrigger : MonoBehaviour
         var acquirePopup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ClearReward>();
         if (acquirePopup == null)
         {
-            GiveAllRewards();
+            await GiveAllRewardsWithPopupAsync(ct);
         }
         else
         {
@@ -131,7 +131,7 @@ public class ClearRewardTrigger : MonoBehaviour
                 Destroy(gameObject);
                 return;
             }
-            GiveAllRewards();
+            await GiveAllRewardsWithPopupAsync(ct);
         }
 
         // 2단계: 아이템 확인 화면 (코드 생성 — Addressable 불필요)
@@ -162,15 +162,60 @@ public class ClearRewardTrigger : MonoBehaviour
         Destroy(gameObject);
     }
 
-    private void GiveAllRewards()
+    /// <summary>
+    /// 각 보상 아이템을 UI_ItemAcquisitionPopup으로 순서대로 표시.
+    /// [그리드 열기] → 보관함 추가, [거부] → 폐기.
+    /// Popup 로드 실패 시 자동으로 보관함에 추가.
+    /// </summary>
+    private async UniTask GiveAllRewardsWithPopupAsync(System.Threading.CancellationToken ct)
     {
         if (_run?.ItemInventory == null || _rewards == null) return;
+
         foreach (var (data, _) in _rewards)
         {
             if (data == null) continue;
-            _run.ItemInventory.AddItem(data);
+
             _run.EffectManager?.OnItemPickup(data);
-            Debug.Log($"[ClearRewardTrigger] 아이템 지급: {data.displayName}");
+
+            // 팝업 표시 — 실패하면 자동 추가
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ItemAcquisitionPopup>();
+            if (popup == null)
+            {
+                _run.ItemInventory.AddToStaging(data);
+                Debug.Log($"[ClearRewardTrigger] 팝업 로드 실패 — 자동 추가: {data.displayName}");
+                continue;
+            }
+
+            popup.Setup(data, _run.ItemInventory);
+
+            // 팝업이 닫힐 때까지 대기 (버튼 클릭 시 팝업이 스스로 ClosePopupUI 호출)
+            try
+            {
+                await UniTask.WaitUntil(() => popup == null || !popup.gameObject.activeSelf,
+                    cancellationToken: ct);
+            }
+            catch (System.OperationCanceledException)
+            {
+                return;
+            }
+
+            Debug.Log($"[ClearRewardTrigger] 아이템 처리 완료: {data.displayName}");
+        }
+
+        // [그리드 열기]를 눌렀으면 그리드 패널이 열려 있음 → 닫힐 때까지 대기
+        // (그 전에 ShowResultScreen을 호출하면 sortingOrder=20 화면이 그리드를 덮어버림)
+        try
+        {
+            if (UI_GridPanel.Instance != null && UI_GridPanel.Instance.gameObject.activeSelf)
+            {
+                await UniTask.WaitUntil(
+                    () => UI_GridPanel.Instance == null || !UI_GridPanel.Instance.gameObject.activeSelf,
+                    cancellationToken: ct);
+            }
+        }
+        catch (System.OperationCanceledException)
+        {
+            return;
         }
     }
 

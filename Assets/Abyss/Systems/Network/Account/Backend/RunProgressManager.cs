@@ -187,7 +187,7 @@ public class RunProgressManager : MonoBehaviour
         var ps = session.PlayerState;
 
         var itemWrapper = new ItemListWrapper();
-        itemWrapper.items.AddRange(session.ItemInventory.Items);
+        itemWrapper.items.AddRange(session.ItemInventory.PlacedItems);
 
         var synWrapper = new SynergyListWrapper();
         synWrapper.items.AddRange(session.AppliedSynergies);
@@ -228,7 +228,7 @@ public class RunProgressManager : MonoBehaviour
             runGold          = ps?.TempGold ?? 0,
             retryCount       = retryCount,
             progressPercent  = progress,
-            itemCount        = session.ItemInventory.Items.Count,
+            itemCount        = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
             synergyCount     = session.AppliedSynergies.Count,
             roomClearCount   = session.RoomClearRecords.Count,
             characterKey     = charKey,
@@ -246,9 +246,9 @@ public class RunProgressManager : MonoBehaviour
 
     private static int CalcProgressPercent(ChapterId chapter)
     {
-        // 챕터당 20% (Chapter1=0%, Chapter2=20%, ..., Chapter5=80%)
-        // 런 클리어(챕터5 보스 격파)=100%는 런 종료 시점에 별도 기록 가능
-        return Mathf.Clamp(((int)chapter - 1) * 20, 0, 100);
+        // 챕터당 25% (Chapter1=0%, Chapter2=25%, Chapter3=50%, Chapter4=75%)
+        // 런 클리어(챕터4 보스 격파)=100%는 런 종료 시점에 별도 기록 가능
+        return Mathf.Clamp(((int)chapter - 1) * 25, 0, 100);
     }
 
     private static string ExtractWeaponSOKey(GameRunSession session, int slot)
