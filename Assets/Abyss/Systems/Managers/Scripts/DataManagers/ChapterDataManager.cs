@@ -129,6 +129,7 @@ public class ChapterDataManager
                 monster_pool_tag    = row.TryGetString("monster_pool_tag"),
                 gold_multiplier     = row.TryGetFloat("gold_multiplier"),
                 item_drop_multiplier = row.TryGetFloat("item_drop_multiplier"),
+                zone_layout_key     = row.TryGetString("zone_layout_key"),
                 total_layers        = row.TryGetInt("total_layers"),
                 peak_layer          = row.TryGetInt("peak_layer"),
                 stat_version        = row.TryGetInt("stat_version"),

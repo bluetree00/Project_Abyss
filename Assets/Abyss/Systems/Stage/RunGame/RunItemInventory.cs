@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 런 중 획득한 아이템을 추적.
@@ -9,6 +10,8 @@ using System.Collections.Generic;
 /// </summary>
 public sealed class RunItemInventory
 {
+    public const int MaxStagingCapacity = 5;
+
     private readonly List<RuntimeItemData> _placedItems  = new();
     private readonly List<RuntimeItemData> _stagingItems = new();
 
@@ -18,8 +21,9 @@ public sealed class RunItemInventory
     /// <summary>보관함(임시). 재배치 중이거나 아직 배치되지 않은 아이템.</summary>
     public IReadOnlyList<RuntimeItemData> StagingItems => _stagingItems;
 
-    public int PlacedCount  => _placedItems.Count;
-    public int StagingCount => _stagingItems.Count;
+    public int  PlacedCount   => _placedItems.Count;
+    public int  StagingCount  => _stagingItems.Count;
+    public bool IsStagingFull => _stagingItems.Count >= MaxStagingCapacity;
 
     /// <summary>그리드 배치 기준 변경 시 발생 — ItemEffectManager.Rebuild 트리거.</summary>
     public event System.Action OnPlacedChanged;
@@ -67,13 +71,16 @@ public sealed class RunItemInventory
     /// <summary>
     /// 아이템 획득 시 보관함에 추가.
     /// 효과는 그리드 배치(PlaceItem) 후 적용됨.
+    /// maxStack 체크는 배치(PlaceItem) 시에만 수행 — 보관함은 임시 보관 장소이므로 중복 허용.
     /// </summary>
     public bool AddToStaging(RuntimeItemData item)
     {
         if (item == null) return false;
-
-        int maxStack = ResolveMaxStack(item);
-        if (CountItem(item.itemId) >= maxStack) return false;
+        if (_stagingItems.Count >= MaxStagingCapacity)
+        {
+            Debug.LogWarning($"[RunItemInventory] 보관함 가득참 ({MaxStagingCapacity}개) — 추가 불가: {item.itemId}");
+            return false;
+        }
 
         _stagingItems.Add(item);
         QuestEvents.ReportItemCollect(item.itemId ?? "Unknown");

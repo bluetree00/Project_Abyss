@@ -66,6 +66,15 @@ public sealed class UIRootBootstrapper : MonoBehaviour
         _boundRun = null;
     }
 
+    private void Update()
+    {
+        if (!Input.GetKeyDown(KeyCode.Tab)) return;
+        var panel = UI_GridPanel.Instance;
+        if (panel == null) return;
+        if (panel.IsOpen) panel.Close();
+        else              panel.Open();
+    }
+
     private void OnDestroy()
     {
         if (ReferenceEquals(Instance, this))

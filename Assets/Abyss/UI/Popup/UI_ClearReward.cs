@@ -31,7 +31,7 @@ public class UI_ClearReward : UI_Popup
         return _confirmTcs.Task;
     }
 
-    private void OnDestroy() => _confirmTcs?.TrySetResult();
+    private void OnDestroy() => _confirmTcs?.TrySetCanceled();
 
     private void OnConfirmClicked()
     {

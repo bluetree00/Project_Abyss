@@ -52,8 +52,31 @@ public class StartRoomGate : MonoBehaviour
 
     private async UniTaskVoid ExitStartRoomAsync()
     {
+        var bootstrapper = GameRunBootstrapper.Instance;
+
+        // zone-layout 모드: Zone 0 클리어 후 첫 번째 인접 존 선택·스폰 → 인게임 전환
+        if (bootstrapper != null && bootstrapper.IsZoneLayoutMode)
+        {
+            var runSession = bootstrapper.Run;
+            var zoneProgression = runSession?.ZoneProgression;
+            if (zoneProgression != null)
+            {
+                var ct = bootstrapper.GetCancellationTokenOnDestroy();
+                await zoneProgression.ShowZoneSelectionAsync(0, ct);
+            }
+            else
+            {
+                // ZoneProgressionService 미초기화 시 기존 전체 스폰 폴백
+                await bootstrapper.SpawnRemainingWorldZonesAsync();
+            }
+            UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+            Debug.Log("[StartRoomGate] zone-layout 모드 — 존 선택 완료, 탐험 시작");
+            return;
+        }
+
+        // 기존 StageMap 전환 흐름
         var rp      = RunProgressManager.Instance;
-        var session = GameRunBootstrapper.Instance?.Run;
+        var session = bootstrapper?.Run;
 
         if (rp != null && session != null && session.IsRunning)
         {

@@ -82,6 +82,15 @@ public sealed class GameRunSession
     public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
 
+    /// <summary>존 단위 진행 서비스. startWithZoneLayout 모드에서만 초기화된다.</summary>
+    public ZoneProgressionService ZoneProgression { get; private set; }
+
+    public void InitZoneProgression(string layoutKey, Vector3 zone0WorldCenter, float blockCellSize)
+    {
+        ZoneProgression = new ZoneProgressionService(layoutKey, zone0WorldCenter, blockCellSize);
+        Debug.Log($"[GameRunSession] ZoneProgressionService 초기화 완료 ({layoutKey})");
+    }
+
     // ── 시너지 이력 (씬 전환에도 생존) ──
     private readonly List<SynergyRecord> _appliedSynergies = new();
     public IReadOnlyList<SynergyRecord> AppliedSynergies => _appliedSynergies;
@@ -465,7 +474,7 @@ public sealed class GameRunSession
         RunState.SpecialRoom => HUDIds.Mode.Combat,
         RunState.BossRoom    => HUDIds.Mode.Boss,
         RunState.Standby     => HUDIds.Mode.Combat,
-        RunState.GridSynergy => HUDIds.Mode.Puzzle,
+        RunState.GridSynergy => HUDIds.Mode.Combat,
         _                    => HUDIds.Mode.None,
     };
 

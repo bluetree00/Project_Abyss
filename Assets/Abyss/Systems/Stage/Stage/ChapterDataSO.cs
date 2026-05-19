@@ -49,6 +49,10 @@ public class ChapterDataSO : ScriptableObject
     [Tooltip("아이템 드롭 확률 배수")]
     public float itemDropMultiplier = 1f;
 
+    [Header("존 레이아웃")]
+    [Tooltip("뒤끝 CDN 차트 키. 이 챕터의 전체 존 배치 데이터를 담은 테이블 (예: chapter1_zone_layout).")]
+    public string zoneLayoutKey;
+
     [Header("맵 노드 구성")]
     [Tooltip("중간 층 수 (Start/Boss 제외). 예: 5면 총 7층")]
     public int middleLayers = 5;
@@ -74,6 +78,7 @@ public class ChapterDataSO : ScriptableObject
             monsterPoolTag   = monsterPoolTag,
             goldMultiplier   = goldMultiplier,
             itemDropMultiplier = itemDropMultiplier,
+            zoneLayoutKey    = zoneLayoutKey,
             middleLayers     = middleLayers,
             peakLayer        = peakLayer,
         };
@@ -113,6 +118,9 @@ public class ChapterRuntimeData
     public float goldMultiplier = 1f;
     public float itemDropMultiplier = 1f;
 
+    // 존 레이아웃
+    public string zoneLayoutKey;
+
     // 맵 노드 구성
     public int middleLayers = 5;
     public int peakLayer = 3;
@@ -131,6 +139,7 @@ public class ChapterRuntimeData
         if (server.monster_count_scale > 0) monsterCountScale = server.monster_count_scale;
         if (server.gold_multiplier > 0) goldMultiplier = server.gold_multiplier;
         if (server.item_drop_multiplier > 0) itemDropMultiplier = server.item_drop_multiplier;
+        if (!string.IsNullOrEmpty(server.zone_layout_key)) zoneLayoutKey = server.zone_layout_key;
         if (server.total_layers > 0) middleLayers = server.total_layers - 2;
         if (server.peak_layer > 0) peakLayer = server.peak_layer;
     }
@@ -151,6 +160,9 @@ public class ChapterServerEntry
     public string monster_pool_tag;
     public float gold_multiplier;
     public float item_drop_multiplier;
+
+    // 존 레이아웃
+    public string zone_layout_key;
 
     // 맵 노드 구성
     public int total_layers;

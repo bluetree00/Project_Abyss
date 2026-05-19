@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -26,9 +27,11 @@ public class TestRewardSpawner : MonoBehaviour
 
         try
         {
-            // ItemInventory가 초기화될 때까지 대기 (GameRunBootstrapper.BindPlayer 이후)
+            // ItemSODatabase 등록 완료까지 대기 (InitItemDataAsync 이후)
+            // ItemInventory는 property initializer라 항상 non-null — 레지스트리 등록 여부로 판별
             await UniTask.WaitUntil(
-                () => GameRunBootstrapper.Instance?.Run?.ItemInventory != null,
+                () => GameRunBootstrapper.Instance?.Run != null
+                   && ItemSORegistry.All.Any(),
                 cancellationToken: ct);
 
             await UniTask.Delay(TimeSpan.FromSeconds(spawnDelay), cancellationToken: ct);
