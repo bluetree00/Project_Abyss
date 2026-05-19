@@ -32,6 +32,6 @@ MonoBehaviour:
   element: 0
   skillQ: {fileID: 11400000, guid: 63acff9af2f34504ab816b94c6d63ebe, type: 2}
   skillE: {fileID: 11400000, guid: f544d79b23e278242b1698613421ec83, type: 2}
-  holdThreshold: 4
+  holdThreshold: 1.2
   promoteMode: 0
   chargeStages: 2

@@ -15,6 +15,16 @@ MonoBehaviour:
   m_GroupName: WeaponAnimation
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
+  - m_GUID: 3fa5704c6cebc174da2ffca73404fc80
+    m_Address: GreatswordGuardLoop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3926aae8fd49d004ab3e4ff77bf39feb
+    m_Address: GreatswordGuardAccept
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 14256027a4ac4e13be1ec0c8dbac1cb6
     m_Address: BowESkill_01
     m_ReadOnly: 0
@@ -22,6 +32,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 24b7b5caf37a46ef9a39bc8e30415847
     m_Address: BowQSkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4f6bfedccb7aeda4d8a1954468050ea6
+    m_Address: GreatswordESkill
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -40,6 +55,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 841790aa24d3b714a9a34d231d93282d
+    m_Address: GreatswordQSkill
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b80c913343c01f14096d7ce299c388df
+    m_Address: GreatswordAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8decc86bf4985ea42b3005926975955f
     m_Address: GroundLightAttack_03
     m_ReadOnly: 0
@@ -55,6 +80,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 98b40a0f8d28b2541854c6fa4941f7bb
+    m_Address: GreatswordGuardAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a967b6c6732e47e889caede9727da1d8
     m_Address: BowAirAttack_03
     m_ReadOnly: 0
@@ -62,6 +92,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b132447a1ddc45868b1188980a28bcc3
     m_Address: GroundLightBowAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c2a95287b4f93b44bc3a4a3270c0c16
+    m_Address: GreatswordAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -80,33 +115,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fc56cd5ad784484184e9a87a1bc7fd47
-    m_Address: BowQSkill_03
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: def216b09d67fab43b1bd39f7748917d
+  - m_GUID: 9b7d649f82b34544e92cb4f402d0f424
     m_Address: GreatswordAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8db0371537281ae46a56f734712ccdd9
-    m_Address: GreatswordAttack_02
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b3ab8d439420950498be32a805f2bee6
-    m_Address: GreatswordAttack_03
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 841790aa24d3b714a9a34d231d93282d
-    m_Address: GreatswordQSkill
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4f6bfedccb7aeda4d8a1954468050ea6
-    m_Address: GreatswordESkill
+  - m_GUID: fc56cd5ad784484184e9a87a1bc7fd47
+    m_Address: BowQSkill_03
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

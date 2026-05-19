@@ -41,7 +41,7 @@ public sealed class ItemEffectManager
 
         if (_inventory == null) return;
 
-        foreach (var item in _inventory.Items)
+        foreach (var item in _inventory.PlacedItems)
         {
             if (item.effects == null) continue;
 

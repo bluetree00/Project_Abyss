@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1af37bf05dae33a4c8e2a613d8352f2b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 220535
+  packageName: Death Knight 2
+  packageVersion: 1.0
+  assetPath: Assets/DeathKnight2/Materials/Mat_DarkKnight2_Helm_Skin1.mat
+  uploadId: 495628

@@ -8,6 +8,9 @@ using UnityEngine;
 [System.Serializable]
 public class RuntimeItemData
 {
+    // ── 인스턴스 식별 ──
+    public string instanceId = System.Guid.NewGuid().ToString();
+
     // ── 기본 정보 ──
     public string itemId;
     public string displayName;

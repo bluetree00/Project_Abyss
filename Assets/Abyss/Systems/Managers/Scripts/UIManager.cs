@@ -54,8 +54,10 @@ public class UIManager
         Canvas canvas = Util.GetOrAddComponent<Canvas>(go);
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-
         canvas.sortingOrder = sort ? _order++ : 0;
+
+        // overrideSorting=true 시 부모 GraphicRaycaster가 무시되므로 자체 추가
+        Util.GetOrAddComponent<UnityEngine.UI.GraphicRaycaster>(go);
     }
 
     #endregion

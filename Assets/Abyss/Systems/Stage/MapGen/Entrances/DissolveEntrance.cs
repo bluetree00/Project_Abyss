@@ -12,7 +12,7 @@ public sealed class DissolveEntrance : IMapEntrance
     private readonly float _staggerInterval;
     private readonly float _duration;
 
-    public DissolveEntrance(float staggerInterval = 0.06f, float duration = 0.4f)
+    public DissolveEntrance(float staggerInterval = 0.045f, float duration = 0.32f)
     {
         _staggerInterval = staggerInterval;
         _duration        = duration;

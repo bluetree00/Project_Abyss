@@ -20,11 +20,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 68ede0dcc5b1be5499e0c70a760cd797
-    m_Address: TestMeteor
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 76886d098064fa34b949e31d57f32f9a
     m_Address: MageData
     m_ReadOnly: 0

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4b0185f97d74dfd4c8e0aa17e95f2bb5
+timeCreated: 1502451489
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/Animator/Lypsync1.controller
+  uploadId: 467556

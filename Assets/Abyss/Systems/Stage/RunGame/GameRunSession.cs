@@ -58,7 +58,7 @@ public sealed class GameRunSession
 
     private void ResolveActiveTheme()
     {
-        var data = _chapterRegistry != null ? _chapterRegistry.Get(CurrentChapter) : null;
+        var data = _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter) : null;
         ActiveTheme = data != null && !string.IsNullOrEmpty(data.theme) ? data.theme : string.Empty;
         ActiveFieldPrefabKey = data != null ? data.fieldPrefabKey ?? string.Empty : string.Empty;
     }
@@ -153,7 +153,7 @@ public sealed class GameRunSession
     private void SnapshotRoomEntry()
     {
         _snapGold         = PlayerState?.TempGold ?? 0;
-        _snapItemCount    = ItemInventory.Items.Count;
+        _snapItemCount    = ItemInventory.PlacedCount + ItemInventory.StagingCount;
         _snapSynergyCount = _appliedSynergies.Count;
     }
 
@@ -163,7 +163,7 @@ public sealed class GameRunSession
         if (!IsRunning) return;
 
         int goldAfter  = PlayerState?.TempGold ?? 0;
-        int itemCount  = ItemInventory.Items.Count;
+        int itemCount  = ItemInventory.PlacedCount + ItemInventory.StagingCount;
         int synCount   = _appliedSynergies.Count;
 
         _roomClearRecords.Add(new RoomClearRecord
@@ -299,7 +299,7 @@ public sealed class GameRunSession
             {
                 var itemWrapper = JsonUtility.FromJson<ItemListWrapper>(save.itemsJson);
                 if (itemWrapper?.items != null)
-                    ItemInventory.RestoreItems(itemWrapper.items);
+                    ItemInventory.RestorePlacedItems(itemWrapper.items);
             }
 
             if (!string.IsNullOrEmpty(save.synergiesJson))
@@ -409,7 +409,7 @@ public sealed class GameRunSession
     private void ClearRunReferences()
     {
         UnsubscribePlayerStateSource();
-        ItemInventory.OnInventoryChanged -= RebuildItemEffects;
+        ItemInventory.OnPlacedChanged -= RebuildItemEffects;
         EffectManager.Cleanup();
         BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
         BuffHandler.ClearAll();
@@ -541,7 +541,7 @@ public sealed class GameRunSession
         if (!IsRunning) return false;
 
         var next = CurrentChapter + 1;
-        if (next > ChapterId.Chapter5) return false;
+        if (next > ChapterId.Chapter4) return false;
 
         CurrentChapter = next;
         ResolveActiveTheme();
@@ -599,16 +599,16 @@ public sealed class GameRunSession
         // 인벤토리 ↔ 스탯 연동 (추가/제거 시 자동 재계산)
         if (Player?.RuntimeStats != null)
         {
-            ItemInventory.OnInventoryChanged -= RefreshPlayerItemStats;
-            ItemInventory.OnInventoryChanged += RefreshPlayerItemStats;
+            ItemInventory.OnPlacedChanged -= RefreshPlayerItemStats;
+            ItemInventory.OnPlacedChanged += RefreshPlayerItemStats;
 
             // 방 버프 ↔ 스탯 연동
             BuffHandler.OnBuffsChanged -= RefreshPlayerRoomBuffs;
             BuffHandler.OnBuffsChanged += RefreshPlayerRoomBuffs;
 
             // ItemEffectManager 초기화
-            ItemInventory.OnInventoryChanged -= RebuildItemEffects;
-            ItemInventory.OnInventoryChanged += RebuildItemEffects;
+            ItemInventory.OnPlacedChanged -= RebuildItemEffects;
+            ItemInventory.OnPlacedChanged += RebuildItemEffects;
             EffectManager.Initialize(Player, this, ItemInventory);
 
             // 현재 인벤토리 아이템 보너스 즉시 적용 (씬 전환 후 복원)

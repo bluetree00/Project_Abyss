@@ -29,6 +29,6 @@ public class ItemReward : Reward
             return;
         }
 
-        run.ItemInventory?.AddItem(data);
+        run.ItemInventory?.AddToStaging(data);
     }
 }
