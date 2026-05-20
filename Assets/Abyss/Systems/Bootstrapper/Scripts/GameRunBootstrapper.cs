@@ -51,7 +51,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("스타트 방 무기 픽업 프리팹 배열. WP 타일 발견 순서대로 매핑됨. 각 프리팹에 StartRoomPickup(Weapon) + WeaponSO 설정 필요.")]
     [SerializeField] private GameObject[] weaponPickupPrefabs;
 
-    [Tooltip("스타트 방 탈출 게이트 프리팹. SG 타일 위치에 배치됨. StartRoomGate 컴포넌트 필요.")]
+    [Tooltip("스타트 방 탈출 게이트 프리팹. next_zone_indices 기준 존 출구 엣지에 배치됨. StartRoomGate 컴포넌트 필요.")]
     [SerializeField] private GameObject startGatePrefab;
 
     [Tooltip("스타트 방에서 캐릭터 선택 전 조작할 Wisp 프리팹. 비워두면 playerPrefabKey 폴백.")]
@@ -95,7 +95,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private ChapterRegistry chapterRegistry;
     [Tooltip("모든 존 구조물이 배치될 씬 루트 Transform. null이면 mapRoot 폴백.")]
     [SerializeField] private Transform worldMapRoot;
-    [Tooltip("존 클리어 후 활성화되는 다음 존 선택 게이트 프리팹. SphereCollider + ZoneExitGate 컴포넌트 필요. null이면 미사용.")]
+    [Tooltip("[Deprecated] startGatePrefab이 null일 때 폴백으로 사용. startGatePrefab 설정 시 불필요.")]
     [SerializeField] private GameObject zoneExitGatePrefab;
 
     [Header("Decoration")]
@@ -178,9 +178,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             bridge.InitializeGridsFromServer();
 
         // IsRunning이 true면 StageMap을 거쳐 전투 씬으로 진입한 것 → 전투 시작
+        // zone-layout 이어하기: 마지막 클리어된 존에서 재개하며 출구 게이트 활성화 상태로 복원
         // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → Wisp 모드 (에디터 직접 실행 시 false)
         if (_run != null && _run.IsRunning)
-            await StartCombatAsync();
+        {
+            if (startWithZoneLayout)
+                await ContinueZoneLayoutRunAsync(this.GetCancellationTokenOnDestroy());
+            else
+                await StartCombatAsync();
+        }
         else if (IsInStartRoom)
             await StartRoomAsync();
         else if (Object.FindFirstObjectByType<DebugStageRunPanel>() == null)
@@ -435,7 +441,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     /// <summary>
     /// zone_index=0(Start)를 MapRoomEntry로 변환해 SpawnBlockMapAsync로 빌드.
-    /// CP/WP/SG 타일에서 픽업·게이트 프리팹이 자동 스폰되고, _pendingPlayerSpawnPos가 설정된다.
+    /// CP/WP 타일에서 픽업 프리팹이 자동 스폰되고, _pendingPlayerSpawnPos가 설정된다.
     /// </summary>
     private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct)
     {
@@ -494,9 +500,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 존 진행 서비스 초기화 — 클리어 후 다음 존 선택·지연 스폰을 조율
         _run?.InitZoneProgression(zoneLayoutKey, worldCenter, blockCellSize);
 
-        // Zone 0 출구 게이트 생성 (SpawnZoneByIndexAsync를 거치지 않으므로 직접 호출)
-        if (_run?.ZoneProgression != null && _currentMapGO != null)
-            CreateZoneExitGates(0, startZone, zones, _currentMapGO);
+        // Zone 0 출구에 StartRoomGate 배치 — 로드아웃 준비 완료 시 픽업이 활성화
+        if (_currentMapGO != null)
+            CreateStartRoomGates(startZone, zones, _currentMapGO);
 
         Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. Wisp 예정 위치: {_pendingPlayerSpawnPos}");
     }
@@ -669,6 +675,67 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             : new Vector3(0f, 0f, dZ >= 0 ? halfH : -halfH);
     }
 
+    /// <summary>
+    /// fromZone 엣지에 배치된 게이트가 방 내부(플레이어 접근 방향)를 향하도록 localRotation을 반환.
+    /// 게이트 프리팹의 +Z가 정면이라고 가정.
+    /// </summary>
+    private Quaternion CalcGateRotationTo(ZoneLayoutEntry fromZone, ZoneLayoutEntry toZone)
+    {
+        float dX = toZone.world_center_x - fromZone.world_center_x;
+        float dZ = toZone.world_center_z - fromZone.world_center_z;
+
+        // 방 내부를 향하는 벡터 = 출구 방향의 반대
+        Vector3 inward = Mathf.Abs(dX) >= Mathf.Abs(dZ)
+            ? new Vector3(dX >= 0 ? -1f : 1f, 0f, 0f)
+            : new Vector3(0f, 0f, dZ >= 0 ? -1f : 1f);
+
+        return Quaternion.LookRotation(inward);
+    }
+
+    /// <summary>
+    /// Zone 0 출구 엣지에 StartRoomGate를 배치하고 씬 내 모든 StartRoomPickup에 게이트 레퍼런스를 주입.
+    /// 로드아웃 준비 완료(캐릭터+무기 선택) 시 픽업이 EnableGate()를 호출해 게이트를 활성화한다.
+    /// </summary>
+    /// <summary>
+    /// Zone 0 출구 방향에 StartRoomGate 1개를 배치한다.
+    /// next_zone_indices가 여러 개여도 물리 게이트는 1개만 생성 —
+    /// 실제 진출 존 선택은 트리거 후 ShowZoneSelectionAsync가 UI로 처리한다.
+    /// </summary>
+    private void CreateStartRoomGates(
+        ZoneLayoutEntry startZone,
+        System.Collections.Generic.List<ZoneLayoutEntry> allZones,
+        GameObject zoneGO)
+    {
+        if (startGatePrefab == null || string.IsNullOrEmpty(startZone.next_zone_indices))
+        {
+            Debug.LogWarning("[GameRunBootstrapper] CreateStartRoomGates: startGatePrefab 미할당 또는 next_zone_indices 없음");
+            return;
+        }
+
+        // 첫 번째 유효한 next zone 방향으로만 게이트 1개 배치
+        int primaryToIdx = -1;
+        foreach (var part in startZone.next_zone_indices.Split('|'))
+        {
+            if (int.TryParse(part.Trim(), out int idx)) { primaryToIdx = idx; break; }
+        }
+        if (primaryToIdx < 0) return;
+
+        var toZone = allZones?.Find(z => z.zone_index == primaryToIdx);
+        if (toZone == null) return;
+
+        var gateLocalPos = CalcGateExitPositionTo(startZone, toZone);
+        var gateLocalRot = CalcGateRotationTo(startZone, toZone);
+        var gateGO = Instantiate(startGatePrefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
+        gateGO.transform.localPosition = gateLocalPos;
+        gateGO.transform.localRotation = gateLocalRot;
+        gateGO.name = "StartRoomGate";
+
+        if (gateGO.GetComponent<StartRoomGate>() == null)
+            gateGO.AddComponent<StartRoomGate>();
+
+        Debug.Log($"[GameRunBootstrapper] StartRoomGate 배치 완료 → Zone {primaryToIdx} 방향");
+    }
+
     private void CreateZoneExitGates(int zoneIndex, ZoneLayoutEntry zone,
         System.Collections.Generic.List<ZoneLayoutEntry> allZones, GameObject zoneGO)
     {
@@ -680,20 +747,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (toZone == null) continue;
 
             var gateLocalPos = CalcGateExitPositionTo(zone, toZone);
+            var gateLocalRot = CalcGateRotationTo(zone, toZone);
+            var prefab = startGatePrefab != null ? startGatePrefab : zoneExitGatePrefab;
             GameObject gateGO;
-            if (zoneExitGatePrefab != null)
+            if (prefab != null)
             {
-                gateGO = Object.Instantiate(zoneExitGatePrefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
+                gateGO = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
                 gateGO.transform.localPosition = gateLocalPos;
+                gateGO.transform.localRotation = gateLocalRot;
             }
             else
             {
                 gateGO = new GameObject($"ZoneExitGate_to{toZoneIdx}");
                 gateGO.transform.SetParent(zoneGO.transform, false);
                 gateGO.transform.localPosition = gateLocalPos;
+                gateGO.transform.localRotation = gateLocalRot;
             }
 
-            var gate = gateGO.GetComponent<ZoneExitGate>() ?? gateGO.AddComponent<ZoneExitGate>();
+            var gate = gateGO.GetComponent<StartRoomGate>() ?? gateGO.AddComponent<StartRoomGate>();
             gate.InitGate(zoneIndex, toZoneIdx, toZone.label, _run.ZoneProgression);
             gateGO.SetActive(false);
             _run.ZoneProgression.RegisterExitGate(zoneIndex, toZoneIdx, gate);
@@ -925,8 +996,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return category.Trim().Equals("Start", System.StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>스타트 방 전용 픽업/게이트 오브젝트를 그리드 좌표 기반으로 스폰.
-    /// CP → characterPickupPrefabs[i] (발견 순서), WP → weaponPickupPrefabs[i], SG → startGatePrefab.</summary>
+    /// <summary>스타트 방 전용 픽업 오브젝트를 그리드 좌표 기반으로 스폰.
+    /// CP → characterPickupPrefabs[i] (발견 순서), WP → weaponPickupPrefabs[i].</summary>
     private void SpawnStartRoomObjects(GameObject mapParent, TileType[,] grid, int w, int h)
     {
         var offset = new Vector3((w / 2f - 0.5f) * blockCellSize, 0f, (h / 2f - 0.5f) * blockCellSize);
@@ -959,24 +1030,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             go.name = $"WeaponPickup_{i}";
         }
 
-        // 탈출 게이트
-        var sgCells = MapDataLoader.FindAll(grid, TileType.StartGate);
-        if (sgCells.Count > 0)
-        {
-            if (startGatePrefab != null)
-            {
-                var c = sgCells[0];
-                var pos = new Vector3(c.x * blockCellSize - offset.x, 0f, c.y * blockCellSize - offset.z);
-                var go = Instantiate(startGatePrefab, pos, Quaternion.identity, mapParent.transform);
-                go.name = "StartGate";
-            }
-            else
-            {
-                Debug.LogWarning("[GameRunBootstrapper] SG 타일 발견했지만 startGatePrefab 미할당 — 스킵");
-            }
-        }
-
-        Debug.Log($"[GameRunBootstrapper] 스타트 방 오브젝트 — CP:{cpCells.Count} WP:{wpCells.Count} SG:{sgCells.Count}");
+        Debug.Log($"[GameRunBootstrapper] 스타트 방 오브젝트 — CP:{cpCells.Count} WP:{wpCells.Count}");
     }
 
     /// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
@@ -1600,6 +1654,84 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // Guard: some room/bootstrap flows can override HUD mode after early request.
         run.RequestHudMode(HUDIds.Mode.Combat);
+    }
+
+    /// <summary>
+    /// zone-layout 이어하기 진입. 저장된 존 인덱스의 방을 빌드하고,
+    /// 출구 게이트를 즉시 활성화해 선택지가 남은 상태로 복원한다.
+    /// </summary>
+    private async UniTask ContinueZoneLayoutRunAsync(CancellationToken ct)
+    {
+        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key;
+        if (string.IsNullOrEmpty(zoneLayoutKey))
+            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        if (string.IsNullOrEmpty(zoneLayoutKey))
+        {
+            Debug.LogError("[GameRunBootstrapper] ContinueZoneLayoutRunAsync: zone_layout_key 없음");
+            return;
+        }
+
+        var layoutMgr = Managers.ZoneLayout;
+        try { await layoutMgr.LoadAsync(zoneLayoutKey); }
+        catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
+
+        var zones = layoutMgr.GetZones(zoneLayoutKey);
+        if (zones == null || zones.Count == 0)
+        {
+            Debug.LogError($"[GameRunBootstrapper] ContinueZoneLayoutRunAsync: '{zoneLayoutKey}' 존 없음");
+            return;
+        }
+
+        // 슬롯에서 저장된 존 인덱스 및 클리어 목록 복원
+        var rp   = RunProgressManager.Instance;
+        var save = rp != null ? rp.Saves[rp.ActiveSlotIndex] : null;
+        int resumeZoneIndex = save?.currentZoneIndex ?? 0;
+
+        // Zone 0 월드 중심 기준으로 ZoneProgression 초기화 (이어하기 시 Zone 0은 스폰하지 않음)
+        var startZone   = zones.Find(z => z.zone_index == 0);
+        var zone0Center = startZone != null ? CalcZoneWorldCenter(startZone) : Vector3.zero;
+        _run?.InitZoneProgression(zoneLayoutKey, zone0Center, blockCellSize);
+
+        // 이전 클리어 이력 복원 — GetNextZoneOptions가 이미 클리어된 존을 필터링할 수 있도록
+        if (_run?.ZoneProgression != null && !string.IsNullOrEmpty(save?.clearedZoneIndicesJson))
+        {
+            var clearedWrapper = JsonUtility.FromJson<IntListWrapper>(save.clearedZoneIndicesJson);
+            if (clearedWrapper?.items != null)
+                _run.ZoneProgression.RestoreState(resumeZoneIndex, clearedWrapper.items);
+        }
+
+        // 저장된 존 스폰 (내부에서 CreateZoneExitGates → RegisterExitGate 호출)
+        await SpawnZoneByIndexAsync(resumeZoneIndex, null, ct);
+
+        // 스폰된 존 월드 중심 등록 (이후 인접 존 계산에 사용)
+        var resumeZone = zones.Find(z => z.zone_index == resumeZoneIndex);
+        if (resumeZone != null && _run?.ZoneProgression != null)
+        {
+            var resumeCenter = CalcZoneWorldCenter(resumeZone);
+            _run.ZoneProgression.RegisterSpawnedZone(resumeZoneIndex, resumeCenter);
+            // 플레이어 스폰 위치: 존 중앙의 spawn_local 오프셋
+            if (!_pendingPlayerSpawnPos.HasValue)
+                _pendingPlayerSpawnPos = resumeCenter + new Vector3(resumeZone.spawn_local_x, 0f, resumeZone.spawn_local_z);
+        }
+
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            SetupEntrance(player);
+            _run?.BindPlayer(player);
+        }
+
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        // 출구 게이트 즉시 활성화 — 방 클리어 상태이므로 선택지 표시
+        _run?.ZoneProgression?.EnableExitGateForZone(resumeZoneIndex);
+
+        Debug.Log($"[GameRunBootstrapper] zone-layout 이어하기 완료 — Zone {resumeZoneIndex} 복원, 출구 게이트 활성화");
     }
 
     public async UniTask StartRunAsync(ChapterId chapter)

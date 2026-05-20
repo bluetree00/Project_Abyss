@@ -16,11 +16,13 @@ public class ZoneProgressionService
     private readonly HashSet<int> _spawnedZones = new();
     private readonly HashSet<int> _clearedZones = new();
     private readonly Dictionary<int, Vector3>     _spawnedWorldCenters = new();
-    private readonly Dictionary<(int from, int to), ZoneExitGate> _exitGates          = new();
+    private readonly Dictionary<(int from, int to), StartRoomGate> _exitGates          = new();
     private readonly HashSet<int>                                  _gateActivatedZones = new();
 
     /// <summary>플레이어가 현재 위치한 존의 인덱스. 다음 존 선택 완료 시 갱신된다.</summary>
     public int CurrentZoneIndex { get; private set; }
+
+    public IReadOnlyCollection<int> ClearedZones => _clearedZones;
 
     public ZoneProgressionService(string layoutKey, Vector3 zone0WorldCenter, float blockCellSize)
     {
@@ -34,12 +36,37 @@ public class ZoneProgressionService
     public bool IsSpawned(int zoneIndex) => _spawnedZones.Contains(zoneIndex);
     public bool IsCleared(int zoneIndex) => _clearedZones.Contains(zoneIndex);
 
-    /// <summary>SpawnZoneByIndexAsync에서 생성된 ZoneExitGate를 등록한다. (fromZone → toZone 쌍으로 저장)</summary>
-    public void RegisterExitGate(int fromZoneIndex, int toZoneIndex, ZoneExitGate gate)
+    /// <summary>
+    /// 이어하기 복원 시 호출. 클리어된 존들과 현재 존 인덱스를 내부 상태에 반영한다.
+    /// 클리어된 존은 _spawnedZones·_clearedZones에 추가되고 CurrentZoneIndex가 갱신된다.
+    /// </summary>
+    public void RestoreState(int currentZoneIndex, System.Collections.Generic.IEnumerable<int> clearedZoneIndices)
+    {
+        CurrentZoneIndex = currentZoneIndex;
+        if (clearedZoneIndices != null)
+        {
+            foreach (var idx in clearedZoneIndices)
+            {
+                _spawnedZones.Add(idx);
+                _clearedZones.Add(idx);
+            }
+        }
+        _spawnedZones.Add(currentZoneIndex);
+    }
+
+    /// <summary>이어하기 또는 외부 스폰 시 해당 존의 월드 중심을 수동 등록한다.</summary>
+    public void RegisterSpawnedZone(int zoneIndex, Vector3 worldCenter)
+    {
+        _spawnedZones.Add(zoneIndex);
+        _spawnedWorldCenters[zoneIndex] = worldCenter;
+    }
+
+    /// <summary>CreateZoneExitGates에서 생성된 StartRoomGate를 등록한다. (fromZone → toZone 쌍으로 저장)</summary>
+    public void RegisterExitGate(int fromZoneIndex, int toZoneIndex, StartRoomGate gate)
         => _exitGates[(fromZoneIndex, toZoneIndex)] = gate;
 
     /// <summary>
-    /// 해당 존의 ZoneExitGate를 활성화한다.
+    /// 해당 존의 StartRoomGate(일반 방 모드)를 활성화한다.
     /// 전투 존: ClearRewardTrigger 보상 완료 후 호출.
     /// 비전투 존: ZoneEntryTrigger 진입 시 즉시 호출.
     /// 게이트 없으면 선택 UI를 직접 표시하는 폴백으로 동작한다.
@@ -79,7 +106,7 @@ public class ZoneProgressionService
     }
 
     /// <summary>
-    /// 게이트를 통해 직접 선택된 존으로 이동. ZoneExitGate가 호출.
+    /// 게이트를 통해 직접 선택된 존으로 이동. StartRoomGate(일반 방 모드)가 호출.
     /// 선택 UI 없이 fromZone 클리어 → toZone 스폰 → CurrentZoneIndex 갱신.
     /// </summary>
     public async UniTask DirectlyEnterZoneAsync(int fromZoneIndex, int toZoneIndex, CancellationToken ct)

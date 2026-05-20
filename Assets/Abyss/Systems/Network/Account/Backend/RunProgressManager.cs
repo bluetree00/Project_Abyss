@@ -217,30 +217,42 @@ public class RunProgressManager : MonoBehaviour
         if (string.IsNullOrEmpty(weapon1Key))
             weapon1Key = loadout?.WeaponSlot1?.name ?? prevSave?.weapon1PrefabKey ?? string.Empty;
 
+        // 존 레이아웃 모드 이어하기를 위해 클리어된 존 인덱스 목록 저장
+        var zoneProgression = session.ZoneProgression;
+        string clearedZoneIndicesJson = string.Empty;
+        if (zoneProgression != null)
+        {
+            var clearedWrapper = new IntListWrapper();
+            clearedWrapper.items.AddRange(zoneProgression.ClearedZones);
+            clearedZoneIndicesJson = JsonUtility.ToJson(clearedWrapper);
+        }
+
         return new RunSaveData
         {
-            slotIndex        = slotIndex,
-            hasActiveRun     = true,
-            chapter          = (int)session.CurrentChapter,
-            currentPointId   = session.StagePointManager?.CurrentPointId ?? -1,
-            currentHp        = ps?.Hp       ?? 0,
-            maxHp            = ps?.MaxHp    ?? 100,
-            runGold          = ps?.TempGold ?? 0,
-            retryCount       = retryCount,
-            progressPercent  = progress,
-            itemCount        = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
-            synergyCount     = session.AppliedSynergies.Count,
-            roomClearCount   = session.RoomClearRecords.Count,
-            characterKey     = charKey,
-            characterName    = charName,
-            weapon0PrefabKey = weapon0Key,
-            weapon1PrefabKey = weapon1Key,
-            graphJson        = BuildGraphJson(session),
-            itemsJson        = JsonUtility.ToJson(itemWrapper),
-            synergiesJson    = JsonUtility.ToJson(synWrapper),
-            roomLogsJson     = JsonUtility.ToJson(logWrapper),
-            savedAt          = DateTime.UtcNow.ToString("o"),
-            isInStartRoom    = isInStartRoom,
+            slotIndex              = slotIndex,
+            hasActiveRun           = true,
+            chapter                = (int)session.CurrentChapter,
+            currentPointId         = session.StagePointManager?.CurrentPointId ?? -1,
+            currentHp              = ps?.Hp       ?? 0,
+            maxHp                  = ps?.MaxHp    ?? 100,
+            runGold                = ps?.TempGold ?? 0,
+            retryCount             = retryCount,
+            progressPercent        = progress,
+            itemCount              = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
+            synergyCount           = session.AppliedSynergies.Count,
+            roomClearCount         = session.RoomClearRecords.Count,
+            characterKey           = charKey,
+            characterName          = charName,
+            weapon0PrefabKey       = weapon0Key,
+            weapon1PrefabKey       = weapon1Key,
+            graphJson              = BuildGraphJson(session),
+            itemsJson              = JsonUtility.ToJson(itemWrapper),
+            synergiesJson          = JsonUtility.ToJson(synWrapper),
+            roomLogsJson           = JsonUtility.ToJson(logWrapper),
+            savedAt                = DateTime.UtcNow.ToString("o"),
+            isInStartRoom          = isInStartRoom,
+            currentZoneIndex       = zoneProgression?.CurrentZoneIndex ?? 0,
+            clearedZoneIndicesJson = clearedZoneIndicesJson,
         };
     }
 
@@ -320,8 +332,10 @@ public class RunProgressManager : MonoBehaviour
         { "itemsJson",        d.itemsJson },
         { "synergiesJson",    d.synergiesJson },
         { "roomLogsJson",     d.roomLogsJson },
-        { "savedAt",          d.savedAt },
-        { "isInStartRoom",    d.isInStartRoom },
+        { "savedAt",                d.savedAt },
+        { "isInStartRoom",          d.isInStartRoom },
+        { "currentZoneIndex",       d.currentZoneIndex },
+        { "clearedZoneIndicesJson", d.clearedZoneIndicesJson },
     };
 
     // ─────────────────────────────────────────────────────────
@@ -351,9 +365,11 @@ public class RunProgressManager : MonoBehaviour
             graphJson        = ParseString(row, "graphJson"),
             itemsJson        = ParseString(row, "itemsJson"),
             synergiesJson    = ParseString(row, "synergiesJson"),
-            roomLogsJson     = ParseString(row, "roomLogsJson"),
-            savedAt          = ParseString(row, "savedAt"),
-            isInStartRoom    = ParseBool(row,   "isInStartRoom"),
+            roomLogsJson           = ParseString(row, "roomLogsJson"),
+            savedAt                = ParseString(row, "savedAt"),
+            isInStartRoom          = ParseBool(row,   "isInStartRoom"),
+            currentZoneIndex       = ParseInt(row,    "currentZoneIndex",    0),
+            clearedZoneIndicesJson = ParseString(row, "clearedZoneIndicesJson"),
         };
     }
 
