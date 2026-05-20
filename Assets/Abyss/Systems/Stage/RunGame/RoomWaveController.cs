@@ -109,10 +109,8 @@ public sealed class RoomWaveController : MonoBehaviour
         if (_bossSpawner != null)
             _bossSpawner.OnMonsterSpawned += HandleWaveMonsterSpawned;
 
-        _active = true;
-        Debug.Log($"[RoomWave] 웨이브 모드 초기화 완료 — {_totalWaves}웨이브 / 스포너 {_spawners.Count}개", this);
-
-        StartWaveAsync(0).Forget();
+        // 활성화는 Activate() 호출 시 시작 (기존 방: SpawnBlockMapAsync에서 즉시, 지연 존: ZoneEntryTrigger에서)
+        Debug.Log($"[RoomWave] 웨이브 모드 준비 완료 — {_totalWaves}웨이브 / 스포너 {_spawners.Count}개", this);
     }
 
     private void InitLegacyMode()
@@ -142,10 +140,30 @@ public sealed class RoomWaveController : MonoBehaviour
         }
 
         _targetKillCount = sum;
-        _active          = true;
 
         string bossTag = _bossSpawner != null ? " + 보스 1" : "";
-        Debug.Log($"[RoomWave] 레거시 모드 초기화 완료 — 킬 목표 {_targetKillCount}마리 ({_spawners.Count}개 스포너{bossTag})", this);
+        Debug.Log($"[RoomWave] 레거시 모드 준비 완료 — 킬 목표 {_targetKillCount}마리 ({_spawners.Count}개 스포너{bossTag})", this);
+    }
+
+    /// <summary>
+    /// 웨이브/레거시 모드를 시작한다.
+    /// 기존 방(SpawnBlockMapAsync): 스포너 활성화 직후 즉시 호출.
+    /// 지연 존(SpawnZoneByIndexAsync): ZoneEntryTrigger가 플레이어 진입 시 호출.
+    /// </summary>
+    public void Activate()
+    {
+        if (_active || _cleared) return;
+        _active = true;
+
+        if (_waveMode)
+        {
+            Debug.Log($"[RoomWave] 웨이브 모드 활성화", this);
+            StartWaveAsync(0).Forget();
+        }
+        else
+        {
+            Debug.Log($"[RoomWave] 레거시 모드 활성화 — 킬 카운트 시작", this);
+        }
     }
 
     private void OnDestroy()

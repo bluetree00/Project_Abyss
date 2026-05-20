@@ -36,13 +36,6 @@ public sealed class HudView : MonoBehaviour
                 bossPanelView = bossRoot.GetComponent<BossPanelView>() ?? bossRoot.gameObject.AddComponent<BossPanelView>();
         }
 
-        if (gridPanel == null)
-        {
-            var gridRoot = FindChildRecursive(transform, "Panel_Grid");
-            if (gridRoot != null)
-                gridPanel = gridRoot.gameObject;
-        }
-
         if (minimapPanel == null)
         {
             var mapRoot = FindChildRecursive(transform, "Panel_Minimap");

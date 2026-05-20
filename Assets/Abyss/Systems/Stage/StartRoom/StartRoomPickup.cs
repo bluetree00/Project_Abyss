@@ -41,7 +41,6 @@ public class StartRoomPickup : MonoBehaviour
         {
             loadout.SetWeaponSlot0(weaponSO);
             Debug.Log($"[StartRoom] 무기 선택: {weaponSO?.displayName}");
-            // 게이트 통과 시점에 저장하므로 픽업 즉시 저장하지 않음
         }
     }
 }

@@ -17,10 +17,12 @@ public sealed class GridEditView : MonoBehaviour
     private const float TAB_HEIGHT  = 36f;
     private const float TAB_SPACING = 6f;
 
-    private static readonly Color COLOR_TAB_ACTIVE   = new(0.3f, 0.6f, 1f,  1f);
-    private static readonly Color COLOR_TAB_INACTIVE = new(0.2f, 0.2f, 0.28f, 0.9f);
-    private static readonly Color COLOR_TAB_TXT      = new(0.9f, 0.92f, 1f, 1f);
-    private static readonly Color COLOR_SYNERGY_TXT  = new(0.85f, 1f, 0.5f, 1f);
+    private static readonly Color COLOR_TAB_ACTIVE    = new(0.3f, 0.6f, 1f,  1f);
+    private static readonly Color COLOR_TAB_INACTIVE  = new(0.2f, 0.2f, 0.28f, 0.9f);
+    private static readonly Color COLOR_TAB_TXT       = new(0.9f, 0.92f, 1f, 1f);
+    private static readonly Color COLOR_SYNERGY_TXT   = new(0.85f, 1f, 0.5f, 1f);
+    private static readonly Color COLOR_BACK_BTN      = new(0.14f, 0.32f, 0.58f, 0.92f);
+    private static readonly Color COLOR_SYNERGY_PANEL = new(0.04f, 0.1f, 0.06f, 0.88f);
 
     // ── SerializeField ──
     [Header("버튼")]
@@ -36,6 +38,7 @@ public sealed class GridEditView : MonoBehaviour
     // ── Private ──
     private string _activeGridId;
     private readonly List<TabEntry> _tabs = new();
+    private GameObject _synergyPanel;
 
     private sealed class TabEntry
     {
@@ -50,6 +53,21 @@ public sealed class GridEditView : MonoBehaviour
     {
         if (backButton != null)
             backButton.onClick.AddListener(OnBackClicked);
+
+        RepositionBackButton();
+        EnsureSynergyPanel();
+    }
+
+    private void OnEnable()
+    {
+        if (BlockSynergyBridge.Instance != null)
+            BlockSynergyBridge.Instance.OnSynergyActivated += OnSynergyActivatedExternal;
+    }
+
+    private void OnDisable()
+    {
+        if (BlockSynergyBridge.Instance != null)
+            BlockSynergyBridge.Instance.OnSynergyActivated -= OnSynergyActivatedExternal;
     }
 
     private void OnDestroy()
@@ -188,12 +206,107 @@ public sealed class GridEditView : MonoBehaviour
         foreach (var synergy in run.AppliedSynergies)
         {
             if (synergy.gridId != gridId) continue;
-            if (!string.IsNullOrEmpty(synergy.effectType))
-                sb.AppendLine($"{synergy.effectType}: {(synergy.value >= 0 ? "+" : "")}{synergy.value * 100f:F0}% [{synergy.trigger}]");
+            if (string.IsNullOrEmpty(synergy.effectType)) continue;
+
+            string triggerLabel = synergy.trigger switch
+            {
+                "Always"  => "항상",
+                "OnHit"   => "피격 시",
+                "OnKill"  => "처치 시",
+                "OnLowHp" => "체력 낮을 때",
+                "OnUse"   => "사용 시",
+                _         => synergy.trigger,
+            };
+            float pct = synergy.value * 100f;
+            sb.AppendLine($"  • {synergy.effectType}  {(pct >= 0 ? "+" : "")}{pct:F0}%  [{triggerLabel}]");
         }
 
-        synergyText.text  = sb.Length > 0 ? $"시너지: {sb}" : string.Empty;
-        synergyText.color = COLOR_SYNERGY_TXT;
+        if (sb.Length > 0)
+        {
+            synergyText.text  = $"✦ 시너지 효과 활성화\n{sb}";
+            synergyText.color = COLOR_SYNERGY_TXT;
+            if (_synergyPanel != null) _synergyPanel.SetActive(true);
+        }
+        else
+        {
+            synergyText.text = string.Empty;
+            if (_synergyPanel != null) _synergyPanel.SetActive(false);
+        }
+    }
+
+    // ── Setup Helpers ──
+
+    private void RepositionBackButton()
+    {
+        if (backButton == null) return;
+
+        // 탭 스트립 레이아웃 그룹에서 분리
+        var le = backButton.GetComponent<LayoutElement>() ?? backButton.gameObject.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        // GridEditView 직속 자식으로 재부모 (앵커 기준 명확화)
+        backButton.transform.SetParent(transform, false);
+
+        var rt = backButton.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.anchorMin        = new Vector2(0f, 1f);
+            rt.anchorMax        = new Vector2(0f, 1f);
+            rt.pivot            = new Vector2(0f, 1f);
+            rt.sizeDelta        = new Vector2(110f, 36f);
+            // 탭 스트립(TAB_HEIGHT) 아래 12px 여백
+            rt.anchoredPosition = new Vector2(8f, -(TAB_HEIGHT + 12f));
+        }
+
+        // 배경 + 텍스트 스타일
+        var img = backButton.GetComponent<Image>() ?? backButton.gameObject.AddComponent<Image>();
+        img.color = COLOR_BACK_BTN;
+        backButton.targetGraphic = img;
+
+        var txt = backButton.GetComponentInChildren<TMP_Text>();
+        if (txt != null)
+        {
+            txt.text      = "◀ 갤러리";
+            txt.fontSize  = 13f;
+            txt.color     = new Color(0.9f, 0.95f, 1f, 1f);
+            txt.alignment = TextAlignmentOptions.Center;
+        }
+    }
+
+    private void EnsureSynergyPanel()
+    {
+        // 시너지 텍스트가 Prefab에서 할당되지 않은 경우 코드로 생성
+        if (synergyText != null) return;
+
+        _synergyPanel = new GameObject("SynergyPanel", typeof(RectTransform));
+        _synergyPanel.transform.SetParent(transform, false);
+
+        var panelRT = _synergyPanel.GetComponent<RectTransform>();
+        panelRT.anchorMin        = new Vector2(0f, 0.16f);
+        panelRT.anchorMax        = new Vector2(0.62f, 0.32f);
+        panelRT.offsetMin        = new Vector2(8f, 4f);
+        panelRT.offsetMax        = new Vector2(-8f, -4f);
+
+        var panelBG = _synergyPanel.AddComponent<Image>();
+        panelBG.color = COLOR_SYNERGY_PANEL;
+
+        var textGO = new GameObject("SynergyText", typeof(RectTransform));
+        textGO.transform.SetParent(_synergyPanel.transform, false);
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = new Vector2(6f, 4f);
+        textRT.offsetMax = new Vector2(-6f, -4f);
+
+        synergyText = textGO.AddComponent<TextMeshProUGUI>();
+        if (tabFont != null) synergyText.font = tabFont;
+        synergyText.fontSize          = 12f;
+        synergyText.color             = COLOR_SYNERGY_TXT;
+        synergyText.alignment         = TextAlignmentOptions.TopLeft;
+        synergyText.enableWordWrapping = true;
+        synergyText.raycastTarget     = false;
+
+        _synergyPanel.SetActive(false);
     }
 
     // ── Event Handlers ──
@@ -209,5 +322,11 @@ public sealed class GridEditView : MonoBehaviour
         RefreshTabHighlight();
         EnterGrid(gridId);
         RefreshSynergyText(gridId);
+    }
+
+    // 시너지 적용 완료 후 호출 — 텍스트를 올바른 타이밍에 갱신
+    private void OnSynergyActivatedExternal(string _)
+    {
+        RefreshSynergyText();
     }
 }

@@ -643,13 +643,14 @@ public class PlayerController : CharacterBase
 
     private void TogglePuzzleGrid()
     {
-        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
+        var run = GameRunBootstrapper.Instance?.Run;
         if (run == null || !run.IsRunning) return;
 
-        if (run.CurrentRunState == GameRunSession.RunState.GridSynergy)
-            run.ExitGridSynergy();
+        var panel = UI_GridPanel.Instance;
+        if (panel != null && panel.IsOpen)
+            panel.Close();
         else
-            run.EnterGridSynergy();
+            panel?.Open();
     }
 
     //============================================================

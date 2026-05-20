@@ -257,6 +257,88 @@ public class GameCameraController : MonoBehaviour
         if (_brain != null)       _brain.enabled       = true;
     }
 
+    /// <summary>
+    /// Cinemachine을 일시 정지하고 카메라를 zoneCenter 위로 이동해 연출을 보여준 뒤 플레이어 추적으로 복귀.
+    /// 신규 존 등장 연출(SpawnZoneByIndexAsync)에서 디졸브와 병렬로 호출된다.
+    /// </summary>
+    public async UniTask PanToZoneAndReturnAsync(
+        Vector3 zoneCenter,
+        float moveDuration,
+        float holdDuration,
+        float returnDuration,
+        Transform playerTransform,
+        CancellationToken ct)
+    {
+        if (this == null) return;
+
+        bool brainWasEnabled = _brain != null && _brain.enabled;
+        bool cmWasEnabled    = _cinemachine != null && _cinemachine.enabled;
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        Vector3    fromPos = transform.position;
+        Quaternion fromRot = transform.rotation;
+
+        // 존 위 내려다보기 시점 (기존 인트로와 동일한 오프셋 재사용)
+        Vector3 toPos   = zoneCenter + new Vector3(0f, introExtraHeight, -introExtraBack);
+        Vector3 lookDir = zoneCenter - toPos;
+        Quaternion toRot = lookDir.sqrMagnitude > 0.01f
+            ? Quaternion.LookRotation(lookDir, Vector3.up)
+            : fromRot;
+
+        try
+        {
+            // 1) 존으로 이동
+            for (float t = 0f; t < moveDuration; t += Time.deltaTime)
+            {
+                ct.ThrowIfCancellationRequested();
+                float ease = PanEase(t / moveDuration);
+                transform.position = Vector3.Lerp(fromPos, toPos, ease);
+                transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
+                await UniTask.Yield(ct);
+            }
+            transform.position = toPos;
+            transform.rotation = toRot;
+
+            // 2) 존 조망 유지
+            await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: ct);
+
+            // 3) 플레이어 위치로 복귀
+            Vector3    retStart    = transform.position;
+            Quaternion retStartRot = transform.rotation;
+            Vector3    retEnd      = playerTransform != null
+                ? playerTransform.position + _originalPosition
+                : fromPos;
+
+            for (float t = 0f; t < returnDuration; t += Time.deltaTime)
+            {
+                ct.ThrowIfCancellationRequested();
+                float ease = PanEase(t / returnDuration);
+                transform.position = Vector3.Lerp(retStart, retEnd, ease);
+                transform.rotation = Quaternion.Slerp(retStartRot, _originalRotation, ease);
+                await UniTask.Yield(ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_brain != null)
+            {
+                // 복귀 위치 맞춤 후 Cinemachine 재개
+                if (playerTransform != null)
+                {
+                    transform.position = playerTransform.position + _originalPosition;
+                    transform.rotation = _originalRotation;
+                }
+                if (brainWasEnabled) _brain.enabled = true;
+            }
+            if (_cinemachine != null && cmWasEnabled) _cinemachine.enabled = true;
+        }
+    }
+
+    private static float PanEase(float t) => 1f - Mathf.Pow(1f - Mathf.Clamp01(t), 3f);
+
     // ── Event Handlers ──
 
     private void OnPlayerBound(PlayerController player)
