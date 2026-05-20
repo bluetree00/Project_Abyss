@@ -36,7 +36,12 @@ public class ZoneEntryTrigger : MonoBehaviour
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
-    private void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other) => TryActivate(other);
+
+    // 존 스폰 시 플레이어가 이미 BoxCollider 내부에 있는 경우 OnTriggerEnter가 발화하지 않을 수 있어 Stay도 처리
+    private void OnTriggerStay(Collider other)  => TryActivate(other);
+
+    private void TryActivate(Collider other)
     {
         if (_activated) return;
         if (other.GetComponentInParent<PlayerController>() == null) return;

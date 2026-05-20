@@ -625,6 +625,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // NavMesh 빌드 (몬스터 AI 이동 경로 계산)
         BuildMapNavMesh(zoneGO);
 
+        // 미니맵 초기화 — Zone 1+ 경로에서도 미니맵이 해당 존 크기로 갱신되도록
+        InitializeMinimapForRoom(zoneGO, grid.GetLength(0), grid.GetLength(1), blocks);
+
         // 방 클리어 컨트롤러 부착 (Activate는 ZoneEntryTrigger가 호출)
         AttachRoomClearController(zoneGO, blocks);
 
