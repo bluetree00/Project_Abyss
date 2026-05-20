@@ -437,7 +437,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
 
-        // 6) (선택) Steam 로그인 — 성공 시 Login씬 스킵, Lobby로 직행
+        // 6) (선택) Steam 로그인 → Lobby로 직행
         if (useSteamLogin)
         {
             var steamGo = new GameObject("@SteamManager");
@@ -453,7 +453,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             startScene = Define.Scene.Lobby;
         }
 
-        // 6-b) 디바이스 ID 자동 로그인 — Login 씬 스킵
+        // 6-b) 디바이스 ID 자동 로그인 (Login 씬 제거 — 성공/실패 모두 Lobby로)
         if (useAutoLogin && !useSteamLogin)
         {
             bool autoOk = await DeviceAutoLoginAsync();
@@ -464,14 +464,14 @@ public sealed class AppBootstrapper : MonoBehaviour
                     RunProgressManager.Instance.LoadAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
-                Debug.Log("[AppBootstrapper] 자동 로그인 성공 → Login 스킵");
-                if (startScene == Define.Scene.Login || startScene == Define.Scene.Logo)
-                    startScene = Define.Scene.Lobby;
+                Debug.Log("[AppBootstrapper] 자동 로그인 성공");
             }
             else
             {
-                Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Login 씬으로 이동");
+                Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Lobby로 진입");
             }
+            if (startScene == Define.Scene.Logo)
+                startScene = Define.Scene.Lobby;
         }
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
@@ -532,11 +532,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         {
             case GameFlowState.Logo:
                 Managers.UI.ShowMenuUI<UI_Logo>();
-                NotifySceneReady();
-                break;
-
-            case GameFlowState.Login:
-                Managers.UI.ShowMenuUI<UI_Login>();
                 NotifySceneReady();
                 break;
 

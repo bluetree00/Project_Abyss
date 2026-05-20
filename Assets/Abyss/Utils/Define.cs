@@ -17,7 +17,6 @@ public class Define
     {
         Unknown,
         Logo,
-        Login,
         Lobby,
         StageMap,
         GameScene,
