@@ -629,7 +629,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var deferredSpawners = DisableSpawnersBeforeEntrance(blocks);
 
         // NavMesh 빌드 (몬스터 AI 이동 경로 계산)
-        BuildMapNavMesh(zoneGO);
+        await BuildMapNavMeshAsync(zoneGO);
 
         // 미니맵 초기화 — Zone 1+ 경로에서도 미니맵이 해당 존 크기로 갱신되도록
         InitializeMinimapForRoom(zoneGO, grid.GetLength(0), grid.GetLength(1), blocks);

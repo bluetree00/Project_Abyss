@@ -365,6 +365,7 @@ public sealed class CombatPanelView : MonoBehaviour
         rect.sizeDelta  = new Vector2(20f, 20f);
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(tmp);
         tmp.text      = text;
         tmp.fontSize  = 14f;
         tmp.fontStyle = FontStyles.Bold;
@@ -375,6 +376,24 @@ public sealed class CombatPanelView : MonoBehaviour
             tmp.font = slotLabelFont;
 
         return tmp;
+    }
+
+    private static TMP_FontAsset _safeFontCache;
+    private static TMP_FontAsset GetSafeFont()
+    {
+        if (_safeFontCache != null && _safeFontCache.material != null)
+            return _safeFontCache;
+        var def = TMP_Settings.defaultFontAsset;
+        if (def != null && def.material != null)
+            return _safeFontCache = def;
+        _safeFontCache = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        return _safeFontCache;
+    }
+    private static void AssignSafeFont(TMP_Text tmp)
+    {
+        if (tmp.font != null && tmp.font.material != null) return;
+        var safe = GetSafeFont();
+        if (safe != null) tmp.font = safe;
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
@@ -486,6 +505,7 @@ public sealed class CombatPanelView : MonoBehaviour
         textRect.offsetMax = new Vector2(-4f, 0f);
 
         var text = textGo.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(text);
         text.text = FormatBuff(buff);
         text.fontSize = 14f;
         text.color = Color.white;
@@ -558,6 +578,7 @@ public sealed class CombatPanelView : MonoBehaviour
         rect.sizeDelta = new Vector2(280f, 22f);
 
         var text = go.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(text);
         text.text = message;
         text.fontSize = 13f;
         text.color = new Color(1f, 0.85f, 0.4f);
@@ -671,6 +692,7 @@ public sealed class CombatPanelView : MonoBehaviour
         rect.sizeDelta = new Vector2(400f, 40f);
 
         buffNoticeText = go.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(buffNoticeText);
         buffNoticeText.fontSize = 22f;
         buffNoticeText.color = Color.yellow;
         buffNoticeText.alignment = TextAlignmentOptions.Center;

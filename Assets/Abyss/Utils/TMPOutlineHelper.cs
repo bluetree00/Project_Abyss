@@ -23,6 +23,7 @@ public static class TMPOutlineHelper
     public static void Apply(TMP_Text text, Color outlineColor, float width, float softness = 0f)
     {
         if (text == null) return;
+        if (text.font == null || text.font.material == null) return;
 
         // fontMaterial 접근 시 Unity가 자동 복제 → 다른 TMP에 영향 없음
         var mat = text.fontMaterial;
