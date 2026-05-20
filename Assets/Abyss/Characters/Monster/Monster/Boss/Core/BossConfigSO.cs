@@ -54,6 +54,10 @@ public enum BossConditionKey
     // ── ForestGuardian HP 범위 ────────────────────────────────────
     FG_Phase1 = 17,   // HpAboveCondition(condPhase2HpThreshold) — 1페이즈 (HP > 50%)
     FG_Phase2 = 18,   // HpBelowCondition(condPhase2HpThreshold) — 2페이즈 HP 범위 (HP ≤ 50%)
+
+    // ── DeathKnight 전용 ─────────────────────────────────────────
+    DK_IsPhase2  = 19,  // HpBelowCondition(condPhase2HpThreshold)
+    DK_IsEnraged = 20,  // Enrage 상태 (HP ≤ enrageHpThreshold, 공격속도/이동속도 증가)
 }
 
 [System.Serializable]
