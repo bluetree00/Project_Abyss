@@ -17,10 +17,15 @@ public class Define
     {
         Unknown,
         Logo,
+        Tutorial,
+        BaseCamp,
         Lobby,
         StageMap,
         GameScene,
-        Result,
+        GameScene_Ch1,
+        GameScene_Ch2,
+        GameScene_Ch3,
+        GameScene_Ch4,
     }
 
     public enum Sound
