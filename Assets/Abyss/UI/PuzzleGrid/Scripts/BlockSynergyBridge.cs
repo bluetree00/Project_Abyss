@@ -241,8 +241,8 @@ public class BlockSynergyBridge : MonoBehaviour
                 boardManager.shapeHost.pivot = new Vector2(0.5f, 1f);
             }
 
-            // spawnOrigin 수정: X=0(중앙), Y=80(상단 80px 아래서 시작)
-            boardManager.spawnOrigin = new Vector2(0f, 80f);
+            // spawnOrigin: X=0(중앙), Y=160(탭스트립 + 여백 확보)
+            boardManager.spawnOrigin = new Vector2(0f, 160f);
 
             // 그리드 영역 배경
             EnsureAreaBackground(boardManager.gameplayRoot, "GridAreaBG",

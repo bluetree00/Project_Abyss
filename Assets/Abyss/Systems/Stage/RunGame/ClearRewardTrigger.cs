@@ -144,6 +144,14 @@ public class ClearRewardTrigger : MonoBehaviour
             Debug.Log($"[ClearRewardTrigger] 보스방 클리어 — 챕터 전환 {(advanced ? "성공" : "마지막 챕터")}");
         }
 
+        // 방 클리어 시점 저장 (플레이어는 현재 존 위치 + 게이트 선택지 유지 상태로 재개)
+        var rp = RunProgressManager.Instance;
+        if (rp != null && _run != null && _run.IsRunning)
+        {
+            try { await rp.SaveAsync(_run, rp.ActiveSlotIndex); }
+            catch (OperationCanceledException) { return; }
+        }
+
         // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
         // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
         if (!_isBossRoom)

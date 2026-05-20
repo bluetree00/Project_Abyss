@@ -4,12 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 존 클리어 후 활성화되는 다음 존 선택 트리거.
-/// SpawnZoneByIndexAsync에서 각 존 GO의 자식으로 생성되고 비활성 상태로 대기한다.
-///
-/// 전투 존: ClearRewardTrigger 보상 완료 후 또는 아이템 없는 클리어 시 EnableGate() 호출.
-/// 비전투 존: ZoneEntryTrigger 진입 즉시 EnableGate() 호출.
-/// 플레이어가 트리거 반경 안에 들어오면 ShowZoneSelectionAsync를 호출한다.
+/// [Deprecated] 기능이 StartRoomGate로 통합됨.
+/// ZoneProgressionService 및 CreateZoneExitGates는 더 이상 이 컴포넌트를 사용하지 않는다.
+/// 기존 프리팹 참조 보존을 위해 파일을 유지한다.
 /// </summary>
 public class ZoneExitGate : MonoBehaviour
 {

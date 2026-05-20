@@ -64,6 +64,7 @@ public sealed class UI_GridPanel : UI_Base
         Instance = this;
         BuildSynergyToast();
         BuildGalleryDetailPanel();
+        EnsureConfirmButtonLabel();
         gameObject.SetActive(false);
     }
 
@@ -90,6 +91,9 @@ public sealed class UI_GridPanel : UI_Base
         if (galleryView != null)
             galleryView.OnGridSelected += RefreshGalleryDetail;
 
+        if (stagingArea != null)
+            stagingArea.OnItemSelected += OnStagingItemSelected;
+
         if (confirmButton != null)
             confirmButton.onClick.AddListener(OnConfirmClicked);
         if (confirmDialogKeepBtn != null)
@@ -114,6 +118,9 @@ public sealed class UI_GridPanel : UI_Base
 
         if (galleryView != null)
             galleryView.OnGridSelected -= RefreshGalleryDetail;
+
+        if (stagingArea != null)
+            stagingArea.OnItemSelected -= OnStagingItemSelected;
 
         _toastCts?.Cancel();
 
@@ -256,6 +263,20 @@ public sealed class UI_GridPanel : UI_Base
 
     private void HandleItemSelected(RuntimeItemData item)
     {
+        itemInfoPanel?.ShowItem(item, isNew: false);
+    }
+
+    private void OnStagingItemSelected(RuntimeItemData item)
+    {
+        stagingArea?.HighlightItem(item);
+
+        // 갤러리 모드일 때: 갤러리 상세 패널 ↔ ItemInfoPanel 교체
+        if (_galleryDetailPanel != null && _galleryDetailPanel.activeSelf)
+        {
+            _galleryDetailPanel.SetActive(false);
+            itemInfoPanel?.gameObject.SetActive(true);
+        }
+
         itemInfoPanel?.ShowItem(item, isNew: false);
     }
 
@@ -417,6 +438,11 @@ public sealed class UI_GridPanel : UI_Base
     {
         _selectedGalleryGridId = gridId;
 
+        // 갤러리 상세 패널 복귀 (보관함 아이템을 보고 있었다면 원래대로)
+        _galleryDetailPanel?.SetActive(true);
+        itemInfoPanel?.gameObject.SetActive(false);
+        stagingArea?.HighlightItem(null);
+
         // 기존 행 제거
         foreach (var row in _galleryDetailRows)
             if (row != null) Destroy(row);
@@ -523,6 +549,45 @@ public sealed class UI_GridPanel : UI_Base
         ItemRarity.Legendary => new Color(1f,   0.7f, 0.2f, 1f),
         _                    => new Color(0.7f, 0.7f, 0.7f, 1f),
     };
+
+    // ── Confirm Button Label ──
+
+    private void EnsureConfirmButtonLabel()
+    {
+        if (confirmButton == null) return;
+
+        // 배경 이미지가 없으면 추가
+        var img = confirmButton.GetComponent<UnityEngine.UI.Image>();
+        if (img == null) img = confirmButton.gameObject.AddComponent<UnityEngine.UI.Image>();
+        img.color = new Color(0.18f, 0.42f, 0.72f, 0.95f);
+        confirmButton.targetGraphic = img;
+
+        // 텍스트 자식이 없으면 생성, 있으면 정렬·색상·내용 강제 보정
+        var existing = confirmButton.GetComponentInChildren<TMPro.TMP_Text>();
+        if (existing != null)
+        {
+            if (string.IsNullOrEmpty(existing.text)) existing.text = "배치 완료";
+            existing.color     = Color.white;
+            existing.fontSize  = 16f;
+            existing.alignment = TMPro.TextAlignmentOptions.Center;
+            existing.raycastTarget = false;
+        }
+        else
+        {
+            var txtGO = new GameObject("Label", typeof(RectTransform));
+            txtGO.transform.SetParent(confirmButton.transform, false);
+            var txtRT = txtGO.GetComponent<RectTransform>();
+            txtRT.anchorMin = Vector2.zero;
+            txtRT.anchorMax = Vector2.one;
+            txtRT.sizeDelta = Vector2.zero;
+            var txt = txtGO.AddComponent<TMPro.TextMeshProUGUI>();
+            txt.text          = "배치 완료";
+            txt.fontSize      = 16f;
+            txt.alignment     = TMPro.TextAlignmentOptions.Center;
+            txt.color         = Color.white;
+            txt.raycastTarget = false;
+        }
+    }
 
     // ── Synergy Toast ──
 

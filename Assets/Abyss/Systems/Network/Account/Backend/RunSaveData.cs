@@ -28,9 +28,11 @@ public class RunSaveData
     public string graphJson;         // SavedStageGraph JSON
     public string itemsJson;         // ItemListWrapper JSON
     public string synergiesJson;     // SynergyListWrapper JSON
-    public string roomLogsJson;      // RoomClearLogWrapper JSON
-    public string savedAt;           // ISO8601 UTC
-    public bool   isInStartRoom;     // true = 스타트룸 미퇴장 상태 (이어하기 시 StartRoom 재진입)
+    public string roomLogsJson;           // RoomClearLogWrapper JSON
+    public string savedAt;                // ISO8601 UTC
+    public bool   isInStartRoom;          // true = 스타트룸 미퇴장 상태 (이어하기 시 StartRoom 재진입)
+    public int    currentZoneIndex;       // ZoneProgressionService.CurrentZoneIndex (zone-layout 모드 이어하기)
+    public string clearedZoneIndicesJson; // IntListWrapper JSON — 클리어된 존 인덱스 목록
 }
 
 /// <summary>
@@ -71,6 +73,12 @@ public sealed class SavedStageNode
 public sealed class ItemListWrapper
 {
     public List<RuntimeItemData> items = new();
+}
+
+[Serializable]
+public sealed class IntListWrapper
+{
+    public List<int> items = new();
 }
 
 [Serializable]

@@ -40,8 +40,11 @@ public sealed class StagingAreaView : MonoBehaviour
     [SerializeField] private TMP_FontAsset cardFont;
 
     [Header("참조")]
-    [SerializeField] private ItemInfoPanel   itemInfoPanel;
-    [SerializeField] private BoardManager    boardManager;
+    [SerializeField] private BoardManager boardManager;
+
+    // ── Events ──
+    /// <summary>보관함 카드 클릭 시 발생. UI_GridPanel에서 패널 전환을 처리한다.</summary>
+    public event System.Action<RuntimeItemData> OnItemSelected;
 
     // ── Private ──
     // 고정 슬롯 구조
@@ -467,7 +470,7 @@ public sealed class StagingAreaView : MonoBehaviour
 
     private void OnCardClicked(RuntimeItemData item)
     {
-        itemInfoPanel?.ShowItem(item, isNew: false);
+        OnItemSelected?.Invoke(item);
     }
 
     private void OnDiscardClicked(RuntimeItemData item)
