@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
+  m_Name: DeathKnightBossConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
+  monsterName: DeathKnight
+  grade: 3
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  stat:
+    maxHp: 3000
+    defense: 1
+    attackPower: 120
+    moveSpeed: 4.5
+    nativeElement: -1
+    attackRange: 2
+    attackRadius: 1
+    attackRate: 1
+    attackDelay: 1
+    knockbackForce: 8
+    attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  detection:
+    detectionRange: 5
+    chaseGiveUpRange: 8
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1.5
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 0
+  animation:
+    animatorControllerAddress: 
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit1
+    dieStateName: Die
+    attackTrigger: 
+    getHitTrigger: 
+    dieTrigger: 
+    detectTrigger: 
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    maxAccumulationScale: 1
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  specialStates: []
+  stateOverrides: []
+  patternBreakDurationMin: 2
+  patternBreakDurationMax: 4
+  patternRepeatPenaltyDuration: 20
+  patternRepeatPenaltyMult: 0.1
+  condPhase2HpThreshold: 0.4
+  condDistClose: 3
+  condDistFar: 5
+  condTimePressureSecs: 8
+  patternEntries:
+  - conditions: []
+    patterns:
+    - {fileID: 11400000, guid: 1a3f31350d8bbba4989524c11f37efd6, type: 2}
+    - {fileID: 11400000, guid: 97b5f8526d84e0c48937720db9fef6a0, type: 2}
+    - {fileID: 11400000, guid: 304d63bdcdbb92043900b25160515e6e, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions:
+    - 5
+    patterns:
+    - {fileID: 11400000, guid: b75077ac3399a9c4782be1c95ef6bd0c, type: 2}
+    selectionMode: 0
+    forceExecute: 0

@@ -55,6 +55,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6d3ffbc71a451fa498698a9e6fd00acc
+    m_Address: DeathKnightBoss/DeathKnightBossConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2d9a2d35675aedc44b8a59ed43b912e0
     m_Address: CrabMonster/CrabMonsterConfig
     m_ReadOnly: 0

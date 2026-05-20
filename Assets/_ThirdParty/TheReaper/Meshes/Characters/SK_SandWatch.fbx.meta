@@ -1,58 +1,11 @@
 fileFormatVersion: 2
-guid: c02421c170d13cd4890793db7b5815d3
+guid: 95880307e49387543a51d4304f582ee9
 ModelImporter:
-  serializedVersion: 23
-  fileIDToRecycleName:
-    100000: Acessories
-    100002: SandWatch
-    100004: SandWatchChainA
-    100006: SandWatchChainB
-    100008: //RootNode
-    100010: SW_0
-    100012: SW_1
-    100014: SW_2
-    100016: SW_3
-    100018: SW_4
-    100020: SW_5
-    100022: SW_6
-    100024: SW_7
-    100026: SW_Root
-    400000: Acessories
-    400002: SandWatch
-    400004: SandWatchChainA
-    400006: SandWatchChainB
-    400008: //RootNode
-    400010: SW_0
-    400012: SW_1
-    400014: SW_2
-    400016: SW_3
-    400018: SW_4
-    400020: SW_5
-    400022: SW_6
-    400024: SW_7
-    400026: SW_Root
-    2100000: MI_SandWatch
-    2100002: MI_SWGlass
-    4300000: SandWatchChainA
-    4300002: SandWatchChainB
-    4300004: SandWatch
-    9500000: //RootNode
-    13700000: SandWatch
-    13700002: SandWatchChainA
-    13700004: SandWatchChainB
-  externalObjects:
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: MI_SWGlass
-    second: {fileID: 2100000, guid: 33a67d22c323fcf4b87f123a640a1b0f, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: MI_SandWatch
-    second: {fileID: 2100000, guid: a45f17ba4db5a844f94366066c3347e8, type: 2}
+  serializedVersion: 24200
+  internalIDToNameTable: []
+  externalObjects: {}
   materials:
-    importMaterials: 1
+    materialImportMode: 2
     materialName: 0
     materialSearch: 1
     materialLocation: 1
@@ -61,9 +14,8 @@ ModelImporter:
     bakeSimulation: 0
     resampleCurves: 1
     optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
@@ -78,32 +30,46 @@ ModelImporter:
     extraExposedTransformPaths: []
     extraUserProperties: []
     clipAnimations: []
-    isReadable: 1
+    isReadable: 0
   meshes:
     lODScreenPercentages: []
     globalScale: 1
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
     importCameras: 1
     importLights: 1
+    nodeNameCollisionStrategy: 1
+    fileIdsGeneration: 2
     swapUVChannels: 0
     generateSecondaryUV: 0
     useFileUnits: 1
-    optimizeMeshForGPU: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
-    previousCalculatedGlobalScale: 0.01
-    hasPreviousCalculatedGlobalScale: 1
+    strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
@@ -112,10 +78,10 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
+  referencedClips: []
   importAnimation: 1
-  copyAvatar: 0
   humanDescription:
-    serializedVersion: 2
+    serializedVersion: 3
     human: []
     skeleton: []
     armTwist: 0.5
@@ -125,21 +91,20 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
+    globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
+  avatarSetup: 0
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 1
+  importBlendShapeDeformPercent: 1
+  remapMaterialsIfMaterialImportModeIsNone: 0
   additionalBone: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 159761
-  packageName: The Reaper
-  packageVersion: 2.0
-  assetPath: Assets/TheReaper/Meshes/Characters/SK_SandWatch.fbx
-  uploadId: 467556

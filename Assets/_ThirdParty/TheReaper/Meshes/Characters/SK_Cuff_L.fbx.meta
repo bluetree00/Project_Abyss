@@ -1,50 +1,11 @@
 fileFormatVersion: 2
-guid: 015e2445337e67948a2073d9d3e612ca
+guid: 400cfff8f8cb29b44bdfe0d1893ef775
 ModelImporter:
-  serializedVersion: 23
-  fileIDToRecycleName:
-    100000: Acessories
-    100002: AimChianRope_L
-    100004: CL_0
-    100006: CL_1
-    100008: CL_2
-    100010: CL_3
-    100012: CL_4
-    100014: CL_5
-    100016: CL_6
-    100018: CL_7
-    100020: CL_8
-    100022: Cuffs_L
-    100024: L_Cuff_root
-    100026: //RootNode
-    400000: Acessories
-    400002: AimChianRope_L
-    400004: CL_0
-    400006: CL_1
-    400008: CL_2
-    400010: CL_3
-    400012: CL_4
-    400014: CL_5
-    400016: CL_6
-    400018: CL_7
-    400020: CL_8
-    400022: Cuffs_L
-    400024: L_Cuff_root
-    400026: //RootNode
-    2100000: MI_Clothing
-    4300000: Cuffs_L
-    4300002: AimChianRope_L
-    9500000: //RootNode
-    13700000: AimChianRope_L
-    13700002: Cuffs_L
-  externalObjects:
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: MI_Clothing
-    second: {fileID: 2100000, guid: 4c9a10ab627013148ac940d1519210b3, type: 2}
+  serializedVersion: 24200
+  internalIDToNameTable: []
+  externalObjects: {}
   materials:
-    importMaterials: 1
+    materialImportMode: 2
     materialName: 0
     materialSearch: 1
     materialLocation: 1
@@ -53,9 +14,8 @@ ModelImporter:
     bakeSimulation: 0
     resampleCurves: 1
     optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
@@ -70,32 +30,46 @@ ModelImporter:
     extraExposedTransformPaths: []
     extraUserProperties: []
     clipAnimations: []
-    isReadable: 1
+    isReadable: 0
   meshes:
     lODScreenPercentages: []
     globalScale: 1
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
     importCameras: 1
     importLights: 1
+    nodeNameCollisionStrategy: 1
+    fileIdsGeneration: 2
     swapUVChannels: 0
     generateSecondaryUV: 0
     useFileUnits: 1
-    optimizeMeshForGPU: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
-    previousCalculatedGlobalScale: 0.01
-    hasPreviousCalculatedGlobalScale: 1
+    strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
@@ -104,10 +78,10 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
+  referencedClips: []
   importAnimation: 1
-  copyAvatar: 0
   humanDescription:
-    serializedVersion: 2
+    serializedVersion: 3
     human: []
     skeleton: []
     armTwist: 0.5
@@ -117,21 +91,20 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
+    globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
+  avatarSetup: 0
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 1
+  importBlendShapeDeformPercent: 1
+  remapMaterialsIfMaterialImportModeIsNone: 0
   additionalBone: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 159761
-  packageName: The Reaper
-  packageVersion: 2.0
-  assetPath: Assets/TheReaper/Meshes/Characters/SK_Cuff_L.fbx
-  uploadId: 467556

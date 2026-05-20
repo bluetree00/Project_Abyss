@@ -462,8 +462,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
         await BuildMapNavMeshAsync(mapGO);
 
-        var ct = this.GetCancellationTokenOnDestroy();
-
         // 벽 투명도 사전 적용 — Material 생성 비용이 있으므로 8개마다 프레임을 반환한다
         int wallCount = 0;
         for (int i = 0; i < blocks.Count; i++)
