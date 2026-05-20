@@ -28,6 +28,9 @@ public sealed class GridGalleryView : MonoBehaviour
     [SerializeField] private RectTransform gridContent;
     [SerializeField] private TMP_FontAsset thumbFont;
 
+    // ── Events ──
+    public event System.Action<string> OnGridSelected;
+
     // ── Private ──
     private readonly List<ThumbEntry> _thumbs = new();
     private string _selectedGridId;
@@ -218,11 +221,27 @@ public sealed class GridGalleryView : MonoBehaviour
         entry.fillText.color = isFull ? COLOR_FULL_TEXT : COLOR_FILL_TEXT;
     }
 
+    /// <summary>현재 선택된 그리드 ID를 반환한다. UI_GridPanel이 초기 진입 시 기본 선택 설정에 사용.</summary>
+    public string GetSelectedGridId() => _selectedGridId;
+
     // ── Event Handlers ──
 
     private void OnThumbClicked(string gridId)
     {
         _selectedGridId = gridId;
-        UI_GridPanel.Instance?.EnterEditMode(gridId);
+        RefreshBorderHighlights();
+        OnGridSelected?.Invoke(gridId);
+    }
+
+    private void RefreshBorderHighlights()
+    {
+        foreach (var entry in _thumbs)
+        {
+            if (entry.border == null) continue;
+            bool selected = entry.gridId == _selectedGridId;
+            entry.border.color = selected ? COLOR_BORDER_SEL : COLOR_BORDER_NRM;
+            var ol = entry.border.GetComponent<Outline>();
+            if (ol != null) ol.effectColor = selected ? COLOR_BORDER_SEL : COLOR_BORDER_NRM;
+        }
     }
 }

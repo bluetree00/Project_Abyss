@@ -119,6 +119,19 @@ public class BoardManager : MonoBehaviour
         return session.gridInstance != null ? session.gridInstance.GetGridSquares() : null;
     }
 
+    /// <summary>특정 그리드에 배치된 아이템 목록을 반환한다. 갤러리 뷰 상세 패널에서 사용.</summary>
+    public List<RuntimeItemData> GetPlacedItemsForGrid(string dataId)
+    {
+        var result = new List<RuntimeItemData>();
+        if (!_runtimeSOCache.TryGetValue(dataId, out var so)) return result;
+        foreach (var pair in _globalPlacements)
+        {
+            if (pair.Value?.grid == so && pair.Key?.ItemData != null)
+                result.Add(pair.Key.ItemData);
+        }
+        return result;
+    }
+
     private readonly Dictionary<string, GridAssetSO> _runtimeSOCache = new();
     private BoardConfigSO    _runtimeBoardConfig;
     private PlacementRulesSO _runtimePlacementRules;

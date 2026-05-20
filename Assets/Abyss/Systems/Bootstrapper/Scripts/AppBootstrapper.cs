@@ -416,6 +416,12 @@ public sealed class AppBootstrapper : MonoBehaviour
         Managers.Sound?.Init();
         await InitSoundTableAsync();
 
+        // 4-a) 아이템/블록 데이터 초기화 — Addressables 로드 이후, 게임 씬 진입 전 완료 필수
+        await UniTask.WhenAll(
+            Managers.ItemData.InitializeAsync(),
+            Managers.BlockData.InitializeAsync()
+        );
+
         // 4-b) QuestManager 초기화 — QuestDatabase / AchievementDatabase Addressables 로드
         await InitQuestManagerAsync();
 

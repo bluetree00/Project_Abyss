@@ -6,7 +6,8 @@ using TMPro;
 /// <summary>
 /// 보관함 하단 패널.
 ///
-/// ■ RunItemInventory.StagingItems 기준으로 아이템 카드를 렌더링.
+/// ■ 5개 고정 슬롯을 항상 표시 (빈 슬롯 포함).
+/// ■ RunItemInventory.StagingItems 기준으로 슬롯 0..n 에 아이템 카드 렌더링.
 /// ■ 신규 아이템: 빛나는 테두리 + NEW 뱃지.
 /// ■ [X] 버튼: 해당 아이템 폐기 (UI_GridPanel.OnDialogDiscardAll과 별개, 개별 폐기).
 /// ■ 카드 클릭: ItemInfoPanel에 해당 아이템 정보 표시.
@@ -15,13 +16,16 @@ using TMPro;
 public sealed class StagingAreaView : MonoBehaviour
 {
     // ── Constants ──
-    private const float CARD_WIDTH      = 110f;
-    private const float CARD_HEIGHT     = 130f;
-    private const float CARD_SPACING    = 10f;
-    private const float GRID_CELL_SIZE  = 120f;
+    private const float SLOT_WIDTH    = 110f;
+    private const float SLOT_HEIGHT   = 130f;
+    private const float SLOT_SPACING  = 10f;
+    private const float GRID_CELL_SIZE = 120f;
 
-    private static readonly Color COLOR_NEW_BORDER    = new(1f, 0.92f, 0.3f, 1f);
-    private static readonly Color COLOR_NORMAL_BORDER = new(0.4f, 0.4f, 0.5f, 0.7f);
+    private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
+    private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
+    private static readonly Color COLOR_SELECTED_BORDER = new(0.3f, 0.85f, 1f, 1f);
+    private static readonly Color COLOR_EMPTY_BG        = new(0.08f, 0.08f, 0.12f, 0.6f);
+    private static readonly Color COLOR_EMPTY_BORDER    = new(0.3f, 0.3f, 0.4f, 0.4f);
 
     private static readonly Color COLOR_COMMON    = new(0.7f, 0.7f, 0.7f, 1f);
     private static readonly Color COLOR_RARE      = new(0.3f, 0.6f, 1f,   1f);
@@ -36,14 +40,23 @@ public sealed class StagingAreaView : MonoBehaviour
     [SerializeField] private TMP_FontAsset cardFont;
 
     [Header("참조")]
-    [SerializeField] private ItemInfoPanel   itemInfoPanel;
-    [SerializeField] private BoardManager    boardManager;
+    [SerializeField] private BoardManager boardManager;
+
+    // ── Events ──
+    /// <summary>보관함 카드 클릭 시 발생. UI_GridPanel에서 패널 전환을 처리한다.</summary>
+    public event System.Action<RuntimeItemData> OnItemSelected;
 
     // ── Private ──
-    private readonly List<RuntimeItemData> _knownItems  = new();
-    private readonly Dictionary<string, GameObject> _cardByInstanceId = new();
-    private readonly Dictionary<string, Shape>      _shapeByInstanceId = new();
-    private readonly HashSet<string>                _newItemIds = new();
+    // 고정 슬롯 구조
+    private readonly GameObject[] _slotGOs       = new GameObject[RunItemInventory.MaxStagingCapacity];
+    private readonly RuntimeItemData[] _slotItems = new RuntimeItemData[RunItemInventory.MaxStagingCapacity];
+
+    // Shape 관리
+    private readonly Dictionary<string, Shape> _shapeByInstanceId = new();
+    private readonly HashSet<string>           _newItemIds         = new();
+
+    // 선택 하이라이트 (현재 하이라이트된 슬롯 인덱스)
+    private RuntimeItemData _highlightedItem;
 
     // 폐기 확인 다이얼로그
     private RuntimeItemData _pendingDiscard;
@@ -55,54 +68,89 @@ public sealed class StagingAreaView : MonoBehaviour
     {
         if (boardManager == null)
             boardManager = BoardManager.Instance;
+        BuildFixedSlots();
         BuildDiscardDialog();
     }
 
     private void OnDestroy()
     {
         HideDiscardDialog();
-        ClearSectionLabels();
-        _knownItems.Clear();
-        _cardByInstanceId.Clear();
         _shapeByInstanceId.Clear();
         _newItemIds.Clear();
     }
 
     // ── Public API ──
 
-    /// <summary>인벤토리 기반으로 카드 목록을 동기화한다. UI_GridPanel.OnStagingChanged에서 호출.</summary>
+    /// <summary>인벤토리 기반으로 슬롯을 동기화한다. UI_GridPanel.OnStagingChanged에서 호출.</summary>
     public void Refresh(RunItemInventory inventory)
     {
         if (inventory == null) return;
 
-        // 신규 아이템 감지
-        foreach (var item in inventory.StagingItems)
+        var stagingItems = inventory.StagingItems;
+
+        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
         {
-            if (!_knownItems.Contains(item))
+            RuntimeItemData item = i < stagingItems.Count ? stagingItems[i] : null;
+
+            // 새 아이템 감지
+            if (item != null && !_newItemIds.Contains(item.instanceId))
             {
-                _newItemIds.Add(item.instanceId);
-                _knownItems.Add(item);
-                CreateCard(item);
+                // 이전 슬롯에 없었던 아이템이면 NEW 처리
+                bool wasKnown = false;
+                for (int j = 0; j < RunItemInventory.MaxStagingCapacity; j++)
+                {
+                    if (_slotItems[j] == item) { wasKnown = true; break; }
+                }
+                if (!wasKnown)
+                    _newItemIds.Add(item.instanceId);
+            }
+
+            _slotItems[i] = item;
+            RefreshSlotDisplay(i, item);
+
+            // Shape 보장
+            if (item != null)
                 EnsureShapeExists(item);
-            }
         }
 
-        // 제거된 아이템 감지 (폐기 또는 배치 완료)
-        for (int i = _knownItems.Count - 1; i >= 0; i--)
+        // 더 이상 보관함에 없는 아이템의 추적 정보만 해제 (Shape는 건드리지 않음)
+        // Shape 제거는 폐기 시 RemoveShapeForItem()에서만 수행한다
+        var activeIds = new HashSet<string>();
+        foreach (var it in stagingItems)
+            if (it != null) activeIds.Add(it.instanceId);
+
+        var toRemove = new List<string>();
+        foreach (var kvp in _shapeByInstanceId)
+            if (!activeIds.Contains(kvp.Key)) toRemove.Add(kvp.Key);
+
+        foreach (var id in toRemove)
         {
-            var known = _knownItems[i];
-            bool stillStaging = false;
-            foreach (var s in inventory.StagingItems)
-                if (s == known) { stillStaging = true; break; }
+            _shapeByInstanceId.Remove(id);
+            _newItemIds.Remove(id);
+        }
+    }
 
-            if (!stillStaging)
-            {
-                RemoveCard(known);
-                _knownItems.RemoveAt(i);
-            }
+    /// <summary>카드 테두리를 하이라이트한다. RefreshInfoPanelDefault에서 선택된 아이템을 표시할 때 호출.</summary>
+    public void HighlightItem(RuntimeItemData item)
+    {
+        // 이전 하이라이트 해제
+        if (_highlightedItem != null)
+        {
+            int prevIdx = FindSlotIndex(_highlightedItem);
+            if (prevIdx >= 0) ApplySlotBorderColor(prevIdx, _highlightedItem);
         }
 
-        RebuildLayout();
+        _highlightedItem = item;
+
+        if (item != null)
+        {
+            int idx = FindSlotIndex(item);
+            if (idx >= 0 && _slotGOs[idx] != null)
+            {
+                var border = _slotGOs[idx].transform.Find("Border")?.GetComponent<Image>();
+                if (border != null) border.color = COLOR_SELECTED_BORDER;
+            }
+        }
     }
 
     /// <summary>특정 아이템의 Shape를 제거한다. 폐기 시 UI_GridPanel에서 호출.</summary>
@@ -111,116 +159,181 @@ public sealed class StagingAreaView : MonoBehaviour
         if (item == null) return;
         if (_shapeByInstanceId.TryGetValue(item.instanceId, out var shape))
         {
-            if (boardManager == null)
-                boardManager = BoardManager.Instance;
+            if (boardManager == null) boardManager = BoardManager.Instance;
             boardManager?.RemoveSharedShape(shape);
             _shapeByInstanceId.Remove(item.instanceId);
         }
     }
 
-    // ── Card Creation ──
+    // ── Fixed Slot Build ──
 
-    private void CreateCard(RuntimeItemData item)
+    private void BuildFixedSlots()
     {
-        if (item == null || scrollContent == null) return;
-        if (_cardByInstanceId.ContainsKey(item.instanceId)) return;
+        if (scrollContent == null) return;
 
-        var card = BuildCardGO(item);
-        card.transform.SetParent(scrollContent, false);
-        _cardByInstanceId[item.instanceId] = card;
-    }
-
-    private void RemoveCard(RuntimeItemData item)
-    {
-        if (item == null) return;
-        if (_cardByInstanceId.TryGetValue(item.instanceId, out var card))
+        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
         {
-            Destroy(card);
-            _cardByInstanceId.Remove(item.instanceId);
+            var slotGO = new GameObject($"Slot_{i}", typeof(RectTransform));
+            slotGO.transform.SetParent(scrollContent, false);
+            var rt = slotGO.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(SLOT_WIDTH, SLOT_HEIGHT);
+            PositionSlot(rt, i);
+
+            // 빈 슬롯 배경
+            var bg = slotGO.AddComponent<Image>();
+            bg.color = COLOR_EMPTY_BG;
+
+            // 테두리
+            var borderGO = new GameObject("Border", typeof(RectTransform));
+            borderGO.transform.SetParent(slotGO.transform, false);
+            var borderRT = borderGO.GetComponent<RectTransform>();
+            borderRT.anchorMin = Vector2.zero;
+            borderRT.anchorMax = Vector2.one;
+            borderRT.sizeDelta = Vector2.zero;
+            var borderImg = borderGO.AddComponent<Image>();
+            borderImg.color = COLOR_EMPTY_BORDER;
+            var outline = borderGO.AddComponent<Outline>();
+            outline.effectColor    = COLOR_EMPTY_BORDER;
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            // 빈 슬롯 텍스트 (기본 표시)
+            var emptyTxtGO = new GameObject("EmptyLabel", typeof(RectTransform));
+            emptyTxtGO.transform.SetParent(slotGO.transform, false);
+            var emptyRT = emptyTxtGO.GetComponent<RectTransform>();
+            emptyRT.anchorMin = Vector2.zero;
+            emptyRT.anchorMax = Vector2.one;
+            emptyRT.sizeDelta = Vector2.zero;
+            var emptyTxt = emptyTxtGO.AddComponent<TextMeshProUGUI>();
+            if (cardFont != null) emptyTxt.font = cardFont;
+            emptyTxt.text      = "빈 슬롯";
+            emptyTxt.fontSize  = 11f;
+            emptyTxt.color     = new Color(0.4f, 0.4f, 0.5f, 0.5f);
+            emptyTxt.alignment = TextAlignmentOptions.Center;
+            emptyTxt.raycastTarget = false;
+
+            _slotGOs[i] = slotGO;
         }
-        _newItemIds.Remove(item.instanceId);
+
+        // scrollContent 폭 설정
+        float totalWidth = RunItemInventory.MaxStagingCapacity * (SLOT_WIDTH + SLOT_SPACING) + SLOT_SPACING;
+        scrollContent.sizeDelta = new Vector2(totalWidth, scrollContent.sizeDelta.y);
     }
 
-    private GameObject BuildCardGO(RuntimeItemData item)
+    private void RefreshSlotDisplay(int index, RuntimeItemData item)
     {
-        bool isNew = _newItemIds.Contains(item.instanceId);
+        if (index < 0 || index >= RunItemInventory.MaxStagingCapacity) return;
+        var slotGO = _slotGOs[index];
+        if (slotGO == null) return;
 
-        // 카드 루트
-        var cardGO = new GameObject($"Card_{item.instanceId[..8]}", typeof(RectTransform));
-        var cardRT = cardGO.GetComponent<RectTransform>();
-        cardRT.sizeDelta = new Vector2(CARD_WIDTH, CARD_HEIGHT);
+        // 기존 아이템 컨텐츠 제거 (Border, EmptyLabel 제외)
+        for (int i = slotGO.transform.childCount - 1; i >= 0; i--)
+        {
+            var child = slotGO.transform.GetChild(i);
+            string n = child.name;
+            if (n != "Border" && n != "EmptyLabel")
+                Destroy(child.gameObject);
+        }
 
-        // 배경 이미지
-        var bg = AddChild<Image>(cardGO, "BG");
-        bg.GetComponent<RectTransform>().anchorMin = Vector2.zero;
-        bg.GetComponent<RectTransform>().anchorMax = Vector2.one;
-        bg.GetComponent<RectTransform>().sizeDelta  = Vector2.zero;
-        bg.color = new Color(0.12f, 0.12f, 0.18f, 0.95f);
+        var bgImg     = slotGO.GetComponent<Image>();
+        var borderImg = slotGO.transform.Find("Border")?.GetComponent<Image>();
+        var emptyLbl  = slotGO.transform.Find("EmptyLabel")?.gameObject;
 
-        // 테두리
-        var borderImg = AddChild<Image>(cardGO, "Border");
-        var borderRT  = borderImg.GetComponent<RectTransform>();
-        borderRT.anchorMin  = Vector2.zero;
-        borderRT.anchorMax  = Vector2.one;
-        borderRT.sizeDelta  = Vector2.zero;
-        borderImg.color     = isNew ? COLOR_NEW_BORDER : COLOR_NORMAL_BORDER;
-        var borderOutline   = borderImg.gameObject.AddComponent<Outline>();
-        borderOutline.effectColor    = isNew ? COLOR_NEW_BORDER : COLOR_NORMAL_BORDER;
-        borderOutline.effectDistance = new Vector2(2f, -2f);
+        if (item == null)
+        {
+            // 빈 슬롯 상태
+            if (bgImg != null)     bgImg.color     = COLOR_EMPTY_BG;
+            if (borderImg != null)
+            {
+                borderImg.color = COLOR_EMPTY_BORDER;
+                var ol = borderImg.GetComponent<Outline>();
+                if (ol != null) ol.effectColor = COLOR_EMPTY_BORDER;
+            }
+            if (emptyLbl != null)  emptyLbl.SetActive(true);
+        }
+        else
+        {
+            // 아이템 슬롯 상태
+            if (emptyLbl != null)  emptyLbl.SetActive(false);
+            bool isNew = _newItemIds.Contains(item.instanceId);
 
-        // 레어도 색 라인 (상단)
-        var rarityBar = AddChild<Image>(cardGO, "RarityBar");
+            if (bgImg != null)     bgImg.color     = new Color(0.12f, 0.12f, 0.18f, 0.95f);
+            if (borderImg != null)
+            {
+                var borderColor = (_highlightedItem == item) ? COLOR_SELECTED_BORDER
+                                  : isNew ? COLOR_NEW_BORDER : COLOR_NORMAL_BORDER;
+                borderImg.color = borderColor;
+                var ol = borderImg.GetComponent<Outline>();
+                if (ol != null) ol.effectColor = borderColor;
+            }
+
+            BuildCardContent(slotGO, item, isNew);
+        }
+    }
+
+    private void BuildCardContent(GameObject slotGO, RuntimeItemData item, bool isNew)
+    {
+        // 레어도 라인 (상단)
+        var rarityBar = new GameObject("RarityBar", typeof(RectTransform));
+        rarityBar.transform.SetParent(slotGO.transform, false);
         var rbRT = rarityBar.GetComponent<RectTransform>();
-        rbRT.anchorMin  = new Vector2(0f, 1f);
-        rbRT.anchorMax  = new Vector2(1f, 1f);
-        rbRT.sizeDelta  = new Vector2(0f, 5f);
+        rbRT.anchorMin        = new Vector2(0f, 1f);
+        rbRT.anchorMax        = new Vector2(1f, 1f);
+        rbRT.sizeDelta        = new Vector2(0f, 5f);
         rbRT.anchoredPosition = Vector2.zero;
-        rarityBar.color = RarityColor(item.rarity);
+        var rbImg = rarityBar.AddComponent<Image>();
+        rbImg.color = RarityColor(item.rarity);
 
-        // 아이콘 (있으면)
+        // 아이콘
         if (item.icon != null)
         {
-            var iconImg = AddChild<Image>(cardGO, "Icon");
-            var iconRT  = iconImg.GetComponent<RectTransform>();
-            iconRT.anchorMin        = new Vector2(0.1f, 0.35f);
-            iconRT.anchorMax        = new Vector2(0.9f, 0.85f);
-            iconRT.sizeDelta        = Vector2.zero;
-            iconImg.sprite          = item.icon;
-            iconImg.preserveAspect  = true;
+            var iconGO  = new GameObject("Icon", typeof(RectTransform));
+            iconGO.transform.SetParent(slotGO.transform, false);
+            var iconRT  = iconGO.GetComponent<RectTransform>();
+            iconRT.anchorMin       = new Vector2(0.1f, 0.35f);
+            iconRT.anchorMax       = new Vector2(0.9f, 0.85f);
+            iconRT.sizeDelta       = Vector2.zero;
+            var iconImg            = iconGO.AddComponent<Image>();
+            iconImg.sprite         = item.icon;
+            iconImg.preserveAspect = true;
         }
 
-        // 이름 텍스트
-        var nameTxt = AddTMPText(cardGO, "Name");
-        var nameRT  = nameTxt.GetComponent<RectTransform>();
+        // 이름
+        var nameTxtGO = new GameObject("Name", typeof(RectTransform));
+        nameTxtGO.transform.SetParent(slotGO.transform, false);
+        var nameRT = nameTxtGO.GetComponent<RectTransform>();
         nameRT.anchorMin        = new Vector2(0f, 0f);
         nameRT.anchorMax        = new Vector2(1f, 0.35f);
         nameRT.sizeDelta        = Vector2.zero;
         nameRT.anchoredPosition = Vector2.zero;
-        nameTxt.text            = item.displayName ?? item.itemId;
-        nameTxt.fontSize        = 11f;
-        nameTxt.alignment       = TextAlignmentOptions.Center;
+        var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
+        if (cardFont != null) nameTxt.font = cardFont;
+        nameTxt.text              = item.displayName ?? item.itemId;
+        nameTxt.fontSize          = 11f;
+        nameTxt.alignment         = TextAlignmentOptions.Center;
         nameTxt.enableWordWrapping = true;
 
         // NEW 뱃지
         if (isNew)
         {
-            var badgeGO  = new GameObject("NewBadge", typeof(RectTransform));
-            badgeGO.transform.SetParent(cardGO.transform, false);
-            var badgeBG  = badgeGO.AddComponent<Image>();
+            var badgeGO = new GameObject("NewBadge", typeof(RectTransform));
+            badgeGO.transform.SetParent(slotGO.transform, false);
+            var badgeBG = badgeGO.AddComponent<Image>();
             badgeBG.color = new Color(1f, 0.3f, 0.3f, 0.95f);
-            var badgeRT  = badgeGO.GetComponent<RectTransform>();
+            var badgeRT = badgeGO.GetComponent<RectTransform>();
             badgeRT.anchorMin        = new Vector2(0f, 1f);
             badgeRT.anchorMax        = new Vector2(0f, 1f);
             badgeRT.pivot            = new Vector2(0f, 1f);
             badgeRT.sizeDelta        = new Vector2(34f, 16f);
             badgeRT.anchoredPosition = new Vector2(2f, -2f);
 
-            // Image와 TMP를 같은 GO에 추가하면 TMP 초기화 실패 → 자식 GO로 분리
-            var badgeTxt = AddTMPText(badgeGO, "NewBadgeText");
-            var badgeTxtRT = badgeTxt.GetComponent<RectTransform>();
+            var badgeTxtGO = new GameObject("NewBadgeText", typeof(RectTransform));
+            badgeTxtGO.transform.SetParent(badgeGO.transform, false);
+            var badgeTxtRT = badgeTxtGO.GetComponent<RectTransform>();
             badgeTxtRT.anchorMin = Vector2.zero;
             badgeTxtRT.anchorMax = Vector2.one;
             badgeTxtRT.sizeDelta = Vector2.zero;
+            var badgeTxt = badgeTxtGO.AddComponent<TextMeshProUGUI>();
+            if (cardFont != null) badgeTxt.font = cardFont;
             badgeTxt.text          = "NEW";
             badgeTxt.fontSize      = 9f;
             badgeTxt.alignment     = TextAlignmentOptions.Center;
@@ -229,51 +342,68 @@ public sealed class StagingAreaView : MonoBehaviour
         }
 
         // [X] 폐기 버튼
-        var xBtn = AddChild<Button>(cardGO, "DiscardBtn");
-        var xRT  = xBtn.GetComponent<RectTransform>();
+        var xBtnGO = new GameObject("DiscardBtn", typeof(RectTransform));
+        xBtnGO.transform.SetParent(slotGO.transform, false);
+        var xRT = xBtnGO.GetComponent<RectTransform>();
         xRT.anchorMin        = new Vector2(1f, 1f);
         xRT.anchorMax        = new Vector2(1f, 1f);
         xRT.pivot            = new Vector2(1f, 1f);
         xRT.sizeDelta        = new Vector2(22f, 22f);
         xRT.anchoredPosition = new Vector2(-2f, -2f);
-        var xImg = xBtn.GetComponent<Image>();
-        if (xImg == null) xImg = xBtn.gameObject.AddComponent<Image>();
+        var xImg = xBtnGO.AddComponent<Image>();
         xImg.color = new Color(0.8f, 0.2f, 0.2f, 0.9f);
+        var xBtn = xBtnGO.AddComponent<Button>();
+        xBtn.targetGraphic = xImg;
 
-        var xTxt = AddTMPText(xBtn.gameObject, "X");
-        xTxt.text      = "✕";
-        xTxt.fontSize  = 12f;
-        xTxt.alignment = TextAlignmentOptions.Center;
-        xTxt.color     = Color.white;
+        var xTxtGO = new GameObject("X", typeof(RectTransform));
+        xTxtGO.transform.SetParent(xBtnGO.transform, false);
+        var xTxtRT = xTxtGO.GetComponent<RectTransform>();
+        xTxtRT.anchorMin = Vector2.zero;
+        xTxtRT.anchorMax = Vector2.one;
+        xTxtRT.sizeDelta = Vector2.zero;
+        var xTxt = xTxtGO.AddComponent<TextMeshProUGUI>();
+        if (cardFont != null) xTxt.font = cardFont;
+        xTxt.text          = "X";
+        xTxt.fontSize      = 12f;
+        xTxt.alignment     = TextAlignmentOptions.Center;
+        xTxt.color         = Color.white;
         xTxt.raycastTarget = false;
 
         var capturedItem = item;
         xBtn.onClick.AddListener(() => OnDiscardClicked(capturedItem));
 
-        // 카드 클릭 이벤트 (Button on root)
-        var clickBtn = cardGO.AddComponent<Button>();
-        var clickBtnImg = cardGO.GetComponent<Image>();
-        if (clickBtnImg == null) clickBtnImg = cardGO.AddComponent<Image>();
-        clickBtnImg.color = Color.clear;
+        // 슬롯 클릭 버튼 (배경 이미지에 Button 추가)
+        var clickBtn = slotGO.GetComponent<Button>() ?? slotGO.AddComponent<Button>();
+        var clickBtnImg = slotGO.GetComponent<Image>();
         clickBtn.targetGraphic = clickBtnImg;
+        clickBtn.onClick.RemoveAllListeners();
         clickBtn.onClick.AddListener(() => OnCardClicked(capturedItem));
-
-        return cardGO;
     }
 
     // ── Shape Management ──
 
     private void EnsureShapeExists(RuntimeItemData item)
     {
-        if (item == null || item.shapeId == 0) return;
+        if (item == null || item.shapeId == 0)
+        {
+            Debug.LogWarning($"[StagingAreaView] EnsureShapeExists 조기반환: shapeId={item?.shapeId} (item={item?.itemId})");
+            return;
+        }
         if (_shapeByInstanceId.ContainsKey(item.instanceId)) return;
 
+        if (boardManager == null) boardManager = BoardManager.Instance;
         if (boardManager == null)
-            boardManager = BoardManager.Instance;
-        if (boardManager == null) return;
+        {
+            Debug.LogWarning($"[StagingAreaView] BoardManager null — shape 생성 불가 (item={item.itemId})");
+            return;
+        }
 
         var blockData = Managers.BlockData;
-        if (blockData == null) return;
+        if (blockData == null)
+        {
+            Debug.LogWarning($"[StagingAreaView] BlockDataManager null — shape 생성 불가 (item={item.itemId})");
+            return;
+        }
 
         var shapeEntry = blockData.GetShape(item.shapeId);
         if (shapeEntry == null)
@@ -285,7 +415,7 @@ public sealed class StagingAreaView : MonoBehaviour
         var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
 
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
-        shapeSO.shapeName       = shapeEntry.shape_name;
+        shapeSO.shapeName        = shapeEntry.shape_name;
         shapeSO.shapeBlockPrefab = boardManager.defaultShapeBlockPrefab;
         shapeSO.cellOffsets      = offsets;
         shapeSO.cellSize         = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
@@ -298,101 +428,49 @@ public sealed class StagingAreaView : MonoBehaviour
         }
     }
 
-    // ── Section Labels ──
+    // ── Layout Helpers ──
 
-    private readonly List<GameObject> _sectionLabels = new();
-
-    private void ClearSectionLabels()
+    private static void PositionSlot(RectTransform rt, int index)
     {
-        foreach (var go in _sectionLabels)
-            if (go != null) Destroy(go);
-        _sectionLabels.Clear();
-    }
-
-    private GameObject CreateSectionLabel(string text, bool isNew)
-    {
-        var go  = new GameObject($"Section_{text}", typeof(RectTransform));
-        go.transform.SetParent(scrollContent, false);
-        var rt  = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(isNew ? 110f : 76f, CARD_HEIGHT);
-
-        var txt = go.AddComponent<TMPro.TextMeshProUGUI>();
-        if (cardFont != null) txt.font = cardFont;
-        txt.text      = text;
-        txt.fontSize  = 11f;
-        txt.color     = isNew ? new Color(1f, 0.92f, 0.3f, 0.9f) : new Color(0.6f, 0.65f, 0.75f, 0.8f);
-        txt.alignment = TMPro.TextAlignmentOptions.MidlineLeft;
-        txt.enableWordWrapping = false;
-        txt.raycastTarget = false;
-        _sectionLabels.Add(go);
-        return go;
-    }
-
-    // ── Layout ──
-
-    private void RebuildLayout()
-    {
-        if (scrollContent == null) return;
-
-        ClearSectionLabels();
-
-        // 미배치(기존)와 신규 아이템 분리
-        var normalItems = new List<RuntimeItemData>();
-        var newItems    = new List<RuntimeItemData>();
-        foreach (var item in _knownItems)
-        {
-            if (_newItemIds.Contains(item.instanceId)) newItems.Add(item);
-            else                                        normalItems.Add(item);
-        }
-
-        float x = CARD_SPACING;
-
-        // 미배치 섹션
-        if (normalItems.Count > 0)
-        {
-            var lbl = CreateSectionLabel("미배치", false);
-            PositionElement(lbl.GetComponent<RectTransform>(), x);
-            x += 76f + CARD_SPACING;
-
-            foreach (var item in normalItems)
-            {
-                if (!_cardByInstanceId.TryGetValue(item.instanceId, out var card)) continue;
-                PositionElement(card.GetComponent<RectTransform>(), x);
-                x += CARD_WIDTH + CARD_SPACING;
-            }
-        }
-
-        // 새로 얻은 아이템 섹션
-        if (newItems.Count > 0)
-        {
-            var lbl = CreateSectionLabel("✦ 새로 얻은 아이템", true);
-            PositionElement(lbl.GetComponent<RectTransform>(), x);
-            x += 110f + CARD_SPACING;
-
-            foreach (var item in newItems)
-            {
-                if (!_cardByInstanceId.TryGetValue(item.instanceId, out var card)) continue;
-                PositionElement(card.GetComponent<RectTransform>(), x);
-                x += CARD_WIDTH + CARD_SPACING;
-            }
-        }
-
-        scrollContent.sizeDelta = new Vector2(x, scrollContent.sizeDelta.y);
-    }
-
-    private static void PositionElement(RectTransform rt, float x)
-    {
+        float x = SLOT_SPACING + index * (SLOT_WIDTH + SLOT_SPACING);
         rt.anchorMin        = new Vector2(0f, 0.5f);
         rt.anchorMax        = new Vector2(0f, 0.5f);
         rt.pivot            = new Vector2(0f, 0.5f);
         rt.anchoredPosition = new Vector2(x, 0f);
     }
 
+    private int FindSlotIndex(RuntimeItemData item)
+    {
+        if (item == null) return -1;
+        for (int i = 0; i < RunItemInventory.MaxStagingCapacity; i++)
+            if (_slotItems[i] == item) return i;
+        return -1;
+    }
+
+    private void ApplySlotBorderColor(int index, RuntimeItemData item)
+    {
+        if (index < 0 || index >= RunItemInventory.MaxStagingCapacity) return;
+        var slotGO = _slotGOs[index];
+        if (slotGO == null) return;
+        var borderImg = slotGO.transform.Find("Border")?.GetComponent<Image>();
+        if (borderImg == null) return;
+
+        if (item == null)
+        {
+            borderImg.color = COLOR_EMPTY_BORDER;
+        }
+        else
+        {
+            bool isNew = _newItemIds.Contains(item.instanceId);
+            borderImg.color = isNew ? COLOR_NEW_BORDER : COLOR_NORMAL_BORDER;
+        }
+    }
+
     // ── Event Handlers ──
 
     private void OnCardClicked(RuntimeItemData item)
     {
-        itemInfoPanel?.ShowItem(item, isNew: false);
+        OnItemSelected?.Invoke(item);
     }
 
     private void OnDiscardClicked(RuntimeItemData item)
@@ -462,7 +540,7 @@ public sealed class StagingAreaView : MonoBehaviour
         btnRT.anchorMax        = anchorMax;
         btnRT.sizeDelta        = Vector2.zero;
         btnRT.anchoredPosition = new Vector2(0f, 6f);
-        var btnBG  = btnGO.AddComponent<Image>();
+        var btnBG = btnGO.AddComponent<Image>();
         btnBG.color = bgColor;
         var btn = btnGO.AddComponent<Button>();
         btn.targetGraphic = btnBG;
@@ -504,29 +582,11 @@ public sealed class StagingAreaView : MonoBehaviour
         if (item == null) return;
 
         RemoveShapeForItem(item);
-        RemoveCard(item);
-        _knownItems.Remove(item);
         var run = GameRunBootstrapper.Instance?.Run;
         run?.ItemInventory?.DiscardFromStaging(item);
     }
 
     // ── Helpers ──
-
-    private T AddChild<T>(GameObject parent, string name) where T : Component
-    {
-        var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent.transform, false);
-        return go.GetComponent<T>() ?? go.AddComponent<T>();
-    }
-
-    private TextMeshProUGUI AddTMPText(GameObject parent, string name)
-    {
-        var go  = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent.transform, false);
-        var txt = go.AddComponent<TextMeshProUGUI>();
-        if (cardFont != null) txt.font = cardFont;
-        return txt;
-    }
 
     private static Color RarityColor(ItemRarity rarity) => rarity switch
     {

@@ -13,7 +13,8 @@ using UnityEngine.UI;
 ///   2) 스크린 스페이스 "[F] 보상 수령" — 트리거 범위 진입 시
 ///
 /// F 키 입력 흐름:
-///   수령 확인 팝업(Addressable) → 아이템 지급 → 결과 화면(코드 생성) → StageMap 복귀
+///   수령 확인 팝업(Addressable) → 아이템 지급(팝업 + 그리드 열기) → 노드 클리어 마킹
+///   ※ 스테이지 전환은 별도 메커니즘이 담당한다.
 /// </summary>
 public class ClearRewardTrigger : MonoBehaviour
 {
@@ -36,9 +37,6 @@ public class ClearRewardTrigger : MonoBehaviour
     private TextMeshProUGUI _distanceText;
     private Sprite     _rewardSprite;
 
-    // 코드 생성 결과 화면
-    private GameObject _resultScreenGO;
-    private UniTaskCompletionSource _resultTcs;
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -85,8 +83,6 @@ public class ClearRewardTrigger : MonoBehaviour
     {
         if (_promptGO         != null) Destroy(_promptGO);
         if (_worldIndicatorGO != null) Destroy(_worldIndicatorGO);
-        if (_resultScreenGO   != null) Destroy(_resultScreenGO);
-        _resultTcs?.TrySetResult();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -118,7 +114,8 @@ public class ClearRewardTrigger : MonoBehaviour
         var acquirePopup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ClearReward>();
         if (acquirePopup == null)
         {
-            await GiveAllRewardsWithPopupAsync(ct);
+            try { await GiveAllRewardsWithPopupAsync(ct); }
+            catch (OperationCanceledException) { return; }
         }
         else
         {
@@ -131,22 +128,11 @@ public class ClearRewardTrigger : MonoBehaviour
                 Destroy(gameObject);
                 return;
             }
-            await GiveAllRewardsWithPopupAsync(ct);
+            try { await GiveAllRewardsWithPopupAsync(ct); }
+            catch (OperationCanceledException) { return; }
         }
 
-        // 2단계: 아이템 확인 화면 (코드 생성 — Addressable 불필요)
-        ShowResultScreen();
-        try
-        {
-            await WaitForResultConfirmAsync().AttachExternalCancellation(ct);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            if (_resultScreenGO != null) Destroy(_resultScreenGO);
-        }
-
-        // 3단계: 스테이지 노드 클리어 → StageMap 복귀
+        // 노드 클리어 마킹 (스테이지 전환은 별도 메커니즘이 담당)
         var spm = _run?.StagePointManager;
         if (spm != null && spm.CurrentPointId >= 0)
             spm.MarkCleared(spm.CurrentPointId);
@@ -158,7 +144,22 @@ public class ClearRewardTrigger : MonoBehaviour
             Debug.Log($"[ClearRewardTrigger] 보스방 클리어 — 챕터 전환 {(advanced ? "성공" : "마지막 챕터")}");
         }
 
-        AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
+        // 방 클리어 시점 저장 (플레이어는 현재 존 위치 + 게이트 선택지 유지 상태로 재개)
+        var rp = RunProgressManager.Instance;
+        if (rp != null && _run != null && _run.IsRunning)
+        {
+            try { await rp.SaveAsync(_run, rp.ActiveSlotIndex); }
+            catch (OperationCanceledException) { return; }
+        }
+
+        // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
+        // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
+        if (!_isBossRoom)
+        {
+            var zoneProgression = _run?.ZoneProgression;
+            zoneProgression?.EnableExitGateForZone(zoneProgression.CurrentZoneIndex);
+        }
+
         Destroy(gameObject);
     }
 
@@ -189,295 +190,11 @@ public class ClearRewardTrigger : MonoBehaviour
             popup.Setup(data, _run.ItemInventory);
 
             // 팝업이 닫힐 때까지 대기 (버튼 클릭 시 팝업이 스스로 ClosePopupUI 호출)
-            try
-            {
-                await UniTask.WaitUntil(() => popup == null || !popup.gameObject.activeSelf,
-                    cancellationToken: ct);
-            }
-            catch (System.OperationCanceledException)
-            {
-                return;
-            }
+            await UniTask.WaitUntil(() => popup == null || !popup.gameObject.activeSelf,
+                cancellationToken: ct);
 
-            Debug.Log($"[ClearRewardTrigger] 아이템 처리 완료: {data.displayName}");
-        }
-
-        // [그리드 열기]를 눌렀으면 그리드 패널이 열려 있음 → 닫힐 때까지 대기
-        // (그 전에 ShowResultScreen을 호출하면 sortingOrder=20 화면이 그리드를 덮어버림)
-        try
-        {
-            if (UI_GridPanel.Instance != null && UI_GridPanel.Instance.gameObject.activeSelf)
-            {
-                await UniTask.WaitUntil(
-                    () => UI_GridPanel.Instance == null || !UI_GridPanel.Instance.gameObject.activeSelf,
-                    cancellationToken: ct);
-            }
-        }
-        catch (System.OperationCanceledException)
-        {
-            return;
         }
     }
-
-    // ── Result Screen (코드 생성) ──────────────────────────────
-
-    private void ShowResultScreen()
-    {
-        _resultScreenGO = new GameObject("ResultScreen");
-
-        var canvas = _resultScreenGO.AddComponent<Canvas>();
-        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 20;
-        _resultScreenGO.AddComponent<CanvasScaler>();
-        _resultScreenGO.AddComponent<GraphicRaycaster>();
-
-        // 배경 딤
-        var dimGO  = new GameObject("Dim");
-        dimGO.transform.SetParent(_resultScreenGO.transform, false);
-        var dimImg = dimGO.AddComponent<Image>();
-        dimImg.color = new Color(0f, 0f, 0f, 0.7f);
-        var dimRT  = dimGO.GetComponent<RectTransform>();
-        dimRT.anchorMin = Vector2.zero;
-        dimRT.anchorMax = Vector2.one;
-        dimRT.offsetMin = Vector2.zero;
-        dimRT.offsetMax = Vector2.zero;
-
-        // 패널
-        var panelGO  = new GameObject("Panel");
-        panelGO.transform.SetParent(_resultScreenGO.transform, false);
-        var panelImg = panelGO.AddComponent<Image>();
-        panelImg.color = new Color(0.1f, 0.1f, 0.15f, 0.97f);
-        var panelRT  = panelGO.GetComponent<RectTransform>();
-        panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        panelRT.pivot            = new Vector2(0.5f, 0.5f);
-        panelRT.sizeDelta        = new Vector2(640f, 360f);
-        panelRT.anchoredPosition = Vector2.zero;
-
-        // 타이틀
-        var titleGO  = new GameObject("Title");
-        titleGO.transform.SetParent(panelGO.transform, false);
-        var titleTmp = titleGO.AddComponent<TextMeshProUGUI>();
-        titleTmp.text      = "보상 획득!";
-        titleTmp.fontSize  = 28f;
-        titleTmp.fontStyle = FontStyles.Bold;
-        titleTmp.alignment = TextAlignmentOptions.Center;
-        titleTmp.color     = new Color(1f, 0.84f, 0f);
-        var titleRT  = titleGO.GetComponent<RectTransform>();
-        titleRT.anchorMin        = new Vector2(0f, 1f);
-        titleRT.anchorMax        = new Vector2(1f, 1f);
-        titleRT.pivot            = new Vector2(0.5f, 1f);
-        titleRT.sizeDelta        = new Vector2(0f, 60f);
-        titleRT.anchoredPosition = new Vector2(0f, -10f);
-
-        // 아이템 카드 컨테이너 (HorizontalLayout)
-        var containerGO = new GameObject("ItemCardContainer");
-        containerGO.transform.SetParent(panelGO.transform, false);
-        var hLayout = containerGO.AddComponent<HorizontalLayoutGroup>();
-        hLayout.spacing              = 16f;
-        hLayout.childAlignment       = TextAnchor.MiddleCenter;
-        hLayout.childForceExpandWidth  = false;
-        hLayout.childForceExpandHeight = false;
-        var containerRT = containerGO.GetComponent<RectTransform>();
-        containerRT.anchorMin        = new Vector2(0f, 0.2f);
-        containerRT.anchorMax        = new Vector2(1f, 0.85f);
-        containerRT.offsetMin        = new Vector2(20f, 0f);
-        containerRT.offsetMax        = new Vector2(-20f, 0f);
-
-        // 아이템 카드 생성
-        if (_rewards != null)
-        {
-            foreach (var (data, so) in _rewards)
-                SpawnItemCard(containerGO.transform, data, so);
-        }
-
-        // 돌아가기 버튼
-        var btnGO  = new GameObject("BackBtn");
-        btnGO.transform.SetParent(panelGO.transform, false);
-        var btnImg = btnGO.AddComponent<Image>();
-        btnImg.color = new Color(0.18f, 0.44f, 0.76f);
-        var btn    = btnGO.AddComponent<Button>();
-        btn.targetGraphic = btnImg;
-        btn.onClick.AddListener(OnResultConfirm);
-        var btnRT  = btnGO.GetComponent<RectTransform>();
-        btnRT.anchorMin        = new Vector2(0.5f, 0f);
-        btnRT.anchorMax        = new Vector2(0.5f, 0f);
-        btnRT.pivot            = new Vector2(0.5f, 0f);
-        btnRT.sizeDelta        = new Vector2(180f, 48f);
-        btnRT.anchoredPosition = new Vector2(0f, 16f);
-
-        var btnTextGO  = new GameObject("BtnText");
-        btnTextGO.transform.SetParent(btnGO.transform, false);
-        var btnTmp = btnTextGO.AddComponent<TextMeshProUGUI>();
-        btnTmp.text      = "돌아가기";
-        btnTmp.fontSize  = 20f;
-        btnTmp.alignment = TextAlignmentOptions.Center;
-        btnTmp.color     = Color.white;
-        var btnTextRT    = btnTextGO.GetComponent<RectTransform>();
-        btnTextRT.anchorMin = Vector2.zero;
-        btnTextRT.anchorMax = Vector2.one;
-        btnTextRT.offsetMin = Vector2.zero;
-        btnTextRT.offsetMax = Vector2.zero;
-    }
-
-    private void SpawnItemCard(Transform parent, RuntimeItemData data, ItemSO so)
-    {
-        var cardGO = new GameObject("ItemCard");
-        cardGO.transform.SetParent(parent, false);
-        var cardRT = cardGO.AddComponent<RectTransform>();
-        cardRT.sizeDelta = new Vector2(140f, 200f);
-        cardGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
-
-        // 등급 배경
-        var bgGO  = new GameObject("RarityBG");
-        bgGO.transform.SetParent(cardGO.transform, false);
-        var bgImg = bgGO.AddComponent<Image>();
-        bgImg.color = GetRarityColor(data?.rarity ?? ItemRarity.Common);
-        var bgRT  = bgGO.GetComponent<RectTransform>();
-        bgRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        bgRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        bgRT.pivot            = new Vector2(0.5f, 0.5f);
-        bgRT.sizeDelta        = new Vector2(100f, 100f);
-        bgRT.anchoredPosition = new Vector2(0f, 42f);
-
-        // 아이콘 (ItemSO.icon 직접 참조 — 상점과 동일 방식)
-        var sprite = so?.icon ?? data?.icon;
-        if (sprite != null)
-        {
-            var iconGO  = new GameObject("Icon");
-            iconGO.transform.SetParent(bgGO.transform, false);
-            var iconImg = iconGO.AddComponent<Image>();
-            iconImg.sprite              = sprite;
-            iconImg.preserveAspect      = true;
-            var iconRT = iconGO.GetComponent<RectTransform>();
-            iconRT.anchorMin = Vector2.zero;
-            iconRT.anchorMax = Vector2.one;
-            iconRT.offsetMin = new Vector2(8f, 8f);
-            iconRT.offsetMax = new Vector2(-8f, -8f);
-        }
-
-        // 블록 그리드 모양 미리보기
-        if (data != null && data.shapeId > 0)
-        {
-            var shapeEntry = Managers.BlockData?.GetShape(data.shapeId);
-            if (shapeEntry != null)
-            {
-                var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
-                SpawnShapeMini(cardGO.transform, offsets, new Vector2(0f, -22f));
-            }
-        }
-
-        // 아이템 이름
-        var nameGO  = new GameObject("Name");
-        nameGO.transform.SetParent(cardGO.transform, false);
-        var nameTmp = nameGO.AddComponent<TextMeshProUGUI>();
-        nameTmp.text      = data?.displayName ?? so?.name ?? "";
-        nameTmp.fontSize  = 13f;
-        nameTmp.alignment = TextAlignmentOptions.Center;
-        nameTmp.color     = Color.white;
-        var nameRT  = nameGO.GetComponent<RectTransform>();
-        nameRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        nameRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        nameRT.pivot            = new Vector2(0.5f, 0.5f);
-        nameRT.sizeDelta        = new Vector2(130f, 25f);
-        nameRT.anchoredPosition = new Vector2(0f, -68f);
-
-        // 등급 텍스트
-        var rarityGO  = new GameObject("Rarity");
-        rarityGO.transform.SetParent(cardGO.transform, false);
-        var rarityTmp = rarityGO.AddComponent<TextMeshProUGUI>();
-        var rarity    = data?.rarity ?? ItemRarity.Common;
-        rarityTmp.text      = $"<color={GetRarityHex(rarity)}>{rarity}</color>";
-        rarityTmp.fontSize  = 11f;
-        rarityTmp.alignment = TextAlignmentOptions.Center;
-        rarityTmp.color     = Color.white;
-        var rarityRT  = rarityGO.GetComponent<RectTransform>();
-        rarityRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        rarityRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        rarityRT.pivot            = new Vector2(0.5f, 0.5f);
-        rarityRT.sizeDelta        = new Vector2(130f, 20f);
-        rarityRT.anchoredPosition = new Vector2(0f, -88f);
-    }
-
-    private static void SpawnShapeMini(Transform parent, Vector2Int[] offsets, Vector2 anchoredPos)
-    {
-        if (offsets == null || offsets.Length == 0) return;
-
-        int minC = int.MaxValue, maxC = int.MinValue;
-        int minR = int.MaxValue, maxR = int.MinValue;
-
-        foreach (var o in offsets)
-        {
-            int c = o.x;
-            int r = -o.y;
-            if (c < minC) minC = c;
-            if (c > maxC) maxC = c;
-            if (r < minR) minR = r;
-            if (r > maxR) maxR = r;
-        }
-
-        int cols = maxC - minC + 1;
-        int rows = maxR - minR + 1;
-
-        const float CellSize = 9f;
-        const float Gap      = 1f;
-        const float Step     = CellSize + Gap;
-
-        float totalW = cols * CellSize + (cols - 1) * Gap;
-        float totalH = rows * CellSize + (rows - 1) * Gap;
-
-        var containerGO = new GameObject("ShapeMini");
-        containerGO.transform.SetParent(parent, false);
-        var containerRT = containerGO.AddComponent<RectTransform>();
-        containerRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        containerRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        containerRT.pivot            = new Vector2(0.5f, 0.5f);
-        containerRT.sizeDelta        = new Vector2(totalW, totalH);
-        containerRT.anchoredPosition = anchoredPos;
-
-        // 빈 셀 배경 (어두운 격자)
-        for (int r = 0; r < rows; r++)
-        {
-            for (int c = 0; c < cols; c++)
-            {
-                var bgCell = new GameObject("BgCell");
-                bgCell.transform.SetParent(containerGO.transform, false);
-                bgCell.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
-                var rt = bgCell.GetComponent<RectTransform>();
-                rt.anchorMin        = new Vector2(0f, 1f);
-                rt.anchorMax        = new Vector2(0f, 1f);
-                rt.pivot            = new Vector2(0f, 1f);
-                rt.sizeDelta        = new Vector2(CellSize, CellSize);
-                rt.anchoredPosition = new Vector2(c * Step, -r * Step);
-            }
-        }
-
-        // 채워진 셀 (파란색)
-        var fillColor = new Color(0.35f, 0.65f, 1f, 0.95f);
-        foreach (var o in offsets)
-        {
-            int c = o.x - minC;
-            int r = -o.y - minR;
-
-            var cell = new GameObject("Cell");
-            cell.transform.SetParent(containerGO.transform, false);
-            cell.AddComponent<Image>().color = fillColor;
-            var rt = cell.GetComponent<RectTransform>();
-            rt.anchorMin        = new Vector2(0f, 1f);
-            rt.anchorMax        = new Vector2(0f, 1f);
-            rt.pivot            = new Vector2(0f, 1f);
-            rt.sizeDelta        = new Vector2(CellSize, CellSize);
-            rt.anchoredPosition = new Vector2(c * Step, -r * Step);
-        }
-    }
-
-    private UniTask WaitForResultConfirmAsync()
-    {
-        _resultTcs = new UniTaskCompletionSource();
-        return _resultTcs.Task;
-    }
-
-    private void OnResultConfirm() => _resultTcs?.TrySetResult();
 
     // ── World Indicator (아이콘 + 거리) ───────────────────────
 
@@ -596,22 +313,6 @@ public class ClearRewardTrigger : MonoBehaviour
     }
 
     // ── Helpers ────────────────────────────────────────────────
-
-    private static Color GetRarityColor(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Common => new Color(0.165f, 0.165f, 0.290f),
-        ItemRarity.Rare   => new Color(0.0f,   0.25f,  0.35f),
-        ItemRarity.Epic   => new Color(0.25f,  0.1f,   0.35f),
-        _                 => new Color(0.165f, 0.165f, 0.290f),
-    };
-
-    private static string GetRarityHex(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Common => "#FFFFFF",
-        ItemRarity.Rare   => "#00FFFF",
-        ItemRarity.Epic   => "#CC66FF",
-        _                 => "#FFFFFF",
-    };
 
     private static bool IsPlayer(Collider col)
         => col.GetComponentInParent<PlayerController>() != null;

@@ -54,6 +54,7 @@ public sealed class Managers : MonoBehaviour
     private ShopDataManager _shopDataManager;
     private QuestManager _questManager;
     private DialogueDataManager _dialogueDataManager;
+    private ZoneLayoutManager _zoneLayoutManager;
 
     // ---- Static Accessors (C# 9 Safe) ----
     public static InputManager Input
@@ -356,6 +357,20 @@ public sealed class Managers : MonoBehaviour
                 inst._dialogueDataManager = new DialogueDataManager();
 
             return inst._dialogueDataManager;
+        }
+    }
+
+    public static ZoneLayoutManager ZoneLayout
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._zoneLayoutManager == null)
+                inst._zoneLayoutManager = new ZoneLayoutManager();
+
+            return inst._zoneLayoutManager;
         }
     }
     #endregion

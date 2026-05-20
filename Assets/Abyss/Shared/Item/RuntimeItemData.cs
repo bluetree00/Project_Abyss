@@ -65,6 +65,13 @@ public class RuntimeItemData
                     if (e.shape_id > 0) { data.shapeId = e.shape_id; break; }
         }
 
+        // 최후 폴백: ITEM_DATA에도 없으면 itemId 해시 기반으로 shape 1~10 순환 할당
+        if (data.shapeId == 0 && !string.IsNullOrEmpty(data.itemId))
+        {
+            data.shapeId = (UnityEngine.Mathf.Abs(data.itemId.GetHashCode()) % 10) + 1;
+            Debug.LogWarning($"[RuntimeItemData] {data.itemId}: shapeId 미설정 — 임시 할당 shapeId={data.shapeId}");
+        }
+
         return data;
     }
 

@@ -227,20 +227,39 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         if (canvasGroup == null) return;
 
+        var rt = GetComponent<RectTransform>();
+        float originX = rt != null ? rt.anchoredPosition.x : 0f;
+        const float SLIDE_OFFSET = 40f;
+
         try
         {
             canvasGroup.alpha = 0f;
+            if (rt != null)
+                rt.anchoredPosition = new Vector2(originX + SLIDE_OFFSET, rt.anchoredPosition.y);
+
             float t = 0f;
             while (t < 1f)
             {
                 ct.ThrowIfCancellationRequested();
                 t += Time.unscaledDeltaTime / SLIDE_DURATION;
-                canvasGroup.alpha = Mathf.Clamp01(t);
+                float eased = Mathf.Clamp01(t);
+                canvasGroup.alpha = eased;
+                if (rt != null)
+                    rt.anchoredPosition = new Vector2(
+                        Mathf.Lerp(originX + SLIDE_OFFSET, originX, eased),
+                        rt.anchoredPosition.y);
                 await UniTask.Yield(PlayerLoopTiming.Update, ct);
             }
             canvasGroup.alpha = 1f;
+            if (rt != null)
+                rt.anchoredPosition = new Vector2(originX, rt.anchoredPosition.y);
         }
-        catch (System.OperationCanceledException) { }
+        catch (System.OperationCanceledException)
+        {
+            canvasGroup.alpha = 1f;
+            if (rt != null)
+                rt.anchoredPosition = new Vector2(originX, rt.anchoredPosition.y);
+        }
     }
 
     // ── Helpers ──

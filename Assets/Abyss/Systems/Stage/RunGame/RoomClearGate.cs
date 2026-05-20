@@ -70,7 +70,6 @@ public class RoomClearGate : MonoBehaviour
             Instantiate(endEffectPrefab, center, Quaternion.identity);
 
         var (itemData, itemSO) = RollRewardItem();
-        if (itemData == null) return;
 
         try
         {
@@ -78,7 +77,18 @@ public class RoomClearGate : MonoBehaviour
         }
         catch (OperationCanceledException) { return; }
 
-        SpawnRewardObject(center, itemData, itemSO);
+        if (itemData != null)
+            SpawnRewardObject(center, itemData, itemSO);
+        else
+            ActivateExitGateDirect(); // 아이템 없을 때도 게이트는 반드시 활성화
+    }
+
+    private void ActivateExitGateDirect()
+    {
+        var progression = _run?.ZoneProgression;
+        if (progression == null) return;
+        progression.EnableExitGateForZone(progression.CurrentZoneIndex);
+        Debug.Log("[RoomClearGate] 드롭 없음 — 존 클리어 게이트 직접 활성화");
     }
 
     private void SpawnRewardObject(Vector3 center, RuntimeItemData itemData, ItemSO itemSO)
