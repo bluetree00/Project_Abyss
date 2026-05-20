@@ -5,7 +5,6 @@ public enum GameFlowState
 {
     None,
     Logo,
-    Login,
     Lobby,
     StageMap,
     InGame,
@@ -24,7 +23,6 @@ public sealed class GameFlow
     private static readonly Dictionary<Define.Scene, GameFlowState> _sceneStateMap = new()
     {
         { Define.Scene.Logo,      GameFlowState.Logo      },
-        { Define.Scene.Login,     GameFlowState.Login     },
         { Define.Scene.Lobby,     GameFlowState.Lobby     },
         { Define.Scene.StageMap,  GameFlowState.StageMap  },
         { Define.Scene.GameScene, GameFlowState.InGame    },
