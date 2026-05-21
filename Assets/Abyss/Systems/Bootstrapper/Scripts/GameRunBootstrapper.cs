@@ -180,7 +180,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // IsRunning이 true면 StageMap을 거쳐 전투 씬으로 진입한 것 → 전투 시작
         // zone-layout 이어하기: 마지막 클리어된 존에서 재개하며 출구 게이트 활성화 상태로 복원
         // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → Wisp 모드 (에디터 직접 실행 시 false)
-        if (_run != null && _run.IsRunning)
+        // DebugStageRunPanel이 있으면 해당 패널이 StartRunAsync를 통해 전투를 시작하므로 중복 실행 방지
+        bool hasDebugPanel = Object.FindFirstObjectByType<DebugStageRunPanel>() != null;
+        if (_run != null && _run.IsRunning && !hasDebugPanel)
         {
             if (startWithZoneLayout)
                 await ContinueZoneLayoutRunAsync(this.GetCancellationTokenOnDestroy());
@@ -189,7 +191,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
         else if (IsInStartRoom)
             await StartRoomAsync();
-        else if (Object.FindFirstObjectByType<DebugStageRunPanel>() == null)
+        else if (!hasDebugPanel)
             await StartCombatDirectAsync(); // 에디터 직접 실행 fallback (DebugStageRunPanel 없을 때만)
 
         AppBootstrapper.Instance?.NotifySceneReady();
