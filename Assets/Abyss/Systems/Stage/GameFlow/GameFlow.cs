@@ -5,11 +5,11 @@ public enum GameFlowState
 {
     None,
     Logo,
-    Login,
+    Tutorial,
+    BaseCamp,
     Lobby,
     StageMap,
     InGame,
-    Result,
 }
 
 public sealed class GameFlow
@@ -23,12 +23,16 @@ public sealed class GameFlow
     // 씬이 상태의 근거: 씬 → 상태 매핑은 GameFlow 내부에서 관리
     private static readonly Dictionary<Define.Scene, GameFlowState> _sceneStateMap = new()
     {
-        { Define.Scene.Logo,      GameFlowState.Logo      },
-        { Define.Scene.Login,     GameFlowState.Login     },
-        { Define.Scene.Lobby,     GameFlowState.Lobby     },
-        { Define.Scene.StageMap,  GameFlowState.StageMap  },
-        { Define.Scene.GameScene, GameFlowState.InGame    },
-        { Define.Scene.Result,    GameFlowState.Result    },
+        { Define.Scene.Logo,           GameFlowState.Logo      },
+        { Define.Scene.Tutorial,       GameFlowState.Tutorial  },
+        { Define.Scene.BaseCamp,       GameFlowState.BaseCamp  },
+        { Define.Scene.Lobby,          GameFlowState.Lobby     },
+        { Define.Scene.StageMap,       GameFlowState.StageMap  },
+        { Define.Scene.GameScene,      GameFlowState.InGame    },
+        { Define.Scene.GameScene_Ch1,  GameFlowState.InGame    },
+        { Define.Scene.GameScene_Ch2,  GameFlowState.InGame    },
+        { Define.Scene.GameScene_Ch3,  GameFlowState.InGame    },
+        { Define.Scene.GameScene_Ch4,  GameFlowState.InGame    },
     };
 
     public void BindSceneTransition(SceneTransitionManager sceneTransition)

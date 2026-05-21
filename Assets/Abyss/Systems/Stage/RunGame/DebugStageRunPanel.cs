@@ -150,10 +150,9 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         else
         {
             Debug.Log("[DebugRunPanel] 마지막 챕터 클리어! 런 종료.");
-            // TODO: 런 클리어 결과 화면으로 전환
             var app = AppBootstrapper.Instance;
             if (app != null)
-                app.RequestLoad(Define.Scene.Result);
+                app.RequestLoad(Define.Scene.Lobby);
         }
     }
 

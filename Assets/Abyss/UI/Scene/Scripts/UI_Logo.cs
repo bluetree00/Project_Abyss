@@ -20,11 +20,7 @@ public class UI_Logo : UI_Scene
         await FadeAsync(1f, fadeInDuration);
         await UniTask.Delay(System.TimeSpan.FromSeconds(holdDuration), ignoreTimeScale: true);
 
-        // 자동 로그인이 이미 성공했으면 Lobby로 직행
-        if (AppBootstrapper.IsAutoLoggedIn)
-            AppBootstrapper.Instance.RequestLoad(Define.Scene.Lobby);
-        else
-            AppBootstrapper.Instance.RequestLoad(Define.Scene.Login);
+        AppBootstrapper.Instance.RequestLoad(Define.Scene.Lobby);
     }
 
     private async UniTask FadeAsync(float target, float duration)
