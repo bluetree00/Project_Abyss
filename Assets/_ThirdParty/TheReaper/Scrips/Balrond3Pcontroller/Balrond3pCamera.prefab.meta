@@ -10,5 +10,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Scrips/Balrond3Pcontroller/Balrond3pCamera.prefab
+  assetPath: Assets/_ThirdParty/TheReaper/Scrips/Balrond3Pcontroller/Balrond3pCamera.prefab
   uploadId: 467556

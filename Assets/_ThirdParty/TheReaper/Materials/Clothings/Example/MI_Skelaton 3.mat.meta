@@ -11,5 +11,6 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Materials/Clothings/Example/MI_Skelaton 3.mat
+  assetPath: Assets/_ThirdParty/TheReaper/Materials/Clothings/Example/MI_Skelaton
+    3.mat
   uploadId: 467556

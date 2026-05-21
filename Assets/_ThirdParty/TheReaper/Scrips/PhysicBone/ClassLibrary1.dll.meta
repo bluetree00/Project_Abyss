@@ -36,5 +36,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Scrips/PhysicBone/ClassLibrary1.dll
+  assetPath: Assets/_ThirdParty/TheReaper/Scrips/PhysicBone/ClassLibrary1.dll
   uploadId: 467556

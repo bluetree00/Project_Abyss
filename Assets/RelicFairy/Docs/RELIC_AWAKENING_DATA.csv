@@ -1,0 +1,61 @@
+index,category_id,level,stat_type,value,cost,description
+1001,sword,1,AttackPower,3,50,검의 각성 1단계 — 공격력 +3
+1002,sword,2,AttackPower,3,100,검의 각성 2단계 — 공격력 +3
+1003,sword,3,AttackPower,4,150,검의 각성 3단계 — 공격력 +4
+1004,sword,4,AttackPower,4,200,검의 각성 4단계 — 공격력 +4
+1005,sword,5,AttackPower,5,250,검의 각성 5단계 — 공격력 +5
+1006,sword,6,AttackPower,5,300,검의 각성 6단계 — 공격력 +5
+1007,sword,7,AttackPower,6,350,검의 각성 7단계 — 공격력 +6
+1008,sword,8,AttackPower,6,400,검의 각성 8단계 — 공격력 +6
+1009,sword,9,AttackPower,8,450,검의 각성 9단계 — 공격력 +8
+1010,sword,10,AttackPower,10,500,검의 각성 10단계 — 공격력 +10
+2001,shield,1,Defense,2,50,방패의 각성 1단계 — 방어력 +2
+2002,shield,2,Defense,2,100,방패의 각성 2단계 — 방어력 +2
+2003,shield,3,Defense,3,150,방패의 각성 3단계 — 방어력 +3
+2004,shield,4,Defense,3,200,방패의 각성 4단계 — 방어력 +3
+2005,shield,5,Defense,4,250,방패의 각성 5단계 — 방어력 +4
+2006,shield,6,Defense,4,300,방패의 각성 6단계 — 방어력 +4
+2007,shield,7,Defense,5,350,방패의 각성 7단계 — 방어력 +5
+2008,shield,8,Defense,5,400,방패의 각성 8단계 — 방어력 +5
+2009,shield,9,Defense,6,450,방패의 각성 9단계 — 방어력 +6
+2010,shield,10,Defense,8,500,방패의 각성 10단계 — 방어력 +8
+3001,heart,1,MaxHp,10,50,심장의 각성 1단계 — 최대 체력 +10
+3002,heart,2,MaxHp,10,100,심장의 각성 2단계 — 최대 체력 +10
+3003,heart,3,MaxHp,15,150,심장의 각성 3단계 — 최대 체력 +15
+3004,heart,4,MaxHp,15,200,심장의 각성 4단계 — 최대 체력 +15
+3005,heart,5,MaxHp,20,250,심장의 각성 5단계 — 최대 체력 +20
+3006,heart,6,MaxHp,20,300,심장의 각성 6단계 — 최대 체력 +20
+3007,heart,7,MaxHp,25,350,심장의 각성 7단계 — 최대 체력 +25
+3008,heart,8,MaxHp,25,400,심장의 각성 8단계 — 최대 체력 +25
+3009,heart,9,MaxHp,30,450,심장의 각성 9단계 — 최대 체력 +30
+3010,heart,10,MaxHp,40,500,심장의 각성 10단계 — 최대 체력 +40
+4001,step,1,MoveSpeed,0.01,50,발걸음의 각성 1단계 — 이동속도 +1%
+4002,step,2,MoveSpeed,0.01,100,발걸음의 각성 2단계 — 이동속도 +1%
+4003,step,3,MoveSpeed,0.01,150,발걸음의 각성 3단계 — 이동속도 +1%
+4004,step,4,MoveSpeed,0.01,200,발걸음의 각성 4단계 — 이동속도 +1%
+4005,step,5,MoveSpeed,0.015,250,발걸음의 각성 5단계 — 이동속도 +1.5%
+4006,step,6,MoveSpeed,0.015,300,발걸음의 각성 6단계 — 이동속도 +1.5%
+4007,step,7,MoveSpeed,0.015,350,발걸음의 각성 7단계 — 이동속도 +1.5%
+4008,step,8,MoveSpeed,0.015,400,발걸음의 각성 8단계 — 이동속도 +1.5%
+4009,step,9,MoveSpeed,0.02,450,발걸음의 각성 9단계 — 이동속도 +2%
+4010,step,10,MoveSpeed,0.02,500,발걸음의 각성 10단계 — 이동속도 +2%
+5001,mana,1,SkillCooldownReduction,0.01,50,마력의 각성 1단계 — 스킬 쿨타임 -1%
+5002,mana,2,SkillCooldownReduction,0.01,100,마력의 각성 2단계 — 스킬 쿨타임 -1%
+5003,mana,3,SkillCooldownReduction,0.01,150,마력의 각성 3단계 — 스킬 쿨타임 -1%
+5004,mana,4,SkillCooldownReduction,0.01,200,마력의 각성 4단계 — 스킬 쿨타임 -1%
+5005,mana,5,SkillCooldownReduction,0.015,250,마력의 각성 5단계 — 스킬 쿨타임 -1.5%
+5006,mana,6,SkillCooldownReduction,0.015,300,마력의 각성 6단계 — 스킬 쿨타임 -1.5%
+5007,mana,7,SkillCooldownReduction,0.015,350,마력의 각성 7단계 — 스킬 쿨타임 -1.5%
+5008,mana,8,SkillCooldownReduction,0.015,400,마력의 각성 8단계 — 스킬 쿨타임 -1.5%
+5009,mana,9,SkillCooldownReduction,0.02,450,마력의 각성 9단계 — 스킬 쿨타임 -2%
+5010,mana,10,SkillCooldownReduction,0.02,500,마력의 각성 10단계 — 스킬 쿨타임 -2%
+6001,luck,1,Luck,1,50,행운의 각성 1단계 — 행운 +1
+6002,luck,2,Luck,1,100,행운의 각성 2단계 — 행운 +1
+6003,luck,3,Luck,2,150,행운의 각성 3단계 — 행운 +2
+6004,luck,4,Luck,2,200,행운의 각성 4단계 — 행운 +2
+6005,luck,5,Luck,2,250,행운의 각성 5단계 — 행운 +2
+6006,luck,6,Luck,3,300,행운의 각성 6단계 — 행운 +3
+6007,luck,7,Luck,3,350,행운의 각성 7단계 — 행운 +3
+6008,luck,8,Luck,3,400,행운의 각성 8단계 — 행운 +3
+6009,luck,9,Luck,4,450,행운의 각성 9단계 — 행운 +4
+6010,luck,10,Luck,5,500,행운의 각성 10단계 — 행운 +5

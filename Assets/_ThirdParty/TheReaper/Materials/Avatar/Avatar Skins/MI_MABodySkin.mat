@@ -18,7 +18,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 2000
+  m_CustomRenderQueue: -1
   stringTagMap:
     MotionVector: User
   disabledShaderPasses:
@@ -191,12 +191,15 @@ Material:
     - _SurfaceType: 0
     - _TransAmbient: 0.2
     - _TransDirect: 1
+    - _TransNormal: 0.5
     - _TransNormalDistortion: 0.1
     - _TransScattering: 2
     - _TransShadow: 0.9
+    - _TransStrength: 1
     - _Translucency: 1
     - _TranslucencyIntensity: 1
     - _TranslucencySpread: 0
+    - _TransmissionShadow: 0.5
     - _TransparentBackfaceEnable: 0
     - _TransparentCullMode: 2
     - _TransparentSortPriority: 0

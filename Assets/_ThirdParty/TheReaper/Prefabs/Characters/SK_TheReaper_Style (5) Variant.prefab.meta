@@ -10,5 +10,6 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Prefabs/Characters/SK_TheReaper_Style (5) Variant.prefab
+  assetPath: Assets/_ThirdParty/TheReaper/Prefabs/Characters/SK_TheReaper_Style (5)
+    Variant.prefab
   uploadId: 467556
