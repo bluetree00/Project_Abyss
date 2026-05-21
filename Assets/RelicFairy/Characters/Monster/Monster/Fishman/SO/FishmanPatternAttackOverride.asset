@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: FishmanPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  patterns:
+  - name: SpearJab
+    animationStateName: Fishman_Attack01
+    minDistance: 0
+    maxDistance: 1.8
+    priority: 0
+    cooldown: 1.1
+    damageDelay: 0.4
+    attackDuration: 0.95
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 3f6a39e2dfb043f699f2d21dd3f3f22d,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  - name: BubbleShot
+    animationStateName: Fishman_Attack02
+    minDistance: 1.6
+    maxDistance: 6
+    priority: 1
+    cooldown: 1.6
+    damageDelay: 0.5
+    attackDuration: 1.15
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 0}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 0
+  engageDistance: 5
+  engageDistanceScale: 0.85

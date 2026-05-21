@@ -11,5 +11,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Prefabs/Floors/SM_Floor_A.prefab
+  assetPath: Assets/_ThirdParty/TheReaper/Prefabs/Floors/SM_Floor_A.prefab
   uploadId: 467556

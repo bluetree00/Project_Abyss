@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: BeholderPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  patterns:
+  - name: Laser2_Burst8
+    animationStateName: Attack02ST
+    minDistance: 0
+    maxDistance: 1.7
+    priority: 1
+    cooldown: 1.25
+    damageDelay: 0.45
+    attackDuration: 1.05
+    damageMultiplier: 1.15
+    knockbackMultiplier: 1.25
+    attackShapeOverride: {fileID: 11400000, guid: 56cb80cf84a84c8c93d43f1e4f73c2d9,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0.35
+    warningShape: 5
+    castVfxPrefab: {fileID: 100100000, guid: a2ab56839e1c9504ea9d141e95d0b16b, type: 3}
+    castVfxDuration: 0.65
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.05
+    castVfxScale: 2
+    castVfxAttachToMonster: 0
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 2.5
+    proceduralBeamWidth: 0.2
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  - name: Laser1_Line3
+    animationStateName: Attack01
+    minDistance: 1.8
+    maxDistance: 3.2
+    priority: 0
+    cooldown: 1.8
+    damageDelay: 0.35
+    attackDuration: 0.9
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 9f6b6b3f7f5f4af8a2d0d447fa7b77c1,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0.25
+    warningShape: 3
+    castVfxPrefab: {fileID: 100100000, guid: 26bee6af42a0e9f44b2aa8742e6bbbbd, type: 3}
+    castVfxDuration: 0.9
+    castVfxForwardOffset: 0.55
+    castVfxVerticalOffset: 1.15
+    castVfxScale: 2.2
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.2
+    proceduralBeamColor: {r: 1, g: 0.25, b: 0.2, a: 0.98}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 0
+  engageDistance: 3.2
+  engageDistanceScale: 0.85

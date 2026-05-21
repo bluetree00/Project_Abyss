@@ -14,5 +14,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Scrips/Balrond3Pcontroller/Balrond3pCameraFollow.cs
+  assetPath: Assets/_ThirdParty/TheReaper/Scrips/Balrond3Pcontroller/Balrond3pCameraFollow.cs
   uploadId: 467556
