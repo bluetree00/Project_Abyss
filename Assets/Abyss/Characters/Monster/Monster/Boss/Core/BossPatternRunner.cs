@@ -67,6 +67,13 @@ public class BossPatternRunner
     // 풀 재사용 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>현재 break cooldown이 minDuration보다 짧으면 minDuration으로 늘린다.</summary>
+    public void EnsureMinBreakCooldown(float minDuration)
+    {
+        if (_patternBreakCooldown < minDuration)
+            _patternBreakCooldown = minDuration;
+    }
+
     /// <summary>보스 풀 재사용(OnEnable) 시 호출.</summary>
     public void Reset()
     {

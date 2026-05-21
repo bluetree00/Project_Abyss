@@ -81,6 +81,9 @@ public class DKChaseState : IMonsterState
             ctx.Agent.SetDestination(ctx.Runtime.PlayerTarget.position);
 
         FacePlayer(ctx);
+        // Animator 자체 전환(Run→Run)이 루프를 담당.
+        // 혹시 다른 애니메이션으로 밀려났을 때만 Run으로 복귀 (안전망)
+        GuardRunAnim(ctx);
     }
 
     public void Exit(MonsterContext ctx)
@@ -90,6 +93,19 @@ public class DKChaseState : IMonsterState
             ctx.Agent.updateRotation = true;
             if (ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
         }
+    }
+
+    // Run 상태를 강제로 끊지 않는 안전망 — Animator 자체 전환이 주 루프 담당
+    private static void GuardRunAnim(MonsterContext ctx)
+    {
+        if (ctx.Animator == null || string.IsNullOrEmpty(ctx.Animation.chaseStateName)) return;
+        if (ctx.Animator.IsInTransition(0)) return;
+        int hash = Animator.StringToHash(ctx.Animation.chaseStateName);
+        if (!ctx.Animator.HasState(0, hash)) return;
+        var info = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+        // Run 이 아닌 다른 상태로 밀려난 경우에만 복귀
+        if (info.shortNameHash != hash)
+            ctx.Animator.CrossFade(ctx.Animation.chaseStateName, 0.1f);
     }
 
     private static void FacePlayer(MonsterContext ctx)
@@ -113,7 +129,8 @@ public class DKChaseState : IMonsterState
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         if (!ctx.Animator.HasState(0, Animator.StringToHash(stateName))) return;
-        ctx.Animator.CrossFade(stateName, ctx.Animation.crossFadeDuration);
+        // CrossFade 대신 Play로 즉시 시작 — 블렌딩 중 멈춤 버그 방지
+        ctx.Animator.Play(stateName, 0, 0f);
     }
 }
 
@@ -124,11 +141,23 @@ public class DKChaseState : IMonsterState
 public class DKAttackReadyState : IMonsterState
 {
     private const float FaceSpeed     = 5f;
-    private const float ChaseBackDist = 2.5f * 1.5f;
+    // HeavySword 최대 사거리(3.5f)와 일치 — 그 이상이면 Chase로 복귀해 재접근
+    private const float ChaseBackDist = 3.5f;
+    // Chase에서 진입할 때 달리기→전투대기 애니메이션 전환 시간 + 여유
+    private const float SettleDelay   = 0.35f;
 
     public void Enter(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped = true;
+            ctx.Agent.velocity  = Vector3.zero; // 잔류 속도 즉시 제거 → 미끄러짐 방지
+            ctx.Agent.ResetPath();
+        }
+
+        // 달리기 애니메이션이 전환 완료될 때까지 패턴 대기
+        (ctx.Monster as DeathKnightBossMonster)?.EnsurePatternDelay(SettleDelay);
+
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);
     }
 
@@ -149,7 +178,11 @@ public class DKAttackReadyState : IMonsterState
         FacePlayer(ctx);
     }
 
-    public void Exit(MonsterContext ctx) { }
+    public void Exit(MonsterContext ctx)
+    {
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+            ctx.Agent.isStopped = false;
+    }
 
     private static void FacePlayer(MonsterContext ctx)
     {
@@ -221,6 +254,8 @@ public class DKGetHitState : GetHitState
     {
         if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
             ctx.Agent.isStopped = false;
+
+        (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.ClearArmorBroken();
     }
 
     private static void PlayRandomHitAnim(MonsterContext ctx)
