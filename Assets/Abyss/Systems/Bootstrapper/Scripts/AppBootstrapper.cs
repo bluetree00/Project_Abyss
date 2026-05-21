@@ -90,6 +90,16 @@ public sealed class AppBootstrapper : MonoBehaviour
             await BackendGameData.Instance.ApplyRunResultAsync(result);
     }
 
+    /// <summary>챕터 ID에 대응하는 GameScene 씬을 반환한다.</summary>
+    public static Define.Scene GetSceneForChapter(ChapterId chapter) => chapter switch
+    {
+        ChapterId.Chapter1 => Define.Scene.GameScene_Ch1,
+        ChapterId.Chapter2 => Define.Scene.GameScene_Ch2,
+        ChapterId.Chapter3 => Define.Scene.GameScene_Ch3,
+        ChapterId.Chapter4 => Define.Scene.GameScene_Ch4,
+        _                  => Define.Scene.GameScene_Ch1,
+    };
+
     public void RequestLoad(Define.Scene scene)
     {
         if (_flow != null)
@@ -157,7 +167,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (vp != null)
                 await vp.PlayAsync(token);
 
-            RequestLoad(Define.Scene.GameScene);
+            RequestLoad(Define.Scene.GameScene_Ch1); // 새 런은 항상 Chapter 1 씬부터
         }
         catch (OperationCanceledException) { }
     }
@@ -198,7 +208,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             Debug.Log("[AppBootstrapper] RestoreRun: isInStartRoom=true — 세이브 초기화 후 새로 시작");
             Loadout.Clear();
             rpm.ClearAsync(slot).Forget();
-            RequestLoad(Define.Scene.GameScene);
+            RequestLoad(Define.Scene.GameScene_Ch1);
             return;
         }
 
@@ -267,7 +277,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             session.SaveWeaponSlots(new WeaponData[] { w0, w1 }, 0);
 
         BeginRun(session);
-        RequestLoad(Define.Scene.StageMap);
+        RequestLoad(GetSceneForChapter(session.CurrentChapter));
     }
 
     /// <summary>
@@ -437,7 +447,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Debug.LogWarning("[AppBootstrapper] UIRootBootstrapper not found. UIManager will use legacy root.");
         }
 
-        // 6) (선택) Steam 로그인 — 성공 시 Login씬 스킵, Lobby로 직행
+        // 6) (선택) Steam 로그인 → Lobby로 직행
         if (useSteamLogin)
         {
             var steamGo = new GameObject("@SteamManager");
@@ -453,7 +463,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             startScene = Define.Scene.Lobby;
         }
 
-        // 6-b) 디바이스 ID 자동 로그인 — Login 씬 스킵
+        // 6-b) 디바이스 ID 자동 로그인 (Login 씬 제거 — 성공/실패 모두 Lobby로)
         if (useAutoLogin && !useSteamLogin)
         {
             bool autoOk = await DeviceAutoLoginAsync();
@@ -464,14 +474,14 @@ public sealed class AppBootstrapper : MonoBehaviour
                     RunProgressManager.Instance.LoadAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
-                Debug.Log("[AppBootstrapper] 자동 로그인 성공 → Login 스킵");
-                if (startScene == Define.Scene.Login || startScene == Define.Scene.Logo)
-                    startScene = Define.Scene.Lobby;
+                Debug.Log("[AppBootstrapper] 자동 로그인 성공");
             }
             else
             {
-                Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Login 씬으로 이동");
+                Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Lobby로 진입");
             }
+            if (startScene == Define.Scene.Logo)
+                startScene = Define.Scene.Lobby;
         }
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
@@ -535,9 +545,12 @@ public sealed class AppBootstrapper : MonoBehaviour
                 NotifySceneReady();
                 break;
 
-            case GameFlowState.Login:
-                Managers.UI.ShowMenuUI<UI_Login>();
-                NotifySceneReady();
+            case GameFlowState.Tutorial:
+                // TutorialBootstrapper가 초기화 완료 후 NotifySceneReady() 호출
+                break;
+
+            case GameFlowState.BaseCamp:
+                // BaseCampBootstrapper가 초기화 완료 후 NotifySceneReady() 호출
                 break;
 
             case GameFlowState.Lobby:
@@ -552,11 +565,6 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             case GameFlowState.InGame:
                 // GameRunBootstrapper가 비동기 초기화 완료 후 NotifySceneReady() 호출
-                break;
-
-            case GameFlowState.Result:
-                Managers.UI.ShowMenuUI<UI_Result>();
-                NotifySceneReady();
                 break;
         }
     }
