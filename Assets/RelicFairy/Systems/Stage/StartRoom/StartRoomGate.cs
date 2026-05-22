@@ -204,7 +204,7 @@ public class StartRoomGate : MonoBehaviour
         {
             var zoneProgression = bootstrapper.Run?.ZoneProgression;
             if (zoneProgression != null)
-                await zoneProgression.ShowZoneSelectionAsync(0, ct);
+                await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
             else
                 await bootstrapper.SpawnRemainingWorldZonesAsync();
 

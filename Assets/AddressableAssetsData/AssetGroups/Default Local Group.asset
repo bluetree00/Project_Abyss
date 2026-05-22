@@ -70,6 +70,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
+    m_Address: DissolveMaterial
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4142df55bc257a045bfc97c60ca08f7b
     m_Address: VFX_DeathNegateAura
     m_ReadOnly: 0
@@ -127,6 +132,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ac3815a3a11e2d84eaa1152c92adad04
     m_Address: VFX_DamageReflect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c2d35a1ffee495648a3ba8c850078037
+    m_Address: UI_AwakeningPanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

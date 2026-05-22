@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 스타트 방 캐릭터 진열대.
 /// WispController가 트리거에 진입하면 상호작용 프롬프트를 표시하고
-/// F키 입력 시 AppBootstrapper.Loadout에 캐릭터를 등록한다.
+/// F키 입력 시 캐릭터 정보 팝업을 표시한다. 팝업에서 선택 확정 시 캐릭터를 등록한다.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
@@ -180,7 +180,6 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         if (_popupGO != null) { Destroy(_popupGO); _popupGO = null; }
     }
 
-    // 버튼 리스너에서 호출 — UniTaskVoid를 Forget으로 처리
     private void ConfirmSelect() => ConfirmSelectAsync().Forget();
 
     private async UniTaskVoid ConfirmSelectAsync()
@@ -188,7 +187,7 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         if (_selected || _pendingWisp == null) return;
 
         var wisp = _pendingWisp;
-        ClosePopup();   // 캐릭터 정보 팝업 먼저 닫기
+        ClosePopup();
 
         _selected = true;
         if (interactPrompt != null) interactPrompt.SetActive(false);
@@ -215,7 +214,6 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         wisp.ClearNearbyStand(this);
         _nearbyWisp = null;
 
-        // 선택되지 않은 나머지 진열대 디졸브 퇴장
         var allStands = Object.FindObjectsByType<CharacterDisplayStand>(FindObjectsSortMode.None);
         foreach (var stand in allStands)
         {
@@ -383,7 +381,6 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
 
         if (passive != null)
         {
-            // 패시브 이름
             var passiveNameGO  = new GameObject("PassiveName");
             passiveNameGO.transform.SetParent(rightGO.transform, false);
             var passiveNameTmp = passiveNameGO.AddComponent<TextMeshProUGUI>();
@@ -399,13 +396,12 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
             passiveNameRT.anchoredPosition = new Vector2(0f, y);
             y -= 24f;
 
-            // 패시브 설명 (멀티라인)
             var passiveDescGO  = new GameObject("PassiveDesc");
             passiveDescGO.transform.SetParent(rightGO.transform, false);
             var passiveDescTmp = passiveDescGO.AddComponent<TextMeshProUGUI>();
-            passiveDescTmp.text           = passive.description;
-            passiveDescTmp.fontSize       = 12f;
-            passiveDescTmp.color          = new Color(0.75f, 0.75f, 0.75f);
+            passiveDescTmp.text               = passive.description;
+            passiveDescTmp.fontSize           = 12f;
+            passiveDescTmp.color              = new Color(0.75f, 0.75f, 0.75f);
             passiveDescTmp.enableWordWrapping = true;
             var passiveDescRT  = passiveDescGO.GetComponent<RectTransform>();
             passiveDescRT.anchorMin        = new Vector2(0f, 1f);
@@ -432,7 +428,6 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
 
         // ── 버튼 영역 (패널 하단) ────────────────────────────────────
 
-        // "선택" 버튼
         var selectBtnGO  = new GameObject("SelectBtn");
         selectBtnGO.transform.SetParent(panelGO.transform, false);
         var selectBtnImg = selectBtnGO.AddComponent<Image>();
@@ -461,7 +456,6 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         selectTextRT.offsetMin = Vector2.zero;
         selectTextRT.offsetMax = Vector2.zero;
 
-        // "닫기" 버튼
         var closeBtnGO  = new GameObject("CloseBtn");
         closeBtnGO.transform.SetParent(panelGO.transform, false);
         var closeBtnImg = closeBtnGO.AddComponent<Image>();
@@ -526,9 +520,9 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         var labelGO  = new GameObject("Label");
         labelGO.transform.SetParent(rowGO.transform, false);
         var labelTmp = labelGO.AddComponent<TextMeshProUGUI>();
-        labelTmp.text    = label;
+        labelTmp.text     = label;
         labelTmp.fontSize = 13f;
-        labelTmp.color   = new Color(0.65f, 0.65f, 0.65f);
+        labelTmp.color    = new Color(0.65f, 0.65f, 0.65f);
         var labelRT = labelGO.GetComponent<RectTransform>();
         labelRT.anchorMin = Vector2.zero;
         labelRT.anchorMax = new Vector2(0.55f, 1f);

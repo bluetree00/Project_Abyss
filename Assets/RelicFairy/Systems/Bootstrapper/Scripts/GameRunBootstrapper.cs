@@ -586,6 +586,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var root = worldMapRoot != null ? worldMapRoot : mapRoot;
         var remaining = zones.FindAll(z => z.zone_index != 0);
         int spawned = 0;
+        bool firstZoneEffectPlayed = false;
 
         for (int i = 0; i < remaining.Count; i++)
         {
@@ -604,6 +605,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             zoneGO.transform.position = worldCenter;
             MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY);
             spawned++;
+
+            // 첫 번째 존: 카메라 팬 + 디졸브 (동기 대기), 이후 존: 디졸브만 fire-and-forget
+            if (!firstZoneEffectPlayed)
+            {
+                firstZoneEffectPlayed = true;
+                var player = _run?.Player;
+                var cam    = GameCameraController.Instance;
+                var panTask = (cam != null && player != null)
+                    ? cam.PanToZoneAndReturnAsync(worldCenter, 1.2f, 1.0f, 1.2f, player.transform, ct)
+                    : UniTask.CompletedTask;
+                var dissolveTask = DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct);
+                try { await UniTask.WhenAll(panTask, dissolveTask); }
+                catch (System.OperationCanceledException) { }
+            }
+            else
+            {
+                DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct).Forget();
+            }
 
             if (i % 4 == 3)
                 await UniTask.Yield(ct);
@@ -676,10 +695,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 스포너 설정 주입
         ConfigureMonsterSpawners(blocks, spawnInfos);
 
-        // 플레이어 진입 전까지 스포너 비활성화
+        // 플레이어 진입 전까지 스포너·렌더러 비활성화 (진입 시 디졸브로 등장)
         var deferredSpawners = DisableSpawnersBeforeEntrance(blocks);
+        HideAllBlockRenderers(blocks);
 
-        // NavMesh 빌드 (몬스터 AI 이동 경로 계산)
+        // NavMesh 빌드 (몬스터 AI 이동 경로 계산) — 렌더러 비활성화와 무관하게 동작
         await BuildMapNavMeshAsync(zoneGO);
 
         // 미니맵 초기화 — Zone 1+ 경로에서도 미니맵이 해당 존 크기로 갱신되도록
@@ -688,30 +708,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 방 클리어 컨트롤러 부착 (Activate는 ZoneEntryTrigger가 호출)
         AttachRoomClearController(zoneGO, blocks);
 
-        // 존 진입 트리거 — 플레이어 진입 시 스포너 + 웨이브 활성화
-        float zoneSizeX = zone.grid_width  * blockCellSize;
-        float zoneSizeZ = zone.grid_height * blockCellSize;
-        var entryTrigger = zoneGO.AddComponent<ZoneEntryTrigger>();
-        zoneGO.TryGetComponent<RoomWaveController>(out var waveCtrl);
-        entryTrigger.Initialize(waveCtrl, deferredSpawners, zoneSizeX, zoneSizeZ);
-
-        CreateZoneExitGates(zoneIndex, zone, zones, zoneGO);
-
         // 이미 스폰된 인접 존과의 코리더 타일 생성 (CorridorStyleSO 할당 시 동작)
         _run?.ZoneProgression?.RegisterSpawnedZone(zoneIndex, worldCenter);
         SpawnCorridorsForZone(zone, worldCenter, zones, root);
 
-        // 신규 존 등장 연출: 카메라 팬 ↔ 디졸브 병렬 재생
-        var player = _run?.Player;
-        var cam    = GameCameraController.Instance;
+        // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 디졸브 재생)
+        float zoneSizeX = zone.grid_width  * blockCellSize;
+        float zoneSizeZ = zone.grid_height * blockCellSize;
+        zoneGO.TryGetComponent<RoomWaveController>(out var waveCtrl);
+        var entryTrigger = zoneGO.AddComponent<ZoneEntryTrigger>();
+        entryTrigger.Initialize(waveCtrl, deferredSpawners, blocks, zoneSizeX, zoneSizeZ);
 
-        var panTask = (cam != null && player != null)
-            ? cam.PanToZoneAndReturnAsync(worldCenter, 1.2f, 1.0f, 1.2f, player.transform, ct)
-            : UniTask.CompletedTask;
-        var dissolveTask = DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct);
-
-        try { await UniTask.WhenAll(panTask, dissolveTask); }
-        catch (System.OperationCanceledException) { }
+        CreateZoneExitGates(zoneIndex, zone, zones, zoneGO);
 
         Debug.Log($"[GameRunBootstrapper] Zone {zoneIndex} ({zone.label}) 스폰 완료 @ {worldCenter}");
     }
@@ -1808,10 +1816,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
 
-        // Wisp 위치에서 player 쪽으로 카메라 줌인 연출
-        GameCameraController.Instance?.PlayStartRoomIntroAsync(player.transform).Forget();
-
-        // Wisp 제거 (카메라 인트로가 시작된 후 — 인트로는 현재 카메라 위치에서 시작하므로 순서 중요)
+        // Wisp 제거
         if (wisp != null)
             Destroy(wisp.gameObject);
 
