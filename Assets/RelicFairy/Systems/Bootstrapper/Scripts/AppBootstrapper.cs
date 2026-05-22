@@ -426,12 +426,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         Managers.Sound?.Init();
         await InitSoundTableAsync();
 
-        // 4-a) 아이템/블록 데이터 초기화 — Addressables 로드 이후, 게임 씬 진입 전 완료 필수
-        await UniTask.WhenAll(
-            Managers.ItemData.InitializeAsync(),
-            Managers.BlockData.InitializeAsync()
-        );
-
         // 4-b) QuestManager 초기화 — QuestDatabase / AchievementDatabase Addressables 로드
         await InitQuestManagerAsync();
 
@@ -460,6 +454,10 @@ public sealed class AppBootstrapper : MonoBehaviour
                 return;
             }
 
+            await UniTask.WhenAll(
+                Managers.ItemData.InitializeAsync(),
+                Managers.BlockData.InitializeAsync()
+            );
             startScene = Define.Scene.Lobby;
         }
 
@@ -470,7 +468,10 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (autoOk)
             {
                 IsAutoLoggedIn = true;
+                // 아이템/블록 데이터는 CDN 인증 후 로드해야 하므로 로그인 성공 이후 초기화
                 await UniTask.WhenAll(
+                    Managers.ItemData.InitializeAsync(),
+                    Managers.BlockData.InitializeAsync(),
                     RunProgressManager.Instance.LoadAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
@@ -479,6 +480,11 @@ public sealed class AppBootstrapper : MonoBehaviour
             else
             {
                 Debug.LogWarning("[AppBootstrapper] 자동 로그인 실패 → Lobby로 진입");
+                // 로그인 실패 시 Addressables 폴백으로 초기화
+                await UniTask.WhenAll(
+                    Managers.ItemData.InitializeAsync(),
+                    Managers.BlockData.InitializeAsync()
+                );
             }
             if (startScene == Define.Scene.Logo)
                 startScene = Define.Scene.Lobby;

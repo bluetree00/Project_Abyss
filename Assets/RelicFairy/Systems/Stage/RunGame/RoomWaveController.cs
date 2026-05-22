@@ -41,6 +41,10 @@ public sealed class RoomWaveController : MonoBehaviour
     private int _targetKillCount;
     private int _killed;
 
+    // ── 마지막 킬 위치 ────────────────────────────────────
+    private Vector3 _lastKillPosition;
+    private bool    _hasKillPosition;
+
     // ── Room Clear Effects ────────────────────────────────
     private GameObject _clearEndEffectPrefab;
     private GameObject _clearEndEffect2Prefab;
@@ -242,7 +246,12 @@ public sealed class RoomWaveController : MonoBehaviour
 
     private void HandleWaveMonsterDied(MonsterBase monster)
     {
-        if (monster != null) monster.OnDied -= HandleWaveMonsterDied;
+        if (monster != null)
+        {
+            monster.OnDied -= HandleWaveMonsterDied;
+            _lastKillPosition = monster.transform.position;
+            _hasKillPosition  = true;
+        }
         if (!_active || _cleared) return;
 
         _currentWaveAlive--;
@@ -290,7 +299,12 @@ public sealed class RoomWaveController : MonoBehaviour
 
     private void HandleLegacyMonsterDied(MonsterBase monster)
     {
-        if (monster != null) monster.OnDied -= HandleLegacyMonsterDied;
+        if (monster != null)
+        {
+            monster.OnDied -= HandleLegacyMonsterDied;
+            _lastKillPosition = monster.transform.position;
+            _hasKillPosition  = true;
+        }
         if (!_active || _cleared) return;
 
         _killed++;
@@ -321,7 +335,7 @@ public sealed class RoomWaveController : MonoBehaviour
 
             var gate = GetComponent<RoomClearGate>() ?? gameObject.AddComponent<RoomClearGate>();
             gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null);
-            gate.Activate(transform.position);
+            gate.Activate(_hasKillPosition ? _lastKillPosition : transform.position);
         }
         catch (OperationCanceledException) { }
         catch (Exception e)

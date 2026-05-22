@@ -176,19 +176,12 @@ public class WorldCovenantPickup : MonoBehaviour
     {
         if (string.IsNullOrEmpty(vfxAddressableKey)) return;
 
-        try
+        var prefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(vfxAddressableKey);
+        if (prefab != null && this != null && gameObject != null)
         {
-            var prefab = await Managers.AddressableManager.LoadAssetAsync<GameObject>(vfxAddressableKey);
-            if (prefab != null && this != null && gameObject != null)
-            {
-                var vfx = Instantiate(prefab, transform);
-                vfx.transform.localPosition = Vector3.zero;
-                vfx.name = "VFX_Covenant";
-            }
-        }
-        catch
-        {
-            // VFX 없어도 기능에 영향 없음 — 폴백 없이 무시
+            var vfx = Instantiate(prefab, transform);
+            vfx.transform.localPosition = Vector3.zero;
+            vfx.name = "VFX_Covenant";
         }
     }
 
