@@ -10,9 +10,9 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
 AssetOrigin:
   serializedVersion: 1
-  productId: 173450
-  packageName: Sword slashes PRO
-  packageVersion: 3.0
+  productId: 364462
+  packageName: Fullscreen effects
+  packageVersion: 1.1
   assetPath: Assets/_ThirdParty/EffectSource/Hovl Studio 1/HSFiles/Shaders/Shader
     Graph/HS_LitFresnel.shadergraph
-  uploadId: 865410
+  uploadId: 898516

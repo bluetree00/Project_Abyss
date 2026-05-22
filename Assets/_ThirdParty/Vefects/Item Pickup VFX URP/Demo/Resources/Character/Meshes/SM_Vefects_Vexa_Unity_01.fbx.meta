@@ -106,8 +106,8 @@ ModelImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 241404
-  packageName: Item Pickup VFX - URP
-  packageVersion: 1.0.20232
-  assetPath: Assets/Vefects/Item Pickup VFX URP/Demo/Resources/Character/Meshes/SM_Vefects_Vexa_Unity_01.fbx
-  uploadId: 771219
+  productId: 340466
+  packageName: Stylized VFX Bundle
+  packageVersion: 1.0.1
+  assetPath: Assets/_ThirdParty/Vefects/Item Pickup VFX URP/Demo/Resources/Character/Meshes/SM_Vefects_Vexa_Unity_01.fbx
+  uploadId: 860344
