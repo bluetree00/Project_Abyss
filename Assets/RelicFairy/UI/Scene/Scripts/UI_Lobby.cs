@@ -19,6 +19,7 @@ public class UI_Lobby : UI_Scene
         Btn_StartRun,
         Btn_Settings,
         Btn_Exit,
+        Btn_Awakening,
     }
 
     // ─────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ public class UI_Lobby : UI_Scene
         GetButton((int)Buttons.Btn_StartRun).onClick.AddListener(OnClickStartRun);
         GetButton((int)Buttons.Btn_Settings).onClick.AddListener(OnClickSettings);
         GetButton((int)Buttons.Btn_Exit).onClick.AddListener(OnClickExit);
+        GetButton((int)Buttons.Btn_Awakening).onClick.AddListener(OnClickAwakening);
 
         if (saveSlotPanel != null)
         {
@@ -57,6 +59,11 @@ public class UI_Lobby : UI_Scene
     private void OnClickSettings()
     {
         Managers.UI.ShowPopupUI<UI_Pause>();
+    }
+
+    private void OnClickAwakening()
+    {
+        Managers.UI.ShowPopupUI<UI_AwakeningPanel>();
     }
 
     private void OnClickExit()
