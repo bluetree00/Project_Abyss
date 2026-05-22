@@ -508,6 +508,15 @@ public class BoardManager : MonoBehaviour
         return shape;
     }
 
+    /// <summary>instanceId로 공용 풀에서 Shape를 찾는다. 배치 중인 Shape도 포함.</summary>
+    public Shape GetSharedShapeByItem(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId)) return null;
+        foreach (var s in _sharedShapes)
+            if (s?.ItemData?.instanceId == instanceId) return s;
+        return null;
+    }
+
     /// <summary>공용 풀에서 Shape를 제거하고 파괴한다. 보관함 아이템 폐기 시 호출.</summary>
     public void RemoveSharedShape(Shape shape)
     {

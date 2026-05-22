@@ -425,6 +425,18 @@ public sealed class StagingAreaView : MonoBehaviour
         if (_shapeByInstanceId.ContainsKey(item.instanceId)) return;
 
         if (boardManager == null) boardManager = BoardManager.Instance;
+
+        // 이미 풀에 있는 Shape(배치됐다가 다시 보관함으로 돌아온 경우)를 재사용해 복사 방지
+        if (boardManager != null)
+        {
+            var existing = boardManager.GetSharedShapeByItem(item.instanceId);
+            if (existing != null)
+            {
+                _shapeByInstanceId[item.instanceId] = existing;
+                return;
+            }
+        }
+
         if (boardManager == null)
         {
             Debug.LogWarning($"[StagingAreaView] BoardManager null — shape 생성 불가 (item={item.itemId})");
