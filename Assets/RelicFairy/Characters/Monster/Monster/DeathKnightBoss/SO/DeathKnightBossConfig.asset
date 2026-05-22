@@ -94,16 +94,11 @@ MonoBehaviour:
   condDistFar: 5
   condTimePressureSecs: 8
   patternEntries:
-  - conditions: []
-    patterns:
-    - {fileID: 11400000, guid: 1a3f31350d8bbba4989524c11f37efd6, type: 2}
-    - {fileID: 11400000, guid: 97b5f8526d84e0c48937720db9fef6a0, type: 2}
-    - {fileID: 11400000, guid: 304d63bdcdbb92043900b25160515e6e, type: 2}
-    selectionMode: 0
-    forceExecute: 0
   - conditions:
-    - 5
     patterns:
-    - {fileID: 11400000, guid: b75077ac3399a9c4782be1c95ef6bd0c, type: 2}
-    selectionMode: 0
+    - {fileID: 11400000, guid: cd7bf46104ebbeb45b542930a1250301, type: 2}
+    - {fileID: 11400000, guid: 803bbb858d1522542a9118d0125f0a04, type: 2}
+    - {fileID: 11400000, guid: d4a6a1dcc6f675847ada91d428cb62ca, type: 2}
+    - {fileID: 11400000, guid: e07059fa40bc28e4fad1bed08447985e, type: 2}
+    selectionMode: 2
     forceExecute: 0
