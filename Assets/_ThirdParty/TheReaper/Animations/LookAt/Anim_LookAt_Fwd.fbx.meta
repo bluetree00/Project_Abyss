@@ -1525,5 +1525,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/LookAt/Anim_LookAt_Fwd.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/LookAt/Anim_LookAt_Fwd.fbx
   uploadId: 467556

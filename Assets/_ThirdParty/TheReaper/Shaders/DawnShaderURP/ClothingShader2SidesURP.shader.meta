@@ -12,5 +12,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Shaders/DawnShaderURP/ClothingShader2SidesURP.shader
+  assetPath: Assets/_ThirdParty/TheReaper/Shaders/DawnShaderURP/ClothingShader2SidesURP.shader
   uploadId: 467556

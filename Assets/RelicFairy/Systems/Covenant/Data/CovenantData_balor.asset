@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c707d93577f383647bd4e51ea3a8651d, type: 3}
+  m_Name: CovenantData_balor
+  m_EditorClassIdentifier: Assembly-CSharp::CovenantDataSO
+  covenantId: balor
+  displayName: "\uBC1C\uB85C\uB974\uC758 \uC11C\uC57D"
+  loreText: 
+  icon: {fileID: 0}
+  basicDescription: 
+  enhancedDescription: 
+  evolvedDescription: 
+  basicValues:
+  - 8
+  - 1
+  enhancedValues:
+  - 5
+  - 1.5
+  evolvedValues:
+  - 5
+  - 1.5

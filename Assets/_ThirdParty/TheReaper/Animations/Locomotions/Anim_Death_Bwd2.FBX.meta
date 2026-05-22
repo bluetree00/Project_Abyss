@@ -1527,5 +1527,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/Locomotions/Anim_Death_Bwd2.FBX
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/Locomotions/Anim_Death_Bwd2.FBX
   uploadId: 467556

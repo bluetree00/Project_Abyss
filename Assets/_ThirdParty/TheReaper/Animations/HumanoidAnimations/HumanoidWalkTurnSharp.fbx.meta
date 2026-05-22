@@ -1341,5 +1341,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/HumanoidAnimations/HumanoidWalkTurnSharp.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/HumanoidAnimations/HumanoidWalkTurnSharp.fbx
   uploadId: 467556

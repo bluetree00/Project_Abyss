@@ -1532,5 +1532,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/FlyAttack/Anim_Fly_Dame_2.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/FlyAttack/Anim_Fly_Dame_2.fbx
   uploadId: 467556

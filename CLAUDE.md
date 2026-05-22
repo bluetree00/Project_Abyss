@@ -1,4 +1,15 @@
-# Project Abyss - Claude 지침
+# Project RelicFairy - Claude 지침
+
+> ## ⚠️ 브랜치 병합 전 필수 작업
+>
+> `namespace Abyss.*` → `namespace RelicFairy.*` 전체 변경이 `develop` 브랜치에 반영되었습니다.
+>
+> **이 안내를 처음 보는 경우**, develop을 merge하기 전에 반드시:
+> 1. 프로젝트 루트의 **`MIGRATION_REQUIRED.md`** 를 읽고 Step 1~4를 먼저 진행
+> 2. 자기 브랜치에서 동일한 네임스페이스 적용 + 커밋 완료
+> 3. 그 다음 develop merge
+>
+> 이 작업 없이 merge하면 모든 .cs 파일에서 대량 충돌이 발생합니다.
 
 ## 세션 시작 시 자동 실행
 - 대화 시작 시 `git fetch origin`으로 원격 패치를 확인한다
@@ -21,13 +32,13 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 ```
 
 ### 핵심 시스템 위치
-- 부트스트래퍼: `Assets/Abyss/Systems/Bootstrapper/Scripts/` (AppBootstrapper, GameRunBootstrapper, StageMapBootstrapper, HudBootstrapper, UIRootBootstrapper)
-- 매니저: `Assets/Abyss/Systems/Managers/Scripts/` (Managers, UIManager, AddressableManager, InputManager 등)
-- 게임 세션: `Assets/Abyss/Systems/Stage/RunGame/` (GameRunSession, PlayerLoadout, PlayerRunState)
-- 스테이지: `Assets/Abyss/Systems/Stage/Stage/` (RoomManager, StagePointManager)
-- 게임 플로우: `Assets/Abyss/Systems/Stage/GameFlow/GameFlow.cs`
-- 플레이어: `Assets/Abyss/Characters/Player/Scripts/PlayerController.cs`
-- 씬: `Assets/Abyss/Scenes/` (Logo, Login, Lobby, StageMap, GameScene, Result)
+- 부트스트래퍼: `Assets/RelicFairy/Systems/Bootstrapper/Scripts/` (AppBootstrapper, GameRunBootstrapper, StageMapBootstrapper, HudBootstrapper, UIRootBootstrapper)
+- 매니저: `Assets/RelicFairy/Systems/Managers/Scripts/` (Managers, UIManager, AddressableManager, InputManager 등)
+- 게임 세션: `Assets/RelicFairy/Systems/Stage/RunGame/` (GameRunSession, PlayerLoadout, PlayerRunState)
+- 스테이지: `Assets/RelicFairy/Systems/Stage/Stage/` (RoomManager, StagePointManager)
+- 게임 플로우: `Assets/RelicFairy/Systems/Stage/GameFlow/GameFlow.cs`
+- 플레이어: `Assets/RelicFairy/Characters/Player/Scripts/PlayerController.cs`
+- 씬: `Assets/RelicFairy/Scenes/` (Logo, Login, Lobby, StageMap, GameScene, Result)
 
 ### 주요 패턴
 - 서비스 로케이터: `Managers.Instance` → 하위 매니저 접근
@@ -63,7 +74,7 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 
 ## 현재 개발 상태
 - **Phase 1 (인게임 루프)** 진행 중
-- **참고 문서**: `Assets/Abyss/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
+- **참고 문서**: `Assets/RelicFairy/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
 - **참고**: `DevTracker.md` 2026-05-11 업데이트 완료. ResourceManager 제거, Addressables 전환 반영됨
 
 ## 에이전트 팀 구조
@@ -80,7 +91,7 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 5. 팀장 → 모든 결과 적절 시 사용자에게 최종 보고
 
 ### 파일 소유권
-- 클라이언트: `Assets/Abyss/Shared/Characters/`, `Assets/Abyss/Systems/Network/`
-- UIUX: `Assets/Abyss/UI/`
-- 공유(수정 시 팀장 조율): `Assets/Abyss/Systems/Bootstrapper/`, `Assets/Abyss/Systems/Managers/`
+- 클라이언트: `Assets/RelicFairy/Shared/Characters/`, `Assets/RelicFairy/Systems/Network/`
+- UIUX: `Assets/RelicFairy/UI/`
+- 공유(수정 시 팀장 조율): `Assets/RelicFairy/Systems/Bootstrapper/`, `Assets/RelicFairy/Systems/Managers/`
 - 서로의 영역을 직접 수정하지 않는다

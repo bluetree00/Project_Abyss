@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59ef79745dfc7bd4eb2de2fbba386294, type: 3}
+  m_Name: T3_Greatsword
+  m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
+  weaponDisplayKey: T3_Greatsword_Display
+  weaponPrefabKey: T3_Greatsword_Weapon
+  displayName: "전설의 대검"
+  iconKey: T3_GreatswordIcon
+  icon: {fileID: 21300000, guid: 241382dec3ea95c4b9172945626373fb, type: 3}
+  tier: 3
+  rarity: 2
+  baseAttack: 55
+  baseDefense: 8
+  attackSpeed: 0.7
+  attackRange: 1.5
+  areaOfEffect: 1.5
+  groundEndCount: 3
+  airEndCount: 2
+  animationSet: {fileID: 11400000, guid: 32cc2d228d3275042a500e5446bcc915, type: 2}
+  abilitySet: {fileID: 11400000, guid: 7d4d5b03bd5d46746acb9e42b3b4ed95, type: 2}
+  weaponType: 5
+  skillQ: {fileID: 11400000, guid: 711b986f371f6364ab02fc436d44d180, type: 2}
+  skillE: {fileID: 11400000, guid: 61bfd2ef1d10aa04786a53d9efdb94a0, type: 2}
+  holdThreshold: 3
+  promoteMode: 1
+  chargeStages: 2

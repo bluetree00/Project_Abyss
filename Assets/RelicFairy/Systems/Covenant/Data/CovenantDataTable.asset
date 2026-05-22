@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bca8cae2633ef5449d3fefe4e2aaa3f, type: 3}
+  m_Name: CovenantDataTable
+  m_EditorClassIdentifier: Assembly-CSharp::CovenantDataTableSO
+  _entries:
+  - {fileID: 11400000, guid: e3556c61c504543489b9071f264b9d4e, type: 2}
+  - {fileID: 11400000, guid: ec0886544ccf2764bbb25c6fbf59fbfb, type: 2}
+  - {fileID: 11400000, guid: e4176e56eec2fad4e85d343d093ce88c, type: 2}
+  - {fileID: 11400000, guid: 204365322eee8df47b1cc6c4e506adc7, type: 2}
+  - {fileID: 11400000, guid: 0ac2f8d14fe0be041a4339ddf2a67481, type: 2}
+  - {fileID: 11400000, guid: e136fe24bfd7a284ea1ecac40ae4f010, type: 2}
+  - {fileID: 11400000, guid: 5c8c57b628f44ad498bd426a367143ab, type: 2}
+  - {fileID: 11400000, guid: ab50f88f221d62f4392d9eb01d9e2335, type: 2}
+  - {fileID: 11400000, guid: 449bad500434f5e43ab3566935cebd53, type: 2}
+  - {fileID: 11400000, guid: effbc679f8d900745b5e8bb25c01f442, type: 2}
+  - {fileID: 11400000, guid: 3d73b1f9f3012e74d8cfff3a76c327bc, type: 2}
+  - {fileID: 11400000, guid: fa5535b445cbce0449541590242b9d69, type: 2}

@@ -1319,5 +1319,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/HumanoidAnimations/HumanoidIdle.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/HumanoidAnimations/HumanoidIdle.fbx
   uploadId: 467556
