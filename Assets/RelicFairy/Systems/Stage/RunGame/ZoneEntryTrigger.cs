@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -11,22 +12,25 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider))]
 public class ZoneEntryTrigger : MonoBehaviour
 {
-    private RoomWaveController  _waveController;
-    private List<MonoBehaviour> _deferredSpawners;
-    private bool                _activated;
+    private RoomWaveController                    _waveController;
+    private List<MonoBehaviour>                   _deferredSpawners;
+    private IReadOnlyList<MapBuilder.PlacedBlock> _blocks;
+    private bool                                  _activated;
 
     /// <summary>
     /// 이 트리거를 초기화한다. zoneSizeX/Z 는 grid_width/height × blockCellSize.
     /// BoxCollider 크기를 존 전체 영역에 맞게 설정한다.
     /// </summary>
     public void Initialize(
-        RoomWaveController  waveController,
-        List<MonoBehaviour> deferredSpawners,
-        float               zoneSizeX,
-        float               zoneSizeZ)
+        RoomWaveController                    waveController,
+        List<MonoBehaviour>                   deferredSpawners,
+        IReadOnlyList<MapBuilder.PlacedBlock> blocks,
+        float                                 zoneSizeX,
+        float                                 zoneSizeZ)
     {
         _waveController   = waveController;
         _deferredSpawners = deferredSpawners;
+        _blocks           = blocks;
 
         var col = GetComponent<BoxCollider>();
         col.isTrigger = true;
@@ -47,7 +51,12 @@ public class ZoneEntryTrigger : MonoBehaviour
         if (other.GetComponentInParent<PlayerController>() == null) return;
 
         _activated = true;
-        Destroy(this); // 재발화 방지 — ActivateZone 내 async 작업은 독립 실행
+        var go     = gameObject;
+        var blocks = _blocks;
+        Destroy(this);
+
+        // 대각선 디졸브 등장 — DissolveEntrance가 WarmupAsync + 렌더러 활성화를 내부에서 처리
+        PlayDissolveEntranceAsync(go, blocks).Forget();
 
         if (_waveController != null)
             ActivateCombatZone();
@@ -57,9 +66,20 @@ public class ZoneEntryTrigger : MonoBehaviour
 
     // ── Private ───────────────────────────────────────────────────────────
 
+    private async UniTaskVoid PlayDissolveEntranceAsync(
+        GameObject go, IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        if (blocks == null || blocks.Count == 0) return;
+        var ct = go.GetCancellationTokenOnDestroy();
+        try
+        {
+            await new DissolveEntrance().PlayAsync(blocks, default, ct);
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
     private void ActivateCombatZone()
     {
-        // 정지된 스포너 재활성화 → Start() 실행 → 스폰 준비
         EnableSpawners();
         _waveController.Activate();
         Debug.Log($"[ZoneEntryTrigger] 전투 존 진입 — 웨이브 시작: {gameObject.name}");
@@ -67,8 +87,6 @@ public class ZoneEntryTrigger : MonoBehaviour
 
     private void ActivateNonCombatZoneAsync()
     {
-        // 코리도·이벤트 등 전투 없는 존: 진입 즉시 게이트 활성화
-        // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
         EnableSpawners();
         Debug.Log($"[ZoneEntryTrigger] 비전투 존 진입 — 클리어 게이트 활성화: {gameObject.name}");
 

@@ -66,6 +66,21 @@ public class ZoneProgressionService
         => _exitGates[(fromZoneIndex, toZoneIndex)] = gate;
 
     /// <summary>
+    /// 스타트 방 전용. fromZone의 next_zone_indices 중 첫 번째 존으로 UI 없이 직접 진입한다.
+    /// Zone 0처럼 문이 하나의 목적지만 가리킬 때 사용한다.
+    /// </summary>
+    public async UniTask DirectlyEnterFirstNextZoneAsync(int fromZoneIndex, CancellationToken ct)
+    {
+        var options = GetNextZoneOptions(fromZoneIndex);
+        if (options.Count == 0)
+        {
+            Debug.LogWarning($"[ZoneProgression] Zone {fromZoneIndex} — 연결된 다음 존 없음");
+            return;
+        }
+        await DirectlyEnterZoneAsync(fromZoneIndex, options[0].zone_index, ct);
+    }
+
+    /// <summary>
     /// 해당 존의 StartRoomGate(일반 방 모드)를 활성화한다.
     /// 전투 존: ClearRewardTrigger 보상 완료 후 호출.
     /// 비전투 존: ZoneEntryTrigger 진입 시 즉시 호출.

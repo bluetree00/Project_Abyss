@@ -35,6 +35,11 @@ public class GameCameraController : MonoBehaviour
     private Canvas _fadeCanvas;
     private bool _introStarted;
     private CinemachineFreeLook.Orbit[] _savedOrbits;
+    private CancellationTokenSource _panCts;
+    private int  _panVersion;
+    private bool _isPanning;
+    private bool _prePanBrainEnabled;
+    private bool _prePanCmEnabled;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
@@ -68,6 +73,9 @@ public class GameCameraController : MonoBehaviour
 
     private void OnDestroy()
     {
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = null;
         UnsubscribePlayerBound();
         if (_fadeCanvas != null) Destroy(_fadeCanvas.gameObject);
         if (Instance == this) Instance = null;
@@ -271,8 +279,19 @@ public class GameCameraController : MonoBehaviour
     {
         if (this == null) return;
 
-        bool brainWasEnabled = _brain != null && _brain.enabled;
-        bool cmWasEnabled    = _cinemachine != null && _cinemachine.enabled;
+        // 진행 중인 팬이 있으면 취소하고 새 팬으로 교체.
+        // 첫 팬 시작 시에만 Cinemachine 원래 상태를 기록해 마지막 팬이 복원한다.
+        if (!_isPanning)
+        {
+            _prePanBrainEnabled = _brain != null && _brain.enabled;
+            _prePanCmEnabled    = _cinemachine != null && _cinemachine.enabled;
+        }
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_panCts.Token, ct);
+        int myVersion = System.Threading.Interlocked.Increment(ref _panVersion);
+        _isPanning = true;
 
         if (_brain != null)       _brain.enabled       = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
@@ -292,17 +311,17 @@ public class GameCameraController : MonoBehaviour
             // 1) 존으로 이동
             for (float t = 0f; t < moveDuration; t += Time.deltaTime)
             {
-                ct.ThrowIfCancellationRequested();
+                linked.Token.ThrowIfCancellationRequested();
                 float ease = PanEase(t / moveDuration);
                 transform.position = Vector3.Lerp(fromPos, toPos, ease);
                 transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
-                await UniTask.Yield(ct);
+                await UniTask.Yield(linked.Token);
             }
             transform.position = toPos;
             transform.rotation = toRot;
 
             // 2) 존 조망 유지
-            await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: linked.Token);
 
             // 3) 플레이어 위치로 복귀
             Vector3    retStart    = transform.position;
@@ -313,27 +332,32 @@ public class GameCameraController : MonoBehaviour
 
             for (float t = 0f; t < returnDuration; t += Time.deltaTime)
             {
-                ct.ThrowIfCancellationRequested();
+                linked.Token.ThrowIfCancellationRequested();
                 float ease = PanEase(t / returnDuration);
                 transform.position = Vector3.Lerp(retStart, retEnd, ease);
                 transform.rotation = Quaternion.Slerp(retStartRot, _originalRotation, ease);
-                await UniTask.Yield(ct);
+                await UniTask.Yield(linked.Token);
             }
         }
         catch (OperationCanceledException) { }
         finally
         {
-            if (_brain != null)
+            // 마지막 팬만 Cinemachine을 원래 상태로 복원한다.
+            // 이전 팬은 새 팬이 이어받으므로 복원하지 않는다.
+            if (myVersion == _panVersion)
             {
-                // 복귀 위치 맞춤 후 Cinemachine 재개
-                if (playerTransform != null)
+                _isPanning = false;
+                if (_brain != null)
                 {
-                    transform.position = playerTransform.position + _originalPosition;
-                    transform.rotation = _originalRotation;
+                    if (playerTransform != null)
+                    {
+                        transform.position = playerTransform.position + _originalPosition;
+                        transform.rotation = _originalRotation;
+                    }
+                    if (_prePanBrainEnabled) _brain.enabled = true;
                 }
-                if (brainWasEnabled) _brain.enabled = true;
+                if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
             }
-            if (_cinemachine != null && cmWasEnabled) _cinemachine.enabled = true;
         }
     }
 
