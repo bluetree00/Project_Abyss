@@ -1544,5 +1544,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/FlyAttack/Anim_Fly_UnEquipBook.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/FlyAttack/Anim_Fly_UnEquipBook.fbx
   uploadId: 467556

@@ -70,11 +70,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
-    m_Address: DissolveMaterial
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 41c21fa0ebd3df841a78da67ad0ed521
     m_Address: Spider/SpiderConfig
     m_ReadOnly: 0
@@ -112,6 +107,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6425f3820b1cdb0438ea5ac456fed98d
     m_Address: Cactus/CactusConfig
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6d3ffbc71a451fa498698a9e6fd00acc
+    m_Address: DeathKnightBoss/DeathKnightBossConfig
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

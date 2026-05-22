@@ -13,5 +13,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Shaders/DawnShaderURP/EyesTearShaderURP.shader
+  assetPath: Assets/_ThirdParty/TheReaper/Shaders/DawnShaderURP/EyesTearShaderURP.shader
   uploadId: 467556

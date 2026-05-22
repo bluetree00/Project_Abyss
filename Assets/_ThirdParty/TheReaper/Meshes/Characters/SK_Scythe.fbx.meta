@@ -119,5 +119,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Meshes/Characters/SK_Scythe.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Meshes/Characters/SK_Scythe.fbx
   uploadId: 467556

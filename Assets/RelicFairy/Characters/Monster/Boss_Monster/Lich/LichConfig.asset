@@ -1,0 +1,116 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
+  m_Name: LichConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
+  monsterName: "\uB9AC\uCE58"
+  grade: 3
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  stat:
+    maxHp: 15000
+    defense: 20
+    attackPower: 50
+    moveSpeed: 3.5
+    nativeElement: -1
+    attackRange: 8
+    attackRadius: 1
+    attackRate: 0.8
+    attackDelay: 1
+    knockbackForce: 5
+    attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  detection:
+    detectionRange: 20
+    chaseGiveUpRange: 25
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1.5
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 0
+  animation:
+    animatorControllerAddress: Lich/LichAnimator
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
+    attackTrigger: 
+    getHitTrigger: 
+    dieTrigger: 
+    detectTrigger: 
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    maxAccumulationScale: 1
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  specialStates: []
+  stateOverrides: []
+  patternBreakDurationMin: 2.5
+  patternBreakDurationMax: 5
+  patternRepeatPenaltyDuration: 20
+  patternRepeatPenaltyMult: 0.1
+  condPhase2HpThreshold: 0.4
+  condDistClose: 3.5
+  condDistFar: 5
+  condTimePressureSecs: 8
+  patternEntries:
+  - conditions:
+    - 21
+    patterns:
+    - {fileID: 11400000, guid: be71dfe94531dad45995607fc2cd5173, type: 2}
+    - {fileID: 11400000, guid: e6190d0c15134374097a382103b46f96, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions:
+    - 23
+    patterns:
+    - {fileID: 11400000, guid: 034118b2db8d3324cb2411f116e2d61a, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions:
+    - 22
+    patterns:
+    - {fileID: 11400000, guid: 3a8cc8ee3f4759d41aa522e198350cf5, type: 2}
+    - {fileID: 11400000, guid: e6190d0c15134374097a382103b46f96, type: 2}
+    selectionMode: 0
+    forceExecute: 0

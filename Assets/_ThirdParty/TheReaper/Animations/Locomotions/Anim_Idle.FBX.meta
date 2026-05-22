@@ -1530,5 +1530,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/Locomotions/Anim_Idle.FBX
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/Locomotions/Anim_Idle.FBX
   uploadId: 467556

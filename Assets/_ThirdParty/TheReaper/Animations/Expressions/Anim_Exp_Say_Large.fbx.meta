@@ -1522,5 +1522,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/Expressions/Anim_Exp_Say_Large.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/Expressions/Anim_Exp_Say_Large.fbx
   uploadId: 467556

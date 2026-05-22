@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: SkeletonPatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  patterns:
+  - name: Slash
+    animationStateName: Attack
+    minDistance: 0
+    maxDistance: 1.3
+    priority: 0
+    cooldown: 0.3
+    damageDelay: 0.3
+    attackDuration: 0.85
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  - name: Thrust
+    animationStateName: Attack
+    minDistance: 0
+    maxDistance: 1.3
+    priority: 0
+    cooldown: 0.9
+    damageDelay: 0.55
+    attackDuration: 1.05
+    damageMultiplier: 1.1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 1
+  engageDistance: 1.1
+  engageDistanceScale: 0.85

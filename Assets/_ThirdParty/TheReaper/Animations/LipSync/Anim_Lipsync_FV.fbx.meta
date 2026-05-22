@@ -1522,5 +1522,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/LipSync/Anim_Lipsync_FV.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/LipSync/Anim_Lipsync_FV.fbx
   uploadId: 467556

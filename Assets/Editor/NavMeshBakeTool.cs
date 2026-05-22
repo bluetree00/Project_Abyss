@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Unity.AI.Navigation;
 
-namespace Abyss.EditorTools
+namespace RelicFairy.EditorTools
 {
     /// <summary>
     /// 씬의 모든 NavMeshSurface 컴포넌트를 일괄 베이크하는 임시 에디터 툴.

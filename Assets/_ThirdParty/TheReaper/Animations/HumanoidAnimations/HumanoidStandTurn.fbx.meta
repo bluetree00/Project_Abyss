@@ -1613,5 +1613,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/HumanoidAnimations/HumanoidStandTurn.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/HumanoidAnimations/HumanoidStandTurn.fbx
   uploadId: 467556

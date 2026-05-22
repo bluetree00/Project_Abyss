@@ -2388,5 +2388,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Animations/HumanoidAnimations/HumanoidIdleJumpUp.fbx
+  assetPath: Assets/_ThirdParty/TheReaper/Animations/HumanoidAnimations/HumanoidIdleJumpUp.fbx
   uploadId: 467556

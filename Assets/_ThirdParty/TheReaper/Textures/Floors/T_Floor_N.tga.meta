@@ -91,5 +91,5 @@ AssetOrigin:
   productId: 159761
   packageName: The Reaper
   packageVersion: 2.0
-  assetPath: Assets/TheReaper/Textures/Floors/T_Floor_N.tga
+  assetPath: Assets/_ThirdParty/TheReaper/Textures/Floors/T_Floor_N.tga
   uploadId: 467556
