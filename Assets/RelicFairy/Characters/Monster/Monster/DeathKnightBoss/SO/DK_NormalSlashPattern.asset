@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0feb06754a4e3654b96004fce96f726b, type: 3}
+  m_Name: DK_NormalSlashPattern
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DKNormalSlashPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: normalslash
+  breakOverride: -1
+  whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
+  blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
+  impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd, type: 3}
+  swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947, type: 3}
+  warningDuration: 0.1
+  hitTime: 0.7
+  hitStep: 0.18
+  recoveryTime: 0.3
+  damageMultiplier: 1
+  knockbackMultiplier: 1
