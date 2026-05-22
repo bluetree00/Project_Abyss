@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 4081bb83479ab3e419b496b879cc45d1
+timeCreated: 1511210958
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/Meshes-Materials BOOK
+    OF DEAD/Rock_Granite_reFto_brighter.prefab
+  uploadId: 902342

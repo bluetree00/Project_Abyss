@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 958df6c2635a1ad4796601cb5cfcc867
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/Scripts/VOLUMETRIC UNDERWATER/URP
+    Volumetric Lighting/Scripts/GradientFogPassOCEANIS.cs
+  uploadId: 902342

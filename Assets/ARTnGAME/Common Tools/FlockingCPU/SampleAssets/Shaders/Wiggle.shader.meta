@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 050cd2ec4cc25ac4aa4842eb72394f5c
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/ARTnGAME/Common Tools/FlockingCPU/SampleAssets/Shaders/Wiggle.shader
+  uploadId: 902342
