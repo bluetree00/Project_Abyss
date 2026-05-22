@@ -35,6 +35,8 @@ public sealed class AbyssEssenceTracker : MonoBehaviour
 
         if (_session != null)
             _session.OnRoomCleared += HandleRoomCleared;
+
+        QuestEvents.OnMonsterKilled += HandleMonsterKilled;
     }
 
     private void Unbind()
@@ -42,14 +44,15 @@ public sealed class AbyssEssenceTracker : MonoBehaviour
         if (_session != null)
             _session.OnRoomCleared -= HandleRoomCleared;
         _session = null;
+
+        QuestEvents.OnMonsterKilled -= HandleMonsterKilled;
     }
 
     private void OnDestroy() => Unbind();
 
-    // ── Public API ───────────────────────────────────────────────────────
+    // ── 이벤트 핸들러 ────────────────────────────────────────────────────
 
-    /// <summary>몬스터 처치 시 PlayerController에서 호출.</summary>
-    public void OnMonsterKilled()
+    private void HandleMonsterKilled(string _)
     {
         if (_session == null) return;
 
@@ -60,8 +63,6 @@ public sealed class AbyssEssenceTracker : MonoBehaviour
         _session.AddEssence(essencePerBatch);
         Debug.Log($"[AbyssEssenceTracker] 처치 배치 +{essencePerBatch} 정수");
     }
-
-    // ── 이벤트 핸들러 ────────────────────────────────────────────────────
 
     private void HandleRoomCleared(bool isBossRoom)
     {
