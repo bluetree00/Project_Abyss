@@ -26,9 +26,16 @@ public class DeathKnightSwordController : MonoBehaviour
     [Tooltip("소멸 디졸브 지속 시간 (초)")]
     [SerializeField] private float _disappearDuration = 0.25f;
 
+    [Header("검 색상 머티리얼")]
+    [Tooltip("흰색 검 머티리얼")]
+    [SerializeField] private Material _whiteMaterial;
+    [Tooltip("검은색 검 머티리얼")]
+    [SerializeField] private Material _blackMaterial;
+
     // ── 상태 ──────────────────────────────────────────
     private bool _isVisible;
     private CancellationToken _destroyCt;
+    private Renderer _swordRenderer;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // Lifecycle
@@ -46,6 +53,8 @@ public class DeathKnightSwordController : MonoBehaviour
             Debug.LogWarning("[DKSword] SM_DarkKnight2_Sword를 찾을 수 없습니다.", this);
             return;
         }
+
+        _swordRenderer = _swordGO.GetComponentInChildren<Renderer>();
 
         // 시작 시 검 숨김
         _swordGO.SetActive(false);
@@ -76,6 +85,20 @@ public class DeathKnightSwordController : MonoBehaviour
         _isVisible = true;
         _swordGO.SetActive(true);
         DissolveEffect.PlayAppear(_swordGO, _appearDuration, activationToken: _destroyCt);
+    }
+
+    /// <summary>검 Transform을 반환한다 (VFX 부착 등에 사용).</summary>
+    public Transform SwordTransform => _swordGO != null ? _swordGO.transform : null;
+
+    /// <summary>
+    /// 검 머티리얼을 지정된 색상으로 변경한다.
+    /// </summary>
+    public void SetSwordColor(DKSwordColor color)
+    {
+        if (_swordRenderer == null) return;
+        Material mat = color == DKSwordColor.White ? _whiteMaterial : _blackMaterial;
+        if (mat != null)
+            _swordRenderer.material = mat;
     }
 
     /// <summary>
