@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 35a182868a3c69842a065ee175471de7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 4890085278179872738
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 256794
+  packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
+  packageVersion: 1.0
+  assetPath: Assets/LeartesStudios/FantasyCastle/HDRP/Scene/SceneSettings.lighting
+  uploadId: 655128

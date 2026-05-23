@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b90a189b547a36f41996d0d6cc050d24
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 248169
+  packageName: Gothic Interior Megapack
+  packageVersion: 1.0
+  assetPath: Assets/Gothic_Interior/Environment/Animation/CameraSequence03.controller
+  uploadId: 678893
