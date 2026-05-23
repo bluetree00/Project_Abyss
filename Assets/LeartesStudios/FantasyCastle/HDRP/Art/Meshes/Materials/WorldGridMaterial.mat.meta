@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6e7f77ef13c95f0419e750d6ce5696db
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 256794
+  packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
+  packageVersion: 1.0
+  assetPath: Assets/LeartesStudios/FantasyCastle/HDRP/Art/Meshes/Materials/WorldGridMaterial.mat
+  uploadId: 655128
