@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 89bba1c81ad831e49b240de178c592af
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/MagicAttacks/Void/EffectGraph/VEG_VoidMagic_Cast.vfx
+  uploadId: 714344

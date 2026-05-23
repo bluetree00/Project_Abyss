@@ -112,6 +112,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 141539
   packageName: Spells Pack
-  packageVersion: 1.3.12
-  assetPath: Assets/Spells Pack/Particles/Models/Skull.png
-  uploadId: 664183
+  packageVersion: 1.3.13
+  assetPath: Assets/_ThirdParty/Spells Pack/Particles/Models/Skull.png
+  uploadId: 766109

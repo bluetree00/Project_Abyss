@@ -75,5 +75,5 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Asset/Texture/T_StainGlass/T_StainGlass_01a_TM.png
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Asset/Texture/T_StainGlass/T_StainGlass_01a_TM.png
   uploadId: 678893

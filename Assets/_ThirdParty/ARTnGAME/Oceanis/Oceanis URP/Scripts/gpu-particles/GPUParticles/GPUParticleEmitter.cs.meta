@@ -24,5 +24,5 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/Scripts/gpu-particles/GPUParticles/GPUParticleEmitter.cs
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/Scripts/gpu-particles/GPUParticles/GPUParticleEmitter.cs
   uploadId: 902342

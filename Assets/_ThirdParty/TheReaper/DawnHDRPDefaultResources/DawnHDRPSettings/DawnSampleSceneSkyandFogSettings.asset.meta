@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a123fc0ac58cb774e8592c925f167e7c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/DawnHDRPDefaultResources/DawnHDRPSettings/DawnSampleSceneSkyandFogSettings.asset
+  uploadId: 467556

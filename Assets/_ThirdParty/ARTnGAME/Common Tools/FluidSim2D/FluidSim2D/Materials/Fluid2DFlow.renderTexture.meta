@@ -12,5 +12,5 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Common Tools/FluidSim2D/FluidSim2D/Materials/Fluid2DFlow.renderTexture
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/FluidSim2D/FluidSim2D/Materials/Fluid2DFlow.renderTexture
   uploadId: 902342

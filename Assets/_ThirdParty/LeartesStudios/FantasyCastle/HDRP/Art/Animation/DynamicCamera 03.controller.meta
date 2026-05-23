@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 256794
   packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
   packageVersion: 1.0
-  assetPath: Assets/LeartesStudios/FantasyCastle/HDRP/Art/Animation/DynamicCamera
+  assetPath: Assets/_ThirdParty/LeartesStudios/FantasyCastle/HDRP/Art/Animation/DynamicCamera
     03.controller
   uploadId: 655128

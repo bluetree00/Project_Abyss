@@ -10,5 +10,6 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Scenes/Cathedral_Main HDRP.unity
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Scenes/Cathedral_Main
+    HDRP.unity
   uploadId: 678893

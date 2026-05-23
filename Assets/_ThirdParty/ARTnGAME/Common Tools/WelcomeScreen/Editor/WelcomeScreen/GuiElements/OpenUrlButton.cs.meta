@@ -14,5 +14,5 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Common Tools/WelcomeScreen/Editor/WelcomeScreen/GuiElements/OpenUrlButton.cs
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/WelcomeScreen/Editor/WelcomeScreen/GuiElements/OpenUrlButton.cs
   uploadId: 902342

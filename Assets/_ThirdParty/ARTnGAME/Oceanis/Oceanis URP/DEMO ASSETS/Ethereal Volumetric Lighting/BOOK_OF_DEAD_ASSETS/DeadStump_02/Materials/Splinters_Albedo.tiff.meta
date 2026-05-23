@@ -109,6 +109,6 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/Ethereal Volumetric
-    Lighting/BOOK_OF_DEAD_ASSETS/DeadStump_02/Materials/Splinters_Albedo.tiff
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/Ethereal
+    Volumetric Lighting/BOOK_OF_DEAD_ASSETS/DeadStump_02/Materials/Splinters_Albedo.tiff
   uploadId: 902342

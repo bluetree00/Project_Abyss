@@ -11,5 +11,6 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Asset/Mesh/Materials/No Name.mat
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Asset/Mesh/Materials/No
+    Name.mat
   uploadId: 678893

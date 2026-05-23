@@ -97,6 +97,7 @@ Material:
     m_Ints: []
     m_Floats:
     - PixelSnap: 0
+    - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Blend: 0
@@ -152,6 +153,7 @@ Material:
     - _SunLightIntensity: 2.94
     - _Surface: 1
     - _WorkflowMode: 1
+    - _XRMotionVectorsPass: 1
     - _ZWrite: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 0.7748986, b: 0.33448273, a: 1}

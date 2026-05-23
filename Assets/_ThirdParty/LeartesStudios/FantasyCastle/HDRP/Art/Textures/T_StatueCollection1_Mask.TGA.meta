@@ -101,5 +101,5 @@ AssetOrigin:
   productId: 256794
   packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
   packageVersion: 1.0
-  assetPath: Assets/LeartesStudios/FantasyCastle/HDRP/Art/Textures/T_StatueCollection1_Mask.TGA
+  assetPath: Assets/_ThirdParty/LeartesStudios/FantasyCastle/HDRP/Art/Textures/T_StatueCollection1_Mask.TGA
   uploadId: 655128
