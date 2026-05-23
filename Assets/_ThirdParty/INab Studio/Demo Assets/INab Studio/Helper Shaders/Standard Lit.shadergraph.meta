@@ -10,8 +10,9 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
 AssetOrigin:
   serializedVersion: 1
-  productId: 337724
-  packageName: Procedural Weapon Trails
+  productId: 352338
+  packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Demo Assets/INab Studio/Helper Shaders/Standard Lit.shadergraph
-  uploadId: 898538
+  assetPath: Assets/_ThirdParty/INab Studio/Demo Assets/INab Studio/Helper Shaders/Standard
+    Lit.shadergraph
+  uploadId: 858964

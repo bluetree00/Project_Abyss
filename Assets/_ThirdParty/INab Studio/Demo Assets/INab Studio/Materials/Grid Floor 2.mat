@@ -24,11 +24,11 @@ Material:
   m_Shader: {fileID: -6465566751694194690, guid: ed9d2c7cebcf9be4e9fa52a4b0479222, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _DISABLE_SSR_TRANSPARENT
   m_InvalidKeywords:
   - _BUILTIN_ALPHATEST_ON
   - _BUILTIN_AlphaClip
-  - _DISABLE_SSR_TRANSPARENT
   - _EMISSION
   - _GLOSSYREFLECTIONS_OFF
   - _NORMALMAP
@@ -162,6 +162,7 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 0
+    - _DstBlend2: 0
     - _EmberOffset: 0
     - _EmberSmoothness: 0
     - _EmberWidth: 0
@@ -182,11 +183,14 @@ Material:
     - _INVERT: 0
     - _Invert: 0
     - _Length: 0
+    - _MaterialID: 1
+    - _MaterialTypeMask: 2
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 0
     - _OpaqueCullMode: 2
     - _Parallax: 0.02
+    - _PerPixelSorting: 0
     - _QueueControl: 0
     - _QueueOffset: 0
     - _Radius1: 0
@@ -215,6 +219,7 @@ Material:
     - _SupportDecals: 1
     - _Surface: 0
     - _SurfaceType: 0
+    - _TransmissionEnable: 1
     - _TransparentBackfaceEnable: 0
     - _TransparentCullMode: 2
     - _TransparentDepthPostpassEnable: 0

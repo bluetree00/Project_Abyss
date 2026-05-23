@@ -113,5 +113,5 @@ AssetOrigin:
   productId: 141539
   packageName: Spells Pack
   packageVersion: 1.3.13
-  assetPath: Assets/Spells Pack/Particles/Textures/Lava_Normal.png
+  assetPath: Assets/_ThirdParty/Spells Pack/Particles/Textures/Lava_Normal.png
   uploadId: 766109

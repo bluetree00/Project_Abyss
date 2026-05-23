@@ -130,8 +130,8 @@ TextureImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 337724
-  packageName: Procedural Weapon Trails
+  productId: 352338
+  packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Common/Textures/Caustics/INab_Caustics_9.png
-  uploadId: 898538
+  assetPath: Assets/_ThirdParty/INab Studio/Common/Textures/Caustics/INab_Caustics_9.png
+  uploadId: 858964

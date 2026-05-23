@@ -206,16 +206,16 @@ Material:
     m_Ints: []
     m_Floats:
     - DepthPyramidScale: 0.19
-    - FresnelFactor: 0.7
+    - FresnelFactor: 0.3
     - _Ambient: 1
-    - _ContactFoam: 1.09
+    - _ContactFoam: 1.5
     - _Displacement: 0.27863377
     - _DisplacementTiling: 18.586807
     - _FadeExp: 0.91503274
     - _FoamBiasLOD0: 0.1
     - _FoamBiasLOD1: 1.45
-    - _FoamBiasLOD2: 2.88
-    - _FoamScale: 5.3
+    - _FoamBiasLOD2: 2.78
+    - _FoamScale: 6.4
     - _FoamWaveDependency: 0.10205479
     - _FresnelPower: 1.7931035
     - _FresnelScale: 18.8
@@ -233,18 +233,18 @@ Material:
     - _Lux_RippleTiling: 0.2
     - _Lux_WaterBumpDistance: 16
     - _MaxGloss: 2.35
-    - _MultiplyEffect: -149
+    - _MultiplyEffect: -150
     - _NormalsDisplacement: 0
     - _PowerFFT: -0.5
     - _PowerFFT1Y: -0.21
     - _PowerFFT2Y: 2
     - _ReflDistort: 0.9267696
     - _RefrDistort: 1.4393286
-    - _Roughness: 0.097
-    - _RoughnessScale: 0.223
-    - _SSSBase: -2.29
-    - _SSSScale: 33
-    - _SSSStrength: 1.86
+    - _Roughness: 0.043
+    - _RoughnessScale: 0.112
+    - _SSSBase: -1.14
+    - _SSSScale: 18.3
+    - _SSSStrength: 1.16
     - _Shininess: 379
     - _ShoreFadeFactor: 0
     - _ShoreTiling: 56.862743
@@ -255,44 +255,44 @@ Material:
     - _WaveCapsAmount: 0.18275861
     - _WaveFoamDistort: 0.27931035
     - _WaveScale: 0.046289656
-    - _WorldScale: 5.6565657
+    - _WorldScale: 8.626657
     - _localLightRange: 2.88
     - _regulateShoreWavesHeight: 1.3
     - _regulateShoreWavesHeightA: 1.41
     - _regulateShoreWavesHeightB: 0
     - _regulateShoreWavesHeightC: 0
     - autoLOD: 0
-    - cameraNearClip: -0.61
+    - cameraNearClip: 6
     - cameraOffset: 0
     - depthBelowZero: 22
     - depthFade: 15
-    - depthFadePower: 2.7
+    - depthFadePower: -1.5
     - enableProjectedGrid: 1
     - foamContrast: 0.02
     - fogBias: 522.73
     - fogDepth: 0.19
-    - fogThres: 283.99997
+    - fogThres: 283.99988
     - isUnderwater: 0
     - offsetTopWaterLight: -2.52
     - sssBackSideFactor: 0
     - sssFactor: 1.53
-    - waterAirMode: 1
-    - waterHeight: 3.0000002
+    - waterAirMode: 0
+    - waterHeight: 3.000001
     - waterHeightFogOffset: 0
     m_Colors:
-    - DepthPyramidScale: {r: 1, g: 0.6667, b: 0, a: 0}
-    - NearClipAdjust: {r: 4, g: 2, b: 4, a: 4}
+    - DepthPyramidScale: {r: 1, g: 1, b: 0, a: 0}
+    - NearClipAdjust: {r: 2, g: 0.8, b: 3, a: 1}
     - RippleFoamAdjust: {r: 1, g: 1, b: 1, a: 1}
     - RippleSpecularAdjust: {r: 1, g: 1, b: 1, a: 1}
     - WaveSpeed: {r: 1.086165, g: 4.440575, b: 12.105146, a: -3.0206447}
     - _AnimationDirection: {r: 2, g: 4, b: 2, a: -1}
     - _AnimationTiling: {r: 0.003, g: 0.003, b: 0.03, a: 0.039}
-    - _BaseColor: {r: 0.10497389, g: 0.43708137, b: 0.517647, a: 0.14117648}
+    - _BaseColor: {r: 0.10513232, g: 0.5188676, b: 0.5109294, a: 0.14117648}
     - _BumpDirection: {r: 57.999977, g: 28.000011, b: 28.000011, a: 1}
     - _BumpMap_ST: {r: 1, g: 1, b: 0, a: 0}
     - _BumpTiling: {r: 1.37, g: 1, b: 1, a: 1}
-    - _Color: {r: 0.40312904, g: 0.90943396, b: 0.8796578, a: 0.3529412}
-    - _DepthCameraPos: {r: -465.0496, g: 1000, b: 307.52106, a: 1}
+    - _Color: {r: 0.0918215, g: 0.5, b: 0.48003662, a: 0.3529412}
+    - _DepthCameraPos: {r: -6.1113677, g: 1000, b: 218.81374, a: 1}
     - _DepthColor: {r: 0.027511697, g: 0.14179105, b: 0.13226777, a: 0.4627451}
     - _DepthColorFade: {r: 0.8880597, g: 0.27834705, b: 0.44463244, a: 0.22352941}
     - _Displacement: {r: 6.6371665, g: 20.353983, b: -1, a: -0.681416}
@@ -300,7 +300,7 @@ Material:
     - _DistortParams: {r: 1.1, g: 2.7, b: 2, a: 4.5}
     - _Extinction: {r: 4.5, g: 75, b: 300, a: 1}
     - _Foam: {r: 2.24, g: -2.92, b: 0.04, a: 1}
-    - _FoamColor: {r: 0.5283019, g: 0.4558093, b: 0.42007977, a: 1}
+    - _FoamColor: {r: 0.5283019, g: 0.4558093, b: 0.4210845, a: 1}
     - _FoamWaveParams: {r: 0, g: 0.24918434, b: 3.3395782, a: 1}
     - _Fresnel_ST: {r: 1, g: 1, b: 0, a: 0}
     - _GAmplitude: {r: 0, g: 0, b: 0, a: 0}
@@ -335,28 +335,28 @@ Material:
     - _RefrColorDepth: {r: 0.050066825, g: 0.23134327, b: 0.17049524, a: 1}
     - _RefractionFog: {r: 0.50543475, g: 0.50543475, b: 0.50543475, a: 0.5}
     - _RefractionTex_ST: {r: 1, g: 1, b: 0, a: 0}
-    - _SSSColor: {r: 0.45233884, g: 0.66571784, b: 0.6830188, a: 0.15686275}
+    - _SSSColor: {r: 1, g: 0.8726415, b: 0.8726415, a: 0.15686275}
     - _ShoreColor: {r: 1, g: 1, b: 1, a: 1}
     - _ShorePerturbation: {r: 0, g: 0, b: 0, a: 0}
     - _ShoreTiling: {r: 1, g: 1, b: 0.1, a: 0.1}
-    - _SpecularColor: {r: 0.7169812, g: 0.15790895, b: 0.15790895, a: 0.047058824}
+    - _SpecularColor: {r: 0.7169812, g: 0.1588591, b: 0.1588591, a: 0.047058824}
     - _SunColor: {r: 0.8399999, g: 0.8399999, b: 0.8399999, a: 0.5}
-    - _TerrainScale: {r: 633.60004, g: 356.40002, b: 0, a: 0}
+    - _TerrainScale: {r: 398.97, g: 237.27, b: 0, a: 0}
     - _UnderwaterColor: {r: 0.6950323, g: 0.89552236, b: 0.7502397, a: 1}
     - _WaveOffset: {r: 1, g: 1, b: -0.01, a: -0.01}
     - _WaveScale4: {r: 0.1, g: 0.1, b: 0.01, a: 0.01}
     - _WorldLightDir: {r: 0.22850722, g: -0.64505774, b: 0.7291673, a: 0}
-    - _controlReflect: {r: 42, g: 5, b: 0.5, a: 1}
-    - _controlSkyColor: {r: 1, g: 0.14473417, b: 0, a: 0}
-    - _controlSkyRadiance: {r: 0.07, g: 2.7, b: -39380, a: 0.1}
-    - _controlSkyRadianceA: {r: 1, g: 39, b: 26, a: 1}
+    - _controlReflect: {r: 222, g: 40, b: 1, a: 1}
+    - _controlSkyColor: {r: 1, g: 0.14566997, b: 0, a: 0}
+    - _controlSkyRadiance: {r: 0.05, g: 2.1, b: 358206, a: 0.1}
+    - _controlSkyRadianceA: {r: 1, g: 410, b: 7262, a: 1}
     - _foamColor: {r: 0.9433962, g: 0.9211463, b: 0.9211463, a: 0.92941177}
     - _localLightAPos: {r: 0, g: 0, b: 0, a: 0}
     - _localLightAProps: {r: 0, g: 0, b: 0, a: 0}
     - _sssColor: {r: 0.43454075, g: 0.5720421, b: 0.5943396, a: 0.7764706}
     - _sssParams: {r: 0.006, g: 20, b: -90, a: -9609}
     - cameraNearColor: {r: 0, g: 0, b: 0, a: 1}
-    - cameraNearControl: {r: 0.1, g: 1, b: 14, a: 1}
+    - cameraNearControl: {r: 0.1, g: 1, b: 14, a: 350}
     - controlProjection: {r: 0.9, g: -0.6, b: 0, a: 0.016}
     - decalEdgeTweak: {r: 0, g: 0, b: 0, a: 0}
     - decalPosRot: {r: -1976.5, g: -370, b: 78, a: 1191.4}

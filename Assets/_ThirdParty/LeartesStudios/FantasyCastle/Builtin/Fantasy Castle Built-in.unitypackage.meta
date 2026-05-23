@@ -10,5 +10,6 @@ AssetOrigin:
   productId: 256794
   packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
   packageVersion: 1.0
-  assetPath: Assets/LeartesStudios/FantasyCastle/Builtin/Fantasy Castle Built-in.unitypackage
+  assetPath: Assets/_ThirdParty/LeartesStudios/FantasyCastle/Builtin/Fantasy Castle
+    Built-in.unitypackage
   uploadId: 655128

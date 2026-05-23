@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 256794
   packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
   packageVersion: 1.0
-  assetPath: Assets/LeartesStudios/FantasyCastle/HDRP/Scene/Overview/Sky and Fog
-    Settings Profile.asset
+  assetPath: Assets/_ThirdParty/LeartesStudios/FantasyCastle/HDRP/Scene/Overview/Sky
+    and Fog Settings Profile.asset
   uploadId: 655128

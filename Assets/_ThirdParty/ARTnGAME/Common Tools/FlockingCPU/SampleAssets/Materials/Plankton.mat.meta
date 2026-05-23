@@ -11,5 +11,5 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Common Tools/FlockingCPU/SampleAssets/Materials/Plankton.mat
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/FlockingCPU/SampleAssets/Materials/Plankton.mat
   uploadId: 902342

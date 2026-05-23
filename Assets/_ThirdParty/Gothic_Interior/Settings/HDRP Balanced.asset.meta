@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 4eee9def74423de4fac2e52448d896ce
+guid: 9e07558d259d83b4bbff3bf3314f1b40
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 0
@@ -11,5 +11,5 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Settings/HDRP Balanced.asset
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Settings/HDRP Balanced.asset
   uploadId: 678893

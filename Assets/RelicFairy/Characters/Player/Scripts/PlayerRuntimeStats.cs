@@ -293,6 +293,12 @@ public sealed class PlayerRuntimeStats
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
 
+    // -- Character Mechanic (고유 메커닉 배율 — HolyGauge 만충, SolarTimer 강화 등) --
+    private float _characterMeleeMult  = 1f;
+    private float _characterRangedMult = 1f;
+    private float _characterDefenseMult = 1f;
+    private float _characterDamageReduction = 0f;
+
     // ── 무기 ─────────────────────────────────────────────────────────────────────
 
     /// <summary>무기 장착/해제 시 호출.</summary>
@@ -592,9 +598,10 @@ public sealed class PlayerRuntimeStats
         }
 
         // % 보너스 배율
-        float dmgMul  = 1f + _itemAllDamagePercent;     // AllDamage% + AllStats% → 공격력
-        float defMul  = 1f + _itemAllStatsPercent;       // AllStats%만 → 방어력
-        float luckMul = 1f + _itemAllStatsPercent;       // AllStats%만 → 행운
+        float dmgMul  = (1f + _itemAllDamagePercent) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent) * _characterRangedMult;
+        float defMul  = (1f + _itemAllStatsPercent) * _characterDefenseMult;
+        float luckMul = 1f + _itemAllStatsPercent;
 
         int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + condMelee;
         int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + condRanged;
@@ -602,7 +609,7 @@ public sealed class PlayerRuntimeStats
         int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
-        RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMul));
+        RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
         Defense      = Mathf.Max(0, Mathf.RoundToInt(baseDefSum * defMul));
         Luck         = Mathf.Max(0, Mathf.RoundToInt(baseLuckSum * luckMul));
 
@@ -630,7 +637,7 @@ public sealed class PlayerRuntimeStats
         HealingReceivedBonus = _itemHealingReceived;
         DebuffResistance    = _itemDebuffResistance;
         AllDamagePercent    = _itemAllDamagePercent;
-        DamageReduction     = _itemDamageReduction;
+        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction);
         ItemLifesteal       = _itemLifesteal + LifestealRate + _awakeningLifesteal;
 
         // 시스템 스탯
@@ -641,6 +648,27 @@ public sealed class PlayerRuntimeStats
         DebuffDurationBonus = _itemDebuffDuration;
 
         OnChanged?.Invoke();
+    }
+
+    // ── 캐릭터 메커닉 배율 ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 캐릭터 고유 메커닉(HolyGauge 만충, SolarTimer 강화 등)의 공격 배율을 설정한다.
+    /// meleeMult=1f, rangedMult=1f 이 기본값(배율 없음).
+    /// </summary>
+    public void SetCharacterAttackMultiplier(float meleeMult, float rangedMult)
+    {
+        _characterMeleeMult  = Mathf.Max(0f, meleeMult);
+        _characterRangedMult = Mathf.Max(0f, rangedMult);
+        Recalculate();
+    }
+
+    /// <summary>방어 배율 및 피해 감소를 캐릭터 메커닉에서 설정한다.</summary>
+    public void SetCharacterDefenseBonus(float defenseMult, float damageReduction)
+    {
+        _characterDefenseMult   = Mathf.Max(0f, defenseMult);
+        _characterDamageReduction = Mathf.Clamp01(damageReduction);
+        Recalculate();
     }
 
     // ── 시너지 ──────────────────────────────────────────────────────────────────

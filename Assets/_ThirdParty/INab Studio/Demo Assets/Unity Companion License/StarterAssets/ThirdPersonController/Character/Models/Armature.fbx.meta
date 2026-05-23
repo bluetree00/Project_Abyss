@@ -912,5 +912,5 @@ AssetOrigin:
   productId: 352338
   packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Demo Assets/Unity Companion License/StarterAssets/ThirdPersonController/Character/Models/Armature.fbx
+  assetPath: Assets/_ThirdParty/INab Studio/Demo Assets/Unity Companion License/StarterAssets/ThirdPersonController/Character/Models/Armature.fbx
   uploadId: 858964

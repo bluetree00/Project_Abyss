@@ -11,6 +11,6 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Settings/RenderPipelines/Universal Render Pipeline
-    Asset_Renderer.asset
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Settings/RenderPipelines/Universal
+    Render Pipeline Asset_Renderer.asset
   uploadId: 678893

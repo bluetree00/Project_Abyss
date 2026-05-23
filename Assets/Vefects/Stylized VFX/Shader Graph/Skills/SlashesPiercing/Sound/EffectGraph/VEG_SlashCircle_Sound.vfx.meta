@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 63f0488dc14a69749bfe0afc2fea9285
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/SlashesPiercing/Sound/EffectGraph/VEG_SlashCircle_Sound.vfx
+  uploadId: 714344

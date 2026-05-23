@@ -125,6 +125,6 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Asset/Texture/sunflowers_puresky_4k
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Asset/Texture/sunflowers_puresky_4k
     copy.hdr
   uploadId: 678893

@@ -11,5 +11,6 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Animation/CameraSequence08 1.controller
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Animation/CameraSequence08
+    1.controller
   uploadId: 678893

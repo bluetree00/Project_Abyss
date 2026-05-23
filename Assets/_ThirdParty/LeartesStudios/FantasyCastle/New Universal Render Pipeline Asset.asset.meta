@@ -11,5 +11,6 @@ AssetOrigin:
   productId: 256794
   packageName: Fantasy Castle Environment ( Fantasy, Soulslike, Castle, Fantasy )
   packageVersion: 1.0
-  assetPath: Assets/LeartesStudios/FantasyCastle/New Universal Render Pipeline Asset.asset
+  assetPath: Assets/_ThirdParty/LeartesStudios/FantasyCastle/New Universal Render
+    Pipeline Asset.asset
   uploadId: 655128

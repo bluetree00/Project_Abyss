@@ -10,8 +10,9 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: 60072b568d64c40a485e0fc55012dc9f, type: 3}
 AssetOrigin:
   serializedVersion: 1
-  productId: 337724
-  packageName: Procedural Weapon Trails
+  productId: 352338
+  packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Common/Subgraphs/Utilities/Simple Depth Mask Refraction.shadersubgraph
-  uploadId: 898538
+  assetPath: Assets/_ThirdParty/INab Studio/Common/Subgraphs/Utilities/Simple Depth
+    Mask Refraction.shadersubgraph
+  uploadId: 858964

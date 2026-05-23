@@ -26,6 +26,8 @@ public class ActSkillState : ActSkillStateBase<ActState>
 
     protected override float GetCooldown()
     {
+        float charCd = _controller.GetCharacterSkillCooldown(_slot);
+        if (charCd > 0f) return charCd;
         var skillSO = GetSkillSO();
         return skillSO?.cooldown ?? 0f;
     }
@@ -45,22 +47,32 @@ public class ActSkillState : ActSkillStateBase<ActState>
         _controller.InputBuffer.TryConsume(Game.Inputs.Command.Heavy);
         _controller.InputBuffer.TryConsume(Game.Inputs.Command.Charge);
 
+        _ctx = new SkillExecutionContext
+        {
+            Controller = _controller,
+            Execution = _execution,
+            WeaponData = _controller.WeaponManager?.CurrentWeaponData,
+            Slot = _slot,
+            ActionType = _actionType,
+            RequestEnd = () => _ended = true,
+        };
+
+        // 캐릭터 고유 스킬 우선 확인
+        var charRuntime = _controller.CreateCharacterSkillRuntime(_slot);
+        if (charRuntime != null)
+        {
+            _runtime = charRuntime;
+            _runtime.OnEnter(_ctx);
+            return;
+        }
+
+        // 무기 기반 스킬 (기존 경로)
         var skillSO = GetSkillSO();
         var behavior = skillSO?.behavior;
         Debug.Log($"[ActSkillState] {_slot} OnEnter: skillSO={skillSO?.name ?? "NULL"}, behavior={behavior?.name ?? "NULL"}");
 
         if (behavior != null)
         {
-            _ctx = new SkillExecutionContext
-            {
-                Controller = _controller,
-                Execution = _execution,
-                WeaponData = _controller.WeaponManager?.CurrentWeaponData,
-                Slot = _slot,
-                ActionType = _actionType,
-                RequestEnd = () => _ended = true,
-            };
-
             _runtime = behavior.CreateRuntime();
             _runtime.OnEnter(_ctx);
         }
@@ -108,8 +120,8 @@ public class ActSkillState : ActSkillStateBase<ActState>
         var wd = _controller.WeaponManager?.CurrentWeaponData;
         return _slot switch
         {
-            SkillType.Q => wd?.skillQ,
             SkillType.E => wd?.skillE,
+            SkillType.R => wd?.skillQ,
             _ => null
         };
     }

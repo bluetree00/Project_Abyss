@@ -117,9 +117,9 @@ TextureImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 337724
-  packageName: Procedural Weapon Trails
+  productId: 352338
+  packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Demo Assets/INab Studio/Environment Reflection/Default
+  assetPath: Assets/_ThirdParty/INab Studio/Demo Assets/INab Studio/Environment Reflection/Default
     Reflection.exr
-  uploadId: 898538
+  uploadId: 858964

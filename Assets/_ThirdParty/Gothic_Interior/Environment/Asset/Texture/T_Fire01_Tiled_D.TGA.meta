@@ -99,5 +99,5 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Asset/Texture/T_Fire01_Tiled_D.TGA
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Asset/Texture/T_Fire01_Tiled_D.TGA
   uploadId: 678893

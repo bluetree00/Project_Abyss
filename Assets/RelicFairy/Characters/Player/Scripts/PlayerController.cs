@@ -312,6 +312,17 @@ public class PlayerController : CharacterBase
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>
     protected virtual void InitPassives() { }
 
+    // ── 캐릭터 고유 스킬 ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 캐릭터 고유 스킬 런타임을 반환한다.
+    /// 무기 스킬보다 우선 적용. null이면 무기 스킬 또는 레거시 폴백 사용.
+    /// </summary>
+    public virtual ISkillRuntime CreateCharacterSkillRuntime(SkillType slot) => null;
+
+    /// <summary>캐릭터 고유 스킬의 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
+    public virtual float GetCharacterSkillCooldown(SkillType slot) => 0f;
+
     //============================================================
     // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
     //============================================================
@@ -420,7 +431,7 @@ public class PlayerController : CharacterBase
 
     private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
 
-    private void OnDestroy()
+    protected virtual void OnDestroy()
     {
         if (inputActions != null)
         {

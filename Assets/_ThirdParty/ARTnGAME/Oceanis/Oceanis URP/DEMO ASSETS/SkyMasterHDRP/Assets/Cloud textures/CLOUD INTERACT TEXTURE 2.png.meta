@@ -135,6 +135,6 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/SkyMasterHDRP/Assets/Cloud
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/SkyMasterHDRP/Assets/Cloud
     textures/CLOUD INTERACT TEXTURE 2.png
   uploadId: 902342

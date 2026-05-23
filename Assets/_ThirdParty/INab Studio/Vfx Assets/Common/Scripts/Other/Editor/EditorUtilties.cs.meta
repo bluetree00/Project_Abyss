@@ -11,8 +11,8 @@ MonoImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 337724
-  packageName: Procedural Weapon Trails
+  productId: 352338
+  packageName: Character Effects
   packageVersion: 1.1
-  assetPath: Assets/INab Studio/Vfx Assets/Common/Scripts/Other/Editor/EditorUtilties.cs
-  uploadId: 898538
+  assetPath: Assets/_ThirdParty/INab Studio/Vfx Assets/Common/Scripts/Other/Editor/EditorUtilties.cs
+  uploadId: 858964

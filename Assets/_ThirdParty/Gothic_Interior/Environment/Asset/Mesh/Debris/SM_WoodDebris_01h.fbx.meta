@@ -235,5 +235,5 @@ AssetOrigin:
   productId: 248169
   packageName: Gothic Interior Megapack
   packageVersion: 1.0
-  assetPath: Assets/Gothic_Interior/Environment/Asset/Mesh/Debris/SM_WoodDebris_01h.fbx
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Environment/Asset/Mesh/Debris/SM_WoodDebris_01h.fbx
   uploadId: 678893

@@ -60,6 +60,6 @@ AssetOrigin:
   productId: 289926
   packageName: Oceanis 2024 Pro URP Water Framework
   packageVersion: 2.3.0
-  assetPath: Assets/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/PANGAEA HDRP/Mesh terrain
-    Textures/terrain_far_01_a3.png
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/PANGAEA
+    HDRP/Mesh terrain Textures/terrain_far_01_a3.png
   uploadId: 902342
