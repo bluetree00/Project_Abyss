@@ -703,7 +703,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // NavMesh 빌드 (몬스터 AI 이동 경로 계산) — 렌더러 비활성화와 무관하게 동작
         await BuildMapNavMeshAsync(zoneGO);
 
-        // 장식(Decoration) 배치 — NavMesh 빌드 후, 기존 방 로드와 동일한 흐름
+        // 오버레이 토큰 처리 — NavMesh 빌드 후 배치 (Decoration, BossSpawn 등)
         TokenParser.Execute(zone.grid_csv, grid.GetLength(0), grid.GetLength(1), new TokenContext
         {
             Parent             = zoneGO.transform,
@@ -711,6 +711,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             BaseY              = blockBaseY,
             Theme              = !string.IsNullOrEmpty(zone.theme) ? zone.theme : string.Empty,
             DecorationCatalogs = decorationCatalogs,
+            ActivePalette      = zonePalette,
             Ct                 = ct,
         });
 
@@ -1038,17 +1039,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (mapGO.TryGetComponent<RoomWaveController>(out var waveCtrl))
             waveCtrl.Activate();
 
-        // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
-        // TokenParser → DecorationHandler → DecorationCatalog → 프리팹 인스턴스화.
+        // 오버레이 토큰 처리 — NavMesh 빌드 후에 배치.
+        // Decoration(d*) / BossSpawn(B) / Pickup(WP,CP) 핸들러가 자동 실행됨.
         TokenParser.Execute(roomEntry.grid_csv, w, h, new TokenContext
         {
-            Parent             = mapGO.transform,
-            CellSize           = blockCellSize,
-            BaseY              = blockBaseY,
-            Theme              = ResolveRoomTheme(roomEntry.theme),
-            RoomEntry          = roomEntry,
-            DecorationCatalogs = decorationCatalogs,
-            Ct                 = ct,
+            Parent                 = mapGO.transform,
+            CellSize               = blockCellSize,
+            BaseY                  = blockBaseY,
+            Theme                  = ResolveRoomTheme(roomEntry.theme),
+            RoomEntry              = roomEntry,
+            DecorationCatalogs     = decorationCatalogs,
+            ActivePalette          = activePalette,
+            CharacterPickupPrefabs = characterPickupPrefabs,
+            WeaponPickupPrefabs    = weaponPickupPrefabs,
+            Ct                     = ct,
         });
 
         // 챕터 필드 구조물 스폰 (디졸브 등장)
@@ -1058,9 +1062,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (IsShopCategory(roomEntry.category))
             await SetupShopRoomAsync(mapGO, roomEntry);
 
-        // 스타트 방 전용 오브젝트 (캐릭터/무기 픽업, 탈출 게이트)
-        if (IsStartCategory(roomEntry.category))
-            SpawnStartRoomObjects(mapGO, grid, w, h);
+        // 스타트 방 픽업(WP/CP)은 TokenParser → WeaponPickupHandler/CharacterPickupHandler 처리
     }
 
     private async UniTask SpawnFieldPrefabAsync(GameObject mapParent, CancellationToken ct)
@@ -1095,44 +1097,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return category.Trim().Equals("Start", System.StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>스타트 방 전용 픽업 오브젝트를 그리드 좌표 기반으로 스폰.
-    /// CP → characterPickupPrefabs[i] (발견 순서), WP → weaponPickupPrefabs[i].</summary>
-    private void SpawnStartRoomObjects(GameObject mapParent, TileType[,] grid, int w, int h)
-    {
-        var offset = new Vector3((w / 2f - 0.5f) * blockCellSize, 0f, (h / 2f - 0.5f) * blockCellSize);
-
-        // 캐릭터 픽업
-        var cpCells = MapDataLoader.FindAll(grid, TileType.CharacterPickup);
-        for (int i = 0; i < cpCells.Count; i++)
-        {
-            if (characterPickupPrefabs == null || i >= characterPickupPrefabs.Length || characterPickupPrefabs[i] == null)
-            {
-                Debug.LogWarning($"[GameRunBootstrapper] CP 타일 {i}에 대한 characterPickupPrefabs[{i}] 미할당 — 스킵");
-                continue;
-            }
-            var pos = new Vector3(cpCells[i].x * blockCellSize - offset.x, 0f, cpCells[i].y * blockCellSize - offset.z);
-            var go = Instantiate(characterPickupPrefabs[i], pos, Quaternion.identity, mapParent.transform);
-            go.name = $"CharPickup_{i}";
-        }
-
-        // 무기 픽업
-        var wpCells = MapDataLoader.FindAll(grid, TileType.WeaponPickup);
-        for (int i = 0; i < wpCells.Count; i++)
-        {
-            if (weaponPickupPrefabs == null || i >= weaponPickupPrefabs.Length || weaponPickupPrefabs[i] == null)
-            {
-                Debug.LogWarning($"[GameRunBootstrapper] WP 타일 {i}에 대한 weaponPickupPrefabs[{i}] 미할당 — 스킵");
-                continue;
-            }
-            var pos = new Vector3(wpCells[i].x * blockCellSize - offset.x, 0f, wpCells[i].y * blockCellSize - offset.z);
-            var go = Instantiate(weaponPickupPrefabs[i], pos, Quaternion.identity, mapParent.transform);
-            go.name = $"WeaponPickup_{i}";
-        }
-
-        Debug.Log($"[GameRunBootstrapper] 스타트 방 오브젝트 — CP:{cpCells.Count} WP:{wpCells.Count}");
-    }
-
-    /// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
+/// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
     /// 선택되지 않은 후보는 Floor로 치환된다.
     /// 규칙:
     ///   · max ≤ 0           : 모든 M/m 전체 활성 (제한 없음)
