@@ -24,5 +24,8 @@ public class TokenContext
 
     // ── 서비스 레퍼런스 (호출자가 주입) ───────────────────
     public DecorationCatalogSO[] DecorationCatalogs;
+    public BlockPalette ActivePalette;
+    public GameObject[] CharacterPickupPrefabs;
+    public GameObject[] WeaponPickupPrefabs;
     public CancellationToken Ct;
 }

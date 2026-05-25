@@ -184,27 +184,7 @@ public class MapBuilder
                         Debug.LogWarning($"[MapBuilder] MonsterSpawn 타일 ({x},{z}) — 팔레트에 BlockDef 없음, 스포너 미배치", parent);
                     }
                 }
-                else if (isBossSpawnTile)
-                {
-                    var bossSpawnerDef = palette.Pick(TileType.BossSpawn);
-                    if (bossSpawnerDef != null && bossSpawnerDef.prefab != null)
-                    {
-                        var bossGo = Object.Instantiate(bossSpawnerDef.prefab, worldPos, Quaternion.identity, parent);
-                        bossGo.name = $"BossSpawner_{x}_{z}";
-                        result.Add(new PlacedBlock
-                        {
-                            instance = bossGo,
-                            targetPosition = worldPos,
-                            targetRotationY = 0f,
-                            tileType = type,
-                            cell = new Vector2Int(x, z),
-                        });
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[MapBuilder] BossSpawn 타일 ({x},{z}) — 팔레트에 BossSpawn BlockDef 없음, 보스 스포너 미배치", parent);
-                    }
-                }
+                // BossSpawn: 바닥만 깔고 스포너 배치는 BossSpawnHandler(TokenParser)에 위임
             }
         }
 
