@@ -668,8 +668,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 그리드 파싱 (스폰 정보 포함)
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
-        var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
-        var grid = MapDataLoader.Parse(zone.grid_csv, spawnInfos, decorationInfos);
+        var grid = MapDataLoader.Parse(zone.grid_csv, spawnInfos);
         if (grid == null)
         {
             Debug.LogWarning($"[GameRunBootstrapper] SpawnZoneByIndexAsync: Zone {zoneIndex} grid_csv 파싱 실패");
@@ -703,6 +702,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // NavMesh 빌드 (몬스터 AI 이동 경로 계산) — 렌더러 비활성화와 무관하게 동작
         await BuildMapNavMeshAsync(zoneGO);
+
+        // 장식(Decoration) 배치 — NavMesh 빌드 후, 기존 방 로드와 동일한 흐름
+        TokenParser.Execute(zone.grid_csv, grid.GetLength(0), grid.GetLength(1), new TokenContext
+        {
+            Parent             = zoneGO.transform,
+            CellSize           = blockCellSize,
+            BaseY              = blockBaseY,
+            Theme              = !string.IsNullOrEmpty(zone.theme) ? zone.theme : string.Empty,
+            DecorationCatalogs = decorationCatalogs,
+            Ct                 = ct,
+        });
 
         // 미니맵 초기화 — Zone 1+ 경로에서도 미니맵이 해당 존 크기로 갱신되도록
         InitializeMinimapForRoom(zoneGO, grid.GetLength(0), grid.GetLength(1), blocks);
@@ -913,8 +923,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
-        var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
-        var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos, decorationInfos);
+        var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos);
         if (grid == null)
         {
             Debug.LogError($"[GameRunBootstrapper] grid_csv 파싱 실패: {roomEntry.room_id}");
@@ -1030,8 +1039,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             waveCtrl.Activate();
 
         // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
-        // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
-        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, ct, ResolveRoomTheme(roomEntry.theme));
+        // TokenParser → DecorationHandler → DecorationCatalog → 프리팹 인스턴스화.
+        TokenParser.Execute(roomEntry.grid_csv, w, h, new TokenContext
+        {
+            Parent             = mapGO.transform,
+            CellSize           = blockCellSize,
+            BaseY              = blockBaseY,
+            Theme              = ResolveRoomTheme(roomEntry.theme),
+            RoomEntry          = roomEntry,
+            DecorationCatalogs = decorationCatalogs,
+            Ct                 = ct,
+        });
 
         // 챕터 필드 구조물 스폰 (디졸브 등장)
         await SpawnFieldPrefabAsync(mapGO, ct);
@@ -1173,86 +1191,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         Debug.Log($"[GameRunBootstrapper] 스포너 계획 적용 — 확정 {fixedSpots.Count} + 후보 {need}/{candidateSpots.Count} 활성 (max={max})");
-    }
-
-    /// <summary>장식(Decoration) 셀에 카탈로그 프리팹을 Instantiate. 테마 일치 카탈로그 우선, 없으면 "*" 폴백.
-    /// MapBuilder는 d* 셀을 Floor로 배치하므로 이미 바닥은 깔려있고, 그 위에 오버레이로 얹힌다.</summary>
-    private void SpawnDecorations(
-        GameObject mapGO,
-        TileType[,] grid,
-        System.Collections.Generic.IReadOnlyDictionary<Vector2Int, string> decorationInfos,
-        MapRoomEntry roomEntry,
-        System.Threading.CancellationToken ct,
-        string themeOverride = null)
-    {
-        if (mapGO == null || grid == null || decorationInfos == null || decorationInfos.Count == 0) return;
-        if (decorationCatalogs == null || decorationCatalogs.Length == 0) return;
-
-        string theme = !string.IsNullOrEmpty(themeOverride) ? themeOverride : roomEntry.theme;
-        var catalog = PickDecorationCatalog(theme);
-        if (catalog == null)
-        {
-            Debug.LogWarning($"[GameRunBootstrapper] Decoration 카탈로그 없음 (theme='{theme}') — {decorationInfos.Count}개 장식 셀 미배치");
-            return;
-        }
-
-        int w = grid.GetLength(0);
-        int h = grid.GetLength(1);
-        var offset = new Vector3((w - 1) * 0.5f * blockCellSize, 0f, (h - 1) * 0.5f * blockCellSize);
-
-        int placed = 0, missing = 0;
-        foreach (var kv in decorationInfos)
-        {
-            var cell = kv.Key;
-            var entry = catalog.Get(kv.Value);
-            if (entry == null || entry.prefab == null) { missing++; continue; }
-
-            var pos = new Vector3(
-                cell.x * blockCellSize - offset.x,
-                blockBaseY + 0.5f + entry.yOffset, // 바닥 블록 상단에 얹기
-                cell.y * blockCellSize - offset.z);
-
-            Quaternion rot = entry.randomYRotation
-                ? Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f)
-                : Quaternion.identity;
-
-            var go = Object.Instantiate(entry.prefab, pos, rot, mapGO.transform);
-            go.name = $"Deco_{cell.x}_{cell.y}_{kv.Value}";
-            if (entry.scale != 1f)
-                go.transform.localScale *= entry.scale;
-
-            // NavMesh 빌드에서 제외 — 나무 등 외부 FBX의 Read/Write OFF 메시로 인한 런타임 실패 방지.
-            // 루트 + 모든 MeshRenderer 자식에 NavMeshModifier 부착.
-            AttachNavMeshIgnore(go);
-            DissolveEffect.PlayAppearAsync(go, 0.6f, ct).Forget();
-
-            placed++;
-        }
-
-        Debug.Log($"[GameRunBootstrapper] Decoration 배치 — {placed}개 성공 / {missing}개 카탈로그 미스 (theme={theme}, catalog={catalog.name})");
-    }
-
-    private static void AttachNavMeshIgnore(GameObject root)
-    {
-        if (root == null) return;
-        EnsureNavMeshIgnore(root);
-
-        // 자식 중 Renderer가 있는 GameObject에도 부착 — NavMeshSurface가 자식 렌더러를 스캔하므로.
-        var renderers = root.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            var r = renderers[i];
-            if (r == null) continue;
-            EnsureNavMeshIgnore(r.gameObject);
-        }
-    }
-
-    private static void EnsureNavMeshIgnore(GameObject go)
-    {
-        var mod = go.GetComponent<Unity.AI.Navigation.NavMeshModifier>();
-        if (mod == null)
-            mod = go.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
-        mod.ignoreFromBuild = true;
     }
 
     /// <summary>
@@ -1454,23 +1392,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return blockPalette; // 하위호환 fallback
     }
 
-    private DecorationCatalogSO PickDecorationCatalog(string theme)
-    {
-        if (decorationCatalogs == null) return null;
-
-        DecorationCatalogSO fallback = null;
-        foreach (var cat in decorationCatalogs)
-        {
-            if (cat == null) continue;
-            if (cat.MatchesTheme(theme) && !string.IsNullOrEmpty(cat.ThemeMatch) && cat.ThemeMatch != "*")
-                return cat; // 정확한 테마 매칭 우선
-            if (cat.ThemeMatch == "*" || string.IsNullOrEmpty(cat.ThemeMatch))
-                fallback = cat;
-        }
-        return fallback;
-    }
-
-    /// <summary>블록 목록에서 MonsterSpawner를 찾아 스폰 테이블의 모든 풀을 미리 채운다.
+/// <summary>블록 목록에서 MonsterSpawner를 찾아 스폰 테이블의 모든 풀을 미리 채운다.
     /// 입장 연출 재생 중 병렬 실행해 첫 스폰 프레임 드랍을 방지한다.</summary>
     private async UniTask PrewarmSpawnersFromBlocksAsync(
         System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks,
