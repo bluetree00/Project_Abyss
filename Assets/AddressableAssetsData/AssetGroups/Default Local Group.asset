@@ -120,6 +120,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9396a1704f2be8a41addba3c7eab9f0d
+    m_Address: UI/Popup/UI_Pause
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9d5dbdf2d3c3c6b4eadc51123699d237
     m_Address: wisp-vfx
     m_ReadOnly: 0
@@ -136,7 +141,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c2d35a1ffee495648a3ba8c850078037
-    m_Address: UI_AwakeningPanel
+    m_Address: UI/Popup/UI_AwakeningPanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -153,6 +158,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d4380da49cd4618468e9419a8c78e8d9
     m_Address: chest_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d63a5df35b4fa904ebb95bd4d5e13f6b
+    m_Address: UI/Popup/UI_CovenantChoice
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

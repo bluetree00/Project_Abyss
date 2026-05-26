@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using UnityEngine.AI;
 
 /// <summary>
 /// 신규 몬스터 25마리 프리팹 + Config.asset 일괄 생성 팩토리.
-/// Abyss > Tools > Create All New Monster Prefabs & Configs 실행.
+/// RelicFairy > Tools > Create All New Monster Prefabs & Configs 실행.
 /// </summary>
 public static class MonsterBatchFactory
 {
@@ -247,7 +247,7 @@ public static class MonsterBatchFactory
 
     // ── 실행 진입점 ──────────────────────────────────────────────
 
-    [MenuItem("Abyss/Tools/Create All New Monster Prefabs and Configs")]
+    [MenuItem("RelicFairy/Tools/Create All New Monster Prefabs and Configs")]
     public static void CreateAll()
     {
         int created = 0;
@@ -258,7 +258,7 @@ public static class MonsterBatchFactory
 
         // SpawnTable 로드
         var spawnTable = AssetDatabase.LoadAssetAtPath<MonsterSpawnTableSO>(
-            "Assets/Abyss/Characters/Monster/Monster/Core/MonsterSpawnTable.asset");
+            "Assets/RelicFairy/Characters/Monster/Monster/Core/MonsterSpawnTable.asset");
         var spawnTableSO = spawnTable != null ? new SerializedObject(spawnTable) : null;
         var entriesProp  = spawnTableSO?.FindProperty("entries");
 
@@ -303,7 +303,7 @@ public static class MonsterBatchFactory
 
     private static bool CreatePrefab(MonsterData m, AddressableAssetGroup addrGroup)
     {
-        string outFolder  = $"Assets/Abyss/Characters/Monster/Monster/{m.name}/Prefab";
+        string outFolder  = $"Assets/RelicFairy/Characters/Monster/Monster/{m.name}/Prefab";
         string prefabPath = $"{outFolder}/{m.name}.prefab";
 
         if (File.Exists(Path.Combine(Application.dataPath,
@@ -391,7 +391,7 @@ public static class MonsterBatchFactory
 
     private static bool CreateConfig(MonsterData m, AddressableAssetGroup addrGroup)
     {
-        string outFolder   = $"Assets/Abyss/Characters/Monster/Monster/{m.name}/SO";
+        string outFolder   = $"Assets/RelicFairy/Characters/Monster/Monster/{m.name}/SO";
         string configPath  = $"{outFolder}/{m.name}Config.asset";
 
         if (File.Exists(Path.Combine(Application.dataPath,
@@ -525,7 +525,7 @@ public static class MonsterBatchFactory
 
     // ── NavMesh 베이크 ───────────────────────────────────────────
 
-    [MenuItem("Abyss/Tools/Bake NavMesh")]
+    [MenuItem("RelicFairy/Tools/Bake NavMesh")]
     public static void BakeNavMesh()
     {
         UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
@@ -534,17 +534,17 @@ public static class MonsterBatchFactory
 
     // ── 테스트 씬 오픈 ────────────────────────────────────────────
 
-    [MenuItem("Abyss/Tools/Open leeTestGameSSecene")]
+    [MenuItem("RelicFairy/Tools/Open leeTestGameSSecene")]
     public static void OpenTestScene()
     {
-        const string path = "Assets/Abyss/Scenes/leeTestGameSSecene.unity";
+        const string path = "Assets/RelicFairy/Scenes/leeTestGameSSecene.unity";
         if (UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             UnityEditor.SceneManagement.EditorSceneManager.OpenScene(path);
     }
 
     // ── SpawnTable maxCount 업데이트 ─────────────────────────────
 
-    [MenuItem("Abyss/Tools/Set Spawner MaxCount to 10")]
+    [MenuItem("RelicFairy/Tools/Set Spawner MaxCount to 10")]
     public static void SetSpawnerMaxCount()
     {
         // 씬에서 MonsterSpawner 찾기

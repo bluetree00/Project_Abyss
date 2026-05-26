@@ -21,7 +21,7 @@ public delegate bool SpawnEntryFilter(SpawnEntry entry);
 /// </summary>
 [CreateAssetMenu(
     fileName = "MonsterSpawnTable",
-    menuName  = "Abyss/Monster/Spawn Table")]
+    menuName  = "RelicFairy/Monster/Spawn Table")]
 public class MonsterSpawnTableSO : ScriptableObject
 {
     [Tooltip("소환 가능한 몬스터 목록. 가중치가 높을수록 더 자주 선택됩니다.")]

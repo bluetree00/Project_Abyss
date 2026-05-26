@@ -5,13 +5,13 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 일회성 빌더 — TrainingDummy 프리팹에 단일 ElementGauge UI를 셋업하고 TrainingDummy의 필드를 와이어링한다.
-/// 메뉴: Tools/Abyss/Build TrainingDummy ElementGauge
+/// 메뉴: Tools/RelicFairy/Build TrainingDummy ElementGauge
 /// </summary>
 public static class TrainingDummyGaugeBuilder
 {
-    private const string PrefabPath = "Assets/Abyss/Characters/Monster/TrainingDummy/TrainingDummy.prefab";
+    private const string PrefabPath = "Assets/RelicFairy/Characters/Monster/TrainingDummy/TrainingDummy.prefab";
 
-    [MenuItem("Tools/Abyss/Build TrainingDummy ElementGauge")]
+    [MenuItem("Tools/RelicFairy/Build TrainingDummy ElementGauge")]
     public static void Build()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);

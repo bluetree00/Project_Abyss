@@ -12,7 +12,7 @@ using UnityEngine;
 /// SpecialStateEntry.state 에 효과 SO 가 연결되면 자동으로 동작한다.
 /// </summary>
 [CreateAssetMenu(fileName = "MonsterCond_Elemental",
-                 menuName  = "Abyss/Monster/Condition/Elemental")]
+                 menuName  = "RelicFairy/Monster/Condition/Elemental")]
 public class MonsterElementalConditionSO : MonsterConditionSO
 {
     [Tooltip("누적치를 체크할 원소 속성")]

@@ -605,7 +605,7 @@ public sealed class GameRunSession
         Managers.Sound?.PlayEvent(SoundEvent.GoldPickup);
     }
 
-    /// <summary>런 중 심연의 정수를 적립한다. AbyssEssenceTracker에서 호출.</summary>
+    /// <summary>런 중 심연의 정수를 적립한다. EssenceTracker에서 호출.</summary>
     public void AddEssence(int amount)
     {
         if (!IsRunning) return;

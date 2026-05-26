@@ -111,7 +111,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [Header("Awakening")]
     [Tooltip("런 중 심연의 정수를 추적하는 컴포넌트. 없으면 자동 생성.")]
-    [SerializeField] private AbyssEssenceTracker essenceTracker;
+    [SerializeField] private EssenceTracker essenceTracker;
 
     private GameObject _currentMapGO;
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
@@ -388,8 +388,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private void BindEssenceTracker()
     {
         if (essenceTracker == null)
-            essenceTracker = GetComponentInChildren<AbyssEssenceTracker>(true)
-                          ?? gameObject.AddComponent<AbyssEssenceTracker>();
+            essenceTracker = GetComponentInChildren<EssenceTracker>(true)
+                          ?? gameObject.AddComponent<EssenceTracker>();
 
         essenceTracker.Bind(_run);
     }
@@ -722,12 +722,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.ZoneProgression?.RegisterSpawnedZone(zoneIndex, worldCenter);
         SpawnCorridorsForZone(zone, worldCenter, zones, root);
 
-        // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 디졸브 재생)
+        // 게이트 통과 즉시 방 등장 연출 — 플레이어가 걸어오는 동안 방이 생성되는 것처럼 보임
+        await new DissolveEntrance().PlayAsync(blocks, default, ct);
+
+        // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 스포너/웨이브 활성화)
         float zoneSizeX = zone.grid_width  * blockCellSize;
         float zoneSizeZ = zone.grid_height * blockCellSize;
         zoneGO.TryGetComponent<RoomWaveController>(out var waveCtrl);
         var entryTrigger = zoneGO.AddComponent<ZoneEntryTrigger>();
-        entryTrigger.Initialize(waveCtrl, deferredSpawners, blocks, zoneSizeX, zoneSizeZ);
+        entryTrigger.Initialize(waveCtrl, deferredSpawners, zoneSizeX, zoneSizeZ);
 
         CreateZoneExitGates(zoneIndex, zone, zones, zoneGO);
 

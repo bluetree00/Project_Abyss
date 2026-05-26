@@ -14,6 +14,10 @@ public class LichBlackboard : BossAttackBlackboard
     public float TeleportStrikeCooldown;
     public float DeathRayCooldown;
 
+    // ── 이동 컨트롤러용 ──────────────────────────────────
+    /// <summary>LichMovementController가 매 Tick 갱신. 패턴 조건에서도 참조 가능.</summary>
+    public float DistanceToPlayer;
+
     public new void TickCooldowns(float dt)
     {
         base.TickCooldowns(dt);
@@ -31,6 +35,7 @@ public class LichBlackboard : BossAttackBlackboard
         MagicBoltCooldown      = 0f;
         TeleportStrikeCooldown = 0f;
         DeathRayCooldown       = 0f;
+        DistanceToPlayer       = 0f;
     }
 }
 }

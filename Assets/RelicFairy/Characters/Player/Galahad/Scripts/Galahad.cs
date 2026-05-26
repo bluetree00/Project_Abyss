@@ -1,21 +1,14 @@
-using UnityEngine;
-
 /// <summary>
 /// 유물 1 — 성배의 수호자 (갈라하드)
 /// 스타일: 방어형 / 초보 친화 / 진입장벽 낮음
 ///
 /// 패시브:
-///   아버지의 죄  — 피격 시 신성 게이지 +15
-///   성스러운 방패 — (STUB) 블록 성공 시 피해 반사
+///   빛의 반사 — 피격 시 10% 피해 경감 + 방어력 비례 반사 피해 (공격자에게)
 /// Q스킬:
-///   성배의 빛 — 전방 범위 신성 폭발. 게이지 30+ 시 강화.
-/// 고유 메커닉:
-///   신성 게이지 — 0~100. 만충 시 5초 공격력 2.5× + 피해감소 30%.
+///   성스러운 방패 — 전방 피해 완전 차단 가드. 블록 성공 시 반사 발동.
 /// </summary>
 public class Galahad : PlayerController
 {
-    private HolyGauge _holyGauge;
-
     // ── 초기화 ───────────────────────────────────────────────────────────────
 
     protected override void InitLayerFSMs()
@@ -30,11 +23,7 @@ public class Galahad : PlayerController
 
     protected override void InitPassives()
     {
-        _holyGauge = gameObject.AddComponent<HolyGauge>();
-        _holyGauge.Initialize(RuntimeStats);
-
-        RegisterPassive(new GalahadFathersGuiltPassive(_holyGauge));
-        RegisterPassive(new GalahadHolyShieldPassive());
+        RegisterPassive(new GalahadLightReflectionPassive());
     }
 
     protected override void RouteInputsToLayers()
@@ -46,7 +35,7 @@ public class Galahad : PlayerController
 
     public override ISkillRuntime CreateCharacterSkillRuntime(SkillType slot)
     {
-        if (slot == SkillType.Q) return new HolyLightSkillRuntime(_holyGauge);
+        if (slot == SkillType.Q) return new HolyShieldSkillRuntime();
         return null;
     }
 
@@ -55,9 +44,4 @@ public class Galahad : PlayerController
         if (slot == SkillType.Q) return 18f;
         return 0f;
     }
-
-    // ── 공개 API ─────────────────────────────────────────────────────────────
-
-    /// <summary>HUD나 UI에서 신성 게이지 상태에 접근할 때 사용.</summary>
-    public HolyGauge HolyGauge => _holyGauge;
 }

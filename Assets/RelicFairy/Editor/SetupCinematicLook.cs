@@ -9,10 +9,10 @@ using UnityEngine.Rendering.Universal;
 /// <summary>
 /// "게임다운" 룩을 한 번에 적용하는 에디터 유틸.
 ///
-/// 메뉴: Abyss/Setup/Apply Cinematic Look (Current Scene)
+/// 메뉴: RelicFairy/Setup/Apply Cinematic Look (Current Scene)
 ///
 /// 하는 일
-///   1) Assets/Abyss/Settings/GameVolumeProfile.asset 생성(없으면) + 오버라이드 일괄 세팅
+///   1) Assets/RelicFairy/Settings/GameVolumeProfile.asset 생성(없으면) + 오버라이드 일괄 세팅
 ///      Bloom / Vignette / ColorAdjustments / LiftGammaGain / Tonemapping(ACES)
 ///      ※ Azure Nature 의 AN_PostProcessing_Volume 구성을 기반으로 강도 톤다운
 ///      ※ MotionBlur 는 제외 (VolumePulseService 의 피격 펄스와 충돌)
@@ -21,14 +21,14 @@ using UnityEngine.Rendering.Universal;
 /// 하지 않는 일 (씬 디자인을 침해하므로 수동)
 ///   · @GlobalVolume 오브젝트 생성 → Volume은 씬마다 직접 배치하여 프로파일 연결
 ///   · Directional Light 강도/색/그림자 일괄 튜닝 → 라이트 디자인은 씬마다 수동
-///   · SSAO Renderer Feature 추가 → 메뉴 'Abyss/Setup/Add SSAO to All URP Renderers' 사용
+///   · SSAO Renderer Feature 추가 → 메뉴 'RelicFairy/Setup/Add SSAO to All URP Renderers' 사용
 /// </summary>
 public static class SetupCinematicLook
 {
-    private const string ProfileFolder = "Assets/Abyss/Settings";
+    private const string ProfileFolder = "Assets/RelicFairy/Settings";
     private const string ProfilePath   = ProfileFolder + "/GameVolumeProfile.asset";
 
-    [MenuItem("Abyss/Setup/Apply Cinematic Look (Current Scene)")]
+    [MenuItem("RelicFairy/Setup/Apply Cinematic Look (Current Scene)")]
     public static void Apply()
     {
         var profile = LoadOrCreateProfile();
@@ -46,7 +46,7 @@ public static class SetupCinematicLook
             $"  · Profile: {ProfilePath} (오버라이드 5종, AN 기반 톤다운)\n" +
             $"  · Post-Processing 활성화된 Camera: {camCount}개\n" +
             $"  · Volume 배치는 씬에 직접 (Volume 컴포넌트 + sharedProfile = GameVolumeProfile)\n" +
-            $"  · SSAO 추가는 메뉴 'Abyss/Setup/Add SSAO to All URP Renderers' 참고");
+            $"  · SSAO 추가는 메뉴 'RelicFairy/Setup/Add SSAO to All URP Renderers' 참고");
     }
 
     // ─────────────────────────────────────────────
@@ -151,7 +151,7 @@ public static class SetupCinematicLook
 
     /// <summary>프로젝트 내 모든 UniversalRendererData 에셋에 Screen Space Ambient Occlusion Feature를 추가.
     /// 이미 있으면 건너뜀. Feature는 sub-asset으로 renderer data에 바인딩됨.</summary>
-    [MenuItem("Abyss/Setup/Add SSAO to All URP Renderers")]
+    [MenuItem("RelicFairy/Setup/Add SSAO to All URP Renderers")]
     public static void AddSSAOToAllRenderers()
     {
         var ssaoType = System.Type.GetType(

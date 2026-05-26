@@ -14,7 +14,9 @@ public static class TokenRegistry
         public string Code;
         public TokenCategory Category;
         public string Description;
+        public string CsvExample;
         public bool IsPrefix;
+        public TokenPhase Phase;
         public ITokenHandler Handler;
     }
 
@@ -43,7 +45,9 @@ public static class TokenRegistry
                 Code        = attr.Code,
                 Category    = attr.Category,
                 Description = attr.Description,
+                CsvExample  = attr.CsvExample,
                 IsPrefix    = attr.IsPrefix,
+                Phase       = attr.Phase,
                 Handler     = (ITokenHandler)Activator.CreateInstance(type),
             };
 
@@ -58,19 +62,37 @@ public static class TokenRegistry
         Debug.Log($"[TokenRegistry] {count}개 핸들러 등록 완료");
     }
 
-    /// <summary>rawToken에 매칭되는 핸들러 반환. 없으면 null.</summary>
-    public static ITokenHandler Resolve(string rawToken)
+    /// <summary>rawToken에 매칭되는 HandlerEntry를 반환. 없으면 false.</summary>
+    public static bool TryResolveEntry(string rawToken, out HandlerEntry entry)
     {
         EnsureInitialized();
-        if (string.IsNullOrEmpty(rawToken)) return null;
+        entry = default;
+        if (string.IsNullOrEmpty(rawToken)) return false;
 
-        if (_exact.TryGetValue(rawToken, out var exact)) return exact.Handler;
+        if (_exact.TryGetValue(rawToken, out entry)) return true;
 
         for (int i = 0; i < _prefix.Count; i++)
+        {
             if (rawToken.StartsWith(_prefix[i].Code, StringComparison.Ordinal))
-                return _prefix[i].Handler;
+            {
+                entry = _prefix[i];
+                return true;
+            }
+        }
 
-        return null;
+        return false;
+    }
+
+    /// <summary>rawToken에 매칭되는 핸들러 반환 (페이즈 무관). 없으면 null.</summary>
+    public static ITokenHandler Resolve(string rawToken)
+    {
+        return TryResolveEntry(rawToken, out var e) ? e.Handler : null;
+    }
+
+    /// <summary>rawToken에 매칭되고 지정 phase인 핸들러만 반환. 없으면 null.</summary>
+    public static ITokenHandler Resolve(string rawToken, TokenPhase phase)
+    {
+        return TryResolveEntry(rawToken, out var e) && e.Phase == phase ? e.Handler : null;
     }
 
     // Editor Window / 디버그용 읽기 전용 접근

@@ -11,17 +11,19 @@ using UnityEngine;
 public static class TokenParser
 {
     /// <summary>
-    /// grid_csv 전체를 순회해 등록된 핸들러가 있는 토큰만 Execute한다.
+    /// grid_csv 전체를 순회해 지정 phase에 등록된 핸들러가 있는 토큰만 Execute한다.
     /// </summary>
     /// <param name="gridCsv">MapRoomEntry.grid_csv 또는 ZoneLayoutEntry.grid_csv</param>
     /// <param name="gridWidth">grid.GetLength(0) — X축 셀 수</param>
     /// <param name="gridHeight">grid.GetLength(1) — Z축 셀 수</param>
     /// <param name="baseCtx">공유 데이터가 채워진 컨텍스트. RawToken/Cell/WorldPos는 이 메서드가 덮어씀.</param>
+    /// <param name="phase">실행할 페이즈. 해당 phase인 핸들러만 실행됨.</param>
     public static void Execute(
         string gridCsv,
         int gridWidth,
         int gridHeight,
-        TokenContext baseCtx)
+        TokenContext baseCtx,
+        TokenPhase phase = TokenPhase.PostBuild)
     {
         if (string.IsNullOrWhiteSpace(gridCsv) || baseCtx?.Parent == null) return;
 
@@ -45,7 +47,7 @@ public static class TokenParser
                 string raw = cells[x].Trim();
                 if (string.IsNullOrEmpty(raw) || raw == ".") continue;
 
-                var handler = TokenRegistry.Resolve(raw);
+                var handler = TokenRegistry.Resolve(raw, phase);
                 if (handler == null) continue;
 
                 // 장식은 바닥 블록 위에 얹히므로 Y = baseY + 0.5f (블록 상단)

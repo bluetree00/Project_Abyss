@@ -5,12 +5,12 @@ using TMPro;
 
 /// <summary>
 /// 서약 선택 UI 프리팹을 에디터에서 자동 생성하는 빌더.
-/// 메뉴: Abyss/Build Covenant Choice Prefab
+/// 메뉴: RelicFairy/Build Covenant Choice Prefab
 /// </summary>
 public static class CovenantUIBuilder
 {
-    private const string PrefabSavePath  = "Assets/Abyss/UI/Popup/UI_CovenantChoice.prefab";
-    private const string TriggerSavePath = "Assets/Abyss/UI/Popup/CovenantTestCanvas.prefab";
+    private const string PrefabSavePath  = "Assets/RelicFairy/UI/Popup/UI_CovenantChoice.prefab";
+    private const string TriggerSavePath = "Assets/RelicFairy/UI/Popup/CovenantTestCanvas.prefab";
 
     // ── 색상 팔레트 ──────────────────────────────────────
     private static readonly Color ColorOverlay   = new Color(0f,    0f,    0f,    0.80f);
@@ -24,7 +24,7 @@ public static class CovenantUIBuilder
     private static readonly Color ColorEnhanced  = new Color(0.40f, 0.80f, 1.00f, 1.00f);
     private static readonly Color ColorEvolved   = new Color(1.00f, 0.75f, 0.20f, 1.00f);
 
-    [MenuItem("Abyss/Build Covenant Choice Prefab")]
+    [MenuItem("RelicFairy/Build Covenant Choice Prefab")]
     public static void Build()
     {
         // ── 루트 (UI_CovenantChoice) ──────────────────────
@@ -84,7 +84,7 @@ public static class CovenantUIBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // ── 프리팹 저장 ─────────────────────────────────
-        EnsureDir("Assets/Abyss/UI/Popup");
+        EnsureDir("Assets/RelicFairy/UI/Popup");
         PrefabUtility.SaveAsPrefabAsset(root, PrefabSavePath);
         Object.DestroyImmediate(root);
 
@@ -204,7 +204,7 @@ public static class CovenantUIBuilder
     }
 
     // ── 테스트 트리거 씬 오브젝트 ──────────────────────────
-    [MenuItem("Abyss/Place Covenant Test Trigger in Scene")]
+    [MenuItem("RelicFairy/Place Covenant Test Trigger in Scene")]
     public static void PlaceTestTrigger()
     {
         // 기존 인스턴스 제거 (중복 방지)

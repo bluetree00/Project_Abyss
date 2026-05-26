@@ -14,7 +14,7 @@ using UnityEngine;
 public static class QuestSOGenerator
 {
     private const string kMenuPath   = "Tools/Quest/Generate From CSV";
-    private const string kOutputRoot = "Assets/Abyss/Data/Quest/Generated";
+    private const string kOutputRoot = "Assets/RelicFairy/Data/Quest/Generated";
 
     [MenuItem(kMenuPath)]
     public static void GenerateFromCSV()

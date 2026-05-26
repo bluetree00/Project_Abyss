@@ -161,30 +161,8 @@ public class MapBuilder
 
                     result.Add(shopBlock);
                 }
-                // 몬스터 스폰 타일: 스포너 프리팹(MonsterSpawner 컴포넌트 포함)을 바닥 위에 배치
-                else if (isMonsterSpawnTile)
-                {
-                    // 확정(MonsterSpawn) / 후보(MonsterSpawnCandidate) 동일 프리팹 사용 — BD_MonsterSpawn 하나만 유지
-                    var spawnerDef = palette.Pick(TileType.MonsterSpawn);
-                    if (spawnerDef != null && spawnerDef.prefab != null)
-                    {
-                        var spawnerGo = Object.Instantiate(spawnerDef.prefab, worldPos, Quaternion.identity, parent);
-                        spawnerGo.name = $"MonsterSpawner_{x}_{z}";
-                        result.Add(new PlacedBlock
-                        {
-                            instance = spawnerGo,
-                            targetPosition = worldPos,
-                            targetRotationY = 0f,
-                            tileType = type,
-                            cell = new Vector2Int(x, z),
-                        });
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[MapBuilder] MonsterSpawn 타일 ({x},{z}) — 팔레트에 BlockDef 없음, 스포너 미배치", parent);
-                    }
-                }
-                // BossSpawn: 바닥만 깔고 스포너 배치는 BossSpawnHandler(TokenParser)에 위임
+                // MonsterSpawn: 바닥만 깔고 스포너 배치는 MonsterSpawnHandler(TokenParser PreBuild)에 위임
+                // BossSpawn: 바닥만 깔고 스포너 배치는 BossSpawnHandler(TokenParser PostBuild)에 위임
             }
         }
 

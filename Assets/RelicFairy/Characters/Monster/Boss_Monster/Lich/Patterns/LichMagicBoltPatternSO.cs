@@ -62,9 +62,10 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 {
     private enum Phase { Cast, Recovery }
 
-    private Phase _phase;
-    private float _timer;
-    private bool  _fired;
+    private Phase      _phase;
+    private float      _timer;
+    private bool       _fired;
+    private GameObject _castGuide;
 
     public LichMagicBoltState(LichMagicBoltPatternSO data) : base(data) { }
 
@@ -74,13 +75,17 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
         _timer = 0f;
         _fired = false;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped = true;
-            ctx.Agent.ResetPath();
-        }
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
 
         FacePlayer(ctx);
+
+        // 시전 중 보스 앞 disc — 투사체 준비 중 표시
+        _castGuide = PatternGuideHelper.Disc(
+            ctx.Transform.position,
+            1.2f,
+            PatternGuideHelper.Telegraph);
     }
 
     public override void Update(MonsterContext ctx)
@@ -93,6 +98,7 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 
             if (_timer >= Data.castDuration)
             {
+                PatternGuideHelper.SafeDestroy(ref _castGuide);
                 FireProjectile(ctx);
                 _phase = Phase.Recovery;
                 _timer = 0f;
@@ -107,8 +113,8 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
+        PatternGuideHelper.SafeDestroy(ref _castGuide);
+        (ctx.Monster as LichMonster)?.MovementController.SetLocked(false);
 
         var lich = ctx.Monster as LichMonster;
         if (lich?.LichBB != null)
@@ -119,6 +125,13 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
     {
         if (_fired || ctx.Runtime.PlayerTarget == null) return;
         _fired = true;
+
+        // 투사체 충돌 지점 가이드 (빨간색, 0.4s)
+        PatternGuideHelper.Sphere(
+            ctx.Runtime.PlayerTarget.position + Vector3.up * 1f,
+            0.5f,
+            PatternGuideHelper.Active,
+            lifetime: 0.4f);
 
         Vector3 origin    = ctx.Transform.position + Vector3.up * 1.5f;
         Vector3 targetPos = ctx.Runtime.PlayerTarget.position + Vector3.up * 1f;

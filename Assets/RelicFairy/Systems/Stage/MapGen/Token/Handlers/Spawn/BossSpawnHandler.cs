@@ -4,7 +4,8 @@ using UnityEngine;
 /// B 토큰 처리 — ActivePalette에서 BossSpawn BlockDef를 꺼내 보스 스포너를 배치한다.
 /// MapBuilder는 BossSpawn 셀에 Floor만 깔고, 실제 스포너는 이 핸들러가 담당한다.
 /// </summary>
-[TokenHandler("B", TokenCategory.Spawn, "보스 스포너")]
+[TokenHandler("B", TokenCategory.Spawn, "보스 스포너 — ActivePalette의 BossSpawn BlockDef 사용",
+    csvExample: "B\n(방당 1개, 바닥은 MapBuilder가 별도 처리)")]
 public sealed class BossSpawnHandler : ITokenHandler
 {
     public void Execute(TokenContext ctx)

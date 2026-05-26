@@ -51,7 +51,7 @@ public static class MapDataTestRunner
     public static void TestLoadOffline()
     {
         var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json");
+            "Assets/RelicFairy/Systems/Stage/MapGen/STAGEDATA_MAP.json");
 
         if (textAsset == null)
         {
@@ -102,7 +102,7 @@ public static class MapDataTestRunner
     {
         // 1. 데이터 로드
         var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/Abyss/Systems/Stage/MapGen/STAGEDATA_MAP.json");
+            "Assets/RelicFairy/Systems/Stage/MapGen/STAGEDATA_MAP.json");
         if (textAsset == null) { Debug.LogError("STAGEDATA_MAP.json not found"); return; }
 
         var mgr = new MapDataManager();
@@ -117,7 +117,7 @@ public static class MapDataTestRunner
 
         // 3. 팔레트 로드
         var palette = AssetDatabase.LoadAssetAtPath<BlockPalette>(
-            "Assets/Abyss/Systems/Stage/MapGen/Data/TestPalette.asset");
+            "Assets/RelicFairy/Systems/Stage/MapGen/Data/TestPalette.asset");
         if (palette == null) { Debug.LogError("TestPalette not found"); return; }
 
         // 4. 맵 루트 생성

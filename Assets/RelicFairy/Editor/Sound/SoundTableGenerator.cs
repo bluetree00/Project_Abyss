@@ -5,8 +5,8 @@ using UnityEngine;
 
 public static class SoundTableGenerator
 {
-    private const string DefaultCsvPath   = "Assets/Abyss/Systems/Sound/Data/SoundEventTable.csv";
-    private const string DefaultAssetPath = "Assets/Abyss/Systems/Sound/Generated/SoundEventTable.asset";
+    private const string DefaultCsvPath   = "Assets/RelicFairy/Systems/Sound/Data/SoundEventTable.csv";
+    private const string DefaultAssetPath = "Assets/RelicFairy/Systems/Sound/Generated/SoundEventTable.asset";
 
     [MenuItem("Tools/Sound/Generate Event Table From CSV")]
     private static void Generate()

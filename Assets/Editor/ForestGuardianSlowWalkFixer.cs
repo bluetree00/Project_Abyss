@@ -10,11 +10,11 @@ using UnityAnimatorController = UnityEditor.Animations.AnimatorController;
 public static class ForestGuardianSlowWalkFixer
 {
     private const string SourceClipPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk.fbx";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk.fbx";
     private const string OutputClipPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk_InPlace.anim";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk_InPlace.anim";
     private const string ControllerPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/ForestGuardianAnimatorController.controller";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/ForestGuardianAnimatorController.controller";
 
     private const string SourceClipName = "SlowWalk";
     private const string OutputClipName = "SlowWalk_InPlace";

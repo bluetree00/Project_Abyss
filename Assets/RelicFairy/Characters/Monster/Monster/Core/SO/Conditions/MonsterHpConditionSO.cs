@@ -7,7 +7,7 @@ namespace RelicFairy.Monster
 /// 현재 HP 비율이 threshold 이하이면 true.
 /// </summary>
 [CreateAssetMenu(fileName  = "MonsterCond_Hp",
-                 menuName  = "Abyss/Monster/Condition/HpThreshold")]
+                 menuName  = "RelicFairy/Monster/Condition/HpThreshold")]
 public class MonsterHpConditionSO : MonsterConditionSO
 {
     [Range(0f, 1f)]

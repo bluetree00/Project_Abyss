@@ -10,7 +10,7 @@ using UnityEngine;
 public class BossSpawner : MonoBehaviour
 {
     [Header("스폰 테이블")]
-    [Tooltip("Boss 등급 엔트리가 포함된 MonsterSpawnTableSO. 'Create > Abyss > Monster > Spawn Table'로 생성.")]
+    [Tooltip("Boss 등급 엔트리가 포함된 MonsterSpawnTableSO. 'Create > RelicFairy > Monster > Spawn Table'로 생성.")]
     [SerializeField] private MonsterSpawnTableSO spawnTable;
 
     [Header("소환 설정")]
