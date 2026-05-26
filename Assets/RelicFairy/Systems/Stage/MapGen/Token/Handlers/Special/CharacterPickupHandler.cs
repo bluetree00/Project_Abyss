@@ -4,7 +4,8 @@ using UnityEngine;
 /// CP / CP0 / CP1 … 토큰 처리 — 캐릭터 픽업 프리팹을 배치한다.
 /// 접미사 없음(CP) 또는 "0"이면 인덱스 0, "1"이면 인덱스 1로 CharacterPickupPrefabs 배열을 참조한다.
 /// </summary>
-[TokenHandler("CP", TokenCategory.Special, "캐릭터 픽업 오브젝트", isPrefix: true)]
+[TokenHandler("CP", TokenCategory.Special, "캐릭터 픽업 — GameRunBootstrapper.characterPickupPrefabs 배열 인덱스로 참조", isPrefix: true,
+    csvExample: "CP0 / CP1 / CP2 ...\n(숫자 = characterPickupPrefabs 배열 인덱스, 생략 시 0)")]
 public sealed class CharacterPickupHandler : ITokenHandler
 {
     public void Execute(TokenContext ctx)

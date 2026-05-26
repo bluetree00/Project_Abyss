@@ -6,11 +6,11 @@ using UnityEngine;
 
 public static class UIRootPrefabLinker
 {
-    const string k_UIRootPath       = "Assets/Abyss/UI/RootUI/@UIRoot.prefab";
-    const string k_ScenePrefabsDir  = "Assets/Abyss/UI/Scene/ScenePrefabs";
+    const string k_UIRootPath       = "Assets/RelicFairy/UI/RootUI/@UIRoot.prefab";
+    const string k_ScenePrefabsDir  = "Assets/RelicFairy/UI/Scene/ScenePrefabs";
     const string k_SceneChildPath   = "Canvas_Scene/@Scene";
 
-    [MenuItem("Tools/Abyss/Link @UIRoot Scene Prefabs")]
+    [MenuItem("Tools/RelicFairy/Link @UIRoot Scene Prefabs")]
     public static void LinkScenePrefabs()
     {
         if (!File.Exists(k_UIRootPath))

@@ -8,9 +8,9 @@ public static class GreatswordAnimImportFixer
     {
         string[] paths = new string[]
         {
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_01.FBX",
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_02.FBX",
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_03.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_01.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_02.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_03.FBX",
         };
 
         string[] clipNames = new string[]

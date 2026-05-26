@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -42,11 +43,14 @@ public class LichMonster : MonsterBase, IBoss
     public LichBlackboard LichBB => _lichBB;
 
     // ── 내부 필드 ─────────────────────────────────────────────
-    private LichBlackboard       _lichBB;
-    private BossPatternRunner    _runner;
-    private BossPatternContext   _patternCtx;
-    private LichFormController   _formController;
-    private bool                 _phase2Transitioning;
+    private LichBlackboard         _lichBB;
+    private BossPatternRunner      _runner;
+    private BossPatternContext     _patternCtx;
+    private LichFormController     _formController;
+    private LichMovementController _movementController;
+    private bool                   _phase2Transitioning;
+
+    public LichMovementController MovementController => _movementController;
 
     // ── 커스텀 ICondition ─────────────────────────────────────
 
@@ -84,6 +88,14 @@ public class LichMonster : MonsterBase, IBoss
         _formController = GetComponentInChildren<LichFormController>();
         _formController?.ApplyForm(LichForm.Phase1);
 
+        // 공중 이동 컨트롤러 초기화 (NavMeshAgent 비활성화 후 직접 Transform 제어)
+        _movementController = GetComponent<LichMovementController>();
+        if (_movementController == null)
+            Debug.LogWarning("[LichMonster] LichMovementController 컴포넌트가 없습니다. 프리팹에 추가하세요.", this);
+
+        if (TryGetComponent<UnityEngine.AI.NavMeshAgent>(out var navAgent))
+            navAgent.enabled = false;
+
         _lichBB = new LichBlackboard();
 
         _patternCtx = new BossPatternContext
@@ -103,6 +115,8 @@ public class LichMonster : MonsterBase, IBoss
             isInRange:   () => _runtime?.PlayerTarget != null,
             changeState: s  => ChangeState(s),
             onExecuted:  p  => { _lichBB.LastPatternTag = p.patternTag; _lichBB.NormalModeTimer = 0f; });
+
+        _movementController?.Init(_lichBB);
 
         BindBossHud();
     }
@@ -129,6 +143,7 @@ public class LichMonster : MonsterBase, IBoss
                 _lichBB.NormalModeTimer += dt;
         }
 
+        _movementController?.Tick(dt, _runtime?.PlayerTarget);
         _runner?.Tick(dt);
 
         // Phase2Entry 패턴이 없을 경우 폴백으로 직접 전환
@@ -145,6 +160,7 @@ public class LichMonster : MonsterBase, IBoss
         base.OnEnable();
         _runner?.Reset();
         _lichBB?.Reset();
+        _movementController?.OnRecycled();
         _phase2Transitioning = false;
         BindBossHud();
     }
@@ -180,6 +196,8 @@ public class LichMonster : MonsterBase, IBoss
             _runtime.SpeedMultiplier = Phase2SpeedMult;
 
         _lichBB.AttackSpeedMult = Phase2AttackMult;
+
+        UI_BossBark.Show("봉인이 풀렸다… 이제 진짜 힘을 보여주마!", BossBarkType.PhaseAnnounce);
 
         _formController?.ApplyForm(LichForm.Phase2);
 

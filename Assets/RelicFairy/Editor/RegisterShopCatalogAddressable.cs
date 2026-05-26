@@ -5,16 +5,16 @@ using UnityEditor.AddressableAssets.Settings;
 
 /// <summary>
 /// 상점 카탈로그(ShopCatalogSO) 에셋을 Addressable에 일괄 등록하는 에디터 유틸.
-/// 메뉴: Abyss/Shop/Register Shop Catalog Addressables
+/// 메뉴: RelicFairy/Shop/Register Shop Catalog Addressables
 /// </summary>
 public static class RegisterShopCatalogAddressable
 {
     private static readonly (string path, string address)[] Catalogs =
     {
-        ("Assets/Abyss/Systems/Stage/Shop/Catalog/ShopCatalog_Default.asset", "ShopCatalog_Default"),
+        ("Assets/RelicFairy/Systems/Stage/Shop/Catalog/ShopCatalog_Default.asset", "ShopCatalog_Default"),
     };
 
-    [MenuItem("Abyss/Shop/Register Shop Catalog Addressables")]
+    [MenuItem("RelicFairy/Shop/Register Shop Catalog Addressables")]
     public static void Execute()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

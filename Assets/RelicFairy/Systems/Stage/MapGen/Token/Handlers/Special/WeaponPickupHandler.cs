@@ -4,7 +4,8 @@ using UnityEngine;
 /// WP / WP0 / WP1 … 토큰 처리 — 무기 픽업 프리팹을 배치한다.
 /// 접미사 없음(WP) 또는 "0"이면 인덱스 0, "1"이면 인덱스 1로 WeaponPickupPrefabs 배열을 참조한다.
 /// </summary>
-[TokenHandler("WP", TokenCategory.Special, "무기 픽업 오브젝트", isPrefix: true)]
+[TokenHandler("WP", TokenCategory.Special, "무기 픽업 — GameRunBootstrapper.weaponPickupPrefabs 배열 인덱스로 참조", isPrefix: true,
+    csvExample: "WP0 / WP1 / WP2 ...\n(숫자 = weaponPickupPrefabs 배열 인덱스, 생략 시 0)")]
 public sealed class WeaponPickupHandler : ITokenHandler
 {
     public void Execute(TokenContext ctx)

@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -200,6 +201,9 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
+        // 캐릭터+무기 선택 완료 후, 첫 전투 진입 전 서약 1개 선택
+        await ShowCovenantChoiceAsync(bootstrapper?.Run, ct);
+
         var zoneProgression = bootstrapper?.Run?.ZoneProgression;
         if (zoneProgression != null)
             await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
@@ -207,6 +211,48 @@ public class StartRoomGate : MonoBehaviour
             await bootstrapper.SpawnRemainingWorldZonesAsync();
 
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+    }
+
+    private static async UniTask ShowCovenantChoiceAsync(GameRunSession run, System.Threading.CancellationToken ct)
+    {
+        if (run?.CovenantHandler == null) return;
+        if (run.CovenantHandler.Covenants.Count > 0) return;
+
+        var ids = WorldCovenantPickup.PickRandomOptions(run.CovenantHandler, 3);
+        var covenants = new List<CovenantBase>(ids.Length);
+        foreach (var id in ids)
+        {
+            var c = CovenantFactory.Create(id);
+            if (c != null) covenants.Add(c);
+        }
+        if (covenants.Count == 0) return;
+
+        UI_CovenantChoice popup;
+        try
+        {
+            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantChoice>();
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StartRoomGate] 서약 선택 팝업 로드 실패: {e.Message}");
+            return;
+        }
+
+        if (popup == null) return;
+
+        popup.Setup(covenants.ToArray());
+
+        int chosen;
+        try { chosen = await popup.WaitForChoiceAsync(); }
+        catch (System.OperationCanceledException) { return; }
+
+        if (chosen >= 0 && chosen < covenants.Count)
+        {
+            string selectedId = covenants[chosen].CovenantId;
+            run.CovenantHandler.TryAdd(selectedId);
+            Debug.Log($"[StartRoomGate] 서약 획득: {selectedId}");
+        }
     }
 
     private static bool IsLoadoutReady()

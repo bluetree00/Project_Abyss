@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -59,9 +60,10 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
 {
     private enum Phase { Channel, Recovery }
 
-    private Phase _phase;
-    private float _channelTimer;
-    private float _tickTimer;
+    private Phase      _phase;
+    private float      _channelTimer;
+    private float      _tickTimer;
+    private GameObject _beamGuide;
 
     public LichDeathRayState(LichDeathRayPatternSO data) : base(data) { }
 
@@ -71,11 +73,20 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
         _channelTimer = 0f;
         _tickTimer    = 0f;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped = true;
-            ctx.Agent.ResetPath();
-        }
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.AltitudeRise);
+        mc?.SetLocked(true);
+
+        UI_BossBark.Show("죽음의 광선!", BossBarkType.PatternAnnounce);
+
+        // 빔 가이드 초기 생성 — 이후 UpdateBeamGuide()에서 매 프레임 위치/방향 갱신
+        Vector3 origin = ctx.Transform.position + Vector3.up * 1.5f;
+        _beamGuide = PatternGuideHelper.Beam(
+            origin,
+            ctx.Transform.forward,
+            Data.beamRange,
+            width: 0.4f,
+            PatternGuideHelper.Active);
     }
 
     public override void Update(MonsterContext ctx)
@@ -87,6 +98,7 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
             _channelTimer += dt;
 
             TrackPlayer(ctx, dt);
+            UpdateBeamGuide(ctx);
 
             _tickTimer += dt;
             if (_tickTimer >= Data.tickInterval)
@@ -97,6 +109,7 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
 
             if (_channelTimer >= Data.channelDuration)
             {
+                PatternGuideHelper.SafeDestroy(ref _beamGuide);
                 _phase        = Phase.Recovery;
                 _channelTimer = 0f;
             }
@@ -111,12 +124,22 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
+        PatternGuideHelper.SafeDestroy(ref _beamGuide);
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.AltitudeDescend);
+        mc?.SetLocked(false);
 
         var lich = ctx.Monster as LichMonster;
         if (lich?.LichBB != null)
             lich.LichBB.DeathRayCooldown = Data.patternCooldown;
+    }
+
+    private void UpdateBeamGuide(MonsterContext ctx)
+    {
+        if (_beamGuide == null) return;
+        Vector3 origin = ctx.Transform.position + Vector3.up * 1.5f;
+        _beamGuide.transform.position = origin + ctx.Transform.forward * (Data.beamRange * 0.5f);
+        _beamGuide.transform.rotation = Quaternion.LookRotation(ctx.Transform.forward);
     }
 
     private void TrackPlayer(MonsterContext ctx, float dt)

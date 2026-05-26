@@ -40,7 +40,7 @@ public enum GradeMatchMode
 public class MonsterSpawner : MonoBehaviour
 {
     [Header("스폰 테이블")]
-    [Tooltip("소환할 몬스터 목록 SO. 'Create > Abyss > Monster > Spawn Table'로 생성.")]
+    [Tooltip("소환할 몬스터 목록 SO. 'Create > RelicFairy > Monster > Spawn Table'로 생성.")]
     [SerializeField] private MonsterSpawnTableSO spawnTable;
 
     [Header("소환 설정")]

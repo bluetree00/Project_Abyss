@@ -46,8 +46,8 @@ public class MonsterSpawnTableEditor : Editor
 
     /// <summary>프로젝트의 모든 MonsterSpawnTableSO에 Auto-Populate를 일괄 실행.
     /// 새 grade 필드를 기존 테이블에 주입할 때 유용.
-    /// 메뉴: Abyss/Monster/Auto-Populate All Spawn Tables</summary>
-    [MenuItem("Abyss/Monster/Auto-Populate All Spawn Tables")]
+    /// 메뉴: RelicFairy/Monster/Auto-Populate All Spawn Tables</summary>
+    [MenuItem("RelicFairy/Monster/Auto-Populate All Spawn Tables")]
     public static void AutoPopulateAll()
     {
         var guids = AssetDatabase.FindAssets("t:MonsterSpawnTableSO");

@@ -13,7 +13,7 @@ namespace RelicFairy.Monster
 ///  hitTime+hitDuration → 피격 (VFX 재생 완료 후)
 ///  hitTime+hitDuration+recoveryTime → FlipSwordColor → AttackReadyState
 /// </summary>
-[CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_ChangeSlashPattern", fileName = "DK_ChangeSlashPattern")]
+[CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_ChangeSlashPattern", fileName = "DK_ChangeSlashPattern")]
 public class DKChangeSlashPatternSO : BossPatternSO
 {
     [Header("Grid Tiles")]

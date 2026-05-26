@@ -10,7 +10,8 @@ using UnityEngine;
 public class TokenRegistryWindow : EditorWindow
 {
     private Vector2 _scroll;
-    private TokenCategory? _filter;
+    private TokenCategory? _filterCategory;
+    private TokenPhase?    _filterPhase;
 
     [MenuItem("Tools/RelicFairy/Token Registry")]
     public static void Open() => GetWindow<TokenRegistryWindow>("Token Registry");
@@ -29,12 +30,23 @@ public class TokenRegistryWindow : EditorWindow
         // 카테고리 필터
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("전체", GUILayout.Width(50)))
-                _filter = null;
-
+            EditorGUILayout.LabelField("카테고리:", GUILayout.Width(55));
+            if (GUILayout.Button("전체", GUILayout.Width(44)))
+                _filterCategory = null;
             foreach (TokenCategory cat in System.Enum.GetValues(typeof(TokenCategory)))
                 if (GUILayout.Button(cat.ToString(), GUILayout.Width(80)))
-                    _filter = cat;
+                    _filterCategory = cat;
+        }
+
+        // 페이즈 필터
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("페이즈:", GUILayout.Width(55));
+            if (GUILayout.Button("전체", GUILayout.Width(44)))
+                _filterPhase = null;
+            foreach (TokenPhase phase in System.Enum.GetValues(typeof(TokenPhase)))
+                if (GUILayout.Button(phase.ToString(), GUILayout.Width(80)))
+                    _filterPhase = phase;
 
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("새로고침", GUILayout.Width(70)))
@@ -49,43 +61,67 @@ public class TokenRegistryWindow : EditorWindow
 
         var all = TokenRegistry.ExactHandlers.Values
             .Concat(TokenRegistry.PrefixHandlers)
-            .OrderBy(e => e.Category)
+            .OrderBy(e => e.Phase)
+            .ThenBy(e => e.Category)
             .ThenBy(e => e.Code)
             .ToList();
 
-        int total   = all.Count;
-        int visible = _filter.HasValue ? all.Count(e => e.Category == _filter.Value) : total;
-        EditorGUILayout.LabelField($"총 {total}개 / 표시 {visible}개", EditorStyles.miniLabel);
-        EditorGUILayout.Space(2);
+        var visible = all
+            .Where(e => (!_filterCategory.HasValue || e.Category == _filterCategory.Value)
+                     && (!_filterPhase.HasValue    || e.Phase    == _filterPhase.Value))
+            .ToList();
 
+        EditorGUILayout.LabelField($"총 {all.Count}개 / 표시 {visible.Count}개", EditorStyles.miniLabel);
+
+        // 헤더 행
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("코드",     EditorStyles.miniLabel, GUILayout.Width(70));
+            EditorGUILayout.LabelField("페이즈",   EditorStyles.miniLabel, GUILayout.Width(72));
+            EditorGUILayout.LabelField("카테고리", EditorStyles.miniLabel, GUILayout.Width(72));
+            EditorGUILayout.LabelField("설명",     EditorStyles.miniLabel, GUILayout.ExpandWidth(true));
+            EditorGUILayout.LabelField("핸들러",   EditorStyles.miniLabel, GUILayout.Width(200));
+        }
+
+        EditorGUILayout.Space(2);
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
-        TokenCategory? lastCat = null;
-        foreach (var entry in all)
+        TokenPhase? lastPhase = null;
+        foreach (var entry in visible)
         {
-            if (_filter.HasValue && entry.Category != _filter.Value) continue;
-
-            if (lastCat != entry.Category)
+            if (lastPhase != entry.Phase)
             {
-                if (lastCat.HasValue) EditorGUILayout.Space(4);
-                lastCat = entry.Category;
-                EditorGUILayout.LabelField($"── {entry.Category} ──", EditorStyles.boldLabel);
+                if (lastPhase.HasValue) EditorGUILayout.Space(4);
+                lastPhase = entry.Phase;
+
+                var phaseColor = entry.Phase == TokenPhase.PreBuild
+                    ? new Color(0.3f, 0.7f, 1f)
+                    : new Color(0.5f, 1f, 0.5f);
+                var prev = GUI.color;
+                GUI.color = phaseColor;
+                EditorGUILayout.LabelField($"── {entry.Phase} ──", EditorStyles.boldLabel);
+                GUI.color = prev;
             }
 
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                // 코드 (IsPrefix면 * 접미사)
-                string label = entry.IsPrefix ? $"{entry.Code}*" : entry.Code;
-                EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(70));
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    string codeLabel = entry.IsPrefix ? $"{entry.Code}*" : entry.Code;
+                    EditorGUILayout.LabelField(codeLabel,              EditorStyles.boldLabel,  GUILayout.Width(70));
+                    EditorGUILayout.LabelField(entry.Phase.ToString(),  EditorStyles.miniLabel,  GUILayout.Width(72));
+                    EditorGUILayout.LabelField(entry.Category.ToString(),                        GUILayout.Width(72));
+                    EditorGUILayout.LabelField(entry.Description,                                GUILayout.ExpandWidth(true));
+                    EditorGUILayout.LabelField(entry.Handler.GetType().Name, EditorStyles.miniLabel, GUILayout.Width(200));
+                }
 
-                // 설명
-                EditorGUILayout.LabelField(entry.Description, GUILayout.ExpandWidth(true));
-
-                // 핸들러 클래스명
-                EditorGUILayout.LabelField(
-                    entry.Handler.GetType().Name,
-                    EditorStyles.miniLabel,
-                    GUILayout.Width(180));
+                if (!string.IsNullOrEmpty(entry.CsvExample))
+                {
+                    var prev = GUI.color;
+                    GUI.color = new Color(0.9f, 0.85f, 0.5f);
+                    EditorGUILayout.LabelField("CSV: " + entry.CsvExample, EditorStyles.miniLabel);
+                    GUI.color = prev;
+                }
             }
         }
 

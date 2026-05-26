@@ -28,4 +28,12 @@ public class TokenContext
     public GameObject[] CharacterPickupPrefabs;
     public GameObject[] WeaponPickupPrefabs;
     public CancellationToken Ct;
+
+    // ── 스포너 핸들러용 (PreBuild 페이즈에서 사용) ────────
+    /// <summary>ApplyMonsterSpawnerPlan 적용 후 그리드. MonsterSpawnHandler가 활성 여부 판단에 사용.</summary>
+    public TileType[,] Grid;
+    /// <summary>MapDataLoader.Parse가 채운 셀별 스폰 설정. MonsterSpawnHandler가 Configure에 사용.</summary>
+    public System.Collections.Generic.IReadOnlyDictionary<Vector2Int, MapDataLoader.CellSpawnInfo> SpawnInfos;
+    /// <summary>비활성화된 스포너 목록. 입장 연출 후 또는 존 진입 시 re-enable됨.</summary>
+    public System.Collections.Generic.List<UnityEngine.MonoBehaviour> DeferredSpawners;
 }

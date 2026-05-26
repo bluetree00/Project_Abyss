@@ -352,10 +352,10 @@ public class ElementNativePalette : MonoBehaviour
 
         if (_rimShader == null)
         {
-            _rimShader = Shader.Find("Abyss/Elements/ElementRim");
+            _rimShader = Shader.Find("RelicFairy/Elements/ElementRim");
             if (_rimShader == null)
             {
-                Debug.LogError("[ElementPalette] Rim 쉐이더 'Abyss/Elements/ElementRim' 로드 실패 — Rim 오버레이 스킵");
+                Debug.LogError("[ElementPalette] Rim 쉐이더 'RelicFairy/Elements/ElementRim' 로드 실패 — Rim 오버레이 스킵");
                 return null;
             }
         }

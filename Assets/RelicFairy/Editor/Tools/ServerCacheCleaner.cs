@@ -26,20 +26,20 @@ public static class ServerCacheCleaner
 
     private const string ZoneLayoutPrefix = "zone_layout_"; // ZoneLayoutManager
 
-    [MenuItem("Tools/Abyss/Cache/Clear Equipment Cache")]
+    [MenuItem("Tools/RelicFairy/Cache/Clear Equipment Cache")]
     public static void ClearEquipment()
     {
         DeleteOne("equipment_data.json");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Clear Zone Layout Cache")]
+    [MenuItem("Tools/RelicFairy/Cache/Clear Zone Layout Cache")]
     public static void ClearZoneLayouts()
     {
         int deleted = DeleteByPrefix(ZoneLayoutPrefix);
         Debug.Log($"[CacheCleaner] zone_layout_* {deleted}개 삭제 완료");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Clear All Server Caches")]
+    [MenuItem("Tools/RelicFairy/Cache/Clear All Server Caches")]
     public static void ClearAll()
     {
         int deleted = 0;
@@ -51,7 +51,7 @@ public static class ServerCacheCleaner
         Debug.Log($"[CacheCleaner] 총 {deleted}개 캐시 삭제 완료");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Open persistentDataPath")]
+    [MenuItem("Tools/RelicFairy/Cache/Open persistentDataPath")]
     public static void OpenFolder()
     {
         EditorUtility.RevealInFinder(Application.persistentDataPath);

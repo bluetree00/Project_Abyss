@@ -10,17 +10,17 @@ using UnityEngine.UI;
 /// </summary>
 public static class LobbyPrefabEditor
 {
-    private const string PrefabPath = "Assets/Abyss/UI/Scene/ScenePrefabs/LobbyRoot.prefab";
+    private const string PrefabPath = "Assets/RelicFairy/UI/Scene/ScenePrefabs/LobbyRoot.prefab";
 
-    private const string StartOffPath   = "Assets/Abyss/UI/AI Resources/Start off.png";
-    private const string StartOnPath    = "Assets/Abyss/UI/AI Resources/Start on.png";
-    private const string SettingOffPath = "Assets/Abyss/UI/AI Resources/Setting off.png";
-    private const string SettingOnPath  = "Assets/Abyss/UI/AI Resources/Setting on.png";
-    private const string ExitOffPath    = "Assets/Abyss/UI/AI Resources/Exit off.png";
-    private const string ExitOnPath     = "Assets/Abyss/UI/AI Resources/Exit on.png";
+    private const string StartOffPath   = "Assets/RelicFairy/UI/AI Resources/Start off.png";
+    private const string StartOnPath    = "Assets/RelicFairy/UI/AI Resources/Start on.png";
+    private const string SettingOffPath = "Assets/RelicFairy/UI/AI Resources/Setting off.png";
+    private const string SettingOnPath  = "Assets/RelicFairy/UI/AI Resources/Setting on.png";
+    private const string ExitOffPath    = "Assets/RelicFairy/UI/AI Resources/Exit off.png";
+    private const string ExitOnPath     = "Assets/RelicFairy/UI/AI Resources/Exit on.png";
 
     // ── Step 1: 구조 정리 + 이미지 교체 ────────────────────────────────────
-    [MenuItem("Tools/Abyss/Setup Lobby Prefab (Step1 - Layout)")]
+    [MenuItem("Tools/RelicFairy/Setup Lobby Prefab (Step1 - Layout)")]
     public static void SetupLobbyLayout()
     {
         Sprite startOff  = LoadSprite(StartOffPath);
@@ -98,7 +98,7 @@ public static class LobbyPrefabEditor
     }
 
     // ── Step 2: LobbyButtonHover 컴포넌트 추가 ──────────────────────────────
-    [MenuItem("Tools/Abyss/Setup Lobby Prefab (Step2 - Hover)")]
+    [MenuItem("Tools/RelicFairy/Setup Lobby Prefab (Step2 - Hover)")]
     public static void SetupLobbyHover()
     {
         System.Type hoverType = System.Type.GetType("LobbyButtonHover, Assembly-CSharp");

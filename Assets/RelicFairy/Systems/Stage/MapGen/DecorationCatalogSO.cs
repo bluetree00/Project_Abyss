@@ -30,6 +30,12 @@ public sealed class DecorationCatalogSO : ScriptableObject
 
         [Tooltip("랜덤 Y 회전 적용 — 같은 프리팹 반복 배치 시 단조로움 제거.")]
         public bool randomYRotation = true;
+
+        [Tooltip("X축 점유 셀 수 (기본 1). 2 이상이면 anchor 셀 기준 오른쪽으로 확장.")]
+        [Min(1)] public int sizeX = 1;
+
+        [Tooltip("Z축 점유 셀 수 (기본 1). 2 이상이면 anchor 셀 기준 앞쪽으로 확장.")]
+        [Min(1)] public int sizeZ = 1;
     }
 
     [Tooltip("방 테마 문자열. 비어있으면 범용 (모든 테마의 fallback).")]

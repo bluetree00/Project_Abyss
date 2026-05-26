@@ -6,7 +6,8 @@ using UnityEngine;
 /// 예) "dTR" → code="TR", catalog.Get("TR") 조회 → prefab 인스턴스화.
 /// NavMesh 빌드에서 제외(ignoreFromBuild=true)하고 디졸브 등장 연출을 실행한다.
 /// </summary>
-[TokenHandler("d", TokenCategory.Decoration, "장식 오브젝트 (DecorationCatalog 참조)", isPrefix: true)]
+[TokenHandler("d", TokenCategory.Decoration, "장식 오브젝트 — DecorationCatalogSO에서 코드로 프리팹 조회 후 배치", isPrefix: true,
+    csvExample: "dTR / dWL / dTL / dBR ...\n(d 뒤의 코드가 DecorationCatalog 키, NavMesh 제외 자동 적용)")]
 public sealed class DecorationHandler : ITokenHandler
 {
     public void Execute(TokenContext ctx)
@@ -32,7 +33,14 @@ public sealed class DecorationHandler : ITokenHandler
         }
 
         float rotY = entry.randomYRotation ? Random.Range(0f, 360f) : 0f;
-        var pos    = ctx.WorldPos + Vector3.up * entry.yOffset;
+
+        // 멀티셀 오브젝트: anchor 셀(좌하단)에서 크기 중심으로 오프셋
+        var centerOffset = new Vector3(
+            (entry.sizeX - 1) * 0.5f * ctx.CellSize,
+            entry.yOffset,
+            (entry.sizeZ - 1) * 0.5f * ctx.CellSize);
+        var pos = ctx.WorldPos + centerOffset;
+
         var go     = Object.Instantiate(entry.prefab, pos, Quaternion.Euler(0f, rotY, 0f), ctx.Parent);
         go.name    = $"Deco_{ctx.Cell.x}_{ctx.Cell.y}_{code}";
 

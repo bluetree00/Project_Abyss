@@ -9,7 +9,7 @@ namespace RelicFairy.Monster
 public sealed class BossColumnHazard : MonoBehaviour
 {
     private const float CylinderHeight = 5f;
-    private const string CutoutShaderName = "Abyss/Boss/ColumnPlayerCutout";
+    private const string CutoutShaderName = "RelicFairy/Boss/ColumnPlayerCutout";
     private const float PlayerHeight = 1.8f;
     private const float CutoutRadiusPadding = 0.45f;
     private const float CutoutSoftness = 0.2f;
