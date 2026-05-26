@@ -29,7 +29,7 @@ public class ZoneMapViewerWindow : EditorWindow
     private float   _cellSize   = 16f;
     private bool    _showLegend = true;
 
-    [MenuItem("Tools/Zone Map Viewer")]
+    [MenuItem("RelicFairy/Map/Zone Map Viewer")]
     public static void ShowWindow()
     {
         var win = GetWindow<ZoneMapViewerWindow>("Zone Map Viewer");

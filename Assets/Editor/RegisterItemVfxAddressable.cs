@@ -19,7 +19,7 @@ public static class RegisterItemVfxAddressable
         ("Assets/RelicFairy/Shared/Item/SOdata/ItemSODatabase.asset",                           "ItemSODatabase"),
     };
 
-    [MenuItem("Tools/Item VFX/Register Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register Item VFX")]
     public static void Register()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

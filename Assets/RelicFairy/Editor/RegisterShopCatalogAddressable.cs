@@ -14,7 +14,7 @@ public static class RegisterShopCatalogAddressable
         ("Assets/RelicFairy/Systems/Stage/Shop/Catalog/ShopCatalog_Default.asset", "ShopCatalog_Default"),
     };
 
-    [MenuItem("RelicFairy/Shop/Register Shop Catalog Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register Shop Catalog")]
     public static void Execute()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

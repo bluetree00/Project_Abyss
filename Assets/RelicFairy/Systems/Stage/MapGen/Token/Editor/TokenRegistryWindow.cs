@@ -13,7 +13,7 @@ public class TokenRegistryWindow : EditorWindow
     private TokenCategory? _filterCategory;
     private TokenPhase?    _filterPhase;
 
-    [MenuItem("Tools/RelicFairy/Token Registry")]
+    [MenuItem("RelicFairy/Map/Token Registry")]
     public static void Open() => GetWindow<TokenRegistryWindow>("Token Registry");
 
     private void OnEnable()

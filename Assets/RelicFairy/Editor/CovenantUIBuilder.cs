@@ -24,7 +24,7 @@ public static class CovenantUIBuilder
     private static readonly Color ColorEnhanced  = new Color(0.40f, 0.80f, 1.00f, 1.00f);
     private static readonly Color ColorEvolved   = new Color(1.00f, 0.75f, 0.20f, 1.00f);
 
-    [MenuItem("RelicFairy/Build Covenant Choice Prefab")]
+    [MenuItem("RelicFairy/UI/Build Covenant Choice Prefab")]
     public static void Build()
     {
         // ── 루트 (UI_CovenantChoice) ──────────────────────
@@ -204,7 +204,7 @@ public static class CovenantUIBuilder
     }
 
     // ── 테스트 트리거 씬 오브젝트 ──────────────────────────
-    [MenuItem("RelicFairy/Place Covenant Test Trigger in Scene")]
+    [MenuItem("RelicFairy/UI/Place Covenant Test Trigger")]
     public static void PlaceTestTrigger()
     {
         // 기존 인스턴스 제거 (중복 방지)

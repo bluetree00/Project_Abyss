@@ -12,7 +12,7 @@ public static class CharInfoPopupRebuilder
     const string SheetFramePath   = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterSheetFrame.prefab";
     const string StatusFramePath  = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterStatusFrame.prefab";
 
-    [MenuItem("RelicFairy/UI/Rebuild CharInfoPopup with Bamao Layout")]
+    [MenuItem("RelicFairy/UI/Rebuild CharInfoPopup")]
     public static void Rebuild()
     {
         var lobbyPrefab  = AssetDatabase.LoadAssetAtPath<GameObject>(LobbyRootPath);

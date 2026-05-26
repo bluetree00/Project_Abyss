@@ -12,7 +12,7 @@ public static class CovenantDataGenerator
 {
     private const string OutputDir = "Assets/RelicFairy/Systems/Covenant/Data";
 
-    [MenuItem("RelicFairy/Covenant/Generate Data Assets")]
+    [MenuItem("RelicFairy/Gameplay/Covenant/Generate Data Assets")]
     public static void Generate()
     {
         if (!Directory.Exists(OutputDir))

@@ -47,7 +47,7 @@ public static class OrganizeItemSO
         return ItemRarity.Common;
     }
 
-    [MenuItem("Tools/Item/Organize SO by Rarity+Trigger")]
+    [MenuItem("RelicFairy/Gameplay/Item/Organize by Rarity+Trigger")]
     public static void Organize()
     {
         // CSV 로드

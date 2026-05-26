@@ -12,6 +12,12 @@ public class LichBlackboard : BossAttackBlackboard
     // ── 패턴 쿨다운 ───────────────────────────────────────
     public float MagicBoltCooldown;
     public float TeleportStrikeCooldown;
+    public float ElementalBarrageCooldown;
+    public float ArcaneOrbCooldown;
+    public float ScytheSweepCooldown;
+    public float ScytheThrowCooldown;
+    public float BlinkStrikeCooldown;
+    public float SkeletonSummonCooldown;
     public float DeathRayCooldown;
 
     // ── 이동 컨트롤러용 ──────────────────────────────────
@@ -21,9 +27,15 @@ public class LichBlackboard : BossAttackBlackboard
     public new void TickCooldowns(float dt)
     {
         base.TickCooldowns(dt);
-        if (MagicBoltCooldown      > 0f) MagicBoltCooldown      -= dt;
-        if (TeleportStrikeCooldown > 0f) TeleportStrikeCooldown -= dt;
-        if (DeathRayCooldown       > 0f) DeathRayCooldown       -= dt;
+        if (MagicBoltCooldown        > 0f) MagicBoltCooldown        -= dt;
+        if (TeleportStrikeCooldown   > 0f) TeleportStrikeCooldown   -= dt;
+        if (ElementalBarrageCooldown > 0f) ElementalBarrageCooldown -= dt;
+        if (ArcaneOrbCooldown        > 0f) ArcaneOrbCooldown        -= dt;
+        if (ScytheSweepCooldown      > 0f) ScytheSweepCooldown      -= dt;
+        if (ScytheThrowCooldown      > 0f) ScytheThrowCooldown      -= dt;
+        if (BlinkStrikeCooldown      > 0f) BlinkStrikeCooldown      -= dt;
+        if (SkeletonSummonCooldown   > 0f) SkeletonSummonCooldown   -= dt;
+        if (DeathRayCooldown         > 0f) DeathRayCooldown         -= dt;
     }
 
     public void SetPhase2() => IsPhase2 = true;
@@ -31,11 +43,17 @@ public class LichBlackboard : BossAttackBlackboard
     public new void Reset()
     {
         base.Reset();
-        IsPhase2               = false;
-        MagicBoltCooldown      = 0f;
-        TeleportStrikeCooldown = 0f;
-        DeathRayCooldown       = 0f;
-        DistanceToPlayer       = 0f;
+        IsPhase2                 = false;
+        MagicBoltCooldown        = 0f;
+        TeleportStrikeCooldown   = 0f;
+        ElementalBarrageCooldown = 0f;
+        ArcaneOrbCooldown        = 0f;
+        ScytheSweepCooldown      = 0f;
+        ScytheThrowCooldown      = 0f;
+        BlinkStrikeCooldown      = 0f;
+        SkeletonSummonCooldown   = 0f;
+        DeathRayCooldown         = 0f;
+        DistanceToPlayer         = 0f;
     }
 }
 }

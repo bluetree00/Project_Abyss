@@ -12,7 +12,7 @@ public static class AwakeningPanelSetup
 {
     private const string PrefabPath = "Assets/RelicFairy/UI/Scene/ScenePrefabs/LobbyRoot.prefab";
 
-    [MenuItem("RelicFairy/Setup Awakening Panel")]
+    [MenuItem("RelicFairy/UI/Setup Awakening Panel")]
     public static void Run()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);

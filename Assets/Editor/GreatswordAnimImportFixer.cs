@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class GreatswordAnimImportFixer
 {
-    [MenuItem("Tools/Fix Greatsword Anim Import")]
+    [MenuItem("RelicFairy/Dev/Fix Greatsword Anim Import")]
     public static void Fix()
     {
         string[] paths = new string[]

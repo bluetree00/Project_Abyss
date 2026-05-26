@@ -28,7 +28,7 @@ public static class SetupCinematicLook
     private const string ProfileFolder = "Assets/RelicFairy/Settings";
     private const string ProfilePath   = ProfileFolder + "/GameVolumeProfile.asset";
 
-    [MenuItem("RelicFairy/Setup/Apply Cinematic Look (Current Scene)")]
+    [MenuItem("RelicFairy/Rendering/Apply Cinematic Look")]
     public static void Apply()
     {
         var profile = LoadOrCreateProfile();
@@ -151,7 +151,7 @@ public static class SetupCinematicLook
 
     /// <summary>프로젝트 내 모든 UniversalRendererData 에셋에 Screen Space Ambient Occlusion Feature를 추가.
     /// 이미 있으면 건너뜀. Feature는 sub-asset으로 renderer data에 바인딩됨.</summary>
-    [MenuItem("RelicFairy/Setup/Add SSAO to All URP Renderers")]
+    [MenuItem("RelicFairy/Rendering/Add SSAO to All URP Renderers")]
     public static void AddSSAOToAllRenderers()
     {
         var ssaoType = System.Type.GetType(

@@ -8,7 +8,7 @@ public static class AIResourcesSpriteImporter
 {
     private const string AIResourcesFolder = "Assets/RelicFairy/UI/AI Resources";
 
-    [MenuItem("Tools/RelicFairy/AI Resources 스프라이트 임포트 설정")]
+    [MenuItem("RelicFairy/UI/Import AI Resources Sprites")]
     public static void SetAIResourcesAsSprites()
     {
         string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { AIResourcesFolder });

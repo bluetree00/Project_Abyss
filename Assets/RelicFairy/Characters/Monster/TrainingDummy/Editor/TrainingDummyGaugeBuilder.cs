@@ -11,7 +11,7 @@ public static class TrainingDummyGaugeBuilder
 {
     private const string PrefabPath = "Assets/RelicFairy/Characters/Monster/TrainingDummy/TrainingDummy.prefab";
 
-    [MenuItem("Tools/RelicFairy/Build TrainingDummy ElementGauge")]
+    [MenuItem("RelicFairy/Character/TrainingDummy/Build ElementGauge")]
     public static void Build()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);

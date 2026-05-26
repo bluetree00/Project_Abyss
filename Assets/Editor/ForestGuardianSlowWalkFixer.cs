@@ -20,7 +20,7 @@ public static class ForestGuardianSlowWalkFixer
     private const string OutputClipName = "SlowWalk_InPlace";
     private const string WalkStateName = "Walk";
 
-    [MenuItem("Tools/ForestGuardian/Diagnose SlowWalk Root Curves")]
+    [MenuItem("RelicFairy/Dev/ForestGuardian/Diagnose SlowWalk")]
     public static void DiagnoseSlowWalkRootCurves()
     {
         var sourceClip = LoadSourceClip();
@@ -57,7 +57,7 @@ public static class ForestGuardianSlowWalkFixer
         }
     }
 
-    [MenuItem("Tools/ForestGuardian/Rebuild SlowWalk In-Place")]
+    [MenuItem("RelicFairy/Dev/ForestGuardian/Rebuild SlowWalk In-Place")]
     public static void RebuildSlowWalkInPlace()
     {
         var sourceClip = LoadSourceClip();

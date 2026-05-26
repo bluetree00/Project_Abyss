@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 
 public static class MapDataTestRunner
 {
-    [MenuItem("Tools/Map/Test Load MapData from Backend")]
+    [MenuItem("RelicFairy/Map/Test/Load MapData (Backend)")]
     public static void TestLoadFromBackend()
     {
         RunAsync().Forget();
@@ -47,7 +47,7 @@ public static class MapDataTestRunner
         Debug.Log("[MapDataTest] 완료.");
     }
 
-    [MenuItem("Tools/Map/Test Load MapData (Offline JSON)")]
+    [MenuItem("RelicFairy/Map/Test/Load MapData (Offline)")]
     public static void TestLoadOffline()
     {
         var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(
@@ -86,7 +86,7 @@ public static class MapDataTestRunner
         Debug.Log("[MapDataTest] 완료.");
     }
 
-    [MenuItem("Tools/Map/Test Build Map (battle_001)")]
+    [MenuItem("RelicFairy/Map/Test/Build Map")]
     public static void TestBuildMap()
     {
         if (!Application.isPlaying)

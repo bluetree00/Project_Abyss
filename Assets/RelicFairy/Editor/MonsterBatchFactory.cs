@@ -247,7 +247,7 @@ public static class MonsterBatchFactory
 
     // ── 실행 진입점 ──────────────────────────────────────────────
 
-    [MenuItem("RelicFairy/Tools/Create All New Monster Prefabs and Configs")]
+    [MenuItem("RelicFairy/Character/Monster/Create All Prefabs and Configs")]
     public static void CreateAll()
     {
         int created = 0;
@@ -523,18 +523,9 @@ public static class MonsterBatchFactory
         }
     }
 
-    // ── NavMesh 베이크 ───────────────────────────────────────────
-
-    [MenuItem("RelicFairy/Tools/Bake NavMesh")]
-    public static void BakeNavMesh()
-    {
-        UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
-        Debug.Log("[MonsterBatchFactory] NavMesh 베이크 완료.");
-    }
-
     // ── 테스트 씬 오픈 ────────────────────────────────────────────
 
-    [MenuItem("RelicFairy/Tools/Open leeTestGameSSecene")]
+    [MenuItem("RelicFairy/Dev/Open Test Scene")]
     public static void OpenTestScene()
     {
         const string path = "Assets/RelicFairy/Scenes/leeTestGameSSecene.unity";
@@ -544,7 +535,7 @@ public static class MonsterBatchFactory
 
     // ── SpawnTable maxCount 업데이트 ─────────────────────────────
 
-    [MenuItem("RelicFairy/Tools/Set Spawner MaxCount to 10")]
+    [MenuItem("RelicFairy/Character/Monster/Set Spawner MaxCount to 10")]
     public static void SetSpawnerMaxCount()
     {
         // 씬에서 MonsterSpawner 찾기

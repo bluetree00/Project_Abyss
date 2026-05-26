@@ -13,7 +13,7 @@ using UnityEngine;
 /// </summary>
 public static class QuestSOGenerator
 {
-    private const string kMenuPath   = "Tools/Quest/Generate From CSV";
+    private const string kMenuPath   = "RelicFairy/Gameplay/Quest/Generate From CSV";
     private const string kOutputRoot = "Assets/RelicFairy/Data/Quest/Generated";
 
     [MenuItem(kMenuPath)]
