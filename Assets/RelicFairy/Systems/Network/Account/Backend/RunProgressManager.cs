@@ -232,7 +232,6 @@ public class RunProgressManager : MonoBehaviour
             slotIndex              = slotIndex,
             hasActiveRun           = true,
             chapter                = (int)session.CurrentChapter,
-            currentPointId         = session.StagePointManager?.CurrentPointId ?? -1,
             currentHp              = ps?.Hp       ?? 0,
             maxHp                  = ps?.MaxHp    ?? 100,
             runGold                = ps?.TempGold ?? 0,
@@ -245,7 +244,6 @@ public class RunProgressManager : MonoBehaviour
             characterName          = charName,
             weapon0PrefabKey       = weapon0Key,
             weapon1PrefabKey       = weapon1Key,
-            graphJson              = BuildGraphJson(session),
             itemsJson              = JsonUtility.ToJson(itemWrapper),
             synergiesJson          = JsonUtility.ToJson(synWrapper),
             roomLogsJson           = JsonUtility.ToJson(logWrapper),
@@ -273,49 +271,11 @@ public class RunProgressManager : MonoBehaviour
              : data?.weaponPrefabKey ?? string.Empty;
     }
 
-    private static string BuildGraphJson(GameRunSession session)
-    {
-        var graph = session.CachedStageGraph;
-        var spm   = session.StagePointManager;
-        if (graph?.Nodes == null || spm == null) return string.Empty;
-
-        var saved = new SavedStageGraph
-        {
-            fullPattern   = graph.FullPattern,
-            middlePattern = graph.MiddlePattern,
-            nodes         = new SavedStageNode[graph.Nodes.Count],
-        };
-
-        for (int i = 0; i < graph.Nodes.Count; i++)
-        {
-            var node = graph.Nodes[i];
-            var ctx  = spm.GetContext(node.PointId);
-
-            saved.nodes[i] = new SavedStageNode
-            {
-                pointId            = node.PointId,
-                stageCategory      = (int)node.Stage,
-                normalRoomCategory = (int)node.Normal,
-                layerIndex         = node.LayerIndex,
-                indexInLayer       = node.IndexInLayer,
-                nextPointIds       = node.NextPointIds?.ToArray() ?? Array.Empty<int>(),
-                state              = ctx != null ? (int)ctx.State : 0,
-                resolvedRoomId     = ctx?.ResolvedRoomId ?? string.Empty,
-                isResolved         = ctx?.IsResolved ?? false,
-                minDifficulty      = ctx?.MinDifficulty ?? -1,
-                maxDifficulty      = ctx?.MaxDifficulty ?? -1,
-            };
-        }
-
-        return JsonUtility.ToJson(saved);
-    }
-
     private static Param ToParam(RunSaveData d) => new Param
     {
         { "slotIndex",        d.slotIndex },
         { "hasActiveRun",     d.hasActiveRun },
         { "chapter",          d.chapter },
-        { "currentPointId",   d.currentPointId },
         { "currentHp",        d.currentHp },
         { "maxHp",            d.maxHp },
         { "runGold",          d.runGold },
@@ -328,7 +288,6 @@ public class RunProgressManager : MonoBehaviour
         { "characterName",    d.characterName },
         { "weapon0PrefabKey", d.weapon0PrefabKey },
         { "weapon1PrefabKey", d.weapon1PrefabKey },
-        { "graphJson",        d.graphJson },
         { "itemsJson",        d.itemsJson },
         { "synergiesJson",    d.synergiesJson },
         { "roomLogsJson",     d.roomLogsJson },
@@ -349,7 +308,6 @@ public class RunProgressManager : MonoBehaviour
             slotIndex        = ParseInt(row,    "slotIndex",        0),
             hasActiveRun     = ParseBool(row,   "hasActiveRun"),
             chapter          = ParseInt(row,    "chapter",          1),
-            currentPointId   = ParseInt(row,    "currentPointId",  -1),
             currentHp        = ParseInt(row,    "currentHp",       100),
             maxHp            = ParseInt(row,    "maxHp",           100),
             runGold          = ParseInt(row,    "runGold",           0),
@@ -362,7 +320,6 @@ public class RunProgressManager : MonoBehaviour
             characterName    = ParseString(row, "characterName"),
             weapon0PrefabKey = ParseString(row, "weapon0PrefabKey"),
             weapon1PrefabKey = ParseString(row, "weapon1PrefabKey"),
-            graphJson        = ParseString(row, "graphJson"),
             itemsJson        = ParseString(row, "itemsJson"),
             synergiesJson    = ParseString(row, "synergiesJson"),
             roomLogsJson           = ParseString(row, "roomLogsJson"),
