@@ -200,30 +200,13 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        if (bootstrapper != null && bootstrapper.IsZoneLayoutMode)
-        {
-            var zoneProgression = bootstrapper.Run?.ZoneProgression;
-            if (zoneProgression != null)
-                await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
-            else
-                await bootstrapper.SpawnRemainingWorldZonesAsync();
+        var zoneProgression = bootstrapper?.Run?.ZoneProgression;
+        if (zoneProgression != null)
+            await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
+        else if (bootstrapper != null)
+            await bootstrapper.SpawnRemainingWorldZonesAsync();
 
-            UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
-            return;
-        }
-
-        var rp      = RunProgressManager.Instance;
-        var session = bootstrapper?.Run;
-
-        if (rp != null && session != null && session.IsRunning)
-        {
-            var spm = session.StagePointManager;
-            if (spm != null && spm.CurrentPointId >= 0)
-                spm.MarkCleared(spm.CurrentPointId);
-            await rp.SaveAsync(session, rp.ActiveSlotIndex, isInStartRoom: false);
-        }
-
-        AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
     }
 
     private static bool IsLoadoutReady()

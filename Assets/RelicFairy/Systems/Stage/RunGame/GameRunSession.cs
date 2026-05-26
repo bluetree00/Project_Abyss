@@ -59,16 +59,6 @@ public sealed class GameRunSession
         ActiveFieldPrefabKey = data != null ? data.fieldPrefabKey ?? string.Empty : string.Empty;
     }
 
-    public RoomManager RoomManager { get; private set; }
-    public StagePointManager StagePointManager { get; private set; }
-
-    // 챕터 단위로 생성된 맵 그래프 캐시 — StageMap 씬 재진입 시 Generator 재실행 없이 UI를 복원해
-    // 노드 연결·방문 기록이 유지되도록 한다. AdvanceToNextChapter 시 무효화.
-    public StageMapGraph CachedStageGraph { get; private set; }
-
-    public void CacheStageGraph(StageMapGraph graph) => CachedStageGraph = graph;
-    public void InvalidateStageGraph() => CachedStageGraph = null;
-
     public PlayerController Player { get; private set; }
     private PlayerController _playerStateSource;
 
@@ -297,7 +287,7 @@ public sealed class GameRunSession
             OnPlayerStateReady?.Invoke(PlayerState);
             OnRunStarted?.Invoke();
 
-            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}, pointId={save.currentPointId}");
+            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}");
         }
         catch (Exception e)
         {
@@ -599,118 +589,6 @@ public sealed class GameRunSession
     {
         state = PlayerState;
         return (Phase == RunPhase.Running || Phase == RunPhase.Starting) && state != null;
-    }
-
-    // =========================================================
-    // StagePoint UI Bind
-    // =========================================================
-    public void RegisterPoints(IEnumerable<StagePointUI> points)
-    {
-        if (!IsRunning || StagePointManager == null || RoomManager == null)
-        {
-            Debug.LogWarning("[GameRun] RegisterPoints ignored: not ready");
-            return;
-        }
-
-        if (points == null) return;
-        foreach (var ui in points) ui.Register(StagePointManager, RoomManager);
-    }
-
-    public void ResolveAllPointsAndSetStart()
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] ResolveAllPointsAndSetStart ignored: not ready");
-            return;
-        }
-
-        StagePointManager.ResolveAll();
-        StagePointManager.SetStartAsCurrent();
-    }
-
-    // =========================================================
-    // Map Spawn / Movement
-    // =========================================================
-    public void RequestSpawnCurrentPointMap()
-    {
-        if (!IsRunning || StagePointManager == null || RoomManager == null)
-        {
-            Debug.LogWarning("[GameRun] RequestSpawnCurrentPointMap ignored: not ready");
-            return;
-        }
-
-        if (StagePointManager.CurrentPointId < 0)
-        {
-            Debug.LogWarning("[GameRun] CurrentPointId < 0. Start를 먼저 세팅하세요.");
-            return;
-        }
-
-        var ctx = StagePointManager.GetContext(StagePointManager.CurrentPointId);
-        if (ctx == null)
-        {
-            Debug.LogError($"[GameRun] Context not found. pointId={StagePointManager.CurrentPointId}");
-            return;
-        }
-
-        StagePointManager.Resolve(ctx);
-
-        var roomId = ctx.ResolvedRoomId;
-        if (string.IsNullOrEmpty(roomId))
-        {
-            Debug.LogError($"[GameRun] ResolvedRoomId is empty. pointId={ctx.PointId}");
-            return;
-        }
-
-        var room = RoomManager.GetById(roomId);
-        if (room == null)
-        {
-            Debug.LogError($"[GameRun] Room not found. roomId={roomId}");
-            return;
-        }
-
-        if (string.IsNullOrEmpty(room.prefab))
-        {
-            Debug.LogError($"[GameRun] Room prefab key is empty. roomId={roomId}");
-            return;
-        }
-
-        Debug.Log($"[SpawnMap] pointId={ctx.PointId}  room={room.name}  category={room.category}  prefab={room.prefab}");
-
-        // 방 카테고리 → RunState 자동 전환
-        var category = RoomCategoryUtil.Parse(room.category);
-        ChangeRunState(CategoryToRunState(category));
-
-        OnMapSpawnRequested?.Invoke(room.prefab);
-    }
-
-    public void RequestMoveTo(int targetPointId)
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] RequestMoveTo ignored: not running");
-            return;
-        }
-
-        if (!StagePointManager.CanMove(targetPointId)) return;
-        if (!StagePointManager.TryMoveTo(targetPointId)) return;
-
-        RequestSpawnCurrentPointMap();
-    }
-
-    /// <summary>
-    /// StageMap 씬에서 호출. 맵 스폰 없이 포인트 이동만 기록합니다.
-    /// 실제 맵 스폰은 GameScene 진입 후 GameRunBootstrapper가 담당합니다.
-    /// </summary>
-    public bool SelectPoint(int targetPointId)
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] SelectPoint ignored: not running");
-            return false;
-        }
-
-        if (!StagePointManager.CanMove(targetPointId)) return false;
-        return StagePointManager.TryMoveTo(targetPointId);
     }
 
     // =========================================================

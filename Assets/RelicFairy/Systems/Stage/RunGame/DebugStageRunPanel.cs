@@ -112,48 +112,11 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         if (run == null || !run.IsRunning) return;
         if (run.CurrentRunState == GameRunSession.RunState.Map) return;
 
-        var spm = run.StagePointManager;
-        if (spm == null || spm.CurrentPointId < 0) return;
+        var zp = run.ZoneProgression;
+        if (zp == null) return;
 
-        var ctx = spm.GetContext(spm.CurrentPointId);
-        spm.MarkCleared(spm.CurrentPointId);
-
-        // 보스 방이면 다음 챕터로 전환
-        if (ctx != null && ctx.StageCategory == StageCategory.Boss)
-        {
-            HandleBossClearAsync(run).Forget();
-            return;
-        }
-
-        run.EnterMap();
-        Debug.Log($"[DebugRunPanel] {clearRoomKey} → 방 클리어 스킵, Map 전환");
-    }
-
-    private async Cysharp.Threading.Tasks.UniTaskVoid HandleBossClearAsync(GameRunSession run)
-    {
-        run.EnterChapterClear();
-
-        Debug.Log($"[DebugRunPanel] 보스 클리어! 챕터 {run.CurrentChapter} → 다음 챕터 전환");
-
-        // 페이드 → 다음 챕터 StageMap으로 전환
-        if (run.AdvanceToNextChapter())
-        {
-            var app = AppBootstrapper.Instance;
-            if (app != null)
-            {
-                if (TransitionOverlay.Instance != null)
-                    await TransitionOverlay.Instance.PlayAsync(() => app.RequestLoad(Define.Scene.StageMap));
-                else
-                    app.RequestLoad(Define.Scene.StageMap);
-            }
-        }
-        else
-        {
-            Debug.Log("[DebugRunPanel] 마지막 챕터 클리어! 런 종료.");
-            var app = AppBootstrapper.Instance;
-            if (app != null)
-                app.RequestLoad(Define.Scene.Lobby);
-        }
+        zp.EnableExitGateForZone(zp.CurrentZoneIndex);
+        Debug.Log($"[DebugRunPanel] {clearRoomKey} → 방 클리어 스킵, 출구 게이트 활성화 (zone {zp.CurrentZoneIndex})");
     }
 
     private void HandleSpawnItem()
@@ -231,7 +194,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private void HandleReturnToStageMap()
     {
-        // 스타트 방 씬이면 캐릭터/무기 선택 여부와 무관하게 StageMap으로 스킵 (테스트용)
         var bootstrapperInst = bootstrapper != null ? bootstrapper : GameRunBootstrapper.Instance;
         if (bootstrapperInst != null && bootstrapperInst.IsStartRoomScene)
         {
@@ -240,42 +202,13 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             return;
         }
 
-        var run = GetCurrentRun();
-        if (run == null || !run.IsRunning) return;
-
-        var spm = run.StagePointManager;
-        if (spm == null || spm.CurrentPointId < 0) return;
-
-        var ctx = spm.GetContext(spm.CurrentPointId);
-        spm.MarkCleared(spm.CurrentPointId);
-
-        // 보스 방이면 다음 챕터로 전환
-        if (ctx != null && ctx.StageCategory == StageCategory.Boss)
-        {
-            HandleBossClearAsync(run).Forget();
-            return;
-        }
-
-        Debug.Log($"[DebugRunPanel] {returnToStageMapKey} → 전투 클리어, StageMap 씬 전환");
-        AppBootstrapper.Instance.RequestLoad(Define.Scene.StageMap);
+        HandleClearRoom();
     }
 
     private async UniTaskVoid StartRun()
     {
         await UniTask.WaitUntil(() => AppBootstrapper.Instance != null && AppBootstrapper.Instance.IsReady);
 
-        var app = AppBootstrapper.Instance;
-
-        // StageMap 씬: StageMapBootstrapper가 비동기로 런을 초기화 중일 수 있으므로 대기
-        if (StageMapBootstrapper.Instance != null)
-        {
-            await UniTask.WaitUntil(() => app.CurrentRun != null && app.CurrentRun.IsRunning);
-            Debug.Log("[DebugRunPanel] StageMapBootstrapper 런 준비 완료.");
-            _started = false;
-            return;
-        }
-
-        // GameScene: GameRunBootstrapper를 통해 런 시작
         if (bootstrapper == null)
             bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
 
@@ -287,9 +220,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         }
 
         await bootstrapper.StartRunAsync(chapter);
-
-        // StageMap 선택 단계를 건너뛰므로 직접 전투 모드로 전환
-        // (정상 플로우에서는 방 선택 시 NotifyCombatStarted()가 호출됨)
         bootstrapper.Run?.NotifyCombatStarted();
     }
 
@@ -333,7 +263,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             };
         }
 
-        GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5]</b> 방 클리어  <b>[F6]</b> StageMap", style);
+        GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5/F6]</b> 방 클리어 (출구 게이트 활성화)", style);
         GUI.Label(new Rect(x, y + 20, 300, 20), $"<b>[F7]</b> 아이템 스폰", style);
         GUI.Label(new Rect(x, y + 40, 300, 20), $"<b>[F8]</b> 무기 속성 변경: {element}", style);
     }

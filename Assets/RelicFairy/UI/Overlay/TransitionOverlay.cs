@@ -2,7 +2,7 @@
 // TransitionOverlay.cs
 // - Canvas_Overlay 위의 전체 화면 페이드 연출
 // - Sort Order 최상위로 모든 레이어를 덮음
-// - StagePointUI 등에서 방 이동 시 호출
+// - 씬 전환 / 페이드 연출 시 호출
 //============================================================
 using System;
 using UnityEngine;

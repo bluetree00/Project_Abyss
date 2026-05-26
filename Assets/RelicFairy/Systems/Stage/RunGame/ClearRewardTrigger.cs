@@ -132,11 +132,6 @@ public class ClearRewardTrigger : MonoBehaviour
             catch (OperationCanceledException) { return; }
         }
 
-        // 노드 클리어 마킹 (스테이지 전환은 별도 메커니즘이 담당)
-        var spm = _run?.StagePointManager;
-        if (spm != null && spm.CurrentPointId >= 0)
-            spm.MarkCleared(spm.CurrentPointId);
-
         if (_isBossRoom && _run != null)
         {
             _run.EnterChapterClear();
