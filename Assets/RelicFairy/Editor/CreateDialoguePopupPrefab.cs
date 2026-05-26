@@ -12,7 +12,7 @@ using UnityEngine.UI;
 /// </summary>
 public static class CreateDialoguePopupPrefab
 {
-    [MenuItem("RelicFairy/Dialogue/Register Illustrations")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Register Illustrations")]
     public static void RegisterIllustrations()
     {
         RegisterAddressable("Assets/RelicFairy/UI/Popup/Quest/Illust_God_Default.png", "Illust_God_Default");
@@ -20,7 +20,7 @@ public static class CreateDialoguePopupPrefab
         Debug.Log("[Dialogue] 일러스트 Addressables 등록 완료 — Illust_God_Default / Illust_Shadow_Default");
     }
 
-    [MenuItem("RelicFairy/Dialogue/Bind Prefab References")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Bind Prefab References")]
     public static void BindDialoguePopupRefs()
     {
         const string prefabPath = "Assets/RelicFairy/UI/Popup/Dialogue/UI_DialoguePopup.prefab";
@@ -53,7 +53,7 @@ public static class CreateDialoguePopupPrefab
         }
     }
 
-    [MenuItem("RelicFairy/Create/Register Dialogue CSV")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Register CSV")]
     public static void RegisterDialogueCsv()
     {
         const string csvPath = "Assets/RelicFairy/Systems/Dialogue/Data/DIALOGUE_DATA.csv";
@@ -61,7 +61,7 @@ public static class CreateDialoguePopupPrefab
         Debug.Log("[CreateDialoguePopupPrefab] DIALOGUE_DATA CSV Addressables 등록 완료");
     }
 
-    [MenuItem("RelicFairy/Create/UI_DialoguePopup Prefab")]
+    [MenuItem("RelicFairy/UI/Create Dialogue Popup Prefab")]
     public static void Create()
     {
         // ── Root ────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ public static class RegisterZoneLayoutAddressable
     private const string AddrKey  = "CHAPTER1_ZONE_LAYOUT";
     private const string GroupName = "ChartData";
 
-    [MenuItem("RelicFairy/Setup/Register Zone Layout Addressable")]
+    [MenuItem("RelicFairy/Addressables/Register Zone Layout")]
     public static void Register()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

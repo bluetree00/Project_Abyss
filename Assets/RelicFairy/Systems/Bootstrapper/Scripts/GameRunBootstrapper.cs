@@ -845,7 +845,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             gateGO.transform.localRotation = gateLocalRot;
 
             var gate = gateGO.GetComponent<StartRoomGate>() ?? gateGO.AddComponent<StartRoomGate>();
-            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, _run.ZoneProgression);
+            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, toZone.category, _run.ZoneProgression);
             gateGO.SetActive(false);
             _run.ZoneProgression.RegisterExitGate(zoneIndex, toZoneIdx, gate);
         }
@@ -1552,12 +1552,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy());
 
+        // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
+        SpawnAwakeningAltar();
+
         await ShowStartRoomDialogueAsync();
 
         if (wispPrefab != null)
             SpawnWisp();
         else
             Debug.LogError("[GameRunBootstrapper] wispPrefab 미할당 — 스타트 방에서 캐릭터를 생성할 수 없습니다.");
+    }
+
+    private void SpawnAwakeningAltar()
+    {
+        var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
+        WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
     }
 
     private async UniTask ShowStartRoomDialogueAsync()

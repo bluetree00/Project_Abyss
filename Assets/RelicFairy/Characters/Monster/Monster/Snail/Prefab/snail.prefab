@@ -48,6 +48,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bee0000100000001000000000000ee01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnailMonster
+  _effectiveElement: -1
   _debugState: 
 --- !u!54 &8837258227881436020
 Rigidbody:
@@ -118,9 +119,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
-  m_Height: 1
+  m_Height: 1.5473573
   m_Direction: 1
-  m_Center: {x: 0, y: 0.5, z: 0}
+  m_Center: {x: 0, y: 0.77367866, z: 0}
 --- !u!1001 &7171632901776852047
 PrefabInstance:
   m_ObjectHideFlags: 0

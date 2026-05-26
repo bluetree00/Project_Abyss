@@ -35,6 +35,8 @@ public class ZoneProgressionService
 
     public bool IsSpawned(int zoneIndex) => _spawnedZones.Contains(zoneIndex);
     public bool IsCleared(int zoneIndex) => _clearedZones.Contains(zoneIndex);
+    /// <summary>해당 존의 출구 게이트가 활성화됐는지 (전투 클리어 또는 비전투 진입 완료).</summary>
+    public bool IsExitEnabled(int zoneIndex) => _gateActivatedZones.Contains(zoneIndex);
 
     /// <summary>
     /// 이어하기 복원 시 호출. 클리어된 존들과 현재 존 인덱스를 내부 상태에 반영한다.

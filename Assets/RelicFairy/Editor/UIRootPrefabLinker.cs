@@ -10,7 +10,7 @@ public static class UIRootPrefabLinker
     const string k_ScenePrefabsDir  = "Assets/RelicFairy/UI/Scene/ScenePrefabs";
     const string k_SceneChildPath   = "Canvas_Scene/@Scene";
 
-    [MenuItem("Tools/RelicFairy/Link @UIRoot Scene Prefabs")]
+    [MenuItem("RelicFairy/UI/Link @UIRoot Scene Prefabs")]
     public static void LinkScenePrefabs()
     {
         if (!File.Exists(k_UIRootPath))

@@ -8,7 +8,7 @@ public static class SoundTableGenerator
     private const string DefaultCsvPath   = "Assets/RelicFairy/Systems/Sound/Data/SoundEventTable.csv";
     private const string DefaultAssetPath = "Assets/RelicFairy/Systems/Sound/Generated/SoundEventTable.asset";
 
-    [MenuItem("Tools/Sound/Generate Event Table From CSV")]
+    [MenuItem("RelicFairy/Audio/Generate Event Table (Custom Path)")]
     private static void Generate()
     {
         var csvPath = EditorUtility.OpenFilePanel("Select SoundEventTable CSV", "Assets", "csv");
@@ -18,7 +18,7 @@ public static class SoundTableGenerator
         GenerateFromCsv(relativePath, DefaultAssetPath);
     }
 
-    [MenuItem("Tools/Sound/Generate Event Table (Default Path)")]
+    [MenuItem("RelicFairy/Audio/Generate Sound Event Table")]
     private static void GenerateDefault()
     {
         GenerateFromCsv(DefaultCsvPath, DefaultAssetPath);

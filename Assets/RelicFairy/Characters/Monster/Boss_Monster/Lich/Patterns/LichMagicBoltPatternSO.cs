@@ -58,7 +58,7 @@ public class LichMagicBoltPatternSO : BossPatternSO
 // LichMagicBoltState — MovementLocked (보스 고정, 중단 가능)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
+public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
 {
     private enum Phase { Cast, Recovery }
 

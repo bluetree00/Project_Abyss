@@ -65,7 +65,7 @@ public class LichTeleportStrikePatternSO : BossPatternSO
 // LichTeleportStrikeState — FullLock (이동 + 중단 불가)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO>
+public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePatternSO>
 {
     private enum Phase { Vanish, StrikeDelay, Strike, Recovery }
 

@@ -20,7 +20,7 @@ public static class LobbyPrefabEditor
     private const string ExitOnPath     = "Assets/RelicFairy/UI/AI Resources/Exit on.png";
 
     // ── Step 1: 구조 정리 + 이미지 교체 ────────────────────────────────────
-    [MenuItem("Tools/RelicFairy/Setup Lobby Prefab (Step1 - Layout)")]
+    [MenuItem("RelicFairy/UI/Setup Lobby (Step1 - Layout)")]
     public static void SetupLobbyLayout()
     {
         Sprite startOff  = LoadSprite(StartOffPath);
@@ -98,7 +98,7 @@ public static class LobbyPrefabEditor
     }
 
     // ── Step 2: LobbyButtonHover 컴포넌트 추가 ──────────────────────────────
-    [MenuItem("Tools/RelicFairy/Setup Lobby Prefab (Step2 - Hover)")]
+    [MenuItem("RelicFairy/UI/Setup Lobby (Step2 - Hover)")]
     public static void SetupLobbyHover()
     {
         System.Type hoverType = System.Type.GetType("LobbyButtonHover, Assembly-CSharp");

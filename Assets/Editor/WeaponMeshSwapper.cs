@@ -81,7 +81,7 @@ public static class WeaponMeshSwapper
             true),
     };
 
-    [MenuItem("Tools/Weapon/Swap Visual Meshes (All 24 Prefabs)")]
+    [MenuItem("RelicFairy/Rendering/Weapon Mesh Swapper")]
     public static void SwapAllWeapons()
     {
         StringBuilder log = new StringBuilder();

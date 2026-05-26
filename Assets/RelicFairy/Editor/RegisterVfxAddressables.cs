@@ -18,7 +18,7 @@ public static class RegisterVfxAddressables
         ),
     };
 
-    [MenuItem("RelicFairy/VFX/Register VFX Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register VFX")]
     public static void Execute()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

@@ -34,7 +34,7 @@ public class ZoneWorldMapWindow : EditorWindow
     private bool    _dragging;
     private bool    _showLabels = true;
 
-    [MenuItem("Tools/Zone World Map")]
+    [MenuItem("RelicFairy/Map/Zone World Map")]
     public static void ShowWindow()
     {
         var w = GetWindow<ZoneWorldMapWindow>("Zone World Map");

@@ -19,7 +19,7 @@ public static class RegisterStageIconsAddressable
         ("Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Sprites/MAP/chest_1.png",    "chest_1"),
     };
 
-    [MenuItem("RelicFairy/Stage/Register Map Icon Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register Map Icons")]
     public static void Execute()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;
