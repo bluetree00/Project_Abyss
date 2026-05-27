@@ -18,6 +18,7 @@ public class ZoneProgressionService
     private readonly Dictionary<int, Vector3>     _spawnedWorldCenters = new();
     private readonly Dictionary<(int from, int to), StartRoomGate> _exitGates          = new();
     private readonly HashSet<int>                                  _gateActivatedZones = new();
+    private readonly Dictionary<int, CombatBarrier>                _barriers           = new();
 
     /// <summary>플레이어가 현재 위치한 존의 인덱스. 다음 존 선택 완료 시 갱신된다.</summary>
     public int CurrentZoneIndex { get; private set; }
@@ -67,6 +68,10 @@ public class ZoneProgressionService
     public void RegisterExitGate(int fromZoneIndex, int toZoneIndex, StartRoomGate gate)
         => _exitGates[(fromZoneIndex, toZoneIndex)] = gate;
 
+    /// <summary>ZoneEntryTrigger가 전투 존 진입 시 생성한 CombatBarrier를 등록한다.</summary>
+    public void RegisterBarrier(int zoneIndex, CombatBarrier barrier)
+        => _barriers[zoneIndex] = barrier;
+
     /// <summary>
     /// 스타트 방 전용. fromZone의 next_zone_indices 중 첫 번째 존으로 UI 없이 직접 진입한다.
     /// Zone 0처럼 문이 하나의 목적지만 가리킬 때 사용한다.
@@ -93,6 +98,9 @@ public class ZoneProgressionService
         // 이미 클리어된 방은 다시 연결 이벤트를 활성화하지 않음
         if (_gateActivatedZones.Contains(zoneIndex)) return;
         _gateActivatedZones.Add(zoneIndex);
+
+        if (_barriers.TryGetValue(zoneIndex, out var barrier) && barrier != null)
+            barrier.Open();
 
         // 현재 존의 게이트 활성화
         bool any = false;

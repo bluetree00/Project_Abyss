@@ -16,24 +16,14 @@ public static class DamagePopupSpawner
     private static bool       _loading;
     private static Transform  _root;
 
-    private static readonly Dictionary<ElementType, Color> _elementColors = new()
-    {
-        { ElementType.None,      Color.white },
-        { ElementType.Lightning, new(1.00f, 0.92f, 0.23f, 1f) },
-        { ElementType.Water,     new(0.13f, 0.59f, 0.95f, 1f) },
-        { ElementType.Fire,      new(0.96f, 0.26f, 0.21f, 1f) },
-        { ElementType.Grass,     new(0.30f, 0.69f, 0.31f, 1f) },
-        { ElementType.Earth,     new(0.55f, 0.43f, 0.39f, 1f) },
-    };
-
     /// <summary>임의 위치에 데미지 숫자 스폰. 인자 부족하면 무동작.</summary>
-    public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false, ElementType element = ElementType.None)
+    public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false)
     {
         if (damage <= 0f) return;
-        SpawnAsync(worldPos, damage, isCrit, element).Forget();
+        SpawnAsync(worldPos, damage, isCrit).Forget();
     }
 
-    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit, ElementType element)
+    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit)
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
@@ -41,8 +31,7 @@ public static class DamagePopupSpawner
         var popup = GetFromPool();
         if (popup == null) return;
 
-        Color color = element.IsValid() && _elementColors.TryGetValue(element, out var c) ? c : Color.white;
-        popup.Show(worldPos, damage, isCrit, color);
+        popup.Show(worldPos, damage, isCrit, Color.white);
     }
 
     private static async UniTask EnsurePrefabAsync()

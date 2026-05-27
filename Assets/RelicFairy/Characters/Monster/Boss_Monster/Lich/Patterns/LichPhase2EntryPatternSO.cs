@@ -67,9 +67,13 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
         _phase2Applied = false;
         _blastThreshold = Data.entryDuration * Data.blastTiming;
 
-        (ctx.Monster as LichMonster)?.MovementController.SetLocked(true);
+        ctx.Animator?.CrossFade("Phase2Entry", 0.1f);
 
-        UI_BossBark.Show("봉인 해제!", BossBarkType.PatternAnnounce);
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
+
+        UI_BossBark.Show("봉인 해제!", BossBarkType.Bark);
 
         // 폭발 범위 disc — 노란색으로 선경고, blast 시점에 빨간색으로 전환
         _aoeGuide = PatternGuideHelper.Disc(
@@ -120,7 +124,7 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
     public override void Exit(MonsterContext ctx)
     {
         PatternGuideHelper.SafeDestroy(ref _aoeGuide);
-        (ctx.Monster as LichMonster)?.MovementController.SetLocked(false);
+        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
     }
 
     private void BlastAoE(MonsterContext ctx)

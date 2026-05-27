@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4712672407335628}
-  - component: {fileID: 114302265647128424}
   - component: {fileID: 54332171404887420}
   - component: {fileID: 135036271185326364}
   m_Layer: 0
@@ -35,31 +34,6 @@ Transform:
   - {fileID: 5151797348264054196}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &114302265647128424
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1878987882032996}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 605a456cfc02f6b499a64717539a27e8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  speed: 20
-  hitOffset: 0.1
-  UseFirePointRotation: 0
-  rotationOffset: {x: 0, y: 0, z: 0}
-  hit: {fileID: 3393281714338379895}
-  hitPS: {fileID: 3291271146559819703}
-  flash: {fileID: 1245723896286914986}
-  rb: {fileID: 54332171404887420}
-  col: {fileID: 135036271185326364}
-  lightSourse: {fileID: 0}
-  Detached: []
-  projectilePS: {fileID: 5430419219330635096}
-  notDestroy: 1
 --- !u!54 &54332171404887420
 Rigidbody:
   m_ObjectHideFlags: 0

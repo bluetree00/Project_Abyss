@@ -46,10 +46,9 @@ public sealed class Managers : MonoBehaviour
     private ServerEquipmentDataManager _serverEquipmentDataManager;
     private MonsterHPBarManager _monsterHPBar;
     private ItemDataManager _itemDataManager;
-    private BlockDataManager _blockDataManager;
+    private RuneDataManager _runeDataManager;
     private BuffDataManager _buffDataManager;
     private ChapterDataManager _chapterDataManager;
-    private ElementEffectDataManager _elementEffectDataManager;
     private CovenantDataManager _covenantDataManager;
     private RelicAwakeningDataManager _relicAwakeningDataManager;
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
@@ -250,17 +249,17 @@ public sealed class Managers : MonoBehaviour
         }
     }
 
-    public static BlockDataManager BlockData
+    public static RuneDataManager RuneData
     {
         get
         {
             var inst = Instance;
             if (inst == null) return null;
 
-            if (inst._blockDataManager == null)
-                inst._blockDataManager = new BlockDataManager();
+            if (inst._runeDataManager == null)
+                inst._runeDataManager = new RuneDataManager();
 
-            return inst._blockDataManager;
+            return inst._runeDataManager;
         }
     }
 
@@ -292,19 +291,6 @@ public sealed class Managers : MonoBehaviour
         }
     }
 
-    public static ElementEffectDataManager ElementEffectData
-    {
-        get
-        {
-            var inst = Instance;
-            if (inst == null) return null;
-
-            if (inst._elementEffectDataManager == null)
-                inst._elementEffectDataManager = new ElementEffectDataManager();
-
-            return inst._elementEffectDataManager;
-        }
-    }
 
     public static CovenantDataManager CovenantData
     {

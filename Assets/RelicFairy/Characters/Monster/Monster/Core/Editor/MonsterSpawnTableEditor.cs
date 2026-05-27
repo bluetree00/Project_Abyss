@@ -13,10 +13,7 @@ using UnityEngine;
 /// "Auto-Populate" 버튼을 누르면 현재 어셈블리에서
 /// MonsterBase를 상속하면서 public const PrefabAddress 를 가진
 /// 모든 구체 클래스를 스캔해 엔트리 행을 자동으로 추가한다.
-/// displayName, addressableKey, nativeElement가 자동으로 채워진다.
-///
-/// nativeElement는 MonsterConfigSO 에셋(…/SO/<Name>Config.asset)을 AssetDatabase로
-/// 찾아서 stat.nativeElement 값을 읽어 매칭한다.
+/// displayName, addressableKey, grade, poolTags가 자동으로 채워진다.
 ///
 /// 새 몬스터 추가 흐름:
 ///   1) MonsterName : MonsterBase 작성
@@ -35,9 +32,9 @@ public class MonsterSpawnTableEditor : Editor
         EditorGUILayout.HelpBox(
             "Auto-Populate: 어셈블리 스캔으로 MonsterBase 서브클래스 엔트리 행을 추가/갱신합니다.\n" +
             "• PrefabAddress → addressableKey\n" +
-            "• MonsterConfigSO.stat.nativeElement → nativeElement\n" +
-            "• Resources/MONSTER_ELEMENT_STAT_DATA.json 의 monster_pool_tag → poolTags\n" +
-            "이미 존재하는 엔트리는 nativeElement/poolTags만 최신값으로 갱신됩니다.",
+            "• MonsterConfigSO.grade → grade\n" +
+            "• poolTags → poolTags\n" +
+            "이미 존재하는 엔트리는 grade/poolTags만 최신값으로 갱신됩니다.",
             MessageType.Info);
 
         if (GUILayout.Button("Auto-Populate (어셈블리 스캔)", GUILayout.Height(32)))
@@ -102,16 +99,14 @@ public class MonsterSpawnTableEditor : Editor
                     ? className.Substring(0, className.Length - "Monster".Length)
                     : className;
                 string address     = (string)field.GetValue(null);
-                ElementType native = LookupNativeElement(configByName, lookupKey);
                 MonsterGrade grade = LookupGrade(configByName, lookupKey);
                 int[] poolTags     = LookupPoolTags(statById, lookupKey);
 
                 var existing = so.entries.Find(e => e.displayName == className);
                 if (existing != null)
                 {
-                    // 기존 엔트리 — nativeElement, grade, poolTags만 최신값으로 덮어씀 (weight/enabled 등 유지)
+                    // 기존 엔트리 — grade, poolTags만 최신값으로 덮어씀 (weight/enabled 등 유지)
                     bool changed = false;
-                    if (existing.nativeElement != native) { existing.nativeElement = native; changed = true; }
                     if (existing.grade != grade) { existing.grade = grade; changed = true; }
                     if (!AreEqual(existing.poolTags, poolTags)) { existing.poolTags = poolTags; changed = true; }
                     if (changed) updated++;
@@ -122,7 +117,6 @@ public class MonsterSpawnTableEditor : Editor
                 {
                     displayName    = className,
                     addressableKey = address,
-                    nativeElement  = native,
                     grade          = grade,
                     poolTags       = poolTags,
                     weight         = 1f,
@@ -136,7 +130,7 @@ public class MonsterSpawnTableEditor : Editor
         {
             EditorUtility.SetDirty(so);
             AssetDatabase.SaveAssets();
-            Debug.Log($"[SpawnTable] 추가 {added}개 / nativeElement 갱신 {updated}개.");
+            Debug.Log($"[SpawnTable] 추가 {added}개 / grade·poolTags 갱신 {updated}개.");
         }
         else
         {
@@ -165,13 +159,6 @@ public class MonsterSpawnTableEditor : Editor
         }
 
         return map;
-    }
-
-    private static ElementType LookupNativeElement(Dictionary<string, MonsterConfigSO> index, string className)
-    {
-        if (index.TryGetValue(className, out var cfg) && cfg != null)
-            return cfg.stat.nativeElement;
-        return ElementType.None;
     }
 
     private static MonsterGrade LookupGrade(Dictionary<string, MonsterConfigSO> index, string className)

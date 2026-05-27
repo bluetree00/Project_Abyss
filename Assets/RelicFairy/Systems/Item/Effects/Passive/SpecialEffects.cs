@@ -26,15 +26,6 @@ public sealed class PoisonAppleEffect : ItemEffectBase
 public sealed class RandomElementEffect : ItemEffectBase
 {
     public RandomElementEffect(ItemEffectSlot s) : base(s) { }
-
-    public override void OnPreDealDamage(ItemEffectContext ctx, ref DamagePacket pkt)
-    {
-        if (pkt.Element != WeaponElement.None) return;
-
-        // 무속성 → 랜덤 원소
-        var elements = new[] { WeaponElement.Water, WeaponElement.Fire, WeaponElement.Grass, WeaponElement.Earth, WeaponElement.Lightning };
-        pkt.Element = elements[Random.Range(0, elements.Length)];
-    }
 }
 
 public sealed class ItemGradeUpEffect : ItemEffectBase

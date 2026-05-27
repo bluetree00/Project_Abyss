@@ -46,12 +46,6 @@ public class WeaponData
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
-    public WeaponElement element = WeaponElement.None;
-
-    // ── 원소 누적치 부여량 ───────────────────────────────────────────
-    public float elementAmountBasic = 0f;
-    public float elementAmountHeavy = 0f;
-    public float elementAmountAir   = 0f;
 
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
@@ -91,7 +85,6 @@ public class WeaponData
         chargeStages = so.chargeStages;
 
         weaponType = so.weaponType;
-        element    = so.element;
 
         skillQ = so.skillQ;
         skillE = so.skillE;
@@ -127,10 +120,6 @@ public class WeaponData
         airEndCount        = entry.air_combo_count;
         promoteMode        = ParsePromoteMode(entry.promote_mode);
         chargeStages       = entry.charge_stages;
-        element            = ParseElement(entry);
-        elementAmountBasic = entry.element_amount_basic;
-        elementAmountHeavy = entry.element_amount_heavy;
-        elementAmountAir   = entry.element_amount_air;
         tier               = entry.tier;
         rarity             = ParseRarity(entry.rarity, entry.tier);
         // weaponType, displayName, weaponPrefabKey, weaponDisplayKey, iconKey,
@@ -167,17 +156,13 @@ public class WeaponData
             groundEndCount   = entry.ground_combo_count,
             airEndCount      = entry.air_combo_count,
             weaponType           = ParseWeaponType(entry.weapon_type),
-            element              = ParseElement(entry),
-            elementAmountBasic   = entry.element_amount_basic,
-            elementAmountHeavy   = entry.element_amount_heavy,
-            elementAmountAir     = entry.element_amount_air,
             // SO 참조는 null — WeaponSO에서 바인딩하거나 Addressables로 로드
             animationSet     = null,
             abilitySet       = null,
             skillQ           = null,
             skillE           = null,
         };
-        UnityEngine.Debug.Log($"[WeaponData.FromServer] {entry.weapon_id} ({entry.weapon_name}) | Elem={data.element} (raw='{entry.element}') | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
+        UnityEngine.Debug.Log($"[WeaponData.FromServer] {entry.weapon_id} ({entry.weapon_name})");
         return data;
     }
 
@@ -211,23 +196,6 @@ public class WeaponData
         4 => ItemRarity.Legendary,
         _ => ItemRarity.Common,
     };
-
-    public static WeaponElement ParseElementPublic(EquipmentEntry entry) => ParseElement(entry);
-
-    private static WeaponElement ParseElement(EquipmentEntry entry)
-    {
-        // EquipmentEntry에 element 필드가 있으면 사용, 없으면 None
-        var s = entry != null ? (entry.element ?? "") : "";
-        return s switch
-        {
-            "Water"     => WeaponElement.Water,
-            "Fire"      => WeaponElement.Fire,
-            "Grass"     => WeaponElement.Grass,
-            "Earth"     => WeaponElement.Earth,
-            "Lightning" => WeaponElement.Lightning,
-            _           => WeaponElement.None,
-        };
-    }
 
     private static WeaponType ParseWeaponType(string s) => s switch
     {

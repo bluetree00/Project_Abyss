@@ -14,6 +14,10 @@ public class UserGameData
     public int highestChapter;    // 최고 도달 챕터 (1~5)
     public int totalGoldEarned;   // 누적 골드 획득량 (통계용)
 
+    // ── 보스 조우 기록 ─────────────────────────────────
+    /// <summary>리치 보스방에 진입한 누적 횟수. 3 이상이면 Phase 2 해금.</summary>
+    public int lichEncounterCount;
+
     // ── 유물의 각성 ────────────────────────────────────
     public int abyssEssence;           // 심연의 정수 (각성 재화)
     public int awakeningLevelSword;    // 검의 각성 — 공격력
@@ -34,6 +38,8 @@ public class UserGameData
         totalClears      = 0;
         highestChapter   = 0;
         totalGoldEarned  = 0;
+
+        lichEncounterCount   = 0;
 
         abyssEssence         = 0;
         awakeningLevelSword  = 0;

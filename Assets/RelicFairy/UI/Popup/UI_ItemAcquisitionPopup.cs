@@ -29,8 +29,9 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     [SerializeField] private TMP_FontAsset popupFont;
 
     // ── Private ──
-    private RuntimeItemData  _item;
-    private RunItemInventory _inventory;
+    private RuntimeItemData            _item;
+    private RunItemInventory           _inventory;
+    private UniTaskCompletionSource    _interactionTcs;
 
     private static readonly Color COLOR_RISK      = new(1f,    0.35f, 0.35f, 1f);
     private static readonly Color COLOR_NORMAL_FX = new(0.85f, 0.92f, 1f,   1f);
@@ -62,6 +63,13 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     }
 
     // ── Public API ──
+
+    /// <summary>버튼 클릭 즉시 resolve — 애니메이션 완료를 기다리지 않는다.</summary>
+    public UniTask WaitForInteractionAsync(System.Threading.CancellationToken ct)
+    {
+        _interactionTcs = new UniTaskCompletionSource();
+        return _interactionTcs.Task.AttachExternalCancellation(ct);
+    }
 
     /// <summary>
     /// 팝업 데이터 설정.
@@ -103,6 +111,8 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnOpenGridClicked()
     {
+        _interactionTcs?.TrySetResult();
+
         if (_item == null || _inventory == null) { ClosePopupUI(); return; }
 
         // 보관함에 추가
@@ -123,7 +133,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
     private void OnRejectClicked()
     {
-        // 아이템 폐기 — 보관함에 없으므로 단순 닫기
+        _interactionTcs?.TrySetResult();
         ClosePopupUI();
     }
 
@@ -165,13 +175,13 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         for (int i = shapePreviewRoot.childCount - 1; i >= 0; i--)
             Destroy(shapePreviewRoot.GetChild(i).gameObject);
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null) return;
 
         var shapeEntry = blockData.GetShape(item.shapeId);
         if (shapeEntry == null) return;
 
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
         if (offsets == null || offsets.Length == 0) return;
 
         int minX = int.MaxValue, minY = int.MaxValue;

@@ -143,6 +143,13 @@ public class BackendGameData : MonoBehaviour
         await tcs.Task;
     }
 
+    /// <summary>리치 조우 횟수를 1 증가시키고 서버에 저장한다. 보스 초기화 시 즉시 호출.</summary>
+    public async UniTask RecordLichEncounterAsync()
+    {
+        Data.lichEncounterCount++;
+        await SaveAsync();
+    }
+
     /// <summary>런 종료 결과를 영구 데이터에 반영하고 서버에 저장한다.</summary>
     public async UniTask ApplyRunResultAsync(EndRunResult result)
     {
@@ -166,6 +173,8 @@ public class BackendGameData : MonoBehaviour
         Data.totalGoldEarned = SafeInt(row,   "totalGoldEarned",0);
 
         // 유물의 각성
+        Data.lichEncounterCount   = SafeInt(row, "lichEncounterCount",   0);
+
         Data.abyssEssence         = SafeInt(row, "abyssEssence",         0);
         Data.awakeningLevelSword  = SafeInt(row, "awakeningLevelSword",  0);
         Data.awakeningLevelShield = SafeInt(row, "awakeningLevelShield", 0);
@@ -187,6 +196,7 @@ public class BackendGameData : MonoBehaviour
         { "highestChapter",       Data.highestChapter       },
         { "totalGoldEarned",      Data.totalGoldEarned      },
         // 유물의 각성
+        { "lichEncounterCount",   Data.lichEncounterCount   },
         { "abyssEssence",         Data.abyssEssence         },
         { "awakeningLevelSword",  Data.awakeningLevelSword  },
         { "awakeningLevelShield", Data.awakeningLevelShield },

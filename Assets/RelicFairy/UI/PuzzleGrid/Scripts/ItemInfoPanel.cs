@@ -175,13 +175,13 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         if (shapePreviewRoot == null || item.shapeId == 0) return;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null) return;
 
         var shapeEntry = blockData.GetShape(item.shapeId);
         if (shapeEntry == null) return;
 
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
         if (offsets == null || offsets.Length == 0) return;
 
         int minX = int.MaxValue, minY = int.MaxValue;

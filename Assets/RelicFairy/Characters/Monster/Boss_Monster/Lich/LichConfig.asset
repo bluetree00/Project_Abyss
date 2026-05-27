@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
   m_Name: LichConfig
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.BossConfigSO
   monsterName: "\uB9AC\uCE58"
   grade: 3
   playerLayer:

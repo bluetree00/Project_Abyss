@@ -73,16 +73,13 @@ public class PlayerController : CharacterBase
     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
     private float _invincibleEnd;
 
-    // 아이템 효과: 다음 1회 공격에 원소 부여 (RecipeSynergyNextAttack)
-    public WeaponElement NextAttackElement { get; set; } = WeaponElement.None;
-
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
 
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }
 
-    public void TakeDamage(int dmg)
+    public virtual void TakeDamage(int dmg, GameObject attacker = null)
     {
         if (debugInvincible || Time.time < _invincibleEnd)
             return;
@@ -90,12 +87,12 @@ public class PlayerController : CharacterBase
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
 
         // 피격 전 — 무효화/감소 처리
-        var pkt = new DamagePacket(dmg, attacker: null, target: gameObject);
+        var pkt = new DamagePacket(dmg, attacker: attacker, target: gameObject);
         mgr?.OnPreTakeDamage(ref pkt);
 
         if (pkt.Negated)
         {
-            FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = 0 });
+            FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = 0, attacker = attacker });
             return;
         }
 
@@ -134,7 +131,7 @@ public class PlayerController : CharacterBase
         };
         mgr?.OnPostTakeDamage(report);
 
-        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = finalDmg });
+        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = finalDmg, attacker = attacker });
     }
 
     public void Heal(int amount)
@@ -359,6 +356,9 @@ public class PlayerController : CharacterBase
         // 애니메이터 오버라이드 서비스 초기화
         _animSvc = new AnimatorOverrideService(anim);
 
+        // 캐릭터 데이터에 지정된 애니메이션 클립으로 오버라이드 (Q스킬 등)
+        ApplyCharacterAnimationOverrides();
+
         // 이펙트 핸들러 초기화
         EffectHandler = new WeaponEffectHandler(this);
 
@@ -481,6 +481,33 @@ public class PlayerController : CharacterBase
     {
         WeaponManager = GetComponent<PlayerWeaponManager>() ?? gameObject.AddComponent<PlayerWeaponManager>();
         WeaponManager.Initialize(this);
+    }
+
+    /// <summary>
+    /// CharacterData 에 지정된 키들로 AnimatorOverrideController 클립을 교체한다.
+    /// 키가 비어 있으면 기본 클립(컨트롤러에 바인딩된 원본) 그대로 사용.
+    /// 캐릭터별 Q스킬 등 고유 모션을 적용하는 통로.
+    /// </summary>
+    private void ApplyCharacterAnimationOverrides()
+    {
+        if (_animSvc == null || characterData == null) return;
+
+        TryOverrideClip("QSkill_01", characterData.QSkillClipKey);
+    }
+
+    private void TryOverrideClip(string stateName, string addressableKey)
+    {
+        if (string.IsNullOrEmpty(addressableKey)) return;
+
+        var clip = Managers.AnimationResources?.GetClip(addressableKey);
+        if (clip == null)
+        {
+            Debug.LogWarning($"[PlayerController] AnimationClip '{addressableKey}' 로드 실패 — '{stateName}' 기본 클립 유지");
+            return;
+        }
+
+        if (!_animSvc.Override(stateName, clip))
+            Debug.LogWarning($"[PlayerController] '{stateName}' state 가 컨트롤러에 없어 override 스킵");
     }
 
     private async UniTask InitCharacterDataAsync()

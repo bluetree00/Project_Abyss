@@ -12,8 +12,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
     [SerializeField] private KeyCode returnToStageMapKey = KeyCode.F6;
     [SerializeField] private KeyCode spawnItemKey = KeyCode.F7;
-    [SerializeField] private KeyCode cycleElementKey = KeyCode.F8;
-
     private bool _started;
 
     private void Awake()
@@ -65,45 +63,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             HandleReturnToStageMap();
         else if (Input.GetKeyDown(spawnItemKey))
             HandleSpawnItem();
-        else if (Input.GetKeyDown(cycleElementKey))
-            HandleCycleElement();
-    }
-
-    private static readonly WeaponElement[] ElementCycle =
-    {
-        WeaponElement.None,
-        WeaponElement.Fire,
-        WeaponElement.Water,
-        WeaponElement.Grass,
-        WeaponElement.Earth,
-        WeaponElement.Lightning,
-    };
-    private int _elementIndex;
-
-    private void HandleCycleElement()
-    {
-        var run = GetCurrentRun();
-        if (run?.Player?.WeaponManager == null) return;
-
-        var wd = run.Player.WeaponManager.CurrentWeaponData;
-        if (wd == null) return;
-
-        _elementIndex = (_elementIndex + 1) % ElementCycle.Length;
-        wd.element = ElementCycle[_elementIndex];
-
-        // 아이템 효과 컨텍스트 갱신
-        run.EffectManager?.RefreshContext(run.Player, run);
-
-        string name = ElementCycle[_elementIndex] switch
-        {
-            WeaponElement.Fire      => "불",
-            WeaponElement.Water     => "물",
-            WeaponElement.Grass     => "풀",
-            WeaponElement.Earth     => "땅",
-            WeaponElement.Lightning => "번개",
-            _                       => "무속성",
-        };
-        Debug.Log($"[DebugPanel] F8 → 무기 속성: {name}");
     }
 
     private void HandleClearRoom()
@@ -248,24 +207,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var run = GetCurrentRun();
         if (run == null || !run.IsRunning) return;
 
-        string element = "무속성";
-        var wd = run.Player?.WeaponManager?.CurrentWeaponData;
-        if (wd != null)
-        {
-            element = wd.element switch
-            {
-                WeaponElement.Fire      => "<color=#FF6622>불</color>",
-                WeaponElement.Water     => "<color=#4488FF>물</color>",
-                WeaponElement.Grass     => "<color=#44CC44>풀</color>",
-                WeaponElement.Earth     => "<color=#CC8844>땅</color>",
-                WeaponElement.Lightning => "<color=#44CCFF>번개</color>",
-                _                       => "무속성",
-            };
-        }
-
         GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5/F6]</b> 방 클리어 (출구 게이트 활성화)", style);
         GUI.Label(new Rect(x, y + 20, 300, 20), $"<b>[F7]</b> 아이템 스폰", style);
-        GUI.Label(new Rect(x, y + 40, 300, 20), $"<b>[F8]</b> 무기 속성 변경: {element}", style);
     }
 
     /// <summary>

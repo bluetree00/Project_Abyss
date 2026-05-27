@@ -9,6 +9,9 @@ public struct PassiveContext
     /// <summary>대상 오브젝트 (OnAttackHit, OnKill)</summary>
     public GameObject target;
 
+    /// <summary>공격자 오브젝트 (OnTakeDamage 시 피해를 가한 주체)</summary>
+    public GameObject attacker;
+
     /// <summary>데미지량 (OnAttackHit, OnKill, OnTakeDamage)</summary>
     public float damage;
 

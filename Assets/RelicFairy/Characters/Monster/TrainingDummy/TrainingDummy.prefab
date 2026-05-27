@@ -13,8 +13,6 @@ GameObject:
   - component: {fileID: 7673641573393682711}
   - component: {fileID: 3013197320085565860}
   - component: {fileID: 7971441237406173546}
-  - component: {fileID: 3835182680937731578}
-  - component: {fileID: 7901193538721857499}
   m_Layer: 7
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -128,40 +126,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &3835182680937731578
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5335401826307014287}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e5db44b0f636b21439aa14ec1df5e739, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ElementBuildup
-  monsterMaxAccumulationScale: 1
-  decayPerSecond: 10
-  decayDelay: 3
---- !u!114 &7901193538721857499
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5335401826307014287}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ffd545ee961a8844f8587fe4fe564343, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ElementVisualFeedback
-  renderers: []
-  colorPropertyName: _BaseColor
-  sustainStrength: 0.45
-  triggerPulseStrength: 0.95
-  tickPulseStrength: 0.8
-  triggerPulseDuration: 0.18
-  tickPulseDuration: 0.12
 --- !u!1001 &8884831491123674878
 PrefabInstance:
   m_ObjectHideFlags: 0

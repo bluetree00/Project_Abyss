@@ -147,6 +147,16 @@ public class ClearRewardTrigger : MonoBehaviour
             catch (OperationCanceledException) { return; }
         }
 
+        // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
+        // 존 선택 UI가 그리드 위에 겹쳐 표시된다.
+        try
+        {
+            await UniTask.WaitUntil(
+                () => UI_GridPanel.Instance == null || !UI_GridPanel.Instance.IsOpen,
+                cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { return; }
+
         // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
         // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
         if (!_isBossRoom)
@@ -184,9 +194,8 @@ public class ClearRewardTrigger : MonoBehaviour
 
             popup.Setup(data, _run.ItemInventory);
 
-            // 팝업이 닫힐 때까지 대기 (버튼 클릭 시 팝업이 스스로 ClosePopupUI 호출)
-            await UniTask.WaitUntil(() => popup == null || !popup.gameObject.activeSelf,
-                cancellationToken: ct);
+            // 버튼 클릭 즉시 resolve — 0.14s 닫기 애니메이션을 기다리지 않는다
+            await popup.WaitForInteractionAsync(ct);
 
         }
     }

@@ -12,7 +12,7 @@ using TMPro;
 /// ■ 신규 아이템: 빛나는 테두리 + NEW 뱃지.
 /// ■ [X] 버튼: 해당 아이템 폐기 (UI_GridPanel.OnDialogDiscardAll과 별개, 개별 폐기).
 /// ■ 카드 클릭: ItemInfoPanel에 해당 아이템 정보 표시.
-/// ■ Shape 생성: 카드 생성 시 BlockDataManager → ShapeAssetSO → BoardManager.SpawnSharedShape.
+/// ■ Shape 생성: 카드 생성 시 RuneDataManager → ShapeAssetSO → BoardManager.SpawnSharedShape.
 /// </summary>
 public sealed class StagingAreaView : MonoBehaviour
 {
@@ -76,8 +76,16 @@ public sealed class StagingAreaView : MonoBehaviour
     {
         if (boardManager == null)
             boardManager = BoardManager.Instance;
-        BuildFixedSlots();
         BuildDiscardDialog();
+    }
+
+    // ── Public Init ──
+
+    /// <summary>코드로 생성 시 scrollContent를 주입하고 슬롯을 빌드한다. UI_GridPanel에서 AddComponent 직후 호출.</summary>
+    public void Init(RectTransform content)
+    {
+        scrollContent = content;
+        BuildFixedSlots();
     }
 
     private void OnDestroy()
@@ -443,10 +451,10 @@ public sealed class StagingAreaView : MonoBehaviour
             return;
         }
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null)
         {
-            Debug.LogWarning($"[StagingAreaView] BlockDataManager null — shape 생성 불가 (item={item.itemId})");
+            Debug.LogWarning($"[StagingAreaView] RuneDataManager null — shape 생성 불가 (item={item.itemId})");
             return;
         }
 
@@ -457,7 +465,7 @@ public sealed class StagingAreaView : MonoBehaviour
             return;
         }
 
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
 
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
         shapeSO.shapeName        = shapeEntry.shape_name;
@@ -572,13 +580,13 @@ public sealed class StagingAreaView : MonoBehaviour
     {
         if (item == null || item.shapeId == 0) return;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null) return;
 
         var shapeEntry = blockData.GetShape(item.shapeId);
         if (shapeEntry == null) return;
 
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
         if (offsets == null || offsets.Length == 0) return;
 
         int minX = int.MaxValue, minY = int.MaxValue;

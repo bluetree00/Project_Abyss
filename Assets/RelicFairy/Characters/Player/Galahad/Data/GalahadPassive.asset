@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ce308ce0c6a57f45a947afe37fd855a, type: 3}
+  m_Name: GalahadPassive
+  m_EditorClassIdentifier: Assembly-CSharp::PassiveSO
+  passiveName: "\uBE5B\uC758 \uBC18\uC0AC"
+  description: "\uD53C\uACA9 \uC2DC \uBC1B\uB294 \uD53C\uD574 10% \uACBD\uAC10 \uBC0F
+    \uBC29\uC5B4\uB825 \uBE44\uB840 \uBC18\uC0AC \uD53C\uD574\uB97C \uACF5\uACA9\uC790\uC5D0\uAC8C
+    \uB3CC\uB824\uC90C."
+  icon: {fileID: 0}
+  baseModifiers:
+  - Type: 1
+    Value: 5

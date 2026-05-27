@@ -99,4 +99,17 @@ public class Grid : MonoBehaviour
     }
 
     public List<GridSquare> GetGridSquares() => gridSquares;
+
+    /// <summary>
+    /// 미리 생성·배치된 GridSquare 목록으로 그리드를 직접 초기화한다.
+    /// Rebuild()를 호출하지 않으므로 gridSquarePrefab 불필요.
+    /// MerlinRuneHexGridView가 헥사 셀 위치에 생성한 GridSquare를 등록할 때 사용.
+    /// </summary>
+    public void InitFromPrebuiltSquares(GridAssetSO asset, List<GridSquare> squares)
+    {
+        gridAsset = asset;
+        gridSquares.Clear();
+        if (squares != null)
+            gridSquares.AddRange(squares);
+    }
 }
