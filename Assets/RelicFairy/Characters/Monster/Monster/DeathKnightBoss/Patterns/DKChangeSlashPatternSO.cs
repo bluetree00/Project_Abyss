@@ -39,6 +39,10 @@ public class DKChangeSlashPatternSO : BossPatternSO
     public float damageMultiplier   = 1f;
     public float knockbackMultiplier = 1f;
 
+    [Header("Border")]
+    [Tooltip("경계 테두리 엣지 프리팹 (DK_WarnBorder)")]
+    public GameObject edgePrefab;
+
     private DKChangeSlashState _state;
 
     public override void Initialize(BossPatternContext ctx) => _state = new DKChangeSlashState(this);
@@ -57,24 +61,24 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
     private const float VfxDelay = 0.05f; // 타일 제거 확정 후 VFX 스폰까지 최소 대기
 
     private float            _timer;
-    private bool             _swingVfxSpawned;
     private bool             _tilesSpawned;
     private bool             _tilesDestroyed;
     private bool             _vfxSpawned;
     private bool             _hitDone;
-    private List<DKTileInfo> _tiles;
+    private List<DKTileInfo>  _tiles;
+    private List<GameObject>  _edges;
 
     public DKChangeSlashState(DKChangeSlashPatternSO data) : base(data) { }
 
     public override void Enter(MonsterContext ctx)
     {
-        _timer           = 0f;
-        _swingVfxSpawned = false;
-        _tilesSpawned    = false;
-        _tilesDestroyed  = false;
+        _timer          = 0f;
+        _tilesSpawned   = false;
+        _tilesDestroyed = false;
         _vfxSpawned      = false;
         _hitDone         = false;
         _tiles           = new List<DKTileInfo>();
+        _edges           = new List<GameObject>();
 
         StopAgent(ctx);
         FacePlayer(ctx);
@@ -85,13 +89,6 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
     {
         _timer += Time.deltaTime * AnimSpeed(ctx);
 
-        // 스윙 시작과 동시에 SwingVfx 1회
-        if (!_swingVfxSpawned)
-        {
-            _swingVfxSpawned = true;
-            SpawnSwingVfx(ctx);
-        }
-
         // warningDuration: 경고 타일 생성 (검이 휘두르는 중)
         if (!_tilesSpawned && _timer >= Data.warningDuration)
         {
@@ -100,13 +97,16 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             _tiles = DKGridPatternHelper.SpawnTiles(
                 (x, z) => x % 2 == 1 ? sc : Opposite(sc),
                 Data.whiteTilePrefab, Data.blackTilePrefab);
+            _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
         }
 
-        // hitTime: 타일 제거만 (VFX는 아직 아님)
+        // hitTime: 타일 제거 + 검 궤적 이펙트
         if (!_tilesDestroyed && _timer >= Data.hitTime)
         {
             _tilesDestroyed = true;
+            DKGridPatternHelper.DestroyEdges(_edges);
             DKGridPatternHelper.DestroyTiles(_tiles);
+            SpawnSwingVfx(ctx);
         }
 
         // hitTime + VfxDelay: 타일이 확실히 사라진 후 VFX 스폰
@@ -138,6 +138,7 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
+        DKGridPatternHelper.DestroyEdges(_edges);
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
     }
@@ -145,8 +146,10 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
     private void SpawnSwingVfx(MonsterContext ctx)
     {
         if (Data.swingVfxPrefab == null) return;
-        BossEffectPool.SpawnOneShot(
-            Data.swingVfxPrefab, ctx.Transform.position, ctx.Transform.rotation, fallbackLifetime: 2f);
+        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
+        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
+        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
+        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 2f);
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

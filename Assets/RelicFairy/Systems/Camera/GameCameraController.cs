@@ -26,6 +26,11 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private Vector2 wispOrbitMiddle = new Vector2(10f,  6f);
     [SerializeField] private Vector2 wispOrbitBottom = new Vector2(5f,   5f);
 
+    [Header("Boss Orbit FreeLook (Dragon Orbit Only)")]
+    [SerializeField] private Vector2 bossOrbitTop    = new Vector2(8f, 8f);
+    [SerializeField] private Vector2 bossOrbitMiddle = new Vector2(5.5f, 6.5f);
+    [SerializeField] private Vector2 bossOrbitBottom = new Vector2(3f, 5f);
+
     // ── Private ──
     private Vector3 _originalPosition;
     private Quaternion _originalRotation;
@@ -40,6 +45,16 @@ public class GameCameraController : MonoBehaviour
     private bool _isPanning;
     private bool _prePanBrainEnabled;
     private bool _prePanCmEnabled;
+    private bool _bossOrbitViewActive;
+    private Transform _bossOrbitOwner;
+    private Transform _savedBossFollow;
+    private Transform _savedBossLookAt;
+    private CinemachineFreeLook.Orbit[] _savedBossOrbits;
+    private bool _topDownViewActive;
+    private bool _savedBrainBeforeTopDown;
+    private bool _savedCmBeforeTopDown;
+    private Vector3 _savedCamPosBeforeTopDown;
+    private Quaternion _savedCamRotBeforeTopDown;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
@@ -213,6 +228,104 @@ public class GameCameraController : MonoBehaviour
 
         if (_brain != null)
             _brain.enabled = true;
+    }
+
+    public void ActivateBossOrbitView(Transform bossTarget, Transform lookAtTarget = null)
+    {
+        if (bossTarget == null || _isPanning)
+            return;
+
+        EnsureCinemachineRefs();
+        if (_cinemachine == null)
+            return;
+
+        if (!_bossOrbitViewActive)
+        {
+            _savedBossFollow = _cinemachine.Follow;
+            _savedBossLookAt = _cinemachine.LookAt;
+            _savedBossOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+            _bossOrbitViewActive = true;
+        }
+
+        _bossOrbitOwner = bossTarget;
+        _cinemachine.m_Orbits[0] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitTop.x,    m_Radius = bossOrbitTop.y };
+        _cinemachine.m_Orbits[1] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitMiddle.x, m_Radius = bossOrbitMiddle.y };
+        _cinemachine.m_Orbits[2] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitBottom.x, m_Radius = bossOrbitBottom.y };
+        _cinemachine.Follow = bossTarget;
+        _cinemachine.LookAt = lookAtTarget != null ? lookAtTarget : bossTarget;
+        _cinemachine.enabled = true;
+        if (_brain != null)
+            _brain.enabled = true;
+    }
+
+    [Header("Dragon Top-Down View")]
+    [SerializeField] private float topDownHeight = 35f;
+
+    public void ActivateDragonTopDownView(Vector3 mapCenter)
+    {
+        Debug.Log($"[GCC.ActivateTopDown] 호출됨 topDownActive={_topDownViewActive} brain={_brain?.enabled} cm={_cinemachine?.enabled}");
+        if (_topDownViewActive) return;
+        EnsureCinemachineRefs();
+
+        _savedBrainBeforeTopDown  = _brain != null && _brain.enabled;
+        _savedCmBeforeTopDown     = _cinemachine != null && _cinemachine.enabled;
+        _savedCamPosBeforeTopDown = transform.position;
+        _savedCamRotBeforeTopDown = transform.rotation;
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        transform.position = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+        _topDownViewActive = true;
+        Debug.Log($"[GCC.ActivateTopDown] 완료 camPos={transform.position} brainDisabled={_brain != null && !_brain.enabled}");
+    }
+
+    public void DeactivateDragonTopDownView()
+    {
+        if (!_topDownViewActive) return;
+        EnsureCinemachineRefs();
+
+        transform.position = _savedCamPosBeforeTopDown;
+        transform.rotation = _savedCamRotBeforeTopDown;
+
+        if (_brain != null && _savedBrainBeforeTopDown)       _brain.enabled       = true;
+        if (_cinemachine != null && _savedCmBeforeTopDown) _cinemachine.enabled = true;
+
+        _topDownViewActive = false;
+    }
+
+    public void DeactivateBossOrbitView(Transform bossTarget = null)
+    {
+        if (!_bossOrbitViewActive)
+            return;
+        if (bossTarget != null && _bossOrbitOwner != null && bossTarget != _bossOrbitOwner)
+            return;
+
+        EnsureCinemachineRefs();
+        if (_cinemachine != null)
+        {
+            if (_savedBossOrbits != null && _savedBossOrbits.Length == 3)
+            {
+                _cinemachine.m_Orbits[0] = _savedBossOrbits[0];
+                _cinemachine.m_Orbits[1] = _savedBossOrbits[1];
+                _cinemachine.m_Orbits[2] = _savedBossOrbits[2];
+            }
+            _cinemachine.Follow = _savedBossFollow;
+            _cinemachine.LookAt = _savedBossLookAt;
+        }
+
+        _bossOrbitViewActive = false;
+        _bossOrbitOwner = null;
+        _savedBossFollow = null;
+        _savedBossLookAt = null;
+        _savedBossOrbits = null;
     }
 
     /// <summary>
@@ -444,8 +557,19 @@ public class GameCameraController : MonoBehaviour
         // 인트로 완료 알림 (플레이어 등장 연출 트리거)
         OnIntroComplete?.Invoke();
 
-        // Cinemachine 복귀
-        if (_cinemachine != null) _cinemachine.enabled = true;
-        if (_brain != null) _brain.enabled = true;
+        // 탑다운 활성 중이면 Cinemachine 복귀 스킵 — 이후 DeactivateDragonTopDownView가 복원
+        if (!_topDownViewActive)
+        {
+            if (_cinemachine != null) _cinemachine.enabled = true;
+            if (_brain != null)       _brain.enabled       = true;
+        }
+    }
+
+    private void EnsureCinemachineRefs()
+    {
+        if (_cinemachine == null)
+            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_brain == null)
+            _brain = GetComponent<CinemachineBrain>();
     }
 }

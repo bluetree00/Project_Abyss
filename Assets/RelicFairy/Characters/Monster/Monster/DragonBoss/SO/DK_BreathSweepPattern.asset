@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83c7cf0d5688faa45b89c1239001a14b, type: 3}
+  m_Name: DK_BreathSweepPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonBreathSweepPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  _hoverStateName: URFlyStand
+  _hideHeight: 38
+  _flySpeed: 22
+  _flySideOffset: 20
+  _warningRowCount: 5
+  _warningDuration: 2
+  _warningColor: {r: 1, g: 0.35, b: 0, a: 0.45}
+  _columnInterval: 0.25
+  _flameBreathPrefab: {fileID: 0}
+  _flameTsunamiPrefab: {fileID: 0}
+  _breathDamage: 20
+  _tsunamiDamage: 10
+  _tsunamiDuration: 5
+  _tsunamiTickInterval: 1
+  _damageRadius: 1.5
+  _cooldown: 22

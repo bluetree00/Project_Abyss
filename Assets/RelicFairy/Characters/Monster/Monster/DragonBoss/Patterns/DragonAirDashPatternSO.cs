@@ -111,7 +111,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private int _fallHash;
     private int _recoverHash;
     private int _landingHash;
-    private GameObject _rangeIndicator;
+    private DragonBossWarningZone _warningZone;
 
     internal DragonAirDashState(DragonAirDashPatternSO data) : base(data) { }
 
@@ -122,7 +122,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _traveledDistance = 0f;
         _playerHit = false;
         _selfDamageApplied = false;
-        DestroyRangeIndicator();
+        DestroyWarningZone();
     }
 
     public override void Enter(MonsterContext ctx)
@@ -185,7 +185,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        DestroyRangeIndicator();
+        DestroyWarningZone();
     }
 
     private void UpdateTakeoff(MonsterContext ctx)
@@ -308,7 +308,9 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _phaseTimer = 0f;
         _traveledDistance = 0f;
         _playerHit = false;
-        DestroyRangeIndicator();
+        float dashDuration = Data.DashDistance / Mathf.Max(1f, Data.DashSpeed);
+        _warningZone?.TransitionToHitPhase(dashDuration + 0.2f);
+        _warningZone = null;
         PlayAnim(ctx, Data.DashStateName, 0.05f);
         FaceDirection(ctx, _dashDirection, 100f);
     }
@@ -352,30 +354,25 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     private void SpawnWarningMarker(MonsterContext ctx)
     {
-        SpawnRangeIndicator(ctx);
-    }
-
-    private void SpawnRangeIndicator(MonsterContext ctx)
-    {
         float groundY = ctx.Runtime.SpawnPosition.y;
         Vector3 origin = new Vector3(_hoverPos.x, groundY, _hoverPos.z);
         Vector3 center = origin + _dashDirection * (Data.DashDistance * 0.5f);
-        _rangeIndicator = DragonBossWarningZone.CreateRectangle(
+        _warningZone = DragonBossWarningZone.CreateRectangle(
             "DashRangeWarning",
             center,
             Quaternion.LookRotation(_dashDirection, Vector3.up),
             Data.DashHitRadius * 2f,
             Data.DashDistance,
             Data.WarningLineColor,
-            Data.WarningDuration + 0.2f,
-            Data.WarningMarkerHeightOffset).gameObject;
+            Data.WarningDuration + 0.5f,
+            Data.WarningMarkerHeightOffset);
     }
 
-    private void DestroyRangeIndicator()
+    private void DestroyWarningZone()
     {
-        if (_rangeIndicator == null) return;
-        Object.Destroy(_rangeIndicator);
-        _rangeIndicator = null;
+        if (_warningZone == null) return;
+        Object.Destroy(_warningZone.gameObject);
+        _warningZone = null;
     }
 
     private void TryHitPlayer(MonsterContext ctx)

@@ -47,6 +47,13 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private float _airChaseSpeedMult = 1.4f;
     [SerializeField] private float _airTurnAngleThreshold = 40f;
     [SerializeField] private float _airTransitionWeightMultiplier = 8f;
+    [SerializeField] private float _airOrbitRadius = 9f;
+    [SerializeField] private float _airOrbitAngularSpeed = 70f;
+    [SerializeField] private float _airOrbitCatchUpSpeedMult = 2.1f;
+    [SerializeField] private float _airOrbitRadiusTolerance = 1.2f;
+    [SerializeField] private float _airMinOrbitTurnsBeforePattern = 1f;
+    [SerializeField] private float _airOrbitRecenterThreshold = 9f;
+    [SerializeField] private float _airOrbitCenterMoveSpeedMult = 1.1f;
 
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
@@ -65,6 +72,13 @@ public class DragonBossMonster : MonsterBase, IBoss
     public float  AirChaseHeight      => _airChaseHeight;
     public float  AirChaseSpeedMult   => _airChaseSpeedMult;
     public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
+    public float  AirOrbitRadius      => _airOrbitRadius;
+    public float  AirOrbitAngularSpeed => _airOrbitAngularSpeed;
+    public float  AirOrbitCatchUpSpeedMult => _airOrbitCatchUpSpeedMult;
+    public float  AirOrbitRadiusTolerance => _airOrbitRadiusTolerance;
+    public float  AirMinOrbitTurnsBeforePattern => _airMinOrbitTurnsBeforePattern;
+    public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
+    public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -176,6 +190,39 @@ public class DragonBossMonster : MonsterBase, IBoss
     // 드래곤 전용 상태 전환 (상태 클래스에서 호출)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 피격 처리 (쉴드)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override void TakeDamage(float amount, GameObject instigator,
+        float knockbackMultiplier = 1f,
+        ElementType element = ElementType.None,
+        float elementAmount = 0f)
+    {
+        if (_dragonBB != null && instigator != null)
+        {
+            Vector3 dir = instigator.transform.position - transform.position;
+            _dragonBB.SetHitDirection(dir, transform.forward);
+        }
+        base.TakeDamage(amount, instigator, knockbackMultiplier, element, elementAmount);
+    }
+
+    protected override void OnDamageTaken()
+    {
+        if (_dragonBB == null) return;
+
+        // 공중 상태 또는 쉴드가 이미 파괴된 상태에서는 GetHit 스킵
+        if (_dragonBB.BodyState == BodyState.Airborne)
+        {
+            _suppressGetHitThisHit = true;
+            return;
+        }
+
+        bool poiseBroke = _dragonBB.ApplyPoiseDamage();
+        if (!poiseBroke)
+            _suppressGetHitThisHit = true;
+    }
+
     public void UnbindBossHudPublic() => UnbindBossHudIfBound();
 
     public void UnbindBossHudAfterDelay(float delay)
@@ -200,8 +247,19 @@ public class DragonBossMonster : MonsterBase, IBoss
     }
 
     private bool IsInEngagementRange()
-        => _runtime?.PlayerTarget != null
-           && _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
+    {
+        if (_runtime?.PlayerTarget == null)
+            return false;
+
+        if (_dragonBB != null && _dragonBB.BodyState == BodyState.Airborne)
+        {
+            float requiredDegrees = Mathf.Max(0f, _airMinOrbitTurnsBeforePattern) * 360f;
+            if (_dragonBB.AirOrbitAccumulatedDegrees < requiredDegrees)
+                return false;
+        }
+
+        return _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
+    }
 
     private void OnPatternExecuted(BossPatternSO pattern)
     {

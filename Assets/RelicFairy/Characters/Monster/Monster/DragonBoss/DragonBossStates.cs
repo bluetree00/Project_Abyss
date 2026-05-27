@@ -416,23 +416,50 @@ public class DragonRunChaseState : IMonsterState
 /// </summary>
 public class DragonBossAttackReadyState : IMonsterState
 {
-    private const float FaceSpeed = 2.5f;
+    private const float ReturnBlendDuration = 1.5f;
+
     private string _currentAirAnim;
+    private int _orbitDirection;
+    private float _lastOrbitAngle;
+    private bool _hasLastOrbitAngle;
+    private Vector3 _orbitCenter;
+    private bool _hasOrbitCenter;
+    private Vector3 _desiredOrbitCenter;
+    private float _returnBlendTimer;
 
     public void Enter(MonsterContext ctx)
     {
+        var bbRaw = (ctx.Monster as IBoss)?.Blackboard as DragonBossBlackboard;
+        Debug.Log($"[DragonAttackReady.Enter] BodyState={bbRaw?.BodyState} GCC={GameCameraController.Instance != null}");
+
         // 지상 상태 진입 시 Agent 가 이전 공중 패턴으로 disabled 되어 있으면 복구한다.
-        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb
-            && bb.BodyState == BodyState.Grounded)
+        if (bbRaw != null && bbRaw.BodyState == BodyState.Grounded)
         {
+            Debug.Log("[DragonAttackReady.Enter] → Grounded 분기, DeactivateTopDown");
+            GameCameraController.Instance?.DeactivateDragonTopDownView();
             RestoreGroundAgent(ctx);
             if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
             PlayAnim(ctx, ctx.Animation.attackReadyStateName);
             return;
         }
 
+        Debug.Log($"[DragonAttackReady.Enter] → Airborne 분기, SpawnPos={ctx.Runtime.SpawnPosition}");
         if (ctx.Agent != null && ctx.Agent.enabled) ctx.Agent.enabled = false;
         _currentAirAnim = null;
+        _orbitDirection = ResolveOrbitDirection(ctx);
+        _hasOrbitCenter = false;
+        _returnBlendTimer = ReturnBlendDuration;
+        if (ctx.Runtime.PlayerTarget != null)
+        {
+            _orbitCenter        = GetPlayerOrbitCenter(ctx, ctx.Runtime.PlayerTarget.position);
+            _desiredOrbitCenter = _orbitCenter;
+            _hasOrbitCenter     = true;
+        }
+        _hasLastOrbitAngle = TryGetOrbitAngle(ctx, out _lastOrbitAngle);
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb)
+            dragonBb.AirOrbitAccumulatedDegrees = 0f;
+        GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
+        Debug.Log("[DragonAttackReady.Enter] ActivateDragonTopDownView 호출 완료");
         UpdateAirChaseAnimation(ctx, true);
     }
 
@@ -459,12 +486,20 @@ public class DragonBossAttackReadyState : IMonsterState
                 ctx.Monster.ChangeState<ChaseState>();
             return;
         }
-        FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed);
+        FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, 2.5f);
     }
 
     public void Exit(MonsterContext ctx)
     {
+        // 공중 패턴 전환 시에는 탑다운 유지 — 지상 전환 또는 죽음 시에만 해제
+        var dragonBb = (ctx.Monster as IBoss)?.Blackboard as DragonBossBlackboard;
+        if (dragonBb == null || dragonBb.BodyState != BodyState.Airborne)
+            GameCameraController.Instance?.DeactivateDragonTopDownView();
         _currentAirAnim = null;
+        _hasLastOrbitAngle = false;
+        _hasOrbitCenter = false;
+        _desiredOrbitCenter = default;
+        _returnBlendTimer = 0f;
     }
 
     private void UpdateAirChase(MonsterContext ctx)
@@ -472,19 +507,35 @@ public class DragonBossAttackReadyState : IMonsterState
         if (ctx.Monster is not DragonBossMonster dragon || ctx.Runtime.PlayerTarget == null)
         {
             if (ctx.Runtime.PlayerTarget != null)
-                FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed);
+                FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, 2.5f);
             return;
         }
 
-        Vector3 targetPos = ctx.Runtime.PlayerTarget.position;
-        targetPos.y = ctx.Runtime.SpawnPosition.y + dragon.AirChaseHeight;
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        RefreshOrbitCenterIfNeeded(ctx, dragon, playerPos);
+        OrbitMotion orbit = BuildOrbitMotion(ctx, dragon, _orbitCenter);
+        float moveSpeed = ctx.Stat.moveSpeed * dragon.AirChaseSpeedMult;
+        float radiusError = Mathf.Abs(GetFlatDistance(ctx.Transform.position, _orbitCenter) - dragon.AirOrbitRadius);
+        if (_returnBlendTimer <= 0f && radiusError > dragon.AirOrbitRadiusTolerance)
+            moveSpeed *= dragon.AirOrbitCatchUpSpeedMult;
 
+        _returnBlendTimer -= Time.deltaTime;
         UpdateAirChaseAnimation(ctx, false);
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position,
-            targetPos,
-            ctx.Stat.moveSpeed * dragon.AirChaseSpeedMult * Time.deltaTime);
-        FaceTarget(ctx, ctx.Runtime.PlayerTarget.position, FaceSpeed * 2f);
+            orbit.TargetPosition,
+            moveSpeed * Time.deltaTime);
+        FaceTarget(ctx, orbit.LookTarget, 5f);
+
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb
+            && TryGetOrbitAngle(ctx, out float currentOrbitAngle))
+        {
+            if (_hasLastOrbitAngle)
+                dragonBb.AirOrbitAccumulatedDegrees += Mathf.Abs(Mathf.DeltaAngle(_lastOrbitAngle, currentOrbitAngle));
+
+            _lastOrbitAngle = currentOrbitAngle;
+            _hasLastOrbitAngle = true;
+        }
     }
 
     private void UpdateAirChaseAnimation(MonsterContext ctx, bool force)
@@ -492,25 +543,119 @@ public class DragonBossAttackReadyState : IMonsterState
         if (ctx.Monster is not DragonBossMonster dragon || ctx.Runtime.PlayerTarget == null)
             return;
 
-        Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.001f)
-            return;
-
-        float angle = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
-        string next;
-        if (angle <= -dragon.AirTurnAngleThreshold)
-            next = dragon.AirChaseRightStateName;
-        else if (angle >= dragon.AirTurnAngleThreshold)
-            next = dragon.AirChaseLeftStateName;
-        else
-            next = dragon.AirChaseStateName;
+        string next = _orbitDirection >= 0
+            ? dragon.AirChaseRightStateName
+            : dragon.AirChaseLeftStateName;
 
         if (!force && _currentAirAnim == next)
             return;
 
         _currentAirAnim = next;
         PlayAnim(ctx, next);
+    }
+
+    private void RefreshOrbitCenterIfNeeded(MonsterContext ctx, DragonBossMonster dragon, Vector3 playerPos)
+    {
+        Vector3 playerCenter = GetPlayerOrbitCenter(ctx, playerPos);
+        if (!_hasOrbitCenter)
+        {
+            _orbitCenter = playerCenter;
+            _desiredOrbitCenter = playerCenter;
+            _hasOrbitCenter = true;
+            return;
+        }
+
+        float threshold = Mathf.Max(0.1f, dragon.AirOrbitRecenterThreshold);
+        if (GetFlatDistance(_orbitCenter, playerCenter) > threshold)
+            _desiredOrbitCenter = playerCenter;
+
+        float centerMoveSpeed = ctx.Stat.moveSpeed * Mathf.Max(0.1f, dragon.AirOrbitCenterMoveSpeedMult);
+        _orbitCenter = Vector3.MoveTowards(
+            _orbitCenter,
+            _desiredOrbitCenter,
+            centerMoveSpeed * Time.deltaTime);
+    }
+
+    private OrbitMotion BuildOrbitMotion(MonsterContext ctx, DragonBossMonster dragon, Vector3 orbitCenter)
+    {
+        Vector3 offset = ctx.Transform.position - orbitCenter;
+        offset.y = 0f;
+        if (offset.sqrMagnitude < 0.001f)
+            offset = ctx.Transform.right.sqrMagnitude > 0.001f
+                ? ctx.Transform.right.normalized * dragon.AirOrbitRadius
+                : Vector3.right * dragon.AirOrbitRadius;
+
+        float currentAngle = Mathf.Atan2(offset.z, offset.x);
+        float nextAngle = currentAngle + (_orbitDirection * dragon.AirOrbitAngularSpeed * Mathf.Deg2Rad * Time.deltaTime);
+        float radius = dragon.AirOrbitRadius;
+        Vector3 horizontal = new Vector3(Mathf.Cos(nextAngle), 0f, Mathf.Sin(nextAngle)) * radius;
+        Vector3 targetPos = orbitCenter + horizontal;
+
+        Vector3 tangent = _orbitDirection >= 0
+            ? new Vector3(-horizontal.z, 0f, horizontal.x)
+            : new Vector3(horizontal.z, 0f, -horizontal.x);
+        if (tangent.sqrMagnitude < 0.001f)
+            tangent = ctx.Transform.forward;
+        tangent.Normalize();
+
+        return new OrbitMotion
+        {
+            TargetPosition = targetPos,
+            LookTarget = ctx.Transform.position + tangent * 3f,
+        };
+    }
+
+    private static Vector3 GetPlayerOrbitCenter(MonsterContext ctx, Vector3 playerPos)
+    {
+        playerPos.y = ctx.Runtime.SpawnPosition.y + ((ctx.Monster as DragonBossMonster)?.AirChaseHeight ?? 0f);
+        return playerPos;
+    }
+
+    private static float GetFlatDistance(Vector3 from, Vector3 to)
+    {
+        from.y = 0f;
+        to.y = 0f;
+        return Vector3.Distance(from, to);
+    }
+
+    private static int ResolveOrbitDirection(MonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null)
+            return 1;
+
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        toPlayer.y = 0f;
+        if (toPlayer.sqrMagnitude < 0.001f)
+            return 1;
+
+        float sign = Vector3.Cross(ctx.Transform.forward, toPlayer.normalized).y;
+        return sign >= 0f ? 1 : -1;
+    }
+
+    private bool TryGetOrbitAngle(MonsterContext ctx, out float angleDegrees)
+    {
+        angleDegrees = 0f;
+        if (ctx.Runtime.PlayerTarget == null || ctx.Monster is not DragonBossMonster dragon)
+            return false;
+
+        Vector3 center = _hasOrbitCenter
+            ? _orbitCenter
+            : GetPlayerOrbitCenter(ctx, ctx.Runtime.PlayerTarget.position);
+        center.y = ctx.Runtime.SpawnPosition.y + dragon.AirChaseHeight;
+
+        Vector3 offset = ctx.Transform.position - center;
+        offset.y = 0f;
+        if (offset.sqrMagnitude < 0.001f)
+            return false;
+
+        angleDegrees = Mathf.Atan2(offset.z, offset.x) * Mathf.Rad2Deg;
+        return true;
+    }
+
+    private struct OrbitMotion
+    {
+        public Vector3 TargetPosition;
+        public Vector3 LookTarget;
     }
 
     private static void RestoreGroundAgent(MonsterContext ctx)
@@ -563,18 +708,56 @@ public class DragonBossAttackState : IMonsterState
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 공통 상태 — 죽음 (Die)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 상태 — 피격 (GetHit)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /// <summary>
-/// 피격 상태. 경직 후 거리에 따라 WalkChase / RunChase / Idle 로 복귀한다.
+/// 쉴드 파괴 시에만 진입. 피격 방향에 따라 방향성 GetHit 애니메이션을 재생한다.
+/// 공중 상태에서는 DragonBossMonster.OnDamageTaken이 억제하므로 진입하지 않는다.
 /// </summary>
 public class DragonGetHitState : GetHitState
 {
+    private const string HitBackAnim  = "UGetHit Back Right";
+    private const string HitLeftAnim  = "UGetHit Front Left 1";
+    private const string HitRightAnim = "UGetHit Front Right 1";
+
+    public override void Enter(MonsterContext ctx)
+    {
+        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped = true;
+            ctx.Agent.velocity  = Vector3.zero;
+            ctx.Agent.ResetPath();
+        }
+
+        var dragon = ctx.Monster as DragonBossMonster;
+        var bb = dragon?.DragonBlackboard;
+
+        if (bb != null && bb.IsPoiseBroken)
+        {
+            ctx.Runtime.StateTimer = DragonBossBlackboard.PoiseStaggerTime;
+            string anim = GetDirectionalAnim(bb.LastHitDirection);
+            if (ctx.Animator != null
+                && ctx.Animator.HasState(0, Animator.StringToHash(anim)))
+                ctx.Animator.CrossFade(anim, 0.05f, 0, 0f);
+        }
+        else
+        {
+            ctx.Runtime.StateTimer = 0f;
+        }
+    }
+
     public override void Update(MonsterContext ctx)
     {
         ctx.Runtime.StateTimer -= Time.deltaTime;
         if (ctx.Runtime.StateTimer > 0f) return;
+
+        var dragon = ctx.Monster as DragonBossMonster;
+        dragon?.DragonBlackboard?.ClearPoiseBroken();
 
         RestoreAgent(ctx);
 
@@ -584,7 +767,6 @@ public class DragonGetHitState : GetHitState
             return;
         }
 
-        var dragon = ctx.Monster as DragonBossMonster;
         float threshold = dragon != null ? dragon.WalkToRunThreshold : float.MaxValue;
 
         if (ctx.Runtime.DistToPlayer > ctx.Detection.chaseGiveUpRange)
@@ -594,11 +776,17 @@ public class DragonGetHitState : GetHitState
         else
             ctx.Monster.ChangeState<ChaseState>();
     }
-}
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 공통 상태 — 죽음 (Die)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private static string GetDirectionalAnim(DragonBossBlackboard.HitDirection dir)
+    {
+        return dir switch
+        {
+            DragonBossBlackboard.HitDirection.Back => HitBackAnim,
+            DragonBossBlackboard.HitDirection.Left => HitLeftAnim,
+            _                                      => HitRightAnim,
+        };
+    }
+}
 
 /// <summary>
 /// 죽음 상태. 비행 중 사망 시 NavMesh 복구 후 보스 HUD 해제 + 기본 Die 처리.
@@ -607,6 +795,7 @@ public class DragonDieState : DieState
 {
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView();
         if (ctx.Agent != null && !ctx.Agent.enabled)
         {
             ctx.Agent.enabled = true;

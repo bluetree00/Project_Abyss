@@ -762,12 +762,20 @@ public class PlayerController : CharacterBase
     protected virtual void CheckMovementInput()
     {
         if (locoSM?.CurrentId == LocoState.Air) return;
-        if (cinemachineCamera == null) return;
         if (inputActions == null) return;
 
+        var camTransform = Camera.main?.transform;
+        if (camTransform == null) return;
+
         var input   = inputActions.Player.Move.ReadValue<Vector2>();
-        var forward = cinemachineCamera.transform.forward; forward.y = 0f;
-        var right   = cinemachineCamera.transform.right;   right.y   = 0f;
+        var forward = camTransform.forward; forward.y = 0f;
+        var right   = camTransform.right;   right.y   = 0f;
+
+        // 카메라가 수직(탑다운)이면 forward가 영벡터 → up 벡터로 대체
+        if (forward.sqrMagnitude < 0.001f)
+        {
+            forward = camTransform.up; forward.y = 0f;
+        }
 
         moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
     }
