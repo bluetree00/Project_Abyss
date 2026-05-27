@@ -46,7 +46,8 @@ public class LichDeathRayPatternSO : BossPatternSO
     {
         if (ctx.Ctx.Runtime.PlayerTarget == null) return false;
         var lichBB = (ctx.Boss as LichMonster)?.LichBB;
-        return lichBB == null || lichBB.DeathRayCooldown <= 0f;
+        if (lichBB == null || !lichBB.IsPhase2) return false;
+        return lichBB.DeathRayCooldown <= 0f;
     }
 
     public override SpecialStateBase GetRuntimeState() => _state;
@@ -63,15 +64,19 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
     private Phase      _phase;
     private float      _channelTimer;
     private float      _tickTimer;
+    private bool       _loopTriggered;
     private GameObject _beamGuide;
 
     public LichDeathRayState(LichDeathRayPatternSO data) : base(data) { }
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase        = Phase.Channel;
-        _channelTimer = 0f;
-        _tickTimer    = 0f;
+        _phase         = Phase.Channel;
+        _channelTimer  = 0f;
+        _tickTimer     = 0f;
+        _loopTriggered = false;
+
+        ctx.Animator?.CrossFade("DeathRayStart", 0.1f);
 
         var mc = (ctx.Monster as LichMonster)?.MovementController;
         mc?.RequestMovementState(LichMovementState.AltitudeRise);
@@ -79,14 +84,14 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
 
         UI_BossBark.Show("죽음의 광선!", BossBarkType.PatternAnnounce);
 
-        // 빔 가이드 초기 생성 — 이후 UpdateBeamGuide()에서 매 프레임 위치/방향 갱신
+        // 빔 가이드 초기 생성 — Telegraph(노랑)로 시작, 루프 전환 시 Active(빨강)로 교체
         Vector3 origin = ctx.Transform.position + Vector3.up * 1.5f;
         _beamGuide = PatternGuideHelper.Beam(
             origin,
             ctx.Transform.forward,
             Data.beamRange,
             width: 0.4f,
-            PatternGuideHelper.Active);
+            PatternGuideHelper.Telegraph);
     }
 
     public override void Update(MonsterContext ctx)
@@ -97,19 +102,31 @@ public class LichDeathRayState : MovementLockedState<LichDeathRayPatternSO>
         {
             _channelTimer += dt;
 
+            // 시작 애니메이션(~0.5s) 후 루프 전환 + 빔 Active로 교체
+            if (!_loopTriggered && _channelTimer >= 0.5f)
+            {
+                _loopTriggered = true;
+                ctx.Animator?.CrossFade("DeathRayLoop", 0.2f);
+                PatternGuideHelper.SetColor(_beamGuide, PatternGuideHelper.Active);
+            }
+
             TrackPlayer(ctx, dt);
             UpdateBeamGuide(ctx);
 
-            _tickTimer += dt;
-            if (_tickTimer >= Data.tickInterval)
+            if (_loopTriggered)
             {
-                _tickTimer -= Data.tickInterval;
-                DealTickDamage(ctx);
+                _tickTimer += dt;
+                if (_tickTimer >= Data.tickInterval)
+                {
+                    _tickTimer -= Data.tickInterval;
+                    DealTickDamage(ctx);
+                }
             }
 
             if (_channelTimer >= Data.channelDuration)
             {
                 PatternGuideHelper.SafeDestroy(ref _beamGuide);
+                ctx.Animator?.CrossFade("DeathRayEnd", 0.1f);
                 _phase        = Phase.Recovery;
                 _channelTimer = 0f;
             }

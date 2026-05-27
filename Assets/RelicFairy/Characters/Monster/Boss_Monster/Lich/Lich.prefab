@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 8215496358905499458}
   - component: {fileID: 7873358846230808583}
   - component: {fileID: 5324488836961570600}
+  - component: {fileID: 3401725602369914206}
   m_Layer: 0
   m_Name: Lich
   m_TagString: Untagged
@@ -30,8 +31,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 1.4, y: 1.4, z: 1.4}
+  m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 7659539928226070738}
   m_Father: {fileID: 0}
@@ -120,8 +121,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30594f1133ed2e341afcdd7709d016e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.LichMonster
-  _effectiveElement: -1
   _debugState: 
+  _entranceDuration: 4
+  _debugOverrideEncounter: 0
+  _debugEncounterCount: 1
+--- !u!114 &3401725602369914206
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5098245364127042272}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 914c4620fdbbb3a4a91e18dd38f84baa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichMovementController
+  _floatSpeed: 2.5
+  _smoothTime: 0.25
+  _strafeAngularSpeed: 50
+  _dashSpeed: 10
+  _dashDuration: 0.4
+  _baseAltitude: 0
+  _riseAltitude: 4.5
+  _altSmoothTime: 0.6
+  _hoverAmplitude: 0.12
+  _hoverPeriod: 2
+  _rotateSpeed: 8
+  _decideInterval: 0.3
 --- !u!1001 &3641127419973022802
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -675,11 +702,13 @@ MonoBehaviour:
   - formName: Phase2_Liberation
     bookActive: 0
     bookssActive: 0
-    scytheEquipRootActive: 0
+    scytheEquipRootActive: 1
     clothingActive: 0
     skirtSeparateActive: 0
     hoodDownActive: 0
     hoodUpActive: 0
+  _dissolvePropertyName: _DissolveAmount
+  _dissolveInDuration: 1
 --- !u!1 &7659539928225782840 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6398424176016533610, guid: faad82d36d0ea4c4aaf38501b9fae25b,

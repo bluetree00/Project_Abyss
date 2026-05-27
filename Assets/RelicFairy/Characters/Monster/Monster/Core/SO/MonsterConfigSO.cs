@@ -31,7 +31,6 @@ public class MonsterConfigSO : ScriptableObject
     public MonsterPatrolData    patrol    = new MonsterPatrolData();
     public MonsterCombatData    combat    = new MonsterCombatData();
     public MonsterAnimationData animation = new MonsterAnimationData();
-    public MonsterElementalData elemental = new MonsterElementalData();
     public MonsterDropData      drop      = new MonsterDropData();
 
     // ── 특수 상태 ─────────────────────────────────────────

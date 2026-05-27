@@ -27,6 +27,7 @@ public sealed class HitFxPresenter : MonoBehaviour
     private const float VignetteDuration  = 0.32f;
 
     private static readonly Color DefaultFlashColor   = new Color(1f, 1f, 1f, 1f);
+    private static readonly Color CritFlashColor      = new Color(1f, 0.95f, 0.35f, 1f);
     private static readonly Color DamageVignetteColor = new Color(1f, 0.1f, 0.1f, 1f);
 
     // ── Private ───────────────────────────────────────────────────
@@ -58,8 +59,8 @@ public sealed class HitFxPresenter : MonoBehaviour
         if (fx == null) return;
 
         // 1) Flash — 모든 히트
-        var   flashColor = info.IsCritical ? ElementColor(info.Element) : DefaultFlashColor;
-        float flashPeak  = info.IsCritical ? FlashPeakCritical          : FlashPeakNormal;
+        var   flashColor = info.IsCritical ? CritFlashColor : DefaultFlashColor;
+        float flashPeak  = info.IsCritical ? FlashPeakCritical : FlashPeakNormal;
         fx.Flash(flashColor, FlashDuration, flashPeak);
 
         // 2) Zoom-In 집중선 — 크리티컬만
@@ -71,18 +72,4 @@ public sealed class HitFxPresenter : MonoBehaviour
             fx.Vignette(DamageVignetteColor, VignetteIntensity, VignetteDuration);
     }
 
-    // ── Private Methods ───────────────────────────────────────────
-    /// <summary>원소별 크리티컬 Flash 색상. ElementType 확장 시 case만 추가.</summary>
-    private static Color ElementColor(ElementType element)
-    {
-        switch (element)
-        {
-            case ElementType.Fire:      return new Color(1f,    0.45f, 0.15f, 1f);
-            case ElementType.Water:     return new Color(0.4f,  0.7f,  1f,    1f);
-            case ElementType.Lightning: return new Color(1f,    0.95f, 0.35f, 1f);
-            case ElementType.Grass:     return new Color(0.55f, 1f,    0.55f, 1f);
-            case ElementType.Earth:     return new Color(0.85f, 0.65f, 0.35f, 1f);
-            default:                    return DefaultFlashColor;
-        }
-    }
 }

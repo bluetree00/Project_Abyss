@@ -20,6 +20,13 @@ public class BossAttackBlackboard
     public string LastPatternTag = "";
     public float AttackSpeedMult = 1f;
 
+    /// <summary>
+    /// 런타임에 패턴 브레이크 딜레이를 덮어쓸 때 사용.
+    /// -1 이하이면 BossConfigSO 기본값 사용.
+    /// </summary>
+    public float BreakDurationMinOverride = -1f;
+    public float BreakDurationMaxOverride = -1f;
+
     public void TickCooldowns(float deltaTime)
     {
         if (LeapCooldown     > 0f) LeapCooldown     -= deltaTime;
@@ -28,10 +35,12 @@ public class BossAttackBlackboard
 
     public void Reset()
     {
-        LeapCooldown      = 0f;
-        DashSlashCooldown = 0f;
-        NormalModeTimer   = 0f;
-        LastPatternTag    = "";
-        AttackSpeedMult   = 1f;
+        LeapCooldown              = 0f;
+        DashSlashCooldown         = 0f;
+        NormalModeTimer           = 0f;
+        LastPatternTag            = "";
+        AttackSpeedMult           = 1f;
+        BreakDurationMinOverride  = -1f;
+        BreakDurationMaxOverride  = -1f;
     }
 }

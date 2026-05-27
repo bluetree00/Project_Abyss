@@ -63,8 +63,8 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
     {
         if (_profile == null) return;
 
-        Color flashColor = _profile.GetFlashColor(info.Element);
-        Color lightColor = _profile.GetLightColor(info.Element);
+        Color flashColor = _profile.FlashColor;
+        Color lightColor = _profile.LightColor;
 
         PlayFlash(flashColor);
         if (_profile.UsePointLight) PlayLightPulse(lightColor);

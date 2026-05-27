@@ -13,7 +13,6 @@ public readonly struct HitInfo
     public readonly Vector3          HitNormal;        // 피격자 → 공격자 방향 (반사/파티클 용)
     public readonly Vector3          AttackDirection;  // 공격자 → 피격자 방향
     public readonly float            Damage;
-    public readonly ElementType      Element;
     public readonly bool             IsCritical;
     public readonly WeaponActionType ActionType;
 
@@ -23,7 +22,6 @@ public readonly struct HitInfo
         Vector3 hitPoint,
         Vector3 attackDirection,
         float damage,
-        ElementType element,
         bool isCritical,
         WeaponActionType actionType)
     {
@@ -33,7 +31,6 @@ public readonly struct HitInfo
         AttackDirection = attackDirection.sqrMagnitude > 0.0001f ? attackDirection.normalized : Vector3.forward;
         HitNormal       = -AttackDirection;
         Damage          = damage;
-        Element         = element;
         IsCritical      = isCritical;
         ActionType      = actionType;
     }

@@ -27,23 +27,25 @@ public static class DissolveEffect
 
     /// <summary>디졸브로 등장 (소멸 → 완전 등장 후 원본 복원).
     /// activationToken: 풀 반환 시 취소되는 토큰 (MonsterBase.ActivationToken). 전달 시 풀 반환 후
-    /// 남은 복원 태스크가 원소 셰이더를 덮어쓰는 레이스를 방지한다. 완료 시 onComplete 호출.</summary>
+    /// 남은 복원 태스크가 레이스를 방지한다. edgeColor 미지정 시 기본 고정색 사용. 완료 시 onComplete 호출.</summary>
     public static void PlayAppear(
         GameObject target,
         float duration = 0.5f,
         Action onComplete = null,
-        CancellationToken activationToken = default)
+        CancellationToken activationToken = default,
+        Color? edgeColor = null)
     {
         if (target == null) { onComplete?.Invoke(); return; }
-        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), activationToken, onComplete).Forget();
+        DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), activationToken, onComplete, edgeColor).Forget();
     }
 
     /// <summary>디졸브로 등장. await 가능.</summary>
     public static async UniTask PlayAppearAsync(
-        GameObject target, float duration = 0.5f, CancellationToken ct = default)
+        GameObject target, float duration = 0.5f, CancellationToken ct = default,
+        Color? edgeColor = null)
     {
         if (target == null) return;
-        await DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), ct, null);
+        await DissolveInAsync(target, duration, target.GetCancellationTokenOnDestroy(), ct, null, edgeColor);
     }
 
     /// <summary>디졸브로 퇴장 (완전 등장 → 소멸). 완료 시 onComplete 호출.</summary>
@@ -93,10 +95,12 @@ public static class DissolveEffect
 
     // ─────────────────── 내부 구현 ───────────────────
 
+    private static readonly Color DefaultEdgeColor = new Color(0f, 2.4f, 3f, 1f);
+
     private static async UniTask DissolveInAsync(
         GameObject target, float duration,
         CancellationToken destroyCt, CancellationToken activationToken,
-        Action onComplete)
+        Action onComplete, Color? edgeColor = null)
     {
         CancellationTokenSource linkedCts = activationToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(destroyCt, activationToken)
@@ -132,7 +136,7 @@ public static class DissolveEffect
             for (int i = 0; i < renderers.Length; i++)
                 origMats[i] = renderers[i].sharedMaterials;
 
-            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, edgeColor ?? DefaultEdgeColor);
             SetDissolveValue(instances, 1f);
 
             float mainDur = Mathf.Max(0.01f, duration * (1f - EdgeFadePortion));

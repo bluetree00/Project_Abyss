@@ -13,10 +13,12 @@ public static class CorridorBridgeSpawner
     /// <param name="style">테마별 코리더 스타일 (null이면 스폰 생략)</param>
     /// <param name="parent">생성된 오브젝트의 부모 트랜스폼</param>
     /// <param name="blockCellSize">블록 한 칸의 월드 크기 (일반적으로 1f)</param>
+    /// <param name="corridorWidth">통로 너비 (타일 수). OpenWallsForConnections의 gateWidth와 동일해야 함.</param>
     public static void Spawn(
         ZoneLayoutEntry fromZone, ZoneLayoutEntry toZone,
         Vector3 fromCenter, Vector3 toCenter,
-        CorridorStyleSO style, Transform parent, float blockCellSize)
+        CorridorStyleSO style, Transform parent, float blockCellSize,
+        int corridorWidth = 5)
     {
         if (style?.floorTilePrefab == null) return;
 
@@ -27,15 +29,23 @@ public static class CorridorBridgeSpawner
         var right = Vector3.Cross(Vector3.up, dir).normalized;
         float gap  = Vector3.Distance(fromDoor, toDoor);
         int count  = Mathf.CeilToInt(gap / blockCellSize);
+        int half   = corridorWidth / 2;
 
+        // 통로 방향(dir)으로 count 행, 너비(right)로 corridorWidth 열의 2D 격자로 타일 배치
         for (int i = 0; i < count; i++)
         {
-            var pos = fromDoor + dir * ((i + 0.5f) * blockCellSize);
-            Object.Instantiate(style.floorTilePrefab, pos, Quaternion.LookRotation(dir), parent);
+            var rowCenter = fromDoor + dir * ((i + 0.5f) * blockCellSize);
+            for (int lane = -half; lane <= half; lane++)
+            {
+                var pos = rowCenter + right * (lane * blockCellSize);
+                Object.Instantiate(style.floorTilePrefab, pos, Quaternion.LookRotation(dir), parent);
+            }
         }
 
-        SpawnEdge(fromDoor, toDoor, right, style.leftEdgePrefabs, style.edgeObjectSpacing, blockCellSize, parent);
-        SpawnEdge(fromDoor, toDoor, -right, style.rightEdgePrefabs, style.edgeObjectSpacing, blockCellSize, parent);
+        // 에지 데코: 타일 영역 바로 바깥에 배치
+        float edgeOffset = (half + 0.5f) * blockCellSize;
+        SpawnEdge(fromDoor, toDoor, right,  style.leftEdgePrefabs,  style.edgeObjectSpacing, edgeOffset, parent);
+        SpawnEdge(fromDoor, toDoor, -right, style.rightEdgePrefabs, style.edgeObjectSpacing, edgeOffset, parent);
 
         if (style.hasVoidBelow && style.voidFogPrefab != null)
         {
@@ -60,13 +70,12 @@ public static class CorridorBridgeSpawner
 
     private static void SpawnEdge(
         Vector3 start, Vector3 end, Vector3 side,
-        GameObject[] prefabs, float spacing, float blockCellSize, Transform parent)
+        GameObject[] prefabs, float spacing, float offset, Transform parent)
     {
         if (prefabs == null || prefabs.Length == 0) return;
 
-        var dir    = (end - start).normalized;
-        float len  = Vector3.Distance(start, end);
-        float offset = blockCellSize * 1.5f;
+        var dir   = (end - start).normalized;
+        float len = Vector3.Distance(start, end);
 
         for (float d = spacing * 0.5f; d < len; d += spacing)
         {

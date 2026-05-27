@@ -26,7 +26,7 @@ public class ItemEntry
     public int    max_stack;
     public float  duration;
     public float  cooldown;
-    public int    shape_id;         // BLOCK_SHAPE_DATA 참조
+    public int    shape_id;         // MERLIN_RUNE_PIECE_DATA 참조
     public string icon_key;
     public string description;
     public int    stat_version;

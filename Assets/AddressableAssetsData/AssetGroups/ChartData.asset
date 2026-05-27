@@ -14,12 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: ChartData
   m_GUID: 6a6364ffb430dbc46ba2b96807f580b2
-  m_SerializeEntries:
-  - m_GUID: 50ae9be0093dd794eabe2daeadeb7415
-    m_Address: CHAPTER1_ZONE_LAYOUT
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
+  m_SerializeEntries: []
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

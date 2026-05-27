@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Cysharp.Threading.Tasks;
@@ -9,18 +10,18 @@ using Cysharp.Threading.Tasks;
 ///
 /// 역할:
 /// 1. UI_GridPanel.BoardContainer(DDOL 계층 직속 자식)에 Puzzle.prefab을 동적 스폰하여 BoardManager 확보
-/// 2. BlockDataManager에서 Grid 데이터 → GridAssetData → BoardManager에 등록
+/// 2. RuneDataManager에서 존 시너지 데이터 → GridAssetData → BoardManager에 등록
 /// 3. 아이템 획득 시 shape_id → ShapeData → BoardManager에 Shape 등록
 /// 4. BoardManager.OnGridFilled 구독 → 시너지 효과 PlayerRuntimeStats에 적용
 /// </summary>
-public class BlockSynergyBridge : MonoBehaviour
+public class MerlinRuneBridge : MonoBehaviour
 {
     // ── Constants ──
     // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
-    private const float GRID_CELL_SIZE = 120f;
+    private const float GRID_CELL_SIZE = 44f;   // CELL_SIZE(40) + CELL_GAP(4) = MerlinRuneHexGridView.CELL_STEP
 
     // ── Static ──
-    public static BlockSynergyBridge Instance { get; private set; }
+    public static MerlinRuneBridge Instance { get; private set; }
 
     // 그리드 완성 시 UI_GridPanel에 시각 피드백 전달
     public event System.Action<string> OnSynergyActivated;
@@ -64,17 +65,17 @@ public class BlockSynergyBridge : MonoBehaviour
     // ── 초기화: UI_GridPanel.BoardContainer에 Puzzle UI 생성 + 서버 Grid 등록 ──
 
     /// <summary>
-    /// BlockDataManager에서 모든 Grid 데이터를 읽어 BoardManager에 등록한다.
+    /// RuneDataManager에서 모든 Grid 데이터를 읽어 BoardManager에 등록한다.
     /// GameRunBootstrapper 초기화 이후에 호출.
     /// </summary>
     public void InitializeGridsFromServer()
     {
         if (_initialized) return;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null || !blockData.IsInitialized)
         {
-            Debug.LogWarning("[BlockSynergyBridge] BlockData 미초기화");
+            Debug.LogWarning("[MerlinRuneBridge] BlockData 미초기화");
             return;
         }
 
@@ -104,7 +105,7 @@ public class BlockSynergyBridge : MonoBehaviour
     {
         if (puzzlePrefab == null)
         {
-            Debug.LogWarning("[BlockSynergyBridge] puzzlePrefab이 할당되지 않음");
+            Debug.LogWarning("[MerlinRuneBridge] puzzlePrefab이 할당되지 않음");
             return;
         }
 
@@ -112,7 +113,7 @@ public class BlockSynergyBridge : MonoBehaviour
         var container = UI_GridPanel.Instance?.BoardContainer;
         if (container == null)
         {
-            Debug.LogWarning("[BlockSynergyBridge] UI_GridPanel.BoardContainer를 찾을 수 없음");
+            Debug.LogWarning("[MerlinRuneBridge] UI_GridPanel.BoardContainer를 찾을 수 없음");
             return;
         }
 
@@ -136,7 +137,7 @@ public class BlockSynergyBridge : MonoBehaviour
         boardManager = _puzzleInstance.GetComponentInChildren<BoardManager>(true);
         if (boardManager == null)
         {
-            Debug.LogError("[BlockSynergyBridge] Puzzle 프리팹에 BoardManager 없음");
+            Debug.LogError("[MerlinRuneBridge] Puzzle 프리팹에 BoardManager 없음");
             if (!wasActive) uiPanel.SetActive(false);
             return;
         }
@@ -148,16 +149,16 @@ public class BlockSynergyBridge : MonoBehaviour
         boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
         boardManager.OnGridSessionActivated += HandleGridSessionActivated;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData != null && blockData.IsInitialized)
             RegisterAllGrids(blockData);
 
         if (!wasActive) uiPanel.SetActive(false);
 
-        Debug.Log("[BlockSynergyBridge] Puzzle UI 생성 완료 (UI_GridPanel.BoardContainer)");
+        Debug.Log("[MerlinRuneBridge] Puzzle UI 생성 완료 (UI_GridPanel.BoardContainer)");
     }
 
-    private void RegisterAllGrids(BlockDataManager blockData)
+    private void RegisterAllGrids(RuneDataManager blockData)
     {
         _initialized = true;
 
@@ -177,7 +178,7 @@ public class BlockSynergyBridge : MonoBehaviour
             var gridAssetData = ConvertToGridAssetData(gridId, meta);
             _registeredGrids[gridId] = gridAssetData;
 
-            Debug.Log($"[BlockSynergyBridge] Grid 등록 (order={meta.order}): {gridId} ({meta.grid_name}) {meta.rows}x{meta.cols}");
+            Debug.Log($"[MerlinRuneBridge] Zone 등록: {gridId} ({meta?.grid_name})");
         }
 
         // GameplayRoot(편집 화면) 레이아웃 구성
@@ -195,6 +196,7 @@ public class BlockSynergyBridge : MonoBehaviour
             }
 
             // GridHost: 좌측 62% × 상하 90% — 그리드 편집 영역
+            // (BoardContainer 기준이므로 CharacterInfoPanel 오프셋 불필요)
             if (boardManager.gridHost != null)
             {
                 boardManager.gridHost.anchorMin = new Vector2(0.02f, 0.05f);
@@ -244,20 +246,72 @@ public class BlockSynergyBridge : MonoBehaviour
             // spawnOrigin: X=0(중앙), Y=160(탭스트립 + 여백 확보)
             boardManager.spawnOrigin = new Vector2(0f, 160f);
 
-            // 그리드 영역 배경
-            EnsureAreaBackground(boardManager.gameplayRoot, "GridAreaBG",
-                new Vector2(0.02f, 0.05f), new Vector2(0.62f, 0.95f),
-                new Color(0f, 0f, 0f, 0.18f));
-
-            // 셰이프 패널 배경
-            EnsureAreaBackground(boardManager.gameplayRoot, "ShapeAreaBG",
-                new Vector2(0.63f, 0.05f), new Vector2(0.94f, 0.95f),
-                new Color(0f, 0f, 0f, 0.18f));
+            // 셰이프 패널 배경 (스타일 패널)
+            EnsureStyledShapePanel(boardManager.gameplayRoot);
         }
 
     }
 
     private void HandleGridSessionActivated(Grid gridInstance) { }
+
+    /// <summary>
+    /// ShapeHost 우측 영역(63%~94%)에 디자인된 모양 스테이징 패널을 생성한다.
+    /// 어두운 배경 + 상단 파란 액센트 선 + 안내 레이블로 구성.
+    /// </summary>
+    private static void EnsureStyledShapePanel(GameObject root)
+    {
+        if (root == null) return;
+        const string NAME = "ShapeAreaBG";
+        if (root.transform.Find(NAME) != null) return;
+
+        // 메인 배경
+        var go = new GameObject(NAME, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(root.transform, false);
+        go.transform.SetAsFirstSibling();
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.63f, 0.05f);
+        rt.anchorMax = new Vector2(0.94f, 0.95f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+
+        var bg = go.GetComponent<Image>();
+        bg.color         = new Color(0.04f, 0.05f, 0.08f, 0.92f);
+        bg.raycastTarget = false;
+
+        var le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        // 상단 파란 액센트 선
+        var accentGO = new GameObject("Accent", typeof(RectTransform), typeof(Image));
+        accentGO.transform.SetParent(go.transform, false);
+        var accentRT = accentGO.GetComponent<RectTransform>();
+        accentRT.anchorMin = new Vector2(0f, 1f);
+        accentRT.anchorMax = Vector2.one;
+        accentRT.offsetMin = Vector2.zero;
+        accentRT.offsetMax = new Vector2(0f, -3f);
+        accentRT.pivot     = new Vector2(0.5f, 1f);
+        var accentImg = accentGO.GetComponent<Image>();
+        accentImg.color         = new Color(0.3f, 0.6f, 1.0f, 0.8f);
+        accentImg.raycastTarget = false;
+
+        // 안내 레이블
+        var labelGO = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        labelGO.transform.SetParent(go.transform, false);
+        var labelRT = labelGO.GetComponent<RectTransform>();
+        labelRT.anchorMin = new Vector2(0f, 0.88f);
+        labelRT.anchorMax = Vector2.one;
+        labelRT.offsetMin = new Vector2(6f, 0f);
+        labelRT.offsetMax = Vector2.zero;
+        labelRT.pivot     = new Vector2(0.5f, 1f);
+        var label = labelGO.GetComponent<TextMeshProUGUI>();
+        label.text      = "드래그하여 배치";
+        label.fontSize  = 10f;
+        label.color     = new Color(0.55f, 0.65f, 0.85f, 0.9f);
+        label.alignment = TextAlignmentOptions.TopLeft;
+        label.raycastTarget = false;
+    }
 
     /// <summary>
     /// GameplayRoot 아래에 반투명 배경 Image를 생성한다.
@@ -303,17 +357,17 @@ public class BlockSynergyBridge : MonoBehaviour
     /// </summary>
     public void RegisterShapeFromItem(int shapeId)
     {
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null || boardManager == null) return;
 
         var shapeEntry = blockData.GetShape(shapeId);
         if (shapeEntry == null)
         {
-            Debug.LogWarning($"[BlockSynergyBridge] Shape 없음: {shapeId}");
+            Debug.LogWarning($"[MerlinRuneBridge] Shape 없음: {shapeId}");
             return;
         }
 
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
+        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
 
         // ShapeAssetSO를 런타임 생성
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
@@ -324,7 +378,7 @@ public class BlockSynergyBridge : MonoBehaviour
 
         // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
         boardManager.SpawnSharedShape(shapeSO);
-        Debug.Log($"[BlockSynergyBridge] Shape 추가(공용풀): {shapeEntry.shape_name} (id={shapeId})");
+        Debug.Log($"[MerlinRuneBridge] Shape 추가(공용풀): {shapeEntry.shape_name} (id={shapeId})");
     }
 
     // ── Grid 완성 시 시너지 효과 적용 ──
@@ -345,7 +399,7 @@ public class BlockSynergyBridge : MonoBehaviour
 
         if (string.IsNullOrEmpty(gridId))
         {
-            Debug.LogWarning($"[BlockSynergyBridge] grid_id 매핑 실패: {filledAsset.name}");
+            Debug.LogWarning($"[MerlinRuneBridge] grid_id 매핑 실패: {filledAsset.name}");
             return;
         }
 
@@ -357,7 +411,7 @@ public class BlockSynergyBridge : MonoBehaviour
         // 이미 적용된 그리드는 중복 적용하지 않음
         if (_appliedGridIds.Contains(gridId)) return;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null) return;
 
         var entries = blockData.GetGrid(gridId);
@@ -417,7 +471,7 @@ public class BlockSynergyBridge : MonoBehaviour
                 duration   = entry.duration,
             });
 
-            Debug.Log($"[BlockSynergyBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
+            Debug.Log($"[MerlinRuneBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
         }
 
         var desc = BuildSynergyDescription(entries);
@@ -425,7 +479,7 @@ public class BlockSynergyBridge : MonoBehaviour
             OnSynergyActivated?.Invoke(desc);
     }
 
-    private static string BuildSynergyDescription(System.Collections.Generic.IEnumerable<BlockGridEntry> entries)
+    private static string BuildSynergyDescription(System.Collections.Generic.IEnumerable<RuneSynergyEntry> entries)
     {
         var sb = new System.Text.StringBuilder();
         foreach (var entry in entries)
@@ -451,19 +505,19 @@ public class BlockSynergyBridge : MonoBehaviour
 
     // ── 변환 유틸 ──
 
-    private GridAssetData ConvertToGridAssetData(string gridId, BlockGridEntry meta)
+    private GridAssetData ConvertToGridAssetData(string gridId, RuneSynergyEntry meta)
     {
-        var rows01 = BlockDataManager.ParseGridRows(meta);
-        int rowCount = meta.rows > 0 ? meta.rows : rows01.Length;
-        int colCount = meta.cols > 0 ? meta.cols : (rows01.Length > 0 ? rows01[0].Length : 0);
+        // 존맵에서 해당 zone의 셀 위치를 추출하여 GridPatternData 생성
+        var positions = Managers.RuneData?.GetZoneCellPositions(gridId)
+                        ?? new System.Collections.Generic.List<UnityEngine.Vector2Int>();
+        var (rows01, rowCount, colCount) = RuneDataManager.BuildZonePattern(positions);
 
-        // SO 이름 → grid_id 매핑 저장
         _gridIdBySOName[gridId] = gridId;
 
         return new GridAssetData
         {
             id = gridId,
-            displayName = meta.grid_name,
+            displayName = meta?.grid_name ?? gridId,
             pattern = new GridPatternData
             {
                 rows = rowCount,

@@ -9,17 +9,15 @@ public struct DamagePacket
     public float FinalDamage;
     public GameObject Attacker;
     public GameObject Target;
-    public WeaponElement Element;
     public bool Negated;           // true면 데미지 0으로 처리
     public bool IsCrit;            // 크리티컬 발생 여부
 
-    public DamagePacket(float damage, GameObject attacker = null, GameObject target = null, WeaponElement element = WeaponElement.None)
+    public DamagePacket(float damage, GameObject attacker = null, GameObject target = null)
     {
         BaseDamage = damage;
         FinalDamage = damage;
         Attacker = attacker;
         Target = target;
-        Element = element;
         Negated = false;
         IsCrit = false;
     }
@@ -33,7 +31,6 @@ public struct DamageReport
     public float DamageDealt;
     public GameObject Attacker;
     public GameObject Target;
-    public WeaponElement Element;
     public bool WasKill;
     public Vector3 HitPosition;
 }

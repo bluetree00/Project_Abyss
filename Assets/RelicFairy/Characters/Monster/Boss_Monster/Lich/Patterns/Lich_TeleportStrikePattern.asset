@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9e942ade2d4db454495943838ca8e10a, type: 3}
   m_Name: Lich_TeleportStrikePattern
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.LichTeleportStrikePatternSO
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichTeleportStrikePatternSO
   _vfxPrefab: {fileID: 0}
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
@@ -23,12 +23,13 @@ MonoBehaviour:
   breakOverride: -1
   maxTriggerRange: 30
   vanishDuration: 0.4
-  strikeDelay: 0.3
+  strikeDelay: 0.7
   strikeDuration: 0.5
   recoveryDuration: 0.5
   sideOffset: 2.5
-  teleportVfxPrefab: {fileID: 0}
-  damageMultiplier: 1.4
-  hitRadius: 2.5
+  teleportVfxPrefab: {fileID: 3981002320176267511, guid: 74c2d05dda379b544b4ec156bbb81a27, type: 3}
+  damageMultiplier: 0
+  hitRadius: 2.0
   knockbackMultiplier: 1.8
   patternCooldown: 6
+

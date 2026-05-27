@@ -150,16 +150,6 @@ public class ServerEquipmentDataManager
                 skill_e_name      = row.TryGetString("skill_e_name"),
                 skill_e_cooldown  = row.TryGetFloat("skill_e_cooldown"),
 
-                // 원소
-                element                  = row.TryGetString("element"),
-                element_amount_basic     = row.TryGetFloat("element_amount_basic"),
-                element_amount_heavy     = row.TryGetFloat("element_amount_heavy"),
-                element_amount_air       = row.TryGetFloat("element_amount_air"),
-                skill_q_element_override = row.TryGetString("skill_q_element_override"),
-                skill_q_element_amount   = row.TryGetFloat("skill_q_element_amount"),
-                skill_e_element_override = row.TryGetString("skill_e_element_override"),
-                skill_e_element_amount   = row.TryGetFloat("skill_e_element_amount"),
-
                 stat_version      = row.TryGetInt("stat_version"),
             };
         }

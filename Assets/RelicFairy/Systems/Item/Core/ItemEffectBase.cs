@@ -49,11 +49,11 @@ public abstract class ItemEffectBase : IItemEffect
         switch (_trigger)
         {
             case "Always":            return true;
-            case "WithFireWeapon":    return ctx.WeaponElement == WeaponElement.Fire;
-            case "WithWaterWeapon":   return ctx.WeaponElement == WeaponElement.Water;
-            case "WithGrassWeapon":   return ctx.WeaponElement == WeaponElement.Grass;
-            case "WithEarthWeapon":   return ctx.WeaponElement == WeaponElement.Earth;
-            case "WithLightningWeapon": return ctx.WeaponElement == WeaponElement.Lightning;
+            case "WithFireWeapon":    return false;
+            case "WithWaterWeapon":   return false;
+            case "WithGrassWeapon":   return false;
+            case "WithEarthWeapon":   return false;
+            case "WithLightningWeapon": return false;
             case "WithBowWeapon":     return ctx.WeaponType == WeaponType.Bow
                                           || ctx.WeaponType == WeaponType.Crossbow;
             case "WithMagicWeapon":   return ctx.WeaponType == WeaponType.Staff;

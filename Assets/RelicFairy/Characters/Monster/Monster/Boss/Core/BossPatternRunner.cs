@@ -101,17 +101,21 @@ public class BossPatternRunner
         {
             if (_pendingForce.pattern != null)
             {
-                // 예약된 강제 패턴 즉시 실행
                 var pending = _pendingForce;
-                _pendingForce         = default;
-                _patternBreakCooldown = 0f;
-                ExecutePattern(pending.pattern);
+                _pendingForce = default;
+
+                // entry 조건이 여전히 유효할 때만 실행 (패턴 실행 중 조건이 무효화된 경우 폐기)
+                if (pending.entry == null || pending.entry.EvaluateConditions(_ctx))
+                {
+                    _patternBreakCooldown = 0f;
+                    ExecutePattern(pending.pattern);
+                }
             }
             else
             {
                 _patternBreakCooldown = (_lastPatternSO != null && _lastPatternSO.breakOverride >= 0f)
                     ? _lastPatternSO.breakOverride
-                    : UnityEngine.Random.Range(_config.patternBreakDurationMin, _config.patternBreakDurationMax);
+                    : UnityEngine.Random.Range(GetBreakDurationMin(), GetBreakDurationMax());
             }
         }
         _wasInPattern = inPattern;
@@ -305,6 +309,22 @@ public class BossPatternRunner
         }
         if (candidates.Count == 0) return null;
         return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+    }
+
+    float GetBreakDurationMin()
+    {
+        var bb = _ctx?.Blackboard;
+        return (bb != null && bb.BreakDurationMinOverride >= 0f)
+            ? bb.BreakDurationMinOverride
+            : _config?.patternBreakDurationMin ?? 0.5f;
+    }
+
+    float GetBreakDurationMax()
+    {
+        var bb = _ctx?.Blackboard;
+        return (bb != null && bb.BreakDurationMaxOverride >= 0f)
+            ? bb.BreakDurationMaxOverride
+            : _config?.patternBreakDurationMax ?? 1.5f;
     }
 
     float ApplyRepeatPenalty(BossPatternSO pattern)

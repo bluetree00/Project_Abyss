@@ -33,6 +33,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>서버에서 로드하는 대화 시퀀스 ID. 비워두면 서버 데이터를 사용하지 않음.</summary>
     private const string StartRoomSequenceId = "StartRoom";
 
+    // OpenWallsForConnections / CorridorBridgeSpawner / StartRoomGate 세 곳에서 동일하게 사용하는 게이트 너비(타일 수)
+    private const int GateWidth = 5;
+
     /// <summary>스타트 방 씬으로 진입한 상태. Loadout 준비 여부와 무관. 디버그 스킵 등에 사용.</summary>
     public bool IsStartRoomScene => AppBootstrapper.Instance != null
         && (!string.IsNullOrEmpty(startRoomMapKey) || startWithZoneLayout);
@@ -182,14 +185,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (!IsStartRoomScene)
             await SpawnWorldMapAsync(this.GetCancellationTokenOnDestroy());
 
-        // UIRoot 로드 대기 (BlockSynergyBridge가 @HUD에 있음)
+        // UIRoot 로드 대기 (MerlinRuneBridge가 @HUD에 있음)
         if (UIRootBootstrapper.Instance == null)
             await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
 
         // 블록 시너지 그리드 구성 (UIRoot @HUD에 있는 Bridge 사용)
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null)
-            bridge = Object.FindFirstObjectByType<BlockSynergyBridge>(FindObjectsInactive.Include);
+            bridge = Object.FindFirstObjectByType<MerlinRuneBridge>(FindObjectsInactive.Include);
         if (bridge != null)
             bridge.InitializeGridsFromServer();
 
@@ -329,7 +332,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ItemData 예외: {e.Message}"); }
         }
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData != null && !blockData.IsInitialized)
         {
             try { await blockData.InitializeAsync(); }
@@ -343,12 +346,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BuffData 예외: {e.Message}"); }
         }
 
-        var elementEffectData = Managers.ElementEffectData;
-        if (elementEffectData != null && !elementEffectData.IsInitialized)
-        {
-            try { await elementEffectData.InitializeAsync(); }
-            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ElementEffectData 예외: {e.Message}"); }
-        }
 
         // 상점 데이터(SHOP_PRICE_DATA) 초기화 — Item/Equipment 레지스트리 로드 이후여야 등급 인덱싱이 정상 작동
         var shopData = Managers.ShopData;
@@ -845,7 +842,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             gateGO.transform.localRotation = gateLocalRot;
 
             var gate = gateGO.GetComponent<StartRoomGate>() ?? gateGO.AddComponent<StartRoomGate>();
-            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, toZone.category, _run.ZoneProgression);
+            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, toZone.category, _run.ZoneProgression, GateWidth * blockCellSize);
             gateGO.SetActive(false);
             _run.ZoneProgression.RegisterExitGate(zoneIndex, toZoneIdx, gate);
         }
@@ -1215,9 +1212,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var otherCenter = CalcZoneWorldCenter(other);
 
             if (newToOther)
-                CorridorBridgeSpawner.Spawn(newZone, other, newCenter, otherCenter, otherStyle, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(newZone, other, newCenter, otherCenter, otherStyle, parent, blockCellSize, GateWidth);
             else
-                CorridorBridgeSpawner.Spawn(other, newZone, otherCenter, newCenter, otherStyle, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(other, newZone, otherCenter, newCenter, otherStyle, parent, blockCellSize, GateWidth);
         }
     }
 
@@ -1252,6 +1249,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (ContainsZoneIndex(other.next_zone_indices, zone.zone_index))
                 connected.Add(other.zone_index);
 
+        // CalcGateExitPositionTo와 동일 기준: dZ != 0이면 항상 Z축 우선
+        const float csvGridUnit = 55f;
+
         foreach (int idx in connected)
         {
             var other = allZones.Find(z => z.zone_index == idx);
@@ -1260,17 +1260,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             float dX = other.world_center_x - zone.world_center_x;
             float dZ = other.world_center_z - zone.world_center_z;
 
-            if (Mathf.Abs(dZ) > 0.5f && Mathf.Abs(dX) < 0.5f)
+            if (Mathf.Abs(dZ) > 0.5f)
             {
-                // 북(+z) / 남(-z) 벽 개방 — grid[x, h-1]=북벽, grid[x, 0]=남벽
+                // 북/남 벽 개방. 대각선 연결(dX != 0)도 Z벽을 뚫되 X 레인 오프셋 적용
                 int wallZ = dZ > 0f ? h - 1 : 0;
-                int cx    = w / 2;
-                for (int x = Mathf.Max(1, cx - half); x <= Mathf.Min(w - 2, cx + half); x++)
-                    grid[x, wallZ] = TileType.Floor;
+                float xRatio = Mathf.Abs(dX) > 0.5f ? dX / csvGridUnit : 0f;
+                int cx = Mathf.RoundToInt(w * 0.5f + xRatio * w * 0.5f);
+                cx = Mathf.Clamp(cx, half + 1, w - half - 2);
+                for (int x = cx - half; x <= cx + half; x++)
+                    if (x > 0 && x < w - 1)
+                        grid[x, wallZ] = TileType.Floor;
             }
-            else if (Mathf.Abs(dX) > 0.5f && Mathf.Abs(dZ) < 0.5f)
+            else if (Mathf.Abs(dX) > 0.5f)
             {
-                // 동(+x) / 서(-x) 벽 개방 — grid[w-1,z]=동벽, grid[0,z]=서벽
+                // 동/서 벽 개방 (순수 X축 연결)
                 int wallX = dX > 0f ? w - 1 : 0;
                 int cz    = h / 2;
                 for (int z2 = Mathf.Max(1, cz - half); z2 <= Mathf.Min(h - 2, cz + half); z2++)
@@ -1300,7 +1303,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 var style      = ResolveCorridorStyle(zone.corridor_style) ?? ResolveCorridorStyle(toZone.corridor_style);
                 var fromCenter = CalcZoneWorldCenter(zone);
                 var toCenter   = CalcZoneWorldCenter(toZone);
-                CorridorBridgeSpawner.Spawn(zone, toZone, fromCenter, toCenter, style, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(zone, toZone, fromCenter, toCenter, style, parent, blockCellSize, GateWidth);
             }
         }
     }

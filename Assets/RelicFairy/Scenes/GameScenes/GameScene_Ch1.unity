@@ -1081,9 +1081,8 @@ MonoBehaviour:
   startWithZoneLayout: 1
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:
-  - {fileID: 5942164450736926565, guid: 8fe63d43c6026cd4f90eca3739353cc8, type: 3}
-  - {fileID: 1615712682993080270, guid: 989e640551bac104aa8e91ad9c6991ee, type: 3}
-  - {fileID: 4835396908360923906, guid: 571ae1f959d38544f8ed1b2256fafff1, type: 3}
+  - {fileID: 3817264450736926565, guid: dcad24e36c0786b44a5ed15fec98612a, type: 3}
+  - {fileID: 5942164450736926565, guid: 40799df5c852a6f4bbb4994f9a838d78, type: 3}
   weaponPickupPrefabs:
   - {fileID: 6690277064601983092, guid: ebcb55c7fe8fe1e4db6c3312e7953481, type: 3}
   - {fileID: 3282498442510412308, guid: 70db2f5a193e2c44288aeeaa9562b402, type: 3}
@@ -1114,7 +1113,6 @@ MonoBehaviour:
     type: 3}
   chapterRegistry: {fileID: 11400000, guid: 90c2d2a74fd74f54e906d34b88ed77f1, type: 2}
   worldMapRoot: {fileID: 1798391502}
-  zoneExitGatePrefab: {fileID: 0}
   corridorStyles:
   - {fileID: 11400000, guid: bd200bc4451b4ba4daf5746722e0842b, type: 2}
   - {fileID: 11400000, guid: d8b74005d32ef8841bffc0aa06a52452, type: 2}
@@ -2093,53 +2091,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
---- !u!1 &1295310711
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1295310714}
-  - component: {fileID: 1295310715}
-  m_Layer: 0
-  m_Name: '[TestRewardSpawner]'
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1295310714
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1295310711}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5, y: 0, z: 3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1295310715
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1295310711}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ec4b809d30517f24da2beb17f897a0a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TestRewardSpawner
-  endEffect2Prefab: {fileID: 0}
-  testItemSO: {fileID: 0}
-  spawnDelay: 1
 --- !u!1 &1343464770
 GameObject:
   m_ObjectHideFlags: 0
@@ -3714,7 +3665,6 @@ SceneRoots:
   - {fileID: 1276884620}
   - {fileID: 4705312660437303789}
   - {fileID: 13670620}
-  - {fileID: 1295310714}
   - {fileID: 2104426524}
   - {fileID: 1798391502}
   - {fileID: 243811253}

@@ -7,21 +7,21 @@ using System;
 using LitJson;
 
 /// <summary>
-/// 뒤끝 CDN에서 BLOCK_SHAPE_DATA + BLOCK_GRID_DATA 로드.
-/// PlayerDataManager와 동일 패턴.
+/// 뒤끝 CDN에서 MERLIN_RUNE_PIECE_DATA + MERLIN_RUNE_SYNERGY_DATA + MERLIN_RUNE_ZONE_MAP 로드.
 /// </summary>
-public class BlockDataManager
+public class RuneDataManager
 {
-    private const string ShapeFileName = "block_shape_data.json";
-    private const string GridFileName  = "block_grid_data.json";
-    private string ShapeFilePath => Path.Combine(Application.persistentDataPath, ShapeFileName);
-    private string GridFilePath  => Path.Combine(Application.persistentDataPath, GridFileName);
+    private const string PieceFileName   = "merlin_rune_piece_data.json";
+    private const string SynergyFileName = "merlin_rune_synergy_data.json";
+    private const string ZoneMapFileName = "merlin_rune_zone_map.json";
 
-    private const string ShapeChartId = "235417";
-    private const string GridChartId  = "235420";
+    private string PieceFilePath   => Path.Combine(Application.persistentDataPath, PieceFileName);
+    private string SynergyFilePath => Path.Combine(Application.persistentDataPath, SynergyFileName);
+    private string ZoneMapFilePath => Path.Combine(Application.persistentDataPath, ZoneMapFileName);
 
-    private Dictionary<int, BlockShapeEntry> _shapeById = new();
-    private Dictionary<string, List<BlockGridEntry>> _gridById = new();
+    private Dictionary<int, RunePieceEntry>              _pieceById   = new();
+    private Dictionary<string, List<RuneSynergyEntry>>   _synergyByZone = new();
+    private List<RuneZoneMapEntry>                        _zoneMapRows = new();
 
     public bool IsInitialized { get; private set; }
 
@@ -29,95 +29,180 @@ public class BlockDataManager
 
     public async UniTask InitializeAsync()
     {
-        if (File.Exists(ShapeFilePath)) LoadShapesFromJson();
-        if (File.Exists(GridFilePath))  LoadGridsFromJson();
+        if (File.Exists(PieceFilePath))   LoadPiecesFromJson();
+        if (File.Exists(SynergyFilePath)) LoadSynergiesFromJson();
+        if (File.Exists(ZoneMapFilePath)) LoadZoneMapFromJson();
 
         try { await LoadFromServerAsync(); }
-        catch (Exception e) { Debug.LogWarning($"[BlockDataManager] CDN 예외: {e.Message}"); }
+        catch (Exception e) { Debug.LogWarning($"[RuneDataManager] CDN 예외: {e.Message}"); }
 
-        if (_shapeById.Count == 0)
+        bool needFallback = _pieceById.Count == 0 || _synergyByZone.Count == 0 || _zoneMapRows.Count == 0;
+        if (needFallback)
         {
-            Debug.Log("[BlockDataManager] CDN 실패 — Addressables 폴백");
-            var shapeJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BLOCK_SHAPE_DATA");
-            if (shapeJson != null)
+            Debug.Log("[RuneDataManager] CDN 실패 — Addressables 폴백");
+
+            if (_pieceById.Count == 0)
             {
-                var col = JsonUtility.FromJson<BlockShapeEntryCollection>(shapeJson.text);
-                if (col?.shapes != null)
-                    foreach (var s in col.shapes)
-                        _shapeById[s.shape_id] = s;
+                var pieceJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MERLIN_RUNE_PIECE_DATA");
+                if (pieceJson != null)
+                {
+                    var col = JsonUtility.FromJson<RunePieceEntryCollection>(pieceJson.text);
+                    if (col?.shapes != null)
+                        foreach (var s in col.shapes)
+                            _pieceById[s.shape_id] = s;
+                }
             }
-            var gridJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BLOCK_GRID_DATA");
-            if (gridJson != null)
+
+            if (_synergyByZone.Count == 0)
             {
-                var col = JsonUtility.FromJson<BlockGridEntryCollection>(gridJson.text);
-                if (col?.grids != null)
-                    foreach (var g in col.grids)
-                    {
-                        if (string.IsNullOrEmpty(g.grid_id)) continue;
-                        if (!_gridById.TryGetValue(g.grid_id, out var list))
+                var synergyJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MERLIN_RUNE_SYNERGY_DATA");
+                if (synergyJson != null)
+                {
+                    var col = JsonUtility.FromJson<RuneSynergyEntryCollection>(synergyJson.text);
+                    if (col?.synergies != null)
+                        foreach (var e in col.synergies)
                         {
-                            list = new List<BlockGridEntry>();
-                            _gridById[g.grid_id] = list;
+                            if (string.IsNullOrEmpty(e.zone_id)) continue;
+                            if (!_synergyByZone.TryGetValue(e.zone_id, out var list))
+                            {
+                                list = new List<RuneSynergyEntry>();
+                                _synergyByZone[e.zone_id] = list;
+                            }
+                            list.Add(e);
                         }
-                        list.Add(g);
-                    }
+                }
+            }
+
+            if (_zoneMapRows.Count == 0)
+            {
+                var zoneMapJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MERLIN_RUNE_ZONE_MAP");
+                if (zoneMapJson != null)
+                {
+                    var col = JsonUtility.FromJson<RuneZoneMapEntryCollection>(zoneMapJson.text);
+                    if (col?.rows != null)
+                        _zoneMapRows = col.rows;
+                }
             }
         }
 
         IsInitialized = true;
-        Debug.Log($"[BlockDataManager] 초기화 완료. 블록 {_shapeById.Count}종, 그리드 {_gridById.Count}종");
+        Debug.Log($"[RuneDataManager] 초기화 완료. 룬 조각 {_pieceById.Count}종, 존 {_synergyByZone.Count}종, 존맵 {_zoneMapRows.Count}행");
     }
 
     // ── 조회 ──────────────────────────────────
 
-    /// <summary>shape_id로 블록 모양 조회.</summary>
-    public BlockShapeEntry GetShape(int shapeId)
+    /// <summary>shape_id로 룬 조각 모양 조회.</summary>
+    public RunePieceEntry GetPiece(int shapeId)
     {
-        _shapeById.TryGetValue(shapeId, out var entry);
+        _pieceById.TryGetValue(shapeId, out var entry);
         return entry;
     }
 
-    /// <summary>grid_id로 시너지 그리드 전체 슬롯 조회.</summary>
-    public List<BlockGridEntry> GetGrid(string gridId)
+    /// <summary>zone_id로 시너지 목록 조회.</summary>
+    public List<RuneSynergyEntry> GetZoneSynergies(string zoneId)
     {
-        _gridById.TryGetValue(gridId, out var list);
+        _synergyByZone.TryGetValue(zoneId, out var list);
         return list;
     }
 
-    /// <summary>grid_id로 slot 1 엔트리 반환 (그리드 모양 + 메타 정보).</summary>
-    public BlockGridEntry GetGridMeta(string gridId)
+    /// <summary>헥사곤 존맵 전체 행 반환.</summary>
+    public IReadOnlyList<RuneZoneMapEntry> GetZoneMapRows() => _zoneMapRows;
+
+    /// <summary>전체 룬 조각 목록.</summary>
+    public IReadOnlyDictionary<int, RunePieceEntry> GetAllPieces() => _pieceById;
+
+    /// <summary>전체 시너지 존 목록.</summary>
+    public IReadOnlyDictionary<string, List<RuneSynergyEntry>> GetAllZoneSynergies() => _synergyByZone;
+
+    /// <summary>zone_id 목록 반환.</summary>
+    public List<string> GetZoneIds()
     {
-        if (!_gridById.TryGetValue(gridId, out var list)) return null;
-        foreach (var e in list)
-            if (e.slot == 1) return e;
-        return list.Count > 0 ? list[0] : null;
+        return new List<string>(_synergyByZone.Keys);
     }
 
-    /// <summary>전체 블록 모양 목록.</summary>
-    public IReadOnlyDictionary<int, BlockShapeEntry> GetAllShapes() => _shapeById;
+    // ── Compat aliases ──────────────────────────
 
-    /// <summary>전체 시너지 그리드 목록.</summary>
-    public IReadOnlyDictionary<string, List<BlockGridEntry>> GetAllGrids() => _gridById;
+    /// <summary>compat: GetPiece 별칭.</summary>
+    public RunePieceEntry GetShape(int shapeId) => GetPiece(shapeId);
 
-    /// <summary>order 순으로 정렬된 grid_id 목록 반환.</summary>
-    public List<string> GetGridIdsSortedByOrder()
+    /// <summary>compat: GetZoneSynergies 별칭 (gridId = zoneId).</summary>
+    public List<RuneSynergyEntry> GetGrid(string zoneId) => GetZoneSynergies(zoneId);
+
+    /// <summary>compat: GetZoneIds 별칭 (order 미적용 — zone 등록 순).</summary>
+    public List<string> GetGridIdsSortedByOrder() => GetZoneIds();
+
+    /// <summary>zone 대표 항목 반환 (첫 번째 시너지 엔트리).</summary>
+    public RuneSynergyEntry GetGridMeta(string zoneId)
     {
-        var metas = new List<(string id, int order)>();
-        foreach (var kvp in _gridById)
+        var list = GetZoneSynergies(zoneId);
+        return list?.Count > 0 ? list[0] : null;
+    }
+
+    // ── Zone pattern helpers ──────────────────────────
+
+    /// <summary>zone_id에 해당하는 존맵 셀 위치 목록 반환.</summary>
+    public List<Vector2Int> GetZoneCellPositions(string zoneId)
+    {
+        char code = ZoneIdToChar(zoneId);
+        var positions = new List<Vector2Int>();
+        foreach (var row in _zoneMapRows)
         {
-            var meta = GetGridMeta(kvp.Key);
-            if (meta != null)
-                metas.Add((kvp.Key, meta.order));
+            if (string.IsNullOrEmpty(row.pattern)) continue;
+            for (int c = 0; c < row.pattern.Length; c++)
+                if (row.pattern[c] == code)
+                    positions.Add(new Vector2Int(c, row.hex_row));
         }
-        metas.Sort((a, b) => a.order.CompareTo(b.order));
-
-        var result = new List<string>(metas.Count);
-        foreach (var m in metas) result.Add(m.id);
-        return result;
+        return positions;
     }
 
-    /// <summary>BlockShapeEntry에서 cellOffsets 배열 생성. r1~r4 패턴 파싱.</summary>
-    public static Vector2Int[] ParseCellOffsets(BlockShapeEntry entry)
+    private static char ZoneIdToChar(string zoneId) => zoneId switch
+    {
+        "ATK"    => 'A',
+        "DEF"    => 'D',
+        "HP"     => 'H',
+        "SPD"    => 'S',
+        "MAG"    => 'M',
+        "LUCK"   => 'L',
+        "CENTER" => '+',
+        _        => '.',
+    };
+
+    /// <summary>셀 위치 목록 → rows01 string[] 변환 (GridPatternData 포맷: "1010" 형태).</summary>
+    public static (string[] rows01, int rowCount, int colCount) BuildZonePattern(List<Vector2Int> positions)
+    {
+        if (positions == null || positions.Count == 0)
+            return (new string[] { "1" }, 1, 1);
+
+        int minX = int.MaxValue, minY = int.MaxValue;
+        int maxX = int.MinValue, maxY = int.MinValue;
+        foreach (var p in positions)
+        {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        }
+        int rowCount = maxY - minY + 1;
+        int colCount = maxX - minX + 1;
+
+        var grid = new char[rowCount][];
+        for (int r = 0; r < rowCount; r++)
+        {
+            grid[r] = new char[colCount];
+            for (int c = 0; c < colCount; c++)
+                grid[r][c] = '0';
+        }
+        foreach (var p in positions)
+            grid[p.y - minY][p.x - minX] = '1';
+
+        var rows01 = new string[rowCount];
+        for (int r = 0; r < rowCount; r++)
+            rows01[r] = new string(grid[r]);
+        return (rows01, rowCount, colCount);
+    }
+
+    /// <summary>RunePieceEntry에서 cellOffsets 배열 생성. r1~r4 패턴 파싱.</summary>
+    public static Vector2Int[] ParseCellOffsets(RunePieceEntry entry)
     {
         if (entry == null) return System.Array.Empty<Vector2Int>();
 
@@ -136,115 +221,134 @@ public class BlockDataManager
         return offsets.ToArray();
     }
 
-    /// <summary>BlockGridEntry에서 GridPatternSO용 rows01 배열 생성. g1~g8 패턴 파싱.</summary>
-    public static string[] ParseGridRows(BlockGridEntry entry)
-    {
-        if (entry == null) return System.Array.Empty<string>();
-
-        var rows = new List<string>();
-        if (!string.IsNullOrEmpty(entry.g1)) rows.Add(entry.g1);
-        if (!string.IsNullOrEmpty(entry.g2)) rows.Add(entry.g2);
-        if (!string.IsNullOrEmpty(entry.g3)) rows.Add(entry.g3);
-        if (!string.IsNullOrEmpty(entry.g4)) rows.Add(entry.g4);
-        if (!string.IsNullOrEmpty(entry.g5)) rows.Add(entry.g5);
-        if (!string.IsNullOrEmpty(entry.g6)) rows.Add(entry.g6);
-        if (!string.IsNullOrEmpty(entry.g7)) rows.Add(entry.g7);
-        if (!string.IsNullOrEmpty(entry.g8)) rows.Add(entry.g8);
-
-        return rows.ToArray();
-    }
-
     // ── 로컬 저장/로드 ──────────────────────────
 
-    private void LoadShapesFromJson()
+    private void LoadPiecesFromJson()
     {
         try
         {
-            var json = File.ReadAllText(ShapeFilePath);
-            var col = JsonUtility.FromJson<BlockShapeEntryCollection>(json);
+            var json = File.ReadAllText(PieceFilePath);
+            var col = JsonUtility.FromJson<RunePieceEntryCollection>(json);
             if (col?.shapes == null) return;
-            _shapeById.Clear();
-            foreach (var s in col.shapes) _shapeById[s.shape_id] = s;
+            _pieceById.Clear();
+            foreach (var s in col.shapes) _pieceById[s.shape_id] = s;
         }
-        catch (Exception e) { Debug.LogError($"[BlockDataManager] Shape 로컬 로드 실패: {e.Message}"); }
+        catch (Exception e) { Debug.LogError($"[RuneDataManager] 룬 조각 로컬 로드 실패: {e.Message}"); }
     }
 
-    private void LoadGridsFromJson()
+    private void LoadSynergiesFromJson()
     {
         try
         {
-            var json = File.ReadAllText(GridFilePath);
-            var col = JsonUtility.FromJson<BlockGridEntryCollection>(json);
-            if (col?.grids == null) return;
-            _gridById.Clear();
-            foreach (var g in col.grids)
+            var json = File.ReadAllText(SynergyFilePath);
+            var col = JsonUtility.FromJson<RuneSynergyEntryCollection>(json);
+            if (col?.synergies == null) return;
+            _synergyByZone.Clear();
+            foreach (var e in col.synergies)
             {
-                if (string.IsNullOrEmpty(g.grid_id)) continue;
-                if (!_gridById.TryGetValue(g.grid_id, out var list))
+                if (string.IsNullOrEmpty(e.zone_id)) continue;
+                if (!_synergyByZone.TryGetValue(e.zone_id, out var list))
                 {
-                    list = new List<BlockGridEntry>();
-                    _gridById[g.grid_id] = list;
+                    list = new List<RuneSynergyEntry>();
+                    _synergyByZone[e.zone_id] = list;
                 }
-                list.Add(g);
+                list.Add(e);
             }
         }
-        catch (Exception e) { Debug.LogError($"[BlockDataManager] Grid 로컬 로드 실패: {e.Message}"); }
+        catch (Exception e) { Debug.LogError($"[RuneDataManager] 시너지 로컬 로드 실패: {e.Message}"); }
     }
 
-    private void SaveShapesToJson()
+    private void LoadZoneMapFromJson()
     {
-        var col = new BlockShapeEntryCollection { shapes = new List<BlockShapeEntry>(_shapeById.Values) };
-        File.WriteAllText(ShapeFilePath, JsonUtility.ToJson(col, true));
+        try
+        {
+            var json = File.ReadAllText(ZoneMapFilePath);
+            var col = JsonUtility.FromJson<RuneZoneMapEntryCollection>(json);
+            if (col?.rows == null) return;
+            _zoneMapRows = col.rows;
+        }
+        catch (Exception e) { Debug.LogError($"[RuneDataManager] 존맵 로컬 로드 실패: {e.Message}"); }
     }
 
-    private void SaveGridsToJson()
+    private void SavePiecesToJson()
     {
-        var all = new List<BlockGridEntry>();
-        foreach (var list in _gridById.Values) all.AddRange(list);
-        var col = new BlockGridEntryCollection { grids = all };
-        File.WriteAllText(GridFilePath, JsonUtility.ToJson(col, true));
+        var col = new RunePieceEntryCollection { shapes = new List<RunePieceEntry>(_pieceById.Values) };
+        File.WriteAllText(PieceFilePath, JsonUtility.ToJson(col, true));
+    }
+
+    private void SaveSynergiesToJson()
+    {
+        var all = new List<RuneSynergyEntry>();
+        foreach (var list in _synergyByZone.Values) all.AddRange(list);
+        var col = new RuneSynergyEntryCollection { synergies = all };
+        File.WriteAllText(SynergyFilePath, JsonUtility.ToJson(col, true));
+    }
+
+    private void SaveZoneMapToJson()
+    {
+        var col = new RuneZoneMapEntryCollection { rows = _zoneMapRows };
+        File.WriteAllText(ZoneMapFilePath, JsonUtility.ToJson(col, true));
     }
 
     // ── 서버 로드 ──────────────────────────────
 
     private async UniTask LoadFromServerAsync()
     {
-        // Shape 데이터
-        int shapeLoaded = ChartLoader.Load("BLOCK_SHAPE_DATA", row =>
+        // 룬 조각 — 임시 딕셔너리에 모두 수집 후 전체 교체 (서버 삭제 반영)
+        var newPieces = new Dictionary<int, RunePieceEntry>();
+        int pieceLoaded = ChartLoader.Load("MERLIN_RUNE_PIECE_DATA", row =>
         {
-            var entry = ParseShapeRow(row);
-            if (entry == null) return;
-            if (_shapeById.TryGetValue(entry.shape_id, out var existing) &&
-                entry.stat_version <= existing.stat_version)
-                return;
-            _shapeById[entry.shape_id] = entry;
+            var entry = ParsePieceRow(row);
+            if (entry != null)
+                newPieces[entry.shape_id] = entry;
         });
-        if (shapeLoaded > 0) SaveShapesToJson();
-
-        // Grid 데이터
-        int gridLoaded = ChartLoader.Load("BLOCK_SYNERGY_DATA", row =>
+        if (pieceLoaded > 0)
         {
-            var entry = ParseGridRow(row);
-            if (entry == null || string.IsNullOrEmpty(entry.grid_id)) return;
+            _pieceById = newPieces;
+            SavePiecesToJson();
+        }
 
-            if (!_gridById.TryGetValue(entry.grid_id, out var list))
+        // 시너지 — 전체 교체
+        var newSynergy = new Dictionary<string, List<RuneSynergyEntry>>();
+        int synergyLoaded = ChartLoader.Load("MERLIN_RUNE_SYNERGY_DATA", row =>
+        {
+            var entry = ParseSynergyRow(row);
+            if (entry == null || string.IsNullOrEmpty(entry.zone_id)) return;
+            if (!newSynergy.TryGetValue(entry.zone_id, out var list))
             {
-                list = new List<BlockGridEntry>();
-                _gridById[entry.grid_id] = list;
+                list = new List<RuneSynergyEntry>();
+                newSynergy[entry.zone_id] = list;
             }
-            list.RemoveAll(g => g.slot == entry.slot);
             list.Add(entry);
         });
-        if (gridLoaded > 0) SaveGridsToJson();
+        if (synergyLoaded > 0)
+        {
+            _synergyByZone = newSynergy;
+            SaveSynergiesToJson();
+        }
+
+        // 존맵 — 전체 교체 후 정렬
+        var newZoneMap = new List<RuneZoneMapEntry>();
+        int zoneMapLoaded = ChartLoader.Load("MERLIN_RUNE_ZONE_MAP", row =>
+        {
+            var entry = ParseZoneMapRow(row);
+            if (entry != null) newZoneMap.Add(entry);
+        });
+        if (zoneMapLoaded > 0)
+        {
+            newZoneMap.Sort((a, b) => a.hex_row.CompareTo(b.hex_row));
+            _zoneMapRows = newZoneMap;
+            SaveZoneMapToJson();
+        }
 
         await UniTask.CompletedTask;
     }
 
-    private static BlockShapeEntry ParseShapeRow(JsonData row)
+    private static RunePieceEntry ParsePieceRow(JsonData row)
     {
         try
         {
-            return new BlockShapeEntry
+            return new RunePieceEntry
             {
                 shape_id     = row.TryGetInt("shape_id"),
                 shape_name   = row.TryGetString("shape_name"),
@@ -259,26 +363,15 @@ public class BlockDataManager
         catch { return null; }
     }
 
-    private static BlockGridEntry ParseGridRow(JsonData row)
+    private static RuneSynergyEntry ParseSynergyRow(JsonData row)
     {
         try
         {
-            return new BlockGridEntry
+            return new RuneSynergyEntry
             {
-                grid_id      = row.TryGetString("grid_id"),
-                grid_name    = row.TryGetString("grid_name"),
-                order        = row.TryGetInt("order"),
-                rows         = row.TryGetInt("rows"),
-                cols         = row.TryGetInt("cols"),
-                g1           = row.TryGetString("g1"),
-                g2           = row.TryGetString("g2"),
-                g3           = row.TryGetString("g3"),
-                g4           = row.TryGetString("g4"),
-                g5           = row.TryGetString("g5"),
-                g6           = row.TryGetString("g6"),
-                g7           = row.TryGetString("g7"),
-                g8           = row.TryGetString("g8"),
-                slot         = row.TryGetInt("slot"),
+                zone_id      = row.TryGetString("zone_id"),
+                zone_name    = row.TryGetString("zone_name"),
+                threshold    = row.TryGetInt("threshold"),
                 effect_type  = row.TryGetString("effect_type"),
                 trigger      = row.TryGetString("trigger"),
                 value        = row.TryGetFloat("value"),
@@ -292,4 +385,21 @@ public class BlockDataManager
         }
         catch { return null; }
     }
+
+    private static RuneZoneMapEntry ParseZoneMapRow(JsonData row)
+    {
+        try
+        {
+            return new RuneZoneMapEntry
+            {
+                hex_row      = row.TryGetInt("hex_row"),
+                pattern      = row.TryGetString("pattern"),
+                stat_version = row.TryGetInt("stat_version"),
+            };
+        }
+        catch { return null; }
+    }
+
+    /// <summary>compat: 구 grid rows01 파싱. 현재 스키마에서는 빈 배열 반환.</summary>
+    public static int[][] ParseGridRows(RuneSynergyEntry meta) => System.Array.Empty<int[]>();
 }

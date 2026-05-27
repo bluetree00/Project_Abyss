@@ -60,14 +60,14 @@ public sealed class GridEditView : MonoBehaviour
 
     private void OnEnable()
     {
-        if (BlockSynergyBridge.Instance != null)
-            BlockSynergyBridge.Instance.OnSynergyActivated += OnSynergyActivatedExternal;
+        if (MerlinRuneBridge.Instance != null)
+            MerlinRuneBridge.Instance.OnSynergyActivated += OnSynergyActivatedExternal;
     }
 
     private void OnDisable()
     {
-        if (BlockSynergyBridge.Instance != null)
-            BlockSynergyBridge.Instance.OnSynergyActivated -= OnSynergyActivatedExternal;
+        if (MerlinRuneBridge.Instance != null)
+            MerlinRuneBridge.Instance.OnSynergyActivated -= OnSynergyActivatedExternal;
     }
 
     private void OnDestroy()
@@ -99,7 +99,7 @@ public sealed class GridEditView : MonoBehaviour
     {
         ClearTabs();
 
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null || tabStrip == null) return;
 
         var grids = bridge.GetRegisteredGrids();
@@ -177,7 +177,7 @@ public sealed class GridEditView : MonoBehaviour
     {
         if (string.IsNullOrEmpty(gridId)) return;
 
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null) return;
 
         var grids = bridge.GetRegisteredGrids();

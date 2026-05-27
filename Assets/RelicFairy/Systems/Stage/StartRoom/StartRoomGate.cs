@@ -20,12 +20,12 @@ using UnityEngine.UI;
 public class StartRoomGate : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────────
-    private const float IndicatorHeight = 5f;
-    private const float CanvasScale     = 0.007f;
-    private const float GracePeriod     = 0.3f;
-    private const float TriggerWidth    = 9f;
-    private const float TriggerHeight   = 6f;
-    private const float TriggerDepth    = 2f;
+    private const float IndicatorHeight    = 5f;
+    private const float CanvasScale        = 0.007f;
+    private const float GracePeriod        = 0.3f;
+    private const float TriggerDepth       = 2f;
+    private const float DefaultGateWidth   = 5f;  // OpenWallsForConnections gateWidth(5) × blockCellSize(1)
+    private const float DefaultGateHeight  = 5f;
 
     // 통과 후 포털 색상 — 거의 투명하게
     private static readonly Color PassThroughColor = new Color(0.4f, 0.85f, 1f, 0.04f);
@@ -50,6 +50,9 @@ public class StartRoomGate : MonoBehaviour
     private string                 _category;
     private ZoneProgressionService _progression;
 
+    private float _gateWidth  = DefaultGateWidth;
+    private float _gateHeight = DefaultGateHeight;
+
     private bool  _triggered;
     private bool  _gateOpen;
     private bool  _isEnabled;
@@ -57,29 +60,34 @@ public class StartRoomGate : MonoBehaviour
 
     private GameObject      _worldIndicatorGO;
     private TextMeshProUGUI _distanceText;
+    private bool            _flashActive;
 
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
     {
         ResizeTriggerCollider();
+        ResizeGate();
     }
 
     /// <summary>Zone 1+ 게이트 초기화. 호출 시 스타트 방 모드에서 일반 방 모드로 전환된다.</summary>
+    /// <param name="openingWidth">벽 개구부 월드 너비 (GateWidth × blockCellSize). 0 이하면 기본값 사용.</param>
     public void InitGate(int fromZoneIndex, int toZoneIndex, string targetLabel, string category,
-        ZoneProgressionService progression)
+        ZoneProgressionService progression, float openingWidth = DefaultGateWidth)
     {
         _fromZoneIndex = fromZoneIndex;
         _toZoneIndex   = toZoneIndex;
         _targetLabel   = string.IsNullOrEmpty(targetLabel) ? "다음 구역" : targetLabel;
         _category      = category ?? string.Empty;
         _progression   = progression;
+        if (openingWidth > 0f) _gateWidth = openingWidth;
 
         if (!TryGetComponent<Collider>(out _))
             gameObject.AddComponent<BoxCollider>();
         ResizeTriggerCollider();
 
         ApplyCategoryColor();
+        ResizeGate();
     }
 
     /// <summary>존 클리어(또는 비전투 존 진입) 시 ZoneProgressionService가 호출. 게이트 활성화.</summary>
@@ -133,8 +141,49 @@ public class StartRoomGate : MonoBehaviour
     {
         if (!TryGetComponent<BoxCollider>(out var bc)) return;
         bc.isTrigger = true;
-        bc.size      = new Vector3(TriggerWidth, TriggerHeight, TriggerDepth);
-        bc.center    = new Vector3(0f, TriggerHeight * 0.5f, 0f);
+        bc.size      = new Vector3(_gateWidth, _gateHeight, TriggerDepth);
+        bc.center    = new Vector3(0f, _gateHeight * 0.5f, 0f);
+    }
+
+    private void ResizeGate()
+    {
+        float halfW = _gateWidth  * 0.5f;
+        float halfH = _gateHeight * 0.5f;
+
+        if (portalActive != null)
+        {
+            var ps = portalActive.transform.localScale;
+            portalActive.transform.localPosition = new Vector3(0f, halfH, 0f);
+            portalActive.transform.localScale    = new Vector3(_gateWidth, _gateHeight, ps.z);
+        }
+
+        const float PillarHalfWidth   = 0.15f;
+        const float CapsuleMeshHeight = 2f;
+        float pillarScaleY = _gateHeight / CapsuleMeshHeight;
+
+        var pillarL = transform.Find("Pillar_L");
+        if (pillarL != null)
+        {
+            var ps = pillarL.localScale;
+            pillarL.localPosition = new Vector3(-(halfW - PillarHalfWidth), halfH, 0f);
+            pillarL.localScale    = new Vector3(ps.x, pillarScaleY, ps.z);
+        }
+
+        var pillarR = transform.Find("Pillar_R");
+        if (pillarR != null)
+        {
+            var ps = pillarR.localScale;
+            pillarR.localPosition = new Vector3(+(halfW - PillarHalfWidth), halfH, 0f);
+            pillarR.localScale    = new Vector3(ps.x, pillarScaleY, ps.z);
+        }
+
+        var lintel = transform.Find("Lintel");
+        if (lintel != null)
+        {
+            var ps = lintel.localScale;
+            lintel.localPosition = new Vector3(0f, _gateHeight + ps.y * 0.5f, 0f);
+            lintel.localScale    = new Vector3(_gateWidth, ps.y, ps.z);
+        }
     }
 
     private void ApplyCategoryColor()
@@ -158,23 +207,23 @@ public class StartRoomGate : MonoBehaviour
         foreach (var col in portalActive.GetComponentsInChildren<Collider>())
             if (!col.isTrigger) col.enabled = false;
 
-        var mpb = new MaterialPropertyBlock();
-        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
-        {
-            r.GetPropertyBlock(mpb);
-            mpb.SetColor("_BaseColor", PassThroughColor);
-            mpb.SetColor("_Color",     PassThroughColor);
-            r.SetPropertyBlock(mpb);
-        }
+        portalActive.SetActive(false);
     }
 
     private void TryActivate(Collider other)
     {
         if (_triggered) return;
 
+        bool isPlayer = other.GetComponentInParent<WispController>() != null ||
+                        other.GetComponentInParent<PlayerController>() != null;
+
         if (_fromZoneIndex != -1)
         {
-            if (!_isEnabled) return;
+            if (!_isEnabled)
+            {
+                if (isPlayer) ShowLockedFeedback();
+                return;
+            }
             if (Time.time - _enabledTime < GracePeriod) return;
 
             // 현재 존이 클리어되지 않은 전투 존이면 다른 방 게이트 통과 불가
@@ -182,12 +231,14 @@ public class StartRoomGate : MonoBehaviour
             {
                 int currentZone = _progression.CurrentZoneIndex;
                 if (currentZone != _fromZoneIndex && !_progression.IsExitEnabled(currentZone))
+                {
+                    if (isPlayer) ShowLockedFeedback();
                     return;
+                }
             }
         }
 
-        if (other.GetComponentInParent<WispController>() == null &&
-            other.GetComponentInParent<PlayerController>() == null) return;
+        if (!isPlayer) return;
 
         if (_fromZoneIndex == -1 && !IsLoadoutReady())
         {
@@ -200,6 +251,46 @@ public class StartRoomGate : MonoBehaviour
         if (_worldIndicatorGO != null) _worldIndicatorGO.SetActive(false);
         SetGatePassable();
         GateActivateAsync().Forget();
+    }
+
+    private void ShowLockedFeedback()
+    {
+        if (_flashActive || portalActive == null) return;
+        FlashLockedAsync().Forget();
+    }
+
+    private async UniTaskVoid FlashLockedAsync()
+    {
+        _flashActive = true;
+        var mpb         = new MaterialPropertyBlock();
+        var lockedColor = new Color(1f, 0.15f, 0.15f, 0.80f);
+        var baseColor   = CategoryColor(_category);
+
+        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
+        {
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor("_BaseColor", lockedColor);
+            mpb.SetColor("_Color",     lockedColor);
+            r.SetPropertyBlock(mpb);
+        }
+
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(0.35f),
+                cancellationToken: gameObject.GetCancellationTokenOnDestroy());
+        }
+        catch (System.OperationCanceledException) { _flashActive = false; return; }
+
+        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
+        {
+            if (r == null) continue;
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor("_BaseColor", baseColor);
+            mpb.SetColor("_Color",     baseColor);
+            r.SetPropertyBlock(mpb);
+        }
+
+        _flashActive = false;
     }
 
     private async UniTaskVoid GateActivateAsync()

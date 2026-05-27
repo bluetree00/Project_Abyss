@@ -12,17 +12,14 @@ public class ChestMonster : MonsterBase
     protected override string ConfigAddress => "ChestMonster/ChestMonsterConfig";
     protected override string DataAddress   => string.Empty;
 
-    public override void TakeDamage(float amount, GameObject instigator,
-                                     float knockbackMultiplier = 1f,
-                                     ElementType element = ElementType.None,
-                                     float elementAmount = 0f)
+    public override void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null) return;
 
         if (_runtime.IsDormant)
             _runtime.HasBeenAttacked = true;
 
-        base.TakeDamage(amount, instigator, knockbackMultiplier, element, elementAmount);
+        base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
     }
 }
 }

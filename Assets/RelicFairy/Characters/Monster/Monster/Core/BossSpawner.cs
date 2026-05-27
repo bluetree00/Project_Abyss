@@ -1,5 +1,5 @@
-using RelicFairy.Monster;
 using Cysharp.Threading.Tasks;
+using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
@@ -33,6 +33,16 @@ public class BossSpawner : MonoBehaviour
     [Header("보스 등장 디졸브 (선택)")]
     [Tooltip("보스 등장 디졸브 지속 시간(초). 0 이하면 미사용.")]
     [SerializeField, Min(0f)] private float spawnDissolveDuration = 1.5f;
+    [Tooltip("디졸브 엣지 색상 (시인성 아웃라인).")]
+    [SerializeField] private Color spawnOutlineColor = new Color(0f, 2.4f, 3f, 1f);
+
+    [Header("직접 배치 보스 (선택)")]
+    [Tooltip("씬에 직접 배치된 보스. 설정 시 spawnTable 대신 이 오브젝트를 활성화한다. 보스는 비활성 상태로 씬에 배치해야 한다.")]
+    [SerializeField] private MonsterBase placedBoss;
+
+    [Header("외부 트리거 연동")]
+    [Tooltip("true면 Start()에서 자동 소환하지 않고 Trigger() 호출을 기다린다. BossRoomController 연출 후 소환 시 사용.")]
+    [SerializeField] private bool waitForExternalTrigger;
 
     // ── Properties / Events ─────────────────────────────────
 
@@ -48,6 +58,31 @@ public class BossSpawner : MonoBehaviour
 
     private void Start()
     {
+        if (waitForExternalTrigger) return;
+
+        if (placedBoss != null)
+        {
+            ActivatePlacedBossAsync().Forget();
+            return;
+        }
+
+        if (spawnTable == null)
+        {
+            Debug.LogWarning("[BossSpawner] spawnTable이 비어 있습니다. Inspector에서 SO를 할당해주세요.", this);
+            return;
+        }
+        SpawnBossAsync().Forget();
+    }
+
+    /// <summary>BossRoomController가 연출 완료 후 호출 — 보스 소환/활성화 시작.</summary>
+    public void Trigger()
+    {
+        if (placedBoss != null)
+        {
+            ActivatePlacedBossAsync().Forget();
+            return;
+        }
+
         if (spawnTable == null)
         {
             Debug.LogWarning("[BossSpawner] spawnTable이 비어 있습니다. Inspector에서 SO를 할당해주세요.", this);
@@ -58,6 +93,50 @@ public class BossSpawner : MonoBehaviour
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 소환 로직
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 직접 배치 보스 활성화
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private async UniTaskVoid ActivatePlacedBossAsync()
+    {
+        if (spawnDelay > 0f)
+        {
+            try
+            {
+                await UniTask.Delay(
+                    System.TimeSpan.FromSeconds(spawnDelay),
+                    cancellationToken: destroyCancellationToken);
+            }
+            catch (System.OperationCanceledException) { return; }
+        }
+
+        if (placedBoss == null) return;
+
+        // 씬에 직접 배치된 보스는 이미 활성 상태 — SetActive 불필요
+        // RoomClearController가 OnDied를 체이닝할 수 있도록 먼저 알림
+        OnMonsterSpawned?.Invoke(placedBoss);
+
+        // 카메라 팬 완료 후 Appear 애니메이션 + 보스 이름 UI 시작
+        (placedBoss as IBossEntrance)?.TriggerEntrance();
+
+        PlaySpawnEffectAsync(placedBoss.transform.position).Forget();
+
+        // IBossEntrance 보스는 자체 등장 연출로 장비 디졸브를 직접 관리 — body 디졸브 스킵
+        bool hasOwnEntrance = placedBoss is IBossEntrance;
+        if (spawnDissolveDuration > 0f && !hasOwnEntrance)
+        {
+            DissolveEffect.PlayAppear(
+                placedBoss.gameObject,
+                spawnDissolveDuration,
+                activationToken: placedBoss.ActivationToken,
+                edgeColor: spawnOutlineColor);
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 풀 소환 보스
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     private async UniTaskVoid SpawnBossAsync()
@@ -104,28 +183,19 @@ public class BossSpawner : MonoBehaviour
         }
 
         OnMonsterSpawned?.Invoke(boss);
+        (boss as IBossEntrance)?.TriggerEntrance();
 
         PlaySpawnEffectAsync(transform.position).Forget();
 
-        var capturedBoss = boss;
-        int capturedGen = capturedBoss.GenerationId;
-        if (spawnDissolveDuration > 0f)
+        // IBossEntrance 보스는 자체 등장 연출로 장비 디졸브를 직접 관리 — body 디졸브 스킵
+        bool hasOwnEntrance = boss is IBossEntrance;
+        if (spawnDissolveDuration > 0f && !hasOwnEntrance)
         {
             DissolveEffect.PlayAppear(
                 boss.gameObject,
                 spawnDissolveDuration,
-                onComplete: () =>
-                {
-                    if (capturedBoss == null) return;
-                    if (!capturedBoss.gameObject.activeInHierarchy) return;
-                    if (capturedBoss.GenerationId != capturedGen) return;
-                    capturedBoss.SetRandomNativeElement();
-                },
-                activationToken: boss.ActivationToken);
-        }
-        else
-        {
-            boss.SetRandomNativeElement();
+                activationToken: boss.ActivationToken,
+                edgeColor: spawnOutlineColor);
         }
     }
 

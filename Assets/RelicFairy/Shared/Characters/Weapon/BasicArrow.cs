@@ -136,23 +136,19 @@ public class BasicArrow : MonoBehaviour
         {
             var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
             var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
-            var weaponElem = weaponData?.element ?? WeaponElement.None;
-            var pkt = new DamagePacket(damage, _instigator, other.gameObject, weaponElem);
+            var pkt = new DamagePacket(damage, _instigator, other.gameObject);
             mgr?.OnPreDealDamage(ref pkt);
 
-            float baseFinal  = pkt.Negated ? 0f : pkt.FinalDamage;
-            var   elemType   = pkt.Element.ToElementType();
-            float elemAmount = weaponData?.elementAmountBasic ?? 0f;
+            float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
 
             // 크리티컬 굴림
             float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
             pkt.IsCrit = isCrit;
 
-            damageable.TakeDamage(finalDmg, _instigator, 1f, elemType, elemAmount);
+            // 팝업은 대상측(MonsterBase 등)이 자체 표시 — isCrit 만 전달
+            damageable.TakeDamage(finalDmg, _instigator, 1f, isCrit);
 
-            // 데미지 팝업 + 타격감
-            Vector3 popupPos = other.ClosestPoint(transform.position);
-            DamagePopupSpawner.Spawn(popupPos, finalDmg, isCrit, elemType);
+            // 타격감 (햅틱·카메라 흔들림 등)
             if (isCrit) HitFeelService.Crit();
             else        HitFeelService.Light();
 

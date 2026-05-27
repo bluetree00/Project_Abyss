@@ -64,6 +64,13 @@ public class CharacterData : ScriptableObject
     [Header("패시브")]
     public PassiveSO passive;
 
+    // 캐릭터별 애니메이션 오버라이드 (AnimatorOverrideService 가 PlayerBaseController 의 state 클립을 교체)
+    // 키는 Addressables 에 등록된 AnimationClip 이름과 일치해야 한다. 비워두면 기본 클립 사용.
+    [Header("애니메이션 오버라이드 (Addressables 키)")]
+    [SerializeField, Tooltip("Q스킬 'QSkill_01' state 클립으로 사용할 Addressables 키. 비우면 기본값 유지.")]
+    private string qSkillClipKey = "";
+    public string QSkillClipKey => qSkillClipKey;
+
     // 씬 진입 시 등장 연출 (null이면 GameRunBootstrapper의 기본 연출 사용)
     [Header("등장 연출")]
     public PlayerEntranceBehaviourSO playerEntrance;

@@ -348,6 +348,48 @@ public class BoardManager : MonoBehaviour
     /// <summary>그리드 세션이 GridHost에 활성화된 직후 발생. Grid 인스턴스를 인수로 전달.</summary>
     public event Action<Grid> OnGridSessionActivated;
 
+    /// <summary>
+    /// 외부(MerlinRuneHexGridView)에서 미리 생성한 Grid를 활성화한다.
+    /// Rebuild()를 호출하지 않으므로 사각 GridSquare가 생성되지 않는다.
+    /// OpenPanel() → BuildGrid() 직후 호출하여 헥사 그리드를 드래그-앤-드롭 타깃으로 등록하고
+    /// 보관함 Shape들을 shapeHost에 표시한다.
+    /// </summary>
+    public void EnterExternalGrid(Grid hexGrid, GridAssetSO hexAsset)
+    {
+        if (hexGrid == null) return;
+
+        activeAsset = hexAsset;
+
+        SetModeSelection(false);   // selectionRoot 숨김 + gameplayRoot 표시
+
+        // GridManager에 먼저 등록 → GetGap()이 올바른 값(44f) 반환
+        if (GridManager.Instance != null)
+            GridManager.Instance.SetActiveGrid(hexGrid);
+
+        // 이미 잘못된 크기(120f 등)로 빌드된 Shape 재조정
+        RebuildShapesWithGridGap();
+
+        // shapeHost 초기화 후 전체 Shape를 슬롯에 배치
+        if (shapeHost != null)
+        {
+            shapeHost.sizeDelta        = new Vector2(shapeHost.sizeDelta.x, 0f);
+            shapeHost.anchoredPosition = Vector2.zero;
+        }
+
+        _sharedShapeSlotY.Clear();
+        _slotCursorY = -spawnOrigin.y;
+
+        // 이전 세션에서 이 그리드 밖에 배치된 것으로 기록된 GlobalPlacement 초기화
+        _globalPlacements.Clear();
+
+        foreach (var s in _sharedShapes)
+        {
+            if (s == null) continue;
+            s.gameObject.SetActive(true);
+            PlaceSharedShapeToSlot(s);
+        }
+    }
+
     /// <summary>선택 화면으로 돌아간다.</summary>
     public void BackToSelection()
     {

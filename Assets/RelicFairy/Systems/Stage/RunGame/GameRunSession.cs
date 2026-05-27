@@ -325,8 +325,8 @@ public sealed class GameRunSession
         try { PlayerState?.Deactivate(); }
         catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
-        // BlockSynergyBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
-        BlockSynergyBridge.Instance?.ClearAppliedGrids();
+        // MerlinRuneBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
+        MerlinRuneBridge.Instance?.ClearAppliedGrids();
 
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);

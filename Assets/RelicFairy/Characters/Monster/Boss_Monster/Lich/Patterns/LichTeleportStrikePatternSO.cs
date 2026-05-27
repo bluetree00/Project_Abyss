@@ -82,7 +82,11 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
         _timer   = 0f;
         _hasDealt = false;
 
-        (ctx.Monster as LichMonster)?.MovementController.SetLocked(true);
+        ctx.Animator?.CrossFade("TeleportStrike", 0.1f);
+
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
 
         UI_BossBark.Show("순간이동!", BossBarkType.PatternAnnounce);
 
@@ -108,6 +112,7 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
                 FacePlayer(ctx);
                 if (_timer >= Data.strikeDelay)
                 {
+                    PatternGuideHelper.SetColor(_strikeGuide, PatternGuideHelper.Active);
                     _phase = Phase.Strike;
                     _timer = 0f;
                 }
@@ -136,7 +141,7 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
     public override void Exit(MonsterContext ctx)
     {
         PatternGuideHelper.SafeDestroy(ref _strikeGuide);
-        (ctx.Monster as LichMonster)?.MovementController.SetLocked(false);
+        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
 
         var lich = ctx.Monster as LichMonster;
         if (lich?.LichBB != null)
@@ -157,12 +162,12 @@ public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePa
         SpawnVfx(ctx, targetPos);
         ctx.Transform.position = targetPos;
 
-        // 착지 후 타격 범위 disc — 선딜 경고
+        // 착지 후 타격 범위 disc — 선딜 중 노랑(Telegraph), 타격 직전 빨강(Active)으로 교체
         PatternGuideHelper.SafeDestroy(ref _strikeGuide);
         _strikeGuide = PatternGuideHelper.Disc(
             targetPos,
             Data.hitRadius,
-            PatternGuideHelper.Active);
+            PatternGuideHelper.Telegraph);
     }
 
     private void DealDamage(MonsterContext ctx)

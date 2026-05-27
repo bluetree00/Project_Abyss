@@ -6,66 +6,86 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 그리드/보관함 오버레이 메인 컨트롤러.
+/// 멀린의 룬 그리드 패널 메인 컨트롤러.
 ///
 /// ■ Canvas_Overlay/@Overlay 하위에 사전 배치 (DDOL UIRoot 소속).
-/// ■ TAB 키 또는 외부 호출(ShowWithNewItem)로 열린다.
+/// ■ 단일 편집 화면: Header / LeftPanel / CenterPanel / RightPanel / Footer 레이아웃.
+/// ■ 외부 호출(OpenPanel / ShowWithNewItem)로 열린다.
 /// ■ GridManager.OnItemPlaced/Removed ↔ RunItemInventory.PlaceItem/UnplaceItem 브리지.
-/// ■ [확인] 버튼: 보관함 잔여 아이템 경고 후 닫힘.
+/// ■ [초기화] 버튼: 배치 전체 초기화. [완료] 버튼: 잔여 아이템 경고 후 닫힘.
 /// </summary>
 public sealed class UI_GridPanel : UI_Base
 {
+    // ── Static ──
     public static UI_GridPanel Instance { get; private set; }
 
-    public RectTransform BoardContainer => boardContainer;
+    // ── Properties ──
+    public RectTransform BoardContainer => _boardContainer;
     public bool IsOpen => _isOpen;
 
-    // ── SerializeField ──
-    [Header("Sub-Views")]
-    [SerializeField] private GridGalleryView galleryView;
-    [SerializeField] private GridEditView    editView;
-    [SerializeField] private StagingAreaView stagingArea;
-    [SerializeField] private ItemInfoPanel   itemInfoPanel;
+    // ── Private: Sub-views ──
+    private CharacterInfoPanelView   _charInfoView;
+    private MerlinRuneHexGridView    _hexGridView;
+    private MerlinRuneSynergyStatusView _synergyStatusView;
+    private StagingAreaView          _stagingArea;
+    private ItemInfoPanel            _itemInfoPanel;
 
-    [Header("보드 컨테이너 (puzzlePrefab 스폰 위치, editView 밖에 배치)")]
-    [SerializeField] private RectTransform boardContainer;
+    // ── Private: Layout roots (코드로 생성) ──
+    private RectTransform _headerRT;
+    private RectTransform _mainAreaRT;
+    private RectTransform _leftPanelRT;
+    private RectTransform _centerPanelRT;
+    private RectTransform _rightPanelRT;
+    private RectTransform _footerRT;
+    private RectTransform _boardContainer;
 
-    [Header("Buttons")]
-    [SerializeField] private UnityEngine.UI.Button confirmButton;
+    // 센터: 상단 그리드 / 하단 시너지
+    private RectTransform _hexGridRoot;
+    private RectTransform _synergyStatusRoot;
 
-    [Header("Confirm Dialog")]
-    [SerializeField] private GameObject confirmDialog;
-    [SerializeField] private UnityEngine.UI.Button confirmDialogKeepBtn;
-    [SerializeField] private UnityEngine.UI.Button confirmDialogDiscardBtn;
-    [SerializeField] private TMPro.TMP_Text confirmDialogText;
+    // 우측: 상단 스테이징(스크롤) / 하단 아이템정보 + 배치버튼
+    private RectTransform _stagingScrollRT;
+    private RectTransform _itemInfoRoot;
+    private Button        _placeButton;
 
-    // ── Private ──
-    private RunItemInventory _inventory;
-    private RuntimeItemData  _pendingNewItem;
-    private bool             _isOpen;
-    private bool             _hoverShowingItemInfo;
+    // ── Private: Header buttons ──
+    private Button  _backButton;
+    private Button  _resetButton;
+    private Button  _confirmButton;
 
-    // ── Gallery Detail Panel (코드로 생성) ──
-    private GameObject   _galleryDetailPanel;
-    private TMP_Text     _galleryDetailTitle;
-    private Transform    _galleryDetailList;
-    private Button       _galleryEditBtn;
-    private string       _selectedGalleryGridId;
-    private readonly List<GameObject> _galleryDetailRows = new();
+    // ── Private: Footer ──
+    private TMP_Text _footerActiveSynText;
+    private TMP_Text _footerCellCountText;
 
-    // ── Synergy Toast ──
+    // ── Private: Confirm Dialog ──
+    private GameObject _confirmDialog;
+    private Button     _confirmDialogKeepBtn;
+    private Button     _confirmDialogDiscardBtn;
+    private TMP_Text   _confirmDialogText;
+
+    // ── Private: Synergy Toast ──
     private GameObject             _synergyToast;
     private TMP_Text               _synergyToastText;
     private CancellationTokenSource _toastCts;
 
+    // ── Private: State ──
+    private RunItemInventory _inventory;
+    private RuntimeItemData  _pendingNewItem;
+    private bool             _isOpen;
+    private bool             _layoutBuilt;
+    private int              _totalPlacedCells;
+
     // ── Lifecycle ──
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        BuildLayout();
+        BuildConfirmDialog();
         BuildSynergyToast();
-        BuildGalleryDetailPanel();
-        EnsureConfirmButtonLabel();
+
         gameObject.SetActive(false);
     }
 
@@ -73,6 +93,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         _toastCts?.Cancel();
         _toastCts?.Dispose();
+        if (Instance == this) Instance = null;
     }
 
     private void OnEnable()
@@ -81,30 +102,28 @@ public sealed class UI_GridPanel : UI_Base
 
         if (GridManager.Instance != null)
         {
-            GridManager.Instance.OnItemPlaced    += HandleItemPlaced;
-            GridManager.Instance.OnItemRemoved   += HandleItemRemoved;
-            GridManager.Instance.OnItemSelected  += HandleItemSelected;
+            GridManager.Instance.OnItemPlaced   += HandleItemPlaced;
+            GridManager.Instance.OnItemRemoved  += HandleItemRemoved;
+            GridManager.Instance.OnItemSelected += HandleItemSelected;
         }
 
-        if (BlockSynergyBridge.Instance != null)
-            BlockSynergyBridge.Instance.OnSynergyActivated += ShowSynergyActivated;
+        if (MerlinRuneBridge.Instance != null)
+            MerlinRuneBridge.Instance.OnSynergyActivated += ShowSynergyActivated;
 
-        if (galleryView != null)
-            galleryView.OnGridSelected += RefreshGalleryDetail;
-
-        if (stagingArea != null)
+        if (_stagingArea != null)
         {
-            stagingArea.OnItemSelected  += OnStagingItemSelected;
-            stagingArea.OnItemHovered   += OnStagingItemHovered;
-            stagingArea.OnItemUnhovered += OnStagingItemUnhovered;
+            _stagingArea.OnItemSelected  += OnStagingItemSelected;
+            _stagingArea.OnItemHovered   += OnStagingItemHovered;
+            _stagingArea.OnItemUnhovered += OnStagingItemUnhovered;
         }
 
-        if (confirmButton != null)
-            confirmButton.onClick.AddListener(OnConfirmClicked);
-        if (confirmDialogKeepBtn != null)
-            confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
-        if (confirmDialogDiscardBtn != null)
-            confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
+        if (_backButton    != null) _backButton.onClick.AddListener(OnBackClicked);
+        if (_resetButton   != null) _resetButton.onClick.AddListener(OnResetClicked);
+        if (_confirmButton != null) _confirmButton.onClick.AddListener(OnConfirmClicked);
+        if (_placeButton   != null) _placeButton.onClick.AddListener(OnPlaceClicked);
+
+        if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
+        if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
     }
 
     private void OnDisable()
@@ -113,32 +132,30 @@ public sealed class UI_GridPanel : UI_Base
 
         if (GridManager.Instance != null)
         {
-            GridManager.Instance.OnItemPlaced    -= HandleItemPlaced;
-            GridManager.Instance.OnItemRemoved   -= HandleItemRemoved;
-            GridManager.Instance.OnItemSelected  -= HandleItemSelected;
+            GridManager.Instance.OnItemPlaced   -= HandleItemPlaced;
+            GridManager.Instance.OnItemRemoved  -= HandleItemRemoved;
+            GridManager.Instance.OnItemSelected -= HandleItemSelected;
         }
 
-        if (BlockSynergyBridge.Instance != null)
-            BlockSynergyBridge.Instance.OnSynergyActivated -= ShowSynergyActivated;
+        if (MerlinRuneBridge.Instance != null)
+            MerlinRuneBridge.Instance.OnSynergyActivated -= ShowSynergyActivated;
 
-        if (galleryView != null)
-            galleryView.OnGridSelected -= RefreshGalleryDetail;
-
-        if (stagingArea != null)
+        if (_stagingArea != null)
         {
-            stagingArea.OnItemSelected  -= OnStagingItemSelected;
-            stagingArea.OnItemHovered   -= OnStagingItemHovered;
-            stagingArea.OnItemUnhovered -= OnStagingItemUnhovered;
+            _stagingArea.OnItemSelected  -= OnStagingItemSelected;
+            _stagingArea.OnItemHovered   -= OnStagingItemHovered;
+            _stagingArea.OnItemUnhovered -= OnStagingItemUnhovered;
         }
 
         _toastCts?.Cancel();
 
-        if (confirmButton != null)
-            confirmButton.onClick.RemoveListener(OnConfirmClicked);
-        if (confirmDialogKeepBtn != null)
-            confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
-        if (confirmDialogDiscardBtn != null)
-            confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
+        if (_backButton    != null) _backButton.onClick.RemoveListener(OnBackClicked);
+        if (_resetButton   != null) _resetButton.onClick.RemoveListener(OnResetClicked);
+        if (_confirmButton != null) _confirmButton.onClick.RemoveListener(OnConfirmClicked);
+        if (_placeButton   != null) _placeButton.onClick.RemoveListener(OnPlaceClicked);
+
+        if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
+        if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
 
         HideConfirmDialog();
     }
@@ -163,6 +180,19 @@ public sealed class UI_GridPanel : UI_Base
         OpenPanel();
     }
 
+    // ── GridManager 브리지 (MerlinRuneBridge에서 boardManager 없을 때 참조) ──
+
+    public void EnterGalleryMode()
+    {
+        // 단일 편집 화면으로 개편 후 갤러리 모드 없음 — 편집 화면 바로 진입
+    }
+
+    public void EnterEditMode(string gridId)
+    {
+        // 단일 편집 화면이므로 별도 편집 모드 전환 없음
+        // GridManager에 편집 대상 gridId 전달 (기존 연동 유지)
+    }
+
     // ── Open / Close ──
 
     private void OpenPanel()
@@ -170,12 +200,50 @@ public sealed class UI_GridPanel : UI_Base
         _isOpen = true;
         Time.timeScale = 0f;
         gameObject.SetActive(true);
-        GameRunBootstrapper.Instance?.Run?.EnterGridSynergy();
+
+        var run   = GameRunBootstrapper.Instance?.Run;
+        var stats = run?.Player?.RuntimeStats;
+
+        _charInfoView?.SetContext(stats, run);
+
+        // 존 총 셀 수 캐시 (RuneData 로드 완료 이후 첫 오픈 시 보장)
+        _synergyStatusView?.CacheZoneTotals();
+
+        // 헥사곤 그리드: 데이터 로드 후 빌드 + 드래그-앤-드롭 연동
+        if (_hexGridView != null && Managers.RuneData != null && Managers.RuneData.IsInitialized)
+        {
+            _hexGridView.BuildGrid();
+
+            // 배치된 Shape가 헥사 셀 위에 렌더링되도록 BoardContainer를 최후 sibling으로
+            _boardContainer.SetAsLastSibling();
+
+            var hexGrid = _hexGridView.HexGrid;
+            if (hexGrid != null)
+            {
+                if (BoardManager.Instance != null)
+                    BoardManager.Instance.EnterExternalGrid(hexGrid, hexGrid.gridAsset);
+                else if (GridManager.Instance != null)
+                    GridManager.Instance.SetActiveGrid(hexGrid);
+            }
+
+            // 초기 점유 상태 반영 (재오픈 시 이전 배치 복원)
+            _hexGridView.RefreshOccupiedCells();
+        }
+
+        run?.EnterGridSynergy();
 
         BindInventory();
-        _pendingNewItem = null; // 갤러리 모드에서는 staging area 슬롯으로 표시되므로 별도 처리 불필요
-        stagingArea?.Refresh(_inventory);
-        EnterGalleryMode();
+        _stagingArea?.Refresh(_inventory);
+
+        RefreshSynergyStatus();
+        RefreshFooter();
+        RefreshInfoPanelDefault();
+
+        if (_pendingNewItem != null)
+        {
+            _itemInfoPanel?.ShowItem(_pendingNewItem, isNew: true);
+            _pendingNewItem = null;
+        }
     }
 
     private void ClosePanel()
@@ -184,47 +252,577 @@ public sealed class UI_GridPanel : UI_Base
         Time.timeScale = 1f;
         HideConfirmDialog();
         GameRunBootstrapper.Instance?.Run?.ExitGridSynergy();
-
-        editView?.Deactivate();
-
         gameObject.SetActive(false);
     }
 
-    // ── Mode Switching ──
+    // ── Layout 빌드 ──
 
-    public void EnterGalleryMode()
+    /// <summary>
+    /// Awake에서 1회 호출. 전체 패널 레이아웃을 코드로 생성한다.
+    /// Canvas: 1920×1080, Scale With Screen Size, Match 0.5 기준.
+    /// </summary>
+    private void BuildLayout()
     {
-        _hoverShowingItemInfo = false;
-        boardContainer?.gameObject.SetActive(false);
-        galleryView?.gameObject.SetActive(true);
-        editView?.gameObject.SetActive(false);
+        var rootRT = GetComponent<RectTransform>();
+        if (rootRT == null) rootRT = gameObject.AddComponent<RectTransform>();
+        rootRT.anchorMin = Vector2.zero;
+        rootRT.anchorMax = Vector2.one;
+        rootRT.offsetMin = rootRT.offsetMax = Vector2.zero;
 
-        // 패널 전환: 갤러리 상세 보이기, ItemInfoPanel 숨기기
-        if (_galleryDetailPanel != null) _galleryDetailPanel.SetActive(true);
-        itemInfoPanel?.gameObject.SetActive(false);
+        // 전체 배경
+        var bg = gameObject.GetComponent<Image>() ?? gameObject.AddComponent<Image>();
+        bg.color = new Color(0.04f, 0.05f, 0.08f, 0.97f);
 
-        galleryView?.Refresh();
-        galleryView?.RefreshThumbnails();
-
-        // 첫 번째 그리드 자동 선택
-        var firstGridId = galleryView?.GetSelectedGridId();
-        if (!string.IsNullOrEmpty(firstGridId))
-            RefreshGalleryDetail(firstGridId);
+        BuildHeader();
+        BuildMainArea();
+        BuildFooter();
     }
 
-    public void EnterEditMode(string gridId)
+    // Header (60px 고정, 상단)
+    private void BuildHeader()
     {
-        _hoverShowingItemInfo = false;
-        boardContainer?.gameObject.SetActive(true);
-        galleryView?.gameObject.SetActive(false);
-        editView?.gameObject.SetActive(true);
+        var headerGO = Go("Header");
+        headerGO.transform.SetParent(transform, false);
+        _headerRT = headerGO.GetComponent<RectTransform>();
+        _headerRT.anchorMin        = new Vector2(0f, 1f);
+        _headerRT.anchorMax        = new Vector2(1f, 1f);
+        _headerRT.sizeDelta        = new Vector2(0f, 60f);
+        _headerRT.anchoredPosition = new Vector2(0f, -30f);
 
-        // 패널 전환: ItemInfoPanel 보이기, 갤러리 상세 숨기기
-        if (_galleryDetailPanel != null) _galleryDetailPanel.SetActive(false);
-        itemInfoPanel?.gameObject.SetActive(true);
-        itemInfoPanel?.ShowEmpty();
+        var hdrBG = headerGO.AddComponent<Image>();
+        hdrBG.color = new Color(0.07f, 0.08f, 0.12f, 1f);
 
-        editView?.Activate(gridId);
+        // ← 뒤로가기 버튼 (좌측)
+        _backButton = MakeButton(headerGO.transform, "BackBtn",
+            new Vector2(0f, 0f), new Vector2(0f, 1f),
+            new Vector2(60f, 0f), Vector2.zero,
+            new Color(0.15f, 0.18f, 0.25f, 1f), "←");
+        var backRT = _backButton.GetComponent<RectTransform>();
+        backRT.pivot = new Vector2(0f, 0.5f);
+        backRT.anchoredPosition = new Vector2(8f, 0f);
+        backRT.sizeDelta = new Vector2(48f, -12f);
+        backRT.anchorMin = new Vector2(0f, 0f);
+        backRT.anchorMax = new Vector2(0f, 1f);
+
+        // 타이틀 텍스트 (중앙)
+        var titleGO = MakeTxt(headerGO.transform, "Title", "그리드 배치", 18f,
+            new Color(0.88f, 0.92f, 1f, 1f), bold: true);
+        var titleRT = titleGO.GetComponent<RectTransform>();
+        titleRT.anchorMin = new Vector2(0.3f, 0f);
+        titleRT.anchorMax = new Vector2(0.7f, 1f);
+        titleRT.sizeDelta = Vector2.zero;
+        titleGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
+        // [초기화] 버튼 (우측, 완료 버튼 왼쪽)
+        _resetButton = MakeButton(headerGO.transform, "ResetBtn",
+            new Vector2(1f, 0f), new Vector2(1f, 1f),
+            new Vector2(90f, -14f), new Vector2(-106f, 0f),
+            new Color(0.45f, 0.22f, 0.18f, 0.9f), "초기화");
+
+        // [완료 ✓] 버튼 (우측 끝)
+        _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
+            new Vector2(1f, 0f), new Vector2(1f, 1f),
+            new Vector2(96f, -14f), new Vector2(-8f, 0f),
+            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료 ✓");
+        var confirmRT = _confirmButton.GetComponent<RectTransform>();
+        confirmRT.pivot = new Vector2(1f, 0.5f);
+        confirmRT.anchorMin = new Vector2(1f, 0f);
+        confirmRT.anchorMax = new Vector2(1f, 1f);
+        confirmRT.sizeDelta = new Vector2(96f, -14f);
+        confirmRT.anchoredPosition = new Vector2(-8f, 0f);
+    }
+
+    // MainArea — Header 하단 ~ Footer 상단
+    private void BuildMainArea()
+    {
+        var mainGO = Go("MainArea");
+        mainGO.transform.SetParent(transform, false);
+        _mainAreaRT = mainGO.GetComponent<RectTransform>();
+        _mainAreaRT.anchorMin        = new Vector2(0f, 0f);
+        _mainAreaRT.anchorMax        = new Vector2(1f, 1f);
+        _mainAreaRT.offsetMin        = new Vector2(0f, 50f);   // footer 50px
+        _mainAreaRT.offsetMax        = new Vector2(0f, -60f);  // header 60px
+
+        BuildLeftPanel(mainGO.transform);
+        BuildCenterPanel(mainGO.transform);
+        BuildRightPanel(mainGO.transform);
+    }
+
+    // LeftPanel (0% ~ 20%)
+    private void BuildLeftPanel(Transform parent)
+    {
+        var go = Go("LeftPanel");
+        go.transform.SetParent(parent, false);
+        _leftPanelRT = go.GetComponent<RectTransform>();
+        _leftPanelRT.anchorMin = new Vector2(0f,    0f);
+        _leftPanelRT.anchorMax = new Vector2(0.20f, 1f);
+        _leftPanelRT.offsetMin = _leftPanelRT.offsetMax = Vector2.zero;
+
+        _charInfoView = CharacterInfoPanelView.Create(go.transform);
+        if (_charInfoView != null)
+        {
+            var charRT = _charInfoView.GetComponent<RectTransform>();
+            charRT.anchorMin = Vector2.zero;
+            charRT.anchorMax = Vector2.one;
+            charRT.offsetMin = charRT.offsetMax = Vector2.zero;
+        }
+    }
+
+    // CenterPanel (20% ~ 75%)
+    private void BuildCenterPanel(Transform parent)
+    {
+        var go = Go("CenterPanel");
+        go.transform.SetParent(parent, false);
+        _centerPanelRT = go.GetComponent<RectTransform>();
+        _centerPanelRT.anchorMin = new Vector2(0.20f, 0f);
+        _centerPanelRT.anchorMax = new Vector2(0.75f, 1f);
+        _centerPanelRT.offsetMin = new Vector2(2f, 0f);
+        _centerPanelRT.offsetMax = new Vector2(-2f, 0f);
+
+        // 상단 65%: HexGrid
+        var hexRootGO = Go("HexGridRoot");
+        hexRootGO.transform.SetParent(go.transform, false);
+        _hexGridRoot = hexRootGO.GetComponent<RectTransform>();
+        _hexGridRoot.anchorMin = new Vector2(0f, 0.35f);
+        _hexGridRoot.anchorMax = new Vector2(1f, 1.00f);
+        _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
+
+        var hexBG = hexRootGO.AddComponent<Image>();
+        hexBG.color = new Color(0.05f, 0.06f, 0.09f, 0.95f);
+
+        _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
+
+        // BoardContainer: GridManager/MerlinRuneBridge와 연동하는 영역
+        var boardGO = Go("BoardContainer");
+        boardGO.transform.SetParent(hexRootGO.transform, false);
+        _boardContainer = boardGO.GetComponent<RectTransform>();
+        _boardContainer.anchorMin = Vector2.zero;
+        _boardContainer.anchorMax = Vector2.one;
+        _boardContainer.offsetMin = _boardContainer.offsetMax = Vector2.zero;
+
+        // 하단 35%: SynergyStatus
+        var synRootGO = Go("SynergyStatusRoot");
+        synRootGO.transform.SetParent(go.transform, false);
+        _synergyStatusRoot = synRootGO.GetComponent<RectTransform>();
+        _synergyStatusRoot.anchorMin = new Vector2(0f, 0f);
+        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.34f);
+        _synergyStatusRoot.offsetMin = new Vector2(0f, 2f);
+        _synergyStatusRoot.offsetMax = Vector2.zero;
+
+        _synergyStatusView = synRootGO.AddComponent<MerlinRuneSynergyStatusView>();
+    }
+
+    // RightPanel (75% ~ 100%)
+    private void BuildRightPanel(Transform parent)
+    {
+        var go = Go("RightPanel");
+        go.transform.SetParent(parent, false);
+        _rightPanelRT = go.GetComponent<RectTransform>();
+        _rightPanelRT.anchorMin = new Vector2(0.75f, 0f);
+        _rightPanelRT.anchorMax = new Vector2(1.00f, 1f);
+        _rightPanelRT.offsetMin = new Vector2(2f, 0f);
+        _rightPanelRT.offsetMax = Vector2.zero;
+
+        var rightBG = go.AddComponent<Image>();
+        rightBG.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+
+        // 상단 70%: StagingAreaView (스크롤)
+        BuildStagingScrollArea(go.transform);
+
+        // 하단 30%: ItemInfoPanel + 배치 버튼
+        BuildItemInfoArea(go.transform);
+    }
+
+    private void BuildStagingScrollArea(Transform parent)
+    {
+        var scrollGO = Go("StagingScroll");
+        scrollGO.transform.SetParent(parent, false);
+        _stagingScrollRT = scrollGO.GetComponent<RectTransform>();
+        _stagingScrollRT.anchorMin = new Vector2(0f, 0.30f);
+        _stagingScrollRT.anchorMax = new Vector2(1f, 1.00f);
+        _stagingScrollRT.offsetMin = new Vector2(4f, 4f);
+        _stagingScrollRT.offsetMax = new Vector2(-4f, -4f);
+
+        var scrollBG = scrollGO.AddComponent<Image>();
+        scrollBG.color = new Color(0.04f, 0.05f, 0.08f, 0.60f);
+
+        // "보관함" 레이블
+        var lblGO = MakeTxt(scrollGO.transform, "StagingLabel", "아이템 목록", 10f,
+            new Color(0.65f, 0.70f, 0.85f, 1f));
+        var lblRT = lblGO.GetComponent<RectTransform>();
+        lblRT.anchorMin = new Vector2(0f, 1f);
+        lblRT.anchorMax = new Vector2(1f, 1f);
+        lblRT.sizeDelta = new Vector2(0f, 22f);
+        lblRT.anchoredPosition = new Vector2(0f, -11f);
+        lblGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
+        // Scroll viewport (레이블 아래)
+        var viewportGO = Go("Viewport");
+        viewportGO.transform.SetParent(scrollGO.transform, false);
+        var viewportRT = viewportGO.GetComponent<RectTransform>();
+        viewportRT.anchorMin = new Vector2(0f, 0f);
+        viewportRT.anchorMax = new Vector2(1f, 1f);
+        viewportRT.offsetMin = new Vector2(0f, 0f);
+        viewportRT.offsetMax = new Vector2(0f, -24f);
+        viewportGO.AddComponent<RectMask2D>();
+
+        var scrollRect = scrollGO.AddComponent<ScrollRect>();
+        scrollRect.horizontal        = true;
+        scrollRect.vertical          = false;
+        scrollRect.scrollSensitivity = 30f;
+        scrollRect.movementType      = ScrollRect.MovementType.Clamped;
+        scrollRect.inertia           = true;
+
+        // ScrollContent — StagingAreaView가 가로 방향으로 슬롯을 배치하므로 좌측 앵커
+        var contentGO = Go("ScrollContent");
+        contentGO.transform.SetParent(viewportGO.transform, false);
+        var contentRT = contentGO.GetComponent<RectTransform>();
+        contentRT.anchorMin = new Vector2(0f, 0f);
+        contentRT.anchorMax = new Vector2(0f, 1f);
+        contentRT.pivot     = new Vector2(0f, 0.5f);
+        contentRT.offsetMin = contentRT.offsetMax = Vector2.zero;
+
+        scrollRect.content  = contentRT;
+        scrollRect.viewport = viewportRT;
+
+        // StagingAreaView 추가 후 Init으로 scrollContent 전달 + 슬롯 빌드
+        _stagingArea = scrollGO.AddComponent<StagingAreaView>();
+        _stagingArea.Init(contentRT);
+    }
+
+    /// <summary>
+    /// ItemInfoPanel의 필수 SerializeField를 코드로 생성한 UI 오브젝트로 주입한다.
+    /// Inspector 연결 없이 동작하도록 최소 UI 구조를 빌드한다.
+    /// </summary>
+    private void BuildAndInjectItemInfoPanelFields(GameObject root)
+    {
+        if (_itemInfoPanel == null) return;
+
+        var rf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var type = typeof(ItemInfoPanel);
+
+        // CanvasGroup
+        var cg = root.AddComponent<CanvasGroup>();
+        type.GetField("canvasGroup", rf)?.SetValue(_itemInfoPanel, cg);
+
+        // itemRoot: 아이템 표시 영역
+        var itemRootGO = new GameObject("ItemRoot", typeof(RectTransform));
+        itemRootGO.transform.SetParent(root.transform, false);
+        var itemRootRT = itemRootGO.GetComponent<RectTransform>();
+        itemRootRT.anchorMin = new Vector2(0f, 0.10f);
+        itemRootRT.anchorMax = new Vector2(1f, 0.92f);
+        itemRootRT.offsetMin = new Vector2(4f, 0f);
+        itemRootRT.offsetMax = new Vector2(-4f, 0f);
+        type.GetField("itemRoot", rf)?.SetValue(_itemInfoPanel, itemRootGO);
+
+        // itemIcon
+        var iconGO = new GameObject("ItemIcon", typeof(RectTransform));
+        iconGO.transform.SetParent(itemRootGO.transform, false);
+        var iconRT = iconGO.GetComponent<RectTransform>();
+        iconRT.anchorMin = new Vector2(0f, 0.62f);
+        iconRT.anchorMax = new Vector2(1f, 1f);
+        iconRT.sizeDelta = Vector2.zero;
+        var iconImg = iconGO.AddComponent<Image>();
+        iconImg.raycastTarget = false;
+        type.GetField("itemIcon", rf)?.SetValue(_itemInfoPanel, iconImg);
+
+        // rarityBar
+        var rarityBarGO = new GameObject("RarityBar", typeof(RectTransform));
+        rarityBarGO.transform.SetParent(itemRootGO.transform, false);
+        var rarityBarRT = rarityBarGO.GetComponent<RectTransform>();
+        rarityBarRT.anchorMin = new Vector2(0f, 1f);
+        rarityBarRT.anchorMax = new Vector2(1f, 1f);
+        rarityBarRT.sizeDelta = new Vector2(0f, 4f);
+        rarityBarRT.anchoredPosition = Vector2.zero;
+        var rarityBarImg = rarityBarGO.AddComponent<Image>();
+        rarityBarImg.raycastTarget = false;
+        type.GetField("rarityBar", rf)?.SetValue(_itemInfoPanel, rarityBarImg);
+
+        // itemName
+        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 11f,
+            new Color(0.92f, 0.95f, 1f, 1f), bold: true);
+        var nameRT = nameTxtGO.GetComponent<RectTransform>();
+        nameRT.anchorMin = new Vector2(0f, 0.48f);
+        nameRT.anchorMax = new Vector2(1f, 0.62f);
+        nameRT.offsetMin = nameRT.offsetMax = Vector2.zero;
+        var nameTxt = nameTxtGO.GetComponent<TMP_Text>();
+        nameTxt.enableWordWrapping = false;
+        nameTxt.alignment = TextAlignmentOptions.MidlineLeft;
+        type.GetField("itemName", rf)?.SetValue(_itemInfoPanel, nameTxt);
+
+        // rarityText
+        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 9f,
+            new Color(0.65f, 0.65f, 0.75f, 1f));
+        var rarityTxtRT = rarityTxtGO.GetComponent<RectTransform>();
+        rarityTxtRT.anchorMin = new Vector2(0f, 0.38f);
+        rarityTxtRT.anchorMax = new Vector2(1f, 0.48f);
+        rarityTxtRT.offsetMin = rarityTxtRT.offsetMax = Vector2.zero;
+        type.GetField("rarityText", rf)?.SetValue(_itemInfoPanel, rarityTxtGO.GetComponent<TMP_Text>());
+
+        // effectListRoot
+        var effectListGO = new GameObject("EffectList", typeof(RectTransform));
+        effectListGO.transform.SetParent(itemRootGO.transform, false);
+        var effectListRT = effectListGO.GetComponent<RectTransform>();
+        effectListRT.anchorMin = new Vector2(0f, 0f);
+        effectListRT.anchorMax = new Vector2(1f, 0.36f);
+        effectListRT.offsetMin = effectListRT.offsetMax = Vector2.zero;
+        var vlgEffect = effectListGO.AddComponent<VerticalLayoutGroup>();
+        vlgEffect.childAlignment       = TextAnchor.UpperLeft;
+        vlgEffect.spacing              = 2f;
+        vlgEffect.childControlWidth    = true;
+        vlgEffect.childControlHeight   = false;
+        vlgEffect.childForceExpandWidth  = true;
+        vlgEffect.childForceExpandHeight = false;
+        type.GetField("effectListRoot", rf)?.SetValue(_itemInfoPanel, effectListGO.transform);
+
+        // shapePreviewRoot
+        var shapePreviewGO = new GameObject("ShapePreview", typeof(RectTransform));
+        shapePreviewGO.transform.SetParent(itemRootGO.transform, false);
+        var shapePreviewRT = shapePreviewGO.GetComponent<RectTransform>();
+        shapePreviewRT.anchorMin = new Vector2(0.6f, 0.60f);
+        shapePreviewRT.anchorMax = new Vector2(1.0f, 1.00f);
+        shapePreviewRT.offsetMin = shapePreviewRT.offsetMax = Vector2.zero;
+        type.GetField("shapePreviewRoot", rf)?.SetValue(_itemInfoPanel, shapePreviewRT);
+
+        // emptyRoot + emptyText
+        var emptyRootGO = new GameObject("EmptyRoot", typeof(RectTransform));
+        emptyRootGO.transform.SetParent(root.transform, false);
+        var emptyRootRT = emptyRootGO.GetComponent<RectTransform>();
+        emptyRootRT.anchorMin = Vector2.zero;
+        emptyRootRT.anchorMax = Vector2.one;
+        emptyRootRT.offsetMin = emptyRootRT.offsetMax = Vector2.zero;
+        type.GetField("emptyRoot", rf)?.SetValue(_itemInfoPanel, emptyRootGO);
+
+        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 10f,
+            new Color(0.45f, 0.48f, 0.58f, 0.8f));
+        var emptyTxtRT = emptyTxtGO.GetComponent<RectTransform>();
+        emptyTxtRT.anchorMin = Vector2.zero;
+        emptyTxtRT.anchorMax = Vector2.one;
+        emptyTxtRT.offsetMin = emptyTxtRT.offsetMax = Vector2.zero;
+        emptyTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        type.GetField("emptyText", rf)?.SetValue(_itemInfoPanel, emptyTxtGO.GetComponent<TMP_Text>());
+
+        // newBadge
+        var newBadgeGO = new GameObject("NewBadge", typeof(RectTransform));
+        newBadgeGO.transform.SetParent(itemRootGO.transform, false);
+        var newBadgeRT = newBadgeGO.GetComponent<RectTransform>();
+        newBadgeRT.anchorMin        = new Vector2(0f, 1f);
+        newBadgeRT.anchorMax        = new Vector2(0f, 1f);
+        newBadgeRT.pivot            = new Vector2(0f, 1f);
+        newBadgeRT.sizeDelta        = new Vector2(36f, 16f);
+        newBadgeRT.anchoredPosition = new Vector2(2f, -2f);
+        var newBadgeBG = newBadgeGO.AddComponent<Image>();
+        newBadgeBG.color = new Color(1f, 0.3f, 0.3f, 0.95f);
+        var newBadgeTxtGO = MakeTxt(newBadgeGO.transform, "Label", "NEW", 8f, Color.white, bold: true);
+        var newBadgeTxtRT = newBadgeTxtGO.GetComponent<RectTransform>();
+        newBadgeTxtRT.anchorMin = Vector2.zero;
+        newBadgeTxtRT.anchorMax = Vector2.one;
+        newBadgeTxtRT.sizeDelta = Vector2.zero;
+        newBadgeTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        type.GetField("newBadge", rf)?.SetValue(_itemInfoPanel, newBadgeGO);
+    }
+
+    private void BuildItemInfoArea(Transform parent)
+    {
+        var infoRootGO = Go("ItemInfoRoot");
+        infoRootGO.transform.SetParent(parent, false);
+        _itemInfoRoot = infoRootGO.GetComponent<RectTransform>();
+        _itemInfoRoot.anchorMin = new Vector2(0f, 0f);
+        _itemInfoRoot.anchorMax = new Vector2(1f, 0.30f);
+        _itemInfoRoot.offsetMin = new Vector2(4f, 4f);
+        _itemInfoRoot.offsetMax = new Vector2(-4f, -4f);
+
+        var infoBG = infoRootGO.AddComponent<Image>();
+        infoBG.color = new Color(0.05f, 0.06f, 0.10f, 0.90f);
+
+        // "선택:" 레이블
+        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 9f,
+            new Color(0.55f, 0.60f, 0.75f, 1f));
+        var selRT = selLbl.GetComponent<RectTransform>();
+        selRT.anchorMin = new Vector2(0f, 1f);
+        selRT.anchorMax = new Vector2(1f, 1f);
+        selRT.sizeDelta = new Vector2(0f, 18f);
+        selRT.anchoredPosition = new Vector2(0f, -9f);
+
+        // ItemInfoPanel 컴포넌트 추가 (필수 SerializeField를 코드로 초기화)
+        _itemInfoPanel = infoRootGO.AddComponent<ItemInfoPanel>();
+        BuildAndInjectItemInfoPanelFields(infoRootGO);
+
+        // [배치하기] 버튼 (하단)
+        var placeGO = new GameObject("PlaceBtn", typeof(RectTransform));
+        placeGO.transform.SetParent(infoRootGO.transform, false);
+        var placeRT = placeGO.GetComponent<RectTransform>();
+        placeRT.anchorMin        = new Vector2(0.05f, 0f);
+        placeRT.anchorMax        = new Vector2(0.95f, 0f);
+        placeRT.pivot            = new Vector2(0.5f, 0f);
+        placeRT.sizeDelta        = new Vector2(0f, 34f);
+        placeRT.anchoredPosition = new Vector2(0f, 4f);
+
+        var placeBG = placeGO.AddComponent<Image>();
+        placeBG.color = new Color(0.20f, 0.45f, 0.80f, 0.90f);
+        _placeButton  = placeGO.AddComponent<Button>();
+        _placeButton.targetGraphic = placeBG;
+
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "배치하기 ▶", 13f, Color.white, bold: true);
+        var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
+        placeTxtRT.anchorMin = Vector2.zero;
+        placeTxtRT.anchorMax = Vector2.one;
+        placeTxtRT.sizeDelta = Vector2.zero;
+        placeTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+    }
+
+    // Footer (50px 고정, 하단)
+    private void BuildFooter()
+    {
+        var footerGO = Go("Footer");
+        footerGO.transform.SetParent(transform, false);
+        _footerRT = footerGO.GetComponent<RectTransform>();
+        _footerRT.anchorMin        = new Vector2(0f, 0f);
+        _footerRT.anchorMax        = new Vector2(1f, 0f);
+        _footerRT.sizeDelta        = new Vector2(0f, 50f);
+        _footerRT.anchoredPosition = new Vector2(0f, 25f);
+
+        var footerBG = footerGO.AddComponent<Image>();
+        footerBG.color = new Color(0.05f, 0.06f, 0.09f, 0.98f);
+
+        // 활성 시너지 텍스트 (좌측)
+        var actGO = MakeTxt(footerGO.transform, "ActiveSyn",
+            "활성: —          미달성: —", 11f, new Color(0.75f, 0.88f, 1f, 1f));
+        var actRT = actGO.GetComponent<RectTransform>();
+        actRT.anchorMin = new Vector2(0f, 0f);
+        actRT.anchorMax = new Vector2(0.75f, 1f);
+        actRT.offsetMin = new Vector2(12f, 0f);
+        actRT.offsetMax = new Vector2(-4f, 0f);
+        _footerActiveSynText = actGO.GetComponent<TMP_Text>();
+        _footerActiveSynText.enableWordWrapping = false;
+        _footerActiveSynText.alignment = TextAlignmentOptions.MidlineLeft;
+
+        // 셀 카운트 (우측)
+        var cntGO = MakeTxt(footerGO.transform, "CellCount", "0/20 셀 배치됨", 11f,
+            new Color(0.65f, 0.70f, 0.85f, 1f));
+        var cntRT = cntGO.GetComponent<RectTransform>();
+        cntRT.anchorMin = new Vector2(0.75f, 0f);
+        cntRT.anchorMax = new Vector2(1.00f, 1f);
+        cntRT.offsetMin = new Vector2(0f, 0f);
+        cntRT.offsetMax = new Vector2(-12f, 0f);
+        _footerCellCountText = cntGO.GetComponent<TMP_Text>();
+        _footerCellCountText.alignment = TextAlignmentOptions.MidlineRight;
+    }
+
+    // ── Confirm Dialog ──
+
+    private void BuildConfirmDialog()
+    {
+        _confirmDialog = new GameObject("ConfirmDialog", typeof(RectTransform));
+        _confirmDialog.transform.SetParent(transform, false);
+
+        var rt = _confirmDialog.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+
+        var overlay = _confirmDialog.AddComponent<Image>();
+        overlay.color         = new Color(0f, 0f, 0f, 0.60f);
+        overlay.raycastTarget = true;
+
+        var panelGO = new GameObject("Panel", typeof(RectTransform));
+        panelGO.transform.SetParent(_confirmDialog.transform, false);
+        var panelRT = panelGO.GetComponent<RectTransform>();
+        panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        panelRT.pivot            = new Vector2(0.5f, 0.5f);
+        panelRT.sizeDelta        = new Vector2(340f, 130f);
+        panelRT.anchoredPosition = Vector2.zero;
+        panelGO.AddComponent<Image>().color = new Color(0.10f, 0.11f, 0.17f, 0.98f);
+
+        var textGO = MakeTxt(panelGO.transform, "Text",
+            "보관함 아이템이 남아 있습니다.", 13f, new Color(0.9f, 0.92f, 1f, 1f));
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = new Vector2(0f, 0.42f);
+        textRT.anchorMax = new Vector2(1f, 1f);
+        textRT.sizeDelta = Vector2.zero;
+        _confirmDialogText = textGO.GetComponent<TMP_Text>();
+        _confirmDialogText.alignment     = TextAlignmentOptions.Center;
+        _confirmDialogText.enableWordWrapping = true;
+
+        // [계속 배치] 버튼
+        _confirmDialogKeepBtn = MakeButton(panelGO.transform, "KeepBtn",
+            new Vector2(0.08f, 0f), new Vector2(0.45f, 0.38f),
+            Vector2.zero, new Vector2(0f, 4f),
+            new Color(0.25f, 0.27f, 0.35f, 1f), "계속 배치");
+
+        // [폐기 후 종료] 버튼
+        _confirmDialogDiscardBtn = MakeButton(panelGO.transform, "DiscardBtn",
+            new Vector2(0.55f, 0f), new Vector2(0.92f, 0.38f),
+            Vector2.zero, new Vector2(0f, 4f),
+            new Color(0.72f, 0.18f, 0.18f, 1f), "폐기 후 종료");
+
+        _confirmDialog.SetActive(false);
+    }
+
+    private void ShowConfirmDialog()
+    {
+        if (_confirmDialog != null) _confirmDialog.SetActive(true);
+    }
+
+    private void HideConfirmDialog()
+    {
+        if (_confirmDialog != null) _confirmDialog.SetActive(false);
+    }
+
+    // ── Synergy Toast ──
+
+    private void BuildSynergyToast()
+    {
+        _synergyToast = new GameObject("SynergyToast", typeof(RectTransform));
+        _synergyToast.transform.SetParent(transform, false);
+
+        var rt = _synergyToast.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0.21f, 0.52f);
+        rt.anchorMax        = new Vector2(0.74f, 0.62f);
+        rt.offsetMin        = Vector2.zero;
+        rt.offsetMax        = Vector2.zero;
+
+        _synergyToast.AddComponent<Image>().color = new Color(0.04f, 0.14f, 0.08f, 0.93f);
+
+        var textGO = MakeTxt(_synergyToast.transform, "Text",
+            "", 14f, new Color(0.3f, 1f, 0.55f, 1f));
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.sizeDelta = new Vector2(-12f, -8f);
+        _synergyToastText = textGO.GetComponent<TMP_Text>();
+        _synergyToastText.alignment = TextAlignmentOptions.Center;
+        _synergyToastText.enableWordWrapping = false;
+
+        _synergyToast.SetActive(false);
+    }
+
+    private void ShowSynergyActivated(string description)
+    {
+        ShowSynergyToastAsync(description).Forget();
+    }
+
+    private async UniTaskVoid ShowSynergyToastAsync(string description)
+    {
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        _toastCts = new CancellationTokenSource();
+        var ct = _toastCts.Token;
+
+        if (_synergyToastText != null)
+            _synergyToastText.text = $"★ 시너지 활성화!  {description}";
+        if (_synergyToast != null)
+            _synergyToast.SetActive(true);
+
+        try
+        {
+            await UniTask.Delay(2500, ignoreTimeScale: true, cancellationToken: ct);
+        }
+        catch (System.OperationCanceledException) { }
+
+        if (_synergyToast != null)
+            _synergyToast.SetActive(false);
     }
 
     // ── Inventory Bridge ──
@@ -251,101 +849,220 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnStagingChanged()
     {
-        stagingArea?.Refresh(_inventory);
+        _stagingArea?.Refresh(_inventory);
         RefreshInfoPanelDefault();
+        RefreshFooter();
     }
 
-    private void OnPlacedChanged() { }
+    private void OnPlacedChanged()
+    {
+        RefreshSynergyStatus();
+        RefreshFooter();
+    }
 
     // ── GridManager Event Bridge ──
 
     private void HandleItemPlaced(RuntimeItemData item)
     {
         _inventory?.PlaceItem(item);
-        itemInfoPanel?.ShowItem(item, isNew: false);
-        galleryView?.RefreshThumbnails();
-        editView?.RefreshSynergyText();
+        _itemInfoPanel?.ShowItem(item, isNew: false);
+        _totalPlacedCells += GetItemCellCount(item);
+        RefreshSynergyStatus();
+        RefreshFooter();
+
+        if (_hexGridView != null)
+        {
+            var shape = item != null
+                ? BoardManager.Instance?.GetSharedShapeByItem(item.instanceId)
+                : null;
+            if (shape != null)
+                _hexGridView.TriggerPlacementEffect(shape.GetOccupiedSquares());
+            else
+                _hexGridView.RefreshOccupiedCells();
+        }
     }
 
     private void HandleItemRemoved(RuntimeItemData item)
     {
         _inventory?.UnplaceItem(item);
-        galleryView?.RefreshThumbnails();
+        _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
+        RefreshSynergyStatus();
+        RefreshFooter();
+        _hexGridView?.RefreshOccupiedCells();
+    }
+
+    private int GetItemCellCount(RuntimeItemData item)
+    {
+        if (item == null || item.shapeId == 0) return 1;
+        var piece = Managers.RuneData?.GetPiece(item.shapeId);
+        if (piece == null) return 1;
+        return RuneDataManager.ParseCellOffsets(piece).Length;
     }
 
     private void HandleItemSelected(RuntimeItemData item)
     {
-        itemInfoPanel?.ShowItem(item, isNew: false);
+        _itemInfoPanel?.ShowItem(item, isNew: false);
     }
 
     private void OnStagingItemSelected(RuntimeItemData item)
     {
-        _hoverShowingItemInfo = false;
-        stagingArea?.HighlightItem(item);
-
-        // 갤러리 모드일 때: 갤러리 상세 패널 ↔ ItemInfoPanel 교체
-        if (_galleryDetailPanel != null && _galleryDetailPanel.activeSelf)
-        {
-            _galleryDetailPanel.SetActive(false);
-            itemInfoPanel?.gameObject.SetActive(true);
-        }
-
-        itemInfoPanel?.ShowItem(item, isNew: false);
+        _stagingArea?.HighlightItem(item);
+        _itemInfoPanel?.ShowItem(item, isNew: false);
     }
 
     private void OnStagingItemHovered(RuntimeItemData item)
     {
-        _hoverShowingItemInfo = true;
-
-        // 갤러리 모드: 갤러리 상세 패널을 일시 숨기고 ItemInfoPanel을 전면에 표시
-        if (_galleryDetailPanel != null && _galleryDetailPanel.activeSelf)
-        {
-            _galleryDetailPanel.SetActive(false);
-            itemInfoPanel?.gameObject.SetActive(true);
-        }
-
-        itemInfoPanel?.ShowItem(item, isNew: false);
+        _itemInfoPanel?.ShowItem(item, isNew: false);
     }
 
     private void OnStagingItemUnhovered()
     {
-        if (!_hoverShowingItemInfo) return;
-        _hoverShowingItemInfo = false;
-
-        // 갤러리 모드라면 갤러리 상세 패널 복귀
-        if (galleryView != null && galleryView.gameObject.activeSelf)
-        {
-            itemInfoPanel?.gameObject.SetActive(false);
-            _galleryDetailPanel?.SetActive(true);
-        }
-        else
-        {
-            // 편집 모드: 기본 상태 복귀
-            RefreshInfoPanelDefault();
-        }
+        RefreshInfoPanelDefault();
     }
 
     // ── Info Panel Default ──
 
     private void RefreshInfoPanelDefault()
     {
-        if (itemInfoPanel == null) return;
-
-        // 보관함에 아이템이 있으면 첫 번째 표시 (슬라이드 진입) + 카드 하이라이트
+        if (_itemInfoPanel == null) return;
         if (_inventory != null && _inventory.StagingCount > 0)
         {
             var firstItem = _inventory.StagingItems[0];
-            itemInfoPanel.ShowItem(firstItem, isNew: false, slideIn: true);
-            stagingArea?.HighlightItem(firstItem);
+            _itemInfoPanel.ShowItem(firstItem, isNew: false, slideIn: true);
+            _stagingArea?.HighlightItem(firstItem);
         }
         else
         {
-            itemInfoPanel.ShowEmpty();
-            stagingArea?.HighlightItem(null);
+            _itemInfoPanel.ShowEmpty();
+            _stagingArea?.HighlightItem(null);
         }
     }
 
-    // ── Confirm Button ──
+    // ── Synergy Status Refresh ──
+
+    private void RefreshSynergyStatus()
+    {
+        if (_synergyStatusView == null) return;
+
+        var cellCountByZone = BuildCellCountByZone();
+        _synergyStatusView.Refresh(cellCountByZone);
+    }
+
+    private Dictionary<string, int> BuildCellCountByZone()
+    {
+        // 존별 배치 셀 수: GridManager.grid의 GridSquare 중 occupied인 것의 존 코드 집계
+        var result = new Dictionary<string, int>
+        {
+            { "ATK",  0 }, { "DEF", 0 }, { "MAG", 0 },
+            { "HP",   0 }, { "SPD", 0 }, { "LUCK", 0 },
+        };
+
+        var runeData = Managers.RuneData;
+        if (runeData == null) return result;
+
+        var zoneMap = runeData.GetZoneMapRows();
+        if (zoneMap == null) return result;
+
+        var charToZone = new Dictionary<char, string>
+        {
+            { 'A', "ATK" }, { 'D', "DEF" }, { 'M', "MAG" },
+            { 'H', "HP"  }, { 'S', "SPD" }, { 'L', "LUCK" },
+        };
+
+        // 존맵: (col, row) → zoneCode 테이블 구성
+        var posToCode = new Dictionary<Vector2Int, char>();
+        foreach (var row in zoneMap)
+        {
+            if (row.pattern == null) continue;
+            for (int c = 0; c < row.pattern.Length; c++)
+                posToCode[new Vector2Int(c, row.hex_row)] = row.pattern[c];
+        }
+
+        // GridManager의 GridSquare.isOccupied + (col, row) 좌표로 존별 정확한 셀 수 계산
+        var gridSquares = GridManager.Instance?.grid?.GetGridSquares();
+        if (gridSquares != null)
+        {
+            foreach (var sq in gridSquares)
+            {
+                if (!sq.isOccupied) continue;
+                var pos = new Vector2Int(sq.col, sq.row);
+                if (posToCode.TryGetValue(pos, out char zoneChar) &&
+                    charToZone.TryGetValue(zoneChar, out string zoneId))
+                    result[zoneId]++;
+            }
+        }
+
+        return result;
+    }
+
+    // ── Footer Refresh ──
+
+    private void RefreshFooter()
+    {
+        if (_footerCellCountText != null)
+            _footerCellCountText.SetText($"{_totalPlacedCells}/20 셀 배치됨");
+
+        if (_footerActiveSynText == null) return;
+
+        var sb    = new System.Text.StringBuilder("활성: ");
+        var sbYet = new System.Text.StringBuilder("미달성: ");
+
+        var runeData = Managers.RuneData;
+        if (runeData != null)
+        {
+            var cellCountByZone = BuildCellCountByZone();
+            foreach (var zoneId in runeData.GetZoneIds())
+            {
+                var synergies = runeData.GetZoneSynergies(zoneId);
+                if (synergies == null) continue;
+
+                int count = cellCountByZone.TryGetValue(zoneId, out var c) ? c : 0;
+                bool anyMet = false;
+
+                foreach (var s in synergies)
+                {
+                    if (s.threshold > 0 && count >= s.threshold)
+                    {
+                        float pct = s.value * 100f;
+                        sb.Append($"{zoneId} {(pct >= 0f ? "+" : "")}{pct:F0}%  ");
+                        anyMet = true;
+                    }
+                }
+
+                if (!anyMet)
+                    sbYet.Append($"{zoneId} ");
+            }
+        }
+
+        string active = sb.Length > 3 ? sb.ToString().TrimEnd() : "활성: —";
+        string yet    = sbYet.Length > 5 ? sbYet.ToString().TrimEnd() : "";
+        _footerActiveSynText.SetText($"{active}          {yet}");
+    }
+
+    // ── Button Handlers ──
+
+    private void OnBackClicked()
+    {
+        ClosePanel();
+    }
+
+    private void OnResetClicked()
+    {
+        // 배치된 모든 아이템 제거: 인벤토리의 배치 목록 경유
+        if (_inventory != null)
+        {
+            var allPlaced = new List<RuntimeItemData>(_inventory.StagingItems);
+            foreach (var item in allPlaced)
+            {
+                _stagingArea?.RemoveShapeForItem(item);
+                _inventory.UnplaceItem(item);
+            }
+        }
+        _totalPlacedCells = 0;
+        RefreshSynergyStatus();
+        RefreshFooter();
+        _stagingArea?.Refresh(_inventory);
+    }
 
     private void OnConfirmClicked()
     {
@@ -355,18 +1072,27 @@ public sealed class UI_GridPanel : UI_Base
             return;
         }
 
-        // 보관함 잔여 경고
         int remaining = _inventory.StagingCount;
-        if (confirmDialogText != null)
-            confirmDialogText.text = $"보관함에 아이템 {remaining}개가 있습니다.\n미배치 아이템은 폐기됩니다.";
+        if (_confirmDialogText != null)
+            _confirmDialogText.text = $"보관함에 아이템 {remaining}개가 있습니다.\n미배치 아이템은 폐기됩니다.";
 
         ShowConfirmDialog();
+    }
+
+    private void OnPlaceClicked()
+    {
+        // 현재 선택된 아이템을 그리드에 배치 시도.
+        // GridManager는 드래그 앤 드롭 기반이므로 코드 직접 배치 API 미제공.
+        // 보관함 첫 아이템을 InfoPanel에 표시하여 사용자가 드래그하도록 유도.
+        if (_inventory == null || _inventory.StagingCount == 0) return;
+        var item = _inventory.StagingItems[0];
+        _itemInfoPanel?.ShowItem(item, isNew: false);
+        _stagingArea?.HighlightItem(item);
     }
 
     private void OnDialogKeep()
     {
         HideConfirmDialog();
-        // 메모리 레이아웃: [계속 배치] → 편집 뷰 유지 (현재 뷰 상태 그대로)
     }
 
     private void OnDialogDiscardAll()
@@ -374,387 +1100,68 @@ public sealed class UI_GridPanel : UI_Base
         HideConfirmDialog();
         if (_inventory == null) { ClosePanel(); return; }
 
-        // 보관함 아이템 전체 폐기 → 대응 Shape도 제거
-        var toDiscard = new System.Collections.Generic.List<RuntimeItemData>(_inventory.StagingItems);
+        var toDiscard = new List<RuntimeItemData>(_inventory.StagingItems);
         foreach (var item in toDiscard)
         {
-            stagingArea?.RemoveShapeForItem(item);
+            _stagingArea?.RemoveShapeForItem(item);
             _inventory.DiscardFromStaging(item);
         }
 
         ClosePanel();
     }
 
-    private void ShowConfirmDialog()
+    // ── Static Helpers ──
+
+    private static GameObject Go(string name) => new(name, typeof(RectTransform));
+
+    private static GameObject MakeTxt(Transform parent, string name,
+        string text, float size, Color color, bool bold = false)
     {
-        if (confirmDialog != null) confirmDialog.SetActive(true);
+        var go = Go(name);
+        go.transform.SetParent(parent, false);
+        var t = go.AddComponent<TextMeshProUGUI>();
+        t.text          = text;
+        t.fontSize      = size;
+        t.color         = color;
+        t.fontStyle     = bold ? FontStyles.Bold : FontStyles.Normal;
+        t.raycastTarget = false;
+        t.enableWordWrapping = false;
+        return go;
     }
 
-    private void HideConfirmDialog()
+    private static Button MakeButton(Transform parent, string name,
+        Vector2 anchorMin, Vector2 anchorMax,
+        Vector2 sizeDelta, Vector2 anchoredPos,
+        Color bgColor, string label)
     {
-        if (confirmDialog != null) confirmDialog.SetActive(false);
-    }
+        var btnGO = Go(name);
+        btnGO.transform.SetParent(parent, false);
+        var btnRT = btnGO.GetComponent<RectTransform>();
+        btnRT.anchorMin        = anchorMin;
+        btnRT.anchorMax        = anchorMax;
+        btnRT.sizeDelta        = sizeDelta;
+        btnRT.anchoredPosition = anchoredPos;
+        btnRT.pivot            = new Vector2(0.5f, 0.5f);
 
-    // ── Gallery Detail Panel ──
+        var img = btnGO.AddComponent<Image>();
+        img.color = bgColor;
+        var btn = btnGO.AddComponent<Button>();
+        btn.targetGraphic = img;
 
-    private void BuildGalleryDetailPanel()
-    {
-        _galleryDetailPanel = new GameObject("GalleryDetailPanel", typeof(RectTransform));
-        _galleryDetailPanel.transform.SetParent(transform, false);
+        var lblGO = Go("Label");
+        lblGO.transform.SetParent(btnGO.transform, false);
+        var lblRT = lblGO.GetComponent<RectTransform>();
+        lblRT.anchorMin = Vector2.zero;
+        lblRT.anchorMax = Vector2.one;
+        lblRT.sizeDelta = Vector2.zero;
+        var txt = lblGO.AddComponent<TextMeshProUGUI>();
+        txt.text          = label;
+        txt.fontSize      = 13f;
+        txt.color         = Color.white;
+        txt.alignment     = TextAlignmentOptions.Center;
+        txt.raycastTarget = false;
+        txt.enableWordWrapping = false;
 
-        // itemInfoPanel과 동일 앵커 영역 (우측 36% 폭, 상단 보관함 위까지)
-        var rt = _galleryDetailPanel.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.64f, 0.18f);
-        rt.anchorMax        = new Vector2(1f,    0.92f);
-        rt.offsetMin        = new Vector2(8f,    0f);
-        rt.offsetMax        = new Vector2(-8f,   0f);
-
-        // 패널 배경
-        var bg = _galleryDetailPanel.AddComponent<Image>();
-        bg.color = new Color(0.08f, 0.1f, 0.14f, 0.95f);
-
-        // 타이틀 텍스트
-        var titleGO = new GameObject("Title", typeof(RectTransform));
-        titleGO.transform.SetParent(_galleryDetailPanel.transform, false);
-        var titleRT = titleGO.GetComponent<RectTransform>();
-        titleRT.anchorMin        = new Vector2(0f, 0.85f);
-        titleRT.anchorMax        = new Vector2(1f, 1f);
-        titleRT.sizeDelta        = Vector2.zero;
-        titleRT.anchoredPosition = Vector2.zero;
-        _galleryDetailTitle = titleGO.AddComponent<TextMeshProUGUI>();
-        _galleryDetailTitle.fontSize        = 15f;
-        _galleryDetailTitle.alignment       = TextAlignmentOptions.Center;
-        _galleryDetailTitle.color           = new Color(0.85f, 0.92f, 1f, 1f);
-        _galleryDetailTitle.raycastTarget   = false;
-        _galleryDetailTitle.enableWordWrapping = false;
-
-        // 아이템 목록 스크롤 영역
-        var listGO = new GameObject("ItemList", typeof(RectTransform));
-        listGO.transform.SetParent(_galleryDetailPanel.transform, false);
-        var listRT = listGO.GetComponent<RectTransform>();
-        listRT.anchorMin        = new Vector2(0f, 0.18f);
-        listRT.anchorMax        = new Vector2(1f, 0.84f);
-        listRT.sizeDelta        = Vector2.zero;
-        listRT.anchoredPosition = Vector2.zero;
-        var listBG = listGO.AddComponent<Image>();
-        listBG.color = new Color(0f, 0f, 0f, 0.1f);
-
-        // VerticalLayoutGroup for item rows
-        var vlg = listGO.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
-        vlg.childAlignment       = TextAnchor.UpperLeft;
-        vlg.spacing              = 4f;
-        vlg.padding              = new RectOffset(6, 6, 6, 6);
-        vlg.childControlWidth    = true;
-        vlg.childControlHeight   = false;
-        vlg.childForceExpandWidth  = true;
-        vlg.childForceExpandHeight = false;
-        _galleryDetailList = listGO.transform;
-
-        // [편집하기] 버튼
-        var editBtnGO = new GameObject("EditBtn", typeof(RectTransform));
-        editBtnGO.transform.SetParent(_galleryDetailPanel.transform, false);
-        var editBtnRT = editBtnGO.GetComponent<RectTransform>();
-        editBtnRT.anchorMin        = new Vector2(0.1f, 0.02f);
-        editBtnRT.anchorMax        = new Vector2(0.9f, 0.16f);
-        editBtnRT.sizeDelta        = Vector2.zero;
-        editBtnRT.anchoredPosition = Vector2.zero;
-        var editBtnBG = editBtnGO.AddComponent<Image>();
-        editBtnBG.color = new Color(0.2f, 0.45f, 0.8f, 0.9f);
-        _galleryEditBtn = editBtnGO.AddComponent<Button>();
-        _galleryEditBtn.targetGraphic = editBtnBG;
-
-        var editBtnLblGO = new GameObject("Label", typeof(RectTransform));
-        editBtnLblGO.transform.SetParent(editBtnGO.transform, false);
-        var editBtnLblRT = editBtnLblGO.GetComponent<RectTransform>();
-        editBtnLblRT.anchorMin = Vector2.zero;
-        editBtnLblRT.anchorMax = Vector2.one;
-        editBtnLblRT.sizeDelta = Vector2.zero;
-        var editBtnTxt = editBtnLblGO.AddComponent<TextMeshProUGUI>();
-        editBtnTxt.text          = "이 그리드 편집하기 →";
-        editBtnTxt.fontSize      = 14f;
-        editBtnTxt.alignment     = TextAlignmentOptions.Center;
-        editBtnTxt.color         = Color.white;
-        editBtnTxt.raycastTarget = false;
-
-        _galleryDetailPanel.SetActive(false);
-    }
-
-    private void RefreshGalleryDetail(string gridId)
-    {
-        _selectedGalleryGridId = gridId;
-
-        // 갤러리 상세 패널 복귀 (보관함 아이템을 보고 있었다면 원래대로)
-        _galleryDetailPanel?.SetActive(true);
-        itemInfoPanel?.gameObject.SetActive(false);
-        stagingArea?.HighlightItem(null);
-
-        // 기존 행 제거
-        foreach (var row in _galleryDetailRows)
-            if (row != null) Destroy(row);
-        _galleryDetailRows.Clear();
-
-        // 타이틀 업데이트
-        if (_galleryDetailTitle != null)
-        {
-            string gridName = gridId;
-            var bridge = BlockSynergyBridge.Instance;
-            if (bridge != null)
-            {
-                var grids = bridge.GetRegisteredGrids();
-                if (grids != null && grids.TryGetValue(gridId, out var data))
-                    gridName = data.displayName ?? gridId;
-            }
-            _galleryDetailTitle.text = $"{gridName}  배치된 아이템";
-        }
-
-        // 배치된 아이템 목록
-        var items = BoardManager.Instance?.GetPlacedItemsForGrid(gridId);
-        if (items != null && _galleryDetailList != null)
-        {
-            foreach (var item in items)
-            {
-                var row = BuildGalleryDetailRow(item);
-                row.transform.SetParent(_galleryDetailList, false);
-                _galleryDetailRows.Add(row);
-            }
-        }
-
-        // [편집하기] 버튼 연결
-        if (_galleryEditBtn != null)
-        {
-            _galleryEditBtn.onClick.RemoveAllListeners();
-            var capturedId = gridId;
-            _galleryEditBtn.onClick.AddListener(() => EnterEditMode(capturedId));
-        }
-    }
-
-    private GameObject BuildGalleryDetailRow(RuntimeItemData item)
-    {
-        var rowGO = new GameObject($"Row_{item.instanceId[..Mathf.Min(8, item.instanceId.Length)]}", typeof(RectTransform));
-        var rowRT = rowGO.GetComponent<RectTransform>();
-        rowRT.sizeDelta = new Vector2(0f, 50f);
-
-        var rowBG = rowGO.AddComponent<Image>();
-        rowBG.color = new Color(0.1f, 0.12f, 0.18f, 0.6f);
-
-        // 레어도 색 라인 (좌측)
-        var rarityBarGO = new GameObject("RarityBar", typeof(RectTransform));
-        rarityBarGO.transform.SetParent(rowGO.transform, false);
-        var rarityBarRT = rarityBarGO.GetComponent<RectTransform>();
-        rarityBarRT.anchorMin        = new Vector2(0f, 0f);
-        rarityBarRT.anchorMax        = new Vector2(0f, 1f);
-        rarityBarRT.sizeDelta        = new Vector2(4f, 0f);
-        rarityBarRT.anchoredPosition = Vector2.zero;
-        var rarityBarImg = rarityBarGO.AddComponent<Image>();
-        rarityBarImg.color = RarityColor(item.rarity);
-
-        // 아이콘
-        var iconGO = new GameObject("Icon", typeof(RectTransform));
-        iconGO.transform.SetParent(rowGO.transform, false);
-        var iconRT = iconGO.GetComponent<RectTransform>();
-        iconRT.anchorMin        = new Vector2(0f, 0.1f);
-        iconRT.anchorMax        = new Vector2(0f, 0.9f);
-        iconRT.pivot            = new Vector2(0f, 0.5f);
-        iconRT.sizeDelta        = new Vector2(36f, 0f);
-        iconRT.anchoredPosition = new Vector2(8f, 0f);
-        var iconImg = iconGO.AddComponent<Image>();
-        if (item.icon != null)
-        {
-            iconImg.sprite         = item.icon;
-            iconImg.preserveAspect = true;
-        }
-        else
-        {
-            iconImg.color = new Color(0.3f, 0.3f, 0.4f, 0.5f);
-        }
-
-        // 이름 텍스트 (우측 모양 프리뷰 공간 확보)
-        var nameTxtGO = new GameObject("Name", typeof(RectTransform));
-        nameTxtGO.transform.SetParent(rowGO.transform, false);
-        var nameTxtRT = nameTxtGO.GetComponent<RectTransform>();
-        nameTxtRT.anchorMin        = new Vector2(0f, 0.2f);
-        nameTxtRT.anchorMax        = new Vector2(1f, 0.8f);
-        nameTxtRT.sizeDelta        = new Vector2(-116f, 0f);
-        nameTxtRT.anchoredPosition = new Vector2(52f, 0f);
-        var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
-        nameTxt.text              = item.displayName ?? item.itemId;
-        nameTxt.fontSize          = 12f;
-        nameTxt.alignment         = TextAlignmentOptions.MidlineLeft;
-        nameTxt.color             = new Color(0.85f, 0.9f, 1f, 1f);
-        nameTxt.raycastTarget     = false;
-        nameTxt.enableWordWrapping = false;
-
-        // 모양 프리뷰 (우측)
-        var shapeRootGO = new GameObject("ShapePreview", typeof(RectTransform));
-        shapeRootGO.transform.SetParent(rowGO.transform, false);
-        var shapeRootRT = shapeRootGO.GetComponent<RectTransform>();
-        shapeRootRT.anchorMin        = new Vector2(1f, 0f);
-        shapeRootRT.anchorMax        = new Vector2(1f, 1f);
-        shapeRootRT.pivot            = new Vector2(1f, 0.5f);
-        shapeRootRT.sizeDelta        = new Vector2(58f, -6f);
-        shapeRootRT.anchoredPosition = new Vector2(-4f, 0f);
-        BuildRowShapePreview(shapeRootRT, item);
-
-        return rowGO;
-    }
-
-    private void BuildRowShapePreview(RectTransform root, RuntimeItemData item)
-    {
-        if (item == null || item.shapeId == 0) return;
-
-        var blockData = Managers.BlockData;
-        if (blockData == null) return;
-
-        var shapeEntry = blockData.GetShape(item.shapeId);
-        if (shapeEntry == null) return;
-
-        var offsets = BlockDataManager.ParseCellOffsets(shapeEntry);
-        if (offsets == null || offsets.Length == 0) return;
-
-        int minX = int.MaxValue, minY = int.MaxValue;
-        int maxX = int.MinValue, maxY = int.MinValue;
-        foreach (var o in offsets)
-        {
-            if (o.x < minX) minX = o.x; if (o.x > maxX) maxX = o.x;
-            if (o.y < minY) minY = o.y; if (o.y > maxY) maxY = o.y;
-        }
-        int cols = maxX - minX + 1;
-        int rows = maxY - minY + 1;
-
-        const float CELL = 9f;
-        const float GAP  = 1.5f;
-        float totalW = cols * CELL + (cols - 1) * GAP;
-        float totalH = rows * CELL + (rows - 1) * GAP;
-        float startX = -totalW * 0.5f + CELL * 0.5f;
-        float startY =  totalH * 0.5f - CELL * 0.5f;
-
-        // 아이템별 고정 색상 (썸네일 팔레트와 동일)
-        var color = GridThumbnail.GetItemColor(item.instanceId);
-
-        foreach (var o in offsets)
-        {
-            int col = o.x - minX;
-            int row = maxY - o.y;
-
-            var cellGO = new GameObject($"S{o.x}_{o.y}", typeof(RectTransform), typeof(Image));
-            cellGO.transform.SetParent(root, false);
-            var rt  = cellGO.GetComponent<RectTransform>();
-            rt.sizeDelta        = Vector2.one * CELL;
-            rt.anchoredPosition = new Vector2(
-                startX + col * (CELL + GAP),
-                startY - row * (CELL + GAP));
-            var img = cellGO.GetComponent<Image>();
-            img.color         = color;
-            img.raycastTarget = false;
-        }
-    }
-
-    private static Color RarityColor(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Rare      => new Color(0.3f, 0.6f, 1f,   1f),
-        ItemRarity.Epic      => new Color(0.7f, 0.3f, 1f,   1f),
-        ItemRarity.Legendary => new Color(1f,   0.7f, 0.2f, 1f),
-        _                    => new Color(0.7f, 0.7f, 0.7f, 1f),
-    };
-
-    // ── Confirm Button Label ──
-
-    private void EnsureConfirmButtonLabel()
-    {
-        if (confirmButton == null) return;
-
-        // 배경 이미지가 없으면 추가
-        var img = confirmButton.GetComponent<UnityEngine.UI.Image>();
-        if (img == null) img = confirmButton.gameObject.AddComponent<UnityEngine.UI.Image>();
-        img.color = new Color(0.18f, 0.42f, 0.72f, 0.95f);
-        confirmButton.targetGraphic = img;
-
-        // 텍스트 자식이 없으면 생성, 있으면 정렬·색상·내용 강제 보정
-        var existing = confirmButton.GetComponentInChildren<TMPro.TMP_Text>();
-        if (existing != null)
-        {
-            if (string.IsNullOrEmpty(existing.text)) existing.text = "배치 완료";
-            existing.color     = Color.white;
-            existing.fontSize  = 16f;
-            existing.alignment = TMPro.TextAlignmentOptions.Center;
-            existing.raycastTarget = false;
-        }
-        else
-        {
-            var txtGO = new GameObject("Label", typeof(RectTransform));
-            txtGO.transform.SetParent(confirmButton.transform, false);
-            var txtRT = txtGO.GetComponent<RectTransform>();
-            txtRT.anchorMin = Vector2.zero;
-            txtRT.anchorMax = Vector2.one;
-            txtRT.sizeDelta = Vector2.zero;
-            var txt = txtGO.AddComponent<TMPro.TextMeshProUGUI>();
-            txt.text          = "배치 완료";
-            txt.fontSize      = 16f;
-            txt.alignment     = TMPro.TextAlignmentOptions.Center;
-            txt.color         = Color.white;
-            txt.raycastTarget = false;
-        }
-    }
-
-    // ── Synergy Toast ──
-
-    private void BuildSynergyToast()
-    {
-        _synergyToast = new GameObject("SynergyToast", typeof(RectTransform));
-        _synergyToast.transform.SetParent(transform, false);
-
-        var rt = _synergyToast.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.01f, 0.52f);
-        rt.anchorMax        = new Vector2(0.64f, 0.62f);
-        rt.offsetMin        = Vector2.zero;
-        rt.offsetMax        = Vector2.zero;
-        rt.anchoredPosition = Vector2.zero;
-
-        var bg = _synergyToast.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.14f, 0.08f, 0.93f);
-
-        var textGO = new GameObject("Text", typeof(RectTransform));
-        textGO.transform.SetParent(_synergyToast.transform, false);
-        var textRT = textGO.GetComponent<RectTransform>();
-        textRT.anchorMin = Vector2.zero;
-        textRT.anchorMax = Vector2.one;
-        textRT.sizeDelta = new Vector2(-12f, -8f);
-
-        _synergyToastText = textGO.AddComponent<TextMeshProUGUI>();
-        _synergyToastText.fontSize       = 15f;
-        _synergyToastText.alignment      = TextAlignmentOptions.Center;
-        _synergyToastText.color          = new Color(0.3f, 1f, 0.55f, 1f);
-        _synergyToastText.raycastTarget  = false;
-        _synergyToastText.enableWordWrapping = false;
-
-        _synergyToast.SetActive(false);
-    }
-
-    private void ShowSynergyActivated(string description)
-    {
-        ShowSynergyToastAsync(description).Forget();
-    }
-
-    private async UniTaskVoid ShowSynergyToastAsync(string description)
-    {
-        _toastCts?.Cancel();
-        _toastCts?.Dispose();
-        _toastCts = new CancellationTokenSource();
-        var ct = _toastCts.Token;
-
-        if (_synergyToastText != null)
-            _synergyToastText.text = $"★ 시너지 활성화!  {description}";
-
-        if (_synergyToast != null)
-            _synergyToast.SetActive(true);
-
-        try
-        {
-            await UniTask.Delay(2500, ignoreTimeScale: true, cancellationToken: ct);
-        }
-        catch (System.OperationCanceledException) { }
-
-        if (_synergyToast != null)
-            _synergyToast.SetActive(false);
+        return btn;
     }
 }

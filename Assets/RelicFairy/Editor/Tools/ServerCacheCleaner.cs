@@ -11,7 +11,6 @@ public static class ServerCacheCleaner
     private static readonly string[] CacheFiles =
     {
         "equipment_data.json",          // ServerEquipmentDataManager
-        "element_effect_data.json",     // ElementEffectDataManager
         "chapter_data.json",            // ChapterDataManager
         "map_data.json",                // MapDataManager
         "monster_data.json",            // MonsterDataManager
@@ -20,8 +19,9 @@ public static class ServerCacheCleaner
         "buff_data.json",               // BuffDataManager
         "passive_data.json",            // PlayerDataManager (passive)
         "player_data.json",             // PlayerDataManager (player stat)
-        "block_grid_data.json",         // BlockDataManager (grid/synergy)
-        "block_shape_data.json",        // BlockDataManager (shape)
+        "merlin_rune_synergy_data.json", // RuneDataManager (synergy)
+        "merlin_rune_piece_data.json",  // RuneDataManager (piece)
+        "merlin_rune_zone_map.json",    // RuneDataManager (zone map)
     };
 
     private const string ZoneLayoutPrefix = "zone_layout_"; // ZoneLayoutManager

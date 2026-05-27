@@ -77,6 +77,8 @@ public class MonsterSpawner : MonoBehaviour
     [Tooltip("몬스터 스폰 직후 디졸브 연출 지속 시간(초). 0 이하면 디졸브 미사용.\n" +
              "너무 짧으면 눈에 안 띄니 0.8~1.5 권장.")]
     [SerializeField, Min(0f)] private float spawnDissolveDuration = 1.2f;
+    [Tooltip("디졸브 엣지 색상 (시인성 아웃라인). 모든 몬스터 공용으로 적용됩니다.")]
+    [SerializeField] private Color spawnOutlineColor = new Color(0f, 2.4f, 3f, 1f);
 
     [Header("풀 그룹 필터 (primary)")]
     [Tooltip("true면 Start 시점에 현재 진행 중인 챕터 번호(ChapterId+1)를 allowedPoolGroups에 자동 주입.\n" +
@@ -96,10 +98,6 @@ public class MonsterSpawner : MonoBehaviour
     [Tooltip("기준 등급. gradeMode와 조합되어 스폰 대상 범위를 정함.\n" +
              "예) AtMost + Elite → Common/Rare/Elite 허용, Exact + Rare → Rare만 허용.")]
     [SerializeField] private MonsterGrade targetGrade = MonsterGrade.Common;
-
-    [Header("원소 필터 (선택 — 비어있으면 모든 원소 허용)")]
-    [Tooltip("특정 원소 테마 방에서 사용. None(무속성)을 허용하려면 명시적으로 추가.")]
-    [SerializeField] private List<ElementType> allowedElements;
 
     [Header("웨이브 모드 설정 (비어있으면 자동 루프 모드)")]
     [Tooltip("배열 길이 = 총 웨이브 수. RoomWaveController가 웨이브별 SpawnWaveAsync를 호출한다.\n" +
@@ -307,7 +305,6 @@ public class MonsterSpawner : MonoBehaviour
                 int total     = spawnTable.entries != null ? spawnTable.entries.Count : 0;
                 int passPool  = 0;
                 int passGrade = 0;
-                int passElem  = 0;
                 int passAll   = 0;
                 if (spawnTable.entries != null)
                 {
@@ -316,24 +313,18 @@ public class MonsterSpawner : MonoBehaviour
                         if (!e.enabled || string.IsNullOrEmpty(e.addressableKey)) continue;
                         bool p1 = PassesPoolGroupFilter(e);
                         bool p2 = PassesGradeFilter(e);
-                        bool p3 = PassesElementFilter(e);
                         if (p1) passPool++;
                         if (p2) passGrade++;
-                        if (p3) passElem++;
-                        if (p1 && p2 && p3) passAll++;
+                        if (p1 && p2) passAll++;
                     }
                 }
                 string pools = allowedPoolGroups == null || allowedPoolGroups.Count == 0
                     ? "(비어있음=전체허용)"
                     : string.Join(",", allowedPoolGroups);
-                string elems = allowedElements == null || allowedElements.Count == 0
-                    ? "(비어있음=전체허용)"
-                    : string.Join(",", allowedElements);
                 Debug.LogWarning($"[MonsterSpawner:{name}] 필터 통과 엔트리 0개 — 스폰 불가.\n" +
                     $"  · allowedPoolGroups = {pools}\n" +
                     $"  · gradeMode/target  = {gradeMode} / {targetGrade}\n" +
-                    $"  · allowedElements   = {elems}\n" +
-                    $"  · 테이블 엔트리 총 {total}개 (풀통과 {passPool} / 등급통과 {passGrade} / 원소통과 {passElem} / 모두통과 {passAll})\n" +
+                    $"  · 테이블 엔트리 총 {total}개 (풀통과 {passPool} / 등급통과 {passGrade} / 모두통과 {passAll})\n" +
                     $"  → SpawnTable Inspector에서 Auto-Populate를 눌러 grade/poolTags가 채워졌는지 확인하세요.", this);
             }
             return false;
@@ -376,31 +367,13 @@ public class MonsterSpawner : MonoBehaviour
         // 스폰 연출 이펙트 (fire-and-forget — 몬스터 루프는 블로킹하지 않음)
         PlaySpawnEffectAsync(spawnPos).Forget();
 
-        // 원소 적용은 반드시 렌더러 머티리얼이 최종 상태일 때 수행해야 색상·속성 UI가 안정적.
-        // 디졸브가 활성이면 렌더러 머티리얼이 일시 교체되므로, 디졸브 완료 콜백에서 원소 적용.
-        //
-        // 풀 재사용 Race 방어: 몬스터가 디졸브 중 사망·반환되어 다른 방에서 재사용된 상태라면,
-        // 뒤늦게 firing되는 onComplete가 새 인스턴스의 원소를 덮어쓰는 사고가 발생할 수 있다.
-        // 캡처한 GenerationId로 동일 lifecycle인지 검증한다.
-        var capturedMonster = monster;
-        int capturedGen = capturedMonster != null ? capturedMonster.GenerationId : -1;
         if (spawnDissolveDuration > 0f && monster != null)
         {
             DissolveEffect.PlayAppear(
                 monster.gameObject,
                 spawnDissolveDuration,
-                onComplete: () =>
-                {
-                    if (capturedMonster == null) return;
-                    if (!capturedMonster.gameObject.activeInHierarchy) return;
-                    if (capturedMonster.GenerationId != capturedGen) return; // 풀 재사용 후라면 무시
-                    capturedMonster.SetRandomNativeElement();
-                },
-                activationToken: monster.ActivationToken);
-        }
-        else
-        {
-            monster.SetRandomNativeElement();
+                activationToken: monster.ActivationToken,
+                edgeColor: spawnOutlineColor);
         }
         return true;
     }
@@ -409,11 +382,10 @@ public class MonsterSpawner : MonoBehaviour
     // 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>엔트리가 이 방의 모든 필터(풀 그룹 AND 등급 AND 원소)를 통과하는지.
-    /// 각 필터 리스트가 비어있으면 해당 필터는 통과로 간주.</summary>
+    /// <summary>엔트리가 이 방의 모든 필터(풀 그룹 AND 등급)를 통과하는지.</summary>
     private bool PassesAllFilters(SpawnEntry entry)
     {
-        return PassesPoolGroupFilter(entry) && PassesGradeFilter(entry) && PassesElementFilter(entry);
+        return PassesPoolGroupFilter(entry) && PassesGradeFilter(entry);
     }
 
     /// <summary>엔트리의 grade가 이 스포너의 설정 모드 + targetGrade 범위 안에 있는지.
@@ -441,13 +413,6 @@ public class MonsterSpawner : MonoBehaviour
         for (int i = 0; i < entry.poolTags.Length; i++)
             if (allowedPoolGroups.Contains(entry.poolTags[i])) return true;
         return false;
-    }
-
-    /// <summary>엔트리가 이 방의 원소 필터를 통과하는지. allowedElements가 비어있으면 항상 통과.</summary>
-    private bool PassesElementFilter(SpawnEntry entry)
-    {
-        if (allowedElements == null || allowedElements.Count == 0) return true;
-        return allowedElements.Contains(entry.nativeElement);
     }
 
     /// <summary>지정 위치에 스폰 VFX를 1회 재생.

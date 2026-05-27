@@ -17,8 +17,11 @@ public class ChaseState : IMonsterState
 
     public virtual void Enter(MonsterContext ctx)
     {
-        ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
-        ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.speed = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
+            ctx.Agent.stoppingDistance = ctx.Monster.GetCombatStopDistance(ctx);
+        }
         _lastDestination = Vector3.positiveInfinity; // 진입 시 즉시 경로 계산 보장
         PlayAnim(ctx, ctx.Animation.chaseStateName);
     }
@@ -28,6 +31,21 @@ public class ChaseState : IMonsterState
         if (ctx.Runtime.PlayerTarget == null || ctx.Monster.IsPlayerDead())
         {
             ctx.Monster.ChangeState<PatrolState>();
+            return;
+        }
+
+        bool onNavMesh = ctx.Agent != null && ctx.Agent.isOnNavMesh;
+
+        // NavMesh 비사용 몬스터(Lich 등): 이동·회전을 자체 컨트롤러에 위임
+        // GiveUpChase·AttackReady 체크는 NavMesh 없을 때 의미없는 상태 진입을 막기 위해 건너뜀
+        if (!onNavMesh)
+        {
+            if (ctx.Monster.ShouldGiveUpChase(ctx))
+            {
+                ctx.Monster.ChangeState<PatrolState>();
+                return;
+            }
+            KeepChaseAnimation(ctx);
             return;
         }
 
@@ -55,7 +73,7 @@ public class ChaseState : IMonsterState
         FaceTarget(ctx);
         KeepChaseAnimation(ctx);
 
-        // 이동 속도 파라미터 갱신 — 댐핑으로 블렌드 트리 부드럽게 전환
+        // 이동 속도 파라미터 갱신
         if (!string.IsNullOrEmpty(ctx.Animation.speedParam) && ctx.Animator != null)
             ctx.Animator.SetFloat(ctx.Animation.speedParam, ctx.Agent.velocity.magnitude,
                 ctx.Animation.speedDampTime, Time.deltaTime);
