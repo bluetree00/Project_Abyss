@@ -39,6 +39,10 @@ public class DKQuickStrikePatternSO : BossPatternSO
     public float damageMultiplier    = 1.2f;
     public float knockbackMultiplier = 1f;
 
+    [Header("Border")]
+    [Tooltip("경계 테두리 엣지 프리팹 (DK_WarnBorder)")]
+    public GameObject edgePrefab;
+
     private DKQuickStrikeState _state;
 
     public override void Initialize(BossPatternContext ctx) => _state = new DKQuickStrikeState(this);
@@ -55,25 +59,25 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
     private const string AnimName = "Attack2";
 
     private float            _timer;
-    private bool             _swingVfxSpawned;
     private bool             _tilesSpawned;
     private bool             _tilesDestroyed;
     private bool             _crossVfxSpawned;
     private bool             _hitDone;
     private List<DKTileInfo> _tiles;
+    private List<GameObject> _edges;
     private Vector2Int       _playerCell;
 
     public DKQuickStrikeState(DKQuickStrikePatternSO data) : base(data) { }
 
     public override void Enter(MonsterContext ctx)
     {
-        _timer            = 0f;
-        _swingVfxSpawned  = false;
-        _tilesSpawned     = false;
+        _timer        = 0f;
+        _tilesSpawned = false;
         _tilesDestroyed   = false;
         _crossVfxSpawned  = false;
         _hitDone          = false;
         _tiles            = new List<DKTileInfo>();
+        _edges            = new List<GameObject>();
 
         // 플레이어 셀 Enter 시점에 캡처
         _playerCell = ctx.Runtime.PlayerTarget != null
@@ -89,25 +93,22 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
     {
         _timer += Time.deltaTime * AnimSpeed(ctx);
 
-        if (!_swingVfxSpawned)
-        {
-            _swingVfxSpawned = true;
-            SpawnSwingVfx(ctx);
-        }
-
         if (!_tilesSpawned && _timer >= Data.warningDuration)
         {
             _tilesSpawned = true;
             DKSwordColor sc = GetSwordColor(ctx);
             _tiles = DKGridPatternHelper.SpawnTiles(
                 ColorRule(sc), Data.whiteTilePrefab, Data.blackTilePrefab);
+            _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
         }
 
-        // hitTime: 타일 제거
+        // hitTime: 타일 제거 + 검 궤적 이펙트
         if (!_tilesDestroyed && _timer >= Data.hitTime)
         {
             _tilesDestroyed = true;
+            DKGridPatternHelper.DestroyEdges(_edges);
             DKGridPatternHelper.DestroyTiles(_tiles);
+            SpawnSwingVfx(ctx);
         }
 
         // hitTime + 0.05s: 타일 제거 확인 후 십자가에만 VFX (1회)
@@ -134,6 +135,7 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
+        DKGridPatternHelper.DestroyEdges(_edges);
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
     }
@@ -148,8 +150,10 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
     private void SpawnSwingVfx(MonsterContext ctx)
     {
         if (Data.swingVfxPrefab == null) return;
-        BossEffectPool.SpawnOneShot(
-            Data.swingVfxPrefab, ctx.Transform.position, ctx.Transform.rotation, fallbackLifetime: 2f);
+        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
+        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
+        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
+        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 2f);
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

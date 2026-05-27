@@ -51,6 +51,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
 
     // ── DeathKnight 공개 접근 ─────────────────────────────
     public DeathKnightBossBlackboard DKBlackboard => _dkBB;
+    public Transform SwordTransform => _swordCtrl?.SwordTransform;
 
     // ── 내부 필드 ─────────────────────────────────────────
     private DeathKnightBossBlackboard _dkBB;

@@ -125,6 +125,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     private int _completedBites;
     private bool _warningShown;
     private bool _damageApplied;
+    private DragonBossWarningZone _activeWarningZone;
     private Vector3 _hoverAnchorPos;
     private Vector3 _biteTargetGroundPos;
     private Vector3 _biteAttackPos;
@@ -143,6 +144,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _completedBites = 0;
         _hasStartedBiteSequence = false;
         _currentAirChaseAnim = null;
+        _activeWarningZone = null;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -238,6 +240,8 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         if (!_damageApplied && _phaseTimer >= Data.HitTime)
         {
             _damageApplied = true;
+            _activeWarningZone?.TransitionToHitPhase(0.35f);
+            _activeWarningZone = null;
             ApplyHit();
         }
 
@@ -331,7 +335,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     {
         Vector3 pos = _biteTargetGroundPos;
         pos.y = ctx.Runtime.SpawnPosition.y;
-        DragonBossWarningZone.CreateCircle(
+        _activeWarningZone = DragonBossWarningZone.CreateCircle(
             "DragonAirBiteWarning",
             pos,
             Data.AttackRadius,

@@ -91,15 +91,17 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _totalSwings;
     private bool    _hitApplied;
     private bool    _dangerShown;
+    private DragonBossWarningZone _activeWarningZone;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
 
     internal void Reset()
     {
-        _phase      = Phase.Done;
-        _swingIndex = 0;
-        _timer      = 0f;
-        _arcHeight  = 0f;
+        _phase             = Phase.Done;
+        _swingIndex        = 0;
+        _timer             = 0f;
+        _arcHeight         = 0f;
+        _activeWarningZone = null;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -213,15 +215,18 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
+            _activeWarningZone?.TransitionToHitPhase(0.25f);
+            _activeWarningZone = null;
             ApplyHit(ctx);
         }
 
         if (_timer >= Data.ClawAnimDuration)
         {
-            _swingIndex++;
-            _timer       = 0f;
-            _hitApplied  = false;
-            _dangerShown = false;
+            _swingIndex        = _swingIndex + 1;
+            _timer             = 0f;
+            _hitApplied        = false;
+            _dangerShown       = false;
+            _activeWarningZone = null;
 
             if (_swingIndex < _totalSwings)
                 PlayCurrentSwingAnim(ctx);
@@ -249,7 +254,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         Vector3 pos = ctx.Transform.position
             + ctx.Transform.forward * (Data.AttackRadius * 0.6f);
         pos.y = ctx.Transform.position.y;
-        DragonBossWarningZone.CreateCircle(
+        _activeWarningZone = DragonBossWarningZone.CreateCircle(
             "DragonClawWarning",
             pos,
             Data.AttackRadius,

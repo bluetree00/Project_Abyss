@@ -314,8 +314,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     {
         if (Data.WindBlastPrefab == null) return;
 
-        // 날개에서 발사: 보스 호버 위치 앞에서 수평으로 발사
-        Vector3 wingOrigin = _hoverPos + _toPlayer * 2f;
+        // 경고 장판 중심(지면 기준)에서 발동
+        Vector3 wingOrigin = _warnCenter;
         Quaternion blastRot = Quaternion.LookRotation(_toPlayer, Vector3.up);
 
         var go = Object.Instantiate(Data.WindBlastPrefab, wingOrigin, blastRot);

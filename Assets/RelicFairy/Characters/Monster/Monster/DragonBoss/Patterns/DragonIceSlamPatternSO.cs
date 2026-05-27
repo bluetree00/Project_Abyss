@@ -21,6 +21,9 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private GameObject _dangerZonePrefab;
     [SerializeField] private float _dangerZoneScale = 15f;
     [SerializeField] private float _dangerZoneHeightOffset = 0.05f;
+    [SerializeField] private float _arenaSideFallback = 30f;
+    [SerializeField] private float _arenaFitPadding = 0.15f;
+    [SerializeField] private float _warningOutlineWidth = 0.18f;
 
     [Header("Ice Pillars")]
     [SerializeField] private GameObject _icePillarPrefab;
@@ -50,6 +53,9 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public GameObject  DangerZonePrefab        => _dangerZonePrefab;
     public float       DangerZoneScale         => _dangerZoneScale;
     public float       DangerZoneHeightOffset  => _dangerZoneHeightOffset;
+    public float       ArenaSideFallback       => _arenaSideFallback;
+    public float       ArenaFitPadding         => _arenaFitPadding;
+    public float       WarningOutlineWidth     => _warningOutlineWidth;
     public GameObject  IcePillarPrefab         => _icePillarPrefab;
     public int         PillarCount             => _pillarCount;
     public float       PillarRadius            => _pillarRadius;
@@ -103,6 +109,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     private int                    _landingHash;
     private readonly List<GameObject> _spawnedPillars = new();
     private bool                   _damageApplied;
+    private DragonBossWarningZone  _warningZone;
+    private float                  _warningRadius;
+    private float                  _warningDiameter;
 
     internal DragonIceSlamState(DragonIceSlamPatternSO data) : base(data) { }
 
@@ -112,6 +121,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         _phaseTimer    = 0f;
         _damageApplied = false;
         _spawnedPillars.Clear();
+        _warningZone = null;
+        _warningRadius = 0f;
+        _warningDiameter = 0f;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -128,6 +140,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         float groundY = ctx.Runtime.SpawnPosition.y;
         _targetY   = groundY + Data.HoverHeight;
         _centerPos = new Vector3(ctx.Runtime.SpawnPosition.x, _targetY, ctx.Runtime.SpawnPosition.z);
+        _warningDiameter = ResolveArenaSideLength(ctx);
+        _warningRadius = Mathf.Max(0.5f, (_warningDiameter * 0.5f) - Data.ArenaFitPadding);
 
         _takeoffHash = Animator.StringToHash(Data.TakeoffStateName);
         _flyDownHash = Animator.StringToHash(Data.FlyDownStateName);
@@ -169,6 +183,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     public override void Exit(MonsterContext ctx)
     {
         RestoreAgent(ctx);
+        DestroyWarningZone();
         CleanupPillars();
         if (ctx.Monster is DragonBossMonster dragon)
             dragon.DragonBlackboard.IsAirborne = false;
@@ -281,6 +296,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         ctx.Transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
         PlayAnim(ctx, Data.LandingStateName, 0.1f);
 
+        DestroyWarningZone();
         CleanupPillars();
         ApplySlamDamage(ctx);
         SpawnSlamEffect(ctx);
@@ -292,13 +308,16 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     {
         float groundY = ctx.Runtime.SpawnPosition.y;
         Vector3 pos = new Vector3(_centerPos.x, groundY, _centerPos.z);
-        DragonBossWarningZone.CreateCircle(
+        _warningZone = DragonBossWarningZone.CreateCircle(
             "DragonIceSlamWarning",
             pos,
-            Data.SlamRadius,
+            _warningRadius,
             new Color(0.55f, 0.85f, 1f, 0.85f),
             Data.WarningDuration + 5f,
-            Data.DangerZoneHeightOffset);
+            Data.DangerZoneHeightOffset,
+            Data.WarningOutlineWidth,
+            startEmpty: true);
+        _warningZone.BeginCircleFill(Data.WarningDuration);
     }
 
     private void SpawnIcePillars(MonsterContext ctx)
@@ -329,7 +348,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         float   groundY    = ctx.Runtime.SpawnPosition.y;
         Vector3 slamCenter = new Vector3(_centerPos.x, groundY + 0.5f, _centerPos.z);
 
-        var hits = Physics.OverlapSphere(slamCenter, Data.SlamRadius);
+        var hits = Physics.OverlapSphere(slamCenter, _warningRadius);
         foreach (var col in hits)
         {
             var player = col.GetComponent<PlayerController>()
@@ -353,7 +372,10 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         var effect = BossEffectPool.Spawn(prefab, pos, Quaternion.identity);
         if (effect == null) return;
 
-        effect.transform.localScale = Vector3.one * Data.SlamEffectScale;
+        float scale = Data.SlamRadius > 0.01f
+            ? Data.SlamEffectScale * (_warningRadius / Data.SlamRadius)
+            : Data.SlamEffectScale;
+        effect.transform.localScale = Vector3.one * scale;
         BossEffectPool.ScheduleRelease(effect, 3f);
     }
 
@@ -365,6 +387,15 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
                 BossEffectPool.Release(pillar);
         }
         _spawnedPillars.Clear();
+    }
+
+    private void DestroyWarningZone()
+    {
+        if (_warningZone == null)
+            return;
+
+        Object.Destroy(_warningZone.gameObject);
+        _warningZone = null;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -379,6 +410,63 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             ctx.Transform.rotation,
             Quaternion.LookRotation(dir),
             Data.AirRotationSpeed * Time.deltaTime);
+    }
+
+    private float ResolveArenaSideLength(MonsterContext ctx)
+    {
+        Vector3 groundCenter = ctx.Runtime.SpawnPosition;
+        float bestScore = float.NegativeInfinity;
+        float bestSide = Mathf.Max(1f, Data.ArenaSideFallback);
+
+        foreach (var collider in Object.FindObjectsOfType<BoxCollider>())
+        {
+            if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy)
+                continue;
+
+            Bounds bounds = collider.bounds;
+            if (!ContainsXZ(bounds, groundCenter))
+                continue;
+
+            Vector3 size = bounds.size;
+            float side = Mathf.Min(size.x, size.z);
+            if (side <= 1f)
+                continue;
+
+            float squareness = 1f - Mathf.Clamp01(Mathf.Abs(size.x - size.z) / Mathf.Max(size.x, size.z));
+            float namePriority = GetArenaNamePriority(collider.name);
+            float areaPenalty = Mathf.Clamp(side / 200f, 0f, 1f);
+            float score = namePriority + squareness - areaPenalty;
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestSide = side;
+        }
+
+        return bestSide;
+    }
+
+    private static bool ContainsXZ(Bounds bounds, Vector3 point)
+    {
+        return point.x >= bounds.min.x && point.x <= bounds.max.x
+            && point.z >= bounds.min.z && point.z <= bounds.max.z;
+    }
+
+    private static float GetArenaNamePriority(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return 0f;
+
+        string lower = name.ToLowerInvariant();
+        if (lower.Contains("safefloor"))
+            return 3f;
+        if (lower.Contains("bossfloor"))
+            return 2.25f;
+        if (lower.Contains("boss") && lower.Contains("floor"))
+            return 1.5f;
+        if (lower.Contains("floor"))
+            return 1f;
+        return 0f;
     }
 
     private static void TintParticles(GameObject go, Color color)
