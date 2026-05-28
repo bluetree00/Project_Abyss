@@ -103,8 +103,7 @@ namespace RelicFairy.Monster
             if (_scytheEquipRoot == null)
                 _scytheEquipRoot = FindChildByName(ScytheEquipName);
 
-            ApplyForm(LichForm.Phase1); // 의상·후드 기본 표시
-            HideWeapons();              // 무기는 등장 연출 전까지 숨김
+            ApplyForm(LichForm.Phase1); // 의상·후드·책 기본 표시
         }
 
         // ─────────────────────────────────────────────────────────

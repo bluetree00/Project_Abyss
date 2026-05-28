@@ -14,6 +14,7 @@ public class LichDormantState : IMonsterState
 {
     private readonly float _duration;
     private float _elapsed;
+    private float _elapsedSinceEnter; // TriggerEntrance 미호출 대비 타임아웃 추적
     private bool  _triggered;
 
     /// <summary>false가 되면 Exit()가 호출됐음을 의미 — LichMonster가 패턴 러너 차단 해제에 사용.</summary>
@@ -26,12 +27,12 @@ public class LichDormantState : IMonsterState
 
     public void Enter(MonsterContext ctx)
     {
-        _elapsed   = 0f;
-        _triggered = false;
-        IsActive   = true;  // 풀 재사용 시 재진입을 위해 명시적 리셋
+        _elapsed          = 0f;
+        _elapsedSinceEnter = 0f;
+        _triggered        = false;
+        IsActive          = true;  // 풀 재사용 시 재진입을 위해 명시적 리셋
 
         (ctx.Monster as LichMonster)?.MovementController?.SetLocked(true);
-        // 카메라 팬 완료를 기다리는 동안 기본 Idle 포즈 유지
     }
 
     /// <summary>
@@ -42,10 +43,9 @@ public class LichDormantState : IMonsterState
     {
         if (_triggered) return;
         _triggered = true;
+        _elapsed   = 0f; // 트리거 시점부터 _duration 카운트
 
-        // Appear 애니메이션 시작 시점에 Phase1 장비 노출
         (ctx.Monster as LichMonster)?.ShowPhase1Form();
-
         ctx.Animator?.CrossFade("Appear", 0.1f);
         UI_BossBark.Show("리치", BossBarkType.BossIntro);
 
@@ -55,7 +55,16 @@ public class LichDormantState : IMonsterState
 
     public void Update(MonsterContext ctx)
     {
-        if (!_triggered) return;
+        _elapsedSinceEnter += Time.deltaTime;
+
+        if (!_triggered)
+        {
+            // BossSpawner가 TriggerEntrance를 호출하지 않은 경우 (테스트씬 등)
+            // _duration 초 후 자동으로 Appear 연출 시작
+            if (_elapsedSinceEnter >= _duration)
+                TriggerEntrance(ctx);
+            return;
+        }
 
         _elapsed += Time.deltaTime;
         if (_elapsed >= _duration)

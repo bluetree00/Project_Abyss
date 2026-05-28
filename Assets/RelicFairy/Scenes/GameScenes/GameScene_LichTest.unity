@@ -3022,7 +3022,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerPrefabKey: Gawain
   debugDefaultWeaponKey: T3_Katana
-  directCombatMapPrefabKey:
+  directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1
@@ -7432,7 +7432,7 @@ MonoBehaviour:
   spawnEffectScale: 1
   spawnDissolveDuration: 1.5
   spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
-  placedBoss: {fileID: 0}
+  placedBoss: {fileID: 1128427348582677200}
   waitForExternalTrigger: 1
 --- !u!1 &1493333036
 GameObject:
@@ -10324,6 +10324,18 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f4d13a3c66c240f4a810682e04439af0, type: 3}
+--- !u!114 &1128427348582677200 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5324488836961570600, guid: f4d13a3c66c240f4a810682e04439af0,
+    type: 3}
+  m_PrefabInstance: {fileID: 1128427348582677199}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30594f1133ed2e341afcdd7709d016e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.LichMonster
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

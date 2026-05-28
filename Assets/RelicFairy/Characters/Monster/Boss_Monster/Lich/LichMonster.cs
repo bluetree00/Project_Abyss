@@ -56,6 +56,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private LichMovementController _movementController;
     private LichDormantState       _dormantState;
     private bool                   _phase2Transitioning;
+    // BossSpawner가 InitAsync 완료 전에 TriggerEntrance()를 호출하는 경우 버퍼링
+    private bool                   _pendingTriggerEntrance;
 
     public LichMovementController MovementController => _movementController;
 
@@ -140,8 +142,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         _formController = GetComponentInChildren<LichFormController>();
-        _formController?.ApplyForm(LichForm.Phase1); // 의상·후드 표시
-        _formController?.HideWeapons();              // 무기는 등장 연출 전까지 숨김
+        _formController?.ApplyForm(LichForm.Phase1); // 의상·후드·책 표시
 
         // 공중 이동 컨트롤러 초기화 (NavMeshAgent 비활성화 후 직접 Transform 제어)
         _movementController = GetComponent<LichMovementController>();
@@ -187,6 +188,13 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         // 등장 대기 상태로 진입 — Appear 애니메이션은 TriggerEntrance() 호출 시 시작
         _dormantState = new LichDormantState(_entranceDuration);
         ChangeState(_dormantState);
+
+        // InitAsync 완료 전에 BossSpawner가 TriggerEntrance()를 호출한 경우 즉시 적용
+        if (_pendingTriggerEntrance)
+        {
+            _pendingTriggerEntrance = false;
+            _dormantState.TriggerEntrance(_ctx);
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -233,11 +241,11 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _runner?.Reset();
         _lichBB?.Reset();
         _movementController?.OnRecycled();
-        _phase2Transitioning = false;
+        _phase2Transitioning    = false;
+        _pendingTriggerEntrance = false;
 
-        // 풀 재사용: Phase1 의상 복원 + 무기 숨기고 등장 대기 재진입
+        // 풀 재사용: Phase1 의상·책 복원 후 등장 대기 재진입
         _formController?.ApplyForm(LichForm.Phase1);
-        _formController?.HideWeapons();
         if (_dormantState != null)
             ChangeState(_dormantState);
 
@@ -270,7 +278,10 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     /// <summary>BossSpawner가 카메라 팬 완료 후 호출 — Appear 애니메이션 + 보스 이름 UI 시작.</summary>
     public void TriggerEntrance()
     {
-        _dormantState?.TriggerEntrance(_ctx);
+        if (_dormantState != null)
+            _dormantState.TriggerEntrance(_ctx);
+        else
+            _pendingTriggerEntrance = true; // InitAsync 완료 전 호출된 경우 OnInitialized에서 적용
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
