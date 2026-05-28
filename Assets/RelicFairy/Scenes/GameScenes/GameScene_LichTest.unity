@@ -3020,8 +3020,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4c506c3bf4371748837bd380ff194f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerPrefabKey: 
-  directCombatMapPrefabKey: 
+  playerPrefabKey: Gawain
+  debugDefaultWeaponKey: T3_Katana
+  directCombatMapPrefabKey:
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
   buildRuntimeNavMesh: 1

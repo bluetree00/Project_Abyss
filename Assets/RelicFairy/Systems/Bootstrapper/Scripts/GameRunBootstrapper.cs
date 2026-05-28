@@ -10,6 +10,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public static GameRunBootstrapper Instance { get; private set; }
 
     [SerializeField] private string playerPrefabKey = "Knight";
+    [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
     [SerializeField] private Transform mapRoot;
@@ -1511,7 +1512,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 // 로비에서 선택한 무기가 있으면 복원, 없으면 기본 무기
                 var loadout = AppBootstrapper.Instance?.Loadout;
                 var weaponSO = loadout?.WeaponSlot0;
-                string weaponKey = weaponSO != null ? null : "T1_Bow";
+                string weaponKey = weaponSO != null ? null : debugDefaultWeaponKey;
 
                 if (weaponSO != null)
                 {
@@ -1779,8 +1780,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             // 무기가 없으면 기본 무기 자동 장착
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
-                Debug.Log("[GameRunBootstrapper] StartRunAsync: 기본 무기 장착");
-                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>("T1_Bow");
+                Debug.Log($"[GameRunBootstrapper] StartRunAsync: 기본 무기 장착 ({debugDefaultWeaponKey})");
+                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>(debugDefaultWeaponKey);
                 await handle.Task;
                 if (handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded && handle.Result != null)
                 {

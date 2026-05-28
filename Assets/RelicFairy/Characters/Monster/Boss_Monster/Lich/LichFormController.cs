@@ -18,21 +18,26 @@ namespace RelicFairy.Monster
     /// TheReaper SourceMesh의 장비 GO를 토글해 리치의 외형 폼을 전환한다.
     /// LichMonster에서 ApplyPhase2Buffs 호출 시 자동 연동됨.
     ///
-    /// Inspector 설정:
-    ///   1. SourceMesh 하위 GO를 각 슬롯에 드래그앤드롭
-    ///   2. Presets 배열 index = LichForm enum value 순서와 반드시 일치
+    /// 무기(책·낫): 중첩 프리팹으로 Inspector 할당 불안정 → Awake에서 이름으로 자동 탐색.
+    ///   SK_BookOpen Equip → 책 무기 프리팹 인스턴스
+    ///   SK_Scythe Equip   → 낫 무기 프리팹 인스턴스
     ///
-    /// 노드 경로 (SourceMesh 하위 기준):
-    ///   BookEquip     → Acessories/BookEquip
+    /// 의상·후드(Inspector 할당 필요, SourceMesh 하위 기준):
     ///   Bookss        → Bookss
     ///   Clothing      → Clothing
     ///   SkirtSeparate → SkirtSeparate
     ///   HoodDown      → HoodDn
     ///   HoodUp        → HoodUp
-    ///   ScytheEquipRoot → Scythe_Equip  (독립 소품, 보통 false)
     /// </summary>
     public class LichFormController : MonoBehaviour
     {
+        // ─────────────────────────────────────────────────────────
+        // Constants
+        // ─────────────────────────────────────────────────────────
+
+        private const string BookEquipName  = "SK_BookOpen Equip";
+        private const string ScytheEquipName = "SK_Scythe Equip";
+
         // ─────────────────────────────────────────────────────────
         // Nested Types
         // ─────────────────────────────────────────────────────────
@@ -45,7 +50,6 @@ namespace RelicFairy.Monster
             [Header("Equipment")]
             public bool bookActive;
             public bool bookssActive;
-            // scytheActive: 루트 Scythe_Equip (독립 소품). 손뼈 낫은 항상 ON이므로 보통 false 유지.
             public bool scytheEquipRootActive;
 
             [Header("Body")]
@@ -61,10 +65,12 @@ namespace RelicFairy.Monster
         // SerializeField
         // ─────────────────────────────────────────────────────────
 
-        [Header("SourceMesh GO References")]
+        [Header("무기 — 이름으로 자동 탐색 (Inspector 할당 시 우선 사용)")]
         [SerializeField] private GameObject _bookEquip;
-        [SerializeField] private GameObject _bookss;
         [SerializeField] private GameObject _scytheEquipRoot;
+
+        [Header("의상·후드 — Inspector에서 직접 할당")]
+        [SerializeField] private GameObject _bookss;
         [SerializeField] private GameObject _clothing;
         [SerializeField] private GameObject _skirtSeparate;
         [SerializeField] private GameObject _hoodDown;
@@ -91,6 +97,12 @@ namespace RelicFairy.Monster
 
         private void Awake()
         {
+            // 무기는 중첩 프리팹 구조로 Inspector 할당이 불안정 — Inspector가 비어있으면 이름으로 자동 탐색
+            if (_bookEquip == null)
+                _bookEquip = FindChildByName(BookEquipName);
+            if (_scytheEquipRoot == null)
+                _scytheEquipRoot = FindChildByName(ScytheEquipName);
+
             ApplyForm(LichForm.Phase1); // 의상·후드 기본 표시
             HideWeapons();              // 무기는 등장 연출 전까지 숨김
         }
@@ -217,6 +229,15 @@ namespace RelicFairy.Monster
         {
             if (go != null && go.activeSelf != active)
                 go.SetActive(active);
+        }
+
+        private GameObject FindChildByName(string childName)
+        {
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+                if (t.name == childName)
+                    return t.gameObject;
+            Debug.LogWarning($"[LichFormController] '{childName}' 오브젝트를 찾지 못했습니다.", this);
+            return null;
         }
 
         // ─────────────────────────────────────────────────────────
