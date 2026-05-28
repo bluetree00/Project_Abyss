@@ -50,6 +50,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 119497b481e20d54f843d3cf322d7234
+    m_Address: LichSkeleton/LichSkeleton
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f4d13a3c66c240f4a810682e04439af0
     m_Address: Lich/Lich
     m_ReadOnly: 0

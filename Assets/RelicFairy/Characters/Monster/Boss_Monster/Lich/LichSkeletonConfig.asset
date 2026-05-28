@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29c57877bc8651428487ef82e2b25f5, type: 3}
+  m_Name: LichSkeletonConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterConfigSO
+  monsterName: "리치 해골"
+  grade: 1
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  stat:
+    maxHp: 400
+    defense: 8
+    attackPower: 18
+    moveSpeed: 2.8
+    nativeElement: -1
+    attackRange: 1.8
+    attackRadius: 1.5
+    attackRate: 1.5
+    attackDelay: 0.6
+    knockbackForce: 4
+    attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  detection:
+    detectionRange: 12
+    chaseGiveUpRange: 20
+  patrol:
+    patrolType: 0
+    patrolRange: 3
+    patrolSpeed: 1.5
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 64
+  animation:
+    animatorControllerAddress: Lich/LichAnimator
+    idleStateName: Idle
+    patrolStateName: Walk
+    chaseStateName: Run
+    attackReadyStateName: AttackReady
+    attackStateName: Attack
+    getHitStateName: GetHit
+    dieStateName: Die
+    attackTrigger:
+    getHitTrigger:
+    dieTrigger:
+    detectTrigger:
+    speedParam:
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  drop:
+    coinMin: 1
+    coinMax: 3
+    coinValue: 1
+  specialStates: []
+  stateOverrides: []

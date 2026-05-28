@@ -24,6 +24,6 @@ MonoBehaviour:
   castDuration: 1.2
   recoveryDuration: 0.5
   spawnCount: 2
-  skeletonPrefab: {fileID: 2509951440700676581, guid: 2ca526cf337f25d49bc28c6d50a184fa, type: 3}
+  skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234, type: 3}
   spawnRadius: 4
   patternCooldown: 12
