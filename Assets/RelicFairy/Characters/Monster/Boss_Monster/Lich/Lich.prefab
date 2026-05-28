@@ -667,9 +667,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e691f1114cbb344f9c92cfdff5a9613, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.LichFormController
-  _bookEquip: {fileID: 7659539928225783052}
+  _bookEquip: {fileID: 0}
+  _scytheEquipRoot: {fileID: 0}
   _bookss: {fileID: 7659539928225783050}
-  _scytheEquipRoot: {fileID: 7659539928225782840}
   _clothing: {fileID: 7659539928225783144}
   _skirtSeparate: {fileID: 7659539928225782818}
   _hoodDown: {fileID: 7659539928225782964}
