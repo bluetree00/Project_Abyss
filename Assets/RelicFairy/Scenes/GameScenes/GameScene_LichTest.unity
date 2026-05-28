@@ -7424,7 +7424,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5da663183bc27ff4a981057b217128c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossSpawner
-  spawnTable: {fileID: 0}
+  spawnTable: {fileID: 11400000, guid: 880c546a040888c499c89d944405966e, type: 2}
   spawnDelay: 1.5
   spawnEffectAddressKey: 
   spawnEffectDuration: 2
@@ -7432,7 +7432,7 @@ MonoBehaviour:
   spawnEffectScale: 1
   spawnDissolveDuration: 1.5
   spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
-  placedBoss: {fileID: 1128427348582677200}
+  placedBoss: {fileID: 0}
   waitForExternalTrigger: 1
 --- !u!1 &1493333036
 GameObject:
@@ -10226,116 +10226,6 @@ Transform:
   - {fileID: 1080053560}
   m_Father: {fileID: 2002879178}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &1128427348582677199
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 3401725602369914206, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: _baseAltitude
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5098245364127042272, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_Name
-      value: Lich
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1.4
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.4
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.4
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 83.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: -0.00000004371139
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7684848994678309800, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7873358846230808583, guid: f4d13a3c66c240f4a810682e04439af0,
-        type: 3}
-      propertyPath: m_Material
-      value: 
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: f4d13a3c66c240f4a810682e04439af0, type: 3}
---- !u!114 &1128427348582677200 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5324488836961570600, guid: f4d13a3c66c240f4a810682e04439af0,
-    type: 3}
-  m_PrefabInstance: {fileID: 1128427348582677199}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30594f1133ed2e341afcdd7709d016e2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.LichMonster
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -10364,7 +10254,6 @@ SceneRoots:
   - {fileID: 1452374375}
   - {fileID: 413149031}
   - {fileID: 2057751933}
-  - {fileID: 1128427348582677199}
   - {fileID: 2093251801}
   - {fileID: 548355324}
   - {fileID: 1493333039}
