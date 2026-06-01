@@ -43,7 +43,8 @@ public static class MapDataLoader
     public static TileType[,] Parse(
         string gridCsv,
         Dictionary<Vector2Int, CellSpawnInfo> spawnInfos = null,
-        Dictionary<Vector2Int, string> decorationInfos = null)
+        Dictionary<Vector2Int, string> decorationInfos = null,
+        Dictionary<Vector2Int, DoorInfo> doorInfos = null)
     {
         if (string.IsNullOrWhiteSpace(gridCsv))
             return null;
@@ -71,6 +72,24 @@ public static class MapDataLoader
                     continue;
                 }
 
+                // 문 토큰 DR<width> — 벽 위 문 앵커. 기본 폐쇄(Wall) + doorInfos에 기록.
+                // 연결 파이프라인이 선택된 문만 Floor로 개방한다.
+                if (doorInfos != null && raw.Length >= 2 && raw[0] == 'D' && raw[1] == 'R')
+                {
+                    int doorWidth = 3;
+                    if (raw.Length > 2) int.TryParse(raw.Substring(2), out doorWidth);
+                    if (doorWidth <= 0) doorWidth = 3;
+
+                    var edge = InferDoorEdge(x, rowZ, w, h);
+                    if (edge.HasValue)
+                    {
+                        doorInfos[new Vector2Int(x, rowZ)] = new DoorInfo { edge = edge.Value, width = doorWidth };
+                        grid[x, rowZ] = TileType.Wall; // 기본 폐쇄 — 연결 시에만 개방
+                        continue;
+                    }
+                    // 내부 셀(엣지 아님)은 무효 → 일반 처리로 폴백
+                }
+
                 var tile = SymbolToTile(raw, out var info);
                 grid[x, rowZ] = tile;
 
@@ -85,6 +104,16 @@ public static class MapDataLoader
 
     /// <summary>단독 "d" 같이 base 기호와 충돌하는 케이스를 걸러냄. 현재 base 기호에 소문자 d는 없어 항상 false.</summary>
     private static bool IsBaseDecorationSymbol(string s) => false;
+
+    /// <summary>문 앵커 셀의 위치로 엣지(방향)를 추론. 벽 링(외곽) 위가 아니면 null.</summary>
+    private static DoorEdge? InferDoorEdge(int x, int rowZ, int w, int h)
+    {
+        if (rowZ == h - 1) return DoorEdge.North;
+        if (rowZ == 0)     return DoorEdge.South;
+        if (x == 0)        return DoorEdge.West;
+        if (x == w - 1)    return DoorEdge.East;
+        return null; // 내부 셀: 무효
+    }
 
     /// <summary>TileType 2D 배열 → grid_csv 문자열.</summary>
     public static string Serialize(TileType[,] grid)
@@ -197,6 +226,7 @@ public static class MapDataLoader
             "T" => TileType.Trap,
             "C" => TileType.Chest,
             "." => TileType.Empty,
+            "Pt" => TileType.Empty,   // PitTrigger — 바닥 없음 + PostBuild 트리거 배치
             "R"  => TileType.BuffBox,
             "D"  => TileType.BuffPedestal,
             "CP" => TileType.CharacterPickup,
