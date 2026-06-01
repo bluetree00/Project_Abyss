@@ -758,6 +758,152 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Debug.Log($"[GameRunBootstrapper] Zone {zoneIndex} ({zone.label}) 스폰 완료 @ {worldCenter}");
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // 절차적(하데스형) 격리 룸 빌드 — RunFlowController가 호출.
+    // SpawnZoneByIndexAsync의 빌드 코어를 재사용하되 contiguous 부분(world_center/
+    // OpenWalls/코리더/존게이트)은 제외하고, 문은 RoomDoorPlanner로 개방한다.
+    // 레거시 contiguous 경로(SpawnZoneByIndexAsync 등)는 변경하지 않는다.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 풀 엔트리 하나를 고정 앵커에 격리형 방으로 빌드한다.
+    /// 입구/직진/턴 문을 개방하고, 진입 위치와 출구 슬롯(클리어 후 게이트 배치용)을 반환한다.
+    /// 플레이어 스폰/이동·게이트 배치·웨이브 활성화는 호출자(RunFlowController)가 담당.
+    /// </summary>
+    public async UniTask<ProcRoomResult> BuildProcRoomAsync(
+        ZonePoolEntry entry, Vector3 anchor, bool mirror, CancellationToken ct = default)
+    {
+        ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
+        if (entry == null || string.IsNullOrWhiteSpace(entry.grid_csv))
+        {
+            Debug.LogWarning("[GameRunBootstrapper] BuildProcRoomAsync: entry/grid_csv 없음");
+            return null;
+        }
+
+        // 1. grid_csv 변환 (좌우 미러) — MapBuilder/TokenParser가 동일 문자열을 쓰도록 문자열 레벨에서 적용
+        string csv = mirror ? GridTransform.MirrorX(entry.grid_csv) : entry.grid_csv;
+
+        // 2. 팔레트
+        BlockPalette palette = null;
+        if (!string.IsNullOrEmpty(entry.palette))
+            palette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(entry.palette);
+        if (palette == null)
+            palette = PickBlockPalette(!string.IsNullOrEmpty(entry.theme) ? entry.theme : string.Empty);
+
+        // 3. 파싱 (스포너 + 문)
+        var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
+        var doorInfos  = new System.Collections.Generic.Dictionary<Vector2Int, DoorInfo>();
+        var grid = MapDataLoader.Parse(csv, spawnInfos, null, doorInfos);
+        if (grid == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] BuildProcRoomAsync: grid 파싱 실패 ({entry.pool_key})");
+            return null;
+        }
+        ct.ThrowIfCancellationRequested();
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+
+        // 4. 문 분류 + 개방 (입구 + 직진 + 턴 모두 개방; 게이트/배리어는 클리어 후 호출자가 제어)
+        var cls = RoomDoorPlanner.Classify(doorInfos);
+        if (cls.entrance.HasValue) RoomDoorPlanner.Open(grid, cls.entrance.Value, doorInfos[cls.entrance.Value]);
+        if (cls.forward.HasValue)  RoomDoorPlanner.Open(grid, cls.forward.Value,  doorInfos[cls.forward.Value]);
+        foreach (var t in cls.turns) RoomDoorPlanner.Open(grid, t, doorInfos[t]);
+
+        // 5. 스포너 플랜 (후보 m 중 max_active_spawners개만 활성)
+        ApplyMonsterSpawnerPlan(grid, entry.max_active_spawners);
+
+        // 6. 방 GO @ 앵커
+        var root = worldMapRoot != null ? worldMapRoot : mapRoot;
+        var roomGO = new GameObject($"ProcRoom_{entry.pool_key}");
+        roomGO.transform.SetParent(root, false);
+        roomGO.transform.position = anchor;
+
+        MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
+
+        // 7. 블록 빌드
+        var blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+
+        // 8. 토큰 (PreBuild 스포너 → NavMesh → PostBuild 장식/보스)
+        var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
+        var tokenCtx = new TokenContext
+        {
+            Parent             = roomGO.transform,
+            CellSize           = blockCellSize,
+            BaseY              = blockBaseY,
+            Theme              = ResolveRoomTheme(entry.theme),
+            ActivePalette      = palette,
+            DecorationCatalogs = decorationCatalogs,
+            Grid               = grid,
+            SpawnInfos         = spawnInfos,
+            DeferredSpawners   = deferredSpawners,
+            Ct                 = ct,
+        };
+        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PreBuild);
+
+        HideAllBlockRenderers(blocks);
+        await BuildMapNavMeshAsync(roomGO);
+        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PostBuild);
+
+        InitializeMinimapForRoom(roomGO, w, h);
+        AttachRoomClearController(roomGO);
+
+        // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
+        for (int i = 0; i < deferredSpawners.Count; i++)
+            if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
+
+        // 등장 연출
+        await new DissolveEntrance().PlayAsync(blocks, default, ct);
+
+        // 9. 결과 — 진입 위치 + 출구 슬롯
+        var result = new ProcRoomResult
+        {
+            roomGO   = roomGO,
+            entryPos = cls.entrance.HasValue
+                ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
+                : ResolvePlayerSpawnFromGrid(grid, anchor, w, h),
+            exits    = new System.Collections.Generic.List<ProcExitSlot>(),
+        };
+        if (cls.forward.HasValue)
+            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true });
+        foreach (var t in cls.turns)
+            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false });
+
+        Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
+        return result;
+    }
+
+    /// <summary>셀(x, z) → 바닥 표면(Y=anchor.y) 월드 좌표. MapBuilder의 중앙 오프셋과 동일.</summary>
+    private Vector3 CellToWorldFloor(Vector2Int cell, Vector3 anchor, int w, int h)
+    {
+        float offX = (w - 1) * 0.5f * blockCellSize;
+        float offZ = (h - 1) * 0.5f * blockCellSize;
+        return new Vector3(anchor.x + cell.x * blockCellSize - offX, anchor.y, anchor.z + cell.y * blockCellSize - offZ);
+    }
+
+    /// <summary>문 엣지에서 방 안쪽으로 살짝 들어간 오프셋 (플레이어가 벽에 끼지 않도록).</summary>
+    private Vector3 DoorInwardOffset(DoorEdge edge)
+    {
+        float d = blockCellSize * 1.5f;
+        switch (edge)
+        {
+            case DoorEdge.North: return new Vector3(0f, 0f, -d);
+            case DoorEdge.South: return new Vector3(0f, 0f,  d);
+            case DoorEdge.East:  return new Vector3(-d, 0f, 0f);
+            case DoorEdge.West:  return new Vector3( d, 0f, 0f);
+            default:             return Vector3.zero;
+        }
+    }
+
+    /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>
+    private Vector3 ResolvePlayerSpawnFromGrid(TileType[,] grid, Vector3 anchor, int w, int h)
+    {
+        var p = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
+        return p.x >= 0 ? CellToWorldFloor(p, anchor, w, h) : anchor;
+    }
+
     /// <summary>fromZone에서 toZone 방향을 계산해 fromZone 엣지의 localPosition을 반환.</summary>
     private Vector3 CalcGateExitPositionTo(ZoneLayoutEntry fromZone, ZoneLayoutEntry toZone)
     {
