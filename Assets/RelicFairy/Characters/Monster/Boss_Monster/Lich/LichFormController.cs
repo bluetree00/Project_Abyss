@@ -80,10 +80,8 @@ namespace RelicFairy.Monster
         [SerializeField] private FormPreset[] _presets;
 
         [Header("Dissolve")]
-        [Tooltip("디졸브 쉐이더 프로퍼티 이름. 1=완전 디졸브, 0=완전 표시.")]
-        [SerializeField] private string _dissolvePropertyName = "_DissolveAmount";
-        [Tooltip("디졸브 인 연출 시간 (초)")]
-        [SerializeField] private float  _dissolveInDuration   = 1.0f;
+        [Tooltip("장비 등장/퇴장 디졸브 연출 시간 (초)")]
+        [SerializeField] private float _dissolveInDuration = 1.0f;
 
         // ─────────────────────────────────────────────────────────
         // Properties
@@ -104,6 +102,9 @@ namespace RelicFairy.Monster
                 _scytheEquipRoot = FindChildByName(ScytheEquipName);
 
             ApplyForm(LichForm.Phase1); // 의상·후드·책 기본 표시
+
+            // DissolveMaterial을 미리 캐시 — 이후 DissolveInFormAsync 첫 호출 시 플래시 방지
+            DissolveEffect.WarmupAsync(destroyCancellationToken).Forget();
         }
 
         // ─────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ namespace RelicFairy.Monster
             CurrentForm = form;
         }
 
-        /// <summary>무기(책·낫)만 숨긴다. 등장 연출 직전 초기 상태에 사용. 의상·후드는 현재 상태 유지.</summary>
+        /// <summary>무기(책·낫)만 숨긴다. 의상·후드는 현재 상태 유지.</summary>
         public void HideWeapons()
         {
             Toggle(_bookEquip,       false);
@@ -128,8 +129,20 @@ namespace RelicFairy.Monster
             Toggle(_scytheEquipRoot, false);
         }
 
+        /// <summary>모든 관리 오브젝트를 즉시 숨긴다. 등장 연출 전 초기 상태에 사용.</summary>
+        public void HideAll()
+        {
+            Toggle(_bookEquip,       false);
+            Toggle(_bookss,          false);
+            Toggle(_scytheEquipRoot, false);
+            Toggle(_clothing,        false);
+            Toggle(_skirtSeparate,   false);
+            Toggle(_hoodDown,        false);
+            Toggle(_hoodUp,          false);
+        }
+
         /// <summary>
-        /// 폼 전환 — 표시할 장비는 디졸브 인(1→0), 숨길 장비는 즉시 비활성화.
+        /// 폼 전환 — 표시할 장비는 DissolveEffect 등장 연출, 숨길 장비는 DissolveEffect 퇴장 연출.
         /// 등장 연출·Phase2Entry 패턴에서 Forget()으로 호출한다.
         /// </summary>
         public async UniTask DissolveInFormAsync(LichForm form, CancellationToken ct)
@@ -140,16 +153,14 @@ namespace RelicFairy.Monster
             var p = _presets[idx];
             CurrentForm = form;
 
-            // 숨길 오브젝트는 즉시 비활성화, 표시할 오브젝트는 현재 숨겨진 경우만 디졸브 인
-            // (이미 활성 상태인 오브젝트는 스킵 — 의상·후드 등 기존 표시 유지)
             var tasks = new List<UniTask>(7);
-            AddDissolveTask(_bookEquip,       p.bookActive,            tasks, ct);
-            AddDissolveTask(_bookss,          p.bookssActive,          tasks, ct);
-            AddDissolveTask(_scytheEquipRoot, p.scytheEquipRootActive, tasks, ct);
-            AddDissolveTask(_clothing,        p.clothingActive,        tasks, ct);
-            AddDissolveTask(_skirtSeparate,   p.skirtSeparateActive,   tasks, ct);
-            AddDissolveTask(_hoodDown,        p.hoodDownActive,        tasks, ct);
-            AddDissolveTask(_hoodUp,          p.hoodUpActive,          tasks, ct);
+            AddTransitionTask(_bookEquip,       p.bookActive,            tasks, ct);
+            AddTransitionTask(_bookss,          p.bookssActive,          tasks, ct);
+            AddTransitionTask(_scytheEquipRoot, p.scytheEquipRootActive, tasks, ct);
+            AddTransitionTask(_clothing,        p.clothingActive,        tasks, ct);
+            AddTransitionTask(_skirtSeparate,   p.skirtSeparateActive,   tasks, ct);
+            AddTransitionTask(_hoodDown,        p.hoodDownActive,        tasks, ct);
+            AddTransitionTask(_hoodUp,          p.hoodUpActive,          tasks, ct);
 
             if (tasks.Count > 0)
                 await UniTask.WhenAll(tasks);
@@ -159,58 +170,24 @@ namespace RelicFairy.Monster
         // Private Methods
         // ─────────────────────────────────────────────────────────
 
-        private void AddDissolveTask(GameObject go, bool targetActive, List<UniTask> tasks, CancellationToken ct)
-        {
-            if (!targetActive) { Toggle(go, false); return; }
-            if (go == null) return;
-            if (!go.activeSelf) tasks.Add(DissolveInAsync(go, ct));
-            // 이미 활성 상태이면 그대로 유지 (불필요한 디졸브·깜빡임 방지)
-        }
-
-        private async UniTask DissolveInAsync(GameObject go, CancellationToken ct)
+        private void AddTransitionTask(GameObject go, bool targetActive, List<UniTask> tasks, CancellationToken ct)
         {
             if (go == null) return;
-
-            var renderers = go.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
+            if (targetActive && !go.activeSelf)
             {
-                go.SetActive(true);
-                return;
+                // SetActive(true)는 DissolveEffect 내부에서 dissolve=1 세팅 후 처리 — 플래시 방지
+                tasks.Add(DissolveEffect.PlayAppearAsync(go, _dissolveInDuration, ct));
             }
-
-            var block = new MaterialPropertyBlock();
-
-            // 완전 디졸브 상태로 초기화 후 활성화
-            SetDissolveAll(renderers, block, 1f);
-            go.SetActive(true);
-
-            float elapsed = 0f;
-            try
+            else if (!targetActive && go.activeSelf)
             {
-                while (elapsed < _dissolveInDuration)
-                {
-                    await UniTask.Yield(cancellationToken: ct);
-                    elapsed += Time.deltaTime;
-                    SetDissolveAll(renderers, block, 1f - Mathf.Clamp01(elapsed / _dissolveInDuration));
-                }
+                tasks.Add(DissolveOutAndHideAsync(go, _dissolveInDuration, ct));
             }
-            catch (OperationCanceledException)
-            {
-                SetDissolveAll(renderers, block, 0f);
-                return;
-            }
-
-            SetDissolveAll(renderers, block, 0f);
         }
 
-        private void SetDissolveAll(Renderer[] renderers, MaterialPropertyBlock block, float value)
+        private async UniTask DissolveOutAndHideAsync(GameObject go, float duration, CancellationToken ct)
         {
-            foreach (var r in renderers)
-            {
-                r.GetPropertyBlock(block);
-                block.SetFloat(_dissolvePropertyName, value);
-                r.SetPropertyBlock(block);
-            }
+            await DissolveEffect.PlayDisappearAsync(go, duration, ct);
+            if (go != null) go.SetActive(false);
         }
 
         private void ApplyPreset(FormPreset preset)

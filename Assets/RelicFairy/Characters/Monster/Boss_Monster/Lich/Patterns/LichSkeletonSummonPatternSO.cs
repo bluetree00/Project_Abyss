@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace RelicFairy.Monster
 {
@@ -74,13 +75,18 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
         mc?.SetLocked(true);
 
         // Cast 중 소환 예정 위치를 Summon(보라) disc로 미리 표시
+        float groundY = (ctx.Monster as LichMonster)?.SpawnGroundY ?? 0f;
         _spawnGuides = new GameObject[Data.spawnCount];
         for (int i = 0; i < Data.spawnCount; i++)
         {
-            float   angle  = i * (360f / Data.spawnCount);
-            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.spawnRadius;
-            _spawnGuides[i] = PatternGuideHelper.Disc(
-                ctx.Transform.position + offset, 0.8f, PatternGuideHelper.Summon);
+            float   angle    = i * (360f / Data.spawnCount);
+            Vector3 offset   = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.spawnRadius;
+            Vector3 guidePos = ctx.Transform.position + offset;
+            if (NavMesh.SamplePosition(guidePos, out NavMeshHit navHit, 10f, NavMesh.AllAreas))
+                guidePos = navHit.position;
+            else
+                guidePos.y = groundY;
+            _spawnGuides[i] = PatternGuideHelper.Disc(guidePos, 0.8f, PatternGuideHelper.Summon);
         }
     }
 
@@ -130,12 +136,16 @@ public class LichSkeletonSummonState : UnInterruptibleState<LichSkeletonSummonPa
 
     private void Summon(MonsterContext ctx)
     {
+        float groundY = (ctx.Monster as LichMonster)?.SpawnGroundY ?? 0f;
         for (int i = 0; i < Data.spawnCount; i++)
         {
-            float angle    = i * (360f / Data.spawnCount);
+            float   angle  = i * (360f / Data.spawnCount);
             Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.spawnRadius;
             Vector3 pos    = ctx.Transform.position + offset;
-            pos.y          = ctx.Transform.position.y;
+            if (NavMesh.SamplePosition(pos, out NavMeshHit navHit, 10f, NavMesh.AllAreas))
+                pos = navHit.position;
+            else
+                pos.y = groundY;
 
             if (Data.skeletonPrefab != null)
             {

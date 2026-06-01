@@ -18,13 +18,16 @@ public class MerlinRuneBridge : MonoBehaviour
 {
     // ── Constants ──
     // 그리드 squareGap 과 Shape cellSize 를 동일 값으로 유지해 크기를 일치시킴
-    private const float GRID_CELL_SIZE = 44f;   // CELL_SIZE(40) + CELL_GAP(4) = MerlinRuneHexGridView.CELL_STEP
+    private const float GRID_CELL_SIZE = 54f;   // CELL_SIZE(50) + CELL_GAP(4) = MerlinRuneHexGridView.CELL_STEP
 
     // ── Static ──
     public static MerlinRuneBridge Instance { get; private set; }
 
     // 그리드 완성 시 UI_GridPanel에 시각 피드백 전달
     public event System.Action<string> OnSynergyActivated;
+    public event System.Action         OnCenterBonusActivated;
+    /// <summary>블록 추가/제거 시마다 발생. CharacterInfoPanelView가 활성효과를 갱신하는 데 사용.</summary>
+    public event System.Action         OnSynergiesUpdated;
 
     // ── SerializeField ──
     [Header("Puzzle 프리팹 (직접 참조)")]
@@ -39,6 +42,11 @@ public class MerlinRuneBridge : MonoBehaviour
     private readonly HashSet<string> _appliedGridIds = new();
     private GameObject _puzzleInstance;
     private bool _initialized;
+
+    // 임계값·CENTER 체크
+    private readonly Dictionary<string, HashSet<int>> _appliedThresholds = new();
+    private readonly Dictionary<string, int>           _lastClusterSizes  = new();
+    private bool _centerBonusActive;
 
     private void Awake()
     {
@@ -124,6 +132,18 @@ public class MerlinRuneBridge : MonoBehaviour
 
         _puzzleInstance = Instantiate(puzzlePrefab, container);
 
+        boardManager = _puzzleInstance.GetComponentInChildren<BoardManager>(true);
+        if (boardManager == null)
+        {
+            Debug.LogError("[MerlinRuneBridge] Puzzle 프리팹에 BoardManager 없음");
+            if (!wasActive) uiPanel.SetActive(false);
+            return;
+        }
+
+        // BoardContainer → UI_GridPanel 루트로 이동: 전체화면 기준 앵커로 Shape 패널 배치 가능
+        _puzzleInstance.transform.SetParent(UI_GridPanel.Instance.transform, false);
+        _puzzleInstance.transform.SetAsLastSibling();
+
         var rt = _puzzleInstance.GetComponent<RectTransform>();
         if (rt != null)
         {
@@ -132,14 +152,6 @@ public class MerlinRuneBridge : MonoBehaviour
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
             rt.localScale = Vector3.one;
-        }
-
-        boardManager = _puzzleInstance.GetComponentInChildren<BoardManager>(true);
-        if (boardManager == null)
-        {
-            Debug.LogError("[MerlinRuneBridge] Puzzle 프리팹에 BoardManager 없음");
-            if (!wasActive) uiPanel.SetActive(false);
-            return;
         }
 
         // 1프레임 대기 (BoardManager.Awake/Start 실행 보장)
@@ -190,31 +202,22 @@ public class MerlinRuneBridge : MonoBehaviour
             {
                 gameplayRT.anchorMin = Vector2.zero;
                 gameplayRT.anchorMax = Vector2.one;
-                gameplayRT.offsetMin = new Vector2(40f, 40f);
-                gameplayRT.offsetMax = new Vector2(-40f, -40f);
+                gameplayRT.offsetMin = Vector2.zero;
+                gameplayRT.offsetMax = Vector2.zero;
                 gameplayRT.pivot = new Vector2(0.5f, 0.5f);
             }
 
-            // GridHost: 좌측 62% × 상하 90% — 그리드 편집 영역
-            // (BoardContainer 기준이므로 CharacterInfoPanel 오프셋 불필요)
-            if (boardManager.gridHost != null)
-            {
-                boardManager.gridHost.anchorMin = new Vector2(0.02f, 0.05f);
-                boardManager.gridHost.anchorMax = new Vector2(0.62f, 0.95f);
-                boardManager.gridHost.offsetMin = Vector2.zero;
-                boardManager.gridHost.offsetMax = Vector2.zero;
-                boardManager.gridHost.pivot = new Vector2(0.5f, 0.5f);
-            }
-
-            // ShapeScrollView: 우측 패널(63%~94%) — 스크롤 뷰포트 영역
+            // ShapeScrollView: 헥사 셀 오른쪽 빈 공간(62%)부터 시작, ItemInfo(하단 30%) 미침범
+            // x: 62%~87% — 헥사 그리드 오른쪽 끝(~64%)과 우측 패널 경계(75%) 사이 포함
+            // y: 31%~96% — ItemInfo 상단(30%)에서 멈춤
             var shapeSSV = boardManager.gameplayRoot.GetComponentInChildren<ShapeScrollView>(true);
             if (shapeSSV != null)
             {
                 var ssvRT = shapeSSV.transform as RectTransform;
                 if (ssvRT != null)
                 {
-                    ssvRT.anchorMin = new Vector2(0.63f, 0.05f);
-                    ssvRT.anchorMax = new Vector2(0.94f, 0.95f);
+                    ssvRT.anchorMin = new Vector2(0.75f, 0.60f);
+                    ssvRT.anchorMax = new Vector2(1.00f, 0.944f); // 헤더(60px) 침범 방지
                     ssvRT.offsetMin = Vector2.zero;
                     ssvRT.offsetMax = Vector2.zero;
                     ssvRT.pivot = new Vector2(0.5f, 0.5f);
@@ -236,15 +239,15 @@ public class MerlinRuneBridge : MonoBehaviour
             else if (boardManager.shapeHost != null)
             {
                 // ShapeScrollView 없을 때 폴백
-                boardManager.shapeHost.anchorMin = new Vector2(0.63f, 0.05f);
-                boardManager.shapeHost.anchorMax = new Vector2(0.94f, 0.95f);
+                boardManager.shapeHost.anchorMin = new Vector2(0.75f, 0.60f);
+                boardManager.shapeHost.anchorMax = new Vector2(1.00f, 0.944f);
                 boardManager.shapeHost.offsetMin = Vector2.zero;
                 boardManager.shapeHost.offsetMax = Vector2.zero;
                 boardManager.shapeHost.pivot = new Vector2(0.5f, 1f);
             }
 
-            // spawnOrigin: X=0(중앙), Y=160(탭스트립 + 여백 확보)
-            boardManager.spawnOrigin = new Vector2(0f, 160f);
+            // spawnOrigin: X=0(중앙), Y=120(탭스트립 + 여백 확보)
+            boardManager.spawnOrigin = new Vector2(0f, 120f);
 
             // 셰이프 패널 배경 (스타일 패널)
             EnsureStyledShapePanel(boardManager.gameplayRoot);
@@ -270,14 +273,14 @@ public class MerlinRuneBridge : MonoBehaviour
         go.transform.SetAsFirstSibling();
 
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.63f, 0.05f);
-        rt.anchorMax = new Vector2(0.94f, 0.95f);
+        rt.anchorMin = new Vector2(0.75f, 0.60f);
+        rt.anchorMax = new Vector2(1.00f, 0.944f); // 헤더 침범 방지
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
         rt.pivot     = new Vector2(0.5f, 0.5f);
 
         var bg = go.GetComponent<Image>();
-        bg.color         = new Color(0.04f, 0.05f, 0.08f, 0.92f);
+        bg.color         = new Color(0.10f, 0.12f, 0.18f, 0.88f);
         bg.raycastTarget = false;
 
         var le = go.AddComponent<LayoutElement>();
@@ -496,11 +499,119 @@ public class MerlinRuneBridge : MonoBehaviour
     public void ClearAppliedGrids()
     {
         _appliedGridIds.Clear();
+        _appliedThresholds.Clear();
+        _lastClusterSizes.Clear();
+        _centerBonusActive = false;
+    }
+
+    // ── 임계값 기반 시너지 체크 ──────────────────────────────────
+
+    /// <summary>
+    /// MerlinRuneHexGridView.RefreshPlacedCells 이후 호출.
+    /// 존별 점유 수를 받아 임계값 달성 여부를 확인하고 시너지를 적용한다.
+    /// </summary>
+    public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts,
+                                    Dictionary<string, int> clusterSizes)
+    {
+        // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화
+        _lastClusterSizes.Clear();
+        if (clusterSizes != null)
+            foreach (var kvp in clusterSizes)
+                _lastClusterSizes[kvp.Key] = kvp.Value;
+
+        CheckAndApplyThresholds(clusterSizes ?? new Dictionary<string, int>());
+        CheckCenterBonus(zoneCounts ?? new Dictionary<string, int>());
+        OnSynergiesUpdated?.Invoke();
+    }
+
+    /// <summary>현재 존별 최대 연결 클러스터 크기. MerlinRuneSynergyStatusView에서 읽는다.</summary>
+    public IReadOnlyDictionary<string, int> GetLastClusterSizes() => _lastClusterSizes;
+
+    private void CheckAndApplyThresholds(Dictionary<string, int> clusterSizes)
+    {
+        var blockData = Managers.RuneData;
+        if (blockData == null) return;
+
+        foreach (var kvp in clusterSizes)
+        {
+            string zoneId      = kvp.Key;
+            int    clusterSize = kvp.Value;
+
+            if (zoneId == "CENTER") continue;
+
+            var entries = blockData.GetZoneSynergies(zoneId);
+            if (entries == null) continue;
+
+            if (!_appliedThresholds.TryGetValue(zoneId, out var applied))
+            {
+                applied = new HashSet<int>();
+                _appliedThresholds[zoneId] = applied;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (clusterSize < entry.threshold) continue;
+                if (applied.Contains(entry.threshold)) continue;
+
+                applied.Add(entry.threshold);
+                ApplyMechanicEffect(zoneId, entry);
+
+                Debug.Log($"[MerlinRuneBridge] 클러스터 임계값 달성: {zoneId} 클러스터={clusterSize} >= {entry.threshold} → {entry.effect_type}");
+
+                var run = AppBootstrapper.Instance?.CurrentRun;
+                run?.RecordSynergy(new SynergyRecord
+                {
+                    gridId     = zoneId,
+                    effectType = entry.effect_type,
+                    trigger    = entry.trigger,
+                    value      = entry.value,
+                    value2     = entry.value2,
+                    maxStack   = entry.max_stack,
+                    duration   = entry.duration,
+                });
+
+                OnSynergyActivated?.Invoke($"{zoneId}: {entry.effect_type}");
+            }
+        }
+    }
+
+    private void CheckCenterBonus(Dictionary<string, int> zoneCounts)
+    {
+        if (_centerBonusActive) return;
+        zoneCounts.TryGetValue("CENTER", out int centerCount);
+        if (centerCount < 2) return;
+
+        _centerBonusActive = true;
+        OnCenterBonusActivated?.Invoke();
+
+        var player = AppBootstrapper.Instance?.CurrentRun?.Player;
+        if (player == null) return;
+
+        player.RuntimeStats.SynergyMechanics.CenterBonusEnabled = true;
+        Debug.Log("[MerlinRuneBridge] CENTER 보너스 활성화: 활성 듀오 시너지 +25%");
+    }
+
+    private void ApplyMechanicEffect(string zoneId, RuneSynergyEntry entry)
+    {
+        var player = AppBootstrapper.Instance?.CurrentRun?.Player;
+        if (player == null) return;
+
+        player.RuntimeStats.ApplySynergyMechanicEffect(entry);
     }
 
     /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView/GridEditView에서 참조.</summary>
     public IReadOnlyDictionary<string, GridAssetData> GetRegisteredGrids()
         => _registeredGrids;
+
+    /// <summary>CENTER 보너스 활성 여부. UI_GridPanel Footer에서 표시.</summary>
+    public bool IsCenterBonusActive => _centerBonusActive;
+
+    /// <summary>Puzzle 인스턴스를 UI_GridPanel 루트의 최상단 자식으로 올린다. GridPanel 열릴 때 호출.</summary>
+    public void EnsureOnTop()
+    {
+        if (_puzzleInstance != null)
+            _puzzleInstance.transform.SetAsLastSibling();
+    }
 
 
     // ── 변환 유틸 ──

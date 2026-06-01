@@ -7,6 +7,17 @@ using Cysharp.Threading.Tasks;
 using LitJson;
 using UnityEngine;
 
+/// <summary>방 연결 방향 비트마스크. North=+Z, South=-Z, East=+X, West=-X.</summary>
+[Flags]
+public enum DoorMask
+{
+    None  = 0,
+    North = 1 << 0,
+    East  = 1 << 1,
+    South = 1 << 2,
+    West  = 1 << 3,
+}
+
 /// <summary>
 /// 뒤끝 CDN에서 챕터별 존 레이아웃(CHAPTER_1_ZONE_LAYOUT 등)을 로드/캐시.
 /// zone_layout_key로 로드 요청 → 내부적으로 ToUpper() 후 ChartLoader 호출.
@@ -14,10 +25,12 @@ using UnityEngine;
 public class ZoneLayoutManager
 {
     private const string CacheFilePrefix = "zone_layout_";
+    private const int    DoorWidth       = 5;
 
     private readonly Dictionary<string, List<ZoneLayoutEntry>> _cache = new();
     private readonly Dictionary<string, List<ZonePoolEntry>>   _poolCache = new();
     private readonly Dictionary<string, List<ZoneMapSlot>>     _slotCache = new();
+    private readonly System.Random _rng = new();
 
     // ── 조회 ────────────────────────────────────
 
@@ -66,27 +79,34 @@ public class ZoneLayoutManager
 
     private List<ZoneLayoutEntry> MergeSlotPool(List<ZoneMapSlot> slots, List<ZonePoolEntry> pool)
     {
-        var result = new List<ZoneLayoutEntry>();
-        var rng    = new System.Random();
+        var result    = new List<ZoneLayoutEntry>();
+        var slotById  = new Dictionary<int, ZoneMapSlot>();
+        foreach (var s in slots) slotById[s.slot_id] = s;
+
+        var doorMasks  = CalcDoorMasks(slots, slotById);
+        var cooldowns  = new Dictionary<string, int>(); // pool_key → 남은 쿨다운 턴
 
         foreach (var slot in slots)
         {
             var category = string.IsNullOrEmpty(slot.fixed_category) ? "Normal" : slot.fixed_category;
-            var matches  = pool.FindAll(p =>
+
+            var candidates = pool.FindAll(p =>
                 string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase) &&
                 (string.IsNullOrEmpty(slot.theme) ||
                  string.Equals(p.theme, slot.theme, StringComparison.OrdinalIgnoreCase)));
 
-            if (matches.Count == 0)
-                matches = pool.FindAll(p => string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase));
+            if (candidates.Count == 0)
+                candidates = pool.FindAll(p => string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase));
 
-            if (matches.Count == 0)
+            if (candidates.Count == 0)
             {
                 Debug.LogWarning($"[ZoneLayoutManager] 슬롯 {slot.slot_id} 에 맞는 풀 없음 (category={category})");
                 continue;
             }
 
-            var pick = matches[rng.Next(matches.Count)];
+            var pick = PickWithCooldown(candidates, cooldowns);
+            var mask = doorMasks.TryGetValue(slot.slot_id, out var m) ? m : DoorMask.None;
+
             result.Add(new ZoneLayoutEntry
             {
                 zone_index          = slot.slot_id,
@@ -106,7 +126,7 @@ public class ZoneLayoutManager
                 difficulty_scale    = pick.difficulty_scale,
                 theme               = string.IsNullOrEmpty(slot.theme) ? pick.theme : slot.theme,
                 palette             = pick.palette,
-                grid_csv            = pick.grid_csv,
+                grid_csv            = PunchDoors(pick.grid_csv, pick.grid_width, pick.grid_height, mask),
                 arena_template_key  = pick.arena_template_key,
                 scatter_range       = pick.scatter_range,
                 clear_overlay_delay = pick.clear_overlay_delay,
@@ -118,6 +138,91 @@ public class ZoneLayoutManager
 
         result.Sort((a, b) => a.zone_index.CompareTo(b.zone_index));
         return result;
+    }
+
+    /// <summary>슬롯 연결(next_slots + lane/layer 차이)으로 각 슬롯의 필요 문 방향을 계산한다.</summary>
+    private static Dictionary<int, DoorMask> CalcDoorMasks(List<ZoneMapSlot> slots, Dictionary<int, ZoneMapSlot> slotById)
+    {
+        var masks = new Dictionary<int, DoorMask>();
+        foreach (var s in slots) masks[s.slot_id] = DoorMask.None;
+
+        foreach (var slot in slots)
+        {
+            if (string.IsNullOrEmpty(slot.next_slots)) continue;
+            foreach (var part in slot.next_slots.Split('|'))
+            {
+                if (!int.TryParse(part.Trim(), out int nextId)) continue;
+                if (!slotById.TryGetValue(nextId, out var next)) continue;
+
+                int dLane  = next.lane  - slot.lane;
+                int dLayer = next.layer - slot.layer;
+
+                if (dLayer > 0) { masks[slot.slot_id] |= DoorMask.North; masks[next.slot_id] |= DoorMask.South; }
+                else if (dLayer < 0) { masks[slot.slot_id] |= DoorMask.South; masks[next.slot_id] |= DoorMask.North; }
+
+                if (dLane > 0) { masks[slot.slot_id] |= DoorMask.East; masks[next.slot_id] |= DoorMask.West; }
+                else if (dLane < 0) { masks[slot.slot_id] |= DoorMask.West; masks[next.slot_id] |= DoorMask.East; }
+            }
+        }
+        return masks;
+    }
+
+    /// <summary>풀 룸 grid_csv의 해당 방향 벽 중앙을 Floor로 뚫어 문을 만든다.</summary>
+    private static string PunchDoors(string gridCsv, int width, int height, DoorMask mask)
+    {
+        if (string.IsNullOrEmpty(gridCsv) || mask == DoorMask.None) return gridCsv;
+
+        var grid = MapDataLoader.Parse(gridCsv);
+        if (grid == null) return gridCsv;
+
+        int w    = grid.GetLength(0);
+        int h    = grid.GetLength(1);
+        int half = DoorWidth / 2;
+
+        if ((mask & DoorMask.North) != 0)
+        {
+            int cx = w / 2;
+            for (int x = cx - half; x <= cx + half; x++)
+                if (x >= 0 && x < w) grid[x, h - 1] = TileType.Floor;
+        }
+        if ((mask & DoorMask.South) != 0)
+        {
+            int cx = w / 2;
+            for (int x = cx - half; x <= cx + half; x++)
+                if (x >= 0 && x < w) grid[x, 0] = TileType.Floor;
+        }
+        if ((mask & DoorMask.East) != 0)
+        {
+            int cz = h / 2;
+            for (int z = cz - half; z <= cz + half; z++)
+                if (z >= 0 && z < h) grid[w - 1, z] = TileType.Floor;
+        }
+        if ((mask & DoorMask.West) != 0)
+        {
+            int cz = h / 2;
+            for (int z = cz - half; z <= cz + half; z++)
+                if (z >= 0 && z < h) grid[0, z] = TileType.Floor;
+        }
+
+        return MapDataLoader.Serialize(grid);
+    }
+
+    /// <summary>쿨다운을 고려해 후보 중 하나를 선택한다. 쿨다운 = max(3, 풀 크기 × 40%).</summary>
+    private ZonePoolEntry PickWithCooldown(List<ZonePoolEntry> candidates, Dictionary<string, int> cooldowns)
+    {
+        var available = candidates.FindAll(p => !cooldowns.TryGetValue(p.pool_key, out int cd) || cd <= 0);
+        if (available.Count == 0) available = candidates; // 폴백: 쿨다운 무시
+
+        var pick     = available[_rng.Next(available.Count)];
+        int cooldown = Math.Max(3, (int)(candidates.Count * 0.4f));
+        cooldowns[pick.pool_key] = cooldown;
+
+        // 기존 쿨다운 감소
+        var keys = new List<string>(cooldowns.Keys);
+        foreach (var key in keys)
+            if (key != pick.pool_key) cooldowns[key]--;
+
+        return pick;
     }
 
     // ── 초기화 ──────────────────────────────────
@@ -262,7 +367,7 @@ public class ZoneLayoutManager
                 spawn_local_x            = row.TryGetFloat("spawn_local_x"),
                 spawn_local_z            = row.TryGetFloat("spawn_local_z"),
                 difficulty_scale         = row.TryGetFloat("difficulty_scale"),
-                has_hidden_reward        = row.TryGetString("has_hidden_reward") == "true",
+                has_hidden_reward        = row.TryGetString("has_hidden_reward").Equals("true", StringComparison.OrdinalIgnoreCase),
                 hidden_reward_local_x    = row.TryGetFloat("hidden_reward_local_x"),
                 hidden_reward_local_y    = row.TryGetFloat("hidden_reward_local_y"),
                 hidden_reward_local_z    = row.TryGetFloat("hidden_reward_local_z"),
@@ -324,7 +429,7 @@ public class ZoneLayoutManager
                     spawn_local_x            = CsvFloat(cols, colMap, "spawn_local_x"),
                     spawn_local_z            = CsvFloat(cols, colMap, "spawn_local_z"),
                     difficulty_scale         = CsvFloat(cols, colMap, "difficulty_scale"),
-                    has_hidden_reward        = CsvStr(cols, colMap, "has_hidden_reward") == "true",
+                    has_hidden_reward        = CsvStr(cols, colMap, "has_hidden_reward").Equals("true", StringComparison.OrdinalIgnoreCase),
                     hidden_reward_local_x    = CsvFloat(cols, colMap, "hidden_reward_local_x"),
                     hidden_reward_local_y    = CsvFloat(cols, colMap, "hidden_reward_local_y"),
                     hidden_reward_local_z    = CsvFloat(cols, colMap, "hidden_reward_local_z"),

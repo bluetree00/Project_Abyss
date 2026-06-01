@@ -379,14 +379,36 @@ public class BoardManager : MonoBehaviour
         _sharedShapeSlotY.Clear();
         _slotCursorY = -spawnOrigin.y;
 
-        // 이전 세션에서 이 그리드 밖에 배치된 것으로 기록된 GlobalPlacement 초기화
-        _globalPlacements.Clear();
+        // 다른 그리드에 대한 스테일 배치만 정리 (이 그리드 배치 정보는 유지)
+        var staleKeys = new System.Collections.Generic.List<Shape>();
+        foreach (var pair in _globalPlacements)
+            if (pair.Value?.grid != hexAsset) staleKeys.Add(pair.Key);
+        foreach (var k in staleKeys) _globalPlacements.Remove(k);
 
         foreach (var s in _sharedShapes)
         {
             if (s == null) continue;
             s.gameObject.SetActive(true);
-            PlaceSharedShapeToSlot(s);
+
+            if (_globalPlacements.TryGetValue(s, out var gp))
+            {
+                // 이 그리드에 배치된 Shape: 위치 복원
+                if (gridHost != null) s.transform.SetParent(gridHost, false);
+                var rt = (RectTransform)s.transform;
+                rt.anchoredPosition = gp.anchoredPosition;
+                rt.localRotation    = Quaternion.identity;
+                rt.localScale       = Vector3.one * GetGameplayScale();
+                foreach (var sq in gp.squares)
+                {
+                    sq?.SetOccupied(true);
+                    if (sq != null) sq.occupyingItem = s.ItemData;
+                }
+                s.SetOccupiedSquares(gp.squares);
+            }
+            else
+            {
+                PlaceSharedShapeToSlot(s);
+            }
         }
     }
 

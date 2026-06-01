@@ -50,14 +50,17 @@ public class WeaponData
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
     public SkillSO skillE;
+    public SkillSO skillR;
 
     // ── 하위 호환 편의 접근자 ─────────────────────────────────────────
     public string skillName        => skillQ?.skillName;
     public string skillDescription => skillQ?.description;
     public Sprite skillQIcon       => skillQ?.icon;
     public Sprite skillEIcon       => skillE?.icon;
+    public Sprite skillRIcon       => skillR?.icon;
     public float  skillQCooldown   => skillQ?.cooldown ?? 0f;
     public float  skillECooldown   => skillE?.cooldown ?? 0f;
+    public float  skillRCooldown   => skillR?.cooldown ?? 0f;
 
     /// <summary>WeaponSO 기반 생성</summary>
     public WeaponData(WeaponSO so)
@@ -103,6 +106,9 @@ public class WeaponData
     /// 차트(EquipmentEntry) stats로 SO 디폴트값을 덮어쓴다.
     /// 차트가 마스터이므로 무기 획득 시 SO 로드 후 반드시 호출.
     /// SO 참조(animationSet, abilitySet, skillQ/E, icon, weaponType, displayName, prefabKey 등)는 보존.
+    /// animationSet 의 ClipMapping 중 GroundLight/AirLight 콤보의 lunge/aim 필드는
+    /// CSV(attack_step_1/2/3, move_input_scale, aim_assist_radius, use_aim_assist) 로 덮어쓴다.
+    /// 이를 위해 animationSet 을 런타임 클론으로 교체한다(원본 .asset 보호).
     /// </summary>
     public void ApplyServerOverride(EquipmentEntry entry)
     {
@@ -122,8 +128,54 @@ public class WeaponData
         chargeStages       = entry.charge_stages;
         tier               = entry.tier;
         rarity             = ParseRarity(entry.rarity, entry.tier);
+
+        // animationSet 런타임 클론 + ClipMapping 의 lunge/aim 필드를 CSV 로 주입
+        if (animationSet != null)
+        {
+            var clone = UnityEngine.Object.Instantiate(animationSet);
+            clone.name = animationSet.name + " (Runtime)";
+            InjectChartLungeAimInto(clone, entry);
+            animationSet = clone;
+        }
+
         // weaponType, displayName, weaponPrefabKey, weaponDisplayKey, iconKey,
-        // animationSet, abilitySet, skillQ/E 는 SO 값 유지
+        // abilitySet, skillQ/E 는 SO 값 유지
+    }
+
+    /// <summary>
+    /// CSV 의 attack_step_1/2/3, move_input_scale, aim_assist_radius, use_aim_assist 를
+    /// 클론된 WeaponAnimationSetSO 의 GroundLight/AirLight ClipMapping 에 주입한다.
+    /// step 값이 0 이면 SO 디폴트(또는 인스펙터 값) 유지.
+    /// </summary>
+    private static void InjectChartLungeAimInto(WeaponAnimationSetSO set, EquipmentEntry e)
+    {
+        if (set == null || set.animGroups == null) return;
+
+        var stepByCombo = new[] { e.attack_step_1, e.attack_step_2, e.attack_step_3 };
+        bool aimAssist  = e.use_aim_assist != 0;
+        float aimRadius = e.aim_assist_radius;
+        float moveScale = e.move_input_scale;
+
+        foreach (var group in set.animGroups)
+        {
+            if (group?.clipMappings == null) continue;
+            foreach (var m in group.clipMappings)
+            {
+                if (m == null) continue;
+                if (m.actionType != WeaponActionType.GroundLight &&
+                    m.actionType != WeaponActionType.AirLight)
+                    continue;
+
+                int idx = UnityEngine.Mathf.Clamp(m.comboIndex, 0, stepByCombo.Length - 1);
+                if (stepByCombo[idx] > 0f)
+                    m.attackStepDistance = stepByCombo[idx];
+
+                m.moveInputScale = moveScale;
+                m.useAimAssist   = aimAssist;
+                if (aimRadius > 0f)
+                    m.aimAssistRadius = aimRadius;
+            }
+        }
     }
 
     /// <summary>

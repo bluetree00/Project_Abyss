@@ -17,15 +17,15 @@ using TMPro;
 public sealed class StagingAreaView : MonoBehaviour
 {
     // ── Constants ──
-    private const float SLOT_WIDTH    = 110f;
-    private const float SLOT_HEIGHT   = 130f;
+    private const float SLOT_WIDTH    = 128f;
+    private const float SLOT_HEIGHT   = 156f;
     private const float SLOT_SPACING  = 10f;
     private const float GRID_CELL_SIZE = 120f;
 
     private static readonly Color COLOR_NEW_BORDER      = new(1f, 0.92f, 0.3f, 1f);
     private static readonly Color COLOR_NORMAL_BORDER   = new(0.4f, 0.4f, 0.5f, 0.7f);
     private static readonly Color COLOR_SELECTED_BORDER = new(0.3f, 0.85f, 1f, 1f);
-    private static readonly Color COLOR_EMPTY_BG        = new(0.08f, 0.08f, 0.12f, 0.6f);
+    private static readonly Color COLOR_EMPTY_BG        = new(0.14f, 0.14f, 0.20f, 0.7f);
     private static readonly Color COLOR_EMPTY_BORDER    = new(0.3f, 0.3f, 0.4f, 0.4f);
 
     private static readonly Color COLOR_COMMON    = new(0.7f, 0.7f, 0.7f, 1f);
@@ -253,6 +253,10 @@ public sealed class StagingAreaView : MonoBehaviour
         var slotGO = _slotGOs[index];
         if (slotGO == null) return;
 
+        // 이전 shimmer 컴포넌트 제거 (ShimmerMask 자식은 아래 루프에서 함께 제거됨)
+        var prevShimmer = slotGO.GetComponent<StagingSlotShimmer>();
+        if (prevShimmer != null) Destroy(prevShimmer);
+
         // 기존 아이템 컨텐츠 제거 (Border, EmptyLabel 제외)
         for (int i = slotGO.transform.childCount - 1; i >= 0; i--)
         {
@@ -287,7 +291,7 @@ public sealed class StagingAreaView : MonoBehaviour
             if (emptyLbl != null)  emptyLbl.SetActive(false);
             bool isNew = _newItemIds.Contains(item.instanceId);
 
-            if (bgImg != null)     bgImg.color     = new Color(0.12f, 0.12f, 0.18f, 0.95f);
+            if (bgImg != null)     bgImg.color     = new Color(0.18f, 0.18f, 0.26f, 0.95f);
             if (borderImg != null)
             {
                 var borderColor = (_highlightedItem == item) ? COLOR_SELECTED_BORDER
@@ -298,6 +302,9 @@ public sealed class StagingAreaView : MonoBehaviour
             }
 
             BuildCardContent(slotGO, item, isNew);
+
+            // 배치 전 카드에 shimmer 반짝임 효과
+            slotGO.AddComponent<StagingSlotShimmer>();
         }
     }
 
@@ -349,7 +356,7 @@ public sealed class StagingAreaView : MonoBehaviour
         var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) nameTxt.font = cardFont;
         nameTxt.text              = item.displayName ?? item.itemId;
-        nameTxt.fontSize          = 11f;
+        nameTxt.fontSize          = 13f;
         nameTxt.alignment         = TextAlignmentOptions.Center;
         nameTxt.enableWordWrapping = true;
 

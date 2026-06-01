@@ -1,0 +1,14 @@
+{"synergies":[
+  {"zone_id":"ATK","zone_name":"공격","threshold":5,"effect_type":"ChargingStrike","trigger":"OnHit","value":3.0,"value2":2.0,"value3":0.0,"max_stack":1,"duration":0,"description":"3번 공격마다 자동 강타 발동 (피해 2배)","stat_version":1},
+  {"zone_id":"ATK","zone_name":"공격","threshold":10,"effect_type":"ShockwaveBurst","trigger":"OnHit","value":0.5,"value2":1.5,"value3":60.0,"max_stack":1,"duration":0,"description":"강타 시 주변 충격파 + 0.5초 스턴","stat_version":1},
+  {"zone_id":"MAG","zone_name":"마력","threshold":3,"effect_type":"MagicEcho","trigger":"Always","value":3.0,"value2":0.3,"value3":0.0,"max_stack":1,"duration":0,"description":"스킬 사용 후 다음 3회 공격에 마법 잔향 (피해 30% 추가)","stat_version":1},
+  {"zone_id":"MAG","zone_name":"마력","threshold":7,"effect_type":"SkillEchoChain","trigger":"Always","value":1.0,"value2":0.5,"value3":8.0,"max_stack":1,"duration":0,"description":"잔향 공격 시 1회 연쇄 발동 8m 내 다른 적 자동 조준 (피해 50%)","stat_version":1},
+  {"zone_id":"DEF","zone_name":"방어","threshold":3,"effect_type":"ShieldAccumulate","trigger":"Always","value":0.2,"value2":0.0,"value3":0.0,"max_stack":1,"duration":0,"description":"피격 피해의 20%를 쉴드로 전환 (최대 HP의 30%까지)","stat_version":1},
+  {"zone_id":"DEF","zone_name":"방어","threshold":7,"effect_type":"ShieldBurst","trigger":"Always","value":0.5,"value2":1.5,"value3":0.0,"max_stack":1,"duration":0,"description":"쉴드 만충 시 무적 0.5초 + 쉴드 전량 폭발 반격","stat_version":1},
+  {"zone_id":"SPD","zone_name":"발걸음","threshold":3,"effect_type":"DodgeOnMove","trigger":"Always","value":0.1,"value2":0.0,"value3":0.0,"max_stack":1,"duration":0,"description":"이동 중 회피율 +10%","stat_version":1},
+  {"zone_id":"SPD","zone_name":"발걸음","threshold":7,"effect_type":"MoveAttackPenetrate","trigger":"Always","value":1.0,"value2":0.3,"value3":0.0,"max_stack":1,"duration":0,"description":"이동 직후 첫 공격 방어 무시 + 넉백","stat_version":1},
+  {"zone_id":"HP","zone_name":"심장","threshold":5,"effect_type":"LowHpDamageReduce","trigger":"Always","value":0.5,"value2":0.4,"value3":0.0,"max_stack":1,"duration":0,"description":"HP 50% 이하일 때 피해 최대 40% 경감 (HP 비율 연동)","stat_version":1},
+  {"zone_id":"HP","zone_name":"심장","threshold":10,"effect_type":"DeathSave","trigger":"Always","value":1.5,"value2":0.3,"value3":0.0,"max_stack":1,"duration":0,"description":"치사 피해 1회 무효 + 무적 1.5초 + HP 30% 즉시 회복 (런당 1회)","stat_version":1},
+  {"zone_id":"LUCK","zone_name":"행운","threshold":3,"effect_type":"GambleDice","trigger":"OnHit","value":0.15,"value2":2.0,"value3":0.15,"max_stack":1,"duration":0,"description":"공격마다 15% 확률 2배 피해 / 15% 확률 빗나감","stat_version":1},
+  {"zone_id":"LUCK","zone_name":"행운","threshold":7,"effect_type":"CritChain","trigger":"OnHit","value":0.5,"value2":0.0,"value3":0.0,"max_stack":1,"duration":0,"description":"치명타 시 50% 확률 연쇄 발동 + 황금구간 진입 시 빗나감 제거","stat_version":1}
+]}

@@ -51,6 +51,17 @@ public sealed class CombatPanelView : MonoBehaviour
     private bool  _ghostActive;
     private bool  _hpInitialized;
 
+    // ── R 스킬 슬롯 런타임 (프리팹에 없어 코드로 생성) ──
+    private Image      _rIconImg;
+    private GameObject _rCooldownBg;
+    private TMP_Text   _rCooldownTxt;
+
+    // ── 스탯 표시 런타임 ──
+    private TMP_Text _atkText;
+    private TMP_Text _defText;
+    private TMP_Text _hpMaxText;
+    private GameObject _statRoot;
+
     // ── 버프 UI 런타임 ──
     private readonly List<GameObject> _buffEntries = new();
     private float _noticeTimer;
@@ -145,11 +156,28 @@ public sealed class CombatPanelView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     public void SetSkillIcon(SkillType skill, Sprite icon)
     {
+        if (skill == SkillType.R)
+        {
+            if (_rIconImg != null)
+            {
+                _rIconImg.sprite = icon;
+                _rIconImg.gameObject.SetActive(icon != null);
+            }
+            return;
+        }
         GetSkillSlot(skill)?.SetIcon(icon);
     }
 
     public void SetSkillCooldown(SkillType skill, float remaining, float total)
     {
+        if (skill == SkillType.R)
+        {
+            bool onCd = remaining > 0.05f;
+            if (_rCooldownBg != null) _rCooldownBg.SetActive(onCd);
+            if (_rCooldownTxt != null)
+                _rCooldownTxt.text = onCd ? Mathf.CeilToInt(remaining).ToString() : string.Empty;
+            return;
+        }
         GetSkillSlot(skill)?.SetCooldown(remaining, total);
     }
 
@@ -288,6 +316,8 @@ public sealed class CombatPanelView : MonoBehaviour
     private void Awake()
     {
         EnsureSlotLabels();
+        EnsureRSlot();
+        EnsureStatPanel();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -645,6 +675,152 @@ public sealed class CombatPanelView : MonoBehaviour
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         _itemNoticeRoot = go.transform;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // R 스킬 슬롯 자동 생성 (Q=138, E=212, R=286 px 배치)
+    // ─────────────────────────────────────────────────────────
+
+    private void EnsureRSlot()
+    {
+        if (_rIconImg != null) return;
+
+        var combatRoot = FindChildRecursive(transform, "CombatStatusRoot");
+        if (combatRoot == null) return;
+
+        var rGO = new GameObject("HUD_RSkile", typeof(RectTransform));
+        rGO.transform.SetParent(combatRoot, false);
+        var rt = rGO.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0.5f, 0f);
+        rt.anchorMax        = new Vector2(0.5f, 0f);
+        rt.pivot            = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta        = new Vector2(68f, 68f);
+        rt.anchoredPosition = new Vector2(286f, 50.8f);
+
+        var slotBG = rGO.AddComponent<Image>();
+        slotBG.color = new Color(0.08f, 0.08f, 0.14f, 0.85f);
+
+        // 스킬 아이콘
+        var iconGO = new GameObject("SkillIcon", typeof(RectTransform));
+        iconGO.transform.SetParent(rGO.transform, false);
+        var iconRT = iconGO.GetComponent<RectTransform>();
+        iconRT.anchorMin = Vector2.zero;
+        iconRT.anchorMax = Vector2.one;
+        iconRT.offsetMin = new Vector2(5f, 5f);
+        iconRT.offsetMax = new Vector2(-5f, -5f);
+        _rIconImg = iconGO.AddComponent<Image>();
+        _rIconImg.preserveAspect = true;
+        _rIconImg.gameObject.SetActive(false);
+
+        // 쿨다운 오버레이
+        var cdBG = new GameObject("Cooldown_BG", typeof(RectTransform));
+        cdBG.transform.SetParent(rGO.transform, false);
+        var cdRT = cdBG.GetComponent<RectTransform>();
+        cdRT.anchorMin = Vector2.zero;
+        cdRT.anchorMax = Vector2.one;
+        cdRT.sizeDelta  = Vector2.zero;
+        cdBG.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.65f);
+        _rCooldownBg = cdBG;
+        _rCooldownBg.SetActive(false);
+
+        // 쿨다운 숫자
+        var cdTxtGO = new GameObject("CooldownText", typeof(RectTransform));
+        cdTxtGO.transform.SetParent(cdBG.transform, false);
+        var cdTxtRT = cdTxtGO.GetComponent<RectTransform>();
+        cdTxtRT.anchorMin = Vector2.zero;
+        cdTxtRT.anchorMax = Vector2.one;
+        cdTxtRT.sizeDelta = Vector2.zero;
+        _rCooldownTxt = cdTxtGO.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(_rCooldownTxt);
+        _rCooldownTxt.fontSize  = 18f;
+        _rCooldownTxt.fontStyle = FontStyles.Bold;
+        _rCooldownTxt.alignment = TextAlignmentOptions.Center;
+        _rCooldownTxt.color     = Color.white;
+
+        // 키 레이블 "R"
+        CreateCornerLabel(rGO.transform, "R");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 스탯 표시 패널 (ATK / DEF — 자동 생성)
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>공격력·방어력을 HUD에 실시간 반영한다. HudPresenter.RefreshStats에서 호출.</summary>
+    public void SetStats(int atk, int def)
+    {
+        if (_atkText != null) _atkText.SetText($"⚔ {atk}");
+        if (_defText != null) _defText.SetText($"🛡 {def}");
+    }
+
+    private void EnsureStatPanel()
+    {
+        if (_statRoot != null) return;
+
+        // CombatStatusRoot 탐색
+        var combatRoot = FindChildRecursive(transform, "CombatStatusRoot");
+        if (combatRoot == null) return;
+
+        // CombatStatusRoot 크기 확대: 650×130 → 750×168
+        if (combatRoot is RectTransform crt)
+        {
+            crt.sizeDelta = new Vector2(750f, 168f);
+        }
+
+        // 스탯 행 배치: CombatStatusRoot 상단 28px 영역
+        var statGO = new GameObject("StatRow", typeof(RectTransform));
+        statGO.transform.SetParent(combatRoot, false);
+        _statRoot = statGO;
+
+        var rt = statGO.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(0f, 30f);
+        rt.anchoredPosition = Vector2.zero;
+
+        // 반투명 배경
+        var bg = statGO.AddComponent<Image>();
+        bg.color         = new Color(0f, 0f, 0f, 0.35f);
+        bg.raycastTarget = false;
+
+        // ── ATK 텍스트 (좌측 절반) ──
+        _atkText = MakeStatText(statGO.transform, "AtkText",
+            new Vector2(0f, 0f), new Vector2(0.5f, 1f),
+            new Color(1.0f, 0.55f, 0.25f, 1f));
+
+        // ── DEF 텍스트 (우측 절반) ──
+        _defText = MakeStatText(statGO.transform, "DefText",
+            new Vector2(0.5f, 0f), new Vector2(1f, 1f),
+            new Color(0.35f, 0.70f, 1.00f, 1f));
+    }
+
+    private TMP_Text MakeStatText(Transform parent, string name,
+        Vector2 anchorMin, Vector2 anchorMax, Color color)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = new Vector2(6f, 0f);
+        rt.offsetMax = new Vector2(-6f, 0f);
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(tmp);
+        tmp.text      = "—";
+        tmp.fontSize  = 15f;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color     = color;
+        tmp.alignment = TextAlignmentOptions.Midline;
+        tmp.enableWordWrapping = false;
+        tmp.raycastTarget = false;
+
+        var ol = go.AddComponent<Outline>();
+        ol.effectColor    = new Color(0f, 0f, 0f, 0.7f);
+        ol.effectDistance = new Vector2(1f, -1f);
+
+        return tmp;
     }
 
     // ── 자동 생성 (Inspector 미연결 시 런타임 폴백) ──

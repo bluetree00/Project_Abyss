@@ -27,7 +27,8 @@ public class MapBuilder
         Transform parent,
         float cellSize = 1f,
         float baseY = 0f,
-        GameObject shopStallPrefab = null)
+        GameObject shopStallPrefab = null,
+        int wallLayers = 1)
     {
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -67,7 +68,9 @@ public class MapBuilder
 
                 var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
                 go.name = $"Block_{x}_{z}_{renderType}";
-                SetLayerRecursive(go, 3); // Ground layer (TagManager layer 3)
+                // 벽은 Wall(8) 레이어로 — 리치 등 공중 보스의 SphereCast 충돌 감지에 사용.
+                // 나머지 블록(바닥·버프·상점 등)은 Ground(3) 레이어.
+                SetLayerRecursive(go, renderType == TileType.Wall ? 8 : 3);
 
                 result.Add(new PlacedBlock
                 {
@@ -77,6 +80,27 @@ public class MapBuilder
                     tileType = renderType,
                     cell = new Vector2Int(x, z),
                 });
+
+                // 벽 블록 수직 반복 — 같은 프리팹을 위로 쌓아 자연스러운 높이 연출.
+                // GPU 인스턴싱(URP 기본)으로 동일 메시+머티리얼은 자동 배칭되어 드로우콜 증가가 적다.
+                if (renderType == TileType.Wall && wallLayers > 1)
+                {
+                    for (int layer = 1; layer < wallLayers; layer++)
+                    {
+                        var layerWorld = worldPos + new Vector3(0f, layer * cellSize, 0f);
+                        var layerGO    = Object.Instantiate(blockDef.prefab, layerWorld, Quaternion.Euler(0, rotY, 0), parent);
+                        layerGO.name   = $"Block_{x}_{z}_Wall_L{layer}";
+                        SetLayerRecursive(layerGO, 8); // Wall layer
+                        result.Add(new PlacedBlock
+                        {
+                            instance        = layerGO,
+                            targetPosition  = layerWorld,
+                            targetRotationY = rotY,
+                            tileType        = TileType.Wall,
+                            cell            = new Vector2Int(x, z),
+                        });
+                    }
+                }
 
                 // 버프 타일: 전용 프리팹이 있으면 사용, 없으면 기본 트리거 오브젝트 생성
                 if (isBuffTile)
@@ -306,6 +330,125 @@ public class MapBuilder
             tileType = type,
             cell = new Vector2Int(x, z),
         };
+    }
+
+    /// <summary>
+    /// 그리드 비어있지 않은 모든 칸 위에 천장 타일을 배치한다.
+    /// palette에 Ceiling BlockDef가 있으면 사용, 없으면 Floor 타일을 X축 180° 뒤집어 폴백.
+    /// ceilingHeight == 0이면 아무것도 하지 않는다.
+    /// </summary>
+    public static void BuildCeiling(
+        TileType[,] grid,
+        BlockPalette palette,
+        Transform parent,
+        float cellSize,
+        float baseY,
+        float ceilingHeight)
+    {
+        if (ceilingHeight <= 0f) return;
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+        float ceilingY = baseY + ceilingHeight;
+
+        var ceilingDef = palette?.Pick(TileType.Ceiling);
+        var floorDef   = palette?.Pick(TileType.Floor);
+        var useDef     = ceilingDef ?? floorDef;
+        if (useDef?.prefab == null) return;
+
+        bool flip = ceilingDef == null; // 전용 천장 프리팹 없으면 바닥 타일 뒤집기
+
+        for (int x = 0; x < w; x++)
+        {
+            for (int z = 0; z < h; z++)
+            {
+                if (grid[x, z] == TileType.Empty) continue;
+
+                var localPos = new Vector3(x * cellSize - offset.x, ceilingY, z * cellSize - offset.z);
+                var worldPos = parent.TransformPoint(localPos);
+                var rot      = flip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
+
+                var go = Object.Instantiate(useDef.prefab, worldPos, rot, parent);
+                go.name = $"Ceiling_{x}_{z}";
+                SetLayerRecursive(go, 3);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Floor에 인접한 Wall 타일의 안쪽 면에 벽 조명 프리팹을 배치한다.
+    /// 방 중앙 조명(centerLightPrefab)도 선택적으로 배치.
+    /// </summary>
+    /// <param name="spacing">몇 칸마다 조명 1개를 배치할지 (낮을수록 조밀).</param>
+    /// <param name="heightRatio">벽 높이 중 어느 위치에 배치할지 (0=하단, 1=상단). 0.4 권장.</param>
+    public static void BuildRoomLights(
+        TileType[,]        grid,
+        Transform          parent,
+        float              cellSize,
+        float              baseY,
+        int                wallLayers,
+        RoomLightingConfig cfg)
+    {
+        if (cfg == null || (cfg.wallLightPrefab == null && cfg.centerLightPrefab == null)) return;
+
+        int w      = grid.GetLength(0);
+        int h      = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+        float lightY = baseY + wallLayers * cellSize * cfg.wallLightHeightRatio;
+
+        // 이웃 방향 (4방향)
+        int[] dx = { -1, 1, 0, 0 };
+        int[] dz = {  0, 0,-1, 1 };
+
+        int counter = 0;
+
+        if (cfg.wallLightPrefab != null)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                for (int z = 0; z < h; z++)
+                {
+                    if (grid[x, z] != TileType.Wall) continue;
+
+                    // Floor에 인접한 방향(안쪽) 탐색
+                    bool      hasInner  = false;
+                    Vector3   inwardDir = Vector3.zero;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = x + dx[d], nz = z + dz[d];
+                        if (nx < 0 || nx >= w || nz < 0 || nz >= h) continue;
+                        var t = grid[nx, nz];
+                        if (t != TileType.Wall && t != TileType.Empty)
+                        {
+                            hasInner  = true;
+                            inwardDir = new Vector3(dx[d], 0f, dz[d]);
+                            break;
+                        }
+                    }
+
+                    if (!hasInner) continue;
+
+                    if (counter++ % cfg.wallLightSpacing != 0) continue;
+
+                    var wallLocal  = new Vector3(x * cellSize - offset.x, lightY, z * cellSize - offset.z);
+                    var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
+                    var worldPos   = parent.TransformPoint(lightLocal);
+                    var rot        = Quaternion.LookRotation(inwardDir);
+
+                    Object.Instantiate(cfg.wallLightPrefab, worldPos, rot, parent);
+                }
+            }
+        }
+
+        // 방 중심 천장 조명
+        if (cfg.centerLightPrefab != null)
+        {
+            float ceilingY = baseY + wallLayers * cellSize;
+            Object.Instantiate(cfg.centerLightPrefab,
+                parent.TransformPoint(new Vector3(0f, ceilingY - cellSize * 0.3f, 0f)),
+                Quaternion.identity, parent);
+        }
     }
 
     /// <summary>

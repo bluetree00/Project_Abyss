@@ -44,10 +44,17 @@ public class BossSpawner : MonoBehaviour
     [Tooltip("true면 Start()에서 자동 소환하지 않고 Trigger() 호출을 기다린다. BossRoomController 연출 후 소환 시 사용.")]
     [SerializeField] private bool waitForExternalTrigger;
 
+    // ── Private ─────────────────────────────────────────────
+    private bool      _spawned;
+    private GameObject _spawnedBossGO;
+
     // ── Properties / Events ─────────────────────────────────
 
     /// <summary>항상 1 (보스는 1마리). RoomClearController가 킬 목표 합산에 사용.</summary>
     public int MaxTotalSpawns => 1;
+
+    /// <summary>스폰 완료된 보스 인스턴스. 스폰 전에는 null. BossRoomController 소급 연결에 사용.</summary>
+    public MonsterBase SpawnedBoss { get; private set; }
 
     /// <summary>보스가 스폰된 직후 발행. RoomClearController가 OnDied를 체이닝하는 데 사용.</summary>
     public event System.Action<MonsterBase> OnMonsterSpawned;
@@ -59,24 +66,17 @@ public class BossSpawner : MonoBehaviour
     private void Start()
     {
         if (waitForExternalTrigger) return;
-
-        if (placedBoss != null)
-        {
-            ActivatePlacedBossAsync().Forget();
-            return;
-        }
-
-        if (spawnTable == null)
-        {
-            Debug.LogWarning("[BossSpawner] spawnTable이 비어 있습니다. Inspector에서 SO를 할당해주세요.", this);
-            return;
-        }
-        SpawnBossAsync().Forget();
+        TrySpawn();
     }
 
     /// <summary>BossRoomController가 연출 완료 후 호출 — 보스 소환/활성화 시작.</summary>
-    public void Trigger()
+    public void Trigger() => TrySpawn();
+
+    private void TrySpawn()
     {
+        if (_spawned) return;
+        _spawned = true;
+
         if (placedBoss != null)
         {
             ActivatePlacedBossAsync().Forget();
@@ -116,10 +116,8 @@ public class BossSpawner : MonoBehaviour
 
         // 씬에 직접 배치된 보스는 이미 활성 상태 — SetActive 불필요
         // RoomClearController가 OnDied를 체이닝할 수 있도록 먼저 알림
+        SpawnedBoss = placedBoss;
         OnMonsterSpawned?.Invoke(placedBoss);
-
-        // 카메라 팬 완료 후 Appear 애니메이션 + 보스 이름 UI 시작
-        (placedBoss as IBossEntrance)?.TriggerEntrance();
 
         PlaySpawnEffectAsync(placedBoss.transform.position).Forget();
 
@@ -136,8 +134,14 @@ public class BossSpawner : MonoBehaviour
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 풀 소환 보스
+    // 어드레서블 직접 소환 보스
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void OnDestroy()
+    {
+        if (_spawnedBossGO != null)
+            Managers.AddressableManager.ReleaseInstance(_spawnedBossGO);
+    }
 
     private async UniTaskVoid SpawnBossAsync()
     {
@@ -161,29 +165,40 @@ public class BossSpawner : MonoBehaviour
             return;
         }
 
-        MonsterBase boss = null;
+        // 보스는 전투 중 단 1마리 — 풀러 대신 어드레서블에서 직접 인스턴스 생성.
+        // 풀러 사용 시 프리웜 인스턴스가 공유 ScriptableObject의 BuiltConditions를 덮어써서
+        // 마지막 인스턴스의 블랙보드가 캡처되는 버그가 발생한다.
+        GameObject bossGO = null;
         try
         {
-            boss = await Managers.ObjectPooler.SpawnAsync<MonsterBase>(
-                entry.addressableKey,
-                ObjectPoolerManager.PoolType.Monster,
-                transform.position,
-                Quaternion.identity);
+            bossGO = await Managers.AddressableManager.InstantiateAsync(entry.addressableKey);
         }
         catch (System.Exception ex)
         {
-            Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 스폰 예외: {ex.Message}", this);
+            Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 소환 예외: {ex.Message}", this);
             return;
         }
 
+        if (bossGO == null)
+        {
+            Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 소환 실패.", this);
+            return;
+        }
+
+        // 스포너 위치·회전 적용 — 보스가 입장 방향을 바라보도록 Inspector에서 스포너를 정렬해둔다.
+        bossGO.transform.SetPositionAndRotation(transform.position, transform.rotation);
+
+        var boss = bossGO.GetComponent<MonsterBase>();
         if (boss == null)
         {
-            Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 스폰 실패.", this);
+            Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 프리팹에 MonsterBase가 없습니다.", this);
+            Managers.AddressableManager.ReleaseInstance(bossGO);
             return;
         }
 
+        _spawnedBossGO = bossGO;
+        SpawnedBoss = boss;
         OnMonsterSpawned?.Invoke(boss);
-        (boss as IBossEntrance)?.TriggerEntrance();
 
         PlaySpawnEffectAsync(transform.position).Forget();
 

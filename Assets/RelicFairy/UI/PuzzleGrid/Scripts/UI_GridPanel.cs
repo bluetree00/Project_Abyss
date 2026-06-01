@@ -24,11 +24,11 @@ public sealed class UI_GridPanel : UI_Base
     public bool IsOpen => _isOpen;
 
     // ── Private: Sub-views ──
-    private CharacterInfoPanelView   _charInfoView;
-    private MerlinRuneHexGridView    _hexGridView;
+    private CharacterInfoPanelView      _charInfoView;
+    private MerlinRuneHexGridView       _hexGridView;
     private MerlinRuneSynergyStatusView _synergyStatusView;
-    private StagingAreaView          _stagingArea;
-    private ItemInfoPanel            _itemInfoPanel;
+    private StagingAreaView             _stagingArea;
+    private ItemInfoPanel               _itemInfoPanel;
 
     // ── Private: Layout roots (코드로 생성) ──
     private RectTransform _headerRT;
@@ -39,7 +39,7 @@ public sealed class UI_GridPanel : UI_Base
     private RectTransform _footerRT;
     private RectTransform _boardContainer;
 
-    // 센터: 상단 그리드 / 하단 시너지
+    // 센터: 상단 그리드 / 하단 존 시너지
     private RectTransform _hexGridRoot;
     private RectTransform _synergyStatusRoot;
 
@@ -68,12 +68,34 @@ public sealed class UI_GridPanel : UI_Base
     private TMP_Text               _synergyToastText;
     private CancellationTokenSource _toastCts;
 
+    // ── Private: Reset Confirm Dialog ──
+    private GameObject _resetDialog;
+    private Button     _resetDialogYes;
+    private Button     _resetDialogNo;
+
+    // ── Private: Place Button ──
+    private Image    _placeBG;
+    private TMP_Text _placeLabel;
+
+    // ── Private: Hex Grid Hint ──
+    private TMP_Text _hexGridHintText;
+
+    // ── Private: Footer Center Bonus ──
+    private TMP_Text _footerCenterText;
+
+    // ── Private: Fade ──
+    private CanvasGroup _canvasGroup;
+
     // ── Private: State ──
     private RunItemInventory _inventory;
     private RuntimeItemData  _pendingNewItem;
     private bool             _isOpen;
     private bool             _layoutBuilt;
     private int              _totalPlacedCells;
+
+    // 아이템 배치 위치 캐시: instanceId → 헥사 그리드 셀 좌표
+    // HandleItemRemoved 에서 GridManager 의존 없이 직접 제거에 사용
+    private readonly Dictionary<string, Vector2Int[]> _placedItemPositions = new();
 
     // ── Lifecycle ──
 
@@ -85,6 +107,7 @@ public sealed class UI_GridPanel : UI_Base
         BuildLayout();
         BuildConfirmDialog();
         BuildSynergyToast();
+        BuildResetConfirmDialog();
 
         gameObject.SetActive(false);
     }
@@ -108,7 +131,13 @@ public sealed class UI_GridPanel : UI_Base
         }
 
         if (MerlinRuneBridge.Instance != null)
-            MerlinRuneBridge.Instance.OnSynergyActivated += ShowSynergyActivated;
+        {
+            MerlinRuneBridge.Instance.OnSynergyActivated    += ShowSynergyActivated;
+            MerlinRuneBridge.Instance.OnCenterBonusActivated += HandleCenterBonusActivated;
+        }
+
+        if (_resetDialogYes != null) _resetDialogYes.onClick.AddListener(OnResetConfirmYes);
+        if (_resetDialogNo  != null) _resetDialogNo.onClick.AddListener(OnResetConfirmNo);
 
         if (_stagingArea != null)
         {
@@ -138,7 +167,13 @@ public sealed class UI_GridPanel : UI_Base
         }
 
         if (MerlinRuneBridge.Instance != null)
-            MerlinRuneBridge.Instance.OnSynergyActivated -= ShowSynergyActivated;
+        {
+            MerlinRuneBridge.Instance.OnSynergyActivated    -= ShowSynergyActivated;
+            MerlinRuneBridge.Instance.OnCenterBonusActivated -= HandleCenterBonusActivated;
+        }
+
+        if (_resetDialogYes != null) _resetDialogYes.onClick.RemoveListener(OnResetConfirmYes);
+        if (_resetDialogNo  != null) _resetDialogNo.onClick.RemoveListener(OnResetConfirmNo);
 
         if (_stagingArea != null)
         {
@@ -200,22 +235,20 @@ public sealed class UI_GridPanel : UI_Base
         _isOpen = true;
         Time.timeScale = 0f;
         gameObject.SetActive(true);
+        FadeInAsync().Forget();
 
         var run   = GameRunBootstrapper.Instance?.Run;
         var stats = run?.Player?.RuntimeStats;
 
         _charInfoView?.SetContext(stats, run);
 
-        // 존 총 셀 수 캐시 (RuneData 로드 완료 이후 첫 오픈 시 보장)
-        _synergyStatusView?.CacheZoneTotals();
-
         // 헥사곤 그리드: 데이터 로드 후 빌드 + 드래그-앤-드롭 연동
         if (_hexGridView != null && Managers.RuneData != null && Managers.RuneData.IsInitialized)
         {
             _hexGridView.BuildGrid();
 
-            // 배치된 Shape가 헥사 셀 위에 렌더링되도록 BoardContainer를 최후 sibling으로
-            _boardContainer.SetAsLastSibling();
+            // Puzzle 인스턴스(UI_GridPanel 루트 직속)가 헥사 셀 위에 렌더링되도록
+            MerlinRuneBridge.Instance?.EnsureOnTop();
 
             var hexGrid = _hexGridView.HexGrid;
             if (hexGrid != null)
@@ -228,6 +261,7 @@ public sealed class UI_GridPanel : UI_Base
 
             // 초기 점유 상태 반영 (재오픈 시 이전 배치 복원)
             _hexGridView.RefreshOccupiedCells();
+            _hexGridView.UpdateAdjacencyConstraints();
         }
 
         run?.EnterGridSynergy();
@@ -238,6 +272,7 @@ public sealed class UI_GridPanel : UI_Base
         RefreshSynergyStatus();
         RefreshFooter();
         RefreshInfoPanelDefault();
+        UpdateHexGridHint();
 
         if (_pendingNewItem != null)
         {
@@ -269,9 +304,12 @@ public sealed class UI_GridPanel : UI_Base
         rootRT.anchorMax = Vector2.one;
         rootRT.offsetMin = rootRT.offsetMax = Vector2.zero;
 
+        // CanvasGroup — 페이드인에 사용
+        _canvasGroup = gameObject.GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+
         // 전체 배경
         var bg = gameObject.GetComponent<Image>() ?? gameObject.AddComponent<Image>();
-        bg.color = new Color(0.04f, 0.05f, 0.08f, 0.97f);
+        bg.color = new Color(0.10f, 0.12f, 0.18f, 0.97f);
 
         BuildHeader();
         BuildMainArea();
@@ -290,13 +328,13 @@ public sealed class UI_GridPanel : UI_Base
         _headerRT.anchoredPosition = new Vector2(0f, -30f);
 
         var hdrBG = headerGO.AddComponent<Image>();
-        hdrBG.color = new Color(0.07f, 0.08f, 0.12f, 1f);
+        hdrBG.color = new Color(0.14f, 0.16f, 0.22f, 1f);
 
         // ← 뒤로가기 버튼 (좌측)
         _backButton = MakeButton(headerGO.transform, "BackBtn",
             new Vector2(0f, 0f), new Vector2(0f, 1f),
             new Vector2(60f, 0f), Vector2.zero,
-            new Color(0.15f, 0.18f, 0.25f, 1f), "←");
+            new Color(0.22f, 0.26f, 0.36f, 1f), "←");
         var backRT = _backButton.GetComponent<RectTransform>();
         backRT.pivot = new Vector2(0f, 0.5f);
         backRT.anchoredPosition = new Vector2(8f, 0f);
@@ -318,6 +356,9 @@ public sealed class UI_GridPanel : UI_Base
             new Vector2(1f, 0f), new Vector2(1f, 1f),
             new Vector2(90f, -14f), new Vector2(-106f, 0f),
             new Color(0.45f, 0.22f, 0.18f, 0.9f), "초기화");
+        var resetRT = _resetButton.GetComponent<RectTransform>();
+        resetRT.pivot           = new Vector2(1f, 0.5f);
+        resetRT.anchoredPosition = new Vector2(-110f, 0f);
 
         // [완료 ✓] 버튼 (우측 끝)
         _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
@@ -379,18 +420,30 @@ public sealed class UI_GridPanel : UI_Base
         _centerPanelRT.offsetMin = new Vector2(2f, 0f);
         _centerPanelRT.offsetMax = new Vector2(-2f, 0f);
 
-        // 상단 65%: HexGrid
+        // 상단 72%: HexGrid (0.28 ~ 1.00)
         var hexRootGO = Go("HexGridRoot");
         hexRootGO.transform.SetParent(go.transform, false);
         _hexGridRoot = hexRootGO.GetComponent<RectTransform>();
-        _hexGridRoot.anchorMin = new Vector2(0f, 0.35f);
+        _hexGridRoot.anchorMin = new Vector2(0f, 0.28f);
         _hexGridRoot.anchorMax = new Vector2(1f, 1.00f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
         var hexBG = hexRootGO.AddComponent<Image>();
-        hexBG.color = new Color(0.05f, 0.06f, 0.09f, 0.95f);
+        hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
+
+        // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
+        var hintGO = MakeTxt(go.transform, "DragHint",
+            "아이템 카드를 드래그해\n그리드에 배치하세요", 15f,
+            new Color(0.62f, 0.68f, 0.85f, 0.45f));
+        _hexGridHintText = hintGO.GetComponent<TMP_Text>();
+        var hintRT = hintGO.GetComponent<RectTransform>();
+        hintRT.anchorMin = new Vector2(0f, 0.28f);
+        hintRT.anchorMax = new Vector2(1f, 1.00f);
+        hintRT.offsetMin = hintRT.offsetMax = Vector2.zero;
+        _hexGridHintText.alignment         = TextAlignmentOptions.Center;
+        _hexGridHintText.enableWordWrapping = true;
 
         // BoardContainer: GridManager/MerlinRuneBridge와 연동하는 영역
         var boardGO = Go("BoardContainer");
@@ -400,12 +453,12 @@ public sealed class UI_GridPanel : UI_Base
         _boardContainer.anchorMax = Vector2.one;
         _boardContainer.offsetMin = _boardContainer.offsetMax = Vector2.zero;
 
-        // 하단 35%: SynergyStatus
+        // 하단 27%: 연결 클러스터 시너지 패널 (0.00 ~ 0.27)
         var synRootGO = Go("SynergyStatusRoot");
         synRootGO.transform.SetParent(go.transform, false);
         _synergyStatusRoot = synRootGO.GetComponent<RectTransform>();
-        _synergyStatusRoot.anchorMin = new Vector2(0f, 0f);
-        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.34f);
+        _synergyStatusRoot.anchorMin = new Vector2(0f, 0.00f);
+        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.27f);
         _synergyStatusRoot.offsetMin = new Vector2(0f, 2f);
         _synergyStatusRoot.offsetMax = Vector2.zero;
 
@@ -424,7 +477,7 @@ public sealed class UI_GridPanel : UI_Base
         _rightPanelRT.offsetMax = Vector2.zero;
 
         var rightBG = go.AddComponent<Image>();
-        rightBG.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+        rightBG.color = new Color(0.12f, 0.14f, 0.20f, 0.95f);
 
         // 상단 70%: StagingAreaView (스크롤)
         BuildStagingScrollArea(go.transform);
@@ -438,17 +491,17 @@ public sealed class UI_GridPanel : UI_Base
         var scrollGO = Go("StagingScroll");
         scrollGO.transform.SetParent(parent, false);
         _stagingScrollRT = scrollGO.GetComponent<RectTransform>();
-        _stagingScrollRT.anchorMin = new Vector2(0f, 0.30f);
-        _stagingScrollRT.anchorMax = new Vector2(1f, 1.00f);
+        _stagingScrollRT.anchorMin = new Vector2(0f, 0.27f);
+        _stagingScrollRT.anchorMax = new Vector2(1f, 0.62f);
         _stagingScrollRT.offsetMin = new Vector2(4f, 4f);
         _stagingScrollRT.offsetMax = new Vector2(-4f, -4f);
 
         var scrollBG = scrollGO.AddComponent<Image>();
-        scrollBG.color = new Color(0.04f, 0.05f, 0.08f, 0.60f);
+        scrollBG.color = new Color(0.10f, 0.12f, 0.18f, 0.75f);
 
         // "보관함" 레이블
-        var lblGO = MakeTxt(scrollGO.transform, "StagingLabel", "아이템 목록", 10f,
-            new Color(0.65f, 0.70f, 0.85f, 1f));
+        var lblGO = MakeTxt(scrollGO.transform, "StagingLabel", "아이템 목록", 15f,
+            new Color(0.82f, 0.87f, 1.00f, 1f));
         var lblRT = lblGO.GetComponent<RectTransform>();
         lblRT.anchorMin = new Vector2(0f, 1f);
         lblRT.anchorMax = new Vector2(1f, 1f);
@@ -539,8 +592,8 @@ public sealed class UI_GridPanel : UI_Base
         type.GetField("rarityBar", rf)?.SetValue(_itemInfoPanel, rarityBarImg);
 
         // itemName
-        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 11f,
-            new Color(0.92f, 0.95f, 1f, 1f), bold: true);
+        var nameTxtGO = MakeTxt(itemRootGO.transform, "ItemName", "", 15f,
+            new Color(0.95f, 0.97f, 1f, 1f), bold: true);
         var nameRT = nameTxtGO.GetComponent<RectTransform>();
         nameRT.anchorMin = new Vector2(0f, 0.48f);
         nameRT.anchorMax = new Vector2(1f, 0.62f);
@@ -551,8 +604,8 @@ public sealed class UI_GridPanel : UI_Base
         type.GetField("itemName", rf)?.SetValue(_itemInfoPanel, nameTxt);
 
         // rarityText
-        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 9f,
-            new Color(0.65f, 0.65f, 0.75f, 1f));
+        var rarityTxtGO = MakeTxt(itemRootGO.transform, "RarityText", "", 12.5f,
+            new Color(0.78f, 0.78f, 0.88f, 1f));
         var rarityTxtRT = rarityTxtGO.GetComponent<RectTransform>();
         rarityTxtRT.anchorMin = new Vector2(0f, 0.38f);
         rarityTxtRT.anchorMax = new Vector2(1f, 0.48f);
@@ -593,7 +646,7 @@ public sealed class UI_GridPanel : UI_Base
         emptyRootRT.offsetMin = emptyRootRT.offsetMax = Vector2.zero;
         type.GetField("emptyRoot", rf)?.SetValue(_itemInfoPanel, emptyRootGO);
 
-        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 10f,
+        var emptyTxtGO = MakeTxt(emptyRootGO.transform, "EmptyText", "아이템을 선택하세요", 12f,
             new Color(0.45f, 0.48f, 0.58f, 0.8f));
         var emptyTxtRT = emptyTxtGO.GetComponent<RectTransform>();
         emptyTxtRT.anchorMin = Vector2.zero;
@@ -628,15 +681,15 @@ public sealed class UI_GridPanel : UI_Base
         infoRootGO.transform.SetParent(parent, false);
         _itemInfoRoot = infoRootGO.GetComponent<RectTransform>();
         _itemInfoRoot.anchorMin = new Vector2(0f, 0f);
-        _itemInfoRoot.anchorMax = new Vector2(1f, 0.30f);
+        _itemInfoRoot.anchorMax = new Vector2(1f, 0.27f);
         _itemInfoRoot.offsetMin = new Vector2(4f, 4f);
         _itemInfoRoot.offsetMax = new Vector2(-4f, -4f);
 
         var infoBG = infoRootGO.AddComponent<Image>();
-        infoBG.color = new Color(0.05f, 0.06f, 0.10f, 0.90f);
+        infoBG.color = new Color(0.11f, 0.13f, 0.19f, 0.90f);
 
         // "선택:" 레이블
-        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 9f,
+        var selLbl = MakeTxt(infoRootGO.transform, "SelectLabel", "선택:", 11f,
             new Color(0.55f, 0.60f, 0.75f, 1f));
         var selRT = selLbl.GetComponent<RectTransform>();
         selRT.anchorMin = new Vector2(0f, 1f);
@@ -658,17 +711,19 @@ public sealed class UI_GridPanel : UI_Base
         placeRT.sizeDelta        = new Vector2(0f, 34f);
         placeRT.anchoredPosition = new Vector2(0f, 4f);
 
-        var placeBG = placeGO.AddComponent<Image>();
-        placeBG.color = new Color(0.20f, 0.45f, 0.80f, 0.90f);
+        _placeBG      = placeGO.AddComponent<Image>();
+        _placeBG.color = new Color(0.20f, 0.28f, 0.40f, 0.65f);
         _placeButton  = placeGO.AddComponent<Button>();
-        _placeButton.targetGraphic = placeBG;
+        _placeButton.targetGraphic = _placeBG;
 
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "배치하기 ▶", 13f, Color.white, bold: true);
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "드래그로 배치", 13f,
+            new Color(0.7f, 0.78f, 0.90f, 0.8f), bold: true);
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;
         placeTxtRT.anchorMax = Vector2.one;
         placeTxtRT.sizeDelta = Vector2.zero;
-        placeTxtGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        _placeLabel = placeTxtGO.GetComponent<TMP_Text>();
+        _placeLabel.alignment = TextAlignmentOptions.Center;
     }
 
     // Footer (50px 고정, 하단)
@@ -683,25 +738,36 @@ public sealed class UI_GridPanel : UI_Base
         _footerRT.anchoredPosition = new Vector2(0f, 25f);
 
         var footerBG = footerGO.AddComponent<Image>();
-        footerBG.color = new Color(0.05f, 0.06f, 0.09f, 0.98f);
+        footerBG.color = new Color(0.10f, 0.12f, 0.16f, 0.98f);
 
-        // 활성 시너지 텍스트 (좌측)
+        // 활성 시너지 텍스트 (좌측 69%)
         var actGO = MakeTxt(footerGO.transform, "ActiveSyn",
-            "활성: —          미달성: —", 11f, new Color(0.75f, 0.88f, 1f, 1f));
+            "활성: —          미달성: —", 12f, new Color(0.75f, 0.88f, 1f, 1f));
         var actRT = actGO.GetComponent<RectTransform>();
         actRT.anchorMin = new Vector2(0f, 0f);
-        actRT.anchorMax = new Vector2(0.75f, 1f);
+        actRT.anchorMax = new Vector2(0.69f, 1f);
         actRT.offsetMin = new Vector2(12f, 0f);
         actRT.offsetMax = new Vector2(-4f, 0f);
         _footerActiveSynText = actGO.GetComponent<TMP_Text>();
         _footerActiveSynText.enableWordWrapping = false;
         _footerActiveSynText.alignment = TextAlignmentOptions.MidlineLeft;
 
-        // 셀 카운트 (우측)
-        var cntGO = MakeTxt(footerGO.transform, "CellCount", "0/20 셀 배치됨", 11f,
+        // CENTER 보너스 표시 (중간 11%)
+        var centerGO = MakeTxt(footerGO.transform, "CenterBonus", "", 11f,
+            new Color(0.50f, 0.55f, 0.70f, 0.6f));
+        var centerRT = centerGO.GetComponent<RectTransform>();
+        centerRT.anchorMin = new Vector2(0.69f, 0f);
+        centerRT.anchorMax = new Vector2(0.82f, 1f);
+        centerRT.offsetMin = centerRT.offsetMax = Vector2.zero;
+        _footerCenterText = centerGO.GetComponent<TMP_Text>();
+        _footerCenterText.alignment         = TextAlignmentOptions.Center;
+        _footerCenterText.enableWordWrapping = false;
+
+        // 셀 카운트 (우측 18%)
+        var cntGO = MakeTxt(footerGO.transform, "CellCount", "0/20 셀 배치됨", 12f,
             new Color(0.65f, 0.70f, 0.85f, 1f));
         var cntRT = cntGO.GetComponent<RectTransform>();
-        cntRT.anchorMin = new Vector2(0.75f, 0f);
+        cntRT.anchorMin = new Vector2(0.82f, 0f);
         cntRT.anchorMax = new Vector2(1.00f, 1f);
         cntRT.offsetMin = new Vector2(0f, 0f);
         cntRT.offsetMax = new Vector2(-12f, 0f);
@@ -778,8 +844,8 @@ public sealed class UI_GridPanel : UI_Base
         _synergyToast.transform.SetParent(transform, false);
 
         var rt = _synergyToast.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.21f, 0.52f);
-        rt.anchorMax        = new Vector2(0.74f, 0.62f);
+        rt.anchorMin        = new Vector2(0.21f, 0.87f);
+        rt.anchorMax        = new Vector2(0.74f, 0.95f);
         rt.offsetMin        = Vector2.zero;
         rt.offsetMax        = Vector2.zero;
 
@@ -852,6 +918,7 @@ public sealed class UI_GridPanel : UI_Base
         _stagingArea?.Refresh(_inventory);
         RefreshInfoPanelDefault();
         RefreshFooter();
+        UpdatePlaceButtonState(_inventory?.StagingCount > 0);
     }
 
     private void OnPlacedChanged()
@@ -867,8 +934,7 @@ public sealed class UI_GridPanel : UI_Base
         _inventory?.PlaceItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _totalPlacedCells += GetItemCellCount(item);
-        RefreshSynergyStatus();
-        RefreshFooter();
+        UpdateHexGridHint();
 
         if (_hexGridView != null)
         {
@@ -876,19 +942,56 @@ public sealed class UI_GridPanel : UI_Base
                 ? BoardManager.Instance?.GetSharedShapeByItem(item.instanceId)
                 : null;
             if (shape != null)
-                _hexGridView.TriggerPlacementEffect(shape.GetOccupiedSquares());
+            {
+                var occupiedSquares = shape.GetOccupiedSquares();
+
+                // 배치 위치 캐시 (제거 시 GridManager 의존 없이 직접 반영하기 위해)
+                if (item != null)
+                {
+                    var cachedPos = new Vector2Int[occupiedSquares.Count];
+                    for (int i = 0; i < occupiedSquares.Count; i++)
+                        cachedPos[i] = new Vector2Int(occupiedSquares[i].col, occupiedSquares[i].row);
+                    _placedItemPositions[item.instanceId] = cachedPos;
+                }
+
+                _hexGridView.TriggerPlacementEffect(occupiedSquares);
+            }
             else
+            {
                 _hexGridView.RefreshOccupiedCells();
+            }
+
+            _hexGridView.UpdateAdjacencyConstraints();
         }
+
+        // hexgrid가 _occupiedPositions와 Bridge를 갱신한 뒤 시너지 뷰 갱신
+        RefreshSynergyStatus();
+        RefreshFooter();
     }
 
     private void HandleItemRemoved(RuntimeItemData item)
     {
         _inventory?.UnplaceItem(item);
         _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
+        UpdateHexGridHint();
+
+        if (_hexGridView != null)
+        {
+            // 캐시된 위치로 직접 제거 → GridManager 그리드 참조 타이밍 문제 없음
+            if (item != null && _placedItemPositions.TryGetValue(item.instanceId, out var cached))
+            {
+                _hexGridView.RemovePlacedCells(cached);
+                _placedItemPositions.Remove(item.instanceId);
+            }
+            else
+            {
+                _hexGridView.RefreshOccupiedCells();
+            }
+            _hexGridView.UpdateAdjacencyConstraints();
+        }
+
         RefreshSynergyStatus();
         RefreshFooter();
-        _hexGridView?.RefreshOccupiedCells();
     }
 
     private int GetItemCellCount(RuntimeItemData item)
@@ -908,6 +1011,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         _stagingArea?.HighlightItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
+        UpdatePlaceButtonState(item != null);
     }
 
     private void OnStagingItemHovered(RuntimeItemData item)
@@ -925,7 +1029,8 @@ public sealed class UI_GridPanel : UI_Base
     private void RefreshInfoPanelDefault()
     {
         if (_itemInfoPanel == null) return;
-        if (_inventory != null && _inventory.StagingCount > 0)
+        bool hasItems = _inventory != null && _inventory.StagingCount > 0;
+        if (hasItems)
         {
             var firstItem = _inventory.StagingItems[0];
             _itemInfoPanel.ShowItem(firstItem, isNew: false, slideIn: true);
@@ -936,63 +1041,16 @@ public sealed class UI_GridPanel : UI_Base
             _itemInfoPanel.ShowEmpty();
             _stagingArea?.HighlightItem(null);
         }
+        UpdatePlaceButtonState(hasItems);
     }
 
     // ── Synergy Status Refresh ──
 
     private void RefreshSynergyStatus()
     {
-        if (_synergyStatusView == null) return;
-
-        var cellCountByZone = BuildCellCountByZone();
-        _synergyStatusView.Refresh(cellCountByZone);
-    }
-
-    private Dictionary<string, int> BuildCellCountByZone()
-    {
-        // 존별 배치 셀 수: GridManager.grid의 GridSquare 중 occupied인 것의 존 코드 집계
-        var result = new Dictionary<string, int>
-        {
-            { "ATK",  0 }, { "DEF", 0 }, { "MAG", 0 },
-            { "HP",   0 }, { "SPD", 0 }, { "LUCK", 0 },
-        };
-
-        var runeData = Managers.RuneData;
-        if (runeData == null) return result;
-
-        var zoneMap = runeData.GetZoneMapRows();
-        if (zoneMap == null) return result;
-
-        var charToZone = new Dictionary<char, string>
-        {
-            { 'A', "ATK" }, { 'D', "DEF" }, { 'M', "MAG" },
-            { 'H', "HP"  }, { 'S', "SPD" }, { 'L', "LUCK" },
-        };
-
-        // 존맵: (col, row) → zoneCode 테이블 구성
-        var posToCode = new Dictionary<Vector2Int, char>();
-        foreach (var row in zoneMap)
-        {
-            if (row.pattern == null) continue;
-            for (int c = 0; c < row.pattern.Length; c++)
-                posToCode[new Vector2Int(c, row.hex_row)] = row.pattern[c];
-        }
-
-        // GridManager의 GridSquare.isOccupied + (col, row) 좌표로 존별 정확한 셀 수 계산
-        var gridSquares = GridManager.Instance?.grid?.GetGridSquares();
-        if (gridSquares != null)
-        {
-            foreach (var sq in gridSquares)
-            {
-                if (!sq.isOccupied) continue;
-                var pos = new Vector2Int(sq.col, sq.row);
-                if (posToCode.TryGetValue(pos, out char zoneChar) &&
-                    charToZone.TryGetValue(zoneChar, out string zoneId))
-                    result[zoneId]++;
-            }
-        }
-
-        return result;
+        // 항상 최신 점유 상태에서 cluster를 계산한 뒤 갱신 (패널 재오픈 시 이전 결과 보존)
+        _hexGridView?.RefreshOccupiedCells();
+        _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetLastClusterSizes());
     }
 
     // ── Footer Refresh ──
@@ -1000,43 +1058,56 @@ public sealed class UI_GridPanel : UI_Base
     private void RefreshFooter()
     {
         if (_footerCellCountText != null)
-            _footerCellCountText.SetText($"{_totalPlacedCells}/20 셀 배치됨");
+            _footerCellCountText.SetText($"{_totalPlacedCells}/20 셀");
 
         if (_footerActiveSynText == null) return;
 
-        var sb    = new System.Text.StringBuilder("활성: ");
-        var sbYet = new System.Text.StringBuilder("미달성: ");
-
         var runeData = Managers.RuneData;
-        if (runeData != null)
+        if (runeData == null)
         {
-            var cellCountByZone = BuildCellCountByZone();
-            foreach (var zoneId in runeData.GetZoneIds())
-            {
-                var synergies = runeData.GetZoneSynergies(zoneId);
-                if (synergies == null) continue;
-
-                int count = cellCountByZone.TryGetValue(zoneId, out var c) ? c : 0;
-                bool anyMet = false;
-
-                foreach (var s in synergies)
-                {
-                    if (s.threshold > 0 && count >= s.threshold)
-                    {
-                        float pct = s.value * 100f;
-                        sb.Append($"{zoneId} {(pct >= 0f ? "+" : "")}{pct:F0}%  ");
-                        anyMet = true;
-                    }
-                }
-
-                if (!anyMet)
-                    sbYet.Append($"{zoneId} ");
-            }
+            _footerActiveSynText.SetText("존 시너지: <color=#556677>데이터 로딩 중…</color>");
+            return;
         }
 
-        string active = sb.Length > 3 ? sb.ToString().TrimEnd() : "활성: —";
-        string yet    = sbYet.Length > 5 ? sbYet.ToString().TrimEnd() : "";
-        _footerActiveSynText.SetText($"{active}          {yet}");
+        var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
+
+        // 존별 색상 (TMP richtext)
+        var zoneColors = new System.Collections.Generic.Dictionary<string, string>
+        {
+            { "ATK",  "#FF8878" }, { "DEF",  "#66AAFF" }, { "MAG",  "#BB88FF" },
+            { "HP",   "#55EE88" }, { "SPD",  "#FFDD55" }, { "LUCK", "#FFCC55" },
+        };
+
+        var sb = new System.Text.StringBuilder("존 시너지  ");
+
+        foreach (var zoneId in runeData.GetZoneIds())
+        {
+            var synergies = runeData.GetZoneSynergies(zoneId);
+            if (synergies == null) continue;
+
+            int count = (clusterSizes != null && clusterSizes.TryGetValue(zoneId, out var c)) ? c : 0;
+            bool anyMet = false;
+            foreach (var s in synergies)
+                if (s.threshold > 0 && count >= s.threshold) { anyMet = true; break; }
+
+            string hex = zoneColors.TryGetValue(zoneId, out var h) ? h : "#AAAAAA";
+
+            if (anyMet)
+                sb.Append($"<color={hex}><b>●{zoneId}</b></color>  ");
+            else
+                sb.Append($"<color=#445566>○{zoneId}</color>  ");
+        }
+
+        _footerActiveSynText.SetText(sb.ToString().TrimEnd());
+
+        if (_footerCenterText != null)
+        {
+            bool centerActive = MerlinRuneBridge.Instance?.IsCenterBonusActive ?? false;
+            _footerCenterText.text  = centerActive ? "◉ 중앙 보너스" : "◎ 중앙";
+            _footerCenterText.color = centerActive
+                ? new Color(1.00f, 0.88f, 0.40f, 0.95f)
+                : new Color(0.50f, 0.55f, 0.70f, 0.55f);
+        }
     }
 
     // ── Button Handlers ──
@@ -1048,7 +1119,12 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnResetClicked()
     {
-        // 배치된 모든 아이템 제거: 인벤토리의 배치 목록 경유
+        if (_totalPlacedCells == 0) return;
+        ShowResetConfirmDialog();
+    }
+
+    private void DoReset()
+    {
         if (_inventory != null)
         {
             var allPlaced = new List<RuntimeItemData>(_inventory.StagingItems);
@@ -1058,9 +1134,13 @@ public sealed class UI_GridPanel : UI_Base
                 _inventory.UnplaceItem(item);
             }
         }
+        _placedItemPositions.Clear();
         _totalPlacedCells = 0;
+        _hexGridView?.ClearAllPlacedCells();
+        _hexGridView?.UpdateAdjacencyConstraints();
         RefreshSynergyStatus();
         RefreshFooter();
+        UpdateHexGridHint();
         _stagingArea?.Refresh(_inventory);
     }
 
@@ -1108,6 +1188,125 @@ public sealed class UI_GridPanel : UI_Base
         }
 
         ClosePanel();
+    }
+
+    // ── Reset Confirm Dialog ──
+
+    private void BuildResetConfirmDialog()
+    {
+        _resetDialog = new GameObject("ResetDialog", typeof(RectTransform));
+        _resetDialog.transform.SetParent(transform, false);
+
+        var rt = _resetDialog.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+
+        var overlay = _resetDialog.AddComponent<Image>();
+        overlay.color         = new Color(0f, 0f, 0f, 0.55f);
+        overlay.raycastTarget = true;
+
+        var panelGO = new GameObject("Panel", typeof(RectTransform));
+        panelGO.transform.SetParent(_resetDialog.transform, false);
+        var panelRT = panelGO.GetComponent<RectTransform>();
+        panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        panelRT.pivot            = new Vector2(0.5f, 0.5f);
+        panelRT.sizeDelta        = new Vector2(320f, 110f);
+        panelRT.anchoredPosition = Vector2.zero;
+        panelGO.AddComponent<Image>().color = new Color(0.10f, 0.11f, 0.17f, 0.98f);
+
+        var textGO = MakeTxt(panelGO.transform, "Text",
+            "배치된 아이템을 모두 초기화합니다.", 13f, new Color(0.9f, 0.92f, 1f, 1f));
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = new Vector2(0f, 0.44f);
+        textRT.anchorMax = new Vector2(1f, 1f);
+        textRT.sizeDelta = Vector2.zero;
+        textGO.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
+        _resetDialogNo = MakeButton(panelGO.transform, "CancelBtn",
+            new Vector2(0.08f, 0f), new Vector2(0.45f, 0.40f),
+            Vector2.zero, new Vector2(0f, 4f),
+            new Color(0.25f, 0.27f, 0.35f, 1f), "취소");
+
+        _resetDialogYes = MakeButton(panelGO.transform, "ResetBtn",
+            new Vector2(0.55f, 0f), new Vector2(0.92f, 0.40f),
+            Vector2.zero, new Vector2(0f, 4f),
+            new Color(0.65f, 0.20f, 0.18f, 1f), "초기화");
+
+        _resetDialog.SetActive(false);
+    }
+
+    private void ShowResetConfirmDialog()
+    {
+        if (_resetDialog != null) _resetDialog.SetActive(true);
+    }
+
+    private void HideResetConfirmDialog()
+    {
+        if (_resetDialog != null) _resetDialog.SetActive(false);
+    }
+
+    private void OnResetConfirmYes()
+    {
+        HideResetConfirmDialog();
+        DoReset();
+    }
+
+    private void OnResetConfirmNo()
+    {
+        HideResetConfirmDialog();
+    }
+
+    // ── Place Button State ──
+
+    private void UpdatePlaceButtonState(bool hasItem)
+    {
+        if (_placeBG == null) return;
+        _placeBG.color = hasItem
+            ? new Color(0.22f, 0.50f, 0.88f, 0.92f)
+            : new Color(0.20f, 0.28f, 0.40f, 0.55f);
+        if (_placeLabel != null)
+            _placeLabel.color = hasItem
+                ? new Color(1f, 1f, 1f, 0.95f)
+                : new Color(0.7f, 0.78f, 0.90f, 0.55f);
+    }
+
+    // ── Hex Grid Hint ──
+
+    private void UpdateHexGridHint()
+    {
+        if (_hexGridHintText != null)
+            _hexGridHintText.gameObject.SetActive(_totalPlacedCells == 0);
+    }
+
+    // ── CENTER Bonus ──
+
+    private void HandleCenterBonusActivated()
+    {
+        RefreshFooter();
+    }
+
+    // ── Fade In ──
+
+    private async UniTaskVoid FadeInAsync()
+    {
+        if (_canvasGroup == null) return;
+        _canvasGroup.alpha = 0f;
+        float elapsed = 0f;
+        const float DURATION = 0.18f;
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            while (elapsed < DURATION)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                _canvasGroup.alpha = Mathf.Clamp01(elapsed / DURATION);
+                await UniTask.NextFrame(cancellationToken: ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        if (_canvasGroup != null) _canvasGroup.alpha = 1f;
     }
 
     // ── Static Helpers ──

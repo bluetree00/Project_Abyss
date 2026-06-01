@@ -708,6 +708,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     protected void BindBossHud()
     {
         if (_config == null || _runtime == null) return;
+        // 풀 프리웜된 비활성 인스턴스가 자기 자신을 바인딩해 실제 스폰된 보스의 OnHPChanged를 가로채지 않도록 가드
+        if (!gameObject.activeInHierarchy) return;
 
         var presenter = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
         if (presenter == null) return;
@@ -774,9 +776,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         if (_rb != null)
         {
-            _rb.isKinematic     = true;
-            _rb.linearVelocity  = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
+            if (!_rb.isKinematic)
+            {
+                _rb.linearVelocity  = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+            _rb.isKinematic = true;
         }
 
         if (_cachedColliders != null)

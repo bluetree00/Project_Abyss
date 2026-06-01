@@ -269,13 +269,20 @@ public class GameCameraController : MonoBehaviour
     /// Cinemachine을 일시 정지하고 카메라를 zoneCenter 위로 이동해 연출을 보여준 뒤 플레이어 추적으로 복귀.
     /// 신규 존 등장 연출(SpawnZoneByIndexAsync)에서 디졸브와 병렬로 호출된다.
     /// </summary>
+    /// <param name="customViewOffset">
+    /// null이면 기본 광각 부감 시점(introExtraHeight/Back 사용).
+    /// 값을 넣으면 zoneCenter 기준 오프셋으로 카메라를 배치 — 보스 클로즈업 등에 사용.
+    /// </param>
+    /// <summary>팬 완료 직후 (홀드 시작 전) 호출할 콜백. 보스 등장 연출 트리거 등에 사용.</summary>
     public async UniTask PanToZoneAndReturnAsync(
         Vector3 zoneCenter,
         float moveDuration,
         float holdDuration,
         float returnDuration,
         Transform playerTransform,
-        CancellationToken ct)
+        CancellationToken ct,
+        Vector3? customViewOffset = null,
+        System.Action onPanComplete = null)
     {
         if (this == null) return;
 
@@ -299,9 +306,16 @@ public class GameCameraController : MonoBehaviour
         Vector3    fromPos = transform.position;
         Quaternion fromRot = transform.rotation;
 
-        // 존 위 내려다보기 시점 (기존 인트로와 동일한 오프셋 재사용)
-        Vector3 toPos   = zoneCenter + new Vector3(0f, introExtraHeight, -introExtraBack);
-        Vector3 lookDir = zoneCenter - toPos;
+        // customViewOffset 미제공 시 기존 광각 부감 오프셋 사용
+        Vector3 toPos   = customViewOffset.HasValue
+            ? zoneCenter + customViewOffset.Value
+            : zoneCenter + new Vector3(0f, introExtraHeight, -introExtraBack);
+
+        // 클로즈업 시 보스 가슴 높이를 바라보도록 lookAt 보정
+        Vector3 lookAt  = customViewOffset.HasValue
+            ? zoneCenter + new Vector3(0f, 1.5f, 0f)
+            : zoneCenter;
+        Vector3 lookDir = lookAt - toPos;
         Quaternion toRot = lookDir.sqrMagnitude > 0.01f
             ? Quaternion.LookRotation(lookDir, Vector3.up)
             : fromRot;
@@ -319,6 +333,9 @@ public class GameCameraController : MonoBehaviour
             }
             transform.position = toPos;
             transform.rotation = toRot;
+
+            // 팬 완료 콜백 (보스 등장 연출 등 — 줌된 상태에서 시작하도록)
+            onPanComplete?.Invoke();
 
             // 2) 존 조망 유지
             await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: linked.Token);

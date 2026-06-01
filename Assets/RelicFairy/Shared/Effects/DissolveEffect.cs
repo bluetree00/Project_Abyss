@@ -118,16 +118,18 @@ public static class DissolveEffect
             {
                 Debug.LogWarning(
                     $"[DissolveEffect] '{MaterialKey}' 로드 실패 — '{target?.name}' 등장 디졸브 스킵");
+                if (target != null && !target.activeSelf) target.SetActive(true);
                 onComplete?.Invoke();
                 return;
             }
 
             if (target == null) return;
-            // includeInactive: true — 비활성 렌더러(LOD 등)도 포함해 디졸브 소재 일관성 유지
+            // includeInactive: true — 비활성 오브젝트의 렌더러도 사전에 준비
             renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0)
             {
                 Debug.LogWarning($"[DissolveEffect] '{target.name}' Renderer 없음 — 등장 디졸브 스킵");
+                if (!target.activeSelf) target.SetActive(true);
                 onComplete?.Invoke();
                 return;
             }
@@ -138,6 +140,8 @@ public static class DissolveEffect
 
             instances = ReplaceMaterials(renderers, mat, edgeColor ?? DefaultEdgeColor);
             SetDissolveValue(instances, 1f);
+            // 비활성 오브젝트는 dissolve=1(완전 투명) 설정 후 활성화 — 플래시 없이 등장
+            if (!target.activeSelf) target.SetActive(true);
 
             float mainDur = Mathf.Max(0.01f, duration * (1f - EdgeFadePortion));
             float edgeDur = Mathf.Max(0.01f, duration - mainDur);

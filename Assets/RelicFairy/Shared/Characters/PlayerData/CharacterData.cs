@@ -64,6 +64,12 @@ public class CharacterData : ScriptableObject
     [Header("패시브")]
     public PassiveSO passive;
 
+    // Q스킬 필살기 카메라 연출 (null 이면 연출 없이 즉시 발동)
+    [Header("Q스킬 필살기 연출")]
+    [SerializeField, Tooltip("Q 입력 시 재생할 카메라 연출. 비우면 연출 생략.")]
+    private UltimateCinematicConfig qSkillCinematic;
+    public UltimateCinematicConfig QSkillCinematic => qSkillCinematic;
+
     // 캐릭터별 애니메이션 오버라이드 (AnimatorOverrideService 가 PlayerBaseController 의 state 클립을 교체)
     // 키는 Addressables 에 등록된 AnimationClip 이름과 일치해야 한다. 비워두면 기본 클립 사용.
     [Header("애니메이션 오버라이드 (Addressables 키)")]

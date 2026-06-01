@@ -14,7 +14,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: ChartData
   m_GUID: 6a6364ffb430dbc46ba2b96807f580b2
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 0880ce3f486b4544db24191b3e982938
+    m_Address: MERLIN_RUNE_PIECE_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c1dee3c13f9fc64caac707f2f7685ec
+    m_Address: MERLIN_RUNE_SYNERGY_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 961b25976bf220944823e0af6916de59
+    m_Address: MERLIN_RUNE_DUO_SYNERGY_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6932adaa3c69d84b95a705480cc0623
+    m_Address: MERLIN_RUNE_ZONE_MAP
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
