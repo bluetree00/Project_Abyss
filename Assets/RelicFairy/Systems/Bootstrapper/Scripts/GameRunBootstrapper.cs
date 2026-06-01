@@ -67,6 +67,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("스타트 방에서 캐릭터 선택 전 조작할 Wisp 프리팹. 비워두면 playerPrefabKey 폴백.")]
     [SerializeField] private GameObject wispPrefab;
 
+    [Tooltip("Wisp 스폰 시 스폰 지점 기준 Y 오프셋(공중에 띄움).")]
+    [SerializeField] private float wispSpawnHeightOffset = 1.5f;
+
     [Header("Block Map Gen")]
     [SerializeField, Tooltip("단일 팔레트 (fallback). blockPalettes에 테마 매칭이 없으면 이 값 사용.")]
     private BlockPalette blockPalette;
@@ -551,7 +554,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             scatter_range     = startZone.scatter_range,
         };
         var worldCenter = CalcZoneWorldCenter(startZone);
-        await SpawnBlockMapAsync(roomEntry, worldCenter, ct);
+        await SpawnBlockMapAsync(roomEntry, worldCenter, ct, instantEntrance: true); // 시작방 허브: 디졸브 없이 완성된 방으로
 
         // P 타일이 없으면 CSV의 spawn_local로 폴백
         if (!_pendingPlayerSpawnPos.HasValue)
@@ -880,22 +883,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         for (int i = 0; i < deferredSpawners.Count; i++)
             if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
 
-        // 등장 연출
-        await new DissolveEntrance().PlayAsync(blocks, default, ct);
+        // 등장 연출(디졸브)은 호출자(RunFlowController)가 화면 복귀 후 재생 — 생성 과정을 보여주기 위함.
+        // (블록은 HideAllBlockRenderers로 숨겨진 상태로 반환됨)
 
-        // 9. 결과 — 진입 위치 + 출구 슬롯
+        // 9. 결과 — 진입 위치 + 출구 슬롯 + 블록(디졸브용)
         var result = new ProcRoomResult
         {
             roomGO   = roomGO,
+            blocks   = blocks,
             entryPos = cls.entrance.HasValue
                 ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
                 : ResolvePlayerSpawnFromGrid(grid, anchor, w, h),
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
+        float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
+        if (cls.entrance.HasValue)
+        {
+            var de = doorInfos[cls.entrance.Value];
+            result.hasEntrance = true;
+            result.entrance = new ProcExitSlot {
+                worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
+                openingWidth = de.width * blockCellSize, openingHeight = openingH };
+        }
         if (cls.forward.HasValue)
-            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = doorInfos[cls.forward.Value].edge });
+        {
+            var d = doorInfos[cls.forward.Value];
+            result.exits.Add(new ProcExitSlot {
+                worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
+                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+        }
         foreach (var t in cls.turns)
-            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = doorInfos[t].edge });
+        {
+            var d = doorInfos[t];
+            result.exits.Add(new ProcExitSlot {
+                worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
+                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+        }
 
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
         return result;
@@ -928,6 +951,40 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var p = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
         return p.x >= 0 ? CellToWorldFloor(p, anchor, w, h) : anchor;
+    }
+
+    /// <summary>
+    /// toZone 방향 엣지(벽 링)에서 실제 문 개구부(Floor 셀)의 중앙 로컬 좌표를 찾는다.
+    /// MapBuilder와 동일한 중앙 오프셋 규약 사용. 개구부 없으면 false.
+    /// </summary>
+    private bool TryFindGateOpeningLocal(TileType[,] grid, ZoneLayoutEntry from, ZoneLayoutEntry to, out Vector3 localPos)
+    {
+        localPos = default;
+        int w = grid.GetLength(0), h = grid.GetLength(1);
+        float dX = to.world_center_x - from.world_center_x;
+        float dZ = to.world_center_z - from.world_center_z;
+
+        int sum = 0, count = 0;
+        if (Mathf.Abs(dZ) > 0f)
+        {
+            int z = dZ >= 0 ? h - 1 : 0; // 북(+Z)=z h-1 / 남(-Z)=z 0
+            for (int x = 0; x < w; x++)
+                if (grid[x, z] == TileType.Floor) { sum += x; count++; }
+            if (count == 0) return false;
+            float cx = sum / (float)count; // 개구부 중앙 x
+            localPos = new Vector3((cx - (w - 1) * 0.5f) * blockCellSize, 0f, (z - (h - 1) * 0.5f) * blockCellSize);
+            return true;
+        }
+        else
+        {
+            int x = dX >= 0 ? w - 1 : 0; // 동(+X)=x w-1 / 서(-X)=x 0
+            for (int z = 0; z < h; z++)
+                if (grid[x, z] == TileType.Floor) { sum += z; count++; }
+            if (count == 0) return false;
+            float cz = sum / (float)count; // 개구부 중앙 z
+            localPos = new Vector3((x - (w - 1) * 0.5f) * blockCellSize, 0f, (cz - (h - 1) * 0.5f) * blockCellSize);
+            return true;
+        }
     }
 
     /// <summary>fromZone에서 toZone 방향을 계산해 fromZone 엣지의 localPosition을 반환.</summary>
@@ -1003,7 +1060,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var toZone = allZones?.Find(z => z.zone_index == primaryToIdx);
         if (toZone == null) return;
 
-        var gateLocalPos = CalcGateExitPositionTo(startZone, toZone);
+        // 실제 문 개구부(엣지의 Floor 셀) 중앙에 배치. 개구부 없으면 엣지 중점으로 폴백.
+        var grid = MapDataLoader.Parse(startZone.grid_csv);
+        var gateLocalPos = (grid != null && TryFindGateOpeningLocal(grid, startZone, toZone, out var openLocal))
+            ? openLocal
+            : CalcGateExitPositionTo(startZone, toZone);
         var gateLocalRot = CalcGateRotationTo(startZone, toZone);
         var gateGO = Instantiate(startGatePrefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
         gateGO.transform.localPosition = gateLocalPos;
@@ -1106,7 +1167,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     // worldCenter 기본값 = Vector3.zero → 기존 동작 유지
-    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default)
+    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default, bool instantEntrance = false)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
@@ -1209,11 +1270,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         // 렌더러 선숨김 — 카메라 페이드인 중 블록/필드 오브젝트가 팝업으로 보이지 않도록.
-        HideAllBlockRenderers(blocks);
-        if (fieldInstance != null)
+        // instantEntrance(시작방/허브): 디졸브 없이 완성된 방으로 보여주므로 숨기지 않는다.
+        if (!instantEntrance)
         {
-            var rs = fieldInstance.GetComponentsInChildren<Renderer>(true);
-            for (int i = 0; i < rs.Length; i++) rs[i].enabled = false;
+            HideAllBlockRenderers(blocks);
+            if (fieldInstance != null)
+            {
+                var rs = fieldInstance.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < rs.Length; i++) rs[i].enabled = false;
+            }
         }
 
         // IntroFade(sortingOrder=9999)가 아직 불투명하게 UI_SceneLoading을 덮고 있는 이 시점에
@@ -1229,8 +1294,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             PrewarmSpawnersAsync(mapGO, ct));
 
         // 입장 연출 (풀이 이미 프리웜된 상태이므로 연출 중 Instantiate 없음)
-        var entranceCtx = new MapEntranceContext(roomEntry);
-        await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+        // instantEntrance(시작방/허브): 디졸브 생략 — 이미 블록이 보이는 완성 상태.
+        if (!instantEntrance)
+        {
+            var entranceCtx = new MapEntranceContext(roomEntry);
+            await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+        }
 
         // PostBuild: 장식(d*) / 보스 스폰(B) / 픽업(WP, CP) — NavMesh 빌드 이후에 배치
         TokenParser.Execute(roomEntry.grid_csv, w, h, tokenCtx, TokenPhase.PostBuild);
@@ -1521,6 +1590,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         foreach (var r in wall.GetComponentsInChildren<Renderer>())
         {
+            // URP Lit 계열만 투명화 지원. 커스텀 셰이더(예: AZURE Nature/Surface)는 _BaseColor가 없어 건너뜀(불투명 유지).
+            if (r.sharedMaterial == null || !r.sharedMaterial.HasProperty("_BaseColor")) continue;
             var mat = new Material(r.sharedMaterial);
             mat.SetFloat("_Surface", 1f);
             mat.SetFloat("_Blend", 0f);
@@ -1751,7 +1822,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 대화·위스프 구간 동안 HUD 숨김 — 캐릭터 획득 시점에 복원
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
+        // 진입 연출: 방 생성·카메라 배치를 검정으로 가린 뒤 둘러보기 시작 시 페이드아웃으로 드러냄
+        await ScreenFade.Out(0f);
+
         await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy());
+
+        // 시작방 둘러보기 카메라 연출 — 시작 포즈에서 페이드아웃+레터박스로 시네마틱하게 진입 후 패닝
+        if (_currentMapGO != null && GameCameraController.Instance != null)
+            await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, this.GetCancellationTokenOnDestroy());
+        else
+            await ScreenFade.In(0.4f); // 둘러보기 미실행 시에도 검정 해제 보장
 
         // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
         SpawnAwakeningAltar();
@@ -1795,6 +1875,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         Vector3 pos = _pendingPlayerSpawnPos ?? Vector3.zero;
         _pendingPlayerSpawnPos = null;
+        pos.y += wispSpawnHeightOffset; // 위습을 공중에 살짝 띄움
 
         var go = Instantiate(wispPrefab, pos, Quaternion.identity);
         go.name = "@Wisp";

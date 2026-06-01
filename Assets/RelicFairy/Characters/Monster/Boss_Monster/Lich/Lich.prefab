@@ -80,6 +80,9 @@ MonoBehaviour:
   _mainLightMult: 0.25
   _mainLightTint: {r: 0.55, g: 0.25, b: 1, a: 1}
   _lightingTransition: 2.5
+  _circleGuideMaterial: {fileID: 2100000, guid: 6ae8763c346894b46b4d8b79f3ed97cd,
+    type: 2}
+  _arrowGuideMaterial: {fileID: 2100000, guid: f11150cb5027606408b87e0ef33e5340, type: 2}
   _debugOverrideEncounter: 0
   _debugEncounterCount: 1
   _debugSkipEntrance: 0

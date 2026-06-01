@@ -85,6 +85,9 @@ public class RoomClearGate : MonoBehaviour
 
     private void ActivateExitGateDirect()
     {
+        // 절차 진행(procgen)에선 RunFlowController가 출구 게이트를 담당 — 레거시 존 선택 UI 억제
+        if (GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.UseProcGen) return;
+
         var progression = _run?.ZoneProgression;
         if (progression == null) return;
         progression.EnableExitGateForZone(progression.CurrentZoneIndex);

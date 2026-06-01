@@ -93,6 +93,12 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("라이팅 전환 시간 (초).")]
     [SerializeField] private float _lightingTransition = 2.5f;
 
+    [Header("── 패턴 가이드 (SkillIndicator) ──────────────")]
+    [Tooltip("원형/AoE 텔레그래프 머티리얼 (taecg/SkillIndicator/Circle). 비우면 프리미티브로 폴백.")]
+    [SerializeField] private Material _circleGuideMaterial;
+    [Tooltip("직선 빔 텔레그래프 머티리얼 (taecg/SkillIndicator/Arrow). 비우면 프리미티브로 폴백.")]
+    [SerializeField] private Material _arrowGuideMaterial;
+
 #if UNITY_EDITOR
     [Header("── 테스트 전용 (빌드 제외) ──────────────────")]
     [SerializeField] private bool _debugOverrideEncounter;
@@ -181,6 +187,9 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             Debug.LogError("[LichMonster] Config이 BossConfigSO가 아닙니다!", this);
             return;
         }
+
+        // 패턴 텔레그래프 비주얼 주입 (미할당 시 PatternGuideHelper가 프리미티브로 폴백)
+        PatternGuideHelper.SetMaterials(_circleGuideMaterial, _arrowGuideMaterial);
 
         _formController = GetComponentInChildren<LichFormController>();
         _formController?.HideAll(); // 등장 연출 전 숨김 — TriggerEntrance()에서 디졸브 인
@@ -347,6 +356,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     /// <summary>LichDormantState가 플레이어를 감지했을 때 발행 — BossRoomController가 카메라 팬을 시작한다.</summary>
+    public override bool HasEntranceAnimation => true;
+
     public event System.Action OnEntranceRequested;
 
     /// <summary>Appear 연출이 끝나고 전투가 시작되기 직전 발행 — 플레이어 입력 복구 등에 사용한다.</summary>
@@ -360,6 +371,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     {
         _runner?.EnsureMinBreakCooldown(3f);
         OnCombatReady?.Invoke();
+        RaiseBossCombatReady();
     }
 
     /// <summary>BossRoomController가 카메라 팬 완료 후 호출 — Appear 애니메이션 + 보스 이름 UI 시작.</summary>
@@ -527,7 +539,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         // ── 포그 스폰 ──────────────────────────────────────────
         if (_groundFogPrefab != null && _spawnedFog == null)
         {
-            var fogPos = new Vector3(transform.position.x, 0f, transform.position.z);
+            var fogPos = new Vector3(transform.position.x, _groundFogPrefab.transform.position.y, transform.position.z);
             _spawnedFog = Instantiate(_groundFogPrefab, fogPos, _groundFogPrefab.transform.rotation);
 
             // VFXLossyTransformBinder.Target이 null이면 파티클이 월드 원점에 스폰됨

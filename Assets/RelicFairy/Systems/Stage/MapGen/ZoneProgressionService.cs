@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// 존 클리어 → 다음 존 선택 → 지연 스폰 흐름을 조율하는 서비스.
@@ -109,10 +107,7 @@ public class ZoneProgressionService
             { kvp.Value.EnableGate(); any = true; }
 
         if (!any)
-        {
-            Debug.LogWarning($"[ZoneProgression] Zone {zoneIndex} ExitGate 없음 — 직접 선택 UI 폴백");
-            ShowZoneSelectionFallbackAsync(zoneIndex).Forget();
-        }
+            Debug.LogWarning($"[ZoneProgression] Zone {zoneIndex} ExitGate 없음 (레거시 선택 UI 제거됨)");
 
         // 다른 클리어된 방들에서 이미 스폰된 존으로 가는 게이트도 함께 활성화
         // (다른 경로로 목적 존이 먼저 스폰된 경우를 대응)
@@ -122,12 +117,6 @@ public class ZoneProgressionService
             if (!_spawnedZones.Contains(kvp.Key.to)) continue;
             kvp.Value?.EnableGate();
         }
-    }
-
-    private async UniTaskVoid ShowZoneSelectionFallbackAsync(int zoneIndex)
-    {
-        try { await ShowZoneSelectionAsync(zoneIndex, System.Threading.CancellationToken.None); }
-        catch (System.OperationCanceledException) { }
     }
 
     /// <summary>
@@ -140,30 +129,6 @@ public class ZoneProgressionService
         await SpawnZoneIfNeededAsync(fromZoneIndex, toZoneIndex, ct);
         CurrentZoneIndex = toZoneIndex;
         Debug.Log($"[ZoneProgression] 게이트 진입 — CurrentZoneIndex → {CurrentZoneIndex}");
-    }
-
-    /// <summary>
-    /// clearedZoneIndex를 클리어 처리하고, 인접 존 선택 UI를 표시한 뒤 선택된 존을 스폰한다.
-    /// 선택지가 없으면 -1을 반환한다 (던전 종료).
-    /// </summary>
-    public async UniTask<int> ShowZoneSelectionAsync(int clearedZoneIndex, CancellationToken ct)
-    {
-        _clearedZones.Add(clearedZoneIndex);
-
-        var options = GetNextZoneOptions(clearedZoneIndex);
-        if (options.Count == 0)
-        {
-            Debug.Log($"[ZoneProgression] Zone {clearedZoneIndex} — 다음 존 없음 (던전 종료)");
-            return -1;
-        }
-
-        int selectedIndex = await ShowSelectionUIAsync(options, ct);
-        if (selectedIndex < 0) return -1;
-
-        await SpawnZoneIfNeededAsync(clearedZoneIndex, selectedIndex, ct);
-        CurrentZoneIndex = selectedIndex;
-        Debug.Log($"[ZoneProgression] CurrentZoneIndex → {CurrentZoneIndex}");
-        return selectedIndex;
     }
 
     // ── Private ──────────────────────────────────────────────────────────
@@ -182,28 +147,6 @@ public class ZoneProgressionService
             var zone = zones.Find(z => z.zone_index == idx);
             if (zone != null && !_clearedZones.Contains(idx))
                 result.Add(zone);
-        }
-        return result;
-    }
-
-    private async UniTask<int> ShowSelectionUIAsync(List<ZoneLayoutEntry> options, CancellationToken ct)
-    {
-        var tcs = new UniTaskCompletionSource<int>();
-        var canvasGO = BuildSelectionCanvas(options, tcs);
-
-        int result;
-        try
-        {
-            result = await tcs.Task.AttachExternalCancellation(ct);
-        }
-        catch (System.OperationCanceledException)
-        {
-            result = -1;
-        }
-        finally
-        {
-            if (canvasGO != null)
-                Object.Destroy(canvasGO);
         }
         return result;
     }
@@ -270,114 +213,4 @@ public class ZoneProgressionService
         );
     }
 
-    private static GameObject BuildSelectionCanvas(List<ZoneLayoutEntry> options, UniTaskCompletionSource<int> tcs)
-    {
-        var canvasGO = new GameObject("ZoneSelectionUI");
-        var canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
-        canvasGO.AddComponent<CanvasScaler>();
-        canvasGO.AddComponent<GraphicRaycaster>();
-
-        // 반투명 전체화면 배경
-        var bgGO = new GameObject("Background");
-        bgGO.transform.SetParent(canvasGO.transform, false);
-        var bgImg = bgGO.AddComponent<Image>();
-        bgImg.color = new Color(0f, 0f, 0f, 0.65f);
-        var bgRT = bgGO.GetComponent<RectTransform>();
-        bgRT.anchorMin = Vector2.zero;
-        bgRT.anchorMax = Vector2.one;
-        bgRT.offsetMin = Vector2.zero;
-        bgRT.offsetMax = Vector2.zero;
-
-        // 카드 패널
-        var panelGO = new GameObject("Panel");
-        panelGO.transform.SetParent(canvasGO.transform, false);
-        var panelImg = panelGO.AddComponent<Image>();
-        panelImg.color = new Color(0.04f, 0.04f, 0.08f, 0.97f);
-        var panelRT = panelGO.GetComponent<RectTransform>();
-        float panelH = 160f + options.Count * 90f;
-        panelRT.anchorMin = new Vector2(0.5f, 0.5f);
-        panelRT.anchorMax = new Vector2(0.5f, 0.5f);
-        panelRT.pivot = new Vector2(0.5f, 0.5f);
-        panelRT.sizeDelta = new Vector2(560f, panelH);
-        panelRT.anchoredPosition = Vector2.zero;
-
-        // 제목
-        var titleGO = new GameObject("Title");
-        titleGO.transform.SetParent(panelGO.transform, false);
-        var titleTMP = titleGO.AddComponent<TextMeshProUGUI>();
-        titleTMP.text = "다음 구역 선택";
-        titleTMP.fontSize = 26f;
-        titleTMP.fontStyle = FontStyles.Bold;
-        titleTMP.alignment = TextAlignmentOptions.Center;
-        titleTMP.color = new Color(0.95f, 0.88f, 0.65f);
-        var titleRT = titleGO.GetComponent<RectTransform>();
-        titleRT.anchorMin = new Vector2(0f, 1f);
-        titleRT.anchorMax = new Vector2(1f, 1f);
-        titleRT.pivot = new Vector2(0.5f, 1f);
-        titleRT.offsetMin = new Vector2(20f, -65f);
-        titleRT.offsetMax = new Vector2(-20f, -18f);
-
-        // 존 옵션 카드들
-        for (int i = 0; i < options.Count; i++)
-        {
-            var zone = options[i];
-            int capturedIndex = zone.zone_index;
-
-            var cardGO = new GameObject($"ZoneCard_{zone.zone_index}");
-            cardGO.transform.SetParent(panelGO.transform, false);
-            var cardImg = cardGO.AddComponent<Image>();
-            cardImg.color = CategoryColor(zone.category);
-
-            var cardRT = cardGO.GetComponent<RectTransform>();
-            cardRT.anchorMin = new Vector2(0.08f, 1f);
-            cardRT.anchorMax = new Vector2(0.92f, 1f);
-            cardRT.pivot = new Vector2(0.5f, 1f);
-            cardRT.sizeDelta = new Vector2(0f, 78f);
-            cardRT.anchoredPosition = new Vector2(0f, -78f - i * 86f);
-
-            var btn = cardGO.AddComponent<Button>();
-            btn.onClick.AddListener(() => tcs.TrySetResult(capturedIndex));
-
-            var labelGO = new GameObject("Label");
-            labelGO.transform.SetParent(cardGO.transform, false);
-            var labelTMP = labelGO.AddComponent<TextMeshProUGUI>();
-            labelTMP.text = $"<b>{zone.label}</b>   <size=15>{CategoryKor(zone.category)}  ·  난이도 {zone.difficulty_scale:F1}</size>";
-            labelTMP.fontSize = 21f;
-            labelTMP.alignment = TextAlignmentOptions.Center;
-            labelTMP.color = Color.white;
-            var labelRT = labelGO.GetComponent<RectTransform>();
-            labelRT.anchorMin = Vector2.zero;
-            labelRT.anchorMax = Vector2.one;
-            labelRT.offsetMin = new Vector2(12f, 6f);
-            labelRT.offsetMax = new Vector2(-12f, -6f);
-        }
-
-        return canvasGO;
-    }
-
-    private static Color CategoryColor(string cat) => cat?.ToLower() switch
-    {
-        "boss"    => new Color(0.55f, 0.08f, 0.08f, 0.97f),
-        "elite"   => new Color(0.32f, 0.12f, 0.52f, 0.97f),
-        "normal"  => new Color(0.08f, 0.18f, 0.38f, 0.97f),
-        "battle"  => new Color(0.08f, 0.18f, 0.38f, 0.97f),
-        "shop"    => new Color(0.08f, 0.32f, 0.12f, 0.97f),
-        "event"   => new Color(0.30f, 0.20f, 0.05f, 0.97f),
-        _         => new Color(0.12f, 0.15f, 0.18f, 0.97f),
-    };
-
-    private static string CategoryKor(string cat) => cat?.ToLower() switch
-    {
-        "normal"   => "전투",
-        "battle"   => "전투",
-        "elite"    => "정예",
-        "boss"     => "보스",
-        "shop"     => "상점",
-        "event"    => "이벤트",
-        "corridor" => "통로",
-        "start"    => "시작",
-        _          => cat ?? "?",
-    };
 }

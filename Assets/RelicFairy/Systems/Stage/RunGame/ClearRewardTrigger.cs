@@ -158,8 +158,9 @@ public class ClearRewardTrigger : MonoBehaviour
         catch (OperationCanceledException) { return; }
 
         // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
-        // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
-        if (!_isBossRoom)
+        // 절차 진행(procgen)에선 RunFlowController가 출구 게이트를 담당하므로 레거시 존 선택 UI를 띄우지 않는다.
+        bool procGen = GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.UseProcGen;
+        if (!_isBossRoom && !procGen)
         {
             var zoneProgression = _run?.ZoneProgression;
             zoneProgression?.EnableExitGateForZone(zoneProgression.CurrentZoneIndex);

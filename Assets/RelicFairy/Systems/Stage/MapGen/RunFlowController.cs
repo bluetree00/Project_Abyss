@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -24,18 +25,36 @@ public class RunFlowController : MonoBehaviour
     private int _seed;
 
     [Header("전환 연출 (방 진입 와이프)")]
-    [SerializeField, Tooltip("덮기 시간(초). 가속 곡선 권장.")]          private float          _coverDuration  = 0.18f;
-    [SerializeField, Tooltip("드러내기 시간(초). 감속 곡선 권장.")]      private float          _revealDuration = 0.32f;
+    [SerializeField, Tooltip("덮기 시간(초). 텔레포트만 가리게 짧게.")]   private float          _coverDuration  = 0.12f;
+    [SerializeField, Tooltip("드러내기 시간(초). 복귀 후 디졸브로 생성 노출.")] private float          _revealDuration = 0.20f;
+    [SerializeField, Tooltip("디졸브 시작 후 복귀까지 지연(초). 디졸브 진행 중에 들어가게.")] private float _revealDelay = 0.3f;
     [SerializeField] private AnimationCurve _coverCurve  = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [SerializeField] private AnimationCurve _revealCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Header("게이트 문 (봉인 → 정보 공개)")]
+    [SerializeField, Tooltip("클리어 시 문 정보 공개(색 전환+글로우) 시간(초).")] private float _gateRevealDuration = 0.6f;
+    [SerializeField, Tooltip("공개 시 글로우(emission) 세기.")]                  private float _gateGlowIntensity = 2.5f;
+
+    // 봉인(전투 중 막힌 문) / 입구 잠금 색 — 중립 톤
+    private static readonly Color SealedColor = new Color(0.10f, 0.11f, 0.13f);
+    private static readonly Color LockedColor = new Color(0.06f, 0.06f, 0.07f);
 
     private RunSequencer                 _sequencer;
     private List<ZonePoolEntry>          _pool;
     private System.Random                _rng;
     private ProcRoomResult               _current;
     private RoomWaveController           _currentWave;
-    private readonly List<ProcRoomGate>  _gates = new();
+    private readonly List<GateView>      _gates = new();
+    private GameObject                   _entranceLock;
     private CancellationTokenSource      _cts;
+
+    /// <summary>게이트 1개의 시각/물리 구성요소 묶음. 봉인 시 blocker로 막고, 공개 시 marker 색 전환.</summary>
+    private sealed class GateView
+    {
+        public ProcRoomGate gate;
+        public Renderer     marker;
+        public Collider     blocker; // 봉인: solid(통과 차단) / 공개: 비활성
+    }
 
     private Vector3 _baseAnchor;
     private int     _anchorToggle;
@@ -91,7 +110,7 @@ public class RunFlowController : MonoBehaviour
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
-        await ScreenFade.CoverAsync(dir, KindColor(plan.kind), _coverDuration, _coverCurve, ct); // 종류색 + 방향 와이프로 덮기
+        await ScreenFade.CoverAsync(dir, KindColor(plan.kind), _coverDuration, _coverCurve, ct); // 짧게 덮어 텔레포트 가림
 
         var prevRoom = _current?.roomGO; // 새 방 준비까지 이전 방 유지 → 플레이어 발판 보존(추락 방지)
 
@@ -99,15 +118,34 @@ public class RunFlowController : MonoBehaviour
         var roomAnchor = _baseAnchor + new Vector3(0f, 0f, (_anchorToggle++ % 2) * 300f);
 
         bool mirror = _rng.Next(2) == 0;
-        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct);
-        if (result == null) { await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct); return; }
+        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct); // 블록 숨김 상태로 빌드(디졸브는 여기서)
+        if (result == null)
+        {
+            await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);
+            return;
+        }
 
         _current = result;
         MovePlayer(result.entryPos);
-
         if (prevRoom != null) Destroy(prevRoom); // 이동 완료 후 이전 방 디스폰
 
-        // 클리어 알림 구독 → 출구 게이트 배치. 전투 없는 방(스포너 0)은 즉시 출구 제공.
+        // 디졸브 먼저 시작 → 약간 지연 → 화면 복귀(디졸브 진행 중 진입) → 완료 대기. 첫 방 포함 모든 절차 방에 적용.
+        var dissolve = result.blocks != null
+            ? new DissolveEntrance().PlayAsync(result.blocks, default, ct)
+            : UniTask.CompletedTask;
+        if (_revealDelay > 0f)
+            await UniTask.Delay(TimeSpan.FromSeconds(_revealDelay), ignoreTimeScale: true, cancellationToken: ct);
+        await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);
+        await dissolve;
+
+        // 전환 중 컨트롤러 파괴/취소(플레이 종료 등) 가드 — 이후 transform 접근 시 MissingReferenceException 방지
+        if (this == null || ct.IsCancellationRequested) return;
+
+        // 출구 문은 봉인(막힘) 상태로 미리 배치, 들어온 입구는 잠금 → 전투 클리어 시 출구만 공개.
+        CreateSealedGates();
+        if (result.hasEntrance) LockEntrance(result.entrance);
+
+        // 디졸브 후 클리어 알림 구독 → 출구 게이트 공개. 전투 없는 방(스포너 0)은 즉시 공개.
         if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out _currentWave))
         {
             _currentWave.OnRoomCleared += HandleRoomCleared;
@@ -118,15 +156,30 @@ public class RunFlowController : MonoBehaviour
             _currentWave = null;
             HandleRoomCleared();
         }
-
-        await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct); // 같은 방향으로 빠져나가며 새 방 드러내기
     }
 
     private void MovePlayer(Vector3 pos)
     {
-        var player = AppBootstrapper.Instance?.CurrentRun?.Player;
-        if (player != null)
-            player.transform.position = pos;
+        // 바인딩된 런 우선(플레이어를 BindPlayer한 세션), 없으면 AppBootstrapper 폴백
+        var player = GameRunBootstrapper.Instance?.Run?.Player
+                  ?? AppBootstrapper.Instance?.CurrentRun?.Player;
+        if (player == null)
+        {
+            Debug.LogWarning("[RunFlow] MovePlayer: 플레이어 참조 없음 — 이동 불가");
+            return;
+        }
+
+        // Rigidbody 텔레포트: transform.position만으론 물리 위치/보간이 덮어쓰므로 rb.position 동기화 + 속도 0
+        // (FallRecoveryController와 동일 패턴)
+        player.transform.position = pos;
+        if (player.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.position        = pos;
+            rb.linearVelocity  = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        GameCameraController.Instance?.SnapToTarget(); // 텔레포트 후 카메라 즉시 스냅(슬로우 패닝/인트로 잔존 방지)
+        Debug.Log($"[RunFlow] 플레이어 이동 → {pos}");
     }
 
     private void HandleRoomCleared()
@@ -139,35 +192,76 @@ public class RunFlowController : MonoBehaviour
             Debug.Log("[RunFlow] 출구 없음 — 런 종료(보스 처치 등)");
             return;
         }
-        PlaceGates(exits);
+        RevealGates(exits);
     }
 
-    private void PlaceGates(List<DoorPlan> exits)
+    /// <summary>빌드 시 모든 출구 슬롯에 봉인(막힌) 게이트를 미리 만든다 — 전투 중엔 통과 불가.</summary>
+    private void CreateSealedGates()
     {
         ClearGates();
         if (_current?.exits == null) return;
-
-        var slots = _current.exits;
-        // 직진 슬롯 → exits[0], 턴 슬롯 → exits[1] (best-effort 슬롯 매칭)
-        for (int i = 0; i < slots.Count && i < exits.Count; i++)
-            _gates.Add(CreateGate(slots[i], exits[i]));
+        foreach (var slot in _current.exits)
+            _gates.Add(CreateSealedGate(slot));
     }
 
-    private ProcRoomGate CreateGate(ProcExitSlot slot, DoorPlan plan)
+    /// <summary>클리어 시 롤된 출구를 슬롯에 매칭해 색 전환+글로우로 공개하고 통과 가능하게 한다.</summary>
+    private void RevealGates(List<DoorPlan> exits)
     {
-        var go = new GameObject($"ProcGate_{plan.kind}");
-        go.transform.SetParent(transform, false);
-        go.transform.position = slot.worldPos;
+        int n = Mathf.Min(_gates.Count, exits.Count);
+        for (int i = 0; i < n; i++)
+            if (_gates[i] != null) RevealGateAsync(_gates[i], exits[i]).Forget();
+        // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
+    }
 
-        var col = go.AddComponent<BoxCollider>();
-        col.isTrigger = true;
-        col.size = new Vector3(2f, 3f, 2f);
+    private GateView CreateSealedGate(ProcExitSlot slot)
+    {
+        var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker);
+
+        // 트리거 — 공개 후 통과 감지용 (봉인 중에는 armed=false)
+        var trig = go.AddComponent<BoxCollider>();
+        trig.isTrigger = true;
+        trig.size = new Vector3(MarkerW(slot), MarkerH(slot), 3f);
 
         var gate = go.AddComponent<ProcRoomGate>();
-        gate.Initialize(plan, slot.edge, OnGateChosen);
-        // TODO(후속): 방 종류 아이콘/라벨 비주얼 (CategoryKor 매핑)
-        return gate;
+        gate.InitializeSealed(slot.edge, OnGateChosen);
+
+        return new GateView { gate = gate, marker = marker, blocker = blocker };
     }
+
+    /// <summary>들어온 입구를 잠금 패널로 막는다 (되돌아가기 차단). 가벼운 잠금 페이드인 연출.</summary>
+    private void LockEntrance(ProcExitSlot slot)
+    {
+        if (_entranceLock != null) Destroy(_entranceLock);
+        _entranceLock = CreateGatePanel("ProcEntranceLock", slot, LockedColor, out _, out _);
+        LockEntranceAsync(_entranceLock).Forget();
+    }
+
+    /// <summary>게이트/잠금 패널 공통 생성 — 개구부 크기로 채운 솔리드 큐브. blocker는 통과 차단용 콜라이더.</summary>
+    private GameObject CreateGatePanel(string name, ProcExitSlot slot, Color color, out Renderer marker, out Collider blocker)
+    {
+        float openW = MarkerW(slot);
+        float openH = MarkerH(slot);
+
+        var go = new GameObject(name);
+        go.transform.SetParent(transform, false);
+        go.transform.position = slot.worldPos + new Vector3(0f, openH * 0.5f, 0f);
+        if (slot.edge == DoorEdge.East || slot.edge == DoorEdge.West)
+            go.transform.localRotation = Quaternion.Euler(0f, 90f, 0f); // 통로를 가로지르게
+
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube); // 솔리드 콜라이더 유지 = 통과 차단
+        panel.name = "Marker";
+        panel.transform.SetParent(go.transform, false);
+        panel.transform.localScale = new Vector3(openW, openH, 0.4f);
+
+        panel.TryGetComponent(out blocker);
+        panel.TryGetComponent(out marker);
+        if (marker != null) marker.material.color = color;
+
+        return go;
+    }
+
+    private static float MarkerW(ProcExitSlot slot) => slot.openingWidth  > 0.01f ? slot.openingWidth  : 4f;
+    private static float MarkerH(ProcExitSlot slot) => slot.openingHeight > 0.01f ? slot.openingHeight : 3f;
 
     /// <summary>문 엣지 → 전환 와이프 스크린 방향. 직진=위 / 우턴=오른쪽 / 좌턴=왼쪽.</summary>
     private static Vector2 WipeDir(DoorEdge edge) => edge switch
@@ -193,8 +287,117 @@ public class RunFlowController : MonoBehaviour
     private void ClearGates()
     {
         for (int i = 0; i < _gates.Count; i++)
-            if (_gates[i] != null) Destroy(_gates[i].gameObject);
+            if (_gates[i]?.gate != null) Destroy(_gates[i].gate.gameObject);
         _gates.Clear();
+        if (_entranceLock != null) { Destroy(_entranceLock); _entranceLock = null; }
+    }
+
+    /// <summary>봉인 → 공개: 색 전환 + 글로우 펄스, 차단 콜라이더 해제, 통과 가능(arm).</summary>
+    private async UniTaskVoid RevealGateAsync(GateView view, DoorPlan plan)
+    {
+        var ct  = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        var rend = view.marker;
+        Color to = KindColor(plan.kind);
+
+        // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인
+        TextMeshProUGUI label = (rend != null) ? CreateGateLabel(rend.transform.parent, plan.kind) : null;
+
+        if (rend != null)
+        {
+            var mat = rend.material;
+            mat.EnableKeyword("_EMISSION");
+            Color from = mat.color;
+            float dur = Mathf.Max(0.01f, _gateRevealDuration);
+            try
+            {
+                float t = 0f;
+                while (t < dur)
+                {
+                    if (rend == null) break;
+                    ct.ThrowIfCancellationRequested();
+                    t += Time.deltaTime;
+                    float k    = Mathf.Clamp01(t / dur);
+                    float glow = Mathf.Sin(k * Mathf.PI); // 0→1→0 펄스
+                    mat.color = Color.Lerp(from, to, k);
+                    mat.SetColor("_EmissionColor", to * (glow * _gateGlowIntensity));
+                    if (label != null) { var lc = label.color; lc.a = k; label.color = lc; }
+                    await UniTask.Yield();
+                }
+            }
+            catch (OperationCanceledException) { return; }
+            if (rend != null)
+            {
+                rend.material.color = to;
+                rend.material.SetColor("_EmissionColor", to * 0.4f); // 잔광
+            }
+            if (label != null) { var lc = label.color; lc.a = 1f; label.color = lc; }
+        }
+
+        if (view.blocker != null) view.blocker.enabled = false; // 통과 차단 해제
+        view.gate?.Reveal(plan);                                 // plan 바인딩 + arm
+    }
+
+    /// <summary>게이트에 다음 방 종류 라벨(월드 스페이스)을 만든다. 알파 0으로 시작 — 공개 연출과 함께 페이드인.</summary>
+    private TextMeshProUGUI CreateGateLabel(Transform gateTr, RoomPlanKind kind)
+    {
+        var go = new GameObject("GateLabel");
+        go.transform.SetParent(gateTr, false);
+        go.transform.localPosition = new Vector3(0f, 1.6f, 0f); // 개구부 상단 부근(게이트 원점 = 개구부 중앙)
+
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        if (Camera.main != null) go.transform.rotation = Camera.main.transform.rotation; // 카메라 향해 빌보드(1회)
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta  = new Vector2(320f, 90f);
+        rt.localScale = Vector3.one * 0.02f;
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.text      = KindKor(kind);
+        tmp.fontSize  = 48f;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = new Color(1f, 1f, 1f, 0f); // 알파 0 시작
+        return tmp;
+    }
+
+    /// <summary>방 종류 → 표시용 한글 라벨.</summary>
+    private static string KindKor(RoomPlanKind kind) => kind switch
+    {
+        RoomPlanKind.Boss    => "보스",
+        RoomPlanKind.PreBoss => "보스 전",
+        RoomPlanKind.Elite   => "정예",
+        RoomPlanKind.Shop    => "상점",
+        RoomPlanKind.Event   => "이벤트",
+        _                    => "전투",
+    };
+
+    /// <summary>입구 잠금 패널을 빠르게 페이드인해 "잠김"을 알린다 (영구 차단, 공개 없음).</summary>
+    private async UniTaskVoid LockEntranceAsync(GameObject lockGo)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        if (lockGo == null) return;
+        var rend = lockGo.GetComponentInChildren<Renderer>();
+        var tr   = rend != null ? rend.transform : null;
+        if (tr == null) return;
+
+        Vector3 full = tr.localScale;
+        Vector3 thin = new Vector3(full.x, 0.05f, full.z); // 위→아래로 닫히는 느낌
+        float dur = 0.25f;
+        try
+        {
+            float t = 0f;
+            while (t < dur)
+            {
+                if (tr == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                tr.localScale = Vector3.Lerp(thin, full, Mathf.Clamp01(t / dur));
+                await UniTask.Yield();
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        if (tr != null) tr.localScale = full;
     }
 
     private async UniTaskVoid TransitionAsync(DoorPlan plan, DoorEdge edge)
@@ -203,7 +406,7 @@ public class RunFlowController : MonoBehaviour
         try
         {
             foreach (var g in _gates)
-                if (g != null) g.Disarm();
+                g?.gate?.Disarm();
 
             ClearGates();
             _sequencer.CommitEntry(plan);
