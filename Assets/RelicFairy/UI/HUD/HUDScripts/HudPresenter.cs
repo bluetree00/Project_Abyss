@@ -103,6 +103,10 @@ public sealed class HudPresenter : MonoBehaviour
 
         // 현재 버프 즉시 반영
         HandleBuffsChanged();
+
+        // 플레이어 스탯이 이미 로드된 경우 즉시 반영
+        if (_runtimeStats != null)
+            RefreshStats();
     }
 
     public void BindPlayer(PlayerController player)
@@ -251,6 +255,7 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (_runtimeStats == null || view?.CombatPanel == null) return;
         view.CombatPanel.SetHp(_runtimeStats.Hp, _runtimeStats.MaxHp);
+        view.CombatPanel.SetStats(_runtimeStats.AttackPower, _runtimeStats.Defense);
     }
 
     private void RefreshWeaponSlots()
@@ -278,6 +283,7 @@ public sealed class HudPresenter : MonoBehaviour
         var current = _weaponManager.CurrentWeaponData;
         view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
     }
 
     public void Dispose()

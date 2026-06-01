@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Knight
   m_EditorClassIdentifier: 
   characterName: Knight
-  baseMoveSpeed: 7
+  baseMoveSpeed: 8
   baseRunSpeed: 8
   maxHealth: 100
   baseMeleeAttack: 0

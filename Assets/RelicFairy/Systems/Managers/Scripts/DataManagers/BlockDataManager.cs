@@ -15,13 +15,13 @@ public class RuneDataManager
     private const string SynergyFileName = "merlin_rune_synergy_data.json";
     private const string ZoneMapFileName = "merlin_rune_zone_map.json";
 
-    private string PieceFilePath   => Path.Combine(Application.persistentDataPath, PieceFileName);
-    private string SynergyFilePath => Path.Combine(Application.persistentDataPath, SynergyFileName);
-    private string ZoneMapFilePath => Path.Combine(Application.persistentDataPath, ZoneMapFileName);
+    private string PieceFilePath    => Path.Combine(Application.persistentDataPath, PieceFileName);
+    private string SynergyFilePath  => Path.Combine(Application.persistentDataPath, SynergyFileName);
+    private string ZoneMapFilePath  => Path.Combine(Application.persistentDataPath, ZoneMapFileName);
 
-    private Dictionary<int, RunePieceEntry>              _pieceById   = new();
+    private Dictionary<int, RunePieceEntry>              _pieceById     = new();
     private Dictionary<string, List<RuneSynergyEntry>>   _synergyByZone = new();
-    private List<RuneZoneMapEntry>                        _zoneMapRows = new();
+    private List<RuneZoneMapEntry>                        _zoneMapRows   = new();
 
     public bool IsInitialized { get; private set; }
 

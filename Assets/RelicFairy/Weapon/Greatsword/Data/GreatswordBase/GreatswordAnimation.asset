@@ -31,6 +31,11 @@ MonoBehaviour:
       comboWindowOpen: 0.5
       comboWindowClose: 0.85
       attackEndAt: 0.9
+      attackStepDistance: 1.6
+      attackStepStartNorm: 0.05
+      attackStepEndNorm: 0.55
+      moveInputScale: 0.04
+      aimAssistRadius: 8
     - baseClipName: GroundLightAttack_02
       addressableKey: GreatswordAttack_02
       actionType: 1
@@ -41,6 +46,11 @@ MonoBehaviour:
       comboWindowOpen: 0.5
       comboWindowClose: 0.85
       attackEndAt: 0.9
+      attackStepDistance: 1.6
+      attackStepStartNorm: 0.05
+      attackStepEndNorm: 0.55
+      moveInputScale: 0.04
+      aimAssistRadius: 8
     - baseClipName: GroundLightAttack_03
       addressableKey: GreatswordAttack_03
       actionType: 1
@@ -51,6 +61,11 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: 0.9
+      attackStepDistance: 2.8
+      attackStepStartNorm: 0.05
+      attackStepEndNorm: 0.60
+      moveInputScale: 0.04
+      aimAssistRadius: 8
     - baseClipName: QSkill_01
       addressableKey: GreatswordQSkill
       actionType: 3

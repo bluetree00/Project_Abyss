@@ -25,4 +25,5 @@ public enum TileType
     CharacterPickup, // CP — 스타트 방 캐릭터 픽업
     WeaponPickup,    // WP — 스타트 방 무기 픽업
     StartGate,       // SG — 스타트 방 탈출 게이트
+    Ceiling,         // — 천장 타일 (BlockPalette에 등록, 없으면 Floor 뒤집기 폴백)
 }

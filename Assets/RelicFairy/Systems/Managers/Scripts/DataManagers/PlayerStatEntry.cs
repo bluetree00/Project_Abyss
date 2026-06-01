@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 /// <summary>
-/// 뒤끝 PLAYER_DATA 차트 1행 = 캐릭터 1명.
+/// 뒤끝 CHARACTER_DATA 차트 1행 = 캐릭터 1명.
 /// </summary>
 [System.Serializable]
 public class PlayerStatEntry
@@ -93,6 +93,14 @@ public class EquipmentEntry
     public float  skill_q_cooldown;
     public string skill_e_name;
     public float  skill_e_cooldown;
+
+    // ── 공격 전진성 / 유도 보정 (WeaponAnimationSetSO ClipMapping 으로 주입) ──
+    public float  attack_step_1;
+    public float  attack_step_2;
+    public float  attack_step_3;
+    public float  move_input_scale;
+    public float  aim_assist_radius;
+    public int    use_aim_assist;
 
     public int    stat_version;
 }

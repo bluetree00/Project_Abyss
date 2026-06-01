@@ -23,6 +23,10 @@ public class ZoneEntryTrigger : MonoBehaviour
     private float _zoneSizeX;
     private float _zoneSizeZ;
 
+    // OnTriggerEnter 시점에 기록한 진입 벽 방향 (중심→벽).
+    // inward = -_entryWall. 진입 축만 margin/속도를 체크하기 위해 사용.
+    private Vector3 _entryWall;
+
     /// <summary>
     /// 이 트리거를 초기화한다. zoneSizeX/Z 는 grid_width/height × blockCellSize.
     /// BoxCollider 크기를 존 전체 영역에 맞게 설정한다.
@@ -46,7 +50,25 @@ public class ZoneEntryTrigger : MonoBehaviour
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
-    private void OnTriggerEnter(Collider other) => TryActivate(other);
+    private void OnTriggerEnter(Collider other)
+    {
+        // 진입 벽 방향 기록: 플레이어가 어느 쪽 경계에서 들어왔는지 최초 1회 캡처
+        if (_entryWall == Vector3.zero)
+        {
+            var player = other.GetComponentInParent<PlayerController>();
+            if (player != null)
+            {
+                var rel = player.transform.position - transform.position;
+                // 정규화된 경계 거리로 지배 축 결정 (더 경계에 가까운 축 = 진입 축)
+                float normX = Mathf.Abs(rel.x) / (_zoneSizeX * 0.5f);
+                float normZ = Mathf.Abs(rel.z) / (_zoneSizeZ * 0.5f);
+                _entryWall  = normX >= normZ
+                    ? new Vector3(Mathf.Sign(rel.x), 0f, 0f)
+                    : new Vector3(0f, 0f, Mathf.Sign(rel.z));
+            }
+        }
+        TryActivate(other);
+    }
 
     // 존 스폰 시 플레이어가 이미 BoxCollider 내부에 있는 경우 OnTriggerEnter가 발화하지 않을 수 있어 Stay도 처리
     private void OnTriggerStay(Collider other) => TryActivate(other);
@@ -56,6 +78,32 @@ public class ZoneEntryTrigger : MonoBehaviour
         if (_activated) return;
         var player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;
+
+        var rel      = player.transform.position - transform.position;
+        var inward   = -_entryWall; // 진입 벽 안쪽 방향 (벽→중심)
+
+        if (_entryWall != Vector3.zero)
+        {
+            // ── 진입 축 margin 체크 ──────────────────────────────────
+            // 진입한 쪽 경계에서 EntryCheckMargin 이상 들어와야 활성화.
+            if (_entryWall.x != 0f && Mathf.Abs(rel.x) > _zoneSizeX * 0.5f - EntryCheckMargin) return;
+            if (_entryWall.z != 0f && Mathf.Abs(rel.z) > _zoneSizeZ * 0.5f - EntryCheckMargin) return;
+
+            // ── 속도 방향 체크 ───────────────────────────────────────
+            // 진입 방향(inward)과 속도의 내적이 음수면 되돌아가는 중 → 발동 안 함.
+            if (player.TryGetComponent<Rigidbody>(out var rb))
+            {
+                var velFlat = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                if (velFlat.sqrMagnitude > 0.1f &&
+                    Vector3.Dot(velFlat.normalized, inward) < -0.3f) return;
+            }
+        }
+        else
+        {
+            // OnTriggerStay에서만 호출된 경우(_entryWall 미기록): 전방향 margin 폴백
+            if (Mathf.Abs(rel.x) > _zoneSizeX * 0.5f - EntryCheckMargin) return;
+            if (Mathf.Abs(rel.z) > _zoneSizeZ * 0.5f - EntryCheckMargin) return;
+        }
 
         _activated = true;
 
@@ -75,8 +123,10 @@ public class ZoneEntryTrigger : MonoBehaviour
     // ── Private ───────────────────────────────────────────────────────────
 
     // 플레이어가 존 경계에서 EntryMargin만큼 안쪽에 들어온 뒤 배리어를 생성한다.
-    // 경계선 위에서 트리거가 발화해도 플레이어가 실제로 방 안에 들어올 때까지 대기.
-    private const float EntryMargin = 2f;
+    // EntryCheckMargin만큼 안쪽에 있을 때만 TryActivate가 실제로 발동된다.
+    // (게이트 근처에서 BoxCollider에 살짝 걸치는 경우 조기 발동 방지)
+    private const float EntryMargin      = 2f;
+    private const float EntryCheckMargin = 2f;
 
     private async UniTaskVoid ActivateCombatZoneAsync(Transform playerTransform, CancellationToken ct)
     {

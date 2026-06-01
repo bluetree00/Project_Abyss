@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -39,6 +40,11 @@ public class HolyShieldSkillRuntime : ISkillRuntime
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
         ctx.Animator?.CrossFade(AnimName, 0.1f);
+
+        // 필살기 카메라 연출 (설정 있을 때만)
+        var cine = ctx.Controller?.CharacterData?.QSkillCinematic;
+        if (cine != null)
+            UltimateCinematicService.Play(cine, ctx.Controller.transform).Forget();
     }
 
     public void OnUpdate(SkillExecutionContext ctx)

@@ -191,7 +191,7 @@ MonoBehaviour:
   _hitBloodVfxPrefab: {fileID: 0}
   _hitBloodVfxScale: 1
   _hitBloodVfxHeightOffset: 1
-  _globalAttackAnimSpeedScale: 1
+  _globalAttackAnimSpeedScale: 1.25
   characterData: {fileID: 0}
   debugInvincible: 0
   cinemachineCamera: {fileID: 0}

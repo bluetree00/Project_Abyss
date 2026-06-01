@@ -361,15 +361,21 @@ public class ZoneProgressionService
     {
         "boss"    => new Color(0.55f, 0.08f, 0.08f, 0.97f),
         "elite"   => new Color(0.32f, 0.12f, 0.52f, 0.97f),
+        "normal"  => new Color(0.08f, 0.18f, 0.38f, 0.97f),
         "battle"  => new Color(0.08f, 0.18f, 0.38f, 0.97f),
+        "shop"    => new Color(0.08f, 0.32f, 0.12f, 0.97f),
+        "event"   => new Color(0.30f, 0.20f, 0.05f, 0.97f),
         _         => new Color(0.12f, 0.15f, 0.18f, 0.97f),
     };
 
     private static string CategoryKor(string cat) => cat?.ToLower() switch
     {
+        "normal"   => "전투",
         "battle"   => "전투",
         "elite"    => "정예",
         "boss"     => "보스",
+        "shop"     => "상점",
+        "event"    => "이벤트",
         "corridor" => "통로",
         "start"    => "시작",
         _          => cat ?? "?",

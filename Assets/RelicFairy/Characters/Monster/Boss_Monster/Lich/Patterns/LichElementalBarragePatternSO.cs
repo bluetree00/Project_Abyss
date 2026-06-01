@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -5,8 +6,12 @@ namespace RelicFairy.Monster
 /// <summary>
 /// 리치 원소 난사 (Elemental Barrage) 패턴 — Phase 1 일반 공격.
 ///
-/// 흐름: 이동 유지 (CircleStrafe 힌트) → 시전(castDuration) → 투사체 3발 연속 발사
-///       (각 shotInterval 간격) → 복귀(recoveryDuration)
+/// 흐름: Cast(조준 선딜, 180°/s 추적) → Shoot(shotCount발, Active 프레임: 방향 고정)
+///       → Recovery → ChaseState.
+///
+/// 각 존은 telegraphDuration 동안 노란 disc로 예고한 뒤 activeDuration 동안 충돌 판정으로 전환.
+/// Dark Souls UX 원칙: Startup(Cast)에서는 각속도 제한 추적,
+///                     Active(Shoot)에서는 방향을 완전히 고정해 플레이어가 옆으로 피할 수 있게 한다.
 /// </summary>
 [CreateAssetMenu(menuName = "RelicFairy/Boss/Lich/Lich_ElementalBarragePattern", fileName = "Lich_ElementalBarragePattern")]
 public class LichElementalBarragePatternSO : BossPatternSO
@@ -19,25 +24,35 @@ public class LichElementalBarragePatternSO : BossPatternSO
     [Tooltip("첫 발사 전 시전 시간 (초)")]
     public float castDuration = 0.6f;
     [Tooltip("발사 간 간격 (초)")]
-    public float shotInterval = 0.25f;
-    [Tooltip("마지막 발사 후 복귀 시간 (초)")]
+    public float shotInterval = 0.5f;
+    [Tooltip("마지막 발사 후 복귀 대기 시간 (초)")]
     public float recoveryDuration = 0.5f;
 
     [Header("Elemental Barrage — Shots")]
     [Tooltip("연속 발사 횟수")]
     public int shotCount = 3;
 
-    [Header("Elemental Barrage — Projectile")]
-    [Tooltip("투사체 프리팹 (MonsterProjectile 컴포넌트 필요). null이면 즉발 처리.")]
-    public GameObject projectilePrefab;
-    [Tooltip("투사체 비행 속도 (m/s)")]
-    public float projectileSpeed = 16f;
-    [Tooltip("투사체 최대 비행 거리 (m)")]
-    public float projectileRange = 35f;
+    [Header("Elemental Barrage — Zone")]
+    [Tooltip("노란 예고 존 표시 시간 (초) — 플레이어가 피할 시간")]
+    public float telegraphDuration = 1.0f;
+    [Tooltip("빨간 충돌 존 유지 시간 (초)")]
+    public float activeDuration = 0.6f;
+    [Tooltip("충돌 판정 반경 (m)")]
+    public float zoneRadius = 1.2f;
+    [Tooltip("바닥 기준 Y 오프셋")]
+    public float groundYOffset = 0.05f;
 
     [Header("Elemental Barrage — Damage")]
-    [Tooltip("기본 attackPower에 곱할 배율 (발당)")]
+    [Tooltip("공격력 대비 데미지 배율")]
     public float damageMultiplier = 0.7f;
+    [Tooltip("존 안에 있는 동안 데미지 틱 간격 (초)")]
+    public float tickInterval = 0.5f;
+
+    [Header("Elemental Barrage — Scatter")]
+    [Tooltip("발사 1회당 소환 존 수. 1이면 기존 동작.")]
+    public int zonesPerShot = 5;
+    [Tooltip("플레이어 위치에서 랜덤으로 흩어지는 최대 반경 (m). 0이면 정확한 위치.")]
+    public float scatterRadius = 3f;
 
     [Header("Elemental Barrage — Cooldown")]
     [Tooltip("패턴 완료 후 재사용 대기 시간 (초)")]
@@ -61,7 +76,7 @@ public class LichElementalBarragePatternSO : BossPatternSO
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// LichElementalBarrageState — UnInterruptible (이동 자유)
+// LichElementalBarrageState — UnInterruptible
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarragePatternSO>
@@ -86,7 +101,8 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
         mc?.RequestMovementState(LichMovementState.CircleStrafe);
         mc?.SetLocked(true);
 
-        FacePlayer(ctx);
+        UI_BossBark.Show("원소여, 쏟아져라!", BossBarkType.PatternAnnounce);
+        FacePlayerTracking(ctx, 360f);
     }
 
     public override void Update(MonsterContext ctx)
@@ -96,23 +112,24 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
         switch (_phase)
         {
             case Phase.Cast:
-                FacePlayer(ctx);
+                // Startup 프레임: 각속도 제한 추적 (180°/s)
+                FacePlayerTracking(ctx, 180f);
                 if (_timer >= Data.castDuration)
                 {
-                    FireShot(ctx);
-                    _shotsFired++;
-                    _phase = Phase.Shoot;
-                    _timer = 0f;
+                    SpawnZone(ctx);
+                    _shotsFired = 1;
+                    _phase      = Phase.Shoot;
+                    _timer      = 0f;
                 }
                 break;
 
             case Phase.Shoot:
-                FacePlayer(ctx);
+                // Active 프레임: 방향 고정 — 플레이어가 옆으로 이동해 회피 가능
                 if (_timer >= Data.shotInterval)
                 {
                     if (_shotsFired < Data.shotCount)
                     {
-                        FireShot(ctx);
+                        SpawnZone(ctx);
                         _shotsFired++;
                         _timer = 0f;
                     }
@@ -140,47 +157,40 @@ public class LichElementalBarrageState : UnInterruptibleState<LichElementalBarra
             lich.LichBB.ElementalBarrageCooldown = Data.patternCooldown;
     }
 
-    private void FireShot(MonsterContext ctx)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 헬퍼
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void SpawnZone(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
 
-        Vector3 origin    = ctx.Transform.position + Vector3.up * 1.5f;
-        Vector3 targetPos = ctx.Runtime.PlayerTarget.position + Vector3.up * 1f;
-        Vector3 dir       = (targetPos - origin).normalized;
+        Vector3 basePos = ctx.Runtime.PlayerTarget.position;
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
+        int count = Mathf.Max(1, Data.zonesPerShot);
 
-        PatternGuideHelper.Sphere(
-            targetPos,
-            0.4f,
-            PatternGuideHelper.Active,
-            lifetime: 0.3f);
-
-        if (Data.projectilePrefab != null)
+        for (int i = 0; i < count; i++)
         {
-            var go = Object.Instantiate(Data.projectilePrefab, origin, Quaternion.LookRotation(dir));
-            if (go.TryGetComponent<MonsterProjectile>(out var proj))
-            {
-                int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-                proj.Init(dir, Data.projectileSpeed, Data.projectileRange, dmg, ctx.Config.stat.knockbackForce);
-            }
-        }
-        else
-        {
-            float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
-            if (dist > Data.maxRange) return;
-            var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
-            if (player == null) return;
-            int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
-            player.TakeDamage(dmg);
+            Vector2 rand2D = Data.scatterRadius > 0f
+                ? Random.insideUnitCircle * Data.scatterRadius
+                : Vector2.zero;
+            Vector3 pos = basePos + new Vector3(rand2D.x, Data.groundYOffset, rand2D.y);
+            LichDarkRainZone.Spawn(pos, Data.zoneRadius, Data.telegraphDuration, Data.activeDuration,
+                dmg, Data.tickInterval);
         }
     }
 
-    private static void FacePlayer(MonsterContext ctx)
+    /// <summary>Startup 프레임용 각속도 제한 추적.</summary>
+    private static void FacePlayerTracking(MonsterContext ctx, float angularDegPerSec)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
-        if (dir.sqrMagnitude > 0.001f)
-            ctx.Transform.rotation = Quaternion.LookRotation(dir);
+        if (dir.sqrMagnitude < 0.001f) return;
+        ctx.Transform.rotation = Quaternion.RotateTowards(
+            ctx.Transform.rotation,
+            Quaternion.LookRotation(dir),
+            angularDegPerSec * Time.deltaTime);
     }
 }
 }

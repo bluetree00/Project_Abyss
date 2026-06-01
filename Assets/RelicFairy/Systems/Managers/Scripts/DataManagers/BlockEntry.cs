@@ -1,5 +1,24 @@
 using System.Collections.Generic;
 
+/// <summary>장비/캐릭터 컨셉과 완성 시너지 사이의 친화도 태그.</summary>
+public enum SynergyAffinityTag
+{
+    None      = 0,
+    Sword     = 1,
+    Axe       = 2,
+    Shield    = 3,
+    Staff     = 4,
+    Wand      = 5,
+    Armor     = 6,
+    Agility   = 7,
+    Heavy     = 8,
+    Wind      = 9,
+    Gambler   = 10,
+    Reckless  = 11,
+    Survivor  = 12,
+    Tank      = 13,
+}
+
 /// <summary>
 /// 뒤끝 MERLIN_RUNE_PIECE_DATA 차트 1행 = 룬 조각(배치 블록) 모양 1개.
 /// shape_id로 조회.
@@ -76,3 +95,4 @@ public class RuneZoneMapEntryCollection
 {
     public List<RuneZoneMapEntry> rows;
 }
+

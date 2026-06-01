@@ -18,9 +18,13 @@ using UnityEngine.UI;
 public sealed class MerlinRuneHexGridView : MonoBehaviour
 {
     // ── Constants ──
-    private const float CELL_SIZE = 40f;
+    private const float CELL_SIZE = 50f;
     private const float CELL_GAP  = 4f;
-    private const float CELL_STEP = CELL_SIZE + CELL_GAP;   // 44f — GridManager.GetGap() 기준값
+    private const float CELL_STEP = CELL_SIZE + CELL_GAP;   // 54f — GridManager.GetGap() 기준값
+
+    // 한 면만 붙어도 배치 허용: 점유 셀로부터 이 거리 내의 빈 셀을 isPlaceable=true로 표시
+    // 값 = 최대 블록 선형 길이(5셀) → 5셀짜리 블록도 한 끝만 닿으면 배치 가능
+    private const int ADJACENCY_REACH = 5;
 
     // 존별 기본 색상
     private static readonly Color COLOR_ATK    = new(1.0f, 0.35f, 0.30f, 0.75f);
@@ -37,16 +41,18 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private const float NORMAL_ALPHA    = 0.75f;
 
     // ── Private fields ──
-    private readonly List<GameObject>              _cellObjects      = new();
-    private readonly Dictionary<Vector2Int, Image> _cellImages       = new();
-    private readonly Dictionary<Vector2Int, Image> _cellFlashImages  = new();
-    private readonly Dictionary<Vector2Int, Color>  _cellBaseColors   = new();
+    private readonly List<GameObject>              _cellObjects       = new();
+    private readonly Dictionary<Vector2Int, Image> _cellImages        = new();
+    private readonly Dictionary<Vector2Int, Image> _cellFlashImages   = new();
+    private readonly Dictionary<Vector2Int, Color>  _cellBaseColors    = new();
     private readonly HashSet<Vector2Int>             _occupiedPositions = new();
+    private readonly Dictionary<Vector2Int, char>    _cellZones         = new();
 
     // 드래그 배치용 GridSquare 레이어
     private GameObject    _gridSquaresRoot;
     private GridAssetSO   _runtimeGridAsset;
     private GridVisualSO  _runtimeVisualSO;
+    private bool          _isBuilt;
 
     // ── Public API ──
 
@@ -57,10 +63,16 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
     /// <summary>
     /// RuneDataManager에서 존맵 데이터를 읽어 그리드를 생성한다.
-    /// 데이터 로드 완료 후 1회 호출.
+    /// 이미 빌드됐으면 GridSquare를 재사용하고 시각 점유 상태만 갱신한다.
     /// </summary>
     public void BuildGrid()
     {
+        if (_isBuilt)
+        {
+            RefreshOccupiedCells();
+            return;
+        }
+
         ClearGrid();
 
         var runeData = Managers.RuneData;
@@ -136,6 +148,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
 
         hexGrid.InitFromPrebuiltSquares(_runtimeGridAsset, squares);
+        _isBuilt = true;
     }
 
     /// <summary>
@@ -160,7 +173,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
     }
 
-    /// <summary>배치된 셀들을 표시 상태로 갱신한다.</summary>
+    /// <summary>배치된 셀들을 표시 상태로 갱신하고 Bridge에 존별 카운트를 알린다.</summary>
     public void RefreshPlacedCells(HashSet<Vector2Int> placedPositions)
     {
         _occupiedPositions.Clear();
@@ -173,6 +186,107 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             bool placed = _occupiedPositions.Contains(kvp.Key);
             kvp.Value.color = placed ? OccupiedColor(bc) : EmptyColor(bc);
         }
+
+        var zoneCounts   = GetZoneOccupiedCounts();
+        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+    }
+
+    /// <summary>
+    /// 점유 셀로부터 BFS로 ADJACENCY_REACH 거리 내의 빈 셀을 isPlaceable=true로 표시한다.
+    /// 멀티셀 블록의 한 면만 기존 블록에 닿아도 배치를 허용하는 구조.
+    /// 그리드가 비어 있으면 전체 셀 개방. 배치/제거 후 호출.
+    /// </summary>
+    public void UpdateAdjacencyConstraints()
+    {
+        var grid = HexGrid;
+        if (grid == null) return;
+        var squares = grid.GetGridSquares();
+        if (squares == null) return;
+
+        bool hasOccupied = _occupiedPositions.Count > 0;
+
+        if (!hasOccupied)
+        {
+            foreach (var sq in squares)
+                if (!sq.isOccupied) sq.isPlaceable = true;
+            return;
+        }
+
+        // BFS: 점유 셀 경계에서 ADJACENCY_REACH 거리까지 확장
+        var reachable = new HashSet<Vector2Int>();
+        var frontier  = new Queue<(Vector2Int pos, int depth)>();
+
+        foreach (var occ in _occupiedPositions)
+            frontier.Enqueue((occ, 0));
+
+        while (frontier.Count > 0)
+        {
+            var (pos, depth) = frontier.Dequeue();
+            if (depth >= ADJACENCY_REACH) continue;
+
+            TryExpandBFS(pos + new Vector2Int(-1, 0), reachable, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 1, 0), reachable, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 0,-1), reachable, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 0, 1), reachable, frontier, depth);
+        }
+
+        foreach (var sq in squares)
+        {
+            if (sq.isOccupied) continue;
+            sq.isPlaceable = reachable.Contains(new Vector2Int(sq.col, sq.row));
+        }
+    }
+
+    private void TryExpandBFS(Vector2Int n,
+        HashSet<Vector2Int> reachable,
+        Queue<(Vector2Int, int)> frontier,
+        int depth)
+    {
+        if (_occupiedPositions.Contains(n)) return;
+        if (!_cellZones.ContainsKey(n)) return;
+        if (reachable.Add(n))
+            frontier.Enqueue((n, depth + 1));
+    }
+
+    /// <summary>존별 점유 셀 수를 반환한다. key = zone_id 문자열.</summary>
+    public Dictionary<string, int> GetZoneOccupiedCounts()
+    {
+        var counts = new Dictionary<string, int>();
+        foreach (var pos in _occupiedPositions)
+        {
+            if (!_cellZones.TryGetValue(pos, out var code)) continue;
+            string zoneId = ZoneCharToId(code);
+            if (zoneId == null) continue;
+            counts.TryGetValue(zoneId, out int cur);
+            counts[zoneId] = cur + 1;
+        }
+        return counts;
+    }
+
+    /// <summary>zone_id 기준으로 점유된 셀 수를 반환한다.</summary>
+    public int CountOccupiedByZone(string zoneId)
+    {
+        if (string.IsNullOrEmpty(zoneId)) return 0;
+        char code = ZoneIdToChar(zoneId);
+        int count = 0;
+        foreach (var pos in _occupiedPositions)
+            if (_cellZones.TryGetValue(pos, out var c) && c == code) count++;
+        return count;
+    }
+
+    /// <summary>전체 존별 셀 총 개수 (그리드 데이터 기준).</summary>
+    public Dictionary<string, int> GetZoneTotalCounts()
+    {
+        var totals = new Dictionary<string, int>();
+        foreach (var kvp in _cellZones)
+        {
+            string zoneId = ZoneCharToId(kvp.Value);
+            if (zoneId == null) continue;
+            totals.TryGetValue(zoneId, out int cur);
+            totals[zoneId] = cur + 1;
+        }
+        return totals;
     }
 
     /// <summary>
@@ -184,10 +298,13 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         TriggerPlacementEffectAsync(squares, this.GetCancellationTokenOnDestroy()).Forget();
     }
 
-    /// <summary>GridManager 의 GridSquare.isOccupied 를 읽어 셀 표시 상태를 갱신한다.</summary>
+    /// <summary>GridSquare.isOccupied 를 읽어 셀 표시 상태를 갱신한다.
+    /// HexGrid 자체 squares를 우선 참조 (BoardManager 전환 후 GridManager.grid가 다를 수 있음).</summary>
     public void RefreshOccupiedCells()
     {
-        var gridSquares = GridManager.Instance?.grid?.GetGridSquares();
+        // HexGrid 직접 참조 우선 — GridManager.Instance?.grid가 다른 그리드를 가리킬 수 있어 fallback
+        var gridSquares = HexGrid?.GetGridSquares()
+                         ?? GridManager.Instance?.grid?.GetGridSquares();
         if (gridSquares == null) { RefreshPlacedCells(null); return; }
 
         var occupied = new HashSet<Vector2Int>();
@@ -196,6 +313,36 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
                 occupied.Add(new Vector2Int(sq.col, sq.row));
 
         RefreshPlacedCells(occupied);
+    }
+
+    /// <summary>
+    /// 지정 위치를 _occupiedPositions에서 직접 제거하고 시각·Bridge를 갱신한다.
+    /// HandleItemRemoved 에서 캐시된 위치로 호출해 GridManager 의존 없이 즉시 반영.
+    /// </summary>
+    public void RemovePlacedCells(Vector2Int[] positions)
+    {
+        if (positions == null) return;
+        foreach (var pos in positions)
+        {
+            _occupiedPositions.Remove(pos);
+            if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
+                img.color = EmptyColor(bc);
+        }
+        var zoneCounts   = GetZoneOccupiedCounts();
+        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+    }
+
+    /// <summary>모든 배치 셀을 초기화한다. DoReset 에서 호출.</summary>
+    public void ClearAllPlacedCells()
+    {
+        foreach (var pos in _occupiedPositions)
+            if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
+                img.color = EmptyColor(bc);
+        _occupiedPositions.Clear();
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(
+            new Dictionary<string, int>(),
+            new Dictionary<string, int>());
     }
 
     // ── Private methods ──
@@ -240,6 +387,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellImages[gridPos]      = img;
         _cellFlashImages[gridPos] = flashImg;
         _cellBaseColors[gridPos]  = zoneColor;
+        _cellZones[gridPos]       = zoneCode;
     }
 
     private void CreateGridSquare(Vector2Int gridPos, float posX, float posY,
@@ -272,6 +420,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
     private void ClearGrid()
     {
+        _isBuilt = false;
         foreach (var go in _cellObjects)
             if (go != null) Destroy(go);
         _cellObjects.Clear();
@@ -279,6 +428,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellFlashImages.Clear();
         _cellBaseColors.Clear();
         _occupiedPositions.Clear();
+        _cellZones.Clear();
 
         if (_gridSquaresRoot != null)
         {
@@ -299,6 +449,30 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
     }
 
+    private static char ZoneIdToChar(string zoneId) => zoneId switch
+    {
+        "ATK"    => 'A',
+        "DEF"    => 'D',
+        "HP"     => 'H',
+        "SPD"    => 'S',
+        "MAG"    => 'M',
+        "LUCK"   => 'L',
+        "CENTER" => '+',
+        _        => '\0',
+    };
+
+    private static string ZoneCharToId(char code) => code switch
+    {
+        'A' => "ATK",
+        'D' => "DEF",
+        'H' => "HP",
+        'S' => "SPD",
+        'M' => "MAG",
+        'L' => "LUCK",
+        '+' => "CENTER",
+        _   => null,
+    };
+
     private static Color GetZoneColor(char code) => code switch
     {
         'A' => COLOR_ATK,
@@ -317,7 +491,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
     // 비어 있음: 어둡고 반투명
     private static Color EmptyColor(Color c) =>
-        new(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, 0.35f);
+        new(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, 0.55f);
 
     // 드래그 호버: 존 색상 그대로, 기본 알파
     private static Color NormalColor(Color c) =>
@@ -329,7 +503,20 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         foreach (var sq in squares)
             if (sq != null) positions.Add(new Vector2Int(sq.col, sq.row));
 
-        // 점유 색상 즉시 적용
+        // 점유 업데이트 전 — 기존 점유 셀 중 새 블록과 인접한 셀 수집 (연결 연출 대상)
+        var posSet       = new HashSet<Vector2Int>(positions);
+        var connSet      = new HashSet<Vector2Int>();
+        foreach (var pos in positions)
+        {
+            CollectConnectedNeighbor(pos + new Vector2Int(-1, 0), posSet, connSet);
+            CollectConnectedNeighbor(pos + new Vector2Int( 1, 0), posSet, connSet);
+            CollectConnectedNeighbor(pos + new Vector2Int( 0,-1), posSet, connSet);
+            CollectConnectedNeighbor(pos + new Vector2Int( 0, 1), posSet, connSet);
+        }
+        var connNeighbors = new List<Vector2Int>(connSet);
+        bool hasConn      = connNeighbors.Count > 0;
+
+        // 점유 색상 즉시 적용 + _occupiedPositions 업데이트
         foreach (var pos in positions)
         {
             _occupiedPositions.Add(pos);
@@ -337,34 +524,64 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
                 img.color = OccupiedColor(bc);
         }
 
-        // 흰색 플래시: 0 → 0.6 (30%) → 0 (100%) over 420ms
-        const int   STEPS    = 18;
-        const float TOTAL_MS = 420f;
-        const float RAMP_T   = 0.3f;
-        const float PEAK_A   = 0.6f;
+        // Bridge에 클러스터 업데이트 알림 (시너지 패널 즉시 갱신)
+        var zoneCounts   = GetZoneOccupiedCounts();
+        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+
+        // ── 애니메이션 ───────────────────────────────────────────────────
+        // 신규 셀: 흰색 플래시  0→0.6(30%)→0 (420ms)
+        // 연결 이웃: 시안 펄스  15% 지연 시작, 더 부드럽게 소멸
+        const int   STEPS    = 20;
+        const float TOTAL_MS = 480f;
+        const float RAMP_T   = 0.28f;
+        const float PEAK_A   = 0.65f;
+        const float CONN_A   = 0.50f;
+        const float CONN_DELAY = 0.12f; // 연결 펄스 시작 지연 비율
 
         for (int i = 0; i <= STEPS; i++)
         {
             float t = i / (float)STEPS;
+
+            // 신규 셀: 흰색 플래시
             float a = t < RAMP_T
                 ? (t / RAMP_T) * PEAK_A
                 : (1f - (t - RAMP_T) / (1f - RAMP_T)) * PEAK_A;
-
             foreach (var pos in positions)
                 if (_cellFlashImages.TryGetValue(pos, out var flash))
                     flash.color = new Color(1f, 1f, 1f, a);
 
-            try
+            // 연결 이웃: 시안 펄스 (약간 지연)
+            if (hasConn)
             {
-                await UniTask.Delay((int)(TOTAL_MS / STEPS),
-                    ignoreTimeScale: true, cancellationToken: ct);
+                float ct2 = Mathf.Max(0f, (t - CONN_DELAY) / (1f - CONN_DELAY));
+                float ca  = ct2 < RAMP_T
+                    ? (ct2 / RAMP_T) * CONN_A
+                    : (1f - (ct2 - RAMP_T) / (1f - RAMP_T)) * CONN_A;
+                var connColor = new Color(0.35f, 0.90f, 1.00f, ca);
+                foreach (var pos in connNeighbors)
+                    if (_cellFlashImages.TryGetValue(pos, out var flash))
+                        flash.color = connColor;
             }
+
+            try { await UniTask.Delay((int)(TOTAL_MS / STEPS), ignoreTimeScale: true, cancellationToken: ct); }
             catch (System.OperationCanceledException) { return; }
         }
 
         foreach (var pos in positions)
             if (_cellFlashImages.TryGetValue(pos, out var flash))
                 flash.color = new Color(1f, 1f, 1f, 0f);
+        if (hasConn)
+            foreach (var pos in connNeighbors)
+                if (_cellFlashImages.TryGetValue(pos, out var flash))
+                    flash.color = new Color(0.35f, 0.90f, 1.00f, 0f);
+    }
+
+    private void CollectConnectedNeighbor(Vector2Int n,
+        HashSet<Vector2Int> newPosSet, HashSet<Vector2Int> result)
+    {
+        if (!newPosSet.Contains(n) && _occupiedPositions.Contains(n))
+            result.Add(n);
     }
 
     private void OnDestroy() => ClearGrid();

@@ -20,6 +20,8 @@ public static class PatternGuideHelper
     public static readonly Color Telegraph = new Color(1.00f, 0.85f, 0.00f); // 노란색
     public static readonly Color Active    = new Color(1.00f, 0.10f, 0.10f); // 빨간색
     public static readonly Color Summon    = new Color(0.55f, 0.00f, 1.00f); // 보라색
+    public static readonly Color Safe      = new Color(0.00f, 1.00f, 0.40f); // 초록색 — 안전지대
+    public static readonly Color Seal      = new Color(0.00f, 0.50f, 1.00f); // 파란색 — 봉인 해골 마커
 
     // ── 스폰 메서드 ────────────────────────────────────────────────
 

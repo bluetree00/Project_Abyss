@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
@@ -53,6 +54,12 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     private Transform  _effectContent;
     private readonly List<GameObject> _effectRows = new();
 
+    // ── Chip Tooltip ──────────────────────────────────────────────
+    private GameObject _chipTooltip;
+    private TMP_Text   _chipTooltipBadge;
+    private TMP_Text   _chipTooltipBody;
+    private Image      _chipAccentBar;
+
     private PlayerRuntimeStats _stats;
     private GameRunSession     _run;
 
@@ -80,7 +87,10 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     {
         if (_stats != null) _stats.OnChanged += OnStatsChanged;
         if (MerlinRuneBridge.Instance != null)
+        {
             MerlinRuneBridge.Instance.OnSynergyActivated += OnSynergyActivated;
+            MerlinRuneBridge.Instance.OnSynergiesUpdated += OnEffectsChanged;
+        }
         if (_run?.CovenantHandler != null)
             _run.CovenantHandler.OnCovenantListChanged += OnEffectsChanged;
     }
@@ -89,7 +99,10 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
     {
         if (_stats != null) _stats.OnChanged -= OnStatsChanged;
         if (MerlinRuneBridge.Instance != null)
+        {
             MerlinRuneBridge.Instance.OnSynergyActivated -= OnSynergyActivated;
+            MerlinRuneBridge.Instance.OnSynergiesUpdated -= OnEffectsChanged;
+        }
         if (_run?.CovenantHandler != null)
             _run.CovenantHandler.OnCovenantListChanged -= OnEffectsChanged;
     }
@@ -144,6 +157,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         BuildStatsGrid(ct);
         MakeDivider(ct, 0.390f);
         BuildEffectsSection(ct);
+        BuildChipTooltip();
     }
 
     // ── Header (초상화 + 이름) ──────────────────────────────────
@@ -411,31 +425,39 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
         bool any = false;
 
-        var synList = _run?.AppliedSynergies;
-        if (synList != null)
+        // 현재 cluster 크기 기반으로 활성 시너지만 표시 (제거 시 실시간 반영)
+        var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
+        if (clusterSizes != null && Managers.RuneData != null)
         {
-            foreach (var s in synList)
+            var zoneOrder = new[] { "ATK", "DEF", "MAG", "HP", "SPD", "LUCK" };
+            foreach (var zoneId in zoneOrder)
             {
-                Color accent = s.trigger switch
+                if (!clusterSizes.TryGetValue(zoneId, out int cluster) || cluster <= 0) continue;
+
+                var entries = Managers.RuneData.GetZoneSynergies(zoneId);
+                if (entries == null) continue;
+
+                var sorted = new List<RuneSynergyEntry>(entries);
+                sorted.Sort((a, b) => a.threshold.CompareTo(b.threshold));
+
+                foreach (var e in sorted)
                 {
-                    "Always"  => C_SYN_ALWAYS,
-                    "OnHit"   => C_SYN_ONHIT,
-                    "OnLowHp" => C_SYN_LOWERHP,
-                    _         => C_SYN_ALWAYS,
-                };
-                string badge = s.trigger switch
-                {
-                    "Always"  => "항상",
-                    "OnHit"   => "피격시",
-                    "OnKill"  => "처치시",
-                    "OnLowHp" => "체력↓",
-                    "OnUse"   => "사용시",
-                    _         => s.trigger,
-                };
-                float pct = s.value * 100f;
-                string body = $"{s.effectType}  {(pct >= 0 ? "+" : "")}{pct:F0}%";
-                _effectRows.Add(MakeChip(body, badge, accent));
-                any = true;
+                    if (cluster < e.threshold) break;
+                    Color accent = GetZoneAccent(zoneId);
+                    string badge = e.trigger switch
+                    {
+                        "Always"  => "항상",
+                        "OnHit"   => "피격시",
+                        "OnKill"  => "처치시",
+                        "OnLowHp" => "체력↓",
+                        "OnUse"   => "사용시",
+                        _         => e.trigger,
+                    };
+                    float pct  = e.value * 100f;
+                    string body = $"{e.effect_type}  {(pct >= 0 ? "+" : "")}{pct:F0}%";
+                    _effectRows.Add(MakeChip(body, badge, accent));
+                    any = true;
+                }
             }
         }
 
@@ -463,15 +485,136 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             _effectScroll.verticalNormalizedPosition = 1f;
     }
 
+    // ── Chip Tooltip ──────────────────────────────────────────────
+
+    private void BuildChipTooltip()
+    {
+        // UI_GridPanel 루트 하위에 생성 → 모든 패널 위에 렌더링
+        Transform tooltipParent = UI_GridPanel.Instance != null
+            ? UI_GridPanel.Instance.transform
+            : transform;
+
+        _chipTooltip = Go("ChipTooltip");
+        _chipTooltip.transform.SetParent(tooltipParent, false);
+
+        var rt = _chipTooltip.GetComponent<RectTransform>();
+        // anchorMin=anchorMax=(0.5, 0.5) → anchoredPosition = UI_GridPanel 중앙 기준 픽셀 오프셋
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(320f, 120f);
+
+        // 그림자 레이어 (뒤쪽에 약간 크게)
+        var shadowGO = Go("Shadow");
+        shadowGO.transform.SetParent(_chipTooltip.transform, false);
+        var shadowRT = shadowGO.GetComponent<RectTransform>();
+        shadowRT.anchorMin = Vector2.zero;
+        shadowRT.anchorMax = Vector2.one;
+        shadowRT.offsetMin = new Vector2(-4f, -4f);
+        shadowRT.offsetMax = new Vector2(4f, 4f);
+        shadowGO.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.60f);
+
+        // 메인 배경
+        var bg = _chipTooltip.AddComponent<Image>();
+        bg.color = new Color(0.13f, 0.16f, 0.27f, 0.98f);
+
+        // 테두리 (두껍고 밝게)
+        var ol = _chipTooltip.AddComponent<Outline>();
+        ol.effectColor    = new Color(0.45f, 0.70f, 1.00f, 0.90f);
+        ol.effectDistance = new Vector2(2f, -2f);
+
+        // 상단 accent 컬러 스트립 (존 색상으로 동적 변경)
+        var accentBarGO = Go("AccentBar");
+        accentBarGO.transform.SetParent(_chipTooltip.transform, false);
+        var accentBarRT = accentBarGO.GetComponent<RectTransform>();
+        accentBarRT.anchorMin        = new Vector2(0f, 1f);
+        accentBarRT.anchorMax        = Vector2.one;
+        accentBarRT.pivot            = new Vector2(0.5f, 1f);
+        accentBarRT.sizeDelta        = new Vector2(0f, 5f);
+        accentBarRT.anchoredPosition = Vector2.zero;
+        _chipAccentBar = accentBarGO.AddComponent<Image>();
+        _chipAccentBar.raycastTarget = false;
+
+        // 배지 (상단 절반)
+        _chipTooltipBadge = Txt(_chipTooltip.transform, "Badge", "", 13f,
+            new Color(0.80f, 0.92f, 1f, 1f), bold: true);
+        var brt = _chipTooltipBadge.GetComponent<RectTransform>();
+        brt.anchorMin = new Vector2(0f, 0.52f);
+        brt.anchorMax = Vector2.one;
+        brt.offsetMin = new Vector2(12f, 0f);
+        brt.offsetMax = new Vector2(-12f, -6f);
+        _chipTooltipBadge.alignment     = TextAlignmentOptions.MidlineLeft;
+        _chipTooltipBadge.raycastTarget = false;
+
+        // 구분선
+        var divGO = Go("Divider");
+        divGO.transform.SetParent(_chipTooltip.transform, false);
+        var divRT = divGO.GetComponent<RectTransform>();
+        divRT.anchorMin = new Vector2(0.03f, 0.50f);
+        divRT.anchorMax = new Vector2(0.97f, 0.52f);
+        divRT.offsetMin = divRT.offsetMax = Vector2.zero;
+        divGO.AddComponent<Image>().color = new Color(0.35f, 0.48f, 0.75f, 0.50f);
+
+        // 본문 텍스트 (하단 절반)
+        _chipTooltipBody = Txt(_chipTooltip.transform, "Body", "", 15f,
+            new Color(0.96f, 0.98f, 1f, 1f));
+        var trt = _chipTooltipBody.GetComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = new Vector2(1f, 0.50f);
+        trt.offsetMin = new Vector2(12f, 6f);
+        trt.offsetMax = new Vector2(-12f, 0f);
+        _chipTooltipBody.alignment         = TextAlignmentOptions.MidlineLeft;
+        _chipTooltipBody.enableWordWrapping = true;
+        _chipTooltipBody.raycastTarget      = false;
+
+        _chipTooltip.SetActive(false);
+    }
+
+    private void ShowChipTooltip(string badge, string body, Color accent, RectTransform chipRT)
+    {
+        if (_chipTooltip == null) return;
+
+        // UI_GridPanel 루트에 붙어있지 않으면 이동 (z-order 보장)
+        var rootPanel = UI_GridPanel.Instance;
+        if (rootPanel != null && _chipTooltip.transform.parent != rootPanel.transform)
+            _chipTooltip.transform.SetParent(rootPanel.transform, false);
+
+        var rt = _chipTooltip.GetComponent<RectTransform>();
+
+        // 칩 우측 중앙 월드 좌표 → UI_GridPanel 로컬 좌표 (anchorMin=anchorMax=0.5 기준)
+        Vector3 chipWorldRight = chipRT.TransformPoint(
+            new Vector2(chipRT.rect.xMax, chipRT.rect.center.y));
+        var panelRT = rootPanel != null
+            ? rootPanel.GetComponent<RectTransform>()
+            : GetComponent<RectTransform>();
+        Vector2 localPos = panelRT.InverseTransformPoint(chipWorldRight);
+        rt.anchoredPosition = new Vector2(localPos.x + 8f, localPos.y);
+
+        if (_chipTooltipBadge != null)
+        {
+            _chipTooltipBadge.text  = badge;
+            _chipTooltipBadge.color = accent;
+        }
+        if (_chipTooltipBody != null)
+            _chipTooltipBody.text = body;
+        if (_chipAccentBar != null)
+            _chipAccentBar.color = new Color(accent.r, accent.g, accent.b, 0.85f);
+
+        _chipTooltip.SetActive(true);
+        _chipTooltip.transform.SetAsLastSibling();
+    }
+
+    private void HideChipTooltip() => _chipTooltip?.SetActive(false);
+
     // ── Chip Builders ─────────────────────────────────────────────
 
     private GameObject MakeChip(string body, string badge, Color accent)
     {
         var go = Go("Chip");
         go.transform.SetParent(_effectContent, false);
-        go.AddComponent<LayoutElement>().preferredHeight = 30f;
+        go.AddComponent<LayoutElement>().preferredHeight = 38f;
         go.AddComponent<Image>().color = new Color(
-            accent.r * 0.12f, accent.g * 0.12f, accent.b * 0.12f, 0.80f);
+            accent.r * 0.14f, accent.g * 0.14f, accent.b * 0.14f, 0.88f);
 
         // 좌측 악센트 스트립
         var strip = Go("Strip");
@@ -502,7 +645,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         blrt.offsetMin = blrt.offsetMax = Vector2.zero;
         var badgeTxt = badgeLblGO.AddComponent<TextMeshProUGUI>();
         badgeTxt.text          = badge;
-        badgeTxt.fontSize      = 8.5f;
+        badgeTxt.fontSize      = 10f;
         badgeTxt.color         = accent;
         badgeTxt.alignment     = TextAlignmentOptions.Center;
         badgeTxt.raycastTarget = false;
@@ -514,7 +657,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             new Vector2(0.08f, 0f), new Vector2(0.72f, 1f));
         var bodyTxt = bodyGO.AddComponent<TextMeshProUGUI>();
         bodyTxt.text = body;
-        bodyTxt.fontSize = 9.5f;
+        bodyTxt.fontSize = 11.5f;
         bodyTxt.color = new Color(
             Mathf.Clamp01(accent.r * 0.65f + 0.35f),
             Mathf.Clamp01(accent.g * 0.65f + 0.35f),
@@ -522,6 +665,20 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         bodyTxt.alignment          = TextAlignmentOptions.MidlineLeft;
         bodyTxt.raycastTarget      = false;
         bodyTxt.enableWordWrapping = false;
+
+        // 마우스 호버 → 툴팁 표시
+        var et = go.AddComponent<EventTrigger>();
+        var chipRT = go.GetComponent<RectTransform>();
+        string cb = badge, cy = body;
+        Color ca = accent;
+
+        var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enter.callback.AddListener(_ => ShowChipTooltip(cb, cy, ca, chipRT));
+        et.triggers.Add(enter);
+
+        var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exit.callback.AddListener(_ => HideChipTooltip());
+        et.triggers.Add(exit);
 
         return go;
     }
@@ -561,6 +718,17 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         t.raycastTarget = false;
         return t;
     }
+
+    private static Color GetZoneAccent(string zoneId) => zoneId switch
+    {
+        "ATK"  => new Color(1.00f, 0.50f, 0.20f, 1f),
+        "DEF"  => new Color(0.30f, 0.65f, 1.00f, 1f),
+        "MAG"  => new Color(0.70f, 0.30f, 1.00f, 1f),
+        "HP"   => new Color(0.30f, 0.85f, 0.45f, 1f),
+        "SPD"  => new Color(1.00f, 0.85f, 0.20f, 1f),
+        "LUCK" => new Color(1.00f, 0.75f, 0.20f, 1f),
+        _      => new Color(0.60f, 0.70f, 0.90f, 1f),
+    };
 
     private static GameObject Go(string name) => new(name, typeof(RectTransform));
 

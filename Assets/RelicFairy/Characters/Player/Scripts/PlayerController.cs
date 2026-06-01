@@ -62,7 +62,7 @@ public class PlayerController : CharacterBase
     [Header("Combat Tuning")]
     [Tooltip("모든 공격 애니메이션 속도에 곱해지는 전역 배율. 레벨 디자인용 (기본값 1.0).")]
     [Range(0.1f, 3f)]
-    [SerializeField] private float _globalAttackAnimSpeedScale = 1f;
+    [SerializeField] private float _globalAttackAnimSpeedScale = 1.25f;
     public float GlobalAttackAnimSpeedScale => _globalAttackAnimSpeedScale;
 
     [Header("Character & Weapon")]
@@ -151,6 +151,17 @@ public class PlayerController : CharacterBase
 
     /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
     public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+
+    /// <summary>
+    /// 플레이어 입력 전체를 활성/비활성화한다.
+    /// 보스 등장 연출 등 컷씬 구간에서 false로 호출해 행동을 막는다.
+    /// </summary>
+    public void SetInputEnabled(bool enabled)
+    {
+        if (inputActions == null) return;
+        if (enabled) inputActions.Player.Enable();
+        else         inputActions.Player.Disable();
+    }
 
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
@@ -427,6 +438,10 @@ public class PlayerController : CharacterBase
         JumpAbility?.UpdateGroundCheck(this);
         JumpAbility?.ApplyGravity(this);
         FreezeRotation();
+
+        // 계단 오르기: FixedUpdate에서 실행해야 물리 충돌 전 위치 보정이 적용됨
+        if (IsGrounded() && moveDirection.sqrMagnitude > 0.01f)
+            MoveAbility?.StepClimb(this, moveDirection.normalized);
     }
 
     private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
@@ -537,6 +552,9 @@ public class PlayerController : CharacterBase
         if (Rigid != null)
         {
             Rigid.useGravity = false;
+            // 공격 lunge 등 MovePosition 호출 시 시각적 보간을 위해 Interpolate 강제
+            if (Rigid.interpolation == RigidbodyInterpolation.None)
+                Rigid.interpolation = RigidbodyInterpolation.Interpolate;
             if (characterData != null)
                 Rigid.linearDamping = characterData.groundDrag;
         }
@@ -564,15 +582,45 @@ public class PlayerController : CharacterBase
         var passives = mgr.GetPassives(entry.passive_id);
         RuntimeStats.InitializeFromServer(entry, passives);
 
-        // SO도 여전히 로드해둠 (이동속도, 점프 등 SO 전용 값 필요)
-        if (preloaded != null)
+        // SO 의 LayerMask/Sprite/Passive 참조는 유지하되 수치 컬럼은 CSV(서버) 로 덮어쓴다.
+        // 원본 .asset 을 변경하지 않도록 Instantiate 로 런타임 클론을 만든 뒤 적용.
+        var source = preloaded ?? characterData;
+        if (source != null)
         {
-            characterData = preloaded;
+            var clone = ScriptableObject.Instantiate(source);
+            clone.name = source.name + " (Runtime)";
+            ApplyServerOverridesTo(clone, entry);
+            characterData = clone;
             characterData.Initialize();
         }
 
-        Debug.Log($"[PlayerController] 서버 데이터 사용: {entry.char_id} (HP:{entry.max_health}, Melee:{entry.base_melee_attack})");
+        Debug.Log($"[PlayerController] 서버 데이터 사용: {entry.char_id} (HP:{entry.max_health}, Melee:{entry.base_melee_attack}, MoveSpd:{entry.base_move_speed})");
         return true;
+    }
+
+    /// <summary>CSV(PlayerStatEntry) 값을 CharacterData 클론에 덮어씀. LayerMask/Sprite/SO 참조는 건드리지 않는다.</summary>
+    private static void ApplyServerOverridesTo(CharacterData data, PlayerStatEntry e)
+    {
+        data.maxHealth                  = e.max_health;
+        data.baseMeleeAttack            = e.base_melee_attack;
+        data.baseRangedAttack           = e.base_ranged_attack;
+        data.baseDefense                = e.base_defense;
+        data.baseLuck                   = e.base_luck;
+        data.baseMoveSpeed              = e.base_move_speed;
+        data.baseRunSpeed               = e.base_run_speed;
+        data.comboDuration              = e.combo_duration;
+        data.heavyAttackChargeThreshold = e.heavy_charge_threshold;
+        data.heavyAttackReleaseTime     = e.heavy_release_time;
+        data.dashSpeed                  = e.dash_speed;
+        data.dashDuration               = e.dash_duration;
+        data.dodgeCooldown              = e.dodge_cooldown;
+        data.jumpForce                  = e.jump_force;
+        data.gravity                    = e.gravity;
+        data.fallMultiplier             = e.fall_multiplier;
+        data.groundCheckDistance        = e.ground_check_distance;
+        data.airControlMultiplier       = e.air_control_multiplier;
+        data.groundDrag                 = e.ground_drag;
+        data.airDrag                    = e.air_drag;
     }
 
     private async UniTask LoadCharacterDataAsync(string characterName)
@@ -1026,29 +1074,133 @@ public class PlayerController : CharacterBase
 
     public void RotateTowardsMousePosition()
     {
+        if (TryComputeMouseLookDir(out var lookDir))
+            transform.rotation = Quaternion.LookRotation(lookDir);
+    }
+
+    /// <summary>
+    /// 마우스 방향을 기준으로 회전하되, 지정 콘 안에 IDamageable 적이 있으면 그 쪽으로 살짝 보정한다.
+    /// 공격 시작/콤보 단계 시작 시 1회만 호출 (매 프레임 호출 시 aimbot 느낌).
+    /// </summary>
+    /// <param name="radius">적 탐색 거리(m)</param>
+    /// <param name="coneHalfAngleDeg">마우스 방향 콘 반각(도)</param>
+    /// <param name="strength">마우스 → 적 방향 블렌드 비율 (0=마우스, 1=적)</param>
+    public void RotateTowardsMouseWithAimAssist(float radius, float coneHalfAngleDeg, float strength)
+    {
+        Quaternion target = ComputeMouseAimAssistRotation(radius, coneHalfAngleDeg, strength);
+        transform.rotation = target;
+    }
+
+    /// <summary>
+    /// 마우스 + 에임 어시스트 적용 후의 최종 목표 회전을 "계산만" 해서 반환한다.
+    /// 호출자에서 즉시 적용하거나 lerp 시작점으로 사용. 적용은 하지 않음.
+    /// </summary>
+    public Quaternion ComputeMouseAimAssistRotation(float radius, float coneHalfAngleDeg, float strength)
+    {
+        if (!TryComputeMouseLookDir(out var mouseDir))
+            return transform.rotation;
+
+        // 보정 비활성 케이스: 마우스 방향 그대로
+        if (radius <= 0f || coneHalfAngleDeg <= 0f || strength <= 0f)
+            return Quaternion.LookRotation(mouseDir);
+
+        // 콘 안 가장 작은 각도의 적 탐색
+        Vector3 origin = transform.position;
+        float cosThreshold = Mathf.Cos(coneHalfAngleDeg * Mathf.Deg2Rad);
+        float bestDot = cosThreshold;
+        Vector3 bestDir = mouseDir;
+        bool found = false;
+
+        var cols = Physics.OverlapSphere(origin, radius);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            var col = cols[i];
+            if (col == null) continue;
+            if (col.transform == transform || col.transform.IsChildOf(transform)) continue;
+
+            var d = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>();
+            if (d == null) continue;
+
+            Vector3 toEnemy = ((d as Component).transform.position) - origin;
+            toEnemy.y = 0f;
+            float sqr = toEnemy.sqrMagnitude;
+            if (sqr < 0.01f) continue;
+
+            Vector3 enemyDir = toEnemy / Mathf.Sqrt(sqr);
+            float dot = Vector3.Dot(mouseDir, enemyDir);
+            if (dot >= bestDot)
+            {
+                bestDot = dot;
+                bestDir = enemyDir;
+                found = true;
+            }
+        }
+
+        Vector3 finalDir = found
+            ? Vector3.Slerp(mouseDir, bestDir, Mathf.Clamp01(strength))
+            : mouseDir;
+
+        return finalDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(finalDir)
+            : transform.rotation;
+    }
+
+    /// <summary>
+    /// 마우스 / 마지막 클릭 위치에서 수평 방향 벡터를 계산. 실패 시 false.
+    /// 1) _lastClickedPosition (입력 시 캐시된 클릭 월드 좌표)
+    /// 2) Ground 레이어 콜라이더 레이캐스트
+    /// 3) 플레이어 Y 높이의 수학적 수평 평면에 레이 투영 (콜라이더 미스 시 폴백)
+    /// </summary>
+    private bool TryComputeMouseLookDir(out Vector3 lookDir)
+    {
         // 1) 입력으로 저장된 클릭 위치 우선 사용
         if (_lastClickedPosition.HasValue)
         {
             Vector3 target = _lastClickedPosition.Value;
-            Vector3 lookDir = target - transform.position;
+            lookDir = target - transform.position;
             lookDir.y = 0f;
-
-            if (lookDir.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.LookRotation(lookDir);
-
             _lastClickedPosition = null;
-            return;
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                lookDir.Normalize();
+                return true;
+            }
         }
 
-        // 2) fallback: 마우스 기반 레이캐스트
-        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-        if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+        // 2/3) 마우스 → 카메라 레이 → Ground 콜라이더 우선, 미스 시 수평 평면 폴백
+        if (Camera.main != null && Mouse.current != null)
         {
-            Vector3 lookDir = hit.point - transform.position;
-            lookDir.y = 0f;
-            if (lookDir.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.LookRotation(lookDir);
+            Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+
+            // 2) Ground 콜라이더 히트
+            if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+            {
+                lookDir = hit.point - transform.position;
+                lookDir.y = 0f;
+                if (lookDir.sqrMagnitude > 0.01f)
+                {
+                    lookDir.Normalize();
+                    return true;
+                }
+            }
+
+            // 3) 플레이어 Y 높이의 수평 평면에 레이 투영 — Ground 콜라이더 누락/미스 대비
+            var plane = new Plane(Vector3.up, transform.position);
+            if (plane.Raycast(ray, out float enter))
+            {
+                Vector3 point = ray.GetPoint(enter);
+                lookDir = point - transform.position;
+                lookDir.y = 0f;
+                if (lookDir.sqrMagnitude > 0.01f)
+                {
+                    lookDir.Normalize();
+                    return true;
+                }
+            }
         }
+
+        lookDir = Vector3.zero;
+        return false;
     }
 
     //============================================================

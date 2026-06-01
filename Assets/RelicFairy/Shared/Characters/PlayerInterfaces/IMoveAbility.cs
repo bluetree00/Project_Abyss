@@ -4,5 +4,6 @@ using UnityEngine;
 
 public interface IMoveAbility<T> where T : PlayerController
 {
-    void Move(T CharacterBase, Vector3 direction);
+    void Move(T owner, Vector3 direction);
+    void StepClimb(T owner, Vector3 moveDir);
 }

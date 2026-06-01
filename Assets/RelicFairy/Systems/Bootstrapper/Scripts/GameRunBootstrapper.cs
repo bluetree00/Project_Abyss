@@ -73,6 +73,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField, Tooltip("블록 배치 Y 오프셋. 바닥 블록 scale.y=0.2(반높이 0.1)이면 -0.1. 프리팹 피봇이 바닥이면 0.")]
     private float blockBaseY = -0.1f;
 
+    [SerializeField, Tooltip("벽 높이 배율. 1=기본(1블록), 12=12배 높이(약 12m). 천장도 이 값에 맞춰 자동 배치.")]
+    private int wallLayers = 12;
+
+
     [Header("Shop Room")]
     [SerializeField, Min(0)] private int shopSlotCount = 3;
 
@@ -401,12 +405,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTask SpawnWorldMapAsync(System.Threading.CancellationToken ct)
     {
         // 존 레이아웃 키 결정: 서버 데이터 → SO 폴백
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
 
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
@@ -414,9 +418,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 존 레이아웃 데이터 로드
+        // 존 레이아웃 데이터 로드 (절차적: slot+pool / 고정: 단일 CSV)
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);
@@ -462,7 +472,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             zoneGO.transform.SetParent(root, false);
             zoneGO.transform.position = worldCenter;
 
-            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY);
+            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, null, wallLayers);
+            MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
             spawned++;
 
             // 4존마다 프레임 분산 (26존 연속 생성 시 히칭 방지)
@@ -480,11 +492,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct)
     {
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
             Debug.LogError("[GameRunBootstrapper] zone_layout_key 없음 — Zone 0 스폰 불가");
@@ -492,7 +505,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);
@@ -594,7 +613,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var zoneGO = new GameObject($"Zone_{zone.zone_index:D2}_{zone.label}");
             zoneGO.transform.SetParent(root, false);
             zoneGO.transform.position = worldCenter;
-            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY);
+            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, null, wallLayers);
+            MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
             spawned++;
 
             // 첫 번째 존: 카메라 팬 + 디졸브 (동기 대기), 이후 존: 디졸브만 fire-and-forget
@@ -680,7 +701,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         zoneGO.transform.position = worldCenter;
 
         // 블록 빌드 (스포너 GO 없음 — MonsterSpawnHandler PreBuild가 담당)
-        var blocks = MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
+        var blocks = MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
 
         // 토큰 실행에 사용할 공유 컨텍스트
         var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
@@ -966,7 +989,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
         if (activePalette == null)
             activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
-        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
+        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        MapBuilder.BuildCeiling(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        if (activePalette != null) MapBuilder.BuildRoomLights(grid, mapGO.transform, blockCellSize, blockBaseY, wallLayers, activePalette.Lighting);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
         // 토큰 실행에 사용할 공유 컨텍스트 — PreBuild/PostBuild 양쪽에서 재사용
@@ -1680,9 +1705,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
             Debug.LogError("[GameRunBootstrapper] ContinueZoneLayoutRunAsync: zone_layout_key 없음");
@@ -1690,7 +1716,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);

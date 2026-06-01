@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: GalahadData
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: "\uAC08\uB77C\uD558\uB4DC"
-  baseMoveSpeed: 4
-  baseRunSpeed: 6
+  baseMoveSpeed: 8
+  baseRunSpeed: 8
   maxHealth: 350
   baseMeleeAttack: 20
   baseRangedAttack: 0
@@ -23,7 +23,7 @@ MonoBehaviour:
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
-  dashSpeed: 10
+  dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 1.5
   jumpForce: 8

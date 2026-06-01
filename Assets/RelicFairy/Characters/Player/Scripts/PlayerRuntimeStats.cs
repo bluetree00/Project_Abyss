@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using RelicFairy;
 
 [Serializable]
 public sealed class PlayerRuntimeStats
@@ -289,6 +290,12 @@ public sealed class PlayerRuntimeStats
     // -- Grid Synergy (조건부) --
     private float _synergyLifesteal;
     private readonly System.Collections.Generic.List<ConditionalSynergy> _conditionalSynergies = new();
+
+    // -- Synergy Mechanics (행동 역학 플래그) --
+    private readonly SynergyMechanicsState _synergyMechanics = new();
+
+    /// <summary>행동 역학 시너지 플래그. 전투·스킬·이동 시스템이 읽는다.</summary>
+    public SynergyMechanicsState SynergyMechanics => _synergyMechanics;
 
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
@@ -762,6 +769,75 @@ public sealed class PlayerRuntimeStats
         if (changed) Recalculate();
     }
 
+    /// <summary>시너지 행동 역학 플래그를 entry 기반으로 활성화한다.</summary>
+    public void ApplySynergyMechanicEffect(RuneSynergyEntry entry)
+    {
+        if (entry == null) return;
+        var m = _synergyMechanics;
+
+        switch (entry.effect_type)
+        {
+            case "ChargingStrike":
+                m.ChargingStrikeEnabled = true;
+                m.ChargingStrikePeriod = entry.value > 0 ? entry.value : 3f;
+                m.ChargingStrikeDamageMultiplier = entry.value2 > 0 ? entry.value2 : 2f;
+                m.ChargingStrikeCounter = 0;
+                break;
+            case "ShockwaveBurst":
+                m.ShockwaveBurstEnabled = true;
+                m.ShockwaveBurstStunDuration = entry.value > 0 ? entry.value : 0.5f;
+                m.ShockwaveBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
+                m.ShockwaveBurstRadius = entry.value3 > 0 ? entry.value3 : 60f;
+                break;
+            case "MagicEcho":
+                m.MagicEchoEnabled = true;
+                m.MagicEchoChargeCount = entry.value > 0 ? entry.value : 3f;
+                m.MagicEchoDamageBonus = entry.value2 > 0 ? entry.value2 : 0.3f;
+                break;
+            case "SkillEchoChain":
+                m.SkillEchoChainEnabled = true;
+                m.SkillEchoChainDamageMultiplier = entry.value2 > 0 ? entry.value2 : 0.5f;
+                m.SkillEchoChainRange = entry.value3 > 0 ? entry.value3 : 8f;
+                break;
+            case "ShieldAccumulate":
+                m.ShieldAccumulateEnabled = true;
+                m.ShieldAccumulateRate = entry.value > 0 ? entry.value : 0.2f;
+                m.ShieldCapRatio = 0.3f;
+                break;
+            case "ShieldBurst":
+                m.ShieldBurstEnabled = true;
+                m.ShieldBurstInvincibleDuration = entry.value > 0 ? entry.value : 0.5f;
+                m.ShieldBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
+                break;
+            case "DodgeOnMove":
+                m.DodgeOnMoveEnabled = true;
+                m.DodgeOnMoveBonus = entry.value > 0 ? entry.value : 0.1f;
+                break;
+            case "MoveAttackPenetrate":
+                m.MoveAttackPenetrateEnabled = true;
+                break;
+            case "LowHpDamageReduce":
+                m.LowHpDamageReduceEnabled = true;
+                m.LowHpThreshold = entry.value > 0 ? entry.value : 0.5f;
+                m.LowHpDamageReduceMax = entry.value2 > 0 ? entry.value2 : 0.4f;
+                break;
+            case "DeathSave":
+                m.DeathSaveEnabled = true;
+                m.DeathSaveInvincibleDuration = entry.value > 0 ? entry.value : 1.5f;
+                m.DeathSaveHealRatio = entry.value2 > 0 ? entry.value2 : 0.3f;
+                break;
+            case "GambleDice":
+                m.GambleDiceEnabled = true;
+                m.GambleDiceDoubleChance = entry.value > 0 ? entry.value : 0.15f;
+                m.GambleDiceMissChance = entry.value3 > 0 ? entry.value3 : 0.15f;
+                break;
+            case "CritChain":
+                m.CritChainEnabled = true;
+                m.CritChainChance = entry.value > 0 ? entry.value : 0.5f;
+                break;
+        }
+    }
+
     /// <summary>모든 시너지 효과 초기화.</summary>
     public void ClearSynergyEffects()
     {
@@ -776,6 +852,7 @@ public sealed class PlayerRuntimeStats
         _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
         _synergyLifesteal = 0f;
         _conditionalSynergies.Clear();
+        _synergyMechanics.Reset();
 
         Recalculate();
     }

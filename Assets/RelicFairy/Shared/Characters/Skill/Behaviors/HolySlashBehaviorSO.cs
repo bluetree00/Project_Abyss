@@ -140,12 +140,29 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             ctx.SetMoveScale(1f);
             _hitTargets.Clear();
             _hitObjects.Clear();
+
+            // 대시 중 벽 충돌 등으로 누적된 angular/linear velocity 제거
+            if (ctx.Rigidbody != null)
+            {
+                ctx.Rigidbody.linearVelocity  = Vector3.zero;
+                ctx.Rigidbody.angularVelocity = Vector3.zero;
+            }
         }
 
         private void UpdateDash(SkillExecutionContext ctx)
         {
             float t = Mathf.Clamp01(_timer / _data.dashDuration);
-            ctx.PlayerTransform.position = Vector3.Lerp(_dashStart, _dashEnd, t);
+            // ease-out: 1 - (1-t)^2 — 초반 가속 / 후반 감속 (자연스러운 일섬 느낌)
+            float u = 1f - t;
+            float eased = 1f - u * u;
+            Vector3 targetPos = Vector3.Lerp(_dashStart, _dashEnd, eased);
+
+            // Rigidbody.MovePosition 으로 적용 — Rigid.interpolation=Interpolate 와 함께
+            // Cinemachine 카메라가 부드럽게 추적 (transform 직접 대입 시 보간 우회로 카메라 흔들림)
+            if (ctx.Rigidbody != null && !ctx.Rigidbody.isKinematic)
+                ctx.Rigidbody.MovePosition(targetPos);
+            else
+                ctx.PlayerTransform.position = targetPos;
 
             // 경로상 적 감지
             var colliders = Physics.OverlapSphere(ctx.PlayerTransform.position, _data.detectRadius);

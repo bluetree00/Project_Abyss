@@ -131,7 +131,7 @@ MoveSpeedMultiplier   = 1 + roomBuff + itemMoveSpeed
 |--------|------|----------|
 | ITEM_DATA | 아이템 효과 | 56개 (76행) |
 | BUFF_DATA | 버프/디버프 티어 | 29행 |
-| PLAYER_DATA | 캐릭터 기본 스탯 | 3명 |
+| CHARACTER_DATA | 캐릭터 기본 스탯 | 3명 |
 | PASSIVE_DATA | 캐릭터 패시브 | 9행 |
 | EQUIPMENT_DATA | 무기 데이터 | 4개 |
 | STAGE_DATA | 맵 그리드 | 9개 방 |

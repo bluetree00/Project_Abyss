@@ -53,10 +53,11 @@ public class StartRoomGate : MonoBehaviour
     private float _gateWidth  = DefaultGateWidth;
     private float _gateHeight = DefaultGateHeight;
 
-    private bool  _triggered;
-    private bool  _gateOpen;
-    private bool  _isEnabled;
-    private float _enabledTime = float.MaxValue;
+    private bool             _triggered;
+    private bool             _gateOpen;
+    private bool             _isEnabled;
+    private float            _enabledTime  = float.MaxValue;
+    private PlayerController _frozenPlayer;
 
     private GameObject      _worldIndicatorGO;
     private TextMeshProUGUI _distanceText;
@@ -250,6 +251,14 @@ public class StartRoomGate : MonoBehaviour
         _triggered = true;
         if (_worldIndicatorGO != null) _worldIndicatorGO.SetActive(false);
         SetGatePassable();
+
+        // 스타트 방 게이트: 서약 선택 UI 동안 플레이어 이동 고정
+        if (_fromZoneIndex == -1)
+        {
+            var pc = other.GetComponentInParent<PlayerController>();
+            if (pc != null) FreezePlayer(pc);
+        }
+
         GateActivateAsync().Forget();
     }
 
@@ -318,6 +327,9 @@ public class StartRoomGate : MonoBehaviour
 
         await ShowCovenantChoiceAsync(bootstrapper?.Run, ct);
 
+        // 서약 선택 완료 → 플레이어 이동 복구
+        UnfreezePlayer();
+
         var zoneProgression = bootstrapper?.Run?.ZoneProgression;
         if (zoneProgression != null)
             await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
@@ -357,9 +369,12 @@ public class StartRoomGate : MonoBehaviour
 
         popup.Setup(covenants.ToArray());
 
+        // 선택 UI가 열린 동안 게임 시간 정지 (플레이어 낙하·몬스터 이동 차단)
+        Time.timeScale = 0f;
         int chosen;
         try { chosen = await popup.WaitForChoiceAsync(); }
-        catch (System.OperationCanceledException) { return; }
+        catch (System.OperationCanceledException) { Time.timeScale = 1f; return; }
+        finally { Time.timeScale = 1f; }
 
         if (chosen >= 0 && chosen < covenants.Count)
         {
@@ -367,6 +382,29 @@ public class StartRoomGate : MonoBehaviour
             run.CovenantHandler.TryAdd(selectedId);
             Debug.Log($"[StartRoomGate] 서약 획득: {selectedId}");
         }
+    }
+
+    // ── Player freeze helpers ─────────────────────────────────────
+
+    private void FreezePlayer(PlayerController pc)
+    {
+        _frozenPlayer = pc;
+        pc.SetInputEnabled(false);
+        if (pc.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.linearVelocity  = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic     = true;
+        }
+    }
+
+    private void UnfreezePlayer()
+    {
+        if (_frozenPlayer == null) return;
+        if (_frozenPlayer.TryGetComponent<Rigidbody>(out var rb))
+            rb.isKinematic = false;
+        _frozenPlayer.SetInputEnabled(true);
+        _frozenPlayer = null;
     }
 
     private static bool IsLoadoutReady()

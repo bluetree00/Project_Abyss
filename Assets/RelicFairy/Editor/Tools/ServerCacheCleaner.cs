@@ -18,7 +18,7 @@ public static class ServerCacheCleaner
         "item_data.json",               // ItemDataManager
         "buff_data.json",               // BuffDataManager
         "passive_data.json",            // PlayerDataManager (passive)
-        "player_data.json",             // PlayerDataManager (player stat)
+        "character_data.json",          // PlayerDataManager (character stat)
         "merlin_rune_synergy_data.json", // RuneDataManager (synergy)
         "merlin_rune_piece_data.json",  // RuneDataManager (piece)
         "merlin_rune_zone_map.json",    // RuneDataManager (zone map)

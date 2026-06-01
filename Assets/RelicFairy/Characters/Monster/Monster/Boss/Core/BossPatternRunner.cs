@@ -105,7 +105,8 @@ public class BossPatternRunner
                 _pendingForce = default;
 
                 // entry 조건이 여전히 유효할 때만 실행 (패턴 실행 중 조건이 무효화된 경우 폐기)
-                if (pending.entry == null || pending.entry.EvaluateConditions(_ctx))
+                // 사망 중 보류된 강제 패턴이 좀비 실행되지 않도록 생존 체크 추가
+                if (_isAlive() && (pending.entry == null || pending.entry.EvaluateConditions(_ctx)))
                 {
                     _patternBreakCooldown = 0f;
                     ExecutePattern(pending.pattern);

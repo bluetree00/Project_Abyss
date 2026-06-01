@@ -1,7 +1,9 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using RelicFairy.UI;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace RelicFairy.Monster
 {
@@ -56,20 +58,50 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private LichMovementController _movementController;
     private LichDormantState       _dormantState;
     private bool                   _phase2Transitioning;
-    // BossSpawner가 InitAsync 완료 전에 TriggerEntrance()를 호출하는 경우 버퍼링
     private bool                   _pendingTriggerEntrance;
+    private bool                   _prevPatternActive; // 패턴 종료 감지용
+    private GameObject             _spawnedFog;
+    private CancellationTokenSource _atmosphereCts;
+    private bool                   _lightingChanged;
+    private AmbientMode            _originalAmbientMode;
+    private Color                  _originalAmbientColor;
+    private float                  _originalMainLightIntensity;
+    private Color                  _originalMainLightColor;
 
     public LichMovementController MovementController => _movementController;
+
+    /// <summary>스폰 지점 Y — 해골 소환 등 지면 높이 추정에 사용.</summary>
+    public float SpawnGroundY => _movementController != null ? _movementController.GroundY : transform.position.y;
 
     [Header("── 등장 연출 ──────────────────────────────────")]
     [Tooltip("Appear 애니메이션 종료 후 전투 진입까지 대기 시간 (초). Appear 클립 길이와 맞춘다.")]
     [SerializeField] private float _entranceDuration = 4f;
+    [Tooltip("플레이어 감지 반경 (m). 방 입장 시 자연스럽게 감지되도록 방 크기에 맞게 설정한다.")]
+    [SerializeField] private float _detectionRange = 20f;
+
+    [Header("── 주변 연출 ──────────────────────────────────")]
+    [Tooltip("보스 중심 바닥에 독립 스폰할 포그 프리팹. 보스와 함께 이동하지 않고 월드에 고정된다.")]
+    [SerializeField] private GameObject _groundFogPrefab;
+
+    [Header("── 연출 — 보스방 라이팅 ─────────────────────────")]
+    [Tooltip("등장 시 전환할 주변광. 어둡고 강렬한 보라색 분위기.")]
+    [SerializeField] private Color _bossAmbientColor   = new Color(0.04f, 0.01f, 0.07f);
+    [Tooltip("주 조명 강도 배율. 0에 가까울수록 더 어두워짐.")]
+    [SerializeField, Range(0f, 1f)] private float _mainLightMult = 0.25f;
+    [Tooltip("주 조명 색상 틴트 (어두운 보라).")]
+    [SerializeField] private Color _mainLightTint      = new Color(0.55f, 0.25f, 1.0f);
+    [Tooltip("라이팅 전환 시간 (초).")]
+    [SerializeField] private float _lightingTransition = 2.5f;
 
 #if UNITY_EDITOR
     [Header("── 테스트 전용 (빌드 제외) ──────────────────")]
     [SerializeField] private bool _debugOverrideEncounter;
     [Tooltip("시작 조우 횟수. 3 이상이면 Phase 2 해금. 전투가 끝날 때마다 자동으로 +1됨.")]
     [SerializeField] private int  _debugEncounterCount = 1;
+    [Tooltip("true: DormantState를 건너뛰고 즉시 전투 진입. BossRoomController 없는 단독 테스트에 사용.")]
+    [SerializeField] private bool _debugSkipEntrance;
+    [Tooltip("true: 전투 시작 즉시 Phase2 상태로 강제 진입 (DarkRain 등 Phase2 패턴 테스트용). _debugSkipEntrance가 true일 때만 동작.")]
+    [SerializeField] private bool _debugForcePhase2;
     private int _debugSessionCount; // 플레이 중 자동 진행되는 세션 카운터
 #endif
 
@@ -87,23 +119,32 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 
     // ── 커스텀 ICondition ─────────────────────────────────────
 
+    // BuiltConditions는 공유 ScriptableObject에 저장되므로 생성 시 _lichBB를 캡처하면
+    // 마지막으로 BuildConditions()를 호출한 풀 인스턴스의 블랙보드를 참조하게 된다.
+    // 평가 시점에 ctx.Boss로 활성 Lich를 조회해 항상 올바른 블랙보드를 사용한다.
+    private sealed class LichPhase1Condition : ICondition
+    {
+        // 봉인 단계(Phase2 미진입)이면 Phase1 패턴을 허용한다.
+        // HP 기반 조건은 제거 — 봉인 해제는 해골 전멸로만 결정된다.
+        public bool Evaluate(BossPatternContext ctx)
+            => !((ctx.Boss as LichMonster)?.LichBB?.IsPhase2 ?? false);
+    }
+
     private sealed class LichPhase2Condition : ICondition
     {
-        private readonly LichBlackboard _bb;
-        public LichPhase2Condition(LichBlackboard bb) => _bb = bb;
-        public bool Evaluate(BossPatternContext ctx) => _bb.IsPhase2;
+        public bool Evaluate(BossPatternContext ctx)
+            => (ctx.Boss as LichMonster)?.LichBB?.IsPhase2 ?? false;
     }
 
     private sealed class LichPhase2PendingCondition : ICondition
     {
-        private readonly LichBlackboard _bb;
-        public LichPhase2PendingCondition(LichBlackboard bb) => _bb = bb;
+        // HP 40% 이하 도달 시 Phase2Entry 발동. SealBreaker와 완전히 독립된 조건.
         public bool Evaluate(BossPatternContext ctx)
         {
             var lich = ctx.Boss as LichMonster;
             return lich != null
                 && lich.HpRatio <= Phase2HpThreshold
-                && !_bb.IsPhase2;
+                && !(lich.LichBB?.IsPhase2 ?? false);
         }
     }
 
@@ -142,7 +183,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         _formController = GetComponentInChildren<LichFormController>();
-        _formController?.ApplyForm(LichForm.Phase1); // 의상·후드·책 표시
+        _formController?.HideAll(); // 등장 연출 전 숨김 — TriggerEntrance()에서 디졸브 인
 
         // 공중 이동 컨트롤러 초기화 (NavMeshAgent 비활성화 후 직접 Transform 제어)
         _movementController = GetComponent<LichMovementController>();
@@ -186,7 +227,28 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 #endif
 
         // 등장 대기 상태로 진입 — Appear 애니메이션은 TriggerEntrance() 호출 시 시작
-        _dormantState = new LichDormantState(_entranceDuration);
+        _dormantState = new LichDormantState(_entranceDuration, _detectionRange);
+
+#if UNITY_EDITOR
+        if (_debugSkipEntrance)
+        {
+            Debug.Log("[LichMonster] debugSkipEntrance — DormantState 생략, ChaseState 즉시 진입");
+            _dormantState = null; // IsActive 가드가 Update를 차단하지 않도록 null 처리
+            _formController?.ApplyForm(LichForm.Phase1); // 디버그: 등장 연출 없이 즉시 표시
+            ChangeState<ChaseState>();
+            if (_debugForcePhase2)
+            {
+                _phase2Transitioning = true; // TriggerPhase2 중복 호출 방지
+                ApplyPhase2Buffs();
+                // HP를 임계값 아래로 설정 — Phase1 엔트리(HP > 40%) 조건이 false가 되도록
+                if (_runtime != null && _config != null)
+                    _runtime.CurrentHp = Mathf.RoundToInt(_config.stat.maxHp * (Phase2HpThreshold - 0.05f));
+                Debug.Log("[LichMonster] debugForcePhase2 — Phase2 강제 적용 완료");
+            }
+            return;
+        }
+#endif
+
         ChangeState(_dormantState);
 
         // InitAsync 완료 전에 BossSpawner가 TriggerEntrance()를 호출한 경우 즉시 적용
@@ -206,6 +268,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         base.Update();
 
         if (_lichBB == null) return;
+        if (_runtime != null && _runtime.IsDead) return;
 
         // 등장 연출 중에는 패턴 러너와 무브먼트 완전 정지
         if (_dormantState != null && _dormantState.IsActive) return;
@@ -223,12 +286,14 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         }
 
         _movementController?.Tick(dt, _runtime?.PlayerTarget);
-        _runner?.Tick(dt);
 
-        // Phase2Entry 패턴이 없을 경우 폴백으로 직접 전환
-        if (!_lichBB.IsPhase2 && !_phase2Transitioning
-            && HpRatio <= Phase2HpThreshold && !IsInSpecialState)
-            TriggerPhase2();
+        // 패턴이 active → inactive 로 전환된 시점에 취약 구간 알림
+        bool nowPattern = _runner?.IsPatternActive ?? false;
+        if (_prevPatternActive && !nowPattern)
+            _movementController?.NotifyPatternEnded();
+        _prevPatternActive = nowPattern;
+
+        _runner?.Tick(dt);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -243,9 +308,10 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _movementController?.OnRecycled();
         _phase2Transitioning    = false;
         _pendingTriggerEntrance = false;
+        _lightingChanged        = false;
 
-        // 풀 재사용: Phase1 의상·책 복원 후 등장 대기 재진입
-        _formController?.ApplyForm(LichForm.Phase1);
+        // 풀 재사용: 숨김 후 등장 연출 재진입 (TriggerEntrance에서 다시 디졸브 인)
+        _formController?.HideAll();
         if (_dormantState != null)
             ChangeState(_dormantState);
 
@@ -255,6 +321,11 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     protected override void OnDisable()
     {
         UnbindBossHudIfBound();
+        if (_spawnedFog != null) { Destroy(_spawnedFog); _spawnedFog = null; }
+        _atmosphereCts?.Cancel();
+        _atmosphereCts?.Dispose();
+        _atmosphereCts = null;
+        RestoreLighting();
         base.OnDisable();
     }
 
@@ -275,7 +346,23 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     // IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>BossSpawner가 카메라 팬 완료 후 호출 — Appear 애니메이션 + 보스 이름 UI 시작.</summary>
+    /// <summary>LichDormantState가 플레이어를 감지했을 때 발행 — BossRoomController가 카메라 팬을 시작한다.</summary>
+    public event System.Action OnEntranceRequested;
+
+    /// <summary>Appear 연출이 끝나고 전투가 시작되기 직전 발행 — 플레이어 입력 복구 등에 사용한다.</summary>
+    public event System.Action OnCombatReady;
+
+    /// <summary>LichDormantState가 감지 직후 호출 — OnEntranceRequested 이벤트 발행.</summary>
+    internal void FireEntranceRequest() => OnEntranceRequested?.Invoke();
+
+    /// <summary>LichDormantState가 ChaseState 전환 직전 호출 — OnCombatReady 이벤트 발행.</summary>
+    internal void FireCombatReady()
+    {
+        _runner?.EnsureMinBreakCooldown(3f);
+        OnCombatReady?.Invoke();
+    }
+
+    /// <summary>BossRoomController가 카메라 팬 완료 후 호출 — Appear 애니메이션 + 보스 이름 UI 시작.</summary>
     public void TriggerEntrance()
     {
         if (_dormantState != null)
@@ -425,6 +512,90 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _formController.DissolveInFormAsync(LichForm.Phase1, destroyCancellationToken).Forget();
     }
 
+    /// <summary>LichDormantState.TriggerEntrance에서 호출 — 포그 스폰 + 라이팅 전환.</summary>
+    internal void TriggerEntranceAtmosphere()
+    {
+        _atmosphereCts?.Cancel();
+        _atmosphereCts?.Dispose();
+        _atmosphereCts = CancellationTokenSource.CreateLinkedTokenSource(
+            destroyCancellationToken, ActivationToken);
+        EntranceAtmosphereAsync(_atmosphereCts.Token).Forget();
+    }
+
+    private async UniTaskVoid EntranceAtmosphereAsync(CancellationToken ct)
+    {
+        // ── 포그 스폰 ──────────────────────────────────────────
+        if (_groundFogPrefab != null && _spawnedFog == null)
+        {
+            var fogPos = new Vector3(transform.position.x, 0f, transform.position.z);
+            _spawnedFog = Instantiate(_groundFogPrefab, fogPos, _groundFogPrefab.transform.rotation);
+
+            // VFXLossyTransformBinder.Target이 null이면 파티클이 월드 원점에 스폰됨
+            // → Lich Transform으로 연결해 올바른 위치에 스폰
+            foreach (var binder in _spawnedFog.GetComponentsInChildren<INab.CommonVFX.VFXLossyTransformBinder>(true))
+                binder.Target = transform;
+
+            foreach (var vfx in _spawnedFog.GetComponentsInChildren<UnityEngine.VFX.VisualEffect>(true))
+                vfx.Play();
+            foreach (var ps in _spawnedFog.GetComponentsInChildren<ParticleSystem>(true))
+                ps.Play(withChildren: true);
+        }
+
+        // ── 라이팅 원본 저장 ────────────────────────────────────
+        _originalAmbientMode      = RenderSettings.ambientMode;
+        _originalAmbientColor     = RenderSettings.ambientLight;
+        var sun = RenderSettings.sun;
+        _originalMainLightIntensity = sun != null ? sun.intensity : 1f;
+        _originalMainLightColor     = sun != null ? sun.color    : Color.white;
+        _lightingChanged = true;
+
+        // Flat 모드로 전환해야 ambientLight 직접 제어 가능
+        RenderSettings.ambientMode = AmbientMode.Flat;
+
+        // ── 라이팅 어둡게 전환 ──────────────────────────────────
+        float t = 0f;
+        try
+        {
+            while (t < _lightingTransition)
+            {
+                t += Time.deltaTime;
+                float f = Mathf.Clamp01(t / _lightingTransition);
+                RenderSettings.ambientLight = Color.Lerp(_originalAmbientColor, _bossAmbientColor, f);
+                if (sun != null)
+                {
+                    sun.intensity = Mathf.Lerp(_originalMainLightIntensity,
+                                               _originalMainLightIntensity * _mainLightMult, f);
+                    sun.color     = Color.Lerp(_originalMainLightColor, _mainLightTint, f);
+                }
+                await UniTask.Yield(ct);
+            }
+            RenderSettings.ambientLight = _bossAmbientColor;
+            if (sun != null)
+            {
+                sun.intensity = _originalMainLightIntensity * _mainLightMult;
+                sun.color     = _mainLightTint;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            RestoreLighting();
+        }
+    }
+
+    private void RestoreLighting()
+    {
+        if (!_lightingChanged) return;
+        _lightingChanged = false;
+        RenderSettings.ambientMode  = _originalAmbientMode;
+        RenderSettings.ambientLight = _originalAmbientColor;
+        var sun = RenderSettings.sun;
+        if (sun != null)
+        {
+            sun.intensity = _originalMainLightIntensity;
+            sun.color     = _originalMainLightColor;
+        }
+    }
+
     /// <summary>LichDormantState.Enter에서 호출 — 플레이어가 실제 보스방에 진입한 시점에 조우 기록.</summary>
     public void StartEncounterRecord() =>
         RecordEncounterAsync(destroyCancellationToken).Forget();
@@ -546,9 +717,9 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             BossConditionKey.Dist_Close          => new MaxRangeCondition(config.condDistClose),
             BossConditionKey.Dist_Far            => new MinRangeCondition(config.condDistFar),
             BossConditionKey.TimePressure        => new NormalModeTimerCondition(config.condTimePressureSecs),
-            BossConditionKey.Lich_Phase1         => new HpAboveCondition(config.condPhase2HpThreshold),
-            BossConditionKey.Lich_IsPhase2       => new LichPhase2Condition(_lichBB),
-            BossConditionKey.Lich_Phase2Pending  => new LichPhase2PendingCondition(_lichBB),
+            BossConditionKey.Lich_Phase1         => new LichPhase1Condition(),
+            BossConditionKey.Lich_IsPhase2       => new LichPhase2Condition(),
+            BossConditionKey.Lich_Phase2Pending  => new LichPhase2PendingCondition(),
             _                                    => new AlwaysTrue(),
         };
     }

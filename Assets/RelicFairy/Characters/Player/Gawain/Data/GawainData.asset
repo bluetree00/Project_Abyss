@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GawainData
   m_EditorClassIdentifier: 
   characterName: "가웨인"
-  baseMoveSpeed: 5
+  baseMoveSpeed: 8
   baseRunSpeed: 8
   maxHealth: 250
   baseMeleeAttack: 45
@@ -23,7 +23,7 @@ MonoBehaviour:
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
-  dashSpeed: 12
+  dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 1.5
   jumpForce: 9

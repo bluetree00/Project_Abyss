@@ -150,6 +150,13 @@ public class ServerEquipmentDataManager
                 skill_e_name      = row.TryGetString("skill_e_name"),
                 skill_e_cooldown  = row.TryGetFloat("skill_e_cooldown"),
 
+                attack_step_1     = row.TryGetFloat("attack_step_1"),
+                attack_step_2     = row.TryGetFloat("attack_step_2"),
+                attack_step_3     = row.TryGetFloat("attack_step_3"),
+                move_input_scale  = row.TryGetFloat("move_input_scale"),
+                aim_assist_radius = row.TryGetFloat("aim_assist_radius"),
+                use_aim_assist    = row.TryGetInt("use_aim_assist"),
+
                 stat_version      = row.TryGetInt("stat_version"),
             };
         }

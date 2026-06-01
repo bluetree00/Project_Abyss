@@ -1,5 +1,5 @@
 ﻿chapter_id,chapter_name,description,zone_layout_key,barrier_type,barrier_prefab_key,map_bg_key,bgm_key,difficulty_scale,monster_count_scale,monster_pool_tag,gold_multiplier,item_drop_multiplier,total_layers,peak_layer,stat_version
-Chapter1,부패의 숲,한때 아서왕의 기사들이 순례하던 성스러운 숲. 흑수에 잠식됨,chapter1_zone_layout,Water,barrier_forest_water,map_forest,bgm_forest,1.0,1.0,forest,1.0,1.0,12,5,1
-Chapter2,용암 대지,고대 지형이 용암으로 뒤덮인 불길의 협곡,chapter2_zone_layout,Lava,barrier_lava,map_lava,bgm_lava,1.5,1.2,lava,1.4,1.1,12,5,1
-Chapter3,잠식된 성채,한때 영웅의 성채. 이제는 리치의 거점,chapter3_zone_layout,Fog,barrier_castle_fog,map_castle,bgm_castle,2.2,1.4,castle,1.8,1.2,12,5,1
-Chapter4,암흑대지,세계의 근원. 빛이 존재하지 않는 곳,chapter4_zone_layout,Void,barrier_void,map_void,bgm_void,3.0,1.6,void,2.5,1.3,12,5,1
+Chapter1,황혼의 숲,할로우 어비스라는 어둠에 물들어가는 황폐해진 숲. 야수가 들끓는다,chapter1_zone_layout,Water,barrier_forest_water,map_forest,bgm_forest,1.0,1.0,forest,1.0,1.0,12,5,1
+Chapter2,용암 지대,끝없는 용암이 흐르는 화산 지대. 불꽃 생물들이 불귀는 곳,chapter2_zone_layout,Lava,barrier_lava,map_lava,bgm_lava,1.5,1.2,lava,1.4,1.1,12,5,1
+Chapter3,신성한 성역,타락한 신성함이 깃든 성스러운 공간. 강력한 수호자들이 지킨다,chapter3_zone_layout,Fog,barrier_sacred_fog,map_sacred,bgm_sacred,2.2,1.4,sacred,1.8,1.2,12,5,1
+Chapter4,천상의 성채,하늘을 찌르는 철옹성. 최강의 기사단이 마지막 방어선을 지킨다,chapter4_zone_layout,Void,barrier_void,map_fortress,bgm_fortress,3.0,1.6,fortress,2.5,1.3,12,5,1
