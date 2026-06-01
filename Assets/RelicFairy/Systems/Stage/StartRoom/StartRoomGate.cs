@@ -330,11 +330,19 @@ public class StartRoomGate : MonoBehaviour
         // 서약 선택 완료 → 플레이어 이동 복구
         UnfreezePlayer();
 
-        var zoneProgression = bootstrapper?.Run?.ZoneProgression;
-        if (zoneProgression != null)
-            await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
-        else if (bootstrapper != null)
-            await bootstrapper.SpawnRemainingWorldZonesAsync();
+        // 절차 진행(하데스형): 레거시 존 진행 대신 RunFlowController로 런 시작
+        if (bootstrapper != null && bootstrapper.UseProcGen)
+        {
+            await bootstrapper.StartProcGenRunAsync();
+        }
+        else
+        {
+            var zoneProgression = bootstrapper?.Run?.ZoneProgression;
+            if (zoneProgression != null)
+                await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
+            else if (bootstrapper != null)
+                await bootstrapper.SpawnRemainingWorldZonesAsync();
+        }
 
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
     }

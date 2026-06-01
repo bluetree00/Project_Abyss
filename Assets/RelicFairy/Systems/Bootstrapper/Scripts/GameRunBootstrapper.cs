@@ -28,6 +28,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("true면 zone_layout_key의 zone_index=0을 스타트 방으로 사용. 위습 캐릭터/무기 선택 후 나머지 존(1-25)을 게이트에서 스폰.")]
     [SerializeField] private bool startWithZoneLayout = true;
 
+    [Header("ProcGen (하데스형 절차 진행)")]
+    [Tooltip("기본 ON. 런 전투를 절차적 생성(RunFlowController)으로 진행. false로 끄면 레거시 contiguous 존 경로 사용.")]
+    [SerializeField] private bool useProcGen = true;
+    [Tooltip("절차 진행 컨트롤러. 비우면 런타임에 AddComponent로 생성(RunFlowController 기본 풀 키 사용).")]
+    [SerializeField] private RunFlowController runFlowController;
+
     [Tooltip("스타트 방 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
     [SerializeField] private DialogueSequenceSO startRoomDialogueSO;
 
@@ -746,6 +752,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 게이트 통과 즉시 방 등장 연출 — 플레이어가 걸어오는 동안 방이 생성되는 것처럼 보임
         await new DissolveEntrance().PlayAsync(blocks, default, ct);
 
+        // 디졸브/NavMesh await 도중 전이가 취소되거나(게이트 파괴 등) 존이 파괴되면 중단
+        // — DissolveEntrance가 취소를 삼키므로 여기서 직접 검사한다
+        if (ct.IsCancellationRequested || zoneGO == null) return;
+
         // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 스포너/웨이브 활성화)
         float zoneSizeX = zone.grid_width  * blockCellSize;
         float zoneSizeZ = zone.grid_height * blockCellSize;
@@ -756,6 +766,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         CreateZoneExitGates(zoneIndex, zone, zones, zoneGO);
 
         Debug.Log($"[GameRunBootstrapper] Zone {zoneIndex} ({zone.label}) 스폰 완료 @ {worldCenter}");
+    }
+
+    /// <summary>절차적 진행 사용 여부. StartRoomGate가 허브 이탈 분기에 사용.</summary>
+    public bool UseProcGen => useProcGen;
+
+    /// <summary>
+    /// 허브(스타트 방) 이탈 시 절차 진행 시작. RunFlowController를 확보(없으면 AddComponent)하고
+    /// 허브와 겹치지 않는 먼 앵커에 첫 방을 빌드한다. 레거시 ZoneProgression 경로를 대체.
+    /// </summary>
+    public async UniTask StartProcGenRunAsync()
+    {
+        var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+        // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
+        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f));
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -771,7 +795,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 플레이어 스폰/이동·게이트 배치·웨이브 활성화는 호출자(RunFlowController)가 담당.
     /// </summary>
     public async UniTask<ProcRoomResult> BuildProcRoomAsync(
-        ZonePoolEntry entry, Vector3 anchor, bool mirror, CancellationToken ct = default)
+        ZonePoolEntry entry, Vector3 anchor, bool mirror, int quarterTurns, CancellationToken ct = default)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         if (entry == null || string.IsNullOrWhiteSpace(entry.grid_csv))
@@ -780,8 +804,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
-        // 1. grid_csv 변환 (좌우 미러) — MapBuilder/TokenParser가 동일 문자열을 쓰도록 문자열 레벨에서 적용
+        // 1. grid_csv 변환 (좌우 미러 → 헤딩 회전) — MapBuilder/TokenParser가 동일 문자열을 쓰도록 문자열 레벨에서 적용.
+        //    quarterTurns = 진행 방향(heading). 방을 회전시켜 입구가 뒤쪽에 오고 직진이 헤딩을 향하게 한다.
         string csv = mirror ? GridTransform.MirrorX(entry.grid_csv) : entry.grid_csv;
+        if (quarterTurns != 0) csv = GridTransform.Rotate(csv, quarterTurns);
 
         // 2. 팔레트
         BlockPalette palette = null;
@@ -804,8 +830,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
 
-        // 4. 문 분류 + 개방 (입구 + 직진 + 턴 모두 개방; 게이트/배리어는 클리어 후 호출자가 제어)
-        var cls = RoomDoorPlanner.Classify(doorInfos);
+        // 4. 문 분류(헤딩 기준: 입구=뒤, 직진=헤딩, 턴=좌우) + 개방
+        var cls = RoomDoorPlanner.ClassifyWithHeading(doorInfos, quarterTurns);
         if (cls.entrance.HasValue) RoomDoorPlanner.Open(grid, cls.entrance.Value, doorInfos[cls.entrance.Value]);
         if (cls.forward.HasValue)  RoomDoorPlanner.Open(grid, cls.forward.Value,  doorInfos[cls.forward.Value]);
         foreach (var t in cls.turns) RoomDoorPlanner.Open(grid, t, doorInfos[t]);
@@ -867,9 +893,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
         if (cls.forward.HasValue)
-            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true });
+            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = doorInfos[cls.forward.Value].edge });
         foreach (var t in cls.turns)
-            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false });
+            result.exits.Add(new ProcExitSlot { worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = doorInfos[t].edge });
 
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
         return result;
@@ -1944,7 +1970,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (!run.IsRunning) return;
 
-        if (startWithZoneLayout)
+        if (useProcGen)
+            await StartProcGenRunAsync();
+        else if (startWithZoneLayout)
             await SpawnZoneByIndexAsync(1, null, this.GetCancellationTokenOnDestroy());
         else if (!string.IsNullOrEmpty(directCombatMapPrefabKey))
             await SpawnMapAsync(directCombatMapPrefabKey);

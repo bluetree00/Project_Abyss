@@ -10,15 +10,18 @@ using UnityEngine;
 public class ProcRoomGate : MonoBehaviour
 {
     private DoorPlan              _plan;
+    private DoorEdge              _edge;
     private Action<ProcRoomGate>  _onChosen;
     private bool                  _armed;
 
     public DoorPlan     Plan => _plan;
     public RoomPlanKind Kind => _plan.kind;
+    public DoorEdge     Edge => _edge; // 전환 와이프 방향(직진=North / 턴=East·West)
 
-    public void Initialize(DoorPlan plan, Action<ProcRoomGate> onChosen)
+    public void Initialize(DoorPlan plan, DoorEdge edge, Action<ProcRoomGate> onChosen)
     {
         _plan     = plan;
+        _edge     = edge;
         _onChosen = onChosen;
         _armed    = true;
 

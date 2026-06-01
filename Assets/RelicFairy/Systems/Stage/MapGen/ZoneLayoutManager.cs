@@ -84,17 +84,77 @@ public class ZoneLayoutManager
     public async UniTask<List<ZonePoolEntry>> LoadPoolAsync(string poolKey)
     {
         if (string.IsNullOrEmpty(poolKey)) return new List<ZonePoolEntry>();
-        if (_poolCache.TryGetValue(poolKey, out var cached)) return cached;
+        if (_poolCache.TryGetValue(poolKey, out var cached) && cached.Count > 0) return cached;
 
-        var pool  = new List<ZonePoolEntry>();
-        var asset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(poolKey.ToUpper());
-        if (asset != null)
-            ParsePoolCsv(asset.text.TrimStart(), pool);
-        else
-            Debug.LogWarning($"[ZoneLayoutManager] LoadPoolAsync: '{poolKey.ToUpper()}' 풀 CSV 없음");
+        var pool      = new List<ZonePoolEntry>();
+        var chartName = poolKey.ToUpper(); // 뒤끝 차트명은 대문자
+
+        // 1) 서버(뒤끝 CDN) 차트 우선 — 존 레이아웃과 동일 경로
+        try
+        {
+            int loaded = ChartLoader.Load(chartName, row =>
+            {
+                var entry = ParsePoolRow(row);
+                if (entry != null && !string.IsNullOrEmpty(entry.pool_key))
+                    pool.Add(entry);
+            });
+            if (loaded > 0)
+                Debug.Log($"[ZoneLayoutManager] LoadPoolAsync 서버 '{chartName}' → {pool.Count}개");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[ZoneLayoutManager] LoadPoolAsync 서버 예외 ({chartName}): {ex.Message}");
+        }
+
+        // 2) Addressables 폴백 (오프라인/에디터 테스트)
+        if (pool.Count == 0)
+        {
+            var asset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(chartName);
+            if (asset != null)
+            {
+                ParsePoolCsv(asset.text.TrimStart(), pool);
+                Debug.Log($"[ZoneLayoutManager] LoadPoolAsync Addressables 폴백 '{chartName}' → {pool.Count}개");
+            }
+            else
+            {
+                Debug.LogWarning($"[ZoneLayoutManager] LoadPoolAsync: '{chartName}' 서버·Addressables 모두 없음");
+            }
+        }
 
         _poolCache[poolKey] = pool;
         return pool;
+    }
+
+    /// <summary>뒤끝 CDN 차트 행(JsonData) → ZonePoolEntry. ParsePoolCsv(CSV)의 서버판.</summary>
+    private static ZonePoolEntry ParsePoolRow(JsonData row)
+    {
+        try
+        {
+            return new ZonePoolEntry
+            {
+                pool_key            = row.TryGetString("pool_key"),
+                category            = row.TryGetString("category"),
+                size_tag            = row.TryGetString("size_tag"),
+                grid_width          = row.TryGetInt("grid_width"),
+                grid_height         = row.TryGetInt("grid_height"),
+                grid_csv            = row.TryGetString("grid_csv"),
+                spawn_local_x       = row.TryGetFloat("spawn_local_x"),
+                spawn_local_z       = row.TryGetFloat("spawn_local_z"),
+                theme               = row.TryGetString("theme"),
+                palette             = row.TryGetString("palette"),
+                arena_template_key  = row.TryGetString("arena_template_key"),
+                difficulty_scale    = row.TryGetFloat("difficulty_scale"),
+                scatter_range       = row.TryGetFloat("scatter_range"),
+                clear_overlay_delay = row.TryGetFloat("clear_overlay_delay"),
+                max_active_spawners = row.TryGetInt("max_active_spawners"),
+                stat_version        = row.TryGetInt("stat_version"),
+            };
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[ZoneLayoutManager] 풀 행 파싱 실패: {e.Message}");
+            return null;
+        }
     }
 
     private List<ZoneLayoutEntry> MergeSlotPool(List<ZoneMapSlot> slots, List<ZonePoolEntry> pool)

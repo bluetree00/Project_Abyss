@@ -12,9 +12,10 @@ public sealed class ProcRoomResult
     public List<ProcExitSlot> exits;    // 클리어 후 ProcRoomGate를 놓을 출구 슬롯
 }
 
-/// <summary>출구 슬롯 — 게이트 배치 위치 + 직진/턴 여부.</summary>
+/// <summary>출구 슬롯 — 게이트 배치 위치 + 직진/턴 여부 + 문 엣지(전환 와이프 방향용).</summary>
 public struct ProcExitSlot
 {
-    public Vector3 worldPos;
-    public bool    isForward; // true=직진(North), false=턴(East/West)
+    public Vector3  worldPos;
+    public bool     isForward; // true=직진(North), false=턴(East/West)
+    public DoorEdge edge;      // North=직진(위) / East=우턴 / West=좌턴 — 전환 와이프 방향
 }

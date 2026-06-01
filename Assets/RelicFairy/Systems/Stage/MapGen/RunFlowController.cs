@@ -23,6 +23,12 @@ public class RunFlowController : MonoBehaviour
     [SerializeField, Tooltip("0이면 매 런 랜덤 시드.")]
     private int _seed;
 
+    [Header("전환 연출 (방 진입 와이프)")]
+    [SerializeField, Tooltip("덮기 시간(초). 가속 곡선 권장.")]          private float          _coverDuration  = 0.18f;
+    [SerializeField, Tooltip("드러내기 시간(초). 감속 곡선 권장.")]      private float          _revealDuration = 0.32f;
+    [SerializeField] private AnimationCurve _coverCurve  = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [SerializeField] private AnimationCurve _revealCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
     private RunSequencer                 _sequencer;
     private List<ZonePoolEntry>          _pool;
     private System.Random                _rng;
@@ -31,15 +37,19 @@ public class RunFlowController : MonoBehaviour
     private readonly List<ProcRoomGate>  _gates = new();
     private CancellationTokenSource      _cts;
 
-    private Vector3 Anchor => _anchor != null ? _anchor.position : Vector3.zero;
+    private Vector3 _baseAnchor;
+    private int     _anchorToggle;
+    private int     _heading; // 현재 진행 방향(0=N,1=E,2=S,3=W). 탄 출구 엣지로 갱신 → 다음 방 회전에 사용.
 
     // ── Public ──────────────────────────────────────
 
-    /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.</summary>
-    public async UniTask StartRunAsync()
+    /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
+    /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.</summary>
+    public async UniTask StartRunAsync(Vector3? anchor = null)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
+        _baseAnchor = anchor ?? (_anchor != null ? _anchor.position : Vector3.zero);
 
         _pool = await Managers.ZoneLayout.LoadPoolAsync(_poolKey);
         if (_pool == null || _pool.Count == 0)
@@ -59,7 +69,7 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
-        await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, ct);
+        await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
     }
 
     // ── Private ─────────────────────────────────────
@@ -74,17 +84,28 @@ public class RunFlowController : MonoBehaviour
         return _pool.Find(p => string.Equals(p.category, "Normal", StringComparison.OrdinalIgnoreCase)) ?? _pool[0];
     }
 
-    private async UniTask EnterRoomAsync(DoorPlan plan, CancellationToken ct)
+    private async UniTask EnterRoomAsync(DoorPlan plan, DoorEdge fromEdge, CancellationToken ct)
     {
         var grb = GameRunBootstrapper.Instance;
         if (grb == null || plan.entry == null) return;
 
+        var dir = WipeDir(fromEdge);
+        _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
+        await ScreenFade.CoverAsync(dir, KindColor(plan.kind), _coverDuration, _coverCurve, ct); // 종류색 + 방향 와이프로 덮기
+
+        var prevRoom = _current?.roomGO; // 새 방 준비까지 이전 방 유지 → 플레이어 발판 보존(추락 방지)
+
+        // 리프프로그 앵커: 이전 방과 겹치지 않게 z를 번갈아 배치 (최대 2개 방만 잠깐 공존)
+        var roomAnchor = _baseAnchor + new Vector3(0f, 0f, (_anchorToggle++ % 2) * 300f);
+
         bool mirror = _rng.Next(2) == 0;
-        var result  = await grb.BuildProcRoomAsync(plan.entry, Anchor, mirror, ct);
-        if (result == null) return;
+        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct);
+        if (result == null) { await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct); return; }
 
         _current = result;
         MovePlayer(result.entryPos);
+
+        if (prevRoom != null) Destroy(prevRoom); // 이동 완료 후 이전 방 디스폰
 
         // 클리어 알림 구독 → 출구 게이트 배치. 전투 없는 방(스포너 0)은 즉시 출구 제공.
         if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out _currentWave))
@@ -97,6 +118,8 @@ public class RunFlowController : MonoBehaviour
             _currentWave = null;
             HandleRoomCleared();
         }
+
+        await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct); // 같은 방향으로 빠져나가며 새 방 드러내기
     }
 
     private void MovePlayer(Vector3 pos)
@@ -127,24 +150,45 @@ public class RunFlowController : MonoBehaviour
         var slots = _current.exits;
         // 직진 슬롯 → exits[0], 턴 슬롯 → exits[1] (best-effort 슬롯 매칭)
         for (int i = 0; i < slots.Count && i < exits.Count; i++)
-            _gates.Add(CreateGate(slots[i].worldPos, exits[i]));
+            _gates.Add(CreateGate(slots[i], exits[i]));
     }
 
-    private ProcRoomGate CreateGate(Vector3 pos, DoorPlan plan)
+    private ProcRoomGate CreateGate(ProcExitSlot slot, DoorPlan plan)
     {
         var go = new GameObject($"ProcGate_{plan.kind}");
         go.transform.SetParent(transform, false);
-        go.transform.position = pos;
+        go.transform.position = slot.worldPos;
 
         var col = go.AddComponent<BoxCollider>();
         col.isTrigger = true;
         col.size = new Vector3(2f, 3f, 2f);
 
         var gate = go.AddComponent<ProcRoomGate>();
-        gate.Initialize(plan, OnGateChosen);
+        gate.Initialize(plan, slot.edge, OnGateChosen);
         // TODO(후속): 방 종류 아이콘/라벨 비주얼 (CategoryKor 매핑)
         return gate;
     }
+
+    /// <summary>문 엣지 → 전환 와이프 스크린 방향. 직진=위 / 우턴=오른쪽 / 좌턴=왼쪽.</summary>
+    private static Vector2 WipeDir(DoorEdge edge) => edge switch
+    {
+        DoorEdge.North => Vector2.up,
+        DoorEdge.East  => Vector2.right,
+        DoorEdge.West  => Vector2.left,
+        DoorEdge.South => Vector2.down,
+        _              => Vector2.up,
+    };
+
+    /// <summary>방 종류 → 전환 커버 색 (전투/정예/상점/보스 단서).</summary>
+    private static Color KindColor(RoomPlanKind kind) => kind switch
+    {
+        RoomPlanKind.Boss    => new Color(0.55f, 0.08f, 0.08f),
+        RoomPlanKind.PreBoss => new Color(0.45f, 0.10f, 0.14f),
+        RoomPlanKind.Elite   => new Color(0.32f, 0.12f, 0.52f),
+        RoomPlanKind.Shop    => new Color(0.08f, 0.32f, 0.12f),
+        RoomPlanKind.Event   => new Color(0.30f, 0.20f, 0.05f),
+        _                    => new Color(0.05f, 0.06f, 0.10f), // Normal
+    };
 
     private void ClearGates()
     {
@@ -153,7 +197,7 @@ public class RunFlowController : MonoBehaviour
         _gates.Clear();
     }
 
-    private async UniTaskVoid TransitionAsync(DoorPlan plan)
+    private async UniTaskVoid TransitionAsync(DoorPlan plan, DoorEdge edge)
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
         try
@@ -161,12 +205,10 @@ public class RunFlowController : MonoBehaviour
             foreach (var g in _gates)
                 if (g != null) g.Disarm();
 
+            ClearGates();
             _sequencer.CommitEntry(plan);
 
-            ClearGates();
-            if (_current?.roomGO != null) Destroy(_current.roomGO);
-
-            await EnterRoomAsync(plan, ct);
+            await EnterRoomAsync(plan, edge, ct); // 빌드 완료 후 이전 방 디스폰(추락 방지)
         }
         catch (OperationCanceledException) { }
     }
@@ -182,6 +224,6 @@ public class RunFlowController : MonoBehaviour
 
     private void OnGateChosen(ProcRoomGate gate)
     {
-        TransitionAsync(gate.Plan).Forget();
+        TransitionAsync(gate.Plan, gate.Edge).Forget();
     }
 }
