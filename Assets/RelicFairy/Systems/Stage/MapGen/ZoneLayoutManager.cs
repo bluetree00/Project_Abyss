@@ -77,6 +77,26 @@ public class ZoneLayoutManager
         Debug.Log($"[ZoneLayoutManager] LoadWithPoolAsync '{mapKey}' → {_cache[key].Count}개 존 (cacheAs:{key})");
     }
 
+    /// <summary>
+    /// 룸 풀 CSV(zone_pool)를 로드/파싱해 ZonePoolEntry 리스트를 반환한다.
+    /// 절차적 생성(RunSequencer)에서 슬롯 병합 없이 풀만 필요할 때 사용. 결과는 _poolCache에 캐시.
+    /// </summary>
+    public async UniTask<List<ZonePoolEntry>> LoadPoolAsync(string poolKey)
+    {
+        if (string.IsNullOrEmpty(poolKey)) return new List<ZonePoolEntry>();
+        if (_poolCache.TryGetValue(poolKey, out var cached)) return cached;
+
+        var pool  = new List<ZonePoolEntry>();
+        var asset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(poolKey.ToUpper());
+        if (asset != null)
+            ParsePoolCsv(asset.text.TrimStart(), pool);
+        else
+            Debug.LogWarning($"[ZoneLayoutManager] LoadPoolAsync: '{poolKey.ToUpper()}' 풀 CSV 없음");
+
+        _poolCache[poolKey] = pool;
+        return pool;
+    }
+
     private List<ZoneLayoutEntry> MergeSlotPool(List<ZoneMapSlot> slots, List<ZonePoolEntry> pool)
     {
         var result    = new List<ZoneLayoutEntry>();

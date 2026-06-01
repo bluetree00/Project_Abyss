@@ -59,6 +59,10 @@ public class RunSequencer
     {
         var result = new List<DoorPlan>(2);
 
+        // 런 종료(보스 처치 등) — 더 이상 출구 없음
+        if (_phase == Phase.Done)
+            return result;
+
         // 보스 피날레 게이팅
         if (_phase == Phase.Boss)
         {
