@@ -53,6 +53,9 @@ public sealed class RoomWaveController : MonoBehaviour
     /// <summary>웨이브가 시작될 때 발행. (현재 웨이브 0-based 인덱스, 총 웨이브 수)</summary>
     public event Action<int, int> OnWaveStarted;
 
+    /// <summary>방이 완전히 클리어됐을 때 1회 발행. 절차 진행(RunFlowController)이 출구 게이트 배치에 사용.</summary>
+    public event Action OnRoomCleared;
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -336,6 +339,9 @@ public sealed class RoomWaveController : MonoBehaviour
             var gate = GetComponent<RoomClearGate>() ?? gameObject.AddComponent<RoomClearGate>();
             gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null);
             gate.Activate(_hasKillPosition ? _lastKillPosition : transform.position);
+
+            // 절차 진행: 출구 게이트 배치 트리거 (레거시 contiguous 경로엔 구독자 없음 → 무영향)
+            OnRoomCleared?.Invoke();
         }
         catch (OperationCanceledException) { }
         catch (Exception e)
