@@ -114,7 +114,6 @@ MonoBehaviour:
   - conditions:
     - 22
     patterns:
-    - {fileID: 11400000, guid: 3a8cc8ee3f4759d41aa522e198350cf5, type: 2}
     - {fileID: 11400000, guid: e6190d0c15134374097a382103b46f96, type: 2}
     - {fileID: 11400000, guid: 331075445ad3e6c4b85e220c8130a0fc, type: 2}
     - {fileID: 11400000, guid: 28eba821eb312df41bba4c65b4bc9969, type: 2}

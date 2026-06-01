@@ -121,6 +121,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>몬스터 사망 시 1회 발행. RoomClearController 등 외부 수명주기가 구독.</summary>
     public event System.Action<MonsterBase> OnDied;
 
+    /// <summary>보스 등장 연출 완료 후 1회 발행. HUD가 보스 패널을 이 시점에 표시.</summary>
+    public event System.Action OnBossCombatReady;
+    protected void RaiseBossCombatReady() => OnBossCombatReady?.Invoke();
+
+    /// <summary>true면 등장 연출이 끝날 때까지 HUD 보스 패널을 억제한다.</summary>
+    public virtual bool HasEntranceAnimation => false;
+
     /// <summary>DieState.Enter에서 호출. 외부 구독자가 사망을 감지할 수 있도록 이벤트 래핑.</summary>
     public void RaiseDied()
     {

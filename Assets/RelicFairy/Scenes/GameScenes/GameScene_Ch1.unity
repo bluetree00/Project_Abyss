@@ -781,6 +781,38 @@ MonoBehaviour:
   wispOrbitTop: {x: 17, y: 4}
   wispOrbitMiddle: {x: 12, y: 5}
   wispOrbitBottom: {x: 6, y: 4}
+  startRoomTourDuration: 4.5
+  startRoomTourRadius: 12
+  startRoomTourHeight: 6
+  startRoomTourArc: 90
+  startRoomWispBlendDuration: 1
+  startRoomTourFrameDuration: 0.5
+  startRoomTourFrameAspect: 2.39
+  startRoomTourDimAlpha: 0.2
+  startRoomTourFrameEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!114 &330585551
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1130,6 +1162,8 @@ MonoBehaviour:
     type: 2}
   startRoomMapKey: 
   startWithZoneLayout: 1
+  useProcGen: 1
+  runFlowController: {fileID: 0}
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:
   - {fileID: 3817264450736926565, guid: dcad24e36c0786b44a5ed15fec98612a, type: 3}
