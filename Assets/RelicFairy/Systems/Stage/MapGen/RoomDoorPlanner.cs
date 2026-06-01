@@ -19,7 +19,32 @@ public static class RoomDoorPlanner
         public List<Vector2Int> turns;    // East/West 턴 출구 후보
     }
 
-    /// <summary>doorInfos를 캐논 엣지 기준으로 분류. 각 역할은 첫 번째 앵커를 채택(턴은 모두 수집).</summary>
+    /// <summary>
+    /// 헤딩(진행방향, 0=N/1=E/2=S/3=W 쿼터턴) 기준으로 분류한다.
+    /// 방이 heading만큼 회전 빌드된 상태이므로, 절대 엣지로 역할을 판정한다:
+    /// 입구=뒤(heading+2) / 직진=앞(heading) / 턴=좌우(heading±1).
+    /// (DoorEdge 순서 North=0,East=1,South=2,West=3 가 시계방향과 일치)
+    /// </summary>
+    public static Classified ClassifyWithHeading(IReadOnlyDictionary<Vector2Int, DoorInfo> doorInfos, int heading)
+    {
+        var c = new Classified { turns = new List<Vector2Int>() };
+        if (doorInfos == null) return c;
+
+        int h = ((heading % 4) + 4) % 4;
+        int entranceEdge = ((int)DoorEdge.South + h) % 4; // 뒤
+        int forwardEdge  = ((int)DoorEdge.North + h) % 4; // 앞(헤딩)
+
+        foreach (var kv in doorInfos)
+        {
+            int e = (int)kv.Value.edge;
+            if      (e == entranceEdge && !c.entrance.HasValue) c.entrance = kv.Key;
+            else if (e == forwardEdge  && !c.forward.HasValue)  c.forward  = kv.Key;
+            else                                                c.turns.Add(kv.Key);
+        }
+        return c;
+    }
+
+    /// <summary>doorInfos를 캐논 엣지 기준으로 분류 (heading=0과 동일). 각 역할은 첫 번째 앵커 채택.</summary>
     public static Classified Classify(IReadOnlyDictionary<Vector2Int, DoorInfo> doorInfos)
     {
         var c = new Classified { turns = new List<Vector2Int>() };

@@ -20,6 +20,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c92d64ad1cef4748b60f3a6c88256e8
+    m_Address: CHAPTER_1_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6c1dee3c13f9fc64caac707f2f7685ec
     m_Address: MERLIN_RUNE_SYNERGY_DATA
     m_ReadOnly: 0
