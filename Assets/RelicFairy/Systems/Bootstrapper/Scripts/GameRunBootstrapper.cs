@@ -10,6 +10,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public static GameRunBootstrapper Instance { get; private set; }
 
     [SerializeField] private string playerPrefabKey = "Knight";
+    [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
+    [SerializeField] private string startBodyKey = "Gawain";
     [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
@@ -29,8 +31,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private bool startWithZoneLayout = true;
 
     [Header("ProcGen (하데스형 절차 진행)")]
-    [Tooltip("기본 ON. 런 전투를 절차적 생성(RunFlowController)으로 진행. false로 끄면 레거시 contiguous 존 경로 사용.")]
-    [SerializeField] private bool useProcGen = true;
+    // 절차적 생성이 유일/기본 진행 방식. 레거시 contiguous 존 경로는 더 이상 사용하지 않음(정리 예정).
     [Tooltip("절차 진행 컨트롤러. 비우면 런타임에 AddComponent로 생성(RunFlowController 기본 풀 키 사용).")]
     [SerializeField] private RunFlowController runFlowController;
 
@@ -771,8 +772,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         Debug.Log($"[GameRunBootstrapper] Zone {zoneIndex} ({zone.label}) 스폰 완료 @ {worldCenter}");
     }
 
-    /// <summary>절차적 진행 사용 여부. StartRoomGate가 허브 이탈 분기에 사용.</summary>
-    public bool UseProcGen => useProcGen;
+    /// <summary>절차적 진행 사용 여부. 항상 true로 고정 — 절차 방식이 유일한 진행 경로.</summary>
+    public bool UseProcGen => true;
 
     /// <summary>
     /// 허브(스타트 방) 이탈 시 절차 진행 시작. RunFlowController를 확보(없으면 AddComponent)하고
@@ -1838,10 +1839,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         await ShowStartRoomDialogueAsync();
 
-        if (wispPrefab != null)
-            SpawnWisp();
-        else
-            Debug.LogError("[GameRunBootstrapper] wispPrefab 미할당 — 스타트 방에서 캐릭터를 생성할 수 없습니다.");
+        // CombatGirl 플레이어를 시작방에 바로 스폰 (위습 단계 제거). 유물은 시작방 유물 오브젝트에서 획득.
+        // 로드아웃 준비(=무기 픽업 허용) — 단일 몸 체제라 body 키만 설정(CharacterData는 몸이 자체 로드).
+        AppBootstrapper.Instance?.Loadout?.SetCharacter(null, startBodyKey);
+        Vector3 startSpawnPos = _pendingPlayerSpawnPos ?? Vector3.zero;
+        _pendingPlayerSpawnPos = null;
+        SpawnCharacterInStartRoomAsync(startBodyKey, startSpawnPos, Quaternion.identity, null).Forget();
     }
 
     private void SpawnAwakeningAltar()
@@ -1910,6 +1913,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await UniTask.WaitUntil(
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
+
+        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout.Relic 없으면 no-op.
+        player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
+
+        // 투어 종료 → 게임플레이 카메라로 핸드오프. BindPlayer(OnPlayerBound) 전에 호출해
+        // 레거시 줌인 인트로(PlayIntroAsync)가 발화되지 않도록 _introStarted를 선점한다.
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
         // HUD를 플레이어에 바인딩 — 무기 선택 시 HUD 슬롯이 즉시 갱신되도록
         _run?.BindPlayer(player);
@@ -2051,12 +2061,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (!run.IsRunning) return;
 
-        if (useProcGen)
-            await StartProcGenRunAsync();
-        else if (startWithZoneLayout)
-            await SpawnZoneByIndexAsync(1, null, this.GetCancellationTokenOnDestroy());
-        else if (!string.IsNullOrEmpty(directCombatMapPrefabKey))
-            await SpawnMapAsync(directCombatMapPrefabKey);
+        await StartProcGenRunAsync();
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
         run.RequestHudMode(HUDIds.Mode.Combat);
@@ -2141,6 +2146,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await Cysharp.Threading.Tasks.UniTask.WaitUntil(
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
+
+        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout.Relic 없으면 no-op.
+        player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
 
         var run = AppBootstrapper.Instance?.CurrentRun;
         var wm = player.WeaponManager;

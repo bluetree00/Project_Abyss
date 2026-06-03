@@ -67,8 +67,14 @@ public class PlayerController : CharacterBase
 
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
+    [Tooltip("선택된 유물 클래스 (패시브+고유스킬+외형). 비우면 유물 없음.")]
+    [SerializeField] protected RelicClassSO relicClass;
     [SerializeField] private bool debugInvincible = false;
     public CharacterData CharacterData => characterData;
+    public RelicClassSO RelicClass => relicClass;
+
+    /// <summary>현재 적용된 유물 행동 객체 (없으면 null). HolyShield 등 스킬/외부가 참조.</summary>
+    public IRelicBehavior RelicBehavior { get; private set; }
 
     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
     private float _invincibleEnd;
@@ -83,6 +89,10 @@ public class PlayerController : CharacterBase
     {
         if (debugInvincible || Time.time < _invincibleEnd)
             return;
+
+        // 유물 피해 보정 (갈라하드 방패 전방 감소 등)
+        if (RelicBehavior != null)
+            dmg = RelicBehavior.ModifyIncomingDamage(this, dmg, attacker);
 
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
 
@@ -306,6 +316,9 @@ public class PlayerController : CharacterBase
 
     protected void RegisterPassive(ICharacterPassive passive) => _passives.Add(passive);
 
+    /// <summary>유물 행동 객체가 패시브를 등록할 때 쓰는 public 래퍼.</summary>
+    public void RegisterRelicPassive(ICharacterPassive passive) => RegisterPassive(passive);
+
     /// <summary>
     /// 트리거 조건이 맞는 패시브를 모두 실행한다.
     /// 상태 클래스 및 외부에서 호출 가능.
@@ -320,22 +333,107 @@ public class PlayerController : CharacterBase
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>
     protected virtual void InitPassives() { }
 
+    private bool _relicApplied;
+    private GameObject _relicAuraInstance;
+
+    /// <summary>
+    /// 런타임에 선택된 유물을 주입·적용한다. 스폰(InitAsync) 이후 호출.
+    /// relicClass가 SerializeField라 Instantiate 후엔 Awake가 이미 지나므로, 이 주입점으로 적용한다.
+    /// null이면 무동작(CombatGirl 기본 몸 유지).
+    /// </summary>
+    public void SetRelicAndApply(RelicClassSO relic)
+    {
+        if (relic == null) return;
+        relicClass = relic;
+        ApplyRelic();
+    }
+
+    /// <summary>
+    /// 선택된 유물(relicClass)을 적용 — 행동 OnAttach(코드 패시브/메커닉)
+    /// + 유물 스탯(유물 스탯 필드 + 데이터 패시브 PassiveSO의 스탯 보정을 공통 베이스 위 가산)
+    /// + 고유스킬 클립 오버라이드 + 외형(오라). relicClass 없으면 무동작.
+    /// _relicApplied 가드로 중복 적용을 방지한다(패시브/스탯 이중 적용 차단).
+    /// </summary>
+    private void ApplyRelic()
+    {
+        if (relicClass == null || _relicApplied) return;
+        _relicApplied = true;
+
+        RelicBehavior = RelicRegistry.Create(relicClass.Id);
+        RelicBehavior?.OnAttach(this);
+
+        // 유물 스탯 — 유물 스탯 필드 + 데이터 패시브(PassiveSO)의 baseModifiers를 합쳐 유물 레이어에 가산.
+        // (코드형 트리거 패시브는 RelicBehavior.OnAttach에서 별도 등록 — 중복 아님.)
+        var relicMods = new System.Collections.Generic.List<StatModifier>();
+        if (relicClass.Stats != null) relicMods.AddRange(relicClass.Stats);
+        if (relicClass.Passives != null)
+            foreach (var p in relicClass.Passives)
+                if (p != null && p.baseModifiers != null) relicMods.AddRange(p.baseModifiers);
+        RuntimeStats?.ApplyRelicStats(relicMods);
+
+        if (!string.IsNullOrEmpty(relicClass.QSkillClipKey))
+            TryOverrideClip("QSkill_01", relicClass.QSkillClipKey);
+
+        // 외형 — 현재는 오라 VFX만(키 있을 때). 추후 모델/애니메이터 변형은 이 지점에서 확장.
+        if (!string.IsNullOrEmpty(relicClass.AuraVfxKey))
+            SpawnRelicAuraAsync(relicClass.AuraVfxKey, relicClass.AuraSocket).Forget();
+
+        Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (passives={relicClass.Passives?.Length ?? 0}, stats={relicMods.Count})");
+    }
+
+    /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>
+    private async UniTaskVoid SpawnRelicAuraAsync(string key, string socket)
+    {
+        ReleaseRelicAura();
+
+        Transform parent = string.IsNullOrEmpty(socket)
+            ? transform
+            : (Util.FindDeepChild(transform, socket) ?? transform);
+
+        try
+        {
+            _relicAuraInstance = await Managers.AddressableManager.InstantiateAsync(key, parent);
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[PlayerController] 유물 오라 VFX 로드 실패: {key}\n{e.Message}");
+        }
+    }
+
+    private void ReleaseRelicAura()
+    {
+        if (_relicAuraInstance != null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(_relicAuraInstance);
+            _relicAuraInstance = null;
+        }
+    }
+
     // ── 캐릭터 고유 스킬 ─────────────────────────────────────────────────────────
 
     /// <summary>
     /// 캐릭터 고유 스킬 런타임을 반환한다.
     /// 무기 스킬보다 우선 적용. null이면 무기 스킬 또는 레거시 폴백 사용.
     /// </summary>
-    public virtual ISkillRuntime CreateCharacterSkillRuntime(SkillType slot) => null;
+    public virtual ISkillRuntime CreateCharacterSkillRuntime(SkillType slot) => RelicBehavior?.CreateSkillRuntime(this, slot);
 
     /// <summary>캐릭터 고유 스킬의 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
-    public virtual float GetCharacterSkillCooldown(SkillType slot) => 0f;
+    public virtual float GetCharacterSkillCooldown(SkillType slot) => RelicBehavior?.GetSkillCooldown(slot) ?? 0f;
 
     //============================================================
     // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
     //============================================================
     public bool IsGrounded() => JumpAbility?.IsGrounded ?? true;
     public bool IsJumping => JumpAbility?.IsJumping ?? false;
+
+    /// <summary>
+    /// 공격/스킬 등 Act 상태가 캐릭터 facing(회전)을 소유 중인지 여부.
+    /// true면 이동 회전(DefaultMoveAbility)이 회전을 양보해 facing 경합을 막는다.
+    /// (None/Pickup 외의 모든 Act 상태 = 조준/공격이 회전을 주도)
+    /// </summary>
+    public bool IsActionControllingFacing =>
+        actSM != null && actSM.CurrentId != ActState.None && actSM.CurrentId != ActState.Pickup;
 
     /// <summary>착지 애니메이션 재생 중 여부. LocoAirState가 관리.</summary>
     public bool IsLanding { get; set; }
@@ -353,6 +451,12 @@ public class PlayerController : CharacterBase
 
         InitCoreComponents();
         await InitCharacterDataAsync();
+
+        // 비동기 로드 중 오브젝트가 파괴된 경우 중단한다.
+        // 여기서 멈추지 않으면 InitInputActions()가 파괴된 객체 위에 PlayerInputActions를 생성·Enable하지만
+        // OnDestroy는 이미 inputActions==null 상태로 지나가, 해당 인스턴스가 Dispose되지 못해 누수 경고가 발생한다.
+        if (destroyCancellationToken.IsCancellationRequested) return;
+
         InitInputActions();
         InitAbilities();
         InitWeaponManager();
@@ -389,6 +493,7 @@ public class PlayerController : CharacterBase
 
         AutoSetIdleIfNoAction();
         InitPassives();
+        ApplyRelic();
 
         if (inputReady) BindInputActions();
     }
@@ -462,6 +567,9 @@ public class PlayerController : CharacterBase
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyAnimation;
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyStats;
         }
+
+        RelicBehavior?.OnDetach(this);
+        ReleaseRelicAura();
     }
 
     //============================================================
@@ -742,8 +850,10 @@ public class PlayerController : CharacterBase
     //============================================================
     // Hooks (Derived)
     //============================================================
-    protected virtual void InitLayerFSMs() { }
-    protected virtual void RouteInputsToLayers() { }
+    /// <summary>FSM 상태 등록. 기본은 공통 세트(RegisterDefaultFSMs). 파생에서 override 가능.</summary>
+    protected virtual void InitLayerFSMs() => RegisterDefaultFSMs();
+    /// <summary>입력 라우팅. 기본은 공통 라우팅(DefaultRouteInputsToLayers). 파생에서 override 가능.</summary>
+    protected virtual void RouteInputsToLayers() => DefaultRouteInputsToLayers();
 
     /// <summary>
     /// 기본 FSM 등록 — 모든 캐릭터가 공유하는 Loco/Act 상태 세트.
@@ -851,11 +961,12 @@ public class PlayerController : CharacterBase
         if (cinemachineCamera == null) return;
         if (inputActions == null) return;
 
-        var input   = inputActions.Player.Move.ReadValue<Vector2>();
-        var forward = cinemachineCamera.transform.forward; forward.y = 0f;
-        var right   = cinemachineCamera.transform.right;   right.y   = 0f;
+        var input = inputActions.Player.Move.ReadValue<Vector2>();
 
-        moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
+        // 고정 탑다운(월드 정렬) 카메라 — 이동 기준은 월드축 고정.
+        // 시작 연출(오버헤드/투어)로 카메라가 움직이거나 거의 수직이 돼도 조작이 어긋나지 않도록
+        // 라이브 카메라 transform에 의존하지 않는다.
+        moveDirection = (Vector3.forward * input.y + Vector3.right * input.x).normalized;
     }
 
     /// <summary>
@@ -865,6 +976,8 @@ public class PlayerController : CharacterBase
     protected virtual bool IsInAttackOrSkillState() =>
         actSM.CurrentId == ActState.Attack      ||
         actSM.CurrentId == ActState.AttackReady ||
+        actSM.CurrentId == ActState.Charge      ||
+        actSM.CurrentId == ActState.HeavyAttack ||
         actSM.CurrentId == ActState.QSkill      ||
         actSM.CurrentId == ActState.ESkill      ||
         actSM.CurrentId == ActState.RSkill;

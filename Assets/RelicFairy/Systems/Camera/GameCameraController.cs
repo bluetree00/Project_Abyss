@@ -161,6 +161,27 @@ public class GameCameraController : MonoBehaviour
         if (_cinemachine != null) _cinemachine.PreviousStateIsValid = false;
     }
 
+    /// <summary>
+    /// 시작방 투어 종료 후 게임플레이 FreeLook으로 카메라 제어권을 넘긴다.
+    /// _introStarted를 점유해 레거시 OnPlayerBound→PlayIntroAsync 자동 줌인을 차단하고,
+    /// 투어가 꺼둔 Brain/FreeLook을 다시 켜 플레이어 추적으로 복귀시킨다.
+    /// </summary>
+    public void HandToGameplayCamera(Transform follow)
+    {
+        _introStarted = true; // 레거시 줌인 인트로(OnPlayerBound) 차단
+
+        if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_brain == null) _brain = GetComponent<CinemachineBrain>();
+
+        if (_cinemachine != null && follow != null)
+        {
+            _cinemachine.Follow = follow;
+            _cinemachine.LookAt = follow;
+        }
+        if (_cinemachine != null) _cinemachine.enabled = true;
+        if (_brain != null) _brain.enabled = true;
+    }
+
     public async UniTask PrepareMapViewAsync(Vector3 mapCenter, float fadeTime, CancellationToken ct)
     {
         if (_introStarted) return;

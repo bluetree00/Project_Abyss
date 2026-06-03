@@ -41,8 +41,8 @@ public class HolyShieldSkillRuntime : ISkillRuntime
         ctx.SetMoveScale(0f);
         ctx.Animator?.CrossFade(AnimName, 0.1f);
 
-        // 필살기 카메라 연출 (설정 있을 때만)
-        var cine = ctx.Controller?.CharacterData?.QSkillCinematic;
+        // 필살기 카메라 연출 — 유물 우선, 없으면 캐릭터 데이터 폴백 (설정 있을 때만)
+        var cine = ctx.Controller?.RelicClass?.QSkillCinematic ?? ctx.Controller?.CharacterData?.QSkillCinematic;
         if (cine != null)
             UltimateCinematicService.Play(cine, ctx.Controller.transform).Forget();
     }
@@ -95,8 +95,10 @@ public class HolyShieldSkillRuntime : ISkillRuntime
         // 타격/흡인 판정 중심을 방패 본체(시각 오브젝트)에 일치시킴
         _zone.SetHitOrigin(shieldBody);
 
-        // 방패 활성화 동안 갈라하드 전방 블록 플래그 ON (전방 방향은 매 프레임 추종됨)
-        if (_galahad != null)
+        // 방패 활성화 동안 전방 블록 플래그 ON (유물 경로 우선, 없으면 레거시 Galahad)
+        if (ctx.Controller != null && ctx.Controller.RelicBehavior is GalahadRelic gr)
+            gr.SetHolyShieldActive(ShieldDuration, pt.forward);
+        else if (_galahad != null)
             _galahad.SetHolyShieldActive(ShieldDuration, pt.forward);
     }
 

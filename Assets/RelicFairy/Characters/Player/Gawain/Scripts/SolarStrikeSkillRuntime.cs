@@ -52,8 +52,8 @@ public class SolarStrikeSkillRuntime : ISkillRuntime
         ctx.SetMoveScale(0f);
         ctx.Animator?.CrossFade(AnimName, 0.1f);
 
-        // 필살기 카메라 연출 (설정 있을 때만)
-        var cine = ctx.Controller?.CharacterData?.QSkillCinematic;
+        // 필살기 카메라 연출 — 유물 우선, 없으면 캐릭터 데이터 폴백 (설정 있을 때만)
+        var cine = ctx.Controller?.RelicClass?.QSkillCinematic ?? ctx.Controller?.CharacterData?.QSkillCinematic;
         if (cine != null)
             UltimateCinematicService.Play(cine, ctx.Controller.transform).Forget();
     }

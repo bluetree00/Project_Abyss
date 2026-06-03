@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 0b689842ca22e584e807939f23484601
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 355960
+  packageName: CombatGirls_SwordShieldCharacterPack
+  packageVersion: 1.1
+  assetPath: Assets/CombatGirlsCharacterPack/Unity Chan Toon Shader-built in/Editor/UniversalRP/UniversalToonGUI.cs
+  uploadId: 848774

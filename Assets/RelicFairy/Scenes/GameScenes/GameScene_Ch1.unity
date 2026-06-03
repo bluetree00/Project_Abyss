@@ -789,6 +789,7 @@ MonoBehaviour:
   startRoomTourFrameDuration: 0.5
   startRoomTourFrameAspect: 2.39
   startRoomTourDimAlpha: 0.2
+  startRoomTourFadeInDuration: 0.8
   startRoomTourFrameEase:
     serializedVersion: 2
     m_Curve:
@@ -1152,6 +1153,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerPrefabKey: 
+  startBodyKey: Gawain
   debugDefaultWeaponKey: T1_Bow
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
@@ -1162,12 +1164,11 @@ MonoBehaviour:
     type: 2}
   startRoomMapKey: 
   startWithZoneLayout: 1
-  useProcGen: 1
   runFlowController: {fileID: 0}
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:
-  - {fileID: 3817264450736926565, guid: dcad24e36c0786b44a5ed15fec98612a, type: 3}
-  - {fileID: 5942164450736926565, guid: 40799df5c852a6f4bbb4994f9a838d78, type: 3}
+  - {fileID: 6162335191038534878, guid: 686db347b775cd7489bb0e5994b8974f, type: 3}
+  - {fileID: 1566606819545522146, guid: 68ccc7cc0f9498246b459a83571e3c1b, type: 3}
   weaponPickupPrefabs:
   - {fileID: 6690277064601983092, guid: ebcb55c7fe8fe1e4db6c3312e7953481, type: 3}
   - {fileID: 3282498442510412308, guid: 70db2f5a193e2c44288aeeaa9562b402, type: 3}
@@ -1177,6 +1178,7 @@ MonoBehaviour:
     type: 3}
   wispPrefab: {fileID: 6090908717942830731, guid: aa5ed5db87064a74abe5c9c54978eacf,
     type: 3}
+  wispSpawnHeightOffset: 1.5
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}
