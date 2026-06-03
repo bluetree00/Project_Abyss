@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 80bd7ce6cad775a4e9de24e18eb5e61e
+timeCreated: 1518248457
+licenseType: Store
+ShaderImporter:
+  defaultTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 355960
+  packageName: CombatGirls_SwordShieldCharacterPack
+  packageVersion: 1.1
+  assetPath: Assets/CombatGirlsCharacterPack/Unity Chan Toon Shader-built in/Shader/UCTS_DoubleShadeWithFeather.cginc
+  uploadId: 848774

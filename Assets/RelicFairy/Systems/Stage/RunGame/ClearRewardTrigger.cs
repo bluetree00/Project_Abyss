@@ -157,15 +157,7 @@ public class ClearRewardTrigger : MonoBehaviour
         }
         catch (OperationCanceledException) { return; }
 
-        // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
-        // 절차 진행(procgen)에선 RunFlowController가 출구 게이트를 담당하므로 레거시 존 선택 UI를 띄우지 않는다.
-        bool procGen = GameRunBootstrapper.Instance != null && GameRunBootstrapper.Instance.UseProcGen;
-        if (!_isBossRoom && !procGen)
-        {
-            var zoneProgression = _run?.ZoneProgression;
-            zoneProgression?.EnableExitGateForZone(zoneProgression.CurrentZoneIndex);
-        }
-
+        // 절차 진행: RunFlowController가 출구 게이트를 담당하므로 레거시 존 클리어 게이트는 활성화하지 않는다.
         Destroy(gameObject);
     }
 

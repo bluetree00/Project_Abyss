@@ -267,6 +267,16 @@ public sealed class PlayerRuntimeStats
     private float _covenantMoveSpeed;   // 퍼센트 가산
     private float _covenantAttackSpeed; // 퍼센트 가산
 
+    // -- Relic (유물 클래스 스탯, 런 시작 시 1회) --
+    private int   _relicMelee;
+    private int   _relicRanged;
+    private int   _relicDefense;
+    private int   _relicLuck;
+    private int   _relicMaxHp;
+    private float _relicMoveSpeed;    // 퍼센트 가산
+    private float _relicAttackSpeed;  // 퍼센트 가산
+    private float _relicSkillCdr;
+
     // -- Grid Synergy (Always) --
     private int _synergyMelee;
     private int _synergyRanged;
@@ -564,6 +574,54 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
+    // ── 유물 클래스 스탯 ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 유물 클래스 스탯을 공통 베이스 위에 가산한다. 재호출 시 이전 기여를 reset 후 재적용(멱등).
+    /// </summary>
+    public void ApplyRelicStats(System.Collections.Generic.IReadOnlyList<StatModifier> mods)
+    {
+        // MaxHp는 합산 레이어가 아니므로 이전 기여분을 먼저 되돌린다.
+        if (_relicMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp - _relicMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        _relicMelee = _relicRanged = _relicDefense = _relicLuck = _relicMaxHp = 0;
+        _relicMoveSpeed = _relicAttackSpeed = _relicSkillCdr = 0f;
+
+        if (mods != null)
+        {
+            foreach (var mod in mods)
+            {
+                switch (mod.Type)
+                {
+                    case StatType.AttackPower:
+                        _relicMelee  += (int)mod.Value;
+                        _relicRanged += (int)mod.Value;
+                        break;
+                    case StatType.MeleeAttack:  _relicMelee   += (int)mod.Value; break;
+                    case StatType.RangedAttack: _relicRanged  += (int)mod.Value; break;
+                    case StatType.Defense:      _relicDefense += (int)mod.Value; break;
+                    case StatType.MaxHp:        _relicMaxHp   += (int)mod.Value; break;
+                    case StatType.Luck:         _relicLuck    += (int)mod.Value; break;
+                    case StatType.MoveSpeed:    _relicMoveSpeed   += mod.Value;  break;
+                    case StatType.AttackSpeed:  _relicAttackSpeed += mod.Value;  break;
+                    case StatType.SkillCooldownReduction: _relicSkillCdr += mod.Value; break;
+                }
+            }
+        }
+
+        if (_relicMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp + _relicMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        Recalculate();
+    }
+
     // ── 공격 속도 (패시브/특성에서 직접 조작) ────────────────────────────────────
 
     /// <summary>패시브 등에서 공격 속도 보너스를 직접 설정 (0.0 = 0%, 0.25 = +25%)</summary>
@@ -610,10 +668,10 @@ public sealed class PlayerRuntimeStats
         float defMul  = (1f + _itemAllStatsPercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
-        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + condMelee;
-        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + condRanged;
-        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _synergyDefense + _awakeningDefense;
-        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck;
+        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + _relicMelee   + condMelee;
+        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + _relicRanged  + condRanged;
+        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _synergyDefense + _awakeningDefense + _relicDefense;
+        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck + _relicLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
         RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
@@ -631,10 +689,10 @@ public sealed class PlayerRuntimeStats
             }
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + condAttackSpeed);
-        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
+        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr + _relicSkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신

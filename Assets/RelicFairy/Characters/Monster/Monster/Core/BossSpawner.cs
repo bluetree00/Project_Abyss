@@ -139,8 +139,9 @@ public class BossSpawner : MonoBehaviour
 
     private void OnDestroy()
     {
+        // 종료/씬 정리 시 Managers가 먼저 파괴되면 AddressableManager가 null이므로 ?. 가드
         if (_spawnedBossGO != null)
-            Managers.AddressableManager.ReleaseInstance(_spawnedBossGO);
+            Managers.AddressableManager?.ReleaseInstance(_spawnedBossGO);
     }
 
     private async UniTaskVoid SpawnBossAsync()
