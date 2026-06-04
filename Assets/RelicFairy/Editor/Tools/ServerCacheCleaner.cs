@@ -19,9 +19,11 @@ public static class ServerCacheCleaner
         "buff_data.json",               // BuffDataManager
         "passive_data.json",            // PlayerDataManager (passive)
         "character_data.json",          // PlayerDataManager (character stat)
-        "merlin_rune_synergy_data.json", // RuneDataManager (synergy)
-        "merlin_rune_piece_data.json",  // RuneDataManager (piece)
-        "merlin_rune_zone_map.json",    // RuneDataManager (zone map)
+        "merlin_rune_synergy_data.json", // BlockDataManager (synergy)
+        "merlin_rune_piece_data.json",  // BlockDataManager (piece)
+        "merlin_rune_zone_map.json",    // BlockDataManager (zone map)
+        "covenant_stat_data.json",      // CovenantDataManager
+        "relic_awakening_data.json",    // RelicAwakeningDataManager
     };
 
     private const string ZoneLayoutPrefix = "zone_layout_"; // ZoneLayoutManager

@@ -233,6 +233,23 @@ public class PlayerController : CharacterBase
     private bool isRunChecked = false;
     public bool IsRunChecked => isRunChecked;
 
+    //============================================================
+    // 로코모션 모드 — 유물 보유 시 자동 걷기→달리기, 우클릭 대시 후 달리기 유지
+    //============================================================
+    /// <summary>유물 보유 여부.</summary>
+    public bool HasRelic => RelicBehavior != null;
+    /// <summary>장비(무기) 보유 여부. 달리기 기능은 장비 획득 시 활성화된다.</summary>
+    public bool HasWeapon => WeaponManager != null && WeaponManager.HasWeapon;
+    /// <summary>현재 달리기 중인지(LocoMoveState가 결정·설정, DefaultMoveAbility가 속도에 사용).</summary>
+    public bool IsRunning { get; set; }
+    private bool _runAfterDash;
+    /// <summary>대시(우클릭) 종료 시 다음 이동을 달리기로 시작하도록 요청.</summary>
+    public void RequestRunAfterDash() => _runAfterDash = true;
+    /// <summary>대시 후 달리기 요청을 소비(읽고 클리어).</summary>
+    public bool ConsumeRunAfterDash() { bool v = _runAfterDash; _runAfterDash = false; return v; }
+    /// <summary>대시 후 달리기 요청 클리어(정지/Idle 시).</summary>
+    public void ClearRunAfterDash() => _runAfterDash = false;
+
     // 입력 정책(무기 타입별: 소드/활 등)
     private IAttackInputPolicy _attackPolicy;
 
@@ -362,14 +379,18 @@ public class PlayerController : CharacterBase
         RelicBehavior = RelicRegistry.Create(relicClass.Id);
         RelicBehavior?.OnAttach(this);
 
-        // 유물 스탯 — 유물 스탯 필드 + 데이터 패시브(PassiveSO)의 baseModifiers를 합쳐 유물 레이어에 가산.
-        // (코드형 트리거 패시브는 RelicBehavior.OnAttach에서 별도 등록 — 중복 아님.)
-        var relicMods = new System.Collections.Generic.List<StatModifier>();
-        if (relicClass.Stats != null) relicMods.AddRange(relicClass.Stats);
-        if (relicClass.Passives != null)
-            foreach (var p in relicClass.Passives)
-                if (p != null && p.baseModifiers != null) relicMods.AddRange(p.baseModifiers);
-        RuntimeStats?.ApplyRelicStats(relicMods);
+        // 유물 스탯 — 유물 char_id 행(서버)으로 전체 교체(유물이 곧 캐릭터).
+        // 서버 데이터/행 없으면 유물 StatModifier 가산으로 폴백.
+        string relicCharId = relicClass.Id.ToString().ToLower(); // Gawain → "gawain"
+        if (!TryApplyServerStats(relicCharId))
+        {
+            var relicMods = new System.Collections.Generic.List<StatModifier>();
+            if (relicClass.Stats != null) relicMods.AddRange(relicClass.Stats);
+            if (relicClass.Passives != null)
+                foreach (var p in relicClass.Passives)
+                    if (p != null && p.baseModifiers != null) relicMods.AddRange(p.baseModifiers);
+            RuntimeStats?.ApplyRelicStats(relicMods);
+        }
 
         if (!string.IsNullOrEmpty(relicClass.QSkillClipKey))
             TryOverrideClip("QSkill_01", relicClass.QSkillClipKey);
@@ -378,7 +399,7 @@ public class PlayerController : CharacterBase
         if (!string.IsNullOrEmpty(relicClass.AuraVfxKey))
             SpawnRelicAuraAsync(relicClass.AuraVfxKey, relicClass.AuraSocket).Forget();
 
-        Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (passives={relicClass.Passives?.Length ?? 0}, stats={relicMods.Count})");
+        Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (char_id={relicCharId}, passives={relicClass.Passives?.Length ?? 0})");
     }
 
     /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>
@@ -437,6 +458,14 @@ public class PlayerController : CharacterBase
 
     /// <summary>착지 애니메이션 재생 중 여부. LocoAirState가 관리.</summary>
     public bool IsLanding { get; set; }
+
+    // 회전(facing) 목표 — 각 회전 writer가 저장하고, FixedUpdate(ApplyFacing)에서 Rigidbody에 적용한다.
+    // Update에서 회전을 직접 대입하면 Rigidbody Interpolate 보간과 타이밍이 어긋나 회전 각도에서 진동이 생긴다.
+    private Quaternion _targetFacing;
+    private bool _facingDirty;
+
+    /// <summary>회전 목표를 지정한다. 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.rotation으로 수행.</summary>
+    public void RequestFacing(Quaternion rot) { _targetFacing = rot; _facingDirty = true; }
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -543,10 +572,26 @@ public class PlayerController : CharacterBase
         JumpAbility?.UpdateGroundCheck(this);
         JumpAbility?.ApplyGravity(this);
         FreezeRotation();
+        ApplyFacing();
 
         // 계단 오르기: FixedUpdate에서 실행해야 물리 충돌 전 위치 보정이 적용됨
         if (IsGrounded() && moveDirection.sqrMagnitude > 0.01f)
             MoveAbility?.StepClimb(this, moveDirection.normalized);
+    }
+
+    /// <summary>
+    /// 회전 목표(_targetFacing)를 Rigidbody에 적용. FixedUpdate에서만 호출한다.
+    /// Rigidbody.rotation(텔레포트)으로 설정 — 회전축 freeze 제약을 우회하면서
+    /// 물리 스텝에 동기화돼 Interpolate 보간과 충돌(진동)하지 않는다.
+    /// </summary>
+    private void ApplyFacing()
+    {
+        // 회전 요청이 있었던 프레임에만 적용한다. (유휴/연출 중 외부 회전을 덮어쓰지 않도록)
+        if (!_facingDirty || Rigid == null) return;
+        // MoveRotation: Interpolate 보간과 정합되는 회전 적용(텔레포트 대입은 보간과 어긋나 진동).
+        // Y축 회전 freeze가 풀려 있어야 적용된다(X/Z는 freeze 유지로 넘어짐 방지).
+        Rigid.MoveRotation(_targetFacing);
+        _facingDirty = false;
     }
 
     private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
@@ -642,6 +687,13 @@ public class PlayerController : CharacterBase
             characterData = preloaded;
             characterData.Initialize();
         }
+        else if (characterData != null)
+        {
+            // 프리팹에 베이스 CharacterData가 직접 지정된 경우(범용 바디 등):
+            // 이름 기반 Addressables 로드 대신 지정된 SO를 그대로 사용한다.
+            // (GameObject 이름/스폰 키가 바뀌어도 안전 — 이름 의존성 제거)
+            characterData.Initialize();
+        }
         else
         {
             // SO가 없으면 Addressables에서 로드 (키 형식: "MageData", "KnightData" 등)
@@ -649,8 +701,9 @@ public class PlayerController : CharacterBase
             await LoadCharacterDataAsync(characterName + "Data");
         }
 
-        // 스탯 초기화: 서버 우선 → SO 폴백
-        bool serverApplied = TryInitFromServer();
+        // 스탯 초기화: 무유물 기본은 'knight' 서버 행 → 서버 없으면 SO 폴백.
+        // (유물 획득 시 ApplyRelic에서 해당 유물 char_id 행으로 교체)
+        bool serverApplied = TryApplyServerStats("knight");
         if (!serverApplied && characterData != null)
         {
             RuntimeStats.InitializeFrom(characterData);
@@ -668,20 +721,18 @@ public class PlayerController : CharacterBase
         }
     }
 
-    /// <summary>서버 PlayerStatEntry로 RuntimeStats 초기화 시도. 성공하면 true.</summary>
-    private bool TryInitFromServer()
+    /// <summary>
+    /// 지정 char_id의 서버 PlayerStatEntry로 RuntimeStats + CharacterData(수치)를 적용한다.
+    /// 무유물 기본은 "knight", 유물 획득 시 유물 char_id("gawain"/"galahad")로 호출 → 행 전체 교체.
+    /// 서버 데이터/매칭 행이 없으면 false(호출자가 폴백 처리).
+    /// </summary>
+    private bool TryApplyServerStats(string charId)
     {
-        var mgr = Managers.PlayerData;
-        if (mgr == null || !mgr.IsInitialized || mgr.GetAllPlayers().Count == 0)
-            return false;
+        if (string.IsNullOrEmpty(charId)) return false;
 
-        // 캐릭터 ID 결정: 로비 선택 or 프리팹 이름
-        string charId = null;
-        var preloaded = Managers.CharacterData?.M_CharacterData;
-        if (preloaded != null)
-            charId = preloaded.conClass.ToString().ToLower(); // Knight → knight
-        if (string.IsNullOrEmpty(charId))
-            charId = gameObject.name.Replace("(Clone)", "").ToLower();
+        var mgr = Managers.PlayerData;
+        if (mgr == null || !mgr.IsInitialized)
+            return false;
 
         var entry = mgr.GetPlayer(charId);
         if (entry == null)
@@ -689,6 +740,8 @@ public class PlayerController : CharacterBase
 
         var passives = mgr.GetPassives(entry.passive_id);
         RuntimeStats.InitializeFromServer(entry, passives);
+
+        var preloaded = Managers.CharacterData?.M_CharacterData;
 
         // SO 의 LayerMask/Sprite/Passive 참조는 유지하되 수치 컬럼은 CSV(서버) 로 덮어쓴다.
         // 원본 .asset 을 변경하지 않도록 Instantiate 로 런타임 클론을 만든 뒤 적용.
@@ -987,6 +1040,9 @@ public class PlayerController : CharacterBase
     //============================================================
     private void OnWeaponChangedApplyAnimation(WeaponData newWeapon, GameObject weaponInstance)
     {
+        // 이전 무기 오버라이드 원복 (로코모션 포함) — 무기 교체/해제 시 이전 클립이 남지 않도록.
+        _animSvc?.ResetOverrides();
+
         // null 무기면 정책 제거
         if (newWeapon == null)
         {
@@ -1182,13 +1238,13 @@ public class PlayerController : CharacterBase
     public void RotateTowardsInput()
     {
         if (moveDirection.sqrMagnitude < 0.0001f) return;
-        transform.rotation = Quaternion.LookRotation(moveDirection);
+        RequestFacing(Quaternion.LookRotation(moveDirection));
     }
 
     public void RotateTowardsMousePosition()
     {
         if (TryComputeMouseLookDir(out var lookDir))
-            transform.rotation = Quaternion.LookRotation(lookDir);
+            RequestFacing(Quaternion.LookRotation(lookDir));
     }
 
     /// <summary>
@@ -1201,7 +1257,7 @@ public class PlayerController : CharacterBase
     public void RotateTowardsMouseWithAimAssist(float radius, float coneHalfAngleDeg, float strength)
     {
         Quaternion target = ComputeMouseAimAssistRotation(radius, coneHalfAngleDeg, strength);
-        transform.rotation = target;
+        RequestFacing(target);
     }
 
     /// <summary>

@@ -15,13 +15,33 @@ MonoBehaviour:
   m_GroupName: Characters
   m_GUID: b0930bf1af79c624a8497762c3e7fc29
   m_SerializeEntries:
+  - m_GUID: 119497b481e20d54f843d3cf322d7234
+    m_Address: LichSkeleton/LichSkeleton
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c425dec343c6934d9cac8328bc6459f
+    m_Address: GalahadData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 39ccc23cef14bfc4fab16530b8ec845b
     m_Address: Mage
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 483eca6c86d325247aadb5dc035e7bec
+    m_Address: PlayerCharacter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 76886d098064fa34b949e31d57f32f9a
     m_Address: MageData
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d11b99f341fb2e49a0b8cccd382c24a
+    m_Address: GawainData
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -40,6 +60,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d939ac2c7eb19f449b1da4037284b0c2
+    m_Address: Galahad
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e3d581ee3dd828f4fa05678debfe60f7
     m_Address: Basic_Arrow_01
     m_ReadOnly: 0
@@ -50,38 +75,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 119497b481e20d54f843d3cf322d7234
-    m_Address: LichSkeleton/LichSkeleton
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f4d13a3c66c240f4a810682e04439af0
-    m_Address: Lich/Lich
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1d91ecda547e384a9849796ff4a66ae
     m_Address: Lich/LichAnimator
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d939ac2c7eb19f449b1da4037284b0c2
-    m_Address: Galahad
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 483eca6c86d325247aadb5dc035e7bec
-    m_Address: Gawain
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1c425dec343c6934d9cac8328bc6459f
-    m_Address: GalahadData
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7d11b99f341fb2e49a0b8cccd382c24a
-    m_Address: GawainData
+  - m_GUID: f4d13a3c66c240f4a810682e04439af0
+    m_Address: Lich/Lich
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

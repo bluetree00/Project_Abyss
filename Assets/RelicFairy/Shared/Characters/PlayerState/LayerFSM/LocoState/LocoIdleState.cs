@@ -17,6 +17,10 @@ public class LocoIdleState : ILayerState<LocoState>
         if (!_controller.Combo.IsAttacking)
             _controller.Anim.CrossFade("MoveBlend", 0.1f);
         SetSpeedParam(_controller.Anim, 0f);
+
+        // 정지 → 달리기 상태/대시-후-달리기 요청 해제 (다음 이동은 걷기부터)
+        _controller.IsRunning = false;
+        _controller.ClearRunAfterDash();
     }
 
     public void Update()

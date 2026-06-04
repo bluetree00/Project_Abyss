@@ -11,7 +11,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [SerializeField] private string playerPrefabKey = "Knight";
     [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
-    [SerializeField] private string startBodyKey = "Gawain";
+    [SerializeField] private string startBodyKey = "PlayerCharacter";
     [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
