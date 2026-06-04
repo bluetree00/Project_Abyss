@@ -27,6 +27,8 @@ public class ActAttackState : ILayerState<ActState>
     private float _stepLastNT;
     private Vector3 _stepDir;
     private float _effectiveStepDistance;
+    private float _aimCompleteBonus;   // 유도 완료 시 추가 전진 거리 (mapping 값)
+    private bool  _bonusApplied;       // 이번 타에 보너스를 이미 반영했는지
 
     // ── 회전 Lerp 상태 ──────────────────────────────────────────────────────
     // RotateTowards 방식 — 매 프레임 현재 회전에서 목표로 일정 각속도로 접근.
@@ -191,17 +193,33 @@ public class ActAttackState : ILayerState<ActState>
     {
         if (!_aimRotating || _aimRotationDuration <= 0f) return;
 
-        var t = _controller.transform;
+        // 현재 회전은 Rigidbody(실제 적용 주체)에서 읽고, 목표는 RequestFacing으로 넘겨
+        // FixedUpdate(ApplyFacing)에서 적용한다. (Update 직접 대입 시 보간과 충돌해 진동)
+        Quaternion cur = _controller.Rigid != null ? _controller.Rigid.rotation : _controller.transform.rotation;
         // 180° 를 duration 안에 완주하는 각속도 (deg/s)
         float maxAngleStep = (180f / _aimRotationDuration) * Time.deltaTime;
-        t.rotation = Quaternion.RotateTowards(t.rotation, _aimTargetRot, maxAngleStep);
+        Quaternion next = Quaternion.RotateTowards(cur, _aimTargetRot, maxAngleStep);
+        _controller.RequestFacing(next);
 
         // 목표 근처(0.5° 미만)면 완료
-        if (Quaternion.Angle(t.rotation, _aimTargetRot) < 0.5f)
+        if (Quaternion.Angle(next, _aimTargetRot) < 0.5f)
         {
-            t.rotation = _aimTargetRot;
+            _controller.RequestFacing(_aimTargetRot);
             _aimRotating = false;
+            TryApplyAimCompleteBonus();
         }
+    }
+
+    /// <summary>
+    /// 유도 회전이 목표에 정렬 완료된 순간(1회) 추가 전진 거리를 반영한다.
+    /// "현재 전진거리 + 보너스" 를 다시 SphereCast 로 캡 계산해, 정면 적/벽 앞에서
+    /// 멈추도록 한다(관통 방지). 보너스가 없거나 이미 반영했으면 무시.
+    /// </summary>
+    private void TryApplyAimCompleteBonus()
+    {
+        if (_bonusApplied || _aimCompleteBonus <= 0f) return;
+        _bonusApplied = true;
+        _effectiveStepDistance = ComputeEffectiveStepDistance(_effectiveStepDistance + _aimCompleteBonus);
     }
 
     /// <summary>
@@ -361,6 +379,8 @@ public class ActAttackState : ILayerState<ActState>
         _currentMapping        = null;
         _stepLastNT            = 0f;
         _effectiveStepDistance = 0f;
+        _aimCompleteBonus      = 0f;
+        _bonusApplied          = false;
         _aimRotating           = false;
 
         _controller.Combo.SetAttacking(false);
@@ -492,7 +512,7 @@ public class ActAttackState : ILayerState<ActState>
         // duration 이 0 이면 즉시 적용, 아니면 매 프레임 RotateTowards
         if (_aimRotationDuration <= 0f)
         {
-            _controller.transform.rotation = _aimTargetRot;
+            _controller.RequestFacing(_aimTargetRot);
             _aimRotating = false;
         }
         else
@@ -511,6 +531,12 @@ public class ActAttackState : ILayerState<ActState>
         // 정면 SphereCast 로 적/벽 사전 탐지 → effective lunge 거리 결정
         _effectiveStepDistance = ComputeEffectiveStepDistance(
             _currentMapping != null ? _currentMapping.attackStepDistance : 0f);
+
+        // 유도 완료 시 추가 전진 보너스 — 이번 타 기준으로 초기화
+        _aimCompleteBonus = _currentMapping != null ? _currentMapping.aimCompleteStepBonus : 0f;
+        _bonusApplied = false;
+        // 유도 회전이 즉시 스냅(_aimRotating=false)이면 이미 정렬 완료 → 바로 보너스 반영
+        if (!_aimRotating) TryApplyAimCompleteBonus();
 
         // 이 단계의 이동 입력 스케일 적용 (0 = 평소대로 정지, >0 = 약간 반영)
         if (_currentMapping != null)

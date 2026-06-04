@@ -26370,6 +26370,7 @@ MonoBehaviour:
   startRoomTourHeight: 6
   startRoomTourArc: 90
   startRoomWispBlendDuration: 1
+  startRoomPlayerBlendDuration: 1.2
   startRoomTourFrameDuration: 0.5
   startRoomTourFrameAspect: 2.39
   startRoomTourDimAlpha: 0.2
@@ -52447,7 +52448,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4c506c3bf4371748837bd380ff194f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerPrefabKey: Gawain
+  playerPrefabKey: PlayerCharacter
+  startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T3_Katana
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
@@ -52458,7 +52460,6 @@ MonoBehaviour:
     type: 2}
   startRoomMapKey: 
   startWithZoneLayout: 0
-  useProcGen: 0
   runFlowController: {fileID: 0}
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:

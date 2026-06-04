@@ -34,6 +34,8 @@ public class WeaponAnimationSetSO : ScriptableObject
         [Range(0f, 1f)] public float attackStepStartNorm = 0.10f;
         [Tooltip("전진 종료 normalizedTime. 실제 HitStep 이전이 적절(0.40).")]
         [Range(0f, 1f)] public float attackStepEndNorm   = 0.40f;
+        [Tooltip("유도(Aim Assist) 회전이 목표에 정렬 완료된 순간 추가로 전진할 거리(m). 0 이면 보너스 없음. 정면 적/벽 앞에서는 캡되어 멈춤(관통 안 함).")]
+        [Range(0f, 3f)] public float aimCompleteStepBonus = 0f;
 
         [Header("공격 중 입력 반영")]
         [Tooltip("공격 중 이동 입력을 어느 정도 반영할지 (0=완전 정지, 1=평소). 무기/콤보별 기동성 조절.")]

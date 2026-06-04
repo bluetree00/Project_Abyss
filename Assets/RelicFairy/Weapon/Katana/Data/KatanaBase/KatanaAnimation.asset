@@ -20,6 +20,15 @@ MonoBehaviour:
   animGroups:
   - groupType: 0
     clipMappings:
+    - baseClipName: Idle_Wait_B
+      addressableKey: APose_Idle
+      actionType: 0
+    - baseClipName: Mvm_Walk
+      addressableKey: 'APose_Walk[GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace]'
+      actionType: 0
+    - baseClipName: Mvm_PowerDash_Front
+      addressableKey: SS_Sprint
+      actionType: 0
     - baseClipName: GroundLightAttack_01
       addressableKey: GroundLightAttack_01
       actionType: 1
@@ -33,6 +42,7 @@ MonoBehaviour:
       attackStepDistance: 1.0
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.50
+      aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: GroundLightAttack_02
       addressableKey: GroundLightAttack_02
@@ -47,6 +57,7 @@ MonoBehaviour:
       attackStepDistance: 1.0
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.50
+      aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: GroundLightAttack_03
       addressableKey: GroundLightAttack_03
@@ -61,6 +72,7 @@ MonoBehaviour:
       attackStepDistance: 1.8
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.55
+      aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: HeavyCharge
       addressableKey: HeavyCharge

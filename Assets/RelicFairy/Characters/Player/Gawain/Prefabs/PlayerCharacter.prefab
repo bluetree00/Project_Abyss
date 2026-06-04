@@ -47,7 +47,7 @@ GameObject:
   - component: {fileID: 7912345678901234567}
   - component: {fileID: 1627041588284324856}
   m_Layer: 0
-  m_Name: Gawain
+  m_Name: PlayerCharacter
   m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -116,7 +116,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 112
+  m_Constraints: 80
   m_CollisionDetection: 0
 --- !u!136 &3421531397081364913
 CapsuleCollider:
@@ -192,7 +192,7 @@ MonoBehaviour:
   _hitBloodVfxScale: 1
   _hitBloodVfxHeightOffset: 1
   _globalAttackAnimSpeedScale: 1.25
-  characterData: {fileID: 0}
+  characterData: {fileID: 11400000, guid: da974d0847d259d45a495f76043c83af, type: 2}
   relicClass: {fileID: 0}
   debugInvincible: 0
   cinemachineCamera: {fileID: 0}
@@ -340,7 +340,11 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 2747218217862792314}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4148577747263735198, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1320678881764113544}
   m_SourcePrefab: {fileID: 100100000, guid: b5f2179a52b86c14589ef598cfa7ffa5, type: 3}
 --- !u!4 &1154403375714729684 stripped
 Transform:
@@ -348,6 +352,29 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 1697851272020990271}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &3322899817713065121 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4148577747263735198, guid: b5f2179a52b86c14589ef598cfa7ffa5,
+    type: 3}
+  m_PrefabInstance: {fileID: 1697851272020990271}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1320678881764113544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3322899817713065121}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1422b0117f22f3945b98101d540de83b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HairSpringBones
+  boneRoots: []
+  stiffness: 0.2
+  damping: 0.4
+  gravity: 0.3
+  maxDeltaTime: 0.03
 --- !u!4 &5254294612690553099 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -2349476437193732044, guid: b5f2179a52b86c14589ef598cfa7ffa5,

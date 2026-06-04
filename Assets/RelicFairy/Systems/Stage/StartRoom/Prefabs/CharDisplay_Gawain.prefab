@@ -67,7 +67,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterDisplayStand
   characterData: {fileID: 11400000, guid: 7d11b99f341fb2e49a0b8cccd382c24a, type: 2}
-  characterPrefabKey: Gawain
+  characterPrefabKey: PlayerCharacter
   relicClass: {fileID: 11400000, guid: 0296196c76b8a14448eba2486d733d86, type: 2}
   displayRotationY: 180
   displayOffsetY: 0

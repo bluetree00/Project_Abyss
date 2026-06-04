@@ -21,6 +21,15 @@ MonoBehaviour:
   animGroups:
   - groupType: 0
     clipMappings:
+    - baseClipName: Idle_Wait_B
+      addressableKey: APose_Idle
+      actionType: 0
+    - baseClipName: Mvm_Walk
+      addressableKey: 'APose_Walk[GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace]'
+      actionType: 0
+    - baseClipName: Mvm_PowerDash_Front
+      addressableKey: SS_Sprint
+      actionType: 0
     - baseClipName: GroundLightAttack_01
       addressableKey: GreatswordAttack_01
       actionType: 1
@@ -34,6 +43,7 @@ MonoBehaviour:
       attackStepDistance: 1.6
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.55
+      aimCompleteStepBonus: 0.8
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_02
@@ -49,6 +59,7 @@ MonoBehaviour:
       attackStepDistance: 1.6
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.55
+      aimCompleteStepBonus: 0.8
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_03
@@ -64,6 +75,7 @@ MonoBehaviour:
       attackStepDistance: 2.8
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.60
+      aimCompleteStepBonus: 0.8
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: QSkill_01

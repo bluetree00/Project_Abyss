@@ -25,7 +25,11 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         }
 
         Vector3 moveDir = direction.normalized;
-        float speed = owner.CharacterData.baseMoveSpeed * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
+        // 달리기 상태(LocoMoveState 결정)면 달리기 속도(baseRunSpeed 설정 시), 아니면 걷기(baseMoveSpeed).
+        float baseSpd = (owner.IsRunning && owner.CharacterData.baseRunSpeed > 0.01f)
+            ? owner.CharacterData.baseRunSpeed
+            : owner.CharacterData.baseMoveSpeed;
+        float speed = baseSpd * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
 
         owner.Rigid.linearVelocity = new Vector3(moveDir.x * speed, owner.Rigid.linearVelocity.y, moveDir.z * speed);
 
@@ -33,10 +37,12 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         if (owner.IsActionControllingFacing) return;
 
         // 이동 방향(=실제 진행 방향)으로 Yaw만 임계 감쇠 회전 — 프레임률 독립, 오버슈트 없음.
-        float currentYaw = owner.transform.eulerAngles.y;
+        // 실제 적용은 PlayerController.FixedUpdate(ApplyFacing)에서 Rigidbody에 한다.
+        // (Update에서 Rigidbody.rotation 직접 대입 시 보간 타이밍과 어긋나 회전 각도에서 진동 발생)
+        float currentYaw = owner.Rigid.rotation.eulerAngles.y;
         float targetYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
         float yaw = Mathf.SmoothDampAngle(currentYaw, targetYaw, ref _yawVelocity, RotationSmoothTime);
-        owner.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        owner.RequestFacing(Quaternion.Euler(0f, yaw, 0f));
     }
 
     // FixedUpdate에서 호출 — 물리 충돌 처리 전 위치를 보정해 계단 수직면과의 충돌 없이 올라감.

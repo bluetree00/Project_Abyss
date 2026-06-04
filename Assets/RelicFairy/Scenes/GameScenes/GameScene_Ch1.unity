@@ -265,8 +265,8 @@ MonoBehaviour:
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -704,8 +704,8 @@ MonoBehaviour:
       m_LegacyHeadingDefinition: -1
       m_LegacyVelocityFilterStrength: -1
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -786,6 +786,7 @@ MonoBehaviour:
   startRoomTourHeight: 6
   startRoomTourArc: 90
   startRoomWispBlendDuration: 1
+  startRoomPlayerBlendDuration: 1.2
   startRoomTourFrameDuration: 0.5
   startRoomTourFrameAspect: 2.39
   startRoomTourDimAlpha: 0.2
@@ -1153,7 +1154,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerPrefabKey: 
-  startBodyKey: Gawain
+  startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T1_Bow
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
@@ -1455,8 +1456,8 @@ MonoBehaviour:
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0
@@ -3588,8 +3589,8 @@ MonoBehaviour:
   m_RollDamping: 0
   m_AngularDamping: 0
   m_Heading:
-    m_Definition: 2
-    m_VelocityFilterStrength: 4
+    m_Definition: 3
+    m_VelocityFilterStrength: 0
     m_Bias: 0
   m_RecenterToTargetHeading:
     m_enabled: 0

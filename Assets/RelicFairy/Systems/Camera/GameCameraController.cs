@@ -32,6 +32,7 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float startRoomTourHeight   = 6f;    // 천장(약 11.9) 아래 방 내부로
     [SerializeField] private float startRoomTourArc      = 90f; // 좌우 스윕 각도(도)
     [SerializeField] private float startRoomWispBlendDuration = 1f; // 둘러보기 → Wisp 추적 전환 보간 시간
+    [SerializeField] private float startRoomPlayerBlendDuration = 1.2f; // 둘러보기 → 플레이어(CombatGirl) 추적 전환 보간 시간
 
     [Header("Start Room Tour 시네마틱 프레임 (레터박스)")]
     [SerializeField] private float          startRoomTourFrameDuration = 0.5f;  // 바 슬라이드 인/아웃 시간
@@ -164,7 +165,7 @@ public class GameCameraController : MonoBehaviour
     /// <summary>
     /// 시작방 투어 종료 후 게임플레이 FreeLook으로 카메라 제어권을 넘긴다.
     /// _introStarted를 점유해 레거시 OnPlayerBound→PlayIntroAsync 자동 줌인을 차단하고,
-    /// 투어가 꺼둔 Brain/FreeLook을 다시 켜 플레이어 추적으로 복귀시킨다.
+    /// 투어 종료 포즈에서 플레이어 추적 시점으로 부드럽게 보간한 뒤 Brain에 인계한다.
     /// </summary>
     public void HandToGameplayCamera(Transform follow)
     {
@@ -178,8 +179,16 @@ public class GameCameraController : MonoBehaviour
             _cinemachine.Follow = follow;
             _cinemachine.LookAt = follow;
         }
-        if (_cinemachine != null) _cinemachine.enabled = true;
-        if (_brain != null) _brain.enabled = true;
+
+        // 투어 종료 포즈 → 플레이어 추적 시점 수동 보간 후 제어권 인계 (스냅 없는 전환 연출)
+        BlendToGameplayAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>둘러보기 종료 포즈에서 플레이어 추적 시점으로 보간 (HandToGameplayCamera에서 fire-and-forget).</summary>
+    private async UniTaskVoid BlendToGameplayAsync(CancellationToken ct)
+    {
+        try { await BlendToActiveCameraAsync(startRoomPlayerBlendDuration, ct); }
+        catch (OperationCanceledException) { }
     }
 
     public async UniTask PrepareMapViewAsync(Vector3 mapCenter, float fadeTime, CancellationToken ct)
