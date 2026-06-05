@@ -21,12 +21,12 @@ MonoBehaviour:
     maxDistance: 1.3
     priority: 0
     cooldown: 0.85
-    damageDelay: 0.18
+    damageDelay: 0.3
     attackDuration: 0.55
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 0f3655724fd91f64f9b5973cbe3db8f3, type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
   - name: DashSting
@@ -35,11 +35,11 @@ MonoBehaviour:
     maxDistance: 1.9
     priority: 1
     cooldown: 1.1
-    damageDelay: 0.22
+    damageDelay: 0.3
     attackDuration: 0.7
     damageMultiplier: 1.1
     knockbackMultiplier: 1.1
     attackShapeOverride: {fileID: 11400000, guid: 8fda11f6c0e24547b88a823bd4f7147b, type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0

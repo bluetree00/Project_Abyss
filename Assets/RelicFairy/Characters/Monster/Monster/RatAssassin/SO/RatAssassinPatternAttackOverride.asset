@@ -19,12 +19,12 @@ MonoBehaviour:
     maxDistance: 1.4
     priority: 0
     cooldown: 0.85
-    damageDelay: 0.2
+    damageDelay: 0.3
     attackDuration: 0.7
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9, type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
@@ -55,7 +55,7 @@ MonoBehaviour:
     knockbackMultiplier: 1.15
     attackShapeOverride: {fileID: 11400000, guid: 478d4d8475e54a4c925f2737e9668c34,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
