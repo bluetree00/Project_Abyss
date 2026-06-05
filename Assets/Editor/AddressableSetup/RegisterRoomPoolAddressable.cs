@@ -5,15 +5,14 @@ using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
 
 /// <summary>
-/// CHAPTER_1_ROOM_POOL.csv를 Addressables에 "CHAPTER_1_ROOM_POOL" 키로 등록.
+/// CHAPTER_N_ROOM_POOL.csv(Ch1~4)를 Addressables에 "CHAPTER_N_ROOM_POOL" 키로 등록.
 /// 서버(뒤끝) 미업로드 시 ZoneLayoutManager.LoadPoolAsync의 Addressables 폴백 경로로 사용.
 /// 메뉴: RelicFairy/Addressables/Register Room Pool
 /// </summary>
 public static class RegisterRoomPoolAddressable
 {
-    private const string CsvPath   = "Assets/RelicFairy/Docs/CHAPTER_1_ROOM_POOL.csv";
-    private const string AddrKey   = "CHAPTER_1_ROOM_POOL";
-    private const string GroupName = "ChartData";
+    private const int    ChapterCount = 4;
+    private const string GroupName    = "ChartData";
 
     [MenuItem("RelicFairy/Addressables/Register Room Pool")]
     public static void Register()
@@ -25,33 +24,28 @@ public static class RegisterRoomPoolAddressable
             return;
         }
 
-        var guid = AssetDatabase.AssetPathToGUID(CsvPath);
-        if (string.IsNullOrEmpty(guid))
-        {
-            Debug.LogError($"[RegisterRoomPool] CSV 파일을 찾을 수 없습니다: {CsvPath}");
-            return;
-        }
-
-        var existing = settings.FindAssetEntry(guid);
-        if (existing != null)
-        {
-            existing.address = AddrKey;
-            EditorUtility.SetDirty(settings);
-            AssetDatabase.SaveAssets();
-            Debug.Log($"[RegisterRoomPool] 기존 항목 키 갱신: {AddrKey}");
-            return;
-        }
-
         var group = settings.FindGroup(GroupName)
                     ?? settings.CreateGroup(GroupName, false, false, false, null);
 
-        var entry = settings.CreateOrMoveEntry(guid, group, false, false);
-        entry.address = AddrKey;
+        for (int n = 1; n <= ChapterCount; n++)
+        {
+            var csvPath = $"Assets/RelicFairy/Docs/CHAPTER_{n}_ROOM_POOL.csv";
+            var addrKey = $"CHAPTER_{n}_ROOM_POOL";
+
+            var guid = AssetDatabase.AssetPathToGUID(csvPath);
+            if (string.IsNullOrEmpty(guid))
+            {
+                Debug.LogWarning($"[RegisterRoomPool] CSV 없음 — 스킵: {csvPath}");
+                continue;
+            }
+
+            var entry = settings.CreateOrMoveEntry(guid, group, false, false);
+            entry.address = addrKey;
+            Debug.Log($"[RegisterRoomPool] 등록: '{csvPath}' → key='{addrKey}'");
+        }
 
         EditorUtility.SetDirty(settings);
         AssetDatabase.SaveAssets();
-
-        Debug.Log($"[RegisterRoomPool] 등록 완료: '{CsvPath}' → key='{AddrKey}' (group='{GroupName}')");
     }
 }
 #endif

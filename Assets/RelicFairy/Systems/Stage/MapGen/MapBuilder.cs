@@ -452,6 +452,106 @@ public class MapBuilder
     }
 
     /// <summary>
+    /// 문 개구부 바깥으로 짧은 복도 스텁(바닥+측벽+천장+끝막이)을 뻗는다.
+    /// 격리형 방의 문 너머가 허공(절벽)으로 보이는 것을 막고 "뒤로 이어지는 통로" 느낌을 준다.
+    /// 방 블록과 동일 팔레트를 쓰고 parent(=roomGO)에 부착되어 디졸브/디스폰에 함께 동참한다.
+    /// </summary>
+    /// <param name="openingCenterLocal">개구부 바닥 중앙의 로컬 좌표(Build의 offset 규약과 동일).</param>
+    /// <param name="edge">문 엣지 — 바깥 방향 결정(North=+Z/South=-Z/East=+X/West=-X).</param>
+    /// <param name="widthCells">개구부 폭(셀 수). 측벽은 폭+1 위치에 세운다.</param>
+    /// <param name="lengthCells">바깥으로 뻗는 길이(셀 수). 0 이하면 아무것도 안 함.</param>
+    public static List<PlacedBlock> BuildDoorCorridor(
+        BlockPalette palette,
+        Transform    parent,
+        Vector3      openingCenterLocal,
+        DoorEdge     edge,
+        int          widthCells,
+        int          lengthCells,
+        float        cellSize,
+        float        baseY,
+        int          wallLayers)
+    {
+        var placed = new List<PlacedBlock>();
+        if (palette == null || lengthCells <= 0) return placed;
+
+        var floorDef = palette.Pick(TileType.Floor);
+        var wallDef  = palette.Pick(TileType.Wall);
+        var ceilDef  = palette.Pick(TileType.Ceiling);
+        bool ceilFlip = ceilDef == null;          // 전용 천장 없으면 바닥 타일 뒤집기(BuildCeiling과 동일)
+        var ceilUse  = ceilDef ?? floorDef;
+        if (floorDef?.prefab == null) return placed;
+
+        // 바깥/측면 단위 방향 (로컬 XZ)
+        Vector3 outward, lateral;
+        switch (edge)
+        {
+            case DoorEdge.North: outward = Vector3.forward; lateral = Vector3.right;   break; // +Z
+            case DoorEdge.South: outward = Vector3.back;    lateral = Vector3.right;   break; // -Z
+            case DoorEdge.East:  outward = Vector3.right;   lateral = Vector3.forward; break; // +X
+            case DoorEdge.West:  outward = Vector3.left;    lateral = Vector3.forward; break; // -X
+            default:             return placed;
+        }
+
+        int half       = Mathf.Max(0, widthCells / 2); // RoomDoorPlanner.Open과 동일 규약(개구부 = 2*half+1)
+        float ceilingY = baseY + wallLayers * cellSize;
+
+        // step=1..length: 바닥(개구부 폭) + 측벽(폭+1) + 천장
+        for (int step = 1; step <= lengthCells; step++)
+        {
+            Vector3 axis = openingCenterLocal + outward * (step * cellSize);
+
+            for (int lat = -half; lat <= half; lat++)
+            {
+                Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
+                Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Corridor_F_{step}_{lat}", TileType.Floor, placed);
+
+                Vector3 cLocal = fLocal; cLocal.y = ceilingY;
+                var cRot = ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
+                if (ceilUse?.prefab != null)
+                    Place(ceilUse, parent, cLocal, cRot, 3, $"Corridor_C_{step}_{lat}", TileType.Ceiling, placed);
+            }
+
+            if (wallDef?.prefab != null)
+                for (int sign = -1; sign <= 1; sign += 2)
+                    StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallLayers, $"Corridor_W_{step}_{sign}", placed);
+        }
+
+        // 끝막이 — 마지막 칸 너머를 벽으로 닫아 또 다른 절벽이 보이지 않게
+        if (wallDef?.prefab != null)
+        {
+            Vector3 capAxis = openingCenterLocal + outward * ((lengthCells + 1) * cellSize);
+            for (int lat = -(half + 1); lat <= half + 1; lat++)
+                StackWall(wallDef, parent, capAxis + lateral * (lat * cellSize), baseY, cellSize, wallLayers, $"Corridor_Cap_{lat}", placed);
+        }
+
+        return placed;
+    }
+
+    /// <summary>local 위치에 블록 1개 인스턴스화 후 placed에 기록.</summary>
+    private static void Place(
+        BlockDef def, Transform parent, Vector3 local, Quaternion rot, int layer, string name,
+        TileType tt, List<PlacedBlock> placed)
+    {
+        var world = parent.TransformPoint(local);
+        var go = Object.Instantiate(def.prefab, world, rot, parent);
+        go.name = name;
+        SetLayerRecursive(go, layer);
+        placed.Add(new PlacedBlock { instance = go, targetPosition = world, targetRotationY = rot.eulerAngles.y, tileType = tt, cell = Vector2Int.zero });
+    }
+
+    /// <summary>한 위치에 벽을 wallLayers만큼 수직으로 쌓는다.</summary>
+    private static void StackWall(
+        BlockDef wallDef, Transform parent, Vector3 baseLocal, float baseY, float cellSize, int wallLayers,
+        string name, List<PlacedBlock> placed)
+    {
+        for (int layer = 0; layer < Mathf.Max(1, wallLayers); layer++)
+        {
+            Vector3 local = baseLocal; local.y = baseY + layer * cellSize;
+            Place(wallDef, parent, local, Quaternion.identity, 8, $"{name}_L{layer}", TileType.Wall, placed);
+        }
+    }
+
+    /// <summary>
     /// 그리드 Floor 영역과 동일한 크기의 투명 바닥 콜라이더 생성.
     /// 외곽 벽 밖(방 경계 이탈)에서는 존재하지 않으므로, 플레이어가 벽을 뚫고 나가면
     /// SafeFloor 없이 바로 낙하 → FallRecoveryController가 _lastSafe로 복구.

@@ -63,17 +63,19 @@ public class RunFlowController : MonoBehaviour
     // ── Public ──────────────────────────────────────
 
     /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
-    /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.</summary>
-    public async UniTask StartRunAsync(Vector3? anchor = null)
+    /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.
+    /// poolKeyOverride: 챕터별 룸 풀 키(CHAPTER_N_ROOM_POOL). 비우면 직렬화된 _poolKey 사용.</summary>
+    public async UniTask StartRunAsync(Vector3? anchor = null, string poolKeyOverride = null)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
         _baseAnchor = anchor ?? (_anchor != null ? _anchor.position : Vector3.zero);
 
-        _pool = await Managers.ZoneLayout.LoadPoolAsync(_poolKey);
+        var poolKey = !string.IsNullOrEmpty(poolKeyOverride) ? poolKeyOverride : _poolKey;
+        _pool = await Managers.ZoneLayout.LoadPoolAsync(poolKey);
         if (_pool == null || _pool.Count == 0)
         {
-            Debug.LogError($"[RunFlow] 풀 로드 실패: {_poolKey}");
+            Debug.LogError($"[RunFlow] 풀 로드 실패: {poolKey}");
             return;
         }
 
