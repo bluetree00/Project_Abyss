@@ -513,6 +513,8 @@ public class MerlinRuneBridge : MonoBehaviour
     public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts,
                                     Dictionary<string, int> clusterSizes)
     {
+        Debug.Log($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={clusterSizes?.Count ?? 0}");
+
         // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화
         _lastClusterSizes.Clear();
         if (clusterSizes != null)
@@ -597,6 +599,9 @@ public class MerlinRuneBridge : MonoBehaviour
         if (player == null) return;
 
         player.RuntimeStats.ApplySynergyMechanicEffect(entry);
+
+        // 속성 단계 효과 스켈레톤 연결: 단계 도달 시 효과 핸들러 활성화 (본문은 단계적 구현)
+        player.RuneEffects.Activate(entry);
     }
 
     /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView/GridEditView에서 참조.</summary>

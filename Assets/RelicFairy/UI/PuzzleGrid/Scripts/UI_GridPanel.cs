@@ -931,6 +931,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void HandleItemPlaced(RuntimeItemData item)
     {
+        Debug.Log($"[GridChk] 배치 수신: {item?.instanceId} (frame {Time.frameCount})");
         _inventory?.PlaceItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _totalPlacedCells += GetItemCellCount(item);
@@ -971,6 +972,7 @@ public sealed class UI_GridPanel : UI_Base
 
     private void HandleItemRemoved(RuntimeItemData item)
     {
+        Debug.Log($"[GridChk] 해제 수신: {item?.instanceId} (frame {Time.frameCount})");
         _inventory?.UnplaceItem(item);
         _totalPlacedCells = Mathf.Max(0, _totalPlacedCells - GetItemCellCount(item));
         UpdateHexGridHint();
@@ -1071,13 +1073,6 @@ public sealed class UI_GridPanel : UI_Base
 
         var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
 
-        // 존별 색상 (TMP richtext)
-        var zoneColors = new System.Collections.Generic.Dictionary<string, string>
-        {
-            { "ATK",  "#FF8878" }, { "DEF",  "#66AAFF" }, { "MAG",  "#BB88FF" },
-            { "HP",   "#55EE88" }, { "SPD",  "#FFDD55" }, { "LUCK", "#FFCC55" },
-        };
-
         var sb = new System.Text.StringBuilder("존 시너지  ");
 
         foreach (var zoneId in runeData.GetZoneIds())
@@ -1090,7 +1085,7 @@ public sealed class UI_GridPanel : UI_Base
             foreach (var s in synergies)
                 if (s.threshold > 0 && count >= s.threshold) { anyMet = true; break; }
 
-            string hex = zoneColors.TryGetValue(zoneId, out var h) ? h : "#AAAAAA";
+            string hex = ElementDef.IdHex(zoneId);
 
             if (anyMet)
                 sb.Append($"<color={hex}><b>●{zoneId}</b></color>  ");

@@ -46,6 +46,9 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         mgr?.OnSkillUse(Slot);
 
+        // 룬 속성 효과: 스킬 사용 hook (전기 방전 등)
+        _controller.RuneEffects.NotifySkillUsed();
+
         OnEnter();
     }
 

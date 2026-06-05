@@ -571,6 +571,7 @@ public sealed class GameRunSession
 
     private void RefreshPlayerItemStats()
     {
+        Debug.Log($"[GridChk] 스탯 refresh (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} 효과수={EffectManager.ActiveEffects.Count}");
         Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
     }
 
@@ -583,6 +584,7 @@ public sealed class GameRunSession
     {
         EffectManager.RefreshContext(Player, this);
         EffectManager.Rebuild();
+        Debug.Log($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)

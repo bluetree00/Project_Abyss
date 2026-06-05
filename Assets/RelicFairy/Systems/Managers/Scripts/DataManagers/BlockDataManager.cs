@@ -143,7 +143,7 @@ public class RuneDataManager
     /// <summary>zone_id에 해당하는 존맵 셀 위치 목록 반환.</summary>
     public List<Vector2Int> GetZoneCellPositions(string zoneId)
     {
-        char code = ZoneIdToChar(zoneId);
+        char code = ElementDef.IdToCode(zoneId);
         var positions = new List<Vector2Int>();
         foreach (var row in _zoneMapRows)
         {
@@ -154,18 +154,6 @@ public class RuneDataManager
         }
         return positions;
     }
-
-    private static char ZoneIdToChar(string zoneId) => zoneId switch
-    {
-        "ATK"    => 'A',
-        "DEF"    => 'D',
-        "HP"     => 'H',
-        "SPD"    => 'S',
-        "MAG"    => 'M',
-        "LUCK"   => 'L',
-        "CENTER" => '+',
-        _        => '.',
-    };
 
     /// <summary>셀 위치 목록 → rows01 string[] 변환 (GridPatternData 포맷: "1010" 형태).</summary>
     public static (string[] rows01, int rowCount, int colCount) BuildZonePattern(List<Vector2Int> positions)

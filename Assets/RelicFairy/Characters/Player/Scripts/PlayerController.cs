@@ -82,6 +82,10 @@ public class PlayerController : CharacterBase
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
 
+    // 멀린 룬 속성 단계 효과 디스패처 (단계 도달 시 MerlinRuneBridge가 Activate)
+    private RuneEffectDispatcher _runeEffects;
+    public RuneEffectDispatcher RuneEffects => _runeEffects ??= new RuneEffectDispatcher(this);
+
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }
 
@@ -531,6 +535,8 @@ public class PlayerController : CharacterBase
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
+        _runeEffects?.Tick(Time.deltaTime);
+
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         if (_slowTimer > 0f)
         {
@@ -615,6 +621,8 @@ public class PlayerController : CharacterBase
 
         RelicBehavior?.OnDetach(this);
         ReleaseRelicAura();
+
+        _runeEffects?.Detach();
     }
 
     //============================================================
