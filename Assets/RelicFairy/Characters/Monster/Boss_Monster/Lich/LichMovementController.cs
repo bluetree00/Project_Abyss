@@ -11,7 +11,7 @@ public enum LichMovementState
     RetreatFloat,    // 플레이어 반대 방향 후퇴
     CircleStrafe,    // 플레이어 주변 선회
     DashClose,       // 고속 돌진 접근
-    AltitudeRise,    // 상승 (DeathRay 준비)
+    AltitudeRise,    // 상승 (DarkRain 준비)
     AltitudeDescend, // 기본 고도 복귀
     Teleport,        // 순간이동 (완료 후 IdleHover로 전환)
 }

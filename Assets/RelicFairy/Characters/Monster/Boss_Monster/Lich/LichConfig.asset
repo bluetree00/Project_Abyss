@@ -103,6 +103,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 9886fae6c787cc847be9fc11a0bf5af4, type: 2}
     - {fileID: 11400000, guid: 3fa7209083c03ea4fadf41a4cc881e85, type: 2}
     - {fileID: 11400000, guid: f030915a72a294b4297807e9d5028a8f, type: 2}
+    - {fileID: 11400000, guid: 4d843e256b4e919469f251fa3d5f7db8, type: 2}
     selectionMode: 0
     forceExecute: 0
   - conditions:
@@ -120,5 +121,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: f952abf09afb88c42bc84b45713f53cd, type: 2}
     - {fileID: 11400000, guid: 3fa7209083c03ea4fadf41a4cc881e85, type: 2}
     - {fileID: 11400000, guid: a3a25d1273778b94b890c0a581723831, type: 2}
+    - {fileID: 11400000, guid: 0932bb2b4c77f5248be5f7e67745e536, type: 2}
+    - {fileID: 11400000, guid: 43f4dfa45d49221458d83f6695cb979d, type: 2}
     selectionMode: 0
     forceExecute: 0

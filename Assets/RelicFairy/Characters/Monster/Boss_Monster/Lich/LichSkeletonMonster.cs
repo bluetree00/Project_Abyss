@@ -12,6 +12,8 @@ public class LichSkeletonMonster : MonsterBase
 {
     // ── 상수 ─────────────────────────────────────────────
     public const string PrefabAddress = "LichSkeleton/LichSkeleton";
+    private const int   MaxConcurrent = 8;     // 동시 생존 상한 — 초과 시 가장 오래된 비봉인 해골 정리
+    private const float Lifetime      = 25f;   // 개체 수명(초). 봉인 해골은 면제.
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "LichSkeleton/LichSkeletonConfig";
@@ -30,6 +32,43 @@ public class LichSkeletonMonster : MonsterBase
         "HoodDown",
         "HoodUp",
     };
+
+    // 살아있는 해골 레지스트리 — 동시 상한·수명·전투 종료 정리에 사용.
+    private static readonly List<LichSkeletonMonster> Live = new();
+
+    private float _spawnTime;
+    private bool  _lifetimeExpired;
+
+    // ── 수명주기 ──────────────────────────────────────────
+
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+        _spawnTime       = Time.time;
+        _lifetimeExpired = false;
+        Live.Add(this);
+        EnforceCap();
+    }
+
+    protected override void OnDisable()
+    {
+        Live.Remove(this);
+        base.OnDisable();
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        if (_lifetimeExpired) return;
+        if (_runtime != null && _runtime.IsDead) return;
+        if (Lifetime > 0f && Time.time - _spawnTime >= Lifetime)
+        {
+            _lifetimeExpired = true;
+            // 봉인 해골은 수명 면제 — 시간 초과로 사라지면 SealBreaker가 영구 무적(소프트락)된다.
+            if (TryGetComponent<SealSkeletonMarker>(out _)) return;
+            Cull(this);
+        }
+    }
 
     // ── FSM 오버라이드 ────────────────────────────────────
 
@@ -63,6 +102,38 @@ public class LichSkeletonMonster : MonsterBase
             if (HiddenObjectNames.Contains(t.name))
                 t.gameObject.SetActive(false);
         }
+    }
+
+    // ── 정적 관리 ──────────────────────────────────────────
+
+    /// <summary>전투 종료(보스 퇴각·사망) 시 생존 해골을 모두 정리한다.</summary>
+    public static void DespawnAll()
+    {
+        for (int i = Live.Count - 1; i >= 0; i--)
+        {
+            var s = Live[i];
+            if (s != null) Managers.ObjectPooler.Despawn(s.gameObject);
+        }
+        Live.Clear();
+    }
+
+    /// <summary>동시 상한 초과 시 가장 오래된 비봉인 해골부터 정리.</summary>
+    private static void EnforceCap()
+    {
+        int idx = 0;
+        while (Live.Count > MaxConcurrent && idx < Live.Count)
+        {
+            var s = Live[idx];
+            if (s == null)                                    { Live.RemoveAt(idx); continue; }
+            if (s.TryGetComponent<SealSkeletonMarker>(out _)) { idx++; continue; } // 봉인 해골 면제
+            Cull(s);
+        }
+    }
+
+    private static void Cull(LichSkeletonMonster s)
+    {
+        Live.Remove(s);
+        if (s != null) Managers.ObjectPooler.Despawn(s.gameObject);
     }
 }
 

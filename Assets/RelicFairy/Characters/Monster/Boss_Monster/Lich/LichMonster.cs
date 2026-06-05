@@ -57,7 +57,6 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private LichFormController     _formController;
     private LichMovementController _movementController;
     private LichDormantState       _dormantState;
-    private bool                   _phase2Transitioning;
     private bool                   _pendingTriggerEntrance;
     private bool                   _prevPatternActive; // 패턴 종료 감지용
     private GameObject             _spawnedFog;
@@ -111,7 +110,15 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private int _debugSessionCount; // 플레이 중 자동 진행되는 세션 카운터
 #endif
 
-    /// <summary>3차+ 조우부터 Phase 2가 영구 해금됨.</summary>
+    /// <summary>
+    /// 3차+ 조우부터 Phase 2가 영구 해금됨. (Lich_Phase2Pending 조건의 게이트)
+    ///
+    /// ── 분기 지점 ───────────────────────────────────────────────────
+    ///  • 테스트(에디터): _debugOverrideEncounter 켜고 _debugEncounterCount로 제어.
+    ///      3 이상 → 처음부터 Phase2 노출 / 1~2 → 봉인(Phase1)만, 사망 시 자동 +1로 전 페이즈 순환.
+    ///  • 출시(빌드): 아래 BackendGameData.lichEncounterCount >= Phase2UnlockAt 게이트가 적용됨.
+    ///      해금 조건(횟수/시점)을 바꾸려면 Phase2UnlockAt 또는 이 반환식을 조정한다.
+    /// </summary>
     public bool IsPhase2Unlocked
     {
         get
@@ -119,6 +126,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 #if UNITY_EDITOR
             if (_debugOverrideEncounter) return _debugSessionCount >= Phase2UnlockAt;
 #endif
+            // 출시 게이트 — 실제 투입 시 해금 정책을 여기에 반영한다.
             return (BackendGameData.Instance?.Data?.lichEncounterCount ?? 0) >= Phase2UnlockAt;
         }
     }
@@ -130,8 +138,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     // 평가 시점에 ctx.Boss로 활성 Lich를 조회해 항상 올바른 블랙보드를 사용한다.
     private sealed class LichPhase1Condition : ICondition
     {
-        // 봉인 단계(Phase2 미진입)이면 Phase1 패턴을 허용한다.
-        // HP 기반 조건은 제거 — 봉인 해제는 해골 전멸로만 결정된다.
+        // Phase2 미진입(봉인) 상태이면 Phase1 패턴을 허용한다.
+        // Phase2 전환은 HP ≤ 40%(Lich_Phase2Pending) 조건이 전담하며 SealBreaker와는 무관하다.
         public bool Evaluate(BossPatternContext ctx)
             => !((ctx.Boss as LichMonster)?.LichBB?.IsPhase2 ?? false);
     }
@@ -145,10 +153,13 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private sealed class LichPhase2PendingCondition : ICondition
     {
         // HP 40% 이하 도달 시 Phase2Entry 발동. SealBreaker와 완전히 독립된 조건.
+        // Phase2는 해금(3차+ 조우, 디버그 시 _debugSessionCount) 이후에만 전환된다.
+        // 해금 전(1·2차)에는 봉인 상태(Phase1)로만 싸우고 HP 0에서 퇴각한다.
         public bool Evaluate(BossPatternContext ctx)
         {
             var lich = ctx.Boss as LichMonster;
             return lich != null
+                && lich.IsPhase2Unlocked
                 && lich.HpRatio <= Phase2HpThreshold
                 && !(lich.LichBB?.IsPhase2 ?? false);
         }
@@ -247,8 +258,7 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
             ChangeState<ChaseState>();
             if (_debugForcePhase2)
             {
-                _phase2Transitioning = true; // TriggerPhase2 중복 호출 방지
-                ApplyPhase2Buffs();
+                ApplyPhase2Buffs(); // 내부에서 IsPhase2 가드로 중복 적용 방지
                 // HP를 임계값 아래로 설정 — Phase1 엔트리(HP > 40%) 조건이 false가 되도록
                 if (_runtime != null && _config != null)
                     _runtime.CurrentHp = Mathf.RoundToInt(_config.stat.maxHp * (Phase2HpThreshold - 0.05f));
@@ -315,7 +325,6 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         _runner?.Reset();
         _lichBB?.Reset();
         _movementController?.OnRecycled();
-        _phase2Transitioning    = false;
         _pendingTriggerEntrance = false;
         _lightingChanged        = false;
 
@@ -418,13 +427,6 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         Debug.Log($"[Lich] Phase 2 해방 — HP={_runtime?.CurrentHp} ratio={HpRatio:F2}", this);
     }
 
-    private void TriggerPhase2()
-    {
-        if (_phase2Transitioning) return;
-        _phase2Transitioning = true;
-        ApplyPhase2Buffs();
-    }
-
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 내부 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -432,6 +434,9 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     /// <summary>HP 0 도달 시 호출. 조우 횟수에 따라 퇴각 or 사망.</summary>
     protected override void OnFatalDamage()
     {
+        // 전투 종료 — 보스보다 오래 남는 생존 해골 정리(퇴각·사망 공통).
+        LichSkeletonMonster.DespawnAll();
+
         if (!IsPhase2Unlocked)
         {
             // 1·2차 조우: 퇴각 연출 후 보스방 완료
@@ -445,6 +450,10 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 
     private async UniTaskVoid DoRetreatAsync(System.Threading.CancellationToken ct)
     {
+        // 진행 중이던 패턴 특수 상태를 빠져나가 Exit(가이드·빔·VFX 정리)를 보장한다.
+        // 사망 시 Update가 정지하므로 패턴이 스스로 종료하지 못해 월드 오브젝트가 잔존하는 문제 방지.
+        ChangeState<ChaseState>();
+
         _movementController?.SetLocked(true);
         _runner?.Reset();
 
@@ -663,7 +672,6 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
         if (!Application.isPlaying) return;
         OnDied -= Editor_HandleDied;
 
-        _phase2Transitioning = false;
         _runner?.Reset();
         _lichBB?.Reset();
         _movementController?.OnRecycled();
