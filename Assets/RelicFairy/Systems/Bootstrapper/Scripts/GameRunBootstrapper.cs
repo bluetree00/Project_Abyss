@@ -572,89 +572,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>
-    /// zone_index != 0 인 존들(전투·엘리트·보스·코리도 등)을 MapBuilder로 빌드.
-    /// StartRoomGate가 zone-layout 모드에서 호출한다.
-    /// </summary>
-    public async UniTask SpawnRemainingWorldZonesAsync()
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
-        var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-        {
-            Debug.LogWarning("[GameRunBootstrapper] SpawnRemainingWorldZonesAsync: zone_layout_key 없음");
-            return;
-        }
-
-        var layoutMgr = Managers.ZoneLayout;
-        var zones = layoutMgr.GetZones(zoneLayoutKey);
-        if (zones == null || zones.Count == 0) return;
-
-        BlockPalette zonePalette = null;
-        var firstWithPalette = zones.Find(z => !string.IsNullOrEmpty(z.palette));
-        if (firstWithPalette != null)
-            zonePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(firstWithPalette.palette);
-        if (zonePalette == null)
-        {
-            var theme = zones.Find(z => !string.IsNullOrEmpty(z.theme))?.theme ?? string.Empty;
-            zonePalette = PickBlockPalette(theme);
-        }
-
-        var root = worldMapRoot != null ? worldMapRoot : mapRoot;
-        var remaining = zones.FindAll(z => z.zone_index != 0);
-        int spawned = 0;
-        bool firstZoneEffectPlayed = false;
-
-        for (int i = 0; i < remaining.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var zone = remaining[i];
-            if (string.IsNullOrWhiteSpace(zone.grid_csv)) continue;
-
-            var grid = MapDataLoader.Parse(zone.grid_csv);
-            if (grid == null) continue;
-
-            OpenWallsForConnections(grid, zone, zones);
-
-            var worldCenter = CalcZoneWorldCenter(zone);
-            var zoneGO = new GameObject($"Zone_{zone.zone_index:D2}_{zone.label}");
-            zoneGO.transform.SetParent(root, false);
-            zoneGO.transform.position = worldCenter;
-            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, null, wallLayers);
-            MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
-            if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
-            spawned++;
-
-            // 첫 번째 존: 카메라 팬 + 디졸브 (동기 대기), 이후 존: 디졸브만 fire-and-forget
-            if (!firstZoneEffectPlayed)
-            {
-                firstZoneEffectPlayed = true;
-                var player = _run?.Player;
-                var cam    = GameCameraController.Instance;
-                var panTask = (cam != null && player != null)
-                    ? cam.PanToZoneAndReturnAsync(worldCenter, 1.2f, 1.0f, 1.2f, player.transform, ct)
-                    : UniTask.CompletedTask;
-                var dissolveTask = DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct);
-                try { await UniTask.WhenAll(panTask, dissolveTask); }
-                catch (System.OperationCanceledException) { }
-            }
-            else
-            {
-                DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct).Forget();
-            }
-
-            if (i % 4 == 3)
-                await UniTask.Yield(ct);
-        }
-
-        SpawnAllCorridors(zones, root);
-        Debug.Log($"[GameRunBootstrapper] 나머지 존 스폰 완료: {spawned}/{remaining.Count}개");
-    }
-
-    /// <summary>
     /// 지정된 zone_index의 존을 월드에 스폰한다. ZoneProgressionService가 선택된 존을 지연 스폰할 때 호출.
     /// 블록 배치 → 스포너 설정 → NavMesh 빌드 → RoomWaveController 부착 → ZoneEntryTrigger 부착.
     /// 플레이어가 존에 진입하면 ZoneEntryTrigger가 스포너·웨이브를 활성화한다.
@@ -782,8 +699,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public async UniTask StartProcGenRunAsync()
     {
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+
+        // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
+        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var poolKey     = serverEntry?.zone_pool_key;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
+
         // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
-        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f));
+        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
     }
 
     // ─────────────────────────────────────────────────────────────────────
