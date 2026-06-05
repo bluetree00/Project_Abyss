@@ -40,14 +40,14 @@ MonoBehaviour:
     nativeElement: -1
     poolTags: 0100000002000000030000000400000005000000
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: SnailMonster
     addressableKey: Snail/Snail
     grade: 0
     nativeElement: -1
     poolTags: 0100000002000000030000000400000005000000
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: SpiderMonster
     addressableKey: Spider/Spider
     grade: 0
@@ -173,7 +173,7 @@ MonoBehaviour:
     nativeElement: -1
     poolTags: 0100000002000000030000000400000005000000
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: CyclopsMonster
     addressableKey: Cyclops/Cyclops
     grade: 2
@@ -201,7 +201,7 @@ MonoBehaviour:
     nativeElement: -1
     poolTags: 0100000002000000030000000400000005000000
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: MushroomSmileMonster
     addressableKey: MushroomSmile/MushroomSmile
     grade: 0

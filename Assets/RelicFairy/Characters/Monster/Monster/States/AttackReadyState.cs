@@ -11,12 +11,18 @@ namespace RelicFairy.Monster
 /// </summary>
 public class AttackReadyState : IMonsterState
 {
+    // 첫 공격 시에도 최소한의 예고(텔레그래프)를 보장하기 위한 상한.
+    // attackDelay를 0으로 완전히 스킵하지 않고 이 값 이내로만 단축한다.
+    private const float FirstAttackReadyMaxDelay = 0.3f;
+
     public virtual void Enter(MonsterContext ctx)
     {
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.ResetPath();
 
-        // 첫 조우 시 딜레이 없이 즉시 공격, 이후부터 attackDelay 적용
-        ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack ? 0f : ctx.Stat.attackDelay;
+        // 첫 조우 시 빠르게 반응하되, 0으로 스킵하지 않고 최소 예고창을 남긴다.
+        ctx.Runtime.StateTimer = ctx.Runtime.IsFirstAttack
+            ? Mathf.Min(ctx.Stat.attackDelay, FirstAttackReadyMaxDelay)
+            : ctx.Stat.attackDelay;
         ctx.Runtime.IsFirstAttack = false;
 
         PlayAnim(ctx, ctx.Animation.attackReadyStateName);

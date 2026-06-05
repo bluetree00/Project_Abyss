@@ -25,7 +25,7 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 3f6a39e2dfb043f699f2d21dd3f3f22d,
       type: 2}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
@@ -55,7 +55,7 @@ MonoBehaviour:
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 0}
-    disableWarning: 1
+    disableWarning: 0
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
