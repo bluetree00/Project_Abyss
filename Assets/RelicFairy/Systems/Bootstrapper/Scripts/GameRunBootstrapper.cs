@@ -13,6 +13,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
     [SerializeField] private string startBodyKey = "PlayerCharacter";
     [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
+    [Tooltip("Loadout에 유물이 없을 때(에디터 직접 전투 테스트) 적용할 기본 유물 클래스. 비우면 유물 미적용. 시작방 경로에는 영향 없음.")]
+    [SerializeField] private RelicClassSO debugDefaultRelic;
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
     [SerializeField] private Transform mapRoot;
@@ -85,6 +87,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [SerializeField, Tooltip("벽 높이 배율. 1=기본(1블록), 12=12배 높이(약 12m). 천장도 이 값에 맞춰 자동 배치.")]
     private int wallLayers = 12;
+
+    [SerializeField, Min(0), Tooltip("절차 방의 각 문(입구/출구) 바깥으로 뻗는 복도 스텁 길이(셀 수). " +
+             "문 너머가 허공(절벽)으로 보이지 않게 '뒤로 이어지는 통로' 느낌을 준다. 0이면 비활성.")]
+    private int procDoorCorridorLength = 6;
 
 
     [Header("Shop Room")]
@@ -701,7 +707,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
 
         // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
-        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        // StartRoom 이탈 흐름은 StartNewRunAsync를 거치지 않아 세션 챕터가 미설정(0)일 수 있으므로 씬에서 유추.
+        var chapter     = ResolveCurrentChapter();
         var serverEntry = Managers.ChapterData?.Get(chapter);
         var chapterSO   = chapterRegistry?.GetData(chapter);
         var poolKey     = serverEntry?.zone_pool_key;
@@ -710,6 +717,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
         await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
+    }
+
+    /// <summary>세션 챕터가 미설정(기본 0, 유효하지 않음)이면 활성 씬 이름(GameScene_ChN)에서 챕터를 유추한다.</summary>
+    private ChapterId ResolveCurrentChapter()
+    {
+        var ch = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        if (System.Enum.IsDefined(typeof(ChapterId), ch)) return ch;
+
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        for (int n = 4; n >= 1; n--)
+            if (scene.EndsWith($"Ch{n}")) return (ChapterId)n;
+        return ChapterId.Chapter1;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -781,6 +800,25 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
         MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
         if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+
+        // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
+        //      blocks에 합쳐 디졸브/디스폰에 함께 동참시킨다.
+        if (procDoorCorridorLength > 0 && palette != null)
+        {
+            float offX = (w - 1) * 0.5f * blockCellSize;
+            float offZ = (h - 1) * 0.5f * blockCellSize;
+            void AddCorridor(Vector2Int cell)
+            {
+                var info        = doorInfos[cell];
+                var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
+                blocks.AddRange(MapBuilder.BuildDoorCorridor(
+                    palette, roomGO.transform, centerLocal, info.edge, info.width,
+                    procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+            }
+            if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
+            if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
+            foreach (var t in cls.turns) AddCorridor(t);
+        }
 
         // 8. 토큰 (PreBuild 스포너 → NavMesh → PostBuild 장식/보스)
         var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
@@ -2018,6 +2056,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         run.RequestHudMode(HUDIds.Mode.Combat);
     }
 
+    /// <summary>Loadout 유물 우선, 없으면 에디터 직접 전투 테스트용 debugDefaultRelic 폴백.</summary>
+    private RelicClassSO ResolveRelicForDirectSpawn()
+        => AppBootstrapper.Instance?.Loadout?.Relic ?? debugDefaultRelic;
+
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)
     {
         // 우선순위: Loadout(Wisp 선택) → CharacterDataManager(PrepPanel) → Inspector 기본값(에디터 테스트용)
@@ -2073,8 +2115,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
 
-        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout.Relic 없으면 no-op.
-        player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
+        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout 유물 없으면 디버그 기본 유물(에디터 테스트).
+        player.SetRelicAndApply(ResolveRelicForDirectSpawn());
 
         var run = AppBootstrapper.Instance?.CurrentRun;
         var wm = player.WeaponManager;

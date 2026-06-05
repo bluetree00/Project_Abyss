@@ -130,6 +130,7 @@ public class ChapterDataManager
                 gold_multiplier     = row.TryGetFloat("gold_multiplier"),
                 item_drop_multiplier = row.TryGetFloat("item_drop_multiplier"),
                 zone_layout_key     = row.TryGetString("zone_layout_key"),
+                zone_pool_key       = row.TryGetString("zone_pool_key"),
                 total_layers        = row.TryGetInt("total_layers"),
                 peak_layer          = row.TryGetInt("peak_layer"),
                 stat_version        = row.TryGetInt("stat_version"),
