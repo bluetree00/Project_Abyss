@@ -20,6 +20,9 @@ public class LichBlackboard : BossAttackBlackboard
     public float SkeletonSummonCooldown;
     public float SealBreakerCooldown;
     public float DarkRainCooldown;
+    public float ReaperCadenceCooldown;
+    public float ArcaneTorrentCooldown;
+    public float TwinCastCooldown;
 
     // ── 이동 컨트롤러용 ──────────────────────────────────
     /// <summary>LichMovementController가 매 Tick 갱신. 패턴 조건에서도 참조 가능.</summary>
@@ -38,6 +41,9 @@ public class LichBlackboard : BossAttackBlackboard
         if (SkeletonSummonCooldown   > 0f) SkeletonSummonCooldown   -= dt;
         if (SealBreakerCooldown      > 0f) SealBreakerCooldown      -= dt;
         if (DarkRainCooldown         > 0f) DarkRainCooldown         -= dt;
+        if (ReaperCadenceCooldown    > 0f) ReaperCadenceCooldown    -= dt;
+        if (ArcaneTorrentCooldown    > 0f) ArcaneTorrentCooldown    -= dt;
+        if (TwinCastCooldown         > 0f) TwinCastCooldown         -= dt;
     }
 
     public void SetPhase2() => IsPhase2 = true;
@@ -56,6 +62,9 @@ public class LichBlackboard : BossAttackBlackboard
         SkeletonSummonCooldown   = 0f;
         SealBreakerCooldown      = 0f;
         DarkRainCooldown         = 0f;
+        ReaperCadenceCooldown    = 0f;
+        ArcaneTorrentCooldown    = 0f;
+        TwinCastCooldown         = 0f;
         DistanceToPlayer         = 0f;
     }
 }

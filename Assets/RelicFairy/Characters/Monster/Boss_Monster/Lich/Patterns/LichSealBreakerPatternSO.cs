@@ -132,6 +132,10 @@ public class LichSealBreakerState : InvincibleState<LichSealBreakerPatternSO>
 
         SpawnSealSkeletons(ctx);
         SpawnAdditionalSkeletons(ctx);
+
+        // 실제 생성된 봉인 마커 수로 보정. 프리팹 미할당(테스트)으로 마커가 0개면
+        // 다음 Update에서 즉시 종료해 무적·이동 잠금이 영구 지속되는 soft-lock을 방지한다.
+        _sealsRemaining = _sealMarkers.Count;
     }
 
     public override void Update(MonsterContext ctx)
@@ -301,7 +305,7 @@ public class LichSealBreakerState : InvincibleState<LichSealBreakerPatternSO>
         }
         else
         {
-            Debug.Log("[SealBreaker] 봉인 전부 파괴 — Phase2 진입 트리거");
+            Debug.Log("[SealBreaker] 봉인 전부 파괴 — 무적 해제, 전투 복귀");
             UI_BossBark.Show("봉인 파괴! 리치의 무적이 해제됐다!", BossBarkType.PatternAnnounce);
             PatternGuideHelper.Disc(
                 ctx.Transform.position,

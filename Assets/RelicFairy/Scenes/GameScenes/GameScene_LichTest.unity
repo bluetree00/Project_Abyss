@@ -52451,6 +52451,7 @@ MonoBehaviour:
   playerPrefabKey: PlayerCharacter
   startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T3_Katana
+  debugDefaultRelic: {fileID: 11400000, guid: 6e49290b1b9721a439a71b43a15be1ba, type: 2}
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
@@ -52488,6 +52489,7 @@ MonoBehaviour:
   blockCellSize: 1
   blockBaseY: -0.1
   wallLayers: 1
+  procDoorCorridorLength: 6
   shopSlotCount: 3
   blockShopStallPrefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8,
     type: 3}
