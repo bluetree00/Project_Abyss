@@ -61,7 +61,12 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         {
             PlayAnimation(ctx);
 
-            var dir = ctx.PlayerTransform.forward;
+            // 대시 직전, 캐릭터를 마우스 방향으로 정면 고정한다.
+            // (현재 forward를 그대로 쓰면 정면이 마우스를 향하지 않은 상태에서 엉뚱하게 전진함)
+            Quaternion aimRot = ctx.Controller.ComputeMouseAimAssistRotation(0f, 0f, 0f);
+            ctx.Controller.RequestFacing(aimRot);
+
+            var dir = aimRot * Vector3.forward;
             _dashStart = ctx.PlayerTransform.position;
             _dashEnd = _dashStart + dir * _data.dashDistance;
 
