@@ -15,16 +15,29 @@ using TMPro;
 public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 {
     // ── Constants ──
-    private static readonly string[] ZONE_ORDER = { "ATK", "DEF", "MAG", "HP", "SPD", "LUCK" };
-    private static readonly string[] ZONE_NAMES = { "공격", "방어", "마력", "체력", "속도", "행운" };
-    private static readonly string[] ZONE_ICONS = { "⚔", "🛡", "✦", "❤", "》", "★" };
+    // 존 순서/이름/아이콘/색은 ElementDef에서 빌드 (단일 소스)
+    private static readonly string[] ZONE_ORDER;
+    private static readonly string[] ZONE_NAMES;
+    private static readonly string[] ZONE_ICONS;
+    private static readonly Color[]  ZONE_COLORS;
 
-    private static readonly Color COLOR_ATK  = new(1.0f, 0.35f, 0.30f, 1f);
-    private static readonly Color COLOR_DEF  = new(0.3f, 0.55f, 1.00f, 1f);
-    private static readonly Color COLOR_MAG  = new(0.7f, 0.30f, 1.00f, 1f);
-    private static readonly Color COLOR_HP   = new(0.3f, 0.85f, 0.45f, 1f);
-    private static readonly Color COLOR_SPD  = new(1.0f, 0.85f, 0.20f, 1f);
-    private static readonly Color COLOR_LUCK = new(1.0f, 0.75f, 0.20f, 1f);
+    static MerlinRuneSynergyStatusView()
+    {
+        var order = ElementDef.Order;
+        int n = order.Count;
+        ZONE_ORDER  = new string[n];
+        ZONE_NAMES  = new string[n];
+        ZONE_ICONS  = new string[n];
+        ZONE_COLORS = new Color[n];
+        for (int i = 0; i < n; i++)
+        {
+            var e = ElementDef.GetById(order[i]);
+            ZONE_ORDER[i]  = e.Id;
+            ZONE_NAMES[i]  = e.Name;
+            ZONE_ICONS[i]  = e.Icon;
+            ZONE_COLORS[i] = e.Color;
+        }
+    }
 
     private static readonly Color COLOR_BG_PANEL      = new(0.12f, 0.14f, 0.20f, 0.90f);
     private static readonly Color COLOR_ROW_BG_ACTIVE = new(0.17f, 0.19f, 0.26f, 0.92f);
@@ -37,9 +50,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         public Image      accentStrip;
         public TMP_Text   nameText;
         public TMP_Text   countText;
-        public Image      barFill;
-        public Image[]    badgeBGs    = new Image[2];
-        public TMP_Text[] badgeLabels = new TMP_Text[2];
+        public Image[]    tierBGs    = new Image[4];
+        public TMP_Text[] tierLabels = new TMP_Text[4];
         public int        zoneIdx;
     }
 
@@ -279,62 +291,39 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         countTxt.raycastTarget      = false;
         row.countText = countTxt;
 
-        // 프로그레스 바 (30~64%)
-        var barBG = new GameObject("BarBG", typeof(RectTransform));
-        barBG.transform.SetParent(row.go.transform, false);
-        var brt = barBG.GetComponent<RectTransform>();
-        brt.anchorMin = new Vector2(0.30f, 0.28f);
-        brt.anchorMax = new Vector2(0.64f, 0.72f);
-        brt.offsetMin = new Vector2(2f, 0f);
-        brt.offsetMax = new Vector2(-2f, 0f);
-        barBG.AddComponent<Image>().color = new Color(0.10f, 0.11f, 0.16f, 0.85f);
-
-        var barFillGO = new GameObject("Fill", typeof(RectTransform));
-        barFillGO.transform.SetParent(barBG.transform, false);
-        var frrt = barFillGO.GetComponent<RectTransform>();
-        frrt.anchorMin = Vector2.zero;
-        frrt.anchorMax = Vector2.one;
-        frrt.offsetMin = new Vector2(1f, 1f);
-        frrt.offsetMax = new Vector2(-1f, -1f);
-        var fillImg = barFillGO.AddComponent<Image>();
-        fillImg.type       = Image.Type.Filled;
-        fillImg.fillMethod = Image.FillMethod.Horizontal;
-        fillImg.fillAmount = 0f;
-        fillImg.color      = new Color(0.4f, 0.4f, 0.5f, 0.5f);
-        fillImg.raycastTarget = false;
-        row.barFill = fillImg;
-
-        // 임계값 배지 x2 (64~99%)
-        for (int b = 0; b < 2; b++)
+        // 4단계 트랙 (30~99%) — 각 단계 = 한 칸, 임계값 도달 시 점등
+        const float TRACK_L = 0.30f, TRACK_R = 0.99f;
+        float segW = (TRACK_R - TRACK_L) / 4f;
+        for (int b = 0; b < 4; b++)
         {
-            float bL = 0.64f + b * 0.178f + 0.004f;
-            float bR = 0.64f + (b + 1) * 0.178f - 0.004f;
+            float sL = TRACK_L + b * segW + 0.004f;
+            float sR = TRACK_L + (b + 1) * segW - 0.004f;
 
-            var badgeGO = new GameObject($"Badge{b}", typeof(RectTransform));
-            badgeGO.transform.SetParent(row.go.transform, false);
-            var badgeRT = badgeGO.GetComponent<RectTransform>();
-            badgeRT.anchorMin = new Vector2(bL, 0.10f);
-            badgeRT.anchorMax = new Vector2(bR, 0.90f);
-            badgeRT.offsetMin = badgeRT.offsetMax = Vector2.zero;
-            row.badgeBGs[b] = badgeGO.AddComponent<Image>();
-            row.badgeBGs[b].color = COLOR_BADGE_OFF;
-            row.badgeBGs[b].raycastTarget = false;
+            var segGO = new GameObject($"Tier{b}", typeof(RectTransform));
+            segGO.transform.SetParent(row.go.transform, false);
+            var segRT = segGO.GetComponent<RectTransform>();
+            segRT.anchorMin = new Vector2(sL, 0.10f);
+            segRT.anchorMax = new Vector2(sR, 0.90f);
+            segRT.offsetMin = segRT.offsetMax = Vector2.zero;
+            row.tierBGs[b] = segGO.AddComponent<Image>();
+            row.tierBGs[b].color = COLOR_BADGE_OFF;
+            row.tierBGs[b].raycastTarget = false;
 
             var lblGO = new GameObject("Lbl", typeof(RectTransform));
-            lblGO.transform.SetParent(badgeGO.transform, false);
+            lblGO.transform.SetParent(segGO.transform, false);
             var lrt = lblGO.GetComponent<RectTransform>();
             lrt.anchorMin = Vector2.zero;
             lrt.anchorMax = Vector2.one;
             lrt.offsetMin = new Vector2(2f, 0f);
             lrt.offsetMax = new Vector2(-2f, 0f);
             var lTxt = lblGO.AddComponent<TextMeshProUGUI>();
-            lTxt.text               = b == 0 ? "각성 —" : "완성 —";
-            lTxt.fontSize           = 9.5f;
+            lTxt.text               = $"{b + 1}단계";
+            lTxt.fontSize           = 8.5f;
             lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
             lTxt.alignment          = TextAlignmentOptions.Center;
             lTxt.enableWordWrapping = false;
             lTxt.raycastTarget      = false;
-            row.badgeLabels[b] = lTxt;
+            row.tierLabels[b] = lTxt;
         }
 
         // 호버 → 툴팁
@@ -372,53 +361,31 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         if (synergies != null) sorted.AddRange(synergies);
         sorted.Sort((a, b) => a.threshold.CompareTo(b.threshold));
 
-        // 프로그레스 바
-        if (row.barFill != null)
-        {
-            float fill = 0f;
-            bool  anyMet = false;
-            if (sorted.Count > 0)
-            {
-                anyMet = cluster >= sorted[0].threshold;
-                bool allMet = cluster >= sorted[sorted.Count - 1].threshold;
-                if (allMet) { fill = 1f; }
-                else
-                {
-                    int prev = 0, next = sorted[sorted.Count - 1].threshold;
-                    foreach (var e in sorted)
-                    {
-                        if (cluster < e.threshold) { next = e.threshold; break; }
-                        prev = e.threshold;
-                    }
-                    fill = next > prev ? (float)(cluster - prev) / (next - prev) : 0f;
-                }
-            }
-            row.barFill.fillAmount = Mathf.Clamp01(fill);
-            row.barFill.color = anyMet
-                ? new Color(zoneColor.r, zoneColor.g, zoneColor.b, 0.88f)
-                : new Color(zoneColor.r * 0.5f, zoneColor.g * 0.5f, zoneColor.b * 0.5f, 0.45f);
-        }
+        // 현재 도달한 최고 단계 인덱스
+        int curTier = -1;
+        for (int i = 0; i < sorted.Count && i < 4; i++)
+            if (cluster >= sorted[i].threshold) curTier = i;
 
-        // 배지
-        for (int b = 0; b < 2; b++)
+        for (int b = 0; b < 4; b++)
         {
-            if (row.badgeBGs[b] == null) continue;
-            bool  hasData = b < sorted.Count;
-            bool  met     = hasData && cluster >= sorted[b].threshold;
-            string tier   = b == 0 ? "각성" : "완성";
-            string label  = met && hasData
-                ? FormatEffectShort(sorted[b])
-                : (hasData ? $"{tier} {sorted[b].threshold}" : "—");
+            if (row.tierBGs[b] == null) continue;
+            bool hasData = b < sorted.Count;
+            bool met     = hasData && cluster >= sorted[b].threshold;
+            bool isCur   = b == curTier;
 
-            row.badgeBGs[b].color = met
-                ? new Color(zoneColor.r * 0.40f, zoneColor.g * 0.40f, zoneColor.b * 0.40f, 0.95f)
+            // 점등: 도달 시 존 색(현재 단계는 더 진하게), 미도달은 어둡게
+            float mul = met ? (isCur ? 0.55f : 0.38f) : 0f;
+            row.tierBGs[b].color = met
+                ? new Color(zoneColor.r * mul, zoneColor.g * mul, zoneColor.b * mul, 0.95f)
                 : COLOR_BADGE_OFF;
 
-            if (row.badgeLabels[b] != null)
+            if (row.tierLabels[b] != null)
             {
-                row.badgeLabels[b].text     = label;
-                row.badgeLabels[b].fontSize  = met ? 9.0f : 9.5f;
-                row.badgeLabels[b].color     = met
+                // 도달: 단계명(예: 점화), 미도달: 필요 칸 수
+                string line2 = !hasData ? "—" : (met ? TierEffectName(sorted[b]) : $"{sorted[b].threshold}칸");
+                row.tierLabels[b].text      = $"{b + 1}단계\n{line2}";
+                row.tierLabels[b].fontStyle = isCur ? FontStyles.Bold : FontStyles.Normal;
+                row.tierLabels[b].color     = met
                     ? new Color(
                         Mathf.Clamp01(zoneColor.r * 1.55f),
                         Mathf.Clamp01(zoneColor.g * 1.55f),
@@ -426,6 +393,19 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                     : new Color(0.46f, 0.49f, 0.62f, 1f);
             }
         }
+    }
+
+    /// <summary>description "N단계 이름: 설명" 에서 "이름"만 추출. 실패 시 effect_type.</summary>
+    private static string TierEffectName(RuneSynergyEntry e)
+    {
+        if (!string.IsNullOrEmpty(e.description))
+        {
+            int colon = e.description.IndexOf(':');
+            string head = colon > 0 ? e.description.Substring(0, colon) : e.description;
+            int sp = head.IndexOf(' ');
+            if (sp > 0 && sp + 1 < head.Length) return head.Substring(sp + 1).Trim();
+        }
+        return e.effect_type;
     }
 
     // ── Tooltip ──
@@ -505,7 +485,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var sb = new System.Text.StringBuilder();
 
         sb.AppendLine($"<b><color=#B8E0FF>{ZONE_ICONS[idx]} {ZONE_NAMES[idx]} ({zoneId})</color></b>");
-        sb.AppendLine($"현재 클러스터: <b>{cluster}</b>");
+        sb.AppendLine($"현재 채움: <b>{cluster}칸</b>");
         sb.AppendLine();
 
         if (synergies != null && synergies.Count > 0)
@@ -513,13 +493,13 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             var sorted = new List<RuneSynergyEntry>(synergies);
             sorted.Sort((a, b) => a.threshold.CompareTo(b.threshold));
 
-            foreach (var s in sorted)
+            for (int i = 0; i < sorted.Count; i++)
             {
+                var s = sorted[i];
                 bool met   = cluster >= s.threshold;
                 string chk = met ? "<color=#55FF88>●</color>" : "○";
-                string tier = s.threshold == sorted[0].threshold ? "각성" : "완성";
-                float pct  = s.value * 100f;
-                sb.AppendLine($"{chk} {tier} ({s.threshold}): {FormatEffectShort(s)}");
+                string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
+                sb.AppendLine($"{chk} <b>({s.threshold}칸)</b> {desc}");
             }
 
             int maxThr = sorted[sorted.Count - 1].threshold;
@@ -529,7 +509,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                 foreach (var s in sorted)
                     if (cluster < s.threshold) { nextThr = s.threshold; break; }
                 if (nextThr > 0)
-                    sb.AppendLine($"\n다음 효과까지 <b>{nextThr - cluster}개</b> 더 필요");
+                    sb.AppendLine($"\n다음 단계까지 <b>{nextThr - cluster}칸</b> 더 필요");
             }
         }
         else
@@ -542,41 +522,6 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     // ── Helpers ──
 
-    private static string FormatEffectShort(RuneSynergyEntry e)
-    {
-        float  pct      = e.value * 100f;
-        string sign     = pct >= 0f ? "+" : "";
-        string abbr = e.effect_type switch
-        {
-            "AttackPowerUp"     => "공격",
-            "DefenseUp"         => "방어",
-            "MagicPowerUp"      => "마력",
-            "SpeedUp"           => "속도",
-            "LuckUp"            => "행운",
-            "ShieldAccumulate"  => "방패",
-            "HpRecovery"        => "회복",
-            "MaxHpUp"           => "MaxHP",
-            "SkillCooldownDown" => "CDR",
-            _                   => e.effect_type is { Length: > 5 }
-                                       ? e.effect_type[..5]
-                                       : (e.effect_type ?? "?"),
-        };
-        string trigIcon = e.trigger switch
-        {
-            "Always"  => "",
-            "OnHit"   => "피격·",
-            "OnLowHp" => "체력↓·",
-            "OnKill"  => "처치·",
-            "OnUse"   => "사용·",
-            _         => "",
-        };
-        return $"✓{trigIcon}{abbr} {sign}{pct:F0}%";
-    }
-
-    private static Color GetZoneColor(int idx) => idx switch
-    {
-        0 => COLOR_ATK,  1 => COLOR_DEF,  2 => COLOR_MAG,
-        3 => COLOR_HP,   4 => COLOR_SPD,  5 => COLOR_LUCK,
-        _ => Color.white,
-    };
+    private static Color GetZoneColor(int idx) =>
+        (idx >= 0 && idx < ZONE_COLORS.Length) ? ZONE_COLORS[idx] : Color.white;
 }

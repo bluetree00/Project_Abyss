@@ -33,7 +33,7 @@ public static class ZoneClusterCalculator
             if (visited.Contains(start)) continue;
             if (!zones.TryGetValue(start, out char zoneCode)) continue;
 
-            string zoneId = ZoneCharToId(zoneCode);
+            string zoneId = ElementDef.CodeToId(zoneCode);
             if (zoneId == null) continue;
 
             queue.Clear();
@@ -64,12 +64,4 @@ public static class ZoneClusterCalculator
 
         return result;
     }
-
-    private static string ZoneCharToId(char code) => code switch
-    {
-        'A' => "ATK",  'D' => "DEF",  'H' => "HP",
-        'S' => "SPD",  'M' => "MAG",  'L' => "LUCK",
-        '+' => "CENTER",
-        _   => null,
-    };
 }

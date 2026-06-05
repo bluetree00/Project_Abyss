@@ -429,8 +429,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
         if (clusterSizes != null && Managers.RuneData != null)
         {
-            var zoneOrder = new[] { "ATK", "DEF", "MAG", "HP", "SPD", "LUCK" };
-            foreach (var zoneId in zoneOrder)
+            foreach (var zoneId in ElementDef.Order)
             {
                 if (!clusterSizes.TryGetValue(zoneId, out int cluster) || cluster <= 0) continue;
 
@@ -719,16 +718,8 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         return t;
     }
 
-    private static Color GetZoneAccent(string zoneId) => zoneId switch
-    {
-        "ATK"  => new Color(1.00f, 0.50f, 0.20f, 1f),
-        "DEF"  => new Color(0.30f, 0.65f, 1.00f, 1f),
-        "MAG"  => new Color(0.70f, 0.30f, 1.00f, 1f),
-        "HP"   => new Color(0.30f, 0.85f, 0.45f, 1f),
-        "SPD"  => new Color(1.00f, 0.85f, 0.20f, 1f),
-        "LUCK" => new Color(1.00f, 0.75f, 0.20f, 1f),
-        _      => new Color(0.60f, 0.70f, 0.90f, 1f),
-    };
+    private static Color GetZoneAccent(string zoneId) =>
+        ElementDef.IdColor(zoneId, new Color(0.60f, 0.70f, 0.90f, 1f));
 
     private static GameObject Go(string name) => new(name, typeof(RectTransform));
 

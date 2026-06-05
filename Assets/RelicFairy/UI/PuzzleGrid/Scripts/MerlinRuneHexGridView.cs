@@ -26,14 +26,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     // 값 = 최대 블록 선형 길이(5셀) → 5셀짜리 블록도 한 끝만 닿으면 배치 가능
     private const int ADJACENCY_REACH = 5;
 
-    // 존별 기본 색상
-    private static readonly Color COLOR_ATK    = new(1.0f, 0.35f, 0.30f, 0.75f);
-    private static readonly Color COLOR_DEF    = new(0.3f, 0.55f, 1.00f, 0.75f);
-    private static readonly Color COLOR_HP     = new(0.3f, 0.85f, 0.45f, 0.75f);
-    private static readonly Color COLOR_SPD    = new(1.0f, 0.85f, 0.20f, 0.75f);
-    private static readonly Color COLOR_MAG    = new(0.7f, 0.30f, 1.00f, 0.75f);
-    private static readonly Color COLOR_LUCK   = new(1.0f, 0.75f, 0.20f, 0.75f);
-    private static readonly Color COLOR_CENTER = new(0.85f, 0.85f, 0.90f, 0.75f);
+    // 존별 색상은 ElementDef에서 조회. 미정의 코드 폴백만 보유.
     private static readonly Color COLOR_EMPTY  = new(0.15f, 0.15f, 0.20f, 0.30f);
 
     // 하이라이트 시 alpha 증가 배수
@@ -449,41 +442,12 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
     }
 
-    private static char ZoneIdToChar(string zoneId) => zoneId switch
-    {
-        "ATK"    => 'A',
-        "DEF"    => 'D',
-        "HP"     => 'H',
-        "SPD"    => 'S',
-        "MAG"    => 'M',
-        "LUCK"   => 'L',
-        "CENTER" => '+',
-        _        => '\0',
-    };
+    private static char ZoneIdToChar(string zoneId) => ElementDef.IdToCode(zoneId);
 
-    private static string ZoneCharToId(char code) => code switch
-    {
-        'A' => "ATK",
-        'D' => "DEF",
-        'H' => "HP",
-        'S' => "SPD",
-        'M' => "MAG",
-        'L' => "LUCK",
-        '+' => "CENTER",
-        _   => null,
-    };
+    private static string ZoneCharToId(char code) => ElementDef.CodeToId(code);
 
-    private static Color GetZoneColor(char code) => code switch
-    {
-        'A' => COLOR_ATK,
-        'D' => COLOR_DEF,
-        'H' => COLOR_HP,
-        'S' => COLOR_SPD,
-        'M' => COLOR_MAG,
-        'L' => COLOR_LUCK,
-        '+' => COLOR_CENTER,
-        _   => COLOR_EMPTY,
-    };
+    private static Color GetZoneColor(char code) =>
+        ElementDef.TryGetCodeColor(code, out var c) ? c : COLOR_EMPTY;
 
     // 점유: 존 색상을 1.45배 밝게 + 완전 불투명
     private static Color OccupiedColor(Color c) =>
