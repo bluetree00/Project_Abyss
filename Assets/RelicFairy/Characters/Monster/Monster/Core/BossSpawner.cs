@@ -225,10 +225,16 @@ public class BossSpawner : MonoBehaviour
     {
         if (string.IsNullOrEmpty(spawnEffectAddressKey)) return;
 
+        var spawnPos = new Vector3(pos.x, pos.y + spawnEffectYOffset, pos.z);
+
         GameObject fx;
         try
         {
-            fx = await Managers.AddressableManager.InstantiateAsync(spawnEffectAddressKey);
+            fx = await Managers.ObjectPooler.SpawnAsync(
+                spawnEffectAddressKey,
+                ObjectPoolerManager.PoolType.Effect,
+                spawnPos,
+                Quaternion.identity);
         }
         catch (System.OperationCanceledException) { return; }
         catch (System.Exception e)
@@ -239,40 +245,9 @@ public class BossSpawner : MonoBehaviour
 
         if (fx == null) return;
 
-        fx.transform.SetPositionAndRotation(
-            new Vector3(pos.x, pos.y + spawnEffectYOffset, pos.z),
-            Quaternion.identity);
-
-        if (spawnEffectScale != 1f)
-            fx.transform.localScale *= spawnEffectScale;
-
-        var particles = fx.GetComponentsInChildren<ParticleSystem>(true);
-        for (int i = 0; i < particles.Length; i++)
-        {
-            var ps = particles[i];
-            var main = ps.main;
-            if (main.loop)
-            {
-                main.loop = false;
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-                ps.Play(true);
-            }
-        }
-
-        try
-        {
-            await UniTask.Delay(
-                System.TimeSpan.FromSeconds(spawnEffectDuration),
-                cancellationToken: destroyCancellationToken);
-        }
-        catch (System.OperationCanceledException)
-        {
-            if (fx != null) Managers.AddressableManager.ReleaseInstance(fx);
-            return;
-        }
-
-        if (fx != null)
-            Managers.AddressableManager.ReleaseInstance(fx);
+        // 풀 인스턴스를 1회용 VFX로 재생 — 수명(spawnEffectDuration) 후 자동 Despawn.
+        var vfx = fx.GetComponent<PooledOneShotVfx>() ?? fx.AddComponent<PooledOneShotVfx>();
+        vfx.Play(spawnEffectDuration, spawnEffectScale);
     }
 
     private void OnDrawGizmosSelected()

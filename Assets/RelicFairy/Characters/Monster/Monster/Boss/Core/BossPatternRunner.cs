@@ -41,6 +41,8 @@ public class BossPatternRunner
     BossPatternSO _lastPatternSO;
     float         _lastPatternTime;
     readonly Dictionary<BossPatternEntry, int> _seqIndex = new();
+    // SelectRandom 평가마다 새 List를 할당하지 않도록 재사용 (보스 1마리·동기 Tick이라 공유 안전)
+    readonly List<BossPatternSO> _randomCandidates = new();
 
     /// <summary>현재 패턴이 실행 중인지. NormalModeTimer 계산에 사용.</summary>
     public bool  IsPatternActive      { get; private set; }
@@ -301,15 +303,15 @@ public class BossPatternRunner
 
     BossPatternSO SelectRandom(BossPatternEntry entry, bool checkCanExecute)
     {
-        var candidates = new List<BossPatternSO>();
+        _randomCandidates.Clear();
         foreach (var p in entry.patterns)
         {
             if (p == null) continue;
             if (checkCanExecute && !p.CanExecute(_ctx)) continue;
-            candidates.Add(p);
+            _randomCandidates.Add(p);
         }
-        if (candidates.Count == 0) return null;
-        return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        if (_randomCandidates.Count == 0) return null;
+        return _randomCandidates[UnityEngine.Random.Range(0, _randomCandidates.Count)];
     }
 
     float GetBreakDurationMin()

@@ -477,8 +477,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         var prefab = _config?.stat?.hitVfxPrefab;
         if (prefab == null) return;
 
+        var pooler = Managers.ObjectPooler;
+        if (pooler == null) return;
+
         Vector3 pos = transform.position + _config.stat.hitVfxOffset;
-        var go = Instantiate(prefab, pos, Quaternion.identity);
+        var go = pooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
+        if (go == null) return;
+
         go.transform.localScale = Vector3.one * Mathf.Max(0.001f, _config.stat.hitVfxScale);
 
         var systems = go.GetComponentsInChildren<ParticleSystem>(true);
@@ -490,7 +495,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
         float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
-        Destroy(go, lifetime);
+
+        // Destroy 대신 풀 반환(수명 후 자동 Despawn). 스케일은 매 스폰 절대 설정 → 재사용 정합.
+        var vfx = go.GetComponent<PooledOneShotVfx>() ?? go.AddComponent<PooledOneShotVfx>();
+        vfx.Play(lifetime);
     }
 
     /// <summary>애니메이션 이벤트에서 호출 (MonsterAnimEventReceiver 경유).</summary>

@@ -67,7 +67,7 @@ public class MapBuilder
                 float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter);
 
                 var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
-                go.name = $"Block_{x}_{z}_{renderType}";
+                Name(go, $"Block_{x}_{z}_{renderType}");
                 // 벽은 Wall(8) 레이어로 — 리치 등 공중 보스의 SphereCast 충돌 감지에 사용.
                 // 나머지 블록(바닥·버프·상점 등)은 Ground(3) 레이어.
                 SetLayerRecursive(go, renderType == TileType.Wall ? 8 : 3);
@@ -89,7 +89,7 @@ public class MapBuilder
                     {
                         var layerWorld = worldPos + new Vector3(0f, layer * cellSize, 0f);
                         var layerGO    = Object.Instantiate(blockDef.prefab, layerWorld, Quaternion.Euler(0, rotY, 0), parent);
-                        layerGO.name   = $"Block_{x}_{z}_Wall_L{layer}";
+                        Name(layerGO, $"Block_{x}_{z}_Wall_L{layer}");
                         SetLayerRecursive(layerGO, 8); // Wall layer
                         result.Add(new PlacedBlock
                         {
@@ -111,7 +111,7 @@ public class MapBuilder
                     if (buffDef != null)
                     {
                         var buffGo = Object.Instantiate(buffDef.prefab, worldPos, Quaternion.identity, parent);
-                        buffGo.name = $"Buff_{x}_{z}_{type}";
+                        Name(buffGo, $"Buff_{x}_{z}_{type}");
                         AttachBuffInteraction(buffGo, type);
                         buffBlock = new PlacedBlock
                         {
@@ -121,13 +121,13 @@ public class MapBuilder
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
                     else
                     {
                         buffBlock = CreateDefaultBuffObject(x, z, type, worldPos, cellSize, parent);
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
 
@@ -144,7 +144,7 @@ public class MapBuilder
                     if (shopStallPrefab != null)
                     {
                         var shopGo = Object.Instantiate(shopStallPrefab, worldPos, Quaternion.identity, parent);
-                        shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                        Name(shopGo, $"ShopStall_{x}_{z}_{type}");
                         AttachShopStallInteraction(shopGo, cellSize, category);
                         shopBlock = new PlacedBlock
                         {
@@ -154,7 +154,7 @@ public class MapBuilder
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={worldPos}");
                     }
                     else
                     {
@@ -163,7 +163,7 @@ public class MapBuilder
                         if (shopDef != null && shopDef.prefab != null)
                         {
                             var shopGo = Object.Instantiate(shopDef.prefab, worldPos, Quaternion.identity, parent);
-                            shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                            Name(shopGo, $"ShopStall_{x}_{z}_{type}");
                             AttachShopStallInteraction(shopGo, cellSize, category);
                             shopBlock = new PlacedBlock
                             {
@@ -173,7 +173,7 @@ public class MapBuilder
                                 tileType = type,
                                 cell = new Vector2Int(x, z),
                             };
-                            Debug.Log($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={worldPos}");
+                            RFLog.D($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={worldPos}");
                         }
                         else
                         {
@@ -191,7 +191,7 @@ public class MapBuilder
         }
 
         if (buffCount > 0)
-            Debug.Log($"[MapBuilder] 맵 빌드 완료: 총 블록 {result.Count}개, 버프 타일 {buffCount}개");
+            RFLog.D($"[MapBuilder] 맵 빌드 완료: 총 블록 {result.Count}개, 버프 타일 {buffCount}개");
 
         return result;
     }
@@ -370,7 +370,7 @@ public class MapBuilder
                 var rot      = flip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
 
                 var go = Object.Instantiate(useDef.prefab, worldPos, rot, parent);
-                go.name = $"Ceiling_{x}_{z}";
+                Name(go, $"Ceiling_{x}_{z}");
                 SetLayerRecursive(go, 3);
             }
         }
@@ -402,6 +402,7 @@ public class MapBuilder
         int[] dz = {  0, 0,-1, 1 };
 
         int counter = 0;
+        int placed  = 0;
 
         if (cfg.wallLightPrefab != null)
         {
@@ -431,12 +432,16 @@ public class MapBuilder
 
                     if (counter++ % cfg.wallLightSpacing != 0) continue;
 
+                    // 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.
+                    if (cfg.maxWallLights > 0 && placed >= cfg.maxWallLights) continue;
+
                     var wallLocal  = new Vector3(x * cellSize - offset.x, lightY, z * cellSize - offset.z);
                     var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
                     var worldPos   = parent.TransformPoint(lightLocal);
                     var rot        = Quaternion.LookRotation(inwardDir);
 
                     Object.Instantiate(cfg.wallLightPrefab, worldPos, rot, parent);
+                    placed++;
                 }
             }
         }
@@ -597,4 +602,9 @@ public class MapBuilder
         foreach (Transform child in go.transform)
             SetLayerRecursive(child.gameObject, layer);
     }
+
+    /// <summary>디버그용 블록 명명. 릴리즈 빌드에서는 호출문(문자열 보간 포함)이 제거돼 GC 할당이 사라진다.
+    /// 런타임 코드는 블록 이름에 의존하지 않는다(이름 기반 Find 없음 — 확인 완료).</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private static void Name(GameObject go, string n) => go.name = n;
 }
