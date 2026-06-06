@@ -218,6 +218,17 @@ public class GameCameraController : MonoBehaviour
     }
 
     /// <summary>
+    /// 카메라 자체 인트로 검정 오버레이(_fadeOverlay)를 즉시 투명 처리한다.
+    /// 베이스캠프처럼 진입 연출을 ScreenFade로 처리해 카메라 인트로 페이드를 쓰지 않는 흐름에서,
+    /// Awake가 만든 불투명 오버레이가 화면에 남는 것을 방지한다(레거시 줌인 인트로도 차단).
+    /// </summary>
+    public void ClearIntroFade()
+    {
+        _introStarted = true; // OnPlayerBound→PlayIntroAsync 자동 줌인 차단
+        if (_fadeOverlay != null) _fadeOverlay.color = Color.clear;
+    }
+
+    /// <summary>
     /// 스타트 방(Wisp) 진입 시 호출.
     /// 검정 오버레이를 즉시 제거하고 Cinemachine이 Wisp를 추적하도록 설정한다.
     /// </summary>

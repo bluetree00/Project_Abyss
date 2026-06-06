@@ -222,8 +222,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → Wisp 모드 (에디터 직접 실행 시 false)
         // DebugStageRunPanel이 있으면 해당 패널이 StartRunAsync를 통해 전투를 시작하므로 중복 실행 방지
         bool hasDebugPanel = Object.FindFirstObjectByType<DebugStageRunPanel>() != null;
+
+        // 베이스캠프(영속 허브)에서 로드아웃 확정 후 진입한 새 런: 바로 전투가 아니라 Zone0를 대기 방으로 띄운다.
+        // IsNewRunPending(로비 새 런 신호, BaseCamp 경유 시 미소비 상태로 유지)을 여기서 소비한다.
+        // 디버그 패널이 있어도 허브발 실제 새 런이 우선한다(디버그 패널은 IsStartRoomScene이면 자동 시작을 보류).
+        bool newRunFromHub = (AppBootstrapper.Instance?.Loadout?.IsReady ?? false)
+            && (AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false);
+
         if (_run != null && _run.IsRunning && !hasDebugPanel)
             await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
+        else if (newRunFromHub)
+            await StartWaitingRoomAsync();
         else if (IsInStartRoom)
             await StartRoomAsync();
         else if (!hasDebugPanel)
@@ -506,14 +515,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// zone_index=0(Start)를 MapRoomEntry로 변환해 SpawnBlockMapAsync로 빌드.
     /// CP/WP 타일에서 픽업 프리팹이 자동 스폰되고, _pendingPlayerSpawnPos가 설정된다.
     /// </summary>
-    private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct)
+    private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct, bool suppressInteractables = false)
     {
-        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        // 세션 챕터가 미설정(0)일 수 있으므로 ResolveCurrentChapter로 씬 이름 폴백까지 처리 (StartProcGenRunAsync와 동일).
+        var chapter     = ResolveCurrentChapter();
         var serverEntry = Managers.ChapterData?.Get(chapter);
         var chapterSO   = chapterRegistry?.GetData(chapter);
         var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
         var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
         var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
+        // 서버/레지스트리에 키가 없으면 규칙 기반 폴백 (StartProcGenRunAsync의 CHAPTER_N_ROOM_POOL과 동일 패턴).
+        if (string.IsNullOrEmpty(zoneLayoutKey))
+            zoneLayoutKey = $"chapter_{(int)chapter}_zone_layout";
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
             Debug.LogError("[GameRunBootstrapper] zone_layout_key 없음 — Zone 0 스폰 불가");
@@ -561,7 +574,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             scatter_range     = startZone.scatter_range,
         };
         var worldCenter = CalcZoneWorldCenter(startZone);
-        await SpawnBlockMapAsync(roomEntry, worldCenter, ct, instantEntrance: true); // 시작방 허브: 디졸브 없이 완성된 방으로
+        await SpawnBlockMapAsync(roomEntry, worldCenter, ct, instantEntrance: true, suppressInteractables: suppressInteractables); // 시작방 허브: 디졸브 없이 완성된 방으로
 
         // P 타일이 없으면 CSV의 spawn_local로 폴백
         if (!_pendingPlayerSpawnPos.HasValue)
@@ -1138,7 +1151,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     // worldCenter 기본값 = Vector3.zero → 기존 동작 유지
-    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default, bool instantEntrance = false)
+    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default, bool instantEntrance = false, bool suppressInteractables = false)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
@@ -1209,8 +1222,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             RoomEntry              = roomEntry,
             DecorationCatalogs     = decorationCatalogs,
             ActivePalette          = activePalette,
-            CharacterPickupPrefabs = characterPickupPrefabs,
-            WeaponPickupPrefabs    = weaponPickupPrefabs,
+            CharacterPickupPrefabs = suppressInteractables ? null : characterPickupPrefabs,
+            WeaponPickupPrefabs    = suppressInteractables ? null : weaponPickupPrefabs,
             Grid                   = grid,
             SpawnInfos             = spawnInfos,
             DeferredSpawners       = deferredSpawners,
@@ -1782,6 +1795,51 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // Guard: force combat HUD once more after player/map bootstrap settles.
         _run?.RequestHudMode(HUDIds.Mode.Combat);
+    }
+
+    /// <summary>
+    /// 베이스캠프(영속 허브)에서 로드아웃을 확정한 새 런의 챕터 진입.
+    /// 바로 전투로 들어가면 어색하므로 Zone0를 "대기 방"으로 빌드한다 — 선택 콘텐츠(CP/WP 픽업·각성 제단·대사)는
+    /// 모두 생략하고 로드아웃 기반 플레이어만 스폰한다. 출구 게이트(StartRoomGate)는 로드아웃이 이미 준비됐으므로
+    /// 즉시 열린 상태가 되며, 통과 시 ExitStartRoomAsync가 서약 선택 후 StartProcGenRunAsync로 던전을 시작한다.
+    /// </summary>
+    private async UniTask StartWaitingRoomAsync()
+    {
+        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+
+        // 대기 방 동안 전투 HUD 억제 — 출구 게이트 통과 시 ExitStartRoomAsync가 복원한다.
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+
+        // 진입 연출: 방 생성·카메라 배치를 검정으로 가린 뒤 둘러보기에서 페이드인으로 드러냄.
+        await ScreenFade.Out(0f);
+
+        // Zone0를 깨끗한 대기 방으로 빌드 — 선택 픽업(CP/WP)은 억제(BaseCamp에서 이미 선택).
+        // 출구에 StartRoomGate가 배치되고 _pendingPlayerSpawnPos가 설정된다.
+        await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy(), suppressInteractables: true);
+
+        // 시작방 둘러보기 카메라 연출 (StartRoomAsync와 동일 구성).
+        if (_currentMapGO != null && GameCameraController.Instance != null)
+            await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, this.GetCancellationTokenOnDestroy());
+        else
+            await ScreenFade.In(0.4f);
+
+        // 로드아웃(body+유물+무기) 기반 스폰 — SpawnPlayerAsync가 로드아웃 키 해석·유물 적용·무기 장착을 처리하고
+        // _pendingPlayerSpawnPos(Zone0 스폰 지점)에 배치한다.
+        var player = await SpawnPlayerAsync(startBodyKey);
+        if (player == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] StartWaitingRoomAsync: 플레이어 스폰 실패");
+            return;
+        }
+
+        _run?.BindPlayer(player);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
+        // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
     }
 
     /// <summary>

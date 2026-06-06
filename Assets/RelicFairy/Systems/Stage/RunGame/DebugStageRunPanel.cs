@@ -25,11 +25,12 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var run = GetCurrentRun();
         if (run != null && run.IsRunning) return;
 
-        // 스타트 방 모드: Wisp가 캐릭터를 선택하기 전이므로 자동 실행하지 않음
+        // 시작방/허브 진입 흐름이 있는 씬에서는 GameRunBootstrapper가 스폰·런 시작을 담당하므로 자동 실행하지 않음.
+        // (허브(BaseCamp)에서 로드아웃을 갖춘 채 진입하면 IsInStartRoom=false가 되므로 IsStartRoomScene으로 판별)
         var bootstrapperInstance = bootstrapper != null
             ? bootstrapper
             : FindObjectOfType<GameRunBootstrapper>(true);
-        if (bootstrapperInstance != null && bootstrapperInstance.IsInStartRoom) return;
+        if (bootstrapperInstance != null && bootstrapperInstance.IsStartRoomScene) return;
 
         if (_started) return;
         _started = true;
