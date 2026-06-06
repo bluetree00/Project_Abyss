@@ -80,6 +80,10 @@ public class MonsterSpawner : MonoBehaviour
     [Tooltip("디졸브 엣지 색상 (시인성 아웃라인). 모든 몬스터 공용으로 적용됩니다.")]
     [SerializeField] private Color spawnOutlineColor = new Color(0f, 2.4f, 3f, 1f);
 
+    [Tooltip("true면 Elite 등급 이상에만 스폰 디졸브를 적용해 일반 몹의 머티리얼 비용을 줄인다. " +
+             "기본값 false = 현행(모든 몹 디졸브).")]
+    [SerializeField] private bool spawnDissolveEliteAndAbove = false;
+
     [Header("풀 그룹 필터 (primary)")]
     [Tooltip("true면 Start 시점에 현재 진행 중인 챕터 번호(ChapterId+1)를 allowedPoolGroups에 자동 주입.\n" +
              "수동으로 특정 그룹만 지정하고 싶으면 false로 설정.")]
@@ -367,7 +371,8 @@ public class MonsterSpawner : MonoBehaviour
         // 스폰 연출 이펙트 (fire-and-forget — 몬스터 루프는 블로킹하지 않음)
         PlaySpawnEffectAsync(spawnPos).Forget();
 
-        if (spawnDissolveDuration > 0f && monster != null)
+        bool dissolveAllowed = !spawnDissolveEliteAndAbove || entry.grade >= MonsterGrade.Elite;
+        if (spawnDissolveDuration > 0f && monster != null && dissolveAllowed)
         {
             DissolveEffect.PlayAppear(
                 monster.gameObject,
@@ -422,10 +427,16 @@ public class MonsterSpawner : MonoBehaviour
     {
         if (string.IsNullOrEmpty(spawnEffectAddressKey)) return;
 
+        var spawnPos = new Vector3(pos.x, pos.y + spawnEffectYOffset, pos.z);
+
         GameObject fx;
         try
         {
-            fx = await Managers.AddressableManager.InstantiateAsync(spawnEffectAddressKey);
+            fx = await Managers.ObjectPooler.SpawnAsync(
+                spawnEffectAddressKey,
+                ObjectPoolerManager.PoolType.Effect,
+                spawnPos,
+                Quaternion.identity);
         }
         catch (System.OperationCanceledException) { return; }
         catch (System.Exception e)
@@ -436,41 +447,10 @@ public class MonsterSpawner : MonoBehaviour
 
         if (fx == null) return;
 
-        fx.transform.SetPositionAndRotation(
-            new Vector3(pos.x, pos.y + spawnEffectYOffset, pos.z),
-            Quaternion.identity);
-
-        if (spawnEffectScale != 1f)
-            fx.transform.localScale *= spawnEffectScale;
-
-        // 루프 강제 off — 프리팹 설정 실수 방지 + 정리 시점 일관성 확보
-        var particles = fx.GetComponentsInChildren<ParticleSystem>(true);
-        for (int i = 0; i < particles.Length; i++)
-        {
-            var ps = particles[i];
-            var main = ps.main;
-            if (main.loop)
-            {
-                main.loop = false;
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-                ps.Play(true);
-            }
-        }
-
-        try
-        {
-            await UniTask.Delay(
-                System.TimeSpan.FromSeconds(spawnEffectDuration),
-                cancellationToken: destroyCancellationToken);
-        }
-        catch (System.OperationCanceledException)
-        {
-            if (fx != null) Managers.AddressableManager.ReleaseInstance(fx);
-            return;
-        }
-
-        if (fx != null)
-            Managers.AddressableManager.ReleaseInstance(fx);
+        // 풀 인스턴스를 1회용 VFX로 재생 — 수명(spawnEffectDuration) 후 자동 Despawn.
+        // 컴포넌트는 첫 스폰 시 자동 부착(프리팹 데이터 변경 없음), 재사용 인스턴스는 그대로 재활용.
+        var vfx = fx.GetComponent<PooledOneShotVfx>() ?? fx.AddComponent<PooledOneShotVfx>();
+        vfx.Play(spawnEffectDuration, spawnEffectScale);
     }
 
     private bool TryGetSpawnPosition(out Vector3 result)

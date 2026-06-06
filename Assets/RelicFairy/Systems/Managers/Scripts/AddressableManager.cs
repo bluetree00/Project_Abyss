@@ -42,6 +42,12 @@ public sealed class AddressableManager
     /// </summary>
     private readonly Dictionary<int, AsyncOperationHandle<GameObject>> _instanceHandles = new();
 
+    /// <summary>
+    /// PR6: 스코프(예: 챕터) 단위 해제용 — 스코프명 → 그 스코프로 로드된 cacheKey 집합.
+    /// 스코프 없이 로드하면 영구 캐시(현행). 스코프 로드를 쓰는 코드가 없으면 ReleaseScope는 무동작.
+    /// </summary>
+    private readonly Dictionary<string, HashSet<string>> _scopeKeys = new();
+
 #if UNITY_EDITOR
     public IReadOnlyDictionary<string, AsyncOperationHandle> LoadedAssetHandles => _assetHandles;
     public IReadOnlyDictionary<int, AsyncOperationHandle<GameObject>> LoadedInstanceHandles => _instanceHandles;
@@ -176,6 +182,25 @@ public sealed class AddressableManager
     public UniTask<CharacterData> LoadCharacterDataAsync(string dataKey)
         => LoadAssetAsync<CharacterData>(dataKey);
 
+    /// <summary>
+    /// PR6: 스코프 태그를 달아 로드한다. 같은 스코프로 로드된 에셋은 ReleaseScope(scope)로 일괄 해제 가능.
+    /// scope가 null/빈 문자열이면 일반 LoadAssetAsync와 동일(영구 캐시).
+    /// </summary>
+    public async UniTask<T> LoadAssetAsync<T>(string key, string scope) where T : UnityEngine.Object
+    {
+        var result = await LoadAssetAsync<T>(key);
+        if (!string.IsNullOrEmpty(scope) && result != null)
+        {
+            if (!_scopeKeys.TryGetValue(scope, out var set))
+            {
+                set = new HashSet<string>();
+                _scopeKeys[scope] = set;
+            }
+            set.Add(MakeAssetCacheKey<T>(key));
+        }
+        return result;
+    }
+
     // -------------------------
     // Instantiate (캐시 X, 인스턴스 추적 O)
     // -------------------------
@@ -305,6 +330,29 @@ public sealed class AddressableManager
     {
         ReleaseAllInstances();
         ReleaseAllAssets();
+    }
+
+    /// <summary>
+    /// PR6: 한 스코프로 로드된 에셋 핸들만 해제한다. 공용/영구 에셋(스코프 미지정)은 건드리지 않는다.
+    /// ⚠ 호출 전 해당 에셋을 참조하는 풀/인스턴스가 모두 정리됐는지 보장해야 한다(분홍텍스처/NRE 방지).
+    /// 스코프 로드를 쓰는 코드가 없으면 해제 대상이 없어 무동작.
+    /// </summary>
+    public void ReleaseScope(string scope)
+    {
+        if (string.IsNullOrEmpty(scope) || !_scopeKeys.TryGetValue(scope, out var keys)) return;
+
+        foreach (var cacheKey in keys)
+        {
+            if (_assetHandles.TryGetValue(cacheKey, out var handle))
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+                _assetHandles.Remove(cacheKey);
+            }
+        }
+
+        _scopeKeys.Remove(scope);
+        UpdateDebugList();
+        Debug.Log($"[AddressableManager] Released Scope: {scope} ({keys.Count} assets)");
     }
 
     // -------------------------

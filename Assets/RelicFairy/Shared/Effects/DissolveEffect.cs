@@ -23,6 +23,11 @@ public static class DissolveEffect
     private const float EdgeFadePortion = 0.25f;
     private const float MaxEdgeWidth    = 0.12f;
 
+    // PR4: MPB 전환은 ShaderGraph+SRP Batcher 런타임 시각 검증이 이 환경에서 불가하여 보류.
+    // 대신 dissolve 머티리얼 인스턴스를 재사용해 등장(appear) 경로의 new Material/Destroy GC churn을 제거한다.
+    private const int MatPoolCap = 256;
+    private static readonly Stack<Material> _matPool = new();
+
     // ─────────────────── 공개 API ───────────────────
 
     /// <summary>디졸브로 등장 (소멸 → 완전 등장 후 원본 복원).
@@ -138,7 +143,7 @@ public static class DissolveEffect
             for (int i = 0; i < renderers.Length; i++)
                 origMats[i] = renderers[i].sharedMaterials;
 
-            instances = ReplaceMaterials(renderers, mat, edgeColor ?? DefaultEdgeColor);
+            instances = ReplaceMaterials(renderers, mat, edgeColor ?? DefaultEdgeColor, pooled: true);
             SetDissolveValue(instances, 1f);
             // 비활성 오브젝트는 dissolve=1(완전 투명) 설정 후 활성화 — 플래시 없이 등장
             if (!target.activeSelf) target.SetActive(true);
@@ -188,9 +193,10 @@ public static class DissolveEffect
         finally
         {
             linkedCts?.Dispose();
+            // 등장 완료/취소 시 렌더러는 이미 origMats로 복원됨 → 풀 머티리얼을 더 이상 참조하지 않아 재사용 안전
             if (instances != null)
                 foreach (var m in instances)
-                    if (m != null) UnityEngine.Object.Destroy(m);
+                    if (m != null) ReturnMaterial(m);
         }
     }
 
@@ -213,7 +219,7 @@ public static class DissolveEffect
             var renderers = target.GetComponentsInChildren<Renderer>(true);
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
 
-            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f));
+            instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f), pooled: false);
             SetDissolveValue(instances, 0f);
             SetEdgeWidth(instances, MaxEdgeWidth);
 
@@ -237,8 +243,27 @@ public static class DissolveEffect
         }
     }
 
+    // ── PR4-pool: dissolve 머티리얼 인스턴스 재사용 (new Material/Destroy churn 제거) ──
+    private static Material RentMaterial(Material dissolveMat)
+    {
+        if (_matPool.Count > 0)
+        {
+            var m = _matPool.Pop();
+            m.CopyPropertiesFromMaterial(dissolveMat);   // alloc 없이 new Material(dissolveMat)와 동일한 깨끗한 상태로 리셋
+            return m;
+        }
+        return new Material(dissolveMat);
+    }
+
+    private static void ReturnMaterial(Material m)
+    {
+        if (m == null) return;
+        if (_matPool.Count < MatPoolCap) _matPool.Push(m);
+        else UnityEngine.Object.Destroy(m);
+    }
+
     private static List<Material> ReplaceMaterials(
-        Renderer[] renderers, Material dissolveMat, Color edgeColor)
+        Renderer[] renderers, Material dissolveMat, Color edgeColor, bool pooled)
     {
         var instances = new List<Material>();
         foreach (var r in renderers)
@@ -246,7 +271,7 @@ public static class DissolveEffect
             var newMats = new Material[r.sharedMaterials.Length];
             for (int j = 0; j < newMats.Length; j++)
             {
-                var inst = new Material(dissolveMat);
+                var inst = pooled ? RentMaterial(dissolveMat) : new Material(dissolveMat);
                 var orig = r.sharedMaterials[j];
 
                 if (orig != null)

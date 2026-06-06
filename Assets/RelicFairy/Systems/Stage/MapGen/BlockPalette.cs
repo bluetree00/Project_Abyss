@@ -18,6 +18,9 @@ public class RoomLightingConfig
 
     [Range(0f, 1f), Tooltip("벽 높이 중 조명 위치 비율. 0=하단, 1=상단. 0.4 권장.")]
     public float wallLightHeightRatio = 0.4f;
+
+    [Min(0), Tooltip("배치할 벽 조명 최대 개수. 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.")]
+    public int maxWallLights = 0;
 }
 
 /// <summary>
