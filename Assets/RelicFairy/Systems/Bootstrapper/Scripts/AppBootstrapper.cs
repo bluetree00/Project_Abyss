@@ -181,7 +181,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (vp != null)
                 await vp.PlayAsync(token);
 
-            RequestLoad(Define.Scene.GameScene_Ch1); // 새 런은 항상 Chapter 1 씬부터
+            RequestLoad(Define.Scene.BaseCamp); // 새 런은 영속 허브(BaseCamp)부터 — 던전 진입은 BaseCamp 게이트가 담당
         }
         catch (OperationCanceledException) { }
     }
@@ -192,6 +192,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         IsNewRunPending = false;
         return was;
     }
+
+    /// <summary>새 런 진입 신호를 세운다. 베이스캠프 던전 게이트 통과처럼 로비(RequestStartRun)를 거치지 않은
+    /// 진입에서도 Ch1 부트스트래퍼가 대기 방(StartWaitingRoomAsync) 흐름을 타도록 보장한다. ConsumeNewRunPending에서 소비.</summary>
+    public void MarkNewRunPending() => IsNewRunPending = true;
 
     /// <summary>
     /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.

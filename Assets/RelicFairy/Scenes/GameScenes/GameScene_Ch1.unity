@@ -161,6 +161,7 @@ MonoBehaviour:
   spawnEffectScale: 0.5
   spawnDissolveDuration: 1.2
   spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
+  spawnDissolveEliteAndAbove: 0
   autoApplyChapterGroup: 1
   allowedPoolGroups: 
   gradeMode: 0
@@ -829,7 +830,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CameraOcclusionFader
   occlusionMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 256
   castRadius: 0.3
   hiddenAlpha: 0.15
   fadeSpeed: 8
@@ -847,13 +848,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Cinemachine::Cinemachine.CinemachineCollider
   m_CollideAgainst:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 256
   m_IgnoreTag: Player
   m_TransparentLayers:
     serializedVersion: 2
     m_Bits: 0
   m_MinimumDistanceFromTarget: 0.5
-  m_AvoidObstacles: 1
+  m_AvoidObstacles: 0
   m_DistanceLimit: 0
   m_MinimumOcclusionTime: 0
   m_CameraRadius: 0.3
@@ -1156,6 +1157,7 @@ MonoBehaviour:
   playerPrefabKey: 
   startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T1_Bow
+  debugDefaultRelic: {fileID: 0}
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
@@ -1191,6 +1193,7 @@ MonoBehaviour:
   blockCellSize: 1
   blockBaseY: -0.1
   wallLayers: 12
+  procDoorCorridorLength: 6
   shopSlotCount: 3
   blockShopStallPrefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8,
     type: 3}
