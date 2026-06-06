@@ -27,6 +27,9 @@ public class BackendGameData : MonoBehaviour
 
     private string _rowInDate;
 
+    // PR5: 메타 로컬 저장소(권위) + 뒤끝 병행(백업/텔레메트리). 보수적 이중 기록.
+    private readonly LocalFileMetaStore _metaStore = new LocalFileMetaStore();
+
     // ── Lifecycle ──────────────────────────────────────────────────────────
     private void Awake()
     {
@@ -88,6 +91,18 @@ public class BackendGameData : MonoBehaviour
         });
 
         await tcs.Task;
+
+        // PR5: 로컬 메타 권위. 로컬 있으면 우선 적용(오프라인/이어쓰기), 없으면 서버값을 로컬로 이관(최초 1회).
+        var local = _metaStore.Load();
+        if (local != null)
+        {
+            Data = local;
+            OnDataLoaded?.Invoke();
+        }
+        else
+        {
+            _metaStore.Save(Data);
+        }
     }
 
     /// <summary>회원가입 완료 시 호출. USER_DATA 테이블에 초기 row를 삽입한다.</summary>
@@ -117,9 +132,12 @@ public class BackendGameData : MonoBehaviour
         await tcs.Task;
     }
 
-    /// <summary>현재 Data를 서버에 반영(UpdateV2). 재화 직접 변경 후에도 호출 가능.</summary>
+    /// <summary>현재 Data를 로컬(권위) + 뒤끝(백업/텔레메트리)에 반영. 재화 직접 변경 후에도 호출 가능.</summary>
     public async UniTask SaveAsync()
     {
+        // PR5: 로컬 우선 저장 — 오프라인에도 메타(각성/통화)가 보존된다.
+        _metaStore.Save(Data);
+
         if (string.IsNullOrEmpty(_rowInDate))
         {
             Debug.LogWarning("[BackendGameData] SaveAsync: rowInDate 없음 — Insert로 대체");

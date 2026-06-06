@@ -223,7 +223,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // DebugStageRunPanel이 있으면 해당 패널이 StartRunAsync를 통해 전투를 시작하므로 중복 실행 방지
         bool hasDebugPanel = Object.FindFirstObjectByType<DebugStageRunPanel>() != null;
         if (_run != null && _run.IsRunning && !hasDebugPanel)
-            await ContinueZoneLayoutRunAsync(this.GetCancellationTokenOnDestroy());
+            await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
         else if (IsInStartRoom)
             await StartRoomAsync();
         else if (!hasDebugPanel)
@@ -744,7 +744,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// 플레이어 스폰/이동·게이트 배치·웨이브 활성화는 호출자(RunFlowController)가 담당.
     /// </summary>
     public async UniTask<ProcRoomResult> BuildProcRoomAsync(
-        ZonePoolEntry entry, Vector3 anchor, bool mirror, int quarterTurns, CancellationToken ct = default)
+        ZonePoolEntry entry, Vector3 anchor, bool mirror, int quarterTurns, CancellationToken ct = default,
+        System.Random roomRng = null)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         if (entry == null || string.IsNullOrWhiteSpace(entry.grid_csv))
@@ -785,8 +786,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (cls.forward.HasValue)  RoomDoorPlanner.Open(grid, cls.forward.Value,  doorInfos[cls.forward.Value]);
         foreach (var t in cls.turns) RoomDoorPlanner.Open(grid, t, doorInfos[t]);
 
-        // 5. 스포너 플랜 (후보 m 중 max_active_spawners개만 활성)
-        ApplyMonsterSpawnerPlan(grid, entry.max_active_spawners);
+        // 5. 스포너 플랜 (후보 m 중 max_active_spawners개만 활성) — roomRng로 결정적(이어하기 재현)
+        ApplyMonsterSpawnerPlan(grid, entry.max_active_spawners, roomRng);
 
         // 6. 방 GO @ 앵커
         var root = worldMapRoot != null ? worldMapRoot : mapRoot;
@@ -796,10 +797,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
 
-        // 7. 블록 빌드
+        // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
+        //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
+        //    리프프로그 앵커로 카메라 밖(+300)에 빌드되므로 순서/연출에 영향 없음. 순서는 await로 보존된다.
         var blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        await UniTask.Yield(ct);
         MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        await UniTask.Yield(ct);
         if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+        await UniTask.Yield(ct);
 
         // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
         //      blocks에 합쳐 디졸브/디스폰에 함께 동참시킨다.
@@ -1338,7 +1344,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     ///   · 확정 ≥ max        : 확정 전부 유지, 후보 전부 Floor 치환
     ///   · 확정 &lt; max       : 확정 유지 + 후보 중 (max - 확정수)개 랜덤 선택
     /// </summary>
-    private static void ApplyMonsterSpawnerPlan(TileType[,] grid, int max)
+    // rng != null이면 결정적(이어하기 재현). null이면 전역 Random(레거시 경로).
+    private static void ApplyMonsterSpawnerPlan(TileType[,] grid, int max, System.Random rng = null)
     {
         if (grid == null) return;
 
@@ -1373,7 +1380,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         for (int i = candidateSpots.Count - 1; i > 0; i--)
         {
-            int j = UnityEngine.Random.Range(0, i + 1);
+            int j = rng != null ? rng.Next(0, i + 1) : UnityEngine.Random.Range(0, i + 1);
             (candidateSpots[i], candidateSpots[j]) = (candidateSpots[j], candidateSpots[i]);
         }
 
@@ -1922,6 +1929,121 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // Guard: some room/bootstrap flows can override HUD mode after early request.
         run.RequestHudMode(HUDIds.Mode.Combat);
+    }
+
+    /// <summary>
+    /// 하데스식 절차생성 이어하기. 로컬 세이브의 마스터 시드/visitCount로 저장된 방을 재생성하고
+    /// 로드아웃·인벤토리·서약·룬보드를 복원한 뒤 방 입구에서 전투를 새로 시작한다.
+    /// 방 내부 전투 상태(적 위치/HP)·플레이어 좌표는 직렬화하지 않는다.
+    /// </summary>
+    private async UniTask ContinueProcGenRunAsync(CancellationToken ct)
+    {
+        var pm   = RunProgressManager.Instance;
+        var save = pm != null && pm.HasLocalRun ? pm.LoadLocalRun() : null;
+        if (save == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] ContinueProcGenRunAsync: 로컬 세이브 없음 — 새 런으로 폴백");
+            await StartCombatDirectAsync();
+            return;
+        }
+
+        // 룸 풀 키: 서버 → SO → 규칙 폴백 (StartProcGenRunAsync와 동일)
+        var chapter     = ResolveCurrentChapter();
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var poolKey     = serverEntry?.zone_pool_key;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
+
+        // HUD + 플레이어 (절차 재개 전에 바인드 — MovePlayer/시너지 재계산이 Player를 참조)
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            SetupEntrance(player);
+            _run?.BindPlayer(player);
+        }
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        // 서약 복원 (BindPlayer가 CovenantHandler.Initialize 수행한 직후)
+        RestoreCovenantsFromSave(save);
+
+        // 룬 보드 복원 (점유 셀 기반 — 시너지 스탯/메커닉 재계산)
+        RestoreRuneBoardFromSave(save);
+
+        // 절차 흐름 재개 — 저장된 방을 동일 시드로 재생성, 입구에서 시작
+        var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+        var meta = BuildMetaFromSave(save);
+        await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct);
+
+        Debug.Log($"[GameRunBootstrapper] 절차생성 이어하기 완료 — visit={save.visitCount}, room={save.currentRoomPoolKey}");
+    }
+
+    private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)
+    {
+        var cooldowns = new System.Collections.Generic.List<CooldownKV>();
+        if (!string.IsNullOrEmpty(save.cooldownsJson))
+        {
+            var w = JsonUtility.FromJson<CooldownListWrapper>(save.cooldownsJson);
+            if (w?.items != null) cooldowns.AddRange(w.items);
+        }
+
+        return new RunMetaSnapshot
+        {
+            masterSeed         = save.masterSeed,
+            visitCount         = save.visitCount,
+            seqPhase           = save.seqPhase,
+            shopUsed           = save.shopUsed,
+            eventUsed          = save.eventUsed,
+            heading            = save.heading,
+            anchorToggle       = save.anchorToggle,
+            currentRoomPoolKey = save.currentRoomPoolKey,
+            currentRoomKind    = save.currentRoomKind,
+            currentRoomMirror  = save.currentRoomMirror,
+            cooldowns          = cooldowns,
+        };
+    }
+
+    private void RestoreCovenantsFromSave(RunSaveData save)
+    {
+        if (string.IsNullOrEmpty(save.covenantsJson)) return;
+        var w = JsonUtility.FromJson<CovenantListWrapper>(save.covenantsJson);
+        if (w?.items != null && w.items.Count > 0)
+            _run?.CovenantHandler?.RestoreSelections(w.items);
+    }
+
+    private void RestoreRuneBoardFromSave(RunSaveData save)
+    {
+        if (string.IsNullOrEmpty(save.runeCellsJson)) return;
+        var w = JsonUtility.FromJson<Vector2IntListWrapper>(save.runeCellsJson);
+        if (w?.items == null || w.items.Count == 0) return;
+
+        // 점유 셀이 룬 시너지의 단일 진실원본. 레코드 기반 중복 적용을 제거한 뒤
+        // 점유 재주입으로 스탯+메커닉을 한 번만 재계산한다.
+        var stats = _run?.Player?.RuntimeStats;
+        stats?.RestoreSynergies(null);                  // 시너지 스탯 초기화 (멱등)
+        _run?.ClearAppliedSynergies();                  // 세션 시너지 이력 초기화
+        MerlinRuneBridge.Instance?.ClearAppliedGrids(); // 브릿지 적용 가드 초기화
+
+        // Shape 재구성(재편집 가능 상태) — 실패해도 점유 기반 복원으로 폴백(시너지 무영향)
+        try
+        {
+            if (!string.IsNullOrEmpty(save.runePlacementsJson))
+            {
+                var pw = JsonUtility.FromJson<RunePlacementListWrapper>(save.runePlacementsJson);
+                if (pw?.items != null && pw.items.Count > 0)
+                    MerlinRuneBridge.Instance?.RestoreRunePlacements(pw.items);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 룬 Shape 재구성 실패(점유 폴백): {e.Message}");
+        }
+
+        // 점유 셀 기반 시너지 재계산 (권위) — Shape 재구성 여부와 무관하게 빌드 효과 보장
+        MerlinRuneBridge.Instance?.RestoreRuneCells(w.items);
     }
 
     /// <summary>

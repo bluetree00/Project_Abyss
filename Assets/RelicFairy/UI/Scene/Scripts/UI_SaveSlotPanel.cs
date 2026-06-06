@@ -77,24 +77,31 @@ public class UI_SaveSlotPanel : UI_Base
 
     private void RefreshAllCards()
     {
-        var rpm = RunProgressManager.Instance;
+        var rpm   = RunProgressManager.Instance;
+        var local = GetLocalSave(rpm);
         for (int i = 0; i < slotCards.Length; i++)
-        {
-            var data = (rpm != null && i < RunProgressManager.SlotCount)
-                ? rpm.Saves[i]
-                : null;
-            slotCards[i].Setup(data, i, OnSlotStartClicked, OnSlotDeleteClicked);
-        }
+            slotCards[i].Setup(ResolveSlotData(rpm, local, i), i, OnSlotStartClicked, OnSlotDeleteClicked);
     }
 
     private void RefreshCard(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= slotCards.Length) return;
-        var rpm  = RunProgressManager.Instance;
-        var data = (rpm != null && slotIndex < RunProgressManager.SlotCount)
-            ? rpm.Saves[slotIndex]
-            : null;
-        slotCards[slotIndex].Setup(data, slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
+        var rpm   = RunProgressManager.Instance;
+        var local = GetLocalSave(rpm);
+        slotCards[slotIndex].Setup(ResolveSlotData(rpm, local, slotIndex), slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
+    }
+
+    /// <summary>PR1: 진행 중 런은 로컬(단일 슬롯)이 권위. 해당 슬롯은 로컬 세이브로 표시한다.</summary>
+    private static RunSaveData GetLocalSave(RunProgressManager rpm)
+    {
+        var local = rpm != null ? rpm.LoadLocalRun() : null;
+        return local != null && local.hasActiveRun ? local : null;
+    }
+
+    private static RunSaveData ResolveSlotData(RunProgressManager rpm, RunSaveData local, int i)
+    {
+        if (local != null && local.slotIndex == i) return local;
+        return (rpm != null && i < RunProgressManager.SlotCount) ? rpm.Saves[i] : null;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -143,6 +150,11 @@ public class UI_SaveSlotPanel : UI_Base
     {
         var rpm = RunProgressManager.Instance;
         if (rpm == null || slotIndex < 0) return;
+
+        // 로컬 런 세이브가 이 슬롯이면 함께 폐기 (PR1: 로컬이 진행 중 런의 권위)
+        var local = GetLocalSave(rpm);
+        if (local != null && local.slotIndex == slotIndex)
+            rpm.ClearLocalRun();
 
         await rpm.ClearAsync(slotIndex);
         RefreshCard(slotIndex);

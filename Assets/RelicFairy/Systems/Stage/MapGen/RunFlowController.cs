@@ -59,6 +59,8 @@ public class RunFlowController : MonoBehaviour
     private Vector3 _baseAnchor;
     private int     _anchorToggle;
     private int     _heading; // 현재 진행 방향(0=N,1=E,2=S,3=W). 탄 출구 엣지로 갱신 → 다음 방 회전에 사용.
+    private int     _masterSeed; // 런 마스터 시드 (세이브/이어하기 결정성).
+    private bool    _resuming;   // 이어하기 재생성 중 — 중복 저장 억제용.
 
     // ── Public ──────────────────────────────────────
 
@@ -79,9 +81,10 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
-        int seed   = _seed != 0 ? _seed : Environment.TickCount;
-        _rng       = new System.Random(seed);
-        _sequencer = new RunSequencer(_pool, _structureConfig, seed);
+        int seed    = _seed != 0 ? _seed : Environment.TickCount;
+        _masterSeed = seed;
+        _rng        = new System.Random(seed);
+        _sequencer  = new RunSequencer(_pool, _structureConfig, seed);
 
         var startEntry = FindStartEntry();
         if (startEntry == null)
@@ -91,6 +94,50 @@ public class RunFlowController : MonoBehaviour
         }
 
         await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
+    }
+
+    /// <summary>
+    /// 이어하기: 저장된 마스터 시드 + 시퀀서 상태로 절차 흐름을 복원하고,
+    /// 저장된 현재 방을 동일 시드로 재생성해 입구에서 재개한다.
+    /// 방 내부 전투 상태(적 위치/HP)는 직렬화하지 않으므로 전투는 새로 시작된다(하데스식).
+    /// </summary>
+    public async UniTask ResumeAsync(RunMetaSnapshot meta, Vector3 anchor, string poolKey, CancellationToken externalCt)
+    {
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(externalCt, this.GetCancellationTokenOnDestroy());
+        var ct = _cts.Token;
+
+        _baseAnchor   = anchor;
+        _masterSeed   = meta.masterSeed;
+        _anchorToggle = meta.anchorToggle;
+        _heading      = meta.heading;
+
+        var key = !string.IsNullOrEmpty(poolKey) ? poolKey : _poolKey;
+        _pool = await Managers.ZoneLayout.LoadPoolAsync(key);
+        if (_pool == null || _pool.Count == 0)
+        {
+            Debug.LogError($"[RunFlow] 이어하기 풀 로드 실패: {key}");
+            return;
+        }
+
+        _rng       = new System.Random(_masterSeed);
+        _sequencer = new RunSequencer(_pool, _structureConfig, _masterSeed);
+        _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns);
+
+        var entry = !string.IsNullOrEmpty(meta.currentRoomPoolKey)
+            ? _pool.Find(p => string.Equals(p.pool_key, meta.currentRoomPoolKey, StringComparison.OrdinalIgnoreCase))
+            : null;
+        if (entry == null) entry = FindStartEntry();
+
+        var plan = new DoorPlan { kind = (RoomPlanKind)meta.currentRoomKind, entry = entry };
+
+        _resuming = true;
+        try
+        {
+            await EnterRoomAsync(plan, (DoorEdge)meta.heading, ct, meta.currentRoomMirror);
+        }
+        finally { _resuming = false; }
+
+        Debug.Log($"[RunFlow] 이어하기 완료 — visit={meta.visitCount}, room={meta.currentRoomPoolKey}");
     }
 
     // ── Private ─────────────────────────────────────
@@ -105,7 +152,7 @@ public class RunFlowController : MonoBehaviour
         return _pool.Find(p => string.Equals(p.category, "Normal", StringComparison.OrdinalIgnoreCase)) ?? _pool[0];
     }
 
-    private async UniTask EnterRoomAsync(DoorPlan plan, DoorEdge fromEdge, CancellationToken ct)
+    private async UniTask EnterRoomAsync(DoorPlan plan, DoorEdge fromEdge, CancellationToken ct, int forcedMirror = -1)
     {
         var grb = GameRunBootstrapper.Instance;
         if (grb == null || plan.entry == null) return;
@@ -119,8 +166,14 @@ public class RunFlowController : MonoBehaviour
         // 리프프로그 앵커: 이전 방과 겹치지 않게 z를 번갈아 배치 (최대 2개 방만 잠깐 공존)
         var roomAnchor = _baseAnchor + new Vector3(0f, 0f, (_anchorToggle++ % 2) * 300f);
 
-        bool mirror = _rng.Next(2) == 0;
-        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct); // 블록 숨김 상태로 빌드(디졸브는 여기서)
+        // 미러: 이어하기는 저장값 강제, 신규는 방별 자식 시드로 결정적 산출
+        int mirrorRoll = forcedMirror >= 0
+            ? forcedMirror
+            : (new System.Random(RunSequencer.Combine(_masterSeed ^ 0x1357, _sequencer.VisitCount)).Next(2));
+        bool mirror = mirrorRoll == 1;
+        // 방 빌드 RNG — 같은 (마스터 시드, visitCount)면 스포너 플랜까지 동일(이어하기 시 방 완전 재현)
+        var roomRng = new System.Random(RunSequencer.Combine(_masterSeed, _sequencer.VisitCount));
+        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct, roomRng); // 블록 숨김 상태로 빌드(디졸브는 여기서)
         if (result == null)
         {
             await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);
@@ -129,7 +182,8 @@ public class RunFlowController : MonoBehaviour
 
         _current = result;
         MovePlayer(result.entryPos);
-        if (prevRoom != null) Destroy(prevRoom); // 이동 완료 후 이전 방 디스폰
+        // 이동 완료 후 이전 방 디스폰 — 자식 배치 파괴로 단발 Destroy 스파이크를 분산(플레이어는 이미 신규 방).
+        if (prevRoom != null) DestroyRoomStaggeredAsync(prevRoom, ct).Forget();
 
         // 디졸브 먼저 시작 → 약간 지연 → 화면 복귀(디졸브 진행 중 진입) → 완료 대기. 첫 방 포함 모든 절차 방에 적용.
         var dissolve = result.blocks != null
@@ -158,6 +212,39 @@ public class RunFlowController : MonoBehaviour
             _currentWave = null;
             HandleRoomCleared();
         }
+
+        // 방 경계 자동저장 (suspend-on-save). 이어하기 재생성 중에는 생략(동일 상태 재저장 방지).
+        if (!_resuming)
+            SaveRunState(plan, fromEdge, mirrorRoll);
+    }
+
+    /// <summary>현재 방 진입 시점의 런 전체 상태를 로컬에 직렬화한다. 전투 도중이 아닌 방 경계 1회.</summary>
+    private void SaveRunState(DoorPlan plan, DoorEdge fromEdge, int mirror)
+    {
+        var pm      = RunProgressManager.Instance;
+        var session = GameRunBootstrapper.Instance?.Run;
+        if (pm == null || session == null || !session.IsRunning || _sequencer == null) return;
+
+        var cooldowns = new List<CooldownKV>();
+        foreach (var kv in _sequencer.Cooldowns)
+            cooldowns.Add(new CooldownKV { key = kv.Key, turns = kv.Value });
+
+        var meta = new RunMetaSnapshot
+        {
+            masterSeed         = _masterSeed,
+            visitCount         = _sequencer.VisitCount,
+            seqPhase           = _sequencer.PhaseInt,
+            shopUsed           = _sequencer.ShopUsed,
+            eventUsed          = _sequencer.EventUsed,
+            heading            = (int)fromEdge,
+            anchorToggle       = _anchorToggle,
+            currentRoomPoolKey = plan.entry?.pool_key,
+            currentRoomKind    = (int)plan.kind,
+            currentRoomMirror  = mirror,
+            cooldowns          = cooldowns,
+        };
+
+        pm.SaveRunLocal(session, meta);
     }
 
     private void MovePlayer(Vector3 pos)
@@ -182,6 +269,29 @@ public class RunFlowController : MonoBehaviour
         }
         GameCameraController.Instance?.SnapToTarget(); // 텔레포트 후 카메라 즉시 스냅(슬로우 패닝/인트로 잔존 방지)
         Debug.Log($"[RunFlow] 플레이어 이동 → {pos}");
+    }
+
+    /// <summary>이전 방을 자식 단위로 몇 프레임에 나눠 파괴해 단발 대량 Destroy 스파이크를 분산한다.
+    /// 플레이어는 이미 신규 방으로 이동·이전 방은 화면 밖(리프프로그 앵커)이라 안전하다.</summary>
+    private async UniTaskVoid DestroyRoomStaggeredAsync(GameObject room, CancellationToken ct)
+    {
+        if (room == null) return;
+
+        var children = new List<Transform>(room.transform.childCount);
+        foreach (Transform c in room.transform) children.Add(c);
+
+        const int PerFrame = 40;
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i] != null) Destroy(children[i].gameObject);
+            if ((i + 1) % PerFrame == 0)
+            {
+                try { await UniTask.Yield(ct); }
+                catch (OperationCanceledException) { break; } // 취소 시 남은 자식은 아래 Destroy(room)으로 일괄 정리
+            }
+        }
+
+        if (room != null) Destroy(room); // 부모 파괴로 남은 자식까지 정리
     }
 
     private void HandleRoomCleared()

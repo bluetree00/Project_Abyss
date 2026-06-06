@@ -360,28 +360,33 @@ public class MerlinRuneBridge : MonoBehaviour
     /// </summary>
     public void RegisterShapeFromItem(int shapeId)
     {
+        var shapeSO = BuildShapeSO(shapeId);
+        if (shapeSO == null) return;
+
+        // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
+        boardManager.SpawnSharedShape(shapeSO);
+        Debug.Log($"[MerlinRuneBridge] Shape 추가(공용풀): {shapeSO.shapeName} (id={shapeId})");
+    }
+
+    /// <summary>shape_id로 런타임 ShapeAssetSO를 생성한다(없으면 null).</summary>
+    private ShapeAssetSO BuildShapeSO(int shapeId)
+    {
         var blockData = Managers.RuneData;
-        if (blockData == null || boardManager == null) return;
+        if (blockData == null || boardManager == null) return null;
 
         var shapeEntry = blockData.GetShape(shapeId);
         if (shapeEntry == null)
         {
             Debug.LogWarning($"[MerlinRuneBridge] Shape 없음: {shapeId}");
-            return;
+            return null;
         }
 
-        var offsets = RuneDataManager.ParseCellOffsets(shapeEntry);
-
-        // ShapeAssetSO를 런타임 생성
         var shapeSO = ScriptableObject.CreateInstance<ShapeAssetSO>();
-        shapeSO.shapeName = shapeEntry.shape_name;
+        shapeSO.shapeName        = shapeEntry.shape_name;
         shapeSO.shapeBlockPrefab = boardManager.defaultShapeBlockPrefab;
-        shapeSO.cellOffsets = offsets;
-        shapeSO.cellSize = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
-
-        // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
-        boardManager.SpawnSharedShape(shapeSO);
-        Debug.Log($"[MerlinRuneBridge] Shape 추가(공용풀): {shapeEntry.shape_name} (id={shapeId})");
+        shapeSO.cellOffsets      = RuneDataManager.ParseCellOffsets(shapeEntry);
+        shapeSO.cellSize         = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
+        return shapeSO;
     }
 
     // ── Grid 완성 시 시너지 효과 적용 ──
@@ -474,7 +479,7 @@ public class MerlinRuneBridge : MonoBehaviour
                 duration   = entry.duration,
             });
 
-            Debug.Log($"[MerlinRuneBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
+            RFLog.D($"[MerlinRuneBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
         }
 
         var desc = BuildSynergyDescription(entries);
@@ -495,6 +500,76 @@ public class MerlinRuneBridge : MonoBehaviour
         return sb.ToString();
     }
 
+    // ── 세이브/이어하기 (룬 보드 점유 셀) ──
+
+    /// <summary>현재 룬 보드 점유 셀 스냅샷. 세이브 시 호출.</summary>
+    public IReadOnlyList<Vector2Int> CaptureRuneCells()
+    {
+        var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+        return view != null ? view.GetOccupiedCells() : null;
+    }
+
+    /// <summary>이어하기: 저장된 점유 셀을 룬 보드에 재주입해 빌드(시너지)를 복원한다.</summary>
+    public void RestoreRuneCells(IReadOnlyList<Vector2Int> cells)
+    {
+        if (cells == null || cells.Count == 0) return;
+        var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+        if (view == null)
+        {
+            Debug.LogWarning("[MerlinRuneBridge] RestoreRuneCells: HexGridView 없음 — 룬 보드 복원 생략");
+            return;
+        }
+        view.RestoreOccupiedCells(cells);
+    }
+
+    /// <summary>현재 배치된 Shape 스냅샷(재구성용). 점유 셀(CaptureRuneCells)과 별개.</summary>
+    public IReadOnlyList<RunePlacementEntry> CaptureRunePlacements()
+        => boardManager != null ? boardManager.CapturePlacements() : null;
+
+    /// <summary>
+    /// 이어하기: 저장된 Shape 배치를 재구성해 재집기/재편집 가능 상태로 복원한다.
+    /// 시너지는 별도로 점유 재계산(RestoreRuneCells)이 권위 — 이 호출은 시각/상호작용 레이어.
+    /// </summary>
+    public void RestoreRunePlacements(IReadOnlyList<RunePlacementEntry> placements)
+    {
+        if (placements == null || placements.Count == 0 || boardManager == null) return;
+
+        var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+        var grid = view != null ? view.HexGrid : null;
+        var squares = grid != null ? grid.GetGridSquares() : null;
+        if (squares == null)
+        {
+            Debug.LogWarning("[MerlinRuneBridge] RestoreRunePlacements: HexGrid 없음 — Shape 재구성 생략");
+            return;
+        }
+
+        var inv = AppBootstrapper.Instance?.CurrentRun?.ItemInventory;
+
+        foreach (var p in placements)
+        {
+            if (p?.cells == null || p.cells.Count == 0) continue;
+
+            var targets = new List<GridSquare>();
+            foreach (var c in p.cells)
+            {
+                var sq = squares.Find(s => s != null && s.col == c.x && s.row == c.y);
+                if (sq != null) targets.Add(sq);
+            }
+            if (targets.Count == 0) continue;
+
+            // 인벤토리 placed 아이템에 재바인딩 (재집기 시 인벤토리 동기화)
+            RuntimeItemData item = null;
+            if (inv != null && !string.IsNullOrEmpty(p.instanceId))
+                foreach (var it in inv.PlacedItems)
+                    if (it != null && it.instanceId == p.instanceId) { item = it; break; }
+
+            var shapeSO = BuildShapeSO(p.shapeId);
+            if (shapeSO == null) continue;
+
+            boardManager.RestorePlacedShape(shapeSO, item, targets);
+        }
+    }
+
     /// <summary>런 종료 시 적용 이력 초기화. 외부에서 호출.</summary>
     public void ClearAppliedGrids()
     {
@@ -513,7 +588,7 @@ public class MerlinRuneBridge : MonoBehaviour
     public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts,
                                     Dictionary<string, int> clusterSizes)
     {
-        Debug.Log($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={clusterSizes?.Count ?? 0}");
+        RFLog.D($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={clusterSizes?.Count ?? 0}");
 
         // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화
         _lastClusterSizes.Clear();
@@ -558,7 +633,7 @@ public class MerlinRuneBridge : MonoBehaviour
                 applied.Add(entry.threshold);
                 ApplyMechanicEffect(zoneId, entry);
 
-                Debug.Log($"[MerlinRuneBridge] 클러스터 임계값 달성: {zoneId} 클러스터={clusterSize} >= {entry.threshold} → {entry.effect_type}");
+                RFLog.D($"[MerlinRuneBridge] 클러스터 임계값 달성: {zoneId} 클러스터={clusterSize} >= {entry.threshold} → {entry.effect_type}");
 
                 var run = AppBootstrapper.Instance?.CurrentRun;
                 run?.RecordSynergy(new SynergyRecord

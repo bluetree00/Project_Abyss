@@ -147,6 +147,9 @@ public sealed class GameRunSession
         _appliedSynergies.RemoveAll(r => r.gridId == gridId);
     }
 
+    /// <summary>시너지 이력 전체 초기화. 이어하기 시 룬 보드 점유 기반 재계산 전에 호출(중복 적용 방지).</summary>
+    public void ClearAppliedSynergies() => _appliedSynergies.Clear();
+
     // =========================================================
     // Room Clear Recording
     // =========================================================
@@ -280,6 +283,17 @@ public sealed class GameRunSession
                 if (logWrapper?.records != null)
                     _roomClearRecords.AddRange(logWrapper.records);
             }
+
+            // 보관함(미배치) 아이템 복원
+            if (!string.IsNullOrEmpty(save.stagingItemsJson))
+            {
+                var stagingWrapper = JsonUtility.FromJson<ItemListWrapper>(save.stagingItemsJson);
+                if (stagingWrapper?.items != null)
+                    ItemInventory.RestoreStagingItems(stagingWrapper.items);
+            }
+
+            // 런 중 적립 정수 복원 (런 종료 시 메타 반영분)
+            RunDelta.GainedEssence = save.runEssence;
 
             Phase = RunPhase.Running;
             ChangeRunState(RunState.Map);

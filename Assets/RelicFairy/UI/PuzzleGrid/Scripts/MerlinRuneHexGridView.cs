@@ -326,6 +326,35 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
     }
 
+    /// <summary>현재 점유된 셀 좌표(col,row) 스냅샷. 세이브 캡처용.</summary>
+    public List<Vector2Int> GetOccupiedCells() => new List<Vector2Int>(_occupiedPositions);
+
+    /// <summary>
+    /// 이어하기: 저장된 점유 셀을 그리드에 재주입한다.
+    /// 그리드가 미빌드면 먼저 빌드하고, GridSquare 점유(재배치 차단)와 시각을 맞춘 뒤
+    /// RefreshPlacedCells로 존 클러스터를 재계산해 Bridge(시너지)에 통보한다.
+    /// 점유 셀이 시너지의 단일 진실원본이므로 이 호출만으로 빌드 효과가 복원된다.
+    /// </summary>
+    public void RestoreOccupiedCells(IReadOnlyList<Vector2Int> cells)
+    {
+        if (!_isBuilt) BuildGrid();
+
+        var set = new HashSet<Vector2Int>();
+        if (cells != null)
+            foreach (var c in cells)
+                if (_cellZones.ContainsKey(c)) set.Add(c);
+
+        // GridSquare 점유 반영 — 이후 신규 룬 배치가 점유 칸을 침범하지 않게.
+        var grid = HexGrid;
+        var squares = grid != null ? grid.GetGridSquares() : null;
+        if (squares != null)
+            foreach (var sq in squares)
+                sq.SetOccupied(set.Contains(new Vector2Int(sq.col, sq.row)));
+
+        RefreshPlacedCells(set);        // 시각 + OnZoneCellsUpdated → 시너지 재계산
+        UpdateAdjacencyConstraints();
+    }
+
     /// <summary>모든 배치 셀을 초기화한다. DoReset 에서 호출.</summary>
     public void ClearAllPlacedCells()
     {

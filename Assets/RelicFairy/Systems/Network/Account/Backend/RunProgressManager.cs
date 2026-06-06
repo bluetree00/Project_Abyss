@@ -30,6 +30,10 @@ public class RunProgressManager : MonoBehaviour
 
     private readonly string[] _rowInDates = new string[SlotCount];
 
+    // PR1: 진행 중 런 세이브는 로컬 파일(persistentDataPath)이 권위.
+    // 뒤끝 USER_RUN_PROGRESS(SaveAsync/ClearAsync)는 텔레메트리 분리 전까지 무변경으로 둔다.
+    private readonly IRunSaveStore _localStore = new LocalFileRunSaveStore();
+
     // ─────────────────────────────────────────────────────────
     // Properties
     // ─────────────────────────────────────────────────────────
@@ -176,6 +180,91 @@ public class RunProgressManager : MonoBehaviour
         });
 
         await tcs.Task;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Public Methods — 로컬 런 세이브 (PR1)
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>로컬에 유효한 진행 중 런 세이브가 있는지.</summary>
+    public bool HasLocalRun => _localStore.HasSave();
+
+    /// <summary>로컬 런 세이브를 로드한다(없으면 null).</summary>
+    public RunSaveData LoadLocalRun() => _localStore.Load();
+
+    /// <summary>로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시).</summary>
+    public void ClearLocalRun() => _localStore.Delete();
+
+    /// <summary>
+    /// 방 경계에서 현재 런 전체 상태를 로컬에 저장한다.
+    /// 기존 BuildSaveData(서버 경로 무변경)로 공통 필드를 채운 뒤 절차생성/로드아웃/룬 확장 필드를 덧붙인다.
+    /// </summary>
+    public void SaveRunLocal(GameRunSession session, in RunMetaSnapshot meta)
+    {
+        if (session == null || !session.IsRunning) return;
+
+        var prev  = _localStore.Load();
+        int retry = prev?.retryCount ?? 0;
+
+        var data = BuildSaveData(session, ActiveSlotIndex, retry, false, prev);
+        ApplyExtendedFields(data, session, meta);
+
+        _localStore.Save(data);
+    }
+
+    /// <summary>로컬 세이브 전용 확장 필드 채움. 서버 ToParam/BuildSaveData에는 영향 없음.</summary>
+    private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m)
+    {
+        d.saveVersion       = 1;
+
+        // 절차생성 진행
+        d.masterSeed        = m.masterSeed;
+        d.visitCount        = m.visitCount;
+        d.seqPhase          = m.seqPhase;
+        d.shopUsed          = m.shopUsed;
+        d.eventUsed         = m.eventUsed;
+        d.heading           = m.heading;
+        d.anchorToggle      = m.anchorToggle;
+        d.currentRoomPoolKey = m.currentRoomPoolKey;
+        d.currentRoomKind   = m.currentRoomKind;
+        d.currentRoomMirror = m.currentRoomMirror;
+
+        var cdw = new CooldownListWrapper();
+        if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);
+        d.cooldownsJson = JsonUtility.ToJson(cdw);
+
+        // 런 상태 확장
+        d.runEssence       = s.RunDelta?.GainedEssence ?? 0;
+        // 현재 슬롯: 라이브 WeaponManager 우선(첫 방 -1 케이스 해결), 없으면 씬 전환 시 저장값
+        int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
+        d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;
+
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        d.relicKey = loadout?.Relic != null ? loadout.Relic.name : string.Empty;
+
+        // 서약
+        var cov = new CovenantListWrapper();
+        if (s.CovenantHandler != null)
+            foreach (var c in s.CovenantHandler.Covenants)
+                cov.items.Add(new CovenantSaveEntry { id = c.CovenantId, stage = (int)c.Stage });
+        d.covenantsJson = JsonUtility.ToJson(cov);
+
+        // 보관함(staging) 아이템
+        var stg = new ItemListWrapper();
+        stg.items.AddRange(s.ItemInventory.StagingItems);
+        d.stagingItemsJson = JsonUtility.ToJson(stg);
+
+        // 룬 보드 점유 셀 (시너지 권위)
+        var cw    = new Vector2IntListWrapper();
+        var cells = MerlinRuneBridge.Instance?.CaptureRuneCells();
+        if (cells != null) cw.items.AddRange(cells);
+        d.runeCellsJson = JsonUtility.ToJson(cw);
+
+        // 룬 보드 Shape 배치 (재편집용)
+        var pw         = new RunePlacementListWrapper();
+        var placements = MerlinRuneBridge.Instance?.CaptureRunePlacements();
+        if (placements != null) pw.items.AddRange(placements);
+        d.runePlacementsJson = JsonUtility.ToJson(pw);
     }
 
     // ─────────────────────────────────────────────────────────
