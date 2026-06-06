@@ -33,7 +33,7 @@ public class RunSequencer
 
     private readonly List<ZonePoolEntry>     _pool;
     private readonly RunStructureConfig      _config;
-    private readonly System.Random           _rng;
+    private readonly int                     _seed;
     private readonly Dictionary<string, int> _cooldowns = new();
 
     private Phase _phase = Phase.Normal;
@@ -45,11 +45,35 @@ public class RunSequencer
     public bool InBossApproach => _phase != Phase.Normal;
     public bool IsDone         => _phase == Phase.Done;
 
+    // ── 이어하기 직렬화용 상태 노출 ──
+    public int Seed      => _seed;
+    public int PhaseInt  => (int)_phase;
+    public int ShopUsed  => _shopUsed;
+    public int EventUsed => _eventUsed;
+    public IReadOnlyDictionary<string, int> Cooldowns => _cooldowns;
+
+    /// <summary>방별 자식 시드. 같은 (마스터 시드, visitCount) → 동일 롤 → 이어하기 재현.</summary>
+    public static int Combine(int seed, int visitCount) => unchecked((seed * 397) ^ visitCount);
+
     public RunSequencer(IEnumerable<ZonePoolEntry> pool, RunStructureConfig config, int seed)
     {
         _pool   = pool != null ? new List<ZonePoolEntry>(pool) : new List<ZonePoolEntry>();
         _config = config;
-        _rng    = new System.Random(seed);
+        _seed   = seed;
+    }
+
+    /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.</summary>
+    public void RestoreState(int visitCount, int phase, int shopUsed, int eventUsed,
+                             IEnumerable<CooldownKV> cooldowns)
+    {
+        _visitCount = visitCount;
+        _phase      = (Phase)phase;
+        _shopUsed   = shopUsed;
+        _eventUsed  = eventUsed;
+        _cooldowns.Clear();
+        if (cooldowns != null)
+            foreach (var c in cooldowns)
+                if (!string.IsNullOrEmpty(c.key)) _cooldowns[c.key] = c.turns;
     }
 
     // ── Public ──────────────────────────────────────
@@ -77,12 +101,15 @@ public class RunSequencer
             return result;
         }
 
+        // 방별 자식 RNG — 같은 (시드, visitCount)면 동일 출구 (이어하기 재현)
+        var rng = new System.Random(Combine(_seed, _visitCount));
+
         // 일반 페이즈 — 2슬롯(직진/턴). 특수방(상점/이벤트)은 한 문쌍 최대 1개.
         bool specialUsed = false;
         for (int i = 0; i < 2; i++)
         {
-            var kind = RollKind(ref specialUsed);
-            result.Add(new DoorPlan { kind = kind, entry = PickEntry(kind) });
+            var kind = RollKind(rng, ref specialUsed);
+            result.Add(new DoorPlan { kind = kind, entry = PickEntry(rng, kind) });
         }
         return result;
     }
@@ -102,23 +129,23 @@ public class RunSequencer
 
     // ── Private ─────────────────────────────────────
 
-    private RoomPlanKind RollKind(ref bool specialUsed)
+    private RoomPlanKind RollKind(System.Random rng, ref bool specialUsed)
     {
         if (_config == null) return RoomPlanKind.Normal;
 
-        if (!specialUsed && _shopUsed < _config.ShopMaxPerChapter && Roll(_config.ShopChance))
+        if (!specialUsed && _shopUsed < _config.ShopMaxPerChapter && Roll(rng, _config.ShopChance))
         {
             _shopUsed++; specialUsed = true; return RoomPlanKind.Shop;
         }
-        if (!specialUsed && _eventUsed < _config.EventMaxPerChapter && Roll(_config.EventChance))
+        if (!specialUsed && _eventUsed < _config.EventMaxPerChapter && Roll(rng, _config.EventChance))
         {
             _eventUsed++; specialUsed = true; return RoomPlanKind.Event;
         }
-        if (Roll(_config.EliteChance)) return RoomPlanKind.Elite;
+        if (Roll(rng, _config.EliteChance)) return RoomPlanKind.Elite;
         return RoomPlanKind.Normal;
     }
 
-    private ZonePoolEntry PickEntry(RoomPlanKind kind)
+    private ZonePoolEntry PickEntry(System.Random rng, RoomPlanKind kind)
     {
         string category = CategoryName(kind);
         var byCategory = _pool.FindAll(p => string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase));
@@ -133,7 +160,7 @@ public class RunSequencer
         var windowed = available.FindAll(p => Mathf.Abs(p.difficulty_scale - target) <= DifficultyTolerance);
         var finalSet = windowed.Count > 0 ? windowed : available;
 
-        return finalSet[_rng.Next(finalSet.Count)];
+        return finalSet[rng.Next(finalSet.Count)];
     }
 
     private ZonePoolEntry FindByKey(string poolKey)
@@ -151,7 +178,7 @@ public class RunSequencer
         _                   => "Normal",
     };
 
-    private bool Roll(float chance) => _rng.NextDouble() < chance;
+    private static bool Roll(System.Random rng, float chance) => rng.NextDouble() < chance;
 
     private bool IsOnCooldown(string key)
         => !string.IsNullOrEmpty(key) && _cooldowns.TryGetValue(key, out int cd) && cd > 0;

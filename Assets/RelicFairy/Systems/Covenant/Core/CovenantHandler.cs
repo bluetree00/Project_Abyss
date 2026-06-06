@@ -88,6 +88,21 @@ public sealed class CovenantHandler
         return true;
     }
 
+    /// <summary>이어하기: 저장된 서약 목록(id + 단계)을 복원한다. Initialize 이후 호출.</summary>
+    public void RestoreSelections(IEnumerable<CovenantSaveEntry> entries)
+    {
+        if (entries == null) return;
+        foreach (var e in entries)
+        {
+            if (e == null || string.IsNullOrEmpty(e.id)) continue;
+            if (!TryAdd(e.id)) continue;
+
+            var stage = (CovenantStage)e.stage;
+            if (stage >= CovenantStage.Enhanced) TryEnhance(e.id);
+            if (stage >= CovenantStage.Evolved)  TryEvolve(e.id);
+        }
+    }
+
     // ── 스탯 레이어 연동 ────────────────────────────────
     /// <summary>모든 서약의 StatModifier 합산 → PlayerRuntimeStats.RefreshCovenants()에서 사용</summary>
     public IEnumerable<StatModifier> GetAllModifiers()
