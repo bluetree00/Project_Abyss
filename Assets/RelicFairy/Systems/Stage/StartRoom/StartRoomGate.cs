@@ -325,9 +325,18 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        await ShowCovenantChoiceAsync(bootstrapper?.Run, ct);
+        // [서약 픽업화] 게이트 선택 팝업 분리 — 베이스캠프에서 예약(PlayerLoadout)한 서약을 여기서 적용.
+        // 이 시점 플레이어는 이미 스폰·BindPlayer 완료(CovenantHandler.Initialize 후)라 TryAdd가 정상 동작.
+        // (ShowCovenantChoiceAsync는 이벤트방/후속 재사용 위해 메서드는 보존하되 미호출)
+        var run     = bootstrapper?.Run;
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        if (run?.CovenantHandler != null && loadout != null)
+        {
+            foreach (var id in loadout.ReservedCovenants)
+                run.CovenantHandler.TryAdd(id);
+        }
 
-        // 서약 선택 완료 → 플레이어 이동 복구
+        // 플레이어 이동 복구
         UnfreezePlayer();
 
         // 절차 진행(하데스형): RunFlowController로 런 시작

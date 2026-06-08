@@ -182,6 +182,8 @@ public class RunFlowController : MonoBehaviour
 
         _current = result;
         MovePlayer(result.entryPos);
+        // [서약] 방 진입 통보
+        GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnRoomEnter();
         // 이동 완료 후 이전 방 디스폰 — 자식 배치 파괴로 단발 Destroy 스파이크를 분산(플레이어는 이미 신규 방).
         if (prevRoom != null) DestroyRoomStaggeredAsync(prevRoom, ct).Forget();
 

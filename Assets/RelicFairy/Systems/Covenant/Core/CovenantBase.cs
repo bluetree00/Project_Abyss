@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 /// <summary>
 /// 모든 서약 구현체의 추상 기반 클래스.
@@ -85,4 +86,76 @@ public abstract class CovenantBase
     public virtual void OnBoundToPlayer(PlayerController player)                         { }
     public virtual void ModifySkillEffect(SkillType skill, ref SkillEffectContext ctx)   { }
     public virtual bool OverrideSkillCost(SkillType skill, ref SkillCostContext ctx)     => false;
+
+    // ── 효과 헬퍼 (PR-C0) ────────────────────────────────
+    // 단계 차등 규약: 수치는 V(idx)/VI(idx)로 스테이지별 자동 스케일(Basic/Enhanced/Evolved 배열).
+    //                신능력은 `Stage >= CovenantStage.Enhanced/Evolved` 게이트로 코드에서 분기.
+    // 액티브 효과는 아래 헬퍼로 "무엇을/언제"만 작성 — AOE/VFX/소환 "어떻게"는 재사용.
+
+    /// <summary>플레이어 현재 위치(없으면 원점).</summary>
+    protected Vector3 PlayerPos => Ctx?.Player != null ? Ctx.Player.transform.position : Vector3.zero;
+
+    /// <summary>스탯 레이어 즉시 재적용(조건/버프 변경 후). null-safe.</summary>
+    protected void RefreshStats()
+    {
+        if (Ctx?.Stats != null && Ctx.Session?.CovenantHandler != null)
+            Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+    }
+
+    /// <summary>
+    /// 반경 내 적에게 플레이어 공격력 기반 피해(multiplier=V(idx) 배수). 플레이어 자신 제외. 반환=피격 수.
+    /// (OnSkillEffects의 AOE 패턴을 공통화 — instigator=player라 IsPlayerInstigator/서약 OnKill과 정합)
+    /// </summary>
+    protected int DealAoe(Vector3 center, float radius, float multiplier, float knockback = 0.3f)
+    {
+        if (Ctx?.Player == null || Ctx.Stats == null) return 0;
+
+        var weaponData = Ctx.Player.WeaponManager?.CurrentWeaponData;
+        var kind = weaponData != null ? weaponData.weaponType.GetAttackStatKind() : AttackStatKind.Melee;
+        float dmg = DamageFormula.Calculate(multiplier, Ctx.Stats.GetEffectiveAttack(kind));
+
+        int hits = 0;
+        var cols = Physics.OverlapSphere(center, radius);
+        foreach (var col in cols)
+        {
+            if (col.gameObject == Ctx.Player.gameObject) continue;
+            if (col.TryGetComponent<IDamageable>(out var d))
+            {
+                d.TakeDamage(dmg, Ctx.Player.gameObject, knockback);
+                hits++;
+            }
+        }
+        return hits;
+    }
+
+    /// <summary>일회성 VFX(ObjectPooler Effect 풀, Addressable 키). 자산 없으면 무동작.</summary>
+    protected static void Vfx(string key, Vector3 pos, float scale = 1f)
+        => ItemEffectVfxHelper.SpawnOneShotAt(key, pos, scale);
+
+    /// <summary>대상에 부착되는 지속 VFX(duration초 후 제거).</summary>
+    protected static void VfxLoop(string key, Transform parent, float duration, float scale = 1f)
+        => ItemEffectVfxHelper.AttachLoopVfx(key, parent, duration, scale).Forget();
+
+    /// <summary>
+    /// 수명 있는 풀 액터(장판/오라/소환물 공통) 스폰 — duration초 후 자동 Despawn + onExpire 콜백.
+    /// 공격 AI를 가진 아군 소환물(예: Solomon 유령)은 별도 프리팹+행동 컴포넌트가 필요(PR-C1).
+    /// </summary>
+    protected static void SpawnTimedActor(string key, Vector3 pos, float duration, Action onExpire = null)
+        => SpawnTimedActorAsync(key, pos, duration, onExpire).Forget();
+
+    private static async UniTaskVoid SpawnTimedActorAsync(string key, Vector3 pos, float duration, Action onExpire)
+    {
+        if (string.IsNullOrEmpty(key) || Managers.ObjectPooler == null) return;
+
+        var go = await Managers.ObjectPooler.SpawnAsync(
+            key, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
+        if (go == null) return;
+
+        if (duration > 0f)
+        {
+            await UniTask.Delay((int)(duration * 1000));
+            if (go != null) Managers.ObjectPooler.Despawn(go);
+        }
+        onExpire?.Invoke();
+    }
 }

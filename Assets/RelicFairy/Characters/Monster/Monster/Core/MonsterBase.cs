@@ -72,6 +72,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ClearConfigCache() => _configCache.Clear();
 
+    // ── 적 가시성 표기용 레이어 (외곽선/실루엣 Render Objects 피처의 필터 대상) ──
+    // 몹 비주얼 렌더러만 Monster 레이어로 올린다. 콜라이더/루트는 그대로 → 물리·타격(IDamageable)·NavMesh 무영향.
+    // -2 = 미조회, -1 = 프로젝트에 Monster 레이어 없음(스킵).
+    private const string MonsterVisibilityLayerName = "Monster";
+    private static int s_monsterVisibilityLayer = -2;
+
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
     protected MonsterFSM         _fsm;
@@ -180,6 +186,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     protected virtual async UniTask InitAsync()
     {
+        // 0. 적 가시성 표기(외곽선) 레이어 부여는 OnEnable의 RevealVisibilityMarkupAsync로 이관 —
+        //    디졸브 등장이 끝난 뒤 켜지도록 지연(미완성 본체에 외곽선이 겹쳐 보이는 것 방지).
+
         // 1. MonsterConfigSO 로드 (주소별 캐시 — 동종 몬스터는 Instantiate·JSON 적용을 1회만 수행)
         if (!_configCache.TryGetValue(ConfigAddress, out _config))
         {
@@ -241,6 +250,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // Collider 배열 캐싱 (OnEnable에서 GetComponentsInChildren 반복 방지)
         _cachedColliders = GetComponentsInChildren<Collider>(true);
+
+        // 4-0. 발밑 가짜 그림자 — 등급별 진하기/링. 콜라이더 반경으로 발자국 크기 산출.
+        EnsureGroundShadow();
 
         // 4-1. Head 본 탐색
         if (!string.IsNullOrEmpty(HPBarAnchorName))
@@ -541,6 +553,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // IDamageable — 플레이어 공격에 맞을 때 호출됨
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>피해 출처가 플레이어(또는 그 자식 무기/투사체)인지. 서약 통보를 플레이어발 피해로 한정.</summary>
+    private static bool IsPlayerInstigator(GameObject g)
+        => g != null && g.GetComponentInParent<PlayerController>() != null;
+
     public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null || _runtime.IsDead) return;
@@ -549,6 +565,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
+        // [서약] 플레이어발 피해 변조 — 방어 계산 전, 원본 데미지에 적용
+        if (IsPlayerInstigator(instigator))
+        {
+            var covHandler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+            if (covHandler != null)
+                amount = covHandler.ModifyOutgoing(amount, new CombatContext { Target = gameObject, Damage = amount, IsCritical = isCrit });
+        }
 
         // 방어력 + 데미지 배율 + 받는 데미지 배율 (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
@@ -566,6 +590,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         {
             _runtime.CurrentHp = 0;
             _runtime.IsDead    = true;
+            // [서약] 플레이어 처치 통보
+            if (IsPlayerInstigator(instigator))
+                GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
             OnFatalDamage();
         }
         else
@@ -699,6 +726,74 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (player != null) IgnorePlayerCollision(player);
     }
 
+    /// <summary>외곽선 표기 on/off 토글. on=Monster 레이어(외곽선/실루엣 Render Objects 필터 대상),
+    /// off=루트 레이어로 복원(디졸브 등장 중 숨김 + 풀 재사용 시 레이어 잔존으로 외곽선이 재-디졸브에 새는 것 방지).
+    /// 콜라이더/루트 레이어는 그대로 → 물리·타격·NavMesh 무영향. ~헬퍼(발밑그림자)는 외곽선 대상 아님.</summary>
+    private void SetVisibilityMarkup(bool on)
+    {
+        if (s_monsterVisibilityLayer == -2)
+            s_monsterVisibilityLayer = LayerMask.NameToLayer(MonsterVisibilityLayerName);
+        if (s_monsterVisibilityLayer < 0) return; // 레이어 미정의 — 스킵
+
+        // off 복원 대상은 루트 레이어(콜라이더/루트가 쓰는 원본 레이어) — 비주얼 렌더러는 본래 루트와 동일 레이어.
+        int target = on ? s_monsterVisibilityLayer : gameObject.layer;
+
+        var renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var r = renderers[i];
+            if (r == null) continue;
+            if (!(r is SkinnedMeshRenderer || r is MeshRenderer)) continue;
+            var n = r.gameObject.name;
+            if (n.Length > 0 && n[0] == '~') continue; // "~" 헬퍼(발밑그림자 등) 제외 — 외곽선 대상 아님
+            r.gameObject.layer = target;
+        }
+    }
+
+    // 디졸브 등장(일반 1.2s / 보스 1.5s)이 끝난 뒤 외곽선을 켜기 위한 지연. 디졸브 호출처가 Spawner/Boss/Lich 등
+    // 여러 곳이라 단일 onComplete를 쓰지 않고, 최장(보스 1.5s)+마진의 지연으로 본체가 완전 불투명이 된 뒤에만 켠다.
+    private const float MarkupRevealDelay = 1.6f;
+
+    /// <summary>디졸브 등장 동안 외곽선이 미완성 본체에 겹쳐 보이지 않도록 지연 후 켠다(off→대기→on).
+    /// OnEnable에서 먼저 off로 내려 풀 재사용 시 잔존 레이어를 리셋 → 매 스폰의 재-디졸브 동안에도 외곽선이 안 샌다.
+    /// ActivationToken에 묶여 풀 반환/파괴 시 취소(이 경우 off 상태 유지).</summary>
+    private async UniTaskVoid RevealVisibilityMarkupAsync()
+    {
+        SetVisibilityMarkup(false); // 스폰 즉시 끔(디졸브 중 숨김 + 풀 재사용 레이어 리셋)
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(MarkupRevealDelay),
+                                ignoreTimeScale: true, cancellationToken: ActivationToken);
+        }
+        catch (System.OperationCanceledException) { return; }
+        SetVisibilityMarkup(true);
+    }
+
+    /// <summary>발밑 가짜 그림자(MonsterGroundShadow)를 런타임 부착·구성. 콜라이더(Capsule) 반경으로 발자국 크기 산출.
+    /// 인스턴스당 1회면 충분 — 풀 재사용 시 자식 그림자는 유지된다.</summary>
+    private void EnsureGroundShadow()
+    {
+        if (_config == null) return;
+
+        float radius = 0.5f;
+        if (_cachedColliders != null)
+        {
+            for (int i = 0; i < _cachedColliders.Length; i++)
+            {
+                if (_cachedColliders[i] is CapsuleCollider cap)
+                {
+                    var ls = cap.transform.lossyScale;
+                    radius = cap.radius * Mathf.Max(ls.x, ls.z);
+                    break;
+                }
+            }
+        }
+
+        var shadow = GetComponent<MonsterGroundShadow>();
+        if (shadow == null) shadow = gameObject.AddComponent<MonsterGroundShadow>();
+        shadow.Configure(_config.grade, radius);
+    }
+
     private void IgnorePlayerCollision(Transform player)
     {
         if (_cachedColliders == null) return;
@@ -763,6 +858,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _activationCts?.Cancel();
         _activationCts?.Dispose();
         _activationCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+
+        // 적 가시성 표기(외곽선) — 디졸브 등장이 끝난 뒤 레이어 부여(외곽선 켜짐). 매 스폰마다 재시도(전 스폰 경로 커버).
+        RevealVisibilityMarkupAsync().Forget();
 
         if (_config == null || _runtime == null) return;
 

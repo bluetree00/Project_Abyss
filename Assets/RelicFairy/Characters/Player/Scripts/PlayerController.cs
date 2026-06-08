@@ -89,6 +89,9 @@ public class PlayerController : CharacterBase
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }
 
+    // 사망 처리 1회 가드 (씬 전환 시 새 인스턴스라 리셋 불필요)
+    private bool _dead;
+
     public virtual void TakeDamage(int dmg, GameObject attacker = null)
     {
         if (debugInvincible || Time.time < _invincibleEnd)
@@ -111,6 +114,14 @@ public class PlayerController : CharacterBase
         }
 
         int finalDmg = Mathf.Max(0, (int)pkt.FinalDamage);
+
+        // [서약] 들어오는 피해 변조 — 사망 체크 전(Galahad 무효 등이 치명타를 취소할 수 있도록)
+        var covHandler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+        if (covHandler != null)
+        {
+            float fd = covHandler.ModifyIncoming(finalDmg, new CombatContext { Target = gameObject, Damage = finalDmg });
+            finalDmg = Mathf.Max(0, (int)fd);
+        }
 
         // 사망 직전 체크
         if (RuntimeStats.Hp - finalDmg <= 0 && mgr != null)
@@ -135,6 +146,26 @@ public class PlayerController : CharacterBase
         {
             SpawnHitBloodVfx();
             OnDamageTaken?.Invoke();
+        }
+
+        // [서약] 피격 통보 (실제 적용 피해량)
+        covHandler?.OnTakeDamage(finalDmg);
+
+        // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
+        if (RuntimeStats.Hp <= 0 && !_dead)
+        {
+            var run = GameRunBootstrapper.Instance?.Run;
+            if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
+            {
+                RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
+                _invincibleEnd = Time.time + 1f;
+            }
+            else
+            {
+                _dead = true;
+                SetInputEnabled(false);
+                GameRunBootstrapper.Instance?.HandlePlayerDeath();
+            }
         }
 
         // 피격 후 — 반사/방버프 등
@@ -536,6 +567,7 @@ public class PlayerController : CharacterBase
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
         _runeEffects?.Tick(Time.deltaTime);
+        GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
 
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         if (_slowTimer > 0f)

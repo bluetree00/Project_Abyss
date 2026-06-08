@@ -26,10 +26,23 @@ public sealed class MorganaCovenant : CovenantBase
     // ── 이벤트 ──────────────────────────────────────────
     public override void OnKill(GameObject target)
     {
-        // TODO: 처치 시 흡혈 처리
-        // healAmount = Ctx.Stats.MaxHp * HealRatio
-        // MaxHealRatio > 0 이면 _accumulatedHeal 누적, MaxHp * MaxHealRatio 이상이면 Evolved 초과분 계산
-        // Ctx.RunState.Heal(healAmount)
+        int maxHp = Ctx?.Stats != null ? Ctx.Stats.MaxHp : 0;
+        if (maxHp <= 0) return;
+
+        int healAmount = Mathf.Max(1, (int)(maxHp * HealRatio));
+        Ctx.Player?.Heal(healAmount); // 전투 HP(RuntimeStats) 회복 → RunState로 동기
+
+        // Evolved: 누적 흡혈이 한도 초과 시 초과분을 다음 공격의 추가 피해로 방출
+        if (IsEvolved && MaxHealRatio > 0f)
+        {
+            _accumulatedHeal += healAmount;
+            float cap = maxHp * MaxHealRatio;
+            if (_accumulatedHeal > cap)
+            {
+                _pendingBurst   += _accumulatedHeal - cap;
+                _accumulatedHeal = cap;
+            }
+        }
     }
 
     // ── 피해 파이프라인 ──────────────────────────────────
@@ -37,6 +50,7 @@ public sealed class MorganaCovenant : CovenantBase
     {
         if (!IsEvolved || _pendingBurst <= 0f) return;
 
-        // TODO: _pendingBurst 추가 피해 방출 후 초기화
+        damage       += _pendingBurst; // 플랫 추가 피해(재귀 없음 — DealAoe 미사용)
+        _pendingBurst = 0f;
     }
 }

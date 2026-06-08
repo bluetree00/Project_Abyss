@@ -17,6 +17,11 @@ public sealed class CovenantHandler
     private CovenantContext _ctx;
     private bool _initialized;
 
+    // 조건부 스탯(예: 저HP 보너스) 재평가 스로틀. Tick에서 누적 → 임계 시 RefreshStats.
+    // (OnChanged 구독 금지 — RefreshCovenants→Recalculate→OnChanged 무한루프 회피)
+    private const float RefreshInterval = 0.2f;
+    private float _refreshAccum;
+
     public IReadOnlyList<CovenantBase> Covenants => _covenants;
 
     // ── 이벤트 ──────────────────────────────────────────
@@ -148,6 +153,15 @@ public sealed class CovenantHandler
     public void Tick(float deltaTime)
     {
         foreach (var c in _covenants) c.Tick(deltaTime);
+
+        // 조건부 스탯 주기적 재평가 — 서약 보유 시에만(0개면 불필요한 Recalculate/OnChanged 방지)
+        if (_covenants.Count == 0) return;
+        _refreshAccum += deltaTime;
+        if (_refreshAccum >= RefreshInterval)
+        {
+            _refreshAccum = 0f;
+            RefreshStats();
+        }
     }
 
     // ── 피해 파이프라인 ──────────────────────────────────
@@ -159,6 +173,20 @@ public sealed class CovenantHandler
     public void ModifyIncomingDamage(ref float damage, CombatContext ctx)
     {
         foreach (var c in _covenants) c.ModifyIncomingDamage(ref damage, ctx);
+    }
+
+    /// <summary>통보 한 줄용 float 반환 래퍼 — 호출부: dmg = handler?.ModifyIncoming(dmg, ctx) ?? dmg;</summary>
+    public float ModifyIncoming(float damage, CombatContext ctx)
+    {
+        ModifyIncomingDamage(ref damage, ctx);
+        return damage;
+    }
+
+    /// <summary>통보 한 줄용 float 반환 래퍼 — 호출부: dmg = handler?.ModifyOutgoing(dmg, ctx) ?? dmg;</summary>
+    public float ModifyOutgoing(float damage, CombatContext ctx)
+    {
+        ModifyOutgoingDamage(ref damage, ctx);
+        return damage;
     }
 
     /// <summary>HP 0 시 호출. 어느 하나라도 true 반환하면 사망 방지.</summary>

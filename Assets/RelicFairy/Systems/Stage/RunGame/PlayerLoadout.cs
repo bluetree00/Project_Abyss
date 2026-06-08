@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -19,6 +20,10 @@ public class PlayerLoadout
     // 슬롯 1 = 서브 장비 (Q 스킬 전용)
     public WeaponSO WeaponSlot1 { get; private set; }
 
+    // 베이스캠프에서 픽업한 서약 id 예약. 던전 진입(핸들러 Initialize 후) 시 CovenantHandler.TryAdd로 적용.
+    private readonly List<string> _reservedCovenants = new();
+    public IReadOnlyList<string> ReservedCovenants => _reservedCovenants;
+
     // CombatGirl 단일 몸 체제: CharacterData 없이 body 키만 있어도 준비 완료(무기 픽업 허용).
     public bool IsReady => CharacterData != null || !string.IsNullOrEmpty(CharacterPrefabKey);
 
@@ -33,6 +38,13 @@ public class PlayerLoadout
     public void SetWeaponSlot0(WeaponSO weapon) => WeaponSlot0 = weapon;
     public void SetWeaponSlot1(WeaponSO weapon) => WeaponSlot1 = weapon;
 
+    /// <summary>베이스캠프 서약 픽업이 호출. 중복 id는 무시.</summary>
+    public void AddCovenant(string id)
+    {
+        if (!string.IsNullOrEmpty(id) && !_reservedCovenants.Contains(id))
+            _reservedCovenants.Add(id);
+    }
+
     public void Clear()
     {
         CharacterData      = null;
@@ -40,5 +52,6 @@ public class PlayerLoadout
         Relic              = null;
         WeaponSlot0        = null;
         WeaponSlot1        = null;
+        _reservedCovenants.Clear();
     }
 }

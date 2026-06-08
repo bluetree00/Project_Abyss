@@ -127,6 +127,8 @@ public sealed class RoomClearController : MonoBehaviour
 
             // 2) 방 클리어 상태 통지 (아이템 효과 hook 등)
             _run?.EnterStandby();
+            // [서약] 방 클리어 통보 (ClearRoomAsync는 _cleared 가드로 방당 1회)
+            _run?.CovenantHandler?.OnRoomClear();
 
             // 3) 룸 중앙에 포탈 등장 + 행운치 기반 아이템 드랍
             var gate = GetComponent<RoomClearGate>();

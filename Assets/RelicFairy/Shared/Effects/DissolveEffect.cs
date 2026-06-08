@@ -129,8 +129,9 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            // includeInactive: true — 비활성 오브젝트의 렌더러도 사전에 준비
-            renderers = target.GetComponentsInChildren<Renderer>(true);
+            // includeInactive: true — 비활성 오브젝트의 렌더러도 사전에 준비.
+            // "~" 프리픽스 헬퍼(예: ~GroundShadow 발밑그림자)는 제외 — 비동기 머티리얼 세팅이 디졸브 복원과 레이스.
+            renderers = CollectDissolveRenderers(target);
             if (renderers.Length == 0)
             {
                 Debug.LogWarning($"[DissolveEffect] '{target.name}' Renderer 없음 — 등장 디졸브 스킵");
@@ -216,7 +217,7 @@ public static class DissolveEffect
             }
 
             if (target == null) return;
-            var renderers = target.GetComponentsInChildren<Renderer>(true);
+            var renderers = CollectDissolveRenderers(target);
             if (renderers.Length == 0) { onComplete?.Invoke(); return; }
 
             instances = ReplaceMaterials(renderers, mat, new Color(0f, 2.4f, 3f, 1f), pooled: false);
@@ -260,6 +261,31 @@ public static class DissolveEffect
         if (m == null) return;
         if (_matPool.Count < MatPoolCap) _matPool.Push(m);
         else UnityEngine.Object.Destroy(m);
+    }
+
+    /// <summary>디졸브 대상 렌더러 수집. "~" 프리픽스 헬퍼 오브젝트(~GroundShadow 발밑그림자 등)는 제외 —
+    /// 이들은 비동기로 sharedMaterial을 세팅하므로 디졸브의 머티리얼 캡처/복원과 레이스가 날 수 있다.
+    /// 본체 렌더러 캡처/복원 로직 자체는 변경 없음.</summary>
+    private static Renderer[] CollectDissolveRenderers(GameObject target)
+    {
+        var all = target.GetComponentsInChildren<Renderer>(true);
+        int keep = 0;
+        for (int i = 0; i < all.Length; i++)
+            if (!IsDissolveExcluded(all[i])) keep++;
+        if (keep == all.Length) return all;
+
+        var filtered = new Renderer[keep];
+        int k = 0;
+        for (int i = 0; i < all.Length; i++)
+            if (!IsDissolveExcluded(all[i])) filtered[k++] = all[i];
+        return filtered;
+    }
+
+    private static bool IsDissolveExcluded(Renderer r)
+    {
+        if (r == null) return true;
+        var n = r.gameObject.name;
+        return n.Length > 0 && n[0] == '~';
     }
 
     private static List<Material> ReplaceMaterials(
