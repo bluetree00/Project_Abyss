@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using RelicFairy.Monster;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
@@ -730,6 +731,88 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
         await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
+    }
+
+    // ── 런 종료 (사망/클리어) ──────────────────────────────────────
+    private bool _runEnding;
+
+    /// <summary>플레이어 사망 시 PlayerController가 호출. 사망 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
+    public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
+
+    /// <summary>
+    /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
+    /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
+    /// 클리어(EndRun true) 경로는 절차 런 종료 조건 확정 후 연결(TODO).
+    /// </summary>
+    private async UniTaskVoid HandleRunEndAsync(bool isCleared)
+    {
+        if (_runEnding) return;
+        _runEnding = true;
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            // 1) 사망 모먼트: 카메라 쉐이크 + 슬로우모션 (realtime 대기, finally로 timeScale 복원 보장)
+            if (!isCleared)
+            {
+                HitFeelService.CameraShake(0.15f, 0.4f);
+                Time.timeScale = 0.25f;
+                try { await UniTask.Delay(System.TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
+                finally { Time.timeScale = 1f; }
+            }
+
+            // 2) 화면 처리: 비네트(보유 자산) + 암전 페이드. 채도저하(URP Volume)는 미보유 → TODO.
+            var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
+            fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            await ScreenFade.Out(1.0f, ct);
+
+            // 3) 종료 메시지(영혼 회수) — 스킵 입력 지원
+            await ShowRunEndMessageAsync(isCleared, ct);
+
+            // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
+            _run?.EndRun(isCleared, isCleared ? "clear" : "death");
+            AppBootstrapper.Instance?.EndRun();
+            AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
+        }
+        catch (System.OperationCanceledException) { Time.timeScale = 1f; }
+    }
+
+    /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>
+    private async UniTask ShowRunEndMessageAsync(bool isCleared, CancellationToken ct)
+    {
+        string msg = isCleared ? "그대의 여정이 끝났다" : "그대의 영혼이 회수되었다...";
+
+        var go = new GameObject("@RunEndMessage");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32000;
+
+        var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
+        tmp.transform.SetParent(go.transform, false);
+        if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
+        tmp.text      = msg;
+        tmp.fontSize  = 48f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = new Color(0.85f, 0.8f, 0.7f);
+        var rt = tmp.rectTransform;
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
+        const float hold = 2.0f;
+        float t = 0f;
+        try
+        {
+            while (t < hold)
+            {
+                if (Input.anyKeyDown) break;   // 스킵 입력
+                t += Time.unscaledDeltaTime;
+                await UniTask.Yield(ct);
+            }
+        }
+        finally
+        {
+            if (go != null) Destroy(go);       // 취소(객체 파괴) 시에도 오버레이 정리 보장
+        }
     }
 
     /// <summary>세션 챕터가 미설정(기본 0, 유효하지 않음)이면 활성 씬 이름(GameScene_ChN)에서 챕터를 유추한다.</summary>
