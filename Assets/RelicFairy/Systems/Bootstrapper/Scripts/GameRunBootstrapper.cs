@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using RelicFairy.Monster;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
@@ -10,6 +11,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public static GameRunBootstrapper Instance { get; private set; }
 
     [SerializeField] private string playerPrefabKey = "Knight";
+    [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
+    [SerializeField] private string startBodyKey = "PlayerCharacter";
+    [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
+    [Tooltip("Loadout에 유물이 없을 때(에디터 직접 전투 테스트) 적용할 기본 유물 클래스. 비우면 유물 미적용. 시작방 경로에는 영향 없음.")]
+    [SerializeField] private RelicClassSO debugDefaultRelic;
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
     [SerializeField] private Transform playerSpawnPoint;
     [SerializeField] private Transform mapRoot;
@@ -25,13 +31,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private string startRoomMapKey = "";
 
     [Tooltip("true면 zone_layout_key의 zone_index=0을 스타트 방으로 사용. 위습 캐릭터/무기 선택 후 나머지 존(1-25)을 게이트에서 스폰.")]
-    [SerializeField] private bool startWithZoneLayout = false;
+    [SerializeField] private bool startWithZoneLayout = true;
+
+    [Header("ProcGen (하데스형 절차 진행)")]
+    // 절차적 생성이 유일/기본 진행 방식. 레거시 contiguous 존 경로는 더 이상 사용하지 않음(정리 예정).
+    [Tooltip("절차 진행 컨트롤러. 비우면 런타임에 AddComponent로 생성(RunFlowController 기본 풀 키 사용).")]
+    [SerializeField] private RunFlowController runFlowController;
 
     [Tooltip("스타트 방 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
     [SerializeField] private DialogueSequenceSO startRoomDialogueSO;
 
     /// <summary>서버에서 로드하는 대화 시퀀스 ID. 비워두면 서버 데이터를 사용하지 않음.</summary>
     private const string StartRoomSequenceId = "StartRoom";
+
+    // OpenWallsForConnections / CorridorBridgeSpawner / StartRoomGate 세 곳에서 동일하게 사용하는 게이트 너비(타일 수)
+    private const int GateWidth = 5;
 
     /// <summary>스타트 방 씬으로 진입한 상태. Loadout 준비 여부와 무관. 디버그 스킵 등에 사용.</summary>
     public bool IsStartRoomScene => AppBootstrapper.Instance != null
@@ -57,6 +71,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("스타트 방에서 캐릭터 선택 전 조작할 Wisp 프리팹. 비워두면 playerPrefabKey 폴백.")]
     [SerializeField] private GameObject wispPrefab;
 
+    [Tooltip("Wisp 스폰 시 스폰 지점 기준 Y 오프셋(공중에 띄움).")]
+    [SerializeField] private float wispSpawnHeightOffset = 1.5f;
+
     [Header("Block Map Gen")]
     [SerializeField, Tooltip("단일 팔레트 (fallback). blockPalettes에 테마 매칭이 없으면 이 값 사용.")]
     private BlockPalette blockPalette;
@@ -68,6 +85,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [SerializeField, Tooltip("블록 배치 Y 오프셋. 바닥 블록 scale.y=0.2(반높이 0.1)이면 -0.1. 프리팹 피봇이 바닥이면 0.")]
     private float blockBaseY = -0.1f;
+
+    [SerializeField, Tooltip("벽 높이 배율. 1=기본(1블록), 12=12배 높이(약 12m). 천장도 이 값에 맞춰 자동 배치.")]
+    private int wallLayers = 12;
+
+    [SerializeField, Min(0), Tooltip("절차 방의 각 문(입구/출구) 바깥으로 뻗는 복도 스텁 길이(셀 수). " +
+             "문 너머가 허공(절벽)으로 보이지 않게 '뒤로 이어지는 통로' 느낌을 준다. 0이면 비활성.")]
+    private int procDoorCorridorLength = 6;
+
 
     [Header("Shop Room")]
     [SerializeField, Min(0)] private int shopSlotCount = 3;
@@ -95,9 +120,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private ChapterRegistry chapterRegistry;
     [Tooltip("모든 존 구조물이 배치될 씬 루트 Transform. null이면 mapRoot 폴백.")]
     [SerializeField] private Transform worldMapRoot;
-    [Tooltip("[Deprecated] startGatePrefab이 null일 때 폴백으로 사용. startGatePrefab 설정 시 불필요.")]
-    [SerializeField] private GameObject zoneExitGatePrefab;
-
     [Header("Corridor")]
     [Tooltip("테마별 코리더 스타일 SO 배열. CorridorStyleSO.themeMatch가 zone.corridor_style과 일치하는 첫 항목을 사용.\n" +
              "미할당 시 CorridorBridgeSpawner 호출이 생략되어 방 사이 갭이 빈 상태로 남는다.")]
@@ -114,9 +136,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [Header("Awakening")]
     [Tooltip("런 중 심연의 정수를 추적하는 컴포넌트. 없으면 자동 생성.")]
-    [SerializeField] private AbyssEssenceTracker essenceTracker;
+    [SerializeField] private EssenceTracker essenceTracker;
 
-    private StagePointUI[] _points;
     private GameObject _currentMapGO;
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
     // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
@@ -186,14 +207,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (!IsStartRoomScene)
             await SpawnWorldMapAsync(this.GetCancellationTokenOnDestroy());
 
-        // UIRoot 로드 대기 (BlockSynergyBridge가 @HUD에 있음)
+        // UIRoot 로드 대기 (MerlinRuneBridge가 @HUD에 있음)
         if (UIRootBootstrapper.Instance == null)
             await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
 
         // 블록 시너지 그리드 구성 (UIRoot @HUD에 있는 Bridge 사용)
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null)
-            bridge = Object.FindFirstObjectByType<BlockSynergyBridge>(FindObjectsInactive.Include);
+            bridge = Object.FindFirstObjectByType<MerlinRuneBridge>(FindObjectsInactive.Include);
         if (bridge != null)
             bridge.InitializeGridsFromServer();
 
@@ -202,13 +223,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → Wisp 모드 (에디터 직접 실행 시 false)
         // DebugStageRunPanel이 있으면 해당 패널이 StartRunAsync를 통해 전투를 시작하므로 중복 실행 방지
         bool hasDebugPanel = Object.FindFirstObjectByType<DebugStageRunPanel>() != null;
+
+        // 베이스캠프(영속 허브)에서 로드아웃 확정 후 진입한 새 런: 바로 전투가 아니라 Zone0를 대기 방으로 띄운다.
+        // IsNewRunPending(로비 새 런 신호, BaseCamp 경유 시 미소비 상태로 유지)을 여기서 소비한다.
+        // 디버그 패널이 있어도 허브발 실제 새 런이 우선한다(디버그 패널은 IsStartRoomScene이면 자동 시작을 보류).
+        bool newRunFromHub = (AppBootstrapper.Instance?.Loadout?.IsReady ?? false)
+            && (AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false);
+
         if (_run != null && _run.IsRunning && !hasDebugPanel)
-        {
-            if (startWithZoneLayout)
-                await ContinueZoneLayoutRunAsync(this.GetCancellationTokenOnDestroy());
-            else
-                await StartCombatAsync();
-        }
+            await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
+        else if (newRunFromHub)
+            await StartWaitingRoomAsync();
         else if (IsInStartRoom)
             await StartRoomAsync();
         else if (!hasDebugPanel)
@@ -338,7 +363,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ItemData 예외: {e.Message}"); }
         }
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData != null && !blockData.IsInitialized)
         {
             try { await blockData.InitializeAsync(); }
@@ -352,12 +377,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] BuffData 예외: {e.Message}"); }
         }
 
-        var elementEffectData = Managers.ElementEffectData;
-        if (elementEffectData != null && !elementEffectData.IsInitialized)
-        {
-            try { await elementEffectData.InitializeAsync(); }
-            catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ElementEffectData 예외: {e.Message}"); }
-        }
 
         // 상점 데이터(SHOP_PRICE_DATA) 초기화 — Item/Equipment 레지스트리 로드 이후여야 등급 인덱싱이 정상 작동
         var shopData = Managers.ShopData;
@@ -397,8 +416,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private void BindEssenceTracker()
     {
         if (essenceTracker == null)
-            essenceTracker = GetComponentInChildren<AbyssEssenceTracker>(true)
-                          ?? gameObject.AddComponent<AbyssEssenceTracker>();
+            essenceTracker = GetComponentInChildren<EssenceTracker>(true)
+                          ?? gameObject.AddComponent<EssenceTracker>();
 
         essenceTracker.Bind(_run);
     }
@@ -412,12 +431,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTask SpawnWorldMapAsync(System.Threading.CancellationToken ct)
     {
         // 존 레이아웃 키 결정: 서버 데이터 → SO 폴백
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
 
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
@@ -425,9 +444,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 존 레이아웃 데이터 로드
+        // 존 레이아웃 데이터 로드 (절차적: slot+pool / 고정: 단일 CSV)
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);
@@ -473,7 +498,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             zoneGO.transform.SetParent(root, false);
             zoneGO.transform.position = worldCenter;
 
-            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY);
+            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, null, wallLayers);
+            MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
             spawned++;
 
             // 4존마다 프레임 분산 (26존 연속 생성 시 히칭 방지)
@@ -489,13 +516,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// zone_index=0(Start)를 MapRoomEntry로 변환해 SpawnBlockMapAsync로 빌드.
     /// CP/WP 타일에서 픽업 프리팹이 자동 스폰되고, _pendingPlayerSpawnPos가 설정된다.
     /// </summary>
-    private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct)
+    private async UniTask SpawnStartZoneFromLayoutAsync(CancellationToken ct, bool suppressInteractables = false)
     {
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        // 세션 챕터가 미설정(0)일 수 있으므로 ResolveCurrentChapter로 씬 이름 폴백까지 처리 (StartProcGenRunAsync와 동일).
+        var chapter     = ResolveCurrentChapter();
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
+        // 서버/레지스트리에 키가 없으면 규칙 기반 폴백 (StartProcGenRunAsync의 CHAPTER_N_ROOM_POOL과 동일 패턴).
         if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+            zoneLayoutKey = $"chapter_{(int)chapter}_zone_layout";
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
             Debug.LogError("[GameRunBootstrapper] zone_layout_key 없음 — Zone 0 스폰 불가");
@@ -503,7 +535,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);
@@ -537,7 +575,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             scatter_range     = startZone.scatter_range,
         };
         var worldCenter = CalcZoneWorldCenter(startZone);
-        await SpawnBlockMapAsync(roomEntry, worldCenter, ct);
+        await SpawnBlockMapAsync(roomEntry, worldCenter, ct, instantEntrance: true, suppressInteractables: suppressInteractables); // 시작방 허브: 디졸브 없이 완성된 방으로
 
         // P 타일이 없으면 CSV의 spawn_local로 폴백
         if (!_pendingPlayerSpawnPos.HasValue)
@@ -551,87 +589,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             CreateStartRoomGates(startZone, zones, _currentMapGO);
 
         Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. Wisp 예정 위치: {_pendingPlayerSpawnPos}");
-    }
-
-    /// <summary>
-    /// zone_index != 0 인 존들(전투·엘리트·보스·코리도 등)을 MapBuilder로 빌드.
-    /// StartRoomGate가 zone-layout 모드에서 호출한다.
-    /// </summary>
-    public async UniTask SpawnRemainingWorldZonesAsync()
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        var chapter = _run?.CurrentChapter ?? ChapterId.Chapter1;
-        var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-        {
-            Debug.LogWarning("[GameRunBootstrapper] SpawnRemainingWorldZonesAsync: zone_layout_key 없음");
-            return;
-        }
-
-        var layoutMgr = Managers.ZoneLayout;
-        var zones = layoutMgr.GetZones(zoneLayoutKey);
-        if (zones == null || zones.Count == 0) return;
-
-        BlockPalette zonePalette = null;
-        var firstWithPalette = zones.Find(z => !string.IsNullOrEmpty(z.palette));
-        if (firstWithPalette != null)
-            zonePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(firstWithPalette.palette);
-        if (zonePalette == null)
-        {
-            var theme = zones.Find(z => !string.IsNullOrEmpty(z.theme))?.theme ?? string.Empty;
-            zonePalette = PickBlockPalette(theme);
-        }
-
-        var root = worldMapRoot != null ? worldMapRoot : mapRoot;
-        var remaining = zones.FindAll(z => z.zone_index != 0);
-        int spawned = 0;
-        bool firstZoneEffectPlayed = false;
-
-        for (int i = 0; i < remaining.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var zone = remaining[i];
-            if (string.IsNullOrWhiteSpace(zone.grid_csv)) continue;
-
-            var grid = MapDataLoader.Parse(zone.grid_csv);
-            if (grid == null) continue;
-
-            OpenWallsForConnections(grid, zone, zones);
-
-            var worldCenter = CalcZoneWorldCenter(zone);
-            var zoneGO = new GameObject($"Zone_{zone.zone_index:D2}_{zone.label}");
-            zoneGO.transform.SetParent(root, false);
-            zoneGO.transform.position = worldCenter;
-            MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY);
-            spawned++;
-
-            // 첫 번째 존: 카메라 팬 + 디졸브 (동기 대기), 이후 존: 디졸브만 fire-and-forget
-            if (!firstZoneEffectPlayed)
-            {
-                firstZoneEffectPlayed = true;
-                var player = _run?.Player;
-                var cam    = GameCameraController.Instance;
-                var panTask = (cam != null && player != null)
-                    ? cam.PanToZoneAndReturnAsync(worldCenter, 1.2f, 1.0f, 1.2f, player.transform, ct)
-                    : UniTask.CompletedTask;
-                var dissolveTask = DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct);
-                try { await UniTask.WhenAll(panTask, dissolveTask); }
-                catch (System.OperationCanceledException) { }
-            }
-            else
-            {
-                DissolveEffect.PlayAppearAsync(zoneGO, 2.0f, ct).Forget();
-            }
-
-            if (i % 4 == 3)
-                await UniTask.Yield(ct);
-        }
-
-        SpawnAllCorridors(zones, root);
-        Debug.Log($"[GameRunBootstrapper] 나머지 존 스폰 완료: {spawned}/{remaining.Count}개");
     }
 
     /// <summary>
@@ -668,8 +625,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 그리드 파싱 (스폰 정보 포함)
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
-        var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
-        var grid = MapDataLoader.Parse(zone.grid_csv, spawnInfos, decorationInfos);
+        var grid = MapDataLoader.Parse(zone.grid_csv, spawnInfos);
         if (grid == null)
         {
             Debug.LogWarning($"[GameRunBootstrapper] SpawnZoneByIndexAsync: Zone {zoneIndex} grid_csv 파싱 실패");
@@ -691,39 +647,414 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         zoneGO.transform.SetParent(root, false);
         zoneGO.transform.position = worldCenter;
 
-        // 블록 빌드
-        var blocks = MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
+        // 블록 빌드 (스포너 GO 없음 — MonsterSpawnHandler PreBuild가 담당)
+        var blocks = MapBuilder.Build(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        MapBuilder.BuildCeiling(grid, zonePalette, zoneGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        if (zonePalette != null) MapBuilder.BuildRoomLights(grid, zoneGO.transform, blockCellSize, blockBaseY, wallLayers, zonePalette.Lighting);
 
-        // 스포너 설정 주입
-        ConfigureMonsterSpawners(blocks, spawnInfos);
+        // 토큰 실행에 사용할 공유 컨텍스트
+        var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
+        var tokenCtx = new TokenContext
+        {
+            Parent             = zoneGO.transform,
+            CellSize           = blockCellSize,
+            BaseY              = blockBaseY,
+            Theme              = !string.IsNullOrEmpty(zone.theme) ? zone.theme : string.Empty,
+            DecorationCatalogs = decorationCatalogs,
+            ActivePalette      = zonePalette,
+            Grid               = grid,
+            SpawnInfos         = spawnInfos,
+            DeferredSpawners   = deferredSpawners,
+            Ct                 = ct,
+        };
 
-        // 플레이어 진입 전까지 스포너·렌더러 비활성화 (진입 시 디졸브로 등장)
-        var deferredSpawners = DisableSpawnersBeforeEntrance(blocks);
+        // PreBuild: 몬스터 스포너 배치 + 비활성화 (ZoneEntryTrigger 진입 시 re-enable)
+        TokenParser.Execute(zone.grid_csv, grid.GetLength(0), grid.GetLength(1), tokenCtx, TokenPhase.PreBuild);
+
+        // 플레이어 진입 전까지 렌더러 비활성화 (진입 시 디졸브로 등장)
         HideAllBlockRenderers(blocks);
 
-        // NavMesh 빌드 (몬스터 AI 이동 경로 계산) — 렌더러 비활성화와 무관하게 동작
+        // NavMesh 빌드 (몬스터 AI 이동 경로 계산)
         await BuildMapNavMeshAsync(zoneGO);
 
-        // 미니맵 초기화 — Zone 1+ 경로에서도 미니맵이 해당 존 크기로 갱신되도록
-        InitializeMinimapForRoom(zoneGO, grid.GetLength(0), grid.GetLength(1), blocks);
+        // PostBuild: 장식(d*) / 보스 스폰(B) — NavMesh 빌드 이후에 배치
+        TokenParser.Execute(zone.grid_csv, grid.GetLength(0), grid.GetLength(1), tokenCtx, TokenPhase.PostBuild);
+
+        // 미니맵 초기화 — PostBuild 후 스포너가 모두 배치된 시점
+        InitializeMinimapForRoom(zoneGO, grid.GetLength(0), grid.GetLength(1));
 
         // 방 클리어 컨트롤러 부착 (Activate는 ZoneEntryTrigger가 호출)
-        AttachRoomClearController(zoneGO, blocks);
+        AttachRoomClearController(zoneGO);
 
         // 이미 스폰된 인접 존과의 코리더 타일 생성 (CorridorStyleSO 할당 시 동작)
         _run?.ZoneProgression?.RegisterSpawnedZone(zoneIndex, worldCenter);
         SpawnCorridorsForZone(zone, worldCenter, zones, root);
 
-        // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 디졸브 재생)
+        // 게이트 통과 즉시 방 등장 연출 — 플레이어가 걸어오는 동안 방이 생성되는 것처럼 보임
+        await new DissolveEntrance().PlayAsync(blocks, default, ct);
+
+        // 디졸브/NavMesh await 도중 전이가 취소되거나(게이트 파괴 등) 존이 파괴되면 중단
+        // — DissolveEntrance가 취소를 삼키므로 여기서 직접 검사한다
+        if (ct.IsCancellationRequested || zoneGO == null) return;
+
+        // 진입 트리거 + 출구 게이트 생성 (플레이어 진입 시 스포너/웨이브 활성화)
         float zoneSizeX = zone.grid_width  * blockCellSize;
         float zoneSizeZ = zone.grid_height * blockCellSize;
         zoneGO.TryGetComponent<RoomWaveController>(out var waveCtrl);
         var entryTrigger = zoneGO.AddComponent<ZoneEntryTrigger>();
-        entryTrigger.Initialize(waveCtrl, deferredSpawners, blocks, zoneSizeX, zoneSizeZ);
+        entryTrigger.Initialize(waveCtrl, deferredSpawners, zoneSizeX, zoneSizeZ);
 
         CreateZoneExitGates(zoneIndex, zone, zones, zoneGO);
 
         Debug.Log($"[GameRunBootstrapper] Zone {zoneIndex} ({zone.label}) 스폰 완료 @ {worldCenter}");
+    }
+
+    /// <summary>절차적 진행 사용 여부. 항상 true로 고정 — 절차 방식이 유일한 진행 경로.</summary>
+    public bool UseProcGen => true;
+
+    /// <summary>
+    /// 허브(스타트 방) 이탈 시 절차 진행 시작. RunFlowController를 확보(없으면 AddComponent)하고
+    /// 허브와 겹치지 않는 먼 앵커에 첫 방을 빌드한다. 레거시 ZoneProgression 경로를 대체.
+    /// </summary>
+    public async UniTask StartProcGenRunAsync()
+    {
+        var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+
+        // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
+        // StartRoom 이탈 흐름은 StartNewRunAsync를 거치지 않아 세션 챕터가 미설정(0)일 수 있으므로 씬에서 유추.
+        var chapter     = ResolveCurrentChapter();
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var poolKey     = serverEntry?.zone_pool_key;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
+
+        // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
+        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
+    }
+
+    // ── 런 종료 (사망/클리어) ──────────────────────────────────────
+    private bool _runEnding;
+
+    /// <summary>플레이어 사망 시 PlayerController가 호출. 사망 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
+    public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
+
+    /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
+    public void HandleRunClear() => HandleRunEndAsync(true).Forget();
+
+    /// <summary>
+    /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
+    /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
+    /// 사망=HandlePlayerDeath, 클리어=HandleRunClear가 진입점.
+    /// </summary>
+    private async UniTaskVoid HandleRunEndAsync(bool isCleared)
+    {
+        if (_runEnding) return;
+        _runEnding = true;
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            // 1) 사망 모먼트: 카메라 쉐이크 + 슬로우모션 (realtime 대기, finally로 timeScale 복원 보장)
+            if (!isCleared)
+            {
+                HitFeelService.CameraShake(0.15f, 0.4f);
+                TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
+                try { await UniTask.Delay(System.TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
+                finally { TimeScaleArbiter.Release(this); }
+            }
+
+            // 2) 화면 처리: 비네트(보유 자산) + 암전 페이드. 채도저하(URP Volume)는 미보유 → TODO.
+            var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
+            fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            await ScreenFade.Out(1.0f, ct);
+
+            // 3) 종료 메시지(영혼 회수) — 스킵 입력 지원
+            await ShowRunEndMessageAsync(isCleared, ct);
+
+            // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
+            _run?.EndRun(isCleared, isCleared ? "clear" : "death");
+            AppBootstrapper.Instance?.EndRun();
+            AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
+        }
+        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); }
+    }
+
+    /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>
+    private async UniTask ShowRunEndMessageAsync(bool isCleared, CancellationToken ct)
+    {
+        string msg = isCleared ? "그대의 여정이 끝났다" : "그대의 영혼이 회수되었다...";
+
+        var go = new GameObject("@RunEndMessage");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32000;
+
+        var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
+        tmp.transform.SetParent(go.transform, false);
+        if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
+        tmp.text      = msg;
+        tmp.fontSize  = 48f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = new Color(0.85f, 0.8f, 0.7f);
+        var rt = tmp.rectTransform;
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
+        const float hold = 2.0f;
+        float t = 0f;
+        try
+        {
+            while (t < hold)
+            {
+                if (Input.anyKeyDown) break;   // 스킵 입력
+                t += Time.unscaledDeltaTime;
+                await UniTask.Yield(ct);
+            }
+        }
+        finally
+        {
+            if (go != null) Destroy(go);       // 취소(객체 파괴) 시에도 오버레이 정리 보장
+        }
+    }
+
+    /// <summary>세션 챕터가 미설정(기본 0, 유효하지 않음)이면 활성 씬 이름(GameScene_ChN)에서 챕터를 유추한다.</summary>
+    private ChapterId ResolveCurrentChapter()
+    {
+        var ch = _run?.CurrentChapter ?? ChapterId.Chapter1;
+        if (System.Enum.IsDefined(typeof(ChapterId), ch)) return ch;
+
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        for (int n = 4; n >= 1; n--)
+            if (scene.EndsWith($"Ch{n}")) return (ChapterId)n;
+        return ChapterId.Chapter1;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 절차적(하데스형) 격리 룸 빌드 — RunFlowController가 호출.
+    // SpawnZoneByIndexAsync의 빌드 코어를 재사용하되 contiguous 부분(world_center/
+    // OpenWalls/코리더/존게이트)은 제외하고, 문은 RoomDoorPlanner로 개방한다.
+    // 레거시 contiguous 경로(SpawnZoneByIndexAsync 등)는 변경하지 않는다.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 풀 엔트리 하나를 고정 앵커에 격리형 방으로 빌드한다.
+    /// 입구/직진/턴 문을 개방하고, 진입 위치와 출구 슬롯(클리어 후 게이트 배치용)을 반환한다.
+    /// 플레이어 스폰/이동·게이트 배치·웨이브 활성화는 호출자(RunFlowController)가 담당.
+    /// </summary>
+    public async UniTask<ProcRoomResult> BuildProcRoomAsync(
+        ZonePoolEntry entry, Vector3 anchor, bool mirror, int quarterTurns, CancellationToken ct = default,
+        System.Random roomRng = null)
+    {
+        ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
+        if (entry == null || string.IsNullOrWhiteSpace(entry.grid_csv))
+        {
+            Debug.LogWarning("[GameRunBootstrapper] BuildProcRoomAsync: entry/grid_csv 없음");
+            return null;
+        }
+
+        // 1. grid_csv 변환 (좌우 미러 → 헤딩 회전) — MapBuilder/TokenParser가 동일 문자열을 쓰도록 문자열 레벨에서 적용.
+        //    quarterTurns = 진행 방향(heading). 방을 회전시켜 입구가 뒤쪽에 오고 직진이 헤딩을 향하게 한다.
+        string csv = mirror ? GridTransform.MirrorX(entry.grid_csv) : entry.grid_csv;
+        if (quarterTurns != 0) csv = GridTransform.Rotate(csv, quarterTurns);
+
+        // 2. 팔레트
+        BlockPalette palette = null;
+        if (!string.IsNullOrEmpty(entry.palette))
+            palette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(entry.palette);
+        if (palette == null)
+            palette = PickBlockPalette(!string.IsNullOrEmpty(entry.theme) ? entry.theme : string.Empty);
+
+        // 3. 파싱 (스포너 + 문)
+        var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
+        var doorInfos  = new System.Collections.Generic.Dictionary<Vector2Int, DoorInfo>();
+        var grid = MapDataLoader.Parse(csv, spawnInfos, null, doorInfos);
+        if (grid == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] BuildProcRoomAsync: grid 파싱 실패 ({entry.pool_key})");
+            return null;
+        }
+        ct.ThrowIfCancellationRequested();
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+
+        // 4. 문 분류(헤딩 기준: 입구=뒤, 직진=헤딩, 턴=좌우) + 개방
+        var cls = RoomDoorPlanner.ClassifyWithHeading(doorInfos, quarterTurns);
+        if (cls.entrance.HasValue) RoomDoorPlanner.Open(grid, cls.entrance.Value, doorInfos[cls.entrance.Value]);
+        if (cls.forward.HasValue)  RoomDoorPlanner.Open(grid, cls.forward.Value,  doorInfos[cls.forward.Value]);
+        foreach (var t in cls.turns) RoomDoorPlanner.Open(grid, t, doorInfos[t]);
+
+        // 5. 스포너 플랜 (후보 m 중 max_active_spawners개만 활성) — roomRng로 결정적(이어하기 재현)
+        ApplyMonsterSpawnerPlan(grid, entry.max_active_spawners, roomRng);
+
+        // 6. 방 GO @ 앵커
+        var root = worldMapRoot != null ? worldMapRoot : mapRoot;
+        var roomGO = new GameObject($"ProcRoom_{entry.pool_key}");
+        roomGO.transform.SetParent(root, false);
+        roomGO.transform.position = anchor;
+
+        MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
+
+        // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
+        //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
+        //    리프프로그 앵커로 카메라 밖(+300)에 빌드되므로 순서/연출에 영향 없음. 순서는 await로 보존된다.
+        var blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        await UniTask.Yield(ct);
+        MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        await UniTask.Yield(ct);
+        if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+        await UniTask.Yield(ct);
+
+        // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
+        //      blocks에 합쳐 디졸브/디스폰에 함께 동참시킨다.
+        if (procDoorCorridorLength > 0 && palette != null)
+        {
+            float offX = (w - 1) * 0.5f * blockCellSize;
+            float offZ = (h - 1) * 0.5f * blockCellSize;
+            void AddCorridor(Vector2Int cell)
+            {
+                var info        = doorInfos[cell];
+                var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
+                blocks.AddRange(MapBuilder.BuildDoorCorridor(
+                    palette, roomGO.transform, centerLocal, info.edge, info.width,
+                    procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+            }
+            if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
+            if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
+            foreach (var t in cls.turns) AddCorridor(t);
+        }
+
+        // 8. 토큰 (PreBuild 스포너 → NavMesh → PostBuild 장식/보스)
+        var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
+        var tokenCtx = new TokenContext
+        {
+            Parent             = roomGO.transform,
+            CellSize           = blockCellSize,
+            BaseY              = blockBaseY,
+            Theme              = ResolveRoomTheme(entry.theme),
+            ActivePalette      = palette,
+            DecorationCatalogs = decorationCatalogs,
+            Grid               = grid,
+            SpawnInfos         = spawnInfos,
+            DeferredSpawners   = deferredSpawners,
+            Ct                 = ct,
+        };
+        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PreBuild);
+
+        HideAllBlockRenderers(blocks);
+        await BuildMapNavMeshAsync(roomGO);
+        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PostBuild);
+
+        InitializeMinimapForRoom(roomGO, w, h);
+        AttachRoomClearController(roomGO);
+
+        // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
+        for (int i = 0; i < deferredSpawners.Count; i++)
+            if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
+
+        // 등장 연출(디졸브)은 호출자(RunFlowController)가 화면 복귀 후 재생 — 생성 과정을 보여주기 위함.
+        // (블록은 HideAllBlockRenderers로 숨겨진 상태로 반환됨)
+
+        // 9. 결과 — 진입 위치 + 출구 슬롯 + 블록(디졸브용)
+        var result = new ProcRoomResult
+        {
+            roomGO   = roomGO,
+            blocks   = blocks,
+            entryPos = cls.entrance.HasValue
+                ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
+                : ResolvePlayerSpawnFromGrid(grid, anchor, w, h),
+            exits    = new System.Collections.Generic.List<ProcExitSlot>(),
+        };
+        float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
+        if (cls.entrance.HasValue)
+        {
+            var de = doorInfos[cls.entrance.Value];
+            result.hasEntrance = true;
+            result.entrance = new ProcExitSlot {
+                worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
+                openingWidth = de.width * blockCellSize, openingHeight = openingH };
+        }
+        if (cls.forward.HasValue)
+        {
+            var d = doorInfos[cls.forward.Value];
+            result.exits.Add(new ProcExitSlot {
+                worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
+                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+        }
+        foreach (var t in cls.turns)
+        {
+            var d = doorInfos[t];
+            result.exits.Add(new ProcExitSlot {
+                worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
+                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+        }
+
+        Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
+        return result;
+    }
+
+    /// <summary>셀(x, z) → 바닥 표면(Y=anchor.y) 월드 좌표. MapBuilder의 중앙 오프셋과 동일.</summary>
+    private Vector3 CellToWorldFloor(Vector2Int cell, Vector3 anchor, int w, int h)
+    {
+        float offX = (w - 1) * 0.5f * blockCellSize;
+        float offZ = (h - 1) * 0.5f * blockCellSize;
+        return new Vector3(anchor.x + cell.x * blockCellSize - offX, anchor.y, anchor.z + cell.y * blockCellSize - offZ);
+    }
+
+    /// <summary>문 엣지에서 방 안쪽으로 살짝 들어간 오프셋 (플레이어가 벽에 끼지 않도록).</summary>
+    private Vector3 DoorInwardOffset(DoorEdge edge)
+    {
+        float d = blockCellSize * 1.5f;
+        switch (edge)
+        {
+            case DoorEdge.North: return new Vector3(0f, 0f, -d);
+            case DoorEdge.South: return new Vector3(0f, 0f,  d);
+            case DoorEdge.East:  return new Vector3(-d, 0f, 0f);
+            case DoorEdge.West:  return new Vector3( d, 0f, 0f);
+            default:             return Vector3.zero;
+        }
+    }
+
+    /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>
+    private Vector3 ResolvePlayerSpawnFromGrid(TileType[,] grid, Vector3 anchor, int w, int h)
+    {
+        var p = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
+        return p.x >= 0 ? CellToWorldFloor(p, anchor, w, h) : anchor;
+    }
+
+    /// <summary>
+    /// toZone 방향 엣지(벽 링)에서 실제 문 개구부(Floor 셀)의 중앙 로컬 좌표를 찾는다.
+    /// MapBuilder와 동일한 중앙 오프셋 규약 사용. 개구부 없으면 false.
+    /// </summary>
+    private bool TryFindGateOpeningLocal(TileType[,] grid, ZoneLayoutEntry from, ZoneLayoutEntry to, out Vector3 localPos)
+    {
+        localPos = default;
+        int w = grid.GetLength(0), h = grid.GetLength(1);
+        float dX = to.world_center_x - from.world_center_x;
+        float dZ = to.world_center_z - from.world_center_z;
+
+        int sum = 0, count = 0;
+        if (Mathf.Abs(dZ) > 0f)
+        {
+            int z = dZ >= 0 ? h - 1 : 0; // 북(+Z)=z h-1 / 남(-Z)=z 0
+            for (int x = 0; x < w; x++)
+                if (grid[x, z] == TileType.Floor) { sum += x; count++; }
+            if (count == 0) return false;
+            float cx = sum / (float)count; // 개구부 중앙 x
+            localPos = new Vector3((cx - (w - 1) * 0.5f) * blockCellSize, 0f, (z - (h - 1) * 0.5f) * blockCellSize);
+            return true;
+        }
+        else
+        {
+            int x = dX >= 0 ? w - 1 : 0; // 동(+X)=x w-1 / 서(-X)=x 0
+            for (int z = 0; z < h; z++)
+                if (grid[x, z] == TileType.Floor) { sum += z; count++; }
+            if (count == 0) return false;
+            float cz = sum / (float)count; // 개구부 중앙 z
+            localPos = new Vector3((x - (w - 1) * 0.5f) * blockCellSize, 0f, (cz - (h - 1) * 0.5f) * blockCellSize);
+            return true;
+        }
     }
 
     /// <summary>fromZone에서 toZone 방향을 계산해 fromZone 엣지의 localPosition을 반환.</summary>
@@ -799,7 +1130,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var toZone = allZones?.Find(z => z.zone_index == primaryToIdx);
         if (toZone == null) return;
 
-        var gateLocalPos = CalcGateExitPositionTo(startZone, toZone);
+        // 실제 문 개구부(엣지의 Floor 셀) 중앙에 배치. 개구부 없으면 엣지 중점으로 폴백.
+        var grid = MapDataLoader.Parse(startZone.grid_csv);
+        var gateLocalPos = (grid != null && TryFindGateOpeningLocal(grid, startZone, toZone, out var openLocal))
+            ? openLocal
+            : CalcGateExitPositionTo(startZone, toZone);
         var gateLocalRot = CalcGateRotationTo(startZone, toZone);
         var gateGO = Instantiate(startGatePrefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
         gateGO.transform.localPosition = gateLocalPos;
@@ -824,24 +1159,17 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             var gateLocalPos = CalcGateExitPositionTo(zone, toZone);
             var gateLocalRot = CalcGateRotationTo(zone, toZone);
-            var prefab = startGatePrefab != null ? startGatePrefab : zoneExitGatePrefab;
-            GameObject gateGO;
-            if (prefab != null)
+            if (startGatePrefab == null)
             {
-                gateGO = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
-                gateGO.transform.localPosition = gateLocalPos;
-                gateGO.transform.localRotation = gateLocalRot;
+                Debug.LogWarning("[GameRunBootstrapper] CreateZoneExitGates: startGatePrefab 미할당 — 게이트 스킵");
+                continue;
             }
-            else
-            {
-                gateGO = new GameObject($"ZoneExitGate_to{toZoneIdx}");
-                gateGO.transform.SetParent(zoneGO.transform, false);
-                gateGO.transform.localPosition = gateLocalPos;
-                gateGO.transform.localRotation = gateLocalRot;
-            }
+            var gateGO = Object.Instantiate(startGatePrefab, Vector3.zero, Quaternion.identity, zoneGO.transform);
+            gateGO.transform.localPosition = gateLocalPos;
+            gateGO.transform.localRotation = gateLocalRot;
 
             var gate = gateGO.GetComponent<StartRoomGate>() ?? gateGO.AddComponent<StartRoomGate>();
-            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, _run.ZoneProgression);
+            gate.InitGate(zoneIndex, toZoneIdx, toZone.label, toZone.category, _run.ZoneProgression, GateWidth * blockCellSize);
             gateGO.SetActive(false);
             _run.ZoneProgression.RegisterExitGate(zoneIndex, toZoneIdx, gate);
         }
@@ -909,12 +1237,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     // worldCenter 기본값 = Vector3.zero → 기존 동작 유지
-    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default)
+    private async UniTask SpawnBlockMapAsync(MapRoomEntry roomEntry, Vector3 worldCenter = default, CancellationToken ct = default, bool instantEntrance = false, bool suppressInteractables = false)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
-        var decorationInfos = new System.Collections.Generic.Dictionary<Vector2Int, string>();
-        var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos, decorationInfos);
+        var grid = MapDataLoader.Parse(roomEntry.grid_csv, spawnInfos);
         if (grid == null)
         {
             Debug.LogError($"[GameRunBootstrapper] grid_csv 파싱 실패: {roomEntry.room_id}");
@@ -965,18 +1292,38 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
         if (activePalette == null)
             activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
-        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab);
+        var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+        MapBuilder.BuildCeiling(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+        if (activePalette != null) MapBuilder.BuildRoomLights(grid, mapGO.transform, blockCellSize, blockBaseY, wallLayers, activePalette.Lighting);
         Debug.Log($"[GameRunBootstrapper] BlockMap: {roomEntry.room_id} ({w}x{h}), {blocks.Count}블록");
 
-        // 각 스포너 인스턴스에 셀별 설정(maxGrade, totalCount) 주입 (Start() 호출 직전)
-        ConfigureMonsterSpawners(blocks, spawnInfos);
+        // 토큰 실행에 사용할 공유 컨텍스트 — PreBuild/PostBuild 양쪽에서 재사용
+        var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
+        var tokenCtx = new TokenContext
+        {
+            Parent                 = mapGO.transform,
+            CellSize               = blockCellSize,
+            BaseY                  = blockBaseY,
+            Theme                  = ResolveRoomTheme(roomEntry.theme),
+            RoomEntry              = roomEntry,
+            DecorationCatalogs     = decorationCatalogs,
+            ActivePalette          = activePalette,
+            CharacterPickupPrefabs = suppressInteractables ? null : characterPickupPrefabs,
+            WeaponPickupPrefabs    = suppressInteractables ? null : weaponPickupPrefabs,
+            Grid                   = grid,
+            SpawnInfos             = spawnInfos,
+            DeferredSpawners       = deferredSpawners,
+            Ct                     = ct,
+        };
 
-        // 입장 디졸브 연출 중 몬스터 스폰 방지 — 첫 await 전 같은 프레임에 비활성화해 Start() 호출을 지연
-        var deferredSpawners = DisableSpawnersBeforeEntrance(blocks);
+        // PreBuild: 몬스터 스포너 배치 + 비활성화 (MonsterSpawnHandler/MonsterSpawnCandidateHandler)
+        // NavMesh 빌드 전에 실행해 풀 프리웜이 입장 연출 전까지 완료될 수 있도록 한다.
+        TokenParser.Execute(roomEntry.grid_csv, w, h, tokenCtx, TokenPhase.PreBuild);
 
-        // NavMesh 빌드 — MapBuilder.Build 직후(Wall 배치 완료) 수행.
-        // AttachRoomClearController → RoomWaveController.StartWaveAsync는 같은 프레임에 동기적으로
-        // TryGetSpawnPosition(NavMesh.SamplePosition)을 호출하므로, NavMesh가 먼저 준비되어야 한다.
+        // FieldPrefab 로드 — NavMesh 빌드 전에 배치해 수동 배치 오브젝트가 NavMesh에 반영되도록 한다.
+        var fieldInstance = await LoadFieldPrefabAsync(mapGO, ct);
+
+        // NavMesh 빌드 — MapBuilder.Build + FieldPrefab 완료 후 수행.
         // 장식 프리팹(나무 등)은 Read/Write OFF 메시를 포함할 수 있으므로 NavMesh 빌드 이후에 배치.
         await BuildMapNavMeshAsync(mapGO);
 
@@ -992,34 +1339,46 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
         }
 
-        // 렌더러 선숨김 — 카메라 페이드인 중 블록이 팝업으로 보이지 않도록.
-        // DissolveEntrance도 동일하게 숨기지만, 그 전에 화면이 열리면 순간 팝업이 발생한다.
-        HideAllBlockRenderers(blocks);
+        // 렌더러 선숨김 — 카메라 페이드인 중 블록/필드 오브젝트가 팝업으로 보이지 않도록.
+        // instantEntrance(시작방/허브): 디졸브 없이 완성된 방으로 보여주므로 숨기지 않는다.
+        if (!instantEntrance)
+        {
+            HideAllBlockRenderers(blocks);
+            if (fieldInstance != null)
+            {
+                var rs = fieldInstance.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < rs.Length; i++) rs[i].enabled = false;
+            }
+        }
 
         // IntroFade(sortingOrder=9999)가 아직 불투명하게 UI_SceneLoading을 덮고 있는 이 시점에
         // 로딩 커버를 해제한다. IntroFade 뒤에서 UI_SceneLoading이 조용히 사라지므로 플레이어 눈에 안 보임.
         AppBootstrapper.Instance?.NotifySceneReady();
 
         // 카메라 페이드인 + Dissolve 머티리얼 프리로드 + 몬스터 풀 프리웜을 병렬로 수행.
-        // StageMap에서 선행 프리웜이 완료된 경우 PrewarmSpawnersFromBlocksAsync는 즉시 반환 → 카메라 준비만 기다림.
-        // 미완료 시에도 카메라 준비(~0.4s) 안에 함께 처리되어 입장 연출 전까지 보장된다.
+        // PreBuild 후 스포너가 씬에 존재하므로 GetComponentsInChildren으로 찾을 수 있다.
         var mapCenter = mapGO != null ? mapGO.transform.position : Vector3.zero;
         await UniTask.WhenAll(
             DissolveEffect.WarmupAsync(ct),
             GameCameraController.Instance?.PrepareMapViewAsync(mapCenter, 0.4f, ct) ?? UniTask.CompletedTask,
-            PrewarmSpawnersFromBlocksAsync(blocks, ct));
+            PrewarmSpawnersAsync(mapGO, ct));
 
         // 입장 연출 (풀이 이미 프리웜된 상태이므로 연출 중 Instantiate 없음)
-        var entranceCtx = new MapEntranceContext(roomEntry);
-        await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+        // instantEntrance(시작방/허브): 디졸브 생략 — 이미 블록이 보이는 완성 상태.
+        if (!instantEntrance)
+        {
+            var entranceCtx = new MapEntranceContext(roomEntry);
+            await MapEntranceRegistry.Resolve(roomEntry.entrance).PlayAsync(blocks, entranceCtx, ct);
+        }
 
-        // 미니맵 구독을 RoomWaveController 초기화보다 먼저 수행.
-        // InitWaveMode → StartWaveAsync → SpawnWaveAsync가 프리웜된 풀에서 동기적으로 OnMonsterSpawned를
-        // 발행할 수 있으므로, 구독이 먼저 완료되어야 첫 스폰 마커를 놓치지 않는다.
-        InitializeMinimapForRoom(mapGO, w, h, blocks);
+        // PostBuild: 장식(d*) / 보스 스폰(B) / 픽업(WP, CP) — NavMesh 빌드 이후에 배치
+        TokenParser.Execute(roomEntry.grid_csv, w, h, tokenCtx, TokenPhase.PostBuild);
 
-        // 방 클리어 컨트롤러 부착 — 미니맵 구독 이후여야 한다.
-        AttachRoomClearController(mapGO, blocks);
+        // 미니맵 구독 — PostBuild 이후 스포너가 모두 배치된 시점에 수행
+        InitializeMinimapForRoom(mapGO, w, h);
+
+        // 방 클리어 컨트롤러 부착 — 미니맵 구독 이후, PostBuild(BossSpawner) 이후여야 한다.
+        AttachRoomClearController(mapGO);
 
         // 스포너 활성화 → Start() 실행 → 스폰 준비
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1029,39 +1388,38 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (mapGO.TryGetComponent<RoomWaveController>(out var waveCtrl))
             waveCtrl.Activate();
 
-        // 장식(Decoration) 후처리 — NavMesh 빌드 후에 배치.
-        // 이중 방어로 NavMeshModifier.ignoreFromBuild = true 를 오브젝트마다 부착한다.
-        SpawnDecorations(mapGO, grid, decorationInfos, roomEntry, ct, ResolveRoomTheme(roomEntry.theme));
-
-        // 챕터 필드 구조물 스폰 (디졸브 등장)
-        await SpawnFieldPrefabAsync(mapGO, ct);
+        // 챕터 필드 구조물 디졸브 등장 — LoadFieldPrefabAsync로 NavMesh 전 배치된 인스턴스를 이 시점에 표시
+        await RevealFieldPrefabAsync(fieldInstance, ct);
 
         // 상점 방이면 ShopRoomController 부착 및 카탈로그 주입
         if (IsShopCategory(roomEntry.category))
             await SetupShopRoomAsync(mapGO, roomEntry);
-
-        // 스타트 방 전용 오브젝트 (캐릭터/무기 픽업, 탈출 게이트)
-        if (IsStartCategory(roomEntry.category))
-            SpawnStartRoomObjects(mapGO, grid, w, h);
     }
 
-    private async UniTask SpawnFieldPrefabAsync(GameObject mapParent, CancellationToken ct)
+    /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
+    private async UniTask<GameObject> LoadFieldPrefabAsync(GameObject mapParent, CancellationToken ct)
     {
         var key = _run?.ActiveFieldPrefabKey;
-        if (string.IsNullOrEmpty(key)) return;
+        if (string.IsNullOrEmpty(key)) return null;
 
         var prefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(key);
         if (prefab == null)
         {
             Debug.LogWarning($"[GameRunBootstrapper] FieldPrefab '{key}' 로드 실패 — 스킵");
-            return;
+            return null;
         }
 
         ct.ThrowIfCancellationRequested();
 
         var instance = Instantiate(prefab, mapParent.transform);
         instance.name = $"FieldStructure_{key}";
+        return instance;
+    }
 
+    /// <summary>LoadFieldPrefabAsync로 배치된 인스턴스를 디졸브 등장 연출로 표시.</summary>
+    private static async UniTask RevealFieldPrefabAsync(GameObject instance, CancellationToken ct)
+    {
+        if (instance == null) return;
         await DissolveEffect.PlayAppearAsync(instance, 0.6f, ct);
     }
 
@@ -1077,44 +1435,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return category.Trim().Equals("Start", System.StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>스타트 방 전용 픽업 오브젝트를 그리드 좌표 기반으로 스폰.
-    /// CP → characterPickupPrefabs[i] (발견 순서), WP → weaponPickupPrefabs[i].</summary>
-    private void SpawnStartRoomObjects(GameObject mapParent, TileType[,] grid, int w, int h)
-    {
-        var offset = new Vector3((w / 2f - 0.5f) * blockCellSize, 0f, (h / 2f - 0.5f) * blockCellSize);
-
-        // 캐릭터 픽업
-        var cpCells = MapDataLoader.FindAll(grid, TileType.CharacterPickup);
-        for (int i = 0; i < cpCells.Count; i++)
-        {
-            if (characterPickupPrefabs == null || i >= characterPickupPrefabs.Length || characterPickupPrefabs[i] == null)
-            {
-                Debug.LogWarning($"[GameRunBootstrapper] CP 타일 {i}에 대한 characterPickupPrefabs[{i}] 미할당 — 스킵");
-                continue;
-            }
-            var pos = new Vector3(cpCells[i].x * blockCellSize - offset.x, 0f, cpCells[i].y * blockCellSize - offset.z);
-            var go = Instantiate(characterPickupPrefabs[i], pos, Quaternion.identity, mapParent.transform);
-            go.name = $"CharPickup_{i}";
-        }
-
-        // 무기 픽업
-        var wpCells = MapDataLoader.FindAll(grid, TileType.WeaponPickup);
-        for (int i = 0; i < wpCells.Count; i++)
-        {
-            if (weaponPickupPrefabs == null || i >= weaponPickupPrefabs.Length || weaponPickupPrefabs[i] == null)
-            {
-                Debug.LogWarning($"[GameRunBootstrapper] WP 타일 {i}에 대한 weaponPickupPrefabs[{i}] 미할당 — 스킵");
-                continue;
-            }
-            var pos = new Vector3(wpCells[i].x * blockCellSize - offset.x, 0f, wpCells[i].y * blockCellSize - offset.z);
-            var go = Instantiate(weaponPickupPrefabs[i], pos, Quaternion.identity, mapParent.transform);
-            go.name = $"WeaponPickup_{i}";
-        }
-
-        Debug.Log($"[GameRunBootstrapper] 스타트 방 오브젝트 — CP:{cpCells.Count} WP:{wpCells.Count}");
-    }
-
-    /// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
+/// <summary>스포너 배치 계획 적용 — 확정(M)은 항상 유지, 후보(m)는 max 한도 내에서 랜덤 선택.
     /// 선택되지 않은 후보는 Floor로 치환된다.
     /// 규칙:
     ///   · max ≤ 0           : 모든 M/m 전체 활성 (제한 없음)
@@ -1122,7 +1443,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     ///   · 확정 ≥ max        : 확정 전부 유지, 후보 전부 Floor 치환
     ///   · 확정 &lt; max       : 확정 유지 + 후보 중 (max - 확정수)개 랜덤 선택
     /// </summary>
-    private static void ApplyMonsterSpawnerPlan(TileType[,] grid, int max)
+    // rng != null이면 결정적(이어하기 재현). null이면 전역 Random(레거시 경로).
+    private static void ApplyMonsterSpawnerPlan(TileType[,] grid, int max, System.Random rng = null)
     {
         if (grid == null) return;
 
@@ -1157,7 +1479,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         for (int i = candidateSpots.Count - 1; i > 0; i--)
         {
-            int j = UnityEngine.Random.Range(0, i + 1);
+            int j = rng != null ? rng.Next(0, i + 1) : UnityEngine.Random.Range(0, i + 1);
             (candidateSpots[i], candidateSpots[j]) = (candidateSpots[j], candidateSpots[i]);
         }
 
@@ -1173,86 +1495,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         Debug.Log($"[GameRunBootstrapper] 스포너 계획 적용 — 확정 {fixedSpots.Count} + 후보 {need}/{candidateSpots.Count} 활성 (max={max})");
-    }
-
-    /// <summary>장식(Decoration) 셀에 카탈로그 프리팹을 Instantiate. 테마 일치 카탈로그 우선, 없으면 "*" 폴백.
-    /// MapBuilder는 d* 셀을 Floor로 배치하므로 이미 바닥은 깔려있고, 그 위에 오버레이로 얹힌다.</summary>
-    private void SpawnDecorations(
-        GameObject mapGO,
-        TileType[,] grid,
-        System.Collections.Generic.IReadOnlyDictionary<Vector2Int, string> decorationInfos,
-        MapRoomEntry roomEntry,
-        System.Threading.CancellationToken ct,
-        string themeOverride = null)
-    {
-        if (mapGO == null || grid == null || decorationInfos == null || decorationInfos.Count == 0) return;
-        if (decorationCatalogs == null || decorationCatalogs.Length == 0) return;
-
-        string theme = !string.IsNullOrEmpty(themeOverride) ? themeOverride : roomEntry.theme;
-        var catalog = PickDecorationCatalog(theme);
-        if (catalog == null)
-        {
-            Debug.LogWarning($"[GameRunBootstrapper] Decoration 카탈로그 없음 (theme='{theme}') — {decorationInfos.Count}개 장식 셀 미배치");
-            return;
-        }
-
-        int w = grid.GetLength(0);
-        int h = grid.GetLength(1);
-        var offset = new Vector3((w - 1) * 0.5f * blockCellSize, 0f, (h - 1) * 0.5f * blockCellSize);
-
-        int placed = 0, missing = 0;
-        foreach (var kv in decorationInfos)
-        {
-            var cell = kv.Key;
-            var entry = catalog.Get(kv.Value);
-            if (entry == null || entry.prefab == null) { missing++; continue; }
-
-            var pos = new Vector3(
-                cell.x * blockCellSize - offset.x,
-                blockBaseY + 0.5f + entry.yOffset, // 바닥 블록 상단에 얹기
-                cell.y * blockCellSize - offset.z);
-
-            Quaternion rot = entry.randomYRotation
-                ? Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f)
-                : Quaternion.identity;
-
-            var go = Object.Instantiate(entry.prefab, pos, rot, mapGO.transform);
-            go.name = $"Deco_{cell.x}_{cell.y}_{kv.Value}";
-            if (entry.scale != 1f)
-                go.transform.localScale *= entry.scale;
-
-            // NavMesh 빌드에서 제외 — 나무 등 외부 FBX의 Read/Write OFF 메시로 인한 런타임 실패 방지.
-            // 루트 + 모든 MeshRenderer 자식에 NavMeshModifier 부착.
-            AttachNavMeshIgnore(go);
-            DissolveEffect.PlayAppearAsync(go, 0.6f, ct).Forget();
-
-            placed++;
-        }
-
-        Debug.Log($"[GameRunBootstrapper] Decoration 배치 — {placed}개 성공 / {missing}개 카탈로그 미스 (theme={theme}, catalog={catalog.name})");
-    }
-
-    private static void AttachNavMeshIgnore(GameObject root)
-    {
-        if (root == null) return;
-        EnsureNavMeshIgnore(root);
-
-        // 자식 중 Renderer가 있는 GameObject에도 부착 — NavMeshSurface가 자식 렌더러를 스캔하므로.
-        var renderers = root.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            var r = renderers[i];
-            if (r == null) continue;
-            EnsureNavMeshIgnore(r.gameObject);
-        }
-    }
-
-    private static void EnsureNavMeshIgnore(GameObject go)
-    {
-        var mod = go.GetComponent<Unity.AI.Navigation.NavMeshModifier>();
-        if (mod == null)
-            mod = go.AddComponent<Unity.AI.Navigation.NavMeshModifier>();
-        mod.ignoreFromBuild = true;
     }
 
     /// <summary>
@@ -1308,9 +1550,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var otherCenter = CalcZoneWorldCenter(other);
 
             if (newToOther)
-                CorridorBridgeSpawner.Spawn(newZone, other, newCenter, otherCenter, otherStyle, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(newZone, other, newCenter, otherCenter, otherStyle, parent, blockCellSize, GateWidth);
             else
-                CorridorBridgeSpawner.Spawn(other, newZone, otherCenter, newCenter, otherStyle, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(other, newZone, otherCenter, newCenter, otherStyle, parent, blockCellSize, GateWidth);
         }
     }
 
@@ -1345,6 +1587,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (ContainsZoneIndex(other.next_zone_indices, zone.zone_index))
                 connected.Add(other.zone_index);
 
+        // CalcGateExitPositionTo와 동일 기준: dZ != 0이면 항상 Z축 우선
+        const float csvGridUnit = 55f;
+
         foreach (int idx in connected)
         {
             var other = allZones.Find(z => z.zone_index == idx);
@@ -1353,17 +1598,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             float dX = other.world_center_x - zone.world_center_x;
             float dZ = other.world_center_z - zone.world_center_z;
 
-            if (Mathf.Abs(dZ) > 0.5f && Mathf.Abs(dX) < 0.5f)
+            if (Mathf.Abs(dZ) > 0.5f)
             {
-                // 북(+z) / 남(-z) 벽 개방 — grid[x, h-1]=북벽, grid[x, 0]=남벽
+                // 북/남 벽 개방. 대각선 연결(dX != 0)도 Z벽을 뚫되 X 레인 오프셋 적용
                 int wallZ = dZ > 0f ? h - 1 : 0;
-                int cx    = w / 2;
-                for (int x = Mathf.Max(1, cx - half); x <= Mathf.Min(w - 2, cx + half); x++)
-                    grid[x, wallZ] = TileType.Floor;
+                float xRatio = Mathf.Abs(dX) > 0.5f ? dX / csvGridUnit : 0f;
+                int cx = Mathf.RoundToInt(w * 0.5f + xRatio * w * 0.5f);
+                cx = Mathf.Clamp(cx, half + 1, w - half - 2);
+                for (int x = cx - half; x <= cx + half; x++)
+                    if (x > 0 && x < w - 1)
+                        grid[x, wallZ] = TileType.Floor;
             }
-            else if (Mathf.Abs(dX) > 0.5f && Mathf.Abs(dZ) < 0.5f)
+            else if (Mathf.Abs(dX) > 0.5f)
             {
-                // 동(+x) / 서(-x) 벽 개방 — grid[w-1,z]=동벽, grid[0,z]=서벽
+                // 동/서 벽 개방 (순수 X축 연결)
                 int wallX = dX > 0f ? w - 1 : 0;
                 int cz    = h / 2;
                 for (int z2 = Mathf.Max(1, cz - half); z2 <= Mathf.Min(h - 2, cz + half); z2++)
@@ -1393,7 +1641,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 var style      = ResolveCorridorStyle(zone.corridor_style) ?? ResolveCorridorStyle(toZone.corridor_style);
                 var fromCenter = CalcZoneWorldCenter(zone);
                 var toCenter   = CalcZoneWorldCenter(toZone);
-                CorridorBridgeSpawner.Spawn(zone, toZone, fromCenter, toCenter, style, parent, blockCellSize);
+                CorridorBridgeSpawner.Spawn(zone, toZone, fromCenter, toCenter, style, parent, blockCellSize, GateWidth);
             }
         }
     }
@@ -1413,6 +1661,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         foreach (var r in wall.GetComponentsInChildren<Renderer>())
         {
+            // URP Lit 계열만 투명화 지원. 커스텀 셰이더(예: AZURE Nature/Surface)는 _BaseColor가 없어 건너뜀(불투명 유지).
+            if (r.sharedMaterial == null || !r.sharedMaterial.HasProperty("_BaseColor")) continue;
             var mat = new Material(r.sharedMaterial);
             mat.SetFloat("_Surface", 1f);
             mat.SetFloat("_Blend", 0f);
@@ -1454,100 +1704,35 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return blockPalette; // 하위호환 fallback
     }
 
-    private DecorationCatalogSO PickDecorationCatalog(string theme)
-    {
-        if (decorationCatalogs == null) return null;
-
-        DecorationCatalogSO fallback = null;
-        foreach (var cat in decorationCatalogs)
-        {
-            if (cat == null) continue;
-            if (cat.MatchesTheme(theme) && !string.IsNullOrEmpty(cat.ThemeMatch) && cat.ThemeMatch != "*")
-                return cat; // 정확한 테마 매칭 우선
-            if (cat.ThemeMatch == "*" || string.IsNullOrEmpty(cat.ThemeMatch))
-                fallback = cat;
-        }
-        return fallback;
-    }
-
-    /// <summary>블록 목록에서 MonsterSpawner를 찾아 스폰 테이블의 모든 풀을 미리 채운다.
+/// <summary>맵 루트에서 MonsterSpawner를 수집해 스폰 테이블의 모든 풀을 미리 채운다.
     /// 입장 연출 재생 중 병렬 실행해 첫 스폰 프레임 드랍을 방지한다.</summary>
-    private async UniTask PrewarmSpawnersFromBlocksAsync(
-        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks,
-        CancellationToken ct)
+    private async UniTask PrewarmSpawnersAsync(GameObject mapGO, CancellationToken ct)
     {
-        if (blocks == null) return;
+        if (mapGO == null) return;
 
-        var tasks = new System.Collections.Generic.List<UniTask>();
-        foreach (var block in blocks)
-        {
-            if (block.instance == null) continue;
-            var spawner = block.instance.GetComponent<MonsterSpawner>();
-            if (spawner != null)
-                tasks.Add(spawner.PrewarmPoolsAsync(3, ct));
-        }
+        var allSpawners = mapGO.GetComponentsInChildren<MonsterSpawner>(true);
+        if (allSpawners.Length == 0) return;
 
-        if (tasks.Count > 0)
-            await UniTask.WhenAll(tasks);
+        var tasks = new System.Collections.Generic.List<UniTask>(allSpawners.Length);
+        foreach (var spawner in allSpawners)
+            tasks.Add(spawner.PrewarmPoolsAsync(3, ct));
+
+        await UniTask.WhenAll(tasks);
     }
 
-    /// <summary>방 클리어 카운터를 맵 루트에 부착. PlacedBlock에서 MonsterSpawner/BossSpawner를 수집해 Initialize.
+    /// <summary>방 클리어 카운터를 맵 루트에 부착. GetComponentsInChildren으로 MonsterSpawner/BossSpawner를 수집.
     /// 스포너가 하나도 없으면 컨트롤러를 생성하지 않는다 (상점/이벤트 방 등).</summary>
-    private void AttachRoomClearController(
-        GameObject mapGO,
-        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    private void AttachRoomClearController(GameObject mapGO)
     {
-        if (mapGO == null || blocks == null || _run == null) return;
+        if (mapGO == null || _run == null) return;
 
-        var spawners = new System.Collections.Generic.List<MonsterSpawner>();
-        BossSpawner bossSpawner = null;
-
-        for (int i = 0; i < blocks.Count; i++)
-        {
-            var b = blocks[i];
-            if (b.instance == null) continue;
-
-            if (b.tileType == TileType.MonsterSpawn || b.tileType == TileType.MonsterSpawnCandidate)
-            {
-                var sp = b.instance.GetComponent<MonsterSpawner>();
-                if (sp != null) spawners.Add(sp);
-            }
-            else if (b.tileType == TileType.BossSpawn)
-            {
-                // 보스 스포너는 방당 1개. 여럿이면 첫 번째만 사용.
-                if (bossSpawner == null)
-                    bossSpawner = b.instance.GetComponent<BossSpawner>();
-            }
-        }
+        var spawners    = new System.Collections.Generic.List<MonsterSpawner>(mapGO.GetComponentsInChildren<MonsterSpawner>(true));
+        var bossSpawner = mapGO.GetComponentInChildren<BossSpawner>(true);
 
         if (spawners.Count == 0 && bossSpawner == null) return;
 
         var controller = mapGO.AddComponent<RoomWaveController>();
         controller.Initialize(_run, spawners, bossSpawner, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
-    }
-
-    /// <summary>입장 연출 전 MonsterSpawner·BossSpawner를 비활성화해 Start() 호출을 연출 종료 이후로 지연시킨다.</summary>
-    private static System.Collections.Generic.List<MonoBehaviour> DisableSpawnersBeforeEntrance(
-        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
-    {
-        var list = new System.Collections.Generic.List<MonoBehaviour>();
-        for (int i = 0; i < blocks.Count; i++)
-        {
-            var b = blocks[i];
-            if (b.instance == null) continue;
-
-            if (b.tileType == TileType.MonsterSpawn || b.tileType == TileType.MonsterSpawnCandidate)
-            {
-                if (b.instance.TryGetComponent<MonsterSpawner>(out var ms))
-                { ms.enabled = false; list.Add(ms); }
-            }
-            else if (b.tileType == TileType.BossSpawn)
-            {
-                if (b.instance.TryGetComponent<BossSpawner>(out var bs))
-                { bs.enabled = false; list.Add(bs); }
-            }
-        }
-        return list;
     }
 
     private static void HideAllBlockRenderers(
@@ -1560,39 +1745,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             for (int j = 0; j < rs.Length; j++)
                 rs[j].enabled = false;
         }
-    }
-
-    /// <summary>MapBuilder.Build 결과 중 스포너 오브젝트에 CellSpawnInfo를 주입.
-    /// Start() 호출 전(같은 프레임)에 실행되어야 MonsterSpawner가 올바른 설정으로 SpawnLoop을 시작한다.</summary>
-    private static void ConfigureMonsterSpawners(
-        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks,
-        System.Collections.Generic.IReadOnlyDictionary<Vector2Int, MapDataLoader.CellSpawnInfo> infos)
-    {
-        if (blocks == null || infos == null) return;
-
-        int applied = 0;
-        for (int i = 0; i < blocks.Count; i++)
-        {
-            var b = blocks[i];
-            if (b.tileType != TileType.MonsterSpawn && b.tileType != TileType.MonsterSpawnCandidate)
-                continue;
-            if (b.instance == null) continue;
-
-            var spawner = b.instance.GetComponent<MonsterSpawner>();
-            if (spawner == null) continue;
-
-            // 후보에서 승격된 셀(MonsterSpawn)이라도 원래 기록된 후보 infos는 좌표 기준으로 찾음
-            if (!infos.TryGetValue(b.cell, out var info)) continue;
-
-            if (info.waves != null && info.waves.Length >= 2)
-                spawner.ConfigureWaves(info.waves);  // 웨이브 배열 모드
-            else
-                spawner.Configure(info.maxGrade, info.totalCount); // 레거시 단일 등급/수량
-            applied++;
-        }
-
-        if (applied > 0)
-            Debug.Log($"[GameRunBootstrapper] MonsterSpawner 설정 주입 — {applied}개");
     }
 
     private async UniTask SetupShopRoomAsync(GameObject mapGO, MapRoomEntry roomEntry)
@@ -1699,7 +1851,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 // 로비에서 선택한 무기가 있으면 복원, 없으면 기본 무기
                 var loadout = AppBootstrapper.Instance?.Loadout;
                 var weaponSO = loadout?.WeaponSlot0;
-                string weaponKey = weaponSO != null ? null : "T1_Bow";
+                string weaponKey = weaponSO != null ? null : debugDefaultWeaponKey;
 
                 if (weaponSO != null)
                 {
@@ -1732,6 +1884,51 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>
+    /// 베이스캠프(영속 허브)에서 로드아웃을 확정한 새 런의 챕터 진입.
+    /// 바로 전투로 들어가면 어색하므로 Zone0를 "대기 방"으로 빌드한다 — 선택 콘텐츠(CP/WP 픽업·각성 제단·대사)는
+    /// 모두 생략하고 로드아웃 기반 플레이어만 스폰한다. 출구 게이트(StartRoomGate)는 로드아웃이 이미 준비됐으므로
+    /// 즉시 열린 상태가 되며, 통과 시 ExitStartRoomAsync가 서약 선택 후 StartProcGenRunAsync로 던전을 시작한다.
+    /// </summary>
+    private async UniTask StartWaitingRoomAsync()
+    {
+        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+
+        // 대기 방 동안 전투 HUD 억제 — 출구 게이트 통과 시 ExitStartRoomAsync가 복원한다.
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
+        if (UIRootBootstrapper.Instance == null)
+            await UniTask.WaitUntil(() => UIRootBootstrapper.Instance != null || !this);
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+
+        // 진입 연출: 방 생성·카메라 배치를 검정으로 가린 뒤 둘러보기에서 페이드인으로 드러냄.
+        await ScreenFade.Out(0f);
+
+        // Zone0를 깨끗한 대기 방으로 빌드 — 선택 픽업(CP/WP)은 억제(BaseCamp에서 이미 선택).
+        // 출구에 StartRoomGate가 배치되고 _pendingPlayerSpawnPos가 설정된다.
+        await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy(), suppressInteractables: true);
+
+        // 시작방 둘러보기 카메라 연출 (StartRoomAsync와 동일 구성).
+        if (_currentMapGO != null && GameCameraController.Instance != null)
+            await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, this.GetCancellationTokenOnDestroy());
+        else
+            await ScreenFade.In(0.4f);
+
+        // 로드아웃(body+유물+무기) 기반 스폰 — SpawnPlayerAsync가 로드아웃 키 해석·유물 적용·무기 장착을 처리하고
+        // _pendingPlayerSpawnPos(Zone0 스폰 지점)에 배치한다.
+        var player = await SpawnPlayerAsync(startBodyKey);
+        if (player == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] StartWaitingRoomAsync: 플레이어 스폰 실패");
+            return;
+        }
+
+        _run?.BindPlayer(player);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
+        // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
+    }
+
+    /// <summary>
     /// 로비 → GameScene 직행 시 스타트 방을 로드하고 플레이어를 스폰한다.
     /// 세션은 IsRunning=false 상태를 유지해 StageMap이 새 런으로 정상 시작되도록 한다.
     /// 캐릭터/무기 선택은 StartRoomPickup/StartRoomGate로 처리.
@@ -1741,17 +1938,34 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 대화·위스프 구간 동안 HUD 숨김 — 캐릭터 획득 시점에 복원
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
-        if (startWithZoneLayout)
-            await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy());
+        // 진입 연출: 방 생성·카메라 배치를 검정으로 가린 뒤 둘러보기 시작 시 페이드아웃으로 드러냄
+        await ScreenFade.Out(0f);
+
+        await SpawnStartZoneFromLayoutAsync(this.GetCancellationTokenOnDestroy());
+
+        // 시작방 둘러보기 카메라 연출 — 시작 포즈에서 페이드아웃+레터박스로 시네마틱하게 진입 후 패닝
+        if (_currentMapGO != null && GameCameraController.Instance != null)
+            await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, this.GetCancellationTokenOnDestroy());
         else
-            await SpawnMapAsync(startRoomMapKey);
+            await ScreenFade.In(0.4f); // 둘러보기 미실행 시에도 검정 해제 보장
+
+        // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
+        SpawnAwakeningAltar();
 
         await ShowStartRoomDialogueAsync();
 
-        if (wispPrefab != null)
-            SpawnWisp();
-        else
-            Debug.LogError("[GameRunBootstrapper] wispPrefab 미할당 — 스타트 방에서 캐릭터를 생성할 수 없습니다.");
+        // CombatGirl 플레이어를 시작방에 바로 스폰 (위습 단계 제거). 유물은 시작방 유물 오브젝트에서 획득.
+        // 로드아웃 준비(=무기 픽업 허용) — 단일 몸 체제라 body 키만 설정(CharacterData는 몸이 자체 로드).
+        AppBootstrapper.Instance?.Loadout?.SetCharacter(null, startBodyKey);
+        Vector3 startSpawnPos = _pendingPlayerSpawnPos ?? Vector3.zero;
+        _pendingPlayerSpawnPos = null;
+        SpawnCharacterInStartRoomAsync(startBodyKey, startSpawnPos, Quaternion.identity, null).Forget();
+    }
+
+    private void SpawnAwakeningAltar()
+    {
+        var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
+        WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
     }
 
     private async UniTask ShowStartRoomDialogueAsync()
@@ -1779,6 +1993,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         Vector3 pos = _pendingPlayerSpawnPos ?? Vector3.zero;
         _pendingPlayerSpawnPos = null;
+        pos.y += wispSpawnHeightOffset; // 위습을 공중에 살짝 띄움
 
         var go = Instantiate(wispPrefab, pos, Quaternion.identity);
         go.name = "@Wisp";
@@ -1814,6 +2029,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
 
+        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout.Relic 없으면 no-op.
+        player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
+
+        // 투어 종료 → 게임플레이 카메라로 핸드오프. BindPlayer(OnPlayerBound) 전에 호출해
+        // 레거시 줌인 인트로(PlayIntroAsync)가 발화되지 않도록 _introStarted를 선점한다.
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
         // HUD를 플레이어에 바인딩 — 무기 선택 시 HUD 슬롯이 즉시 갱신되도록
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
@@ -1836,19 +2058,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
 
-        // 맵 스폰을 awaited로 처리 — 맵 생성 완료 후 몬스터 스포너가 초기화되므로
-        // 플레이어 스폰 전에 반드시 맵이 준비되어야 한다.
-        // RequestSpawnCurrentPointMap의 RunState 전환 side effect를 유지하면서
-        // SpawnMapAsync는 직접 await한다.
-        UniTask mapTask = UniTask.CompletedTask;
-        _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
-        void captureMap(string key) { mapTask = SpawnMapAsync(key); }
-        _run.OnMapSpawnRequested += captureMap;
-        run.RequestSpawnCurrentPointMap();
-        _run.OnMapSpawnRequested -= captureMap;
-        _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
-        await mapTask;
-
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
             uiRoot.BindHudToRun(run);
@@ -1867,6 +2076,121 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>
+    /// 하데스식 절차생성 이어하기. 로컬 세이브의 마스터 시드/visitCount로 저장된 방을 재생성하고
+    /// 로드아웃·인벤토리·서약·룬보드를 복원한 뒤 방 입구에서 전투를 새로 시작한다.
+    /// 방 내부 전투 상태(적 위치/HP)·플레이어 좌표는 직렬화하지 않는다.
+    /// </summary>
+    private async UniTask ContinueProcGenRunAsync(CancellationToken ct)
+    {
+        var pm   = RunProgressManager.Instance;
+        var save = pm != null && pm.HasLocalRun ? pm.LoadLocalRun() : null;
+        if (save == null)
+        {
+            Debug.LogError("[GameRunBootstrapper] ContinueProcGenRunAsync: 로컬 세이브 없음 — 새 런으로 폴백");
+            await StartCombatDirectAsync();
+            return;
+        }
+
+        // 룸 풀 키: 서버 → SO → 규칙 폴백 (StartProcGenRunAsync와 동일)
+        var chapter     = ResolveCurrentChapter();
+        var serverEntry = Managers.ChapterData?.Get(chapter);
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var poolKey     = serverEntry?.zone_pool_key;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
+        if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
+
+        // HUD + 플레이어 (절차 재개 전에 바인드 — MovePlayer/시너지 재계산이 Player를 참조)
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            SetupEntrance(player);
+            _run?.BindPlayer(player);
+        }
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        // 서약 복원 (BindPlayer가 CovenantHandler.Initialize 수행한 직후)
+        RestoreCovenantsFromSave(save);
+
+        // 룬 보드 복원 (점유 셀 기반 — 시너지 스탯/메커닉 재계산)
+        RestoreRuneBoardFromSave(save);
+
+        // 절차 흐름 재개 — 저장된 방을 동일 시드로 재생성, 입구에서 시작
+        var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+        var meta = BuildMetaFromSave(save);
+        await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct);
+
+        Debug.Log($"[GameRunBootstrapper] 절차생성 이어하기 완료 — visit={save.visitCount}, room={save.currentRoomPoolKey}");
+    }
+
+    private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)
+    {
+        var cooldowns = new System.Collections.Generic.List<CooldownKV>();
+        if (!string.IsNullOrEmpty(save.cooldownsJson))
+        {
+            var w = JsonUtility.FromJson<CooldownListWrapper>(save.cooldownsJson);
+            if (w?.items != null) cooldowns.AddRange(w.items);
+        }
+
+        return new RunMetaSnapshot
+        {
+            masterSeed         = save.masterSeed,
+            visitCount         = save.visitCount,
+            seqPhase           = save.seqPhase,
+            shopUsed           = save.shopUsed,
+            eventUsed          = save.eventUsed,
+            heading            = save.heading,
+            anchorToggle       = save.anchorToggle,
+            currentRoomPoolKey = save.currentRoomPoolKey,
+            currentRoomKind    = save.currentRoomKind,
+            currentRoomMirror  = save.currentRoomMirror,
+            cooldowns          = cooldowns,
+        };
+    }
+
+    private void RestoreCovenantsFromSave(RunSaveData save)
+    {
+        if (string.IsNullOrEmpty(save.covenantsJson)) return;
+        var w = JsonUtility.FromJson<CovenantListWrapper>(save.covenantsJson);
+        if (w?.items != null && w.items.Count > 0)
+            _run?.CovenantHandler?.RestoreSelections(w.items);
+    }
+
+    private void RestoreRuneBoardFromSave(RunSaveData save)
+    {
+        if (string.IsNullOrEmpty(save.runeCellsJson)) return;
+        var w = JsonUtility.FromJson<Vector2IntListWrapper>(save.runeCellsJson);
+        if (w?.items == null || w.items.Count == 0) return;
+
+        // 점유 셀이 룬 시너지의 단일 진실원본. 레코드 기반 중복 적용을 제거한 뒤
+        // 점유 재주입으로 스탯+메커닉을 한 번만 재계산한다.
+        var stats = _run?.Player?.RuntimeStats;
+        stats?.RestoreSynergies(null);                  // 시너지 스탯 초기화 (멱등)
+        _run?.ClearAppliedSynergies();                  // 세션 시너지 이력 초기화
+        MerlinRuneBridge.Instance?.ClearAppliedGrids(); // 브릿지 적용 가드 초기화
+
+        // Shape 재구성(재편집 가능 상태) — 실패해도 점유 기반 복원으로 폴백(시너지 무영향)
+        try
+        {
+            if (!string.IsNullOrEmpty(save.runePlacementsJson))
+            {
+                var pw = JsonUtility.FromJson<RunePlacementListWrapper>(save.runePlacementsJson);
+                if (pw?.items != null && pw.items.Count > 0)
+                    MerlinRuneBridge.Instance?.RestoreRunePlacements(pw.items);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 룬 Shape 재구성 실패(점유 폴백): {e.Message}");
+        }
+
+        // 점유 셀 기반 시너지 재계산 (권위) — Shape 재구성 여부와 무관하게 빌드 효과 보장
+        MerlinRuneBridge.Instance?.RestoreRuneCells(w.items);
+    }
+
+    /// <summary>
     /// zone-layout 이어하기 진입. 저장된 존 인덱스의 방을 빌드하고,
     /// 출구 게이트를 즉시 활성화해 선택지가 남은 상태로 복원한다.
     /// </summary>
@@ -1874,9 +2198,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var chapter     = _run?.CurrentChapter ?? ChapterId.Chapter1;
         var serverEntry = Managers.ChapterData?.Get(chapter);
-        var zoneLayoutKey = serverEntry?.zone_layout_key;
-        if (string.IsNullOrEmpty(zoneLayoutKey))
-            zoneLayoutKey = chapterRegistry?.GetData(chapter)?.zoneLayoutKey;
+        var chapterSO   = chapterRegistry?.GetData(chapter);
+        var zoneLayoutKey = serverEntry?.zone_layout_key ?? chapterSO?.zoneLayoutKey;
+        var zoneSlotKey   = serverEntry?.zone_slot_key   ?? chapterSO?.zoneSlotKey;
+        var zonePoolKey   = serverEntry?.zone_pool_key   ?? chapterSO?.zonePoolKey;
         if (string.IsNullOrEmpty(zoneLayoutKey))
         {
             Debug.LogError("[GameRunBootstrapper] ContinueZoneLayoutRunAsync: zone_layout_key 없음");
@@ -1884,7 +2209,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
 
         var layoutMgr = Managers.ZoneLayout;
-        try { await Managers.ZoneLayout.LoadAsync(zoneLayoutKey); }
+        try
+        {
+            if (!string.IsNullOrEmpty(zoneSlotKey) && !string.IsNullOrEmpty(zonePoolKey))
+                await Managers.ZoneLayout.LoadWithPoolAsync(zoneSlotKey, zonePoolKey, zoneLayoutKey);
+            else
+                await Managers.ZoneLayout.LoadAsync(zoneLayoutKey);
+        }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ZoneLayout 로드 예외: {e.Message}"); }
 
         var zones = layoutMgr.GetZones(zoneLayoutKey);
@@ -1958,16 +2289,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         static UniTask<TextAsset> LoadTextAsset(string key) =>
             Managers.AddressableManager.LoadAssetAsync<TextAsset>(key);
 
-        if (!run.IsRunning || run.RoomManager == null || !run.RoomManager.IsInitialized)
-        {
-            Debug.LogWarning("[GameRunBootstrapper] StartRunAsync aborted: RoomManager not ready.");
-            return;
-        }
+        if (!run.IsRunning) return;
 
-        _points = FindObjectsOfType<StagePointUI>(true);
-        run.RegisterPoints(_points);
-        run.ResolveAllPointsAndSetStart();
-        run.RequestSpawnCurrentPointMap();
+        await StartProcGenRunAsync();
 
         UIRootBootstrapper.Instance?.BindHudToRun(run);
         run.RequestHudMode(HUDIds.Mode.Combat);
@@ -1978,8 +2302,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             // 무기가 없으면 기본 무기 자동 장착
             if (player.WeaponManager != null && !player.WeaponManager.HasWeapon)
             {
-                Debug.Log("[GameRunBootstrapper] StartRunAsync: 기본 무기 장착");
-                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>("T1_Bow");
+                Debug.Log($"[GameRunBootstrapper] StartRunAsync: 기본 무기 장착 ({debugDefaultWeaponKey})");
+                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>(debugDefaultWeaponKey);
                 await handle.Task;
                 if (handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded && handle.Result != null)
                 {
@@ -1997,6 +2321,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // Guard: ensure HUD remains in combat mode after late binds complete.
         run.RequestHudMode(HUDIds.Mode.Combat);
     }
+
+    /// <summary>Loadout 유물 우선, 없으면 에디터 직접 전투 테스트용 debugDefaultRelic 폴백.</summary>
+    private RelicClassSO ResolveRelicForDirectSpawn()
+        => AppBootstrapper.Instance?.Loadout?.Relic ?? debugDefaultRelic;
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)
     {
@@ -2052,6 +2380,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await Cysharp.Threading.Tasks.UniTask.WaitUntil(
             () => player.WeaponManager != null,
             cancellationToken: destroyCancellationToken);
+
+        // 선택된 유물 적용 (CombatGirl 단일 몸 + 유물). Loadout 유물 없으면 디버그 기본 유물(에디터 테스트).
+        player.SetRelicAndApply(ResolveRelicForDirectSpawn());
 
         var run = AppBootstrapper.Instance?.CurrentRun;
         var wm = player.WeaponManager;
@@ -2153,10 +2484,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     // ── Minimap ───────────────────────────────────────────────
 
-    private void InitializeMinimapForRoom(
-        GameObject mapGO,
-        int gridW, int gridH,
-        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    private void InitializeMinimapForRoom(GameObject mapGO, int gridW, int gridH)
     {
         var minimap = UIRootBootstrapper.Instance?.GetMinimapView();
         if (minimap == null) return;
@@ -2168,15 +2496,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var roomSize   = new Vector2(gridW * blockCellSize, gridH * blockCellSize);
         minimap.Initialize(roomCenter, roomSize);
 
-        if (blocks == null) return;
+        if (mapGO == null) return;
 
-        for (int i = 0; i < blocks.Count; i++)
+        foreach (var spawner in mapGO.GetComponentsInChildren<MonsterSpawner>(true))
         {
-            var b = blocks[i];
-            if (b.instance == null) continue;
-
-            if (!b.instance.TryGetComponent<MonsterSpawner>(out var spawner)) continue;
-
             var capturedMinimap = minimap;
             spawner.OnMonsterSpawned += monster => OnMinimapMonsterSpawned(capturedMinimap, monster);
             _minimapSpawnerSubs.Add(spawner);

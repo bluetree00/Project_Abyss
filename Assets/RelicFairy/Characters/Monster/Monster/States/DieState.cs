@@ -12,8 +12,6 @@ namespace RelicFairy.Monster
 /// </summary>
 public class DieState : IMonsterState
 {
-    private const float DespawnDelay = 3f;
-
     public virtual void Enter(MonsterContext ctx)
     {
         ctx.Runtime.IsDead = true;
@@ -24,6 +22,16 @@ public class DieState : IMonsterState
 
         // 골드 코인 드롭
         SpawnGoldDrop(ctx);
+
+        // 처치 연출 — 막타(킬) 히트스톱 + 사망 위치 VFX 버스트
+        var fx = ctx.Death;
+        if (fx != null)
+        {
+            if (fx.killHitStopDuration > 0f)
+                HitFeelService.KillImpact(fx.killHitStopScale, fx.killHitStopDuration);
+            if (!string.IsNullOrEmpty(fx.deathVfxKey))
+                SpawnDeathVfx(ctx.Monster.transform.position, fx.deathVfxKey, fx.deathVfxScale).Forget();
+        }
 
         // 이동 중지
         ctx.Agent.enabled = false;
@@ -55,8 +63,10 @@ public class DieState : IMonsterState
             ctx.Animator.CrossFade(dieAnim, 0.1f, 0, 0f);
         }
 
-        // 지연 파괴
-        DespawnAsync(ctx.Monster).Forget();
+        // 지연 파괴(+ 소멸 디졸브)
+        float despawnDelay     = fx?.despawnDelay     ?? 3f;
+        float dissolveDuration = fx?.dissolveDuration ?? 0f;
+        DespawnAsync(ctx.Monster, despawnDelay, dissolveDuration).Forget();
     }
 
     public virtual void Update(MonsterContext ctx) { }
@@ -81,16 +91,65 @@ public class DieState : IMonsterState
         GoldCoinPickup.SpawnDrops(ctx.Monster.transform.position, count, drop.coinValue);
     }
 
+    // ── 처치 VFX ──────────────────────────────────────────
+
+    private static async UniTaskVoid SpawnDeathVfx(Vector3 pos, string key, float scale)
+    {
+        var pooler = Managers.ObjectPooler;
+        if (pooler == null) return;
+
+        GameObject go;
+        try
+        {
+            go = await pooler.SpawnAsync(
+                key, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
+        }
+        catch (System.OperationCanceledException) { return; }
+        if (go == null) return;
+
+        var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
+        float lifetime = ps != null
+            ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f
+            : 2f;
+
+        var vfx = go.GetComponent<PooledOneShotVfx>() ?? go.AddComponent<PooledOneShotVfx>();
+        vfx.Play(lifetime, Mathf.Max(0.001f, scale));
+    }
+
     // ── 비동기 파괴 ────────────────────────────────────────
 
-    private static async UniTaskVoid DespawnAsync(MonsterBase monster)
+    private static async UniTaskVoid DespawnAsync(MonsterBase monster, float despawnDelay, float dissolveDuration)
     {
-        await UniTask.Delay(
-            System.TimeSpan.FromSeconds(DespawnDelay),
-            cancellationToken: monster.destroyCancellationToken);
+        if (monster == null) return;
 
-        if (monster != null)
+        // destroyCancellationToken(파괴) + ActivationToken(OnDisable=풀 반환) 링크.
+        // 디졸브 진행 중 외부 Despawn(방 클리어 등)으로 풀 반환되면 ActivationToken 취소 →
+        // 디졸브가 onDespawn 미호출로 중단 → 이중 Despawn 레이스 차단. 머티리얼 복원은 디졸브 finally가 담당.
+        using var cts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(
+            monster.destroyCancellationToken, monster.ActivationToken);
+        var ct = cts.Token;
+
+        try
+        {
+            await UniTask.Delay(
+                System.TimeSpan.FromSeconds(despawnDelay),
+                cancellationToken: ct);
+        }
+        catch (System.OperationCanceledException) { return; }
+
+        if (monster == null) return;
+
+        if (dissolveDuration > 0f)
+        {
+            await DissolveEffect.PlayDeathDissolveAsync(
+                monster.gameObject, dissolveDuration,
+                () => { if (monster != null) Managers.ObjectPooler.Despawn(monster.gameObject); },
+                ct);
+        }
+        else
+        {
             Managers.ObjectPooler.Despawn(monster.gameObject);
+        }
     }
 }
 }

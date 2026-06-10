@@ -28,6 +28,9 @@ MonoBehaviour:
       comboWindowOpen: 0.1
       comboWindowClose: 0.35
       attackEndAt: 0.4
+      attackStepDistance: 0
+      moveInputScale: 0
+      aimAssistRadius: 12
     - baseClipName: GroundLightAttack_02
       addressableKey: GroundLightBowAttack_02
       actionType: 1
@@ -38,6 +41,9 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: 0.4
+      attackStepDistance: 0
+      moveInputScale: 0
+      aimAssistRadius: 12
     - baseClipName: HeavyCharge
       addressableKey: BowHeavyCharge
       actionType: 2

@@ -132,16 +132,22 @@ public class ClearRewardTrigger : MonoBehaviour
             catch (OperationCanceledException) { return; }
         }
 
-        // 노드 클리어 마킹 (스테이지 전환은 별도 메커니즘이 담당)
-        var spm = _run?.StagePointManager;
-        if (spm != null && spm.CurrentPointId >= 0)
-            spm.MarkCleared(spm.CurrentPointId);
-
         if (_isBossRoom && _run != null)
         {
-            _run.EnterChapterClear();
-            bool advanced = _run.AdvanceToNextChapter();
-            Debug.Log($"[ClearRewardTrigger] 보스방 클리어 — 챕터 전환 {(advanced ? "성공" : "마지막 챕터")}");
+            if (_run.HasNextChapter())
+            {
+                _run.EnterChapterClear();
+                _run.AdvanceToNextChapter();
+                Debug.Log("[ClearRewardTrigger] 보스방 클리어 — 다음 챕터 진행");
+            }
+            else
+            {
+                // 최종 챕터 보스 격파 = 런 클리어. 종료 시퀀스가 메타 저장·세이브 폐기·BaseCamp 복귀를 담당하므로
+                // 이후 방 경계 저장/게이트 로직은 건너뛴다(끝난 런을 재개 가능 상태로 저장하지 않도록).
+                Debug.Log("[ClearRewardTrigger] 최종 보스 격파 — 런 클리어");
+                GameRunBootstrapper.Instance?.HandleRunClear();
+                return;
+            }
         }
 
         // 방 클리어 시점 저장 (플레이어는 현재 존 위치 + 게이트 선택지 유지 상태로 재개)
@@ -152,14 +158,17 @@ public class ClearRewardTrigger : MonoBehaviour
             catch (OperationCanceledException) { return; }
         }
 
-        // 존 단위 진행: 존 클리어 게이트 활성화 (보스방 제외)
-        // 플레이어가 게이트로 이동하면 ZoneExitGate가 ShowZoneSelectionAsync를 호출한다.
-        if (!_isBossRoom)
+        // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
+        // 존 선택 UI가 그리드 위에 겹쳐 표시된다.
+        try
         {
-            var zoneProgression = _run?.ZoneProgression;
-            zoneProgression?.EnableExitGateForZone(zoneProgression.CurrentZoneIndex);
+            await UniTask.WaitUntil(
+                () => UI_GridPanel.Instance == null || !UI_GridPanel.Instance.IsOpen,
+                cancellationToken: ct);
         }
+        catch (OperationCanceledException) { return; }
 
+        // 절차 진행: RunFlowController가 출구 게이트를 담당하므로 레거시 존 클리어 게이트는 활성화하지 않는다.
         Destroy(gameObject);
     }
 
@@ -189,9 +198,8 @@ public class ClearRewardTrigger : MonoBehaviour
 
             popup.Setup(data, _run.ItemInventory);
 
-            // 팝업이 닫힐 때까지 대기 (버튼 클릭 시 팝업이 스스로 ClosePopupUI 호출)
-            await UniTask.WaitUntil(() => popup == null || !popup.gameObject.activeSelf,
-                cancellationToken: ct);
+            // 버튼 클릭 즉시 resolve — 0.14s 닫기 애니메이션을 기다리지 않는다
+            await popup.WaitForInteractionAsync(ct);
 
         }
     }

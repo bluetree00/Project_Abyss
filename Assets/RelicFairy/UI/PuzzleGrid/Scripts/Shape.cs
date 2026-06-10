@@ -164,11 +164,11 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         if (placed)
         {
-            // 배치된 Shape는 scroll content 밖(gridHost)으로 이동 → 스크롤 시 따라 움직이지 않음
+            // gridHost로 이동 후 raycastTarget 활성화 → 배치된 셀에서 재드래그 가능
             if (BoardManager.Instance?.gridHost != null)
                 transform.SetParent(BoardManager.Instance.gridHost, true);
-            // 슬롯 해제 → shapeHost 콘텐츠 높이 갱신
             BoardManager.Instance?.OnShapePlaced(this);
+            SetBlocksRaycastTarget(true);
         }
         else
         {
@@ -222,5 +222,14 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         var le = GetComponent<LayoutElement>();
         if (le != null)
             le.ignoreLayout = ignore;
+    }
+
+    private void SetBlocksRaycastTarget(bool enable)
+    {
+        foreach (Transform child in transform)
+        {
+            var img = child.GetComponent<Image>();
+            if (img != null) img.raycastTarget = enable;
+        }
     }
 }

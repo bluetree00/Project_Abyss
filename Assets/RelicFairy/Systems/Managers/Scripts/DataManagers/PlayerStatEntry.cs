@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 /// <summary>
-/// 뒤끝 PLAYER_DATA 차트 1행 = 캐릭터 1명.
+/// 뒤끝 CHARACTER_DATA 차트 1행 = 캐릭터 1명.
 /// </summary>
 [System.Serializable]
 public class PlayerStatEntry
@@ -16,6 +16,11 @@ public class PlayerStatEntry
     public int    base_luck;
     public float  base_move_speed;
     public float  base_run_speed;
+    public float  base_run_ramp;   // 걷기→달리기 램프 시간(초). 0이면 CharacterData 값 유지
+    public float  move_accel;      // 가속도(m/s²). 0이면 CharacterData 값 유지
+    public float  move_decel;      // 정지 감속도(m/s²). 0이면 CharacterData 값 유지
+    public float  reverse_accel_mult; // 역방향 가속 배율. 0이면 CharacterData 값 유지
+    public float  initial_boost;   // 출발 부스트(walkMax 비율). 0이면 CharacterData 값 유지
     public float  combo_duration;
     public float  heavy_charge_threshold;
     public float  heavy_release_time;
@@ -94,15 +99,13 @@ public class EquipmentEntry
     public string skill_e_name;
     public float  skill_e_cooldown;
 
-    // ── 원소 (None, Water, Fire, Grass, Earth, Lightning) ──
-    public string element;
-    public float  element_amount_basic;   // 기본공격 1히트당 원소 누적치
-    public float  element_amount_heavy;   // 차지공격 1히트당
-    public float  element_amount_air;     // 공중공격 1히트당
-    public string skill_q_element_override;   // Q스킬 원소 오버라이드 (None=무기 원소 따름)
-    public float  skill_q_element_amount;
-    public string skill_e_element_override;
-    public float  skill_e_element_amount;
+    // ── 공격 전진성 / 유도 보정 (WeaponAnimationSetSO ClipMapping 으로 주입) ──
+    public float  attack_step_1;
+    public float  attack_step_2;
+    public float  attack_step_3;
+    public float  move_input_scale;
+    public float  aim_assist_radius;
+    public int    use_aim_assist;
 
     public int    stat_version;
 }

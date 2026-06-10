@@ -6,7 +6,7 @@ using TMPro;
 /// <summary>
 /// 갤러리 뷰 — 보드 썸네일 목록 표시.
 ///
-/// ■ BlockSynergyBridge가 등록한 GridAssetData 기반으로 썸네일 생성.
+/// ■ MerlinRuneBridge가 등록한 GridAssetData 기반으로 썸네일 생성.
 /// ■ 썸네일 클릭 → UI_GridPanel.EnterEditMode(gridId).
 /// ■ RefreshThumbnails(): 채움 상태(occupied) 반영.
 /// </summary>
@@ -58,7 +58,7 @@ public sealed class GridGalleryView : MonoBehaviour
     {
         ClearThumbs();
 
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null || gridContent == null) return;
 
         var grids = bridge.GetRegisteredGrids();
@@ -85,7 +85,7 @@ public sealed class GridGalleryView : MonoBehaviour
     /// <summary>각 썸네일의 채움 상태만 갱신. Shape 배치/제거 시 호출.</summary>
     public void RefreshThumbnails()
     {
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null) return;
 
         foreach (var entry in _thumbs)

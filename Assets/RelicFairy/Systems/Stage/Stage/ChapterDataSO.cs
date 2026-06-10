@@ -43,6 +43,10 @@ public class ChapterDataSO : ScriptableObject
     [Tooltip("이 챕터에서 사용할 몬스터 풀 태그 (비어있으면 전체)")]
     public string monsterPoolTag;
 
+    [Header("보스")]
+    [Tooltip("이 챕터 보스방에서 소환할 보스 스폰 테이블. BossSpawner가 GameRunSession 경유로 조회한다. 비우면 BossSpawner의 직렬화 폴백 사용.")]
+    public MonsterSpawnTableSO bossSpawnTable;
+
     [Header("보상")]
     [Tooltip("골드 드롭 배수")]
     public float goldMultiplier = 1f;
@@ -50,8 +54,12 @@ public class ChapterDataSO : ScriptableObject
     public float itemDropMultiplier = 1f;
 
     [Header("존 레이아웃")]
-    [Tooltip("뒤끝 CDN 차트 키. 이 챕터의 전체 존 배치 데이터를 담은 테이블 (예: chapter_1_zone_layout).")]
+    [Tooltip("뒤끝 CDN 차트 키. 이 챕터의 전체 존 배치 데이터를 담은 테이블 (예: chapter_1_zone_layout). 레거시/고정 방식.")]
     public string zoneLayoutKey;
+    [Tooltip("절차적 생성 슬롯 CSV 키 (예: chapter_1_slot). zonePoolKey와 함께 설정하면 LoadWithPoolAsync 사용.")]
+    public string zoneSlotKey;
+    [Tooltip("절차적 생성 룸 풀 CSV 키 (예: chapter_1_room_pool). zoneSlotKey와 함께 설정.")]
+    public string zonePoolKey;
 
     [Header("맵 노드 구성")]
     [Tooltip("중간 층 수 (Start/Boss 제외). 예: 5면 총 7층")]
@@ -79,6 +87,8 @@ public class ChapterDataSO : ScriptableObject
             goldMultiplier   = goldMultiplier,
             itemDropMultiplier = itemDropMultiplier,
             zoneLayoutKey    = zoneLayoutKey,
+            zoneSlotKey      = zoneSlotKey,
+            zonePoolKey      = zonePoolKey,
             middleLayers     = middleLayers,
             peakLayer        = peakLayer,
         };
@@ -120,6 +130,8 @@ public class ChapterRuntimeData
 
     // 존 레이아웃
     public string zoneLayoutKey;
+    public string zoneSlotKey;
+    public string zonePoolKey;
 
     // 맵 노드 구성
     public int middleLayers = 5;
@@ -140,6 +152,8 @@ public class ChapterRuntimeData
         if (server.gold_multiplier > 0) goldMultiplier = server.gold_multiplier;
         if (server.item_drop_multiplier > 0) itemDropMultiplier = server.item_drop_multiplier;
         if (!string.IsNullOrEmpty(server.zone_layout_key)) zoneLayoutKey = server.zone_layout_key;
+        if (!string.IsNullOrEmpty(server.zone_slot_key))   zoneSlotKey   = server.zone_slot_key;
+        if (!string.IsNullOrEmpty(server.zone_pool_key))   zonePoolKey   = server.zone_pool_key;
         if (server.total_layers > 0) middleLayers = server.total_layers - 2;
         if (server.peak_layer > 0) peakLayer = server.peak_layer;
     }
@@ -163,6 +177,8 @@ public class ChapterServerEntry
 
     // 존 레이아웃
     public string zone_layout_key;
+    public string zone_slot_key;
+    public string zone_pool_key;
 
     // 맵 노드 구성
     public int total_layers;

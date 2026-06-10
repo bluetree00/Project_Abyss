@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 096a3736f2515474f9576723261174f2
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/SlashesPiercing/Generic/EffectGraph/VEG_Slash_Generic.vfx
+  uploadId: 714344

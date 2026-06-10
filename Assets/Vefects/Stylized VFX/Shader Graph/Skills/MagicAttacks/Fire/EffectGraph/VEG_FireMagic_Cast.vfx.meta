@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4233ad85feb7e034588bd70414e8c059
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/MagicAttacks/Fire/EffectGraph/VEG_FireMagic_Cast.vfx
+  uploadId: 714344

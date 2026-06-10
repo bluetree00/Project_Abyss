@@ -348,6 +348,70 @@ public class BoardManager : MonoBehaviour
     /// <summary>그리드 세션이 GridHost에 활성화된 직후 발생. Grid 인스턴스를 인수로 전달.</summary>
     public event Action<Grid> OnGridSessionActivated;
 
+    /// <summary>
+    /// 외부(MerlinRuneHexGridView)에서 미리 생성한 Grid를 활성화한다.
+    /// Rebuild()를 호출하지 않으므로 사각 GridSquare가 생성되지 않는다.
+    /// OpenPanel() → BuildGrid() 직후 호출하여 헥사 그리드를 드래그-앤-드롭 타깃으로 등록하고
+    /// 보관함 Shape들을 shapeHost에 표시한다.
+    /// </summary>
+    public void EnterExternalGrid(Grid hexGrid, GridAssetSO hexAsset)
+    {
+        if (hexGrid == null) return;
+
+        activeAsset = hexAsset;
+
+        SetModeSelection(false);   // selectionRoot 숨김 + gameplayRoot 표시
+
+        // GridManager에 먼저 등록 → GetGap()이 올바른 값(44f) 반환
+        if (GridManager.Instance != null)
+            GridManager.Instance.SetActiveGrid(hexGrid);
+
+        // 이미 잘못된 크기(120f 등)로 빌드된 Shape 재조정
+        RebuildShapesWithGridGap();
+
+        // shapeHost 초기화 후 전체 Shape를 슬롯에 배치
+        if (shapeHost != null)
+        {
+            shapeHost.sizeDelta        = new Vector2(shapeHost.sizeDelta.x, 0f);
+            shapeHost.anchoredPosition = Vector2.zero;
+        }
+
+        _sharedShapeSlotY.Clear();
+        _slotCursorY = -spawnOrigin.y;
+
+        // 다른 그리드에 대한 스테일 배치만 정리 (이 그리드 배치 정보는 유지)
+        var staleKeys = new System.Collections.Generic.List<Shape>();
+        foreach (var pair in _globalPlacements)
+            if (pair.Value?.grid != hexAsset) staleKeys.Add(pair.Key);
+        foreach (var k in staleKeys) _globalPlacements.Remove(k);
+
+        foreach (var s in _sharedShapes)
+        {
+            if (s == null) continue;
+            s.gameObject.SetActive(true);
+
+            if (_globalPlacements.TryGetValue(s, out var gp))
+            {
+                // 이 그리드에 배치된 Shape: 위치 복원
+                if (gridHost != null) s.transform.SetParent(gridHost, false);
+                var rt = (RectTransform)s.transform;
+                rt.anchoredPosition = gp.anchoredPosition;
+                rt.localRotation    = Quaternion.identity;
+                rt.localScale       = Vector3.one * GetGameplayScale();
+                foreach (var sq in gp.squares)
+                {
+                    sq?.SetOccupied(true);
+                    if (sq != null) sq.occupyingItem = s.ItemData;
+                }
+                s.SetOccupiedSquares(gp.squares);
+            }
+            else
+            {
+                PlaceSharedShapeToSlot(s);
+            }
+        }
+    }
+
     /// <summary>선택 화면으로 돌아간다.</summary>
     public void BackToSelection()
     {
@@ -515,6 +579,68 @@ public class BoardManager : MonoBehaviour
         foreach (var s in _sharedShapes)
             if (s?.ItemData?.instanceId == instanceId) return s;
         return null;
+    }
+
+    // ── 세이브/이어하기 (Shape 배치 재구성) ──────────────────────────
+
+    /// <summary>현재 배치된 Shape별 (아이템 instanceId, shapeId, 점유 셀) 스냅샷.</summary>
+    public List<RunePlacementEntry> CapturePlacements()
+    {
+        var result = new List<RunePlacementEntry>();
+        foreach (var pair in _globalPlacements)
+        {
+            var shape = pair.Key;
+            var gp    = pair.Value;
+            if (shape == null || shape.ItemData == null || gp?.squares == null) continue;
+
+            var entry = new RunePlacementEntry
+            {
+                instanceId = shape.ItemData.instanceId,
+                shapeId    = shape.ItemData.shapeId,
+            };
+            foreach (var sq in gp.squares)
+                if (sq != null) entry.cells.Add(new Vector2Int(sq.col, sq.row));
+
+            if (entry.cells.Count > 0) result.Add(entry);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 이어하기: 지정 셀에 Shape를 직접 배치(드래그 기하 비의존)해 재편집 가능 상태로 복원한다.
+    /// 점유/시너지는 별도 권위(MerlinRuneHexGridView 점유 재계산)이므로 시각 위치는 근사로 충분.
+    /// </summary>
+    public Shape RestorePlacedShape(ShapeAssetSO asset, RuntimeItemData item, List<GridSquare> squares)
+    {
+        if (shapePrefab == null || asset == null || squares == null || squares.Count == 0) return null;
+
+        var shape = Instantiate(shapePrefab, gridHost != null ? gridHost : cacheRoot);
+        shape.ApplyAsset(asset);
+        shape.BindItem(item);
+
+        var rt = (RectTransform)shape.transform;
+        rt.localScale    = Vector3.one * GetGameplayScale();
+        rt.localRotation = Quaternion.identity;
+        var firstSqRT = squares[0] != null ? squares[0].GetComponent<RectTransform>() : null;
+        if (firstSqRT != null) rt.anchoredPosition = firstSqRT.anchoredPosition;
+
+        foreach (var sq in squares)
+        {
+            if (sq == null) continue;
+            sq.SetOccupied(true);
+            sq.occupyingItem = item;
+        }
+        shape.SetOccupiedSquares(squares);
+        shape.CacheStartTransform();
+
+        _sharedShapes.Add(shape);
+        _globalPlacements[shape] = new GlobalPlacement
+        {
+            grid             = activeAsset,
+            squares          = new List<GridSquare>(squares),
+            anchoredPosition = rt.anchoredPosition,
+        };
+        return shape;
     }
 
     /// <summary>공용 풀에서 Shape를 제거하고 파괴한다. 보관함 아이템 폐기 시 호출.</summary>

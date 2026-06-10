@@ -227,7 +227,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (setActive)
             await SetCurrentSlotInternalAsync(slotIndex);
 
-        Debug.Log($"[WeaponManager] Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive}) | Elem={runtimeData.element} | Amt(B/H/A)={runtimeData.elementAmountBasic}/{runtimeData.elementAmountHeavy}/{runtimeData.elementAmountAir}");
+        Debug.Log($"[WeaponManager] Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive})");
     }
 
     // ----------------------
@@ -615,7 +615,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         }
 
         runtime.ApplyServerOverride(entry);
-        Debug.Log($"[PlayerWeaponManager] {weaponId} stats 덮어쓰기: atk={runtime.baseAttack}, def={runtime.baseDefense}, tier={runtime.tier}, rarity={runtime.rarity} | Elem={runtime.element} | Amt(B/H/A)={runtime.elementAmountBasic}/{runtime.elementAmountHeavy}/{runtime.elementAmountAir}");
+        Debug.Log($"[PlayerWeaponManager] {weaponId} stats 덮어쓰기: atk={runtime.baseAttack}, def={runtime.baseDefense}, tier={runtime.tier}, rarity={runtime.rarity}");
     }
 
     /// <summary>
@@ -645,7 +645,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         if (entry == null) return;
 
         data.ApplyServerOverride(entry);
-        Debug.Log($"[PlayerWeaponManager] (pickup fallback) 서버 수치 적용: {entry.weapon_id} ({entry.weapon_name}) | ATK={entry.base_attack} SPD={entry.attack_speed} | Elem={data.element} | Amt(B/H/A)={data.elementAmountBasic}/{data.elementAmountHeavy}/{data.elementAmountAir}");
+        Debug.Log($"[PlayerWeaponManager] (pickup fallback) 서버 수치 적용: {entry.weapon_id} ({entry.weapon_name}) | ATK={entry.base_attack} SPD={entry.attack_speed}");
     }
 
     // ----------------------

@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 public static class QuestDatabaseAutoLinker
 {
-    private const string kMenuPath = "Tools/Quest/Rebuild Database";
+    private const string kMenuPath = "RelicFairy/Gameplay/Quest/Rebuild Database";
 
     [MenuItem(kMenuPath)]
     public static void RebuildDatabase()

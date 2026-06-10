@@ -14,7 +14,7 @@ namespace RelicFairy.Monster
 ///                        한 줄씩 Sword Slash 15 VFX + 피격
 ///  마지막 행 이후 + recoveryTime → AttackReadyState
 /// </summary>
-[CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_NormalSlashPattern", fileName = "DK_NormalSlashPattern")]
+[CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_NormalSlashPattern", fileName = "DK_NormalSlashPattern")]
 public class DKNormalSlashPatternSO : BossPatternSO
 {
     [Header("Grid Tiles")]

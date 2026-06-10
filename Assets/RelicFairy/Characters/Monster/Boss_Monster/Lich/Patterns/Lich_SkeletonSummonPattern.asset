@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da4099e54407b9c4ab43dac896344b75, type: 3}
+  m_Name: Lich_SkeletonSummonPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichSkeletonSummonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  castDuration: 1.2
+  recoveryDuration: 0.5
+  spawnCount: 2
+  skeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234, type: 3}
+  spawnRadius: 4
+  patternCooldown: 12

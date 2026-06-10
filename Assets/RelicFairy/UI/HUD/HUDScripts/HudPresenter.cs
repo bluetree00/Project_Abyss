@@ -37,6 +37,8 @@ public sealed class HudPresenter : MonoBehaviour
     public CanvasGroup MainCanvasGroup => canvasGroup;
     public MinimapView  MinimapView => view != null ? view.MinimapView : null;
 
+    private bool _bossPanelSuppressed;
+
     private int _fadeToken = 0;
     private HUDIds.Mode _currentMode = HUDIds.Mode.None;
 
@@ -103,6 +105,10 @@ public sealed class HudPresenter : MonoBehaviour
 
         // 현재 버프 즉시 반영
         HandleBuffsChanged();
+
+        // 플레이어 스탯이 이미 로드된 경우 즉시 반영
+        if (_runtimeStats != null)
+            RefreshStats();
     }
 
     public void BindPlayer(PlayerController player)
@@ -180,7 +186,8 @@ public sealed class HudPresenter : MonoBehaviour
 
             view?.BossPanel?.Init(maxHp, boss.BossName);
             view?.BossPanel?.SetHP(currentHp, maxHp);
-            SetMode(HUDIds.Mode.Boss);
+            if (!_bossPanelSuppressed)
+                SetMode(HUDIds.Mode.Boss);
             return;
         }
 
@@ -193,6 +200,24 @@ public sealed class HudPresenter : MonoBehaviour
         view?.BossPanel?.Init(maxHp, boss.BossName);
         view?.BossPanel?.SetHP(currentHp, maxHp);
 
+        // 등장 연출이 있는 보스면 연출 완료(OnBossCombatReady) 후 패널 표시
+        if (boss.HasEntranceAnimation)
+        {
+            _bossPanelSuppressed = true;
+            boss.OnBossCombatReady += HandleBossCombatReady;
+            SetMode(HUDIds.Mode.Combat); // 연출 중에는 전투 HUD 유지
+        }
+        else
+        {
+            SetMode(HUDIds.Mode.Boss);
+        }
+    }
+
+    private void HandleBossCombatReady()
+    {
+        _bossPanelSuppressed = false;
+        if (_boss != null)
+            _boss.OnBossCombatReady -= HandleBossCombatReady;
         SetMode(HUDIds.Mode.Boss);
     }
 
@@ -211,8 +236,11 @@ public sealed class HudPresenter : MonoBehaviour
         if (_boss != null)
         {
             _boss.OnHPChanged -= HandleBossHPChanged;
+            _boss.OnBossCombatReady -= HandleBossCombatReady;
             _boss = null;
         }
+
+        _bossPanelSuppressed = false;
 
         if (_currentMode == HUDIds.Mode.Boss)
             SetMode(HUDIds.Mode.Combat);
@@ -251,6 +279,7 @@ public sealed class HudPresenter : MonoBehaviour
     {
         if (_runtimeStats == null || view?.CombatPanel == null) return;
         view.CombatPanel.SetHp(_runtimeStats.Hp, _runtimeStats.MaxHp);
+        view.CombatPanel.SetStats(_runtimeStats.AttackPower, _runtimeStats.Defense);
     }
 
     private void RefreshWeaponSlots()
@@ -278,6 +307,7 @@ public sealed class HudPresenter : MonoBehaviour
         var current = _weaponManager.CurrentWeaponData;
         view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
+        view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
     }
 
     public void Dispose()
@@ -341,6 +371,10 @@ public sealed class HudPresenter : MonoBehaviour
     public void SetMode(HUDIds.Mode mode)
     {
         if (view == null) return;
+
+        // 보스 패널 억제 중이면 Boss 모드 요청을 Combat으로 강등
+        if (_bossPanelSuppressed && mode == HUDIds.Mode.Boss)
+            mode = HUDIds.Mode.Combat;
 
         bool shouldBeVisible = mode != HUDIds.Mode.None;
         SetVisible(shouldBeVisible, true);

@@ -9,7 +9,7 @@ public static class FbxSubAssetInspector
 {
     private const string OutputPath = "Assets/_TempInspect/fbx_subassets.txt";
 
-    [MenuItem("Tools/Inspect/Dump Weapon FBX SubAssets")]
+    [MenuItem("RelicFairy/Dev/Dump Weapon FBX SubAssets")]
     public static void DumpWeaponFbxSubAssets()
     {
         string[] fbxPaths =

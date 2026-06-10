@@ -14,7 +14,7 @@ using System.IO;
 /// </summary>
 public static class OrganizeItemSO
 {
-    private const string RootFolder = "Assets/Abyss/Shared/Item/SOdata";
+    private const string RootFolder = "Assets/RelicFairy/Shared/Item/SOdata";
 
     // 트리거 → 폴더명 매핑
     private static string GetTriggerFolder(string trigger) => trigger switch
@@ -47,7 +47,7 @@ public static class OrganizeItemSO
         return ItemRarity.Common;
     }
 
-    [MenuItem("Tools/Item/Organize SO by Rarity+Trigger")]
+    [MenuItem("RelicFairy/Gameplay/Item/Organize by Rarity+Trigger")]
     public static void Organize()
     {
         // CSV 로드

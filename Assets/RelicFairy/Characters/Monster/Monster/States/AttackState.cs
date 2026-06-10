@@ -36,6 +36,7 @@ public class AttackState : IMonsterState
         ctx.Runtime.AttackHitCount = 0;
         PlayAttackAnim(ctx);
         FacePlayer(ctx);
+        SpawnAttackWarning(ctx);
     }
 
     public virtual void Update(MonsterContext ctx)
@@ -92,6 +93,24 @@ public class AttackState : IMonsterState
         dir.y = 0f;
         if (dir.sqrMagnitude > 0.001f)
             ctx.Transform.rotation = Quaternion.LookRotation(dir);
+    }
+
+    // 공격 전 암시 판정 — 기본 근접 몹의 히트 존을 데미지보다 먼저 바닥에 표시.
+    // 데미지는 damageApplyDelay 후 발동하므로 경고가 그만큼 선행한다.
+    // 투사체(원거리)는 비행 자체가 예고이므로 제외. 패턴 몹은 PatternAttackState가 별도 처리.
+    private static void SpawnAttackWarning(MonsterContext ctx)
+    {
+        if (ctx.Stat.attackShape is MonsterRangedAttackSO) return;
+
+        float radius = ctx.Monster.GetCombatHitDistance(ctx);
+        if (radius <= 0.01f) return;
+
+        float duration = Mathf.Max(0.2f, ctx.Combat.damageApplyDelay);
+        MonsterGroundWarning.Spawn(
+            ctx.Transform.position,
+            radius,
+            duration,
+            new Color(1f, 0.15f, 0.15f, 0.95f));
     }
 
     private static void PlayAttackAnim(MonsterContext ctx)

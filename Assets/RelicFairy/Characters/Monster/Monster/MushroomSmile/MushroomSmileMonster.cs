@@ -29,10 +29,7 @@ public class MushroomSmileMonster : MonsterBase
             _fsm.RegisterAs<PatrolState>(new MushroomSmilePatrolState(trapData));
     }
 
-    public override void TakeDamage(float amount, GameObject instigator,
-                                     float knockbackMultiplier = 1f,
-                                     ElementType element = ElementType.None,
-                                     float elementAmount = 0f)
+    public override void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         // 트랩은 외부 공격에 파괴되지 않는다 — 완전 무적
     }

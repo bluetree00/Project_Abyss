@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d043065f6082a4c8986ec62e44929e9b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/FlockingCPU/SampleAssets/Animation/AnimationECS/Target01AnimationController.controller
+  uploadId: 902342

@@ -1,0 +1,20 @@
+{
+    "name": "TrailsEditor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:0d3ea69a00655d5449cdf09f8773af8f",
+        "GUID:6e9fe7c69e3b48b468ce473f286ca533",
+        "GUID:3b1bc6735b536a44bb3b3ba6d9f49509"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

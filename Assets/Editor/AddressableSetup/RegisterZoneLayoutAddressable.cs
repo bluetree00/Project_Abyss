@@ -6,15 +6,15 @@ using UnityEngine;
 
 /// <summary>
 /// CHAPTER1_ZONE_LAYOUT.csv를 Addressables에 "CHAPTER1_ZONE_LAYOUT" 키로 등록.
-/// 메뉴: Abyss/Setup/Register Zone Layout Addressable
+/// 메뉴: RelicFairy/Setup/Register Zone Layout Addressable
 /// </summary>
 public static class RegisterZoneLayoutAddressable
 {
-    private const string CsvPath  = "Assets/Abyss/Docs/CHAPTER1_ZONE_LAYOUT.csv";
+    private const string CsvPath  = "Assets/RelicFairy/Docs/CHAPTER1_ZONE_LAYOUT.csv";
     private const string AddrKey  = "CHAPTER1_ZONE_LAYOUT";
     private const string GroupName = "ChartData";
 
-    [MenuItem("Abyss/Setup/Register Zone Layout Addressable")]
+    [MenuItem("RelicFairy/Addressables/Register Zone Layout")]
     public static void Register()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

@@ -16,6 +16,10 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
     [SerializeField] private CharacterData characterData;
     [SerializeField] private string characterPrefabKey = "Knight";
 
+    [Header("Relic")]
+    [SerializeField, Tooltip("유물 클래스. 할당 시 선택 확정 후 Loadout.Relic으로 전달된다(없으면 기존 캐릭터 경로 유지).")]
+    private RelicClassSO relicClass;
+
     [Header("Display")]
     [SerializeField, Tooltip("진열 캐릭터가 바라볼 Y 회전")]
     private float displayRotationY = 180f;
@@ -155,9 +159,9 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         if (_selected || wisp == null) return;
         if (_popupOpen) return;
 
-        if (characterData == null)
+        if (characterData == null && relicClass == null)
         {
-            Debug.LogError("[CharacterDisplayStand] characterData가 null — Inspector에서 CharacterData SO를 할당하세요.");
+            Debug.LogError("[CharacterDisplayStand] characterData/relicClass 둘 다 null — 하나는 할당해야 합니다.");
             return;
         }
 
@@ -197,7 +201,10 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         if (loadout == null) return;
 
         loadout.SetCharacter(characterData, characterPrefabKey);
-        Managers.CharacterData?.SetCharacterData(characterData, characterPrefabKey);
+        loadout.SetRelic(relicClass); // null이면 기존 캐릭터 경로 유지 (회귀 0)
+        // 유물 경로(characterData null)면 몸이 prefabKey로 베이스 데이터를 자체 로드하므로 스킵
+        if (characterData != null)
+            Managers.CharacterData?.SetCharacterData(characterData, characterPrefabKey);
 
         // 캐릭터별 획득 대사 (정보 팝업 닫힌 후, 캐릭터 스폰 전)
         await ShowAcquisitionDialogueAsync();
@@ -221,7 +228,7 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
             stand.DismissStand();
         }
 
-        Debug.Log($"[CharacterDisplayStand] 캐릭터 선택: {characterData.characterName} ({characterPrefabKey})");
+        Debug.Log($"[CharacterDisplayStand] 선택: {(relicClass != null ? relicClass.DisplayName : characterData?.characterName)} ({characterPrefabKey})");
     }
 
     /// <summary>
@@ -308,8 +315,9 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         frameRT.offsetMin = Vector2.zero;
         frameRT.offsetMax = Vector2.zero;
 
-        // 로스터 일러스트 (없으면 초상화 폴백)
-        var illust = characterData?.rosterIllust ?? characterData?.portrait;
+        // 로스터 일러스트 — 유물 우선, 없으면 캐릭터 데이터 폴백
+        var illust = relicClass?.RosterIllust ?? relicClass?.Portrait
+                     ?? characterData?.rosterIllust ?? characterData?.portrait;
         var innerGO  = new GameObject("PortraitInner");
         innerGO.transform.SetParent(frameGO.transform, false);
         var innerImg = innerGO.AddComponent<Image>();
@@ -326,7 +334,9 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         var charNameGO  = new GameObject("CharName");
         charNameGO.transform.SetParent(leftGO.transform, false);
         var charNameTmp = charNameGO.AddComponent<TextMeshProUGUI>();
-        charNameTmp.text      = characterData?.characterName ?? "???";
+        charNameTmp.text      = !string.IsNullOrEmpty(relicClass?.DisplayName)
+            ? relicClass.DisplayName
+            : (characterData?.characterName ?? "???");
         charNameTmp.fontSize  = 20f;
         charNameTmp.fontStyle = FontStyles.Bold;
         charNameTmp.alignment = TextAlignmentOptions.Center;
@@ -375,8 +385,10 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
         divRT.anchoredPosition = new Vector2(0f, y);
         y -= 6f;
 
-        // 패시브 섹션
-        var passive = characterData?.passive;
+        // 패시브 섹션 — 유물 우선(첫 패시브), 없으면 캐릭터 데이터 폴백
+        var passive = (relicClass != null && relicClass.Passives != null && relicClass.Passives.Length > 0)
+            ? relicClass.Passives[0]
+            : characterData?.passive;
         AddSectionTitle(rightGO.transform, "패시브", new Color(0.5f, 1f, 0.6f), ref y);
 
         if (passive != null)

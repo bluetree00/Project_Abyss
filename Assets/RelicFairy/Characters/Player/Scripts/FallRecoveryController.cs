@@ -76,6 +76,9 @@ public class FallRecoveryController : MonoBehaviour
         return Physics.CheckSphere(center, groundCheckRadius, groundLayer, QueryTriggerInteraction.Ignore);
     }
 
+    /// <summary>PitTrigger 등 외부에서 낙사 복구를 즉시 발동한다.</summary>
+    public void ForceRecover() => Recover();
+
     private void Recover()
     {
         _recovering = true;

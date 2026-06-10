@@ -49,6 +49,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aec1234500000003000000000000ee01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlimeMonster
+  _effectiveElement: -1
   _debugState: 
 --- !u!54 &4083062266879023044
 Rigidbody:
@@ -97,9 +98,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
-  m_Height: 1
+  m_Height: 1.3499721
   m_Direction: 1
-  m_Center: {x: 0, y: 0.5, z: 0}
+  m_Center: {x: 0, y: 0.67498606, z: 0}
 --- !u!195 &8021281636087948607
 NavMeshAgent:
   m_ObjectHideFlags: 0

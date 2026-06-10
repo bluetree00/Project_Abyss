@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
   m_Name: LichConfig
-  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.BossConfigSO
   monsterName: "\uB9AC\uCE58"
   grade: 3
   playerLayer:
@@ -99,6 +99,11 @@ MonoBehaviour:
     patterns:
     - {fileID: 11400000, guid: be71dfe94531dad45995607fc2cd5173, type: 2}
     - {fileID: 11400000, guid: e6190d0c15134374097a382103b46f96, type: 2}
+    - {fileID: 11400000, guid: f38d02ac2b44d8841be9cc64f068d9ca, type: 2}
+    - {fileID: 11400000, guid: 9886fae6c787cc847be9fc11a0bf5af4, type: 2}
+    - {fileID: 11400000, guid: 3fa7209083c03ea4fadf41a4cc881e85, type: 2}
+    - {fileID: 11400000, guid: f030915a72a294b4297807e9d5028a8f, type: 2}
+    - {fileID: 11400000, guid: 4d843e256b4e919469f251fa3d5f7db8, type: 2}
     selectionMode: 0
     forceExecute: 0
   - conditions:
@@ -110,7 +115,13 @@ MonoBehaviour:
   - conditions:
     - 22
     patterns:
-    - {fileID: 11400000, guid: 3a8cc8ee3f4759d41aa522e198350cf5, type: 2}
     - {fileID: 11400000, guid: e6190d0c15134374097a382103b46f96, type: 2}
+    - {fileID: 11400000, guid: 331075445ad3e6c4b85e220c8130a0fc, type: 2}
+    - {fileID: 11400000, guid: 28eba821eb312df41bba4c65b4bc9969, type: 2}
+    - {fileID: 11400000, guid: f952abf09afb88c42bc84b45713f53cd, type: 2}
+    - {fileID: 11400000, guid: 3fa7209083c03ea4fadf41a4cc881e85, type: 2}
+    - {fileID: 11400000, guid: a3a25d1273778b94b890c0a581723831, type: 2}
+    - {fileID: 11400000, guid: 0932bb2b4c77f5248be5f7e67745e536, type: 2}
+    - {fileID: 11400000, guid: 43f4dfa45d49221458d83f6695cb979d, type: 2}
     selectionMode: 0
     forceExecute: 0

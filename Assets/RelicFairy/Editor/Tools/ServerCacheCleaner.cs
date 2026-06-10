@@ -11,7 +11,6 @@ public static class ServerCacheCleaner
     private static readonly string[] CacheFiles =
     {
         "equipment_data.json",          // ServerEquipmentDataManager
-        "element_effect_data.json",     // ElementEffectDataManager
         "chapter_data.json",            // ChapterDataManager
         "map_data.json",                // MapDataManager
         "monster_data.json",            // MonsterDataManager
@@ -19,27 +18,30 @@ public static class ServerCacheCleaner
         "item_data.json",               // ItemDataManager
         "buff_data.json",               // BuffDataManager
         "passive_data.json",            // PlayerDataManager (passive)
-        "player_data.json",             // PlayerDataManager (player stat)
-        "block_grid_data.json",         // BlockDataManager (grid/synergy)
-        "block_shape_data.json",        // BlockDataManager (shape)
+        "character_data.json",          // PlayerDataManager (character stat)
+        "merlin_rune_synergy_data.json", // BlockDataManager (synergy)
+        "merlin_rune_piece_data.json",  // BlockDataManager (piece)
+        "merlin_rune_zone_map.json",    // BlockDataManager (zone map)
+        "covenant_stat_data.json",      // CovenantDataManager
+        "relic_awakening_data.json",    // RelicAwakeningDataManager
     };
 
     private const string ZoneLayoutPrefix = "zone_layout_"; // ZoneLayoutManager
 
-    [MenuItem("Tools/Abyss/Cache/Clear Equipment Cache")]
+    [MenuItem("RelicFairy/Dev/Cache/Clear Equipment Cache")]
     public static void ClearEquipment()
     {
         DeleteOne("equipment_data.json");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Clear Zone Layout Cache")]
+    [MenuItem("RelicFairy/Dev/Cache/Clear Zone Layout Cache")]
     public static void ClearZoneLayouts()
     {
         int deleted = DeleteByPrefix(ZoneLayoutPrefix);
         Debug.Log($"[CacheCleaner] zone_layout_* {deleted}개 삭제 완료");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Clear All Server Caches")]
+    [MenuItem("RelicFairy/Dev/Cache/Clear All")]
     public static void ClearAll()
     {
         int deleted = 0;
@@ -51,7 +53,7 @@ public static class ServerCacheCleaner
         Debug.Log($"[CacheCleaner] 총 {deleted}개 캐시 삭제 완료");
     }
 
-    [MenuItem("Tools/Abyss/Cache/Open persistentDataPath")]
+    [MenuItem("RelicFairy/Dev/Cache/Open persistentDataPath")]
     public static void OpenFolder()
     {
         EditorUtility.RevealInFinder(Application.persistentDataPath);

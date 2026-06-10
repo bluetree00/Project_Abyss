@@ -27,6 +27,7 @@ public class MonsterContext
     public MonsterPatrolData    Patrol    => Config.patrol;
     public MonsterCombatData    Combat    => Config.combat;
     public MonsterAnimationData Animation => Config.animation;
+    public MonsterDeathFxData   Death     => Config.death;
 
     // ── Transform 단축 ────────────────────────────────────
     public Transform Transform => Monster.transform;

@@ -8,8 +8,7 @@ using UnityEngine;
 /// MonsterHPBar 풀을 그대로 사용하며, 데미지를 받으면 HP가 줄고 일정 시간 후 자동 회복한다.
 /// 절대 죽지 않음 (IKillable.IsDead = false).
 /// </summary>
-[RequireComponent(typeof(ElementBuildup))]
-public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarget
+public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 {
     // ── [SerializeField] ────────────────────────────────────────────
 
@@ -31,9 +30,7 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
     private static readonly int HitHash = Animator.StringToHash("Hit");
 
-    private ElementBuildup        _buildup;
-    private ElementVisualFeedback _visualFeedback;
-    private MonsterHPBar          _hpBar;
+    private MonsterHPBar _hpBar;
 
     private float _currentHp;
     private float _lastHitTime;
@@ -41,25 +38,15 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
     private readonly Queue<(float time, float damage)> _damageLog = new();
     private float _damageInWindow;
 
-    private float _incomingDamageMultiplier = 1f;
-    private float _movementMultiplier       = 1f;
-    private float _attackSpeedMultiplier    = 1f;
-    private float _defenseMultiplier        = 1f;
-
     // ── Properties ──────────────────────────────────────────────────
 
-    public bool       IsDead     => false;
-    public Transform  Transform  => transform;
-    public GameObject GameObject => gameObject;
-    public float      MaxHp      => maxHp;
+    public bool IsDead => false;
 
     // ── Lifecycle ───────────────────────────────────────────────────
 
     private void Awake()
     {
-        _currentHp      = maxHp;
-        _buildup        = GetComponent<ElementBuildup>();
-        _visualFeedback = GetComponent<ElementVisualFeedback>();
+        _currentHp = maxHp;
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -68,24 +55,6 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
     private void Start()
     {
         InitHPBarAsync(this.GetCancellationTokenOnDestroy()).Forget();
-    }
-
-    private void OnEnable()
-    {
-        if (_buildup != null)
-        {
-            _buildup.OnTriggered += HandleTriggered;
-            _buildup.OnExpired   += HandleExpired;
-        }
-    }
-
-    private void OnDisable()
-    {
-        if (_buildup != null)
-        {
-            _buildup.OnTriggered -= HandleTriggered;
-            _buildup.OnExpired   -= HandleExpired;
-        }
     }
 
     private void OnDestroy()
@@ -105,54 +74,27 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
 
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
 
-        if (_buildup != null && _hpBar != null)
-            _hpBar.UpdateElement(_buildup.Ratio, _buildup.Accum, _buildup.Threshold, _buildup.LastElement, _buildup.PoisonStacks);
-
         UpdateDps();
     }
 
     // ── Public Methods (IDamageable) ─────────────────────────────────
 
-    public void TakeDamage(float amount, GameObject instigator,
-                           float knockbackMultiplier = 1f,
-                           ElementType element       = ElementType.None,
-                           float elementAmount       = 0f)
+    public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (amount <= 0f) return;
 
-        amount      *= _incomingDamageMultiplier;
         _currentHp   = Mathf.Max(0f, _currentHp - amount);
         _lastHitTime = Time.time;
         LogDamage(amount);
 
-        if (_buildup != null)
-            _buildup.AddBuildup(element, elementAmount, amount);
-
         if (animator != null)
             animator.SetTrigger(HitHash);
 
-        _visualFeedback?.FlashHit(Color.red);
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
+
+        // 데미지 팝업 (허수아비도 일관 표시)
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * (hpBarHeadOffset + 0.9f), amount, isCrit);
     }
-
-    // ── Public Methods (IElementTarget) ──────────────────────────────
-
-    public void TakeElementalDoT(float damage, ElementType source)
-    {
-        if (damage <= 0f) return;
-
-        _currentHp   = Mathf.Max(0f, _currentHp - damage);
-        _lastHitTime = Time.time;
-        LogDamage(damage);
-
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
-        _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
-    }
-
-    public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMultiplier = multi;
-    public void SetMovementMultiplier(float multi)       => _movementMultiplier       = multi;
-    public void SetAttackSpeedMultiplier(float multi)    => _attackSpeedMultiplier    = multi;
-    public void SetDefenseMultiplier(float multi)        => _defenseMultiplier        = multi;
 
     // ── Private Methods ──────────────────────────────────────────────
 
@@ -185,17 +127,5 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable, IElementTarg
             _hpBar?.SetMonsterName(displayName);
         }
         catch (System.OperationCanceledException) { }
-    }
-
-    // ── Event Handlers ───────────────────────────────────────────────
-
-    private void HandleTriggered(ElementType element, ElementEffectEntry entry)
-    {
-        Debug.Log($"[Dummy] 원소 발동! {element} → {entry.effect_id}");
-    }
-
-    private void HandleExpired(ElementType element, ElementEffectEntry entry)
-    {
-        Debug.Log($"[Dummy] 원소 효과 만료: {element} → {entry.effect_id}");
     }
 }

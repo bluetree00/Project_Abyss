@@ -1,0 +1,10 @@
+{"duos":[
+  {"duo_id":"ATK_SPD","zone_a":"ATK","zone_b":"SPD","duo_name":"전광석화","effect_type":"Duo_ChargingStrikeReset","value":1.0,"value2":0.0,"value3":0.0,"description":"강타 적중 시 이동속도 50% 증가 2초 + 다음 강타 쿨타임 초기화","affinity_tags":["Sword","Agility"],"stat_version":1},
+  {"duo_id":"ATK_LUCK","zone_a":"ATK","zone_b":"LUCK","duo_name":"도살자","effect_type":"Duo_RageGambleBonus","value":2.0,"value2":3.0,"value3":0.0,"description":"도박 2배 적중 시 강타 카운트 즉시 충전 + 연속 2배 확률 누적","affinity_tags":["Axe","Reckless"],"stat_version":1},
+  {"duo_id":"ATK_DEF","zone_a":"ATK","zone_b":"DEF","duo_name":"반격의 일격","effect_type":"Duo_ShieldBurstAsChargingStrike","value":1.0,"value2":0.0,"value3":0.0,"description":"쉴드 폭발이 강타로 인정되어 ShockwaveBurst 발동 가능","affinity_tags":["Shield","Heavy"],"stat_version":1},
+  {"duo_id":"MAG_SPD","zone_a":"MAG","zone_b":"SPD","duo_name":"폭풍술사","effect_type":"Duo_MoveAttackMagicEcho","value":1.0,"value2":0.0,"value3":0.0,"description":"이동 직후 첫 공격이 항상 마법 잔향 상태로 발동","affinity_tags":["Staff","Wind"],"stat_version":1},
+  {"duo_id":"MAG_LUCK","zone_a":"MAG","zone_b":"LUCK","duo_name":"마법 도박","effect_type":"Duo_EchoChainGuaranteed","value":1.0,"value2":0.0,"value3":0.0,"description":"마법 잔향 공격이 2배 피해 도박 결과를 항상 성공으로 처리","affinity_tags":["Wand","Gambler"],"stat_version":1},
+  {"duo_id":"DEF_HP","zone_a":"DEF","zone_b":"HP","duo_name":"난공불락","effect_type":"Duo_ShieldLimitExpand","value":0.5,"value2":0.0,"value3":0.0,"description":"쉴드 상한이 HP 30% → 50%로 증가 + 쉴드 보유 중 DeathSave 쿨타임 50% 단축","affinity_tags":["Armor","Tank"],"stat_version":1},
+  {"duo_id":"HP_LUCK","zone_a":"HP","zone_b":"LUCK","duo_name":"역전극","effect_type":"Duo_LowHpGambleBonus","value":0.0,"value2":2.0,"value3":0.0,"description":"HP 30% 이하에서 도박 2배 확률이 기본 15% → 40%로 증가","affinity_tags":["Reckless","Survivor"],"stat_version":1},
+  {"duo_id":"SPD_LUCK","zone_a":"SPD","zone_b":"LUCK","duo_name":"행운의 발걸음","effect_type":"Duo_DodgeSuccessGuaranteed2x","value":2.0,"value2":0.0,"value3":0.0,"description":"회피 성공 시 다음 공격 도박 2배 확정","affinity_tags":["Agility","Gambler"],"stat_version":1}
+]}

@@ -1,0 +1,13 @@
+﻿zone_id,zone_name,threshold,effect_type,trigger,value,value2,value3,max_stack,duration,description,stat_version
+ATK,공격,5,ChargingStrike,OnHit,3,2,0,1,0,3번 공격마다 자동 강타 발동 (피해 2배),1
+ATK,공격,10,ShockwaveBurst,OnHit,0.5,1.5,60,1,0,강타 시 주변 충격파 + 0.5초 스턴,1
+MAG,마력,3,MagicEcho,Always,3,0.3,0,1,0,스킬 사용 후 다음 3회 공격에 마법 잔향 (피해 30% 추가),1
+MAG,마력,7,SkillEchoChain,Always,1,0.5,8,1,0,잔향 공격 시 1회 연쇄 발동 8m 내 다른 적 자동 조준 (피해 50%),1
+DEF,방어,3,ShieldAccumulate,Always,0.2,0,0,1,0,피격 피해의 20%를 쉴드로 전환 (최대 HP의 30%까지),1
+DEF,방어,7,ShieldBurst,Always,0.5,1.5,0,1,0,쉴드 만충 시 무적 0.5초 + 쉴드 전량 폭발 반격,1
+SPD,발걸음,3,DodgeOnMove,Always,0.1,0,0,1,0,이동 중 회피율 +10%,1
+SPD,발걸음,7,MoveAttackPenetrate,Always,1,0.3,0,1,0,이동 직후 첫 공격 방어 무시 + 넉백,1
+HP,심장,5,LowHpDamageReduce,Always,0.5,0.4,0,1,0,HP 50% 이하일 때 피해 최대 40% 경감 (HP 비율 연동),1
+HP,심장,10,DeathSave,Always,1.5,0.3,0,1,0,치사 피해 1회 무효 + 무적 1.5초 + HP 30% 즉시 회복 (런당 1회),1
+LUCK,행운,3,GambleDice,OnHit,0.15,2,0.15,1,0,공격마다 15% 확률 2배 피해 / 15% 확률 빗나감,1
+LUCK,행운,7,CritChain,OnHit,0.5,0,0,1,0,치명타 시 50% 확률 연쇄 발동 + 황금구간 진입 시 빗나감 제거,1

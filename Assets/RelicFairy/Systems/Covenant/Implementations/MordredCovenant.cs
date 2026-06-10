@@ -48,7 +48,7 @@ public sealed class MordredCovenant : CovenantBase
         if (Stage == CovenantStage.Evolved && _killCount >= KillThreshold)
         {
             _penaltyRemoved = true;
-            Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+            RefreshStats();
         }
     }
 }

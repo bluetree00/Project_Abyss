@@ -220,17 +220,16 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         float knockback = ctx.Stat.knockbackForce * pattern.knockbackMultiplier;
         var shape = pattern.attackShapeOverride != null ? pattern.attackShapeOverride : ctx.Stat.attackShape;
 
-        // Keep ranged patterns as shape-driven attacks, but make melee pattern hits
-        // match the same grid used by warning squares.
+        // 비원거리(근접/콘/구체) 패턴은 히트 판정을 화면에 표시된 경고 그리드와 정확히 일치시킨다.
+        // 그리드(=경고) 밖이면 맞지 않음 — 콘/구체 실제 형상으로 폴백해 경고 밖을 때리지 않도록 제거.
+        // (원거리 발사체는 아래 shape.Execute 경로 유지.)
         if (!(shape is MonsterRangedAttackSO))
         {
             var gridShape = ResolveWarningShape(pattern, shape);
-            if (TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration))
-            {
-                shape?.SpawnVFX(ctx.Transform, warningCenter);
-                SpawnPatternHitVfx(ctx, pattern, warningCenter);
-                return;
-            }
+            TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration);
+            shape?.SpawnVFX(ctx.Transform, warningCenter);
+            SpawnPatternHitVfx(ctx, pattern, warningCenter);
+            return;
         }
 
         if (shape != null)

@@ -202,10 +202,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     // 피격 처리 (강인도)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    public override void TakeDamage(float amount, UnityEngine.GameObject instigator,
-        float knockbackMultiplier = 1f,
-        ElementType element = ElementType.None,
-        float elementAmount = 0f)
+    public override void TakeDamage(float amount, UnityEngine.GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_fgBB != null && instigator != null)
         {
@@ -213,7 +210,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             Vector3 dir  = instigator.transform.position - transform.position;
             _fgBB.SetHitDirection(dir, transform.forward, isHeavy);
         }
-        base.TakeDamage(amount, instigator, knockbackMultiplier, element, elementAmount);
+        base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
     }
 
     protected override void OnDamageTaken()

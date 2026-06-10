@@ -115,6 +115,24 @@ public class ObjectPoolerManager
         return go != null && go.TryGetComponent(out T comp) ? comp : null;
     }
 
+    /// <summary>
+    /// Addressables 키 없이 프리팹 직접 참조로 동기 풀 스폰. (예: SO에 직접 할당된 히트 VFX 프리팹)
+    /// 풀은 prefab 인스턴스ID로 키잉되어 동일 프리팹은 같은 풀을 재사용한다. Addressables 로드 없음.
+    /// 풀이 비어 있으면 SpawnInternal이 즉시 1개 생성하므로 사전 프리웜 불필요.
+    /// </summary>
+    public GameObject SpawnFromPrefab(GameObject prefab, PoolType category, Vector3 position, Quaternion rotation, object param = null)
+    {
+        if (prefab == null) return null;
+
+        string key = "prefab:" + prefab.GetInstanceID();
+        if (!_pools.ContainsKey(key))
+        {
+            _configs[key] = new PoolConfig { key = key, prefab = prefab, initialSize = 1, poolType = category };
+            _pools[key]   = new Queue<GameObject>();
+        }
+        return SpawnInternal(key, position, rotation, param);
+    }
+
     // =========================
     // Despawn
     // =========================
@@ -128,7 +146,12 @@ public class ObjectPoolerManager
         if (!obj.TryGetComponent(out PooledObjectInfo info) ||
             !_pools.TryGetValue(info.key, out var queue))
         {
-            UnityEngine.Object.Destroy(obj);
+            // 비풀 경로: AddressableManager.InstantiateAsync로 만든 추적 인스턴스(예: 보스)면
+            // ReleaseInstance로 핸들까지 정식 해제(+GO 파괴)해 장부 누수를 막고, 아니면 일반 Destroy.
+            if (Managers.AddressableManager != null && Managers.AddressableManager.IsTrackedInstance(obj))
+                Managers.AddressableManager.ReleaseInstance(obj);
+            else
+                UnityEngine.Object.Destroy(obj);
             return;
         }
 
@@ -278,6 +301,37 @@ public class ObjectPoolerManager
         obj.SetActive(false);
         obj.transform.SetParent(_categoryRoots[_configs[info.key].poolType], false);
         _pools[info.key].Enqueue(obj);
+    }
+
+    // =========================
+    // Clear (PR6: 스코프 언로드 선행 — 에셋 해제 전 풀 인스턴스 파괴)
+    // =========================
+
+    /// <summary>
+    /// 지정 카테고리의 모든 풀을 비운다 — 유휴(큐) 인스턴스를 파괴하고 풀 등록을 제거한다.
+    /// 사용 중(활성) 인스턴스는 Despawn 시 풀 미발견 경로로 자체 Destroy된다.
+    /// ⚠ 이 풀의 프리팹 에셋을 Addressables에서 해제하기 전에 먼저 호출해야 한다(dangling 방지).
+    /// </summary>
+    public void ClearCategory(PoolType category)
+    {
+        var keysToRemove = new List<string>();
+        foreach (var kv in _configs)
+            if (kv.Value.poolType == category)
+                keysToRemove.Add(kv.Key);
+
+        foreach (var key in keysToRemove)
+        {
+            if (_pools.TryGetValue(key, out var queue))
+            {
+                while (queue.Count > 0)
+                {
+                    var obj = queue.Dequeue();
+                    if (obj != null) UnityEngine.Object.Destroy(obj);
+                }
+                _pools.Remove(key);
+            }
+            _configs.Remove(key);
+        }
     }
 
     // =========================

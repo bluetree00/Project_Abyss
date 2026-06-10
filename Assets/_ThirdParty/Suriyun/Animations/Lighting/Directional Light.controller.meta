@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: efbceb58bfe09ac4580e68c85a59bdb6
+timeCreated: 1464330733
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263555
+  packageName: Little Heroes Pack
+  packageVersion: 3.2
+  assetPath: Assets/_ThirdParty/Suriyun/Animations/Lighting/Directional Light.controller
+  uploadId: 834578

@@ -13,4 +13,40 @@ MonoBehaviour:
   m_Name: DecorationCatalog_Default
   m_EditorClassIdentifier: Assembly-CSharp::DecorationCatalogSO
   themeMatch: "*"
-  entries: []
+  entries:
+  - code: lL
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    yOffset: 2
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lM
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    yOffset: 4
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lH
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    yOffset: 6
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lC
+    prefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0

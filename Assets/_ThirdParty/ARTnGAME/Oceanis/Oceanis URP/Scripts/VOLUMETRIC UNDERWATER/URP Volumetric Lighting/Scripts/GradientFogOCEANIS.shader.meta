@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: a2593b83c1fdd7247b2716a6ab24f4b2
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/Scripts/VOLUMETRIC UNDERWATER/URP
+    Volumetric Lighting/Scripts/GradientFogOCEANIS.shader
+  uploadId: 902342

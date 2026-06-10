@@ -3,14 +3,14 @@ using UnityEngine;
 
 public static class GreatswordAnimImportFixer
 {
-    [MenuItem("Tools/Fix Greatsword Anim Import")]
+    [MenuItem("RelicFairy/Dev/Fix Greatsword Anim Import")]
     public static void Fix()
     {
         string[] paths = new string[]
         {
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_01.FBX",
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_02.FBX",
-            "Assets/Abyss/Animations/Player/Test_01/Attack/GreatswordAttack_03.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_01.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_02.FBX",
+            "Assets/RelicFairy/Animations/Player/Test_01/Attack/GreatswordAttack_03.FBX",
         };
 
         string[] clipNames = new string[]

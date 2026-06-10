@@ -138,13 +138,11 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
 
     // ── IDamageable ──────────────────────────────────────────────────────────
 
-    public void TakeDamage(float amount, GameObject instigator,
-        float knockbackMultiplier = 1f,
-        ElementType element = ElementType.None,
-        float elementAmount = 0f)
+    public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (IsDead) return;
         _currentHp -= Mathf.RoundToInt(amount);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, amount, isCrit);
         if (_currentHp <= 0) Die();
     }
 

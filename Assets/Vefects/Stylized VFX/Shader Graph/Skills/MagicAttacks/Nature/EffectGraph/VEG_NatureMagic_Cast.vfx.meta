@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 87e34f15635be4c498125e83991b2c3e
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/MagicAttacks/Nature/EffectGraph/VEG_NatureMagic_Cast.vfx
+  uploadId: 714344

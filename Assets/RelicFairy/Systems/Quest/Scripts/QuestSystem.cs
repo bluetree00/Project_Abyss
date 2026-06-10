@@ -1,3 +1,3 @@
-// QuestSystem (EVE MonoBehaviour singleton) is not used in Abyss.
+// QuestSystem (EVE MonoBehaviour singleton) is not used in RelicFairy.
 // Replaced by QuestManager (pure C# class, Managers service locator pattern).
-// See: Assets/Abyss/Systems/Quest/Scripts/QuestManager.cs
+// See: Assets/RelicFairy/Systems/Quest/Scripts/QuestManager.cs

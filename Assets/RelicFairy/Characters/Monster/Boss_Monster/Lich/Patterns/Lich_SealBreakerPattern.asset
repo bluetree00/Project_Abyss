@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0697fc29de348e64ea04a62574020773, type: 3}
+  m_Name: Lich_SealBreakerPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichSealBreakerPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: SealBreaker
+  breakOverride: -1
+  sealCount: 3
+  sealRadius: 5
+  sealActiveTime: 0
+  punishmentMultiplier: 1.2
+  sealSkeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
+    type: 3}
+  additionalSummonCount: 2
+  additionalSummonRadius: 7
+  additionalSkeletonPrefab: {fileID: 5098245364127042272, guid: 119497b481e20d54f843d3cf322d7234,
+    type: 3}
+  groundYOffset: 0.05
+  patternCooldown: 35

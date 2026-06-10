@@ -41,18 +41,22 @@ public sealed class CuChulainnCovenant : CovenantBase
     // ── 이벤트 ──────────────────────────────────────────
     public override void OnTakeDamage(float damage)
     {
+        // Evolved: 한 번 게시가 발동하면 회복으로 임계 위로 올라가도 해제하지 않음(무한 유지 가능)
+        if (IsEvolved && _warpSpasm) return;
+
         bool shouldBeActive = ShouldActivate;
         if (shouldBeActive == _warpSpasm) return;
 
         _warpSpasm = shouldBeActive;
-        Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+        RefreshStats();
     }
 
     public override void OnKill(GameObject target)
     {
         if (!IsEvolved || !_warpSpasm) return;
 
-        // TODO: HP EvolvedHealRatio% 회복
-        // TODO: 게시 지속 연장 (HP 임계 해제 지연 or 별도 타이머)
+        // Evolved: 게시 중 처치 시 HP EvolvedHealRatio% 회복 (지속은 위 OnTakeDamage 래치로 유지)
+        int heal = Mathf.Max(1, (int)(Ctx.RunState.MaxHp * EvolvedHealRatio));
+        Ctx.Player?.Heal(heal);
     }
 }

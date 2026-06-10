@@ -11,7 +11,7 @@ using TMPro;
 /// </summary>
 public class FontFixHelper
 {
-    [MenuItem("Tools/Fix Korean Font Atlas")]
+    [MenuItem("RelicFairy/Rendering/Fix Korean Font Atlas")]
     public static void FixKoreanFontAtlas()
     {
         // NotoSansKR 폰트 에셋 찾기
@@ -42,7 +42,7 @@ public class FontFixHelper
         Debug.Log("[FontFixHelper] 완료! DynamicOS 모드로 저장됨.");
     }
 
-    [MenuItem("Tools/Regenerate Korean Font (High Quality)")]
+    [MenuItem("RelicFairy/Rendering/Regenerate Korean Font")]
     public static void RegenerateKoreanFontHighQuality()
     {
         // NotoSansKR 폰트 에셋 찾기
@@ -92,7 +92,7 @@ public class FontFixHelper
         Debug.Log("[FontFixHelper] 고품질 재생성 완료!");
     }
 
-    [MenuItem("Tools/Screenshot Game View")]
+    [MenuItem("RelicFairy/Dev/Screenshot Game View")]
     public static void TakeScreenshot()
     {
         string path = "Assets/Screenshots/gameview_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";

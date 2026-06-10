@@ -13,7 +13,6 @@ public sealed class FireExplosionOnSkillEffect : ItemEffectBase
 
     public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
-        if (ctx.WeaponElement != WeaponElement.Fire) return;
         if (ctx.Player == null || ctx.Stats == null) return;
 
         Vector3 center = ctx.Player.transform.position;
@@ -46,7 +45,6 @@ public sealed class LightningOnSkillEffect : ItemEffectBase
 
     public override void OnSkillUse(ItemEffectContext ctx, SkillType skill)
     {
-        if (ctx.WeaponElement != WeaponElement.Lightning) return;
         if (ctx.Player == null || ctx.Stats == null) return;
 
         Vector3 center = ctx.Player.transform.position;

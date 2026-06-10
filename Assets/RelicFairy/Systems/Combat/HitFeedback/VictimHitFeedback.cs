@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -34,8 +32,18 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
     // ── Private ───────────────────────────────────────────────────
     private Renderer[]             _renderers;
     private MaterialPropertyBlock  _mpb;
-    private CancellationTokenSource _flashCts;
-    private CancellationTokenSource _lightCts;
+
+    // ③ CTS new/Dispose 대체 세대 카운터 — 히트마다 alloc 없이 이전 루틴 무효화.
+    // 재시작 = ++gen, 취소(OnDisable/OnDestroy) = ++gen. 루틴은 자기 gen 불일치 시 즉시 종료.
+    private int _flashGen;
+    private int _lightGen;
+
+    // 방향성 히트 리액션: 루트가 아닌 자식 비주얼만 틸트(루트=콜라이더/rb/agent/넉백 불간섭).
+    // rest 로컬 트랜스폼은 Awake에서 1회 캡처 — 매틱 절대 세팅이라 누적 없음, 복원=rest 재대입.
+    private Transform              _visualRoot;
+    private Quaternion            _restLocalRot;
+    private Vector3               _restLocalPos;
+    private int                   _reactGen;
 
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
@@ -43,12 +51,24 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         CollectRenderers();
         EnsureLight();
         _mpb = new MaterialPropertyBlock();
+
+        _visualRoot = ResolveVisualRoot();
+        if (_visualRoot != null)
+        {
+            _restLocalRot = _visualRoot.localRotation;
+            _restLocalPos = _visualRoot.localPosition;
+        }
+
+        // 프로필 미배정 = 피격 플래시/펄스/리액션 전부 스킵(무음). 설정 누락을 개발 중 1회 알린다.
+        if (_profile == null)
+            RFLog.D($"[VictimHitFeedback] '{name}' MonsterHitProfile 미배정 — 피격 시각 펄스 스킵.", this);
     }
 
     private void OnDisable()
     {
         CancelAll();
         RestoreMaterials();
+        RestoreVisualRoot();   // 풀 반환 시 틸트/오프셋 잔류 0 보장 (루틴 finally가 비동기라도 동기 복원)
         if (_pulseLight != null)
         {
             _pulseLight.enabled = false;
@@ -63,11 +83,12 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
     {
         if (_profile == null) return;
 
-        Color flashColor = _profile.GetFlashColor(info.Element);
-        Color lightColor = _profile.GetLightColor(info.Element);
+        Color flashColor = _profile.FlashColor;
+        Color lightColor = _profile.LightColor;
 
         PlayFlash(flashColor);
         if (_profile.UsePointLight) PlayLightPulse(lightColor);
+        if (_profile.UseHitReaction) PlayHitReaction(info);
     }
 
     // ── Private Methods ───────────────────────────────────────────
@@ -108,25 +129,35 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 
     private void PlayFlash(Color flashColor)
     {
-        _flashCts?.Cancel();
-        _flashCts?.Dispose();
-        _flashCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-
-        _ = FlashRoutineAsync(flashColor, _flashCts.Token);
+        int gen = ++_flashGen;
+        _ = FlashRoutineAsync(flashColor, gen);
     }
 
     private void PlayLightPulse(Color lightColor)
     {
         if (_pulseLight == null) return;
 
-        _lightCts?.Cancel();
-        _lightCts?.Dispose();
-        _lightCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-
-        _ = LightPulseRoutineAsync(lightColor, _lightCts.Token);
+        int gen = ++_lightGen;
+        _ = LightPulseRoutineAsync(lightColor, gen);
     }
 
-    private async UniTaskVoid FlashRoutineAsync(Color flashColor, CancellationToken ct)
+    private void PlayHitReaction(in HitInfo info)
+    {
+        if (_visualRoot == null) return;
+
+        // 맞은 방향(공격자→피격자) 수평화. 수직 성분만이면 방향감 없음 → 스킵.
+        Vector3 dir = info.AttackDirection;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
+        dir.Normalize();
+
+        float mult = info.IsCritical ? _profile.CritReactionMultiplier : 1f;
+
+        int gen = ++_reactGen;
+        _ = HitReactionRoutineAsync(dir, mult, gen);
+    }
+
+    private async UniTaskVoid FlashRoutineAsync(Color flashColor, int gen)
     {
         float duration = _profile.FlashDuration;
         if (duration <= 0f || _renderers == null || _renderers.Length == 0) return;
@@ -135,36 +166,30 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         var   curve = _profile.FlashCurve;
 
         float t = 0f;
-        try
+        while (t < duration)
         {
-            while (t < duration)
-            {
-                ct.ThrowIfCancellationRequested();
+            if (gen != _flashGen) return; // 새 플래시/취소 → 이전 루틴 무효 (복원은 새 루틴/OnDisable이 담당)
 
-                float n = Mathf.Clamp01(t / duration);
-                float w = curve != null ? curve.Evaluate(n) : 1f - n;
+            float n = Mathf.Clamp01(t / duration);
+            float w = curve != null ? curve.Evaluate(n) : 1f - n;
 
-                Color tint     = flashColor;
-                tint.a         = 1f;
-                Color emission = flashColor * (boost * w);
+            Color tint     = flashColor;
+            tint.a         = 1f;
+            Color emission = flashColor * (boost * w);
 
-                _mpb.SetColor(BaseColorId,     Color.Lerp(Color.white, tint, w));
-                _mpb.SetColor(EmissionColorId, emission);
+            _mpb.SetColor(BaseColorId,     Color.Lerp(Color.white, tint, w));
+            _mpb.SetColor(EmissionColorId, emission);
 
-                ApplyPropertyBlock(_mpb);
+            ApplyPropertyBlock(_mpb);
 
-                t += Time.deltaTime;
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            }
+            t += Time.deltaTime;
+            await UniTask.Yield(PlayerLoopTiming.Update);
         }
-        catch (OperationCanceledException) { /* 정상 취소 */ }
-        finally
-        {
-            RestoreMaterials();
-        }
+
+        if (gen == _flashGen) RestoreMaterials(); // 자연 종료만 복원 (중첩 시 새 루틴이 소유)
     }
 
-    private async UniTaskVoid LightPulseRoutineAsync(Color lightColor, CancellationToken ct)
+    private async UniTaskVoid LightPulseRoutineAsync(Color lightColor, int gen)
     {
         float duration = _profile.LightDuration;
         if (duration <= 0f || _pulseLight == null) return;
@@ -177,29 +202,89 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         _pulseLight.enabled = true;
 
         float t = 0f;
-        try
+        while (t < duration)
         {
-            while (t < duration)
+            if (gen != _lightGen) return; // 새 펄스/취소 → 이전 루틴 무효 (새 루틴이 라이트 소유)
+
+            float n = Mathf.Clamp01(t / duration);
+            float w = curve != null ? curve.Evaluate(n) : 1f - n;
+            _pulseLight.intensity = peak * w;
+
+            t += Time.deltaTime;
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+
+        if (gen == _lightGen && _pulseLight != null) // 자연 종료만 소등
+        {
+            _pulseLight.intensity = 0f;
+            _pulseLight.enabled   = false;
+        }
+    }
+
+    private async UniTaskVoid HitReactionRoutineAsync(Vector3 dirWorld, float mult, int gen)
+    {
+        float duration = _profile.FlinchDuration;
+        if (duration <= 0f || _visualRoot == null) return;
+
+        float angle = _profile.FlinchTiltAngle  * mult;
+        float back  = _profile.FlinchBackOffset * mult;
+        var   curve = _profile.FlinchCurve;
+
+        // 틸트축(맞은 방향으로 상단이 기울도록) + 플린치 오프셋 방향을 부모 로컬 공간으로 1회 변환.
+        // → 리액션 중 몸(루트)이 회전해도 몸 기준 일관, localRotation/Position 절대 세팅이라 복원 단순.
+        var parent = _visualRoot.parent;
+        Vector3 tiltAxis = Vector3.Cross(Vector3.up, dirWorld);
+        if (parent != null)
+        {
+            tiltAxis = parent.InverseTransformDirection(tiltAxis);
+            dirWorld = parent.InverseTransformDirection(dirWorld);
+        }
+        if (tiltAxis.sqrMagnitude > 0.0001f) tiltAxis.Normalize();
+
+        float t = 0f;
+        while (t < duration)
+        {
+            if (gen != _reactGen) return; // 새 리액션/취소 → 이전 루틴 무효 (절대 세팅이라 새 루틴이 덮어씀)
+
+            float n   = Mathf.Clamp01(t / duration);
+            float env = curve != null ? curve.Evaluate(n) : 1f - n;
+
+            _visualRoot.localRotation = Quaternion.AngleAxis(angle * env, tiltAxis) * _restLocalRot;
+            _visualRoot.localPosition = _restLocalPos + dirWorld * (back * env);
+
+            t += Time.deltaTime;
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+
+        if (gen == _reactGen) RestoreVisualRoot(); // 자연 종료만 복원
+    }
+
+    /// <summary>비주얼 자식만 틸트 대상으로 해석. Animator 트랜스폼(루트≠) 우선, 없으면 렌더러의 루트 직속 자식.
+    /// 단일 메시가 루트에만 있으면 null(틸트 스킵 — 루트 회전=물리/NavMesh 파손 방지).</summary>
+    private Transform ResolveVisualRoot()
+    {
+        var anim = GetComponentInChildren<Animator>(true);
+        if (anim != null && anim.transform != transform) return anim.transform;
+
+        if (_renderers != null)
+        {
+            for (int i = 0; i < _renderers.Length; i++)
             {
-                ct.ThrowIfCancellationRequested();
-
-                float n = Mathf.Clamp01(t / duration);
-                float w = curve != null ? curve.Evaluate(n) : 1f - n;
-                _pulseLight.intensity = peak * w;
-
-                t += Time.deltaTime;
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                var r = _renderers[i];
+                if (r == null) continue;
+                var t = r.transform;
+                while (t != null && t.parent != transform) t = t.parent;
+                if (t != null && t != transform) return t;
             }
         }
-        catch (OperationCanceledException) { /* 정상 취소 */ }
-        finally
-        {
-            if (_pulseLight != null)
-            {
-                _pulseLight.intensity = 0f;
-                _pulseLight.enabled   = false;
-            }
-        }
+        return null;
+    }
+
+    private void RestoreVisualRoot()
+    {
+        if (_visualRoot == null) return;
+        _visualRoot.localRotation = _restLocalRot;
+        _visualRoot.localPosition = _restLocalPos;
     }
 
     private void ApplyPropertyBlock(MaterialPropertyBlock mpb)
@@ -224,12 +309,10 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 
     private void CancelAll()
     {
-        _flashCts?.Cancel();
-        _flashCts?.Dispose();
-        _flashCts = null;
-
-        _lightCts?.Cancel();
-        _lightCts?.Dispose();
-        _lightCts = null;
+        // 세대 bump로 실행 중 루틴을 무효화 — 다음 yield에서 자기 gen 불일치 감지 후 종료.
+        // 동기 복원(RestoreMaterials/RestoreVisualRoot/라이트 소등)은 OnDisable이 별도 수행.
+        _flashGen++;
+        _lightGen++;
+        _reactGen++;
     }
 }

@@ -41,6 +41,8 @@ public class BossPatternRunner
     BossPatternSO _lastPatternSO;
     float         _lastPatternTime;
     readonly Dictionary<BossPatternEntry, int> _seqIndex = new();
+    // SelectRandom 평가마다 새 List를 할당하지 않도록 재사용 (보스 1마리·동기 Tick이라 공유 안전)
+    readonly List<BossPatternSO> _randomCandidates = new();
 
     /// <summary>현재 패턴이 실행 중인지. NormalModeTimer 계산에 사용.</summary>
     public bool  IsPatternActive      { get; private set; }
@@ -101,17 +103,22 @@ public class BossPatternRunner
         {
             if (_pendingForce.pattern != null)
             {
-                // 예약된 강제 패턴 즉시 실행
                 var pending = _pendingForce;
-                _pendingForce         = default;
-                _patternBreakCooldown = 0f;
-                ExecutePattern(pending.pattern);
+                _pendingForce = default;
+
+                // entry 조건이 여전히 유효할 때만 실행 (패턴 실행 중 조건이 무효화된 경우 폐기)
+                // 사망 중 보류된 강제 패턴이 좀비 실행되지 않도록 생존 체크 추가
+                if (_isAlive() && (pending.entry == null || pending.entry.EvaluateConditions(_ctx)))
+                {
+                    _patternBreakCooldown = 0f;
+                    ExecutePattern(pending.pattern);
+                }
             }
             else
             {
                 _patternBreakCooldown = (_lastPatternSO != null && _lastPatternSO.breakOverride >= 0f)
                     ? _lastPatternSO.breakOverride
-                    : UnityEngine.Random.Range(_config.patternBreakDurationMin, _config.patternBreakDurationMax);
+                    : UnityEngine.Random.Range(GetBreakDurationMin(), GetBreakDurationMax());
             }
         }
         _wasInPattern = inPattern;
@@ -296,15 +303,31 @@ public class BossPatternRunner
 
     BossPatternSO SelectRandom(BossPatternEntry entry, bool checkCanExecute)
     {
-        var candidates = new List<BossPatternSO>();
+        _randomCandidates.Clear();
         foreach (var p in entry.patterns)
         {
             if (p == null) continue;
             if (checkCanExecute && !p.CanExecute(_ctx)) continue;
-            candidates.Add(p);
+            _randomCandidates.Add(p);
         }
-        if (candidates.Count == 0) return null;
-        return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        if (_randomCandidates.Count == 0) return null;
+        return _randomCandidates[UnityEngine.Random.Range(0, _randomCandidates.Count)];
+    }
+
+    float GetBreakDurationMin()
+    {
+        var bb = _ctx?.Blackboard;
+        return (bb != null && bb.BreakDurationMinOverride >= 0f)
+            ? bb.BreakDurationMinOverride
+            : _config?.patternBreakDurationMin ?? 0.5f;
+    }
+
+    float GetBreakDurationMax()
+    {
+        var bb = _ctx?.Blackboard;
+        return (bb != null && bb.BreakDurationMaxOverride >= 0f)
+            ? bb.BreakDurationMaxOverride
+            : _config?.patternBreakDurationMax ?? 1.5f;
     }
 
     float ApplyRepeatPenalty(BossPatternSO pattern)

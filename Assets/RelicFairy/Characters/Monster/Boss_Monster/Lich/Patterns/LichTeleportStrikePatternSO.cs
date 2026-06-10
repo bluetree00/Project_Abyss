@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -64,13 +65,14 @@ public class LichTeleportStrikePatternSO : BossPatternSO
 // LichTeleportStrikeState — FullLock (이동 + 중단 불가)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO>
+public class LichTeleportStrikeState : UnInterruptibleState<LichTeleportStrikePatternSO>
 {
     private enum Phase { Vanish, StrikeDelay, Strike, Recovery }
 
-    private Phase _phase;
-    private float _timer;
-    private bool  _hasDealt;
+    private Phase      _phase;
+    private float      _timer;
+    private bool       _hasDealt;
+    private GameObject _strikeGuide;
 
     public LichTeleportStrikeState(LichTeleportStrikePatternSO data) : base(data) { }
 
@@ -80,11 +82,13 @@ public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO
         _timer   = 0f;
         _hasDealt = false;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped = true;
-            ctx.Agent.ResetPath();
-        }
+        ctx.Animator?.CrossFade("TeleportStrike", 0.1f);
+
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
+
+        UI_BossBark.Show("순간이동!", BossBarkType.PatternAnnounce);
 
         SpawnVfx(ctx, ctx.Transform.position);
     }
@@ -108,6 +112,7 @@ public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO
                 FacePlayer(ctx);
                 if (_timer >= Data.strikeDelay)
                 {
+                    PatternGuideHelper.SetColor(_strikeGuide, PatternGuideHelper.Active);
                     _phase = Phase.Strike;
                     _timer = 0f;
                 }
@@ -135,8 +140,8 @@ public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
+        PatternGuideHelper.SafeDestroy(ref _strikeGuide);
+        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
 
         var lich = ctx.Monster as LichMonster;
         if (lich?.LichBB != null)
@@ -155,11 +160,14 @@ public class LichTeleportStrikeState : FullLockState<LichTeleportStrikePatternSO
         targetPos.y         = playerPos.y;
 
         SpawnVfx(ctx, targetPos);
+        ctx.Transform.position = targetPos;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.Warp(targetPos);
-        else
-            ctx.Transform.position = targetPos;
+        // 착지 후 타격 범위 disc — 선딜 중 노랑(Telegraph), 타격 직전 빨강(Active)으로 교체
+        PatternGuideHelper.SafeDestroy(ref _strikeGuide);
+        _strikeGuide = PatternGuideHelper.Disc(
+            targetPos,
+            Data.hitRadius,
+            PatternGuideHelper.Telegraph);
     }
 
     private void DealDamage(MonsterContext ctx)

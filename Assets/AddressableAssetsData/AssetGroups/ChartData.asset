@@ -15,8 +15,43 @@ MonoBehaviour:
   m_GroupName: ChartData
   m_GUID: 6a6364ffb430dbc46ba2b96807f580b2
   m_SerializeEntries:
-  - m_GUID: 50ae9be0093dd794eabe2daeadeb7415
-    m_Address: CHAPTER1_ZONE_LAYOUT
+  - m_GUID: 0880ce3f486b4544db24191b3e982938
+    m_Address: MERLIN_RUNE_PIECE_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 119fe1fcff857794a98a4beda47082d2
+    m_Address: CHAPTER_2_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c92d64ad1cef4748b60f3a6c88256e8
+    m_Address: CHAPTER_1_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3f5dbb3250dc9054793e2f8dcb95699c
+    m_Address: CHAPTER_3_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c1dee3c13f9fc64caac707f2f7685ec
+    m_Address: MERLIN_RUNE_SYNERGY_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9212f645dffa57e4c80ba4fee87a4dc4
+    m_Address: CHAPTER_4_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 961b25976bf220944823e0af6916de59
+    m_Address: MERLIN_RUNE_DUO_SYNERGY_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6932adaa3c69d84b95a705480cc0623
+    m_Address: MERLIN_RUNE_ZONE_MAP
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

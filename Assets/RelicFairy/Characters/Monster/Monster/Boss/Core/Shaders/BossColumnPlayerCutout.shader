@@ -1,4 +1,4 @@
-Shader "Abyss/Boss/ColumnPlayerCutout"
+Shader "RelicFairy/Boss/ColumnPlayerCutout"
 {
     Properties
     {

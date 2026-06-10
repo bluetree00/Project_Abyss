@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3e625151121238b4eafa00ac85bce154
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/SlashesPiercing/Earth/EffectGraph/VEG_Piercing_Earth.vfx
+  uploadId: 714344

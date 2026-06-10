@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c0fd692752c28ee4bab22b1dabc8560b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 355960
+  packageName: CombatGirls_SwordShieldCharacterPack
+  packageVersion: 1.1
+  assetPath: Assets/CombatGirlsCharacterPack/CombatGirl_Shield/Materials/Body/Body.mat
+  uploadId: 848774

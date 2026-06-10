@@ -5,14 +5,14 @@ using UnityEngine;
 
 /// <summary>
 /// 12개 서약 CovenantDataSO 에셋과 CovenantDataTableSO를 일괄 생성한다.
-/// Abyss/Covenant/Generate Data Assets 메뉴에서 실행.
+/// RelicFairy/Covenant/Generate Data Assets 메뉴에서 실행.
 /// 이미 존재하는 에셋은 덮어쓰지 않는다.
 /// </summary>
 public static class CovenantDataGenerator
 {
-    private const string OutputDir = "Assets/Abyss/Systems/Covenant/Data";
+    private const string OutputDir = "Assets/RelicFairy/Systems/Covenant/Data";
 
-    [MenuItem("Abyss/Covenant/Generate Data Assets")]
+    [MenuItem("RelicFairy/Gameplay/Covenant/Generate Data Assets")]
     public static void Generate()
     {
         if (!Directory.Exists(OutputDir))

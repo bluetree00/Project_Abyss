@@ -10,17 +10,17 @@ using UnityAnimatorController = UnityEditor.Animations.AnimatorController;
 public static class ForestGuardianSlowWalkFixer
 {
     private const string SourceClipPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk.fbx";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk.fbx";
     private const string OutputClipPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk_InPlace.anim";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Animations/Treant@SlowWalk_InPlace.anim";
     private const string ControllerPath =
-        "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/ForestGuardianAnimatorController.controller";
+        "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/ForestGuardianAnimatorController.controller";
 
     private const string SourceClipName = "SlowWalk";
     private const string OutputClipName = "SlowWalk_InPlace";
     private const string WalkStateName = "Walk";
 
-    [MenuItem("Tools/ForestGuardian/Diagnose SlowWalk Root Curves")]
+    [MenuItem("RelicFairy/Dev/ForestGuardian/Diagnose SlowWalk")]
     public static void DiagnoseSlowWalkRootCurves()
     {
         var sourceClip = LoadSourceClip();
@@ -57,7 +57,7 @@ public static class ForestGuardianSlowWalkFixer
         }
     }
 
-    [MenuItem("Tools/ForestGuardian/Rebuild SlowWalk In-Place")]
+    [MenuItem("RelicFairy/Dev/ForestGuardian/Rebuild SlowWalk In-Place")]
     public static void RebuildSlowWalkInPlace()
     {
         var sourceClip = LoadSourceClip();

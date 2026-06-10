@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 이어하기 저장 데이터 DTO.
 /// 뒤끝 RUN_PROGRESS 테이블 컬럼과 1:1 대응하며, JSON 직렬화 필드는
-/// SavedStageGraph / ItemListWrapper / SynergyListWrapper 로 분리된다.
+/// ItemListWrapper / SynergyListWrapper 로 분리된다.
+///
+/// PR1(로컬 세이브): 아래 "── 로컬 세이브 확장" 필드는 로컬 파일(JsonUtility) 전용이며
+/// 뒤끝 ToParam 매핑에는 포함되지 않는다(서버 세이브 경로 무변경).
 /// </summary>
 [Serializable]
 public class RunSaveData
@@ -12,7 +16,6 @@ public class RunSaveData
     public int    slotIndex;          // 0, 1, 2 — 저장 슬롯 번호
     public bool   hasActiveRun;
     public int    chapter;           // ChapterId enum 값
-    public int    currentPointId;    // StagePointManager.CurrentPointId
     public int    currentHp;
     public int    maxHp;
     public int    runGold;
@@ -25,7 +28,6 @@ public class RunSaveData
     public int    itemCount;          // 현재 보유 아이템 수 (빠른 표시용)
     public int    synergyCount;       // 현재 활성 시너지 수 (빠른 표시용)
     public int    roomClearCount;     // 이 런에서 클리어한 방 수
-    public string graphJson;         // SavedStageGraph JSON
     public string itemsJson;         // ItemListWrapper JSON
     public string synergiesJson;     // SynergyListWrapper JSON
     public string roomLogsJson;           // RoomClearLogWrapper JSON
@@ -33,37 +35,79 @@ public class RunSaveData
     public bool   isInStartRoom;          // true = 스타트룸 미퇴장 상태 (이어하기 시 StartRoom 재진입)
     public int    currentZoneIndex;       // ZoneProgressionService.CurrentZoneIndex (zone-layout 모드 이어하기)
     public string clearedZoneIndicesJson; // IntListWrapper JSON — 클리어된 존 인덱스 목록
+
+    // ── 로컬 세이브 확장 (PR1: 하데스식 절차생성 이어하기) ──
+    public int    saveVersion;            // 마이그레이션용. 현재 1.
+    public int    runEssence;             // RunDelta.GainedEssence 중간 적립
+    public int    weaponCurrentSlot = -1; // 현재 무기 슬롯 인덱스
+
+    public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
+    public string covenantsJson;          // CovenantListWrapper JSON
+    public string runeCellsJson;          // Vector2IntListWrapper JSON — 룬 보드 점유 셀(시너지 권위)
+    public string runePlacementsJson;     // RunePlacementListWrapper JSON — Shape 재구성(재편집)용
+    public string stagingItemsJson;       // ItemListWrapper JSON — 보관함 아이템
+
+    // 절차생성 진행 상태 (RunFlowController/RunSequencer)
+    public int    masterSeed;
+    public int    visitCount;
+    public int    seqPhase;
+    public int    shopUsed;
+    public int    eventUsed;
+    public int    heading;
+    public int    anchorToggle;
+    public string currentRoomPoolKey;
+    public int    currentRoomKind;
+    public int    currentRoomMirror;
+    public string cooldownsJson;          // CooldownListWrapper JSON
 }
 
-/// <summary>
-/// StageMapGraph + 각 노드의 StagePointContext 상태를 합쳐서 직렬화한다.
-/// 이어하기 시 이 데이터만으로 그래프를 재생성 없이 완전 복원 가능.
-/// </summary>
+// ── 로컬 세이브 확장용 래퍼/엔트리 ──
+
 [Serializable]
-public sealed class SavedStageGraph
+public sealed class Vector2IntListWrapper
 {
-    public int[]           fullPattern;
-    public int[]           middlePattern;
-    public SavedStageNode[] nodes;
+    public List<Vector2Int> items = new();
 }
 
 [Serializable]
-public sealed class SavedStageNode
+public sealed class CooldownListWrapper
 {
-    // StageMapNode 정보
-    public int   pointId;
-    public int   stageCategory;        // StageCategory as int
-    public int   normalRoomCategory;   // NormalRoomCategory as int
-    public int   layerIndex;
-    public int   indexInLayer;
-    public int[] nextPointIds;
+    public List<CooldownKV> items = new();
+}
 
-    // StagePointContext 상태
-    public int    state;               // StagePointState as int
-    public string resolvedRoomId;
-    public bool   isResolved;
-    public int    minDifficulty;       // -1 = null
-    public int    maxDifficulty;       // -1 = null
+[Serializable]
+public sealed class CooldownKV
+{
+    public string key;
+    public int    turns;
+}
+
+[Serializable]
+public sealed class CovenantListWrapper
+{
+    public List<CovenantSaveEntry> items = new();
+}
+
+[Serializable]
+public sealed class CovenantSaveEntry
+{
+    public string id;
+    public int    stage;   // CovenantStage (int)
+}
+
+// 룬 보드 배치 — 점유 셀(runeCellsJson)은 시너지 권위, 아래는 Shape 재구성(재편집)용.
+[Serializable]
+public sealed class RunePlacementListWrapper
+{
+    public List<RunePlacementEntry> items = new();
+}
+
+[Serializable]
+public sealed class RunePlacementEntry
+{
+    public string          instanceId;  // RuntimeItemData.instanceId (인벤토리 재바인딩)
+    public int             shapeId;     // shape_id (Shape 재생성)
+    public List<Vector2Int> cells = new(); // 점유 셀(col,row)
 }
 
 // ── JsonUtility 직렬화용 래퍼 ──
