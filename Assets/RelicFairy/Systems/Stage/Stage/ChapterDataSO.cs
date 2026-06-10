@@ -43,6 +43,10 @@ public class ChapterDataSO : ScriptableObject
     [Tooltip("이 챕터에서 사용할 몬스터 풀 태그 (비어있으면 전체)")]
     public string monsterPoolTag;
 
+    [Header("보스")]
+    [Tooltip("이 챕터 보스방에서 소환할 보스 스폰 테이블. BossSpawner가 GameRunSession 경유로 조회한다. 비우면 BossSpawner의 직렬화 폴백 사용.")]
+    public MonsterSpawnTableSO bossSpawnTable;
+
     [Header("보상")]
     [Tooltip("골드 드롭 배수")]
     public float goldMultiplier = 1f;

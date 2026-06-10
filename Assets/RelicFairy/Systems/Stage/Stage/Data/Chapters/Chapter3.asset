@@ -24,6 +24,7 @@ MonoBehaviour:
   difficultyScale: 1.7
   monsterCountScale: 1.4
   monsterPoolTag: 3
+  bossSpawnTable: {fileID: 11400000, guid: 88b7a054f5cb4894daedd602bd1dbb60, type: 2}
   goldMultiplier: 1.4
   itemDropMultiplier: 1
   middleLayers: 9

@@ -43,6 +43,10 @@ public sealed class GameRunSession
     /// <summary>현재 챕터의 필드 구조물 프리팹 Addressables 키.</summary>
     public string ActiveFieldPrefabKey { get; private set; } = string.Empty;
 
+    /// <summary>현재 챕터 ChapterDataSO의 보스 스폰 테이블. 레지스트리 미주입/미설정 시 null(BossSpawner가 직렬화 폴백 사용).</summary>
+    public MonsterSpawnTableSO CurrentBossSpawnTable =>
+        _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
+
     private ChapterRegistry _chapterRegistry;
 
     /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
@@ -488,13 +492,19 @@ public sealed class GameRunSession
         ChangeRunState(RunState.ChapterClear);
     }
 
+    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter4).</summary>
+    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter4;
+
+    /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
+    public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
+
     /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
     public bool AdvanceToNextChapter()
     {
         if (!IsRunning) return false;
 
         var next = CurrentChapter + 1;
-        if (next > ChapterId.Chapter4) return false;
+        if (next > FinalChapter) return false;
 
         CurrentChapter = next;
         ResolveActiveTheme();

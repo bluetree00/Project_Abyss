@@ -14,6 +14,10 @@ public class ChapterRegistry : ScriptableObject
     [Header("챕터 지형 레이아웃 (12방 배치·배리어)")]
     [SerializeField] private List<ChapterLayoutSO> layouts  = new();
 
+    [Header("빌드 진행 범위")]
+    [Tooltip("이 챕터까지만 진행한다. 이 챕터의 보스를 클리어하면 런 클리어로 종료(다음 챕터로 넘어가지 않음). 데모는 Chapter1.")]
+    [SerializeField] private ChapterId _finalChapter = ChapterId.Chapter4;
+
     private Dictionary<ChapterId, ChapterDataSO>   _dataLookup;
     private Dictionary<ChapterId, ChapterLayoutSO> _layoutLookup;
 
@@ -33,6 +37,9 @@ public class ChapterRegistry : ScriptableObject
 
     public IReadOnlyList<ChapterDataSO>   AllData    => chapters;
     public IReadOnlyList<ChapterLayoutSO> AllLayouts => layouts;
+
+    /// <summary>진행 가능한 마지막 챕터. 이 챕터 보스 클리어 = 런 클리어.</summary>
+    public ChapterId FinalChapter => _finalChapter;
 
     private void BuildLookups()
     {

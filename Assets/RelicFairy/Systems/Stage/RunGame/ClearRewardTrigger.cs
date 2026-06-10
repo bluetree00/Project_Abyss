@@ -134,9 +134,20 @@ public class ClearRewardTrigger : MonoBehaviour
 
         if (_isBossRoom && _run != null)
         {
-            _run.EnterChapterClear();
-            bool advanced = _run.AdvanceToNextChapter();
-            Debug.Log($"[ClearRewardTrigger] 보스방 클리어 — 챕터 전환 {(advanced ? "성공" : "마지막 챕터")}");
+            if (_run.HasNextChapter())
+            {
+                _run.EnterChapterClear();
+                _run.AdvanceToNextChapter();
+                Debug.Log("[ClearRewardTrigger] 보스방 클리어 — 다음 챕터 진행");
+            }
+            else
+            {
+                // 최종 챕터 보스 격파 = 런 클리어. 종료 시퀀스가 메타 저장·세이브 폐기·BaseCamp 복귀를 담당하므로
+                // 이후 방 경계 저장/게이트 로직은 건너뛴다(끝난 런을 재개 가능 상태로 저장하지 않도록).
+                Debug.Log("[ClearRewardTrigger] 최종 보스 격파 — 런 클리어");
+                GameRunBootstrapper.Instance?.HandleRunClear();
+                return;
+            }
         }
 
         // 방 클리어 시점 저장 (플레이어는 현재 존 위치 + 게이트 선택지 유지 상태로 재개)

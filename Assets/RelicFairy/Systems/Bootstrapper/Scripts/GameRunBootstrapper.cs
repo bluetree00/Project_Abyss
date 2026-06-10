@@ -739,10 +739,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>플레이어 사망 시 PlayerController가 호출. 사망 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandlePlayerDeath() => HandleRunEndAsync(false).Forget();
 
+    /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
+    public void HandleRunClear() => HandleRunEndAsync(true).Forget();
+
     /// <summary>
     /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
     /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
-    /// 클리어(EndRun true) 경로는 절차 런 종료 조건 확정 후 연결(TODO).
+    /// 사망=HandlePlayerDeath, 클리어=HandleRunClear가 진입점.
     /// </summary>
     private async UniTaskVoid HandleRunEndAsync(bool isCleared)
     {
@@ -756,9 +759,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             if (!isCleared)
             {
                 HitFeelService.CameraShake(0.15f, 0.4f);
-                Time.timeScale = 0.25f;
+                TimeScaleArbiter.Acquire(this, 0.25f, TimeScaleArbiter.Priority.SlowMotion);
                 try { await UniTask.Delay(System.TimeSpan.FromSeconds(0.6f), DelayType.Realtime, cancellationToken: ct); }
-                finally { Time.timeScale = 1f; }
+                finally { TimeScaleArbiter.Release(this); }
             }
 
             // 2) 화면 처리: 비네트(보유 자산) + 암전 페이드. 채도저하(URP Volume)는 미보유 → TODO.
@@ -774,7 +777,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             AppBootstrapper.Instance?.EndRun();
             AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
-        catch (System.OperationCanceledException) { Time.timeScale = 1f; }
+        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(this); }
     }
 
     /// <summary>종료 메시지 경량 오버레이(코드 생성). 입력 시 즉시 스킵, 아니면 홀드 후 자동 진행.</summary>

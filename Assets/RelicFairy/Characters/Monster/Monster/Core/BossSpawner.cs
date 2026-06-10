@@ -83,12 +83,14 @@ public class BossSpawner : MonoBehaviour
             return;
         }
 
-        if (spawnTable == null)
+        // 챕터별 보스 테이블 우선(현재 챕터 ChapterDataSO.bossSpawnTable), 없으면 직렬화 폴백.
+        var table = GameRunBootstrapper.Instance?.Run?.CurrentBossSpawnTable ?? spawnTable;
+        if (table == null)
         {
             Debug.LogWarning("[BossSpawner] spawnTable이 비어 있습니다. Inspector에서 SO를 할당해주세요.", this);
             return;
         }
-        SpawnBossAsync().Forget();
+        SpawnBossAsync(table).Forget();
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -144,7 +146,7 @@ public class BossSpawner : MonoBehaviour
             Managers.AddressableManager?.ReleaseInstance(_spawnedBossGO);
     }
 
-    private async UniTaskVoid SpawnBossAsync()
+    private async UniTaskVoid SpawnBossAsync(MonsterSpawnTableSO table)
     {
         if (spawnDelay > 0f)
         {
@@ -157,7 +159,7 @@ public class BossSpawner : MonoBehaviour
             catch (System.OperationCanceledException) { return; }
         }
 
-        var entry = spawnTable.PickRandom(IsBossEntry);
+        var entry = table.PickRandom(IsBossEntry);
         if (entry == null)
         {
             Debug.LogWarning(
@@ -183,6 +185,13 @@ public class BossSpawner : MonoBehaviour
         if (bossGO == null)
         {
             Debug.LogWarning($"[BossSpawner] '{entry.addressableKey}' 소환 실패.", this);
+            return;
+        }
+
+        // 인스턴스화 도중 스포너 파괴(보스룸/씬 언로드) 시 — 파괴된 self 접근 차단 + 보스GO 릴리스(누수 방지)
+        if (this == null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(bossGO);
             return;
         }
 
