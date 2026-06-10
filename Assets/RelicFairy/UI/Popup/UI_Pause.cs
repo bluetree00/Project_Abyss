@@ -39,6 +39,10 @@ public class UI_Pause : UI_Popup
 	{
 		base.Init();
 
+		// 일시정지 진입 — 시간 정지 요청(PR4 마이그레이션서 누락됐던 Acquire 복원).
+		// 기존 Resume/Exit 버튼의 Release 와 짝. 강제 닫힘(씬 전환 등) 대비 OnDestroy 에 방어 Release.
+		TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
+
 		Bind<GameObject>(typeof(GameObjects));
 		Bind<TextMeshProUGUI>(typeof(Texts));
 		Bind<Button>(typeof(Buttons));
@@ -95,13 +99,16 @@ public class UI_Pause : UI_Popup
 		BindEvent(resumeGo, (PointerEventData data) =>
 		{
 			Managers.UI.ClosePopupUI(this);
-			Time.timeScale = 1f;
+			TimeScaleArbiter.Release(this);
 		}, Define.UIEvent.Click);
 
 		GameObject exitGo = GetButton((int)Buttons.ExitButton).gameObject;
 		BindEvent(exitGo, (PointerEventData data) =>
 		{
-			Time.timeScale = 1f;
+			// Resume 과 동일하게 팝업을 닫고 timeScale 복원(닫기→Release 순서 정합, 멱등).
+			Managers.UI.ClosePopupUI(this);
+			TimeScaleArbiter.Release(this);
+			// TODO: 실제 게임 종료/메인화면 이동 씬 전환 미구현. 현재는 팝업 닫기+게임 재개만 수행.
 			Debug.Log("게임 종료 또는 메인화면 이동");
 		}, Define.UIEvent.Click);
 
@@ -132,9 +139,15 @@ public class UI_Pause : UI_Popup
 				ShowTab(_tabNames[_tabIndex]);
 			}
 		}
-		
+
 	}
-	
+
+	private void OnDestroy()
+	{
+		// 방어적 Release — Resume/Exit 없이 강제 파괴되어도 timeScale 0 고착 방지(멱등 no-op 가드).
+		TimeScaleArbiter.Release(this);
+	}
+
 	//TODO: 탭에 따라 표시할 정보를 업데이트하는 메서드들 구현 필요. 테스트 요망
 	// 예시로, "Chapter" 탭에 대해 표시할 텍스트나 아이템 업데이트
 	// private void UpdateChapterInfo()

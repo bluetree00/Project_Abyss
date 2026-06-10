@@ -146,7 +146,12 @@ public class ObjectPoolerManager
         if (!obj.TryGetComponent(out PooledObjectInfo info) ||
             !_pools.TryGetValue(info.key, out var queue))
         {
-            UnityEngine.Object.Destroy(obj);
+            // 비풀 경로: AddressableManager.InstantiateAsync로 만든 추적 인스턴스(예: 보스)면
+            // ReleaseInstance로 핸들까지 정식 해제(+GO 파괴)해 장부 누수를 막고, 아니면 일반 Destroy.
+            if (Managers.AddressableManager != null && Managers.AddressableManager.IsTrackedInstance(obj))
+                Managers.AddressableManager.ReleaseInstance(obj);
+            else
+                UnityEngine.Object.Destroy(obj);
             return;
         }
 

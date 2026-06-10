@@ -35,6 +35,12 @@ public static class UltimateCinematicService
 
     private static CancellationTokenSource _cts;
     private static bool _isPlaying;
+    private static readonly object _timeScaleOwner = new object();   // TimeScaleArbiter 요청 키
+
+    // 도메인 리로드 OFF: finally 미실행으로 _isPlaying=true 잔류 시 다음 런 PlayInternal이 영구 탈출 → 리셋.
+    // Unity-object 캐시(_host/_vcam/_canvas 등)는 Ensure* 가 자가 치유하므로 bool/cts만 복원.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() { _isPlaying = false; _cts = null; }
 
     // ── Public API ────────────────────────────────────────────────────
     /// <summary>필살기 연출 시작 — 슬로모 + 클로즈업 + UI. 이미 실행 중이면 기존 것 취소 후 새로 시작.</summary>
@@ -63,16 +69,16 @@ public static class UltimateCinematicService
         if (_isPlaying) return; // 동시 진입 방지 (Cancel 후 재진입은 다른 _cts)
         _isPlaying = true;
 
-        // 상태 백업
-        float originalTimeScale = Time.timeScale;
+        // 상태 백업 (timeScale 은 TimeScaleArbiter 가 소유 — fixedDeltaTime/Brain 만 직접 백업·복원)
         float originalFixedDt   = Time.fixedDeltaTime;
         bool  brainIgnoreSaved  = _brain != null ? _brain.m_IgnoreTimeScale : false;
+        float slowScale         = Mathf.Max(0.01f, cfg.timeScale);
 
         try
         {
             // 슬로모 + Cinemachine Brain unscaled time 사용
-            Time.timeScale = Mathf.Max(0.01f, cfg.timeScale);
-            Time.fixedDeltaTime = 0.02f * Time.timeScale;
+            TimeScaleArbiter.Acquire(_timeScaleOwner, slowScale, TimeScaleArbiter.Priority.SlowMotion);
+            Time.fixedDeltaTime = 0.02f * slowScale;
             if (_brain != null) _brain.m_IgnoreTimeScale = true;
 
             // 카메라 세팅
@@ -100,7 +106,7 @@ public static class UltimateCinematicService
         catch (OperationCanceledException) { /* 정상 종료 */ }
         finally
         {
-            Time.timeScale = originalTimeScale;
+            TimeScaleArbiter.Release(_timeScaleOwner);
             Time.fixedDeltaTime = originalFixedDt;
             if (_brain != null) _brain.m_IgnoreTimeScale = brainIgnoreSaved;
 

@@ -114,6 +114,8 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnDestroy()
     {
+        // 방어적 Release — 패널이 열린(Acquire) 채 파괴되면 timeScale 0 고착(ClosePanel만 Release).
+        TimeScaleArbiter.Release(this);
         _toastCts?.Cancel();
         _toastCts?.Dispose();
         if (Instance == this) Instance = null;
@@ -233,7 +235,7 @@ public sealed class UI_GridPanel : UI_Base
     private void OpenPanel()
     {
         _isOpen = true;
-        Time.timeScale = 0f;
+        TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         gameObject.SetActive(true);
         FadeInAsync().Forget();
 
@@ -284,7 +286,7 @@ public sealed class UI_GridPanel : UI_Base
     private void ClosePanel()
     {
         _isOpen = false;
-        Time.timeScale = 1f;
+        TimeScaleArbiter.Release(this);
         HideConfirmDialog();
         GameRunBootstrapper.Instance?.Run?.ExitGridSynergy();
         gameObject.SetActive(false);

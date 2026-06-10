@@ -1,5 +1,3 @@
-using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -31,6 +29,10 @@ public static class VolumePulseService
 
     private const float VolumePriority     = 10f; // ambient Volume 위에 얹되, 긴 쿨다운 연출(보스 연출 등) 아래
 
+    // ① 풀스크린 펄스 발화 게이트 (멀미·가독성) — 강도(peak)는 불변, 발화 조건만 한정.
+    private const float PulseDamageThreshold = 1f;    // 이하 약타/DoT 틱은 풀스크린 펄스 생략 (히트스톱/플래시/데미지넘버는 별개)
+    private const float PulseMinInterval     = 0.12f; // 비크리 연타 시 펄스 최소 간격(초). 크리는 무시하고 항상 발화.
+
     // ── Static ────────────────────────────────────────────────────
     private class Host : MonoBehaviour { }
 
@@ -41,11 +43,33 @@ public static class VolumePulseService
     private static MotionBlur           _motionBlur;
     private static Bloom                _bloom;
 
-    private static CancellationTokenSource _pulseCts;
     private static AnimationCurve          _pulseCurve;
     private static bool                    _initialized;
 
+    private static float _lastPulseTime = -999f; // ① 비크리 쿨다운 추적 (unscaledTime)
+    private static int   _pulseGen;              // ③ CTS 대체 세대 카운터 — 새 펄스가 이전 루틴 무효화
+
     // ── Bootstrap ─────────────────────────────────────────────────
+    // 도메인 리로드 비활성(에디터) 시 정적 상태가 새 플레이세션으로 새지 않도록 초기화.
+    // SubsystemRegistration 은 AfterSceneLoad(Init)보다 먼저 실행 → 리셋 후 Init 재구동.
+    // 미리셋 시: 2회차에 _host/_volume 은 파괴(Unity-null)인데 _initialized=true 잔존 →
+    // Init 조기 return → 펄스 영구 사망. (TimeScaleArbiter.ResetStatics 패턴)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        HitFeedbackService.OnHit -= OnHit; // 중복 구독 방지 (Init 에서 += 재등록)
+        _initialized   = false;
+        _host          = null;
+        _volume        = null;
+        _profile       = null;
+        _chromatic     = null;
+        _motionBlur    = null;
+        _bloom         = null;
+        _pulseCurve    = null;
+        _pulseGen      = 0;
+        _lastPulseTime = -999f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -123,8 +147,19 @@ public static class VolumePulseService
     // ── Event Handler ─────────────────────────────────────────────
     private static void OnHit(HitInfo info)
     {
-        float peak     = info.IsCritical ? PeakCritical     : PeakNormal;
-        float duration = info.IsCritical ? DurationCritical : DurationNormal;
+        bool isCrit = info.IsCritical;
+
+        // ① 비크리 약타/연타는 풀스크린 PostFX 펄스 생략 — 멀미·시각노이즈 방지.
+        //    크리티컬은 임계/쿨다운 무시하고 항상 발화(타격감 보존).
+        if (!isCrit)
+        {
+            if (info.Damage < PulseDamageThreshold) return;
+            if (Time.unscaledTime - _lastPulseTime < PulseMinInterval) return;
+        }
+
+        float peak     = isCrit ? PeakCritical     : PeakNormal;
+        float duration = isCrit ? DurationCritical : DurationNormal;
+        _lastPulseTime = Time.unscaledTime;
         StartPulse(peak, duration);
     }
 
@@ -132,37 +167,30 @@ public static class VolumePulseService
     {
         if (_volume == null || _host == null) return;
 
-        _pulseCts?.Cancel();
-        _pulseCts?.Dispose();
-        _pulseCts = new CancellationTokenSource();
-
-        _ = PulseRoutineAsync(peak, duration, _pulseCts.Token);
+        // ③ CTS new/Dispose 제거 — 세대 카운터 증가로 이전 루틴 무효화.
+        int gen = ++_pulseGen;
+        _ = PulseRoutineAsync(peak, duration, gen);
     }
 
-    private static async UniTaskVoid PulseRoutineAsync(float peak, float duration, CancellationToken ct)
+    private static async UniTaskVoid PulseRoutineAsync(float peak, float duration, int gen)
     {
         if (duration <= 0f) return;
 
         float t = 0f;
-        try
+        while (t < duration)
         {
-            while (t < duration)
-            {
-                ct.ThrowIfCancellationRequested();
+            if (gen != _pulseGen) return; // 새 펄스가 시작됨 → 이전 루틴 무효 (weight는 새 루틴이 소유)
 
-                float n = Mathf.Clamp01(t / duration);
-                float w = _pulseCurve.Evaluate(n) * peak;
-                if (_volume != null) _volume.weight = w;
+            float n = Mathf.Clamp01(t / duration);
+            float w = _pulseCurve.Evaluate(n) * peak;
+            if (_volume != null) _volume.weight = w;
 
-                // Hit-Stop(timeScale 변경)과 독립적으로 펄스 진행
-                t += Time.unscaledDeltaTime;
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            }
+            // Hit-Stop(timeScale 변경)과 독립적으로 펄스 진행
+            t += Time.unscaledDeltaTime;
+            await UniTask.Yield(PlayerLoopTiming.Update);
         }
-        catch (OperationCanceledException) { /* 정상 취소 */ }
-        finally
-        {
-            if (_volume != null) _volume.weight = 0f;
-        }
+
+        // 마지막(현 세대) 펄스만 weight 리셋 — 중첩 시 이전 루틴은 위에서 이미 return.
+        if (gen == _pulseGen && _volume != null) _volume.weight = 0f;
     }
 }

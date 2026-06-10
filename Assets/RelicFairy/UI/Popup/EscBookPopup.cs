@@ -51,7 +51,7 @@ public sealed class EscBookPopup : UI_Popup
         EnsureCharacterInfoView();
         _currentTab = 0;
         SetPageImmediate(0);
-        Time.timeScale = 0f;
+        TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
     }
 
     private void EnsureInventoryView()
@@ -73,7 +73,7 @@ public sealed class EscBookPopup : UI_Popup
         StopAllCoroutines();
         _isFlipping = false;
         gameObject.SetActive(false);
-        Time.timeScale = 1f;
+        TimeScaleArbiter.Release(this);
     }
 
     public override void ClosePopupUI()
@@ -161,6 +161,6 @@ public sealed class EscBookPopup : UI_Popup
 
     private void OnDestroy()
     {
-        Time.timeScale = 1f;
+        TimeScaleArbiter.Release(this);
     }
 }

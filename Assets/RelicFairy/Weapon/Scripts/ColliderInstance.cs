@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -7,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public class ColliderInstance : MonoBehaviour
 {
+    // hitEffectKey 미할당 시 사용할 공용 히트 VFX.
+    private const string FallbackHitEffectKey = "HitEffect_02";
+
     public string payloadKey;
     public float damage;
     public float knockbackMultiplier;
@@ -165,16 +170,26 @@ public class ColliderInstance : MonoBehaviour
             });
         }
 
+#if UNITY_EDITOR
         Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={finalDmg:F0} | atk={actionType} | id={attackId}");
+#endif
 
-        if (!string.IsNullOrEmpty(hitEffectKey))
-            SpawnHitEffect(other.ClosestPoint(transform.position));
+        string fxKey = !string.IsNullOrEmpty(hitEffectKey) ? hitEffectKey : FallbackHitEffectKey;
+        SpawnHitEffect(other.ClosestPoint(transform.position), fxKey).Forget();
     }
 
-    private async void SpawnHitEffect(Vector3 hitPoint)
+    // UniTaskVoid + 수명 토큰: 비동기 로드 도중 콜라이더가 파괴/풀반환되면 후속 처리를 안전하게 취소.
+    private async UniTaskVoid SpawnHitEffect(Vector3 hitPoint, string fxKey)
     {
-        var effectObj = await Managers.ObjectPooler.SpawnAsync(
-            hitEffectKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity);
+        GameObject effectObj;
+        try
+        {
+            effectObj = await Managers.ObjectPooler
+                .SpawnAsync(fxKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity)
+                .AttachExternalCancellation(this.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException) { return; }
+
         if (effectObj == null) return;
 
         effectObj.transform.localScale = Vector3.one * hitEffectScale;

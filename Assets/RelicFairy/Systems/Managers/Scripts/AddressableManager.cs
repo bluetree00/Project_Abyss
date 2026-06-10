@@ -268,6 +268,13 @@ public sealed class AddressableManager
     // -------------------------
 
     /// <summary>
+    /// ✅ 이 GameObject가 InstantiateAsync로 만들어 추적 중인 인스턴스인지 여부.
+    /// - 비풀 Despawn 경계에서 ReleaseInstance vs Destroy 분기에 사용(경고 로그 없이 판별).
+    /// </summary>
+    public bool IsTrackedInstance(GameObject instance)
+        => instance != null && _instanceHandles.ContainsKey(instance.GetInstanceID());
+
+    /// <summary>
     /// ✅ InstantiateAsync로 생성된 인스턴스만 Addressables.ReleaseInstance가 가능
     /// - LoadAsset + Unity Instantiate로 만든 오브젝트는 여기로 해제하지 말고 Destroy로 처리
     /// </summary>

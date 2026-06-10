@@ -28,6 +28,10 @@ public static class DissolveEffect
     private const int MatPoolCap = 256;
     private static readonly Stack<Material> _matPool = new();
 
+    // 도메인 리로드 OFF: 2회차 진입 시 _matPool에 파괴된(Unity-null) Material이 잔류 → RentMaterial에서 예외.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => _matPool.Clear();
+
     // ─────────────────── 공개 API ───────────────────
 
     /// <summary>디졸브로 등장 (소멸 → 완전 등장 후 원본 복원).
@@ -68,6 +72,18 @@ public static class DissolveEffect
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(
             target.GetCancellationTokenOnDestroy(), ct);
         await DissolveOutAsync(target, duration, cts.Token, null);
+    }
+
+    /// <summary>풀링 몹 처치 전용 소멸 디졸브 — origMats 캡처 → 소멸 애님(0→1) → onDespawn(비활성·풀반환)
+    /// → 비활성 상태에서 origMats 복원(깜빡임 0) → 풀 머티리얼 반환. 재스폰 시 디졸브 잔상 없음을 보장한다.
+    /// PlayDisappear(제단/무기/보스)와 달리 머티리얼 인스턴스를 풀에서 빌려 쓰고 복원한다.</summary>
+    public static async UniTask PlayDeathDissolveAsync(
+        GameObject target, float duration, Action onDespawn = null, CancellationToken ct = default)
+    {
+        if (target == null) { onDespawn?.Invoke(); return; }
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+            target.GetCancellationTokenOnDestroy(), ct);
+        await DeathDissolveAsync(target, duration, onDespawn, cts.Token);
     }
 
     /// <summary>DissolveMaterial을 Addressables에서 미리 로드해 캐시를 워밍업. DissolveEntrance 선로드용.</summary>
@@ -244,12 +260,75 @@ public static class DissolveEffect
         }
     }
 
+    // 처치 전용 소멸 디졸브 — 풀 머티리얼 사용 + origMats 복원(재스폰 잔상 방지).
+    private static async UniTask DeathDissolveAsync(
+        GameObject target, float duration, Action onDespawn, CancellationToken ct)
+    {
+        Renderer[]     renderers = null;
+        Material[][]   origMats  = null;
+        List<Material> instances = null;
+        bool despawned = false;
+        try
+        {
+            var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
+            if (mat == null)
+            {
+                Debug.LogWarning(
+                    $"[DissolveEffect] '{MaterialKey}' 로드 실패 — '{target?.name}' 처치 디졸브 스킵");
+                onDespawn?.Invoke();
+                return;
+            }
+
+            if (target == null) { onDespawn?.Invoke(); return; }
+            renderers = CollectDissolveRenderers(target);
+            if (renderers.Length == 0) { onDespawn?.Invoke(); return; }
+
+            origMats = new Material[renderers.Length][];
+            for (int i = 0; i < renderers.Length; i++)
+                origMats[i] = renderers[i].sharedMaterials;
+
+            instances = ReplaceMaterials(renderers, mat, DefaultEdgeColor, pooled: true);
+            SetDissolveValue(instances, 0f);
+            SetEdgeWidth(instances, MaxEdgeWidth);
+
+            float dur = Mathf.Max(0.01f, duration);
+            float t = 0f;
+            while (t < dur)
+            {
+                t += Time.deltaTime;
+                SetDissolveValue(instances, Mathf.Clamp01(t / dur));
+                await UniTask.Yield(ct);
+            }
+            SetDissolveValue(instances, 1f);
+
+            // 소멸 완료(완전 투명) → 먼저 비활성·풀반환 후, finally에서 비활성 상태로 원본 복원 → 깜빡임 0
+            onDespawn?.Invoke();
+            despawned = true;
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            // 복원 전 비활성화 보장 — 취소 경로(아직 despawn 전)에서도 원본이 한 프레임도 보이지 않도록.
+            if (!despawned && target != null && target.activeSelf)
+                target.SetActive(false);
+
+            if (renderers != null && origMats != null)
+                for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
+                    if (renderers[i] != null) renderers[i].sharedMaterials = origMats[i];
+
+            if (instances != null)
+                foreach (var m in instances)
+                    if (m != null) ReturnMaterial(m);
+        }
+    }
+
     // ── PR4-pool: dissolve 머티리얼 인스턴스 재사용 (new Material/Destroy churn 제거) ──
     private static Material RentMaterial(Material dissolveMat)
     {
         if (_matPool.Count > 0)
         {
             var m = _matPool.Pop();
+            if (m == null) return new Material(dissolveMat);   // 풀에 잔류한 파괴된 인스턴스(Unity-null) 방어
             m.CopyPropertiesFromMaterial(dissolveMat);   // alloc 없이 new Material(dissolveMat)와 동일한 깨끗한 상태로 리셋
             return m;
         }
@@ -294,11 +373,12 @@ public static class DissolveEffect
         var instances = new List<Material>();
         foreach (var r in renderers)
         {
-            var newMats = new Material[r.sharedMaterials.Length];
+            var srcMats = r.sharedMaterials;   // 게터는 매 호출 배열 alloc — 1회만 캐시
+            var newMats = new Material[srcMats.Length];
             for (int j = 0; j < newMats.Length; j++)
             {
                 var inst = pooled ? RentMaterial(dissolveMat) : new Material(dissolveMat);
-                var orig = r.sharedMaterials[j];
+                var orig = srcMats[j];
 
                 if (orig != null)
                 {
