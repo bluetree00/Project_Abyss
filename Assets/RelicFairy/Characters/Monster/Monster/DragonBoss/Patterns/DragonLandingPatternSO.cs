@@ -22,6 +22,11 @@ namespace RelicFairy.Monster
     menuName = "RelicFairy/Boss/Dragon/LandingPattern")]
 public class DragonLandingPatternSO : BossPatternSO
 {
+    [Header("선택 가중치")]
+    [Tooltip("런타임 streak 배수의 기반값. 공통 weight 와 달리 코드로 절대 수정되지 않음.")]
+    [SerializeField] private float _baseWeight = 1f;
+    public float BaseWeight => _baseWeight;
+
     [Header("하강 파라미터")]
     [Tooltip("Y 하강 속도 (m/s).")]
     [SerializeField] private float _descentSpeed = 8f;
@@ -74,6 +79,7 @@ internal sealed class DragonLandingState : FullLockState<DragonLandingPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
         _phase         = Phase.Descend;
         _targetY       = ctx.Runtime.SpawnPosition.y;
         _touchdownHash = Animator.StringToHash(Data.TouchdownStateName);

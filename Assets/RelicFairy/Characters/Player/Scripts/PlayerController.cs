@@ -922,8 +922,17 @@ public class PlayerController : CharacterBase
             else
                 Debug.Log("[Input] Attack started ignored - no weapon");
 
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue()), out var hit, 100f, LayerMask.GetMask("Ground")))
+            // 탑뷰 포함 모든 카메라 상태에서 마우스 월드 위치 계산
+            Ray atkRay = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(atkRay, out var hit, 200f, LayerMask.GetMask("Ground")))
                 _lastClickedPosition = hit.point;
+            else
+            {
+                // 지면 레이어 미스 시 Y=player 높이 평면으로 폴백 (탑뷰 대응)
+                var groundPlane = new Plane(Vector3.up, transform.position);
+                if (groundPlane.Raycast(atkRay, out float atkDist))
+                    _lastClickedPosition = atkRay.GetPoint(atkDist);
+            }
         };
 
         inputActions.Player.Attack.canceled += _ =>
@@ -1073,7 +1082,6 @@ public class PlayerController : CharacterBase
     protected virtual void CheckMovementInput()
     {
         if (locoSM?.CurrentId == LocoState.Air) return;
-        if (cinemachineCamera == null) return;
         if (inputActions == null) return;
 
         var input = inputActions.Player.Move.ReadValue<Vector2>();
