@@ -6,12 +6,14 @@
 
 ## 1. 그리드 기본 규칙
 
-- **크기**: 30×30 기본 (가변 가능, `width`/`height`는 `grid_csv` 크기로 자동 계산되어 사실상 무시됨)
+- **크기**: 가변 (실제 룸 풀 기준 32×32 ~ 44×44 등). `grid_width`/`grid_height` 컬럼은 `grid_csv` 첫 행 폭/행 수로 **자동 계산되어 무시됨** — 표기는 참고용이므로 실제 크기와 맞춰 적어두는 것을 권장
 - **행 구분**: `;` (세미콜론) 또는 개행
 - **열 구분**: `,` (쉼표)
 - **CSV 첫 줄 = 맵 맨 윗줄** (z축 반전되어 렌더링됨. 플레이어 시점에서 "위쪽"이 CSV 첫 줄)
-- **비어있는 셀**: `F` (Floor) 로 채움. 공란 금지
-- **테두리**: 보통 `W` (Wall) 로 둘러쌈
+- **그리드 직사각**: 모든 행의 셀 수가 동일해야 함 (폭은 **첫 행** 기준으로 계산됨 → 행 길이가 다르면 정렬이 어긋남)
+- **비어있는 셀**: `F` (Floor) 로 채움. **공란(빈 셀) 금지** — 공란은 무음으로 Floor 처리됨
+- **테두리**: 외곽 링은 전부 `W` (Wall) 또는 문 앵커 `DR`(아래 2-3) 이어야 함. 뚫리면 낙사
+- **빌드 전 검증**: `Tools/RelicFairy/Validate Room CSVs` 메뉴로 위 규칙 위반을 콘솔/리포트에서 일괄 확인
 
 ---
 
@@ -25,8 +27,10 @@
 | `W` | Wall | 벽 | 이동 불가, 맵 경계 |
 | `O` | Obstacle | 장애물 | 이동 불가, 맵 내부 장식 겸 가림막 |
 | `P` | PlayerSpawn | 플레이어 시작점 | 방 진입 시 플레이어 위치. 방당 1개 |
-| `B` | BossSpawn | 보스 스폰 | Boss 카테고리 방에서 보스 생성 위치 |
-| `S` | ShopStall | 상점 진열대 | Shop 카테고리 방에서 상품 진열 위치 |
+| `B` | BossSpawn | 보스 스폰 | Boss 카테고리 방에서 보스 생성 위치. 방당 1개 |
+| `Sw` | ShopStallWeapon | 상점 장비 매대 | Shop 카테고리 방의 장비 진열 위치 |
+| `Si` | ShopStallItem | 상점 아이템 매대 | Shop 카테고리 방의 아이템 진열 위치 |
+| `S` | ShopStall | 상점 매대 (레거시) | `Sw`/`Si` 도입 전 단일 매대. 신규 작성은 `Sw`/`Si` 사용 |
 | `N` | NPCSpawn | NPC | Event 방 등에서 NPC 배치 |
 | `E` | Entrance | 입구 마커 | (현재 미사용 예약) |
 | `X` | Exit | 출구 마커 | (현재 미사용 예약) |
@@ -35,12 +39,27 @@
 | `R` | BuffBox | 버프 상자 | 상호작용 필요 — 플레이어가 눌러야 버프 발동 |
 | `D` | BuffPedestal | 버프 발판 | 즉시 발동 — 플레이어가 밟으면 버프 |
 | `.` | Empty | 구멍 | 블록 없음 (빈 공간) |
+| `Pt` | (Empty+트리거) | 낙사 트리거 | 구멍 진입 즉시 `FallRecoveryController` 발동 |
+| `CP` / `CP<n>` | CharacterPickup | 캐릭터 픽업 | 스타트 방. `<n>`=프리팹 배열 인덱스(생략 시 0) |
+| `WP` / `WP<n>` | WeaponPickup | 무기 픽업 | 스타트 방. `<n>`=프리팹 배열 인덱스(생략 시 0) |
+| `CV` | (Floor+제단) | 서약 제단 | Event 방. 바닥 위 `WorldCovenantPickup` 스폰 → F 상호작용 시 서약 3지선다 |
+| `SG` | StartGate | 스타트 게이트 | 스타트 방 탈출 게이트 |
+
+### 2-3. 문 앵커 토큰 `DR`
+
+형식: **`DR<width>`** (예: `DR`, `DR3`, `DR5` — 폭 셀 수, 생략 시 3)
+
+- **외곽 링(테두리) 위에만** 배치 (위=North / 아래=South / 좌=West / 우=East 자동 추론)
+- 기본은 닫힌 벽이며, 방 연결 시 선택된 문만 폭만큼 Floor로 개방됨
+- 내부(테두리 아님)에 두면 무효 → 무음 Floor로 소실되므로 금지
 
 ---
 
 ## 3. 몬스터 스포너 토큰
 
-형식: **`[M|m][c|r|e]<숫자>`**  (예: `Mc3`, `mr5`, `Me1`)
+형식: **`[M|m]([c|r|e]<숫자>)+`**  (예: `Mc3`, `mr5`, `Me1`, 멀티웨이브 `Mc3r1e1`, `mc3r2`)
+
+> 세그먼트 1개(`Mc3`)는 단일 등급·수량. 세그먼트 2개 이상(`Mc3r1e1`)은 **웨이브 배열**(세그먼트 수 = 웨이브 수)로 해석됨. 등급 문자는 대/소문자 모두 허용되나 **소문자 권장**(`c`/`r`/`e`).
 
 ### 3-1. 첫 글자 — 활성화 방식
 
@@ -75,6 +94,8 @@
 | `Mr5` | 확정 스폰, Rare 등급까지, 5마리 |
 | `Me1` | 확정 스폰, Elite 등급까지, 1마리 (보통 엘리트 방에 사용) |
 | `mr4` | 후보 스폰, Rare 등급까지, 4마리 |
+| `mc3r2` | 후보 스폰, 2웨이브 (1웨이브 Common 3 → 2웨이브 Rare 2) |
+| `Mc3r1e1` | 확정 스폰, 3웨이브 (Common 3 → Rare 1 → Elite 1) |
 | `M` | 별칭 = `Mc0` (Common, 무제한). 하위호환용 |
 
 ---
@@ -115,7 +136,7 @@
 | 필드 | 타입 | 설명 | 예시 |
 |---|---|---|---|
 | `room_id` | 문자열 | 방 고유 ID. snake_case + 번호 | `battle_001`, `elite_002`, `boss_001` |
-| `category` | enum | 방 종류 | `Battle` / `Elite` / `Boss` / `Event` / `Shop` / `Start` |
+| `category` | enum | 방 종류 (`RunSequencer.CategoryName` 기준) | `Normal` / `Elite` / `Shop` / `Event` / `PreBoss` / `Boss` |
 | `theme` | 문자열 | 블록 외형 테마. 챕터 테마로 오버라이드될 수 있음 | `Forest` / `Cave` / `Abyss` / `Castle` / `Throne` |
 | `palette` | 문자열 | (참고용 ID, 현재는 `theme`로 매칭) | `ForestT1` |
 | `width` / `height` | 정수 | 참고 필드 (grid_csv에서 자동 계산됨) | `30` |
@@ -160,14 +181,16 @@
 
 ## 7. 카테고리별 작성 가이드
 
+모든 방 공통: `P` 1개 + 외곽 `W`/`DR` 폐쇄 + 입구(South 문). Boss 외에는 직진(North 문)도 필요.
+
 | category | 필수 배치 토큰 | 일반적으로 쓰는 토큰 |
 |---|---|---|
-| Battle | `P` (1개), 최소 1개 이상 `M`/`m` | `O`, 장식 |
-| Elite | `P` (1개), `Me1` 계열 (엘리트 몬스터) | `O`, 장식 |
-| Boss | `P` (1개), `B` (1개 또는 `B,B` 2연속) | `O`, 장식 |
-| Event | `P` (1개), `N` 또는 `C` | 장식 |
-| Shop | `P` (1개), `S` (여러 개 가능) | 장식 |
-| Start | `P` (1개) | 장식, `O` (분위기용) |
+| Normal | 최소 1개 이상 `M`/`m` | `O`, 장식 |
+| Elite | `Me1`/`Me4r3` 계열 (엘리트 몬스터, 최소 1 스포너) | `O`, 장식 |
+| Shop | `Sw`/`Si` (여러 개 가능) | 장식 |
+| Event | `N` / `C` / `CV`(서약 제단) | 장식 |
+| PreBoss | (특수 토큰 없음 — 보스 직전 대기/이동 방) | 장식, `O` |
+| Boss | `B` (1개 또는 `B,B` 2연속) | `O`, 장식 |
 
 ---
 
@@ -192,7 +215,9 @@ Chapter 1 Battle 방, Forest 테마, 30×30
 
 - [ ] `P` 토큰이 정확히 1개인가? (0개면 플레이어가 스폰 안 됨)
 - [ ] 맵 외곽이 `W`로 전부 둘러싸여 있는가? (뚫려 있으면 플레이어가 맵 밖으로 추락)
-- [ ] Boss 방에 `B`가 있는가? / Shop 방에 `S`가 있는가?
+- [ ] 외곽이 전부 `W`/`DR`인가? 모든 행 길이가 같은가(직사각)? 공란 셀은 없는가?
+- [ ] Boss 방에 `B`가 있는가? / Shop 방에 `Sw`·`Si`가 있는가? / Normal·Elite 방에 `M`/`m`가 있는가?
+- [ ] 입구(아래 `DR`)와 직진 출구(위 `DR`)가 있는가? (Boss는 입구만)
 - [ ] 장식 셀과 기능 셀(`M`, `P` 등)이 겹쳐있지는 않은가?
 - [ ] `max_active_spawners`가 실제 스포너 설계 의도와 맞는가?
 - [ ] 대소문자 구분: `M` ≠ `m`, `Mc3` ≠ `MC3` (현재 등급 문자 `c/r/e`는 대소문자 모두 허용되지만 소문자 권장)
@@ -203,8 +228,10 @@ Chapter 1 Battle 방, Forest 테마, 30×30
 
 - 타일 enum: [TileType.cs](../Systems/Stage/MapGen/TileType.cs)
 - 파싱 로직: [MapDataLoader.cs](../Systems/Stage/MapGen/MapDataLoader.cs)
-- 블록 팔레트: [Assets/Abyss/Systems/Stage/MapGen/Data/](../Systems/Stage/MapGen/Data/)
-- 장식 카탈로그: [Assets/Abyss/Settings/](../../Settings/)
-- 챕터 데이터: [Assets/Abyss/Systems/Stage/Stage/Data/Chapters/](../Systems/Stage/Stage/Data/Chapters/)
+- 토큰 핸들러 레지스트리: [TokenRegistry.cs](../Systems/Stage/MapGen/Token/TokenRegistry.cs)
+- 빌드 전 린터: [RoomCsvLinter.cs](../Systems/Stage/MapGen/Editor/RoomCsvLinter.cs) — 메뉴 `Tools/RelicFairy/Validate Room CSVs`
+- 블록 팔레트: [Assets/RelicFairy/Systems/Stage/MapGen/Data/](../Systems/Stage/MapGen/Data/)
+- 장식 카탈로그: `DecorationCatalogSO` 에셋 (테마별, 예: `DecorationCatalog_Forest.asset`)
+- 챕터 데이터: [Assets/RelicFairy/Systems/Stage/Stage/Data/Chapters/](../Systems/Stage/Stage/Data/Chapters/)
 
-문서 관리: 토큰이 추가/변경되면 본 문서도 함께 갱신.
+문서 관리: 토큰이 추가/변경되면 본 문서도 함께 갱신. 코드↔본 문서의 토큰 정합은 `Tools/RelicFairy/Validate Token Canon (drift check)` 메뉴로 검증.
