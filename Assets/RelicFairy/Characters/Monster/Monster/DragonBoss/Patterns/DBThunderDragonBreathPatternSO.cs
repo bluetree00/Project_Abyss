@@ -102,6 +102,7 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
 
         public override void Enter(MonsterContext ctx)
         {
+            GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
             if (ctx.Agent.isOnNavMesh)
                 ctx.Agent.ResetPath();
             ctx.Agent.velocity = Vector3.zero;
@@ -112,7 +113,7 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
             ctx.Agent.updateRotation = false;
 
             _mapCenter = ctx.Runtime.SpawnPosition;
-            _mapCenter.y = ctx.Runtime.SpawnPosition.y;
+            _mapCenter.y = DragonPatternFloorUtils.GetFloorY(ctx.Runtime.SpawnPosition, ctx.Runtime.SpawnPosition.y);
             _flyPosition = _mapCenter + Vector3.up * Data.riseHeight;
 
             if (ctx.Animator != null)
@@ -267,7 +268,7 @@ public class DBThunderDragonBreathPatternSO : BossPatternSO
             float angleDeg = 360f / Data.columnCount;
             Vector3 dir = Quaternion.Euler(0f, _columnAngle, 0f) * Vector3.forward;
             Vector3 pos = _mapCenter + dir * Data.lightningRingRadius;
-            pos.y = _mapCenter.y;
+            pos.y = DragonPatternFloorUtils.GetFloorY(pos, _mapCenter.y);
 
             _columnPositions[_spawnedColumns] = pos;
             _columnSpawnTimes[_spawnedColumns] = _timer;

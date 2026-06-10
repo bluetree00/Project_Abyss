@@ -2321,10 +2321,23 @@ MonoBehaviour:
   _bodyRenderers: []
   _swordCtrl: {fileID: 0}
   _attackPool:
-  - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
   - {fileID: 11400000, guid: a7323ceaf1a96b246bb54a211f51df1f, type: 2}
+  - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
+  _teleportVfxPrefab: {fileID: 0}
+  _teleportDistance: 3
+  _teleportVfxDuration: 0.5
+  _phase2BasicPool:
+  - {fileID: 11400000, guid: 354f3dee0a05dde40963eaede4c00777, type: 2}
+  - {fileID: 11400000, guid: 4b27db7900ffe704fa974e306ea4486f, type: 2}
+  - {fileID: 11400000, guid: 58b11ee0303bfc440a472e5007433b47, type: 2}
+  - {fileID: 11400000, guid: d77e2803a97843449b905cd85c470308, type: 2}
+  _phase2AreaPool:
+  - {fileID: 11400000, guid: 319e3f071fd9121469eca78d7144e426, type: 2}
+  - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
+  - {fileID: 11400000, guid: fcfd1f3cacf82144f91ba7a36125a55c, type: 2}
   - {fileID: 11400000, guid: 1150cdc212785954ca3d3f1ea2ba8e4d, type: 2}
   - {fileID: 11400000, guid: b03018b7b30b24e449747552137e93f2, type: 2}
+  _phase1AnchorTransform: {fileID: 0}
 --- !u!195 &8839149076850127432
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -5331,96 +5344,6 @@ Transform:
   - {fileID: 5880897092327123436}
   m_Father: {fileID: 2929849094128476524}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &6425117858667715993
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8702006396692757139}
-  - component: {fileID: 6543931359996072074}
-  - component: {fileID: 5024035345738070389}
-  m_Layer: 0
-  m_Name: SM_DarkKnight2_Sword
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8702006396692757139
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6425117858667715993}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4936772962965869439}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &6543931359996072074
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6425117858667715993}
-  m_Mesh: {fileID: 6432337824229305612, guid: d1ad8ef9354feb545ae0e7bd03d5380e, type: 3}
---- !u!23 &5024035345738070389
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6425117858667715993}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: -1108641195704703512, guid: d1ad8ef9354feb545ae0e7bd03d5380e, type: 3}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &6542526379853173027
 GameObject:
   m_ObjectHideFlags: 0
@@ -6992,3 +6915,77 @@ Transform:
   - {fileID: 2883149399987833129}
   m_Father: {fileID: 669178978469437709}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &4237197168943146653
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 4936772962965869439}
+    m_Modifications:
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7198747572118092548, guid: 9f1b0093739bea441aa88a3a074492cb,
+        type: 3}
+      propertyPath: m_Name
+      value: SM_DarkKnight2_Sword
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 9f1b0093739bea441aa88a3a074492cb, type: 3}
+--- !u!4 &8702006396692757139 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4759795553169693710, guid: 9f1b0093739bea441aa88a3a074492cb,
+    type: 3}
+  m_PrefabInstance: {fileID: 4237197168943146653}
+  m_PrefabAsset: {fileID: 0}

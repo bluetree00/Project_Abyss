@@ -19,15 +19,15 @@ internal sealed class DragonSummonedAtCondition : ICondition
         float hp = cfg?.stat.maxHp > 0 ? (float)rt.CurrentHp / cfg.stat.maxHp : 1f;
         return _phase switch
         {
-            DragonSummonPhase.At80 => hp <= 0.8f && !bb.HasSummonedAt80,
-            DragonSummonPhase.At50 => hp <= 0.5f && !bb.HasSummonedAt50,
+            DragonSummonPhase.At70 => hp <= 0.7f && !bb.HasSummonedAt70,
+            DragonSummonPhase.At40 => hp <= 0.4f && !bb.HasSummonedAt40,
             DragonSummonPhase.At10 => hp <= 0.1f && !bb.HasSummonedAt10,
             _                      => false,
         };
     }
 }
 
-public enum DragonSummonPhase { At80, At50, At10 }
+public enum DragonSummonPhase { At70, At40, At10 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DragonBoss 속성 페이즈 조건 (HP 비율 범위)
@@ -216,12 +216,20 @@ public class DragonWalkChaseState : IMonsterState
 
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
-        float angle = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
+        float angle    = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
+        float absAngle = Mathf.Abs(angle);
+
+        bool inTurnAnim = _currentAnim != null && _currentAnim != dragon.WalkChaseStateName;
 
         string target;
-        if      (angle < -DirThreshold) target = dragon.WalkLeftStateName;
-        else if (angle >  DirThreshold) target = dragon.WalkRightStateName;
-        else                            target = dragon.WalkChaseStateName;
+        if (inTurnAnim)
+            target = absAngle > dragon.GroundTurnFaceAngle
+                ? (angle < 0f ? dragon.WalkLeftStateName : dragon.WalkRightStateName)
+                : dragon.WalkChaseStateName;
+        else
+            target = angle < -DirThreshold ? dragon.WalkLeftStateName
+                   : angle >  DirThreshold ? dragon.WalkRightStateName
+                   : dragon.WalkChaseStateName;
 
         if (_currentAnim == target) return;
         _currentAnim = target;
@@ -250,7 +258,9 @@ public class DragonWalkChaseState : IMonsterState
             : ctx.Stat.moveSpeed * speedMult * ctx.Runtime.SpeedMultiplier;
 
         // 항상 플레이어 위치를 목적지로 설정 — angularSpeed(35f)가 천천히 회전을 담당
-        Vector3 dest = ctx.Runtime.PlayerTarget.position;
+        Vector3 dest = isDirectional && dragon != null
+            ? DragonGroundTurnUtility.BuildDestination(ctx, dragon)
+            : ctx.Runtime.PlayerTarget.position;
 
         if ((dest - _lastDest).sqrMagnitude > DestSqThreshold)
         {
@@ -356,12 +366,20 @@ public class DragonRunChaseState : IMonsterState
 
         Vector3 dir = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
         dir.y = 0f;
-        float angle = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
+        float angle    = Vector3.SignedAngle(ctx.Transform.forward, dir, Vector3.up);
+        float absAngle = Mathf.Abs(angle);
+
+        bool inTurnAnim = _currentAnim != null && _currentAnim != dragon.RunChaseStateName;
 
         string target;
-        if      (angle < -DirThreshold) target = dragon.RunLeftStateName;
-        else if (angle >  DirThreshold) target = dragon.RunRightStateName;
-        else                            target = dragon.RunChaseStateName;
+        if (inTurnAnim)
+            target = absAngle > dragon.GroundTurnFaceAngle
+                ? (angle < 0f ? dragon.RunLeftStateName : dragon.RunRightStateName)
+                : dragon.RunChaseStateName;
+        else
+            target = angle < -DirThreshold ? dragon.RunLeftStateName
+                   : angle >  DirThreshold ? dragon.RunRightStateName
+                   : dragon.RunChaseStateName;
 
         if (_currentAnim == target) return;
         _currentAnim = target;
@@ -388,7 +406,9 @@ public class DragonRunChaseState : IMonsterState
             ? ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier * dragon.TurnSpeedMult
             : ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
 
-        Vector3 dest = ctx.Runtime.PlayerTarget.position;
+        Vector3 dest = isDirectional && dragon != null
+            ? DragonGroundTurnUtility.BuildDestination(ctx, dragon)
+            : ctx.Runtime.PlayerTarget.position;
 
         if ((dest - _lastDest).sqrMagnitude > DestSqThreshold)
         {
@@ -426,6 +446,7 @@ public class DragonBossAttackReadyState : IMonsterState
     private bool _hasOrbitCenter;
     private Vector3 _desiredOrbitCenter;
     private float _returnBlendTimer;
+    private bool _topDownActivated;
 
     public void Enter(MonsterContext ctx)
     {
@@ -458,8 +479,8 @@ public class DragonBossAttackReadyState : IMonsterState
         _hasLastOrbitAngle = TryGetOrbitAngle(ctx, out _lastOrbitAngle);
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb)
             dragonBb.AirOrbitAccumulatedDegrees = 0f;
-        GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
-        Debug.Log("[DragonAttackReady.Enter] ActivateDragonTopDownView 호출 완료");
+        _topDownActivated = false;
+        // 카메라 전환은 선회궤도 진입 완료 시점(UpdateAirChase)에서 수행
         UpdateAirChaseAnimation(ctx, true);
     }
 
@@ -491,15 +512,16 @@ public class DragonBossAttackReadyState : IMonsterState
 
     public void Exit(MonsterContext ctx)
     {
-        // 공중 패턴 전환 시에는 탑다운 유지 — 지상 전환 또는 죽음 시에만 해제
-        var dragonBb = (ctx.Monster as IBoss)?.Blackboard as DragonBossBlackboard;
-        if (dragonBb == null || dragonBb.BodyState != BodyState.Airborne)
+        // 공중 패턴으로 전환 시 카메라는 그대로 유지 — 각 공중 패턴이 Enter()에서 직접 제어
+        var bb = (ctx.Monster as IBoss)?.Blackboard as DragonBossBlackboard;
+        if (bb == null || bb.BodyState != BodyState.Airborne)
             GameCameraController.Instance?.DeactivateDragonTopDownView();
         _currentAirAnim = null;
         _hasLastOrbitAngle = false;
         _hasOrbitCenter = false;
         _desiredOrbitCenter = default;
         _returnBlendTimer = 0f;
+        _topDownActivated = false;
     }
 
     private void UpdateAirChase(MonsterContext ctx)
@@ -520,6 +542,13 @@ public class DragonBossAttackReadyState : IMonsterState
             moveSpeed *= dragon.AirOrbitCatchUpSpeedMult;
 
         _returnBlendTimer -= Time.deltaTime;
+
+        // 선회궤도 진입 완료 시점에 탑뷰 카메라 전환 (부자연스러운 이동 구간을 가림)
+        if (!_topDownActivated && _returnBlendTimer <= 0f)
+        {
+            _topDownActivated = true;
+            GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
+        }
         UpdateAirChaseAnimation(ctx, false);
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position,
@@ -804,6 +833,48 @@ public class DragonDieState : DieState
         // Despawn 타이밍(3초)에 맞춰 HUD 해제 — 시체가 사라질 때 같이 없어짐
         (ctx.Monster as DragonBossMonster)?.UnbindBossHudAfterDelay(3f);
         base.Enter(ctx);
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 지상 회전 호 이동 헬퍼
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// <summary>
+/// 드래곤이 방향 전환 애니메이션 재생 중 제자리 회전이 아닌 호(arc)를 그리며
+/// 이동하도록 NavMeshAgent 목적지를 계산한다.
+/// </summary>
+internal static class DragonGroundTurnUtility
+{
+    private const float MinOrbitRadius = 2f;
+    private const float MaxOrbitRadius = 8f;
+    private const float OrbitDistRatio = 0.5f;
+
+    /// <summary>
+    /// 드래곤 위치에서 플레이어 방향으로 <see cref="DragonBossMonster.GroundTurnOrbitAngle"/>만큼
+    /// 회전된 방향의 목적지를 반환한다. NavMeshAgent는 이 지점으로 이동하면서 자연스럽게
+    /// 호를 그려 플레이어를 향해 돌아선다.
+    /// </summary>
+    public static Vector3 BuildDestination(MonsterContext ctx, DragonBossMonster dragon)
+    {
+        if (ctx.Runtime.PlayerTarget == null)
+            return ctx.Transform.position;
+
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        toPlayer.y = 0f;
+
+        float distToPlayer = toPlayer.magnitude;
+        if (distToPlayer < 0.1f)
+            return ctx.Transform.position;
+
+        float signedAngle = Vector3.SignedAngle(ctx.Transform.forward, toPlayer.normalized, Vector3.up);
+        float orbitSide   = signedAngle >= 0f ? 1f : -1f;
+
+        Vector3 orbitalDir = Quaternion.Euler(0f, orbitSide * dragon.GroundTurnOrbitAngle, 0f)
+                             * ctx.Transform.forward;
+
+        float orbitRadius = Mathf.Clamp(distToPlayer * OrbitDistRatio, MinOrbitRadius, MaxOrbitRadius);
+        return ctx.Transform.position + orbitalDir.normalized * orbitRadius;
     }
 }
 

@@ -127,6 +127,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
         _phase = Phase.Warning;
         _phaseTimer = 0f;
         _traveledDistance = 0f;

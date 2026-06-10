@@ -23,7 +23,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [SerializeField] private float  _warningWidth        = 8f;
     [SerializeField] private float  _warningLength       = 14f;
     [SerializeField] private float  _borderLineWidth     = 0.15f;
-    [SerializeField] private Color  _warningColor        = new Color(0.3f, 0.8f, 1f, 0.45f);
+    [SerializeField] private Color  _warningColor        = new Color(0.65f, 0.3f, 1.0f, 0.45f);
 
     [Header("공격")]
     [SerializeField] private float  _attackAnimDuration  = 1.8f;
@@ -32,6 +32,9 @@ public class DragonStormWingsPatternSO : BossPatternSO
 
     [Header("상태이상")]
     [SerializeField] private PlayerStatusEffectSO _statusEffect;
+
+    [Header("EndPose (반격 창)")]
+    [SerializeField] private float  _endPoseDuration     = 0.4f;
 
     [Header("쿨다운")]
     [SerializeField] private float  _cooldown            = 18f;
@@ -50,6 +53,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public int    AttackDamage       => _attackDamage;
     public GameObject WindBlastPrefab => _windBlastPrefab;
     public PlayerStatusEffectSO StatusEffect => _statusEffect;
+    public float  EndPoseDuration    => _endPoseDuration;
     public float  Cooldown           => _cooldown;
 
     private DragonStormWingsState _runtimeState;
@@ -76,7 +80,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
 
 internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatternSO>
 {
-    private enum Phase { Takeoff, Hover, Warning, Attack, Landing, Done }
+    private enum Phase { Takeoff, Hover, Warning, Attack, EndPose, Landing, Done }
 
     private Phase   _phase;
     private float   _timer;
@@ -108,6 +112,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
         _phase            = Phase.Hover;
         _timer            = 0f;
         _windBlastSpawned = false;
@@ -135,6 +140,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             case Phase.Hover:    UpdateHover(ctx);    break;
             case Phase.Warning:  UpdateWarning(ctx);  break;
             case Phase.Attack:   UpdateAttack(ctx);   break;
+            case Phase.EndPose:  UpdateEndPose(ctx);  break;
             case Phase.Landing:  UpdateLanding(ctx);  break;
         }
     }
@@ -186,11 +192,12 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     private void CreateWarning(MonsterContext ctx)
     {
-        Color c = Data.WarningColor;
+        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
+        Color c = new Color(thunderBase.r, thunderBase.g, thunderBase.b, Data.WarningColor.a);
         _targetAlpha = c.a;
 
         // 바닥 기준 위치 — 지형 z-fighting 방지용 0.3f 오프셋
-        float groundY = ctx.Runtime.SpawnPosition.y + 0.3f;
+        float groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y) + 0.3f;
         Vector3 bossFloor = new Vector3(
             ctx.Transform.position.x, groundY, ctx.Transform.position.z);
 
@@ -287,8 +294,16 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
         if (_timer < Data.AttackAnimDuration) return;
 
-        _phase = Phase.Done;
+        _phase = Phase.EndPose;
         _timer = 0f;
+    }
+
+    private void UpdateEndPose(MonsterContext ctx)
+    {
+        ctx.Transform.position = _hoverPos;
+        if (_timer < Data.EndPoseDuration) return;
+
+        _phase = Phase.Done;
         ctx.Monster.ChangeState<AttackReadyState>();
     }
 
@@ -322,7 +337,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         go.transform.localScale = new Vector3(Data.WarningWidth, Data.WarningWidth * 0.5f, Data.WarningLength);
 
         // 속성 색상 적용
-        Color tint = new Color(Data.WarningColor.r, Data.WarningColor.g, Data.WarningColor.b, 1f);
+        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
+        Color tint = new Color(thunderBase.r, thunderBase.g, thunderBase.b, 1f);
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -338,9 +354,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             }
         }
 
-        // 경고 장판 전체 범위로 판정 (장판이 SpawnPosition.y 기준)
         Vector3 hitCenter = _warnCenter;
-        hitCenter.y = ctx.Runtime.SpawnPosition.y + 1f;
+        hitCenter.y = DragonPatternFloorUtils.GetFloorY(_warnCenter, ctx.Runtime.SpawnPosition.y) + 1f;
         var hits = Physics.OverlapBox(
             hitCenter,
             new Vector3(Data.WarningWidth * 0.5f, 1.5f, Data.WarningLength * 0.5f),

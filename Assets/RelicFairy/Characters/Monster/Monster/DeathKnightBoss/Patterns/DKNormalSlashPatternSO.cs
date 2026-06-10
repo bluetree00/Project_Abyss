@@ -124,6 +124,10 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                 DKGridPatternHelper.SpawnSingleRowVfx(Data.impactVfxPrefab, rowZ, _swordColor);
                 DKGridPatternHelper.TriggerSingleRowDamage(
                     ctx, rowZ, Data.damageMultiplier, Data.knockbackMultiplier);
+                // §3 타격감 — 첫 행에서 히트스톱, 이후 행은 쉐이크만
+                if (_rowIndex == 0)
+                    BossImpactFeedback.TriggerHitStop(0.08f);
+                BossImpactFeedback.TriggerCameraShake(0.1f, 0.2f);
                 _rowIndex++;
             }
         }

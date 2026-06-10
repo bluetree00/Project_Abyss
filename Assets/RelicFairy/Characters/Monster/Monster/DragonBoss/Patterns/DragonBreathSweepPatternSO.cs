@@ -3,78 +3,127 @@ using UnityEngine;
 
 namespace RelicFairy.Monster
 {
-/// <summary>
-/// 브레스 휩쓸기 패턴.
-/// ① 5행 경고장판 페이드인 → ② 장판 소멸 + 드래곤 측면 위에서 AirChase로 통과
-///    (위쪽 Spotlight가 따라다니며 바닥에 드래곤 그림자 연출)
-/// ③ 드래곤 통과 방향 대각선 아래로 FlameBreath 발사 + 해당 열 중간칸 FlameTsunami 즉시 스폰
-/// ④ sweep 종료 후 모든 FlameTsunami 5초 잔류 + 틱 피해 → 전부 소멸 시 종료
-/// </summary>
 [CreateAssetMenu(fileName = "DragonBreathSweepPattern",
     menuName = "RelicFairy/Boss/Dragon/BreathSweepPattern")]
 public class DragonBreathSweepPatternSO : BossPatternSO
 {
-    [Header("비행 — 애니메이션")]
-    [SerializeField] private string _airChaseLeftStateName  = "AirChaseLeft";
+    [Header("Air Animation")]
+    [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
     [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
 
-    [Header("비행 — 위치")]
-    [SerializeField] private float _hideHeight   = 38f;
-    [SerializeField] private float _flySpeed     = 18f;
-    [SerializeField] private float _flySideOffset= 20f;   // 맵 중앙에서 시작/끝 여백
+    [Header("Flight")]
+    [SerializeField] private float _hideHeight = 6f;
+    [SerializeField] private float _flySpeed = 7f;
 
-    [Header("경고 타일")]
-    [SerializeField] private int   _warningRowCount = 5;
+    [Header("Warning")]
+    [SerializeField] private int _warningRowCount = 5;
     [SerializeField] private float _warningDuration = 2f;
-    [SerializeField] private Color _warningColor    = new Color(1f, 0.35f, 0f, 0.45f);
+    [SerializeField] private Color _warningColor = new Color(1.0f, 0.35f, 0.1f, 0.45f);
 
-    [Header("따라다니는 광원 (그림자 연출)")]
-    [SerializeField] private float _lightHeightOffset = 4f;   // 드래곤 위 오프셋
-    [SerializeField] private float _lightIntensity    = 4f;
-    [SerializeField] private float _lightRange        = 60f;
-    [SerializeField] private float _lightSpotAngle    = 55f;
-    [SerializeField] private Color _lightColor        = new Color(1f, 0.85f, 0.6f);
+    [Header("Cinematic")]
+    [SerializeField] private int _sweepCount = 3;
+    [SerializeField] private float _previewDuration = 1f;
+    [SerializeField] private float _previewTimeScale = 0.25f;
+    [SerializeField] private float _cameraReturnDuration = 1.2f;
+    [Tooltip("첫 sweep에서 슬로우+탑뷰를 유지하는 레인 비율 (0~1). 높을수록 더 오래 탑뷰 유지.")]
+    [SerializeField] private float _slowReleaseRatio = 0.4f;
 
-    [Header("이펙트")]
+    [Header("Follow Light")]
+    [SerializeField] private float _lightHeightOffset = 2f;
+    [SerializeField] private float _lightIntensity = 20f;
+    [SerializeField] private float _lightRange = 30f;
+    [SerializeField] private float _lightSpotAngle = 60f;
+    [SerializeField] private Color _lightColor = new Color(1f, 0.85f, 0.6f);
+
+    [Header("Flame Breath")]
     [SerializeField] private GameObject _flameBreathPrefab;
+    [SerializeField] private float _breathDownAngle = 45f;
+    [Tooltip("탑뷰 슬로우 연출 시 사용할 각도. 0에 가까울수록 수평에 가까워 위에서 보임")]
+    [SerializeField] private float _breathPreviewAngle = 8f;
+    [SerializeField] private float _flameBreathBaseLength = 10f;
+    [SerializeField] private float _flameBreathBaseWidth = 5f;
+    [SerializeField] private float _flameBreathScale = 1f;
+    [SerializeField] private float _breathHorizReach = 0f;
+
+    [Header("Flame Tsunami")]
     [SerializeField] private GameObject _flameTsunamiPrefab;
+    [SerializeField] private int _tsunamiColInterval = 3;
+    [SerializeField] private float _tsunamiScale = 0.2f;
 
-    [Header("브레스 대각선 각도 (도, 0=수평 90=수직)")]
-    [SerializeField] private float _breathDownAngle = 30f;   // 아래로 꺾이는 각도
-
-    [Header("피해")]
-    [SerializeField] private int   _breathDamage        = 20;
-    [SerializeField] private int   _tsunamiDamage       = 10;
-    [SerializeField] private float _tsunamiDuration     = 5f;
+    [Header("Damage")]
+    [SerializeField] private int _breathDamage = 20;
+    [SerializeField] private int _tsunamiDamage = 10;
+    [SerializeField] private float _tsunamiDuration = 5f;
     [SerializeField] private float _tsunamiTickInterval = 1f;
-    [SerializeField] private float _damageRadius        = 1.5f;
+    [Tooltip("브레스 파티클 도달 지연 보정: 기하학 계산이 비주얼보다 빨리 잡히는 경우 증가 (셀 단위)")]
+    [SerializeField] private float _tsunamiLagCells = 1f;
+    [SerializeField] private LayerMask _breathBlockMask;
 
-    [Header("쿨다운")]
+    [Header("Scorch Marks")]
+    [Tooltip("직접 지정한 텍스처. 없으면 절차적 생성 사용.")]
+    [SerializeField] private Texture2D _scorchTexture;
+    [Tooltip("열당 스폰할 그을림 쿼드 수")]
+    [SerializeField] private int   _scorchClusterCount = 3;
+    [SerializeField] private float _scorchDuration     = 9f;
+    [Tooltip("스케일 범위 (셀 크기 배수)")]
+    [SerializeField] private float _scorchScaleMin     = 0.8f;
+    [SerializeField] private float _scorchScaleMax     = 2.2f;
+    [Tooltip("진행 방향 수직 분산 (셀 단위)")]
+    [SerializeField] private float _scorchPerpJitter   = 0.55f;
+
+    [Header("Flame Scatter")]
+    [Tooltip("열당 추가 시각 불 이펙트 수 (데미지 판정 1개 + 여기서 지정한 수만큼 시각 전용 추가)")]
+    [SerializeField] private int   _fireVisualCount    = 1;
+    [SerializeField] private float _fireScaleMin       = 0.13f;
+    [SerializeField] private float _fireScaleMax       = 0.27f;
+    [Tooltip("진행 방향 수직 분산 (셀 단위)")]
+    [SerializeField] private float _firePerpJitter     = 0.45f;
+
+    [Header("Cooldown")]
     [SerializeField] private float _cooldown = 22f;
 
-    // ── Properties ───────────────────────────────────────────────────────────
-    public string AirChaseLeftStateName  => _airChaseLeftStateName;
+    public string AirChaseLeftStateName => _airChaseLeftStateName;
     public string AirChaseRightStateName => _airChaseRightStateName;
-    public float  HideHeight             => _hideHeight;
-    public float  FlySpeed               => _flySpeed;
-    public float  FlySideOffset          => _flySideOffset;
-    public int    WarningRowCount        => _warningRowCount;
-    public float  WarningDuration        => _warningDuration;
-    public Color  WarningColor           => _warningColor;
-    public float  LightHeightOffset      => _lightHeightOffset;
-    public float  LightIntensity         => _lightIntensity;
-    public float  LightRange             => _lightRange;
-    public float  LightSpotAngle         => _lightSpotAngle;
-    public Color  LightColor             => _lightColor;
-    public GameObject FlameBreathPrefab   => _flameBreathPrefab;
-    public GameObject FlameTsunamiPrefab  => _flameTsunamiPrefab;
-    public float  BreathDownAngle        => _breathDownAngle;
-    public int    BreathDamage           => _breathDamage;
-    public int    TsunamiDamage          => _tsunamiDamage;
-    public float  TsunamiDuration        => _tsunamiDuration;
-    public float  TsunamiTickInterval    => _tsunamiTickInterval;
-    public float  DamageRadius           => _damageRadius;
-    public float  Cooldown               => _cooldown;
+    public float HideHeight => _hideHeight;
+    public float FlySpeed => _flySpeed;
+    public int WarningRowCount => _warningRowCount;
+    public float WarningDuration => _warningDuration;
+    public Color WarningColor => _warningColor;
+    public int SweepCount => _sweepCount;
+    public float PreviewDuration => _previewDuration;
+    public float PreviewTimeScale => _previewTimeScale;
+    public float CameraReturnDuration => _cameraReturnDuration;
+    public float SlowReleaseRatio     => _slowReleaseRatio;
+    public float LightHeightOffset => _lightHeightOffset;
+    public float LightIntensity => _lightIntensity;
+    public float LightRange => _lightRange;
+    public float LightSpotAngle => _lightSpotAngle;
+    public Color LightColor => _lightColor;
+    public GameObject FlameBreathPrefab => _flameBreathPrefab;
+    public float BreathDownAngle        => _breathDownAngle;
+    public float BreathPreviewAngle     => _breathPreviewAngle;
+    public float BreathHorizReach => _breathHorizReach;
+    public float FlameBreathScale => _flameBreathScale;
+    public GameObject FlameTsunamiPrefab => _flameTsunamiPrefab;
+    public int TsunamiColInterval => _tsunamiColInterval;
+    public float TsunamiScale => _tsunamiScale;
+    public int BreathDamage => _breathDamage;
+    public int TsunamiDamage => _tsunamiDamage;
+    public float TsunamiDuration => _tsunamiDuration;
+    public float TsunamiTickInterval => _tsunamiTickInterval;
+    public float TsunamiLagCells    => _tsunamiLagCells;
+    public LayerMask BreathBlockMask => _breathBlockMask;
+    public Texture2D ScorchTexture      => _scorchTexture;
+    public int   ScorchClusterCount => _scorchClusterCount;
+    public float ScorchDuration     => _scorchDuration;
+    public float ScorchScaleMin     => _scorchScaleMin;
+    public float ScorchScaleMax     => _scorchScaleMax;
+    public float ScorchPerpJitter   => _scorchPerpJitter;
+    public int   FireVisualCount    => _fireVisualCount;
+    public float FireScaleMin       => _fireScaleMin;
+    public float FireScaleMax       => _fireScaleMax;
+    public float FirePerpJitter     => _firePerpJitter;
+    public float Cooldown => _cooldown;
 
     private DragonBreathSweepState _runtimeState;
 
@@ -94,80 +143,111 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Runtime state
-// ─────────────────────────────────────────────────────────────────────────────
-
 internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPatternSO>
 {
-    private enum Phase { Warning, Sweep, Tsunami, Done }
+    private enum Phase { FlyToStart, Warning, Preview, Sweep, Tsunami, Done }
 
     private struct TsunamiEntry
     {
         public GameObject Go;
-        public Vector3    Position;
-        public float      Timer;
-        public float      TickTimer;
+        public Vector3 Center;
+        public Vector3 Direction;
+        public Vector3 Right;
+        public float HalfWidth;
+        public float Timer;
+        public float TickTimer;
     }
+
+    private struct ScorchEntry
+    {
+        public GameObject Go;
+        public float Timer;
+        public float MaxTimer;
+    }
+
+    private const float FlyThroughPadding   = 3f;
+    private const float FlyToStartTolerance = 1.5f;
 
     private Phase _phase;
     private float _timer;
+    private int   _sweepIndex;
+    private int   _nextColIndex;
+    private int   _totalCols;
 
-    // 경고 타일
-    private readonly List<GameObject> _warnTiles = new();
-    private readonly List<Material>   _warnMats  = new();
+    private float _beamLength;
+    private float _horizontalReach;
+    private float _halfLaneWidth;
+    private float _sweepStartProj;
+    private float _sweepEndProj;
+    private float _flyThroughEndProj;
 
-    // 행 범위 (플레이어 중심 N행)
-    private int _rowMin;
-    private int _rowMax;
-    private int _centerRow;
+    private Vector3 _sweepDir   = Vector3.right;
+    private Vector3 _sweepRight = Vector3.forward;
+    private Vector3 _laneCenter;
 
-    // sweep 방향 / 열 추적
-    private int _fromSide;            // -1: 왼→오, +1: 오→왼
-    private int _nextColIndex;        // 다음에 발사할 열 순번 (0 ~ Width-3)
-    private int _totalCols;
+    private bool     _animSlowActive;
+    private Animator _savedAnimator;
+    private int      _revealedTileCount;
+    private string   _currentFlyAnim;
+    private float    _slowUntilProj;
 
-    // 따라다니는 광원
-    private Light _followLight;
+    private static Texture2D s_ScorchTex;
+    private static Material  s_ScorchMat;
 
-    // 열별 FlameTsunami (타이머는 Tsunami 페이즈 진입 시 일괄 시작)
-    private readonly List<TsunamiEntry> _tsunamis = new();
+    private readonly List<Vector2Int>   _warnCells = new();
+    private readonly List<GameObject>   _warnTiles = new();
+    private readonly List<Material>     _warnMats  = new();
+    private readonly List<TsunamiEntry> _tsunamis  = new();
+    private readonly List<ScorchEntry>  _scorches  = new();
+
+    private GameObject _flameBreathGo;
+    private Light      _followLight;
 
     internal DragonBreathSweepState(DragonBreathSweepPatternSO data) : base(data) { }
 
     internal void Reset()
     {
+        RestoreDragonSpeedDirect();
         CleanupWarn();
         CleanupFollowLight();
+        CleanupFlameBreath();
         CleanupAllTsunamis();
-        _phase = Phase.Done;
-        _timer = 0f;
+        CleanupAllScorches();
+        _phase          = Phase.Done;
+        _timer          = 0f;
+        _currentFlyAnim = null;
     }
-
-    // ── FSM ──────────────────────────────────────────────────────────────────
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase         = Phase.Warning;
-        _timer         = 0f;
-        _nextColIndex  = 0;
-        _fromSide      = Random.value < 0.5f ? -1 : 1;
+        _phase             = Phase.FlyToStart;
+        _timer             = 0f;
+        _sweepIndex        = 0;
+        _nextColIndex      = 0;
+        _currentFlyAnim    = null;
+        _revealedTileCount = 0;
         _tsunamis.Clear();
 
+        _scorches.Clear();
         if (ctx.Agent != null) ctx.Agent.enabled = false;
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
+            bb.LeapCooldown = Data.Cooldown;
 
-        var bb = (ctx.Monster as IBoss)?.Blackboard;
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
+        if (Data.BreathHorizReach > 0f)
+        {
+            _horizontalReach = Data.BreathHorizReach;
+            _beamLength      = Mathf.Sqrt(Data.HideHeight * Data.HideHeight + _horizontalReach * _horizontalReach);
+        }
+        else
+        {
+            float sinDown    = Mathf.Max(0.001f, Mathf.Sin(Data.BreathDownAngle * Mathf.Deg2Rad));
+            float cosDown    = Mathf.Cos(Data.BreathDownAngle * Mathf.Deg2Rad);
+            _beamLength      = Data.HideHeight / sinDown;
+            _horizontalReach = _beamLength * cosDown;
+        }
 
-        ComputeRows(ctx);
-        SpawnWarnTiles();
-
-        // 경고 기간 중 드래곤은 맵 위 공중 호버 (현 위치 유지)
-        float hoverY = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
-        ctx.Transform.position = new Vector3(
-            DKBossRoomContext.WorldCenter.x,
-            hoverY,
-            WorldZOfRow(_centerRow));
+        GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
+        PickSweepLine(ctx);
     }
 
     public override void Update(MonsterContext ctx)
@@ -175,246 +255,387 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _timer += Time.deltaTime;
         switch (_phase)
         {
-            case Phase.Warning: UpdateWarning(ctx); break;
-            case Phase.Sweep:   UpdateSweep(ctx);   break;
-            case Phase.Tsunami: UpdateTsunami(ctx); break;
+            case Phase.FlyToStart: UpdateFlyToStart(ctx); break;
+            case Phase.Warning:    UpdateWarning(ctx);    break;
+            case Phase.Sweep:      UpdateSweep(ctx);      break;
+            case Phase.Tsunami:    UpdateTsunami(ctx);    break;
         }
     }
 
     public override void Exit(MonsterContext ctx)
     {
+        RestoreDragonSpeed(ctx);
         CleanupWarn();
         CleanupFollowLight();
+        CleanupFlameBreath();
         CleanupAllTsunamis();
+        CleanupAllScorches();
+        RestoreAgent(ctx);
     }
 
-    // ── Warning ───────────────────────────────────────────────────────────────
+    // ─── Phase: FlyToStart ────────────────────────────────────────────────
+
+    private void UpdateFlyToStart(MonsterContext ctx)
+    {
+        UpdateLivingTsunamis(ctx);
+        UpdateLivingScorches();
+
+        Vector3 targetPos = GetSweepStartPosition(ctx);
+        Vector3 toTarget  = targetPos - ctx.Transform.position;
+        toTarget.y = 0f;
+
+        string anim = toTarget.sqrMagnitude > 0.01f
+            ? (Vector3.SignedAngle(ctx.Transform.forward, toTarget.normalized, Vector3.up) >= 0f
+               ? Data.AirChaseRightStateName : Data.AirChaseLeftStateName)
+            : Data.AirChaseRightStateName;
+
+        if (_currentFlyAnim != anim)
+        {
+            _currentFlyAnim = anim;
+            PlayAnim(ctx, anim);
+        }
+
+        // 비행 중: 목적지 방향을 바라봄
+        if (toTarget.sqrMagnitude > 0.01f)
+            ctx.Transform.rotation = Quaternion.Slerp(
+                ctx.Transform.rotation,
+                Quaternion.LookRotation(toTarget.normalized, Vector3.up),
+                Time.deltaTime * 5f);
+
+        ctx.Transform.position = Vector3.MoveTowards(
+            ctx.Transform.position, targetPos, Data.FlySpeed * Time.deltaTime);
+
+        if (Vector3.Distance(ctx.Transform.position, targetPos) >= FlyToStartTolerance) return;
+
+        // 도착 시점의 플레이어 위치로 레인 중심 재계산 → 비행 중 플레이어 이동 반영
+        UpdateLaneCenterToPlayer(ctx);
+
+        ctx.Transform.SetPositionAndRotation(GetSweepStartPosition(ctx),
+            Quaternion.LookRotation(_sweepDir, Vector3.up));
+        SpawnWarnTilesSorted(ctx);
+        _revealedTileCount = 0;
+        _phase = Phase.Warning;
+        _timer = 0f;
+    }
+
+    private Vector3 GetSweepStartPosition(MonsterContext ctx)
+    {
+        Vector3 pos = _laneCenter + _sweepDir * (_sweepStartProj - _horizontalReach);
+        pos.y       = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
+        return pos;
+    }
+
+    // ─── Phase: Warning ───────────────────────────────────────────────────
+
+    private void BeginNextSweep(MonsterContext ctx)
+    {
+        CleanupWarn();
+        CleanupFollowLight();
+        CleanupFlameBreath();
+        PickSweepLine(ctx);
+        // 2번째/3번째 sweep: 텔레포트 후 짧은 경고장판만 표시 (탑뷰·슬로우 없음)
+        ctx.Transform.SetPositionAndRotation(
+            GetSweepStartPosition(ctx), Quaternion.LookRotation(_sweepDir, Vector3.up));
+        SpawnWarnTilesSorted(ctx);
+        _revealedTileCount = 0;
+        _phase = Phase.Warning;
+        _timer = 0f;
+    }
 
     private void UpdateWarning(MonsterContext ctx)
     {
-        // 장판 페이드인
-        float t = Mathf.Clamp01(_timer / Data.WarningDuration);
-        foreach (var mat in _warnMats)
+        UpdateLivingTsunamis(ctx);
+        UpdateLivingScorches();
+
+        float warnDur = Mathf.Max(0.01f, Data.WarningDuration);
+
+        float t           = Mathf.Clamp01(_timer / warnDur);
+        int   targetCount = Mathf.CeilToInt(t * _warnTiles.Count);
+        while (_revealedTileCount < targetCount && _revealedTileCount < _warnMats.Count)
         {
-            if (mat == null) continue;
-            Color c = mat.color;
-            c.a = Mathf.Lerp(0f, Data.WarningColor.a, t);
-            mat.color = c;
+            if (_warnMats[_revealedTileCount] != null)
+            {
+                Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+                _warnMats[_revealedTileCount].color = new Color(fireBase.r, fireBase.g, fireBase.b, Data.WarningColor.a);
+            }
+            _revealedTileCount++;
         }
-        if (_timer < Data.WarningDuration) return;
 
-        // 경고장판 소멸
+        if (_timer < warnDur) return;
+
         CleanupWarn();
-
-        // 드래곤을 시작 측면으로 순간이동
-        _totalCols    = DKBossRoomContext.Width - 2;   // interior 열 수
-        _nextColIndex = 0;
-        PlaceDragonAtStartSide(ctx);
-
-        // AirChase 애니메이션 적용 (진행 방향에 따라 Left/Right)
-        string animName = _fromSide < 0
-            ? Data.AirChaseRightStateName   // 왼→오 = 오른쪽으로 날기
-            : Data.AirChaseLeftStateName;   // 오→왼 = 왼쪽으로 날기
-        PlayAnim(ctx, animName);
-
-        // 광원 생성
+        ctx.Transform.SetPositionAndRotation(
+            GetSweepStartPosition(ctx), Quaternion.LookRotation(_sweepDir, Vector3.up));
+        PlayAnim(ctx, ResolveAirChaseAnim(ctx));
         CreateFollowLight(ctx);
-
+        SpawnFlameBreath(ctx);
+        // 첫 번째 sweep만 슬로우 + 탑뷰 유지
+        if (_sweepIndex == 0)
+        {
+            ApplyDragonSlow(ctx);
+            _slowUntilProj = _sweepStartProj + (_sweepEndProj - _sweepStartProj)
+                             * Mathf.Clamp01(Data.SlowReleaseRatio);
+        }
+        _nextColIndex  = 0;
         _phase = Phase.Sweep;
         _timer = 0f;
     }
 
-    // ── Sweep ─────────────────────────────────────────────────────────────────
-
     private void UpdateSweep(MonsterContext ctx)
     {
-        // 드래곤 수평 이동
-        bool reachedEnd = MoveDragonAcross(ctx);
-
-        // 광원 위치 갱신
+        MoveDragonContinuous(ctx);
         UpdateFollowLight(ctx);
+        UpdateFlameBreath(ctx);
+        UpdateLivingTsunamis(ctx);
+        UpdateLivingScorches();
 
-        // 드래곤 X 기준으로 통과한 열에 브레스 발사
+        float tipProj = Vector3.Dot(ctx.Transform.position - _laneCenter, _sweepDir) + _horizontalReach;
+
+        // 첫 sweep 슬로우: 경고장판 1/5 지점 도달 시 속도 복원 + 카메라 하강 시작
+        if (_sweepIndex == 0 && _animSlowActive && tipProj >= _slowUntilProj)
+        {
+            RestoreDragonSpeed(ctx);
+            GameCameraController.Instance?.DeactivateDragonTopDownView(Data.CameraReturnDuration);
+        }
+
         while (_nextColIndex < _totalCols)
         {
-            int colX = GetColX(_nextColIndex);
-            float colWorldX = DKBossRoomContext.CellToWorld(colX, 0, 0f).x;
-            float dragonX   = ctx.Transform.position.x;
+            float colProj = GetColumnProjection(_nextColIndex);
+            if (tipProj < colProj + Data.TsunamiLagCells * DKBossRoomContext.CellSize) break;
 
-            // 해당 열 중심 X를 아직 지나지 않았으면 대기
-            bool passed = _fromSide < 0 ? dragonX >= colWorldX : dragonX <= colWorldX;
-            if (!passed) break;
+            ApplyBreathDamage(ctx, colProj);
 
-            FireBreathAtColumn(ctx, colX);
+            int interval = Mathf.Max(1, Data.TsunamiColInterval);
+            if (_nextColIndex % interval == 0)
+            {
+                SpawnTsunamiAtProjection(colProj, ctx);
+                SpawnFireVisuals(colProj, ctx);
+                SpawnScorchCluster(colProj, ctx);
+            }
+
             _nextColIndex++;
         }
 
-        if (reachedEnd || _nextColIndex >= _totalCols)
-        {
-            // 남은 열 처리 (빠른 종료 대비)
-            while (_nextColIndex < _totalCols)
-            {
-                FireBreathAtColumn(ctx, GetColX(_nextColIndex));
-                _nextColIndex++;
-            }
+        if (_nextColIndex < _totalCols) return;
 
-            CleanupFollowLight();
+        CleanupFlameBreath();
+        CleanupFollowLight();
+        _sweepIndex++;
+
+        if (_sweepIndex < Mathf.Max(1, Data.SweepCount))
+            BeginNextSweep(ctx);
+        else
+        {
             _phase = Phase.Tsunami;
             _timer = 0f;
         }
     }
 
-    // ── Tsunami ───────────────────────────────────────────────────────────────
-
     private void UpdateTsunami(MonsterContext ctx)
     {
-        // 모든 FlameTsunami 타이머 틱 (sweep 종료 후 일괄 시작)
-        for (int i = _tsunamis.Count - 1; i >= 0; i--)
-        {
-            var e = _tsunamis[i];
-            e.Timer     += Time.deltaTime;
-            e.TickTimer += Time.deltaTime;
+        UpdateLivingTsunamis(ctx);
+        UpdateLivingScorches();
+        if (_tsunamis.Count != 0) return;
 
-            if (e.TickTimer >= Data.TsunamiTickInterval)
-            {
-                e.TickTimer = 0f;
-                ApplyTsunamiDamageAt(ctx, e.Position);
-            }
-
-            if (e.Timer >= Data.TsunamiDuration)
-            {
-                if (e.Go != null) Object.Destroy(e.Go);
-                _tsunamis.RemoveAt(i);
-                continue;
-            }
-
-            _tsunamis[i] = e;
-        }
-
-        if (_tsunamis.Count == 0)
-        {
-            _phase = Phase.Done;
-            RestoreAgent(ctx);
-            ctx.Monster.ChangeState<AttackReadyState>();
-        }
+        _phase = Phase.Done;
+        RestoreAgent(ctx);
+        ctx.Monster.ChangeState<AttackReadyState>();
     }
 
-    // ── 행/열 계산 ────────────────────────────────────────────────────────────
-
-    private void ComputeRows(MonsterContext ctx)
+    // 비행 도착 후 플레이어 현재 위치로 레인 중심만 갱신 (방향은 유지)
+    private void UpdateLaneCenterToPlayer(MonsterContext ctx)
     {
-        int playerZ = DKBossRoomContext.Height / 2;
-        if (ctx.Runtime.PlayerTarget != null)
+        if (ctx.Runtime.PlayerTarget == null) return;
+
+        Vector3 center = ctx.Runtime.PlayerTarget.position;
+        center.y    = ctx.Runtime.SpawnPosition.y;
+        _laneCenter = center;
+
+        _warnCells.Clear();
+        float minProj         = float.PositiveInfinity;
+        float maxProj         = float.NegativeInfinity;
+        float paddedHalfWidth = _halfLaneWidth + DKBossRoomContext.CellSize * 0.5f;
+
+        foreach (var cell in DKBossRoomContext.GetInteriorCells())
         {
-            var cell = DKBossRoomContext.WorldToCell(ctx.Runtime.PlayerTarget.position);
-            playerZ = Mathf.Clamp(cell.y, 1, DKBossRoomContext.Height - 2);
+            Vector3 delta = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f) - _laneCenter;
+            float   perp  = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
+            if (perp > paddedHalfWidth) continue;
+
+            float proj = Vector3.Dot(delta, _sweepDir);
+            minProj    = Mathf.Min(minProj, proj);
+            maxProj    = Mathf.Max(maxProj, proj);
+            _warnCells.Add(cell);
         }
-        int half   = Data.WarningRowCount / 2;
-        _rowMin    = Mathf.Max(1, playerZ - half);
-        _rowMax    = Mathf.Min(DKBossRoomContext.Height - 2, playerZ + half);
-        _centerRow = (_rowMin + _rowMax) / 2;
+
+        if (_warnCells.Count == 0)
+        {
+            var fallbackCell = DKBossRoomContext.WorldToCell(center);
+            _warnCells.Add(fallbackCell);
+            Vector3 world = DKBossRoomContext.CellToWorld(fallbackCell.x, fallbackCell.y, 0f);
+            float   proj  = Vector3.Dot(world - _laneCenter, _sweepDir);
+            minProj = maxProj = proj;
+        }
+
+        float halfCell     = DKBossRoomContext.CellSize * 0.5f;
+        _sweepStartProj    = minProj - halfCell;
+        _sweepEndProj      = maxProj + halfCell;
+        _flyThroughEndProj = _sweepEndProj + FlyThroughPadding;
+        _totalCols         = Mathf.Max(1, Mathf.CeilToInt(
+            (_sweepEndProj - _sweepStartProj) / DKBossRoomContext.CellSize) + 1);
+        _nextColIndex      = 0;
     }
 
-    // fromSide 방향의 n번째 열 X 그리드 좌표
-    private int GetColX(int index)
-        => _fromSide < 0
-            ? 1 + index
-            : DKBossRoomContext.Width - 2 - index;
+    private void PickSweepLine(MonsterContext ctx)
+    {
+        float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+        _sweepDir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)).normalized;
+        _sweepRight = new Vector3(-_sweepDir.z, 0f, _sweepDir.x);
 
-    // 그리드 행 z 인덱스 → 월드 Z
-    private static float WorldZOfRow(int rowZ)
-        => DKBossRoomContext.CellToWorld(0, rowZ, 0f).z;
+        Vector3 center = ctx.Runtime.PlayerTarget != null
+            ? ctx.Runtime.PlayerTarget.position
+            : DKBossRoomContext.WorldCenter;
+        center.y = ctx.Runtime.SpawnPosition.y;
+        _laneCenter = center;
+        _halfLaneWidth = Mathf.Max(
+            DKBossRoomContext.CellSize * 0.5f,
+            Mathf.Max(1, Data.WarningRowCount) * DKBossRoomContext.CellSize * 0.5f);
 
-    // ── 경고 타일 ─────────────────────────────────────────────────────────────
+        _warnCells.Clear();
+        float minProj = float.PositiveInfinity;
+        float maxProj = float.NegativeInfinity;
+        float paddedHalfWidth = _halfLaneWidth + DKBossRoomContext.CellSize * 0.5f;
 
-    private void SpawnWarnTiles()
+        foreach (var cell in DKBossRoomContext.GetInteriorCells())
+        {
+            Vector3 world = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            Vector3 delta = world - _laneCenter;
+            float perp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
+            if (perp > paddedHalfWidth) continue;
+
+            float proj = Vector3.Dot(delta, _sweepDir);
+            minProj = Mathf.Min(minProj, proj);
+            maxProj = Mathf.Max(maxProj, proj);
+            _warnCells.Add(cell);
+        }
+
+        if (_warnCells.Count == 0)
+        {
+            var cell = DKBossRoomContext.WorldToCell(center);
+            _warnCells.Add(cell);
+            Vector3 world = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            float proj = Vector3.Dot(world - _laneCenter, _sweepDir);
+            minProj = proj;
+            maxProj = proj;
+        }
+
+        float halfCell = DKBossRoomContext.CellSize * 0.5f;
+        _sweepStartProj = minProj - halfCell;
+        _sweepEndProj = maxProj + halfCell;
+        _flyThroughEndProj = _sweepEndProj + FlyThroughPadding;
+        _totalCols = Mathf.Max(1, Mathf.CeilToInt((_sweepEndProj - _sweepStartProj) / DKBossRoomContext.CellSize) + 1);
+    }
+
+    private void SpawnWarnTilesSorted(MonsterContext ctx)
     {
         CleanupWarn();
+        _warnCells.Sort((a, b) =>
+        {
+            float pa = Vector3.Dot(DKBossRoomContext.CellToWorld(a.x, a.y, 0f) - _laneCenter, _sweepDir);
+            float pb = Vector3.Dot(DKBossRoomContext.CellToWorld(b.x, b.y, 0f) - _laneCenter, _sweepDir);
+            return pa.CompareTo(pb);
+        });
+
         var shader = Shader.Find("Sprites/Default")
                   ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
 
-        for (int z = _rowMin; z <= _rowMax; z++)
+        float fallbackY = ctx.Runtime.SpawnPosition.y;
+        foreach (var cell in _warnCells)
         {
-            for (int x = 1; x <= DKBossRoomContext.Width - 2; x++)
-            {
-                Vector3 pos = DKBossRoomContext.CellToWorld(x, z, 0.1f);
-                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                go.name = "BreathSweepWarn";
-                Object.Destroy(go.GetComponent<MeshCollider>());
-                go.transform.SetPositionAndRotation(pos, Quaternion.Euler(90f, 0f, 0f));
-                go.transform.localScale = Vector3.one;
-
-                var mr = go.GetComponent<MeshRenderer>();
-                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                mr.receiveShadows    = false;
-                var mat = new Material(shader);
-                mat.color = new Color(
-                    Data.WarningColor.r, Data.WarningColor.g, Data.WarningColor.b, 0f);
-                mr.material = mat;
-
-                _warnTiles.Add(go);
-                _warnMats.Add(mat);
-            }
+            Vector3 pos = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            pos.y = GetFloorY(pos, ctx) + 0.05f;
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "BreathSweepWarn";
+            Object.Destroy(go.GetComponent<MeshCollider>());
+            go.transform.SetPositionAndRotation(pos, Quaternion.Euler(90f, 0f, 0f));
+            go.transform.localScale = Vector3.one;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows    = false;
+            Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+            var mat = new Material(shader);
+            mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
+            mr.material = mat;
+            _warnTiles.Add(go);
+            _warnMats.Add(mat);
         }
     }
 
-    // ── 드래곤 이동 ───────────────────────────────────────────────────────────
-
-    private void PlaceDragonAtStartSide(MonsterContext ctx)
+    private void MoveDragonContinuous(MonsterContext ctx)
     {
-        float startX = _fromSide < 0
-            ? DKBossRoomContext.WorldCenter.x - Data.FlySideOffset
-            : DKBossRoomContext.WorldCenter.x + Data.FlySideOffset;
-
-        ctx.Transform.position = new Vector3(
-            startX,
-            ctx.Runtime.SpawnPosition.y + Data.HideHeight,
-            WorldZOfRow(_centerRow));
-
-        // 진행 방향을 미리 바라봄
-        ctx.Transform.rotation = Quaternion.LookRotation(
-            new Vector3(_fromSide < 0 ? 1f : -1f, 0f, 0f));
-    }
-
-    // 반환값: 목적지 측면에 도달했으면 true
-    private bool MoveDragonAcross(MonsterContext ctx)
-    {
-        float endX = _fromSide < 0
-            ? DKBossRoomContext.WorldCenter.x + Data.FlySideOffset
-            : DKBossRoomContext.WorldCenter.x - Data.FlySideOffset;
-
-        Vector3 target = new Vector3(
-            endX,
-            ctx.Runtime.SpawnPosition.y + Data.HideHeight,
-            WorldZOfRow(_centerRow));
-
+        Vector3 target = _laneCenter + _sweepDir * _flyThroughEndProj;
+        target.y = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
         ctx.Transform.position = Vector3.MoveTowards(
             ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
-
-        return Vector3.Distance(ctx.Transform.position, target) < 0.3f;
     }
 
-    // ── 따라다니는 광원 (그림자 연출) ────────────────────────────────────────
+    private float GetColumnProjection(int index)
+        => _sweepStartProj + index * DKBossRoomContext.CellSize;
+
+    private void SpawnFlameBreath(MonsterContext ctx)
+    {
+        if (Data.FlameBreathPrefab == null) return;
+        _flameBreathGo = Object.Instantiate(
+            Data.FlameBreathPrefab,
+            ctx.Transform.position,
+            GetBreathRotation());
+        _flameBreathGo.transform.localScale = Vector3.one * Data.FlameBreathScale;
+    }
+
+    private void UpdateFlameBreath(MonsterContext ctx)
+    {
+        if (_flameBreathGo == null) return;
+        _flameBreathGo.transform.SetPositionAndRotation(
+            ctx.Transform.position, GetBreathRotation());
+    }
+
+    private void CleanupFlameBreath()
+    {
+        if (_flameBreathGo == null) return;
+        Object.Destroy(_flameBreathGo);
+        _flameBreathGo = null;
+    }
+
+    private Quaternion GetBreathRotation()
+    {
+        Vector3 dir;
+        if (Data.BreathHorizReach > 0f)
+            dir = (_sweepDir * _horizontalReach + Vector3.down * Data.HideHeight).normalized;
+        else
+        {
+            float downRad = Data.BreathDownAngle * Mathf.Deg2Rad;
+            dir = (_sweepDir * Mathf.Cos(downRad) + Vector3.down * Mathf.Sin(downRad)).normalized;
+        }
+        return Quaternion.LookRotation(dir, Vector3.up);
+    }
 
     private void CreateFollowLight(MonsterContext ctx)
     {
         var go = new GameObject("DragonSweepSpotlight");
         _followLight = go.AddComponent<Light>();
-        _followLight.type      = LightType.Spot;
-        _followLight.color     = Data.LightColor;
+        _followLight.type = LightType.Spot;
+        _followLight.color = Data.LightColor;
         _followLight.intensity = Data.LightIntensity;
-        _followLight.range     = Data.LightRange;
+        _followLight.range = Data.LightRange;
         _followLight.spotAngle = Data.LightSpotAngle;
-        _followLight.shadows   = LightShadows.Hard;
+        _followLight.shadows = LightShadows.Hard;
         UpdateFollowLight(ctx);
     }
 
     private void UpdateFollowLight(MonsterContext ctx)
     {
         if (_followLight == null) return;
-        _followLight.transform.position =
-            ctx.Transform.position + Vector3.up * Data.LightHeightOffset;
-        // 수직 아래를 향하게
+        _followLight.transform.position = ctx.Transform.position + Vector3.up * Data.LightHeightOffset;
         _followLight.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
     }
 
@@ -425,101 +646,350 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _followLight = null;
     }
 
-    // ── 브레스 열 발동 ────────────────────────────────────────────────────────
-
-    private void FireBreathAtColumn(MonsterContext ctx, int colX)
+    private static float GetFloorY(Vector3 xzPos, MonsterContext ctx)
     {
-        // FlameBreath: 드래곤 현재 위치에서 진행방향 + 아래 대각선으로
-        if (Data.FlameBreathPrefab != null)
-        {
-            float forwardX  = _fromSide < 0 ? 1f : -1f;
-            float downRad   = Data.BreathDownAngle * Mathf.Deg2Rad;
-            Vector3 breathDir = new Vector3(
-                forwardX * Mathf.Cos(downRad),
-                -Mathf.Sin(downRad),
-                0f).normalized;
-
-            BossEffectPool.SpawnOneShot(
-                Data.FlameBreathPrefab,
-                ctx.Transform.position,          // 드래곤 현재 위치에서 발사
-                Quaternion.LookRotation(breathDir, Vector3.up),
-                fallbackLifetime: 1.5f);
-        }
-
-        // FlameTsunami: 해당 열의 경고장판 중간칸(centerRow) 지면에 즉시 생성
-        SpawnTsunamiAtColumn(colX);
-
-        // 피격 판정: 해당 열 경고 행 범위 내 플레이어 1회
-        if (ctx?.Runtime?.PlayerTarget != null)
-        {
-            for (int z = _rowMin; z <= _rowMax; z++)
-            {
-                Vector3 cellPos    = DKBossRoomContext.CellToWorld(colX, z, 0.05f);
-                Vector3 playerFlat = ctx.Runtime.PlayerTarget.position;
-                playerFlat.y = cellPos.y;
-                if (Vector3.Distance(playerFlat, cellPos) <= Data.DamageRadius)
-                {
-                    ctx.Runtime.PlayerTarget
-                        .GetComponent<PlayerController>()
-                        ?.TakeDamage(Data.BreathDamage);
-                    break;
-                }
-            }
-        }
+        Vector3 origin = new Vector3(xzPos.x, ctx.Runtime.SpawnPosition.y + 50f, xzPos.z);
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 100f))
+            return hit.point.y;
+        return ctx.Runtime.SpawnPosition.y;
     }
 
-    // ── FlameTsunami ─────────────────────────────────────────────────────────
-
-    private void SpawnTsunamiAtColumn(int colX)
+    private void SpawnTsunamiAtProjection(float projection, MonsterContext ctx)
     {
         if (Data.FlameTsunamiPrefab == null) return;
 
-        Vector3 pos = DKBossRoomContext.CellToWorld(colX, _centerRow, 0.05f);
-        var go = Object.Instantiate(Data.FlameTsunamiPrefab, pos, Quaternion.identity);
+        Vector3 pos = _laneCenter + _sweepDir * projection;
+        pos.y = GetFloorY(pos, ctx) + 0.05f;
+        Quaternion rot = Quaternion.LookRotation(_sweepDir, Vector3.up);
+        var go = Object.Instantiate(Data.FlameTsunamiPrefab, pos, rot);
+        go.transform.localScale = Vector3.one * Data.TsunamiScale;
 
-        // Timer = 0: Tsunami 페이즈 진입 후 틱 시작
+        foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
+            mb.enabled = false;
+
         _tsunamis.Add(new TsunamiEntry
         {
-            Go        = go,
-            Position  = pos,
-            Timer     = 0f,
-            TickTimer = 0f,
+            Go = go,
+            Center = pos,
+            Direction = _sweepDir,
+            Right = _sweepRight,
+            HalfWidth = _halfLaneWidth,
         });
     }
 
-    private void ApplyTsunamiDamageAt(MonsterContext ctx, Vector3 tsunamiPos)
+    private void UpdateLivingTsunamis(MonsterContext ctx)
     {
-        if (ctx?.Runtime?.PlayerTarget == null) return;
-        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
-        playerPos.y = tsunamiPos.y;
-        if (Vector3.Distance(playerPos, tsunamiPos) <= Data.DamageRadius * 3f)
-            ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
-                ?.TakeDamage(Data.TsunamiDamage);
+        for (int i = _tsunamis.Count - 1; i >= 0; i--)
+        {
+            var entry = _tsunamis[i];
+            entry.Timer += Time.deltaTime;
+            entry.TickTimer += Time.deltaTime;
+
+            if (entry.TickTimer >= Data.TsunamiTickInterval)
+            {
+                entry.TickTimer = 0f;
+                ApplyTsunamiDamage(ctx, entry);
+            }
+
+            if (entry.Timer >= Data.TsunamiDuration)
+            {
+                if (entry.Go != null) Object.Destroy(entry.Go);
+                _tsunamis.RemoveAt(i);
+                continue;
+            }
+
+            _tsunamis[i] = entry;
+        }
     }
 
-    // ── 정리 ─────────────────────────────────────────────────────────────────
+    private void ApplyBreathDamage(MonsterContext ctx, float projection)
+    {
+        if (ctx?.Runtime?.PlayerTarget == null) return;
+
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        Vector3 delta = playerPos - _laneCenter;
+        float playerProj = Vector3.Dot(delta, _sweepDir);
+        float playerPerp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
+        if (Mathf.Abs(playerProj - projection) > DKBossRoomContext.CellSize * 0.5f) return;
+        if (playerPerp > _halfLaneWidth) return;
+
+        Vector3 origin = ctx.Transform.position;
+        if (Data.BreathBlockMask != 0)
+        {
+            Vector3 rayDir = (playerPos - origin).normalized;
+            float dist = Vector3.Distance(origin, playerPos);
+            if (Physics.Raycast(origin, rayDir, dist, Data.BreathBlockMask))
+                return;
+        }
+
+        ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
+            ?.TakeDamage(Data.BreathDamage);
+    }
+
+    private void ApplyTsunamiDamage(MonsterContext ctx, TsunamiEntry entry)
+    {
+        if (ctx?.Runtime?.PlayerTarget == null) return;
+
+        Vector3 delta = ctx.Runtime.PlayerTarget.position - entry.Center;
+        float along = Mathf.Abs(Vector3.Dot(delta, entry.Direction));
+        float perp = Mathf.Abs(Vector3.Dot(delta, entry.Right));
+        float halfLength = Mathf.Max(1, Data.TsunamiColInterval / 2) * DKBossRoomContext.CellSize;
+        if (along > halfLength || perp > entry.HalfWidth) return;
+
+        ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
+            ?.TakeDamage(Data.TsunamiDamage);
+    }
+
+    private void ApplyDragonSlow(MonsterContext ctx)
+    {
+        if (_animSlowActive) return;
+        float slow      = Mathf.Clamp(Data.PreviewTimeScale, 0.05f, 1f);
+        _savedAnimator  = ctx.Animator;
+        if (ctx.Animator != null) ctx.Animator.speed = slow;
+        // 브레스 파티클은 슬로우 적용 안 함 — 정상 속도로 보여야 함
+        _animSlowActive = true;
+    }
+
+    private void RestoreDragonSpeed(MonsterContext ctx)
+    {
+        if (!_animSlowActive) return;
+        if (ctx.Animator != null) ctx.Animator.speed = 1f;
+        _animSlowActive = false;
+        _savedAnimator  = null;
+    }
+
+    private void RestoreDragonSpeedDirect()
+    {
+        if (!_animSlowActive) return;
+        if (_savedAnimator != null) _savedAnimator.speed = 1f;
+        _animSlowActive = false;
+        _savedAnimator  = null;
+    }
+
+    private void SetFlameBreathSimSpeed(float speed)
+    {
+        if (_flameBreathGo == null) return;
+        foreach (var ps in _flameBreathGo.GetComponentsInChildren<ParticleSystem>())
+        {
+            var m = ps.main;
+            m.simulationSpeed = speed;
+        }
+    }
 
     private void CleanupWarn()
     {
-        foreach (var go  in _warnTiles) if (go  != null) Object.Destroy(go);
-        foreach (var mat in _warnMats)  if (mat != null) Object.Destroy(mat);
+        foreach (var go in _warnTiles) if (go != null) Object.Destroy(go);
+        foreach (var mat in _warnMats) if (mat != null) Object.Destroy(mat);
         _warnTiles.Clear();
         _warnMats.Clear();
     }
 
+    // ─── Scorch marks ────────────────────────────────────────────────────────
+
+    private void SpawnScorchCluster(float projection, MonsterContext ctx)
+    {
+        float cell  = DKBossRoomContext.CellSize;
+        var   mat   = GetOrCreateScorchMaterial();
+        int   count = Mathf.Max(1, Data.ScorchClusterCount);
+
+        // 경고장판 너비를 count개 구역으로 분할 — 구역당 1개 배치로 겹침 최소화
+        float laneHalf  = _halfLaneWidth;
+        float zoneWidth = 2f * laneHalf / count;
+
+        // sweepAngle은 구역 반복마다 동일하므로 한 번만 계산
+        float sweepAngle = Vector3.SignedAngle(Vector3.forward, _sweepDir, Vector3.up);
+
+        for (int i = 0; i < count; i++)
+        {
+            // 구역 안쪽(양 끝 5% 여백)에서 랜덤 배치
+            float zoneCenter = -laneHalf + (i + 0.5f) * zoneWidth;
+            float margin     = zoneWidth * 0.05f;
+            float perp       = Random.Range(zoneCenter - zoneWidth * 0.5f + margin,
+                                            zoneCenter + zoneWidth * 0.5f - margin);
+
+            float fwd = Random.Range(-0.5f, 0.5f) * cell;
+
+            Vector3 pos = _laneCenter
+                + _sweepDir   * (projection + fwd)
+                + _sweepRight * perp;
+            pos.y = GetFloorY(pos, ctx) + 0.02f;
+
+            // 진행방향 기준: 왼쪽 구역은 오른쪽(양수)으로만, 오른쪽 구역은 왼쪽(음수)으로만 휘어짐
+            float jitter;
+            if (zoneCenter < -0.01f)
+                jitter = Random.Range(5f, 30f);
+            else if (zoneCenter > 0.01f)
+                jitter = Random.Range(-30f, -5f);
+            else
+                jitter = Random.Range(-15f, 15f);
+            Quaternion rot = Quaternion.Euler(90f, sweepAngle - 90f + jitter, 0f);
+
+            // 세로(sweep 방향)은 ScorchScaleMin/Max, 가로(수직)는 1.5~2배로 역전
+            float length = Random.Range(Data.ScorchScaleMin, Data.ScorchScaleMax) * cell;
+            float width  = Mathf.Min(
+                length * Random.Range(1.5f, 2.0f),
+                2f * laneHalf * 0.92f);  // 경고장판 전체 너비를 넘지 않도록 클램프
+
+            var go  = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "ScorchMark";
+            Object.Destroy(go.GetComponent<MeshCollider>());
+            go.transform.SetPositionAndRotation(pos, rot);
+            go.transform.localScale = new Vector3(length, width, 1f);
+
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows    = false;
+            mr.material          = mat;
+
+            _scorches.Add(new ScorchEntry { Go = go, Timer = 0f, MaxTimer = Data.ScorchDuration });
+        }
+    }
+
+    private void SpawnFireVisuals(float projection, MonsterContext ctx)
+    {
+        if (Data.FlameTsunamiPrefab == null || Data.FireVisualCount <= 0) return;
+
+        float cell = DKBossRoomContext.CellSize;
+
+        for (int i = 0; i < Data.FireVisualCount; i++)
+        {
+            float perp = Random.Range(-Data.FirePerpJitter, Data.FirePerpJitter) * cell;
+            float fwd  = Random.Range(-0.35f, 0.35f) * cell;
+
+            Vector3 pos = _laneCenter
+                + _sweepDir   * (projection + fwd)
+                + _sweepRight * perp;
+            pos.y = GetFloorY(pos, ctx) + 0.05f;
+
+            float  yRot = Random.Range(-25f, 25f);
+            var    rot  = Quaternion.LookRotation(_sweepDir, Vector3.up) * Quaternion.Euler(0f, yRot, 0f);
+            float  scl  = Random.Range(Data.FireScaleMin, Data.FireScaleMax);
+
+            var go = Object.Instantiate(Data.FlameTsunamiPrefab, pos, rot);
+            go.transform.localScale = Vector3.one * scl;
+            foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
+                mb.enabled = false;
+
+            _scorches.Add(new ScorchEntry { Go = go, Timer = 0f, MaxTimer = Data.TsunamiDuration });
+        }
+    }
+
+    private void UpdateLivingScorches()
+    {
+        for (int i = _scorches.Count - 1; i >= 0; i--)
+        {
+            var e = _scorches[i];
+            e.Timer += Time.deltaTime;
+            if (e.Timer >= e.MaxTimer)
+            {
+                if (e.Go != null) Object.Destroy(e.Go);
+                _scorches.RemoveAt(i);
+                continue;
+            }
+            _scorches[i] = e;
+        }
+    }
+
+    private void CleanupAllScorches()
+    {
+        foreach (var e in _scorches) if (e.Go != null) Object.Destroy(e.Go);
+        _scorches.Clear();
+    }
+
+    private Material GetOrCreateScorchMaterial()
+    {
+        var tex = Data.ScorchTexture != null ? Data.ScorchTexture : GetOrCreateScorchTexture();
+
+        if (s_ScorchMat != null && s_ScorchMat.GetTexture("_MainTex") == tex)
+            return s_ScorchMat;
+
+        // Sprites/Default: 투명도 내장, ZWrite=Off, SrcAlpha OneMinusSrcAlpha
+        var shader = Shader.Find("Sprites/Default")
+                  ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
+
+        s_ScorchMat = new Material(shader);
+        s_ScorchMat.SetTexture("_MainTex", tex);
+        s_ScorchMat.SetTexture("_BaseMap", tex);
+        s_ScorchMat.SetColor("_Color",     Color.white);
+        s_ScorchMat.SetColor("_BaseColor", Color.white);
+
+        // URP Particles/Unlit 폴백일 경우 투명 모드 강제 설정
+        if (shader != null && shader.name.Contains("Particles"))
+        {
+            s_ScorchMat.SetFloat("_Surface", 1f);   // Transparent
+            s_ScorchMat.SetFloat("_Blend",   0f);   // Alpha
+            s_ScorchMat.SetInt("_SrcBlend",  5);    // SrcAlpha
+            s_ScorchMat.SetInt("_DstBlend",  10);   // OneMinusSrcAlpha
+            s_ScorchMat.SetInt("_ZWrite",    0);
+            s_ScorchMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            s_ScorchMat.renderQueue = 3000;
+        }
+
+        return s_ScorchMat;
+    }
+
+    // Perlin noise 기반 절차적 그을림 텍스처 — 불규칙한 가장자리의 어두운 얼룩
+    private static Texture2D GetOrCreateScorchTexture()
+    {
+        if (s_ScorchTex != null) return s_ScorchTex;
+
+        const int size = 256;
+        s_ScorchTex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        s_ScorchTex.wrapMode = TextureWrapMode.Clamp;
+
+        var center = new Vector2(0.5f, 0.5f);
+
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (float)x / (size - 1);
+            float v = (float)y / (size - 1);
+
+            float dist = Vector2.Distance(new Vector2(u, v), center);
+
+            // 3겹 노이즈로 불규칙한 가장자리 구현
+            float n0 = Mathf.PerlinNoise(u * 3.7f + 0.10f, v * 3.7f + 0.30f);   // 저주파 형태
+            float n1 = Mathf.PerlinNoise(u * 7.3f + 1.40f, v * 7.3f + 2.10f);   // 중주파 디테일
+            float n2 = Mathf.PerlinNoise(u * 14f  + 3.20f, v * 14f  + 0.70f);   // 고주파 균열
+
+            float noise = n0 * 0.55f + n1 * 0.30f + n2 * 0.15f;
+
+            // 노이즈로 변형된 거리 → 불규칙 외곽선
+            float pertDist = dist + (noise - 0.5f) * 0.28f;
+
+            // 외곽 페이드 (0.30 → 0.48 사이에서 0→1)
+            float outerMask = 1f - Mathf.Clamp01((pertDist - 0.30f) / 0.18f);
+
+            // 내부 중심부 (더 진하게)
+            float innerMask = Mathf.Clamp01(1f - pertDist * 3.2f);
+
+            float alpha = outerMask;
+
+            // 탄 색상: 진한 갈흑색, 가장자리는 약간 밝게
+            float brightness = Mathf.Lerp(0.09f, 0.02f, innerMask);
+            s_ScorchTex.SetPixel(x, y, new Color(brightness * 1.3f, brightness * 0.75f, brightness * 0.4f, alpha));
+        }
+
+        s_ScorchTex.Apply();
+        return s_ScorchTex;
+    }
+
     private void CleanupAllTsunamis()
     {
-        foreach (var e in _tsunamis) if (e.Go != null) Object.Destroy(e.Go);
+        foreach (var entry in _tsunamis) if (entry.Go != null) Object.Destroy(entry.Go);
         _tsunamis.Clear();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    private string ResolveAirChaseAnim(MonsterContext ctx)
+    {
+        float angle = Vector3.SignedAngle(ctx.Transform.forward, _sweepDir, Vector3.up);
+        return angle >= 0f ? Data.AirChaseRightStateName : Data.AirChaseLeftStateName;
+    }
 
     private static void PlayAnim(MonsterContext ctx, string stateName)
     {
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
-        int hash = Animator.StringToHash(stateName);
-        if (ctx.Animator.HasState(0, hash))
+        if (ctx.Animator.HasState(0, Animator.StringToHash(stateName)))
             ctx.Animator.CrossFade(stateName, 0.12f, 0, 0f);
     }
 

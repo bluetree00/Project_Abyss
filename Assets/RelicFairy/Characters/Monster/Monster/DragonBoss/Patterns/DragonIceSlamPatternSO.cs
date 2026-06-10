@@ -29,7 +29,7 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private GameObject _icePillarPrefab;
     [SerializeField] private int _pillarCount = 8;
     [SerializeField] private float _pillarRadius = 5f;
-    [SerializeField] private Color _pillarTintColor = new Color(0.4f, 0.8f, 1.0f);
+    [SerializeField] private Color _pillarTintColor = new Color(0.5f, 0.85f, 1.0f);
 
     [Header("Slam")]
     [SerializeField] private float _flyDownSpeed = 14f;
@@ -306,13 +306,14 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     private void SpawnDangerZone(MonsterContext ctx)
     {
-        float groundY = ctx.Runtime.SpawnPosition.y;
+        float groundY = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
         Vector3 pos = new Vector3(_centerPos.x, groundY, _centerPos.z);
+        var iceBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice);
         _warningZone = DragonBossWarningZone.CreateCircle(
             "DragonIceSlamWarning",
             pos,
             _warningRadius,
-            new Color(0.55f, 0.85f, 1f, 0.85f),
+            new Color(iceBase.r, iceBase.g, iceBase.b, 0.85f),
             Data.WarningDuration + 5f,
             Data.DangerZoneHeightOffset,
             Data.WarningOutlineWidth,
@@ -324,8 +325,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     {
         if (Data.IcePillarPrefab == null) return;
 
-        float groundY = ctx.Runtime.SpawnPosition.y;
-        int   count   = Mathf.Max(1, Data.PillarCount);
+        int count = Mathf.Max(1, Data.PillarCount);
 
         for (int i = 0; i < count; i++)
         {
@@ -334,18 +334,20 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
                 Mathf.Cos(angle) * Data.PillarRadius, 0f,
                 Mathf.Sin(angle) * Data.PillarRadius);
 
-            Vector3 pos    = new Vector3(_centerPos.x + offset.x, groundY, _centerPos.z + offset.z);
+            Vector3 xzPos  = new Vector3(_centerPos.x + offset.x, 0f, _centerPos.z + offset.z);
+            float   groundY = DragonPatternFloorUtils.GetFloorY(xzPos, ctx.Runtime.SpawnPosition.y);
+            Vector3 pos    = new Vector3(xzPos.x, groundY, xzPos.z);
             var     pillar = BossEffectPool.Spawn(Data.IcePillarPrefab, pos, Quaternion.identity);
             if (pillar == null) continue;
 
-            TintParticles(pillar, Data.PillarTintColor);
+            TintParticles(pillar, DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
             _spawnedPillars.Add(pillar);
         }
     }
 
     private void ApplySlamDamage(MonsterContext ctx)
     {
-        float   groundY    = ctx.Runtime.SpawnPosition.y;
+        float   groundY    = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
         Vector3 slamCenter = new Vector3(_centerPos.x, groundY + 0.5f, _centerPos.z);
 
         var hits = Physics.OverlapSphere(slamCenter, _warningRadius);
@@ -366,7 +368,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         var prefab = Data.SlamEffectPrefab;
         if (prefab == null) return;
 
-        float   groundY = ctx.Runtime.SpawnPosition.y;
+        float   groundY = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
         Vector3 pos     = new Vector3(_centerPos.x, groundY + 0.1f, _centerPos.z);
 
         var effect = BossEffectPool.Spawn(prefab, pos, Quaternion.identity);

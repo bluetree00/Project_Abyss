@@ -22,8 +22,8 @@ public class DragonBossBlackboard : BossAttackBlackboard
     /// <summary>드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.</summary>
     public enum DragonElement { Fire, Ice, Thunder }
 
-    public bool HasSummonedAt80;
-    public bool HasSummonedAt50;
+    public bool HasSummonedAt70;
+    public bool HasSummonedAt40;
     public bool HasSummonedAt10;
 
     /// <summary>
@@ -105,8 +105,8 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public new void Reset()
     {
         base.Reset();
-        HasSummonedAt80 = false;
-        HasSummonedAt50 = false;
+        HasSummonedAt70 = false;
+        HasSummonedAt40 = false;
         HasSummonedAt10 = false;
         BodyState             = BodyState.Grounded;
         GroundedPatternStreak = 0;

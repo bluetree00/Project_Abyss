@@ -221,6 +221,10 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
                 Data.impactVfxPrefab, _bossCell, e.ring, _swordColor);
             DKGridPatternHelper.TriggerRingDamage(
                 ctx, _bossCell, e.ring, Data.damageMultiplier, Data.knockbackMultiplier);
+            // §3 타격감 — 세트 첫 링에서만 히트스톱
+            if (_ringIdx % 3 == 0)
+                BossImpactFeedback.TriggerHitStop(0.1f);
+            BossImpactFeedback.TriggerCameraShake(0.12f, 0.28f);
             _ringIdx++;
         }
 
