@@ -16,6 +16,11 @@ public class PlayerStatEntry
     public int    base_luck;
     public float  base_move_speed;
     public float  base_run_speed;
+    public float  base_run_ramp;   // 걷기→달리기 램프 시간(초). 0이면 CharacterData 값 유지
+    public float  move_accel;      // 가속도(m/s²). 0이면 CharacterData 값 유지
+    public float  move_decel;      // 정지 감속도(m/s²). 0이면 CharacterData 값 유지
+    public float  reverse_accel_mult; // 역방향 가속 배율. 0이면 CharacterData 값 유지
+    public float  initial_boost;   // 출발 부스트(walkMax 비율). 0이면 CharacterData 값 유지
     public float  combo_duration;
     public float  heavy_charge_threshold;
     public float  heavy_release_time;

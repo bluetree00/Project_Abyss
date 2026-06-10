@@ -5,17 +5,13 @@ public class LocoMoveState : ILayerState<LocoState>
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
-    // MoveBlend(1D) 목표값: 정지=0, 걷기=0.5, 달리기=1.0
-    private const float WalkTarget = 0.5f;
-    private const float RunTarget = 1f;
-    // MoveSpeed 보간 시간(클수록 걷기↔달리기 전환이 더 점진적).
-    private const float BlendDamp = 0.18f;
-    // 유물 보유 시, 걷기를 이 시간 이상 지속하면 달리기로 자동 전환.
-    private const float RunHoldTime = 1.0f;
+    // MoveSpeed 댐핑(작게 — 속도 평활은 가속 모델 한 곳에서만, 여긴 미세 떨림만 제거).
+    private const float BlendDamp = 0.08f;
+    // CharacterData.runRampDuration 미설정 시 사용할 기본 램프 시간(초).
+    private const float DefaultRunRamp = 1.0f;
 
-    private float _walkTime;   // 연속 걷기 누적 시간
-    private bool _forceRun;    // 대시(우클릭) 직후 — 정지 전까지 달리기 유지
-    private bool _prevRunning; // 진단용 — running 상태 변화 로그
+    private float _runCharge01; // 걷기→달리기 램프 진행도(0→1), 이동 지속 시 차오름
+    private bool _forceRun;     // 대시(우클릭) 직후 — 즉시 풀 달리기 유지
     private string _lastClip = ""; // 진단용 — 재생 클립 변화 로그
 
     public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
@@ -30,9 +26,10 @@ public class LocoMoveState : ILayerState<LocoState>
         if (!_controller.Combo.IsAttacking)
             _controller.Anim.CrossFade("MoveBlend", 0.05f);
 
-        _walkTime = 0f;
-        // 대시 직후 진입이면 바로 달리기로 시작(장비 보유 시에만).
+        _runCharge01 = 0f;
+        // 대시 직후 진입이면 바로 풀 달리기로 시작(장비 보유 시에만).
         _forceRun = _controller.HasWeapon && _controller.ConsumeRunAfterDash();
+        if (_forceRun) _runCharge01 = 1f;
     }
 
     public void Update()
@@ -40,27 +37,38 @@ public class LocoMoveState : ILayerState<LocoState>
         var dir = _controller.MoveDirection * _controller.MoveScale;
         bool moving = dir.sqrMagnitude > 0.0001f;
 
-        if (moving) _walkTime += Time.deltaTime;
-
-        // 무장비=걷기만. 장비(무기) 보유 시: 대시 직후(_forceRun) 또는 걷기 1초 지속 → 달리기.
-        bool running = moving && _controller.HasWeapon && (_forceRun || _walkTime >= RunHoldTime);
-        _controller.IsRunning = running;
-
-        // [진단] running 상태가 바뀔 때 핵심 값 출력 — 원인 확인 후 제거
-        if (running != _prevRunning)
+        // 무장비=걷기만. 장비(무기) 보유 시: 대시 직후(_forceRun)는 즉시 풀, 아니면 램프 시간 동안 점진 가속.
+        bool canRun = moving && _controller.HasWeapon;
+        if (canRun)
         {
-            _prevRunning = running;
-            var cd = _controller.CharacterData;
-            Debug.Log($"[Loco] running={running} | HasRelic={_controller.HasRelic} forceRun={_forceRun} walkTime={_walkTime:F2} " +
-                      $"| moveSpeed={(cd != null ? cd.baseMoveSpeed : -1f)} runSpeed={(cd != null ? cd.baseRunSpeed : -1f)} dataName={(cd != null ? cd.characterName : "null")}");
+            if (_forceRun)
+            {
+                _runCharge01 = 1f;
+            }
+            else
+            {
+                var cd = _controller.CharacterData;
+                float ramp = (cd != null && cd.runRampDuration > 0.01f) ? cd.runRampDuration : DefaultRunRamp;
+                _runCharge01 = Mathf.Min(1f, _runCharge01 + Time.deltaTime / ramp);
+            }
+        }
+        else
+        {
+            _runCharge01 = 0f; // 정지 시 즉시 리셋
         }
 
-        // 실제 이동 처리 (Move가 IsRunning으로 속도 결정)
+        // 가벼운 ease-in-out 보간율 → 속도/애니 공통 적용
+        float runBlend = canRun ? Mathf.SmoothStep(0f, 1f, _runCharge01) : 0f;
+        _controller.RunBlend01 = runBlend;
+        bool running = canRun && _runCharge01 >= 1f;
+        _controller.IsRunning = running;
+
+        // 실제 이동 처리 (Move가 RunBlend01로 속도 보간)
         _controller.MoveAbility?.Move(_controller, dir);
 
-        // 블렌드 파라미터 — 정지(0)/걷기(0.5)/달리기(1.0)로 부드럽게 보간
-        float target = !moving ? 0f : (running ? RunTarget : WalkTarget);
-        SetSpeedParam(_controller.Anim, target, BlendDamp);
+        // 블렌드 파라미터 — 실제 수평 속도비율로 구동(가속 램프·runCharge·정지감속이 애니에 자동 반영, 발미끄러짐 해소).
+        float animSpeed = moving ? _controller.HorizontalSpeed01 : 0f;
+        SetSpeedParam(_controller.Anim, animSpeed, BlendDamp);
 
         // [진단] 실제 재생 중인 클립(최대 가중치) + 장착 무기 — 변할 때만 출력. 원인 확인 후 제거
         if (moving)
