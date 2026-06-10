@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32b60e9438d85fb4483b7ea6b687579d, type: 3}
+  m_Name: DK_PyramidSlashPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DKPyramidSlashPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: pyramidslash
+  breakOverride: -1
+  whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
+  blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
+  impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,
+    type: 3}
+  fireShieldPrefab: {fileID: 490251359132586323, guid: 4003197b71ad4f84595b009938f9898c,
+    type: 3}
+  guardianShieldPrefab: {fileID: 5833179566574657652, guid: c6c75f58d606ede4798d66af58e8b614,
+    type: 3}
+  guardianShieldRadius: 1.8
+  floatingSwordPrefab: {fileID: 7198747572118092548, guid: 9f1b0093739bea441aa88a3a074492cb,
+    type: 3}
+  whiteSwordMaterial: {fileID: 2100000, guid: 2d215973ef3daec4f96eaabd33e2b48b, type: 2}
+  blackSwordMaterial: {fileID: 2100000, guid: 03173d869908c9046a995334bc539417, type: 2}
+  swordSideOffset: 5
+  swordHeight: 1
+  swordBobAmplitude: 0.25
+  swordBobSpeed: 1.5
+  swordHp: 30
+  moveToCenterTime: 2.5
+  tileLayerDelay: 0.4
+  slashHitDelay: 1.2
+  recoveryTime: 0.4
+  wrongSwordSpeedMult: 2.5
+  damageMultiplier: 1.5
+  knockbackMultiplier: 1

@@ -43,16 +43,33 @@ public class DeathKnightBossBlackboard
     // ── 검 색상 ───────────────────────────────────────────
     public DKSwordColor SwordColor { get; private set; } = DKSwordColor.White;
 
+    // ── 무적 ─────────────────────────────────────────────
+    public bool IsInvincible { get; private set; }
+
+    // ── Phase1 고정 위치 (Phase2 텔레포트용) ──────────────
+    public Vector3 Phase1FixedPosition { get; private set; }
+    public bool    HasPhase1Position   { get; private set; }
+
     // ── 공개 API ──────────────────────────────────────────
+
+    public void SetInvincible(bool value) => IsInvincible = value;
+
+    public void SetPhase1FixedPosition(Vector3 pos)
+    {
+        Phase1FixedPosition = pos;
+        HasPhase1Position   = true;
+    }
 
     public void Reset()
     {
-        IsPhase2      = false;
-        IsEnraged     = false;
-        AnimSpeedMult = 1f;
-        Armor         = MaxArmor;
-        IsArmorBroken = false;
-        SwordColor    = DKSwordColor.White;
+        IsPhase2          = false;
+        IsEnraged         = false;
+        AnimSpeedMult     = 1f;
+        Armor             = MaxArmor;
+        IsArmorBroken     = false;
+        SwordColor        = DKSwordColor.White;
+        IsInvincible      = false;
+        HasPhase1Position = false;
     }
 
     /// <summary>검 색상을 White↔Black 반전한다.</summary>
