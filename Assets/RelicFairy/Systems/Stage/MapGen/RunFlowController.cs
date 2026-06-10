@@ -16,6 +16,8 @@ using UnityEngine;
 public class RunFlowController : MonoBehaviour
 {
     [SerializeField] private RunStructureConfig _structureConfig;
+    [SerializeField, Tooltip("_structureConfig 비었을 때 Addressables로 로드할 키. 런타임 AddComponent 생성 경로 대응(에셋만 만들고 인스펙터 배선 불가).")]
+    private string _structureConfigKey = "RUN_STRUCTURE_DEFAULT";
     [SerializeField] private string _poolKey = "CHAPTER_1_ROOM_POOL";
     [SerializeField, Tooltip("시작 방 pool_key. 비우면 첫 Normal 방 사용.")]
     private string _startPoolKey;
@@ -40,6 +42,7 @@ public class RunFlowController : MonoBehaviour
     private static readonly Color LockedColor = new Color(0.06f, 0.06f, 0.07f);
 
     private RunSequencer                 _sequencer;
+    private RunPlan                      _runPlan; // 런 시작 시 산출한 명시적 일정표(가시성/미리보기/드리프트 검증용)
     private List<ZonePoolEntry>          _pool;
     private System.Random                _rng;
     private ProcRoomResult               _current;
@@ -64,6 +67,9 @@ public class RunFlowController : MonoBehaviour
 
     // ── Public ──────────────────────────────────────
 
+    /// <summary>이번 런의 명시적 일정표(깊이별 출구 종류). 맵 미리보기 UI 등의 데이터 소스. 시작 전엔 null.</summary>
+    public RunPlan RunPlan => _runPlan;
+
     /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
     /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.
     /// poolKeyOverride: 챕터별 룸 풀 키(CHAPTER_N_ROOM_POOL). 비우면 직렬화된 _poolKey 사용.</summary>
@@ -81,10 +87,14 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
+        await EnsureStructureConfigAsync();
+
         int seed    = _seed != 0 ? _seed : Environment.TickCount;
         _masterSeed = seed;
         _rng        = new System.Random(seed);
         _sequencer  = new RunSequencer(_pool, _structureConfig, seed);
+        _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
+        DumpRunPlan(seed);
 
         var startEntry = FindStartEntry();
         if (startEntry == null)
@@ -119,9 +129,13 @@ public class RunFlowController : MonoBehaviour
             return;
         }
 
+        await EnsureStructureConfigAsync();
+
         _rng       = new System.Random(_masterSeed);
         _sequencer = new RunSequencer(_pool, _structureConfig, _masterSeed);
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns);
+        _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
+        DumpRunPlan(_masterSeed);
 
         var entry = !string.IsNullOrEmpty(meta.currentRoomPoolKey)
             ? _pool.Find(p => string.Equals(p.pool_key, meta.currentRoomPoolKey, StringComparison.OrdinalIgnoreCase))
@@ -141,6 +155,16 @@ public class RunFlowController : MonoBehaviour
     }
 
     // ── Private ─────────────────────────────────────
+
+    /// <summary>인스펙터 배선이 없으면(AddComponent 생성 경로) Addressables로 구조 config를 로드한다.
+    /// 실패해도 진행은 막지 않음 — config=null이면 RunSequencer가 전 방 Normal로 안전 동작(구조만 비활성).</summary>
+    private async UniTask EnsureStructureConfigAsync()
+    {
+        if (_structureConfig != null || string.IsNullOrEmpty(_structureConfigKey)) return;
+        _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(_structureConfigKey);
+        if (_structureConfig == null)
+            Debug.LogWarning($"[RunFlow] RunStructureConfig 로드 실패: {_structureConfigKey} — 전 방 Normal로 진행(구조 비활성).");
+    }
 
     private ZonePoolEntry FindStartEntry()
     {
@@ -301,12 +325,47 @@ public class RunFlowController : MonoBehaviour
         if (_currentWave != null) _currentWave.OnRoomCleared -= HandleRoomCleared;
 
         var exits = _sequencer.RollExits();
+        VerifyAgainstPlan(_sequencer.VisitCount, exits); // 라이브 종류가 일정표와 일치하는지(드리프트) 검증
         if (exits == null || exits.Count == 0)
         {
             Debug.Log("[RunFlow] 출구 없음 — 런 종료(보스 처치 등)");
             return;
         }
         RevealGates(exits);
+    }
+
+    /// <summary>산출된 일정표를 한 줄씩 콘솔에 덤프한다 — 레벨디자인 가시성/마일스톤 검증용. 런 시작 1회.</summary>
+    private void DumpRunPlan(int seed)
+    {
+        if (_runPlan == null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"[RunPlan] seed={seed} chambers={_runPlan.Chambers.Count}");
+        foreach (var ch in _runPlan.Chambers)
+        {
+            sb.Append($"\n  #{ch.visitIndex} → ");
+            for (int i = 0; i < ch.exitKinds.Length; i++)
+            {
+                if (i > 0) sb.Append(" / ");
+                sb.Append(KindKor(ch.exitKinds[i]));
+            }
+        }
+        Debug.Log(sb.ToString());
+    }
+
+    /// <summary>라이브 RollExits 종류가 사전 일정표와 일치하는지 검증(드리프트 감지). 불일치 시 경고만(동작 영향 없음).</summary>
+    private void VerifyAgainstPlan(int visitIndex, List<DoorPlan> liveExits)
+    {
+        if (_runPlan == null || liveExits == null) return;
+        foreach (var ch in _runPlan.Chambers)
+        {
+            if (ch.visitIndex != visitIndex) continue;
+            bool match = ch.exitKinds.Length == liveExits.Count;
+            for (int i = 0; match && i < liveExits.Count; i++)
+                if (ch.exitKinds[i] != liveExits[i].kind) match = false;
+            if (!match)
+                Debug.LogWarning($"[RunPlan] 드리프트 감지 visit={visitIndex} — 일정표와 라이브 출구 종류 불일치.");
+            return;
+        }
     }
 
     /// <summary>빌드 시 모든 출구 슬롯에 봉인(막힌) 게이트를 미리 만든다 — 전투 중엔 통과 불가.</summary>

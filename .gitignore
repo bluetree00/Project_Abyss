@@ -124,6 +124,11 @@ crashlytics-build.properties
 .claude/settings.local.json
 
 # ----------------------------
+# 룸 CSV 린터 생성 리포트 (빌드 산출물)
+# ----------------------------
+/ROOM_CSV_LINT_REPORT.md
+
+# ----------------------------
 # IMPORTANT (DO NOT IGNORE)
 # ----------------------------
 # Assets/

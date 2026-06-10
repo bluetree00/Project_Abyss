@@ -231,9 +231,27 @@ public static class MapDataLoader
             "D"  => TileType.BuffPedestal,
             "CP" => TileType.CharacterPickup,
             "WP" => TileType.WeaponPickup,
+            "CV" => TileType.Floor,   // 서약 제단 — 바닥 위에 CovenantAltarHandler가 PostBuild 스폰
             "SG" => TileType.StartGate,
-            _    => TileType.Floor,
+            _    => UnknownToFloor(s),
         };
+    }
+
+    // 미등록 토큰이 default로 떨어질 때 1회 경고하는 dedup 집합 (도메인 리로드마다 초기화).
+    private static readonly HashSet<string> _warnedUnknownTokens = new HashSet<string>();
+
+    /// <summary>등록되지 않은 토큰을 Floor로 폴백하되, 무음 소실을 막기 위해 토큰별 1회 경고한다.
+    /// 반환값(Floor)·렌더 동작은 기존과 동일 — 진단 가시화만 추가.
+    /// 장식 d&lt;code&gt;·문 DR&lt;w&gt;는 상위 레이어(TokenParser/doorInfos)가 처리하는 정상 토큰이며,
+    /// 호출부가 해당 dictionary를 넘기지 않으면 합법적으로 이 분기에 도달하므로 경고에서 제외한다.</summary>
+    private static TileType UnknownToFloor(string s)
+    {
+        bool handledElsewhere =
+            (s.Length >= 2 && s[0] == 'd') ||                 // 장식 d<code>
+            (s.Length >= 2 && s[0] == 'D' && s[1] == 'R');    // 문 DR<width>
+        if (!handledElsewhere && _warnedUnknownTokens.Add(s))
+            Debug.LogWarning($"[MapDataLoader] 미등록 토큰 '{s}' → Floor 폴백(무음 소실 방지 경고). grid_csv 오타 가능성 — Tools/RelicFairy/Validate Room CSVs 확인 권장.");
+        return TileType.Floor;
     }
 
     /// <summary>[Mm]([cre]\d*)+ 토큰 파싱. 실패 시 false.
