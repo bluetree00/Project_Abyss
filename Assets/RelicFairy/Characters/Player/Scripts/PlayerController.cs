@@ -613,8 +613,17 @@ public class PlayerController : CharacterBase
             else
                 Debug.Log("[Input] Attack started ignored - no weapon");
 
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue()), out var hit, 100f, LayerMask.GetMask("Ground")))
+            // 탑뷰 포함 모든 카메라 상태에서 마우스 월드 위치 계산
+            Ray atkRay = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(atkRay, out var hit, 200f, LayerMask.GetMask("Ground")))
                 _lastClickedPosition = hit.point;
+            else
+            {
+                // 지면 레이어 미스 시 Y=player 높이 평면으로 폴백 (탑뷰 대응)
+                var groundPlane = new Plane(Vector3.up, transform.position);
+                if (groundPlane.Raycast(atkRay, out float atkDist))
+                    _lastClickedPosition = atkRay.GetPoint(atkDist);
+            }
         };
 
         inputActions.Player.Attack.canceled += _ =>
@@ -1010,11 +1019,29 @@ public class PlayerController : CharacterBase
             return;
         }
 
-        // 2) fallback: 마우스 기반 레이캐스트
+        // 2) fallback: 마우스 기반 레이캐스트 (탑뷰 포함)
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-        if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+        Vector3 worldPoint = Vector3.zero;
+        bool gotPoint = false;
+
+        if (Physics.Raycast(ray, out var hit, 200f, LayerMask.GetMask("Ground")))
         {
-            Vector3 lookDir = hit.point - transform.position;
+            worldPoint = hit.point;
+            gotPoint   = true;
+        }
+        else
+        {
+            var groundPlane = new Plane(Vector3.up, transform.position);
+            if (groundPlane.Raycast(ray, out float dist))
+            {
+                worldPoint = ray.GetPoint(dist);
+                gotPoint   = true;
+            }
+        }
+
+        if (gotPoint)
+        {
+            Vector3 lookDir = worldPoint - transform.position;
             lookDir.y = 0f;
             if (lookDir.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.LookRotation(lookDir);

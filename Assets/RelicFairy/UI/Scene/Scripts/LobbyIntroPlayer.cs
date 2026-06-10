@@ -8,11 +8,9 @@ using System.Threading;
 public class LobbyIntroPlayer : MonoBehaviour
 {
     [Header("Video Clips")]
-    [SerializeField] private VideoClip _introClip;
     [SerializeField] private VideoClip _loopClip;
 
     [Header("HUD Fade")]
-    [SerializeField] private float _hudFadeBeforeEnd = 2f;
     [SerializeField] private float _hudFadeDuration = 1.5f;
 
     private VideoPlayer _videoPlayer;
@@ -45,6 +43,13 @@ public class LobbyIntroPlayer : MonoBehaviour
         }
         if (_bgRawImage != null)
             _bgRawImage.texture = _renderTexture;
+
+        _fadeTargets = new CanvasGroup[]
+        {
+            GetOrAddCanvasGroup(transform, "DarkOverlay"),
+            GetOrAddCanvasGroup(transform, "MenuPanel"),
+            GetOrAddCanvasGroup(transform, "TitleImage"),
+        };
     }
 
     private static CanvasGroup GetOrAddCanvasGroup(Transform parent, string childName)
@@ -55,21 +60,36 @@ public class LobbyIntroPlayer : MonoBehaviour
         return cg != null ? cg : tr.gameObject.AddComponent<CanvasGroup>();
     }
 
-    private void Start()
+    private void OnEnable()
     {
-        var hud = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
-        _hudCanvasGroup = hud?.MainCanvasGroup;
-
-        _fadeTargets = new CanvasGroup[]
+        if (_hudCanvasGroup == null)
         {
-            GetOrAddCanvasGroup(transform, "DarkOverlay"),
-            GetOrAddCanvasGroup(transform, "MenuPanel"),
-        };
+            var hud = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
+            _hudCanvasGroup = hud?.MainCanvasGroup;
+        }
+
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+
+        if (_videoPlayer != null)
+            _videoPlayer.loopPointReached -= OnLoopEnd;
 
         HideAll();
-
-        _cts = new CancellationTokenSource();
         PlaySequenceAsync(_cts.Token).Forget();
+    }
+
+    private void OnDisable()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+
+        if (_videoPlayer != null)
+        {
+            _videoPlayer.loopPointReached -= OnLoopEnd;
+            _videoPlayer.Stop();
+        }
     }
 
     private void OnDestroy()
@@ -108,31 +128,9 @@ public class LobbyIntroPlayer : MonoBehaviour
     {
         try
         {
-            if (_videoPlayer == null) return;
+            FadeInAllAsync(token).Forget();
 
-            if (_introClip != null)
-            {
-                _videoPlayer.source = VideoSource.VideoClip;
-                _videoPlayer.clip = _introClip;
-                _videoPlayer.isLooping = false;
-                _videoPlayer.Prepare();
-                await UniTask.WaitUntil(() => _videoPlayer.isPrepared, cancellationToken: token);
-                _videoPlayer.Play();
-
-                float fadeStartDelay = Mathf.Max(0f, (float)_introClip.length - _hudFadeBeforeEnd);
-                await UniTask.Delay(TimeSpan.FromSeconds(fadeStartDelay), cancellationToken: token);
-                FadeInAllAsync(token).Forget();
-
-                await WaitForVideoEndAsync(_videoPlayer, token);
-                _videoPlayer.Stop();
-                await UniTask.Yield(token);
-            }
-            else
-            {
-                FadeInAllAsync(token).Forget();
-            }
-
-            if (_loopClip == null) return;
+            if (_videoPlayer == null || _loopClip == null) return;
 
             _videoPlayer.source = VideoSource.VideoClip;
             _videoPlayer.clip = _loopClip;
@@ -151,25 +149,6 @@ public class LobbyIntroPlayer : MonoBehaviour
     {
         vp.time = 0;
         vp.Play();
-    }
-
-    private static async UniTask WaitForVideoEndAsync(VideoPlayer player, CancellationToken token)
-    {
-        var tcs = new UniTaskCompletionSource();
-        void OnEnd(VideoPlayer _)
-        {
-            player.loopPointReached -= OnEnd;
-            tcs.TrySetResult();
-        }
-        player.loopPointReached += OnEnd;
-        try
-        {
-            await tcs.Task.AttachExternalCancellation(token);
-        }
-        finally
-        {
-            player.loopPointReached -= OnEnd;
-        }
     }
 
     private async UniTaskVoid FadeInAllAsync(CancellationToken token)

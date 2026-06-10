@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -34,15 +35,31 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
     [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
 
+    [Header("Dragon — 지상 히트박스")]
+    [Tooltip("지상 상태 콜라이더 중심 Y (루트 기준). 프리팹 저장 상태와 무관하게 항상 이 값 사용.")]
+    [SerializeField] private float _groundHitboxCenterY = 2.5f;
+    [Tooltip("지상 상태 콜라이더 높이")]
+    [SerializeField] private float _groundHitboxHeight = 5f;
+
+    [Header("Dragon — 공중 히트박스")]
+    [Tooltip("공중 상태에서 지상 높이 기준 배율 (수직 확장 — 투사체 피격 범위)")]
+    [SerializeField] private float _airborneHitboxHeightMult = 5f;
+    [Tooltip("공중 상태에서 콜라이더 중심을 아래로 이동하는 Y 오프셋 (지상 발사체가 닿도록)")]
+    [SerializeField] private float _airborneHitboxCenterOffsetY = 8f;
+    [Tooltip("공중 상태에서 콜라이더 반경 (넓을수록 맞추기 쉬움)")]
+    [SerializeField] private float _airborneHitboxRadius = 3f;
+
     [Header("Dragon — 이동")]
     [Tooltip("이 거리 초과 시 RunChase, 이하 시 WalkChase")]
     [SerializeField] private float _walkToRunThreshold = 8f;
     [Tooltip("WalkChase 속도 배율 (moveSpeed 대비)")]
     [SerializeField] private float _walkChaseSpeedMult = 0.5f;
     [Tooltip("추적 중 NavMeshAgent 회전 속도 (낮을수록 천천히 방향 전환)")]
-    [SerializeField] private float _chaseAngularSpeed = 35f;
+    [SerializeField] private float _chaseAngularSpeed = 12f;
     [Tooltip("방향 전환 애니 재생 중 이동 속도 배율")]
     [SerializeField] private float _turnSpeedMult = 0.4f;
+    [SerializeField] private float _groundTurnOrbitAngle = 65f;
+    [SerializeField] private float _groundTurnFaceAngle = 25f;
     [SerializeField] private float _airChaseHeight = 4f;
     [SerializeField] private float _airChaseSpeedMult = 1.4f;
     [SerializeField] private float _airTurnAngleThreshold = 40f;
@@ -69,6 +86,8 @@ public class DragonBossMonster : MonsterBase, IBoss
     public float  ChaseAngularSpeed   => _chaseAngularSpeed;
     public float  WalkChaseSpeedMult  => _walkChaseSpeedMult;
     public float  TurnSpeedMult       => _turnSpeedMult;
+    public float  GroundTurnOrbitAngle => _groundTurnOrbitAngle;
+    public float  GroundTurnFaceAngle  => _groundTurnFaceAngle;
     public float  AirChaseHeight      => _airChaseHeight;
     public float  AirChaseSpeedMult   => _airChaseSpeedMult;
     public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
@@ -92,6 +111,13 @@ public class DragonBossMonster : MonsterBase, IBoss
     private DragonBossBlackboard  _dragonBB;
     private BossPatternContext    _patternCtx;
     private BossPatternRunner     _runner;
+
+    // ── 공중 히트박스 ─────────────────────────────────────
+    private CapsuleCollider _capsule;
+    private Vector3         _capsuleCenterNormal; // X/Z 중심 보존용
+    private float           _capsuleRadiusNormal; // 지상 반경 보존용
+    private bool            _airborneHitboxActive;
+    private bool            _hitStopActive;
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
@@ -147,7 +173,21 @@ public class DragonBossMonster : MonsterBase, IBoss
         UpdateTransitionPatternWeights();
     }
 
-    protected override void OnInitialized() => BindBossHud();
+    protected override void OnInitialized()
+    {
+        BindBossHud();
+        _capsule = GetComponent<CapsuleCollider>();
+        if (_capsule != null)
+        {
+            _capsuleCenterNormal = _capsule.center; // X/Z만 보존
+            _capsuleRadiusNormal = _capsule.radius; // 지상 반경 보존
+            // 프리팹 저장 상태와 무관하게 지상 히트박스로 초기화
+            _airborneHitboxActive = true;           // 다음 SyncAirborneHitbox 호출 시 else(지상) 분기 강제 진입
+        }
+        // 초기 상태: Ice 페이즈 (HP 100%) 색상
+        DragonBossVisualHelper.ApplyBodyTint(transform,
+            DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 매 프레임
@@ -169,7 +209,39 @@ public class DragonBossMonster : MonsterBase, IBoss
         }
 
         UpdateTransitionPatternWeights();
-        _runner?.Tick(Time.deltaTime);
+
+        // 공중 상태에서 최소 선회량을 채울 때까지 패턴 발동 잠금
+        bool airPatternLocked = _dragonBB.BodyState == BodyState.Airborne
+            && _dragonBB.AirOrbitAccumulatedDegrees < _airMinOrbitTurnsBeforePattern * 360f;
+        if (!airPatternLocked)
+            _runner?.Tick(Time.deltaTime);
+
+        SyncAirborneHitbox();
+    }
+
+    private void SyncAirborneHitbox()
+    {
+        if (_capsule == null || _dragonBB == null) return;
+        bool shouldBeAirborne = _dragonBB.BodyState == BodyState.Airborne;
+        if (shouldBeAirborne == _airborneHitboxActive) return;
+
+        _airborneHitboxActive = shouldBeAirborne;
+        float cx = _capsuleCenterNormal.x;
+        float cz = _capsuleCenterNormal.z;
+        if (shouldBeAirborne)
+        {
+            // 공중: 아래로 확장 + 반경 확대 — 지상에서 조준하기 쉽도록
+            _capsule.height = _groundHitboxHeight * _airborneHitboxHeightMult;
+            _capsule.center = new Vector3(cx, _groundHitboxCenterY - _airborneHitboxCenterOffsetY, cz);
+            _capsule.radius = _airborneHitboxRadius;
+        }
+        else
+        {
+            // 지상: 명시적 수치로 바디 중앙에 콜라이더 배치, 반경 원래 값으로 복원
+            _capsule.height = _groundHitboxHeight;
+            _capsule.center = new Vector3(cx, _groundHitboxCenterY, cz);
+            _capsule.radius = _capsuleRadiusNormal;
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -184,6 +256,11 @@ public class DragonBossMonster : MonsterBase, IBoss
         CacheTransitionPatternBaseWeights();
         UpdateTransitionPatternWeights();
         BindBossHud();
+        _hitStopActive = false;
+        _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
+        // pool 재활성 시 Ice 페이즈 색상으로 리셋
+        DragonBossVisualHelper.ApplyBodyTint(transform,
+            DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -205,6 +282,32 @@ public class DragonBossMonster : MonsterBase, IBoss
             _dragonBB.SetHitDirection(dir, transform.forward);
         }
         base.TakeDamage(amount, instigator, knockbackMultiplier, element, elementAmount);
+
+        // 지상 피격 시 히트스톱 (poise 파괴 = 강타격, 일반 = 약타격)
+        bool isAirborne = _dragonBB != null && _dragonBB.BodyState == BodyState.Airborne;
+        if (!isAirborne)
+        {
+            float dur = (_dragonBB != null && _dragonBB.IsPoiseBroken) ? 0.14f : 0.05f;
+            HitStopAsync(dur, destroyCancellationToken).Forget();
+        }
+    }
+
+    private async UniTaskVoid HitStopAsync(float duration, System.Threading.CancellationToken ct)
+    {
+        if (_hitStopActive) return;
+        _hitStopActive = true;
+        float prev = Time.timeScale;
+        Time.timeScale = 0.05f;
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(duration), DelayType.Realtime, cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            Time.timeScale = prev;
+            _hitStopActive = false;
+        }
     }
 
     protected override void OnDamageTaken()
@@ -250,13 +353,6 @@ public class DragonBossMonster : MonsterBase, IBoss
     {
         if (_runtime?.PlayerTarget == null)
             return false;
-
-        if (_dragonBB != null && _dragonBB.BodyState == BodyState.Airborne)
-        {
-            float requiredDegrees = Mathf.Max(0f, _airMinOrbitTurnsBeforePattern) * 360f;
-            if (_dragonBB.AirOrbitAccumulatedDegrees < requiredDegrees)
-                return false;
-        }
 
         return _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
     }
@@ -315,10 +411,18 @@ public class DragonBossMonster : MonsterBase, IBoss
 
             foreach (var pattern in entry.patterns)
             {
-                if (pattern is DragonTakeoffPatternSO)
-                    _dragonBB.TakeoffBaseWeight = Mathf.Max(0.01f, pattern.weight);
-                else if (pattern is DragonLandingPatternSO)
-                    _dragonBB.LandingBaseWeight = Mathf.Max(0.01f, pattern.weight);
+                // pattern.weight 는 런타임에 배수가 곱해지므로 오염될 수 있음.
+                // BaseWeight (전용 SO 필드, 코드 비수정) 에서 읽어 SO weight 도 즉시 정규화.
+                if (pattern is DragonTakeoffPatternSO tp)
+                {
+                    _dragonBB.TakeoffBaseWeight = Mathf.Max(0.01f, tp.BaseWeight);
+                    pattern.weight = _dragonBB.TakeoffBaseWeight;
+                }
+                else if (pattern is DragonLandingPatternSO lp)
+                {
+                    _dragonBB.LandingBaseWeight = Mathf.Max(0.01f, lp.BaseWeight);
+                    pattern.weight = _dragonBB.LandingBaseWeight;
+                }
             }
         }
     }
@@ -378,8 +482,8 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.AfterBackstep        => new LastTagCondition("backstep"),
             BossConditionKey.AfterSidestep        => new LastTagCondition("sidestep"),
             BossConditionKey.TimePressure         => new NormalModeTimerCondition(config.condTimePressureSecs),
-            BossConditionKey.Dragon_Summon80      => new DragonSummonedAtCondition(DragonSummonPhase.At80),
-            BossConditionKey.Dragon_Summon50      => new DragonSummonedAtCondition(DragonSummonPhase.At50),
+            BossConditionKey.Dragon_Summon70      => new DragonSummonedAtCondition(DragonSummonPhase.At70),
+            BossConditionKey.Dragon_Summon40      => new DragonSummonedAtCondition(DragonSummonPhase.At40),
             BossConditionKey.Dragon_Summon10      => new DragonSummonedAtCondition(DragonSummonPhase.At10),
             // 속성 페이즈: HP 비율 범위로 판정 (Ice 100-70%, Thunder 70-40%, Fire 40-0%)
             BossConditionKey.Dragon_ElementIce     => new DragonElementPhaseCondition(DragonElementPhase.Ice),

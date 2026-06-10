@@ -27,8 +27,8 @@ public class DKQuickStrikePatternSO : BossPatternSO
     public GameObject swingVfxPrefab;
 
     [Header("Timing")]
-    [Tooltip("Attack 애니메이션 시작 후 경고 타일이 생성되는 시점")]
-    public float warningDuration = 0.2f;
+    [Tooltip("Attack 애니메이션 시작 후 경고 타일이 생성되는 시점. §2 약공격 Opening Pose ≥0.3s")]
+    public float warningDuration = 0.35f;
     [Tooltip("타일 제거 + VFX 스폰 시점")]
     public float hitTime         = 0.5f;
     [Tooltip("VFX 스폰 후 실제 피격까지 대기 시간")]
@@ -127,6 +127,9 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
             DKGridPatternHelper.TriggerDamage(
                 ctx, ColorRule(sc), sc,
                 Data.damageMultiplier, Data.knockbackMultiplier);
+            // §3 타격감
+            BossImpactFeedback.TriggerHitStop(0.08f);
+            BossImpactFeedback.TriggerCameraShake(0.1f, 0.25f);
         }
 
         if (_timer >= Data.hitTime + Data.hitDuration + Data.recoveryTime)

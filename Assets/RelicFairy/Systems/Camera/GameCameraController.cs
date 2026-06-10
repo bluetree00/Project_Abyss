@@ -55,6 +55,9 @@ public class GameCameraController : MonoBehaviour
     private bool _savedCmBeforeTopDown;
     private Vector3 _savedCamPosBeforeTopDown;
     private Quaternion _savedCamRotBeforeTopDown;
+    private Vector3 _savedFollowPosBeforeTopDown;
+    private CancellationTokenSource _topDownReturnCts;
+    private CancellationTokenSource _topDownAscendCts;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
@@ -91,6 +94,12 @@ public class GameCameraController : MonoBehaviour
         _panCts?.Cancel();
         _panCts?.Dispose();
         _panCts = null;
+        _topDownAscendCts?.Cancel();
+        _topDownAscendCts?.Dispose();
+        _topDownAscendCts = null;
+        _topDownReturnCts?.Cancel();
+        _topDownReturnCts?.Dispose();
+        _topDownReturnCts = null;
         UnsubscribePlayerBound();
         if (_fadeCanvas != null) Destroy(_fadeCanvas.gameObject);
         if (Instance == this) Instance = null;
@@ -265,40 +274,151 @@ public class GameCameraController : MonoBehaviour
 
     [Header("Dragon Top-Down View")]
     [SerializeField] private float topDownHeight = 35f;
+    [SerializeField] private float topDownAscendDuration = 1.2f;
 
     public void ActivateDragonTopDownView(Vector3 mapCenter)
     {
-        Debug.Log($"[GCC.ActivateTopDown] 호출됨 topDownActive={_topDownViewActive} brain={_brain?.enabled} cm={_cinemachine?.enabled}");
         if (_topDownViewActive) return;
         EnsureCinemachineRefs();
 
-        _savedBrainBeforeTopDown  = _brain != null && _brain.enabled;
-        _savedCmBeforeTopDown     = _cinemachine != null && _cinemachine.enabled;
-        _savedCamPosBeforeTopDown = transform.position;
-        _savedCamRotBeforeTopDown = transform.rotation;
+        // 복귀 중 재활성 시 brain/cm가 꺼진 채 저장되는 버그 방지:
+        // 이전 저장값에 따라 brain/cm를 먼저 복원한 뒤 새 상태를 저장한다.
+        _topDownReturnCts?.Cancel();
+        _topDownAscendCts?.Cancel();
+        if (_brain       != null && !_brain.enabled       && _savedBrainBeforeTopDown) _brain.enabled       = true;
+        if (_cinemachine != null && !_cinemachine.enabled && _savedCmBeforeTopDown)    _cinemachine.enabled = true;
 
-        if (_brain != null)       _brain.enabled       = false;
+        _savedBrainBeforeTopDown     = _brain       != null && _brain.enabled;
+        _savedCmBeforeTopDown        = _cinemachine != null && _cinemachine.enabled;
+        _savedCamPosBeforeTopDown    = transform.position;
+        _savedCamRotBeforeTopDown    = transform.rotation;
+        _savedFollowPosBeforeTopDown = _cinemachine?.Follow != null
+            ? _cinemachine.Follow.position
+            : transform.position;
+
+        if (_brain       != null) _brain.enabled       = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
 
+        // 중간 상태 없이 즉시 탑뷰 스냅 (비동기 상승 애니메이션 제거)
         transform.position = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
         transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-
         _topDownViewActive = true;
-        Debug.Log($"[GCC.ActivateTopDown] 완료 camPos={transform.position} brainDisabled={_brain != null && !_brain.enabled}");
+    }
+
+    private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter)
+    {
+        _topDownAscendCts?.Cancel();
+        _topDownAscendCts?.Dispose();
+        _topDownAscendCts = new CancellationTokenSource();
+        var token = _topDownAscendCts.Token;
+
+        Vector3    startPos  = transform.position;
+        Quaternion startRot  = transform.rotation;
+        Vector3    targetPos = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        Quaternion targetRot = Quaternion.Euler(90f, 0f, 0f);
+        float      duration  = Mathf.Max(0.01f, topDownAscendDuration);
+
+        try
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                token.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float ease = PanEase(elapsed / duration);
+                transform.position = Vector3.Lerp(startPos, targetPos, ease);
+                transform.rotation = Quaternion.Slerp(startRot, targetRot, ease);
+                await UniTask.Yield(token);
+            }
+            transform.position = targetPos;
+            transform.rotation = targetRot;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public void DeactivateDragonTopDownView(float duration)
+    {
+        // duration 무시 — 중간 상태 없이 즉시 플레이어 시점으로 복귀
+        DeactivateDragonTopDownView();
     }
 
     public void DeactivateDragonTopDownView()
     {
         if (!_topDownViewActive) return;
         EnsureCinemachineRefs();
+        _topDownAscendCts?.Cancel();
+        _topDownReturnCts?.Cancel();
 
-        transform.position = _savedCamPosBeforeTopDown;
+        // 플레이어 현재 위치 기준으로 카메라 복원 (저장 당시 오프셋 유지)
+        if (_cinemachine?.Follow != null)
+        {
+            Vector3 offset = _savedCamPosBeforeTopDown - _savedFollowPosBeforeTopDown;
+            transform.position = _cinemachine.Follow.position + offset;
+        }
+        else
+        {
+            transform.position = _savedCamPosBeforeTopDown;
+        }
         transform.rotation = _savedCamRotBeforeTopDown;
 
-        if (_brain != null && _savedBrainBeforeTopDown)       _brain.enabled       = true;
-        if (_cinemachine != null && _savedCmBeforeTopDown) _cinemachine.enabled = true;
+        if (_brain       != null && _savedBrainBeforeTopDown) _brain.enabled       = true;
+        if (_cinemachine != null && _savedCmBeforeTopDown)    _cinemachine.enabled = true;
 
         _topDownViewActive = false;
+    }
+
+    private async UniTaskVoid DeactivateDragonTopDownViewAsync(float duration)
+    {
+        if (!_topDownViewActive) return;
+        EnsureCinemachineRefs();
+
+        _topDownAscendCts?.Cancel();
+        _topDownReturnCts?.Cancel();
+        _topDownReturnCts?.Dispose();
+        _topDownReturnCts = new CancellationTokenSource();
+        var token = _topDownReturnCts.Token;
+
+        Vector3 startPos = transform.position;
+        Quaternion startRot = transform.rotation;
+        // follow 타겟의 현재 위치 기준으로 목표 계산 → 활성화 시점의 stale 위치 대신 현재 위치 반영
+        Vector3 targetPos;
+        if (_cinemachine?.Follow != null)
+        {
+            Vector3 camToFollowOffset = _savedCamPosBeforeTopDown - _savedFollowPosBeforeTopDown;
+            targetPos = _cinemachine.Follow.position + camToFollowOffset;
+        }
+        else
+        {
+            targetPos = _savedCamPosBeforeTopDown;
+        }
+        Quaternion targetRot = _savedCamRotBeforeTopDown;
+        bool restoreBrain = _savedBrainBeforeTopDown;
+        bool restoreCm = _savedCmBeforeTopDown;
+
+        _topDownViewActive = false;
+        if (_brain != null) _brain.enabled = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        try
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                token.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float ease = PanEase(elapsed / duration);
+                transform.position = Vector3.Lerp(startPos, targetPos, ease);
+                transform.rotation = Quaternion.Slerp(startRot, targetRot, ease);
+                await UniTask.Yield(token);
+            }
+
+            transform.position = targetPos;
+            transform.rotation = targetRot;
+
+            if (_brain != null && restoreBrain) _brain.enabled = true;
+            if (_cinemachine != null && restoreCm) _cinemachine.enabled = true;
+        }
+        catch (OperationCanceledException) { }
     }
 
     public void DeactivateBossOrbitView(Transform bossTarget = null)

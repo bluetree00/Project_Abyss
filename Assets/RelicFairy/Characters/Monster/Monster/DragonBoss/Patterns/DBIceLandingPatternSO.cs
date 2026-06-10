@@ -1,4 +1,4 @@
-using UnityEngine;
+    using UnityEngine;
 
 namespace RelicFairy.Monster
 {
@@ -62,7 +62,7 @@ public class DBIceLandingPatternSO : BossPatternSO
 
             // 맵 중앙 = 착지 지점
             _targetPos = ctx.Runtime.SpawnPosition;
-            _targetPos.y = ctx.Runtime.SpawnPosition.y;
+            _targetPos.y = DragonPatternFloorUtils.GetFloorY(_targetPos, ctx.Runtime.SpawnPosition.y);
 
             _startPos = ctx.Transform.position;
             _flyPos = _targetPos + Vector3.up * Data.riseHeight;
@@ -77,6 +77,7 @@ public class DBIceLandingPatternSO : BossPatternSO
             {
                 float angle = i * (360f / Mathf.Max(1, Data.columnCount));
                 Vector3 colPos = _targetPos + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.columnRingRadius;
+                colPos.y = DragonPatternFloorUtils.GetFloorY(colPos, _targetPos.y);
                 MonsterGroundWarning.Spawn(colPos, Data.columnRadius, Data.warningDuration, iceColor);
             }
 
@@ -163,6 +164,7 @@ public class DBIceLandingPatternSO : BossPatternSO
             {
                 float angle = i * (360f / Mathf.Max(1, Data.columnCount));
                 Vector3 pos = _targetPos + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * Data.columnRingRadius;
+                pos.y = DragonPatternFloorUtils.GetFloorY(pos, _targetPos.y);
                 if (Data.vfxPrefab != null)
                     BossEffectPool.SpawnOneShot(Data.vfxPrefab, pos, Quaternion.identity);
 

@@ -22,6 +22,11 @@ namespace RelicFairy.Monster
     menuName = "RelicFairy/Boss/Dragon/TakeoffPattern")]
 public class DragonTakeoffPatternSO : BossPatternSO
 {
+    [Header("선택 가중치")]
+    [Tooltip("런타임 streak 배수의 기반값. 공통 weight 와 달리 코드로 절대 수정되지 않음.")]
+    [SerializeField] private float _baseWeight = 1f;
+    public float BaseWeight => _baseWeight;
+
     [Header("상승 파라미터")]
     [Tooltip("이륙 시작 위치 기준 상승 누적량 임계값 (m). 이 값 이상 상승하면 Airborne 플립.")]
     [SerializeField] private float _airborneThreshold = 4f;

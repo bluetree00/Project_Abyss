@@ -127,6 +127,9 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
             DKGridPatternHelper.TriggerDamage(
                 ctx, (x, z) => x % 2 == 1 ? sc : Opposite(sc),
                 sc, Data.damageMultiplier, Data.knockbackMultiplier);
+            // §3 타격감
+            BossImpactFeedback.TriggerHitStop(0.1f);
+            BossImpactFeedback.TriggerCameraShake(0.12f, 0.3f);
         }
 
         if (_timer >= Data.hitTime + Data.hitDuration + Data.recoveryTime)

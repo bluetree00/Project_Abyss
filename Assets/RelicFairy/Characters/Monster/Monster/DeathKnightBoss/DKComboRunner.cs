@@ -16,11 +16,16 @@ public class DKComboRunner
     // ── 외부 의존성 ──────────────────────────────────────────
     private readonly BossConfigSO          _config;
     private readonly BossPatternContext    _ctx;
-    private readonly List<BossPatternSO>   _attackPool;
-    private readonly Func<bool>            _isAlive;
-    private readonly Func<bool>            _isInRange;
-    private readonly Action<IMonsterState> _changeState;
-    private readonly Action<BossPatternSO> _onExecuted;
+    private readonly List<BossPatternSO>   _phase1AreaPool;   // 1페이즈 광역 공격 풀
+    private readonly List<BossPatternSO>   _basicPool;        // 기본 공격 풀 (1·2페이즈 공용)
+    private readonly List<BossPatternSO>   _phase2AreaPool;   // 2페이즈 광역 공격 풀
+    private readonly Func<bool>                         _isAlive;
+    private readonly Func<bool>                         _isInRange;
+    private readonly Func<bool>                         _isPhase2;
+    private readonly Func<bool>                         _isStaggered;  // GetHit 등 경직 중 콤보 차단
+    private readonly Action<IMonsterState>              _changeState;
+    private readonly Action<BossPatternSO>              _onExecuted;
+    private readonly Func<IMonsterState, IMonsterState> _stateDecorator;
 
     // ── 런타임 상태 ──────────────────────────────────────────
     private float                         _breakCooldown;
@@ -28,27 +33,39 @@ public class DKComboRunner
     private readonly Queue<BossPatternSO> _comboQueue = new Queue<BossPatternSO>();
     private BossPatternSO                 _lastFiredAttack;
     private float                         _lastFiredTime;
+    private bool                          _currentComboUsePhase1Position;
 
-    public bool  IsPatternActive      { get; private set; }
-    public float PatternBreakCooldown => _breakCooldown;
+    public bool  IsPatternActive               { get; private set; }
+    public float PatternBreakCooldown          => _breakCooldown;
+    public bool  CurrentComboUsePhase1Position => _currentComboUsePhase1Position;
 
     // ── 생성자 ───────────────────────────────────────────────
     public DKComboRunner(
-        BossConfigSO          config,
-        BossPatternContext     ctx,
-        List<BossPatternSO>   attackPool,
-        Func<bool>            isAlive,
-        Func<bool>            isInRange,
-        Action<IMonsterState> changeState,
-        Action<BossPatternSO> onExecuted = null)
+        BossConfigSO                        config,
+        BossPatternContext                   ctx,
+        List<BossPatternSO>                 phase1AreaPool,
+        List<BossPatternSO>                 basicPool,
+        List<BossPatternSO>                 phase2AreaPool,
+        Func<bool>                          isAlive,
+        Func<bool>                          isInRange,
+        Func<bool>                          isPhase2,
+        Func<bool>                          isStaggered,
+        Action<IMonsterState>               changeState,
+        Action<BossPatternSO>               onExecuted     = null,
+        Func<IMonsterState, IMonsterState>  stateDecorator = null)
     {
-        _config      = config;
-        _ctx         = ctx;
-        _attackPool  = attackPool ?? new List<BossPatternSO>();
-        _isAlive     = isAlive;
-        _isInRange   = isInRange;
-        _changeState = changeState;
-        _onExecuted  = onExecuted;
+        _config          = config;
+        _ctx             = ctx;
+        _phase1AreaPool  = phase1AreaPool  ?? new List<BossPatternSO>();
+        _basicPool       = basicPool       ?? new List<BossPatternSO>();
+        _phase2AreaPool  = phase2AreaPool  ?? new List<BossPatternSO>();
+        _isAlive         = isAlive;
+        _isInRange       = isInRange;
+        _isPhase2        = isPhase2        ?? (() => false);
+        _isStaggered     = isStaggered     ?? (() => false);
+        _changeState     = changeState;
+        _onExecuted      = onExecuted;
+        _stateDecorator  = stateDecorator;
     }
 
     // ── 풀 재사용 ────────────────────────────────────────────
@@ -81,6 +98,17 @@ public class DKComboRunner
         // 패턴 종료 감지
         if (_wasInPattern && !inPattern)
         {
+            // GetHit 등 경직으로 패턴이 중단된 경우 — 콤보 큐 초기화 후 쿨다운 적용
+            if (_isStaggered())
+            {
+                _comboQueue.Clear();
+                _wasInPattern    = false;
+                _breakCooldown   = UnityEngine.Random.Range(
+                    _config.patternBreakDurationMin,
+                    _config.patternBreakDurationMax);
+                return;
+            }
+
             if (_comboQueue.Count > 0)
             {
                 // 콤보 연속 — 브레이크 없이 즉시 다음 공격
@@ -97,9 +125,9 @@ public class DKComboRunner
 
         inPattern = IsPatternActive = _ctx.Ctx.Monster.IsInSpecialState;
 
-        // 새 콤보 시작 조건: 비전투 + 쿨다운 완료 + 생존 + 사정거리
+        // 새 콤보 시작 조건: 비전투 + 쿨다운 완료 + 생존 + 사정거리 + 경직 없음
         if (!inPattern && _comboQueue.Count == 0 &&
-            _breakCooldown <= 0f && _isAlive() && _isInRange())
+            _breakCooldown <= 0f && _isAlive() && _isInRange() && !_isStaggered())
         {
             var combo = SelectComboConfig();
             if (combo != null)
@@ -112,7 +140,10 @@ public class DKComboRunner
 
     // ── 콤보 설정 선택 ───────────────────────────────────────
 
-    /// <summary>patternEntries 의 DKComboConfigSO 중 가중치 기반 랜덤 선택.</summary>
+    /// <summary>
+    /// patternEntries 의 DKComboConfigSO 중 가중치 기반 랜덤 선택.
+    /// 선택 결과의 usePhase1Position을 _currentComboUsePhase1Position에 캡처한다.
+    /// </summary>
     private DKComboConfigSO SelectComboConfig()
     {
         if (_config?.patternEntries == null || _config.patternEntries.Count == 0) return null;
@@ -140,7 +171,11 @@ public class DKComboRunner
                 var c = p as DKComboConfigSO;
                 if (c == null || !c.CanExecute(_ctx)) continue;
                 acc += Mathf.Max(0f, c.weight);
-                if (roll <= acc) return c;
+                if (roll <= acc)
+                {
+                    _currentComboUsePhase1Position = c.usePhase1Position;
+                    return c;
+                }
             }
         }
         return null;
@@ -159,13 +194,30 @@ public class DKComboRunner
         }
     }
 
-    /// <summary>attackPool 에서 가중치+반복 패널티 기반으로 공격 1개 선택.</summary>
+    /// <summary>
+    /// 현재 콤보 설정에 따라 적절한 공격 풀에서 가중치+반복 패널티 기반으로 1개 선택.
+    ///
+    /// usePhase1Position=false → _basicPool (기본 공격, 1·2페이즈 공용)
+    /// usePhase1Position=true  → Phase2이면 _phase2AreaPool, Phase1이면 _phase1AreaPool
+    /// </summary>
     private BossPatternSO SelectAttack()
     {
-        if (_attackPool == null || _attackPool.Count == 0) return null;
+        List<BossPatternSO> pool;
+        if (!_currentComboUsePhase1Position)
+        {
+            pool = _basicPool.Count > 0 ? _basicPool : _phase1AreaPool;
+        }
+        else
+        {
+            pool = (_isPhase2() && _phase2AreaPool.Count > 0)
+                ? _phase2AreaPool
+                : _phase1AreaPool;
+        }
+
+        if (pool == null || pool.Count == 0) return null;
 
         float total = 0f;
-        foreach (var p in _attackPool)
+        foreach (var p in pool)
         {
             if (p == null || !p.CanExecute(_ctx)) continue;
             total += ApplyRepeatPenalty(p);
@@ -173,15 +225,14 @@ public class DKComboRunner
 
         if (total <= 0f)
         {
-            // 모든 가중치가 0 이면 실행 가능한 첫 번째 공격으로 폴백
-            foreach (var p in _attackPool)
+            foreach (var p in pool)
                 if (p != null && p.CanExecute(_ctx)) return p;
             return null;
         }
 
         float roll = UnityEngine.Random.Range(0f, total);
         float acc  = 0f;
-        foreach (var p in _attackPool)
+        foreach (var p in pool)
         {
             if (p == null || !p.CanExecute(_ctx)) continue;
             acc += ApplyRepeatPenalty(p);
@@ -199,7 +250,10 @@ public class DKComboRunner
         var state   = pattern.GetRuntimeState();
         if (state == null) return;
 
-        _changeState(state);
+        // Phase2 텔레포트 등 사전 처리 상태가 있으면 감싸서 실행
+        IMonsterState finalState = _stateDecorator != null ? _stateDecorator(state) : state;
+
+        _changeState(finalState);
         _lastFiredAttack = pattern;
         _lastFiredTime   = Time.time;
         IsPatternActive  = true;

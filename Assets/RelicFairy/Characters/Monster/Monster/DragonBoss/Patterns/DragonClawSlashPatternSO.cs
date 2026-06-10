@@ -29,6 +29,9 @@ public class DragonClawSlashPatternSO : BossPatternSO
     [Tooltip("Marker 7 Danger zone prefab for attack warning")]
     [SerializeField] private GameObject _dangerZonePrefab;
 
+    [Header("EndPose (반격 창)")]
+    [SerializeField] private float _endPoseDuration = 0.4f;
+
     [Header("Cooldown")]
     [SerializeField] private float _cooldown = 12f;
 
@@ -46,6 +49,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
     public float       AttackRadius     => _attackRadius;
     public int         AttackDamage     => _attackDamage;
     public GameObject  DangerZonePrefab => _dangerZonePrefab;
+    public float       EndPoseDuration  => _endPoseDuration;
     public float       Cooldown         => _cooldown;
     public string      JumpUpStateName  => _jumpUpStateName;
     public string      ClawLStateName   => _clawLStateName;
@@ -80,7 +84,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
 /// </summary>
 internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatternSO>
 {
-    private enum Phase { Jumping, Attacking, Done }
+    private enum Phase { Jumping, Attacking, EndPose, Done }
 
     private Phase   _phase;
     private Vector3 _startPos;
@@ -135,6 +139,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         {
             case Phase.Jumping:   UpdateJumping(ctx);   break;
             case Phase.Attacking: UpdateAttacking(ctx); break;
+            case Phase.EndPose:   UpdateEndPose(ctx);   break;
         }
     }
 
@@ -231,7 +236,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             if (_swingIndex < _totalSwings)
                 PlayCurrentSwingAnim(ctx);
             else
-                FinishPattern(ctx);
+                StartEndPose();
         }
     }
 
@@ -273,6 +278,18 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             player.TakeDamage(Data.AttackDamage);
             break;
         }
+    }
+
+    private void StartEndPose()
+    {
+        _phase = Phase.EndPose;
+        _timer = 0f;
+    }
+
+    private void UpdateEndPose(MonsterContext ctx)
+    {
+        if (_timer >= Data.EndPoseDuration)
+            FinishPattern(ctx);
     }
 
     private void FinishPattern(MonsterContext ctx)
