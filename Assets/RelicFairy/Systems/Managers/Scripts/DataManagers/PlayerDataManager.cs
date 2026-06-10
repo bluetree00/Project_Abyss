@@ -7,12 +7,13 @@ using System;
 using LitJson;
 
 /// <summary>
-/// 뒤끝 CDN에서 PLAYER_DATA + PASSIVE_DATA 로드.
+/// 뒤끝 CDN에서 CHARACTER_DATA + PASSIVE_DATA 로드.
 /// MonsterDataManager와 동일 패턴.
+/// (구 PLAYER_DATA 차트는 레거시 — 모든 신규 데이터는 CHARACTER_DATA 사용)
 /// </summary>
 public class PlayerDataManager
 {
-    private const string PlayerDataFileName = "player_data.json";
+    private const string PlayerDataFileName = "character_data.json";
     private const string PassiveDataFileName = "passive_data.json";
     private string PlayerFilePath => Path.Combine(Application.persistentDataPath, PlayerDataFileName);
     private string PassiveFilePath => Path.Combine(Application.persistentDataPath, PassiveDataFileName);
@@ -41,7 +42,7 @@ public class PlayerDataManager
         if (_playerById.Count == 0)
         {
             Debug.Log("[PlayerDataManager] CDN 실패 — Addressables 폴백");
-            var playerJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("PLAYER_DATA");
+            var playerJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("CHARACTER_DATA");
             if (playerJson != null)
             {
                 var col = JsonUtility.FromJson<PlayerStatEntryCollection>(playerJson.text);
@@ -142,7 +143,7 @@ public class PlayerDataManager
     private async UniTask LoadFromServerAsync()
     {
         // Player 데이터
-        int playerLoaded = ChartLoader.Load("PLAYER_DATA", row =>
+        int playerLoaded = ChartLoader.Load("CHARACTER_DATA", row =>
         {
             var entry = ParsePlayerRow(row);
             if (entry == null) return;
@@ -187,6 +188,11 @@ public class PlayerDataManager
                 base_luck             = row.TryGetInt("base_luck"),
                 base_move_speed       = row.TryGetFloat("base_move_speed"),
                 base_run_speed        = row.TryGetFloat("base_run_speed"),
+                base_run_ramp         = row.TryGetFloat("base_run_ramp"),
+                move_accel            = row.TryGetFloat("move_accel"),
+                move_decel            = row.TryGetFloat("move_decel"),
+                reverse_accel_mult    = row.TryGetFloat("reverse_accel_mult"),
+                initial_boost         = row.TryGetFloat("initial_boost"),
                 combo_duration        = row.TryGetFloat("combo_duration"),
                 heavy_charge_threshold= row.TryGetFloat("heavy_charge_threshold"),
                 heavy_release_time    = row.TryGetFloat("heavy_release_time"),

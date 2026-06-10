@@ -13,6 +13,8 @@ public sealed class ArthurCovenant : CovenantBase
     private const int V_MOVE_SPEED_BONUS   = 1;
     private const int V_LOW_HP_THRESHOLD   = 2;
     private const int V_SHOCKWAVE_INTERVAL = 3;
+    private const int V_SHOCKWAVE_RADIUS   = 4;
+    private const int V_SHOCKWAVE_MULT     = 5;
 
     public override string CovenantId => CovenantFactory.Arthur;
 
@@ -23,6 +25,8 @@ public sealed class ArthurCovenant : CovenantBase
     private float MoveSpeedBonus    => V(V_MOVE_SPEED_BONUS,   0f);
     private float LowHpThreshold    => V(V_LOW_HP_THRESHOLD,   0.30f);
     private float ShockwaveInterval => V(V_SHOCKWAVE_INTERVAL, 5f);
+    private float ShockwaveRadius   => V(V_SHOCKWAVE_RADIUS,   4f);
+    private float ShockwaveMult     => V(V_SHOCKWAVE_MULT,     2f); // 방어무시 근사 — 큰 배수(IDamageable에 방어무시 인자 없음)
 
     private bool IsLowHp => Ctx != null &&
         Ctx.RunState.Hp <= Ctx.RunState.MaxHp * LowHpThreshold;
@@ -47,8 +51,8 @@ public sealed class ArthurCovenant : CovenantBase
         if (_shockwaveCooldown > 0f) return;
 
         _shockwaveCooldown = ShockwaveInterval;
-        // TODO: 방어력 무시 충격파 발동
-
-        Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+        // 방어무시 충격파 — Tick 내 호출이라 DealAoe 재진입 안전
+        DealAoe(PlayerPos, ShockwaveRadius, ShockwaveMult, knockback: 1f);
+        Vfx("VFX_LightningStrike", PlayerPos); // 임시 VFX (전용 VFX_Shockwave 대기)
     }
 }

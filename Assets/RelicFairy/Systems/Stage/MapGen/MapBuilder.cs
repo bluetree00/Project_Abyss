@@ -27,7 +27,8 @@ public class MapBuilder
         Transform parent,
         float cellSize = 1f,
         float baseY = 0f,
-        GameObject shopStallPrefab = null)
+        GameObject shopStallPrefab = null,
+        int wallLayers = 1)
     {
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -66,8 +67,10 @@ public class MapBuilder
                 float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter);
 
                 var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
-                go.name = $"Block_{x}_{z}_{renderType}";
-                SetLayerRecursive(go, 3); // Ground layer (TagManager layer 3)
+                Name(go, $"Block_{x}_{z}_{renderType}");
+                // 벽은 Wall(8) 레이어로 — 리치 등 공중 보스의 SphereCast 충돌 감지에 사용.
+                // 나머지 블록(바닥·버프·상점 등)은 Ground(3) 레이어.
+                SetLayerRecursive(go, renderType == TileType.Wall ? 8 : 3);
 
                 result.Add(new PlacedBlock
                 {
@@ -78,6 +81,27 @@ public class MapBuilder
                     cell = new Vector2Int(x, z),
                 });
 
+                // 벽 블록 수직 반복 — 같은 프리팹을 위로 쌓아 자연스러운 높이 연출.
+                // GPU 인스턴싱(URP 기본)으로 동일 메시+머티리얼은 자동 배칭되어 드로우콜 증가가 적다.
+                if (renderType == TileType.Wall && wallLayers > 1)
+                {
+                    for (int layer = 1; layer < wallLayers; layer++)
+                    {
+                        var layerWorld = worldPos + new Vector3(0f, layer * cellSize, 0f);
+                        var layerGO    = Object.Instantiate(blockDef.prefab, layerWorld, Quaternion.Euler(0, rotY, 0), parent);
+                        Name(layerGO, $"Block_{x}_{z}_Wall_L{layer}");
+                        SetLayerRecursive(layerGO, 8); // Wall layer
+                        result.Add(new PlacedBlock
+                        {
+                            instance        = layerGO,
+                            targetPosition  = layerWorld,
+                            targetRotationY = rotY,
+                            tileType        = TileType.Wall,
+                            cell            = new Vector2Int(x, z),
+                        });
+                    }
+                }
+
                 // 버프 타일: 전용 프리팹이 있으면 사용, 없으면 기본 트리거 오브젝트 생성
                 if (isBuffTile)
                 {
@@ -87,7 +111,7 @@ public class MapBuilder
                     if (buffDef != null)
                     {
                         var buffGo = Object.Instantiate(buffDef.prefab, worldPos, Quaternion.identity, parent);
-                        buffGo.name = $"Buff_{x}_{z}_{type}";
+                        Name(buffGo, $"Buff_{x}_{z}_{type}");
                         AttachBuffInteraction(buffGo, type);
                         buffBlock = new PlacedBlock
                         {
@@ -97,13 +121,13 @@ public class MapBuilder
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 버프 타일 배치 (프리팹): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
                     else
                     {
                         buffBlock = CreateDefaultBuffObject(x, z, type, worldPos, cellSize, parent);
-                        Debug.Log($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 버프 타일 배치 (임시큐브): {type} at ({x},{z}) pos={worldPos}");
                         buffCount++;
                     }
 
@@ -120,7 +144,7 @@ public class MapBuilder
                     if (shopStallPrefab != null)
                     {
                         var shopGo = Object.Instantiate(shopStallPrefab, worldPos, Quaternion.identity, parent);
-                        shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                        Name(shopGo, $"ShopStall_{x}_{z}_{type}");
                         AttachShopStallInteraction(shopGo, cellSize, category);
                         shopBlock = new PlacedBlock
                         {
@@ -130,7 +154,7 @@ public class MapBuilder
                             tileType = type,
                             cell = new Vector2Int(x, z),
                         };
-                        Debug.Log($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={worldPos}");
+                        RFLog.D($"[MapBuilder] 상점 타일 배치 (Block_ShopStall): ({x},{z}) {type} cat={category} pos={worldPos}");
                     }
                     else
                     {
@@ -139,7 +163,7 @@ public class MapBuilder
                         if (shopDef != null && shopDef.prefab != null)
                         {
                             var shopGo = Object.Instantiate(shopDef.prefab, worldPos, Quaternion.identity, parent);
-                            shopGo.name = $"ShopStall_{x}_{z}_{type}";
+                            Name(shopGo, $"ShopStall_{x}_{z}_{type}");
                             AttachShopStallInteraction(shopGo, cellSize, category);
                             shopBlock = new PlacedBlock
                             {
@@ -149,7 +173,7 @@ public class MapBuilder
                                 tileType = type,
                                 cell = new Vector2Int(x, z),
                             };
-                            Debug.Log($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={worldPos}");
+                            RFLog.D($"[MapBuilder] 상점 타일 배치 (팔레트 프리팹): ({x},{z}) {type} cat={category} pos={worldPos}");
                         }
                         else
                         {
@@ -161,55 +185,13 @@ public class MapBuilder
 
                     result.Add(shopBlock);
                 }
-                // 몬스터 스폰 타일: 스포너 프리팹(MonsterSpawner 컴포넌트 포함)을 바닥 위에 배치
-                else if (isMonsterSpawnTile)
-                {
-                    // 확정(MonsterSpawn) / 후보(MonsterSpawnCandidate) 동일 프리팹 사용 — BD_MonsterSpawn 하나만 유지
-                    var spawnerDef = palette.Pick(TileType.MonsterSpawn);
-                    if (spawnerDef != null && spawnerDef.prefab != null)
-                    {
-                        var spawnerGo = Object.Instantiate(spawnerDef.prefab, worldPos, Quaternion.identity, parent);
-                        spawnerGo.name = $"MonsterSpawner_{x}_{z}";
-                        result.Add(new PlacedBlock
-                        {
-                            instance = spawnerGo,
-                            targetPosition = worldPos,
-                            targetRotationY = 0f,
-                            tileType = type,
-                            cell = new Vector2Int(x, z),
-                        });
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[MapBuilder] MonsterSpawn 타일 ({x},{z}) — 팔레트에 BlockDef 없음, 스포너 미배치", parent);
-                    }
-                }
-                else if (isBossSpawnTile)
-                {
-                    var bossSpawnerDef = palette.Pick(TileType.BossSpawn);
-                    if (bossSpawnerDef != null && bossSpawnerDef.prefab != null)
-                    {
-                        var bossGo = Object.Instantiate(bossSpawnerDef.prefab, worldPos, Quaternion.identity, parent);
-                        bossGo.name = $"BossSpawner_{x}_{z}";
-                        result.Add(new PlacedBlock
-                        {
-                            instance = bossGo,
-                            targetPosition = worldPos,
-                            targetRotationY = 0f,
-                            tileType = type,
-                            cell = new Vector2Int(x, z),
-                        });
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[MapBuilder] BossSpawn 타일 ({x},{z}) — 팔레트에 BossSpawn BlockDef 없음, 보스 스포너 미배치", parent);
-                    }
-                }
+                // MonsterSpawn: 바닥만 깔고 스포너 배치는 MonsterSpawnHandler(TokenParser PreBuild)에 위임
+                // BossSpawn: 바닥만 깔고 스포너 배치는 BossSpawnHandler(TokenParser PostBuild)에 위임
             }
         }
 
         if (buffCount > 0)
-            Debug.Log($"[MapBuilder] 맵 빌드 완료: 총 블록 {result.Count}개, 버프 타일 {buffCount}개");
+            RFLog.D($"[MapBuilder] 맵 빌드 완료: 총 블록 {result.Count}개, 버프 타일 {buffCount}개");
 
         return result;
     }
@@ -351,6 +333,230 @@ public class MapBuilder
     }
 
     /// <summary>
+    /// 그리드 비어있지 않은 모든 칸 위에 천장 타일을 배치한다.
+    /// palette에 Ceiling BlockDef가 있으면 사용, 없으면 Floor 타일을 X축 180° 뒤집어 폴백.
+    /// ceilingHeight == 0이면 아무것도 하지 않는다.
+    /// </summary>
+    public static void BuildCeiling(
+        TileType[,] grid,
+        BlockPalette palette,
+        Transform parent,
+        float cellSize,
+        float baseY,
+        float ceilingHeight)
+    {
+        if (ceilingHeight <= 0f) return;
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+        float ceilingY = baseY + ceilingHeight;
+
+        var ceilingDef = palette?.Pick(TileType.Ceiling);
+        var floorDef   = palette?.Pick(TileType.Floor);
+        var useDef     = ceilingDef ?? floorDef;
+        if (useDef?.prefab == null) return;
+
+        bool flip = ceilingDef == null; // 전용 천장 프리팹 없으면 바닥 타일 뒤집기
+
+        for (int x = 0; x < w; x++)
+        {
+            for (int z = 0; z < h; z++)
+            {
+                if (grid[x, z] == TileType.Empty) continue;
+
+                var localPos = new Vector3(x * cellSize - offset.x, ceilingY, z * cellSize - offset.z);
+                var worldPos = parent.TransformPoint(localPos);
+                var rot      = flip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
+
+                var go = Object.Instantiate(useDef.prefab, worldPos, rot, parent);
+                Name(go, $"Ceiling_{x}_{z}");
+                SetLayerRecursive(go, 3);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Floor에 인접한 Wall 타일의 안쪽 면에 벽 조명 프리팹을 배치한다.
+    /// 방 중앙 조명(centerLightPrefab)도 선택적으로 배치.
+    /// </summary>
+    /// <param name="spacing">몇 칸마다 조명 1개를 배치할지 (낮을수록 조밀).</param>
+    /// <param name="heightRatio">벽 높이 중 어느 위치에 배치할지 (0=하단, 1=상단). 0.4 권장.</param>
+    public static void BuildRoomLights(
+        TileType[,]        grid,
+        Transform          parent,
+        float              cellSize,
+        float              baseY,
+        int                wallLayers,
+        RoomLightingConfig cfg)
+    {
+        if (cfg == null || (cfg.wallLightPrefab == null && cfg.centerLightPrefab == null)) return;
+
+        int w      = grid.GetLength(0);
+        int h      = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+        float lightY = baseY + wallLayers * cellSize * cfg.wallLightHeightRatio;
+
+        // 이웃 방향 (4방향)
+        int[] dx = { -1, 1, 0, 0 };
+        int[] dz = {  0, 0,-1, 1 };
+
+        int counter = 0;
+        int placed  = 0;
+
+        if (cfg.wallLightPrefab != null)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                for (int z = 0; z < h; z++)
+                {
+                    if (grid[x, z] != TileType.Wall) continue;
+
+                    // Floor에 인접한 방향(안쪽) 탐색
+                    bool      hasInner  = false;
+                    Vector3   inwardDir = Vector3.zero;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = x + dx[d], nz = z + dz[d];
+                        if (nx < 0 || nx >= w || nz < 0 || nz >= h) continue;
+                        var t = grid[nx, nz];
+                        if (t != TileType.Wall && t != TileType.Empty)
+                        {
+                            hasInner  = true;
+                            inwardDir = new Vector3(dx[d], 0f, dz[d]);
+                            break;
+                        }
+                    }
+
+                    if (!hasInner) continue;
+
+                    if (counter++ % cfg.wallLightSpacing != 0) continue;
+
+                    // 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.
+                    if (cfg.maxWallLights > 0 && placed >= cfg.maxWallLights) continue;
+
+                    var wallLocal  = new Vector3(x * cellSize - offset.x, lightY, z * cellSize - offset.z);
+                    var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
+                    var worldPos   = parent.TransformPoint(lightLocal);
+                    var rot        = Quaternion.LookRotation(inwardDir);
+
+                    Object.Instantiate(cfg.wallLightPrefab, worldPos, rot, parent);
+                    placed++;
+                }
+            }
+        }
+
+        // 방 중심 천장 조명
+        if (cfg.centerLightPrefab != null)
+        {
+            float ceilingY = baseY + wallLayers * cellSize;
+            Object.Instantiate(cfg.centerLightPrefab,
+                parent.TransformPoint(new Vector3(0f, ceilingY - cellSize * 0.3f, 0f)),
+                Quaternion.identity, parent);
+        }
+    }
+
+    /// <summary>
+    /// 문 개구부 바깥으로 짧은 복도 스텁(바닥+측벽+천장+끝막이)을 뻗는다.
+    /// 격리형 방의 문 너머가 허공(절벽)으로 보이는 것을 막고 "뒤로 이어지는 통로" 느낌을 준다.
+    /// 방 블록과 동일 팔레트를 쓰고 parent(=roomGO)에 부착되어 디졸브/디스폰에 함께 동참한다.
+    /// </summary>
+    /// <param name="openingCenterLocal">개구부 바닥 중앙의 로컬 좌표(Build의 offset 규약과 동일).</param>
+    /// <param name="edge">문 엣지 — 바깥 방향 결정(North=+Z/South=-Z/East=+X/West=-X).</param>
+    /// <param name="widthCells">개구부 폭(셀 수). 측벽은 폭+1 위치에 세운다.</param>
+    /// <param name="lengthCells">바깥으로 뻗는 길이(셀 수). 0 이하면 아무것도 안 함.</param>
+    public static List<PlacedBlock> BuildDoorCorridor(
+        BlockPalette palette,
+        Transform    parent,
+        Vector3      openingCenterLocal,
+        DoorEdge     edge,
+        int          widthCells,
+        int          lengthCells,
+        float        cellSize,
+        float        baseY,
+        int          wallLayers)
+    {
+        var placed = new List<PlacedBlock>();
+        if (palette == null || lengthCells <= 0) return placed;
+
+        var floorDef = palette.Pick(TileType.Floor);
+        var wallDef  = palette.Pick(TileType.Wall);
+        var ceilDef  = palette.Pick(TileType.Ceiling);
+        bool ceilFlip = ceilDef == null;          // 전용 천장 없으면 바닥 타일 뒤집기(BuildCeiling과 동일)
+        var ceilUse  = ceilDef ?? floorDef;
+        if (floorDef?.prefab == null) return placed;
+
+        // 바깥/측면 단위 방향 (로컬 XZ)
+        Vector3 outward, lateral;
+        switch (edge)
+        {
+            case DoorEdge.North: outward = Vector3.forward; lateral = Vector3.right;   break; // +Z
+            case DoorEdge.South: outward = Vector3.back;    lateral = Vector3.right;   break; // -Z
+            case DoorEdge.East:  outward = Vector3.right;   lateral = Vector3.forward; break; // +X
+            case DoorEdge.West:  outward = Vector3.left;    lateral = Vector3.forward; break; // -X
+            default:             return placed;
+        }
+
+        int half       = Mathf.Max(0, widthCells / 2); // RoomDoorPlanner.Open과 동일 규약(개구부 = 2*half+1)
+        float ceilingY = baseY + wallLayers * cellSize;
+
+        // step=1..length: 바닥(개구부 폭) + 측벽(폭+1) + 천장
+        for (int step = 1; step <= lengthCells; step++)
+        {
+            Vector3 axis = openingCenterLocal + outward * (step * cellSize);
+
+            for (int lat = -half; lat <= half; lat++)
+            {
+                Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
+                Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Corridor_F_{step}_{lat}", TileType.Floor, placed);
+
+                Vector3 cLocal = fLocal; cLocal.y = ceilingY;
+                var cRot = ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
+                if (ceilUse?.prefab != null)
+                    Place(ceilUse, parent, cLocal, cRot, 3, $"Corridor_C_{step}_{lat}", TileType.Ceiling, placed);
+            }
+
+            if (wallDef?.prefab != null)
+                for (int sign = -1; sign <= 1; sign += 2)
+                    StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallLayers, $"Corridor_W_{step}_{sign}", placed);
+        }
+
+        // 끝막이 — 마지막 칸 너머를 벽으로 닫아 또 다른 절벽이 보이지 않게
+        if (wallDef?.prefab != null)
+        {
+            Vector3 capAxis = openingCenterLocal + outward * ((lengthCells + 1) * cellSize);
+            for (int lat = -(half + 1); lat <= half + 1; lat++)
+                StackWall(wallDef, parent, capAxis + lateral * (lat * cellSize), baseY, cellSize, wallLayers, $"Corridor_Cap_{lat}", placed);
+        }
+
+        return placed;
+    }
+
+    /// <summary>local 위치에 블록 1개 인스턴스화 후 placed에 기록.</summary>
+    private static void Place(
+        BlockDef def, Transform parent, Vector3 local, Quaternion rot, int layer, string name,
+        TileType tt, List<PlacedBlock> placed)
+    {
+        var world = parent.TransformPoint(local);
+        var go = Object.Instantiate(def.prefab, world, rot, parent);
+        go.name = name;
+        SetLayerRecursive(go, layer);
+        placed.Add(new PlacedBlock { instance = go, targetPosition = world, targetRotationY = rot.eulerAngles.y, tileType = tt, cell = Vector2Int.zero });
+    }
+
+    /// <summary>한 위치에 벽을 wallLayers만큼 수직으로 쌓는다.</summary>
+    private static void StackWall(
+        BlockDef wallDef, Transform parent, Vector3 baseLocal, float baseY, float cellSize, int wallLayers,
+        string name, List<PlacedBlock> placed)
+    {
+        for (int layer = 0; layer < Mathf.Max(1, wallLayers); layer++)
+        {
+            Vector3 local = baseLocal; local.y = baseY + layer * cellSize;
+            Place(wallDef, parent, local, Quaternion.identity, 8, $"{name}_L{layer}", TileType.Wall, placed);
+        }
+    }
+
+    /// <summary>
     /// 그리드 Floor 영역과 동일한 크기의 투명 바닥 콜라이더 생성.
     /// 외곽 벽 밖(방 경계 이탈)에서는 존재하지 않으므로, 플레이어가 벽을 뚫고 나가면
     /// SafeFloor 없이 바로 낙하 → FallRecoveryController가 _lastSafe로 복구.
@@ -396,4 +602,9 @@ public class MapBuilder
         foreach (Transform child in go.transform)
             SetLayerRecursive(child.gameObject, layer);
     }
+
+    /// <summary>디버그용 블록 명명. 릴리즈 빌드에서는 호출문(문자열 보간 포함)이 제거돼 GC 할당이 사라진다.
+    /// 런타임 코드는 블록 이름에 의존하지 않는다(이름 기반 Find 없음 — 확인 완료).</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private static void Name(GameObject go, string n) => go.name = n;
 }

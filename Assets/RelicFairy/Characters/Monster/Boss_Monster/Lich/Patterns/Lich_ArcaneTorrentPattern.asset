@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f1ee5b6d0a3ee2449f3fe99aaad24f2, type: 3}
+  m_Name: Lich_ArcaneTorrentPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichArcaneTorrentPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  maxTriggerRange: 16
+  riseDuration: 0.8
+  chargeDuration: 1.2
+  sweepDuration: 2.5
+  descendDuration: 0.6
+  recoveryDuration: 1
+  beamRange: 16
+  beamWidth: 1.2
+  sweepArc: 200
+  flowEmitInterval: 0.06
+  flowMotesPerEmit: 2
+  flowMoteRadius: 0.25
+  flowMoteLifetime: 0.3
+  chargeVfxPrefab: {fileID: 0}
+  beamVfxPrefab: {fileID: 0}
+  damageMultiplier: 0.6
+  tickInterval: 0.4
+  knockbackMultiplier: 1
+  patternCooldown: 22

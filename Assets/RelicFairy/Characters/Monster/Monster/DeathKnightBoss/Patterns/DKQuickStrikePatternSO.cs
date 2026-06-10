@@ -13,7 +13,7 @@ namespace RelicFairy.Monster
 ///  hitTime+hitDuration → 피격
 ///  hitTime+hitDuration+recoveryTime → AttackReadyState
 /// </summary>
-[CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_QuickStrikePattern", fileName = "DK_QuickStrikePattern")]
+[CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_QuickStrikePattern", fileName = "DK_QuickStrikePattern")]
 public class DKQuickStrikePatternSO : BossPatternSO
 {
     [Header("Grid Tiles")]

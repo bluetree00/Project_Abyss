@@ -28,17 +28,17 @@ public static class BuildScript
     [MenuItem("Build/Build Windows (Steam)")]
     public static void BuildWindows()
     {
-        string outputPath = "C:/Users/u/Desktop/AbyssBuild/Abyss.exe";
+        string outputPath = "C:/Users/u/Desktop/RelicFairyBuild/RelicFairy.exe";
 
         BuildPlayerOptions options = new BuildPlayerOptions
         {
             scenes = new[]
             {
-                "Assets/Abyss/Scenes/Logo.unity",
-                "Assets/Abyss/Scenes/Login.unity",
-                "Assets/Abyss/Scenes/Lobby.unity",
-                "Assets/Abyss/Scenes/StageMap.unity",
-                "Assets/Abyss/Scenes/GameScene.unity",
+                "Assets/RelicFairy/Scenes/Logo.unity",
+                "Assets/RelicFairy/Scenes/Login.unity",
+                "Assets/RelicFairy/Scenes/Lobby.unity",
+                "Assets/RelicFairy/Scenes/StageMap.unity",
+                "Assets/RelicFairy/Scenes/GameScene.unity",
             },
             locationPathName = outputPath,
             target = BuildTarget.StandaloneWindows64,

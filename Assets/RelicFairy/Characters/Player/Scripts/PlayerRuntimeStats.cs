@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using RelicFairy;
 
 [Serializable]
 public sealed class PlayerRuntimeStats
@@ -266,6 +267,16 @@ public sealed class PlayerRuntimeStats
     private float _covenantMoveSpeed;   // 퍼센트 가산
     private float _covenantAttackSpeed; // 퍼센트 가산
 
+    // -- Relic (유물 클래스 스탯, 런 시작 시 1회) --
+    private int   _relicMelee;
+    private int   _relicRanged;
+    private int   _relicDefense;
+    private int   _relicLuck;
+    private int   _relicMaxHp;
+    private float _relicMoveSpeed;    // 퍼센트 가산
+    private float _relicAttackSpeed;  // 퍼센트 가산
+    private float _relicSkillCdr;
+
     // -- Grid Synergy (Always) --
     private int _synergyMelee;
     private int _synergyRanged;
@@ -290,8 +301,20 @@ public sealed class PlayerRuntimeStats
     private float _synergyLifesteal;
     private readonly System.Collections.Generic.List<ConditionalSynergy> _conditionalSynergies = new();
 
+    // -- Synergy Mechanics (행동 역학 플래그) --
+    private readonly SynergyMechanicsState _synergyMechanics = new();
+
+    /// <summary>행동 역학 시너지 플래그. 전투·스킬·이동 시스템이 읽는다.</summary>
+    public SynergyMechanicsState SynergyMechanics => _synergyMechanics;
+
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
+
+    // -- Character Mechanic (고유 메커닉 배율 — HolyGauge 만충, SolarTimer 강화 등) --
+    private float _characterMeleeMult  = 1f;
+    private float _characterRangedMult = 1f;
+    private float _characterDefenseMult = 1f;
+    private float _characterDamageReduction = 0f;
 
     // ── 무기 ─────────────────────────────────────────────────────────────────────
 
@@ -551,6 +574,54 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
+    // ── 유물 클래스 스탯 ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 유물 클래스 스탯을 공통 베이스 위에 가산한다. 재호출 시 이전 기여를 reset 후 재적용(멱등).
+    /// </summary>
+    public void ApplyRelicStats(System.Collections.Generic.IReadOnlyList<StatModifier> mods)
+    {
+        // MaxHp는 합산 레이어가 아니므로 이전 기여분을 먼저 되돌린다.
+        if (_relicMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp - _relicMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        _relicMelee = _relicRanged = _relicDefense = _relicLuck = _relicMaxHp = 0;
+        _relicMoveSpeed = _relicAttackSpeed = _relicSkillCdr = 0f;
+
+        if (mods != null)
+        {
+            foreach (var mod in mods)
+            {
+                switch (mod.Type)
+                {
+                    case StatType.AttackPower:
+                        _relicMelee  += (int)mod.Value;
+                        _relicRanged += (int)mod.Value;
+                        break;
+                    case StatType.MeleeAttack:  _relicMelee   += (int)mod.Value; break;
+                    case StatType.RangedAttack: _relicRanged  += (int)mod.Value; break;
+                    case StatType.Defense:      _relicDefense += (int)mod.Value; break;
+                    case StatType.MaxHp:        _relicMaxHp   += (int)mod.Value; break;
+                    case StatType.Luck:         _relicLuck    += (int)mod.Value; break;
+                    case StatType.MoveSpeed:    _relicMoveSpeed   += mod.Value;  break;
+                    case StatType.AttackSpeed:  _relicAttackSpeed += mod.Value;  break;
+                    case StatType.SkillCooldownReduction: _relicSkillCdr += mod.Value; break;
+                }
+            }
+        }
+
+        if (_relicMaxHp != 0)
+        {
+            MaxHp = Mathf.Max(1, MaxHp + _relicMaxHp);
+            Hp = Mathf.Min(Hp, MaxHp);
+        }
+
+        Recalculate();
+    }
+
     // ── 공격 속도 (패시브/특성에서 직접 조작) ────────────────────────────────────
 
     /// <summary>패시브 등에서 공격 속도 보너스를 직접 설정 (0.0 = 0%, 0.25 = +25%)</summary>
@@ -592,17 +663,18 @@ public sealed class PlayerRuntimeStats
         }
 
         // % 보너스 배율
-        float dmgMul  = 1f + _itemAllDamagePercent;     // AllDamage% + AllStats% → 공격력
-        float defMul  = 1f + _itemAllStatsPercent;       // AllStats%만 → 방어력
-        float luckMul = 1f + _itemAllStatsPercent;       // AllStats%만 → 행운
+        float dmgMul  = (1f + _itemAllDamagePercent) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent) * _characterRangedMult;
+        float defMul  = (1f + _itemAllStatsPercent) * _characterDefenseMult;
+        float luckMul = 1f + _itemAllStatsPercent;
 
-        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + condMelee;
-        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + condRanged;
-        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _synergyDefense + _awakeningDefense;
-        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck;
+        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + _relicMelee   + condMelee;
+        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + _relicRanged  + condRanged;
+        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _synergyDefense + _awakeningDefense + _relicDefense;
+        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck + _relicLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
-        RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMul));
+        RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
         Defense      = Mathf.Max(0, Mathf.RoundToInt(baseDefSum * defMul));
         Luck         = Mathf.Max(0, Mathf.RoundToInt(baseLuckSum * luckMul));
 
@@ -617,10 +689,10 @@ public sealed class PlayerRuntimeStats
             }
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + condAttackSpeed);
-        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
+        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr + _relicSkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신
@@ -630,7 +702,7 @@ public sealed class PlayerRuntimeStats
         HealingReceivedBonus = _itemHealingReceived;
         DebuffResistance    = _itemDebuffResistance;
         AllDamagePercent    = _itemAllDamagePercent;
-        DamageReduction     = _itemDamageReduction;
+        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction);
         ItemLifesteal       = _itemLifesteal + LifestealRate + _awakeningLifesteal;
 
         // 시스템 스탯
@@ -641,6 +713,27 @@ public sealed class PlayerRuntimeStats
         DebuffDurationBonus = _itemDebuffDuration;
 
         OnChanged?.Invoke();
+    }
+
+    // ── 캐릭터 메커닉 배율 ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 캐릭터 고유 메커닉(HolyGauge 만충, SolarTimer 강화 등)의 공격 배율을 설정한다.
+    /// meleeMult=1f, rangedMult=1f 이 기본값(배율 없음).
+    /// </summary>
+    public void SetCharacterAttackMultiplier(float meleeMult, float rangedMult)
+    {
+        _characterMeleeMult  = Mathf.Max(0f, meleeMult);
+        _characterRangedMult = Mathf.Max(0f, rangedMult);
+        Recalculate();
+    }
+
+    /// <summary>방어 배율 및 피해 감소를 캐릭터 메커닉에서 설정한다.</summary>
+    public void SetCharacterDefenseBonus(float defenseMult, float damageReduction)
+    {
+        _characterDefenseMult   = Mathf.Max(0f, defenseMult);
+        _characterDamageReduction = Mathf.Clamp01(damageReduction);
+        Recalculate();
     }
 
     // ── 시너지 ──────────────────────────────────────────────────────────────────
@@ -734,6 +827,75 @@ public sealed class PlayerRuntimeStats
         if (changed) Recalculate();
     }
 
+    /// <summary>시너지 행동 역학 플래그를 entry 기반으로 활성화한다.</summary>
+    public void ApplySynergyMechanicEffect(RuneSynergyEntry entry)
+    {
+        if (entry == null) return;
+        var m = _synergyMechanics;
+
+        switch (entry.effect_type)
+        {
+            case "ChargingStrike":
+                m.ChargingStrikeEnabled = true;
+                m.ChargingStrikePeriod = entry.value > 0 ? entry.value : 3f;
+                m.ChargingStrikeDamageMultiplier = entry.value2 > 0 ? entry.value2 : 2f;
+                m.ChargingStrikeCounter = 0;
+                break;
+            case "ShockwaveBurst":
+                m.ShockwaveBurstEnabled = true;
+                m.ShockwaveBurstStunDuration = entry.value > 0 ? entry.value : 0.5f;
+                m.ShockwaveBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
+                m.ShockwaveBurstRadius = entry.value3 > 0 ? entry.value3 : 60f;
+                break;
+            case "MagicEcho":
+                m.MagicEchoEnabled = true;
+                m.MagicEchoChargeCount = entry.value > 0 ? entry.value : 3f;
+                m.MagicEchoDamageBonus = entry.value2 > 0 ? entry.value2 : 0.3f;
+                break;
+            case "SkillEchoChain":
+                m.SkillEchoChainEnabled = true;
+                m.SkillEchoChainDamageMultiplier = entry.value2 > 0 ? entry.value2 : 0.5f;
+                m.SkillEchoChainRange = entry.value3 > 0 ? entry.value3 : 8f;
+                break;
+            case "ShieldAccumulate":
+                m.ShieldAccumulateEnabled = true;
+                m.ShieldAccumulateRate = entry.value > 0 ? entry.value : 0.2f;
+                m.ShieldCapRatio = 0.3f;
+                break;
+            case "ShieldBurst":
+                m.ShieldBurstEnabled = true;
+                m.ShieldBurstInvincibleDuration = entry.value > 0 ? entry.value : 0.5f;
+                m.ShieldBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
+                break;
+            case "DodgeOnMove":
+                m.DodgeOnMoveEnabled = true;
+                m.DodgeOnMoveBonus = entry.value > 0 ? entry.value : 0.1f;
+                break;
+            case "MoveAttackPenetrate":
+                m.MoveAttackPenetrateEnabled = true;
+                break;
+            case "LowHpDamageReduce":
+                m.LowHpDamageReduceEnabled = true;
+                m.LowHpThreshold = entry.value > 0 ? entry.value : 0.5f;
+                m.LowHpDamageReduceMax = entry.value2 > 0 ? entry.value2 : 0.4f;
+                break;
+            case "DeathSave":
+                m.DeathSaveEnabled = true;
+                m.DeathSaveInvincibleDuration = entry.value > 0 ? entry.value : 1.5f;
+                m.DeathSaveHealRatio = entry.value2 > 0 ? entry.value2 : 0.3f;
+                break;
+            case "GambleDice":
+                m.GambleDiceEnabled = true;
+                m.GambleDiceDoubleChance = entry.value > 0 ? entry.value : 0.15f;
+                m.GambleDiceMissChance = entry.value3 > 0 ? entry.value3 : 0.15f;
+                break;
+            case "CritChain":
+                m.CritChainEnabled = true;
+                m.CritChainChance = entry.value > 0 ? entry.value : 0.5f;
+                break;
+        }
+    }
+
     /// <summary>모든 시너지 효과 초기화.</summary>
     public void ClearSynergyEffects()
     {
@@ -748,6 +910,7 @@ public sealed class PlayerRuntimeStats
         _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
         _synergyLifesteal = 0f;
         _conditionalSynergies.Clear();
+        _synergyMechanics.Reset();
 
         Recalculate();
     }

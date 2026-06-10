@@ -19,7 +19,7 @@ namespace RelicFairy.Monster
 ///              → 각 링 테두리에 VFX 스폰 + 플레이어 피격
 ///  세트 간 hitGap 대기, 마지막 세트 후 recoveryTime → AttackReady
 /// </summary>
-[CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_StrikePattern", fileName = "DK_StrikePattern")]
+[CreateAssetMenu(menuName = "RelicFairy/Boss/DeathKnight/DK_StrikePattern", fileName = "DK_StrikePattern")]
 public class DKStrikePatternSO : BossPatternSO
 {
     [Header("Grid Tiles")]

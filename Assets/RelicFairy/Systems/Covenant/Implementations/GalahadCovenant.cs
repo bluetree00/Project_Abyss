@@ -11,15 +11,20 @@ public sealed class GalahadCovenant : CovenantBase
 {
     private const int V_BLOCK_COOLDOWN  = 0;
     private const int V_HOLY_BURST_TIME = 1;
+    private const int V_BURST_RADIUS    = 2;
+    private const int V_BURST_MULT      = 3;
 
     public override string CovenantId => CovenantFactory.Galahad;
 
     // ── 런타임 상태 ──────────────────────────────────────
     private float _blockCooldown;
     private float _holyBurstTimer;
+    private bool  _bursting; // DealAoe 재진입(폭발→피해→ModifyOutgoing) 가드
 
     private float BlockCooldownMax => V(V_BLOCK_COOLDOWN,  10f);
     private float HolyBurstTime    => V(V_HOLY_BURST_TIME, 3f);
+    private float BurstRadius      => V(V_BURST_RADIUS,    3f);
+    private float BurstMult        => V(V_BURST_MULT,      0.5f);
     private bool  IsEvolved        => Stage == CovenantStage.Evolved;
     private bool  CanBlock         => _blockCooldown <= 0f;
 
@@ -37,9 +42,14 @@ public sealed class GalahadCovenant : CovenantBase
 
     public override void ModifyOutgoingDamage(ref float damage, CombatContext ctx)
     {
-        if (!IsEvolved || _holyBurstTimer <= 0f) return;
+        if (!IsEvolved || _holyBurstTimer <= 0f || _bursting) return;
 
-        // TODO: 신성 폭발 추가 발동 (범위 피해 VFX + 데미지)
+        // 신성 폭발: 명중 지점에 범위 피해 (재진입 가드로 폭발 피해가 다시 폭발을 부르지 않게)
+        _bursting = true;
+        Vector3 at = ctx.Target != null ? ctx.Target.transform.position : PlayerPos;
+        DealAoe(at, BurstRadius, BurstMult, knockback: 0.2f);
+        Vfx("VFX_FireExplosion", at); // 임시 VFX (전용 VFX_HolyBurst 대기)
+        _bursting = false;
     }
 
     // ── 이벤트 ──────────────────────────────────────────

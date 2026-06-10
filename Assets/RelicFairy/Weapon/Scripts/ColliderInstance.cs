@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -7,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public class ColliderInstance : MonoBehaviour
 {
+    // hitEffectKey 미할당 시 사용할 공용 히트 VFX.
+    private const string FallbackHitEffectKey = "HitEffect_02";
+
     public string payloadKey;
     public float damage;
     public float knockbackMultiplier;
@@ -113,23 +118,20 @@ public class ColliderInstance : MonoBehaviour
         // 아이템 효과: 공격 전 데미지 수정
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
-        var weaponElem = weaponData?.element ?? WeaponElement.None;
-        var pkt = new DamagePacket(damage, owner, other.gameObject, weaponElem);
+        var pkt = new DamagePacket(damage, owner, other.gameObject);
         mgr?.OnPreDealDamage(ref pkt);
 
-        float baseFinal  = pkt.Negated ? 0f : pkt.FinalDamage;
-        var   elemType   = pkt.Element.ToElementType();
-        float elemAmount = GetElementAmountFor(weaponData, actionType);
+        float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
 
         // 크리티컬 굴림
         float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
         pkt.IsCrit = isCrit;
 
-        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, elemType, elemAmount);
+        // 팝업은 대상 측(MonsterBase 등)에서 자체적으로 표시 — isCrit 만 전달
+        damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, isCrit);
 
-        // 데미지 팝업 + 타격감 (HitFeedbackService 허브 경유 → 기존 HitFeel + 구독자 전파)
+        // 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)
         Vector3 hitPoint = other.ClosestPoint(transform.position);
-        DamagePopupSpawner.Spawn(hitPoint, finalDmg, isCrit, elemType);
 
         Vector3 attackDir = owner != null
             ? (other.transform.position - owner.transform.position)
@@ -141,7 +143,6 @@ public class ColliderInstance : MonoBehaviour
             hitPoint:        hitPoint,
             attackDirection: attackDir,
             damage:          finalDmg,
-            element:         elemType,
             isCritical:      isCrit,
             actionType:      actionType);
 
@@ -157,16 +158,38 @@ public class ColliderInstance : MonoBehaviour
         };
         mgr?.OnPostDealDamage(report);
 
-        Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={finalDmg:F0} | atk={actionType} | id={attackId}");
+        // 캐릭터 패시브: 실제 적중 시점 (대상 + 데미지 정보 포함)
+        if (owner != null && owner.TryGetComponent<PlayerController>(out var ownerCtrl) && finalDmg > 0f)
+        {
+            ownerCtrl.FirePassive(PassiveTrigger.OnAttackHit, new PassiveContext
+            {
+                target     = other.gameObject,
+                damage     = finalDmg,
+                comboStep  = attackId,
+                weaponType = weaponData?.weaponType,
+            });
+        }
 
-        if (!string.IsNullOrEmpty(hitEffectKey))
-            SpawnHitEffect(other.ClosestPoint(transform.position));
+#if UNITY_EDITOR
+        Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={finalDmg:F0} | atk={actionType} | id={attackId}");
+#endif
+
+        string fxKey = !string.IsNullOrEmpty(hitEffectKey) ? hitEffectKey : FallbackHitEffectKey;
+        SpawnHitEffect(other.ClosestPoint(transform.position), fxKey).Forget();
     }
 
-    private async void SpawnHitEffect(Vector3 hitPoint)
+    // UniTaskVoid + 수명 토큰: 비동기 로드 도중 콜라이더가 파괴/풀반환되면 후속 처리를 안전하게 취소.
+    private async UniTaskVoid SpawnHitEffect(Vector3 hitPoint, string fxKey)
     {
-        var effectObj = await Managers.ObjectPooler.SpawnAsync(
-            hitEffectKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity);
+        GameObject effectObj;
+        try
+        {
+            effectObj = await Managers.ObjectPooler
+                .SpawnAsync(fxKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity)
+                .AttachExternalCancellation(this.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException) { return; }
+
         if (effectObj == null) return;
 
         effectObj.transform.localScale = Vector3.one * hitEffectScale;
@@ -182,17 +205,4 @@ public class ColliderInstance : MonoBehaviour
             Destroy(gameObject);
     }
 
-    /// <summary>WeaponData + 공격 타입 → 원소 누적치 부여량.</summary>
-    private static float GetElementAmountFor(WeaponData wd, WeaponActionType type)
-    {
-        if (wd == null) return 0f;
-        return type switch
-        {
-            WeaponActionType.GroundHeavy
-            or WeaponActionType.AirHeavy
-            or WeaponActionType.AirPlunge => wd.elementAmountHeavy,
-            WeaponActionType.AirLight     => wd.elementAmountAir > 0f ? wd.elementAmountAir : wd.elementAmountBasic,
-            _                             => wd.elementAmountBasic,
-        };
-    }
 }

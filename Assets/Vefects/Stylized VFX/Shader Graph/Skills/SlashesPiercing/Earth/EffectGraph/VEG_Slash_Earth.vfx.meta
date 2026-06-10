@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8b7936261f1578847bd2854358b842b0
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/SlashesPiercing/Earth/EffectGraph/VEG_Slash_Earth.vfx
+  uploadId: 714344

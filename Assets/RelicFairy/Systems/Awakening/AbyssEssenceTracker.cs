@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 런 중 심연의 정수(Abyss Essence)를 적립하는 컴포넌트.
+/// 런 중 심연의 정수(RelicFairy Essence)를 적립하는 컴포넌트.
 /// GameRunBootstrapper가 소유하며 Bind() 후 GameRunSession 이벤트에 연결된다.
 ///
 /// 적립 시점:
@@ -9,7 +9,7 @@ using UnityEngine;
 ///   - 일반 방 클리어              → GameRunSession.OnRoomCleared(false)
 ///   - 보스 처치                   → GameRunSession.OnRoomCleared(true)
 /// </summary>
-public sealed class AbyssEssenceTracker : MonoBehaviour
+public sealed class EssenceTracker : MonoBehaviour
 {
     // ── 설정 ────────────────────────────────────────────────────────────
     [Header("처치 적립")]
@@ -61,7 +61,7 @@ public sealed class AbyssEssenceTracker : MonoBehaviour
 
         _killCount -= killsPerBatch;
         _session.AddEssence(essencePerBatch);
-        Debug.Log($"[AbyssEssenceTracker] 처치 배치 +{essencePerBatch} 정수");
+        Debug.Log($"[EssenceTracker] 처치 배치 +{essencePerBatch} 정수");
     }
 
     private void HandleRoomCleared(bool isBossRoom)
@@ -70,6 +70,6 @@ public sealed class AbyssEssenceTracker : MonoBehaviour
 
         int amount = isBossRoom ? essencePerBoss : essencePerRoom;
         _session.AddEssence(amount);
-        Debug.Log($"[AbyssEssenceTracker] {(isBossRoom ? "보스" : "방")} 클리어 +{amount} 정수");
+        Debug.Log($"[EssenceTracker] {(isBossRoom ? "보스" : "방")} 클리어 +{amount} 정수");
     }
 }

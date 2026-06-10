@@ -4,15 +4,15 @@ using UnityEditor;
 
 /// <summary>
 /// CharInfoPopup 구조를 Bamao CharacterSheetFrame + CharacterStatusFrame 기반으로 재구성하는 Editor 도구.
-/// Menu: Abyss/UI/Rebuild CharInfoPopup with Bamao Layout
+/// Menu: RelicFairy/UI/Rebuild CharInfoPopup with Bamao Layout
 /// </summary>
 public static class CharInfoPopupRebuilder
 {
-    const string LobbyRootPath    = "Assets/Abyss/UI/Scene/ScenePrefabs/LobbyRoot.prefab";
-    const string SheetFramePath   = "Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterSheetFrame.prefab";
-    const string StatusFramePath  = "Assets/Abyss/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterStatusFrame.prefab";
+    const string LobbyRootPath    = "Assets/RelicFairy/UI/Scene/ScenePrefabs/LobbyRoot.prefab";
+    const string SheetFramePath   = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterSheetFrame.prefab";
+    const string StatusFramePath  = "Assets/RelicFairy/Prefabs/UI/Bamao/BamaoUIPack/Prefabs/Frame/CharacterStatusFrame.prefab";
 
-    [MenuItem("Abyss/UI/Rebuild CharInfoPopup with Bamao Layout")]
+    [MenuItem("RelicFairy/UI/Rebuild CharInfoPopup")]
     public static void Rebuild()
     {
         var lobbyPrefab  = AssetDatabase.LoadAssetAtPath<GameObject>(LobbyRootPath);

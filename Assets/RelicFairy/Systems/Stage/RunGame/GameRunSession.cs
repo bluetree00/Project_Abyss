@@ -43,6 +43,10 @@ public sealed class GameRunSession
     /// <summary>현재 챕터의 필드 구조물 프리팹 Addressables 키.</summary>
     public string ActiveFieldPrefabKey { get; private set; } = string.Empty;
 
+    /// <summary>현재 챕터 ChapterDataSO의 보스 스폰 테이블. 레지스트리 미주입/미설정 시 null(BossSpawner가 직렬화 폴백 사용).</summary>
+    public MonsterSpawnTableSO CurrentBossSpawnTable =>
+        _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
+
     private ChapterRegistry _chapterRegistry;
 
     /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
@@ -58,16 +62,6 @@ public sealed class GameRunSession
         ActiveTheme = data != null && !string.IsNullOrEmpty(data.theme) ? data.theme : string.Empty;
         ActiveFieldPrefabKey = data != null ? data.fieldPrefabKey ?? string.Empty : string.Empty;
     }
-
-    public RoomManager RoomManager { get; private set; }
-    public StagePointManager StagePointManager { get; private set; }
-
-    // 챕터 단위로 생성된 맵 그래프 캐시 — StageMap 씬 재진입 시 Generator 재실행 없이 UI를 복원해
-    // 노드 연결·방문 기록이 유지되도록 한다. AdvanceToNextChapter 시 무효화.
-    public StageMapGraph CachedStageGraph { get; private set; }
-
-    public void CacheStageGraph(StageMapGraph graph) => CachedStageGraph = graph;
-    public void InvalidateStageGraph() => CachedStageGraph = null;
 
     public PlayerController Player { get; private set; }
     private PlayerController _playerStateSource;
@@ -156,6 +150,9 @@ public sealed class GameRunSession
         if (string.IsNullOrEmpty(gridId)) return;
         _appliedSynergies.RemoveAll(r => r.gridId == gridId);
     }
+
+    /// <summary>시너지 이력 전체 초기화. 이어하기 시 룬 보드 점유 기반 재계산 전에 호출(중복 적용 방지).</summary>
+    public void ClearAppliedSynergies() => _appliedSynergies.Clear();
 
     // =========================================================
     // Room Clear Recording
@@ -291,13 +288,24 @@ public sealed class GameRunSession
                     _roomClearRecords.AddRange(logWrapper.records);
             }
 
+            // 보관함(미배치) 아이템 복원
+            if (!string.IsNullOrEmpty(save.stagingItemsJson))
+            {
+                var stagingWrapper = JsonUtility.FromJson<ItemListWrapper>(save.stagingItemsJson);
+                if (stagingWrapper?.items != null)
+                    ItemInventory.RestoreStagingItems(stagingWrapper.items);
+            }
+
+            // 런 중 적립 정수 복원 (런 종료 시 메타 반영분)
+            RunDelta.GainedEssence = save.runEssence;
+
             Phase = RunPhase.Running;
             ChangeRunState(RunState.Map);
 
             OnPlayerStateReady?.Invoke(PlayerState);
             OnRunStarted?.Invoke();
 
-            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}, pointId={save.currentPointId}");
+            Debug.Log($"[GameRun] Restored. chapter={CurrentChapter}");
         }
         catch (Exception e)
         {
@@ -335,8 +343,8 @@ public sealed class GameRunSession
         try { PlayerState?.Deactivate(); }
         catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
-        // BlockSynergyBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
-        BlockSynergyBridge.Instance?.ClearAppliedGrids();
+        // MerlinRuneBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
+        MerlinRuneBridge.Instance?.ClearAppliedGrids();
 
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
@@ -484,13 +492,19 @@ public sealed class GameRunSession
         ChangeRunState(RunState.ChapterClear);
     }
 
+    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter4).</summary>
+    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter4;
+
+    /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
+    public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
+
     /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
     public bool AdvanceToNextChapter()
     {
         if (!IsRunning) return false;
 
         var next = CurrentChapter + 1;
-        if (next > ChapterId.Chapter4) return false;
+        if (next > FinalChapter) return false;
 
         CurrentChapter = next;
         ResolveActiveTheme();
@@ -581,6 +595,7 @@ public sealed class GameRunSession
 
     private void RefreshPlayerItemStats()
     {
+        Debug.Log($"[GridChk] 스탯 refresh (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} 효과수={EffectManager.ActiveEffects.Count}");
         Player?.RuntimeStats?.RefreshItemBonuses(ItemInventory);
     }
 
@@ -593,124 +608,13 @@ public sealed class GameRunSession
     {
         EffectManager.RefreshContext(Player, this);
         EffectManager.Rebuild();
+        Debug.Log($"[GridChk] 효과 rebuild (frame {Time.frameCount}) placed={ItemInventory.PlacedCount} → 효과수={EffectManager.ActiveEffects.Count}");
     }
 
     public bool TryGetPlayerState(out PlayerRunState state)
     {
         state = PlayerState;
         return (Phase == RunPhase.Running || Phase == RunPhase.Starting) && state != null;
-    }
-
-    // =========================================================
-    // StagePoint UI Bind
-    // =========================================================
-    public void RegisterPoints(IEnumerable<StagePointUI> points)
-    {
-        if (!IsRunning || StagePointManager == null || RoomManager == null)
-        {
-            Debug.LogWarning("[GameRun] RegisterPoints ignored: not ready");
-            return;
-        }
-
-        if (points == null) return;
-        foreach (var ui in points) ui.Register(StagePointManager, RoomManager);
-    }
-
-    public void ResolveAllPointsAndSetStart()
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] ResolveAllPointsAndSetStart ignored: not ready");
-            return;
-        }
-
-        StagePointManager.ResolveAll();
-        StagePointManager.SetStartAsCurrent();
-    }
-
-    // =========================================================
-    // Map Spawn / Movement
-    // =========================================================
-    public void RequestSpawnCurrentPointMap()
-    {
-        if (!IsRunning || StagePointManager == null || RoomManager == null)
-        {
-            Debug.LogWarning("[GameRun] RequestSpawnCurrentPointMap ignored: not ready");
-            return;
-        }
-
-        if (StagePointManager.CurrentPointId < 0)
-        {
-            Debug.LogWarning("[GameRun] CurrentPointId < 0. Start를 먼저 세팅하세요.");
-            return;
-        }
-
-        var ctx = StagePointManager.GetContext(StagePointManager.CurrentPointId);
-        if (ctx == null)
-        {
-            Debug.LogError($"[GameRun] Context not found. pointId={StagePointManager.CurrentPointId}");
-            return;
-        }
-
-        StagePointManager.Resolve(ctx);
-
-        var roomId = ctx.ResolvedRoomId;
-        if (string.IsNullOrEmpty(roomId))
-        {
-            Debug.LogError($"[GameRun] ResolvedRoomId is empty. pointId={ctx.PointId}");
-            return;
-        }
-
-        var room = RoomManager.GetById(roomId);
-        if (room == null)
-        {
-            Debug.LogError($"[GameRun] Room not found. roomId={roomId}");
-            return;
-        }
-
-        if (string.IsNullOrEmpty(room.prefab))
-        {
-            Debug.LogError($"[GameRun] Room prefab key is empty. roomId={roomId}");
-            return;
-        }
-
-        Debug.Log($"[SpawnMap] pointId={ctx.PointId}  room={room.name}  category={room.category}  prefab={room.prefab}");
-
-        // 방 카테고리 → RunState 자동 전환
-        var category = RoomCategoryUtil.Parse(room.category);
-        ChangeRunState(CategoryToRunState(category));
-
-        OnMapSpawnRequested?.Invoke(room.prefab);
-    }
-
-    public void RequestMoveTo(int targetPointId)
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] RequestMoveTo ignored: not running");
-            return;
-        }
-
-        if (!StagePointManager.CanMove(targetPointId)) return;
-        if (!StagePointManager.TryMoveTo(targetPointId)) return;
-
-        RequestSpawnCurrentPointMap();
-    }
-
-    /// <summary>
-    /// StageMap 씬에서 호출. 맵 스폰 없이 포인트 이동만 기록합니다.
-    /// 실제 맵 스폰은 GameScene 진입 후 GameRunBootstrapper가 담당합니다.
-    /// </summary>
-    public bool SelectPoint(int targetPointId)
-    {
-        if (!IsRunning || StagePointManager == null)
-        {
-            Debug.LogWarning("[GameRun] SelectPoint ignored: not running");
-            return false;
-        }
-
-        if (!StagePointManager.CanMove(targetPointId)) return false;
-        return StagePointManager.TryMoveTo(targetPointId);
     }
 
     // =========================================================
@@ -727,7 +631,7 @@ public sealed class GameRunSession
         Managers.Sound?.PlayEvent(SoundEvent.GoldPickup);
     }
 
-    /// <summary>런 중 심연의 정수를 적립한다. AbyssEssenceTracker에서 호출.</summary>
+    /// <summary>런 중 심연의 정수를 적립한다. EssenceTracker에서 호출.</summary>
     public void AddEssence(int amount)
     {
         if (!IsRunning) return;

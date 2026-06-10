@@ -12,14 +12,38 @@ public class LichBlackboard : BossAttackBlackboard
     // ── 패턴 쿨다운 ───────────────────────────────────────
     public float MagicBoltCooldown;
     public float TeleportStrikeCooldown;
-    public float DeathRayCooldown;
+    public float ElementalBarrageCooldown;
+    public float ArcaneOrbCooldown;
+    public float ScytheSweepCooldown;
+    public float ScytheThrowCooldown;
+    public float BlinkStrikeCooldown;
+    public float SkeletonSummonCooldown;
+    public float SealBreakerCooldown;
+    public float DarkRainCooldown;
+    public float ReaperCadenceCooldown;
+    public float ArcaneTorrentCooldown;
+    public float TwinCastCooldown;
+
+    // ── 이동 컨트롤러용 ──────────────────────────────────
+    /// <summary>LichMovementController가 매 Tick 갱신. 패턴 조건에서도 참조 가능.</summary>
+    public float DistanceToPlayer;
 
     public new void TickCooldowns(float dt)
     {
         base.TickCooldowns(dt);
-        if (MagicBoltCooldown      > 0f) MagicBoltCooldown      -= dt;
-        if (TeleportStrikeCooldown > 0f) TeleportStrikeCooldown -= dt;
-        if (DeathRayCooldown       > 0f) DeathRayCooldown       -= dt;
+        if (MagicBoltCooldown        > 0f) MagicBoltCooldown        -= dt;
+        if (TeleportStrikeCooldown   > 0f) TeleportStrikeCooldown   -= dt;
+        if (ElementalBarrageCooldown > 0f) ElementalBarrageCooldown -= dt;
+        if (ArcaneOrbCooldown        > 0f) ArcaneOrbCooldown        -= dt;
+        if (ScytheSweepCooldown      > 0f) ScytheSweepCooldown      -= dt;
+        if (ScytheThrowCooldown      > 0f) ScytheThrowCooldown      -= dt;
+        if (BlinkStrikeCooldown      > 0f) BlinkStrikeCooldown      -= dt;
+        if (SkeletonSummonCooldown   > 0f) SkeletonSummonCooldown   -= dt;
+        if (SealBreakerCooldown      > 0f) SealBreakerCooldown      -= dt;
+        if (DarkRainCooldown         > 0f) DarkRainCooldown         -= dt;
+        if (ReaperCadenceCooldown    > 0f) ReaperCadenceCooldown    -= dt;
+        if (ArcaneTorrentCooldown    > 0f) ArcaneTorrentCooldown    -= dt;
+        if (TwinCastCooldown         > 0f) TwinCastCooldown         -= dt;
     }
 
     public void SetPhase2() => IsPhase2 = true;
@@ -27,10 +51,21 @@ public class LichBlackboard : BossAttackBlackboard
     public new void Reset()
     {
         base.Reset();
-        IsPhase2               = false;
-        MagicBoltCooldown      = 0f;
-        TeleportStrikeCooldown = 0f;
-        DeathRayCooldown       = 0f;
+        IsPhase2                 = false;
+        MagicBoltCooldown        = 0f;
+        TeleportStrikeCooldown   = 0f;
+        ElementalBarrageCooldown = 0f;
+        ArcaneOrbCooldown        = 0f;
+        ScytheSweepCooldown      = 0f;
+        ScytheThrowCooldown      = 0f;
+        BlinkStrikeCooldown      = 0f;
+        SkeletonSummonCooldown   = 0f;
+        SealBreakerCooldown      = 0f;
+        DarkRainCooldown         = 0f;
+        ReaperCadenceCooldown    = 0f;
+        ArcaneTorrentCooldown    = 0f;
+        TwinCastCooldown         = 0f;
+        DistanceToPlayer         = 0f;
     }
 }
 }

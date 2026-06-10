@@ -47,7 +47,7 @@ public sealed class LughCovenant : CovenantBase
             _roomModifiers.Add(new StatModifier(type, BonusValue));
         }
 
-        Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+        RefreshStats();
     }
 
     public override void OnRoomClear()
@@ -56,6 +56,6 @@ public sealed class LughCovenant : CovenantBase
             _permanentModifiers.AddRange(_roomModifiers);
 
         _roomModifiers.Clear();
-        Ctx.Stats.RefreshCovenants(Ctx.Session.CovenantHandler);
+        RefreshStats();
     }
 }

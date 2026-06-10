@@ -61,12 +61,20 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
         {
             PlayAnimation(ctx);
 
-            var dir = ctx.PlayerTransform.forward;
+            // 대시 직전, 캐릭터를 마우스 방향으로 정면 고정한다.
+            // (현재 forward를 그대로 쓰면 정면이 마우스를 향하지 않은 상태에서 엉뚱하게 전진함)
+            Quaternion aimRot = ctx.Controller.ComputeMouseAimAssistRotation(0f, 0f, 0f);
+            ctx.Controller.RequestFacing(aimRot);
+
+            var dir = aimRot * Vector3.forward;
             _dashStart = ctx.PlayerTransform.position;
             _dashEnd = _dashStart + dir * _data.dashDistance;
 
             if (ctx.Rigidbody != null)
-                ctx.Rigidbody.linearVelocity = Vector3.zero;
+            {
+                ctx.Rigidbody.linearVelocity  = Vector3.zero;
+                ctx.Rigidbody.angularVelocity = Vector3.zero; // 잔류 회전 방지
+            }
 
             _hitTargets.Clear();
             _hitObjects.Clear();
@@ -95,13 +103,26 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             _hitTargets.Clear();
             _hitObjects.Clear();
             DespawnPlayerTrail();
+
+            // 대시 중 벽 충돌 등으로 누적된 angular/linear velocity 제거
+            if (ctx.Rigidbody != null)
+            {
+                ctx.Rigidbody.linearVelocity  = Vector3.zero;
+                ctx.Rigidbody.angularVelocity = Vector3.zero;
+            }
         }
 
         // ── Dash ──
         private void UpdateDash(SkillExecutionContext ctx)
         {
             float t = Mathf.Clamp01(_timer / _data.dashDuration);
-            ctx.PlayerTransform.position = Vector3.Lerp(_dashStart, _dashEnd, t);
+            Vector3 targetPos = Vector3.Lerp(_dashStart, _dashEnd, t);
+
+            // Rigidbody.MovePosition 으로 적용 — 벽 등 정적 콜라이더와 정상 충돌 (transform 직접 대입 시 관통 + 잔류 angularVelocity)
+            if (ctx.Rigidbody != null && !ctx.Rigidbody.isKinematic)
+                ctx.Rigidbody.MovePosition(targetPos);
+            else
+                ctx.PlayerTransform.position = targetPos;
 
             // 경로상 적 감지
             var colliders = Physics.OverlapSphere(ctx.PlayerTransform.position, _data.detectRadius);
@@ -120,6 +141,13 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             {
                 _timer = 0f;
                 _phase = Phase.Slash;
+
+                // 대시 종료 시점에 잔류 회전/속도 다시 제거 (벽 충돌 잔여물 정리)
+                if (ctx.Rigidbody != null)
+                {
+                    ctx.Rigidbody.linearVelocity  = Vector3.zero;
+                    ctx.Rigidbody.angularVelocity = Vector3.zero;
+                }
 
                 DespawnPlayerTrail();
 

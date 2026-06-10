@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 990f7fb8d0a61024f85f2c2a67ac8bcc
+ComputeShaderImporter:
+  externalObjects: {}
+  currentAPIMask: 4
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/FlockingCPU/Scripts/Compute/ComputeBoids.compute
+  uploadId: 902342

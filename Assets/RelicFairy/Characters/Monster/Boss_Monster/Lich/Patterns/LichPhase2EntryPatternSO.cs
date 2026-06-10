@@ -1,3 +1,4 @@
+using RelicFairy.UI;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -49,11 +50,12 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
 {
     private enum Phase { Entry, Recovery }
 
-    private Phase _phase;
-    private float _timer;
-    private bool  _hasBlasted;
-    private bool  _phase2Applied;
-    private float _blastThreshold;
+    private Phase      _phase;
+    private float      _timer;
+    private bool       _hasBlasted;
+    private bool       _phase2Applied;
+    private float      _blastThreshold;
+    private GameObject _aoeGuide;
 
     public LichPhase2EntryState(LichPhase2EntryPatternSO data) : base(data) { }
 
@@ -65,11 +67,19 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
         _phase2Applied = false;
         _blastThreshold = Data.entryDuration * Data.blastTiming;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped = true;
-            ctx.Agent.ResetPath();
-        }
+        ctx.Animator?.CrossFade("Phase2Entry", 0.1f);
+
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
+
+        UI_BossBark.Show("봉인 해제!", BossBarkType.Bark);
+
+        // 폭발 범위 disc — 노란색으로 선경고, blast 시점에 빨간색으로 전환
+        _aoeGuide = PatternGuideHelper.Disc(
+            ctx.Transform.position,
+            Data.blastRadius,
+            PatternGuideHelper.Telegraph);
 
         if (Data.effectPrefab != null)
         {
@@ -89,6 +99,7 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
             if (!_hasBlasted && _timer >= _blastThreshold)
             {
                 _hasBlasted = true;
+                PatternGuideHelper.SetColor(_aoeGuide, PatternGuideHelper.Active);
                 BlastAoE(ctx);
             }
 
@@ -112,8 +123,8 @@ public class LichPhase2EntryState : FullLockState<LichPhase2EntryPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
+        PatternGuideHelper.SafeDestroy(ref _aoeGuide);
+        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
     }
 
     private void BlastAoE(MonsterContext ctx)

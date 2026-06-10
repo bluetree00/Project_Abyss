@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
@@ -17,21 +18,26 @@ namespace RelicFairy.Monster
     /// TheReaper SourceMesh의 장비 GO를 토글해 리치의 외형 폼을 전환한다.
     /// LichMonster에서 ApplyPhase2Buffs 호출 시 자동 연동됨.
     ///
-    /// Inspector 설정:
-    ///   1. SourceMesh 하위 GO를 각 슬롯에 드래그앤드롭
-    ///   2. Presets 배열 index = LichForm enum value 순서와 반드시 일치
+    /// 무기(책·낫): 중첩 프리팹으로 Inspector 할당 불안정 → Awake에서 이름으로 자동 탐색.
+    ///   SK_BookOpen Equip → 책 무기 프리팹 인스턴스
+    ///   SK_Scythe Equip   → 낫 무기 프리팹 인스턴스
     ///
-    /// 노드 경로 (SourceMesh 하위 기준):
-    ///   BookEquip     → Acessories/BookEquip
+    /// 의상·후드(Inspector 할당 필요, SourceMesh 하위 기준):
     ///   Bookss        → Bookss
     ///   Clothing      → Clothing
     ///   SkirtSeparate → SkirtSeparate
     ///   HoodDown      → HoodDn
     ///   HoodUp        → HoodUp
-    ///   ScytheEquipRoot → Scythe_Equip  (독립 소품, 보통 false)
     /// </summary>
     public class LichFormController : MonoBehaviour
     {
+        // ─────────────────────────────────────────────────────────
+        // Constants
+        // ─────────────────────────────────────────────────────────
+
+        private const string BookEquipName  = "SK_BookOpen Equip";
+        private const string ScytheEquipName = "SK_Scythe Equip";
+
         // ─────────────────────────────────────────────────────────
         // Nested Types
         // ─────────────────────────────────────────────────────────
@@ -44,7 +50,6 @@ namespace RelicFairy.Monster
             [Header("Equipment")]
             public bool bookActive;
             public bool bookssActive;
-            // scytheActive: 루트 Scythe_Equip (독립 소품). 손뼈 낫은 항상 ON이므로 보통 false 유지.
             public bool scytheEquipRootActive;
 
             [Header("Body")]
@@ -60,10 +65,12 @@ namespace RelicFairy.Monster
         // SerializeField
         // ─────────────────────────────────────────────────────────
 
-        [Header("SourceMesh GO References")]
+        [Header("무기 — 이름으로 자동 탐색 (Inspector 할당 시 우선 사용)")]
         [SerializeField] private GameObject _bookEquip;
-        [SerializeField] private GameObject _bookss;
         [SerializeField] private GameObject _scytheEquipRoot;
+
+        [Header("의상·후드 — Inspector에서 직접 할당")]
+        [SerializeField] private GameObject _bookss;
         [SerializeField] private GameObject _clothing;
         [SerializeField] private GameObject _skirtSeparate;
         [SerializeField] private GameObject _hoodDown;
@@ -71,6 +78,10 @@ namespace RelicFairy.Monster
 
         [Header("Form Presets (index = LichForm enum 순서)")]
         [SerializeField] private FormPreset[] _presets;
+
+        [Header("Dissolve")]
+        [Tooltip("장비 등장/퇴장 디졸브 연출 시간 (초)")]
+        [SerializeField] private float _dissolveInDuration = 1.0f;
 
         // ─────────────────────────────────────────────────────────
         // Properties
@@ -84,7 +95,16 @@ namespace RelicFairy.Monster
 
         private void Awake()
         {
-            ApplyForm(LichForm.Phase1);
+            // 무기는 중첩 프리팹 구조로 Inspector 할당이 불안정 — Inspector가 비어있으면 이름으로 자동 탐색
+            if (_bookEquip == null)
+                _bookEquip = FindChildByName(BookEquipName);
+            if (_scytheEquipRoot == null)
+                _scytheEquipRoot = FindChildByName(ScytheEquipName);
+
+            ApplyForm(LichForm.Phase1); // 의상·후드·책 기본 표시
+
+            // DissolveMaterial을 미리 캐시 — 이후 DissolveInFormAsync 첫 호출 시 플래시 방지
+            DissolveEffect.WarmupAsync(destroyCancellationToken).Forget();
         }
 
         // ─────────────────────────────────────────────────────────
@@ -101,27 +121,74 @@ namespace RelicFairy.Monster
             CurrentForm = form;
         }
 
+        /// <summary>무기(책·낫)만 숨긴다. 의상·후드는 현재 상태 유지.</summary>
+        public void HideWeapons()
+        {
+            Toggle(_bookEquip,       false);
+            Toggle(_bookss,          false);
+            Toggle(_scytheEquipRoot, false);
+        }
+
+        /// <summary>모든 관리 오브젝트를 즉시 숨긴다. 등장 연출 전 초기 상태에 사용.</summary>
+        public void HideAll()
+        {
+            Toggle(_bookEquip,       false);
+            Toggle(_bookss,          false);
+            Toggle(_scytheEquipRoot, false);
+            Toggle(_clothing,        false);
+            Toggle(_skirtSeparate,   false);
+            Toggle(_hoodDown,        false);
+            Toggle(_hoodUp,          false);
+        }
+
         /// <summary>
-        /// 폼 전환 — SoundManager·VFX 훅 포인트 포함.
-        /// Phase2Entry 패턴에서 await로 호출한다.
+        /// 폼 전환 — 표시할 장비는 DissolveEffect 등장 연출, 숨길 장비는 DissolveEffect 퇴장 연출.
+        /// 등장 연출·Phase2Entry 패턴에서 Forget()으로 호출한다.
         /// </summary>
-        public async UniTask ApplyFormWithTransitionAsync(LichForm form, CancellationToken ct)
+        public async UniTask DissolveInFormAsync(LichForm form, CancellationToken ct)
         {
             int idx = (int)form;
             if (_presets == null || idx < 0 || idx >= _presets.Length) return;
 
-            // TODO: SoundManager.Instance.Play("Lich_FormChange") 연동
-            // TODO: VFX 파티클 재생 훅
-
-            ApplyPreset(_presets[idx]);
+            var p = _presets[idx];
             CurrentForm = form;
 
-            await UniTask.Yield(cancellationToken: ct);
+            var tasks = new List<UniTask>(7);
+            AddTransitionTask(_bookEquip,       p.bookActive,            tasks, ct);
+            AddTransitionTask(_bookss,          p.bookssActive,          tasks, ct);
+            AddTransitionTask(_scytheEquipRoot, p.scytheEquipRootActive, tasks, ct);
+            AddTransitionTask(_clothing,        p.clothingActive,        tasks, ct);
+            AddTransitionTask(_skirtSeparate,   p.skirtSeparateActive,   tasks, ct);
+            AddTransitionTask(_hoodDown,        p.hoodDownActive,        tasks, ct);
+            AddTransitionTask(_hoodUp,          p.hoodUpActive,          tasks, ct);
+
+            if (tasks.Count > 0)
+                await UniTask.WhenAll(tasks);
         }
 
         // ─────────────────────────────────────────────────────────
         // Private Methods
         // ─────────────────────────────────────────────────────────
+
+        private void AddTransitionTask(GameObject go, bool targetActive, List<UniTask> tasks, CancellationToken ct)
+        {
+            if (go == null) return;
+            if (targetActive && !go.activeSelf)
+            {
+                // SetActive(true)는 DissolveEffect 내부에서 dissolve=1 세팅 후 처리 — 플래시 방지
+                tasks.Add(DissolveEffect.PlayAppearAsync(go, _dissolveInDuration, ct));
+            }
+            else if (!targetActive && go.activeSelf)
+            {
+                tasks.Add(DissolveOutAndHideAsync(go, _dissolveInDuration, ct));
+            }
+        }
+
+        private async UniTask DissolveOutAndHideAsync(GameObject go, float duration, CancellationToken ct)
+        {
+            await DissolveEffect.PlayDisappearAsync(go, duration, ct);
+            if (go != null) go.SetActive(false);
+        }
 
         private void ApplyPreset(FormPreset preset)
         {
@@ -138,6 +205,15 @@ namespace RelicFairy.Monster
         {
             if (go != null && go.activeSelf != active)
                 go.SetActive(active);
+        }
+
+        private GameObject FindChildByName(string childName)
+        {
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+                if (t.name == childName)
+                    return t.gameObject;
+            Debug.LogWarning($"[LichFormController] '{childName}' 오브젝트를 찾지 못했습니다.", this);
+            return null;
         }
 
         // ─────────────────────────────────────────────────────────
@@ -182,12 +258,12 @@ namespace RelicFairy.Monster
                     hoodDownActive        = true,
                     hoodUpActive          = false,
                 },
-                new FormPreset   // [3] Phase2 — Style 4/5: 로브·책 전체 OFF, 뼈 노출
+                new FormPreset   // [3] Phase2 — Style 4/5: 로브·책 OFF, 낫 ON, 뼈 노출
                 {
                     formName              = "Phase2_Liberation",
                     bookActive            = false,
                     bookssActive          = false,
-                    scytheEquipRootActive = false,
+                    scytheEquipRootActive = true,
                     clothingActive        = false,
                     skirtSeparateActive   = false,
                     hoodDownActive        = false,

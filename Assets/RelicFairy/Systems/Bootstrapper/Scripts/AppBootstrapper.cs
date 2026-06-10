@@ -43,9 +43,9 @@ public sealed class AppBootstrapper : MonoBehaviour
     [Header("Auto Login (Device ID)")]
     [SerializeField] private bool useAutoLogin = true;
 
-    [Header("Element Palette (원소별 쉐이더 수치 전역 설정)")]
-    [Tooltip("모든 몬스터가 공유하는 원소 팔레트. 비워두면 ElementNativePalette 내장 기본값 사용.")]
-    [SerializeField] private ElementPaletteSO elementPalette;
+    [Header("Asset Unload (실험적 — 기본 off)")]
+    [Tooltip("챕터 전환 시 스코프 에셋 언로드 활성화. ⚠ Memory Profiler로 '사용 중 핸들 미해제(분홍텍스처/NRE 없음)' 검증 후에만 켤 것.")]
+    [SerializeField] private bool enableScopedAssetUnload = false;
 
     [Header("Flow Start (Optional)")]
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
@@ -73,10 +73,25 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (CurrentRun != null)
             CurrentRun.OnRunEnded -= HandleRunEnded;
 
-        var rpm = RunProgressManager.Instance;
-        rpm?.ClearAsync(rpm.ActiveSlotIndex).Forget();
+        // PR1: 진행 중 런 세이브(로컬)를 폐기. 메타 반영은 HandleRunEnded → ApplyRunResultAsync.
+        RunProgressManager.Instance?.ClearLocalRun();
         CurrentRun = null;
         Loadout.Clear();
+    }
+
+    /// <summary>
+    /// PR6: 챕터 전환 시 호출 가능한 안전 언로드 훅. 기본 비활성(enableScopedAssetUnload=false).
+    /// 안전 순서: 풀 클리어(인스턴스 파괴) → 스코프 에셋 해제.
+    /// ⚠ 활성화 전 Memory Profiler로 사용 중 핸들 미해제(분홍텍스처/NRE 없음) 검증 필수.
+    /// 스코프 태그 로드(LoadAssetAsync(key, scope))를 쓰는 코드가 갖춰지기 전까지 ReleaseScope는 무동작.
+    /// </summary>
+    public void UnloadChapterAssets(string chapterScope)
+    {
+        if (!enableScopedAssetUnload) return;
+
+        Managers.ObjectPooler?.ClearCategory(ObjectPoolerManager.PoolType.Monster);
+        Managers.ObjectPooler?.ClearCategory(ObjectPoolerManager.PoolType.Effect);
+        Managers.AddressableManager?.ReleaseScope(chapterScope);
     }
 
     private static void HandleRunEnded(EndRunResult result)
@@ -157,9 +172,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         try
         {
             IsNewRunPending = true;
-            var rpm = RunProgressManager.Instance;
-            if (rpm != null)
-                await rpm.ClearAsync(rpm.ActiveSlotIndex);
+            // 새 런 시작 — 기존 로컬 런 세이브 폐기.
+            RunProgressManager.Instance?.ClearLocalRun();
 
             var vp = UIRootBootstrapper.Instance != null
                 ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
@@ -167,7 +181,7 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (vp != null)
                 await vp.PlayAsync(token);
 
-            RequestLoad(Define.Scene.GameScene_Ch1); // 새 런은 항상 Chapter 1 씬부터
+            RequestLoad(Define.Scene.BaseCamp); // 새 런은 영속 허브(BaseCamp)부터 — 던전 진입은 BaseCamp 게이트가 담당
         }
         catch (OperationCanceledException) { }
     }
@@ -178,6 +192,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         IsNewRunPending = false;
         return was;
     }
+
+    /// <summary>새 런 진입 신호를 세운다. 베이스캠프 던전 게이트 통과처럼 로비(RequestStartRun)를 거치지 않은
+    /// 진입에서도 Ch1 부트스트래퍼가 대기 방(StartWaitingRoomAsync) 흐름을 타도록 보장한다. ConsumeNewRunPending에서 소비.</summary>
+    public void MarkNewRunPending() => IsNewRunPending = true;
 
     /// <summary>
     /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.
@@ -193,11 +211,11 @@ public sealed class AppBootstrapper : MonoBehaviour
         var rpm = RunProgressManager.Instance;
         if (rpm == null) return;
 
-        int slot = rpm.ActiveSlotIndex;
-        var save = rpm.Saves[slot];
+        // PR1: 진행 중 런은 로컬 파일이 권위(뒤끝 USER_RUN_PROGRESS 아님).
+        var save = rpm.HasLocalRun ? rpm.LoadLocalRun() : null;
         if (save == null || !save.hasActiveRun)
         {
-            Debug.LogWarning($"[AppBootstrapper] RequestRestoreRun: slot {slot}에 유효한 저장 없음");
+            Debug.LogWarning("[AppBootstrapper] RequestRestoreRun: 유효한 로컬 세이브 없음");
             onFailed?.Invoke();
             return;
         }
@@ -207,7 +225,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         {
             Debug.Log("[AppBootstrapper] RestoreRun: isInStartRoom=true — 세이브 초기화 후 새로 시작");
             Loadout.Clear();
-            rpm.ClearAsync(slot).Forget();
+            rpm.ClearLocalRun();
             RequestLoad(Define.Scene.GameScene_Ch1);
             return;
         }
@@ -260,6 +278,21 @@ public sealed class AppBootstrapper : MonoBehaviour
             }
         }
 
+        // 유물(Relic) 로드 — 휴면 경로(보통 null). 실패해도 복원은 계속.
+        if (!string.IsNullOrEmpty(save.relicKey))
+        {
+            try
+            {
+                var relic = await Managers.AddressableManager.TryLoadAssetAsync<RelicClassSO>(save.relicKey);
+                if (relic != null) Loadout.SetRelic(relic);
+                else Debug.LogWarning($"[AppBootstrapper] RestoreRun: Relic '{save.relicKey}' 로드 실패");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AppBootstrapper] RestoreRun: Relic 로드 예외: {e.Message}");
+            }
+        }
+
         var session = new GameRunSession();
         await session.RestoreFromSaveAsync(save, LoadTextAsset);
 
@@ -274,7 +307,11 @@ public sealed class AppBootstrapper : MonoBehaviour
         var w0 = ws0 != null ? WeaponData.FromSO(ws0) : null;
         var w1 = ws1 != null ? WeaponData.FromSO(ws1) : null;
         if (w0 != null || w1 != null)
-            session.SaveWeaponSlots(new WeaponData[] { w0, w1 }, 0);
+        {
+            // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.
+            int curSlot = save.weaponCurrentSlot >= 0 ? save.weaponCurrentSlot : 0;
+            session.SaveWeaponSlots(new WeaponData[] { w0, w1 }, curSlot);
+        }
 
         BeginRun(session);
         RequestLoad(GetSceneForChapter(session.CurrentChapter));
@@ -353,10 +390,6 @@ public sealed class AppBootstrapper : MonoBehaviour
             var bgdGo = new GameObject("@BackendGameData");
             bgdGo.AddComponent<BackendGameData>();
         }
-
-        // 첫 몬스터 스폰(및 프리워밍) 이전에 원소 팔레트 주입 — Addressable 로드 비용 없이 Inspector 참조.
-        if (elementPalette != null)
-            ElementNativePalette.SetPaletteSO(elementPalette);
 
         if (initBackend && !IsBackendInitialized)
         {
@@ -456,7 +489,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             await UniTask.WhenAll(
                 Managers.ItemData.InitializeAsync(),
-                Managers.BlockData.InitializeAsync()
+                Managers.RuneData.InitializeAsync()
             );
             startScene = Define.Scene.Lobby;
         }
@@ -471,7 +504,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 // 아이템/블록 데이터는 CDN 인증 후 로드해야 하므로 로그인 성공 이후 초기화
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
-                    Managers.BlockData.InitializeAsync(),
+                    Managers.RuneData.InitializeAsync(),
                     RunProgressManager.Instance.LoadAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
@@ -483,7 +516,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 // 로그인 실패 시 Addressables 폴백으로 초기화
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
-                    Managers.BlockData.InitializeAsync()
+                    Managers.RuneData.InitializeAsync()
                 );
             }
             if (startScene == Define.Scene.Logo)

@@ -2,6 +2,28 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
+/// 팔레트별 방 조명 설정. BlockPalette에 직렬화되어 테마별 조명을 바인딩한다.
+/// </summary>
+[System.Serializable]
+public class RoomLightingConfig
+{
+    [Tooltip("벽 안쪽 면에 배치할 조명 프리팹 (Point Light 포함 횃불/벽등). 비워두면 벽 조명 없음.")]
+    public GameObject wallLightPrefab;
+
+    [Tooltip("방 중앙 천장에 배치할 조명 프리팹. 비워두면 중앙 조명 없음.")]
+    public GameObject centerLightPrefab;
+
+    [Min(1), Tooltip("벽 조명 배치 간격 (값이 클수록 듬성). 기본 5.")]
+    public int wallLightSpacing = 5;
+
+    [Range(0f, 1f), Tooltip("벽 높이 중 조명 위치 비율. 0=하단, 1=상단. 0.4 권장.")]
+    public float wallLightHeightRatio = 0.4f;
+
+    [Min(0), Tooltip("배치할 벽 조명 최대 개수. 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.")]
+    public int maxWallLights = 0;
+}
+
+/// <summary>
 /// 테마별 블록 세트. TileType → BlockDef 매핑.
 /// 같은 TileType에 여러 BlockDef를 등록하면 가중치 랜덤 선택.
 ///
@@ -14,11 +36,16 @@ public class BlockPalette : ScriptableObject
     [Tooltip("방 테마 문자열. 비어있거나 \"*\"면 범용(모든 테마 fallback).")]
     [SerializeField] private string themeMatch = "*";
 
+    [Header("Lighting")]
+    [SerializeField] private RoomLightingConfig lighting = new();
+
+    [Header("Blocks")]
     [SerializeField] private List<BlockDef> blocks = new();
 
     private Dictionary<TileType, List<BlockDef>> _cache;
 
     public string ThemeMatch => themeMatch;
+    public RoomLightingConfig Lighting => lighting;
 
     /// <summary>주어진 테마와 이 팔레트가 일치하는지. "*" 또는 빈값은 항상 매칭.</summary>
     public bool MatchesTheme(string theme)

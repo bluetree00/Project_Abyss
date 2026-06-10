@@ -1,4 +1,4 @@
-Shader "Abyss/Elements/ElementRim"
+Shader "RelicFairy/Elements/ElementRim"
 {
     // URP Unlit 기반 Fresnel Rim Glow + 원소별 애니메이션 분기.
     // _ElementType 값에 따라 Fresnel 강도가 시간/위치 함수로 다르게 변조되어

@@ -10,16 +10,16 @@ public static class RegisterItemVfxAddressable
 {
     private static readonly (string path, string address)[] Entries =
     {
-        ("Assets/Abyss/Shared/Item/VFX/item_snow_white_mirror/VFX_DamageReflect.prefab",   "VFX_DamageReflect"),
-        ("Assets/Abyss/Shared/Item/VFX/item_aladdin_carpet/VFX_JumpLandingDamage.prefab",  "VFX_JumpLandingDamage"),
-        ("Assets/Abyss/Shared/Item/VFX/item_black_wings/VFX_DeathNegateAura.prefab",       "VFX_DeathNegateAura"),
-        ("Assets/Abyss/Shared/Item/VFX/item_excalibur_fragment/VFX_ExtraAttack.prefab",     "VFX_ExtraAttack"),
-        ("Assets/Abyss/Shared/Item/VFX/item_ifrit_ring/VFX_FireExplosion.prefab",          "VFX_FireExplosion"),
-        ("Assets/Abyss/Shared/Item/VFX/item_thor_hammer_fragment/VFX_LightningStrike.prefab", "VFX_LightningStrike"),
-        ("Assets/Abyss/Shared/Item/SOdata/ItemSODatabase.asset",                           "ItemSODatabase"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_snow_white_mirror/VFX_DamageReflect.prefab",   "VFX_DamageReflect"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_aladdin_carpet/VFX_JumpLandingDamage.prefab",  "VFX_JumpLandingDamage"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_black_wings/VFX_DeathNegateAura.prefab",       "VFX_DeathNegateAura"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_excalibur_fragment/VFX_ExtraAttack.prefab",     "VFX_ExtraAttack"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_ifrit_ring/VFX_FireExplosion.prefab",          "VFX_FireExplosion"),
+        ("Assets/RelicFairy/Shared/Item/VFX/item_thor_hammer_fragment/VFX_LightningStrike.prefab", "VFX_LightningStrike"),
+        ("Assets/RelicFairy/Shared/Item/SOdata/ItemSODatabase.asset",                           "ItemSODatabase"),
     };
 
-    [MenuItem("Tools/Item VFX/Register Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register Item VFX")]
     public static void Register()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

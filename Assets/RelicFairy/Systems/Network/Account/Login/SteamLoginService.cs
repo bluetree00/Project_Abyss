@@ -13,7 +13,7 @@ using UnityEngine;
 public static class SteamLoginService
 {
     public static bool IsLoggedIn { get; private set; }
-    private const string SALT = "Abyss_4488270_Steam";
+    private const string SALT = "RelicFairy_4488270_Steam";
 
     public static UniTask<bool> LoginAsync()
     {

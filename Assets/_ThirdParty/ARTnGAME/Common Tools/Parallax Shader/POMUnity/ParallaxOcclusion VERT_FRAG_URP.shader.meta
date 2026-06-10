@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 9171edb4177db51469133573839923ec
+timeCreated: 1489106442
+licenseType: Store
+ShaderImporter:
+  defaultTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Common Tools/Parallax Shader/POMUnity/ParallaxOcclusion
+    VERT_FRAG_URP.shader
+  uploadId: 902342

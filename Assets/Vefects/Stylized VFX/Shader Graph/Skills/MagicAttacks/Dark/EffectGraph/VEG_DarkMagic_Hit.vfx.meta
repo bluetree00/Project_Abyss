@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b1d4d4260e2197341923a244da2ef9a6
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/MagicAttacks/Dark/EffectGraph/VEG_DarkMagic_Hit.vfx
+  uploadId: 714344

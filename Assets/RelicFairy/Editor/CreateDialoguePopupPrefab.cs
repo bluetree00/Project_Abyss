@@ -12,18 +12,18 @@ using UnityEngine.UI;
 /// </summary>
 public static class CreateDialoguePopupPrefab
 {
-    [MenuItem("Abyss/Dialogue/Register Illustrations")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Register Illustrations")]
     public static void RegisterIllustrations()
     {
-        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/Illust_God_Default.png", "Illust_God_Default");
-        RegisterAddressable("Assets/Abyss/UI/Popup/Quest/Illust_Shadow_Default.png", "Illust_Shadow_Default");
+        RegisterAddressable("Assets/RelicFairy/UI/Popup/Quest/Illust_God_Default.png", "Illust_God_Default");
+        RegisterAddressable("Assets/RelicFairy/UI/Popup/Quest/Illust_Shadow_Default.png", "Illust_Shadow_Default");
         Debug.Log("[Dialogue] 일러스트 Addressables 등록 완료 — Illust_God_Default / Illust_Shadow_Default");
     }
 
-    [MenuItem("Abyss/Dialogue/Bind Prefab References")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Bind Prefab References")]
     public static void BindDialoguePopupRefs()
     {
-        const string prefabPath = "Assets/Abyss/UI/Popup/Dialogue/UI_DialoguePopup.prefab";
+        const string prefabPath = "Assets/RelicFairy/UI/Popup/Dialogue/UI_DialoguePopup.prefab";
 
         var prefabContents = PrefabUtility.LoadPrefabContents(prefabPath);
         try
@@ -53,15 +53,15 @@ public static class CreateDialoguePopupPrefab
         }
     }
 
-    [MenuItem("Abyss/Create/Register Dialogue CSV")]
+    [MenuItem("RelicFairy/Gameplay/Dialogue/Register CSV")]
     public static void RegisterDialogueCsv()
     {
-        const string csvPath = "Assets/Abyss/Systems/Dialogue/Data/DIALOGUE_DATA.csv";
+        const string csvPath = "Assets/RelicFairy/Systems/Dialogue/Data/DIALOGUE_DATA.csv";
         RegisterAddressable(csvPath, "DIALOGUE_DATA");
         Debug.Log("[CreateDialoguePopupPrefab] DIALOGUE_DATA CSV Addressables 등록 완료");
     }
 
-    [MenuItem("Abyss/Create/UI_DialoguePopup Prefab")]
+    [MenuItem("RelicFairy/UI/Create Dialogue Popup Prefab")]
     public static void Create()
     {
         // ── Root ────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ public static class CreateDialoguePopupPrefab
 
         // ── TextBox Panel ───────────────────────────────────────────
         var tbSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
-            "Assets/Abyss/UI/Popup/Quest/BdyUj.png");
+            "Assets/RelicFairy/UI/Popup/Quest/BdyUj.png");
         var tbGO = new GameObject("TextBox");
         tbGO.layer = LayerMask.NameToLayer("UI");
         tbGO.transform.SetParent(root.transform, false);
@@ -168,7 +168,7 @@ public static class CreateDialoguePopupPrefab
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // ── 프리팹 저장 ──────────────────────────────────────────────
-        const string dir  = "Assets/Abyss/UI/Popup/Dialogue";
+        const string dir  = "Assets/RelicFairy/UI/Popup/Dialogue";
         const string path = dir + "/UI_DialoguePopup.prefab";
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);

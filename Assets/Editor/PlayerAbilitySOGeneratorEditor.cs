@@ -11,7 +11,7 @@ public class PlayerAbilitySOGeneratorEditor : EditorWindow
     private float dashSpeed = 10f;
     private float dodgeCooldown = 1f;
 
-    [MenuItem("Tools/Player Ability SO Generator")]
+    [MenuItem("RelicFairy/Gameplay/Player Ability SO Generator")]
     public static void ShowWindow()
     {
         GetWindow<PlayerAbilitySOGeneratorEditor>("Player Ability SO Generator");

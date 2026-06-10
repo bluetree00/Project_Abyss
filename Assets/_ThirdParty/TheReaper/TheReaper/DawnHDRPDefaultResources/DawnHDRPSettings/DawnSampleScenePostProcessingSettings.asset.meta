@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4f22135a270cf024ca53242a6ffc0e21
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/DawnHDRPDefaultResources/DawnHDRPSettings/DawnSampleScenePostProcessingSettings.asset
+  uploadId: 467556

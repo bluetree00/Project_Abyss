@@ -13,10 +13,10 @@ using System.IO;
 /// </summary>
 public static class GenerateItemSOFromCSV
 {
-    private const string SOFolder = "Assets/Abyss/Shared/Item/SOdata";
-    private const string DatabasePath = "Assets/Abyss/Shared/Item/SOdata/ItemSODatabase.asset";
+    private const string SOFolder = "Assets/RelicFairy/Shared/Item/SOdata";
+    private const string DatabasePath = "Assets/RelicFairy/Shared/Item/SOdata/ItemSODatabase.asset";
 
-    [MenuItem("Tools/Item/Generate SO from CSV")]
+    [MenuItem("RelicFairy/Gameplay/Item/Generate SO from CSV")]
     public static void Generate()
     {
         // CSV 로드

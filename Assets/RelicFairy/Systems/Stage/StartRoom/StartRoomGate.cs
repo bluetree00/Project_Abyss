@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,18 +14,28 @@ using UnityEngine.UI;
 /// 일반 방 모드 (InitGate 호출 후):
 ///   ZoneProgressionService.EnableExitGateForZone() 호출 시 활성화.
 ///   트리거 진입 시 DirectlyEnterZoneAsync(from, to) 호출.
+///   현재 존이 클리어되지 않은 전투 존이면 통과 불가.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class StartRoomGate : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────────
-    private const float IndicatorHeight  = 2.5f;
-    private const float CanvasScale      = 0.006f;
-    private const float GracePeriod      = 0.3f;
-    private const float TriggerWidth     = 5f;   // 게이트 트리거 너비 (localX)
-    private const float TriggerHeight    = 3f;   // 게이트 트리거 높이
-    private const float TriggerDepth     = 1.5f; // 게이트 트리거 깊이 (localZ)
-    private static readonly Color PassThroughColor = new Color(0.4f, 0.85f, 1f, 0.25f); // 통과 시 연한 청색
+    private const float IndicatorHeight    = 5f;
+    private const float CanvasScale        = 0.007f;
+    private const float GracePeriod        = 0.3f;
+    private const float TriggerDepth       = 2f;
+    private const float DefaultGateWidth   = 5f;  // OpenWallsForConnections gateWidth(5) × blockCellSize(1)
+    private const float DefaultGateHeight  = 5f;
+
+    // 통과 후 포털 색상 — 거의 투명하게
+    private static readonly Color PassThroughColor = new Color(0.4f, 0.85f, 1f, 0.04f);
+
+    // 카테고리별 포털 기본 색상
+    private static readonly Color ColorBattle   = new Color(0.25f, 0.55f, 1.00f, 0.85f);
+    private static readonly Color ColorElite    = new Color(0.65f, 0.20f, 1.00f, 0.85f);
+    private static readonly Color ColorBoss     = new Color(1.00f, 0.18f, 0.18f, 0.85f);
+    private static readonly Color ColorCorridor = new Color(0.55f, 0.85f, 0.55f, 0.85f);
+    private static readonly Color ColorDefault  = new Color(0.70f, 0.70f, 0.70f, 0.85f);
 
     // ── [SerializeField] ─────────────────────────────────────────
     [SerializeField, Tooltip("준비 완료 시 활성화할 포탈 비주얼 오브젝트")]
@@ -33,44 +44,54 @@ public class StartRoomGate : MonoBehaviour
     private GameObject notReadyIndicator;
 
     // ── Private fields ────────────────────────────────────────────
-    private int                    _fromZoneIndex = -1; // -1 = 스타트 방 모드
+    private int                    _fromZoneIndex = -1;
     private int                    _toZoneIndex   = -1;
     private string                 _targetLabel;
+    private string                 _category;
     private ZoneProgressionService _progression;
 
-    private bool  _triggered;
-    private bool  _gateOpen;      // 스타트 방 모드: portalActive 상태 추적
-    private bool  _isEnabled;     // 일반 방 모드: EnableGate() 호출 여부
-    private float _enabledTime    = float.MaxValue;
+    private float _gateWidth  = DefaultGateWidth;
+    private float _gateHeight = DefaultGateHeight;
+
+    private bool             _triggered;
+    private bool             _gateOpen;
+    private bool             _isEnabled;
+    private float            _enabledTime  = float.MaxValue;
+    private PlayerController _frozenPlayer;
 
     private GameObject      _worldIndicatorGO;
     private TextMeshProUGUI _distanceText;
+    private bool            _flashActive;
 
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
     {
         ResizeTriggerCollider();
+        ResizeGate();
     }
 
-    /// <summary>
-    /// Zone 1+ 게이트 초기화. 호출 시 스타트 방 모드에서 일반 방 모드로 전환된다.
-    /// CreateZoneExitGates에서 프리팹 인스턴스화 직후 호출.
-    /// </summary>
-    public void InitGate(int fromZoneIndex, int toZoneIndex, string targetLabel, ZoneProgressionService progression)
+    /// <summary>Zone 1+ 게이트 초기화. 호출 시 스타트 방 모드에서 일반 방 모드로 전환된다.</summary>
+    /// <param name="openingWidth">벽 개구부 월드 너비 (GateWidth × blockCellSize). 0 이하면 기본값 사용.</param>
+    public void InitGate(int fromZoneIndex, int toZoneIndex, string targetLabel, string category,
+        ZoneProgressionService progression, float openingWidth = DefaultGateWidth)
     {
         _fromZoneIndex = fromZoneIndex;
         _toZoneIndex   = toZoneIndex;
         _targetLabel   = string.IsNullOrEmpty(targetLabel) ? "다음 구역" : targetLabel;
+        _category      = category ?? string.Empty;
         _progression   = progression;
+        if (openingWidth > 0f) _gateWidth = openingWidth;
 
-        // 프리팹에 Collider가 없는 경우 런타임 보장 후 크기 재설정
         if (!TryGetComponent<Collider>(out _))
             gameObject.AddComponent<BoxCollider>();
         ResizeTriggerCollider();
+
+        ApplyCategoryColor();
+        ResizeGate();
     }
 
-    /// <summary>존 클리어(또는 비전투 존 진입) 시 ZoneProgressionService가 호출. 게이트 활성화 + 인디케이터 생성.</summary>
+    /// <summary>존 클리어(또는 비전투 존 진입) 시 ZoneProgressionService가 호출. 게이트 활성화.</summary>
     public void EnableGate()
     {
         if (_isEnabled || _triggered) return;
@@ -91,7 +112,6 @@ public class StartRoomGate : MonoBehaviour
             return;
         }
 
-        // 스타트 방 모드: 로드아웃 완료 여부 폴링
         bool ready = IsLoadoutReady();
         if (ready == _gateOpen) return;
         _gateOpen = ready;
@@ -122,45 +142,104 @@ public class StartRoomGate : MonoBehaviour
     {
         if (!TryGetComponent<BoxCollider>(out var bc)) return;
         bc.isTrigger = true;
-        bc.size      = new Vector3(TriggerWidth, TriggerHeight, TriggerDepth);
-        bc.center    = new Vector3(0f, TriggerHeight * 0.5f, 0f);
+        bc.size      = new Vector3(_gateWidth, _gateHeight, TriggerDepth);
+        bc.center    = new Vector3(0f, _gateHeight * 0.5f, 0f);
     }
 
-    /// <summary>
-    /// 플레이어가 게이트를 통과할 때 호출.
-    /// portalActive의 물리 차단을 해제하고 반투명 색상으로 전환해 통과 가능 상태를 표시한다.
-    /// </summary>
+    private void ResizeGate()
+    {
+        float halfW = _gateWidth  * 0.5f;
+        float halfH = _gateHeight * 0.5f;
+
+        if (portalActive != null)
+        {
+            var ps = portalActive.transform.localScale;
+            portalActive.transform.localPosition = new Vector3(0f, halfH, 0f);
+            portalActive.transform.localScale    = new Vector3(_gateWidth, _gateHeight, ps.z);
+        }
+
+        const float PillarHalfWidth   = 0.15f;
+        const float CapsuleMeshHeight = 2f;
+        float pillarScaleY = _gateHeight / CapsuleMeshHeight;
+
+        var pillarL = transform.Find("Pillar_L");
+        if (pillarL != null)
+        {
+            var ps = pillarL.localScale;
+            pillarL.localPosition = new Vector3(-(halfW - PillarHalfWidth), halfH, 0f);
+            pillarL.localScale    = new Vector3(ps.x, pillarScaleY, ps.z);
+        }
+
+        var pillarR = transform.Find("Pillar_R");
+        if (pillarR != null)
+        {
+            var ps = pillarR.localScale;
+            pillarR.localPosition = new Vector3(+(halfW - PillarHalfWidth), halfH, 0f);
+            pillarR.localScale    = new Vector3(ps.x, pillarScaleY, ps.z);
+        }
+
+        var lintel = transform.Find("Lintel");
+        if (lintel != null)
+        {
+            var ps = lintel.localScale;
+            lintel.localPosition = new Vector3(0f, _gateHeight + ps.y * 0.5f, 0f);
+            lintel.localScale    = new Vector3(_gateWidth, ps.y, ps.z);
+        }
+    }
+
+    private void ApplyCategoryColor()
+    {
+        if (portalActive == null) return;
+        var color = CategoryColor(_category);
+        var mpb   = new MaterialPropertyBlock();
+        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
+        {
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor("_BaseColor", color);
+            mpb.SetColor("_Color",     color);
+            r.SetPropertyBlock(mpb);
+        }
+    }
+
     private void SetGatePassable()
     {
         if (portalActive == null) return;
 
-        // 물리 차단 해제: 비트리거 콜라이더를 비활성화
         foreach (var col in portalActive.GetComponentsInChildren<Collider>())
             if (!col.isTrigger) col.enabled = false;
 
-        // 반투명 청색으로 전환 (MaterialPropertyBlock — 원본 에셋 수정 없이 인스턴스별 적용)
-        var mpb = new MaterialPropertyBlock();
-        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
-        {
-            r.GetPropertyBlock(mpb);
-            mpb.SetColor("_BaseColor", PassThroughColor); // URP
-            mpb.SetColor("_Color",     PassThroughColor); // Standard
-            r.SetPropertyBlock(mpb);
-        }
+        portalActive.SetActive(false);
     }
 
     private void TryActivate(Collider other)
     {
         if (_triggered) return;
 
+        bool isPlayer = other.GetComponentInParent<WispController>() != null ||
+                        other.GetComponentInParent<PlayerController>() != null;
+
         if (_fromZoneIndex != -1)
         {
-            if (!_isEnabled) return;
+            if (!_isEnabled)
+            {
+                if (isPlayer) ShowLockedFeedback();
+                return;
+            }
             if (Time.time - _enabledTime < GracePeriod) return;
+
+            // 현재 존이 클리어되지 않은 전투 존이면 다른 방 게이트 통과 불가
+            if (_progression != null)
+            {
+                int currentZone = _progression.CurrentZoneIndex;
+                if (currentZone != _fromZoneIndex && !_progression.IsExitEnabled(currentZone))
+                {
+                    if (isPlayer) ShowLockedFeedback();
+                    return;
+                }
+            }
         }
 
-        if (other.GetComponentInParent<WispController>() == null &&
-            other.GetComponentInParent<PlayerController>() == null) return;
+        if (!isPlayer) return;
 
         if (_fromZoneIndex == -1 && !IsLoadoutReady())
         {
@@ -172,7 +251,55 @@ public class StartRoomGate : MonoBehaviour
         _triggered = true;
         if (_worldIndicatorGO != null) _worldIndicatorGO.SetActive(false);
         SetGatePassable();
+
+        // 스타트 방 게이트: 서약 선택 UI 동안 플레이어 이동 고정
+        if (_fromZoneIndex == -1)
+        {
+            var pc = other.GetComponentInParent<PlayerController>();
+            if (pc != null) FreezePlayer(pc);
+        }
+
         GateActivateAsync().Forget();
+    }
+
+    private void ShowLockedFeedback()
+    {
+        if (_flashActive || portalActive == null) return;
+        FlashLockedAsync().Forget();
+    }
+
+    private async UniTaskVoid FlashLockedAsync()
+    {
+        _flashActive = true;
+        var mpb         = new MaterialPropertyBlock();
+        var lockedColor = new Color(1f, 0.15f, 0.15f, 0.80f);
+        var baseColor   = CategoryColor(_category);
+
+        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
+        {
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor("_BaseColor", lockedColor);
+            mpb.SetColor("_Color",     lockedColor);
+            r.SetPropertyBlock(mpb);
+        }
+
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(0.35f),
+                cancellationToken: gameObject.GetCancellationTokenOnDestroy());
+        }
+        catch (System.OperationCanceledException) { _flashActive = false; return; }
+
+        foreach (var r in portalActive.GetComponentsInChildren<Renderer>())
+        {
+            if (r == null) continue;
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor("_BaseColor", baseColor);
+            mpb.SetColor("_Color",     baseColor);
+            r.SetPropertyBlock(mpb);
+        }
+
+        _flashActive = false;
     }
 
     private async UniTaskVoid GateActivateAsync()
@@ -181,7 +308,6 @@ public class StartRoomGate : MonoBehaviour
 
         if (_fromZoneIndex != -1)
         {
-            // 일반 방 모드: 다음 존 직접 진입
             if (_progression != null)
             {
                 try { await _progression.DirectlyEnterZoneAsync(_fromZoneIndex, _toZoneIndex, ct); }
@@ -191,7 +317,6 @@ public class StartRoomGate : MonoBehaviour
             return;
         }
 
-        // 스타트 방 모드
         try { await ExitStartRoomAsync(ct); }
         catch (System.OperationCanceledException) { }
     }
@@ -200,30 +325,95 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        if (bootstrapper != null && bootstrapper.IsZoneLayoutMode)
+        // [서약 픽업화] 게이트 선택 팝업 분리 — 베이스캠프에서 예약(PlayerLoadout)한 서약을 여기서 적용.
+        // 이 시점 플레이어는 이미 스폰·BindPlayer 완료(CovenantHandler.Initialize 후)라 TryAdd가 정상 동작.
+        // (ShowCovenantChoiceAsync는 이벤트방/후속 재사용 위해 메서드는 보존하되 미호출)
+        var run     = bootstrapper?.Run;
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        if (run?.CovenantHandler != null && loadout != null)
         {
-            var zoneProgression = bootstrapper.Run?.ZoneProgression;
-            if (zoneProgression != null)
-                await zoneProgression.DirectlyEnterFirstNextZoneAsync(0, ct);
-            else
-                await bootstrapper.SpawnRemainingWorldZonesAsync();
+            foreach (var id in loadout.ReservedCovenants)
+                run.CovenantHandler.TryAdd(id);
+        }
 
-            UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+        // 플레이어 이동 복구
+        UnfreezePlayer();
+
+        // 절차 진행(하데스형): RunFlowController로 런 시작
+        if (bootstrapper != null)
+            await bootstrapper.StartProcGenRunAsync();
+
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+    }
+
+    private static readonly object _covenantPauseOwner = new object();   // TimeScaleArbiter 요청 키
+
+    private static async UniTask ShowCovenantChoiceAsync(GameRunSession run, System.Threading.CancellationToken ct)
+    {
+        if (run?.CovenantHandler == null) return;
+        if (run.CovenantHandler.Covenants.Count > 0) return;
+
+        var ids = WorldCovenantPickup.PickRandomOptions(run.CovenantHandler, 3);
+        var covenants = new List<CovenantBase>(ids.Length);
+        foreach (var id in ids)
+        {
+            var c = CovenantFactory.Create(id);
+            if (c != null) covenants.Add(c);
+        }
+        if (covenants.Count == 0) return;
+
+        UI_CovenantChoice popup;
+        try
+        {
+            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantChoice>();
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[StartRoomGate] 서약 선택 팝업 로드 실패: {e.Message}");
             return;
         }
 
-        var rp      = RunProgressManager.Instance;
-        var session = bootstrapper?.Run;
+        if (popup == null) return;
 
-        if (rp != null && session != null && session.IsRunning)
+        popup.Setup(covenants.ToArray());
+
+        // 선택 UI가 열린 동안 게임 시간 정지 (플레이어 낙하·몬스터 이동 차단)
+        TimeScaleArbiter.Acquire(_covenantPauseOwner, 0f, TimeScaleArbiter.Priority.Pause);
+        int chosen;
+        try { chosen = await popup.WaitForChoiceAsync(); }
+        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(_covenantPauseOwner); return; }
+        finally { TimeScaleArbiter.Release(_covenantPauseOwner); }
+
+        if (chosen >= 0 && chosen < covenants.Count)
         {
-            var spm = session.StagePointManager;
-            if (spm != null && spm.CurrentPointId >= 0)
-                spm.MarkCleared(spm.CurrentPointId);
-            await rp.SaveAsync(session, rp.ActiveSlotIndex, isInStartRoom: false);
+            string selectedId = covenants[chosen].CovenantId;
+            run.CovenantHandler.TryAdd(selectedId);
+            Debug.Log($"[StartRoomGate] 서약 획득: {selectedId}");
         }
+    }
 
-        AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
+    // ── Player freeze helpers ─────────────────────────────────────
+
+    private void FreezePlayer(PlayerController pc)
+    {
+        _frozenPlayer = pc;
+        pc.SetInputEnabled(false);
+        if (pc.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.linearVelocity  = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic     = true;
+        }
+    }
+
+    private void UnfreezePlayer()
+    {
+        if (_frozenPlayer == null) return;
+        if (_frozenPlayer.TryGetComponent<Rigidbody>(out var rb))
+            rb.isKinematic = false;
+        _frozenPlayer.SetInputEnabled(true);
+        _frozenPlayer = null;
     }
 
     private static bool IsLoadoutReady()
@@ -232,6 +422,28 @@ public class StartRoomGate : MonoBehaviour
         return loadout != null && loadout.IsReady && loadout.WeaponSlot0 != null;
     }
 
+    // ── Category helpers ──────────────────────────────────────────
+
+    private static Color CategoryColor(string cat) => cat?.ToLower() switch
+    {
+        "boss"     => ColorBoss,
+        "elite"    => ColorElite,
+        "battle"   => ColorBattle,
+        "corridor" => ColorCorridor,
+        "start"    => ColorCorridor,
+        _          => ColorDefault,
+    };
+
+    private static string CategoryKor(string cat) => cat?.ToLower() switch
+    {
+        "battle"   => "전투",
+        "elite"    => "정예",
+        "boss"     => "보스",
+        "corridor" => "통로",
+        "start"    => "시작",
+        _          => cat ?? "?",
+    };
+
     // ── World Indicator ───────────────────────────────────────────
 
     private void UpdateIndicator()
@@ -239,15 +451,12 @@ public class StartRoomGate : MonoBehaviour
         if (_worldIndicatorGO == null || _triggered) return;
         var cam = Camera.main;
         if (cam != null) _worldIndicatorGO.transform.rotation = cam.transform.rotation;
-        if (_distanceText == null) return;
-        var player = GameRunBootstrapper.Instance?.Run?.Player;
-        if (player == null) return;
-        _distanceText.text = $"{Mathf.RoundToInt(Vector3.Distance(transform.position, player.transform.position))}m";
+        UpdateIndicatorText();
     }
 
     private void CreateWorldIndicator()
     {
-        if (_fromZoneIndex == -1) return; // 스타트 방에는 인디케이터 없음
+        if (_fromZoneIndex == -1) return;
 
         _worldIndicatorGO = new GameObject("GateIndicator");
         _worldIndicatorGO.transform.SetParent(transform, false);
@@ -257,45 +466,74 @@ public class StartRoomGate : MonoBehaviour
         canvas.renderMode  = RenderMode.WorldSpace;
         canvas.worldCamera = Camera.main;
 
-        var rt        = _worldIndicatorGO.GetComponent<RectTransform>();
-        rt.sizeDelta  = new Vector2(200f, 70f);
+        var rt       = _worldIndicatorGO.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(280f, 100f);
         rt.localScale = Vector3.one * CanvasScale;
 
+        // 배경
         var bgGO  = new GameObject("BG");
         bgGO.transform.SetParent(_worldIndicatorGO.transform, false);
         var bgImg = bgGO.AddComponent<Image>();
-        bgImg.color = new Color(0.05f, 0.05f, 0.12f, 0.88f);
+        bgImg.color = new Color(0.04f, 0.04f, 0.10f, 0.95f);
         var bgRT  = bgGO.GetComponent<RectTransform>();
         bgRT.anchorMin = Vector2.zero;
         bgRT.anchorMax = Vector2.one;
         bgRT.offsetMin = Vector2.zero;
         bgRT.offsetMax = Vector2.zero;
 
+        // 카테고리 색 사이드바
+        var sideGO  = new GameObject("Side");
+        sideGO.transform.SetParent(_worldIndicatorGO.transform, false);
+        var sideImg = sideGO.AddComponent<Image>();
+        sideImg.color = CategoryColor(_category);
+        var sideRT  = sideGO.GetComponent<RectTransform>();
+        sideRT.anchorMin = new Vector2(0f, 0f);
+        sideRT.anchorMax = new Vector2(0f, 1f);
+        sideRT.pivot     = new Vector2(0f, 0.5f);
+        sideRT.offsetMin = new Vector2(0f,  0f);
+        sideRT.offsetMax = new Vector2(6f,  0f);
+
+        // 목적지 라벨
         var labelGO  = new GameObject("Label");
         labelGO.transform.SetParent(_worldIndicatorGO.transform, false);
         var labelTMP = labelGO.AddComponent<TextMeshProUGUI>();
-        labelTMP.text      = _targetLabel;
-        labelTMP.fontSize  = 24f;
-        labelTMP.fontStyle = FontStyles.Bold;
-        labelTMP.alignment = TextAlignmentOptions.Center;
-        labelTMP.color     = new Color(1f, 0.88f, 0.35f);
+        labelTMP.text      = $"<b>{_targetLabel}</b>";
+        labelTMP.fontSize  = 28f;
+        labelTMP.alignment = TextAlignmentOptions.Left;
+        labelTMP.color     = Color.white;
         var labelRT = labelGO.GetComponent<RectTransform>();
         labelRT.anchorMin = new Vector2(0f, 0.45f);
         labelRT.anchorMax = new Vector2(1f, 1f);
-        labelRT.offsetMin = new Vector2(6f, 0f);
-        labelRT.offsetMax = new Vector2(-6f, -2f);
+        labelRT.offsetMin = new Vector2(14f,  2f);
+        labelRT.offsetMax = new Vector2(-8f, -4f);
 
-        var distGO = new GameObject("Distance");
-        distGO.transform.SetParent(_worldIndicatorGO.transform, false);
-        _distanceText           = distGO.AddComponent<TextMeshProUGUI>();
-        _distanceText.fontSize  = 17f;
-        _distanceText.alignment = TextAlignmentOptions.Center;
-        _distanceText.color     = new Color(0.85f, 0.85f, 0.85f);
-        _distanceText.text      = "";
-        var distRT = distGO.GetComponent<RectTransform>();
-        distRT.anchorMin = new Vector2(0f, 0f);
-        distRT.anchorMax = new Vector2(1f, 0.45f);
-        distRT.offsetMin = new Vector2(6f, 2f);
-        distRT.offsetMax = new Vector2(-6f, 0f);
+        // 카테고리 + 거리 행
+        var subGO  = new GameObject("Sub");
+        subGO.transform.SetParent(_worldIndicatorGO.transform, false);
+        var subTMP = subGO.AddComponent<TextMeshProUGUI>();
+        subTMP.fontSize  = 19f;
+        subTMP.alignment = TextAlignmentOptions.Left;
+        subTMP.color     = new Color(0.75f, 0.75f, 0.75f);
+        var subRT = subGO.GetComponent<RectTransform>();
+        subRT.anchorMin = new Vector2(0f, 0f);
+        subRT.anchorMax = new Vector2(1f, 0.45f);
+        subRT.offsetMin = new Vector2(14f, 4f);
+        subRT.offsetMax = new Vector2(-8f, 0f);
+
+        string catKor = CategoryKor(_category);
+        subTMP.text = catKor;
+        _distanceText = subTMP; // 거리 업데이트용으로 재활용
+        // 매 프레임 UpdateIndicator에서 distance만 갱신
+        subTMP.text = $"{catKor}   <color=#aaaaaa>--m</color>";
+        _distanceText = subTMP;
+    }
+
+    private void UpdateIndicatorText()
+    {
+        if (_distanceText == null) return;
+        var player = GameRunBootstrapper.Instance?.Run?.Player;
+        if (player == null) return;
+        int dist = Mathf.RoundToInt(Vector3.Distance(transform.position, player.transform.position));
+        _distanceText.text = $"{CategoryKor(_category)}   <color=#aaaaaa>{dist}m</color>";
     }
 }

@@ -12,7 +12,7 @@ namespace RelicFairy.EditorTools
     /// </summary>
     internal static class NavMeshBakeTool
     {
-        [MenuItem("Abyss/Bake All NavMesh Surfaces In Scene")]
+        [MenuItem("RelicFairy/Map/Bake NavMesh")]
         public static void BakeAll()
         {
             var scene = SceneManager.GetActiveScene();

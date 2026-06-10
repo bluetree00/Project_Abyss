@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 312e38fbb8e2d8d4ebcc72e44be875ad
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/TheReaper/DawnHDRPDefaultResources/DawnDefaultSceneRoot.prefab
+  uploadId: 467556

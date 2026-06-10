@@ -84,7 +84,7 @@ public class DebugGridCheatPanel : MonoBehaviour
         var canvas = FindOverlayCanvas();
         if (canvas == null) return;
 
-        var blockData = Managers.BlockData;
+        var blockData = Managers.RuneData;
         if (blockData == null || !blockData.IsInitialized) return;
 
         var sortedIds = blockData.GetGridIdsSortedByOrder();
@@ -170,7 +170,7 @@ public class DebugGridCheatPanel : MonoBehaviour
 
     private void ReapplyAllSynergies()
     {
-        var bridge = BlockSynergyBridge.Instance;
+        var bridge = MerlinRuneBridge.Instance;
         if (bridge == null) return;
 
         var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;

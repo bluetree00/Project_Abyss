@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
@@ -103,6 +102,20 @@ public class WorldCovenantPickup : MonoBehaviour
         return pool.Take(count).ToArray();
     }
 
+    /// <summary>
+    /// 전체 서약 풀에서 exclude를 제외하고 랜덤 count개 ID를 반환한다.
+    /// 베이스캠프(CovenantPickup): 핸들러가 없으므로 PlayerLoadout 예약 목록을 exclude로 전달한다.
+    /// </summary>
+    public static string[] PickRandomOptionsExcluding(ICollection<string> exclude, int count = 3)
+    {
+        var pool = new List<string>(CovenantFactory.AllIds);
+        if (exclude != null)
+            pool.RemoveAll(exclude.Contains);
+
+        Shuffle(pool);
+        return pool.Take(count).ToArray();
+    }
+
     // ── Private Methods ──────────────────────────────────────
 
     private async UniTaskVoid OpenChoiceAsync(System.Threading.CancellationToken ct)
@@ -116,46 +129,16 @@ public class WorldCovenantPickup : MonoBehaviour
 
         var run = GameRunBootstrapper.Instance?.Run;
 
-        UI_CovenantChoice popup;
-        try
-        {
-            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantChoice>();
-        }
-        catch (OperationCanceledException) { return; }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[WorldCovenantPickup] 팝업 로드 실패: {e.Message}");
-            Destroy(gameObject);
-            return;
-        }
-
-        if (popup == null) { Destroy(gameObject); return; }
-
         string[] ids = _options != null && _options.Length > 0
             ? _options
             : PickRandomOptions(run?.CovenantHandler);
 
-        var covenants = ids
-            .Select(id => CovenantFactory.Create(id))
-            .Where(c => c != null)
-            .ToArray();
+        string selectedId = await CovenantChoiceUI.ChooseAsync(ids, ct);
 
-        if (covenants.Length == 0) { Destroy(gameObject); return; }
-
-        popup.Setup(covenants);
-
-        int chosen;
-        try { chosen = await popup.WaitForChoiceAsync(); }
-        catch (OperationCanceledException) { Destroy(gameObject); return; }
-
-        if (chosen >= 0 && chosen < covenants.Length && run != null)
+        if (selectedId != null && run != null && run.CovenantHandler.TryAdd(selectedId))
         {
-            string selectedId = covenants[chosen].CovenantId;
-            if (run.CovenantHandler.TryAdd(selectedId))
-            {
-                ShowAcquireNotice(selectedId, run);
-                Debug.Log($"[WorldCovenantPickup] 서약 획득: {selectedId}");
-            }
+            ShowAcquireNotice(selectedId, run);
+            Debug.Log($"[WorldCovenantPickup] 서약 획득: {selectedId}");
         }
 
         if (this != null && gameObject != null)

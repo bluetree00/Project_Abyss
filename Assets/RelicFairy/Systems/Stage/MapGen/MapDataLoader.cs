@@ -43,7 +43,8 @@ public static class MapDataLoader
     public static TileType[,] Parse(
         string gridCsv,
         Dictionary<Vector2Int, CellSpawnInfo> spawnInfos = null,
-        Dictionary<Vector2Int, string> decorationInfos = null)
+        Dictionary<Vector2Int, string> decorationInfos = null,
+        Dictionary<Vector2Int, DoorInfo> doorInfos = null)
     {
         if (string.IsNullOrWhiteSpace(gridCsv))
             return null;
@@ -71,6 +72,24 @@ public static class MapDataLoader
                     continue;
                 }
 
+                // 문 토큰 DR<width> — 벽 위 문 앵커. 기본 폐쇄(Wall) + doorInfos에 기록.
+                // 연결 파이프라인이 선택된 문만 Floor로 개방한다.
+                if (doorInfos != null && raw.Length >= 2 && raw[0] == 'D' && raw[1] == 'R')
+                {
+                    int doorWidth = 3;
+                    if (raw.Length > 2) int.TryParse(raw.Substring(2), out doorWidth);
+                    if (doorWidth <= 0) doorWidth = 3;
+
+                    var edge = InferDoorEdge(x, rowZ, w, h);
+                    if (edge.HasValue)
+                    {
+                        doorInfos[new Vector2Int(x, rowZ)] = new DoorInfo { edge = edge.Value, width = doorWidth };
+                        grid[x, rowZ] = TileType.Wall; // 기본 폐쇄 — 연결 시에만 개방
+                        continue;
+                    }
+                    // 내부 셀(엣지 아님)은 무효 → 일반 처리로 폴백
+                }
+
                 var tile = SymbolToTile(raw, out var info);
                 grid[x, rowZ] = tile;
 
@@ -85,6 +104,16 @@ public static class MapDataLoader
 
     /// <summary>단독 "d" 같이 base 기호와 충돌하는 케이스를 걸러냄. 현재 base 기호에 소문자 d는 없어 항상 false.</summary>
     private static bool IsBaseDecorationSymbol(string s) => false;
+
+    /// <summary>문 앵커 셀의 위치로 엣지(방향)를 추론. 벽 링(외곽) 위가 아니면 null.</summary>
+    private static DoorEdge? InferDoorEdge(int x, int rowZ, int w, int h)
+    {
+        if (rowZ == h - 1) return DoorEdge.North;
+        if (rowZ == 0)     return DoorEdge.South;
+        if (x == 0)        return DoorEdge.West;
+        if (x == w - 1)    return DoorEdge.East;
+        return null; // 내부 셀: 무효
+    }
 
     /// <summary>TileType 2D 배열 → grid_csv 문자열.</summary>
     public static string Serialize(TileType[,] grid)
@@ -197,13 +226,32 @@ public static class MapDataLoader
             "T" => TileType.Trap,
             "C" => TileType.Chest,
             "." => TileType.Empty,
+            "Pt" => TileType.Empty,   // PitTrigger — 바닥 없음 + PostBuild 트리거 배치
             "R"  => TileType.BuffBox,
             "D"  => TileType.BuffPedestal,
             "CP" => TileType.CharacterPickup,
             "WP" => TileType.WeaponPickup,
+            "CV" => TileType.Floor,   // 서약 제단 — 바닥 위에 CovenantAltarHandler가 PostBuild 스폰
             "SG" => TileType.StartGate,
-            _    => TileType.Floor,
+            _    => UnknownToFloor(s),
         };
+    }
+
+    // 미등록 토큰이 default로 떨어질 때 1회 경고하는 dedup 집합 (도메인 리로드마다 초기화).
+    private static readonly HashSet<string> _warnedUnknownTokens = new HashSet<string>();
+
+    /// <summary>등록되지 않은 토큰을 Floor로 폴백하되, 무음 소실을 막기 위해 토큰별 1회 경고한다.
+    /// 반환값(Floor)·렌더 동작은 기존과 동일 — 진단 가시화만 추가.
+    /// 장식 d&lt;code&gt;·문 DR&lt;w&gt;는 상위 레이어(TokenParser/doorInfos)가 처리하는 정상 토큰이며,
+    /// 호출부가 해당 dictionary를 넘기지 않으면 합법적으로 이 분기에 도달하므로 경고에서 제외한다.</summary>
+    private static TileType UnknownToFloor(string s)
+    {
+        bool handledElsewhere =
+            (s.Length >= 2 && s[0] == 'd') ||                 // 장식 d<code>
+            (s.Length >= 2 && s[0] == 'D' && s[1] == 'R');    // 문 DR<width>
+        if (!handledElsewhere && _warnedUnknownTokens.Add(s))
+            Debug.LogWarning($"[MapDataLoader] 미등록 토큰 '{s}' → Floor 폴백(무음 소실 방지 경고). grid_csv 오타 가능성 — Tools/RelicFairy/Validate Room CSVs 확인 권장.");
+        return TileType.Floor;
     }
 
     /// <summary>[Mm]([cre]\d*)+ 토큰 파싱. 실패 시 false.

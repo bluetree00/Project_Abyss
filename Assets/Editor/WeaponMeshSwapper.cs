@@ -81,7 +81,7 @@ public static class WeaponMeshSwapper
             true),
     };
 
-    [MenuItem("Tools/Weapon/Swap Visual Meshes (All 24 Prefabs)")]
+    [MenuItem("RelicFairy/Rendering/Weapon Mesh Swapper")]
     public static void SwapAllWeapons()
     {
         StringBuilder log = new StringBuilder();
@@ -89,8 +89,8 @@ public static class WeaponMeshSwapper
 
         foreach (var spec in specs)
         {
-            string weaponPrefab = string.Format("Assets/Abyss/Weapon/{0}/Prefabs/T{1}_{0}_Weapon.prefab", spec.weaponType, spec.tier);
-            string displayPrefab = string.Format("Assets/Abyss/Weapon/{0}/Prefabs/T{1}_{0}_Display.prefab", spec.weaponType, spec.tier);
+            string weaponPrefab = string.Format("Assets/RelicFairy/Weapon/{0}/Prefabs/T{1}_{0}_Weapon.prefab", spec.weaponType, spec.tier);
+            string displayPrefab = string.Format("Assets/RelicFairy/Weapon/{0}/Prefabs/T{1}_{0}_Display.prefab", spec.weaponType, spec.tier);
 
             log.AppendLine(string.Format("=== T{0}_{1} ({2}) ===", spec.tier, spec.weaponType, spec.isSkinned ? "skinned" : "static"));
 

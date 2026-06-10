@@ -179,6 +179,7 @@ public class UIManager
                 existing.SetActive(true);
                 var cached = existing.GetComponent<T>();
                 _popupStack.Push(cached);
+                cached.PlayOpenAnimation();
                 return cached;
             }
             _uiObjects.Remove(name);
@@ -197,8 +198,9 @@ public class UIManager
             T popup = Util.GetOrAddComponent<T>(go);
             popup.Init();
             _popupStack.Push(popup);
-
             _uiObjects[name] = go;
+
+            popup.PlayOpenAnimation();
             return popup;
         }
         catch
@@ -231,24 +233,33 @@ public class UIManager
             Debug.Log("Close Popup Failed!");
             return;
         }
-
-        ClosePopupUI();
+        CloseTopPopup(immediate: false);
     }
 
     public void ClosePopupUI()
     {
-        if (_popupStack.Count == 0)
-            return;
+        CloseTopPopup(immediate: false);
+    }
+
+    /// <param name="immediate">true면 애니메이션 없이 즉시 파괴 (씬 전환, 일괄 닫기용).</param>
+    private void CloseTopPopup(bool immediate)
+    {
+        if (_popupStack.Count == 0) return;
 
         UI_Popup popup = _popupStack.Pop();
-        Object.Destroy(popup.gameObject);
+        _uiObjects.Remove(popup.gameObject.name);
         _order--;
+
+        if (immediate)
+            Object.Destroy(popup.gameObject);
+        else
+            popup.StartCloseAndDestroy();
     }
 
     public void CloseAllPopupUI()
     {
         while (_popupStack.Count > 0)
-            ClosePopupUI();
+            CloseTopPopup(immediate: true);
     }
 
     public void Clear()

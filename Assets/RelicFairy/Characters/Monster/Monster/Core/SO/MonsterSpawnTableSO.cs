@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>스폰 필터 — 허용할 원소 집합. 비어있으면 모든 원소 허용.</summary>
 public delegate bool SpawnEntryFilter(SpawnEntry entry);
 
 /// <summary>
@@ -21,7 +20,7 @@ public delegate bool SpawnEntryFilter(SpawnEntry entry);
 /// </summary>
 [CreateAssetMenu(
     fileName = "MonsterSpawnTable",
-    menuName  = "Abyss/Monster/Spawn Table")]
+    menuName  = "RelicFairy/Monster/Spawn Table")]
 public class MonsterSpawnTableSO : ScriptableObject
 {
     [Tooltip("소환 가능한 몬스터 목록. 가중치가 높을수록 더 자주 선택됩니다.")]
@@ -79,9 +78,6 @@ public class SpawnEntry
     [Tooltip("몬스터의 등급. 티어 스포너가 이 값으로 필터링. (Auto-Populate가 MonsterConfigSO.grade에서 자동 채움)\n" +
              "Boss 등급은 일반 스포너에서 자동 제외됨 — 보스는 전용 소환 연출 사용.")]
     public MonsterGrade grade = MonsterGrade.Common;
-
-    [Tooltip("몬스터의 네이티브 원소. 스포너 원소 필터와 매칭됨. (Auto-Populate로 자동 채워짐)")]
-    public ElementType nativeElement = ElementType.None;
 
     [Tooltip("몬스터가 속한 풀 그룹 번호 목록. 스포너의 Allowed Pool Groups와 교집합이 있으면 스폰. " +
              "(Auto-Populate가 MONSTER_ELEMENT_STAT_DATA의 monster_pool_tag에서 자동 채움)")]

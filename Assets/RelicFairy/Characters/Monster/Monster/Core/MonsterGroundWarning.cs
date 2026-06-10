@@ -7,7 +7,9 @@ public class MonsterGroundWarning : MonoBehaviour
     private const int SegmentCount = 48;
     private static Material s_material;
     private const float CellSize = 1f;
-    private const float CellHalfSize = 0.45f;
+    // 히트 판정(PatternAttackOverrideSO.IsInsideGrid)의 cellHalf=0.5와 일치시켜
+    // 표시된 경고 = 실제 판정 범위가 되도록 한다.
+    private const float CellHalfSize = 0.5f;
 
     private float _remaining;
 

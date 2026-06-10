@@ -37,6 +37,10 @@ public class LichMagicBoltPatternSO : BossPatternSO
     [Tooltip("패턴 완료 후 재사용 대기 시간 (초)")]
     public float patternCooldown = 4f;
 
+    [Header("Magic Bolt — Telegraph")]
+    [Tooltip("캐스트 중 표시할 발사 경로 빔 너비 (m)")]
+    public float trajectoryBeamWidth = 0.12f;
+
     // ── 런타임 ───────────────────────────────────────────
     private LichMagicBoltState _state;
 
@@ -58,13 +62,16 @@ public class LichMagicBoltPatternSO : BossPatternSO
 // LichMagicBoltState — MovementLocked (보스 고정, 중단 가능)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
+public class LichMagicBoltState : UnInterruptibleState<LichMagicBoltPatternSO>
 {
     private enum Phase { Cast, Recovery }
 
-    private Phase _phase;
-    private float _timer;
-    private bool  _fired;
+    private Phase      _phase;
+    private float      _timer;
+    private bool       _fired;
+    private Vector3    _lockedTargetPos;  // Enter 시점 조준 위치 — 가이드·발사 모두 이 위치 사용
+    private GameObject _castGuide;
+    private GameObject _beamGuide;
 
     public LichMagicBoltState(LichMagicBoltPatternSO data) : base(data) { }
 
@@ -74,13 +81,31 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
         _timer = 0f;
         _fired = false;
 
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped = true;
-            ctx.Agent.ResetPath();
-        }
+        ctx.Animator?.CrossFade("MagicBolt", 0.1f);
+
+        var mc = (ctx.Monster as LichMonster)?.MovementController;
+        mc?.RequestMovementState(LichMovementState.IdleHover);
+        mc?.SetLocked(true);
 
         FacePlayer(ctx);
+
+        // 조준 위치를 Enter 시점에 고정 — 이후 플레이어가 이동해도 발사 방향 불변
+        _lockedTargetPos = ctx.Runtime.PlayerTarget != null
+            ? ctx.Runtime.PlayerTarget.position
+            : ctx.Transform.position + ctx.Transform.forward * 10f;
+
+        // 착탄 예고 disc (노란색)
+        _castGuide = PatternGuideHelper.Disc(_lockedTargetPos, 1.0f, PatternGuideHelper.Telegraph);
+
+        // 발사 경로 빔 (보스 → 착탄 지점)
+        Vector3 origin   = ctx.Transform.position + Vector3.up * 1.5f;
+        Vector3 aimPoint = _lockedTargetPos + Vector3.up * 1f;
+        Vector3 toTarget = aimPoint - origin;
+        float   aimDist  = toTarget.magnitude;
+        if (aimDist > 0.1f)
+            _beamGuide = PatternGuideHelper.Beam(
+                origin, toTarget.normalized, aimDist * 0.92f,
+                Data.trajectoryBeamWidth, PatternGuideHelper.Telegraph);
     }
 
     public override void Update(MonsterContext ctx)
@@ -93,6 +118,8 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 
             if (_timer >= Data.castDuration)
             {
+                PatternGuideHelper.SafeDestroy(ref _castGuide);
+                PatternGuideHelper.SafeDestroy(ref _beamGuide);
                 FireProjectile(ctx);
                 _phase = Phase.Recovery;
                 _timer = 0f;
@@ -107,8 +134,9 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
+        PatternGuideHelper.SafeDestroy(ref _castGuide);
+        PatternGuideHelper.SafeDestroy(ref _beamGuide);
+        (ctx.Monster as LichMonster)?.MovementController?.SetLocked(false);
 
         var lich = ctx.Monster as LichMonster;
         if (lich?.LichBB != null)
@@ -117,11 +145,18 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
 
     private void FireProjectile(MonsterContext ctx)
     {
-        if (_fired || ctx.Runtime.PlayerTarget == null) return;
+        if (_fired) return;
         _fired = true;
 
+        // 착탄 지점 Active 가이드 (빨간색, 0.4s) — 고정 위치
+        PatternGuideHelper.Sphere(
+            _lockedTargetPos + Vector3.up * 1f,
+            0.5f,
+            PatternGuideHelper.Active,
+            lifetime: 0.4f);
+
         Vector3 origin    = ctx.Transform.position + Vector3.up * 1.5f;
-        Vector3 targetPos = ctx.Runtime.PlayerTarget.position + Vector3.up * 1f;
+        Vector3 targetPos = _lockedTargetPos + Vector3.up * 1f;
         Vector3 dir       = (targetPos - origin).normalized;
 
         if (Data.projectilePrefab != null)
@@ -135,9 +170,10 @@ public class LichMagicBoltState : MovementLockedState<LichMagicBoltPatternSO>
         }
         else
         {
-            // 즉발 폴백: 사정거리 내에 있으면 바로 데미지
-            float dist = Vector3.Distance(ctx.Transform.position, ctx.Runtime.PlayerTarget.position);
+            // 즉발 폴백: Enter 시점 사정거리 내에 있었으면 데미지
+            float dist = Vector3.Distance(ctx.Transform.position, _lockedTargetPos);
             if (dist > Data.maxRange) return;
+            if (ctx.Runtime.PlayerTarget == null) return;
 
             var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
             if (player == null) return;

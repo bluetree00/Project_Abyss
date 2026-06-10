@@ -5,7 +5,7 @@ using UnityEditor.AddressableAssets.Build;
 
 public static class AddressablesBuildRunner
 {
-    [MenuItem("Tools/Build Addressables Now")]
+    [MenuItem("RelicFairy/Addressables/Build Now")]
     public static void BuildAddressables()
     {
         AddressableAssetSettings.CleanPlayerContent(

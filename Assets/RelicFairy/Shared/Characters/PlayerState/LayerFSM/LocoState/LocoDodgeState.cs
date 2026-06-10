@@ -14,7 +14,11 @@ public class LocoDodgeState : ILayerState<LocoState>
     public void Enter()
     {
         _controller.RotateTowardsInput();
-        _dodgeDir = _controller.transform.forward;
+        // RequestFacing은 FixedUpdate에서 적용되어 transform.forward가 아직 갱신 전이므로,
+        // 회피 방향은 입력 방향(없으면 현재 정면)에서 직접 계산한다.
+        _dodgeDir = _controller.MoveDirection.sqrMagnitude > 0.0001f
+            ? _controller.MoveDirection.normalized
+            : _controller.transform.forward;
 
         // 기본 거리 = dashSpeed × dashDuration, 보너스 거리만큼 duration 연장
         float baseSpeed = _controller.CharacterData.dashSpeed;
@@ -63,6 +67,10 @@ public class LocoDodgeState : ILayerState<LocoState>
         _controller.DodgeCooldownEnd = Time.time + baseCooldown * (1f + bonus);
 
         _controller.SetMoveScale(1f);
+
+        // 우클릭 대시 후 — 유물 보유 시 다음 이동을 달리기로 시작(정지 전까지 유지)
+        if (_controller.HasRelic && _controller.IsGrounded())
+            _controller.RequestRunAfterDash();
 
         // 아이템 효과: 구르기 종료 hook
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;

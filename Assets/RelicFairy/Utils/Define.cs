@@ -114,19 +114,6 @@ public class Define
         
     }
 
-    // 무기 타입 — 실제 사용하는 enum은 WeaponType.cs (전역 네임스페이스).
-    // 이 enum은 레거시이며 참조 코드가 없으므로 제거 예정.
-    [System.Obsolete("Use global WeaponType enum instead")]
-    public enum WeaponType
-    {
-        Sword,
-        Bow,
-        Staff,
-        Dagger,
-        Axe,
-        BaseTest,
-    }
-
     public enum PlayerAbilityType
     {
         Dodge,

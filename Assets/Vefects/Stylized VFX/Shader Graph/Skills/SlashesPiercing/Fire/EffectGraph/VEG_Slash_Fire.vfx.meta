@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b29c47a8ffba8564e922022d1f844a3a
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 225078
+  packageName: Stylized VFX URP
+  packageVersion: 1.0.2023
+  assetPath: Assets/Vefects/Stylized VFX URP/Skills/SlashesPiercing/Fire/EffectGraph/VEG_Slash_Fire.vfx
+  uploadId: 714344

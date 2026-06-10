@@ -3,10 +3,10 @@ using UnityEngine;
 
 public static class Temp_FGBoneListEditor
 {
-    [MenuItem("Tools/Temp/List FG Bone Names")]
+    [MenuItem("RelicFairy/Dev/List FG Bone Names")]
     public static void ListBones()
     {
-        string prefabPath = "Assets/Abyss/Characters/Monster/Monster/ForestGuardian/Art/Treant_Body.fbx";
+        string prefabPath = "Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Art/Treant_Body.fbx";
         var go = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (go == null)
         {

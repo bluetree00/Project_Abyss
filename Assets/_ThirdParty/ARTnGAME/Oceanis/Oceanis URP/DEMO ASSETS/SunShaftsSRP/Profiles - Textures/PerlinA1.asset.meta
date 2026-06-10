@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b6d6f79c2d3ef3241a9948dd089967d1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/SunShaftsSRP/Profiles
+    - Textures/PerlinA1.asset
+  uploadId: 902342

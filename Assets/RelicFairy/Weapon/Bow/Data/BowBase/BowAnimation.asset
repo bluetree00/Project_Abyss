@@ -28,6 +28,9 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      attackStepDistance: 0
+      moveInputScale: 0
+      aimAssistRadius: 10
     - baseClipName: GroundLightAttack_02
       addressableKey: GroundLightBowAttack_02
       actionType: 1
@@ -38,6 +41,9 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      attackStepDistance: 0
+      moveInputScale: 0
+      aimAssistRadius: 10
     - baseClipName: GroundLightAttack_03
       addressableKey: GroundLightBowAttack_03
       actionType: 1
@@ -48,6 +54,9 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
+      attackStepDistance: 0
+      moveInputScale: 0
+      aimAssistRadius: 10
     - baseClipName: QSkill_01
       addressableKey: BowQSkill_01
       actionType: 3

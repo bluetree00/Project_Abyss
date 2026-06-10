@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: MageData
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   characterName: "\uB9C8\uBC95\uC0AC"
-  baseMoveSpeed: 4
-  baseRunSpeed: 7
+  baseMoveSpeed: 8
+  baseRunSpeed: 8
   maxHealth: 200
   baseMeleeAttack: 20
   baseRangedAttack: 40
@@ -23,7 +23,7 @@ MonoBehaviour:
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
-  dashSpeed: 10
+  dashSpeed: 15
   dashDuration: 0.2
   dodgeCooldown: 2
   jumpForce: 10

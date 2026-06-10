@@ -20,7 +20,7 @@ public static class AwakeningPopupCreator
 
     private static readonly string[] CatIds = { "sword", "shield", "heart", "step", "mana", "luck" };
 
-    [MenuItem("RelicFairy/Create Awakening Popup Prefab")]
+    [MenuItem("RelicFairy/UI/Create Awakening Popup Prefab")]
     public static void Run()
     {
         CreatePrefab();

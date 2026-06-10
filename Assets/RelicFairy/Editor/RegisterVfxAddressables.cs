@@ -6,7 +6,7 @@ using UnityEditor.AddressableAssets.Settings;
 /// <summary>
 /// 게임플레이 VFX 프리팹을 Addressable에 일괄 등록하는 에디터 유틸.
 /// 새 VFX 추가 시 Vfx 배열에 경로/주소 한 줄만 추가.
-/// 메뉴: Abyss/VFX/Register VFX Addressables
+/// 메뉴: RelicFairy/VFX/Register VFX Addressables
 /// </summary>
 public static class RegisterVfxAddressables
 {
@@ -18,7 +18,7 @@ public static class RegisterVfxAddressables
         ),
     };
 
-    [MenuItem("Abyss/VFX/Register VFX Addressables")]
+    [MenuItem("RelicFairy/Addressables/Register VFX")]
     public static void Execute()
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;

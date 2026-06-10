@@ -1,0 +1,4 @@
+﻿char_id,char_name,class,max_health,base_melee_attack,base_ranged_attack,base_defense,base_luck,base_move_speed,base_run_speed,combo_duration,heavy_charge_threshold,heavy_release_time,dash_speed,dash_duration,dodge_cooldown,jump_force,gravity,fall_multiplier,ground_check_distance,air_control_multiplier,ground_drag,air_drag,passive_id,stat_version
+knight,기사,Knight,100,0,0,0,0,8,8,3,1.5,0.4,15,0.2,0.5,5,-5,2,0.2,0.5,4,0.5,knight_passive,1
+galahad,갈라하드,Galahad,350,20,0,40,5,8,8,3,1.5,0.4,15,0.2,1.5,8,-25,2,0.3,0.4,4,0.5,galahad_passive,1
+gawain,가웨인,Gawain,250,45,0,20,10,8,8,3,1.5,0.4,15,0.2,1.5,9,-28,2,0.3,0.5,4,0.5,gawain_passive,1

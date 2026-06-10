@@ -1,21 +1,3 @@
-public class UI_StageMap : UI_Scene
-{
-    public override void Init()
-    {
-        base.Init();
-        RefreshStageMap();
-    }
-
-    public void RefreshStageMap()
-    {
-        var app = AppBootstrapper.Instance;
-        if (app == null) return;
-
-        var session = app.CurrentRun;
-        if (session == null) return;
-
-        var stageMgr = session.StagePointManager;
-
-        // 이미 Resolve된 Context 기반으로 UI 구성
-    }
-}
+// StageMap UI — 존 레이아웃 시스템 전환 후 레거시 참조 유지용 스텁.
+// StageMapBootstrapper가 실질적 초기화를 담당하므로 이 클래스는 비어 있습니다.
+public class UI_StageMap : UI_Scene { }

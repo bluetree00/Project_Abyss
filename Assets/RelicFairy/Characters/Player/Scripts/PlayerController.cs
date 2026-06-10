@@ -62,44 +62,66 @@ public class PlayerController : CharacterBase
     [Header("Combat Tuning")]
     [Tooltip("모든 공격 애니메이션 속도에 곱해지는 전역 배율. 레벨 디자인용 (기본값 1.0).")]
     [Range(0.1f, 3f)]
-    [SerializeField] private float _globalAttackAnimSpeedScale = 1f;
+    [SerializeField] private float _globalAttackAnimSpeedScale = 1.25f;
     public float GlobalAttackAnimSpeedScale => _globalAttackAnimSpeedScale;
 
     [Header("Character & Weapon")]
     [SerializeField] protected CharacterData characterData;
+    [Tooltip("선택된 유물 클래스 (패시브+고유스킬+외형). 비우면 유물 없음.")]
+    [SerializeField] protected RelicClassSO relicClass;
     [SerializeField] private bool debugInvincible = false;
     public CharacterData CharacterData => characterData;
+    public RelicClassSO RelicClass => relicClass;
+
+    /// <summary>현재 적용된 유물 행동 객체 (없으면 null). HolyShield 등 스킬/외부가 참조.</summary>
+    public IRelicBehavior RelicBehavior { get; private set; }
 
     // 아이템 효과: 시간 제한 무적 (DeathNegate 등)
     private float _invincibleEnd;
 
-    // 아이템 효과: 다음 1회 공격에 원소 부여 (RecipeSynergyNextAttack)
-    public WeaponElement NextAttackElement { get; set; } = WeaponElement.None;
-
     // 런타임 실시간 스탯 (HUD는 이걸 구독)
     public PlayerRuntimeStats RuntimeStats { get; private set; } = new PlayerRuntimeStats();
+
+    // 멀린 룬 속성 단계 효과 디스패처 (단계 도달 시 MerlinRuneBridge가 Activate)
+    private RuneEffectDispatcher _runeEffects;
+    public RuneEffectDispatcher RuneEffects => _runeEffects ??= new RuneEffectDispatcher(this);
 
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }
 
-    public void TakeDamage(int dmg)
+    // 사망 처리 1회 가드 (씬 전환 시 새 인스턴스라 리셋 불필요)
+    private bool _dead;
+
+    public virtual void TakeDamage(int dmg, GameObject attacker = null)
     {
         if (debugInvincible || Time.time < _invincibleEnd)
             return;
 
+        // 유물 피해 보정 (갈라하드 방패 전방 감소 등)
+        if (RelicBehavior != null)
+            dmg = RelicBehavior.ModifyIncomingDamage(this, dmg, attacker);
+
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
 
         // 피격 전 — 무효화/감소 처리
-        var pkt = new DamagePacket(dmg, attacker: null, target: gameObject);
+        var pkt = new DamagePacket(dmg, attacker: attacker, target: gameObject);
         mgr?.OnPreTakeDamage(ref pkt);
 
         if (pkt.Negated)
         {
-            FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = 0 });
+            FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = 0, attacker = attacker });
             return;
         }
 
         int finalDmg = Mathf.Max(0, (int)pkt.FinalDamage);
+
+        // [서약] 들어오는 피해 변조 — 사망 체크 전(Galahad 무효 등이 치명타를 취소할 수 있도록)
+        var covHandler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+        if (covHandler != null)
+        {
+            float fd = covHandler.ModifyIncoming(finalDmg, new CombatContext { Target = gameObject, Damage = finalDmg });
+            finalDmg = Mathf.Max(0, (int)fd);
+        }
 
         // 사망 직전 체크
         if (RuntimeStats.Hp - finalDmg <= 0 && mgr != null)
@@ -126,6 +148,26 @@ public class PlayerController : CharacterBase
             OnDamageTaken?.Invoke();
         }
 
+        // [서약] 피격 통보 (실제 적용 피해량)
+        covHandler?.OnTakeDamage(finalDmg);
+
+        // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
+        if (RuntimeStats.Hp <= 0 && !_dead)
+        {
+            var run = GameRunBootstrapper.Instance?.Run;
+            if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
+            {
+                RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
+                _invincibleEnd = Time.time + 1f;
+            }
+            else
+            {
+                _dead = true;
+                SetInputEnabled(false);
+                GameRunBootstrapper.Instance?.HandlePlayerDeath();
+            }
+        }
+
         // 피격 후 — 반사/방버프 등
         var report = new DamageReport
         {
@@ -134,7 +176,7 @@ public class PlayerController : CharacterBase
         };
         mgr?.OnPostTakeDamage(report);
 
-        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = finalDmg });
+        FirePassive(PassiveTrigger.OnTakeDamage, new PassiveContext { damage = finalDmg, attacker = attacker });
     }
 
     public void Heal(int amount)
@@ -154,6 +196,17 @@ public class PlayerController : CharacterBase
 
     /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
     public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
+
+    /// <summary>
+    /// 플레이어 입력 전체를 활성/비활성화한다.
+    /// 보스 등장 연출 등 컷씬 구간에서 false로 호출해 행동을 막는다.
+    /// </summary>
+    public void SetInputEnabled(bool enabled)
+    {
+        if (inputActions == null) return;
+        if (enabled) inputActions.Player.Enable();
+        else         inputActions.Player.Disable();
+    }
 
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
@@ -214,6 +267,39 @@ public class PlayerController : CharacterBase
 
     private bool isRunChecked = false;
     public bool IsRunChecked => isRunChecked;
+
+    //============================================================
+    // 로코모션 모드 — 유물 보유 시 자동 걷기→달리기, 우클릭 대시 후 달리기 유지
+    //============================================================
+    /// <summary>유물 보유 여부.</summary>
+    public bool HasRelic => RelicBehavior != null;
+    /// <summary>장비(무기) 보유 여부. 달리기 기능은 장비 획득 시 활성화된다.</summary>
+    public bool HasWeapon => WeaponManager != null && WeaponManager.HasWeapon;
+    /// <summary>현재 달리기 중인지(LocoMoveState가 결정·설정, DefaultMoveAbility가 속도에 사용).</summary>
+    public bool IsRunning { get; set; }
+    /// <summary>걷기→달리기 속도 램프 진행도(0=걷기, 1=달리기). LocoMoveState가 설정, DefaultMoveAbility가 속도 보간에 사용.</summary>
+    public float RunBlend01 { get; set; }
+    /// <summary>현재 수평 실속도를 runMax 기준 0~1로 정규화. 애니 MoveSpeed 구동용(실속도라 가속·감속 반영 + 발미끄러짐 방지).</summary>
+    public float HorizontalSpeed01
+    {
+        get
+        {
+            var cd = CharacterData;
+            if (cd == null) return 0f;
+            float runMax = cd.baseRunSpeed > 0.01f ? cd.baseRunSpeed : cd.baseMoveSpeed;
+            if (runMax < 0.01f) return 0f;
+            Vector3 v = Rigid.linearVelocity;
+            float mag = Mathf.Sqrt(v.x * v.x + v.z * v.z);
+            return Mathf.Clamp01(mag / runMax);
+        }
+    }
+    private bool _runAfterDash;
+    /// <summary>대시(우클릭) 종료 시 다음 이동을 달리기로 시작하도록 요청.</summary>
+    public void RequestRunAfterDash() => _runAfterDash = true;
+    /// <summary>대시 후 달리기 요청을 소비(읽고 클리어).</summary>
+    public bool ConsumeRunAfterDash() { bool v = _runAfterDash; _runAfterDash = false; return v; }
+    /// <summary>대시 후 달리기 요청 클리어(정지/Idle 시).</summary>
+    public void ClearRunAfterDash() => _runAfterDash = false;
 
     // 입력 정책(무기 타입별: 소드/활 등)
     private IAttackInputPolicy _attackPolicy;
@@ -298,6 +384,9 @@ public class PlayerController : CharacterBase
 
     protected void RegisterPassive(ICharacterPassive passive) => _passives.Add(passive);
 
+    /// <summary>유물 행동 객체가 패시브를 등록할 때 쓰는 public 래퍼.</summary>
+    public void RegisterRelicPassive(ICharacterPassive passive) => RegisterPassive(passive);
+
     /// <summary>
     /// 트리거 조건이 맞는 패시브를 모두 실행한다.
     /// 상태 클래스 및 외부에서 호출 가능.
@@ -312,14 +401,122 @@ public class PlayerController : CharacterBase
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>
     protected virtual void InitPassives() { }
 
+    private bool _relicApplied;
+    private GameObject _relicAuraInstance;
+
+    /// <summary>
+    /// 런타임에 선택된 유물을 주입·적용한다. 스폰(InitAsync) 이후 호출.
+    /// relicClass가 SerializeField라 Instantiate 후엔 Awake가 이미 지나므로, 이 주입점으로 적용한다.
+    /// null이면 무동작(CombatGirl 기본 몸 유지).
+    /// </summary>
+    public void SetRelicAndApply(RelicClassSO relic)
+    {
+        if (relic == null) return;
+        relicClass = relic;
+        ApplyRelic();
+    }
+
+    /// <summary>
+    /// 선택된 유물(relicClass)을 적용 — 행동 OnAttach(코드 패시브/메커닉)
+    /// + 유물 스탯(유물 스탯 필드 + 데이터 패시브 PassiveSO의 스탯 보정을 공통 베이스 위 가산)
+    /// + 고유스킬 클립 오버라이드 + 외형(오라). relicClass 없으면 무동작.
+    /// _relicApplied 가드로 중복 적용을 방지한다(패시브/스탯 이중 적용 차단).
+    /// </summary>
+    private void ApplyRelic()
+    {
+        if (relicClass == null || _relicApplied) return;
+        _relicApplied = true;
+
+        RelicBehavior = RelicRegistry.Create(relicClass.Id);
+        RelicBehavior?.OnAttach(this);
+
+        // 유물 스탯 — 유물 char_id 행(서버)으로 전체 교체(유물이 곧 캐릭터).
+        // 서버 데이터/행 없으면 유물 StatModifier 가산으로 폴백.
+        string relicCharId = relicClass.Id.ToString().ToLower(); // Gawain → "gawain"
+        if (!TryApplyServerStats(relicCharId))
+        {
+            var relicMods = new System.Collections.Generic.List<StatModifier>();
+            if (relicClass.Stats != null) relicMods.AddRange(relicClass.Stats);
+            if (relicClass.Passives != null)
+                foreach (var p in relicClass.Passives)
+                    if (p != null && p.baseModifiers != null) relicMods.AddRange(p.baseModifiers);
+            RuntimeStats?.ApplyRelicStats(relicMods);
+        }
+
+        if (!string.IsNullOrEmpty(relicClass.QSkillClipKey))
+            TryOverrideClip("QSkill_01", relicClass.QSkillClipKey);
+
+        // 외형 — 현재는 오라 VFX만(키 있을 때). 추후 모델/애니메이터 변형은 이 지점에서 확장.
+        if (!string.IsNullOrEmpty(relicClass.AuraVfxKey))
+            SpawnRelicAuraAsync(relicClass.AuraVfxKey, relicClass.AuraSocket).Forget();
+
+        Debug.Log($"[PlayerController] 유물 적용: {relicClass.Id} (char_id={relicCharId}, passives={relicClass.Passives?.Length ?? 0})");
+    }
+
+    /// <summary>유물 오라 VFX를 소켓(없으면 루트)에 부착. 재적용 시 기존 인스턴스를 먼저 정리(멱등).</summary>
+    private async UniTaskVoid SpawnRelicAuraAsync(string key, string socket)
+    {
+        ReleaseRelicAura();
+
+        Transform parent = string.IsNullOrEmpty(socket)
+            ? transform
+            : (Util.FindDeepChild(transform, socket) ?? transform);
+
+        try
+        {
+            _relicAuraInstance = await Managers.AddressableManager.InstantiateAsync(key, parent);
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[PlayerController] 유물 오라 VFX 로드 실패: {key}\n{e.Message}");
+        }
+    }
+
+    private void ReleaseRelicAura()
+    {
+        if (_relicAuraInstance != null)
+        {
+            Managers.AddressableManager?.ReleaseInstance(_relicAuraInstance);
+            _relicAuraInstance = null;
+        }
+    }
+
+    // ── 캐릭터 고유 스킬 ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 캐릭터 고유 스킬 런타임을 반환한다.
+    /// 무기 스킬보다 우선 적용. null이면 무기 스킬 또는 레거시 폴백 사용.
+    /// </summary>
+    public virtual ISkillRuntime CreateCharacterSkillRuntime(SkillType slot) => RelicBehavior?.CreateSkillRuntime(this, slot);
+
+    /// <summary>캐릭터 고유 스킬의 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
+    public virtual float GetCharacterSkillCooldown(SkillType slot) => RelicBehavior?.GetSkillCooldown(slot) ?? 0f;
+
     //============================================================
     // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
     //============================================================
     public bool IsGrounded() => JumpAbility?.IsGrounded ?? true;
     public bool IsJumping => JumpAbility?.IsJumping ?? false;
 
+    /// <summary>
+    /// 공격/스킬 등 Act 상태가 캐릭터 facing(회전)을 소유 중인지 여부.
+    /// true면 이동 회전(DefaultMoveAbility)이 회전을 양보해 facing 경합을 막는다.
+    /// (None/Pickup 외의 모든 Act 상태 = 조준/공격이 회전을 주도)
+    /// </summary>
+    public bool IsActionControllingFacing =>
+        actSM != null && actSM.CurrentId != ActState.None && actSM.CurrentId != ActState.Pickup;
+
     /// <summary>착지 애니메이션 재생 중 여부. LocoAirState가 관리.</summary>
     public bool IsLanding { get; set; }
+
+    // 회전(facing) 목표 — 각 회전 writer가 저장하고, FixedUpdate(ApplyFacing)에서 Rigidbody에 적용한다.
+    // Update에서 회전을 직접 대입하면 Rigidbody Interpolate 보간과 타이밍이 어긋나 회전 각도에서 진동이 생긴다.
+    private Quaternion _targetFacing;
+    private bool _facingDirty;
+
+    /// <summary>회전 목표를 지정한다. 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.rotation으로 수행.</summary>
+    public void RequestFacing(Quaternion rot) { _targetFacing = rot; _facingDirty = true; }
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -334,6 +531,12 @@ public class PlayerController : CharacterBase
 
         InitCoreComponents();
         await InitCharacterDataAsync();
+
+        // 비동기 로드 중 오브젝트가 파괴된 경우 중단한다.
+        // 여기서 멈추지 않으면 InitInputActions()가 파괴된 객체 위에 PlayerInputActions를 생성·Enable하지만
+        // OnDestroy는 이미 inputActions==null 상태로 지나가, 해당 인스턴스가 Dispose되지 못해 누수 경고가 발생한다.
+        if (destroyCancellationToken.IsCancellationRequested) return;
+
         InitInputActions();
         InitAbilities();
         InitWeaponManager();
@@ -347,6 +550,9 @@ public class PlayerController : CharacterBase
 
         // 애니메이터 오버라이드 서비스 초기화
         _animSvc = new AnimatorOverrideService(anim);
+
+        // 캐릭터 데이터에 지정된 애니메이션 클립으로 오버라이드 (Q스킬 등)
+        ApplyCharacterAnimationOverrides();
 
         // 이펙트 핸들러 초기화
         EffectHandler = new WeaponEffectHandler(this);
@@ -367,6 +573,7 @@ public class PlayerController : CharacterBase
 
         AutoSetIdleIfNoAction();
         InitPassives();
+        ApplyRelic();
 
         if (inputReady) BindInputActions();
     }
@@ -374,6 +581,9 @@ public class PlayerController : CharacterBase
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
+
+        _runeEffects?.Tick(Time.deltaTime);
+        GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
 
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         if (_slowTimer > 0f)
@@ -416,11 +626,31 @@ public class PlayerController : CharacterBase
         JumpAbility?.UpdateGroundCheck(this);
         JumpAbility?.ApplyGravity(this);
         FreezeRotation();
+        ApplyFacing();
+
+        // 계단 오르기: FixedUpdate에서 실행해야 물리 충돌 전 위치 보정이 적용됨
+        if (IsGrounded() && moveDirection.sqrMagnitude > 0.01f)
+            MoveAbility?.StepClimb(this, moveDirection.normalized);
+    }
+
+    /// <summary>
+    /// 회전 목표(_targetFacing)를 Rigidbody에 적용. FixedUpdate에서만 호출한다.
+    /// Rigidbody.rotation(텔레포트)으로 설정 — 회전축 freeze 제약을 우회하면서
+    /// 물리 스텝에 동기화돼 Interpolate 보간과 충돌(진동)하지 않는다.
+    /// </summary>
+    private void ApplyFacing()
+    {
+        // 회전 요청이 있었던 프레임에만 적용한다. (유휴/연출 중 외부 회전을 덮어쓰지 않도록)
+        if (!_facingDirty || Rigid == null) return;
+        // MoveRotation: Interpolate 보간과 정합되는 회전 적용(텔레포트 대입은 보간과 어긋나 진동).
+        // Y축 회전 freeze가 풀려 있어야 적용된다(X/Z는 freeze 유지로 넘어짐 방지).
+        Rigid.MoveRotation(_targetFacing);
+        _facingDirty = false;
     }
 
     private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
 
-    private void OnDestroy()
+    protected virtual void OnDestroy()
     {
         if (inputActions != null)
         {
@@ -436,6 +666,11 @@ public class PlayerController : CharacterBase
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyAnimation;
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyStats;
         }
+
+        RelicBehavior?.OnDetach(this);
+        ReleaseRelicAura();
+
+        _runeEffects?.Detach();
     }
 
     //============================================================
@@ -472,6 +707,33 @@ public class PlayerController : CharacterBase
         WeaponManager.Initialize(this);
     }
 
+    /// <summary>
+    /// CharacterData 에 지정된 키들로 AnimatorOverrideController 클립을 교체한다.
+    /// 키가 비어 있으면 기본 클립(컨트롤러에 바인딩된 원본) 그대로 사용.
+    /// 캐릭터별 Q스킬 등 고유 모션을 적용하는 통로.
+    /// </summary>
+    private void ApplyCharacterAnimationOverrides()
+    {
+        if (_animSvc == null || characterData == null) return;
+
+        TryOverrideClip("QSkill_01", characterData.QSkillClipKey);
+    }
+
+    private void TryOverrideClip(string stateName, string addressableKey)
+    {
+        if (string.IsNullOrEmpty(addressableKey)) return;
+
+        var clip = Managers.AnimationResources?.GetClip(addressableKey);
+        if (clip == null)
+        {
+            Debug.LogWarning($"[PlayerController] AnimationClip '{addressableKey}' 로드 실패 — '{stateName}' 기본 클립 유지");
+            return;
+        }
+
+        if (!_animSvc.Override(stateName, clip))
+            Debug.LogWarning($"[PlayerController] '{stateName}' state 가 컨트롤러에 없어 override 스킵");
+    }
+
     private async UniTask InitCharacterDataAsync()
     {
         // CharacterData SO 확보 (서버 데이터 사용 여부와 무관하게 필요)
@@ -481,6 +743,13 @@ public class PlayerController : CharacterBase
             characterData = preloaded;
             characterData.Initialize();
         }
+        else if (characterData != null)
+        {
+            // 프리팹에 베이스 CharacterData가 직접 지정된 경우(범용 바디 등):
+            // 이름 기반 Addressables 로드 대신 지정된 SO를 그대로 사용한다.
+            // (GameObject 이름/스폰 키가 바뀌어도 안전 — 이름 의존성 제거)
+            characterData.Initialize();
+        }
         else
         {
             // SO가 없으면 Addressables에서 로드 (키 형식: "MageData", "KnightData" 등)
@@ -488,8 +757,9 @@ public class PlayerController : CharacterBase
             await LoadCharacterDataAsync(characterName + "Data");
         }
 
-        // 스탯 초기화: 서버 우선 → SO 폴백
-        bool serverApplied = TryInitFromServer();
+        // 스탯 초기화: 무유물 기본은 'knight' 서버 행 → 서버 없으면 SO 폴백.
+        // (유물 획득 시 ApplyRelic에서 해당 유물 char_id 행으로 교체)
+        bool serverApplied = TryApplyServerStats("knight");
         if (!serverApplied && characterData != null)
         {
             RuntimeStats.InitializeFrom(characterData);
@@ -499,25 +769,26 @@ public class PlayerController : CharacterBase
         if (Rigid != null)
         {
             Rigid.useGravity = false;
+            // 공격 lunge 등 MovePosition 호출 시 시각적 보간을 위해 Interpolate 강제
+            if (Rigid.interpolation == RigidbodyInterpolation.None)
+                Rigid.interpolation = RigidbodyInterpolation.Interpolate;
             if (characterData != null)
                 Rigid.linearDamping = characterData.groundDrag;
         }
     }
 
-    /// <summary>서버 PlayerStatEntry로 RuntimeStats 초기화 시도. 성공하면 true.</summary>
-    private bool TryInitFromServer()
+    /// <summary>
+    /// 지정 char_id의 서버 PlayerStatEntry로 RuntimeStats + CharacterData(수치)를 적용한다.
+    /// 무유물 기본은 "knight", 유물 획득 시 유물 char_id("gawain"/"galahad")로 호출 → 행 전체 교체.
+    /// 서버 데이터/매칭 행이 없으면 false(호출자가 폴백 처리).
+    /// </summary>
+    private bool TryApplyServerStats(string charId)
     {
-        var mgr = Managers.PlayerData;
-        if (mgr == null || !mgr.IsInitialized || mgr.GetAllPlayers().Count == 0)
-            return false;
+        if (string.IsNullOrEmpty(charId)) return false;
 
-        // 캐릭터 ID 결정: 로비 선택 or 프리팹 이름
-        string charId = null;
-        var preloaded = Managers.CharacterData?.M_CharacterData;
-        if (preloaded != null)
-            charId = preloaded.conClass.ToString().ToLower(); // Knight → knight
-        if (string.IsNullOrEmpty(charId))
-            charId = gameObject.name.Replace("(Clone)", "").ToLower();
+        var mgr = Managers.PlayerData;
+        if (mgr == null || !mgr.IsInitialized)
+            return false;
 
         var entry = mgr.GetPlayer(charId);
         if (entry == null)
@@ -526,15 +797,53 @@ public class PlayerController : CharacterBase
         var passives = mgr.GetPassives(entry.passive_id);
         RuntimeStats.InitializeFromServer(entry, passives);
 
-        // SO도 여전히 로드해둠 (이동속도, 점프 등 SO 전용 값 필요)
-        if (preloaded != null)
+        var preloaded = Managers.CharacterData?.M_CharacterData;
+
+        // SO 의 LayerMask/Sprite/Passive 참조는 유지하되 수치 컬럼은 CSV(서버) 로 덮어쓴다.
+        // 원본 .asset 을 변경하지 않도록 Instantiate 로 런타임 클론을 만든 뒤 적용.
+        var source = preloaded ?? characterData;
+        if (source != null)
         {
-            characterData = preloaded;
+            var clone = ScriptableObject.Instantiate(source);
+            clone.name = source.name + " (Runtime)";
+            ApplyServerOverridesTo(clone, entry);
+            characterData = clone;
             characterData.Initialize();
         }
 
-        Debug.Log($"[PlayerController] 서버 데이터 사용: {entry.char_id} (HP:{entry.max_health}, Melee:{entry.base_melee_attack})");
+        Debug.Log($"[PlayerController] 서버 데이터 사용: {entry.char_id} (HP:{entry.max_health}, Melee:{entry.base_melee_attack}, MoveSpd:{entry.base_move_speed})");
         return true;
+    }
+
+    /// <summary>CSV(PlayerStatEntry) 값을 CharacterData 클론에 덮어씀. LayerMask/Sprite/SO 참조는 건드리지 않는다.</summary>
+    private static void ApplyServerOverridesTo(CharacterData data, PlayerStatEntry e)
+    {
+        data.maxHealth                  = e.max_health;
+        data.baseMeleeAttack            = e.base_melee_attack;
+        data.baseRangedAttack           = e.base_ranged_attack;
+        data.baseDefense                = e.base_defense;
+        data.baseLuck                   = e.base_luck;
+        data.baseMoveSpeed              = e.base_move_speed;
+        data.baseRunSpeed               = e.base_run_speed;
+        if (e.base_run_ramp > 0.01f) data.runRampDuration = e.base_run_ramp; // CSV 컬럼 없으면 에셋값 유지
+        if (e.move_accel > 0.01f)          data.moveAccel               = e.move_accel;
+        if (e.move_decel > 0.01f)          data.moveDecel               = e.move_decel;
+        if (e.reverse_accel_mult > 0.01f)  data.reverseAccelMultiplier  = e.reverse_accel_mult;
+        if (e.initial_boost > 0.0001f)     data.initialBoost            = e.initial_boost;
+
+        data.comboDuration              = e.combo_duration;
+        data.heavyAttackChargeThreshold = e.heavy_charge_threshold;
+        data.heavyAttackReleaseTime     = e.heavy_release_time;
+        data.dashSpeed                  = e.dash_speed;
+        data.dashDuration               = e.dash_duration;
+        data.dodgeCooldown              = e.dodge_cooldown;
+        data.jumpForce                  = e.jump_force;
+        data.gravity                    = e.gravity;
+        data.fallMultiplier             = e.fall_multiplier;
+        data.groundCheckDistance        = e.ground_check_distance;
+        data.airControlMultiplier       = e.air_control_multiplier;
+        data.groundDrag                 = e.ground_drag;
+        data.airDrag                    = e.air_drag;
     }
 
     private async UniTask LoadCharacterDataAsync(string characterName)
@@ -656,8 +965,10 @@ public class PlayerController : CharacterBase
     //============================================================
     // Hooks (Derived)
     //============================================================
-    protected virtual void InitLayerFSMs() { }
-    protected virtual void RouteInputsToLayers() { }
+    /// <summary>FSM 상태 등록. 기본은 공통 세트(RegisterDefaultFSMs). 파생에서 override 가능.</summary>
+    protected virtual void InitLayerFSMs() => RegisterDefaultFSMs();
+    /// <summary>입력 라우팅. 기본은 공통 라우팅(DefaultRouteInputsToLayers). 파생에서 override 가능.</summary>
+    protected virtual void RouteInputsToLayers() => DefaultRouteInputsToLayers();
 
     /// <summary>
     /// 기본 FSM 등록 — 모든 캐릭터가 공유하는 Loco/Act 상태 세트.
@@ -765,11 +1076,12 @@ public class PlayerController : CharacterBase
         if (cinemachineCamera == null) return;
         if (inputActions == null) return;
 
-        var input   = inputActions.Player.Move.ReadValue<Vector2>();
-        var forward = cinemachineCamera.transform.forward; forward.y = 0f;
-        var right   = cinemachineCamera.transform.right;   right.y   = 0f;
+        var input = inputActions.Player.Move.ReadValue<Vector2>();
 
-        moveDirection = (forward.normalized * input.y + right.normalized * input.x).normalized;
+        // 고정 탑다운(월드 정렬) 카메라 — 이동 기준은 월드축 고정.
+        // 시작 연출(오버헤드/투어)로 카메라가 움직이거나 거의 수직이 돼도 조작이 어긋나지 않도록
+        // 라이브 카메라 transform에 의존하지 않는다.
+        moveDirection = (Vector3.forward * input.y + Vector3.right * input.x).normalized;
     }
 
     /// <summary>
@@ -779,6 +1091,8 @@ public class PlayerController : CharacterBase
     protected virtual bool IsInAttackOrSkillState() =>
         actSM.CurrentId == ActState.Attack      ||
         actSM.CurrentId == ActState.AttackReady ||
+        actSM.CurrentId == ActState.Charge      ||
+        actSM.CurrentId == ActState.HeavyAttack ||
         actSM.CurrentId == ActState.QSkill      ||
         actSM.CurrentId == ActState.ESkill      ||
         actSM.CurrentId == ActState.RSkill;
@@ -788,6 +1102,9 @@ public class PlayerController : CharacterBase
     //============================================================
     private void OnWeaponChangedApplyAnimation(WeaponData newWeapon, GameObject weaponInstance)
     {
+        // 이전 무기 오버라이드 원복 (로코모션 포함) — 무기 교체/해제 시 이전 클립이 남지 않도록.
+        _animSvc?.ResetOverrides();
+
         // null 무기면 정책 제거
         if (newWeapon == null)
         {
@@ -983,34 +1300,138 @@ public class PlayerController : CharacterBase
     public void RotateTowardsInput()
     {
         if (moveDirection.sqrMagnitude < 0.0001f) return;
-        transform.rotation = Quaternion.LookRotation(moveDirection);
+        RequestFacing(Quaternion.LookRotation(moveDirection));
     }
 
     public void RotateTowardsMousePosition()
+    {
+        if (TryComputeMouseLookDir(out var lookDir))
+            RequestFacing(Quaternion.LookRotation(lookDir));
+    }
+
+    /// <summary>
+    /// 마우스 방향을 기준으로 회전하되, 지정 콘 안에 IDamageable 적이 있으면 그 쪽으로 살짝 보정한다.
+    /// 공격 시작/콤보 단계 시작 시 1회만 호출 (매 프레임 호출 시 aimbot 느낌).
+    /// </summary>
+    /// <param name="radius">적 탐색 거리(m)</param>
+    /// <param name="coneHalfAngleDeg">마우스 방향 콘 반각(도)</param>
+    /// <param name="strength">마우스 → 적 방향 블렌드 비율 (0=마우스, 1=적)</param>
+    public void RotateTowardsMouseWithAimAssist(float radius, float coneHalfAngleDeg, float strength)
+    {
+        Quaternion target = ComputeMouseAimAssistRotation(radius, coneHalfAngleDeg, strength);
+        RequestFacing(target);
+    }
+
+    /// <summary>
+    /// 마우스 + 에임 어시스트 적용 후의 최종 목표 회전을 "계산만" 해서 반환한다.
+    /// 호출자에서 즉시 적용하거나 lerp 시작점으로 사용. 적용은 하지 않음.
+    /// </summary>
+    public Quaternion ComputeMouseAimAssistRotation(float radius, float coneHalfAngleDeg, float strength)
+    {
+        if (!TryComputeMouseLookDir(out var mouseDir))
+            return transform.rotation;
+
+        // 보정 비활성 케이스: 마우스 방향 그대로
+        if (radius <= 0f || coneHalfAngleDeg <= 0f || strength <= 0f)
+            return Quaternion.LookRotation(mouseDir);
+
+        // 콘 안 가장 작은 각도의 적 탐색
+        Vector3 origin = transform.position;
+        float cosThreshold = Mathf.Cos(coneHalfAngleDeg * Mathf.Deg2Rad);
+        float bestDot = cosThreshold;
+        Vector3 bestDir = mouseDir;
+        bool found = false;
+
+        var cols = Physics.OverlapSphere(origin, radius);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            var col = cols[i];
+            if (col == null) continue;
+            if (col.transform == transform || col.transform.IsChildOf(transform)) continue;
+
+            var d = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>();
+            if (d == null) continue;
+
+            Vector3 toEnemy = ((d as Component).transform.position) - origin;
+            toEnemy.y = 0f;
+            float sqr = toEnemy.sqrMagnitude;
+            if (sqr < 0.01f) continue;
+
+            Vector3 enemyDir = toEnemy / Mathf.Sqrt(sqr);
+            float dot = Vector3.Dot(mouseDir, enemyDir);
+            if (dot >= bestDot)
+            {
+                bestDot = dot;
+                bestDir = enemyDir;
+                found = true;
+            }
+        }
+
+        Vector3 finalDir = found
+            ? Vector3.Slerp(mouseDir, bestDir, Mathf.Clamp01(strength))
+            : mouseDir;
+
+        return finalDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(finalDir)
+            : transform.rotation;
+    }
+
+    /// <summary>
+    /// 마우스 / 마지막 클릭 위치에서 수평 방향 벡터를 계산. 실패 시 false.
+    /// 1) _lastClickedPosition (입력 시 캐시된 클릭 월드 좌표)
+    /// 2) Ground 레이어 콜라이더 레이캐스트
+    /// 3) 플레이어 Y 높이의 수학적 수평 평면에 레이 투영 (콜라이더 미스 시 폴백)
+    /// </summary>
+    private bool TryComputeMouseLookDir(out Vector3 lookDir)
     {
         // 1) 입력으로 저장된 클릭 위치 우선 사용
         if (_lastClickedPosition.HasValue)
         {
             Vector3 target = _lastClickedPosition.Value;
-            Vector3 lookDir = target - transform.position;
+            lookDir = target - transform.position;
             lookDir.y = 0f;
-
-            if (lookDir.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.LookRotation(lookDir);
-
             _lastClickedPosition = null;
-            return;
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                lookDir.Normalize();
+                return true;
+            }
         }
 
-        // 2) fallback: 마우스 기반 레이캐스트
-        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-        if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+        // 2/3) 마우스 → 카메라 레이 → Ground 콜라이더 우선, 미스 시 수평 평면 폴백
+        if (Camera.main != null && Mouse.current != null)
         {
-            Vector3 lookDir = hit.point - transform.position;
-            lookDir.y = 0f;
-            if (lookDir.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.LookRotation(lookDir);
+            Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+
+            // 2) Ground 콜라이더 히트
+            if (Physics.Raycast(ray, out var hit, 100f, LayerMask.GetMask("Ground")))
+            {
+                lookDir = hit.point - transform.position;
+                lookDir.y = 0f;
+                if (lookDir.sqrMagnitude > 0.01f)
+                {
+                    lookDir.Normalize();
+                    return true;
+                }
+            }
+
+            // 3) 플레이어 Y 높이의 수평 평면에 레이 투영 — Ground 콜라이더 누락/미스 대비
+            var plane = new Plane(Vector3.up, transform.position);
+            if (plane.Raycast(ray, out float enter))
+            {
+                Vector3 point = ray.GetPoint(enter);
+                lookDir = point - transform.position;
+                lookDir.y = 0f;
+                if (lookDir.sqrMagnitude > 0.01f)
+                {
+                    lookDir.Normalize();
+                    return true;
+                }
+            }
         }
+
+        lookDir = Vector3.zero;
+        return false;
     }
 
     //============================================================

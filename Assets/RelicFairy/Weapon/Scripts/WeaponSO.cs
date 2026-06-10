@@ -41,7 +41,6 @@ public class WeaponSO : ScriptableObject
 
     [Header("타입 & 정책")]
     public WeaponType weaponType = WeaponType.Katana;
-    public WeaponElement element = WeaponElement.None;
 
     [Header("스킬")]
     public SkillSO skillQ;

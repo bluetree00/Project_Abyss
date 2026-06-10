@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8997b7d9a83e71a4cae5bf2ac4de0921
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMOS 2021/Oceanis v1.0.9a
+    - Floaters Low waves heights.unity
+  uploadId: 902342

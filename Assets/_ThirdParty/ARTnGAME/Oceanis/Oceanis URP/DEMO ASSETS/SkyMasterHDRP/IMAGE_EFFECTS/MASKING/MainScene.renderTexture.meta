@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fa922b8668c949a43bfc6cfe5904803d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 8400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 289926
+  packageName: Oceanis 2024 Pro URP Water Framework
+  packageVersion: 2.3.0
+  assetPath: Assets/_ThirdParty/ARTnGAME/Oceanis/Oceanis URP/DEMO ASSETS/SkyMasterHDRP/IMAGE_EFFECTS/MASKING/MainScene.renderTexture
+  uploadId: 902342

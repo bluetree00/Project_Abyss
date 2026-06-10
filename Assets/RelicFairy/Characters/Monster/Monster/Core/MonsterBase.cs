@@ -23,7 +23,7 @@ namespace RelicFairy.Monster
 ///   3) 빈 오브젝트에 해당 클래스 + Rigidbody + NavMeshAgent 추가
 ///   4) SO .asset 파일들 생성 후 Addressables 등록
 /// </summary>
-public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
+public abstract class MonsterBase : MonoBehaviour, IDamageable
 {
     // ── 추상 멤버 (파생 클래스가 구현) ────────────────────
     /// <summary>Addressables에 등록된 MonsterConfigSO 주소.</summary>
@@ -72,6 +72,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ClearConfigCache() => _configCache.Clear();
 
+    // ── 적 가시성 표기용 레이어 (외곽선/실루엣 Render Objects 피처의 필터 대상) ──
+    // 몹 비주얼 렌더러만 Monster 레이어로 올린다. 콜라이더/루트는 그대로 → 물리·타격(IDamageable)·NavMesh 무영향.
+    // -2 = 미조회, -1 = 프로젝트에 Monster 레이어 없음(스킵).
+    private const string MonsterVisibilityLayerName = "Monster";
+    private static int s_monsterVisibilityLayer = -2;
+
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
     protected MonsterFSM         _fsm;
@@ -83,27 +89,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     private   bool               _hpBarRequesting;
     private   bool               _worldHPBarSuppressed;
 
-    // ── 원소 시스템 ───────────────────────────────────────
-    private ElementBuildup         _elementBuildup;
-    private ElementVisualFeedback  _elementVisual;
-    private ElementNativePalette   _elementPalette;
+    // ── 이동/전투 캐시 ────────────────────────────────────
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
     private float                  _incomingDamageMulti = 1f;
-    // 원소 효과로 인한 일시 배율 (Water slow/Earth petrify/Lightning paralyze)
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
-    // 네이티브 원소 패시브 보너스 (인스턴스별 — Config 공유 캐시 오염 방지)
-    private float                  _nativeAttackMulti   = 1f;
-    private float                  _nativeHpMulti       = 1f;
-    private float                  _nativeDefenseMulti  = 1f;
-    private float                  _nativeRateMulti     = 1f;
-    private float                  _grassRegenTimer;
-
-    [Header("Runtime Element (현재 속성)")]
-    [Tooltip("스폰 시 SetRandomNativeElement로 자동 주입됨. 플레이 중 Inspector에서 값을 바꾸면 " +
-             "OnValidate가 SetNativeElement를 호출해 tinted/Rim 머티리얼 + 보너스 스탯이 즉시 재적용된다.")]
-    [SerializeField] private ElementType _effectiveElement = ElementType.None;
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
@@ -120,17 +111,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     /// <summary>공격 상태/어빌리티가 쿨다운 계산 시 곱할 배율. 0 = 공격 불가.</summary>
     public float AttackSpeedMultiplier => _attackSpeedMulti;
 
-    /// <summary>이 몬스터 인스턴스에 실제 적용된 원소. 스폰 시 SetRandomNativeElement로 결정.</summary>
-    public ElementType EffectiveElement => _effectiveElement;
+    /// <summary>유효 공격력.</summary>
+    public float EffectiveAttackPower => _config != null ? _config.stat.attackPower : 0f;
 
-    /// <summary>네이티브 보너스와 원소 효과 배율이 모두 반영된 유효 공격력.</summary>
-    public float EffectiveAttackPower => _config != null ? _config.stat.attackPower * _nativeAttackMulti : 0f;
+    /// <summary>유효 최대 HP.</summary>
+    public int EffectiveMaxHp => _config != null ? _config.stat.maxHp : 0;
 
-    /// <summary>네이티브 보너스가 반영된 유효 최대 HP (반올림).</summary>
-    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _nativeHpMulti) : 0;
-
-    /// <summary>네이티브 보너스가 반영된 유효 공격 속도.</summary>
-    public float EffectiveAttackRate => _config != null ? _config.stat.attackRate * _nativeRateMulti : 0f;
+    /// <summary>유효 공격 속도.</summary>
+    public float EffectiveAttackRate => _config != null ? _config.stat.attackRate : 0f;
 
     // ── HP 변경 이벤트 (보스 UI 등 외부에서 구독) ─────────
     /// <summary>HP가 변경될 때마다 발행. (currentHp, maxHp)</summary>
@@ -138,6 +126,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     /// <summary>몬스터 사망 시 1회 발행. RoomClearController 등 외부 수명주기가 구독.</summary>
     public event System.Action<MonsterBase> OnDied;
+
+    /// <summary>보스 등장 연출 완료 후 1회 발행. HUD가 보스 패널을 이 시점에 표시.</summary>
+    public event System.Action OnBossCombatReady;
+    protected void RaiseBossCombatReady() => OnBossCombatReady?.Invoke();
+
+    /// <summary>true면 등장 연출이 끝날 때까지 HUD 보스 패널을 억제한다.</summary>
+    public virtual bool HasEntranceAnimation => false;
 
     /// <summary>DieState.Enter에서 호출. 외부 구독자가 사망을 감지할 수 있도록 이벤트 래핑.</summary>
     public void RaiseDied()
@@ -153,9 +148,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────
     private readonly List<SpecialStateBase> _specialStates = new();
-
-    // ── 원소 상태 인스턴스 (원소별 고정 슬롯) ─────────────
-    private readonly SpecialStateBase[] _elementalStates = new SpecialStateBase[ElementTypeUtil.Count];
 
     // ── HP 트리거 발동 추적 (oneShot 트리거 중복 방지) ────
     private readonly HashSet<int> _firedHpTriggers = new();
@@ -194,10 +186,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
     protected virtual async UniTask InitAsync()
     {
-        // ElementNativePalette를 첫 await 전(동기 구간)에 부착 — Awake가 원본 sharedMaterial을 캡처해야
-        // 나중에 DissolveEffect가 임시 머티리얼로 교체해도 원소 틴트 복원 기준이 오염되지 않는다.
-        _elementPalette = GetComponent<ElementNativePalette>();
-        if (_elementPalette == null) _elementPalette = gameObject.AddComponent<ElementNativePalette>();
+        // 0. 적 가시성 표기(외곽선) 레이어 부여는 OnEnable의 RevealVisibilityMarkupAsync로 이관 —
+        //    디졸브 등장이 끝난 뒤 켜지도록 지연(미완성 본체에 외곽선이 겹쳐 보이는 것 방지).
 
         // 1. MonsterConfigSO 로드 (주소별 캐시 — 동종 몬스터는 Instantiate·JSON 적용을 1회만 수행)
         if (!_configCache.TryGetValue(ConfigAddress, out _config))
@@ -225,24 +215,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
                 if (this == null) return;
 
-                // 2-0. 구버전 .asset 값(절대 100~1000) → 배율(1.0~10.0) 자동 마이그레이션.
-                // 새 필드 maxAccumulationScale은 "배율"이라 10을 초과하면 구버전 저장값으로 간주.
-                if (_config.elemental.maxAccumulationScale > 10f)
-                    _config.elemental.maxAccumulationScale /= 100f;
-
-                // 2-1. 서버 CDN(MONSTER_ELEMENT_STAT_DATA) 으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
+                // 2-1. 서버 CDN으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
                 ApplyServerStatOverride();
             }
         }
 
-        // 2-2. base 스탯 캐싱 (ApplyNativeElementBonus 로그가 올바른 DEF를 찍도록 선행)
+        // 2-2. base 스탯 캐싱
         _baseDefense = _config.stat.defense;
-
-        // 2-3. 인스턴스 고유 원소를 Config 기본값으로 초기화 + 보너스 배율 세팅.
-        // (MonsterSpawner가 스폰 직후 SetRandomNativeElement로 원소 결정:
-        //  테이블에 원소 지정 시 고정, None이면 5원소 중 랜덤)
-        _effectiveElement = _config.stat.nativeElement;
-        ApplyNativeElementBonus();
 
         // 3. NavMeshAgent 설정
         _agent = GetComponent<NavMeshAgent>();
@@ -263,15 +242,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
 
-        // 원소 시스템 자동 부착 (없으면 생성) + 배율 주입
-        _elementBuildup = GetComponent<ElementBuildup>();
-        if (_elementBuildup == null) _elementBuildup = gameObject.AddComponent<ElementBuildup>();
-        _elementVisual  = GetComponent<ElementVisualFeedback>();
-        if (_elementVisual == null)  _elementVisual  = gameObject.AddComponent<ElementVisualFeedback>();
-        _elementBuildup.SetMonsterMaxAccumulationScale(_config.elemental.maxAccumulationScale);
-        _elementBuildup.OnTriggered += HandleElementTriggered;
-        // _elementPalette: InitAsync 최상단(첫 await 전)에서 이미 부착됨
-
         // 4. Animator 설정 (Addressables에서 AnimatorController 로드)
         _animator = GetComponentInChildren<Animator>();
         if (_animator == null)
@@ -280,6 +250,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         // Collider 배열 캐싱 (OnEnable에서 GetComponentsInChildren 반복 방지)
         _cachedColliders = GetComponentsInChildren<Collider>(true);
+
+        // 4-0. 발밑 가짜 그림자 — 등급별 진하기/링. 콜라이더 반경으로 발자국 크기 산출.
+        EnsureGroundShadow();
 
         // 4-1. Head 본 탐색
         if (!string.IsNullOrEmpty(HPBarAnchorName))
@@ -321,7 +294,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (UseWorldHPBar && gameObject.activeInHierarchy && !_worldHPBarSuppressed)
         {
             _hpBar = await Managers.MonsterHPBar.RequestHPBarAsync(this, _runtime.CurrentHp, EffectiveMaxHp, _hpBarAnchor != null ? _hpBarAnchor : _headBone, HPBarHeadOffset);
-            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
+            _hpBar?.SetMonsterInfo(_config.monsterName);
         }
 
         OnInitialized();
@@ -355,14 +328,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             foreach (var ovr in _config.stateOverrides)
                 ovr?.RegisterOverrides(_fsm, this);
 
-        // ── 원소 상태 등록 (null = DefaultElementalState, SO 있으면 커스텀) ──
-        for (int i = 0; i < ElementTypeUtil.Count; i++)
-        {
-            var elementType = (ElementType)i;
-            var entry = _config.elemental.Get(elementType);
-            _elementalStates[i] = entry?.overrideState?.Create(this)
-                                   ?? new DefaultElementalState(elementType);
-        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -382,30 +347,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _runtime.DistToPlayer = _runtime.PlayerTarget != null
             ? Vector3.Distance(transform.position, _runtime.PlayerTarget.position)
             : float.MaxValue;
-
-        // 원소 누적치 게이지 UI 갱신 (독 게이지일 때 스택 수 포함)
-        if (_hpBar != null && _elementBuildup != null)
-            _hpBar.UpdateElement(_elementBuildup.Ratio, _elementBuildup.Accum, _elementBuildup.Threshold,
-                                 _elementBuildup.LastElement, _elementBuildup.PoisonStacks);
-
-        // 네이티브 Grass — 2초마다 최대HP의 5% 재생
-        if (_effectiveElement == ElementType.Grass && _runtime.CurrentHp < EffectiveMaxHp)
-        {
-            _grassRegenTimer += Time.deltaTime;
-            if (_grassRegenTimer >= 2f)
-            {
-                _grassRegenTimer -= 2f;
-                int effMax = EffectiveMaxHp;
-                int heal = Mathf.Max(1, Mathf.RoundToInt(effMax * 0.05f));
-                int newHp = Mathf.Min(effMax, _runtime.CurrentHp + heal);
-                if (newHp != _runtime.CurrentHp)
-                {
-                    _runtime.CurrentHp = newHp;
-                    _hpBar?.UpdateHP(newHp, effMax);
-                    OnHPChanged?.Invoke(newHp, effMax);
-                }
-            }
-        }
 
         _fsm?.Update();
 
@@ -478,6 +419,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     /// 이 메서드 안에서 ChangeState(specialState) 를 호출하면
     /// 이후 GetHitState 전환이 자동으로 스킵된다.
     /// </summary>
+    /// <summary>HP가 0 이하가 됐을 때 호출. 기본 동작은 DieState 전환. 보스에서 퇴각 등으로 오버라이드 가능.</summary>
+    protected virtual void OnFatalDamage() => ChangeState<DieState>();
+
     protected virtual void OnDamageTaken()
     {
         if (_config.specialStates == null || _config.specialStates.Count == 0) return;
@@ -506,8 +450,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             ChangeState(state);
             return;
         }
-
-        // 원소 누적치 처리는 ElementBuildup 으로 이전 (HandleElementTriggered 이벤트 참조)
     }
 
     /// <summary>
@@ -535,7 +477,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (player == null) return;
 
         SpawnHitVfx();
-        player.TakeDamage(damage);
+        player.TakeDamage(damage, gameObject);
 
         Vector3 dir = (_runtime.PlayerTarget.position - transform.position).normalized;
         dir.y = 0.3f;
@@ -547,8 +489,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         var prefab = _config?.stat?.hitVfxPrefab;
         if (prefab == null) return;
 
+        var pooler = Managers.ObjectPooler;
+        if (pooler == null) return;
+
         Vector3 pos = transform.position + _config.stat.hitVfxOffset;
-        var go = Instantiate(prefab, pos, Quaternion.identity);
+        var go = pooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
+        if (go == null) return;
+
         go.transform.localScale = Vector3.one * Mathf.Max(0.001f, _config.stat.hitVfxScale);
 
         var systems = go.GetComponentsInChildren<ParticleSystem>(true);
@@ -560,7 +507,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         var ps = go.GetComponent<ParticleSystem>() ?? go.GetComponentInChildren<ParticleSystem>();
         float lifetime = ps != null ? ps.main.duration + ps.main.startLifetimeMultiplier + 0.3f : 3f;
-        Destroy(go, lifetime);
+
+        // Destroy 대신 풀 반환(수명 후 자동 Despawn). 스케일은 매 스폰 절대 설정 → 재사용 정합.
+        var vfx = go.GetComponent<PooledOneShotVfx>() ?? go.AddComponent<PooledOneShotVfx>();
+        vfx.Play(lifetime);
     }
 
     /// <summary>애니메이션 이벤트에서 호출 (MonsterAnimEventReceiver 경유).</summary>
@@ -603,8 +553,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     // IDamageable — 플레이어 공격에 맞을 때 호출됨
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f,
-                                   ElementType element = ElementType.None, float elementAmount = 0f)
+    /// <summary>피해 출처가 플레이어(또는 그 자식 무기/투사체)인지. 서약 통보를 플레이어발 피해로 한정.</summary>
+    private static bool IsPlayerInstigator(GameObject g)
+        => g != null && g.GetComponentInParent<PlayerController>() != null;
+
+    public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null || _runtime.IsDead) return;
 
@@ -613,18 +566,22 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
-        // 방어력(네이티브 보너스 + 원소 효과 배율) + 데미지 배율 + 받는 데미지 배율 (최소 1 데미지)
-        float defense = _baseDefense * _nativeDefenseMulti * _defenseMulti;
+        // [서약] 플레이어발 피해 변조 — 방어 계산 전, 원본 데미지에 적용
+        if (IsPlayerInstigator(instigator))
+        {
+            var covHandler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+            if (covHandler != null)
+                amount = covHandler.ModifyOutgoing(amount, new CombatContext { Target = gameObject, Damage = amount, IsCritical = isCrit });
+        }
+
+        // 방어력 + 데미지 배율 + 받는 데미지 배율 (최소 1 데미지)
+        float defense = _baseDefense * _defenseMulti;
         float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti);
         _runtime.CurrentHp -= (int)actual;
 
-        // 원소 누적치는 ElementBuildup 으로 위임 (resistance 반영)
-        if (element.IsValid() && elementAmount > 0f && _elementBuildup != null)
-        {
-            var entry = _config.elemental.Get(element);
-            float scaled = elementAmount * (entry?.resistance ?? 1f);
-            _elementBuildup.AddBuildup(element, scaled, actual);
-        }
+        // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+
         int effMax = EffectiveMaxHp;
         _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
         OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
@@ -633,7 +590,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         {
             _runtime.CurrentHp = 0;
             _runtime.IsDead    = true;
-            ChangeState<DieState>();
+            // [서약] 플레이어 처치 통보
+            if (IsPlayerInstigator(instigator))
+                GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
+            OnFatalDamage();
         }
         else
         {
@@ -658,16 +618,17 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
                 return;
             }
 
-            // NavMeshAgent가 활성화된 몬스터는 Agent가 위치를 제어하므로 Rigidbody 넉백 생략
-            // (isKinematic ↔ Agent 충돌로 발생하는 "Setting linear velocity of kinematic body" 경고 방지)
+            // 먼저 GetHitState로 전환해 NavMeshAgent를 끈 뒤 Rigidbody 넉백을 적용한다.
+            // Agent 활성 중에는 Agent가 위치를 제어해 임펄스가 무효화되고
+            // "Setting linear velocity of kinematic body" 경고가 발생하므로, 전환→임펄스 순서가 필수.
+            ChangeState<GetHitState>();
+
             if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled))
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;
                 _rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
             }
-
-            ChangeState<GetHitState>();
         }
     }
 
@@ -707,11 +668,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         data.ApplyToConfig(_config);
     }
 
-    /// <summary>
-    /// MONSTER_ELEMENT_STAT_DATA 서버 값으로 _config 수치 덮어쓰기.
-    /// HP / 공격력 / 방어력 / 누적치 임계값 / 네이티브 원소.
-    /// 서버 데이터가 없거나 매니저 미초기화 시 SO 기본값 유지.
-    /// </summary>
     private void ApplyServerStatOverride()
     {
         var mgr = Managers.ServerMonsterStat;
@@ -727,131 +683,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             return;
         }
 
-        if (entry.max_hp > 0)           _config.stat.maxHp         = entry.max_hp;
-        if (entry.base_attack > 0f)     _config.stat.attackPower   = entry.base_attack;
-        if (entry.base_defense >= 0f)   _config.stat.defense       = entry.base_defense;
-        if (entry.max_accumulation > 0f) _config.elemental.maxAccumulationScale = entry.max_accumulation;
+        if (entry.max_hp > 0)         _config.stat.maxHp       = entry.max_hp;
+        if (entry.base_attack > 0f)   _config.stat.attackPower = entry.base_attack;
+        if (entry.base_defense >= 0f) _config.stat.defense      = entry.base_defense;
 
-        _config.stat.nativeElement = ParseElementType(entry.element);
-
-        Debug.Log($"[MonsterBase] 서버 스탯 적용: {id} ({entry.monster_name}) | HP={entry.max_hp} ATK={entry.base_attack} DEF={entry.base_defense} | Elem={_config.stat.nativeElement} AccumScale={entry.max_accumulation}");
+        Debug.Log($"[MonsterBase] 서버 스탯 적용: {id} ({entry.monster_name}) | HP={entry.max_hp} ATK={entry.base_attack} DEF={entry.base_defense}");
     }
-
-    /// <summary>
-    /// 인스턴스 원소에 따른 패시브 보너스를 배율 필드에 적용.
-    /// Config를 직접 수정하지 않으므로 동종 몬스터 간 공유 캐시가 오염되지 않는다.
-    ///   Fire      → 공격력 +10%
-    ///   Water     → 최대HP +10%
-    ///   Lightning → 공격속도 +10%
-    ///   Earth     → 방어력 +10%
-    ///   Grass     → 2초마다 최대HP의 5% 체력 재생 (Update 루프에서 처리)
-    ///   None      → 보너스 없음
-    /// </summary>
-    private void ApplyNativeElementBonus()
-    {
-        const float Bonus = 0.1f;
-        // 기본값 리셋 — 재사용(풀) 시 이전 속성 배율 잔존 방지
-        _nativeAttackMulti  = 1f;
-        _nativeHpMulti      = 1f;
-        _nativeDefenseMulti = 1f;
-        _nativeRateMulti    = 1f;
-
-        switch (_effectiveElement)
-        {
-            case ElementType.Fire:
-                _nativeAttackMulti = 1f + Bonus;
-                break;
-            case ElementType.Water:
-                _nativeHpMulti = 1f + Bonus;
-                break;
-            case ElementType.Lightning:
-                _nativeRateMulti = 1f + Bonus;
-                break;
-            case ElementType.Earth:
-                _nativeDefenseMulti = 1f + Bonus;
-                break;
-            case ElementType.Grass:
-                // 재생은 Update 루프에서 nativeElement 체크로 처리
-                break;
-            default:
-                return; // None — 보너스 없음
-        }
-
-        Debug.Log($"[MonsterBase] 네이티브 원소 보너스: {name} Element={_effectiveElement} → HP={EffectiveMaxHp} ATK={EffectiveAttackPower:F1} DEF={_baseDefense * _nativeDefenseMulti:F1} Rate={EffectiveAttackRate:F2}");
-    }
-
-    /// <summary>스폰 시 5원소(Lightning~Earth) 중 랜덤으로 인스턴스 원소 결정 + 보너스/틴트 재적용.
-    /// None은 절대 선택되지 않아 모든 스폰 몬스터는 유효 원소를 가진다.
-    /// 같은 Config를 공유하는 인스턴스끼리도 서로 다른 원소 variant가 되도록 인스턴스별 독립 롤.
-    /// InitAsync 진행 중이면 완료될 때까지 대기 후 롤·적용.</summary>
-    public void SetRandomNativeElement()
-    {
-        ApplyElementWhenReady(_generationId).Forget();
-    }
-
-    private async UniTaskVoid ApplyElementWhenReady(int expectedGen)
-    {
-        try
-        {
-            // Config/runtime이 아직 null이면 InitAsync가 진행 중. 완료 대기.
-            while ((_config == null || _runtime == null) && this != null && gameObject != null)
-            {
-                if (_generationId != expectedGen) return; // 대기 중 풀 재사용 → 무시
-                await UniTask.Yield(destroyCancellationToken);
-            }
-            if (this == null || gameObject == null) return;
-            if (_generationId != expectedGen) return;        // 완료 시점에 재사용됐어도 무시
-            if (!gameObject.activeInHierarchy) return;
-
-            // 공유 Config(_config.stat.nativeElement)를 읽지 않고 인스턴스별 독립 롤.
-            // None(-1) 제외 — 모든 스폰 몬스터는 반드시 유효 원소를 갖는다.
-            ElementType element = (ElementType)UnityEngine.Random.Range(0, ElementTypeUtil.Count);
-
-            // 여러 몬스터가 같은 프레임에 디졸브 종료 → 동시 Apply 시 renderer.materials 복제 스파이크 발생.
-            // 0~2 프레임 랜덤 지연으로 Apply 호출을 분산해 프레임당 부담을 1/3로 경감.
-            int jitterFrames = UnityEngine.Random.Range(0, 3);
-            for (int i = 0; i < jitterFrames; i++)
-            {
-                if (this == null || gameObject == null) return;
-                if (_generationId != expectedGen) return;
-                await UniTask.Yield(destroyCancellationToken);
-            }
-            if (!gameObject.activeInHierarchy) return;
-
-            SetNativeElement(element);
-        }
-        catch (OperationCanceledException) { }
-    }
-
-    /// <summary>특정 원소로 강제 설정. 방별 테마 스폰 등 특수 케이스용.</summary>
-    public void SetNativeElement(ElementType element)
-    {
-        _effectiveElement = element;
-#if UNITY_EDITOR
-        _lastInspectorElement = element; // OnValidate 중복 트리거 방지
-#endif
-        ApplyNativeElementBonus();
-        _grassRegenTimer = 0f; // 원소 바뀌면 재생 타이머 초기화
-        _elementPalette?.Apply(element);
-
-        // HP 배율이 바뀌면 CurrentHp도 비례 조정 (풀피 기준 유지)
-        if (_runtime != null && !_runtime.IsDead)
-            _runtime.CurrentHp = EffectiveMaxHp;
-
-        _hpBar?.UpdateHP(_runtime != null ? _runtime.CurrentHp : 0, EffectiveMaxHp);
-        if (_config != null)
-            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
-    }
-
-    private static ElementType ParseElementType(string s) => s switch
-    {
-        "Lightning" => ElementType.Lightning,
-        "Water"     => ElementType.Water,
-        "Fire"      => ElementType.Fire,
-        "Grass"     => ElementType.Grass,
-        "Earth"     => ElementType.Earth,
-        _           => ElementType.None,
-    };
 
     // Animator Controller는 프리팹에 직접 할당 — 런타임 로드 불필요
     private async UniTask LoadAnimatorControllerAsync()
@@ -890,6 +727,74 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         if (player != null) IgnorePlayerCollision(player);
     }
 
+    /// <summary>외곽선 표기 on/off 토글. on=Monster 레이어(외곽선/실루엣 Render Objects 필터 대상),
+    /// off=루트 레이어로 복원(디졸브 등장 중 숨김 + 풀 재사용 시 레이어 잔존으로 외곽선이 재-디졸브에 새는 것 방지).
+    /// 콜라이더/루트 레이어는 그대로 → 물리·타격·NavMesh 무영향. ~헬퍼(발밑그림자)는 외곽선 대상 아님.</summary>
+    private void SetVisibilityMarkup(bool on)
+    {
+        if (s_monsterVisibilityLayer == -2)
+            s_monsterVisibilityLayer = LayerMask.NameToLayer(MonsterVisibilityLayerName);
+        if (s_monsterVisibilityLayer < 0) return; // 레이어 미정의 — 스킵
+
+        // off 복원 대상은 루트 레이어(콜라이더/루트가 쓰는 원본 레이어) — 비주얼 렌더러는 본래 루트와 동일 레이어.
+        int target = on ? s_monsterVisibilityLayer : gameObject.layer;
+
+        var renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var r = renderers[i];
+            if (r == null) continue;
+            if (!(r is SkinnedMeshRenderer || r is MeshRenderer)) continue;
+            var n = r.gameObject.name;
+            if (n.Length > 0 && n[0] == '~') continue; // "~" 헬퍼(발밑그림자 등) 제외 — 외곽선 대상 아님
+            r.gameObject.layer = target;
+        }
+    }
+
+    // 디졸브 등장(일반 1.2s / 보스 1.5s)이 끝난 뒤 외곽선을 켜기 위한 지연. 디졸브 호출처가 Spawner/Boss/Lich 등
+    // 여러 곳이라 단일 onComplete를 쓰지 않고, 최장(보스 1.5s)+마진의 지연으로 본체가 완전 불투명이 된 뒤에만 켠다.
+    private const float MarkupRevealDelay = 1.6f;
+
+    /// <summary>디졸브 등장 동안 외곽선이 미완성 본체에 겹쳐 보이지 않도록 지연 후 켠다(off→대기→on).
+    /// OnEnable에서 먼저 off로 내려 풀 재사용 시 잔존 레이어를 리셋 → 매 스폰의 재-디졸브 동안에도 외곽선이 안 샌다.
+    /// ActivationToken에 묶여 풀 반환/파괴 시 취소(이 경우 off 상태 유지).</summary>
+    private async UniTaskVoid RevealVisibilityMarkupAsync()
+    {
+        SetVisibilityMarkup(false); // 스폰 즉시 끔(디졸브 중 숨김 + 풀 재사용 레이어 리셋)
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(MarkupRevealDelay),
+                                ignoreTimeScale: true, cancellationToken: ActivationToken);
+        }
+        catch (System.OperationCanceledException) { return; }
+        SetVisibilityMarkup(true);
+    }
+
+    /// <summary>발밑 가짜 그림자(MonsterGroundShadow)를 런타임 부착·구성. 콜라이더(Capsule) 반경으로 발자국 크기 산출.
+    /// 인스턴스당 1회면 충분 — 풀 재사용 시 자식 그림자는 유지된다.</summary>
+    private void EnsureGroundShadow()
+    {
+        if (_config == null) return;
+
+        float radius = 0.5f;
+        if (_cachedColliders != null)
+        {
+            for (int i = 0; i < _cachedColliders.Length; i++)
+            {
+                if (_cachedColliders[i] is CapsuleCollider cap)
+                {
+                    var ls = cap.transform.lossyScale;
+                    radius = cap.radius * Mathf.Max(ls.x, ls.z);
+                    break;
+                }
+            }
+        }
+
+        var shadow = GetComponent<MonsterGroundShadow>();
+        if (shadow == null) shadow = gameObject.AddComponent<MonsterGroundShadow>();
+        shadow.Configure(_config.grade, radius);
+    }
+
     private void IgnorePlayerCollision(Transform player)
     {
         if (_cachedColliders == null) return;
@@ -914,6 +819,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
     protected void BindBossHud()
     {
         if (_config == null || _runtime == null) return;
+        // 풀 프리웜된 비활성 인스턴스가 자기 자신을 바인딩해 실제 스폰된 보스의 OnHPChanged를 가로채지 않도록 가드
+        if (!gameObject.activeInHierarchy) return;
 
         var presenter = FindAnyObjectByType<HudPresenter>(FindObjectsInactive.Include);
         if (presenter == null) return;
@@ -937,24 +844,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             Managers.Player.OnPlayerSpawned -= OnPlayerSpawned;
     }
 
-#if UNITY_EDITOR
-    // Inspector에서 _effectiveElement를 직접 바꿔 쉐이더/머티리얼 연출을 즉시 확인할 수 있게 한다.
-    // 코드 경로로 값이 바뀌는 경우(Awake, SetNativeElement 등)는 _lastInspectorElement 동기화로 중복 호출 방지.
-    private ElementType _lastInspectorElement = ElementType.None;
-
-    private void OnValidate()
-    {
-        if (!Application.isPlaying) return;
-        if (_effectiveElement == _lastInspectorElement) return;
-
-        var newElement = _effectiveElement;
-        _lastInspectorElement = newElement;
-
-        // Awake 이전/Config 미로드 상태에서는 Apply 경로 스킵 — Awake가 이후 정상 초기화.
-        if (_elementPalette == null || _config == null || _runtime == null) return;
-        SetNativeElement(newElement);
-    }
-#endif
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 풀 재사용 — OnEnable/OnDisable 콜백
@@ -970,6 +859,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         _activationCts?.Cancel();
         _activationCts?.Dispose();
         _activationCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken);
+
+        // 적 가시성 표기(외곽선) — 디졸브 등장이 끝난 뒤 레이어 부여(외곽선 켜짐). 매 스폰마다 재시도(전 스폰 경로 커버).
+        RevealVisibilityMarkupAsync().Forget();
 
         if (_config == null || _runtime == null) return;
 
@@ -998,9 +890,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
 
         if (_rb != null)
         {
-            _rb.isKinematic     = true;
-            _rb.linearVelocity  = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
+            if (!_rb.isKinematic)
+            {
+                _rb.linearVelocity  = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+            _rb.isKinematic = true;
         }
 
         if (_cachedColliders != null)
@@ -1008,18 +903,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
                 if (col != null) col.enabled = true;
 
         _firedHpTriggers.Clear();
-        System.Array.Clear(_runtime.ElementAccumulation, 0, _runtime.ElementAccumulation.Length);
 
-        // 원소 상태/버프 리셋 (일시 배율만 — 네이티브 보너스 배율은 SetRandomNativeElement에서 재설정)
         _incomingDamageMulti = 1f;
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
-        _grassRegenTimer     = 0f;
-        _elementBuildup?.ResetAll();
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
         // 풀 재사용 시 이전 Die에서 설정된 HP바 숨김 플래그/요청중 플래그를 리셋 —
-        // 리셋 없이는 RequestHPBarAsync가 조기 탈출해 HP바/이름/속성 라벨이 영구 미표시됨.
+        // 리셋 없이는 RequestHPBarAsync가 조기 탈출해 HP바가 영구 미표시됨.
         _worldHPBarSuppressed = false;
         _hpBarRequesting      = false;
 
@@ -1095,7 +986,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
             _hpBar = null;
         }
         if (_config != null)
-            _hpBar?.SetMonsterInfo(_config.monsterName, _effectiveElement);
+            _hpBar?.SetMonsterInfo(_config.monsterName);
         _hpBarRequesting = false;
     }
 
@@ -1144,52 +1035,5 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable, IElementTarget
         }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // IElementTarget 구현
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    Transform IElementTarget.Transform => transform;
-    GameObject IElementTarget.GameObject => gameObject;
-    float IElementTarget.MaxHp => EffectiveMaxHp;
-
-    public void TakeElementalDoT(float damage, ElementType source)
-    {
-        if (_runtime == null || _runtime.IsDead || damage <= 0f) return;
-        _runtime.CurrentHp -= Mathf.Max(1, (int)damage);
-        if (_runtime.CurrentHp <= 0)
-        {
-            _runtime.CurrentHp = 0;
-            _runtime.IsDead    = true;
-            ChangeState<DieState>();
-        }
-        int effMax = EffectiveMaxHp;
-        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
-        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
-
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.5f, damage, false, source);
-    }
-
-    public void SetIncomingDamageMultiplier(float multi) => _incomingDamageMulti = Mathf.Max(0f, multi);
-
-    public void SetMovementMultiplier(float multi)
-    {
-        if (_agent == null) return;
-        _agent.speed = _baseAgentSpeed * Mathf.Max(0f, multi);
-    }
-
-    public void SetAttackSpeedMultiplier(float multi)
-    {
-        _attackSpeedMulti = Mathf.Max(0f, multi);
-    }
-
-    public void SetDefenseMultiplier(float multi)
-    {
-        _defenseMulti = Mathf.Max(0f, multi);
-    }
-
-    private void HandleElementTriggered(ElementType element, ElementEffectEntry entry)
-    {
-        Debug.Log($"[Monster:{name}] 원소 발동 → {element} ({entry.effect_id}) dur={entry.duration}s");
-    }
 }
 }

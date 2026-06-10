@@ -1,0 +1,26 @@
+zone_id,zone_name,threshold,effect_type,trigger,value,value2,value3,max_stack,duration,description,stat_version
+ATK,공격,3,AttackPower,Always,10,0,0,0,0,공격력 10 증가,1
+ATK,공격,6,AttackPower,Always,20,0,0,0,0,공격력 20 증가,1
+ATK,공격,6,AttackSpeed,Always,0.05,0,0,0,0,공격 속도 5% 증가,1
+ATK,공격,10,AttackPower,Always,35,0,0,0,0,공격력 35 증가,1
+ATK,공격,10,AttackSpeed,Always,0.10,0,0,0,0,공격 속도 10% 증가,1
+DEF,방어,3,Defense,Always,8,0,0,0,0,방어력 8 증가,1
+DEF,방어,6,Defense,Always,15,0,0,0,0,방어력 15 증가,1
+DEF,방어,6,MaxHp,Always,30,0,0,0,0,최대 HP 30 증가,1
+HP,체력,3,MaxHp,Always,60,0,0,0,0,최대 HP 60 증가,1
+HP,체력,6,MaxHp,Always,100,0,0,0,0,최대 HP 100 증가,1
+HP,체력,10,MaxHp,Always,150,0,0,0,0,최대 HP 150 증가,1
+HP,체력,10,Defense,Always,10,0,0,0,0,방어력 10 증가,1
+SPD,발걸음,3,MoveSpeed,Always,0.2,0,0,0,0,이동속도 0.2 증가,1
+SPD,발걸음,6,MoveSpeed,Always,0.4,0,0,0,0,이동속도 0.4 증가,1
+SPD,발걸음,6,AttackSpeed,Always,0.05,0,0,0,0,공격 속도 5% 증가,1
+MAG,마력,3,SkillCooldownReduction,Always,0.10,0,0,0,0,스킬 쿨다운 10% 감소,1
+MAG,마력,6,SkillCooldownReduction,Always,0.15,0,0,0,0,스킬 쿨다운 15% 감소,1
+MAG,마력,6,ActiveItemCooldownReduction,Always,0.10,0,0,0,0,액티브 아이템 쿨다운 10% 감소,1
+LUCK,행운,3,Luck,Always,10,0,0,0,0,행운 10 증가,1
+LUCK,행운,6,Luck,Always,20,0,0,0,0,행운 20 증가,1
+CENTER,중앙,3,AttackPower,Always,5,0,0,0,0,공격력 5 증가,1
+CENTER,중앙,3,Defense,Always,5,0,0,0,0,방어력 5 증가,1
+CENTER,중앙,6,AttackPower,Always,8,0,0,0,0,공격력 8 증가,1
+CENTER,중앙,6,Defense,Always,8,0,0,0,0,방어력 8 증가,1
+CENTER,중앙,6,MaxHp,Always,30,0,0,0,0,최대 HP 30 증가,1

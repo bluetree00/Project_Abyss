@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -96,7 +97,10 @@ public class MonsterConfigSOEditor : Editor
                 "overrideState 지정 : 해당 SO 가 생성하는 커스텀 원소 반응 상태 사용\n" +
                 "예) 불 면역 몬스터 → fire.overrideState 에 FireImmuneStateSO 할당",
                 MessageType.Info);
-            EditorGUILayout.PropertyField(_elemental, true);
+            if (_elemental != null)
+                EditorGUILayout.PropertyField(_elemental, true);
+            else
+                EditorGUILayout.HelpBox("elemental 필드가 MonsterConfigSO에 없습니다. 필드를 추가하거나 이 섹션을 제거하세요.", MessageType.Warning);
         });
     }
 
@@ -124,7 +128,14 @@ public class MonsterConfigSOEditor : Editor
         {
             EditorGUI.indentLevel++;
             EditorGUILayout.Space(2);
-            drawContent();
+            try
+            {
+                drawContent();
+            }
+            catch (Exception e)
+            {
+                EditorGUILayout.HelpBox($"[Inspector 오류] {e.GetType().Name}: {e.Message}", MessageType.Error);
+            }
             EditorGUILayout.Space(2);
             EditorGUI.indentLevel--;
         }
