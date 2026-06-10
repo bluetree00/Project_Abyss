@@ -277,6 +277,22 @@ public class PlayerController : CharacterBase
     public bool HasWeapon => WeaponManager != null && WeaponManager.HasWeapon;
     /// <summary>현재 달리기 중인지(LocoMoveState가 결정·설정, DefaultMoveAbility가 속도에 사용).</summary>
     public bool IsRunning { get; set; }
+    /// <summary>걷기→달리기 속도 램프 진행도(0=걷기, 1=달리기). LocoMoveState가 설정, DefaultMoveAbility가 속도 보간에 사용.</summary>
+    public float RunBlend01 { get; set; }
+    /// <summary>현재 수평 실속도를 runMax 기준 0~1로 정규화. 애니 MoveSpeed 구동용(실속도라 가속·감속 반영 + 발미끄러짐 방지).</summary>
+    public float HorizontalSpeed01
+    {
+        get
+        {
+            var cd = CharacterData;
+            if (cd == null) return 0f;
+            float runMax = cd.baseRunSpeed > 0.01f ? cd.baseRunSpeed : cd.baseMoveSpeed;
+            if (runMax < 0.01f) return 0f;
+            Vector3 v = Rigid.linearVelocity;
+            float mag = Mathf.Sqrt(v.x * v.x + v.z * v.z);
+            return Mathf.Clamp01(mag / runMax);
+        }
+    }
     private bool _runAfterDash;
     /// <summary>대시(우클릭) 종료 시 다음 이동을 달리기로 시작하도록 요청.</summary>
     public void RequestRunAfterDash() => _runAfterDash = true;
@@ -809,6 +825,12 @@ public class PlayerController : CharacterBase
         data.baseLuck                   = e.base_luck;
         data.baseMoveSpeed              = e.base_move_speed;
         data.baseRunSpeed               = e.base_run_speed;
+        if (e.base_run_ramp > 0.01f) data.runRampDuration = e.base_run_ramp; // CSV 컬럼 없으면 에셋값 유지
+        if (e.move_accel > 0.01f)          data.moveAccel               = e.move_accel;
+        if (e.move_decel > 0.01f)          data.moveDecel               = e.move_decel;
+        if (e.reverse_accel_mult > 0.01f)  data.reverseAccelMultiplier  = e.reverse_accel_mult;
+        if (e.initial_boost > 0.0001f)     data.initialBoost            = e.initial_boost;
+
         data.comboDuration              = e.combo_duration;
         data.heavyAttackChargeThreshold = e.heavy_charge_threshold;
         data.heavyAttackReleaseTime     = e.heavy_release_time;

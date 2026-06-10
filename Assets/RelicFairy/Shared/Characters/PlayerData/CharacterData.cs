@@ -11,6 +11,8 @@ public class CharacterData : ScriptableObject
     [Header("캐릭터 기본 스탯")]
     public float baseMoveSpeed;
     public float baseRunSpeed;
+    [Tooltip("이동 지속 시 걷기→달리기 속도까지 점진적으로 차오르는 시간(초). 0 이하면 기본 1초 사용.")]
+    public float runRampDuration = 1.0f;
     public int maxHealth;
 
     [Header("공격력 (근거리/원거리)")]
@@ -49,6 +51,16 @@ public class CharacterData : ScriptableObject
     public float airControlMultiplier = 0.5f;
     public float groundDrag = 4f;
     public float airDrag = 0.5f;
+
+    [Header("이동 가속 모델")]
+    [Tooltip("가속도(m/s²). 목표속도를 추격하는 빠른 레이어. 0 이하면 기본값(≈0→8m/s 90ms).")]
+    public float moveAccel = 90f;
+    [Tooltip("정지 감속도(m/s²). 정밀 멈춤 위해 accel 이상 권장. 0 이하면 기본값(≈8→0 73ms).")]
+    public float moveDecel = 110f;
+    [Tooltip("역방향 입력 전환 시 가속 배율(1.5~2 권장). 0 이하면 기본 1.75.")]
+    public float reverseAccelMultiplier = 1.75f;
+    [Tooltip("정지→출발 첫 프레임 최소 출발속도(walkMax 비율, 0~0.15). 0이면 비활성.")]
+    public float initialBoost = 0f;
 
     //캐릭터 클래스
     [Header("캐릭터 클래스")]
