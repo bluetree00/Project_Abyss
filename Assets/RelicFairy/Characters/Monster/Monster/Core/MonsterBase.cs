@@ -618,16 +618,17 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 return;
             }
 
-            // NavMeshAgent가 활성화된 몬스터는 Agent가 위치를 제어하므로 Rigidbody 넉백 생략
-            // (isKinematic ↔ Agent 충돌로 발생하는 "Setting linear velocity of kinematic body" 경고 방지)
+            // 먼저 GetHitState로 전환해 NavMeshAgent를 끈 뒤 Rigidbody 넉백을 적용한다.
+            // Agent 활성 중에는 Agent가 위치를 제어해 임펄스가 무효화되고
+            // "Setting linear velocity of kinematic body" 경고가 발생하므로, 전환→임펄스 순서가 필수.
+            ChangeState<GetHitState>();
+
             if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled))
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;
                 _rb.AddForce(dir * 3f * knockbackMultiplier, ForceMode.Impulse);
             }
-
-            ChangeState<GetHitState>();
         }
     }
 

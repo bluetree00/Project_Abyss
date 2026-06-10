@@ -104,6 +104,30 @@ public class MonsterDropData
     [Min(1)] public int coinValue = 1;
 }
 
+/// <summary>처치 연출 데이터. 소멸 디졸브 · 처치 VFX · 막타(킬) 히트스톱.
+/// 모든 값은 C# 기본값 내장 — 기존 .asset 수정 없이 동작한다.</summary>
+[Serializable]
+public class MonsterDeathFxData
+{
+    [Header("소멸")]
+    [Tooltip("사망 애니메이션 재생 후 소멸 디졸브를 시작하기까지의 지연(s).")]
+    public float despawnDelay = 1.5f;
+    [Tooltip("소멸 디졸브 지속(s). 0이면 디졸브 생략 후 지연 끝에 즉시 풀 반환.")]
+    public float dissolveDuration = 0.6f;
+
+    [Header("처치 VFX")]
+    [Tooltip("사망 위치에 스폰할 VFX Addressable 키. 비우면 생략.")]
+    public string deathVfxKey = "DieEffect_01";
+    [Tooltip("처치 VFX 스케일 배율.")]
+    public float deathVfxScale = 1f;
+
+    [Header("막타 임팩트 (킬 히트스톱)")]
+    [Tooltip("킬 순간 timeScale (0~1). killHitStopDuration 이 0이면 비활성.")]
+    public float killHitStopScale = 0.04f;
+    [Tooltip("킬 히트스톱 지속(s). 0이면 막타 임팩트 비활성.")]
+    public float killHitStopDuration = 0.09f;
+}
+
 /// <summary>몬스터 애니메이션 설정 데이터.</summary>
 [Serializable]
 public class MonsterAnimationData

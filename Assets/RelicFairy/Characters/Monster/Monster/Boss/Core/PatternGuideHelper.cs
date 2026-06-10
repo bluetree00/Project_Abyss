@@ -28,12 +28,20 @@ public static class PatternGuideHelper
     public static readonly Color Seal      = new Color(0.00f, 0.50f, 1.00f); // 파란색 — 봉인 해골 마커
 
     private static readonly int SectorId = Shader.PropertyToID("_Sector");
+    private static readonly int ColorId  = Shader.PropertyToID("_Color");
 
     // ── SkillIndicator 주입 머티리얼 ────────────────────────────────
     // null이면 프리미티브 폴백. 보스 초기화 시 SetMaterials()로 1회 주입한다.
     private static Material _circleSource;
     private static Material _arrowSource;
     private static Mesh     _quadMesh;
+
+    // ── 1회 캐시 (보스전 GC 회피) ───────────────────────────────────
+    // 셰이더 룩업·머티리얼 인스턴스를 매 스폰 생성하던 것을 static 1회 캐시로 대체.
+    // 색/섹터는 공유 머티리얼 위에 MaterialPropertyBlock으로 per-renderer 지정 → 인스턴스 0개.
+    private static Shader                _unlitShader;
+    private static Material              _unlitShared; // 프리미티브 폴백 공유 머티리얼
+    private static MaterialPropertyBlock _mpb;         // 재사용 — 매 스폰 alloc 회피
 
     /// <summary>SkillIndicator 머티리얼을 주입한다. null 전달 시 프리미티브 폴백으로 동작.</summary>
     public static void SetMaterials(Material circle, Material arrow)
@@ -59,11 +67,10 @@ public static class PatternGuideHelper
     {
         if (_circleSource != null)
         {
-            var go  = CreateDecal("Guide_Disc", _circleSource, color);
+            var go  = CreateDecal("Guide_Disc", _circleSource, color, setSector: true, sector: 0f); // 꽉 찬 원
             go.transform.position   = center + Vector3.up * 0.04f;
             go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f); // Quad를 바닥에 눕힘
             go.transform.localScale = new Vector3(radius * 2f, radius * 2f, 1f);
-            go.GetComponent<MeshRenderer>().material.SetFloat(SectorId, 0f); // 꽉 찬 원
             AutoDestroy(go, lifetime);
             return go;
         }
@@ -82,7 +89,7 @@ public static class PatternGuideHelper
 
         if (_arrowSource != null && direction.sqrMagnitude > 0.001f)
         {
-            var go = CreateDecal("Guide_Beam", _arrowSource, color);
+            var go = CreateDecal("Guide_Beam", _arrowSource, color, setSector: false, sector: 0f);
             go.transform.position   = origin + direction * (range * 0.5f) + Vector3.up * 0.04f;
             // Quad 노멀(+Z)을 위로, +Y(화살표 진행)를 빔 방향으로
             go.transform.rotation   = Quaternion.LookRotation(Vector3.up, direction);
@@ -107,9 +114,8 @@ public static class PatternGuideHelper
     public static void SetColor(GameObject go, Color color)
     {
         if (go == null) return;
-        var mr = go.GetComponent<MeshRenderer>();
-        if (mr == null || mr.material == null) return;
-        mr.material.color = color; // _Color — Unlit/Color · SkillIndicator 공통
+        if (!go.TryGetComponent<MeshRenderer>(out var mr)) return;
+        ApplyGuideColor(mr, color, setSector: false, sector: 0f); // 기존 섹터(꽉찬원 등) 보존하고 색만 교체
     }
 
     /// <summary>null 안전 파괴. ref로 전달해 자동 null 초기화.</summary>
@@ -122,8 +128,9 @@ public static class PatternGuideHelper
 
     // ── 내부 헬퍼 ─────────────────────────────────────────────────
 
-    /// <summary>SkillIndicator 머티리얼을 입힌 Quad 데칼 GameObject 생성.</summary>
-    private static GameObject CreateDecal(string name, Material source, Color color)
+    /// <summary>SkillIndicator 머티리얼을 입힌 Quad 데칼 GameObject 생성.
+    /// 공유 머티리얼 + MPB로 색/섹터 지정 — 머티리얼 인스턴스 생성 없음.</summary>
+    private static GameObject CreateDecal(string name, Material source, Color color, bool setSector, float sector)
     {
         var go = new GameObject(name);
         go.AddComponent<MeshFilter>().sharedMesh = QuadMesh;
@@ -131,8 +138,8 @@ public static class PatternGuideHelper
         var mr = go.AddComponent<MeshRenderer>();
         mr.shadowCastingMode = ShadowCastingMode.Off;
         mr.receiveShadows    = false;
-        mr.sharedMaterial    = source;
-        mr.material.color    = color; // 렌더러 소유 인스턴스 생성 후 _Color 지정 (GO 파괴 시 자동 해제)
+        mr.sharedMaterial    = source; // 공유 — 인스턴스 미생성
+        ApplyGuideColor(mr, color, setSector, sector);
         return go;
     }
 
@@ -145,11 +152,37 @@ public static class PatternGuideHelper
         if (go.TryGetComponent<Collider>(out var col))
             col.enabled = false;
 
-        // 새 인스턴스 매터리얼 — Unlit/Color로 조명 무관하게 항상 보임
-        var mat = new Material(Shader.Find("Unlit/Color")) { color = color };
-        go.GetComponent<MeshRenderer>().material = mat;
+        // 공유 Unlit/Color 머티리얼 — 조명 무관하게 항상 보임. 색은 MPB로 per-renderer.
+        var mr = go.GetComponent<MeshRenderer>();
+        mr.sharedMaterial = UnlitShared;
+        ApplyGuideColor(mr, color, setSector: false, sector: 0f);
 
         return go;
+    }
+
+    /// <summary>공유 머티리얼 위에 MPB로 색(_Color)/섹터(_Sector)를 per-renderer 지정.
+    /// setSector=false면 기존 섹터 값 보존(색만 교체).</summary>
+    private static void ApplyGuideColor(MeshRenderer mr, Color color, bool setSector, float sector)
+    {
+        if (_mpb == null) _mpb = new MaterialPropertyBlock();
+        mr.GetPropertyBlock(_mpb); // 기존 블록 값 유지 (섹터 보존)
+        _mpb.SetColor(ColorId, color);
+        if (setSector) _mpb.SetFloat(SectorId, sector);
+        mr.SetPropertyBlock(_mpb);
+    }
+
+    /// <summary>프리미티브 폴백용 공유 Unlit/Color 머티리얼 — Shader.Find/new Material 1회만.</summary>
+    private static Material UnlitShared
+    {
+        get
+        {
+            if (_unlitShared == null)
+            {
+                if (_unlitShader == null) _unlitShader = Shader.Find("Unlit/Color");
+                _unlitShared = new Material(_unlitShader);
+            }
+            return _unlitShared;
+        }
     }
 
     /// <summary>내장 Quad 메시를 1회 생성·캐시한다.</summary>

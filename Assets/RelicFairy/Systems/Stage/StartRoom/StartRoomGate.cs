@@ -346,6 +346,8 @@ public class StartRoomGate : MonoBehaviour
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
     }
 
+    private static readonly object _covenantPauseOwner = new object();   // TimeScaleArbiter 요청 키
+
     private static async UniTask ShowCovenantChoiceAsync(GameRunSession run, System.Threading.CancellationToken ct)
     {
         if (run?.CovenantHandler == null) return;
@@ -377,11 +379,11 @@ public class StartRoomGate : MonoBehaviour
         popup.Setup(covenants.ToArray());
 
         // 선택 UI가 열린 동안 게임 시간 정지 (플레이어 낙하·몬스터 이동 차단)
-        Time.timeScale = 0f;
+        TimeScaleArbiter.Acquire(_covenantPauseOwner, 0f, TimeScaleArbiter.Priority.Pause);
         int chosen;
         try { chosen = await popup.WaitForChoiceAsync(); }
-        catch (System.OperationCanceledException) { Time.timeScale = 1f; return; }
-        finally { Time.timeScale = 1f; }
+        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(_covenantPauseOwner); return; }
+        finally { TimeScaleArbiter.Release(_covenantPauseOwner); }
 
         if (chosen >= 0 && chosen < covenants.Count)
         {

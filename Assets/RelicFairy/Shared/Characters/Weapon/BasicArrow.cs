@@ -149,8 +149,7 @@ public class BasicArrow : MonoBehaviour
             damageable.TakeDamage(finalDmg, _instigator, 1f, isCrit);
 
             // 타격감 (햅틱·카메라 흔들림 등)
-            if (isCrit) HitFeelService.Crit();
-            else        HitFeelService.Light();
+            HitFeelService.Hit(finalDmg, isCrit);
 
             var report = new DamageReport
             {

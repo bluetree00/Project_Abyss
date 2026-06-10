@@ -35,8 +35,7 @@ public static class HitFeedbackService
     /// </summary>
     private static void PlayDefaultFeel(in HitInfo info)
     {
-        if (info.IsCritical) HitFeelService.Crit();
-        else                 HitFeelService.Light();
+        HitFeelService.Hit(info.Damage, info.IsCritical);
     }
 
     /// <summary>피격자 로컬 피드백 — IHitReceiver 구현체에게 직접 전달.</summary>
