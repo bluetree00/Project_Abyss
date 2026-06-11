@@ -84,7 +84,8 @@ public class BossSpawner : MonoBehaviour
         }
 
         // 챕터별 보스 테이블 우선(현재 챕터 ChapterDataSO.bossSpawnTable), 없으면 직렬화 폴백.
-        var table = GameRunBootstrapper.Instance?.Run?.CurrentBossSpawnTable ?? spawnTable;
+        // ResolveBossSpawnTable은 세션 챕터 미설정 시 씬 이름 폴백까지 처리한다(절차 진행 흐름 대응).
+        var table = GameRunBootstrapper.Instance?.ResolveBossSpawnTable() ?? spawnTable;
         if (table == null)
         {
             Debug.LogWarning("[BossSpawner] spawnTable이 비어 있습니다. Inspector에서 SO를 할당해주세요.", this);

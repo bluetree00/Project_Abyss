@@ -114,6 +114,12 @@ public class UI_DialoguePopup : UI_Popup
     /// <summary>시퀀스 시작 시 등장하는 고유 키를 한 번 순회해 일괄 로드.</summary>
     private async UniTask PreloadIllustrationsAsync(DialogueLine[] lines, CancellationToken ct)
     {
+        // 매니저 참조를 1회 캡처해 release 람다에 가둔다. AddressableManager는 순수 C# 객체라
+        // Managers.Instance(MonoBehaviour)가 teardown으로 먼저 파괴돼도 이 참조는 살아있어
+        // OnDestroy/finally의 ReleaseIllustrations가 정적 getter(null)를 거치지 않고 안전하게 해제한다.
+        var addressables = Managers.AddressableManager;
+        if (addressables == null) return;
+
         var keys = lines
             .Select(l => l.illustrationKey)
             .Where(k => !string.IsNullOrEmpty(k))
@@ -123,23 +129,23 @@ public class UI_DialoguePopup : UI_Popup
         {
             ct.ThrowIfCancellationRequested();
 
-            var sprite = await Managers.AddressableManager.TryLoadAssetAsync<Sprite>(key);
+            var sprite = await addressables.TryLoadAssetAsync<Sprite>(key);
             if (sprite != null)
             {
                 _illustCache[key] = sprite;
                 var k = key;
-                _releaseActions.Add(() => Managers.AddressableManager.ReleaseAsset<Sprite>(k));
+                _releaseActions.Add(() => addressables.ReleaseAsset<Sprite>(k));
                 continue;
             }
 
             // PNG가 Texture2D 주 타입으로 등록된 경우 폴백
-            var tex = await Managers.AddressableManager.TryLoadAssetAsync<Texture2D>(key);
+            var tex = await addressables.TryLoadAssetAsync<Texture2D>(key);
             if (tex != null)
             {
                 sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0f), 100f);
                 _illustCache[key] = sprite;
                 var k = key;
-                _releaseActions.Add(() => Managers.AddressableManager.ReleaseAsset<Texture2D>(k));
+                _releaseActions.Add(() => addressables.ReleaseAsset<Texture2D>(k));
             }
             else
             {

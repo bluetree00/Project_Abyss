@@ -45,9 +45,13 @@ public sealed class LocalFileMetaStore
             if (File.Exists(FilePath))
             {
                 File.Copy(FilePath, BakPath, true);
+                SaveIntegrity.CopySidecar(FilePath, BakPath);
                 File.Delete(FilePath);
             }
             File.Move(TempPath, FilePath);
+
+            // 새 본파일 서명 기록(실패해도 저장은 성공 — 격리됨).
+            SaveIntegrity.WriteSidecar(FilePath, json);
         }
         catch (Exception e)
         {
@@ -62,7 +66,17 @@ public sealed class LocalFileMetaStore
             if (!File.Exists(path)) return null;
             string json = File.ReadAllText(path);
             if (string.IsNullOrWhiteSpace(json)) return null;
-            return JsonUtility.FromJson<UserGameData>(json);
+
+            // 사이드카 서명 검증: 불일치해도 경고만, 로드는 진행(데이터 손실 0).
+            if (SaveIntegrity.Verify(path, json) == SaveIntegrity.SignatureStatus.Mismatch)
+                Debug.LogWarning($"[SaveIntegrity] 메타 서명 불일치 — 변조 의심 ({Path.GetFileName(path)})");
+
+            var data = JsonUtility.FromJson<UserGameData>(json);
+            if (data == null) return null;
+
+            // 반환 직전 중앙 정규화 — 모든 호출자가 클램프된 값 수령.
+            SaveSanitizer.Sanitize(data);
+            return data;
         }
         catch (Exception e)
         {
