@@ -830,6 +830,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return ChapterId.Chapter1;
     }
 
+    /// <summary>
+    /// 현재 챕터의 보스 스폰 테이블을 레지스트리에서 해석한다. BossSpawner가 호출.
+    /// 절차 진행 흐름은 StartNewRunAsync를 거치지 않아 세션 CurrentChapter가 미설정(0)일 수 있으므로
+    /// ResolveCurrentChapter(씬 이름 폴백 포함)로 챕터를 확정한다.
+    /// chapterRegistry 미할당(예: LichTest)이면 null → BossSpawner가 직렬화 폴백을 사용한다.
+    /// </summary>
+    public MonsterSpawnTableSO ResolveBossSpawnTable()
+        => chapterRegistry != null ? chapterRegistry.GetData(ResolveCurrentChapter())?.bossSpawnTable : null;
+
     // ─────────────────────────────────────────────────────────────────────
     // 절차적(하데스형) 격리 룸 빌드 — RunFlowController가 호출.
     // SpawnZoneByIndexAsync의 빌드 코어를 재사용하되 contiguous 부분(world_center/
@@ -2083,7 +2092,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private async UniTask ContinueProcGenRunAsync(CancellationToken ct)
     {
         var pm   = RunProgressManager.Instance;
-        var save = pm != null && pm.HasLocalRun ? pm.LoadLocalRun() : null;
+        int slot = pm != null ? pm.ActiveSlotIndex : 0;
+        var save = pm != null && pm.HasLocalRun(slot) ? pm.LoadLocalRun(slot) : null;
         if (save == null)
         {
             Debug.LogError("[GameRunBootstrapper] ContinueProcGenRunAsync: 로컬 세이브 없음 — 새 런으로 폴백");
@@ -2225,9 +2235,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 슬롯에서 저장된 존 인덱스 및 클리어 목록 복원
+        // 슬롯에서 저장된 존 인덱스 및 클리어 목록 복원 (로컬 세이브가 단독 권위)
         var rp   = RunProgressManager.Instance;
-        var save = rp != null ? rp.Saves[rp.ActiveSlotIndex] : null;
+        var save = rp != null ? rp.LoadLocalRun(rp.ActiveSlotIndex) : null;
         int resumeZoneIndex = save?.currentZoneIndex ?? 0;
 
         // Zone 0 월드 중심 기준으로 ZoneProgression 초기화 (이어하기 시 Zone 0은 스폰하지 않음)

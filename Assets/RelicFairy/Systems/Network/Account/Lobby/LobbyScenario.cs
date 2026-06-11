@@ -24,12 +24,7 @@ public class LobbyScenario : MonoBehaviour
         if (!DevAutoLoginBootstrap.IsLoggedIn && !SteamLoginService.IsLoggedIn)
             return;
 #endif
-        await UniTask.WhenAll(
-            BackendGameData.Instance.LoadAsync(),
-            RunProgressManager.Instance != null
-                ? RunProgressManager.Instance.LoadAsync()
-                : UniTask.CompletedTask
-        );
+        await BackendGameData.Instance.LoadAsync();
     }
 
     // ── Public Methods ─────────────────────────────────────────────────────
