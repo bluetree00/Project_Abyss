@@ -123,6 +123,22 @@ public class ColliderInstance : MonoBehaviour
 
         float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
 
+        // 서약: 출력 피해 변형(아서 등). 플레이어 공격만, 크리티컬 전에 적용.
+        if (baseFinal > 0f && owner != null && owner.TryGetComponent<PlayerController>(out _))
+        {
+            var covH = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+            if (covH != null)
+            {
+                var cctx = new CombatContext
+                {
+                    Target     = other.gameObject,
+                    Damage     = baseFinal,
+                    WeaponType = weaponData != null ? weaponData.weaponType : default,
+                };
+                baseFinal = covH.ModifyOutgoing(baseFinal, cctx);
+            }
+        }
+
         // 크리티컬 굴림
         float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
         pkt.IsCrit = isCrit;
@@ -168,6 +184,9 @@ public class ColliderInstance : MonoBehaviour
                 comboStep  = attackId,
                 weaponType = weaponData?.weaponType,
             });
+
+            // 서약: 실제 적중 디스패치(근접). DealAoe 등 2차 피해는 이 경로를 안 타므로 재귀 없음.
+            GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(other.gameObject, finalDmg);
         }
 
 #if UNITY_EDITOR

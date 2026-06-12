@@ -93,6 +93,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
     private float                  _incomingDamageMulti = 1f;
+    // 받는 피해 증폭 디버프(심판 낙인 등) — 1f=없음. 시한부, 만료 시 1f로 복귀.
+    private float                  _debuffDamageTakenMult = 1f;
+    private float                  _debuffDamageTakenExpire;
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
@@ -557,6 +560,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private static bool IsPlayerInstigator(GameObject g)
         => g != null && g.GetComponentInParent<PlayerController>() != null;
 
+    /// <summary>받는 피해 증폭 디버프 부여(심판 낙인 등 적 낙인). ampPercent=0.2 → 받는 피해 ×1.2, duration초 후 자동 해제.</summary>
+    public void ApplyDamageTakenAmp(float ampPercent, float duration)
+    {
+        _debuffDamageTakenMult   = 1f + Mathf.Max(0f, ampPercent);
+        _debuffDamageTakenExpire = Time.time + duration;
+    }
+
     public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null || _runtime.IsDead) return;
@@ -574,9 +584,13 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 amount = covHandler.ModifyOutgoing(amount, new CombatContext { Target = gameObject, Damage = amount, IsCritical = isCrit });
         }
 
-        // 방어력 + 데미지 배율 + 받는 데미지 배율 (최소 1 데미지)
+        // 받는피해 증폭 디버프(낙인 등) 만료 처리
+        if (_debuffDamageTakenMult != 1f && Time.time >= _debuffDamageTakenExpire)
+            _debuffDamageTakenMult = 1f;
+
+        // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭 (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
-        float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti);
+        float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * _debuffDamageTakenMult);
         _runtime.CurrentHp -= (int)actual;
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
@@ -905,6 +919,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _firedHpTriggers.Clear();
 
         _incomingDamageMulti = 1f;
+        _debuffDamageTakenMult = 1f;
+        _debuffDamageTakenExpire = 0f;
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
         if (_agent != null) _agent.speed = _baseAgentSpeed;

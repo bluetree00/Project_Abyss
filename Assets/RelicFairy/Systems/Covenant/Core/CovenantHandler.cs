@@ -37,17 +37,46 @@ public sealed class CovenantHandler
             c.Initialize(_ctx);
     }
 
+    // 무기 교체 어댑터 상태 (OnWeaponSwap 디스패치용)
+    private PlayerWeaponManager _weapons;
+    private WeaponData _lastWeapon;
+    private Action<WeaponData, GameObject> _onWeaponChanged;
+
     public void BindPlayer(PlayerController player)
     {
         foreach (var c in _covenants)
             c.OnBoundToPlayer(player);
+
+        // 무기 교체 → OnWeaponSwap 디스패치 (OnWeaponChanged는 새 무기만 주므로 이전 무기 캐싱)
+        UnsubscribeWeapon();
+        _weapons = player != null ? player.WeaponManager : null;
+        if (_weapons != null)
+        {
+            _lastWeapon = _weapons.CurrentWeaponData;
+            _onWeaponChanged = (newData, _) =>
+            {
+                var prev = _lastWeapon;
+                _lastWeapon = newData;
+                foreach (var c in _covenants) c.OnWeaponSwap(prev, newData);
+            };
+            _weapons.OnWeaponChanged += _onWeaponChanged;
+        }
     }
 
     public void Cleanup()
     {
+        UnsubscribeWeapon();
         foreach (var c in _covenants)
             c.Dispose();
         _covenants.Clear();
+    }
+
+    private void UnsubscribeWeapon()
+    {
+        if (_weapons != null && _onWeaponChanged != null)
+            _weapons.OnWeaponChanged -= _onWeaponChanged;
+        _onWeaponChanged = null;
+        _weapons = null;
     }
 
     // ── 획득 / 강화 / 진화 ──────────────────────────────
@@ -197,6 +226,16 @@ public sealed class CovenantHandler
             if (c.TryPreventDeath()) return true;
         }
         return false;
+    }
+
+    /// <summary>치명타 오버라이드 질의. 첫 응답 서약(갤러해드)의 결과를 반환. CombatCalculator.RollCrit이 호출.</summary>
+    public bool TryGetCritOverride(WeaponData weapon, out bool forceCrit, out float minFloorRatio)
+    {
+        foreach (var c in _covenants)
+        {
+            if (c.TryProvideCritOverride(weapon, out forceCrit, out minFloorRatio)) return true;
+        }
+        forceCrit = false; minFloorRatio = 0f; return false;
     }
 
     // ── 메커닉 파이프라인 ────────────────────────────────
