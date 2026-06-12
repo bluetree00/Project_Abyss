@@ -15,6 +15,8 @@ public enum StatType
     ActiveItemCooldownReduction, // 액티브 아이템 쿨다운 감소
     Projectile,                 // 투사체 추가 개수 (가산)
     InstantDamage,              // 즉시 피해 (버프가 아닌 즉발 효과)
+    CritChance,                 // 치명타 확률 보너스(%포인트 가산) — 유물 베이스/버프
+    CritDamage,                 // 치명타 피해 배율 보너스(가산, 0.2 = +20%)
 }
 
 /// <summary>

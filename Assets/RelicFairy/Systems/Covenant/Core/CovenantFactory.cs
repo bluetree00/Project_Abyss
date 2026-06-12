@@ -10,16 +10,16 @@ public static class CovenantFactory
     // ── ID 상수 ──────────────────────────────────────────
     public const string Nimue      = "nimue";
     public const string Morgana    = "morgana";
+    public const string Lionel      = "lionel";      // v2 신규 (행동 조건형)
+    public const string Elaine      = "elaine";      // v2 신규 (전투 리듬형)
+    public const string Kay         = "kay";         // v2 신규 (전투 리듬형)
+    public const string Bedivere    = "bedivere";    // v2 신규 (트레이드오프형)
+    public const string Tristan     = "tristan";     // v2 신규 (행동 조건형)
+    public const string Isolde      = "isolde";      // v2 신규 (전투 리듬형)
+    public const string Leodegrance = "leodegrance"; // v2 신규 (런 구조형 — 임시 스텁)
+    public const string Guinevere   = "guinevere";   // v2 신규 (런 구조형 — 임시 스텁)
     public const string Arthur     = "arthur";
     public const string Galahad    = "galahad";
-    public const string Mordred    = "mordred";
-    public const string Morrigan   = "morrigan";
-    public const string CuChulainn = "cuchulainn";
-    public const string Lugh       = "lugh";
-    public const string Balor      = "balor";
-    public const string Hecate     = "hecate";
-    public const string Solomon    = "solomon";
-    public const string Prometheus = "prometheus";
 
     // ── 등록 테이블 ─────────────────────────────────────
     private static readonly Dictionary<string, Func<CovenantBase>> _registry
@@ -27,16 +27,19 @@ public static class CovenantFactory
     {
         { Nimue,      () => new NimueCovenant()      },
         { Morgana,    () => new MorganaCovenant()    },
+        { Lionel,      () => new LionelCovenant()      },
+        { Elaine,      () => new ElaineCovenant()      },
+        { Kay,         () => new KayCovenant()         },
+        { Bedivere,    () => new BedivereCovenant()    },
+        { Tristan,     () => new TristanCovenant()     },
+        { Isolde,      () => new IsoldeCovenant()      },
+        { Leodegrance, () => new LeodegranceCovenant() },
+        { Guinevere,   () => new GuinevereCovenant()   },
         { Arthur,     () => new ArthurCovenant()     },
         { Galahad,    () => new GalahadCovenant()    },
-        { Mordred,    () => new MordredCovenant()    },
-        { Morrigan,   () => new MorriganCovenant()   },
-        { CuChulainn, () => new CuChulainnCovenant() },
-        { Lugh,       () => new LughCovenant()       },
-        { Balor,      () => new BalorCovenant()      },
-        { Hecate,     () => new HecateCovenant()     },
-        { Solomon,    () => new SolomonCovenant()    },
-        { Prometheus, () => new PrometheusCovenant() },
+        // v2 로스터 확정: 위 12종이 랜덤 3지선다 풀.
+        // 구버전 8종(mordred/morrigan/cuchulainn/lugh/balor/hecate/solomon/prometheus)은
+        // 2026-06-12 구현체·데이터·테이블 참조 전부 삭제 완료.
     };
 
     // ── API ─────────────────────────────────────────────

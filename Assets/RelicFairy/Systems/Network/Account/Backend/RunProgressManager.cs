@@ -1,13 +1,11 @@
 using System;
-using BackEnd;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 이어하기 저장/불러오기. 뒤끝 RUN_PROGRESS 테이블 CRUD — 슬롯 3개 지원.
+/// 진행 중 런 세이브(이어하기). 로컬 파일(persistentDataPath)이 단독 권위 — 슬롯 3개.
 ///
-/// 저장 시점 : StageMap 진입 (방 사이). StageMapBootstrapper가 SaveAsync 호출.
-/// 삭제 시점 : 런 종료. AppBootstrapper.EndRun → ClearAsync 호출.
+/// 저장 시점 : 방 경계(RunFlowController.SaveRunState → SaveRunLocal).
+/// 삭제 시점 : 사망/런 클리어/슬롯 삭제(ClearLocalRun).
 /// </summary>
 public class RunProgressManager : MonoBehaviour
 {
@@ -15,8 +13,7 @@ public class RunProgressManager : MonoBehaviour
     // Constants
     // ─────────────────────────────────────────────────────────
 
-    private const string TABLE     = "USER_RUN_PROGRESS";
-    public  const int    SlotCount = 3;
+    public const int SlotCount = 3;
 
     // ─────────────────────────────────────────────────────────
     // Static
@@ -28,28 +25,20 @@ public class RunProgressManager : MonoBehaviour
     // Private
     // ─────────────────────────────────────────────────────────
 
-    private readonly string[] _rowInDates = new string[SlotCount];
-
-    // PR1: 진행 중 런 세이브는 로컬 파일(persistentDataPath)이 권위.
-    // 뒤끝 USER_RUN_PROGRESS(SaveAsync/ClearAsync)는 텔레메트리 분리 전까지 무변경으로 둔다.
+    // 진행 중 런 세이브는 로컬 파일(persistentDataPath)이 단독 권위.
     private readonly IRunSaveStore _localStore = new LocalFileRunSaveStore();
 
     // ─────────────────────────────────────────────────────────
     // Properties
     // ─────────────────────────────────────────────────────────
 
-    public RunSaveData[] Saves           { get; private set; } = new RunSaveData[SlotCount];
-
-    /// <summary>현재 플레이 중인 슬롯 인덱스. UI에서 슬롯 선택 시 설정.</summary>
-    public int           ActiveSlotIndex { get; set; } = 0;
-
-    public bool HasActiveSaveAt(int slot) => IsValidSlot(slot) && Saves[slot]?.hasActiveRun == true;
-
-    // ─────────────────────────────────────────────────────────
-    // Events
-    // ─────────────────────────────────────────────────────────
-
-    public event Action OnSaveLoaded;
+    /// <summary>현재 플레이 중인 슬롯 인덱스. UI에서 슬롯 선택 시 설정. 유효 범위(0~2)로 클램프.</summary>
+    private int _activeSlotIndex = 0;
+    public int ActiveSlotIndex
+    {
+        get => _activeSlotIndex;
+        set => _activeSlotIndex = Mathf.Clamp(value, 0, SlotCount - 1);
+    }
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
@@ -65,154 +54,42 @@ public class RunProgressManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        for (int i = 0; i < SlotCount; i++)
-            Saves[i] = MakeEmpty(i);
+        // 레거시 단일 run_save.json → 슬롯 파일 1회 이전(무손실).
+        _localStore.MigrateIfNeeded();
     }
 
     // ─────────────────────────────────────────────────────────
-    // Public Methods
+    // Public Methods — 로컬 런 세이브
     // ─────────────────────────────────────────────────────────
 
-    /// <summary>로그인 직후 호출. RUN_PROGRESS 전체 행을 불러온다.</summary>
-    public async UniTask LoadAsync()
-    {
-        var tcs = new UniTaskCompletionSource();
+    /// <summary>지정 슬롯에 유효한 진행 중 런 세이브가 있는지.</summary>
+    public bool HasLocalRun(int slot) => _localStore.HasSave(slot);
 
-        Backend.GameData.GetMyData(TABLE, new Where(), callback =>
-        {
-            if (callback.IsSuccess())
-            {
-                try
-                {
-                    var rows = callback.FlattenRows();
-                    for (int i = 0; i < rows.Count; i++)
-                    {
-                        var row  = rows[i];
-                        int slot = ParseInt(row, "slotIndex", 0);
-                        if (!IsValidSlot(slot)) continue;
+    /// <summary>지정 슬롯의 로컬 런 세이브를 로드한다(없으면 null).</summary>
+    public RunSaveData LoadLocalRun(int slot) => _localStore.Load(slot);
 
-                        _rowInDates[slot] = row["inDate"].ToString();
-                        Saves[slot]       = ParseRow(row);
-                    }
-
-                    // 서버에 없는 슬롯은 빈 행 삽입 (비동기 fire-and-forget)
-                    for (int i = 0; i < SlotCount; i++)
-                    {
-                        if (string.IsNullOrEmpty(_rowInDates[i]))
-                            InsertEmptyRow(i);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[RunProgress] Load parse error: {e}");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"[RunProgress] Load failed: {callback.GetMessage()}");
-            }
-
-            OnSaveLoaded?.Invoke();
-            tcs.TrySetResult();
-        });
-
-        await tcs.Task;
-    }
-
-    /// <summary>
-    /// StageMap 진입 시 호출. 현재 런 상태를 직렬화해 지정 슬롯에 저장한다.
-    /// isNewRun=true이면 retryCount를 먼저 1 증가시킨다.
-    /// </summary>
-    public async UniTask SaveAsync(GameRunSession session, int slotIndex, bool isNewRun = false, bool isInStartRoom = false)
-    {
-        if (session == null || !session.IsRunning) return;
-        if (!IsValidSlot(slotIndex)) return;
-
-        if (isNewRun)
-            Saves[slotIndex].retryCount++;
-
-        Saves[slotIndex] = BuildSaveData(session, slotIndex, Saves[slotIndex].retryCount, isInStartRoom, Saves[slotIndex]);
-
-        var param = ToParam(Saves[slotIndex]);
-        var tcs   = new UniTaskCompletionSource();
-
-        if (string.IsNullOrEmpty(_rowInDates[slotIndex]))
-        {
-            Backend.GameData.Insert(TABLE, param, cb =>
-            {
-                if (cb.IsSuccess())
-                    _rowInDates[slotIndex] = cb.GetInDate();
-                else
-                    Debug.LogWarning($"[RunProgress] Save[{slotIndex}](Insert) failed: {cb.GetMessage()}");
-                tcs.TrySetResult();
-            });
-        }
-        else
-        {
-            Backend.GameData.UpdateV2(TABLE, _rowInDates[slotIndex], Backend.UserInDate, param, cb =>
-            {
-                if (!cb.IsSuccess())
-                    Debug.LogWarning($"[RunProgress] Save[{slotIndex}](Update) failed: {cb.GetMessage()}");
-                tcs.TrySetResult();
-            });
-        }
-
-        await tcs.Task;
-    }
-
-    /// <summary>런 종료 또는 슬롯 삭제 시 호출. 모든 필드를 기본값으로 초기화한다.</summary>
-    public async UniTask ClearAsync(int slotIndex)
-    {
-        if (!IsValidSlot(slotIndex)) return;
-
-        Saves[slotIndex] = MakeEmpty(slotIndex);
-
-        if (string.IsNullOrEmpty(_rowInDates[slotIndex])) return;
-
-        var param = ToParam(MakeEmpty(slotIndex));
-        var tcs   = new UniTaskCompletionSource();
-
-        Backend.GameData.UpdateV2(TABLE, _rowInDates[slotIndex], Backend.UserInDate, param, cb =>
-        {
-            if (!cb.IsSuccess())
-                Debug.LogWarning($"[RunProgress] Clear[{slotIndex}] failed: {cb.GetMessage()}");
-            tcs.TrySetResult();
-        });
-
-        await tcs.Task;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // Public Methods — 로컬 런 세이브 (PR1)
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>로컬에 유효한 진행 중 런 세이브가 있는지.</summary>
-    public bool HasLocalRun => _localStore.HasSave();
-
-    /// <summary>로컬 런 세이브를 로드한다(없으면 null).</summary>
-    public RunSaveData LoadLocalRun() => _localStore.Load();
-
-    /// <summary>로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시).</summary>
-    public void ClearLocalRun() => _localStore.Delete();
+    /// <summary>지정 슬롯의 로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시). 다른 슬롯 무영향.</summary>
+    public void ClearLocalRun(int slot) => _localStore.Delete(slot);
 
     /// <summary>
     /// 방 경계에서 현재 런 전체 상태를 로컬에 저장한다.
-    /// 기존 BuildSaveData(서버 경로 무변경)로 공통 필드를 채운 뒤 절차생성/로드아웃/룬 확장 필드를 덧붙인다.
+    /// BuildSaveData로 공통 필드를 채운 뒤 절차생성/로드아웃/룬 확장 필드를 덧붙인다.
     /// </summary>
     public void SaveRunLocal(GameRunSession session, in RunMetaSnapshot meta)
     {
         if (session == null || !session.IsRunning) return;
 
-        var prev  = _localStore.Load();
+        int slot  = ActiveSlotIndex;
+        var prev  = _localStore.Load(slot);
         int retry = prev?.retryCount ?? 0;
 
-        var data = BuildSaveData(session, ActiveSlotIndex, retry, false, prev);
+        var data = BuildSaveData(session, slot, retry, false, prev);
         ApplyExtendedFields(data, session, meta);
 
-        _localStore.Save(data);
+        _localStore.Save(slot, data);
     }
 
-    /// <summary>로컬 세이브 전용 확장 필드 채움. 서버 ToParam/BuildSaveData에는 영향 없음.</summary>
+    /// <summary>로컬 세이브 전용 확장 필드 채움. BuildSaveData 공통 필드와 별개.</summary>
     private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m)
     {
         d.saveVersion       = 1;
@@ -359,87 +236,4 @@ public class RunProgressManager : MonoBehaviour
         return !string.IsNullOrEmpty(data?.weaponSOKey) ? data.weaponSOKey
              : data?.weaponPrefabKey ?? string.Empty;
     }
-
-    private static Param ToParam(RunSaveData d) => new Param
-    {
-        { "slotIndex",        d.slotIndex },
-        { "hasActiveRun",     d.hasActiveRun },
-        { "chapter",          d.chapter },
-        { "currentHp",        d.currentHp },
-        { "maxHp",            d.maxHp },
-        { "runGold",          d.runGold },
-        { "retryCount",       d.retryCount },
-        { "progressPercent",  d.progressPercent },
-        { "itemCount",        d.itemCount },
-        { "synergyCount",     d.synergyCount },
-        { "roomClearCount",   d.roomClearCount },
-        { "characterKey",     d.characterKey },
-        { "characterName",    d.characterName },
-        { "weapon0PrefabKey", d.weapon0PrefabKey },
-        { "weapon1PrefabKey", d.weapon1PrefabKey },
-        { "itemsJson",        d.itemsJson },
-        { "synergiesJson",    d.synergiesJson },
-        { "roomLogsJson",     d.roomLogsJson },
-        { "savedAt",                d.savedAt },
-        { "isInStartRoom",          d.isInStartRoom },
-        { "currentZoneIndex",       d.currentZoneIndex },
-        { "clearedZoneIndicesJson", d.clearedZoneIndicesJson },
-    };
-
-    // ─────────────────────────────────────────────────────────
-    // Private Methods — Parse
-    // ─────────────────────────────────────────────────────────
-
-    private static RunSaveData ParseRow(LitJson.JsonData row)
-    {
-        return new RunSaveData
-        {
-            slotIndex        = ParseInt(row,    "slotIndex",        0),
-            hasActiveRun     = ParseBool(row,   "hasActiveRun"),
-            chapter          = ParseInt(row,    "chapter",          1),
-            currentHp        = ParseInt(row,    "currentHp",       100),
-            maxHp            = ParseInt(row,    "maxHp",           100),
-            runGold          = ParseInt(row,    "runGold",           0),
-            retryCount       = ParseInt(row,    "retryCount",        0),
-            progressPercent  = ParseInt(row,    "progressPercent",   0),
-            itemCount        = ParseInt(row,    "itemCount",          0),
-            synergyCount     = ParseInt(row,    "synergyCount",       0),
-            roomClearCount   = ParseInt(row,    "roomClearCount",     0),
-            characterKey     = ParseString(row, "characterKey"),
-            characterName    = ParseString(row, "characterName"),
-            weapon0PrefabKey = ParseString(row, "weapon0PrefabKey"),
-            weapon1PrefabKey = ParseString(row, "weapon1PrefabKey"),
-            itemsJson        = ParseString(row, "itemsJson"),
-            synergiesJson    = ParseString(row, "synergiesJson"),
-            roomLogsJson           = ParseString(row, "roomLogsJson"),
-            savedAt                = ParseString(row, "savedAt"),
-            isInStartRoom          = ParseBool(row,   "isInStartRoom"),
-            currentZoneIndex       = ParseInt(row,    "currentZoneIndex",    0),
-            clearedZoneIndicesJson = ParseString(row, "clearedZoneIndicesJson"),
-        };
-    }
-
-    private static bool   ParseBool(LitJson.JsonData row, string key)
-        => row.ContainsKey(key) && bool.TryParse(row[key].ToString(), out var v) && v;
-    private static int    ParseInt(LitJson.JsonData row, string key, int fallback)
-        => row.ContainsKey(key) && int.TryParse(row[key].ToString(), out var v) ? v : fallback;
-    private static string ParseString(LitJson.JsonData row, string key)
-        => row.ContainsKey(key) ? row[key].ToString() : string.Empty;
-
-    private static RunSaveData MakeEmpty(int slotIndex)
-        => new RunSaveData { slotIndex = slotIndex, hasActiveRun = false };
-
-    private void InsertEmptyRow(int slotIndex)
-    {
-        var param = ToParam(MakeEmpty(slotIndex));
-        Backend.GameData.Insert(TABLE, param, cb =>
-        {
-            if (cb.IsSuccess())
-                _rowInDates[slotIndex] = cb.GetInDate();
-            else
-                Debug.LogWarning($"[RunProgress] Empty insert[{slotIndex}] failed: {cb.GetMessage()}");
-        });
-    }
-
-    private static bool IsValidSlot(int slot) => slot >= 0 && slot < SlotCount;
 }

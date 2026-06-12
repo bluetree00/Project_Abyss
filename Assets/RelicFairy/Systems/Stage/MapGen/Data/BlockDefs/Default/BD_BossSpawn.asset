@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fca197032da92624dad13766f5d4c427, type: 3}
   m_Name: BD_BossSpawn
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
-  prefab: {fileID: 5040475063202128142, guid: 38333e7c30def2648a5247f197644d3b, type: 3}
+  prefab: {fileID: 5040475063202128142, guid: 74fdb3e32e9fe664fa473febece4b999, type: 3}
   tileType: 6
   facingRule: 0
   weight: 1

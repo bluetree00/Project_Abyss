@@ -38,6 +38,13 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
             return;
         }
 
+        // 유물 스킬 게이팅(정오 구간 한정 / 자동 발동형 수동 입력 차단 등). 레거시 유물은 항상 true.
+        if (_controller.RelicBehavior != null && !_controller.RelicBehavior.CanUseSkill(Slot))
+        {
+            _stateChanger.Change(default);
+            return;
+        }
+
         UnityEngine.Debug.Log($"[SkillBase] {Slot} Enter");
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
             new PassiveContext { skillUsed = Slot });
@@ -45,6 +52,9 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
         // 아이템 효과: 스킬 사용 hook (FireExplosion, Lightning 등)
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         mgr?.OnSkillUse(Slot);
+
+        // 서약: 스킬 사용 디스패치 (엘레인/이졸데 등)
+        GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnSkillUse(Slot);
 
         // 룬 속성 효과: 스킬 사용 hook (전기 방전 등)
         _controller.RuneEffects.NotifySkillUsed();

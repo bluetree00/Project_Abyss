@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 7788228038494383230}
   - component: {fileID: 425894906297530831}
   - component: {fileID: 8039392198882294540}
-  - component: {fileID: 6450213546446177719}
   m_Layer: 3
   m_Name: Block_Spawn
   m_TagString: Untagged
@@ -113,25 +112,3 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &6450213546446177719
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5040475063202128142}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5da663183bc27ff4a981057b217128c6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BossSpawner
-  spawnTable: {fileID: 11400000, guid: 880c546a040888c499c89d944405966e, type: 2}
-  spawnDelay: 1.5
-  spawnEffectAddressKey: 
-  spawnEffectDuration: 2
-  spawnEffectYOffset: 0
-  spawnEffectScale: 1
-  spawnDissolveDuration: 1.5
-  spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
-  placedBoss: {fileID: 0}
-  waitForExternalTrigger: 0

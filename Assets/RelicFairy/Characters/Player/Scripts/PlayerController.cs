@@ -218,6 +218,18 @@ public class PlayerController : CharacterBase
 
     public event Action OnDamageTaken;
 
+    /// <summary>회피 무적 창 시작(true)/종료(false) 신호. 시각 "안전" 피드백(머티리얼 블링크/잔상 등) 구독용.
+    /// 현재 렌더러 직접 조작 없이 훅만 노출 — 후속에서 안전한 시각 효과를 여기에 연결한다.</summary>
+    public event Action<bool> OnDodgeIFrame;
+    public void RaiseDodgeIFrame(bool active) => OnDodgeIFrame?.Invoke(active);
+
+    /// <summary>회피 시작(Enter)/종료(Exit) 신호. 대시 먼지·트레일 등 i-frame 창과 무관하게
+    /// 회피 동작 전체에 걸리는 시각 연출 구독용(DodgePresentation).</summary>
+    public event Action OnDodgeStart;
+    public event Action OnDodgeEnd;
+    public void RaiseDodgeStart() => OnDodgeStart?.Invoke();
+    public void RaiseDodgeEnd()   => OnDodgeEnd?.Invoke();
+
     public event Action OnHudStatChanged
     {
         add => RuntimeStats.OnChanged += value;
@@ -574,6 +586,11 @@ public class PlayerController : CharacterBase
         AutoSetIdleIfNoAction();
         InitPassives();
         ApplyRelic();
+
+        // 회피 연출(잔상/틴트/먼지/트레일) 런타임 자동 부착 — 프리팹/씬 수동 배선 불가 환경 대응.
+        // 중복 부착 금지. 시각 자원(CharacterData optional 필드) 미할당 시 컴포넌트는 무동작.
+        if (!TryGetComponent<DodgePresentation>(out _))
+            gameObject.AddComponent<DodgePresentation>();
 
         if (inputReady) BindInputActions();
     }
