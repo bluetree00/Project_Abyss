@@ -1,4 +1,4 @@
-index,covenant_id,slot,description,basic,enhanced,evolved,stat_version
+﻿index,covenant_id,slot,description,basic,enhanced,evolved,stat_version
 2001,lionel,0,연속 적중 필요 횟수,5,4,4,1
 2002,lionel,1,충격파 반경(m),2,3,3,1
 2003,lionel,2,발동 후 재시작 카운터,0,0,2,1

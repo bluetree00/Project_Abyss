@@ -654,6 +654,13 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
+    /// <summary>유물 일시 이동속도 보너스(퍼센트 가산, -0.2 = -20%). 랜슬롯 빈틈 등. 0 = 해제.</summary>
+    public void SetRelicMoveSpeedBonus(float pct)
+    {
+        _relicMoveSpeed = pct;
+        Recalculate();
+    }
+
     // ── 내부 재계산 ──────────────────────────────────────────────────────────────
 
     private void Recalculate()
