@@ -18,6 +18,12 @@ public interface IRelicBehavior
     /// <summary>고유 스킬 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
     float GetSkillCooldown(SkillType slot);
 
+    /// <summary>
+    /// 고유 스킬 발동 가능 여부(리소스 게이팅). 정오 구간 한정·스택 조건 등.
+    /// true=발동 허용(레거시 기본). 자동 발동형(랜슬롯)은 수동 입력을 false로 막고 내부에서 발동.
+    /// </summary>
+    bool CanUseSkill(SkillType slot);
+
     /// <summary>피격 데미지 보정(갈라하드 방패 감소 등). 그대로면 dmg 반환.</summary>
     int ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker);
 }

@@ -733,6 +733,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
     }
 
+    /// <summary>
+    /// 대기방(BlockMap_zone_0_, =_currentMapGO) GO를 호출자에게 넘기고 참조를 비운다.
+    /// 절차런은 _currentMapGO를 쓰지 않으므로(ProcRoom_*로 별도 추적) 대기방은 원점에 방치된다.
+    /// RunFlowController가 첫 절차 방 진입 후 이를 파괴해 잔존 zone_0이 보스룸 등과 겹치지 않게 한다.
+    /// </summary>
+    public GameObject ConsumeWaitingRoomMap()
+    {
+        var go = _currentMapGO;
+        _currentMapGO = null;
+        return go;
+    }
+
     // ── 런 종료 (사망/클리어) ──────────────────────────────────────
     private bool _runEnding;
 
@@ -903,38 +915,72 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         roomGO.transform.SetParent(root, false);
         roomGO.transform.position = anchor;
 
-        MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
+        // 커스텀 손맵 아레나(보스 등): arena_template_key가 있으면 격자 지형 대신 프리팹이 방 전체를 제공한다.
+        // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
+        bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
 
         // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
         //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
         //    리프프로그 앵커로 카메라 밖(+300)에 빌드되므로 순서/연출에 영향 없음. 순서는 await로 보존된다.
-        var blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
-        await UniTask.Yield(ct);
-        MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
-        await UniTask.Yield(ct);
-        if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
-        await UniTask.Yield(ct);
-
-        // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
-        //      blocks에 합쳐 디졸브/디스폰에 함께 동참시킨다.
-        if (procDoorCorridorLength > 0 && palette != null)
+        var blocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>();
+        if (useCustomArena)
         {
-            float offX = (w - 1) * 0.5f * blockCellSize;
-            float offZ = (h - 1) * 0.5f * blockCellSize;
-            void AddCorridor(Vector2Int cell)
+            // NavMesh(아래 BuildMapNavMeshAsync)가 프리팹 바닥을 포함하도록 roomGO 자식으로 먼저 인스턴스화한다.
+            // localPosition 0 = 방 중앙(anchor). heading 회전은 격자 입구 문(cls.entrance)과 맞물리도록 동일 quarterTurns 적용.
+            // (mirror는 적용하지 않음 — 프리팹 입구를 변 중앙에 두면 좌우 미러가 입구 위치에 영향 없음)
+            GameObject arena = null;
+            try
             {
-                var info        = doorInfos[cell];
-                var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
-                blocks.AddRange(MapBuilder.BuildDoorCorridor(
-                    palette, roomGO.transform, centerLocal, info.edge, info.width,
-                    procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+                arena = await Managers.AddressableManager.InstantiateAsync(entry.arena_template_key, roomGO.transform);
             }
-            if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
-            if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
-            foreach (var t in cls.turns) AddCorridor(t);
+            catch (System.OperationCanceledException) { throw; }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 인스턴스 실패: {ex.Message}");
+            }
+            if (arena != null)
+            {
+                arena.transform.localPosition = Vector3.zero;
+                arena.transform.localRotation = Quaternion.Euler(0f, 90f * quarterTurns, 0f);
+            }
+            else
+            {
+                Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 미배치 — 빈 방으로 진행 ({entry.pool_key})");
+            }
+        }
+        else
+        {
+            MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
+            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+            await UniTask.Yield(ct);
+            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            await UniTask.Yield(ct);
+            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+            await UniTask.Yield(ct);
+
+            // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
+            //      blocks에 합쳐 디졸브/디스폰에 함께 동참시킨다.
+            if (procDoorCorridorLength > 0 && palette != null)
+            {
+                float offX = (w - 1) * 0.5f * blockCellSize;
+                float offZ = (h - 1) * 0.5f * blockCellSize;
+                void AddCorridor(Vector2Int cell)
+                {
+                    var info        = doorInfos[cell];
+                    var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
+                    blocks.AddRange(MapBuilder.BuildDoorCorridor(
+                        palette, roomGO.transform, centerLocal, info.edge, info.width,
+                        procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+                }
+                if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
+                if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
+                foreach (var t in cls.turns) AddCorridor(t);
+            }
         }
 
         // 8. 토큰 (PreBuild 스포너 → NavMesh → PostBuild 장식/보스)
+        //    커스텀 아레나는 프리팹이 보스/스포너/장식을 모두 소유하므로 grid 토큰을 실행하지 않는다.
+        //    (실행 시 grid의 B 토큰이 팔레트 보스 스포너를 중복 생성 → 보스 2마리 버그)
         var deferredSpawners = new System.Collections.Generic.List<UnityEngine.MonoBehaviour>();
         var tokenCtx = new TokenContext
         {
@@ -949,11 +995,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             DeferredSpawners   = deferredSpawners,
             Ct                 = ct,
         };
-        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PreBuild);
+        if (!useCustomArena) TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PreBuild);
 
         HideAllBlockRenderers(blocks);
         await BuildMapNavMeshAsync(roomGO);
-        TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PostBuild);
+        if (!useCustomArena) TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PostBuild);
 
         InitializeMinimapForRoom(roomGO, w, h);
         AttachRoomClearController(roomGO);

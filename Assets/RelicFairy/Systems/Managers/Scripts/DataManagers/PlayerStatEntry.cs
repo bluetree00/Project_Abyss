@@ -35,6 +35,8 @@ public class PlayerStatEntry
     public float  ground_drag;
     public float  air_drag;
     public string passive_id;
+    public float  crit_chance;     // 치명타 확률(%포인트). 무기 크릿 위에 가산.
+    public float  crit_damage;     // 치명타 피해 배율 보너스(가산, 0.2=+20%).
     public int    stat_version;
 }
 

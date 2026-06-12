@@ -493,7 +493,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             await UniTask.WhenAll(
                 Managers.ItemData.InitializeAsync(),
-                Managers.RuneData.InitializeAsync()
+                Managers.RuneData.InitializeAsync(),
+                Managers.RelicStatData.InitializeAsync()
             );
             startScene = Define.Scene.Lobby;
         }
@@ -509,6 +510,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
                     Managers.RuneData.InitializeAsync(),
+                    Managers.RelicStatData.InitializeAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공");
@@ -519,7 +521,8 @@ public sealed class AppBootstrapper : MonoBehaviour
                 // 로그인 실패 시 Addressables 폴백으로 초기화
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
-                    Managers.RuneData.InitializeAsync()
+                    Managers.RuneData.InitializeAsync(),
+                    Managers.RelicStatData.InitializeAsync()
                 );
             }
             if (startScene == Define.Scene.Logo)
