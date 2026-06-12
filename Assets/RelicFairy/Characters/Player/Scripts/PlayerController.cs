@@ -774,13 +774,11 @@ public class PlayerController : CharacterBase
             await LoadCharacterDataAsync(characterName + "Data");
         }
 
-        // 스탯 초기화: 무유물 기본은 'knight' 서버 행 → 서버 없으면 SO 폴백.
-        // (유물 획득 시 ApplyRelic에서 해당 유물 char_id 행으로 교체)
-        bool serverApplied = TryApplyServerStats("knight");
-        if (!serverApplied && characterData != null)
+        // 무유물 기본 스탯은 SO(범용 바디)에서 초기화 — 유물 착용 시 ApplyRelic이 서버 char_id 행으로 교체.
+        if (characterData != null)
         {
             RuntimeStats.InitializeFrom(characterData);
-            Debug.Log($"[PlayerController] SO 데이터 사용: {characterData.characterName}");
+            Debug.Log($"[PlayerController] 무유물 기본 스탯(SO): {characterData.characterName}");
         }
 
         if (Rigid != null)
