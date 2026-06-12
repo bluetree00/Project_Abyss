@@ -6,7 +6,7 @@ public static class RelicRegistry
         switch (id)
         {
             case RelicId.Galahad: return new GalahadRelic();
-            case RelicId.Gawain:  return new GawainRelic();
+            case RelicId.Gawain:  return new GawainZenithRelic(); // v1 차세대(레거시 GawainRelic 보존·미등록)
             default:              return null;
         }
     }

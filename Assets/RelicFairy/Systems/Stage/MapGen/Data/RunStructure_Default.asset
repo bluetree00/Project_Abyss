@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d50b93cfbd4465e40bcf2b1be9909901, type: 3}
   m_Name: RunStructure_Default
   m_EditorClassIdentifier: Assembly-CSharp::RunStructureConfig
-  _bossThreshold: 8
+  _bossThreshold: 0
   _preBossRoomKey: 
   _bossRoomKey: 
   _shopMaxPerChapter: 2

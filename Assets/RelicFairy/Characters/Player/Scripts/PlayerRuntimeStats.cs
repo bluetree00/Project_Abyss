@@ -110,6 +110,10 @@ public sealed class PlayerRuntimeStats
         _baseDefense = Mathf.Max(0, entry.base_defense);
         _baseLuck    = Mathf.Max(0, entry.base_luck);
 
+        // 유물=캐릭터 베이스 크릿(CHARACTER_DATA 행). 무기 크릿 위에 가산.
+        _relicCritChance = entry.crit_chance;
+        _relicCritDamage = entry.crit_damage;
+
         _weaponMelee = 0; _weaponRanged = 0; _weaponDefense = 0;
         _passiveMelee = 0; _passiveRanged = 0; _passiveDefense = 0;
         _passiveLuck = 0; _passiveSkillCdr = 0f; _passiveActiveItemCdr = 0f;
@@ -276,6 +280,22 @@ public sealed class PlayerRuntimeStats
     private float _relicMoveSpeed;    // 퍼센트 가산
     private float _relicAttackSpeed;  // 퍼센트 가산
     private float _relicSkillCdr;
+    private float _relicCritChance;   // 유물 클래스 크릿 확률 보너스(%포인트)
+    private float _relicCritDamage;   // 유물 크릿 피해 배율 보너스(가산, 0.2=+20%)
+    private float _buffCritChance;    // 일시 크릿 버프(예: 가웨인 정오 구간). 리소스가 토글.
+    private float _buffCritDamage;
+
+    /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
+    public float CritChanceBonus => _relicCritChance + _buffCritChance;
+    /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
+    public float CritDamageBonus => _relicCritDamage + _buffCritDamage;
+
+    /// <summary>유물 일시 크릿 버프 설정(가웨인 정오 등). chance=%포인트, damage=배율 가산. (0,0)=해제.</summary>
+    public void SetRelicCritBuff(float chanceBonus, float damageBonus)
+    {
+        _buffCritChance = chanceBonus;
+        _buffCritDamage = damageBonus;
+    }
 
     // -- Grid Synergy (Always) --
     private int _synergyMelee;
@@ -590,6 +610,7 @@ public sealed class PlayerRuntimeStats
 
         _relicMelee = _relicRanged = _relicDefense = _relicLuck = _relicMaxHp = 0;
         _relicMoveSpeed = _relicAttackSpeed = _relicSkillCdr = 0f;
+        _relicCritChance = _relicCritDamage = 0f;
 
         if (mods != null)
         {
@@ -609,6 +630,8 @@ public sealed class PlayerRuntimeStats
                     case StatType.MoveSpeed:    _relicMoveSpeed   += mod.Value;  break;
                     case StatType.AttackSpeed:  _relicAttackSpeed += mod.Value;  break;
                     case StatType.SkillCooldownReduction: _relicSkillCdr += mod.Value; break;
+                    case StatType.CritChance:   _relicCritChance += mod.Value; break;
+                    case StatType.CritDamage:   _relicCritDamage += mod.Value; break;
                 }
             }
         }

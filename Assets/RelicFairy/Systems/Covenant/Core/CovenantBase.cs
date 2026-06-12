@@ -18,6 +18,9 @@ public abstract class CovenantBase
     public abstract string CovenantId { get; }
     public CovenantStage Stage { get; set; } = CovenantStage.Basic;
 
+    /// <summary>서약 카테고리(기획서 4분류). 선택 UI/메타데이터용 — 구현체가 override.</summary>
+    public virtual CovenantCategory Category => CovenantCategory.ActionConditional;
+
     // ── 표시 데이터 (UI용) ──────────────────────────────
     public virtual string DisplayName         => CovenantId;
     public virtual string LoreText            => string.Empty;
@@ -75,12 +78,20 @@ public abstract class CovenantBase
     public virtual void OnAttackHit(GameObject target, float dmg)  { }
     public virtual void OnTakeDamage(float damage)                 { }
     public virtual void OnSkillUse(SkillType skill)                { }
+    public virtual void OnWeaponSwap(WeaponData prev, WeaponData next) { }
     public virtual void Tick(float deltaTime)                      { }
 
     // ── ICovenantDamagePipeline ─────────────────────────
     public virtual void ModifyOutgoingDamage(ref float damage, CombatContext ctx) { }
     public virtual void ModifyIncomingDamage(ref float damage, CombatContext ctx) { }
     public virtual bool TryPreventDeath() => false;
+
+    /// <summary>
+    /// 치명타 산출 오버라이드(갤러해드). true 반환 시 CombatCalculator.RollCrit이 일반 굴림을 대체한다.
+    /// forceCrit=true면 확정 치명타, 아니면 치명타 억제 + 최소피해 하한(최대피해×minFloorRatio).
+    /// </summary>
+    public virtual bool TryProvideCritOverride(WeaponData weapon, out bool forceCrit, out float minFloorRatio)
+    { forceCrit = false; minFloorRatio = 0f; return false; }
 
     // ── ICovenantMechanicModifier ───────────────────────
     public virtual void OnBoundToPlayer(PlayerController player)                         { }

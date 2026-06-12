@@ -14,14 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CovenantDataTableSO
   _entries:
   - {fileID: 11400000, guid: e3556c61c504543489b9071f264b9d4e, type: 2}
-  - {fileID: 11400000, guid: ec0886544ccf2764bbb25c6fbf59fbfb, type: 2}
-  - {fileID: 11400000, guid: e4176e56eec2fad4e85d343d093ce88c, type: 2}
   - {fileID: 11400000, guid: 204365322eee8df47b1cc6c4e506adc7, type: 2}
   - {fileID: 11400000, guid: 0ac2f8d14fe0be041a4339ddf2a67481, type: 2}
   - {fileID: 11400000, guid: e136fe24bfd7a284ea1ecac40ae4f010, type: 2}
-  - {fileID: 11400000, guid: 5c8c57b628f44ad498bd426a367143ab, type: 2}
-  - {fileID: 11400000, guid: ab50f88f221d62f4392d9eb01d9e2335, type: 2}
-  - {fileID: 11400000, guid: 449bad500434f5e43ab3566935cebd53, type: 2}
-  - {fileID: 11400000, guid: effbc679f8d900745b5e8bb25c01f442, type: 2}
-  - {fileID: 11400000, guid: 3d73b1f9f3012e74d8cfff3a76c327bc, type: 2}
-  - {fileID: 11400000, guid: fa5535b445cbce0449541590242b9d69, type: 2}
+  - {fileID: 11400000, guid: f994340164e0b844da45e82453c7ceec, type: 2}
+  - {fileID: 11400000, guid: 5569fe87f3c1fb641b29fe5daa02f940, type: 2}
+  - {fileID: 11400000, guid: e101c13b66860fb4fade9c9929841275, type: 2}
+  - {fileID: 11400000, guid: 7de9a99e81c5d9543a594917b3c59a70, type: 2}
+  - {fileID: 11400000, guid: 7caba1ea2a4ee7541b70f776d9498abf, type: 2}
+  - {fileID: 11400000, guid: 29c3c92c3bf42684a82e9e441c0cc98d, type: 2}

@@ -39,6 +39,10 @@ public class GawainRelic : IRelicBehavior
 
     public float GetSkillCooldown(SkillType slot) => slot == SkillType.Q ? 20f : 0f;
 
+    public bool CanUseSkill(SkillType slot) => true; // 레거시 — 게이팅 없음
+
+
+
     public int ModifyIncomingDamage(PlayerController owner, int dmg, GameObject attacker) => dmg;
 
     /// <summary>태양 페이즈 변경 시 방어 배율 갱신. 강화 구간만 보정.</summary>

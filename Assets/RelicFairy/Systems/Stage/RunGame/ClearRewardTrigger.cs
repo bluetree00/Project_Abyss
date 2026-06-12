@@ -150,13 +150,7 @@ public class ClearRewardTrigger : MonoBehaviour
             }
         }
 
-        // 방 클리어 시점 저장 (플레이어는 현재 존 위치 + 게이트 선택지 유지 상태로 재개)
-        var rp = RunProgressManager.Instance;
-        if (rp != null && _run != null && _run.IsRunning)
-        {
-            try { await rp.SaveAsync(_run, rp.ActiveSlotIndex); }
-            catch (OperationCanceledException) { return; }
-        }
+        // 방 경계 저장은 로컬 권위(RunFlowController.SaveRunState)가 담당하므로 여기서는 별도 저장하지 않는다.
 
         // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
         // 존 선택 UI가 그리드 위에 겹쳐 표시된다.
