@@ -207,6 +207,8 @@ public class PlayerDataManager
                 ground_drag           = row.TryGetFloat("ground_drag"),
                 air_drag              = row.TryGetFloat("air_drag"),
                 passive_id            = row.TryGetString("passive_id"),
+                crit_chance           = row.TryGetFloat("crit_chance"),
+                crit_damage           = row.TryGetFloat("crit_damage"),
                 stat_version          = row.TryGetInt("stat_version"),
             };
         }

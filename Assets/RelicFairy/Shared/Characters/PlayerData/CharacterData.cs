@@ -36,6 +36,34 @@ public class CharacterData : ScriptableObject
     public float dashSpeed = 10f;
     public float dashDuration = 0.2f;
     public float dodgeCooldown = 2f;
+    [Tooltip("회피 시작 후 무적이 켜지기까지의 그레이스 시간(초). 이 동안은 피격 가능. 회피 총 길이를 넘으면 자동 클램프.")]
+    public float dodgeIFrameStartDelay = 0.05f;
+    [Tooltip("무적 지속 시간(초). startDelay 경과 후 이만큼 무적. 회복 구간은 다시 피격 가능. 창 끝이 회피 길이를 넘으면 자동 클램프.")]
+    public float dodgeIFrameDuration = 0.3f;
+    [Tooltip("[실험] 회피 시작 속도에 직전 이동 속도벡터를 블렌딩하는 비율(0~1). 0=현행(블렌딩 없음). 방향 급전환 시 튐 완화용 — 에디터에서 튜닝.")]
+    [Range(0f, 1f)]
+    public float dodgeMomentumBlend = 0f;
+    [Tooltip("대시 종료 후~다음 상태 복귀 사이의 무적 없는 짧은 회복(취약) 구간(초). 0=현행(즉시 전환). i-frame과 겹치지 않음(무적 종료 뒤). 남발 억제용 — 플레이테스트로 튜닝(예 0.05).")]
+    public float dodgeRecoveryWindow = 0f;
+
+    // 회피 연출(시각) — 전부 선택. 미할당 시 해당 효과만 무동작(DodgePresentation이 읽음).
+    [Header("회피 연출 (시각 — 선택, 미할당 시 무동작)")]
+    [Tooltip("잔상(afterimage) 머티리얼. 비우면 잔상 스킵. 반투명 블렌딩 머티리얼 권장.")]
+    public Material dodgeGhostMaterial;
+    [Tooltip("잔상 스냅샷 간격(초). i-frame 동안 이 간격으로 BakeMesh 잔상 생성.")]
+    public float dodgeGhostInterval = 0.05f;
+    [Tooltip("잔상 1개의 페이드아웃 수명(초). 이 동안 알파가 0으로 감소.")]
+    public float dodgeGhostLifetime = 0.25f;
+    [Tooltip("잔상 시작 색·알파. 수명 동안 알파가 0으로 페이드. 잔상 머티리얼의 _BaseColor를 덮어쓴다.")]
+    public Color dodgeGhostColor = new Color(0.4f, 0.7f, 1f, 0.6f);
+    [Tooltip("i-frame 동안 플레이어 렌더러에 입힐 틴트/발광 색. a≤0이면 틴트 스킵. (발광은 머티리얼 Emission 활성 필요)")]
+    public Color dodgeIFrameTint = new Color(0f, 0f, 0f, 0f);
+    [Tooltip("i-frame 틴트 발광(_EmissionColor) 강도 배수. 0이면 발광 없이 베이스 틴트만.")]
+    public float dodgeIFrameTintEmission = 1.5f;
+    [Tooltip("회피 시작 시 발밑에 1회 스폰할 먼지 VFX 프리팹. 비우면 스킵.")]
+    public GameObject dodgeDustVfxPrefab;
+    [Tooltip("먼지 VFX 발밑 높이 오프셋(m).")]
+    public float dodgeDustHeightOffset = 0.05f;
 
     [Header("점프 및 중력 설정")]
     public float jumpForce = 5f;

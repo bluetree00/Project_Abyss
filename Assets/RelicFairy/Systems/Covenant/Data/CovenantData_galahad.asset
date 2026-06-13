@@ -20,11 +20,17 @@ MonoBehaviour:
   enhancedDescription: 
   evolvedDescription: 
   basicValues:
-  - 10
-  - 3
+  - 0
+  - 0.8
+  - 0
+  - 0
   enhancedValues:
-  - 7
-  - 3
+  - 0
+  - 0.9
+  - 20
+  - 0
   evolvedValues:
-  - 7
+  - 0
+  - 0.9
+  - 15
   - 3

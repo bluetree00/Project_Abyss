@@ -27,6 +27,8 @@ public class GalahadRelic : IRelicBehavior
 
     public float GetSkillCooldown(SkillType slot) => slot == SkillType.Q ? 18f : 0f;
 
+    public bool CanUseSkill(SkillType slot) => true; // 레거시 — 게이팅 없음
+
     /// <summary>HolyShieldSkillRuntime가 호출 — 방패 활성 종료 시각 기록.</summary>
     public void SetHolyShieldActive(float duration, Vector3 forward) => _shieldEnd = Time.time + duration;
 

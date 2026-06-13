@@ -74,7 +74,9 @@ public sealed class AppBootstrapper : MonoBehaviour
             CurrentRun.OnRunEnded -= HandleRunEnded;
 
         // PR1: 진행 중 런 세이브(로컬)를 폐기. 메타 반영은 HandleRunEnded → ApplyRunResultAsync.
-        RunProgressManager.Instance?.ClearLocalRun();
+        // 종료된 런의 슬롯만 클리어(다른 슬롯 무영향).
+        var rpm = RunProgressManager.Instance;
+        rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
         CurrentRun = null;
         Loadout.Clear();
     }
@@ -172,8 +174,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         try
         {
             IsNewRunPending = true;
-            // 새 런 시작 — 기존 로컬 런 세이브 폐기.
-            RunProgressManager.Instance?.ClearLocalRun();
+            // 새 런 시작 — 선택 슬롯의 로컬 런 세이브만 폐기(다른 슬롯 무영향).
+            var rpm = RunProgressManager.Instance;
+            rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
 
             var vp = UIRootBootstrapper.Instance != null
                 ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
@@ -211,8 +214,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         var rpm = RunProgressManager.Instance;
         if (rpm == null) return;
 
-        // PR1: 진행 중 런은 로컬 파일이 권위(뒤끝 USER_RUN_PROGRESS 아님).
-        var save = rpm.HasLocalRun ? rpm.LoadLocalRun() : null;
+        // PR1: 진행 중 런은 로컬 파일이 권위(뒤끝 USER_RUN_PROGRESS 아님). 선택 슬롯에서 로드.
+        int slot = rpm.ActiveSlotIndex;
+        var save = rpm.HasLocalRun(slot) ? rpm.LoadLocalRun(slot) : null;
         if (save == null || !save.hasActiveRun)
         {
             Debug.LogWarning("[AppBootstrapper] RequestRestoreRun: 유효한 로컬 세이브 없음");
@@ -225,7 +229,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         {
             Debug.Log("[AppBootstrapper] RestoreRun: isInStartRoom=true — 세이브 초기화 후 새로 시작");
             Loadout.Clear();
-            rpm.ClearLocalRun();
+            rpm.ClearLocalRun(slot);
             RequestLoad(Define.Scene.GameScene_Ch1);
             return;
         }
@@ -489,7 +493,8 @@ public sealed class AppBootstrapper : MonoBehaviour
 
             await UniTask.WhenAll(
                 Managers.ItemData.InitializeAsync(),
-                Managers.RuneData.InitializeAsync()
+                Managers.RuneData.InitializeAsync(),
+                Managers.RelicStatData.InitializeAsync()
             );
             startScene = Define.Scene.Lobby;
         }
@@ -505,7 +510,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
                     Managers.RuneData.InitializeAsync(),
-                    RunProgressManager.Instance.LoadAsync(),
+                    Managers.RelicStatData.InitializeAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공");
@@ -516,7 +521,8 @@ public sealed class AppBootstrapper : MonoBehaviour
                 // 로그인 실패 시 Addressables 폴백으로 초기화
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
-                    Managers.RuneData.InitializeAsync()
+                    Managers.RuneData.InitializeAsync(),
+                    Managers.RelicStatData.InitializeAsync()
                 );
             }
             if (startScene == Define.Scene.Logo)
