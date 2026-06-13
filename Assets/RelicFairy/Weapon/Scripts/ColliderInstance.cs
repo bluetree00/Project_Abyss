@@ -170,6 +170,7 @@ public class ColliderInstance : MonoBehaviour
             DamageDealt = finalDmg,
             Attacker = owner,
             Target = other.gameObject,
+            IsCrit = isCrit,
             HitPosition = other.ClosestPoint(transform.position),
         };
         mgr?.OnPostDealDamage(report);

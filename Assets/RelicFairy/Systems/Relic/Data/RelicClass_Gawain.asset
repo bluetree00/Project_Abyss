@@ -17,8 +17,7 @@ MonoBehaviour:
   loreDesc: 
   portrait: {fileID: 0}
   rosterIllust: {fileID: 21300000, guid: 5752829a159ee2f4a9f7b48d3cc16242, type: 3}
-  passives:
-  - {fileID: 11400000, guid: 8cda6cce1841832459b3f8fd1a23c788, type: 2}
+  passives: []
   qSkillClipKey: Gawain_QSkill
   qSkillCinematic: {fileID: 0}
   auraVfxKey: 

@@ -286,9 +286,9 @@ public sealed class PlayerRuntimeStats
     private float _buffCritDamage;
 
     /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
-    public float CritChanceBonus => _relicCritChance + _buffCritChance;
+    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance;
     /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
-    public float CritDamageBonus => _relicCritDamage + _buffCritDamage;
+    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage;
 
     /// <summary>유물 일시 크릿 버프 설정(가웨인 정오 등). chance=%포인트, damage=배율 가산. (0,0)=해제.</summary>
     public void SetRelicCritBuff(float chanceBonus, float damageBonus)
@@ -329,6 +329,15 @@ public sealed class PlayerRuntimeStats
 
     // -- 공격 속도 보너스 (패시브 등에서 직접 설정) --
     private float _bonusAttackSpeed;
+
+    // -- Synergy Dynamic (룬 속성 효과의 런타임 동적 버프, 6속성 공용) --
+    // 기존 단일 슬롯(SetRelicCritBuff/SetCharacterAttackMultiplier 등 유물 점유)과 충돌하지 않도록
+    // 전부 가산 전용 별도 레이어로 둔다. 전기=공속, 어둠=공격%/받피, 빛=치확/치피.
+    private float _synergyDynAttackSpeed;
+    private float _synergyDynAttackPct;
+    private float _synergyDynCritChance;
+    private float _synergyDynCritDamage;
+    private float _synergyDynDamageReduction;
 
     // -- Character Mechanic (고유 메커닉 배율 — HolyGauge 만충, SolarTimer 강화 등) --
     private float _characterMeleeMult  = 1f;
@@ -654,6 +663,55 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
+    /// <summary>유물 일시 이동속도 보너스(퍼센트 가산, -0.2 = -20%). 랜슬롯 빈틈 등. 0 = 해제.</summary>
+    public void SetRelicMoveSpeedBonus(float pct)
+    {
+        _relicMoveSpeed = pct;
+        Recalculate();
+    }
+
+    // ── 시너지 동적 레이어 (룬 속성 효과 전용) ────────────────────────────────────
+
+    /// <summary>룬 시너지 동적 공격 속도 보너스(가산, 0.18 = +18%). 전기 정전기/감전 등. 매 프레임 갱신될 수 있어 무변동 시 재계산 생략.</summary>
+    public void SetSynergyDynamicAttackSpeed(float bonus)
+    {
+        if (Mathf.Approximately(_synergyDynAttackSpeed, bonus)) return;
+        _synergyDynAttackSpeed = bonus;
+        Recalculate();
+    }
+
+    /// <summary>룬 시너지 동적 공격력 % 보너스(가산, 0.15 = +15%). (향후)어둠 게이지 등.</summary>
+    public void SetSynergyDynamicAttackPercent(float pct)
+    {
+        if (Mathf.Approximately(_synergyDynAttackPct, pct)) return;
+        _synergyDynAttackPct = pct;
+        Recalculate();
+    }
+
+    /// <summary>룬 시너지 동적 치명타 확률 보너스(%포인트, 가산). (향후)빛 광채 등.</summary>
+    public void SetSynergyDynamicCritChance(float bonus)
+    {
+        if (Mathf.Approximately(_synergyDynCritChance, bonus)) return;
+        _synergyDynCritChance = bonus;
+        OnChanged?.Invoke();   // CritChanceBonus는 라이브 프로퍼티 — 재계산 불필요, UI 갱신만.
+    }
+
+    /// <summary>룬 시너지 동적 치명타 피해 보너스(배율 가산). (향후)빛 빛장판 등.</summary>
+    public void SetSynergyDynamicCritDamage(float bonus)
+    {
+        if (Mathf.Approximately(_synergyDynCritDamage, bonus)) return;
+        _synergyDynCritDamage = bonus;
+        OnChanged?.Invoke();
+    }
+
+    /// <summary>룬 시너지 동적 피해 감소(가산, 0.15 = -15% 받는 피해). (향후)어둠 암흑 등.</summary>
+    public void SetSynergyDynamicDamageReduction(float reduction)
+    {
+        if (Mathf.Approximately(_synergyDynDamageReduction, reduction)) return;
+        _synergyDynDamageReduction = reduction;
+        Recalculate();
+    }
+
     // ── 내부 재계산 ──────────────────────────────────────────────────────────────
 
     private void Recalculate()
@@ -686,8 +744,8 @@ public sealed class PlayerRuntimeStats
         }
 
         // % 보너스 배율
-        float dmgMul  = (1f + _itemAllDamagePercent) * _characterMeleeMult;
-        float dmgMulR = (1f + _itemAllDamagePercent) * _characterRangedMult;
+        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct) * _characterRangedMult;
         float defMul  = (1f + _itemAllStatsPercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
@@ -712,7 +770,7 @@ public sealed class PlayerRuntimeStats
             }
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _synergyDynAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
         SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr + _relicSkillCdr);
@@ -725,7 +783,7 @@ public sealed class PlayerRuntimeStats
         HealingReceivedBonus = _itemHealingReceived;
         DebuffResistance    = _itemDebuffResistance;
         AllDamagePercent    = _itemAllDamagePercent;
-        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction);
+        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction + _synergyDynDamageReduction);
         ItemLifesteal       = _itemLifesteal + LifestealRate + _awakeningLifesteal;
 
         // 시스템 스탯
@@ -932,6 +990,8 @@ public sealed class PlayerRuntimeStats
         _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
         _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
         _synergyLifesteal = 0f;
+        _synergyDynAttackSpeed = _synergyDynAttackPct = 0f;
+        _synergyDynCritChance = _synergyDynCritDamage = _synergyDynDamageReduction = 0f;
         _conditionalSynergies.Clear();
         _synergyMechanics.Reset();
 

@@ -41,10 +41,13 @@ public sealed class FreezeEffect : ItemEffectBase
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (Random.value >= _value) return;
-        if (report.Target != null)
-            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
-        // TODO: 상태이상 시스템 연결
-        Debug.Log($"[Freeze] 빙결 적용! 대상={report.Target?.name}, 지속={_maxStack}초");
+        if (report.Target == null) return;
+
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
+
+        // 상태이상 통합 수신기로 흡수 — 빙결 = CC(이동·FSM 정지). 지속은 _maxStack 필드 재사용.
+        var mb = report.Target.GetComponentInParent<RelicFairy.Monster.MonsterBase>();
+        if (mb != null) mb.Status.ApplyCc("freeze", _maxStack > 0 ? _maxStack : 2f);
     }
 }
 
@@ -110,10 +113,13 @@ public sealed class PetrifyEffect : ItemEffectBase
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (Random.value >= _value) return;
-        if (report.Target != null)
-            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
-        // TODO: 상태이상 시스템 연결 (석화 = 일정 시간 완전 무력화)
-        Debug.Log($"[Petrify] 석화 적용! 대상={report.Target?.name}, 지속={_duration}초");
+        if (report.Target == null) return;
+
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
+
+        // 상태이상 통합 수신기로 흡수 — 석화 = CC(완전 무력화). 지속은 _duration 재사용.
+        var mb = report.Target.GetComponentInParent<RelicFairy.Monster.MonsterBase>();
+        if (mb != null) mb.Status.ApplyCc("petrify", _duration > 0f ? _duration : 1.5f);
     }
 }
 
@@ -126,9 +132,12 @@ public sealed class StunEffect : ItemEffectBase
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (Random.value >= _value) return;
-        if (report.Target != null)
-            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
-        // TODO: 상태이상 시스템 연결 (기절)
-        Debug.Log($"[Stun] 기절 적용! 대상={report.Target?.name}, 지속={_duration}초");
+        if (report.Target == null) return;
+
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
+
+        // 상태이상 시스템(MonsterBase.ApplyStun)과 통합 — 룬 감전과 동일 경로.
+        var mb = report.Target.GetComponentInParent<RelicFairy.Monster.MonsterBase>();
+        if (mb != null) mb.ApplyStun(_duration > 0f ? _duration : 1f);
     }
 }

@@ -1156,8 +1156,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerPrefabKey: 
   startBodyKey: PlayerCharacter
-  debugDefaultWeaponKey: T1_Bow
-  debugDefaultRelic: {fileID: 0}
+  debugDefaultWeaponKey: T3_Katana
+  debugDefaultRelic: {fileID: 11400000, guid: 0296196c76b8a14448eba2486d733d86, type: 2}
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
@@ -1170,7 +1170,6 @@ MonoBehaviour:
   runFlowController: {fileID: 0}
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:
-  - {fileID: 6162335191038534878, guid: 686db347b775cd7489bb0e5994b8974f, type: 3}
   - {fileID: 1566606819545522146, guid: 68ccc7cc0f9498246b459a83571e3c1b, type: 3}
   weaponPickupPrefabs:
   - {fileID: 6690277064601983092, guid: ebcb55c7fe8fe1e4db6c3312e7953481, type: 3}
