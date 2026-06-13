@@ -124,6 +124,10 @@ public sealed class ItemEffectManager
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnPostDealDamage(_ctx, report);
+
+        // 룬 속성 효과 OnHit/OnCrit — 근접(ColliderInstance)·원거리(BasicArrow) 공통 경로.
+        // (Fix#2) 원거리는 HitFeedbackService.RaiseHit를 안 타므로 이 경로가 근/원 단일 통지점이다.
+        _ctx.Player?.RuneEffects?.NotifyHit(report);
     }
 
     public void OnKill(GameObject target)

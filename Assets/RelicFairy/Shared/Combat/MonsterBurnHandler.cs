@@ -23,6 +23,9 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         if (target == null || dps <= 0f || duration <= 0f || tickInterval <= 0f) return;
         if (!target.TryGetComponent<IDamageable>(out var dmg)) return;
 
+        // [가이드라인 비주얼] 화상 마커(점화색 재사용) — 모든 화상 사용처 공통 단일 지점
+        GuidelineVisual.StatusApplied(target.transform, "burn", duration);
+
         if (!target.TryGetComponent<MonsterBurnHandler>(out var h))
             h = target.AddComponent<MonsterBurnHandler>();
 

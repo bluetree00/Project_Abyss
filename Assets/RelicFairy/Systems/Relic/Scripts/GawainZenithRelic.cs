@@ -22,6 +22,7 @@ public sealed class GawainZenithRelic : IRelicBehavior
     private Action           _onChanged;
     private bool             _skillUsedThisNoon;
     private bool             _wasNoon;
+    private bool             _wasMarkReady;        // [가이드라인 비주얼] 각인 진입 엣지 검출
     private bool             _markPendingFirstHit; // 각인: 정오 첫 공격 +50%
 
     public ZenithGauge Gauge => _gauge;
@@ -56,6 +57,7 @@ public sealed class GawainZenithRelic : IRelicBehavior
     {
         if (_gauge != null) _gauge.OnChanged -= _onChanged;
         ClearBuffs();
+        GuidelineVisual.ClearBadge("gawain"); // [가이드라인 비주얼]
     }
 
     public ISkillRuntime CreateSkillRuntime(PlayerController owner, SkillType slot)
@@ -75,8 +77,18 @@ public sealed class GawainZenithRelic : IRelicBehavior
         if (rs == null || _gauge == null) return;
 
         // 정오 진입 시: 스킬 1회 리셋 + 각인 첫타(+50%) 적립(충전 100%→정오라 각인 항상 발동)
-        if (_gauge.IsNoon && !_wasNoon) { _skillUsedThisNoon = false; _markPendingFirstHit = true; }
+        if (_gauge.IsNoon && !_wasNoon)
+        {
+            _skillUsedThisNoon = false; _markPendingFirstHit = true;
+            if (_owner != null) GuidelineVisual.Toast(_owner.transform.position + Vector3.up * 2.4f, "정오 진입", GuidelineVisual.ToastKind.Relic); // [가이드라인 비주얼]
+        }
         _wasNoon = _gauge.IsNoon;
+
+        // [가이드라인 비주얼] 각인 진입 엣지 토스트(정오 아님 + 각인 준비 상승엣지)
+        bool markEntering = _gauge.IsMarkReady && !_gauge.IsNoon;
+        if (markEntering && !_wasMarkReady && _owner != null)
+            GuidelineVisual.Toast(_owner.transform.position + Vector3.up * 2.4f, "각인", GuidelineVisual.ToastKind.Relic);
+        _wasMarkReady = markEntering;
 
         if (_gauge.IsNoon)
         {
@@ -84,6 +96,7 @@ public sealed class GawainZenithRelic : IRelicBehavior
             rs.SetRelicCritBuff(V(V_NOON_CRITCH, 10f), V(V_NOON_CRITDMG, 0.20f));
             float allMul = 1f + V(V_NOON_ALLDMG, 0.20f);
             rs.SetCharacterAttackMultiplier(allMul, allMul);
+            if (_owner != null) GuidelineVisual.SetBadge(_owner.transform, "gawain", "정오", GuidelineVisual.BadgeTint.Relic); // [가이드라인 비주얼]
         }
         else if (_gauge.IsMarkReady)
         {
@@ -92,10 +105,12 @@ public sealed class GawainZenithRelic : IRelicBehavior
             rs.SetRelicCritBuff(0f, 0f);
             float atkMul = 1f + V(V_MARK_ATK, 0.10f);
             rs.SetCharacterAttackMultiplier(atkMul, atkMul);
+            if (_owner != null) GuidelineVisual.SetBadge(_owner.transform, "gawain", "각인", GuidelineVisual.BadgeTint.Light); // [가이드라인 비주얼]
         }
         else
         {
             ClearBuffs();
+            GuidelineVisual.ClearBadge("gawain"); // [가이드라인 비주얼]
         }
     }
 

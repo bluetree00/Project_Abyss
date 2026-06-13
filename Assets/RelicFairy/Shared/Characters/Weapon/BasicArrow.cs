@@ -172,6 +172,7 @@ public class BasicArrow : MonoBehaviour
                 DamageDealt = finalDmg,
                 Attacker = _instigator,
                 Target = other.gameObject,
+                IsCrit = isCrit,
                 HitPosition = other.ClosestPoint(transform.position),
             };
             mgr?.OnPostDealDamage(report);

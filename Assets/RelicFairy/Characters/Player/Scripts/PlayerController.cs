@@ -146,6 +146,8 @@ public class PlayerController : CharacterBase
         {
             SpawnHitBloodVfx();
             OnDamageTaken?.Invoke();
+            // 룬 속성 OnDamaged 통지(어둠 게이지 등). 실제 피해가 들어갈 때만 — i-frame/회피/무효/사망무효는 위에서 이미 return.
+            _runeEffects?.NotifyDamaged(finalDmg, attacker);
         }
 
         // [서약] 피격 통보 (실제 적용 피해량)
@@ -407,7 +409,11 @@ public class PlayerController : CharacterBase
     {
         foreach (var p in _passives)
             if (p.Trigger == trigger && p.CanApply(this, ctx))
+            {
                 p.Apply(this, ctx);
+                // [가이드라인 비주얼] 유물/캐릭터 패시브 발동 토스트(통지만)
+                GuidelineVisual.Toast(transform.position + Vector3.up * 2.4f, p.PassiveName, GuidelineVisual.ToastKind.Relic);
+            }
     }
 
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>

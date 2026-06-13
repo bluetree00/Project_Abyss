@@ -90,6 +90,15 @@ public class CharacterData : ScriptableObject
     [Tooltip("정지→출발 첫 프레임 최소 출발속도(walkMax 비율, 0~0.15). 0이면 비활성.")]
     public float initialBoost = 0f;
 
+    [Header("회전 (선회)")]
+    [Tooltip("이동 방향으로 도는 각속도(도/초). '일정 각속도' 회전이라 프레임률 독립·점근(빙 도는 느낌) 없음. 클수록 빠릿. 0 이하면 기본 720.")]
+    public float turnSpeedDegPerSec = 720f;
+    [Tooltip("[P1·옵션] 입력 방향과 현재 바라보는 방향의 각도 차가 클수록 이동속도를 이 비율(0~1)만큼 감속 → 급선회 반경 축소. 0=현행(감속 없음).")]
+    [Range(0f, 1f)]
+    public float sharpTurnMoveSlowdown = 0f;
+    [Tooltip("[P1·옵션] 입력-facing 각도 차가 이 값(도) 이상이면 즉시 스냅 회전. 180=실질 비활성(급반전만). 너무 낮추면 휙휙거림.")]
+    public float snapTurnAngle = 180f;
+
     //캐릭터 클래스
     [Header("캐릭터 클래스")]
     public Define.CharacterClass conClass;

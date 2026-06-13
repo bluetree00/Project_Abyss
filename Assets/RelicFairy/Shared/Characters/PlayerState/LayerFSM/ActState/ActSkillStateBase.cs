@@ -38,8 +38,12 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
             return;
         }
 
-        // 유물 스킬 게이팅(정오 구간 한정 / 자동 발동형 수동 입력 차단 등). 레거시 유물은 항상 true.
-        if (_controller.RelicBehavior != null && !_controller.RelicBehavior.CanUseSkill(Slot))
+        // 유물 스킬 게이팅(정오 구간 한정 / 자동 발동형 수동 입력 차단 등).
+        // 유물이 '소유'한 슬롯(런타임 제공)에만 적용 — 미소유 슬롯(무기 스킬 E/R, 스킬 없는 랜슬롯)은
+        // 게이팅 대상이 아니므로 무기 스킬로 진행한다. (레거시 유물은 모든 슬롯 CanUseSkill=true였음)
+        if (_controller.RelicBehavior != null
+            && _controller.CreateCharacterSkillRuntime(Slot) != null
+            && !_controller.RelicBehavior.CanUseSkill(Slot))
         {
             _stateChanger.Change(default);
             return;

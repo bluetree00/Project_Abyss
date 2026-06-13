@@ -98,6 +98,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private float                  _debuffDamageTakenExpire;
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
+    // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
+    private readonly MonsterStatusReceiver _status = new();
+    private bool                   _statusCcActive;     // CC로 정지 중 → 해제 시 agent 1회 복원
+    private bool                   _statusSlowActive;   // 슬로우로 속도 override 중 → 해제 시 base 1회 복원
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
@@ -351,7 +355,40 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             ? Vector3.Distance(transform.position, _runtime.PlayerTarget.position)
             : float.MaxValue;
 
+        // 상태이상 수신기 틱(CC/Slow/DoT/공격디버프). DoT가 이 프레임에 처치할 수 있으므로 직후 사망 가드.
+        _status.Tick(Time.deltaTime, this);
+        if (_runtime.IsDead) return;
+        _attackSpeedMulti = _status.AttackSpeedMultiplier;   // 풀 간파/지배 적 공격 디버프
+
+        // CC(스턴/빙결): 이동·FSM 정지. 해제 시 1회 복원.
+        if (_status.IsCcActive)
+        {
+            _statusCcActive = true;
+            if (_agent != null && _agent.isOnNavMesh && _agent.isActiveAndEnabled && !_agent.isStopped)
+                _agent.isStopped = true;
+            return;
+        }
+        if (_statusCcActive)
+        {
+            _statusCcActive = false;
+            if (_agent != null && _agent.isOnNavMesh && _agent.isActiveAndEnabled)
+                _agent.isStopped = false;
+        }
+
         _fsm?.Update();
+
+        // Slow(서리): FSM이 설정한 agent.speed 위에 덮어쓴다. 해제 시 base 1회 복원.
+        float moveMult = _status.MoveSpeedMultiplier;
+        if (moveMult < 0.999f)
+        {
+            _statusSlowActive = true;
+            if (_agent != null) _agent.speed = _baseAgentSpeed * moveMult;
+        }
+        else if (_statusSlowActive)
+        {
+            _statusSlowActive = false;
+            if (_agent != null) _agent.speed = _baseAgentSpeed;
+        }
 
 #if UNITY_EDITOR
         _debugState = _fsm?.CurrentType?.Name;
@@ -560,11 +597,66 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private static bool IsPlayerInstigator(GameObject g)
         => g != null && g.GetComponentInParent<PlayerController>() != null;
 
-    /// <summary>받는 피해 증폭 디버프 부여(심판 낙인 등 적 낙인). ampPercent=0.2 → 받는 피해 ×1.2, duration초 후 자동 해제.</summary>
-    public void ApplyDamageTakenAmp(float ampPercent, float duration)
+    /// <summary>
+    /// 받는 피해 증폭 디버프 부여(심판 낙인 등 적 낙인). ampPercent=0.2 → 받는 피해 ×1.2, duration초 후 자동 해제.
+    /// statusId는 가이드라인 비주얼 마커 구분용(낙인 brand / 분쇄 shatter / 취약 vulnerable). 로직엔 미사용.
+    /// </summary>
+    public void ApplyDamageTakenAmp(float ampPercent, float duration, string statusId = "brand")
     {
         _debuffDamageTakenMult   = 1f + Mathf.Max(0f, ampPercent);
         _debuffDamageTakenExpire = Time.time + duration;
+        GuidelineVisual.StatusApplied(transform, statusId, duration);   // [가이드라인 비주얼]
+    }
+
+    /// <summary>
+    /// 시너지(룬) 즉발 피해(DM) — 방어 경감을 defenseIgnore(0~1)만큼 우회한다(기본 1=완전 무시).
+    /// %기반 즉발/DoT 수치가 방어의 max(1,...) 감산에 무력화되지 않게 하는 경로.
+    /// GetHit 경직·넉백 없음(DoT/체인 연타로 인한 스턴락 방지). 처치 판정은 일반 피해와 동일.
+    /// </summary>
+    public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false)
+    {
+        if (_runtime == null || _runtime.IsDead || amount <= 0f) return;
+
+        var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
+        if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
+        if (_debuffDamageTakenMult != 1f && Time.time >= _debuffDamageTakenExpire)
+            _debuffDamageTakenMult = 1f;
+
+        float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
+        float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * _debuffDamageTakenMult);
+        _runtime.CurrentHp -= (int)actual;
+
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+
+        // [가이드라인 비주얼] 시너지 즉발/DoT 피해 표시(통지만 — 토글 OFF면 무동작)
+        GuidelineVisual.SynergyDamage(transform.position + Vector3.up * 1.2f, isCrit);
+
+        int effMax = EffectiveMaxHp;
+        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
+
+        if (_runtime.CurrentHp <= 0)
+        {
+            _runtime.CurrentHp = 0;
+            _runtime.IsDead    = true;
+            if (IsPlayerInstigator(instigator))
+                GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
+            OnFatalDamage();
+        }
+    }
+
+    /// <summary>상태이상 통합 수신기(ST). 룬·아이템 효과가 CC/Slow/DoT를 부여하는 진입점.</summary>
+    public MonsterStatusReceiver Status { get { _status.AttachOwner(this); return _status; } }
+
+    /// <summary>
+    /// 시너지 상태이상: 감전/마비(CC) — duration초간 이동·FSM 정지. 누적 시 더 긴 만료 시각 유지.
+    /// (아이템 Stun 효과도 이 경로를 공유. 일반 진입점은 Status.ApplyCc.)
+    /// </summary>
+    public void ApplyStun(float duration)
+    {
+        if (_runtime == null || _runtime.IsDead) return;
+        _status.ApplyCc("stun", duration);
     }
 
     public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
@@ -923,6 +1015,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _debuffDamageTakenExpire = 0f;
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
+        _status.Reset();
+        _statusCcActive      = false;
+        _statusSlowActive    = false;
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
         // 풀 재사용 시 이전 Die에서 설정된 HP바 숨김 플래그/요청중 플래그를 리셋 —
