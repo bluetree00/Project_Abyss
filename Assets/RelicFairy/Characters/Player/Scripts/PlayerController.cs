@@ -123,6 +123,14 @@ public class PlayerController : CharacterBase
             finalDmg = Mathf.Max(0, (int)fd);
         }
 
+        // 실드 흡수 — HP 차감 전. 실드가 먼저 피해를 받고, ShieldAccumulate면 피격 피해 일부를 실드로 축적.
+        if (finalDmg > 0)
+        {
+            int incoming = finalDmg;
+            finalDmg = RuntimeStats.AbsorbWithShield(finalDmg);
+            RuntimeStats.AccumulateShieldFromDamage(incoming);
+        }
+
         // 사망 직전 체크
         if (RuntimeStats.Hp - finalDmg <= 0 && mgr != null)
         {
@@ -607,6 +615,7 @@ public class PlayerController : CharacterBase
 
         _runeEffects?.Tick(Time.deltaTime);
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
+        GameRunBootstrapper.Instance?.Run?.EffectManager?.OnTick(Time.deltaTime);   // 아이템 타임드/동적 효과 구동
 
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         if (_slowTimer > 0f)

@@ -111,4 +111,5 @@ public abstract class ItemEffectBase : IItemEffect
     public virtual void OnSkillUse(ItemEffectContext ctx, SkillType skill) { }
     public virtual void ModifyHeal(ItemEffectContext ctx, ref int amount) { }
     public virtual void OnTick(ItemEffectContext ctx, float deltaTime) { }
+    public virtual void ContributeDynamicStats(ItemEffectContext ctx, ref ItemDynamicStats dyn) { }
 }

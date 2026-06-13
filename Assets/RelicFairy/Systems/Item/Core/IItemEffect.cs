@@ -60,4 +60,8 @@ public interface IItemEffect
 
     // ── 틱 ──────────────────────────────────────────────────
     void OnTick(ItemEffectContext ctx, float deltaTime);
+
+    // ── 동적 스탯 (조건부/타임드, 매 틱 합산) ───────────────
+    /// <summary>현재 조건이 충족된 동안의 스탯 기여를 누적기에 더한다. ItemEffectManager.OnTick이 호출.</summary>
+    void ContributeDynamicStats(ItemEffectContext ctx, ref ItemDynamicStats dyn);
 }

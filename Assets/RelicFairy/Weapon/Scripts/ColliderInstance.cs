@@ -118,7 +118,18 @@ public class ColliderInstance : MonoBehaviour
         // 아이템 효과: 공격 전 데미지 수정
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
-        var pkt = new DamagePacket(damage, owner, other.gameObject);
+
+        // 스킬 피해 % — Q/E/R 스킬 액션이고 플레이어 공격일 때만 기본 피해에 적용(SkillDamageBonus 소비처)
+        float baseDamage = damage;
+        if (owner != null
+            && (actionType == WeaponActionType.QSkill || actionType == WeaponActionType.ESkill || actionType == WeaponActionType.RSkill)
+            && owner.TryGetComponent<PlayerController>(out var skillOwner))
+        {
+            float skillBonus = skillOwner.RuntimeStats != null ? skillOwner.RuntimeStats.SkillDamageBonus : 0f;
+            if (skillBonus != 0f) baseDamage *= 1f + skillBonus;
+        }
+
+        var pkt = new DamagePacket(baseDamage, owner, other.gameObject);
         mgr?.OnPreDealDamage(ref pkt);
 
         float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;

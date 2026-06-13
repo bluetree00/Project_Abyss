@@ -83,6 +83,24 @@ public static class ItemEffectRegistry
         Register("ProjectilePierce",           s => new ProjectilePierceEffect(s));
         Register("ProjectileCount",            s => new ProjectileCountEffect(s));
 
+        // ── 정적 % 스탯 (무조건) ────────────────────────────
+        Register("CritChance",                 s => new CritChanceEffect(s));
+        Register("CritDamage",                 s => new CritDamageEffect(s));
+        Register("DefensePercent",             s => new DefensePercentEffect(s));
+        Register("MaxHPPercent",               s => new MaxHPPercentEffect(s));
+
+        // ── 조건부/타임드 동적 스탯 (trigger=조건, value=버프량) ──
+        Register("CondAttackPercent",          s => new ConditionalStatBuffEffect(s));
+        Register("CondDefensePercent",         s => new ConditionalStatBuffEffect(s));
+        Register("CondAttackSpeed",            s => new ConditionalStatBuffEffect(s));
+        Register("CondMoveSpeed",              s => new ConditionalStatBuffEffect(s));
+        Register("CondCritChance",             s => new ConditionalStatBuffEffect(s));
+        Register("CondCritDamage",             s => new ConditionalStatBuffEffect(s));
+        Register("CondSkillDamage",            s => new ConditionalStatBuffEffect(s));
+        Register("CondAllDamage",              s => new ConditionalStatBuffEffect(s));
+        Register("CondMaxHpPercent",           s => new ConditionalStatBuffEffect(s));
+        Register("FirstHitBonus",              s => new FirstHitBonusEffect(s));
+
         // ── OnHit: 공격 적중 ────────────────────────────────
         Register("Lifesteal",                  s => new LifestealEffect(s));
         Register("PoisonOnHit",                s => new PoisonOnHitEffect(s));
