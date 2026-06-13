@@ -662,7 +662,8 @@ public class GameCameraController : MonoBehaviour
         Transform playerTransform,
         CancellationToken ct,
         Vector3? customViewOffset = null,
-        System.Action onPanComplete = null)
+        System.Action onPanComplete = null,
+        Vector3? customLookOffset = null)
     {
         if (this == null) return;
 
@@ -691,9 +692,9 @@ public class GameCameraController : MonoBehaviour
             ? zoneCenter + customViewOffset.Value
             : zoneCenter + new Vector3(0f, introExtraHeight, -introExtraBack);
 
-        // 클로즈업 시 보스 가슴 높이를 바라보도록 lookAt 보정
+        // 클로즈업 시 보스 가슴 높이(또는 customLookOffset)를 바라보도록 lookAt 보정
         Vector3 lookAt  = customViewOffset.HasValue
-            ? zoneCenter + new Vector3(0f, 1.5f, 0f)
+            ? zoneCenter + (customLookOffset ?? new Vector3(0f, 1.5f, 0f))
             : zoneCenter;
         Vector3 lookDir = lookAt - toPos;
         Quaternion toRot = lookDir.sqrMagnitude > 0.01f
@@ -753,6 +754,61 @@ public class GameCameraController : MonoBehaviour
                     }
                     if (_prePanBrainEnabled) _brain.enabled = true;
                 }
+                if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 진행 중인 보스 등장 연출 카메라(팬)를 인수하여 플레이어 추적 위치/회전으로 복귀시키고 Cinemachine을 재개한다.
+    /// </summary>
+    public async UniTask ReturnToPlayerAsync(Transform playerTransform, float returnDuration, CancellationToken ct)
+    {
+        if (this == null) return;
+
+        if (!_isPanning)
+        {
+            _prePanBrainEnabled = _brain != null && _brain.enabled;
+            _prePanCmEnabled    = _cinemachine != null && _cinemachine.enabled;
+        }
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_panCts.Token, ct);
+        int myVersion = System.Threading.Interlocked.Increment(ref _panVersion);
+        _isPanning = true;
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        Vector3    fromPos = transform.position;
+        Quaternion fromRot = transform.rotation;
+        Vector3    toPos   = playerTransform != null ? playerTransform.position + _originalPosition : fromPos;
+        Quaternion toRot   = _originalRotation;
+
+        try
+        {
+            for (float t = 0f; t < returnDuration; t += Time.deltaTime)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                float ease = PanEase(t / returnDuration);
+                transform.position = Vector3.Lerp(fromPos, toPos, ease);
+                transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
+                await UniTask.Yield(linked.Token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (myVersion == _panVersion)
+            {
+                _isPanning = false;
+                if (playerTransform != null)
+                {
+                    transform.position = playerTransform.position + _originalPosition;
+                    transform.rotation = _originalRotation;
+                }
+                if (_brain != null && _prePanBrainEnabled) _brain.enabled = true;
                 if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
             }
         }
