@@ -1157,6 +1157,7 @@ MonoBehaviour:
   spawnEffectScale: 0.5
   spawnDissolveDuration: 1.2
   spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
+  spawnDissolveEliteAndAbove: 0
   autoApplyChapterGroup: 1
   allowedPoolGroups: 
   gradeMode: 0
@@ -9569,6 +9570,7 @@ MonoBehaviour:
   spawnEffectScale: 0.5
   spawnDissolveDuration: 1.2
   spawnOutlineColor: {r: 0, g: 2.4, b: 3, a: 1}
+  spawnDissolveEliteAndAbove: 0
   autoApplyChapterGroup: 1
   allowedPoolGroups: 
   gradeMode: 0
@@ -52451,7 +52453,7 @@ MonoBehaviour:
   playerPrefabKey: PlayerCharacter
   startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T3_Katana
-  debugDefaultRelic: {fileID: 11400000, guid: 6e49290b1b9721a439a71b43a15be1ba, type: 2}
+  debugDefaultRelic: {fileID: 11400000, guid: 0296196c76b8a14448eba2486d733d86, type: 2}
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 243811253}
   mapRoot: {fileID: 0}
@@ -52463,11 +52465,7 @@ MonoBehaviour:
   startWithZoneLayout: 0
   runFlowController: {fileID: 0}
   startRoomDialogueSO: {fileID: 0}
-  characterPickupPrefabs:
-  - {fileID: 5942164450736926565, guid: 8fe63d43c6026cd4f90eca3739353cc8, type: 3}
-  - {fileID: 4835396908360923906, guid: 571ae1f959d38544f8ed1b2256fafff1, type: 3}
-  - {fileID: 1615712682993080270, guid: 989e640551bac104aa8e91ad9c6991ee, type: 3}
-  - {fileID: 3817264450736926565, guid: dcad24e36c0786b44a5ed15fec98612a, type: 3}
+  characterPickupPrefabs: []
   weaponPickupPrefabs:
   - {fileID: 6690277064601983092, guid: ebcb55c7fe8fe1e4db6c3312e7953481, type: 3}
   - {fileID: 3282498442510412308, guid: 70db2f5a193e2c44288aeeaa9562b402, type: 3}

@@ -10,10 +10,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 {
     public static GameRunBootstrapper Instance { get; private set; }
 
-    [SerializeField] private string playerPrefabKey = "Knight";
+    [SerializeField] private string playerPrefabKey = "PlayerCharacter";
     [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
     [SerializeField] private string startBodyKey = "PlayerCharacter";
-    [SerializeField] private string debugDefaultWeaponKey = "T1_Bow";
+    [SerializeField] private string debugDefaultWeaponKey = "T3_Katana";
     [Tooltip("Loadout에 유물이 없을 때(에디터 직접 전투 테스트) 적용할 기본 유물 클래스. 비우면 유물 미적용. 시작방 경로에는 영향 없음.")]
     [SerializeField] private RelicClassSO debugDefaultRelic;
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";

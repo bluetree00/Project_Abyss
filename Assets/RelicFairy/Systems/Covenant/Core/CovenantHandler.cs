@@ -42,8 +42,14 @@ public sealed class CovenantHandler
     private WeaponData _lastWeapon;
     private Action<WeaponData, GameObject> _onWeaponChanged;
 
+    // [가이드라인 비주얼] 발동 토스트 위치/스로틀(매 적중·매 프레임 spam 방지)
+    private PlayerController _player;
+    private readonly Dictionary<string, float> _procThrottle = new();
+    private const float ProcThrottle = 0.4f;
+
     public void BindPlayer(PlayerController player)
     {
+        _player = player;   // [가이드라인 비주얼] 토스트 위치
         foreach (var c in _covenants)
             c.OnBoundToPlayer(player);
 
@@ -95,6 +101,10 @@ public sealed class CovenantHandler
         _covenants.Add(covenant);
         RefreshStats();
         OnCovenantListChanged?.Invoke();
+
+        // [가이드라인 비주얼] 서약 획득 토스트
+        if (_player != null)
+            GuidelineVisual.Toast(_player.transform.position + Vector3.up * 2.8f, "서약 획득: " + covenant.DisplayName, GuidelineVisual.ToastKind.Covenant);
         return true;
     }
 
@@ -196,12 +206,35 @@ public sealed class CovenantHandler
     // ── 피해 파이프라인 ──────────────────────────────────
     public void ModifyOutgoingDamage(ref float damage, CombatContext ctx)
     {
-        foreach (var c in _covenants) c.ModifyOutgoingDamage(ref damage, ctx);
+        foreach (var c in _covenants)
+        {
+            float before = damage;
+            c.ModifyOutgoingDamage(ref damage, ctx);
+            // [가이드라인 비주얼] 실제 피해 변조한 서약만 통지(스로틀)
+            if (ctx.Target != null && !Mathf.Approximately(before, damage))
+                ProcToast(c.CovenantId + "_out", c.DisplayName, ctx.Target.transform.position + Vector3.up * 1.8f, GuidelineVisual.ToastKind.Covenant);
+        }
     }
 
     public void ModifyIncomingDamage(ref float damage, CombatContext ctx)
     {
-        foreach (var c in _covenants) c.ModifyIncomingDamage(ref damage, ctx);
+        foreach (var c in _covenants)
+        {
+            float before = damage;
+            c.ModifyIncomingDamage(ref damage, ctx);
+            // [가이드라인 비주얼] 받피 변조한 서약만 통지(스로틀)
+            if (_player != null && !Mathf.Approximately(before, damage))
+                ProcToast(c.CovenantId + "_in", c.DisplayName, _player.transform.position + Vector3.up * 2.4f, GuidelineVisual.ToastKind.Covenant);
+        }
+    }
+
+    // [가이드라인 비주얼] 스로틀 토스트 헬퍼
+    private void ProcToast(string throttleKey, string name, Vector3 pos, GuidelineVisual.ToastKind kind)
+    {
+        float now = UnityEngine.Time.unscaledTime;
+        if (_procThrottle.TryGetValue(throttleKey, out var last) && now - last < ProcThrottle) return;
+        _procThrottle[throttleKey] = now;
+        GuidelineVisual.Toast(pos, name, kind);
     }
 
     /// <summary>통보 한 줄용 float 반환 래퍼 — 호출부: dmg = handler?.ModifyIncoming(dmg, ctx) ?? dmg;</summary>
@@ -233,7 +266,14 @@ public sealed class CovenantHandler
     {
         foreach (var c in _covenants)
         {
-            if (c.TryProvideCritOverride(weapon, out forceCrit, out minFloorRatio)) return true;
+            if (c.TryProvideCritOverride(weapon, out forceCrit, out minFloorRatio))
+            {
+                // [가이드라인 비주얼] 치명 오버라이드 통지(스로틀)
+                if (_player != null)
+                    ProcToast(c.CovenantId + "_crit", c.DisplayName + (forceCrit ? " 확정치명" : " 치명보정"),
+                              _player.transform.position + Vector3.up * 2.6f, GuidelineVisual.ToastKind.Crit);
+                return true;
+            }
         }
         forceCrit = false; minFloorRatio = 0f; return false;
     }

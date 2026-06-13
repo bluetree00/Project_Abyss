@@ -121,6 +121,10 @@ public abstract class CovenantBase
     {
         if (Ctx?.Player == null || Ctx.Stats == null) return 0;
 
+        // [가이드라인 비주얼] 서약 광역 발동 표시(통지만)
+        GuidelineVisual.AoeBurst(center, radius, GuidelineVisual.ToastKind.Covenant);
+        GuidelineVisual.Toast(center + Vector3.up * 1.6f, DisplayName, GuidelineVisual.ToastKind.Covenant);
+
         var weaponData = Ctx.Player.WeaponManager?.CurrentWeaponData;
         var kind = weaponData != null ? weaponData.weaponType.GetAttackStatKind() : AttackStatKind.Melee;
         float dmg = DamageFormula.Calculate(multiplier, Ctx.Stats.GetEffectiveAttack(kind));
@@ -141,7 +145,10 @@ public abstract class CovenantBase
 
     /// <summary>일회성 VFX(ObjectPooler Effect 풀, Addressable 키). 자산 없으면 무동작.</summary>
     protected static void Vfx(string key, Vector3 pos, float scale = 1f)
-        => ItemEffectVfxHelper.SpawnOneShotAt(key, pos, scale);
+    {
+        GuidelineVisual.Toast(pos + Vector3.up * 1.2f, key, GuidelineVisual.ToastKind.Covenant);   // [가이드라인 비주얼]
+        ItemEffectVfxHelper.SpawnOneShotAt(key, pos, scale);
+    }
 
     /// <summary>대상에 부착되는 지속 VFX(duration초 후 제거).</summary>
     protected static void VfxLoop(string key, Transform parent, float duration, float scale = 1f)
@@ -156,6 +163,7 @@ public abstract class CovenantBase
 
     private static async UniTaskVoid SpawnTimedActorAsync(string key, Vector3 pos, float duration, Action onExpire)
     {
+        GuidelineVisual.Toast(pos + Vector3.up * 1.4f, key, GuidelineVisual.ToastKind.Covenant);   // [가이드라인 비주얼]
         if (string.IsNullOrEmpty(key) || Managers.ObjectPooler == null) return;
 
         var go = await Managers.ObjectPooler.SpawnAsync(
