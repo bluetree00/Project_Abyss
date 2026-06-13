@@ -186,3 +186,29 @@ public sealed class ProjectileCountEffect : ItemEffectBase
     public ProjectileCountEffect(ItemEffectSlot s) : base(s) { }
     public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.ProjectileCountBonus += (int)_value;
 }
+
+// ── 정적 % 스탯 (무조건). 조건부 버전은 ConditionalStatBuffEffect(Cond*) ──
+
+public sealed class CritChanceEffect : ItemEffectBase
+{
+    public CritChanceEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.CritChancePercent += _value;
+}
+
+public sealed class CritDamageEffect : ItemEffectBase
+{
+    public CritDamageEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.CritDamagePercent += _value;
+}
+
+public sealed class DefensePercentEffect : ItemEffectBase
+{
+    public DefensePercentEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.DefensePercent += _value;
+}
+
+public sealed class MaxHPPercentEffect : ItemEffectBase
+{
+    public MaxHPPercentEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.MaxHPPercent += _value;
+}

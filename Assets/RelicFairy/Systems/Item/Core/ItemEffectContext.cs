@@ -22,7 +22,7 @@ public sealed class ItemEffectContext
         var weaponData = player?.WeaponManager?.CurrentWeaponData;
         WeaponType = weaponData?.weaponType ?? WeaponType.None;
         CharacterClass = player?.CharacterData?.conClass ?? Define.CharacterClass.Default;
-        HasShield = false; // 추후 방패 시스템 추가 시
+        HasShield = Stats != null && Stats.HasShield;
 
         if (Stats != null && Stats.MaxHp > 0)
             HpRatio = (float)Stats.Hp / Stats.MaxHp;

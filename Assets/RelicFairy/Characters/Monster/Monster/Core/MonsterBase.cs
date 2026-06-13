@@ -641,7 +641,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             _runtime.CurrentHp = 0;
             _runtime.IsDead    = true;
             if (IsPlayerInstigator(instigator))
+            {
                 GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
+                GameRunBootstrapper.Instance?.Run?.EffectManager?.OnKill(gameObject);   // 아이템 처치 효과
+            }
             OnFatalDamage();
         }
     }
@@ -698,7 +701,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             _runtime.IsDead    = true;
             // [서약] 플레이어 처치 통보
             if (IsPlayerInstigator(instigator))
+            {
                 GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
+                GameRunBootstrapper.Instance?.Run?.EffectManager?.OnKill(gameObject);   // 아이템 처치 효과
+            }
             OnFatalDamage();
         }
         else

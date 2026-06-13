@@ -16,6 +16,10 @@ public sealed class ItemEffectManager
     private readonly Dictionary<string, int> _persistentStacks = new(); // Rebuild 간 스택 보존
     private RunItemInventory _inventory;
 
+    // 다음 1타에만 가산되는 피해 보너스 누적(광폭형 "다음 공격 ×N" + 단발 조건부 "첫 공격 +N%" 공용).
+    // OnPreDealDamage에서 (1+합)을 곱하고 소비. 0.4=+40%, 1.5=+150%(×2.5).
+    private float _nextAttackBonus;
+
     public IReadOnlyList<IItemEffect> ActiveEffects => _activeEffects;
 
     // ── 초기화 / 갱신 ───────────────────────────────────────
@@ -76,6 +80,8 @@ public sealed class ItemEffectManager
         _activeEffects.Clear();
         _onceTriggered.Clear();
         _persistentStacks.Clear();
+        _nextAttackBonus = 0f;
+        _ctx.Stats?.ApplyItemDynamicStats(default);   // 동적 레이어 0으로 복원
         _inventory = null;
     }
 
@@ -117,6 +123,19 @@ public sealed class ItemEffectManager
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnPreDealDamage(_ctx, ref pkt);
+
+        // 다음-공격-강화 버퍼 소비(1타 한정)
+        if (_nextAttackBonus > 0f)
+        {
+            pkt.FinalDamage *= 1f + _nextAttackBonus;
+            _nextAttackBonus = 0f;
+        }
+    }
+
+    /// <summary>다음 1타에 가산될 피해 보너스 예약(광폭형/단발 조건부 공용). 누적 후 첫 공격에서 소비.</summary>
+    public void QueueNextAttackBonus(float bonus)
+    {
+        if (bonus > 0f) _nextAttackBonus += bonus;
     }
 
     public void OnPostDealDamage(DamageReport report)
@@ -257,7 +276,15 @@ public sealed class ItemEffectManager
 
     public void OnTick(float deltaTime)
     {
+        _ctx.RefreshHpRatio();   // HP 조건 라이브 평가
+
         foreach (var eff in _activeEffects)
             eff.OnTick(_ctx, deltaTime);
+
+        // 조건부/타임드 동적 스탯 합산 → 플레이어 동적 레이어 push (무변동 시 내부에서 재계산 생략)
+        var dyn = new ItemDynamicStats();
+        foreach (var eff in _activeEffects)
+            eff.ContributeDynamicStats(_ctx, ref dyn);
+        _ctx.Stats?.ApplyItemDynamicStats(in dyn);
     }
 }
