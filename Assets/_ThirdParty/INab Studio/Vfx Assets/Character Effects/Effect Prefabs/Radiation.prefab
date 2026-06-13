@@ -357,7 +357,8 @@ VisualEffect:
         m_Overridden: 1
     m_NamedObject:
       m_Array:
-      - m_Value: {fileID: -664032772943106202, guid: 8e758bfa6efa28e4ba889fa7ce593840, type: 3}
+      - m_Value: {fileID: -664032772943106202, guid: 8e758bfa6efa28e4ba889fa7ce593840,
+          type: 3}
         m_Name: Mesh Renderer
         m_Overridden: 1
       - m_Value: {fileID: 2800000, guid: 52709a6c2c8a50349890a6c8a778953b, type: 3}
@@ -404,6 +405,8 @@ VFXRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_StaticBatchInfo:
@@ -423,9 +426,11 @@ VFXRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
 --- !u!114 &4251767342055985031
 MonoBehaviour:
   m_ObjectHideFlags: 0
