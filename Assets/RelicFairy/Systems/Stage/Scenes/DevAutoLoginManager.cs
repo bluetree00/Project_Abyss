@@ -133,12 +133,7 @@ public sealed class DevAutoLoginBootstrap : MonoBehaviour
     private async UniTaskVoid LoadGameDataAsync()
     {
         Log("GameData Load...");
-        await UniTask.WhenAll(
-            BackendGameData.Instance.LoadAsync(),
-            RunProgressManager.Instance != null
-                ? RunProgressManager.Instance.LoadAsync()
-                : UniTask.CompletedTask
-        );
+        await BackendGameData.Instance.LoadAsync();
         Log("GameData Load OK");
         OnReady();
     }

@@ -209,7 +209,16 @@ public class RunFlowController : MonoBehaviour
         // [서약] 방 진입 통보
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnRoomEnter();
         // 이동 완료 후 이전 방 디스폰 — 자식 배치 파괴로 단발 Destroy 스파이크를 분산(플레이어는 이미 신규 방).
-        if (prevRoom != null) DestroyRoomStaggeredAsync(prevRoom, ct).Forget();
+        if (prevRoom != null)
+        {
+            DestroyRoomStaggeredAsync(prevRoom, ct).Forget();
+        }
+        else
+        {
+            // 첫 절차 방 진입: 허브 대기방(BlockMap_zone_0_)이 원점에 잔존하면 보스룸 등과 겹친다 → 정리.
+            var waitingRoom = grb.ConsumeWaitingRoomMap();
+            if (waitingRoom != null) DestroyRoomStaggeredAsync(waitingRoom, ct).Forget();
+        }
 
         // 디졸브 먼저 시작 → 약간 지연 → 화면 복귀(디졸브 진행 중 진입) → 완료 대기. 첫 방 포함 모든 절차 방에 적용.
         var dissolve = result.blocks != null

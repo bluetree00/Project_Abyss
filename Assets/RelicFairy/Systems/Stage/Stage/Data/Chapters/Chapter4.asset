@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a47a37ab628dfe246b83d5c984a79b2a, type: 3}
   m_Name: Chapter4
   m_EditorClassIdentifier: Assembly-CSharp::ChapterDataSO
-  chapterId: 3
+  chapterId: 4
   chapterName: "\uC2EC\uC5F0\uC758 \uD611\uACE1"
   description: "\uC774 \uACB0\uACFC\uB294 \uB204\uAD6C\uC758 \uC695\uB9DD\uC778\uAC00"
   mapBackground: {fileID: 0}

@@ -1,4 +1,3 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -84,31 +83,24 @@ public class UI_SaveSlotPanel : UI_Base
 
     private void RefreshAllCards()
     {
-        var rpm   = RunProgressManager.Instance;
-        var local = GetLocalSave(rpm);
+        var rpm = RunProgressManager.Instance;
         for (int i = 0; i < slotCards.Length; i++)
-            slotCards[i].Setup(ResolveSlotData(rpm, local, i), i, OnSlotStartClicked, OnSlotDeleteClicked);
+            slotCards[i].Setup(ResolveSlotData(rpm, i), i, OnSlotStartClicked, OnSlotDeleteClicked);
     }
 
     private void RefreshCard(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= slotCards.Length) return;
-        var rpm   = RunProgressManager.Instance;
-        var local = GetLocalSave(rpm);
-        slotCards[slotIndex].Setup(ResolveSlotData(rpm, local, slotIndex), slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
+        var rpm = RunProgressManager.Instance;
+        slotCards[slotIndex].Setup(ResolveSlotData(rpm, slotIndex), slotIndex, OnSlotStartClicked, OnSlotDeleteClicked);
     }
 
-    /// <summary>PR1: 진행 중 런은 로컬(단일 슬롯)이 권위. 해당 슬롯은 로컬 세이브로 표시한다.</summary>
-    private static RunSaveData GetLocalSave(RunProgressManager rpm)
+    /// <summary>진행 중 런은 슬롯별 로컬 파일이 단독 권위. 활성 로컬 런이 있으면 그것을, 없으면 빈 슬롯(null).</summary>
+    private static RunSaveData ResolveSlotData(RunProgressManager rpm, int i)
     {
-        var local = rpm != null ? rpm.LoadLocalRun() : null;
+        if (rpm == null || i < 0 || i >= RunProgressManager.SlotCount) return null;
+        var local = rpm.LoadLocalRun(i);
         return local != null && local.hasActiveRun ? local : null;
-    }
-
-    private static RunSaveData ResolveSlotData(RunProgressManager rpm, RunSaveData local, int i)
-    {
-        if (local != null && local.slotIndex == i) return local;
-        return (rpm != null && i < RunProgressManager.SlotCount) ? rpm.Saves[i] : null;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -148,22 +140,18 @@ public class UI_SaveSlotPanel : UI_Base
     {
         int slot = _pendingDeleteSlot;
         HideConfirm();
-        DeleteSlotAsync(slot).Forget();
+        DeleteSlot(slot);
     }
 
     private void OnClickCancelDelete() => HideConfirm();
 
-    private async UniTaskVoid DeleteSlotAsync(int slotIndex)
+    private void DeleteSlot(int slotIndex)
     {
         var rpm = RunProgressManager.Instance;
         if (rpm == null || slotIndex < 0) return;
 
-        // 로컬 런 세이브가 이 슬롯이면 함께 폐기 (PR1: 로컬이 진행 중 런의 권위)
-        var local = GetLocalSave(rpm);
-        if (local != null && local.slotIndex == slotIndex)
-            rpm.ClearLocalRun();
-
-        await rpm.ClearAsync(slotIndex);
+        // 이 슬롯의 로컬 런 세이브만 폐기(다른 슬롯 무영향). 로컬이 단독 권위.
+        rpm.ClearLocalRun(slotIndex);
         RefreshCard(slotIndex);
     }
 }

@@ -141,6 +141,22 @@ public class BasicArrow : MonoBehaviour
 
             float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
 
+            // 서약: 출력 피해 변형(아서 등). 플레이어 발사체만, 크리티컬 전에 적용.
+            if (baseFinal > 0f && _instigator != null && _instigator.TryGetComponent<PlayerController>(out _))
+            {
+                var covH = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
+                if (covH != null)
+                {
+                    var cctx = new CombatContext
+                    {
+                        Target     = other.gameObject,
+                        Damage     = baseFinal,
+                        WeaponType = weaponData != null ? weaponData.weaponType : default,
+                    };
+                    baseFinal = covH.ModifyOutgoing(baseFinal, cctx);
+                }
+            }
+
             // 크리티컬 굴림
             float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
             pkt.IsCrit = isCrit;
@@ -159,6 +175,10 @@ public class BasicArrow : MonoBehaviour
                 HitPosition = other.ClosestPoint(transform.position),
             };
             mgr?.OnPostDealDamage(report);
+
+            // 서약: 실제 적중 디스패치(투사체). 플레이어 발사체만.
+            if (finalDmg > 0f && _instigator != null && _instigator.TryGetComponent<PlayerController>(out _))
+                GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(other.gameObject, finalDmg);
         }
 
         SpawnHitEffect(other);
