@@ -2,10 +2,8 @@ using UnityEngine;
 
 public class DefaultMoveAbility : IMoveAbility<PlayerController>
 {
-    // 회전 부드러움(임계 감쇠 SmoothDamp). 작을수록 빠릿, 클수록 느긋. 0.08s = 반응성/자연스러움 균형.
-    private const float RotationSmoothTime = 0.08f;
-    // SmoothDampAngle 상태 — 프레임 간 각속도를 보존해야 임계 감쇠가 성립한다.
-    private float _yawVelocity;
+    // 회전 각속도 폴백(도/초). CharacterData.turnSpeedDegPerSec 미설정 시 사용. 즉발 액션 지향 → 빠른 기본값.
+    private const float DefaultTurnSpeed = 720f;
 
     // 오를 수 있는 계단 최대 높이 (m)
     private const float StepMaxHeight = 0.35f;
@@ -47,6 +45,17 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         float baseSpd = Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(owner.RunBlend01));
         float currentMaxSpeed = baseSpd * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
 
+        // P1(옵션·게이트): 입력 방향과 현재 facing 차이가 클수록 이동속도 감속 → 급선회 반경 축소.
+        // 0=현행(무영향). 조준이 facing을 주도하는 공격/스킬 중에는 적용하지 않는다(move-vs-aim 오판 방지).
+        float turnSlow = cd != null ? Mathf.Clamp01(cd.sharpTurnMoveSlowdown) : 0f;
+        if (turnSlow > 0f && !owner.IsActionControllingFacing)
+        {
+            float facingYaw = rb.rotation.eulerAngles.y;
+            float desiredYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
+            float diff01 = Mathf.Clamp01(Mathf.Abs(Mathf.DeltaAngle(facingYaw, desiredYaw)) / 180f);
+            currentMaxSpeed *= Mathf.Lerp(1f, 1f - turnSlow, diff01);
+        }
+
         // ② 빠른 추격 레이어: 목표(moveDir×currentMaxSpeed)를 가속으로 추격.
         Vector2 target = moveDir2 * currentMaxSpeed;
         float accel = (cd != null && cd.moveAccel > 0.01f) ? cd.moveAccel : DefaultAccel;
@@ -65,12 +74,19 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         // 회전 권한 일원화: 공격/스킬 등 Act 상태가 facing을 소유 중이면 이동 회전은 양보(매 프레임 경합 방지).
         if (owner.IsActionControllingFacing) return;
 
-        // 이동 방향(=실제 진행 방향)으로 Yaw만 임계 감쇠 회전 — 프레임률 독립, 오버슈트 없음.
+        // 이동 방향(=실제 진행 방향)으로 Yaw만 "일정 각속도" 회전 — 프레임률 독립, 점근(빙 도는 느낌) 없음.
+        // 비율보간(SmoothDampAngle)은 목표에 점근해 방향전환 시 모델이 휘어 도는 orbiting 체감 → MoveTowardsAngle로 교체.
         // 실제 적용은 PlayerController.FixedUpdate(ApplyFacing)에서 Rigidbody에 한다.
         // (Update에서 Rigidbody.rotation 직접 대입 시 보간 타이밍과 어긋나 회전 각도에서 진동 발생)
         float currentYaw = owner.Rigid.rotation.eulerAngles.y;
         float targetYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
-        float yaw = Mathf.SmoothDampAngle(currentYaw, targetYaw, ref _yawVelocity, RotationSmoothTime);
+        float turnSpeed = (cd != null && cd.turnSpeedDegPerSec > 0.01f) ? cd.turnSpeedDegPerSec : DefaultTurnSpeed;
+
+        // P1(옵션·게이트): 입력-facing 각차가 snapTurnAngle 이상이면 즉시 스냅(급반전 자연스럽게). 180=실질 off.
+        float snapAngle = (cd != null && cd.snapTurnAngle > 0.01f) ? cd.snapTurnAngle : 180f;
+        float yaw = Mathf.Abs(Mathf.DeltaAngle(currentYaw, targetYaw)) >= snapAngle
+            ? targetYaw
+            : Mathf.MoveTowardsAngle(currentYaw, targetYaw, turnSpeed * dt);
         owner.RequestFacing(Quaternion.Euler(0f, yaw, 0f));
     }
 

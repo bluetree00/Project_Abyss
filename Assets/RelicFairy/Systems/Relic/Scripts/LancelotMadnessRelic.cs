@@ -46,6 +46,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior
         var rs = _owner != null ? _owner.RuntimeStats : null;
         rs?.SetCharacterAttackMultiplier(1f, 1f);
         rs?.SetRelicMoveSpeedBonus(0f);
+        GuidelineVisual.ClearBadge("lancelot");   // [가이드라인 비주얼]
     }
 
     public ISkillRuntime CreateSkillRuntime(PlayerController owner, SkillType slot) => null; // 자동 발동(스킬런타임 없음)
@@ -77,6 +78,14 @@ public sealed class LancelotMadnessRelic : IRelicBehavior
         rs.SetCharacterAttackMultiplier(atkMul, atkMul);
         // 배신의 대가 빈틈 — 이동속도 감소
         rs.SetRelicMoveSpeedBonus(_madness.IsFaltering ? -V(V_FALTER_MOVE, 0.20f) : 0f);
+
+        // [가이드라인 비주얼] 광기 스택/빈틈 배지(통지만)
+        if (_owner != null)
+        {
+            if (_madness.IsFaltering)    GuidelineVisual.SetBadge(_owner.transform, "lancelot", "빈틈", GuidelineVisual.BadgeTint.Dark);
+            else if (_madness.Stacks > 0) GuidelineVisual.SetBadge(_owner.transform, "lancelot", "광기 " + _madness.Stacks, GuidelineVisual.BadgeTint.Dark);
+            else                          GuidelineVisual.ClearBadge("lancelot");
+        }
     }
 
     /// <summary>MAX 스택 도달 시 자동 발동 — 전방 직선 관통 ATK×(base+stack×per) + 심판 낙인.</summary>
@@ -97,6 +106,10 @@ public sealed class LancelotMadnessRelic : IRelicBehavior
         if (fwd.sqrMagnitude < 0.001f) { _madness.StartFalter(V(V_FALTER_DUR, 4f), Mathf.RoundToInt(V(V_RESTART, 10f))); return; }
         fwd.Normalize();
 
+        // [가이드라인 비주얼] 심판 일격 발동 — 전방 직선(±45°) 윤곽 + 발동 토스트
+        GuidelineVisual.Cone(origin, fwd, StrikeRange, 45f);
+        GuidelineVisual.Toast(origin + Vector3.up * 2.4f, "심판의 일격", GuidelineVisual.ToastKind.Relic);
+
         var owner = _owner.gameObject;
         var cols  = Physics.OverlapSphere(origin, StrikeRange);
         foreach (var col in cols)
@@ -110,7 +123,8 @@ public sealed class LancelotMadnessRelic : IRelicBehavior
             if (d == null || d is not Component dc) continue;
 
             d.TakeDamage(dmg, owner, 0.4f);
-            // 심판 낙인 — 적 받는피해 증폭(이후 피해 +brandAmp, brandDur초)
+            GuidelineVisual.SynergyDamage(dc.transform.position + Vector3.up * 1.2f, false);   // [가이드라인 비주얼] 적중 피해 플래시
+            // 심판 낙인 — 적 받는피해 증폭(이후 피해 +brandAmp, brandDur초). 마커는 ApplyDamageTakenAmp(기본 "brand")가 표시.
             dc.GetComponentInParent<MonsterBase>()?.ApplyDamageTakenAmp(brandAmp, brandDur);
         }
 

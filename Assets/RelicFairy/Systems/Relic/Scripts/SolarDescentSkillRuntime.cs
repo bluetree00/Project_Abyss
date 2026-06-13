@@ -31,6 +31,10 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         _elapsed = 0f; _hitDone = false;
         _relic?.MarkSkillUsed(); // 구간당 1회 소비
 
+        // [가이드라인 비주얼] 태양 강림 발동 토스트
+        if (ctx.PlayerTransform != null)
+            GuidelineVisual.Toast(ctx.PlayerTransform.position + Vector3.up * 2.4f, "태양 강림", GuidelineVisual.ToastKind.Relic);
+
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
         ctx.Animator?.CrossFade(AnimName, 0.1f);
@@ -54,6 +58,9 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         fwd.Normalize();
         float cosHalf = Mathf.Cos(FanHalfAngleDeg * Mathf.Deg2Rad);
 
+        // [가이드라인 비주얼] 부채꼴 범위 윤곽
+        GuidelineVisual.Cone(origin, fwd, FanRadius, FanHalfAngleDeg);
+
         // 각인 첫타(정오 첫 공격이 스킬이면 스킬이 소비) → +50% = 525%
         float markMul = (_relic != null && _relic.ConsumeMarkFirstHit()) ? (1f + V(V_FIRST_HIT, 0.5f)) : 1f;
         float dmg     = ctx.CalculateDamage(V(V_SKILL_MULT, 3.5f)) * markMul;
@@ -76,6 +83,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
             if (!hit.Add(dc.gameObject)) continue; // 같은 적 1회
 
             d.TakeDamage(dmg, owner, 0.3f);
+            GuidelineVisual.SynergyDamage(dc.transform.position + Vector3.up * 1.2f, false);   // [가이드라인 비주얼] 적중 피해 플래시
             if (burnDps > 0f)
                 MonsterBurnHandler.Apply(target: dc.gameObject, dps: burnDps, duration: burnDur,
                                          tickInterval: BurnTickInterval, instigator: owner);

@@ -46,6 +46,7 @@ public class MerlinRuneBridge : MonoBehaviour
     // 임계값·CENTER 체크
     private readonly Dictionary<string, HashSet<int>> _appliedThresholds = new();
     private readonly Dictionary<string, int>           _lastClusterSizes  = new();
+    private readonly List<int>                         _downgradeScratch  = new();   // 하강 해제 임계값(루프 중 수정 방지)
     private bool _centerBonusActive;
 
     private void Awake()
@@ -588,31 +589,36 @@ public class MerlinRuneBridge : MonoBehaviour
     public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts,
                                     Dictionary<string, int> clusterSizes)
     {
-        RFLog.D($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={clusterSizes?.Count ?? 0}");
+        // 단계 판정 = 속성별 점유 셀 "개수"(연결성 미고려). threshold는 데이터 구동(점유 셀 수).
+        // clusterSizes(연결 클러스터)는 더 이상 판정에 쓰지 않으나, 그리드 뷰 시그니처 호환을 위해 인자만 유지.
+        zoneCounts ??= new Dictionary<string, int>();
 
-        // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화
+        RFLog.D($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={zoneCounts.Count}");
+
+        // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화 (표시·판정 모두 점유 수 기준)
         _lastClusterSizes.Clear();
-        if (clusterSizes != null)
-            foreach (var kvp in clusterSizes)
-                _lastClusterSizes[kvp.Key] = kvp.Value;
+        foreach (var kvp in zoneCounts)
+            _lastClusterSizes[kvp.Key] = kvp.Value;
 
-        CheckAndApplyThresholds(clusterSizes ?? new Dictionary<string, int>());
-        CheckCenterBonus(zoneCounts ?? new Dictionary<string, int>());
+        CheckAndApplyThresholds(zoneCounts);
+        CheckCenterBonus(zoneCounts);
         OnSynergiesUpdated?.Invoke();
     }
 
-    /// <summary>현재 존별 최대 연결 클러스터 크기. MerlinRuneSynergyStatusView에서 읽는다.</summary>
+    /// <summary>현재 존별 점유 셀 수(단계 판정·표시 공용). MerlinRuneSynergyStatusView에서 읽는다.</summary>
     public IReadOnlyDictionary<string, int> GetLastClusterSizes() => _lastClusterSizes;
 
-    private void CheckAndApplyThresholds(Dictionary<string, int> clusterSizes)
+    private void CheckAndApplyThresholds(Dictionary<string, int> zoneCounts)
     {
         var blockData = Managers.RuneData;
         if (blockData == null) return;
 
-        foreach (var kvp in clusterSizes)
+        DowngradeBelowThreshold(blockData, zoneCounts);
+
+        foreach (var kvp in zoneCounts)
         {
-            string zoneId      = kvp.Key;
-            int    clusterSize = kvp.Value;
+            string zoneId       = kvp.Key;
+            int    occupiedCount = kvp.Value;
 
             if (zoneId == "CENTER") continue;
 
@@ -627,13 +633,13 @@ public class MerlinRuneBridge : MonoBehaviour
 
             foreach (var entry in entries)
             {
-                if (clusterSize < entry.threshold) continue;
+                if (occupiedCount < entry.threshold) continue;
                 if (applied.Contains(entry.threshold)) continue;
 
                 applied.Add(entry.threshold);
                 ApplyMechanicEffect(zoneId, entry);
 
-                RFLog.D($"[MerlinRuneBridge] 클러스터 임계값 달성: {zoneId} 클러스터={clusterSize} >= {entry.threshold} → {entry.effect_type}");
+                RFLog.D($"[MerlinRuneBridge] 점유 임계값 달성: {zoneId} 점유={occupiedCount} >= {entry.threshold} → {entry.effect_type}");
 
                 var run = AppBootstrapper.Instance?.CurrentRun;
                 run?.RecordSynergy(new SynergyRecord
@@ -652,20 +658,66 @@ public class MerlinRuneBridge : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 런 중 룬 재배치로 점유가 줄어든 존의 단계를 해제한다(상승만 적용하던 기존 로직의 역방향).
+    /// 점유 0이 된 존은 zoneCounts에서 사라질 수 있으므로 이전 적용분(_appliedThresholds) 기준으로 순회한다.
+    /// 속성 효과는 디스패처에서 해제하고, _appliedThresholds에서 제거해 재상승 시 다시 적용되도록 한다.
+    /// </summary>
+    private void DowngradeBelowThreshold(RuneDataManager blockData, Dictionary<string, int> zoneCounts)
+    {
+        var player = AppBootstrapper.Instance?.CurrentRun?.Player;
+
+        foreach (var kv in _appliedThresholds)
+        {
+            string zoneId  = kv.Key;
+            var    applied = kv.Value;
+            if (applied.Count == 0) continue;
+
+            zoneCounts.TryGetValue(zoneId, out int occupiedCount);   // 없으면 0
+
+            _downgradeScratch.Clear();
+            foreach (int thr in applied)
+                if (occupiedCount < thr) _downgradeScratch.Add(thr);
+            if (_downgradeScratch.Count == 0) continue;
+
+            var entries = blockData.GetZoneSynergies(zoneId);
+            for (int i = 0; i < _downgradeScratch.Count; i++)
+            {
+                int thr = _downgradeScratch[i];
+                applied.Remove(thr);
+
+                var entry = FindEntryByThreshold(entries, thr);
+                if (entry == null) continue;
+
+                player?.RuneEffects?.Deactivate(entry.effect_type);
+                RFLog.D($"[MerlinRuneBridge] 점유 하락 단계 해제: {zoneId} 점유={occupiedCount} < {thr} → {entry.effect_type}");
+            }
+        }
+    }
+
+    private static RuneSynergyEntry FindEntryByThreshold(IReadOnlyList<RuneSynergyEntry> entries, int threshold)
+    {
+        if (entries == null) return null;
+        for (int i = 0; i < entries.Count; i++)
+            if (entries[i] != null && entries[i].threshold == threshold) return entries[i];
+        return null;
+    }
+
     private void CheckCenterBonus(Dictionary<string, int> zoneCounts)
     {
-        if (_centerBonusActive) return;
         zoneCounts.TryGetValue("CENTER", out int centerCount);
-        if (centerCount < 2) return;
+        bool shouldActivate = centerCount >= 2;
+        if (shouldActivate == _centerBonusActive) return;   // 상태 무변동 — 스킵
 
-        _centerBonusActive = true;
-        OnCenterBonusActivated?.Invoke();
+        _centerBonusActive = shouldActivate;
 
         var player = AppBootstrapper.Instance?.CurrentRun?.Player;
-        if (player == null) return;
+        if (player != null)
+            player.RuntimeStats.SynergyMechanics.CenterBonusEnabled = shouldActivate;   // 하강 시에도 +25% 해제
 
-        player.RuntimeStats.SynergyMechanics.CenterBonusEnabled = true;
-        Debug.Log("[MerlinRuneBridge] CENTER 보너스 활성화: 활성 듀오 시너지 +25%");
+        // 구독자(UI 푸터)는 IsCenterBonusActive 상태를 다시 읽어 갱신하므로 양방향 전이 모두 통지한다.
+        OnCenterBonusActivated?.Invoke();
+        Debug.Log($"[MerlinRuneBridge] CENTER 보너스 {(shouldActivate ? "활성화: 활성 듀오 시너지 +25%" : "해제")}");
     }
 
     private void ApplyMechanicEffect(string zoneId, RuneSynergyEntry entry)

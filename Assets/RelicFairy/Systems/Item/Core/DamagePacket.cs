@@ -32,5 +32,6 @@ public struct DamageReport
     public GameObject Attacker;
     public GameObject Target;
     public bool WasKill;
+    public bool IsCrit;            // 치명타 여부 (룬 OnCrit 라우팅에 사용)
     public Vector3 HitPosition;
 }
