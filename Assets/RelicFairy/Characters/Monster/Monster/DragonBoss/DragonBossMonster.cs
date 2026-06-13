@@ -21,7 +21,7 @@ namespace RelicFairy.Monster
 ///  BossPatternRunner 가 Update() 에서 틱되어 BossConfigSO 의
 ///  patternEntries 를 평가하고 패턴 SpecialState 를 발동한다.
 /// </summary>
-public class DragonBossMonster : MonsterBase, IBoss
+public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 {
     // ── 드래곤 전용 설정 (Inspector) ──────────────────────
     [Header("Dragon — 애니메이션 상태 이름")]
@@ -72,6 +72,30 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private float _airOrbitRecenterThreshold = 9f;
     [SerializeField] private float _airOrbitCenterMoveSpeedMult = 1.1f;
 
+    [Header("Dragon — 등장 연출")]
+    [Tooltip("등장 대기 중 플레이어 감지 반경")]
+    [SerializeField] private float _detectionRange = 15f;
+    [Tooltip("등장 시 착지 지점 위쪽으로 띄우는 높이 — 브레스 발사 고도")]
+    [SerializeField] private float _entranceDescendHeight = 45f;
+    [Tooltip("등장 하강 속도 (m/s)")]
+    [SerializeField] private float _entranceDescendSpeed = 18f;
+    [Tooltip("고공 와이드샷 유지 중 브레스로 파괴할 지붕 타일들 (MCP로 미리 배치한 scale=1 타일 225개)")]
+    [SerializeField] private GameObject[] _entranceRoofTiles;
+    [Tooltip("브레스 착지점 기준, 이 반경(m) 안의 지붕 타일만 파괴")]
+    [SerializeField] private float _entranceRoofHitRadius = 8f;
+    [Tooltip("지붕 파괴 임팩트 시점 생성할 브레스 VFX 프리팹")]
+    [SerializeField] private GameObject _entranceBreathVfxPrefab;
+    [Tooltip("브레스 VFX 생성 위치. 비워두면 드래곤 위치 사용")]
+    [SerializeField] private Transform _entranceVfxPoint;
+    [Tooltip("착지 후 카메라 클로즈업 오프셋 (드래곤 기준 월드 좌표)")]
+    [SerializeField] private Vector3 _entranceCameraOffset = new Vector3(7f, 0.5f, -2f);
+    [Tooltip("보스 이름 HUD 소멸 후 플레이어 카메라로 복귀하는 시간 (초)")]
+    [SerializeField] private float _entranceCameraMoveDuration = 1.2f;
+    [Tooltip("등장 비행 시작 위치 — 착지 지점(SpawnPosition) 기준 수평 오프셋 (X/Z). 이 위치에서 브레스를 뿜으며 착지 지점 위까지 날아온다")]
+    [SerializeField] private Vector2 _entranceFlyInOffset = new Vector2(0f, 55f);
+    [Tooltip("등장 비행 속도 (m/s)")]
+    [SerializeField] private float _entranceFlyInSpeed = 25f;
+
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
     public string RunChaseStateName    => _runChaseStateName;
@@ -99,6 +123,13 @@ public class DragonBossMonster : MonsterBase, IBoss
     public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
     public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
 
+    public float   EntranceDescendHeight     => _entranceDescendHeight;
+    public float   EntranceDescendSpeed      => _entranceDescendSpeed;
+    public Vector3 EntranceCameraOffset      => _entranceCameraOffset;
+    public float   EntranceCameraMoveDuration => _entranceCameraMoveDuration;
+    public Vector2 EntranceFlyInOffset           => _entranceFlyInOffset;
+    public float   EntranceFlyInSpeed            => _entranceFlyInSpeed;
+
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
         (_config != null && _config.stat.maxHp > 0)
@@ -111,6 +142,8 @@ public class DragonBossMonster : MonsterBase, IBoss
     private DragonBossBlackboard  _dragonBB;
     private BossPatternContext    _patternCtx;
     private BossPatternRunner     _runner;
+    private DragonDormantState    _dormantState;
+    private bool                  _pendingTriggerEntrance;
 
     // ── 공중 히트박스 ─────────────────────────────────────
     private CapsuleCollider _capsule;
@@ -187,6 +220,17 @@ public class DragonBossMonster : MonsterBase, IBoss
         // 초기 상태: Ice 페이즈 (HP 100%) 색상
         DragonBossVisualHelper.ApplyBodyTint(transform,
             DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
+
+        // 등장 대기 상태로 진입 — 하강/착지/지붕 파괴 연출은 TriggerEntrance() 호출 시 시작
+        _dormantState = new DragonDormantState(_detectionRange);
+        ChangeState(_dormantState);
+
+        // InitAsync 완료 전에 BossSpawner가 TriggerEntrance()를 호출한 경우 즉시 적용
+        if (_pendingTriggerEntrance)
+        {
+            _pendingTriggerEntrance = false;
+            _dormantState.TriggerEntrance(_ctx);
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -197,6 +241,9 @@ public class DragonBossMonster : MonsterBase, IBoss
     {
         base.Update();
         if (_runtime == null || _runtime.IsDead || _dragonBB == null) return;
+
+        // 등장 연출 중에는 패턴 러너와 무브먼트 완전 정지
+        if (_dormantState != null && _dormantState.IsActive) return;
 
         _dragonBB.TickCooldowns(Time.deltaTime);
 
@@ -258,6 +305,10 @@ public class DragonBossMonster : MonsterBase, IBoss
         BindBossHud();
         _hitStopActive = false;
         _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
+        _pendingTriggerEntrance = false;
+        // pool 재활성: 등장 연출 재진입
+        if (_dormantState != null)
+            ChangeState(_dormantState);
         // pool 재활성 시 Ice 페이즈 색상으로 리셋
         DragonBossVisualHelper.ApplyBodyTint(transform,
             DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
@@ -493,6 +544,96 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.Dragon_Body_Airborne  => new DragonBodyStateCondition(BodyState.Airborne),
             _                                      => new AlwaysTrue(),
         };
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IBossEntrance
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>DragonDormantState가 플레이어를 감지했을 때 발행 — BossRoomController가 카메라 팬을 시작한다.</summary>
+    public override bool HasEntranceAnimation => true;
+
+    public event Action OnEntranceRequested;
+
+    /// <summary>Appear 연출이 끝나고 전투가 시작되기 직전 발행 — 플레이어 입력 복구 등에 사용한다.</summary>
+    public event Action OnCombatReady;
+
+    /// <summary>DragonDormantState가 감지 직후 호출 — OnEntranceRequested 이벤트 발행.</summary>
+    internal void FireEntranceRequest() => OnEntranceRequested?.Invoke();
+
+    /// <summary>DragonDormantState가 ChaseState 전환 직전 호출 — OnCombatReady 이벤트 발행.</summary>
+    internal void FireCombatReady()
+    {
+        _runner?.EnsureMinBreakCooldown(3f);
+        OnCombatReady?.Invoke();
+        RaiseBossCombatReady();
+    }
+
+    /// <summary>BossRoomController가 카메라 팬 완료 후 호출 — 하강/착지 연출 시작.</summary>
+    public void TriggerEntrance()
+    {
+        if (_dormantState != null)
+            _dormantState.TriggerEntrance(_ctx);
+        else
+            _pendingTriggerEntrance = true; // InitAsync 완료 전 호출된 경우 OnInitialized에서 적용
+    }
+
+    /// <summary>등장 비행 시작 시 호출 — 브레스 VFX를 EntranceBreathPoint에 붙여 생성한다 (드래곤을 따라 이동/회전).</summary>
+    public GameObject SpawnEntranceBreathVfx()
+    {
+        if (_entranceBreathVfxPrefab == null) return null;
+
+        Vector3    pos = _entranceVfxPoint != null ? _entranceVfxPoint.position : transform.position;
+        Quaternion rot = _entranceVfxPoint != null ? _entranceVfxPoint.rotation : transform.rotation;
+        GameObject vfx = Instantiate(_entranceBreathVfxPrefab, pos, rot);
+        if (_entranceVfxPoint != null)
+            vfx.transform.SetParent(_entranceVfxPoint, true);
+        return vfx;
+    }
+
+    /// <summary>등장 비행 종료 시점 브레스 방향을 지붕 높이까지 투영해 착지점을 계산한다.</summary>
+    private Vector3 ComputeBreathImpactPoint()
+    {
+        if (_entranceVfxPoint == null || _entranceRoofTiles == null || _entranceRoofTiles.Length == 0)
+            return transform.position;
+
+        Vector3 origin = _entranceVfxPoint.position;
+        Vector3 dir    = _entranceVfxPoint.forward;
+        float   roofY  = _entranceRoofTiles[0].transform.position.y;
+
+        if (Mathf.Abs(dir.y) < 0.0001f) return origin;
+
+        float t = (roofY - origin.y) / dir.y;
+        return origin + dir * t;
+    }
+
+    /// <summary>등장 비행이 착지 지점 위에 도착했을 때 호출 — 브레스 착지점 반경 내 지붕 타일만 파괴.</summary>
+    public void TriggerRoofDestruction()
+    {
+        if (_entranceRoofTiles == null) return;
+
+        Vector3 impact   = ComputeBreathImpactPoint();
+        float   radiusSq = _entranceRoofHitRadius * _entranceRoofHitRadius;
+
+        foreach (var tile in _entranceRoofTiles)
+        {
+            if (tile == null || !tile.activeSelf) continue;
+
+            Vector3 p  = tile.transform.position;
+            float   dx = p.x - impact.x;
+            float   dz = p.z - impact.z;
+            if (dx * dx + dz * dz <= radiusSq)
+                tile.SetActive(false);
+        }
+    }
+
+    /// <summary>착지 순간 호출 — 남아있는 지붕 타일을 모두 파괴.</summary>
+    public void TriggerRoofCollapse()
+    {
+        if (_entranceRoofTiles == null) return;
+
+        foreach (var tile in _entranceRoofTiles)
+            if (tile != null) tile.SetActive(false);
     }
 }
 }

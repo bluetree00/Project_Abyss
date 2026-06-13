@@ -44,6 +44,9 @@ public class BossRoomController : MonoBehaviour
              "z 음수 = 보스 앞에서 바라봄. 방 배치에 따라 조정.")]
     [SerializeField] private Vector3 bossCloseUpOffset = new Vector3(0f, 3f, -7f);
 
+    [Tooltip("카메라가 바라볼 시선 대상 (bossZoneCenter 기준 월드 좌표 오프셋).")]
+    [SerializeField] private Vector3 bossCloseUpLookOffset = new Vector3(0f, 1.5f, 0f);
+
     // ── Private ──────────────────────────────────────────────────
     private bool             _triggered;
     private bool             _playerPassing;
@@ -140,7 +143,8 @@ public class BossRoomController : MonoBehaviour
                     _playerTransform,
                     ct,
                     bossCloseUpOffset,
-                    onPanComplete: entrance.TriggerEntrance);
+                    onPanComplete: entrance.TriggerEntrance,
+                    customLookOffset: bossCloseUpLookOffset);
             }
             catch (OperationCanceledException)
             {
