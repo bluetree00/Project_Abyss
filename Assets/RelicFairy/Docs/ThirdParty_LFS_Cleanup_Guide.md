@@ -63,11 +63,30 @@ mv ../_ThirdParty_backup Assets/_ThirdParty    # pull 후: 되돌리기(이후 .
 
 ## 4. 앞으로의 워크플로우 — 새 외부 에셋을 쓸 때
 
-1. 새 팩은 `Assets/_ThirdParty/`에 임포트 (git이 자동 무시)
-2. 실제 쓸 에셋을 **Unity 안에서**(`AssetDatabase.MoveAsset` 또는 드래그) `Assets/RelicFairy/_Imported/<팩>/`로 이동
-   - 반드시 **연쇄 의존(머티리얼·텍스처·메시)까지 함께** 이동 — 안 그러면 다른 사람에게 missing(핑크)
-   - 파일 탐색기로 옮기면 GUID 깨짐 → 반드시 Unity 안에서 이동
-3. `git add` → `.gitattributes` 규칙으로 자동 LFS 추적
+### 핵심 변경점 (왜 이렇게 하나)
+
+| | 기존 | 변경 후 |
+|---|---|---|
+| 팩을 받으면 | 전체가 git 추적 → **받자마자 전부 서버로** (안 쓰는 것도 용량 차지) | `_ThirdParty`라 **git 무시 → 서버에 안 올라감** |
+| 서버에 올라가는 시점 | 받자마자 전부 | **쓸 것만 RelicFairy로 가져왔을 때** |
+
+→ 받은 팩 전체가 아니라 **실제 쓰는 에셋만** 서버 용량을 쓰게 됨. 이게 LFS 용량 절약의 핵심.
+
+### 절차
+
+1. 새 팩은 `Assets/_ThirdParty/`에 임포트 (git이 자동 무시 → 서버에 안 올라감)
+2. 쓸 에셋 + **연쇄 의존 전부**를 RelicFairy로 이동:
+   - Project 창에서 가져올 에셋 선택 → 우클릭 → **Select Dependencies**
+     (그 에셋이 참조하는 머티리얼·텍스처·메시·셰이더가 함께 선택됨)
+   - 선택된 것 중 **`_ThirdParty` 경로의 것만** → `Assets/RelicFairy/_Imported/<팩>/`로 드래그(이동)
+   - ⚠️ 반드시 **Unity 안에서** 이동 — 파일 탐색기로 옮기면 GUID 깨짐
+   - ⚠️ 연쇄 의존을 빠뜨리면 **본인 로컬은 멀쩡한데 협업자에게만 missing(핑크)**
+3. `git add` → `.gitattributes` 규칙으로 자동 LFS 추적 → 서버에 올라감
+
+### 검증 (가끔)
+
+옮길 때 의존성을 빠뜨렸는지는 본인 로컬에선 안 보입니다(로컬엔 `_ThirdParty` 원본이 남아 있어 정상으로 보임).
+주기적으로 **"RelicFairy가 `_ThirdParty`를 참조하는지"** GUID 교차 점검 → 발견되면 그 에셋도 마저 이동.
 
 **LFS로 잡히는 확장자**: `.png .jpg .tga .psd .fbx .obj .wav .ogg .mp4`
 (그 외 큰 확장자를 쓰면 `.gitattributes`에 규칙 추가 필요)
