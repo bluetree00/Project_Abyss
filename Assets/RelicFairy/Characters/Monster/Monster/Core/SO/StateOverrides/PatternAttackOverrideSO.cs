@@ -786,6 +786,12 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _waitForAnimFinish = ctx.Animator != null
                 && !string.IsNullOrEmpty(animState)
                 && ctx.Animator.HasState(0, Animator.StringToHash(animState));
+
+            // 근접 windup(예고) 노출 — 데미지 지연 동안 아이템 저스트가드/섬광 판정용(공용 AttackState와 동일).
+            // 투사체(원거리)는 비행이 예고이므로 제외.
+            var telegraphShape = _pattern.attackShapeOverride != null ? _pattern.attackShapeOverride : ctx.Stat.attackShape;
+            if (!(telegraphShape is MonsterRangedAttackSO))
+                ctx.Monster.BeginAttackTelegraph();
         }
 
         public void Update(MonsterContext ctx)
@@ -798,7 +804,11 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
                 if (_damageTimer <= 0f)
                 {
                     _damageDealt = true;
-                    ExecutePatternAttack(ctx, _pattern, _cachedWarningCenter);
+                    // 아이템 섬광의 순간: windup 중 적중당해 취소되었으면 데미지 스킵.
+                    bool canceled = ctx.Monster.ConsumeAttackCancel();
+                    ctx.Monster.EndAttackTelegraph();
+                    if (!canceled)
+                        ExecutePatternAttack(ctx, _pattern, _cachedWarningCenter);
                 }
             }
 
@@ -822,6 +832,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
         public void Exit(MonsterContext ctx)
         {
+            ctx.Monster.EndAttackTelegraph();
             if (_castVfxInstance != null)
             {
                 Destroy(_castVfxInstance);

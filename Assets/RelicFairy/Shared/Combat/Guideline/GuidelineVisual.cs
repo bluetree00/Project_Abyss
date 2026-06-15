@@ -82,9 +82,10 @@ public static class GuidelineVisual
             case "frost":                 c = Ice;      label = "서리"; break;
             case "freeze":                c = IceDeep;  label = "빙결"; break;
             case "shatter":               c = IceDeep;  label = "분쇄"; break;
-            case "poison":                c = Grass;    label = "독";   break;
+            case "poison": case "item_poison": c = Grass; label = "독";   break;
             case "poison_atk":            c = Grass;    label = "약화"; break;
             case "vulnerable":            c = Grass;    label = "취약"; break;
+            case "item_mark":             c = Dark;     label = "표식"; break;
             case "shock": case "static":  c = Electric; label = "감전"; break;
             case "stun":                  c = Electric; label = "기절"; break;
             case "brand":                 c = Dark;     label = "낙인"; break;

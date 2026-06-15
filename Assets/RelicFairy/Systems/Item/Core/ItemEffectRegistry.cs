@@ -55,8 +55,6 @@ public static class ItemEffectRegistry
     {
         // ── Passive: 스탯 ───────────────────────────────────
         Register("MoveSpeed",                  s => new MoveSpeedEffect(s));
-        Register("MeleeDamage",                s => new MeleeDamageEffect(s));
-        Register("RangedDamage",               s => new RangedDamageEffect(s));
         Register("AllDamage",                  s => new AllDamageEffect(s));
         Register("AttackDamage",               s => new AttackDamageEffect(s));
         Register("Defense",                    s => new DefenseEffect(s));
@@ -156,10 +154,47 @@ public static class ItemEffectRegistry
         Register("ItemGradeUp",                s => new ItemGradeUpEffect(s));
         Register("Heal",                       s => new HealOnUseEffect(s));
 
-        // ── 레거시 호환 ─────────────────────────────────────
-        Register("MeleeAttack",                s => new MeleeDamageEffect(s));
-        Register("RangedAttack",               s => new RangedDamageEffect(s));
-        Register("AttackPower",                s => new AllDamageEffect(s));
+        // ── T3/T4 잔첨형 (Tier3/ResidualEffects) ────────────
+        Register("StackDamagePerTarget",       s => new StackDamagePerTargetEffect(s));
+        Register("EchoStrike",                 s => new EchoStrikeEffect(s));
+        Register("TargetVulnStack",            s => new TargetVulnStackEffect(s));
+        Register("SplitStrike",                s => new SplitStrikeEffect(s));
+        Register("EchoArrow",                  s => new EchoArrowEffect(s));
+        Register("MarkExplode",                s => new MarkExplodeEffect(s));
+        Register("LifestealStack",             s => new LifestealStackEffect(s));
+        Register("RepeatChance",               s => new RepeatChanceEffect(s));
+        Register("CritMomentum",               s => new CritMomentumEffect(s));
+        Register("BrandChain",                 s => new BrandChainEffect(s));
+
+        // ── T3/T4 광폭형 (Tier3/BerserkEffects) ─────────────
+        Register("TimedEmpowerNext",           s => new TimedEmpowerNextEffect(s));
+        Register("HpThresholdAoE",             s => new HpThresholdAoEEffect(s));
+        Register("SkillReadyEmpower",          s => new SkillReadyEmpowerEffect(s));
+        Register("DamageAccumEmpower",         s => new DamageAccumEmpowerEffect(s));
+        Register("LastBreath",                 s => new LastBreathEffect(s));
+        Register("GuaranteedCrit",             s => new GuaranteedCritEffect(s));
+        Register("ChargeWhileIdle",            s => new ChargeWhileIdleEffect(s));
+        Register("CounterShockwave",           s => new CounterShockwaveEffect(s));
+        Register("SkillIdleEmpower",           s => new SkillIdleEmpowerEffect(s));
+        Register("DamageAccumPenetrate",       s => new DamageAccumPenetrateEffect(s));
+
+        // ── T3/T4 타이밍형 (Tier3/TimingEffects) ────────────
+        Register("JustGuard",                  s => new JustGuardEffect(s));
+        Register("AttackInterrupt",            s => new AttackInterruptEffect(s));
+        Register("SkillCdReset",               s => new SkillCdResetEffect(s));
+        Register("DoubleHitTiming",            s => new DoubleHitTimingEffect(s));
+        Register("RoomEntryWindow",            s => new RoomEntryWindowEffect(s));
+        Register("NoHitThenCrit",              s => new NoHitThenCritEffect(s));
+        Register("ExecuteBonus",               s => new ExecuteBonusEffect(s));
+        Register("CombatStartWindow",          s => new CombatStartWindowEffect(s));
+        Register("StationaryRangeBuff",        s => new StationaryRangeBuffEffect(s));
+        Register("SkillCastGuard",             s => new SkillCastGuardEffect(s));
+
+        // ── T3/T4 형태변형 (Tier3/ShapeEffects) ─────────────
+        Register("MeleeMultiHit",              s => new MeleeMultiHitEffect(s));
+        Register("MeleeRangeExtend",           s => new MeleeRangeExtendEffect(s));
+        Register("SkillProjectileCount",       s => new SkillProjectileCountEffect(s));
+        Register("MeleeShapeCircle",           s => new MeleeShapeCircleEffect(s));
 
         Debug.Log($"[ItemEffectRegistry] {_creators.Count}개 effectType 등록 완료");
     }

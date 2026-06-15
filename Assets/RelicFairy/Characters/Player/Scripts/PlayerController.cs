@@ -123,6 +123,12 @@ public class PlayerController : CharacterBase
             finalDmg = Mathf.Max(0, (int)fd);
         }
 
+        // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
+        // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
+        float dr = RuntimeStats.DamageReduction;
+        if (dr > 0f)
+            finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (1f - dr)));
+
         // 실드 흡수 — HP 차감 전. 실드가 먼저 피해를 받고, ShieldAccumulate면 피격 피해 일부를 실드로 축적.
         if (finalDmg > 0)
         {
@@ -162,27 +168,15 @@ public class PlayerController : CharacterBase
         covHandler?.OnTakeDamage(finalDmg);
 
         // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
-        if (RuntimeStats.Hp <= 0 && !_dead)
-        {
-            var run = GameRunBootstrapper.Instance?.Run;
-            if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
-            {
-                RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
-                _invincibleEnd = Time.time + 1f;
-            }
-            else
-            {
-                _dead = true;
-                SetInputEnabled(false);
-                GameRunBootstrapper.Instance?.HandlePlayerDeath();
-            }
-        }
+        TryHandleDeath();
 
-        // 피격 후 — 반사/방버프 등
+        // 피격 후 — 반사/방버프 등. Attacker를 채워야 DamageReflect/FireReflect가 반사 대상을 안다.
         var report = new DamageReport
         {
             DamageDealt = finalDmg,
+            Attacker = attacker,
             Target = gameObject,
+            HitPosition = attacker != null ? attacker.transform.position : transform.position,
         };
         mgr?.OnPostTakeDamage(report);
 
@@ -194,6 +188,30 @@ public class PlayerController : CharacterBase
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         mgr?.ModifyHeal(ref amount);
         RuntimeStats.Heal(amount);
+    }
+
+    /// <summary>
+    /// HP가 0 이하면 서약 사망방지 체크 후 사망 처리. TakeDamage 외 경로(아이템 자해 등)로
+    /// HP가 소진됐을 때 호출해 "다음 피격까지 생존" 버그를 막는다.
+    /// </summary>
+    public void NotifyHpDepleted() => TryHandleDeath();
+
+    private void TryHandleDeath()
+    {
+        if (RuntimeStats.Hp > 0 || _dead) return;
+
+        var run = GameRunBootstrapper.Instance?.Run;
+        if (run?.CovenantHandler != null && run.CovenantHandler.TryPreventDeath())
+        {
+            RuntimeStats.SetHp(Mathf.Max(1, RuntimeStats.Hp)); // 서약 사망방지 → 사망 취소
+            _invincibleEnd = Time.time + 1f;
+        }
+        else
+        {
+            _dead = true;
+            SetInputEnabled(false);
+            GameRunBootstrapper.Instance?.HandlePlayerDeath();
+        }
     }
 
     /// <summary>외부에서 일시 무적 상태로 설정. 기존 무적이 남아있으면 더 긴 쪽을 유지.

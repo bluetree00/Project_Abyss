@@ -70,6 +70,13 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase
     {
         if (_trigger == "AfterRoomEnter") _windowUntil = Time.time + Mathf.Max(0f, _duration);
         _bossActive = false;   // 일반 방 진입 시 보스 플래그 해제
+
+        // 연속 적중(SameTarget/Consecutive) 카운터 리셋 — 방 넘어 streak가 이어지면 새 방 첫 타에
+        // 즉시 만렙 버프가 붙는 누적 오염을 막는다.
+        _streakTarget = null;
+        _sameTargetCount = 0;
+        _streakCount = 0;
+        _lastDealTime = -999f;
     }
 
     public override void OnPostTakeDamage(ItemEffectContext ctx, DamageReport report)

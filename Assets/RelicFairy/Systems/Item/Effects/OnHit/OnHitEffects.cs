@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 // ═══════════════════════════════════════════════════════════
 // 공격 적중 시 발동하는 효과
@@ -12,10 +13,19 @@ public sealed class LifestealEffect : ItemEffectBase
     {
         float heal = report.DamageDealt * _value;
         if (heal > 0f && ctx.Player != null)
-            ctx.Player.Heal(Mathf.Max(1, (int)heal));
+        {
+            int h = Mathf.Max(1, (int)heal);
+            ctx.Player.Heal(h);
+            ItemGuide.Toast(ctx.Player.transform.position, $"흡혈 +{h}");
+        }
     }
 }
 
+/// <summary>
+/// 적중 시 확률로 독(DoT) 부여 — 공격력 비율 기반(설계 ③ A안).
+///  value=발동확률, value2=틱당 피해비율(EffAtk×value2), value3=틱간격, duration=총지속.
+/// MonsterStatusReceiver.ApplyDot로 흡수(방어무시) — 룬 점화/독과 동일 경로. 가이드라인 마커 자동.
+/// </summary>
 public sealed class PoisonOnHitEffect : ItemEffectBase
 {
     private const string DefaultVfxKey = "VFX_Poison";
@@ -25,10 +35,20 @@ public sealed class PoisonOnHitEffect : ItemEffectBase
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
         if (Random.value >= _value) return;
-        if (report.Target != null)
-            ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
-        // TODO: 상태이상 시스템(MonsterStatusReceiver) 연결
-        Debug.Log($"[PoisonOnHit] 독 적용! 대상={report.Target?.name}, 지속={_maxStack}초");
+        if (report.Target == null) return;
+
+        var mb = report.Target.GetComponentInParent<RelicFairy.Monster.MonsterBase>();
+        if (mb == null) return;
+
+        int atk = ctx.Stats != null ? ctx.Stats.GetEffectiveAttack(ctx.WeaponType.GetAttackStatKind()) : 0;
+        float dmgPerTick = Mathf.Max(1f, atk * Mathf.Max(0f, _value2));
+        float interval   = _value3 > 0f ? _value3 : 1f;
+        int   ticks      = Mathf.Max(1, Mathf.RoundToInt((_duration > 0f ? _duration : interval) / interval));
+
+        // ApplyDot 내부에서 가이드라인 상태 마커(item_poison → 독) 자동 표시.
+        mb.Status.ApplyDot("item_poison", dmgPerTick, interval, ticks,
+                           ctx.Player != null ? ctx.Player.gameObject : null);
+        ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
     }
 }
 
@@ -45,9 +65,14 @@ public sealed class FreezeEffect : ItemEffectBase
 
         ItemEffectVfxHelper.SpawnOneShotAt(ResolveVfxKey(DefaultVfxKey), report.Target.transform.position);
 
-        // 상태이상 통합 수신기로 흡수 — 빙결 = CC(이동·FSM 정지). 지속은 _maxStack 필드 재사용.
+        // 상태이상 통합 수신기로 흡수 — 빙결 = CC(이동·FSM 정지).
+        // 지속은 duration(초) 필드를 사용. 구버전 데이터(지속을 max_stack에 넣은 경우) 하위호환 폴백.
         var mb = report.Target.GetComponentInParent<RelicFairy.Monster.MonsterBase>();
-        if (mb != null) mb.Status.ApplyCc("freeze", _maxStack > 0 ? _maxStack : 2f);
+        if (mb != null)
+        {
+            float dur = _duration > 0f ? _duration : (_maxStack > 0 ? _maxStack : 2f);
+            mb.Status.ApplyCc("freeze", dur);
+        }
     }
 }
 
@@ -78,6 +103,8 @@ public sealed class ExtraAttackEffect : ItemEffectBase
 
 public sealed class TeleportSwapEffect : ItemEffectBase
 {
+    private const float SampleRadius = 1.5f;
+
     public TeleportSwapEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
@@ -87,20 +114,34 @@ public sealed class TeleportSwapEffect : ItemEffectBase
 
         var playerPos = ctx.Player.transform.position;
         var targetPos = report.Target.transform.position;
-        ctx.Player.transform.position = targetPos;
-        report.Target.transform.position = playerPos;
+
+        // NavMesh 검증 — 두 착지점 모두 NavMesh 위로 스냅 가능할 때만 교체(벽끼임/낙사 방지).
+        if (!NavMesh.SamplePosition(targetPos, out var playerHit, SampleRadius, NavMesh.AllAreas)) return;
+        if (!NavMesh.SamplePosition(playerPos, out var targetHit, SampleRadius, NavMesh.AllAreas)) return;
+
+        ctx.Player.transform.position = playerHit.position;
+        report.Target.transform.position = targetHit.position;
         Debug.Log("[TeleportSwap] 위치 교체!");
     }
 }
 
 public sealed class HPRegenOnHitEffect : ItemEffectBase
 {
+    // 다단 히트로 매 타격마다 회복하는 과회복 방지 — 내부 쿨다운(value2초, 기본 0.5s).
+    private const float DefaultCooldown = 0.5f;
+    private float _cooldownEnd;
+
     public HPRegenOnHitEffect(ItemEffectSlot s) : base(s) { }
 
     public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
     {
-        if (ctx.Player != null)
-            ctx.Player.Heal((int)_value);
+        if (ctx.Player == null) return;
+        if (Time.time < _cooldownEnd) return;
+
+        _cooldownEnd = Time.time + (_value2 > 0f ? _value2 : DefaultCooldown);
+        int heal = Mathf.Max(1, (int)_value);
+        ctx.Player.Heal(heal);
+        ItemGuide.Toast(ctx.Player.transform.position, $"회복 +{heal}");
     }
 }
 

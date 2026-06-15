@@ -20,4 +20,8 @@ public abstract class ItemCombatEffectBase : ItemEffectBase
 
     /// <summary>시전자 GameObject(없으면 null).</summary>
     protected static GameObject Self(ItemEffectContext ctx) => ctx?.Player != null ? ctx.Player.gameObject : null;
+
+    /// <summary>다음 일반공격 1타 강화 예약(광폭형 공용). bonus 0.4 = +40%.</summary>
+    protected static void QueueNext(float bonus)
+        => GameRunBootstrapper.Instance?.Run?.EffectManager?.QueueNextAttackBonus(bonus);
 }
