@@ -150,7 +150,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
             txt.fontSize   = 13f;
             txt.color      = isRisk ? COLOR_RISK : COLOR_NORMAL_FX;
             txt.text       = BuildEffectLabel(slot, isRisk);
-            txt.enableWordWrapping = false;
+            txt.textWrappingMode = TextWrappingModes.NoWrap;
 
             var rt = rowGO.GetComponent<RectTransform>();
             rt.anchorMin  = new Vector2(0f, 1f);

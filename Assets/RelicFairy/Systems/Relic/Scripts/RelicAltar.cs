@@ -100,7 +100,7 @@ public class RelicAltar : MonoBehaviour
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.9f, 0.7f, 0.2f);
-        _worldText.enableWordWrapping = false;
+        _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = 10;
         TMPOutlineHelper.ApplyDefault(_worldText);
     }
@@ -116,7 +116,7 @@ public class RelicAltar : MonoBehaviour
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
-        _promptText.enableWordWrapping = false;
+        _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = 11;
         TMPOutlineHelper.ApplyDefault(_promptText);
         _promptText.text = "<color=#FFD700>[F]</color> 유물 획득";

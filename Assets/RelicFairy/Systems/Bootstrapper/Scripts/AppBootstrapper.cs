@@ -14,7 +14,7 @@ public sealed class AppBootstrapper : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoCreate()
     {
-        if (FindObjectOfType<AppBootstrapper>(true) != null)
+        if (FindFirstObjectByType<AppBootstrapper>(FindObjectsInactive.Include) != null)
             return;
 
         var go = new GameObject("@AppBootstrapper");
@@ -711,7 +711,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         if (_uiRootEnsured)
             return;
 
-        var existing = FindObjectOfType<UIRootBootstrapper>(true);
+        var existing = FindFirstObjectByType<UIRootBootstrapper>(FindObjectsInactive.Include);
         if (existing != null)
         {
             _uiRootEnsured = true;

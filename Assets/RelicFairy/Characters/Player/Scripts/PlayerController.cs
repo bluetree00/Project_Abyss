@@ -1285,7 +1285,7 @@ public class PlayerController : CharacterBase
     protected virtual void SetupCamera()
     {
         if (cinemachineCamera == null)
-            cinemachineCamera = FindObjectOfType<CinemachineFreeLook>();
+            cinemachineCamera = FindFirstObjectByType<CinemachineFreeLook>();
 
         if (cinemachineCamera != null)
         {

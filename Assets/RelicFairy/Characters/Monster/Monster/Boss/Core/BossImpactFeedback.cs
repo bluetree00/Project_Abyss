@@ -18,7 +18,7 @@ public static class BossImpactFeedback
         get
         {
             if (_host != null) return _host;
-            var existing = Object.FindObjectOfType<BossImpactFeedbackHost>();
+            var existing = Object.FindFirstObjectByType<BossImpactFeedbackHost>();
             if (existing != null) { _host = existing; return _host; }
             var go = new GameObject("[BossImpactFeedback]");
             Object.DontDestroyOnLoad(go);

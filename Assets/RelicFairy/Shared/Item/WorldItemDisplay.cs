@@ -168,7 +168,7 @@ public class WorldItemDisplay : MonoBehaviour
 
     private void ShowPickupNotice()
     {
-        var hud = UnityEngine.Object.FindObjectOfType<HudPresenter>(true);
+        var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
         if (hud == null || _runtimeData == null) return;
 
         string color = _runtimeData.rarity switch
@@ -271,7 +271,7 @@ public class WorldItemDisplay : MonoBehaviour
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = GetRarityColor(_runtimeData.rarity);
-        _worldText.enableWordWrapping = false;
+        _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = 10;
 
         TMPOutlineHelper.ApplyDefault(_worldText);
@@ -315,7 +315,7 @@ public class WorldItemDisplay : MonoBehaviour
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
-        _promptText.enableWordWrapping = false;
+        _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = 11;
 
         TMPOutlineHelper.ApplyDefault(_promptText);

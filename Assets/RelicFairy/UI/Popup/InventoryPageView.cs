@@ -258,7 +258,7 @@ public class InventoryPageView : MonoBehaviour
         tmp.color = color;
         tmp.alignment = align;
         tmp.fontStyle = style;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         tmp.richText = true;
         tmp.raycastTarget = false;
 
@@ -324,7 +324,7 @@ public class InventoryPageView : MonoBehaviour
         _tooltipText.color = Color.white;
         _tooltipText.alignment = TextAlignmentOptions.TopLeft;
         _tooltipText.richText = true;
-        _tooltipText.enableWordWrapping = true;
+        _tooltipText.textWrappingMode = TextWrappingModes.Normal;
         _tooltipText.raycastTarget = false;
 
         // ContentSizeFitter 추가 (텍스트 길이에 맞게)
@@ -671,7 +671,7 @@ public class InventoryPageView : MonoBehaviour
 
     private void DropItemToWorld(RuntimeItemData item)
     {
-        var player = Object.FindObjectOfType<PlayerController>();
+        var player = Object.FindFirstObjectByType<PlayerController>();
         if (player == null) return;
 
         // 플레이어 앞쪽(facing 방향)에 드롭

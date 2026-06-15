@@ -420,7 +420,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         float bestScore = float.NegativeInfinity;
         float bestSide = Mathf.Max(1f, Data.ArenaSideFallback);
 
-        foreach (var collider in Object.FindObjectsOfType<BoxCollider>())
+        foreach (var collider in Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None))
         {
             if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy)
                 continue;

@@ -205,7 +205,7 @@ public static class UltimateCinematicService
 
         // Brain 캐시
         if (_brain == null)
-            _brain = UnityEngine.Object.FindObjectOfType<CinemachineBrain>();
+            _brain = UnityEngine.Object.FindFirstObjectByType<CinemachineBrain>();
     }
 
     private static void DeactivateVCam()
