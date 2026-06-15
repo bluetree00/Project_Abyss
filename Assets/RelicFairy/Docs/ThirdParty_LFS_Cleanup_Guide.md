@@ -91,11 +91,29 @@ mv ../_ThirdParty_backup Assets/_ThirdParty    # pull 후: 되돌리기(이후 .
 **LFS로 잡히는 확장자**: `.png .jpg .tga .psd .fbx .obj .wav .ogg .mp4`
 (그 외 큰 확장자를 쓰면 `.gitattributes`에 규칙 추가 필요)
 
-## 5. 남은 작업 (향후)
+## 5. LFS 용량 운영 방침
 
-추적 해제만으로는 **원격 LFS 용량이 줄지 않습니다**(과거 커밋이 객체를 참조). 실제 16GB 회수는 별도 진행 예정:
+### 핵심 — purge는 필수가 아니라 선택
 
-- `git filter-repo`로 전체 히스토리에서 `_ThirdParty` 제거 → force push (팀 전원 re-clone 필요)
-- GitHub Support에 미참조 LFS 객체 purge 요청 (또는 repo 재생성)
+LFS storage는 **GiB-hours(시간당 사용량)**로 측정되고 **매월 1일 0으로 리셋**됩니다(저장 객체는 그대로 남아도). `$0 budget`이면 한도 소진 시 그 달만 막히고, 다음 달 리셋되면 새 push가 다시 가능합니다.
 
-→ 이 단계는 **팀 전체 일정 조율 후** 진행합니다. 그 전까지는 본 가이드대로 pull/작업하면 됩니다.
+→ 따라서 **월 리셋 주기를 활용한 점진 추가**로 운영합니다:
+
+```
+받은 팩 → _ThirdParty (추적 없이 통째 보관, 서버 용량 0)
+              ↓ 매월 리셋(월초 여유)에
+          쓸 에셋만 → _Imported (점진적으로 서버에 추가)
+```
+
+- 받은 팩은 `_ThirdParty`에 통째 보관 → 서버 용량 0
+- 매월 **월초(리셋 직후 여유가 가장 큼)**에 쓸 에셋을 `_Imported`로 옮겨 추가
+- 한 번에 올리는 양은 여유 내로 조절 (연쇄 의존까지 포함하면 생각보다 큼)
+
+### 한계 / 향후
+
+`_Imported` 누적이 무료 한도(10GB)를 넘을수록 월 후반이 빠듯해집니다(현재 `_Imported` 8.2GB + 게임 자체 2.3GB ≈ 10.5GB로 이미 약간 초과). 운영하다 정말 빠듯해지면 그때 아래를 **선택적으로** 진행:
+
+- `git filter-repo`로 전체 히스토리에서 `_ThirdParty` 제거 → force push (팀 전원 re-clone) → GitHub Support purge 요청
+- 또는 data pack 구매 ($5 / 50GB)
+
+→ **기존 에셋은 서버에 온전**하며(clone 테스트 확인) 협업은 정상입니다. purge는 "매월 빠듯함"을 없애려는 안정화 작업일 뿐, 지금 당장 필수는 아닙니다.
