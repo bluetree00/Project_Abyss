@@ -41,6 +41,11 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float          startRoomTourFadeInDuration = 0.8f; // 진입 검정 → 드러내기 시간
     [SerializeField] private AnimationCurve startRoomTourFrameEase     = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
+    [Header("Boss Orbit FreeLook (Dragon Orbit Only)")]
+    [SerializeField] private Vector2 bossOrbitTop    = new Vector2(8f, 8f);
+    [SerializeField] private Vector2 bossOrbitMiddle = new Vector2(5.5f, 6.5f);
+    [SerializeField] private Vector2 bossOrbitBottom = new Vector2(3f, 5f);
+
     // ── Private ──
     private Vector3 _originalPosition;
     private Quaternion _originalRotation;
@@ -55,6 +60,19 @@ public class GameCameraController : MonoBehaviour
     private bool _isPanning;
     private bool _prePanBrainEnabled;
     private bool _prePanCmEnabled;
+    private bool _bossOrbitViewActive;
+    private Transform _bossOrbitOwner;
+    private Transform _savedBossFollow;
+    private Transform _savedBossLookAt;
+    private CinemachineFreeLook.Orbit[] _savedBossOrbits;
+    private bool _topDownViewActive;
+    private bool _savedBrainBeforeTopDown;
+    private bool _savedCmBeforeTopDown;
+    private Vector3 _savedCamPosBeforeTopDown;
+    private Quaternion _savedCamRotBeforeTopDown;
+    private Vector3 _savedFollowPosBeforeTopDown;
+    private CancellationTokenSource _topDownReturnCts;
+    private CancellationTokenSource _topDownAscendCts;
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
@@ -91,6 +109,12 @@ public class GameCameraController : MonoBehaviour
         _panCts?.Cancel();
         _panCts?.Dispose();
         _panCts = null;
+        _topDownAscendCts?.Cancel();
+        _topDownAscendCts?.Dispose();
+        _topDownAscendCts = null;
+        _topDownReturnCts?.Cancel();
+        _topDownReturnCts?.Dispose();
+        _topDownReturnCts = null;
         UnsubscribePlayerBound();
         if (_fadeCanvas != null) Destroy(_fadeCanvas.gameObject);
         if (Instance == this) Instance = null;
@@ -329,6 +353,215 @@ public class GameCameraController : MonoBehaviour
         if (_brain != null) _brain.enabled = true;
     }
 
+    public void ActivateBossOrbitView(Transform bossTarget, Transform lookAtTarget = null)
+    {
+        if (bossTarget == null || _isPanning)
+            return;
+
+        EnsureCinemachineRefs();
+        if (_cinemachine == null)
+            return;
+
+        if (!_bossOrbitViewActive)
+        {
+            _savedBossFollow = _cinemachine.Follow;
+            _savedBossLookAt = _cinemachine.LookAt;
+            _savedBossOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+            _bossOrbitViewActive = true;
+        }
+
+        _bossOrbitOwner = bossTarget;
+        _cinemachine.m_Orbits[0] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitTop.x,    m_Radius = bossOrbitTop.y };
+        _cinemachine.m_Orbits[1] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitMiddle.x, m_Radius = bossOrbitMiddle.y };
+        _cinemachine.m_Orbits[2] = new CinemachineFreeLook.Orbit { m_Height = bossOrbitBottom.x, m_Radius = bossOrbitBottom.y };
+        _cinemachine.Follow = bossTarget;
+        _cinemachine.LookAt = lookAtTarget != null ? lookAtTarget : bossTarget;
+        _cinemachine.enabled = true;
+        if (_brain != null)
+            _brain.enabled = true;
+    }
+
+    [Header("Dragon Top-Down View")]
+    [SerializeField] private float topDownHeight = 35f;
+    [SerializeField] private float topDownAscendDuration = 1.2f;
+
+    public void ActivateDragonTopDownView(Vector3 mapCenter)
+    {
+        if (_topDownViewActive) return;
+        EnsureCinemachineRefs();
+
+        // 복귀 중 재활성 시 brain/cm가 꺼진 채 저장되는 버그 방지:
+        // 이전 저장값에 따라 brain/cm를 먼저 복원한 뒤 새 상태를 저장한다.
+        _topDownReturnCts?.Cancel();
+        _topDownAscendCts?.Cancel();
+        if (_brain       != null && !_brain.enabled       && _savedBrainBeforeTopDown) _brain.enabled       = true;
+        if (_cinemachine != null && !_cinemachine.enabled && _savedCmBeforeTopDown)    _cinemachine.enabled = true;
+
+        _savedBrainBeforeTopDown     = _brain       != null && _brain.enabled;
+        _savedCmBeforeTopDown        = _cinemachine != null && _cinemachine.enabled;
+        _savedCamPosBeforeTopDown    = transform.position;
+        _savedCamRotBeforeTopDown    = transform.rotation;
+        _savedFollowPosBeforeTopDown = _cinemachine?.Follow != null
+            ? _cinemachine.Follow.position
+            : transform.position;
+
+        if (_brain       != null) _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        // 중간 상태 없이 즉시 탑뷰 스냅 (비동기 상승 애니메이션 제거)
+        transform.position = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        _topDownViewActive = true;
+    }
+
+    private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter)
+    {
+        _topDownAscendCts?.Cancel();
+        _topDownAscendCts?.Dispose();
+        _topDownAscendCts = new CancellationTokenSource();
+        var token = _topDownAscendCts.Token;
+
+        Vector3    startPos  = transform.position;
+        Quaternion startRot  = transform.rotation;
+        Vector3    targetPos = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        Quaternion targetRot = Quaternion.Euler(90f, 0f, 0f);
+        float      duration  = Mathf.Max(0.01f, topDownAscendDuration);
+
+        try
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                token.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float ease = PanEase(elapsed / duration);
+                transform.position = Vector3.Lerp(startPos, targetPos, ease);
+                transform.rotation = Quaternion.Slerp(startRot, targetRot, ease);
+                await UniTask.Yield(token);
+            }
+            transform.position = targetPos;
+            transform.rotation = targetRot;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public void DeactivateDragonTopDownView(float duration)
+    {
+        // duration 무시 — 중간 상태 없이 즉시 플레이어 시점으로 복귀
+        DeactivateDragonTopDownView();
+    }
+
+    public void DeactivateDragonTopDownView()
+    {
+        if (!_topDownViewActive) return;
+        EnsureCinemachineRefs();
+        _topDownAscendCts?.Cancel();
+        _topDownReturnCts?.Cancel();
+
+        // 플레이어 현재 위치 기준으로 카메라 복원 (저장 당시 오프셋 유지)
+        if (_cinemachine?.Follow != null)
+        {
+            Vector3 offset = _savedCamPosBeforeTopDown - _savedFollowPosBeforeTopDown;
+            transform.position = _cinemachine.Follow.position + offset;
+        }
+        else
+        {
+            transform.position = _savedCamPosBeforeTopDown;
+        }
+        transform.rotation = _savedCamRotBeforeTopDown;
+
+        if (_brain       != null && _savedBrainBeforeTopDown) _brain.enabled       = true;
+        if (_cinemachine != null && _savedCmBeforeTopDown)    _cinemachine.enabled = true;
+
+        _topDownViewActive = false;
+    }
+
+    private async UniTaskVoid DeactivateDragonTopDownViewAsync(float duration)
+    {
+        if (!_topDownViewActive) return;
+        EnsureCinemachineRefs();
+
+        _topDownAscendCts?.Cancel();
+        _topDownReturnCts?.Cancel();
+        _topDownReturnCts?.Dispose();
+        _topDownReturnCts = new CancellationTokenSource();
+        var token = _topDownReturnCts.Token;
+
+        Vector3 startPos = transform.position;
+        Quaternion startRot = transform.rotation;
+        // follow 타겟의 현재 위치 기준으로 목표 계산 → 활성화 시점의 stale 위치 대신 현재 위치 반영
+        Vector3 targetPos;
+        if (_cinemachine?.Follow != null)
+        {
+            Vector3 camToFollowOffset = _savedCamPosBeforeTopDown - _savedFollowPosBeforeTopDown;
+            targetPos = _cinemachine.Follow.position + camToFollowOffset;
+        }
+        else
+        {
+            targetPos = _savedCamPosBeforeTopDown;
+        }
+        Quaternion targetRot = _savedCamRotBeforeTopDown;
+        bool restoreBrain = _savedBrainBeforeTopDown;
+        bool restoreCm = _savedCmBeforeTopDown;
+
+        _topDownViewActive = false;
+        if (_brain != null) _brain.enabled = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        try
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                token.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float ease = PanEase(elapsed / duration);
+                transform.position = Vector3.Lerp(startPos, targetPos, ease);
+                transform.rotation = Quaternion.Slerp(startRot, targetRot, ease);
+                await UniTask.Yield(token);
+            }
+
+            transform.position = targetPos;
+            transform.rotation = targetRot;
+
+            if (_brain != null && restoreBrain) _brain.enabled = true;
+            if (_cinemachine != null && restoreCm) _cinemachine.enabled = true;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public void DeactivateBossOrbitView(Transform bossTarget = null)
+    {
+        if (!_bossOrbitViewActive)
+            return;
+        if (bossTarget != null && _bossOrbitOwner != null && bossTarget != _bossOrbitOwner)
+            return;
+
+        EnsureCinemachineRefs();
+        if (_cinemachine != null)
+        {
+            if (_savedBossOrbits != null && _savedBossOrbits.Length == 3)
+            {
+                _cinemachine.m_Orbits[0] = _savedBossOrbits[0];
+                _cinemachine.m_Orbits[1] = _savedBossOrbits[1];
+                _cinemachine.m_Orbits[2] = _savedBossOrbits[2];
+            }
+            _cinemachine.Follow = _savedBossFollow;
+            _cinemachine.LookAt = _savedBossLookAt;
+        }
+
+        _bossOrbitViewActive = false;
+        _bossOrbitOwner = null;
+        _savedBossFollow = null;
+        _savedBossLookAt = null;
+        _savedBossOrbits = null;
+    }
+
     /// <summary>
     /// 스타트 방 캐릭터 선택 직후 호출. Cinemachine이 이미 player를 추적 중인 상태에서
     /// Brain을 끄고 현재 위치(Wisp 근처)에서 player 쪽으로 줌인 후 Cinemachine 복귀.
@@ -429,7 +662,8 @@ public class GameCameraController : MonoBehaviour
         Transform playerTransform,
         CancellationToken ct,
         Vector3? customViewOffset = null,
-        System.Action onPanComplete = null)
+        System.Action onPanComplete = null,
+        Vector3? customLookOffset = null)
     {
         if (this == null) return;
 
@@ -458,9 +692,9 @@ public class GameCameraController : MonoBehaviour
             ? zoneCenter + customViewOffset.Value
             : zoneCenter + new Vector3(0f, introExtraHeight, -introExtraBack);
 
-        // 클로즈업 시 보스 가슴 높이를 바라보도록 lookAt 보정
+        // 클로즈업 시 보스 가슴 높이(또는 customLookOffset)를 바라보도록 lookAt 보정
         Vector3 lookAt  = customViewOffset.HasValue
-            ? zoneCenter + new Vector3(0f, 1.5f, 0f)
+            ? zoneCenter + (customLookOffset ?? new Vector3(0f, 1.5f, 0f))
             : zoneCenter;
         Vector3 lookDir = lookAt - toPos;
         Quaternion toRot = lookDir.sqrMagnitude > 0.01f
@@ -520,6 +754,61 @@ public class GameCameraController : MonoBehaviour
                     }
                     if (_prePanBrainEnabled) _brain.enabled = true;
                 }
+                if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 진행 중인 보스 등장 연출 카메라(팬)를 인수하여 플레이어 추적 위치/회전으로 복귀시키고 Cinemachine을 재개한다.
+    /// </summary>
+    public async UniTask ReturnToPlayerAsync(Transform playerTransform, float returnDuration, CancellationToken ct)
+    {
+        if (this == null) return;
+
+        if (!_isPanning)
+        {
+            _prePanBrainEnabled = _brain != null && _brain.enabled;
+            _prePanCmEnabled    = _cinemachine != null && _cinemachine.enabled;
+        }
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_panCts.Token, ct);
+        int myVersion = System.Threading.Interlocked.Increment(ref _panVersion);
+        _isPanning = true;
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        Vector3    fromPos = transform.position;
+        Quaternion fromRot = transform.rotation;
+        Vector3    toPos   = playerTransform != null ? playerTransform.position + _originalPosition : fromPos;
+        Quaternion toRot   = _originalRotation;
+
+        try
+        {
+            for (float t = 0f; t < returnDuration; t += Time.deltaTime)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                float ease = PanEase(t / returnDuration);
+                transform.position = Vector3.Lerp(fromPos, toPos, ease);
+                transform.rotation = Quaternion.Slerp(fromRot, toRot, ease);
+                await UniTask.Yield(linked.Token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (myVersion == _panVersion)
+            {
+                _isPanning = false;
+                if (playerTransform != null)
+                {
+                    transform.position = playerTransform.position + _originalPosition;
+                    transform.rotation = _originalRotation;
+                }
+                if (_brain != null && _prePanBrainEnabled) _brain.enabled = true;
                 if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
             }
         }
@@ -608,8 +897,19 @@ public class GameCameraController : MonoBehaviour
         // 인트로 완료 알림 (플레이어 등장 연출 트리거)
         OnIntroComplete?.Invoke();
 
-        // Cinemachine 복귀
-        if (_cinemachine != null) _cinemachine.enabled = true;
-        if (_brain != null) _brain.enabled = true;
+        // 탑다운 활성 중이면 Cinemachine 복귀 스킵 — 이후 DeactivateDragonTopDownView가 복원
+        if (!_topDownViewActive)
+        {
+            if (_cinemachine != null) _cinemachine.enabled = true;
+            if (_brain != null)       _brain.enabled       = true;
+        }
+    }
+
+    private void EnsureCinemachineRefs()
+    {
+        if (_cinemachine == null)
+            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_brain == null)
+            _brain = GetComponent<CinemachineBrain>();
     }
 }

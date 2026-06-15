@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace RelicFairy.Monster
 {
 /// <summary>
@@ -20,8 +22,8 @@ public class DragonBossBlackboard : BossAttackBlackboard
     /// <summary>드래곤 브레스 원소 종류. BossColumnHazard 에서 사용.</summary>
     public enum DragonElement { Fire, Ice, Thunder }
 
-    public bool HasSummonedAt80;
-    public bool HasSummonedAt50;
+    public bool HasSummonedAt70;
+    public bool HasSummonedAt40;
     public bool HasSummonedAt10;
 
     /// <summary>
@@ -33,6 +35,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public int AirbornePatternStreak;
     public float TakeoffBaseWeight = 1f;
     public float LandingBaseWeight = 1f;
+    public float AirOrbitAccumulatedDegrees;
 
     /// <summary>
     /// Legacy 호환 proxy — 기존 코드의 `bb.IsAirborne = true/false` 설정을
@@ -48,6 +51,50 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public float AirBiteCooldown;
     public float IceSlamCooldown;
 
+    // ── 피격 방향 ─────────────────────────────────────────
+    public enum HitDirection { Front, Back, Left, Right }
+    public HitDirection LastHitDirection { get; private set; }
+
+    // ── 쉴드(Poise) ──────────────────────────────────────
+    public const float MaxPoise          = 60f;
+    public const float NormalPoiseDamage = 20f;
+    public const float PoiseStaggerTime  = 0.5f;
+
+    public float Poise         { get; private set; } = MaxPoise;
+    public bool  IsPoiseBroken { get; private set; }
+
+    public void SetHitDirection(Vector3 instigatorDir, Vector3 monsterForward)
+    {
+        Vector3 dir = instigatorDir;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.001f) { LastHitDirection = HitDirection.Front; return; }
+        dir.Normalize();
+
+        float fwd   = Vector3.Dot(dir, monsterForward);
+        float right = Vector3.Dot(dir, Vector3.Cross(Vector3.up, monsterForward).normalized * -1f);
+
+        if (Mathf.Abs(fwd) >= Mathf.Abs(right))
+            LastHitDirection = fwd >= 0f ? HitDirection.Front : HitDirection.Back;
+        else
+            LastHitDirection = right >= 0f ? HitDirection.Right : HitDirection.Left;
+    }
+
+    /// <returns>쉴드가 파괴됐으면 true.</returns>
+    public bool ApplyPoiseDamage()
+    {
+        if (IsPoiseBroken) return false;
+        Poise -= NormalPoiseDamage;
+        if (Poise <= 0f)
+        {
+            Poise         = MaxPoise;
+            IsPoiseBroken = true;
+            return true;
+        }
+        return false;
+    }
+
+    public void ClearPoiseBroken() => IsPoiseBroken = false;
+
     public new void TickCooldowns(float deltaTime)
     {
         base.TickCooldowns(deltaTime);
@@ -58,16 +105,20 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public new void Reset()
     {
         base.Reset();
-        HasSummonedAt80 = false;
-        HasSummonedAt50 = false;
+        HasSummonedAt70 = false;
+        HasSummonedAt40 = false;
         HasSummonedAt10 = false;
         BodyState             = BodyState.Grounded;
         GroundedPatternStreak = 0;
         AirbornePatternStreak = 0;
         TakeoffBaseWeight     = 1f;
         LandingBaseWeight     = 1f;
+        AirOrbitAccumulatedDegrees = 0f;
         AirBiteCooldown       = 0f;
         IceSlamCooldown       = 0f;
+        Poise                 = MaxPoise;
+        IsPoiseBroken         = false;
+        LastHitDirection      = HitDirection.Front;
     }
 }
 }

@@ -29,6 +29,9 @@ public class DragonClawSlashPatternSO : BossPatternSO
     [Tooltip("Marker 7 Danger zone prefab for attack warning")]
     [SerializeField] private GameObject _dangerZonePrefab;
 
+    [Header("EndPose (반격 창)")]
+    [SerializeField] private float _endPoseDuration = 0.4f;
+
     [Header("Cooldown")]
     [SerializeField] private float _cooldown = 12f;
 
@@ -46,6 +49,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
     public float       AttackRadius     => _attackRadius;
     public int         AttackDamage     => _attackDamage;
     public GameObject  DangerZonePrefab => _dangerZonePrefab;
+    public float       EndPoseDuration  => _endPoseDuration;
     public float       Cooldown         => _cooldown;
     public string      JumpUpStateName  => _jumpUpStateName;
     public string      ClawLStateName   => _clawLStateName;
@@ -80,7 +84,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
 /// </summary>
 internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatternSO>
 {
-    private enum Phase { Jumping, Attacking, Done }
+    private enum Phase { Jumping, Attacking, EndPose, Done }
 
     private Phase   _phase;
     private Vector3 _startPos;
@@ -91,15 +95,17 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _totalSwings;
     private bool    _hitApplied;
     private bool    _dangerShown;
+    private DragonBossWarningZone _activeWarningZone;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
 
     internal void Reset()
     {
-        _phase      = Phase.Done;
-        _swingIndex = 0;
-        _timer      = 0f;
-        _arcHeight  = 0f;
+        _phase             = Phase.Done;
+        _swingIndex        = 0;
+        _timer             = 0f;
+        _arcHeight         = 0f;
+        _activeWarningZone = null;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -133,6 +139,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         {
             case Phase.Jumping:   UpdateJumping(ctx);   break;
             case Phase.Attacking: UpdateAttacking(ctx); break;
+            case Phase.EndPose:   UpdateEndPose(ctx);   break;
         }
     }
 
@@ -213,20 +220,23 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
+            _activeWarningZone?.TransitionToHitPhase(0.25f);
+            _activeWarningZone = null;
             ApplyHit(ctx);
         }
 
         if (_timer >= Data.ClawAnimDuration)
         {
-            _swingIndex++;
-            _timer       = 0f;
-            _hitApplied  = false;
-            _dangerShown = false;
+            _swingIndex        = _swingIndex + 1;
+            _timer             = 0f;
+            _hitApplied        = false;
+            _dangerShown       = false;
+            _activeWarningZone = null;
 
             if (_swingIndex < _totalSwings)
                 PlayCurrentSwingAnim(ctx);
             else
-                FinishPattern(ctx);
+                StartEndPose();
         }
     }
 
@@ -249,7 +259,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         Vector3 pos = ctx.Transform.position
             + ctx.Transform.forward * (Data.AttackRadius * 0.6f);
         pos.y = ctx.Transform.position.y;
-        DragonBossWarningZone.CreateCircle(
+        _activeWarningZone = DragonBossWarningZone.CreateCircle(
             "DragonClawWarning",
             pos,
             Data.AttackRadius,
@@ -268,6 +278,18 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             player.TakeDamage(Data.AttackDamage);
             break;
         }
+    }
+
+    private void StartEndPose()
+    {
+        _phase = Phase.EndPose;
+        _timer = 0f;
+    }
+
+    private void UpdateEndPose(MonsterContext ctx)
+    {
+        if (_timer >= Data.EndPoseDuration)
+            FinishPattern(ctx);
     }
 
     private void FinishPattern(MonsterContext ctx)

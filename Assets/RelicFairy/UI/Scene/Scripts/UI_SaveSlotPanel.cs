@@ -26,6 +26,12 @@ public class UI_SaveSlotPanel : UI_Base
     [SerializeField] private Button     btnCancelDelete;
 
     // ─────────────────────────────────────────────────────────
+    // Events
+    // ─────────────────────────────────────────────────────────
+
+    public event System.Action OnClosed;
+
+    // ─────────────────────────────────────────────────────────
     // Private
     // ─────────────────────────────────────────────────────────
 
@@ -68,6 +74,7 @@ public class UI_SaveSlotPanel : UI_Base
     {
         HideConfirm();
         gameObject.SetActive(false);
+        OnClosed?.Invoke();
     }
 
     // ─────────────────────────────────────────────────────────

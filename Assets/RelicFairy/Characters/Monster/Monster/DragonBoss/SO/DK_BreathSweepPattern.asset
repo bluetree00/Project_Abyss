@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83c7cf0d5688faa45b89c1239001a14b, type: 3}
+  m_Name: DK_BreathSweepPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DragonBreathSweepPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  _airChaseLeftStateName: AirChaseLeft
+  _airChaseRightStateName: AirChaseRight
+  _hideHeight: 20
+  _flySpeed: 10
+  _warningRowCount: 5
+  _warningDuration: 2
+  _warningColor: {r: 1, g: 0.35, b: 0, a: 0.45}
+  _sweepCount: 3
+  _previewDuration: 1
+  _previewTimeScale: 0.25
+  _cameraReturnDuration: 1.2
+  _slowReleaseRatio: 0.4
+  _lightHeightOffset: 21
+  _lightIntensity: 4
+  _lightRange: 60
+  _lightSpotAngle: 55
+  _lightColor: {r: 1, g: 0.85, b: 0.6, a: 1}
+  _flameBreathPrefab: {fileID: 1267622881173442705, guid: 9de51515f2c48aa47a0211de766d342e,
+    type: 3}
+  _breathDownAngle: 30
+  _breathPreviewAngle: 8
+  _flameBreathBaseLength: 10
+  _flameBreathBaseWidth: 1
+  _flameBreathScale: 1
+  _breathHorizReach: 0
+  _flameTsunamiPrefab: {fileID: 7082525810440381746, guid: 7239f2bebff5f5b4a91fc5d1c2c4619b,
+    type: 3}
+  _tsunamiColInterval: 2
+  _tsunamiScale: 0.2
+  _breathDamage: 20
+  _tsunamiDamage: 10
+  _tsunamiDuration: 5
+  _tsunamiTickInterval: 1
+  _tsunamiLagCells: 4
+  _breathBlockMask:
+    serializedVersion: 2
+    m_Bits: 0
+  _scorchTexture: {fileID: 2800000, guid: 42ff3d86a51404c478150414affacb07, type: 3}
+  _scorchClusterCount: 3
+  _scorchDuration: 9
+  _scorchScaleMin: 1.8
+  _scorchScaleMax: 4.95
+  _scorchPerpJitter: 0.8
+  _fireVisualCount: 1
+  _fireScaleMin: 0.13
+  _fireScaleMax: 0.27
+  _firePerpJitter: 0.45
+  _cooldown: 22

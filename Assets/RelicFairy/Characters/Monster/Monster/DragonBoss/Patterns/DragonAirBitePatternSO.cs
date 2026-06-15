@@ -43,6 +43,9 @@ public class DragonAirBitePatternSO : BossPatternSO
     [SerializeField] private float _warningMarkerLifetime = 0.75f;
     [SerializeField] private float _warningMarkerHeightOffset = 0.12f;
 
+    [Header("EndPose (반격 창)")]
+    [SerializeField] private float _endPoseDuration = 0.4f;
+
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
     [SerializeField] private string _airChaseStateName = "AirChase";
@@ -85,7 +88,8 @@ public class DragonAirBitePatternSO : BossPatternSO
     public string AirChaseLeftStateName => _airChaseLeftStateName;
     public string AirChaseRightStateName => _airChaseRightStateName;
     public string BiteStateName => _biteStateName;
-    public string LandingStateName => _landingStateName;
+    public string LandingStateName  => _landingStateName;
+    public float  EndPoseDuration   => _endPoseDuration;
 
     private DragonAirBiteState _runtimeState;
 
@@ -114,6 +118,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         Approach,
         Bite,
         Recovery,
+        EndPose,
         Landing,
         Done,
     }
@@ -125,6 +130,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     private int _completedBites;
     private bool _warningShown;
     private bool _damageApplied;
+    private DragonBossWarningZone _activeWarningZone;
     private Vector3 _hoverAnchorPos;
     private Vector3 _biteTargetGroundPos;
     private Vector3 _biteAttackPos;
@@ -143,10 +149,12 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _completedBites = 0;
         _hasStartedBiteSequence = false;
         _currentAirChaseAnim = null;
+        _activeWarningZone = null;
     }
 
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
         _phase = Phase.Approach;
         _phaseTimer = 0f;
         _completedBites = 0;
@@ -178,6 +186,9 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
                 break;
             case Phase.Recovery:
                 UpdateRecovery(ctx);
+                break;
+            case Phase.EndPose:
+                UpdateEndPose(ctx);
                 break;
         }
     }
@@ -238,6 +249,8 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         if (!_damageApplied && _phaseTimer >= Data.HitTime)
         {
             _damageApplied = true;
+            _activeWarningZone?.TransitionToHitPhase(0.35f);
+            _activeWarningZone = null;
             ApplyHit();
         }
 
@@ -247,7 +260,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _completedBites++;
         if (_completedBites >= Mathf.Max(1, Data.BiteCount))
         {
-            ReturnToAirCombat(ctx);
+            StartEndPose(ctx);
             return;
         }
 
@@ -312,6 +325,19 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         PlayAnim(ctx, Data.BiteStateName, 0.08f);
     }
 
+    private void StartEndPose(MonsterContext ctx)
+    {
+        _phase = Phase.EndPose;
+        _phaseTimer = 0f;
+        _currentAirChaseAnim = null;
+    }
+
+    private void UpdateEndPose(MonsterContext ctx)
+    {
+        if (_phaseTimer >= Data.EndPoseDuration)
+            ReturnToAirCombat(ctx);
+    }
+
     private void StartRecovery(MonsterContext ctx)
     {
         _phase = Phase.Recovery;
@@ -331,7 +357,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     {
         Vector3 pos = _biteTargetGroundPos;
         pos.y = ctx.Runtime.SpawnPosition.y;
-        DragonBossWarningZone.CreateCircle(
+        _activeWarningZone = DragonBossWarningZone.CreateCircle(
             "DragonAirBiteWarning",
             pos,
             Data.AttackRadius,
