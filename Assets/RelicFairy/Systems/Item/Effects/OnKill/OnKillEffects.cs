@@ -10,11 +10,13 @@ public sealed class GoldOnKillEffect : ItemEffectBase
 
     public override void OnKill(ItemEffectContext ctx, GameObject target)
     {
-        if (Random.value < _value)
-        {
-            ctx.Session?.AddGold(1);
-            Debug.Log("[GoldOnKill] 추가 골드 획득!");
-        }
+        if (Random.value >= _value) return;   // value = 발동 확률
+
+        // value2 = 획득 골드량(미설정 시 1). 하드코딩 1 제거.
+        // (전역 GoldGainRate 배율은 현재 어디서도 소비되지 않는 미배선 스탯 — AddGold 파이프라인 후속 보류.)
+        int gold = _value2 > 0f ? Mathf.Max(1, (int)_value2) : 1;
+        ctx.Session?.AddGold(gold);
+        Debug.Log($"[GoldOnKill] 추가 골드 +{gold}");
     }
 }
 

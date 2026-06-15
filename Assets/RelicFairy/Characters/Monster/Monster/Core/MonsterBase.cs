@@ -93,15 +93,20 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
     private float                  _incomingDamageMulti = 1f;
-    // 받는 피해 증폭 디버프(심판 낙인 등) — 1f=없음. 시한부, 만료 시 1f로 복귀.
-    private float                  _debuffDamageTakenMult = 1f;
-    private float                  _debuffDamageTakenExpire;
+    // 받는 피해 증폭 디버프(낙인/취약/분쇄 등) — statusId별 다중 슬롯. 시한부, 만료 시 슬롯 무시.
+    // 과거 단일 float 1슬롯이라 서로 다른 출처(룬 분쇄/유물 낙인/아이템 취약)가 덮어써 1개만 유효했다.
+    // 이제 활성 슬롯들의 증폭을 합연산(1 + Σamp)한다.
+    private struct DmgTakenAmpSlot { public float amp; public float expire; }
+    private readonly Dictionary<string, DmgTakenAmpSlot> _dmgTakenAmpSlots = new();
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
     // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
     private readonly MonsterStatusReceiver _status = new();
     private bool                   _statusCcActive;     // CC로 정지 중 → 해제 시 agent 1회 복원
     private bool                   _statusSlowActive;   // 슬로우로 속도 override 중 → 해제 시 base 1회 복원
+    // 공격 windup(예고) 노출 — 아이템 저스트가드/공격캔슬(ColliderInstance가 소비).
+    private bool                   _telegraphing;
+    private bool                   _attackCanceled;
     // 풀 재사용 race 방어용 lifecycle 카운터 — OnEnable마다 증가하여 외부 콜백(dissolve onComplete 등)이
     // 자기 세대 값과 비교해 이전 인스턴스에 대한 호출을 무시할 수 있도록 한다.
     // 기존 _worldHPBarSuppressed/_hpBarRequesting과 계층이 달라(외부 vs 내부 UI) 겹치지 않음.
@@ -599,13 +604,28 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>
     /// 받는 피해 증폭 디버프 부여(심판 낙인 등 적 낙인). ampPercent=0.2 → 받는 피해 ×1.2, duration초 후 자동 해제.
-    /// statusId는 가이드라인 비주얼 마커 구분용(낙인 brand / 분쇄 shatter / 취약 vulnerable). 로직엔 미사용.
+    /// statusId별로 독립 슬롯에 저장돼 서로 다른 출처(룬 분쇄 shatter / 유물·아이템 낙인 brand / 취약 vulnerable)가
+    /// 덮어쓰지 않고 합연산(1 + Σamp)으로 누적된다. 같은 statusId 재부여는 해당 슬롯만 갱신.
     /// </summary>
     public void ApplyDamageTakenAmp(float ampPercent, float duration, string statusId = "brand")
     {
-        _debuffDamageTakenMult   = 1f + Mathf.Max(0f, ampPercent);
-        _debuffDamageTakenExpire = Time.time + duration;
+        _dmgTakenAmpSlots[statusId] = new DmgTakenAmpSlot
+        {
+            amp = Mathf.Max(0f, ampPercent),
+            expire = Time.time + duration,
+        };
         GuidelineVisual.StatusApplied(transform, statusId, duration);   // [가이드라인 비주얼]
+    }
+
+    /// <summary>현재 활성 받피증폭 디버프 합산 배율(1 + 만료되지 않은 슬롯들의 amp 합). 슬롯 없으면 1.</summary>
+    private float CurrentDamageTakenMult()
+    {
+        if (_dmgTakenAmpSlots.Count == 0) return 1f;
+        float now = Time.time;
+        float sum = 0f;
+        foreach (var kv in _dmgTakenAmpSlots)   // Dictionary struct enumerator — alloc 없음
+            if (now < kv.Value.expire) sum += kv.Value.amp;
+        return 1f + sum;
     }
 
     /// <summary>
@@ -620,11 +640,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
-        if (_debuffDamageTakenMult != 1f && Time.time >= _debuffDamageTakenExpire)
-            _debuffDamageTakenMult = 1f;
-
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
-        float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * _debuffDamageTakenMult);
+        float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
 
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
@@ -644,6 +661,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             {
                 GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
                 GameRunBootstrapper.Instance?.Run?.EffectManager?.OnKill(gameObject);   // 아이템 처치 효과
+                instigator.GetComponentInParent<PlayerController>()
+                    ?.FirePassive(PassiveTrigger.OnKill, new PassiveContext { target = gameObject });  // [유물] 처치 패시브
             }
             OnFatalDamage();
         }
@@ -651,6 +670,22 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>상태이상 통합 수신기(ST). 룬·아이템 효과가 CC/Slow/DoT를 부여하는 진입점.</summary>
     public MonsterStatusReceiver Status { get { _status.AttachOwner(this); return _status; } }
+
+    // ── 공격 windup(예고) 노출 — 아이템 저스트가드/공격캔슬(ColliderInstance가 소비) ──
+    /// <summary>현재 근접 공격 windup(예고) 중인가. 저스트가드(+피해)·섬광(캔슬) 판정용.</summary>
+    public bool IsTelegraphingAttack => _telegraphing;
+
+    /// <summary>AttackState가 데미지 적용 전 windup 진입 시 호출.</summary>
+    public void BeginAttackTelegraph() { _telegraphing = true; _attackCanceled = false; }
+
+    /// <summary>windup 종료(데미지 적용/상태 이탈) 시 호출.</summary>
+    public void EndAttackTelegraph() { _telegraphing = false; }
+
+    /// <summary>아이템 효과가 windup 중인 공격을 취소(섬광의 순간).</summary>
+    public void CancelTelegraphedAttack() { if (_telegraphing) _attackCanceled = true; }
+
+    /// <summary>AttackState가 데미지 직전 호출 — 취소되었으면 true(데미지 스킵).</summary>
+    public bool ConsumeAttackCancel() { bool c = _attackCanceled; _attackCanceled = false; return c; }
 
     /// <summary>
     /// 시너지 상태이상: 감전/마비(CC) — duration초간 이동·FSM 정지. 누적 시 더 긴 만료 시각 유지.
@@ -679,13 +714,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 amount = covHandler.ModifyOutgoing(amount, new CombatContext { Target = gameObject, Damage = amount, IsCritical = isCrit });
         }
 
-        // 받는피해 증폭 디버프(낙인 등) 만료 처리
-        if (_debuffDamageTakenMult != 1f && Time.time >= _debuffDamageTakenExpire)
-            _debuffDamageTakenMult = 1f;
-
-        // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭 (최소 1 데미지)
+        // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭(statusId별 합연산) (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
-        float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * _debuffDamageTakenMult);
+        float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
@@ -704,6 +735,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             {
                 GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnKill(gameObject);
                 GameRunBootstrapper.Instance?.Run?.EffectManager?.OnKill(gameObject);   // 아이템 처치 효과
+                instigator.GetComponentInParent<PlayerController>()
+                    ?.FirePassive(PassiveTrigger.OnKill, new PassiveContext { target = gameObject });  // [유물] 처치 패시브
             }
             OnFatalDamage();
         }
@@ -1017,13 +1050,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _firedHpTriggers.Clear();
 
         _incomingDamageMulti = 1f;
-        _debuffDamageTakenMult = 1f;
-        _debuffDamageTakenExpire = 0f;
+        _dmgTakenAmpSlots.Clear();
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
         _status.Reset();
         _statusCcActive      = false;
         _statusSlowActive    = false;
+        _telegraphing        = false;
+        _attackCanceled      = false;
         if (_agent != null) _agent.speed = _baseAgentSpeed;
 
         // 풀 재사용 시 이전 Die에서 설정된 HP바 숨김 플래그/요청중 플래그를 리셋 —

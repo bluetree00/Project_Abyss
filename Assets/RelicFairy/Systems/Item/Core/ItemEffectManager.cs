@@ -82,6 +82,7 @@ public sealed class ItemEffectManager
         _persistentStacks.Clear();
         _nextAttackBonus = 0f;
         _ctx.Stats?.ApplyItemDynamicStats(default);   // 동적 레이어 0으로 복원
+        ItemCombatMods.Clear();                       // 공격 변형 스냅샷 복원
         _inventory = null;
     }
 
@@ -118,14 +119,14 @@ public sealed class ItemEffectManager
 
     // ── 전투: 공격 ──────────────────────────────────────────
 
-    public void OnPreDealDamage(ref DamagePacket pkt)
+    public void OnPreDealDamage(ref DamagePacket pkt, bool meleeAttack)
     {
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnPreDealDamage(_ctx, ref pkt);
 
-        // 다음-공격-강화 버퍼 소비(1타 한정)
-        if (_nextAttackBonus > 0f)
+        // 다음-공격-강화 버퍼 소비(1타 한정) — 일반(근접)공격에서만(원거리/스킬 누수 방지).
+        if (meleeAttack && _nextAttackBonus > 0f)
         {
             pkt.FinalDamage *= 1f + _nextAttackBonus;
             _nextAttackBonus = 0f;
@@ -154,6 +155,15 @@ public sealed class ItemEffectManager
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnKill(_ctx, target);
+    }
+
+    /// <summary>활성 보스드랍 아이템들의 추가 드랍 횟수 합(설계 ④). RoomClearGate가 보스방에서 호출.</summary>
+    public int GetBonusBossDropCount()
+    {
+        int total = 0;
+        foreach (var eff in _activeEffects)
+            if (eff is ItemEffectBase b) total += b.BonusBossDrops;
+        return total;
     }
 
     // ── 전투: 피격 ──────────────────────────────────────────
@@ -286,5 +296,11 @@ public sealed class ItemEffectManager
         foreach (var eff in _activeEffects)
             eff.ContributeDynamicStats(_ctx, ref dyn);
         _ctx.Stats?.ApplyItemDynamicStats(in dyn);
+
+        // 공격 판정 변형(형태/사거리/다단/투사체) 합산 → 무기 판정 코드가 읽는 전역 스냅샷에 push
+        var mods = new ItemCombatModifiers();
+        foreach (var eff in _activeEffects)
+            if (eff is ItemEffectBase b) b.ContributeCombatMods(_ctx, ref mods);
+        ItemCombatMods.Current = mods;
     }
 }

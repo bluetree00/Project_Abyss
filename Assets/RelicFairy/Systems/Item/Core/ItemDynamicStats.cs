@@ -20,7 +20,7 @@ public struct ItemDynamicStats
     public float critDamage;      // 치명타 피해 배율 가산
     public float skillDamage;     // 스킬 피해 % (SkillDamageBonus 가산)
     public float allDamage;       // 모든 피해 % (공격 dmgMul + 스킬 SkillDamageBonus 양쪽)
-    public float maxHpPercent;    // 최대 HP % (적용은 기본 HP 조립 리팩터 후 — 현재 미적용)
+    public float maxHpPercent;    // 최대 HP % (PlayerRuntimeStats.Recalculate에서 정적+동적 합산 적용됨)
 
     public bool Approximately(in ItemDynamicStats o) =>
         Mathf.Approximately(attackPercent, o.attackPercent) &&

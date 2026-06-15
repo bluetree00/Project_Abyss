@@ -28,8 +28,9 @@ public sealed class PlayerRuntimeStats
     public float HealingReceivedBonus { get; private set; }
     public float DebuffResistance { get; private set; }
     public float AllDamagePercent { get; private set; }
-    /// <summary>스킬 피해 % 보너스 합(정적 SkillDamage 아이템 + 동적 스킬피해/모든피해). ⚠️ 소비처(스킬 데미지 계산)는 아직 미배선.</summary>
-    public float SkillDamageBonus => _itemSkillDamage + _itemDyn.skillDamage + _itemDyn.allDamage;
+    /// <summary>스킬 전용 피해 % 보너스 합(정적 SkillDamage 아이템 + 동적 스킬피해).
+    /// allDamage는 공격스탯(dmgMul)에 이미 반영돼 스킬 base에 들어가므로 제외 — 안 그러면 ColliderInstance에서 이중곱.</summary>
+    public float SkillDamageBonus => _itemSkillDamage + _itemDyn.skillDamage;
     public float DamageReduction { get; private set; }
     public float ItemLifesteal { get; private set; }
     // 시스템
@@ -789,6 +790,44 @@ public sealed class PlayerRuntimeStats
         Recalculate();
         OnChanged?.Invoke();
     }
+
+    // ── 1회성 전투 플래그 (아이템 확정크릿 / 방어무시) ─────────────────────────────
+    // 다음 플레이어 공격 1타에만 소비되는 one-shot. 스탯 레이어가 아니므로 Recalculate와 무관.
+    // 확정크릿은 CombatCalculator.RollCrit, 방어무시는 ColliderInstance.ApplyDamage가 소비한다.
+    private bool  _forceNextCrit;
+    private float _forceNextCritMult;
+    private bool  _penetrateNextHit;
+
+    /// <summary>다음 1타를 강제 크리티컬로 예약(균열의 일격/숨 고르기). critMultiplier=총 배율(0 이하면 무기 크릿 배율).</summary>
+    public void ArmForceCrit(float critMultiplier)
+    {
+        _forceNextCrit = true;
+        _forceNextCritMult = critMultiplier;
+    }
+
+    /// <summary>강제 크릿 1회 소비. 무장돼 있으면 true + 배율 반환.</summary>
+    public bool ConsumeForceCrit(out float critMultiplier)
+    {
+        critMultiplier = _forceNextCritMult;
+        if (!_forceNextCrit) return false;
+        _forceNextCrit = false;
+        _forceNextCritMult = 0f;
+        return true;
+    }
+
+    /// <summary>다음 일반공격 1타를 방어무시로 예약(광기의 파동). ColliderInstance가 소비.</summary>
+    public void ArmPenetrateNextHit() => _penetrateNextHit = true;
+
+    /// <summary>방어무시 1회 소비. 무장돼 있으면 true.</summary>
+    public bool ConsumePenetrateNextHit()
+    {
+        if (!_penetrateNextHit) return false;
+        _penetrateNextHit = false;
+        return true;
+    }
+
+    /// <summary>방어무시 1타 무장 여부(가이드라인 배지 정리용).</summary>
+    public bool PenetrateArmed => _penetrateNextHit;
 
     // ── 내부 재계산 ──────────────────────────────────────────────────────────────
 
