@@ -259,8 +259,6 @@ public sealed class AddressableManager
 
         _assetHandles.Remove(cacheKey);
         UpdateDebugList();
-
-        Debug.Log($"[AddressableManager] Released Asset: {cacheKey}");
     }
 
     // -------------------------
