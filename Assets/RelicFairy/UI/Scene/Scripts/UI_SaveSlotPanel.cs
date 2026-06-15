@@ -63,7 +63,7 @@ public class UI_SaveSlotPanel : UI_Base
     // ─────────────────────────────────────────────────────────
 
     /// <summary>패널을 열고 슬롯 카드를 최신 세이브 데이터로 갱신한다.</summary>
-    public void Open()
+    public override void Open()
     {
         HideConfirm();
         RefreshAllCards();

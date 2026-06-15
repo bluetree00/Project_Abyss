@@ -12,7 +12,6 @@ public class LocoMoveState : ILayerState<LocoState>
 
     private float _runCharge01; // 걷기→달리기 램프 진행도(0→1), 이동 지속 시 차오름
     private bool _forceRun;     // 대시(우클릭) 직후 — 즉시 풀 달리기 유지
-    private string _lastClip = ""; // 진단용 — 재생 클립 변화 로그
 
     public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
     {
@@ -69,21 +68,6 @@ public class LocoMoveState : ILayerState<LocoState>
         // 블렌드 파라미터 — 실제 수평 속도비율로 구동(가속 램프·runCharge·정지감속이 애니에 자동 반영, 발미끄러짐 해소).
         float animSpeed = moving ? _controller.HorizontalSpeed01 : 0f;
         SetSpeedParam(_controller.Anim, animSpeed, BlendDamp);
-
-        // [진단] 실제 재생 중인 클립(최대 가중치) + 장착 무기 — 변할 때만 출력. 원인 확인 후 제거
-        if (moving)
-        {
-            var infos = _controller.Anim.GetCurrentAnimatorClipInfo(0);
-            string top = ""; float w = -1f;
-            for (int i = 0; i < infos.Length; i++)
-                if (infos[i].clip != null && infos[i].weight > w) { w = infos[i].weight; top = infos[i].clip.name; }
-            if (top != _lastClip)
-            {
-                _lastClip = top;
-                var wd = _controller.WeaponManager != null ? _controller.WeaponManager.CurrentWeaponData : null;
-                Debug.Log($"[LocoClip] 재생='{top}' | 무기={(wd != null ? wd.weaponType.ToString() : "없음")} HasRelic={_controller.HasRelic} running={running}");
-            }
-        }
 
         // Air 전이
         if (!_controller.IsGrounded())

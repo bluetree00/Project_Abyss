@@ -214,7 +214,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = GetTierColor(_runtimeData.tier);
-        _worldText.enableWordWrapping = false;
+        _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = 10;
 
         TMPOutlineHelper.ApplyDefault(_worldText);
@@ -258,7 +258,7 @@ public class WorldWeaponDisplay : MonoBehaviour
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
-        _promptText.enableWordWrapping = false;
+        _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = 11;
 
         TMPOutlineHelper.ApplyDefault(_promptText);

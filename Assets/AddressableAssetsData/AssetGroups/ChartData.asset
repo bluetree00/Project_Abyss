@@ -45,11 +45,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 961b25976bf220944823e0af6916de59
-    m_Address: MERLIN_RUNE_DUO_SYNERGY_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d6932adaa3c69d84b95a705480cc0623
     m_Address: MERLIN_RUNE_ZONE_MAP
     m_ReadOnly: 0

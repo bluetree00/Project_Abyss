@@ -813,7 +813,7 @@ public sealed class CombatPanelView : MonoBehaviour
         tmp.fontStyle = FontStyles.Bold;
         tmp.color     = color;
         tmp.alignment = TextAlignmentOptions.Midline;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.raycastTarget = false;
 
         var ol = go.AddComponent<Outline>();

@@ -213,6 +213,8 @@ public sealed class GameRunSession
 
         try
         {
+            await UniTask.CompletedTask;
+
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
 
@@ -259,6 +261,8 @@ public sealed class GameRunSession
 
         try
         {
+            await UniTask.CompletedTask;
+
             PlayerState = new PlayerRunState(save.maxHp, save.runGold);
             PlayerState.SetHp(save.currentHp);
 
@@ -591,6 +595,11 @@ public sealed class GameRunSession
             var covenantCtx = new CovenantContext(player, player.RuntimeStats, PlayerState, this, _covenantDataTable);
             CovenantHandler.Initialize(covenantCtx);
         }
+
+        // 서약 ↔ 플레이어 바인드 — 매 씬 전환(새 플레이어 인스턴스)마다 무기교체 구독·토스트 위치 갱신.
+        // BindPlayer 내부가 UnsubscribeWeapon으로 재구독 멱등 처리하므로 중복 호출 안전.
+        if (player != null)
+            CovenantHandler.BindPlayer(player);
     }
 
     private void RefreshPlayerItemStats()

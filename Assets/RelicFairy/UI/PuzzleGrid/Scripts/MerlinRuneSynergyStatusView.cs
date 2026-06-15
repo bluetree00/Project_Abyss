@@ -170,7 +170,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         descTxt.fontSize           = 9f;
         descTxt.color              = new Color(0.48f, 0.54f, 0.72f, 0.85f);
         descTxt.alignment          = TextAlignmentOptions.MidlineRight;
-        descTxt.enableWordWrapping = false;
+        descTxt.textWrappingMode = TextWrappingModes.NoWrap;
         descTxt.raycastTarget      = false;
     }
 
@@ -270,7 +270,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         nameTxt.fontStyle          = FontStyles.Bold;
         nameTxt.color              = zoneColor;
         nameTxt.alignment          = TextAlignmentOptions.MidlineLeft;
-        nameTxt.enableWordWrapping = false;
+        nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
         nameTxt.raycastTarget      = false;
         row.nameText = nameTxt;
 
@@ -287,7 +287,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         countTxt.fontStyle          = FontStyles.Bold;
         countTxt.color              = new Color(0.92f, 0.96f, 1.00f, 1f);
         countTxt.alignment          = TextAlignmentOptions.Midline;
-        countTxt.enableWordWrapping = false;
+        countTxt.textWrappingMode = TextWrappingModes.NoWrap;
         countTxt.raycastTarget      = false;
         row.countText = countTxt;
 
@@ -321,7 +321,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             lTxt.fontSize           = 8.5f;
             lTxt.color              = new Color(0.50f, 0.53f, 0.66f, 1f);
             lTxt.alignment          = TextAlignmentOptions.Center;
-            lTxt.enableWordWrapping = false;
+            lTxt.textWrappingMode = TextWrappingModes.NoWrap;
             lTxt.raycastTarget      = false;
             row.tierLabels[b] = lTxt;
         }
@@ -442,7 +442,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         _tooltipText.fontSize          = 11f;
         _tooltipText.color             = new Color(0.88f, 0.93f, 1.00f, 1f);
         _tooltipText.alignment         = TextAlignmentOptions.TopLeft;
-        _tooltipText.enableWordWrapping = true;
+        _tooltipText.textWrappingMode = TextWrappingModes.Normal;
         _tooltipText.raycastTarget     = false;
 
         _tooltipGO.SetActive(false);

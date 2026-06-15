@@ -80,7 +80,7 @@ public class ShopSpawner : MonoBehaviour
             display.Initialize(so);
 
             // 클릭 콜백: 획득 동작 연결 (예시)
-            display.onClicked = async (weaponSo) =>
+            display.onClicked = (weaponSo) =>
             {
                 // 이 부분은 실제 게임 로직에 맞게 변경하세요 (서버검증, 결제, 인벤토리 체크 등)
                 Debug.Log($"플레이어가 상점에서 {weaponSo.displayName}을(를) 클릭했습니다.");

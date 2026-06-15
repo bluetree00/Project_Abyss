@@ -160,7 +160,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
             txt.fontSize = 14f;
             txt.color    = isRisk ? COLOR_RISK : COLOR_NORMAL_FX;
             txt.text     = BuildEffectLabel(slot, isRisk);
-            txt.enableWordWrapping = false;
+            txt.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(effectListRoot as RectTransform);

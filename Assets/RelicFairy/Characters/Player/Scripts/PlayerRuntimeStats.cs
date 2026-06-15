@@ -28,6 +28,9 @@ public sealed class PlayerRuntimeStats
     public float HealingReceivedBonus { get; private set; }
     public float DebuffResistance { get; private set; }
     public float AllDamagePercent { get; private set; }
+    /// <summary>스킬 전용 피해 % 보너스 합(정적 SkillDamage 아이템 + 동적 스킬피해).
+    /// allDamage는 공격스탯(dmgMul)에 이미 반영돼 스킬 base에 들어가므로 제외 — 안 그러면 ColliderInstance에서 이중곱.</summary>
+    public float SkillDamageBonus => _itemSkillDamage + _itemDyn.skillDamage;
     public float DamageReduction { get; private set; }
     public float ItemLifesteal { get; private set; }
     // 시스템
@@ -54,6 +57,7 @@ public sealed class PlayerRuntimeStats
 
         MaxHp = Mathf.Max(1, data.maxHealth);
         Hp = MaxHp;
+        _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
         _baseMelee  = Mathf.Max(0, data.baseMeleeAttack);
         _baseRanged = Mathf.Max(0, data.baseRangedAttack);
@@ -104,6 +108,7 @@ public sealed class PlayerRuntimeStats
 
         MaxHp = Mathf.Max(1, entry.max_health);
         Hp = MaxHp;
+        _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
         _baseMelee   = Mathf.Max(0, entry.base_melee_attack);
         _baseRanged  = Mathf.Max(0, entry.base_ranged_attack);
@@ -179,6 +184,51 @@ public sealed class PlayerRuntimeStats
         SetHp(Hp + amount);
     }
 
+    // ── 실드(보호막) ──────────────────────────────────────────────────────────────
+    // 상태는 SynergyMechanics.ShieldCurrentValue 재사용(룬 ShieldAccumulate/Burst와 공유). HP 차감 전 흡수.
+
+    /// <summary>현재 실드값(표시용 정수).</summary>
+    public int Shield => Mathf.RoundToInt(_synergyMechanics.ShieldCurrentValue);
+    /// <summary>실드 보유 여부(아이템 보호막 조건·HasShield).</summary>
+    public bool HasShield => _synergyMechanics.ShieldCurrentValue > 0f;
+    /// <summary>실드 상한(최대 HP × CapRatio).</summary>
+    public int ShieldCap => Mathf.Max(0, Mathf.RoundToInt(MaxHp * Mathf.Clamp01(_synergyMechanics.ShieldCapRatio)));
+
+    /// <summary>실드 부여(상한 클램프). 음수 무시.</summary>
+    public void AddShield(float amount)
+    {
+        if (amount <= 0f) return;
+        float cap = ShieldCap;
+        float v = Mathf.Clamp(_synergyMechanics.ShieldCurrentValue + amount, 0f, cap);
+        if (Mathf.Approximately(v, _synergyMechanics.ShieldCurrentValue)) return;
+        _synergyMechanics.ShieldCurrentValue = v;
+        OnChanged?.Invoke();
+    }
+
+    /// <summary>실드로 피해를 먼저 흡수하고 HP로 넘길 잔여 피해를 반환.</summary>
+    public int AbsorbWithShield(int damage)
+    {
+        float s = _synergyMechanics.ShieldCurrentValue;
+        if (s <= 0f || damage <= 0) return damage;
+
+        if (s >= damage)
+        {
+            _synergyMechanics.ShieldCurrentValue = s - damage;
+            OnChanged?.Invoke();
+            return 0;
+        }
+        _synergyMechanics.ShieldCurrentValue = 0f;
+        OnChanged?.Invoke();
+        return damage - Mathf.CeilToInt(s);
+    }
+
+    /// <summary>ShieldAccumulate(룬 방어 시너지) 활성 시 피격 피해의 일부를 실드로 축적.</summary>
+    public void AccumulateShieldFromDamage(int incomingDamage)
+    {
+        if (!_synergyMechanics.ShieldAccumulateEnabled || incomingDamage <= 0) return;
+        AddShield(incomingDamage * Mathf.Max(0f, _synergyMechanics.ShieldAccumulateRate));
+    }
+
     /// <summary>
     /// 최대 체력 영구 감소. 현재 HP가 새 MaxHP를 초과하면 같이 내려간다.
     /// MaxHp는 최소 1로 클램프.
@@ -241,7 +291,14 @@ public sealed class PlayerRuntimeStats
     private int _itemMaxHp;
     private float _itemMoveSpeed;
     private float _itemAttackSpeed;
+    // 아이템 MaxHp 기여(flat + 동적 %)의 현재 적용분. 멱등 재계산용 — 매 Recalculate에서 제거 후 재적용.
+    private int   _maxHpItemContribution;
     private float _itemAllDamagePercent;
+    private float _itemSkillDamage;        // 스킬 피해 % (acc.SkillDamagePercent). 소비처: SkillDamageBonus 프로퍼티
+    private float _itemCritChance;         // 정적 치명타 확률 %포인트
+    private float _itemCritDamage;         // 정적 치명타 피해 배율 가산
+    private float _itemDefensePercent;     // 정적 방어력 %
+    private float _itemMaxHpPercent;       // 정적 최대 HP %
     private float _itemAllStatsPercent;
     private float _itemRollCooldown;
     private float _itemRollDistance;
@@ -286,9 +343,9 @@ public sealed class PlayerRuntimeStats
     private float _buffCritDamage;
 
     /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
-    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance;
+    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance + _itemDyn.critChance + _itemCritChance;
     /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
-    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage;
+    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage;
 
     /// <summary>유물 일시 크릿 버프 설정(가웨인 정오 등). chance=%포인트, damage=배율 가산. (0,0)=해제.</summary>
     public void SetRelicCritBuff(float chanceBonus, float damageBonus)
@@ -338,6 +395,10 @@ public sealed class PlayerRuntimeStats
     private float _synergyDynCritChance;
     private float _synergyDynCritDamage;
     private float _synergyDynDamageReduction;
+
+    // -- Item Dynamic (조건부/타임드 아이템 효과의 런타임 동적 버프, 가산 합산) --
+    // ItemEffectManager.OnTick이 매 프레임 ApplyItemDynamicStats로 갱신. 정적 아이템 스탯과 분리.
+    private ItemDynamicStats _itemDyn;
 
     // -- Character Mechanic (고유 메커닉 배율 — HolyGauge 만충, SolarTimer 강화 등) --
     private float _characterMeleeMult  = 1f;
@@ -423,7 +484,8 @@ public sealed class PlayerRuntimeStats
         _itemMelee = _itemRanged = _itemDefense = _itemLuck = 0;
         _itemSkillCdr = _itemActiveItemCdr = 0f;
         _itemMaxHp = 0; _itemMoveSpeed = 0f; _itemAttackSpeed = 0f;
-        _itemAllDamagePercent = 0f; _itemAllStatsPercent = 0f; _itemRollCooldown = 0f; _itemRollDistance = 0f;
+        _itemAllDamagePercent = 0f; _itemSkillDamage = 0f; _itemAllStatsPercent = 0f; _itemRollCooldown = 0f; _itemRollDistance = 0f;
+        _itemCritChance = 0f; _itemCritDamage = 0f; _itemDefensePercent = 0f; _itemMaxHpPercent = 0f;
         _itemRangedRange = 0f; _itemHealingReceived = 0f; _itemDebuffResistance = 0f;
         _itemDamageReduction = 0f; _itemLifesteal = 0f; _itemAllElementBonus = 0f;
         _itemSpecialRoomChance = 0f; _itemHighGradeItemChance = 0f;
@@ -449,6 +511,11 @@ public sealed class PlayerRuntimeStats
         _itemMoveSpeed = acc.MoveSpeed;
         _itemAttackSpeed = acc.AttackSpeed;
         _itemAllDamagePercent = acc.AllDamagePercent + acc.AllStatsPercent;
+        _itemSkillDamage = acc.SkillDamagePercent;   // 그동안 버려지던 스킬피해 % 연결
+        _itemCritChance = acc.CritChancePercent;
+        _itemCritDamage = acc.CritDamagePercent;
+        _itemDefensePercent = acc.DefensePercent;
+        _itemMaxHpPercent = acc.MaxHPPercent;
         _itemAllStatsPercent = acc.AllStatsPercent;
         _itemRollCooldown = acc.RollCooldown;
         _itemRollDistance = acc.RollDistance;
@@ -712,6 +779,56 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
+    /// <summary>
+    /// 아이템 조건부/타임드 동적 스탯 갱신(ItemEffectManager.OnTick이 매 프레임 호출).
+    /// 무변동 시 재계산 생략. 크릿은 라이브 프로퍼티라 변동 시 UI 갱신만으로 충분하나, 단순화를 위해 통합 재계산.
+    /// </summary>
+    public void ApplyItemDynamicStats(in ItemDynamicStats dyn)
+    {
+        if (dyn.Approximately(_itemDyn)) return;
+        _itemDyn = dyn;
+        Recalculate();
+        OnChanged?.Invoke();
+    }
+
+    // ── 1회성 전투 플래그 (아이템 확정크릿 / 방어무시) ─────────────────────────────
+    // 다음 플레이어 공격 1타에만 소비되는 one-shot. 스탯 레이어가 아니므로 Recalculate와 무관.
+    // 확정크릿은 CombatCalculator.RollCrit, 방어무시는 ColliderInstance.ApplyDamage가 소비한다.
+    private bool  _forceNextCrit;
+    private float _forceNextCritMult;
+    private bool  _penetrateNextHit;
+
+    /// <summary>다음 1타를 강제 크리티컬로 예약(균열의 일격/숨 고르기). critMultiplier=총 배율(0 이하면 무기 크릿 배율).</summary>
+    public void ArmForceCrit(float critMultiplier)
+    {
+        _forceNextCrit = true;
+        _forceNextCritMult = critMultiplier;
+    }
+
+    /// <summary>강제 크릿 1회 소비. 무장돼 있으면 true + 배율 반환.</summary>
+    public bool ConsumeForceCrit(out float critMultiplier)
+    {
+        critMultiplier = _forceNextCritMult;
+        if (!_forceNextCrit) return false;
+        _forceNextCrit = false;
+        _forceNextCritMult = 0f;
+        return true;
+    }
+
+    /// <summary>다음 일반공격 1타를 방어무시로 예약(광기의 파동). ColliderInstance가 소비.</summary>
+    public void ArmPenetrateNextHit() => _penetrateNextHit = true;
+
+    /// <summary>방어무시 1회 소비. 무장돼 있으면 true.</summary>
+    public bool ConsumePenetrateNextHit()
+    {
+        if (!_penetrateNextHit) return false;
+        _penetrateNextHit = false;
+        return true;
+    }
+
+    /// <summary>방어무시 1타 무장 여부(가이드라인 배지 정리용).</summary>
+    public bool PenetrateArmed => _penetrateNextHit;
+
     // ── 내부 재계산 ──────────────────────────────────────────────────────────────
 
     private void Recalculate()
@@ -744,9 +861,9 @@ public sealed class PlayerRuntimeStats
         }
 
         // % 보너스 배율
-        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct) * _characterMeleeMult;
-        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct) * _characterRangedMult;
-        float defMul  = (1f + _itemAllStatsPercent) * _characterDefenseMult;
+        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage) * _characterRangedMult;
+        float defMul  = (1f + _itemAllStatsPercent + _itemDefensePercent + _itemDyn.defensePercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
         int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + _relicMelee   + condMelee;
@@ -759,19 +876,25 @@ public sealed class PlayerRuntimeStats
         Defense      = Mathf.Max(0, Mathf.RoundToInt(baseDefSum * defMul));
         Luck         = Mathf.Max(0, Mathf.RoundToInt(baseLuckSum * luckMul));
 
-        // MaxHp 아이템 보너스
-        if (_itemMaxHp != 0)
+        // MaxHp 아이템 보너스 (flat + 동적 %) — 멱등 재계산.
+        // 매 호출 자기 기여(_maxHpItemContribution)를 제거해 타 레이어 합(othersMax)을 얻고 재적용한다.
+        // (이전 구현은 매 Recalculate마다 _itemMaxHp를 무조건 가산 → 반복 호출 시 MaxHp 폭증 버그였음)
         {
-            int newMax = Mathf.Max(1, MaxHp + _itemMaxHp);
+            int othersMax = MaxHp - _maxHpItemContribution;                       // base/passive/awakening/relic/synergy 합
+            int flatTotal = othersMax + _itemMaxHp;                               // % 는 flat 총합 기준
+            float maxHpPct = _itemMaxHpPercent + _itemDyn.maxHpPercent;           // 정적 + 동적
+            int newContribution = _itemMaxHp + Mathf.RoundToInt(flatTotal * maxHpPct);
+            int newMax = Mathf.Max(1, othersMax + newContribution);
             if (newMax != MaxHp)
             {
                 MaxHp = newMax;
-                Hp = Mathf.Min(Hp, MaxHp);
+                if (Hp > MaxHp) Hp = MaxHp;
             }
+            _maxHpItemContribution = newContribution;
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _synergyDynAttackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
-        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
+        MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
         SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr + _relicSkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);

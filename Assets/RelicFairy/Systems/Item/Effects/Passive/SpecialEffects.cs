@@ -23,6 +23,11 @@ public sealed class PoisonAppleEffect : ItemEffectBase
     }
 }
 
+/// <summary>
+/// 무기에 랜덤 속성 부여 — 의도적 무동작(보류). 속성(원소) 시스템이 아직 미구현이라
+/// (ItemEffectBase.IsActive의 WithFire/Water/... 조건이 전부 false 스텁) 변환 결과를 소비할 경로가 없다.
+/// 속성 시스템 도입 시 여기서 ctx 무기 원소를 무작위 설정하도록 구현한다.
+/// </summary>
 public sealed class RandomElementEffect : ItemEffectBase
 {
     public RandomElementEffect(ItemEffectSlot s) : base(s) { }

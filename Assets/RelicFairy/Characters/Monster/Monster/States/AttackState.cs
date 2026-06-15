@@ -37,6 +37,11 @@ public class AttackState : IMonsterState
         PlayAttackAnim(ctx);
         FacePlayer(ctx);
         SpawnAttackWarning(ctx);
+
+        // 근접 windup(예고) 노출 — 데미지 지연 동안 아이템 저스트가드/섬광 판정용.
+        // 투사체(원거리)는 비행이 예고이므로 제외.
+        if (!(ctx.Stat.attackShape is MonsterRangedAttackSO))
+            ctx.Monster.BeginAttackTelegraph();
     }
 
     public virtual void Update(MonsterContext ctx)
@@ -54,7 +59,11 @@ public class AttackState : IMonsterState
             if (_damageTimer <= 0f)
             {
                 _damageDealt = true;
-                ctx.Monster.DealDamageToPlayer();
+                // 아이템 섬광의 순간: windup 중 적중당해 취소되었으면 데미지 스킵.
+                bool canceled = ctx.Monster.ConsumeAttackCancel();
+                ctx.Monster.EndAttackTelegraph();
+                if (!canceled)
+                    ctx.Monster.DealDamageToPlayer();
             }
         }
 
@@ -84,7 +93,7 @@ public class AttackState : IMonsterState
             ctx.Monster.ChangeState<ChaseState>();
     }
 
-    public virtual void Exit(MonsterContext ctx) { }
+    public virtual void Exit(MonsterContext ctx) => ctx.Monster.EndAttackTelegraph();
 
     protected static void FacePlayer(MonsterContext ctx)
     {

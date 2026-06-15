@@ -143,7 +143,7 @@ public sealed class DevAutoLoginBootstrap : MonoBehaviour
         Log("READY");
 
         // 로비씬에 이미 있는 경우 유저 정보 fetch 트리거
-        var lobby = FindObjectOfType<LobbyScenario>();
+        var lobby = FindFirstObjectByType<LobbyScenario>();
         lobby?.FetchUserInfo();
 
         if (!loadLobbyOnReady) return;

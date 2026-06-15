@@ -111,4 +111,11 @@ public abstract class ItemEffectBase : IItemEffect
     public virtual void OnSkillUse(ItemEffectContext ctx, SkillType skill) { }
     public virtual void ModifyHeal(ItemEffectContext ctx, ref int amount) { }
     public virtual void OnTick(ItemEffectContext ctx, float deltaTime) { }
+    public virtual void ContributeDynamicStats(ItemEffectContext ctx, ref ItemDynamicStats dyn) { }
+
+    /// <summary>보스 클리어 시 추가 행운표 드랍 횟수(보스드랍 아이템만 &gt;0). RoomClearGate가 합산해 추가 롤.</summary>
+    public virtual int BonusBossDrops => 0;
+
+    /// <summary>현재 활성 공격 판정 변형(형태/사거리/다단/투사체)을 누적기에 더한다. ItemEffectManager.OnTick이 호출.</summary>
+    public virtual void ContributeCombatMods(ItemEffectContext ctx, ref ItemCombatModifiers mods) { }
 }

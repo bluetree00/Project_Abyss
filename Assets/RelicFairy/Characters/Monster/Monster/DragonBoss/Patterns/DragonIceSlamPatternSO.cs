@@ -418,7 +418,6 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             Data.AirRotationSpeed * Time.deltaTime);
     }
 
-
     private static void TintParticles(GameObject go, Color color)
     {
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))

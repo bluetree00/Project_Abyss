@@ -139,20 +139,18 @@ public class ShopDataManager
     {
         _byCatRarity.Clear();
 
-        int skipped = 0;
+        var skippedIds = new List<string>();
         foreach (var entry in _all)
         {
             if (string.IsNullOrEmpty(entry.category) || string.IsNullOrEmpty(entry.target_id))
             {
-                Debug.LogWarning($"[ShopDataManager] 잘못된 entry 제외 (id={entry.shop_entry_id}, category={entry.category}, target={entry.target_id})");
-                skipped++;
+                skippedIds.Add(entry.shop_entry_id);
                 continue;
             }
 
             if (!TryLookupRarity(entry.category, entry.target_id, out var rarity))
             {
-                Debug.LogWarning($"[ShopDataManager] target rarity 조회 실패 → 풀에서 제외 (id={entry.shop_entry_id}, category={entry.category}, target={entry.target_id})");
-                skipped++;
+                skippedIds.Add(entry.shop_entry_id);
                 continue;
             }
 
@@ -171,11 +169,12 @@ public class ShopDataManager
         sb.Append("[ShopDataManager] 풀 통계: ");
         foreach (var kv in _byCatRarity)
             sb.Append($"({kv.Key.category}/{kv.Key.rarity}={kv.Value.Count}) ");
-        if (skipped > 0) sb.Append($"| skipped={skipped}");
+        if (skippedIds.Count > 0) sb.Append($"| skipped={skippedIds.Count}");
         Debug.Log(sb.ToString());
 
-        if (skipped > 0)
-            Debug.LogWarning($"[ShopDataManager] BuildIndexes: {skipped}건 풀 제외");
+        // 제외 항목은 한 줄로 요약(개별 도배 방지). 상점 데이터 재제작 후 0이어야 정상.
+        if (skippedIds.Count > 0)
+            Debug.LogWarning($"[ShopDataManager] 풀 제외 {skippedIds.Count}건(타깃 등급 조회 실패/누락): {string.Join(", ", skippedIds)}");
     }
 
     /// <summary>

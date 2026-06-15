@@ -235,7 +235,7 @@ public class MonsterHPBar : MonoBehaviour
         _subLabel.alignment          = TMPro.TextAlignmentOptions.Center;
         _subLabel.color              = new Color(1f, 0.85f, 0.4f, 1f);
         _subLabel.fontSize           = 11f;
-        _subLabel.enableWordWrapping = false;
+        _subLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _subLabel.overflowMode       = TMPro.TextOverflowModes.Overflow;
         _subLabel.raycastTarget      = false;
         TMPOutlineHelper.ApplyDefault(_subLabel);
@@ -263,7 +263,7 @@ public class MonsterHPBar : MonoBehaviour
         _nameLabel.alignment          = TMPro.TextAlignmentOptions.Center;
         _nameLabel.color              = Color.white;
         _nameLabel.fontStyle          = TMPro.FontStyles.Bold;
-        _nameLabel.enableWordWrapping = false;
+        _nameLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _nameLabel.overflowMode       = TMPro.TextOverflowModes.Overflow;
         _nameLabel.raycastTarget      = false;
         _nameLabel.fontSize           = _nameLabelFontSize;
