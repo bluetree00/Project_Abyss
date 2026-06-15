@@ -411,6 +411,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     // ── 조건 훅 (공용 상태가 위임, 파생 클래스에서 오버라이드 가능) ────────
 
+    /// <summary>true면 근접 공격(ColliderInstance) 판정을 무시한다. 원거리 투사체(BasicArrow 등)는 영향 없음.</summary>
+    public virtual bool IsMeleeImmuneNow => false;
+
     /// <summary>Patrol → Chase 전환 조건. 오버라이드로 몬스터별 감지 로직 교체.</summary>
     public virtual bool ShouldStartChase(MonsterContext ctx)
     {

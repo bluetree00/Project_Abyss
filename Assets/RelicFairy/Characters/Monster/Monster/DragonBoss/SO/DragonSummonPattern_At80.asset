@@ -12,6 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d34da58c66dd9cc4c8feddd6543025b9, type: 3}
   m_Name: DragonSummonPattern_At80
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonSummonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   weight: 1
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
@@ -53,3 +57,8 @@ MonoBehaviour:
   _miniBreathWarningScale: 1.5
   _landingFollowUpPattern: {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d,
     type: 2}
+  _breathSweepPattern: {fileID: 11400000, guid: 0cbb765717811dd42890d111d477baf9,
+    type: 2}
+  _fireballRainPattern: {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605,
+    type: 2}
+  _airPatternInterval: 8

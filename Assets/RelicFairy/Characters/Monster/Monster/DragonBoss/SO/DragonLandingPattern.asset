@@ -21,7 +21,7 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: landing
   breakOverride: -1
-  _baseWeight: 0.1
+  _baseWeight: 13
   _descentSpeed: 8
   _groundedEpsilon: 0.1
   _descendStateName: Landing_Descend

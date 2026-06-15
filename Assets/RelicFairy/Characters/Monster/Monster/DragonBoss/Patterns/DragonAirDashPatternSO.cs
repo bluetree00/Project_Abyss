@@ -104,6 +104,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private Vector3 _hoverPos;
     private Vector3 _dashDirection;
     private float _traveledDistance;
+    private float _effectiveDashDistance;
     private bool _playerHit;
     private bool _selfDamageApplied;
     private int _takeoffHash;
@@ -120,6 +121,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _phase = Phase.Done;
         _phaseTimer = 0f;
         _traveledDistance = 0f;
+        _effectiveDashDistance = 0f;
         _playerHit = false;
         _selfDamageApplied = false;
         DestroyWarningZone();
@@ -239,7 +241,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
         TryHitPlayer(ctx);
 
-        if (_traveledDistance >= Data.DashDistance)
+        if (_traveledDistance >= _effectiveDashDistance)
             ReturnToAirCombat(ctx);
     }
 
@@ -253,11 +255,14 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
     private void UpdateFall(MonsterContext ctx)
     {
+        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        float groundY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         Vector3 pos = ctx.Transform.position;
-        pos.y = Mathf.MoveTowards(pos.y, ctx.Runtime.SpawnPosition.y, Data.DashSpeed * 0.45f * Time.deltaTime);
+        pos.y = Mathf.MoveTowards(pos.y, groundY, Data.DashSpeed * 0.45f * Time.deltaTime);
         ctx.Transform.position = pos;
 
-        if (!IsAnimNearEnd(ctx, _fallHash) || pos.y > ctx.Runtime.SpawnPosition.y + 0.05f)
+        if (!IsAnimNearEnd(ctx, _fallHash) || pos.y > groundY + 0.05f)
             return;
 
         StartRecover(ctx);
@@ -266,7 +271,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private void UpdateRecover(MonsterContext ctx)
     {
         Vector3 pos = ctx.Transform.position;
-        pos.y = ctx.Runtime.SpawnPosition.y;
+        pos.y = DragonPatternFloorUtils.GetFloorY(pos, ctx.Runtime.SpawnPosition.y);
         ctx.Transform.position = pos;
         FacePlayer(ctx, Data.RotationSpeed);
 
@@ -309,7 +314,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _phaseTimer = 0f;
         _traveledDistance = 0f;
         _playerHit = false;
-        float dashDuration = Data.DashDistance / Mathf.Max(1f, Data.DashSpeed);
+        float dashDuration = _effectiveDashDistance / Mathf.Max(1f, Data.DashSpeed);
         _warningZone?.TransitionToHitPhase(dashDuration + 0.2f);
         _warningZone = null;
         PlayAnim(ctx, Data.DashStateName, 0.05f);
@@ -341,7 +346,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _phase = Phase.Recover;
         _phaseTimer = 0f;
         Vector3 pos = ctx.Transform.position;
-        pos.y = ctx.Runtime.SpawnPosition.y;
+        pos.y = DragonPatternFloorUtils.GetFloorY(pos, ctx.Runtime.SpawnPosition.y);
         ctx.Transform.position = pos;
         PlayAnim(ctx, Data.RecoverStateName, 0.05f);
     }
@@ -357,13 +362,16 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     {
         float groundY = ctx.Runtime.SpawnPosition.y;
         Vector3 origin = new Vector3(_hoverPos.x, groundY, _hoverPos.z);
-        Vector3 center = origin + _dashDirection * (Data.DashDistance * 0.5f);
+        // 경고장판이 항상 바닥 끝까지 닿도록 fallback을 룸 최대 크기로 보정 — 드래곤이 경고장판 경로 끝까지 돌진한다
+        float maxDistance = Mathf.Max(Data.DashDistance, DragonPatternFloorUtils.GetRoomMaxExtent());
+        _effectiveDashDistance = DragonPatternFloorUtils.DistanceToFloorEdge(origin, _dashDirection, maxDistance);
+        Vector3 center = origin + _dashDirection * (_effectiveDashDistance * 0.5f);
         _warningZone = DragonBossWarningZone.CreateRectangle(
             "DashRangeWarning",
             center,
             Quaternion.LookRotation(_dashDirection, Vector3.up),
             Data.DashHitRadius * 2f,
-            Data.DashDistance,
+            _effectiveDashDistance,
             Data.WarningLineColor,
             Data.WarningDuration + 0.5f,
             Data.WarningMarkerHeightOffset);

@@ -21,7 +21,7 @@ MonoBehaviour:
   playerStatusEffect: {fileID: 0}
   patternTag: takeoff
   breakOverride: -1
-  _baseWeight: 1
+  _baseWeight: 20
   _airborneThreshold: 4
   _liftSpeed: 6
   _launchStateName: Takeoff_Launch

@@ -38,6 +38,12 @@ public class DragonBossBlackboard : BossAttackBlackboard
     public float AirOrbitAccumulatedDegrees;
 
     /// <summary>
+    /// Summon 패턴의 공중 대기 루프에서 BreathSweep/FireballRain 패턴으로 핸드오프했을 때,
+    /// 해당 패턴 종료 후 복귀할 상태. null이면 평소처럼 AttackReadyState로 복귀한다.
+    /// </summary>
+    public SpecialStateBase AirLoopReturnState;
+
+    /// <summary>
     /// Legacy 호환 proxy — 기존 코드의 `bb.IsAirborne = true/false` 설정을
     /// 그대로 유지하면서 내부적으로는 BodyState 를 갱신한다.
     /// 신규 코드는 BodyState 를 직접 사용할 것.
@@ -114,6 +120,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
         TakeoffBaseWeight     = 1f;
         LandingBaseWeight     = 1f;
         AirOrbitAccumulatedDegrees = 0f;
+        AirLoopReturnState    = null;
         AirBiteCooldown       = 0f;
         IceSlamCooldown       = 0f;
         Poise                 = MaxPoise;

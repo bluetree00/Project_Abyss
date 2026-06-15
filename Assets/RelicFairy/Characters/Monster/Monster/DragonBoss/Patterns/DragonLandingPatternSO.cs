@@ -80,8 +80,10 @@ internal sealed class DragonLandingState : FullLockState<DragonLandingPatternSO>
     public override void Enter(MonsterContext ctx)
     {
         GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
-        _phase         = Phase.Descend;
-        _targetY       = ctx.Runtime.SpawnPosition.y;
+        _phase   = Phase.Descend;
+        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        _targetY       = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         _touchdownHash = Animator.StringToHash(Data.TouchdownStateName);
 
         PlayAnim(ctx, Data.DescendStateName, 0.15f);

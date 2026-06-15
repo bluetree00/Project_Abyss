@@ -12,17 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9eafdbd7300e4aa1a66ed990bde51b1f, type: 3}
   m_Name: DragonAirBitePattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonAirBitePatternSO
-  weight: 1
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 24
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: air_bite
   breakOverride: -1
   _biteCount: 3
-  _cooldown: 30
+  _cooldown: 14
   _takeoffDuration: 0.55
   _takeoffHeight: 3
   _hoverHeight: 3
-  _approachSpeed: 3
+  _approachSpeed: 6
   _approachDuration: 0.46
   _maxApproachDuration: 2.5
   _recoveryDuration: 0.9
@@ -47,6 +51,7 @@ MonoBehaviour:
   _warningMarkerScale: 1
   _warningMarkerLifetime: 0.9
   _warningMarkerHeightOffset: 0.18
+  _endPoseDuration: 0.4
   _takeoffStateName: Takeoff
   _airChaseStateName: AirChase
   _airChaseLeftStateName: AirChaseLeft

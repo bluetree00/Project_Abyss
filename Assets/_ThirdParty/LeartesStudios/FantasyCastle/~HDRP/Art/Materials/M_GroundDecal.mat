@@ -57,7 +57,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_9250a6bea12d4dee974ec6760fbf38c9_Texture_1_Texture2D:
-        m_Texture: {fileID: 2800000, guid: f8542fce10ebfb74ebaa68110181f85b, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_e245a77afc034060b3d77c4051a74a23_Texture_1:
@@ -65,7 +65,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_e245a77afc034060b3d77c4051a74a23_Texture_1_Texture2D:
-        m_Texture: {fileID: 2800000, guid: 0998fac953312fb4c88c3e771b3a1483, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_fbb90a38fb794ba7858fde19665eda4c_Texture_1:
@@ -73,7 +73,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_fbb90a38fb794ba7858fde19665eda4c_Texture_1_Texture2D:
-        m_Texture: {fileID: 2800000, guid: 08c237e2cbc3a8440a93219937ddb92b, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
