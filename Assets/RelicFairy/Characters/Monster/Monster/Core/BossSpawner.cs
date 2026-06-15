@@ -117,7 +117,10 @@ public class BossSpawner : MonoBehaviour
 
         if (placedBoss == null) return;
 
-        // 씬에 직접 배치된 보스는 이미 활성 상태 — SetActive 불필요
+        // 비활성 상태로 배치된 보스 활성화 (이미 활성 상태면 영향 없음)
+        if (!placedBoss.gameObject.activeSelf)
+            placedBoss.gameObject.SetActive(true);
+
         // RoomClearController가 OnDied를 체이닝할 수 있도록 먼저 알림
         SpawnedBoss = placedBoss;
         OnMonsterSpawned?.Invoke(placedBoss);

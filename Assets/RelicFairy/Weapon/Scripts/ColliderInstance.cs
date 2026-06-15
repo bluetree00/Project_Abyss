@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using RelicFairy.Monster;
 using UnityEngine;
 
 /// <summary>
@@ -88,6 +89,7 @@ public class ColliderInstance : MonoBehaviour
     {
         if (target == owner) return false;
         if (!target.TryGetComponent<IDamageable>(out _)) return false;
+        if (target.TryGetComponent<MonsterBase>(out var monster) && monster.IsMeleeImmuneNow) return false;
 
         // 같은 attackId로 이미 맞았으면 스킵
         if (_hitRecord.TryGetValue(target, out int lastId) && lastId == attackId)

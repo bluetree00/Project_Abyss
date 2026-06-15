@@ -16,7 +16,7 @@ MonoBehaviour:
   _vfxScale: 1
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
-  weight: 1
+  weight: 16
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
@@ -24,15 +24,15 @@ MonoBehaviour:
   _airChaseLeftStateName: AirChaseLeft
   _airChaseRightStateName: AirChaseRight
   _hideHeight: 20
-  _flySpeed: 10
-  _warningRowCount: 5
+  _flySpeed: 20
+  _warningRowCount: 15
   _warningDuration: 2
   _warningColor: {r: 1, g: 0.35, b: 0, a: 0.45}
   _sweepCount: 3
   _previewDuration: 1
   _previewTimeScale: 0.25
   _cameraReturnDuration: 1.2
-  _slowReleaseRatio: 0.4
+  _slowReleaseRatio: 0.15
   _lightHeightOffset: 21
   _lightIntensity: 4
   _lightRange: 60
@@ -58,14 +58,16 @@ MonoBehaviour:
   _breathBlockMask:
     serializedVersion: 2
     m_Bits: 0
+  _screenFireEffectPrefab: {fileID: 3942825033974895155, guid: 78e80e6b24aba274ca8fec7837e6a299,
+    type: 3}
+  _screenFireGraceDuration: 1.5
   _scorchTexture: {fileID: 2800000, guid: 42ff3d86a51404c478150414affacb07, type: 3}
   _scorchClusterCount: 3
   _scorchDuration: 9
   _scorchScaleMin: 1.8
   _scorchScaleMax: 4.95
   _scorchPerpJitter: 0.8
-  _fireVisualCount: 1
+  _fireVisualCount: 3
   _fireScaleMin: 0.13
   _fireScaleMax: 0.27
-  _firePerpJitter: 0.45
-  _cooldown: 22
+  _cooldown: 26

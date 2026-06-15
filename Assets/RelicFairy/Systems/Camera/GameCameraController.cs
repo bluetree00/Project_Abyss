@@ -51,6 +51,7 @@ public class GameCameraController : MonoBehaviour
     private Quaternion _originalRotation;
     private CinemachineFreeLook _cinemachine;
     private CinemachineBrain _brain;
+    private Camera _camera;
     private Image _fadeOverlay;
     private Canvas _fadeCanvas;
     private bool _introStarted;
@@ -93,6 +94,7 @@ public class GameCameraController : MonoBehaviour
 
         _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
         _brain = GetComponent<CinemachineBrain>();
+        _camera = GetComponent<Camera>();
 
         // Cinemachine 비활성 (인트로 끝까지)
         if (_brain != null) _brain.enabled = false;
@@ -390,7 +392,12 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float topDownHeight = 35f;
     [SerializeField] private float topDownAscendDuration = 1.2f;
 
-    public void ActivateDragonTopDownView(Vector3 mapCenter)
+    /// <summary>
+    /// 드래곤 탑다운 뷰를 활성화한다.
+    /// floorSize(월드 단위, x=가로/z=세로)를 지정하면 카메라 FOV/Aspect 기준으로
+    /// Floor 전체가 화면에 들어오는 높이를 계산한다. 생략 시 topDownHeight 고정값을 사용한다.
+    /// </summary>
+    public void ActivateDragonTopDownView(Vector3 mapCenter, Vector2 floorSize = default)
     {
         if (_topDownViewActive) return;
         EnsureCinemachineRefs();
@@ -413,10 +420,25 @@ public class GameCameraController : MonoBehaviour
         if (_brain       != null) _brain.enabled       = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
 
+        float height = floorSize.sqrMagnitude > 0f ? ComputeTopDownHeight(floorSize) : topDownHeight;
+
         // 중간 상태 없이 즉시 탑뷰 스냅 (비동기 상승 애니메이션 제거)
-        transform.position = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        transform.position = new Vector3(mapCenter.x, mapCenter.y + height, mapCenter.z);
         transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         _topDownViewActive = true;
+    }
+
+    /// <summary>Floor 전체(XZ)가 화면에 들어오도록 카메라 FOV/Aspect 기준으로 필요한 높이를 계산한다.</summary>
+    private float ComputeTopDownHeight(Vector2 floorSize)
+    {
+        if (_camera == null) return topDownHeight;
+
+        float tanHalfVFov = Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        if (tanHalfVFov <= 0f) return topDownHeight;
+
+        float heightForDepth = floorSize.y / (2f * tanHalfVFov);
+        float heightForWidth = floorSize.x / (2f * tanHalfVFov * _camera.aspect);
+        return Mathf.Max(heightForDepth, heightForWidth);
     }
 
     private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter)

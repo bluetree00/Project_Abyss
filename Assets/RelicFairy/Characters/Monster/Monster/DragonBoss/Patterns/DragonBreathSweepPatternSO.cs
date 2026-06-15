@@ -13,10 +13,10 @@ public class DragonBreathSweepPatternSO : BossPatternSO
 
     [Header("Flight")]
     [SerializeField] private float _hideHeight = 6f;
-    [SerializeField] private float _flySpeed = 7f;
+    [SerializeField] private float _flySpeed = 14f;
 
     [Header("Warning")]
-    [SerializeField] private int _warningRowCount = 5;
+    [SerializeField] private int _warningRowCount = 15;
     [SerializeField] private float _warningDuration = 2f;
     [SerializeField] private Color _warningColor = new Color(1.0f, 0.35f, 0.1f, 0.45f);
 
@@ -26,7 +26,7 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [SerializeField] private float _previewTimeScale = 0.25f;
     [SerializeField] private float _cameraReturnDuration = 1.2f;
     [Tooltip("첫 sweep에서 슬로우+탑뷰를 유지하는 레인 비율 (0~1). 높을수록 더 오래 탑뷰 유지.")]
-    [SerializeField] private float _slowReleaseRatio = 0.4f;
+    [SerializeField] private float _slowReleaseRatio = 0.15f;
 
     [Header("Follow Light")]
     [SerializeField] private float _lightHeightOffset = 2f;
@@ -59,6 +59,12 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [SerializeField] private float _tsunamiLagCells = 1f;
     [SerializeField] private LayerMask _breathBlockMask;
 
+    [Header("Screen Fire (피해 중 화면 이펙트)")]
+    [Tooltip("브레스/화염 피해를 받는 동안 표시할 화면 전체 이펙트 프리팹")]
+    [SerializeField] private GameObject _screenFireEffectPrefab;
+    [Tooltip("마지막 피해 후 이펙트가 사라지기까지의 유예 시간(초)")]
+    [SerializeField] private float _screenFireGraceDuration = 1.5f;
+
     [Header("Scorch Marks")]
     [Tooltip("직접 지정한 텍스처. 없으면 절차적 생성 사용.")]
     [SerializeField] private Texture2D _scorchTexture;
@@ -76,8 +82,6 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [SerializeField] private int   _fireVisualCount    = 1;
     [SerializeField] private float _fireScaleMin       = 0.13f;
     [SerializeField] private float _fireScaleMax       = 0.27f;
-    [Tooltip("진행 방향 수직 분산 (셀 단위)")]
-    [SerializeField] private float _firePerpJitter     = 0.45f;
 
     [Header("Cooldown")]
     [SerializeField] private float _cooldown = 22f;
@@ -113,6 +117,8 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float TsunamiTickInterval => _tsunamiTickInterval;
     public float TsunamiLagCells    => _tsunamiLagCells;
     public LayerMask BreathBlockMask => _breathBlockMask;
+    public GameObject ScreenFireEffectPrefab  => _screenFireEffectPrefab;
+    public float      ScreenFireGraceDuration => _screenFireGraceDuration;
     public Texture2D ScorchTexture      => _scorchTexture;
     public int   ScorchClusterCount => _scorchClusterCount;
     public float ScorchDuration     => _scorchDuration;
@@ -122,7 +128,6 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public int   FireVisualCount    => _fireVisualCount;
     public float FireScaleMin       => _fireScaleMin;
     public float FireScaleMax       => _fireScaleMax;
-    public float FirePerpJitter     => _firePerpJitter;
     public float Cooldown => _cooldown;
 
     private DragonBreathSweepState _runtimeState;
@@ -246,7 +251,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             _horizontalReach = _beamLength * cosDown;
         }
 
-        GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
+        GameCameraController.Instance?.ActivateDragonTopDownView(
+            DragonBossRoomContext.WorldCenter,
+            new Vector2(DragonBossRoomContext.Width * DragonBossRoomContext.CellSize, DragonBossRoomContext.Height * DragonBossRoomContext.CellSize));
         PickSweepLine(ctx);
     }
 
@@ -401,7 +408,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         while (_nextColIndex < _totalCols)
         {
             float colProj = GetColumnProjection(_nextColIndex);
-            if (tipProj < colProj + Data.TsunamiLagCells * DKBossRoomContext.CellSize) break;
+            if (tipProj < colProj + Data.TsunamiLagCells * DragonBossRoomContext.CellSize) break;
 
             ApplyBreathDamage(ctx, colProj);
 
@@ -438,6 +445,16 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (_tsunamis.Count != 0) return;
 
         _phase = Phase.Done;
+
+        // Summon 패턴 공중 대기 루프에서 핸드오프된 경우 — 원래 상태로 복귀
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb && bb.AirLoopReturnState != null)
+        {
+            var returnState = bb.AirLoopReturnState;
+            bb.AirLoopReturnState = null;
+            ctx.Monster.ChangeState(returnState);
+            return;
+        }
+
         RestoreAgent(ctx);
         ctx.Monster.ChangeState<AttackReadyState>();
     }
@@ -454,11 +471,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _warnCells.Clear();
         float minProj         = float.PositiveInfinity;
         float maxProj         = float.NegativeInfinity;
-        float paddedHalfWidth = _halfLaneWidth + DKBossRoomContext.CellSize * 0.5f;
+        float paddedHalfWidth = _halfLaneWidth + DragonBossRoomContext.CellSize * 0.5f;
 
-        foreach (var cell in DKBossRoomContext.GetInteriorCells())
+        foreach (var cell in DragonBossRoomContext.GetInteriorCells())
         {
-            Vector3 delta = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f) - _laneCenter;
+            Vector3 delta = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f) - _laneCenter;
             float   perp  = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
             if (perp > paddedHalfWidth) continue;
 
@@ -470,19 +487,19 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         if (_warnCells.Count == 0)
         {
-            var fallbackCell = DKBossRoomContext.WorldToCell(center);
+            var fallbackCell = DragonBossRoomContext.WorldToCell(center);
             _warnCells.Add(fallbackCell);
-            Vector3 world = DKBossRoomContext.CellToWorld(fallbackCell.x, fallbackCell.y, 0f);
+            Vector3 world = DragonBossRoomContext.CellToWorld(fallbackCell.x, fallbackCell.y, 0f);
             float   proj  = Vector3.Dot(world - _laneCenter, _sweepDir);
             minProj = maxProj = proj;
         }
 
-        float halfCell     = DKBossRoomContext.CellSize * 0.5f;
+        float halfCell     = DragonBossRoomContext.CellSize * 0.5f;
         _sweepStartProj    = minProj - halfCell;
         _sweepEndProj      = maxProj + halfCell;
         _flyThroughEndProj = _sweepEndProj + FlyThroughPadding;
         _totalCols         = Mathf.Max(1, Mathf.CeilToInt(
-            (_sweepEndProj - _sweepStartProj) / DKBossRoomContext.CellSize) + 1);
+            (_sweepEndProj - _sweepStartProj) / DragonBossRoomContext.CellSize) + 1);
         _nextColIndex      = 0;
     }
 
@@ -494,21 +511,21 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         Vector3 center = ctx.Runtime.PlayerTarget != null
             ? ctx.Runtime.PlayerTarget.position
-            : DKBossRoomContext.WorldCenter;
+            : DragonBossRoomContext.WorldCenter;
         center.y = ctx.Runtime.SpawnPosition.y;
         _laneCenter = center;
         _halfLaneWidth = Mathf.Max(
-            DKBossRoomContext.CellSize * 0.5f,
-            Mathf.Max(1, Data.WarningRowCount) * DKBossRoomContext.CellSize * 0.5f);
+            DragonBossRoomContext.CellSize * 0.5f,
+            Mathf.Max(1, Data.WarningRowCount) * DragonBossRoomContext.CellSize * 0.5f);
 
         _warnCells.Clear();
         float minProj = float.PositiveInfinity;
         float maxProj = float.NegativeInfinity;
-        float paddedHalfWidth = _halfLaneWidth + DKBossRoomContext.CellSize * 0.5f;
+        float paddedHalfWidth = _halfLaneWidth + DragonBossRoomContext.CellSize * 0.5f;
 
-        foreach (var cell in DKBossRoomContext.GetInteriorCells())
+        foreach (var cell in DragonBossRoomContext.GetInteriorCells())
         {
-            Vector3 world = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            Vector3 world = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
             Vector3 delta = world - _laneCenter;
             float perp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
             if (perp > paddedHalfWidth) continue;
@@ -521,19 +538,19 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         if (_warnCells.Count == 0)
         {
-            var cell = DKBossRoomContext.WorldToCell(center);
+            var cell = DragonBossRoomContext.WorldToCell(center);
             _warnCells.Add(cell);
-            Vector3 world = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            Vector3 world = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
             float proj = Vector3.Dot(world - _laneCenter, _sweepDir);
             minProj = proj;
             maxProj = proj;
         }
 
-        float halfCell = DKBossRoomContext.CellSize * 0.5f;
+        float halfCell = DragonBossRoomContext.CellSize * 0.5f;
         _sweepStartProj = minProj - halfCell;
         _sweepEndProj = maxProj + halfCell;
         _flyThroughEndProj = _sweepEndProj + FlyThroughPadding;
-        _totalCols = Mathf.Max(1, Mathf.CeilToInt((_sweepEndProj - _sweepStartProj) / DKBossRoomContext.CellSize) + 1);
+        _totalCols = Mathf.Max(1, Mathf.CeilToInt((_sweepEndProj - _sweepStartProj) / DragonBossRoomContext.CellSize) + 1);
     }
 
     private void SpawnWarnTilesSorted(MonsterContext ctx)
@@ -541,8 +558,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         CleanupWarn();
         _warnCells.Sort((a, b) =>
         {
-            float pa = Vector3.Dot(DKBossRoomContext.CellToWorld(a.x, a.y, 0f) - _laneCenter, _sweepDir);
-            float pb = Vector3.Dot(DKBossRoomContext.CellToWorld(b.x, b.y, 0f) - _laneCenter, _sweepDir);
+            float pa = Vector3.Dot(DragonBossRoomContext.CellToWorld(a.x, a.y, 0f) - _laneCenter, _sweepDir);
+            float pb = Vector3.Dot(DragonBossRoomContext.CellToWorld(b.x, b.y, 0f) - _laneCenter, _sweepDir);
             return pa.CompareTo(pb);
         });
 
@@ -552,7 +569,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         float fallbackY = ctx.Runtime.SpawnPosition.y;
         foreach (var cell in _warnCells)
         {
-            Vector3 pos = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
+            Vector3 pos = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
             pos.y = GetFloorY(pos, ctx) + 0.05f;
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             go.name = "BreathSweepWarn";
@@ -580,7 +597,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     }
 
     private float GetColumnProjection(int index)
-        => _sweepStartProj + index * DKBossRoomContext.CellSize;
+        => _sweepStartProj + index * DragonBossRoomContext.CellSize;
 
     private void SpawnFlameBreath(MonsterContext ctx)
     {
@@ -646,10 +663,16 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _followLight = null;
     }
 
+    private static int s_groundLayerMask = -1;
+
+    // Ground 레이어만 검사 — 그렇지 않으면 경고장판/장식 효과가 그 위치에 선 플레이어 콜라이더 위에 생성됨
     private static float GetFloorY(Vector3 xzPos, MonsterContext ctx)
     {
+        if (s_groundLayerMask < 0)
+            s_groundLayerMask = 1 << LayerMask.NameToLayer("Ground");
+
         Vector3 origin = new Vector3(xzPos.x, ctx.Runtime.SpawnPosition.y + 50f, xzPos.z);
-        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 100f))
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 100f, s_groundLayerMask))
             return hit.point.y;
         return ctx.Runtime.SpawnPosition.y;
     }
@@ -710,7 +733,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         Vector3 delta = playerPos - _laneCenter;
         float playerProj = Vector3.Dot(delta, _sweepDir);
         float playerPerp = Mathf.Abs(Vector3.Dot(delta, _sweepRight));
-        if (Mathf.Abs(playerProj - projection) > DKBossRoomContext.CellSize * 0.5f) return;
+        if (Mathf.Abs(playerProj - projection) > DragonBossRoomContext.CellSize * 0.5f) return;
         if (playerPerp > _halfLaneWidth) return;
 
         Vector3 origin = ctx.Transform.position;
@@ -722,8 +745,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 return;
         }
 
-        ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
-            ?.TakeDamage(Data.BreathDamage);
+        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
+        if (player == null) return;
+
+        player.TakeDamage(Data.BreathDamage);
+        PlayerStatusEffectVisuals.ApplyTimed(player, Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
     private void ApplyTsunamiDamage(MonsterContext ctx, TsunamiEntry entry)
@@ -733,11 +759,14 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         Vector3 delta = ctx.Runtime.PlayerTarget.position - entry.Center;
         float along = Mathf.Abs(Vector3.Dot(delta, entry.Direction));
         float perp = Mathf.Abs(Vector3.Dot(delta, entry.Right));
-        float halfLength = Mathf.Max(1, Data.TsunamiColInterval / 2) * DKBossRoomContext.CellSize;
+        float halfLength = Mathf.Max(1, Data.TsunamiColInterval / 2) * DragonBossRoomContext.CellSize;
         if (along > halfLength || perp > entry.HalfWidth) return;
 
-        ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
-            ?.TakeDamage(Data.TsunamiDamage);
+        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
+        if (player == null) return;
+
+        player.TakeDamage(Data.TsunamiDamage);
+        PlayerStatusEffectVisuals.ApplyTimed(player, Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
     private void ApplyDragonSlow(MonsterContext ctx)
@@ -788,7 +817,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void SpawnScorchCluster(float projection, MonsterContext ctx)
     {
-        float cell  = DKBossRoomContext.CellSize;
+        float cell  = DragonBossRoomContext.CellSize;
         var   mat   = GetOrCreateScorchMaterial();
         int   count = Mathf.Max(1, Data.ScorchClusterCount);
 
@@ -849,11 +878,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         if (Data.FlameTsunamiPrefab == null || Data.FireVisualCount <= 0) return;
 
-        float cell = DKBossRoomContext.CellSize;
+        float cell = DragonBossRoomContext.CellSize;
 
         for (int i = 0; i < Data.FireVisualCount; i++)
         {
-            float perp = Random.Range(-Data.FirePerpJitter, Data.FirePerpJitter) * cell;
+            // 경고장판 전체 폭(_halfLaneWidth)에 걸쳐 분산 — 경고장판이 넓어지면 함께 넓어진다
+            float perp = Random.Range(-_halfLaneWidth, _halfLaneWidth);
             float fwd  = Random.Range(-0.35f, 0.35f) * cell;
 
             Vector3 pos = _laneCenter

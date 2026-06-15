@@ -120,7 +120,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9771dd7f57d65b489408bdca7649383, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonBossMonster
-  _effectiveElement: -1
   _debugState: 
   _walkChaseStateName: WalkChase
   _runChaseStateName: RunChase
@@ -131,21 +130,43 @@ MonoBehaviour:
   _airChaseStateName: AirChase
   _airChaseLeftStateName: AirChaseLeft
   _airChaseRightStateName: AirChaseRight
+  _groundHitboxCenterY: 2.5
+  _groundHitboxHeight: 5
+  _airborneHitboxHeightMult: 5
+  _airborneHitboxCenterOffsetY: 8
+  _airborneHitboxRadius: 3
   _walkToRunThreshold: 8
   _walkChaseSpeedMult: 0.5
   _chaseAngularSpeed: 35
   _turnSpeedMult: 0.4
+  _groundTurnOrbitAngle: 65
+  _groundTurnFaceAngle: 25
   _airChaseHeight: 4
   _airChaseSpeedMult: 1.4
   _airTurnAngleThreshold: 40
   _airTransitionWeightMultiplier: 8
-  _airOrbitRadius: 9
-  _airOrbitAngularSpeed: 70
+  _airOrbitAngularSpeed: 35
   _airOrbitCatchUpSpeedMult: 2.1
   _airOrbitRadiusTolerance: 1.2
-  _airMinOrbitTurnsBeforePattern: 1
+  _airOrbitRadiusRatio: 0.8
+  _airMinOrbitTurnsBeforePattern: 0.5
   _airOrbitRecenterThreshold: 9
   _airOrbitCenterMoveSpeedMult: 1.1
+  _detectionRange: 15
+  _entranceDescendHeight: 45
+  _entranceDescendSpeed: 18
+  _entranceRockObjects: []
+  _entranceBreathVfxPrefab: {fileID: 0}
+  _entranceVfxPoint: {fileID: 0}
+  _entranceBreathPitchDeg: 35
+  _entranceCameraOffset: {x: 7, y: 0.5, z: -2}
+  _entranceCameraLookOffset: {x: 0, y: 2.5, z: 0}
+  _entranceCameraCloseUpDuration: 1
+  _entranceCameraMoveDuration: 1.2
+  _entranceFlyInOffset: {x: 0, y: 55}
+  _entranceFlyInSpeed: 25
+  _entranceWindEffectPrefab: {fileID: 3942825033974895155, guid: 89e2ff99f68108143afdc000c0e256e4,
+    type: 3}
 --- !u!1001 &1484152418330750485
 PrefabInstance:
   m_ObjectHideFlags: 0
