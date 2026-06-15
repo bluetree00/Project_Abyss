@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
 using UnityEngine;
-using RelicFairy.Monster;
 
 /// <summary>
 /// 히트 판정 컴포넌트.
