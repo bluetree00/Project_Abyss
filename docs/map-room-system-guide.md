@@ -202,7 +202,7 @@ useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key)
 
 ### 현재 테스트 자산
 - [Arena_Boss_Ch1.prefab](../Assets/RelicFairy/Systems/Stage/MapGen/Prefabs/Arena_Boss_Ch1.prefab) — ForestGuardian placedBoss + 트리거·배리어·플레이어스폰. BaseCamp에 비활성 파킹.
-- ⚠️ **임시 테스트 설정**: `RunStructure_Default._bossThreshold = 0`(첫 방 직후 보스). 출시 전 **8로 복원**.
+- ⚠️ **임시 테스트 설정**: `RunStructure_Default._bossThreshold = 4`(visitCount>=4에서 PreBoss→Boss). 출시 전 **8로 복원**.
 
 ---
 

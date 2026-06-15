@@ -463,7 +463,7 @@ public class CharacterInfoPageView : MonoBehaviour
         tmp.color = color;
         tmp.alignment = align;
         tmp.fontStyle = style;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         tmp.richText = true;
         tmp.raycastTarget = false;
         tmp.outlineWidth = 0.2f;

@@ -445,7 +445,7 @@ public sealed class UI_GridPanel : UI_Base
         hintRT.anchorMax = new Vector2(1f, 1.00f);
         hintRT.offsetMin = hintRT.offsetMax = Vector2.zero;
         _hexGridHintText.alignment         = TextAlignmentOptions.Center;
-        _hexGridHintText.enableWordWrapping = true;
+        _hexGridHintText.textWrappingMode = TextWrappingModes.Normal;
 
         // BoardContainer: GridManager/MerlinRuneBridge와 연동하는 영역
         var boardGO = Go("BoardContainer");
@@ -601,7 +601,7 @@ public sealed class UI_GridPanel : UI_Base
         nameRT.anchorMax = new Vector2(1f, 0.62f);
         nameRT.offsetMin = nameRT.offsetMax = Vector2.zero;
         var nameTxt = nameTxtGO.GetComponent<TMP_Text>();
-        nameTxt.enableWordWrapping = false;
+        nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
         nameTxt.alignment = TextAlignmentOptions.MidlineLeft;
         type.GetField("itemName", rf)?.SetValue(_itemInfoPanel, nameTxt);
 
@@ -751,7 +751,7 @@ public sealed class UI_GridPanel : UI_Base
         actRT.offsetMin = new Vector2(12f, 0f);
         actRT.offsetMax = new Vector2(-4f, 0f);
         _footerActiveSynText = actGO.GetComponent<TMP_Text>();
-        _footerActiveSynText.enableWordWrapping = false;
+        _footerActiveSynText.textWrappingMode = TextWrappingModes.NoWrap;
         _footerActiveSynText.alignment = TextAlignmentOptions.MidlineLeft;
 
         // CENTER 보너스 표시 (중간 11%)
@@ -763,7 +763,7 @@ public sealed class UI_GridPanel : UI_Base
         centerRT.offsetMin = centerRT.offsetMax = Vector2.zero;
         _footerCenterText = centerGO.GetComponent<TMP_Text>();
         _footerCenterText.alignment         = TextAlignmentOptions.Center;
-        _footerCenterText.enableWordWrapping = false;
+        _footerCenterText.textWrappingMode = TextWrappingModes.NoWrap;
 
         // 셀 카운트 (우측 18%)
         var cntGO = MakeTxt(footerGO.transform, "CellCount", "0/20 셀 배치됨", 12f,
@@ -811,7 +811,7 @@ public sealed class UI_GridPanel : UI_Base
         textRT.sizeDelta = Vector2.zero;
         _confirmDialogText = textGO.GetComponent<TMP_Text>();
         _confirmDialogText.alignment     = TextAlignmentOptions.Center;
-        _confirmDialogText.enableWordWrapping = true;
+        _confirmDialogText.textWrappingMode = TextWrappingModes.Normal;
 
         // [계속 배치] 버튼
         _confirmDialogKeepBtn = MakeButton(panelGO.transform, "KeepBtn",
@@ -861,7 +861,7 @@ public sealed class UI_GridPanel : UI_Base
         textRT.sizeDelta = new Vector2(-12f, -8f);
         _synergyToastText = textGO.GetComponent<TMP_Text>();
         _synergyToastText.alignment = TextAlignmentOptions.Center;
-        _synergyToastText.enableWordWrapping = false;
+        _synergyToastText.textWrappingMode = TextWrappingModes.NoWrap;
 
         _synergyToast.SetActive(false);
     }
@@ -1321,7 +1321,7 @@ public sealed class UI_GridPanel : UI_Base
         t.color         = color;
         t.fontStyle     = bold ? FontStyles.Bold : FontStyles.Normal;
         t.raycastTarget = false;
-        t.enableWordWrapping = false;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
         return go;
     }
 
@@ -1356,7 +1356,7 @@ public sealed class UI_GridPanel : UI_Base
         txt.color         = Color.white;
         txt.alignment     = TextAlignmentOptions.Center;
         txt.raycastTarget = false;
-        txt.enableWordWrapping = false;
+        txt.textWrappingMode = TextWrappingModes.NoWrap;
 
         return btn;
     }

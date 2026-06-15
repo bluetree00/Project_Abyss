@@ -165,7 +165,7 @@ public class WeaponDisplayStand : MonoBehaviour
         _worldText.text = weaponSO.displayName;
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
-        _worldText.enableWordWrapping = false;
+        _worldText.textWrappingMode = TextWrappingModes.NoWrap;
         _worldText.sortingOrder = 10;
 
         if (_camTransform != null)
@@ -189,7 +189,7 @@ public class WeaponDisplayStand : MonoBehaviour
         tmp.text = "<color=#FFD700>[F]</color> 획득";
         tmp.fontSize = 4f;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = 11;
 
         _promptGo.SetActive(false);

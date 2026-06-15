@@ -137,7 +137,7 @@ public class BasicArrow : MonoBehaviour
             var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
             var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
             var pkt = new DamagePacket(damage, _instigator, other.gameObject);
-            mgr?.OnPreDealDamage(ref pkt);
+            mgr?.OnPreDealDamage(ref pkt, meleeAttack: false);   // 원거리 — 확정크릿/다음공격강화 누수 방지
 
             float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
 
@@ -157,8 +157,8 @@ public class BasicArrow : MonoBehaviour
                 }
             }
 
-            // 크리티컬 굴림
-            float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit);
+            // 크리티컬 굴림 (원거리 — 확정크릿 1타 소비 안 함)
+            float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit, meleeAttack: false);
             pkt.IsCrit = isCrit;
 
             // 팝업은 대상측(MonsterBase 등)이 자체 표시 — isCrit 만 전달

@@ -69,7 +69,22 @@ public class RoomClearGate : MonoBehaviour
         if (endEffectPrefab != null)
             Instantiate(endEffectPrefab, center, Quaternion.identity);
 
+        var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>();
+
         var (itemData, itemSO) = RollRewardItem();
+        if (itemData != null) rewards.Add((itemData, itemSO));
+
+        // [설계 ④] 보스방: 보스드랍 아이템 보유 시 추가 행운표 롤을 기존 풀에서 append.
+        if (_isBossRoom)
+        {
+            int bonus = _run?.EffectManager?.GetBonusBossDropCount() ?? 0;
+            for (int i = 0; i < bonus; i++)
+            {
+                var (bd, bso) = RollRewardItem();
+                if (bd != null) rewards.Add((bd, bso));
+            }
+            if (bonus > 0) Debug.Log($"[RoomClearGate] 보스드랍 보너스 +{bonus}롤 → 총 보상 {rewards.Count}개");
+        }
 
         try
         {
@@ -77,12 +92,12 @@ public class RoomClearGate : MonoBehaviour
         }
         catch (OperationCanceledException) { return; }
 
-        if (itemData != null)
-            SpawnRewardObject(center, itemData, itemSO);
+        if (rewards.Count > 0)
+            SpawnRewardObject(center, rewards);
         // 아이템이 없으면 별도 처리 불필요 — 절차 진행에선 RunFlowController가 출구 게이트를 담당한다.
     }
 
-    private void SpawnRewardObject(Vector3 center, RuntimeItemData itemData, ItemSO itemSO)
+    private void SpawnRewardObject(Vector3 center, System.Collections.Generic.List<(RuntimeItemData, ItemSO)> rewards)
     {
         var rewardGO = endEffect2Prefab != null
             ? Instantiate(endEffect2Prefab, center, Quaternion.identity)
@@ -90,7 +105,6 @@ public class RoomClearGate : MonoBehaviour
         rewardGO.transform.position = center;
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
-        var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)> { (itemData, itemSO) };
         trigger.Initialize(_run, rewards, _isBossRoom);
     }
 

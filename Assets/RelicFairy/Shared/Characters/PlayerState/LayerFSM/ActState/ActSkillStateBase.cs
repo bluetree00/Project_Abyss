@@ -70,10 +70,10 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
     public void Exit()
     {
-        // 테스트: 쿨다운 비활성화
-        // float cd = GetCooldown();
-        // if (cd > 0f)
-        //     _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
+        // 스킬 종료 시 쿨다운 시작 (SkillCooldownReduction 반영). 엘레인/베디비어 부활.
+        float cd = GetCooldown();
+        if (cd > 0f)
+            _controller.CooldownTracker.StartCooldown(Slot, cd, _controller.RuntimeStats.SkillCooldownReduction);
 
         OnExit();
     }

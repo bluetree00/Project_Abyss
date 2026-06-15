@@ -303,7 +303,7 @@ public sealed class GridEditView : MonoBehaviour
         synergyText.fontSize          = 12f;
         synergyText.color             = COLOR_SYNERGY_TXT;
         synergyText.alignment         = TextAlignmentOptions.TopLeft;
-        synergyText.enableWordWrapping = true;
+        synergyText.textWrappingMode = TextWrappingModes.Normal;
         synergyText.raycastTarget     = false;
 
         _synergyPanel.SetActive(false);

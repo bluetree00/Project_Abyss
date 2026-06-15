@@ -137,7 +137,7 @@ public static class CreateDialoguePopupPrefab
         bodyTMP.text = "";
         bodyTMP.fontSize = 26;
         bodyTMP.color = Color.white;
-        bodyTMP.enableWordWrapping = true;
+        bodyTMP.textWrappingMode = TextWrappingModes.Normal;
         bodyTMP.raycastTarget = false;
         var bodyRT = bodyGO.GetComponent<RectTransform>();
         bodyRT.anchorMin = new Vector2(0.06f, 0.06f);

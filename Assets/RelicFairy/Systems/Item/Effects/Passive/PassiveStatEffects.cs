@@ -11,18 +11,6 @@ public sealed class MoveSpeedEffect : ItemEffectBase
     public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.MoveSpeed += _value;
 }
 
-public sealed class MeleeDamageEffect : ItemEffectBase
-{
-    public MeleeDamageEffect(ItemEffectSlot s) : base(s) { }
-    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.MeleeDamage += (int)_value;
-}
-
-public sealed class RangedDamageEffect : ItemEffectBase
-{
-    public RangedDamageEffect(ItemEffectSlot s) : base(s) { }
-    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.RangedDamage += (int)_value;
-}
-
 public sealed class AllDamageEffect : ItemEffectBase
 {
     public AllDamageEffect(ItemEffectSlot s) : base(s) { }
@@ -98,7 +86,8 @@ public sealed class ActiveItemCooldownEffect : ItemEffectBase
 public sealed class HealingReceivedEffect : ItemEffectBase
 {
     public HealingReceivedEffect(ItemEffectSlot s) : base(s) { }
-    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.HealingReceived += _value;
+    // 회복량 증가는 ModifyHeal 한 곳에서만 적용. (ModifyStats의 HealingReceived 누적은
+    // 실제 회복 경로에서 소비되지 않는 표기용이라, 두 경로를 두면 향후 이중적용 위험 → 제거.)
     public override void ModifyHeal(ItemEffectContext ctx, ref int amount)
     {
         amount = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.RoundToInt(amount * (1f + _value)));
@@ -114,11 +103,9 @@ public sealed class DebuffResistanceEffect : ItemEffectBase
 public sealed class DamageReductionEffect : ItemEffectBase
 {
     public DamageReductionEffect(ItemEffectSlot s) : base(s) { }
+    // ModifyStats만 — 실제 피해 차감은 PlayerController.TakeDamage가 RuntimeStats.DamageReduction
+    // 통합 채널(아이템+캐릭터+어둠룬)에서 1회 적용한다. (여기서 OnPreTakeDamage로 또 곱하면 이중적용)
     public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.DamageReduction += _value;
-    public override void OnPreTakeDamage(ItemEffectContext ctx, ref DamagePacket pkt)
-    {
-        pkt.FinalDamage *= (1f - _value);
-    }
 }
 
 public sealed class AllStatsEffect : ItemEffectBase
@@ -185,4 +172,30 @@ public sealed class ProjectileCountEffect : ItemEffectBase
 {
     public ProjectileCountEffect(ItemEffectSlot s) : base(s) { }
     public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.ProjectileCountBonus += (int)_value;
+}
+
+// ── 정적 % 스탯 (무조건). 조건부 버전은 ConditionalStatBuffEffect(Cond*) ──
+
+public sealed class CritChanceEffect : ItemEffectBase
+{
+    public CritChanceEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.CritChancePercent += _value;
+}
+
+public sealed class CritDamageEffect : ItemEffectBase
+{
+    public CritDamageEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.CritDamagePercent += _value;
+}
+
+public sealed class DefensePercentEffect : ItemEffectBase
+{
+    public DefensePercentEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.DefensePercent += _value;
+}
+
+public sealed class MaxHPPercentEffect : ItemEffectBase
+{
+    public MaxHPPercentEffect(ItemEffectSlot s) : base(s) { }
+    public override void ModifyStats(ItemEffectContext ctx, ref AccumulatedStats stats) => stats.MaxHPPercent += _value;
 }

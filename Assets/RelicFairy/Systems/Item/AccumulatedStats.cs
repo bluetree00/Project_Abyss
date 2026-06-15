@@ -36,6 +36,10 @@ public struct AccumulatedStats
     public float SkillDamagePercent;          // 스킬 데미지 % 가산 (0.1 = +10%)
     public int ProjectilePierceBonus;         // 투사체 관통 +개수
     public int ProjectileCountBonus;          // 투사체 추가 개수 (멀티샷)
+    public float CritChancePercent;           // 치명타 확률 %포인트 (0.04 = +4%)
+    public float CritDamagePercent;           // 치명타 피해 배율 가산 (0.12 = +12%)
+    public float DefensePercent;              // 방어력 % 가산 (0.08 = +8%)
+    public float MaxHPPercent;                // 최대 HP % 가산 (0.12 = +12%)
 
     /// <summary>모든 값을 0으로 초기화.</summary>
     public void Clear()

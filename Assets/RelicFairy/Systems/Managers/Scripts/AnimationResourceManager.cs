@@ -39,7 +39,6 @@ public class AnimationResourceManager
                 if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
                 {
                     _clipCache[key] = handle.Result;
-                    Debug.Log($"[AnimResource] Loaded {key}");
                 }
                 else
                 {

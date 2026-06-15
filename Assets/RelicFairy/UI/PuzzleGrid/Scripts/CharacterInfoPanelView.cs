@@ -563,7 +563,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         trt.offsetMin = new Vector2(12f, 6f);
         trt.offsetMax = new Vector2(-12f, 0f);
         _chipTooltipBody.alignment         = TextAlignmentOptions.MidlineLeft;
-        _chipTooltipBody.enableWordWrapping = true;
+        _chipTooltipBody.textWrappingMode = TextWrappingModes.Normal;
         _chipTooltipBody.raycastTarget      = false;
 
         _chipTooltip.SetActive(false);
@@ -663,7 +663,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
             Mathf.Clamp01(accent.b * 0.65f + 0.35f), 1f);
         bodyTxt.alignment          = TextAlignmentOptions.MidlineLeft;
         bodyTxt.raycastTarget      = false;
-        bodyTxt.enableWordWrapping = false;
+        bodyTxt.textWrappingMode = TextWrappingModes.NoWrap;
 
         // 마우스 호버 → 툴팁 표시
         var et = go.AddComponent<EventTrigger>();

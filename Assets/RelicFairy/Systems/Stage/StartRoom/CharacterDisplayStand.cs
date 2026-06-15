@@ -414,7 +414,7 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
             passiveDescTmp.text               = passive.description;
             passiveDescTmp.fontSize           = 12f;
             passiveDescTmp.color              = new Color(0.75f, 0.75f, 0.75f);
-            passiveDescTmp.enableWordWrapping = true;
+            passiveDescTmp.textWrappingMode = TextWrappingModes.Normal;
             var passiveDescRT  = passiveDescGO.GetComponent<RectTransform>();
             passiveDescRT.anchorMin        = new Vector2(0f, 1f);
             passiveDescRT.anchorMax        = new Vector2(1f, 1f);
