@@ -1,1 +1,0 @@
-*.{png,jpg,mp4,fbx,wav,mp3,tga} filter=lfs diff=lfs merge=lfs -text
