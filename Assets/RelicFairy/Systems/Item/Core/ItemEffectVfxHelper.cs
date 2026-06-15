@@ -42,7 +42,7 @@ public static class ItemEffectVfxHelper
     /// <summary>아이템 효과 발동 알림을 HUD 왼쪽에 표시.</summary>
     public static void ShowNotice(string message)
     {
-        var hud = Object.FindObjectOfType<HudPresenter>(true);
+        var hud = Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
         hud?.ShowItemEffectNotice(message);
     }
 

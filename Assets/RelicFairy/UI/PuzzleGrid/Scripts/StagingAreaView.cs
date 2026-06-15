@@ -358,7 +358,7 @@ public sealed class StagingAreaView : MonoBehaviour
         nameTxt.text              = item.displayName ?? item.itemId;
         nameTxt.fontSize          = 13f;
         nameTxt.alignment         = TextAlignmentOptions.Center;
-        nameTxt.enableWordWrapping = true;
+        nameTxt.textWrappingMode = TextWrappingModes.Normal;
 
         // NEW 뱃지
         if (isNew)

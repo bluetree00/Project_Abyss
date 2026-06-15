@@ -263,7 +263,7 @@ public class ShopStallInteraction : MonoBehaviour
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
-        _promptText.enableWordWrapping = false;
+        _promptText.textWrappingMode = TextWrappingModes.NoWrap;
 
         var rect = _promptGo.GetComponent<RectTransform>();
         if (rect != null) rect.sizeDelta = new Vector2(5f, 1.4f);

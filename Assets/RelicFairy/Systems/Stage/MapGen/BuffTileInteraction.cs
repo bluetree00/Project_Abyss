@@ -186,7 +186,7 @@ public class BuffTileInteraction : MonoBehaviour
         _promptText.fontSize = 4f;
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
-        _promptText.enableWordWrapping = false;
+        _promptText.textWrappingMode = TextWrappingModes.NoWrap;
 
         var rect = _promptGo.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(3f, 1f);
@@ -201,7 +201,7 @@ public class BuffTileInteraction : MonoBehaviour
     private void ShowNotice(string message)
     {
         if (_hud == null)
-            _hud = FindObjectOfType<HudPresenter>(true);
+            _hud = FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
         _hud?.ShowBuffNotice(message);
     }
 

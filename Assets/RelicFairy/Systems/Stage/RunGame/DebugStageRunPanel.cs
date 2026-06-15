@@ -17,7 +17,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     private void Awake()
     {
         if (bootstrapper == null)
-            bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
+            bootstrapper = FindFirstObjectByType<GameRunBootstrapper>(FindObjectsInactive.Include);
     }
 
     private void Start()
@@ -29,7 +29,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         // (허브(BaseCamp)에서 로드아웃을 갖춘 채 진입하면 IsInStartRoom=false가 되므로 IsStartRoomScene으로 판별)
         var bootstrapperInstance = bootstrapper != null
             ? bootstrapper
-            : FindObjectOfType<GameRunBootstrapper>(true);
+            : FindFirstObjectByType<GameRunBootstrapper>(FindObjectsInactive.Include);
         if (bootstrapperInstance != null && bootstrapperInstance.IsStartRoomScene) return;
 
         if (_started) return;
@@ -170,7 +170,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         await UniTask.WaitUntil(() => AppBootstrapper.Instance != null && AppBootstrapper.Instance.IsReady);
 
         if (bootstrapper == null)
-            bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
+            bootstrapper = FindFirstObjectByType<GameRunBootstrapper>(FindObjectsInactive.Include);
 
         if (bootstrapper == null)
         {

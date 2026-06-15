@@ -6,10 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/Logo.unity
+    path: Assets/RelicFairy/Scenes/GameScenes/Logo.unity
     guid: 0f347859b0b563045ade5226b7eba638
   - enabled: 1
-    path: Assets/RelicFairy/Scenes/Lobby.unity
+    path: Assets/RelicFairy/Scenes/GameScenes/Lobby.unity
     guid: cdbd8c9b3f2ec4c4687c2ec5c6a9e8a5
   - enabled: 1
     path: Assets/RelicFairy/Scenes/GameScenes/Tutorial.unity

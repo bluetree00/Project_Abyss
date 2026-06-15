@@ -91,7 +91,7 @@ public class GameCameraController : MonoBehaviour
         _originalPosition = transform.position;
         _originalRotation = transform.rotation;
 
-        _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         _brain = GetComponent<CinemachineBrain>();
 
         // Cinemachine 비활성 (인트로 끝까지)
@@ -149,7 +149,7 @@ public class GameCameraController : MonoBehaviour
 
     private void SubscribePlayerBound()
     {
-        var bootstrapper = FindObjectOfType<GameRunBootstrapper>(true);
+        var bootstrapper = FindFirstObjectByType<GameRunBootstrapper>(FindObjectsInactive.Include);
         if (bootstrapper != null && bootstrapper.Run != null)
         {
             bootstrapper.Run.OnPlayerBound += OnPlayerBound;
@@ -182,7 +182,7 @@ public class GameCameraController : MonoBehaviour
     /// <summary>플레이어 텔레포트(절차 방 전환 등) 직후 호출 — Cinemachine을 새 위치로 즉시 스냅(댐핑 패닝 방지).</summary>
     public void SnapToTarget()
     {
-        if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_cinemachine != null) _cinemachine.PreviousStateIsValid = false;
     }
 
@@ -195,7 +195,7 @@ public class GameCameraController : MonoBehaviour
     {
         _introStarted = true; // 레거시 줌인 인트로(OnPlayerBound) 차단
 
-        if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null) _brain = GetComponent<CinemachineBrain>();
 
         if (_cinemachine != null && follow != null)
@@ -262,7 +262,7 @@ public class GameCameraController : MonoBehaviour
         _introStarted = true;
 
         if (_cinemachine == null)
-            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+            _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null)
             _brain = GetComponent<CinemachineBrain>();
 
@@ -599,7 +599,7 @@ public class GameCameraController : MonoBehaviour
     {
         if (this == null || startRoomTourDuration <= 0f) return;
 
-        if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null)       _brain       = GetComponent<CinemachineBrain>();
         if (_brain != null)       _brain.enabled       = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
@@ -831,7 +831,7 @@ public class GameCameraController : MonoBehaviour
         if (this == null) return;
 
         // Cinemachine 확실히 OFF
-        if (_cinemachine == null) _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+        if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null) _brain = GetComponent<CinemachineBrain>();
         if (_brain != null) _brain.enabled = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
@@ -908,7 +908,7 @@ public class GameCameraController : MonoBehaviour
     private void EnsureCinemachineRefs()
     {
         if (_cinemachine == null)
-            _cinemachine = FindObjectOfType<CinemachineFreeLook>(true);
+            _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null)
             _brain = GetComponent<CinemachineBrain>();
     }

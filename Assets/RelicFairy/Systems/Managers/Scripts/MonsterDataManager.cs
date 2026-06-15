@@ -71,7 +71,7 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
         }
     }
 
-    private async UniTask LoadFromServerAsync()
+    private UniTask LoadFromServerAsync()
     {
         int loaded = ChartLoader.Load("MONSTER_STAT_DATA", row =>
         {
@@ -111,6 +111,7 @@ public class MonsterDataManager //TODO: 해당 기능은 제이슨 런타임 데
         });
 
         if (loaded > 0) SaveToJson();
+        return UniTask.CompletedTask;
     }
 
     public MonsterStat GetStatById(int monsterId)

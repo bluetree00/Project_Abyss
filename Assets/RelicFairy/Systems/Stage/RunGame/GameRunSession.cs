@@ -213,6 +213,8 @@ public sealed class GameRunSession
 
         try
         {
+            await UniTask.CompletedTask;
+
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
 
@@ -259,6 +261,8 @@ public sealed class GameRunSession
 
         try
         {
+            await UniTask.CompletedTask;
+
             PlayerState = new PlayerRunState(save.maxHp, save.runGold);
             PlayerState.SetHp(save.currentHp);
 
