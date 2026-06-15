@@ -135,3 +135,6 @@ crashlytics-build.properties
 # ProjectSettings/
 # Packages/
 .vsconfig
+
+# 외부 에셋 원본 보관소 (로컬 유지, git 추적 제외) — 사용분은 RelicFairy/_Imported로 이동됨
+Assets/_ThirdParty/
