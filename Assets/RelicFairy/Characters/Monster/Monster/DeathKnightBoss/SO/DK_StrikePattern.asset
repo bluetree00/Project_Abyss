@@ -23,15 +23,25 @@ MonoBehaviour:
   breakOverride: -1
   whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
   blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
-  impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd, type: 3}
-  swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947, type: 3}
+  impactVfxPrefab: {fileID: 1644958980890870, guid: d0ebac18aae7a7349a6feb3ac42cbccd,
+    type: 3}
+  swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947,
+    type: 3}
   hitTime1: 0.5
   hitTime2: 1.2
   hitTime3: 1.9
   holdDuration: 0.3
-  ringStep: 0.1
-  hitGap: 0.4
+  ringStep: 0.2
+  hitGap: 0.8
   recoveryTime: 0.5
   ringCount: 6
   damageMultiplier: 1.5
   knockbackMultiplier: 1.5
+  edgePrefab: {fileID: 2020822494038853150, guid: e9d86af1f0802464394b7405ba5e804e,
+    type: 3}
+  barrierPrefab: {fileID: 1586059801500780, guid: ac8484e80858b3c48925e94eb1014dc4,
+    type: 3}
+  barrierPadding: 0.15
+  barrierThickness: 0.63
+  barrierHeight: 3
+  barrierVfxYOffset: 0.03

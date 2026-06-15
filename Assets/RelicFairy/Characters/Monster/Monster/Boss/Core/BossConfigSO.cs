@@ -35,8 +35,8 @@ public enum BossConditionKey
     TimePressure  = 5,   // NormalModeTimerCondition(condTimePressureSecs)
 
     // ── DragonBoss 전용 ──────────────────────────────────────────
-    Dragon_Summon80       = 6,
-    Dragon_Summon50       = 7,
+    Dragon_Summon70       = 6,
+    Dragon_Summon40       = 7,
     Dragon_Summon10       = 8,
     Dragon_ElementIce     = 9,
     Dragon_ElementThunder = 10,
@@ -56,8 +56,9 @@ public enum BossConditionKey
     FG_Phase2 = 18,   // HpBelowCondition(condPhase2HpThreshold) — 2페이즈 HP 범위 (HP ≤ 50%)
 
     // ── DeathKnight 전용 ─────────────────────────────────────────
-    DK_IsPhase2  = 19,  // HpBelowCondition(condPhase2HpThreshold)
+    DK_IsPhase2  = 19,  // DKBlackboard.IsPhase2 — Phase2 전환 완료
     DK_IsEnraged = 20,  // Enrage 상태 (HP ≤ enrageHpThreshold, 공격속도/이동속도 증가)
+    DK_IsPhase1  = 24,  // !DKBlackboard.IsPhase2 — Phase2 전환 전 (1페이즈 전용 조건)
 
     // ── Lich (리치) 전용 ─────────────────────────────────────────
     Lich_Phase1        = 21,  // HpAboveCondition(condPhase2HpThreshold) — 봉인 상태 (HP > 40%)

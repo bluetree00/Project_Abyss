@@ -34,8 +34,11 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private GameObject _warningEffectPrefab;
 
     [Header("속성")]
-    [SerializeField] private Color                _breathColor  = Color.white;
+    [SerializeField] private Color                _breathColor  = new Color(1.0f, 0.35f, 0.1f);
     [SerializeField] private PlayerStatusEffectSO _statusEffect;
+
+    [Header("EndPose (반격 창)")]
+    [SerializeField] private float _endPoseDuration = 0.4f;
 
     public string BreathStartStateName  => _breathStartStateName;
     public string BreathLoopStateName   => _breathLoopStateName;
@@ -50,6 +53,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public GameObject WarningEffectPrefab  => _warningEffectPrefab;
     public Color  BreathColor           => _breathColor;
     public PlayerStatusEffectSO StatusEffect => _statusEffect;
+    public float  EndPoseDuration       => _endPoseDuration;
 
     private DragonGroundBreathState _runtimeState;
 
@@ -72,7 +76,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
 
 internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreathPatternSO>
 {
-    private enum Phase { Prepare, Breathing, Done }
+    private enum Phase { Prepare, Breathing, EndPose, Done }
 
     private Phase      _phase;
     private float      _timer;
@@ -118,6 +122,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         {
             case Phase.Prepare:   UpdatePrepare(ctx);   break;
             case Phase.Breathing: UpdateBreathing(ctx); break;
+            case Phase.EndPose:   UpdateEndPose(ctx);   break;
         }
     }
 
@@ -167,8 +172,10 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         if (_timer >= Data.BreathDuration)
         {
-            _phase = Phase.Done;
-            ctx.Monster.ChangeState<ChaseState>();
+            DestroyEffect(ref _breathEffect);
+            DestroyEffect(ref _rangeIndicator);
+            _phase = Phase.EndPose;
+            _timer = 0f;
         }
     }
 
@@ -236,8 +243,9 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         if (forward.sqrMagnitude < 0.001f) return;
         forward.Normalize();
 
-        float groundY = ctx.Transform.position.y + 0.05f;
-        Vector3 origin = new Vector3(ctx.Transform.position.x, groundY, ctx.Transform.position.z);
+        Vector3 mouthPos = GetMouthPos(ctx);
+        float groundY = DragonPatternFloorUtils.GetFloorY(mouthPos, ctx.Runtime.SpawnPosition.y) + 0.05f;
+        Vector3 origin = new Vector3(mouthPos.x, groundY, mouthPos.z);
 
         lr.SetPosition(0, origin);
         lr.SetPosition(1, origin + forward * Data.BreathRange);
@@ -331,6 +339,15 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     }
 
     // ── 데미지 ────────────────────────────────────────────────────────────────
+
+    private void UpdateEndPose(MonsterContext ctx)
+    {
+        if (_timer >= Data.EndPoseDuration)
+        {
+            _phase = Phase.Done;
+            ctx.Monster.ChangeState<ChaseState>();
+        }
+    }
 
     private void ApplyDamage(MonsterContext ctx)
     {

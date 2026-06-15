@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -20,7 +21,7 @@ namespace RelicFairy.Monster
 ///  BossPatternRunner 가 Update() 에서 틱되어 BossConfigSO 의
 ///  patternEntries 를 평가하고 패턴 SpecialState 를 발동한다.
 /// </summary>
-public class DragonBossMonster : MonsterBase, IBoss
+public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 {
     // ── 드래곤 전용 설정 (Inspector) ──────────────────────
     [Header("Dragon — 애니메이션 상태 이름")]
@@ -34,19 +35,66 @@ public class DragonBossMonster : MonsterBase, IBoss
     [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
     [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
 
+    [Header("Dragon — 지상 히트박스")]
+    [Tooltip("지상 상태 콜라이더 중심 Y (루트 기준). 프리팹 저장 상태와 무관하게 항상 이 값 사용.")]
+    [SerializeField] private float _groundHitboxCenterY = 2.5f;
+    [Tooltip("지상 상태 콜라이더 높이")]
+    [SerializeField] private float _groundHitboxHeight = 5f;
+
+    [Header("Dragon — 공중 히트박스")]
+    [Tooltip("공중 상태에서 지상 높이 기준 배율 (수직 확장 — 투사체 피격 범위)")]
+    [SerializeField] private float _airborneHitboxHeightMult = 5f;
+    [Tooltip("공중 상태에서 콜라이더 중심을 아래로 이동하는 Y 오프셋 (지상 발사체가 닿도록)")]
+    [SerializeField] private float _airborneHitboxCenterOffsetY = 8f;
+    [Tooltip("공중 상태에서 콜라이더 반경 (넓을수록 맞추기 쉬움)")]
+    [SerializeField] private float _airborneHitboxRadius = 3f;
+
     [Header("Dragon — 이동")]
     [Tooltip("이 거리 초과 시 RunChase, 이하 시 WalkChase")]
     [SerializeField] private float _walkToRunThreshold = 8f;
     [Tooltip("WalkChase 속도 배율 (moveSpeed 대비)")]
     [SerializeField] private float _walkChaseSpeedMult = 0.5f;
     [Tooltip("추적 중 NavMeshAgent 회전 속도 (낮을수록 천천히 방향 전환)")]
-    [SerializeField] private float _chaseAngularSpeed = 35f;
+    [SerializeField] private float _chaseAngularSpeed = 12f;
     [Tooltip("방향 전환 애니 재생 중 이동 속도 배율")]
     [SerializeField] private float _turnSpeedMult = 0.4f;
+    [SerializeField] private float _groundTurnOrbitAngle = 65f;
+    [SerializeField] private float _groundTurnFaceAngle = 25f;
     [SerializeField] private float _airChaseHeight = 4f;
     [SerializeField] private float _airChaseSpeedMult = 1.4f;
     [SerializeField] private float _airTurnAngleThreshold = 40f;
     [SerializeField] private float _airTransitionWeightMultiplier = 8f;
+    [SerializeField] private float _airOrbitRadius = 9f;
+    [SerializeField] private float _airOrbitAngularSpeed = 70f;
+    [SerializeField] private float _airOrbitCatchUpSpeedMult = 2.1f;
+    [SerializeField] private float _airOrbitRadiusTolerance = 1.2f;
+    [SerializeField] private float _airMinOrbitTurnsBeforePattern = 1f;
+    [SerializeField] private float _airOrbitRecenterThreshold = 9f;
+    [SerializeField] private float _airOrbitCenterMoveSpeedMult = 1.1f;
+
+    [Header("Dragon — 등장 연출")]
+    [Tooltip("등장 대기 중 플레이어 감지 반경")]
+    [SerializeField] private float _detectionRange = 15f;
+    [Tooltip("등장 시 착지 지점 위쪽으로 띄우는 높이 — 브레스 발사 고도")]
+    [SerializeField] private float _entranceDescendHeight = 45f;
+    [Tooltip("등장 하강 속도 (m/s)")]
+    [SerializeField] private float _entranceDescendSpeed = 18f;
+    [Tooltip("고공 와이드샷 유지 중 브레스로 파괴할 지붕 타일들 (MCP로 미리 배치한 scale=1 타일 225개)")]
+    [SerializeField] private GameObject[] _entranceRoofTiles;
+    [Tooltip("브레스 착지점 기준, 이 반경(m) 안의 지붕 타일만 파괴")]
+    [SerializeField] private float _entranceRoofHitRadius = 8f;
+    [Tooltip("지붕 파괴 임팩트 시점 생성할 브레스 VFX 프리팹")]
+    [SerializeField] private GameObject _entranceBreathVfxPrefab;
+    [Tooltip("브레스 VFX 생성 위치. 비워두면 드래곤 위치 사용")]
+    [SerializeField] private Transform _entranceVfxPoint;
+    [Tooltip("착지 후 카메라 클로즈업 오프셋 (드래곤 기준 월드 좌표)")]
+    [SerializeField] private Vector3 _entranceCameraOffset = new Vector3(7f, 0.5f, -2f);
+    [Tooltip("보스 이름 HUD 소멸 후 플레이어 카메라로 복귀하는 시간 (초)")]
+    [SerializeField] private float _entranceCameraMoveDuration = 1.2f;
+    [Tooltip("등장 비행 시작 위치 — 착지 지점(SpawnPosition) 기준 수평 오프셋 (X/Z). 이 위치에서 브레스를 뿜으며 착지 지점 위까지 날아온다")]
+    [SerializeField] private Vector2 _entranceFlyInOffset = new Vector2(0f, 55f);
+    [Tooltip("등장 비행 속도 (m/s)")]
+    [SerializeField] private float _entranceFlyInSpeed = 25f;
 
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
@@ -62,9 +110,25 @@ public class DragonBossMonster : MonsterBase, IBoss
     public float  ChaseAngularSpeed   => _chaseAngularSpeed;
     public float  WalkChaseSpeedMult  => _walkChaseSpeedMult;
     public float  TurnSpeedMult       => _turnSpeedMult;
+    public float  GroundTurnOrbitAngle => _groundTurnOrbitAngle;
+    public float  GroundTurnFaceAngle  => _groundTurnFaceAngle;
     public float  AirChaseHeight      => _airChaseHeight;
     public float  AirChaseSpeedMult   => _airChaseSpeedMult;
     public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
+    public float  AirOrbitRadius      => _airOrbitRadius;
+    public float  AirOrbitAngularSpeed => _airOrbitAngularSpeed;
+    public float  AirOrbitCatchUpSpeedMult => _airOrbitCatchUpSpeedMult;
+    public float  AirOrbitRadiusTolerance => _airOrbitRadiusTolerance;
+    public float  AirMinOrbitTurnsBeforePattern => _airMinOrbitTurnsBeforePattern;
+    public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
+    public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
+
+    public float   EntranceDescendHeight     => _entranceDescendHeight;
+    public float   EntranceDescendSpeed      => _entranceDescendSpeed;
+    public Vector3 EntranceCameraOffset      => _entranceCameraOffset;
+    public float   EntranceCameraMoveDuration => _entranceCameraMoveDuration;
+    public Vector2 EntranceFlyInOffset           => _entranceFlyInOffset;
+    public float   EntranceFlyInSpeed            => _entranceFlyInSpeed;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -78,6 +142,15 @@ public class DragonBossMonster : MonsterBase, IBoss
     private DragonBossBlackboard  _dragonBB;
     private BossPatternContext    _patternCtx;
     private BossPatternRunner     _runner;
+    private DragonDormantState    _dormantState;
+    private bool                  _pendingTriggerEntrance;
+
+    // ── 공중 히트박스 ─────────────────────────────────────
+    private CapsuleCollider _capsule;
+    private Vector3         _capsuleCenterNormal; // X/Z 중심 보존용
+    private float           _capsuleRadiusNormal; // 지상 반경 보존용
+    private bool            _airborneHitboxActive;
+    private bool            _hitStopActive;
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
@@ -133,7 +206,32 @@ public class DragonBossMonster : MonsterBase, IBoss
         UpdateTransitionPatternWeights();
     }
 
-    protected override void OnInitialized() => BindBossHud();
+    protected override void OnInitialized()
+    {
+        BindBossHud();
+        _capsule = GetComponent<CapsuleCollider>();
+        if (_capsule != null)
+        {
+            _capsuleCenterNormal = _capsule.center; // X/Z만 보존
+            _capsuleRadiusNormal = _capsule.radius; // 지상 반경 보존
+            // 프리팹 저장 상태와 무관하게 지상 히트박스로 초기화
+            _airborneHitboxActive = true;           // 다음 SyncAirborneHitbox 호출 시 else(지상) 분기 강제 진입
+        }
+        // 초기 상태: Ice 페이즈 (HP 100%) 색상
+        DragonBossVisualHelper.ApplyBodyTint(transform,
+            DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
+
+        // 등장 대기 상태로 진입 — 하강/착지/지붕 파괴 연출은 TriggerEntrance() 호출 시 시작
+        _dormantState = new DragonDormantState(_detectionRange);
+        ChangeState(_dormantState);
+
+        // InitAsync 완료 전에 BossSpawner가 TriggerEntrance()를 호출한 경우 즉시 적용
+        if (_pendingTriggerEntrance)
+        {
+            _pendingTriggerEntrance = false;
+            _dormantState.TriggerEntrance(_ctx);
+        }
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 매 프레임
@@ -143,6 +241,9 @@ public class DragonBossMonster : MonsterBase, IBoss
     {
         base.Update();
         if (_runtime == null || _runtime.IsDead || _dragonBB == null) return;
+
+        // 등장 연출 중에는 패턴 러너와 무브먼트 완전 정지
+        if (_dormantState != null && _dormantState.IsActive) return;
 
         _dragonBB.TickCooldowns(Time.deltaTime);
 
@@ -155,7 +256,39 @@ public class DragonBossMonster : MonsterBase, IBoss
         }
 
         UpdateTransitionPatternWeights();
-        _runner?.Tick(Time.deltaTime);
+
+        // 공중 상태에서 최소 선회량을 채울 때까지 패턴 발동 잠금
+        bool airPatternLocked = _dragonBB.BodyState == BodyState.Airborne
+            && _dragonBB.AirOrbitAccumulatedDegrees < _airMinOrbitTurnsBeforePattern * 360f;
+        if (!airPatternLocked)
+            _runner?.Tick(Time.deltaTime);
+
+        SyncAirborneHitbox();
+    }
+
+    private void SyncAirborneHitbox()
+    {
+        if (_capsule == null || _dragonBB == null) return;
+        bool shouldBeAirborne = _dragonBB.BodyState == BodyState.Airborne;
+        if (shouldBeAirborne == _airborneHitboxActive) return;
+
+        _airborneHitboxActive = shouldBeAirborne;
+        float cx = _capsuleCenterNormal.x;
+        float cz = _capsuleCenterNormal.z;
+        if (shouldBeAirborne)
+        {
+            // 공중: 아래로 확장 + 반경 확대 — 지상에서 조준하기 쉽도록
+            _capsule.height = _groundHitboxHeight * _airborneHitboxHeightMult;
+            _capsule.center = new Vector3(cx, _groundHitboxCenterY - _airborneHitboxCenterOffsetY, cz);
+            _capsule.radius = _airborneHitboxRadius;
+        }
+        else
+        {
+            // 지상: 명시적 수치로 바디 중앙에 콜라이더 배치, 반경 원래 값으로 복원
+            _capsule.height = _groundHitboxHeight;
+            _capsule.center = new Vector3(cx, _groundHitboxCenterY, cz);
+            _capsule.radius = _capsuleRadiusNormal;
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -170,11 +303,78 @@ public class DragonBossMonster : MonsterBase, IBoss
         CacheTransitionPatternBaseWeights();
         UpdateTransitionPatternWeights();
         BindBossHud();
+        _hitStopActive = false;
+        _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
+        _pendingTriggerEntrance = false;
+        // pool 재활성: 등장 연출 재진입
+        if (_dormantState != null)
+            ChangeState(_dormantState);
+        // pool 재활성 시 Ice 페이즈 색상으로 리셋
+        DragonBossVisualHelper.ApplyBodyTint(transform,
+            DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 드래곤 전용 상태 전환 (상태 클래스에서 호출)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 피격 처리 (쉴드)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override void TakeDamage(float amount, GameObject instigator,
+        float knockbackMultiplier = 1f,
+        bool isCrit = false)
+    {
+        if (_dragonBB != null && instigator != null)
+        {
+            Vector3 dir = instigator.transform.position - transform.position;
+            _dragonBB.SetHitDirection(dir, transform.forward);
+        }
+        base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
+
+        // 지상 피격 시 히트스톱 (poise 파괴 = 강타격, 일반 = 약타격)
+        bool isAirborne = _dragonBB != null && _dragonBB.BodyState == BodyState.Airborne;
+        if (!isAirborne)
+        {
+            float dur = (_dragonBB != null && _dragonBB.IsPoiseBroken) ? 0.14f : 0.05f;
+            HitStopAsync(dur, destroyCancellationToken).Forget();
+        }
+    }
+
+    private async UniTaskVoid HitStopAsync(float duration, System.Threading.CancellationToken ct)
+    {
+        if (_hitStopActive) return;
+        _hitStopActive = true;
+        float prev = Time.timeScale;
+        Time.timeScale = 0.05f;
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(duration), DelayType.Realtime, cancellationToken: ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            Time.timeScale = prev;
+            _hitStopActive = false;
+        }
+    }
+
+    protected override void OnDamageTaken()
+    {
+        if (_dragonBB == null) return;
+
+        // 공중 상태 또는 쉴드가 이미 파괴된 상태에서는 GetHit 스킵
+        if (_dragonBB.BodyState == BodyState.Airborne)
+        {
+            _suppressGetHitThisHit = true;
+            return;
+        }
+
+        bool poiseBroke = _dragonBB.ApplyPoiseDamage();
+        if (!poiseBroke)
+            _suppressGetHitThisHit = true;
+    }
 
     public void UnbindBossHudPublic() => UnbindBossHudIfBound();
 
@@ -200,8 +400,12 @@ public class DragonBossMonster : MonsterBase, IBoss
     }
 
     private bool IsInEngagementRange()
-        => _runtime?.PlayerTarget != null
-           && _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
+    {
+        if (_runtime?.PlayerTarget == null)
+            return false;
+
+        return _runtime.DistToPlayer < _config.detection.chaseGiveUpRange;
+    }
 
     private void OnPatternExecuted(BossPatternSO pattern)
     {
@@ -257,10 +461,18 @@ public class DragonBossMonster : MonsterBase, IBoss
 
             foreach (var pattern in entry.patterns)
             {
-                if (pattern is DragonTakeoffPatternSO)
-                    _dragonBB.TakeoffBaseWeight = Mathf.Max(0.01f, pattern.weight);
-                else if (pattern is DragonLandingPatternSO)
-                    _dragonBB.LandingBaseWeight = Mathf.Max(0.01f, pattern.weight);
+                // pattern.weight 는 런타임에 배수가 곱해지므로 오염될 수 있음.
+                // BaseWeight (전용 SO 필드, 코드 비수정) 에서 읽어 SO weight 도 즉시 정규화.
+                if (pattern is DragonTakeoffPatternSO tp)
+                {
+                    _dragonBB.TakeoffBaseWeight = Mathf.Max(0.01f, tp.BaseWeight);
+                    pattern.weight = _dragonBB.TakeoffBaseWeight;
+                }
+                else if (pattern is DragonLandingPatternSO lp)
+                {
+                    _dragonBB.LandingBaseWeight = Mathf.Max(0.01f, lp.BaseWeight);
+                    pattern.weight = _dragonBB.LandingBaseWeight;
+                }
             }
         }
     }
@@ -320,8 +532,8 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.AfterBackstep        => new LastTagCondition("backstep"),
             BossConditionKey.AfterSidestep        => new LastTagCondition("sidestep"),
             BossConditionKey.TimePressure         => new NormalModeTimerCondition(config.condTimePressureSecs),
-            BossConditionKey.Dragon_Summon80      => new DragonSummonedAtCondition(DragonSummonPhase.At80),
-            BossConditionKey.Dragon_Summon50      => new DragonSummonedAtCondition(DragonSummonPhase.At50),
+            BossConditionKey.Dragon_Summon70      => new DragonSummonedAtCondition(DragonSummonPhase.At70),
+            BossConditionKey.Dragon_Summon40      => new DragonSummonedAtCondition(DragonSummonPhase.At40),
             BossConditionKey.Dragon_Summon10      => new DragonSummonedAtCondition(DragonSummonPhase.At10),
             // 속성 페이즈: HP 비율 범위로 판정 (Ice 100-70%, Thunder 70-40%, Fire 40-0%)
             BossConditionKey.Dragon_ElementIce     => new DragonElementPhaseCondition(DragonElementPhase.Ice),
@@ -332,6 +544,96 @@ public class DragonBossMonster : MonsterBase, IBoss
             BossConditionKey.Dragon_Body_Airborne  => new DragonBodyStateCondition(BodyState.Airborne),
             _                                      => new AlwaysTrue(),
         };
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IBossEntrance
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>DragonDormantState가 플레이어를 감지했을 때 발행 — BossRoomController가 카메라 팬을 시작한다.</summary>
+    public override bool HasEntranceAnimation => true;
+
+    public event Action OnEntranceRequested;
+
+    /// <summary>Appear 연출이 끝나고 전투가 시작되기 직전 발행 — 플레이어 입력 복구 등에 사용한다.</summary>
+    public event Action OnCombatReady;
+
+    /// <summary>DragonDormantState가 감지 직후 호출 — OnEntranceRequested 이벤트 발행.</summary>
+    internal void FireEntranceRequest() => OnEntranceRequested?.Invoke();
+
+    /// <summary>DragonDormantState가 ChaseState 전환 직전 호출 — OnCombatReady 이벤트 발행.</summary>
+    internal void FireCombatReady()
+    {
+        _runner?.EnsureMinBreakCooldown(3f);
+        OnCombatReady?.Invoke();
+        RaiseBossCombatReady();
+    }
+
+    /// <summary>BossRoomController가 카메라 팬 완료 후 호출 — 하강/착지 연출 시작.</summary>
+    public void TriggerEntrance()
+    {
+        if (_dormantState != null)
+            _dormantState.TriggerEntrance(_ctx);
+        else
+            _pendingTriggerEntrance = true; // InitAsync 완료 전 호출된 경우 OnInitialized에서 적용
+    }
+
+    /// <summary>등장 비행 시작 시 호출 — 브레스 VFX를 EntranceBreathPoint에 붙여 생성한다 (드래곤을 따라 이동/회전).</summary>
+    public GameObject SpawnEntranceBreathVfx()
+    {
+        if (_entranceBreathVfxPrefab == null) return null;
+
+        Vector3    pos = _entranceVfxPoint != null ? _entranceVfxPoint.position : transform.position;
+        Quaternion rot = _entranceVfxPoint != null ? _entranceVfxPoint.rotation : transform.rotation;
+        GameObject vfx = Instantiate(_entranceBreathVfxPrefab, pos, rot);
+        if (_entranceVfxPoint != null)
+            vfx.transform.SetParent(_entranceVfxPoint, true);
+        return vfx;
+    }
+
+    /// <summary>등장 비행 종료 시점 브레스 방향을 지붕 높이까지 투영해 착지점을 계산한다.</summary>
+    private Vector3 ComputeBreathImpactPoint()
+    {
+        if (_entranceVfxPoint == null || _entranceRoofTiles == null || _entranceRoofTiles.Length == 0)
+            return transform.position;
+
+        Vector3 origin = _entranceVfxPoint.position;
+        Vector3 dir    = _entranceVfxPoint.forward;
+        float   roofY  = _entranceRoofTiles[0].transform.position.y;
+
+        if (Mathf.Abs(dir.y) < 0.0001f) return origin;
+
+        float t = (roofY - origin.y) / dir.y;
+        return origin + dir * t;
+    }
+
+    /// <summary>등장 비행이 착지 지점 위에 도착했을 때 호출 — 브레스 착지점 반경 내 지붕 타일만 파괴.</summary>
+    public void TriggerRoofDestruction()
+    {
+        if (_entranceRoofTiles == null) return;
+
+        Vector3 impact   = ComputeBreathImpactPoint();
+        float   radiusSq = _entranceRoofHitRadius * _entranceRoofHitRadius;
+
+        foreach (var tile in _entranceRoofTiles)
+        {
+            if (tile == null || !tile.activeSelf) continue;
+
+            Vector3 p  = tile.transform.position;
+            float   dx = p.x - impact.x;
+            float   dz = p.z - impact.z;
+            if (dx * dx + dz * dz <= radiusSq)
+                tile.SetActive(false);
+        }
+    }
+
+    /// <summary>착지 순간 호출 — 남아있는 지붕 타일을 모두 파괴.</summary>
+    public void TriggerRoofCollapse()
+    {
+        if (_entranceRoofTiles == null) return;
+
+        foreach (var tile in _entranceRoofTiles)
+            if (tile != null) tile.SetActive(false);
     }
 }
 }

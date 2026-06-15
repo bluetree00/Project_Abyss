@@ -21,6 +21,10 @@ public enum DKVfxGroupMode { PerCell, PerColumn, PerRow, PerCrossLine }
 /// </summary>
 public static class DKGridPatternHelper
 {
+    private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorId         = Shader.PropertyToID("_Color");
+    private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+
     // ── 타일 스폰/제거 ──────────────────────────────────────
 
     /// <summary>colorRule(x, z) 결과에 따라 내부 셀 전체에 타일 프리팹을 스폰한다.</summary>
@@ -298,6 +302,93 @@ public static class DKGridPatternHelper
         if (go != null) TintVfx(go, tint);
     }
 
+    // ── 경계 테두리 엣지 스폰/제거 ────────────────────────────
+
+    /// <summary>
+    /// 타일 목록의 색상 경계를 탐지하여 얇은 테두리 엣지를 스폰한다.
+    /// 엣지는 타일과 같은 흑/백 계열을 유지하되 밝기 차이를 줘서 장판 위에서도 읽히게 만든다.
+    /// 두 색상이 공유하는 내부 경계는 먼저 처리된 타일 기준 엣지 1개만 스폰한다.
+    /// </summary>
+    public static List<GameObject> SpawnBoundaryEdges(
+        List<DKTileInfo> tiles,
+        GameObject edgePrefab,
+        float thickness = 0.13333334f,
+        float yOffset   = 0.12f)
+    {
+        var result = new List<GameObject>();
+        if (edgePrefab == null || tiles == null || tiles.Count == 0) return result;
+
+        float cs = DKBossRoomContext.CellSize;
+
+        var colorMap = new Dictionary<Vector2Int, DKSwordColor>(tiles.Count);
+        foreach (var t in tiles) colorMap[t.Cell] = t.Color;
+
+        // 중복 방지: (canonX, canonZ, axis) — axis 0=N/S 경계, 1=E/W 경계
+        var processed = new HashSet<(int, int, int)>();
+
+        // (dx, dz, isNS): isNS=true → 이웃이 Z 방향 → 엣지는 X축으로 놓임
+        (int dx, int dz, bool isNS)[] dirs =
+        {
+            ( 0,  1, true ),  // North
+            ( 0, -1, true ),  // South
+            ( 1,  0, false),  // East
+            (-1,  0, false),  // West
+        };
+
+        foreach (var tile in tiles)
+        {
+            int     tx        = tile.Cell.x;
+            int     tz        = tile.Cell.y;
+            Vector3 tileWorld = DKBossRoomContext.CellToWorld(tx, tz, yOffset);
+
+            foreach (var (dx, dz, isNS) in dirs)
+            {
+                var nb = new Vector2Int(tx + dx, tz + dz);
+
+                bool neighborSameColor =
+                    colorMap.TryGetValue(nb, out var nbColor) && nbColor == tile.Color;
+                if (neighborSameColor) continue;
+
+                // 정식 엣지 키: 항상 좌표가 작은 쪽 기준
+                int canonX = isNS ? tx                   : Mathf.Min(tx, nb.x);
+                int canonZ = isNS ? Mathf.Min(tz, nb.y) : tz;
+                int axis   = isNS ? 0 : 1;
+                if (!processed.Add((canonX, canonZ, axis))) continue;
+
+                // 엣지 위치: 타일 중심과 이웃 중심의 중간
+                Vector3 edgePos = tileWorld
+                    + new Vector3(dx * cs * 0.5f, 0f, dz * cs * 0.5f);
+
+                // N/S 경계 → 엣지가 X축 방향 Euler(-90,0,0)
+                // E/W 경계 → 엣지가 Z축 방향 Euler(-90,90,0)
+                Quaternion rot = isNS
+                    ? Quaternion.Euler(-90f,  0f, 0f)
+                    : Quaternion.Euler(-90f, 90f, 0f);
+
+                var go = BossEffectPool.Spawn(edgePrefab, edgePos, rot);
+                if (go == null) continue;
+
+                go.transform.localScale = new Vector3(cs, thickness, cs);
+                ApplyEdgeStyle(go, tile.Color);
+
+                result.Add(go);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>경계 엣지 오브젝트 목록을 풀에 반환하고 비운다.</summary>
+    public static void DestroyEdges(List<GameObject> edges)
+    {
+        if (edges == null) return;
+        foreach (var go in edges)
+            if (go != null) BossEffectPool.Release(go);
+        edges.Clear();
+    }
+
+    // ───────────────────────────────────────────────────────
+
     private static void ApplyDamageToPlayer(MonsterContext ctx, float damageMult, float knockbackMult)
     {
         if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
@@ -312,6 +403,28 @@ public static class DKGridPatternHelper
         toPlayer.y = 0.2f;
         Vector3 knockDir = toPlayer.sqrMagnitude > 0.001f ? toPlayer.normalized : ctx.Transform.forward;
         player.ApplyKnockback(knockDir * ctx.Config.stat.knockbackForce * knockbackMult);
+    }
+
+    private static void ApplyEdgeStyle(GameObject go, DKSwordColor tileColor)
+    {
+        if (go == null) return;
+
+        Color baseColor = tileColor == DKSwordColor.White
+            ? new Color(0.95f, 0.96f, 0.98f, 0.92f)
+            : new Color(0.14f, 0.15f, 0.18f, 0.92f);
+        Color emission = tileColor == DKSwordColor.White
+            ? new Color(0.08f, 0.08f, 0.10f, 1f)
+            : new Color(0.02f, 0.02f, 0.03f, 1f);
+
+        var block = new MaterialPropertyBlock();
+        foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.GetPropertyBlock(block);
+            block.SetColor(BaseColorId, baseColor);
+            block.SetColor(ColorId, baseColor);
+            block.SetColor(EmissionColorId, emission);
+            renderer.SetPropertyBlock(block);
+        }
     }
 }
 }

@@ -12,7 +12,7 @@ namespace RelicFairy.Monster
 public class DragonSummonPatternSO : BossPatternSO
 {
     [Header("소환 조건")]
-    [SerializeField] private DragonSummonPhase _summonPhase = DragonSummonPhase.At80;
+    [SerializeField] private DragonSummonPhase _summonPhase = DragonSummonPhase.At70;
 
     [Header("비행")]
     [SerializeField] private float  _hoverHeight       = 6f;
@@ -90,16 +90,16 @@ public class DragonSummonPatternSO : BossPatternSO
     public (Color eggColor, Color miniColor, GameObject breathPrefab) GetElementAssets() =>
         _summonPhase switch
         {
-            DragonSummonPhase.At80 => (_iceColor,     _iceColor,     _iceBreathPrefab),
-            DragonSummonPhase.At50 => (_thunderColor, _thunderColor, _thunderBreathPrefab),
+            DragonSummonPhase.At70 => (_iceColor,     _iceColor,     _iceBreathPrefab),
+            DragonSummonPhase.At40 => (_thunderColor, _thunderColor, _thunderBreathPrefab),
             DragonSummonPhase.At10 => (_fireColor,    _fireColor,    _fireBreathPrefab),
             _                      => (_iceColor,     _iceColor,     _iceBreathPrefab),
         };
 
     public PlayerStatusEffectSO GetStatusEffect() => _summonPhase switch
     {
-        DragonSummonPhase.At80 => _iceStatusEffect,
-        DragonSummonPhase.At50 => _thunderStatusEffect,
+        DragonSummonPhase.At70 => _iceStatusEffect,
+        DragonSummonPhase.At40 => _thunderStatusEffect,
         DragonSummonPhase.At10 => _fireStatusEffect,
         _                      => null,
     };
@@ -108,11 +108,20 @@ public class DragonSummonPatternSO : BossPatternSO
     {
         switch (_summonPhase)
         {
-            case DragonSummonPhase.At80: bb.HasSummonedAt80 = value; break;
-            case DragonSummonPhase.At50: bb.HasSummonedAt50 = value; break;
+            case DragonSummonPhase.At70: bb.HasSummonedAt70 = value; break;
+            case DragonSummonPhase.At40: bb.HasSummonedAt40 = value; break;
             case DragonSummonPhase.At10: bb.HasSummonedAt10 = value; break;
         }
     }
+
+    /// <summary>소환 페이즈에 따라 드래곤 바디에 적용할 원소 색상을 반환한다.</summary>
+    public Color GetNextPhaseBodyTint() => _summonPhase switch
+    {
+        DragonSummonPhase.At70 => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder),
+        DragonSummonPhase.At40 => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire),
+        DragonSummonPhase.At10 => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire),
+        _                      => DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice),
+    };
 
     // ── BossPatternSO ────────────────────────────────────────────────────────
 
@@ -131,8 +140,8 @@ public class DragonSummonPatternSO : BossPatternSO
             : 1f;
         return _summonPhase switch
         {
-            DragonSummonPhase.At80 => hp <= 0.8f && !bb.HasSummonedAt80,
-            DragonSummonPhase.At50 => hp <= 0.5f && !bb.HasSummonedAt50,
+            DragonSummonPhase.At70 => hp <= 0.7f && !bb.HasSummonedAt70,
+            DragonSummonPhase.At40 => hp <= 0.4f && !bb.HasSummonedAt40,
             DragonSummonPhase.At10 => hp <= 0.1f && !bb.HasSummonedAt10,
             _                      => false,
         };
@@ -192,6 +201,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         if (alreadyAirborne)
         {
             ctx.Transform.position = _hoverPos;
+            DragonBossVisualHelper.ApplyBodyTint(ctx.Transform, Data.GetNextPhaseBodyTint());
             SpawnEggs(ctx);
         }
         else
@@ -231,6 +241,8 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         _hoverPos = ctx.Transform.position;
         _phase    = Phase.Hover;
         _timer    = 0f;
+        // 이륙 완료 = 카메라 밖 공중 위치 → 속성 색상으로 바디 틴트 전환
+        DragonBossVisualHelper.ApplyBodyTint(ctx.Transform, Data.GetNextPhaseBodyTint());
         SpawnEggs(ctx);
     }
 

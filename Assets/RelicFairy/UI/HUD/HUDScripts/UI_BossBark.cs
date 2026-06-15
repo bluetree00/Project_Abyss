@@ -65,7 +65,7 @@ namespace RelicFairy.UI
         [SerializeField] private float _fadeInDuration   = 0.15f;
         [SerializeField] private float _fadeOutDuration  = 0.45f;
 
-        private readonly Queue<(string text, BossBarkType type)> _queue = new();
+        private readonly Queue<(string text, BossBarkType type, UniTaskCompletionSource tcs)> _queue = new();
         private CancellationTokenSource _cts;
         private bool _showing;
 
@@ -93,12 +93,21 @@ namespace RelicFairy.UI
         public static void Show(string text, BossBarkType type = BossBarkType.Bark)
         {
             if (Instance == null) return;
-            Instance.Enqueue(text, type);
+            Instance.Enqueue(text, type, null);
+        }
+
+        /// <summary>표시 후 페이드아웃까지 완료될 때까지 대기한다. (보스 등장 연출의 카메라 단계 동기화용)</summary>
+        public static UniTask ShowAndWaitAsync(string text, BossBarkType type = BossBarkType.Bark)
+        {
+            if (Instance == null) return UniTask.CompletedTask;
+            var tcs = new UniTaskCompletionSource();
+            Instance.Enqueue(text, type, tcs);
+            return tcs.Task;
         }
 
         // ─── Internal ─────────────────────────────────────────────────
 
-        private void Enqueue(string text, BossBarkType type)
+        private void Enqueue(string text, BossBarkType type, UniTaskCompletionSource tcs)
         {
             // PhaseAnnounce는 큐를 비우고 즉시 표시 (페이즈 전환은 최우선)
             // MerlinNarration은 큐 유지 — 서사 대사는 순서대로 출력
@@ -108,7 +117,7 @@ namespace RelicFairy.UI
                 InterruptCurrent();
             }
 
-            _queue.Enqueue((text, type));
+            _queue.Enqueue((text, type, tcs));
 
             if (!_showing)
                 RunQueue(destroyCancellationToken).Forget();
@@ -128,7 +137,7 @@ namespace RelicFairy.UI
             {
                 if (lifetimeToken.IsCancellationRequested) return;
 
-                var (text, type) = _queue.Dequeue();
+                var (text, type, tcs) = _queue.Dequeue();
                 _showing = true;
 
                 _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
@@ -143,6 +152,7 @@ namespace RelicFairy.UI
                     _cts?.Dispose();
                     _cts = null;
                     _showing = false;
+                    tcs?.TrySetResult();
                 }
             }
         }

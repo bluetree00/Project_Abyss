@@ -32,6 +32,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     private float _nextSideStepTime;
     private float _sideStepActiveTimer;
     private bool  _isSideStepping;
+    private bool  _wasInBreathRange;
 
     // 브레스 발사 애니메이션 제어
     private bool  _isFiring;
@@ -119,11 +120,19 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         _breathTimer   += Time.deltaTime;
         _sideStepTimer += Time.deltaTime;
 
-        UpdateSideStep();
-        if (_isSideStepping) return;
-
         float distToPlayer = Vector3.Distance(transform.position, _playerTarget.position);
         bool  inBreathRange = distToPlayer <= _breathRange;
+
+        // 추적→공격 전환 시 사이드스텝 타이머 리셋: 공격 먼저 실행되도록
+        if (inBreathRange && !_wasInBreathRange)
+        {
+            _sideStepTimer    = 0f;
+            _nextSideStepTime = Random.Range(SideStepMin, SideStepMax);
+        }
+        _wasInBreathRange = inBreathRange;
+
+        UpdateSideStep();
+        if (_isSideStepping) return;
 
         if (inBreathRange)
         {
@@ -164,7 +173,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
             return;
         }
 
-        if (_sideStepTimer >= _nextSideStepTime)
+        if (_sideStepTimer >= _nextSideStepTime && !_isFiring)
             BeginSideStep();
     }
 
