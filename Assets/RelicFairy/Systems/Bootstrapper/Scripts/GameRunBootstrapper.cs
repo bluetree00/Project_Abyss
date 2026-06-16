@@ -108,6 +108,19 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("행운치 기반 등급 추첨 테이블. 상점 매대 등급 추첨에 사용.")]
     [SerializeField] private LuckRollTableSO luckRollTable;
 
+    [Tooltip("상점 NPC 프리팹 Addressable 키. 플레이어가 F로 상호작용하면 상점 UI(UI_ShopPanel)를 연다. " +
+             "기존 월드 매대는 ShopRoomController가 비활성화한다.")]
+    [SerializeField] private string shopNpcAddressableKey = "Shop/ShopNpc";
+
+    [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
+    [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
+
+    [Tooltip("상점 리롤 기능 on/off 피처 플래그. 기본 off. (리롤은 의도적 비결정 RNG 사용)")]
+    [SerializeField] private bool shopRerollEnabled = false;
+
+    [Tooltip("리롤 1회 비용(골드).")]
+    [SerializeField, Min(0)] private int shopRerollCost = 50;
+
     [Header("Room Clear Effects")]
     [SerializeField, Tooltip("방 클리어 시 맵 중앙에 재생할 이펙트 프리팹.")]
     private GameObject clearEndEffectPrefab;
@@ -729,8 +742,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
         if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
 
+        var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
+
         // 허브(Zone 0, ~원점)와 겹치지 않게 먼 앵커에서 격리 빌드
-        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey);
+        await flow.StartRunAsync(new Vector3(0f, 0f, 2000f), poolKey, structureKey);
+    }
+
+    /// <summary>챕터별 레벨 스파인(RunStructureConfig) Addressable 키 해석: 서버 → SO → 규칙(CHAPTER_N_RUN_STRUCTURE) 폴백.
+    /// 룸 풀 키와 동일한 3단 우선순위. 해당 챕터 전용 에셋이 없으면 RunFlowController가 RUN_STRUCTURE_DEFAULT로 폴백한다(회귀 0).</summary>
+    private static string ResolveStructureKey(ChapterId chapter, ChapterServerEntry serverEntry, ChapterDataSO chapterSO)
+    {
+        var key = serverEntry?.run_structure_key;
+        if (string.IsNullOrEmpty(key)) key = chapterSO?.runStructureKey;
+        if (string.IsNullOrEmpty(key)) key = $"CHAPTER_{(int)chapter}_RUN_STRUCTURE";
+        return key;
     }
 
     /// <summary>
@@ -918,6 +943,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 커스텀 손맵 아레나(보스 등): arena_template_key가 있으면 격자 지형 대신 프리팹이 방 전체를 제공한다.
         // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
         bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
+        Vector3? customArenaEntryPos = null; // 커스텀 아레나: 프리팹 PlayerSpawn 마커 위치(있으면 grid 입구 대신 사용 → 격자 정렬 불필요)
 
         // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
         //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
@@ -942,6 +968,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             {
                 arena.transform.localPosition = Vector3.zero;
                 arena.transform.localRotation = Quaternion.Euler(0f, 90f * quarterTurns, 0f);
+
+                // 진입 위치: 프리팹의 PlayerSpawn 마커(디자이너 지정)를 우선 사용. 없으면 grid 입구로 폴백.
+                // 회전 적용 후의 월드 좌표라 heading 회전이 자동 반영된다 — 프리팹 바닥을 격자 입구에 맞출 필요가 없다.
+                var playerSpawn = arena.transform.Find("PlayerSpawn");
+                if (playerSpawn != null) customArenaEntryPos = playerSpawn.position;
+                else Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}'에 PlayerSpawn 자식 없음 — grid 입구로 폴백");
             }
             else
             {
@@ -1004,6 +1036,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         InitializeMinimapForRoom(roomGO, w, h);
         AttachRoomClearController(roomGO);
 
+        // 상점 방이면 ShopRoomController 부착 — 진열 롤에 roomRng를 넘겨 결정적(이어하기 재현) 추첨.
+        // (MapBuilder가 stall 타일에서 ShopStallInteraction을 이미 생성한 시점)
+        if (IsShopCategory(entry.category))
+            await SetupShopRoomAsync(roomGO, entry.pool_key, roomRng);
+
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
             if (deferredSpawners[i] != null) deferredSpawners[i].enabled = true;
@@ -1016,9 +1053,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             roomGO   = roomGO,
             blocks   = blocks,
-            entryPos = cls.entrance.HasValue
+            entryPos = customArenaEntryPos ?? (cls.entrance.HasValue
                 ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
-                : ResolvePlayerSpawnFromGrid(grid, anchor, w, h),
+                : ResolvePlayerSpawnFromGrid(grid, anchor, w, h)),
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
         float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
@@ -1447,8 +1484,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await RevealFieldPrefabAsync(fieldInstance, ct);
 
         // 상점 방이면 ShopRoomController 부착 및 카탈로그 주입
+        // (레거시/단일세계 경로 — 방 시드 미보유 → roomRng=null 전역 Random 폴백)
         if (IsShopCategory(roomEntry.category))
-            await SetupShopRoomAsync(mapGO, roomEntry);
+            await SetupShopRoomAsync(mapGO, roomEntry.room_id);
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -1802,20 +1840,33 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         }
     }
 
-    private async UniTask SetupShopRoomAsync(GameObject mapGO, MapRoomEntry roomEntry)
+    /// <summary>
+    /// 상점 룸에 ShopRoomController를 부착하고 진열을 초기화한다.
+    /// roomRng: 방 시드 기반 결정적 RNG. 진열 롤 결정성(이어하기 재현)을 위해 절차 빌드 경로에서 전달.
+    ///          null이면 진열 롤은 전역 Random으로 폴백(비결정적).
+    /// </summary>
+    private async UniTask SetupShopRoomAsync(GameObject mapGO, string roomId, System.Random roomRng = null)
     {
         var controller = mapGO.AddComponent<ShopRoomController>();
 
         // 신규 경로: SHOP_PRICE_DATA + LuckRollTable 기반 추첨 (catalog는 fallback용)
-        var catalog = await LoadShopCatalogAsync(roomEntry.room_id);
+        var catalog = await LoadShopCatalogAsync(roomId);
 
         if (luckRollTable == null)
             Debug.LogWarning("[GameRunBootstrapper] LuckRollTable 미할당 — 상점 매대는 fallback 카탈로그를 사용합니다.");
 
         if (catalog == null && luckRollTable == null)
-            Debug.LogWarning($"[GameRunBootstrapper] ShopCatalog/LuckRollTable 모두 없음: {roomEntry.room_id}. 진열대가 비어 있게 됩니다.");
+            Debug.LogWarning($"[GameRunBootstrapper] ShopCatalog/LuckRollTable 모두 없음: {roomId}. 진열대가 비어 있게 됩니다.");
 
-        controller.Initialize(_run, catalog, luckRollTable, shopSlotCount);
+        // NPC 프리팹 로드 (월드 매대 대신 NPC + UI로 진열)
+        GameObject npcPrefab = null;
+        if (!string.IsNullOrEmpty(shopNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(shopNpcAddressableKey);
+        if (npcPrefab == null)
+            Debug.LogWarning($"[GameRunBootstrapper] 상점 NPC 프리팹 로드 실패: {shopNpcAddressableKey}. 상점 UI를 열 수 없습니다.");
+
+        controller.Initialize(_run, catalog, luckRollTable, shopSlotCount, roomRng,
+                              npcPrefab, shopWeaponSlotFallback, shopRerollEnabled, shopRerollCost);
     }
 
     private async UniTask<ShopCatalogSO> LoadShopCatalogAsync(string roomId)
@@ -2176,7 +2227,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 절차 흐름 재개 — 저장된 방을 동일 시드로 재생성, 입구에서 시작
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
         var meta = BuildMetaFromSave(save);
-        await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct);
+        var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
+        await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct, structureKey);
 
         Debug.Log($"[GameRunBootstrapper] 절차생성 이어하기 완료 — visit={save.visitCount}, room={save.currentRoomPoolKey}");
     }

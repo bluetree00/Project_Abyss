@@ -10,7 +10,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     [Header("Debug Keys")]
     [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
-    [SerializeField] private KeyCode returnToStageMapKey = KeyCode.F6;
     [SerializeField] private KeyCode spawnItemKey = KeyCode.F7;
     private bool _started;
 
@@ -60,8 +59,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     {
         if (Input.GetKeyDown(clearRoomKey))
             HandleClearRoom();
-        else if (Input.GetKeyDown(returnToStageMapKey))
-            HandleReturnToStageMap();
         else if (Input.GetKeyDown(spawnItemKey))
             HandleSpawnItem();
     }
@@ -150,19 +147,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
                 new ItemEffectSlot { effectType = "MeleeDamage", trigger = "Always", value = 5 }
             }
         };
-    }
-
-    private void HandleReturnToStageMap()
-    {
-        var bootstrapperInst = bootstrapper != null ? bootstrapper : GameRunBootstrapper.Instance;
-        if (bootstrapperInst != null && bootstrapperInst.IsStartRoomScene)
-        {
-            Debug.Log("[DebugRunPanel] F6 → 스타트 방 스킵, StageMap 씬 전환");
-            AppBootstrapper.Instance?.RequestLoad(Define.Scene.StageMap);
-            return;
-        }
-
-        HandleClearRoom();
     }
 
     private async UniTaskVoid StartRun()

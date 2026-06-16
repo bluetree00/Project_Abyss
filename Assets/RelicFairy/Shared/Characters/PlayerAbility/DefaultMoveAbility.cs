@@ -17,6 +17,12 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
     private const float DefaultDecel = 110f;       // ≈ 8→0 73ms (정밀 멈춤 위해 accel 이상)
     private const float DefaultReverseMult = 1.75f;
 
+    // ── 급반전(마찰 제동) 폴백 상수 ──
+    // 이 각도(현재 facing↔입력 방향) 이상이면 '급반전' 구간 — 마찰 제동 + 빠른 정면 피벗.
+    private const float DefaultSharpTurnAngle = 135f;
+    // 급반전 시 이동속도 감속 비율(0~1). CharacterData.sharpTurnMoveSlowdown 미설정(0) 시 사용.
+    private const float DefaultSharpTurnBrake = 0.6f;
+
     public void Move(PlayerController owner, Vector3 direction)
     {
         if (owner.IsKnockback) return;
@@ -27,17 +33,27 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         // 권위 소스(rb)에서 현재 수평속도를 읽어 적분 → 회피 잔여속도/버프와 자동 정합(즉시 0 깎임 없음).
         Vector2 curHoriz = new Vector2(rb.linearVelocity.x, rb.linearVelocity.z);
 
-        // 입력 없음 → 정지 감속 램프(즉시 0 차단 대신 빠른 감속, 정밀 멈춤). StopHorizontalMovement는 외력/연출용으로 유지.
+        // 입력 없음 → 정지 감속 램프(즉시 0 차단 대신 빠른 감속, 정밀 멈춤). 이동 회전 슬루도 정지(마지막 facing 유지).
         if (direction.sqrMagnitude < 0.01f)
         {
             float decel = (cd != null && cd.moveDecel > 0.01f) ? cd.moveDecel : DefaultDecel;
             Vector2 stopped = Vector2.MoveTowards(curHoriz, Vector2.zero, decel * dt);
             rb.linearVelocity = new Vector3(stopped.x, rb.linearVelocity.y, stopped.y);
+            owner.StopFacingSlew();
             return;
         }
 
         Vector3 moveDir = direction.normalized;
         Vector2 moveDir2 = new Vector2(moveDir.x, moveDir.z);
+
+        // 현재 facing ↔ 이동 방향의 각도차로 '급반전' 여부 판정.
+        //  · 미만(안쪽): 속도 유지하며 정면으로 즉시 전환(선회감 제거).
+        //  · 이상(바깥): 마찰 제동(감속) + 빠른 정면 피벗 → 무게감 있는 급반전.
+        float currentYaw = rb.rotation.eulerAngles.y;
+        float targetYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
+        float facingDiff = Mathf.Abs(Mathf.DeltaAngle(currentYaw, targetYaw));
+        float sharpAngle = (cd != null && cd.sharpTurnAngle > 0.01f) ? cd.sharpTurnAngle : DefaultSharpTurnAngle;
+        bool sharpTurn = facingDiff >= sharpAngle;
 
         // ① 느린 목표 레이어: 걷기→달리기 연속 램프(RunBlend01, 0=걷기/1=달리기) × 버프배율 = 현재 최대속도.
         float walkSpd = cd.baseMoveSpeed;
@@ -45,15 +61,16 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         float baseSpd = Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(owner.RunBlend01));
         float currentMaxSpeed = baseSpd * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
 
-        // P1(옵션·게이트): 입력 방향과 현재 facing 차이가 클수록 이동속도 감속 → 급선회 반경 축소.
-        // 0=현행(무영향). 조준이 facing을 주도하는 공격/스킬 중에는 적용하지 않는다(move-vs-aim 오판 방지).
-        float turnSlow = cd != null ? Mathf.Clamp01(cd.sharpTurnMoveSlowdown) : 0f;
-        if (turnSlow > 0f && !owner.IsActionControllingFacing)
+        // [마찰 제동] 급반전 구간(sharpTurn)에서만 이동속도를 깎아 무게감 부여 → 안쪽 각도는 감속 없이 속도 유지.
+        // 조준이 facing을 주도하는 공격/스킬 중에는 적용하지 않는다(move-vs-aim 오판 방지).
+        if (sharpTurn && !owner.IsActionControllingFacing)
         {
-            float facingYaw = rb.rotation.eulerAngles.y;
-            float desiredYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
-            float diff01 = Mathf.Clamp01(Mathf.Abs(Mathf.DeltaAngle(facingYaw, desiredYaw)) / 180f);
-            currentMaxSpeed *= Mathf.Lerp(1f, 1f - turnSlow, diff01);
+            float brake = cd != null && cd.sharpTurnMoveSlowdown > 0.0001f
+                ? Mathf.Clamp01(cd.sharpTurnMoveSlowdown)
+                : DefaultSharpTurnBrake;
+            // sharpAngle→180° 사이에서 제동 깊이를 비례 적용(임계 진입은 가볍게, 정반대일수록 강하게).
+            float brake01 = Mathf.Clamp01((facingDiff - sharpAngle) / Mathf.Max(1f, 180f - sharpAngle));
+            currentMaxSpeed *= Mathf.Lerp(1f, 1f - brake, brake01);
         }
 
         // ② 빠른 추격 레이어: 목표(moveDir×currentMaxSpeed)를 가속으로 추격.
@@ -71,23 +88,14 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         newHoriz = Vector2.ClampMagnitude(newHoriz, currentMaxSpeed); // 합속도 제한
         rb.linearVelocity = new Vector3(newHoriz.x, rb.linearVelocity.y, newHoriz.y);
 
-        // 회전 권한 일원화: 공격/스킬 등 Act 상태가 facing을 소유 중이면 이동 회전은 양보(매 프레임 경합 방지).
-        if (owner.IsActionControllingFacing) return;
+        // 회전 권한 일원화: 공격/스킬 등 Act 상태가 facing을 소유 중이면 이동 회전(슬루)을 정지하고 양보.
+        if (owner.IsActionControllingFacing) { owner.StopFacingSlew(); return; }
 
-        // 이동 방향(=실제 진행 방향)으로 Yaw만 "일정 각속도" 회전 — 프레임률 독립, 점근(빙 도는 느낌) 없음.
-        // 비율보간(SmoothDampAngle)은 목표에 점근해 방향전환 시 모델이 휘어 도는 orbiting 체감 → MoveTowardsAngle로 교체.
-        // 실제 적용은 PlayerController.FixedUpdate(ApplyFacing)에서 Rigidbody에 한다.
-        // (Update에서 Rigidbody.rotation 직접 대입 시 보간 타이밍과 어긋나 회전 각도에서 진동 발생)
-        float currentYaw = owner.Rigid.rotation.eulerAngles.y;
-        float targetYaw = Quaternion.LookRotation(moveDir).eulerAngles.y;
+        // 이동 방향(정면)을 향해 일정 각속도로 회전. step을 직접 계산하지 않고 '목표 Yaw + 각속도'만 넘긴다.
+        // 실제 적분은 PlayerController.FixedUpdate(ApplyFacing)에서 fixedDeltaTime으로 수행 → 프레임률 독립
+        // (Update에서 Rigidbody.rotation을 읽어 step을 계산하면 물리 스텝 사이엔 같은 값이라 고FPS에서 회전이 느려진다).
         float turnSpeed = (cd != null && cd.turnSpeedDegPerSec > 0.01f) ? cd.turnSpeedDegPerSec : DefaultTurnSpeed;
-
-        // P1(옵션·게이트): 입력-facing 각차가 snapTurnAngle 이상이면 즉시 스냅(급반전 자연스럽게). 180=실질 off.
-        float snapAngle = (cd != null && cd.snapTurnAngle > 0.01f) ? cd.snapTurnAngle : 180f;
-        float yaw = Mathf.Abs(Mathf.DeltaAngle(currentYaw, targetYaw)) >= snapAngle
-            ? targetYaw
-            : Mathf.MoveTowardsAngle(currentYaw, targetYaw, turnSpeed * dt);
-        owner.RequestFacing(Quaternion.Euler(0f, yaw, 0f));
+        owner.RequestFacingSlew(targetYaw, turnSpeed);
     }
 
     // FixedUpdate에서 호출 — 물리 충돌 처리 전 위치를 보정해 계단 수직면과의 충돌 없이 올라감.

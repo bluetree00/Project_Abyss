@@ -8,7 +8,6 @@ public enum GameFlowState
     Tutorial,
     BaseCamp,
     Lobby,
-    StageMap,
     InGame,
 }
 
@@ -27,7 +26,6 @@ public sealed class GameFlow
         { Define.Scene.Tutorial,       GameFlowState.Tutorial  },
         { Define.Scene.BaseCamp,       GameFlowState.BaseCamp  },
         { Define.Scene.Lobby,          GameFlowState.Lobby     },
-        { Define.Scene.StageMap,       GameFlowState.StageMap  },
         { Define.Scene.GameScene_Ch1,  GameFlowState.InGame    },
         { Define.Scene.GameScene_Ch2,  GameFlowState.InGame    },
         { Define.Scene.GameScene_Ch3,  GameFlowState.InGame    },
