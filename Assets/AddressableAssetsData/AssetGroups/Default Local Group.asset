@@ -90,6 +90,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
+    m_Address: UI/Popup/UI_ShopPanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9c6358fd8c7c049499697da7d6dd18ba
+    m_Address: Shop/ShopNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63418a5331367b04287574885f39e9ac
     m_Address: dragon
     m_ReadOnly: 0

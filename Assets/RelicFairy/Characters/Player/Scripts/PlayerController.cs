@@ -559,8 +559,31 @@ public class PlayerController : CharacterBase
     private Quaternion _targetFacing;
     private bool _facingDirty;
 
-    /// <summary>회전 목표를 지정한다. 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.rotation으로 수행.</summary>
+    // 이동 회전(슬루) — 목표 Yaw를 향해 일정 각속도로 FixedUpdate에서 적분한다.
+    // (Update에서 step을 계산하면 Rigidbody.rotation이 물리 스텝에서만 갱신돼 고FPS에서 회전이 느려지는 프레임률 의존 발생 → FixedUpdate 적분으로 해소)
+    private bool _facingSlewActive;
+    private float _slewTargetYaw;
+    private float _slewDegPerSec;
+
+    // 슬루 ease-out — 목표까지 남은 각이 이 값(도) 이하면 각속도를 부드럽게 줄여 짧은 회전·마무리를 매끄럽게 한다.
+    // ease-in은 두지 않는다(시작은 전속력) → 방향전환 반응성/선회감 제거 유지, 끝만 부드럽게 안착.
+    private const float FacingSlewEaseOutAngle = 40f;
+    private const float FacingSlewEaseFloor = 0.18f; // 목표 직전 정체 방지용 최저 속도비
+
+    /// <summary>즉시(1회) 회전 지정. 스킬/회피/조준 등 한 프레임 스냅 또는 자체 보간 writer용. 진행 중인 이동 회전 슬루를 취소한다.
+    /// 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.MoveRotation으로 수행.</summary>
     public void RequestFacing(Quaternion rot) { _targetFacing = rot; _facingDirty = true; }
+
+    /// <summary>이동 회전 목표를 지정한다. 목표 Yaw로 degPerSec 각속도로 FixedUpdate(ApplyFacing)에서 적분 → 프레임률 독립.</summary>
+    public void RequestFacingSlew(float targetYaw, float degPerSec)
+    {
+        _slewTargetYaw = targetYaw;
+        _slewDegPerSec = degPerSec;
+        _facingSlewActive = true;
+    }
+
+    /// <summary>이동 회전 슬루를 정지한다(정지/행동 양보 시). 현재 facing을 그대로 유지.</summary>
+    public void StopFacingSlew() => _facingSlewActive = false;
 
     //============================================================
     // Unity Lifecycle / Initialization
@@ -690,12 +713,29 @@ public class PlayerController : CharacterBase
     /// </summary>
     private void ApplyFacing()
     {
-        // 회전 요청이 있었던 프레임에만 적용한다. (유휴/연출 중 외부 회전을 덮어쓰지 않도록)
-        if (!_facingDirty || Rigid == null) return;
-        // MoveRotation: Interpolate 보간과 정합되는 회전 적용(텔레포트 대입은 보간과 어긋나 진동).
-        // Y축 회전 freeze가 풀려 있어야 적용된다(X/Z는 freeze 유지로 넘어짐 방지).
-        Rigid.MoveRotation(_targetFacing);
-        _facingDirty = false;
+        if (Rigid == null) return;
+
+        // 즉시 회전 요청이 우선 — 적용 후 이동 슬루를 취소(직접 지정이 이동 회전을 덮어쓴다).
+        if (_facingDirty)
+        {
+            // MoveRotation: Interpolate 보간과 정합되는 회전 적용(텔레포트 대입은 보간과 어긋나 진동).
+            // Y축 회전 freeze가 풀려 있어야 적용된다(X/Z는 freeze 유지로 넘어짐 방지).
+            Rigid.MoveRotation(_targetFacing);
+            _facingDirty = false;
+            _facingSlewActive = false;
+            return;
+        }
+
+        // 이동 회전 슬루 — 물리 스텝마다 fixedDeltaTime으로 적분(프레임률 독립, Rigidbody.rotation stale-read 없음).
+        if (_facingSlewActive)
+        {
+            float cur = Rigid.rotation.eulerAngles.y;
+            // 목표 근처에서만 각속도를 ease-out(시작은 전속력 유지). 짧은 회전은 통째로 부드럽고, 큰 회전은 마지막만 매끄럽게 안착.
+            float remaining = Mathf.Abs(Mathf.DeltaAngle(cur, _slewTargetYaw));
+            float ease = Mathf.Max(FacingSlewEaseFloor, Mathf.SmoothStep(0f, 1f, remaining / FacingSlewEaseOutAngle));
+            float next = Mathf.MoveTowardsAngle(cur, _slewTargetYaw, _slewDegPerSec * ease * Time.fixedDeltaTime);
+            Rigid.MoveRotation(Quaternion.Euler(0f, next, 0f));
+        }
     }
 
     private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);

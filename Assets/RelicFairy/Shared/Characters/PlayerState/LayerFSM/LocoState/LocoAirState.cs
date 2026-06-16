@@ -2,15 +2,21 @@ using UnityEngine;
 
 public class LocoAirState : ILayerState<LocoState>
 {
-    private enum AirPhase { Start, Loop, Landing }
+    // MinorDrop: 점프 없이 떨어졌고 낙하 높이가 임계 미만 — 추락/착지 애니 생략, 로코모션 유지.
+    private enum AirPhase { Start, MinorDrop, Loop, Landing }
 
     private const float LandingDuration = 0.15f;
+
+    // CharacterData.minFallAnimHeight 미설정 시 사용할 기본 임계 높이(m).
+    private const float DefaultMinFallAnimHeight = 0.6f;
 
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
     private AirPhase _phase;
     private float _landingTimer;
+    private float _takeoffY;     // 낙하 시작 시점의 Y (누적 낙하 높이 안전망용)
+    private float _fallThreshold; // 이번 낙하의 추락 애니 임계 높이
 
     public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
     {
@@ -23,13 +29,25 @@ public class LocoAirState : ILayerState<LocoState>
         _phase = AirPhase.Start;
         _landingTimer = 0f;
 
-        // ProcessJump에서 이미 CrossFade 했으므로,
-        // 낙하 진입(점프 없이 떨어진 경우)만 여기서 처리
+        // ProcessJump에서 이미 CrossFade 했으므로, 낙하 진입(점프 없이 떨어진 경우)만 여기서 처리.
         if (!_controller.IsJumping)
         {
-            _phase = AirPhase.Loop;
-            _controller.Anim.SetFloat("JumpValue", 1f);
-            _controller.Anim.CrossFade("JumpBlend", 0.1f);
+            _takeoffY = _controller.transform.position.y;
+            var cd = _controller.CharacterData;
+            _fallThreshold = cd != null && cd.minFallAnimHeight > 0.01f ? cd.minFallAnimHeight : DefaultMinFallAnimHeight;
+
+            // 발밑에 임계 높이 안쪽으로 지면이 있으면 작은 단차 → 추락/착지 애니 생략하고 로코모션 유지.
+            if (HasGroundWithin(_fallThreshold))
+            {
+                _phase = AirPhase.MinorDrop;
+            }
+            else
+            {
+                // 실제 추락 — 추락 루프 애니 재생.
+                _phase = AirPhase.Loop;
+                _controller.Anim.SetFloat("JumpValue", 1f);
+                _controller.Anim.CrossFade("JumpBlend", 0.1f);
+            }
         }
     }
 
@@ -42,6 +60,29 @@ public class LocoAirState : ILayerState<LocoState>
                 {
                     _phase = AirPhase.Loop;
                     _controller.Anim.SetFloat("JumpValue", 1f);
+                }
+                break;
+
+            case AirPhase.MinorDrop:
+                // 재점프 → 일반 점프 흐름으로 복귀
+                if (_controller.IsJumping)
+                {
+                    _phase = AirPhase.Start;
+                    break;
+                }
+                // 작은 단차 착지 — 추락/착지 애니 없이 즉시 지상 상태로 복귀
+                if (_controller.IsGrounded())
+                {
+                    float spd = _controller.MoveDirection.magnitude * _controller.MoveScale;
+                    _stateChanger.Change(spd > 0.05f ? LocoState.Move : LocoState.Idle);
+                    break;
+                }
+                // 안전망: 예측보다 더 떨어지면(임계 초과) 추락 애니로 전환
+                if (_takeoffY - _controller.transform.position.y > _fallThreshold)
+                {
+                    _phase = AirPhase.Loop;
+                    _controller.Anim.SetFloat("JumpValue", 1f);
+                    _controller.Anim.CrossFade("JumpBlend", 0.1f);
                 }
                 break;
 
@@ -89,5 +130,14 @@ public class LocoAirState : ILayerState<LocoState>
         // 아이템 효과: 점프 착지 hook
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
         mgr?.OnJumpLand(_controller.transform.position);
+    }
+
+    // 발(약간 위)에서 아래로 height(m)만큼 지면이 있는지 예측. 있으면 작은 단차로 간주.
+    private bool HasGroundWithin(float height)
+    {
+        var cd = _controller.CharacterData;
+        if (cd == null) return false;
+        Vector3 origin = _controller.transform.position + Vector3.up * 0.1f;
+        return Physics.Raycast(origin, Vector3.down, height + 0.1f, cd.groundLayer);
     }
 }

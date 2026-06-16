@@ -64,6 +64,7 @@ public class RunFlowController : MonoBehaviour
     private int     _heading; // 현재 진행 방향(0=N,1=E,2=S,3=W). 탄 출구 엣지로 갱신 → 다음 방 회전에 사용.
     private int     _masterSeed; // 런 마스터 시드 (세이브/이어하기 결정성).
     private bool    _resuming;   // 이어하기 재생성 중 — 중복 저장 억제용.
+    private string  _resolvedStructureKey; // 이번 런의 챕터별 구조 config 키(StartRun/Resume에서 주입). 비면 _structureConfigKey.
 
     // ── Public ──────────────────────────────────────
 
@@ -72,12 +73,14 @@ public class RunFlowController : MonoBehaviour
 
     /// <summary>절차 런 시작 — 풀 로드 → 시퀀서 생성 → 첫 방 진입.
     /// anchor: 방을 빌드할 고정 월드 위치(허브와 겹치지 않게 먼 곳). null이면 _anchor 또는 원점.
-    /// poolKeyOverride: 챕터별 룸 풀 키(CHAPTER_N_ROOM_POOL). 비우면 직렬화된 _poolKey 사용.</summary>
-    public async UniTask StartRunAsync(Vector3? anchor = null, string poolKeyOverride = null)
+    /// poolKeyOverride: 챕터별 룸 풀 키(CHAPTER_N_ROOM_POOL). 비우면 직렬화된 _poolKey 사용.
+    /// structureKeyOverride: 챕터별 레벨 스파인 키(CHAPTER_N_RUN_STRUCTURE). 비우면 _structureConfigKey 공유 기본.</summary>
+    public async UniTask StartRunAsync(Vector3? anchor = null, string poolKeyOverride = null, string structureKeyOverride = null)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
         _baseAnchor = anchor ?? (_anchor != null ? _anchor.position : Vector3.zero);
+        _resolvedStructureKey = structureKeyOverride;
 
         var poolKey = !string.IsNullOrEmpty(poolKeyOverride) ? poolKeyOverride : _poolKey;
         _pool = await Managers.ZoneLayout.LoadPoolAsync(poolKey);
@@ -111,11 +114,12 @@ public class RunFlowController : MonoBehaviour
     /// 저장된 현재 방을 동일 시드로 재생성해 입구에서 재개한다.
     /// 방 내부 전투 상태(적 위치/HP)는 직렬화하지 않으므로 전투는 새로 시작된다(하데스식).
     /// </summary>
-    public async UniTask ResumeAsync(RunMetaSnapshot meta, Vector3 anchor, string poolKey, CancellationToken externalCt)
+    public async UniTask ResumeAsync(RunMetaSnapshot meta, Vector3 anchor, string poolKey, CancellationToken externalCt, string structureKeyOverride = null)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(externalCt, this.GetCancellationTokenOnDestroy());
         var ct = _cts.Token;
 
+        _resolvedStructureKey = structureKeyOverride;
         _baseAnchor   = anchor;
         _masterSeed   = meta.masterSeed;
         _anchorToggle = meta.anchorToggle;
@@ -160,10 +164,21 @@ public class RunFlowController : MonoBehaviour
     /// 실패해도 진행은 막지 않음 — config=null이면 RunSequencer가 전 방 Normal로 안전 동작(구조만 비활성).</summary>
     private async UniTask EnsureStructureConfigAsync()
     {
-        if (_structureConfig != null || string.IsNullOrEmpty(_structureConfigKey)) return;
-        _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(_structureConfigKey);
+        if (_structureConfig != null) return; // 인스펙터 직접 배선이 최우선
+
+        // 1순위: 챕터별 키(StartRun/Resume 주입). 2순위: 직렬화 공유 기본 키(RUN_STRUCTURE_DEFAULT) 폴백.
+        string key = !string.IsNullOrEmpty(_resolvedStructureKey) ? _resolvedStructureKey : _structureConfigKey;
+        if (!string.IsNullOrEmpty(key))
+            _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(key);
+
+        if (_structureConfig == null && !string.IsNullOrEmpty(_structureConfigKey) && key != _structureConfigKey)
+        {
+            Debug.Log($"[RunFlow] 챕터 구조 config '{key}' 없음 — 공유 기본 '{_structureConfigKey}' 폴백.");
+            _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(_structureConfigKey);
+        }
+
         if (_structureConfig == null)
-            Debug.LogWarning($"[RunFlow] RunStructureConfig 로드 실패: {_structureConfigKey} — 전 방 Normal로 진행(구조 비활성).");
+            Debug.LogWarning($"[RunFlow] RunStructureConfig 로드 실패: {key} — 전 방 Normal로 진행(구조 비활성).");
     }
 
     private ZonePoolEntry FindStartEntry()

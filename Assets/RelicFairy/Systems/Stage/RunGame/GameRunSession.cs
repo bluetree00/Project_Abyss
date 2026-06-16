@@ -634,6 +634,12 @@ public sealed class GameRunSession
         if (!IsRunning) return;
         if (amount <= 0) return;
 
+        // 골드 획득 배율(아이템 GoldGainRate, 0.2 = +20%) 적용 — 모든 골드원이 이 진입점을 거치므로 한 곳에서 일괄 반영.
+        // 환불(ShopRoomController.AddTempGold)은 이 진입점을 거치지 않으므로 배율 미적용(중복/이중곱 0).
+        float goldGainRate = EffectManager?.GetAccumulatedStats().GoldGainRate ?? 0f;
+        if (goldGainRate > 0f)
+            amount = Mathf.Max(0, Mathf.RoundToInt(amount * (1f + goldGainRate)));
+
         RunDelta.GainedGold += amount;
         PlayerState?.AddTempGold(amount);
         QuestEvents.ReportGold(amount);

@@ -603,11 +603,6 @@ public sealed class AppBootstrapper : MonoBehaviour
                 NotifySceneReady();
                 break;
 
-            case GameFlowState.StageMap:
-                Managers.UI.ShowMenuUI<UI_StageMap>();
-                // StageMapBootstrapper가 비동기 초기화 완료 후 NotifySceneReady() 호출
-                break;
-
             case GameFlowState.InGame:
                 // GameRunBootstrapper가 비동기 초기화 완료 후 NotifySceneReady() 호출
                 break;
