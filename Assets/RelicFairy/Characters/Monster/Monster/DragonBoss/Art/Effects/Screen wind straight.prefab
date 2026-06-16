@@ -48,7 +48,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   screenEffect: {fileID: 207495765307802987}
   sourceCamera: {fileID: 0}
-  fallbackDistance: 0.05
+  fallbackDistance: 0.15
   snapOnStart: 1
   parentToCameraOnStart: 1
 --- !u!198 &207495765307802987
@@ -305,7 +305,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 18.02481
+      scalar: 0.14917326
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -358,7 +358,7 @@ ParticleSystem:
     startSizeY:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 10.138956
+      scalar: 0.08390996
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -690,7 +690,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 18.02481, y: 10.138956, z: 1}
+    m_Scale: {x: 0.14917326, y: 0.08390996, z: 1}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
