@@ -273,6 +273,16 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         if (_allSpawned && _landedCount >= Data.FireballCount)
         {
             _phase = Phase.Done;
+
+            // Summon 패턴 공중 대기 루프에서 핸드오프된 경우 — 원래 상태로 복귀
+            if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb && bb.AirLoopReturnState != null)
+            {
+                var returnState = bb.AirLoopReturnState;
+                bb.AirLoopReturnState = null;
+                ctx.Monster.ChangeState(returnState);
+                return;
+            }
+
             RestoreAgent(ctx);
             ctx.Monster.ChangeState<AttackReadyState>();
         }
@@ -283,12 +293,12 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     private void SpawnFireball(MonsterContext ctx)
     {
         // 랜덤 중심 셀 (경계 2칸 안쪽: 3×3 영역이 맵 안에 들어오게)
-        int minX = 2, maxX = DKBossRoomContext.Width  - 3;
-        int minZ = 2, maxZ = DKBossRoomContext.Height - 3;
+        int minX = 2, maxX = DragonBossRoomContext.Width  - 3;
+        int minZ = 2, maxZ = DragonBossRoomContext.Height - 3;
         int cx = Random.Range(minX, maxX + 1);
         int cz = Random.Range(minZ, maxZ + 1);
 
-        Vector3 landBase = DKBossRoomContext.CellToWorld(cx, cz, 0f);
+        Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
         Vector3 landPos;
         if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit groundHit, 100f))
             landPos = groundHit.point + Vector3.up * 0.05f;
@@ -315,9 +325,9 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             for (int dz = -1; dz <= 1; dz++)
             {
                 int tx = cx + dx, tz = cz + dz;
-                if (!DKBossRoomContext.IsInterior(tx, tz)) continue;
+                if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
 
-                var go = CreateWarnTile(DKBossRoomContext.CellToWorld(tx, tz, 0.1f));
+                var go = CreateWarnTile(DragonBossRoomContext.CellToWorld(tx, tz, 0.1f));
                 if (go == null) continue;
 
                 entry.WarnTiles.Add(go);
@@ -375,7 +385,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     private void SpawnScorchCluster(Vector3 landPos, MonsterContext ctx)
     {
         var mat  = GetOrCreateScorchMaterial();
-        float cell = DKBossRoomContext.CellSize;
+        float cell = DragonBossRoomContext.CellSize;
 
         for (int i = 0; i < Mathf.Max(1, Data.ScorchClusterCount); i++)
         {
@@ -524,12 +534,6 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        if (UnityEngine.AI.NavMesh.SamplePosition(
-            ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
-            ctx.Agent.Warp(hit.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 }
 }

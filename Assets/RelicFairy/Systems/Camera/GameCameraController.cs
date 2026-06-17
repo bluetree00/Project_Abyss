@@ -46,11 +46,17 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private Vector2 bossOrbitMiddle = new Vector2(5.5f, 6.5f);
     [SerializeField] private Vector2 bossOrbitBottom = new Vector2(3f, 5f);
 
+    [Header("DeathKnight Player Orbit (낮은 시야각 — 유리 너머 보스 확인용)")]
+    [SerializeField] private Vector2 dkPlayerOrbitTop    = new Vector2(5f,  2f);
+    [SerializeField] private Vector2 dkPlayerOrbitMiddle = new Vector2(5f,  2f);
+    [SerializeField] private Vector2 dkPlayerOrbitBottom = new Vector2(5f, 4.7f);
+
     // ── Private ──
     private Vector3 _originalPosition;
     private Quaternion _originalRotation;
     private CinemachineFreeLook _cinemachine;
     private CinemachineBrain _brain;
+    private Camera _camera;
     private Image _fadeOverlay;
     private Canvas _fadeCanvas;
     private bool _introStarted;
@@ -65,6 +71,8 @@ public class GameCameraController : MonoBehaviour
     private Transform _savedBossFollow;
     private Transform _savedBossLookAt;
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
+    private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
+    private CancellationTokenSource     _dkOrbitTransitionCts;
     private bool _topDownViewActive;
     private bool _savedBrainBeforeTopDown;
     private bool _savedCmBeforeTopDown;
@@ -93,6 +101,7 @@ public class GameCameraController : MonoBehaviour
 
         _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         _brain = GetComponent<CinemachineBrain>();
+        _camera = GetComponent<Camera>();
 
         // Cinemachine 비활성 (인트로 끝까지)
         if (_brain != null) _brain.enabled = false;
@@ -115,6 +124,9 @@ public class GameCameraController : MonoBehaviour
         _topDownReturnCts?.Cancel();
         _topDownReturnCts?.Dispose();
         _topDownReturnCts = null;
+        _dkOrbitTransitionCts?.Cancel();
+        _dkOrbitTransitionCts?.Dispose();
+        _dkOrbitTransitionCts = null;
         UnsubscribePlayerBound();
         if (_fadeCanvas != null) Destroy(_fadeCanvas.gameObject);
         if (Instance == this) Instance = null;
@@ -390,7 +402,12 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float topDownHeight = 35f;
     [SerializeField] private float topDownAscendDuration = 1.2f;
 
-    public void ActivateDragonTopDownView(Vector3 mapCenter)
+    /// <summary>
+    /// 드래곤 탑다운 뷰를 활성화한다.
+    /// floorSize(월드 단위, x=가로/z=세로)를 지정하면 카메라 FOV/Aspect 기준으로
+    /// Floor 전체가 화면에 들어오는 높이를 계산한다. 생략 시 topDownHeight 고정값을 사용한다.
+    /// </summary>
+    public void ActivateDragonTopDownView(Vector3 mapCenter, Vector2 floorSize = default)
     {
         if (_topDownViewActive) return;
         EnsureCinemachineRefs();
@@ -413,10 +430,25 @@ public class GameCameraController : MonoBehaviour
         if (_brain       != null) _brain.enabled       = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
 
+        float height = floorSize.sqrMagnitude > 0f ? ComputeTopDownHeight(floorSize) : topDownHeight;
+
         // 중간 상태 없이 즉시 탑뷰 스냅 (비동기 상승 애니메이션 제거)
-        transform.position = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        transform.position = new Vector3(mapCenter.x, mapCenter.y + height, mapCenter.z);
         transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         _topDownViewActive = true;
+    }
+
+    /// <summary>Floor 전체(XZ)가 화면에 들어오도록 카메라 FOV/Aspect 기준으로 필요한 높이를 계산한다.</summary>
+    private float ComputeTopDownHeight(Vector2 floorSize)
+    {
+        if (_camera == null) return topDownHeight;
+
+        float tanHalfVFov = Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        if (tanHalfVFov <= 0f) return topDownHeight;
+
+        float heightForDepth = floorSize.y / (2f * tanHalfVFov);
+        float heightForWidth = floorSize.x / (2f * tanHalfVFov * _camera.aspect);
+        return Mathf.Max(heightForDepth, heightForWidth);
     }
 
     private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter)
@@ -560,6 +592,87 @@ public class GameCameraController : MonoBehaviour
         _savedBossFollow = null;
         _savedBossLookAt = null;
         _savedBossOrbits = null;
+    }
+
+    /// <summary>
+    /// DK Phase1 고정위치 텔레포트 시 호출. 플레이어 추적은 유지한 채 오빗 높이만 낮춰
+    /// 유리 너머 보스를 볼 수 있는 시야각으로 서서히 전환한다.
+    /// </summary>
+    public void ActivateDKPlayerOrbit(float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        if (_savedDKPlayerOrbits == null)
+        {
+            _savedDKPlayerOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+        }
+
+        TransitionDKOrbitAsync(
+            dkPlayerOrbitTop, dkPlayerOrbitMiddle, dkPlayerOrbitBottom,
+            duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>DK 보스가 플레이어 근처로 텔레포트하거나 사망 시 호출. 원래 플레이어 오빗으로 서서히 복원.</summary>
+    public void DeactivateDKPlayerOrbit(float duration = 1.0f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null || _savedDKPlayerOrbits == null) return;
+
+        var targetTop    = new Vector2(_savedDKPlayerOrbits[0].m_Height, _savedDKPlayerOrbits[0].m_Radius);
+        var targetMiddle = new Vector2(_savedDKPlayerOrbits[1].m_Height, _savedDKPlayerOrbits[1].m_Radius);
+        var targetBottom = new Vector2(_savedDKPlayerOrbits[2].m_Height, _savedDKPlayerOrbits[2].m_Radius);
+        _savedDKPlayerOrbits = null;
+
+        TransitionDKOrbitAsync(targetTop, targetMiddle, targetBottom,
+            duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private async UniTaskVoid TransitionDKOrbitAsync(
+        Vector2 targetTop, Vector2 targetMiddle, Vector2 targetBottom,
+        float duration, CancellationToken destroyCt)
+    {
+        _dkOrbitTransitionCts?.Cancel();
+        _dkOrbitTransitionCts?.Dispose();
+        _dkOrbitTransitionCts = CancellationTokenSource.CreateLinkedTokenSource(destroyCt);
+        var token = _dkOrbitTransitionCts.Token;
+
+        if (_cinemachine == null) return;
+
+        var fromTop    = new Vector2(_cinemachine.m_Orbits[0].m_Height, _cinemachine.m_Orbits[0].m_Radius);
+        var fromMiddle = new Vector2(_cinemachine.m_Orbits[1].m_Height, _cinemachine.m_Orbits[1].m_Radius);
+        var fromBottom = new Vector2(_cinemachine.m_Orbits[2].m_Height, _cinemachine.m_Orbits[2].m_Radius);
+        float dur = Mathf.Max(0.01f, duration);
+
+        try
+        {
+            for (float t = 0f; t < dur; t += Time.deltaTime)
+            {
+                token.ThrowIfCancellationRequested();
+                float k    = Mathf.Clamp01(t / dur);
+                float ease = k * k * (3f - 2f * k); // smoothstep
+
+                var top = Vector2.Lerp(fromTop,    targetTop,    ease);
+                var mid = Vector2.Lerp(fromMiddle, targetMiddle, ease);
+                var bot = Vector2.Lerp(fromBottom, targetBottom, ease);
+
+                _cinemachine.m_Orbits[0] = new CinemachineFreeLook.Orbit { m_Height = top.x, m_Radius = top.y };
+                _cinemachine.m_Orbits[1] = new CinemachineFreeLook.Orbit { m_Height = mid.x, m_Radius = mid.y };
+                _cinemachine.m_Orbits[2] = new CinemachineFreeLook.Orbit { m_Height = bot.x, m_Radius = bot.y };
+
+                await UniTask.Yield(token);
+            }
+
+            _cinemachine.m_Orbits[0] = new CinemachineFreeLook.Orbit { m_Height = targetTop.x,    m_Radius = targetTop.y };
+            _cinemachine.m_Orbits[1] = new CinemachineFreeLook.Orbit { m_Height = targetMiddle.x, m_Radius = targetMiddle.y };
+            _cinemachine.m_Orbits[2] = new CinemachineFreeLook.Orbit { m_Height = targetBottom.x, m_Radius = targetBottom.y };
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>

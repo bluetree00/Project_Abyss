@@ -60,8 +60,10 @@ public class BossRoomController : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (_triggered) return;
-        if (other.GetComponentInParent<PlayerController>() == null) return;
-        _playerPassing = true;
+        var player = other.GetComponentInParent<PlayerController>();
+        if (player == null) return;
+        _playerPassing    = true;
+        _playerController = player;
     }
 
     private void OnTriggerExit(Collider other)
@@ -79,6 +81,7 @@ public class BossRoomController : MonoBehaviour
     {
         _playerTransform  = player.transform;
         _playerController = player;
+        player.SetInputEnabled(false);
 
         if (barrier != null)
             barrier.SetActive(true);

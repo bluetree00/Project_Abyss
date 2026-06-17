@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 980dbd5840f34b73bfbe2f5df9af1a16, type: 3}
   m_Name: DragonAirDashPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonAirDashPatternSO
-  weight: 1
+  weight: 22
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: air_dash
   breakOverride: -1
-  _cooldown: 30
+  _cooldown: 12
   _takeoffDuration: 0.55
   _takeoffHeight: 3
   _warningDuration: 0.75

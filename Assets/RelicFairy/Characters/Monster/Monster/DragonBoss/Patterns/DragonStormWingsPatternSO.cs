@@ -36,9 +36,13 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [Header("EndPose (반격 창)")]
     [SerializeField] private float  _endPoseDuration     = 0.4f;
 
+    [Header("원소")]
+    [SerializeField] private DragonBossBlackboard.DragonElement _element = DragonBossBlackboard.DragonElement.Thunder;
+
     [Header("쿨다운")]
     [SerializeField] private float  _cooldown            = 18f;
 
+    public DragonBossBlackboard.DragonElement Element => _element;
     public float  HoverHeight        => _hoverHeight;
     public string TakeoffStateName   => _takeoffStateName;
     public string HoverStateName     => _hoverStateName;
@@ -97,6 +101,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     private Quaternion _warnRotation;
     private Vector3    _toPlayer;
     private float      _targetAlpha;
+    private float      _effectiveLength;
     private bool       _windBlastSpawned;
 
     internal DragonStormWingsState(DragonStormWingsPatternSO data) : base(data) { }
@@ -192,8 +197,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     private void CreateWarning(MonsterContext ctx)
     {
-        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
-        Color c = new Color(thunderBase.r, thunderBase.g, thunderBase.b, Data.WarningColor.a);
+        Color elementBase = DragonBossVisualHelper.GetElementColor(Data.Element);
+        Color c = new Color(elementBase.r, elementBase.g, elementBase.b, Data.WarningColor.a);
         _targetAlpha = c.a;
 
         // 바닥 기준 위치 — 지형 z-fighting 방지용 0.3f 오프셋
@@ -215,7 +220,11 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         if (_toPlayer.sqrMagnitude < 0.01f) _toPlayer = ctx.Transform.forward;
         _toPlayer.Normalize();
 
-        _warnCenter   = bossFloor + _toPlayer * (Data.WarningLength * 0.5f);
+        // 경고장판이 항상 바닥 끝까지 닿도록 fallback을 룸 최대 크기로 보정
+        float maxLength = Mathf.Max(Data.WarningLength, DragonPatternFloorUtils.GetRoomMaxExtent());
+        _effectiveLength = DragonPatternFloorUtils.DistanceToFloorEdge(bossFloor, _toPlayer, maxLength);
+
+        _warnCenter   = bossFloor + _toPlayer * (_effectiveLength * 0.5f);
         _warnRotation = Quaternion.LookRotation(_toPlayer, Vector3.up);
 
         // ── 채움 Plane (PrimitiveType.Plane = 기본 +Y 방향, 바닥에 눕힘, alpha 0→target) ──
@@ -233,7 +242,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         // Plane 기본 크기 = 10×10 → WarningWidth/10, WarningLength/10 으로 스케일
         _fillGo.transform.position   = _warnCenter;
         _fillGo.transform.rotation   = Quaternion.LookRotation(_toPlayer, Vector3.up);
-        _fillGo.transform.localScale = new Vector3(Data.WarningWidth / 10f, 1f, Data.WarningLength / 10f);
+        _fillGo.transform.localScale = new Vector3(Data.WarningWidth / 10f, 1f, _effectiveLength / 10f);
 
         // ── 테두리 LineRenderer (즉시 완전 불투명) ────────────────────
         _borderGo = new GameObject("StormWingsBorder");
@@ -249,7 +258,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         lr.receiveShadows    = false;
 
         Vector3 right  = Vector3.Cross(Vector3.up, _toPlayer).normalized * (Data.WarningWidth * 0.5f);
-        Vector3 fwdVec = _toPlayer * Data.WarningLength;
+        Vector3 fwdVec = _toPlayer * _effectiveLength;
         lr.SetPositions(new[]
         {
             bossFloor - right,
@@ -311,7 +320,9 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     private void UpdateLanding(MonsterContext ctx)
     {
-        float targetY = ctx.Runtime.SpawnPosition.y;
+        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        float targetY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         Vector3 pos   = ctx.Transform.position;
         pos.y = Mathf.MoveTowards(pos.y, targetY, ctx.Stat.moveSpeed * 2f * Time.deltaTime);
         ctx.Transform.position = pos;
@@ -334,11 +345,11 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         Quaternion blastRot = Quaternion.LookRotation(_toPlayer, Vector3.up);
 
         var go = Object.Instantiate(Data.WindBlastPrefab, wingOrigin, blastRot);
-        go.transform.localScale = new Vector3(Data.WarningWidth, Data.WarningWidth * 0.5f, Data.WarningLength);
+        go.transform.localScale = new Vector3(Data.WarningWidth, Data.WarningWidth * 0.5f, _effectiveLength);
 
         // 속성 색상 적용
-        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
-        Color tint = new Color(thunderBase.r, thunderBase.g, thunderBase.b, 1f);
+        Color elementBase = DragonBossVisualHelper.GetElementColor(Data.Element);
+        Color tint = new Color(elementBase.r, elementBase.g, elementBase.b, 1f);
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -358,7 +369,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         hitCenter.y = DragonPatternFloorUtils.GetFloorY(_warnCenter, ctx.Runtime.SpawnPosition.y) + 1f;
         var hits = Physics.OverlapBox(
             hitCenter,
-            new Vector3(Data.WarningWidth * 0.5f, 1.5f, Data.WarningLength * 0.5f),
+            new Vector3(Data.WarningWidth * 0.5f, 1.5f, _effectiveLength * 0.5f),
             _warnRotation);
         foreach (var col in hits)
         {
@@ -422,11 +433,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static DragonBossBlackboard GetDragonBB(MonsterContext ctx)
         => (ctx.Monster as DragonBossMonster)?.DragonBlackboard;

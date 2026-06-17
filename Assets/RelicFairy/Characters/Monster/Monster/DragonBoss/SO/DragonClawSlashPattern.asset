@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e353bccabbaac7d479a911f76f8e7abd, type: 3}
   m_Name: DragonClawSlashPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonClawSlashPatternSO
-  weight: 1
+  weight: 35
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
@@ -27,7 +27,7 @@ MonoBehaviour:
   _attackDamage: 20
   _dangerZonePrefab: {fileID: 1173698457435006, guid: cbe5151d1ac46c44dadb19833a241e92,
     type: 3}
-  _cooldown: 30
+  _cooldown: 10
   _jumpUpStateName: JumpUp
   _clawLStateName: ClawAttackL
   _clawRStateName: ClawAttackR

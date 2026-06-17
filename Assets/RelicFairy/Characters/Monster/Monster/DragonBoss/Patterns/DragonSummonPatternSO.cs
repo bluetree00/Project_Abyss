@@ -62,6 +62,11 @@ public class DragonSummonPatternSO : BossPatternSO
     [Tooltip("착지 직후 CanExecute가 참이면 이 패턴을 이어서 실행. null이면 ChaseState 복귀.")]
     [SerializeField] private BossPatternSO _landingFollowUpPattern;
 
+    [Header("공중 대기 패턴 (Summon 중 일정 주기로 번갈아 사용)")]
+    [SerializeField] private DragonBreathSweepPatternSO  _breathSweepPattern;
+    [SerializeField] private DragonFireballRainPatternSO _fireballRainPattern;
+    [SerializeField] private float _airPatternInterval = 8f;
+
     // ── Properties ──────────────────────────────────────────────────────────
     public DragonSummonPhase SummonPhase        => _summonPhase;
     public float  HoverHeight                   => _hoverHeight;
@@ -81,6 +86,9 @@ public class DragonSummonPatternSO : BossPatternSO
     public int    MiniBreathDamage              => _miniBreathDamage;
     public float  MiniBreathSpeed               => _miniBreathSpeed;
     public BossPatternSO         LandingFollowUpPattern    => _landingFollowUpPattern;
+    public DragonBreathSweepPatternSO  BreathSweepPattern  => _breathSweepPattern;
+    public DragonFireballRainPatternSO FireballRainPattern => _fireballRainPattern;
+    public float                       AirPatternInterval  => _airPatternInterval;
     public PlayerStatusEffectSO  IceStatusEffect           => _iceStatusEffect;
     public PlayerStatusEffectSO  ThunderStatusEffect       => _thunderStatusEffect;
     public PlayerStatusEffectSO  FireStatusEffect          => _fireStatusEffect;
@@ -166,20 +174,37 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     private Vector3 _hoverPos;
     private int     _minionsSpawned;
     private int     _minionsAlive;
+    private bool    _nextPatternIsBreathSweep;
+    private bool    _resuming;
+    private bool    _handingOffToSubPattern;
 
     internal DragonSummonState(DragonSummonPatternSO data) : base(data) { }
 
     internal void Reset()
     {
-        _phase          = Phase.Done;
-        _minionsSpawned = 0;
-        _minionsAlive   = 0;
+        _phase                    = Phase.Done;
+        _minionsSpawned           = 0;
+        _minionsAlive             = 0;
+        _nextPatternIsBreathSweep = false;
+        _resuming                 = false;
+        _handingOffToSubPattern   = false;
     }
 
     // ── FSM ──────────────────────────────────────────────────────────────────
 
     public override void Enter(MonsterContext ctx)
     {
+        // BreathSweep/FireballRain 패턴으로 핸드오프했다가 복귀한 경우 — WaitMinions를 그대로 재개
+        if (_resuming)
+        {
+            _resuming = false;
+            _phase    = Phase.WaitMinions;
+            _timer    = 0f;
+            if (ctx.Agent != null) ctx.Agent.enabled = false;
+            ctx.Transform.position = _hoverPos;
+            return;
+        }
+
         var bb = GetDragonBB(ctx);
         bool alreadyAirborne = bb != null && bb.BodyState == BodyState.Airborne;
         if (bb != null)
@@ -190,13 +215,17 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
-        _phase          = alreadyAirborne ? Phase.Hover : Phase.Takeoff;
-        _timer          = 0f;
-        _minionsSpawned = 0;
-        _minionsAlive   = 0;
-        _takeoffHash    = Animator.StringToHash(Data.TakeoffStateName);
-        _hoverPos       = ctx.Transform.position;
-        _hoverPos.y     = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.HoverHeight);
+        // 소환 시작 시 카메라를 플레이어 시점으로 복귀 (탑다운 등 다른 시점이었을 경우)
+        GameCameraController.Instance?.DeactivateDragonTopDownView();
+
+        _phase                    = alreadyAirborne ? Phase.Hover : Phase.Takeoff;
+        _timer                    = 0f;
+        _minionsSpawned           = 0;
+        _minionsAlive             = 0;
+        _nextPatternIsBreathSweep = true;
+        _takeoffHash              = Animator.StringToHash(Data.TakeoffStateName);
+        _hoverPos                 = ctx.Transform.position;
+        _hoverPos.y               = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.HoverHeight);
 
         if (alreadyAirborne)
         {
@@ -224,6 +253,13 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
+        // BreathSweep/FireballRain으로의 핸드오프 — 공중 상태를 유지한 채로 넘어간다
+        if (_handingOffToSubPattern)
+        {
+            _handingOffToSubPattern = false;
+            return;
+        }
+
         RestoreAgent(ctx);
         var bb = GetDragonBB(ctx);
         if (bb != null) bb.IsAirborne = false;
@@ -269,16 +305,46 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
         // 미니 드래곤이 모두 죽기 전까지는 절대로 착지하지 않음
         bool allDead = _minionsSpawned >= TotalMinions && _minionsAlive <= 0;
-        if (!allDead) return;
+        if (allDead)
+        {
+            StartLanding(ctx);
+            return;
+        }
 
-        StartLanding(ctx);
+        // 가만히 있지 않고 일정 주기마다 BreathSweep/FireballRain을 번갈아 사용
+        if (_timer < Data.AirPatternInterval) return;
+        _timer = 0f;
+        TriggerAirPattern(ctx);
+    }
+
+    /// <summary>BreathSweep/FireballRain 중 하나로 핸드오프하고, 종료 후 WaitMinions로 복귀하도록 예약한다.</summary>
+    private void TriggerAirPattern(MonsterContext ctx)
+    {
+        BossPatternSO pattern = _nextPatternIsBreathSweep
+            ? (BossPatternSO)Data.BreathSweepPattern
+            : Data.FireballRainPattern;
+        _nextPatternIsBreathSweep = !_nextPatternIsBreathSweep;
+        if (pattern == null) return;
+
+        var runtimeState = pattern.GetRuntimeState();
+        if (runtimeState == null) return;
+
+        var bb = GetDragonBB(ctx);
+        if (bb == null) return;
+
+        bb.AirLoopReturnState   = this;
+        _resuming               = true;
+        _handingOffToSubPattern = true;
+        ctx.Monster.ChangeState(runtimeState);
     }
 
     // ── Phase: Landing ────────────────────────────────────────────────────────
 
     private void UpdateLanding(MonsterContext ctx)
     {
-        float targetY = ctx.Runtime.SpawnPosition.y;
+        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        float targetY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         MoveY(ctx, targetY);
 
         int landHash = Animator.StringToHash(Data.LandingStateName);
@@ -412,11 +478,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static DragonBossBlackboard GetDragonBB(MonsterContext ctx)
         => (ctx.Monster as DragonBossMonster)?.DragonBlackboard;

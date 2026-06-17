@@ -32,8 +32,16 @@ public class PlayerStatusEffectSO : ScriptableObject
     [Tooltip("이펙트 스케일 (1 = 기본 크기)")]
     [SerializeField] private float _effectScale = 1f;
 
+    [Header("화면 이펙트 (선택)")]
+    [Tooltip("플레이어 화면 전체에 표시할 이펙트 프리팹. null이면 표시 안 함. 위 이펙트와 함께(추가로) 적용된다.")]
+    [SerializeField] private GameObject _screenEffectPrefab;
+    [Tooltip("화면 이펙트 스케일 (1 = 기본 크기)")]
+    [SerializeField] private float _screenEffectScale = 1f;
+
     public GameObject EffectPrefab => _effectPrefab;
     public float      EffectScale  => _effectScale;
+    public GameObject ScreenEffectPrefab => _screenEffectPrefab;
+    public float      ScreenEffectScale  => _screenEffectScale;
 
     // ── Public API ──────────────────────────────────────────
 
@@ -49,23 +57,8 @@ public class PlayerStatusEffectSO : ScriptableObject
             case StatusEffectType.Slow:   player.ApplySlow(slowScale, duration);       break;
         }
 
-        if (_effectPrefab == null) return;
-
-        string markerName = "StatusEffect_" + effectType;
-        var existing = player.transform.Find(markerName);
-        if (existing != null)
-        {
-            existing.GetComponent<StatusEffectInstance>()?.Refresh(duration);
-        }
-        else
-        {
-            var go = Object.Instantiate(_effectPrefab,
-                player.transform.position, Quaternion.identity, player.transform);
-            go.name                    = markerName;
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localScale    = Vector3.one * _effectScale;
-            go.AddComponent<StatusEffectInstance>().Init(duration);
-        }
+        PlayerStatusEffectVisuals.ApplyTimed(player, _effectPrefab, _effectScale, duration, "StatusEffect_" + effectType);
+        PlayerStatusEffectVisuals.ApplyTimed(player, _screenEffectPrefab, _screenEffectScale, duration, "StatusEffectScreen_" + effectType);
     }
 }
 
@@ -85,6 +78,31 @@ public sealed class StatusEffectInstance : MonoBehaviour
         _remaining -= Time.deltaTime;
         if (_remaining <= 0f)
             Destroy(gameObject);
+    }
+}
+
+/// <summary>
+/// 플레이어에게 시간제 이펙트를 부착/갱신하는 공용 헬퍼.
+/// 동일 markerName의 인스턴스가 있으면 지속시간만 갱신하고, 없으면 새로 생성한다.
+/// </summary>
+internal static class PlayerStatusEffectVisuals
+{
+    internal static void ApplyTimed(PlayerController player, GameObject prefab, float scale, float duration, string markerName)
+    {
+        if (prefab == null) return;
+
+        var existing = player.transform.Find(markerName);
+        if (existing != null)
+        {
+            existing.GetComponent<StatusEffectInstance>()?.Refresh(duration);
+            return;
+        }
+
+        var go = Object.Instantiate(prefab, player.transform.position, Quaternion.identity, player.transform);
+        go.name                    = markerName;
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localScale    = Vector3.one * scale;
+        go.AddComponent<StatusEffectInstance>().Init(duration);
     }
 }
 }

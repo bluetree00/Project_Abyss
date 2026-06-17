@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a77315dc4b65f1418de3b12f612e192, type: 3}
   m_Name: DragonIceSlamPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonIceSlamPatternSO
-  weight: 1
+  weight: 13
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
   patternTag: 
   breakOverride: -1
-  _cooldown: 35
+  _cooldown: 32
   _hoverHeight: 8
   _moveSpeed: 7
   _centerReachedDistance: 0.6
