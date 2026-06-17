@@ -139,7 +139,6 @@ public class DKP2WalkSlashState : UnInterruptibleState<DKP2WalkSlashPatternSO>
 
     private void TriggerSlash(MonsterContext ctx, float angleOffset)
     {
-        SpawnSwingVfx(ctx);
         if (CheckHitZone(ctx, angleOffset))
             ApplyDamage(ctx);
         else
@@ -174,15 +173,6 @@ public class DKP2WalkSlashState : UnInterruptibleState<DKP2WalkSlashPatternSO>
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────
-
-    private void SpawnSwingVfx(MonsterContext ctx)
-    {
-        if (Data.swingVfxPrefab == null) return;
-        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
-        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 1.5f);
-    }
 
     private static float AnimSpeed(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.AnimSpeedMult ?? 1f;

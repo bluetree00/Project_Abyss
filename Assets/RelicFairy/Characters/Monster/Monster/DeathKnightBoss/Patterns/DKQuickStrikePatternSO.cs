@@ -102,13 +102,12 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
         }
 
-        // hitTime: 타일 제거 + 검 궤적 이펙트
+        // hitTime: 타일 제거
         if (!_tilesDestroyed && _timer >= Data.hitTime)
         {
             _tilesDestroyed = true;
             DKGridPatternHelper.DestroyEdges(_edges);
             DKGridPatternHelper.DestroyTiles(_tiles);
-            SpawnSwingVfx(ctx);
         }
 
         // hitTime + 0.05s: 타일 제거 확인 후 십자가에만 VFX (1회)
@@ -148,15 +147,6 @@ public class DKQuickStrikeState : FullLockState<DKQuickStrikePatternSO>
         int px = _playerCell.x;
         int pz = _playerCell.y;
         return (x, z) => (x == px || z == pz) ? sc : Opposite(sc);
-    }
-
-    private void SpawnSwingVfx(MonsterContext ctx)
-    {
-        if (Data.swingVfxPrefab == null) return;
-        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
-        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 2f);
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

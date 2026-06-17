@@ -27,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 1595817048890013537}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: -10}
+  m_LocalPosition: {x: 0, y: 1.5, z: -17.29}
   m_LocalScale: {x: 3.2934, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -67,125 +67,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossRoomController
   bossSpawner: {fileID: 2214965468150121097}
-  barrier: {fileID: 2484923032882149965}
+  barrier: {fileID: 0}
   bossZoneCenter: {fileID: 2591019744712350258}
   panDuration: 1.5
-  holdDuration: 2
+  holdDuration: 15
   returnDuration: 1
-  bossCloseUpOffset: {x: 0, y: 3, z: -7}
-  bossCloseUpLookOffset: {x: 0, y: 1.5, z: 0}
---- !u!1 &2484923032882149965
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2876192285393079456}
-  - component: {fileID: 6336530556375997013}
-  - component: {fileID: 928238189206104391}
-  - component: {fileID: 2797958277979447047}
-  m_Layer: 0
-  m_Name: Barrier
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &2876192285393079456
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2484923032882149965}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: -15}
-  m_LocalScale: {x: 20, y: 3, z: 0.5}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 8267987811358081670}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &6336530556375997013
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2484923032882149965}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!65 &928238189206104391
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2484923032882149965}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!23 &2797958277979447047
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2484923032882149965}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 1
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
+  bossCloseUpOffset: {x: -35, y: 35, z: -45}
+  bossCloseUpLookOffset: {x: 5, y: 4, z: -5}
 --- !u!1 &2736338374577982080
 GameObject:
   m_ObjectHideFlags: 0
@@ -226,13 +114,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8267987811358081670}
+  - component: {fileID: 4920089279348961110}
   m_Layer: 0
   m_Name: Arena_Boss_Ch2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8267987811358081670
 Transform:
   m_ObjectHideFlags: 0
@@ -256,12 +145,23 @@ Transform:
   - {fileID: 3904389876292079155}
   - {fileID: 6014262376692506035}
   - {fileID: 2591019744712350258}
-  - {fileID: 2876192285393079456}
   - {fileID: 7515389761847529730}
   - {fileID: 5929480883153757112}
   - {fileID: 4924793614322123743}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4920089279348961110
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2914289304035155840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28e13660a9a392a46bd32d596508e8af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArenaNavMeshBuilder
 --- !u!1 &3043627473850402114
 GameObject:
   m_ObjectHideFlags: 0
@@ -1126,6 +1026,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3728655236770447890, guid: 29b6eed2069bcfc459cc1653d399680e,
         type: 3}
+      propertyPath: _entranceVfxPoint
+      value: 
+      objectReference: {fileID: 6684011868611533926}
+    - target: {fileID: 3728655236770447890, guid: 29b6eed2069bcfc459cc1653d399680e,
+        type: 3}
       propertyPath: _entranceRockObjects.Array.size
       value: 7
       objectReference: {fileID: 0}
@@ -1177,6 +1082,12 @@ PrefabInstance:
 --- !u!4 &4924793614322123743 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 868490752726385412, guid: 29b6eed2069bcfc459cc1653d399680e,
+    type: 3}
+  m_PrefabInstance: {fileID: 5212105197337149659}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6684011868611533926 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1483794714479713469, guid: 29b6eed2069bcfc459cc1653d399680e,
     type: 3}
   m_PrefabInstance: {fileID: 5212105197337149659}
   m_PrefabAsset: {fileID: 0}

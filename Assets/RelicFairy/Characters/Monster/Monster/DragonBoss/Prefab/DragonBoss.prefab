@@ -44,7 +44,7 @@ NavMeshAgent:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3246159262785727669}
   m_Enabled: 1
-  m_AgentTypeID: 0
+  m_AgentTypeID: -1923039037
   m_Radius: 0.8
   m_Speed: 4
   m_Acceleration: 8
@@ -154,13 +154,16 @@ MonoBehaviour:
   _airOrbitCenterMoveSpeedMult: 1.1
   _detectionRange: 15
   _entranceDescendHeight: 45
+  _entranceDescendFastSpeed: 35
   _entranceDescendSpeed: 18
   _entranceRockObjects: []
-  _entranceBreathVfxPrefab: {fileID: 0}
-  _entranceVfxPoint: {fileID: 0}
+  _entranceBreathVfxPrefab: {fileID: 1267622881173442705, guid: 9de51515f2c48aa47a0211de766d342e,
+    type: 3}
+  _entranceVfxPoint: {fileID: 4428475197715112, guid: e142d6c687383804885f341d620f8751,
+    type: 3}
   _entranceBreathPitchDeg: 35
-  _entranceCameraOffset: {x: 7, y: 0.5, z: -2}
-  _entranceCameraLookOffset: {x: 0, y: 2.5, z: 0}
+  _entranceCameraOffset: {x: 2, y: 2.7, z: -4}
+  _entranceCameraLookOffset: {x: 0, y: 1.5, z: 0}
   _entranceCameraCloseUpDuration: 1
   _entranceCameraMoveDuration: 1.2
   _entranceFlyInOffset: {x: 0, y: 55}

@@ -47,6 +47,7 @@ public static class DKGridPatternHelper
             // Quad 노말이 +Z → -90° X 회전으로 +Y(위)를 향하게
             GameObject go = BossEffectPool.Spawn(prefab, worldPos, Quaternion.Euler(-90f, 0f, 0f));
             if (go == null) continue;
+            go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
 
             result.Add(new DKTileInfo { Cell = cell, Color = color, GO = go });
         }
@@ -90,13 +91,13 @@ public static class DKGridPatternHelper
         float colLen = (DKBossRoomContext.Height - 2) * DKBossRoomContext.CellSize;
         float rowLen = (DKBossRoomContext.Width  - 2) * DKBossRoomContext.CellSize;
 
-        // 세로줄: 플레이어 열 x, 방 중앙 z, scale z=3(줄 길이)
+        // 세로줄: 플레이어 열 x, 방 중앙 z
         Vector3 colPos = DKBossRoomContext.CellToWorld(playerCell.x, DKBossRoomContext.Height / 2, 0.1f);
-        SpawnStretchedVfx(prefab, colPos, Quaternion.identity, 3f, tint);
+        SpawnStretchedVfx(prefab, colPos, Quaternion.identity, ColumnLineLength(), tint);
 
-        // 가로줄: 방 중앙 x, 플레이어 행 z, Y90 회전, scale z=3
+        // 가로줄: 방 중앙 x, 플레이어 행 z, Y90 회전
         Vector3 rowPos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, playerCell.y, 0.1f);
-        SpawnStretchedVfx(prefab, rowPos, Quaternion.Euler(0f, 90f, 0f), 3f, tint);
+        SpawnStretchedVfx(prefab, rowPos, Quaternion.Euler(0f, 90f, 0f), RowLineLength(), tint);
     }
 
     /// <summary>
@@ -107,7 +108,7 @@ public static class DKGridPatternHelper
         if (prefab == null) return;
         Color tint = swordColor == DKSwordColor.White ? Color.white : Color.black;
         Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f);
-        SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), 3f, tint);
+        SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), RowLineLength(), tint);
     }
 
     /// <summary>
@@ -157,14 +158,16 @@ public static class DKGridPatternHelper
         if (prefab == null) return;
         Color tint  = swordColor == DKSwordColor.White ? Color.white : Color.black;
         int   bx    = bossCell.x, bz = bossCell.y;
-        float scale = (2 * ring + 1) * 0.1f; // 변 길이(칸) × 0.1
+        float scale = (2 * ring + 1) * DKBossRoomContext.CellSize * 0.1f; // 변 길이(칸) × CellSize × 0.1
+
+        float cs = DKBossRoomContext.CellSize;
 
         if (ring == 0)
         {
             if (DKBossRoomContext.IsInterior(bx, bz))
                 SpawnStretchedVfx(prefab,
                     DKBossRoomContext.CellToWorld(bx, bz, 0.1f),
-                    Quaternion.identity, 0.1f, tint);
+                    Quaternion.identity, cs * 0.1f, tint);
             return;
         }
 
@@ -233,6 +236,16 @@ public static class DKGridPatternHelper
         }
     }
 
+    // ── lineLength 헬퍼 (Floor 기준 동적 계산) ──────────────
+
+    /// <summary>세로줄(열, Z 방향) VFX를 방 높이에 맞게 늘리는 lineLength.</summary>
+    public static float ColumnLineLength()
+        => (DKBossRoomContext.Height - 2) * DKBossRoomContext.CellSize * 0.1f;
+
+    /// <summary>가로줄(행, X 방향) VFX를 방 너비에 맞게 늘리는 lineLength.</summary>
+    public static float RowLineLength()
+        => (DKBossRoomContext.Width - 2) * DKBossRoomContext.CellSize * 0.1f;
+
     // ── 내부 헬퍼 ──────────────────────────────────────────
 
     private static void SpawnGroupedVfx(
@@ -268,16 +281,18 @@ public static class DKGridPatternHelper
         int centerX = DKBossRoomContext.Width  / 2;
         int centerZ = DKBossRoomContext.Height / 2;
 
-        // 매칭하는 모든 열/행마다 VFX 1개씩, Z scale=3 으로 한 줄 길이에 맞게 늘림
+        // 매칭하는 모든 열/행마다 VFX 1개씩, Floor 크기에 맞게 늘림
+        float colLen = ColumnLineLength();
+        float rowLen = RowLineLength();
         foreach (int cx in matchedCols)
         {
             Vector3 pos = DKBossRoomContext.CellToWorld(cx, centerZ, 0.1f);
-            SpawnStretchedVfx(prefab, pos, Quaternion.identity, 3f, tint);
+            SpawnStretchedVfx(prefab, pos, Quaternion.identity, colLen, tint);
         }
         foreach (int rz in matchedRows)
         {
             Vector3 pos = DKBossRoomContext.CellToWorld(centerX, rz, 0.1f);
-            SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), 3f, tint);
+            SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), rowLen, tint);
         }
     }
 

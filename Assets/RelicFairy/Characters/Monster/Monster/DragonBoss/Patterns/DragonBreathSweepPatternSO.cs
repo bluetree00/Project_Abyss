@@ -1024,12 +1024,6 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        if (UnityEngine.AI.NavMesh.SamplePosition(
-            ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
-            ctx.Agent.Warp(hit.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 }
 }

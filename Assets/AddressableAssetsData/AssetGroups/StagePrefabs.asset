@@ -13,25 +13,8 @@ MonoBehaviour:
   m_Name: StagePrefabs
   m_EditorClassIdentifier: 
   m_GroupName: StagePrefabs
-  m_Data:
-    m_SerializedData: []
   m_GUID: 77834257986c1bb47a6977e30eca223c
   m_SerializeEntries:
-  - m_GUID: 5469e19d3b7ee2a409cabad511d5ebae
-    m_Address: TestBossStage
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 36183d54e356bce4e8e98b0236c432c0
-    m_Address: TestNomarStage_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f4600daf17a8b9b4887fd3494c32daf0
-    m_Address: TestNomarStage_02
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0b9e11e1928435242adb0a75117ee379
     m_Address: Room_Start_Campfire
     m_ReadOnly: 0
@@ -42,8 +25,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 36183d54e356bce4e8e98b0236c432c0
+    m_Address: TestNomarStage_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5469e19d3b7ee2a409cabad511d5ebae
+    m_Address: TestBossStage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 78f9a44eacc9e934cb37c54ce041fb0c
     m_Address: Arena_Boss_Ch1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a01aefef1dc0253489321d6dd6d815f1
+    m_Address: Shop_Custom_Ch1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d76c3a76bc3a6c9428656ac3ca332a9f
+    m_Address: Arena_Boss_Ch3
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -52,8 +55,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a01aefef1dc0253489321d6dd6d815f1
-    m_Address: Shop_Custom_Ch1
+  - m_GUID: f4600daf17a8b9b4887fd3494c32daf0
+    m_Address: TestNomarStage_02
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

@@ -574,13 +574,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled)
-            return;
-
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static void ReturnToAirCombat(MonsterContext ctx)
     {
