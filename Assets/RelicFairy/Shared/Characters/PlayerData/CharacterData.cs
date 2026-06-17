@@ -74,6 +74,8 @@ public class CharacterData : ScriptableObject
     public float groundCheckDistance = 1f;
     public float hardLandingTimeThreshold = 0.8f;
     public LayerMask groundLayer;
+    [Tooltip("낙하(점프 아님) 진입 시 발밑 낙하 높이가 이 값(m) 미만이면 추락/착지 애니를 생략하고 로코모션 유지(작은 단차·턱). 이상이면 추락 애니 재생. 0 이하면 기본 0.6.")]
+    public float minFallAnimHeight = 0.6f;
 
     [Header("물리 이동 관련")]
     public float airControlMultiplier = 0.5f;
@@ -93,11 +95,11 @@ public class CharacterData : ScriptableObject
     [Header("회전 (선회)")]
     [Tooltip("이동 방향으로 도는 각속도(도/초). '일정 각속도' 회전이라 프레임률 독립·점근(빙 도는 느낌) 없음. 클수록 빠릿. 0 이하면 기본 720.")]
     public float turnSpeedDegPerSec = 720f;
-    [Tooltip("[P1·옵션] 입력 방향과 현재 바라보는 방향의 각도 차가 클수록 이동속도를 이 비율(0~1)만큼 감속 → 급선회 반경 축소. 0=현행(감속 없음).")]
+    [Tooltip("급반전(sharpTurnAngle 이상) 시 '마찰 제동' — 이동속도를 이 비율(0~1)만큼 깎아 무게감을 준다. 0이면 기본 0.6 적용. 안쪽 각도는 감속 없이 속도 유지.")]
     [Range(0f, 1f)]
     public float sharpTurnMoveSlowdown = 0f;
-    [Tooltip("[P1·옵션] 입력-facing 각도 차가 이 값(도) 이상이면 즉시 스냅 회전. 180=실질 비활성(급반전만). 너무 낮추면 휙휙거림.")]
-    public float snapTurnAngle = 180f;
+    [Tooltip("이 각도(도) 이상으로 방향을 꺾으면 '급반전' 구간 — 마찰 제동(sharpTurnMoveSlowdown)으로 감속하며 정면으로 빠르게 피벗. 미만은 속도 유지하며 즉시 정면 전환. 0 이하면 기본 135.")]
+    public float sharpTurnAngle = 135f;
 
     //캐릭터 클래스
     [Header("캐릭터 클래스")]

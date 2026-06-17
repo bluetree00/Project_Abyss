@@ -35,8 +35,10 @@ public static class LuckRollService
     /// <summary>
     /// Luck → 행운치 레벨 → 등급 가중치 → 가중 추첨으로 등급을 결정한다.
     /// 가중치 합이 0 이하이면 Common 반환.
+    /// <paramref name="rng"/>가 주어지면(방 시드 기반 결정적 RNG) 그 소스로 추첨하여
+    /// 같은 시드면 항상 같은 등급이 나오도록 한다(이어하기 결정성). null이면 전역 UnityEngine.Random.
     /// </summary>
-    public static ItemRarity RollRarity(int luck, LuckRollTableSO table)
+    public static ItemRarity RollRarity(int luck, LuckRollTableSO table, System.Random rng = null)
     {
         if (table == null)
         {
@@ -60,7 +62,7 @@ public static class LuckRollService
             return ItemRarity.Common;
         }
 
-        float roll = Random.Range(0f, sum);
+        float roll = rng != null ? (float)(rng.NextDouble() * sum) : Random.Range(0f, sum);
 
         // 누적 비교
         float cumulative = cW;
