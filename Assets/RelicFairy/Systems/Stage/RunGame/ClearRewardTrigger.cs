@@ -136,9 +136,12 @@ public class ClearRewardTrigger : MonoBehaviour
         {
             if (_run.HasNextChapter())
             {
-                _run.EnterChapterClear();
-                _run.AdvanceToNextChapter();
-                Debug.Log("[ClearRewardTrigger] 보스방 클리어 — 다음 챕터 진행");
+                // 다음 챕터 진행: 챕터 전환 연출(CHAPTER N) + 다음 챕터 procgen 재시작은 GameRunBootstrapper가 담당.
+                // (챕터 갱신·테마·풀/구조 키 해석을 한 곳에서 처리 — 끝난 게이트/저장 로직은 건너뛴다.)
+                Debug.Log("[ClearRewardTrigger] 보스방 클리어 — 다음 챕터 전환 시작");
+                GameRunBootstrapper.Instance?.AdvanceChapter();
+                Destroy(gameObject);
+                return;
             }
             else
             {

@@ -17,6 +17,7 @@ public sealed class SoundManager
     private readonly List<PooledAudioSource> _effectPool = new();
 
     private Transform _effectPoolRoot;
+    private bool _initialized;
     private int _bgmRequestVersion;
     private int _effectPoolVersion;
     private int _nextPoolId;
@@ -59,6 +60,9 @@ public sealed class SoundManager
 
     public void Init()
     {
+        if (_initialized)
+            return;
+
         _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    1f);
         _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 1f);
 
@@ -73,6 +77,8 @@ public sealed class SoundManager
 
         var bgmSrc = GetAudioSource(Define.Sound.Bgm);
         if (bgmSrc != null) bgmSrc.volume = _bgmVolume;
+
+        _initialized = true;
     }
 
     public void Clear()

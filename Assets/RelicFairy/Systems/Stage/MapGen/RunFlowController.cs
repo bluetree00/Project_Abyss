@@ -158,6 +158,53 @@ public class RunFlowController : MonoBehaviour
         Debug.Log($"[RunFlow] 이어하기 완료 — visit={meta.visitCount}, room={meta.currentRoomPoolKey}");
     }
 
+    /// <summary>
+    /// 보스 클리어 후 다음 챕터로 procgen을 이어서 재시작한다(씬 유지).
+    /// 현재 방(보스 아레나)은 새 시작 방 진입 시 디스폰되고, 런 상태(인벤토리/버프)는 GameRunSession에 유지된다.
+    /// 시드는 마스터 시드+챕터 번호로 결정적이라 이어하기 재현에 안전하다.
+    /// GameRunBootstrapper.AdvanceChapterAsync가 챕터 갱신·키 해석 후 호출한다.
+    /// </summary>
+    public async UniTask StartNextChapterAsync(string poolKey, string structureKey)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+
+        // 이전 챕터 웨이브 구독·게이트 정리
+        if (_currentWave != null) { _currentWave.OnRoomCleared -= HandleRoomCleared; _currentWave = null; }
+        ClearGates();
+
+        _resolvedStructureKey = structureKey;
+        _structureConfig      = null; // 새 챕터 스파인 재로드 강제
+
+        var key  = !string.IsNullOrEmpty(poolKey) ? poolKey : _poolKey;
+        var pool = await Managers.ZoneLayout.LoadPoolAsync(key);
+        if (pool == null || pool.Count == 0)
+        {
+            Debug.LogError($"[RunFlow] 다음 챕터 풀 로드 실패: {key}");
+            return;
+        }
+        _pool = pool;
+        await EnsureStructureConfigAsync();
+
+        int chapterNum = (int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? 0);
+        int seed       = RunSequencer.Combine(_masterSeed, 7000 + chapterNum); // 챕터별 결정적 시드
+        _rng           = new System.Random(seed);
+        _sequencer     = new RunSequencer(_pool, _structureConfig, seed);
+        _runPlan       = _sequencer.BuildPlan();
+        DumpRunPlan(seed);
+
+        _heading = (int)DoorEdge.North;
+
+        var startEntry = FindStartEntry();
+        if (startEntry == null)
+        {
+            Debug.LogError("[RunFlow] 다음 챕터 시작 방 없음");
+            return;
+        }
+
+        await EnterRoomAsync(new DoorPlan { kind = RoomPlanKind.Normal, entry = startEntry }, DoorEdge.North, ct);
+        Debug.Log($"[RunFlow] 챕터 {chapterNum} 진행 시작 — pool={key}");
+    }
+
     // ── Private ─────────────────────────────────────
 
     /// <summary>인스펙터 배선이 없으면(AddComponent 생성 경로) Addressables로 구조 config를 로드한다.
@@ -452,7 +499,8 @@ public class RunFlowController : MonoBehaviour
 
         panel.TryGetComponent(out blocker);
         panel.TryGetComponent(out marker);
-        if (marker != null) marker.material.color = color;
+        // 빌드에서 프리미티브 기본 머티리얼이 핑크로 스트립되는 문제 → URP/Lit 명시 할당.
+        RuntimePrimitiveMaterial.Apply(marker, color);
 
         return go;
     }

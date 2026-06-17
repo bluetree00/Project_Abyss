@@ -176,7 +176,7 @@ MonoBehaviour:
     m_Value: {r: 0.82, g: 0.88, b: 1, a: 1}
   highQualityFiltering:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 1
   filter:
     m_OverrideState: 1
     m_Value: 0
