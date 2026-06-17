@@ -9261,7 +9261,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
   isStartRoomPickup: 0
-  worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
+  worldTextFont: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
   textHeight: 3
   textSize: 3
 --- !u!23 &115272141
@@ -15610,8 +15610,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uBCF4\uC0C1 \uD68D\uB4DD!"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
-  m_sharedMaterial: {fileID: 6505875521421274007, guid: 3ee88a5b8d3190e4b9174b184fcc9b83,
+  m_fontAsset: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
+  m_sharedMaterial: {fileID: 6505875521421274007, guid: 2f45c19c426a4df43b40a87734416f1f,
     type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -15851,7 +15851,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
   isStartRoomPickup: 0
-  worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
+  worldTextFont: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
   textHeight: 3
   textSize: 3
 --- !u!23 &186265443
@@ -36999,7 +36999,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
   isStartRoomPickup: 0
-  worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
+  worldTextFont: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
   textHeight: 3
   textSize: 3
 --- !u!23 &487247458
@@ -93770,7 +93770,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldWeaponDisplay
   weaponSO: {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
   isStartRoomPickup: 0
-  worldTextFont: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
+  worldTextFont: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
   textHeight: 3
   textSize: 3
 --- !u!23 &1150250079
@@ -106316,8 +106316,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uCCB4\uB825 +20"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
-  m_sharedMaterial: {fileID: 6505875521421274007, guid: 3ee88a5b8d3190e4b9174b184fcc9b83,
+  m_fontAsset: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
+  m_sharedMaterial: {fileID: 6505875521421274007, guid: 2f45c19c426a4df43b40a87734416f1f,
     type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -113208,8 +113208,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: <color=#FFFFFF>Common</color>
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
-  m_sharedMaterial: {fileID: 6505875521421274007, guid: 3ee88a5b8d3190e4b9174b184fcc9b83,
+  m_fontAsset: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
+  m_sharedMaterial: {fileID: 6505875521421274007, guid: 2f45c19c426a4df43b40a87734416f1f,
     type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -137752,8 +137752,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uB3CC\uC544\uAC00\uAE30"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 3ee88a5b8d3190e4b9174b184fcc9b83, type: 2}
-  m_sharedMaterial: {fileID: 6505875521421274007, guid: 3ee88a5b8d3190e4b9174b184fcc9b83,
+  m_fontAsset: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
+  m_sharedMaterial: {fileID: 6505875521421274007, guid: 2f45c19c426a4df43b40a87734416f1f,
     type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}

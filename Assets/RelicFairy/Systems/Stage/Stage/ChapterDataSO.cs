@@ -60,6 +60,8 @@ public class ChapterDataSO : ScriptableObject
     public string zoneSlotKey;
     [Tooltip("절차적 생성 룸 풀 CSV 키 (예: chapter_1_room_pool). zoneSlotKey와 함께 설정.")]
     public string zonePoolKey;
+    [Tooltip("이 챕터의 레벨 스파인(RunStructureConfig) Addressable 키. 상점/정예/보스 타이밍을 챕터별로 분리. 비우면 RUN_STRUCTURE_DEFAULT 공유 폴백.")]
+    public string runStructureKey;
 
     [Header("맵 노드 구성")]
     [Tooltip("중간 층 수 (Start/Boss 제외). 예: 5면 총 7층")]
@@ -89,6 +91,7 @@ public class ChapterDataSO : ScriptableObject
             zoneLayoutKey    = zoneLayoutKey,
             zoneSlotKey      = zoneSlotKey,
             zonePoolKey      = zonePoolKey,
+            runStructureKey  = runStructureKey,
             middleLayers     = middleLayers,
             peakLayer        = peakLayer,
         };
@@ -132,6 +135,7 @@ public class ChapterRuntimeData
     public string zoneLayoutKey;
     public string zoneSlotKey;
     public string zonePoolKey;
+    public string runStructureKey;
 
     // 맵 노드 구성
     public int middleLayers = 5;
@@ -154,6 +158,7 @@ public class ChapterRuntimeData
         if (!string.IsNullOrEmpty(server.zone_layout_key)) zoneLayoutKey = server.zone_layout_key;
         if (!string.IsNullOrEmpty(server.zone_slot_key))   zoneSlotKey   = server.zone_slot_key;
         if (!string.IsNullOrEmpty(server.zone_pool_key))   zonePoolKey   = server.zone_pool_key;
+        if (!string.IsNullOrEmpty(server.run_structure_key)) runStructureKey = server.run_structure_key;
         if (server.total_layers > 0) middleLayers = server.total_layers - 2;
         if (server.peak_layer > 0) peakLayer = server.peak_layer;
     }
@@ -179,6 +184,7 @@ public class ChapterServerEntry
     public string zone_layout_key;
     public string zone_slot_key;
     public string zone_pool_key;
+    public string run_structure_key;
 
     // 맵 노드 구성
     public int total_layers;

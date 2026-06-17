@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RunStructure_Default
   m_EditorClassIdentifier: Assembly-CSharp::RunStructureConfig
   _bossThreshold: 4
-  _preBossRoomKey: 
+  _preBossRoomKey:
   _bossRoomKey: 
   _shopMaxPerChapter: 2
   _shopChance: 0.25

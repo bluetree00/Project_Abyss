@@ -3,68 +3,93 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+/// <summary>TryPurchaseSlot 결과. UI가 피드백 분기에 사용.</summary>
+public enum ShopPurchaseResult
+{
+    Success,          // 즉시 구매 완료(아이템)
+    PendingAsync,     // 비동기 확정 대기(무기 교체 팝업) — 결과는 OnShopChanged로 통지
+    InsufficientGold, // 골드 부족
+    Unavailable,      // 빈/품절/보유/대기 슬롯
+    Failed,           // 인벤토리 가득 등 — 환불됨
+}
+
 /// <summary>
-/// 상점 방 런타임 컨트롤러.
-/// 룸 프리팹의 매대(ShopStallInteraction) 수가 곧 슬롯 수.
+/// 상점 방 런타임 컨트롤러 (NPC + UI 방식).
 ///
-/// 매대마다:
-///   1. 매대의 카테고리(Item/Weapon)를 사용
-///   2. LuckRollService.RollRarity(player.Luck) 로 등급 추첨
-///   3. ShopDataManager.GetPool(category, rarity) 풀 조회
-///   4. 인벤토리/무기 매니저로 보유 항목 필터
-///   5. 풀 비면 등급 강등 fallback (Legendary→Epic→Rare→Common, 다 비면 SOLD OUT)
-///   6. 매대 간 같은 target_id 중복 차단 (HashSet)
-///   7. weight 기반 가중 추첨
+/// 표현은 월드 매대(ShopStallInteraction/WorldItemDisplay) → 상점 NPC + UI 패널로 교체했다.
+/// 데이터/계산 로직(등급 롤·가격표·환불·roomRng 결정성)은 그대로 재사용한다.
 ///
-/// 인벤토리/무기 변동 시 매대를 재평가하여 "보유 중" 라벨을 토글한다.
-/// LuckRollTable이 비어있거나 ShopDataManager가 비초기화면 ShopCatalogSO 폴백.
+/// 흐름:
+///   1. 방의 기존 매대(ShopStallInteraction)들을 비활성(되돌리기 쉬움)하고, 그 개수·카테고리를
+///      슬롯 레이아웃 소스로 재사용한다. 매대가 없으면 slotCount 폴백.
+///   2. NPC 1개를 매대 중심점에 스폰하고 OnInteract에 UI 열기를 연결.
+///   3. 슬롯 N개를 인메모리(List&lt;ShopSlot&gt;)로 롤한다(roomRng 결정적).
+///   4. UI(UI_ShopPanel)가 Slots를 읽어 그리고, TryPurchaseSlot/TryReroll로 구매·리롤한다.
+///
+/// 인벤토리/무기 변동 시 슬롯의 "보유 중" 상태를 재평가하고 OnShopChanged로 UI에 통지한다.
 /// </summary>
 public class ShopRoomController : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
     private const int MaxRarityFallbackAttempts = 4;
+    private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록(캡슐 height=2의 절반).
+    private static readonly string[] DeadStallChildren = { "SoldOutLabel", "DisplayVfxRoot" }; // 과거 월드 구매 상태연출 — NPC+UI로 대체됨.
 
     // ── 비공개 필드 ─────────────────────────────────────────
-    private readonly List<ShopStallInteraction> _stalls = new();
+    private readonly List<ShopSlot> _slots = new();
+    private readonly List<ShopCategory> _stallCategories = new();
     private GameRunSession _run;
     private ShopCatalogSO _catalog;
     private LuckRollTableSO _luckTable;
+    private System.Random _roomRng;     // 최초 진열용 결정적 RNG. null이면 전역 Random.
+    private System.Random _rerollRng;   // 리롤용 비결정 RNG(시간 기반). lazy init.
     private int _slotCount;
+    private int _weaponSlotFallback;    // 매대 없는 방에서 무기 슬롯 수 폴백
+    private bool _rerollEnabled;
+    private int _rerollCost;
+
+    private GameObject _npcInstance;
+    private ShopNpcInteraction _npc;
+
     private bool _initialized;
-    private bool _exiting;
+    private bool _uiOpen;
     private bool _eventsHooked;
     private bool _weaponEventsHooked;
+    private bool _goldHooked;
     private PlayerWeaponManager _hookedWeaponManager;
 
+    // ── Properties (UI가 읽음) ──────────────────────────────
+    public IReadOnlyList<ShopSlot> Slots => _slots;
+    public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
+    public bool RerollEnabled => _rerollEnabled;
+    public int RerollCost => _rerollCost;
+
+    /// <summary>슬롯/골드 상태가 바뀌어 UI 재렌더가 필요할 때 발생.</summary>
+    public event Action OnShopChanged;
+
     // ── Lifecycle ───────────────────────────────────────────
-
-    private void Update()
-    {
-        if (!_initialized || _exiting) return;
-
-        if (Input.GetKeyDown(KeyCode.Escape))
-            ExitToStageMap();
-    }
 
     private void OnDestroy()
     {
         UnhookRunEvents();
 
-        foreach (var stall in _stalls)
-        {
-            if (stall != null)
-                stall.OnPurchaseRequested -= HandlePurchase;
-        }
-        _stalls.Clear();
+        if (_npc != null)
+            _npc.OnInteract -= HandleNpcInteract;
     }
 
     // ── Public Methods ──────────────────────────────────────
 
     /// <summary>
     /// Bootstrapper에서 호출.
-    /// catalog는 ShopDataManager 미초기화/LuckTable 비어있을 때의 폴백용 (deprecated, 신규 흐름은 chart 기반).
+    /// catalog: ShopDataManager 미초기화/LuckTable 비어있을 때의 폴백.
+    /// npcPrefab: 상점 NPC 프리팹(Addressable로 로드해 전달). null이면 NPC 없이 매대만 비활성.
+    /// roomRng: 최초 진열 롤 결정성(이어하기 재현)용. null이면 전역 Random.
+    /// rerollEnabled/rerollCost: 리롤 피처 플래그. 기본 off.
     /// </summary>
-    public void Initialize(GameRunSession run, ShopCatalogSO catalog, LuckRollTableSO luckTable, int slotCount)
+    public void Initialize(GameRunSession run, ShopCatalogSO catalog, LuckRollTableSO luckTable,
+                           int slotCount, System.Random roomRng = null,
+                           GameObject npcPrefab = null, int weaponSlotFallback = 1,
+                           bool rerollEnabled = false, int rerollCost = 50)
     {
         if (_initialized)
         {
@@ -75,100 +100,297 @@ public class ShopRoomController : MonoBehaviour
         _run = run;
         _catalog = catalog;
         _luckTable = luckTable;
+        _roomRng = roomRng;
         _slotCount = Mathf.Max(0, slotCount);
+        _weaponSlotFallback = Mathf.Max(0, weaponSlotFallback);
+        _rerollEnabled = rerollEnabled;
+        _rerollCost = Mathf.Max(0, rerollCost);
 
-        CollectStalls();
-        DistributeItems();
+        var (npcPos, npcRot) = ResolveNpcPlacement();
+        BuildSlots(_roomRng);
+        SpawnNpc(npcPrefab, npcPos, npcRot);
         HookRunEvents();
-        RefreshAllStallOwnership();
+        RefreshOwnership();
 
         _initialized = true;
-        Debug.Log($"[ShopRoom] 초기화 완료. 진열대 {_stalls.Count}개 / 요청 슬롯 {_slotCount}개 / luckTable={(luckTable != null ? "OK" : "null")} / catalog={(catalog != null ? "OK" : "null")}");
+        Debug.Log($"[ShopRoom] 초기화 완료(NPC+UI). 슬롯 {_slots.Count}개 / 매대(카운터) {_stallCategories.Count}개 / " +
+                  $"luckTable={(luckTable != null ? "OK" : "null")} / rng={(roomRng != null ? "seeded" : "global")} / reroll={(_rerollEnabled ? $"on({_rerollCost}G)" : "off")}");
     }
 
-    // ── Private Methods ─────────────────────────────────────
+    // ── 구매 (UI가 호출) ────────────────────────────────────
 
-    private void CollectStalls()
+    public ShopPurchaseResult TryPurchaseSlot(int index)
     {
-        _stalls.Clear();
-        GetComponentsInChildren<ShopStallInteraction>(true, _stalls);
+        if (index < 0 || index >= _slots.Count) return ShopPurchaseResult.Unavailable;
+        if (_run == null || !_run.IsRunning) return ShopPurchaseResult.Unavailable;
 
-        foreach (var stall in _stalls)
-            stall.OnPurchaseRequested += HandlePurchase;
+        var slot = _slots[index];
+        if (slot == null || !slot.Purchasable) return ShopPurchaseResult.Unavailable;
+
+        var playerState = _run.PlayerState;
+        if (playerState == null) return ShopPurchaseResult.Unavailable;
+
+        return slot.Entry != null
+            ? PurchaseFromEntry(slot, slot.Entry, playerState)
+            : PurchaseFromLegacy(slot, slot.LegacyItem, playerState);
     }
 
-    private void DistributeItems()
+    /// <summary>리롤. 비결정 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
+    public bool TryReroll()
     {
-        if (_stalls.Count == 0) return;
+        if (!_rerollEnabled) return false;
+        var playerState = _run?.PlayerState;
+        if (playerState == null) return false;
+
+        if (_rerollCost > 0 && !playerState.TrySpendGold(_rerollCost))
+        {
+            Debug.Log($"[ShopRoom] 리롤 골드 부족: 필요 {_rerollCost}, 보유 {playerState.TempGold}");
+            return false;
+        }
+
+        _rerollRng ??= new System.Random();
+        BuildSlots(_rerollRng); // 의도적 비결정 — 이어하기 복원 대상 아님
+        RefreshOwnership();
+        OnShopChanged?.Invoke();
+        Debug.Log($"[ShopRoom] 리롤 완료 ({_rerollCost}G 차감) — 슬롯 {_slots.Count}개 재생성");
+        return true;
+    }
+
+    // ── NPC / UI ────────────────────────────────────────────
+
+    private void SpawnNpc(GameObject npcPrefab, Vector3 pos, Quaternion rot)
+    {
+        if (npcPrefab == null)
+        {
+            Debug.LogWarning("[ShopRoom] NPC 프리팹 없음 — 상점 UI를 열 수 없습니다.");
+            return;
+        }
+
+        _npcInstance = Instantiate(npcPrefab, pos, rot, transform);
+        _npc = _npcInstance.GetComponent<ShopNpcInteraction>();
+        if (_npc == null) _npc = _npcInstance.GetComponentInChildren<ShopNpcInteraction>(true);
+
+        if (_npc != null)
+            _npc.OnInteract += HandleNpcInteract;
+        else
+            Debug.LogWarning("[ShopRoom] NPC 프리팹에 ShopNpcInteraction 없음");
+    }
+
+    private void HandleNpcInteract()
+    {
+        if (_uiOpen) return;
+        OpenShopUIAsync().Forget();
+    }
+
+    private async UniTaskVoid OpenShopUIAsync()
+    {
+        _uiOpen = true;
+        if (_npc != null) _npc.SetInteractable(false);
+
+        var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_ShopPanel>();
+        if (panel == null)
+        {
+            _uiOpen = false;
+            if (_npc != null) _npc.SetInteractable(true);
+            Debug.LogWarning("[ShopRoom] UI_ShopPanel 로드 실패");
+            return;
+        }
+        panel.Bind(this);
+    }
+
+    /// <summary>UI_ShopPanel이 닫힐 때 호출.</summary>
+    public void NotifyPanelClosed()
+    {
+        _uiOpen = false;
+        if (_npc != null) _npc.SetInteractable(true);
+    }
+
+    // ── 슬롯 생성 ───────────────────────────────────────────
+
+    /// <summary>NPC 스폰 위치/방향 결정 + 매대 마커 수집.
+    /// 1순위: 커스텀 손맵 프리팹의 <see cref="ShopNpcAnchor"/>(디자이너 지정 위치·방향).
+    /// 2순위: 매대 중심점. 3순위: 방 중앙. (절차 CSV 방엔 앵커가 없어 2/3으로 폴백)</summary>
+    private (Vector3 pos, Quaternion rot) ResolveNpcPlacement()
+    {
+        CollectStalls(out Vector3 stallCenter, out bool hasStalls);
+
+        var anchor = GetComponentInChildren<ShopNpcAnchor>(true);
+        if (anchor != null)
+            return (anchor.transform.position, anchor.transform.rotation);
+
+        Vector3 pos = hasStalls ? stallCenter : transform.position;
+        pos.y += NpcStandHeight; // 앵커가 정확한 높이를 주므로 폴백에서만 보정.
+        return (pos, Quaternion.identity);
+    }
+
+    /// <summary>매대(ShopStallInteraction) 마커를 수집해 슬롯 카테고리 소스로 쓰고, 중심점을 산출한다.
+    /// 매대는 이제 보이는 카운터로 유지한다(숨기지 않음). 과거 월드 구매 상태연출(SOLD/VFX)만 끄고,
+    /// 트리거 콜라이더는 솔리드 카운터로 전환한다(플레이어 통과 방지) — 레거시 정리.</summary>
+    private void CollectStalls(out Vector3 center, out bool hasStalls)
+    {
+        _stallCategories.Clear();
+        var stalls = new List<ShopStallInteraction>();
+        GetComponentsInChildren<ShopStallInteraction>(true, stalls);
+
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        foreach (var stall in stalls)
+        {
+            if (stall == null) continue;
+            _stallCategories.Add(stall.Category);
+            sum += stall.transform.position;
+            count++;
+
+            DisableDeadStallVisuals(stall.gameObject);
+            if (stall.TryGetComponent<Collider>(out var col)) col.isTrigger = false;
+        }
+
+        hasStalls = count > 0;
+        center = hasStalls ? sum / count : transform.position;
+    }
+
+    /// <summary>매대 프리팹(Block_ShopStall)에 남은 과거 상태연출 자식만 비활성화. 카운터 본체는 유지.</summary>
+    private static void DisableDeadStallVisuals(GameObject stall)
+    {
+        var all = stall.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < all.Length; i++)
+            if (System.Array.IndexOf(DeadStallChildren, all[i].name) >= 0)
+                all[i].gameObject.SetActive(false);
+    }
+
+    /// <summary>슬롯 카테고리 레이아웃. 매대가 있으면 그 카테고리를, 없으면 slotCount+무기폴백.</summary>
+    private List<ShopCategory> BuildCategoryLayout()
+    {
+        var cats = new List<ShopCategory>();
+        if (_stallCategories.Count > 0)
+        {
+            cats.AddRange(_stallCategories);
+            return cats;
+        }
+
+        int total = _slotCount;
+        int weapons = Mathf.Clamp(_weaponSlotFallback, 0, total);
+        for (int i = 0; i < total - weapons; i++) cats.Add(ShopCategory.Item);
+        for (int i = 0; i < weapons; i++) cats.Add(ShopCategory.Weapon);
+        return cats;
+    }
+
+    private void BuildSlots(System.Random rng)
+    {
+        _slots.Clear();
 
         bool useChartFlow = Managers.ShopData != null
                             && Managers.ShopData.IsInitialized
                             && _luckTable != null;
 
         if (useChartFlow)
-        {
-            DistributeItemsFromChart();
-            return;
-        }
-
-        // ─ 폴백: 레거시 ShopCatalogSO 흐름 ─
-        Debug.LogWarning("[ShopRoom] Chart 기반 추첨 불가 — ShopCatalogSO 폴백 사용");
-        DistributeItemsFromCatalog();
+            BuildSlotsFromChart(rng);
+        else
+            BuildSlotsFromCatalog();
     }
 
-    private void DistributeItemsFromChart()
+    private void BuildSlotsFromChart(System.Random rng)
     {
+        var layout = BuildCategoryLayout();
         var usedTargetIds = new HashSet<string>();
         int luck = ResolvePlayerLuck();
         int filled = 0;
 
-        for (int i = 0; i < _stalls.Count; i++)
+        foreach (var cat in layout)
         {
-            var stall = _stalls[i];
-            var entry = TryRollEntryForStall(stall.Category, luck, usedTargetIds);
+            var entry = TryRollEntry(cat, luck, usedTargetIds, rng);
             if (entry != null)
             {
                 usedTargetIds.Add(entry.target_id);
-                stall.Bind(entry);
+                _slots.Add(BuildSlotFromEntry(entry, cat));
                 filled++;
             }
             else
             {
-                stall.BindEmpty();
-                stall.MarkSold(); // 빈 매대는 SOLD OUT으로 처리하여 입력 차단
+                _slots.Add(ShopSlot.Empty(cat));
             }
         }
 
-        Debug.Log($"[ShopRoom] Chart 추첨 완료: 채워진 매대 {filled}/{_stalls.Count} (luck={luck})");
+        Debug.Log($"[ShopRoom] Chart 진열 완료: 채워진 슬롯 {filled}/{_slots.Count} (luck={luck})");
     }
 
-    private void DistributeItemsFromCatalog()
+    private void BuildSlotsFromCatalog()
     {
-        int distributeCount = Mathf.Min(_slotCount, _stalls.Count);
+        Debug.LogWarning("[ShopRoom] Chart 기반 추첨 불가 — ShopCatalogSO 폴백 사용");
+
+        var layout = BuildCategoryLayout();
+        int distributeCount = layout.Count > 0 ? layout.Count : Mathf.Max(0, _slotCount);
         List<ShopItemSO> picks = _catalog != null
             ? _catalog.PickRandom(distributeCount)
             : new List<ShopItemSO>();
 
-        for (int i = 0; i < _stalls.Count; i++)
+        for (int i = 0; i < distributeCount; i++)
         {
-            if (i < picks.Count)
-                _stalls[i].Bind(picks[i]);
+            if (i < picks.Count && picks[i] != null && picks[i].Item != null)
+                _slots.Add(BuildSlotFromLegacy(picks[i]));
             else
-                _stalls[i].MarkSold(); // 풀이 부족하면 남은 진열대는 SOLD OUT
+                _slots.Add(ShopSlot.Empty(ShopCategory.Item));
         }
-
-        if (picks.Count < distributeCount)
-            Debug.LogWarning($"[ShopRoom] 카탈로그가 부족해 {distributeCount - picks.Count}개 진열대 비어있음");
     }
 
-    /// <summary>
-    /// 매대 1개에 들어갈 entry 추첨.
-    /// 등급 추첨 → 풀 조회 + 인벤토리/중복 필터 → 비면 강등 fallback.
-    /// 모두 실패하면 null.
-    /// </summary>
-    private ShopEntry TryRollEntryForStall(ShopCategory cat, int luck, HashSet<string> used)
+    private ShopSlot BuildSlotFromEntry(ShopEntry entry, ShopCategory cat)
     {
-        var rarity = LuckRollService.RollRarity(luck, _luckTable);
+        int price = Managers.ShopData != null
+            ? Managers.ShopData.ResolvePrice(entry)
+            : Mathf.Max(0, entry.price_override);
+
+        string name = entry.target_id;
+        ItemRarity rarity = ItemRarity.Common;
+        Sprite icon = null;
+
+        if (cat == ShopCategory.Weapon)
+        {
+            var equip = Managers.ServerEquipment?.GetById(entry.target_id);
+            if (equip != null)
+            {
+                if (!string.IsNullOrEmpty(equip.weapon_name)) name = equip.weapon_name;
+                Enum.TryParse(equip.rarity, ignoreCase: true, out rarity);
+            }
+        }
+        else
+        {
+            var itemSO = ItemSORegistry.Find(entry.target_id);
+            if (itemSO != null)
+            {
+                if (!string.IsNullOrEmpty(itemSO.displayName)) name = itemSO.displayName;
+                rarity = itemSO.rarity;
+                icon = itemSO.icon;
+            }
+        }
+
+        return new ShopSlot(entry, null, cat, price, name, rarity, icon, BuildDescription(cat, rarity));
+    }
+
+    private ShopSlot BuildSlotFromLegacy(ShopItemSO shopItem)
+    {
+        var so = shopItem.Item;
+        string name = string.IsNullOrEmpty(so.displayName) ? so.itemId : so.displayName;
+        return new ShopSlot(null, shopItem, ShopCategory.Item, shopItem.Price,
+                            name, so.rarity, so.icon, BuildDescription(ShopCategory.Item, so.rarity));
+    }
+
+    private static string BuildDescription(ShopCategory cat, ItemRarity rarity)
+    {
+        string r = rarity switch
+        {
+            ItemRarity.Rare => "레어",
+            ItemRarity.Epic => "에픽",
+            ItemRarity.Legendary => "전설",
+            _ => "일반",
+        };
+        return cat == ShopCategory.Weapon ? $"{r} 무기" : $"{r} 아이템";
+    }
+
+    // ── 등급 롤 (기존 로직 재사용) ──────────────────────────
+
+    private ShopEntry TryRollEntry(ShopCategory cat, int luck, HashSet<string> used, System.Random rng)
+    {
+        var rarity = LuckRollService.RollRarity(luck, _luckTable, rng);
         string catStr = cat.ToChartString();
 
         for (int attempt = 0; attempt < MaxRarityFallbackAttempts; attempt++)
@@ -177,9 +399,8 @@ public class ShopRoomController : MonoBehaviour
             var filtered = FilterPool(pool, used);
 
             if (filtered.Count > 0)
-                return WeightedPick(filtered);
+                return WeightedPick(filtered, rng);
 
-            // 강등 fallback: Legendary→Epic→Rare→Common
             if (rarity == ItemRarity.Common) return null;
             rarity = (ItemRarity)((int)rarity - 1);
         }
@@ -201,14 +422,14 @@ public class ShopRoomController : MonoBehaviour
         return result;
     }
 
-    /// <summary>weight 기반 가중 추첨. 빈 리스트면 null.</summary>
-    private static ShopEntry WeightedPick(List<ShopEntry> pool)
+    /// <summary>weight 기반 가중 추첨. rng가 있으면 그 소스로 추첨(없으면 전역 Random).</summary>
+    private static ShopEntry WeightedPick(List<ShopEntry> pool, System.Random rng)
     {
         int total = 0;
         for (int i = 0; i < pool.Count; i++) total += Mathf.Max(0, pool[i].weight);
         if (total <= 0) return pool.Count > 0 ? pool[0] : null;
 
-        int roll = UnityEngine.Random.Range(0, total);
+        int roll = rng != null ? rng.Next(0, total) : UnityEngine.Random.Range(0, total);
         int acc = 0;
         for (int i = 0; i < pool.Count; i++)
         {
@@ -218,11 +439,6 @@ public class ShopRoomController : MonoBehaviour
         return pool[pool.Count - 1];
     }
 
-    /// <summary>
-    /// entry가 이미 인벤토리/무기 매니저에 보유 중인지.
-    /// 아이템: CountItem &gt;= MaxStack
-    /// 무기: HasWeaponId
-    /// </summary>
     private bool IsAlreadyOwned(ShopEntry entry)
     {
         if (entry == null || string.IsNullOrEmpty(entry.target_id)) return false;
@@ -236,7 +452,6 @@ public class ShopRoomController : MonoBehaviour
             return wm.HasWeaponId(entry.target_id);
         }
 
-        // Item
         var inv = _run.ItemInventory;
         if (inv == null) return false;
 
@@ -251,7 +466,158 @@ public class ShopRoomController : MonoBehaviour
         return stats != null ? stats.Luck : 0;
     }
 
-    // ── 인벤토리/무기 변동 이벤트 ───────────────────────────
+    // ── 구매 처리 (기존 로직 재사용) ────────────────────────
+
+    private ShopPurchaseResult PurchaseFromEntry(ShopSlot slot, ShopEntry entry, PlayerRunState playerState)
+    {
+        if (IsAlreadyOwned(entry))
+        {
+            slot.Owned = true;
+            OnShopChanged?.Invoke();
+            return ShopPurchaseResult.Unavailable;
+        }
+
+        int price = slot.Price;
+        if (!playerState.TrySpendGold(price))
+        {
+            Debug.Log($"[ShopRoom] 골드 부족: 필요 {price}, 보유 {playerState.TempGold}");
+            return ShopPurchaseResult.InsufficientGold;
+        }
+
+        var cat = ShopCategoryExtensions.FromChartString(entry.category);
+        if (cat == ShopCategory.Weapon)
+        {
+            var wm = _run.Player?.WeaponManager;
+            if (wm == null)
+            {
+                Debug.LogWarning("[ShopRoom] WeaponManager 없음 — 무기 구매 실패");
+                playerState.AddTempGold(price); // 차감 환불(GoldGainRate 미적용 우회)
+                return ShopPurchaseResult.Failed;
+            }
+            string addressableKey = ResolveWeaponAddressableKey(entry.target_id);
+            if (string.IsNullOrEmpty(addressableKey))
+            {
+                Debug.LogWarning($"[ShopRoom] weapon prefab key 조회 실패: {entry.target_id}");
+                playerState.AddTempGold(price);
+                return ShopPurchaseResult.Failed;
+            }
+
+            // 비동기 무기 획득 + 교체 팝업. SOLD 확정은 획득 성공 이후로 미룬다.
+            slot.Pending = true;
+            OnShopChanged?.Invoke();
+            ProcessWeaponAcquisitionAsync(slot, wm, addressableKey, price, entry.target_id).Forget();
+            return ShopPurchaseResult.PendingAsync;
+        }
+
+        // Item
+        var itemSO = ItemSORegistry.Find(entry.target_id);
+        if (itemSO == null)
+        {
+            Debug.LogWarning($"[ShopRoom] ItemSO 미등록: {entry.target_id}");
+            playerState.AddTempGold(price);
+            return ShopPurchaseResult.Failed;
+        }
+        var runtimeItem = RuntimeItemData.FromSO(itemSO);
+        if (runtimeItem == null)
+        {
+            Debug.LogWarning($"[ShopRoom] RuntimeItemData 생성 실패: {entry.target_id}");
+            playerState.AddTempGold(price);
+            return ShopPurchaseResult.Failed;
+        }
+        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
+        if (!added)
+        {
+            Debug.Log($"[ShopRoom] 인벤토리 가득 참 — 환불: {entry.target_id}");
+            playerState.AddTempGold(price);
+            return ShopPurchaseResult.Failed;
+        }
+        Debug.Log($"[ShopRoom] 아이템 구매 성공: {entry.target_id} ({price}G)");
+        slot.Sold = true;
+        OnShopChanged?.Invoke();
+        return ShopPurchaseResult.Success;
+    }
+
+    private async UniTaskVoid ProcessWeaponAcquisitionAsync(ShopSlot slot, PlayerWeaponManager wm, string addressableKey, int price, string targetIdForLog)
+    {
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            bool acquired = await wm.TryAcquireWeaponWithReplaceAsync(addressableKey, ct);
+            if (!acquired)
+            {
+                Debug.Log($"[ShopRoom] 무기 구매 취소/실패 — 환불: {targetIdForLog} ({price}G)");
+                _run?.PlayerState?.AddTempGold(price);
+                slot.Pending = false;
+                OnShopChanged?.Invoke();
+                return;
+            }
+            Debug.Log($"[ShopRoom] 무기 구매 성공: {targetIdForLog} ({price}G)");
+
+            slot.Pending = false;
+            slot.Sold = true;
+            OnShopChanged?.Invoke();
+
+            // 다음 방에서 장비 유지되도록 세션에 즉시 저장
+            var slotData = new WeaponData[wm.SlotCount];
+            for (int i = 0; i < wm.SlotCount; i++)
+                slotData[i] = wm.slots[i]?.runtimeData;
+            _run.SaveWeaponSlots(slotData, wm.CurrentSlotIndex);
+        }
+        catch (OperationCanceledException)
+        {
+            _run?.PlayerState?.AddTempGold(price);
+            slot.Pending = false;
+            // 룸 파괴 중일 수 있으므로 이벤트는 안전 호출
+            OnShopChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[ShopRoom] 무기 구매 처리 중 예외 — 환불: {ex.Message}");
+            _run?.PlayerState?.AddTempGold(price);
+            slot.Pending = false;
+            OnShopChanged?.Invoke();
+        }
+    }
+
+    private ShopPurchaseResult PurchaseFromLegacy(ShopSlot slot, ShopItemSO shopItem, PlayerRunState playerState)
+    {
+        if (shopItem == null || shopItem.Item == null) return ShopPurchaseResult.Unavailable;
+
+        int price = slot.Price;
+        if (!playerState.TrySpendGold(price))
+        {
+            Debug.Log($"[ShopRoom] 골드 부족: 필요 {price}, 보유 {playerState.TempGold}");
+            return ShopPurchaseResult.InsufficientGold;
+        }
+
+        var runtimeItem = RuntimeItemData.FromSO(shopItem.Item);
+        if (runtimeItem == null)
+        {
+            Debug.LogWarning($"[ShopRoom] (레거시) RuntimeItemData 생성 실패: {shopItem.Item?.itemId}");
+            playerState.AddTempGold(price);
+            return ShopPurchaseResult.Failed;
+        }
+
+        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
+        if (!added)
+        {
+            Debug.Log($"[ShopRoom] (레거시) 인벤토리 가득 참 — 환불: {shopItem.Item.itemId}");
+            playerState.AddTempGold(price);
+            return ShopPurchaseResult.Failed;
+        }
+        Debug.Log($"[ShopRoom] (레거시) 구매 성공: {shopItem.Item.itemId} ({price}G)");
+        slot.Sold = true;
+        OnShopChanged?.Invoke();
+        return ShopPurchaseResult.Success;
+    }
+
+    private static string ResolveWeaponAddressableKey(string weaponId)
+    {
+        if (string.IsNullOrEmpty(weaponId)) return null;
+        return weaponId;
+    }
+
+    // ── 인벤토리/무기/골드 변동 이벤트 ──────────────────────
 
     private void HookRunEvents()
     {
@@ -260,7 +626,12 @@ public class ShopRoomController : MonoBehaviour
         if (_run.ItemInventory != null)
             _run.ItemInventory.OnStagingChanged += OnInventoryChanged;
 
-        // 무기 매니저는 플레이어 스폰 시점에 따라 늦게 붙을 수 있음 → OnPlayerBound로 후크
+        if (_run.PlayerState != null)
+        {
+            _run.PlayerState.OnGoldChanged += OnGoldChanged;
+            _goldHooked = true;
+        }
+
         TryHookWeaponManager(_run.Player);
         _run.OnPlayerBound += OnPlayerBound;
 
@@ -274,6 +645,10 @@ public class ShopRoomController : MonoBehaviour
 
         if (_run?.ItemInventory != null)
             _run.ItemInventory.OnStagingChanged -= OnInventoryChanged;
+
+        if (_goldHooked && _run?.PlayerState != null)
+            _run.PlayerState.OnGoldChanged -= OnGoldChanged;
+        _goldHooked = false;
 
         if (_run != null)
             _run.OnPlayerBound -= OnPlayerBound;
@@ -305,210 +680,32 @@ public class ShopRoomController : MonoBehaviour
     private void OnPlayerBound(PlayerController player)
     {
         TryHookWeaponManager(player);
-        RefreshAllStallOwnership();
+        RefreshOwnership();
+        OnShopChanged?.Invoke();
     }
 
-    private void OnInventoryChanged() => RefreshAllStallOwnership();
-    private void OnWeaponChanged(WeaponData _, GameObject __) => RefreshAllStallOwnership();
-
-    private void RefreshAllStallOwnership()
+    private void OnInventoryChanged()
     {
-        for (int i = 0; i < _stalls.Count; i++)
-        {
-            var stall = _stalls[i];
-            if (stall == null) continue;
-            if (stall.IsSold) continue; // 이미 구매한 매대는 그대로
-
-            bool owned = stall.Entry != null && IsAlreadyOwned(stall.Entry);
-            stall.SetOwnedState(owned);
-        }
+        RefreshOwnership();
+        OnShopChanged?.Invoke();
     }
 
-    // ── 구매 ────────────────────────────────────────────────
-
-    private bool HandlePurchase(ShopStallInteraction stall)
+    private void OnWeaponChanged(WeaponData _, GameObject __)
     {
-        if (stall == null) return false;
-        if (_run == null || !_run.IsRunning)
-        {
-            Debug.LogWarning("[ShopRoom] 활성 런 없음 — 구매 거부");
-            return false;
-        }
-
-        var playerState = _run.PlayerState;
-        if (playerState == null) return false;
-
-        // 신규 경로 (ShopEntry)
-        if (stall.Entry != null)
-            return HandlePurchaseFromEntry(stall, stall.Entry, playerState);
-
-        // 레거시 경로 (ShopItemSO)
-        if (stall.Item != null)
-            return HandlePurchaseFromLegacyItem(stall, stall.Item, playerState);
-
-        return false;
+        RefreshOwnership();
+        OnShopChanged?.Invoke();
     }
 
-    private bool HandlePurchaseFromEntry(ShopStallInteraction stall, ShopEntry entry, PlayerRunState playerState)
+    private void OnGoldChanged(int _) => OnShopChanged?.Invoke();
+
+    private void RefreshOwnership()
     {
-        // 보유 중 가드 (인벤토리/무기 변동이 매대 갱신보다 늦을 수 있어 재검사)
-        if (IsAlreadyOwned(entry))
+        for (int i = 0; i < _slots.Count; i++)
         {
-            Debug.Log($"[ShopRoom] 이미 보유 중 — 구매 거부: {entry.target_id}");
-            // 매대 라벨 동기화
-            stall.SetOwnedState(true);
-            return false;
-        }
-
-        int price = Managers.ShopData != null
-            ? Managers.ShopData.ResolvePrice(entry)
-            : Mathf.Max(0, entry.price_override);
-
-        if (!playerState.TrySpendGold(price))
-        {
-            Debug.Log($"[ShopRoom] 골드 부족: 필요 {price}, 보유 {playerState.TempGold}");
-            return false;
-        }
-
-        var cat = ShopCategoryExtensions.FromChartString(entry.category);
-        if (cat == ShopCategory.Weapon)
-        {
-            var wm = _run.Player?.WeaponManager;
-            if (wm == null)
-            {
-                Debug.LogWarning("[ShopRoom] WeaponManager 없음 — 무기 구매 실패");
-                playerState.AddTempGold(price); // 차감 환불
-                return false;
-            }
-            // weapon_id 기반 prefabKey 조회
-            string addressableKey = ResolveWeaponAddressableKey(entry.target_id);
-            if (string.IsNullOrEmpty(addressableKey))
-            {
-                Debug.LogWarning($"[ShopRoom] weapon prefab key 조회 실패: {entry.target_id}");
-                playerState.AddTempGold(price); // 차감 환불
-                return false;
-            }
-
-            // 비동기로 무기 획득 + 교체 팝업. 실패/취소 시 환불.
-            ProcessWeaponAcquisitionAsync(wm, addressableKey, price, entry.target_id).Forget();
-            return true;
-        }
-
-        // Item
-        var itemSO = ItemSORegistry.Find(entry.target_id);
-        if (itemSO == null)
-        {
-            Debug.LogWarning($"[ShopRoom] ItemSO 미등록: {entry.target_id}");
-            playerState.AddTempGold(price); // 차감 환불
-            return false;
-        }
-        var runtimeItem = RuntimeItemData.FromSO(itemSO);
-        if (runtimeItem == null)
-        {
-            Debug.LogWarning($"[ShopRoom] RuntimeItemData 생성 실패: {entry.target_id}");
-            playerState.AddTempGold(price); // 차감 환불
-            return false;
-        }
-        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
-        if (!added)
-        {
-            Debug.Log($"[ShopRoom] 인벤토리 가득 참 — 환불: {entry.target_id}");
-            playerState.AddTempGold(price);
-            return false;
-        }
-        Debug.Log($"[ShopRoom] 아이템 구매 성공: {entry.target_id} ({price}G)");
-        return true;
-    }
-
-    /// <summary>
-    /// 무기 비동기 획득 흐름. 빈 슬롯 자동 장착 또는 교체 팝업 → 사용자 선택 후 결과 처리.
-    /// 실패/취소 시 차감된 골드 환불.
-    /// </summary>
-    private async UniTaskVoid ProcessWeaponAcquisitionAsync(PlayerWeaponManager wm, string addressableKey, int price, string targetIdForLog)
-    {
-        var ct = this.GetCancellationTokenOnDestroy();
-        try
-        {
-            bool acquired = await wm.TryAcquireWeaponWithReplaceAsync(addressableKey, ct);
-            if (!acquired)
-            {
-                Debug.Log($"[ShopRoom] 무기 구매 취소/실패 — 환불: {targetIdForLog} ({price}G)");
-                _run?.PlayerState?.AddTempGold(price);
-                return;
-            }
-            Debug.Log($"[ShopRoom] 무기 구매 성공: {targetIdForLog} ({price}G)");
-
-            // 다음 방에서 장비가 유지되도록 세션에 즉시 저장
-            var slotData = new WeaponData[wm.SlotCount];
-            for (int i = 0; i < wm.SlotCount; i++)
-                slotData[i] = wm.slots[i]?.runtimeData;
-            _run.SaveWeaponSlots(slotData, wm.CurrentSlotIndex);
-        }
-        catch (OperationCanceledException)
-        {
-            // 룸/플레이어 파괴 시 환불 시도 (PlayerState가 살아있으면 적용)
-            _run?.PlayerState?.AddTempGold(price);
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogWarning($"[ShopRoom] 무기 구매 처리 중 예외 — 환불: {ex.Message}");
-            _run?.PlayerState?.AddTempGold(price);
+            var slot = _slots[i];
+            if (slot == null || slot.Sold) continue;
+            slot.Owned = slot.Entry != null && IsAlreadyOwned(slot.Entry);
         }
     }
 
-    private bool HandlePurchaseFromLegacyItem(ShopStallInteraction stall, ShopItemSO shopItem, PlayerRunState playerState)
-    {
-        if (shopItem == null || shopItem.Item == null) return false;
-
-        int price = shopItem.Price;
-        if (!playerState.TrySpendGold(price))
-        {
-            Debug.Log($"[ShopRoom] 골드 부족: 필요 {price}, 보유 {playerState.TempGold}");
-            return false;
-        }
-
-        var itemSO = shopItem.Item;
-        var runtimeItem = RuntimeItemData.FromSO(itemSO);
-        if (runtimeItem == null)
-        {
-            Debug.LogWarning($"[ShopRoom] (레거시) RuntimeItemData 생성 실패: {itemSO?.itemId}");
-            playerState.AddTempGold(price); // 차감 환불
-            return false;
-        }
-
-        bool added = _run.ItemInventory != null && _run.ItemInventory.AddToStaging(runtimeItem);
-        if (!added)
-        {
-            Debug.Log($"[ShopRoom] (레거시) 인벤토리 가득 참 — 환불: {itemSO.itemId}");
-            playerState.AddTempGold(price);
-            return false;
-        }
-        Debug.Log($"[ShopRoom] (레거시) 구매 성공: {itemSO.itemId} ({price}G)");
-        return true;
-    }
-
-    /// <summary>weapon_id → Addressables WeaponSO 로드 키. WeaponSO Addressable 키 = weapon_id 컨벤션.</summary>
-    private static string ResolveWeaponAddressableKey(string weaponId)
-    {
-        if (string.IsNullOrEmpty(weaponId)) return null;
-        return weaponId;
-    }
-
-    private void ExitToStageMap()
-    {
-        if (_exiting) return;
-        _exiting = true;
-
-        if (_run != null && _run.IsRunning)
-            _run.EnterStandby();
-
-        var app = AppBootstrapper.Instance;
-        if (app == null)
-        {
-            Debug.LogError("[ShopRoom] AppBootstrapper 없음 — 퇴장 실패");
-            return;
-        }
-
-        app.RequestLoad(Define.Scene.StageMap);
-    }
 }
