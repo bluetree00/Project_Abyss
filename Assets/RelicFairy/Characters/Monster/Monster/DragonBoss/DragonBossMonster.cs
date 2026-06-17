@@ -60,15 +60,17 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _turnSpeedMult = 0.4f;
     [SerializeField] private float _groundTurnOrbitAngle = 65f;
     [SerializeField] private float _groundTurnFaceAngle = 25f;
-    [SerializeField] private float _airChaseHeight = 4f;
+    [SerializeField] private float _airChaseHeight = 7f;
     [SerializeField] private float _airChaseSpeedMult = 1.4f;
     [SerializeField] private float _airTurnAngleThreshold = 40f;
     [SerializeField] private float _airTransitionWeightMultiplier = 8f;
-    [SerializeField] private float _airOrbitRadius = 9f;
-    [SerializeField] private float _airOrbitAngularSpeed = 70f;
+    [SerializeField] private float _airOrbitAngularSpeed = 35f;
     [SerializeField] private float _airOrbitCatchUpSpeedMult = 2.1f;
     [SerializeField] private float _airOrbitRadiusTolerance = 1.2f;
-    [SerializeField] private float _airMinOrbitTurnsBeforePattern = 1f;
+    [Tooltip("선회 반경 = Floor 내접원 반지름 * 이 비율 (1=내접원에 정확히 접함, 작을수록 카메라 안쪽으로)")]
+    [SerializeField] private float _airOrbitRadiusRatio = 0.8f;
+    [Tooltip("공중 패턴 발동 잠금에 필요한 최소 선회량 (1=한 바퀴). 너무 크면 원거리 공격 윈도우가 루즈해짐")]
+    [SerializeField] private float _airMinOrbitTurnsBeforePattern = 0.5f;
     [SerializeField] private float _airOrbitRecenterThreshold = 9f;
     [SerializeField] private float _airOrbitCenterMoveSpeedMult = 1.1f;
 
@@ -77,24 +79,32 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _detectionRange = 15f;
     [Tooltip("등장 시 착지 지점 위쪽으로 띄우는 높이 — 브레스 발사 고도")]
     [SerializeField] private float _entranceDescendHeight = 45f;
-    [Tooltip("등장 하강 속도 (m/s)")]
-    [SerializeField] private float _entranceDescendSpeed = 18f;
-    [Tooltip("고공 와이드샷 유지 중 브레스로 파괴할 지붕 타일들 (MCP로 미리 배치한 scale=1 타일 225개)")]
-    [SerializeField] private GameObject[] _entranceRoofTiles;
-    [Tooltip("브레스 착지점 기준, 이 반경(m) 안의 지붕 타일만 파괴")]
-    [SerializeField] private float _entranceRoofHitRadius = 8f;
+    [Tooltip("등장 하강 초기 빠른 속도 (m/s) — 착지 트리거 구간 전까지 이 속도로 하강")]
+    [SerializeField] private float _entranceDescendFastSpeed = 35f;
+    [Tooltip("등장 착지 애니메이션 재생 구간 속도 (m/s) — Landing_Touchdown 클립 재생 중 이 속도 유지")]
+    [SerializeField] private float _entranceDescendSpeed = 5f;
+    [Tooltip("등장 브레스로 파괴할 진입로 바위들 (SM_grouped_cliffs_SM_Rock_31 + (1)~(6))")]
+    [SerializeField] private GameObject[] _entranceRockObjects;
     [Tooltip("지붕 파괴 임팩트 시점 생성할 브레스 VFX 프리팹")]
     [SerializeField] private GameObject _entranceBreathVfxPrefab;
     [Tooltip("브레스 VFX 생성 위치. 비워두면 드래곤 위치 사용")]
     [SerializeField] private Transform _entranceVfxPoint;
+    [Tooltip("브레스 VFX가 비행 방향 기준 아래로 꺾이는 각도 (도) — 진행방향 대각선 아래로 분사")]
+    [SerializeField] private float _entranceBreathPitchDeg = 35f;
     [Tooltip("착지 후 카메라 클로즈업 오프셋 (드래곤 기준 월드 좌표)")]
     [SerializeField] private Vector3 _entranceCameraOffset = new Vector3(7f, 0.5f, -2f);
+    [Tooltip("착지 후 카메라가 바라보는 지점 = 드래곤 위치 + 이 오프셋 (월드 좌표). Y를 높이면 더 위쪽(얼굴)을 바라본다")]
+    [SerializeField] private Vector3 _entranceCameraLookOffset = new Vector3(0f, 2.5f, 0f);
+    [Tooltip("착지 직후 보스 클로즈업으로 전환하는 카메라 이동 시간 (초). 0이면 즉시 컷")]
+    [SerializeField] private float _entranceCameraCloseUpDuration = 1.0f;
     [Tooltip("보스 이름 HUD 소멸 후 플레이어 카메라로 복귀하는 시간 (초)")]
     [SerializeField] private float _entranceCameraMoveDuration = 1.2f;
     [Tooltip("등장 비행 시작 위치 — 착지 지점(SpawnPosition) 기준 수평 오프셋 (X/Z). 이 위치에서 브레스를 뿜으며 착지 지점 위까지 날아온다")]
     [SerializeField] private Vector2 _entranceFlyInOffset = new Vector2(0f, 55f);
     [Tooltip("등장 비행 속도 (m/s)")]
     [SerializeField] private float _entranceFlyInSpeed = 25f;
+    [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
+    [SerializeField] private GameObject _entranceWindEffectPrefab;
 
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
@@ -115,7 +125,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float  AirChaseHeight      => _airChaseHeight;
     public float  AirChaseSpeedMult   => _airChaseSpeedMult;
     public float  AirTurnAngleThreshold => _airTurnAngleThreshold;
-    public float  AirOrbitRadius      => _airOrbitRadius;
+    // Floor에 내접하는 원의 반지름(짧은 변 기준) * 비율 = 선회 반경 — 비율이 1보다 작으면 카메라 안쪽으로 들어옴
+    public float  AirOrbitRadius      => Mathf.Min(DragonBossRoomContext.Width, DragonBossRoomContext.Height) * DragonBossRoomContext.CellSize * 0.5f * _airOrbitRadiusRatio;
     public float  AirOrbitAngularSpeed => _airOrbitAngularSpeed;
     public float  AirOrbitCatchUpSpeedMult => _airOrbitCatchUpSpeedMult;
     public float  AirOrbitRadiusTolerance => _airOrbitRadiusTolerance;
@@ -123,12 +134,18 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
     public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
 
-    public float   EntranceDescendHeight     => _entranceDescendHeight;
-    public float   EntranceDescendSpeed      => _entranceDescendSpeed;
+    public float   EntranceDescendHeight      => _entranceDescendHeight;
+    public float   EntranceDescendFastSpeed   => _entranceDescendFastSpeed;
+    public float   EntranceDescendSpeed       => _entranceDescendSpeed;
     public Vector3 EntranceCameraOffset      => _entranceCameraOffset;
+    public Vector3 EntranceCameraLookOffset  => _entranceCameraLookOffset;
+    public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;
     public float   EntranceCameraMoveDuration => _entranceCameraMoveDuration;
     public Vector2 EntranceFlyInOffset           => _entranceFlyInOffset;
     public float   EntranceFlyInSpeed            => _entranceFlyInSpeed;
+    public float   EntranceBreathPitchDeg        => _entranceBreathPitchDeg;
+    public int     EntranceRockCount             => _entranceRockObjects?.Length ?? 0;
+    public GameObject EntranceWindEffectPrefab   => _entranceWindEffectPrefab;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -208,6 +225,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
     protected override void OnInitialized()
     {
+        InitializeRoomContext(); // OnEnable이 _runtime 생성 전에 호출된 경우를 위한 재시도
         BindBossHud();
         _capsule = GetComponent<CapsuleCollider>();
         if (_capsule != null)
@@ -298,6 +316,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     protected override void OnEnable()
     {
         base.OnEnable();
+        InitializeRoomContext();
         _dragonBB?.Reset();
         _runner?.Reset();
         CacheTransitionPatternBaseWeights();
@@ -397,6 +416,23 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
         return !IsPlayerDead();
+    }
+
+    // 공중 상태에서는 근접 공격을 받지 않는다 (원거리 투사체는 ColliderInstance를 거치지 않아 영향 없음)
+    public override bool IsMeleeImmuneNow
+        => _dragonBB != null && _dragonBB.BodyState == BodyState.Airborne;
+
+    /// <summary>Floor(BoxCollider) 영역을 감지해 DragonBossRoomContext를 초기화 — BreathSweep/FireballRain 등 Floor 기반 패턴이 이 바닥을 기준으로 동작한다.</summary>
+    private void InitializeRoomContext()
+    {
+        // 배치된 보스의 첫 OnEnable은 InitAsync(_runtime 생성) 완료 전에 호출될 수 있음 — OnInitialized에서 재시도
+        if (_runtime == null) return;
+
+        Bounds floorBounds = DragonPatternFloorUtils.ResolveArenaBoundsXZ(_runtime.SpawnPosition, 15f);
+        int width  = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.x));
+        int height = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.z));
+        Vector3 worldCenter = new Vector3(floorBounds.center.x, _runtime.SpawnPosition.y, floorBounds.center.z);
+        DragonBossRoomContext.Initialize(width, height, 1f, worldCenter);
     }
 
     private bool IsInEngagementRange()
@@ -578,62 +614,47 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             _pendingTriggerEntrance = true; // InitAsync 완료 전 호출된 경우 OnInitialized에서 적용
     }
 
-    /// <summary>등장 비행 시작 시 호출 — 브레스 VFX를 EntranceBreathPoint에 붙여 생성한다 (드래곤을 따라 이동/회전).</summary>
-    public GameObject SpawnEntranceBreathVfx()
+    /// <summary>등장 비행 시작 시 호출 — 입(EntranceVfxPoint) 위치에서, 진행방향 대각선 아래로 분사되는 브레스 VFX를 생성한다.
+    /// 회전이 애니메이션 중인 Jaw 본에 끌려가지 않도록 본체(드래곤 루트)에 고정한다.</summary>
+    public GameObject SpawnEntranceBreathVfx(Vector3 flightDir)
     {
         if (_entranceBreathVfxPrefab == null) return null;
 
         Vector3    pos = _entranceVfxPoint != null ? _entranceVfxPoint.position : transform.position;
-        Quaternion rot = _entranceVfxPoint != null ? _entranceVfxPoint.rotation : transform.rotation;
+        Quaternion rot = transform.rotation;
+        if (flightDir.sqrMagnitude > 0.0001f)
+        {
+            float   rad     = _entranceBreathPitchDeg * Mathf.Deg2Rad;
+            Vector3 horizDir = flightDir.normalized;
+            Vector3 aimDir  = (horizDir * Mathf.Cos(rad) + Vector3.down * Mathf.Sin(rad)).normalized;
+            rot = Quaternion.LookRotation(aimDir, Vector3.up);
+        }
+
         GameObject vfx = Instantiate(_entranceBreathVfxPrefab, pos, rot);
-        if (_entranceVfxPoint != null)
-            vfx.transform.SetParent(_entranceVfxPoint, true);
+        vfx.transform.SetParent(transform, true);
         return vfx;
     }
 
-    /// <summary>등장 비행 종료 시점 브레스 방향을 지붕 높이까지 투영해 착지점을 계산한다.</summary>
-    private Vector3 ComputeBreathImpactPoint()
+    /// <summary>등장 비행 중 브레스 도달 시 호출 — 진입로를 막던 바위들을 전부 파괴.</summary>
+    public void TriggerRockDestruction()
     {
-        if (_entranceVfxPoint == null || _entranceRoofTiles == null || _entranceRoofTiles.Length == 0)
-            return transform.position;
+        if (_entranceRockObjects == null) return;
 
-        Vector3 origin = _entranceVfxPoint.position;
-        Vector3 dir    = _entranceVfxPoint.forward;
-        float   roofY  = _entranceRoofTiles[0].transform.position.y;
-
-        if (Mathf.Abs(dir.y) < 0.0001f) return origin;
-
-        float t = (roofY - origin.y) / dir.y;
-        return origin + dir * t;
+        foreach (var rock in _entranceRockObjects)
+            if (rock != null) rock.SetActive(false);
     }
 
-    /// <summary>등장 비행이 착지 지점 위에 도착했을 때 호출 — 브레스 착지점 반경 내 지붕 타일만 파괴.</summary>
-    public void TriggerRoofDestruction()
+    /// <summary>등장 비행 중 브레스가 스치는 진행도에 맞춰 바위를 하나씩 파괴.</summary>
+    public void DestroyEntranceRock(int index)
     {
-        if (_entranceRoofTiles == null) return;
+        if (_entranceRockObjects == null || index < 0 || index >= _entranceRockObjects.Length) return;
 
-        Vector3 impact   = ComputeBreathImpactPoint();
-        float   radiusSq = _entranceRoofHitRadius * _entranceRoofHitRadius;
-
-        foreach (var tile in _entranceRoofTiles)
-        {
-            if (tile == null || !tile.activeSelf) continue;
-
-            Vector3 p  = tile.transform.position;
-            float   dx = p.x - impact.x;
-            float   dz = p.z - impact.z;
-            if (dx * dx + dz * dz <= radiusSq)
-                tile.SetActive(false);
-        }
+        var rock = _entranceRockObjects[index];
+        if (rock != null) rock.SetActive(false);
     }
 
-    /// <summary>착지 순간 호출 — 남아있는 지붕 타일을 모두 파괴.</summary>
-    public void TriggerRoofCollapse()
-    {
-        if (_entranceRoofTiles == null) return;
-
-        foreach (var tile in _entranceRoofTiles)
-            if (tile != null) tile.SetActive(false);
-    }
+    /// <summary>보스 이름 HUD 표시와 함께 호출 — 화면 전체 바람 이펙트를 생성한다. HUD 소멸 시 호출자가 Destroy한다.</summary>
+    public GameObject SpawnEntranceWindVfx()
+        => _entranceWindEffectPrefab != null ? Instantiate(_entranceWindEffectPrefab) : null;
 }
 }

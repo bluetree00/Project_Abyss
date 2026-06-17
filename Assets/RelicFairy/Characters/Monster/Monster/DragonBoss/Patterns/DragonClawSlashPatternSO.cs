@@ -162,7 +162,10 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
         Vector3 flat = Vector3.Lerp(_startPos, _targetPos, t);
         float   arc  = Mathf.Sin(t * Mathf.PI) * _arcHeight;
-        ctx.Transform.position = new Vector3(flat.x, flat.y + arc, flat.z);
+        // 착지 지점의 Y는 플레이어 위치(_targetPos.y)가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        float groundY = DragonPatternFloorUtils.GetFloorY(flat, ctx.Runtime.SpawnPosition.y);
+        ctx.Transform.position = new Vector3(flat.x, groundY + arc, flat.z);
 
         Vector3 dir = _targetPos - ctx.Transform.position;
         dir.y = 0f;

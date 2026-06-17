@@ -2316,14 +2316,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab51010053f9a534ba61c18d435b2de3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DeathKnightBossMonster
-  _effectiveElement: -1
   _debugState: 
   _bodyRenderers: []
   _swordCtrl: {fileID: 0}
   _attackPool:
   - {fileID: 11400000, guid: a7323ceaf1a96b246bb54a211f51df1f, type: 2}
   - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
-  _teleportVfxPrefab: {fileID: 0}
+  _teleportVfxPrefab: {fileID: 1219712984032920, guid: c5424e651f34a7644b13964e9b23cdd0,
+    type: 3}
   _teleportDistance: 3
   _teleportVfxDuration: 0.5
   _phase2BasicPool:
@@ -2338,6 +2338,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1150cdc212785954ca3d3f1ea2ba8e4d, type: 2}
   - {fileID: 11400000, guid: b03018b7b30b24e449747552137e93f2, type: 2}
   _phase1AnchorTransform: {fileID: 0}
+  _entranceCameraOffset: {x: 5, y: 0, z: -3}
+  _entranceCameraLookOffset: {x: 0, y: 1.5, z: 0}
+  _entranceCameraCloseUpDuration: 1
+  _entranceCameraReturnDuration: 1.2
+  _entranceWindEffectPrefab: {fileID: 0}
 --- !u!195 &8839149076850127432
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -2427,6 +2432,7 @@ MonoBehaviour:
   _disappearDuration: 0.25
   _whiteMaterial: {fileID: 2100000, guid: 2d215973ef3daec4f96eaabd33e2b48b, type: 2}
   _blackMaterial: {fileID: 2100000, guid: 03173d869908c9046a995334bc539417, type: 2}
+  _swordTrail: {fileID: 0}
 --- !u!1 &3440618284725765318
 GameObject:
   m_ObjectHideFlags: 0

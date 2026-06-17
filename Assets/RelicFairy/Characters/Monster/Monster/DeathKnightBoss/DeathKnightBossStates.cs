@@ -383,6 +383,9 @@ public class DKDieState : DieState
         if (ctx.Monster is DeathKnightBossMonster dk)
             dk.UnbindBossHudIfBoundPublic();
 
+        // 사망 시 DK 전용 카메라 오빗 복원
+        GameCameraController.Instance?.DeactivateDKPlayerOrbit(1.5f);
+
         base.Enter(ctx);
     }
 }
@@ -410,14 +413,23 @@ public class DKPhase2TeleportState : SpecialStateBase
     private readonly float         _postTeleportDelay;
     private readonly Vector3?      _phase1FixedPosition;
 
-    private GameObject _spawnedVfx;
+    private GameObject _spawnedVfx;   // 출발 위치 VFX (텔레포트 시점에 제거)
     private float      _timer;
     private bool       _teleported;
+    private Vector3    _telePos;      // Enter()에서 미리 계산한 목적지
+    private bool       _usePhase1Pos; // 카메라 전환 방향 결정용
+    private bool       _skipTeleport; // PlayerTarget 없을 때 텔레포트 스킵
+    private readonly float _vfxHeightOffset;
+    private readonly float _vfxScale;
+    private readonly float _vfxFadeInDuration;
 
     public DKPhase2TeleportState(IMonsterState nextState, GameObject vfxPrefab,
                                   float teleportDist, float vfxDelay,
                                   Vector3? phase1FixedPosition = null,
-                                  float postTeleportDelay = 0.35f)
+                                  float postTeleportDelay = 0.35f,
+                                  float vfxHeightOffset = 1.5f,
+                                  float vfxScale = 3f,
+                                  float vfxFadeInDuration = 0.3f)
     {
         _nextState           = nextState;
         _vfxPrefab           = vfxPrefab;
@@ -425,12 +437,16 @@ public class DKPhase2TeleportState : SpecialStateBase
         _vfxDelay            = vfxDelay;
         _postTeleportDelay   = postTeleportDelay;
         _phase1FixedPosition = phase1FixedPosition;
+        _vfxHeightOffset     = vfxHeightOffset;
+        _vfxScale            = vfxScale;
+        _vfxFadeInDuration   = vfxFadeInDuration;
     }
 
     public override void Enter(MonsterContext ctx)
     {
-        _timer      = 0f;
-        _teleported = false;
+        _timer        = 0f;
+        _teleported   = false;
+        _skipTeleport = false;
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -439,10 +455,28 @@ public class DKPhase2TeleportState : SpecialStateBase
             ctx.Agent.ResetPath();
         }
 
-        if (_vfxPrefab != null)
-            _spawnedVfx = BossEffectPool.SpawnOneShot(
-                _vfxPrefab, ctx.Transform.position, ctx.Transform.rotation,
-                fallbackLifetime: _vfxDelay + 1f);
+        // 목적지를 Enter에서 미리 계산 → 출발·도착 VFX 동시 스폰 가능
+        if (_phase1FixedPosition.HasValue)
+        {
+            _telePos      = _phase1FixedPosition.Value;
+            _usePhase1Pos = true;
+        }
+        else if (ctx.Runtime.PlayerTarget != null)
+        {
+            float   angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            Vector3 dir   = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
+            _telePos      = ctx.Runtime.PlayerTarget.position + dir * _teleportDist;
+            _usePhase1Pos = false;
+        }
+        else
+        {
+            _skipTeleport = true;
+        }
+
+        // 도착 위치에만 스폰 (출발 위치는 스폰하지 않음)
+        // EffectBehaviour가 ObjectPooler.Despawn으로 수명을 자체 관리하므로 BossEffectPool 미사용
+        if (!_skipTeleport && _vfxPrefab != null)
+            SpawnVfx(_telePos);
     }
 
     public override void Update(MonsterContext ctx)
@@ -455,34 +489,29 @@ public class DKPhase2TeleportState : SpecialStateBase
         {
             _teleported = true;
 
-            if (_spawnedVfx != null)
-            {
-                BossEffectPool.Release(_spawnedVfx);
-                _spawnedVfx = null;
-            }
-
-            Vector3 telePos;
-
-            if (_phase1FixedPosition.HasValue)
-            {
-                telePos = _phase1FixedPosition.Value;
-            }
-            else if (ctx.Runtime.PlayerTarget != null)
-            {
-                float   angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-                Vector3 dir   = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-                telePos = ctx.Runtime.PlayerTarget.position + dir * _teleportDist;
-            }
-            else
+            if (_skipTeleport)
             {
                 ctx.Monster.ChangeState(_nextState);
                 return;
             }
 
-            if (ctx.Agent != null)
-                ctx.Agent.Warp(telePos);
+            // 출발 VFX 제거 (빈 자리에 남으면 안 됨)
+            if (_spawnedVfx != null)
+            {
+                Object.Destroy(_spawnedVfx);
+                _spawnedVfx = null;
+            }
+
+            // 카메라 전환
+            if (_usePhase1Pos)
+                GameCameraController.Instance?.ActivateDKPlayerOrbit(1.0f);
             else
-                ctx.Transform.position = telePos;
+                GameCameraController.Instance?.DeactivateDKPlayerOrbit(1.0f);
+
+            if (ctx.Agent != null)
+                ctx.Agent.Warp(_telePos);
+            else
+                ctx.Transform.position = _telePos;
 
             // 플레이어를 향해 바라봄
             if (ctx.Runtime.PlayerTarget != null)
@@ -503,12 +532,20 @@ public class DKPhase2TeleportState : SpecialStateBase
     {
         if (_spawnedVfx != null)
         {
-            BossEffectPool.Release(_spawnedVfx);
+            Object.Destroy(_spawnedVfx);
             _spawnedVfx = null;
         }
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
             ctx.Agent.isStopped = false;
+    }
+
+    private GameObject SpawnVfx(Vector3 basePos)
+    {
+        var go          = Object.Instantiate(_vfxPrefab, basePos + Vector3.up * _vfxHeightOffset, Quaternion.identity);
+        var targetScale = Vector3.one * _vfxScale;
+        go.AddComponent<VfxFadeIn>().Init(targetScale, _vfxFadeInDuration);
+        return go;
     }
 }
 }

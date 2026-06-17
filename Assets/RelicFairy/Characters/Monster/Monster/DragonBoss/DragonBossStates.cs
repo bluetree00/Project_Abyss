@@ -470,12 +470,9 @@ public class DragonBossAttackReadyState : IMonsterState
         _orbitDirection = ResolveOrbitDirection(ctx);
         _hasOrbitCenter = false;
         _returnBlendTimer = ReturnBlendDuration;
-        if (ctx.Runtime.PlayerTarget != null)
-        {
-            _orbitCenter        = GetPlayerOrbitCenter(ctx, ctx.Runtime.PlayerTarget.position);
-            _desiredOrbitCenter = _orbitCenter;
-            _hasOrbitCenter     = true;
-        }
+        _orbitCenter        = GetMapOrbitCenter(ctx);
+        _desiredOrbitCenter = _orbitCenter;
+        _hasOrbitCenter     = true;
         _hasLastOrbitAngle = TryGetOrbitAngle(ctx, out _lastOrbitAngle);
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb)
             dragonBb.AirOrbitAccumulatedDegrees = 0f;
@@ -533,10 +530,12 @@ public class DragonBossAttackReadyState : IMonsterState
             return;
         }
 
-        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
-        RefreshOrbitCenterIfNeeded(ctx, dragon, playerPos);
+        RefreshOrbitCenterIfNeeded(ctx, dragon);
         OrbitMotion orbit = BuildOrbitMotion(ctx, dragon, _orbitCenter);
-        float moveSpeed = ctx.Stat.moveSpeed * dragon.AirChaseSpeedMult;
+        // 선회 목표점은 AirOrbitAngularSpeed로 매 프레임 이동하므로,
+        // 이동속도가 그 접선속도(반지름 * 각속도)보다 느리면 실제 선회가 각속도를 따라가지 못한다
+        float tangentialSpeed = dragon.AirOrbitRadius * dragon.AirOrbitAngularSpeed * Mathf.Deg2Rad;
+        float moveSpeed = Mathf.Max(ctx.Stat.moveSpeed * dragon.AirChaseSpeedMult, tangentialSpeed);
         float radiusError = Mathf.Abs(GetFlatDistance(ctx.Transform.position, _orbitCenter) - dragon.AirOrbitRadius);
         if (_returnBlendTimer <= 0f && radiusError > dragon.AirOrbitRadiusTolerance)
             moveSpeed *= dragon.AirOrbitCatchUpSpeedMult;
@@ -547,7 +546,9 @@ public class DragonBossAttackReadyState : IMonsterState
         if (!_topDownActivated && _returnBlendTimer <= 0f)
         {
             _topDownActivated = true;
-            GameCameraController.Instance?.ActivateDragonTopDownView(ctx.Runtime.SpawnPosition);
+            GameCameraController.Instance?.ActivateDragonTopDownView(
+                DragonBossRoomContext.WorldCenter,
+                new Vector2(DragonBossRoomContext.Width * DragonBossRoomContext.CellSize, DragonBossRoomContext.Height * DragonBossRoomContext.CellSize));
         }
         UpdateAirChaseAnimation(ctx, false);
         ctx.Transform.position = Vector3.MoveTowards(
@@ -583,20 +584,20 @@ public class DragonBossAttackReadyState : IMonsterState
         PlayAnim(ctx, next);
     }
 
-    private void RefreshOrbitCenterIfNeeded(MonsterContext ctx, DragonBossMonster dragon, Vector3 playerPos)
+    private void RefreshOrbitCenterIfNeeded(MonsterContext ctx, DragonBossMonster dragon)
     {
-        Vector3 playerCenter = GetPlayerOrbitCenter(ctx, playerPos);
+        Vector3 mapCenter = GetMapOrbitCenter(ctx);
         if (!_hasOrbitCenter)
         {
-            _orbitCenter = playerCenter;
-            _desiredOrbitCenter = playerCenter;
+            _orbitCenter = mapCenter;
+            _desiredOrbitCenter = mapCenter;
             _hasOrbitCenter = true;
             return;
         }
 
         float threshold = Mathf.Max(0.1f, dragon.AirOrbitRecenterThreshold);
-        if (GetFlatDistance(_orbitCenter, playerCenter) > threshold)
-            _desiredOrbitCenter = playerCenter;
+        if (GetFlatDistance(_orbitCenter, mapCenter) > threshold)
+            _desiredOrbitCenter = mapCenter;
 
         float centerMoveSpeed = ctx.Stat.moveSpeed * Mathf.Max(0.1f, dragon.AirOrbitCenterMoveSpeedMult);
         _orbitCenter = Vector3.MoveTowards(
@@ -634,10 +635,12 @@ public class DragonBossAttackReadyState : IMonsterState
         };
     }
 
-    private static Vector3 GetPlayerOrbitCenter(MonsterContext ctx, Vector3 playerPos)
+    /// <summary>공중 선회 기준점 = 맵(Floor) 중앙. 플레이어 위치와 무관하게 고정된다.</summary>
+    private static Vector3 GetMapOrbitCenter(MonsterContext ctx)
     {
-        playerPos.y = ctx.Runtime.SpawnPosition.y + ((ctx.Monster as DragonBossMonster)?.AirChaseHeight ?? 0f);
-        return playerPos;
+        Vector3 center = DragonBossRoomContext.WorldCenter;
+        center.y = ctx.Runtime.SpawnPosition.y + ((ctx.Monster as DragonBossMonster)?.AirChaseHeight ?? 0f);
+        return center;
     }
 
     private static float GetFlatDistance(Vector3 from, Vector3 to)
@@ -669,7 +672,7 @@ public class DragonBossAttackReadyState : IMonsterState
 
         Vector3 center = _hasOrbitCenter
             ? _orbitCenter
-            : GetPlayerOrbitCenter(ctx, ctx.Runtime.PlayerTarget.position);
+            : GetMapOrbitCenter(ctx);
         center.y = ctx.Runtime.SpawnPosition.y + dragon.AirChaseHeight;
 
         Vector3 offset = ctx.Transform.position - center;
@@ -688,20 +691,7 @@ public class DragonBossAttackReadyState : IMonsterState
     }
 
     private static void RestoreGroundAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null)
-            return;
-
-        if (!ctx.Agent.enabled)
-            ctx.Agent.enabled = true;
-
-        if (!ctx.Agent.isOnNavMesh
-            && UnityEngine.AI.NavMesh.SamplePosition(
-                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
-        {
-            ctx.Agent.Warp(hit.position);
-        }
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static void FaceTarget(MonsterContext ctx, Vector3 targetPos, float speed)
     {

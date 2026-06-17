@@ -28,9 +28,9 @@ MonoBehaviour:
   recoveryTime: 0.25
   hitRange: 3
   hitHalfAngle: 75
-  doesDash: 0
-  dashDistance: 1.5
-  dashDuration: 0.25
+  doesDash: 1
+  dashDistance: 2.5
+  dashDuration: 0.3
   swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947,
     type: 3}
   damageMultiplier: 1.2

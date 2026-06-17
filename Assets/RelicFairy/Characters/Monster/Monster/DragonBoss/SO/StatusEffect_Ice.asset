@@ -18,3 +18,6 @@ MonoBehaviour:
   _effectPrefab: {fileID: 1198433312203469917, guid: 4e0461f4812c7234989081e6a21ebc9e,
     type: 3}
   _effectScale: 1
+  _screenEffectPrefab: {fileID: 3942825033974895155, guid: 24222363483190a4dadcc3981c257d8f,
+    type: 3}
+  _screenEffectScale: 1

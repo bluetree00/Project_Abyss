@@ -20,7 +20,7 @@ MonoBehaviour:
   baseDamagePerSlash: 5
   knockbackMultiplier: 0.2
   endDelay: 0.3
-  dashEffectKey: IasenDashLaser
+  dashEffectKey:
   dashTrailKey: IasenDashFire
   slashEffectKey: IasenFinishFlash
   hitEffectKey: BlueShootHit

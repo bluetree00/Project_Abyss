@@ -32,6 +32,10 @@ public class DeathKnightSwordController : MonoBehaviour
     [Tooltip("검은색 검 머티리얼")]
     [SerializeField] private Material _blackMaterial;
 
+    [Header("검 트레일")]
+    [Tooltip("검 궤적 TrailRenderer. 검 선단 자식 오브젝트에 컴포넌트 부착 후 할당.")]
+    [SerializeField] private TrailRenderer _swordTrail;
+
     // ── 상태 ──────────────────────────────────────────
     private bool _isVisible;
     private CancellationToken _destroyCt;
@@ -56,19 +60,21 @@ public class DeathKnightSwordController : MonoBehaviour
 
         _swordRenderer = _swordGO.GetComponentInChildren<Renderer>();
 
-        // 시작 시 검 숨김
+        // 시작 시 검 및 트레일 숨김
         _swordGO.SetActive(false);
         _isVisible = false;
+        if (_swordTrail != null) { _swordTrail.enabled = false; _swordTrail.Clear(); }
     }
 
     private void OnEnable()
     {
-        // 풀 재사용 시 검 초기화
+        // 풀 재사용 시 검 및 트레일 초기화
         if (_swordGO != null)
         {
             _swordGO.SetActive(false);
             _isVisible = false;
         }
+        if (_swordTrail != null) { _swordTrail.enabled = false; _swordTrail.Clear(); }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -85,6 +91,7 @@ public class DeathKnightSwordController : MonoBehaviour
         _isVisible = true;
         _swordGO.SetActive(true);
         DissolveEffect.PlayAppear(_swordGO, _appearDuration, activationToken: _destroyCt);
+        if (_swordTrail != null) { _swordTrail.Clear(); _swordTrail.enabled = true; }
     }
 
     /// <summary>검 Transform을 반환한다 (VFX 부착 등에 사용).</summary>
@@ -99,6 +106,15 @@ public class DeathKnightSwordController : MonoBehaviour
         Material mat = color == DKSwordColor.White ? _whiteMaterial : _blackMaterial;
         if (mat != null)
             _swordRenderer.material = mat;
+
+        if (_swordTrail != null)
+        {
+            Color trailColor = color == DKSwordColor.White
+                ? new Color(0.8f, 0.9f, 1.0f)  // 흰 검: 은청색
+                : new Color(0.4f, 0.0f, 0.6f); // 검 검: 진보라색
+            _swordTrail.startColor = trailColor;
+            _swordTrail.endColor   = new Color(trailColor.r, trailColor.g, trailColor.b, 0f);
+        }
     }
 
     /// <summary>
@@ -109,6 +125,7 @@ public class DeathKnightSwordController : MonoBehaviour
     {
         if (_swordGO == null || !_isVisible) return;
         _isVisible = false;
+        if (_swordTrail != null) _swordTrail.enabled = false;
         DissolveEffect.PlayDisappear(
             _swordGO,
             _disappearDuration,

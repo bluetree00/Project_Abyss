@@ -12,7 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61ef757d02b3a7843bd3b26879aca9dd, type: 3}
   m_Name: DragonGroundBreathPattern_Ice
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonGroundBreathPatternSO
-  weight: 1
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 35
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
@@ -23,10 +27,11 @@ MonoBehaviour:
   _breathDuration: 5
   _rotateSpeedPrepare: 70
   _rotateSpeedBreath: 35
-  _breathRange: 12
+  _breathRange: 24
   _breathRadius: 0.8
   _breathDamagePerSec: 20
   _breathEffectPrefab: {fileID: 189272, guid: a99a0208643f5f048be748ca15ce6eb1, type: 3}
   _warningEffectPrefab: {fileID: 0}
   _breathColor: {r: 0.5, g: 0.85, b: 1, a: 1}
   _statusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
+  _endPoseDuration: 0.4

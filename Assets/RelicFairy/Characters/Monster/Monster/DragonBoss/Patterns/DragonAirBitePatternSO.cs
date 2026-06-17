@@ -14,7 +14,7 @@ public class DragonAirBitePatternSO : BossPatternSO
     [SerializeField] private float _takeoffDuration = 0.45f;
     [SerializeField] private float _takeoffHeight = 2.8f;
     [SerializeField] private float _hoverHeight = 4f;
-    [SerializeField] private float _approachSpeed = 8f;
+    [SerializeField] private float _approachSpeed = 16f;
     [SerializeField] private float _approachDuration = 0.75f;
     [SerializeField] private float _maxApproachDuration = 2.1f;
     [SerializeField] private float _recoveryDuration = 0.35f;
@@ -574,13 +574,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled)
-            return;
-
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static void ReturnToAirCombat(MonsterContext ctx)
     {

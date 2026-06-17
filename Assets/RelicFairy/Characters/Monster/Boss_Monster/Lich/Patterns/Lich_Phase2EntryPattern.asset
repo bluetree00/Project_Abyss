@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -17,7 +17,8 @@ MonoBehaviour:
   _vfxOffset: {x: 0, y: 0, z: 0}
   _vfxFollowTransform: 0
   weight: 1
-  effectPrefab: {fileID: 3802098707266296607, guid: 58c55f68faacae24a840b257e8e54862, type: 3}
+  effectPrefab: {fileID: 3802098707266296607, guid: 58c55f68faacae24a840b257e8e54862,
+    type: 3}
   playerStatusEffect: {fileID: 0}
   patternTag: phase2entry
   breakOverride: 0.3
@@ -27,4 +28,3 @@ MonoBehaviour:
   blastRadius: 10
   damageMultiplier: 0
   knockbackMultiplier: 3
-

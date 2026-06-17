@@ -21,7 +21,6 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private GameObject _dangerZonePrefab;
     [SerializeField] private float _dangerZoneScale = 15f;
     [SerializeField] private float _dangerZoneHeightOffset = 0.05f;
-    [SerializeField] private float _arenaSideFallback = 30f;
     [SerializeField] private float _arenaFitPadding = 0.15f;
     [SerializeField] private float _warningOutlineWidth = 0.18f;
 
@@ -53,7 +52,6 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public GameObject  DangerZonePrefab        => _dangerZonePrefab;
     public float       DangerZoneScale         => _dangerZoneScale;
     public float       DangerZoneHeightOffset  => _dangerZoneHeightOffset;
-    public float       ArenaSideFallback       => _arenaSideFallback;
     public float       ArenaFitPadding         => _arenaFitPadding;
     public float       WarningOutlineWidth     => _warningOutlineWidth;
     public GameObject  IcePillarPrefab         => _icePillarPrefab;
@@ -128,6 +126,8 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
+        GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
+
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
         bool alreadyAirborne = (ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard dragonBb
@@ -139,8 +139,10 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
         float groundY = ctx.Runtime.SpawnPosition.y;
         _targetY   = groundY + Data.HoverHeight;
-        _centerPos = new Vector3(ctx.Runtime.SpawnPosition.x, _targetY, ctx.Runtime.SpawnPosition.z);
-        _warningDiameter = ResolveArenaSideLength(ctx);
+        // 슬램 중심 = Floor의 실제 중심 — 드래곤 스폰 위치와 다를 수 있어 경고장판이 Floor 밖으로 벗어나는 것을 방지
+        Vector3 floorCenter = DragonBossRoomContext.WorldCenter;
+        _centerPos = new Vector3(floorCenter.x, _targetY, floorCenter.z);
+        _warningDiameter = Mathf.Min(DragonBossRoomContext.Width, DragonBossRoomContext.Height) * DragonBossRoomContext.CellSize;
         _warningRadius = Mathf.Max(0.5f, (_warningDiameter * 0.5f) - Data.ArenaFitPadding);
 
         _takeoffHash = Animator.StringToHash(Data.TakeoffStateName);
@@ -234,7 +236,9 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
 
     private void UpdateFlyDown(MonsterContext ctx)
     {
-        float groundY = ctx.Runtime.SpawnPosition.y;
+        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
+        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
+        float groundY = DragonPatternFloorUtils.GetFloorY(_centerPos, ctx.Runtime.SpawnPosition.y);
         Vector3 pos = ctx.Transform.position;
         pos.y = Mathf.MoveTowards(pos.y, groundY, Data.FlyDownSpeed * Time.deltaTime);
         ctx.Transform.position = pos;
@@ -414,63 +418,6 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
             Data.AirRotationSpeed * Time.deltaTime);
     }
 
-    private float ResolveArenaSideLength(MonsterContext ctx)
-    {
-        Vector3 groundCenter = ctx.Runtime.SpawnPosition;
-        float bestScore = float.NegativeInfinity;
-        float bestSide = Mathf.Max(1f, Data.ArenaSideFallback);
-
-        foreach (var collider in Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None))
-        {
-            if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy)
-                continue;
-
-            Bounds bounds = collider.bounds;
-            if (!ContainsXZ(bounds, groundCenter))
-                continue;
-
-            Vector3 size = bounds.size;
-            float side = Mathf.Min(size.x, size.z);
-            if (side <= 1f)
-                continue;
-
-            float squareness = 1f - Mathf.Clamp01(Mathf.Abs(size.x - size.z) / Mathf.Max(size.x, size.z));
-            float namePriority = GetArenaNamePriority(collider.name);
-            float areaPenalty = Mathf.Clamp(side / 200f, 0f, 1f);
-            float score = namePriority + squareness - areaPenalty;
-            if (score <= bestScore)
-                continue;
-
-            bestScore = score;
-            bestSide = side;
-        }
-
-        return bestSide;
-    }
-
-    private static bool ContainsXZ(Bounds bounds, Vector3 point)
-    {
-        return point.x >= bounds.min.x && point.x <= bounds.max.x
-            && point.z >= bounds.min.z && point.z <= bounds.max.z;
-    }
-
-    private static float GetArenaNamePriority(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-            return 0f;
-
-        string lower = name.ToLowerInvariant();
-        if (lower.Contains("safefloor"))
-            return 3f;
-        if (lower.Contains("bossfloor"))
-            return 2.25f;
-        if (lower.Contains("boss") && lower.Contains("floor"))
-            return 1.5f;
-        if (lower.Contains("floor"))
-            return 1f;
-        return 0f;
-    }
-
     private static void TintParticles(GameObject go, Color color)
     {
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
@@ -528,11 +475,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static void ReturnToCombat(MonsterContext ctx)
     {

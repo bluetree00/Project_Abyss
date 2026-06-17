@@ -23,7 +23,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private float _rotateSpeedBreath  = 60f;
 
     [Header("브레스 데미지")]
-    [SerializeField] private float _breathRange        = 12f;
+    [SerializeField] private float _breathRange        = 24f;
     [SerializeField] private float _breathRadius       = 0.8f;
     [SerializeField] private int   _breathDamagePerSec = 20;
 
@@ -246,9 +246,10 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         Vector3 mouthPos = GetMouthPos(ctx);
         float groundY = DragonPatternFloorUtils.GetFloorY(mouthPos, ctx.Runtime.SpawnPosition.y) + 0.05f;
         Vector3 origin = new Vector3(mouthPos.x, groundY, mouthPos.z);
+        float range = DragonPatternFloorUtils.DistanceToFloorEdge(origin, forward, Data.BreathRange);
 
         lr.SetPosition(0, origin);
-        lr.SetPosition(1, origin + forward * Data.BreathRange);
+        lr.SetPosition(1, origin + forward * range);
     }
 
     private void SetRangeIndicatorAlpha(float r, float g, float b, float a)
@@ -353,9 +354,12 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     {
         if (ctx.Runtime.PlayerTarget == null) return;
 
+        Vector3 mouthPos = GetMouthPos(ctx);
+        float range = DragonPatternFloorUtils.DistanceToFloorEdge(mouthPos, ctx.Transform.forward, Data.BreathRange);
+
         float dmg = Data.BreathDamagePerSec * DamageTick;
-        if (Physics.SphereCast(GetMouthPos(ctx), Data.BreathRadius,
-                               ctx.Transform.forward, out var hit, Data.BreathRange))
+        if (Physics.SphereCast(mouthPos, Data.BreathRadius,
+                               ctx.Transform.forward, out var hit, range))
         {
             var player = hit.collider.GetComponent<PlayerController>()
                       ?? hit.collider.GetComponentInParent<PlayerController>();
