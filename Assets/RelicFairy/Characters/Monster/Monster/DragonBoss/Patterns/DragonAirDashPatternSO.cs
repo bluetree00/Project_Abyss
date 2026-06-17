@@ -389,7 +389,11 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         if (_playerHit)
             return;
 
-        var hits = Physics.OverlapSphere(ctx.Transform.position, Data.DashHitRadius);
+        // 드래곤이 공중(hoverHeight)에서 돌진하므로 OverlapSphere는 지상 플레이어에 닿지 않음.
+        // OverlapCapsule로 바닥~드래곤 위치 전체 구간을 커버한다.
+        Vector3 dashPos   = ctx.Transform.position;
+        Vector3 groundPos = new Vector3(dashPos.x, ctx.Runtime.SpawnPosition.y, dashPos.z);
+        var hits = Physics.OverlapCapsule(groundPos, dashPos, Data.DashHitRadius);
         foreach (var col in hits)
         {
             var player = col.GetComponent<PlayerController>()
@@ -497,13 +501,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled)
-            return;
-
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static void ReturnToAirCombat(MonsterContext ctx)
     {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
@@ -16,7 +17,7 @@ namespace RelicFairy.Monster
 ///  HP 30% 이하 도달 시 1회 발동.
 ///  이동속도 1.3x, 애니메이션 속도 1.4x. 해제 없음.
 /// </summary>
-public class DeathKnightBossMonster : MonsterBase, IBoss
+public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 {
     // ── 상수 ─────────────────────────────────────────────
     private const float Phase2SpeedMult    = 1.2f;
@@ -49,6 +50,24 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
     [Header("DeathKnight — 1페이즈 고정 위치 앵커 (비워두면 초기 위치 자동 사용)")]
     [SerializeField] private Transform _phase1AnchorTransform;
 
+    [Header("DeathKnight — 피라미드 슬래시 앵커 (플레이어 구역 중심, (0,0,-11) 오브젝트)")]
+    [SerializeField] private Transform _pyramidStrikeAnchor;
+
+    [Header("DeathKnight — 연출 종료 시 활성화할 장벽 오브젝트")]
+    [SerializeField] private GameObject[] _entranceEndBarriers;
+
+    [Header("DeathKnight — 등장 연출")]
+    [Tooltip("클로즈업 카메라 오프셋 (보스 기준). 측면+정면 대각선 구도, Y>0 으로 바닥 클리핑 방지")]
+    [SerializeField] private Vector3    _entranceCameraOffset          = new Vector3(1.5f, 1.0f, -1.5f);
+    [Tooltip("카메라가 바라보는 지점 = 데스나이트 위치 + 이 오프셋")]
+    [SerializeField] private Vector3    _entranceCameraLookOffset      = new Vector3(0f, 1.2f, 0f);
+    [Tooltip("카메라 클로즈업 전환 시간 (초)")]
+    [SerializeField] private float      _entranceCameraCloseUpDuration = 1.0f;
+    [Tooltip("보스 이름 HUD 소멸 후 플레이어 카메라 복귀 시간 (초)")]
+    [SerializeField] private float      _entranceCameraReturnDuration  = 1.2f;
+    [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
+    [SerializeField] private GameObject _entranceWindEffectPrefab;
+
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "DeathKnightBoss/DeathKnightBossConfig";
     protected override string DataAddress     => string.Empty;
@@ -66,7 +85,12 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
 
     // ── DeathKnight 공개 접근 ─────────────────────────────
     public DeathKnightBossBlackboard DKBlackboard => _dkBB;
-    public Transform SwordTransform => _swordCtrl?.SwordTransform;
+    public Transform SwordTransform          => _swordCtrl?.SwordTransform;
+    public Transform PyramidStrikeAnchor     => _pyramidStrikeAnchor;
+    public Vector3 EntranceCameraOffset          => _entranceCameraOffset;
+    public Vector3 EntranceCameraLookOffset      => _entranceCameraLookOffset;
+    public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;
+    public float   EntranceCameraReturnDuration  => _entranceCameraReturnDuration;
 
     // ── 내부 필드 ─────────────────────────────────────────
     private DeathKnightBossBlackboard _dkBB;
@@ -76,6 +100,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
     private BossPatternContext        _patternCtx;
     private bool                      _prevPatternActive;
     private bool                      _isStaggered;
+    private DKDormantState            _dormantState;
+    private bool                      _pendingTriggerEntrance;
 
     /// <summary>GetHitState 진입/종료 시 콤보 러너 차단 플래그.</summary>
     public void SetStagger(bool value) => _isStaggered = value;
@@ -124,6 +150,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
 
     protected override void OnInitialized()
     {
+        InitializeRoomContext();
         var bossConfig = _config as BossConfigSO;
         if (bossConfig == null)
         {
@@ -169,7 +196,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
             _phase2BasicPool,   // 기본 공격 풀 (공용)
             _phase2AreaPool,    // 2페이즈 광역 풀
             isAlive:     () => _runtime != null && !_runtime.IsDead && !IsPlayerDead(),
-            isInRange:   () => _runtime?.PlayerTarget != null,
+            isInRange:   IsInEngagementRange,
             isPhase2:    () => _dkBB?.IsPhase2 ?? false,
             isStaggered: () => _isStaggered,
             changeState:    s => ChangeState(s),
@@ -193,6 +220,14 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
         runnerRef = _runner;
 
         BindBossHud();
+
+        _dormantState = new DKDormantState();
+        ChangeState(_dormantState);
+        if (_pendingTriggerEntrance)
+        {
+            _pendingTriggerEntrance = false;
+            _dormantState.TriggerEntrance(_ctx);
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -204,6 +239,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
         base.Update();
 
         if (_dkBB == null || _coreBB == null) return;
+        if (_dormantState != null && _dormantState.IsActive) return;
 
         float dt = Time.deltaTime;
 
@@ -253,6 +289,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
     protected override void OnEnable()
     {
         base.OnEnable();
+        InitializeRoomContext();
         _runner?.Reset();
         _coreBB?.Reset();
         _dkBB?.Reset();
@@ -269,6 +306,9 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
             foreach (var p in _phase2AreaPool)
                 p?.OnRecycled();
         BindBossHud();
+        _pendingTriggerEntrance = false;
+        if (_dormantState != null)
+            ChangeState(_dormantState);
     }
 
     protected override void OnDisable()
@@ -352,6 +392,28 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
         if (!_prevPatternActive)
             _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
         ApplyArmorTint(_dkBB.SwordColor);
+        ApplyBarrierTint(_dkBB.SwordColor);
+    }
+
+    private void ApplyBarrierTint(DKSwordColor color)
+    {
+        if (_entranceEndBarriers == null) return;
+        Color tint, emission;
+        if (color == DKSwordColor.White)
+        {
+            tint     = new Color(0.9f, 0.95f, 1.0f,  0.02f);
+            emission = new Color(0.05f, 0.06f, 0.12f, 1f);
+        }
+        else
+        {
+            tint     = new Color(0.0f, 0.0f,  0.0f,  0.02f);
+            emission = new Color(0.0f, 0.0f,  0.0f,  1f);
+        }
+        foreach (var b in _entranceEndBarriers)
+        {
+            if (b == null) continue;
+            b.GetComponent<SoftBarrier>()?.SetTint(tint, emission);
+        }
     }
 
     private void ApplyArmorTint(DKSwordColor color)
@@ -382,6 +444,21 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 내부 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private bool IsInEngagementRange()
+    {
+        return _runtime?.PlayerTarget != null && !IsPlayerDead();
+    }
+
+    private void InitializeRoomContext()
+    {
+        if (_runtime == null) return;
+        Bounds floorBounds = DragonPatternFloorUtils.ResolveArenaBoundsXZ(_runtime.SpawnPosition, 15f);
+        int width  = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.x / 2f));
+        int height = Mathf.Max(2, Mathf.RoundToInt(floorBounds.size.z / 2f));
+        Vector3 worldCenter = new Vector3(floorBounds.center.x, 0f, floorBounds.center.z);
+        DKBossRoomContext.Initialize(width, height, 2f, worldCenter);
+    }
 
     private void InitializePatterns(BossConfigSO config)
     {
@@ -482,5 +559,37 @@ public class DeathKnightBossMonster : MonsterBase, IBoss
 
         Debug.Log($"[DK] Enrage 발동 — HP={HpRatio:F2}", this);
     }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IBossEntrance
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override bool HasEntranceAnimation => true;
+
+    public event Action OnEntranceRequested;
+    public event Action OnCombatReady;
+
+    internal void FireEntranceRequest() => OnEntranceRequested?.Invoke();
+
+    internal void FireCombatReady()
+    {
+        foreach (var b in _entranceEndBarriers)
+            if (b != null) b.SetActive(true);
+        ApplyBarrierTint(_dkBB?.SwordColor ?? DKSwordColor.White);
+        _runner?.EnsureMinBreakCooldown(3f);
+        OnCombatReady?.Invoke();
+        RaiseBossCombatReady();
+    }
+
+    public void TriggerEntrance()
+    {
+        if (_dormantState != null)
+            _dormantState.TriggerEntrance(_ctx);
+        else
+            _pendingTriggerEntrance = true;
+    }
+
+    public GameObject SpawnEntranceWindVfx()
+        => _entranceWindEffectPrefab != null ? Instantiate(_entranceWindEffectPrefab) : null;
 }
 }

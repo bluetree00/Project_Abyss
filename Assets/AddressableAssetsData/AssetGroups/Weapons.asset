@@ -45,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3defb73d0de15bf438a5b9bfda84e670
+    m_Address: UI/Popup/UI_ClearResult
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3e07f70b993baae40947d85b2813b0e6
     m_Address: T2_Crossbow_Weapon
     m_ReadOnly: 0
@@ -146,6 +151,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aae8f0f888f36fb4294032a50f519abe
+    m_Address: UI/Popup/UI_ClearReward
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b12bcf6cbd9761c489488d993a61d7ee
     m_Address: T1_Katana_Weapon
     m_ReadOnly: 0
@@ -176,16 +186,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: aae8f0f888f36fb4294032a50f519abe
-    m_Address: UI/Popup/UI_ClearReward
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3defb73d0de15bf438a5b9bfda84e670
-    m_Address: UI/Popup/UI_ClearResult
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cbf7b96bd6742054bb98dad9531eed5c
     m_Address: T1_Greatsword_Display
     m_ReadOnly: 0
@@ -193,11 +193,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db65e169d1514aa4293acaeed3b85e05
     m_Address: T1_Katana_Display
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: dc3cbb3ad4fafba4db517e2b8ecbd5d5
-    m_Address: T3_Katana
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

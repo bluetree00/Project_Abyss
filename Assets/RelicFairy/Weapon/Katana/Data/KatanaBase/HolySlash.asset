@@ -35,11 +35,11 @@ MonoBehaviour:
   dashLineScale: 1.5
   tier2ExtraHitKey: KatanaSlashHit
   tier2ExtraHitScale: 0.5
-  tier2DashMuzzleKey: KatanaDashMuzzle
+  tier2DashMuzzleKey:
   tier2DashMuzzleScale: 1.5
   tier3BurstEffectKey: MissileExplosion
   tier3BurstScale: 3
-  tier3DashLineExtraKey: IasenDashLaser
+  tier3DashLineExtraKey:
   tier3DashLineExtraScale: 1.5
   useWeaponTrail: 1
   animationOverride: QSkill_01

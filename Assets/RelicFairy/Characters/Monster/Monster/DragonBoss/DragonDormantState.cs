@@ -240,10 +240,17 @@ public class DragonDormantState : IMonsterState
 
     private static async UniTask DescendAndLandAsync(MonsterContext ctx, DragonBossMonster dragon, CancellationToken ct)
     {
-        // 착지 지점의 Y는 Spawn Y가 아닌 실제 바닥 높이를 사용 —
-        // 그렇지 않으면 NavMeshAgent.Warp이 바닥과 어긋난 위치에서 실패해 착지 후 이동이 안 됨
-        float targetY = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
-        float descentSpeed = dragon.EntranceDescendSpeed;
+        float targetY     = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
+        float fastSpeed   = dragon.EntranceDescendFastSpeed;
+        float slowSpeed   = dragon.EntranceDescendSpeed;
+        float totalHeight = ctx.Transform.position.y - targetY;
+
+        // Landing_Touchdown 클립 길이 × 착지 속도 = 착지 애니 전환 높이
+        // 클립이 재생되는 동안 slowSpeed로 이동하면 바닥에 정확히 도달하도록 역산
+        float clipLen       = GetAnimClipLength(ctx, TouchdownStateName);
+        float triggerHeight = clipLen > 0f ? clipLen * slowSpeed : 3f;
+
+        bool touchdownTriggered = false;
 
         PlayAnim(ctx, DescendStateName, 0.15f);
 
@@ -251,28 +258,60 @@ public class DragonDormantState : IMonsterState
         {
             ct.ThrowIfCancellationRequested();
 
-            Vector3 pos = ctx.Transform.position;
-            pos.y = Mathf.MoveTowards(pos.y, targetY, descentSpeed * Time.deltaTime);
-            ctx.Transform.position = pos;
+            Vector3 pos         = ctx.Transform.position;
+            float   distToGround = pos.y - targetY;
 
-            if (pos.y - targetY <= GroundedEpsilon)
+            if (distToGround <= GroundedEpsilon)
             {
                 pos.y = targetY;
                 ctx.Transform.position = pos;
                 break;
             }
 
+            // 착지 애니 전환 시점 — 클립 재생 시작 & 잔여 장애물 파괴
+            if (!touchdownTriggered && distToGround <= triggerHeight)
+            {
+                touchdownTriggered = true;
+                dragon.TriggerRockDestruction();
+                PlayAnim(ctx, TouchdownStateName, 0.1f);
+            }
+
+            // 속도 곡선: 트리거 구간 위에서 fastSpeed → slowSpeed로 sqrt 감속
+            // triggerHeight 이하(Landing_Touchdown 재생 중)는 slowSpeed 고정
+            float easeRange = totalHeight - triggerHeight;
+            float t = easeRange > 0.01f
+                ? Mathf.Clamp01((distToGround - triggerHeight) / easeRange)
+                : 0f;
+            float speed = Mathf.Lerp(slowSpeed, fastSpeed, Mathf.Sqrt(t));
+
+            pos.y = Mathf.MoveTowards(pos.y, targetY, speed * Time.deltaTime);
+            ctx.Transform.position = pos;
+
             await UniTask.Yield(ct);
         }
 
-        // 착지 시점 — 브레스로 파괴되지 않고 남은 진입로 장애물 전부 파괴
-        dragon.TriggerRockDestruction();
+        // 착지 거리가 triggerHeight보다 짧은 경우 안전망
+        if (!touchdownTriggered)
+        {
+            dragon.TriggerRockDestruction();
+            PlayAnim(ctx, TouchdownStateName, 0.1f);
+        }
 
-        PlayAnim(ctx, TouchdownStateName, 0.1f);
         await WaitForAnimNearEndAsync(ctx, TouchdownStateName, ct);
 
         // 착지 즉시 Idle 전환 — 2단계 카메라 컷/HUD와 동시에 보여진다
         PlayAnim(ctx, ctx.Animation.idleStateName, ctx.Animation.crossFadeDuration);
+    }
+
+    private static float GetAnimClipLength(MonsterContext ctx, string stateName)
+    {
+        if (ctx.Animator?.runtimeAnimatorController == null) return 0f;
+        foreach (var clip in ctx.Animator.runtimeAnimatorController.animationClips)
+        {
+            if (clip != null && clip.name == stateName)
+                return clip.length;
+        }
+        return 0f;
     }
 
     private static async UniTask LerpCameraToAsync(GameCameraController cam, Vector3 toPos, Vector3 lookAt, float duration, CancellationToken ct)

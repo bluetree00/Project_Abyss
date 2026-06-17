@@ -10,9 +10,9 @@ namespace RelicFairy.Monster
 /// 흐름:
 ///  MovingToCenter  → Walk1 재생, NavMesh로 맵 중앙 이동
 ///  TileExpansion   → Idle2 루프, DK 무적 + FireShield + 부유검 소환
-///                    경고 타일 링 단위로 맵 전체 확장
-///                    같은 색 검 파괴 → GuardianShield 생성 (피격 면제 존)
-///                    다른 색 검 파괴 → 타일 확장 가속
+///                    경고 타일 벽 위(플레이어 공간)부터 행 단위로 DK 방향 채움
+///                    같은 색 검 파괴 → GuardianShield 플레이어 위치에 생성
+///                    아무 검 파괴 → 타일 확장 가속
 ///  SlashAttack     → 전 가로줄 Sword Slash 15 + slashHitDelay 후 피격
 ///                    GuardianShield 내 플레이어 면제
 ///  Recovery        → recoveryTime 후 AttackReadyState
@@ -54,6 +54,8 @@ public class DKPyramidSlashPatternSO : BossPatternSO
     public float swordBobSpeed      = 1.5f;
     [Tooltip("검 최대 체력")]
     public float swordHp            = 30f;
+    [Tooltip("소환 검 스케일 (SM_Statue_01b ≈ 3 units, 검 메시 1.56 units → 기본 2.0으로 비슷하게 맞춤)")]
+    public float swordScale          = 2f;
 
     [Header("Timing")]
     [Tooltip("맵 중앙 이동 최대 허용 시간")]
@@ -95,12 +97,14 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
     // ── 타일 ─────────────────────────────────────────────
     private List<DKTileInfo> _tiles;
-    private int              _currentLayer;
-    private int              _maxLayer;
+    private int              _currentRow;
+    private int              _totalRows;
+    private int              _tileZStart;
+    private int              _tileZStep;
     private float            _tileLayerTimer;
     private float            _activeTileDelay;
-    private Vector2Int       _centerCell;
     private DKSwordColor     _swordColor;
+    private Transform        _playerTarget;
 
     // Effect_09_GuardianShield 프리팹 스케일(1,1,1) 기준 구체 방출기 반경
     private const float ShieldVfxSphereUnit = 15f;
@@ -129,10 +133,11 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         _phase                = Phase.MovingToCenter;
         _timer                = 0f;
         _tiles                = new List<DKTileInfo>();
-        _currentLayer         = 0;
+        _currentRow           = 0;
         _tileLayerTimer       = 0f;
         _activeTileDelay      = Data.tileLayerDelay;
         _swordColor           = GetSwordColor(ctx);
+        _playerTarget         = ctx.Runtime.PlayerTarget;
         _fireShieldVfx        = null;
         _guardianShieldVfx    = null;
         _guardianShieldActive = false;
@@ -141,17 +146,44 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         _patternEnded = false;
         _damageDone   = false;
 
-        _centerCell = new Vector2Int(DKBossRoomContext.Width / 2, DKBossRoomContext.Height / 2);
-        _maxLayer   = CalculateMaxLayer();
+        var anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
+        if (anchor != null)
+        {
+            // 앵커의 실제 위치(y 포함)를 그대로 사용해 타일이 앵커 바닥 위에 생성되도록 함
+            DKBossRoomContext.SetWorldCenterOverride(anchor.position);
+        }
 
-        MoveToCenter(ctx);
-        PlayAnim(ctx, AnimWalk);
+        _totalRows = DKBossRoomContext.Height - 2;
+        // DK forward 기준으로 타일 채움 방향 결정: 플레이어 공간 먼 쪽(DK 반대편 벽)부터 시작
+        Vector3 fwd = ctx.Transform.forward; fwd.y = 0f;
+        if (fwd.z <= 0f) { _tileZStart = 1;                                 _tileZStep = 1;  }
+        else              { _tileZStart = DKBossRoomContext.Height - 2;      _tileZStep = -1; }
+
+        if (anchor != null)
+        {
+            // 보스는 단상에 고정 — MovingToCenter 페이즈를 건너뛰고 즉시 TileExpansion 시작
+            StopAgent(ctx);
+            PlayAnim(ctx, AnimIdle2);
+            (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
+            SpawnFireShield(ctx);
+            SpawnFloatingSwords(ctx);
+            _phase          = Phase.TileExpansion;
+            _timer          = 0f;
+            _tileLayerTimer = 0f;
+        }
+        else
+        {
+            MoveToCenter(ctx);
+            PlayAnim(ctx, AnimWalk);
+        }
     }
 
     public override void Exit(MonsterContext ctx)
     {
         _patternEnded = true;
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(false);
+        if ((ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor != null)
+            DKBossRoomContext.ClearWorldCenterOverride();
         CleanupEffects();
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
@@ -201,15 +233,15 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
     {
         _tileLayerTimer += Time.deltaTime;
 
-        if (_currentLayer <= _maxLayer && _tileLayerTimer >= _activeTileDelay)
+        if (_currentRow < _totalRows && _tileLayerTimer >= _activeTileDelay)
         {
             _tileLayerTimer = 0f;
-            SpawnTileLayer(_currentLayer);
-            _currentLayer++;
+            SpawnTileRow(_currentRow);
+            _currentRow++;
         }
 
         // 전체 맵 덮임 → 양방향 슬래시 VFX 즉시 스폰 후 피격 대기
-        if (_currentLayer > _maxLayer)
+        if (_currentRow >= _totalRows)
         {
             FireAllRowSlashVfx();
             _phase = Phase.SlashAttack;
@@ -246,43 +278,15 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
     // 타일 확장
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private int CalculateMaxLayer()
+    private void SpawnTileRow(int rowIdx)
     {
-        int cx = _centerCell.x, cz = _centerCell.y;
-        int maxDist = 0;
-        foreach (var cell in DKBossRoomContext.GetInteriorCells())
-        {
-            int ring = Mathf.Max(Mathf.Abs(cell.x - cx), Mathf.Abs(cell.y - cz));
-            if (ring > maxDist) maxDist = ring;
-        }
-        return maxDist;
-    }
-
-    private void SpawnTileLayer(int ring)
-    {
-        int cx = _centerCell.x, cz = _centerCell.y;
+        int z = _tileZStart + _tileZStep * rowIdx;
         GameObject prefab = _swordColor == DKSwordColor.White
             ? Data.whiteTilePrefab : Data.blackTilePrefab;
         if (prefab == null) return;
 
-        if (ring == 0)
-        {
-            SpawnOneTile(cx, cz, prefab);
-            return;
-        }
-
-        // 상단/하단 행 (코너 포함)
-        for (int x = cx - ring; x <= cx + ring; x++)
-        {
-            SpawnOneTile(x, cz + ring, prefab);
-            SpawnOneTile(x, cz - ring, prefab);
-        }
-        // 좌측/우측 열 (코너 제외)
-        for (int z = cz - ring + 1; z < cz + ring; z++)
-        {
-            SpawnOneTile(cx - ring, z, prefab);
-            SpawnOneTile(cx + ring, z, prefab);
-        }
+        for (int x = 1; x <= DKBossRoomContext.Width - 2; x++)
+            SpawnOneTile(x, z, prefab);
     }
 
     private void SpawnOneTile(int x, int z, GameObject prefab)
@@ -291,6 +295,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         Vector3    pos = DKBossRoomContext.CellToWorld(x, z, 0.05f);
         GameObject go  = BossEffectPool.Spawn(prefab, pos, Quaternion.Euler(-90f, 0f, 0f));
         if (go == null) return;
+        go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
         _tiles.Add(new DKTileInfo { Cell = new Vector2Int(x, z), Color = _swordColor, GO = go });
     }
 
@@ -303,13 +308,14 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         if (Data.impactVfxPrefab == null) return;
         Color tint = _swordColor == DKSwordColor.White ? Color.white : Color.black;
 
+        float rowLen = DKGridPatternHelper.RowLineLength();
         for (int z = 1; z <= DKBossRoomContext.Height - 2; z++)
         {
             Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, z, 0.1f);
             DKGridPatternHelper.SpawnStretchedVfx(
-                Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), 3f, tint);
+                Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);
             DKGridPatternHelper.SpawnStretchedVfx(
-                Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), 3f, tint);
+                Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), rowLen, tint);
         }
     }
 
@@ -380,6 +386,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         var go = UnityEngine.Object.Instantiate(
             Data.floatingSwordPrefab, position, Quaternion.Euler(180f, 0f, 0f));
         if (go == null) return;
+        go.transform.localScale = Vector3.one * Data.swordScale;
 
         // 색상 머티리얼 적용
         var rend = go.GetComponentInChildren<Renderer>();
@@ -417,8 +424,10 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
         if (isSameColorAsDK)
         {
-            // 같은 색 검 파괴 → GuardianShield 생성 (지면 기준 위치)
-            Vector3 groundPos = new Vector3(position.x, DKBossRoomContext.WorldCenter.y, position.z);
+            // 같은 색 검 파괴 → GuardianShield를 플레이어 현재 위치에 생성
+            Vector3 groundPos = _playerTarget != null
+                ? new Vector3(_playerTarget.position.x, DKBossRoomContext.WorldCenter.y, _playerTarget.position.z)
+                : DKBossRoomContext.WorldCenter;
             _guardianShieldActive = true;
             _guardianShieldPos    = groundPos;
 
@@ -434,11 +443,9 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
                 }
             }
         }
-        else
-        {
-            // 다른 색 검 파괴 → 타일 확장 가속
-            _activeTileDelay = Mathf.Max(0.05f, _activeTileDelay / Data.wrongSwordSpeedMult);
-        }
+
+        // 아무 색이든 검 파괴 시 타일 확장 가속
+        _activeTileDelay = Mathf.Max(0.05f, _activeTileDelay / Data.wrongSwordSpeedMult);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -474,7 +481,7 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
 
     private void MoveToCenter(MonsterContext ctx)
     {
-        Vector3 centerWorld = DKBossRoomContext.CellToWorld(_centerCell.x, _centerCell.y, 0f);
+        Vector3 centerWorld = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, DKBossRoomContext.Height / 2, 0f);
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
             ctx.Agent.isStopped        = false;

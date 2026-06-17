@@ -85,8 +85,8 @@ MonoBehaviour:
     coinValue: 1
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 2
-  patternBreakDurationMax: 4
+  patternBreakDurationMin: 1
+  patternBreakDurationMax: 2.5
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.4

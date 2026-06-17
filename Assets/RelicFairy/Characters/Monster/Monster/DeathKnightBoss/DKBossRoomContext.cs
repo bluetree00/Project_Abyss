@@ -14,17 +14,35 @@ public static class DKBossRoomContext
     public static int     Width       = 30;
     public static int     Height      = 30;
     public static float   CellSize    = 1f;
-    public static Vector3 WorldCenter = Vector3.zero;
+    public static Vector3 WorldCenter => _overrideActive ? _worldCenterOverride : _worldCenterBase;
+
+    private static Vector3 _worldCenterBase;
+    private static Vector3 _worldCenterOverride;
+    private static bool    _overrideActive;
 
     // ── 초기화 ─────────────────────────────────────────────
 
     /// <summary>보스룸 그리드 파라미터를 설정한다.</summary>
     public static void Initialize(int width, int height, float cellSize, Vector3 worldCenter)
     {
-        Width       = width;
-        Height      = height;
-        CellSize    = cellSize;
-        WorldCenter = worldCenter;
+        Width            = width;
+        Height           = height;
+        CellSize         = cellSize;
+        _worldCenterBase = worldCenter;
+        _overrideActive  = false;
+    }
+
+    /// <summary>특정 패턴 실행 시 그리드 중심을 임시로 지정된 위치로 교체한다.</summary>
+    public static void SetWorldCenterOverride(Vector3 center)
+    {
+        _worldCenterOverride = center;
+        _overrideActive      = true;
+    }
+
+    /// <summary>SetWorldCenterOverride로 설정한 오버라이드를 제거하고 원래 중심으로 복귀한다.</summary>
+    public static void ClearWorldCenterOverride()
+    {
+        _overrideActive = false;
     }
 
     // ── 좌표 변환 ──────────────────────────────────────────

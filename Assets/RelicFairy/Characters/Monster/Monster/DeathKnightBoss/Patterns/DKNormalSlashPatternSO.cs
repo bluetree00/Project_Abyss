@@ -105,13 +105,12 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                 if (z % 2 == 1) _matchingRows.Add(z);
         }
 
-        // hitTime: 타일 제거 + 검 궤적 이펙트
+        // hitTime: 타일 제거
         if (!_tilesDestroyed && _timer >= Data.hitTime)
         {
             _tilesDestroyed = true;
             DKGridPatternHelper.DestroyEdges(_edges);
             DKGridPatternHelper.DestroyTiles(_tiles);
-            SpawnSwingVfx(ctx);
         }
 
         // hitTime + VfxDelay + n*hitStep: 줄마다 VFX + 피격
@@ -146,15 +145,6 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
         DKGridPatternHelper.DestroyEdges(_edges);
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
-    }
-
-    private void SpawnSwingVfx(MonsterContext ctx)
-    {
-        if (Data.swingVfxPrefab == null) return;
-        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
-        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 2f);
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

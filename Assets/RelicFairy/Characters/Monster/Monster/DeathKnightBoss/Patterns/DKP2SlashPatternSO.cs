@@ -119,7 +119,6 @@ public class DKP2SlashState : FullLockState<DKP2SlashPatternSO>
         if (!_hitApplied && _timer >= Data.hitTime)
         {
             _hitApplied = true;
-            SpawnSwingVfx(ctx);
             if (CheckHitZone(ctx))
                 ApplyDamage(ctx);
             else
@@ -165,15 +164,6 @@ public class DKP2SlashState : FullLockState<DKP2SlashPatternSO>
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────
-
-    private void SpawnSwingVfx(MonsterContext ctx)
-    {
-        if (Data.swingVfxPrefab == null) return;
-        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
-        BossEffectPool.SpawnOneShot(Data.swingVfxPrefab, pos, rot, fallbackLifetime: 1.5f);
-    }
 
     private static float AnimSpeed(MonsterContext ctx)
         => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.AnimSpeedMult ?? 1f;

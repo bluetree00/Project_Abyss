@@ -148,7 +148,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             DKGridPatternHelper.DestroyTiles(_tiles);
             _tiles = SpawnRingTiles(Pattern1(), maxRing);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
-            SpawnSwingVfx(ctx);
         }
         if (!_shown2 && _timer >= Data.hitTime2)
         {
@@ -157,7 +156,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             DKGridPatternHelper.DestroyTiles(_tiles);
             _tiles = SpawnRingTiles(Pattern2(), maxRing);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
-            SpawnSwingVfx(ctx);
         }
         if (!_shown3 && _timer >= Data.hitTime3)
         {
@@ -166,7 +164,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             DKGridPatternHelper.DestroyTiles(_tiles);
             _tiles = SpawnRingTiles(Pattern1(), maxRing);
             _edges = DKGridPatternHelper.SpawnBoundaryEdges(_tiles, Data.edgePrefab);
-            SpawnSwingVfx(ctx);
         }
         if (_shown3 && !_cleared && _timer >= Data.hitTime3 + Data.holdDuration)
         {
@@ -282,6 +279,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             Vector3    pos = DKBossRoomContext.CellToWorld(cell.x, cell.y, 0.05f);
             GameObject go  = BossEffectPool.Spawn(prefab, pos, Quaternion.Euler(-90f, 0f, 0f));
             if (go == null) continue;
+            go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
             result.Add(new DKTileInfo { Cell = cell, Color = color, GO = go });
         }
         return result;
@@ -300,16 +298,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         DKGridPatternHelper.DestroyEdges(_edges);
         DKGridPatternHelper.DestroyTiles(_tiles);
         RestoreAgent(ctx);
-    }
-
-    private void SpawnSwingVfx(MonsterContext ctx)
-    {
-        if (Data.swingVfxPrefab == null) return;
-        Transform swordTf = (ctx.Monster as DeathKnightBossMonster)?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : ctx.Transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : ctx.Transform.rotation;
-        BossEffectPool.SpawnOneShot(
-            Data.swingVfxPrefab, pos, rot, fallbackLifetime: 2f);
     }
 
     private static DKSwordColor GetSwordColor(MonsterContext ctx)

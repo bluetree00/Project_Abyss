@@ -478,11 +478,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static DragonBossBlackboard GetDragonBB(MonsterContext ctx)
         => (ctx.Monster as DragonBossMonster)?.DragonBlackboard;

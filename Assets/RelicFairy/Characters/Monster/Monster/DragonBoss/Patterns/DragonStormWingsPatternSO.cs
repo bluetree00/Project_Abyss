@@ -36,9 +36,13 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [Header("EndPose (반격 창)")]
     [SerializeField] private float  _endPoseDuration     = 0.4f;
 
+    [Header("원소")]
+    [SerializeField] private DragonBossBlackboard.DragonElement _element = DragonBossBlackboard.DragonElement.Thunder;
+
     [Header("쿨다운")]
     [SerializeField] private float  _cooldown            = 18f;
 
+    public DragonBossBlackboard.DragonElement Element => _element;
     public float  HoverHeight        => _hoverHeight;
     public string TakeoffStateName   => _takeoffStateName;
     public string HoverStateName     => _hoverStateName;
@@ -193,8 +197,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     private void CreateWarning(MonsterContext ctx)
     {
-        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
-        Color c = new Color(thunderBase.r, thunderBase.g, thunderBase.b, Data.WarningColor.a);
+        Color elementBase = DragonBossVisualHelper.GetElementColor(Data.Element);
+        Color c = new Color(elementBase.r, elementBase.g, elementBase.b, Data.WarningColor.a);
         _targetAlpha = c.a;
 
         // 바닥 기준 위치 — 지형 z-fighting 방지용 0.3f 오프셋
@@ -344,8 +348,8 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         go.transform.localScale = new Vector3(Data.WarningWidth, Data.WarningWidth * 0.5f, _effectiveLength);
 
         // 속성 색상 적용
-        Color thunderBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Thunder);
-        Color tint = new Color(thunderBase.r, thunderBase.g, thunderBase.b, 1f);
+        Color elementBase = DragonBossVisualHelper.GetElementColor(Data.Element);
+        Color tint = new Color(elementBase.r, elementBase.g, elementBase.b, 1f);
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -429,11 +433,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     }
 
     private static void RestoreAgent(MonsterContext ctx)
-    {
-        if (ctx.Agent == null || ctx.Agent.enabled) return;
-        ctx.Agent.enabled = true;
-        ctx.Agent.Warp(ctx.Transform.position);
-    }
+        => DragonPatternFloorUtils.SnapToFloorAndRestoreAgent(ctx);
 
     private static DragonBossBlackboard GetDragonBB(MonsterContext ctx)
         => (ctx.Monster as DragonBossMonster)?.DragonBlackboard;

@@ -79,8 +79,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _detectionRange = 15f;
     [Tooltip("등장 시 착지 지점 위쪽으로 띄우는 높이 — 브레스 발사 고도")]
     [SerializeField] private float _entranceDescendHeight = 45f;
-    [Tooltip("등장 하강 속도 (m/s)")]
-    [SerializeField] private float _entranceDescendSpeed = 18f;
+    [Tooltip("등장 하강 초기 빠른 속도 (m/s) — 착지 트리거 구간 전까지 이 속도로 하강")]
+    [SerializeField] private float _entranceDescendFastSpeed = 35f;
+    [Tooltip("등장 착지 애니메이션 재생 구간 속도 (m/s) — Landing_Touchdown 클립 재생 중 이 속도 유지")]
+    [SerializeField] private float _entranceDescendSpeed = 5f;
     [Tooltip("등장 브레스로 파괴할 진입로 바위들 (SM_grouped_cliffs_SM_Rock_31 + (1)~(6))")]
     [SerializeField] private GameObject[] _entranceRockObjects;
     [Tooltip("지붕 파괴 임팩트 시점 생성할 브레스 VFX 프리팹")]
@@ -132,8 +134,9 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
     public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
 
-    public float   EntranceDescendHeight     => _entranceDescendHeight;
-    public float   EntranceDescendSpeed      => _entranceDescendSpeed;
+    public float   EntranceDescendHeight      => _entranceDescendHeight;
+    public float   EntranceDescendFastSpeed   => _entranceDescendFastSpeed;
+    public float   EntranceDescendSpeed       => _entranceDescendSpeed;
     public Vector3 EntranceCameraOffset      => _entranceCameraOffset;
     public Vector3 EntranceCameraLookOffset  => _entranceCameraLookOffset;
     public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;

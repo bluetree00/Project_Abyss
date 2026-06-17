@@ -130,5 +130,27 @@ namespace RelicFairy.Monster
                 return 1f;
             return 0f;
         }
+
+        /// <summary>
+        /// 공중 패턴 종료 후 지상 복귀 시 모든 패턴에서 공통으로 사용한다.
+        /// Transform Y를 SpawnPosition.y(최초 정상 착지 높이)로 스냅한 뒤
+        /// NavMesh.SamplePosition으로 가장 가까운 NavMesh 지점에 Agent를 Warp한다.
+        /// SpawnPosition.y는 초기 착지 시 정상 동작이 확인된 높이이므로
+        /// Raycast 오차나 애니메이션 드리프트로 인한 NavMesh 이탈을 방지한다.
+        /// </summary>
+        internal static void SnapToFloorAndRestoreAgent(MonsterContext ctx)
+        {
+            Vector3 pos = ctx.Transform.position;
+            pos.y = ctx.Runtime.SpawnPosition.y;
+            ctx.Transform.position = pos;
+
+            if (ctx.Agent == null) return;
+            if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
+            if (!ctx.Agent.isOnNavMesh
+                && UnityEngine.AI.NavMesh.SamplePosition(pos, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                ctx.Agent.Warp(hit.position);
+            }
+        }
     }
 }
