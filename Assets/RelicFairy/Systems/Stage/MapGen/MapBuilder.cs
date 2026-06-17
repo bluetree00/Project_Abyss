@@ -224,12 +224,11 @@ public class MapBuilder
         var visualCol = visual.GetComponent<Collider>();
         if (visualCol != null) Object.Destroy(visualCol);
 
-        // 색상: 발판=파랑, 상자=노랑
+        // 색상: 발판=파랑, 상자=노랑 (빌드 프리미티브 핑크 방지 — URP/Lit 명시 할당)
         var renderer = visual.GetComponent<Renderer>();
-        if (renderer != null)
-            renderer.material.color = isPedestal
-                ? new Color(0.3f, 0.5f, 1f, 0.8f)
-                : new Color(1f, 0.85f, 0.2f, 0.8f);
+        RuntimePrimitiveMaterial.Apply(renderer, isPedestal
+            ? new Color(0.3f, 0.5f, 1f, 0.8f)
+            : new Color(1f, 0.85f, 0.2f, 0.8f));
 
         AttachBuffInteraction(go, type);
 
@@ -315,9 +314,9 @@ public class MapBuilder
         var visualCol = visual.GetComponent<Collider>();
         if (visualCol != null) Object.Destroy(visualCol);
 
+        // 나무색 진열대 (빌드 프리미티브 핑크 방지 — URP/Lit 명시 할당)
         var renderer = visual.GetComponent<Renderer>();
-        if (renderer != null)
-            renderer.material.color = new Color(0.9f, 0.6f, 0.2f, 1f); // 나무색 진열대
+        RuntimePrimitiveMaterial.Apply(renderer, new Color(0.9f, 0.6f, 0.2f, 1f));
 
         var interaction = go.AddComponent<ShopStallInteraction>();
         interaction.SetCategory(category);

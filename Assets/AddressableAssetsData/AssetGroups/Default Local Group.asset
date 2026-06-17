@@ -90,6 +90,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 813a84120a8c453488b7cc49058dfb9d
+    m_Address: UI/Popup/UI_WeaponForgePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
     m_Address: UI/Popup/UI_ShopPanel
     m_ReadOnly: 0

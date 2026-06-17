@@ -139,11 +139,11 @@ public class GoldCoinPickup : MonoBehaviour
         if (col != null) Object.Destroy(col);
 
         var rend = go.GetComponent<Renderer>();
+        // 빌드에서 프리미티브 기본 머티리얼이 핑크로 스트립되는 문제 → URP/Lit 명시 할당.
+        RuntimePrimitiveMaterial.Apply(rend, CoinColor);
         if (rend != null)
         {
             var mat = rend.material; // instance — 공유 머티리얼 오염 방지
-            if (mat.HasProperty("_Color"))      mat.color = CoinColor;
-            if (mat.HasProperty("_BaseColor"))  mat.SetColor("_BaseColor", CoinColor);
             if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.9f);
             if (mat.HasProperty("_Metallic"))   mat.SetFloat("_Metallic", 0.9f);
         }

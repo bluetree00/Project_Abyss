@@ -779,6 +779,66 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandleRunClear() => HandleRunEndAsync(true).Forget();
 
+    private bool _advancingChapter;
+
+    /// <summary>보스 클리어(비최종 챕터) 시 ClearRewardTrigger가 호출 — 챕터 전환 연출 후 다음 챕터 procgen 재시작.</summary>
+    public void AdvanceChapter() => AdvanceChapterAsync().Forget();
+
+    /// <summary>
+    /// 챕터 전환: 챕터 번호·테마 갱신 → 풀스크린 "CHAPTER N" 연출 아래에서 다음 챕터 풀/구조로 procgen 재시작.
+    /// 마지막 챕터면 런 클리어로 분기. 씬 리로드 없이 현재 씬에서 이어진다(RunFlowController.StartNextChapterAsync).
+    /// </summary>
+    private async UniTaskVoid AdvanceChapterAsync()
+    {
+        if (_advancingChapter) return;
+        _advancingChapter = true;
+        var ct = this.GetCancellationTokenOnDestroy();
+        ChapterTransitionOverlay overlay = null;
+        try
+        {
+            var run = Run;
+            if (run == null) return;
+
+            run.EnterChapterClear();
+            if (!run.AdvanceToNextChapter())
+            {
+                HandleRunClear(); // 마지막 챕터였음 — 런 클리어
+                return;
+            }
+
+            var chapter = run.CurrentChapter;
+
+            overlay = new ChapterTransitionOverlay();
+            await overlay.PlayInAsync($"CHAPTER {(int)chapter}", string.Empty, ct);
+
+            // 다음 챕터 키 해석 (StartProcGenRunAsync와 동일 3단 폴백)
+            var serverEntry = Managers.ChapterData?.Get(chapter);
+            var chapterSO   = chapterRegistry?.GetData(chapter);
+            var poolKey     = serverEntry?.zone_pool_key;
+            if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
+            if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
+            var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
+
+            var flow = runFlowController != null ? runFlowController : GetComponent<RunFlowController>();
+            if (flow == null)
+            {
+                Debug.LogError("[GameRunBootstrapper] AdvanceChapter: RunFlowController 없음");
+                return;
+            }
+
+            await flow.StartNextChapterAsync(poolKey, structureKey);
+            await overlay.PlayOutAsync(ct);
+            overlay = null;
+            Debug.Log($"[GameRunBootstrapper] 챕터 전환 완료 → Chapter {(int)chapter}");
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (overlay != null) await overlay.PlayOutAsync(ct);
+            _advancingChapter = false;
+        }
+    }
+
     /// <summary>
     /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
     /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
@@ -944,6 +1004,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
         bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
         Vector3? customArenaEntryPos = null; // 커스텀 아레나: 프리팹 PlayerSpawn 마커 위치(있으면 grid 입구 대신 사용 → 격자 정렬 불필요)
+        System.Collections.Generic.List<ProcExitSlot> customArenaExits = null; // 프리팹 Exit 마커에서 산출한 출구(있으면 grid DR 대신 사용 → 게이트가 항상 프리팹 바닥 위)
 
         // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
         //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
@@ -974,6 +1035,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 var playerSpawn = arena.transform.Find("PlayerSpawn");
                 if (playerSpawn != null) customArenaEntryPos = playerSpawn.position;
                 else Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}'에 PlayerSpawn 자식 없음 — grid 입구로 폴백");
+
+                // 출구: 프리팹 Exit 마커(Exit/Exit1/Exit2…)를 우선 사용 — PlayerSpawn 규약과 동일.
+                customArenaExits = CollectArenaExitSlots(arena.transform, wallLayers * blockCellSize);
             }
             else
             {
@@ -1059,27 +1123,38 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
         float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
-        if (cls.entrance.HasValue)
+
+        // 커스텀 아레나에 Exit 마커가 있으면 그리드 DR 대신 사용 — 출구 게이트가 항상 프리팹 바닥 위에 배치된다.
+        // (그리드는 프리팹 footprint보다 커서 DR 셀이 바닥 밖에 떨어지는 문제 회피. 입구 잠금은 생략 — 프리팹이 경계를 소유.)
+        if (useCustomArena && customArenaExits != null && customArenaExits.Count > 0)
         {
-            var de = doorInfos[cls.entrance.Value];
-            result.hasEntrance = true;
-            result.entrance = new ProcExitSlot {
-                worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
-                openingWidth = de.width * blockCellSize, openingHeight = openingH };
+            result.hasEntrance = false;
+            result.exits.AddRange(customArenaExits);
         }
-        if (cls.forward.HasValue)
+        else
         {
-            var d = doorInfos[cls.forward.Value];
-            result.exits.Add(new ProcExitSlot {
-                worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
-                openingWidth = d.width * blockCellSize, openingHeight = openingH });
-        }
-        foreach (var t in cls.turns)
-        {
-            var d = doorInfos[t];
-            result.exits.Add(new ProcExitSlot {
-                worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
-                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            if (cls.entrance.HasValue)
+            {
+                var de = doorInfos[cls.entrance.Value];
+                result.hasEntrance = true;
+                result.entrance = new ProcExitSlot {
+                    worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
+                    openingWidth = de.width * blockCellSize, openingHeight = openingH };
+            }
+            if (cls.forward.HasValue)
+            {
+                var d = doorInfos[cls.forward.Value];
+                result.exits.Add(new ProcExitSlot {
+                    worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
+                    openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            }
+            foreach (var t in cls.turns)
+            {
+                var d = doorInfos[t];
+                result.exits.Add(new ProcExitSlot {
+                    worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
+                    openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            }
         }
 
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
@@ -1106,6 +1181,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             case DoorEdge.West:  return new Vector3( d, 0f, 0f);
             default:             return Vector3.zero;
         }
+    }
+
+    /// <summary>
+    /// 커스텀 아레나 프리팹의 Exit 마커(이름이 "Exit"로 시작하는 자식)를 출구 슬롯으로 변환한다.
+    /// 마커의 월드 위치 = 게이트 바닥 중앙, 마커의 +Z(forward) = 출구 방향(밖) → 엣지 산출.
+    /// 마커가 없으면 빈 리스트(호출자가 grid 폴백).
+    /// </summary>
+    private System.Collections.Generic.List<ProcExitSlot> CollectArenaExitSlots(Transform arena, float openingHeight)
+    {
+        var list = new System.Collections.Generic.List<ProcExitSlot>();
+        if (arena == null) return list;
+
+        var all = arena.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < all.Length; i++)
+        {
+            var t = all[i];
+            if (t == arena || !t.name.StartsWith("Exit", System.StringComparison.OrdinalIgnoreCase)) continue;
+
+            var edge  = EdgeFromForward(t.forward);
+            float ow  = t.localScale.x > 0.01f ? t.localScale.x : GateWidth * blockCellSize;
+            list.Add(new ProcExitSlot {
+                worldPos     = t.position,
+                isForward    = edge == DoorEdge.North,
+                edge         = edge,
+                openingWidth = ow,
+                openingHeight = openingHeight });
+        }
+        return list;
+    }
+
+    /// <summary>월드 forward 벡터를 가장 가까운 카디널 DoorEdge로 매핑.</summary>
+    private static DoorEdge EdgeFromForward(Vector3 fwd)
+    {
+        if (Mathf.Abs(fwd.z) >= Mathf.Abs(fwd.x))
+            return fwd.z >= 0f ? DoorEdge.North : DoorEdge.South;
+        return fwd.x >= 0f ? DoorEdge.East : DoorEdge.West;
     }
 
     /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>

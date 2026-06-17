@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using Cysharp.Threading.Tasks;
 using BackEnd;
 
@@ -10,7 +11,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 {
     public static AppBootstrapper Instance { get; private set; }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    // 모든 빌드에서 부트스트랩 자동 생성 (씬/프리팹에 배치된 인스턴스 없음 → 릴리스 빌드 부팅 보장).
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoCreate()
     {
@@ -20,7 +21,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         var go = new GameObject("@AppBootstrapper");
         go.AddComponent<AppBootstrapper>();
     }
-#endif
 
     [Header("Core Init")]
     [SerializeField] private bool initBackend = true;
@@ -51,6 +51,11 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private bool startFlow = false;   // 테스트 씬이면 보통 false
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
+
+    // 콜드 부팅 연출 — 첫 씬(로비) UI가 준비되기 전 빈 화면을 가리는 검은 커버.
+    // Awake에서 즉시 생성(Addressables/UIRoot 무관), NotifySceneReady/IsReady 시 페이드아웃.
+    private GameObject _bootCover;
+    private bool _bootCoverDismissed;
 
     // ---- 로드아웃 (로비 선택 → InGame 전달) ----
     public PlayerLoadout Loadout { get; private set; } = new PlayerLoadout();
@@ -162,6 +167,53 @@ public sealed class AppBootstrapper : MonoBehaviour
     public void NotifySceneReady()
     {
         UI_SceneLoading.Instance?.HideAsync().Forget();
+        DismissBootCover();
+    }
+
+    // 검은 커버 생성 — 코드 자체완결 ScreenSpaceOverlay 캔버스(최상단, 입력 차단).
+    private void CreateBootCover()
+    {
+        _bootCover = new GameObject("@BootCover");
+        DontDestroyOnLoad(_bootCover);
+
+        var canvas = _bootCover.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = short.MaxValue; // 모든 UI 위
+        _bootCover.AddComponent<GraphicRaycaster>(); // 빈 로비 클릭 차단
+        _bootCover.AddComponent<CanvasGroup>();
+
+        var imgGo = new GameObject("Black");
+        imgGo.transform.SetParent(_bootCover.transform, false);
+        var img = imgGo.AddComponent<Image>();
+        img.color = Color.black;
+        var rt = img.rectTransform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+    }
+
+    // 로비 UI 준비 완료(또는 IsReady 폴백) 시 1회 페이드아웃.
+    private void DismissBootCover()
+    {
+        if (_bootCoverDismissed || _bootCover == null) return;
+        _bootCoverDismissed = true;
+        FadeOutBootCoverAsync().Forget();
+    }
+
+    private async UniTaskVoid FadeOutBootCoverAsync()
+    {
+        var cg = _bootCover.GetComponent<CanvasGroup>();
+        const float dur = 0.4f;
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            if (cg != null) cg.alpha = Mathf.Lerp(1f, 0f, t / dur);
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+        Destroy(_bootCover);
+        _bootCover = null;
     }
 
     public void RequestStartRun()
@@ -381,6 +433,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        // 부팅 즉시 검은 커버 — 비동기 init 동안 빈 로비 노출 방지(첫 프레임부터).
+        CreateBootCover();
+
         // RunProgressManager (이어하기 저장) — 뒤끝 로그인 전부터 인스턴스 준비
         if (RunProgressManager.Instance == null)
         {
@@ -548,6 +603,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         }
 
         IsReady = true;
+
+        // 폴백 — 씬→상태 매핑이 없어 NotifySceneReady가 안 불리는 경우에도 커버가 영구히 남지 않도록.
+        DismissBootCover();
     }
 
     private void OnDestroy()

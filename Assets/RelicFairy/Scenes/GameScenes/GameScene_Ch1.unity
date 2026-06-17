@@ -15,18 +15,18 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.35, g: 0.4, b: 0.38, a: 1}
+  m_FogColor: {r: 0.09, g: 0.16, b: 0.15, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.006
+  m_FogDensity: 0.011
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.28, g: 0.36, b: 0.42, a: 1}
+  m_AmbientSkyColor: {r: 0.1, g: 0.17, b: 0.15, a: 1}
   m_AmbientEquatorColor: {r: 0.22, g: 0.22, b: 0.2, a: 1}
   m_AmbientGroundColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
-  m_AmbientIntensity: 0.75
+  m_AmbientIntensity: 0.85
   m_AmbientMode: 3
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: e59092bab1bc41098dbb441e7bc5aadd, type: 2}
+  m_SkyboxMaterial: {fileID: 2100000, guid: 1afb83b7dcdfd0042a92322a9bd2f061, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -816,6 +816,11 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  bossOrbitTop: {x: 8, y: 8}
+  bossOrbitMiddle: {x: 5.5, y: 6.5}
+  bossOrbitBottom: {x: 3, y: 5}
+  topDownHeight: 35
+  topDownAscendDuration: 1.2
 --- !u!114 &330585551
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1198,6 +1203,10 @@ MonoBehaviour:
     type: 3}
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}
+  shopNpcAddressableKey: Shop/ShopNpc
+  shopWeaponSlotFallback: 1
+  shopRerollEnabled: 0
+  shopRerollCost: 50
   clearEndEffectPrefab: {fileID: 8117584988822686635, guid: a61117abe58ca5e4984969cb5c8e33b6,
     type: 3}
   clearEndEffect2Prefab: {fileID: 3606566459220164321, guid: 1f4f93d25102e9f49884560a79fc4185,
@@ -1579,6 +1588,55 @@ Transform:
   m_Children:
   - {fileID: 32953335}
   m_Father: {fileID: 330585546}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &923893142
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 923893144}
+  - component: {fileID: 923893143}
+  m_Layer: 0
+  m_Name: PP_Ch1_Forest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &923893143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 923893142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
+  m_IsGlobal: 1
+  priority: 1
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: 68829be54e8483940b07ade618b3a803, type: 2}
+--- !u!4 &923893144
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 923893142}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &929267072
 GameObject:
@@ -3210,7 +3268,6 @@ MonoBehaviour:
   chapter: 0
   bootstrapper: {fileID: 0}
   clearRoomKey: 286
-  returnToStageMapKey: 287
   spawnItemKey: 288
 --- !u!114 &1881724120
 MonoBehaviour:
@@ -3762,3 +3819,4 @@ SceneRoots:
   - {fileID: 1350179239}
   - {fileID: 589569921}
   - {fileID: 1347629739}
+  - {fileID: 923893144}
