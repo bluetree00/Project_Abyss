@@ -202,6 +202,9 @@ public class CharacterDisplayStand : MonoBehaviour, IWispInteractable
 
         loadout.SetCharacter(characterData, characterPrefabKey);
         loadout.SetRelic(relicClass); // null이면 기존 캐릭터 경로 유지 (회귀 0)
+
+        // 퀘스트: 유물/캐릭터 획득 보고 (범용 채널)
+        QuestEvents.Report("Relic", relicClass != null ? relicClass.DisplayName : characterPrefabKey);
         // 유물 경로(characterData null)면 몸이 prefabKey로 베이스 데이터를 자체 로드하므로 스킵
         if (characterData != null)
             Managers.CharacterData?.SetCharacterData(characterData, characterPrefabKey);

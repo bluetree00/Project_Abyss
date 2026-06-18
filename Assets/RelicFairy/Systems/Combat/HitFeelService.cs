@@ -81,18 +81,23 @@ public static class HitFeelService
     }
 
     /// <summary>데미지 비례 히트 피드백 — 정지 길이를 데미지에 비례시키되 상한으로 클램프.
-    /// 깊이(timeScale)·셰이크는 비크리/크리 앵커 고정(기존 Light/Crit 체감 유지).</summary>
+    /// 깊이(timeScale)·셰이크는 비크리/크리 앵커 고정(기존 Light/Crit 체감 유지). 무기 무관 기본 프로필.</summary>
     public static void Hit(float damage, bool isCritical)
+        => Hit(damage, isCritical, WeaponFeelTable.Default);
+
+    /// <summary>무기별 손맛 프로필 적용 히트 피드백 — 정지 길이는 데미지 비례 × feel.StopDurationMult,
+    /// 깊이·셰이크는 feel 값. 무기마다 무게감/카메라 셰이크가 달라진다.</summary>
+    public static void Hit(float damage, bool isCritical, in WeaponFeel feel)
     {
         if (isCritical)
         {
-            HitStop(CritStopScale, CritStopDuration(damage));
-            CameraShake(0.18f, 0.18f);
+            HitStop(feel.CritStopScale, CritStopDuration(damage) * feel.StopDurationMult);
+            CameraShake(feel.CritShakeAmp, feel.CritShakeDur);
         }
         else
         {
-            HitStop(LightStopScale, HitStopDuration(damage));
-            CameraShake(0.04f, 0.06f);
+            HitStop(feel.StopScale, HitStopDuration(damage) * feel.StopDurationMult);
+            CameraShake(feel.ShakeAmp, feel.ShakeDur);
         }
     }
 

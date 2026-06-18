@@ -117,6 +117,20 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
         return useLeft ? _owner.handTransformLeft : _owner.handTransform;
     }
 
+    // 활/석궁은 전용 왼손 소켓이 없어 모델이 마운트에 거꾸로 붙는다(발사 방향은 정상). 장착 시 Y 180° 보정.
+    // 게임에서 보며 이 값만 조정. 0이면 보정 없음.
+    private const float RangedMountYawCorrection = 180f;
+
+    /// <summary>활/석궁 인스턴스의 장착 방향을 보정한다. 생성 직후 1회만 호출(재장착/전환 시 중복 360° 방지).</summary>
+    private static void ApplyMountOrientation(GameObject instance, WeaponData data)
+    {
+        if (instance == null || data == null) return;
+        bool ranged = data.weaponType == WeaponType.Bow || data.weaponType == WeaponType.Crossbow;
+        if (!ranged || Mathf.Abs(RangedMountYawCorrection) < 0.01f) return;
+        var t = instance.transform;
+        t.localRotation = Quaternion.Euler(0f, RangedMountYawCorrection, 0f) * t.localRotation;
+    }
+
     private void Awake()
     {
         for (int i = 0; i < slots.Length; i++)
@@ -205,6 +219,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
                     var wi = slot.instance.GetComponent<WeaponInstance>();
                     if (wi != null) wi.Initialize(runtimeData);
+
+                    ApplyMountOrientation(slot.instance, runtimeData);
                 }
             }
             catch (Exception ex)
@@ -272,6 +288,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
                         var wi = target.instance.GetComponent<WeaponInstance>();
                         if (wi != null) wi.Initialize(target.runtimeData);
+
+                        ApplyMountOrientation(target.instance, target.runtimeData);
                     }
                 }
                 catch (Exception ex)

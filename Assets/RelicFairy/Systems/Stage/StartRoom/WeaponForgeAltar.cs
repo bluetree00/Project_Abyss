@@ -133,6 +133,9 @@ public class WeaponForgeAltar : MonoBehaviour
         loadout.SetWeaponSlot0(choice.Melee);
         loadout.SetWeaponSlot1(choice.Ranged);
 
+        // 퀘스트: 장비 선택 보고 (범용 채널)
+        QuestEvents.Report("Equip", choice.Melee != null ? choice.Melee.name : "Weapon");
+
         var player = _player;
         if (player == null) return;
 

@@ -77,6 +77,9 @@ public class LocoDodgeState : ILayerState<LocoState>
         // 회피 시작 연출 신호(먼지·트레일). i-frame 창과 무관하게 회피 진입 즉시 1회.
         _controller.RaiseDodgeStart();
 
+        // 대시 펀치 — 진입 순간 짧은 약한 카메라 셰이크로 가속감 부여.
+        HitFeelService.CameraShake(0.05f, 0.1f);
+
         // startDelay==0이면 Enter 즉시 무적 적용(아래 헬퍼가 시각 도달 검사).
         TryApplyIFrame();
     }

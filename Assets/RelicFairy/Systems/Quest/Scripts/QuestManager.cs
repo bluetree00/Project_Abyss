@@ -95,6 +95,31 @@ public class QuestManager
         return newQuest;
     }
 
+    /// <summary>
+    /// QuestDatabase에서 codeName으로 퀘스트를 찾아 등록. 이미 진행/완료 중이면 무시.
+    /// 런 시작·튜토리얼 등에서 특정 퀘스트를 명시적으로 시작할 때 사용.
+    /// </summary>
+    public Quest RegisterQuest(string codeName)
+    {
+        if (_questDatabase == null)
+        {
+            Debug.LogWarning("[QuestManager] QuestDatabase 미초기화 — RegisterQuest 무시.");
+            return null;
+        }
+
+        var quest = _questDatabase.FindQuestBy(codeName);
+        if (quest == null)
+        {
+            Debug.LogWarning($"[QuestManager] '{codeName}' 퀘스트를 DB에서 찾을 수 없음.");
+            return null;
+        }
+
+        if (ContainInActiveQuests(quest) || ContainInCompleteQuests(quest))
+            return null;
+
+        return Register(quest);
+    }
+
     public void ReceiveReport(string category, object target, int successCount)
     {
         ReceiveReport(_activeQuests, category, target, successCount);
@@ -143,10 +168,8 @@ public class QuestManager
 
     private void SubscribeQuestEvents()
     {
-        QuestEvents.OnMonsterKilled  += codeName  => ReceiveReport("Kill",  codeName, 1);
-        QuestEvents.OnRoomCleared    += category  => ReceiveReport("Room",  category, 1);
-        QuestEvents.OnItemCollected  += itemId    => ReceiveReport("Item",  itemId,   1);
-        QuestEvents.OnGoldGained     += amount    => ReceiveReport("Gold",  amount,   1);
+        // 단일 범용 채널만 구독 — 새 카테고리는 여기 수정 없이 Report(category,...)로 확장된다.
+        QuestEvents.OnReported += ReceiveReport;
     }
 
     // ──────────────────────────────────────────────────────────

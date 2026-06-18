@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GreatswordAnimation
   m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimationSetSO
   useGuardCharge: 1
-  lightAttackAnimSpeed: 1
+  lightAttackAnimSpeed: 1.4
   heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.5
   defaultComboWindowClose: 0.85
@@ -31,13 +31,13 @@ MonoBehaviour:
       addressableKey: SS_Sprint
       actionType: 0
     - baseClipName: GroundLightAttack_01
-      addressableKey: GreatswordAttack_01
+      addressableKey: GS_Attack02_2
       actionType: 1
       comboIndex: 0
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.5
+      comboWindowOpen: 0.35
       comboWindowClose: 0.85
       attackEndAt: 0.9
       attackStepDistance: 1.6
@@ -47,13 +47,13 @@ MonoBehaviour:
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_02
-      addressableKey: GreatswordAttack_02
+      addressableKey: GS_Attack02_3
       actionType: 1
       comboIndex: 1
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.5
+      comboWindowOpen: 0.35
       comboWindowClose: 0.85
       attackEndAt: 0.9
       attackStepDistance: 1.6
@@ -63,7 +63,7 @@ MonoBehaviour:
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_03
-      addressableKey: GreatswordAttack_03
+      addressableKey: GS_Attack02_4
       actionType: 1
       comboIndex: 2
       isPlunge: 0
@@ -147,7 +147,7 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.5
+      comboWindowOpen: 0.35
       comboWindowClose: 0.85
       attackEndAt: 0.9
     - baseClipName: AirLightAttack_02
