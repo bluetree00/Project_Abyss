@@ -20,6 +20,9 @@ public class LobbyIntroPlayer : MonoBehaviour
     private RenderTexture _renderTexture;
     private CancellationTokenSource _cts;
 
+    /// <summary>인트로 루프 영상이 실제 재생 중인지 — 로비가 화면에 나오기 시작한 시점(부팅 커버 페이드아웃 트리거용).</summary>
+    public bool IsPlaying => _videoPlayer != null && _videoPlayer.isPlaying;
+
     private void Awake()
     {
         var bgTr = transform.Find("BG");

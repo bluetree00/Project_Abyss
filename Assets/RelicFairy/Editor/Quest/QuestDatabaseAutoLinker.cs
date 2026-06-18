@@ -19,8 +19,7 @@ public static class QuestDatabaseAutoLinker
         string[] dbGuids = AssetDatabase.FindAssets("t:QuestDatabase");
         if (dbGuids.Length == 0)
         {
-            Debug.LogError("[QuestDatabaseAutoLinker] QuestDatabase 에셋을 찾을 수 없습니다.");
-            EditorUtility.DisplayDialog("Rebuild Database", "QuestDatabase 에셋이 없습니다.\n먼저 에셋을 생성하세요.", "확인");
+            Debug.LogError("[QuestDatabaseAutoLinker] QuestDatabase 에셋을 찾을 수 없습니다. 먼저 Generate From CSV 실행.");
             return;
         }
 
@@ -71,11 +70,7 @@ public static class QuestDatabaseAutoLinker
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        EditorUtility.DisplayDialog(
-            "Rebuild Database",
-            $"{rebuilt}개 QuestDatabase 재구성 완료.\nQuest: {allQuests.Count}개, Achievement: {allAchievements.Count}개",
-            "확인"
-        );
+        Debug.Log($"[QuestDatabaseAutoLinker] {rebuilt}개 DB 재구성 완료 — Quest {allQuests.Count}, Achievement {allAchievements.Count}");
     }
 }
 #endif

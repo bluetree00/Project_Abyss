@@ -134,16 +134,7 @@ public class ClearRewardTrigger : MonoBehaviour
 
         if (_isBossRoom && _run != null)
         {
-            if (_run.HasNextChapter())
-            {
-                // 다음 챕터 진행: 챕터 전환 연출(CHAPTER N) + 다음 챕터 procgen 재시작은 GameRunBootstrapper가 담당.
-                // (챕터 갱신·테마·풀/구조 키 해석을 한 곳에서 처리 — 끝난 게이트/저장 로직은 건너뛴다.)
-                Debug.Log("[ClearRewardTrigger] 보스방 클리어 — 다음 챕터 전환 시작");
-                GameRunBootstrapper.Instance?.AdvanceChapter();
-                Destroy(gameObject);
-                return;
-            }
-            else
+            if (!_run.HasNextChapter())
             {
                 // 최종 챕터 보스 격파 = 런 클리어. 종료 시퀀스가 메타 저장·세이브 폐기·BaseCamp 복귀를 담당하므로
                 // 이후 방 경계 저장/게이트 로직은 건너뛴다(끝난 런을 재개 가능 상태로 저장하지 않도록).
@@ -151,6 +142,10 @@ public class ClearRewardTrigger : MonoBehaviour
                 GameRunBootstrapper.Instance?.HandleRunClear();
                 return;
             }
+
+            // 비최종 보스: 챕터 전환은 보스 클리어 시 스폰된 ChapterGate(플레이어 통과)가 담당한다.
+            // 여기서는 보상만 수령하고 아래 공통 정리로 진행한다(자동 전환 제거).
+            Debug.Log("[ClearRewardTrigger] 보스방 보상 수령 — 챕터 전환은 ChapterGate가 담당");
         }
 
         // 방 경계 저장은 로컬 권위(RunFlowController.SaveRunState)가 담당하므로 여기서는 별도 저장하지 않는다.

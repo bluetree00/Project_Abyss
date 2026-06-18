@@ -13,29 +13,30 @@ public static class GrruzamHumanoidConverter
     private const string Root  = "Assets/_ThirdParty/Grruzam Powerful Sword Animation(Great Sword, Katana)";
     private const string TPose = Root + "/Modeling/Modeling_T-Pose_Grrrru_Man(recommend).FBX";
 
+    // 사용 중인 클립은 LFS 정리 때 _Imported 로 이동됨(원본 _ThirdParty 는 미사용 보관분만 남음).
+    // 재변환 대상은 실제 사용 위치(_Imported)를 가리켜야 한다.
+    private const string ImportedRoot = "Assets/RelicFairy/_Imported/Grruzam Powerful Sword Animation(Great Sword, Katana)";
+
     private static readonly string[] ClipFolders =
     {
         Root + "/Animation/M_Big_Sword",
         Root + "/Animation/M_Katana_Blade",
     };
 
-    // 대검에 실제 사용하는 클립 — CopyFromOther로 임포트가 깨진 케이스(3콤보 등)를
-    // CreateFromThisModel(각 클립 자체 스켈레톤으로 아바타 생성)로 재변환해 복구.
+    // 대검에 실제 사용하는 클립(전부 _Imported 로 이동됨). CopyFromOther(T-pose 아바타)로 재변환.
     private static readonly string[] GreatswordUsed =
     {
-        Root + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_1.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_2.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_3.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_1_ZeroHeight.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_2_ZeroHeight.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_3_ZeroHeight.FBX",
-        Root + "/Animation/M_Big_Sword/2_Attacks/5__Upper_Attack/M_Big_Sword@UpperAttack_ZeroHeight.FBX",
-        Root + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Loop.FBX",
-        Root + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Attack.FBX",
-        Root + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Accept.FBX",
-        Root + "/Animation/M_Big_Sword/3_Skills/M_Big_Sword@Skill_C.FBX",
-        Root + "/Animation/M_Big_Sword/1_Movements/4__Run/M_Big_Sword@Run_ver_A.FBX",
-        Root + "/Animation/M_Big_Sword/1_Movements/1__Idle/M_Big_Sword@Idle.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_1.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_2.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_3.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_1_ZeroHeight.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_2_ZeroHeight.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_3_ZeroHeight.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/2_Attacks/5__Upper_Attack/M_Big_Sword@UpperAttack_ZeroHeight.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Loop.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Attack.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Accept.FBX",
+        ImportedRoot + "/Animation/M_Big_Sword/3_Skills/M_Big_Sword@Skill_C.FBX",
     };
 
     // 올바른 본 매핑: T-pose 아바타로 CopyFromOther (CreateFromThisModel은 비-T포즈라 본이 틀어짐).
@@ -44,12 +45,17 @@ public static class GrruzamHumanoidConverter
     {
         var baseImp = AssetImporter.GetAtPath(TPose) as ModelImporter;
         if (baseImp == null) { Debug.LogError("[GrruzamFix] T-pose 모델 없음: " + TPose); return; }
-        if (baseImp.animationType != ModelImporterAnimationType.Human || baseImp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
-        {
-            baseImp.animationType = ModelImporterAnimationType.Human;
-            baseImp.avatarSetup   = ModelImporterAvatarSetup.CreateFromThisModel;
-            baseImp.SaveAndReimport();
-        }
+        // T-pose 아바타: Humanoid + 자체 생성 + Translation DoF 활성화.
+        // (원본이 UE 스켈레톤이라 척추·쇄골 translation이 버려져 상체 포즈가 캐릭터와 어긋남 → Translation DoF로 보존해 리타게팅 품질 개선)
+        bool baseDirty = false;
+        if (baseImp.animationType != ModelImporterAnimationType.Human)
+        { baseImp.animationType = ModelImporterAnimationType.Human; baseDirty = true; }
+        if (baseImp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+        { baseImp.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel; baseDirty = true; }
+        var hd = baseImp.humanDescription;
+        if (!hd.hasTranslationDoF) { hd.hasTranslationDoF = true; baseImp.humanDescription = hd; baseDirty = true; }
+        if (baseDirty) baseImp.SaveAndReimport();
+        Debug.Log($"[GrruzamFix] T-pose hasTranslationDoF={baseImp.humanDescription.hasTranslationDoF}");
         Avatar src = null;
         foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(TPose))
             if (o is Avatar a) { src = a; break; }

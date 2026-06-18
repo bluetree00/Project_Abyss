@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 using Cysharp.Threading.Tasks;
 using BackEnd;
 
@@ -52,17 +52,16 @@ public sealed class AppBootstrapper : MonoBehaviour
     [SerializeField] private Define.Scene startScene = Define.Scene.Logo;
     public bool IsReady { get; private set; }
 
-    // 콜드 부팅 연출 — 첫 씬(로비) UI가 준비되기 전 빈 화면을 가리는 검은 커버.
-    // Awake에서 즉시 생성(Addressables/UIRoot 무관), NotifySceneReady/IsReady 시 페이드아웃.
-    private GameObject _bootCover;
-    private bool _bootCoverDismissed;
-
     // ---- 로드아웃 (로비 선택 → InGame 전달) ----
     public PlayerLoadout Loadout { get; private set; } = new PlayerLoadout();
 
     // ---- Run 수명 관리 ----
     public GameRunSession CurrentRun { get; private set; }
     public bool IsNewRunPending { get; private set; }
+
+    // 챕터 전환 신호 — 보스 클리어 후 다음 챕터 씬을 로드할 때, 로드된 GameScene이
+    // 저장 이어하기(ContinueProcGenRunAsync)가 아니라 "새 챕터 처음부터" 진입하도록 구분한다.
+    public bool IsChapterAdvancePending { get; private set; }
 
     public void BeginRun(GameRunSession session)
     {
@@ -167,53 +166,6 @@ public sealed class AppBootstrapper : MonoBehaviour
     public void NotifySceneReady()
     {
         UI_SceneLoading.Instance?.HideAsync().Forget();
-        DismissBootCover();
-    }
-
-    // 검은 커버 생성 — 코드 자체완결 ScreenSpaceOverlay 캔버스(최상단, 입력 차단).
-    private void CreateBootCover()
-    {
-        _bootCover = new GameObject("@BootCover");
-        DontDestroyOnLoad(_bootCover);
-
-        var canvas = _bootCover.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = short.MaxValue; // 모든 UI 위
-        _bootCover.AddComponent<GraphicRaycaster>(); // 빈 로비 클릭 차단
-        _bootCover.AddComponent<CanvasGroup>();
-
-        var imgGo = new GameObject("Black");
-        imgGo.transform.SetParent(_bootCover.transform, false);
-        var img = imgGo.AddComponent<Image>();
-        img.color = Color.black;
-        var rt = img.rectTransform;
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-    }
-
-    // 로비 UI 준비 완료(또는 IsReady 폴백) 시 1회 페이드아웃.
-    private void DismissBootCover()
-    {
-        if (_bootCoverDismissed || _bootCover == null) return;
-        _bootCoverDismissed = true;
-        FadeOutBootCoverAsync().Forget();
-    }
-
-    private async UniTaskVoid FadeOutBootCoverAsync()
-    {
-        var cg = _bootCover.GetComponent<CanvasGroup>();
-        const float dur = 0.4f;
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.unscaledDeltaTime;
-            if (cg != null) cg.alpha = Mathf.Lerp(1f, 0f, t / dur);
-            await UniTask.Yield(PlayerLoopTiming.Update);
-        }
-        Destroy(_bootCover);
-        _bootCover = null;
     }
 
     public void RequestStartRun()
@@ -251,6 +203,17 @@ public sealed class AppBootstrapper : MonoBehaviour
     /// <summary>새 런 진입 신호를 세운다. 베이스캠프 던전 게이트 통과처럼 로비(RequestStartRun)를 거치지 않은
     /// 진입에서도 Ch1 부트스트래퍼가 대기 방(StartWaitingRoomAsync) 흐름을 타도록 보장한다. ConsumeNewRunPending에서 소비.</summary>
     public void MarkNewRunPending() => IsNewRunPending = true;
+
+    /// <summary>챕터 전환 진입 신호를 세운다. AdvanceChapter가 다음 챕터 씬 로드 직전에 호출.
+    /// 로드된 GameScene의 GameRunBootstrapper가 ConsumeChapterAdvance로 소비해 새 챕터를 처음부터 시작한다.</summary>
+    public void MarkChapterAdvance() => IsChapterAdvancePending = true;
+
+    public bool ConsumeChapterAdvance()
+    {
+        bool was = IsChapterAdvancePending;
+        IsChapterAdvancePending = false;
+        return was;
+    }
 
     /// <summary>
     /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.
@@ -433,9 +396,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 부팅 즉시 검은 커버 — 비동기 init 동안 빈 로비 노출 방지(첫 프레임부터).
-        CreateBootCover();
-
         // RunProgressManager (이어하기 저장) — 뒤끝 로그인 전부터 인스턴스 준비
         if (RunProgressManager.Instance == null)
         {
@@ -603,9 +563,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         }
 
         IsReady = true;
-
-        // 폴백 — 씬→상태 매핑이 없어 NotifySceneReady가 안 불리는 경우에도 커버가 영구히 남지 않도록.
-        DismissBootCover();
     }
 
     private void OnDestroy()
@@ -736,6 +693,19 @@ public sealed class AppBootstrapper : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogWarning($"[AppBootstrapper] SoundEventTable 로드 실패: {e.Message}");
+        }
+
+        try
+        {
+            var mixer = await addr.TryLoadAssetAsync<AudioMixer>("GameAudioMixer");
+            if (mixer != null)
+                Managers.Sound?.SetMixer(mixer);
+            else
+                Debug.Log("[AppBootstrapper] GameAudioMixer 없음 — 믹서 비활성(폴백 볼륨 사용)");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[AppBootstrapper] GameAudioMixer 로드 실패: {e.Message}");
         }
     }
 

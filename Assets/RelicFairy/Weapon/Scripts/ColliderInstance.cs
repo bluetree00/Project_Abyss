@@ -206,7 +206,8 @@ public class ColliderInstance : MonoBehaviour
             attackDirection: attackDir,
             damage:          finalDmg,
             isCritical:      isCrit,
-            actionType:      actionType);
+            actionType:      actionType,
+            weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None);
 
         HitFeedbackService.RaiseHit(hitInfo);
 
