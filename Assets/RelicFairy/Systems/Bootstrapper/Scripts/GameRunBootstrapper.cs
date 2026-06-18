@@ -194,6 +194,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             DisableSceneBakedNavMesh();
 
         _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
+        _run.OnBossRoomCleared += OnBossRoomClearedHandler;
+    }
+
+    /// <summary>보스방 클리어 신호 → 비최종 챕터면 챕터 전환 게이트를 스폰(등장 연출).
+    /// 최종 챕터는 게이트 없이 ClearRewardTrigger가 런 클리어를 담당한다. 보상은 별개(ClearRewardTrigger).</summary>
+    private void OnBossRoomClearedHandler(Vector3 center)
+    {
+        if (_run != null && _run.HasNextChapter())
+            ChapterGate.Spawn(center);
     }
 
     private async void Start()
@@ -243,7 +252,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         bool newRunFromHub = (AppBootstrapper.Instance?.Loadout?.IsReady ?? false)
             && (AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false);
 
-        if (_run != null && _run.IsRunning && !hasDebugPanel)
+        // 챕터 전환 진입: 기존 런(IsRunning) 유지하되 저장 이어하기가 아니라 새 챕터를 처음부터 시작.
+        bool chapterAdvance = AppBootstrapper.Instance?.ConsumeChapterAdvance() ?? false;
+
+        if (_run != null && _run.IsRunning && chapterAdvance && !hasDebugPanel)
+            await StartNextChapterInSceneAsync(this.GetCancellationTokenOnDestroy());
+        else if (_run != null && _run.IsRunning && !hasDebugPanel)
             await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
         else if (newRunFromHub)
             await StartWaitingRoomAsync();
@@ -279,6 +293,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (_run != null)
         {
             _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
+            _run.OnBossRoomCleared -= OnBossRoomClearedHandler;
 
             // 씬 이탈 전 현재 무기 슬롯 저장
             if (_run.IsRunning)
@@ -736,6 +751,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
         // StartRoom 이탈 흐름은 StartNewRunAsync를 거치지 않아 세션 챕터가 미설정(0)일 수 있으므로 씬에서 유추.
         var chapter     = ResolveCurrentChapter();
+        // 세션 CurrentChapter를 확정 — 챕터 종료 판정(HasNextChapter/AdvanceToNextChapter)이
+        // raw CurrentChapter(미설정=0)를 쓰는 오프바이원으로 최종 보스에서 Chapter1을 재시작하던 버그 차단.
+        _run?.EnsureChapter(chapter);
         var serverEntry = Managers.ChapterData?.Get(chapter);
         var chapterSO   = chapterRegistry?.GetData(chapter);
         var poolKey     = serverEntry?.zone_pool_key;
@@ -781,19 +799,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private bool _advancingChapter;
 
-    /// <summary>보스 클리어(비최종 챕터) 시 ClearRewardTrigger가 호출 — 챕터 전환 연출 후 다음 챕터 procgen 재시작.</summary>
-    public void AdvanceChapter() => AdvanceChapterAsync().Forget();
-
     /// <summary>
-    /// 챕터 전환: 챕터 번호·테마 갱신 → 풀스크린 "CHAPTER N" 연출 아래에서 다음 챕터 풀/구조로 procgen 재시작.
-    /// 마지막 챕터면 런 클리어로 분기. 씬 리로드 없이 현재 씬에서 이어진다(RunFlowController.StartNextChapterAsync).
+    /// 보스 클리어(비최종 챕터) 시 ClearRewardTrigger가 호출 — 챕터 번호·테마 갱신 후
+    /// 다음 챕터 전용 씬(GameScene_ChN)을 로드해 해당 챕터 고유 환경에서 새 챕터를 처음부터 시작한다.
+    /// 마지막 챕터면 런 클리어로 분기. 런 상태는 DDOL 세션 + 새 씬 BindPlayer 복원으로 이월된다.
     /// </summary>
-    private async UniTaskVoid AdvanceChapterAsync()
+    public void AdvanceChapter()
     {
         if (_advancingChapter) return;
         _advancingChapter = true;
-        var ct = this.GetCancellationTokenOnDestroy();
-        ChapterTransitionOverlay overlay = null;
         try
         {
             var run = Run;
@@ -808,33 +822,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             var chapter = run.CurrentChapter;
 
-            overlay = new ChapterTransitionOverlay();
-            await overlay.PlayInAsync($"CHAPTER {(int)chapter}", string.Empty, ct);
-
-            // 다음 챕터 키 해석 (StartProcGenRunAsync와 동일 3단 폴백)
-            var serverEntry = Managers.ChapterData?.Get(chapter);
-            var chapterSO   = chapterRegistry?.GetData(chapter);
-            var poolKey     = serverEntry?.zone_pool_key;
-            if (string.IsNullOrEmpty(poolKey)) poolKey = chapterSO?.zonePoolKey;
-            if (string.IsNullOrEmpty(poolKey)) poolKey = $"CHAPTER_{(int)chapter}_ROOM_POOL";
-            var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
-
-            var flow = runFlowController != null ? runFlowController : GetComponent<RunFlowController>();
-            if (flow == null)
-            {
-                Debug.LogError("[GameRunBootstrapper] AdvanceChapter: RunFlowController 없음");
-                return;
-            }
-
-            await flow.StartNextChapterAsync(poolKey, structureKey);
-            await overlay.PlayOutAsync(ct);
-            overlay = null;
-            Debug.Log($"[GameRunBootstrapper] 챕터 전환 완료 → Chapter {(int)chapter}");
+            // 다음 챕터 전용 씬을 로드 — 로드된 GameScene의 GameRunBootstrapper가 IsChapterAdvancePending을
+            // 감지해 저장 이어하기가 아니라 새 챕터를 처음부터 시작한다(StartNextChapterInSceneAsync).
+            // 화면 전환 가림은 RequestLoad의 로딩 오버레이가 담당한다.
+            AppBootstrapper.Instance?.MarkChapterAdvance();
+            AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(chapter));
+            Debug.Log($"[GameRunBootstrapper] 챕터 전환 → Chapter {(int)chapter} 씬 로드 요청");
         }
-        catch (System.OperationCanceledException) { }
         finally
         {
-            if (overlay != null) await overlay.PlayOutAsync(ct);
             _advancingChapter = false;
         }
     }
@@ -861,9 +857,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 finally { TimeScaleArbiter.Release(this); }
             }
 
-            // 2) 화면 처리: 비네트(보유 자산) + 암전 페이드. 채도저하(URP Volume)는 미보유 → TODO.
-            var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
-            fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            // 2) 화면 처리: 사망만 빨간 비네트(피격감) — 클리어(승리)는 비네트 없이 암전만 적용해 사망 연출과 구분.
+            if (!isCleared)
+            {
+                var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
+                fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            }
             await ScreenFade.Out(1.0f, ct);
 
             // 3) 종료 메시지(영혼 회수) — 스킵 입력 지원
@@ -2342,6 +2341,30 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct, structureKey);
 
         Debug.Log($"[GameRunBootstrapper] 절차생성 이어하기 완료 — visit={save.visitCount}, room={save.currentRoomPoolKey}");
+    }
+
+    /// <summary>
+    /// 챕터 전환으로 다음 챕터 씬을 로드한 직후 진입. 저장 이어하기와 달리 "새 챕터를 처음부터" 시작한다.
+    /// 런 상태(아이템/버프/서약/시너지)는 DDOL 세션에 유지되며, 새 플레이어 인스턴스에 BindPlayer가 복원한다.
+    /// 흐름: HUD 바인드 → 플레이어 스폰 → BindPlayer → 새 챕터 procgen 첫 방부터(StartProcGenRunAsync).
+    /// </summary>
+    private async UniTask StartNextChapterInSceneAsync(CancellationToken ct)
+    {
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            SetupEntrance(player);
+            _run?.BindPlayer(player); // 라이브 세션 → 아이템/버프/서약/시너지 복원(BindPlayer가 씬 전환 복원 처리)
+        }
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        // 새 챕터 procgen — CurrentChapter는 AdvanceToNextChapter로 이미 갱신됨. 첫 방부터 빌드.
+        await StartProcGenRunAsync();
+
+        Debug.Log($"[GameRunBootstrapper] 챕터 전환 진입 완료 → Chapter {(int)ResolveCurrentChapter()}");
     }
 
     private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)

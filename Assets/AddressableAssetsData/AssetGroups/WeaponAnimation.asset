@@ -65,6 +65,71 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8dc3c80b7b116641b8ede0a49c32311
+    m_Address: GreatswordAttack_04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8320a58daa9b96846b425c36befb573e
+    m_Address: GreatswordAttack_05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61bb43deb52f6ba4f9400b9c7a8b8a8c
+    m_Address: GreatswordAttack_06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea4e2ef456d9e8645b915317e997d334
+    m_Address: GreatswordAttack_07
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f935b9f1d197ae64fa23d312530efa23
+    m_Address: SS_Attack1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c17a750330e6e04c9685ac96f8e0351
+    m_Address: SS_Attack2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 07e9746d22304ff42b1cc5a3188188f4
+    m_Address: SS_Attack3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a40902f57abb8e94c9c2ededb8df4b47
+    m_Address: GS_Attack04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b712c0204fec784458ad2b40ca2b4f67
+    m_Address: GS_Attack05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c410c8e0a8a3ba42a977f8b012d073d
+    m_Address: GS_Attack06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9a50ebdafd4db4a47abd08965c9d4f3a
+    m_Address: GS_Attack02_2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 686d6fee3c23524439553401966a5bab
+    m_Address: GS_Attack02_3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2240b17a57760c48b5b2e6de43e37bb
+    m_Address: GS_Attack02_4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b72313c5276bb2a458d79fe4e12198c0
     m_Address: GreatswordAttack_03
     m_ReadOnly: 0

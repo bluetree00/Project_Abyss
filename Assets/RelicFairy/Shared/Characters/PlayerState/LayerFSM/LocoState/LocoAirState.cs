@@ -10,6 +10,10 @@ public class LocoAirState : ILayerState<LocoState>
     // CharacterData.minFallAnimHeight 미설정 시 사용할 기본 임계 높이(m).
     private const float DefaultMinFallAnimHeight = 0.6f;
 
+    // 착지 충격 카메라 셰이크 — 낙하 속도(m/s) 이 범위로 강도 매핑. Min 미만은 셰이크 없음(평범한 점프 착지).
+    private const float LandShakeMinSpeed = 6f;
+    private const float LandShakeMaxSpeed = 18f;
+
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
@@ -17,6 +21,7 @@ public class LocoAirState : ILayerState<LocoState>
     private float _landingTimer;
     private float _takeoffY;     // 낙하 시작 시점의 Y (누적 낙하 높이 안전망용)
     private float _fallThreshold; // 이번 낙하의 추락 애니 임계 높이
+    private float _maxFallSpeed;  // 체공 중 최대 하강 속도(착지 충격 셰이크 강도용)
 
     public void Init(PlayerController controller, ILayerStateChanger<LocoState> stateChanger)
     {
@@ -28,6 +33,7 @@ public class LocoAirState : ILayerState<LocoState>
     {
         _phase = AirPhase.Start;
         _landingTimer = 0f;
+        _maxFallSpeed = 0f;
 
         // ProcessJump에서 이미 CrossFade 했으므로, 낙하 진입(점프 없이 떨어진 경우)만 여기서 처리.
         if (!_controller.IsJumping)
@@ -87,6 +93,9 @@ public class LocoAirState : ILayerState<LocoState>
                 break;
 
             case AirPhase.Loop:
+                // 착지 충격 강도용: 체공 중 최대 하강 속도 추적.
+                float fall = -_controller.Rigid.linearVelocity.y;
+                if (fall > _maxFallSpeed) _maxFallSpeed = fall;
                 if (_controller.IsGrounded())
                 {
                     EnterLanding();
@@ -123,6 +132,11 @@ public class LocoAirState : ILayerState<LocoState>
         _landingTimer = LandingDuration;
 
         _controller.IsLanding = true;
+
+        // 착지 충격 — 낙하 속도 비례 카메라 셰이크(약한 착지는 스킵). 무게감/임팩트.
+        float impact = Mathf.InverseLerp(LandShakeMinSpeed, LandShakeMaxSpeed, _maxFallSpeed);
+        if (impact > 0f)
+            HitFeelService.CameraShake(Mathf.Lerp(0.03f, 0.12f, impact), 0.14f);
 
         // 공중 공격 중이든 아니든, 착지 애니메이션 강제 재생
         _controller.Anim.CrossFade("JumpLand", 0.05f);

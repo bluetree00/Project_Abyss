@@ -1,8 +1,15 @@
 # 오디오 믹서 도입 설계서 (계획서)
 
-> 대상: Unity 6, RelicFairy / 작성일: 2026-06-17
-> 상태: **계획 단계 — 코드 구현 전. 본 문서 합의 후 단계별 착수.**
+> 대상: Unity 6, RelicFairy / 작성일: 2026-06-17 / 갱신: 2026-06-18
+> 상태: **P1 코드 구현 완료(폴백 동작) — 믹서 자산 authoring·컴파일 검증·P2 UI 대기.**
 > 관련: [SoundManager.cs](../Assets/RelicFairy/Systems/Managers/Scripts/SoundManager.cs), [SoundEventTableSO.cs](../Assets/RelicFairy/Systems/Sound/SoundEventTableSO.cs), [SoundKey.cs](../Assets/RelicFairy/Utils/SoundKey.cs)
+
+> ### 구현 현황 (2026-06-18)
+> - ✅ **SoundManager**: `SetMixer`/그룹 라우팅(BGM·SFX)/dB setter 4종(Master·BGM·SFX·UI)/`ChannelScale` 폴백/`LinearToDb`. 믹서 없으면 현행 곱셈으로 동작.
+> - ✅ **AppBootstrapper**: `InitSoundTableAsync`에서 `GameAudioMixer` Addressable 로드 → `SetMixer` 주입(없으면 폴백 로그).
+> - ⏳ **사용자 작업**: `GameAudioMixer.mixer` authoring(§7 스펙) + Addressable 키 `GameAudioMixer` 등록.
+> - ⏳ **컴파일 검증**: Unity MCP 미연결로 미실행 — 에디터에서 `refresh_unity`/콘솔 0 에러 확인 필요.
+> - ⏳ **UI 채널 라우팅**: `_uiGroup` 참조·`PlayUi` 경로는 P2(옵션 UI + UI음 배선)로 보류. dB 노출 파라미터 `UiVolume`는 `SetUiVolume`로 이미 제어 가능.
 
 ---
 
@@ -77,6 +84,8 @@ dB = (v <= 0.0001f) ? -80f : Mathf.Log10(v) * 20f
 - `v=1` → 0dB, `v=0.5` → ≈ -6dB, `v=0.1` → -20dB, `v=0` → -80dB(무음).
 - 역변환(믹서값 로드 시): `v = Mathf.Pow(10f, dB / 20f)`. 단 **권위는 PlayerPrefs 선형값**으로 유지, 믹서는 출력 대상.
 
+> **실무 검증**(John Leonard French): 이 `Log10(v)*20` + `v≤0.0001` 클램프가 표준 권장안과 정확히 일치. 슬라이더(P2)는 선형이 인지음량과 안 맞으므로 **Slider Min=0.0001, Max=1, Default=1**로 두고 이 변환을 거쳐 `SetFloat`. (Min을 0으로 두면 `Log10(0)=-∞`로 깨짐 — 0.0001이 그 방지값.) 믹서 그룹 dB 가용범위는 -80~+20이나, 본 설계는 게인(+dB) 없이 0dB 상한으로 보수적으로 둔다.
+
 ---
 
 ## 4. SoundManager 변경 설계
@@ -148,11 +157,15 @@ public void PlayUi(string key, float volume = 1f) => PlayPooledEffect(..., group
 
 보스 등장·중요 컷신에서 BGM을 일시 감쇠.
 
-- **권장: AudioMixer 스냅샷** — `Default` / `BgmDucked`(BGM 그룹만 -12dB 등) 2개를 authoring.
-- API: `Managers.Sound.TransitionSnapshot("BgmDucked", 0.4f)` → 내부 `snapshot.TransitionTo(time)`.
-- **사용자 볼륨 설정과 충돌 없음** — 스냅샷은 노출 파라미터와 독립적으로 합성됨.
-- 호출처 후보: `SoundEvent.BossAppear`([SoundEvent.cs:6](../Assets/RelicFairy/Utils/SoundEvent.cs#L6)) 발생 시 덕트, 보스 처치/페이즈 종료 시 복귀.
+실무에는 두 방식이 있고 둘 다 표준이다:
 
+- **방식 1 — Duck Volume 이펙트(사이드체인 컴프레서)**: BGM 그룹에 Duck Volume 이펙트를 걸고, SFX 그룹에서 Send로 신호를 보낸다. 큰 SFX가 날 때 BGM이 **자동으로** 감쇠 → 코드 훅이 전혀 필요 없다. "특정 채널이 울리면 항상 BGM을 낮춘다"는 상시 규칙에 적합. 단 임계/릴리즈 튜닝이 authoring 단계에 필요.
+- **방식 2(본 설계 권장) — 스냅샷 전이**: `Default` / `BgmDucked`(BGM 그룹만 -12dB 등) 2개를 authoring.
+  - API: `Managers.Sound.TransitionSnapshot("BgmDucked", 0.4f)` → 내부 `snapshot.TransitionTo(time)`.
+  - **사용자 볼륨 설정과 충돌 없음** — 스냅샷은 노출 파라미터와 독립적으로 합성됨.
+  - 호출처 후보: `SoundEvent.BossAppear`([SoundEvent.cs:6](../Assets/RelicFairy/Utils/SoundEvent.cs#L6)) 발생 시 덕트, 보스 처치/페이즈 종료 시 복귀.
+
+> **선택 기준**: 보스 등장·컷신처럼 **이벤트 시점에 명시적으로** 덕트했다 복귀하는 게 우리 용례 → **스냅샷(방식 2)** 가 코드로 제어하기 쉽다. 사이드체인(방식 1)은 "전투 중 타격음마다 음악이 항상 살짝 비켜준다" 같은 상시 자동 더킹을 원할 때 추가로 고려.
 > v1에서는 제외 가능. **결정 필요 ②**: 더킹을 이번 작업에 포함할지.
 
 ---
@@ -183,6 +196,28 @@ public void PlayUi(string key, float volume = 1f) => PlayPooledEffect(..., group
 | UI | `UiVolume` |
 
 **스냅샷(P3 채택 시)**: `Default`(기본), `BgmDucked`(BGM Volume -12dB).
+
+---
+
+## 7.5 오디오 클립 임포트·메모리 관리 (실무 표준 — 외부 문서 검증)
+
+> 실무에서 "사운드 관리"는 믹서만큼이나 **클립 임포트 설정**이 핵심이다. 우리는 모든 클립을 `AddressableManager.TryLoadAssetAsync`([SoundManager.cs:207](../Assets/RelicFairy/Systems/Managers/Scripts/SoundManager.cs#L207))로 로드하므로, 클립별 임포트 설정이 메모리/로딩 비용을 직접 결정한다. ⚠️ 아래는 클립 `.meta`의 임포트 설정 — **에디터에서 사용자(오디오 담당)가 지정**(코드/`.meta` 직접 수정 금지).
+
+**Load Type — 클립 길이/용도별 분류**
+| 분류 | Load Type | 근거 |
+|---|---|---|
+| BGM (긴 루프, `bgm_*`) | **Streaming** | 메모리에 안 올리고 디스크 스트리밍. CPU↑지만 긴 파일에 적합 |
+| 일반 SFX (짧음, `sfx_*`) | **Compressed In Memory** | 메모리에 압축 보관, 재생 시 디코드. 메모리↔CPU 트레이드, 짧은 음에 최적 |
+| 즉각성 critical SFX (타격/대시 등 빈발) | **Decompress On Load** | 원본 크기로 메모리 상주, 디코드 지연 0. 빈번/즉시 재생용 |
+
+**그 외 표준 항목**
+- **Force To Mono**: 3D(positional) SFX는 모노로. 스테레오라도 월드 한 점에서 나오므로 좌우 분리가 무의미·낭비. → `PlayEffectAt` 경로 대상 클립.
+- **Load In Background**: 긴급하지 않은 음(적 사망음, 종료 연출 등)은 백그라운드 로드로 씬 초기화 블로킹 방지. (우리는 어차피 async 로드라 부분 충족)
+- **Preload Audio Data**: 선택적. 자주 안 쓰는 환경음은 끄고 진행 중 언로드해 메모리 절약.
+- **Compression Format**: 모바일/짧은음 Vorbis, 매우 짧은 음 PCM/ADPCM 등 — 플랫폼·길이별. (PC 출시 기준 Vorbis 무난)
+- **소스 비활성 = mute보다 Disable**: muted 소스도 보이스를 점유 → 우리 풀은 이미 `gameObject.SetActive(false)`([SoundManager.cs:393](../Assets/RelicFairy/Systems/Managers/Scripts/SoundManager.cs#L393))로 충족 ✅.
+
+> **결정 필요 ⑤**: 이 임포트 가이드를 사운드 에셋 반입 시 체크리스트로 운용할지(권장). 믹서와 별개 트랙이며 P1과 병행 가능.
 
 ---
 
@@ -225,6 +260,7 @@ public void PlayUi(string key, float volume = 1f) => PlayPooledEffect(..., group
 | ② | 더킹 P1 포함 vs P3로 분리 | **P3 분리**(코어 먼저) |
 | ③ | 일시정지 시 음향 — 유지 / SFX만 정지 / 전체 정지 | **SFX만 정지** (BGM은 유지) |
 | ④ | 믹서 자산 Addressable 로드 방식 확정 | ✅ (SoundEventTable과 동일) |
+| ⑤ | 클립 임포트 가이드(§7.5)를 반입 체크리스트로 운용 | **운용**(믹서와 병행 가능) |
 
 ---
 
@@ -235,3 +271,12 @@ public void PlayUi(string key, float volume = 1f) => PlayPooledEffect(..., group
 - **대안 C: FMOD/Wwise 미들웨어** — 오버킬. 현 규모/팀에 불필요한 의존성·빌드 복잡도.
 
 → **B 채택**. 폴백 분기로 안정성 확보, 호출 규약 무변경으로 surgical.
+
+---
+
+## 12. 참고 (외부 문서 — 실무 표준 검증)
+
+- 로그 변환 볼륨 슬라이더(Log10×20, Min 0.0001): [John Leonard French — The right way to make a volume slider in Unity](https://johnleonardfrench.music/the-right-way-to-make-a-volume-slider-in-unity-using-logarithmic-conversion/)
+- 클립 임포트/메모리 최적화(Load Type·Force to Mono·Disable vs mute): [Truong Pham — Optimizing audio checklist](https://medium.com/@truongpham/optimize-unity-game-performance-optimizing-audio-checklist-4dd0fff93be7)
+- 믹서 그룹/더킹/스냅샷 개요: [Unity Manual — AudioMixer Overview](https://docs.unity3d.com/560/Documentation/Manual/AudioMixerOverview.html), [Unity Learn — Audio mixing](https://learn.unity.com/course/tanks-make-a-battle-game-for-web-and-mobile/tutorial/audio-mixing-1)
+- dB 범위(-80~+20)·노출 파라미터: [Unity Manual — AudioGroup Inspector](https://docs.unity3d.com/Manual/AudioMixerInspectors.html)

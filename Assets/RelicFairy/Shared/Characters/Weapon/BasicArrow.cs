@@ -164,8 +164,18 @@ public class BasicArrow : MonoBehaviour
             // 팝업은 대상측(MonsterBase 등)이 자체 표시 — isCrit 만 전달
             damageable.TakeDamage(finalDmg, _instigator, 1f, isCrit);
 
-            // 타격감 (햅틱·카메라 흔들림 등)
-            HitFeelService.Hit(finalDmg, isCrit);
+            // 타격감 — 근접과 동일하게 HitFeedbackService 허브 경유(적 플래시/플린치 + 화면연출 + 무기별 손맛).
+            // 아이템 통지는 아래 OnPostDealDamage 가 단일점이라 RaiseHit 로 바꿔도 이중발동 없음.
+            var hitInfo = new HitInfo(
+                attacker:        _instigator,
+                target:          other.gameObject,
+                hitPoint:        other.ClosestPoint(transform.position),
+                attackDirection: other.transform.position - (_instigator != null ? _instigator.transform.position : transform.position),
+                damage:          finalDmg,
+                isCritical:      isCrit,
+                actionType:      WeaponActionType.GroundLight,
+                weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.Bow);
+            HitFeedbackService.RaiseHit(hitInfo);
 
             var report = new DamageReport
             {

@@ -15,6 +15,7 @@ public readonly struct HitInfo
     public readonly float            Damage;
     public readonly bool             IsCritical;
     public readonly WeaponActionType ActionType;
+    public readonly WeaponType       WeaponType;   // 무기별 손맛 프로필(WeaponFeelTable) 조회용. 미지정 시 None=Default.
 
     public HitInfo(
         GameObject attacker,
@@ -23,7 +24,8 @@ public readonly struct HitInfo
         Vector3 attackDirection,
         float damage,
         bool isCritical,
-        WeaponActionType actionType)
+        WeaponActionType actionType,
+        WeaponType weaponType = WeaponType.None)
     {
         Attacker        = attacker;
         Target          = target;
@@ -33,5 +35,6 @@ public readonly struct HitInfo
         Damage          = damage;
         IsCritical      = isCritical;
         ActionType      = actionType;
+        WeaponType      = weaponType;
     }
 }

@@ -45,6 +45,9 @@ public class UI_WeaponForgePopup : UI_Popup
     [SerializeField] private Button confirmButton;
     [SerializeField] private Button cancelButton;
 
+    private static readonly Color CardNormal   = new Color(0.20f, 0.22f, 0.30f, 1f);
+    private static readonly Color CardSelected = new Color(0.50f, 0.42f, 0.16f, 1f);
+
     /// <summary>옵션 1개의 런타임 UI 묶음 (직렬화 평면 필드를 묶어 다룬다).</summary>
     private sealed class Option
     {
@@ -71,9 +74,11 @@ public class UI_WeaponForgePopup : UI_Popup
             SetSelected(false);
         }
 
+        /// <summary>선택 시 카드 색 강조(흰 카드 방지 위해 색을 코드에서 제어). 프레임은 미사용.</summary>
         public void SetSelected(bool on)
         {
-            if (Frame != null && Frame.activeSelf != on) Frame.SetActive(on);
+            if (Button != null && Button.image != null)
+                Button.image.color = on ? CardSelected : CardNormal;
         }
     }
 
@@ -89,6 +94,7 @@ public class UI_WeaponForgePopup : UI_Popup
     public void Setup(IReadOnlyList<WeaponSO> melee, IReadOnlyList<WeaponSO> ranged)
     {
         EnsureOptions();
+        ApplyStaticTheme();
 
         _selectedMelee = null;
         _selectedRanged = null;
@@ -109,6 +115,43 @@ public class UI_WeaponForgePopup : UI_Popup
     public UniTask<ForgeChoice?> WaitForChoiceAsync() => _tcs.Task;
 
     // ── Private ───────────────────────────────────────────────
+
+    private bool _themed;
+
+    /// <summary>프리팹 색/레이블이 MCP 작성 한계로 누락될 수 있어 코드에서 강제 적용(흰 카드·저대비 방지).</summary>
+    private void ApplyStaticTheme()
+    {
+        if (_themed) return;
+        _themed = true;
+
+        if (confirmButton != null && confirmButton.image != null)
+            confirmButton.image.color = new Color(0.22f, 0.55f, 0.32f, 1f);
+        if (cancelButton != null && cancelButton.image != null)
+            cancelButton.image.color = new Color(0.34f, 0.34f, 0.40f, 1f);
+        SetButtonTextWhite(confirmButton);
+        SetButtonTextWhite(cancelButton);
+
+        SetThemeText("Panel/Title", "무기 제작", new Color(1f, 0.88f, 0.5f, 1f));
+        SetThemeText("Panel/MeleeLabel", "근거리 무기 — 1번 슬롯", new Color(0.80f, 0.85f, 1f, 1f));
+        SetThemeText("Panel/RangedLabel", "원거리 무기 — 2번 슬롯", new Color(0.80f, 0.85f, 1f, 1f));
+    }
+
+    private void SetButtonTextWhite(Button button)
+    {
+        if (button == null) return;
+        var label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null) label.color = Color.white;
+    }
+
+    private void SetThemeText(string path, string text, Color color)
+    {
+        var tr = transform.Find(path);
+        if (tr == null) return;
+        var label = tr.GetComponent<TMP_Text>();
+        if (label == null) return;
+        label.text = text;
+        label.color = color;
+    }
 
     private void EnsureOptions()
     {
@@ -146,11 +189,15 @@ public class UI_WeaponForgePopup : UI_Popup
 
     private void OnSelect(Option[] options, WeaponSO weapon, bool isMelee)
     {
-        if (isMelee) _selectedMelee = weapon;
-        else _selectedRanged = weapon;
+        WeaponSO current = isMelee ? _selectedMelee : _selectedRanged;
+        // 이미 선택된 항목을 다시 누르면 선택 취소(토글)
+        WeaponSO next = current == weapon ? null : weapon;
+
+        if (isMelee) _selectedMelee = next;
+        else _selectedRanged = next;
 
         for (int i = 0; i < options.Length; i++)
-            options[i].SetSelected(options[i].Weapon == weapon);
+            options[i].SetSelected(next != null && options[i].Weapon == next);
 
         RefreshConfirmInteractable();
     }
