@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7ad26eea9c2be342ae3bca63118ad71, type: 3}
+  m_Name: tut_acquire_relic
+  m_EditorClassIdentifier: Assembly-CSharp::Quest
+  category: {fileID: 11400000, guid: ef4f07a544106a447b90df75f3fc0c64, type: 2}
+  icon: {fileID: 0}
+  codeName: tut_acquire_relic
+  displayName: "\uC720\uBB3C\uC758 \uBD80\uB984"
+  description: "\uCCAB \uC720\uBB3C\uC744 \uC190\uC5D0 \uB123\uC5B4\uB77C"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 746553ce81089aa44aada5ce89ddb95d, type: 2}
+  rewards: []
+  useAutoCompletion: 1
+  isCancelable: 0
+  isSavable: 0
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 11400000, guid: 66539ca74a647b641bf0e0b7336ee66c, type: 2}

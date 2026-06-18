@@ -60,8 +60,8 @@ ModelImporter:
       animation that will be discarded.\n\t'calf_r' has translation animation that
       will be discarded.\n\t'foot_r' has translation animation that will be discarded.\n\t'ball_r'
       has translation animation that will be discarded.\nEvent AE_EndTrail has a
-      time (1.735334) outside the clip's valid range (0.000000..1.233333). It will
-      never be firedEvent AE_AttackEnd has a time (2.313779) outside the clip's valid
+      time (2.140246) outside the clip's valid range (0.000000..1.233333). It will
+      never be firedEvent AE_AttackEnd has a time (2.853661) outside the clip's valid
       range (0.000000..1.233333). It will never be fired"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
@@ -961,7 +961,7 @@ ModelImporter:
     feetSpacing: 0
     globalScale: 1
     rootMotionBoneName: 
-    hasTranslationDoF: 0
+    hasTranslationDoF: 1
     hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: a4025a3a50983d944b3ab61540e6c18b,
