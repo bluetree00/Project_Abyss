@@ -16,6 +16,8 @@ public class CameraOcclusionFader : MonoBehaviour
     // ── Constants ─────────────────────────────────────────────────────────
     private const int MaxHits = 32;
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
+    private static readonly int BaseMapID   = Shader.PropertyToID("_BaseMap");
+    private static readonly int BumpMapID   = Shader.PropertyToID("_BumpMap");
 
     // ── SerializeField ────────────────────────────────────────────────────
     [Header("Detection")]
@@ -47,6 +49,10 @@ public class CameraOcclusionFader : MonoBehaviour
     // 재사용 MaterialPropertyBlock (프레임당 1개) — Awake에서 초기화
     private MaterialPropertyBlock _mpb;
 
+    // 페이드용 투명 셰이더 (URP Lit). 원본이 Opaque 전용 ShaderGraph라도 확실히 반투명 처리하기 위해
+    // 원본 클론 대신 이 셰이더로 스왑한다. Awake에서 1회 캐싱.
+    private Shader _fadeShader;
+
     private class FadeState
     {
         public Material[] originals;
@@ -59,15 +65,19 @@ public class CameraOcclusionFader : MonoBehaviour
     private void Awake()
     {
         _mpb = new MaterialPropertyBlock();
+        _fadeShader = Shader.Find("Universal Render Pipeline/Lit");
     }
 
     private void Start()
     {
+        // 플레이어 (재)스폰 시마다 타깃 갱신 — 허브 유물 재스폰·전투 존 재스폰에서 이전 타깃이 파괴되므로.
+        if (Managers.Player != null) Managers.Player.OnPlayerSpawned += SetTarget;
         SubscribePlayer();
     }
 
     private void OnDestroy()
     {
+        if (Managers.Player != null) Managers.Player.OnPlayerSpawned -= SetTarget;
         RestoreAll();
     }
 
@@ -104,10 +114,13 @@ public class CameraOcclusionFader : MonoBehaviour
     {
         var ct = destroyCancellationToken;
         await Cysharp.Threading.Tasks.UniTask.WaitUntil(
-            () => GameRunBootstrapper.Instance?.Run?.Player != null,
+            () => GameRunBootstrapper.Instance?.Run?.Player != null
+               || Managers.Player?.PlayerTransform != null,
             cancellationToken: ct);
         if (GameRunBootstrapper.Instance?.Run?.Player != null)
             _playerTransform = GameRunBootstrapper.Instance.Run.Player.transform;
+        else if (Managers.Player?.PlayerTransform != null)
+            _playerTransform = Managers.Player.PlayerTransform;
     }
 
     private void DetectOccluders()
@@ -179,8 +192,29 @@ public class CameraOcclusionFader : MonoBehaviour
         var fadedMats = new Material[origMats.Length];
         for (int i = 0; i < origMats.Length; i++)
         {
-            var copy = new Material(origMats[i]);
-            MakeTransparent(copy);
+            var orig = origMats[i];
+
+            // 원본을 클론해 _Surface만 토글하면 Opaque 전용 ShaderGraph(예: BaseCamp 석재
+            // S_OpaqueORMWorldAlign)는 투명 패스가 컴파일돼 있지 않아 무시된다(불투명 그대로).
+            // → URP Lit(투명 패스 내장)로 스왑하고 베이스맵/색/노멀만 복사해 어떤 셰이더든 확실히 반투명화.
+            Material copy;
+            if (_fadeShader != null)
+            {
+                copy = new Material(_fadeShader);
+                if (orig != null)
+                {
+                    if (orig.HasProperty(BaseMapID)   && copy.HasProperty(BaseMapID))   copy.SetTexture(BaseMapID, orig.GetTexture(BaseMapID));
+                    if (orig.HasProperty(BaseColorID) && copy.HasProperty(BaseColorID)) copy.SetColor(BaseColorID, orig.GetColor(BaseColorID));
+                    if (orig.HasProperty(BumpMapID)   && copy.HasProperty(BumpMapID))   copy.SetTexture(BumpMapID, orig.GetTexture(BumpMapID));
+                }
+            }
+            else
+            {
+                // URP Lit 미발견 시 기존 경로 폴백(원본 클론 + _Surface 토글)
+                copy = orig != null ? new Material(orig) : null;
+            }
+
+            if (copy != null) MakeTransparent(copy);
             fadedMats[i] = copy;
         }
         r.materials = fadedMats;
