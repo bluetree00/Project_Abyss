@@ -30,8 +30,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 114ab6919cf39484e946697e02cfa078
+    m_Address: VFX_LevelUp
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 13a7c7a8d1bb29943ae2fda15a8f1e5c
+    m_Address: VFX_Debuff
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 13b7fdb99d291054ab23ba24b4c37776
+    m_Address: VFX_MonsterSpawn
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1f33e38f004dea4459c7e28969c59464
     m_Address: Illust_God_Default
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 34b67c9097fda7840a1a2cf55fc0c6b1
+    m_Address: VFX_WindBuff
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -50,11 +70,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
-    m_Address: UI/Popup/UI_ShopPanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
     m_Address: DissolveMaterial
     m_ReadOnly: 0
@@ -65,8 +80,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51f58a7ac453dab48a238fee31899d31
+    m_Address: GoldDot
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 58a8524c4e5019b4690d56aa62608a80
     m_Address: UI/Popup/UI_ItemAcquisitionPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 813a84120a8c453488b7cc49058dfb9d
+    m_Address: UI/Popup/UI_WeaponForgePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
+    m_Address: UI/Popup/UI_ShopPanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9c6358fd8c7c049499697da7d6dd18ba
+    m_Address: Shop/ShopNpc
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -77,6 +112,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 643fac2164c3b8e4e8b73afbbb274127
     m_Address: UI/Popup/UI_DialoguePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 721cfe8018b2cd04abd0748143d2a312
+    m_Address: VFX_Heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7ada66e14a4aec34292b67dabd608e9d
+    m_Address: VFX_Teleport
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -100,8 +145,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9c6358fd8c7c049499697da7d6dd18ba
-    m_Address: Shop/ShopNpc
+  - m_GUID: 9d5dbdf2d3c3c6b4eadc51123699d237
+    m_Address: wisp-vfx
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -146,8 +191,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9467a10b94fb3b428cc539326c9579b
+    m_Address: Buff2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db18c22cee80cc74487b0900361715f6
     m_Address: StageUI
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc5c4a87f8985374494021879967c823
+    m_Address: VFX_PoisonAura
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

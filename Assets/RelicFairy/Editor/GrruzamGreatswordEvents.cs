@@ -21,6 +21,23 @@ public static class GrruzamGreatswordEvents
         new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_1.FBX",                    fx = 0 },
         new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_2.FBX",                    fx = 1 },
         new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_3.FBX",                    fx = 2 },
+        // 대체 3콤보 후보(7Combo_4~7) — fx는 배치할 콤보 단계(0/1/2)에 맞춤. 7은 마무리(step2=fx2) 대용.
+        new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_4.FBX",                    fx = 0 },
+        new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_5.FBX",                    fx = 1 },
+        new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_6.FBX",                    fx = 2 },
+        new Def{ path = A + "/2_Attacks/2__7Combos/M_Big_Sword@Attack_7Combo_7.FBX",                    fx = 2 },
+        // CombatGirl 네이티브 공격(왜곡 0) — 대검 지상 3콤보용. fx=콤보 단계.
+        new Def{ path = "Assets/CombatGirlsCharacterPack/CombatGirl_Shield/Animations/Normal/SS_Attack1.fbx", fx = 0 },
+        new Def{ path = "Assets/CombatGirlsCharacterPack/CombatGirl_Shield/Animations/Normal/SS_Attack2.fbx", fx = 1 },
+        new Def{ path = "Assets/CombatGirlsCharacterPack/CombatGirl_Shield/Animations/Normal/SS_Attack3.fbx", fx = 2 },
+        // GhostSamurai 카타나 스윙 — 대검 지상 3콤보 대체 후보. fx=콤보 단계.
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack04_Inplace.FBX", fx = 0 },
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack05_Inplace.FBX", fx = 1 },
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack06_Inplace.FBX", fx = 2 },
+        // GhostSamurai Attack02 시퀀스(2·3·4) — 대검 지상 3콤보. fx=콤보 단계.
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack02_2_Inplace.FBX", fx = 0 },
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack02_3_Inplace.FBX", fx = 1 },
+        new Def{ path = "Assets/_ThirdParty/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack02_4_Inplace.FBX", fx = 2 },
         new Def{ path = A + "/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_1_ZeroHeight.FBX", fx = 0 },
         new Def{ path = A + "/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_2_ZeroHeight.FBX", fx = 1 },
         new Def{ path = A + "/2_Attacks/4__Jump_Attack/M_Big_Sword@Jump_Attack_Combo_3_ZeroHeight.FBX", fx = 2 },

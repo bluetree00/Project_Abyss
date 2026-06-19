@@ -194,6 +194,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             DisableSceneBakedNavMesh();
 
         _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
+        _run.OnBossRoomCleared += OnBossRoomClearedHandler;
+    }
+
+    /// <summary>보스방 클리어 신호 → 비최종 챕터면 챕터 전환 게이트를 스폰(등장 연출).
+    /// 최종 챕터는 게이트 없이 ClearRewardTrigger가 런 클리어를 담당한다. 보상은 별개(ClearRewardTrigger).</summary>
+    private void OnBossRoomClearedHandler(Vector3 center)
+    {
+        if (_run != null && _run.HasNextChapter())
+            ChapterGate.Spawn(center);
     }
 
     private async void Start()
@@ -243,7 +252,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         bool newRunFromHub = (AppBootstrapper.Instance?.Loadout?.IsReady ?? false)
             && (AppBootstrapper.Instance?.ConsumeNewRunPending() ?? false);
 
-        if (_run != null && _run.IsRunning && !hasDebugPanel)
+        // 챕터 전환 진입: 기존 런(IsRunning) 유지하되 저장 이어하기가 아니라 새 챕터를 처음부터 시작.
+        bool chapterAdvance = AppBootstrapper.Instance?.ConsumeChapterAdvance() ?? false;
+
+        if (_run != null && _run.IsRunning && chapterAdvance && !hasDebugPanel)
+            await StartNextChapterInSceneAsync(this.GetCancellationTokenOnDestroy());
+        else if (_run != null && _run.IsRunning && !hasDebugPanel)
             await ContinueProcGenRunAsync(this.GetCancellationTokenOnDestroy());
         else if (newRunFromHub)
             await StartWaitingRoomAsync();
@@ -279,6 +293,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (_run != null)
         {
             _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
+            _run.OnBossRoomCleared -= OnBossRoomClearedHandler;
 
             // 씬 이탈 전 현재 무기 슬롯 저장
             if (_run.IsRunning)
@@ -736,6 +751,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
         // StartRoom 이탈 흐름은 StartNewRunAsync를 거치지 않아 세션 챕터가 미설정(0)일 수 있으므로 씬에서 유추.
         var chapter     = ResolveCurrentChapter();
+        // 세션 CurrentChapter를 확정 — 챕터 종료 판정(HasNextChapter/AdvanceToNextChapter)이
+        // raw CurrentChapter(미설정=0)를 쓰는 오프바이원으로 최종 보스에서 Chapter1을 재시작하던 버그 차단.
+        _run?.EnsureChapter(chapter);
         var serverEntry = Managers.ChapterData?.Get(chapter);
         var chapterSO   = chapterRegistry?.GetData(chapter);
         var poolKey     = serverEntry?.zone_pool_key;
@@ -779,6 +797,44 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>최종 챕터 보스 클리어 시 ClearRewardTrigger가 호출. 클리어 연출 후 메타 저장·세이브 폐기·베이스캠프 복귀.</summary>
     public void HandleRunClear() => HandleRunEndAsync(true).Forget();
 
+    private bool _advancingChapter;
+
+    /// <summary>
+    /// 보스 클리어(비최종 챕터) 시 ClearRewardTrigger가 호출 — 챕터 번호·테마 갱신 후
+    /// 다음 챕터 전용 씬(GameScene_ChN)을 로드해 해당 챕터 고유 환경에서 새 챕터를 처음부터 시작한다.
+    /// 마지막 챕터면 런 클리어로 분기. 런 상태는 DDOL 세션 + 새 씬 BindPlayer 복원으로 이월된다.
+    /// </summary>
+    public void AdvanceChapter()
+    {
+        if (_advancingChapter) return;
+        _advancingChapter = true;
+        try
+        {
+            var run = Run;
+            if (run == null) return;
+
+            run.EnterChapterClear();
+            if (!run.AdvanceToNextChapter())
+            {
+                HandleRunClear(); // 마지막 챕터였음 — 런 클리어
+                return;
+            }
+
+            var chapter = run.CurrentChapter;
+
+            // 다음 챕터 전용 씬을 로드 — 로드된 GameScene의 GameRunBootstrapper가 IsChapterAdvancePending을
+            // 감지해 저장 이어하기가 아니라 새 챕터를 처음부터 시작한다(StartNextChapterInSceneAsync).
+            // 화면 전환 가림은 RequestLoad의 로딩 오버레이가 담당한다.
+            AppBootstrapper.Instance?.MarkChapterAdvance();
+            AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(chapter));
+            Debug.Log($"[GameRunBootstrapper] 챕터 전환 → Chapter {(int)chapter} 씬 로드 요청");
+        }
+        finally
+        {
+            _advancingChapter = false;
+        }
+    }
+
     /// <summary>
     /// 런 종료 공용 시퀀스. isCleared=false(사망)/true(클리어) 분기.
     /// 사망 모먼트(슬로우모션·쉐이크) → 화면 처리(비네트·암전) → 메시지 → 메타 저장 → 세이브 폐기 → BaseCamp 복귀.
@@ -801,9 +857,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 finally { TimeScaleArbiter.Release(this); }
             }
 
-            // 2) 화면 처리: 비네트(보유 자산) + 암전 페이드. 채도저하(URP Volume)는 미보유 → TODO.
-            var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
-            fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            // 2) 화면 처리: 사망만 빨간 비네트(피격감) — 클리어(승리)는 비네트 없이 암전만 적용해 사망 연출과 구분.
+            if (!isCleared)
+            {
+                var fx = Managers.UI?.GetOverlayUI<RelicFairy.UI.Overlay.FXLayer>();
+                fx?.Vignette(new Color(0.5f, 0f, 0f), 1f, 1.5f);
+            }
             await ScreenFade.Out(1.0f, ct);
 
             // 3) 종료 메시지(영혼 회수) — 스킵 입력 지원
@@ -944,6 +1003,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
         bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
         Vector3? customArenaEntryPos = null; // 커스텀 아레나: 프리팹 PlayerSpawn 마커 위치(있으면 grid 입구 대신 사용 → 격자 정렬 불필요)
+        System.Collections.Generic.List<ProcExitSlot> customArenaExits = null; // 프리팹 Exit 마커에서 산출한 출구(있으면 grid DR 대신 사용 → 게이트가 항상 프리팹 바닥 위)
 
         // 7. 블록 빌드 — 각 패스(블록/천장/조명) 사이에 yield를 넣어 한 프레임에 몰리는 Instantiate 스파이크를 분산.
         //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
@@ -974,6 +1034,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 var playerSpawn = arena.transform.Find("PlayerSpawn");
                 if (playerSpawn != null) customArenaEntryPos = playerSpawn.position;
                 else Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}'에 PlayerSpawn 자식 없음 — grid 입구로 폴백");
+
+                // 출구: 프리팹 Exit 마커(Exit/Exit1/Exit2…)를 우선 사용 — PlayerSpawn 규약과 동일.
+                customArenaExits = CollectArenaExitSlots(arena.transform, wallLayers * blockCellSize);
             }
             else
             {
@@ -1059,27 +1122,38 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
         float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
-        if (cls.entrance.HasValue)
+
+        // 커스텀 아레나에 Exit 마커가 있으면 그리드 DR 대신 사용 — 출구 게이트가 항상 프리팹 바닥 위에 배치된다.
+        // (그리드는 프리팹 footprint보다 커서 DR 셀이 바닥 밖에 떨어지는 문제 회피. 입구 잠금은 생략 — 프리팹이 경계를 소유.)
+        if (useCustomArena && customArenaExits != null && customArenaExits.Count > 0)
         {
-            var de = doorInfos[cls.entrance.Value];
-            result.hasEntrance = true;
-            result.entrance = new ProcExitSlot {
-                worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
-                openingWidth = de.width * blockCellSize, openingHeight = openingH };
+            result.hasEntrance = false;
+            result.exits.AddRange(customArenaExits);
         }
-        if (cls.forward.HasValue)
+        else
         {
-            var d = doorInfos[cls.forward.Value];
-            result.exits.Add(new ProcExitSlot {
-                worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
-                openingWidth = d.width * blockCellSize, openingHeight = openingH });
-        }
-        foreach (var t in cls.turns)
-        {
-            var d = doorInfos[t];
-            result.exits.Add(new ProcExitSlot {
-                worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
-                openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            if (cls.entrance.HasValue)
+            {
+                var de = doorInfos[cls.entrance.Value];
+                result.hasEntrance = true;
+                result.entrance = new ProcExitSlot {
+                    worldPos = CellToWorldFloor(cls.entrance.Value, anchor, w, h), isForward = false, edge = de.edge,
+                    openingWidth = de.width * blockCellSize, openingHeight = openingH };
+            }
+            if (cls.forward.HasValue)
+            {
+                var d = doorInfos[cls.forward.Value];
+                result.exits.Add(new ProcExitSlot {
+                    worldPos = CellToWorldFloor(cls.forward.Value, anchor, w, h), isForward = true, edge = d.edge,
+                    openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            }
+            foreach (var t in cls.turns)
+            {
+                var d = doorInfos[t];
+                result.exits.Add(new ProcExitSlot {
+                    worldPos = CellToWorldFloor(t, anchor, w, h), isForward = false, edge = d.edge,
+                    openingWidth = d.width * blockCellSize, openingHeight = openingH });
+            }
         }
 
         Debug.Log($"[GameRunBootstrapper] ProcRoom '{entry.pool_key}' 빌드 완료 @ {anchor} (출구 {result.exits.Count})");
@@ -1106,6 +1180,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             case DoorEdge.West:  return new Vector3( d, 0f, 0f);
             default:             return Vector3.zero;
         }
+    }
+
+    /// <summary>
+    /// 커스텀 아레나 프리팹의 Exit 마커(이름이 "Exit"로 시작하는 자식)를 출구 슬롯으로 변환한다.
+    /// 마커의 월드 위치 = 게이트 바닥 중앙, 마커의 +Z(forward) = 출구 방향(밖) → 엣지 산출.
+    /// 마커가 없으면 빈 리스트(호출자가 grid 폴백).
+    /// </summary>
+    private System.Collections.Generic.List<ProcExitSlot> CollectArenaExitSlots(Transform arena, float openingHeight)
+    {
+        var list = new System.Collections.Generic.List<ProcExitSlot>();
+        if (arena == null) return list;
+
+        var all = arena.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < all.Length; i++)
+        {
+            var t = all[i];
+            if (t == arena || !t.name.StartsWith("Exit", System.StringComparison.OrdinalIgnoreCase)) continue;
+
+            var edge  = EdgeFromForward(t.forward);
+            float ow  = t.localScale.x > 0.01f ? t.localScale.x : GateWidth * blockCellSize;
+            list.Add(new ProcExitSlot {
+                worldPos     = t.position,
+                isForward    = edge == DoorEdge.North,
+                edge         = edge,
+                openingWidth = ow,
+                openingHeight = openingHeight });
+        }
+        return list;
+    }
+
+    /// <summary>월드 forward 벡터를 가장 가까운 카디널 DoorEdge로 매핑.</summary>
+    private static DoorEdge EdgeFromForward(Vector3 fwd)
+    {
+        if (Mathf.Abs(fwd.z) >= Mathf.Abs(fwd.x))
+            return fwd.z >= 0f ? DoorEdge.North : DoorEdge.South;
+        return fwd.x >= 0f ? DoorEdge.East : DoorEdge.West;
     }
 
     /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>
@@ -2231,6 +2341,30 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct, structureKey);
 
         Debug.Log($"[GameRunBootstrapper] 절차생성 이어하기 완료 — visit={save.visitCount}, room={save.currentRoomPoolKey}");
+    }
+
+    /// <summary>
+    /// 챕터 전환으로 다음 챕터 씬을 로드한 직후 진입. 저장 이어하기와 달리 "새 챕터를 처음부터" 시작한다.
+    /// 런 상태(아이템/버프/서약/시너지)는 DDOL 세션에 유지되며, 새 플레이어 인스턴스에 BindPlayer가 복원한다.
+    /// 흐름: HUD 바인드 → 플레이어 스폰 → BindPlayer → 새 챕터 procgen 첫 방부터(StartProcGenRunAsync).
+    /// </summary>
+    private async UniTask StartNextChapterInSceneAsync(CancellationToken ct)
+    {
+        UIRootBootstrapper.Instance?.BindHudToRun(_run);
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        var player = await SpawnPlayerAsync(playerPrefabKey);
+        if (player != null)
+        {
+            SetupEntrance(player);
+            _run?.BindPlayer(player); // 라이브 세션 → 아이템/버프/서약/시너지 복원(BindPlayer가 씬 전환 복원 처리)
+        }
+        _run?.RequestHudMode(HUDIds.Mode.Combat);
+
+        // 새 챕터 procgen — CurrentChapter는 AdvanceToNextChapter로 이미 갱신됨. 첫 방부터 빌드.
+        await StartProcGenRunAsync();
+
+        Debug.Log($"[GameRunBootstrapper] 챕터 전환 진입 완료 → Chapter {(int)ResolveCurrentChapter()}");
     }
 
     private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)

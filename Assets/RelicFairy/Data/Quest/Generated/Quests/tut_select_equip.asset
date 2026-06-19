@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7ad26eea9c2be342ae3bca63118ad71, type: 3}
+  m_Name: tut_select_equip
+  m_EditorClassIdentifier: Assembly-CSharp::Quest
+  category: {fileID: 11400000, guid: 564abeb724975a94b832adfb9253b91c, type: 2}
+  icon: {fileID: 0}
+  codeName: tut_select_equip
+  displayName: "\uBB34\uC7A5\uD558\uB77C"
+  description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44\uB97C \uC120\uD0DD\uD558\uB77C"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 6aae4281bfa36fa4eaae42471e887d33, type: 2}
+  rewards: []
+  useAutoCompletion: 1
+  isCancelable: 0
+  isSavable: 0
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}

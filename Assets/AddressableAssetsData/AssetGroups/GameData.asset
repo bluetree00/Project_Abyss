@@ -14,8 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: GameData
   m_GUID: 9d7397ccff4ede3478017cf3a6f90b96
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 5ca2241dfaaa1d54d8631198e1a20bed
+    m_Address: QuestDatabase
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f29dbb5f387aa02408ffaffe55e82488
+    m_Address: AchievementDatabase
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
-    m_Schemas: []
+    m_Schemas:
+    - {fileID: 11400000, guid: 2173d83ae5f243a45bede8acf2ba8193, type: 2}
+    - {fileID: 11400000, guid: d61be7dac31a2cd4b954da2b2b89285f, type: 2}

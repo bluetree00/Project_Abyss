@@ -340,6 +340,10 @@ public sealed class RoomWaveController : MonoBehaviour
             gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null);
             gate.Activate(_hasKillPosition ? _lastKillPosition : transform.position);
 
+            // 보스방 클리어 신호 발행 — 챕터 게이트 스폰 트리거(이벤트 기반, 보스/DieState 코드 무수정).
+            if (_bossSpawner != null)
+                _run?.NotifyBossRoomCleared(_hasKillPosition ? _lastKillPosition : transform.position);
+
             // 절차 진행: 출구 게이트 배치 트리거 (레거시 contiguous 경로엔 구독자 없음 → 무영향)
             OnRoomCleared?.Invoke();
         }

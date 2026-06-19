@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
 using BackEnd;
@@ -10,7 +11,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 {
     public static AppBootstrapper Instance { get; private set; }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    // 모든 빌드에서 부트스트랩 자동 생성 (씬/프리팹에 배치된 인스턴스 없음 → 릴리스 빌드 부팅 보장).
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoCreate()
     {
@@ -20,7 +21,6 @@ public sealed class AppBootstrapper : MonoBehaviour
         var go = new GameObject("@AppBootstrapper");
         go.AddComponent<AppBootstrapper>();
     }
-#endif
 
     [Header("Core Init")]
     [SerializeField] private bool initBackend = true;
@@ -58,6 +58,10 @@ public sealed class AppBootstrapper : MonoBehaviour
     // ---- Run 수명 관리 ----
     public GameRunSession CurrentRun { get; private set; }
     public bool IsNewRunPending { get; private set; }
+
+    // 챕터 전환 신호 — 보스 클리어 후 다음 챕터 씬을 로드할 때, 로드된 GameScene이
+    // 저장 이어하기(ContinueProcGenRunAsync)가 아니라 "새 챕터 처음부터" 진입하도록 구분한다.
+    public bool IsChapterAdvancePending { get; private set; }
 
     public void BeginRun(GameRunSession session)
     {
@@ -199,6 +203,17 @@ public sealed class AppBootstrapper : MonoBehaviour
     /// <summary>새 런 진입 신호를 세운다. 베이스캠프 던전 게이트 통과처럼 로비(RequestStartRun)를 거치지 않은
     /// 진입에서도 Ch1 부트스트래퍼가 대기 방(StartWaitingRoomAsync) 흐름을 타도록 보장한다. ConsumeNewRunPending에서 소비.</summary>
     public void MarkNewRunPending() => IsNewRunPending = true;
+
+    /// <summary>챕터 전환 진입 신호를 세운다. AdvanceChapter가 다음 챕터 씬 로드 직전에 호출.
+    /// 로드된 GameScene의 GameRunBootstrapper가 ConsumeChapterAdvance로 소비해 새 챕터를 처음부터 시작한다.</summary>
+    public void MarkChapterAdvance() => IsChapterAdvancePending = true;
+
+    public bool ConsumeChapterAdvance()
+    {
+        bool was = IsChapterAdvancePending;
+        IsChapterAdvancePending = false;
+        return was;
+    }
 
     /// <summary>
     /// 저장 슬롯의 이어하기. 세션을 복원한 뒤 StageMap 씬으로 이동한다.
@@ -678,6 +693,19 @@ public sealed class AppBootstrapper : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogWarning($"[AppBootstrapper] SoundEventTable 로드 실패: {e.Message}");
+        }
+
+        try
+        {
+            var mixer = await addr.TryLoadAssetAsync<AudioMixer>("GameAudioMixer");
+            if (mixer != null)
+                Managers.Sound?.SetMixer(mixer);
+            else
+                Debug.Log("[AppBootstrapper] GameAudioMixer 없음 — 믹서 비활성(폴백 볼륨 사용)");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[AppBootstrapper] GameAudioMixer 로드 실패: {e.Message}");
         }
     }
 

@@ -26,6 +26,7 @@ public sealed class EscBookPopup : UI_Popup
     [SerializeField] private Button btnResume;
     [SerializeField] private Button btnOption;
     [SerializeField] private Button btnLobby;
+    [SerializeField] private Button btnQuit;
 
     [Header("Animation")]
     [SerializeField] private float flipDuration = 0.4f;
@@ -42,6 +43,7 @@ public sealed class EscBookPopup : UI_Popup
         btnResume?.onClick.AddListener(ClosePopup);
         btnOption?.onClick.AddListener(OnOption);
         btnLobby?.onClick.AddListener(OnLobby);
+        btnQuit?.onClick.AddListener(OnQuit);
     }
 
     public void OpenPopup()
@@ -157,6 +159,17 @@ public sealed class EscBookPopup : UI_Popup
     {
         Debug.Log("[EscBookPopup] Lobby clicked");
         ClosePopup();
+    }
+
+    private void OnQuit()
+    {
+        // 강제 닫힘 대비 timeScale 복원 후 종료(멱등 Release).
+        TimeScaleArbiter.Release(this);
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     private void OnDestroy()
