@@ -406,7 +406,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         }
         else
         {
-            tint     = new Color(0.0f, 0.0f,  0.0f,  0.02f);
+            tint     = new Color(0.0f, 0.0f,  0.0f,  0.1f);
             emission = new Color(0.0f, 0.0f,  0.0f,  1f);
         }
         foreach (var b in _entranceEndBarriers)
