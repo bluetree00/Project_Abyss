@@ -119,6 +119,13 @@ public sealed class GameRunSession
     /// <summary>방 클리어 시 발행. isBossRoom=true면 챕터 보스 처치.</summary>
     public event Action<bool> OnRoomCleared;
 
+    /// <summary>보스방 클리어 시점(보상/전환 전)에 발행. Vector3=보스/방 중심. 챕터 게이트 스폰 트리거.
+    /// RoomWaveController가 NotifyBossRoomCleared로 발행 — 보스/몬스터 코드는 건드리지 않는다.</summary>
+    public event Action<Vector3> OnBossRoomCleared;
+
+    /// <summary>RoomWaveController에서 보스방 클리어 시 호출. OnBossRoomCleared 구독자(챕터 게이트)에게 알린다.</summary>
+    public void NotifyBossRoomCleared(Vector3 center) => OnBossRoomCleared?.Invoke(center);
+
     public event Action<PlayerRunState> OnPlayerStateReady;
     public event Action<PlayerController> OnPlayerBound;
     public event Action<string> OnMapSpawnRequested;
@@ -515,6 +522,20 @@ public sealed class GameRunSession
 
         ChangeRunState(RunState.Map);
         return true;
+    }
+
+    /// <summary>
+    /// CurrentChapter 확정. 절차 진행 흐름(베이스캠프→시작방 게이트→StartProcGenRunAsync)은
+    /// StartNewRunAsync를 거치지 않아 CurrentChapter가 미설정((ChapterId)0)으로 남는다.
+    /// 이 경우 HasNextChapter/AdvanceToNextChapter가 0+1=Chapter1로 오판해 최종 보스에서
+    /// 런 클리어 대신 Chapter1을 재시작하는 오프바이원이 발생한다 → 런 시작 시 1회 확정한다.
+    /// 이미 정의된 챕터(1~4)면 유지한다.
+    /// </summary>
+    public void EnsureChapter(ChapterId chapter)
+    {
+        if (System.Enum.IsDefined(typeof(ChapterId), CurrentChapter)) return;
+        CurrentChapter = chapter;
+        ResolveActiveTheme();
     }
 
     // =========================================================

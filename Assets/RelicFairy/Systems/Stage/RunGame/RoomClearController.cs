@@ -131,9 +131,10 @@ public sealed class RoomClearController : MonoBehaviour
             _run?.CovenantHandler?.OnRoomClear();
 
             // 3) 룸 중앙에 포탈 등장 + 행운치 기반 아이템 드랍
+            //    보스방(_bossSpawner!=null)이면 isBossRoom=true 전달 → 보상 수령 후 챕터 전환/런 클리어 분기(ClearRewardTrigger).
             var gate = GetComponent<RoomClearGate>();
             if (gate == null) gate = gameObject.AddComponent<RoomClearGate>();
-            gate.Initialize(_run, _luckTable);
+            gate.Initialize(_run, _luckTable, isBossRoom: _bossSpawner != null);
 
             // mapGO의 origin = 룸 중앙 (블록 맵은 중심 기준 배치)
             Vector3 roomCenter = transform.position;

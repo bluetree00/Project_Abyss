@@ -160,6 +160,13 @@ public class PlayerController : CharacterBase
         {
             SpawnHitBloodVfx();
             OnDamageTaken?.Invoke();
+
+            // 피격 반작용 — 카메라 셰이크(피해 비례). 위험 전달/타격감.
+            // 글로벌 히트스톱은 의도적으로 생략(들어오는 피해에 프리즈=렉 체감, 보스별 설계 히트스톱은 별도 유지).
+            float maxHp = RuntimeStats != null ? Mathf.Max(1f, RuntimeStats.MaxHp) : 100f;
+            float sev = Mathf.Clamp01(finalDmg / (maxHp * 0.2f)); // 최대HP 20% 피해 = 최대 강도
+            HitFeelService.CameraShake(Mathf.Lerp(0.05f, 0.16f, sev), 0.18f);
+
             // 룬 속성 OnDamaged 통지(어둠 게이지 등). 실제 피해가 들어갈 때만 — i-frame/회피/무효/사망무효는 위에서 이미 return.
             _runeEffects?.NotifyDamaged(finalDmg, attacker);
         }

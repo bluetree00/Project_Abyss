@@ -15,28 +15,13 @@ MonoBehaviour:
   m_GroupName: WeaponAnimation
   m_GUID: e022b22868950144f9a5f9bdc5770e86
   m_SerializeEntries:
-  - m_GUID: 020598ec7075891469d39c8001089e9f
-    m_Address: SS_Walk
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 14256027a4ac4e13be1ec0c8dbac1cb6
-    m_Address: BowESkill_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1fb5156f95474594ba5c842a0c266fdf
-    m_Address: APose_Idle
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 24b7b5caf37a46ef9a39bc8e30415847
-    m_Address: BowQSkill_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 315ac933a0551744a837e93af3d25704
     m_Address: SS_Idle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 020598ec7075891469d39c8001089e9f
+    m_Address: SS_Walk
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -45,8 +30,148 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1fb5156f95474594ba5c842a0c266fdf
+    m_Address: APose_Idle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0cb689c84df043547ae36efd536396d5
+    m_Address: APose_Walk
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 14256027a4ac4e13be1ec0c8dbac1cb6
+    m_Address: BowESkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24b7b5caf37a46ef9a39bc8e30415847
+    m_Address: BowQSkill_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4f6bfedccb7aeda4d8a1954468050ea6
     m_Address: GreatswordESkill
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c0b8265125452341a43f1394358cdb0
+    m_Address: GreatswordAttack_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c2e4c472ee2e0345bf589fe9cb190a4
+    m_Address: GreatswordAttack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8dc3c80b7b116641b8ede0a49c32311
+    m_Address: GreatswordAttack_04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8320a58daa9b96846b425c36befb573e
+    m_Address: GreatswordAttack_05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61bb43deb52f6ba4f9400b9c7a8b8a8c
+    m_Address: GreatswordAttack_06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea4e2ef456d9e8645b915317e997d334
+    m_Address: GreatswordAttack_07
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f935b9f1d197ae64fa23d312530efa23
+    m_Address: SS_Attack1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c17a750330e6e04c9685ac96f8e0351
+    m_Address: SS_Attack2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 07e9746d22304ff42b1cc5a3188188f4
+    m_Address: SS_Attack3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a40902f57abb8e94c9c2ededb8df4b47
+    m_Address: GS_Attack04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b712c0204fec784458ad2b40ca2b4f67
+    m_Address: GS_Attack05
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c410c8e0a8a3ba42a977f8b012d073d
+    m_Address: GS_Attack06
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9a50ebdafd4db4a47abd08965c9d4f3a
+    m_Address: GS_Attack02_2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 686d6fee3c23524439553401966a5bab
+    m_Address: GS_Attack02_3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2240b17a57760c48b5b2e6de43e37bb
+    m_Address: GS_Attack02_4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b72313c5276bb2a458d79fe4e12198c0
+    m_Address: GreatswordAttack_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6f423919d9bd20746a6fd16321280f00
+    m_Address: GreatswordGuardLoop
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8c2610a832de8244d81483c9e131ef31
+    m_Address: GreatswordGuardAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 275bcd57e88f81f48bbff2be567c4fbc
+    m_Address: GreatswordGuardAccept
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cea18b9bde235954a80961d090b435fd
+    m_Address: GreatswordAirLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbca79f1daf54f748a17891e44ac0810
+    m_Address: GreatswordAirLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1ded6755ac20999408645f8a76b95ee2
+    m_Address: GreatswordAirHeavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6be7ea595e5ec794790dbd4f2aeccb5b
+    m_Address: GreatswordAirPlunge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 12fd0b9c43bf23b458ba50c883cddd22
+    m_Address: GreatswordESkill_T3
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

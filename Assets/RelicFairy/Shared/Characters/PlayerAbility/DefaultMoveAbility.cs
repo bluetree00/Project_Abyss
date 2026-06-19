@@ -7,10 +7,11 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 
     // 오를 수 있는 계단 최대 높이 (m)
     private const float StepMaxHeight = 0.35f;
-    // 계단 감지 레이 거리 (m)
+    // 계단 감지 레이 거리 (m). 캡슐 반경보다 커야 충돌 전에 감지해 매끄럽게 오름.
     private const float StepProbeDistance = 0.4f;
-    // 계단 오르는 속도 (m/s) — 값이 클수록 빠르게 오름, 카메라 흔들림과 트레이드오프
-    private const float StepClimbSpeed = 8f;
+    // 계단 상승률(m/s) 범위. 실제 상승률은 수평 접근속도에 비례시켜 이 범위로 클램프(속도 무관 일관 스텝).
+    private const float MinStepClimbSpeed = 3f;
+    private const float MaxStepClimbSpeed = 12f;
 
     // ── 가속 모델 폴백 상수 (CharacterData 미설정 시) ──
     private const float DefaultAccel = 90f;        // ≈ 0→8m/s 90ms
@@ -102,28 +103,43 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
     // rb.position 직접 대입 대신 MovePosition + MoveTowards를 사용해 카메라 튀는 현상 방지.
     public void StepClimb(PlayerController owner, Vector3 moveDir)
     {
+        var rb = owner.Rigid;
+        var cd = owner.CharacterData;
         Vector3 pos = owner.transform.position;
+        int groundMask = cd != null ? cd.groundLayer.value : Physics.DefaultRaycastLayers;
 
-        // 발 높이에서 앞 장애물 감지
-        if (!Physics.Raycast(pos + Vector3.up * 0.05f, moveDir, out var footHit, StepProbeDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        // 발 높이에서 앞 계단 면 감지 — 지면 레이어만(소품/적 오감지 방지).
+        if (!Physics.Raycast(pos + Vector3.up * 0.05f, moveDir, out var footHit, StepProbeDistance, groundMask, QueryTriggerInteraction.Ignore))
             return;
 
-        // StepMaxHeight 위는 열려있어야 계단 (막혀있으면 벽)
+        // StepMaxHeight 위가 막혀있으면 계단이 아니라 벽 — 모든 솔리드 기준으로 보수적으로 차단(오르기 스킵만).
         if (Physics.Raycast(pos + Vector3.up * (StepMaxHeight + 0.05f), moveDir, StepProbeDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             return;
 
-        // 계단 상단 표면 탐색
+        // 계단 상단 표면 탐색 — 지면 레이어만.
         Vector3 probeStart = pos + moveDir * (footHit.distance + 0.01f) + Vector3.up * (StepMaxHeight + 0.05f);
-        if (!Physics.Raycast(probeStart, Vector3.down, out var topHit, StepMaxHeight + 0.1f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        if (!Physics.Raycast(probeStart, Vector3.down, out var topHit, StepMaxHeight + 0.1f, groundMask, QueryTriggerInteraction.Ignore))
             return;
 
         float deltaY = topHit.point.y - pos.y;
         if (deltaY <= 0.01f || deltaY > StepMaxHeight) return;
 
-        // 한 프레임에 StepClimbSpeed * dt 만큼씩 이동 → 카메라가 부드럽게 따라옴
-        float newY = Mathf.MoveTowards(pos.y, topHit.point.y, StepClimbSpeed * Time.fixedDeltaTime);
-        owner.Rigid.MovePosition(new Vector3(pos.x, newY, pos.z));
-        var rb = owner.Rigid;
+        float dt = Time.fixedDeltaTime;
+
+        // 상승률을 수평 접근에 비례시킨다(남은 접근거리에 걸쳐 계단 높이를 올림) → 이동속도와 무관하게
+        // 계단 모서리에서 상단에 정확히 도달. 미리 떠오르거나 팝업되는 느낌 제거. 너무 가까우면 최대치로 마무리.
+        float horizSpeed = new Vector2(rb.linearVelocity.x, rb.linearVelocity.z).magnitude;
+        float climbRate = footHit.distance > 0.02f ? deltaY * horizSpeed / footHit.distance : MaxStepClimbSpeed;
+        climbRate = Mathf.Clamp(climbRate, MinStepClimbSpeed, MaxStepClimbSpeed);
+        float newY = Mathf.MoveTowards(pos.y, topHit.point.y, climbRate * dt);
+
+        // 수평 전진을 유지하면서 Y만 올린다(수평 위치 고정 제거 → 멈칫/지터 해소).
+        // StepClimb은 물리 충돌 처리 전에 위치를 보정하므로, 위로 올려 캡슐이 계단 면에 끼지 않게 한 뒤 전진을 이어간다.
+        // MovePosition 목표의 수평 성분을 이번 스텝 수평 속도와 일치시켜 velocity 지정과 충돌하지 않게 한다.
+        Vector3 horizStep = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z) * dt;
+        rb.MovePosition(new Vector3(pos.x + horizStep.x, newY, pos.z + horizStep.z));
+
+        // 수직 속도만 0(바운스 방지). 수평 속도는 유지.
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
     }
 }
