@@ -12,6 +12,9 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
     // 계단 상승률(m/s) 범위. 실제 상승률은 수평 접근속도에 비례시켜 이 범위로 클램프(속도 무관 일관 스텝).
     private const float MinStepClimbSpeed = 3f;
     private const float MaxStepClimbSpeed = 12f;
+    // 계단 오르기 최소 전진 속도(m/s). 이동방향으로 실제 나아갈 때만 오른다 —
+    // 벽에 막혀 속도≈0인데 입력만 들어오는 상황에서 캐릭터를 들어올려 끼이는(고정) 문제 방지.
+    private const float MinStepForwardSpeed = 1f;
 
     // ── 가속 모델 폴백 상수 (CharacterData 미설정 시) ──
     private const float DefaultAccel = 90f;        // ≈ 0→8m/s 90ms
@@ -107,6 +110,11 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         var cd = owner.CharacterData;
         Vector3 pos = owner.transform.position;
         int groundMask = cd != null ? cd.groundLayer.value : Physics.DefaultRaycastLayers;
+
+        // 실제로 이동방향으로 전진 중일 때만 오른다 — 벽에 막혀 속도≈0(정지/끼임)인데
+        // 입력만 들어오는 상태에서 캐릭터를 들어올려 모서리에 끼이는 고정 현상 방지.
+        Vector3 horizVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        if (Vector3.Dot(horizVel, moveDir) < MinStepForwardSpeed) return;
 
         // 발 높이에서 앞 계단 면 감지 — 지면 레이어만(소품/적 오감지 방지).
         if (!Physics.Raycast(pos + Vector3.up * 0.05f, moveDir, out var footHit, StepProbeDistance, groundMask, QueryTriggerInteraction.Ignore))
