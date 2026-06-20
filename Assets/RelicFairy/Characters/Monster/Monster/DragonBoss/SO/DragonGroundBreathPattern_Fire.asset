@@ -32,6 +32,7 @@ MonoBehaviour:
   _breathDamagePerSec: 20
   _breathEffectPrefab: {fileID: 189272, guid: a99a0208643f5f048be748ca15ce6eb1, type: 3}
   _warningEffectPrefab: {fileID: 0}
+  _breathSfx: {fileID: 8300000, guid: fb00b1c11a5aad4438670d7530866a66, type: 3}
   _breathColor: {r: 1, g: 0.35, b: 0.1, a: 1}
   _statusEffect: {fileID: 11400000, guid: b10ccd161dd874a4cb22d5a0971b1c2c, type: 2}
   _endPoseDuration: 0.4

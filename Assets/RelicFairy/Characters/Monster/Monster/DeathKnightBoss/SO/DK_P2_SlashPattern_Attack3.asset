@@ -23,7 +23,7 @@ MonoBehaviour:
   breakOverride: -1
   animName: Attack3
   windupDuration: 0.35
-  hitTime: 0.55
+  hitTime: 0.6
   endPoseTime: 0.35
   recoveryTime: 0.2
   hitRange: 2.8
@@ -35,3 +35,4 @@ MonoBehaviour:
     type: 3}
   damageMultiplier: 1.1
   knockbackMultiplier: 0.8
+  slashSfx: {fileID: 8300000, guid: e5efd731d55ee4c4ebd407ed3f949a33, type: 3}

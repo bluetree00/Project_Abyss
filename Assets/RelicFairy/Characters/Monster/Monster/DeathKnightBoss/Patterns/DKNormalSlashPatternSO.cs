@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -37,6 +37,10 @@ public class DKNormalSlashPatternSO : BossPatternSO
     [Header("Damage")]
     public float damageMultiplier    = 1f;
     public float knockbackMultiplier = 1f;
+
+    [Header("Sound")]
+    [Tooltip("Big Slash — Sword Slash 15 이펙트가 뜨는 위치에서 재생")]
+    public AudioClip bigSlashSfx;
 
     [Header("Border")]
     [Tooltip("경계 테두리 엣지 프리팹 (DK_WarnBorder)")]
@@ -125,7 +129,11 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                     ctx, rowZ, Data.damageMultiplier, Data.knockbackMultiplier);
                 // §3 타격감 — 첫 행에서 히트스톱, 이후 행은 쉐이크만
                 if (_rowIndex == 0)
+                {
                     BossImpactFeedback.TriggerHitStop(0.08f);
+                    // 첫 Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+                    Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
+                }
                 BossImpactFeedback.TriggerCameraShake(0.1f, 0.2f);
                 _rowIndex++;
             }

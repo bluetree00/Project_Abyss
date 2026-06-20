@@ -37,6 +37,8 @@ public class DragonBreathSweepPatternSO : BossPatternSO
 
     [Header("Flame Breath")]
     [SerializeField] private GameObject _flameBreathPrefab;
+    [Tooltip("매 sweep 시작 시 재생할 브레스 사운드")]
+    [SerializeField] private AudioClip _breathSfx;
     [SerializeField] private float _breathDownAngle = 45f;
     [Tooltip("탑뷰 슬로우 연출 시 사용할 각도. 0에 가까울수록 수평에 가까워 위에서 보임")]
     [SerializeField] private float _breathPreviewAngle = 8f;
@@ -49,6 +51,8 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [SerializeField] private GameObject _flameTsunamiPrefab;
     [SerializeField] private int _tsunamiColInterval = 3;
     [SerializeField] private float _tsunamiScale = 0.2f;
+    [Tooltip("바닥에 남는 불길 이펙트가 생성될 때 재생할 사운드")]
+    [SerializeField] private AudioClip _residualFireSfx;
 
     [Header("Damage")]
     [SerializeField] private int _breathDamage = 20;
@@ -104,6 +108,7 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float LightSpotAngle => _lightSpotAngle;
     public Color LightColor => _lightColor;
     public GameObject FlameBreathPrefab => _flameBreathPrefab;
+    public AudioClip  BreathSfx         => _breathSfx;
     public float BreathDownAngle        => _breathDownAngle;
     public float BreathPreviewAngle     => _breathPreviewAngle;
     public float BreathHorizReach => _breathHorizReach;
@@ -111,6 +116,7 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public GameObject FlameTsunamiPrefab => _flameTsunamiPrefab;
     public int TsunamiColInterval => _tsunamiColInterval;
     public float TsunamiScale => _tsunamiScale;
+    public AudioClip ResidualFireSfx => _residualFireSfx;
     public int BreathDamage => _breathDamage;
     public int TsunamiDamage => _tsunamiDamage;
     public float TsunamiDuration => _tsunamiDuration;
@@ -161,6 +167,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         public float HalfWidth;
         public float Timer;
         public float TickTimer;
+        public int SweepIndex;
     }
 
     private struct ScorchEntry
@@ -205,8 +212,13 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private readonly List<TsunamiEntry> _tsunamis  = new();
     private readonly List<ScorchEntry>  _scorches  = new();
 
-    private GameObject _flameBreathGo;
-    private Light      _followLight;
+    private GameObject  _flameBreathGo;
+    private Light       _followLight;
+    private AudioSource _flameBreathAudioSource;
+
+    // sweep(브레스 라인) 단위로 잔불 사운드 1개씩만 루프 재생 — 개별 화염 패치마다 재생하면 소리가 겹쳐 터진다.
+    private readonly Dictionary<int, int>         _lineFireRemaining = new();
+    private readonly Dictionary<int, AudioSource> _lineFireAudio     = new();
 
     internal DragonBreathSweepState(DragonBreathSweepPatternSO data) : base(data) { }
 
@@ -601,8 +613,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void SpawnFlameBreath(MonsterContext ctx)
     {
+        _flameBreathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, ctx.Transform.position);
+
         if (Data.FlameBreathPrefab == null) return;
-        _flameBreathGo = Object.Instantiate(
+        _flameBreathGo = BossEffectPool.Spawn(
             Data.FlameBreathPrefab,
             ctx.Transform.position,
             GetBreathRotation());
@@ -618,8 +632,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupFlameBreath()
     {
+        Managers.Sound?.StopEffect(_flameBreathAudioSource, Data.BreathSfx);
+
         if (_flameBreathGo == null) return;
-        Object.Destroy(_flameBreathGo);
+        BossEffectPool.Release(_flameBreathGo);
         _flameBreathGo = null;
     }
 
@@ -684,7 +700,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         Vector3 pos = _laneCenter + _sweepDir * projection;
         pos.y = GetFloorY(pos, ctx) + 0.05f;
         Quaternion rot = Quaternion.LookRotation(_sweepDir, Vector3.up);
-        var go = Object.Instantiate(Data.FlameTsunamiPrefab, pos, rot);
+        var go = BossEffectPool.Spawn(Data.FlameTsunamiPrefab, pos, rot);
         go.transform.localScale = Vector3.one * Data.TsunamiScale;
 
         foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
@@ -697,7 +713,41 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             Direction = _sweepDir,
             Right = _sweepRight,
             HalfWidth = _halfLaneWidth,
+            SweepIndex = _sweepIndex,
         });
+
+        // 이 라인(sweep)의 첫 화염 패치일 때만 루프 사운드 1개 시작 — 패치마다 개별 재생하지 않음
+        _lineFireRemaining.TryGetValue(_sweepIndex, out int remaining);
+        _lineFireRemaining[_sweepIndex] = remaining + 1;
+        if (remaining == 0)
+            _lineFireAudio[_sweepIndex] = Managers.Sound?.PlayLoopingEffectAt(Data.ResidualFireSfx, pos);
+    }
+
+    private void ReleaseLineFireSlot(int sweepIndex)
+    {
+        if (!_lineFireRemaining.TryGetValue(sweepIndex, out int remaining)) return;
+
+        remaining--;
+        if (remaining > 0)
+        {
+            _lineFireRemaining[sweepIndex] = remaining;
+            return;
+        }
+
+        _lineFireRemaining.Remove(sweepIndex);
+        if (_lineFireAudio.TryGetValue(sweepIndex, out var source))
+        {
+            Managers.Sound?.StopLoopingEffect(source);
+            _lineFireAudio.Remove(sweepIndex);
+        }
+    }
+
+    private void StopAllLineFireAudio()
+    {
+        foreach (var source in _lineFireAudio.Values)
+            Managers.Sound?.StopLoopingEffect(source);
+        _lineFireAudio.Clear();
+        _lineFireRemaining.Clear();
     }
 
     private void UpdateLivingTsunamis(MonsterContext ctx)
@@ -716,7 +766,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
             if (entry.Timer >= Data.TsunamiDuration)
             {
-                if (entry.Go != null) Object.Destroy(entry.Go);
+                if (entry.Go != null) BossEffectPool.Release(entry.Go);
+                ReleaseLineFireSlot(entry.SweepIndex);
                 _tsunamis.RemoveAt(i);
                 continue;
             }
@@ -895,7 +946,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             var    rot  = Quaternion.LookRotation(_sweepDir, Vector3.up) * Quaternion.Euler(0f, yRot, 0f);
             float  scl  = Random.Range(Data.FireScaleMin, Data.FireScaleMax);
 
-            var go = Object.Instantiate(Data.FlameTsunamiPrefab, pos, rot);
+            var go = BossEffectPool.Spawn(Data.FlameTsunamiPrefab, pos, rot);
             go.transform.localScale = Vector3.one * scl;
             foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
                 mb.enabled = false;
@@ -912,7 +963,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             e.Timer += Time.deltaTime;
             if (e.Timer >= e.MaxTimer)
             {
-                if (e.Go != null) Object.Destroy(e.Go);
+                if (e.Go != null) BossEffectPool.Release(e.Go);
                 _scorches.RemoveAt(i);
                 continue;
             }
@@ -922,7 +973,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupAllScorches()
     {
-        foreach (var e in _scorches) if (e.Go != null) Object.Destroy(e.Go);
+        foreach (var e in _scorches) if (e.Go != null) BossEffectPool.Release(e.Go);
         _scorches.Clear();
     }
 
@@ -1006,8 +1057,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupAllTsunamis()
     {
-        foreach (var entry in _tsunamis) if (entry.Go != null) Object.Destroy(entry.Go);
+        foreach (var entry in _tsunamis) if (entry.Go != null) BossEffectPool.Release(entry.Go);
         _tsunamis.Clear();
+        StopAllLineFireAudio();
     }
 
     private string ResolveAirChaseAnim(MonsterContext ctx)

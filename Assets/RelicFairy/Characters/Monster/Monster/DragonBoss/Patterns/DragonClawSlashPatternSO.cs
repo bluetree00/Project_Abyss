@@ -22,12 +22,16 @@ public class DragonClawSlashPatternSO : BossPatternSO
     [SerializeField] private float _warnDuration     = 0.15f;
     [Tooltip("Seconds after swing start when hit is applied")]
     [SerializeField] private float _hitTime          = 0.55f;
+    [Tooltip("Seconds after swing start when the arm-swing motion visually appears — Craw 사운드 재생 시점")]
+    [SerializeField] private float _swingSfxDelay    = 0.3f;
     [SerializeField] private float _attackRadius     = 2.5f;
     [SerializeField] private int   _attackDamage     = 20;
 
     [Header("Effect")]
     [Tooltip("Marker 7 Danger zone prefab for attack warning")]
     [SerializeField] private GameObject _dangerZonePrefab;
+    [Tooltip("할퀴기 스윙 시작 시 재생할 사운드")]
+    [SerializeField] private AudioClip _clawSfx;
 
     [Header("EndPose (반격 창)")]
     [SerializeField] private float _endPoseDuration = 0.4f;
@@ -46,9 +50,11 @@ public class DragonClawSlashPatternSO : BossPatternSO
     public float       ClawAnimDuration => _clawAnimDuration;
     public float       WarnDuration     => _warnDuration;
     public float       HitTime          => _hitTime;
+    public float       SwingSfxDelay    => _swingSfxDelay;
     public float       AttackRadius     => _attackRadius;
     public int         AttackDamage     => _attackDamage;
     public GameObject  DangerZonePrefab => _dangerZonePrefab;
+    public AudioClip    ClawSfx          => _clawSfx;
     public float       EndPoseDuration  => _endPoseDuration;
     public float       Cooldown         => _cooldown;
     public string      JumpUpStateName  => _jumpUpStateName;
@@ -95,6 +101,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _totalSwings;
     private bool    _hitApplied;
     private bool    _dangerShown;
+    private bool    _swingSfxPlayed;
     private DragonBossWarningZone _activeWarningZone;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
@@ -198,12 +205,13 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
                 ctx.Transform.rotation = Quaternion.LookRotation(dir);
         }
 
-        _phase       = Phase.Attacking;
-        _timer       = 0f;
-        _swingIndex  = 0;
-        _totalSwings = Data.ClawCount * 2;
-        _hitApplied  = false;
-        _dangerShown = false;
+        _phase          = Phase.Attacking;
+        _timer          = 0f;
+        _swingIndex     = 0;
+        _totalSwings    = Data.ClawCount * 2;
+        _hitApplied     = false;
+        _dangerShown    = false;
+        _swingSfxPlayed = false;
 
         PlayCurrentSwingAnim(ctx);
     }
@@ -220,6 +228,12 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             SpawnDangerZone(ctx);
         }
 
+        if (!_swingSfxPlayed && _timer >= Data.SwingSfxDelay)
+        {
+            _swingSfxPlayed = true;
+            Managers.Sound?.PlayEffectAt(Data.ClawSfx, ctx.Transform.position);
+        }
+
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
@@ -234,6 +248,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             _timer             = 0f;
             _hitApplied        = false;
             _dangerShown       = false;
+            _swingSfxPlayed    = false;
             _activeWarningZone = null;
 
             if (_swingIndex < _totalSwings)

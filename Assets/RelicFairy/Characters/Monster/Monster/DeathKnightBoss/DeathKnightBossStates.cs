@@ -412,6 +412,8 @@ public class DKPhase2TeleportState : SpecialStateBase
     private readonly float         _vfxDelay;
     private readonly float         _postTeleportDelay;
     private readonly Vector3?      _phase1FixedPosition;
+    private readonly AudioClip     _teleportInSfx;
+    private readonly AudioClip     _teleportOutSfx;
 
     private GameObject _spawnedVfx;   // 출발 위치 VFX (텔레포트 시점에 제거)
     private float      _timer;
@@ -429,7 +431,9 @@ public class DKPhase2TeleportState : SpecialStateBase
                                   float postTeleportDelay = 0.35f,
                                   float vfxHeightOffset = 1.5f,
                                   float vfxScale = 3f,
-                                  float vfxFadeInDuration = 0.3f)
+                                  float vfxFadeInDuration = 0.3f,
+                                  AudioClip teleportInSfx = null,
+                                  AudioClip teleportOutSfx = null)
     {
         _nextState           = nextState;
         _vfxPrefab           = vfxPrefab;
@@ -440,6 +444,8 @@ public class DKPhase2TeleportState : SpecialStateBase
         _vfxHeightOffset     = vfxHeightOffset;
         _vfxScale            = vfxScale;
         _vfxFadeInDuration   = vfxFadeInDuration;
+        _teleportInSfx       = teleportInSfx;
+        _teleportOutSfx      = teleportOutSfx;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -477,6 +483,10 @@ public class DKPhase2TeleportState : SpecialStateBase
         // EffectBehaviour가 ObjectPooler.Despawn으로 수명을 자체 관리하므로 BossEffectPool 미사용
         if (!_skipTeleport && _vfxPrefab != null)
             SpawnVfx(_telePos);
+
+        // 출발 지점 사운드 (TPIN)
+        if (!_skipTeleport)
+            Managers.Sound?.PlayEffectAt(_teleportInSfx, ctx.Transform.position);
     }
 
     public override void Update(MonsterContext ctx)
@@ -512,6 +522,9 @@ public class DKPhase2TeleportState : SpecialStateBase
                 ctx.Agent.Warp(_telePos);
             else
                 ctx.Transform.position = _telePos;
+
+            // 도착 지점 사운드 (TPOUT)
+            Managers.Sound?.PlayEffectAt(_teleportOutSfx, _telePos);
 
             // 플레이어를 향해 바라봄
             if (ctx.Runtime.PlayerTarget != null)

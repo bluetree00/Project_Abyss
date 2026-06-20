@@ -40,6 +40,7 @@ MonoBehaviour:
   _lightColor: {r: 1, g: 0.85, b: 0.6, a: 1}
   _flameBreathPrefab: {fileID: 1267622881173442705, guid: 9de51515f2c48aa47a0211de766d342e,
     type: 3}
+  _breathSfx: {fileID: 8300000, guid: 1d70c1c40e448d54a8efaab06e24ca83, type: 3}
   _breathDownAngle: 30
   _breathPreviewAngle: 8
   _flameBreathBaseLength: 10
@@ -50,6 +51,7 @@ MonoBehaviour:
     type: 3}
   _tsunamiColInterval: 2
   _tsunamiScale: 0.2
+  _residualFireSfx: {fileID: 8300000, guid: be2bcfbfd2792ff49b06b25c8218c2dd, type: 3}
   _breathDamage: 20
   _tsunamiDamage: 10
   _tsunamiDuration: 5

@@ -35,6 +35,8 @@ MonoBehaviour:
   _attackDamage: 25
   _windBlastPrefab: {fileID: 3398366222349601506, guid: 83f617b32744f24449a186e674909954,
     type: 3}
+  _wingStrikeSfx: {fileID: 8300000, guid: 7bb47a62404b27440be4b118c1261a24, type: 3}
+  _wingStrikeSfxDelay: 1
   _statusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
   _endPoseDuration: 0.4
   _element: 1

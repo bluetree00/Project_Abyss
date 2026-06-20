@@ -24,6 +24,8 @@ public class DragonAirDashPatternSO : BossPatternSO
     [SerializeField] private int _dashDamage = 28;
     [SerializeField] private int _selfCrashDamage = 80;
     [SerializeField] private float _wallStopPadding = 0.3f;
+    [Tooltip("돌진 시작 시 재생할 사운드")]
+    [SerializeField] private AudioClip _dashSfx;
 
     [Header("Warning Marker")]
     [SerializeField] private GameObject _warningMarkerPrefab;
@@ -53,6 +55,7 @@ public class DragonAirDashPatternSO : BossPatternSO
     public int DashDamage => _dashDamage;
     public int SelfCrashDamage => _selfCrashDamage;
     public float WallStopPadding => _wallStopPadding;
+    public AudioClip DashSfx => _dashSfx;
     public GameObject WarningMarkerPrefab => _warningMarkerPrefab;
     public Vector3 WarningMarkerScale => _warningMarkerScale;
     public float WarningMarkerHeightOffset => _warningMarkerHeightOffset;
@@ -319,6 +322,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _warningZone = null;
         PlayAnim(ctx, Data.DashStateName, 0.05f);
         FaceDirection(ctx, _dashDirection, 100f);
+        Managers.Sound?.PlayEffectAt(Data.DashSfx, ctx.Transform.position);
     }
 
     private void StartCrash(MonsterContext ctx)

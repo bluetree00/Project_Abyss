@@ -380,9 +380,24 @@ public class PlayerController : CharacterBase
     private float _freezeTimer;
     public bool IsFrozen => _freezeTimer > 0f;
 
+    [Tooltip("빙결 상태(얼음 쉴드+스크린 이펙트) 동안 반복 재생할 사운드")]
+    [SerializeField] private AudioClip _freezeLoopSfx;
+    private AudioSource _freezeLoopAudioSource;
+
     /// <summary>빙결: duration초 동안 이동·행동·입력을 완전히 차단한다. 연속 피격 시 남은 시간을 연장.</summary>
     public void ApplyFreeze(float duration)
-        => _freezeTimer = Mathf.Max(_freezeTimer, duration);
+    {
+        _freezeTimer = Mathf.Max(_freezeTimer, duration);
+        if (_freezeLoopAudioSource == null)
+            _freezeLoopAudioSource = Managers.Sound?.PlayLoopingEffectAt(_freezeLoopSfx, transform.position);
+    }
+
+    private void StopFreezeLoopSfx()
+    {
+        if (_freezeLoopAudioSource == null) return;
+        Managers.Sound?.StopLoopingEffect(_freezeLoopAudioSource);
+        _freezeLoopAudioSource = null;
+    }
 
     //============================================================
     // Knockback
@@ -676,6 +691,7 @@ public class PlayerController : CharacterBase
         {
             _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.deltaTime);
             moveDirection = Vector3.zero;
+            if (_freezeTimer <= 0f) StopFreezeLoopSfx();
             return;
         }
         _attackPolicy?.Tick(this, Time.unscaledDeltaTime);
@@ -745,7 +761,11 @@ public class PlayerController : CharacterBase
         }
     }
 
-    private void OnDisable() => UnsubscribeFromAnimationReceiver(EventReceiver);
+    private void OnDisable()
+    {
+        UnsubscribeFromAnimationReceiver(EventReceiver);
+        StopFreezeLoopSfx();
+    }
 
     protected virtual void OnDestroy()
     {
@@ -1299,6 +1319,7 @@ public class PlayerController : CharacterBase
 
     public void ProcessJump()
     {
+        if (IsFrozen) return;
         if (!IsGrounded()) return;
 
         JumpAbility?.Jump(this);

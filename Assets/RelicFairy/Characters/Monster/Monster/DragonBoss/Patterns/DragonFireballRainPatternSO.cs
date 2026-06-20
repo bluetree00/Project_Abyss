@@ -35,6 +35,12 @@ public class DragonFireballRainPatternSO : BossPatternSO
     [Tooltip("착지 후 Meteor 이펙트 파괴까지 대기 시간 (초). impactDelay보다 커야 함.")]
     [SerializeField] private float  _meteorHitDuration    = 2.5f;
 
+    [Header("사운드")]
+    [Tooltip("패턴 시작(드래곤이 비를 부르는 순간) 1회 재생할 사운드")]
+    [SerializeField] private AudioClip _rainSfx;
+    [Tooltip("화염구가 낙하를 시작할 때마다 해당 위치에서 재생할 사운드")]
+    [SerializeField] private AudioClip _fireRainSfx;
+
     [Header("Scorch Marks")]
     [Tooltip("착지 지점에 남길 그을림 텍스처. 없으면 절차적 생성 사용.")]
     [SerializeField] private Texture2D _scorchTexture;
@@ -60,6 +66,8 @@ public class DragonFireballRainPatternSO : BossPatternSO
     public Color  WarningColor     => _warningColor;
     public GameObject FireballPrefab    => _fireballPrefab;
     public float  FireballScale         => _fireballScale;
+    public AudioClip  RainSfx            => _rainSfx;
+    public AudioClip  FireRainSfx        => _fireRainSfx;
     public GameObject ExplosionPrefab   => _explosionPrefab;
     public float  ExplosionScale        => _explosionScale;
     public float  ImpactDelay           => _impactDelay;
@@ -188,6 +196,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             _phase = Phase.Rain;
             _timer = 0f;
             _spawnTimer = 0f;
+            Managers.Sound?.PlayEffectAt(Data.RainSfx, ctx.Transform.position);
         }
     }
 
@@ -235,9 +244,10 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                     if (Data.FireballPrefab != null)
                     {
                         // LandPos에 직접 스폰 — 파티클 시뮬레이션이 낙하~폭발 전체를 재생
-                        e.Projectile = Object.Instantiate(Data.FireballPrefab, e.LandPos, Quaternion.identity);
+                        e.Projectile = BossEffectPool.Spawn(Data.FireballPrefab, e.LandPos, Quaternion.identity);
                         e.Projectile.transform.localScale = Vector3.one * Data.FireballScale;
                     }
+                    Managers.Sound?.PlayEffectAt(Data.FireRainSfx, e.LandPos);
                 }
                 _entries[i] = e;
             }
@@ -259,7 +269,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
                 // MeteorHitDuration 경과 시 파티클 오브젝트 파괴 후 종료
                 if (e.FallTimer >= Data.MeteorHitDuration)
                 {
-                    if (e.Projectile != null) { Object.Destroy(e.Projectile); e.Projectile = null; }
+                    if (e.Projectile != null) { BossEffectPool.Release(e.Projectile); e.Projectile = null; }
                     e.Landed = true;
                     _landedCount++;
                 }
@@ -517,7 +527,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         {
             var e = _entries[i];
             DestroyWarnTiles(ref e);
-            if (e.Projectile != null) Object.Destroy(e.Projectile);
+            if (e.Projectile != null) BossEffectPool.Release(e.Projectile);
             _entries[i] = e;
         }
         _entries.Clear();

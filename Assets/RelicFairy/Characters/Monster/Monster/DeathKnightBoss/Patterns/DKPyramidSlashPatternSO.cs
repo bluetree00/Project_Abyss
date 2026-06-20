@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -72,6 +72,10 @@ public class DKPyramidSlashPatternSO : BossPatternSO
     [Header("Damage")]
     public float damageMultiplier    = 1.5f;
     public float knockbackMultiplier = 1f;
+
+    [Header("Sound")]
+    [Tooltip("Big Slash — 전체 맵 슬래시 발동 시 1회만 재생 (모든 줄이 동시에 떨어져도 중복 재생 금지)")]
+    public AudioClip bigSlashSfx;
 
     private DKPyramidSlashState _state;
 
@@ -244,6 +248,8 @@ public class DKPyramidSlashState : FullLockState<DKPyramidSlashPatternSO>
         if (_currentRow >= _totalRows)
         {
             FireAllRowSlashVfx();
+            // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+            Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
             _phase = Phase.SlashAttack;
             _timer = 0f;
         }

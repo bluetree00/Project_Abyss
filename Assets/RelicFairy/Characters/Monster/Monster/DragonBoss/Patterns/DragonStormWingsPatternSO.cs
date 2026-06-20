@@ -29,6 +29,10 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [SerializeField] private float  _attackAnimDuration  = 1.8f;
     [SerializeField] private int    _attackDamage        = 25;
     [SerializeField] private GameObject _windBlastPrefab;
+    [Tooltip("날개치기 발동 시 재생할 사운드")]
+    [SerializeField] private AudioClip _wingStrikeSfx;
+    [Tooltip("경고 장판 생성 후 사운드를 재생하기까지 지연 시간(초)")]
+    [SerializeField] private float _wingStrikeSfxDelay = 1f;
 
     [Header("상태이상")]
     [SerializeField] private PlayerStatusEffectSO _statusEffect;
@@ -56,6 +60,8 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public float  AttackAnimDuration => _attackAnimDuration;
     public int    AttackDamage       => _attackDamage;
     public GameObject WindBlastPrefab => _windBlastPrefab;
+    public AudioClip  WingStrikeSfx   => _wingStrikeSfx;
+    public float  WingStrikeSfxDelay => _wingStrikeSfxDelay;
     public PlayerStatusEffectSO StatusEffect => _statusEffect;
     public float  EndPoseDuration    => _endPoseDuration;
     public float  Cooldown           => _cooldown;
@@ -103,6 +109,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     private float      _targetAlpha;
     private float      _effectiveLength;
     private bool       _windBlastSpawned;
+    private bool       _wingStrikeSfxPlayed;
 
     internal DragonStormWingsState(DragonStormWingsPatternSO data) : base(data) { }
 
@@ -121,6 +128,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
         _phase            = Phase.Hover;
         _timer            = 0f;
         _windBlastSpawned = false;
+        _wingStrikeSfxPlayed = false;
         _takeoffHash      = Animator.StringToHash(Data.TakeoffStateName);
         _landingHash      = Animator.StringToHash(Data.LandingStateName);
         _hoverPos         = ctx.Transform.position;
@@ -272,6 +280,12 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     {
         ctx.Transform.position = _hoverPos;
 
+        if (!_wingStrikeSfxPlayed && _timer >= Data.WingStrikeSfxDelay)
+        {
+            _wingStrikeSfxPlayed = true;
+            Managers.Sound?.PlayEffectAt(Data.WingStrikeSfx, _warnCenter);
+        }
+
         // fill alpha 0 → target
         float t = Mathf.Clamp01(_timer / Data.WarningDuration);
         if (_fillMat != null)
@@ -338,13 +352,13 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
     private void SpawnWindBlast(MonsterContext ctx)
     {
-        if (Data.WindBlastPrefab == null) return;
-
         // 경고 장판 중심(지면 기준)에서 발동
         Vector3 wingOrigin = _warnCenter;
         Quaternion blastRot = Quaternion.LookRotation(_toPlayer, Vector3.up);
 
-        var go = Object.Instantiate(Data.WindBlastPrefab, wingOrigin, blastRot);
+        if (Data.WindBlastPrefab == null) return;
+
+        var go = BossEffectPool.SpawnOneShot(Data.WindBlastPrefab, wingOrigin, blastRot, fallbackLifetime: 3f);
         go.transform.localScale = new Vector3(Data.WarningWidth, Data.WarningWidth * 0.5f, _effectiveLength);
 
         // 속성 색상 적용
@@ -380,8 +394,6 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             Data.StatusEffect?.Apply(player);
             break;
         }
-
-        Object.Destroy(go, 3f);
     }
 
     // ── 경고 장판 정리 ────────────────────────────────────────────────────────
