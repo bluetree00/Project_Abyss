@@ -9,11 +9,11 @@ namespace RelicFairy.Monster
 ///   windupDuration=0.6s, hitTime=1.0s, endPoseTime=0.6s, hitHalfAngle=75°, doesDash=false
 ///
 /// Attack2 (animName="Attack2"): 앞으로 전진하며 빠르게 1회 베기 (1.208s)
-///   windupDuration=0.35s, hitTime=0.55s, endPoseTime=0.35s, hitHalfAngle=45°,
+///   windupDuration=0.35s, hitTime=0.6s, endPoseTime=0.35s, hitHalfAngle=45°,
 ///   doesDash=true, dashDistance=1.5, dashDuration=0.25s
 ///
 /// Attack3 (animName="Attack3"): 앞으로 전진하며 빠르게 1회 찌르기 (1.208s)
-///   windupDuration=0.35s, hitTime=0.55s, endPoseTime=0.35s, hitHalfAngle=25°,
+///   windupDuration=0.35s, hitTime=0.6s, endPoseTime=0.35s, hitHalfAngle=25°,
 ///   doesDash=true, dashDistance=1.5, dashDuration=0.25s
 ///
 /// ━━ BossDesign §2 5단계 준수 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -60,6 +60,10 @@ public class DKP2SlashPatternSO : BossPatternSO
     [Header("데미지")]
     public float damageMultiplier    = 1f;
     public float knockbackMultiplier = 1f;
+
+    [Header("사운드")]
+    [Tooltip("animName에 맞는 클립을 지정 — Attack1=Slash2, Attack2/Attack3=Slash1")]
+    public AudioClip slashSfx;
 
     private DKP2SlashState _state;
 
@@ -108,7 +112,7 @@ public class DKP2SlashState : FullLockState<DKP2SlashPatternSO>
         {
             float t      = (_timer - Data.windupDuration) / Data.dashDuration;
             Vector3 dest = _dashStart + _dashDir * Data.dashDistance;
-            Vector3 pos  = Vector3.Lerp(_dashStart, dest, t);
+            Vector3 pos  = Vector3.Lerp(_dashStart, dest, Mathf.SmoothStep(0f, 1f, t));
             if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
                 ctx.Agent.Warp(pos);
             else
@@ -119,6 +123,7 @@ public class DKP2SlashState : FullLockState<DKP2SlashPatternSO>
         if (!_hitApplied && _timer >= Data.hitTime)
         {
             _hitApplied = true;
+            Managers.Sound?.PlayEffectAt(Data.slashSfx, ctx.Transform.position);
             if (CheckHitZone(ctx))
                 ApplyDamage(ctx);
             else

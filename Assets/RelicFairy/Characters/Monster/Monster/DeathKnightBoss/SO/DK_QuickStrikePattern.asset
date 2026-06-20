@@ -33,5 +33,6 @@ MonoBehaviour:
   recoveryTime: 0.3
   damageMultiplier: 1
   knockbackMultiplier: 1
+  bigSlashSfx: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}
   edgePrefab: {fileID: 2020822494038853150, guid: e9d86af1f0802464394b7405ba5e804e,
     type: 3}

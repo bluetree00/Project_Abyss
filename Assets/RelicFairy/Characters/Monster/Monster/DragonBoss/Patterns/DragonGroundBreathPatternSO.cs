@@ -32,6 +32,8 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private GameObject _breathEffectPrefab;
     [Tooltip("준비 단계 경고 이펙트 (없으면 경고 생략)")]
     [SerializeField] private GameObject _warningEffectPrefab;
+    [Tooltip("브레스 발사 시작 시 재생할 사운드")]
+    [SerializeField] private AudioClip _breathSfx;
 
     [Header("속성")]
     [SerializeField] private Color                _breathColor  = new Color(1.0f, 0.35f, 0.1f);
@@ -51,6 +53,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public int    BreathDamagePerSec    => _breathDamagePerSec;
     public GameObject BreathEffectPrefab   => _breathEffectPrefab;
     public GameObject WarningEffectPrefab  => _warningEffectPrefab;
+    public AudioClip  BreathSfx            => _breathSfx;
     public Color  BreathColor           => _breathColor;
     public PlayerStatusEffectSO StatusEffect => _statusEffect;
     public float  EndPoseDuration       => _endPoseDuration;
@@ -81,10 +84,11 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     private Phase      _phase;
     private float      _timer;
     private float      _damageTick;
-    private Transform  _mouthBone;
-    private GameObject _breathEffect;
-    private GameObject _warningEffect;
-    private GameObject _rangeIndicator;
+    private Transform   _mouthBone;
+    private GameObject  _breathEffect;
+    private GameObject  _warningEffect;
+    private GameObject  _rangeIndicator;
+    private AudioSource _breathAudioSource;
 
     private const float DamageTick = 0.15f;
 
@@ -93,6 +97,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     internal void Reset()
     {
         _phase = Phase.Done;
+        StopBreathSfx();
         DestroyEffect(ref _breathEffect);
         DestroyEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
@@ -129,6 +134,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     public override void Exit(MonsterContext ctx)
     {
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
+        StopBreathSfx();
         DestroyEffect(ref _breathEffect);
         DestroyEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
@@ -172,12 +178,16 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         if (_timer >= Data.BreathDuration)
         {
+            StopBreathSfx();
             DestroyEffect(ref _breathEffect);
             DestroyEffect(ref _rangeIndicator);
             _phase = Phase.EndPose;
             _timer = 0f;
         }
     }
+
+    private void StopBreathSfx()
+        => Managers.Sound?.StopEffect(_breathAudioSource, Data.BreathSfx);
 
     // ── 이펙트 ────────────────────────────────────────────────────────────────
 
@@ -195,6 +205,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void SpawnBreath(MonsterContext ctx)
     {
+        _breathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, GetMouthPos(ctx));
+
         if (Data.BreathEffectPrefab == null) return;
         _breathEffect = Object.Instantiate(Data.BreathEffectPrefab);
         SyncEffect(_breathEffect, ctx);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -51,6 +51,10 @@ public class DKStrikePatternSO : BossPatternSO
     [Header("Damage")]
     public float damageMultiplier    = 1.5f;
     public float knockbackMultiplier = 1.5f;
+
+    [Header("Sound")]
+    [Tooltip("Big Slash — 링 타격 시 재생. 한 링이 동시에 여러 군데에서 터져도 사운드는 1회만 재생")]
+    public AudioClip bigSlashSfx;
 
     [Header("Border")]
     [Tooltip("경계 테두리 엣지 프리팹 (DK_WarnBorder)")]
@@ -214,6 +218,10 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         while (_ringIdx < _ringList.Count && _timer >= _ringList[_ringIdx].fireTime)
         {
             var e = _ringList[_ringIdx];
+            if (_ringIdx == 0)
+                // 첫 Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+                Managers.Sound?.PlayEffectAt(
+                    Data.bigSlashSfx, DKBossRoomContext.CellToWorld(_bossCell.x, _bossCell.y, 0f), startTime: 0.5f);
             DKGridPatternHelper.SpawnRingPerimeterVfx(
                 Data.impactVfxPrefab, _bossCell, e.ring, _swordColor);
             DKGridPatternHelper.TriggerRingDamage(

@@ -2326,6 +2326,8 @@ MonoBehaviour:
     type: 3}
   _teleportDistance: 3
   _teleportVfxDuration: 0.5
+  _teleportInSfx: {fileID: 8300000, guid: 843f88f7315a7b34384ff4b7fb882ad8, type: 3}
+  _teleportOutSfx: {fileID: 8300000, guid: 9d4c1b34966ce5140815b611bd572b0b, type: 3}
   _phase2BasicPool:
   - {fileID: 11400000, guid: 354f3dee0a05dde40963eaede4c00777, type: 2}
   - {fileID: 11400000, guid: 4b27db7900ffe704fa974e306ea4486f, type: 2}
@@ -2338,6 +2340,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1150cdc212785954ca3d3f1ea2ba8e4d, type: 2}
   - {fileID: 11400000, guid: b03018b7b30b24e449747552137e93f2, type: 2}
   _phase1AnchorTransform: {fileID: 0}
+  _pyramidStrikeAnchor: {fileID: 0}
+  _entranceEndBarriers: []
   _entranceCameraOffset: {x: 5, y: 0, z: -3}
   _entranceCameraLookOffset: {x: 0, y: 1.5, z: 0}
   _entranceCameraCloseUpDuration: 1

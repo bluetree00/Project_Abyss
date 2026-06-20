@@ -207,6 +207,11 @@ public class DragonDormantState : IMonsterState
         float   speed     = dragon.EntranceFlyInSpeed;
         float   totalDist = Vector3.Distance(startPos, targetPos);
 
+        // VFX보다 사운드를 먼저 재생 — 체감상 브레스 타이밍이 더 빠르게 느껴지도록
+        dragon.PlayEntranceBreathSfx();
+        if (dragon.EntranceBreathSfxLeadTime > 0f)
+            await UniTask.Delay(TimeSpan.FromSeconds(dragon.EntranceBreathSfxLeadTime), cancellationToken: ct);
+
         GameObject breathVfx = dragon.SpawnEntranceBreathVfx(ctx.Transform.forward);
 
         int rockCount      = dragon.EntranceRockCount;
@@ -236,6 +241,7 @@ public class DragonDormantState : IMonsterState
 
         if (breathVfx != null)
             UnityEngine.Object.Destroy(breathVfx);
+        dragon.StopEntranceBreathSfx();
     }
 
     private static async UniTask DescendAndLandAsync(MonsterContext ctx, DragonBossMonster dragon, CancellationToken ct)

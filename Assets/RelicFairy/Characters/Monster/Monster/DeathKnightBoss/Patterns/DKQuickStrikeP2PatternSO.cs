@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -57,6 +57,10 @@ public class DKQuickStrikeP2PatternSO : BossPatternSO
     [Header("데미지")]
     public float damageMultiplier    = 1.2f;
     public float knockbackMultiplier = 1f;
+
+    [Header("사운드")]
+    [Tooltip("Big Slash — Sword Slash 15 이펙트가 뜨는 위치에서 재생")]
+    public AudioClip bigSlashSfx;
 
     private DKQuickStrikeP2State _state;
 
@@ -148,6 +152,9 @@ public class DKQuickStrikeP2State : FullLockState<DKQuickStrikeP2PatternSO>
         if (_tilesDestroyed && !_vfxSpawned && _timer >= Data.hitTime + 0.05f)
         {
             _vfxSpawned = true;
+            // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+            Managers.Sound?.PlayEffectAt(
+                Data.bigSlashSfx, DKBossRoomContext.CellToWorld(_playerCell.x, _playerCell.y, 0f), startTime: 0.5f);
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.SpawnCrossVfx(Data.impactVfxPrefab, _playerCell, sc);
         }

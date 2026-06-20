@@ -91,6 +91,11 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private Transform _entranceVfxPoint;
     [Tooltip("브레스 VFX가 비행 방향 기준 아래로 꺾이는 각도 (도) — 진행방향 대각선 아래로 분사")]
     [SerializeField] private float _entranceBreathPitchDeg = 35f;
+    [Tooltip("등장 브레스 VFX 시작 시 재생할 사운드")]
+    [SerializeField] private AudioClip _entranceBreathSfx;
+    [Tooltip("브레스 VFX가 보이기 전 사운드를 미리 재생하는 선행 시간(초)")]
+    [SerializeField] private float _entranceBreathSfxLeadTime = 0.2f;
+    private AudioSource _entranceBreathAudioSource;
     [Tooltip("착지 후 카메라 클로즈업 오프셋 (드래곤 기준 월드 좌표)")]
     [SerializeField] private Vector3 _entranceCameraOffset = new Vector3(7f, 0.5f, -2f);
     [Tooltip("착지 후 카메라가 바라보는 지점 = 드래곤 위치 + 이 오프셋 (월드 좌표). Y를 높이면 더 위쪽(얼굴)을 바라본다")]
@@ -105,6 +110,18 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _entranceFlyInSpeed = 25f;
     [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
     [SerializeField] private GameObject _entranceWindEffectPrefab;
+
+    [Header("Dragon — 날개 펄럭임 사운드 (AirChase 계열 전용)")]
+    [Tooltip("날개 다운스트로크마다 랜덤 재생할 사운드 클립 (Wing1~5)")]
+    [SerializeField] private AudioClip[] _wingFlapClips;
+    [Tooltip("UPFly 클립 기준 날개 다운스트로크 시점 (normalizedTime, 20/40 프레임 = 0.5)")]
+    [SerializeField] private float _wingFlapPhase = 0.5f;
+
+    [Header("Dragon — 발걸음 사운드 (WalkChase/RunChase 계열 전용)")]
+    [Tooltip("발걸음마다 랜덤 재생할 사운드 클립 (Walk1~6)")]
+    [SerializeField] private AudioClip[] _footstepClips;
+    [Tooltip("걷기/달리기 클립 1회 재생 중 발이 닿는 시점들 (normalizedTime, 0~1). 48프레임 클립 기준 24프레임마다 = {0, 0.5}")]
+    [SerializeField] private float[] _footstepPhases = new float[] { 0f, 0.5f };
 
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
@@ -146,6 +163,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float   EntranceBreathPitchDeg        => _entranceBreathPitchDeg;
     public int     EntranceRockCount             => _entranceRockObjects?.Length ?? 0;
     public GameObject EntranceWindEffectPrefab   => _entranceWindEffectPrefab;
+    public float   EntranceBreathSfxLeadTime  => _entranceBreathSfxLeadTime;
 
     // ── IBoss ─────────────────────────────────────────────
     public float HpRatio =>
@@ -168,6 +186,19 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     private float           _capsuleRadiusNormal; // 지상 반경 보존용
     private bool            _airborneHitboxActive;
     private bool            _hitStopActive;
+    private int              _airChaseHash;
+    private int              _airChaseLeftHash;
+    private int              _airChaseRightHash;
+    private int              _wingFlapStateHash;
+    private float            _wingFlapPrevTime;
+    private int              _walkChaseHash;
+    private int              _walkLeftHash;
+    private int              _walkRightHash;
+    private int              _runChaseHash;
+    private int              _runLeftHash;
+    private int              _runRightHash;
+    private int              _footstepStateHash;
+    private float            _footstepPrevTime;
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
@@ -239,6 +270,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         DragonBossVisualHelper.ApplyBodyTint(transform,
             DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Ice));
 
+        _airChaseHash      = Animator.StringToHash(_airChaseStateName);
+        _airChaseLeftHash  = Animator.StringToHash(_airChaseLeftStateName);
+        _airChaseRightHash = Animator.StringToHash(_airChaseRightStateName);
+        _walkChaseHash     = Animator.StringToHash(_walkChaseStateName);
+        _walkLeftHash      = Animator.StringToHash(_walkLeftStateName);
+        _walkRightHash     = Animator.StringToHash(_walkRightStateName);
+        _runChaseHash      = Animator.StringToHash(_runChaseStateName);
+        _runLeftHash       = Animator.StringToHash(_runLeftStateName);
+        _runRightHash      = Animator.StringToHash(_runRightStateName);
+
         // 등장 대기 상태로 진입 — 하강/착지/지붕 파괴 연출은 TriggerEntrance() 호출 시 시작
         _dormantState = new DragonDormantState(_detectionRange);
         ChangeState(_dormantState);
@@ -282,6 +323,95 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             _runner?.Tick(Time.deltaTime);
 
         SyncAirborneHitbox();
+        UpdateWingFlapSound();
+        UpdateFootstepSound();
+    }
+
+    /// <summary>WalkChase/RunChase 계열(좌우 회전 포함) 재생 중, 클립의 발걸음 접지 시점(normalizedTime)을
+    /// 지나갈 때마다 Walk1~6 중 하나를 랜덤 재생한다. 애니메이션 속도가 바뀌어도 항상 같은 프레임에 맞는다.</summary>
+    private void UpdateFootstepSound()
+    {
+        if (_footstepClips == null || _footstepClips.Length == 0
+            || _footstepPhases == null || _footstepPhases.Length == 0
+            || _dragonBB == null || _animator == null) return;
+
+        if (_dragonBB.BodyState != BodyState.Grounded)
+        {
+            _footstepStateHash = 0;
+            return;
+        }
+
+        var info = _animator.GetCurrentAnimatorStateInfo(0);
+        int hash = info.shortNameHash;
+        bool isGroundChaseFamily = hash == _walkChaseHash || hash == _walkLeftHash || hash == _walkRightHash
+            || hash == _runChaseHash || hash == _runLeftHash || hash == _runRightHash;
+        if (!isGroundChaseFamily)
+        {
+            _footstepStateHash = 0;
+            return;
+        }
+
+        if (_footstepStateHash != hash)
+        {
+            // 상태 진입 첫 프레임 — 기준 시간만 잡고 트리거는 다음 프레임부터
+            _footstepStateHash = hash;
+            _footstepPrevTime = info.normalizedTime;
+            return;
+        }
+
+        float currentTime = info.normalizedTime;
+        foreach (float phase in _footstepPhases)
+        {
+            int prevCycle = Mathf.FloorToInt(_footstepPrevTime - phase);
+            int curCycle  = Mathf.FloorToInt(currentTime - phase);
+            if (curCycle != prevCycle)
+            {
+                var clip = _footstepClips[UnityEngine.Random.Range(0, _footstepClips.Length)];
+                Managers.Sound?.PlayEffectAt(clip, transform.position);
+                break;
+            }
+        }
+        _footstepPrevTime = currentTime;
+    }
+
+    /// <summary>AirChase/AirChaseLeft/AirChaseRight 재생 중, UPFly 클립의 다운스트로크 프레임(normalizedTime)을
+    /// 지나갈 때마다 날개 펄럭임 사운드를 재생한다. 애니메이션 속도가 바뀌어도 항상 같은 프레임에 맞는다.</summary>
+    private void UpdateWingFlapSound()
+    {
+        if (_wingFlapClips == null || _wingFlapClips.Length == 0 || _dragonBB == null || _animator == null) return;
+
+        if (_dragonBB.BodyState != BodyState.Airborne)
+        {
+            _wingFlapStateHash = 0;
+            return;
+        }
+
+        var info = _animator.GetCurrentAnimatorStateInfo(0);
+        int hash = info.shortNameHash;
+        bool isAirChaseFamily = hash == _airChaseHash || hash == _airChaseLeftHash || hash == _airChaseRightHash;
+        if (!isAirChaseFamily)
+        {
+            _wingFlapStateHash = 0;
+            return;
+        }
+
+        if (_wingFlapStateHash != hash)
+        {
+            // 상태 진입 첫 프레임 — 기준 시간만 잡고 트리거는 다음 프레임부터
+            _wingFlapStateHash = hash;
+            _wingFlapPrevTime = info.normalizedTime;
+            return;
+        }
+
+        float currentTime = info.normalizedTime;
+        int prevCycle = Mathf.FloorToInt(_wingFlapPrevTime - _wingFlapPhase);
+        int curCycle  = Mathf.FloorToInt(currentTime - _wingFlapPhase);
+        if (curCycle != prevCycle)
+        {
+            var clip = _wingFlapClips[UnityEngine.Random.Range(0, _wingFlapClips.Length)];
+            Managers.Sound?.PlayEffectAt(clip, transform.position);
+        }
+        _wingFlapPrevTime = currentTime;
     }
 
     private void SyncAirborneHitbox()
@@ -614,6 +744,13 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             _pendingTriggerEntrance = true; // InitAsync 완료 전 호출된 경우 OnInitialized에서 적용
     }
 
+    /// <summary>등장 비행 시작 직전 호출 — VFX보다 EntranceBreathSfxLeadTime만큼 먼저 브레스 사운드를 재생한다.</summary>
+    public void PlayEntranceBreathSfx()
+    {
+        Vector3 pos = _entranceVfxPoint != null ? _entranceVfxPoint.position : transform.position;
+        _entranceBreathAudioSource = Managers.Sound?.PlayEffectAt(_entranceBreathSfx, pos);
+    }
+
     /// <summary>등장 비행 시작 시 호출 — 입(EntranceVfxPoint) 위치에서, 진행방향 대각선 아래로 분사되는 브레스 VFX를 생성한다.
     /// 회전이 애니메이션 중인 Jaw 본에 끌려가지 않도록 본체(드래곤 루트)에 고정한다.</summary>
     public GameObject SpawnEntranceBreathVfx(Vector3 flightDir)
@@ -634,6 +771,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         vfx.transform.SetParent(transform, true);
         return vfx;
     }
+
+    /// <summary>등장 브레스 VFX가 파괴되는 시점에 함께 호출 — 사운드가 VFX보다 길게 남지 않도록 정지.</summary>
+    public void StopEntranceBreathSfx()
+        => Managers.Sound?.StopEffect(_entranceBreathAudioSource, _entranceBreathSfx);
 
     /// <summary>등장 비행 중 브레스 도달 시 호출 — 진입로를 막던 바위들을 전부 파괴.</summary>
     public void TriggerRockDestruction()

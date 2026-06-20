@@ -12,6 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b814ecbc2e6f87a4e8a7e3db4afcdb03, type: 3}
   m_Name: DragonStormWingsPattern_Thunder
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonStormWingsPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   weight: 22
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
@@ -31,5 +35,9 @@ MonoBehaviour:
   _attackDamage: 25
   _windBlastPrefab: {fileID: 3398366222349601506, guid: 83f617b32744f24449a186e674909954,
     type: 3}
+  _wingStrikeSfx: {fileID: 8300000, guid: 7bb47a62404b27440be4b118c1261a24, type: 3}
+  _wingStrikeSfxDelay: 1
   _statusEffect: {fileID: 11400000, guid: 13fc451eb7c351a498e908777b2ba39d, type: 2}
+  _endPoseDuration: 0.4
+  _element: 2
   _cooldown: 14

@@ -166,6 +166,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc3cbb3ad4fafba4db517e2b8ecbd5d5
+    m_Address: T3_Katana
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: be96bc1d3604f6748ba4a0e8bd874b2f
     m_Address: T3_Greatsword_Display
     m_ReadOnly: 0

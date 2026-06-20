@@ -50,6 +50,12 @@ public class DKP2WalkSlashPatternSO : BossPatternSO
     public float damageMultiplier    = 0.8f;
     public float knockbackMultiplier = 0.8f;
 
+    [Header("사운드 (총 64프레임 기준 17/29/42프레임)")]
+    [Tooltip("1, 2번째 베기 사운드")]
+    public AudioClip slash1Sfx;
+    [Tooltip("3번째 베기 사운드")]
+    public AudioClip slash2Sfx;
+
     private DKP2WalkSlashState _state;
 
     public override void Initialize(BossPatternContext ctx) => _state = new DKP2WalkSlashState(this);
@@ -69,10 +75,15 @@ public class DKP2WalkSlashState : UnInterruptibleState<DKP2WalkSlashPatternSO>
 {
     private const string AnimName = "Attack4";
 
+    // 애니메이션 클립 총 64프레임 기준 베기 사운드 프레임 (normalizedTime = frame / 64)
+    private static readonly float[] SlashSfxFrames = { 17f / 64f, 29f / 64f, 42f / 64f };
+
     private float   _timer;
     private bool    _hit1, _hit2, _hit3;
     private Vector3 _startPos;
     private Vector3 _endPos;
+    private float   _prevNormalizedTime;
+    private bool[]  _slashSfxPlayed;
 
     public DKP2WalkSlashState(DKP2WalkSlashPatternSO data) : base(data) { }
 
@@ -80,6 +91,8 @@ public class DKP2WalkSlashState : UnInterruptibleState<DKP2WalkSlashPatternSO>
     {
         _timer = 0f;
         _hit1 = _hit2 = _hit3 = false;
+        _prevNormalizedTime = 0f;
+        _slashSfxPlayed = new bool[SlashSfxFrames.Length];
 
         StopAgent(ctx);
         FacePlayer(ctx);
@@ -131,6 +144,27 @@ public class DKP2WalkSlashState : UnInterruptibleState<DKP2WalkSlashPatternSO>
 
         if (_timer >= Data.hitTime3 + Data.recoveryTime)
             ctx.Monster.ChangeState<AttackReadyState>();
+
+        UpdateSlashSfx(ctx);
+    }
+
+    // ── 프레임 동기화 사운드 ─────────────────────────────────────
+
+    private void UpdateSlashSfx(MonsterContext ctx)
+    {
+        if (ctx.Animator == null) return;
+
+        float normTime = ctx.Animator.GetCurrentAnimatorStateInfo(0).normalizedTime;
+        for (int i = 0; i < SlashSfxFrames.Length; i++)
+        {
+            if (_slashSfxPlayed[i]) continue;
+            if (_prevNormalizedTime >= SlashSfxFrames[i] || normTime < SlashSfxFrames[i]) continue;
+
+            _slashSfxPlayed[i] = true;
+            AudioClip clip = i < 2 ? Data.slash1Sfx : Data.slash2Sfx;
+            Managers.Sound?.PlayEffectAt(clip, ctx.Transform.position);
+        }
+        _prevNormalizedTime = normTime;
     }
 
     public override void Exit(MonsterContext ctx) => RestoreAgent(ctx);

@@ -237,21 +237,25 @@ public sealed class SoundManager
         PlayEffect(audioClip, volume, pitch);
     }
 
-    public void PlayEffect(AudioClip audioClip, float volume = 1f, float pitch = 1f)
+    public AudioSource PlayEffect(AudioClip audioClip, float volume = 1f, float pitch = 1f)
     {
-        PlayPooledEffect(audioClip, null, volume, pitch, 0f, 1f, 500f, AudioRolloffMode.Logarithmic);
+        return PlayPooledEffect(audioClip, null, volume, pitch, 0f, 1f, 500f, AudioRolloffMode.Logarithmic);
     }
 
-    public void PlayEffectAt(
+    /// <summary>재생 중인 AudioSource를 반환한다 — 연결된 이펙트가 먼저 사라지면 호출 측에서 source.Stop()으로 함께 끊을 수 있다.</summary>
+    /// <param name="startTime">클립 앞부분의 무음/예비음을 건너뛰고 싶을 때 재생 시작 지점(초)을 지정한다.</param>
+    public AudioSource PlayEffectAt(
         AudioClip audioClip,
         Vector3 position,
         float volume = 1f,
         float pitch = 1f,
         float minDistance = 2f,
         float maxDistance = 25f,
-        AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic)
+        AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic,
+        float startTime = 0f)
     {
-        PlayPooledEffect(audioClip, position, volume, pitch, 1f, minDistance, maxDistance, rolloffMode);
+        return PlayPooledEffect(audioClip, position, volume, pitch, 1f, minDistance, maxDistance, rolloffMode,
+            startTime: startTime);
     }
 
     public void StopBgm()
@@ -405,7 +409,49 @@ public sealed class SoundManager
             _availableEffects.Enqueue(CreatePooledAudioSource());
     }
 
-    private void PlayPooledEffect(
+    /// <summary>재생 중인 풀링 사운드를 정지한다. source.clip이 expectedClip과 다르면 이미 다른 소리로
+    /// 재사용된 소스이므로 건드리지 않는다 — 이펙트 수명에 사운드를 묶을 때 사용.</summary>
+    public void StopEffect(AudioSource source, AudioClip expectedClip)
+    {
+        if (source == null || expectedClip == null) return;
+        if (source.clip == expectedClip && source.isPlaying)
+            source.Stop();
+    }
+
+    /// <summary>여러 개의 짧은 이펙트가 동시에 같은 사운드를 트리거할 때(예: 한 구역에 깔리는 잔불 이펙트들)
+    /// 개별 재생 대신 구역 전체를 대표하는 루프 사운드 1개로 묶기 위한 API.
+    /// 자동 해제되지 않으므로 반드시 StopLoopingEffect로 직접 정지/반환해야 한다.</summary>
+    public AudioSource PlayLoopingEffectAt(
+        AudioClip audioClip,
+        Vector3 position,
+        float volume = 1f,
+        float pitch = 1f,
+        float minDistance = 2f,
+        float maxDistance = 25f,
+        AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic)
+    {
+        return PlayPooledEffect(audioClip, position, volume, pitch, 1f, minDistance, maxDistance, rolloffMode,
+            loop: true, autoRelease: false);
+    }
+
+    /// <summary>PlayLoopingEffectAt으로 받은 소스를 정지하고 풀에 반환한다.</summary>
+    public void StopLoopingEffect(AudioSource source)
+    {
+        if (source == null) return;
+
+        var pooled = _effectPool.Find(p => p.Source == source);
+        if (pooled == null)
+        {
+            source.Stop();
+            return;
+        }
+
+        pooled.Version++;
+        ResetPooledSource(pooled);
+        _availableEffects.Enqueue(pooled);
+    }
+
+    private AudioSource PlayPooledEffect(
         AudioClip audioClip,
         Vector3? position,
         float volume,
@@ -413,17 +459,20 @@ public sealed class SoundManager
         float spatialBlend,
         float minDistance,
         float maxDistance,
-        AudioRolloffMode rolloffMode)
+        AudioRolloffMode rolloffMode,
+        bool loop = false,
+        bool autoRelease = true,
+        float startTime = 0f)
     {
         if (audioClip == null)
-            return;
+            return null;
 
         Init();
 
         var pooled = GetPooledAudioSource();
         var source = pooled.Source;
         if (source == null)
-            return;
+            return null;
 
         source.gameObject.SetActive(true);
         source.transform.position = position ?? Vector3.zero;
@@ -431,17 +480,24 @@ public sealed class SoundManager
         source.volume = volume * ChannelScale(Define.Sound.Effect);
         source.outputAudioMixerGroup = _sfxGroup; // 믹서 없으면 null = 기본 출력
         source.pitch = pitch;
-        source.loop = false;
+        source.loop = loop;
         source.playOnAwake = false;
         source.spatialBlend = Mathf.Clamp01(spatialBlend);
         source.rolloffMode = rolloffMode;
         source.minDistance = Mathf.Max(0.01f, minDistance);
         source.maxDistance = Mathf.Max(source.minDistance, maxDistance);
+        source.time = Mathf.Clamp(startTime, 0f, Mathf.Max(0f, audioClip.length - 0.01f));
         source.Play();
 
-        float safePitch = Mathf.Max(0.01f, Mathf.Abs(pitch));
-        float releaseDelay = Mathf.Max(MinReleaseDelay, audioClip.length / safePitch);
-        ReleaseAfterAsync(pooled, pooled.Version, releaseDelay).Forget();
+        if (autoRelease)
+        {
+            float safePitch = Mathf.Max(0.01f, Mathf.Abs(pitch));
+            float remainingLength = Mathf.Max(0f, audioClip.length - source.time);
+            float releaseDelay = Mathf.Max(MinReleaseDelay, remainingLength / safePitch);
+            ReleaseAfterAsync(pooled, pooled.Version, releaseDelay).Forget();
+        }
+
+        return source;
     }
 
     private PooledAudioSource GetPooledAudioSource()

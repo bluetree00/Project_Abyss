@@ -39,6 +39,7 @@ MonoBehaviour:
   swordBobAmplitude: 0.25
   swordBobSpeed: 1.5
   swordHp: 30
+  swordScale: 2
   moveToCenterTime: 2.5
   tileLayerDelay: 0.4
   slashHitDelay: 1.2
@@ -46,3 +47,4 @@ MonoBehaviour:
   wrongSwordSpeedMult: 2.5
   damageMultiplier: 1.5
   knockbackMultiplier: 1
+  bigSlashSfx: {fileID: 8300000, guid: a5b4676a78851ad408e98b3c68202f75, type: 3}

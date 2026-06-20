@@ -162,6 +162,8 @@ MonoBehaviour:
   _entranceVfxPoint: {fileID: 4428475197715112, guid: e142d6c687383804885f341d620f8751,
     type: 3}
   _entranceBreathPitchDeg: 35
+  _entranceBreathSfx: {fileID: 8300000, guid: 1d70c1c40e448d54a8efaab06e24ca83, type: 3}
+  _entranceBreathSfxLeadTime: 0.2
   _entranceCameraOffset: {x: 2, y: 2.7, z: -4}
   _entranceCameraLookOffset: {x: 0, y: 1.5, z: 0}
   _entranceCameraCloseUpDuration: 1
@@ -170,6 +172,23 @@ MonoBehaviour:
   _entranceFlyInSpeed: 25
   _entranceWindEffectPrefab: {fileID: 3942825033974895155, guid: 89e2ff99f68108143afdc000c0e256e4,
     type: 3}
+  _wingFlapClips:
+  - {fileID: 8300000, guid: ab2d125e19289f5449c3532b95377a8a, type: 3}
+  - {fileID: 8300000, guid: 8eda4165b94bc52439f9fde1906ead26, type: 3}
+  - {fileID: 8300000, guid: cf6ad25a39fd33d4ca27e9662f6fed3e, type: 3}
+  - {fileID: 8300000, guid: c8051d745ba744442a0538d9a8619f85, type: 3}
+  - {fileID: 8300000, guid: b4b5057d57dbe154f8ac57df8f31cf3d, type: 3}
+  _wingFlapPhase: 0.5
+  _footstepClips:
+  - {fileID: 8300000, guid: c018304781881f243b37f1599df05c12, type: 3}
+  - {fileID: 8300000, guid: 96cdabbd68c042d438d6d54688a3f9ee, type: 3}
+  - {fileID: 8300000, guid: bafa5d9dec458f743ae132a19fa4ce17, type: 3}
+  - {fileID: 8300000, guid: c858288198119294faa74f0e8ea13232, type: 3}
+  - {fileID: 8300000, guid: 88dc5799a8dea6a44979568580ecdc0f, type: 3}
+  - {fileID: 8300000, guid: ed6d1e47fff834044aacbc26ce147309, type: 3}
+  _footstepPhases:
+  - 0
+  - 0.5
 --- !u!1001 &1484152418330750485
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -35,3 +35,4 @@ MonoBehaviour:
     type: 3}
   damageMultiplier: 1.2
   knockbackMultiplier: 1
+  slashSfx: {fileID: 8300000, guid: 8b7acdd4373d9d145bb0ad06fee6b391, type: 3}

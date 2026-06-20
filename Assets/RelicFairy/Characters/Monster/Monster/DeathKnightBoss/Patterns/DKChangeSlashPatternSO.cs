@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -38,6 +38,10 @@ public class DKChangeSlashPatternSO : BossPatternSO
     [Header("Damage")]
     public float damageMultiplier   = 1f;
     public float knockbackMultiplier = 1f;
+
+    [Header("Sound")]
+    [Tooltip("Big Slash — Sword Slash 15 이펙트가 뜨는 위치에서 재생")]
+    public AudioClip bigSlashSfx;
 
     [Header("Border")]
     [Tooltip("경계 테두리 엣지 프리팹 (DK_WarnBorder)")]
@@ -112,6 +116,8 @@ public class DKChangeSlashState : FullLockState<DKChangeSlashPatternSO>
         if (_tilesDestroyed && !_vfxSpawned && _timer >= Data.hitTime + VfxDelay)
         {
             _vfxSpawned = true;
+            // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+            Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
             DKSwordColor sc = GetSwordColor(ctx);
             DKGridPatternHelper.SpawnHitVfx(
                 (x, z) => x % 2 == 1 ? sc : Opposite(sc),

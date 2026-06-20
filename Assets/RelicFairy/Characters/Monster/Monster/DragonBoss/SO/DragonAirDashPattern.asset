@@ -23,13 +23,14 @@ MonoBehaviour:
   _warningDuration: 0.75
   _warningHoverHeight: 3
   _rotationSpeed: 3.2
-  _dashSpeed: 18
+  _dashSpeed: 36
   _dashDistance: 12
   _dashCollisionRadius: 1.1
   _dashHitRadius: 1.5
   _dashDamage: 28
   _selfCrashDamage: 80
   _wallStopPadding: 0.3
+  _dashSfx: {fileID: 8300000, guid: 6a10e9ac2ce85a644a80dbaa3f37425f, type: 3}
   _warningMarkerPrefab: {fileID: 1173698457435006, guid: a8b2d1c44c0f47ac9aab7c77d9f3b891,
     type: 3}
   _warningMarkerScale: {x: 2.2, y: 1, z: 8}

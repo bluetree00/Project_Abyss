@@ -40,6 +40,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private GameObject _teleportVfxPrefab;
     [SerializeField] private float      _teleportDistance    = 3f;
     [SerializeField] private float      _teleportVfxDuration = 0.5f;
+    [SerializeField] private AudioClip  _teleportInSfx;
+    [SerializeField] private AudioClip  _teleportOutSfx;
 
     [Header("DeathKnight — 기본 공격 풀 (1·2페이즈 공용)")]
     [SerializeField] private List<BossPatternSO> _phase2BasicPool;
@@ -87,6 +89,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     public DeathKnightBossBlackboard DKBlackboard => _dkBB;
     public Transform SwordTransform          => _swordCtrl?.SwordTransform;
     public Transform PyramidStrikeAnchor     => _pyramidStrikeAnchor;
+    public AudioClip TeleportInSfx           => _teleportInSfx;
+    public AudioClip TeleportOutSfx          => _teleportOutSfx;
     public Vector3 EntranceCameraOffset          => _entranceCameraOffset;
     public Vector3 EntranceCameraLookOffset      => _entranceCameraLookOffset;
     public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;
@@ -214,7 +218,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
                 }
 
                 return new DKPhase2TeleportState(
-                    state, _teleportVfxPrefab, _teleportDistance, _teleportVfxDuration, phase1Pos);
+                    state, _teleportVfxPrefab, _teleportDistance, _teleportVfxDuration, phase1Pos,
+                    teleportInSfx: _teleportInSfx, teleportOutSfx: _teleportOutSfx);
             });
 
         runnerRef = _runner;
