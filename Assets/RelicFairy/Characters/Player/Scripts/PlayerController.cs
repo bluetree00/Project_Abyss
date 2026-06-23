@@ -1439,7 +1439,18 @@ public class PlayerController : CharacterBase
     /// 호출자에서 즉시 적용하거나 lerp 시작점으로 사용. 적용은 하지 않음.
     /// </summary>
     public Quaternion ComputeMouseAimAssistRotation(float radius, float coneHalfAngleDeg, float strength)
+        => ComputeMouseAimAssistRotation(radius, coneHalfAngleDeg, strength, out _, out _);
+
+    /// <summary>
+    /// 위와 동일하되, 콘 안에서 선택된 적(IDamageable)과 그 수평 거리를 함께 반환한다.
+    /// 런지(전진)가 좁은 SphereCast 대신 이 OverlapSphere 기반 타겟을 재사용해 인식 안정성을 높이기 위함.
+    /// </summary>
+    public Quaternion ComputeMouseAimAssistRotation(float radius, float coneHalfAngleDeg, float strength,
+                                                    out Transform enemy, out float enemyPlanarDist)
     {
+        enemy = null;
+        enemyPlanarDist = 0f;
+
         if (!TryComputeMouseLookDir(out var mouseDir))
             return transform.rotation;
 
@@ -1452,6 +1463,8 @@ public class PlayerController : CharacterBase
         float cosThreshold = Mathf.Cos(coneHalfAngleDeg * Mathf.Deg2Rad);
         float bestDot = cosThreshold;
         Vector3 bestDir = mouseDir;
+        Transform bestEnemy = null;
+        float bestDist = 0f;
         bool found = false;
 
         var cols = Physics.OverlapSphere(origin, radius);
@@ -1464,19 +1477,31 @@ public class PlayerController : CharacterBase
             var d = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>();
             if (d == null) continue;
 
-            Vector3 toEnemy = ((d as Component).transform.position) - origin;
+            var dt = (d as Component) != null ? (d as Component).transform : null;
+            if (dt == null) continue;
+
+            Vector3 toEnemy = dt.position - origin;
             toEnemy.y = 0f;
             float sqr = toEnemy.sqrMagnitude;
             if (sqr < 0.01f) continue;
 
-            Vector3 enemyDir = toEnemy / Mathf.Sqrt(sqr);
+            float dist = Mathf.Sqrt(sqr);
+            Vector3 enemyDir = toEnemy / dist;
             float dot = Vector3.Dot(mouseDir, enemyDir);
             if (dot >= bestDot)
             {
                 bestDot = dot;
                 bestDir = enemyDir;
+                bestEnemy = dt;
+                bestDist = dist;
                 found = true;
             }
+        }
+
+        if (found)
+        {
+            enemy = bestEnemy;
+            enemyPlanarDist = bestDist;
         }
 
         Vector3 finalDir = found

@@ -111,6 +111,9 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         var cd = owner.CharacterData;
         if (rb == null) return;
 
+        // 플로팅 컨트롤러가 켜져 있으면 호버 스프링이 단차를 처리하므로 StepClimb는 비활성(충돌 방지).
+        if (cd != null && cd.useFloatingController) return;
+
         // 진행 방향 = 실제 수평 속도(입력 moveDir이 아님 — 관성/미끄러짐/회전에도 실제 이동 기준).
         // 전진 속도가 충분할 때만 — 벽에 막혀 속도≈0인데 입력만 있는 상태에선 오르지 않음(고정 방지).
         Vector3 horizVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);

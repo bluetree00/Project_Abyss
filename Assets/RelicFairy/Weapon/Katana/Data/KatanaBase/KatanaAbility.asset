@@ -15,7 +15,7 @@ MonoBehaviour:
   steps:
   - stepIndex: 0
     order: 0
-    baseDamage: 10
+    baseDamage: 2
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -29,7 +29,7 @@ MonoBehaviour:
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 10
+      damage: 2
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -45,7 +45,7 @@ MonoBehaviour:
     rotateToMouse: 0
   - stepIndex: 2
     order: 0
-    baseDamage: 10
+    baseDamage: 2
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -59,7 +59,7 @@ MonoBehaviour:
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 10
+      damage: 2
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -75,7 +75,7 @@ MonoBehaviour:
     rotateToMouse: 0
   - stepIndex: 3
     order: 0
-    baseDamage: 10
+    baseDamage: 2
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -89,7 +89,7 @@ MonoBehaviour:
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 10
+      damage: 2
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
@@ -105,7 +105,7 @@ MonoBehaviour:
     rotateToMouse: 0
   - stepIndex: 4
     order: 0
-    baseDamage: 10
+    baseDamage: 2
     knockbackMultiplier: 1
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
@@ -119,7 +119,7 @@ MonoBehaviour:
       behavior: {fileID: 0}
     collider:
       mode: 0
-      damage: 10
+      damage: 2
       trailRadiusOverride: 0
       colliderPrefabKey: 
       positionOffset: {x: 0, y: 0, z: 0}
