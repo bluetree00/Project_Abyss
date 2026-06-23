@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
+using RelicFairy.UI;
 using UnityEngine;
 
 /// <summary>
@@ -106,7 +107,14 @@ public class BossRoomController : MonoBehaviour
     {
         bossSpawner.OnMonsterSpawned -= OnBossSpawned;
 
-        if (boss is not IBossEntrance entrance) return;
+        // 등장 연출(IBossEntrance) 없는 보스(예: ForestGuardian)는 입장 시 차단한 입력을
+        // 복구해줄 OnCombatReady 시퀀스가 없다 — 여기서 즉시 복구하지 않으면 플레이어가 영구 이동 불가.
+        if (boss is not IBossEntrance entrance)
+        {
+            _playerController?.SetInputEnabled(true);
+            ShowNonEntranceEncounterBark(boss); // 등장 연출 없는 보스도 인카운터 대사는 띄움
+            return;
+        }
 
         // 전투 준비 완료 시 플레이어 입력 복구 (단발)
         Action combatReadyHandler = null;
@@ -128,6 +136,21 @@ public class BossRoomController : MonoBehaviour
             DoCameraAndTriggerAsync(entrance, destroyCancellationToken).Forget();
         };
         entrance.OnEntranceRequested += entranceHandler;
+    }
+
+    /// <summary>등장 연출(IBossEntrance) 없는 보스의 인카운터 대사 — 타입명에서 키 유도(예: ForestGuardianMonster → ForestGuardian_Encounter).
+    /// 방문 변형(GetVisitLines) 적용. 대사 미작성/미로드 시 조용히 스킵(대사 없어도 정상 진행).</summary>
+    private static void ShowNonEntranceEncounterBark(MonsterBase boss)
+    {
+        if (boss == null || UI_BossBark.Instance == null) return;
+
+        string typeName = boss.GetType().Name;
+        const string suffix = "Monster";
+        if (typeName.EndsWith(suffix)) typeName = typeName.Substring(0, typeName.Length - suffix.Length);
+
+        var lines = Managers.DialogueData?.GetVisitLines($"{typeName}_Encounter");
+        if (lines != null && lines.Length > 0)
+            UI_BossBark.Show(lines[0].text, BossBarkType.BossIntro);
     }
 
     private async UniTaskVoid DoCameraAndTriggerAsync(IBossEntrance entrance, CancellationToken ct)

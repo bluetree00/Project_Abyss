@@ -2225,6 +2225,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
         if (lines == null || lines.Length == 0) return;
 
+        // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사(대사끼리도 큐잉).
+        await Managers.UI.WaitUntilNoBlockingPopupAsync();
+
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
         if (popup == null) return;
         try { await popup.ShowAsync(lines); }
@@ -2241,6 +2244,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         DialogueLine[] lines = dlgMgr?.GetLines(StartRoomSequenceId)
                                ?? startRoomDialogueSO?.Lines;
         if (lines == null || lines.Length == 0) return;
+
+        // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사.
+        await Managers.UI.WaitUntilNoBlockingPopupAsync();
 
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
         if (popup == null) return;

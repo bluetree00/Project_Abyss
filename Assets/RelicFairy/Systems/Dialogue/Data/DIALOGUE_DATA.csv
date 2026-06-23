@@ -1,50 +1,106 @@
 sequence_id,line_order,speaker,illustration_key,text
 StartRoom,0,God,Illust_God_Default,"깨어나라, 작은 빛이여."
-StartRoom,1,God,Illust_God_Default,"네가 누구인지 기억하지 못해도 괜찮아. 너는 내가 부른 신성한 영혼이야."
-StartRoom,2,Shadow,Illust_Shadow_Default,"...또 시작이군. 이번 영혼은 몇 번째인지도 잊었어."
-StartRoom,3,God,Illust_God_Default,"저기 잠들어 있는 유물을 봐. 오래전 쓰러진 영웅의 몸이야."
-StartRoom,4,God,Illust_God_Default,"그 몸 속으로 들어가. 유물은 영혼이 깃들어야 비로소 빛을 발하거든."
-StartRoom,5,Shadow,Illust_Shadow_Default,"...꽤 어울리는 한 쌍이네."
+StartRoom,1,God,Illust_God_Default,네가 누구인지 기억하지 못해도 괜찮아. 너는 내가 부른 신성한 영혼이야.
+StartRoom,2,Shadow,Illust_Shadow_Default,...또 시작이군. 이번 영혼은 몇 번째인지도 잊었어.
+StartRoom,3,God,Illust_God_Default,저기 잠들어 있는 유물을 봐. 오래전 쓰러진 영웅의 몸이야.
+StartRoom,4,God,Illust_God_Default,그 몸 속으로 들어가. 유물은 영혼이 깃들어야 비로소 빛을 발하거든.
+StartRoom,5,Shadow,Illust_Shadow_Default,...꽤 어울리는 한 쌍이네.
 BossRoom,0,Shadow,Illust_Shadow_Default,"이 기운... 오래된 것이야. 조심해, 영혼."
-BossRoom,1,God,Illust_God_Default,"두려워하지 마. 너는 신성한 빛을 품고 있어."
+BossRoom,1,God,Illust_God_Default,두려워하지 마. 너는 신성한 빛을 품고 있어.
 RunClear,0,God,Illust_God_Default,"해냈어. 잘했어, 나의 영혼."
-RunClear,1,Shadow,Illust_Shadow_Default,"순환이 한 바퀴 돌았군. 하지만 심연은 끝이 없어."
+RunClear,1,Shadow,Illust_Shadow_Default,순환이 한 바퀴 돌았군. 하지만 심연은 끝이 없어.
 RunClear,2,God,Illust_God_Default,"잠시 쉬어. 유물도, 영혼도 지쳐 있을 테니."
 RunFail,0,Shadow,Illust_Shadow_Default,"...돌아왔군, 작은 빛."
-RunFail,1,God,Illust_God_Default,"괜찮아. 영혼은 꺼지지 않아. 다시 깃들면 돼."
-RunFail,2,God,Illust_God_Default,"유물은 아직 기다리고 있어."
-Knight_Pickup,0,God,Illust_God_Default,"이 몸은 한때 전장을 지배했던 기사야. 굳건한 의지가 깃든 유물이지."
-Knight_Pickup,1,Shadow,Illust_Shadow_Default,"...기사라. 몸은 믿음직하군. 영혼이 그 무게를 감당할 수 있다면."
+RunFail,1,God,Illust_God_Default,괜찮아. 영혼은 꺼지지 않아. 다시 깃들면 돼.
+RunFail,2,God,Illust_God_Default,유물은 아직 기다리고 있어.
+Knight_Pickup,0,God,Illust_God_Default,이 몸은 한때 전장을 지배했던 기사야. 굳건한 의지가 깃든 유물이지.
+Knight_Pickup,1,Shadow,Illust_Shadow_Default,...기사라. 몸은 믿음직하군. 영혼이 그 무게를 감당할 수 있다면.
 Knight_Pickup,2,God,Illust_God_Default,"자, 깃들어. 그 갑옷 안에서 네 빛이 다시 타오를 거야."
-Berserker_Pickup,0,Shadow,Illust_Shadow_Default,"광전사의 몸... 이건 단순한 유물이 아니야. 분노 그 자체가 새겨진 그릇이지."
+Berserker_Pickup,0,Shadow,Illust_Shadow_Default,광전사의 몸... 이건 단순한 유물이 아니야. 분노 그 자체가 새겨진 그릇이지.
 Berserker_Pickup,1,God,Illust_God_Default,"두려워하지 마. 그 힘도 결국 너의 것이 될 거야, 작은 빛이여."
 Berserker_Pickup,2,Shadow,Illust_Shadow_Default,"...영혼이 이 폭풍을 다스릴 수 있다면, 꽤 볼 만한 순환이 되겠군."
-Mage_Pickup,0,God,Illust_God_Default,"이 몸에는 오래된 마법의 기억이 남아 있어. 빛과 어둠을 모두 알았던 자의 유물이야."
+Mage_Pickup,0,God,Illust_God_Default,이 몸에는 오래된 마법의 기억이 남아 있어. 빛과 어둠을 모두 알았던 자의 유물이야.
 Mage_Pickup,1,Shadow,Illust_Shadow_Default,"...마법사. 모든 마법은 대가를 치르지. 그것만큼은 잊지 마, 영혼."
-Mage_Pickup,2,God,Illust_God_Default,"괜찮아. 네 안의 신성한 빛이 그 마법을 인도해 줄 거야."
-Lich_Intro,0,Lich,Lich_Portrait,"알고 있었어."
-Lich_Intro,1,Lich,Lich_Portrait,"언젠간 올 거라고. 멀린이 그렇게 만들었으니까."
-Lich_Intro,2,Lich,Lich_Portrait,"그 얼굴. 그 눈. 나는 알아. 네가 무엇인지."
-Lich_Intro,3,Lich,Lich_Portrait,"멀린이 소환한 영혼. 세계를 구하러 온 빛."
-Lich_Intro,4,Lich,Lich_Portrait,"하지만 영혼이여. 네가 지금 보고 있는 것이 무엇인지 알고 있는가?"
-Lich_Intro,5,Lich,Lich_Portrait,"멀린의 기억. 그의 지식. 그의 목소리. 모두 내 안에 있다."
-Lich_Intro,6,Lich,Lich_Portrait,"넌 나를 죽여야 한다."
-Lich_Intro,7,Lich,Lich_Portrait_Calm,"그 순간 — 멀린도 완전히 사라진다는 것도 알면서."
-Lich_Intro,8,Lich,Lich_Portrait_Rage,"그럼에도 오겠다면... 받아라."
-Lich_Phase2,0,Lich,Lich_Portrait_Calm,"...흥미롭군."
-Lich_Phase2,1,Lich,Lich_Portrait_Calm,"멀린조차 이 정도의 영혼은 소환할 수 없었을 텐데."
-Lich_Phase2,2,Lich,Lich_Portrait_Rage,"멀린의 껍데기는 이제 필요 없어."
-Lich_Phase2,3,Lich,Lich_Portrait_Rage,"이것이 — 진짜 나다."
-Lich_Death,0,Lich,Lich_Portrait_Dying,"...이상하군."
-Lich_Death,1,Lich,Lich_Portrait_Dying,"이렇게 되면... 안 되는 건데."
-Lich_Death,2,Lich,Lich_Portrait_Dying,"나는... 단순한 도구였던 건가."
-Lich_Death,3,Lich,Lich_Portrait_Dying,"처음부터... 이 결말을 위해..."
-Lich_Death,4,God,Illust_God_Default,"영혼이여..."
-Lich_Death,5,God,Illust_God_Default,"...고마워."
-Morgana_Reveal,0,Shadow,Illust_Shadow_Default,"잘했어."
-Morgana_Reveal,1,Shadow,Illust_Shadow_Default,"실험은 완벽하게 끝났으니까."
-Morgana_Reveal,2,Shadow,Illust_Shadow_Default,"너도. 멀린도. 저 리치도 — 전부 내 계획의 한 부분이었어."
-Morgana_Reveal,3,God,Illust_God_Default,"모르가나..."
-Morgana_Reveal,4,God,Illust_God_Default,"역시 그녀였군."
-Morgana_Reveal,5,God,Illust_God_Default,"아직..."
-Morgana_Reveal,6,God,Illust_God_Default,"...끝나지 않았어."
+Mage_Pickup,2,God,Illust_God_Default,괜찮아. 네 안의 신성한 빛이 그 마법을 인도해 줄 거야.
+Lich_Intro,0,Lich,Lich_Portrait,알고 있었어.
+Lich_Intro,1,Lich,Lich_Portrait,언젠간 올 거라고. 멀린이 그렇게 만들었으니까.
+Lich_Intro,2,Lich,Lich_Portrait,그 얼굴. 그 눈. 나는 알아. 네가 무엇인지.
+Lich_Intro,3,Lich,Lich_Portrait,멀린이 소환한 영혼. 세계를 구하러 온 빛.
+Lich_Intro,4,Lich,Lich_Portrait,하지만 영혼이여. 네가 지금 보고 있는 것이 무엇인지 알고 있는가?
+Lich_Intro,5,Lich,Lich_Portrait,멀린의 기억. 그의 지식. 그의 목소리. 모두 내 안에 있다.
+Lich_Intro,6,Lich,Lich_Portrait,넌 나를 죽여야 한다.
+Lich_Intro,7,Lich,Lich_Portrait_Calm,그 순간 — 멀린도 완전히 사라진다는 것도 알면서.
+Lich_Intro,8,Lich,Lich_Portrait_Rage,그럼에도 오겠다면... 받아라.
+Lich_Phase2,0,Lich,Lich_Portrait_Calm,...흥미롭군.
+Lich_Phase2,1,Lich,Lich_Portrait_Calm,멀린조차 이 정도의 영혼은 소환할 수 없었을 텐데.
+Lich_Phase2,2,Lich,Lich_Portrait_Rage,멀린의 껍데기는 이제 필요 없어.
+Lich_Phase2,3,Lich,Lich_Portrait_Rage,이것이 — 진짜 나다.
+Lich_Death,0,Lich,Lich_Portrait_Dying,...이상하군.
+Lich_Death,1,Lich,Lich_Portrait_Dying,이렇게 되면... 안 되는 건데.
+Lich_Death,2,Lich,Lich_Portrait_Dying,나는... 단순한 도구였던 건가.
+Lich_Death,3,Lich,Lich_Portrait_Dying,처음부터... 이 결말을 위해...
+Lich_Death,4,God,Illust_God_Default,영혼이여...
+Lich_Death,5,God,Illust_God_Default,...고마워.
+Morgana_Reveal,0,Shadow,Illust_Shadow_Default,잘했어.
+Morgana_Reveal,1,Shadow,Illust_Shadow_Default,실험은 완벽하게 끝났으니까.
+Morgana_Reveal,2,Shadow,Illust_Shadow_Default,너도. 멀린도. 저 리치도 — 전부 내 계획의 한 부분이었어.
+Morgana_Reveal,3,God,Illust_God_Default,모르가나...
+Morgana_Reveal,4,God,Illust_God_Default,역시 그녀였군.
+Morgana_Reveal,5,God,Illust_God_Default,아직...
+Morgana_Reveal,6,God,Illust_God_Default,...끝나지 않았어.
+Quest_TutEquip_Complete,0,God,Illust_God_Default,무기가 손에 익는구나. 이제 너는 싸울 수 있어.
+Quest_TutEquip_Complete,1,Shadow,Illust_Shadow_Default,...겉모습만 그럴듯하군. 심연은 칼날 따위로 무너지지 않아.
+Quest_TutEquip_Complete,2,God,Illust_God_Default,두려워 마. 다음은 너를 지킬 서약이야.
+Quest_TutCovenant_Complete,0,God,Illust_God_Default,서약을 받아들였구나. 그 맹세가 너의 빛을 더 멀리 비출 거야.
+Quest_TutCovenant_Complete,1,Shadow,Illust_Shadow_Default,"서약이라... 대가 없는 힘은 없어. 잊지 마, 작은 빛."
+Quest_TutCovenant_Complete,2,God,Illust_God_Default,"이제 준비됐어. 저 너머의 문을 지나, 심연으로 내려가렴."
+Quest_HiddenAmbush_Start,0,Shadow,Illust_Shadow_Default,"...멈춰. 이 기운, 평범한 적이 아니야."
+Quest_HiddenAmbush_Start,1,God,Illust_God_Default,"갑작스러운 시련이구나. 영혼이여, 정신을 가다듬어."
+Quest_HiddenAmbush_Clear,0,God,Illust_God_Default,"위협을 떨쳐냈어. 역시 너야, 작은 빛."
+Quest_HiddenAmbush_Clear,1,Shadow,Illust_Shadow_Default,...이번엔 운이 좋았군. 심연은 더 많은 걸 숨기고 있어.
+Chapter1_Enter_First,0,God,Illust_God_Default,숲의 초입이야. 저 안은 한때 생명이 넘쳤지만... 지금은 깊이 뒤틀려 있어.
+Chapter1_Enter_First,1,Shadow,Illust_Shadow_Default,서두를 것 없어. 들어가기 전에 채비부터 갖춰.
+Chapter1_Enter_First,2,God,Illust_God_Default,준비가 되면 게이트를 지나렴. 나는 늘 함께야.
+Chapter1_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 숲 앞이군. ...몇 번째인지 세는 것도 지쳤어.
+Chapter1_Enter_R1,1,God,Illust_God_Default,익숙해도 방심은 금물. 채비는 늘 새로 갖추렴.
+Chapter1_Enter_R2,0,God,Illust_God_Default,"다시 왔구나. 숨을 고르고, 필요한 걸 챙겨."
+Chapter1_Enter_R2,1,Shadow,Illust_Shadow_Default,...준비됐으면 들어가. 숲은 기다려주지 않아.
+Chapter1_Enter_R3,0,Shadow,Illust_Shadow_Default,또 너군. 이 숲도 네 얼굴을 외웠겠어.
+Chapter2_Enter_First,0,Shadow,Illust_Shadow_Default,...열기가 밀려온다. 저 너머는 용암 대지야. 숲과는 차원이 달라.
+Chapter2_Enter_First,1,God,Illust_God_Default,여기서 단단히 준비해. 한 번 들어가면 쉴 곳은 없어.
+Chapter2_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 불바다 앞이군. 익숙해질 법도 한데.
+Chapter2_Enter_R1,1,God,Illust_God_Default,채비를 갖추고 가자. 너라면 견딜 수 있어.
+Chapter2_Enter_R2,0,God,Illust_God_Default,다시 왔구나. 장비를 점검하고 들어가렴.
+Chapter3_Enter_First,0,God,Illust_God_Default,무너진 성소의 어귀야. 가장 성스러웠던 땅이... 이렇게 됐어.
+Chapter3_Enter_First,1,Shadow,Illust_Shadow_Default,여기서부턴 한 치도 방심 마. 준비를 마치고 들어가.
+Chapter3_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 폐허 앞이군. ...너도 참 끈질겨.
+Chapter3_Enter_R1,1,God,Illust_God_Default,숨을 고르고 채비를 갖춰. 멀린의 핵심이 가까워.
+Chapter3_Enter_R2,0,God,Illust_God_Default,다시 섰구나. 준비됐으면 망설이지 마.
+Chapter4_Enter_First,0,God,Illust_God_Default,성소의 가장 깊은 곳. 그 앞은 안개와 어둠뿐이야.
+Chapter4_Enter_First,1,Shadow,Illust_Shadow_Default,마지막 채비야. 안개 너머엔... 그것이 기다려.
+Chapter4_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 안개 앞이군. 끝을 보러 왔나?
+Chapter4_Enter_R1,1,God,Illust_God_Default,준비를 마치고 들어가자. 이번엔 다를 거야.
+Lich_Encounter_First,0,Lich,Lich_Portrait,...드디어 왔군. 멀린이 부른 빛이여.
+Lich_Encounter_R1,0,Lich,Lich_Portrait,또 너인가. 몇 번을 쓰러져도 다시 일어서는군.
+Lich_Encounter_R2,0,Lich,Lich_Portrait,또 도전하러 왔나? ...그 끈기만은 인정하지.
+Lich_Encounter_R3,0,Lich,Lich_Portrait_Rage,질리지도 않는군. 이번에야말로 끝내주마.
+Lich_Encounter_R4,0,Lich,Lich_Portrait_Calm,"...너의 얼굴을 외울 지경이야. 다시, 시작하지."
+BossRoom_Ch1_Enter_First,0,Shadow,Illust_Shadow_Default,...나무들이 침묵했어. 이 숲의 주인이 가까이 있어.
+BossRoom_Ch1_Enter_First,1,God,Illust_God_Default,"준비됐지? 숨을 고르고, 들어가자."
+BossRoom_Ch1_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 숲의 끝이군. 이번엔 다를까?
+BossRoom_Ch1_Enter_R2,0,God,Illust_God_Default,망설이지 마. 너는 이미 답을 알고 있어.
+BossRoom_Ch2_Enter_First,0,Shadow,Illust_Shadow_Default,용암이 들끓는다. 이 대지의 지배자가 깨어났어.
+BossRoom_Ch2_Enter_R1,0,God,Illust_God_Default,이 불길 너머는 이제 익숙하지? 할 수 있어.
+BossRoom_Ch3_Enter_First,0,God,Illust_God_Default,"무너진 제단 위에 무언가 있어. 조심해, 작은 빛."
+BossRoom_Ch3_Enter_R1,0,Shadow,Illust_Shadow_Default,...또 이 폐허군. 끈질긴 영혼이야.
+BossRoom_Ch4_Enter_First,0,God,Illust_God_Default,안개가 걷힌다. 마지막 문이야. 모든 것이 여기서 결정돼.
+BossRoom_Ch4_Enter_R1,0,Shadow,Illust_Shadow_Default,또 이 어둠 끝에 섰군. 끝을 보러 왔나?
+ForestGuardian_Encounter_First,0,ForestGuardian,,침입자여... 이 숲은 더 이상 너를 들이지 않는다.
+ForestGuardian_Encounter_R1,0,ForestGuardian,,또 너인가. 숲은 네 발자국을 기억한다.
+ForestGuardian_Encounter_R2,0,ForestGuardian,,몇 번을 쓰러뜨려도 다시 자라나는 것이 숲이다. ...너처럼.
+Dragon_Encounter_First,0,Dragon,,감히 내 둥지에 발을 들이다니. 재가 되어라.
+Dragon_Encounter_R1,0,Dragon,,또 기어 왔군. 이번엔 뼈도 남기지 않겠다.
+Dragon_Encounter_R2,0,Dragon,,"끈질긴 불씨로군. ...태워주마, 몇 번이고."
+DeathKnight_Encounter_First,0,DeathKnight,,살아있는 자여. 죽음의 영역에 잘 왔다.
+DeathKnight_Encounter_R1,0,DeathKnight,,또 돌아왔나. 죽음은 너를 환영한다.
+DeathKnight_Encounter_R2,0,DeathKnight,,너의 집착이 가상하군. ...영원히 이곳에 머물게 해주마.

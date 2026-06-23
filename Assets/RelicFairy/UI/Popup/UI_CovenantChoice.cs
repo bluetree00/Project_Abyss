@@ -15,6 +15,8 @@ using UnityEngine;
 /// </summary>
 public class UI_CovenantChoice : UI_Popup
 {
+    public override bool BlocksGameplay => true; // 서약 선택 중 시간정지 + 입력잠금
+
     [Header("제목")]
     [SerializeField] private TMP_Text _titleText;
 

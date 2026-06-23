@@ -70,6 +70,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8d2f750b0b13efd4eba02ca0233db878
+    m_Address: Arena_Boss_Ch4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f4600daf17a8b9b4887fd3494c32daf0
     m_Address: TestNomarStage_02
     m_ReadOnly: 0

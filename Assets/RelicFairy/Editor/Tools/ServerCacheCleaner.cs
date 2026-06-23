@@ -12,6 +12,7 @@ public static class ServerCacheCleaner
     {
         "equipment_data.json",          // ServerEquipmentDataManager
         "chapter_data.json",            // ChapterDataManager
+        "run_structure.json",           // RunStructureDataManager (런 구조 — boss_threshold 등)
         "map_data.json",                // MapDataManager
         "monster_data.json",            // MonsterDataManager
         "monster_element_stat_data.json", // ServerMonsterStatDataManager

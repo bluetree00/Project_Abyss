@@ -7,9 +7,14 @@ public class UIManager
 {
     // 팝업 정렬 베이스. Canvas_HUD(100)보다 위, Canvas_Overlay(2000)보다 아래에 위치해야
     // 팝업/대사가 HUD 위에, 토스트·로딩·페이드(Overlay) 아래에 렌더된다.
-    int _order = 200;
+    // ⚠️ 리셋(ClearOnSceneTransition)도 반드시 이 상수로 — 과거 10으로 리셋해 전환 후 대사가 HUD 뒤로 묻힌 버그.
+    const int PopupBaseOrder = 200;
+    int _order = PopupBaseOrder;
 
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
+
+    // 게임플레이 차단(BlocksGameplay 팝업) 상태 — 시간정지 + 입력잠금 토글.
+    bool _gameplayBlocked;
     UI_Scene _menuUI = null;
 
     Dictionary<string, GameObject> _uiObjects = new Dictionary<string, GameObject>();
@@ -181,6 +186,7 @@ public class UIManager
                 existing.SetActive(true);
                 var cached = existing.GetComponent<T>();
                 _popupStack.Push(cached);
+                RefreshGameplayBlock();
                 cached.PlayOpenAnimation();
                 return cached;
             }
@@ -200,6 +206,7 @@ public class UIManager
             T popup = Util.GetOrAddComponent<T>(go);
             popup.Init();
             _popupStack.Push(popup);
+            RefreshGameplayBlock();
             _uiObjects[name] = go;
 
             popup.PlayOpenAnimation();
@@ -251,6 +258,7 @@ public class UIManager
         UI_Popup popup = _popupStack.Pop();
         _uiObjects.Remove(popup.gameObject.name);
         _order--;
+        RefreshGameplayBlock();
 
         if (immediate)
             Object.Destroy(popup.gameObject);
@@ -262,6 +270,41 @@ public class UIManager
     {
         while (_popupStack.Count > 0)
             CloseTopPopup(immediate: true);
+    }
+
+    // ── 게임플레이 차단(시간정지 + 입력잠금) ──────────────────
+
+    /// <summary>BlocksGameplay 팝업이 하나라도 열려있나.</summary>
+    public bool IsGameplayBlocked => _popupStack.Any(p => p != null && p.BlocksGameplay);
+
+    /// <summary>BlocksGameplay 팝업이 모두 닫힐 때까지 대기. 대사를 선택 UI 닫힘 뒤로 미루는 데 사용.</summary>
+    public async UniTask WaitUntilNoBlockingPopupAsync()
+        => await UniTask.WaitUntil(() => !IsGameplayBlocked);
+
+    /// <summary>스택의 BlocksGameplay 팝업 유무에 따라 시간정지·입력잠금을 동기화한다(push/pop마다 호출).</summary>
+    private void RefreshGameplayBlock()
+    {
+        bool shouldBlock = IsGameplayBlocked;
+        if (shouldBlock == _gameplayBlocked) return;
+        _gameplayBlocked = shouldBlock;
+
+        if (shouldBlock)
+        {
+            TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
+            SetPlayerInput(false);
+        }
+        else
+        {
+            TimeScaleArbiter.Release(this);
+            SetPlayerInput(true);
+        }
+    }
+
+    private void SetPlayerInput(bool enabled)
+    {
+        var t = Managers.Player?.PlayerTransform;
+        if (t != null && t.TryGetComponent<PlayerController>(out var pc))
+            pc.SetInputEnabled(enabled);
     }
 
     public void Clear()
@@ -279,7 +322,7 @@ public class UIManager
     {
         CloseAllPopupUI();
         CloseMenuUI();
-        _order = 10;
+        _order = PopupBaseOrder;
 
         if (!IsRootInjected)
             _uiObjects.Clear();

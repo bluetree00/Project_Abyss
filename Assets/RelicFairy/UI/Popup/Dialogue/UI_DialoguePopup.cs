@@ -14,6 +14,9 @@ using UnityEngine.UI;
 /// </summary>
 public class UI_DialoguePopup : UI_Popup
 {
+    // 대사 중 이동·시간 흐름 차단(보스전 포함). timeScale=0이라 내부 연출은 unscaled로 동작해야 함.
+    public override bool BlocksGameplay => true;
+
     // ─────────────────────────────────────────────────────────
     // SerializeField
     // ─────────────────────────────────────────────────────────
@@ -234,7 +237,8 @@ public class UI_DialoguePopup : UI_Popup
                 }
 
                 bodyText.text = text[..(i + 1)];
-                await UniTask.Delay(TimeSpan.FromSeconds(charDelay), cancellationToken: ct);
+                // timeScale=0(BlocksGameplay) 중에도 진행되도록 unscaled.
+                await UniTask.Delay(TimeSpan.FromSeconds(charDelay), DelayType.UnscaledDeltaTime, cancellationToken: ct);
             }
         }
         catch (OperationCanceledException)

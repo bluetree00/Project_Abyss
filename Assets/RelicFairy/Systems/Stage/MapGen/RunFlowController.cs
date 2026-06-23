@@ -214,13 +214,23 @@ public class RunFlowController : MonoBehaviour
     /// 실패해도 진행은 막지 않음 — null이면 RunSequencer가 전 방 Normal로 동작(구조만 비활성).</summary>
     private async UniTask EnsureStructureConfigAsync()
     {
+        var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
+
         // 0순위: 인스펙터 직접 배선(개발자 명시 오버라이드).
-        if (_structureConfig != null) { _resolvedStructure = _structureConfig; return; }
+        if (_structureConfig != null)
+        {
+            _resolvedStructure = _structureConfig;
+            LogResolvedStructure("Inspector-SO", chapter);
+            return;
+        }
 
         // 1순위: CSV 정본 — RUN_STRUCTURE(CDN). 챕터는 현재 런 세션에서 해석.
-        var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
         _resolvedStructure = Managers.RunStructureData?.Get(chapter);
-        if (_resolvedStructure != null) return;
+        if (_resolvedStructure != null)
+        {
+            LogResolvedStructure("CSV", chapter);
+            return;
+        }
 
         // 2순위: SO 오프라인 폴백 — Addressables(챕터별 키 → 공유 기본 키).
         string key = !string.IsNullOrEmpty(_resolvedStructureKey) ? _resolvedStructureKey : _structureConfigKey;
@@ -235,6 +245,24 @@ public class RunFlowController : MonoBehaviour
 
         if (_resolvedStructure == null)
             Debug.LogWarning($"[RunFlow] 런 구조 로드 실패: {key} — 전 방 Normal로 진행(구조 비활성).");
+        else
+            LogResolvedStructure($"Addressable-SO({key})", chapter);
+    }
+
+    // [검증용 임시] 해석된 런 구조의 실제 수치를 한 줄로 출력 — CSV/SO 어느 소스가 들어갔는지 확인. 검증 끝나면 제거.
+    private void LogResolvedStructure(string source, ChapterId chapter)
+    {
+        var s = _resolvedStructure;
+        if (s == null) return;
+        var ms = new System.Text.StringBuilder();
+        for (int v = 1; v <= s.BossThreshold; v++)
+        {
+            var k = s.GetMilestoneKind(v);
+            if (k.HasValue) ms.Append($"{v}:{k.Value} ");
+        }
+        Debug.Log($"[RunStructure검증] {chapter} 소스={source} boss@{s.BossThreshold} " +
+                  $"shop{s.ShopChance:0.##}/{s.ShopMaxPerChapter} event{s.EventChance:0.##}/{s.EventMaxPerChapter} elite{s.EliteChance:0.##} " +
+                  $"diff[0→{s.DifficultyAt(0):0.##} / {s.BossThreshold}→{s.DifficultyAt(s.BossThreshold):0.##}] ms{{{ms.ToString().Trim()}}}");
     }
 
     private ZonePoolEntry FindStartEntry()
@@ -340,6 +368,9 @@ public class RunFlowController : MonoBehaviour
         var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
         var lines = dlg.GetVisitLines($"BossRoom_Ch{(int)chapter}_Enter");
         if (lines == null || lines.Length == 0) return;
+
+        // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사.
+        await Managers.UI.WaitUntilNoBlockingPopupAsync();
 
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
         if (popup == null) return;

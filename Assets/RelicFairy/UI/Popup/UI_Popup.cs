@@ -16,6 +16,11 @@ public class UI_Popup : UI_Base
     private RectTransform _rt;
     private bool          _isClosing;
 
+    // ── Public ───────────────────────────────────────────────
+    /// <summary>true면 이 팝업이 열려있는 동안 게임플레이를 차단한다(인게임 시간정지 + 플레이어 입력잠금).
+    /// 또한 열려있는 동안 대사 이벤트가 대기한다. 선택/편집 UI·대사 팝업이 override한다.</summary>
+    public virtual bool BlocksGameplay => false;
+
     // ── Init ─────────────────────────────────────────────────
 
     public override void Init()
