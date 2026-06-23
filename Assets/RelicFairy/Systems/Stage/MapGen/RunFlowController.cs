@@ -18,6 +18,8 @@ public class RunFlowController : MonoBehaviour
     [SerializeField] private RunStructureConfig _structureConfig;
     [SerializeField, Tooltip("_structureConfig 비었을 때 Addressables로 로드할 키. 런타임 AddComponent 생성 경로 대응(에셋만 만들고 인스펙터 배선 불가).")]
     private string _structureConfigKey = "RUN_STRUCTURE_DEFAULT";
+    // 해석된 런 구조(IRunStructure): CSV(RUN_STRUCTURE) 정본 → SO 폴백. 인터페이스라 [SerializeField] 불가하여 별도 보유.
+    private IRunStructure _resolvedStructure;
     [SerializeField] private string _poolKey = "CHAPTER_1_ROOM_POOL";
     [SerializeField, Tooltip("시작 방 pool_key. 비우면 첫 Normal 방 사용.")]
     private string _startPoolKey;
@@ -95,7 +97,7 @@ public class RunFlowController : MonoBehaviour
         int seed    = _seed != 0 ? _seed : Environment.TickCount;
         _masterSeed = seed;
         _rng        = new System.Random(seed);
-        _sequencer  = new RunSequencer(_pool, _structureConfig, seed);
+        _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed);
         _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
         DumpRunPlan(seed);
 
@@ -136,7 +138,7 @@ public class RunFlowController : MonoBehaviour
         await EnsureStructureConfigAsync();
 
         _rng       = new System.Random(_masterSeed);
-        _sequencer = new RunSequencer(_pool, _structureConfig, _masterSeed);
+        _sequencer = new RunSequencer(_pool, _resolvedStructure, _masterSeed);
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns);
         _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
         DumpRunPlan(_masterSeed);
@@ -188,7 +190,7 @@ public class RunFlowController : MonoBehaviour
         int chapterNum = (int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? 0);
         int seed       = RunSequencer.Combine(_masterSeed, 7000 + chapterNum); // 챕터별 결정적 시드
         _rng           = new System.Random(seed);
-        _sequencer     = new RunSequencer(_pool, _structureConfig, seed);
+        _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed);
         _runPlan       = _sequencer.BuildPlan();
         DumpRunPlan(seed);
 
@@ -207,25 +209,32 @@ public class RunFlowController : MonoBehaviour
 
     // ── Private ─────────────────────────────────────
 
-    /// <summary>인스펙터 배선이 없으면(AddComponent 생성 경로) Addressables로 구조 config를 로드한다.
-    /// 실패해도 진행은 막지 않음 — config=null이면 RunSequencer가 전 방 Normal로 안전 동작(구조만 비활성).</summary>
+    /// <summary>런 구조(IRunStructure)를 해석한다. 우선순위: 인스펙터 SO(명시 오버라이드)
+    /// → CSV 정본(RUN_STRUCTURE, 서버 CDN) → SO 오프라인 폴백(Addressables) → null(전 방 Normal 안전동작).
+    /// 실패해도 진행은 막지 않음 — null이면 RunSequencer가 전 방 Normal로 동작(구조만 비활성).</summary>
     private async UniTask EnsureStructureConfigAsync()
     {
-        if (_structureConfig != null) return; // 인스펙터 직접 배선이 최우선
+        // 0순위: 인스펙터 직접 배선(개발자 명시 오버라이드).
+        if (_structureConfig != null) { _resolvedStructure = _structureConfig; return; }
 
-        // 1순위: 챕터별 키(StartRun/Resume 주입). 2순위: 직렬화 공유 기본 키(RUN_STRUCTURE_DEFAULT) 폴백.
+        // 1순위: CSV 정본 — RUN_STRUCTURE(CDN). 챕터는 현재 런 세션에서 해석.
+        var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
+        _resolvedStructure = Managers.RunStructureData?.Get(chapter);
+        if (_resolvedStructure != null) return;
+
+        // 2순위: SO 오프라인 폴백 — Addressables(챕터별 키 → 공유 기본 키).
         string key = !string.IsNullOrEmpty(_resolvedStructureKey) ? _resolvedStructureKey : _structureConfigKey;
         if (!string.IsNullOrEmpty(key))
-            _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(key);
+            _resolvedStructure = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(key);
 
-        if (_structureConfig == null && !string.IsNullOrEmpty(_structureConfigKey) && key != _structureConfigKey)
+        if (_resolvedStructure == null && !string.IsNullOrEmpty(_structureConfigKey) && key != _structureConfigKey)
         {
-            Debug.Log($"[RunFlow] 챕터 구조 config '{key}' 없음 — 공유 기본 '{_structureConfigKey}' 폴백.");
-            _structureConfig = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(_structureConfigKey);
+            Debug.Log($"[RunFlow] 챕터 구조 '{key}' 없음 — 공유 기본 '{_structureConfigKey}' 폴백.");
+            _resolvedStructure = await Managers.AddressableManager.TryLoadAssetAsync<RunStructureConfig>(_structureConfigKey);
         }
 
-        if (_structureConfig == null)
-            Debug.LogWarning($"[RunFlow] RunStructureConfig 로드 실패: {key} — 전 방 Normal로 진행(구조 비활성).");
+        if (_resolvedStructure == null)
+            Debug.LogWarning($"[RunFlow] 런 구조 로드 실패: {key} — 전 방 Normal로 진행(구조 비활성).");
     }
 
     private ZonePoolEntry FindStartEntry()

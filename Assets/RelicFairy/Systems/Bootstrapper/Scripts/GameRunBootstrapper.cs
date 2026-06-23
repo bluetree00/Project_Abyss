@@ -214,6 +214,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await InitItemDataAsync();
         await InitCovenantDataAsync();
         await InitRelicAwakeningAsync();
+        await InitChapterDataAsync();
+        await InitRunStructureDataAsync();
 
         // 트래커 바인딩 (데이터 초기화 후)
         BindEssenceTracker();
@@ -433,6 +435,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         try { await awakening.InitializeAsync(); }
         catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] RelicAwakening 예외: {e.Message}"); }
+    }
+
+    private async UniTask InitChapterDataAsync()
+    {
+        var chapterData = Managers.ChapterData;
+        if (chapterData == null || chapterData.IsInitialized) return;
+
+        try { await chapterData.InitializeAsync(); }
+        catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] ChapterData 예외: {e.Message}"); }
+    }
+
+    private async UniTask InitRunStructureDataAsync()
+    {
+        var runStructureData = Managers.RunStructureData;
+        if (runStructureData == null || runStructureData.IsInitialized) return;
+
+        try { await runStructureData.InitializeAsync(); }
+        catch (System.Exception e) { Debug.LogWarning($"[GameRunBootstrapper] RunStructureData 예외: {e.Message}"); }
     }
 
     private void BindEssenceTracker()

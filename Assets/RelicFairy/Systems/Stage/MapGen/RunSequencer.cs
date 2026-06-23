@@ -62,7 +62,7 @@ public class RunSequencer
     private enum Phase { Normal, PreBoss, Boss, Done }
 
     private readonly List<ZonePoolEntry>     _pool;
-    private readonly RunStructureConfig      _config;
+    private readonly IRunStructure           _config;
     private readonly int                     _seed;
     private readonly Dictionary<string, int> _cooldowns = new();
 
@@ -85,7 +85,7 @@ public class RunSequencer
     /// <summary>방별 자식 시드. 같은 (마스터 시드, visitCount) → 동일 롤 → 이어하기 재현.</summary>
     public static int Combine(int seed, int visitCount) => unchecked((seed * 397) ^ visitCount);
 
-    public RunSequencer(IEnumerable<ZonePoolEntry> pool, RunStructureConfig config, int seed)
+    public RunSequencer(IEnumerable<ZonePoolEntry> pool, IRunStructure config, int seed)
     {
         _pool   = pool != null ? new List<ZonePoolEntry>(pool) : new List<ZonePoolEntry>();
         _config = config;
