@@ -723,6 +723,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         try { achievementDb = await addr.TryLoadAssetAsync<QuestDatabase>("AchievementDatabase"); }
         catch (Exception e) { Debug.LogWarning($"[AppBootstrapper] AchievementDatabase 로드 실패: {e.Message}"); }
 
+        Debug.Log($"[AppBootstrapper] Quest DB 로드 결과 — QuestDatabase={(questDb != null)}, AchievementDatabase={(achievementDb != null)}");
+
         if (questDb != null || achievementDb != null)
             Managers.Quest.Initialize(questDb, achievementDb);
         else

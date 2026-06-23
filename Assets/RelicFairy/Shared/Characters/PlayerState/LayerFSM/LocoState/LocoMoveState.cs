@@ -69,8 +69,8 @@ public class LocoMoveState : ILayerState<LocoState>
         float animSpeed = moving ? _controller.HorizontalSpeed01 : 0f;
         SetSpeedParam(_controller.Anim, animSpeed, BlendDamp);
 
-        // Air 전이
-        if (!_controller.IsGrounded())
+        // Air 전이 — 스텝 오르는 중엔 잠깐 공중 판정이 떠도 낙하 상태로 빠지지 않음.
+        if (!_controller.IsGrounded() && !_controller.IsStepClimbing)
         {
             _stateChanger.Change(LocoState.Air);
             return;

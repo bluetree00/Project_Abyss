@@ -971,9 +971,6 @@ MonoBehaviour:
   - {fileID: 211444737294688988, guid: b301e4af27f588b4294ba3ce4a5c5628, type: 3}
   startGatePrefab: {fileID: 3370721773177374504, guid: 6fbc55cf5fb2d504382e9cc2bb096150,
     type: 3}
-  wispPrefab: {fileID: 6090908717942830731, guid: aa5ed5db87064a74abe5c9c54978eacf,
-    type: 3}
-  wispSpawnHeightOffset: 1.5
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}

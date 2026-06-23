@@ -30,7 +30,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("로비에서 바로 GameScene 진입 시 로드할 스타트 방 맵 키. 비워두면 기존 에디터 직접 실행 fallback으로 동작.")]
     [SerializeField] private string startRoomMapKey = "";
 
-    [Tooltip("true면 zone_layout_key의 zone_index=0을 스타트 방으로 사용. 위습 캐릭터/무기 선택 후 나머지 존(1-25)을 게이트에서 스폰.")]
+    [Tooltip("true면 zone_layout_key의 zone_index=0을 스타트 방으로 사용. 캐릭터/무기 선택 후 나머지 존(1-25)을 게이트에서 스폰.")]
     [SerializeField] private bool startWithZoneLayout = true;
 
     [Header("ProcGen (하데스형 절차 진행)")]
@@ -51,7 +51,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public bool IsStartRoomScene => AppBootstrapper.Instance != null
         && (!string.IsNullOrEmpty(startRoomMapKey) || startWithZoneLayout);
 
-    /// <summary>스타트 방 모드 여부. 로비를 거쳐 진입했고 Wisp가 캐릭터를 선택하기 전까지 true.
+    /// <summary>스타트 방 모드 여부. 로비를 거쳐 진입한 경우 true.
     /// AppBootstrapper.Instance가 null이면 에디터 직접 실행으로 간주해 false를 반환한다.</summary>
     public bool IsInStartRoom => IsStartRoomScene
         && !(AppBootstrapper.Instance.Loadout?.IsReady ?? false);
@@ -67,12 +67,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     [Tooltip("스타트 방 탈출 게이트 프리팹. next_zone_indices 기준 존 출구 엣지에 배치됨. StartRoomGate 컴포넌트 필요.")]
     [SerializeField] private GameObject startGatePrefab;
-
-    [Tooltip("스타트 방에서 캐릭터 선택 전 조작할 Wisp 프리팹. 비워두면 playerPrefabKey 폴백.")]
-    [SerializeField] private GameObject wispPrefab;
-
-    [Tooltip("Wisp 스폰 시 스폰 지점 기준 Y 오프셋(공중에 띄움).")]
-    [SerializeField] private float wispSpawnHeightOffset = 1.5f;
 
     [Header("Block Map Gen")]
     [SerializeField, Tooltip("단일 팔레트 (fallback). blockPalettes에 테마 매칭이 없으면 이 값 사용.")]
@@ -242,7 +236,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // IsRunning이 true면 StageMap을 거쳐 전투 씬으로 진입한 것 → 전투 시작
         // zone-layout 이어하기: 마지막 클리어된 존에서 재개하며 출구 게이트 활성화 상태로 복원
-        // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → Wisp 모드 (에디터 직접 실행 시 false)
+        // IsInStartRoom이면 로비를 거쳐 스타트 방으로 진입 → 스타트 방 모드 (에디터 직접 실행 시 false)
         // DebugStageRunPanel이 있으면 해당 패널이 StartRunAsync를 통해 전투를 시작하므로 중복 실행 방지
         bool hasDebugPanel = Object.FindFirstObjectByType<DebugStageRunPanel>() != null;
 
@@ -616,7 +610,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (_currentMapGO != null)
             CreateStartRoomGates(startZone, zones, _currentMapGO);
 
-        Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. Wisp 예정 위치: {_pendingPlayerSpawnPos}");
+        Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. 플레이어 예정 위치: {_pendingPlayerSpawnPos}");
     }
 
     /// <summary>
@@ -1002,6 +996,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // 커스텀 손맵 아레나(보스 등): arena_template_key가 있으면 격자 지형 대신 프리팹이 방 전체를 제공한다.
         // 지형/보스/트리거/배리어를 모두 프리팹이 담은 길 1 구조 — docs/boss-custom-arena-design.md 참조.
         bool useCustomArena = !string.IsNullOrEmpty(entry.arena_template_key);
+        // 커스텀 아레나 키가 Addressable에 없으면(미제작 챕터 등) 격자 보스룸으로 폴백 — 빈 방/보스 미스폰 방지.
+        if (useCustomArena && !await Managers.AddressableManager.KeyExistsAsync(entry.arena_template_key))
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] arena '{entry.arena_template_key}' 미등록 — 기본 격자 보스룸으로 폴백");
+            useCustomArena = false;
+        }
         Vector3? customArenaEntryPos = null; // 커스텀 아레나: 프리팹 PlayerSpawn 마커 위치(있으면 grid 입구 대신 사용 → 격자 정렬 불필요)
         System.Collections.Generic.List<ProcExitSlot> customArenaExits = null; // 프리팹 Exit 마커에서 산출한 출구(있으면 grid DR 대신 사용 → 게이트가 항상 프리팹 바닥 위)
 
@@ -2128,6 +2128,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
             await ScreenFade.In(0.4f);
 
+        // 허브 신규 런: 세션 런을 정식으로 시작(Phase=Running + PlayerState 생성 + 이벤트 발행).
+        // 절차 진행 흐름은 StartNewRunAsync를 거치지 않아 Phase가 NotRunning으로 남고, 그 결과
+        // 챕터 게이트 통과 시 AdvanceToNextChapter가 !IsRunning으로 false를 반환해 런 클리어(베이스캠프 복귀)로
+        // 잘못 분기하던 버그를 차단한다. BindPlayer 전에 호출해 PlayerState↔RuntimeStats 동기화·서약 초기화가 정상 동작하게 한다.
+        if (_run != null && !_run.IsRunning)
+            await _run.StartNewRunAsync(ResolveCurrentChapter(),
+                key => Managers.AddressableManager.LoadAssetAsync<TextAsset>(key));
+
         // 로드아웃(body+유물+무기) 기반 스폰 — SpawnPlayerAsync가 로드아웃 키 해석·유물 적용·무기 장착을 처리하고
         // _pendingPlayerSpawnPos(Zone0 스폰 지점)에 배치한다.
         var player = await SpawnPlayerAsync(startBodyKey);
@@ -2140,6 +2148,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
+        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
+        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
 
         // 던전 빌드(StartProcGenRunAsync)는 여기서 호출하지 않는다 — 출구 게이트가 통과 시 시작한다.
     }
@@ -2175,13 +2186,29 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         AppBootstrapper.Instance?.Loadout?.SetCharacter(null, startBodyKey);
         Vector3 startSpawnPos = _pendingPlayerSpawnPos ?? Vector3.zero;
         _pendingPlayerSpawnPos = null;
-        SpawnCharacterInStartRoomAsync(startBodyKey, startSpawnPos, Quaternion.identity, null).Forget();
+        SpawnCharacterInStartRoomAsync(startBodyKey, startSpawnPos, Quaternion.identity).Forget();
     }
 
     private void SpawnAwakeningAltar()
     {
         var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
         WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
+    }
+
+    /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.</summary>
+    private async UniTask ShowWaitingRoomDialogueAsync(ChapterId chapter)
+    {
+        var dlg = Managers.DialogueData;
+        if (dlg == null) return;
+        if (!dlg.IsInitialized) await dlg.InitializeAsync();
+
+        var lines = dlg.GetVisitLines($"Chapter{(int)chapter}_Enter");
+        if (lines == null || lines.Length == 0) return;
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+        if (popup == null) return;
+        try { await popup.ShowAsync(lines); }
+        catch (System.OperationCanceledException) { }
     }
 
     private async UniTask ShowStartRoomDialogueAsync()
@@ -2205,24 +2232,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         catch (System.OperationCanceledException) { }
     }
 
-    private void SpawnWisp()
-    {
-        Vector3 pos = _pendingPlayerSpawnPos ?? Vector3.zero;
-        _pendingPlayerSpawnPos = null;
-        pos.y += wispSpawnHeightOffset; // 위습을 공중에 살짝 띄움
-
-        var go = Instantiate(wispPrefab, pos, Quaternion.identity);
-        go.name = "@Wisp";
-
-        // WispCameraFollow.Start()보다 먼저 동기 호출로 신뢰성 확보
-        GameCameraController.Instance?.ActivateForStartRoom(go.transform);
-
-        Debug.Log($"[GameRunBootstrapper] Wisp 스폰: {pos}");
-    }
-
-    /// <summary>스타트 방에서 캐릭터 선택 시 호출. 해당 위치에 PlayerController를 스폰하고 Wisp를 제거한다.</summary>
+    /// <summary>스타트 방에서 캐릭터(CombatGirl)를 해당 위치에 스폰한다.</summary>
     public async UniTaskVoid SpawnCharacterInStartRoomAsync(
-        string prefabKey, Vector3 pos, Quaternion rot, WispController wisp)
+        string prefabKey, Vector3 pos, Quaternion rot)
     {
         var prefab = await Managers.AddressableManager.LoadAssetAsync<GameObject>(prefabKey);
         if (prefab == null)
@@ -2255,10 +2267,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // HUD를 플레이어에 바인딩 — 무기 선택 시 HUD 슬롯이 즉시 갱신되도록
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
-
-        // Wisp 제거
-        if (wisp != null)
-            Destroy(wisp.gameObject);
 
         Debug.Log($"[GameRunBootstrapper] 스타트 방 캐릭터 스폰 완료: {prefabKey} at {pos}");
     }
@@ -2346,25 +2354,42 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// <summary>
     /// 챕터 전환으로 다음 챕터 씬을 로드한 직후 진입. 저장 이어하기와 달리 "새 챕터를 처음부터" 시작한다.
     /// 런 상태(아이템/버프/서약/시너지)는 DDOL 세션에 유지되며, 새 플레이어 인스턴스에 BindPlayer가 복원한다.
-    /// 흐름: HUD 바인드 → 플레이어 스폰 → BindPlayer → 새 챕터 procgen 첫 방부터(StartProcGenRunAsync).
+    /// 흐름: HUD 바인드 → 대기방(Zone0) 빌드 → 플레이어 스폰 → BindPlayer → 출구 게이트 통과 시 던전(StartProcGenRunAsync).
     /// </summary>
     private async UniTask StartNextChapterInSceneAsync(CancellationToken ct)
     {
+        // 챕터 전환도 첫 챕터와 동일하게 "대기 방"을 띄운 뒤 출구 게이트로 던전에 진입한다.
+        // (이전엔 곧장 던전으로 들어가 챕터별 대기방이 없었음 — 우선 방 구조만, 준비 스테이션은 후속.)
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
         UIRootBootstrapper.Instance?.BindHudToRun(_run);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
 
-        var player = await SpawnPlayerAsync(playerPrefabKey);
-        if (player != null)
+        await ScreenFade.Out(0f);
+
+        // 새 챕터의 Zone0를 대기 방으로 빌드 (StartRoomGate 포함). 준비 픽업은 우선 억제(스테이션은 후속).
+        await SpawnStartZoneFromLayoutAsync(ct, suppressInteractables: true);
+
+        if (_currentMapGO != null && GameCameraController.Instance != null)
+            await GameCameraController.Instance.PlayStartRoomTourAsync(_currentMapGO.transform.position, ct);
+        else
+            await ScreenFade.In(0.4f);
+
+        // 로드아웃 기반 스폰 + 라이브 세션 복원(BindPlayer가 아이템/버프/서약/시너지 이월 처리).
+        var player = await SpawnPlayerAsync(startBodyKey);
+        if (player == null)
         {
-            SetupEntrance(player);
-            _run?.BindPlayer(player); // 라이브 세션 → 아이템/버프/서약/시너지 복원(BindPlayer가 씬 전환 복원 처리)
+            Debug.LogError("[GameRunBootstrapper] StartNextChapterInSceneAsync: 플레이어 스폰 실패");
+            return;
         }
+        _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
+        GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
-        // 새 챕터 procgen — CurrentChapter는 AdvanceToNextChapter로 이미 갱신됨. 첫 방부터 빌드.
-        await StartProcGenRunAsync();
+        // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
+        await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
 
-        Debug.Log($"[GameRunBootstrapper] 챕터 전환 진입 완료 → Chapter {(int)ResolveCurrentChapter()}");
+        // 던전(StartProcGenRunAsync)은 대기방 출구 게이트(StartRoomGate) 통과 시 시작된다.
+        Debug.Log($"[GameRunBootstrapper] 챕터 {(int)ResolveCurrentChapter()} 대기방 진입");
     }
 
     private static RunMetaSnapshot BuildMetaFromSave(RunSaveData save)
@@ -2570,7 +2595,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
     private async UniTask<PlayerController> SpawnPlayerAsync(string prefabKey)
     {
-        // 우선순위: Loadout(Wisp 선택) → CharacterDataManager(PrepPanel) → Inspector 기본값(에디터 테스트용)
+        // 우선순위: Loadout(시작방 선택) → CharacterDataManager(PrepPanel) → Inspector 기본값(에디터 테스트용)
         var loadoutKey = AppBootstrapper.Instance?.Loadout?.CharacterPrefabKey;
         if (!string.IsNullOrEmpty(loadoutKey))
             prefabKey = loadoutKey;
