@@ -592,6 +592,14 @@ public class PlayerController : CharacterBase
     /// <summary>이동 회전 슬루를 정지한다(정지/행동 양보 시). 현재 facing을 그대로 유지.</summary>
     public void StopFacingSlew() => _facingSlewActive = false;
 
+    // 스텝 오르기 — 상승 중에는 잠깐 공중 판정이 떠도(groundCheckDistance < 스텝높이) 낙하/공중 상태로
+    // 전이하지 않도록 억제한다. StepClimb가 상승하는 프레임마다 MarkStepClimbing() 갱신.
+    private float _stepClimbUntil;
+    /// <summary>스텝 오르는 중인지(공중/낙하 상태 억제용).</summary>
+    public bool IsStepClimbing => Time.time < _stepClimbUntil;
+    /// <summary>StepClimb 상승 프레임에서 호출 — 짧은 유효시간 동안 IsStepClimbing 유지.</summary>
+    public void MarkStepClimbing() => _stepClimbUntil = Time.time + 0.08f;
+
     //============================================================
     // Unity Lifecycle / Initialization
     //============================================================
@@ -708,8 +716,9 @@ public class PlayerController : CharacterBase
         FreezeRotation();
         ApplyFacing();
 
-        // 계단 오르기: FixedUpdate에서 실행해야 물리 충돌 전 위치 보정이 적용됨
-        if (IsGrounded() && moveDirection.sqrMagnitude > 0.01f)
+        // 계단 오르기: FixedUpdate에서 실행. 상승 중엔 잠깐 공중 판정이 떠도(groundCheckDistance < 스텝높이)
+        // 계속 호출해야 상승이 끊겨 떨어지는 진동을 막는다 → IsGrounded 또는 IsStepClimbing이면 호출.
+        if ((IsGrounded() || IsStepClimbing) && moveDirection.sqrMagnitude > 0.01f)
             MoveAbility?.StepClimb(this, moveDirection.normalized);
     }
 

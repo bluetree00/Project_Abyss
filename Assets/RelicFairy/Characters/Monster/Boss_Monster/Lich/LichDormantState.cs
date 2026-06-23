@@ -72,7 +72,13 @@ public class LichDormantState : IMonsterState
         (ctx.Monster as LichMonster)?.ShowPhase1Form();
         (ctx.Monster as LichMonster)?.TriggerEntranceAtmosphere();
         ctx.Animator?.CrossFade("Appear", 0.1f);
-        UI_BossBark.Show("리치", BossBarkType.BossIntro);
+
+        // 보스 재도전 변형 대사 — 첫 조우/재도전마다 다른 대사("또 왔냐" 컨셉). 미로드 시 "리치" 폴백.
+        string introBark = "리치";
+        var encounterLines = Managers.DialogueData?.GetVisitLines("Lich_Encounter");
+        if (encounterLines != null && encounterLines.Length > 0)
+            introBark = encounterLines[0].text;
+        UI_BossBark.Show(introBark, BossBarkType.BossIntro);
 
         (ctx.Monster as LichMonster)?.StartEncounterRecord();
     }

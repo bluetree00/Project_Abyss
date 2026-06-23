@@ -5,7 +5,9 @@ using Cysharp.Threading.Tasks;
 
 public class UIManager
 {
-    int _order = 10;
+    // 팝업 정렬 베이스. Canvas_HUD(100)보다 위, Canvas_Overlay(2000)보다 아래에 위치해야
+    // 팝업/대사가 HUD 위에, 토스트·로딩·페이드(Overlay) 아래에 렌더된다.
+    int _order = 200;
 
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
     UI_Scene _menuUI = null;

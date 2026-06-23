@@ -464,6 +464,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: ForestGuardian
       objectReference: {fileID: 0}
+    - target: {fileID: 3107424503361241529, guid: 453ef7639b7bc764ab71f1ee6dde7794,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3695359105475421212, guid: 453ef7639b7bc764ab71f1ee6dde7794,
         type: 3}
       propertyPath: m_LocalPosition.x
