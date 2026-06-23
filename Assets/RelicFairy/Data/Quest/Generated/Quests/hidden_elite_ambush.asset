@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7ad26eea9c2be342ae3bca63118ad71, type: 3}
+  m_Name: hidden_elite_ambush
+  m_EditorClassIdentifier: Assembly-CSharp::Quest
+  category: {fileID: 11400000, guid: e80ec1002c6239a42977fb8300370ba5, type: 2}
+  icon: {fileID: 0}
+  codeName: hidden_elite_ambush
+  displayName: "\uC608\uAE30\uCE58 \uBABB\uD55C \uC2B5\uACA9"
+  description: "\uC81C\uD55C \uC2DC\uAC04 \uB0B4\uC5D0 \uC815\uC608\uB97C \uCC98\uCE58\uD558\uB77C"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: 2933de92331fd064881619f0ab8315f3, type: 2}
+  rewards:
+  - {fileID: 11400000, guid: 0193205e3250d984e874455a61583f2c, type: 2}
+  useAutoCompletion: 1
+  isCancelable: 0
+  isSavable: 0
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 2
+  acceptFeedbackId: Quest_HiddenAmbush_Start
+  completeFeedbackType: 2
+  completeFeedbackId: Quest_HiddenAmbush_Clear
+  timeLimit: 20

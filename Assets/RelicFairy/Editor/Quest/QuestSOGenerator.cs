@@ -88,6 +88,13 @@ public static class QuestSOGenerator
                 bool   autoComplete = ParseBool(cols[10], true);
                 bool   savable      = ParseBool(cols[11], true);
 
+                // 피드백(등장/완료 연출) — 선택 컬럼(idx 14~17), 없으면 None/빈문자
+                string acceptTypeStr   = cols.Count >= 15 ? cols[14].Trim() : "";
+                string acceptId        = cols.Count >= 16 ? cols[15].Trim() : "";
+                string completeTypeStr = cols.Count >= 17 ? cols[16].Trim() : "";
+                string completeId      = cols.Count >= 18 ? cols[17].Trim() : "";
+                float  timeLimit       = cols.Count >= 19 ? ParseFloat(cols[18], 0f) : 0f;
+
                 if (string.IsNullOrEmpty(codeName))
                 {
                     Debug.LogWarning($"[QuestSOGenerator] Line {i + 1}: codeName 없음 — 건너뜀.");
@@ -103,7 +110,8 @@ public static class QuestSOGenerator
                 var task     = CreateTask(codeName, description, category, action, target, needCount);
                 var reward   = CreateReward(codeName, rewardType, rewardAmt);
                 var quest    = CreateQuest(codeName, displayName, description, category, task, reward,
-                                           autoComplete, savable, isAchievement);
+                                           autoComplete, savable, isAchievement,
+                                           acceptTypeStr, acceptId, completeTypeStr, completeId, timeLimit);
 
                 createdByCode[codeName] = quest;
                 string afterCode = cols.Count >= 14 ? cols[13].Trim() : "";
@@ -236,7 +244,9 @@ public static class QuestSOGenerator
 
     private static Quest CreateQuest(string codeName, string displayName, string description,
                                      Category category, Task task, Reward reward,
-                                     bool autoComplete, bool savable, bool isAchievement)
+                                     bool autoComplete, bool savable, bool isAchievement,
+                                     string acceptType, string acceptId,
+                                     string completeType, string completeId, float timeLimit)
     {
         string folder = isAchievement ? "Achievements" : "Quests";
         string path = $"{kOutputRoot}/{folder}/{Sanitize(codeName)}.asset";
@@ -252,6 +262,12 @@ public static class QuestSOGenerator
         s.FindProperty("useAutoCompletion").boolValue    = autoComplete;
         s.FindProperty("isSavable").boolValue            = savable;
         s.FindProperty("isCancelable").boolValue         = false;
+
+        s.FindProperty("acceptFeedbackType").enumValueIndex   = ParseFeedbackType(acceptType);
+        s.FindProperty("acceptFeedbackId").stringValue        = acceptId;
+        s.FindProperty("completeFeedbackType").enumValueIndex = ParseFeedbackType(completeType);
+        s.FindProperty("completeFeedbackId").stringValue      = completeId;
+        s.FindProperty("timeLimit").floatValue                = timeLimit;
 
         // TaskGroup[] (직렬화 중첩 클래스) — 1그룹 1태스크 배선
         var groupsProp = s.FindProperty("taskGroups");
@@ -324,6 +340,20 @@ public static class QuestSOGenerator
 
     private static bool ParseBool(string s, bool fallback)
         => bool.TryParse(s.Trim(), out bool v) ? v : fallback;
+
+    private static float ParseFloat(string s, float fallback)
+        => float.TryParse(s.Trim(), out float v) ? v : fallback;
+
+    // QuestFeedbackType enum 인덱스(None=0, Text=1, Dialogue=2)
+    private static int ParseFeedbackType(string s)
+    {
+        switch (s.Trim().ToLowerInvariant())
+        {
+            case "dialogue": return 2;
+            case "text":     return 1;
+            default:         return 0;
+        }
+    }
 
     private static string Sanitize(string s)
     {

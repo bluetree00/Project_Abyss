@@ -52,6 +52,10 @@ public sealed class CovenantPickup : MonoBehaviour
 
         _taken = true;
         loadout.AddCovenant(selectedId);
+
+        // 퀘스트: 서약 획득 보고 (베이스캠프 픽업 시점 — 실제 적용은 던전 진입 TryAdd에서)
+        QuestEvents.Report("Covenant", selectedId);
+
         Debug.Log($"[CovenantPickup] 서약 예약: {selectedId}");
 
         if (!string.IsNullOrEmpty(acquireVfxKey))

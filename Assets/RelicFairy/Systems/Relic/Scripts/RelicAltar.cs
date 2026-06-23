@@ -79,6 +79,10 @@ public class RelicAltar : MonoBehaviour
         // 허브에서 바로 유물 스킬을 테스트할 수 있고, 다른 유물로 바꾸면 중첩 없이 교체된다.
         s_selected = this;
         AppBootstrapper.Instance?.Loadout?.SetRelic(relicClass);
+
+        // 퀘스트: 유물 획득 보고 (CombatGirl 제단 경로)
+        QuestEvents.Report("Relic", relicClass.DisplayName);
+
         Debug.Log($"[RelicAltar] 유물 선택: {relicClass.DisplayName} ({relicClass.Id})");
 
         BaseCampBootstrapper.Instance?.RespawnWithLoadout();

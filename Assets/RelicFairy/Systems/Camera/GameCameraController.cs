@@ -21,17 +21,11 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private float fadeInStart = 0.2f;
     [SerializeField] private float fadeInDuration = 1.5f;
 
-    [Header("Wisp FreeLook 오빗 (스타트 방 전용)")]
-    [SerializeField] private Vector2 wispOrbitTop    = new Vector2(15f,  5f);   // x=height, y=radius
-    [SerializeField] private Vector2 wispOrbitMiddle = new Vector2(10f,  6f);
-    [SerializeField] private Vector2 wispOrbitBottom = new Vector2(5f,   5f);
-
     [Header("Start Room Tour (방 둘러보기 패닝)")]
     [SerializeField] private float startRoomTourDuration = 4.5f;  // 둘러보기 속도(느릴수록 길게)
     [SerializeField] private float startRoomTourRadius   = 12f;   // 더 안쪽으로 (방 내부 시점)
     [SerializeField] private float startRoomTourHeight   = 6f;    // 천장(약 11.9) 아래 방 내부로
     [SerializeField] private float startRoomTourArc      = 90f; // 좌우 스윕 각도(도)
-    [SerializeField] private float startRoomWispBlendDuration = 1f; // 둘러보기 → Wisp 추적 전환 보간 시간
     [SerializeField] private float startRoomPlayerBlendDuration = 1.2f; // 둘러보기 → 플레이어(CombatGirl) 추적 전환 보간 시간
 
     [Header("Start Room Tour 시네마틱 프레임 (레터박스)")]
@@ -253,69 +247,9 @@ public class GameCameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// 스타트 방(Wisp) 진입 시 호출.
-    /// 검정 오버레이를 즉시 제거하고 Cinemachine이 Wisp를 추적하도록 설정한다.
-    /// </summary>
-    public void ActivateForStartRoom(Transform wispTarget)
-    {
-        if (_introStarted) return;
-        _introStarted = true;
-
-        if (_cinemachine == null)
-            _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
-        if (_brain == null)
-            _brain = GetComponent<CinemachineBrain>();
-
-        if (_fadeCanvas != null)
-        {
-            Destroy(_fadeCanvas.gameObject);
-            _fadeCanvas = null;
-            _fadeOverlay = null;
-        }
-
-        if (wispTarget != null && _cinemachine != null)
-        {
-            // 플레이어 오빗 저장 후 Wisp 전용 값으로 교체
-            _savedOrbits = new CinemachineFreeLook.Orbit[]
-            {
-                _cinemachine.m_Orbits[0],
-                _cinemachine.m_Orbits[1],
-                _cinemachine.m_Orbits[2],
-            };
-            _cinemachine.m_Orbits[0] = new CinemachineFreeLook.Orbit { m_Height = wispOrbitTop.x,    m_Radius = wispOrbitTop.y    };
-            _cinemachine.m_Orbits[1] = new CinemachineFreeLook.Orbit { m_Height = wispOrbitMiddle.x, m_Radius = wispOrbitMiddle.y };
-            _cinemachine.m_Orbits[2] = new CinemachineFreeLook.Orbit { m_Height = wispOrbitBottom.x, m_Radius = wispOrbitBottom.y };
-
-            _cinemachine.Follow = wispTarget;
-            _cinemachine.LookAt = wispTarget;
-
-            // 즉시 스냅 대신 둘러보기 종료 포즈에서 Wisp 추적 시점으로 부드럽게 보간
-            BlendToWispAsync(this.GetCancellationTokenOnDestroy()).Forget();
-        }
-        else if (wispTarget != null)
-        {
-            transform.position = wispTarget.position + _originalPosition;
-            transform.rotation = _originalRotation;
-            Debug.LogWarning("[GameCameraController] CinemachineFreeLook not found. Using direct camera fallback for Wisp.");
-            if (_brain != null) _brain.enabled = true;
-        }
-        else if (_brain != null)
-        {
-            _brain.enabled = true;
-        }
-    }
-
-    /// <summary>둘러보기 종료 포즈에서 Wisp 추적 시점으로 보간 (ActivateForStartRoom에서 fire-and-forget).</summary>
-    private async UniTaskVoid BlendToWispAsync(CancellationToken ct)
-    {
-        try { await BlendToActiveCameraAsync(startRoomWispBlendDuration, ct); }
-        catch (OperationCanceledException) { }
-    }
-
-    /// <summary>
     /// 현재(수동) 카메라 포즈에서 활성 Cinemachine 시점으로 수동 보간한 뒤 제어권을 인계한다.
     /// Brain을 끈 채 매 프레임 vcam의 해석 포즈(FinalPosition/Orientation)를 갱신·추종하므로
-    /// 타깃(Wisp/플레이어)이 움직여도 끝점이 어긋나지 않는다. 호출 전 Follow/LookAt·오빗을 설정할 것.
+    /// 타깃(플레이어)이 움직여도 끝점이 어긋나지 않는다. 호출 전 Follow/LookAt·오빗을 설정할 것.
     /// </summary>
     private async UniTask BlendToActiveCameraAsync(float duration, CancellationToken ct)
     {
@@ -564,14 +498,14 @@ public class GameCameraController : MonoBehaviour
 
     /// <summary>
     /// 스타트 방 캐릭터 선택 직후 호출. Cinemachine이 이미 player를 추적 중인 상태에서
-    /// Brain을 끄고 현재 위치(Wisp 근처)에서 player 쪽으로 줌인 후 Cinemachine 복귀.
+    /// Brain을 끄고 현재 위치에서 player 쪽으로 줌인 후 Cinemachine 복귀.
     /// _introStarted 상태와 무관하게 실행되며 OnIntroComplete는 발생시키지 않는다.
     /// </summary>
     public async UniTaskVoid PlayStartRoomIntroAsync(Transform target)
     {
         if (this == null || target == null) return;
 
-        // Wisp 오빗으로 덮어썼던 플레이어 오빗 복원 — resolved 포즈가 플레이어 시점이 되도록 보간 전에 먼저
+        // 저장된 플레이어 오빗이 있으면 복원 — resolved 포즈가 플레이어 시점이 되도록 보간 전에 먼저
         if (_savedOrbits != null && _cinemachine != null)
         {
             _cinemachine.m_Orbits[0] = _savedOrbits[0];
@@ -585,7 +519,7 @@ public class GameCameraController : MonoBehaviour
             _cinemachine.LookAt = target;
         }
 
-        // Wisp 전환과 동일하게 실제 Cinemachine 해석 포즈로 수렴 (고정 오프셋 스냅 제거 → 핸드오프 튐 없음)
+        // 실제 Cinemachine 해석 포즈로 수렴 (고정 오프셋 스냅 제거 → 핸드오프 튐 없음)
         try { await BlendToActiveCameraAsync(introDuration, this.GetCancellationTokenOnDestroy()); }
         catch (OperationCanceledException) { }
     }
@@ -593,7 +527,7 @@ public class GameCameraController : MonoBehaviour
     /// <summary>
     /// 시작방(허브) 진입 시 방 내부를 천천히 둘러보는 패닝 연출.
     /// center를 중심으로 좌우로 호(arc)를 그리며 스윕한다. Cinemachine을 잠시 끄고 수동 이동.
-    /// _introStarted를 건드리지 않으므로 이후 ActivateForStartRoom(Wisp 추적)이 정상 동작한다.
+    /// _introStarted를 건드리지 않으므로 이후 카메라 핸드오프가 정상 동작한다.
     /// </summary>
     public async UniTask PlayStartRoomTourAsync(Vector3 center, CancellationToken ct = default)
     {

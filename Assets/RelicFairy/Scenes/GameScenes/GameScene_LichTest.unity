@@ -93,8 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000000, guid: b4c0603e568daa24a9e74102a6420285,
-    type: 2}
+  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
   m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
@@ -26364,14 +26363,10 @@ MonoBehaviour:
   introDuration: 2.5
   fadeInStart: 0.2
   fadeInDuration: 1.5
-  wispOrbitTop: {x: 17, y: 4}
-  wispOrbitMiddle: {x: 12, y: 5}
-  wispOrbitBottom: {x: 6, y: 4}
   startRoomTourDuration: 4.5
   startRoomTourRadius: 12
   startRoomTourHeight: 6
   startRoomTourArc: 90
-  startRoomWispBlendDuration: 1
   startRoomPlayerBlendDuration: 1.2
   startRoomTourFrameDuration: 0.5
   startRoomTourFrameAspect: 2.39
@@ -26401,6 +26396,11 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  bossOrbitTop: {x: 8, y: 8}
+  bossOrbitMiddle: {x: 5.5, y: 6.5}
+  bossOrbitBottom: {x: 3, y: 5}
+  topDownHeight: 35
+  topDownAscendDuration: 1.2
 --- !u!114 &330585551
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -52473,9 +52473,6 @@ MonoBehaviour:
   - {fileID: 211444737294688988, guid: b301e4af27f588b4294ba3ce4a5c5628, type: 3}
   startGatePrefab: {fileID: 3370721773177374504, guid: 6fbc55cf5fb2d504382e9cc2bb096150,
     type: 3}
-  wispPrefab: {fileID: 6090908717942830731, guid: aa5ed5db87064a74abe5c9c54978eacf,
-    type: 3}
-  wispSpawnHeightOffset: 1.5
   blockPalette: {fileID: 0}
   blockPalettes:
   - {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb, type: 2}
@@ -52493,6 +52490,10 @@ MonoBehaviour:
     type: 3}
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}
+  shopNpcAddressableKey: Shop/ShopNpc
+  shopWeaponSlotFallback: 1
+  shopRerollEnabled: 0
+  shopRerollCost: 50
   clearEndEffectPrefab: {fileID: 8117584988822686635, guid: a61117abe58ca5e4984969cb5c8e33b6,
     type: 3}
   clearEndEffect2Prefab: {fileID: 3606566459220164321, guid: 1f4f93d25102e9f49884560a79fc4185,
@@ -116819,6 +116820,7 @@ MonoBehaviour:
   holdDuration: 1.5
   returnDuration: 1
   bossCloseUpOffset: {x: 0, y: 3, z: -7}
+  bossCloseUpLookOffset: {x: 0, y: 1.5, z: 0}
 --- !u!65 &1493333038
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -143536,7 +143538,6 @@ MonoBehaviour:
   chapter: 0
   bootstrapper: {fileID: 0}
   clearRoomKey: 286
-  returnToStageMapKey: 287
   spawnItemKey: 288
 --- !u!114 &1881724120
 MonoBehaviour:

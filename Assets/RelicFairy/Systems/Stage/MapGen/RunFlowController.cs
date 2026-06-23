@@ -294,6 +294,10 @@ public class RunFlowController : MonoBehaviour
         // 전환 중 컨트롤러 파괴/취소(플레이 종료 등) 가드 — 이후 transform 접근 시 MissingReferenceException 방지
         if (this == null || ct.IsCancellationRequested) return;
 
+        // 방 입장 대사 이벤트 — 보스룸 등 특정 방 진입 시 챕터별/방문변형 대사 재생.
+        await PlayRoomEntryDialogueAsync(plan.kind, ct);
+        if (this == null || ct.IsCancellationRequested) return;
+
         // 출구 문은 봉인(막힘) 상태로 미리 배치, 들어온 입구는 잠금 → 전투 클리어 시 출구만 공개.
         CreateSealedGates();
         if (result.hasEntrance) LockEntrance(result.entrance);
@@ -313,6 +317,25 @@ public class RunFlowController : MonoBehaviour
         // 방 경계 자동저장 (suspend-on-save). 이어하기 재생성 중에는 생략(동일 상태 재저장 방지).
         if (!_resuming)
             SaveRunState(plan, fromEdge, mirrorRoll);
+    }
+
+    /// <summary>방 입장 대사 이벤트. 현재는 보스룸만 — 챕터별 BossRoom_Ch{N}_Enter를 방문변형(첫/반복)으로 재생.</summary>
+    private async UniTask PlayRoomEntryDialogueAsync(RoomPlanKind kind, CancellationToken ct)
+    {
+        if (kind != RoomPlanKind.Boss) return;
+
+        var dlg = Managers.DialogueData;
+        if (dlg == null) return;
+        if (!dlg.IsInitialized) await dlg.InitializeAsync();
+
+        var chapter = GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1;
+        var lines = dlg.GetVisitLines($"BossRoom_Ch{(int)chapter}_Enter");
+        if (lines == null || lines.Length == 0) return;
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+        if (popup == null) return;
+        try { await popup.ShowAsync(lines); }
+        catch (System.OperationCanceledException) { }
     }
 
     /// <summary>현재 방 진입 시점의 런 전체 상태를 로컬에 직렬화한다. 전투 도중이 아닌 방 경계 1회.</summary>
