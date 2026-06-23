@@ -30,6 +30,9 @@ public class ActAttackState : ILayerState<ActState>
     private float _aimCompleteBonus;   // 유도 완료 시 추가 전진 거리 (mapping 값)
     private bool  _bonusApplied;       // 이번 타에 보너스를 이미 반영했는지
 
+    private bool  _hasLungeTarget;     // 에임어시스트가 잡은 적(런지 거리 신뢰 소스) 존재 여부
+    private float _lungeTargetDist;    // 그 적까지의 수평 거리
+
     // ── 회전 Lerp 상태 ──────────────────────────────────────────────────────
     // RotateTowards 방식 — 매 프레임 현재 회전에서 목표로 일정 각속도로 접근.
     // 외부 회전(물리/충돌/넉백) 이 끼어들어도 그 시점의 회전에서 다시 목표로 수렴 (시작점 캐싱 없음).
@@ -38,8 +41,11 @@ public class ActAttackState : ILayerState<ActState>
     private float      _aimRotationDuration;
 
     // ── Lunge 타겟 부스트/정지 파라미터 ───────────────────────────────────
-    private const float LungeTouchBuffer  = 0.6f;   // 몬스터 중심에서 정지할 거리(닿기 전 마진)
-    private const float LungeBoostExtra   = 1.0f;   // 기본 거리에 최대 +N m 까지 부스트 허용
+    private const float LungeStopGap      = 0.3f;   // (SphereCast) 적 표면 앞에서 정지할 마진(캐스트 반경 보정 후 실제 간격)
+    private const float LungeTargetStopGap = 0.85f; // (에임타겟) 적 중심 기준 정지 마진(적 반경+접근 여유 근사)
+    private const float LungeSearchMargin = 0.6f;   // reach 너머까지 적 탐지 여유(이 안의 적이면 reach까지 돌진)
+    private const float LungeBoostExtra   = 1.0f;   // lungeMaxRange 미설정 시 base + 이 값까지 부스트(레거시)
+    private const float LungeTrackMinRadius = 7.0f; // 유도 타겟 탐지 최소 반경 — CSV aim_assist_radius(3~4)가 작아 추적이 안 걸리는 것 방지
     private const float LungeWallBuffer   = 0.4f;   // 벽 앞에서 정지할 거리
     private const float LungeCastRadius   = 0.4f;   // SphereCast 반경
     private const float LungeCastHeight   = 0.5f;   // 캐스트 원점 높이 오프셋(가슴 높이)
@@ -296,13 +302,20 @@ public class ActAttackState : ILayerState<ActState>
     {
         if (baseDist <= 0f || _controller == null) return 0f;
 
-        float maxBoost    = baseDist + LungeBoostExtra;
-        float searchRange = maxBoost + LungeTouchBuffer;
+        // 유도 돌진 사거리: 클립에 lungeMaxRange 설정 시 그 값(전진 지능), 아니면 레거시(base + 1.0).
+        float reach = (_currentMapping != null && _currentMapping.lungeMaxRange > 0f)
+            ? _currentMapping.lungeMaxRange
+            : baseDist + LungeBoostExtra;
+        float searchRange = reach + LungeCastRadius + LungeSearchMargin;
         Vector3 origin    = _controller.transform.position + Vector3.up * LungeCastHeight;
+
+        // 바닥 레이어 제외 — 경사/단차/평지 바닥을 '벽'으로 오인해 런지가 잘리는 것 방지.
+        int groundBits = _controller.CharacterData != null ? _controller.CharacterData.groundLayer.value : 0;
+        int castMask   = ~groundBits;
 
         int count = Physics.SphereCastNonAlloc(
             origin, LungeCastRadius, _stepDir, _lungeCastBuf, searchRange,
-            ~0, QueryTriggerInteraction.Ignore);
+            castMask, QueryTriggerInteraction.Ignore);
 
         float monsterDist = float.PositiveInfinity;
         float wallDist    = float.PositiveInfinity;
@@ -328,9 +341,17 @@ public class ActAttackState : ILayerState<ActState>
 
         float effective = baseDist;
 
-        // 정면 몬스터 발견 — 닿기 전(buffer) 까지, 단 부스트 상한 적용
+        // 적까지 전진 거리 — 두 소스 중 더 멀리(둘 다 같은 표적을 가리킴):
+        //  ① 에임어시스트 타겟(OverlapSphere 기반 — 높이/각도 무관, 신뢰 소스)
+        //  ② 전방 SphereCast 가 직접 잡은 적(정면 직격 보조)
+        float advance = -1f;
+        if (_hasLungeTarget)
+            advance = Mathf.Max(advance, _lungeTargetDist - LungeTargetStopGap);
         if (!float.IsInfinity(monsterDist))
-            effective = Mathf.Clamp(monsterDist - LungeTouchBuffer, 0f, maxBoost);
+            advance = Mathf.Max(advance, monsterDist + LungeCastRadius - LungeStopGap);
+
+        if (advance >= 0f)
+            effective = Mathf.Clamp(advance, 0f, reach);
 
         // 벽이 더 가까우면 벽 앞에서 추가로 캡
         if (!float.IsInfinity(wallDist))
@@ -491,17 +512,25 @@ public class ActAttackState : ILayerState<ActState>
         _currentMapping = TryGetClipMapping(step, action, isAir);
 
         // 목표 회전 계산 — 적용은 RotateTowards 로 매 프레임 (외부 회전 영향에도 자연 수렴)
+        // 동시에 에임어시스트가 고른 적을 받아 런지 거리의 신뢰 소스로 사용(좁은 SphereCast 수직/각도 빗나감 보완).
         if (_currentMapping != null && _currentMapping.useAimAssist)
         {
+            // CSV가 aim_assist_radius를 작게(3~4) 덮어쓰면 추적이 거의 안 걸리므로 최소 반경 보장.
+            float trackRadius = Mathf.Max(_currentMapping.aimAssistRadius, LungeTrackMinRadius);
             _aimTargetRot = _controller.ComputeMouseAimAssistRotation(
-                _currentMapping.aimAssistRadius,
+                trackRadius,
                 _currentMapping.aimAssistConeHalfAngle,
-                _currentMapping.aimAssistStrength);
+                _currentMapping.aimAssistStrength,
+                out var aimEnemy, out var aimDist);
+            _hasLungeTarget  = aimEnemy != null;
+            _lungeTargetDist = aimDist;
             _aimRotationDuration = _currentMapping.aimRotationDuration;
         }
         else
         {
             _aimTargetRot = _controller.ComputeMouseAimAssistRotation(0f, 0f, 0f);
+            _hasLungeTarget  = false;
+            _lungeTargetDist = 0f;
             _aimRotationDuration = _currentMapping != null ? _currentMapping.aimRotationDuration : 0.10f;
         }
 

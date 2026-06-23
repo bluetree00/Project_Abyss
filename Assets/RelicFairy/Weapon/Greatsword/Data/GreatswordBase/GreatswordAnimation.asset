@@ -44,6 +44,7 @@ MonoBehaviour:
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.3
       aimCompleteStepBonus: 0
+      lungeMaxRange: 2.5
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_02
@@ -60,6 +61,7 @@ MonoBehaviour:
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.3
       aimCompleteStepBonus: 0
+      lungeMaxRange: 2.5
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_03
@@ -76,6 +78,7 @@ MonoBehaviour:
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.30
       aimCompleteStepBonus: 0
+      lungeMaxRange: 3
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: QSkill_01
