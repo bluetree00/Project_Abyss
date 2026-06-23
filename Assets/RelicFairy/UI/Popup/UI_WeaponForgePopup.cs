@@ -10,6 +10,8 @@ using UnityEngine.UI;
 /// </summary>
 public class UI_WeaponForgePopup : UI_Popup
 {
+    public override bool BlocksGameplay => true; // 무기 모루 선택 중 시간정지 + 입력잠금
+
     /// <summary>확정 결과. 취소 시 null.</summary>
     public struct ForgeChoice
     {

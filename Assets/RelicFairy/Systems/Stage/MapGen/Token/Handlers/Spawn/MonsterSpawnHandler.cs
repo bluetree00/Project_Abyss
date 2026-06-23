@@ -50,6 +50,10 @@ internal static class MonsterSpawnUtil
         var spawner = go.GetComponent<MonsterSpawner>();
         if (spawner == null) return;
 
+        // 내부 필드 경계 주입 — 스폰이 게이트/복도로 새지 않게 방 안으로 제한
+        if (ctx.FieldBounds.HasValue)
+            spawner.SetFieldBounds(ctx.FieldBounds.Value);
+
         // 웨이브 설정 주입
         if (ctx.SpawnInfos != null && ctx.SpawnInfos.TryGetValue(ctx.Cell, out var info))
         {

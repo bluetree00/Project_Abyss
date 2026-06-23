@@ -83,6 +83,9 @@ public sealed class QuestFeedbackPresenter : MonoBehaviour
                 var lines = dlg?.GetLines(id);
                 if (lines == null || lines.Length == 0) continue;
 
+                // 장비/서약 선택 UI가 열려있으면 닫힐 때까지 대기 후 완료 대사.
+                await Managers.UI.WaitUntilNoBlockingPopupAsync();
+
                 var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
                 if (popup == null) continue;
                 await popup.ShowAsync(lines);

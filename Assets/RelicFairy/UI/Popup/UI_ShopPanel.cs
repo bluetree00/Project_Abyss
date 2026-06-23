@@ -16,6 +16,8 @@ using UnityEngine.UI;
 /// </summary>
 public sealed class UI_ShopPanel : UI_Popup
 {
+    public override bool BlocksGameplay => true; // 상점 이용 중 시간정지 + 입력잠금
+
     private const float WindowW = 1100f;
     private const float WindowH = 880f;
     private static readonly Vector2 CellSize = new(218f, 300f);
