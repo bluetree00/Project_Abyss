@@ -201,7 +201,6 @@ MonoBehaviour:
   actStateDebug: 0
   handTransform: {fileID: 0}
   handTransformLeft: {fileID: 0}
-  _freezeLoopSfx: {fileID: 8300000, guid: 03edcd1bf1c003641b6a22d10c411ee6, type: 3}
 --- !u!1001 &1697851272020990271
 PrefabInstance:
   m_ObjectHideFlags: 0
