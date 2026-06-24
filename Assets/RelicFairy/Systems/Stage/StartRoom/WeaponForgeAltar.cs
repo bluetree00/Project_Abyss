@@ -147,6 +147,9 @@ public class WeaponForgeAltar : MonoBehaviour
         // 마지막 장착(원거리)이 활성화되므로 근접(슬롯0)으로 되돌려 시작
         if (player.WeaponManager != null)
             await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
+
+        // 장착 완료 → 허브에서 전투 HUD 표시(테스트용).
+        UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
     }
 
     // ── World Text / Prompt (RelicAltar 패턴) ─────────────────

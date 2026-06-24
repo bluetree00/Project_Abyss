@@ -36,4 +36,8 @@ public class TokenContext
     public System.Collections.Generic.IReadOnlyDictionary<Vector2Int, MapDataLoader.CellSpawnInfo> SpawnInfos;
     /// <summary>비활성화된 스포너 목록. 입장 연출 후 또는 존 진입 시 re-enable됨.</summary>
     public System.Collections.Generic.List<UnityEngine.MonoBehaviour> DeferredSpawners;
+
+    /// <summary>방 걷기셀들의 월드 AABB(벽/구멍 안쪽으로 inset). TokenParser가 1회 계산.
+    /// MonsterSpawner가 이 경계 안으로만 스폰해 게이트/복도로 새는 것을 막는다. null = 미계산(현행 동작).</summary>
+    public Bounds? FieldBounds;
 }

@@ -27,3 +27,8 @@ MonoBehaviour:
   acceptionConditions: []
   cancelConditions: []
   afterQuest: {fileID: 11400000, guid: 66539ca74a647b641bf0e0b7336ee66c, type: 2}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

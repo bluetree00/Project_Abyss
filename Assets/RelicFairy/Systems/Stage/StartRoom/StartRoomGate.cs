@@ -131,8 +131,7 @@ public class StartRoomGate : MonoBehaviour
     private void OnTriggerExit(Collider other)
     {
         if (_fromZoneIndex != -1) return;
-        if (other.GetComponentInParent<WispController>() == null &&
-            other.GetComponentInParent<PlayerController>() == null) return;
+        if (other.GetComponentInParent<PlayerController>() == null) return;
         if (notReadyIndicator != null) notReadyIndicator.SetActive(false);
     }
 
@@ -215,8 +214,7 @@ public class StartRoomGate : MonoBehaviour
     {
         if (_triggered) return;
 
-        bool isPlayer = other.GetComponentInParent<WispController>() != null ||
-                        other.GetComponentInParent<PlayerController>() != null;
+        bool isPlayer = other.GetComponentInParent<PlayerController>() != null;
 
         if (_fromZoneIndex != -1)
         {
@@ -255,6 +253,9 @@ public class StartRoomGate : MonoBehaviour
         // 스타트 방 게이트: 서약 선택 UI 동안 플레이어 이동 고정
         if (_fromZoneIndex == -1)
         {
+            // 퀘스트: 게이트로 챕터 입장 보고 (target='*')
+            QuestEvents.Report("Gate", "*");
+
             var pc = other.GetComponentInParent<PlayerController>();
             if (pc != null) FreezePlayer(pc);
         }

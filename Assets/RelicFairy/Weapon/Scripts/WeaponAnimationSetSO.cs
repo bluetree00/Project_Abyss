@@ -36,6 +36,8 @@ public class WeaponAnimationSetSO : ScriptableObject
         [Range(0f, 1f)] public float attackStepEndNorm   = 0.40f;
         [Tooltip("유도(Aim Assist) 회전이 목표에 정렬 완료된 순간 추가로 전진할 거리(m). 0 이면 보너스 없음. 정면 적/벽 앞에서는 캡되어 멈춤(관통 안 함).")]
         [Range(0f, 3f)] public float aimCompleteStepBonus = 0f;
+        [Tooltip("유도 돌진 최대 거리(m). >0 이면 정면(콘+이 사거리) 안의 적을 향해 이 거리까지 전진(적 앞에서 정지). base(attackStepDistance)와 분리된 '전진 지능' 사거리. 0 이면 기존(base+1.0) 부스트 사용.")]
+        [Range(0f, 6f)] public float lungeMaxRange = 0f;
 
         [Header("공격 중 입력 반영")]
         [Tooltip("공격 중 이동 입력을 어느 정도 반영할지 (0=완전 정지, 1=평소). 무기/콤보별 기동성 조절.")]

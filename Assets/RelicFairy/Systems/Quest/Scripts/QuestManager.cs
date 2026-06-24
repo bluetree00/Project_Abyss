@@ -26,9 +26,13 @@ public class QuestManager
     public event QuestRegisterHandler onQuestRegistered;
     public event QuestCompletedHandler onQuestCompleted;
     public event QuestCanceledHandler onQuestCanceled;
+    public event QuestCanceledHandler onQuestFailed;
 
     public event QuestRegisterHandler onAchievementRegistered;
     public event QuestCompletedHandler onAchievementCompleted;
+
+    /// <summary>QuestDatabase 주입(Initialize) 완료 시 1회 발행. 비동기 부트스트랩 이후 등록을 거는 소비자용.</summary>
+    public event Action onInitialized;
     #endregion
 
     // Singleton accessor — routed through Managers service locator
@@ -46,6 +50,9 @@ public class QuestManager
     public IReadOnlyList<Quest> CompletedQuests     => _completedQuests;
     public IReadOnlyList<Quest> ActiveAchievements  => _activeAchievements;
     public IReadOnlyList<Quest> CompletedAchievements => _completedAchievements;
+
+    /// <summary>QuestDatabase가 주입돼 RegisterQuest가 가능한 상태인지. (비동기 부트스트랩 완료 신호)</summary>
+    public bool IsInitialized => _questDatabase != null;
 
     public QuestManager()
     {
@@ -66,6 +73,8 @@ public class QuestManager
             foreach (var achievement in _achievementDatabase.Quests)
                 Register(achievement);
         }
+
+        onInitialized?.Invoke();
     }
 
     // ──────────────────────────────────────────────────────────
@@ -136,6 +145,14 @@ public class QuestManager
             if (quest.IsCompltable)
                 quest.Complete();
         }
+    }
+
+    /// <summary>제한 시간 초과 등으로 퀘스트를 실패 처리. 활성 목록에서 제거하고 onQuestFailed 발행(보상/afterQuest 없음).</summary>
+    public void FailQuest(Quest quest)
+    {
+        if (quest == null) return;
+        if (_activeQuests.Remove(quest))
+            onQuestFailed?.Invoke(quest);
     }
 
     public bool ContainInActiveQuests(Quest quest)

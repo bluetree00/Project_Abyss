@@ -112,6 +112,10 @@ public class MonsterSpawner : MonoBehaviour
 
     // 비활성(풀 반환) 또는 null 엔트리는 Purge로 제거
     private readonly List<MonsterBase> _spawnedMonsters = new();
+
+    // 내부 필드 경계(월드 AABB). 설정 시 스폰 후보를 이 안으로 제한 — 게이트/복도로 새는 것 차단.
+    private bool    _hasFieldBounds;
+    private Bounds  _fieldBounds;
     // 스폰 실패한 키는 다시 시도하지 않음 (런타임 캐시)
     private readonly HashSet<string> _disabledKeys = new();
     // 필터 미스 경고는 1회만 출력
@@ -453,6 +457,14 @@ public class MonsterSpawner : MonoBehaviour
         vfx.Play(spawnEffectDuration, spawnEffectScale);
     }
 
+    /// <summary>방 내부 필드 경계(월드 AABB)를 주입한다. 설정되면 스폰 후보가 이 경계 밖(게이트/복도)으로
+    /// 나가지 않도록 클램프 + NavMesh 스냅 후 재검증한다. 미설정(손맵/테스트)이면 기존 동작 유지.</summary>
+    public void SetFieldBounds(Bounds worldBounds)
+    {
+        _fieldBounds    = worldBounds;
+        _hasFieldBounds = true;
+    }
+
     private bool TryGetSpawnPosition(out Vector3 result)
     {
         const int MaxAttempts = 10;
@@ -462,17 +474,40 @@ public class MonsterSpawner : MonoBehaviour
             Vector2 rand2D    = Random.insideUnitCircle * spawnRadius;
             Vector3 candidate = transform.position + new Vector3(rand2D.x, 0f, rand2D.y);
 
+            // 후보를 방 안으로 투영 — 처음부터 경계 밖으로 안 나가게
+            if (_hasFieldBounds)
+                candidate = ClampXZ(candidate, _fieldBounds);
+
             if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, navMeshSampleDistance, NavMesh.AllAreas))
             {
-                result = hit.position;
-                return true;
+                // NavMesh 스냅이 문틈으로 복도에 붙는 경우 차단 — 경계 안일 때만 채택
+                if (!_hasFieldBounds || ContainsXZ(_fieldBounds, hit.position))
+                {
+                    result = hit.position;
+                    return true;
+                }
             }
+        }
+
+        // 폴백: 스포너 자기 위치(방 안 보장)로 스냅 — 스폰 누락 방지
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas))
+        {
+            result = selfHit.position;
+            return true;
         }
 
         Debug.LogWarning("[MonsterSpawner] 유효한 NavMesh 소환 위치를 찾지 못했습니다.", this);
         result = Vector3.zero;
         return false;
     }
+
+    /// <summary>X·Z만 경계 안으로 클램프(Y는 유지).</summary>
+    private static Vector3 ClampXZ(Vector3 p, Bounds b)
+        => new Vector3(Mathf.Clamp(p.x, b.min.x, b.max.x), p.y, Mathf.Clamp(p.z, b.min.z, b.max.z));
+
+    /// <summary>X·Z 경계 포함 여부(Y 무시).</summary>
+    private static bool ContainsXZ(Bounds b, Vector3 p)
+        => p.x >= b.min.x && p.x <= b.max.x && p.z >= b.min.z && p.z <= b.max.z;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 에디터 Gizmo

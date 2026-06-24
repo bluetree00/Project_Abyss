@@ -15,7 +15,7 @@ MonoBehaviour:
   steps:
   - stepIndex: 0
     order: 0
-    baseDamage: 18
+    baseDamage: 3
     knockbackMultiplier: 1.2
     selfMovement: {x: 0, y: 0, z: 0.8}
     effect:
@@ -45,7 +45,7 @@ MonoBehaviour:
     rotateToMouse: 1
   - stepIndex: 1
     order: 0
-    baseDamage: 20
+    baseDamage: 4
     knockbackMultiplier: 1.3
     selfMovement: {x: 0, y: 0, z: 0.6}
     effect:
@@ -75,7 +75,7 @@ MonoBehaviour:
     rotateToMouse: 1
   - stepIndex: 2
     order: 0
-    baseDamage: 25
+    baseDamage: 5
     knockbackMultiplier: 1.8
     selfMovement: {x: 0, y: 0, z: 1.2}
     effect:

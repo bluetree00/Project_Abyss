@@ -201,6 +201,21 @@ public sealed class AddressableManager
         return result;
     }
 
+    /// <summary>Addressable 키에 대응하는 위치가 존재하는지 예외 없이 확인. 커스텀 아레나 등 옵셔널 에셋 폴백용.</summary>
+    public async UniTask<bool> KeyExistsAsync(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return false;
+
+        await EnsureInitializedAsync();
+
+        var locHandle = Addressables.LoadResourceLocationsAsync(key);
+        await locHandle.ToUniTask();
+        bool exists = locHandle.Status == AsyncOperationStatus.Succeeded
+                      && locHandle.Result != null && locHandle.Result.Count > 0;
+        Addressables.Release(locHandle);
+        return exists;
+    }
+
     // -------------------------
     // Instantiate (캐시 X, 인스턴스 추적 O)
     // -------------------------

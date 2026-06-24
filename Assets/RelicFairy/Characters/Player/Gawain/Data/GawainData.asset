@@ -23,8 +23,8 @@ MonoBehaviour:
   comboDuration: 3
   heavyAttackChargeThreshold: 1.5
   heavyAttackReleaseTime: 0.4
-  dashSpeed: 15
-  dashDuration: 0.2
+  dashSpeed: 22
+  dashDuration: 0.18
   dodgeCooldown: 1.5
   jumpForce: 9
   gravity: -28
