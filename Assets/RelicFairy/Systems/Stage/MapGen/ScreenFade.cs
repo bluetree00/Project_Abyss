@@ -62,6 +62,9 @@ public static class ScreenFade
     private static async UniTask FadeTo(float target, float duration, CancellationToken ct)
     {
         Ensure();
+        // 알파 페이드(Out/In)는 항상 검정 암전 — 직전 방향성 와이프(Slide)가 _img.color에 남긴
+        // 방 종류색(예: 보스방 어두운 빨강)을 물려받아 빨갛게 페이드되는 누수를 차단.
+        _img.color = Color.black;
         var rt = _img.rectTransform;
         rt.anchorMin = FullMin; rt.anchorMax = FullMax; rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
         _cg.blocksRaycasts = target > 0.5f;

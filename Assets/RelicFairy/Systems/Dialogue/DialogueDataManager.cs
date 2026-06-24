@@ -70,6 +70,38 @@ public class DialogueDataManager
 
     public bool HasSequence(string sequenceId) => _sequences.ContainsKey(sequenceId);
 
+    /// <summary>
+    /// 방문 횟수 기반 변형 대사 선택(로그라이크 반복 재미). 호출 시 방문 횟수를 1 증가(PlayerPrefs 영속).
+    /// 첫 방문(count 0) → <c>{baseKey}_First</c>(없으면 baseKey), 재방문 → <c>{baseKey}_R*</c> 중 랜덤(없으면 First/base).
+    /// 예: GetVisitLines("Chapter1_Enter"), GetVisitLines("Lich_Encounter").
+    /// </summary>
+    public DialogueLine[] GetVisitLines(string baseKey)
+    {
+        if (string.IsNullOrEmpty(baseKey)) return null;
+
+        string prefsKey = "dlgVisit_" + baseKey;
+        int count = PlayerPrefs.GetInt(prefsKey, 0);
+        PlayerPrefs.SetInt(prefsKey, count + 1);
+
+        if (count == 0)
+            return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+
+        var variants = CollectVariantKeys(baseKey + "_R");
+        if (variants.Count > 0)
+            return GetLines(variants[UnityEngine.Random.Range(0, variants.Count)]);
+
+        return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+    }
+
+    private List<string> CollectVariantKeys(string prefix)
+    {
+        var list = new List<string>();
+        foreach (var key in _sequences.Keys)
+            if (key.StartsWith(prefix, StringComparison.Ordinal))
+                list.Add(key);
+        return list;
+    }
+
     // ─────────────────────────────────────────────────────────
     // Private Methods
     // ─────────────────────────────────────────────────────────

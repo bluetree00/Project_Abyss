@@ -117,10 +117,8 @@ public class BossSpawner : MonoBehaviour
 
         if (placedBoss == null) return;
 
-        // 비활성 상태로 배치된 보스 활성화 (이미 활성 상태면 영향 없음)
-        if (!placedBoss.gameObject.activeSelf)
-            placedBoss.gameObject.SetActive(true);
-
+        // 배치 보스는 비활성 상태로 둔다(프리팹 active off) — 방 빌드 시점에 보이지 않다가 트리거 시 등장.
+        // (디졸브 미사용/자체 등장 보스는 아래 else if 에서 조건부 활성화 → 즉시 활성화로 인한 이중 등장 방지)
         // RoomClearController가 OnDied를 체이닝할 수 있도록 먼저 알림
         SpawnedBoss = placedBoss;
         OnMonsterSpawned?.Invoke(placedBoss);
@@ -131,11 +129,17 @@ public class BossSpawner : MonoBehaviour
         bool hasOwnEntrance = placedBoss is IBossEntrance;
         if (spawnDissolveDuration > 0f && !hasOwnEntrance)
         {
+            // DissolveEffect가 dissolve=1(투명) 세팅 후 활성화하므로 플래시 없이 등장한다(여기서 SetActive 하지 않음).
             DissolveEffect.PlayAppear(
                 placedBoss.gameObject,
                 spawnDissolveDuration,
                 activationToken: placedBoss.ActivationToken,
                 edgeColor: spawnOutlineColor);
+        }
+        else if (!placedBoss.gameObject.activeSelf)
+        {
+            // 디졸브 미사용/자체 등장 보스: 비활성 배치 시 여기서 직접 활성화(보스 미등장 방지).
+            placedBoss.gameObject.SetActive(true);
         }
     }
 

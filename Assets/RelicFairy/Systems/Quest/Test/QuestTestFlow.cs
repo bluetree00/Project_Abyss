@@ -1,73 +1,48 @@
-using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 퀘스트 시스템 테스트 플로우. BaseCamp에 배치.
-/// 진입 시 첫 튜토리얼 퀘스트(유물 획득)를 등록 → afterQuest 체인으로 장비 선택 퀘스트로 이어짐.
-/// 마지막 퀘스트 완료 시 신(God) 완료 대사를 재생한다.
-///
-/// 흐름: [유물 획득] → [장비 선택] → [완료 대사 + 토스트]
+/// 가이드 퀘스트 시작점. BaseCamp에 배치 — 진입 시 첫 가이드 퀘스트를 등록한다.
+/// 이후 진행(afterQuest 체인)은 QuestManager, 등장/완료 대사 연출은 QuestFeedbackPresenter가 담당한다.
+/// 직접 씬 플레이 시 비동기 부트스트랩이 늦으므로 QuestManager.onInitialized로 등록을 건다.
 /// </summary>
 public sealed class QuestTestFlow : MonoBehaviour
 {
     [Header("Quest Codes")]
     [SerializeField] private string firstQuestCode = "tut_acquire_relic";
-    [SerializeField] private string finalQuestCode = "tut_select_equip";
-
-    [Header("완료 대사 (신)")]
-    [SerializeField] private DialogueSequenceSO completionDialogue;
 
     private QuestManager _quest;
-    private CancellationTokenSource _cts;
 
     private void OnEnable()
     {
-        _cts = new CancellationTokenSource();
-
         _quest = Managers.Quest;
-        if (_quest != null)
-            _quest.onQuestCompleted += HandleQuestCompleted;
-    }
+        if (_quest == null) return;
 
-    private void Start()
-    {
-        // QuestManager가 초기화됐다면 첫 퀘스트 등록 (DB 로드는 AppBootstrapper에서 선행)
-        var registered = _quest?.RegisterQuest(firstQuestCode);
-        if (registered == null)
-            Debug.LogWarning($"[QuestTestFlow] '{firstQuestCode}' 등록 실패 — QuestDatabase 초기화 여부 확인.");
+        if (_quest.IsInitialized)
+            TryRegisterFirstQuest();
+        else
+            _quest.onInitialized += HandleQuestManagerInitialized;
     }
 
     private void OnDisable()
     {
         if (_quest != null)
         {
-            _quest.onQuestCompleted -= HandleQuestCompleted;
+            _quest.onInitialized -= HandleQuestManagerInitialized;
             _quest = null;
         }
-
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
     }
 
-    private void HandleQuestCompleted(Quest quest)
+    private void HandleQuestManagerInitialized()
     {
-        if (quest == null || quest.CodeName != finalQuestCode) return;
-        PlayCompletionDialogueAsync(_cts.Token).Forget();
+        if (_quest != null)
+            _quest.onInitialized -= HandleQuestManagerInitialized;
+        TryRegisterFirstQuest();
     }
 
-    private async UniTaskVoid PlayCompletionDialogueAsync(CancellationToken ct)
+    private void TryRegisterFirstQuest()
     {
-        if (completionDialogue == null || completionDialogue.Lines == null || completionDialogue.Lines.Length == 0)
-            return;
-
-        try
-        {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
-            if (popup == null) return;
-            await popup.ShowAsync(completionDialogue);
-        }
-        catch (System.OperationCanceledException) { /* 씬 종료 시 정상 */ }
+        var registered = _quest.RegisterQuest(firstQuestCode);
+        if (registered == null)
+            Debug.LogWarning($"[QuestTestFlow] '{firstQuestCode}' 등록 실패 — 이미 진행/완료 중이거나 DB에 없음.");
     }
 }

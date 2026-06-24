@@ -119,9 +119,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
-  m_Height: 1
+  m_Height: 1.03735
   m_Direction: 1
-  m_Center: {x: 0, y: 0.5, z: 0}
+  m_Center: {x: 0, y: 0.518675, z: 0}
 --- !u!114 &4475776685423486684
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -145,6 +145,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 6395588771770785031}
     m_Modifications:
+    - target: {fileID: 2164510317250172977, guid: babd5fd8b0564e898602d31e29677f4e,
+        type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: e582f2ccaecb19b419516b8915a7c151, type: 2}
     - target: {fileID: 2164510317257406413, guid: babd5fd8b0564e898602d31e29677f4e,
         type: 3}
       propertyPath: m_LocalScale.x
@@ -215,11 +220,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: BatPAMaskTint
       objectReference: {fileID: 0}
-    - target: {fileID: 2164510317250172977, guid: babd5fd8b0564e898602d31e29677f4e,
-        type: 3}
-      propertyPath: m_Controller
-      value: 
-      objectReference: {fileID: 9100000, guid: e582f2ccaecb19b419516b8915a7c151, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

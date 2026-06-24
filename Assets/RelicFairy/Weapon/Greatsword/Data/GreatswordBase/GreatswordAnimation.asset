@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GreatswordAnimation
   m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimationSetSO
   useGuardCharge: 1
-  lightAttackAnimSpeed: 1.4
+  lightAttackAnimSpeed: 0.6
   heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.5
   defaultComboWindowClose: 0.85
@@ -37,13 +37,14 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.35
-      comboWindowClose: 0.85
-      attackEndAt: 0.9
-      attackStepDistance: 1.6
+      comboWindowOpen: 0.25
+      comboWindowClose: 0.35
+      attackEndAt: 0.35
+      attackStepDistance: 0.4
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.55
-      aimCompleteStepBonus: 0.8
+      attackStepEndNorm: 0.3
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 2.5
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_02
@@ -53,13 +54,14 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.35
-      comboWindowClose: 0.85
-      attackEndAt: 0.9
-      attackStepDistance: 1.6
+      comboWindowOpen: 0.25
+      comboWindowClose: 0.35
+      attackEndAt: 0.35
+      attackStepDistance: 0.4
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.55
-      aimCompleteStepBonus: 0.8
+      attackStepEndNorm: 0.3
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 2.5
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: GroundLightAttack_03
@@ -69,13 +71,14 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: 0.9
-      attackStepDistance: 2.8
+      comboWindowOpen: 0.25
+      comboWindowClose: 0.35
+      attackEndAt: 0.35
+      attackStepDistance: 0.6
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.60
-      aimCompleteStepBonus: 0.8
+      attackStepEndNorm: 0.30
+      aimCompleteStepBonus: 0
+      lungeMaxRange: 3
       moveInputScale: 0.04
       aimAssistRadius: 8
     - baseClipName: QSkill_01

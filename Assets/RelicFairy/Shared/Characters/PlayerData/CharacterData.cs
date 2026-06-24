@@ -77,6 +77,20 @@ public class CharacterData : ScriptableObject
     [Tooltip("낙하(점프 아님) 진입 시 발밑 낙하 높이가 이 값(m) 미만이면 추락/착지 애니를 생략하고 로코모션 유지(작은 단차·턱). 이상이면 추락 애니 재생. 0 이하면 기본 0.6.")]
     public float minFallAnimHeight = 0.6f;
 
+    [Header("플로팅 캡슐 컨트롤러 (실험 · 기본 off)")]
+    [Tooltip("켜면 접지/계단을 스프링-호버로 처리(StepClimb 대체, 위치 강제 없음). 끄면 기존 레이 접지 사용. 콜라이더 바닥을 floatRideHeight만큼 띄워야 발이 지면 안착.")]
+    public bool useFloatingController = false;
+    [Tooltip("캡슐 바닥과 지면 사이 유지 높이(m). 이 이하 단차를 흡수.")]
+    public float floatRideHeight = 0.4f;
+    [Tooltip("호버 스프링 강도(mass 50 기준). 클수록 단단.")]
+    public float floatSpring = 4000f;
+    [Tooltip("호버 댐퍼(진동 억제). 임계감쇠 ≈ 2·√(spring·mass) ≈ mass 50·spring 4000 기준 900.")]
+    public float floatDamper = 900f;
+    [Tooltip("rideHeight 아래로 추가 탐지 거리(m). 단차 하강/리프트 여유.")]
+    public float floatProbeExtra = 0.3f;
+    [Tooltip("계단 하강 스냅 최대 단차(m). 직전 접지 상태에서 이 이하로 지면이 낮아지면 낙하 대신 접지 유지(스프링이 따라 내려감). 이보다 크게 떨어지면 낙하. 즉 보장되는 최소 단차 처리.")]
+    public float floatStepDownDistance = 0.5f;
+
     [Header("물리 이동 관련")]
     public float airControlMultiplier = 0.5f;
     public float groundDrag = 4f;

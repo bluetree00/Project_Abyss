@@ -14,6 +14,14 @@ public enum QuestState
     WaitingForCompletion
 }
 
+/// <summary>퀘스트 이벤트(등장/완료) 시 재생할 피드백 종류. None=없음, Text=가벼운 배너/토스트, Dialogue=대사 팝업.</summary>
+public enum QuestFeedbackType
+{
+    None,
+    Text,
+    Dialogue
+}
+
 [CreateAssetMenu(menuName = "Quest/Quest", fileName = "Quest_")]
 public class Quest : ScriptableObject
 {
@@ -50,6 +58,15 @@ public class Quest : ScriptableObject
     [Header("완료 후 다음 퀘스트가 있다면")]
     [SerializeField] private Quest afterQuest;
 
+    [Header("Feedback (등장/완료 시 연출)")]
+    [SerializeField] private QuestFeedbackType acceptFeedbackType;
+    [SerializeField] private string acceptFeedbackId;
+    [SerializeField] private QuestFeedbackType completeFeedbackType;
+    [SerializeField] private string completeFeedbackId;
+
+    [Header("제한 시간 (초, 0=무제한 — 돌발/타임어택 퀘스트용)")]
+    [SerializeField] private float timeLimit;
+
     private int _currentTaskGroupIndex;
 
     public Category Category => category;
@@ -62,6 +79,12 @@ public class Quest : ScriptableObject
     public TaskGroup CurrentTaskGroup => taskGroups[_currentTaskGroupIndex];
     public IReadOnlyList<TaskGroup> TaskGroups => taskGroups;
     public IReadOnlyList<Reward> Rewards => rewards;
+
+    public QuestFeedbackType AcceptFeedbackType   => acceptFeedbackType;
+    public string            AcceptFeedbackId     => acceptFeedbackId;
+    public QuestFeedbackType CompleteFeedbackType => completeFeedbackType;
+    public string            CompleteFeedbackId   => completeFeedbackId;
+    public float             TimeLimit            => timeLimit;
 
     public bool IsRegistered => State == QuestState.Inactive;
     public bool IsCompltable => State == QuestState.WaitingForCompletion;
@@ -134,10 +157,11 @@ public class Quest : ScriptableObject
         foreach (var reward in rewards)
             reward.Give(this);
 
+        // 완료 이벤트를 afterQuest 등록보다 먼저 발행 → 트래커가 "완료 연출 → 다음 퀘스트 등장" 순서로 처리.
+        onCompleted?.Invoke(this);
+
         if (afterQuest != null)
             QuestManager.Instance?.Register(afterQuest);
-
-        onCompleted?.Invoke(this);
 
         onTaskSuccessChanged = null;
         onCompleted = null;

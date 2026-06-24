@@ -208,6 +208,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     protected override string ConfigAddress => "DragonBossConfig";
+    // ConfigAddress에 '/'가 없어 기본 ServerStatId 추출이 "DragonBossConfig"가 되어 CSV id("DragonBoss")와 불일치 → 명시 지정.
+    protected override string ServerStatId  => "DragonBoss";
     protected override string DataAddress   => null;
     protected override bool   UseWorldHPBar => false;
 

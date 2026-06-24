@@ -49,6 +49,7 @@ public sealed class Managers : MonoBehaviour
     private RuneDataManager _runeDataManager;
     private BuffDataManager _buffDataManager;
     private ChapterDataManager _chapterDataManager;
+    private RunStructureDataManager _runStructureDataManager;
     private CovenantDataManager _covenantDataManager;
     private RelicStatDataManager _relicStatDataManager;
     private RelicAwakeningDataManager _relicAwakeningDataManager;
@@ -289,6 +290,20 @@ public sealed class Managers : MonoBehaviour
                 inst._chapterDataManager = new ChapterDataManager();
 
             return inst._chapterDataManager;
+        }
+    }
+
+    public static RunStructureDataManager RunStructureData
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._runStructureDataManager == null)
+                inst._runStructureDataManager = new RunStructureDataManager();
+
+            return inst._runStructureDataManager;
         }
     }
 

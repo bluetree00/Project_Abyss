@@ -2,14 +2,21 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 시작방 유물 제단. CombatGirl 플레이어가 범위에 들어와 F를 누르면 해당 유물 클래스를
-/// 기존 플레이어에 적용한다(새 스폰 X). 유물 1개 확정형 — 획득 시 다른 제단은 제거.
+/// 시작방 유물 제단. CombatGirl 플레이어가 범위에 들어와 F를 누르면 해당 유물을 선택한다.
+/// 유물 단일 선택(스왑형) — 선택 시 로드아웃에 기록하고 그 제단만 숨긴다. 다른 제단을 선택하면
+/// 이전 선택 제단은 다시 등장(재선택 가능). 실제 유물 효과 적용은 던전 진입 시(지연 적용).
 /// 캐릭터 전시(스폰)와 분리된 별도 오브젝트. (WorldAwakeningAltar 상호작용 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class RelicAltar : MonoBehaviour
 {
     private const float PromptOffsetY = 1.8f;
+
+    // 현재 선택된 유물 제단(단 하나). 다른 제단 선택 시 이전 것을 복귀시키기 위한 공유 상태.
+    private static RelicAltar s_selected;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_selected = null;
 
     [Header("유물")]
     [SerializeField] private RelicClassSO relicClass;
@@ -63,20 +70,42 @@ public class RelicAltar : MonoBehaviour
     private void Claim()
     {
         if (_player == null || relicClass == null) return;
-        _claimed = true;
-        ShowPrompt(false);
+        if (s_selected == this) return; // 이미 선택된 제단 — 무동작
 
-        // 기존 CombatGirl 플레이어에 유물 적용 + 런 유지(전투 존 재스폰 시에도 유지)
-        _player.SetRelicAndApply(relicClass);
+        // 이전 선택 유물 복귀(다시 선택 가능)
+        if (s_selected != null) s_selected.Deselect();
+
+        // 로드아웃에 기록 후, 허브 플레이어를 재스폰해 유물을 클린하게 적용(재스폰-온-스왑).
+        // 허브에서 바로 유물 스킬을 테스트할 수 있고, 다른 유물로 바꾸면 중첩 없이 교체된다.
+        s_selected = this;
         AppBootstrapper.Instance?.Loadout?.SetRelic(relicClass);
 
-        Debug.Log($"[RelicAltar] 유물 획득: {relicClass.DisplayName} ({relicClass.Id})");
+        // 퀘스트: 유물 획득 보고 (CombatGirl 제단 경로)
+        QuestEvents.Report("Relic", relicClass.DisplayName);
 
-        // 유물 1개 확정 — 다른 제단 제거
-        foreach (var altar in FindObjectsByType<RelicAltar>(FindObjectsSortMode.None))
-            if (altar != this) Destroy(altar.gameObject);
+        Debug.Log($"[RelicAltar] 유물 선택: {relicClass.DisplayName} ({relicClass.Id})");
 
-        DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
+        BaseCampBootstrapper.Instance?.RespawnWithLoadout();
+
+        Select();
+    }
+
+    /// <summary>이 유물을 선택 상태로 — 제단을 숨긴다(GO 비활성, 머티리얼 보존).</summary>
+    private void Select()
+    {
+        _claimed = true;
+        _player = null;
+        ShowPrompt(false);
+        gameObject.SetActive(false);
+    }
+
+    /// <summary>선택 해제 — 제단을 디졸브로 다시 등장시켜 재선택 가능하게 한다.</summary>
+    private void Deselect()
+    {
+        _claimed = false;
+        _player = null;
+        ShowPrompt(false);
+        DissolveEffect.PlayAppear(gameObject, 0.5f);
     }
 
     // ── 월드 텍스트 / 프롬프트 (WorldAwakeningAltar 패턴) ──────────────────────
@@ -119,7 +148,7 @@ public class RelicAltar : MonoBehaviour
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
         _promptText.sortingOrder = 11;
         TMPOutlineHelper.ApplyDefault(_promptText);
-        _promptText.text = "<color=#FFD700>[F]</color> 유물 획득";
+        _promptText.text = "<color=#FFD700>[F]</color> 유물 선택";
 
         _promptGo.SetActive(false);
     }

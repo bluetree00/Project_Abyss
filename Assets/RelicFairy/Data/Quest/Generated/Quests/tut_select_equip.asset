@@ -26,4 +26,9 @@ MonoBehaviour:
   isSavable: 0
   acceptionConditions: []
   cancelConditions: []
-  afterQuest: {fileID: 0}
+  afterQuest: {fileID: 11400000, guid: 0dd3f6f57d3da5c40a295a89d6324a7d, type: 2}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 2
+  completeFeedbackId: Quest_TutEquip_Complete
+  timeLimit: 0

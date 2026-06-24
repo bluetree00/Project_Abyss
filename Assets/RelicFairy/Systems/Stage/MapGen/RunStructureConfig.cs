@@ -26,7 +26,7 @@ public struct RunMilestone
 /// 보스는 _bossThreshold(도달 시 보스 어프로치)로 확정되는 별도 마일스톤.
 /// </summary>
 [CreateAssetMenu(fileName = "NewRunStructureConfig", menuName = "Stage/Run Structure Config")]
-public class RunStructureConfig : ScriptableObject
+public class RunStructureConfig : ScriptableObject, IRunStructure
 {
     [Header("보스 진입")]
     [Tooltip("이 방문 수에 도달하면 보스 어프로치(보스 전방→보스) 진입")]

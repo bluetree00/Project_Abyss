@@ -37,6 +37,10 @@ public static class TokenParser
         // 맵 중앙이 parent.position에 오도록 — MapBuilder와 동일한 오프셋
         var offset = new Vector3((gridWidth - 1) * 0.5f * cs, 0f, (gridHeight - 1) * 0.5f * cs);
 
+        // 방 내부 필드 경계(걷기셀 월드 AABB)를 1회 계산 — 스포너가 게이트/복도로 새지 않게 제한.
+        if (baseCtx.FieldBounds == null && baseCtx.Grid != null)
+            baseCtx.FieldBounds = ComputeFieldBounds(baseCtx.Grid, gridWidth, gridHeight, cs, baseY, baseCtx.Parent, offset);
+
         for (int z = 0; z < h; z++)
         {
             var cells = rows[z].Split(',');
@@ -63,6 +67,46 @@ public static class TokenParser
                 handler.Execute(baseCtx);
             }
         }
+    }
+
+    /// <summary>방 그리드의 걷기셀(벽/구멍/천장 제외) 월드 AABB를 계산해 반 셀만큼 inset.
+    /// 셀→월드 매핑은 Execute의 localPos 공식과 동일하게 맞춘다(좌표계 일관성).
+    /// Y는 넓게(±50) 잡아 Contains/ClosestPoint가 X·Z만 사실상 제한하도록 한다.</summary>
+    private static Bounds? ComputeFieldBounds(
+        TileType[,] grid, int gridWidth, int gridHeight, float cs, float baseY, Transform parent, Vector3 offset)
+    {
+        if (parent == null) return null;
+
+        int gw = Mathf.Min(gridWidth, grid.GetLength(0));
+        int gh = Mathf.Min(gridHeight, grid.GetLength(1));
+
+        bool any = false;
+        Vector3 min = Vector3.positiveInfinity;
+        Vector3 max = Vector3.negativeInfinity;
+
+        for (int x = 0; x < gw; x++)
+        for (int gz = 0; gz < gh; gz++)
+        {
+            var t = grid[x, gz];
+            if (t == TileType.Wall || t == TileType.Empty || t == TileType.Ceiling) continue;
+
+            var local = new Vector3(x * cs - offset.x, baseY, gz * cs - offset.z);
+            var world = parent.TransformPoint(local);
+            if (!any) { min = max = world; any = true; }
+            else { min = Vector3.Min(min, world); max = Vector3.Max(max, world); }
+        }
+        if (!any) return null;
+
+        // 벽·문에 딱 붙는 스폰 방지 — X·Z를 반 셀 안쪽으로. 너무 좁아지면 중앙으로 수렴.
+        float inset = cs * 0.5f;
+        min.x += inset; max.x -= inset;
+        min.z += inset; max.z -= inset;
+        if (min.x > max.x) { float m = (min.x + max.x) * 0.5f; min.x = max.x = m; }
+        if (min.z > max.z) { float m = (min.z + max.z) * 0.5f; min.z = max.z = m; }
+
+        var bounds = new Bounds();
+        bounds.SetMinMax(new Vector3(min.x, baseY - 50f, min.z), new Vector3(max.x, baseY + 50f, max.z));
+        return bounds;
     }
 
     private static string[] SplitRows(string gridCsv)

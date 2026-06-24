@@ -28,3 +28,8 @@ MonoBehaviour:
   acceptionConditions: []
   cancelConditions: []
   afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 0
+  completeFeedbackId: 
+  timeLimit: 0

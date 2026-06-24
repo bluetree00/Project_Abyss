@@ -101,7 +101,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.GameScene_Ch1);
     }
 
-    private async UniTask SpawnPlayerAsync(CancellationToken ct)
+    private async UniTask SpawnPlayerAsync(CancellationToken ct, Vector3? overridePos = null, Quaternion? overrideRot = null)
     {
         // 로드아웃에 body 키 등록 — WeaponDisplayStand가 Loadout.IsReady를 요구하고,
         // 던전 진입(StartWaitingRoomAsync→SpawnPlayerAsync)이 이 키로 CombatGirl을 스폰한다.
@@ -114,8 +114,8 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             return;
         }
 
-        Vector3 pos    = playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero;
-        Quaternion rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
+        Vector3 pos    = overridePos ?? (playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero);
+        Quaternion rot = overrideRot ?? (playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity);
 
         var go = Instantiate(prefab, pos, rot);
         var player = go.GetComponent<PlayerController>();
@@ -132,9 +132,70 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // 선택된 유물 적용 (Loadout.Relic 없으면 no-op).
         player.SetRelicAndApply(AppBootstrapper.Instance?.Loadout?.Relic);
 
+        // 장비(무기) 적용 — 허브에서도 장착·테스트 가능하도록 Loadout 무기를 장착.
+        await EquipLoadoutWeaponsAsync(player, ct);
+
+        // 전역 플레이어 등록 — 카메라 오클루전 페이더 등 Managers.Player를 참조하는 시스템이
+        // 허브(런 아님) 씬에서도 플레이어를 잡을 수 있게 한다.
+        Managers.Player?.SetPlayer(player.transform);
+
         // 카메라 인계(HandToGameplayCamera)는 둘러보기 투어 종료 후 Start()에서 수행한다.
         _player = player;
+
+        // 장비/유물 보유 시 전투 HUD 표시(허브 테스트용).
+        UpdateHudForLoadout();
+
         Debug.Log($"[BaseCampBootstrapper] 플레이어 스폰 완료: {playerBodyKey} at {pos}");
+    }
+
+    /// <summary>Loadout에 기록된 무기(슬롯0/1)를 플레이어에 장착한다. 둘 다 없으면 no-op.
+    /// WeaponForgeAltar.EquipChoiceAsync와 동일한 장착 경로(빈 슬롯 순서 장착 → 슬롯0 복귀).</summary>
+    private async UniTask EquipLoadoutWeaponsAsync(PlayerController player, CancellationToken ct)
+    {
+        var lo = AppBootstrapper.Instance?.Loadout;
+        if (lo == null || player == null) return;
+
+        bool any = false;
+        if (lo.WeaponSlot0 != null) { await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot0, player); any = true; }
+        if (lo.WeaponSlot1 != null) { await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot1, player); any = true; }
+        ct.ThrowIfCancellationRequested();
+
+        if (any && player.WeaponManager != null)
+            await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
+    }
+
+    /// <summary>장비/유물 보유 시 전투 HUD를 표시(허브 테스트), 없으면 억제 유지.</summary>
+    private void UpdateHudForLoadout()
+    {
+        var lo = AppBootstrapper.Instance?.Loadout;
+        bool equipped = lo != null && (lo.WeaponSlot0 != null || lo.WeaponSlot1 != null || lo.Relic != null);
+        if (equipped) UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
+    }
+
+    /// <summary>유물 등 로드아웃 변경 후 허브 플레이어를 제자리에서 재스폰해 클린하게 재적용한다
+    /// (유물 핫스왑 시 패시브/컴포넌트 중첩을 피하기 위한 재스폰-온-스왑).</summary>
+    public void RespawnWithLoadout()
+    {
+        RespawnAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private async UniTaskVoid RespawnAsync(CancellationToken ct)
+    {
+        Vector3 pos = _player != null ? _player.transform.position
+                    : (playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero);
+        Quaternion rot = _player != null ? _player.transform.rotation : Quaternion.identity;
+
+        if (_player != null) { Destroy(_player.gameObject); _player = null; }
+
+        try
+        {
+            await SpawnPlayerAsync(ct, pos, rot);
+        }
+        catch (OperationCanceledException) { return; }
+
+        // 재스폰된 플레이어로 게임플레이 카메라 추적 재인계.
+        if (_player != null)
+            GameCameraController.Instance?.HandToGameplayCamera(_player.transform);
     }
 
     /// <summary>베이스캠프 진입 대사 연출. 서버 CSV('StartRoom' 시퀀스) 우선, 없으면 인스펙터 SO 폴백.
