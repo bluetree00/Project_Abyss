@@ -677,6 +677,11 @@ public class PlayerController : CharacterBase
         if (!TryGetComponent<DodgePresentation>(out _))
             gameObject.AddComponent<DodgePresentation>();
 
+        // 검 공격/대시 칼날 트레일(INab Weapon Trail) 구동기 — 동일한 런타임 자동 부착 패턴.
+        // 트레일 프리팹 미할당(무기 SO / CharacterData) 시 무동작.
+        if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
+            gameObject.AddComponent<PlayerWeaponTrailVfx>();
+
         if (inputReady) BindInputActions();
     }
 

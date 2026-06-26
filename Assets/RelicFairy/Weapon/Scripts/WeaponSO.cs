@@ -39,6 +39,10 @@ public class WeaponSO : ScriptableObject
     [Header("Ability Set")]
     public WeaponAbilitySetSO abilitySet;
 
+    [Header("트레일 VFX")]
+    [Tooltip("공격 시 칼날에 표시할 트레일 VFX 프리팹(INab Weapon Trail). 비우면 트레일 스킵. PlayerWeaponTrailVfx가 읽음.")]
+    public GameObject trailVfxPrefab;
+
     [Header("타입 & 정책")]
     public WeaponType weaponType = WeaponType.Katana;
 
