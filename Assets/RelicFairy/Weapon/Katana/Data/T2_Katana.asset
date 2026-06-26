@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T2_Katana_Display
   weaponPrefabKey: T2_Katana_Weapon
-  displayName: "강화된 카타나"
+  displayName: "\uAC15\uD654\uB41C \uCE74\uD0C0\uB098"
   iconKey: T2_KatanaIcon
   icon: {fileID: 21300000, guid: 2e8414774381f0444805c23b0d8bf7a8, type: 3}
   tier: 2
@@ -24,12 +24,15 @@ MonoBehaviour:
   attackSpeed: 2
   attackRange: 0.8
   areaOfEffect: 0.5
+  critChance: 25
+  critDamage: 1.25
   groundEndCount: 3
   airEndCount: 3
   animationSet: {fileID: 11400000, guid: b11c40e7008eefa4a965103378c5ef86, type: 2}
   abilitySet: {fileID: 11400000, guid: ff28d03c9d5f86d46a4e5760ec8135c5, type: 2}
+  trailVfxPrefab: {fileID: 8286214244176697238, guid: 95b1fba5e99ab424991443bc1cc982d0,
+    type: 3}
   weaponType: 4
-  element: 0
   skillQ: {fileID: 11400000, guid: 63acff9af2f34504ab816b94c6d63ebe, type: 2}
   skillE: {fileID: 11400000, guid: f544d79b23e278242b1698613421ec83, type: 2}
   holdThreshold: 1.2
