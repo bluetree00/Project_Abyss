@@ -15,6 +15,7 @@ MonoBehaviour:
   characterName: PlayerCharacter
   baseMoveSpeed: 8
   baseRunSpeed: 8
+  runRampDuration: 1
   maxHealth: 250
   baseMeleeAttack: 45
   baseRangedAttack: 0
@@ -26,6 +27,20 @@ MonoBehaviour:
   dashSpeed: 22
   dashDuration: 0.18
   dodgeCooldown: 1.5
+  dodgeIFrameStartDelay: 0.05
+  dodgeIFrameDuration: 0.3
+  dodgeMomentumBlend: 0
+  dodgeRecoveryWindow: 0
+  dodgeGhostMaterial: {fileID: 0}
+  dodgeGhostInterval: 0.05
+  dodgeGhostLifetime: 0.25
+  dodgeGhostColor: {r: 0.4, g: 0.7, b: 1, a: 0.6}
+  dodgeIFrameTint: {r: 0, g: 0, b: 0, a: 0}
+  dodgeIFrameTintEmission: 1.5
+  dodgeDustVfxPrefab: {fileID: 0}
+  dodgeDustHeightOffset: 0.05
+  dashTrailVfxPrefab: {fileID: 8511224677645706110, guid: dd506520638422b488b79ab9ee75186f,
+    type: 3}
   jumpForce: 9
   gravity: -28
   fallMultiplier: 2
@@ -34,9 +49,23 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
+  minFallAnimHeight: 0.6
+  useFloatingController: 0
+  floatRideHeight: 0.4
+  floatSpring: 4000
+  floatDamper: 900
+  floatProbeExtra: 0.3
+  floatStepDownDistance: 0.5
   airControlMultiplier: 0.5
   groundDrag: 4
   airDrag: 0.5
+  moveAccel: 90
+  moveDecel: 110
+  reverseAccelMultiplier: 1.75
+  initialBoost: 0
+  turnSpeedDegPerSec: 720
+  sharpTurnMoveSlowdown: 0
+  sharpTurnAngle: 135
   conClass: 0
   portrait: {fileID: 0}
   rosterIllust: {fileID: 21300000, guid: 5752829a159ee2f4a9f7b48d3cc16242, type: 3}
