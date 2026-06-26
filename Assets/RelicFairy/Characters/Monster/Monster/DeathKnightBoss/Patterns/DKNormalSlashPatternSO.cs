@@ -127,13 +127,13 @@ public class DKNormalSlashState : FullLockState<DKNormalSlashPatternSO>
                 DKGridPatternHelper.SpawnSingleRowVfx(Data.impactVfxPrefab, rowZ, _swordColor);
                 DKGridPatternHelper.TriggerSingleRowDamage(
                     ctx, rowZ, Data.damageMultiplier, Data.knockbackMultiplier);
+                // 행마다 Sword Slash 15 이펙트 위치에서 재생 — 거리 감쇄로 먼 행은 자연스럽게 작게 들림.
+                // 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+                Vector3 rowSoundPos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f);
+                Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, rowSoundPos, startTime: 0.5f);
                 // §3 타격감 — 첫 행에서 히트스톱, 이후 행은 쉐이크만
                 if (_rowIndex == 0)
-                {
                     BossImpactFeedback.TriggerHitStop(0.08f);
-                    // 첫 Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
-                    Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
-                }
                 BossImpactFeedback.TriggerCameraShake(0.1f, 0.2f);
                 _rowIndex++;
             }

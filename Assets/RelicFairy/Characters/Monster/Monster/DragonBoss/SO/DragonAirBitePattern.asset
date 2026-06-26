@@ -52,6 +52,7 @@ MonoBehaviour:
   _warningMarkerLifetime: 0.9
   _warningMarkerHeightOffset: 0.18
   _endPoseDuration: 0.4
+  _biteSfx: {fileID: 8300000, guid: 0e31af901937f4c4abd3e8e8cf14a745, type: 3}
   _takeoffStateName: Takeoff
   _airChaseStateName: AirChase
   _airChaseLeftStateName: AirChaseLeft

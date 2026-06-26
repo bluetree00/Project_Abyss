@@ -23,13 +23,19 @@ MonoBehaviour:
   breakOverride: -1
   _breathStartStateName: UAttack FireBreath L
   _breathLoopStateName: UAttack FireBreath Loop
+  _backStateName: Back
+  _backDuration: 0.35
+  _backStepDistance: 1
   _prepareDuration: 2
   _breathDuration: 5
   _rotateSpeedPrepare: 70
   _rotateSpeedBreath: 35
-  _breathRange: 24
+  _breathRange: 100
   _breathRadius: 0.8
   _breathDamagePerSec: 20
+  _rangeStartRatio: 0.3
+  _rangeGrowDuration: 2
+  _vfxReferenceLength: 8
   _breathEffectPrefab: {fileID: 189272, guid: a99a0208643f5f048be748ca15ce6eb1, type: 3}
   _warningEffectPrefab: {fileID: 0}
   _breathSfx: {fileID: 8300000, guid: fb00b1c11a5aad4438670d7530866a66, type: 3}

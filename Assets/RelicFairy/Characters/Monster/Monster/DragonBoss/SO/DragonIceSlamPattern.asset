@@ -12,6 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a77315dc4b65f1418de3b12f612e192, type: 3}
   m_Name: DragonIceSlamPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonIceSlamPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   weight: 13
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
@@ -27,6 +31,8 @@ MonoBehaviour:
     type: 3}
   _dangerZoneScale: 4.5
   _dangerZoneHeightOffset: 0.1
+  _arenaFitPadding: 0.15
+  _warningOutlineWidth: 0.18
   _icePillarPrefab: {fileID: 6530448752386012335, guid: c3467a660c4fd4f429b33f697302408c,
     type: 3}
   _pillarCount: 8
@@ -38,6 +44,7 @@ MonoBehaviour:
   _slamEffectPrefab: {fileID: 96566848741554304, guid: c5809d1ce520247448f43b81810d55de,
     type: 3}
   _slamEffectScale: 5
+  _slamSfx: {fileID: 8300000, guid: 0c0623ff0510b8d4598a8825a338dad6, type: 3}
   _takeoffStateName: Takeoff
   _airChaseStateName: AirChase
   _flyDownStateName: URFly Down

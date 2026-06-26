@@ -36,6 +36,7 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [SerializeField] private float _slamRadius = 7f;
     [SerializeField] private GameObject _slamEffectPrefab;
     [SerializeField] private float _slamEffectScale = 4f;
+    [SerializeField] private AudioClip _slamSfx;
 
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
@@ -63,6 +64,7 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public float       SlamRadius              => _slamRadius;
     public GameObject  SlamEffectPrefab        => _slamEffectPrefab;
     public float       SlamEffectScale         => _slamEffectScale;
+    public AudioClip   SlamSfx                 => _slamSfx;
     public string      TakeoffStateName        => _takeoffStateName;
     public string      AirChaseStateName       => _airChaseStateName;
     public string      FlyDownStateName        => _flyDownStateName;
@@ -304,6 +306,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
         CleanupPillars();
         ApplySlamDamage(ctx);
         SpawnSlamEffect(ctx);
+        Managers.Sound?.PlayEffectAt(Data.SlamSfx, ctx.Transform.position);
     }
 
     // ── Effects ──────────────────────────────────────────────────────────────
