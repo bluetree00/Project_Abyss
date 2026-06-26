@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: VolumetricBlood2
-  m_Shader: {fileID: 4800000, guid: ae42f9236360a314c94b1f280583b096, type: 3}
+  m_Shader: {fileID: 4800000, guid: b85d6def27a1d1041b93e3045d7d6c0f, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
