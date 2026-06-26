@@ -14,6 +14,11 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private string _breathStartStateName = "UAttack FireBreath L";
     [SerializeField] private string _breathLoopStateName  = "UAttack FireBreath Loop";
 
+    [Header("Back 모션 (브레스 시작 전 후퇴)")]
+    [SerializeField] private string _backStateName    = "Back";
+    [SerializeField] private float  _backDuration     = 0.35f;
+    [SerializeField] private float  _backStepDistance = 1f;
+
     [Header("타이밍")]
     [SerializeField] private float _prepareDuration = 2f;
     [SerializeField] private float _breathDuration  = 5f;
@@ -23,9 +28,18 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private float _rotateSpeedBreath  = 60f;
 
     [Header("브레스 데미지")]
+    [Tooltip("사거리 최대 한도. 맵 경계가 이보다 가까우면 경계까지만 닿는다 — 맵 끝까지 닿게 하려면 맵 크기보다 크게 설정")]
     [SerializeField] private float _breathRange        = 24f;
     [SerializeField] private float _breathRadius       = 0.8f;
     [SerializeField] private int   _breathDamagePerSec = 20;
+
+    [Header("사거리 점진 확장 (브레스 진행에 따라 맵 끝까지 늘어남)")]
+    [Tooltip("브레스 시작 시점 사거리 = 전체 사거리(맵 경계까지) * 이 비율")]
+    [SerializeField] private float _rangeStartRatio   = 0.3f;
+    [Tooltip("시작 비율에서 전체 사거리까지 늘어나는 데 걸리는 시간(초)")]
+    [SerializeField] private float _rangeGrowDuration = 2f;
+    [Tooltip("브레스 VFX 원본 startSpeed(배율 1)로 시각적으로 도달하는 기준 길이(m) — 에디터에서 실측 후 조정")]
+    [SerializeField] private float _vfxReferenceLength = 8f;
 
     [Header("이펙트")]
     [Tooltip("Style 2 - Flamethrower 프리팹")]
@@ -44,6 +58,9 @@ public class DragonGroundBreathPatternSO : BossPatternSO
 
     public string BreathStartStateName  => _breathStartStateName;
     public string BreathLoopStateName   => _breathLoopStateName;
+    public string BackStateName         => _backStateName;
+    public float  BackDuration          => _backDuration;
+    public float  BackStepDistance      => _backStepDistance;
     public float  PrepareDuration       => _prepareDuration;
     public float  BreathDuration        => _breathDuration;
     public float  RotateSpeedPrepare    => _rotateSpeedPrepare;
@@ -51,6 +68,9 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public float  BreathRange           => _breathRange;
     public float  BreathRadius          => _breathRadius;
     public int    BreathDamagePerSec    => _breathDamagePerSec;
+    public float  RangeStartRatio       => _rangeStartRatio;
+    public float  RangeGrowDuration     => _rangeGrowDuration;
+    public float  VfxReferenceLength    => _vfxReferenceLength;
     public GameObject BreathEffectPrefab   => _breathEffectPrefab;
     public GameObject WarningEffectPrefab  => _warningEffectPrefab;
     public AudioClip  BreathSfx            => _breathSfx;
@@ -79,7 +99,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
 
 internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreathPatternSO>
 {
-    private enum Phase { Prepare, Breathing, EndPose, Done }
+    private enum Phase { Back, Prepare, Breathing, EndPose, Done }
 
     private Phase      _phase;
     private float      _timer;
@@ -89,6 +109,20 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     private GameObject  _warningEffect;
     private GameObject  _rangeIndicator;
     private AudioSource _breathAudioSource;
+    private Vector3      _backStartPos;
+    private Vector3      _backForward;
+    private float        _currentRange;
+    private readonly System.Collections.Generic.List<ParticleSystem> _breathParticles = new();
+    private readonly System.Collections.Generic.List<SpeedBase>      _breathBaseSpeed  = new();
+
+    /// <summary>스케일 1(=VfxReferenceLength) 기준 startSpeed 원본값. mode와 무관하게 4개 필드 모두 캐싱 후 동일 배율로 스케일.</summary>
+    private struct SpeedBase
+    {
+        public float Constant;
+        public float ConstantMin;
+        public float ConstantMax;
+        public float CurveMultiplier;
+    }
 
     private const float DamageTick = 0.15f;
 
@@ -97,6 +131,9 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     internal void Reset()
     {
         _phase = Phase.Done;
+        _currentRange = 0f;
+        _breathParticles.Clear();
+        _breathBaseSpeed.Clear();
         StopBreathSfx();
         DestroyEffect(ref _breathEffect);
         DestroyEffect(ref _warningEffect);
@@ -107,7 +144,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase      = Phase.Prepare;
+        _phase      = Phase.Back;
         _timer      = 0f;
         _damageTick = 0f;
 
@@ -115,8 +152,11 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         _mouthBone = FindBone(ctx.Transform, "Jaw");
 
-        PlayAnim(ctx, Data.BreathStartStateName);
-        SpawnWarning(ctx);
+        _backStartPos = ctx.Transform.position;
+        _backForward  = ctx.Transform.forward;
+
+        PlayAnim(ctx, Data.BackStateName);
+        (ctx.Monster as DragonBossMonster)?.PlayWingFlapSfxOnce();
     }
 
     public override void Update(MonsterContext ctx)
@@ -125,10 +165,33 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         switch (_phase)
         {
+            case Phase.Back:      UpdateBack(ctx);      break;
             case Phase.Prepare:   UpdatePrepare(ctx);   break;
             case Phase.Breathing: UpdateBreathing(ctx); break;
             case Phase.EndPose:   UpdateEndPose(ctx);   break;
         }
+    }
+
+    // ── Phase: Back (브레스 전 후퇴) ─────────────────────────────────────────────
+
+    private void UpdateBack(MonsterContext ctx)
+    {
+        float t = Data.BackDuration > 0.0001f ? Mathf.Clamp01(_timer / Data.BackDuration) : 1f;
+        ctx.Transform.position = Vector3.Lerp(
+            _backStartPos, _backStartPos - _backForward * Data.BackStepDistance, t);
+
+        if (_timer < Data.BackDuration) return;
+
+        StartPrepare(ctx);
+    }
+
+    private void StartPrepare(MonsterContext ctx)
+    {
+        _phase = Phase.Prepare;
+        _timer = 0f;
+
+        PlayAnim(ctx, Data.BreathStartStateName);
+        SpawnWarning(ctx);
     }
 
     public override void Exit(MonsterContext ctx)
@@ -166,8 +229,11 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     private void UpdateBreathing(MonsterContext ctx)
     {
         RotateToPlayer(ctx, Data.RotateSpeedBreath);
+
+        UpdateCurrentRange(ctx);
         SyncEffect(_breathEffect, ctx);
-        SyncRangeIndicator(ctx);
+        SyncBreathEffectScale(_breathEffect);
+        SyncRangeIndicator(ctx, _currentRange);
 
         _damageTick += Time.deltaTime;
         if (_damageTick >= DamageTick)
@@ -188,6 +254,64 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
     private void StopBreathSfx()
         => Managers.Sound?.StopEffect(_breathAudioSource, Data.BreathSfx);
+
+    /// <summary>브레스 진행 시간에 따라 사거리를 시작 비율→맵 경계까지 점진적으로 늘린다.</summary>
+    private void UpdateCurrentRange(MonsterContext ctx)
+    {
+        Vector3 mouthPos = GetMouthPos(ctx);
+        float fullRange  = DragonPatternFloorUtils.DistanceToFloorEdge(mouthPos, ctx.Transform.forward, Data.BreathRange);
+        float startRange = fullRange * Mathf.Clamp01(Data.RangeStartRatio);
+        float t = Data.RangeGrowDuration > 0.0001f ? Mathf.Clamp01(_timer / Data.RangeGrowDuration) : 1f;
+        _currentRange = Mathf.Lerp(startRange, fullRange, t);
+    }
+
+    /// <summary>
+    /// localScale은 ScalingMode.Hierarchy라 파티클 크기/모양만 키울 뿐 사거리(속도×수명)는 늘리지 않는다.
+    /// 실제로 더 멀리 뻗어나가게 하려면 startSpeed 자체를 사거리 비율로 스케일해야 한다.
+    /// </summary>
+    private void SyncBreathEffectScale(GameObject go)
+    {
+        if (go == null) return;
+        float reference = Mathf.Max(0.01f, Data.VfxReferenceLength);
+        float factor    = Mathf.Max(0.01f, _currentRange / reference);
+
+        for (int i = 0; i < _breathParticles.Count; i++)
+        {
+            var ps = _breathParticles[i];
+            if (ps == null) continue;
+
+            var main  = ps.main;
+            var speed = main.startSpeed;
+            var baseSpeed = _breathBaseSpeed[i];
+
+            speed.constant        = baseSpeed.Constant * factor;
+            speed.constantMin     = baseSpeed.ConstantMin * factor;
+            speed.constantMax     = baseSpeed.ConstantMax * factor;
+            speed.curveMultiplier = baseSpeed.CurveMultiplier * factor;
+            main.startSpeed = speed;
+        }
+    }
+
+    /// <summary>SpawnBreath 시점 (스케일 1) 의 startSpeed 원본값을 캐싱 — 이후 매 프레임 이 값을 기준으로 배율 적용.</summary>
+    private void CacheBreathParticleBaseSpeeds(GameObject go)
+    {
+        _breathParticles.Clear();
+        _breathBaseSpeed.Clear();
+        if (go == null) return;
+
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var speed = ps.main.startSpeed;
+            _breathParticles.Add(ps);
+            _breathBaseSpeed.Add(new SpeedBase
+            {
+                Constant        = speed.constant,
+                ConstantMin     = speed.constantMin,
+                ConstantMax     = speed.constantMax,
+                CurveMultiplier = speed.curveMultiplier,
+            });
+        }
+    }
 
     // ── 이펙트 ────────────────────────────────────────────────────────────────
 
@@ -211,6 +335,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         _breathEffect = Object.Instantiate(Data.BreathEffectPrefab);
         SyncEffect(_breathEffect, ctx);
         TintEffect(_breathEffect, Data.BreathColor);
+        CacheBreathParticleBaseSpeeds(_breathEffect);
     }
 
     private void SyncEffect(GameObject go, MonsterContext ctx)
@@ -244,7 +369,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         SyncRangeIndicator(ctx);
     }
 
-    private void SyncRangeIndicator(MonsterContext ctx)
+    /// <summary>overrideRange를 주면 그 거리를 그대로 사용 (브레스 중 점진 확장), 없으면 맵 경계까지의 전체 사거리를 사용 (준비 단계 예고).</summary>
+    private void SyncRangeIndicator(MonsterContext ctx, float? overrideRange = null)
     {
         if (_rangeIndicator == null) return;
         var lr = _rangeIndicator.GetComponent<LineRenderer>();
@@ -258,7 +384,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         Vector3 mouthPos = GetMouthPos(ctx);
         float groundY = DragonPatternFloorUtils.GetFloorY(mouthPos, ctx.Runtime.SpawnPosition.y) + 0.05f;
         Vector3 origin = new Vector3(mouthPos.x, groundY, mouthPos.z);
-        float range = DragonPatternFloorUtils.DistanceToFloorEdge(origin, forward, Data.BreathRange);
+        float range = overrideRange ?? DragonPatternFloorUtils.DistanceToFloorEdge(origin, forward, Data.BreathRange);
 
         lr.SetPosition(0, origin);
         lr.SetPosition(1, origin + forward * range);
@@ -362,23 +488,35 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         }
     }
 
+    /// <summary>
+    /// 경고장판(SyncRangeIndicator)과 완전히 동일한 기준(정면 투영 거리 ≤ _currentRange, 수직 거리 ≤ BreathRadius)으로 판정.
+    /// Physics.SphereCast 대신 직접 투영 계산을 사용해 중간 장애물에 막히지 않고, 사거리가 경고장판과 항상 일치한다.
+    /// </summary>
     private void ApplyDamage(MonsterContext ctx)
     {
         if (ctx.Runtime.PlayerTarget == null) return;
 
-        Vector3 mouthPos = GetMouthPos(ctx);
-        float range = DragonPatternFloorUtils.DistanceToFloorEdge(mouthPos, ctx.Transform.forward, Data.BreathRange);
+        Vector3 forward = ctx.Transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) return;
+        forward.Normalize();
+
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - GetMouthPos(ctx);
+        toPlayer.y = 0f;
+
+        float along = Vector3.Dot(toPlayer, forward);
+        if (along < 0f || along > _currentRange) return;
+
+        Vector3 lateral = toPlayer - forward * along;
+        if (lateral.magnitude > Data.BreathRadius) return;
+
+        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()
+                  ?? ctx.Runtime.PlayerTarget.GetComponentInParent<PlayerController>();
+        if (player == null) return;
 
         float dmg = Data.BreathDamagePerSec * DamageTick;
-        if (Physics.SphereCast(mouthPos, Data.BreathRadius,
-                               ctx.Transform.forward, out var hit, range))
-        {
-            var player = hit.collider.GetComponent<PlayerController>()
-                      ?? hit.collider.GetComponentInParent<PlayerController>();
-            if (player == null) return;
-            player.TakeDamage(Mathf.RoundToInt(dmg));
-            Data.StatusEffect?.Apply(player);
-        }
+        player.TakeDamage(Mathf.RoundToInt(dmg));
+        Data.StatusEffect?.Apply(player);
     }
 
     // ── 헬퍼 ─────────────────────────────────────────────────────────────────

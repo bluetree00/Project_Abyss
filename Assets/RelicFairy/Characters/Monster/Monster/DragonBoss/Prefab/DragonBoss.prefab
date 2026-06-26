@@ -189,6 +189,7 @@ MonoBehaviour:
   _footstepPhases:
   - 0
   - 0.5
+  _normalSfx: {fileID: 8300000, guid: 175a8c4e32b658d4aa59696f25de0bb1, type: 3}
 --- !u!1001 &1484152418330750485
 PrefabInstance:
   m_ObjectHideFlags: 0
