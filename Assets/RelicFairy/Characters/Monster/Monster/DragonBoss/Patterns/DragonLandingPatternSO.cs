@@ -123,11 +123,7 @@ internal sealed class DragonLandingState : FullLockState<DragonLandingPatternSO>
     {
         if (!IsAnimNearEnd(ctx, _touchdownHash)) return;
 
-        if (ctx.Agent != null && !ctx.Agent.enabled)
-        {
-            ctx.Agent.enabled = true;
-            ctx.Agent.Warp(ctx.Transform.position);
-        }
+        DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
 
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
             bb.BodyState = BodyState.Grounded;

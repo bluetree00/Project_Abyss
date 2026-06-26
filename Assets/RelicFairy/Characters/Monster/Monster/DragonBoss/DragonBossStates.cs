@@ -155,23 +155,7 @@ public class DragonWalkChaseState : IMonsterState
     }
 
     private static void EnsureAgentReady(MonsterContext ctx)
-    {
-        if (ctx.Agent == null) return;
-        if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
-        if (ctx.Agent.isOnNavMesh) return;
-
-        bool sampled = UnityEngine.AI.NavMesh.SamplePosition(
-            ctx.Transform.position, out var hit, 10f, UnityEngine.AI.NavMesh.AllAreas);
-        if (sampled)
-        {
-            bool warped = ctx.Agent.Warp(hit.position);
-            Debug.Log($"[DragonWalkChase] Warp to {hit.position} warped={warped} isOnNavMesh={ctx.Agent.isOnNavMesh}");
-        }
-        else
-        {
-            Debug.LogWarning($"[DragonWalkChase] NavMesh.SamplePosition FAILED from {ctx.Transform.position}");
-        }
-    }
+        => DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
 
     public void Update(MonsterContext ctx)
     {
@@ -312,16 +296,7 @@ public class DragonRunChaseState : IMonsterState
     }
 
     private static void EnsureAgentReady(MonsterContext ctx)
-    {
-        if (ctx.Agent == null) return;
-        if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
-        if (!ctx.Agent.isOnNavMesh
-            && UnityEngine.AI.NavMesh.SamplePosition(
-                ctx.Transform.position, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
-        {
-            ctx.Agent.Warp(hit.position);
-        }
-    }
+        => DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
 
     public void Update(MonsterContext ctx)
     {
@@ -788,9 +763,7 @@ public class DragonGetHitState : GetHitState
 
         float threshold = dragon != null ? dragon.WalkToRunThreshold : float.MaxValue;
 
-        if (ctx.Runtime.DistToPlayer > ctx.Detection.chaseGiveUpRange)
-            ctx.Monster.ChangeState<PatrolState>();
-        else if (ctx.Runtime.DistToPlayer > threshold)
+        if (ctx.Runtime.DistToPlayer > threshold)
             ctx.Monster.ChangeState<DragonRunChaseState>();
         else
             ctx.Monster.ChangeState<ChaseState>();

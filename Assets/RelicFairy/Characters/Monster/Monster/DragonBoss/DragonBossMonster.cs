@@ -117,6 +117,14 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("UPFly 클립 기준 날개 다운스트로크 시점 (normalizedTime, 20/40 프레임 = 0.5)")]
     [SerializeField] private float _wingFlapPhase = 0.5f;
 
+    [Header("Dragon — 생존감 사운드 (Normal)")]
+    [Tooltip("등장 클로즈업 등에서 \"살아있는 보스\"처럼 들리도록 재생할 사운드 클립")]
+    [SerializeField] private AudioClip _normalSfx;
+    [Tooltip("평시(지상 + 패턴 비활성) 상태에서 Normal 사운드를 재생하는 최소 간격(초)")]
+    [SerializeField] private float _normalSfxIntervalMin = 8f;
+    [Tooltip("평시 상태에서 Normal 사운드를 재생하는 최대 간격(초)")]
+    [SerializeField] private float _normalSfxIntervalMax = 15f;
+
     [Header("Dragon — 발걸음 사운드 (WalkChase/RunChase 계열 전용)")]
     [Tooltip("발걸음마다 랜덤 재생할 사운드 클립 (Walk1~6)")]
     [SerializeField] private AudioClip[] _footstepClips;
@@ -199,6 +207,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     private int              _runRightHash;
     private int              _footstepStateHash;
     private float            _footstepPrevTime;
+    private float            _normalSfxTimer;
+    private float            _normalSfxNextInterval;
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
@@ -327,6 +337,26 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         SyncAirborneHitbox();
         UpdateWingFlapSound();
         UpdateFootstepSound();
+        UpdateNormalSfx();
+    }
+
+    /// <summary>평시(지상 + 패턴 비활성) 상태에서 랜덤 간격으로 Normal 사운드를 재생해 "살아있는 보스" 느낌을 준다.</summary>
+    private void UpdateNormalSfx()
+    {
+        bool idleGrounded = _dragonBB.BodyState == BodyState.Grounded
+            && (_runner == null || !_runner.IsPatternActive);
+        if (!idleGrounded)
+        {
+            _normalSfxTimer = 0f;
+            return;
+        }
+
+        _normalSfxTimer += Time.deltaTime;
+        if (_normalSfxTimer < _normalSfxNextInterval) return;
+
+        _normalSfxTimer = 0f;
+        _normalSfxNextInterval = UnityEngine.Random.Range(_normalSfxIntervalMin, _normalSfxIntervalMax);
+        PlayNormalSfx();
     }
 
     /// <summary>WalkChase/RunChase 계열(좌우 회전 포함) 재생 중, 클립의 발걸음 접지 시점(normalizedTime)을
@@ -374,6 +404,18 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             }
         }
         _footstepPrevTime = currentTime;
+    }
+
+    /// <summary>등장 클로즈업 등 특정 연출 시점에 "살아있는 보스" 느낌의 사운드를 재생한다.</summary>
+    public void PlayNormalSfx()
+        => Managers.Sound?.PlayEffectAt(_normalSfx, transform.position);
+
+    /// <summary>공중 선회 사이클과 무관하게 날개짓 사운드를 한 번 재생한다 (그라운드 브레스 Back 모션 등).</summary>
+    public void PlayWingFlapSfxOnce()
+    {
+        if (_wingFlapClips == null || _wingFlapClips.Length == 0) return;
+        var clip = _wingFlapClips[UnityEngine.Random.Range(0, _wingFlapClips.Length)];
+        Managers.Sound?.PlayEffectAt(clip, transform.position);
     }
 
     /// <summary>AirChase/AirChaseLeft/AirChaseRight 재생 중, UPFly 클립의 다운스트로크 프레임(normalizedTime)을
@@ -457,6 +499,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         _hitStopActive = false;
         _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
         _pendingTriggerEntrance = false;
+        _normalSfxTimer = 0f;
+        _normalSfxNextInterval = UnityEngine.Random.Range(_normalSfxIntervalMin, _normalSfxIntervalMax);
         // pool 재활성: 등장 연출 재진입
         if (_dormantState != null)
             ChangeState(_dormantState);
@@ -548,6 +592,13 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         if (ctx.Runtime.PlayerTarget == null) return false;
         return !IsPlayerDead();
+    }
+
+    // 인식 이후에는 거리와 무관하게 죽을 때까지 추적을 포기하지 않는다
+    public override bool ShouldGiveUpChase(MonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null) return true;
+        return IsPlayerDead();
     }
 
     // 공중 상태에서는 근접 공격을 받지 않는다 (원거리 투사체는 ColliderInstance를 거치지 않아 영향 없음)

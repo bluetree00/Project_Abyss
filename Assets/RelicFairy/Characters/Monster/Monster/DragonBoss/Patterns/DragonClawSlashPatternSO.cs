@@ -153,11 +153,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     public override void Exit(MonsterContext ctx)
     {
         if (ctx.Agent == null) return;
-        if (!ctx.Agent.enabled)
-        {
-            ctx.Agent.enabled = true;
-            ctx.Agent.Warp(ctx.Transform.position);
-        }
+        DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
         if (ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
     }
 
@@ -188,13 +184,12 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     private void StartAttacking(MonsterContext ctx)
     {
-        if (ctx.Agent != null && !ctx.Agent.enabled)
+        if (ctx.Agent != null)
         {
-            ctx.Agent.enabled = true;
-            ctx.Agent.Warp(ctx.Transform.position);
+            DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
+            if (ctx.Agent.isOnNavMesh)
+                ctx.Agent.isStopped = true;
         }
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = true;
 
         // Face player exactly before attacking
         if (ctx.Runtime.PlayerTarget != null)
