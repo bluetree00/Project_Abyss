@@ -47,6 +47,9 @@ public class WeaponData
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
 
+    /// <summary>공격 시 칼날 트레일 VFX 프리팹(INab Weapon Trail). SO에서만 채워짐(서버 차트는 미관여). 없으면 트레일 스킵.</summary>
+    public GameObject trailVfxPrefab;
+
     // ── 스킬 SO 참조 ─────────────────────────────────────────────────
     public SkillSO skillQ;
     public SkillSO skillE;
@@ -97,6 +100,7 @@ public class WeaponData
 
         animationSet = so.animationSet;
         abilitySet   = so.abilitySet;
+        trailVfxPrefab = so.trailVfxPrefab;
     }
 
     /// <summary>SO 타입을 자동 판별해 적절한 WeaponData를 생성하는 팩토리</summary>
