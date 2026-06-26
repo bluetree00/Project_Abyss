@@ -64,6 +64,12 @@ public class CharacterData : ScriptableObject
     public GameObject dodgeDustVfxPrefab;
     [Tooltip("먼지 VFX 발밑 높이 오프셋(m).")]
     public float dodgeDustHeightOffset = 0.05f;
+    [Tooltip("대시 중 표시할 트레일 VFX 프리팹(INab Weapon Trail). 비우면 대시 트레일 스킵. PlayerWeaponTrailVfx가 읽음.")]
+    public GameObject dashTrailVfxPrefab;
+    [Tooltip("대시 트레일 상단 앵커의 플레이어 루트 기준 로컬 오프셋(칼날이 아닌 몸을 따라감). 보통 머리/가슴 높이.")]
+    public Vector3 dashTrailTopOffset = new Vector3(0f, 1.3f, 0f);
+    [Tooltip("대시 트레일 하단 앵커의 플레이어 루트 기준 로컬 오프셋. 보통 발밑 높이.")]
+    public Vector3 dashTrailBottomOffset = new Vector3(0f, 0.05f, 0f);
 
     [Header("점프 및 중력 설정")]
     public float jumpForce = 5f;
