@@ -46,6 +46,10 @@ public class DragonAirBitePatternSO : BossPatternSO
     [Header("EndPose (반격 창)")]
     [SerializeField] private float _endPoseDuration = 0.4f;
 
+    [Header("사운드")]
+    [Tooltip("물 때마다(3회 각각) 재생할 사운드 클립")]
+    [SerializeField] private AudioClip _biteSfx;
+
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
     [SerializeField] private string _airChaseStateName = "AirChase";
@@ -90,6 +94,7 @@ public class DragonAirBitePatternSO : BossPatternSO
     public string BiteStateName => _biteStateName;
     public string LandingStateName  => _landingStateName;
     public float  EndPoseDuration   => _endPoseDuration;
+    public AudioClip BiteSfx        => _biteSfx;
 
     private DragonAirBiteState _runtimeState;
 
@@ -323,6 +328,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _currentAirChaseAnim = null;
 
         PlayAnim(ctx, Data.BiteStateName, 0.08f);
+        Managers.Sound?.PlayEffectAt(Data.BiteSfx, ctx.Transform.position);
     }
 
     private void StartEndPose(MonsterContext ctx)
