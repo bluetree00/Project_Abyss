@@ -541,33 +541,14 @@ public sealed class CombatPanelView : MonoBehaviour
         text.color = Color.white;
         text.alignment = TextAlignmentOptions.MidlineLeft;
 
+        EffectIconView.Attach(go.transform, EffectDescriptionFormatter.IconKeyForStat(buff.Modifier.Type), text, 16f);
+
         return go;
     }
 
     private static string FormatBuff(ActiveRoomBuff buff)
-    {
-        string typeName = buff.Modifier.Type switch
-        {
-            StatType.MoveSpeed    => "이동속도",
-            StatType.AttackPower  => "공격력",
-            StatType.MeleeAttack  => "근접공격",
-            StatType.RangedAttack => "원거리공격",
-            StatType.Defense      => "방어력",
-            StatType.AttackSpeed  => "공격속도",
-            StatType.Projectile   => "투사체",
-            _                     => buff.Modifier.Type.ToString(),
-        };
-
-        string sign = buff.Modifier.Value >= 0 ? "+" : "";
-
-        string valueStr = buff.IsPercent
-            ? $"{sign}{buff.Modifier.Value * 100f:F0}%"
-            : $"{sign}{buff.Modifier.Value:F0}";
-
-        string remaining = buff.RoomsRemaining > 0 ? $" [{buff.RoomsRemaining}방]" : "";
-
-        return $"{typeName} {valueStr}{remaining}";
-    }
+        => EffectDescriptionFormatter.FormatStatBuff(
+            buff.Modifier.Type, buff.Modifier.Value, buff.IsPercent, buff.RoomsRemaining);
 
     // ─────────────────────────────────────────────────────────
     // 아이템 효과 발동 알림 (스택형, 왼쪽 하단)
