@@ -27,7 +27,7 @@
   - `AppBootstrapper.Awake` L374 `Backend.Initialize()`; `DeviceAutoLoginAsync`/`TryCustomLoginAsync` L610-637 `Backend.BMember.CustomSignUp/CustomLogin`.
   - `RunProgressManager`: `Backend.GameData.GetMyData/Insert/UpdateV2` (`LoadAsync` L77, `SaveAsync` L137/148, `ClearAsync` L171).
   - `BackendGameData`: 동일 `Backend.GameData.*` (`LoadAsync` L55, `InsertAsync` L101, `SaveAsync` L133).
-  - 기타 호출처: `BackendManager.cs`, `SteamLoginService.cs`, `UI_Login.cs`, `DevAutoLoginManager.cs`, `RegisterAccount/FindPw/FindID/UserInfo/Nickname.cs`.
+  - 기타 호출처: `SteamLoginService.cs`, `UI_Login.cs`, `DevAutoLoginManager.cs`, `RegisterAccount/FindPw/FindID/UserInfo/Nickname.cs`. (`BackendManager.cs`는 死 스크립트로 2026-06-27 제거)
 - 결론: **뒤끝 = 실통합 + 로그인/세이브 실사용 중**. 텔레메트리로 역할 축소 시 **세이브 경로만 분리**하면 되고 로그인/계정 인프라는 그대로 둘 수 있다.
 
 ### 1.2 현재 세이브 매체 — 100% 서버 (로컬 런/메타 세이브 없음)

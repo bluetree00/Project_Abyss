@@ -731,7 +731,7 @@ public class MerlinRuneBridge : MonoBehaviour
         player.RuneEffects.Activate(entry);
     }
 
-    /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView/GridEditView에서 참조.</summary>
+    /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView에서 참조.</summary>
     public IReadOnlyDictionary<string, GridAssetData> GetRegisteredGrids()
         => _registeredGrids;
 

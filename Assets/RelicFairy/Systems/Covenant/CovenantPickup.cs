@@ -13,7 +13,7 @@ public sealed class CovenantPickup : MonoBehaviour
 {
     private const int CandidateCount = 3;
 
-    [SerializeField, Tooltip("후보에 반드시 포함할 서약 id(선택). 비우면 전부 랜덤. (CovenantFactory 상수: galahad/morrigan/arthur 등)")]
+    [SerializeField, Tooltip("후보에 반드시 포함할 서약 id(선택). 비우면 전부 랜덤. (CovenantFactory 상수: galahad/nimue/arthur 등)")]
     private string covenantId;
 
     [SerializeField, Tooltip("획득 시 일회성 VFX(선택, Addressable 키)")]

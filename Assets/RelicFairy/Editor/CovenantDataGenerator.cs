@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 12개 서약 CovenantDataSO 에셋과 CovenantDataTableSO를 일괄 생성한다.
+/// 서약 CovenantDataSO 에셋과 CovenantDataTableSO를 일괄 생성한다.
 /// RelicFairy/Covenant/Generate Data Assets 메뉴에서 실행.
 /// 이미 존재하는 에셋은 덮어쓰지 않는다.
 /// </summary>
@@ -27,16 +27,6 @@ public static class CovenantDataGenerator
                 enhanced: new[] { 0.70f, 4f },
                 evolved:  new[] { 0.70f, 4f }),
 
-            Create("prometheus", "프로메테우스의 서약",
-                basic:    new[] { 0.40f,  0.020f },
-                enhanced: new[] { 0.55f,  0.015f },
-                evolved:  new[] { 0.55f,  0.015f }),
-
-            Create("solomon",    "솔로몬의 서약",
-                basic:    new[] { 0.25f, 1f, 10f },
-                enhanced: new[] { 0.45f, 2f, 10f },
-                evolved:  new[] { 0.45f, 5f, 10f }),
-
             Create("arthur",     "아서의 서약",
                 basic:    new[] { 35f,  0f,    0.30f, 5f },
                 enhanced: new[] { 55f,  0.20f, 0.30f, 5f },
@@ -51,36 +41,6 @@ public static class CovenantDataGenerator
                 basic:    new[] { 10f, 3f },
                 enhanced: new[] {  7f, 3f },
                 evolved:  new[] {  7f, 3f }),
-
-            Create("mordred",    "모드레드의 서약",
-                basic:    new[] { 50f, -30f,  0f, 20f },
-                enhanced: new[] { 70f, -15f,  0f, 20f },
-                evolved:  new[] { 70f, -15f, 20f, 20f }),
-
-            Create("morrigan",   "모리건의 서약",
-                basic:    new[] { 0.02f, 10f, 10f },
-                enhanced: new[] { 0.03f, 15f, 10f },
-                evolved:  new[] { 0.03f, 15f, 10f }),
-
-            Create("cuchulainn", "쿠훌린의 서약",
-                basic:    new[] { 0.50f, 60f, -40f, 0.02f },
-                enhanced: new[] { 0.65f, 80f, -40f, 0.02f },
-                evolved:  new[] { 0.65f, 80f, -40f, 0.02f }),
-
-            Create("lugh",       "루의 서약",
-                basic:    new[] { 0.15f, 1f },
-                enhanced: new[] { 0.25f, 2f },
-                evolved:  new[] { 0.25f, 2f }),
-
-            Create("balor",      "발로르의 서약",
-                basic:    new[] { 8f, 1.0f },
-                enhanced: new[] { 5f, 1.5f },
-                evolved:  new[] { 5f, 1.5f }),
-
-            Create("hecate",     "헤카테의 서약",
-                basic:    new[] { 1f, 0f    },
-                enhanced: new[] { 2f, 0f    },
-                evolved:  new[] { 3f, 0.30f }),
         };
 
         // ── CovenantDataTableSO ──────────────────────────

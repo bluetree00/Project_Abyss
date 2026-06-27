@@ -95,7 +95,7 @@
 ## 5. 막힌 부분 / 조사 필요 (Blocked / Research Needed)
 
 5.1 Quest 시스템 — 전체 주석 처리 상태. Phase 2에서 재설계 필요
-5.2 GameEventManager — portal 이벤트만 존재, 활용 방향 미결정
+5.2 GameEventManager — [제거됨 2026-06-27: 死 스크립트(외부참조 0) 정리]
 5.3 Steam 로그인 — 뒤끝 Federation 500 에러 (Steam 앱 `unavailable` 상태). 앱 출시 예정 전환 후 재시도
 5.4 ResourceManager — ✅ 해결됨 (2026-05-11): ResourceManager 삭제, 의존 코드 인라인 전환 완료
 
