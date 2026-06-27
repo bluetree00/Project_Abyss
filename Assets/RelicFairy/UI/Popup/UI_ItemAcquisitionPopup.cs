@@ -146,21 +146,19 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         for (int i = effectListRoot.childCount - 1; i >= 0; i--)
             Destroy(effectListRoot.GetChild(i).gameObject);
 
+        var style = EffectRowStyle.Default;
+        style.fontAsset       = popupFont;
+        style.fontSize        = 14f;
+        style.iconSize        = 18f;
+        style.rowHeight       = 22f;
+        style.usePrefixArrows = true;
+        style.normalColor     = COLOR_NORMAL_FX;
+        style.riskColor       = COLOR_RISK;
+
         foreach (var slot in item.effects)
         {
             if (string.IsNullOrEmpty(slot.effectType)) continue;
-
-            bool isRisk = IsRiskEffect(slot.effectType);
-
-            var rowGO = new GameObject("EffectRow", typeof(RectTransform));
-            rowGO.transform.SetParent(effectListRoot, false);
-
-            var txt = rowGO.AddComponent<TextMeshProUGUI>();
-            if (popupFont != null) txt.font = popupFont;
-            txt.fontSize = 14f;
-            txt.color    = isRisk ? COLOR_RISK : COLOR_NORMAL_FX;
-            txt.text     = BuildEffectLabel(slot, isRisk);
-            txt.textWrappingMode = TextWrappingModes.NoWrap;
+            EffectRowWidget.Create(effectListRoot, style, slot);
         }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(effectListRoot as RectTransform);
@@ -220,20 +218,6 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     }
 
     // ── Helpers ──
-
-    private static string BuildEffectLabel(ItemEffectSlot slot, bool isRisk)
-    {
-        string prefix = isRisk ? "▼ " : "▲ ";
-        float  pct    = slot.value * 100f;
-        return $"{prefix}{slot.effectType}  {(pct >= 0 ? "+" : "")}{pct:F0}%";
-    }
-
-    private static bool IsRiskEffect(string effectType)
-    {
-        if (string.IsNullOrEmpty(effectType)) return false;
-        string lower = effectType.ToLowerInvariant();
-        return lower.Contains("damage_taken") || lower.Contains("risk") || lower.Contains("penalty");
-    }
 
     private static Color RarityColor(ItemRarity rarity) => rarity switch
     {

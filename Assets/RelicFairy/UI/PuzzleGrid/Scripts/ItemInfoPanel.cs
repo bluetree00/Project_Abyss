@@ -136,28 +136,20 @@ public sealed class ItemInfoPanel : MonoBehaviour
 
         if (effectListRoot == null || item.effects == null) return;
 
+        var style = EffectRowStyle.Default;
+        style.fontAsset       = panelFont;
+        style.fontSize        = 13f;
+        style.iconSize        = 16f;
+        style.rowHeight       = 20f;
+        style.usePrefixArrows = true;
+        style.normalColor     = COLOR_NORMAL_FX;
+        style.riskColor       = COLOR_RISK;
+
         foreach (var slot in item.effects)
         {
             if (string.IsNullOrEmpty(slot.effectType)) continue;
-
-            bool isRisk = IsRiskEffect(slot.effectType);
-
-            var rowGO = new GameObject("EffectRow", typeof(RectTransform));
-            rowGO.transform.SetParent(effectListRoot, false);
-
-            var txt = rowGO.AddComponent<TextMeshProUGUI>();
-            if (panelFont != null) txt.font = panelFont;
-            txt.fontSize   = 13f;
-            txt.color      = isRisk ? COLOR_RISK : COLOR_NORMAL_FX;
-            txt.text       = BuildEffectLabel(slot, isRisk);
-            txt.textWrappingMode = TextWrappingModes.NoWrap;
-
-            var rt = rowGO.GetComponent<RectTransform>();
-            rt.anchorMin  = new Vector2(0f, 1f);
-            rt.anchorMax  = new Vector2(1f, 1f);
-            rt.sizeDelta  = new Vector2(0f, 20f);
-
-            _effectRows.Add(rowGO);
+            var widget = EffectRowWidget.Create(effectListRoot, style, slot);
+            _effectRows.Add(widget.gameObject);
         }
 
         // 수직 레이아웃 갱신
@@ -268,20 +260,6 @@ public sealed class ItemInfoPanel : MonoBehaviour
     }
 
     // ── Helpers ──
-
-    private static string BuildEffectLabel(ItemEffectSlot slot, bool isRisk)
-    {
-        string prefix = isRisk ? "▼ " : "▲ ";
-        float  pct    = slot.value * 100f;
-        return $"{prefix}{slot.effectType}  {(pct >= 0 ? "+" : "")}{pct:F0}%";
-    }
-
-    private static bool IsRiskEffect(string effectType)
-    {
-        if (string.IsNullOrEmpty(effectType)) return false;
-        string lower = effectType.ToLowerInvariant();
-        return lower.Contains("damage_taken") || lower.Contains("risk") || lower.Contains("penalty");
-    }
 
     private static Color RarityColor(ItemRarity rarity) => rarity switch
     {

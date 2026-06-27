@@ -483,8 +483,11 @@ public class InventoryPageView : MonoBehaviour
                 string effectText = "";
                 foreach (var eff in item.effects)
                 {
-                    string triggerLabel = eff.trigger == "Always" ? "" : $"  <color=#807060>({eff.trigger})</color>";
-                    effectText += $"  <color=#8B4513>{eff.effectType}</color>  +{eff.value}{triggerLabel}\n";
+                    var display = EffectDescriptionFormatter.Describe(eff);
+                    string triggerLabel = string.IsNullOrEmpty(display.TriggerText)
+                        ? "" : $"  <color=#807060>({display.TriggerText})</color>";
+                    string valuePart = string.IsNullOrEmpty(display.ValueText) ? "" : $"  {display.ValueText}";
+                    effectText += $"  <color=#8B4513>{display.Label}</color>{valuePart}{triggerLabel}\n";
                 }
                 _detailEffects.text = effectText.TrimEnd('\n');
             }
@@ -702,8 +705,8 @@ public class InventoryPageView : MonoBehaviour
             text += "\n";
             foreach (var eff in item.effects)
             {
-                string triggerLabel = eff.trigger == "Always" ? "" : $" ({eff.trigger})";
-                text += $"  {eff.effectType} +{eff.value}{triggerLabel}\n";
+                var display = EffectDescriptionFormatter.Describe(eff);
+                text += $"  {display.Combined}\n";
             }
         }
 
