@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ac0316ca287ba459492b669ff1317a6f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 248169
+  packageName: Gothic Interior Megapack
+  packageVersion: 1.0
+  assetPath: Assets/_ThirdParty/Gothic_Interior/Settings/RenderPipelines/HDRenderPipelineGlobalSettings.asset
+  uploadId: 678893
