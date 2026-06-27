@@ -178,7 +178,7 @@ BaseCamp.unity
 ├─ Main Camera (+ WispCameraFollow 또는 GameCameraController)  ← 카메라 추적 재사용
 ├─ Interactables
 │   ├─ RelicAltar (유물 선택대)                      ← StartRoomPickup/CharacterDisplayStand 프리팹 직접 배치
-│   ├─ WeaponDisplayStand (무기 선택대)              ← WeaponDisplayStand 프리팹 직접 배치
+│   ├─ WeaponForgeAltar (무기 선택대)              ← WeaponForgeAltar 프리팹 직접 배치
 │   ├─ AwakeningAltar (각성 제단)                     ← 기존 BaseCamp.unity 오브젝트 재사용/재배치
 │   ├─ SoulRestorationAltar (영혼 복원 제단)          ← ⏸ 결정 대기(분기 A) — 자리만 확보
 │   ├─ MerlinNPC (경량)                              ← 신규, IWispInteractable 또는 트리거+F
@@ -268,7 +268,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 | 현행(Ch1 내부) | 이전 후(BaseCamp) | 작업 |
 |---|---|---|
 | Zone 0 절차 빌드(`SpawnStartZoneFromLayoutAsync`) | BaseCamp 손배치 씬 | Ch1에서 Zone0=시작방 경로 비활성, BaseCamp 지오메트리 작성 |
-| CP/WP 토큰 → 캐릭터/무기 픽업 | RelicAltar/WeaponDisplayStand 직접 배치 | 프리팹 인스펙터 배치 + 게이트 참조 주입 |
+| CP/WP 토큰 → 캐릭터/무기 픽업 | RelicAltar/WeaponForgeAltar 직접 배치 | 프리팹 인스펙터 배치 + 게이트 참조 주입 |
 | 코드 스폰 각성제단 | 씬 배치 각성제단 | BaseCamp.unity 기존 제단 위치 조정 |
 | Zone 0 출구 StartRoomGate | BaseCamp DungeonGate | StartRoomGate 이식 or BaseCampGate 신규 |
 | `StartRoomAsync` 진입 | `BaseCampBootstrapper.Start` | 신규 부트 |
@@ -300,7 +300,7 @@ BaseCamp 게이트 통과 → 던전 첫 방 빌드 시점에 최초 던전 세�
 - 위험: 카메라 추적 주체(Wisp vs Player) 미스매치 → 검은 화면. **확인 필요 지점.**
 
 ### PR2 — 시작방 구성물 이전 (선택대/제단/게이트)
-- 내용: RelicAltar/WeaponDisplayStand/AwakeningAltar **직접 배치**. DungeonGate에 `IsLoadoutReady` 게이팅 + 서약 선택 이식. GameScene_Ch1의 **Zone 0 시작방 경로 비활성**(던전 직행 모드).
+- 내용: RelicAltar/WeaponForgeAltar/AwakeningAltar **직접 배치**. DungeonGate에 `IsLoadoutReady` 게이팅 + 서약 선택 이식. GameScene_Ch1의 **Zone 0 시작방 경로 비활성**(던전 직행 모드).
 - **검증:** BaseCamp에서 유물+무기 선택 → 게이트 활성 → 서약 선택 → 던전 첫 방 정상 빌드. 미선택 시 게이트 거부. Ch1 단독 실행 시 회귀 없음.
 - 위험: CP/WP 토큰 의존 제거가 다른 챕터(Ch2~4) 시작 흐름에 영향(확인 필요: 챕터별 시작방 동작). 던전 앵커 오프셋 정합.
 
@@ -325,7 +325,7 @@ BaseCamp 게이트 통과 → 던전 첫 방 빌드 시점에 최초 던전 세�
 |---|---|---|
 | 부트 패턴 | `GameRunBootstrapper.Start` 골격 | `BaseCampBootstrapper` |
 | 플레이어 스폰/카메라 | `SpawnCharacterInStartRoomAsync`, `HandToGameplayCamera`, `WispCameraFollow` | 스폰 포인트 마커 |
-| 선택대 | `CharacterDisplayStand`/`WeaponDisplayStand`/`StartRoomPickup` 프리팹 | 토큰→직접배치 전환 |
+| 선택대 | `CharacterDisplayStand`/`WeaponForgeAltar`/`StartRoomPickup` 프리팹 | 토큰→직접배치 전환 |
 | 각성 제단 | `WorldAwakeningAltar`+`UI_AwakeningPanel` 전부 | 위치 조정만 |
 | 던전 게이트 | `StartRoomGate`(ExitStartRoom/Covenant/IsLoadoutReady) | `BaseCampGate`(또는 StartRoomGate 모드 확장) |
 | 서약 선택 | `ShowCovenantChoiceAsync`+`UI_CovenantChoice` | — |

@@ -64,7 +64,7 @@
 | `RelicId` enum | 유물 식별자 (Lancelot 추가 필요) |
 | 리소스 컴포넌트 선례 | `SolarTimer`(가웨인 기존) — Initialize(RuntimeStats), OnPhaseChanged, IsEmpowered |
 | 패시브 시스템 | `owner.RegisterRelicPassive(PassiveBase)` + `PassiveTrigger`(OnAttackHit/OnSkillUse/OnTakeDamage…) |
-| 스킬 런타임 | `ISkillRuntime`(Q 슬롯) — 가웨인 SolarStrikeSkillRuntime, 갈라하드 HolyShieldSkillRuntime |
+| 스킬 런타임 | `ISkillRuntime`(Q 슬롯) — 가웨인 SolarDescentSkillRuntime, 갈라하드 HolyShieldSkillRuntime |
 | 스탯 레이어 | `PlayerRuntimeStats`에 **유물 전용 레이어**(_relicAttackSpeed 등) + AllDamagePercent/DamageReduction/MoveSpeedMultiplier/AttackSpeedMultiplier |
 | 선택/적용 | RelicAltar(베이스캠프) → `Loadout.SetRelic` → PlayerController.ApplyRelic → OnAttach |
 | 각성 | `RelicAwakeningDataManager`/Entry (서버 데이터 경로 존재) |

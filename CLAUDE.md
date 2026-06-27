@@ -107,15 +107,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ### 매니저 — `Assets/RelicFairy/Systems/Managers/Scripts/`
 - `Managers.cs` — 서비스 로케이터 (`Managers.Instance`)
 - `AddressableManager.cs` — Addressables 리소스 로딩 (Resources.Load 대체)
-- `UIManager.cs` / `UIDataManager.cs` — UI 라이프사이클/데이터
+- `UIManager.cs` — UI 라이프사이클/데이터
 - `InputManager.cs` — 입력
 - `SoundManager.cs` — 사운드
 - `SceneTransitionManager.cs` — 씬 전환
-- `GameEventManager.cs` — 글로벌 이벤트 허브
 - `ObjectPoolerManager.cs` — 오브젝트 풀
 - `PlayerManager.cs` — 플레이어 인스턴스 관리
 - `CharacterDataManager.cs` / `MonsterDataManager.cs` — 캐릭터/몬스터 데이터
-- `ChartLoader.cs` / `GoogleSheetManager.cs` — 차트 CSV 로딩
+- `ChartLoader.cs` — 차트 CSV 로딩
 - `AnimationResourceManager.cs` — 애니메이션 리소스
 
 ### 게임 런(전투) — `Assets/RelicFairy/Systems/Stage/RunGame/`
@@ -146,7 +145,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ### 시작방(베이스캠프) — `Assets/RelicFairy/Systems/Stage/StartRoom/`
 - `WispController.cs` / `WispCameraFollow.cs` — 위습(요정) 조작
-- `CharacterDisplayStand.cs` / `WeaponDisplayStand.cs` — 캐릭터/무기 선택대
+- `CharacterDisplayStand.cs` — 캐릭터 선택대 (무기 선택은 `WeaponForgeAltar.cs`로 대체됨)
 - `StartRoomPickup.cs` / `StartRoomGate.cs` — 픽업/게이트
 
 ### 상점 — `Assets/RelicFairy/Systems/Stage/Shop/`
