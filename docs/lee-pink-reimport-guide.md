@@ -26,6 +26,12 @@ KBG 쪽에서 전수 검사한 결과:
 
 ## 복구 절차 (순서대로)
 
+> ⚠️ **클론/풀 전 1회 필수 설정**: 일부 데모 에셋 경로가 Windows 260자 제한을 넘습니다. 아래 설정 없이는 **그 파일들 체크아웃이 실패**해 또 핑크/누락이 생깁니다.
+> ```bash
+> git config core.longpaths true
+> ```
+> (근본적으론 `Magic Pig Games/.../_DEMO SOURCE FILES/...` 류 데모 junk라 정리 단계에서 삭제 예정)
+
 ### 0. 내 작업 보호 (먼저!)
 ```bash
 git status                 # 변경사항 확인
@@ -35,11 +41,11 @@ git add -A && git commit -m "wip: 재임포트 전 작업 백업"   # 또는 git
 ### 1. 최신 develop 반영 확인
 ```bash
 git fetch origin
-git log --oneline -1 origin/develop      # c7c0cbefa 이상인지 확인
+git log --oneline -1 origin/develop      # 286693618 이상인지 확인
 git merge origin/develop                  # dev/lee에 최신 develop 머지 (또는 develop 체크아웃)
 git rev-parse HEAD                         # 현재 커밋 해시 기록 (문제 시 KBG에 전달)
 ```
-- `HEAD`가 `c7c0cbefa`(또는 그 이후)가 **아니면**, 에셋 이동 전 상태라 이게 핑크 원인입니다. 머지/풀부터 끝내세요.
+- `HEAD`가 `286693618`(또는 그 이후)가 **아니면**, 에셋 이동 전 상태라 이게 핑크 원인입니다. 머지/풀부터 끝내세요.
 
 ### 2. LFS 실제 파일 받기
 ```bash
