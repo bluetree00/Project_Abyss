@@ -26,7 +26,7 @@ MonoBehaviour:
   _dashSpeed: 36
   _dashDistance: 12
   _dashCollisionRadius: 1.1
-  _dashHitRadius: 1.5
+  _dashHitRadius: 2.5
   _dashDamage: 28
   _selfCrashDamage: 80
   _wallStopPadding: 0.3

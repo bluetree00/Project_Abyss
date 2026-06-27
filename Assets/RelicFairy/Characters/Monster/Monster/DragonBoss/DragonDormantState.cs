@@ -162,6 +162,7 @@ public class DragonDormantState : IMonsterState
             await DescendAndLandAsync(ctx, dragon, ct);
 
             // 2단계: 보스 대각선 아래에서 올려다보는 클로즈업으로 서서히 전환 + 보스 이름 HUD (Idle 전환과 동시)
+            dragon.PlayNormalSfx();
             if (cam != null)
                 await LerpCameraCloseUpAsync(cam, ctx.Transform, dragon.EntranceCameraOffset, dragon.EntranceCameraLookOffset, dragon.EntranceCameraCloseUpDuration, ct);
 
@@ -193,11 +194,7 @@ public class DragonDormantState : IMonsterState
             return;
         }
 
-        if (ctx.Agent != null && !ctx.Agent.enabled)
-        {
-            ctx.Agent.enabled = true;
-            ctx.Agent.Warp(ctx.Transform.position);
-        }
+        DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
         if (dragon.DragonBlackboard != null)
             dragon.DragonBlackboard.BodyState = BodyState.Grounded;
 

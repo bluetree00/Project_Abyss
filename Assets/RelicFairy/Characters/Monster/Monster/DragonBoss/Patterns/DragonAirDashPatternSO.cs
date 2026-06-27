@@ -20,7 +20,7 @@ public class DragonAirDashPatternSO : BossPatternSO
     [SerializeField] private float _dashSpeed = 18f;
     [SerializeField] private float _dashDistance = 12f;
     [SerializeField] private float _dashCollisionRadius = 1.1f;
-    [SerializeField] private float _dashHitRadius = 1.5f;
+    [SerializeField] private float _dashHitRadius = 2.5f;
     [SerializeField] private int _dashDamage = 28;
     [SerializeField] private int _selfCrashDamage = 80;
     [SerializeField] private float _wallStopPadding = 0.3f;

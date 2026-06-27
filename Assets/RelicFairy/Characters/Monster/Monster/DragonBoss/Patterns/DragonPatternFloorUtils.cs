@@ -133,8 +133,7 @@ namespace RelicFairy.Monster
 
         /// <summary>
         /// 공중 패턴 종료 후 지상 복귀 시 모든 패턴에서 공통으로 사용한다.
-        /// Transform Y를 SpawnPosition.y(최초 정상 착지 높이)로 스냅한 뒤
-        /// NavMesh.SamplePosition으로 가장 가까운 NavMesh 지점에 Agent를 Warp한다.
+        /// Transform Y를 SpawnPosition.y(최초 정상 착지 높이)로 스냅한 뒤 NavMesh 복구를 시도한다.
         /// SpawnPosition.y는 초기 착지 시 정상 동작이 확인된 높이이므로
         /// Raycast 오차나 애니메이션 드리프트로 인한 NavMesh 이탈을 방지한다.
         /// </summary>
@@ -144,13 +143,48 @@ namespace RelicFairy.Monster
             pos.y = ctx.Runtime.SpawnPosition.y;
             ctx.Transform.position = pos;
 
-            if (ctx.Agent == null) return;
+            EnsureAgentOnNavMesh(ctx);
+        }
+
+        // 단계적으로 넓혀가며 시도할 NavMesh 검색 반경 — 한 번 실패해도 절대 포기하지 않는다.
+        private static readonly float[] s_navMeshSearchRadii = { 5f, 15f, 40f, 100f };
+
+        /// <summary>
+        /// 드래곤이 Floor 위에서 절대 멈춰서지 않도록 보장하는 NavMesh 복구 루틴.
+        /// 현재 위치 기준으로 검색 반경을 단계적으로 넓혀 시도하고, 그래도 실패하면
+        /// 룸 중앙(항상 NavMesh가 존재해야 하는 기준점)으로 강제 복귀시킨다.
+        /// 이 마지노선까지 실패하면 NavMesh 베이크 자체가 문제이므로 에러 로그로 표면화한다.
+        /// </summary>
+        /// <returns>Agent가 NavMesh 위에 정상 복구되었는지 여부.</returns>
+        internal static bool EnsureAgentOnNavMesh(MonsterContext ctx)
+        {
+            if (ctx.Agent == null) return false;
             if (!ctx.Agent.enabled) ctx.Agent.enabled = true;
-            if (!ctx.Agent.isOnNavMesh
-                && UnityEngine.AI.NavMesh.SamplePosition(pos, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+            if (ctx.Agent.isOnNavMesh) return true;
+
+            Vector3 pos = ctx.Transform.position;
+            foreach (float radius in s_navMeshSearchRadii)
             {
+                if (!UnityEngine.AI.NavMesh.SamplePosition(pos, out var hit, radius, UnityEngine.AI.NavMesh.AllAreas))
+                    continue;
+
+                ctx.Transform.position = hit.position;
                 ctx.Agent.Warp(hit.position);
+                if (ctx.Agent.isOnNavMesh) return true;
             }
+
+            // 마지노선: 룸 중앙은 항상 NavMesh가 깔려 있어야 하는 기준점 — 여기서도 실패하면 더 이상 코드로 복구 불가.
+            Vector3 roomCenter = DragonBossRoomContext.WorldCenter;
+            if (UnityEngine.AI.NavMesh.SamplePosition(roomCenter, out var centerHit, 50f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                ctx.Transform.position = centerHit.position;
+                ctx.Agent.Warp(centerHit.position);
+                if (ctx.Agent.isOnNavMesh) return true;
+            }
+
+            Debug.LogError($"[DragonBoss] NavMesh 복구 완전 실패 — pos={pos}, roomCenter={roomCenter}. " +
+                            "해당 보스룸의 NavMesh 베이크 또는 Floor 경계 설정을 확인해야 합니다.");
+            return false;
         }
     }
 }
