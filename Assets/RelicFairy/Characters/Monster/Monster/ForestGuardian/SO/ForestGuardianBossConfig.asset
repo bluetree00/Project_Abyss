@@ -99,7 +99,6 @@ MonoBehaviour:
     forceExecute: 0
   - conditions: 1100000002000000
     patterns:
-    - {fileID: 11400000, guid: d60753c43671f5f4f8b01f319d4d59af, type: 2}
     - {fileID: 11400000, guid: 0576a9463f438fa4b8eab3c31bcec713, type: 2}
     selectionMode: 2
     forceExecute: 0
@@ -113,7 +112,6 @@ MonoBehaviour:
     forceExecute: 0
   - conditions: 1200000002000000
     patterns:
-    - {fileID: 11400000, guid: d60753c43671f5f4f8b01f319d4d59af, type: 2}
     - {fileID: 11400000, guid: b250c44439411aa4089a082e52376197, type: 2}
     selectionMode: 2
     forceExecute: 0

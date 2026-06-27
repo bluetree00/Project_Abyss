@@ -472,6 +472,8 @@ public class DKPhase2TeleportState : SpecialStateBase
             float   angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
             Vector3 dir   = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
             _telePos      = ctx.Runtime.PlayerTarget.position + dir * _teleportDist;
+            // 플레이어가 점프 중이어도 보스는 항상 지면에 스폰되도록 Y를 바닥 높이로 스냅
+            _telePos.y    = DragonPatternFloorUtils.GetFloorY(_telePos, ctx.Transform.position.y);
             _usePhase1Pos = false;
         }
         else
