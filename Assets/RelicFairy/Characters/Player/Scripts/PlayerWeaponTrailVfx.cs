@@ -124,7 +124,13 @@ public class PlayerWeaponTrailVfx : MonoBehaviour
         }
         _subscribed = false;
 
-        if (_trail != null) _trail.StopTrail(0.001f);
+        // 씬 언로드/오브젝트 파괴 중 OnDisable이면 StopTrail의 페이드 코루틴을 띄울 수 없다
+        // (INab StopTrail은 항상 StartCoroutine 경로 → 파괴 중 오브젝트에서 "inactive" 경고).
+        // 씬 언로드 중에는 activeInHierarchy가 true라 isActiveAndEnabled로는 못 거른다 →
+        // scene.isLoaded로 판정한다(언로드 중이면 false). 그 경우 트레일은 어차피 사라지므로 스킵.
+        // 실제 게임 중 컴포넌트만 비활성화될 때만(scene 로드됨) 정상 페이드 종료.
+        if (_trail != null && _trail.isActiveAndEnabled && gameObject.scene.isLoaded)
+            _trail.StopTrail(0.001f);
     }
 
     // ── Private Methods ───────────────────────────────────────────
