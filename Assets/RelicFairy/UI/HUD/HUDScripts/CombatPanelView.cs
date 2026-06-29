@@ -84,12 +84,11 @@ public sealed class CombatPanelView : MonoBehaviour
 
     private float _noticeTimer;
 
-    // ── 버프창 가장자리 도킹(좌상단, 서약 패널 아래) ──
-    // Panel_Covenant: top-left, y=-70, 최대 4슬롯(슬롯40 + spacing6) → 최대 높이 ~186px.
-    // 그 아래 ~16px 여유 → 그리드 시작 y = -(70+186+16) = -272. 그리드/게이지를 함께 좌상단 도킹.
-    private const float BuffDockX    = 12f;
-    private const float BuffDockTopY = -272f;
-    private const float BuffGaugeGap = 8f;   // 그리드와 게이지 사이 간격
+    // ── 버프창 도킹(하단 중앙, 중앙 HUD 위 — 로스트아크식) ──
+    // 그리드: 화면 하단 중앙에서 오른쪽으로 늘고 위로 쌓임. 게이지(분리 영역): 그리드 왼쪽에 두어 가려지지 않게.
+    private const float BuffDockX       = 0f;     // 화면 중앙 기준 X 오프셋(그리드 시작점)
+    private const float BuffDockBottomY = 260f;   // 화면 하단에서 위로(중앙 캐릭터 HUD 위). 더 올리려면 값을 키울 것.
+    private const float BuffGaugeGap    = 8f;     // 그리드와 게이지 사이 간격
 
     // 툴팁 화면 클램프용 코너 버퍼(재사용 — 호버 시 GC 억제).
     private static readonly Vector3[] _tooltipCorners = new Vector3[4];
@@ -948,12 +947,12 @@ public sealed class CombatPanelView : MonoBehaviour
         var go = new GameObject("BuffGridRoot", typeof(RectTransform));
         go.transform.SetParent(transform, false);
 
-        // 화면 좌상단(서약 패널 아래)에 도킹, 아래로 확장(그리드). 레이아웃 컴포넌트는 EnsureBuffGrid에서 부착.
+        // 화면 하단 중앙에 도킹 → 중앙에서 오른쪽으로 늘고 위로 쌓임(중앙 HUD 위). 레이아웃은 EnsureBuffGrid에서 부착.
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockTopY);
+        rect.anchorMin = new Vector2(0.5f, 0f);
+        rect.anchorMax = new Vector2(0.5f, 0f);
+        rect.pivot = new Vector2(0f, 0f);   // 좌하단 피벗 → 중앙 기준 오른쪽+위로 확장
+        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY);
         rect.sizeDelta = new Vector2(250f, 100f);
 
         buffListRoot = go.transform;
@@ -980,11 +979,11 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_buffGrid == null) _buffGrid = rootGo.AddComponent<GridLayoutGroup>();
         _buffGrid.cellSize        = new Vector2(46f, 46f);
         _buffGrid.spacing         = new Vector2(4f, 4f);
-        _buffGrid.startCorner     = GridLayoutGroup.Corner.UpperLeft;
+        _buffGrid.startCorner     = GridLayoutGroup.Corner.LowerLeft;   // 하단 행부터 채우고 위로 쌓기
         _buffGrid.startAxis       = GridLayoutGroup.Axis.Horizontal;
-        _buffGrid.childAlignment  = TextAnchor.UpperLeft;
+        _buffGrid.childAlignment  = TextAnchor.LowerLeft;
         _buffGrid.constraint      = GridLayoutGroup.Constraint.FixedColumnCount;
-        _buffGrid.constraintCount = 5;
+        _buffGrid.constraintCount = 8;   // 한 행 8개, 9개째부터 위로 쌓임
 
         var fitter = rootGo.GetComponent<ContentSizeFitter>();
         if (fitter == null) fitter = rootGo.AddComponent<ContentSizeFitter>();
@@ -1041,16 +1040,16 @@ public sealed class CombatPanelView : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        // Y는 그리드 실제 높이에 따라 RepositionGaugeBelowGrid에서 동적 갱신(그리드 침범 방지).
-        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockTopY);
+        rect.anchorMin = new Vector2(0.5f, 0f);
+        rect.anchorMax = new Vector2(0.5f, 0f);
+        rect.pivot = new Vector2(1f, 0f);   // 우하단 피벗 → 그리드 왼쪽에서 위로 쌓임(안 가려지게)
+        // 그리드 시작점(중앙) 왼쪽에 분리 배치.
+        rect.anchoredPosition = new Vector2(BuffDockX - BuffGaugeGap, BuffDockBottomY);
         rect.sizeDelta = new Vector2(210f, 100f);
 
         var layout = go.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 3f;
-        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childAlignment = TextAnchor.LowerRight;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
         layout.childControlWidth = true;
@@ -1062,20 +1061,12 @@ public sealed class CombatPanelView : MonoBehaviour
         _gaugeRoot = go.transform;
     }
 
-    /// <summary>게이지 영역을 그리드 실제 높이만큼 아래로 배치(다수 버프 시 그리드가 게이지를 침범하지 않게).</summary>
+    /// <summary>게이지 영역을 그리드 시작점 왼쪽에 고정 배치(분리 영역). 그리드는 오른쪽+위로 자라므로 buffCount와 무관.</summary>
     private void RepositionGaugeBelowGrid(int buffCount)
     {
         if (_gaugeRoot == null) return;
-
-        int   cols   = _buffGrid != null ? Mathf.Max(1, _buffGrid.constraintCount) : 5;
-        float cellH  = _buffGrid != null ? _buffGrid.cellSize.y : 46f;
-        float spaceY = _buffGrid != null ? _buffGrid.spacing.y  : 4f;
-
-        int   rows       = buffCount > 0 ? Mathf.CeilToInt(buffCount / (float)cols) : 0;
-        float gridHeight = rows > 0 ? rows * cellH + (rows - 1) * spaceY : 0f;
-
         ((RectTransform)_gaugeRoot).anchoredPosition =
-            new Vector2(BuffDockX, BuffDockTopY - gridHeight - BuffGaugeGap);
+            new Vector2(BuffDockX - BuffGaugeGap, BuffDockBottomY);
     }
 
     private GaugeBar CreateGaugeBar()

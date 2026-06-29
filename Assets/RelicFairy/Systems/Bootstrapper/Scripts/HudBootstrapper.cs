@@ -53,7 +53,24 @@ public sealed class HudBootstrapper : MonoBehaviour
         EnsureHudHierarchyVisible();
         if (_run != null)
             BindRun(_run);
+
+        // 타이밍 무관 허브 플레이어 바인딩: 전역 플레이어 채널 구독 + 이미 스폰돼 있으면 즉시.
+        // 플레이어/HUD 어느 쪽이 먼저 준비되든 대응한다. 런(전투)은 run 흐름이 바인딩을 소유하므로 _run==null일 때만.
+        if (Managers.Player != null)
+        {
+            Managers.Player.OnPlayerSpawned -= HandleGlobalPlayerSpawned;
+            Managers.Player.OnPlayerSpawned += HandleGlobalPlayerSpawned;
+        }
+        TryBindHubPlayer();
     }
+
+    private void OnDisable()
+    {
+        if (Managers.Player != null)
+            Managers.Player.OnPlayerSpawned -= HandleGlobalPlayerSpawned;
+    }
+
+    private void HandleGlobalPlayerSpawned(Transform _) => TryBindHubPlayer();
 
     private void LateUpdate()
     {
@@ -169,6 +186,32 @@ public sealed class HudBootstrapper : MonoBehaviour
             presenter.BindPlayer(_run.Player);
 
         EnsureHudHierarchyVisible();
+    }
+
+    /// <summary>런이 없을 때(허브) 전역 플레이어를 HUD에 바인딩 — 타이밍 무관(플레이어/HUD 순서 무관, 재스폰 대응).</summary>
+    private void TryBindHubPlayer()
+    {
+        if (_run != null) return;                       // 런은 run 흐름이 바인딩을 소유
+        var t = Managers.Player?.PlayerTransform;
+        if (t == null) return;
+        var pc = t.GetComponent<PlayerController>();
+        // 초기화 완료(WeaponManager 준비 = init 완료 신호) 전이면 스킵 — 플레이어 자체 init 중
+        // 조기 SetPlayer 대응. 완료 후 재호출되는 SetPlayer에서 정상 바인딩된다(타이밍 무관).
+        if (pc == null || pc.WeaponManager == null) return;
+        BindPlayerStandalone(pc);
+    }
+
+    /// <summary>런 없이(허브) 플레이어만 HUD에 바인딩 — 스탯/무기/버프뷰(유물·룬 패시브) 표시.
+    /// 아이템/방버프/서약 소스는 런(Construct)이 있어야 채워지므로 허브에선 플레이어 소스만 활성.</summary>
+    private void BindPlayerStandalone(PlayerController player)
+    {
+        if (presenter == null)
+            presenter = GetComponentInChildren<HudPresenter>(true);
+        if (presenter == null || player == null) return;
+
+        EnsureHudHierarchyVisible();
+        presenter.SetMode(HUDIds.Mode.Combat);
+        presenter.BindPlayer(player);
     }
 
     private void BindStateNow(PlayerRunState st)
