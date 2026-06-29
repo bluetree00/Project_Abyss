@@ -13,7 +13,7 @@ using UnityEngine;
 ///
 /// 효과 본문은 비어 있어도(RuneEffect 스켈레톤) 연결 구조는 완성된다.
 /// </summary>
-public sealed class RuneEffectDispatcher
+public sealed class RuneEffectDispatcher : IBuffViewSource
 {
     private readonly PlayerController       _player;
     private readonly List<IRuneEffect>      _active      = new();
@@ -22,13 +22,13 @@ public sealed class RuneEffectDispatcher
     private float _lastSkillTime = -999f;
     private bool _subscribed;
 
-    // [가이드라인 비주얼] 룬 리소스 배지 폴링(0.25s throttle). key→라벨/색 고정 테이블.
+    // [가이드라인 비주얼] 룬 리소스 배지 폴링(0.25s throttle). key→라벨/아이콘/색 고정 테이블.
     private float _badgePollAccum;
-    private static readonly (string key, string label, GuidelineVisual.BadgeTint tint)[] s_resourceBadges =
+    private static readonly (string key, string label, string iconKey, GuidelineVisual.BadgeTint tint)[] s_resourceBadges =
     {
-        ("ElecStatic",    "전기", GuidelineVisual.BadgeTint.Electric),
-        ("LightRadiance", "광채", GuidelineVisual.BadgeTint.Light),
-        ("darkGauge",     "어둠", GuidelineVisual.BadgeTint.Dark),
+        ("ElecStatic",    "전기", "lightning", GuidelineVisual.BadgeTint.Electric),
+        ("LightRadiance", "광채", "light",     GuidelineVisual.BadgeTint.Light),
+        ("darkGauge",     "어둠", "dark",      GuidelineVisual.BadgeTint.Dark),
     };
 
     public RuneEffectDispatcher(PlayerController player)
@@ -139,6 +139,22 @@ public sealed class RuneEffectDispatcher
             string badgeKey = "rune_" + b.key;
             if (v > 0) GuidelineVisual.SetBadge(t, badgeKey, b.label + " " + v, b.tint);
             else       GuidelineVisual.ClearBadge(badgeKey);
+        }
+    }
+
+    // ── 버프창 수집(IBuffViewSource) ────────────────────────
+    /// <summary>현재 활성 룬 리소스(스택/게이지>0)를 버프창 항목으로 기여. 읽기 전용 — 리소스 로직 미변경.</summary>
+    public void Contribute(List<BuffViewItem> into)
+    {
+        for (int i = 0; i < s_resourceBadges.Length; i++)
+        {
+            var b = s_resourceBadges[i];
+            int v = _resources.Get(b.key);
+            if (v <= 0) continue;
+            // 카운트는 스택 배지(×N)로, 상한 대비 충전%는 게이지로. 라벨은 속성명만.
+            int max = _resources.GetMax(b.key);
+            float fill = max > 0 ? (float)v / max : -1f;
+            into.Add(new BuffViewItem(b.iconKey, b.label, v, fill, "", BuffSource.Rune, isDebuff: false));
         }
     }
 

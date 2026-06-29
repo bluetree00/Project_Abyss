@@ -58,6 +58,7 @@ public class DodgePresentation : MonoBehaviour
         _data       = _controller != null ? _controller.CharacterData : null;
         _renderers  = GetComponentsInChildren<SkinnedMeshRenderer>(true);
         _trail      = GetComponentInChildren<TrailRenderer>(true);
+        if (_trail == null) _trail = CreateDashTrail();   // 자식에 없으면 CharacterData 머티리얼로 런타임 생성
         _mpb        = new MaterialPropertyBlock();
 
         // 트레일은 회피 중에만 켠다 — 시작 상태는 항상 OFF로 강제(인스펙터에서 켜둔 상태 방어).
@@ -303,6 +304,43 @@ public class DodgePresentation : MonoBehaviour
     }
 
     // ── 트레일 ────────────────────────────────────────────────────
+    /// <summary>
+    /// 자식에 TrailRenderer가 없을 때 CharacterData 설정으로 대시 트레일을 런타임 생성한다.
+    /// dashTrailMaterial 미할당 시 null 반환(트레일 스킵).
+    /// </summary>
+    private TrailRenderer CreateDashTrail()
+    {
+        if (_data == null || _data.dashTrailMaterial == null) return null;
+
+        var go = new GameObject("~DashTrail");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = _data.dashTrailLocalOffset;
+
+        var tr = go.AddComponent<TrailRenderer>();
+        tr.material = _data.dashTrailMaterial;
+        tr.time = _data.dashTrailTime;
+        tr.startWidth = _data.dashTrailWidth;
+        tr.endWidth = 0f;
+        tr.minVertexDistance = 0.05f;
+        tr.autodestruct = false;
+        tr.emitting = false;
+        tr.alignment = LineAlignment.View;
+        tr.textureMode = LineTextureMode.Stretch;
+        tr.numCapVertices = 2;
+        tr.numCornerVertices = 2;
+        tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        tr.receiveShadows = false;
+
+        Color c = _data.dashTrailColor;
+        var grad = new Gradient();
+        grad.SetKeys(
+            new[] { new GradientColorKey(c, 0f), new GradientColorKey(c, 1f) },
+            new[] { new GradientAlphaKey(c.a, 0f), new GradientAlphaKey(0f, 1f) });
+        tr.colorGradient = grad;
+
+        return tr;
+    }
+
     private void EnableTrail()
     {
         if (_trail == null) return;

@@ -292,6 +292,19 @@ public sealed class CovenantHandler
         foreach (var c in _covenants) c.OverrideSkillCost(skill, ref ctx);
     }
 
+    // ── 버프창 표시 수집 ────────────────────────────────
+    /// <summary>
+    /// 현재 "발동/지속 상태"를 노출하는 서약만 버프창 표시 항목으로 수집(옵트인).
+    /// 보유 서약 상시 목록은 CovenantPanelView가 담당하므로 여기선 일시 상태만 모은다. 읽기 전용.
+    /// </summary>
+    public void CollectBuffViews(List<BuffViewItem> into)
+    {
+        if (into == null) return;
+        for (int i = 0; i < _covenants.Count; i++)
+            if (_covenants[i].TryGetBuffView(out var item))
+                into.Add(item);
+    }
+
     // ── 헬퍼 ────────────────────────────────────────────
     public CovenantBase Find(string covenantId)
         => _covenants.Find(c => c.CovenantId == covenantId);

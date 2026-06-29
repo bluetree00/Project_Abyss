@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using RelicFairy.Monster;
 
@@ -9,7 +10,7 @@ using RelicFairy.Monster;
 ///   심판 후 배신의 대가 빈틈(받피+/이속-, 빈틈 중 처치 시 즉시 해제, 종료 후 스택 재시작). 스킬 수동 불가.
 /// 수치는 RELIC_STAT_DATA(lancelot) 슬롯 구동. 낙인은 MonsterBase.ApplyDamageTakenAmp 재사용.
 /// </summary>
-public sealed class LancelotMadnessRelic : IRelicBehavior
+public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource
 {
     private const string RelicKey = "lancelot";
     private const int V_STACK_ATK = 3, V_TAKEN_CAP = 4, V_GUARD = 5, V_FALTER_DUR = 6,
@@ -130,5 +131,17 @@ public sealed class LancelotMadnessRelic : IRelicBehavior
 
         // 발동 후 스택 재시작(배신의 대가 재시작값은 후속 — 현재 0/슬롯값)
         _madness.StartFalter(V(V_FALTER_DUR, 4f), Mathf.RoundToInt(V(V_RESTART, 10f)));
+    }
+
+    // ── 버프창 수집(IBuffViewSource) ────────────────────────
+    /// <summary>현재 지속 상태(빈틈/광기 N)를 버프창 항목으로 기여. 머리 위 배지와 동일 판정(읽기 전용).</summary>
+    public void Contribute(List<BuffViewItem> into)
+    {
+        if (_owner == null || _madness == null) return;
+        // 광기: 카운트=스택 배지(×N), 게이지=MAX(심판)까지 진행도(Fill=Ratio). 빈틈: 남은시간 미노출 → 게이지 없음.
+        if (_madness.IsFaltering)
+            into.Add(new BuffViewItem("dark", "빈틈", 1, -1f, "", BuffSource.Relic, isDebuff: true));
+        else if (_madness.Stacks > 0)
+            into.Add(new BuffViewItem("dark", "광기", _madness.Stacks, _madness.Fill, "", BuffSource.Relic, isDebuff: false));
     }
 }
