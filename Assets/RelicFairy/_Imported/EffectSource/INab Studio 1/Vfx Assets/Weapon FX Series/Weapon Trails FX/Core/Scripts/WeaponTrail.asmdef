@@ -1,0 +1,18 @@
+{
+    "name": "WeaponTrail",
+    "rootNamespace": "",
+    "references": [
+        "GUID:9d7027634704bf544ab4f3f2d1db09f8",
+        "GUID:d04eb9c554ad44ceab303cecf0c0cf82",
+        "GUID:478a2357cc57436488a56e564b08d223"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
