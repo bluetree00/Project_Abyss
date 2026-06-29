@@ -5,6 +5,7 @@
 // - PlayerRuntimeStats 이벤트 구독 (AttackPower)
 // - PlayerWeaponManager 이벤트 구독 (장비 변화)
 //============================================================
+using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
@@ -27,7 +28,15 @@ public sealed class HudPresenter : MonoBehaviour
     private PlayerWeaponManager _weaponManager;
     private SkillCooldownTracker _cooldownTracker;
     private RoomBuffHandler _buffHandler;
+    private readonly BuffViewAggregator _buffAggregator = new();
+    private PlayerBuffViewSource _playerBuffSource;
+    private ItemBuffViewSource _itemBuffSource;
+    private bool _hasDynamicBuffSources;          // 룬/유물 등 폴링 기반 소스 등록 여부
+    private float _buffPollAccum;
+    private const float BuffPollInterval = 0.25f; // 룬 배지 폴링과 동일 cadence
+    private readonly List<BuffViewItem> _lastBuffItems = new();  // 더티 체크 캐시(재사용)
     private CovenantHandler _covenantHandler;
+    private CovenantBuffViewSource _covenantBuffSource;
 
     private UserInfo _userInfo;
 
@@ -57,6 +66,17 @@ public sealed class HudPresenter : MonoBehaviour
             SetMode(startMode);
     }
 
+    private void Update()
+    {
+        // 동적 지속 버프(룬/유물)는 이벤트가 아니라 상태가 매 프레임 변하므로 저빈도 폴링으로 반영.
+        // 방버프는 OnBuffsChanged 이벤트로 즉시 갱신되므로 동적 소스가 없으면 폴링 불필요.
+        if (!_hasDynamicBuffSources) return;
+        _buffPollAccum += Time.unscaledDeltaTime;
+        if (_buffPollAccum < BuffPollInterval) return;
+        _buffPollAccum = 0f;
+        RefreshBuffWindow();
+    }
+
     public void Construct(GameRunSession run, UIHudDataProvider provider)
     {
         if (_state != null)
@@ -74,7 +94,16 @@ public sealed class HudPresenter : MonoBehaviour
         if (run?.BuffHandler != null)
         {
             _buffHandler = run.BuffHandler;
+            _buffAggregator.SetRoomBuffSource(_buffHandler);
             _buffHandler.OnBuffsChanged += HandleBuffsChanged;
+        }
+
+        // 아이템 동적 지속 버프(조건부 Cond*) 소스 등록 — 상태가 매 프레임 변하므로 폴링 갱신.
+        if (run?.EffectManager != null)
+        {
+            _itemBuffSource = new ItemBuffViewSource(run.EffectManager);
+            _buffAggregator.AddSource(_itemBuffSource);
+            _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
         }
 
         if (view == null)
@@ -126,10 +155,25 @@ public sealed class HudPresenter : MonoBehaviour
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
+
+        // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
+        _playerBuffSource = new PlayerBuffViewSource(player);
+        _buffAggregator.AddSource(_playerBuffSource);
+        _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
+        _buffPollAccum = 0f;
+        RefreshBuffWindow();   // 즉시 1회 반영
     }
 
     public void UnbindPlayer()
     {
+        if (_playerBuffSource != null)
+        {
+            _buffAggregator.RemoveSource(_playerBuffSource);
+            _playerBuffSource = null;
+        }
+        _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
+        RefreshBuffWindow();   // 동적 버프 제거 반영(방버프만 남김)
+
         if (_runtimeStats != null)
         {
             _runtimeStats.OnChanged -= RefreshStats;
@@ -249,7 +293,46 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
-    private void HandleBuffsChanged() => view?.CombatPanel?.RefreshBuffList(_buffHandler?.ActiveBuffs);
+    private void HandleBuffsChanged() => RefreshBuffWindow();
+
+    private enum BuffDiff { None, Values, Structure }
+
+    /// <summary>
+    /// 버프창 수집→구조/값 차이 판정→변경 종류에 맞게 갱신. 방버프 이벤트와 동적 폴링의 단일 경로.
+    /// 구조 변경=전량 재생성, 값(게이지/스택)만 변경=in-place 갱신, 무변경=스킵(폴링 GC 억제).
+    /// </summary>
+    private void RefreshBuffWindow()
+    {
+        if (view?.CombatPanel == null) return;
+
+        var items = _buffAggregator.Collect();
+        var diff = DiffBuffs(items);
+        if (diff == BuffDiff.None) return;
+
+        CacheBuffItems(items);
+        if (diff == BuffDiff.Structure) view.CombatPanel.RefreshBuffView(items);
+        else                            view.CombatPanel.UpdateBuffValues(items);
+    }
+
+    private BuffDiff DiffBuffs(IReadOnlyList<BuffViewItem> items)
+    {
+        if (items.Count != _lastBuffItems.Count) return BuffDiff.Structure;
+
+        bool valuesChanged = false;
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (!items[i].SameStructure(_lastBuffItems[i])) return BuffDiff.Structure;
+            if (!items[i].SameValues(_lastBuffItems[i])) valuesChanged = true;
+        }
+        return valuesChanged ? BuffDiff.Values : BuffDiff.None;
+    }
+
+    private void CacheBuffItems(IReadOnlyList<BuffViewItem> items)
+    {
+        _lastBuffItems.Clear();
+        for (int i = 0; i < items.Count; i++)
+            _lastBuffItems.Add(items[i]);
+    }
 
     /// <summary>버프 획득 알림 텍스트 표시.</summary>
     public void ShowBuffNotice(string message) => view?.CombatPanel?.ShowBuffNotice(message);
@@ -333,6 +416,14 @@ public sealed class HudPresenter : MonoBehaviour
             _buffHandler.OnBuffsChanged -= HandleBuffsChanged;
             _buffHandler = null;
         }
+        _buffAggregator.SetRoomBuffSource(null);
+
+        if (_itemBuffSource != null)
+        {
+            _buffAggregator.RemoveSource(_itemBuffSource);
+            _itemBuffSource = null;
+        }
+        _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
     }
 
     public void BindCovenant(CovenantHandler handler)
@@ -343,10 +434,22 @@ public sealed class HudPresenter : MonoBehaviour
         _covenantHandler = handler;
         _covenantHandler.OnCovenantListChanged += HandleCovenantChanged;
         HandleCovenantChanged(); // 현재 목록 즉시 반영
+
+        // 서약 발동/지속 상태(옵트인) 버프창 소스 등록 — 보유 목록은 CovenantPanel이 담당.
+        _covenantBuffSource = new CovenantBuffViewSource(handler);
+        _buffAggregator.AddSource(_covenantBuffSource);
+        _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
     }
 
     public void UnbindCovenant()
     {
+        if (_covenantBuffSource != null)
+        {
+            _buffAggregator.RemoveSource(_covenantBuffSource);
+            _covenantBuffSource = null;
+        }
+        _hasDynamicBuffSources = _buffAggregator.DynamicSourceCount > 0;
+
         if (_covenantHandler == null) return;
         _covenantHandler.OnCovenantListChanged -= HandleCovenantChanged;
         _covenantHandler = null;

@@ -85,6 +85,8 @@ public class PlayerController : CharacterBase
     // 멀린 룬 속성 단계 효과 디스패처 (단계 도달 시 MerlinRuneBridge가 Activate)
     private RuneEffectDispatcher _runeEffects;
     public RuneEffectDispatcher RuneEffects => _runeEffects ??= new RuneEffectDispatcher(this);
+    /// <summary>이미 생성된 룬 디스패처(없으면 null). 지연 생성을 강제하지 않는 읽기 전용 조회 — 버프창 수집용.</summary>
+    public RuneEffectDispatcher RuneEffectsOrNull => _runeEffects;
 
     // 스킬 버프: 기본공격 시 추가 발사 횟수 (0이면 비활성)
     public int ExtraShotCount { get; set; }

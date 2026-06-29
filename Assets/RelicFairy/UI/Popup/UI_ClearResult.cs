@@ -161,8 +161,9 @@ public class UI_ClearResult : UI_Popup
         foreach (var eff in data.effects)
         {
             if (string.IsNullOrEmpty(eff.effectType)) continue;
-            string sign = eff.value >= 0 ? "+" : "";
-            sb.AppendLine($"{eff.effectType}: {sign}{eff.value}");
+            // 표시 전용 포맷터로 한글 라벨/단위/조건/CSV 원문 일원화(raw enum 제거).
+            var display = EffectDescriptionFormatter.Describe(eff);
+            sb.AppendLine(display.Combined);
         }
         return sb.ToString().TrimEnd();
     }

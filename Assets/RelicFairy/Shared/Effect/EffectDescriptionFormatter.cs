@@ -15,9 +15,11 @@ public readonly struct EffectDisplay
     public readonly Color Color;         // 기존 컨벤션(이로움=옅은 청백 / 해로움=적색)
     public readonly bool IsRisk;
     public readonly bool IsFallback;     // 미등록 effectType 폴백 여부
+    public readonly string Description;  // CSV 원문(있으면 조립 텍스트 대신 우선 노출). 없으면 ""
 
     public EffectDisplay(string label, string valueText, string triggerText, EffectCategory category,
-                         EffectUnit unit, string iconKey, Color color, bool isRisk, bool isFallback)
+                         EffectUnit unit, string iconKey, Color color, bool isRisk, bool isFallback,
+                         string description = null)
     {
         Label = label;
         ValueText = valueText;
@@ -28,18 +30,21 @@ public readonly struct EffectDisplay
         Color = color;
         IsRisk = isRisk;
         IsFallback = isFallback;
+        Description = description ?? string.Empty;
     }
 
-    /// <summary>"라벨 +4%" 형태(트리거 제외). 수치 없으면 라벨만.</summary>
+    /// <summary>"라벨 +4%" 형태(트리거 제외). CSV 원문이 있으면 그것을 우선. 수치 없으면 라벨만.</summary>
     public string LabelWithValue
-        => string.IsNullOrEmpty(ValueText) ? Label : $"{Label} {ValueText}";
+        => !string.IsNullOrEmpty(Description) ? Description
+         : string.IsNullOrEmpty(ValueText) ? Label : $"{Label} {ValueText}";
 
-    /// <summary>"라벨 +4% (적중 시)" 형태. 가장 완전한 한 줄.</summary>
+    /// <summary>"라벨 +4% (적중 시)" 형태. 가장 완전한 한 줄. CSV 원문(조건 포함 완전 문장)이 있으면 우선.</summary>
     public string Combined
     {
         get
         {
-            string core = LabelWithValue;
+            if (!string.IsNullOrEmpty(Description)) return Description;
+            string core = string.IsNullOrEmpty(ValueText) ? Label : $"{Label} {ValueText}";
             return string.IsNullOrEmpty(TriggerText) ? core : $"{core} ({TriggerText})";
         }
     }
@@ -65,11 +70,11 @@ public static class EffectDescriptionFormatter
     {
         if (slot == null)
             return Describe(string.Empty, 0f, null);
-        return Describe(slot.effectType, slot.value, slot.trigger);
+        return Describe(slot.effectType, slot.value, slot.trigger, slot.description);
     }
 
-    /// <summary>raw 필드 → 표시 결과.</summary>
-    public static EffectDisplay Describe(string effectType, float value, string trigger)
+    /// <summary>raw 필드 → 표시 결과. description(CSV 원문)이 있으면 표시 문구로 우선 사용.</summary>
+    public static EffectDisplay Describe(string effectType, float value, string trigger, string description = null)
     {
         var meta = EffectMetaRegistry.Get(effectType);
 
@@ -79,7 +84,7 @@ public static class EffectDescriptionFormatter
         Color color = isRisk ? RiskColor : NormalColor;
 
         return new EffectDisplay(meta.Label, valueText, triggerText, meta.Category, meta.Unit,
-                                 meta.IconKey, color, isRisk, meta.IsFallback);
+                                 meta.IconKey, color, isRisk, meta.IsFallback, description);
     }
 
     // ── 룸 버프(HUD) — StatType 기반 ─────────────────────────────
@@ -94,6 +99,28 @@ public static class EffectDescriptionFormatter
         string valueStr = isPercent ? FormatValue(EffectUnit.Ratio, value) : FormatValue(EffectUnit.Flat, value);
         string remain = roomsRemaining > 0 ? $" [{roomsRemaining}방]" : "";
         return $"{label} {valueStr}{remain}";
+    }
+
+    /// <summary>룸 버프(StatType) → 한글 라벨. 버프 뷰모델(BuffViewItem)이 라벨/수치 분리 생성에 사용.</summary>
+    public static string StatLabel(StatType type) => StatTypeLabel(type);
+
+    /// <summary>
+    /// 상태이상 statusId(GuidelineVisual.StatusApplied 어휘) → 아이콘 키(EffectIconRegistry 어휘).
+    /// 두 어휘를 통합하는 단일 진입점. 미매핑은 "unknown"(회색 폴백 — 기능 정상).
+    /// </summary>
+    public static string IconKeyForStatus(string statusId)
+    {
+        switch (statusId)
+        {
+            case "ignite": case "burn":                       return "fire";
+            case "frost":  case "freeze": case "shatter":     return "freeze";
+            case "poison": case "item_poison":
+            case "poison_atk": case "vulnerable":             return "poison";
+            case "shock":  case "static":                     return "lightning";
+            case "stun":                                       return "stun";
+            case "brand":  case "item_mark":                  return "dark";
+            default:                                           return "unknown";
+        }
     }
 
     /// <summary>룸 버프(StatType) → 아이콘 키. EffectMetaRegistry IconKey 어휘와 동일.</summary>
@@ -200,6 +227,27 @@ public static class EffectDescriptionFormatter
             case "OnRevive":      return "부활 시";
             case "OnBossEnter":   return "보스 진입 시";
             case "OnRoomEnter":   return "방 진입 시";
+
+            // ── 아이템 조건부 트리거(ITEM_DATA.csv) — ConditionalStatBuffEffect/FirstHitBonusEffect 어휘 ──
+            case "HPBelow50":          return "HP 50% 이하";
+            case "HPBelow40":          return "HP 40% 이하";
+            case "HPBelow30":          return "HP 30% 이하";
+            case "AfterSkill":         return "스킬 사용 후";
+            case "AfterHit":           return "피격 후";
+            case "AfterRoomEnter":     return "방 진입 후";
+            case "WhileMoving":        return "이동 중";
+            case "Stationary":         return "정지 중";
+            case "Consecutive":        return "연속 공격 시";
+            case "SameTarget":         return "같은 적 연속 시";
+            case "NoHit":              return "무피격 유지 시";
+            case "DefenseAbove":       return "방어력 높을 때";
+            case "EnemiesNearby":      return "주변 적 다수 시";
+            case "HasShield":          return "보호막 보유 시";
+            case "DuringBoss":         return "보스전 중";
+            case "SingleEnemy":        return "단일 적 시";
+            case "FirstAttackInRoom":  return "방 첫 공격 시";
+            case "WhileSkillCooldown": return "스킬 쿨다운 중";
+
             default:              return trigger; // 미지 트리거는 원문 노출(정보 손실 방지)
         }
     }
