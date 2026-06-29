@@ -2436,7 +2436,15 @@ MonoBehaviour:
   _disappearDuration: 0.25
   _whiteMaterial: {fileID: 2100000, guid: 2d215973ef3daec4f96eaabd33e2b48b, type: 2}
   _blackMaterial: {fileID: 2100000, guid: 03173d869908c9046a995334bc539417, type: 2}
-  _swordTrail: {fileID: 0}
+  _holyTrailPrefab: {fileID: 2318646775085140256, guid: 7dd1d0016b35b5b4eb41078fe62ab4f2,
+    type: 3}
+  _darkTrailPrefab: {fileID: 211711048654108181, guid: 9a1b2e700070e9140a1249cbf0ab8fc6,
+    type: 3}
+  _trailTipOffset: {x: 0, y: -1.2, z: 0}
+  _trailRootOffset: {x: 0, y: -0.05, z: 0}
+  _trailFadeIn: 0.05
+  _trailFadeOut: 0.15
+  _trailLength: 1
 --- !u!1 &3440618284725765318
 GameObject:
   m_ObjectHideFlags: 0
