@@ -45,7 +45,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1c0b8265125452341a43f1394358cdb0
+  - m_GUID: def216b09d67fab43b1bd39f7748917d
     m_Address: GreatswordAttack_01
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -75,7 +75,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4c2e4c472ee2e0345bf589fe9cb190a4
+  - m_GUID: 8db0371537281ae46a56f734712ccdd9
     m_Address: GreatswordAttack_02
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -150,7 +150,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b72313c5276bb2a458d79fe4e12198c0
+  - m_GUID: b3ab8d439420950498be32a805f2bee6
     m_Address: GreatswordAttack_03
     m_ReadOnly: 0
     m_SerializedLabels: []
