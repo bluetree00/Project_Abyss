@@ -17,6 +17,9 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
     private const string RelicKey = "gawain";
     private const int V_NOON_ATKSPD = 3, V_NOON_CRITCH = 4, V_NOON_CRITDMG = 5, V_NOON_ALLDMG = 6,
                       V_MARK_ATK = 8;
+    // 기본 패시브 설명(버프창 첫 셀의 호버 툴팁). 태양 게이지/정오/각인 사이클 요약.
+    private const string PassiveTip =
+        "정오의 맹세 — 태양 게이지를 채워 '정오'에 들면 공속·치명타·모든 피해가 강화되고, 게이지 80%+ '각인'에서 공격력이 미리 강화된다 (처치 시 충전 가속)";
 
     private PlayerController _owner;
     private ZenithGauge      _gauge;
@@ -129,6 +132,10 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
     public void Contribute(List<BuffViewItem> into)
     {
         if (_owner == null || _gauge == null) return;
+
+        // 기본 패시브(항상 첫 셀, 게이지 없는 상시 표시) — 상세는 호버 툴팁(Label)으로.
+        into.Add(new BuffViewItem("light", PassiveTip, 1, -1f, "", BuffSource.Relic, isDebuff: false));
+
         // 게이지: 정오=남은 정오시간(1→0), 각인=충전 진행도. ZenithGauge.Fill이 구간별로 제공.
         if (_gauge.IsNoon)
             into.Add(new BuffViewItem("atk", "정오", 1, _gauge.Fill, "", BuffSource.Relic, isDebuff: false));
