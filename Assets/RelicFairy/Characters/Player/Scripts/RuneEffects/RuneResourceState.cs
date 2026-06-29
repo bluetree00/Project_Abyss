@@ -65,6 +65,9 @@ public sealed class RuneResourceState
 
     public int Get(string key) => _slots.TryGetValue(key, out var s) ? s.count : 0;
 
+    /// <summary>슬롯 상한(충전 게이지 진행% 산출용, 버프창 표시 전용). 미존재면 0.</summary>
+    public int GetMax(string key) => _slots.TryGetValue(key, out var s) ? s.max : 0;
+
     /// <summary>전량 소모 → 소모한 수 반환. 임계 발화 플래그도 리셋(재충전 시 재발화).</summary>
     public int Consume(string key)
     {

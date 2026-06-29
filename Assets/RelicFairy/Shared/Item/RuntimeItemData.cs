@@ -156,6 +156,7 @@ public class RuntimeItemData
                 value3     = e.value3,
                 maxStack   = e.max_stack,
                 duration   = e.duration,
+                description = e.description,
                 vfxKey     = soVfxKey,
             });
         }
@@ -181,6 +182,12 @@ public class ItemEffectSlot
     public float  value3;
     public int    maxStack;
     public float  duration;
+
+    /// <summary>
+    /// CSV(ITEM_DATA) 원문 설명. 표시 레이어가 있으면 우선 사용(없으면 포맷터 조립 폴백).
+    /// 동작/밸런스에는 영향 없음 — 순수 표시용.
+    /// </summary>
+    public string description;
 
     /// <summary>
     /// 이 슬롯의 VFX Addressable 키. 빈 값이면 Effect 클래스의 기본 키 사용.

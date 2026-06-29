@@ -175,6 +175,10 @@ public static class EffectIconRegistry
             case "projectile": return new Color(0.80f, 0.70f, 0.45f);
             case "range":      return new Color(0.78f, 0.68f, 0.50f);
 
+            // ── 속성(빛/어둠) — GuidelineVisual 팔레트와 정합 ──
+            case "light":      return new Color(1.00f, 0.95f, 0.55f);
+            case "dark":       return new Color(0.60f, 0.35f, 0.85f);
+
             // ── 기타 ──
             case "skill":      return new Color(0.65f, 0.45f, 0.90f);
             case "stun":       return new Color(0.92f, 0.85f, 0.40f);

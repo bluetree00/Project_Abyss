@@ -19,8 +19,11 @@ public sealed class UI_ShopPanel : UI_Popup
     public override bool BlocksGameplay => true; // 상점 이용 중 시간정지 + 입력잠금
 
     private const float WindowW = 1100f;
-    private const float WindowH = 880f;
-    private static readonly Vector2 CellSize = new(218f, 300f);
+    // 카드 셀 높이를 308로 올려 셀 내부 여유(=308-8-292=8px)를 확보하고, 5개 이상(2행) 슬롯이
+    // 그리드 영역(=WindowH-104-150=658)에 들어가도록 윈도우 높이를 912로 키운다.
+    // (2행 필요 높이 = 308*2 + 22 spacing + 12 padding = 650 ≤ 658)
+    private const float WindowH = 912f;
+    private static readonly Vector2 CellSize = new(218f, 308f);
 
     private ShopRoomController _controller;
     private readonly List<UI_ShopSlotView> _views = new();
