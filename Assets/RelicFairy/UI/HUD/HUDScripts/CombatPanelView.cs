@@ -62,9 +62,37 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text _hpMaxText;
     private GameObject _statRoot;
 
-    // ── 버프 UI 런타임 ──
-    private readonly List<GameObject> _buffEntries = new();
+    // ── 버프 그리드 UI 런타임 ──
+    private GridLayoutGroup _buffGrid;                       // buffListRoot에 부착(아이콘+스택)
+    private readonly List<BuffCell> _buffCells = new();      // 셀 풀(재사용)
+    private GameObject _buffTooltip;                         // 재사용 툴팁 1개
+    private TMP_Text   _buffTooltipText;
+    private BuffCell   _hoveredCell;
+
+    // ── 분리된 게이지 영역 런타임(그리드와 별개) ──
+    private Transform _gaugeRoot;
+    private readonly List<GaugeBar> _gaugeBars = new();      // 게이지 바 풀(재사용)
+
+    /// <summary>분리 게이지 바 1개의 위젯 참조.</summary>
+    private struct GaugeBar
+    {
+        public GameObject    go;
+        public Image         icon;
+        public RectTransform fill;   // 폭=anchorMax.x
+        public Image         fillImg;
+    }
+
     private float _noticeTimer;
+
+    // ── 버프창 가장자리 도킹(좌상단, 서약 패널 아래) ──
+    // Panel_Covenant: top-left, y=-70, 최대 4슬롯(슬롯40 + spacing6) → 최대 높이 ~186px.
+    // 그 아래 ~16px 여유 → 그리드 시작 y = -(70+186+16) = -272. 그리드/게이지를 함께 좌상단 도킹.
+    private const float BuffDockX    = 12f;
+    private const float BuffDockTopY = -272f;
+    private const float BuffGaugeGap = 8f;   // 그리드와 게이지 사이 간격
+
+    // 툴팁 화면 클램프용 코너 버퍼(재사용 — 호버 시 GC 억제).
+    private static readonly Vector3[] _tooltipCorners = new Vector3[4];
 
     // ─────────────────────────────────────────────────────────
     // HP
@@ -486,69 +514,176 @@ public sealed class CombatPanelView : MonoBehaviour
         _noticeTimer = NoticeDuration + NoticeFadeTime;
     }
 
-    /// <summary>현재 활성 버프 목록 전체 갱신.</summary>
-    public void RefreshBuffList(IReadOnlyList<ActiveRoomBuff> buffs)
+    /// <summary>
+    /// 현재 활성 지속 버프 목록 전체 갱신(BuffViewItem 모델 경로).
+    /// 그리드 = 모든 버프(아이콘 + 칸 안 스택 숫자). 게이지 = Remaining01 보유 항목만 분리 영역에 별도 바.
+    /// 셀/바는 풀에서 재사용(부족하면 생성, 남으면 숨김). 수집은 BuffViewAggregator 담당.
+    /// </summary>
+    public void RefreshBuffView(IReadOnlyList<BuffViewItem> items)
     {
-        if (buffListRoot == null)
+        EnsureBuffGrid();
+        if (_buffGrid == null) return;
+
+        int count = items?.Count ?? 0;
+
+        // ── 그리드(아이콘 + 스택 숫자) — 모든 버프 ──
+        while (_buffCells.Count < count)
+            _buffCells.Add(CreateBuffCell());
+        for (int i = 0; i < _buffCells.Count; i++)
         {
-            EnsureBuffListRoot();
-            if (buffListRoot == null) return;
+            if (i < count) _buffCells[i].Bind(items[i]);
+            else           _buffCells[i].Hide();
         }
 
-        // 기존 엔트리 정리
-        foreach (var go in _buffEntries)
-            if (go != null) Destroy(go);
-        _buffEntries.Clear();
+        // ── 분리된 게이지 영역 — Remaining01>=0 항목만 ──
+        EnsureGaugeArea();
+        RepositionGaugeBelowGrid(count);   // 그리드 실제 높이만큼 게이지를 아래로(침범 방지)
+        int gaugeCount = 0;
+        for (int i = 0; i < count; i++)
+            if (items[i].Remaining01 >= 0f) gaugeCount++;
 
-        if (buffs == null || buffs.Count == 0) return;
+        while (_gaugeBars.Count < gaugeCount)
+            _gaugeBars.Add(CreateGaugeBar());
 
-        for (int i = 0; i < buffs.Count; i++)
+        int gi = 0;
+        for (int i = 0; i < count; i++)
         {
-            var buff = buffs[i];
-            var entry = CreateBuffEntry(buff, i);
-            _buffEntries.Add(entry);
+            if (items[i].Remaining01 < 0f) continue;
+            BindGauge(_gaugeBars[gi], items[i]);
+            gi++;
+        }
+        for (; gi < _gaugeBars.Count; gi++)
+            if (_gaugeBars[gi].go != null) _gaugeBars[gi].go.SetActive(false);
+
+        // 호버 중이던 셀이 숨겨졌으면 툴팁 정리, 살아있으면 내용 갱신
+        if (_hoveredCell != null)
+        {
+            if (!_hoveredCell.gameObject.activeSelf) HideBuffTooltip();
+            else SetTooltipContent(_hoveredCell.Item);
         }
     }
 
-    private GameObject CreateBuffEntry(ActiveRoomBuff buff, int index)
+    /// <summary>
+    /// 구조가 동일할 때 동적 값만 in-place 갱신: 셀의 스택 숫자 + 분리 게이지 바의 채움.
+    /// 전량 재생성 없이 폴링 GC를 억제한다.
+    /// </summary>
+    public void UpdateBuffValues(IReadOnlyList<BuffViewItem> items)
     {
-        var go = new GameObject($"BuffEntry_{index}", typeof(RectTransform));
-        go.transform.SetParent(buffListRoot, false);
+        if (items == null) return;
 
-        var rect = go.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(200f, 24f);
+        // 스택 숫자(셀)
+        int n = Mathf.Min(items.Count, _buffCells.Count);
+        for (int i = 0; i < n; i++)
+            if (_buffCells[i].gameObject.activeSelf)
+                _buffCells[i].UpdateValues(items[i]);
 
-        // 배경
-        var bg = go.AddComponent<Image>();
-        bg.color = buff.IsDebuff
-            ? new Color(0.6f, 0.15f, 0.15f, 0.7f)
-            : new Color(0.15f, 0.35f, 0.6f, 0.7f);
+        // 게이지 채움(분리 영역) — Remaining01 보유 항목 순서대로 바와 매칭
+        int gi = 0;
+        for (int i = 0; i < items.Count && gi < _gaugeBars.Count; i++)
+        {
+            if (items[i].Remaining01 < 0f) continue;
+            var bar = _gaugeBars[gi];
+            if (bar.fill != null)
+                bar.fill.anchorMax = new Vector2(Mathf.Clamp01(items[i].Remaining01), 1f);
+            gi++;
+        }
 
-        // 텍스트
-        var textGo = new GameObject("Text", typeof(RectTransform));
-        textGo.transform.SetParent(go.transform, false);
-
-        var textRect = textGo.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(6f, 0f);
-        textRect.offsetMax = new Vector2(-4f, 0f);
-
-        var text = textGo.AddComponent<TextMeshProUGUI>();
-        AssignSafeFont(text);
-        text.text = FormatBuff(buff);
-        text.fontSize = 14f;
-        text.color = Color.white;
-        text.alignment = TextAlignmentOptions.MidlineLeft;
-
-        EffectIconView.Attach(go.transform, EffectDescriptionFormatter.IconKeyForStat(buff.Modifier.Type), text, 16f);
-
-        return go;
+        if (_hoveredCell != null && _hoveredCell.gameObject.activeSelf)
+            SetTooltipContent(_hoveredCell.Item);
     }
 
-    private static string FormatBuff(ActiveRoomBuff buff)
-        => EffectDescriptionFormatter.FormatStatBuff(
-            buff.Modifier.Type, buff.Modifier.Value, buff.IsPercent, buff.RoomsRemaining);
+    private BuffCell CreateBuffCell()
+    {
+        var go = new GameObject($"BuffCell_{_buffCells.Count}", typeof(RectTransform));
+        go.transform.SetParent(_buffGrid.transform, false);
+        var cell = go.AddComponent<BuffCell>();
+        cell.Initialize(GetSafeFont(), OnBuffCellHover);
+        return cell;
+    }
+
+    // ── 호버 툴팁(재사용 1개) ────────────────────────────────
+    private void OnBuffCellHover(BuffCell cell, bool entered)
+    {
+        if (entered)
+        {
+            _hoveredCell = cell;
+            ShowBuffTooltip(cell);
+        }
+        else if (_hoveredCell == cell)
+        {
+            HideBuffTooltip();
+        }
+    }
+
+    private void ShowBuffTooltip(BuffCell cell)
+    {
+        EnsureBuffTooltip();
+        if (_buffTooltip == null) return;
+
+        SetTooltipContent(cell.Item);
+        _buffTooltip.transform.SetAsLastSibling();
+
+        // 셀 우측에 배치한 뒤 화면 경계 안으로 클램프.
+        float cw = _buffGrid != null ? _buffGrid.cellSize.x : 46f;
+        float ch = _buffGrid != null ? _buffGrid.cellSize.y : 46f;
+        _buffTooltip.transform.position = cell.Rect.position + new Vector3(cw * 0.5f + 8f, ch * 0.5f, 0f);
+
+        _buffTooltip.SetActive(true);
+        ClampTooltipToScreen();
+    }
+
+    /// <summary>툴팁이 화면 밖으로 나가지 않도록 위치 보정(Overlay 캔버스 = 스크린 픽셀 좌표).</summary>
+    private void ClampTooltipToScreen()
+    {
+        if (_buffTooltip == null) return;
+        var rt = (RectTransform)_buffTooltip.transform;
+
+        // ContentSizeFitter 높이 반영을 위해 즉시 레이아웃 재빌드 후 실제 코너 측정.
+        LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+        rt.GetWorldCorners(_tooltipCorners);   // 0:BL 1:TL 2:TR 3:BR
+
+        float minX = _tooltipCorners[0].x, maxX = _tooltipCorners[2].x;
+        float minY = _tooltipCorners[0].y, maxY = _tooltipCorners[1].y;
+
+        float dx = 0f, dy = 0f;
+        if (maxX > Screen.width)        dx  = Screen.width - maxX;          // 우측 초과 → 왼쪽으로
+        if (minX + dx < 0f)             dx += -(minX + dx);                 // 좌측 초과 → 오른쪽으로
+        if (minY + dy < 0f)             dy  = -minY;                        // 하단 초과 → 위로
+        if (maxY + dy > Screen.height)  dy += Screen.height - (maxY + dy);  // 상단 초과 → 아래로
+
+        if (dx != 0f || dy != 0f)
+            _buffTooltip.transform.position += new Vector3(dx, dy, 0f);
+    }
+
+    private void HideBuffTooltip()
+    {
+        _hoveredCell = null;
+        if (_buffTooltip != null && _buffTooltip.activeSelf)
+            _buffTooltip.SetActive(false);
+    }
+
+    private void SetTooltipContent(in BuffViewItem item)
+    {
+        if (_buffTooltipText == null) return;
+
+        string src = item.Source switch
+        {
+            BuffSource.Room   => "방 버프",
+            BuffSource.Rune   => "룬",
+            BuffSource.Relic  => "유물",
+            BuffSource.Item   => "아이템",
+            BuffSource.Status => "상태이상",
+            _                 => "",
+        };
+
+        string text = $"<b>{item.Label}</b>";
+        if (item.Stacks > 1) text += $"\n중첩 ×{item.Stacks}";
+        if (!string.IsNullOrEmpty(item.RemainText)) text += $"\n잔여 {item.RemainText}";
+        else if (item.Remaining01 >= 0f) text += $"\n충전 {Mathf.RoundToInt(Mathf.Clamp01(item.Remaining01) * 100f)}%";
+        if (!string.IsNullOrEmpty(src)) text += $"\n<size=85%><color=#AAAAAA>{src}</color></size>";
+
+        _buffTooltipText.text = text;
+    }
 
     // ─────────────────────────────────────────────────────────
     // 아이템 효과 발동 알림 (스택형, 왼쪽 하단)
@@ -810,18 +945,111 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         if (buffListRoot != null) return;
 
-        var go = new GameObject("BuffListRoot", typeof(RectTransform));
+        var go = new GameObject("BuffGridRoot", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        // 화면 좌상단(서약 패널 아래)에 도킹, 아래로 확장(그리드). 레이아웃 컴포넌트는 EnsureBuffGrid에서 부착.
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockTopY);
+        rect.sizeDelta = new Vector2(250f, 100f);
+
+        buffListRoot = go.transform;
+    }
+
+    /// <summary>버프 그리드 컨테이너(GridLayoutGroup + ContentSizeFitter) 보장. buffListRoot에 부착.</summary>
+    private void EnsureBuffGrid()
+    {
+        if (_buffGrid != null) return;
+
+        if (buffListRoot == null)
+        {
+            EnsureBuffListRoot();
+            if (buffListRoot == null) return;
+        }
+
+        var rootGo = buffListRoot.gameObject;
+
+        // 이전 세로 리스트용 레이아웃이 있으면 제거(그리드와 충돌 방지).
+        var vlg = rootGo.GetComponent<VerticalLayoutGroup>();
+        if (vlg != null) Destroy(vlg);
+
+        _buffGrid = rootGo.GetComponent<GridLayoutGroup>();
+        if (_buffGrid == null) _buffGrid = rootGo.AddComponent<GridLayoutGroup>();
+        _buffGrid.cellSize        = new Vector2(46f, 46f);
+        _buffGrid.spacing         = new Vector2(4f, 4f);
+        _buffGrid.startCorner     = GridLayoutGroup.Corner.UpperLeft;
+        _buffGrid.startAxis       = GridLayoutGroup.Axis.Horizontal;
+        _buffGrid.childAlignment  = TextAnchor.UpperLeft;
+        _buffGrid.constraint      = GridLayoutGroup.Constraint.FixedColumnCount;
+        _buffGrid.constraintCount = 5;
+
+        var fitter = rootGo.GetComponent<ContentSizeFitter>();
+        if (fitter == null) fitter = rootGo.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+    }
+
+    /// <summary>호버 툴팁(재사용 1개) 보장. CombatPanel 하위에 생성, 표시 시 최상위로.</summary>
+    private void EnsureBuffTooltip()
+    {
+        if (_buffTooltip != null) return;
+
+        var go = new GameObject("BuffTooltip", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.pivot     = new Vector2(0f, 1f);
+        rt.sizeDelta = new Vector2(220f, 64f);
+
+        var bg = go.AddComponent<Image>();
+        bg.color = new Color(0.05f, 0.05f, 0.08f, 0.92f);
+        bg.raycastTarget = false;
+
+        var txtGo = new GameObject("Text", typeof(RectTransform));
+        txtGo.transform.SetParent(go.transform, false);
+        var trt = txtGo.GetComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = Vector2.one;
+        trt.offsetMin = new Vector2(8f, 6f);
+        trt.offsetMax = new Vector2(-8f, -6f);
+
+        _buffTooltipText = txtGo.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(_buffTooltipText);
+        _buffTooltipText.fontSize = 13f;
+        _buffTooltipText.color = Color.white;
+        _buffTooltipText.alignment = TextAlignmentOptions.TopLeft;
+        _buffTooltipText.textWrappingMode = TextWrappingModes.Normal;
+        _buffTooltipText.raycastTarget = false;
+
+        var fitter = go.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        go.SetActive(false);
+        _buffTooltip = go;
+    }
+
+    // ── 분리된 게이지 영역 ───────────────────────────────────
+    /// <summary>그리드와 구분된 게이지 영역(세로 바 목록) 보장. 그리드 아래쪽에 별도 배치.</summary>
+    private void EnsureGaugeArea()
+    {
+        if (_gaugeRoot != null) return;
+
+        var go = new GameObject("BuffGaugeArea", typeof(RectTransform));
         go.transform.SetParent(transform, false);
 
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0.5f);
-        rect.anchorMax = new Vector2(0f, 0.5f);
-        rect.pivot = new Vector2(0f, 0.5f);
-        rect.anchoredPosition = new Vector2(10f, 0f);
-        rect.sizeDelta = new Vector2(210f, 400f);
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        // Y는 그리드 실제 높이에 따라 RepositionGaugeBelowGrid에서 동적 갱신(그리드 침범 방지).
+        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockTopY);
+        rect.sizeDelta = new Vector2(210f, 100f);
 
         var layout = go.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 4f;
+        layout.spacing = 3f;
         layout.childAlignment = TextAnchor.UpperLeft;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
@@ -831,7 +1059,91 @@ public sealed class CombatPanelView : MonoBehaviour
         var fitter = go.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        buffListRoot = go.transform;
+        _gaugeRoot = go.transform;
+    }
+
+    /// <summary>게이지 영역을 그리드 실제 높이만큼 아래로 배치(다수 버프 시 그리드가 게이지를 침범하지 않게).</summary>
+    private void RepositionGaugeBelowGrid(int buffCount)
+    {
+        if (_gaugeRoot == null) return;
+
+        int   cols   = _buffGrid != null ? Mathf.Max(1, _buffGrid.constraintCount) : 5;
+        float cellH  = _buffGrid != null ? _buffGrid.cellSize.y : 46f;
+        float spaceY = _buffGrid != null ? _buffGrid.spacing.y  : 4f;
+
+        int   rows       = buffCount > 0 ? Mathf.CeilToInt(buffCount / (float)cols) : 0;
+        float gridHeight = rows > 0 ? rows * cellH + (rows - 1) * spaceY : 0f;
+
+        ((RectTransform)_gaugeRoot).anchoredPosition =
+            new Vector2(BuffDockX, BuffDockTopY - gridHeight - BuffGaugeGap);
+    }
+
+    private GaugeBar CreateGaugeBar()
+    {
+        var go = new GameObject($"BuffGauge_{_gaugeBars.Count}", typeof(RectTransform));
+        go.transform.SetParent(_gaugeRoot, false);
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(210f, 16f);
+        var le = go.AddComponent<LayoutElement>();
+        le.preferredHeight = 16f;
+        le.minHeight = 16f;
+
+        // 아이콘(좌측)
+        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+        iconGo.transform.SetParent(go.transform, false);
+        var irt = iconGo.GetComponent<RectTransform>();
+        irt.anchorMin = new Vector2(0f, 0.5f);
+        irt.anchorMax = new Vector2(0f, 0.5f);
+        irt.pivot     = new Vector2(0f, 0.5f);
+        irt.anchoredPosition = new Vector2(0f, 0f);
+        irt.sizeDelta = new Vector2(14f, 14f);
+        var icon = iconGo.GetComponent<Image>();
+        icon.preserveAspect = true;
+        icon.raycastTarget = false;
+
+        // 트랙(아이콘 우측 ~ 우측 끝)
+        var trackGo = new GameObject("Track", typeof(RectTransform));
+        trackGo.transform.SetParent(go.transform, false);
+        var trt = trackGo.GetComponent<RectTransform>();
+        trt.anchorMin = new Vector2(0f, 0.5f);
+        trt.anchorMax = new Vector2(1f, 0.5f);
+        trt.pivot     = new Vector2(0f, 0.5f);
+        trt.offsetMin = new Vector2(18f, -4f);
+        trt.offsetMax = new Vector2(0f, 4f);
+        var trackImg = trackGo.AddComponent<Image>();
+        trackImg.color = new Color(0f, 0f, 0f, 0.55f);
+        trackImg.raycastTarget = false;
+
+        // 채움(anchorMax.x로 폭 — 스프라이트 불필요, in-place 갱신 가벼움)
+        var fillGo = new GameObject("Fill", typeof(RectTransform));
+        fillGo.transform.SetParent(trackGo.transform, false);
+        var frt = fillGo.GetComponent<RectTransform>();
+        frt.anchorMin = new Vector2(0f, 0f);
+        frt.anchorMax = new Vector2(0f, 1f);
+        frt.offsetMin = Vector2.zero;
+        frt.offsetMax = Vector2.zero;
+        var fillImg = fillGo.AddComponent<Image>();
+        fillImg.raycastTarget = false;
+
+        return new GaugeBar { go = go, icon = icon, fill = frt, fillImg = fillImg };
+    }
+
+    private void BindGauge(in GaugeBar bar, in BuffViewItem item)
+    {
+        if (bar.go == null) return;
+        bar.go.SetActive(true);
+
+        if (bar.icon != null)
+            bar.icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
+
+        if (bar.fillImg != null)
+            bar.fillImg.color = item.IsDebuff
+                ? new Color(0.90f, 0.40f, 0.40f, 0.95f)
+                : new Color(0.40f, 0.80f, 0.85f, 0.95f);
+
+        if (bar.fill != null)
+            bar.fill.anchorMax = new Vector2(Mathf.Clamp01(item.Remaining01), 1f);
     }
 
     private void EnsureBuffNoticeText()

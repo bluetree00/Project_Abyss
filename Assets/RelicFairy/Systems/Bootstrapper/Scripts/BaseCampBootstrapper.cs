@@ -54,25 +54,21 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // 허브에서는 전투 HUD를 억제(시작방과 동일 처리).
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
-            // 시작 연출 (Ch1 StartRoomAsync 진입 연출과 동일 구성):
-            // 검정으로 가린 뒤 플레이어 스폰 → 둘러보기 패닝(레터박스+페이드인)으로 드러냄 → 게임플레이 카메라 인계.
+            // 시작 연출: 검정으로 가린 뒤 플레이어 스폰 → 게임플레이 카메라 인계 → 페이드인.
+            // (예전 '둘러보기 패닝 투어'는 제거됨 — 주변을 보여주지 않고 곧장 플레이어 시점으로 시작)
             await ScreenFade.Out(0f);
 
             await SpawnPlayerAsync(ct);
 
             var cam = GameCameraController.Instance;
-            // 카메라 자체 인트로 검정 오버레이 해제 — 진입 연출은 ScreenFade(투어)가 담당하므로 중복.
-            // 해제하지 않으면 Awake가 만든 불투명 오버레이가 화면에 그대로 남는다.
+            // 카메라 자체 인트로 검정 오버레이 해제. 해제하지 않으면 Awake가 만든 불투명 오버레이가 화면에 남는다.
             cam?.ClearIntroFade();
-            Vector3 tourCenter = playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero;
-            if (cam != null)
-                await cam.PlayStartRoomTourAsync(tourCenter, ct);
-            else
-                await ScreenFade.In(0.4f, ct); // 카메라 컨트롤러 부재 시에도 검정 해제 보장
 
-            // 둘러보기 종료 → 플레이어 추적 게임플레이 카메라로 인계 (CinemachineFreeLook 리그 필요).
+            // 둘러보기 투어 없이 곧장 플레이어 추적 게임플레이 카메라로 인계 (CinemachineFreeLook 리그 필요).
             if (_player != null)
                 cam?.HandToGameplayCamera(_player.transform);
+
+            await ScreenFade.In(0.4f, ct);
         }
         catch (OperationCanceledException) { return; }
 

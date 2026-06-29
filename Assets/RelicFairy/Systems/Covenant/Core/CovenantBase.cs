@@ -67,6 +67,15 @@ public abstract class CovenantBase
 
     public virtual void Dispose() { }
 
+    // ── 버프창 표시(옵트인) ──────────────────────────────
+    /// <summary>
+    /// 현재 "발동/지속 상태"를 버프창 항목으로 노출할지. 기본=노출 안 함.
+    /// 보유 서약 자체는 전용 <see cref="CovenantPanelView"/>에 이미 상시 표시되므로 버프창 중복을 피한다.
+    /// 일시적 발동/지속 상태(예: 일정시간 강화·게이지)가 있는 서약만 override해 true + <see cref="BuffViewItem"/> 반환.
+    /// (관례는 유물과 동일 — 상시 보유는 패널, 일시 상태만 버프창.) 읽기 전용 — 동작/밸런스 무변경.
+    /// </summary>
+    public virtual bool TryGetBuffView(out BuffViewItem item) { item = default; return false; }
+
     // ── ICovenantStatProvider ───────────────────────────
     public virtual IEnumerable<StatModifier> GetStatModifiers()
         => Array.Empty<StatModifier>();

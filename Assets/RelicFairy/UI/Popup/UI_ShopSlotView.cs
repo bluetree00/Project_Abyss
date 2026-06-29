@@ -62,7 +62,9 @@ public sealed class UI_ShopSlotView : MonoBehaviour, IPointerEnterHandler, IPoin
         vlg.padding = new RectOffset(10, 10, 0, 12);
         vlg.spacing = 7f;
         vlg.childControlWidth = true;
-        vlg.childControlHeight = false;
+        // 자식 높이를 LayoutElement.preferredHeight(Ribbon24/IconFrame116/Name44/Price28/Buy40)로
+        // 결정적으로 제어한다. (false면 자식의 sizeDelta.y를 써 의도한 높이가 적용되지 않음)
+        vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
         vlg.childAlignment = TextAnchor.UpperCenter;

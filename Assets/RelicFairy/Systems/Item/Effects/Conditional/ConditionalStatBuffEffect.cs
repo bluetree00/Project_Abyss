@@ -19,7 +19,7 @@ using RelicFairy.Monster;
 /// IsActive=true로 두어 이벤트 훅(OnSkillUse/OnRoomEnter/OnPostTakeDamage/OnBoss*)을 항상 수신,
 /// 타임드 타이머를 갱신한다. ModifyStats(정적)에는 기여하지 않는다.
 /// </summary>
-public sealed class ConditionalStatBuffEffect : ItemEffectBase
+public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewProvider
 {
     private enum Channel { AttackPercent, DefensePercent, AttackSpeed, MoveSpeed, CritChance, CritDamage, SkillDamage, AllDamage, MaxHpPercent, None }
 
@@ -178,5 +178,26 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase
     {
         if (ctx?.Player == null) return 0;
         return CombatQuery.GetNearbyEnemies(ctx.Player.transform.position, NEARBY_RADIUS, null, 32, s_buf);
+    }
+
+    // ── 버프창 표시 수집(IItemBuffViewProvider) ─────────────
+    /// <summary>
+    /// 조건이 충족된 동안만 버프창 항목으로 노출(읽기 전용 — 조건/동적스탯 로직 미변경).
+    /// 라벨/아이콘/단위는 표시 포맷터로 일원화(CSV description 우선). 타임드 윈도(AfterSkill/AfterRoomEnter/AfterHit)는
+    /// 남은 시간을 게이지(Remaining01)로, 상태형 조건은 게이지 없이 아이콘만 표시한다.
+    /// </summary>
+    public bool TryGetBuffView(ItemEffectContext ctx, out BuffViewItem item)
+    {
+        item = default;
+        if (_channel == Channel.None || !ConditionMet(ctx)) return false;
+
+        var d = EffectDescriptionFormatter.Describe(EffectType, _value, _trigger, _slot?.description);
+
+        float remaining01 = -1f;
+        if (_duration > 0f && (_trigger == "AfterSkill" || _trigger == "AfterRoomEnter" || _trigger == "AfterHit"))
+            remaining01 = Mathf.Clamp01((_windowUntil - Time.time) / _duration);
+
+        item = new BuffViewItem(d.IconKey, d.Combined, 1, remaining01, "", BuffSource.Item, isDebuff: false);
+        return true;
     }
 }

@@ -100,6 +100,20 @@ public sealed class ItemEffectManager
     public void SetPersistentStack(string key, int value) =>
         _persistentStacks[key] = value;
 
+    // ── 버프창 표시 수집 ────────────────────────────────────
+
+    /// <summary>
+    /// 현재 조건이 충족된 활성 지속 버프(조건부 Cond* 등)를 버프창 표시 항목으로 수집.
+    /// 읽기 전용 — 효과 상태/조건을 질의만 한다(동작/밸런스 무변경). HUD 어댑터(ItemBuffViewSource)가 폴링 호출.
+    /// </summary>
+    public void CollectActiveBuffViews(List<BuffViewItem> into)
+    {
+        if (into == null) return;
+        for (int i = 0; i < _activeEffects.Count; i++)
+            if (_activeEffects[i] is IItemBuffViewProvider p && p.TryGetBuffView(_ctx, out var item))
+                into.Add(item);
+    }
+
     // ── 스탯 합산 ───────────────────────────────────────────
 
     /// <summary>

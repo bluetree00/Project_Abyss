@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -11,7 +12,7 @@ using UnityEngine;
 ///
 /// 수치는 RELIC_STAT_DATA(gawain) 슬롯 구동.
 /// </summary>
-public sealed class GawainZenithRelic : IRelicBehavior
+public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
 {
     private const string RelicKey = "gawain";
     private const int V_NOON_ATKSPD = 3, V_NOON_CRITCH = 4, V_NOON_CRITDMG = 5, V_NOON_ALLDMG = 6,
@@ -121,5 +122,17 @@ public sealed class GawainZenithRelic : IRelicBehavior
         rs.SetBonusAttackSpeed(0f);
         rs.SetRelicCritBuff(0f, 0f);
         rs.SetCharacterAttackMultiplier(1f, 1f);
+    }
+
+    // ── 버프창 수집(IBuffViewSource) ────────────────────────
+    /// <summary>현재 지속 상태(정오/각인)를 버프창 항목으로 기여. 머리 위 배지와 동일 판정(읽기 전용).</summary>
+    public void Contribute(List<BuffViewItem> into)
+    {
+        if (_owner == null || _gauge == null) return;
+        // 게이지: 정오=남은 정오시간(1→0), 각인=충전 진행도. ZenithGauge.Fill이 구간별로 제공.
+        if (_gauge.IsNoon)
+            into.Add(new BuffViewItem("atk", "정오", 1, _gauge.Fill, "", BuffSource.Relic, isDebuff: false));
+        else if (_gauge.IsMarkReady)
+            into.Add(new BuffViewItem("atk", "각인", 1, _gauge.Fill, "", BuffSource.Relic, isDebuff: false));
     }
 }
