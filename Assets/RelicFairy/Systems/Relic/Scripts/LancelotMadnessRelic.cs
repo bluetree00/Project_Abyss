@@ -18,6 +18,9 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
     private const float StrikeRange = 6f;     // 전방 직선 사거리(근사)
     private const float StrikeCos   = 0.7f;   // 전방 ±45도
+    // 기본 패시브 설명(버프창 첫 셀의 호버 툴팁). 광기 스택/심판/빈틈 사이클 요약.
+    private const string PassiveTip =
+        "찢긴 서약의 검 — 적중으로 광기를 쌓아 공격력이 오르지만 받는 피해도 늘어난다 (미공격 시 감쇠). 광기 최대치에서 심판의 일격, 이후 '빈틈'";
 
     private PlayerController _owner;
     private MadnessStack     _madness;
@@ -138,6 +141,10 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource
     public void Contribute(List<BuffViewItem> into)
     {
         if (_owner == null || _madness == null) return;
+
+        // 기본 패시브(항상 첫 셀, 게이지 없는 상시 표시) — 상세는 호버 툴팁(Label)으로.
+        into.Add(new BuffViewItem("dmg", PassiveTip, 1, -1f, "", BuffSource.Relic, isDebuff: false));
+
         // 광기: 카운트=스택 배지(×N), 게이지=MAX(심판)까지 진행도(Fill=Ratio). 빈틈: 남은시간 미노출 → 게이지 없음.
         if (_madness.IsFaltering)
             into.Add(new BuffViewItem("dark", "빈틈", 1, -1f, "", BuffSource.Relic, isDebuff: true));

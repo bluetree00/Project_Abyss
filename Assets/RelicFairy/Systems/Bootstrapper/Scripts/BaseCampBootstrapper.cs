@@ -165,6 +165,8 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     {
         var lo = AppBootstrapper.Instance?.Loadout;
         bool equipped = lo != null && (lo.WeaponSlot0 != null || lo.WeaponSlot1 != null || lo.Relic != null);
+        // 허브에서도 유물/룬 패시브 버프뷰가 뜨도록 전투 HUD 억제 해제(플레이어 바인딩은
+        // HudBootstrapper가 Managers.Player 채널로 타이밍 무관하게 처리).
         if (equipped) UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
     }
 
