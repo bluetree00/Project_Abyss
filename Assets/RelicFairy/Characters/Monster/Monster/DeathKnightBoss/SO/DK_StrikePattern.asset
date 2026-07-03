@@ -34,7 +34,7 @@ MonoBehaviour:
     type: 3}
   whiteSwordMaterial: {fileID: 2100000, guid: 2d215973ef3daec4f96eaabd33e2b48b, type: 2}
   blackSwordMaterial: {fileID: 2100000, guid: 03173d869908c9046a995334bc539417, type: 2}
-  swordSideOffset: 9
+  swordSideOffset: 12
   swordHeight: 1
   swordBobAmplitude: 0.25
   swordBobSpeed: 1.5
