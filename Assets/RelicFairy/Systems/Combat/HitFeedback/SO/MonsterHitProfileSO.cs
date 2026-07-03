@@ -11,10 +11,15 @@ public class MonsterHitProfileSO : ScriptableObject
 {
     // ── Serialized ────────────────────────────────────────────────
     [Header("⑧ Flash (색 변화)")]
-    [SerializeField] private Color _flashColor = Color.white;
+    [SerializeField] private Color _flashColor = new(1f, 0.12f, 0.1f, 1f); // 피격 빨강
     [SerializeField, Range(0f, 10f)] private float _emissionBoost = 2f;
-    [SerializeField, Range(0f, 1f)]  private float _flashDuration = 0.06f;
+    [SerializeField, Range(0f, 1f)]  private float _flashDuration = 0.18f;
+    [Tooltip("플래시 지속시간 동안 반복할 깜빡임 횟수. 2면 더블 블링크(빨강→어둠→빨강→어둠).")]
+    [SerializeField, Range(1, 4)] private int _flashPulses = 2;
     [SerializeField] private AnimationCurve _flashCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+
+    [Tooltip("피격 시 외곽선(아웃라인)도 함께 빨갛게 깜빡이게 한다. MonsterOutline 셰이더의 _HitFlash를 구동.")]
+    [SerializeField] private bool _useOutlineFlash = true;
 
     [Header("② Point Light (화면 번쩍임)")]
     [SerializeField] private bool  _usePointLight = true;
@@ -39,7 +44,9 @@ public class MonsterHitProfileSO : ScriptableObject
     public Color          FlashColor        => _flashColor;
     public float          EmissionBoost     => _emissionBoost;
     public float          FlashDuration     => _flashDuration;
+    public int            FlashPulses       => _flashPulses;
     public AnimationCurve FlashCurve        => _flashCurve;
+    public bool           UseOutlineFlash   => _useOutlineFlash;
 
     public bool           UsePointLight     => _usePointLight;
     public Color          LightColor        => _lightColor;

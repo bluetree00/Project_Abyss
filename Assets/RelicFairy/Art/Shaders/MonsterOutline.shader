@@ -9,6 +9,9 @@ Shader "RelicFairy/MonsterOutline"
     {
         _OutlineColor ("Outline Color", Color)        = (0.6, 0.85, 1.0, 1.0)
         _OutlineWidth ("Outline Width (object)", Range(0, 0.15)) = 0.02
+        // 피격 플래시: VictimHitFeedback이 렌더러 MPB로 _HitFlash(0~1)를 구동 → _HitFlashColor로 블렌드.
+        _HitFlash      ("Hit Flash Amount", Range(0, 1)) = 0
+        _HitFlashColor ("Hit Flash Color", Color)        = (1.0, 0.12, 0.1, 1.0)
     }
 
     SubShader
@@ -29,6 +32,8 @@ Shader "RelicFairy/MonsterOutline"
             CBUFFER_START(UnityPerMaterial)
                 float4 _OutlineColor;
                 float  _OutlineWidth;
+                float4 _HitFlashColor;
+                float  _HitFlash;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
@@ -44,7 +49,7 @@ Shader "RelicFairy/MonsterOutline"
 
             half4 frag (Varyings IN) : SV_Target
             {
-                return _OutlineColor;
+                return lerp(_OutlineColor, _HitFlashColor, saturate(_HitFlash));
             }
             ENDHLSL
         }

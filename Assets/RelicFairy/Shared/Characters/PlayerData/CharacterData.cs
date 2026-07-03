@@ -74,6 +74,12 @@ public class CharacterData : ScriptableObject
     public float dashTrailTime = 0.25f;
     [Tooltip("대시 트레일 시작 폭(m). 끝 폭은 0으로 가늘어짐.")]
     public float dashTrailWidth = 1.0f;
+    [Tooltip("대시 트레일 INab VFX 프리팹(Weapon Trails FX, 예: Wind 1). 할당 시 위 TrailRenderer 대신 이 INab 트레일을 몸 상/하 앵커로 구동. 비우면 TrailRenderer 폴백.")]
+    public GameObject dashTrailVfxPrefab;
+    [Tooltip("INab 대시 트레일 상단 앵커 로컬 Y(m, 머리 근처).")]
+    public float dashTrailUpperY = 1.7f;
+    [Tooltip("INab 대시 트레일 하단 앵커 로컬 Y(m, 발 근처).")]
+    public float dashTrailLowerY = 0.1f;
 
     [Header("점프 및 중력 설정")]
     public float jumpForce = 5f;

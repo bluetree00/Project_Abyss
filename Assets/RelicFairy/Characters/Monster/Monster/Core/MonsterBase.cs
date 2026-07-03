@@ -191,6 +191,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>비-보스 몬스터 시각 크기 배율(핵앤슬래시 가독성). 1이면 미적용. 보스는 항상 원본 크기.</summary>
+    private const float NonBossVisualScale = 0.8f;
+
+    /// <summary>전 몬스터 플레이어 탐색 범위 배율. 1이면 미적용. detectionRange/chaseGiveUpRange에 곱해진다.</summary>
+    private const float DetectionRangeMultiplier = 1.5f;
+
     private async void Awake()
     {
         await InitAsync();
@@ -229,6 +235,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
                 // 2-1. 서버 CDN으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
                 ApplyServerStatOverride();
+
+                // 2-2. 전 몬스터 플레이어 탐색 범위 상향. 캐시 채움 시(타입당 1회)만 적용 → 인스턴스 누적 없음.
+                ApplyDetectionRangeBoost(_config);
             }
         }
 
@@ -245,6 +254,23 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _agent.speed            = _config.stat.moveSpeed;
         _agent.stoppingDistance = _config.stat.attackRange;
         _baseAgentSpeed         = _config.stat.moveSpeed;
+
+        // 3-1. 비-보스 몬스터 시각 크기 축소 (핵앤슬래시 가독성).
+        //      콜라이더/발밑그림자/HP바/외곽선은 lossyScale로 자동 추종되며,
+        //      NavMeshAgent radius/height만 월드값이라 함께 축소해 정합을 맞춘다.
+        //      InitAsync는 인스턴스당 1회만 실행 → 풀 재사용(OnEnable) 시 중복 축소 없음.
+        if (_config.grade != MonsterGrade.Boss && NonBossVisualScale != 1f)
+        {
+            transform.localScale *= NonBossVisualScale;
+            _agent.radius        *= NonBossVisualScale;
+            _agent.height        *= NonBossVisualScale;
+        }
+
+        // 3-2. 피격 시각 피드백(빨강 플래시) 자동 부착 — 프리팹에 명시 부착 안 된 몬스터도 적용.
+        //      VictimHitFeedback은 프로필 미배정 시 공유 기본 프로필(빨강 더블블링크)을 사용한다.
+        //      NavMeshAgent 자동추가와 동일 패턴, 인스턴스당 1회.
+        if (!TryGetComponent<VictimHitFeedback>(out _))
+            gameObject.AddComponent<VictimHitFeedback>();
 
         // Agent 를 가장 가까운 NavMesh 로 스냅. baseOffset=0 + voxel 오차로
         // isOnNavMesh=false 로 시작하는 경우를 방지한다. SamplePosition 기반 재시도.
@@ -314,6 +340,16 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>초기화 완료 후 파생 클래스에서 추가 처리가 필요한 경우 오버라이드.</summary>
     protected virtual void OnInitialized() { }
+
+    /// <summary>전 몬스터 탐색 범위 일괄 상향. 캐시된 config 복사본에 1회만 곱한다(원본 SO 불변, 인스턴스 누적 없음).
+    /// detectionRange와 chaseGiveUpRange를 같은 배율로 곱해 "감지 &lt; 포기" 순서를 유지한다.
+    /// 보스 등 별도 탐색 필드(DragonBoss._detectionRange)를 쓰는 커스텀 로직은 영향받지 않는다.</summary>
+    private static void ApplyDetectionRangeBoost(MonsterConfigSO config)
+    {
+        if (DetectionRangeMultiplier == 1f || config == null || config.detection == null) return;
+        config.detection.detectionRange   *= DetectionRangeMultiplier;
+        config.detection.chaseGiveUpRange *= DetectionRangeMultiplier;
+    }
 
     /// <summary>
     /// 공용 상태를 FSM에 등록한다.

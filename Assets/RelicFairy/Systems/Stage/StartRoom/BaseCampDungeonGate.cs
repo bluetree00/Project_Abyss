@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 베이스캠프 던전 입장 포탈. 유물(Loadout.Relic)+무기(Loadout.WeaponSlot0)가 모두 준비되면 활성화되고,
-/// 활성 상태에서 플레이어가 트리거에 진입하면 던전 씬으로 전환한다(BaseCampBootstrapper.EnterDungeon).
+/// 베이스캠프 던전 입장 포탈. 유물(Loadout.Relic)+무기(Loadout.WeaponSlot0)+서약(예약)이 모두 준비되면
+/// 활성화되고, 활성 상태에서 플레이어가 트리거에 진입하면 던전 씬으로 전환한다(BaseCampBootstrapper.EnterDungeon).
 /// 미준비 시 포탈 비주얼 비활성 + 통과 차단. (StartRoomGate 스타트 방 모드 게이팅 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -47,6 +47,9 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     private static bool IsLoadoutReady()
     {
         var loadout = AppBootstrapper.Instance?.Loadout;
-        return loadout != null && loadout.Relic != null && loadout.WeaponSlot0 != null;
+        return loadout != null
+            && loadout.Relic != null
+            && loadout.WeaponSlot0 != null
+            && loadout.ReservedCovenants != null && loadout.ReservedCovenants.Count > 0;   // 서약까지 필수
     }
 }

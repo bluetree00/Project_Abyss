@@ -3,6 +3,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
@@ -29,6 +30,26 @@ public static class CinematicFrame
     private static float _shown;     // 0=숨김 ~ 1=완전 표시
     private static float _barFrac;   // 현재 목표 바 높이 비율(각 바, 0~0.5)
     private static float _dimTarget; // 목표 Dim 알파
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Init()
+    {
+        // 도메인 리로드로 DDOL 캔버스가 파괴되므로 정적 참조 초기화 + 씬 로드 정리 훅 등록.
+        _canvas = null; _topBar = null; _bottomBar = null; _dim = null; _title = null;
+        _shown = 0f; _barFrac = 0f; _dimTarget = 0f;
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    /// <summary>연출 중 씬 전환으로 HideAsync가 누락되면 DDOL 레터박스/타이틀이 다음 씬까지 남는다 → 새 씬 로드 시 강제 정리.</summary>
+    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (_canvas == null) return;
+        _shown = 0f;
+        ApplyShown(0f);
+        if (_title != null) _title.gameObject.SetActive(false);
+        _canvas.enabled = false;
+    }
 
     /// <summary>레터박스 프레임을 슬라이드 인. title이 있으면 삼분할 하단선에 표시한다.</summary>
     public static async UniTask ShowAsync(

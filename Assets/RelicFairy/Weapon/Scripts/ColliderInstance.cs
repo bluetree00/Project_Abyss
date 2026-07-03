@@ -33,6 +33,8 @@ public class ColliderInstance : MonoBehaviour
 
     // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
     private static readonly List<MonsterBase> s_shapeBuf = new();
+    // 근접 원샷 오버랩 질의 버퍼(재사용 — alloc 방지). 밀집 지역 대비 넉넉히.
+    private static readonly Collider[] s_overlapBuf = new Collider[64];
 
     // key: 대상, value: 마지막으로 맞은 attackId
     private readonly Dictionary<GameObject, int> _hitRecord = new();
@@ -62,12 +64,40 @@ public class ColliderInstance : MonoBehaviour
         float rangeMult = IsMeleeAction(actionType) ? ItemCombatMods.Current.meleeRangeMult : 0f;
         transform.localScale = rangeMult > 0f ? _baseScale * (1f + rangeMult) : _baseScale;
 
-        // 콜라이더를 껐다 켜서 물리 엔진이 재감지하도록 강제
+        // 근접 원샷(hitInterval=0): 스윙 순간 콜라이더 영역에 겹친 대상만 즉시 1회 판정.
+        // 트리거 지속에 의존하지 않아 "타이밍 씹힘"과 "잔류 콜라이더 뒤늦은 타격"을 동시에 제거.
+        if (hitInterval <= 0f && IsMeleeAction(actionType))
+        {
+            OneShotMeleeOverlap();
+            _active = false;
+            return;
+        }
+
+        // 지속/주기 판정: 콜라이더를 껐다 켜서 물리 엔진이 재감지하도록 강제(OnTriggerEnter/Stay)
         var col = GetComponent<Collider>();
         if (col != null)
         {
             col.enabled = false;
             col.enabled = true;
+        }
+    }
+
+    // 근접 원샷 판정: 콜라이더 영역(bounds)에 겹친 대상에 즉시 1회 데미지(트리거 지속 없음).
+    private void OneShotMeleeOverlap()
+    {
+        var col = GetComponent<Collider>();
+        if (col == null) return;
+
+        Bounds b = col.bounds;
+        int n = Physics.OverlapBoxNonAlloc(
+            b.center, b.extents, s_overlapBuf, Quaternion.identity, ~0, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < n; i++)
+        {
+            var other = s_overlapBuf[i];
+            if (other == null || other == col) continue;
+            if (!CanHit(other.gameObject)) continue;
+            ApplyDamage(other);
+            RecordHit(other.gameObject);
         }
     }
 

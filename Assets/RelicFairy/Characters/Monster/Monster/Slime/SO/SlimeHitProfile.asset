@@ -12,9 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f663916edd449f8498e9d1003777df1e, type: 3}
   m_Name: SlimeHitProfile
   m_EditorClassIdentifier: Assembly-CSharp::MonsterHitProfileSO
-  _flashColor: {r: 1, g: 1, b: 1, a: 1}
+  _flashColor: {r: 1, g: 0.12, b: 0.1, a: 1}
   _emissionBoost: 2
-  _flashDuration: 0.06
+  _flashDuration: 0.18
+  _flashPulses: 2
+  _useOutlineFlash: 1
   _flashCurve:
     serializedVersion: 2
     m_Curve:

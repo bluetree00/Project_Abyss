@@ -15,8 +15,10 @@ using UnityEngine;
 public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 {
     // ── Constants ─────────────────────────────────────────────────
-    private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
-    private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+    private static readonly int BaseColorId      = Shader.PropertyToID("_BaseColor");
+    private static readonly int EmissionColorId  = Shader.PropertyToID("_EmissionColor");
+    private static readonly int HitFlashId       = Shader.PropertyToID("_HitFlash");      // 외곽선 셰이더 구동(0~1)
+    private static readonly int HitFlashColorId  = Shader.PropertyToID("_HitFlashColor"); // 외곽선 플래시 색
     private const string       AutoLightName   = "~HitFlashLight";
 
     // ── Serialized ────────────────────────────────────────────────
@@ -28,6 +30,10 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 
     [Header("PointLight (비우면 자동 생성)")]
     [SerializeField] private Light _pulseLight;
+
+    // 프로필 미배정 몬스터가 공유하는 런타임 기본 프로필(빨강 더블블링크 = SO 필드 기본값).
+    // 자산 없이 MonsterHitProfileSO의 C# 기본 초기화값을 그대로 사용 — 프리팹 배선 불필요.
+    private static MonsterHitProfileSO s_defaultProfile;
 
     // ── Private ───────────────────────────────────────────────────
     private Renderer[]             _renderers;
@@ -48,6 +54,14 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
     // ── Lifecycle ─────────────────────────────────────────────────
     private void Awake()
     {
+        // 프로필 미배정(자동 부착된 몬스터 등)이면 공유 기본 프로필 사용 — EnsureLight보다 먼저.
+        if (_profile == null)
+        {
+            if (s_defaultProfile == null)
+                s_defaultProfile = ScriptableObject.CreateInstance<MonsterHitProfileSO>();
+            _profile = s_defaultProfile;
+        }
+
         CollectRenderers();
         EnsureLight();
         _mpb = new MaterialPropertyBlock();
@@ -58,10 +72,6 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
             _restLocalRot = _visualRoot.localRotation;
             _restLocalPos = _visualRoot.localPosition;
         }
-
-        // 프로필 미배정 = 피격 플래시/펄스/리액션 전부 스킵(무음). 설정 누락을 개발 중 1회 알린다.
-        if (_profile == null)
-            RFLog.D($"[VictimHitFeedback] '{name}' MonsterHitProfile 미배정 — 피격 시각 펄스 스킵.", this);
     }
 
     private void OnDisable()
@@ -162,8 +172,13 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
         float duration = _profile.FlashDuration;
         if (duration <= 0f || _renderers == null || _renderers.Length == 0) return;
 
-        float boost = _profile.EmissionBoost;
-        var   curve = _profile.FlashCurve;
+        float boost  = _profile.EmissionBoost;
+        var   curve  = _profile.FlashCurve;
+        int   pulses = Mathf.Max(1, _profile.FlashPulses);
+        bool  outlineFlash = _profile.UseOutlineFlash;
+
+        Color outlineColor = flashColor;
+        outlineColor.a     = 1f; // 가림 아웃라인이 플래시 중 또렷하게 보이도록 불투명 빨강
 
         float t = 0f;
         while (t < duration)
@@ -171,7 +186,10 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
             if (gen != _flashGen) return; // 새 플래시/취소 → 이전 루틴 무효 (복원은 새 루틴/OnDisable이 담당)
 
             float n = Mathf.Clamp01(t / duration);
-            float w = curve != null ? curve.Evaluate(n) : 1f - n;
+            // 지속시간을 pulses등분해 커브를 반복 → 더블(멀티) 블링크. pulses=1이면 기존 단발.
+            float phase = n * pulses;
+            float local = phase - Mathf.Floor(phase);
+            float w     = curve != null ? curve.Evaluate(local) : 1f - local;
 
             Color tint     = flashColor;
             tint.a         = 1f;
@@ -179,6 +197,13 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 
             _mpb.SetColor(BaseColorId,     Color.Lerp(Color.white, tint, w));
             _mpb.SetColor(EmissionColorId, emission);
+
+            // 외곽선 플래시: 같은 렌더러 MPB를 Render Objects 아웃라인 패스가 함께 읽음.
+            if (outlineFlash)
+            {
+                _mpb.SetFloat(HitFlashId,      w);
+                _mpb.SetColor(HitFlashColorId, outlineColor);
+            }
 
             ApplyPropertyBlock(_mpb);
 

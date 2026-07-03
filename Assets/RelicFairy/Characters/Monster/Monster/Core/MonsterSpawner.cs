@@ -104,9 +104,16 @@ public class MonsterSpawner : MonoBehaviour
     [SerializeField] private MonsterGrade targetGrade = MonsterGrade.Common;
 
     [Header("웨이브 모드 설정 (비어있으면 자동 루프 모드)")]
-    [Tooltip("배열 길이 = 총 웨이브 수. RoomWaveController가 웨이브별 SpawnWaveAsync를 호출한다.\n" +
+    [Tooltip("단일 웨이브의 스폰 그룹 목록. 각 항목 = (등급 상한 × 마릿수).\n" +
+             "예) [Common×3, Rare×2] → 한 웨이브에서 총 5마리를 연속 스폰.\n" +
              "비어있으면 기존 자동 루프 모드(maxTotalSpawns 기반)로 동작.")]
     [SerializeField] private WaveEntry[] _waveEntries;
+
+    [Tooltip("웨이브 내 몬스터 간 스폰 간격 최소값(초). 한 마리씩 연속으로 등장하는 느낌을 준다.")]
+    [SerializeField, Min(0f)] private float _waveSpawnDelayMin = 0.15f;
+
+    [Tooltip("웨이브 내 몬스터 간 스폰 간격 최대값(초). Min~Max 사이 랜덤 대기.")]
+    [SerializeField, Min(0f)] private float _waveSpawnDelayMax = 0.4f;
 
     // ── 런타임 ─────────────────────────────────────────────
 
@@ -129,8 +136,9 @@ public class MonsterSpawner : MonoBehaviour
     /// 방 클리어 카운터가 Σ로 합산해 킬 목표 수를 계산할 때 사용.</summary>
     public int MaxTotalSpawns => maxTotalSpawns;
 
-    /// <summary>웨이브 모드의 총 웨이브 수. 0이면 자동 루프 모드.</summary>
-    public int WaveCount => _waveEntries?.Length ?? 0;
+    /// <summary>웨이브 모드 여부(단일 웨이브). 그룹이 하나라도 있으면 1, 없으면 0(자동 루프 모드).
+    /// _waveEntries의 모든 그룹을 하나의 웨이브로 합쳐 연속 스폰한다.</summary>
+    public int WaveCount => (_waveEntries != null && _waveEntries.Length > 0) ? 1 : 0;
 
     /// <summary>몬스터가 실제로 스폰된 직후 발행. (풀에서 꺼낸 MonsterBase 인스턴스 전달)
     /// RoomClearController가 몬스터 OnDied를 체이닝하는 데 사용.</summary>
@@ -168,7 +176,8 @@ public class MonsterSpawner : MonoBehaviour
             maxTotalSpawns = Mathf.Max(0, totalCount);
     }
 
-    /// <summary>외부(Bootstrapper)에서 웨이브 배열을 주입. Start() 전에 호출.
+    /// <summary>외부(Bootstrapper)에서 CSV 토큰의 세그먼트 배열을 주입. Start() 전에 호출.
+    /// 각 세그먼트는 단일 웨이브 안의 스폰 그룹(등급 상한 × 마릿수)으로 취급된다 — 여러 웨이브가 아님.
     /// Inspector의 _waveEntries를 덮어쓴다 — CSV 토큰 기반 데이터가 Inspector 수동 설정보다 우선됨.</summary>
     public void ConfigureWaves(MapDataLoader.WaveCellConfig[] waves)
     {
@@ -184,8 +193,8 @@ public class MonsterSpawner : MonoBehaviour
         if (autoApplyChapterGroup)
             ApplyCurrentChapterGroup();
 
-        Debug.Log($"[MonsterSpawner:{name}] 웨이브 {waves.Length}개 주입 — " +
-                  string.Join(" | ", System.Array.ConvertAll(waves, w => $"{w.grade}×{w.count}")), this);
+        Debug.Log($"[MonsterSpawner:{name}] 단일 웨이브 그룹 {waves.Length}개 주입 — " +
+                  string.Join(" + ", System.Array.ConvertAll(waves, w => $"{w.grade}×{w.count}")), this);
     }
 
     /// <summary>현재 런의 챕터 번호(Chapter1 → 1, Chapter5 → 5)를 allowedPoolGroups에 주입.
@@ -251,29 +260,48 @@ public class MonsterSpawner : MonoBehaviour
         _spawnedMonsters.RemoveAll(m => m == null || !m.gameObject.activeInHierarchy);
     }
 
-    /// <summary>웨이브 모드에서 지정 웨이브 인덱스의 설정 마릿수만큼 스폰. 실제 스폰된 수를 반환.
-    /// 웨이브별 maxGrade를 적용하며 ct가 취소되면 즉시 중단.</summary>
+    /// <summary>단일 웨이브 스폰. _waveEntries의 모든 그룹(등급 상한 × 마릿수)을 하나의 웨이브로 합쳐
+    /// 한 마리씩 랜덤 간격으로 연속 스폰한다. waveIndex는 항상 0(단일 웨이브)이며 무시된다.
+    /// 그룹별 maxGrade를 유지하며 ct가 취소되면 즉시 중단. 실제 스폰된 수를 반환.</summary>
     public async UniTask<int> SpawnWaveAsync(int waveIndex, CancellationToken ct)
     {
-        if (_waveEntries == null || waveIndex < 0 || waveIndex >= _waveEntries.Length)
+        if (_waveEntries == null || _waveEntries.Length == 0)
         {
-            Debug.LogWarning($"[MonsterSpawner:{name}] SpawnWaveAsync: 유효하지 않은 waveIndex={waveIndex}", this);
+            Debug.LogWarning($"[MonsterSpawner:{name}] SpawnWaveAsync: 웨이브 그룹이 비어 있음", this);
             return 0;
         }
 
-        var entry = _waveEntries[waveIndex];
-        int target = entry.spawnCount;
-
-        // 이 웨이브 동안 targetGrade를 일시 교체 — TrySpawnOneAsync의 PassesGradeFilter에 반영됨.
+        // 이 웨이브 동안 targetGrade를 그룹별로 일시 교체 — TrySpawnOneAsync의 PassesGradeFilter에 반영됨.
         // SpawnWaveAsync는 같은 인스턴스에 대해 순차 실행되므로 동시성 문제 없음.
         var prevGrade = targetGrade;
-        targetGrade   = entry.maxGrade;
+
+        // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
+        int remaining = 0;
+        foreach (var g in _waveEntries) remaining += Mathf.Max(0, g.spawnCount);
 
         int spawned = 0;
-        for (int i = 0; i < target; i++)
+        for (int g = 0; g < _waveEntries.Length; g++)
         {
-            if (ct.IsCancellationRequested) break;
-            if (await TrySpawnOneAsync()) spawned++;
+            targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
+            int count   = _waveEntries[g].spawnCount;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (ct.IsCancellationRequested) { targetGrade = prevGrade; return spawned; }
+
+                if (await TrySpawnOneAsync()) spawned++;
+                remaining--;
+
+                // 마지막 한 마리 뒤에는 대기 생략 — 스폰 완료를 지체시키지 않음.
+                if (remaining <= 0) continue;
+
+                float delay = UnityEngine.Random.Range(_waveSpawnDelayMin, _waveSpawnDelayMax);
+                try
+                {
+                    await UniTask.Delay(System.TimeSpan.FromSeconds(delay), cancellationToken: ct);
+                }
+                catch (System.OperationCanceledException) { targetGrade = prevGrade; return spawned; }
+            }
         }
 
         targetGrade = prevGrade; // 복원

@@ -684,6 +684,10 @@ public class PlayerController : CharacterBase
         if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
             gameObject.AddComponent<PlayerWeaponTrailVfx>();
 
+        // 자동추적 대상 화살표(현재 에임어시스트 타겟을 머리 위 화살표로 실시간 표시) — 동일 자동 부착 패턴.
+        if (!TryGetComponent<AimTargetIndicator>(out _))
+            gameObject.AddComponent<AimTargetIndicator>();
+
         if (inputReady) BindInputActions();
     }
 

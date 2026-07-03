@@ -41,7 +41,7 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 
 ### UIUX 팀원 핵심 클래스
 - HUD MVP: HudPresenter(프레젠터) ↔ HudView(섹션 토글) ↔ CombatPanelView(HP/무기/스킬 슬롯)
-- 데이터: UIHudData(구조체), UIHudDataProvider(어댑터), UILobbyData
+- 데이터: UIHudData(구조체), UIHudDataProvider(어댑터)
 - 팝업: UI_Popup(베이스), UI_WeaponReplacePopup(UniTask), UI_Pause(탭 3개)
 - 씬 UI: UI_Lobby, UI_PrepPanel(캐릭터/무기 선택 3단계)
 - 오버레이: TransitionOverlay(페이드 전환)
