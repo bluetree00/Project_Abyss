@@ -27,10 +27,15 @@ public class DebugGridCheatPanel : MonoBehaviour
     private readonly Dictionary<string, Image> _btnImages = new();
     private readonly Dictionary<string, TMP_Text> _btnTexts = new();
 
+    // ── Serialize ──
+    [SerializeField, Tooltip("레거시 그리드 치트 패널 표시(기본 off — 필요 시 켬)")]
+    private bool showPanel = false;
+
     // ── Lifecycle ──
 
     private void Start()
     {
+        if (!showPanel) return;   // 레거시 정리: 기본 비활성
         CreateToggleButton();
     }
 

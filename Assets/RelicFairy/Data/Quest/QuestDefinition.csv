@@ -1,8 +1,7 @@
 type,codeName,displayName,description,category,target,action,needCount,rewardType,rewardAmount,autoComplete,savable,chapter,afterQuest,acceptType,acceptId,completeType,completeId,timeLimit
 quest,tut_acquire_relic,유물의 부름,첫 유물을 손에 넣어라,Relic,*,SimpleCount,1,None,0,true,false,0,tut_select_equip,None,,None,,0
 quest,tut_select_equip,무장하라,모루에서 장비를 선택하라,Equip,*,SimpleCount,1,None,0,true,false,0,tut_covenant,None,,Dialogue,Quest_TutEquip_Complete,0
-quest,tut_covenant,서약을 맺어라,제단에서 서약을 받아들여라,Covenant,*,SimpleCount,1,None,0,true,false,0,tut_enter_gate,None,,Dialogue,Quest_TutCovenant_Complete,0
-quest,tut_enter_gate,심연으로,게이트를 지나 다음 챕터로 나아가라,Gate,*,SimpleCount,1,None,0,true,false,0,,None,,None,,0
+quest,tut_covenant,서약을 맺어라,제단에서 서약을 받아들여라,Covenant,*,SimpleCount,1,None,0,true,false,0,,None,,Dialogue,Quest_TutCovenant_Complete,0
 quest,clear_room_3,첫 발걸음,방 3개를 클리어하라,Room,Normal,SimpleCount,3,Gold,300,true,true,1,,None,,None,,0
 quest,kill_monster_20,사냥 시작,몬스터 20마리를 처치하라,Kill,*,SimpleCount,20,Gold,500,true,true,1,,None,,None,,0
 quest,collect_gold_1000,재력가,골드 1000을 모아라,Gold,*,SimpleCount,1000,Gold,200,true,true,1,,None,,None,,0

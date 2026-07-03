@@ -16,6 +16,9 @@ public sealed class QuestFeedbackPresenter : MonoBehaviour
     private CancellationTokenSource _cts;
     private bool _isProcessing;
 
+    /// <summary>획득 대사 큐를 재생 중인지(마지막 대사까지 끝나면 false). 온보딩 연출이 대사 종료를 기다리는 데 사용.</summary>
+    public bool IsPlaying => _isProcessing;
+
     private void OnEnable()
     {
         _cts = new CancellationTokenSource();

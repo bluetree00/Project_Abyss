@@ -8,8 +8,12 @@ using TMPro;
 /// </summary>
 public class DebugStatsBootstrap : MonoBehaviour
 {
+    [SerializeField, Tooltip("레거시 디버그 스탯 패널 표시(기본 off — 필요 시 켬)")]
+    private bool showPanel = false;
+
     private void Start()
     {
+        if (!showPanel) return;   // 레거시 정리: 기본 비활성
         CreateDebugStatsUI();
     }
 

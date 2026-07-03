@@ -111,6 +111,11 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     public float Fill => Ratio;
     public string Label => "광기 " + _stacks;
     public int Phase => _stacks >= _maxStacks ? 4 : (_stacks >= 31 ? 3 : (_stacks >= 16 ? 2 : (_stacks >= 1 ? 1 : 0)));
+    public Color BarColor => IsFaltering
+        ? new Color(0.35f, 0.30f, 0.42f)                                                    // 빈틈 — 어두운 보라회색
+        : (_stacks >= _maxStacks
+            ? new Color(0.78f, 0.30f, 0.98f)                                                // MAX — 보라(심판)
+            : Color.Lerp(new Color(0.55f, 0.22f, 0.20f), new Color(0.96f, 0.20f, 0.16f), Ratio)); // 광기 — 붉은 강도
     public bool IsSkillReady => false; // 자동 발동(수동 불가)
 
     public void Tick(float deltaTime) { }                 // 감쇠는 자체 Update

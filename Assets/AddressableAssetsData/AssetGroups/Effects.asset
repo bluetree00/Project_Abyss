@@ -100,11 +100,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2f2d4e6b133dd204b98d767461befc6d
-    m_Address: VFX_Item_Rare
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 33921697d23d94e49b30e02de1aee7e2
     m_Address: VFX_Wet
     m_ReadOnly: 0
@@ -272,11 +267,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b4f9efd16e8b5c04c91abcf7f00f5166
-    m_Address: VFX_Item_Epic
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b5c49b7d08769594c855059bca8bebf5
     m_Address: IasenDashTrail
     m_ReadOnly: 0
@@ -344,11 +334,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e9a61902ec4cb8f42b1b2a59fe27cf07
-    m_Address: VFX_Item_Common
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ec3f674830402cc45bce805cf6493db7
     m_Address: GreatswordImpact
     m_ReadOnly: 0
@@ -374,11 +359,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fabdc41743036b945ade90d43535856b
-    m_Address: VFX_Item_Legendary
-    m_ReadOnly: 0
-    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fb2df51e77abde1429eb83c0317784af
     m_Address: DragonPunch
