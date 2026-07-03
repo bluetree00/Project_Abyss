@@ -70,6 +70,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
+    m_Address: UI/Popup/UI_ShopPanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
     m_Address: DissolveMaterial
     m_ReadOnly: 0
@@ -87,21 +92,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 58a8524c4e5019b4690d56aa62608a80
     m_Address: UI/Popup/UI_ItemAcquisitionPopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 813a84120a8c453488b7cc49058dfb9d
-    m_Address: UI/Popup/UI_WeaponForgePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3db1aafaeba194d4da8623da5a8b2d5e
-    m_Address: UI/Popup/UI_ShopPanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9c6358fd8c7c049499697da7d6dd18ba
-    m_Address: Shop/ShopNpc
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -135,6 +125,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 813a84120a8c453488b7cc49058dfb9d
+    m_Address: UI/Popup/UI_WeaponForgePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a915dbbc4b23bf4f931629039cfbf6f
     m_Address: VFX_FireExplosion
     m_ReadOnly: 0
@@ -142,6 +137,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9396a1704f2be8a41addba3c7eab9f0d
     m_Address: UI/Popup/UI_Pause
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9c6358fd8c7c049499697da7d6dd18ba
+    m_Address: Shop/ShopNpc
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -193,11 +193,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d9467a10b94fb3b428cc539326c9579b
     m_Address: Buff2
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: db18c22cee80cc74487b0900361715f6
-    m_Address: StageUI
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

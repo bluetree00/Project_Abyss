@@ -151,6 +151,8 @@ public sealed class HudPresenter : MonoBehaviour
 
         RefreshStats();
         RefreshWeaponSlots();
+        // 유물 전용 아이덴티티 바(체력바 아래) 연결 — 활성 유물이 IRelicResourceProvider면
+        view?.CombatPanel?.SetRelicResource((player.RelicBehavior as IRelicResourceProvider)?.RelicResource);
 
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
@@ -166,6 +168,7 @@ public sealed class HudPresenter : MonoBehaviour
 
     public void UnbindPlayer()
     {
+        view?.CombatPanel?.SetRelicResource(null);   // 유물 아이덴티티 바 해제
         if (_playerBuffSource != null)
         {
             _buffAggregator.RemoveSource(_playerBuffSource);
@@ -391,6 +394,7 @@ public sealed class HudPresenter : MonoBehaviour
         view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
         view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
+        view.CombatPanel.SetActiveWeapon(_weaponManager.CurrentSlotIndex);   // 활성 무기 강조
     }
 
     public void Dispose()

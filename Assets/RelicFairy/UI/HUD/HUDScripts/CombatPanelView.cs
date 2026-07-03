@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public sealed class CombatPanelView : MonoBehaviour
@@ -84,11 +85,37 @@ public sealed class CombatPanelView : MonoBehaviour
 
     private float _noticeTimer;
 
-    // ── 버프창 도킹(하단 중앙, 중앙 HUD 위 — 로스트아크식) ──
-    // 그리드: 화면 하단 중앙에서 오른쪽으로 늘고 위로 쌓임. 게이지(분리 영역): 그리드 왼쪽에 두어 가려지지 않게.
-    private const float BuffDockX       = 0f;     // 화면 중앙 기준 X 오프셋(그리드 시작점)
-    private const float BuffDockBottomY = 260f;   // 화면 하단에서 위로(중앙 캐릭터 HUD 위). 더 올리려면 값을 키울 것.
-    private const float BuffGaugeGap    = 8f;     // 그리드와 게이지 사이 간격
+    // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
+    // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀). 게이지: 그리드 아래.
+    private const float BuffDockX       = 16f;    // 화면 왼쪽 가장자리 인셋
+    private const float BuffDockBottomY = 20f;    // 좌측중앙 앵커 기준 Y
+
+    // ── 캐릭터 HUD 레이아웃(원신/명조식): HP 하단중앙 · 스킬 우하단 2포드(유물 Q / 무기 E·R) ──
+    private static readonly Color RelicColor  = new Color(1.00f, 0.80f, 0.30f, 1f);  // 유물=금
+    private static readonly Color WeaponColor = new Color(0.45f, 0.70f, 1.00f, 1f);  // 무기=강철청
+
+    // HP fill 색: 가득=초록 → 절반=노랑 → 위험=빨강 (전주의적 위험 신호)
+    private static readonly Color HpColorFull = new Color(0.30f, 0.82f, 0.35f, 1f);
+    private static readonly Color HpColorMid  = new Color(0.95f, 0.78f, 0.20f, 1f);
+    private static readonly Color HpColorLow  = new Color(0.90f, 0.22f, 0.20f, 1f);
+    private bool _layoutBuilt;
+    private RectTransform _hpBar;
+    private RectTransform _relicPod;
+    private RectTransform _weaponPod;
+
+    // 유물 전용 아이덴티티 바(체력바 아래) — 활성 유물 IRelicResource 표시
+    private RectTransform _relicBar;
+    private Image         _relicBarFill;
+    private Outline       _relicBarGlow;   // 게이지 맥동 연출
+    private TMP_Text      _relicBarLabel;
+    private IRelicResource _relicResource;
+    private System.Action  _relicChanged;
+    private bool           _lastSkillReady;  // 절정(정오 등) 진입 엣지
+    private float          _relicFlash;      // 진입 플래시(1→0)
+
+    // 무기 슬롯 활성 강조
+    private RectTransform _weaponSlot0, _weaponSlot1;
+    private Outline       _weaponOutline0, _weaponOutline1;
 
     // 툴팁 화면 클램프용 코너 버퍼(재사용 — 호버 시 GC 억제).
     private static readonly Vector3[] _tooltipCorners = new Vector3[4];
@@ -138,10 +165,40 @@ public sealed class CombatPanelView : MonoBehaviour
             hpSlider.value = ratio * hpSlider.maxValue;
 
         if (hpFillImage != null)
+        {
             hpFillImage.fillAmount = ratio;
+            hpFillImage.color = HpColorFor(ratio);   // 초록(가득)→노랑→빨강(위험)
+        }
 
         if (hpGhostFillImage != null)
             hpGhostFillImage.fillAmount = Mathf.Max(_ghostRatio, ratio);
+    }
+
+    /// <summary>HP 비율에 따른 fill 색: 1.0 초록 → 0.5 노랑 → 0.0 빨강.</summary>
+    private static Color HpColorFor(float ratio)
+    {
+        ratio = Mathf.Clamp01(ratio);
+        return ratio > 0.5f
+            ? Color.Lerp(HpColorMid, HpColorFull, (ratio - 0.5f) * 2f)
+            : Color.Lerp(HpColorLow, HpColorMid, ratio * 2f);
+    }
+
+    /// <summary>체력바의 늘어난 장식 스프라이트를 제거해 단색 플랫 바로 정리(억지 스트레치 방지). fill 색은 ApplyHpFill이 담당.</summary>
+    private void CleanHpBarVisual()
+    {
+        if (_hpBar != null && FindChildRecursive(_hpBar, "Background") is RectTransform bgRT
+            && bgRT.TryGetComponent<Image>(out var bgImg))
+        {
+            bgImg.sprite = null;
+            bgImg.type   = Image.Type.Simple;
+            bgImg.color  = new Color(0f, 0f, 0f, 0.55f);   // 어두운 반투명 트랙
+        }
+        if (hpFillImage != null)
+        {
+            hpFillImage.sprite = null;   // 늘어난 fill 아트 → 단색(슬라이더가 폭 제어)
+            hpFillImage.type   = Image.Type.Simple;
+        }
+        if (hpText != null) hpText.fontSize = 11f;   // 얇은 바에 맞춘 소형 수치
     }
 
     private void UpdateHpAnimation()
@@ -342,9 +399,247 @@ public sealed class CombatPanelView : MonoBehaviour
 
     private void Awake()
     {
+        EnsureLayout();          // 컨테이너 분해·재배치(HP 하단중앙 / 스킬 2포드 / 액티브) — 먼저
         EnsureSlotLabels();
-        EnsureRSlot();
-        EnsureStatPanel();
+        EnsureRSlot();           // R → WeaponPod
+        EnsureStatPanel();       // ATK/DEF → HpBar
+    }
+
+    private void OnEnable()  => SceneManager.sceneLoaded += HandleSceneLoaded;
+    private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
+
+    /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
+    private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        _noticeTimer = 0f;
+        if (buffNoticeText != null) buffNoticeText.gameObject.SetActive(false);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 레이아웃 분해(원신/명조식): 프리팹 authored 요소를 역할별 컨테이너로 재배치.
+    // 재부모는 GameObject를 보존하므로 CombatPanelView 직렬화 참조(슬라이더/아이콘)는 유지됨.
+    // ─────────────────────────────────────────────────────────
+    private void EnsureLayout()
+    {
+        if (_layoutBuilt) return;
+        _layoutBuilt = true;
+
+        // HP → 하단중앙 얇은 모던 바 (올림 → 아래에 무기 2종 자리)
+        _hpBar = CreateContainer("HpBar", new Vector2(0.5f, 0f), new Vector2(0f, 96f), new Vector2(520f, 16f), new Vector2(0.5f, 0f));
+        if (FindChildRecursive(transform, "HUD_Hp") is RectTransform hpRT)
+        {
+            hpRT.SetParent(_hpBar, false);
+            StretchFill(hpRT);
+        }
+        // HP fill 이미지가 미할당이면 슬라이더 Fill에서 확보(색상 제어용)
+        if (hpFillImage == null && hpSlider != null && hpSlider.fillRect != null)
+            hpFillImage = hpSlider.fillRect.GetComponent<Image>();
+        CleanHpBarVisual();   // 늘어난 장식 아트 → 단색 플랫 바
+
+        // 스킬 2포드(우하단): 유물(금) / 무기(청) — 스킬=최상위 위계(가장 큼)
+        _relicPod  = CreatePod("RelicPod",  new Vector2(-336f, 26f), new Vector2(118f, 118f), RelicColor);
+        _weaponPod = CreatePod("WeaponPod", new Vector2(-24f,  26f), new Vector2(300f, 118f), WeaponColor);
+        ReparentSkill("HUD_QSkile", _relicPod,  new Vector2(0.5f, 0.5f), new Vector2(0f, -6f), new Vector2(90f, 90f));
+        ReparentSkill("HUD_ESkile", _weaponPod, new Vector2(0f, 0.5f),   new Vector2(94f, -6f), new Vector2(78f, 78f));
+        AddPodLabel(_relicPod,  "유물", RelicColor);
+        AddPodLabel(_weaponPod, "무기", WeaponColor);
+        // R은 EnsureRSlot이 _weaponPod 우측에 배치(궁극=가장 큼)
+
+        // 무기 2종 → 좌하단(빈 공간), 확대. 활성 무기 강조용 슬롯/아웃라인 캐싱.
+        if (FindChildRecursive(transform, "WeaponPanel") is RectTransform wpRT)
+        {
+            wpRT.SetParent(transform, false);
+            Anchor(wpRT, new Vector2(0f, 0f), new Vector2(30f, 60f), new Vector2(170f, 78f), new Vector2(0f, 0f));
+            wpRT.localScale = Vector3.one;   // 확대(0.85→1.0)
+            _weaponSlot0 = FindChildRecursive(wpRT, "Weapon_01") as RectTransform;
+            _weaponSlot1 = FindChildRecursive(wpRT, "Weapon_02") as RectTransform;
+            _weaponOutline0 = EnsureSlotOutline(_weaponSlot0);
+            _weaponOutline1 = EnsureSlotOutline(_weaponSlot1);
+            DisableChildrenNamed(wpRT, "EmptyText");   // 빈 슬롯 "비어있음" 텍스트 정리
+        }
+
+        // 유물 아이덴티티 바 (체력바 아래) — 활성 유물 IRelicResource 표시
+        CreateRelicBar();
+
+        // 중앙 하단 HUD 가시성↑: HP·유물바·스탯 뒤 어두운 배경 패널(밝은 바닥 대비)
+        var backdrop = CreateContainer("CenterBackdrop", new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(560f, 106f), new Vector2(0.5f, 0f));
+        var bdImg = backdrop.gameObject.AddComponent<Image>();
+        bdImg.color = new Color(0f, 0f, 0f, 0.34f);
+        bdImg.raycastTarget = false;
+        backdrop.SetAsFirstSibling();   // 중앙 요소들 뒤로
+
+        // 액티브 아이템 1/2/3 → 상단 좌측 소형 행(무기 슬롯과 분리)
+        ReanchorActive("HUD_Active_01", new Vector2(-300f, 172f));
+        ReanchorActive("HUD_Active_02", new Vector2(-346f, 172f));
+        ReanchorActive("HUD_Active_03", new Vector2(-392f, 172f));
+
+        // 자식이 모두 빠져나간 원래 컨테이너(배경 이미지)를 숨김 — 하단중앙 빈 박스 잔류 방지
+        if (FindChildRecursive(transform, "CombatStatusRoot") is RectTransform legacyRoot)
+            legacyRoot.gameObject.SetActive(false);
+    }
+
+    /// <summary>transform 직속 빈 RectTransform 컨테이너 생성.</summary>
+    private RectTransform CreateContainer(string name, Vector2 anchor, Vector2 pos, Vector2 size, Vector2 pivot)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = anchor; rt.anchorMax = anchor; rt.pivot = pivot;
+        rt.anchoredPosition = pos; rt.sizeDelta = size;
+        return rt;
+    }
+
+    /// <summary>우하단 스킬 포드(반투명 배경 + 테두리). 색+형태 이중부호화(WCAG 1.4.1).</summary>
+    private RectTransform CreatePod(string name, Vector2 pos, Vector2 size, Color color)
+    {
+        var rt = CreateContainer(name, new Vector2(1f, 0f), pos, size, new Vector2(1f, 0f));
+        var img = rt.gameObject.AddComponent<Image>();
+        img.color = new Color(color.r, color.g, color.b, 0.14f);
+        img.raycastTarget = false;
+        var ol = rt.gameObject.AddComponent<Outline>();
+        ol.effectColor = new Color(color.r, color.g, color.b, 0.9f);
+        ol.effectDistance = new Vector2(2f, -2f);
+        return rt;
+    }
+
+    private void ReparentSkill(string childName, RectTransform pod, Vector2 anchor, Vector2 pos, Vector2 size)
+    {
+        if (pod == null) return;
+        if (FindChildRecursive(transform, childName) is not RectTransform rt) return;
+        rt.SetParent(pod, false);
+        Anchor(rt, anchor, pos, size, new Vector2(0.5f, 0.5f));
+    }
+
+    private void ReanchorActive(string childName, Vector2 pos)
+    {
+        if (FindChildRecursive(transform, childName) is not RectTransform rt) return;
+        rt.SetParent(transform, false);
+        Anchor(rt, new Vector2(1f, 0f), pos, new Vector2(46f, 46f), new Vector2(0.5f, 0.5f));
+    }
+
+    /// <summary>포드 상단 출처 라벨(유물/무기).</summary>
+    private void AddPodLabel(RectTransform pod, string text, Color color)
+    {
+        var go = new GameObject("PodLabel", typeof(RectTransform));
+        go.transform.SetParent(pod, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 0f); rt.anchoredPosition = new Vector2(0f, 2f);
+        rt.sizeDelta = new Vector2(70f, 16f);
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(tmp);
+        tmp.text = text; tmp.fontSize = 12f; tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center; tmp.color = color;
+        tmp.raycastTarget = false;
+    }
+
+    private static void Anchor(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size, Vector2 pivot)
+    {
+        rt.anchorMin = anchor; rt.anchorMax = anchor; rt.pivot = pivot;
+        rt.anchoredPosition = pos; rt.sizeDelta = size;
+    }
+
+    private static void StretchFill(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+    }
+
+    /// <summary>지정 이름의 모든 자손 오브젝트를 비활성화(비활성 포함 순회). 무기 빈 슬롯 텍스트 정리 등.</summary>
+    private static void DisableChildrenNamed(Transform root, string name)
+    {
+        if (root == null) return;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var c = root.GetChild(i);
+            if (c.name == name && c.gameObject.activeSelf) c.gameObject.SetActive(false);
+            DisableChildrenNamed(c, name);
+        }
+    }
+
+    /// <summary>유물 아이덴티티 바(체력바 아래): 트랙 + fill(anchorMax.x로 폭) + 중앙 라벨. 유물 바인딩 전엔 숨김.</summary>
+    private void CreateRelicBar()
+    {
+        _relicBar = CreateContainer("RelicIdentityBar", new Vector2(0.5f, 0f), new Vector2(0f, 72f), new Vector2(360f, 14f), new Vector2(0.5f, 0f));
+        var track = _relicBar.gameObject.AddComponent<Image>();
+        track.color = new Color(0f, 0f, 0f, 0.5f);
+        track.raycastTarget = false;
+
+        var fillGO = new GameObject("Fill", typeof(RectTransform));
+        fillGO.transform.SetParent(_relicBar, false);
+        var frt = fillGO.GetComponent<RectTransform>();
+        frt.anchorMin = new Vector2(0f, 0f);
+        frt.anchorMax = new Vector2(0f, 1f);   // 폭=0 시작 → Update에서 anchorMax.x=Fill
+        frt.offsetMin = new Vector2(1f, 1f); frt.offsetMax = new Vector2(0f, -1f);
+        frt.pivot = new Vector2(0f, 0.5f);
+        _relicBarFill = fillGO.AddComponent<Image>();
+        _relicBarFill.color = Color.white;
+        _relicBarFill.raycastTarget = false;
+        _relicBarGlow = fillGO.AddComponent<Outline>();   // fill 가장자리 맥동(게이지 피드백)
+        _relicBarGlow.effectColor = new Color(1f, 1f, 1f, 0f);
+        _relicBarGlow.effectDistance = new Vector2(2f, 2f);
+
+        var lblGO = new GameObject("Label", typeof(RectTransform));
+        lblGO.transform.SetParent(_relicBar, false);
+        var lrt = lblGO.GetComponent<RectTransform>();
+        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
+        lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
+        _relicBarLabel = lblGO.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(_relicBarLabel);
+        _relicBarLabel.fontSize = 10f;
+        _relicBarLabel.alignment = TextAlignmentOptions.Center;
+        _relicBarLabel.color = Color.white;
+        _relicBarLabel.raycastTarget = false;
+        var ol = lblGO.AddComponent<Outline>();
+        ol.effectColor = new Color(0f, 0f, 0f, 0.8f);
+        ol.effectDistance = new Vector2(1f, -1f);
+
+        _relicBar.gameObject.SetActive(false);
+    }
+
+    private Outline EnsureSlotOutline(RectTransform slot)
+    {
+        if (slot == null) return null;
+        if (!slot.TryGetComponent<Outline>(out var ol)) ol = slot.gameObject.AddComponent<Outline>();
+        ol.effectColor = new Color(1f, 0.85f, 0.30f, 0.95f);   // 금색 강조
+        ol.effectDistance = new Vector2(3f, -3f);
+        ol.enabled = false;
+        return ol;
+    }
+
+    /// <summary>활성 무기 슬롯 강조(아웃라인 + 확대 연출). HudPresenter가 CurrentSlotIndex로 호출.</summary>
+    public void SetActiveWeapon(int index)
+    {
+        SetSlotActive(_weaponSlot0, _weaponOutline0, index == 0);
+        SetSlotActive(_weaponSlot1, _weaponOutline1, index == 1);
+    }
+
+    private static void SetSlotActive(RectTransform slot, Outline ol, bool active)
+    {
+        if (ol != null)   ol.enabled = active;
+        if (slot != null) slot.localScale = Vector3.one * (active ? 1.15f : 1.0f);
+    }
+
+    /// <summary>유물 아이덴티티 바에 활성 유물 리소스를 연결(null이면 숨김). 라벨은 OnChanged, Fill/색은 Update 폴링.</summary>
+    public void SetRelicResource(IRelicResource res)
+    {
+        if (_relicBar == null) return;
+        if (_relicResource != null && _relicChanged != null)
+            _relicResource.OnChanged -= _relicChanged;
+
+        _relicResource = res;
+        if (res == null) { _relicBar.gameObject.SetActive(false); return; }
+
+        _relicChanged ??= RefreshRelicLabel;
+        res.OnChanged += _relicChanged;
+        _relicBar.gameObject.SetActive(true);
+        RefreshRelicLabel();
+    }
+
+    private void RefreshRelicLabel()
+    {
+        if (_relicBarLabel != null && _relicResource != null)
+            _relicBarLabel.text = _relicResource.Label;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -469,9 +764,34 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_hpInitialized)
             UpdateHpAnimation();
 
+        // 유물 아이덴티티 바: Fill(폭)·색 매 프레임 폴링 + 게이지 맥동/절정 연출(라벨은 OnChanged)
+        if (_relicResource != null && _relicBarFill != null)
+        {
+            float fill = Mathf.Clamp01(_relicResource.Fill);
+            _relicBarFill.rectTransform.anchorMax = new Vector2(fill, 1f);
+            var c = _relicResource.BarColor;
+            _relicBarFill.color = c;
+
+            // 절정 구간(가웨인 정오 등 IsSkillReady): 진입 플래시 + 빠르고 강한 맥동. 랜슬롯은 게이지 비례.
+            bool ready = _relicResource.IsSkillReady;
+            if (ready && !_lastSkillReady) _relicFlash = 1f;               // 정오 진입 플래시(상승엣지)
+            _lastSkillReady = ready;
+            if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
+
+            if (_relicBarGlow != null)
+            {
+                float pulse     = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * (ready ? 10f : 6f));
+                float intensity = ready ? 1f : fill * fill;               // 절정=상시 강, 아니면 게이지 비례
+                float glow      = pulse * intensity * 0.9f + _relicFlash; // 진입 플래시 가산
+                _relicBarGlow.effectColor = new Color(c.r, c.g, c.b, Mathf.Clamp01(glow));
+            }
+            // 정오 진입 시 바를 잠깐 확대(펀치) — 절정 강조
+            _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
+        }
+
         if (_noticeTimer > 0f)
         {
-            _noticeTimer -= Time.deltaTime;
+            _noticeTimer -= Time.unscaledDeltaTime;   // 씬 전환/일시정지(timeScale=0)에도 얼지 않게 — 알림 잔류 방지
 
             if (buffNoticeText != null)
             {
@@ -799,18 +1119,16 @@ public sealed class CombatPanelView : MonoBehaviour
     private void EnsureRSlot()
     {
         if (_rIconImg != null) return;
-
-        var combatRoot = FindChildRecursive(transform, "CombatStatusRoot");
-        if (combatRoot == null) return;
+        if (_weaponPod == null) return;   // EnsureLayout이 먼저 생성
 
         var rGO = new GameObject("HUD_RSkile", typeof(RectTransform));
-        rGO.transform.SetParent(combatRoot, false);
+        rGO.transform.SetParent(_weaponPod, false);   // 무기 포드(청) 우측
         var rt = rGO.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0.5f, 0f);
-        rt.anchorMax        = new Vector2(0.5f, 0f);
+        rt.anchorMin        = new Vector2(0f, 0.5f);
+        rt.anchorMax        = new Vector2(0f, 0.5f);
         rt.pivot            = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta        = new Vector2(68f, 68f);
-        rt.anchoredPosition = new Vector2(286f, 50.8f);
+        rt.sizeDelta        = new Vector2(100f, 100f);  // 궁극=가장 큼(시각 위계)
+        rt.anchoredPosition = new Vector2(214f, 0f);
 
         var slotBG = rGO.AddComponent<Image>();
         slotBG.color = new Color(0.08f, 0.08f, 0.14f, 0.85f);
@@ -863,35 +1181,26 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>공격력·방어력을 HUD에 실시간 반영한다. HudPresenter.RefreshStats에서 호출.</summary>
     public void SetStats(int atk, int def)
     {
-        if (_atkText != null) _atkText.SetText($"⚔ {atk}");
-        if (_defText != null) _defText.SetText($"🛡 {def}");
+        if (_atkText != null) _atkText.SetText($"ATK {atk}");
+        if (_defText != null) _defText.SetText($"DEF {def}");
     }
 
     private void EnsureStatPanel()
     {
         if (_statRoot != null) return;
+        if (_hpBar == null) return;   // EnsureLayout이 먼저 생성
 
-        // CombatStatusRoot 탐색
-        var combatRoot = FindChildRecursive(transform, "CombatStatusRoot");
-        if (combatRoot == null) return;
-
-        // CombatStatusRoot 크기 확대: 650×130 → 750×168
-        if (combatRoot is RectTransform crt)
-        {
-            crt.sizeDelta = new Vector2(750f, 168f);
-        }
-
-        // 스탯 행 배치: CombatStatusRoot 상단 28px 영역
+        // 스탯 행: HP 바 바로 위 24px (ATK 좌 / DEF 우)
         var statGO = new GameObject("StatRow", typeof(RectTransform));
-        statGO.transform.SetParent(combatRoot, false);
+        statGO.transform.SetParent(_hpBar, false);
         _statRoot = statGO;
 
         var rt = statGO.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(1f, 1f);
-        rt.pivot     = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(0f, 30f);
-        rt.anchoredPosition = Vector2.zero;
+        rt.pivot     = new Vector2(0.5f, 0f);
+        rt.sizeDelta = new Vector2(0f, 24f);
+        rt.anchoredPosition = new Vector2(0f, 4f);
 
         // 반투명 배경
         var bg = statGO.AddComponent<Image>();
@@ -947,11 +1256,11 @@ public sealed class CombatPanelView : MonoBehaviour
         var go = new GameObject("BuffGridRoot", typeof(RectTransform));
         go.transform.SetParent(transform, false);
 
-        // 화면 하단 중앙에 도킹 → 중앙에서 오른쪽으로 늘고 위로 쌓임(중앙 HUD 위). 레이아웃은 EnsureBuffGrid에서 부착.
+        // 화면 좌측 중하단에 도킹 → 왼쪽에서 오른쪽으로 늘고 위로 쌓임(주변시야). 레이아웃은 EnsureBuffGrid에서 부착.
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0f);
-        rect.anchorMax = new Vector2(0.5f, 0f);
-        rect.pivot = new Vector2(0f, 0f);   // 좌하단 피벗 → 중앙 기준 오른쪽+위로 확장
+        rect.anchorMin = new Vector2(0f, 0.38f);
+        rect.anchorMax = new Vector2(0f, 0.38f);
+        rect.pivot = new Vector2(0f, 0f);   // 좌하단 피벗 → 좌측 기준 오른쪽+위로 확장
         rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY);
         rect.sizeDelta = new Vector2(250f, 100f);
 
@@ -1040,16 +1349,16 @@ public sealed class CombatPanelView : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0f);
-        rect.anchorMax = new Vector2(0.5f, 0f);
-        rect.pivot = new Vector2(1f, 0f);   // 우하단 피벗 → 그리드 왼쪽에서 위로 쌓임(안 가려지게)
-        // 그리드 시작점(중앙) 왼쪽에 분리 배치.
-        rect.anchoredPosition = new Vector2(BuffDockX - BuffGaugeGap, BuffDockBottomY);
+        rect.anchorMin = new Vector2(0f, 0.38f);
+        rect.anchorMax = new Vector2(0f, 0.38f);
+        rect.pivot = new Vector2(0f, 1f);   // 좌상단 피벗 → 그리드 아래에서 아래로 쌓임
+        // 그리드(좌측) 바로 아래에 분리 배치.
+        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY - 8f);
         rect.sizeDelta = new Vector2(210f, 100f);
 
         var layout = go.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 3f;
-        layout.childAlignment = TextAnchor.LowerRight;
+        layout.childAlignment = TextAnchor.LowerLeft;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
         layout.childControlWidth = true;
@@ -1066,7 +1375,7 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         if (_gaugeRoot == null) return;
         ((RectTransform)_gaugeRoot).anchoredPosition =
-            new Vector2(BuffDockX - BuffGaugeGap, BuffDockBottomY);
+            new Vector2(BuffDockX, BuffDockBottomY - 8f);
     }
 
     private GaugeBar CreateGaugeBar()

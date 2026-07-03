@@ -30,6 +30,9 @@ public class RoomClearGate : MonoBehaviour
     [SerializeField, Tooltip("EndEffect 스폰 후 EndEffect2 스폰까지의 딜레이(초)."), Min(0f)]
     private float endEffect2SpawnDelay = 2f;
 
+    [SerializeField, Tooltip("클리어 이펙트/보상 오브젝트를 바닥(사망 위치)에서 위로 띄우는 높이(m)."), Min(0f)]
+    private float effectHeightOffset = 0.6f;
+
     [Header("Drop Table (옵션 — Initialize에서 주입 권장)")]
     [SerializeField] private LuckRollTableSO luckTable;
 
@@ -65,6 +68,9 @@ public class RoomClearGate : MonoBehaviour
     private async UniTaskVoid PlayClearEffectSequenceAsync(Vector3 center)
     {
         var ct = this.GetCancellationTokenOnDestroy();
+
+        // 바닥(사망 위치)에서 살짝 띄워 이펙트/보상이 지면에 파묻히지 않게 한다.
+        center += Vector3.up * effectHeightOffset;
 
         if (endEffectPrefab != null)
             Instantiate(endEffectPrefab, center, Quaternion.identity);
