@@ -33,6 +33,14 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     [Header("DeathKnight — 검")]
     [SerializeField] private DeathKnightSwordController _swordCtrl;
 
+    [Header("DeathKnight — 전신 오라 (검 색상 연동)")]
+    [Tooltip("오라를 붙일 기준 위치. 비워두면 보스 루트 사용")]
+    [SerializeField] private Transform  _auraAnchor;
+    [Tooltip("SwordColor.White일 때 재생할 오라 프리팹 (Aura_Light_LWRP)")]
+    [SerializeField] private GameObject _whiteAuraPrefab;
+    [Tooltip("SwordColor.Black일 때 재생할 오라 프리팹 (Aura_Dark_LWRP)")]
+    [SerializeField] private GameObject _blackAuraPrefab;
+
     [Header("DeathKnight — 콤보 공격 풀")]
     [SerializeField] private List<BossPatternSO> _attackPool;
 
@@ -69,6 +77,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float      _entranceCameraReturnDuration  = 1.2f;
     [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
     [SerializeField] private GameObject _entranceWindEffectPrefab;
+    [Tooltip("Attack1 스윙 적중 시점에 검 위치에서 재생할 슬래시 이펙트 (Basic Slash Blue)")]
+    [SerializeField] private GameObject _entranceSlashVfxPrefab;
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "DeathKnightBoss/DeathKnightBossConfig";
@@ -89,6 +99,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     public DeathKnightBossBlackboard DKBlackboard => _dkBB;
     public Transform SwordTransform          => _swordCtrl?.SwordTransform;
     public Transform PyramidStrikeAnchor     => _pyramidStrikeAnchor;
+    public GameObject WhiteAuraPrefab        => _whiteAuraPrefab;
+    public GameObject BlackAuraPrefab        => _blackAuraPrefab;
     public AudioClip TeleportInSfx           => _teleportInSfx;
     public AudioClip TeleportOutSfx          => _teleportOutSfx;
     public Vector3 EntranceCameraOffset          => _entranceCameraOffset;
@@ -106,6 +118,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     private bool                      _isStaggered;
     private DKDormantState            _dormantState;
     private bool                      _pendingTriggerEntrance;
+    private GameObject                _auraInstance;
+    private GameObject                _currentAuraPrefab;
 
     /// <summary>GetHitState 진입/종료 시 콤보 러너 차단 플래그.</summary>
     public void SetStagger(bool value) => _isStaggered = value;
@@ -219,7 +233,9 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
                 return new DKPhase2TeleportState(
                     state, _teleportVfxPrefab, _teleportDistance, _teleportVfxDuration, phase1Pos,
-                    teleportInSfx: _teleportInSfx, teleportOutSfx: _teleportOutSfx);
+                    teleportInSfx: _teleportInSfx, teleportOutSfx: _teleportOutSfx,
+                    onTeleportStart: OnTeleportStart,
+                    onTeleportComplete: OnTeleportComplete);
             });
 
         runnerRef = _runner;
@@ -234,6 +250,30 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             _dormantState.TriggerEntrance(_ctx);
         }
     }
+
+    /// <summary>DKPhase2TeleportState 진입 시점에 호출되어 전신 오라를 끈다 (텔레포트 거리만큼 잔상이 남는 것 방지).</summary>
+    private void OnTeleportStart()
+    {
+        if (_auraInstance != null) _auraInstance.SetActive(false);
+    }
+
+    /// <summary>DKPhase2TeleportState의 텔레포트 완료(또는 스킵) 시점에 호출되어 검과 전신 오라를 다시 등장시킨다.</summary>
+    private void OnTeleportComplete()
+    {
+        ShowSwordVisual();
+        if (_auraInstance != null) _auraInstance.SetActive(true);
+    }
+
+    /// <summary>검을 등장시킨다 (텔레포트 완료 / 등장 연출 스윙 등 외부 호출용).</summary>
+    public void ShowSwordVisual()
+    {
+        // 등장 전 반드시 올바른 색상 머티리얼 세팅 (핑크 방지)
+        if (_dkBB != null) _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
+        _swordCtrl?.ShowSword();
+    }
+
+    /// <summary>검을 소멸시킨다 (등장 연출 종료 등 외부 호출용).</summary>
+    public void HideSwordVisual() => _swordCtrl?.HideSword();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 매 프레임
@@ -259,19 +299,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             else
                 _coreBB.NormalModeTimer += dt;
 
-            // 패턴 시작 → 검 등장 / 패턴 종료 → 검 소멸
+            // 검 등장은 DKPhase2TeleportState의 텔레포트 완료 콜백(OnTeleportComplete)에서 처리한다
+            // (텔레포트 전에 등장하면 트레일이 출발 위치부터 길게 남는 문제가 있었음).
+            // 패턴 종료 시점에만 여기서 검을 소멸시킨다.
             if (active != _prevPatternActive)
             {
-                if (active)
-                {
-                    // 등장 전 반드시 올바른 색상 머티리얼 세팅 (핑크 방지)
-                    if (_dkBB != null) _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
-                    _swordCtrl?.ShowSword();
-                }
-                else
-                {
+                if (!active)
                     _swordCtrl?.HideSword();
-                }
                 _prevPatternActive = active;
             }
         }
@@ -301,6 +335,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         _prevPatternActive = false;
         _isStaggered       = false;
         if (_dkBB != null) ApplyArmorTint(_dkBB.SwordColor);
+        ApplyAuraColor(_dkBB?.SwordColor ?? DKSwordColor.White);
         if (_attackPool != null)
             foreach (var p in _attackPool)
                 p?.OnRecycled();
@@ -398,6 +433,24 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
         ApplyArmorTint(_dkBB.SwordColor);
         ApplyBarrierTint(_dkBB.SwordColor);
+        ApplyAuraColor(_dkBB.SwordColor);
+    }
+
+    /// <summary>전신 오라 프리팹을 검 색상에 맞춰 교체한다 (보스 루트/지정 앵커에 인스턴스화).</summary>
+    private void ApplyAuraColor(DKSwordColor color)
+    {
+        GameObject auraPrefab = color == DKSwordColor.White ? _whiteAuraPrefab : _blackAuraPrefab;
+        if (auraPrefab == null) return;
+        if (auraPrefab == _currentAuraPrefab) return;
+
+        if (_auraInstance != null) Destroy(_auraInstance);
+
+        Transform anchor = _auraAnchor != null ? _auraAnchor : transform;
+        _auraInstance = Instantiate(auraPrefab, anchor);
+        // 바닥 장판 잔여물이 바닥 아래로 가려지도록 살짝 낮춤 (뜨는 입자는 위로 올라가므로 영향 없음)
+        _auraInstance.transform.localPosition = new Vector3(0f, -1.5f, 0f);
+        _auraInstance.transform.localRotation = Quaternion.identity;
+        _currentAuraPrefab = auraPrefab;
     }
 
     private void ApplyBarrierTint(DKSwordColor color)
@@ -596,5 +649,15 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
     public GameObject SpawnEntranceWindVfx()
         => _entranceWindEffectPrefab != null ? Instantiate(_entranceWindEffectPrefab) : null;
+
+    /// <summary>등장 연출 Attack1 스윙 적중 시점에 검 위치/방향으로 슬래시 VFX를 재생한다.</summary>
+    public void SpawnEntranceSlashVfx()
+    {
+        if (_entranceSlashVfxPrefab == null) return;
+        Transform swordTf = _swordCtrl?.SwordTransform;
+        Vector3    pos = swordTf != null ? swordTf.position : transform.position;
+        Quaternion rot = swordTf != null ? swordTf.rotation : transform.rotation;
+        BossEffectPool.SpawnOneShot(_entranceSlashVfxPrefab, pos, rot, fallbackLifetime: 2f);
+    }
 }
 }

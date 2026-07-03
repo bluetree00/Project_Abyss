@@ -2319,6 +2319,11 @@ MonoBehaviour:
   _debugState: 
   _bodyRenderers: []
   _swordCtrl: {fileID: 0}
+  _auraAnchor: {fileID: 0}
+  _whiteAuraPrefab: {fileID: 174211133732289389, guid: 6f33d5b0319dbdf4e95edc7a2c267e53,
+    type: 3}
+  _blackAuraPrefab: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
+    type: 3}
   _attackPool:
   - {fileID: 11400000, guid: a7323ceaf1a96b246bb54a211f51df1f, type: 2}
   - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
@@ -2347,6 +2352,8 @@ MonoBehaviour:
   _entranceCameraCloseUpDuration: 1
   _entranceCameraReturnDuration: 1.2
   _entranceWindEffectPrefab: {fileID: 0}
+  _entranceSlashVfxPrefab: {fileID: 5503505460791601945, guid: 7981772f8929edc4bb90c4e960c81cd8,
+    type: 3}
 --- !u!195 &8839149076850127432
 NavMeshAgent:
   m_ObjectHideFlags: 0

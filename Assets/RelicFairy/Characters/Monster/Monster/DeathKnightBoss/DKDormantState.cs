@@ -104,9 +104,11 @@ public class DKDormantState : IMonsterState
 
         try
         {
-            // ① 오버뷰 카메라 상태: Attack1 → hitTime 후 프롭 날리기
+            // ① 오버뷰 카메라 상태: 스윙과 함께 검 등장 → hitTime 후 슬래시 VFX + 프롭 날리기
+            dk.ShowSwordVisual();
             PlayAnim(ctx, "Attack1");
             await UniTask.Delay(TimeSpan.FromSeconds(AttackHitDelay), cancellationToken: ct);
+            dk.SpawnEntranceSlashVfx();
             SwapAndFlyProps(dk); // 물리는 백그라운드에서 계속 날아감
 
             // 오버뷰 카메라로 프롭 날아가는 모습 노출 후 클로즈업 전환
@@ -118,8 +120,9 @@ public class DKDormantState : IMonsterState
                     dk.EntranceCameraOffset, dk.EntranceCameraLookOffset,
                     dk.EntranceCameraCloseUpDuration, ct);
 
-            // 보스 이름 HUD 직전: Idle 애니메이션 재생
+            // 보스 이름 HUD 직전: Idle 애니메이션 재생 + 검 소멸 (평상시처럼 비무장 상태로 복귀)
             PlayIdleAnim(ctx);
+            dk.HideSwordVisual();
 
             // 보스 이름 HUD + 바람 이펙트
             GameObject windVfx = dk.SpawnEntranceWindVfx();
