@@ -693,6 +693,70 @@ public class GameCameraController : MonoBehaviour
     }
 
     /// <summary>
+    /// 온보딩 연출: 현재 카메라 위치에서 target으로 **천천히 넓게 클로즈업**으로 이동→잠시 비춤→**조금 빠르게 복귀**.
+    /// orbit 없음. Cinemachine을 일시 정지하고 카메라 transform을 직접 보간한 뒤 원위치 복귀+추적 재개.
+    /// </summary>
+    public async UniTask PlayOnboardingRevealAsync(
+        Vector3 target, Vector3 viewOffset, float lookHeight,
+        float moveDuration, float holdDuration, float returnDuration,
+        Transform playerTransform, CancellationToken ct = default)
+    {
+        if (this == null) return;
+        if (_brain == null)       _brain       = GetComponent<CinemachineBrain>();
+        if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        Vector3    startPos = transform.position;
+        Quaternion startRot = transform.rotation;
+
+        Vector3 toPos   = target + viewOffset;
+        Vector3 lookDir = (target + Vector3.up * lookHeight) - toPos;
+        Quaternion toRot = lookDir.sqrMagnitude > 0.001f ? Quaternion.LookRotation(lookDir, Vector3.up) : startRot;
+
+        try
+        {
+            await MoveCameraAsync(startPos, startRot, toPos, toRot, moveDuration, ct);    // 천천히 넓게 클로즈업
+            if (holdDuration > 0f)
+                await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), DelayType.UnscaledDeltaTime, cancellationToken: ct);
+
+            // 복귀: 플레이어의 **현재 위치**를 추적하는 게임플레이 카메라 포즈로 블렌드(정확) — 조금 빠르게.
+            if (_cinemachine != null && playerTransform != null)
+            {
+                _cinemachine.Follow = playerTransform;
+                _cinemachine.LookAt = playerTransform;
+            }
+            await BlendToActiveCameraAsync(returnDuration, ct);   // 라이브 플레이어 vcam 포즈로 + brain 복원
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            // 취소 등으로 중단돼도 게임플레이 카메라 복원 보장
+            if (_cinemachine != null) _cinemachine.enabled = true;
+            if (_brain != null)       _brain.enabled       = true;
+        }
+    }
+
+    /// <summary>카메라 transform을 from→to로 PanEase 보간(unscaled). PlayOnboardingRevealAsync 전용.</summary>
+    private async UniTask MoveCameraAsync(Vector3 fromP, Quaternion fromR, Vector3 toP, Quaternion toR, float dur, CancellationToken ct)
+    {
+        float d = Mathf.Max(0.01f, dur), t = 0f;
+        while (t < d)
+        {
+            if (this == null) return;
+            ct.ThrowIfCancellationRequested();
+            t += Time.unscaledDeltaTime;
+            float k = PanEase(t / d);
+            transform.position = Vector3.Lerp(fromP, toP, k);
+            transform.rotation = Quaternion.Slerp(fromR, toR, k);
+            await UniTask.Yield(PlayerLoopTiming.Update);
+        }
+        transform.position = toP;
+        transform.rotation = toR;
+    }
+
+    /// <summary>
     /// Cinemachine을 일시 정지하고 카메라를 zoneCenter 위로 이동해 연출을 보여준 뒤 플레이어 추적으로 복귀.
     /// 신규 존 등장 연출(SpawnZoneByIndexAsync)에서 디졸브와 병렬로 호출된다.
     /// </summary>

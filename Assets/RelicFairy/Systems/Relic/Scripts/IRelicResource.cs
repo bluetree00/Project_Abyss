@@ -14,6 +14,8 @@ public interface IRelicResource
     string Label { get; }
     /// <summary>구간/상태 인덱스 (HUD 색·라벨 분기).</summary>
     int Phase { get; }
+    /// <summary>HUD 아이덴티티 바 색(유물별 단계 색). 유물 종류를 몰라도 바가 그대로 사용.</summary>
+    Color BarColor { get; }
     /// <summary>스킬 발동 가능 여부(정오 구간 / 스택 MAX 등). 스킬 게이팅이 읽음.</summary>
     bool IsSkillReady { get; }
 

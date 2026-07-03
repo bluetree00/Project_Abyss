@@ -169,8 +169,13 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     // ── 디버그 키 가이드 UI ────────────────────────────────
 
+    [SerializeField, Tooltip("레거시 디버그 키 힌트 오버레이 표시(기본 off — F5/F6/F7 키 자체는 유지)")]
+    private bool showGuiHints = false;
+
     private void OnGUI()
     {
+        if (!showGuiHints) return;   // 레거시 정리: 화면 힌트 비활성(키 동작은 Update에서 유지)
+
         var style = new GUIStyle(GUI.skin.label)
         {
             fontSize = 13,

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
+using INab.Common;
 
 /// <summary>
 /// 회피(닷지) 시각 연출 — 잔상(afterimage) / i-frame 색 틴트 / 대시 먼지·트레일.
@@ -26,12 +27,15 @@ public class DodgePresentation : MonoBehaviour
     private static readonly int BaseColorId     = Shader.PropertyToID("_BaseColor");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
     private const string GhostObjectName = "~DodgeGhost";
+    private const float  DashTrailFadeIn  = 0.02f;
+    private const float  DashTrailFadeOut = 0.1f;
 
     // ── Private (refs, Awake 캐싱) ─────────────────────────────────
     private PlayerController     _controller;
     private CharacterData        _data;
     private SkinnedMeshRenderer[] _renderers;
-    private TrailRenderer        _trail;             // 있으면 사용, 없으면 트레일 스킵
+    private TrailRenderer        _trail;             // 폴백 — dashTrailVfxPrefab 미할당 시 사용
+    private WeaponTrailEffect    _dashTrailVfx;       // INab 대시 트레일 — dashTrailVfxPrefab 할당 시 우선
     private MaterialPropertyBlock _mpb;
 
     // ── Private (틴트) ────────────────────────────────────────────
@@ -57,12 +61,11 @@ public class DodgePresentation : MonoBehaviour
         _controller = GetComponent<PlayerController>();
         _data       = _controller != null ? _controller.CharacterData : null;
         _renderers  = GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        _trail      = GetComponentInChildren<TrailRenderer>(true);
-        if (_trail == null) _trail = CreateDashTrail();   // 자식에 없으면 CharacterData 머티리얼로 런타임 생성
         _mpb        = new MaterialPropertyBlock();
+        SetupDashTrail();   // INab 프리팹 할당 시 INab 트레일, 아니면 TrailRenderer 폴백
 
         // 트레일은 회피 중에만 켠다 — 시작 상태는 항상 OFF로 강제(인스펙터에서 켜둔 상태 방어).
-        DisableTrail();
+        HardOffTrail();
     }
 
     private void OnEnable()
@@ -85,7 +88,7 @@ public class DodgePresentation : MonoBehaviour
         // 비활성/풀 반환 시 시각 잔류 0 보장 — 틴트 원복 + 스폰 중지 + 트레일 OFF.
         ClearIFrameTint();
         StopGhostSpawn();
-        DisableTrail();
+        HardOffTrail();
     }
 
     private void OnDestroy()
@@ -341,16 +344,64 @@ public class DodgePresentation : MonoBehaviour
         return tr;
     }
 
+    // INab 프리팹이 있으면 몸 상/하 앵커로 INab 트레일을 구성(우선), 없으면 기존 TrailRenderer 폴백.
+    private void SetupDashTrail()
+    {
+        if (_data != null && _data.dashTrailVfxPrefab != null)
+        {
+            var rig = new GameObject("~DashTrailRig");
+            rig.transform.SetParent(transform, false);
+
+            var tip = new GameObject("Tip").transform;
+            tip.SetParent(rig.transform, false);
+            tip.localPosition = new Vector3(0f, _data.dashTrailUpperY, 0f);
+
+            var bottom = new GameObject("Bottom").transform;
+            bottom.SetParent(rig.transform, false);
+            bottom.localPosition = new Vector3(0f, _data.dashTrailLowerY, 0f);
+
+            _dashTrailVfx = rig.AddComponent<WeaponTrailEffect>();
+            _dashTrailVfx.trailUsageType      = WeaponTrailEffect.TrailUsageType.Manual;
+            _dashTrailVfx.useEvents           = false;
+            _dashTrailVfx.enableGizmos        = false;
+            _dashTrailVfx.lineTipTransform    = tip;
+            _dashTrailVfx.lineBottomTransform = bottom;
+            _dashTrailVfx.SetNewTrailPrefab(_data.dashTrailVfxPrefab);   // 안전 컨텍스트(Awake)에서 인스턴스화
+            return;
+        }
+
+        // 폴백: 기존 자식 TrailRenderer 탐색 → 없으면 CharacterData 머티리얼로 생성
+        _trail = GetComponentInChildren<TrailRenderer>(true);
+        if (_trail == null) _trail = CreateDashTrail();
+    }
+
     private void EnableTrail()
     {
+        if (_dashTrailVfx != null) { _dashTrailVfx.StartTrail(DashTrailFadeIn); return; }
         if (_trail == null) return;
         _trail.Clear();          // 직전 위치에서 이어지는 잔상 줄 방지
         _trail.emitting = true;
         _trail.enabled  = true;
     }
 
+    // 회피 종료 — 부드럽게 페이드아웃(게임플레이 활성 컨텍스트).
     private void DisableTrail()
     {
+        if (_dashTrailVfx != null) { _dashTrailVfx.StopTrail(DashTrailFadeOut); return; }
+        if (_trail == null) return;
+        _trail.emitting = false;
+        _trail.enabled  = false;
+    }
+
+    // 즉시 OFF(코루틴 없음) — Awake 초기화/OnDisable에서 'inactive GameObject' 경고 방지.
+    private void HardOffTrail()
+    {
+        if (_dashTrailVfx != null)
+        {
+            _dashTrailVfx.SetProperty_EffectActive(false);
+            _dashTrailVfx.SetProperty_EffectAlive(0f);
+            return;
+        }
         if (_trail == null) return;
         _trail.emitting = false;
         _trail.enabled  = false;

@@ -97,6 +97,13 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     };
     public string Label => _phase switch { ZPhase.Charging => "정오 충전", ZPhase.Noon => "정오!", _ => "황혼" };
     public int Phase => (int)_phase;
+    public Color BarColor => _phase switch
+    {
+        ZPhase.Noon     => new Color(1.00f, 0.85f, 0.25f),                                   // 정오 — 밝은 금
+        ZPhase.Charging => IsMarkReady ? new Color(1.00f, 0.62f, 0.18f)                      // 각인 — 주황금
+                                       : new Color(0.72f, 0.58f, 0.24f),                     // 충전 — 어두운 금
+        _               => new Color(0.42f, 0.42f, 0.48f),                                   // 황혼 — 회색
+    };
     public bool IsSkillReady => _phase == ZPhase.Noon;
 
     public void Tick(float deltaTime) { }          // 시간형: 자체 Update로 진행

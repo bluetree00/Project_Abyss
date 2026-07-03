@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PlayerCharacterData
   m_EditorClassIdentifier: 
   characterName: PlayerCharacter
-  baseMoveSpeed: 8
+  baseMoveSpeed: 5
   baseRunSpeed: 8
   runRampDuration: 1
   maxHealth: 250
@@ -44,6 +44,10 @@ MonoBehaviour:
   dashTrailLocalOffset: {x: 0, y: 1, z: 0}
   dashTrailTime: 0.25
   dashTrailWidth: 1
+  dashTrailVfxPrefab: {fileID: 1298082800965881913, guid: 833bd2bfddf27ff4494b0bc4356e2a28,
+    type: 3}
+  dashTrailUpperY: 1.7
+  dashTrailLowerY: 0.1
   jumpForce: 9
   gravity: -28
   fallMultiplier: 2

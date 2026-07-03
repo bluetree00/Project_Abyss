@@ -12,7 +12,7 @@ using UnityEngine;
 ///
 /// 수치는 RELIC_STAT_DATA(gawain) 슬롯 구동.
 /// </summary>
-public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
+public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicResourceProvider
 {
     private const string RelicKey = "gawain";
     private const int V_NOON_ATKSPD = 3, V_NOON_CRITCH = 4, V_NOON_CRITDMG = 5, V_NOON_ALLDMG = 6,
@@ -30,6 +30,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
     private bool             _markPendingFirstHit; // 각인: 정오 첫 공격 +50%
 
     public ZenithGauge Gauge => _gauge;
+    public IRelicResource RelicResource => _gauge;   // HUD 아이덴티티 바 연결
 
     /// <summary>태양 강림이 호출 — 정오 구간당 1회 소비.</summary>
     public void MarkSkillUsed() => _skillUsedThisNoon = true;
@@ -100,7 +101,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
             rs.SetRelicCritBuff(V(V_NOON_CRITCH, 10f), V(V_NOON_CRITDMG, 0.20f));
             float allMul = 1f + V(V_NOON_ALLDMG, 0.20f);
             rs.SetCharacterAttackMultiplier(allMul, allMul);
-            if (_owner != null) GuidelineVisual.SetBadge(_owner.transform, "gawain", "정오", GuidelineVisual.BadgeTint.Relic); // [가이드라인 비주얼]
+            // 정오 상태 표시는 유물 아이덴티티 바가 담당(머리 위 배지 제거).
         }
         else if (_gauge.IsMarkReady)
         {
@@ -109,7 +110,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
             rs.SetRelicCritBuff(0f, 0f);
             float atkMul = 1f + V(V_MARK_ATK, 0.10f);
             rs.SetCharacterAttackMultiplier(atkMul, atkMul);
-            if (_owner != null) GuidelineVisual.SetBadge(_owner.transform, "gawain", "각인", GuidelineVisual.BadgeTint.Light); // [가이드라인 비주얼]
+            // 각인 상태 표시는 유물 아이덴티티 바가 담당(머리 위 배지 제거).
         }
         else
         {
@@ -134,12 +135,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource
         if (_owner == null || _gauge == null) return;
 
         // 기본 패시브(항상 첫 셀, 게이지 없는 상시 표시) — 상세는 호버 툴팁(Label)으로.
+        // 정오/각인 게이지는 체력바 아래 '유물 아이덴티티 바'(IRelicResource)로 이관 → 버프창엔 패시브 셀만.
         into.Add(new BuffViewItem("light", PassiveTip, 1, -1f, "", BuffSource.Relic, isDebuff: false));
-
-        // 게이지: 정오=남은 정오시간(1→0), 각인=충전 진행도. ZenithGauge.Fill이 구간별로 제공.
-        if (_gauge.IsNoon)
-            into.Add(new BuffViewItem("atk", "정오", 1, _gauge.Fill, "", BuffSource.Relic, isDebuff: false));
-        else if (_gauge.IsMarkReady)
-            into.Add(new BuffViewItem("atk", "각인", 1, _gauge.Fill, "", BuffSource.Relic, isDebuff: false));
     }
 }

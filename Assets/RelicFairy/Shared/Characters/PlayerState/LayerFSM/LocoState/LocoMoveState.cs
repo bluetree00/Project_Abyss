@@ -26,8 +26,8 @@ public class LocoMoveState : ILayerState<LocoState>
             _controller.Anim.CrossFade("MoveBlend", 0.05f);
 
         _runCharge01 = 0f;
-        // 대시 직후 진입이면 바로 풀 달리기로 시작(장비 보유 시에만).
-        _forceRun = _controller.HasWeapon && _controller.ConsumeRunAfterDash();
+        // 대시 직후 진입이면 바로 풀 달리기로 시작.
+        _forceRun = _controller.ConsumeRunAfterDash();
         if (_forceRun) _runCharge01 = 1f;
     }
 
@@ -36,8 +36,8 @@ public class LocoMoveState : ILayerState<LocoState>
         var dir = _controller.MoveDirection * _controller.MoveScale;
         bool moving = dir.sqrMagnitude > 0.0001f;
 
-        // 무장비=걷기만. 장비(무기) 보유 시: 대시 직후(_forceRun)는 즉시 풀, 아니면 램프 시간 동안 점진 가속.
-        bool canRun = moving && _controller.HasWeapon;
+        // 이동 지속 시 걷기→달리기 램프(무장비 포함). 대시 직후(_forceRun)면 즉시 풀 달리기, 아니면 램프 시간 동안 점진 가속.
+        bool canRun = moving;
         if (canRun)
         {
             if (_forceRun)
