@@ -30,7 +30,10 @@ public class EntrancePropDestructible : MonoBehaviour
     private void Launch(GameObject go, Vector3 fromPos)
     {
         foreach (var col in go.GetComponentsInChildren<Collider>(true))
+        {
+            if (col is MeshCollider mc && !mc.convex) { Object.Destroy(col); continue; }
             col.isTrigger = true;
+        }
 
         foreach (var childRb in go.GetComponentsInChildren<Rigidbody>(true))
             Destroy(childRb);

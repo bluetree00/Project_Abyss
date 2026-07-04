@@ -414,6 +414,8 @@ public class DKPhase2TeleportState : SpecialStateBase
     private readonly Vector3?      _phase1FixedPosition;
     private readonly AudioClip     _teleportInSfx;
     private readonly AudioClip     _teleportOutSfx;
+    private readonly System.Action _onTeleportStart;    // 텔레포트 진입 시점에 호출 (전신 오라 끄기 등)
+    private readonly System.Action _onTeleportComplete; // 텔레포트 완료(또는 스킵) 시점에 검 등장 트리거
 
     private GameObject _spawnedVfx;   // 출발 위치 VFX (텔레포트 시점에 제거)
     private float      _timer;
@@ -433,7 +435,9 @@ public class DKPhase2TeleportState : SpecialStateBase
                                   float vfxScale = 3f,
                                   float vfxFadeInDuration = 0.3f,
                                   AudioClip teleportInSfx = null,
-                                  AudioClip teleportOutSfx = null)
+                                  AudioClip teleportOutSfx = null,
+                                  System.Action onTeleportStart = null,
+                                  System.Action onTeleportComplete = null)
     {
         _nextState           = nextState;
         _vfxPrefab           = vfxPrefab;
@@ -446,10 +450,13 @@ public class DKPhase2TeleportState : SpecialStateBase
         _vfxFadeInDuration   = vfxFadeInDuration;
         _teleportInSfx       = teleportInSfx;
         _teleportOutSfx      = teleportOutSfx;
+        _onTeleportStart     = onTeleportStart;
+        _onTeleportComplete  = onTeleportComplete;
     }
 
     public override void Enter(MonsterContext ctx)
     {
+        _onTeleportStart?.Invoke();
         _timer        = 0f;
         _teleported   = false;
         _skipTeleport = false;
@@ -503,6 +510,7 @@ public class DKPhase2TeleportState : SpecialStateBase
 
             if (_skipTeleport)
             {
+                _onTeleportComplete?.Invoke();
                 ctx.Monster.ChangeState(_nextState);
                 return;
             }
@@ -536,6 +544,9 @@ public class DKPhase2TeleportState : SpecialStateBase
                 if (look.sqrMagnitude > 0.001f)
                     ctx.Transform.rotation = Quaternion.LookRotation(look);
             }
+
+            // 텔레포트 완료 직후에 검 등장 → 출발 위치부터 트레일이 남는 문제 방지
+            _onTeleportComplete?.Invoke();
         }
 
         // ── 텔레포트 후 짧은 텀 → 공격 시작 ──────────────

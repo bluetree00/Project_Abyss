@@ -371,6 +371,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &171360474
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &184198124
 GameObject:
   m_ObjectHideFlags: 0
@@ -1167,11 +1180,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Arena_Boss_Ch2
       objectReference: {fileID: 0}
-    - target: {fileID: 2914289304035155840, guid: e6a92243ca6e30e47ab4002a0b16500d,
-        type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 3681909362941497075, guid: e6a92243ca6e30e47ab4002a0b16500d,
         type: 3}
       propertyPath: m_Material
@@ -1837,11 +1845,16 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 2618870960734231533, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
+    - target: {fileID: 351204726080617261, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
+      propertyPath: m_Material
       value: 
-      objectReference: {fileID: 2100000, guid: 2d215973ef3daec4f96eaabd33e2b48b, type: 2}
+      objectReference: {fileID: 1336252448}
+    - target: {fileID: 2526713050824006041, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
+        type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 171360474}
     - target: {fileID: 2914289304035155840, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
       propertyPath: m_Name
@@ -1852,6 +1865,11 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3766514293291422455, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
+        type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 1178506735}
     - target: {fileID: 8144083805959077411, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
       propertyPath: m_Material
@@ -2340,6 +2358,19 @@ Transform:
   - {fileID: 879285685}
   m_Father: {fileID: 330585546}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &1178506735
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &1192114170
 GameObject:
   m_ObjectHideFlags: 0
@@ -2403,6 +2434,19 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!134 &1336252448
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &1343464770
 GameObject:
   m_ObjectHideFlags: 0
