@@ -1,5 +1,6 @@
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using INab.Common;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -12,6 +13,9 @@ namespace RelicFairy.Monster
 ///
 /// 검은 기본적으로 오른손 Bone_Sword에 붙어있다.
 /// 인스펙터 미할당 시 Awake에서 "SM_DarkKnight2_Sword" 이름으로 자동 탐색.
+///
+/// 검 트레일은 INab Weapon Trail(VFX Graph) 사용 — 흰색 검=성속성, 검은색 검=암속성 프리팹을
+/// <see cref="SetSwordColor"/>에서 스왑한다(플레이어 측 PlayerWeaponTrailVfx와 동일 패턴).
 /// </summary>
 public class DeathKnightSwordController : MonoBehaviour
 {
@@ -32,14 +36,30 @@ public class DeathKnightSwordController : MonoBehaviour
     [Tooltip("검은색 검 머티리얼")]
     [SerializeField] private Material _blackMaterial;
 
-    [Header("검 트레일")]
-    [Tooltip("검 궤적 TrailRenderer. 검 선단 자식 오브젝트에 컴포넌트 부착 후 할당.")]
-    [SerializeField] private TrailRenderer _swordTrail;
+    [Header("검 트레일 (INab Weapon Trail VFX)")]
+    [Tooltip("흰색 검 트레일 프리팹 (성속성, 예: Holy 1/2)")]
+    [SerializeField] private GameObject _holyTrailPrefab;
+    [Tooltip("검은색 검 트레일 프리팹 (암속성, 예: Dark 1)")]
+    [SerializeField] private GameObject _darkTrailPrefab;
+    [Tooltip("칼끝 앵커 로컬 오프셋(검 메시 기준). 메시에 따라 미세 조정 필요.")]
+    [SerializeField] private Vector3 _trailTipOffset = new Vector3(0f, -1.2f, 0f);
+    [Tooltip("칼밑(손잡이) 앵커 로컬 오프셋(검 메시 기준). 메시에 따라 미세 조정 필요.")]
+    [SerializeField] private Vector3 _trailRootOffset = new Vector3(0f, -0.05f, 0f);
+    [Tooltip("트레일 페이드 인 시간 (초)")]
+    [SerializeField] private float _trailFadeIn = 0.05f;
+    [Tooltip("트레일 페이드 아웃 시간 (초)")]
+    [SerializeField] private float _trailFadeOut = 0.15f;
+    [Tooltip("트레일 길이(VFX Lifetime/Length)")]
+    [SerializeField] private float _trailLength = 0.35f;
 
     // ── 상태 ──────────────────────────────────────────
     private bool _isVisible;
     private CancellationToken _destroyCt;
     private Renderer _swordRenderer;
+    private WeaponTrailEffect _trail;
+    private Transform _tipAnchor;
+    private Transform _rootAnchor;
+    private GameObject _loadedTrailPrefab;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // Lifecycle
@@ -60,10 +80,33 @@ public class DeathKnightSwordController : MonoBehaviour
 
         _swordRenderer = _swordGO.GetComponentInChildren<Renderer>();
 
+        SetupTrail();
+
         // 시작 시 검 및 트레일 숨김
         _swordGO.SetActive(false);
         _isVisible = false;
-        if (_swordTrail != null) { _swordTrail.enabled = false; _swordTrail.Clear(); }
+    }
+
+    /// <summary>검 메시 기준 칼끝/칼밑 앵커를 생성하고 WeaponTrailEffect를 수동 모드로 구성한다.</summary>
+    private void SetupTrail()
+    {
+        if (!TryGetComponent(out _trail))
+            _trail = gameObject.AddComponent<WeaponTrailEffect>();
+
+        _trail.trailUsageType = WeaponTrailEffect.TrailUsageType.Manual;
+        _trail.useEvents = false;
+        _trail.enableGizmos = false;
+
+        _tipAnchor = new GameObject("~SwordTrailTip").transform;
+        _tipAnchor.SetParent(_swordGO.transform, false);
+        _tipAnchor.localPosition = _trailTipOffset;
+
+        _rootAnchor = new GameObject("~SwordTrailRoot").transform;
+        _rootAnchor.SetParent(_swordGO.transform, false);
+        _rootAnchor.localPosition = _trailRootOffset;
+
+        _trail.lineTipTransform = _tipAnchor;
+        _trail.lineBottomTransform = _rootAnchor;
     }
 
     private void OnEnable()
@@ -74,7 +117,7 @@ public class DeathKnightSwordController : MonoBehaviour
             _swordGO.SetActive(false);
             _isVisible = false;
         }
-        if (_swordTrail != null) { _swordTrail.enabled = false; _swordTrail.Clear(); }
+        if (_trail != null && _trail.isActiveAndEnabled) _trail.StopTrail(0.001f);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -91,7 +134,7 @@ public class DeathKnightSwordController : MonoBehaviour
         _isVisible = true;
         _swordGO.SetActive(true);
         DissolveEffect.PlayAppear(_swordGO, _appearDuration, activationToken: _destroyCt);
-        if (_swordTrail != null) { _swordTrail.Clear(); _swordTrail.enabled = true; }
+        if (_trail != null) _trail.StartTrailWithLength(_trailFadeIn, _trailLength);
     }
 
     /// <summary>검 Transform을 반환한다 (VFX 부착 등에 사용).</summary>
@@ -102,18 +145,22 @@ public class DeathKnightSwordController : MonoBehaviour
     /// </summary>
     public void SetSwordColor(DKSwordColor color)
     {
-        if (_swordRenderer == null) return;
-        Material mat = color == DKSwordColor.White ? _whiteMaterial : _blackMaterial;
-        if (mat != null)
-            _swordRenderer.material = mat;
-
-        if (_swordTrail != null)
+        if (_swordRenderer != null)
         {
-            Color trailColor = color == DKSwordColor.White
-                ? new Color(0.8f, 0.9f, 1.0f)  // 흰 검: 은청색
-                : new Color(0.4f, 0.0f, 0.6f); // 검 검: 진보라색
-            _swordTrail.startColor = trailColor;
-            _swordTrail.endColor   = new Color(trailColor.r, trailColor.g, trailColor.b, 0f);
+            Material mat = color == DKSwordColor.White ? _whiteMaterial : _blackMaterial;
+            if (mat != null)
+                _swordRenderer.material = mat;
+        }
+
+        if (_trail != null)
+        {
+            GameObject trailPrefab = color == DKSwordColor.White ? _holyTrailPrefab : _darkTrailPrefab;
+            // 색이 실제로 바뀔 때만 재생성 — 매 패턴 시작마다 재생성하면 궤적이 누적될 시간 없이 한 프레임짜리 반짝임만 남는다.
+            if (trailPrefab != null && trailPrefab != _loadedTrailPrefab)
+            {
+                _trail.SetNewTrailPrefab(trailPrefab);
+                _loadedTrailPrefab = trailPrefab;
+            }
         }
     }
 
@@ -125,7 +172,7 @@ public class DeathKnightSwordController : MonoBehaviour
     {
         if (_swordGO == null || !_isVisible) return;
         _isVisible = false;
-        if (_swordTrail != null) _swordTrail.enabled = false;
+        if (_trail != null) _trail.StopTrail(_trailFadeOut);
         DissolveEffect.PlayDisappear(
             _swordGO,
             _disappearDuration,

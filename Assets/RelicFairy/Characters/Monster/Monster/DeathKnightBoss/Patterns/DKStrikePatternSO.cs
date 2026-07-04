@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -124,7 +126,8 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     private bool                           _patternEnded;
 
     // ── 슬래시 ───────────────────────────────────────────
-    private bool  _damageDone;
+    private bool                    _damageDone;
+    private CancellationTokenSource _vfxCts;
 
     public DKStrikeState(DKStrikePatternSO data) : base(data) { }
 
@@ -148,6 +151,10 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         _swords.Clear();
         _patternEnded = false;
         _damageDone   = false;
+
+        _vfxCts?.Cancel();
+        _vfxCts?.Dispose();
+        _vfxCts = new CancellationTokenSource();
 
         _anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
         var anchor = _anchor;
@@ -185,6 +192,9 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     public override void Exit(MonsterContext ctx)
     {
         _patternEnded = true;
+        _vfxCts?.Cancel();
+        _vfxCts?.Dispose();
+        _vfxCts = null;
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(false);
         if ((ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor != null)
             DKBossRoomContext.ClearWorldCenterOverride();
@@ -244,10 +254,10 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             _currentRow++;
         }
 
-        // 전체 맵 덮임 → 양방향 슬래시 VFX 즉시 스폰 후 피격 대기
+        // 전체 맵 덮임 → 양방향 슬래시 VFX 분산 스폰 후 피격 대기
         if (_currentRow >= _totalRows)
         {
-            FireAllRowSlashVfx();
+            FireAllRowSlashVfxAsync(_vfxCts.Token).Forget();
             // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
             Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
             _phase = Phase.SlashAttack;
@@ -309,20 +319,28 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     // 슬래시 & 피격
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private void FireAllRowSlashVfx()
+    private async UniTaskVoid FireAllRowSlashVfxAsync(CancellationToken ct)
     {
         if (Data.impactVfxPrefab == null) return;
         Color tint = _swordColor == DKSwordColor.White ? Color.white : Color.black;
-
         float rowLen = DKGridPatternHelper.RowLineLength();
-        for (int z = 1; z <= DKBossRoomContext.Height - 2; z++)
+        const int perFrame = 5;
+
+        try
         {
-            Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, z, 0.1f);
-            DKGridPatternHelper.SpawnStretchedVfx(
-                Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);
-            DKGridPatternHelper.SpawnStretchedVfx(
-                Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), rowLen, tint);
+            for (int z = 1; z <= DKBossRoomContext.Height - 2; z++)
+            {
+                Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, z, 0.1f);
+                DKGridPatternHelper.SpawnStretchedVfx(
+                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);
+                DKGridPatternHelper.SpawnStretchedVfx(
+                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), rowLen, tint);
+
+                if (z % perFrame == 0)
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
         }
+        catch (OperationCanceledException) { }
     }
 
     private void ApplySlashDamage(MonsterContext ctx)
@@ -370,6 +388,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
         Vector3 dkPos   = ctx.Transform.position;
         Vector3 dkRight = ctx.Transform.right;
+        var     dkBoss  = ctx.Monster as DeathKnightBossMonster;
 
         bool leftIsWhite   = UnityEngine.Random.value > 0.5f;
         bool leftIsSame    = leftIsWhite == (_swordColor == DKSwordColor.White);
@@ -377,16 +396,19 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
         SpawnOneSword(
             dkPos - dkRight * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos.y, dkBoss,
             leftIsWhite  ? DKSwordColor.White : DKSwordColor.Black,
             leftIsSame);
 
         SpawnOneSword(
             dkPos + dkRight * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos.y, dkBoss,
             !leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             rightIsSame);
     }
 
-    private void SpawnOneSword(Vector3 position, DKSwordColor color, bool isSameColorAsDK)
+    private void SpawnOneSword(Vector3 position, float groundY, DeathKnightBossMonster dkBoss,
+                                DKSwordColor color, bool isSameColorAsDK)
     {
         // 칼끝이 바닥을 향하도록 X축 180° 회전
         var go = UnityEngine.Object.Instantiate(
@@ -421,7 +443,26 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             Data.swordBobSpeed,
             OnSwordDestroyed);
 
+        SpawnSwordAura(position, groundY, dkBoss, color, go.transform);
+
         _swords.Add(sword);
+    }
+
+    /// <summary>검 바로 아래 바닥에 보스와 동일한 색상의 오라를 띄운다 (검과 함께 파괴됨).</summary>
+    private static void SpawnSwordAura(Vector3 swordPos, float groundY, DeathKnightBossMonster dkBoss,
+                                        DKSwordColor color, Transform parent)
+    {
+        if (dkBoss == null) return;
+        GameObject auraPrefab = color == DKSwordColor.White ? dkBoss.WhiteAuraPrefab : dkBoss.BlackAuraPrefab;
+        if (auraPrefab == null) return;
+
+        Vector3 groundPos = new Vector3(swordPos.x, groundY, swordPos.z);
+        var     auraGo    = UnityEngine.Object.Instantiate(auraPrefab, groundPos, Quaternion.identity, parent);
+
+        // 보스용으로 꺼둔 바닥 마법진 이펙트는 검 아래에서는 그대로 보여줘도 된다.
+        foreach (Transform child in auraGo.transform)
+            if (child.name == "Glow" || child.name == "Aura_Effect")
+                child.gameObject.SetActive(true);
     }
 
     private void OnSwordDestroyed(bool isSameColorAsDK, Vector3 position)
