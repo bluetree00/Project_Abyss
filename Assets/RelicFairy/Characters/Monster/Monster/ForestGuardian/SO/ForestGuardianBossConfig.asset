@@ -22,13 +22,15 @@ MonoBehaviour:
     defense: 5
     attackPower: 25
     moveSpeed: 3
-    nativeElement: -1
     attackRange: 2.5
     attackRadius: 1
     attackRate: 1
     attackDelay: 1
     knockbackForce: 8
     attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
   detection:
     detectionRange: 15
     chaseGiveUpRange: 20
@@ -39,10 +41,12 @@ MonoBehaviour:
     waypointWaitTime: 0.5
   combat:
     damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
     targetLayer:
       serializedVersion: 2
       m_Bits: 0
   animation:
+    animatorControllerAddress: 
     idleStateName: Idle
     patrolStateName: Walk
     chaseStateName: Walk
@@ -50,34 +54,28 @@ MonoBehaviour:
     attackStateName: AttackReady
     getHitStateName: GetHit_Front
     dieStateName: Die
+    attackTrigger: 
+    getHitTrigger: 
+    dieTrigger: 
+    detectTrigger: 
     speedParam: 
     speedDampTime: 0.1
     crossFadeDuration: 0.15
-  elemental:
-    maxAccumulationScale: 100
-    lightning:
-      resistance: 1
-      overrideState: {fileID: 0}
-    water:
-      resistance: 1
-      overrideState: {fileID: 0}
-    fire:
-      resistance: 1
-      overrideState: {fileID: 0}
-    grass:
-      resistance: 1
-      overrideState: {fileID: 0}
-    earth:
-      resistance: 1
-      overrideState: {fileID: 0}
   drop:
     coinMin: 5
     coinMax: 8
     coinValue: 1
+  death:
+    despawnDelay: 1.5
+    dissolveDuration: 0.6
+    deathVfxKey: DieEffect_01
+    deathVfxScale: 1
+    killHitStopScale: 0.04
+    killHitStopDuration: 0.09
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 2
-  patternBreakDurationMax: 2
+  patternBreakDurationMin: 1.2
+  patternBreakDurationMax: 2.5
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.5

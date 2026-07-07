@@ -27,6 +27,9 @@ public class FGPunchPatternSO : BossPatternSO
     [Tooltip("경고 장판 표시 시간 — 이 시간 후 타격 판정")]
     public float warningDuration = 0.7f;
 
+    [Tooltip("타격 애니메이션 시작 후 실제 데미지·SFX 발생까지 딜레이 (초) — 팔이 닿는 프레임에 맞게 조정")]
+    public float hitTime = 0.4f;
+
     [Tooltip("타격 후 자세 복귀 시간")]
     public float recoveryDuration = 0.5f;
 
@@ -37,6 +40,11 @@ public class FGPunchPatternSO : BossPatternSO
 
     [Tooltip("넉백 힘 배율")]
     public float knockbackMultiplier = 1.5f;
+
+    // ── 사운드 ────────────────────────────────────────────
+    [Header("Punch — Sound")]
+    [Tooltip("팔을 휘두르는 타이밍에 재생할 사운드")]
+    public AudioClip punchSfx;
 
     // ── 경고 장판 ─────────────────────────────────────────
     [Header("Warning Zone")]
@@ -126,13 +134,15 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
             PlayAnim(ctx, _isLeftHand ? AnimLeft : AnimRight);  // 경고 종료 → 타격 애니메이션
         }
 
-        if (!_hasDealt && _attackAnimPlayed)
+        if (_attackAnimPlayed && !_hasDealt && _timer >= Data.warningDuration + Data.hitTime)
         {
             _hasDealt = true;
+            if (Data.punchSfx != null)
+                Managers.Sound?.PlayEffectAt(Data.punchSfx, ctx.Transform.position);
             DealFanDamage(ctx);
         }
 
-        if (_timer >= Data.warningDuration + Data.recoveryDuration)
+        if (_timer >= Data.warningDuration + Data.hitTime + Data.recoveryDuration)
             ctx.Monster.ChangeState<ChaseState>();
     }
 
@@ -218,6 +228,7 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
             Debug.LogWarning($"[FGPunch] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, 0.1f, 0, 0f);
     }
 

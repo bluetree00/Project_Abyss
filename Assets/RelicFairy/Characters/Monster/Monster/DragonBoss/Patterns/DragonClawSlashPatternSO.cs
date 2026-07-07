@@ -102,7 +102,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private bool    _hitApplied;
     private bool    _dangerShown;
     private bool    _swingSfxPlayed;
-    private DragonBossWarningZone _activeWarningZone;
+    private DragonBossWarningZone    _activeWarningZone;
+    private DragonClawTrailController _clawTrail;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
 
@@ -113,11 +114,13 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         _timer             = 0f;
         _arcHeight         = 0f;
         _activeWarningZone = null;
+        _clawTrail         = null;
     }
 
     public override void Enter(MonsterContext ctx)
     {
         if (ctx.Agent != null) ctx.Agent.enabled = false;
+        _clawTrail = (ctx.Monster as DragonBossMonster)?.ClawTrailController;
 
         _phase      = Phase.Jumping;
         _timer      = 0f;
@@ -152,6 +155,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     public override void Exit(MonsterContext ctx)
     {
+        _clawTrail?.StopAll();
         if (ctx.Agent == null) return;
         DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
         if (ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
@@ -239,6 +243,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
         if (_timer >= Data.ClawAnimDuration)
         {
+            _clawTrail?.StopTrail(_swingIndex % 2 == 0);
             _swingIndex        = _swingIndex + 1;
             _timer             = 0f;
             _hitApplied        = false;
@@ -257,8 +262,10 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     private void PlayCurrentSwingAnim(MonsterContext ctx)
     {
-        string name = (_swingIndex % 2 == 0) ? Data.ClawLStateName : Data.ClawRStateName;
+        bool isLeft = (_swingIndex % 2 == 0);
+        string name = isLeft ? Data.ClawLStateName : Data.ClawRStateName;
         PlayAnim(ctx, name);
+        _clawTrail?.StartTrail(isLeft);
     }
 
     private static void PlayAnim(MonsterContext ctx, string stateName)

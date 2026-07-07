@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace RelicFairy.Monster
 {
@@ -8,8 +10,8 @@ namespace RelicFairy.Monster
 /// ForestGuardian 보스 MonoBehaviour.
 ///
 /// ━━ 페이즈 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-///  1페이즈 (HP 100~50%) : TreantE 머티리얼, 이동속도 1.0x, 패턴 딜레이 0.8~1.8s
-///  2페이즈 (HP 50~0%)   : TreantD 머티리얼, 이동속도 1.25x, 패턴 딜레이 0.2~0.7s
+///  1페이즈 (HP 100~50%) : TreantE 머티리얼
+///  2페이즈 (HP 50~0%)   : TreantD 머티리얼 (속도/딜레이 변화 없음)
 ///
 /// ━━ 그로기 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  일반 피격 시 강인도 8 감소.
@@ -19,15 +21,11 @@ namespace RelicFairy.Monster
 /// ━━ 패턴 가중치 회복 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ///  패턴 실행 직후 weight=0, 5~10초에 걸쳐 원래값으로 복원.
 /// </summary>
-public class ForestGuardianMonster : MonsterBase, IBoss
+public class ForestGuardianMonster : MonsterBase, IBoss, IBossEntrance
 {
     // ── 상수 ─────────────────────────────────────────────────
     private const string Phase2BodyMatAddress  = "ForestGuardian/Materials/TreantD";
     private const string Phase2LimbMatAddress  = "ForestGuardian/Materials/TreantDLimbs";
-    private const float  Phase2SpeedMultiplier = 1.25f;
-    private const float  Phase2AttackSpeedMult = 1.2f;
-    private const float  Phase2BreakMin        = 0.2f;
-    private const float  Phase2BreakMax        = 0.7f;
     private const float  Phase2HpThreshold     = 0.5f;
     private const float  WeightRecoveryMin     = 5f;
     private const float  WeightRecoveryMax     = 10f;
@@ -38,6 +36,34 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     [SerializeField] private Renderer[] _bodyRenderers;
     [Tooltip("limbs 머티리얼(index 1)을 가진 Renderer 배열 (body와 동일 오브젝트여도 무방)")]
     [SerializeField] private Renderer[] _limbRenderers;
+
+    [Header("ForestGuardian — 목소리 사운드 (Voice)")]
+    [Tooltip("랜덤 간격으로 재생할 목소리 클립 (Voice1~3)")]
+    [SerializeField] private AudioClip[] _voiceClips;
+    [Tooltip("패턴 비활성 상태에서 목소리 사운드를 재생하는 최소 간격 (초)")]
+    [SerializeField] private float _voiceSfxIntervalMin = 8f;
+    [Tooltip("패턴 비활성 상태에서 목소리 사운드를 재생하는 최대 간격 (초)")]
+    [SerializeField] private float _voiceSfxIntervalMax = 15f;
+
+    [Header("ForestGuardian — 등장 연출 카메라")]
+    [Tooltip("카메라 오프셋 (보스 기준). 우측아래에서 올려다보는 구도. Ch2/Ch3 참고: DK=(1.5,1,-1.5), Dragon=(7,0.5,-2)")]
+    [SerializeField] private Vector3 _entranceCamOffset     = new Vector3(4f, 1f, -3f);
+    [Tooltip("카메라가 바라볼 지점 = 보스 위치 + 이 오프셋. Y를 높이면 얼굴 방향을 바라본다")]
+    [SerializeField] private Vector3 _entranceCamLookOffset = new Vector3(0f, 3f, 0f);
+    [Tooltip("플레이어→보스 대각선 이동 시간 (초)")]
+    [SerializeField] private float   _entranceCamMoveDuration   = 1.0f;
+    [Tooltip("대각선 구도에서 보스를 보여주는 홀드 시간 (초)")]
+    [SerializeField] private float   _entranceCamHoldDuration   = 1.5f;
+    [Tooltip("보스 대각선→플레이어 복귀 이동 시간 (초)")]
+    [SerializeField] private float   _entranceCamReturnDuration = 1.2f;
+
+    [Header("ForestGuardian — 발걸음 사운드 (Walk)")]
+    [Tooltip("발이 땅에 닿을 때 랜덤 재생할 발걸음 클립 (Walk1~3)")]
+    [SerializeField] private AudioClip[] _footstepClips;
+    [Tooltip("걷기 애니메이션 상태 이름 (Animator 상태명과 일치)")]
+    [SerializeField] private string _walkStateName = "Walk";
+    [Tooltip("걷기 클립 내 발이 땅에 닿는 시점 (normalizedTime). 108프레임 기준 20·48·75·102프레임")]
+    [SerializeField] private float[] _footstepPhases = { 0.185f, 0.444f, 0.694f, 0.944f };
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────────
     protected override string ConfigAddress  => "ForestGuardian/ForestGuardianConfig";
@@ -57,11 +83,27 @@ public class ForestGuardianMonster : MonsterBase, IBoss
     // ── ForestGuardian 공개 접근 ──────────────────────────────
     public ForestGuardianBlackboard FGBlackboard => _fgBB;
 
+    public Vector3 EntranceCamOffset       => _entranceCamOffset;
+    public Vector3 EntranceCamLookOffset   => _entranceCamLookOffset;
+    public float   EntranceCamMoveDuration   => _entranceCamMoveDuration;
+    public float   EntranceCamHoldDuration   => _entranceCamHoldDuration;
+    public float   EntranceCamReturnDuration => _entranceCamReturnDuration;
+
     // ── 내부 필드 ─────────────────────────────────────────────
     private ForestGuardianBlackboard _fgBB;
     private BossAttackBlackboard     _coreBB;
     private BossPatternRunner        _runner;
     private BossPatternContext       _patternCtx;
+    private FGDormantState _dormantState;
+
+    // 목소리 사운드
+    private float _voiceSfxTimer;
+    private float _voiceSfxNextInterval;
+
+    // 발걸음 사운드
+    private int   _walkStateHash;
+    private int   _footstepStateHash;
+    private float _footstepPrevTime;
 
     // ── 패턴 가중치 회복 ──────────────────────────────────────
     private struct WeightRecoveryEntry
@@ -156,7 +198,13 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             changeState: s  => ChangeState(s),
             onExecuted:  OnPatternExecuted);
 
+        _walkStateHash         = Animator.StringToHash(_walkStateName);
+        _voiceSfxNextInterval  = Random.Range(_voiceSfxIntervalMin, _voiceSfxIntervalMax);
+
         BindBossHud();
+
+        _dormantState = new FGDormantState();
+        ChangeState(_dormantState);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -168,6 +216,7 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         base.Update();
 
         if (_fgBB == null || _coreBB == null) return;
+        if (_dormantState != null && _dormantState.IsActive) return;
 
         float dt = Time.deltaTime;
 
@@ -188,6 +237,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         }
 
         _runner?.Tick(dt);
+
+        UpdateVoiceSfx();
+        UpdateFootstepSound();
 
         // 페이즈 전환 체크 — 패턴 실행 중일 땐 패턴이 직접 트리거하도록 위임
         if (!_fgBB.IsPhase2 && HpRatio < Phase2HpThreshold && !IsInSpecialState)
@@ -210,6 +262,15 @@ public class ForestGuardianMonster : MonsterBase, IBoss
             Vector3 dir  = instigator.transform.position - transform.position;
             _fgBB.SetHitDirection(dir, transform.forward, isHeavy);
         }
+
+        if (_fgBB != null)
+        {
+            if (_fgBB.IsTransitioning)
+                amount *= 0.01f;          // 변신 연출 중: 99% 감소
+            else if (_fgBB.IsPhase2)
+                amount *= 0.7f;           // 2페이즈: 30% 감소
+        }
+
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
     }
 
@@ -219,8 +280,9 @@ public class ForestGuardianMonster : MonsterBase, IBoss
 
         bool isHeavy = _fgBB.IsBigWindowOpen;
 
-        // 강인도 데미지 (그로기 판정)
-        _fgBB.ApplyToughnessDamage(ForestGuardianBlackboard.NormalHitDamage, isHeavy);
+        // 그로기는 2페이즈에서만 발동
+        if (_fgBB.IsPhase2)
+            _fgBB.ApplyToughnessDamage(ForestGuardianBlackboard.NormalHitDamage, isHeavy);
 
         if (_fgBB.IsGroggy)
         {
@@ -246,7 +308,11 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         _coreBB?.Reset();
         _fgBB?.Reset();
         _weightRecoveries.Clear();
-        _phase2Transitioning = false;
+        _phase2Transitioning    = false;
+        _voiceSfxTimer          = 0f;
+        _voiceSfxNextInterval = Random.Range(_voiceSfxIntervalMin, _voiceSfxIntervalMax);
+        if (_dormantState != null)
+            ChangeState(_dormantState);
         BindBossHud();
     }
 
@@ -385,20 +451,6 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         Debug.Log($"[FG] Phase2 시작 — HP={_runtime?.CurrentHp}/{EffectiveMaxHp} ratio={HpRatio:F2}", this);
         _fgBB.SetPhase2();
 
-        // 이동속도, 애니메이션 속도 적용
-        if (_runtime is not null)
-            _runtime.SpeedMultiplier = Phase2SpeedMultiplier;
-
-        if (_coreBB is not null)
-            _coreBB.AttackSpeedMult = Phase2AttackSpeedMult;
-
-        // BossConfigSO 패턴 딜레이 교체
-        if (_config is BossConfigSO bossConfig)
-        {
-            bossConfig.patternBreakDurationMin = Phase2BreakMin;
-            bossConfig.patternBreakDurationMax = Phase2BreakMax;
-        }
-
         // 머티리얼 교체 (Addressable 로드)
         try
         {
@@ -428,6 +480,65 @@ public class ForestGuardianMonster : MonsterBase, IBoss
         }
     }
 
+    /// <summary>패턴 비활성 상태에서 랜덤 간격으로 Voice1~3 중 하나를 재생해 "살아있는 보스" 느낌을 준다.</summary>
+    private void UpdateVoiceSfx()
+    {
+        if (_runtime == null || _runtime.IsDead) return;
+        if (_voiceClips == null || _voiceClips.Length == 0) return;
+
+        if (_runner != null && _runner.IsPatternActive)
+        {
+            _voiceSfxTimer = 0f;
+            return;
+        }
+
+        _voiceSfxTimer += Time.deltaTime;
+        if (_voiceSfxTimer < _voiceSfxNextInterval) return;
+
+        _voiceSfxTimer        = 0f;
+        _voiceSfxNextInterval = Random.Range(_voiceSfxIntervalMin, _voiceSfxIntervalMax);
+        var clip = _voiceClips[Random.Range(0, _voiceClips.Length)];
+        Managers.Sound?.PlayEffectAt(clip, transform.position);
+    }
+
+    /// <summary>Walk 애니메이션 재생 중 발이 땅에 닿는 시점(normalizedTime)을 지날 때마다 Walk1~3 중 하나를 랜덤 재생한다.</summary>
+    private void UpdateFootstepSound()
+    {
+        if (_footstepClips == null || _footstepClips.Length == 0
+            || _footstepPhases == null || _footstepPhases.Length == 0
+            || _animator == null) return;
+
+        var info = _animator.GetCurrentAnimatorStateInfo(0);
+        int hash = info.shortNameHash;
+
+        if (hash != _walkStateHash)
+        {
+            _footstepStateHash = 0;
+            return;
+        }
+
+        if (_footstepStateHash != hash)
+        {
+            _footstepStateHash = hash;
+            _footstepPrevTime  = info.normalizedTime;
+            return;
+        }
+
+        float currentTime = info.normalizedTime;
+        foreach (float phase in _footstepPhases)
+        {
+            int prevCycle = Mathf.FloorToInt(_footstepPrevTime - phase);
+            int curCycle  = Mathf.FloorToInt(currentTime - phase);
+            if (curCycle != prevCycle)
+            {
+                var clip = _footstepClips[Random.Range(0, _footstepClips.Length)];
+                Managers.Sound?.PlayEffectAt(clip, transform.position);
+                break;
+            }
+        }
+        _footstepPrevTime = currentTime;
+    }
+
     private static void ApplyMaterials(Renderer[] renderers, Material mat, int matIndex = 0)
     {
         if (mat == null || renderers == null) return;
@@ -441,6 +552,40 @@ public class ForestGuardianMonster : MonsterBase, IBoss
                 r.materials = mats;
             }
         }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IBossEntrance
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override bool HasEntranceAnimation => true;
+
+    // OnEntranceRequested 는 발행하지 않는다 — BRC 카메라 팬 개입 방지
+    public event Action OnEntranceRequested;
+    public event Action OnCombatReady;
+
+    internal void FireCombatReady()
+    {
+        _runner?.EnsureMinBreakCooldown(3f);
+        OnCombatReady?.Invoke();
+        RaiseBossCombatReady();
+    }
+
+    // BRC 호출용 — 이 보스는 Enter 에서 직접 시작하므로 실질적으로 호출되지 않음
+    public void TriggerEntrance()
+    {
+        _dormantState?.TriggerEntrance(_ctx);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 등장 연출 전용 메서드 (FGDormantState 에서 호출)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    internal void PlayEntranceVoice()
+    {
+        if (_voiceClips == null || _voiceClips.Length == 0) return;
+        var clip = _voiceClips[Random.Range(0, _voiceClips.Length)];
+        Managers.Sound?.PlayEffectAt(clip, transform.position);
     }
 }
 }
