@@ -101,8 +101,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     public Transform PyramidStrikeAnchor     => _pyramidStrikeAnchor;
     public GameObject WhiteAuraPrefab        => _whiteAuraPrefab;
     public GameObject BlackAuraPrefab        => _blackAuraPrefab;
-    public AudioClip TeleportInSfx           => _teleportInSfx;
-    public AudioClip TeleportOutSfx          => _teleportOutSfx;
     public Vector3 EntranceCameraOffset          => _entranceCameraOffset;
     public Vector3 EntranceCameraLookOffset      => _entranceCameraLookOffset;
     public float   EntranceCameraCloseUpDuration => _entranceCameraCloseUpDuration;
@@ -204,9 +202,6 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         InitializePhase2BasicPool();
         InitializePhase2AreaPool();
 
-        // stateDecorator 에서 runner 를 참조하기 위한 클로저 트릭
-        DKComboRunner runnerRef = null;
-
         _runner = new DKComboRunner(
             bossConfig,
             _patternCtx,
@@ -219,26 +214,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             isStaggered: () => _isStaggered,
             changeState:    s => ChangeState(s),
             onExecuted:     OnPatternExecuted,
-            stateDecorator: state =>
-            {
-                // 1·2페이즈 모두 텔레포트 적용
-                // usePhase1Position=true → Phase1 고정 위치 (광역 공격)
-                // usePhase1Position=false → 플레이어 근처 (기본 공격)
-                Vector3? phase1Pos = null;
-                if (runnerRef != null && runnerRef.CurrentComboUsePhase1Position
-                    && _dkBB.HasPhase1Position)
-                {
-                    phase1Pos = _dkBB.Phase1FixedPosition;
-                }
-
-                return new DKPhase2TeleportState(
-                    state, _teleportVfxPrefab, _teleportDistance, _teleportVfxDuration, phase1Pos,
-                    teleportInSfx: _teleportInSfx, teleportOutSfx: _teleportOutSfx,
-                    onTeleportStart: OnTeleportStart,
-                    onTeleportComplete: OnTeleportComplete);
-            });
-
-        runnerRef = _runner;
+            stateDecorator: null);
 
         BindBossHud();
 
@@ -251,20 +227,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         }
     }
 
-    /// <summary>DKPhase2TeleportState 진입 시점에 호출되어 전신 오라를 끈다 (텔레포트 거리만큼 잔상이 남는 것 방지).</summary>
-    private void OnTeleportStart()
-    {
-        if (_auraInstance != null) _auraInstance.SetActive(false);
-    }
-
-    /// <summary>DKPhase2TeleportState의 텔레포트 완료(또는 스킵) 시점에 호출되어 검과 전신 오라를 다시 등장시킨다.</summary>
-    private void OnTeleportComplete()
-    {
-        ShowSwordVisual();
-        if (_auraInstance != null) _auraInstance.SetActive(true);
-    }
-
-    /// <summary>검을 등장시킨다 (텔레포트 완료 / 등장 연출 스윙 등 외부 호출용).</summary>
+    /// <summary>검을 등장시킨다 (패턴 시작 / 등장 연출 스윙 등 외부 호출용).</summary>
     public void ShowSwordVisual()
     {
         // 등장 전 반드시 올바른 색상 머티리얼 세팅 (핑크 방지)
@@ -299,12 +262,11 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             else
                 _coreBB.NormalModeTimer += dt;
 
-            // 검 등장은 DKPhase2TeleportState의 텔레포트 완료 콜백(OnTeleportComplete)에서 처리한다
-            // (텔레포트 전에 등장하면 트레일이 출발 위치부터 길게 남는 문제가 있었음).
-            // 패턴 종료 시점에만 여기서 검을 소멸시킨다.
             if (active != _prevPatternActive)
             {
-                if (!active)
+                if (active)
+                    ShowSwordVisual();
+                else
                     _swordCtrl?.HideSword();
                 _prevPatternActive = active;
             }
@@ -634,6 +596,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         foreach (var b in _entranceEndBarriers)
             if (b != null) b.SetActive(true);
         ApplyBarrierTint(_dkBB?.SwordColor ?? DKSwordColor.White);
+        GameCameraController.Instance?.ActivateDKPlayerOrbit(1.0f);
         _runner?.EnsureMinBreakCooldown(3f);
         OnCombatReady?.Invoke();
         RaiseBossCombatReady();

@@ -40,7 +40,10 @@ public class FGThrowRockPatternSO : BossPatternSO
     [Tooltip("던지는 손 본 이름 (Generic 아바타용, 예: TreantLPalm)")]
     public string throwHandBoneName = "Hand_R";
 
-    [Tooltip("손이 바위에 이 거리 이내로 들어오면 잡기 (m)")]
+    [Tooltip("MagicAttack1 클립 내 돌을 강제로 손에 붙이는 시점 (0~1). 이 시점에 근접 여부 무관하게 손에 부착.")]
+    public float grabNormalizedTime = 0.15f;
+
+    [Tooltip("손이 바위에 이 거리 이내로 들어오면 조기 잡기 (m). grabNormalizedTime 이전에 손이 가까워지면 먼저 잡음.")]
     public float grabThreshold = 1.0f;
 
     // ── 데미지 ────────────────────────────────────────────
@@ -52,6 +55,28 @@ public class FGThrowRockPatternSO : BossPatternSO
     public float knockbackMultiplier = 2f;
 
     // ── 비주얼 ────────────────────────────────────────────
+    [Header("ThrowRock — Sound")]
+    [Tooltip("돌이 바닥에 착지할 때 재생할 사운드 (메인 + 파편 공용)")]
+    public AudioClip stoneLandSfx;
+
+    [Header("ThrowRock — Fragment Shards")]
+    [Tooltip("파편 3개의 방향 각도 (도). 인덱스 0~2가 각 파편에 대응. VFX 파편 방향에 맞게 개별 조정.")]
+    public float[] fragmentAngles = { 0f, 120f, 240f };
+    [Tooltip("전체 파편 방향을 일괄 회전하는 오프셋 (도). 양수 = 시계방향. VFX와 맞지 않을 때 이 값만 조정.")]
+    public float fragmentAngleOffset = 0f;
+    [Tooltip("메인 착지점에서 각 파편 착지점까지 거리 (m). VFX 파편 비행 거리에 맞게 조정.")]
+    public float fragmentSpreadRadius = 3.5f;
+    [Tooltip("파편 경고장판 반경 (m)")]
+    public float fragmentWarningRadius = 1.5f;
+    [Tooltip("메인 착지 후 경고장판이 나타나기까지 지연 시간 (초). VFX가 파편을 발사하는 타이밍에 맞게 조정.")]
+    public float fragmentWarningStartDelay = 0.3f;
+    [Tooltip("경고장판 출현 후 파편이 착지할 때까지 시간 (초). VFX 파편 비행 시간에 맞게 조정.")]
+    public float fragmentLandDelay = 1.2f;
+    [Tooltip("파편 attackPower 배율")]
+    public float fragmentDamageMultiplier = 0.8f;
+    [Tooltip("파편 착지 시 재생할 이펙트 프리팹 (null이면 없음)")]
+    public GameObject fragmentImpactEffectPrefab;
+
     [Header("ThrowRock — Visual")]
     [Tooltip("돌 투사체 프리팹 (MonsterProjectile 컴포넌트 포함)")]
     public GameObject rockPrefab;
@@ -99,23 +124,31 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private const float  WindupFallback    = 0.8f;
     private const float  PostThrowFallback = 0.8f;
 
-    private enum Phase { Windup, PostThrow, Recovery }
+    private enum Phase { Windup, PostThrow, Fragment, Recovery }
+
+    private const int FragmentCount = 3;
 
     private Phase              _phase;
     private float              _timer;
     private GameObject         _rockGO;
     private GameObject         _warningGO;
-    private MonsterProjectile  _proj;           // 발사 후 소멸 감지용 레퍼런스
+    private MonsterProjectile  _proj;
     private Vector3            _rockSpawnPos;
-    private Vector3            _landingPos;     // SpawnWarning 시 저장 → 착지 이펙트 위치
+    private Vector3            _landingPos;
     private float              _windupDuration;
+    private float              _grabDuration;
     private float              _postThrowDuration;
     private float              _launchDist;
     private Vector3            _warningTargetScale;
-    private float              _warningGrowDuration; // 경고 장판 확장 기준 시간
-    private float              _warningGrowTimer;    // 확장 시작 시점부터의 경과 시간
-    private Transform          _handBone;           // 손 본 캐시 (Generic 아바타용)
-    private bool               _grabbed;            // 바위가 손에 부착됐는지
+    private float              _warningGrowDuration;
+    private float              _warningGrowTimer;
+    private Transform          _handBone;
+    private bool               _grabbed;
+    private readonly GameObject[] _fragmentWarnings  = new GameObject[FragmentCount];
+    private readonly Vector3[]    _fragmentPositions = new Vector3[FragmentCount];
+    private float                 _fragmentTimer;
+    private bool                  _fragmentWarningsSpawned;
+    private bool                  _fragmentDamaged;
 
     public FGThrowRockState(FGThrowRockPatternSO data) : base(data) { }
 
@@ -137,12 +170,13 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         if (clipLen > 0f)
         {
             float t            = Mathf.Clamp01(Data.throwNormalizedTime);
-            // throwExtraDelay 를 더해 실제 발사 시점을 늦춤 (양손 잡기 모션 완료 후)
+            _grabDuration      = clipLen * Mathf.Clamp01(Data.grabNormalizedTime);
             _windupDuration    = clipLen * t + Data.throwExtraDelay;
             _postThrowDuration = Mathf.Max(0.2f, clipLen * (1f - t) - Data.throwExtraDelay);
         }
         else
         {
+            _grabDuration      = WindupFallback * Mathf.Clamp01(Data.grabNormalizedTime);
             _windupDuration    = WindupFallback + Data.throwExtraDelay;
             _postThrowDuration = PostThrowFallback;
         }
@@ -159,7 +193,9 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         switch (_phase)
         {
             case Phase.Windup:
-                TryGrabRock();   // 손이 바위에 충분히 가까워지면 부착
+                TryGrabRock();
+                if (!_grabbed && _timer >= _grabDuration)
+                    ForceGrabRock();  // grabNormalizedTime 도달 시 거리 무관하게 강제 부착
                 FacePlayer(ctx);
 
                 if (_timer >= _windupDuration)
@@ -188,7 +224,47 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
                 bool timedOut   = _timer >= _postThrowDuration;
 
                 if (rockLanded || timedOut)
-                    OnRockLanded();
+                    OnRockLanded(ctx);
+                break;
+
+            case Phase.Fragment:
+                _fragmentTimer += Time.deltaTime * SpeedMult(ctx);
+
+                // 경고장판 등장 딜레이 — VFX가 파편을 '발사'하는 타이밍
+                if (!_fragmentWarningsSpawned && _fragmentTimer >= Data.fragmentWarningStartDelay)
+                {
+                    _fragmentWarningsSpawned = true;
+                    SpawnFragmentWarnings();
+                }
+
+                // 경고장판 서서히 확장
+                if (_fragmentWarningsSpawned && Data.fragmentLandDelay > 0f)
+                {
+                    float growElapsed = _fragmentTimer - Data.fragmentWarningStartDelay;
+                    float ft = Mathf.Clamp01(growElapsed / Data.fragmentLandDelay);
+                    float fs = Data.fragmentWarningRadius;
+                    for (int i = 0; i < FragmentCount; i++)
+                    {
+                        if (_fragmentWarnings[i] != null)
+                            _fragmentWarnings[i].transform.localScale = Vector3.Lerp(Vector3.zero, new Vector3(fs, 1f, fs), ft);
+                    }
+                }
+
+                // 파편 착지 — 피격판정 + 사운드 + 이펙트
+                if (!_fragmentDamaged && _fragmentTimer >= Data.fragmentWarningStartDelay + Data.fragmentLandDelay)
+                {
+                    _fragmentDamaged = true;
+                    for (int i = 0; i < FragmentCount; i++)
+                    {
+                        if (Data.stoneLandSfx != null)
+                            Managers.Sound?.PlayEffectAt(Data.stoneLandSfx, _fragmentPositions[i]);
+                        SpawnFragmentImpactEffect(_fragmentPositions[i]);
+                        TryDealFragmentDamage(ctx, _fragmentPositions[i]);
+                        DespawnFragmentWarning(i);
+                    }
+                    _timer = 0f;
+                    _phase = Phase.Recovery;
+                }
                 break;
 
             case Phase.Recovery:
@@ -202,19 +278,25 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     {
         DespawnRock();
         DespawnWarning();
+        DespawnAllFragmentWarnings();
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
             ctx.Agent.isStopped = false;
     }
 
-    // ── 착지 처리 (경고장판 제거 + 이펙트) ─────────────────
-    private void OnRockLanded()
+    // ── 착지 처리 (경고장판 제거 + 이펙트 + 사운드 → 파편 페이즈) ──
+    private void OnRockLanded(MonsterContext ctx)
     {
         SpawnImpactEffect();
+        if (Data.stoneLandSfx != null)
+            Managers.Sound?.PlayEffectAt(Data.stoneLandSfx, _landingPos);
         DespawnWarning();
-        _proj  = null;
+        _proj                    = null;
+        _fragmentTimer           = 0f;
+        _fragmentWarningsSpawned = false;
+        _fragmentDamaged         = false;
         _timer = 0f;
-        _phase = Phase.Recovery;
+        _phase = Phase.Fragment;
     }
 
     // ── 돌 생성 (보스 앞 바닥에 배치) ──────────────────────
@@ -225,6 +307,10 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         _rockSpawnPos   = ctx.Transform.position + ctx.Transform.forward * 1.5f;
         _rockSpawnPos.y = ctx.Transform.position.y + 0.3f;
         _rockGO = Object.Instantiate(Data.rockPrefab, _rockSpawnPos, Quaternion.identity);
+
+        // 발사(Init) 전까지 중력/충돌로 위치가 밀리면 TryGrabRock 거리 체크 실패 → kinematic으로 고정
+        if (_rockGO.TryGetComponent<Rigidbody>(out var rb))
+            rb.isKinematic = true;
 
         Vector3 s = Data.rockScale;
         if (s.x > 0f && s.y > 0f && s.z > 0f)
@@ -240,6 +326,19 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         if (dist > Data.grabThreshold) return;
 
         _rockGO.transform.SetParent(_handBone, worldPositionStays: true);
+        _grabbed = true;
+    }
+
+    // ── grabNormalizedTime 도달 시 거리 무관 강제 부착 ──
+    private void ForceGrabRock()
+    {
+        if (_grabbed || _rockGO == null) return;
+
+        if (_handBone != null)
+        {
+            _rockGO.transform.SetParent(_handBone, worldPositionStays: false);
+            _rockGO.transform.localPosition = Vector3.zero;
+        }
         _grabbed = true;
     }
 
@@ -304,6 +403,75 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         _rockGO = null;
     }
 
+    // ── 파편 경고장판 ────────────────────────────────────
+    private void SpawnFragmentWarnings()
+    {
+        var   prefab  = Data.ResolveWarningPrefab();
+        float r       = Data.fragmentSpreadRadius;
+        var   angles  = Data.fragmentAngles;
+        for (int i = 0; i < FragmentCount; i++)
+        {
+            float angle = ((angles != null && i < angles.Length) ? angles[i] : i * (360f / FragmentCount)) + Data.fragmentAngleOffset;
+            float rad   = angle * Mathf.Deg2Rad;
+            Vector3 offset = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad)) * r;
+            Vector3 pos    = _landingPos + offset;
+            _fragmentPositions[i] = pos;
+
+            if (prefab == null) continue;
+            pos.y += 0.02f;
+            _fragmentWarnings[i] = Object.Instantiate(prefab, pos, Quaternion.identity);
+            _fragmentWarnings[i].transform.localScale = Vector3.zero;
+        }
+    }
+
+    private void SpawnFragmentImpactEffect(Vector3 pos)
+    {
+        if (Data.fragmentImpactEffectPrefab == null) return;
+        var go = Object.Instantiate(Data.fragmentImpactEffectPrefab, pos, Quaternion.identity);
+        float lifetime = 2f;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.loop = false;
+            float end = main.duration + main.startLifetime.constantMax;
+            if (end > lifetime) lifetime = end;
+        }
+        Object.Destroy(go, lifetime);
+    }
+
+    private void DespawnFragmentWarning(int i)
+    {
+        if (_fragmentWarnings[i] == null) return;
+        Object.Destroy(_fragmentWarnings[i]);
+        _fragmentWarnings[i] = null;
+    }
+
+    private void DespawnAllFragmentWarnings()
+    {
+        for (int i = 0; i < FragmentCount; i++)
+            DespawnFragmentWarning(i);
+    }
+
+    private void TryDealFragmentDamage(MonsterContext ctx, Vector3 pos)
+    {
+        if (ctx.Config?.stat == null || ctx.Runtime.PlayerTarget == null) return;
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        float dx = playerPos.x - pos.x;
+        float dz = playerPos.z - pos.z;
+        if (Mathf.Sqrt(dx * dx + dz * dz) > Data.fragmentWarningRadius) return;
+
+        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
+        if (player == null) return;
+
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.fragmentDamageMultiplier));
+        player.TakeDamage(dmg);
+
+        Vector3 dir = playerPos - pos;
+        dir.y = 0.3f;
+        if (dir.sqrMagnitude > 0.001f) dir.Normalize();
+        player.ApplyKnockback(dir * (ctx.Config.stat.knockbackForce * Data.knockbackMultiplier));
+    }
+
     // ── 착지 이펙트 ──────────────────────────────────────
     private void SpawnImpactEffect()
     {
@@ -340,6 +508,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
             Debug.LogWarning($"[FGThrowRock] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, 0.1f, 0, 0f);
     }
 
