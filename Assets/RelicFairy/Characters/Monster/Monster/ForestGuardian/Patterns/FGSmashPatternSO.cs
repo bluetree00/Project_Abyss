@@ -71,6 +71,10 @@ public class FGSmashPatternSO : BossPatternSO
     [Tooltip("보스 전방 추가 오프셋 (m). 손이 몸보다 앞으로 뻗는 거리.")]
     public float handForwardOffset = 0.5f;
 
+    [Header("Smash — Sound")]
+    [Tooltip("팔을 휘두르는 타이밍(충격파 발생 시)에 재생할 사운드")]
+    public AudioClip punchSfx;
+
     // ── 런타임 ───────────────────────────────────────────
     private FGSmashState _state;
 
@@ -172,6 +176,8 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
                 {
                     _timer = 0f;
                     _phase = Phase.Shockwave;
+                    if (Data.punchSfx != null)
+                        Managers.Sound?.PlayEffectAt(Data.punchSfx, ctx.Transform.position);
                     SpawnShockwave(ctx);
                 }
                 break;
@@ -292,6 +298,17 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
         if (!Mathf.Approximately(s, 1f))
             _shockwaveGO.transform.localScale = new Vector3(s, s, s);
 
+        // Phase 2에서 파티클 VFX를 타이머(데미지 판정) 속도와 동기화
+        float speedMult = SpeedMult(ctx);
+        if (!Mathf.Approximately(speedMult, 1f))
+        {
+            foreach (var ps in _shockwaveGO.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.simulationSpeed = speedMult;
+            }
+        }
+
         if (_shockwaveGO.TryGetComponent<PlayableVfx>(out var vfx))
             vfx.Play();
     }
@@ -329,7 +346,7 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
             Debug.LogWarning($"[FGSmash] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
-        ctx.Animator.speed = 1f;
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, 0.1f, 0, 0f);
     }
 

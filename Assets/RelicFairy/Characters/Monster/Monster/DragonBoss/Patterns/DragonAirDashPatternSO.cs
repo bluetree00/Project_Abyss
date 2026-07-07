@@ -27,6 +27,9 @@ public class DragonAirDashPatternSO : BossPatternSO
     [Tooltip("돌진 시작 시 재생할 사운드")]
     [SerializeField] private AudioClip _dashSfx;
 
+    [Header("Repeat")]
+    [SerializeField] private int _dashRepeatCount = 3;
+
     [Header("Warning Marker")]
     [SerializeField] private GameObject _warningMarkerPrefab;
     [SerializeField] private Vector3 _warningMarkerScale = new Vector3(2.2f, 1f, 8f);
@@ -56,6 +59,7 @@ public class DragonAirDashPatternSO : BossPatternSO
     public int SelfCrashDamage => _selfCrashDamage;
     public float WallStopPadding => _wallStopPadding;
     public AudioClip DashSfx => _dashSfx;
+    public int DashRepeatCount => _dashRepeatCount;
     public GameObject WarningMarkerPrefab => _warningMarkerPrefab;
     public Vector3 WarningMarkerScale => _warningMarkerScale;
     public float WarningMarkerHeightOffset => _warningMarkerHeightOffset;
@@ -110,6 +114,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
     private float _effectiveDashDistance;
     private bool _playerHit;
     private bool _selfDamageApplied;
+    private int _dashCount;
     private int _takeoffHash;
     private int _crashHash;
     private int _fallHash;
@@ -127,6 +132,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _effectiveDashDistance = 0f;
         _playerHit = false;
         _selfDamageApplied = false;
+        _dashCount = 0;
         DestroyWarningZone();
     }
 
@@ -138,6 +144,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         _traveledDistance = 0f;
         _playerHit = false;
         _selfDamageApplied = false;
+        _dashCount = 0;
         _takeoffStartPos = ctx.Transform.position;
         _hoverPos = _takeoffStartPos;
         _hoverPos.y = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.WarningHoverHeight);
@@ -245,7 +252,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
         TryHitPlayer(ctx);
 
         if (_traveledDistance >= _effectiveDashDistance)
-            ReturnToAirCombat(ctx);
+            FinishDash(ctx);
     }
 
     private void UpdateCrash(MonsterContext ctx)
@@ -299,6 +306,26 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
 
         RestoreAgent(ctx);
         ReturnToGroundCombat(ctx);
+    }
+
+    private void FinishDash(MonsterContext ctx)
+    {
+        _dashCount++;
+        if (_dashCount < Data.DashRepeatCount)
+        {
+            _phase = Phase.Warning;
+            _phaseTimer = 0f;
+            _traveledDistance = 0f;
+            _playerHit = false;
+            _hoverPos = ctx.Transform.position;
+            _dashDirection = GetHorizontalDirectionToPlayer(ctx);
+            PlayAnim(ctx, Data.WarningHoverStateName, 0.12f);
+            SpawnWarningMarker(ctx);
+        }
+        else
+        {
+            ReturnToAirCombat(ctx);
+        }
     }
 
     private void StartWarning(MonsterContext ctx)

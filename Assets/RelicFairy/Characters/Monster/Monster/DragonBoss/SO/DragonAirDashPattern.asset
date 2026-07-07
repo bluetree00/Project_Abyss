@@ -20,7 +20,7 @@ MonoBehaviour:
   _cooldown: 12
   _takeoffDuration: 0.55
   _takeoffHeight: 3
-  _warningDuration: 0.75
+  _warningDuration: 0.45
   _warningHoverHeight: 3
   _rotationSpeed: 3.2
   _dashSpeed: 36

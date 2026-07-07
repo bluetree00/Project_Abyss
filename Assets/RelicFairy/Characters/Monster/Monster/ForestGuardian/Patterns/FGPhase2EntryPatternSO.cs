@@ -52,8 +52,9 @@ public class FGPhase2EntryState : FullLockState<FGPhase2EntryPatternSO>
             ctx.Agent.ResetPath();
         }
 
-        // 2페이즈 전환 트리거 — 머터리얼·속도 교체는 비동기로 진행됨
+        // 변신 중 피해 감소 시작
         var fg = ctx.Monster as ForestGuardianMonster;
+        fg?.FGBlackboard.SetTransitioning(true);
         fg?.TriggerPhase2();
 
         PlayAnim(ctx, AnimAttackReady);
@@ -68,6 +69,9 @@ public class FGPhase2EntryState : FullLockState<FGPhase2EntryPatternSO>
 
     public override void Exit(MonsterContext ctx)
     {
+        // 변신 완료 — 피해 감소 해제
+        (ctx.Monster as ForestGuardianMonster)?.FGBlackboard.SetTransitioning(false);
+
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
             ctx.Agent.isStopped = false;
     }

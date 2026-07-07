@@ -28,8 +28,8 @@ MonoBehaviour:
   swingVfxPrefab: {fileID: 1105761162065845526, guid: 28668731d069e9444b9b61a080a17947,
     type: 3}
   warningDuration: 0.4
-  hitTime: 1.8
-  hitDuration: 0.6
+  hitTime: 1.2
+  hitDuration: 0.4
   recoveryTime: 0.3
   damageMultiplier: 1
   knockbackMultiplier: 1

@@ -64,10 +64,24 @@ public class FGGrabThrowPatternSO : BossPatternSO
     [Tooltip("저글링 이동 방향의 위쪽 성분 — 높을수록 포물선이 큼")]
     public float juggleArcUp = 0.8f;
 
+    // ── 사운드 ────────────────────────────────────────────
+    [Header("GrabThrow — Sound")]
+    [Tooltip("팔에서 팔로 옮길 때 랜덤 재생할 사운드 클립 (Hand1~3)")]
+    public AudioClip[] handClips;
+    [Tooltip("플레이어를 던지는 타이밍에 재생할 사운드")]
+    public AudioClip throwSfx;
+
     // ── 비주얼 ────────────────────────────────────────────
     [Header("GrabThrow — Visual")]
     [Tooltip("잡기 경고장판 프리팹 (FanMeshWarning 포함, 45°). null이면 effectPrefab 사용.")]
     public GameObject warningZonePrefab;
+
+    // ── 연계 패턴 ─────────────────────────────────────────
+    [Header("GrabThrow — Combo Chain")]
+    [Tooltip("잡기 성공 후 1페이즈에서 연계할 패턴 SO. null이면 연계 없음.")]
+    public BossPatternSO phase1ComboPattern;
+    [Tooltip("잡기 성공 후 2페이즈에서 연계할 패턴 SO. null이면 연계 없음.")]
+    public BossPatternSO phase2ComboPattern;
 
     // ── 런타임 ────────────────────────────────────────────
     private FGGrabThrowState _state;
@@ -113,6 +127,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private float            _timer;
     private float            _holdTimer;
     private bool             _grabbed;
+    private bool             _wasGrabbed;
     private bool             _slam1Done;
     private bool             _slam2Done;
     private bool             _throwDone;
@@ -139,6 +154,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         _timer       = 0f;
         _holdTimer   = 0f;
         _grabbed     = false;
+        _wasGrabbed  = false;
         _slam1Done   = false;
         _slam2Done   = false;
         _throwDone   = false;
@@ -211,6 +227,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                     if (_grabbed)
                     {
                         DealSlamDamage(ctx);
+                        PlayHandSfx(ctx);
                         StartJuggle(_leftHandBone, ctx);
                     }
                 }
@@ -222,6 +239,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                     if (_grabbed)
                     {
                         DealSlamDamage(ctx);
+                        PlayHandSfx(ctx);
                         StartJuggle(_rightHandBone, ctx);
                     }
                 }
@@ -230,7 +248,12 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
                 if (!_throwDone && _holdTimer >= Data.throwOffset)
                 {
                     _throwDone = true;
-                    if (_grabbed) Throw(ctx);
+                    if (_grabbed)
+                    {
+                        if (Data.throwSfx != null)
+                            Managers.Sound?.PlayEffectAt(Data.throwSfx, ctx.Transform.position);
+                        Throw(ctx);
+                    }
                 }
 
                 // 애니메이션 종료 후 Recovery
@@ -243,7 +266,10 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 
             case Phase.Recovery:
                 if (_timer >= Data.recoveryDuration)
+                {
+                    if (_wasGrabbed && TryExecuteCombo(ctx)) return;
                     ctx.Monster.ChangeState<ChaseState>();
+                }
                 break;
         }
     }
@@ -259,6 +285,19 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
             if (!ctx.Agent.isOnNavMesh)
                 ctx.Monster.TrySnapAgentToNavMesh();
         }
+    }
+
+    // ── 연계 패턴 실행 ────────────────────────────────────
+    private bool TryExecuteCombo(MonsterContext ctx)
+    {
+        var fg = ctx.Monster as ForestGuardianMonster;
+        if (fg == null) return false;
+        var combo = fg.FGBlackboard.IsPhase2 ? Data.phase2ComboPattern : Data.phase1ComboPattern;
+        if (combo == null) return false;
+        var state = combo.GetRuntimeState();
+        if (state == null) return false;
+        ctx.Monster.ChangeState(state);
+        return true;
     }
 
     // ── 잡기 판정 ─────────────────────────────────────────
@@ -278,6 +317,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         if (player == null) return;
 
         _grabbed     = true;
+        _wasGrabbed  = true;
         _heldPlayer  = player;
         _bossForward = ctx.Transform.forward;
 
@@ -384,6 +424,14 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         _grabbed    = false;
     }
 
+    // ── Hand 사운드 ───────────────────────────────────────
+    private void PlayHandSfx(MonsterContext ctx)
+    {
+        if (Data.handClips == null || Data.handClips.Length == 0) return;
+        var clip = Data.handClips[Random.Range(0, Data.handClips.Length)];
+        Managers.Sound?.PlayEffectAt(clip, ctx.Transform.position);
+    }
+
     // ── 경고장판 (45° 부채꼴) ─────────────────────────────
     private void SpawnWarning(MonsterContext ctx)
     {
@@ -435,6 +483,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
             Debug.LogWarning($"[FGGrabThrow] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, 0.1f, 0, 0f);
     }
 

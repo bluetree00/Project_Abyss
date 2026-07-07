@@ -12,15 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5b67262f8fe11f4aae7ec3d5cdff533, type: 3}
   m_Name: FG_GroundSlashPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGroundSlashPatternSO
-  weight: 0.07196936
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 0.060905427
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   maxRange: 8
-  warningDuration: 0.5
+  warningDuration: 0.3
   strikeAnimDuration: 0.8
-  vfxDelay: 0.4
+  vfxDelay: 0.7
   hitInterval: 0.4
   recoveryDuration: 0.5
   hitRanges:
@@ -40,3 +44,4 @@ MonoBehaviour:
   slamVfxPrefab: {fileID: 8719263370430895187, guid: cfcf1b1a67677664b8243dfeeeeb152e,
     type: 3}
   vfxLifetime: 2
+  groundSfx: {fileID: 8300000, guid: 5dfd2a02b507f11479a9ae6871fe4543, type: 3}
