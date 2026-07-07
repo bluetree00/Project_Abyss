@@ -37,8 +37,9 @@ public class ForestGuardianBlackboard
     public bool  IsBigWindowOpen => BigAttackWindow > 0f;
 
     // ── 페이즈 ────────────────────────────────────────────
-    public bool  IsPhase2      { get; private set; }
-    public float AnimSpeedMult { get; private set; } = 1f;
+    public bool  IsPhase2        { get; private set; }
+    public bool  IsTransitioning { get; private set; }
+    public float AnimSpeedMult   { get; private set; } = 1f;
 
     // ── 피격 방향 ─────────────────────────────────────────
     public enum HitDirection { Front, Back, Left, Right, Heavy }
@@ -79,6 +80,7 @@ public class ForestGuardianBlackboard
         GroggyTimer     = 0f;
         BigAttackWindow = 0f;
         IsPhase2        = false;
+        IsTransitioning = false;
         AnimSpeedMult   = 1f;
         Poise           = MaxPoise;
         IsPoiseBroken   = false;
@@ -162,5 +164,8 @@ public class ForestGuardianBlackboard
         IsPhase2      = true;
         AnimSpeedMult = 1.2f;
     }
+
+    /// <summary>2페이즈 변신 연출 진행 중 여부. 변신 중에는 받는 피해 99% 감소.</summary>
+    public void SetTransitioning(bool value) => IsTransitioning = value;
 }
 }

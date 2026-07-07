@@ -12,17 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d9ca387c80397243a49337595412ae4, type: 3}
   m_Name: FG_GrabThrowPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGGrabThrowPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   weight: 0.042604934
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
-  range: 4
-  arcHalfAngle: 22.5
-  grabTime: 1
-  slam1Offset: 1.4
-  slam2Offset: 2
-  throwOffset: 4
+  range: 2.5
+  arcHalfAngle: 40
+  grabTime: 0.18
+  slam1Offset: 2.0
+  slam2Offset: 3.0
+  throwOffset: 5.0
   recoveryDuration: 1
   slamDamageMultiplier: 1.2
   throwDamageMultiplier: 1.5
@@ -31,4 +35,11 @@ MonoBehaviour:
   juggleSpeed: 12
   juggleCatchRadius: 0.4
   juggleArcUp: 0.8
+  handClips:
+  - {fileID: 8300000, guid: 178eb6f2b98fe5345a9b2793ae820c66, type: 3}
+  - {fileID: 8300000, guid: 9e677fd5d57097f489aa2c459ea96a78, type: 3}
+  - {fileID: 8300000, guid: 53161b19466cf6a4d81219410456ac28, type: 3}
+  throwSfx: {fileID: 8300000, guid: b8065bcffeb6d854ca0bf24c3833df18, type: 3}
   warningZonePrefab: {fileID: 3000000, guid: d135e9ccf3685a94d80cff9190380b1b, type: 3}
+  phase1ComboPattern: {fileID: 11400000, guid: 9f6f6baa2e1a52b4a8b8ac2dff018dc7, type: 2}
+  phase2ComboPattern: {fileID: 11400000, guid: 384a86726bd98af4dbb579935de50960, type: 2}

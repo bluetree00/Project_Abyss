@@ -12,19 +12,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 582218f336279a646972aec835548bee, type: 3}
   m_Name: FG_BreathPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGBreathPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
   weight: 1
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
   breakOverride: -1
   minRange: 6
-  warningDuration: 1
+  warningDuration: 0.6
   breathStartDuration: 0.8
   breathDuration: 3.5
   breathEndDuration: 0.6
   damageTick: 0.3
   range: 10
   width: 1
+  rangeStartRatio: 0.3
+  rangeGrowDuration: 1.5
   rotationSpeed: 60
   damageMultiplier: 0.5
   knockbackMultiplier: 0.3
@@ -32,3 +38,4 @@ MonoBehaviour:
     type: 3}
   breathVfxPrefab: {fileID: 4258341324361696382, guid: 3056fa96aa0e3e543bc45f1f6654a4b3,
     type: 3}
+  beamSfx: {fileID: 0}

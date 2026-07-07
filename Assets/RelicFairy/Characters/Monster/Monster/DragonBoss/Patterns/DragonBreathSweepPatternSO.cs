@@ -90,6 +90,10 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [Header("Cooldown")]
     [SerializeField] private float _cooldown = 22f;
 
+    [Header("Meteor Rain (브레스 스위프 연동)")]
+    [Tooltip("브레스 스위프 진행 중 동시에 메테오를 내리꽂는 파라미터 SO. null이면 메테오 없음.")]
+    [SerializeField] private DragonFireballRainPatternSO _meteorPattern;
+
     public string AirChaseLeftStateName => _airChaseLeftStateName;
     public string AirChaseRightStateName => _airChaseRightStateName;
     public float HideHeight => _hideHeight;
@@ -135,6 +139,7 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float FireScaleMin       => _fireScaleMin;
     public float FireScaleMax       => _fireScaleMax;
     public float Cooldown => _cooldown;
+    public DragonFireballRainPatternSO MeteorPattern => _meteorPattern;
 
     private DragonBreathSweepState _runtimeState;
 
@@ -177,8 +182,23 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         public float MaxTimer;
     }
 
+    private struct MeteorEntry
+    {
+        public List<GameObject> WarnTiles;
+        public List<Material>   WarnMats;
+        public GameObject Projectile;
+        public Vector3 LandPos;
+        public float WarnTimer;
+        public float FallTimer;
+        public bool  Falling;
+        public bool  ImpactApplied;
+        public bool  Landed;
+        public int   HalfR; // 경고/피격 범위 반경: 1=3×3, 2=5×5
+    }
+
     private const float FlyThroughPadding   = 3f;
     private const float FlyToStartTolerance = 1.5f;
+    private const float FlyOffscreenPadding = 40f;
 
     private Phase _phase;
     private float _timer;
@@ -211,6 +231,10 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private readonly List<Material>     _warnMats  = new();
     private readonly List<TsunamiEntry> _tsunamis  = new();
     private readonly List<ScorchEntry>  _scorches  = new();
+    private readonly List<MeteorEntry>  _meteors   = new();
+    private float _meteorSpawnTimer;
+    private bool  _meteorSpawning;
+    private bool  _cameraReturned;
 
     private GameObject  _flameBreathGo;
     private Light       _followLight;
@@ -230,9 +254,13 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         CleanupFlameBreath();
         CleanupAllTsunamis();
         CleanupAllScorches();
-        _phase          = Phase.Done;
-        _timer          = 0f;
-        _currentFlyAnim = null;
+        CleanupAllMeteors();
+        _phase            = Phase.Done;
+        _timer            = 0f;
+        _currentFlyAnim   = null;
+        _meteorSpawnTimer = 0f;
+        _meteorSpawning   = false;
+        _cameraReturned   = false;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -244,8 +272,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _currentFlyAnim    = null;
         _revealedTileCount = 0;
         _tsunamis.Clear();
-
         _scorches.Clear();
+        _meteors.Clear();
+        _meteorSpawnTimer  = 0f;
+        _meteorSpawning    = false;
+        _cameraReturned    = false;
         if (ctx.Agent != null) ctx.Agent.enabled = false;
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
             bb.LeapCooldown = Data.Cooldown;
@@ -272,6 +303,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     public override void Update(MonsterContext ctx)
     {
         _timer += Time.deltaTime;
+        UpdateMeteors(ctx);
         switch (_phase)
         {
             case Phase.FlyToStart: UpdateFlyToStart(ctx); break;
@@ -289,6 +321,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         CleanupFlameBreath();
         CleanupAllTsunamis();
         CleanupAllScorches();
+        CleanupAllMeteors();
+        _meteorSpawning = false;
+        // 정상 종료(Done) 시 이미 카메라가 복귀 예약됨. 중단(Exit 강제) 시에만 즉시 복귀.
+        if (!_cameraReturned)
+            GameCameraController.Instance?.DeactivateDragonTopDownView(0f);
         RestoreAgent(ctx);
     }
 
@@ -388,12 +425,18 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         PlayAnim(ctx, ResolveAirChaseAnim(ctx));
         CreateFollowLight(ctx);
         SpawnFlameBreath(ctx);
-        // 첫 번째 sweep만 슬로우 + 탑뷰 유지
+        // 첫 번째 sweep만 슬로우 적용 (탑뷰는 패턴 전체 종료까지 유지)
         if (_sweepIndex == 0)
         {
             ApplyDragonSlow(ctx);
             _slowUntilProj = _sweepStartProj + (_sweepEndProj - _sweepStartProj)
                              * Mathf.Clamp01(Data.SlowReleaseRatio);
+        }
+        // 스위프 시작 시 메테오 스폰 활성화
+        if (Data.MeteorPattern != null)
+        {
+            _meteorSpawning   = true;
+            _meteorSpawnTimer = 0f;
         }
         _nextColIndex  = 0;
         _phase = Phase.Sweep;
@@ -410,12 +453,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
         float tipProj = Vector3.Dot(ctx.Transform.position - _laneCenter, _sweepDir) + _horizontalReach;
 
-        // 첫 sweep 슬로우: 경고장판 1/5 지점 도달 시 속도 복원 + 카메라 하강 시작
+        // 첫 sweep 슬로우: 경고장판 1/5 지점 도달 시 드래곤 애니 속도만 복원 (카메라는 패턴 종료 시 복귀)
         if (_sweepIndex == 0 && _animSlowActive && tipProj >= _slowUntilProj)
-        {
             RestoreDragonSpeed(ctx);
-            GameCameraController.Instance?.DeactivateDragonTopDownView(Data.CameraReturnDuration);
-        }
 
         while (_nextColIndex < _totalCols)
         {
@@ -445,6 +485,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             BeginNextSweep(ctx);
         else
         {
+            _meteorSpawning = false; // 모든 스위프 완료 — 신규 메테오 스폰 중단
             _phase = Phase.Tsunami;
             _timer = 0f;
         }
@@ -454,9 +495,14 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         UpdateLivingTsunamis(ctx);
         UpdateLivingScorches();
-        if (_tsunamis.Count != 0) return;
+        MoveDragonOffscreen(ctx);
+        // 잔불 + 공중 메테오가 모두 소멸할 때까지 대기
+        if (_tsunamis.Count != 0 || _meteors.Count != 0) return;
 
         _phase = Phase.Done;
+        // 패턴 정상 종료 시 탑뷰 → 플레이어 시점으로 부드럽게 복귀
+        _cameraReturned = true;
+        GameCameraController.Instance?.DeactivateDragonTopDownView(Data.CameraReturnDuration);
 
         // Summon 패턴 공중 대기 루프에서 핸드오프된 경우 — 원래 상태로 복귀
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb && bb.AirLoopReturnState != null)
@@ -608,12 +654,22 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
     }
 
+    private void MoveDragonOffscreen(MonsterContext ctx)
+    {
+        Vector3 target = _laneCenter + _sweepDir * (_flyThroughEndProj + FlyOffscreenPadding);
+        target.y = ctx.Runtime.SpawnPosition.y + Data.HideHeight;
+        ctx.Transform.position = Vector3.MoveTowards(
+            ctx.Transform.position, target, Data.FlySpeed * Time.deltaTime);
+    }
+
     private float GetColumnProjection(int index)
         => _sweepStartProj + index * DragonBossRoomContext.CellSize;
 
     private void SpawnFlameBreath(MonsterContext ctx)
     {
-        _flameBreathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, ctx.Transform.position);
+        // 탑뷰 카메라 중에도 자연스럽게 들리도록 플레이어 위치 기준으로 재생
+        Vector3 breathAudioPos = ctx?.Runtime?.PlayerTarget != null ? ctx.Runtime.PlayerTarget.position : ctx.Transform.position;
+        _flameBreathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, breathAudioPos);
 
         if (Data.FlameBreathPrefab == null) return;
         _flameBreathGo = BossEffectPool.Spawn(
@@ -720,7 +776,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _lineFireRemaining.TryGetValue(_sweepIndex, out int remaining);
         _lineFireRemaining[_sweepIndex] = remaining + 1;
         if (remaining == 0)
-            _lineFireAudio[_sweepIndex] = Managers.Sound?.PlayLoopingEffectAt(Data.ResidualFireSfx, pos);
+        {
+            // 탑뷰 카메라 중 AudioListener가 높이 올라 있으므로 플레이어 위치 기준으로 재생
+            Vector3 audioPos = ctx?.Runtime?.PlayerTarget != null ? ctx.Runtime.PlayerTarget.position : pos;
+            _lineFireAudio[_sweepIndex] = Managers.Sound?.PlayLoopingEffectAt(Data.ResidualFireSfx, audioPos);
+        }
     }
 
     private void ReleaseLineFireSlot(int sweepIndex)
@@ -1060,6 +1120,176 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         foreach (var entry in _tsunamis) if (entry.Go != null) BossEffectPool.Release(entry.Go);
         _tsunamis.Clear();
         StopAllLineFireAudio();
+    }
+
+    // ─── Meteor Rain (통합) ──────────────────────────────────────────────────
+
+    private void SpawnMeteor(MonsterContext ctx)
+    {
+        if (Data.MeteorPattern == null) return;
+
+        int minX = 2, maxX = DragonBossRoomContext.Width  - 3;
+        int minZ = 2, maxZ = DragonBossRoomContext.Height - 3;
+        int cx = Random.Range(minX, maxX + 1);
+        int cz = Random.Range(minZ, maxZ + 1);
+
+        Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
+        Vector3 landPos;
+        if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f))
+            landPos = hit.point + Vector3.up * 0.05f;
+        else
+        {
+            landPos = landBase;
+            landPos.y = ctx.Runtime.SpawnPosition.y + 0.05f;
+        }
+
+        int halfR = Random.Range(1, 3); // 1=3×3, 2=5×5
+
+        var entry = new MeteorEntry
+        {
+            WarnTiles     = new List<GameObject>(),
+            WarnMats      = new List<Material>(),
+            LandPos       = landPos,
+            WarnTimer     = 0f,
+            Falling       = false,
+            ImpactApplied = false,
+            Landed        = false,
+            HalfR         = halfR,
+        };
+
+        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        for (int dx = -halfR; dx <= halfR; dx++)
+        for (int dz = -halfR; dz <= halfR; dz++)
+        {
+            int tx = cx + dx, tz = cz + dz;
+            if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
+
+            Vector3 tilePos = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "MeteorWarn";
+            Object.Destroy(go.GetComponent<MeshCollider>());
+            go.transform.position  = tilePos;
+            go.transform.rotation  = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.localScale = Vector3.one;
+
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows    = false;
+            Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
+            var mat = new Material(shader);
+            mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
+            mr.material = mat;
+            entry.WarnTiles.Add(go);
+            entry.WarnMats.Add(mat);
+        }
+
+        _meteors.Add(entry);
+    }
+
+    private void UpdateMeteors(MonsterContext ctx)
+    {
+        if (Data.MeteorPattern == null) return;
+
+        // 스위프 진행 중 일정 간격으로 메테오 스폰
+        if (_meteorSpawning)
+        {
+            _meteorSpawnTimer += Time.deltaTime;
+            if (_meteorSpawnTimer >= Data.MeteorPattern.SpawnInterval)
+            {
+                _meteorSpawnTimer = 0f;
+                SpawnMeteor(ctx);
+            }
+        }
+
+        for (int i = _meteors.Count - 1; i >= 0; i--)
+        {
+            var e = _meteors[i];
+
+            if (!e.Falling)
+            {
+                e.WarnTimer += Time.deltaTime;
+                float t = Mathf.Clamp01(e.WarnTimer / Data.MeteorPattern.WarningDuration);
+                foreach (var mat in e.WarnMats)
+                {
+                    if (mat == null) continue;
+                    Color c = mat.color;
+                    c.a = Mathf.Lerp(0f, Data.MeteorPattern.WarningColor.a, t);
+                    mat.color = c;
+                }
+
+                if (e.WarnTimer >= Data.MeteorPattern.WarningDuration)
+                {
+                    e.Falling  = true;
+                    e.FallTimer = 0f;
+                    DestroyMeteorWarnTiles(ref e);
+                    if (Data.MeteorPattern.FireballPrefab != null)
+                    {
+                        e.Projectile = BossEffectPool.Spawn(Data.MeteorPattern.FireballPrefab, e.LandPos, Quaternion.identity);
+                        e.Projectile.transform.localScale = Vector3.one * Data.MeteorPattern.FireballScale;
+                    }
+                    Managers.Sound?.PlayEffectAt(Data.MeteorPattern.FireRainSfx, e.LandPos);
+                }
+                _meteors[i] = e;
+            }
+            else
+            {
+                e.FallTimer += Time.deltaTime;
+
+                if (!e.ImpactApplied && e.FallTimer >= Data.MeteorPattern.ImpactDelay)
+                {
+                    e.ImpactApplied = true;
+                    ApplyMeteorImpact(ctx, ref e);
+                    if (e.Projectile != null)
+                        foreach (var ps in e.Projectile.GetComponentsInChildren<ParticleSystem>(true))
+                            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                }
+
+                if (e.FallTimer >= Data.MeteorPattern.MeteorHitDuration)
+                {
+                    if (e.Projectile != null) { BossEffectPool.Release(e.Projectile); e.Projectile = null; }
+                    _meteors.RemoveAt(i);
+                    continue;
+                }
+                _meteors[i] = e;
+            }
+        }
+    }
+
+    private void ApplyMeteorImpact(MonsterContext ctx, ref MeteorEntry e)
+    {
+        if (Data.MeteorPattern.ExplosionPrefab != null)
+        {
+            var exp = BossEffectPool.SpawnOneShot(Data.MeteorPattern.ExplosionPrefab, e.LandPos, Quaternion.identity, fallbackLifetime: 3f);
+            if (exp != null) exp.transform.localScale = Vector3.one * Data.MeteorPattern.ExplosionScale;
+        }
+
+        if (ctx?.Runtime?.PlayerTarget != null)
+        {
+            Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+            float halfExtent = (e.HalfR + 0.5f) * DragonBossRoomContext.CellSize;
+            Vector3 d = playerPos - e.LandPos;
+            if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
+                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Data.MeteorPattern.AttackDamage);
+        }
+    }
+
+    private static void DestroyMeteorWarnTiles(ref MeteorEntry e)
+    {
+        foreach (var go in e.WarnTiles) if (go != null) Object.Destroy(go);
+        foreach (var mat in e.WarnMats) if (mat != null) Object.Destroy(mat);
+        e.WarnTiles.Clear();
+        e.WarnMats.Clear();
+    }
+
+    private void CleanupAllMeteors()
+    {
+        for (int i = 0; i < _meteors.Count; i++)
+        {
+            var e = _meteors[i];
+            DestroyMeteorWarnTiles(ref e);
+            if (e.Projectile != null) BossEffectPool.Release(e.Projectile);
+        }
+        _meteors.Clear();
     }
 
     private string ResolveAirChaseAnim(MonsterContext ctx)
