@@ -36,6 +36,8 @@ public static class SaveSanitizer
 
         d.runGold         = ClampMin(d.runGold,         0, ref changed);
         d.runEssence      = ClampMin(d.runEssence,      0, ref changed);
+        d.fuelEnhanceMaterial = ClampMin(d.fuelEnhanceMaterial, 0, ref changed);
+        d.fuelRuneOre         = ClampMin(d.fuelRuneOre,         0, ref changed);
         d.maxHp           = ClampMin(d.maxHp,           MinMaxHp, ref changed);
         // currentHp: [0, maxHp] — 0(사망 상태)도 허용해 정상값을 끌어올리지 않는다.
         d.currentHp       = ClampRange(d.currentHp,     0, d.maxHp, ref changed);

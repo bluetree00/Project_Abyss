@@ -5,7 +5,8 @@ using UnityEngine;
 
 /// <summary>
 /// BaseCamp 초회 온보딩 강제 시퀀스 오케스트레이터(상태머신).
-/// 순서: 유물 → 장비 → 서약 → 게이트. 각 단계 완료를 퀘스트 보고(Relic/Equip/Covenant)로 감지해
+/// 순서: 유물 → 장비(모루) → 게이트. (서약은 진입 후 대기방 제단에서 획득 — Covenant 단계는 자동 통과.)
+/// 각 단계 완료를 퀘스트 보고(Relic/Equip)로 감지해
 /// 다음 구역의 돔 배리어를 제거하고, **단계 진입 시 그 대상을 카메라 연출(둘러보기)로 보여준다**
 /// (초회 첫 연출=유물 즉시, 이후 전환=짧은 지연 후). 가이드 화살표·임시 대사 동반.
 /// 완료는 PlayerPrefs로 영속 → 2회차부터 전 구역 개방·연출 스킵.
@@ -113,8 +114,35 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     {
         _stepIndex = i;
         if (i < 0 || i >= steps.Length) return;
+
+        // [서약 폐기] 서약 획득은 진입 후 대기방(WorldCovenantAltar)으로 이동 —
+        // BaseCamp 온보딩의 서약 단계는 자동 통과(구역 개방 후 다음/게이트로). 소프트락 방지.
+        if (string.Equals(steps[i].questCategory, "Covenant"))
+        {
+            Unlock(steps[i].unlockBarrier);
+            AdvanceFrom(i);
+            return;
+        }
+
         guideArrow?.SetTarget(steps[i].target);
         RevealAsync(steps[i].target, steps[i].guideline, waitDialogue: !initial, _cts.Token).Forget();
+    }
+
+    /// <summary>단계 i 완료 후 다음으로 — 마지막이면 게이트 연출 + 완료 기록.</summary>
+    private void AdvanceFrom(int i)
+    {
+        int next = i + 1;
+        if (next < steps.Length)
+        {
+            EnterStep(next, initial: false);
+        }
+        else
+        {
+            _stepIndex = steps.Length;
+            guideArrow?.SetTarget(gateTarget);
+            RevealAsync(gateTarget, gateGuideline, waitDialogue: true, _cts.Token).Forget();
+            MarkCompleted();
+        }
     }
 
     /// <summary>획득 대사가 닫힌 뒤(전환), 현재 카메라 위치에서 대상으로 이동→비추기→플레이어 복귀(orbit 아님). 연출 중 입력 잠금.</summary>
@@ -209,18 +237,6 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         if (!string.Equals(category, steps[_stepIndex].questCategory)) return;
 
         Unlock(steps[_stepIndex].unlockBarrier);   // 현재 단계 완료 → 다음 구역 개방
-
-        int next = _stepIndex + 1;
-        if (next < steps.Length)
-        {
-            EnterStep(next, initial: false);        // 다음 대상 연출(지연 후)
-        }
-        else
-        {
-            _stepIndex = steps.Length;              // 전 단계 완료
-            guideArrow?.SetTarget(gateTarget);
-            RevealAsync(gateTarget, gateGuideline, waitDialogue: true, _cts.Token).Forget();
-            MarkCompleted();
-        }
+        AdvanceFrom(_stepIndex);
     }
 }

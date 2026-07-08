@@ -326,16 +326,8 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        // [서약 픽업화] 게이트 선택 팝업 분리 — 베이스캠프에서 예약(PlayerLoadout)한 서약을 여기서 적용.
-        // 이 시점 플레이어는 이미 스폰·BindPlayer 완료(CovenantHandler.Initialize 후)라 TryAdd가 정상 동작.
-        // (ShowCovenantChoiceAsync는 이벤트방/후속 재사용 위해 메서드는 보존하되 미호출)
-        var run     = bootstrapper?.Run;
-        var loadout = AppBootstrapper.Instance?.Loadout;
-        if (run?.CovenantHandler != null && loadout != null)
-        {
-            foreach (var id in loadout.ReservedCovenants)
-                run.CovenantHandler.TryAdd(id);
-        }
+        // [서약 폐기] 사전제작 서약 예약(PlayerLoadout.ReservedCovenants) 적용을 폐기.
+        // 서약 획득은 챕터 시작 대기방의 조립 서약 제단(WorldCovenantAltar)으로 일원화됨.
 
         // 플레이어 이동 복구
         UnfreezePlayer();
@@ -345,53 +337,6 @@ public class StartRoomGate : MonoBehaviour
             await bootstrapper.StartProcGenRunAsync();
 
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
-    }
-
-    private static readonly object _covenantPauseOwner = new object();   // TimeScaleArbiter 요청 키
-
-    private static async UniTask ShowCovenantChoiceAsync(GameRunSession run, System.Threading.CancellationToken ct)
-    {
-        if (run?.CovenantHandler == null) return;
-        if (run.CovenantHandler.Covenants.Count > 0) return;
-
-        var ids = WorldCovenantPickup.PickRandomOptions(run.CovenantHandler, 3);
-        var covenants = new List<CovenantBase>(ids.Length);
-        foreach (var id in ids)
-        {
-            var c = CovenantFactory.Create(id);
-            if (c != null) covenants.Add(c);
-        }
-        if (covenants.Count == 0) return;
-
-        UI_CovenantChoice popup;
-        try
-        {
-            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantChoice>();
-        }
-        catch (System.OperationCanceledException) { return; }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[StartRoomGate] 서약 선택 팝업 로드 실패: {e.Message}");
-            return;
-        }
-
-        if (popup == null) return;
-
-        popup.Setup(covenants.ToArray());
-
-        // 선택 UI가 열린 동안 게임 시간 정지 (플레이어 낙하·몬스터 이동 차단)
-        TimeScaleArbiter.Acquire(_covenantPauseOwner, 0f, TimeScaleArbiter.Priority.Pause);
-        int chosen;
-        try { chosen = await popup.WaitForChoiceAsync(); }
-        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(_covenantPauseOwner); return; }
-        finally { TimeScaleArbiter.Release(_covenantPauseOwner); }
-
-        if (chosen >= 0 && chosen < covenants.Count)
-        {
-            string selectedId = covenants[chosen].CovenantId;
-            run.CovenantHandler.TryAdd(selectedId);
-            Debug.Log($"[StartRoomGate] 서약 획득: {selectedId}");
-        }
     }
 
     // ── Player freeze helpers ─────────────────────────────────────

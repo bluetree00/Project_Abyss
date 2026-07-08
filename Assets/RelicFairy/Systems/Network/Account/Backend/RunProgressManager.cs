@@ -112,6 +112,8 @@ public class RunProgressManager : MonoBehaviour
 
         // 런 상태 확장
         d.runEssence       = s.RunDelta?.GainedEssence ?? 0;
+        d.fuelEnhanceMaterial = s.FuelBank?.EnhanceMaterial ?? 0;   // 이벤트방 연료 은행
+        d.fuelRuneOre         = s.FuelBank?.RuneOre ?? 0;
         // 현재 슬롯: 라이브 WeaponManager 우선(첫 방 -1 케이스 해결), 없으면 씬 전환 시 저장값
         int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
         d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;

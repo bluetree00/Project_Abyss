@@ -884,6 +884,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
             _run?.EndRun(isCleared, isCleared ? "clear" : "death");
+            RunReturnTracker.RecordRunEnd(isCleared);   // BaseCamp 복귀 대사(사망/클리어 카운트) 기록
             AppBootstrapper.Instance?.EndRun();
             AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
@@ -1123,6 +1124,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // (MapBuilder가 stall 타일에서 ShopStallInteraction을 이미 생성한 시점)
         if (IsShopCategory(entry.category))
             await SetupShopRoomAsync(roomGO, entry.pool_key, roomRng);
+        else if (IsEventCategory(entry.category))
+            SetupEventRoom(roomGO, entry.pool_key, roomRng);   // 챌린지 종류는 pool_key 명명 규약으로 유추
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1617,6 +1620,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // (레거시/단일세계 경로 — 방 시드 미보유 → roomRng=null 전역 Random 폴백)
         if (IsShopCategory(roomEntry.category))
             await SetupShopRoomAsync(mapGO, roomEntry.room_id);
+        else if (IsEventCategory(roomEntry.category))
+            SetupEventRoom(mapGO, roomEntry.room_id);   // 챌린지 종류는 room_id 명명 규약으로 유추
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -1650,6 +1655,63 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (string.IsNullOrEmpty(category)) return false;
         return category.Trim().Equals("Shop", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsEventCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Event", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 이벤트방 셋업 — 전투 챌린지: 스포너가 있어 RoomWaveController가 붙은 방에 성과 오버레이를 얹는다.
+    /// arena_template_key로 챌린지 종류 지정("hitless"/"hitless:2"/"timelimit:30"), 미지정=속공 45초 기본.
+    /// 스포너 없는(비전투) 이벤트방은 상호작용 챌린지 담당(후속) — 여기선 무동작.
+    /// </summary>
+    private void SetupEventRoom(GameObject roomGO, string typeHint, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        if (roomGO.TryGetComponent<RoomWaveController>(out _))
+        {
+            // 전투 챌린지 — 스포너 있는 이벤트방에 성과 오버레이.
+            var (type, param) = ParseChallengeType(typeHint);
+            var overlay = roomGO.AddComponent<CombatChallengeOverlay>();
+            overlay.Initialize(_run, type, param);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 전투 챌린지 부착: {type}({param}) — {typeHint}");
+            return;
+        }
+
+        // 비전투 — pool_key에 "gamble" 포함 시 도박 상자 상호작용. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
+        if (!string.IsNullOrEmpty(typeHint) && typeHint.ToLowerInvariant().Contains("gamble"))
+        {
+            int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "gamble").GetHashCode());
+            var gamble = roomGO.AddComponent<GambleBoxChallenge>();
+            gamble.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 도박 상자 부착 (seed={seed}) — {typeHint}");
+        }
+    }
+
+    /// <summary>pool_key 등 키 문자열에서 챌린지 종류 유추: "hitless/flawless"=무결, "speed/timelimit/rush"=속공, 기본=속공45.
+    /// arena_template_key는 커스텀 아레나 프리팹 전용이므로 여기 쓰지 않고 pool_key 명명 규약을 사용한다.</summary>
+    private static (CombatChallengeOverlay.OverlayType type, float param) ParseChallengeType(string key)
+    {
+        if (!string.IsNullOrEmpty(key))
+        {
+            string k = key.Trim().ToLowerInvariant();
+            if (k.Contains("hitless") || k.Contains("flawless"))
+                return (CombatChallengeOverlay.OverlayType.Hitless, ParseChallengeParam(k, 2f));
+            if (k.Contains("speed") || k.Contains("timelimit") || k.Contains("rush"))
+                return (CombatChallengeOverlay.OverlayType.TimeLimit, ParseChallengeParam(k, 45f));
+        }
+        return (CombatChallengeOverlay.OverlayType.TimeLimit, 45f);
+    }
+
+    private static float ParseChallengeParam(string k, float fallback)
+    {
+        int i = k.IndexOf(':');
+        if (i >= 0 && float.TryParse(k.Substring(i + 1), out var v)) return v;
+        return fallback;
     }
 
     private static bool IsStartCategory(string category)
@@ -2169,6 +2231,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
+        // 챕터 시작 대기방: 조립 서약 제단 배치(선택 픽업은 억제해도 서약 제단은 항상 제공)
+        SpawnCovenantAltar(player.transform.position);
+
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
 
@@ -2198,6 +2263,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
         SpawnAwakeningAltar();
+        SpawnCovenantAltar(_pendingPlayerSpawnPos ?? Vector3.zero);
 
         await ShowStartRoomDialogueAsync();
 
@@ -2213,6 +2279,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
         WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
+    }
+
+    /// <summary>챕터 시작 대기방의 조립 서약 제단(원인×효과). 세 대기방 경로 공통 — 첫 서약=실버 고정은 제단이 판정.</summary>
+    private void SpawnCovenantAltar(Vector3 basePos)
+    {
+        WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
     }
 
     /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.</summary>
@@ -2410,6 +2482,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.BindPlayer(player);
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
+
+        // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)
+        SpawnCovenantAltar(player.transform.position);
 
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
