@@ -49,7 +49,6 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
         var loadout = AppBootstrapper.Instance?.Loadout;
         return loadout != null
             && loadout.Relic != null
-            && loadout.WeaponSlot0 != null
-            && loadout.ReservedCovenants != null && loadout.ReservedCovenants.Count > 0;   // 서약까지 필수
+            && loadout.WeaponSlot0 != null;   // [서약 폐기] 서약은 대기방 조립 제단에서 획득 — 게이트 조건서 제외
     }
 }

@@ -3,10 +3,10 @@ using UnityEngine;
 using RelicFairy.Monster;
 
 /// <summary>
-/// 가웨인 고유 스킬 — 태양 강림. 정오 전용·구간당 1회(GawainZenithRelic 게이팅).
-/// 전방 부채꼴 광역 ATK×skillMult 1회 타격 + 적중 적에게 태양 화상(DoT) 부여.
-/// 수치는 RELIC_STAT_DATA(gawain) 슬롯 구동. 화상은 기존 MonsterBurnHandler 재사용.
-/// (애니 클립 QSkill_01은 RelicClassSO.QSkillClipKey로 오버라이드 — 미설정 시 연출만 생략, 판정은 동작)
+/// 가웨인 고유 스킬 — 낙일(태양 강림 리워크). 정오 전용·구간당 1회(GawainZenithRelic 게이팅).
+/// 전방 지정 지점에 태양이 낙하 → 착탄 반경 대폭발(ATK×skillMult) + 작열 지대(지속 화염 장판) 생성.
+/// "태양이 정점에서 강림한다" 컨셉 직접 표현(부채꼴 → 낙하 폭발).
+/// 수치는 RELIC_STAT_DATA(gawain) 슬롯 구동. 화상은 MonsterBurnHandler, 장판은 SolarZone.
 /// </summary>
 public sealed class SolarDescentSkillRuntime : ISkillRuntime
 {
@@ -15,10 +15,13 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
     private const string AnimName        = "QSkill_01";
     private const float  AnimDuration    = 1.0f;
-    private const float  HitTime         = 0.3f;
-    private const float  FanRadius       = 4.5f;
-    private const float  FanHalfAngleDeg = 60f;   // 부채꼴 반각(전방 120도)
-    private const float  BurnTickInterval = 0.5f;
+    private const float  HitTime         = 0.35f;
+    private const float  ImpactDistance  = 3.0f;   // 전방 낙하 지점 거리
+    private const float  ImpactRadius    = 3.5f;   // 착탄 폭발 반경
+    private const float  ZoneRadius      = 3.5f;   // 작열 지대 반경
+    private const float  ZoneDuration    = 4.0f;   // 작열 지대 지속
+    private const float  ZoneTickInterval = 0.5f;
+    private const string ImpactVfxKey     = "vfx_gawain_solar_impact"; // 낙일 착탄 VFX(에셋 배선 후 등록)
 
     private readonly GawainZenithRelic _relic;
     private float _elapsed;
@@ -31,9 +34,8 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         _elapsed = 0f; _hitDone = false;
         _relic?.MarkSkillUsed(); // 구간당 1회 소비
 
-        // [가이드라인 비주얼] 태양 강림 발동 토스트
         if (ctx.PlayerTransform != null)
-            GuidelineVisual.Toast(ctx.PlayerTransform.position + Vector3.up * 2.4f, "태양 강림", GuidelineVisual.ToastKind.Relic);
+            GuidelineVisual.Toast(ctx.PlayerTransform.position + Vector3.up * 2.4f, "낙일", GuidelineVisual.ToastKind.Relic);
 
         ctx.RotateToMouse();
         ctx.SetMoveScale(0f);
@@ -43,51 +45,43 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
     public void OnUpdate(SkillExecutionContext ctx)
     {
         _elapsed += Time.deltaTime;
-        if (!_hitDone && _elapsed >= HitTime) { _hitDone = true; FanStrike(ctx); }
+        if (!_hitDone && _elapsed >= HitTime) { _hitDone = true; Impact(ctx); }
         if (_elapsed >= AnimDuration) ctx.RequestEnd?.Invoke();
     }
 
     public void OnExit(SkillExecutionContext ctx) => ctx.SetMoveScale(1f);
 
-    private void FanStrike(SkillExecutionContext ctx)
+    private void Impact(SkillExecutionContext ctx)
     {
         var pt = ctx.PlayerTransform;
-        Vector3 origin = pt.position;
         Vector3 fwd = pt.forward; fwd.y = 0f;
-        if (fwd.sqrMagnitude < 0.001f) return;
+        if (fwd.sqrMagnitude < 0.001f) fwd = Vector3.forward;
         fwd.Normalize();
-        float cosHalf = Mathf.Cos(FanHalfAngleDeg * Mathf.Deg2Rad);
+        Vector3 impact = pt.position + fwd * ImpactDistance;
 
-        // [가이드라인 비주얼] 부채꼴 범위 윤곽
-        GuidelineVisual.Cone(origin, fwd, FanRadius, FanHalfAngleDeg);
-
-        // 각인 첫타(정오 첫 공격이 스킬이면 스킬이 소비) → +50% = 525%
         float markMul = (_relic != null && _relic.ConsumeMarkFirstHit()) ? (1f + V(V_FIRST_HIT, 0.5f)) : 1f;
         float dmg     = ctx.CalculateDamage(V(V_SKILL_MULT, 3.5f)) * markMul;
         float effAtk  = ctx.RuntimeStats.GetEffectiveAttack(AttackStatKind.Melee);
         float burnDps = effAtk * V(V_BURN_TICK_RATIO, 0.15f);
         float burnDur = V(V_BURN_DURATION, 6f);
 
-        var owner = ctx.Controller.gameObject;
-        var hit   = new HashSet<GameObject>();
-        var cols  = Physics.OverlapSphere(origin, FanRadius);
-        foreach (var col in cols)
+        GuidelineVisual.SynergyDamage(impact + Vector3.up * 0.2f, false); // 착탄 표시
+        RelicStateVfx.PlayOneShot(ImpactVfxKey, impact);                  // 낙일 착탄 VFX
+
+        var owner  = ctx.Controller.gameObject;
+        var buffer = new List<MonsterBase>(32);
+        CombatQuery.GetNearbyEnemies(impact, ImpactRadius, owner, 32, buffer);
+        foreach (var mb in buffer)
         {
-            if (col == null || col.gameObject == owner) continue;
-            Vector3 to = col.transform.position - origin; to.y = 0f;
-            if (to.sqrMagnitude < 0.001f) continue;
-            if (Vector3.Dot(fwd, to.normalized) < cosHalf) continue; // 부채꼴 밖
-
-            var d = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>();
-            if (d == null || d is not Component dc) continue;
-            if (!hit.Add(dc.gameObject)) continue; // 같은 적 1회
-
-            d.TakeDamage(dmg, owner, 0.3f);
-            GuidelineVisual.SynergyDamage(dc.transform.position + Vector3.up * 1.2f, false);   // [가이드라인 비주얼] 적중 피해 플래시
+            if (mb == null) continue;
+            if (mb is IDamageable d) d.TakeDamage(dmg, owner, 0.3f);
             if (burnDps > 0f)
-                MonsterBurnHandler.Apply(target: dc.gameObject, dps: burnDps, duration: burnDur,
-                                         tickInterval: BurnTickInterval, instigator: owner);
+                MonsterBurnHandler.Apply(mb.gameObject, burnDps, burnDur, ZoneTickInterval, owner);
         }
+
+        // 작열 지대 — 착탄 지점에 지속 화염 장판(틱 피해 + 화상)
+        SolarZone.Spawn(impact, ZoneRadius, ZoneDuration,
+                        tickDamage: effAtk * 0.10f, burnDps: burnDps, tickInterval: ZoneTickInterval, instigator: owner);
     }
 
     private static float V(int slot, float fallback)

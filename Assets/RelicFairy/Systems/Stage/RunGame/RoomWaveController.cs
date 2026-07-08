@@ -337,7 +337,9 @@ public sealed class RoomWaveController : MonoBehaviour
             _run?.EnterStandby();
 
             var gate = GetComponent<RoomClearGate>() ?? gameObject.AddComponent<RoomClearGate>();
-            gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null);
+            // 이벤트 챌린지 오버레이가 있으면 성과 등급을 산출해 보상에 반영(없으면 null=일반 보상).
+            ChallengeGrade? challengeGrade = GetComponent<CombatChallengeOverlay>()?.EvaluateGrade();
+            gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab, _bossSpawner != null, challengeGrade);
             gate.Activate(_hasKillPosition ? _lastKillPosition : transform.position);
 
             // 보스방 클리어 신호 발행 — 챕터 게이트 스폰 트리거(이벤트 기반, 보스/DieState 코드 무수정).

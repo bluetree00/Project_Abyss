@@ -32,6 +32,23 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         h.Configure(dmg, instigator, dps, tickInterval, duration);
     }
 
+    /// <summary>대상의 화상을 즉시 폭발(잔여 총량을 1회 피해로) — 가웨인 정오 즉발.</summary>
+    public static void DetonateOn(GameObject target)
+    {
+        if (target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)) h.Detonate();
+    }
+
+    /// <summary>남은 화상 총량(dps × 잔여시간)을 즉시 피해로 가하고 소멸.</summary>
+    public void Detonate()
+    {
+        if (_target != null)
+        {
+            float burst = _dps * Mathf.Max(0f, _remaining);
+            if (burst > 0f) _target.TakeDamage(burst, _instigator);
+        }
+        Destroy(this);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────
     private void Update()
     {

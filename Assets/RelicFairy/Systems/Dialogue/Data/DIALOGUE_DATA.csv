@@ -5,14 +5,64 @@ StartRoom,2,Shadow,Illust_Shadow_Default,...또 시작이군. 이번 영혼은 �
 StartRoom,3,God,Illust_God_Default,저기 잠들어 있는 유물을 봐. 오래전 쓰러진 영웅의 몸이야.
 StartRoom,4,God,Illust_God_Default,그 몸 속으로 들어가. 유물은 영혼이 깃들어야 비로소 빛을 발하거든.
 StartRoom,5,Shadow,Illust_Shadow_Default,...꽤 어울리는 한 쌍이네.
+StartRoom_R1,0,Shadow,Illust_Shadow_Default,...또 돌아왔군. 유물도 무기도 늘 같은 자리에서 널 기다려.
+StartRoom_R1,1,God,Illust_God_Default,"채비를 갖추렴, 작은 빛. 문은 언제든 열려 있어."
+StartRoom_R2,0,God,Illust_God_Default,다시 깨어났구나. 유물도, 무기도 — 네 손길을 기다리고 있어.
+StartRoom_R2,1,Shadow,Illust_Shadow_Default,순환은 지치지 않아. ...너는 어떨지 모르겠지만.
 BossRoom,0,Shadow,Illust_Shadow_Default,"이 기운... 오래된 것이야. 조심해, 영혼."
 BossRoom,1,God,Illust_God_Default,두려워하지 마. 너는 신성한 빛을 품고 있어.
 RunClear,0,God,Illust_God_Default,"해냈어. 잘했어, 나의 영혼."
 RunClear,1,Shadow,Illust_Shadow_Default,순환이 한 바퀴 돌았군. 하지만 심연은 끝이 없어.
 RunClear,2,God,Illust_God_Default,"잠시 쉬어. 유물도, 영혼도 지쳐 있을 테니."
-RunFail,0,Shadow,Illust_Shadow_Default,"...돌아왔군, 작은 빛."
-RunFail,1,God,Illust_God_Default,괜찮아. 영혼은 꺼지지 않아. 다시 깃들면 돼.
-RunFail,2,God,Illust_God_Default,유물은 아직 기다리고 있어.
+RunFail_First,0,God,Illust_God_Default,"...돌아왔구나. 처음이지? 많이 놀랐을 거야."
+RunFail_First,1,God,Illust_God_Default,"괜찮아. 영혼은 죽지 않아. 그저 유물을 떠나 내게 돌아온 것뿐이야."
+RunFail_First,2,Shadow,Illust_Shadow_Default,"...벌써 한 번. 심연은 이제 막 네 이름을 외우기 시작했어."
+RunFail_R1,0,Shadow,Illust_Shadow_Default,"...또 돌아왔군, 작은 빛."
+RunFail_R1,1,God,Illust_God_Default,"다시 깃들면 돼. 유물은 아직 널 기다려."
+RunFail_R2,0,God,Illust_God_Default,"아파했겠구나. 하지만 넌 다시 여기 있어."
+RunFail_R2,1,Shadow,Illust_Shadow_Default,"순환은 그런 거야. 익숙해지든지, 부서지든지."
+RunFail_R3,0,God,Illust_God_Default,"숨을 골라. 심연은 어디 가지 않아."
+RunFail_R4,0,Shadow,Illust_Shadow_Default,"몇 번째였더라. ...세는 걸 그만둔 지 오래야."
+RunFail_R4,1,God,Illust_God_Default,"숫자는 중요하지 않아. 네가 다시 일어선다는 것만 중요해."
+RunFail_R5,0,God,Illust_God_Default,"돌아온 걸 환영해, 나의 영혼."
+RunFail_R6,0,Shadow,Illust_Shadow_Default,"그 상처, 유물에는 남지 않아. 하지만 너는... 기억하겠지."
+RunFail_R7,0,God,Illust_God_Default,"실패가 아니야. 그저 한 걸음 물러선 것뿐."
+RunFail_R7,1,Shadow,Illust_Shadow_Default,"...위로가 참 한결같군."
+RunFail_R8,0,Shadow,Illust_Shadow_Default,"또 너야. 심연도 슬슬 지겨워할 텐데."
+RunFail_R9,0,God,Illust_God_Default,"다시 채비를 갖추렴. 이번엔 조금 더 멀리 갈 수 있을 거야."
+RunFail_R10,0,Shadow,Illust_Shadow_Default,"죽음은 문이야. 넌 그저 자꾸 되돌아오는 열쇠고."
+RunFail_R11,0,God,Illust_God_Default,"두렵니? ...두려워도 괜찮아. 두려움도 빛의 일부야."
+RunFail_R12,0,Shadow,Illust_Shadow_Default,"유물은 흠집 하나 없어. ...참 편리한 몸이지."
+RunFail_R12,1,God,Illust_God_Default,"그러니 다시 깃들어. 처음부터, 몇 번이고."
+RunFail_T10_R1,0,Shadow,Illust_Shadow_Default,"열 번을 넘겼군. 이쯤 되면 순환도 너를 손님이 아니라 주민으로 여길 거야."
+RunFail_T10_R1,1,God,Illust_God_Default,"...그래도 넌 매번 돌아와. 그게 답이야."
+RunFail_T10_R2,0,God,Illust_God_Default,"지쳤지. 알아. 나도... 이 반복이 마냥 편치만은 않아."
+RunFail_T10_R3,0,Shadow,Illust_Shadow_Default,"너는 왜 자꾸 돌아오는 걸까. ...누가 널 이렇게까지 부르는 걸까."
+RunFail_T10_R4,0,God,Illust_God_Default,"유물은 여전히 널 기다려. 하지만 나는... 가끔 궁금해. 이게 정말 구원인지."
+RunFail_T10_R5,0,Shadow,Illust_Shadow_Default,"이 정도 반복했으면 뭔가 이상하다는 걸 눈치챘을 텐데. ...아니면, 모르는 편이 나을지도."
+RunFail_T10_R6,0,God,Illust_God_Default,"다시 일어서. 몇 번이든. 내가 널 부른 이유가 분명 있으니까."
+RunFail_T10_R6,1,Shadow,Illust_Shadow_Default,"...그 '이유'라는 거, 정말 네 것이 맞긴 할까."
+RunFail_T25_R1,0,Shadow,Illust_Shadow_Default,"스물다섯 번. ...멀린이 부른 영혼치고는, 참 오래도 버티는군."
+RunFail_T25_R1,1,God,Illust_God_Default,"그 이름을... 네가 어떻게."
+RunFail_T25_R2,0,Shadow,Illust_Shadow_Default,"너 이전에도 영혼은 있었어. 전부 이 자리에 서서, 똑같은 위로를 들었지."
+RunFail_T25_R3,0,God,Illust_God_Default,"...미안해. 나는 너에게 다 말해주지 못했어."
+RunFail_T25_R3,1,Shadow,Illust_Shadow_Default,"이제야 양심이 찔리나 보군."
+RunFail_T25_R4,0,Shadow,Illust_Shadow_Default,"이 순환을 누가 설계했는지, 슬슬 묻고 싶지 않아?"
+RunFail_M5,0,God,Illust_God_Default,"다섯 번째로구나. ...너는 참 강해. 어떤 영혼은 두 번째를 넘기지 못했는데."
+RunFail_M5,1,Shadow,Illust_Shadow_Default,"그건 강한 게 아니라 벗어나지 못하는 거야. ...하지만 인정하지, 끈질기긴 해."
+RunFail_M10,0,Shadow,Illust_Shadow_Default,"열 번. ...나는 이 숫자를 기억해. 이쯤에서 대부분의 영혼이 무너졌거든."
+RunFail_M10,1,God,Illust_God_Default,"하지만 너는 여기 서 있어, 나의 빛."
+RunFail_M10,2,Shadow,Illust_Shadow_Default,"...그래, 서 있군. 그게 축복인지 저주인지는 아직 모르겠지만."
+RunFail_M20,0,God,Illust_God_Default,"스무 번이야. 나조차 이 순환이 어디로 향하는지 확신이 흐려져."
+RunFail_M20,1,Shadow,Illust_Shadow_Default,"확신이 흐려진다라. ...신이 그런 말을 할 줄이야."
+RunFail_M20,2,God,Illust_God_Default,"...그래도 나는 너를 구하려 불렀어. 그건 변하지 않아."
+RunFail_M30,0,Shadow,Illust_Shadow_Default,"서른 번. 너는 이제 이 심연의 일부야. 흉터가 아니라, 뼈대지."
+RunFail_M30,1,God,Illust_God_Default,"그만두고 싶니? ...그래도 돼. 나는 널 원망하지 않아."
+RunFail_M30,2,Shadow,Illust_Shadow_Default,"봐. 신도 지쳤어. ...하지만 너는? 너는 아직 눈이 살아있군."
+RunFail_M50,0,Shadow,Illust_Shadow_Default,"쉰 번. ...이제 인정해야겠어. 너는 실험체가 아니야. 너는 예외야."
+RunFail_M50,1,God,Illust_God_Default,"예외?"
+RunFail_M50,2,Shadow,Illust_Shadow_Default,"설계를 벗어난 영혼. 누군가는 이걸 두려워할 거야. ...그 누군가가 누군지는, 너도 곧 알게 될 테고."
+RunFail_M50,3,God,Illust_God_Default,"...작은 빛. 네가 여기까지 온 건, 내가 부른 힘 때문만은 아닐지도 몰라."
 Knight_Pickup,0,God,Illust_God_Default,이 몸은 한때 전장을 지배했던 기사야. 굳건한 의지가 깃든 유물이지.
 Knight_Pickup,1,Shadow,Illust_Shadow_Default,...기사라. 몸은 믿음직하군. 영혼이 그 무게를 감당할 수 있다면.
 Knight_Pickup,2,God,Illust_God_Default,"자, 깃들어. 그 갑옷 안에서 네 빛이 다시 타오를 거야."
@@ -50,10 +100,10 @@ Morgana_Reveal,5,God,Illust_God_Default,아직...
 Morgana_Reveal,6,God,Illust_God_Default,...끝나지 않았어.
 Quest_TutEquip_Complete,0,God,Illust_God_Default,무기가 손에 익는구나. 이제 너는 싸울 수 있어.
 Quest_TutEquip_Complete,1,Shadow,Illust_Shadow_Default,...겉모습만 그럴듯하군. 심연은 칼날 따위로 무너지지 않아.
-Quest_TutEquip_Complete,2,God,Illust_God_Default,두려워 마. 다음은 너를 지킬 서약이야.
+Quest_TutEquip_Complete,2,God,Illust_God_Default,채비는 갖췄어. 저 문을 지나렴 — 너를 지킬 서약은 심연 안에서 맺게 될 거야.
 Quest_TutCovenant_Complete,0,God,Illust_God_Default,서약을 받아들였구나. 그 맹세가 너의 빛을 더 멀리 비출 거야.
 Quest_TutCovenant_Complete,1,Shadow,Illust_Shadow_Default,"서약이라... 대가 없는 힘은 없어. 잊지 마, 작은 빛."
-Quest_TutCovenant_Complete,2,God,Illust_God_Default,"이제 준비됐어. 저 너머의 문을 지나, 심연으로 내려가렴."
+Quest_TutCovenant_Complete,2,God,Illust_God_Default,"이제 정말 준비됐어. 앞의 문을 지나, 심연 깊이 나아가렴."
 Quest_HiddenAmbush_Start,0,Shadow,Illust_Shadow_Default,"...멈춰. 이 기운, 평범한 적이 아니야."
 Quest_HiddenAmbush_Start,1,God,Illust_God_Default,"갑작스러운 시련이구나. 영혼이여, 정신을 가다듬어."
 Quest_HiddenAmbush_Clear,0,God,Illust_God_Default,"위협을 떨쳐냈어. 역시 너야, 작은 빛."

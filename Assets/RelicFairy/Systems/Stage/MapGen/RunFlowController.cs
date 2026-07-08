@@ -348,7 +348,18 @@ public class RunFlowController : MonoBehaviour
         else
         {
             _currentWave = null;
-            HandleRoomCleared();
+            // 비전투 방: 상호작용 챌린지(도박 등)가 있으면 해결(OnResolved)까지 클리어 지연, 없으면 즉시 공개.
+            var challenge = result.roomGO != null ? result.roomGO.GetComponent<IInteractionChallenge>() : null;
+            if (challenge != null)
+            {
+                System.Action onResolved = null;
+                onResolved = () => { challenge.OnResolved -= onResolved; HandleRoomCleared(); };
+                challenge.OnResolved += onResolved;
+            }
+            else
+            {
+                HandleRoomCleared();
+            }
         }
 
         // 방 경계 자동저장 (suspend-on-save). 이어하기 재생성 중에는 생략(동일 상태 재저장 방지).

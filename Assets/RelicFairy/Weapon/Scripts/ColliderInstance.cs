@@ -82,15 +82,33 @@ public class ColliderInstance : MonoBehaviour
         }
     }
 
-    // 근접 원샷 판정: 콜라이더 영역(bounds)에 겹친 대상에 즉시 1회 데미지(트리거 지속 없음).
+    // 근접 원샷 판정: 콜라이더 영역에 겹친 대상에 즉시 1회 데미지(트리거 지속 없음).
     private void OneShotMeleeOverlap()
     {
         var col = GetComponent<Collider>();
         if (col == null) return;
 
-        Bounds b = col.bounds;
-        int n = Physics.OverlapBoxNonAlloc(
-            b.center, b.extents, s_overlapBuf, Quaternion.identity, ~0, QueryTriggerInteraction.Collide);
+        int n;
+        // 박스는 콜라이더 회전(플레이어 방향)을 반영한 OBB로 판정한다.
+        // AABB(col.bounds)로 판정하면 대각선을 바라볼 때 박스가 부풀어 슬래시 밖까지 오판정된다.
+        // 구/기타 형상은 AABB가 회전 불변이라 기존 판정 그대로 사용(대검 등).
+        if (col is BoxCollider box)
+        {
+            Vector3 s = box.transform.lossyScale;
+            Vector3 half = new Vector3(
+                box.size.x * 0.5f * Mathf.Abs(s.x),
+                box.size.y * 0.5f * Mathf.Abs(s.y),
+                box.size.z * 0.5f * Mathf.Abs(s.z));
+            n = Physics.OverlapBoxNonAlloc(
+                box.transform.TransformPoint(box.center), half, s_overlapBuf,
+                box.transform.rotation, ~0, QueryTriggerInteraction.Collide);
+        }
+        else
+        {
+            Bounds b = col.bounds;
+            n = Physics.OverlapBoxNonAlloc(
+                b.center, b.extents, s_overlapBuf, Quaternion.identity, ~0, QueryTriggerInteraction.Collide);
+        }
         for (int i = 0; i < n; i++)
         {
             var other = s_overlapBuf[i];

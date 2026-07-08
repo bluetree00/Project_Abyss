@@ -47,6 +47,14 @@ public sealed class GameRunSession
     public MonsterSpawnTableSO CurrentBossSpawnTable =>
         _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
 
+    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale. 미주입/미설정 시 1.</summary>
+    public float CurrentDifficultyScale =>
+        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+
+    /// <summary>현재 챕터의 몬스터 수량 배율. ChapterDataSO.monsterCountScale. 미주입/미설정 시 1.</summary>
+    public float CurrentMonsterCountScale =>
+        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.monsterCountScale ?? 1f) : 1f;
+
     private ChapterRegistry _chapterRegistry;
 
     /// <summary>챕터 레지스트리 주입. 챕터 변경 시 ActiveTheme 자동 해석에 사용.</summary>
@@ -68,6 +76,8 @@ public sealed class GameRunSession
 
     public PlayerRunState PlayerState { get; private set; }
     public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
+    /// <summary>런 지속 연료(강화재료·원석). 이벤트방 생산·#1/#2 소비. 미소비분은 런 종료 시 abyssEssence로 환산.</summary>
+    public RunFuelBank FuelBank { get; private set; } = new RunFuelBank();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
     public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
@@ -309,6 +319,7 @@ public sealed class GameRunSession
 
             // 런 중 적립 정수 복원 (런 종료 시 메타 반영분)
             RunDelta.GainedEssence = save.runEssence;
+            FuelBank.RestoreRaw(save.fuelEnhanceMaterial, save.fuelRuneOre);   // 연료 은행 복원
 
             Phase = RunPhase.Running;
             ChangeRunState(RunState.Map);
@@ -334,6 +345,10 @@ public sealed class GameRunSession
         }
 
         Phase = RunPhase.Ending;
+
+        // 미소비 연료(강화재료·원석) → abyssEssence(메타) 환산 (로스 0). Phase=Ending이라 AddEssence 가드 우회, RunDelta 직접 가산.
+        int fuelConverted = FuelBank.TotalRemaining();
+        if (fuelConverted > 0) RunDelta.GainedEssence += fuelConverted;
 
         // 종료 상태 발행 (OnRunEnded 전에 구독자가 반응할 수 있도록)
         var endState = isCleared ? RunState.RunClear : RunState.RunEnd;

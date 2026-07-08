@@ -92,6 +92,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // ── 이동/전투 캐시 ────────────────────────────────────
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
+    // 챕터 난이도 배율(ChapterDataSO.difficultyScale) — HP/공격력 스케일. 보스는 1 고정. 스폰/풀재사용마다 갱신.
+    private float                  _difficultyScale = 1f;
     private float                  _incomingDamageMulti = 1f;
     // 받는 피해 증폭 디버프(낙인/취약/분쇄 등) — statusId별 다중 슬롯. 시한부, 만료 시 슬롯 무시.
     // 과거 단일 float 1슬롯이라 서로 다른 출처(룬 분쇄/유물 낙인/아이템 취약)가 덮어써 1개만 유효했다.
@@ -126,8 +128,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>유효 공격력.</summary>
     public float EffectiveAttackPower => _config != null ? _config.stat.attackPower : 0f;
 
-    /// <summary>유효 최대 HP.</summary>
-    public int EffectiveMaxHp => _config != null ? _config.stat.maxHp : 0;
+    /// <summary>유효 최대 HP. 챕터 난이도 배율(difficultyScale) 반영.</summary>
+    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale) : 0;
 
     /// <summary>유효 공격 속도.</summary>
     public float EffectiveAttackRate => _config != null ? _config.stat.attackRate : 0f;
@@ -155,6 +157,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
+    /// <summary>사망 처리됨(런타임). 서약 등 외부 타겟팅에서 시체 제외용.</summary>
+    public bool IsDead => _runtime != null && _runtime.IsDead;
     public int    BossMaxHp => EffectiveMaxHp;
     public string BossName  => _config != null ? _config.monsterName : string.Empty;
 
@@ -299,10 +303,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (!string.IsNullOrEmpty(HeadBoneName))
             _headBone = FindBoneRecursive(transform, HeadBoneName);
 
-        // 5. 런타임 데이터 초기화
+        // 5. 런타임 데이터 초기화 — 챕터 난이도 배율 반영(HP scale + 공격력 = AttackMultiplier).
+        ResolveDifficultyScale();
         _runtime = new MonsterRuntimeData
         {
             CurrentHp        = EffectiveMaxHp,
+            AttackMultiplier = _difficultyScale,
             SpawnPosition    = transform.position,
             PatrolDirection  = 1,
         };
@@ -349,6 +355,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (DetectionRangeMultiplier == 1f || config == null || config.detection == null) return;
         config.detection.detectionRange   *= DetectionRangeMultiplier;
         config.detection.chaseGiveUpRange *= DetectionRangeMultiplier;
+    }
+
+    /// <summary>현재 런/챕터의 난이도 배율을 _difficultyScale에 반영. 보스는 1 고정(자체 밸런스 유지).
+    /// 인스턴스별 적용이라 공유 config를 오염시키지 않으며, 멀티챕터 런에서 OnEnable마다 재호출된다.</summary>
+    private void ResolveDifficultyScale()
+    {
+        if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; return; }
+        var run = AppBootstrapper.Instance?.CurrentRun;
+        _difficultyScale = run != null ? run.CurrentDifficultyScale : 1f;
     }
 
     /// <summary>
@@ -1049,6 +1064,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         if (_config == null || _runtime == null) return;
 
+        // 풀 재사용 시 현재 챕터의 난이도 배율 재적용(멀티챕터 런 대응).
+        ResolveDifficultyScale();
+
         _runtime.CurrentHp           = EffectiveMaxHp;
         _runtime.IsDead              = false;
         _runtime.SpawnPosition       = transform.position;
@@ -1063,7 +1081,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.IsReturning         = false;
         _runtime.TargetCleared       = true;
         _runtime.SpeedMultiplier     = 1f;
-        _runtime.AttackMultiplier    = 1f;
+        _runtime.AttackMultiplier    = _difficultyScale;
         _runtime.DamageMultiplier    = 1f;
 
         if (_agent != null)

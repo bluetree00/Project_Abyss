@@ -167,6 +167,8 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   _waveEntries: []
+  _waveSpawnDelayMin: 0.15
+  _waveSpawnDelayMax: 0.4
 --- !u!4 &13670620
 Transform:
   m_ObjectHideFlags: 0
@@ -356,6 +358,8 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   _waveEntries: []
+  _waveSpawnDelayMin: 0.15
+  _waveSpawnDelayMax: 0.4
 --- !u!4 &117726861
 Transform:
   m_ObjectHideFlags: 0
@@ -1180,6 +1184,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Arena_Boss_Ch2
       objectReference: {fileID: 0}
+    - target: {fileID: 2914289304035155840, guid: e6a92243ca6e30e47ab4002a0b16500d,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3681909362941497075, guid: e6a92243ca6e30e47ab4002a0b16500d,
         type: 3}
       propertyPath: m_Material
@@ -1863,7 +1872,7 @@ PrefabInstance:
     - target: {fileID: 2914289304035155840, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3766514293291422455, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
@@ -3055,6 +3064,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: '@WaterPlane'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8620662760014642560, guid: 3a1e9129919f5764d85d6408b1cc1521,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

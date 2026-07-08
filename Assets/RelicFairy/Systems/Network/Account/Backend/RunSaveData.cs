@@ -39,6 +39,8 @@ public class RunSaveData
     // ── 로컬 세이브 확장 (PR1: 하데스식 절차생성 이어하기) ──
     public int    saveVersion;            // 마이그레이션용. 현재 1.
     public int    runEssence;             // RunDelta.GainedEssence 중간 적립
+    public int    fuelEnhanceMaterial;    // RunFuelBank 강화재료 잔량(이벤트방 연료)
+    public int    fuelRuneOre;            // RunFuelBank 원석 잔량(이벤트방 연료)
     public int    weaponCurrentSlot = -1; // 현재 무기 슬롯 인덱스
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
