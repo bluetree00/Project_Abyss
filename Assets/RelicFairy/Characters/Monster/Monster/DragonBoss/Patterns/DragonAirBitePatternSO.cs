@@ -14,12 +14,17 @@ public class DragonAirBitePatternSO : BossPatternSO
     [SerializeField] private float _takeoffDuration = 0.45f;
     [SerializeField] private float _takeoffHeight = 2.8f;
     [SerializeField] private float _hoverHeight = 4f;
-    [SerializeField] private float _approachSpeed = 16f;
+    [SerializeField] private float _approachSpeed = 22f;
     [SerializeField] private float _approachDuration = 0.75f;
     [SerializeField] private float _maxApproachDuration = 2.1f;
     [SerializeField] private float _recoveryDuration = 0.35f;
     [SerializeField] private float _airTurnAngleThreshold = 40f;
-    [SerializeField] private float _airChaseRotationSpeed = 4.5f;
+    [SerializeField] private float _airChaseRotationSpeed = 7f;
+
+    [Header("Pre-Dash (거리 초과 시 접근 돌진)")]
+    [SerializeField] private float _preDashDistanceThreshold = 14f;
+    [SerializeField] private float _preDashSpeed = 26f;
+    [SerializeField] private float _preDashMaxDuration = 0.9f;
     [SerializeField] private float _airTurnMoveMultiplier = 0.55f;
     [SerializeField] private float _cameraViewportY = 0.78f;
     [SerializeField] private float _cameraSideOffset = 1.5f;
@@ -52,6 +57,7 @@ public class DragonAirBitePatternSO : BossPatternSO
 
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
+    [SerializeField] private string _preDashStateName = "AirDashForward";
     [SerializeField] private string _airChaseStateName = "AirChase";
     [SerializeField] private string _airChaseLeftStateName = "AirChaseLeft";
     [SerializeField] private string _airChaseRightStateName = "AirChaseRight";
@@ -87,7 +93,11 @@ public class DragonAirBitePatternSO : BossPatternSO
     public float WarningMarkerScale => _warningMarkerScale;
     public float WarningMarkerLifetime => _warningMarkerLifetime;
     public float WarningMarkerHeightOffset => _warningMarkerHeightOffset;
+    public float PreDashDistanceThreshold => _preDashDistanceThreshold;
+    public float PreDashSpeed => _preDashSpeed;
+    public float PreDashMaxDuration => _preDashMaxDuration;
     public string TakeoffStateName => _takeoffStateName;
+    public string PreDashStateName => _preDashStateName;
     public string AirChaseStateName => _airChaseStateName;
     public string AirChaseLeftStateName => _airChaseLeftStateName;
     public string AirChaseRightStateName => _airChaseRightStateName;
@@ -119,6 +129,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 {
     private enum Phase
     {
+        PreDash,
         Takeoff,
         Approach,
         Bite,
@@ -160,7 +171,6 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     public override void Enter(MonsterContext ctx)
     {
         GameCameraController.Instance?.DeactivateDragonTopDownView(0.8f);
-        _phase = Phase.Approach;
         _phaseTimer = 0f;
         _completedBites = 0;
         _warningShown = false;
@@ -174,7 +184,13 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
             bb.AirBiteCooldown = Data.Cooldown;
 
-        UpdateAirChaseAnimation(ctx, _hoverAnchorPos, force: true);
+        if (GetHorizontalDistanceToPlayer(ctx) > Data.PreDashDistanceThreshold)
+            StartPreDash(ctx);
+        else
+        {
+            _phase = Phase.Approach;
+            UpdateAirChaseAnimation(ctx, _hoverAnchorPos, force: true);
+        }
     }
 
     public override void Update(MonsterContext ctx)
@@ -183,6 +199,9 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 
         switch (_phase)
         {
+            case Phase.PreDash:
+                UpdatePreDash(ctx);
+                break;
             case Phase.Approach:
                 UpdateApproach(ctx);
                 break;
@@ -199,6 +218,34 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     }
 
     public override void Exit(MonsterContext ctx) { }
+
+    private void StartPreDash(MonsterContext ctx)
+    {
+        _phase = Phase.PreDash;
+        _phaseTimer = 0f;
+        PlayAnim(ctx, Data.PreDashStateName, 0.08f);
+    }
+
+    private void UpdatePreDash(MonsterContext ctx)
+    {
+        if (ctx.Runtime.PlayerTarget == null)
+        {
+            StartApproach(ctx);
+            return;
+        }
+
+        Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
+        Vector3 target = new Vector3(playerPos.x, ctx.Transform.position.y, playerPos.z);
+        ctx.Transform.position = Vector3.MoveTowards(
+            ctx.Transform.position,
+            target,
+            Data.PreDashSpeed * Time.deltaTime);
+        FaceTarget(ctx, playerPos, Data.AirChaseRotationSpeed);
+
+        bool closeEnough = GetHorizontalDistanceToPlayer(ctx) <= Data.MaxAnchorDistance;
+        if (closeEnough || _phaseTimer >= Data.PreDashMaxDuration)
+            StartApproach(ctx);
+    }
 
     private void UpdateTakeoff(MonsterContext ctx)
     {
