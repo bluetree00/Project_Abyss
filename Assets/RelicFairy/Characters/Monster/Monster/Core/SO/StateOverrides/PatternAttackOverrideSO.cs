@@ -44,10 +44,17 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         public WarningShapeType warningShape = WarningShapeType.Auto;
         public GameObject castVfxPrefab;
         public float castVfxDuration = 0f;
+        public float castVfxDelay = 0f;
+        public float castVfxLeadTime = 0.15f;
+        public float castVfxXRotationOffset = 0f;
+        public float castVfxYRotationOffset = 0f;
+        public float castVfxZRotationOffset = 0f;
         public float castVfxForwardOffset = 0f;
+        public float castVfxRightOffset = 0f;
         public float castVfxVerticalOffset = 0.8f;
         public float castVfxScale = 1f;
         public bool castVfxAttachToMonster = true;
+        public bool castVfxAtPlayerPosition = false;
         public bool useProceduralBeamVfx = false;
         public float proceduralBeamLength = 3f;
         public float proceduralBeamWidth = 0.16f;
@@ -167,6 +174,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
     {
         float dist = ctx.Runtime.DistToPlayer;
         float desired = GetEffectiveEngageDistance();
+        float scale = Mathf.Clamp(engageDistanceScale, 0.5f, 1f);
 
         for (int i = 0; i < patterns.Count; i++)
         {
@@ -177,7 +185,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             if (dist <= pattern.maxDistance)
                 continue;
 
-            desired = Mathf.Min(desired, pattern.maxDistance);
+            desired = Mathf.Min(desired, pattern.maxDistance * scale);
         }
 
         return Mathf.Max(0.1f, desired);
@@ -226,16 +234,15 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         if (!(shape is MonsterRangedAttackSO))
         {
             var gridShape = ResolveWarningShape(pattern, shape);
-            TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration);
-            shape?.SpawnVFX(ctx.Transform, warningCenter);
-            SpawnPatternHitVfx(ctx, pattern, warningCenter);
+            bool hit = TryExecuteGridHit(ctx, gridShape, damage, knockback, pattern.slowScale, pattern.slowDuration);
+            if (hit && ctx.Runtime?.PlayerTarget != null)
+                SpawnPatternHitVfx(ctx, pattern, ctx.Runtime.PlayerTarget.position);
             return;
         }
 
         if (shape != null)
         {
             shape.Execute(ctx, damage, knockback);
-            SpawnPatternHitVfx(ctx, pattern, warningCenter);
             return;
         }
 
@@ -254,7 +261,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         Vector3 dir = (ctx.Runtime.PlayerTarget.position - ctx.Transform.position).normalized;
         dir.y = 0.3f;
         player.ApplyKnockback(dir.normalized * knockback);
-        SpawnPatternHitVfx(ctx, pattern, warningCenter);
+        SpawnPatternHitVfx(ctx, pattern, ctx.Runtime.PlayerTarget.position);
     }
 
     private static Vector3 GetWarningCenterPosition(MonsterContext ctx, AttackPattern pattern)
@@ -442,12 +449,14 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
 
         if (pattern.castVfxPrefab == null) return null;
 
-        Vector3 pos =
-            ctx.Transform.position
-            + ctx.Transform.forward * pattern.castVfxForwardOffset
-            + Vector3.up * pattern.castVfxVerticalOffset;
-        Quaternion rot = ctx.Transform.rotation;
-        Transform parent = pattern.castVfxAttachToMonster ? ctx.Transform : null;
+        Vector3 origin = (pattern.castVfxAtPlayerPosition && ctx.Runtime?.PlayerTarget != null)
+            ? ctx.Runtime.PlayerTarget.position
+            : ctx.Transform.position
+              + ctx.Transform.forward * pattern.castVfxForwardOffset
+              + ctx.Transform.right * pattern.castVfxRightOffset;
+        Vector3 pos = origin + Vector3.up * pattern.castVfxVerticalOffset;
+        Quaternion rot = ctx.Transform.rotation * Quaternion.Euler(pattern.castVfxXRotationOffset, pattern.castVfxYRotationOffset, pattern.castVfxZRotationOffset);
+        Transform parent = (pattern.castVfxAttachToMonster && !pattern.castVfxAtPlayerPosition) ? ctx.Transform : null;
 
         GameObject instance = null;
         try
@@ -467,6 +476,14 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         float scale = pattern.castVfxScale > 0.001f ? pattern.castVfxScale : 1f;
         instance.transform.localScale *= scale;
         ApplyVfxHierarchyScaling(instance);
+
+        var spawnedSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < spawnedSystems.Length; i++)
+        {
+            var m = spawnedSystems[i].main;
+            m.loop = false;
+        }
+
         ForcePlayVfx(instance);
 
         float life = pattern.castVfxDuration;
@@ -521,7 +538,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             var ps = particleSystems[i];
             if (ps == null) continue;
             if (!ps.gameObject.activeSelf) ps.gameObject.SetActive(true);
-            ps.Play(true);
+            ps.Play(false);
         }
 
         var lines = root.GetComponentsInChildren<LineRenderer>(true);
@@ -739,6 +756,9 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         private Vector3 _cachedWarningCenter;
         private bool _waitForAnimFinish;
         private string _currentAnimState;
+        private bool _animFirstCycleDone;
+        private float _castVfxDelayTimer;
+        private bool _castVfxSpawned;
 
         public PatternAttackState(PatternAttackOverrideSO owner, PatternRuntime runtime)
         {
@@ -776,7 +796,20 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _cachedWarningCenter = GetWarningCenterPosition(ctx, _pattern);
 
             SpawnPatternWarning(ctx, _pattern);
-            _castVfxInstance = SpawnPatternVfx(ctx, _pattern);
+            float vfxDelay = _pattern.castVfxDelay > 0f ? _pattern.castVfxDelay
+                : (_pattern.castVfxLeadTime > 0f && _pattern.damageDelay >= 0f
+                    ? Mathf.Max(0f, _pattern.damageDelay - _pattern.castVfxLeadTime)
+                    : 0f);
+            if (vfxDelay > 0f)
+            {
+                _castVfxDelayTimer = vfxDelay;
+                _castVfxSpawned = false;
+            }
+            else
+            {
+                _castVfxInstance = SpawnPatternVfx(ctx, _pattern);
+                _castVfxSpawned = true;
+            }
 
             string animState = string.IsNullOrEmpty(_pattern.animationStateName)
                 ? ctx.Animation.attackStateName
@@ -786,6 +819,7 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             _waitForAnimFinish = ctx.Animator != null
                 && !string.IsNullOrEmpty(animState)
                 && ctx.Animator.HasState(0, Animator.StringToHash(animState));
+            _animFirstCycleDone = false;
 
             // 근접 windup(예고) 노출 — 데미지 지연 동안 아이템 저스트가드/섬광 판정용(공용 AttackState와 동일).
             // 투사체(원거리)는 비행이 예고이므로 제외.
@@ -798,17 +832,51 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
         {
             _runtime.Tick(Time.deltaTime);
 
-            if (!_damageDealt)
+            if (!_castVfxSpawned)
             {
+                _castVfxDelayTimer -= Time.deltaTime;
+                if (_castVfxDelayTimer <= 0f)
+                {
+                    _castVfxInstance = SpawnPatternVfx(ctx, _pattern);
+                    _castVfxSpawned = true;
+                    if (!_damageDealt)
+                    {
+                        _damageDealt = true;
+                        ctx.Runtime.AttackHitDealt = true;
+                        bool canceled = ctx.Monster.ConsumeAttackCancel();
+                        ctx.Monster.EndAttackTelegraph();
+                        if (!canceled)
+                            ExecutePatternAttack(ctx, _pattern, _cachedWarningCenter);
+                    }
+                }
+            }
+            else if (!_damageDealt)
+            {
+                // castVfxDelay == 0 이어서 Enter에서 즉시 스폰된 경우 타이머 폴백
                 _damageTimer -= Time.deltaTime;
                 if (_damageTimer <= 0f)
                 {
                     _damageDealt = true;
-                    // 아이템 섬광의 순간: windup 중 적중당해 취소되었으면 데미지 스킵.
+                    ctx.Runtime.AttackHitDealt = true;
                     bool canceled = ctx.Monster.ConsumeAttackCancel();
                     ctx.Monster.EndAttackTelegraph();
                     if (!canceled)
                         ExecutePatternAttack(ctx, _pattern, _cachedWarningCenter);
+                }
+            }
+
+            // 첫 번째 사이클 92% 도달 시 idle로 복귀 → 루프 방지, cooldown은 계속 진행
+            if (_waitForAnimFinish && !_animFirstCycleDone && ctx.Animator != null
+                && !string.IsNullOrEmpty(_currentAnimState) && !ctx.Animator.IsInTransition(0))
+            {
+                int h = Animator.StringToHash(_currentAnimState);
+                var s = ctx.Animator.GetCurrentAnimatorStateInfo(0);
+                if ((s.shortNameHash == h || s.fullPathHash == h) && s.normalizedTime >= 0.92f)
+                {
+                    _animFirstCycleDone = true;
+                    _waitForAnimFinish = false;
+                    if (!string.IsNullOrEmpty(ctx.Animation.idleStateName))
+                        ctx.Animator.CrossFade(ctx.Animation.idleStateName, 0.15f, 0);
                 }
             }
 
@@ -835,9 +903,12 @@ public class PatternAttackOverrideSO : MonsterStateOverrideSO
             ctx.Monster.EndAttackTelegraph();
             if (_castVfxInstance != null)
             {
-                Destroy(_castVfxInstance);
+                // 부모에서 분리만 하고 강제 삭제하지 않음 — SpawnPatternVfx의 Destroy(life)로 자연 수명 만료
+                // (플레이어가 멀어져 상태가 일찍 종료되어도 이펙트가 중단되지 않음)
+                _castVfxInstance.transform.SetParent(null, true);
                 _castVfxInstance = null;
             }
+            _animFirstCycleDone = false;
             _runtime.SelectedPatternIndex = -1;
         }
 
