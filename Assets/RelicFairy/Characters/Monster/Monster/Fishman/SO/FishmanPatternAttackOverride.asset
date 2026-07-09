@@ -17,7 +17,7 @@ MonoBehaviour:
     animationStateName: Fishman_Attack01
     minDistance: 0
     maxDistance: 1.8
-    priority: 0
+    priority: 1
     cooldown: 1.1
     damageDelay: 0.4
     attackDuration: 0.95
@@ -25,15 +25,15 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 3f6a39e2dfb043f699f2d21dd3f3f22d,
       type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
+    castVfxPrefab: {fileID: 1200950891393156, guid: 9b7a1c6d730650d49a8d873b3f3b59d4, type: 3}
+    castVfxDuration: 0.5
+    castVfxForwardOffset: 0.4
     castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxScale: 0.9
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
@@ -46,16 +46,17 @@ MonoBehaviour:
     hitVfxOffset: {x: 0, y: 0, z: 0}
   - name: BubbleShot
     animationStateName: Fishman_Attack02
-    minDistance: 1.6
+    minDistance: 0
     maxDistance: 6
-    priority: 1
-    cooldown: 1.6
+    priority: 2
+    cooldown: 3.5
     damageDelay: 0.5
     attackDuration: 1.15
     damageMultiplier: 1
     knockbackMultiplier: 1
-    attackShapeOverride: {fileID: 0}
-    disableWarning: 0
+    attackShapeOverride: {fileID: 11400000, guid: 532509ab448154d4390fa0e25033392b,
+      type: 2}
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
