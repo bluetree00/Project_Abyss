@@ -59,6 +59,7 @@ public class AttackState : IMonsterState
             if (_damageTimer <= 0f)
             {
                 _damageDealt = true;
+                ctx.Runtime.AttackHitDealt = true;
                 // 아이템 섬광의 순간: windup 중 적중당해 취소되었으면 데미지 스킵.
                 bool canceled = ctx.Monster.ConsumeAttackCancel();
                 ctx.Monster.EndAttackTelegraph();
