@@ -25,15 +25,15 @@ MonoBehaviour:
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
-    castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxPrefab: {fileID: 1210069404974878, guid: 4115fa92bef46aa4ca6d34fd1213a9ce, type: 3}
+    castVfxDuration: 0.8
+    castVfxForwardOffset: 0.4
+    castVfxVerticalOffset: 0
+    castVfxScale: 1.2
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
@@ -56,15 +56,15 @@ MonoBehaviour:
     knockbackMultiplier: 1.1
     attackShapeOverride: {fileID: 11400000, guid: 8a87deef4ca24f1192c20d1f0f6f49a9,
       type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
-    castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxPrefab: {fileID: 1210069404974878, guid: 4115fa92bef46aa4ca6d34fd1213a9ce, type: 3}
+    castVfxDuration: 0.8
+    castVfxForwardOffset: 0.4
+    castVfxVerticalOffset: 0
+    castVfxScale: 1.2
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
@@ -87,15 +87,15 @@ MonoBehaviour:
     knockbackMultiplier: 1.15
     attackShapeOverride: {fileID: 11400000, guid: 1ab75c36f2d6472f8569ac7f53f2d7e7,
       type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 1.8
     warningDuration: 0.45
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
-    castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxPrefab: {fileID: 1210069404974878, guid: 4115fa92bef46aa4ca6d34fd1213a9ce, type: 3}
+    castVfxDuration: 0.8
+    castVfxForwardOffset: 0.4
+    castVfxVerticalOffset: 0
+    castVfxScale: 1.2
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3

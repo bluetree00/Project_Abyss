@@ -26,9 +26,15 @@ MonoBehaviour:
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 11400000, guid: 0f3655724fd91f64f9b5973cbe3db8f3, type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
+    castVfxPrefab: {fileID: 1200950891393156, guid: 63a7affbb072bd544808004edfd7d658, type: 3}
+    castVfxDuration: 0.5
+    castVfxForwardOffset: 0.4
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 0.9
+    castVfxAttachToMonster: 1
   - name: DashSting
     animationStateName: BattleBee_Attack01
     minDistance: 0.9
@@ -40,6 +46,12 @@ MonoBehaviour:
     damageMultiplier: 1.1
     knockbackMultiplier: 1.1
     attackShapeOverride: {fileID: 11400000, guid: 8fda11f6c0e24547b88a823bd4f7147b, type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
+    castVfxPrefab: {fileID: 1200950891393156, guid: 63a7affbb072bd544808004edfd7d658, type: 3}
+    castVfxDuration: 0.6
+    castVfxForwardOffset: 0.4
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 0.9
+    castVfxAttachToMonster: 1
