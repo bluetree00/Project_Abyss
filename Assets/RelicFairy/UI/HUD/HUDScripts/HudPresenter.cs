@@ -156,6 +156,7 @@ public sealed class HudPresenter : MonoBehaviour
 
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
+        _weaponManager.OnEquippedWeaponRefreshed += HandleEquippedWeaponRefreshed;
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
 
         // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
@@ -186,6 +187,7 @@ public sealed class HudPresenter : MonoBehaviour
         if (_weaponManager != null)
         {
             _weaponManager.OnWeaponChanged -= HandleWeaponChanged;
+            _weaponManager.OnEquippedWeaponRefreshed -= HandleEquippedWeaponRefreshed;
             _weaponManager = null;
         }
 
@@ -296,6 +298,7 @@ public sealed class HudPresenter : MonoBehaviour
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
+    private void HandleEquippedWeaponRefreshed(WeaponData _) => RefreshWeaponSlots();
     private void HandleBuffsChanged() => RefreshBuffWindow();
 
     private enum BuffDiff { None, Values, Structure }

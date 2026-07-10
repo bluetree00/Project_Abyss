@@ -56,6 +56,10 @@ public static class SaveSanitizer
 
         d.weaponCurrentSlot = ClampRange(d.weaponCurrentSlot, MinWeaponSlot, MaxWeaponSlot, ref changed);
 
+        // 강화 레벨: ≥0만. 상한은 재련소 차트(EnhanceTableSO) 구동이라 여기서 강제하지 않는다.
+        d.weapon0EnhanceLevel = ClampMin(d.weapon0EnhanceLevel, 0, ref changed);
+        d.weapon1EnhanceLevel = ClampMin(d.weapon1EnhanceLevel, 0, ref changed);
+
         // masterSeed·heading·anchorToggle·currentRoomKind/Mirror·seqPhase 등 절차생성
         // 내부 상태는 클램프하지 않는다(시드 정합성/복원 무결성 보존, 과도 개입 금지).
 

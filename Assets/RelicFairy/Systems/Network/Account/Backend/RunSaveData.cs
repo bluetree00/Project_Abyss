@@ -42,6 +42,10 @@ public class RunSaveData
     public int    fuelEnhanceMaterial;    // RunFuelBank 강화재료 잔량(이벤트방 연료)
     public int    fuelRuneOre;            // RunFuelBank 원석 잔량(이벤트방 연료)
     public int    weaponCurrentSlot = -1; // 현재 무기 슬롯 인덱스
+    public int    weapon0EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 0)
+    public int    weapon1EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 1)
+    public string weapon0LegendId;        // WeaponData.legendId (슬롯 0 승급 분기)
+    public string weapon1LegendId;        // WeaponData.legendId (슬롯 1 승급 분기)
 
     public string relicKey;               // PlayerLoadout.Relic SO 이름(Addressables 키)
     public string covenantsJson;          // CovenantListWrapper JSON

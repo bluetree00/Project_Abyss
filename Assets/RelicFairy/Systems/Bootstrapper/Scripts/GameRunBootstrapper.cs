@@ -106,6 +106,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
              "기존 월드 매대는 ShopRoomController가 비활성화한다.")]
     [SerializeField] private string shopNpcAddressableKey = "Shop/ShopNpc";
 
+    [Tooltip("재련소 NPC 프리팹 Addressable 키. 미등록 시 상점 NPC(shopNpcAddressableKey)로 폴백.")]
+    [SerializeField] private string crucibleNpcAddressableKey = "Crucible/CrucibleNpc";
+
     [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
     [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
 
@@ -1126,6 +1129,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await SetupShopRoomAsync(roomGO, entry.pool_key, roomRng);
         else if (IsEventCategory(entry.category))
             SetupEventRoom(roomGO, entry.pool_key, roomRng);   // 챌린지 종류는 pool_key 명명 규약으로 유추
+        else if (IsCrucibleCategory(entry.category))
+            await SetupCrucibleRoomAsync(roomGO, roomRng);
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1622,6 +1627,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await SetupShopRoomAsync(mapGO, roomEntry.room_id);
         else if (IsEventCategory(roomEntry.category))
             SetupEventRoom(mapGO, roomEntry.room_id);   // 챌린지 종류는 room_id 명명 규약으로 유추
+        else if (IsCrucibleCategory(roomEntry.category))
+            await SetupCrucibleRoomAsync(mapGO, null);
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -1661,6 +1668,34 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (string.IsNullOrEmpty(category)) return false;
         return category.Trim().Equals("Event", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCrucibleCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Crucible", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>재련소 방 셋업 — 비전투 스테이션(상점과 동일 흐름). P5에서 CrucibleRoomController(NPC+강화/승급 UI) 부착.</summary>
+    private async UniTask SetupCrucibleRoomAsync(GameObject roomGO, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        var controller = roomGO.AddComponent<CrucibleRoomController>();
+
+        // 강화 데이터 로드(없으면 서비스 기본 곡선 폴백)
+        var table = await WeaponEnhanceService.EnsureLoadedAsync();
+
+        // 재련공 NPC 프리팹 로드 (전용 키 → 상점 NPC 폴백)
+        GameObject npcPrefab = null;
+        if (!string.IsNullOrEmpty(crucibleNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(crucibleNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(shopNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(shopNpcAddressableKey);
+        if (npcPrefab == null)
+            Debug.LogWarning("[GameRunBootstrapper] 재련소 NPC 프리팹 로드 실패 — 재련소 UI를 열 수 없습니다.");
+
+        controller.Initialize(_run, table, roomRng, npcPrefab);
     }
 
     /// <summary>

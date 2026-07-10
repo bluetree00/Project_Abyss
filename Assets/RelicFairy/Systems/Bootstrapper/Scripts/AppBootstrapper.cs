@@ -325,6 +325,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 체크포인트 저장 시 weapon key 보존 — FromSO로 생성한 WeaponData 사용
         var w0 = ws0 != null ? WeaponData.FromSO(ws0) : null;
         var w1 = ws1 != null ? WeaponData.FromSO(ws1) : null;
+        // 강화/승급 복원 — 씬 진입 시 ApplyServerOverride가 RecomputeEnhancedStats()로 유효값을 재계산한다.
+        if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.RecomputeEnhancedStats(); }
+        if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.RecomputeEnhancedStats(); }
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.
@@ -543,6 +546,9 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (startScene == Define.Scene.Logo)
                 startScene = Define.Scene.Lobby;
         }
+
+        // 무기 강화 곡선 사전 설치(이어하기 복원 시 유효 스탯 재계산에 사용). 실패해도 기본 곡선 폴백.
+        WeaponEnhanceService.EnsureLoadedAsync().Forget();
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)
