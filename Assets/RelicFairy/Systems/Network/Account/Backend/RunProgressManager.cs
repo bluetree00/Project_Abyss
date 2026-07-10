@@ -118,6 +118,9 @@ public class RunProgressManager : MonoBehaviour
         int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
         d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;
 
+        // 무기 강화/승급 상태 — 라이브 WeaponManager 우선, 없으면 씬 전환 저장 슬롯
+        CaptureWeaponEnhance(d, s);
+
         var loadout = AppBootstrapper.Instance?.Loadout;
         d.relicKey = loadout?.Relic != null ? loadout.Relic.name : string.Empty;
 
@@ -145,6 +148,21 @@ public class RunProgressManager : MonoBehaviour
         if (placements != null) pw.items.AddRange(placements);
         d.runePlacementsJson = JsonUtility.ToJson(pw);
     }
+
+    /// <summary>무기 슬롯 강화/승급 상태를 세이브에 캡처. 라이브 WeaponManager → 씬 전환 저장 슬롯 순.</summary>
+    private static void CaptureWeaponEnhance(RunSaveData d, GameRunSession s)
+    {
+        var wm = s.Player?.WeaponManager;
+        WeaponData w0 = wm?.Weapon0Data ?? SlotFromSaved(s, 0);
+        WeaponData w1 = wm?.Weapon1Data ?? SlotFromSaved(s, 1);
+        d.weapon0EnhanceLevel = w0?.enhanceLevel ?? 0;
+        d.weapon1EnhanceLevel = w1?.enhanceLevel ?? 0;
+        d.weapon0LegendId     = w0?.legendId ?? string.Empty;
+        d.weapon1LegendId     = w1?.legendId ?? string.Empty;
+    }
+
+    private static WeaponData SlotFromSaved(GameRunSession s, int slot)
+        => (s.SavedWeaponSlots != null && s.SavedWeaponSlots.Length > slot) ? s.SavedWeaponSlots[slot] : null;
 
     // ─────────────────────────────────────────────────────────
     // Private Methods — Build

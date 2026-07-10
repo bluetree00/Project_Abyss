@@ -54,6 +54,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     // 기존 이벤트 유지 (외부에서 구독)
     public event Action<WeaponData, GameObject> OnWeaponChanged;
 
+    // 강화/승급 등으로 현재 장착 무기의 "스탯만" 갱신됐을 때 발행(무기 교체 아님).
+    // OnWeaponChanged와 달리 애니 재적용·서약 스왑·트레일 재생성 부작용 없이 스탯/표시만 갱신하는 용도.
+    public event Action<WeaponData> OnEquippedWeaponRefreshed;
+
     // ----------------------
     // 편의 접근자 / IWeaponProvider 구현
     // ----------------------
@@ -333,6 +337,13 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     public int GetCurrentSlotIndex() => currentSlotIndex;
+
+    /// <summary>현재 장착 무기의 스탯 갱신 통지(강화·승급 직후 호출). 장착 무기 없으면 무시.</summary>
+    public void RaiseEquippedWeaponRefreshed()
+    {
+        var data = CurrentWeaponData;
+        if (data != null) OnEquippedWeaponRefreshed?.Invoke(data);
+    }
 
     /// <summary>
     /// 주어진 weapon_id(=서버 EquipmentEntry.weapon_id)에 해당하는 무기를 슬롯에 보유 중인지.

@@ -42,6 +42,9 @@ public class PlayerController : CharacterBase
 
     public WeaponActionType CurrentAttackTypeForEffect { get; set; }
 
+    /// <summary>강공 차지 완료도(0~1). ActAttackChargeState가 발동 시점에 기록, WeaponEffectHandler가 원형 AoE 반경 스케일에 사용.</summary>
+    public float HeavyChargeLevel01 { get; set; }
+
     // PendingAttack 초기화
     public void ClearPendingAttack()
     {
@@ -668,6 +671,7 @@ public class PlayerController : CharacterBase
         {
             WeaponManager.OnWeaponChanged += OnWeaponChangedApplyAnimation;
             WeaponManager.OnWeaponChanged += OnWeaponChangedApplyStats;
+            WeaponManager.OnEquippedWeaponRefreshed += OnEquippedWeaponRefreshedApplyStats;
         }
 
         AutoSetIdleIfNoAction();
@@ -802,6 +806,7 @@ public class PlayerController : CharacterBase
         {
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyAnimation;
             WeaponManager.OnWeaponChanged -= OnWeaponChangedApplyStats;
+            WeaponManager.OnEquippedWeaponRefreshed -= OnEquippedWeaponRefreshedApplyStats;
         }
 
         RelicBehavior?.OnDetach(this);
@@ -1285,6 +1290,10 @@ public class PlayerController : CharacterBase
         int ranged = kind == AttackStatKind.Ranged ? (int)newWeapon.baseAttack : 0;
         RuntimeStats.SetWeaponStats(melee, ranged, (int)newWeapon.baseDefense);
     }
+
+    /// <summary>강화/승급으로 장착 무기 스탯만 갱신됐을 때 — 교체 없이 데미지 스탯만 재적용.</summary>
+    private void OnEquippedWeaponRefreshedApplyStats(WeaponData weapon)
+        => OnWeaponChangedApplyStats(weapon, null);
 
     private void AssignAttackPolicyForWeapon(WeaponData wd)
     {

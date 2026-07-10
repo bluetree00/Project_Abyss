@@ -17,6 +17,11 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: c2fc2d31b26efff43bf40d41dd854055
   m_SerializeEntries:
+  - m_GUID: 94fffd0521886ef4ab286bb77b72e32b
+    m_Address: EnhanceTable
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9d8cc533fb32d6e40a4ca366785b2804
     m_Address: STAGEDATA_ROOMS
     m_ReadOnly: 0

@@ -600,6 +600,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Elite   => new Color(0.32f, 0.12f, 0.52f),
         RoomPlanKind.Shop    => new Color(0.08f, 0.32f, 0.12f),
         RoomPlanKind.Event   => new Color(0.30f, 0.20f, 0.05f),
+        RoomPlanKind.Crucible => new Color(0.52f, 0.25f, 0.08f), // 구리톤(대장간)
         _                    => new Color(0.05f, 0.06f, 0.10f), // Normal
     };
 
@@ -688,6 +689,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Elite   => "정예",
         RoomPlanKind.Shop    => "상점",
         RoomPlanKind.Event   => "이벤트",
+        RoomPlanKind.Crucible => "재련소",
         _                    => "전투",
     };
 
