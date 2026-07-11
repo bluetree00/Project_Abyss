@@ -48,8 +48,8 @@ MonoBehaviour:
   - visitIndex: 4
     kind: 2
   - visitIndex: 5
-    kind: 6
-  - visitIndex: 7
     kind: 3
+  - visitIndex: 7
+    kind: 6
   - visitIndex: 10
     kind: 1

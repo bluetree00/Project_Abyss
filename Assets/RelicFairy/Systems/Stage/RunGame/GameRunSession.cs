@@ -32,6 +32,11 @@ public sealed class GameRunSession
         RunEnd,       // 런 종료 (사망)
     }
 
+    /// <summary>신규 런 시작 시 지급하는 강화재료(EnhanceMaterial) 초기량. 재련소(#1 소비처)가
+    /// 이벤트방(유일 생산처)보다 앞 순번일 때 첫 재련소에서 재료=0이 되는 갭의 안전장치.
+    /// EnhanceTable +0→+1 비용(1) 기준 약 5회 시도분. 이어하기 복원 경로에는 지급하지 않는다.</summary>
+    private const int NewRunStartingEnhanceMaterial = 5;
+
     public RunPhase Phase { get; private set; } = RunPhase.NotRunning;
     public bool IsRunning => Phase == RunPhase.Running;
 
@@ -234,6 +239,11 @@ public sealed class GameRunSession
 
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
+
+            // 신규 런 강화재료 시작 지급 — 재련소(첫 소비처)가 이벤트방(첫 생산처)보다 앞 순번일 수 있어
+            // 첫 재련소에서 강화재료=0이 되는 갭을 막는 안전장치. 이어하기(RestoreFromSaveAsync)는 이 경로를
+            // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
+            FuelBank.Add(FuelKind.EnhanceMaterial, NewRunStartingEnhanceMaterial);
 
             // PlayerState ready (HUD may already exist)
             OnPlayerStateReady?.Invoke(PlayerState);
