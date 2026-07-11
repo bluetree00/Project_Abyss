@@ -4,10 +4,15 @@
 // - 각 패널은 Presenter가 패널별 View로 직접 데이터 전달
 //============================================================
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 public sealed class HudView : MonoBehaviour
 {
+    // 런 재화(강화재료·원석) 임시 아이콘 색 — 전용 아이콘 에셋 나오면 교체.
+    private static readonly Color EnhanceMatIcon = new(0.90f, 0.55f, 0.20f); // 강화재료(주황)
+    private static readonly Color RuneOreIcon    = new(0.35f, 0.70f, 0.95f); // 원석(청록)
+
     [Header("Sections")]
     [SerializeField] private GameObject topBarRoot;
     [SerializeField] private CombatPanelView combatPanel;
@@ -20,6 +25,13 @@ public sealed class HudView : MonoBehaviour
     [Header("TopBar Info")]
     [SerializeField] private TMP_Text nicknameText;
     [SerializeField] private TMP_Text goldText;
+
+    // 런 재화 표시(강화재료·원석) — goldText 옆에 절차 생성(임시). 0이면 슬롯 숨김.
+    private RectTransform _fuelRow;
+    private GameObject    _enhanceMatSlot;
+    private GameObject    _runeOreSlot;
+    private TMP_Text      _enhanceMatText;
+    private TMP_Text      _runeOreText;
 
     public CombatPanelView   CombatPanel   => combatPanel;
     public BossPanelView     BossPanel     => bossPanelView;
@@ -85,6 +97,74 @@ public sealed class HudView : MonoBehaviour
     {
         if (goldText != null)
             goldText.text = gold.ToString();
+    }
+
+    public void SetEnhanceMaterial(int amount)
+    {
+        EnsureFuelSlots();
+        if (_enhanceMatText != null) _enhanceMatText.text = amount.ToString();
+        if (_enhanceMatSlot != null) _enhanceMatSlot.SetActive(amount > 0);
+    }
+
+    public void SetRuneOre(int amount)
+    {
+        EnsureFuelSlots();
+        if (_runeOreText != null) _runeOreText.text = amount.ToString();
+        if (_runeOreSlot != null) _runeOreSlot.SetActive(amount > 0);
+    }
+
+    // ── 런 재화 슬롯 절차 생성 (goldText 기준 바로 아래 행) ──
+    private void EnsureFuelSlots()
+    {
+        if (_fuelRow != null || goldText == null || goldText.transform.parent == null) return;
+
+        var rowGo = new GameObject("CurrencyRow_Fuel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        _fuelRow = (RectTransform)rowGo.transform;
+        _fuelRow.SetParent(goldText.transform.parent, false);
+
+        var g = goldText.rectTransform;
+        _fuelRow.anchorMin = g.anchorMin;
+        _fuelRow.anchorMax = g.anchorMax;
+        _fuelRow.pivot     = g.pivot;
+        _fuelRow.anchoredPosition = g.anchoredPosition + new Vector2(0f, -32f); // 골드 바로 아래
+        _fuelRow.sizeDelta = new Vector2(240f, 26f);
+
+        var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 16f;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        hlg.childControlWidth = true;  hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+
+        _enhanceMatSlot = MakeFuelSlot(_fuelRow, EnhanceMatIcon, out _enhanceMatText);
+        _runeOreSlot    = MakeFuelSlot(_fuelRow, RuneOreIcon,    out _runeOreText);
+        _enhanceMatSlot.SetActive(false);
+        _runeOreSlot.SetActive(false);
+    }
+
+    private GameObject MakeFuelSlot(Transform parent, Color iconColor, out TMP_Text valueText)
+    {
+        var slot = new GameObject("FuelSlot", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        slot.transform.SetParent(parent, false);
+        var shlg = slot.GetComponent<HorizontalLayoutGroup>();
+        shlg.spacing = 5f;
+        shlg.childAlignment = TextAnchor.MiddleLeft;
+        shlg.childControlWidth = true;  shlg.childControlHeight = true;
+        shlg.childForceExpandWidth = false; shlg.childForceExpandHeight = false;
+
+        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+        iconGo.transform.SetParent(slot.transform, false);
+        iconGo.GetComponent<Image>().color = iconColor;
+        var ile = iconGo.AddComponent<LayoutElement>();
+        ile.preferredWidth = 18f; ile.preferredHeight = 18f;
+
+        var txtGo = new GameObject("Value", typeof(RectTransform));
+        txtGo.transform.SetParent(slot.transform, false);
+        valueText = txtGo.AddComponent<TextMeshProUGUI>();
+        if (goldText != null) { valueText.font = goldText.font; valueText.fontSize = goldText.fontSize; }
+        valueText.color = new Color(0.93f, 0.91f, 0.85f, 1f);
+        valueText.alignment = TextAlignmentOptions.MidlineLeft;
+        valueText.text = "0";
+        return slot;
     }
 
     private static void SetActiveSafe(MonoBehaviour comp, bool on)
