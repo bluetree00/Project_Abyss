@@ -3,6 +3,10 @@ using Cysharp.Threading.Tasks;
 
 public class WeaponEffectHandler
 {
+    // 강공 차지 원형 AoE 반경 배율 범위(차지레벨 0→1 보간). Phase1 상수 — 밸런싱 시 weaponData 승격 가능.
+    private const float HeavyChargeMinScale = 0.7f;
+    private const float HeavyChargeMaxScale = 1.8f;
+
     private PlayerController _player;
 
     public WeaponEffectHandler(PlayerController player)
@@ -66,7 +70,11 @@ public class WeaponEffectHandler
 
                 if (_player == null || effectObj == null) return;
 
-                effectObj.transform.localScale = Vector3.one * e.scaleMultiplier;
+                // 강공(GroundHeavy)만 차지레벨로 원형 AoE 반경 스케일 — 스피어 콜라이더가 함께 커진다.
+                float chargeScale = actionType == WeaponActionType.GroundHeavy
+                    ? Mathf.Lerp(HeavyChargeMinScale, HeavyChargeMaxScale, _player.HeavyChargeLevel01)
+                    : 1f;
+                effectObj.transform.localScale = Vector3.one * e.scaleMultiplier * chargeScale;
 
                 // Local space → 소켓에 부착
                 if (e.space == WeaponAbilitySO.EffectSpace.Local)
