@@ -511,6 +511,20 @@ public class ActAttackState : ILayerState<ActState>
         // 이 단계의 mapping 확보 (회전/이동/MoveScale 결정)
         _currentMapping = TryGetClipMapping(step, action, isAir);
 
+        // 공중 콤보 스텝이 낙하 공격으로 지정된 경우 → 낙하공격 위임(콤보 진행 중 전환. Enter()의 라우팅과 동일).
+        if (isAir && _currentMapping != null && _currentMapping.isPlunge)
+        {
+            _controller.CurrentAttackTypeForEffect = WeaponActionType.AirPlunge;
+            _controller.PendingPlunge = new PlayerController.PlungeInfo
+            {
+                fallClipName = _currentMapping.baseClipName,
+                fallSpeed    = _currentMapping.plungeFallSpeed,
+                descendAt    = _currentMapping.plungeDescendAt
+            };
+            _stateChanger.Change(ActState.Plunge);
+            return;
+        }
+
         // 목표 회전 계산 — 적용은 RotateTowards 로 매 프레임 (외부 회전 영향에도 자연 수렴)
         // 동시에 에임어시스트가 고른 적을 받아 런지 거리의 신뢰 소스로 사용(좁은 SphereCast 수직/각도 빗나감 보완).
         if (_currentMapping != null && _currentMapping.useAimAssist)

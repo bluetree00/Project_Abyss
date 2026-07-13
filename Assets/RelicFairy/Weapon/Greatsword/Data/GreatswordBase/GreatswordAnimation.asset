@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 027b38215b45a3a419b771ed55a162e2, type: 3}
   m_Name: GreatswordAnimation
   m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimationSetSO
-  useGuardCharge: 1
+  useGuardCharge: 0
   lightAttackAnimSpeed: 0.6
   heavyAttackAnimSpeed: 1
   defaultComboWindowOpen: 0.5
@@ -157,8 +157,8 @@ MonoBehaviour:
       addressableKey: GreatswordAirLight_02
       actionType: 6
       comboIndex: 1
-      isPlunge: 0
-      plungeFallSpeed: 0
+      isPlunge: 1
+      plungeFallSpeed: 22
       plungeDescendAt: 0
       comboWindowOpen: -1
       comboWindowClose: -1
