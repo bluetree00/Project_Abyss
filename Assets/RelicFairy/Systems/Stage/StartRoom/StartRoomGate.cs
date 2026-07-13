@@ -250,7 +250,7 @@ public class StartRoomGate : MonoBehaviour
         if (_worldIndicatorGO != null) _worldIndicatorGO.SetActive(false);
         SetGatePassable();
 
-        // 스타트 방 게이트: 서약 선택 UI 동안 플레이어 이동 고정
+        // 스타트 방 게이트: 챕터 진입 연출/로딩 동안 플레이어 이동 고정
         if (_fromZoneIndex == -1)
         {
             // 퀘스트: 게이트로 챕터 입장 보고 (target='*')

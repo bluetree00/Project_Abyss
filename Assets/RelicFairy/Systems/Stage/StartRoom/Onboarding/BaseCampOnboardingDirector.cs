@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// BaseCamp 초회 온보딩 강제 시퀀스 오케스트레이터(상태머신).
-/// 순서: 유물 → 장비(모루) → 게이트. (서약은 진입 후 대기방 제단에서 획득 — Covenant 단계는 자동 통과.)
+/// 순서: 유물 → 장비(모루) → 게이트. (서약은 심연 진입 후 대기방 제단/조립에서 획득 — 대상 없는 단계는 자동 통과.)
 /// 각 단계 완료를 퀘스트 보고(Relic/Equip)로 감지해
 /// 다음 구역의 돔 배리어를 제거하고, **단계 진입 시 그 대상을 카메라 연출(둘러보기)로 보여준다**
 /// (초회 첫 연출=유물 즉시, 이후 전환=짧은 지연 후). 가이드 화살표·임시 대사 동반.
@@ -13,13 +13,18 @@ using UnityEngine;
 /// </summary>
 public sealed class BaseCampOnboardingDirector : MonoBehaviour
 {
-    private const string SaveKey = "basecamp_onboarding_done_v1";
+    // 완료 기록은 <b>세이브 슬롯별</b>로 보관한다.
+    // 전역 키로 두면 슬롯을 지우고 새로 시작해도 온보딩이 다시 나오지 않는다(초회 판정이 깨짐).
+    private const string SaveKeyPrefix = "basecamp_onboarding_done_v1_slot";
+
+    private static string SaveKeyFor(int slot) => SaveKeyPrefix + slot;
+    private static int    ActiveSlot          => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
     private const float DialogueOpenWait = 0.6f;   // 획득 후 대사 팝업이 열릴 때까지 최대 대기(레이스 방지)
 
     [Serializable]
     private struct Step
     {
-        [Tooltip("완료 감지 퀘스트 카테고리 (Relic / Equip / Covenant)")]
+        [Tooltip("완료 감지 퀘스트 카테고리 (Relic / Equip)")]
         public string questCategory;
         [Tooltip("화살표/연출 대상(제단·픽업 위치)")]
         public Transform target;
@@ -29,10 +34,10 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         public string guideline;
     }
 
-    [Header("단계 (유물 → 장비 → 서약 순)")]
+    [Header("단계 (유물 → 장비 순. 서약은 BaseCamp에서 폐기 — 심연 대기방으로 이동)")]
     [SerializeField] private Step[] steps;
 
-    [Header("게이트 (서약 완료 후 목표)")]
+    [Header("게이트 (장비 완료 후 목표)")]
     [SerializeField] private Transform gateTarget;
     [SerializeField] private string gateGuideline = "준비 완료 — 포탈로 다음 영역에 진입하라.";
 
@@ -59,7 +64,15 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     private bool _entered;
     private CancellationTokenSource _cts;
 
-    public static bool IsCompleted => PlayerPrefs.GetInt(SaveKey, 0) == 1;
+    /// <summary>현재 활성 슬롯의 온보딩 완료 여부. 초회 판정(입구 스폰 + 가이드) 근거.</summary>
+    public static bool IsCompleted => PlayerPrefs.GetInt(SaveKeyFor(ActiveSlot), 0) == 1;
+
+    /// <summary>슬롯 삭제 시 온보딩 기록도 함께 초기화 → 그 슬롯으로 새로 시작하면 초회로 다시 진행된다.</summary>
+    public static void ClearForSlot(int slot)
+    {
+        PlayerPrefs.DeleteKey(SaveKeyFor(slot));
+        PlayerPrefs.Save();
+    }
 
     private void Start()
     {
@@ -115,9 +128,10 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         _stepIndex = i;
         if (i < 0 || i >= steps.Length) return;
 
-        // [서약 폐기] 서약 획득은 진입 후 대기방(WorldCovenantAltar)으로 이동 —
-        // BaseCamp 온보딩의 서약 단계는 자동 통과(구역 개방 후 다음/게이트로). 소프트락 방지.
-        if (string.Equals(steps[i].questCategory, "Covenant"))
+        // 대상(target)이 없는 단계는 BaseCamp에 실물이 없는 단계다 — 구역만 열고 자동 통과한다.
+        // 현재 해당: 서약(획득처가 심연 대기방 WorldCovenantAltar/조립으로 이동함).
+        // 퀘스트 체인도 유물 → 장비 → 게이트(tut_enter_gate) → 서약(심연) 순으로 맞춰져 있다. 소프트락 방지.
+        if (steps[i].target == null)
         {
             Unlock(steps[i].unlockBarrier);
             AdvanceFrom(i);
@@ -225,7 +239,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
 
     private static void MarkCompleted()
     {
-        PlayerPrefs.SetInt(SaveKey, 1);
+        PlayerPrefs.SetInt(SaveKeyFor(ActiveSlot), 1);
         PlayerPrefs.Save();
     }
 
