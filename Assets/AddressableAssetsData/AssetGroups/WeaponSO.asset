@@ -17,6 +17,11 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: 59fff0af195fcd84fafd247299abf2c3
   m_SerializeEntries:
+  - m_GUID: 23a447e3dc3893141907288454da2c9d
+    m_Address: T0_Nameless
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dad215bb626832f4cbf0767639d63223
     m_Address: T1_Katana
     m_ReadOnly: 0

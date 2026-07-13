@@ -46,6 +46,11 @@ public class WeaponSO : ScriptableObject
     [Header("타입 & 정책")]
     public WeaponType weaponType = WeaponType.Katana;
 
+    [Header("진화 (파생 분기)")]
+    [Tooltip("이 무기가 진화할 수 있는 분기 목록. 비우면 최종 형태(더 이상 진화 불가). " +
+             "진화하면 대상 WeaponSO로 통째 교체된다 — 외형·무브셋·스킬·아이콘·이름·타입·스탯 전부.")]
+    public WeaponEvolutionSO evolution;
+
     [Header("스킬")]
     public SkillSO skillQ;
     public SkillSO skillE;
