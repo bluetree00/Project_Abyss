@@ -24,6 +24,14 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     private const string FrenzyVfxKey   = "vfx_lancelot_frenzy";    // 광란 오라(상태 토글)
     private const string JudgmentVfxKey = "vfx_lancelot_judgment";  // 심판의 일격 히트
 
+    // 심판 참격 VFX 배율 — 원본 프리팹이 실제 판정(콘 6m/±45°)보다 훨씬 커서 축소.
+    // 이펙트가 판정보다 크면 "닿았는데 안 맞는다"는 체감이 생긴다.
+    private const float JudgmentVfxScale = 0.55f;
+
+    // 판정 범위 — VFX/가이드라인과 같은 값을 쓰도록 상수화(따로 놀지 않게).
+    private const float JudgmentRange     = 6f;
+    private const float JudgmentHalfAngle = 45f;
+
     private PlayerController _owner;
     private MadnessStack     _madness;
     private RelicStateVfx    _vfx;
@@ -109,18 +117,36 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         if (fwd.sqrMagnitude < 0.001f) return;
         fwd.Normalize();
 
-        GuidelineVisual.Cone(pos, fwd, 6f, 45f);
+        GuidelineVisual.Cone(pos, fwd, JudgmentRange, JudgmentHalfAngle);
         GuidelineVisual.Toast(pos + Vector3.up * 2.4f, "심판의 일격", GuidelineVisual.ToastKind.Relic);
-        RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + fwd * 2f + Vector3.up * 0.8f); // 전방 참격 1회
+
+        // 전방 참격 1회 — 판정 범위에 맞춰 축소하고 전방을 바라보게 정렬(이펙트/판정 불일치 제거).
+        RelicStateVfx.PlayOneShot(JudgmentVfxKey, pos + fwd * 2f + Vector3.up * 0.8f,
+                                  JudgmentVfxScale, fwd);
 
         var owner = _owner.gameObject;
         var buffer = new List<MonsterBase>(16);
-        CombatQuery.GetEnemiesInCone(pos, fwd, 6f, 45f, 32, buffer);
+        int found = CombatQuery.GetEnemiesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, 32, buffer);
+
+        Debug.Log($"[랜슬롯Q] 발동 | stacks={stacks} mult={mult:F2} effAtk={effAtk} dmg={dmg:F0} | 콘({JudgmentRange}m/±{JudgmentHalfAngle}°) 적중 대상={found}마리");
+
         foreach (var mb in buffer)
         {
             if (mb == null || mb.gameObject == owner) continue;
-            if (mb is IDamageable d) d.TakeDamage(dmg, owner, 0.4f);
-            GuidelineVisual.SynergyDamage(mb.transform.position + Vector3.up * 1.2f, false);
+
+            // 주 피해 파이프라인 — 직접 TakeDamage를 부르면 크리티컬·아이템·서약·패시브·타격감이 전부 스킵된다.
+            float applied = CombatDamage.Deal(new CombatDamage.Request
+            {
+                Target              = mb.gameObject,
+                BaseDamage          = dmg,
+                Owner               = owner,
+                ActionType          = WeaponActionType.QSkill,
+                KnockbackMultiplier = 0.4f,
+                HitPoint            = mb.transform.position + Vector3.up * 1.2f,
+                SourcePosition      = pos,
+            });
+            Debug.Log($"[랜슬롯Q] → {mb.name}: 요청 {dmg:F0} → 실제적용 {applied:F0}");
+
             mb.ApplyDamageTakenAmp(brandAmp, brandDur); // 심판 낙인
         }
     }
