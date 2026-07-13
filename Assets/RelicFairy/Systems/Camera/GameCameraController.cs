@@ -79,6 +79,14 @@ public class GameCameraController : MonoBehaviour
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
 
+    /// <summary>
+    /// 보스 시점·탑다운·패닝·DK 연출 등이 <b>FreeLook 궤도를 점유 중</b>인지.
+    /// 전투 동적 프레이밍(CombatCameraFraming)은 이 동안 궤도를 건드리지 않고 양보한다
+    /// — 안 그러면 연출이 저장/복원하는 궤도를 매 프레임 덮어써서 연출이 깨진다.
+    /// </summary>
+    public bool IsOrbitOverridden =>
+        _bossOrbitViewActive || _topDownViewActive || _isPanning || _savedDKPlayerOrbits != null;
+
     // ── Events ──
     /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
     public event Action OnIntroComplete;

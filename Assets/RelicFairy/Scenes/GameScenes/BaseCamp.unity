@@ -56537,12 +56537,8 @@ MonoBehaviour:
     guideline: "\uBE5B\uB098\uB294 \uC81C\uB2E8\uC5D0\uC11C \uC720\uBB3C\uC744 \uC120\uD0DD\uD558\uB77C."
   - questCategory: Equip
     target: {fileID: 341071737}
-    unlockBarrier: {fileID: 0}
-    guideline: "\uBAA8\uB8E8\uC5D0\uC11C \uBB34\uAE30\uB97C \uBCBC\uB824\uB77C."
-  - questCategory: Covenant
-    target: {fileID: 0}
     unlockBarrier: {fileID: 1899904724}
-    guideline: "\uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C."
+    guideline: "\uBAA8\uB8E8\uC5D0\uC11C \uBB34\uAE30\uB97C \uBCBC\uB824\uB77C."
   gateTarget: {fileID: 1155803283}
   gateGuideline: "\uC900\uBE44 \uC644\uB8CC \u2014 \uD3EC\uD0C8\uB85C \uB2E4\uC74C
     \uC601\uC5ED\uC5D0 \uC9C4\uC785\uD558\uB77C."
@@ -62700,7 +62696,7 @@ MonoBehaviour:
   m_LookAt: {fileID: 0}
   m_Follow: {fileID: 0}
   m_Lens:
-    FieldOfView: 80
+    FieldOfView: 78
     OrthographicSize: 10
     NearClipPlane: 0.1
     FarClipPlane: 5000
@@ -135517,7 +135513,7 @@ MonoBehaviour:
   m_Follow: {fileID: 0}
   m_CommonLens: 1
   m_Lens:
-    FieldOfView: 80
+    FieldOfView: 78
     OrthographicSize: 10
     NearClipPlane: 0.1
     FarClipPlane: 5000
@@ -135589,12 +135585,12 @@ MonoBehaviour:
   m_BindingMode: 4
   m_SplineCurvature: 0
   m_Orbits:
-  - m_Height: 5
-    m_Radius: 2
-  - m_Height: 5
-    m_Radius: 2
-  - m_Height: 5
-    m_Radius: 2
+  - m_Height: 8.8
+    m_Radius: 3.4
+  - m_Height: 7.3
+    m_Radius: 4
+  - m_Height: 4.8
+    m_Radius: 3.8
   m_LegacyHeadingBias: 3.4028235e+38
   m_Rigs:
   - {fileID: 1520480887}
@@ -177508,7 +177504,7 @@ MonoBehaviour:
   m_LookAt: {fileID: 0}
   m_Follow: {fileID: 0}
   m_Lens:
-    FieldOfView: 80
+    FieldOfView: 78
     OrthographicSize: 10
     NearClipPlane: 0.1
     FarClipPlane: 5000
@@ -185633,7 +185629,7 @@ MonoBehaviour:
   m_LookAt: {fileID: 0}
   m_Follow: {fileID: 0}
   m_Lens:
-    FieldOfView: 80
+    FieldOfView: 78
     OrthographicSize: 10
     NearClipPlane: 0.1
     FarClipPlane: 5000
