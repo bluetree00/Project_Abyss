@@ -167,6 +167,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CovenantPanelView
   _slots: []
+  covenantFrameSprite: {fileID: 21300000, guid: 5c8fcf2e62df96e4d98f9205b9739d2a,
+    type: 3}
+  covenantInnerSprite: {fileID: 21300000, guid: 8e9c35001ae16234597a6a7adc54a191,
+    type: 3}
 --- !u!1 &120663106174731936
 GameObject:
   m_ObjectHideFlags: 0
@@ -3113,6 +3117,10 @@ MonoBehaviour:
   covenantPanel: {fileID: 0}
   nicknameText: {fileID: 3397901793256520361}
   goldText: {fileID: 7100000000000000004}
+  goldFrameSprite: {fileID: 21300000, guid: 6df1a575a4a43554687b69ff7496ec00, type: 3}
+  goldInnerSprite: {fileID: 21300000, guid: 3d8b8869bdd23284c9d178025ceff6d4, type: 3}
+  goldBarSize: {x: 230, y: 36}
+  hideLegacyGoldIcon: 1
 --- !u!114 &3302298203259958368
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3702,9 +3710,45 @@ MonoBehaviour:
   hpText: {fileID: 6498474881468806239}
   hpFillImage: {fileID: 0}
   hpGhostFillImage: {fileID: 5418397947929384530}
+  hpFrameSprite: {fileID: 21300000, guid: 5ec62e3830024a844a229da4452b4a91, type: 3}
+  hpTrackSprite: {fileID: 21300000, guid: fe1a878e7b8f6a74499aaf9f75fc79c9, type: 3}
+  hpFillHighSprite: {fileID: 21300000, guid: a23d68cda0075f9449c0ba0028b93894, type: 3}
+  hpFillLowSprite: {fileID: 21300000, guid: efa0b803333097044992eed1f90c684c, type: 3}
+  hpFillSwapThreshold: 0.4
   hpLerpSpeed: 3
   ghostDelay: 0.35
   ghostLerpSpeed: 1.2
+  weaponFrameSprite: {fileID: 21300000, guid: 4f67b8a6ec0861c4cb79844527359e56, type: 3}
+  weaponFrameInactiveSprite: {fileID: 21300000, guid: a0927960191cfab449ea1a970a4c8c97,
+    type: 3}
+  weaponSlotInnerSprite: {fileID: 21300000, guid: 12575a76a66d56748b943b2151a140b8,
+    type: 3}
+  skillFrameSprite: {fileID: 21300000, guid: 746ed1d8f6651984ba64416ccbf49dbe, type: 3}
+  skillInnerSprite: {fileID: 21300000, guid: 8fb6750f341cbd2459f7044743e12a5c, type: 3}
+  skillFrameReadySprite: {fileID: 21300000, guid: 24278f1b377ba914182d692c924bcdc9,
+    type: 3}
+  relicSlotFrameSprite: {fileID: 21300000, guid: 08d71591b1685e844b0b16676ab8025a,
+    type: 3}
+  relicSlotInnerSprite: {fileID: 21300000, guid: 5f74b95b3f141b641bb27c229b0f842f,
+    type: 3}
+  relicSlotActiveSprite: {fileID: 21300000, guid: 182550e022db39342bc6b701c8802ed7,
+    type: 3}
+  relicGaugeFrameSprite: {fileID: 21300000, guid: 524a368b4ea81de48a5047c910c8e977,
+    type: 3}
+  relicGaugeTrackSprite: {fileID: 21300000, guid: 68572139866a54940a789fca61d04c64,
+    type: 3}
+  relicGaugeFillSprite: {fileID: 21300000, guid: 3a2608fd17fcfeb4ab3aca6363135e64,
+    type: 3}
+  relicGaugeReadySprite: {fileID: 21300000, guid: 0f40a310ec05db64fbe9d7811b7548b1,
+    type: 3}
+  buffFrameSprite: {fileID: 21300000, guid: b5c1e01b8191e0443819e982ffd2fa81, type: 3}
+  buffInnerSprite: {fileID: 21300000, guid: e17375d4fb5372f448f076c48faeb28b, type: 3}
+  buffIconSpeed: {fileID: 21300000, guid: 317ace83867279d42a986801d9b90669, type: 3}
+  buffIconCooldown: {fileID: 21300000, guid: bb0965a5e9d3c08448c7ce84a353d15f, type: 3}
+  buffIconHeal: {fileID: 21300000, guid: 9b1007c36b7171544b0b385349ecedc5, type: 3}
+  buffIconLuck: {fileID: 21300000, guid: 4a05495a7de2e96479cc031f418d243e, type: 3}
+  atkIconSprite: {fileID: 21300000, guid: 4c92631cfe61a2d4db7ee2c882ac530a, type: 3}
+  defIconSprite: {fileID: 21300000, guid: 95f39b57d10c89b44a36cd530526df69, type: 3}
   slot0:
     emptyRoot: {fileID: 6211475292025033642}
     iconImage: {fileID: 3426724504408688797}
@@ -12200,6 +12244,9 @@ MonoBehaviour:
   colorHigh: {r: 0.25, g: 0.9, b: 0.35, a: 1}
   colorMid: {r: 1, g: 0.8, b: 0.1, a: 1}
   colorLow: {r: 0.95, g: 0.18, b: 0.1, a: 1}
+  bossFrameSprite: {fileID: 21300000, guid: faee3800456b63a4f871882d2c03d207, type: 3}
+  bossTrackSprite: {fileID: 21300000, guid: fa758bfa828d0bd4fafbea838994ba0c, type: 3}
+  bossFillSprite: {fileID: 21300000, guid: 12e039c2fc48ef542bd296f752e52e2f, type: 3}
 --- !u!1001 &941216508442142019
 PrefabInstance:
   m_ObjectHideFlags: 0

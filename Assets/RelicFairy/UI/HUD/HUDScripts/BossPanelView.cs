@@ -23,7 +23,15 @@ public sealed class BossPanelView : MonoBehaviour
     [SerializeField] private Color colorMid = new Color(1.00f, 0.80f, 0.10f);
     [SerializeField] private Color colorLow = new Color(0.95f, 0.18f, 0.10f);
 
+    [Header("보스바 스킨 (선택 — 지정 시 플랫색 대신 아트 사용)")]
+    [SerializeField] private Sprite bossFrameSprite;   // 보스바 테두리
+    [SerializeField] private Sprite bossTrackSprite;   // 보스바 내부 검정
+    [SerializeField] private Sprite bossFillSprite;    // 보스바 내부 빨강
+
     private int _maxHp;
+    private bool _skinApplied;
+
+    private bool HasSkin => bossTrackSprite != null || bossFillSprite != null || bossFrameSprite != null;
 
     private void Awake()
     {
@@ -106,6 +114,57 @@ public sealed class BossPanelView : MonoBehaviour
 
         if (hpSlider == null || hpText == null || nameText == null)
             BuildRuntimeFallback();
+
+        ApplySkin();
+    }
+
+    /// <summary>
+    /// 디자이너 아트로 보스바 스킨 적용: 트랙(검정) + fill(빨강) + 테두리 오버레이.
+    /// fill을 Filled/Horizontal로 두면 Slider가 폭(anchor) 대신 fillAmount를 구동하므로 아트가 찌그러지지 않는다.
+    /// 스프라이트 미지정 시 아무 것도 하지 않아 기존 플랫색 동작이 유지된다.
+    /// </summary>
+    private void ApplySkin()
+    {
+        if (_skinApplied || !HasSkin) return;
+        _skinApplied = true;
+
+        if (hpSlider != null && bossTrackSprite != null)
+        {
+            var bg = hpSlider.transform.Find("Background");
+            if (bg != null && bg.TryGetComponent<Image>(out var bgImg))
+            {
+                bgImg.sprite = bossTrackSprite;
+                bgImg.type   = Image.Type.Sliced;
+                bgImg.color  = Color.white;
+            }
+        }
+
+        if (hpFillImage != null && bossFillSprite != null)
+        {
+            hpFillImage.sprite     = bossFillSprite;
+            hpFillImage.type       = Image.Type.Filled;
+            hpFillImage.fillMethod = Image.FillMethod.Horizontal;
+            hpFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+            hpFillImage.color      = Color.white;   // 색 틴트 대신 아트 그대로
+        }
+
+        // 어두운 사각 배경판은 테두리 아트와 겹쳐 박스처럼 보이므로 감춘다(스킨 시에만).
+        var panelBg = transform.Find("BossPanelBG");
+        if (panelBg != null && panelBg.TryGetComponent<Image>(out var panelImg))
+            panelImg.color = new Color(0f, 0f, 0f, 0f);
+
+        if (bossFrameSprite != null)
+        {
+            var frame = EnsureImage("BossBarFrame", transform, Color.white);
+            var frt = (RectTransform)frame.transform;
+            frt.anchorMin = Vector2.zero;
+            frt.anchorMax = Vector2.one;
+            frt.offsetMin = Vector2.zero;
+            frt.offsetMax = Vector2.zero;
+            frame.sprite = bossFrameSprite;
+            frame.type   = Image.Type.Sliced;
+            frt.SetAsLastSibling();   // 슬라이더 위
+        }
     }
 
     private void BuildRuntimeFallback()
@@ -244,6 +303,7 @@ public sealed class BossPanelView : MonoBehaviour
     private void ApplyFillColor(float pct)
     {
         if (hpFillImage == null) return;
+        if (HasSkin) return;   // 스킨: fill 아트를 그대로 쓰므로 색 틴트하지 않음
 
         Color c;
         if (pct >= 0.75f)

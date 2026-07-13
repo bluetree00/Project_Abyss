@@ -15,9 +15,16 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private static readonly Color BuffBg   = new(0.10f, 0.12f, 0.16f, 0.85f);
     private static readonly Color DebuffBg = new(0.35f, 0.12f, 0.12f, 0.88f);
 
+    // 스킨 모드: 배경 아트를 유지한 채 디버프만 붉게 틴트(디버프 신호 보존).
+    private static readonly Color SkinBuffTint   = Color.white;
+    private static readonly Color SkinDebuffTint = new(1f, 0.62f, 0.62f, 1f);
+
     private Image    _bg;
     private Image    _icon;
     private TMP_Text _stack;
+
+    private bool _hasSkin;
+    private Func<string, Sprite> _iconResolver;
 
     private BuffViewItem _item;
     private Action<BuffCell, bool> _onHover;
@@ -25,20 +32,46 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public BuffViewItem Item => _item;
     public RectTransform Rect => (RectTransform)transform;
 
-    /// <summary>셀 내부 위젯을 1회 생성. 부모 GridLayoutGroup이 셀 크기를 제어하므로 자식만 anchor로 배치.</summary>
-    public void Initialize(TMP_FontAsset font, Action<BuffCell, bool> onHover)
+    /// <summary>
+    /// 셀 내부 위젯을 1회 생성. 부모 GridLayoutGroup이 셀 크기를 제어하므로 자식만 anchor로 배치.
+    /// innerSprite/frameSprite를 주면 디자이너 아트로, 없으면 기존 단색 배경으로 그린다.
+    /// iconResolver는 IconKey → Sprite 해석기(미지정 시 EffectIconRegistry 직접 사용).
+    /// </summary>
+    public void Initialize(TMP_FontAsset font, Action<BuffCell, bool> onHover,
+                           Sprite innerSprite = null, Sprite frameSprite = null,
+                           Func<string, Sprite> iconResolver = null)
     {
-        _onHover = onHover;
+        _onHover      = onHover;
+        _iconResolver = iconResolver;
+        _hasSkin      = innerSprite != null;
 
         _bg = gameObject.GetComponent<Image>();
         if (_bg == null) _bg = gameObject.AddComponent<Image>();
-        _bg.color = BuffBg;
+        if (_hasSkin)
+        {
+            _bg.sprite = innerSprite;
+            _bg.type   = Image.Type.Sliced;
+            _bg.color  = SkinBuffTint;
+        }
+        else
+        {
+            _bg.color = BuffBg;
+        }
         _bg.raycastTarget = true;   // 호버 감지
 
         // 아이콘(칸 거의 가득)
         _icon = CreateChildImage("Icon", new Vector2(0.14f, 0.14f), new Vector2(0.86f, 0.86f));
         _icon.preserveAspect = true;
         _icon.raycastTarget = false;
+
+        // 테두리 오버레이(아이콘 위) — 스킨 시에만 생성
+        if (frameSprite != null)
+        {
+            var frame = CreateChildImage("Frame", Vector2.zero, Vector2.one);
+            frame.sprite        = frameSprite;
+            frame.type          = Image.Type.Sliced;
+            frame.raycastTarget = false;
+        }
 
         // 스택 숫자(칸 우하단)
         var stackGo = new GameObject("Stack", typeof(RectTransform));
@@ -68,8 +101,13 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _item = item;
         gameObject.SetActive(true);
 
-        _bg.color = item.IsDebuff ? DebuffBg : BuffBg;
-        _icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
+        _bg.color = _hasSkin
+            ? (item.IsDebuff ? SkinDebuffTint : SkinBuffTint)
+            : (item.IsDebuff ? DebuffBg : BuffBg);
+
+        _icon.sprite = _iconResolver != null
+            ? _iconResolver(item.IconKey)
+            : EffectIconRegistry.GetSprite(item.IconKey);
 
         bool hasStack = item.Stacks > 1;
         _stack.gameObject.SetActive(hasStack);
