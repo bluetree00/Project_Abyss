@@ -2549,6 +2549,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomPoolKey = save.currentRoomPoolKey,
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
+            currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
+            crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치
             cooldowns          = cooldowns,
         };
     }
