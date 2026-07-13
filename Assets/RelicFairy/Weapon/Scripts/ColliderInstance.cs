@@ -34,7 +34,16 @@ public class ColliderInstance : MonoBehaviour
     // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
     private static readonly List<MonsterBase> s_shapeBuf = new();
     // 근접 원샷 오버랩 질의 버퍼(재사용 — alloc 방지). 밀집 지역 대비 넉넉히.
-    private static readonly Collider[] s_overlapBuf = new Collider[64];
+    // 근접 원샷 오버랩 질의 버퍼.
+    // ⚠️ 작으면 환경 콜라이더(바닥·벽·소품·VFX 트리거 등)가 버퍼를 채워버려 몬스터가 안 잡힌다
+    //    — 물리엔진은 버퍼가 차면 거기서 끊고, 그 순서는 거리순이 아니다("가끔 씹힘"의 원인).
+    //    레이어 `~0`으로 훑을 수밖에 없는 구조(몬스터 콜라이더가 Default 레이어)라 넉넉히 잡는다.
+    private static readonly Collider[] s_overlapBuf = new Collider[256];
+
+    // 타격 대상 레이어 마스크 — 몬스터(MonsterHit) + 플레이어.
+    // `~0`(전 레이어)로 훑으면 바닥·벽·소품·VFX 트리거가 버퍼를 채워 정작 대상이 안 잡힌다.
+    // Player를 포함하는 건 몬스터가 이 컴포넌트를 쓰게 될 경우를 위한 대비(현재는 플레이어 무기 전용).
+    private static int HitMask => MonsterBase.HitLayerMask | (1 << LayerMask.NameToLayer("Player"));
 
     // key: 대상, value: 마지막으로 맞은 attackId
     private readonly Dictionary<GameObject, int> _hitRecord = new();
@@ -101,13 +110,13 @@ public class ColliderInstance : MonoBehaviour
                 box.size.z * 0.5f * Mathf.Abs(s.z));
             n = Physics.OverlapBoxNonAlloc(
                 box.transform.TransformPoint(box.center), half, s_overlapBuf,
-                box.transform.rotation, ~0, QueryTriggerInteraction.Collide);
+                box.transform.rotation, HitMask, QueryTriggerInteraction.Collide);
         }
         else
         {
             Bounds b = col.bounds;
             n = Physics.OverlapBoxNonAlloc(
-                b.center, b.extents, s_overlapBuf, Quaternion.identity, ~0, QueryTriggerInteraction.Collide);
+                b.center, b.extents, s_overlapBuf, Quaternion.identity, HitMask, QueryTriggerInteraction.Collide);
         }
         for (int i = 0; i < n; i++)
         {

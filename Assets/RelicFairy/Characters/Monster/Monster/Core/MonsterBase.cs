@@ -78,6 +78,28 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private const string MonsterVisibilityLayerName = "Monster";
     private static int s_monsterVisibilityLayer = -2;
 
+    // ── 타격 판정용 레이어(MonsterHit) ────────────────────
+    // 몬스터 '콜라이더'를 전용 레이어로 올린다. 물리 질의가 레이어 마스크로 몬스터만 골라낼 수 있게 하려는 것.
+    //
+    // 왜 필요한가: 예전엔 몬스터 콜라이더가 Default라, 광역 질의가 `~0`(전 레이어)로 훑을 수밖에 없었다.
+    // 그러면 바닥·벽·소품·VFX 트리거까지 전부 걸려서 NonAlloc 버퍼가 환경 콜라이더로 가득 차고
+    // 몬스터가 한 마리도 안 잡히는 사고가 났다("이펙트는 나가는데 데미지 0").
+    //
+    // 가시성 레이어(Monster=렌더러)와 별개다 — 렌더러/콜라이더가 서로 간섭하지 않게 분리했다.
+    private const string MonsterHitLayerName = "MonsterHit";
+    private static int s_monsterHitLayer = -2;
+
+    /// <summary>몬스터 콜라이더 레이어 마스크. 광역 질의가 몬스터만 고르는 데 쓴다. 레이어 미정의면 ~0(전부).</summary>
+    public static int HitLayerMask
+    {
+        get
+        {
+            if (s_monsterHitLayer == -2)
+                s_monsterHitLayer = LayerMask.NameToLayer(MonsterHitLayerName);
+            return s_monsterHitLayer >= 0 ? (1 << s_monsterHitLayer) : ~0;
+        }
+    }
+
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
     protected MonsterFSM         _fsm;
@@ -929,6 +951,27 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>외곽선 표기 on/off 토글. on=Monster 레이어(외곽선/실루엣 Render Objects 필터 대상),
     /// off=루트 레이어로 복원(디졸브 등장 중 숨김 + 풀 재사용 시 레이어 잔존으로 외곽선이 재-디졸브에 새는 것 방지).
     /// 콜라이더/루트 레이어는 그대로 → 물리·타격·NavMesh 무영향. ~헬퍼(발밑그림자)는 외곽선 대상 아님.</summary>
+    /// <summary>
+    /// 이 몬스터의 <b>콜라이더</b>들을 MonsterHit 레이어로 올린다(렌더러는 건드리지 않는다).
+    /// 광역 질의가 레이어 마스크로 몬스터만 골라낼 수 있게 하는 것이 목적 — 환경 콜라이더가
+    /// NonAlloc 버퍼를 채워 몬스터가 안 잡히는 사고를 구조적으로 막는다.
+    /// 프리팹을 수정하지 않도록 런타임에 적용한다.
+    /// </summary>
+    private void ApplyHitLayer()
+    {
+        if (s_monsterHitLayer == -2)
+            s_monsterHitLayer = LayerMask.NameToLayer(MonsterHitLayerName);
+        if (s_monsterHitLayer < 0) return;   // 레이어 미정의 — 스킵(질의는 ~0 폴백)
+
+        var colliders = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            var c = colliders[i];
+            if (c == null) continue;
+            c.gameObject.layer = s_monsterHitLayer;
+        }
+    }
+
     private void SetVisibilityMarkup(bool on)
     {
         if (s_monsterVisibilityLayer == -2)
@@ -946,6 +989,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             if (!(r is SkinnedMeshRenderer || r is MeshRenderer)) continue;
             var n = r.gameObject.name;
             if (n.Length > 0 && n[0] == '~') continue; // "~" 헬퍼(발밑그림자 등) 제외 — 외곽선 대상 아님
+
+            // 콜라이더가 같이 붙은 GO는 건드리지 않는다 — 여긴 타격 판정 레이어(MonsterHit)라
+            // 여기서 Monster 레이어로 바꿔버리면 광역 질의의 레이어 마스크가 이 몹을 놓친다(외곽선 < 타격).
+            if (r.TryGetComponent<Collider>(out _)) continue;
+
             r.gameObject.layer = target;
         }
     }
@@ -959,6 +1007,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// ActivationToken에 묶여 풀 반환/파괴 시 취소(이 경우 off 상태 유지).</summary>
     private async UniTaskVoid RevealVisibilityMarkupAsync()
     {
+        // 콜라이더를 타격 판정 레이어(MonsterHit)로 — 광역 질의가 몬스터만 골라낼 수 있게.
+        // 풀 재사용 시에도 매 스폰 재적용(레이어 잔존/유실 방지).
+        ApplyHitLayer();
+
         SetVisibilityMarkup(false); // 스폰 즉시 끔(디졸브 중 숨김 + 풀 재사용 레이어 리셋)
         try
         {

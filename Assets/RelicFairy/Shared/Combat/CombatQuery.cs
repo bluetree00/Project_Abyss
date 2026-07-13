@@ -11,7 +11,17 @@ using RelicFairy.Monster;
 /// </summary>
 public static class CombatQuery
 {
-    private const int MaxOverlap = 32;
+    // ⚠️ 이 버퍼가 작으면 "이펙트는 나가는데 데미지가 0"이 된다.
+    //
+    // OverlapSphereNonAlloc은 레이어 `~0`(전부) + 트리거 포함으로 훑는데, 반경 안에는 몬스터 말고도
+    // 바닥·벽·기둥·소품·VFX 트리거·픽업·배리어·존 트리거·플레이어·몬스터 다중 콜라이더가 잔뜩 있다.
+    // 버퍼가 차면 물리엔진은 거기서 끊고, 그 순서는 <b>거리순이 아니라 내부 임의 순서</b>다.
+    // → 환경 콜라이더가 버퍼를 다 차지하면 몬스터가 한 마리도 안 잡힌다.
+    //   (아래 거리 정렬은 '필터링이 끝난 뒤'라 이미 잘린 것을 되살리지 못한다.)
+    //
+    // 몬스터 콜라이더는 Default 레이어라(가시성 레이어는 렌더러에만 적용) 레이어 필터로 줄일 수 없다.
+    // 따라서 버퍼를 넉넉히 잡는 것이 현실적인 해법.
+    private const int MaxOverlap = 256;
     private static readonly Collider[] s_overlap = new Collider[MaxOverlap];
 
     /// <summary>
@@ -25,7 +35,7 @@ public static class CombatQuery
         buffer.Clear();
         if (radius <= 0f || max <= 0) return 0;
 
-        int n = Physics.OverlapSphereNonAlloc(center, radius, s_overlap, ~0, QueryTriggerInteraction.Collide);
+        int n = Physics.OverlapSphereNonAlloc(center, radius, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
         for (int i = 0; i < n; i++)
         {
             var col = s_overlap[i];
@@ -69,7 +79,7 @@ public static class CombatQuery
         // [가이드라인 비주얼] 원뿔 광역 질의 표시(통지만)
         GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
 
-        int n = Physics.OverlapSphereNonAlloc(origin, range, s_overlap, ~0, QueryTriggerInteraction.Collide);
+        int n = Physics.OverlapSphereNonAlloc(origin, range, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
         for (int i = 0; i < n; i++)
         {
             var col = s_overlap[i];
