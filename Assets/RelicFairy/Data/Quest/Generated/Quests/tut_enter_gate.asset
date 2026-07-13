@@ -16,8 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: tut_enter_gate
   displayName: "\uC2EC\uC5F0\uC73C\uB85C"
-  description: "\uAC8C\uC774\uD2B8\uB97C \uC9C0\uB098 \uB2E4\uC74C \uCC55\uD130\uB85C
-    \uB098\uC544\uAC00\uB77C"
+  description: "\uD3EC\uD0C8\uC744 \uC9C0\uB098 \uC2EC\uC5F0\uC5D0 \uC9C4\uC785\uD558\uB77C"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 1274786773e08ef408f77f0d84e81965, type: 2}
@@ -27,7 +26,7 @@ MonoBehaviour:
   isSavable: 0
   acceptionConditions: []
   cancelConditions: []
-  afterQuest: {fileID: 0}
+  afterQuest: {fileID: 11400000, guid: 0dd3f6f57d3da5c40a295a89d6324a7d, type: 2}
   acceptFeedbackType: 0
   acceptFeedbackId: 
   completeFeedbackType: 0
