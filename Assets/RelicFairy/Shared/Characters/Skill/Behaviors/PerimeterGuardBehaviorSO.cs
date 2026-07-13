@@ -147,7 +147,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                     if (_hitByExpand.Contains(col.gameObject)) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
                     {
-                        d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 2f);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
                         _hitByExpand.Add(col.gameObject);
 
                         SpawnEffect(ctx, _data.hitEffectKey,
@@ -189,7 +189,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
                 if (_hitPerCast.Contains(col.gameObject)) continue;
                 if (col.TryGetComponent<IDamageable>(out var d))
                 {
-                    d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
                     _hitPerCast.Add(col.gameObject);
 
                     SpawnEffect(ctx, _data.hitEffectKey,

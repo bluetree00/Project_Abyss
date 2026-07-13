@@ -132,64 +132,24 @@ public class BasicArrow : MonoBehaviour
         if (other.gameObject == _instigator) return;
         if (_pierce && _pierced != null && _pierced.Contains(other.gameObject)) return;
 
-        if (other.TryGetComponent<IDamageable>(out var damageable))
+        if (other.TryGetComponent<IDamageable>(out _))
         {
-            var mgr        = GameRunBootstrapper.Instance?.Run?.EffectManager;
-            var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
-            var pkt = new DamagePacket(damage, _instigator, other.gameObject);
-            mgr?.OnPreDealDamage(ref pkt, meleeAttack: false);   // 원거리 — 확정크릿/다음공격강화 누수 방지
-
-            float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
-
-            // 서약: 출력 피해 변형(아서 등). 플레이어 발사체만, 크리티컬 전에 적용.
-            if (baseFinal > 0f && _instigator != null && _instigator.TryGetComponent<PlayerController>(out _))
+            // 주 피해 파이프라인 위임 — 예전엔 이 아래로 파이프라인(사전보정·서약·크릿·타격감·사후효과)을
+            // 통째로 복제해 두고 있었다. 콜라이더 경로와 따로 놀며 드리프트하던 원인이라 단일 경로로 합쳤다.
+            //  · IsRanged   : 확정크릿/다음공격강화가 화살로 새지 않도록(기존 meleeAttack:false 보존)
+            //  · SkipHitVfx : 화살은 아래 SpawnHitEffect로 자체 히트 VFX를 띄운다(이중 스폰 방지)
+            CombatDamage.Deal(new CombatDamage.Request
             {
-                var covH = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
-                if (covH != null)
-                {
-                    var cctx = new CombatContext
-                    {
-                        Target     = other.gameObject,
-                        Damage     = baseFinal,
-                        WeaponType = weaponData != null ? weaponData.weaponType : default,
-                    };
-                    baseFinal = covH.ModifyOutgoing(baseFinal, cctx);
-                }
-            }
-
-            // 크리티컬 굴림 (원거리 — 확정크릿 1타 소비 안 함)
-            float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit, meleeAttack: false);
-            pkt.IsCrit = isCrit;
-
-            // 팝업은 대상측(MonsterBase 등)이 자체 표시 — isCrit 만 전달
-            damageable.TakeDamage(finalDmg, _instigator, 1f, isCrit);
-
-            // 타격감 — 근접과 동일하게 HitFeedbackService 허브 경유(적 플래시/플린치 + 화면연출 + 무기별 손맛).
-            // 아이템 통지는 아래 OnPostDealDamage 가 단일점이라 RaiseHit 로 바꿔도 이중발동 없음.
-            var hitInfo = new HitInfo(
-                attacker:        _instigator,
-                target:          other.gameObject,
-                hitPoint:        other.ClosestPoint(transform.position),
-                attackDirection: other.transform.position - (_instigator != null ? _instigator.transform.position : transform.position),
-                damage:          finalDmg,
-                isCritical:      isCrit,
-                actionType:      WeaponActionType.GroundLight,
-                weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.Bow);
-            HitFeedbackService.RaiseHit(hitInfo);
-
-            var report = new DamageReport
-            {
-                DamageDealt = finalDmg,
-                Attacker = _instigator,
-                Target = other.gameObject,
-                IsCrit = isCrit,
-                HitPosition = other.ClosestPoint(transform.position),
-            };
-            mgr?.OnPostDealDamage(report);
-
-            // 서약: 실제 적중 디스패치(투사체). 플레이어 발사체만.
-            if (finalDmg > 0f && _instigator != null && _instigator.TryGetComponent<PlayerController>(out _))
-                GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(other.gameObject, finalDmg);
+                Target              = other.gameObject,
+                BaseDamage          = damage,
+                Owner               = _instigator,
+                ActionType          = WeaponActionType.GroundLight,
+                KnockbackMultiplier = 1f,
+                HitPoint            = other.ClosestPoint(transform.position),
+                SourcePosition      = _instigator != null ? _instigator.transform.position : transform.position,
+                IsRanged            = true,
+                SkipHitVfx          = true,
+            });
         }
 
         SpawnHitEffect(other);
