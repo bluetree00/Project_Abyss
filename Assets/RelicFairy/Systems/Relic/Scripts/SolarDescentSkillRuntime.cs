@@ -70,11 +70,28 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
 
         var owner  = ctx.Controller.gameObject;
         var buffer = new List<MonsterBase>(32);
-        CombatQuery.GetNearbyEnemies(impact, ImpactRadius, owner, 32, buffer);
+        int found = CombatQuery.GetNearbyEnemies(impact, ImpactRadius, owner, 32, buffer);
+
+        Debug.Log($"[가웨인Q] 발동 | mult={V(V_SKILL_MULT, 3.5f):F2} dmg={dmg:F0} | 착탄({ImpactRadius}m) 적중 대상={found}마리");
+
         foreach (var mb in buffer)
         {
             if (mb == null) continue;
-            if (mb is IDamageable d) d.TakeDamage(dmg, owner, 0.3f);
+
+            // 주 피해 파이프라인 — 직접 TakeDamage를 부르면 크리티컬·아이템·서약·패시브·타격감이 전부 스킵된다.
+            float applied = CombatDamage.Deal(new CombatDamage.Request
+            {
+                Target              = mb.gameObject,
+                BaseDamage          = dmg,
+                Owner               = owner,
+                ActionType          = WeaponActionType.QSkill,
+                KnockbackMultiplier = 0.3f,
+                HitPoint            = mb.transform.position + Vector3.up * 1.2f,
+                SourcePosition      = impact,
+            });
+            Debug.Log($"[가웨인Q] → {mb.name}: 요청 {dmg:F0} → 실제적용 {applied:F0}");
+
+            // 화상은 2차 피해(DoT) — 파이프라인을 타지 않는다(틱마다 크릿/흡혈이 터지면 안 됨).
             if (burnDps > 0f)
                 MonsterBurnHandler.Apply(mb.gameObject, burnDps, burnDur, ZoneTickInterval, owner);
         }
