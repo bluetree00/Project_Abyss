@@ -576,6 +576,102 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
 
     // ----------------------
+    // 진화 (파생 분기) — 제자리 교체
+    // ----------------------
+
+    /// <summary>
+    /// 현재 장착 무기를 진화시킨다. 분기의 target WeaponSO로 <b>통째 교체</b>된다
+    /// (외형·무브셋·스킬·아이콘·이름·타입·스탯 전부).
+    ///
+    /// ReplaceSlotAsync와 다른 점 — <b>기존 무기를 월드에 떨어뜨리지 않는다.</b>
+    /// 진화는 '교체'가 아니라 '변신'이므로 원본은 사라진다.
+    ///
+    /// 강화 레벨(enhanceLevel)은 <b>계승</b>하고, 승급(legendId)은 진화가 대체하므로 초기화한다.
+    /// </summary>
+    /// <returns>진화 성공 여부.</returns>
+    public async UniTask<bool> EvolveCurrentWeaponAsync(WeaponEvolutionSO.Branch branch, CancellationToken ct = default)
+    {
+        if (_isSwitching) return false;
+
+        var current = CurrentWeaponData;
+        if (current == null || branch == null || !branch.IsValid) return false;
+        if (!WeaponEvolutionSO.IsUnlocked(branch, current.enhanceLevel))
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] 진화 조건 미달: {branch.branchId} (필요 강화 {branch.requiredEnhanceLevel}, 현재 {current.enhanceLevel})");
+            return false;
+        }
+
+        int slotIndex = currentSlotIndex;
+        if (slotIndex < 0 || slotIndex >= SlotCount) return false;
+
+        _isSwitching = true;
+        try
+        {
+            // 1) 대상 WeaponSO → 새 WeaponData (차트 수치 덮어쓰기까지 기존 획득 경로와 동일하게)
+            var evolved = WeaponData.FromSO(branch.target);
+            ApplyServerOverrideIfAvailable(evolved, evolved.weaponSOKey);
+
+            // 2) 강화 계승 — ApplyServerOverride가 baseAttackRaw를 새로 잡으므로 그 뒤에 재계산해야 한다.
+            //    승급(legendId)은 진화가 대체하므로 넘기지 않는다(빈 값 유지).
+            evolved.enhanceLevel = current.enhanceLevel;
+            evolved.RecomputeEnhancedStats();
+
+            // 3) 새 무브셋 클립 프리로드 — 안 하면 진화 직후 첫 공격이 빈 클립으로 나간다.
+            await PreloadWeaponClipsAsync(evolved, ct);
+            ct.ThrowIfCancellationRequested();
+
+            // 4) 기존 인스턴스 정리 (월드 드랍 없음 — 원본은 소멸)
+            var slot = slots[slotIndex];
+            _owned.Remove(slot.runtimeData);
+            DestroySlotInstance(slot);
+
+            // 5) 새 무기 장착 — EquipToSlotAsync가 인스턴스 생성 + OnWeaponChanged 발행
+            //    (애니메이터 오버라이드/트레일/서약 스왑이 이 이벤트로 재적용된다)
+            slot.runtimeData = evolved;
+            _owned.Add(evolved);
+            await EquipToSlotAsync(slotIndex, evolved, setActive: true);
+
+            Debug.Log($"[PlayerWeaponManager] 진화: {current.displayName} → {evolved.displayName} " +
+                      $"(branch={branch.branchId}, 강화 {evolved.enhanceLevel} 계승)");
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] 진화 실패: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            _isSwitching = false;
+        }
+    }
+
+    /// <summary>슬롯의 무기 인스턴스를 해제/파괴한다(월드 드랍 없음).</summary>
+    private static void DestroySlotInstance(WeaponSlot slot)
+    {
+        if (slot?.instance == null) return;
+
+        try
+        {
+            if (slot.isAddressablesInstance) Addressables.ReleaseInstance(slot.instance);
+            else UnityEngine.Object.Destroy(slot.instance);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerWeaponManager] 인스턴스 해제 실패: {ex.Message}");
+        }
+        finally
+        {
+            slot.instance = null;
+            slot.isAddressablesInstance = false;
+        }
+    }
+
+    // ----------------------
     // 슬롯 교환
     // ----------------------
     public async UniTask SwapSlotsAsync(int slotA, int slotB)

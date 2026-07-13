@@ -56,6 +56,15 @@ public class WeaponData
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
 
+    /// <summary>
+    /// 이 무기가 진화할 수 있는 분기 테이블(SO 참조 — 서버 차트는 미관여). null이면 최종 형태.
+    /// 진화하면 분기의 target WeaponSO로 통째 교체된다.
+    /// </summary>
+    public WeaponEvolutionSO evolution;
+
+    /// <summary>진화 가능한 분기가 하나라도 있는지.</summary>
+    public bool CanEvolve => evolution != null && evolution.Branches.Count > 0;
+
     /// <summary>공격 시 칼날 트레일 VFX 프리팹(INab Weapon Trail). SO에서만 채워짐(서버 차트는 미관여). 없으면 트레일 스킵.</summary>
     public GameObject trailVfxPrefab;
 
@@ -110,6 +119,7 @@ public class WeaponData
         animationSet = so.animationSet;
         abilitySet   = so.abilitySet;
         trailVfxPrefab = so.trailVfxPrefab;
+        evolution    = so.evolution;   // 진화 분기 — 서버 차트가 덮지 않는 SO 소유 참조
 
         baseAttackRaw = baseAttack;   // 강화 재계산의 기준(마스터)
     }
@@ -166,7 +176,7 @@ public class WeaponData
         }
 
         // weaponType, displayName, weaponPrefabKey, weaponDisplayKey, iconKey,
-        // abilitySet, skillQ/E 는 SO 값 유지
+        // abilitySet, skillQ/E, evolution 은 SO 값 유지
 
         // 차트 값이 강화의 새 기준(raw). enhanceLevel 이 보존된 채 매 씬 전환마다 여기로 들어오므로
         // 반드시 재계산하여 baseAttack 을 유효값으로 유지한다(강화 유실 방지).
