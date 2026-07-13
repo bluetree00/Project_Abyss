@@ -26,8 +26,8 @@ MonoBehaviour:
   heavyAttackReleaseTime: 0.4
   dashSpeed: 22
   dashDuration: 0.18
-  dodgeCooldown: 1.5
-  dodgeIFrameStartDelay: 0.05
+  dodgeCooldown: 0.25
+  dodgeIFrameStartDelay: 0
   dodgeIFrameDuration: 0.3
   dodgeMomentumBlend: 0
   dodgeRecoveryWindow: 0
