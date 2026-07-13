@@ -23,6 +23,30 @@ public class CharacterData : ScriptableObject
     public int baseDefense;
     public int baseLuck;
 
+    // 포이즈(아머치) — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.
+    // 회복이 붙어 있어 "연타로 맞으면 브레이크, 띄엄띄엄 맞으면 안 브레이크"가 자동 성립한다.
+    [Header("포이즈 (아머치) — 넉백/날아감 게이트")]
+    [Tooltip("포이즈 최대치. 이만큼의 누적 임팩트를 버틴다. 유물/아이템으로 증가(MaxPoise 스탯).")]
+    public float basePoise = 100f;
+    [Tooltip("피해량 → 임팩트 변환 계수. 임팩트 = 최종피해 × 이 값. 클수록 잘 날아감.")]
+    public float poiseImpactPerDamage = 2.5f;
+    [Tooltip("마지막 피격 후 포이즈 회복이 시작되기까지의 지연(초).")]
+    public float poiseRegenDelay = 1.5f;
+    [Tooltip("포이즈 초당 회복량. 지연 경과 후 이 속도로 최대치까지 회복.")]
+    public float poiseRegenPerSec = 40f;
+    [Tooltip("날아감 발동 직후 넉백 면역 시간(초). 무한 저글링 방지 — 이 동안 포이즈가 깎이지 않고 재발동 불가.")]
+    public float knockbackImmunity = 1.5f;
+
+    [Header("날아감 (피격 넉백)")]
+    [Tooltip("날아감 수평 임펄스 세기(공격자 반대방향).")]
+    public float launchHorizontalForce = 8f;
+    [Tooltip("날아감 상향 임펄스 세기(띄우기).")]
+    public float launchUpForce = 6f;
+    [Tooltip("착지 후 회복(경직) 시간(초). 이 동안 입력 잠금.")]
+    public float launchLandRecovery = 0.25f;
+    [Tooltip("착지 직후 무적 시간(초). 즉시 재피격 방지.")]
+    public float launchLandIFrame = 0.3f;
+
     // 공격, 콤보 관련 수치
     [Header("공격, 콤보 관련 수치")]
     public float comboDuration = 3.0f;
@@ -31,10 +55,23 @@ public class CharacterData : ScriptableObject
     public float heavyAttackChargeThreshold = 1.5f;
     public float heavyAttackReleaseTime = 0.4f;
 
+    // 스태미너 — 대시의 자원 게이트(쿨타임 대체).
+    // 회복은 지연 없이 항상 진행된다. 연속 대시는 아래 dodgeCooldown(대시 후 텀)이 막는다.
+    [Header("스태미너 (대시 자원)")]
+    [Tooltip("스태미너 최대치. 유물/아이템으로 증가(MaxStamina 스탯).")]
+    public float maxStamina = 100f;
+    [Tooltip("대시(회피) 1회가 소모하는 스태미너. 100/25 = 연속 4회.")]
+    public float dodgeStaminaCost = 25f;
+    [Tooltip("스태미너 초당 회복량.")]
+    public float staminaRegenPerSec = 25f;
+    [Tooltip("대시 직후 스태미너가 차오르지 않는 시간(초). 이 시간이 지나면 계속 회복한다.")]
+    public float staminaRegenDelay = 0.5f;
+
     // 대시 관련 수치
     [Header("대시 관련 수치")]
     public float dashSpeed = 10f;
     public float dashDuration = 0.2f;
+    [Tooltip("대시가 끝난 뒤 다음 대시까지의 짧은 텀(초). 스태미너가 남아도 이 시간 안엔 재대시 불가 — 즉시 연타 방지.")]
     public float dodgeCooldown = 2f;
     [Tooltip("회피 시작 후 무적이 켜지기까지의 그레이스 시간(초). 이 동안은 피격 가능. 회피 총 길이를 넘으면 자동 클램프.")]
     public float dodgeIFrameStartDelay = 0.05f;
@@ -45,6 +82,41 @@ public class CharacterData : ScriptableObject
     public float dodgeMomentumBlend = 0f;
     [Tooltip("대시 종료 후~다음 상태 복귀 사이의 무적 없는 짧은 회복(취약) 구간(초). 0=현행(즉시 전환). i-frame과 겹치지 않음(무적 종료 뒤). 남발 억제용 — 플레이테스트로 튜닝(예 0.05).")]
     public float dodgeRecoveryWindow = 0f;
+
+    // 저스트 회피 — 회피 초반(퍼펙트 창)에 공격이 스치면 슬로모를 걸고, 그 동안 플레이어만 빠르게 움직이게 보상한다.
+    [Header("저스트 회피 (퍼펙트 닷지)")]
+    [Tooltip("회피 시작 후 이 시간(초) 안에 피격되면 '저스트 회피' 발동. 0이면 비활성.")]
+    public float perfectDodgeWindow = 0.12f;
+    [Tooltip("저스트 회피 성공 시 적용할 시간 배율(슬로모). 낮을수록 세계가 느려진다.")]
+    [Range(0.05f, 1f)]
+    public float perfectDodgeTimeScale = 0.35f;
+    [Tooltip("슬로모 지속 시간(초, 실제 시간 기준).")]
+    public float perfectDodgeDuration = 1.2f;
+    [Tooltip("슬로모 동안 플레이어의 '실제 체감' 이동 배율. 1이면 평소와 같은 속도로 움직이고, 1보다 크면 더 빠르다. (내부적으로 시간배율의 역수까지 자동 보정)")]
+    public float perfectDodgeSpeedBoost = 1.3f;
+
+    // 저스트 회피 연출 — 레퍼런스는 베요네타 Witch Time.
+    // 핵심 원칙: "세계는 변하고 플레이어는 안 변한다". 화면 채도를 빼 세계를 회색으로 만들고,
+    // 플레이어에게만 발광 틴트를 입혀 회색 속에서 혼자 빛나게 한다.
+    [Header("저스트 회피 연출")]
+    [Tooltip("저스트 중 화면 채도(-100=완전 흑백, 0=원본). 세계만 회색이 되고 플레이어는 아래 틴트로 색을 유지한다.")]
+    [Range(-100f, 0f)]
+    public float perfectDodgeSaturation = -85f;
+    [Tooltip("저스트 중 비네트 강도(0~1). 화면 가장자리를 어둡게 해 집중감을 준다.")]
+    [Range(0f, 1f)]
+    public float perfectDodgeVignette = 0.35f;
+    [Tooltip("회색 필터 페이드 인 시간(초, 실제시간). 짧을수록 '탁' 걸리는 느낌.")]
+    public float perfectDodgeFadeIn = 0.05f;
+    [Tooltip("회색 필터 페이드 아웃 시간(초, 실제시간).")]
+    public float perfectDodgeFadeOut = 0.25f;
+    [Tooltip("발동 순간 프레임 스톱(정지) 시간(초, 실제시간). 끝나면 슬로모로 이어진다. 0이면 생략.")]
+    public float perfectDodgeFreeze = 0.07f;
+    [Tooltip("저스트 중 플레이어에 입힐 틴트/발광 색 — 회색 세계에서 혼자 빛나게 한다. a≤0이면 생략.")]
+    public Color perfectDodgeTint = new Color(0.35f, 0.85f, 1f, 0.7f);
+    [Tooltip("저스트 틴트 발광(_EmissionColor) 강도 배수.")]
+    public float perfectDodgeTintEmission = 2.5f;
+    [Tooltip("저스트 중 잔상 스폰 간격(초, 실제시간 기준). 0 이하면 잔상 생략. dodgeGhostMaterial이 필요하다.")]
+    public float perfectDodgeGhostInterval = 0.045f;
 
     // 회피 연출(시각) — 전부 선택. 미할당 시 해당 효과만 무동작(DodgePresentation이 읽음).
     [Header("회피 연출 (시각 — 선택, 미할당 시 무동작)")]

@@ -1,2 +1,2 @@
-public enum LocoState { Idle, Move, Air, Dodge }
+public enum LocoState { Idle, Move, Air, Dodge, Launched }
 

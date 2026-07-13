@@ -21,7 +21,8 @@ public class PlayerController : CharacterBase
     // 무기 장착 여부 검사 유틸
     public bool CanAttack()
     {
-        return WeaponManager != null && WeaponManager.HasWeapon;
+        // 날아가는 중(피격 넉백)엔 어떤 공격도 불가.
+        return WeaponManager != null && WeaponManager.HasWeapon && !IsLaunched;
     }
 
     // PendingAttack 설정 (무기가 없으면 무시)
@@ -97,8 +98,12 @@ public class PlayerController : CharacterBase
     // 사망 처리 1회 가드 (씬 전환 시 새 인스턴스라 리셋 불필요)
     private bool _dead;
 
-    public virtual void TakeDamage(int dmg, GameObject attacker = null)
+    /// <param name="ignorePoise">포이즈를 무시하고 확정으로 날아감을 발동한다(보스 대기술 등). 넉백 면역은 그대로 적용.</param>
+    public virtual void TakeDamage(int dmg, GameObject attacker = null, bool ignorePoise = false)
     {
+        // 저스트 회피 — 회피 초반(퍼펙트 창)에 스친 공격이면 슬로모+이동보너스로 보상하고 피해는 무효.
+        if (TryPerfectDodge()) return;
+
         if (debugInvincible || Time.time < _invincibleEnd)
             return;
 
@@ -182,6 +187,22 @@ public class PlayerController : CharacterBase
         // 사망 판정 — 아이템(OnNearDeath) 부활 실패 후 HP 0이면 서약 사망방지 체크, 그래도 0이면 사망 처리.
         TryHandleDeath();
 
+        // 포이즈(아머치) — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.
+        // 회복이 붙어 있어 연타로 맞을 때만 브레이크된다(띄엄띄엄 맞으면 회복돼 안 날아감).
+        // 넉백 면역 중이면 PoiseController가 알아서 무시 → 무한 저글링 방지. 사망했으면 생략.
+        if (!_dead && Poise != null && CharacterData != null && RuntimeStats != null)
+        {
+            float maxPoise = RuntimeStats.MaxPoise;
+            float immunity = CharacterData.knockbackImmunity;
+
+            bool broke = ignorePoise
+                ? Poise.ForceBreak(maxPoise, immunity)
+                : Poise.TakeImpact(finalDmg * CharacterData.poiseImpactPerDamage,
+                                   maxPoise, CharacterData.poiseRegenDelay, immunity);
+
+            if (broke) LaunchFrom(attacker);
+        }
+
         // 피격 후 — 반사/방버프 등. Attacker를 채워야 DamageReflect/FireReflect가 반사 대상을 안다.
         var report = new DamageReport
         {
@@ -222,6 +243,7 @@ public class PlayerController : CharacterBase
         {
             _dead = true;
             SetInputEnabled(false);
+            ClearPerfectDodge();   // 사망했는데 슬로모가 남아 시간이 느린 채로 진행되는 것 방지
             GameRunBootstrapper.Instance?.HandlePlayerDeath();
         }
     }
@@ -288,6 +310,8 @@ public class PlayerController : CharacterBase
 
     [Header("Camera")]
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
+
+    /// <summary>추적 중인 FreeLook 카메라. 전투 동적 프레이밍 등이 읽는다.</summary>
 
     // 애니메이터 오버라이드 서비스
     private AnimatorOverrideService _animSvc;
@@ -418,6 +442,176 @@ public class PlayerController : CharacterBase
     }
 
     //============================================================
+    // 저스트 회피 (퍼펙트 닷지) — 회피 초반에 공격이 스치면 슬로모 + 플레이어 이동 보너스
+    //============================================================
+    // 발동 순간 프레임 스톱에 쓰는 시간 배율(완전 0은 물리/애니가 죽어 복귀가 튈 수 있어 아주 작은 값).
+    private const float PerfectDodgeFreezeScale = 0.02f;
+
+    private float _perfectDodgeWindowEnd;      // 퍼펙트 판정 창 종료 시각(unscaled)
+    private bool  _perfectDodgeArmed;          // 이번 회피에서 아직 발동하지 않았는지
+    private float _perfectDodgeEnd;            // 슬로모/보너스 종료 시각(unscaled)
+    private float _perfectDodgeFreezeEnd;      // 프레임 스톱 종료 시각(unscaled)
+    private bool  _perfectDodgeFrozen;         // 지금 프레임 스톱 구간인지
+    private float _perfectDodgeScale = 0.35f;  // 프리즈 후 적용할 슬로모 배율
+    private float _bonusMoveMultiplier = 1f;
+
+    /// <summary>저스트 회피 슬로모 동안의 이동 배율(평소 1). DefaultMoveAbility가 최고속에 곱한다.</summary>
+    public float BonusMoveSpeedMultiplier => _bonusMoveMultiplier;
+
+    /// <summary>저스트 회피 발동 — 연출(회색 필터/틴트/잔상)이 구독한다. 인자는 총 지속시간(초, 실제시간).</summary>
+    public event Action<float> OnPerfectDodge;
+
+    /// <summary>회피 진입 시 퍼펙트 판정 창을 연다(LocoDodgeState.Enter가 호출).</summary>
+    public void ArmPerfectDodge(float window)
+    {
+        if (window <= 0f) { _perfectDodgeArmed = false; return; }
+        _perfectDodgeArmed     = true;
+        _perfectDodgeWindowEnd = Time.unscaledTime + window;
+    }
+
+    /// <summary>
+    /// 회피 초반(퍼펙트 창)에 공격이 들어왔는지 판정. 성공 시 슬로모 + 이동 보너스를 걸고 true를 반환한다.
+    /// TakeDamage 맨 앞에서 호출 — 어차피 무적이라 피해는 없지만, '아슬하게 스쳤다'는 사실을 여기서 잡아 보상한다.
+    /// </summary>
+    private bool TryPerfectDodge()
+    {
+        if (!_perfectDodgeArmed) return false;
+        if (Time.unscaledTime > _perfectDodgeWindowEnd) { _perfectDodgeArmed = false; return false; }
+        if (locoSM == null || locoSM.CurrentId != LocoState.Dodge) return false;
+
+        _perfectDodgeArmed = false;
+
+        float scale    = characterData != null ? Mathf.Clamp(characterData.perfectDodgeTimeScale, 0.05f, 1f) : 0.35f;
+        float duration = characterData != null ? Mathf.Max(0f, characterData.perfectDodgeDuration)   : 1.2f;
+        float boost    = characterData != null ? Mathf.Max(1f, characterData.perfectDodgeSpeedBoost) : 1.3f;
+        float freeze   = characterData != null ? Mathf.Max(0f, characterData.perfectDodgeFreeze)     : 0.07f;
+        if (duration <= 0f) return true;
+
+        _perfectDodgeScale = scale;
+
+        // 시간은 TimeScaleArbiter가 단일 소유 — 직접 Time.timeScale을 만지지 않는다.
+        // 프레임 스톱과 슬로모는 우선순위가 달라(HitStop 10 < SlowMotion 100) 겹쳐 걸 수 없으므로,
+        // 같은 owner로 '프리즈 → 슬로모' 순차 덮어쓰기를 한다.
+        _perfectDodgeFrozen = freeze > 0f;
+        TimeScaleArbiter.Acquire(this,
+            _perfectDodgeFrozen ? PerfectDodgeFreezeScale : scale,
+            TimeScaleArbiter.Priority.SlowMotion);
+
+        _perfectDodgeFreezeEnd = Time.unscaledTime + freeze;
+        _perfectDodgeEnd       = Time.unscaledTime + freeze + duration;
+
+        // 세계는 느려지는데 플레이어는 빨라야 한다.
+        // 물리는 스케일된 시간으로 적분되므로, 시간배율의 역수(1/scale)만큼 되돌리고 그 위에 부스트를 얹는다.
+        _bonusMoveMultiplier = (1f / scale) * boost;
+
+        // 세계만 느려지고 플레이어는 정상 속도로 움직여야 한다(Witch Time의 핵심).
+        // Time.timeScale은 전역이라 Animator까지 같이 느려진다 → 플레이어 Animator만 실제시간으로 돌린다.
+        // 이게 없으면 "슬로모 애니로 빠르게 미끄러지고 공격도 느리게 나가는" 반쪽짜리가 된다.
+        if (Anim != null) Anim.updateMode = AnimatorUpdateMode.UnscaledTime;
+
+        // 발동 임팩트 — 짧은 카메라 펀치
+        HitFeelService.CameraShake(0.1f, 0.12f);
+
+        OnPerfectDodge?.Invoke(freeze + duration);
+        return true;
+    }
+
+    /// <summary>저스트 회피 프리즈→슬로모 전환 및 만료 처리. Update에서 unscaled 시간으로 구동.</summary>
+    private void TickPerfectDodge()
+    {
+        if (!TimeScaleArbiter.IsHeldBy(this)) return;
+
+        // 프레임 스톱 종료 → 같은 owner로 슬로모 배율로 덮어쓴다.
+        if (_perfectDodgeFrozen && Time.unscaledTime >= _perfectDodgeFreezeEnd)
+        {
+            _perfectDodgeFrozen = false;
+            TimeScaleArbiter.Acquire(this, _perfectDodgeScale, TimeScaleArbiter.Priority.SlowMotion);
+        }
+
+        if (Time.unscaledTime < _perfectDodgeEnd) return;
+
+        TimeScaleArbiter.Release(this);
+        _bonusMoveMultiplier = 1f;
+        _perfectDodgeFrozen  = false;
+        if (Anim != null) Anim.updateMode = AnimatorUpdateMode.Normal;
+    }
+
+    /// <summary>슬로모를 강제 종료한다(사망/씬 전환 시 시간이 느린 채로 남지 않도록).</summary>
+    private void ClearPerfectDodge()
+    {
+        TimeScaleArbiter.Release(this);
+        _bonusMoveMultiplier = 1f;
+        _perfectDodgeArmed   = false;
+        _perfectDodgeFrozen  = false;
+        if (Anim != null) Anim.updateMode = AnimatorUpdateMode.Normal;
+    }
+
+    // 다음 로코모션 진입(MoveBlend) 크로스페이드 길이 1회 오버라이드. -1이면 각 상태의 기본값 사용.
+    // 회피 종료처럼 '자세 차이가 큰 상태에서 복귀'할 때만 길게 잡아 툭 튀는 스냅을 없앤다.
+    private float _pendingLocoBlend = -1f;
+
+    /// <summary>회피 종료 등에서 다음 로코모션 크로스페이드를 길게 잡도록 예약한다.</summary>
+    public void RequestLocoBlend(float duration) => _pendingLocoBlend = duration;
+
+    /// <summary>예약된 크로스페이드 길이를 소비한다(1회). 없으면 기본값 반환.</summary>
+    public float ConsumeLocoBlend(float defaultDuration)
+    {
+        if (_pendingLocoBlend < 0f) return defaultDuration;
+        float d = _pendingLocoBlend;
+        _pendingLocoBlend = -1f;
+        return d;
+    }
+
+    // 날아감 진입 방향 — LaunchFrom이 세팅하고 LocoLaunchedState.Enter가 1회 소비한다.
+    private Vector3 _pendingLaunchDir;
+
+    /// <summary>날아감 방향(수평 정규화)을 소비한다. 미설정이면 등 뒤(-forward).</summary>
+    public Vector3 ConsumeLaunchDirection()
+    {
+        Vector3 d = _pendingLaunchDir;
+        _pendingLaunchDir = Vector3.zero;
+        d.y = 0f;
+        return d.sqrMagnitude > 0.0001f ? d.normalized : -transform.forward;
+    }
+
+    /// <summary>
+    /// 대시 스태미너를 소모 시도한다. 부족하면 false → 대시 불발(쿨타임 대신 자원이 게이트).
+    /// </summary>
+    private bool TryConsumeDodgeStamina()
+    {
+        if (Stamina == null || characterData == null || RuntimeStats == null) return true;
+
+        return Stamina.TryConsume(characterData.dodgeStaminaCost, RuntimeStats.MaxStamina,
+                                  characterData.staminaRegenDelay);
+    }
+
+    /// <summary>진행 중인 공격/스킬을 즉시 취소한다(날아감 진입 등).</summary>
+    public void CancelActions()
+    {
+        Combo?.Reset();
+        if (actSM != null && actSM.CurrentId != ActState.None)
+            actSM.Change(ActState.None);
+    }
+
+    /// <summary>
+    /// 피격 넉백 — 날아감(LocoState.Launched) 진입. attacker 반대방향으로 띄운다.
+    /// 사망 중이거나 이미 날아가는 중이면 무시한다.
+    /// </summary>
+    public void LaunchFrom(GameObject attacker)
+    {
+        if (_dead || locoSM == null) return;
+        if (locoSM.CurrentId == LocoState.Launched) return;
+
+        Vector3 dir = attacker != null
+            ? (transform.position - attacker.transform.position)
+            : -transform.forward;
+        dir.y = 0f;
+        _pendingLaunchDir = dir.sqrMagnitude > 0.0001f ? dir.normalized : -transform.forward;
+
+        locoSM.Change(LocoState.Launched);
+    }
+
+    //============================================================
     // Input Buffer & Time
     //============================================================
     protected IClock Clock { get; private set; }
@@ -438,6 +632,12 @@ public class PlayerController : CharacterBase
     // Combo State (콤보 관련 상태는 ComboController에 위임)
     //============================================================
     public ComboController Combo { get; private set; }
+
+    /// <summary>포이즈(아머치) 게이지 — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.</summary>
+    public PoiseController Poise { get; private set; }
+
+    /// <summary>스태미너 게이지 — 대시(회피)의 자원 게이트. 쿨타임을 대체한다.</summary>
+    public StaminaController Stamina { get; private set; }
 
     //============================================================
     // Skill Cooldown
@@ -629,7 +829,9 @@ public class PlayerController : CharacterBase
 
         Clock = new UnscaledClock();
         InputBuffer = new InputBuffer(Clock, capacity: 16, bufferWindowSec: 0.4f, dedupeSec: 0.04f);
-        Combo = new ComboController();
+        Combo   = new ComboController();
+        Poise   = new PoiseController();
+        Stamina = new StaminaController();
 
         InitCoreComponents();
         await InitCharacterDataAsync();
@@ -683,6 +885,12 @@ public class PlayerController : CharacterBase
         if (!TryGetComponent<DodgePresentation>(out _))
             gameObject.AddComponent<DodgePresentation>();
 
+        // 스태미너 바(원신·명조식) — 동일한 런타임 자동 부착. HUD 프리팹을 건드리지 않는다.
+        if (!TryGetComponent<StaminaBarView>(out _))
+            gameObject.AddComponent<StaminaBarView>();
+
+        // 전투 중 카메라 자동 줌아웃 — 낮은 몰입 구도와 다수 적 가독성을 둘 다 가져간다.
+
         // 검 공격/대시 칼날 트레일(INab Weapon Trail) 구동기 — 동일한 런타임 자동 부착 패턴.
         // 트레일 프리팹 미할당(무기 SO / CharacterData) 시 무동작.
         if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
@@ -722,6 +930,19 @@ public class PlayerController : CharacterBase
         CheckMovementInput();
         // Combo.Tick을 FSM Update보다 먼저 실행해 actSM이 최신 창 상태를 즉시 반영하도록 한다
         Combo.Tick(Time.unscaledDeltaTime);
+
+        // 포이즈 회복/넉백 면역 타이머
+        if (CharacterData != null && RuntimeStats != null)
+        {
+            Poise.Tick(Time.deltaTime, RuntimeStats.MaxPoise,
+                       CharacterData.poiseRegenDelay, CharacterData.poiseRegenPerSec);
+
+            // 스태미너 회복 — 지연 경과 후 초당 회복(원신·명조 방식)
+            Stamina.Tick(Time.deltaTime, RuntimeStats.MaxStamina, CharacterData.staminaRegenPerSec);
+        }
+
+        // 저스트 회피 슬로모 만료 (unscaled — 느려진 시간에 영향받지 않아야 한다)
+        TickPerfectDodge();
         RouteInputsToLayers();
 
         locoSM?.Update();
@@ -789,6 +1010,9 @@ public class PlayerController : CharacterBase
     {
         UnsubscribeFromAnimationReceiver(EventReceiver);
         StopFreezeLoopSfx();
+
+        // 저스트 회피 슬로모가 걸린 채 비활성화되면 시간이 느린 상태로 남는다 → 반드시 해제.
+        ClearPerfectDodge();
     }
 
     protected virtual void OnDestroy()
@@ -824,7 +1048,8 @@ public class PlayerController : CharacterBase
         {
             if (locoSM.CurrentId != LocoState.Move &&
                 locoSM.CurrentId != LocoState.Air &&
-                locoSM.CurrentId != LocoState.Dodge)
+                locoSM.CurrentId != LocoState.Dodge &&
+                locoSM.CurrentId != LocoState.Launched)   // 날아감은 자체적으로 착지까지 유지
             {
                 locoSM.Change(LocoState.Idle);
             }
@@ -1125,10 +1350,11 @@ public class PlayerController : CharacterBase
     /// </summary>
     protected void RegisterDefaultFSMs()
     {
-        locoSM.Register(LocoState.Idle,  new LocoIdleState());
-        locoSM.Register(LocoState.Move,  new LocoMoveState());
-        locoSM.Register(LocoState.Air,   new LocoAirState());
-        locoSM.Register(LocoState.Dodge, new LocoDodgeState());
+        locoSM.Register(LocoState.Idle,     new LocoIdleState());
+        locoSM.Register(LocoState.Move,     new LocoMoveState());
+        locoSM.Register(LocoState.Air,      new LocoAirState());
+        locoSM.Register(LocoState.Dodge,    new LocoDodgeState());
+        locoSM.Register(LocoState.Launched, new LocoLaunchedState());
 
         actSM.Register(ActState.None,        new ActNoneState());
         actSM.Register(ActState.AttackReady, new ActAttackReadyState());
@@ -1186,8 +1412,16 @@ public class PlayerController : CharacterBase
 
         if (InputBuffer.TryConsume(Game.Inputs.Command.Dodge))
         {
-            if (isInSkill) return; // 스킬 중에는 회피로 캔슬 불가
-            if (!isDodging && UnityEngine.Time.time >= DodgeCooldownEnd)
+            if (isInSkill) return;  // 스킬 중에는 회피로 캔슬 불가
+            if (IsLaunched) return; // 날아가는 중엔 회피로 탈출 불가
+
+            // 대시 게이트 3중:
+            //  ① !isDodging      — 대시 도중엔 재대시 불가
+            //  ② DodgeCooldownEnd — 대시가 끝난 뒤 짧은 텀(dodgeCooldown) 동안 불가 (즉시 연타 방지)
+            //  ③ 스태미너         — 자원이 있어야 발동 (소모는 여기서 확정)
+            if (!isDodging
+                && UnityEngine.Time.time >= DodgeCooldownEnd
+                && TryConsumeDodgeStamina())
             {
                 if (isInAct) actSM.Change(ActState.None);
                 locoSM.Change(LocoState.Dodge);
@@ -1409,7 +1643,11 @@ public class PlayerController : CharacterBase
     public bool IsChargeBlocked =>
         Combo.IsAttacking ||
         !IsGrounded() ||
-        locoSM?.CurrentId == LocoState.Dodge;
+        locoSM?.CurrentId == LocoState.Dodge ||
+        IsLaunched;
+
+    /// <summary>피격 넉백으로 날아가는 중(착지 회복 포함) — 이 동안 모든 조작 불가.</summary>
+    public bool IsLaunched => locoSM?.CurrentId == LocoState.Launched;
 
     /// <summary>픽업 대기 중인 무기 데이터 (WorldWeaponDisplay → ActPickupState 전달용)</summary>
     public WeaponData PendingPickupWeapon { get; set; }

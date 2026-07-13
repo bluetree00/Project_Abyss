@@ -6,6 +6,9 @@ public class LocoDodgeState : ILayerState<LocoState>
     // 이보다 느리면 사실상 정지로 보고 바라보는 방향으로 폴백 → 진짜 정지 상태는 현행과 동일.
     private const float MinVelSqrForDirFallback = 0.25f; // 0.5 m/s
 
+    // 구르기 → 로코모션 복귀 크로스페이드 길이. 기본(0.05s)은 자세 차가 커서 스냅이 보인다.
+    private const float DodgeExitBlend = 0.15f;
+
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
@@ -70,6 +73,9 @@ public class LocoDodgeState : ILayerState<LocoState>
         _iframeApplied = false;
         _iframeOpen = false;
 
+        // 저스트 회피 판정 창 오픈 — 이 창 안에 공격이 스치면 슬로모 + 이동 보너스로 보상.
+        _controller.ArmPerfectDodge(data.perfectDodgeWindow);
+
         _controller.Anim.CrossFade("Dodge", 0.05f);
         _controller.SetMoveScale(0f);
         _controller.FirePassive(PassiveTrigger.OnDodge, new PassiveContext());
@@ -113,9 +119,23 @@ public class LocoDodgeState : ILayerState<LocoState>
         }
         else
         {
-            // 대시 이동 종료 — 수평 속도 정지(중력 y 유지).
+            // 대시 이동 종료 — 속도를 0으로 죽이지 않고 '이어받는다'.
+            // 예전엔 22m/s → 0 으로 한 프레임에 급정지시켜, 멈췄다 다시 가속하는 불연속(=경직감)이 생겼다.
+            //  · 이동 입력이 있으면 → 그 방향 최고속(걷기~달리기)으로 이어받아 그대로 달려나간다.
+            //  · 입력이 없으면 → 대시 방향 속도를 최고속으로만 낮춰 넘기고, 정지는 Idle의 감속(moveDecel)에 맡긴다.
             float vy = _controller.Rigid.linearVelocity.y;
-            _controller.Rigid.linearVelocity = new Vector3(0f, vy, 0f);
+
+            float walkSpd = _controller.CharacterData.baseMoveSpeed;
+            float runSpd  = _controller.CharacterData.baseRunSpeed;
+            float maxSpd  = Mathf.Max(walkSpd, Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(_controller.RunBlend01)));
+            maxSpd *= _controller.RuntimeStats?.MoveSpeedMultiplier ?? 1f;
+
+            Vector3 carryDir = _controller.MoveDirection.sqrMagnitude > 0.0001f
+                ? _controller.MoveDirection.normalized
+                : _dodgeDir;
+            Vector3 carry = carryDir * maxSpd;
+
+            _controller.Rigid.linearVelocity = new Vector3(carry.x, vy, carry.z);
 
             // 회복(취약)창(설계 §5-1.4): 기본 0이면 _recoveryEndTime==_moveEndTime이라 이 분기 즉시 통과 → 현행과 동일 프레임 전환.
             // 0보다 크면 그동안 Dodge 상태에 머물러(무적 없음·재회피 불가) 남발을 억제한다. i-frame은 이미 종료된 뒤다.
@@ -132,6 +152,10 @@ public class LocoDodgeState : ILayerState<LocoState>
 
     public void Exit()
     {
+        // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 짧은 블렌드(0.05s)면 툭 튀며 선다.
+        // 다음 로코모션 진입의 크로스페이드를 길게 예약해 부드럽게 이어붙인다(다른 전이엔 영향 없음).
+        _controller.RequestLocoBlend(DodgeExitBlend);
+
         // 회피 도중 중단(취소)되어도 무적(_invincibleEnd)은 억지 해제하지 않고 자연 만료시킨다(안전).
         // 시각 피드백 창만 닫아 신호 짝을 맞춘다.
         if (_iframeOpen)

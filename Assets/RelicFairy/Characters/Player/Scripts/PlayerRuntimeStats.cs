@@ -43,6 +43,19 @@ public sealed class PlayerRuntimeStats
     /// <summary>레거시 호환 — Max(Melee, Ranged). 범용 공격력이 필요한 곳에서 사용.</summary>
     public int AttackPower => Mathf.Max(MeleeAttack, RangedAttack);
 
+    // 포이즈(아머치) 최대치 — 누적 임팩트를 이만큼 버틴다. 넘으면 날아감 발동.
+    // 베이스(캐릭터) + 보너스(유물 패시브 / 룬 시너지 등 effect_type "MaxPoise").
+    private const float DefaultBasePoise = 100f;
+    private float _basePoise  = DefaultBasePoise;
+    private float _poiseBonus;
+    public float MaxPoise => Mathf.Max(1f, _basePoise + _poiseBonus);
+
+    // 스태미너 최대치 — 대시 자원. 베이스(캐릭터) + 보너스(effect_type "MaxStamina").
+    private const float DefaultBaseStamina = 100f;
+    private float _baseStamina  = DefaultBaseStamina;
+    private float _staminaBonus;
+    public float MaxStamina => Mathf.Max(1f, _baseStamina + _staminaBonus);
+
     public event Action OnChanged;
 
     // ── 초기화 ───────────────────────────────────────────────────────────────────
@@ -58,6 +71,12 @@ public sealed class PlayerRuntimeStats
         MaxHp = Mathf.Max(1, data.maxHealth);
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
+
+        _basePoise  = data.basePoise > 0f ? data.basePoise : DefaultBasePoise;
+        _poiseBonus = 0f;
+
+        _baseStamina  = data.maxStamina > 0f ? data.maxStamina : DefaultBaseStamina;
+        _staminaBonus = 0f;
 
         _baseMelee  = Mathf.Max(0, data.baseMeleeAttack);
         _baseRanged = Mathf.Max(0, data.baseRangedAttack);
@@ -110,6 +129,12 @@ public sealed class PlayerRuntimeStats
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
+        // CHARACTER_DATA CSV에 포이즈/스태미너 컬럼이 아직 없어 기본치 사용(추가 시 entry에서 읽도록 교체).
+        _basePoise    = DefaultBasePoise;
+        _poiseBonus   = 0f;
+        _baseStamina  = DefaultBaseStamina;
+        _staminaBonus = 0f;
+
         _baseMelee   = Mathf.Max(0, entry.base_melee_attack);
         _baseRanged  = Mathf.Max(0, entry.base_ranged_attack);
         _baseDefense = Mathf.Max(0, entry.base_defense);
@@ -147,6 +172,8 @@ public sealed class PlayerRuntimeStats
                         MaxHp += (int)p.value;
                         Hp = Mathf.Min(Hp, MaxHp);
                         break;
+                    case "MaxPoise":     _poiseBonus   += p.value; break;
+                    case "MaxStamina":   _staminaBonus += p.value; break;
                     case "Luck":         _passiveLuck += (int)p.value; break;
                     case "AttackSpeed":  _bonusAttackSpeed += p.value; break;
                     case "SkillCooldownReduction":       _passiveSkillCdr += p.value; break;
@@ -959,6 +986,8 @@ public sealed class PlayerRuntimeStats
                 MaxHp = Mathf.Max(1, MaxHp + (int)value);
                 Hp = Mathf.Min(Hp, MaxHp);
                 break;
+            case "MaxPoise":      _poiseBonus   += value; break;
+            case "MaxStamina":    _staminaBonus += value; break;
             case "Luck":          _synergyLuck += (int)value; break;
             case "AttackSpeed":   _synergyAttackSpeed += value; break;
             case "Lifesteal":     _synergyLifesteal += value; break;

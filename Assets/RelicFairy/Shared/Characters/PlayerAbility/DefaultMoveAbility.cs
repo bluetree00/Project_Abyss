@@ -65,6 +65,9 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         float baseSpd = Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(owner.RunBlend01));
         float currentMaxSpeed = baseSpd * (owner.RuntimeStats?.MoveSpeedMultiplier ?? 1f);
 
+        // 저스트 회피 슬로모 — 세계는 느려져도 플레이어는 빠르게 움직인다(평소 1이라 무영향).
+        currentMaxSpeed *= owner.BonusMoveSpeedMultiplier;
+
         // [마찰 제동] 급반전 구간(sharpTurn)에서만 이동속도를 깎아 무게감 부여 → 안쪽 각도는 감속 없이 속도 유지.
         // 조준이 facing을 주도하는 공격/스킬 중에는 적용하지 않는다(move-vs-aim 오판 방지).
         if (sharpTurn && !owner.IsActionControllingFacing)
