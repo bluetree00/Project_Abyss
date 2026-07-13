@@ -43,11 +43,26 @@ MonoBehaviour:
   - successRate: 0.15
     dropAmount: 2
     cost: 16
+  - successRate: 0.12
+    dropAmount: 2
+    cost: 20
+  - successRate: 0.1
+    dropAmount: 3
+    cost: 25
+  - successRate: 0.08
+    dropAmount: 3
+    cost: 30
+  - successRate: 0.06
+    dropAmount: 3
+    cost: 38
+  - successRate: 0.05
+    dropAmount: 3
+    cost: 46
   _attackPctPerLevel: 0.08
-  _maxCommon: 3
-  _maxRare: 5
-  _maxEpic: 8
-  _maxLegendary: 10
+  _maxCommon: 6
+  _maxRare: 9
+  _maxEpic: 12
+  _maxLegendary: 15
   _legends:
   - legendId: excalibur
     displayName: "엑스칼리버"

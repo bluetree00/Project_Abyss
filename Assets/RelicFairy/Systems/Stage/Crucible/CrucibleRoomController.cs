@@ -92,6 +92,15 @@ public class CrucibleRoomController : MonoBehaviour
 
         _event = RollEvent();   // 결정적 돌발 이벤트
 
+        // ── save-scum 방지 ──
+        // 방 안에서 저장(S3)하고 재접속하면 _roomRng 스트림이 처음으로 리셋된다.
+        // 그러면 "이미 굴린 롤"을 다시 굴릴 수 있어 좋은 결과만 반복 취득이 가능해진다.
+        // → 세션에 기록된 소비 수만큼 스트림을 미리 진행시켜 이어서 굴리게 한다.
+        int consumed = _run != null ? _run.CrucibleRollIndex : 0;
+        for (int i = 0; i < consumed; i++) _roomRng.NextDouble();
+        if (consumed > 0)
+            Debug.Log($"[Crucible] 결정적 롤 스트림 재개 — 소비 {consumed}회 건너뜀");
+
         var (npcPos, npcRot) = ResolveNpcPlacement();
         SpawnNpc(npcPrefab, npcPos, npcRot);
         HookRunEvents();
@@ -133,14 +142,13 @@ public class CrucibleRoomController : MonoBehaviour
 
     // ── 강화 / 승급 (UI가 호출) ─────────────────────────────
 
-    /// <summary>강화 시도. sacrificeSlot=-1이면 제물 없음.</summary>
-    public EnhanceResult TryEnhance(int targetSlot, int sacrificeSlot = -1)
+    /// <summary>강화 시도(대상 슬롯 단일). 실패 시 대상 단계 하락(하한 0).</summary>
+    public EnhanceResult TryEnhance(int targetSlot)
     {
         if (_run == null || !_run.IsRunning || _table == null)
             return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
 
         var target = GetSlot(targetSlot);
-        var sac    = sacrificeSlot >= 0 ? GetSlot(sacrificeSlot) : null;
         var fuel   = _run.FuelBank;
         if (target == null || fuel == null)
             return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
@@ -148,24 +156,40 @@ public class CrucibleRoomController : MonoBehaviour
         _lastJackpot = false;
         _lastRefund  = 0;
 
-        var result = WeaponEnhanceService.TryEnhance(target, sac, _table, _roomRng, fuel, CostMult, SuccessBonus);
+        var result = WeaponEnhanceService.TryEnhance(target, _table, _roomRng, fuel, CostMult, SuccessBonus);
+
+        // 롤 소비 기록 — 거부(재료부족/최대치)는 롤을 굴리지 않으므로 세지 않는다.
+        if (!result.IsReject) BumpRoll(1);
 
         if (result.outcome == EnhanceOutcome.Success)
         {
             _streak++;
-            RollJackpot(fuel, result.spent);
+            RollJackpot(fuel, result.spent);   // 잭팟 굴림도 내부에서 롤 소비를 기록
         }
-        else if (result.outcome == EnhanceOutcome.FailDropped || result.outcome == EnhanceOutcome.FailAbsorbed)
+        else if (result.outcome == EnhanceOutcome.FailDropped)
         {
             _streak = 0;
         }
 
-        // 변경된 무기가 현재 장착 무기면 데미지/HUD 스탯 즉시 갱신
-        if (!result.IsReject) RefreshEquippedIfCurrent(result.targetChanged ? targetSlot : sacrificeSlot);
+        // 대상이 현재 장착 무기면 데미지/HUD 스탯 즉시 갱신
+        if (!result.IsReject)
+        {
+            RefreshEquippedIfCurrent(targetSlot);
+            SaveNow("crucible-enhance");   // S3: 강화 결과 확정 → 즉시 저장
+        }
 
         OnCrucibleChanged?.Invoke();
         return result;
     }
+
+    /// <summary>결정적 롤 소비 수를 세션에 누적(세이브에 기록 → 복원 시 스트림 재개).</summary>
+    private void BumpRoll(int n)
+    {
+        if (_run != null) _run.CrucibleRollIndex += n;
+    }
+
+    /// <summary>행동 확정 즉시 저장(S3). 방 경계가 아니어도 진행분이 보존된다.</summary>
+    private static void SaveNow(string reason) => RunFlowController.Active?.SaveNow(reason);
 
     /// <summary>승급 시도(확정 성공, 재료 대량). legendId는 Legends에서 택1.</summary>
     public PromoteResult TryPromote(int targetSlot, string legendId)
@@ -179,7 +203,11 @@ public class CrucibleRoomController : MonoBehaviour
             return PromoteResult.Reject(PromoteOutcome.RejectInvalidLegend);
 
         var result = WeaponEnhanceService.TryPromote(target, legendId, _table, fuel);
-        if (result.IsSuccess) RefreshEquippedIfCurrent(targetSlot);
+        if (result.IsSuccess)
+        {
+            RefreshEquippedIfCurrent(targetSlot);
+            SaveNow("crucible-promote");   // S3: 승급 확정 → 즉시 저장 (롤 미소비 — 확정 성공)
+        }
 
         OnCrucibleChanged?.Invoke();
         return result;
@@ -309,7 +337,11 @@ public class CrucibleRoomController : MonoBehaviour
     {
         if (spent <= 0) return;
         float chance = Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * (_streak - 1));
-        if (_roomRng.NextDouble() < chance)
+
+        double roll = _roomRng.NextDouble();
+        BumpRoll(1);   // 잭팟 굴림도 스트림을 소비 → 복원 시 동일하게 건너뛰어야 한다
+
+        if (roll < chance)
         {
             fuel.Add(FuelKind.EnhanceMaterial, spent);
             _lastJackpot = true;

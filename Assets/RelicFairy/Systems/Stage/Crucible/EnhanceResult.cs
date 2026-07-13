@@ -4,9 +4,8 @@ using System;
 /// <summary>강화 시도 결과 종류.</summary>
 public enum EnhanceOutcome
 {
-    Success,        // 성공 — 대상 단계 +1
-    FailDropped,    // 실패 — 대상 단계 하락(하한 0)
-    FailAbsorbed,   // 실패 — 제물(다른 슬롯)이 하락을 대신 흡수, 대상 보호
+    Success,        // 성공 — 단계 +1
+    FailDropped,    // 실패 — 단계 하락(하한 0)
     RejectMaxed,    // 거부 — 이미 등급 상한
     RejectNoFuel,   // 거부 — 강화재료 부족
     RejectInvalid,  // 거부 — 대상 없음/무효
@@ -20,7 +19,10 @@ public struct EnhanceResult
     public int  beforeLevel;   // 변경된 무기의 시도 전 단계
     public int  afterLevel;    // 변경된 무기의 시도 후 단계
     public int  spent;         // 소모한 강화재료
-    public bool targetChanged; // true=대상이 변경, false=제물이 변경(흡수)
+
+    // 연출 전용 부가 필드(로직 무관, 기본 0). 니어미스 강조 판정에 사용.
+    public double roll;        // 실패 판정에 쓰인 롤값(0~1). Reject 시 0.
+    public float  chance;      // 이 시도에 적용된 유효 성공확률(0~1). Reject 시 0.
 
     public bool IsSuccess => outcome == EnhanceOutcome.Success;
     public bool IsReject  => outcome == EnhanceOutcome.RejectMaxed
@@ -28,7 +30,7 @@ public struct EnhanceResult
                           || outcome == EnhanceOutcome.RejectInvalid;
 
     public static EnhanceResult Reject(EnhanceOutcome o)
-        => new EnhanceResult { outcome = o, targetChanged = true };
+        => new EnhanceResult { outcome = o };
 }
 
 /// <summary>승급(전설 분기) 결과 종류.</summary>

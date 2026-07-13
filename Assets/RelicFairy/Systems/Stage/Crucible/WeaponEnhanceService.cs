@@ -75,7 +75,7 @@ public static class WeaponEnhanceService
     /// 안전장치 A(제물 흡수) + B(하한 0·파괴 없음). rng·fuel 은 호출측 소유.
     /// costMult/successBonus: 돌발 이벤트(할인/성공부스트) 반영. 기본 1/0(무보정).
     /// </summary>
-    public static EnhanceResult TryEnhance(WeaponData target, WeaponData sacrifice,
+    public static EnhanceResult TryEnhance(WeaponData target,
                                            EnhanceTableSO t, System.Random rng, RunFuelBank fuel,
                                            float costMult = 1f, float successBonus = 0f)
     {
@@ -92,7 +92,8 @@ public static class WeaponEnhanceService
             return EnhanceResult.Reject(EnhanceOutcome.RejectNoFuel);
 
         float chance = Mathf.Clamp01(t.SuccessAt(level) + successBonus);
-        bool success = rng.NextDouble() < chance;
+        double roll  = rng.NextDouble();   // RNG 소비 1회 불변(결정성 유지) — 값만 결과에 실어 연출에 전달
+        bool success = roll < chance;
         if (success)
         {
             int before = target.enhanceLevel;
@@ -102,38 +103,21 @@ public static class WeaponEnhanceService
             {
                 outcome = EnhanceOutcome.Success,
                 beforeLevel = before, afterLevel = target.enhanceLevel,
-                spent = cost, targetChanged = true,
+                spent = cost, roll = roll, chance = chance,
             };
         }
 
-        int drop = t.DropAt(level);
-
-        // 안전장치 A — 제물이 하락을 흡수(대상 보호)
-        if (sacrifice != null && !ReferenceEquals(sacrifice, target) && sacrifice.enhanceLevel > 0)
+        // 실패 — 대상 단계 하락(하한 0, 파괴 없음)
+        int drop  = t.DropAt(level);
+        int start = target.enhanceLevel;
+        target.enhanceLevel = Mathf.Max(0, start - drop);
+        target.RecomputeEnhancedStats();
+        return new EnhanceResult
         {
-            int before = sacrifice.enhanceLevel;
-            sacrifice.enhanceLevel = Mathf.Max(0, before - drop);
-            sacrifice.RecomputeEnhancedStats();
-            return new EnhanceResult
-            {
-                outcome = EnhanceOutcome.FailAbsorbed,
-                beforeLevel = before, afterLevel = sacrifice.enhanceLevel,
-                spent = cost, targetChanged = false,
-            };
-        }
-
-        // 안전장치 B — 대상 하락(하한 0, 파괴 없음)
-        {
-            int before = target.enhanceLevel;
-            target.enhanceLevel = Mathf.Max(0, before - drop);
-            target.RecomputeEnhancedStats();
-            return new EnhanceResult
-            {
-                outcome = EnhanceOutcome.FailDropped,
-                beforeLevel = before, afterLevel = target.enhanceLevel,
-                spent = cost, targetChanged = true,
-            };
-        }
+            outcome = EnhanceOutcome.FailDropped,
+            beforeLevel = start, afterLevel = target.enhanceLevel,
+            spent = cost, roll = roll, chance = chance,
+        };
     }
 
     // ── 승급(전설 분기) ───────────────────────────────────────────────
