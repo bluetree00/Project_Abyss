@@ -116,6 +116,14 @@ public sealed class GameRunSession
     private int _snapItemCount;
     private int _snapSynergyCount;
 
+    /// <summary>
+    /// 현재 방에서 재련소가 소비한 결정적 롤 수.
+    /// 방 안에서 저장(S3)을 허용하면 재접속 시 RNG 스트림이 처음으로 리셋돼
+    /// "같은 롤을 다시 굴리는" save-scum이 뚫린다 → 이 값만큼 스트림을 진행시켜 막는다.
+    /// 새 방 진입 시 0으로 리셋(방마다 시드가 다르므로).
+    /// </summary>
+    public int CrucibleRollIndex { get; set; }
+
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
     public int SavedCurrentSlotIndex { get; private set; } = -1;

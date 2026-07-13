@@ -69,7 +69,13 @@ public class RunProgressManager : MonoBehaviour
     public RunSaveData LoadLocalRun(int slot) => _localStore.Load(slot);
 
     /// <summary>지정 슬롯의 로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시). 다른 슬롯 무영향.</summary>
-    public void ClearLocalRun(int slot) => _localStore.Delete(slot);
+    /// <summary>슬롯 삭제 — 런 세이브와 함께 <b>온보딩 완료 기록</b>도 초기화한다.
+    /// (안 지우면 슬롯을 지우고 새로 시작해도 초회 온보딩이 스킵된다)</summary>
+    public void ClearLocalRun(int slot)
+    {
+        _localStore.Delete(slot);
+        BaseCampOnboardingDirector.ClearForSlot(slot);
+    }
 
     /// <summary>
     /// 방 경계에서 현재 런 전체 상태를 로컬에 저장한다.
@@ -105,6 +111,8 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomPoolKey = m.currentRoomPoolKey;
         d.currentRoomKind   = m.currentRoomKind;
         d.currentRoomMirror = m.currentRoomMirror;
+        d.currentRoomCleared = m.currentRoomCleared;   // 클리어 후 저장 → 복원 시 몹 재스폰 방지
+        d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)
 
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);

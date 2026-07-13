@@ -49,6 +49,16 @@ public class RunFlowController : MonoBehaviour
     private System.Random                _rng;
     private ProcRoomResult               _current;
     private RoomWaveController           _currentWave;
+
+    /// <summary>현재 활성 런 플로우. 재련소/상점/서약 등이 행동 확정 시 SaveNow를 호출하기 위한 진입점.</summary>
+    public static RunFlowController Active { get; private set; }
+
+    private bool     _currentRoomCleared;   // 현재 방 클리어 여부(세이브 기록)
+    private bool     _resumedRoomCleared;   // 이어하기: 저장 당시 방이 클리어 상태였는가(1회성)
+    private DoorPlan _lastPlan;             // 재저장(S2/S3)용 방 정보 캐시
+    private DoorEdge _lastEdge;
+    private int      _lastMirror;
+    private bool     _hasLastPlan;
     private readonly List<GateView>      _gates = new();
     private GameObject                   _entranceLock;
     private CancellationTokenSource      _cts;
@@ -126,6 +136,13 @@ public class RunFlowController : MonoBehaviour
         _masterSeed   = meta.masterSeed;
         _anchorToggle = meta.anchorToggle;
         _heading      = meta.heading;
+
+        // 저장 당시 방이 클리어 상태였는가 → true면 재생성 시 몹을 스폰하지 않고 출구만 연다.
+        _resumedRoomCleared = meta.currentRoomCleared;
+
+        // 재련소 결정적 롤 스트림 재개 위치 — 방 안 저장 후 재접속해도 같은 롤을 다시 굴리지 못하게.
+        var resumeSession = GameRunBootstrapper.Instance?.Run;
+        if (resumeSession != null) resumeSession.CrucibleRollIndex = meta.crucibleRollIndex;
 
         var key = !string.IsNullOrEmpty(poolKey) ? poolKey : _poolKey;
         _pool = await Managers.ZoneLayout.LoadPoolAsync(key);
@@ -335,12 +352,40 @@ public class RunFlowController : MonoBehaviour
         await PlayRoomEntryDialogueAsync(plan.kind, ct);
         if (this == null || ct.IsCancellationRequested) return;
 
+        // 재저장(S2/S3)용 캐시 — 방 정보를 들고 있어야 임의 시점에 다시 저장할 수 있다.
+        _lastPlan    = plan;
+        _lastEdge    = fromEdge;
+        _lastMirror  = mirrorRoll;
+        _hasLastPlan = true;
+
+        // 새 방 진입 → 방 스코프 상태 리셋. (이어하기 재생성 중에는 복원값을 덮지 않는다)
+        if (!_resuming)
+        {
+            _currentRoomCleared = false;
+            var s = GameRunBootstrapper.Instance?.Run;
+            if (s != null) s.CrucibleRollIndex = 0;   // 방마다 시드가 다르므로 롤 카운터도 새로
+        }
+
         // 출구 문은 봉인(막힘) 상태로 미리 배치, 들어온 입구는 잠금 → 전투 클리어 시 출구만 공개.
         CreateSealedGates();
         if (result.hasEntrance) LockEntrance(result.entrance);
 
+        // 이어하기 + '저장 당시 이미 클리어된 방'이면 몬스터를 다시 스폰하지 않고 출구만 연다.
+        // (이게 없으면 보상은 챙긴 채 몹이 부활해 중복 파밍이 된다.)
+        bool restoreCleared = _resuming && _resumedRoomCleared;
+        _resumedRoomCleared = false;   // 1회성 — 다음 방으로 새어나가지 않게
+
+        if (restoreCleared)
+        {
+            if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out var clearedWave))
+                clearedWave.enabled = false;   // Activate() 미호출 + 비활성 → 몬스터 스폰 없음
+            _currentWave = null;
+            // 정상 클리어 경로를 그대로 탄다: 저장은 _resuming 가드로 무시되고,
+            // RollExits는 롤 '전' 상태로 저장돼 있었으므로 같은 시드로 동일 출구가 재현된다.
+            HandleRoomCleared();
+        }
         // 디졸브 후 클리어 알림 구독 → 출구 게이트 공개. 전투 없는 방(스포너 0)은 즉시 공개.
-        if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out _currentWave))
+        else if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out _currentWave))
         {
             _currentWave.OnRoomCleared += HandleRoomCleared;
             _currentWave.Activate();
@@ -365,6 +410,15 @@ public class RunFlowController : MonoBehaviour
         // 방 경계 자동저장 (suspend-on-save). 이어하기 재생성 중에는 생략(동일 상태 재저장 방지).
         if (!_resuming)
             SaveRunState(plan, fromEdge, mirrorRoll);
+    }
+
+    /// <summary>현재 진행 상태를 즉시 저장한다(S2 클리어 직후 / S3 행동·이벤트 확정 시).
+    /// 방 정보는 마지막 방 빌드 시점 캐시를 재사용하므로 방 경계가 아니어도 안전하다.</summary>
+    public void SaveNow(string reason)
+    {
+        if (_resuming || !_hasLastPlan) return;   // 복원 중 재저장 방지
+        SaveRunState(_lastPlan, _lastEdge, _lastMirror);
+        Debug.Log($"[RunFlow] 자동저장 — {reason}");
     }
 
     /// <summary>방 입장 대사 이벤트. 현재는 보스룸만 — 챕터별 BossRoom_Ch{N}_Enter를 방문변형(첫/반복)으로 재생.</summary>
@@ -412,6 +466,8 @@ public class RunFlowController : MonoBehaviour
             currentRoomPoolKey = plan.entry?.pool_key,
             currentRoomKind    = (int)plan.kind,
             currentRoomMirror  = mirror,
+            currentRoomCleared = _currentRoomCleared,
+            crucibleRollIndex  = session.CrucibleRollIndex,
             cooldowns          = cooldowns,
         };
 
@@ -472,6 +528,13 @@ public class RunFlowController : MonoBehaviour
     private void HandleRoomCleared()
     {
         if (_currentWave != null) _currentWave.OnRoomCleared -= HandleRoomCleared;
+
+        // ── S2: 클리어 직후 자동저장 (전투 보상·드랍 획득분 보존) ──
+        // ⚠️ 반드시 RollExits() '앞'에서 저장한다. 롤 뒤에 저장하면 시퀀서(shopUsed/eventUsed/쿨다운)가
+        //    이미 진행된 상태로 기록되고, 복원 시 RollExits가 한 번 더 돌아 '이중 반영'된다.
+        //    롤 전 상태로 저장해두면 복원 때 같은 시드로 다시 굴려 동일한 출구가 재현된다.
+        _currentRoomCleared = true;
+        SaveNow("room-cleared");   // 복원 중(_resuming)이면 내부에서 무시
 
         var exits = _sequencer.RollExits();
         VerifyAgainstPlan(_sequencer.VisitCount, exits); // 라이브 종류가 일정표와 일치하는지(드리프트) 검증
@@ -741,8 +804,11 @@ public class RunFlowController : MonoBehaviour
         catch (OperationCanceledException) { }
     }
 
+    private void Awake() => Active = this;
+
     private void OnDestroy()
     {
+        if (Active == this) Active = null;
         if (_currentWave != null) _currentWave.OnRoomCleared -= HandleRoomCleared;
         _cts?.Cancel();
         _cts?.Dispose();

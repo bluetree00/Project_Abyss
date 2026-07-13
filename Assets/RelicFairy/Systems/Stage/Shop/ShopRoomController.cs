@@ -533,6 +533,7 @@ public class ShopRoomController : MonoBehaviour
         }
         Debug.Log($"[ShopRoom] 아이템 구매 성공: {entry.target_id} ({price}G)");
         slot.Sold = true;
+        RunFlowController.Active?.SaveNow("shop-purchase");   // S3: 구매 확정 → 즉시 저장
         OnShopChanged?.Invoke();
         return ShopPurchaseResult.Success;
     }
@@ -555,6 +556,7 @@ public class ShopRoomController : MonoBehaviour
 
             slot.Pending = false;
             slot.Sold = true;
+            RunFlowController.Active?.SaveNow("shop-purchase");   // S3: 구매 확정 → 즉시 저장
             OnShopChanged?.Invoke();
 
             // 다음 방에서 장비 유지되도록 세션에 즉시 저장
@@ -607,6 +609,7 @@ public class ShopRoomController : MonoBehaviour
         }
         Debug.Log($"[ShopRoom] (레거시) 구매 성공: {shopItem.Item.itemId} ({price}G)");
         slot.Sold = true;
+        RunFlowController.Active?.SaveNow("shop-purchase");   // S3: 구매 확정 → 즉시 저장
         OnShopChanged?.Invoke();
         return ShopPurchaseResult.Success;
     }

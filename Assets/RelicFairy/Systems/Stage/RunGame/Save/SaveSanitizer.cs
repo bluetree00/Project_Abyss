@@ -60,6 +60,9 @@ public static class SaveSanitizer
         d.weapon0EnhanceLevel = ClampMin(d.weapon0EnhanceLevel, 0, ref changed);
         d.weapon1EnhanceLevel = ClampMin(d.weapon1EnhanceLevel, 0, ref changed);
 
+        // 재련소 RNG 소비 수: ≥0. 음수면 스트림 진행이 깨져 save-scum이 뚫린다.
+        d.crucibleRollIndex = ClampMin(d.crucibleRollIndex, 0, ref changed);
+
         // masterSeed·heading·anchorToggle·currentRoomKind/Mirror·seqPhase 등 절차생성
         // 내부 상태는 클램프하지 않는다(시드 정합성/복원 무결성 보존, 과도 개입 금지).
 
