@@ -312,6 +312,7 @@ public class PlayerController : CharacterBase
     [SerializeField] protected CinemachineFreeLook cinemachineCamera;
 
     /// <summary>추적 중인 FreeLook 카메라. 전투 동적 프레이밍 등이 읽는다.</summary>
+    public CinemachineFreeLook CinemachineCamera => cinemachineCamera;
 
     // 애니메이터 오버라이드 서비스
     private AnimatorOverrideService _animSvc;
@@ -890,6 +891,8 @@ public class PlayerController : CharacterBase
             gameObject.AddComponent<StaminaBarView>();
 
         // 전투 중 카메라 자동 줌아웃 — 낮은 몰입 구도와 다수 적 가독성을 둘 다 가져간다.
+        if (!TryGetComponent<CombatCameraFraming>(out _))
+            gameObject.AddComponent<CombatCameraFraming>();
 
         // 검 공격/대시 칼날 트레일(INab Weapon Trail) 구동기 — 동일한 런타임 자동 부착 패턴.
         // 트레일 프리팹 미할당(무기 SO / CharacterData) 시 무동작.
