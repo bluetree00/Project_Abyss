@@ -136,6 +136,9 @@ public class MonsterSpawner : MonoBehaviour
     /// 방 클리어 카운터가 Σ로 합산해 킬 목표 수를 계산할 때 사용.</summary>
     public int MaxTotalSpawns => maxTotalSpawns;
 
+    /// <summary>이 스포너가 현재 살려두고 있는 몬스터 수. MonsterBudget이 전역 동시 상한을 계산할 때 합산한다.</summary>
+    public int AliveCount => _spawnedMonsters.Count;
+
     /// <summary>웨이브 모드 여부(단일 웨이브). 그룹이 하나라도 있으면 1, 없으면 0(자동 루프 모드).
     /// _waveEntries의 모든 그룹을 하나의 웨이브로 합쳐 연속 스폰한다.</summary>
     public int WaveCount => (_waveEntries != null && _waveEntries.Length > 0) ? 1 : 0;
@@ -147,6 +150,10 @@ public class MonsterSpawner : MonoBehaviour
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // 방 전체 동시 적 하드캡(MonsterBudget)이 이 스포너의 생존 수를 합산할 수 있도록 등록한다.
+    private void OnEnable()  => MonsterBudget.Register(this);
+    private void OnDisable() => MonsterBudget.Unregister(this);
 
     private void Start()
     {
@@ -253,7 +260,12 @@ public class MonsterSpawner : MonoBehaviour
                 return;
             }
 
-            if (_spawnedMonsters.Count < maxMonsterCount)
+            // 스폰 조건 2중:
+            //  ① 자기 몫(maxMonsterCount) — 죽으면 보충해 호드를 유지한다("많이 잡는 재미")
+            //  ② 방 전체 동시 상한(MonsterBudget) — 스포너가 여러 개일 때 합계가 폭증해
+            //     화면이 몹으로 꽉 차는 것을 막는다. 상한에 걸리면 이번 턴은 건너뛰고,
+            //     적이 죽어 자리가 나면 다음 턴에 다시 스폰된다(루프는 안 끝냄).
+            if (_spawnedMonsters.Count < maxMonsterCount && MonsterBudget.CanSpawn)
                 await TrySpawnOneAsync();
         }
     }
