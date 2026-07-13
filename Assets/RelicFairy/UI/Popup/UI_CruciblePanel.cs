@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,34 +8,65 @@ using UnityEngine.UI;
 /// <summary>
 /// 재련소 UI 패널 (Canvas_Popup, Addressable "UI_CruciblePanel").
 ///
-/// 무기 강화/승급 화면(다크 판타지·유물 톤, ShopUIStyle 재사용):
+/// 무기 강화/승급 화면(다크 판타지·유물 톤, ShopUIStyle 재사용). 크게·강화 몰입형:
 ///  - 상단: 재련공 이름/대사 + 강화재료 표시(실시간)
-///  - 중앙: 무기 2슬롯 카드(대상 택1 + 제물 토글) + 강화 정보(성공률/재료/실패하락/공격 전→후)
-///  - 하단: 스트릭/결과 문구 + [강화] 버튼 (+ 강화 MAX 시 승급 전설 버튼)
+///  - 중앙: 무기 2슬롯 카드(대상 택1) — 큰 강화단계 + 강화 게이지 바 + 공격력
+///  - 하단: 강화 정보(성공률/재료/실패하락/공격 전→후) + 스트릭/결과 + 큰 [강화] 버튼 (+ MAX 시 승급)
 ///
-/// 데이터/계산/결정성은 CrucibleRoomController가 권위. 위젯은 절차 생성.
+/// 제물(sacrifice) 메커닉은 제거됨 — 한 무기에 집중하는 강화. 데이터/계산/결정성은 CrucibleRoomController가 권위.
 /// </summary>
 public sealed class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
 
-    private const float WindowW = 900f;
-    private const float WindowH = 680f;
+    private const float WindowW = 1040f;
+    private const float WindowH = 780f;
+
+    // 카드 배치
+    private const float CardW  = 490f;
+    private const float CardH  = 300f;
+    private const float Card0X = 30f;
+    private const float Card1X = 30f + CardW + 20f;
+    private const float CardY  = -150f;
+
+    // ── 연출 노브 (도파민 레이어; 표시층 전용, 결과/데이터 불변) ──
+    private const float PunchScale        = 0.14f;  // 성공 카드 스케일 펀치 진폭
+    private const float PunchDur          = 0.22f;
+    private const float JackpotPunchScale = 0.28f;  // 잭팟 강한 펀치
+    private const float JackpotPunchDur   = 0.34f;
+    private const float CountStepDur      = 0.07f;  // 레벨 1단계 카운트 시간(초)
+    private const float CountMaxDur       = 0.45f;  // 카운트 총 상한
+    private const float FlashDur          = 0.28f;  // 카드 색 플래시 감쇠 시간
+    private const float FailShakeDur      = 0.34f;
+    private const float FailShakeAmp      = 12f;    // 실패 카드 좌우 흔들림(px)
+    private const float NearMissShakeMult = 1.6f;   // 니어미스 시 흔들림 배수
+    private const float NearMissBand      = 1.1f;   // roll < chance*이 배수면 니어미스
+    private const float JackpotPulsePeak  = 0.7f;   // 전체화면 펄스 강도
+    private const float JackpotPulseDur   = 0.4f;
+
+    private static readonly Color SuccessFlash  = new(0.28f, 0.72f, 0.34f, 1f);
+    private static readonly Color JackpotFlash  = new(1f,    0.78f, 0.30f, 1f);
+    private static readonly Color FailFlash     = new(0.60f, 0.14f, 0.14f, 1f);
+    private static readonly Color NearMissFlash = new(0.78f, 0.42f, 0.12f, 1f);
+
+    private static readonly Color GaugeTrack = new(0.05f, 0.05f, 0.08f, 1f);
+    private static readonly Color GaugeFillC = new(0.92f, 0.62f, 0.22f, 1f);
+    private static readonly Color CardTargetBg = new(0.20f, 0.16f, 0.09f, 1f);
 
     private CrucibleRoomController _controller;
     private int _targetSlot = PlayerWeaponManager.Slot0;
-    private int _sacrificeSlot = -1;
 
     // 헤더
     private TMP_Text _fuelText;
     private TMP_Text _dialogText;
 
     // 슬롯 카드(2)
-    private readonly Image[]    _cardBg    = new Image[2];
-    private readonly TMP_Text[] _cardName  = new TMP_Text[2];
-    private readonly TMP_Text[] _cardLevel = new TMP_Text[2];
-    private readonly TMP_Text[] _cardAtk   = new TMP_Text[2];
-    private readonly TMP_Text[] _sacLabel  = new TMP_Text[2];
+    private readonly Image[]         _cardBg        = new Image[2];
+    private readonly TMP_Text[]      _cardName      = new TMP_Text[2];
+    private readonly TMP_Text[]      _cardLevel     = new TMP_Text[2];
+    private readonly TMP_Text[]      _cardAtk       = new TMP_Text[2];
+    private readonly RectTransform[] _cardGaugeFill = new RectTransform[2];
+    private readonly Vector2[]       _cardBasePos   = new Vector2[2]; // 카드 기준 앵커 위치(쉐이크 복원용)
 
     // 정보
     private TMP_Text _successText;
@@ -50,6 +83,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private bool _built;
     private bool _closing;
+    private bool _animating; // 연출 진행 중 재입력 잠금
 
     // ── Lifecycle ───────────────────────────────────────────
 
@@ -84,7 +118,6 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         ShopUIStyle.PlaySfx("shop_open");
         _targetSlot = PlayerWeaponManager.Slot0;
-        _sacrificeSlot = -1;
         BuildLegendButtons();
         _dialogText.text = _controller.HasEvent ? _controller.EventBanner : _controller.GetDialogue(CrucibleMood.Idle);
         RefreshAll();
@@ -127,37 +160,37 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         var header = ShopUIStyle.MakeImage(w, "Header", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(header.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, 0), new Vector2(0, 120));
+                           new Vector2(0, 0), new Vector2(0, 130));
         var h = header.transform;
 
         var line = ShopUIStyle.MakeImage(h, "Underline", ShopUIStyle.BronzeLine);
         ShopUIStyle.Anchor(line.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0),
                            new Vector2(0, 0), new Vector2(0, 3));
 
-        var title = ShopUIStyle.MakeText(h, "Title", 28f, FontStyles.Bold,
+        var title = ShopUIStyle.MakeText(h, "Title", 34f, FontStyles.Bold,
                                          TextAlignmentOptions.MidlineLeft, ShopUIStyle.Gold);
         title.text = "재련소";
         ShopUIStyle.Anchor(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(32, -18), new Vector2(-360, 42));
+                           new Vector2(34, -18), new Vector2(-380, 48));
 
-        _dialogText = ShopUIStyle.MakeText(h, "Dialog", 16f, FontStyles.Italic,
+        _dialogText = ShopUIStyle.MakeText(h, "Dialog", 17f, FontStyles.Italic,
                                            TextAlignmentOptions.MidlineLeft, ShopUIStyle.TextDim);
         _dialogText.text = "쇠는 두드릴수록 강해지지… 운이 따라준다면 말이야.";
         ShopUIStyle.Anchor(_dialogText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(32, -62), new Vector2(-360, 40));
+                           new Vector2(34, -70), new Vector2(-380, 44));
 
         // 강화재료 pill
         var pill = ShopUIStyle.MakeRect(h, "FuelPill", typeof(Image), typeof(HorizontalLayoutGroup));
         pill.GetComponent<Image>().color = ShopUIStyle.GoldPillBg;
         ShopUIStyle.Anchor((RectTransform)pill.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-24, -24), new Vector2(300, 50));
+                           new Vector2(-26, -28), new Vector2(320, 56));
         var phlg = pill.GetComponent<HorizontalLayoutGroup>();
-        phlg.padding = new RectOffset(16, 16, 4, 4);
+        phlg.padding = new RectOffset(18, 18, 4, 4);
         phlg.spacing = 8f;
         phlg.childAlignment = TextAnchor.MiddleRight;
         phlg.childControlWidth = true; phlg.childControlHeight = true;
         phlg.childForceExpandWidth = false; phlg.childForceExpandHeight = false;
-        _fuelText = ShopUIStyle.MakeText(pill.transform, "Fuel", 22f, FontStyles.Bold,
+        _fuelText = ShopUIStyle.MakeText(pill.transform, "Fuel", 24f, FontStyles.Bold,
                                          TextAlignmentOptions.MidlineRight, ShopUIStyle.Gold);
         var le = _fuelText.gameObject.AddComponent<LayoutElement>();
         le.flexibleWidth = 1f;
@@ -171,47 +204,46 @@ public sealed class UI_CruciblePanel : UI_Popup
             var card = ShopUIStyle.MakeFrame(w, $"Card{i}", ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 3f, raycast: true);
             _cardBg[i] = (Image)card.transform.parent.GetComponent<Image>();
             var cardRT = (RectTransform)card.transform.parent;
-            float x = i == 0 ? 24f : 24f + 410f + 12f;
+            _cardBasePos[i] = new Vector2(i == 0 ? Card0X : Card1X, CardY);
             ShopUIStyle.Anchor(cardRT, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                               new Vector2(x, -132), new Vector2(410, 200));
+                               _cardBasePos[i], new Vector2(CardW, CardH));
             var c = card.transform;
 
-            var slotLabel = ShopUIStyle.MakeText(c, "Slot", 15f, FontStyles.Bold,
+            var slotLabel = ShopUIStyle.MakeText(c, "Slot", 16f, FontStyles.Bold,
                                                  TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
             slotLabel.text = i == 0 ? "슬롯 0 · 근접" : "슬롯 1 · 원거리";
             ShopUIStyle.Anchor(slotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(16, -12), new Vector2(-32, 24));
+                               new Vector2(20, -14), new Vector2(-40, 26));
 
-            _cardName[i] = ShopUIStyle.MakeText(c, "Name", 22f, FontStyles.Bold,
+            _cardName[i] = ShopUIStyle.MakeText(c, "Name", 24f, FontStyles.Bold,
                                                 TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
             ShopUIStyle.Anchor(_cardName[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(16, -40), new Vector2(-32, 32));
+                               new Vector2(20, -46), new Vector2(-40, 34));
 
-            _cardLevel[i] = ShopUIStyle.MakeText(c, "Level", 26f, FontStyles.Bold,
+            _cardLevel[i] = ShopUIStyle.MakeText(c, "Level", 44f, FontStyles.Bold,
                                                  TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
             ShopUIStyle.Anchor(_cardLevel[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(16, -78), new Vector2(-32, 34));
+                               new Vector2(20, -88), new Vector2(-40, 56));
 
-            _cardAtk[i] = ShopUIStyle.MakeText(c, "Atk", 17f, FontStyles.Normal,
+            // 강화 게이지 바 (레벨/최대 채움) — "강화하는 느낌"
+            var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
+            ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                               new Vector2(20, -160), new Vector2(-40, 24));
+            var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
+            var fr = fill.rectTransform;
+            fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
+            fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
+            _cardGaugeFill[i] = fr;
+
+            _cardAtk[i] = ShopUIStyle.MakeText(c, "Atk", 20f, FontStyles.Bold,
                                                TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
             ShopUIStyle.Anchor(_cardAtk[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(16, -116), new Vector2(-32, 28));
+                               new Vector2(20, -196), new Vector2(-40, 32));
 
             // 대상 선택 (카드 전체 버튼)
             var selBtn = card.transform.parent.gameObject.AddComponent<Button>();
             selBtn.transition = Selectable.Transition.None;
-            selBtn.onClick.AddListener(() => { _targetSlot = slot; if (_sacrificeSlot == slot) _sacrificeSlot = -1; UpdateTargetDialogue(); RefreshAll(); });
-
-            // 제물 토글
-            var sacBtn = ShopUIStyle.MakeRect(c, "Sac", typeof(Image), typeof(Button));
-            sacBtn.GetComponent<Image>().color = ShopUIStyle.BuyDisabled;
-            ShopUIStyle.Anchor((RectTransform)sacBtn.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
-                               new Vector2(-14, 14), new Vector2(120, 36));
-            _sacLabel[i] = ShopUIStyle.MakeText(sacBtn.transform, "Label", 14f, FontStyles.Bold,
-                                                TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
-            _sacLabel[i].text = "제물";
-            ShopUIStyle.Stretch(_sacLabel[i].rectTransform);
-            sacBtn.GetComponent<Button>().onClick.AddListener(() => { ToggleSacrifice(slot); });
+            selBtn.onClick.AddListener(() => { if (_animating) return; _targetSlot = slot; UpdateTargetDialogue(); RefreshAll(); });
         }
     }
 
@@ -219,51 +251,52 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         var panel = ShopUIStyle.MakeImage(w, "Info", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(panel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -344), new Vector2(-48, 118));
+                           new Vector2(0, -470), new Vector2(-60, 140));
         var p = panel.transform;
 
-        _successText = ShopUIStyle.MakeText(p, "Success", 18f, FontStyles.Bold,
+        _successText = ShopUIStyle.MakeText(p, "Success", 22f, FontStyles.Bold,
                                             TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(_successText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(20, -12), new Vector2(-20, 28));
+                           new Vector2(24, -14), new Vector2(-24, 32));
 
-        _costText = ShopUIStyle.MakeText(p, "Cost", 18f, FontStyles.Bold,
+        _costText = ShopUIStyle.MakeText(p, "Cost", 22f, FontStyles.Bold,
                                          TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
         ShopUIStyle.Anchor(_costText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(10, -12), new Vector2(-20, 28));
+                           new Vector2(12, -14), new Vector2(-24, 32));
 
-        _dropText = ShopUIStyle.MakeText(p, "Drop", 16f, FontStyles.Normal,
+        _dropText = ShopUIStyle.MakeText(p, "Drop", 17f, FontStyles.Normal,
                                          TextAlignmentOptions.TopLeft, ShopUIStyle.RejectRed);
         ShopUIStyle.Anchor(_dropText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(20, -44), new Vector2(-20, 26));
+                           new Vector2(24, -52), new Vector2(-24, 28));
 
-        _previewText = ShopUIStyle.MakeText(p, "Preview", 16f, FontStyles.Normal,
+        _previewText = ShopUIStyle.MakeText(p, "Preview", 17f, FontStyles.Normal,
                                             TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
         ShopUIStyle.Anchor(_previewText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(10, -44), new Vector2(-20, 26));
+                           new Vector2(12, -52), new Vector2(-24, 28));
 
-        _streakText = ShopUIStyle.MakeText(p, "Streak", 16f, FontStyles.Bold,
+        _streakText = ShopUIStyle.MakeText(p, "Streak", 18f, FontStyles.Bold,
                                            TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
         ShopUIStyle.Anchor(_streakText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(20, -76), new Vector2(-20, 30));
+                           new Vector2(24, -88), new Vector2(-24, 34));
 
-        _resultText = ShopUIStyle.MakeText(p, "Result", 17f, FontStyles.Bold,
+        _resultText = ShopUIStyle.MakeText(p, "Result", 20f, FontStyles.Bold,
                                            TextAlignmentOptions.TopRight, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(_resultText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(10, -76), new Vector2(-20, 30));
+                           new Vector2(12, -88), new Vector2(-24, 34));
     }
 
     private void BuildActions(Transform w)
     {
-        _enhanceBtn = MakeStyledButton(w, "Enhance", "강화", out _enhanceLabel);
+        _enhanceBtn = MakeStyledButton(w, "Enhance", "강 화", out _enhanceLabel);
+        _enhanceLabel.fontSize = 26f;
         ShopUIStyle.Anchor((RectTransform)_enhanceBtn.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                           new Vector2(0.5f, 0), new Vector2(0, 88), new Vector2(300, 60));
+                           new Vector2(0.5f, 0), new Vector2(0, 100), new Vector2(400, 76));
         _enhanceBtn.onClick.AddListener(OnEnhanceClicked);
 
         var rowGo = ShopUIStyle.MakeRect(w, "PromoteRow", typeof(HorizontalLayoutGroup));
         _promoteRow = (RectTransform)rowGo.transform;
         ShopUIStyle.Anchor(_promoteRow, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                           new Vector2(0, 20), new Vector2(560, 52));
+                           new Vector2(0, 22), new Vector2(680, 54));
         var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
         hlg.spacing = 10f;
         hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -272,7 +305,7 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         var exitBtn = MakeStyledButton(w, "Exit", "나가기", out _);
         ShopUIStyle.Anchor((RectTransform)exitBtn.transform, new Vector2(1, 0), new Vector2(1, 0),
-                           new Vector2(1, 0), new Vector2(-24, 20), new Vector2(160, 48));
+                           new Vector2(1, 0), new Vector2(-26, 24), new Vector2(170, 50));
         exitBtn.onClick.AddListener(ClosePopupUI);
     }
 
@@ -282,7 +315,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         lbl.color = ShopUIStyle.TextPrimary;
         close.GetComponent<Image>().color = new Color(0.5f, 0.16f, 0.16f, 1f);
         ShopUIStyle.Anchor((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                           new Vector2(-12, -12), new Vector2(50, 50));
+                           new Vector2(-14, -14), new Vector2(52, 52));
         close.onClick.AddListener(ClosePopupUI);
     }
 
@@ -330,30 +363,98 @@ public sealed class UI_CruciblePanel : UI_Popup
             _dialogText.text = _controller.GetDialogue(CrucibleMood.Taunt);
     }
 
-    private void ToggleSacrifice(int slot)
-    {
-        if (slot == _targetSlot) return;                 // 대상은 제물 불가
-        _sacrificeSlot = _sacrificeSlot == slot ? -1 : slot;
-        RefreshAll();
-    }
-
     private void OnEnhanceClicked()
     {
-        if (_controller == null) return;
-        var result = _controller.TryEnhance(_targetSlot, _sacrificeSlot);
-        ShowEnhanceResult(result);
-        RefreshAll();
+        if (_controller == null || _animating) return;
+        // 컨트롤러가 결과를 즉시 확정(OnCrucibleChanged→RefreshAll 동기 발화). 연출은 표시층만 재생.
+        var result = _controller.TryEnhance(_targetSlot);
+        PlayEnhanceSequence(result).Forget();
     }
 
     private void OnPromoteClicked(string legendId)
     {
-        if (_controller == null) return;
+        if (_controller == null || _animating) return;
         var result = _controller.TryPromote(_targetSlot, legendId);
         ShowPromoteResult(result);
         RefreshAll();
     }
 
-    private void ShowEnhanceResult(EnhanceResult r)
+    // ── 도파민 연출 시퀀스 (표시층 전용; 결과/데이터/세이브 불변) ──
+
+    /// <summary>강화 결과를 비동기 연출로 재생. 연출 종료 후 RefreshAll로 최종 확정.</summary>
+    private async UniTaskVoid PlayEnhanceSequence(EnhanceResult r)
+    {
+        if (r.IsReject)
+        {
+            ShowResultText(r);
+            if (r.outcome != EnhanceOutcome.RejectMaxed) ShopUIStyle.PlaySfx("crucible_fail");
+            RefreshAll();
+            return;
+        }
+
+        _animating = true;
+        SetActionsInteractable(false);
+        ShowResultText(r);
+
+        int slot = _targetSlot;
+        int max  = slot >= 0 ? _controller.MaxAt(slot) : 0;
+        // 카운트 연출이 레벨 셀을 소유하도록 시작 단계로 되돌림
+        // (RefreshAll이 이미 afterLevel로 세팅했으나 다음 렌더 전 동일 프레임에서 덮어씀 → 깜빡임 없음).
+        if (IsCardSlot(slot)) { _cardLevel[slot].text = FormatLevel(r.beforeLevel, max); SetGauge(slot, r.beforeLevel, max); }
+
+        try
+        {
+            switch (r.outcome)
+            {
+                case EnhanceOutcome.Success:
+                    if (_controller.LastJackpot) await JackpotSequence(slot, r, max);
+                    else                         await SuccessSequence(slot, r, max);
+                    break;
+                case EnhanceOutcome.FailDropped:
+                    await FailSequence(slot, r, max);
+                    break;
+            }
+        }
+        catch (OperationCanceledException) { return; } // 패널 파괴 — 정적 서비스는 자립적, 정리 불필요
+
+        _animating = false;
+        SetActionsInteractable(true);
+        RefreshAll(); // 연출 후 최종 확정
+    }
+
+    private async UniTask SuccessSequence(int slot, EnhanceResult r, int max)
+    {
+        ShopUIStyle.PlaySfx("crucible_success");
+        HitFeelService.HitStop(0.6f, 0.05f); // 시간정지 팝업에선 timeScale 무효(무해) — 카메라측 반응만
+        await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
+        await UniTask.WhenAll(PunchCard(slot, PunchScale, PunchDur),
+                              FlashCard(slot, SuccessFlash));
+    }
+
+    private async UniTask JackpotSequence(int slot, EnhanceResult r, int max)
+    {
+        ShopUIStyle.PlaySfx("crucible_jackpot");
+        VolumePulseService.Pulse(JackpotPulsePeak, JackpotPulseDur); // 전체화면 크로매틱+블룸(unscaled)
+        HitFeelService.Heavy();
+        await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
+        await UniTask.WhenAll(PunchCard(slot, JackpotPunchScale, JackpotPunchDur),
+                              FlashCard(slot, JackpotFlash));
+    }
+
+    private async UniTask FailSequence(int slot, EnhanceResult r, int max)
+    {
+        bool nearMiss = IsNearMiss(r);
+        ShopUIStyle.PlaySfx("crucible_fail");
+        HitFeelService.Light();
+        if (r.beforeLevel != r.afterLevel) // 하락분이 있으면 카운트다운
+            await CountLevel(slot, r.beforeLevel, r.afterLevel, max);
+        float amp   = nearMiss ? FailShakeAmp * NearMissShakeMult : FailShakeAmp;
+        Color flash = nearMiss ? NearMissFlash : FailFlash;
+        await UniTask.WhenAll(ShakeCard(slot, amp, FailShakeDur),
+                              FlashCard(slot, flash));
+    }
+
+    private void ShowResultText(EnhanceResult r)
     {
         switch (r.outcome)
         {
@@ -365,21 +466,14 @@ public sealed class UI_CruciblePanel : UI_Popup
                 _dialogText.text = _controller.LastJackpot ? _controller.GetDialogue(CrucibleMood.Jackpot)
                                  : _controller.Streak >= 2 ? _controller.GetDialogue(CrucibleMood.Streak)
                                  : _controller.GetDialogue(CrucibleMood.Success);
-                ShopUIStyle.PlaySfx("shop_open");
-                break;
-            case EnhanceOutcome.FailAbsorbed:
-                _resultText.text = "<color=#FF8A50>실패 — 제물이 흡수</color>";
-                _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
-                ShopUIStyle.PlaySfx("shop_reject");
                 break;
             case EnhanceOutcome.FailDropped:
-                _resultText.text = $"<color=#FF5250>실패 — 하락 (+{r.afterLevel})</color>";
+                _resultText.text = IsNearMiss(r) ? $"<color=#FF7A3A>아슬아슬! 하락 (+{r.afterLevel})</color>"
+                                                 : $"<color=#FF5250>실패 — 하락 (+{r.afterLevel})</color>";
                 _dialogText.text = _controller.GetDialogue(CrucibleMood.Fail);
-                ShopUIStyle.PlaySfx("shop_reject");
                 break;
             case EnhanceOutcome.RejectNoFuel:
                 _resultText.text = "<color=#FF5250>강화재료 부족</color>";
-                ShopUIStyle.PlaySfx("shop_reject");
                 break;
             case EnhanceOutcome.RejectMaxed:
                 _resultText.text = "<color=#8AB0D5>이미 최대 강화</color>";
@@ -387,6 +481,111 @@ public sealed class UI_CruciblePanel : UI_Popup
             default:
                 _resultText.text = "<color=#FF5250>강화 불가</color>";
                 break;
+        }
+    }
+
+    /// <summary>실패가 성공확률에 아슬아슬했는지(roll이 chance의 NearMissBand배 이내).</summary>
+    private static bool IsNearMiss(EnhanceResult r)
+        => r.outcome == EnhanceOutcome.FailDropped
+           && r.chance > 0f && r.roll < r.chance * NearMissBand;
+
+    private bool IsCardSlot(int slot) => slot >= 0 && slot < 2 && _cardLevel[slot] != null;
+
+    private static string FormatLevel(int level, int max)
+        => $"+{level} <size=55%><color=#9A98A0>/ {max}</color></size>";
+
+    private void SetGauge(int slot, int level, int max)
+    {
+        if (slot < 0 || slot >= 2 || _cardGaugeFill[slot] == null) return;
+        float ratio = max > 0 ? Mathf.Clamp01((float)level / max) : 0f;
+        var f = _cardGaugeFill[slot];
+        f.anchorMin = new Vector2(0f, 0f);
+        f.anchorMax = new Vector2(ratio, 1f);
+        f.offsetMin = Vector2.zero; f.offsetMax = Vector2.zero;
+    }
+
+    private void SetActionsInteractable(bool on)
+    {
+        if (_enhanceBtn != null) _enhanceBtn.interactable = on;
+        foreach (var b in _legendBtns) if (b != null) b.interactable = on;
+    }
+
+    /// <summary>레벨 셀 + 게이지를 before→after로 한 단계씩 표기(카운트업/다운).</summary>
+    private async UniTask CountLevel(int slot, int before, int after, int max)
+    {
+        if (!IsCardSlot(slot)) return;
+        int step  = after >= before ? 1 : -1;
+        int steps = Mathf.Max(1, Mathf.Abs(after - before));
+        float perStep = Mathf.Min(CountStepDur, CountMaxDur / steps);
+
+        int lvl = before;
+        _cardLevel[slot].text = FormatLevel(lvl, max);
+        SetGauge(slot, lvl, max);
+        while (lvl != after)
+        {
+            await Hold(perStep);
+            lvl += step;
+            _cardLevel[slot].text = FormatLevel(lvl, max);
+            SetGauge(slot, lvl, max);
+        }
+    }
+
+    /// <summary>카드 스케일 펀치(ShopSlot PopAsync 이식). unscaledDeltaTime.</summary>
+    private async UniTask PunchCard(int slot, float amp, float dur)
+    {
+        if (slot < 0 || slot >= 2 || _cardBg[slot] == null) return;
+        var rt = _cardBg[slot].rectTransform;
+        float t = 0f;
+        while (t < 1f)
+        {
+            t = Mathf.Min(t + Time.unscaledDeltaTime / dur, 1f);
+            float s = 1f + amp * Mathf.Sin(t * Mathf.PI);
+            rt.localScale = Vector3.one * s;
+            await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+        }
+        rt.localScale = Vector3.one;
+    }
+
+    /// <summary>카드 배경색 플래시 → 원색 복귀(감쇠). unscaledDeltaTime.</summary>
+    private async UniTask FlashCard(int slot, Color flash)
+    {
+        if (slot < 0 || slot >= 2 || _cardBg[slot] == null) return;
+        var img = _cardBg[slot];
+        Color baseCol = img.color;
+        float t = 0f;
+        while (t < FlashDur)
+        {
+            t += Time.unscaledDeltaTime;
+            img.color = Color.Lerp(flash, baseCol, t / FlashDur);
+            await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+        }
+        img.color = baseCol;
+    }
+
+    /// <summary>카드 좌우 흔들림(ShopSlot ShakeAsync 이식) — 기준 앵커 복원. unscaledDeltaTime.</summary>
+    private async UniTask ShakeCard(int slot, float amp, float dur)
+    {
+        if (slot < 0 || slot >= 2 || _cardBg[slot] == null) return;
+        var rt = _cardBg[slot].rectTransform;
+        Vector2 basePos = _cardBasePos[slot];
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float damp = 1f - (t / dur);
+            rt.anchoredPosition = basePos + new Vector2(Mathf.Sin(t * 60f) * amp * damp, 0f);
+            await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
+        }
+        rt.anchoredPosition = basePos;
+    }
+
+    private async UniTask Hold(float seconds)
+    {
+        float t = 0f;
+        while (t < seconds)
+        {
+            t += Time.unscaledDeltaTime;
+            await UniTask.Yield(PlayerLoopTiming.Update, destroyCancellationToken);
         }
     }
 
@@ -416,26 +615,24 @@ public sealed class UI_CruciblePanel : UI_Popup
         {
             var w = _controller.GetSlot(i);
             bool isTarget = i == _targetSlot;
-            bool isSac    = i == _sacrificeSlot;
 
-            _cardBg[i].color = isTarget ? new Color(0.20f, 0.16f, 0.09f, 1f)
-                                        : (isSac ? new Color(0.16f, 0.10f, 0.10f, 1f) : ShopUIStyle.CardFill);
+            _cardBg[i].color = isTarget ? CardTargetBg : ShopUIStyle.CardFill;
 
             if (w == null)
             {
                 _cardName[i].text = "—";
                 _cardLevel[i].text = "";
                 _cardAtk[i].text = "";
-                _sacLabel[i].text = "제물";
+                SetGauge(i, 0, 1);
                 continue;
             }
 
             int max = _controller.MaxAt(i);
             string legend = string.IsNullOrEmpty(w.legendId) ? "" : $"  <color=#FFD24A>[{LegendName(w.legendId)}]</color>";
             _cardName[i].text = $"{w.displayName}{legend}";
-            _cardLevel[i].text = $"+{w.enhanceLevel} <size=60%><color=#9A98A0>/ {max}</color></size>";
+            _cardLevel[i].text = FormatLevel(w.enhanceLevel, max);
             _cardAtk[i].text = $"공격 {w.baseAttack:F0}";
-            _sacLabel[i].text = isSac ? "제물 ✓" : "제물";
+            SetGauge(i, w.enhanceLevel, max);
         }
 
         RefreshInfo();
@@ -453,7 +650,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             _successText.text = "<color=#8AB0D5>최대 강화 도달</color>";
             _costText.text = "";
             _dropText.text = "";
-            _previewText.text = "승급 가능" ;
+            _previewText.text = _controller.CanPromote(_targetSlot) ? "승급 가능" : "";
         }
         else
         {
@@ -479,7 +676,6 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_promoteRow != null) _promoteRow.gameObject.SetActive(canPromote);
         if (!canPromote) return;
 
-        var w = _controller.GetSlot(_targetSlot);
         for (int i = 0; i < _legendBtns.Count && i < _controller.Legends.Length; i++)
         {
             var legend = _controller.Legends[i];

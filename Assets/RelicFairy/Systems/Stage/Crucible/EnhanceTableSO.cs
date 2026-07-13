@@ -37,10 +37,10 @@ public class EnhanceTableSO : ScriptableObject
     [SerializeField] private float _attackPctPerLevel = 0.08f;
 
     [Header("등급별 강화 상한")]
-    [SerializeField] private int _maxCommon    = 3;
-    [SerializeField] private int _maxRare      = 5;
-    [SerializeField] private int _maxEpic      = 8;
-    [SerializeField] private int _maxLegendary = 10;
+    [SerializeField] private int _maxCommon    = 6;
+    [SerializeField] private int _maxRare      = 9;
+    [SerializeField] private int _maxEpic      = 12;
+    [SerializeField] private int _maxLegendary = 15;
 
     [Header("승급 전설 (택1 분기)")]
     [SerializeField] private LegendDef[] _legends;
