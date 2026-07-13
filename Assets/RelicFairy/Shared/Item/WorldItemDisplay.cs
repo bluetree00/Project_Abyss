@@ -88,6 +88,7 @@ public class WorldItemDisplay : MonoBehaviour
     public static WorldItemDisplay SpawnFromData(RuntimeItemData data, Vector3 position, ItemSO so = null, ItemVfxConfig config = null)
     {
         var go = new GameObject($"DroppedItem_{data.displayName}");
+        RoomScopedDrop.Mark(go);   // 방 전환 시 정리(부모 없어 방 파괴로는 안 지워짐)
         go.transform.position = position;
 
         var col = go.AddComponent<SphereCollider>();
