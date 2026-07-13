@@ -448,6 +448,10 @@ public class RunFlowController : MonoBehaviour
     {
         if (room == null) return;
 
+        // 이전 방의 드랍(골드 코인·클리어 보상·버린 아이템)은 부모가 없어 방 파괴로 안 지워진다.
+        // → 다음 방에 흔적으로 떠다니지 않도록 여기서 일괄 정리.
+        RoomScopedDrop.ClearAll();
+
         var children = new List<Transform>(room.transform.childCount);
         foreach (Transform c in room.transform) children.Add(c);
 

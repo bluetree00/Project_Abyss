@@ -131,6 +131,7 @@ public class RoomClearGate : MonoBehaviour
             ? Instantiate(endEffect2Prefab, center, Quaternion.identity)
             : new GameObject("ClearReward_Fallback");
         rewardGO.transform.position = center;
+        RoomScopedDrop.Mark(rewardGO);   // 안 주웠으면 방 전환 시 정리(다음 방 잔존 방지)
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
         trigger.Initialize(_run, rewards, _isBossRoom);
