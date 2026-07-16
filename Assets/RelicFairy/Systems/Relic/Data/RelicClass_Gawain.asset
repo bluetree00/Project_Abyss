@@ -14,11 +14,52 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RelicClassSO
   id: 2
   displayName: "\uAC00\uC6E8\uC778"
-  loreDesc: 
+  loreDesc: "\uD574\uAC00 \uC911\uCC9C\uC5D0 \uC124 \uB54C \uAC00\uC7A5 \uAC15\uD574\uC9C0\uB294
+    \uAE30\uC0AC\uC758 \uC794\uC0C1. \uADF8\uC758 \uAC80\uC740 \uBCA0\uB294 \uAC83\uC774
+    \uC544\uB2C8\uB77C \uD0DC\uC6B0\uB294 \uAC83\uC774\uB2E4."
+  tagline: "\uD0DC\uC591\uC758 \uB9F9\uC138\uB97C \uC9CA\uC5B4\uC9C4 \uAC80"
+  tags:
+  - "\uC2DC\uAC04 \uC21C\uD658"
+  - "\uBC84\uC2A4\uD2B8 \uAD6C\uAC04"
+  - "\uD654\uC0C1"
+  abilities:
+  - name: "\uD558\uB8E8\uC758 \uC21C\uD658"
+    kind: 0
+    badge: "\uD328\uC2DC\uBE0C \xB7 \uC790\uB3D9 \uC21C\uD658"
+    summary: "\uC5EC\uBA85 \u2192 \uC815\uC624 \u2192 \uD669\uD63C\uC774 \uC2A4\uC2A4\uB85C
+      \uC21C\uD658\uD55C\uB2E4.\n\uC815\uC624\uAC00 \uC544\uB2D0 \uB54C \uC801\uC744
+      \uCC98\uCE58\uD558\uBA74 \uB2E4\uC74C \uD574\uAC00 \uB354 \uBE68\uB9AC \uB73C\uB2E4."
+    stats:
+    - "\uC5EC\uBA85 (20\uCD08)|\uACF5\uACA9\uC774 \uD654\uC0C1\uC744 \uC2EC\uB294\uB2E4
+      \xB7 80% \uC774\uC0C1 \uACF5\uACA9\uB825 +10%"
+    - "\uD669\uD63C (15\uCD08)|\uC794\uC5F4 \u2014 \uD654\uC0C1\uC774 8\uCD08\uAC04
+      \uAE38\uAC8C \uD0C4\uB2E4"
+  - name: "\uC815\uC624"
+    kind: 1
+    badge: "\uAC8C\uC774\uC9C0 \uAC00\uB4DD \xB7 10\uCD08"
+    summary: "\uC21C\uD658\uC758 \uC808\uC815. \uC9C4\uC785 \uC21C\uAC04 \uC2EC\uC5B4\uB454
+      \uD654\uC0C1\uC774 \uC804\uBD80 \uD130\uC9C4\uB2E4."
+    stats:
+    - "\uACF5\uACA9 \uC18D\uB3C4|+30%"
+    - "\uBAA8\uB4E0 \uD53C\uD574|+20%  (\uC815\uC624 \uCCAB \uD0C0\uACA9\uC740 +50%
+      \uCD94\uAC00)"
+    - "\uCE58\uBA85\uD0C0|\uD655\uB960 +10%p \xB7 \uD53C\uD574 +20%"
+  - name: "\uB099\uC77C"
+    kind: 2
+    badge: "Q \xB7 \uC815\uC624 \uC911 1\uD68C"
+    summary: "\uC815\uC624 \uC911\uC5D0\uB9CC \uC0AC\uC6A9 \uAC00\uB2A5. \uC804\uBC29
+      3m \uC9C0\uC810\uC5D0 \uD0DC\uC591\uC744 \uB0D9\uD558\uC2DC\uD0A8\uB2E4."
+    stats:
+    - "\uCC29\uD0C4 \uD53C\uD574|\uACF5\uACA9\uB825\uC758 350%"
+    - "\uD654\uC0C1|\uCD08\uB2F9 \uACF5\uACA9\uB825\uC758 15% \xB7 6\uCD08"
+    - "\uC791\uC5F4 \uC9C0\uB300|\uC7A5\uD310 4\uCD08 \xB7 0.5\uCD08\uB9C8\uB2E4
+      \uD53C\uD574"
+  themeColor: {r: 0.98, g: 0.78, b: 0.32, a: 1}
   portrait: {fileID: 0}
-  rosterIllust: {fileID: 21300000, guid: 5752829a159ee2f4a9f7b48d3cc16242, type: 3}
+  rosterIllust: {fileID: 0}
   passives: []
-  qSkillClipKey: Gawain_QSkill
+  qSkillClipKey: 
   qSkillCinematic: {fileID: 0}
+  stats: []
   auraVfxKey: 
   auraSocket: 

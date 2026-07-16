@@ -982,9 +982,13 @@ MonoBehaviour:
   blockCellSize: 1
   blockBaseY: -0.1
   wallLayers: 12
-  procDoorCorridorLength: 6
+  procDoorCorridorLength: 20
   shopSlotCount: 3
   blockShopStallPrefab: {fileID: 5608813811190350905, guid: d3719a5f59ab7214eb3382b0d7490ca8,
+    type: 3}
+  gatePortalPrefab: {fileID: 131587655575345367, guid: ad086e0fe857e42498115575f8a88e39,
+    type: 3}
+  gateSealDoorPrefab: {fileID: 1030972229, guid: abc00000000015711909437229106541,
     type: 3}
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}

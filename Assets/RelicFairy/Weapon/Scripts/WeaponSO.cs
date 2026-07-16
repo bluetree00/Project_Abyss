@@ -7,6 +7,10 @@ public class WeaponSO : ScriptableObject
     public string weaponDisplayKey;
     public string weaponPrefabKey;  // Addressables 무기 프리팹 키
     public string displayName;
+    [TextArea(1, 3), Tooltip("무기 선택 UI에 뜨는 한 줄 설명(성격·운용법). 비우면 설명 줄 생략.")]
+    public string tagline;
+    [Tooltip("무기 선택 UI 테마색(무기마다 톤이 달라 보이게). a<=0이면 기본 청색.")]
+    public Color uiThemeColor = new Color(0f, 0f, 0f, 0f);
     public string iconKey;          // Addressables 비동기 로드용 키
     public Sprite icon;             // HUD 즉시 표시용 직접 참조
     [Tooltip("장비 티어 (1~3). 스킬 해금 단계에 사용")]

@@ -63,12 +63,20 @@ public class RunFlowController : MonoBehaviour
     private GameObject                   _entranceLock;
     private CancellationTokenSource      _cts;
 
+    // 게이트 포탈 VFX — 런타임 AddComponent 생성이라 인스펙터 배선 불가 → Addressable 프리로드 캐시.
+    private const string GatePortalKey = "ProcGatePortal";
+    private GameObject _gatePortalPrefab;
+    private bool       _gatePortalTried;
+
     /// <summary>게이트 1개의 시각/물리 구성요소 묶음. 봉인 시 blocker로 막고, 공개 시 marker 색 전환.</summary>
     private sealed class GateView
     {
         public ProcRoomGate gate;
         public Renderer     marker;
         public Collider     blocker; // 봉인: solid(통과 차단) / 공개: 비활성
+        public GameObject   portal;  // 게이트 포탈 VFX — 봉인 시 비활성, 공개 시 활성(열림 연출)
+        public Transform    door;    // 봉인 석문 — 봉인 시 닫힘(낙하), 공개 시 위로 올라가며 열림
+        public float        openH;   // 개구부 높이(문 낙하/상승 거리)
     }
 
     private Vector3 _baseAnchor;
@@ -296,6 +304,15 @@ public class RunFlowController : MonoBehaviour
     {
         var grb = GameRunBootstrapper.Instance;
         if (grb == null || plan.entry == null) return;
+
+        // 게이트 포탈 VFX 참조 확보 (부트스트래퍼 직렬화 참조 → 없으면 Addressable 폴백). 실패해도 색 패널로 동작.
+        if (!_gatePortalTried)
+        {
+            _gatePortalTried = true;
+            _gatePortalPrefab = grb.GatePortalPrefab;
+            if (_gatePortalPrefab == null)
+                _gatePortalPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(GatePortalKey);
+        }
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
@@ -600,7 +617,7 @@ public class RunFlowController : MonoBehaviour
 
     private GateView CreateSealedGate(ProcExitSlot slot)
     {
-        var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker);
+        var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker, withPortal: true);
 
         // 트리거 — 공개 후 통과 감지용 (봉인 중에는 armed=false)
         var trig = go.AddComponent<BoxCollider>();
@@ -610,19 +627,119 @@ public class RunFlowController : MonoBehaviour
         var gate = go.AddComponent<ProcRoomGate>();
         gate.InitializeSealed(slot.edge, OnGateChosen);
 
-        return new GateView { gate = gate, marker = marker, blocker = blocker };
+        var portal = go.transform.Find("GatePortalVfx");
+
+        // 출구 봉인 석문 — 전투 시작 시 웅장하게 낙하해 봉인(플레이어가 보는 앞쪽). 클리어 시 위로 열리며 포탈 공개.
+        float oh   = MarkerH(slot);
+        var   door = SpawnSealDoor(go.transform, MarkerW(slot), oh);
+        if (door != null && marker != null) marker.enabled = false; // 석문이 시각 담당(색 패널 숨김)
+
+        var view = new GateView { gate = gate, marker = marker, blocker = blocker, portal = portal != null ? portal.gameObject : null, door = door, openH = oh };
+        if (door != null) SealDoorDropAsync(door, oh, shake: _gates.Count == 0).Forget(); // 첫 문에서만 카메라 흔들림(중복 방지)
+        return view;
+    }
+
+    /// <summary>봉인 석문이 높은 곳에서 강하게 가속 낙하해 "쿵" 봉인 — 웅장한 동적 연출. shake=착지 카메라 흔들림.</summary>
+    private async UniTaskVoid SealDoorDropAsync(Transform door, float openH, bool shake)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        if (door == null) return;
+        Vector3 sealedPos = door.localPosition;
+        Vector3 upPos     = sealedPos + Vector3.up * (Mathf.Max(1f, openH) * 1.7f); // 개구부 높이의 1.7배 위 = 멀리서 떨어짐
+        float   dur       = 0.42f;
+        door.localPosition = upPos;
+        try
+        {
+            float t = 0f;
+            while (t < dur)
+            {
+                if (door == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / dur);
+                door.localPosition = Vector3.Lerp(upPos, sealedPos, k * k * k); // 큐빅 ease-in: 강한 가속(무겁게 쾅)
+                await UniTask.Yield();
+            }
+            door.localPosition = sealedPos;
+        }
+        catch (OperationCanceledException) { return; }
+        if (shake) HitFeelService.CameraShake(0.30f, 0.32f); // 웅장한 착지 임팩트
+    }
+
+    /// <summary>봉인 석문이 위로 올라가며 열림(클리어 공개). 감속 정착.</summary>
+    private async UniTaskVoid SealDoorRaiseAsync(Transform door, float openH)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        if (door == null) return;
+        Vector3 sealedPos = door.localPosition;
+        Vector3 upPos     = sealedPos + Vector3.up * Mathf.Max(1f, openH);
+        float   dur       = 0.5f;
+        try
+        {
+            float t = 0f;
+            while (t < dur)
+            {
+                if (door == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / dur);
+                float e = 1f - (1f - k) * (1f - k); // ease-out
+                door.localPosition = Vector3.Lerp(sealedPos, upPos, e);
+                await UniTask.Yield();
+            }
+            door.localPosition = upPos;
+        }
+        catch (OperationCanceledException) { return; }
     }
 
     /// <summary>들어온 입구를 잠금 패널로 막는다 (되돌아가기 차단). 가벼운 잠금 페이드인 연출.</summary>
+    // SM_ArchWall_01a 석문 메시 로컬 바운드(m) — 개구부에 맞춰 스케일 계산용.
+    private const float SealDoorMeshW = 7f;
+    private const float SealDoorMeshH = 11.5f;
+
     private void LockEntrance(ProcExitSlot slot)
     {
         if (_entranceLock != null) Destroy(_entranceLock);
-        _entranceLock = CreateGatePanel("ProcEntranceLock", slot, LockedColor, out _, out _);
-        LockEntranceAsync(_entranceLock).Forget();
+        _entranceLock = CreateGatePanel("ProcEntranceLock", slot, LockedColor, out var lockMarker, out _, withPortal: false);
+
+        // 갇힘 방지: 봉인 연출(낙하) 중에도 통과를 확실히 막는 풀사이즈 정적 콜라이더.
+        // 시각 문은 위에서 내려오지만 이 콜라이더는 처음부터 완전한 크기로 입구를 막는다.
+        var hardBlock = new GameObject("EntranceHardBlocker");
+        hardBlock.transform.SetParent(_entranceLock.transform, false);
+        var bc = hardBlock.AddComponent<BoxCollider>();
+        bc.size = new Vector3(MarkerW(slot) + 1f, MarkerH(slot) * 2f + 2f, 2.5f); // 폭·높이 넉넉히 — 뛰어넘기/틈새 통과 차단
+
+        // 석문 오브젝트 리소스(Gothic 석재)를 시각으로 사용 — 큐브 패널 렌더러는 숨겨 콜라이더만 남긴다.
+        float oh = MarkerH(slot);
+        Transform doorTr = SpawnSealDoor(_entranceLock.transform, MarkerW(slot), oh);
+        if (doorTr != null && lockMarker != null) lockMarker.enabled = false;
+
+        LockEntranceAsync(_entranceLock, doorTr, oh).Forget();
+    }
+
+    /// <summary>봉인 석문(Gothic 석재)을 개구부 크기에 맞춰 닫힘 위치에 인스턴스화. 프리팹 없으면 null.</summary>
+    private Transform SpawnSealDoor(Transform parent, float ow, float oh)
+    {
+        var doorPrefab = GameRunBootstrapper.Instance?.GateSealDoorPrefab;
+        if (doorPrefab == null) return null;
+        var door = Instantiate(doorPrefab, parent);
+        door.name = "SealDoor";
+        door.transform.localRotation = Quaternion.identity;
+        door.transform.localScale    = new Vector3(ow / SealDoorMeshW, oh / SealDoorMeshH, 1f);
+        // 코너 피벗(0..W,0..H) → 개구부 중앙 정렬(게이트 원점 = 개구부 중앙)
+        door.transform.localPosition = new Vector3(-ow * 0.5f, -oh * 0.5f, -0.25f);
+        SetLayerRecursive(door, 8); // Wall 레이어
+        return door.transform;
+    }
+
+    private static void SetLayerRecursive(GameObject go, int layer)
+    {
+        go.layer = layer;
+        foreach (Transform c in go.transform) SetLayerRecursive(c.gameObject, layer);
     }
 
     /// <summary>게이트/잠금 패널 공통 생성 — 개구부 크기로 채운 솔리드 큐브. blocker는 통과 차단용 콜라이더.</summary>
-    private GameObject CreateGatePanel(string name, ProcExitSlot slot, Color color, out Renderer marker, out Collider blocker)
+    private GameObject CreateGatePanel(string name, ProcExitSlot slot, Color color, out Renderer marker, out Collider blocker, bool withPortal)
     {
         float openW = MarkerW(slot);
         float openH = MarkerH(slot);
@@ -633,15 +750,28 @@ public class RunFlowController : MonoBehaviour
         if (slot.edge == DoorEdge.East || slot.edge == DoorEdge.West)
             go.transform.localRotation = Quaternion.Euler(0f, 90f, 0f); // 통로를 가로지르게
 
-        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube); // 솔리드 콜라이더 유지 = 통과 차단
+        // 얇은 색 프레임(=통과 차단 콜라이더 겸 봉인/공개 색 표시). 두께를 얇게 해 포탈이 앞뒤로 보이게.
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
         panel.name = "Marker";
         panel.transform.SetParent(go.transform, false);
-        panel.transform.localScale = new Vector3(openW, openH, 0.4f);
+        panel.transform.localScale = new Vector3(openW, openH, 0.12f);
 
         panel.TryGetComponent(out blocker);
         panel.TryGetComponent(out marker);
         // 빌드에서 프리미티브 기본 머티리얼이 핑크로 스트립되는 문제 → URP/Lit 명시 할당.
         RuntimePrimitiveMaterial.Apply(marker, color);
+
+        // 게이트 포탈 VFX — 봉인 시 비활성으로 심고, 공개 때 활성화(열림 연출). 실패 시 색 패널만.
+        if (withPortal && _gatePortalPrefab != null)
+        {
+            var portal = Instantiate(_gatePortalPrefab, go.transform);
+            portal.name = "GatePortalVfx";
+            portal.transform.localPosition = Vector3.zero;
+            portal.transform.localRotation = Quaternion.identity;
+            float s = Mathf.Min(openW, openH) * 0.5f; // 개구부 크기에 맞춤(원본 루트 스케일 (1,10,1) 무시하고 균일화)
+            portal.transform.localScale = new Vector3(s, s, s);
+            portal.SetActive(false);
+        }
 
         return go;
     }
@@ -686,8 +816,18 @@ public class RunFlowController : MonoBehaviour
         var rend = view.marker;
         Color to = KindColor(plan.kind);
 
+        // 봉인 석문이 위로 올라가며 열림 → 그 뒤 포탈이 드러난다.
+        if (view.door != null) SealDoorRaiseAsync(view.door, view.openH).Forget();
+
+        // 포탈 VFX 활성화 — "문이 열린다" 연출. 포탈이 있으면 레거시 색 슬래브(불투명 큐브)를 숨겨 포탈로 대체.
+        if (view.portal != null)
+        {
+            view.portal.SetActive(true);
+            if (rend != null) rend.enabled = false; // 보라 사각형 제거 → 포탈이 개구부를 채움
+        }
+
         // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인
-        TextMeshProUGUI label = (rend != null) ? CreateGateLabel(rend.transform.parent, plan.kind) : null;
+        TextMeshProUGUI label = (rend != null) ? CreateGateLabel(rend.transform.parent, plan.kind, rend.transform.localScale.y) : null;
 
         if (rend != null)
         {
@@ -725,28 +865,57 @@ public class RunFlowController : MonoBehaviour
     }
 
     /// <summary>게이트에 다음 방 종류 라벨(월드 스페이스)을 만든다. 알파 0으로 시작 — 공개 연출과 함께 페이드인.</summary>
-    private TextMeshProUGUI CreateGateLabel(Transform gateTr, RoomPlanKind kind)
+    private TextMeshProUGUI CreateGateLabel(Transform gateTr, RoomPlanKind kind, float openH)
     {
         var go = new GameObject("GateLabel");
         go.transform.SetParent(gateTr, false);
-        go.transform.localPosition = new Vector3(0f, 1.6f, 0f); // 개구부 상단 부근(게이트 원점 = 개구부 중앙)
+        // 게이트 원점 = 개구부 중앙(지면에서 openH/2 위). 라벨을 지면 기준 ~2.2m로 내려 화면에 보이게 한다.
+        go.transform.localPosition = new Vector3(0f, -openH * 0.5f + 2.2f, 0f);
 
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
         if (Camera.main != null) go.transform.rotation = Camera.main.transform.rotation; // 카메라 향해 빌보드(1회)
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta  = new Vector2(320f, 90f);
+        rt.sizeDelta  = new Vector2(360f, 110f);
         rt.localScale = Vector3.one * 0.02f;
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text      = KindKor(kind);
-        tmp.fontSize  = 48f;
+        tmp.text      = KindGlyph(kind) + " " + KindKor(kind);
+        tmp.fontSize  = 62f;
         tmp.fontStyle = FontStyles.Bold;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color     = new Color(1f, 1f, 1f, 0f); // 알파 0 시작
+        // 방 종류별 밝은 색 + 검은 테두리로 어느 배경에서도 읽히게. 알파 0 시작(공개 시 페이드인).
+        var c = KindBrightColor(kind); c.a = 0f;
+        tmp.color            = c;
+        tmp.outlineColor     = new Color(0f, 0f, 0f, 1f);
+        tmp.outlineWidth     = 0.22f;
         return tmp;
     }
+
+    /// <summary>방 종류 → 라벨용 밝은 색(가독성). KindColor는 패널용 어두운 톤이라 텍스트엔 부적합.</summary>
+    private static Color KindBrightColor(RoomPlanKind kind) => kind switch
+    {
+        RoomPlanKind.Boss     => new Color(1f, 0.30f, 0.30f),
+        RoomPlanKind.PreBoss  => new Color(1f, 0.45f, 0.45f),
+        RoomPlanKind.Elite    => new Color(0.72f, 0.45f, 1f),
+        RoomPlanKind.Shop     => new Color(0.40f, 1f, 0.55f),
+        RoomPlanKind.Event    => new Color(1f, 0.85f, 0.35f),
+        RoomPlanKind.Crucible => new Color(1f, 0.60f, 0.25f),
+        _                     => new Color(0.85f, 0.90f, 1f), // 전투(Normal)
+    };
+
+    /// <summary>방 종류 → 라벨 앞 기호(폰트에 있는 안전한 글리프만).</summary>
+    private static string KindGlyph(RoomPlanKind kind) => kind switch
+    {
+        RoomPlanKind.Boss     => "▲",
+        RoomPlanKind.PreBoss  => "▲",
+        RoomPlanKind.Elite    => "◆",
+        RoomPlanKind.Shop     => "■",
+        RoomPlanKind.Event    => "◇",
+        RoomPlanKind.Crucible => "●",
+        _                     => "▪",
+    };
 
     /// <summary>방 종류 → 표시용 한글 라벨.</summary>
     private static string KindKor(RoomPlanKind kind) => kind switch
@@ -760,32 +929,64 @@ public class RunFlowController : MonoBehaviour
         _                    => "전투",
     };
 
-    /// <summary>입구 잠금 패널을 빠르게 페이드인해 "잠김"을 알린다 (영구 차단, 공개 없음).</summary>
-    private async UniTaskVoid LockEntranceAsync(GameObject lockGo)
+    /// <summary>입구를 봉인 — 무거운 석문이 개구부 위에서 가속 낙하해 "쿵" 닫히고 카메라가 흔들린다(임팩트).
+    /// 통과 차단은 EntranceHardBlocker 정적 콜라이더가 처음부터 담당하므로 낙하 중 갇힘이 없다.</summary>
+    private async UniTaskVoid LockEntranceAsync(GameObject lockGo, Transform door, float openH)
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
-        if (lockGo == null) return;
-        var rend = lockGo.GetComponentInChildren<Renderer>();
-        var tr   = rend != null ? rend.transform : null;
+        // 석문이 있으면 그걸, 없으면 큐브 패널을 낙하 애니 대상으로.
+        Transform tr = door;
+        if (tr == null)
+        {
+            if (lockGo == null) return;
+            var rend = lockGo.GetComponentInChildren<Renderer>();
+            tr = rend != null ? rend.transform : null;
+        }
         if (tr == null) return;
 
-        Vector3 full = tr.localScale;
-        Vector3 thin = new Vector3(full.x, 0.05f, full.z); // 위→아래로 닫히는 느낌
-        float dur = 0.25f;
+        Vector3 sealedPos = tr.localPosition;              // 닫힘(개구부 봉인) 위치
+        float   rise      = Mathf.Max(1f, openH);
+        Vector3 upPos     = sealedPos + Vector3.up * rise; // 열림(개구부 위로 올라간) 위치
+        float   openDur   = 0.5f;
+        float   holdDur    = 0.45f;
+        float   fallDur   = 0.5f;
+        tr.localPosition = sealedPos;                      // 닫힌 상태에서 시작
         try
         {
+            // 1) 열림 — 석문이 위로 올라가며 통로를 연다(감속 정착). "도착 = 통로 확보"
             float t = 0f;
-            while (t < dur)
+            while (t < openDur)
             {
                 if (tr == null) return;
                 ct.ThrowIfCancellationRequested();
                 t += Time.deltaTime;
-                tr.localScale = Vector3.Lerp(thin, full, Mathf.Clamp01(t / dur));
+                float k = Mathf.Clamp01(t / openDur);
+                float e = 1f - (1f - k) * (1f - k);        // ease-out
+                tr.localPosition = Vector3.Lerp(sealedPos, upPos, e);
                 await UniTask.Yield();
             }
+            tr.localPosition = upPos;
+
+            // 2) 잠깐 열린 채 유지 — 통로가 보이는 순간
+            await UniTask.Delay(TimeSpan.FromSeconds(holdDur), ignoreTimeScale: true, cancellationToken: ct);
+
+            // 3) 닫힘 — 무겁게 가속 낙하해 봉인
+            t = 0f;
+            while (t < fallDur)
+            {
+                if (tr == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / fallDur);
+                tr.localPosition = Vector3.Lerp(upPos, sealedPos, k * k); // ease-in: 무겁게 가속
+                await UniTask.Yield();
+            }
+            tr.localPosition = sealedPos;
         }
         catch (OperationCanceledException) { return; }
-        if (tr != null) tr.localScale = full;
+
+        // 4) 착지 임팩트 — 카메라 흔들림(쿵). 무거운 석문이 바닥에 꽂히는 피드백.
+        HitFeelService.CameraShake(0.18f, 0.24f);
     }
 
     private async UniTaskVoid TransitionAsync(DoorPlan plan, DoorEdge edge)

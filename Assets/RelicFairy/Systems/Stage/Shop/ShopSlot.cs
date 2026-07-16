@@ -36,11 +36,19 @@ public sealed class ShopSlot
     /// <summary>비동기 구매 확정 대기(무기 교체 팝업 등). 이중 구매 차단.</summary>
     public bool Pending { get; set; }
 
+    /// <summary>정비소 서비스 슬롯이면 해당 종류. 아이템/무기/포션 슬롯이면 null.</summary>
+    public ShopServiceKind? Service { get; }
+
+    /// <summary>서비스 진열이 '준비 중'(정제소 대기 등)이라 구매 불가일 때 true.</summary>
+    public bool Locked { get; }
+
     /// <summary>지금 구매 가능한 상태인지.</summary>
-    public bool Purchasable => (Entry != null || LegacyItem != null) && !Sold && !Owned && !Pending;
+    public bool Purchasable =>
+        (Entry != null || LegacyItem != null || Service.HasValue) && !Sold && !Owned && !Pending && !Locked;
 
     public ShopSlot(ShopEntry entry, ShopItemSO legacyItem, ShopCategory category, int price,
-                    string displayName, ItemRarity rarity, Sprite icon, string description)
+                    string displayName, ItemRarity rarity, Sprite icon, string description,
+                    ShopServiceKind? service = null, bool locked = false)
     {
         Entry = entry;
         LegacyItem = legacyItem;
@@ -50,7 +58,14 @@ public sealed class ShopSlot
         Rarity = rarity;
         Icon = icon;
         Description = description;
+        Service = service;
+        Locked = locked;
     }
+
+    /// <summary>정비소 서비스 슬롯 생성(가격/이름은 ShopServiceRunner·Catalog에서 계산).</summary>
+    public static ShopSlot ForService(ShopServiceKind kind, int price, string name, string desc, bool locked)
+        => new ShopSlot(null, null, ShopCategory.Item, price, name, ItemRarity.Common, null, desc,
+                        service: kind, locked: locked);
 
     /// <summary>풀 고갈로 채우지 못한 빈 슬롯.</summary>
     public static ShopSlot Empty(ShopCategory category)

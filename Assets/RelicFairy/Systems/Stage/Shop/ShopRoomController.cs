@@ -32,6 +32,7 @@ public class ShopRoomController : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
     private const int MaxRarityFallbackAttempts = 4;
+    private const string PotionEntryId = "shop_potion";   // SHOP_DATA의 포션 엔트리 id(가격 원본)
     private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록(캡슐 height=2의 절반).
     private static readonly string[] DeadStallChildren = { "SoldOutLabel", "DisplayVfxRoot" }; // 과거 월드 구매 상태연출 — NPC+UI로 대체됨.
 
@@ -130,9 +131,33 @@ public class ShopRoomController : MonoBehaviour
         var playerState = _run.PlayerState;
         if (playerState == null) return ShopPurchaseResult.Unavailable;
 
+        if (slot.Service.HasValue)
+            return PurchaseService(slot, slot.Service.Value);
+
         return slot.Entry != null
             ? PurchaseFromEntry(slot, slot.Entry, playerState)
             : PurchaseFromLegacy(slot, slot.LegacyItem, playerState);
+    }
+
+    /// <summary>정비소 서비스 구매 — ShopServiceRunner에 위임하고 결과를 상점 결과로 매핑한다.</summary>
+    private ShopPurchaseResult PurchaseService(ShopSlot slot, ShopServiceKind kind)
+    {
+        var result = ShopServiceRunner.Execute(kind, _run);
+        switch (result)
+        {
+            case ShopServiceResult.Success:
+                // 서비스는 반복 구매 가능(품절 없음). 누진 가격 반영 위해 서비스 슬롯 가격만 갱신.
+                RebuildServiceSlots();
+                RunFlowController.Active?.SaveNow("shop-service");
+                OnShopChanged?.Invoke();
+                return ShopPurchaseResult.Success;
+            case ShopServiceResult.InsufficientGold:
+                return ShopPurchaseResult.InsufficientGold;
+            case ShopServiceResult.NotImplemented:
+            case ShopServiceResult.Unavailable:
+            default:
+                return ShopPurchaseResult.Unavailable;
+        }
     }
 
     /// <summary>리롤. 비결정 RNG로 진열을 새로 롤. 피처 off거나 골드 부족이면 false.</summary>
@@ -261,18 +286,12 @@ public class ShopRoomController : MonoBehaviour
     /// <summary>슬롯 카테고리 레이아웃. 매대가 있으면 그 카테고리를, 없으면 slotCount+무기폴백.</summary>
     private List<ShopCategory> BuildCategoryLayout()
     {
-        var cats = new List<ShopCategory>();
-        if (_stallCategories.Count > 0)
-        {
-            cats.AddRange(_stallCategories);
-            return cats;
-        }
-
-        int total = _slotCount;
-        int weapons = Mathf.Clamp(_weaponSlotFallback, 0, total);
-        for (int i = 0; i < total - weapons; i++) cats.Add(ShopCategory.Item);
-        for (int i = 0; i < weapons; i++) cats.Add(ShopCategory.Weapon);
-        return cats;
+        // 상점 판매 = 포션만(BuildSlots가 고정 슬롯으로 추가). 무기·아이템 판매는 폐기.
+        //   · 무기: 무형검 기본 지급 + 재련소 강화/진화로 진행(완제품 무기 구매 안 함)
+        //   · 아이템: 드롭 + 정제로 획득
+        // 매대 카테고리(_stallCategories)·슬롯수(_slotCount)는 더 이상 진열에 쓰지 않는다.
+        // 남은 무기 판매 코드(ProcessWeaponAcquisitionAsync 등)는 데이터가 없어 도달 불가(정리 대상).
+        return new List<ShopCategory>();
     }
 
     private void BuildSlots(System.Random rng)
@@ -287,6 +306,46 @@ public class ShopRoomController : MonoBehaviour
             BuildSlotsFromChart(rng);
         else
             BuildSlotsFromCatalog();
+
+        AppendPotionSlot();     // 포션은 랜덤 롤이 아니라 항상 있는 고정 슬롯
+        AppendServiceSlots();   // 정비소 서비스(룬 제거·정수·서약·HP…) 고정 진열
+    }
+
+    /// <summary>정비소 서비스 슬롯 진열(항상 노출). 미구현 서비스는 '준비 중'(Locked)으로 표시만.</summary>
+    private void AppendServiceSlots()
+    {
+        foreach (var def in ShopServiceCatalog.All)
+        {
+            int price   = ShopServiceRunner.GetPrice(def.Kind, _run);
+            // 준비 중(미구현) 또는 조건 미충족(뺄 룬 없음 등)이면 잠금 표시.
+            bool locked = !def.Implemented || !ShopServiceRunner.IsAvailable(def.Kind, _run);
+            _slots.Add(ShopSlot.ForService(def.Kind, price, def.DisplayName, def.Description, locked));
+        }
+    }
+
+    /// <summary>서비스 슬롯만 제거 후 재진열(누진 가격·조건 변화 반영). 아이템/무기/포션 슬롯은 유지.</summary>
+    private void RebuildServiceSlots()
+    {
+        _slots.RemoveAll(s => s != null && s.Service.HasValue);
+        AppendServiceSlots();
+    }
+
+    /// <summary>
+    /// 체력 포션 슬롯을 진열 맨 뒤에 고정으로 붙인다(구매 재고 없음 개념 — 골드만 있으면 반복 구매 가능).
+    /// SHOP_DATA의 category=potion 엔트리(price_override로 가격)를 GetById로 찾는다. 없으면 붙이지 않음.
+    /// </summary>
+    private void AppendPotionSlot()
+    {
+        var shopData = Managers.ShopData;
+        if (shopData == null || !shopData.IsInitialized) return;
+
+        var entry = shopData.GetById(PotionEntryId);
+        if (entry == null) return;   // CSV에 포션 엔트리 없으면 스킵
+
+        int price = shopData.ResolvePrice(entry);   // price_override 우선
+        _slots.Add(new ShopSlot(entry, null, ShopCategory.Potion, price,
+                                "체력 포션", ItemRarity.Common, null,
+                                "즉시 최대 체력의 40%를 회복한다. 퀵슬롯(H)에 충전."));
     }
 
     private void BuildSlotsFromChart(System.Random rng)
@@ -477,6 +536,12 @@ public class ShopRoomController : MonoBehaviour
             return ShopPurchaseResult.Unavailable;
         }
 
+        var cat = ShopCategoryExtensions.FromChartString(entry.category);
+
+        // 포션 만재면 구매 자체를 막는다(골드 차감 전 — 낭비 방지). 재고 없음으로 표시.
+        if (cat == ShopCategory.Potion && playerState.PotionCount >= playerState.PotionCapacity)
+            return ShopPurchaseResult.Unavailable;
+
         int price = slot.Price;
         if (!playerState.TrySpendGold(price))
         {
@@ -484,7 +549,15 @@ public class ShopRoomController : MonoBehaviour
             return ShopPurchaseResult.InsufficientGold;
         }
 
-        var cat = ShopCategoryExtensions.FromChartString(entry.category);
+        if (cat == ShopCategory.Potion)
+        {
+            playerState.AddPotion(1);
+            slot.Sold = true;   // 한 번 진열당 1개(반복 구매하려면 재진열/리롤)
+            RunFlowController.Active?.SaveNow("shop-purchase");
+            OnShopChanged?.Invoke();
+            return ShopPurchaseResult.Success;
+        }
+
         if (cat == ShopCategory.Weapon)
         {
             var wm = _run.Player?.WeaponManager;

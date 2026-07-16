@@ -13,6 +13,16 @@ MonoBehaviour:
   m_Name: BlockPalette_Forest
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
   themeMatch: Forest
+  wallMode: 1
+  wallHeight: 8
+  hasCeiling: 0
+  lighting:
+    wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    centerLightPrefab: {fileID: 0}
+    wallLightSpacing: 6
+    wallLightHeightRatio: 0.4
+    maxWallLights: 16
   blocks:
   - {fileID: 11400000, guid: 6bfba40b082f66549bb9192b1f434331, type: 2}
   - {fileID: 11400000, guid: 6210a5df7c32f604e86b821372770ad1, type: 2}

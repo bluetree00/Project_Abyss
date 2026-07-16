@@ -212,7 +212,7 @@ public sealed class PlayerRuntimeStats
     }
 
     // ── 실드(보호막) ──────────────────────────────────────────────────────────────
-    // 상태는 SynergyMechanics.ShieldCurrentValue 재사용(룬 ShieldAccumulate/Burst와 공유). HP 차감 전 흡수.
+    // 상태는 SynergyMechanics(실드 전용 상태)에 보관. HP 차감 전 흡수.
 
     /// <summary>현재 실드값(표시용 정수).</summary>
     public int Shield => Mathf.RoundToInt(_synergyMechanics.ShieldCurrentValue);
@@ -247,13 +247,6 @@ public sealed class PlayerRuntimeStats
         _synergyMechanics.ShieldCurrentValue = 0f;
         OnChanged?.Invoke();
         return damage - Mathf.CeilToInt(s);
-    }
-
-    /// <summary>ShieldAccumulate(룬 방어 시너지) 활성 시 피격 피해의 일부를 실드로 축적.</summary>
-    public void AccumulateShieldFromDamage(int incomingDamage)
-    {
-        if (!_synergyMechanics.ShieldAccumulateEnabled || incomingDamage <= 0) return;
-        AddShield(incomingDamage * Mathf.Max(0f, _synergyMechanics.ShieldAccumulateRate));
     }
 
     /// <summary>
@@ -369,10 +362,34 @@ public sealed class PlayerRuntimeStats
     private float _buffCritChance;    // 일시 크릿 버프(예: 가웨인 정오 구간). 리소스가 토글.
     private float _buffCritDamage;
 
+    // ── 속성 반응(Reaction) 레이어 — 인접 두 속성 존이 함께 활성일 때 MerlinRuneBridge가 설정 ──
+    private float _reactionCritChance;
+    private float _reactionCritDamage;
+    private float _reactionAttackSpeed;
+    private float _reactionDamagePercent;
+    private float _reactionSkillCdr;
+    private float _reactionDamageReduction;
+
     /// <summary>치명타 확률 보너스 합(%포인트). 무기 크릿 위에 가산. CombatCalculator.RollCrit이 읽음.</summary>
-    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance + _itemDyn.critChance + _itemCritChance;
+    public float CritChanceBonus => _relicCritChance + _buffCritChance + _synergyDynCritChance + _itemDyn.critChance + _itemCritChance + _reactionCritChance;
     /// <summary>치명타 피해 배율 보너스 합(가산). 무기 크릿 배율 위에 가산.</summary>
-    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage;
+    public float CritDamageBonus => _relicCritDamage + _buffCritDamage + _synergyDynCritDamage + _itemDyn.critDamage + _itemCritDamage + _reactionCritDamage;
+
+    /// <summary>
+    /// 속성 반응 스탯을 한 번에 설정한다. MerlinRuneBridge가 시너지 갱신마다 활성 반응을 합산해 호출.
+    /// 크리는 프로퍼티(라이브)라 즉시 반영, 나머지 3종은 Recalculate로 반영한다.
+    /// </summary>
+    public void SetReactionBonuses(float critChance, float critDamage, float attackSpeed,
+                                   float damagePercent, float skillCdr, float damageReduction)
+    {
+        _reactionCritChance      = critChance;
+        _reactionCritDamage      = critDamage;
+        _reactionAttackSpeed     = attackSpeed;
+        _reactionDamagePercent   = damagePercent;
+        _reactionSkillCdr        = skillCdr;
+        _reactionDamageReduction = damageReduction;
+        Recalculate();
+    }
 
     /// <summary>유물 일시 크릿 버프 설정(가웨인 정오 등). chance=%포인트, damage=배율 가산. (0,0)=해제.</summary>
     public void SetRelicCritBuff(float chanceBonus, float damageBonus)
@@ -382,14 +399,6 @@ public sealed class PlayerRuntimeStats
     }
 
     // -- Grid Synergy (Always) --
-    private int _synergyMelee;
-    private int _synergyRanged;
-    private int _synergyDefense;
-    private int _synergyLuck;
-    private int _synergyMaxHp;
-    private float _synergySkillCdr;
-    private float _synergyActiveItemCdr;
-    private float _synergyAttackSpeed;
 
     // -- Relic Awakening (영구 성장 레이어) --
     private int   _awakeningMelee;
@@ -402,8 +411,6 @@ public sealed class PlayerRuntimeStats
     private float _awakeningLifesteal;
 
     // -- Grid Synergy (조건부) --
-    private float _synergyLifesteal;
-    private readonly System.Collections.Generic.List<ConditionalSynergy> _conditionalSynergies = new();
 
     // -- Synergy Mechanics (행동 역학 플래그) --
     private readonly SynergyMechanicsState _synergyMechanics = new();
@@ -860,43 +867,17 @@ public sealed class PlayerRuntimeStats
 
     private void Recalculate()
     {
-        // 조건부 시너지 누적
-        int condMelee = 0, condRanged = 0;
-        float condAttackSpeed = 0f;
-
-        foreach (var s in _conditionalSynergies)
-        {
-            float multiplier = 0f;
-
-            if (s.trigger == "OnHit" && s.currentStacks > 0)
-                multiplier = s.currentStacks;
-            else if (s.trigger == "OnLowHp" && s.isActive)
-                multiplier = 1f;
-
-            if (multiplier <= 0f) continue;
-
-            switch (s.effectType)
-            {
-                case "AttackPower":
-                    condMelee  += (int)(s.value * multiplier);
-                    condRanged += (int)(s.value * multiplier);
-                    break;
-                case "MeleeAttack":  condMelee  += (int)(s.value * multiplier); break;
-                case "RangedAttack": condRanged += (int)(s.value * multiplier); break;
-                case "AttackSpeed":  condAttackSpeed += s.value * multiplier; break;
-            }
-        }
 
         // % 보너스 배율
-        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage) * _characterMeleeMult;
-        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage) * _characterRangedMult;
+        float dmgMul  = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent) * _characterMeleeMult;
+        float dmgMulR = (1f + _itemAllDamagePercent + _synergyDynAttackPct + _itemDyn.attackPercent + _itemDyn.allDamage + _reactionDamagePercent) * _characterRangedMult;
         float defMul  = (1f + _itemAllStatsPercent + _itemDefensePercent + _itemDyn.defensePercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
-        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee  + _synergyMelee  + _awakeningMelee  + _relicMelee   + condMelee;
-        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _synergyRanged + _awakeningRanged + _relicRanged  + condRanged;
-        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _synergyDefense + _awakeningDefense + _relicDefense;
-        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _synergyLuck + _awakeningLuck + _relicLuck;
+        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee   + _awakeningMelee  + _relicMelee  ;
+        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _awakeningRanged + _relicRanged ;
+        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _awakeningDefense + _relicDefense;
+        int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _awakeningLuck + _relicLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
         RangedAttack = Mathf.Max(0, Mathf.RoundToInt(baseRangedSum * dmgMulR));
@@ -920,11 +901,11 @@ public sealed class PlayerRuntimeStats
             _maxHpItemContribution = newContribution;
         }
 
-        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + condAttackSpeed);
+        AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _synergySkillCdr + _awakeningSkillCdr + _relicSkillCdr);
-        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr + _synergyActiveItemCdr);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr);
+        ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신
         RollCooldownBonus   = _itemRollCooldown;
@@ -932,9 +913,9 @@ public sealed class PlayerRuntimeStats
         RangedRangeBonus    = _itemRangedRange;
         HealingReceivedBonus = _itemHealingReceived;
         DebuffResistance    = _itemDebuffResistance;
-        AllDamagePercent    = _itemAllDamagePercent;
-        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction + _synergyDynDamageReduction);
-        ItemLifesteal       = _itemLifesteal + LifestealRate + _awakeningLifesteal;
+        AllDamagePercent    = _itemAllDamagePercent + _reactionDamagePercent;
+        DamageReduction     = Mathf.Clamp01(_itemDamageReduction + _characterDamageReduction + _synergyDynDamageReduction + _reactionDamageReduction);
+        ItemLifesteal       = _itemLifesteal + _awakeningLifesteal;
 
         // 시스템 스탯
         AllElementBonus     = _itemAllElementBonus;
@@ -967,231 +948,4 @@ public sealed class PlayerRuntimeStats
         Recalculate();
     }
 
-    // ── 시너지 ──────────────────────────────────────────────────────────────────
-
-    /// <summary>Always 트리거 시너지 — 즉시 영구 스탯 적용.</summary>
-    public void ApplySynergyEffect(string effectType, float value)
-    {
-        switch (effectType)
-        {
-            case "MeleeAttack":   _synergyMelee  += (int)value; break;
-            case "RangedAttack":  _synergyRanged += (int)value; break;
-            case "AttackPower":
-                _synergyMelee  += (int)value;
-                _synergyRanged += (int)value;
-                break;
-            case "Defense":       _synergyDefense += (int)value; break;
-            case "MaxHp":
-                _synergyMaxHp += (int)value;
-                MaxHp = Mathf.Max(1, MaxHp + (int)value);
-                Hp = Mathf.Min(Hp, MaxHp);
-                break;
-            case "MaxPoise":      _poiseBonus   += value; break;
-            case "MaxStamina":    _staminaBonus += value; break;
-            case "Luck":          _synergyLuck += (int)value; break;
-            case "AttackSpeed":   _synergyAttackSpeed += value; break;
-            case "Lifesteal":     _synergyLifesteal += value; break;
-            case "MoveSpeed":     break; // TODO: 이동속도 레이어 추가 시
-            case "SkillCooldownReduction":       _synergySkillCdr += value; break;
-            case "ActiveItemCooldownReduction":  _synergyActiveItemCdr += value; break;
-        }
-
-        Recalculate();
-    }
-
-    /// <summary>조건부 시너지 등록 (OnHit, OnLowHp 등).</summary>
-    public void RegisterConditionalSynergy(ConditionalSynergy synergy)
-    {
-        if (synergy == null) return;
-        _conditionalSynergies.Add(synergy);
-    }
-
-    /// <summary>흡혈 비율 (OnHit Lifesteal 포함).</summary>
-    public float LifestealRate => _synergyLifesteal;
-
-    /// <summary>조건부 시너지 목록 (읽기 전용).</summary>
-    public System.Collections.Generic.IReadOnlyList<ConditionalSynergy> ConditionalSynergies => _conditionalSynergies;
-
-    /// <summary>OnHit 트리거 발동 — 공격 적중 시 호출.</summary>
-    public void TriggerOnHit()
-    {
-        foreach (var s in _conditionalSynergies)
-        {
-            if (s.trigger != "OnHit") continue;
-            s.currentStacks = Mathf.Min(s.currentStacks + 1, s.maxStack > 0 ? s.maxStack : 1);
-            s.remainingDuration = s.duration;
-        }
-
-        Recalculate();
-    }
-
-    /// <summary>OnLowHp 체크 — HP 비율 기반 조건부 효과 활성화.</summary>
-    public void CheckOnLowHp()
-    {
-        float hpRatio = MaxHp > 0 ? (float)Hp / MaxHp : 1f;
-
-        foreach (var s in _conditionalSynergies)
-        {
-            if (s.trigger != "OnLowHp") continue;
-            s.isActive = hpRatio <= s.threshold;
-        }
-
-        Recalculate();
-    }
-
-    /// <summary>조건부 시너지 시간 경과 — Update에서 호출.</summary>
-    public void TickConditionalSynergies(float deltaTime)
-    {
-        bool changed = false;
-        foreach (var s in _conditionalSynergies)
-        {
-            if (s.trigger != "OnHit" || s.currentStacks <= 0) continue;
-            if (s.duration <= 0f) continue;
-
-            s.remainingDuration -= deltaTime;
-            if (s.remainingDuration <= 0f)
-            {
-                s.currentStacks = 0;
-                s.remainingDuration = 0f;
-                changed = true;
-            }
-        }
-
-        if (changed) Recalculate();
-    }
-
-    /// <summary>시너지 행동 역학 플래그를 entry 기반으로 활성화한다.</summary>
-    public void ApplySynergyMechanicEffect(RuneSynergyEntry entry)
-    {
-        if (entry == null) return;
-        var m = _synergyMechanics;
-
-        switch (entry.effect_type)
-        {
-            case "ChargingStrike":
-                m.ChargingStrikeEnabled = true;
-                m.ChargingStrikePeriod = entry.value > 0 ? entry.value : 3f;
-                m.ChargingStrikeDamageMultiplier = entry.value2 > 0 ? entry.value2 : 2f;
-                m.ChargingStrikeCounter = 0;
-                break;
-            case "ShockwaveBurst":
-                m.ShockwaveBurstEnabled = true;
-                m.ShockwaveBurstStunDuration = entry.value > 0 ? entry.value : 0.5f;
-                m.ShockwaveBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
-                m.ShockwaveBurstRadius = entry.value3 > 0 ? entry.value3 : 60f;
-                break;
-            case "MagicEcho":
-                m.MagicEchoEnabled = true;
-                m.MagicEchoChargeCount = entry.value > 0 ? entry.value : 3f;
-                m.MagicEchoDamageBonus = entry.value2 > 0 ? entry.value2 : 0.3f;
-                break;
-            case "SkillEchoChain":
-                m.SkillEchoChainEnabled = true;
-                m.SkillEchoChainDamageMultiplier = entry.value2 > 0 ? entry.value2 : 0.5f;
-                m.SkillEchoChainRange = entry.value3 > 0 ? entry.value3 : 8f;
-                break;
-            case "ShieldAccumulate":
-                m.ShieldAccumulateEnabled = true;
-                m.ShieldAccumulateRate = entry.value > 0 ? entry.value : 0.2f;
-                m.ShieldCapRatio = 0.3f;
-                break;
-            case "ShieldBurst":
-                m.ShieldBurstEnabled = true;
-                m.ShieldBurstInvincibleDuration = entry.value > 0 ? entry.value : 0.5f;
-                m.ShieldBurstDamageMultiplier = entry.value2 > 0 ? entry.value2 : 1.5f;
-                break;
-            case "DodgeOnMove":
-                m.DodgeOnMoveEnabled = true;
-                m.DodgeOnMoveBonus = entry.value > 0 ? entry.value : 0.1f;
-                break;
-            case "MoveAttackPenetrate":
-                m.MoveAttackPenetrateEnabled = true;
-                break;
-            case "LowHpDamageReduce":
-                m.LowHpDamageReduceEnabled = true;
-                m.LowHpThreshold = entry.value > 0 ? entry.value : 0.5f;
-                m.LowHpDamageReduceMax = entry.value2 > 0 ? entry.value2 : 0.4f;
-                break;
-            case "DeathSave":
-                m.DeathSaveEnabled = true;
-                m.DeathSaveInvincibleDuration = entry.value > 0 ? entry.value : 1.5f;
-                m.DeathSaveHealRatio = entry.value2 > 0 ? entry.value2 : 0.3f;
-                break;
-            case "GambleDice":
-                m.GambleDiceEnabled = true;
-                m.GambleDiceDoubleChance = entry.value > 0 ? entry.value : 0.15f;
-                m.GambleDiceMissChance = entry.value3 > 0 ? entry.value3 : 0.15f;
-                break;
-            case "CritChain":
-                m.CritChainEnabled = true;
-                m.CritChainChance = entry.value > 0 ? entry.value : 0.5f;
-                break;
-        }
-    }
-
-    /// <summary>모든 시너지 효과 초기화.</summary>
-    public void ClearSynergyEffects()
-    {
-        // MaxHp 복원 (초기화 전에 처리)
-        if (_synergyMaxHp != 0)
-        {
-            MaxHp = Mathf.Max(1, MaxHp - _synergyMaxHp);
-            Hp = Mathf.Min(Hp, MaxHp);
-        }
-
-        _synergyMelee = _synergyRanged = _synergyDefense = _synergyLuck = _synergyMaxHp = 0;
-        _synergySkillCdr = _synergyActiveItemCdr = _synergyAttackSpeed = 0f;
-        _synergyLifesteal = 0f;
-        _synergyDynAttackSpeed = _synergyDynAttackPct = 0f;
-        _synergyDynCritChance = _synergyDynCritDamage = _synergyDynDamageReduction = 0f;
-        _conditionalSynergies.Clear();
-        _synergyMechanics.Reset();
-
-        Recalculate();
-    }
-
-    /// <summary>
-    /// 시너지 레코드 목록으로부터 전체 재계산.
-    /// ClearSynergyEffects() 후 순회 적용하므로 항상 정확한 상태.
-    /// 씬 전환 후 BindPlayer 시점에서 호출.
-    /// </summary>
-    public void RestoreSynergies(System.Collections.Generic.IReadOnlyList<SynergyRecord> records)
-    {
-        ClearSynergyEffects();
-
-        if (records == null) return;
-
-        foreach (var r in records)
-        {
-            if (string.IsNullOrEmpty(r.effectType)) continue;
-
-            switch (r.trigger)
-            {
-                case "Always":
-                    ApplySynergyEffect(r.effectType, r.value);
-                    break;
-                case "OnHit":
-                    RegisterConditionalSynergy(new ConditionalSynergy
-                    {
-                        gridId     = r.gridId,
-                        effectType = r.effectType,
-                        trigger    = "OnHit",
-                        value      = r.value,
-                        maxStack   = r.maxStack > 0 ? r.maxStack : 1,
-                        duration   = r.duration,
-                    });
-                    break;
-                case "OnLowHp":
-                    RegisterConditionalSynergy(new ConditionalSynergy
-                    {
-                        gridId     = r.gridId,
-                        effectType = r.effectType,
-                        trigger    = "OnLowHp",
-                        value      = r.value,
-                        threshold  = r.value2 > 0f ? r.value2 : 0.3f,
-                    });
-                    break;
-            }
-        }
-    }
 }

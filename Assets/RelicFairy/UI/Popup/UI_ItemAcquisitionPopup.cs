@@ -115,10 +115,12 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
 
         if (_item == null || _inventory == null) { ClosePopupUI(); return; }
 
-        // 보관함에 추가
+        // 보관함에 추가. 가득 차면 실패하는데, 과거엔 이 실패를 무시하고 팝업만 닫아
+        // <b>아이템이 조용히 사라졌다</b> → 실패 시 그리드로 넘겨 '보류' 상태로 들고 있게 한다.
         bool added = _inventory.AddToStaging(_item);
         if (!added)
-            Debug.LogWarning($"[AcquisitionPopup] 스태킹 한계 초과로 추가 실패: {_item.itemId}");
+            ItemEffectVfxHelper.ShowNotice(
+                $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
 
         ClosePopupUI();
 
@@ -126,9 +128,10 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
         if (UI_GridPanel.Instance == null)
             Managers.UI?.ShowOverlayUI<UI_GridPanel>();
 
-        // Awake가 실행되어 Instance가 설정되었으면 새 아이템을 강조하며 패널 열기
-        if (UI_GridPanel.Instance != null)
-            UI_GridPanel.Instance.ShowWithNewItem(_item);
+        if (UI_GridPanel.Instance == null) return;
+
+        if (added) UI_GridPanel.Instance.ShowWithNewItem(_item);      // 강조하며 열기
+        else       UI_GridPanel.Instance.ShowWithPendingItem(_item);  // 자리 나면 자동 추가
     }
 
     private void OnRejectClicked()

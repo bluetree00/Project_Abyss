@@ -1,3 +1,5 @@
+using System;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
@@ -46,7 +48,7 @@ public class RelicAltar : MonoBehaviour
     {
         BillboardTexts();
         if (_claimed || _player == null) return;
-        if (Input.GetKeyDown(KeyCode.F)) Claim();
+        if (Input.GetKeyDown(KeyCode.F)) OpenInfoPopup();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -67,9 +69,33 @@ public class RelicAltar : MonoBehaviour
         }
     }
 
-    private void Claim()
+    /// <summary>
+    /// F — 곧바로 선택하지 않고 <b>유물 정보 팝업</b>을 먼저 띄운다.
+    /// 무엇을 고르는지 모르고 확정하던 흐름이었다(제단 위엔 이름만 떠 있었다).
+    /// 팝업에서 '선택'을 눌러야 Claim이 실제로 실행된다.
+    /// </summary>
+    private void OpenInfoPopup()
     {
         if (_player == null || relicClass == null) return;
+        if (s_selected == this) return;   // 이미 선택된 제단 — 무동작
+
+        OpenInfoPopupAsync().Forget();
+    }
+
+    private async UniTaskVoid OpenInfoPopupAsync()
+    {
+        try
+        {
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicInfoPopup>();
+            if (popup == null) { Claim(); return; }   // 팝업 로드 실패 시 기존 동작으로 폴백
+            popup.Setup(relicClass, Claim);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void Claim()
+    {
+        if (relicClass == null) return;
         if (s_selected == this) return; // 이미 선택된 제단 — 무동작
 
         // 이전 선택 유물 복귀(다시 선택 가능)

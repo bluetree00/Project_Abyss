@@ -120,12 +120,18 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 받는 피해 증폭 디버프(낙인/취약/분쇄 등) — statusId별 다중 슬롯. 시한부, 만료 시 슬롯 무시.
     // 과거 단일 float 1슬롯이라 서로 다른 출처(룬 분쇄/유물 낙인/아이템 취약)가 덮어써 1개만 유효했다.
     // 이제 활성 슬롯들의 증폭을 합연산(1 + Σamp)한다.
-    private struct DmgTakenAmpSlot { public float amp; public float expire; }
+    private struct DmgTakenAmpSlot { public float amp; public float expire; public float total; }
     private readonly Dictionary<string, DmgTakenAmpSlot> _dmgTakenAmpSlots = new();
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
     // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
     private readonly MonsterStatusReceiver _status = new();
+
+    // 디버프 아이콘 행 갱신 — 매 프레임 돌 필요가 없다(잔여 게이지는 0.15초 계단이면 충분히 부드럽다).
+    private const float StatusUiInterval = 0.15f;
+    private readonly List<BuffViewItem> _statusUiBuf = new();
+    private float _statusUiTimer;
+    private bool  _statusUiWasEmpty = true;
     private bool                   _statusCcActive;     // CC로 정지 중 → 해제 시 agent 1회 복원
     private bool                   _statusSlowActive;   // 슬로우로 속도 override 중 → 해제 시 base 1회 복원
     // 공격 windup(예고) 노출 — 아이템 저스트가드/공격캔슬(ColliderInstance가 소비).
@@ -152,6 +158,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>유효 최대 HP. 챕터 난이도 배율(difficultyScale) 반영.</summary>
     public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale) : 0;
+
+    /// <summary>몬스터 등급(Common/Rare/Elite/Boss). 대상 수가 아니라 '상대의 격'으로 보상을 정할 때 쓴다.</summary>
+    public MonsterGrade Grade => _config != null ? _config.grade : MonsterGrade.Common;
 
     /// <summary>유효 공격 속도.</summary>
     public float EffectiveAttackRate => _config != null ? _config.stat.attackRate : 0f;
@@ -436,6 +445,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 상태이상 수신기 틱(CC/Slow/DoT/공격디버프). DoT가 이 프레임에 처치할 수 있으므로 직후 사망 가드.
         _status.Tick(Time.deltaTime, this);
         if (_runtime.IsDead) return;
+
+        RefreshStatusUi();   // HP바 아래 디버프 아이콘 행(저주기 갱신)
         _attackSpeedMulti = _status.AttackSpeedMultiplier;   // 풀 간파/지배 적 공격 디버프
 
         // CC(스턴/빙결): 이동·FSM 정지. 해제 시 1회 복원.
@@ -687,10 +698,59 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         _dmgTakenAmpSlots[statusId] = new DmgTakenAmpSlot
         {
-            amp = Mathf.Max(0f, ampPercent),
+            amp    = Mathf.Max(0f, ampPercent),
             expire = Time.time + duration,
+            total  = Mathf.Max(0.01f, duration),   // 게이지 비율용
         };
         GuidelineVisual.StatusApplied(transform, statusId, duration);   // [가이드라인 비주얼]
+    }
+
+    /// <summary>
+    /// 디버프 아이콘 행 갱신. 매 프레임 딕셔너리 4개를 훑을 필요는 없으므로 저주기로 돈다.
+    /// 상태가 하나도 없으면 첫 호출에서 행을 숨긴 뒤 더 이상 아무 일도 하지 않는다(정상 상태의 비용 ≈ 0).
+    /// </summary>
+    private void RefreshStatusUi()
+    {
+        if (_hpBar == null) return;
+
+        _statusUiTimer -= Time.deltaTime;
+        if (_statusUiTimer > 0f) return;
+        _statusUiTimer = StatusUiInterval;
+
+        _statusUiBuf.Clear();
+        CollectStatuses(_statusUiBuf);
+
+        // 상태가 계속 없으면 SetStatuses(빈 리스트)조차 부를 필요가 없다.
+        if (_statusUiBuf.Count == 0 && _statusUiWasEmpty) return;
+        _statusUiWasEmpty = _statusUiBuf.Count == 0;
+
+        _hpBar.SetStatuses(_statusUiBuf);
+    }
+
+    /// <summary>
+    /// 지금 이 몬스터에게 걸려 있는 <b>모든</b> 상태이상을 UI 모델로 뽑는다(디버프 표시 단일 진입점).
+    ///
+    /// 상태가 세 곳에 흩어져 있다 — 상태수신기(CC/슬로우/DoT/공속), 받피증폭 슬롯, 그리고
+    /// 독립 MonoBehaviour인 화상 핸들러. UI가 세 곳을 각각 알 필요가 없도록 여기서 합친다.
+    /// </summary>
+    public void CollectStatuses(List<BuffViewItem> into)
+    {
+        if (into == null) return;
+
+        _status.CollectStatuses(into);
+
+        // 받피증폭(낙인·분쇄·취약·저주) — 상태수신기를 안 거치는 별도 슬롯
+        float now = Time.time;
+        foreach (var kv in _dmgTakenAmpSlots)
+        {
+            float left = kv.Value.expire - now;
+            if (left <= 0f) continue;
+            into.Add(MonsterStatusReceiver.MakeItem(kv.Key, 1, left / kv.Value.total, left));
+        }
+
+        // 화상 — MonsterStatusReceiver를 타지 않는 독립 계통(가웨인 태양)
+        if (TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
+            into.Add(MonsterStatusReceiver.MakeItem("burn", 1, burn.Remaining01, burn.Remaining));
     }
 
     /// <summary>현재 활성 받피증폭 디버프 합산 배율(1 + 만료되지 않은 슬롯들의 amp 합). 슬롯 없으면 1.</summary>
@@ -709,7 +769,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// %기반 즉발/DoT 수치가 방어의 max(1,...) 감산에 무력화되지 않게 하는 경로.
     /// GetHit 경직·넉백 없음(DoT/체인 연타로 인한 스턴락 방지). 처치 판정은 일반 피해와 동일.
     /// </summary>
-    public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false)
+    /// <param name="kind">데미지 숫자 색 구분용. DoT 틱은 Dot을 넘긴다(기본은 즉발 시너지).</param>
+    public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false,
+                                  DamageKind kind = DamageKind.Synergy)
     {
         if (_runtime == null || _runtime.IsDead || amount <= 0f) return;
 
@@ -720,7 +782,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
 
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind);
 
         // [가이드라인 비주얼] 시너지 즉발/DoT 피해 표시(통지만 — 토글 OFF면 무동작)
         GuidelineVisual.SynergyDamage(transform.position + Vector3.up * 1.2f, isCrit);
@@ -796,7 +858,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.CurrentHp -= (int)actual;
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());
 
         int effMax = EffectiveMaxHp;
         _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);

@@ -153,7 +153,7 @@ public sealed class UI_ShopSlotView : MonoBehaviour, IPointerEnterHandler, IPoin
     public void Refresh(ShopSlot slot, bool affordable)
     {
         if (slot == null) return;
-        bool hasGoods = slot.Entry != null || slot.LegacyItem != null;
+        bool hasGoods = slot.Entry != null || slot.LegacyItem != null || slot.Service.HasValue;
         _lastAffordable = affordable;
 
         // 등급 위계: 테두리/리본/후광/이름색
@@ -190,7 +190,7 @@ public sealed class UI_ShopSlotView : MonoBehaviour, IPointerEnterHandler, IPoin
         if (_buyButton != null) _buyButton.interactable = _interactable;
         if (_buyLabel != null) _buyLabel.color = _interactable ? ShopUIStyle.Gold : ShopUIStyle.TextDim;
 
-        bool blocked = slot.Sold || slot.Owned || slot.Pending;
+        bool blocked = slot.Sold || slot.Owned || slot.Pending || slot.Locked;
         if (_overlay != null)
         {
             _overlay.SetActive(blocked);
@@ -198,6 +198,7 @@ public sealed class UI_ShopSlotView : MonoBehaviour, IPointerEnterHandler, IPoin
             {
                 if (slot.Sold) { _stamp.text = "SOLD"; _stamp.color = ShopUIStyle.SoldStamp; }
                 else if (slot.Owned) { _stamp.text = "보유 중"; _stamp.color = ShopUIStyle.OwnedStamp; }
+                else if (slot.Locked) { _stamp.text = "준비 중"; _stamp.color = ShopUIStyle.TextDim; }
                 else { _stamp.text = "구매 중…"; _stamp.color = ShopUIStyle.TextPrimary; }
             }
         }

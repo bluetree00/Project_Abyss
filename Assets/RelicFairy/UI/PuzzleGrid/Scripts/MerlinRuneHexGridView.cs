@@ -180,9 +180,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             kvp.Value.color = placed ? OccupiedColor(bc) : EmptyColor(bc);
         }
 
-        var zoneCounts   = GetZoneOccupiedCounts();
-        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
     }
 
     /// <summary>
@@ -321,9 +319,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
                 img.color = EmptyColor(bc);
         }
-        var zoneCounts   = GetZoneOccupiedCounts();
-        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
     }
 
     /// <summary>현재 점유된 셀 좌표(col,row) 스냅샷. 세이브 캡처용.</summary>
@@ -362,9 +358,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
                 img.color = EmptyColor(bc);
         _occupiedPositions.Clear();
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(
-            new Dictionary<string, int>(),
-            new Dictionary<string, int>());
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(new Dictionary<string, int>());
     }
 
     // ── Private methods ──
@@ -518,9 +512,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
 
         // Bridge에 클러스터 업데이트 알림 (시너지 패널 즉시 갱신)
-        var zoneCounts   = GetZoneOccupiedCounts();
-        var clusterSizes = ZoneClusterCalculator.Compute(_occupiedPositions, _cellZones);
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(zoneCounts, clusterSizes);
+        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
 
         // ── 애니메이션 ───────────────────────────────────────────────────
         // 신규 셀: 흰색 플래시  0→0.6(30%)→0 (420ms)

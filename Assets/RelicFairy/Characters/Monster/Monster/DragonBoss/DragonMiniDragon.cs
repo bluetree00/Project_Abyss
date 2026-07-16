@@ -151,7 +151,7 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
     {
         if (IsDead) return;
         _currentHp -= Mathf.RoundToInt(amount);
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, amount, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, amount, isCrit, GetInstanceID());
         if (_currentHp <= 0) Die();
     }
 

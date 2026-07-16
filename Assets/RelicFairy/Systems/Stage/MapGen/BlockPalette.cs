@@ -23,6 +23,15 @@ public class RoomLightingConfig
     public int maxWallLights = 0;
 }
 
+/// <summary>벽을 세우는 방식. 팔레트(테마)별로 다르다.</summary>
+public enum WallBuildMode
+{
+    /// <summary>1셀 벽 프리팹을 wallHeight만큼 수직 반복(현행 큐브 방식). 실내 던전용.</summary>
+    Stacked,
+    /// <summary>셀당 벽 프리팹 1개만 배치. 높이는 프리팹 메시가 소유(절벽 등). 자연 지형용.</summary>
+    Single,
+}
+
 /// <summary>
 /// 테마별 블록 세트. TileType → BlockDef 매핑.
 /// 같은 TileType에 여러 BlockDef를 등록하면 가중치 랜덤 선택.
@@ -36,6 +45,16 @@ public class BlockPalette : ScriptableObject
     [Tooltip("방 테마 문자열. 비어있거나 \"*\"면 범용(모든 테마 fallback).")]
     [SerializeField] private string themeMatch = "*";
 
+    [Header("Vertical Profile")]
+    [Tooltip("벽 세우는 방식. Stacked=1셀 프리팹 수직 반복(실내), Single=셀당 1개(절벽 등 자연지형).")]
+    [SerializeField] private WallBuildMode wallMode = WallBuildMode.Stacked;
+
+    [Min(1), Tooltip("벽 높이(셀 수). Stacked면 반복 층수, Single이면 문 개구부/복도/천장 높이 계산용 논리 높이. 0/미설정 시 부트스트래퍼 전역값 폴백.")]
+    [SerializeField] private int wallHeight = 12;
+
+    [Tooltip("천장을 덮을지. false면 열린 하늘(숲·심연). true면 천장 배치(실내).")]
+    [SerializeField] private bool hasCeiling = true;
+
     [Header("Lighting")]
     [SerializeField] private RoomLightingConfig lighting = new();
 
@@ -45,6 +64,9 @@ public class BlockPalette : ScriptableObject
     private Dictionary<TileType, List<BlockDef>> _cache;
 
     public string ThemeMatch => themeMatch;
+    public WallBuildMode WallMode => wallMode;
+    public int WallHeight => wallHeight;
+    public bool HasCeiling => hasCeiling;
     public RoomLightingConfig Lighting => lighting;
 
     /// <summary>주어진 테마와 이 팔레트가 일치하는지. "*" 또는 빈값은 항상 매칭.</summary>

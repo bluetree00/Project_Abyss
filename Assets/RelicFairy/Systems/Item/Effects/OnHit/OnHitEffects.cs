@@ -5,22 +5,6 @@ using UnityEngine.AI;
 // 공격 적중 시 발동하는 효과
 // ═══════════════════════════════════════════════════════════
 
-public sealed class LifestealEffect : ItemEffectBase
-{
-    public LifestealEffect(ItemEffectSlot s) : base(s) { }
-
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        float heal = report.DamageDealt * _value;
-        if (heal > 0f && ctx.Player != null)
-        {
-            int h = Mathf.Max(1, (int)heal);
-            ctx.Player.Heal(h);
-            ItemGuide.Toast(ctx.Player.transform.position, $"흡혈 +{h}");
-        }
-    }
-}
-
 /// <summary>
 /// 적중 시 확률로 독(DoT) 부여 — 공격력 비율 기반(설계 ③ A안).
 ///  value=발동확률, value2=틱당 피해비율(EffAtk×value2), value3=틱간격, duration=총지속.

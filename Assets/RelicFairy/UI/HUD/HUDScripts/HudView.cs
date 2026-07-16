@@ -36,8 +36,8 @@ public sealed class HudView : MonoBehaviour
 
     [SerializeField] private Vector2 currencyPillSize    = new Vector2(150f, 40f);
     [SerializeField] private float   currencyPillSpacing = 8f;
-    [Tooltip("재화 라인 위치 — 화면 우상단 코너 기준 오프셋(음수=안쪽)")]
-    [SerializeField] private Vector2 currencyRowOffset   = new Vector2(-24f, -16f);
+    [Tooltip("재화 라인 위치 — 화면 우상단 코너 기준 오프셋(음수=안쪽). 목업은 코너에 붙지 않고 안쪽으로 들어와 있다.")]
+    [SerializeField] private Vector2 currencyRowOffset   = new Vector2(-56f, -74f);
     [Tooltip("pill 내용(아이콘+수치)을 테두리 안쪽으로 들여넣는 여백 (L,B,R,T)")]
     [SerializeField] private Vector4 currencyPillPadding = new Vector4(14f, 8f, 14f, 8f);
     /// <summary>테두리 아트에 코인이 그려져 있어 기존 GoldIcon과 중복될 때 숨긴다.</summary>

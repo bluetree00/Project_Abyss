@@ -52,17 +52,34 @@ public sealed class UI_CovenantSlot : MonoBehaviour
         if (_nameText != null)
             _nameText.text = covenant.DisplayName;
 
-        // 효과 설명 — 현재 단계에 해당하는 문구(목업처럼 따옴표 인용체)
+        // 효과 설명.
+        // 조립 서약은 원인/결과가 별도 데이터다 → 한 줄로 이어붙이지 않고 <b>줄을 나눠</b> 보여준다(좁은 칸에서 훨씬 읽힌다).
+        // 그 외(고정 서약)는 기존대로 단계별 문구를 인용체로.
         if (_descText != null)
         {
-            string desc = covenant.Stage switch
+            string cause  = covenant.CauseText;
+            string effect = covenant.EffectText;
+
+            string text;
+            if (!string.IsNullOrWhiteSpace(cause) && !string.IsNullOrWhiteSpace(effect))
             {
-                CovenantStage.Evolved  => covenant.EvolvedDescription,
-                CovenantStage.Enhanced => covenant.EnhancedDescription,
-                _                      => covenant.BasicDescription,
-            };
-            bool has = !string.IsNullOrWhiteSpace(desc);
-            _descText.text = has ? $"“{desc}”" : string.Empty;
+                _descText.fontStyle = FontStyles.Normal;
+                text = cause + "\n↓\n" + effect;
+            }
+            else
+            {
+                string desc = covenant.Stage switch
+                {
+                    CovenantStage.Evolved  => covenant.EvolvedDescription,
+                    CovenantStage.Enhanced => covenant.EnhancedDescription,
+                    _                      => covenant.BasicDescription,
+                };
+                _descText.fontStyle = FontStyles.Italic;
+                text = string.IsNullOrWhiteSpace(desc) ? string.Empty : $"“{desc}”";
+            }
+
+            bool has = !string.IsNullOrEmpty(text);
+            _descText.text = text;
             _descText.gameObject.SetActive(has);
         }
 

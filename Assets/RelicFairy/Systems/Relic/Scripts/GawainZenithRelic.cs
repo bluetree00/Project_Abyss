@@ -27,6 +27,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     private PlayerController _owner;
     private ZenithGauge      _gauge;
     private RelicStateVfx    _vfx;
+    private SolarNoonSun     _sun;          // 정오 — 머리 위 태양
     private Action           _onChanged;
     private bool             _skillUsedThisNoon;
     private bool             _wasNoon;
@@ -36,10 +37,19 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
     public ZenithGauge Gauge => _gauge;
     public IRelicResource RelicResource => _gauge;   // HUD 아이덴티티 바 연결
 
+    // ── 하루의 순환 ────────────────────────────────────────────────
+    // 이 유물의 정체성은 '게이지를 채우는 것'이 아니라 <b>시간의 순환</b>이다(해가 뜨고 진다).
+    // 그래서 구간마다 역할이 다르다 — 채우기형 유물(광기 스택 등)과 구조가 겹치지 않게 한다.
+    //   여명(충전) : 화상을 <b>심는다</b>. 각인(80%+)에서 공격력이 먼저 오른다.
+    //   정오       : <b>수확</b>. 심어둔 화상이 전부 터지고, 전 스탯이 강화되며 Q가 열린다.
+    //   황혼(쿨다운): <b>잔열</b>. 대지가 아직 뜨거워 화상이 오래 탄다. 처치하면 다음 해를 앞당긴다.
+
     /// <summary>정오 구간 — 공격 화염화(화상 강화·즉발). GawainSolarBurnPassive/스킬이 조회.</summary>
     public bool FlameMode => _gauge != null && _gauge.IsNoon;
-    /// <summary>여명(충전) 구간 — 화상 부착(준비). 죽은 구간 제거.</summary>
+    /// <summary>여명(충전) 구간 — 화상 부착(준비).</summary>
     public bool DawnMode  => _gauge != null && _gauge.CurrentPhase == ZenithGauge.ZPhase.Charging;
+    /// <summary>황혼(쿨다운) 구간 — 잔열. 화상이 오래 남고, 처치가 다음 해를 앞당긴다.</summary>
+    public bool TwilightMode => _gauge != null && _gauge.CurrentPhase == ZenithGauge.ZPhase.Cooldown;
 
     /// <summary>태양 강림이 호출 — 정오 구간당 1회 소비.</summary>
     public void MarkSkillUsed() => _skillUsedThisNoon = true;
@@ -60,6 +70,9 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         _vfx   = owner.gameObject.AddComponent<RelicStateVfx>();
         _vfx.Register("noon", NoonVfxKey);
 
+        _sun   = owner.gameObject.AddComponent<SolarNoonSun>();   // 정오 머리 위 태양
+        _sun.Bind(owner.transform);
+
         // 패시브: 각인 첫타(+50%) · 황혼 처치 충전 가속(잔열)
         owner.RegisterRelicPassive(new GawainSolarMarkPassive());
         owner.RegisterRelicPassive(new GawainAfterglowPassive());
@@ -75,6 +88,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         if (_gauge != null) _gauge.OnChanged -= _onChanged;
         ClearBuffs();
         if (_vfx != null) { UnityEngine.Object.Destroy(_vfx); _vfx = null; }
+        if (_sun != null) { UnityEngine.Object.Destroy(_sun); _sun = null; }
         GuidelineVisual.ClearBadge("gawain"); // [가이드라인 비주얼]
     }
 
@@ -95,6 +109,7 @@ public sealed class GawainZenithRelic : IRelicBehavior, IBuffViewSource, IRelicR
         if (rs == null || _gauge == null) return;
 
         _vfx?.SetActive("noon", _gauge.IsNoon);   // 정오 오라 활성/비활성
+        _sun?.SetActive(_gauge.IsNoon);           // 정오 — 머리 위 태양 등장/퇴장
 
         // 정오 진입 시: 스킬 1회 리셋 + 각인 첫타(+50%) 적립(충전 100%→정오라 각인 항상 발동)
         if (_gauge.IsNoon && !_wasNoon)

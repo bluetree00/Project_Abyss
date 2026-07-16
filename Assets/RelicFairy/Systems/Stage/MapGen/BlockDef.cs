@@ -16,6 +16,13 @@ public class BlockDef : ScriptableObject
     [Header("방향")]
     public FacingRule facingRule = FacingRule.None;
 
+    [Header("배치 보정 (건축 프롭 등 피벗·크기가 셀과 안 맞을 때)")]
+    [Tooltip("인스턴스 로컬 스케일. 기둥 등 임의 크기 메시를 셀에 맞출 때. 기본 (1,1,1).")]
+    public Vector3 localScale = Vector3.one;
+
+    [Tooltip("배치 후 로컬 위치 보정(월드 단위). 피벗이 중앙인 메시를 바닥에 앉힐 때 Y로 올림. 기본 (0,0,0).")]
+    public Vector3 localOffset = Vector3.zero;
+
     [Header("선택 가중치 (같은 tileType 내에서)")]
     [Min(1)] public int weight = 1;
 }

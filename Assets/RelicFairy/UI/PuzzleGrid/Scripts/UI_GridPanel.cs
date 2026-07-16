@@ -89,6 +89,7 @@ public sealed class UI_GridPanel : UI_Base
     // ── Private: State ──
     private RunItemInventory _inventory;
     private RuntimeItemData  _pendingNewItem;
+    private RuntimeItemData  _pendingAddItem;   // 보관함이 가득 차 아직 못 넣은 획득 아이템(자리 나면 자동 추가)
     private bool             _isOpen;
     private bool             _layoutBuilt;
     private int              _totalPlacedCells;
@@ -217,18 +218,19 @@ public sealed class UI_GridPanel : UI_Base
         OpenPanel();
     }
 
-    // ── GridManager 브리지 (MerlinRuneBridge에서 boardManager 없을 때 참조) ──
-
-    public void EnterGalleryMode()
+    /// <summary>
+    /// 보관함이 가득 차 <b>추가에 실패한</b> 아이템을 들고 패널을 연다.
+    /// 플레이어가 배치/폐기로 자리를 비우면 <see cref="TryFlushPendingAdd"/>가 자동으로 넣어준다.
+    /// </summary>
+    public void ShowWithPendingItem(RuntimeItemData item)
     {
-        // 단일 편집 화면으로 개편 후 갤러리 모드 없음 — 편집 화면 바로 진입
+        _pendingAddItem = item;
+        OpenPanel();
+        TryFlushPendingAdd();   // 여는 사이에 자리가 났을 수도 있다
     }
 
-    public void EnterEditMode(string gridId)
-    {
-        // 단일 편집 화면이므로 별도 편집 모드 전환 없음
-        // GridManager에 편집 대상 gridId 전달 (기존 연동 유지)
-    }
+    // 갤러리 모드(EnterGalleryMode)·편집 모드(EnterEditMode)는 단일 편집 화면으로 개편되며 폐기됐다.
+    // 두 함수 모두 빈 껍데기였고 호출처도 없어 제거함. 갤러리 뷰(GridGalleryView.cs)도 함께 삭제.
 
     // ── Open / Close ──
 
@@ -917,10 +919,33 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnStagingChanged()
     {
+        TryFlushPendingAdd();   // 보관함에 자리가 나면 대기 중이던 획득 아이템을 넣는다
+
         _stagingArea?.Refresh(_inventory);
         RefreshInfoPanelDefault();
         RefreshFooter();
         UpdatePlaceButtonState(_inventory?.StagingCount > 0);
+    }
+
+    /// <summary>
+    /// 보관함이 가득 찬 상태에서 획득한 아이템을 보류했다가, 자리가 나면 자동으로 추가한다.
+    /// (과거엔 AddToStaging 실패를 호출부가 무시해 <b>아이템이 조용히 사라졌다</b>.)
+    /// </summary>
+    private void TryFlushPendingAdd()
+    {
+        if (_pendingAddItem == null || _inventory == null) return;
+        if (_inventory.StagingCount >= RunItemInventory.MaxStagingCapacity) return;
+
+        var item = _pendingAddItem;
+        _pendingAddItem = null;                 // 재진입 방지 — AddToStaging이 OnStagingChanged를 다시 부른다
+        if (!_inventory.AddToStaging(item))
+        {
+            _pendingAddItem = item;             // 실패하면 다시 보류
+            return;
+        }
+
+        ItemEffectVfxHelper.ShowNotice($"<color=#7FE7FF>보관함에 추가</color> {item.displayName}");
+        _itemInfoPanel?.ShowItem(item, isNew: true);
     }
 
     private void OnPlacedChanged()
@@ -1054,7 +1079,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         // 항상 최신 점유 상태에서 cluster를 계산한 뒤 갱신 (패널 재오픈 시 이전 결과 보존)
         _hexGridView?.RefreshOccupiedCells();
-        _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetLastClusterSizes());
+        _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetZoneOccupiedCounts());
     }
 
     // ── Footer Refresh ──
@@ -1073,7 +1098,7 @@ public sealed class UI_GridPanel : UI_Base
             return;
         }
 
-        var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
+        var zoneCounts = MerlinRuneBridge.Instance?.GetZoneOccupiedCounts();
 
         var sb = new System.Text.StringBuilder("존 시너지  ");
 
@@ -1082,7 +1107,7 @@ public sealed class UI_GridPanel : UI_Base
             var synergies = runeData.GetZoneSynergies(zoneId);
             if (synergies == null) continue;
 
-            int count = (clusterSizes != null && clusterSizes.TryGetValue(zoneId, out var c)) ? c : 0;
+            int count = (zoneCounts != null && zoneCounts.TryGetValue(zoneId, out var c)) ? c : 0;
             bool anyMet = false;
             foreach (var s in synergies)
                 if (s.threshold > 0 && count >= s.threshold) { anyMet = true; break; }
@@ -1124,11 +1149,14 @@ public sealed class UI_GridPanel : UI_Base
     {
         if (_inventory != null)
         {
-            var allPlaced = new List<RuntimeItemData>(_inventory.StagingItems);
-            foreach (var item in allPlaced)
+            // ⚠️ 배치된 아이템은 PlacedItems에 있다(UnplaceItem이 placed → staging으로 되돌리는 구조).
+            //    과거엔 StagingItems를 순회해서 배치된 건 하나도 안 잡혔고,
+            //    셀만 지워져 '시너지는 사라졌는데 아이템 효과와 Shape는 남는' 상태가 됐다.
+            var placed = new List<RuntimeItemData>(_inventory.PlacedItems);
+            foreach (var item in placed)
             {
                 _stagingArea?.RemoveShapeForItem(item);
-                _inventory.UnplaceItem(item);
+                _inventory.UnplaceItem(item);   // PlacedItems → StagingItems 복귀
             }
         }
         _placedItemPositions.Clear();

@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// 멀린 룬 그리드의 속성(존) 단일 정의 테이블.
 /// 존 코드(char) ↔ zone_id(string) ↔ 표시명/아이콘/색을 한 곳에서 관리한다.
-/// 기존엔 MerlinRuneHexGridView / ZoneClusterCalculator / RuneDataManager /
+/// 기존엔 MerlinRuneHexGridView / RuneDataManager /
 /// MerlinRuneSynergyStatusView / CharacterInfoPanelView / UI_GridPanel 6곳에 중복돼 있었다.
 ///
 /// 존 코드: F=불, I=얼음, T=번개, P=독, L=빛, D=어둠, '+'=중심(CENTER)

@@ -26,10 +26,9 @@ public class RunSaveData
     public string weapon0PrefabKey;  // WeaponData.weaponPrefabKey (슬롯 0)
     public string weapon1PrefabKey;  // WeaponData.weaponPrefabKey (슬롯 1)
     public int    itemCount;          // 현재 보유 아이템 수 (빠른 표시용)
-    public int    synergyCount;       // 현재 활성 시너지 수 (빠른 표시용)
+    public int    synergyCount;       // 현재 활성 시너지 단계 수 (표시용 — MerlinRuneBridge.ActiveSynergyCount)
     public int    roomClearCount;     // 이 런에서 클리어한 방 수
     public string itemsJson;         // ItemListWrapper JSON
-    public string synergiesJson;     // SynergyListWrapper JSON
     public string roomLogsJson;           // RoomClearLogWrapper JSON
     public string savedAt;                // ISO8601 UTC
     public bool   isInStartRoom;          // true = 스타트룸 미퇴장 상태 (이어하기 시 StartRoom 재진입)
@@ -41,6 +40,8 @@ public class RunSaveData
     public int    runEssence;             // RunDelta.GainedEssence 중간 적립
     public int    fuelEnhanceMaterial;    // RunFuelBank 강화재료 잔량(이벤트방 연료)
     public int    fuelRuneOre;            // RunFuelBank 원석 잔량(이벤트방 연료)
+    public int    potionCount;            // 퀵슬롯 포션 개수
+    public int    potionCapacity;         // 퀵슬롯 포션 용량
     public int    weaponCurrentSlot = -1; // 현재 무기 슬롯 인덱스
     public int    weapon0EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 0)
     public int    weapon1EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 1)
@@ -133,8 +134,3 @@ public sealed class IntListWrapper
     public List<int> items = new();
 }
 
-[Serializable]
-public sealed class SynergyListWrapper
-{
-    public List<SynergyRecord> items = new();
-}

@@ -43,6 +43,16 @@ public static class CombatDamage
         public WeaponActionType ActionType;
         public float KnockbackMultiplier;
 
+        /// <summary>
+        /// 방어력 무시 비율(0~1). 0이면 평소대로 방어력이 감산된다.
+        ///
+        /// ⚠️ <b>다타 스킬에 필수다.</b> 방어력은 <b>감산</b>이라 타격마다 다시 빠진다
+        /// (일반 몹 1~6, 보스 20). 총 피해를 20타로 쪼개면 방어력도 20번 빠져서
+        /// 타당 피해가 방어력보다 작으면 전부 하한 1로 뭉개진다 — 스킬이 통째로 증발한다.
+        /// 한 방 스킬은 0으로 두고, 잘게 쪼개는 스킬만 이 값을 쓴다.
+        /// </summary>
+        public float DefenseIgnore;
+
         /// <summary>타격 지점(타격감·히트 VFX). zero면 대상 위치로 대체.</summary>
         public Vector3 HitPoint;
         /// <summary>공격 발원지(타격 방향 폴백). zero면 Owner 위치 사용.</summary>
@@ -146,6 +156,14 @@ public static class CombatDamage
                 tgtMb.TakeSynergyDamage(finalDmg, owner, 1f, isCrit);   // 방어 완전 무시
                 penetrated = true;
             }
+        }
+
+        // ⑥-b 다타 스킬 방어무시 — 감산 방어력이 타격마다 다시 빠지는 것을 막는다.
+        //     아이템 관통과 같은 경로(TakeSynergyDamage)를 쓰므로 크리·아이템·패시브는 그대로 유효하다.
+        if (!penetrated && tgtMb != null && finalDmg > 0f && req.DefenseIgnore > 0f)
+        {
+            tgtMb.TakeSynergyDamage(finalDmg, owner, Mathf.Clamp01(req.DefenseIgnore), isCrit, DamageKind.Normal);
+            penetrated = true;
         }
 
         // ⑦ 실제 피해 적용

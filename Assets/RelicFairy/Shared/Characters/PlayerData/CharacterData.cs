@@ -83,10 +83,13 @@ public class CharacterData : ScriptableObject
     [Tooltip("대시 종료 후~다음 상태 복귀 사이의 무적 없는 짧은 회복(취약) 구간(초). 0=현행(즉시 전환). i-frame과 겹치지 않음(무적 종료 뒤). 남발 억제용 — 플레이테스트로 튜닝(예 0.05).")]
     public float dodgeRecoveryWindow = 0f;
 
-    // 저스트 회피 — 회피 초반(퍼펙트 창)에 공격이 스치면 슬로모를 걸고, 그 동안 플레이어만 빠르게 움직이게 보상한다.
+    // 저스트 회피 — 적의 공격 예고(windup) 중에 회피를 시작하면 슬로모를 걸고,
+    // 그 동안 플레이어만 빠르게 움직이게 보상한다(베요네타 Witch Time).
+    // 피격을 기다리지 않는 이유: 회피에 성공하면 몹의 피해 시점 거리 재검사에 걸려
+    // TakeDamage 자체가 호출되지 않는다 — 성공할수록 발동이 안 되는 모순이 생긴다.
     [Header("저스트 회피 (퍼펙트 닷지)")]
-    [Tooltip("회피 시작 후 이 시간(초) 안에 피격되면 '저스트 회피' 발동. 0이면 비활성.")]
-    public float perfectDodgeWindow = 0.12f;
+    [Tooltip("이 반경(m) 안에 공격 예고 중인 적이 있을 때 회피하면 '저스트 회피' 발동. 0이면 비활성.")]
+    public float perfectDodgeSenseRadius = 4f;
     [Tooltip("저스트 회피 성공 시 적용할 시간 배율(슬로모). 낮을수록 세계가 느려진다.")]
     [Range(0.05f, 1f)]
     public float perfectDodgeTimeScale = 0.35f;

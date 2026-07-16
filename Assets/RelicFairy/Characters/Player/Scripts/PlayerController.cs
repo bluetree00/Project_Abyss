@@ -139,12 +139,10 @@ public class PlayerController : CharacterBase
         if (dr > 0f)
             finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (1f - dr)));
 
-        // 실드 흡수 — HP 차감 전. 실드가 먼저 피해를 받고, ShieldAccumulate면 피격 피해 일부를 실드로 축적.
+        // 실드 흡수 — HP 차감 전. 실드가 먼저 피해를 받는다.
         if (finalDmg > 0)
         {
-            int incoming = finalDmg;
             finalDmg = RuntimeStats.AbsorbWithShield(finalDmg);
-            RuntimeStats.AccumulateShieldFromDamage(incoming);
         }
 
         // 사망 직전 체크
@@ -447,8 +445,11 @@ public class PlayerController : CharacterBase
     //============================================================
     // 발동 순간 프레임 스톱에 쓰는 시간 배율(완전 0은 물리/애니가 죽어 복귀가 튈 수 있어 아주 작은 값).
     private const float PerfectDodgeFreezeScale = 0.02f;
+    private const int   PerfectDodgeSenseMax    = 8;   // windup 감지 시 훑을 적 수 상한
 
-    private float _perfectDodgeWindowEnd;      // 퍼펙트 판정 창 종료 시각(unscaled)
+    // windup 감지 질의 버퍼(재사용 — 회피마다 alloc 방지)
+    private readonly List<RelicFairy.Monster.MonsterBase> _perfectDodgeSenseBuf = new(PerfectDodgeSenseMax);
+
     private bool  _perfectDodgeArmed;          // 이번 회피에서 아직 발동하지 않았는지
     private float _perfectDodgeEnd;            // 슬로모/보너스 종료 시각(unscaled)
     private float _perfectDodgeFreezeEnd;      // 프레임 스톱 종료 시각(unscaled)
@@ -462,31 +463,60 @@ public class PlayerController : CharacterBase
     /// <summary>저스트 회피 발동 — 연출(회색 필터/틴트/잔상)이 구독한다. 인자는 총 지속시간(초, 실제시간).</summary>
     public event Action<float> OnPerfectDodge;
 
-    /// <summary>회피 진입 시 퍼펙트 판정 창을 연다(LocoDodgeState.Enter가 호출).</summary>
-    public void ArmPerfectDodge(float window)
+    /// <summary>
+    /// 회피 진입 시 호출(LocoDodgeState.Enter). 퍼펙트 판정을 장전하고, <b>이미 날아오는 공격이 있으면 즉시 발동</b>한다.
+    ///
+    /// '맞으면 발동'만으로는 거의 안 터진다 — 몹은 피해를 적용하는 순간에 거리를 <b>다시</b> 재는데
+    /// (MonsterBase.DealDamageToPlayer), 대시로 4m를 빠져나가면 그 검사에서 걸러져 TakeDamage 자체가
+    /// 호출되지 않는다. 즉 "회피에 성공하면 판정이 안 온다"는 모순이 생긴다.
+    /// 그래서 <b>적의 공격 windup(예고) 중에 회피를 시작했는가</b>로 잡는다. 이게 긴급회피의 실제 정의다.
+    /// </summary>
+    public void ArmPerfectDodge()
     {
-        if (window <= 0f) { _perfectDodgeArmed = false; return; }
-        _perfectDodgeArmed     = true;
-        _perfectDodgeWindowEnd = Time.unscaledTime + window;
+        _perfectDodgeArmed = true;
+        if (SensesIncomingAttack()) TriggerPerfectDodge("공격 예고 회피");
+    }
+
+    /// <summary>회피 반경 안에 공격 windup 중인 적이 있는가(= 지금 회피하면 아슬하게 피하는 것).</summary>
+    private bool SensesIncomingAttack()
+    {
+        float r = characterData != null ? characterData.perfectDodgeSenseRadius : 4f;
+        if (r <= 0f) return false;
+
+        int n = CombatQuery.GetNearbyEnemies(transform.position, r, gameObject, PerfectDodgeSenseMax, _perfectDodgeSenseBuf);
+        for (int i = 0; i < n; i++)
+        {
+            var mb = _perfectDodgeSenseBuf[i];
+            if (mb != null && mb.IsTelegraphingAttack) return true;
+        }
+        return false;
     }
 
     /// <summary>
-    /// 회피 초반(퍼펙트 창)에 공격이 들어왔는지 판정. 성공 시 슬로모 + 이동 보너스를 걸고 true를 반환한다.
-    /// TakeDamage 맨 앞에서 호출 — 어차피 무적이라 피해는 없지만, '아슬하게 스쳤다'는 사실을 여기서 잡아 보상한다.
+    /// <b>대시(회피) 중에 공격을 맞았는가</b>를 판정. TakeDamage 맨 앞에서 호출.
+    /// 대시 전 구간이 무적이라 피해는 어차피 0이지만, 회피로 파고들어 실제로 접촉한 경우를 여기서 잡는다.
+    /// (대부분의 저스트 회피는 위 windup 감지로 먼저 발동한다.)
     /// </summary>
     private bool TryPerfectDodge()
     {
         if (!_perfectDodgeArmed) return false;
-        if (Time.unscaledTime > _perfectDodgeWindowEnd) { _perfectDodgeArmed = false; return false; }
         if (locoSM == null || locoSM.CurrentId != LocoState.Dodge) return false;
 
+        TriggerPerfectDodge("대시 중 피격");
+        return true;
+    }
+
+    /// <summary>저스트 회피 발동 본체 — 슬로모 + 이동 보너스 + 연출 신호. 회피 1회당 1발.</summary>
+    private void TriggerPerfectDodge(string trigger)
+    {
+        if (!_perfectDodgeArmed) return;
         _perfectDodgeArmed = false;
 
         float scale    = characterData != null ? Mathf.Clamp(characterData.perfectDodgeTimeScale, 0.05f, 1f) : 0.35f;
         float duration = characterData != null ? Mathf.Max(0f, characterData.perfectDodgeDuration)   : 1.2f;
         float boost    = characterData != null ? Mathf.Max(1f, characterData.perfectDodgeSpeedBoost) : 1.3f;
         float freeze   = characterData != null ? Mathf.Max(0f, characterData.perfectDodgeFreeze)     : 0.07f;
-        if (duration <= 0f) return true;
+        if (duration <= 0f) return;
 
         _perfectDodgeScale = scale;
 
@@ -514,7 +544,7 @@ public class PlayerController : CharacterBase
         HitFeelService.CameraShake(0.1f, 0.12f);
 
         OnPerfectDodge?.Invoke(freeze + duration);
-        return true;
+        Debug.Log($"[저스트회피] 발동 ({trigger}) | 슬로모 {scale:F2}배 {duration:F1}초 · 이동 {_bonusMoveMultiplier:F1}배");
     }
 
     /// <summary>저스트 회피 프리즈→슬로모 전환 및 만료 처리. Update에서 unscaled 시간으로 구동.</summary>
@@ -894,6 +924,10 @@ public class PlayerController : CharacterBase
         if (!TryGetComponent<CombatCameraFraming>(out _))
             gameObject.AddComponent<CombatCameraFraming>();
 
+        // 카메라 리그 기준점을 플레이어보다 앞에 — 구도는 그대로, 위치만 앞으로.
+        if (!TryGetComponent<CameraRigAnchor>(out _))
+            gameObject.AddComponent<CameraRigAnchor>();
+
         // 검 공격/대시 칼날 트레일(INab Weapon Trail) 구동기 — 동일한 런타임 자동 부착 패턴.
         // 트레일 프리팹 미할당(무기 SO / CharacterData) 시 무동작.
         if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
@@ -906,9 +940,16 @@ public class PlayerController : CharacterBase
         if (inputReady) BindInputActions();
     }
 
+    [Header("포션")]
+    [SerializeField] private KeyCode potionKey = KeyCode.H;   // 퀵슬롯 포션 사용 키(자유 키)
+
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
+
+        // 포션(퀵슬롯) — 즉발 % 회복. 시간정지(그리드/일시정지) 중엔 무시.
+        if (Time.timeScale > 0f && Input.GetKeyDown(potionKey))
+            GameRunBootstrapper.Instance?.Run?.TryUsePotion();
 
         _runeEffects?.Tick(Time.deltaTime);
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
@@ -1327,10 +1368,16 @@ public class PlayerController : CharacterBase
         inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
     }
 
+    /// <summary>
+    /// 룬판 토글 — 이 경로가 <b>유일한 토글 경로</b>다(PuzzleToggle = Tab).
+    /// 과거 UIRootBootstrapper.Update()도 같은 Tab을 폴링해 같은 프레임에 이중 토글 → 상쇄되어
+    /// 런 중엔 룬판이 열리지 않았다. 그쪽 폴링은 제거했다.
+    /// IsRunning 가드는 걸지 않는다 — 베이스캠프(허브)는 Phase가 Running이 아니라 룬판이 막혀버린다.
+    /// </summary>
     private void TogglePuzzleGrid()
     {
         var run = GameRunBootstrapper.Instance?.Run;
-        if (run == null || !run.IsRunning) return;
+        if (run == null) return;
 
         var panel = UI_GridPanel.Instance;
         if (panel != null && panel.IsOpen)
