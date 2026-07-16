@@ -187,7 +187,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                 {
                     if (col.gameObject == ctx.Controller.gameObject) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
-                        d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
                 }
 
                 // 검기 이펙트
@@ -225,7 +225,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
                     if (col.gameObject == ctx.Controller.gameObject) continue;
                     if (col.TryGetComponent<IDamageable>(out var d))
                     {
-                        d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 2f);
+                        ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
 
                         // 피격 이펙트
                         var hitOffset = new Vector3(
@@ -280,7 +280,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
             if (_hitTargets.Count == 0) return;
             float dmg = ctx.CalculateDamage(_data.baseDamagePerHit);
             foreach (var target in _hitTargets)
-                target.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
 
             foreach (var obj in _hitObjects)
             {

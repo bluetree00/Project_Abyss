@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b0c3a74d232eda46aab9f9984eb60e0, type: 3}
   m_Name: BlockPalette_Throne
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
-  themeMatch: Throne
+  themeMatch: Fortress
   blocks:
   - {fileID: 11400000, guid: 9aa8b58e024dd3d4fa8175d71645cde8, type: 2}
   - {fileID: 11400000, guid: 0eb3ff44f728bde4eb330fbe506d6066, type: 2}

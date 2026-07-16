@@ -15,37 +15,67 @@ MonoBehaviour:
   themeMatch: Forest
   entries:
   - code: t
-    prefab: {fileID: 6311773184561708073, guid: 0f9c006fb32f5154485a8e57fc34c0cb, type: 3}
+    prefab: {fileID: 6311773184561708073, guid: 0f9c006fb32f5154485a8e57fc34c0cb,
+      type: 3}
     yOffset: 0
     scale: 0.4
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: p
-    prefab: {fileID: 6582730512412793593, guid: 81a4ae3b32471cc469f44a6af7acd727, type: 3}
+    prefab: {fileID: 6582730512412793593, guid: 81a4ae3b32471cc469f44a6af7acd727,
+      type: 3}
     yOffset: 0
     scale: 0.35
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: n
-    prefab: {fileID: 6458907534031036834, guid: 8027a374f0ceca94480a5bc31377188b, type: 3}
+    prefab: {fileID: 6458907534031036834, guid: 8027a374f0ceca94480a5bc31377188b,
+      type: 3}
     yOffset: 0
     scale: 0.45
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: f
-    prefab: {fileID: 4984988325240244053, guid: d350eb392248fd048a2c03fb449f79c5, type: 3}
+    prefab: {fileID: 4984988325240244053, guid: d350eb392248fd048a2c03fb449f79c5,
+      type: 3}
     yOffset: 0
     scale: 1.5
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: l
-    prefab: {fileID: 3388537039447241905, guid: 0763e557dfa7dc54798bfd19e2fcb0e4, type: 3}
+    prefab: {fileID: 3388537039447241905, guid: 0763e557dfa7dc54798bfd19e2fcb0e4,
+      type: 3}
     yOffset: 0
     scale: 1
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: m
     prefab: {fileID: 863546763990780396, guid: 6f75e5dcad3441e4d9c06313c8dd1d13, type: 3}
     yOffset: 0
     scale: 1.2
     randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
   - code: lL
-    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
     yOffset: 2
     scale: 1
     randomYRotation: 0
@@ -54,7 +84,8 @@ MonoBehaviour:
     faceNearestWall: 1
     wallInset: 0.45
   - code: lM
-    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
     yOffset: 4
     scale: 1
     randomYRotation: 0
@@ -63,7 +94,8 @@ MonoBehaviour:
     faceNearestWall: 1
     wallInset: 0.45
   - code: lH
-    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137, type: 3}
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
     yOffset: 6
     scale: 1
     randomYRotation: 0
@@ -72,10 +104,47 @@ MonoBehaviour:
     faceNearestWall: 1
     wallInset: 0.45
   - code: lC
-    prefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615, type: 3}
+    prefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
     yOffset: 0
     scale: 1
     randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r1
+    prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r2
+    prefab: {fileID: 1031125300, guid: abc00000000015461637500741923270, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: alt
+    prefab: {fileID: 1031119978, guid: abc00000000012857661513297908409, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 2
+    sizeZ: 2
+    faceNearestWall: 0
+    wallInset: 0
+  - code: sta
+    prefab: {fileID: 1031125134, guid: abc00000000003064275970823802713, type: 3}
+    yOffset: 0
+    scale: 1.2
+    randomYRotation: 1
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 0

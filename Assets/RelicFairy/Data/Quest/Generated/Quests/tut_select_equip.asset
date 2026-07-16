@@ -26,7 +26,7 @@ MonoBehaviour:
   isSavable: 0
   acceptionConditions: []
   cancelConditions: []
-  afterQuest: {fileID: 11400000, guid: 0dd3f6f57d3da5c40a295a89d6324a7d, type: 2}
+  afterQuest: {fileID: 11400000, guid: 422382185d558764082dcdd29457bc89, type: 2}
   acceptFeedbackType: 0
   acceptFeedbackId: 
   completeFeedbackType: 2

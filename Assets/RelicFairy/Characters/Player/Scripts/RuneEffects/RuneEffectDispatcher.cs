@@ -7,7 +7,7 @@ using UnityEngine;
 /// 연결 경로:
 ///  - 단계 도달: MerlinRuneBridge.ApplyMechanicEffect → Activate(entry)
 ///  - 공격 적중: EffectManager.OnPostDealDamage → NotifyHit (근접/원거리 공통 단일 경로)
-///  - 피격:     HitFeedbackService.OnHit 구독 → OnDamaged 라우팅(현재 미발화, P4 배선 예정)
+///  - 피격:     PlayerController.TakeDamage → NotifyDamaged (플레이어 피해의 유일한 싱크)
 ///  - 스킬/처치: 캐릭터에서 NotifySkillUsed / NotifyKill 호출
 ///  - 매 프레임: PlayerController.Update → Tick(dt)
 ///
@@ -22,6 +22,16 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     private float _lastSkillTime = -999f;
     private bool _subscribed;
 
+    // 중앙(CENTER) 공명 — 활성 속성 효과의 value를 배수로 끌어올린다.
+    // 효과들이 Entry.value를 직접 읽으므로, 24개 클래스를 건드리지 않고
+    // "value를 곱한 사본 엔트리로 효과를 재생성"하는 방식으로 증폭한다.
+    // → 원본(미증폭) 엔트리를 반드시 따로 보관해야 배수 변경 시 복리로 누적되지 않는다.
+    private readonly Dictionary<string, RuneSynergyEntry> _sourceEntries = new();
+    private float _amplifier = 1f;
+
+    /// <summary>현재 중앙 공명 배수(1 = 증폭 없음).</summary>
+    public float Amplifier => _amplifier;
+
     // [가이드라인 비주얼] 룬 리소스 배지 폴링(0.25s throttle). key→라벨/아이콘/색 고정 테이블.
     private float _badgePollAccum;
     private static readonly (string key, string label, string iconKey, GuidelineVisual.BadgeTint tint)[] s_resourceBadges =
@@ -35,7 +45,6 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         _player = player;
         _resources.SetAnchor(player != null ? player.transform : null);   // [가이드라인 비주얼] 리소스 토스트 위치
-        HitFeedbackService.OnHit    += HandleHit;
         QuestEvents.OnMonsterKilled += HandleKill;
         _subscribed = true;
     }
@@ -62,8 +71,15 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         if (entry == null || string.IsNullOrEmpty(entry.effect_type)) return;
         if (!_activeTypes.Add(entry.effect_type)) return;
 
-        var fx = RuneEffectFactory.Create(entry);
-        if (fx == null) { _activeTypes.Remove(entry.effect_type); return; }
+        _sourceEntries[entry.effect_type] = entry;   // 원본 보관(증폭 재계산의 기준)
+
+        var fx = RuneEffectFactory.Create(Amplified(entry));
+        if (fx == null)
+        {
+            _activeTypes.Remove(entry.effect_type);
+            _sourceEntries.Remove(entry.effect_type);
+            return;
+        }
 
         _active.Add(fx);
         // 누적형 단계 의존(전기 방전→감전, 어둠 잠식→해방→잔상)은 OnSkillUsed/OnHit/Tick의
@@ -76,6 +92,70 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     private static int CompareByThreshold(IRuneEffect a, IRuneEffect b)
         => (a.Entry != null ? a.Entry.threshold : 0).CompareTo(b.Entry != null ? b.Entry.threshold : 0);
 
+    // ── 중앙(CENTER) 공명 ──────────────────────────────────────
+
+    /// <summary>
+    /// 중앙 공명 배수 설정. 활성 속성 효과를 <b>원본 엔트리 기준</b>으로 전부 재생성한다.
+    /// 룬판(시간정지) 안에서만 값이 바뀌므로 전투 중 재생성은 발생하지 않는다.
+    /// 배수가 그대로면 아무 것도 하지 않는다(불필요한 재생성 방지).
+    /// </summary>
+    public void SetAmplifier(float mult)
+    {
+        mult = Mathf.Max(0.01f, mult);
+        if (Mathf.Approximately(mult, _amplifier)) return;
+
+        _amplifier = mult;
+        RebuildActive();
+    }
+
+    /// <summary>원본 엔트리로 활성 효과 전체를 재생성(증폭 반영).</summary>
+    private void RebuildActive()
+    {
+        if (_sourceEntries.Count == 0) return;
+
+        var sources = new List<RuneSynergyEntry>(_sourceEntries.Values);
+
+        for (int i = 0; i < _active.Count; i++) _active[i].OnDeactivate();
+        _active.Clear();
+        _activeTypes.Clear();
+
+        foreach (var src in sources)
+        {
+            var fx = RuneEffectFactory.Create(Amplified(src));
+            if (fx == null) continue;
+            _activeTypes.Add(src.effect_type);
+            _active.Add(fx);
+        }
+
+        _active.Sort(CompareByThreshold);
+        for (int i = 0; i < _active.Count; i++) _active[i].OnActivate(_player);
+    }
+
+    /// <summary>
+    /// value에 공명 배수를 적용한 <b>사본</b>을 만든다(원본 불변 — 복리 누적 방지).
+    /// ⚠️ value만 곱한다. value2/value3는 지속시간·횟수·간격이 섞여 있어 일괄 배수가 위험하다.
+    /// </summary>
+    private RuneSynergyEntry Amplified(RuneSynergyEntry src)
+    {
+        if (src == null || Mathf.Approximately(_amplifier, 1f)) return src;
+
+        return new RuneSynergyEntry
+        {
+            zone_id      = src.zone_id,
+            zone_name    = src.zone_name,
+            threshold    = src.threshold,
+            effect_type  = src.effect_type,
+            trigger      = src.trigger,
+            value        = src.value * _amplifier,   // ← 증폭 지점
+            value2       = src.value2,
+            value3       = src.value3,
+            max_stack    = src.max_stack,
+            duration     = src.duration,
+            description  = src.description,
+            stat_version = src.stat_version,
+        };
+    }
+
     /// <summary>
     /// 단일 단계 효과 해제(런 중 룬 재배치로 점유가 임계 미만이 됐을 때). OnDeactivate로 동적 스탯/예약을 되돌린 뒤 목록에서 제거.
     /// 누적형은 상위 단계만 골라 해제 가능(예: 감전만 빠지고 정전기/방전은 유지) — 각 효과의 OnDeactivate가 자기 기여만 정리한다.
@@ -84,6 +164,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         if (string.IsNullOrEmpty(effectType)) return;
         if (!_activeTypes.Remove(effectType)) return;
+        _sourceEntries.Remove(effectType);
         for (int i = _active.Count - 1; i >= 0; i--)
         {
             if (_active[i].EffectType != effectType) continue;
@@ -99,6 +180,8 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         for (int i = 0; i < _active.Count; i++) _active[i].OnDeactivate();
         _active.Clear();
         _activeTypes.Clear();
+        _sourceEntries.Clear();
+        _amplifier = 1f;
         _resources.Clear();
 
         // [가이드라인 비주얼] 리소스 배지 정리
@@ -111,7 +194,6 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         if (_subscribed)
         {
-            HitFeedbackService.OnHit    -= HandleHit;
             QuestEvents.OnMonsterKilled -= HandleKill;
             _subscribed = false;
         }
@@ -230,18 +312,4 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         for (int i = 0; i < _active.Count; i++) _active[i].OnKill(_player);
     }
 
-    // ── HitFeedbackService.OnHit 라우팅 ──
-    // 공격(플레이어→적) OnHit/OnCrit은 NotifyHit(근/원 공통 경로)로 일원화했다.
-    // 여기서는 피격(적→플레이어) OnDamaged만 처리한다.
-    // (현재 몬스터 공격은 RaiseHit를 안 타 미발화 — 어둠 속성용 OnDamaged 배선은 P4.)
-    private void HandleHit(HitInfo info)
-    {
-        if (_active.Count == 0) return;
-
-        bool targetIsPlayer = info.Target != null && _player != null &&
-            (info.Target == _player.gameObject || info.Target.transform.IsChildOf(_player.transform));
-        if (!targetIsPlayer) return;
-
-        for (int i = 0; i < _active.Count; i++) _active[i].OnDamaged(info, _player);
-    }
 }

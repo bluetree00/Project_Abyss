@@ -9,7 +9,18 @@ using UnityEngine;
 public static class DamagePopupSpawner
 {
     private const string PrefabKey = "DamagePopup";
-    private const int    PoolSize  = 16;
+
+    // 연타(랜슬롯 심판 9타 등)가 다수 적에게 동시에 꽂히면 16개로는 즉시 고갈된다.
+    private const int    PoolSize  = 48;
+
+    // ── 영수증 캐스케이드 ──────────────────────────────────────────
+    // 같은 대상에 이 시간(초) 안에 다시 꽂히면 '연타'로 보고 순번을 올려 위로 쌓는다.
+    // 지나면 순번을 0으로 리셋 — 새 공격은 다시 바닥부터 찍힌다.
+    private const float CascadeWindow  = 0.7f;
+    private const int   CascadeMaxStep = 7;   // 그 이상은 화면 밖으로 나가므로 되감는다
+
+    private struct Cascade { public int index; public float lastTime; }
+    private static readonly Dictionary<int, Cascade> _cascades = new();
 
     // free 큐: 반환된(비활성) 인스턴스만 보관 → GetFromPool 은 O(1) 디큐.
     // 완료 시 DamagePopup 이 ReturnToPool 콜백으로 스스로 재입큐한다.
@@ -25,19 +36,41 @@ public static class DamagePopupSpawner
     private static void ResetStatics()
     {
         _pool.Clear();
+        _cascades.Clear();
         _prefab  = null;
         _root    = null;
         _loading = false;
     }
 
-    /// <summary>임의 위치에 데미지 숫자 스폰. 인자 부족하면 무동작.</summary>
-    public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false)
+    /// <summary>
+    /// 임의 위치에 데미지 숫자 스폰. 인자 부족하면 무동작.
+    /// targetId: 같은 대상에 꽂힌 연타를 위로 쌓기 위한 식별자(보통 GetInstanceID()). 0이면 캐스케이드 없음.
+    /// kind: 피해 출처 — 색으로 구분된다(일반/시너지/DoT).
+    /// </summary>
+    public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false, int targetId = 0,
+                             DamageKind kind = DamageKind.Normal)
     {
         if (damage <= 0f) return;
-        SpawnAsync(worldPos, damage, isCrit).Forget();
+        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind).Forget();
     }
 
-    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit)
+    /// <summary>대상별 연타 순번. 창(CascadeWindow) 안에 다시 맞으면 +1, 지나면 0으로 리셋.</summary>
+    private static int NextCascadeIndex(int targetId)
+    {
+        if (targetId == 0) return 0;
+
+        float now = Time.time;
+        int index = 0;
+
+        if (_cascades.TryGetValue(targetId, out var c) && now - c.lastTime <= CascadeWindow)
+            index = (c.index + 1) % (CascadeMaxStep + 1);
+
+        _cascades[targetId] = new Cascade { index = index, lastTime = now };
+        return index;
+    }
+
+    private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit, int cascadeIndex,
+                                                DamageKind kind)
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
@@ -45,7 +78,7 @@ public static class DamagePopupSpawner
         var popup = GetFromPool();
         if (popup == null) return;
 
-        popup.Show(worldPos, damage, isCrit, Color.white);
+        popup.Show(worldPos, damage, isCrit, kind, cascadeIndex);
     }
 
     private static async UniTask EnsurePrefabAsync()

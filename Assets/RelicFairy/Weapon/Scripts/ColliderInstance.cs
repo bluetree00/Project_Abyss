@@ -10,9 +10,6 @@ using UnityEngine;
 /// </summary>
 public class ColliderInstance : MonoBehaviour
 {
-    // hitEffectKey 미할당 시 사용할 공용 히트 VFX.
-    private const string FallbackHitEffectKey = "HitEffect_02";
-
     public string payloadKey;
     public float damage;
     public float knockbackMultiplier;
@@ -31,10 +28,17 @@ public class ColliderInstance : MonoBehaviour
     private bool _active;
     private Vector3 _baseScale = Vector3.one;
 
-    // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
-    private static readonly List<MonsterBase> s_shapeBuf = new();
     // 근접 원샷 오버랩 질의 버퍼(재사용 — alloc 방지). 밀집 지역 대비 넉넉히.
-    private static readonly Collider[] s_overlapBuf = new Collider[64];
+    // 근접 원샷 오버랩 질의 버퍼.
+    // ⚠️ 작으면 환경 콜라이더(바닥·벽·소품·VFX 트리거 등)가 버퍼를 채워버려 몬스터가 안 잡힌다
+    //    — 물리엔진은 버퍼가 차면 거기서 끊고, 그 순서는 거리순이 아니다("가끔 씹힘"의 원인).
+    //    레이어 `~0`으로 훑을 수밖에 없는 구조(몬스터 콜라이더가 Default 레이어)라 넉넉히 잡는다.
+    private static readonly Collider[] s_overlapBuf = new Collider[256];
+
+    // 타격 대상 레이어 마스크 — 몬스터(MonsterHit) + 플레이어.
+    // `~0`(전 레이어)로 훑으면 바닥·벽·소품·VFX 트리거가 버퍼를 채워 정작 대상이 안 잡힌다.
+    // Player를 포함하는 건 몬스터가 이 컴포넌트를 쓰게 될 경우를 위한 대비(현재는 플레이어 무기 전용).
+    private static int HitMask => MonsterBase.HitLayerMask | (1 << LayerMask.NameToLayer("Player"));
 
     // key: 대상, value: 마지막으로 맞은 attackId
     private readonly Dictionary<GameObject, int> _hitRecord = new();
@@ -61,12 +65,12 @@ public class ColliderInstance : MonoBehaviour
 
         // 아이템 근접 사거리 변형(확장된 칼끝/기다림의 미학) — 근접 액션이면 콜라이더 스케일.
         // 변형이 없으면 기준 스케일 그대로(회귀 0). 풀 재사용 정합을 위해 매 Activate 절대 설정.
-        float rangeMult = IsMeleeAction(actionType) ? ItemCombatMods.Current.meleeRangeMult : 0f;
+        float rangeMult = CombatDamage.IsMeleeAction(actionType) ? ItemCombatMods.Current.meleeRangeMult : 0f;
         transform.localScale = rangeMult > 0f ? _baseScale * (1f + rangeMult) : _baseScale;
 
         // 근접 원샷(hitInterval=0): 스윙 순간 콜라이더 영역에 겹친 대상만 즉시 1회 판정.
         // 트리거 지속에 의존하지 않아 "타이밍 씹힘"과 "잔류 콜라이더 뒤늦은 타격"을 동시에 제거.
-        if (hitInterval <= 0f && IsMeleeAction(actionType))
+        if (hitInterval <= 0f && CombatDamage.IsMeleeAction(actionType))
         {
             OneShotMeleeOverlap();
             _active = false;
@@ -82,15 +86,33 @@ public class ColliderInstance : MonoBehaviour
         }
     }
 
-    // 근접 원샷 판정: 콜라이더 영역(bounds)에 겹친 대상에 즉시 1회 데미지(트리거 지속 없음).
+    // 근접 원샷 판정: 콜라이더 영역에 겹친 대상에 즉시 1회 데미지(트리거 지속 없음).
     private void OneShotMeleeOverlap()
     {
         var col = GetComponent<Collider>();
         if (col == null) return;
 
-        Bounds b = col.bounds;
-        int n = Physics.OverlapBoxNonAlloc(
-            b.center, b.extents, s_overlapBuf, Quaternion.identity, ~0, QueryTriggerInteraction.Collide);
+        int n;
+        // 박스는 콜라이더 회전(플레이어 방향)을 반영한 OBB로 판정한다.
+        // AABB(col.bounds)로 판정하면 대각선을 바라볼 때 박스가 부풀어 슬래시 밖까지 오판정된다.
+        // 구/기타 형상은 AABB가 회전 불변이라 기존 판정 그대로 사용(대검 등).
+        if (col is BoxCollider box)
+        {
+            Vector3 s = box.transform.lossyScale;
+            Vector3 half = new Vector3(
+                box.size.x * 0.5f * Mathf.Abs(s.x),
+                box.size.y * 0.5f * Mathf.Abs(s.y),
+                box.size.z * 0.5f * Mathf.Abs(s.z));
+            n = Physics.OverlapBoxNonAlloc(
+                box.transform.TransformPoint(box.center), half, s_overlapBuf,
+                box.transform.rotation, HitMask, QueryTriggerInteraction.Collide);
+        }
+        else
+        {
+            Bounds b = col.bounds;
+            n = Physics.OverlapBoxNonAlloc(
+                b.center, b.extents, s_overlapBuf, Quaternion.identity, HitMask, QueryTriggerInteraction.Collide);
+        }
         for (int i = 0; i < n; i++)
         {
             var other = s_overlapBuf[i];
@@ -154,189 +176,25 @@ public class ColliderInstance : MonoBehaviour
         _hitTimestamps[target] = Time.time;
     }
 
+    // 실제 피해 처리는 CombatDamage(주 피해 단일 파이프라인)에 위임한다.
+    // 콜라이더는 '판정 형상'만 담당하고, 크리티컬·아이템·서약·패시브·타격감은 전부 그쪽에서 일괄 처리된다.
     private void ApplyDamage(Collider other)
     {
-        if (!other.TryGetComponent<IDamageable>(out var damageable)) return;
+        if (other == null) return;
 
-        // 아이템 효과: 공격 전 데미지 수정
-        var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;
-        var weaponData = GameRunBootstrapper.Instance?.Run?.Player?.WeaponManager?.CurrentWeaponData;
-
-        // 스킬 피해 % — Q/E/R 스킬 액션이고 플레이어 공격일 때만 기본 피해에 적용(SkillDamageBonus 소비처)
-        float baseDamage = damage;
-        if (owner != null
-            && (actionType == WeaponActionType.QSkill || actionType == WeaponActionType.ESkill || actionType == WeaponActionType.RSkill)
-            && owner.TryGetComponent<PlayerController>(out var skillOwner))
+        CombatDamage.Deal(new CombatDamage.Request
         {
-            float skillBonus = skillOwner.RuntimeStats != null ? skillOwner.RuntimeStats.SkillDamageBonus : 0f;
-            if (skillBonus != 0f) baseDamage *= 1f + skillBonus;
-        }
-
-        bool isMeleeAtk = IsMeleeAction(actionType);
-        var pkt = new DamagePacket(baseDamage, owner, other.gameObject);
-        mgr?.OnPreDealDamage(ref pkt, isMeleeAtk);
-
-        float baseFinal = pkt.Negated ? 0f : pkt.FinalDamage;
-
-        // 서약: 출력 피해 변형(아서 등). 플레이어 공격만, 크리티컬 전에 적용.
-        if (baseFinal > 0f && owner != null && owner.TryGetComponent<PlayerController>(out _))
-        {
-            var covH = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
-            if (covH != null)
-            {
-                var cctx = new CombatContext
-                {
-                    Target     = other.gameObject,
-                    Damage     = baseFinal,
-                    WeaponType = weaponData != null ? weaponData.weaponType : default,
-                };
-                baseFinal = covH.ModifyOutgoing(baseFinal, cctx);
-            }
-        }
-
-        // 아이템 타이밍형: 적 windup(예고) 중 적중 시 저스트가드(+피해)·섬광(공격 캔슬)
-        var mods = ItemCombatMods.Current;
-        bool isPlayerAtk = owner != null && owner.TryGetComponent<PlayerController>(out _);
-        MonsterBase tgtMb = isPlayerAtk ? other.GetComponentInParent<MonsterBase>() : null;
-        if (tgtMb != null && tgtMb.IsTelegraphingAttack)
-        {
-            if (mods.justGuardBonus > 0f) baseFinal *= 1f + mods.justGuardBonus;
-            if (mods.attackInterrupt)     tgtMb.CancelTelegraphedAttack();
-        }
-
-        // 크리티컬 굴림 (확정크릿 소비는 근접 일반공격 한정)
-        float finalDmg = CombatCalculator.RollCrit(weaponData, baseFinal, out bool isCrit, isMeleeAtk);
-        pkt.IsCrit = isCrit;
-
-        // 아이템 광기의 파동: 무장된 일반(근접) 공격 1타를 실제 방어무시로 적용(방어 우회 경로).
-        // 팝업은 대상 측(MonsterBase 등)에서 자체적으로 표시 — isCrit 만 전달.
-        bool penetrated = false;
-        if (isPlayerAtk && tgtMb != null && finalDmg > 0f && IsMeleeAction(actionType))
-        {
-            var prs = GameRunBootstrapper.Instance?.Run?.Player?.RuntimeStats;
-            if (prs != null && prs.ConsumePenetrateNextHit())
-            {
-                tgtMb.TakeSynergyDamage(finalDmg, owner, 1f, isCrit);   // 방어 완전 무시
-                penetrated = true;
-            }
-        }
-        if (!penetrated)
-            damageable.TakeDamage(finalDmg, owner, knockbackMultiplier, isCrit);
-
-        // 타격감 (HitFeedbackService 허브 경유 → 구독자 전파)
-        Vector3 hitPoint = other.ClosestPoint(transform.position);
-
-        Vector3 attackDir = owner != null
-            ? (other.transform.position - owner.transform.position)
-            : (other.transform.position - transform.position);
-
-        var hitInfo = new HitInfo(
-            attacker:        owner,
-            target:          other.gameObject,
-            hitPoint:        hitPoint,
-            attackDirection: attackDir,
-            damage:          finalDmg,
-            isCritical:      isCrit,
-            actionType:      actionType,
-            weaponType:      weaponData != null ? weaponData.weaponType : WeaponType.None);
-
-        HitFeedbackService.RaiseHit(hitInfo);
-
-        // 아이템 효과: 적중 후 (흡혈, 독, 빙결 등)
-        var report = new DamageReport
-        {
-            DamageDealt = finalDmg,
-            Attacker = owner,
-            Target = other.gameObject,
-            IsCrit = isCrit,
-            HitPosition = other.ClosestPoint(transform.position),
-        };
-        mgr?.OnPostDealDamage(report);
-
-        // 아이템 형태변형: 다단히트(이중타격)·원형 충격파·스킬 추가 투사체(실제 오버랩/추가 적중)
-        ApplyItemShapeExtras(other, finalDmg, in mods);
-
-        // 캐릭터 패시브: 실제 적중 시점 (대상 + 데미지 정보 포함)
-        if (owner != null && owner.TryGetComponent<PlayerController>(out var ownerCtrl) && finalDmg > 0f)
-        {
-            ownerCtrl.FirePassive(PassiveTrigger.OnAttackHit, new PassiveContext
-            {
-                target     = other.gameObject,
-                damage     = finalDmg,
-                comboStep  = attackId,
-                weaponType = weaponData?.weaponType,
-            });
-
-            // 서약: 실제 적중 디스패치(근접). DealAoe 등 2차 피해는 이 경로를 안 타므로 재귀 없음.
-            GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnAttackHit(other.gameObject, finalDmg);
-        }
-
-#if UNITY_EDITOR
-        Debug.Log($"[EffectHit] {gameObject.name} → {other.name} | dmg={finalDmg:F0} | atk={actionType} | id={attackId}");
-#endif
-
-        string fxKey = !string.IsNullOrEmpty(hitEffectKey) ? hitEffectKey : FallbackHitEffectKey;
-        SpawnHitEffect(other.ClosestPoint(transform.position), fxKey).Forget();
-    }
-
-    // UniTaskVoid + 수명 토큰: 비동기 로드 도중 콜라이더가 파괴/풀반환되면 후속 처리를 안전하게 취소.
-    private async UniTaskVoid SpawnHitEffect(Vector3 hitPoint, string fxKey)
-    {
-        GameObject effectObj;
-        try
-        {
-            effectObj = await Managers.ObjectPooler
-                .SpawnAsync(fxKey, ObjectPoolerManager.PoolType.Effect, hitPoint, Quaternion.identity)
-                .AttachExternalCancellation(this.GetCancellationTokenOnDestroy());
-        }
-        catch (OperationCanceledException) { return; }
-
-        if (effectObj == null) return;
-
-        effectObj.transform.localScale = Vector3.one * hitEffectScale;
-        if (effectObj.TryGetComponent<EffectBehaviour>(out var eb))
-            eb.Initialize(eb.behaviorSO, null, 1f);
-    }
-
-    private static bool IsMeleeAction(WeaponActionType a) =>
-        a == WeaponActionType.GroundLight || a == WeaponActionType.GroundHeavy ||
-        a == WeaponActionType.AirLight    || a == WeaponActionType.AirHeavy    ||
-        a == WeaponActionType.AirPlunge;
-
-    private static bool IsSkillAction(WeaponActionType a) =>
-        a == WeaponActionType.QSkill || a == WeaponActionType.ESkill || a == WeaponActionType.RSkill;
-
-    /// <summary>
-    /// 아이템 형태변형 추가 판정 — 실제 오버랩/추가 적중으로 동작(가이드라인은 SynergyDamage 플래시).
-    ///  • 근접: meleeExtraHits회 같은 대상 추가타 + meleeCircle 원형 오버랩.
-    ///  • 스킬: skillExtraProjectiles만큼 인근 적에 추가 적중(투사체 근사).
-    /// DealSynergyDamage 경로는 OnPostDealDamage 미재귀 → 안전.
-    /// </summary>
-    private void ApplyItemShapeExtras(Collider other, float finalDmg, in ItemCombatModifiers mods)
-    {
-        if (owner == null || finalDmg <= 0f || other == null) return;
-        float ratio = mods.meleeExtraHitRatio > 0f ? mods.meleeExtraHitRatio : 0.8f;
-
-        if (IsMeleeAction(actionType))
-        {
-            for (int i = 0; i < mods.meleeExtraHits; i++)
-                CombatQuery.DealSynergyDamage(other.gameObject, finalDmg * ratio, owner, 0f, false);
-
-            if (mods.meleeCircle && mods.meleeCircleRadius > 0f)
-            {
-                int n = CombatQuery.GetNearbyEnemies(owner.transform.position, mods.meleeCircleRadius,
-                                                     other.gameObject, 12, s_shapeBuf);
-                for (int i = 0; i < n; i++)
-                    CombatQuery.DealSynergyDamage(s_shapeBuf[i], finalDmg * ratio, owner, 0f, false);
-            }
-        }
-        else if (IsSkillAction(actionType) && mods.skillExtraProjectiles > 0)
-        {
-            int n = CombatQuery.GetNearbyEnemies(other.transform.position, 5f,
-                                                 other.gameObject, mods.skillExtraProjectiles, s_shapeBuf);
-            for (int i = 0; i < n; i++)
-                CombatQuery.DealSynergyDamage(s_shapeBuf[i], finalDmg, owner, 0f, false);
-        }
+            Target              = other.gameObject,
+            BaseDamage          = damage,
+            Owner               = owner,
+            ActionType          = actionType,
+            KnockbackMultiplier = knockbackMultiplier,
+            HitPoint            = other.ClosestPoint(transform.position),
+            SourcePosition      = owner != null ? owner.transform.position : transform.position,
+            HitEffectKey        = hitEffectKey,
+            HitEffectScale      = hitEffectScale,
+            ComboStep           = attackId,
+        });
     }
 
     private void ReturnToPool()

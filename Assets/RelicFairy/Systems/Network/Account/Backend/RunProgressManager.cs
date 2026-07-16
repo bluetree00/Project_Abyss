@@ -69,7 +69,13 @@ public class RunProgressManager : MonoBehaviour
     public RunSaveData LoadLocalRun(int slot) => _localStore.Load(slot);
 
     /// <summary>지정 슬롯의 로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시). 다른 슬롯 무영향.</summary>
-    public void ClearLocalRun(int slot) => _localStore.Delete(slot);
+    /// <summary>슬롯 삭제 — 런 세이브와 함께 <b>온보딩 완료 기록</b>도 초기화한다.
+    /// (안 지우면 슬롯을 지우고 새로 시작해도 초회 온보딩이 스킵된다)</summary>
+    public void ClearLocalRun(int slot)
+    {
+        _localStore.Delete(slot);
+        BaseCampOnboardingDirector.ClearForSlot(slot);
+    }
 
     /// <summary>
     /// 방 경계에서 현재 런 전체 상태를 로컬에 저장한다.
@@ -105,6 +111,8 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomPoolKey = m.currentRoomPoolKey;
         d.currentRoomKind   = m.currentRoomKind;
         d.currentRoomMirror = m.currentRoomMirror;
+        d.currentRoomCleared = m.currentRoomCleared;   // 클리어 후 저장 → 복원 시 몹 재스폰 방지
+        d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)
 
         var cdw = new CooldownListWrapper();
         if (m.cooldowns != null) cdw.items.AddRange(m.cooldowns);
@@ -112,9 +120,16 @@ public class RunProgressManager : MonoBehaviour
 
         // 런 상태 확장
         d.runEssence       = s.RunDelta?.GainedEssence ?? 0;
+        d.fuelEnhanceMaterial = s.FuelBank?.EnhanceMaterial ?? 0;   // 이벤트방 연료 은행
+        d.fuelRuneOre         = s.FuelBank?.RuneOre ?? 0;
+        d.potionCount         = s.PlayerState?.PotionCount ?? 0;
+        d.potionCapacity      = s.PlayerState?.PotionCapacity ?? PlayerRunState.DefaultPotionCapacity;
         // 현재 슬롯: 라이브 WeaponManager 우선(첫 방 -1 케이스 해결), 없으면 씬 전환 시 저장값
         int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
         d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;
+
+        // 무기 강화/승급 상태 — 라이브 WeaponManager 우선, 없으면 씬 전환 저장 슬롯
+        CaptureWeaponEnhance(d, s);
 
         var loadout = AppBootstrapper.Instance?.Loadout;
         d.relicKey = loadout?.Relic != null ? loadout.Relic.name : string.Empty;
@@ -144,6 +159,21 @@ public class RunProgressManager : MonoBehaviour
         d.runePlacementsJson = JsonUtility.ToJson(pw);
     }
 
+    /// <summary>무기 슬롯 강화/승급 상태를 세이브에 캡처. 라이브 WeaponManager → 씬 전환 저장 슬롯 순.</summary>
+    private static void CaptureWeaponEnhance(RunSaveData d, GameRunSession s)
+    {
+        var wm = s.Player?.WeaponManager;
+        WeaponData w0 = wm?.Weapon0Data ?? SlotFromSaved(s, 0);
+        WeaponData w1 = wm?.Weapon1Data ?? SlotFromSaved(s, 1);
+        d.weapon0EnhanceLevel = w0?.enhanceLevel ?? 0;
+        d.weapon1EnhanceLevel = w1?.enhanceLevel ?? 0;
+        d.weapon0LegendId     = w0?.legendId ?? string.Empty;
+        d.weapon1LegendId     = w1?.legendId ?? string.Empty;
+    }
+
+    private static WeaponData SlotFromSaved(GameRunSession s, int slot)
+        => (s.SavedWeaponSlots != null && s.SavedWeaponSlots.Length > slot) ? s.SavedWeaponSlots[slot] : null;
+
     // ─────────────────────────────────────────────────────────
     // Private Methods — Build
     // ─────────────────────────────────────────────────────────
@@ -154,9 +184,6 @@ public class RunProgressManager : MonoBehaviour
 
         var itemWrapper = new ItemListWrapper();
         itemWrapper.items.AddRange(session.ItemInventory.PlacedItems);
-
-        var synWrapper = new SynergyListWrapper();
-        synWrapper.items.AddRange(session.AppliedSynergies);
 
         var logWrapper = new RoomClearLogWrapper();
         logWrapper.records.AddRange(session.RoomClearRecords);
@@ -204,14 +231,13 @@ public class RunProgressManager : MonoBehaviour
             retryCount             = retryCount,
             progressPercent        = progress,
             itemCount              = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
-            synergyCount           = session.AppliedSynergies.Count,
+            synergyCount           = MerlinRuneBridge.Instance != null ? MerlinRuneBridge.Instance.ActiveSynergyCount : 0,
             roomClearCount         = session.RoomClearRecords.Count,
             characterKey           = charKey,
             characterName          = charName,
             weapon0PrefabKey       = weapon0Key,
             weapon1PrefabKey       = weapon1Key,
             itemsJson              = JsonUtility.ToJson(itemWrapper),
-            synergiesJson          = JsonUtility.ToJson(synWrapper),
             roomLogsJson           = JsonUtility.ToJson(logWrapper),
             savedAt                = DateTime.UtcNow.ToString("o"),
             isInStartRoom          = isInStartRoom,

@@ -75,6 +75,21 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e46de729db3a82544a974f5ba870e90d
+    m_Address: UI/Popup/UI_CruciblePanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e5500b67cc9173243b4667c2128b9e37
+    m_Address: UI/Popup/UI_RelicInfoPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 408a2411a3cc3b1459e70e1b22fcdbc3
+    m_Address: UI/Popup/UI_RangedForgePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4063d8dd02099dc479ba8eaaa99c0331
     m_Address: DissolveMaterial
     m_ReadOnly: 0
@@ -160,6 +175,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2fc212087f94454595128336e811841
+    m_Address: UI/Popup/UI_CovenantAssemble
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c2d35a1ffee495648a3ba8c850078037
     m_Address: UI/Popup/UI_AwakeningPanel
     m_ReadOnly: 0
@@ -178,11 +198,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d4380da49cd4618468e9419a8c78e8d9
     m_Address: chest_1
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d63a5df35b4fa904ebb95bd4d5e13f6b
-    m_Address: UI/Popup/UI_CovenantChoice
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

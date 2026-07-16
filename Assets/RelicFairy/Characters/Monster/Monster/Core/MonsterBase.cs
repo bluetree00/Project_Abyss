@@ -78,6 +78,28 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private const string MonsterVisibilityLayerName = "Monster";
     private static int s_monsterVisibilityLayer = -2;
 
+    // ── 타격 판정용 레이어(MonsterHit) ────────────────────
+    // 몬스터 '콜라이더'를 전용 레이어로 올린다. 물리 질의가 레이어 마스크로 몬스터만 골라낼 수 있게 하려는 것.
+    //
+    // 왜 필요한가: 예전엔 몬스터 콜라이더가 Default라, 광역 질의가 `~0`(전 레이어)로 훑을 수밖에 없었다.
+    // 그러면 바닥·벽·소품·VFX 트리거까지 전부 걸려서 NonAlloc 버퍼가 환경 콜라이더로 가득 차고
+    // 몬스터가 한 마리도 안 잡히는 사고가 났다("이펙트는 나가는데 데미지 0").
+    //
+    // 가시성 레이어(Monster=렌더러)와 별개다 — 렌더러/콜라이더가 서로 간섭하지 않게 분리했다.
+    private const string MonsterHitLayerName = "MonsterHit";
+    private static int s_monsterHitLayer = -2;
+
+    /// <summary>몬스터 콜라이더 레이어 마스크. 광역 질의가 몬스터만 고르는 데 쓴다. 레이어 미정의면 ~0(전부).</summary>
+    public static int HitLayerMask
+    {
+        get
+        {
+            if (s_monsterHitLayer == -2)
+                s_monsterHitLayer = LayerMask.NameToLayer(MonsterHitLayerName);
+            return s_monsterHitLayer >= 0 ? (1 << s_monsterHitLayer) : ~0;
+        }
+    }
+
     // ── 내부 필드 ─────────────────────────────────────────
     protected MonsterConfigSO    _config;
     protected MonsterFSM         _fsm;
@@ -92,16 +114,24 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // ── 이동/전투 캐시 ────────────────────────────────────
     private float                  _baseAgentSpeed;
     private float                  _baseDefense;
+    // 챕터 난이도 배율(ChapterDataSO.difficultyScale) — HP/공격력 스케일. 보스는 1 고정. 스폰/풀재사용마다 갱신.
+    private float                  _difficultyScale = 1f;
     private float                  _incomingDamageMulti = 1f;
     // 받는 피해 증폭 디버프(낙인/취약/분쇄 등) — statusId별 다중 슬롯. 시한부, 만료 시 슬롯 무시.
     // 과거 단일 float 1슬롯이라 서로 다른 출처(룬 분쇄/유물 낙인/아이템 취약)가 덮어써 1개만 유효했다.
     // 이제 활성 슬롯들의 증폭을 합연산(1 + Σamp)한다.
-    private struct DmgTakenAmpSlot { public float amp; public float expire; }
+    private struct DmgTakenAmpSlot { public float amp; public float expire; public float total; }
     private readonly Dictionary<string, DmgTakenAmpSlot> _dmgTakenAmpSlots = new();
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
     // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
     private readonly MonsterStatusReceiver _status = new();
+
+    // 디버프 아이콘 행 갱신 — 매 프레임 돌 필요가 없다(잔여 게이지는 0.15초 계단이면 충분히 부드럽다).
+    private const float StatusUiInterval = 0.15f;
+    private readonly List<BuffViewItem> _statusUiBuf = new();
+    private float _statusUiTimer;
+    private bool  _statusUiWasEmpty = true;
     private bool                   _statusCcActive;     // CC로 정지 중 → 해제 시 agent 1회 복원
     private bool                   _statusSlowActive;   // 슬로우로 속도 override 중 → 해제 시 base 1회 복원
     // 공격 windup(예고) 노출 — 아이템 저스트가드/공격캔슬(ColliderInstance가 소비).
@@ -126,8 +156,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>유효 공격력.</summary>
     public float EffectiveAttackPower => _config != null ? _config.stat.attackPower : 0f;
 
-    /// <summary>유효 최대 HP.</summary>
-    public int EffectiveMaxHp => _config != null ? _config.stat.maxHp : 0;
+    /// <summary>유효 최대 HP. 챕터 난이도 배율(difficultyScale) 반영.</summary>
+    public int EffectiveMaxHp => _config != null ? Mathf.RoundToInt(_config.stat.maxHp * _difficultyScale) : 0;
+
+    /// <summary>몬스터 등급(Common/Rare/Elite/Boss). 대상 수가 아니라 '상대의 격'으로 보상을 정할 때 쓴다.</summary>
+    public MonsterGrade Grade => _config != null ? _config.grade : MonsterGrade.Common;
 
     /// <summary>유효 공격 속도.</summary>
     public float EffectiveAttackRate => _config != null ? _config.stat.attackRate : 0f;
@@ -155,6 +188,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>보스 HP 바 초기화용. Config 로드 후 유효.</summary>
     public int CurrentHp => _runtime != null ? _runtime.CurrentHp : 0;
+    /// <summary>사망 처리됨(런타임). 서약 등 외부 타겟팅에서 시체 제외용.</summary>
+    public bool IsDead => _runtime != null && _runtime.IsDead;
     public int    BossMaxHp => EffectiveMaxHp;
     public string BossName  => _config != null ? _config.monsterName : string.Empty;
 
@@ -299,10 +334,12 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (!string.IsNullOrEmpty(HeadBoneName))
             _headBone = FindBoneRecursive(transform, HeadBoneName);
 
-        // 5. 런타임 데이터 초기화
+        // 5. 런타임 데이터 초기화 — 챕터 난이도 배율 반영(HP scale + 공격력 = AttackMultiplier).
+        ResolveDifficultyScale();
         _runtime = new MonsterRuntimeData
         {
             CurrentHp        = EffectiveMaxHp,
+            AttackMultiplier = _difficultyScale,
             SpawnPosition    = transform.position,
             PatrolDirection  = 1,
         };
@@ -349,6 +386,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (DetectionRangeMultiplier == 1f || config == null || config.detection == null) return;
         config.detection.detectionRange   *= DetectionRangeMultiplier;
         config.detection.chaseGiveUpRange *= DetectionRangeMultiplier;
+    }
+
+    /// <summary>현재 런/챕터의 난이도 배율을 _difficultyScale에 반영. 보스는 1 고정(자체 밸런스 유지).
+    /// 인스턴스별 적용이라 공유 config를 오염시키지 않으며, 멀티챕터 런에서 OnEnable마다 재호출된다.</summary>
+    private void ResolveDifficultyScale()
+    {
+        if (_config != null && _config.grade == MonsterGrade.Boss) { _difficultyScale = 1f; return; }
+        var run = AppBootstrapper.Instance?.CurrentRun;
+        _difficultyScale = run != null ? run.CurrentDifficultyScale : 1f;
     }
 
     /// <summary>
@@ -399,6 +445,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 상태이상 수신기 틱(CC/Slow/DoT/공격디버프). DoT가 이 프레임에 처치할 수 있으므로 직후 사망 가드.
         _status.Tick(Time.deltaTime, this);
         if (_runtime.IsDead) return;
+
+        RefreshStatusUi();   // HP바 아래 디버프 아이콘 행(저주기 갱신)
         _attackSpeedMulti = _status.AttackSpeedMultiplier;   // 풀 간파/지배 적 공격 디버프
 
         // CC(스턴/빙결): 이동·FSM 정지. 해제 시 1회 복원.
@@ -678,10 +726,59 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     {
         _dmgTakenAmpSlots[statusId] = new DmgTakenAmpSlot
         {
-            amp = Mathf.Max(0f, ampPercent),
+            amp    = Mathf.Max(0f, ampPercent),
             expire = Time.time + duration,
+            total  = Mathf.Max(0.01f, duration),   // 게이지 비율용
         };
         GuidelineVisual.StatusApplied(transform, statusId, duration);   // [가이드라인 비주얼]
+    }
+
+    /// <summary>
+    /// 디버프 아이콘 행 갱신. 매 프레임 딕셔너리 4개를 훑을 필요는 없으므로 저주기로 돈다.
+    /// 상태가 하나도 없으면 첫 호출에서 행을 숨긴 뒤 더 이상 아무 일도 하지 않는다(정상 상태의 비용 ≈ 0).
+    /// </summary>
+    private void RefreshStatusUi()
+    {
+        if (_hpBar == null) return;
+
+        _statusUiTimer -= Time.deltaTime;
+        if (_statusUiTimer > 0f) return;
+        _statusUiTimer = StatusUiInterval;
+
+        _statusUiBuf.Clear();
+        CollectStatuses(_statusUiBuf);
+
+        // 상태가 계속 없으면 SetStatuses(빈 리스트)조차 부를 필요가 없다.
+        if (_statusUiBuf.Count == 0 && _statusUiWasEmpty) return;
+        _statusUiWasEmpty = _statusUiBuf.Count == 0;
+
+        _hpBar.SetStatuses(_statusUiBuf);
+    }
+
+    /// <summary>
+    /// 지금 이 몬스터에게 걸려 있는 <b>모든</b> 상태이상을 UI 모델로 뽑는다(디버프 표시 단일 진입점).
+    ///
+    /// 상태가 세 곳에 흩어져 있다 — 상태수신기(CC/슬로우/DoT/공속), 받피증폭 슬롯, 그리고
+    /// 독립 MonoBehaviour인 화상 핸들러. UI가 세 곳을 각각 알 필요가 없도록 여기서 합친다.
+    /// </summary>
+    public void CollectStatuses(List<BuffViewItem> into)
+    {
+        if (into == null) return;
+
+        _status.CollectStatuses(into);
+
+        // 받피증폭(낙인·분쇄·취약·저주) — 상태수신기를 안 거치는 별도 슬롯
+        float now = Time.time;
+        foreach (var kv in _dmgTakenAmpSlots)
+        {
+            float left = kv.Value.expire - now;
+            if (left <= 0f) continue;
+            into.Add(MonsterStatusReceiver.MakeItem(kv.Key, 1, left / kv.Value.total, left));
+        }
+
+        // 화상 — MonsterStatusReceiver를 타지 않는 독립 계통(가웨인 태양)
+        if (TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
+            into.Add(MonsterStatusReceiver.MakeItem("burn", 1, burn.Remaining01, burn.Remaining));
     }
 
     /// <summary>현재 활성 받피증폭 디버프 합산 배율(1 + 만료되지 않은 슬롯들의 amp 합). 슬롯 없으면 1.</summary>
@@ -700,7 +797,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// %기반 즉발/DoT 수치가 방어의 max(1,...) 감산에 무력화되지 않게 하는 경로.
     /// GetHit 경직·넉백 없음(DoT/체인 연타로 인한 스턴락 방지). 처치 판정은 일반 피해와 동일.
     /// </summary>
-    public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false)
+    /// <param name="kind">데미지 숫자 색 구분용. DoT 틱은 Dot을 넘긴다(기본은 즉발 시너지).</param>
+    public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false,
+                                  DamageKind kind = DamageKind.Synergy)
     {
         if (_runtime == null || _runtime.IsDead || amount <= 0f) return;
 
@@ -711,7 +810,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
 
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind);
 
         // [가이드라인 비주얼] 시너지 즉발/DoT 피해 표시(통지만 — 토글 OFF면 무동작)
         GuidelineVisual.SynergyDamage(transform.position + Vector3.up * 1.2f, isCrit);
@@ -787,7 +886,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.CurrentHp -= (int)actual;
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());
 
         int effMax = EffectiveMaxHp;
         _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
@@ -942,6 +1041,27 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>외곽선 표기 on/off 토글. on=Monster 레이어(외곽선/실루엣 Render Objects 필터 대상),
     /// off=루트 레이어로 복원(디졸브 등장 중 숨김 + 풀 재사용 시 레이어 잔존으로 외곽선이 재-디졸브에 새는 것 방지).
     /// 콜라이더/루트 레이어는 그대로 → 물리·타격·NavMesh 무영향. ~헬퍼(발밑그림자)는 외곽선 대상 아님.</summary>
+    /// <summary>
+    /// 이 몬스터의 <b>콜라이더</b>들을 MonsterHit 레이어로 올린다(렌더러는 건드리지 않는다).
+    /// 광역 질의가 레이어 마스크로 몬스터만 골라낼 수 있게 하는 것이 목적 — 환경 콜라이더가
+    /// NonAlloc 버퍼를 채워 몬스터가 안 잡히는 사고를 구조적으로 막는다.
+    /// 프리팹을 수정하지 않도록 런타임에 적용한다.
+    /// </summary>
+    private void ApplyHitLayer()
+    {
+        if (s_monsterHitLayer == -2)
+            s_monsterHitLayer = LayerMask.NameToLayer(MonsterHitLayerName);
+        if (s_monsterHitLayer < 0) return;   // 레이어 미정의 — 스킵(질의는 ~0 폴백)
+
+        var colliders = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            var c = colliders[i];
+            if (c == null) continue;
+            c.gameObject.layer = s_monsterHitLayer;
+        }
+    }
+
     private void SetVisibilityMarkup(bool on)
     {
         if (s_monsterVisibilityLayer == -2)
@@ -959,6 +1079,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             if (!(r is SkinnedMeshRenderer || r is MeshRenderer)) continue;
             var n = r.gameObject.name;
             if (n.Length > 0 && n[0] == '~') continue; // "~" 헬퍼(발밑그림자 등) 제외 — 외곽선 대상 아님
+
+            // 콜라이더가 같이 붙은 GO는 건드리지 않는다 — 여긴 타격 판정 레이어(MonsterHit)라
+            // 여기서 Monster 레이어로 바꿔버리면 광역 질의의 레이어 마스크가 이 몹을 놓친다(외곽선 < 타격).
+            if (r.TryGetComponent<Collider>(out _)) continue;
+
             r.gameObject.layer = target;
         }
     }
@@ -972,6 +1097,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// ActivationToken에 묶여 풀 반환/파괴 시 취소(이 경우 off 상태 유지).</summary>
     private async UniTaskVoid RevealVisibilityMarkupAsync()
     {
+        // 콜라이더를 타격 판정 레이어(MonsterHit)로 — 광역 질의가 몬스터만 골라낼 수 있게.
+        // 풀 재사용 시에도 매 스폰 재적용(레이어 잔존/유실 방지).
+        ApplyHitLayer();
+
         SetVisibilityMarkup(false); // 스폰 즉시 끔(디졸브 중 숨김 + 풀 재사용 레이어 리셋)
         try
         {
@@ -1077,6 +1206,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         if (_config == null || _runtime == null) return;
 
+        // 풀 재사용 시 현재 챕터의 난이도 배율 재적용(멀티챕터 런 대응).
+        ResolveDifficultyScale();
+
         _runtime.CurrentHp           = EffectiveMaxHp;
         _runtime.IsDead              = false;
         _runtime.SpawnPosition       = transform.position;
@@ -1091,7 +1223,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _runtime.IsReturning         = false;
         _runtime.TargetCleared       = true;
         _runtime.SpeedMultiplier     = 1f;
-        _runtime.AttackMultiplier    = 1f;
+        _runtime.AttackMultiplier    = _difficultyScale;
         _runtime.DamageMultiplier    = 1f;
 
         if (_agent != null)

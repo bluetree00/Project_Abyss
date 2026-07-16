@@ -61,6 +61,25 @@ public class ShopDataManager
                 Register(entry);
             });
 
+            // CDN 실패/빈 데이터 → Addressables 폴백(오프라인·에디터 테스트). ITEM_DATA와 동일 패턴.
+            // 이게 있어야 뒤끝 미연결 상태에서도 로컬 CSV(→ SHOP_PRICE_DATA.json)가 상점에 반영된다.
+            if (_all.Count == 0)
+            {
+                Debug.Log("[ShopDataManager] CDN 0행 — 로컬 폴백(SHOP_PRICE_DATA.json)");
+                // 1순위 Addressables(ITEM_DATA와 동일), 실패 시 Resources 직접 로드(오프라인 데이터 안전망).
+                var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(ChartName)
+                           ?? Resources.Load<TextAsset>(ChartName);
+                if (json != null)
+                {
+                    var col = JsonUtility.FromJson<ShopEntryCollection>(json.text);
+                    if (col?.entries != null)
+                        foreach (var entry in col.entries)
+                            if (entry != null && !string.IsNullOrEmpty(entry.shop_entry_id))
+                                Register(entry);
+                    Debug.Log($"[ShopDataManager] 폴백 로드 {_all.Count}행");
+                }
+            }
+
             ct.ThrowIfCancellationRequested();
 
             BuildIndexes();

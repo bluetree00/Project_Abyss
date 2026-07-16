@@ -19,14 +19,16 @@ namespace RelicFairy.Monster
     /// </summary>
     public sealed class MonsterStatusReceiver
     {
-        private sealed class CcSlot   { public float until; public Action onExpire; }
-        private sealed class SlowSlot { public float magnitude; public float until; public int stacks; }
+        // total = 부여 시점의 총 지속(초). 남은 시간만으론 게이지 비율을 그릴 수 없어 함께 보관한다.
+        private sealed class CcSlot   { public float until; public float total; public Action onExpire; }
+        private sealed class SlowSlot { public float magnitude; public float until; public float total; public int stacks; }
         private sealed class DotSlot
         {
             public float      damagePerTick;
             public float      interval;
             public float      timer;
             public int        remainingTicks;
+            public int        totalTicks;    // 게이지 비율용(remainingTicks / totalTicks)
             public GameObject instigator;
             public float      defenseIgnore;
             public Action     onExpire;
@@ -59,6 +61,7 @@ namespace RelicFairy.Monster
             if (string.IsNullOrEmpty(id) || duration <= 0f) return;
             if (!_cc.TryGetValue(id, out var c)) { c = new CcSlot(); _cc[id] = c; }
             c.until = Mathf.Max(c.until, Time.time + duration);
+            c.total = Mathf.Max(0.01f, c.until - Time.time);   // 게이지 기준(부여 직후 = 100%)
             if (onExpire != null) c.onExpire = onExpire;
             GuidelineVisual.StatusApplied(OwnerTf, id, duration);
         }
@@ -82,6 +85,7 @@ namespace RelicFairy.Monster
             if (!_slow.TryGetValue(id, out var s)) { s = new SlowSlot(); _slow[id] = s; }
             s.magnitude = Mathf.Clamp01(magnitudePct);
             s.until     = Time.time + duration;
+            s.total     = Mathf.Max(0.01f, duration);
             s.stacks    = Mathf.Clamp(s.stacks + 1, 1, Mathf.Max(1, maxStacks));
             GuidelineVisual.StatusApplied(OwnerTf, id, duration);
         }
@@ -118,6 +122,7 @@ namespace RelicFairy.Monster
             d.onExpire       = onExpire;
             d.onTick         = onTick;
             d.remainingTicks = Mathf.Max(d.remainingTicks, tickCount);   // top-up(보존 타이머)
+            d.totalTicks     = Mathf.Max(d.totalTicks, d.remainingTicks); // 게이지 기준
             GuidelineVisual.StatusApplied(OwnerTf, id, tickInterval * d.remainingTicks);
         }
 
@@ -128,6 +133,7 @@ namespace RelicFairy.Monster
             if (!_atkSlow.TryGetValue(id, out var s)) { s = new SlowSlot(); _atkSlow[id] = s; }
             s.magnitude = Mathf.Clamp01(magnitudePct);
             s.until     = Time.time + duration;
+            s.total     = Mathf.Max(0.01f, duration);
             s.stacks    = 1;
             GuidelineVisual.StatusApplied(OwnerTf, id, duration);
         }
@@ -136,6 +142,60 @@ namespace RelicFairy.Monster
         /// <summary>남은 DoT 총 피해(작열 폭발 합산용).</summary>
         public float GetRemainingDotDamage(string id)
             => _dot.TryGetValue(id, out var d) ? d.damagePerTick * d.remainingTicks : 0f;
+
+        // ── 표시(UI) ───────────────────────────────────────
+        /// <summary>
+        /// 지금 걸려 있는 상태이상을 UI 모델(BuffViewItem)로 뽑는다 — 플레이어 버프창과 같은 규격.
+        ///
+        /// 여태 상태는 id별 단건 조회(HasCc/HasDot 등)만 가능했다. "무엇이 걸려 있는지" 자체를
+        /// 물어볼 방법이 없어서 디버프 UI를 만들 수 없었다 — 그 구멍을 메우는 유일한 열거 진입점.
+        /// 라벨/아이콘은 EffectDescriptionFormatter가 statusId에서 해석한다(표시 규칙 단일화).
+        /// </summary>
+        public void CollectStatuses(List<BuffViewItem> into)
+        {
+            if (into == null) return;
+            float now = Time.time;
+
+            foreach (var kv in _cc)
+            {
+                float left = kv.Value.until - now;
+                if (left <= 0f) continue;
+                into.Add(MakeItem(kv.Key, 1, left / kv.Value.total, left));
+            }
+
+            foreach (var kv in _slow)
+            {
+                float left = kv.Value.until - now;
+                if (left <= 0f) continue;
+                into.Add(MakeItem(kv.Key, kv.Value.stacks, left / kv.Value.total, left));
+            }
+
+            foreach (var kv in _atkSlow)
+            {
+                float left = kv.Value.until - now;
+                if (left <= 0f) continue;
+                into.Add(MakeItem(kv.Key, 1, left / kv.Value.total, left));
+            }
+
+            foreach (var kv in _dot)
+            {
+                var d = kv.Value;
+                if (d.remainingTicks <= 0) continue;
+                float left = d.remainingTicks * d.interval;
+                into.Add(MakeItem(kv.Key, 1, (float)d.remainingTicks / Mathf.Max(1, d.totalTicks), left));
+            }
+        }
+
+        /// <summary>statusId → 표시 항목. 몬스터에게 걸린 것이므로 항상 디버프로 취급한다.</summary>
+        internal static BuffViewItem MakeItem(string statusId, int stacks, float remaining01, float remainSec)
+            => new BuffViewItem(
+                EffectDescriptionFormatter.IconKeyForStatus(statusId),
+                EffectDescriptionFormatter.LabelForStatus(statusId),
+                Mathf.Max(1, stacks),
+                Mathf.Clamp01(remaining01),
+                remainSec >= 0f ? $"{remainSec:0.0}초" : string.Empty,
+                BuffSource.Status,
+                isDebuff: true);
 
         // ── 수명 ───────────────────────────────────────────
         public void Tick(float dt, MonsterBase owner)
@@ -182,7 +242,7 @@ namespace RelicFairy.Monster
                     d.timer -= dt;
                     while (d.timer <= 0f && d.remainingTicks > 0)
                     {
-                        owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore);
+                        owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot);
                         d.onTick?.Invoke();
                         d.remainingTicks--;
                         d.timer += d.interval;

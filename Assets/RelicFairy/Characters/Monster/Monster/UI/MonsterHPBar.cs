@@ -35,6 +35,14 @@ public class MonsterHPBar : MonoBehaviour
     [SerializeField] private Vector2 _nameLabelSize = new(200f, 26f);
     [SerializeField] private float _nameLabelFontSize = 14f;
 
+    [Header("Status Row (디버프 아이콘)")]
+    [Tooltip("아이콘 한 칸의 크기(px).")]
+    [SerializeField] private float _statusIconSize = 16f;
+    [Tooltip("아이콘 사이 간격(px).")]
+    [SerializeField] private float _statusSpacing = 2f;
+    [Tooltip("동시에 표시할 최대 아이콘 수. 넘치면 오래된 것부터 잘린다.")]
+    [SerializeField] private int _statusMaxIcons = 6;
+
     [Header("Position")]
     [SerializeField] private float _headOffset = 0.1f;
     [SerializeField] private float _minAutoOffset = 0.12f;
@@ -58,6 +66,19 @@ public class MonsterHPBar : MonoBehaviour
     private bool _ghostActive;
 
     private TMPro.TMP_Text _subLabel;
+
+    // 디버프 아이콘 행 — 프리팹에 앵커가 없어 _subLabel/_nameLabel과 같은 절차 생성 패턴으로 만든다.
+    private sealed class StatusCell
+    {
+        public GameObject      go;
+        public Image           icon;
+        public Image           remain;   // 하단 잔여 게이지
+        public TMPro.TMP_Text  stack;    // ×N (2중첩 이상일 때만)
+    }
+
+    private RectTransform _statusRow;
+    private readonly System.Collections.Generic.List<StatusCell> _statusCells = new();
+    private int _statusShown = -1;   // 마지막으로 배치한 개수(개수가 바뀔 때만 재배치)
 
     private MonoBehaviour _monster;
     private Transform _anchor;
@@ -127,6 +148,10 @@ public class MonsterHPBar : MonoBehaviour
         _colliders = null;
         _hasLastPosition = false;
         if (_subLabel != null) _subLabel.text = string.Empty;
+
+        // 풀로 돌아가는 바에 이전 몬스터의 디버프가 남지 않게 한다.
+        SetStatuses(null);
+
         gameObject.SetActive(false);
     }
 
@@ -155,6 +180,59 @@ public class MonsterHPBar : MonoBehaviour
         if (_nameLabel == null) return;
         _nameLabel.text = monsterName ?? string.Empty;
         TMPOutlineHelper.ApplyDefault(_nameLabel);
+    }
+
+    /// <summary>
+    /// HP바 아래에 걸린 상태이상(디버프) 아이콘 행을 갱신한다.
+    /// 아이콘 + 중첩 수 + 잔여 게이지. 빈 리스트면 행 전체를 숨긴다.
+    ///
+    /// 지금까지 몬스터 상태는 머리 위 디버그 마커(GuidelineVisual)로만 보였고, 여러 개가 걸리면
+    /// 같은 지점에 포개져 읽히지 않았다. 이 행이 그 역할을 대체한다.
+    /// </summary>
+    public void SetStatuses(System.Collections.Generic.IReadOnlyList<BuffViewItem> items)
+    {
+        int count = items != null ? Mathf.Min(items.Count, Mathf.Max(1, _statusMaxIcons)) : 0;
+
+        if (count == 0)
+        {
+            if (_statusRow != null && _statusRow.gameObject.activeSelf) _statusRow.gameObject.SetActive(false);
+            _statusShown = 0;
+            return;
+        }
+
+        EnsureStatusRow();
+        if (_statusRow == null) return;
+        if (!_statusRow.gameObject.activeSelf) _statusRow.gameObject.SetActive(true);
+
+        while (_statusCells.Count < count) _statusCells.Add(CreateStatusCell());
+
+        for (int i = 0; i < _statusCells.Count; i++)
+        {
+            var cell = _statusCells[i];
+            if (i >= count) { if (cell.go.activeSelf) cell.go.SetActive(false); continue; }
+            if (!cell.go.activeSelf) cell.go.SetActive(true);
+
+            var item = items[i];
+            cell.icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
+            cell.remain.fillAmount = Mathf.Clamp01(item.Remaining01);
+
+            bool multi = item.Stacks > 1;
+            if (cell.stack.gameObject.activeSelf != multi) cell.stack.gameObject.SetActive(multi);
+            if (multi) cell.stack.text = "×" + item.Stacks;
+        }
+
+        // 개수가 바뀔 때만 가로 배치를 다시 계산한다(매 갱신마다 레이아웃을 흔들지 않는다).
+        if (_statusShown != count)
+        {
+            _statusShown = count;
+            float step = _statusIconSize + _statusSpacing;
+            float startX = -(count - 1) * 0.5f * step;
+            for (int i = 0; i < count; i++)
+            {
+                var rt = (RectTransform)_statusCells[i].go.transform;
+                rt.anchoredPosition = new Vector2(startX + i * step, 0f);
+            }
+        }
     }
 
     public void UpdateHP(int currentHp, int maxHp)
@@ -214,6 +292,86 @@ public class MonsterHPBar : MonoBehaviour
         _ghostFill.color = _ghostColor;
     }
 
+    /// <summary>디버프 아이콘 행 컨테이너 — HP바 바로 아래.</summary>
+    private void EnsureStatusRow()
+    {
+        if (_statusRow != null) return;
+
+        var parentRT = _barRoot != null ? _barRoot : (RectTransform)transform;
+        if (parentRT == null) return;
+
+        var go = new GameObject("StatusRow", typeof(RectTransform));
+        go.transform.SetParent(parentRT, false);
+
+        _statusRow = go.GetComponent<RectTransform>();
+        _statusRow.anchorMin = new Vector2(0.5f, 0f);
+        _statusRow.anchorMax = new Vector2(0.5f, 0f);
+        _statusRow.pivot     = new Vector2(0.5f, 1f);
+        _statusRow.anchoredPosition = new Vector2(0f, -2f);
+        _statusRow.sizeDelta = new Vector2(200f, _statusIconSize);
+    }
+
+    /// <summary>아이콘 1칸 — 아이콘 + 하단 잔여 게이지 + 중첩 배지.</summary>
+    private StatusCell CreateStatusCell()
+    {
+        var cell = new StatusCell();
+
+        cell.go = new GameObject("Status", typeof(RectTransform));
+        cell.go.transform.SetParent(_statusRow, false);
+        var rt = (RectTransform)cell.go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(_statusIconSize, _statusIconSize);
+
+        // 아이콘
+        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer));
+        iconGo.transform.SetParent(rt, false);
+        var irt = (RectTransform)iconGo.transform;
+        irt.anchorMin = Vector2.zero; irt.anchorMax = Vector2.one;
+        irt.offsetMin = Vector2.zero; irt.offsetMax = Vector2.zero;
+        cell.icon = iconGo.AddComponent<Image>();
+        cell.icon.raycastTarget = false;
+        cell.icon.preserveAspect = true;
+
+        // 잔여 게이지 — 아이콘 하단의 얇은 바(가로 채우기)
+        var remGo = new GameObject("Remain", typeof(RectTransform), typeof(CanvasRenderer));
+        remGo.transform.SetParent(rt, false);
+        var rrt = (RectTransform)remGo.transform;
+        rrt.anchorMin = new Vector2(0f, 0f);
+        rrt.anchorMax = new Vector2(1f, 0f);
+        rrt.pivot     = new Vector2(0.5f, 0f);
+        rrt.offsetMin = Vector2.zero;
+        rrt.offsetMax = Vector2.zero;
+        rrt.sizeDelta = new Vector2(0f, 2f);
+        cell.remain = remGo.AddComponent<Image>();
+        cell.remain.raycastTarget = false;
+        cell.remain.color = new Color(1f, 1f, 1f, 0.85f);
+        cell.remain.type = Image.Type.Filled;
+        cell.remain.fillMethod = Image.FillMethod.Horizontal;
+        cell.remain.fillOrigin = 0;
+
+        // 중첩 배지 — 우하단
+        var stGo = new GameObject("Stack", typeof(RectTransform), typeof(CanvasRenderer));
+        stGo.transform.SetParent(rt, false);
+        var srt = (RectTransform)stGo.transform;
+        srt.anchorMin = new Vector2(1f, 0f);
+        srt.anchorMax = new Vector2(1f, 0f);
+        srt.pivot     = new Vector2(1f, 0f);
+        srt.anchoredPosition = new Vector2(1f, 0f);
+        srt.sizeDelta = new Vector2(_statusIconSize, _statusIconSize * 0.6f);
+        cell.stack = stGo.AddComponent<TMPro.TextMeshProUGUI>();
+        cell.stack.alignment      = TMPro.TextAlignmentOptions.BottomRight;
+        cell.stack.fontSize       = _statusIconSize * 0.55f;
+        cell.stack.color          = Color.white;
+        cell.stack.raycastTarget  = false;
+        cell.stack.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+        cell.stack.overflowMode   = TMPro.TextOverflowModes.Overflow;
+        TMPOutlineHelper.ApplyDefault(cell.stack);
+        stGo.SetActive(false);
+
+        return cell;
+    }
+
     private void EnsureSubLabel()
     {
         if (_subLabel != null) return;
@@ -228,7 +386,8 @@ public class MonsterHPBar : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 0f);
         rt.anchorMax = new Vector2(0.5f, 0f);
         rt.pivot     = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = new Vector2(0f, -3f);
+        // 상태 아이콘 행이 바로 아래(y -2)에 오므로 그만큼 내려 겹치지 않게 한다.
+        rt.anchoredPosition = new Vector2(0f, -(_statusIconSize + 8f));
         rt.sizeDelta = new Vector2(200f, 20f);
 
         _subLabel = go.AddComponent<TMPro.TextMeshProUGUI>();

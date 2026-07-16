@@ -275,7 +275,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
                 if (col.gameObject == ctx.Controller.gameObject) continue;
                 if (alreadyHit != null && !alreadyHit.Add(col.gameObject)) continue;
                 if (col.TryGetComponent<IDamageable>(out var d))
-                    d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 2f);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier * 2f);
             }
         }
 
@@ -284,7 +284,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
             if (_hitTargets.Count == 0) return;
             float dmg = ctx.CalculateDamage(baseDmg);
             foreach (var target in _hitTargets)
-                target.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
         }
 
         private void SpawnHitEffects(SkillExecutionContext ctx)

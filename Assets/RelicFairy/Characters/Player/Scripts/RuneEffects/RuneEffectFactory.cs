@@ -1,8 +1,8 @@
 /// <summary>
 /// effect_type 문자열 → IRuneEffect 인스턴스 생성.
 ///
-/// 24효과(6속성×4단계)를 effect_type 고유키로 분기한다. 이번 구현은 전기 4종만 실효과,
-/// 나머지 20종은 안전한 빈 RuneEffect(연결만)로 폴백 — 점진 구현이 가능한 구조.
+/// 24효과(6속성×4단계)를 effect_type 고유키로 분기한다. <b>24종 전부 실구현</b>돼 있으며,
+/// default의 빈 RuneEffect는 데이터에 없는 키가 들어왔을 때의 안전 폴백이다.
 /// 키는 MERLIN_RUNE_SYNERGY_DATA의 effect_type과 정확히 일치해야 한다.
 /// </summary>
 public static class RuneEffectFactory

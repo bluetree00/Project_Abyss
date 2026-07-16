@@ -8,14 +8,21 @@ using System;
 
 public sealed class PlayerRunState
 {
+    public const int DefaultPotionCapacity = 3;
+
     public int Hp { get; private set; }
     public int MaxHp { get; private set; }
     public int TempGold { get; private set; }
 
+    // 포션(퀵슬롯 소모품) — 런 지속. 사용 시 GameRunSession이 즉발 % 회복을 처리하고 여기서 개수를 깎는다.
+    public int PotionCount { get; private set; }
+    public int PotionCapacity { get; private set; } = DefaultPotionCapacity;
+
     public bool IsActive { get; private set; } = true;
 
-    public event Action<int, int> OnHpChanged; // (hp, maxHp)
-    public event Action<int> OnGoldChanged;    // tempGold
+    public event Action<int, int> OnHpChanged;       // (hp, maxHp)
+    public event Action<int> OnGoldChanged;          // tempGold
+    public event Action<int, int> OnPotionChanged;   // (count, capacity)
 
     public PlayerRunState(int maxHp = 100, int startGold = 0)
     {
@@ -31,6 +38,55 @@ public sealed class PlayerRunState
         IsActive = false;
         OnHpChanged = null;
         OnGoldChanged = null;
+        OnPotionChanged = null;
+    }
+
+    // ── 포션 ──────────────────────────────────────────────────
+
+    /// <summary>포션 용량 설정(소모품 슬롯 보너스 등). 초과분은 잘린다.</summary>
+    public void SetPotionCapacity(int capacity)
+    {
+        if (!IsActive) return;
+        capacity = Math.Max(0, capacity);
+        if (PotionCapacity == capacity) return;
+        PotionCapacity = capacity;
+        if (PotionCount > PotionCapacity) PotionCount = PotionCapacity;
+        OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
+    }
+
+    /// <summary>포션 지급(상점 구매·대기방 보충). 용량 상한까지만.</summary>
+    public void AddPotion(int amount)
+    {
+        if (!IsActive || amount <= 0) return;
+        int next = Math.Min(PotionCapacity, PotionCount + amount);
+        if (next == PotionCount) return;
+        PotionCount = next;
+        OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
+    }
+
+    /// <summary>포션을 용량까지 가득 채운다(대기방 보충).</summary>
+    public void RefillPotions()
+    {
+        if (!IsActive || PotionCount >= PotionCapacity) return;
+        PotionCount = PotionCapacity;
+        OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
+    }
+
+    /// <summary>포션 1개 소모 시도. 없으면 false(회복도 없음).</summary>
+    public bool TryConsumePotion()
+    {
+        if (!IsActive || PotionCount <= 0) return false;
+        PotionCount--;
+        OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
+        return true;
+    }
+
+    /// <summary>세이브 복원용 — 이벤트 없이 개수/용량 직접 설정.</summary>
+    public void RestorePotions(int count, int capacity)
+    {
+        PotionCapacity = Math.Max(0, capacity);
+        PotionCount    = Math.Clamp(count, 0, PotionCapacity);
+        OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
     }
 
     public void SetHp(int hp)

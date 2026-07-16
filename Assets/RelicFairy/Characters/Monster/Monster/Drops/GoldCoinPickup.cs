@@ -93,6 +93,7 @@ public class GoldCoinPickup : MonoBehaviour
 
             var go = CreateCoinVisual();
             go.transform.position = startPos;
+            RoomScopedDrop.Mark(go);   // 방 전환 시 정리 대상(부모가 없어 방 파괴로는 안 지워짐)
 
             var coin = go.AddComponent<GoldCoinPickup>();
             coin.Initialize(startPos, landing, valuePerCoin);

@@ -70,8 +70,19 @@ public static class GuidelineVisual
     }
 
     /// <summary>적 상태이상 마커 — id에 따라 색/라벨 자동(점화/빙결/서리/독/기절 등). 만료 시 자동 제거.</summary>
+    /// <summary>
+    /// ⚠️ 상태이상 마커는 <b>기본 OFF</b>다.
+    ///
+    /// 원래 개발용 플레이스홀더였는데 켜진 채로 게임에 노출돼 있었다. 상태가 여러 개 걸리면
+    /// 전부 머리 위 한 점(2.2m)에 포개져 읽히지도 않았다. 이제 정식 UI(MonsterHPBar 디버프 아이콘 행)가
+    /// 그 역할을 하므로 마커는 끈다 — 켜면 둘이 겹쳐 화면만 지저분해진다.
+    /// 디버깅이 필요하면 StatusMarkersEnabled 를 켠다(콘·범위 등 다른 가이드라인은 영향 없음).
+    /// </summary>
+    public static bool StatusMarkersEnabled { get; set; } = false;
+
     public static void StatusApplied(Transform target, string statusId, float duration)
     {
+        if (!StatusMarkersEnabled) return;
         if (!s_enabled || target == null || string.IsNullOrEmpty(statusId)) return;
         var r = GuidelineVisualRunner.Instance; if (r == null) return;
 

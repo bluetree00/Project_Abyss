@@ -32,6 +32,15 @@ public sealed class GameRunSession
         RunEnd,       // 런 종료 (사망)
     }
 
+    /// <summary>신규 런 시작 시 지급하는 강화재료(EnhanceMaterial) 초기량. 재련소(#1 소비처)가
+    /// 이벤트방(유일 생산처)보다 앞 순번일 때 첫 재련소에서 재료=0이 되는 갭의 안전장치.
+    /// EnhanceTable +0→+1 비용(1) 기준 약 5회 시도분. 이어하기 복원 경로에는 지급하지 않는다.</summary>
+    private const int NewRunStartingEnhanceMaterial = 5;
+
+    // 포션 — 신규 런 시작 지급량, 사용 시 회복 비율(최대 HP 대비).
+    private const int   NewRunStartingPotions = 3;
+    private const float PotionHealRatio       = 0.40f;   // 즉발 40% 회복
+
     public RunPhase Phase { get; private set; } = RunPhase.NotRunning;
     public bool IsRunning => Phase == RunPhase.Running;
 
@@ -46,6 +55,14 @@ public sealed class GameRunSession
     /// <summary>현재 챕터 ChapterDataSO의 보스 스폰 테이블. 레지스트리 미주입/미설정 시 null(BossSpawner가 직렬화 폴백 사용).</summary>
     public MonsterSpawnTableSO CurrentBossSpawnTable =>
         _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
+
+    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale. 미주입/미설정 시 1.</summary>
+    public float CurrentDifficultyScale =>
+        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+
+    /// <summary>현재 챕터의 몬스터 수량 배율. ChapterDataSO.monsterCountScale. 미주입/미설정 시 1.</summary>
+    public float CurrentMonsterCountScale =>
+        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.monsterCountScale ?? 1f) : 1f;
 
     private ChapterRegistry _chapterRegistry;
 
@@ -68,6 +85,8 @@ public sealed class GameRunSession
 
     public PlayerRunState PlayerState { get; private set; }
     public RunItemInventory ItemInventory { get; private set; } = new RunItemInventory();
+    /// <summary>런 지속 연료(강화재료·원석). 이벤트방 생산·#1/#2 소비. 미소비분은 런 종료 시 abyssEssence로 환산.</summary>
+    public RunFuelBank FuelBank { get; private set; } = new RunFuelBank();
     public RunDelta RunDelta { get; private set; } = new RunDelta();
     public RoomBuffHandler BuffHandler { get; private set; } = new RoomBuffHandler();
     public ItemEffectManager EffectManager { get; private set; } = new ItemEffectManager();
@@ -88,9 +107,12 @@ public sealed class GameRunSession
         Debug.Log($"[GameRunSession] ZoneProgressionService 초기화 완료 ({layoutKey})");
     }
 
-    // ── 시너지 이력 (씬 전환에도 생존) ──
-    private readonly List<SynergyRecord> _appliedSynergies = new();
-    public IReadOnlyList<SynergyRecord> AppliedSynergies => _appliedSynergies;
+    // 구 시너지 이력(_appliedSynergies / SynergyRecord)은 제거됨.
+    // 시너지의 진실원본은 룬 보드 점유 셀(RunSaveData.runeCellsJson)이고, 복원도 그쪽이 담당한다.
+    // 현재 발동 중인 단계 수가 필요하면 MerlinRuneBridge.ActiveSynergyCount를 읽는다(상승·하강 반영).
+    private static int ActiveSynergyCount => MerlinRuneBridge.Instance != null
+        ? MerlinRuneBridge.Instance.ActiveSynergyCount
+        : 0;
 
     // ── 방 클리어 이력 ──
     private readonly List<RoomClearRecord> _roomClearRecords = new();
@@ -100,6 +122,14 @@ public sealed class GameRunSession
     private int _snapGold;
     private int _snapItemCount;
     private int _snapSynergyCount;
+
+    /// <summary>
+    /// 현재 방에서 재련소가 소비한 결정적 롤 수.
+    /// 방 안에서 저장(S3)을 허용하면 재접속 시 RNG 스트림이 처음으로 리셋돼
+    /// "같은 롤을 다시 굴리는" save-scum이 뚫린다 → 이 값만큼 스트림을 진행시켜 막는다.
+    /// 새 방 진입 시 0으로 리셋(방마다 시드가 다르므로).
+    /// </summary>
+    public int CrucibleRollIndex { get; set; }
 
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
@@ -141,27 +171,6 @@ public sealed class GameRunSession
     private bool _hudModeSet = false;
 
     // =========================================================
-    // Synergy Record
-    // =========================================================
-
-    /// <summary>시너지 효과 기록 추가.</summary>
-    public void RecordSynergy(SynergyRecord record)
-    {
-        if (record == null) return;
-        _appliedSynergies.Add(record);
-    }
-
-    /// <summary>특정 그리드의 시너지 철회 (아이템 제거로 그리드 미완성 시).</summary>
-    public void RemoveSynergiesByGrid(string gridId)
-    {
-        if (string.IsNullOrEmpty(gridId)) return;
-        _appliedSynergies.RemoveAll(r => r.gridId == gridId);
-    }
-
-    /// <summary>시너지 이력 전체 초기화. 이어하기 시 룬 보드 점유 기반 재계산 전에 호출(중복 적용 방지).</summary>
-    public void ClearAppliedSynergies() => _appliedSynergies.Clear();
-
-    // =========================================================
     // Room Clear Recording
     // =========================================================
 
@@ -170,7 +179,7 @@ public sealed class GameRunSession
     {
         _snapGold         = PlayerState?.TempGold ?? 0;
         _snapItemCount    = ItemInventory.PlacedCount + ItemInventory.StagingCount;
-        _snapSynergyCount = _appliedSynergies.Count;
+        _snapSynergyCount = ActiveSynergyCount;
     }
 
     /// <summary>방 클리어 시 호출. 현재 상태와 스냅샷의 차이로 방 내 획득 정보를 기록한다.</summary>
@@ -180,7 +189,7 @@ public sealed class GameRunSession
 
         int goldAfter  = PlayerState?.TempGold ?? 0;
         int itemCount  = ItemInventory.PlacedCount + ItemInventory.StagingCount;
-        int synCount   = _appliedSynergies.Count;
+        int synCount   = ActiveSynergyCount;
 
         _roomClearRecords.Add(new RoomClearRecord
         {
@@ -224,6 +233,12 @@ public sealed class GameRunSession
 
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
+
+            // 신규 런 강화재료 시작 지급 — 재련소(첫 소비처)가 이벤트방(첫 생산처)보다 앞 순번일 수 있어
+            // 첫 재련소에서 강화재료=0이 되는 갭을 막는 안전장치. 이어하기(RestoreFromSaveAsync)는 이 경로를
+            // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
+            FuelBank.Add(FuelKind.EnhanceMaterial, NewRunStartingEnhanceMaterial);
+            PlayerState.AddPotion(NewRunStartingPotions);   // 신규 런 포션 지급(이어하기는 세이브 복원)
 
             // PlayerState ready (HUD may already exist)
             OnPlayerStateReady?.Invoke(PlayerState);
@@ -272,6 +287,7 @@ public sealed class GameRunSession
 
             PlayerState = new PlayerRunState(save.maxHp, save.runGold);
             PlayerState.SetHp(save.currentHp);
+            PlayerState.RestorePotions(save.potionCount, save.potionCapacity > 0 ? save.potionCapacity : PlayerRunState.DefaultPotionCapacity);
 
             RunDelta = new RunDelta();
 
@@ -282,15 +298,7 @@ public sealed class GameRunSession
                     ItemInventory.RestorePlacedItems(itemWrapper.items);
             }
 
-            if (!string.IsNullOrEmpty(save.synergiesJson))
-            {
-                var synWrapper = JsonUtility.FromJson<SynergyListWrapper>(save.synergiesJson);
-                if (synWrapper?.items != null)
-                {
-                    foreach (var record in synWrapper.items)
-                        if (record != null) _appliedSynergies.Add(record);
-                }
-            }
+            // 시너지는 복원하지 않는다 — 룬 보드 점유 셀(runeCellsJson)에서 재계산되는 게 권위다.
 
             if (!string.IsNullOrEmpty(save.roomLogsJson))
             {
@@ -309,6 +317,7 @@ public sealed class GameRunSession
 
             // 런 중 적립 정수 복원 (런 종료 시 메타 반영분)
             RunDelta.GainedEssence = save.runEssence;
+            FuelBank.RestoreRaw(save.fuelEnhanceMaterial, save.fuelRuneOre);   // 연료 은행 복원
 
             Phase = RunPhase.Running;
             ChangeRunState(RunState.Map);
@@ -335,6 +344,10 @@ public sealed class GameRunSession
 
         Phase = RunPhase.Ending;
 
+        // 미소비 연료(강화재료·원석) → abyssEssence(메타) 환산 (로스 0). Phase=Ending이라 AddEssence 가드 우회, RunDelta 직접 가산.
+        int fuelConverted = FuelBank.TotalRemaining();
+        if (fuelConverted > 0) RunDelta.GainedEssence += fuelConverted;
+
         // 종료 상태 발행 (OnRunEnded 전에 구독자가 반응할 수 있도록)
         var endState = isCleared ? RunState.RunClear : RunState.RunEnd;
         CurrentRunState = endState;
@@ -355,7 +368,7 @@ public sealed class GameRunSession
         catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
         // MerlinRuneBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
-        MerlinRuneBridge.Instance?.ClearAppliedGrids();
+        MerlinRuneBridge.Instance?.ResetSynergyState();
 
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
@@ -387,7 +400,6 @@ public sealed class GameRunSession
         CurrentRunState = RunState.None;
         SavedWeaponSlots = null;
         SavedCurrentSlotIndex = -1;
-        _appliedSynergies.Clear();
         _roomClearRecords.Clear();
         ActiveTheme = string.Empty;
         ActiveFieldPrefabKey = string.Empty;
@@ -572,6 +584,17 @@ public sealed class GameRunSession
     // =========================================================
     public void BindPlayer(PlayerController player)
     {
+        // 챕터 전환 시 새 플레이어는 InitializeFrom으로 만피(Hp=MaxHp)가 된다.
+        // 자동 만피를 없애고 HP를 이어받는다 — 회복은 챕터 시작 특수 오브젝트/포션이 담당.
+        // PlayerState는 씬 전환에도 살아남아 직전 HP를 들고 있으므로, 그 '비율'을 새 플레이어에 적용한다.
+        //   · 첫 시작:  PlayerState.Hp==MaxHp → 비율 1.0 → 만피 (정상)
+        //   · 챕터 전환: 직전 챕터 종료 HP 비율로 진입
+        //   · 이어하기:  save.currentHp/save.maxHp 비율 복원(LoadFromSave가 PlayerState에 선반영)
+        // SubscribePlayerStateSource가 곧 PlayerState를 새 만피로 덮으므로 비율은 지금 캡처한다.
+        float carriedHpRatio = (PlayerState != null && PlayerState.MaxHp > 0)
+            ? Mathf.Clamp01((float)PlayerState.Hp / PlayerState.MaxHp)
+            : 1f;
+
         UnsubscribePlayerStateSource();
         Player = player;
         if (Player == null) Debug.LogWarning("[GameRun] BindPlayer: player is null");
@@ -602,9 +625,12 @@ public sealed class GameRunSession
             // 방 버프 즉시 적용
             RefreshPlayerRoomBuffs();
 
-            // 시너지 이력 복원 (씬 전환 후 복원)
-            if (_appliedSynergies.Count > 0)
-                Player.RuntimeStats.RestoreSynergies(_appliedSynergies);
+            // 시너지는 룬 보드 점유 셀에서 재계산된다(GameRunBootstrapper.RestoreRuneBoardFromSave →
+            // OnZoneCellsUpdated → RuneEffects.Activate). 구 RestoreSynergies 경로는 제거함.
+
+            // 위 Refresh들로 MaxHp가 최종 확정된 뒤, 이어받은 비율로 HP를 설정한다(자동 만피 제거).
+            var rs = Player.RuntimeStats;
+            rs.SetHp(Mathf.Clamp(Mathf.RoundToInt(rs.MaxHp * carriedHpRatio), 1, rs.MaxHp));
         }
 
         OnPlayerBound?.Invoke(Player);
@@ -682,6 +708,49 @@ public sealed class GameRunSession
         if (count <= 0) return;
 
         RunDelta.GainedItems.Add(new ItemStack(itemId, count));
+    }
+
+    // ── 포션 ──────────────────────────────────────────────────
+
+    // ── 상점 정비소 연결점 ────────────────────────────────────
+
+    /// <summary>룬 제거 누적 횟수(누진 가격용, StS 카드제거 방식). 런 지속.</summary>
+    public int RuneExtractCount { get; set; }
+
+    /// <summary>
+    /// 배치된 룬 1개를 제거하고 원석으로 되돌린다(상점 룬 제거 서비스의 실제 처리).
+    /// ⚠️ 보드 셀/시너지 재계산은 UI(UI_GridPanel.HandleItemRemoved) 경로가 담당하므로,
+    ///    이 메서드는 <b>인벤토리 + 원석 환원</b>만 처리하고 보드 정리는 호출부(룬판 제거 모드)가 함께 해야 한다.
+    ///    현재는 연결점만 — 룬판 제거 모드 UI 배선 시 여기로 들어온다.
+    /// </summary>
+    public bool TryExtractPlacedRune(RuntimeItemData item, int oreRefund)
+    {
+        if (item == null || ItemInventory == null) return false;
+        if (!ItemInventory.IsPlaced(item.instanceId)) return false;
+
+        ItemInventory.RemovePlaced(item);
+        if (oreRefund > 0) FuelBank?.Add(FuelKind.RuneOre, oreRefund);
+        return true;
+    }
+
+    /// <summary>포션 사용 — 1개 소모 후 즉발 % 회복. 성공 시 true.</summary>
+    public bool TryUsePotion()
+    {
+        if (Player?.RuntimeStats == null || PlayerState == null) return false;
+        if (Player.RuntimeStats.Hp >= Player.RuntimeStats.MaxHp) return false;   // 만피면 낭비 방지
+        if (!PlayerState.TryConsumePotion()) return false;                       // 재고 없음
+
+        int heal = Mathf.Max(1, Mathf.RoundToInt(Player.RuntimeStats.MaxHp * PotionHealRatio));
+        Player.Heal(heal);
+        return true;
+    }
+
+    /// <summary>대기방 회복 오브젝트 — 만피 + 포션 가득 보충.</summary>
+    public void RestAtSanctuary()
+    {
+        if (Player?.RuntimeStats != null)
+            Player.RuntimeStats.SetHp(Player.RuntimeStats.MaxHp);
+        PlayerState?.RefillPotions();
     }
 
     private PlayerRunState CreateInitialPlayerStateFromSession()

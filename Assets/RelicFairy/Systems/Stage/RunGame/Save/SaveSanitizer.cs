@@ -36,6 +36,10 @@ public static class SaveSanitizer
 
         d.runGold         = ClampMin(d.runGold,         0, ref changed);
         d.runEssence      = ClampMin(d.runEssence,      0, ref changed);
+        d.fuelEnhanceMaterial = ClampMin(d.fuelEnhanceMaterial, 0, ref changed);
+        d.fuelRuneOre         = ClampMin(d.fuelRuneOre,         0, ref changed);
+        d.potionCapacity      = ClampMin(d.potionCapacity, PlayerRunState.DefaultPotionCapacity, ref changed);
+        d.potionCount         = Mathf.Clamp(d.potionCount, 0, d.potionCapacity);
         d.maxHp           = ClampMin(d.maxHp,           MinMaxHp, ref changed);
         // currentHp: [0, maxHp] — 0(사망 상태)도 허용해 정상값을 끌어올리지 않는다.
         d.currentHp       = ClampRange(d.currentHp,     0, d.maxHp, ref changed);
@@ -54,13 +58,19 @@ public static class SaveSanitizer
 
         d.weaponCurrentSlot = ClampRange(d.weaponCurrentSlot, MinWeaponSlot, MaxWeaponSlot, ref changed);
 
+        // 강화 레벨: ≥0만. 상한은 재련소 차트(EnhanceTableSO) 구동이라 여기서 강제하지 않는다.
+        d.weapon0EnhanceLevel = ClampMin(d.weapon0EnhanceLevel, 0, ref changed);
+        d.weapon1EnhanceLevel = ClampMin(d.weapon1EnhanceLevel, 0, ref changed);
+
+        // 재련소 RNG 소비 수: ≥0. 음수면 스트림 진행이 깨져 save-scum이 뚫린다.
+        d.crucibleRollIndex = ClampMin(d.crucibleRollIndex, 0, ref changed);
+
         // masterSeed·heading·anchorToggle·currentRoomKind/Mirror·seqPhase 등 절차생성
         // 내부 상태는 클램프하지 않는다(시드 정합성/복원 무결성 보존, 과도 개입 금지).
 
         // JSON 문자열 필드: 파싱 실패 시에만 빈 값 폴백(크래시 방지). 내용은 강제 수정 안 함.
         d.itemsJson              = SafeJson<ItemListWrapper>(d.itemsJson, ref changed);
         d.stagingItemsJson       = SafeJson<ItemListWrapper>(d.stagingItemsJson, ref changed);
-        d.synergiesJson          = SafeJson<SynergyListWrapper>(d.synergiesJson, ref changed);
         d.roomLogsJson           = SafeJson<RoomClearLogWrapper>(d.roomLogsJson, ref changed);
         d.clearedZoneIndicesJson = SafeJson<IntListWrapper>(d.clearedZoneIndicesJson, ref changed);
         d.covenantsJson          = SafeJson<CovenantListWrapper>(d.covenantsJson, ref changed);

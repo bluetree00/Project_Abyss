@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b0c3a74d232eda46aab9f9984eb60e0, type: 3}
   m_Name: BlockPalette_Cave
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
-  themeMatch: Cave
+  themeMatch: Lava
   blocks:
   - {fileID: 11400000, guid: 93afa8f895c85bf4f96570ae5c3ed1e8, type: 2}
   - {fileID: 11400000, guid: 796314963f87a4646aca71b4dcab22c7, type: 2}

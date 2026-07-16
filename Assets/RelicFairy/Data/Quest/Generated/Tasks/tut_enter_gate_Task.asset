@@ -14,8 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: e7ce8d0be6825a447a97b7be3ae0c2db, type: 2}
   codeName: tut_enter_gate
-  description: "\uAC8C\uC774\uD2B8\uB97C \uC9C0\uB098 \uB2E4\uC74C \uCC55\uD130\uB85C
-    \uB098\uC544\uAC00\uB77C"
+  description: "\uD3EC\uD0C8\uC744 \uC9C0\uB098 \uC2EC\uC5F0\uC5D0 \uC9C4\uC785\uD558\uB77C"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: 657dcb4aedda808478a684923b590bd9, type: 2}

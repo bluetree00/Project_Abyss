@@ -150,7 +150,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
             foreach (var target in _hitTargets)
             {
                 if (target == null) continue;
-                target.TakeDamage(extraDmg, ctx.Controller.gameObject, _data.knockbackMultiplier * 1.5f);
+                ctx.DealDamage(target, extraDmg, _data.knockbackMultiplier * 1.5f);
             }
 
             // 티어별 추가 피격 이펙트
@@ -193,7 +193,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
 
                 if (col.TryGetComponent<IDamageable>(out var d))
                 {
-                    d.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                    ctx.DealDamage(d, dmg, _data.knockbackMultiplier);
                     _hitTargets.Add(d);
                     _hitObjects.Add(col.gameObject);
                 }

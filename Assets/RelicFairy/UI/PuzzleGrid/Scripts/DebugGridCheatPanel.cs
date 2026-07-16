@@ -173,23 +173,14 @@ public class DebugGridCheatPanel : MonoBehaviour
         ReapplyAllSynergies();
     }
 
+    /// <summary>
+    /// 구 "그리드 완성 → 시너지 일괄 적용" 치트는 폐기됐다(그 경로 자체가 제거됨).
+    /// 현재 시너지는 <b>룬판 점유 셀 개수</b>로만 결정되므로, 치트로 강제 발동하려면
+    /// 셀을 직접 점유시켜야 한다(MerlinRuneHexGridView.RestoreOccupiedCells 등).
+    /// </summary>
     private void ReapplyAllSynergies()
     {
-        var bridge = MerlinRuneBridge.Instance;
-        if (bridge == null) return;
-
-        var run = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.Run : null;
-        var player = run?.Player;
-        if (player == null) return;
-
-        // 전체 초기화
-        player.RuntimeStats.ClearSynergyEffects();
-
-        // 활성화된 그리드만 재적용
-        foreach (var gridId in _activeGrids)
-            bridge.CheatTriggerSynergy(gridId);
-
-        Debug.Log($"[GridCheat] 시너지 재적용: {_activeGrids.Count}개 활성");
+        Debug.LogWarning("[GridCheat] 시너지 강제 적용 치트는 폐기됨 — 시너지는 룬판 점유 셀 개수로만 결정된다");
     }
 
     private static Canvas FindOverlayCanvas()

@@ -13,6 +13,10 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [SerializeField] private KeyCode spawnItemKey = KeyCode.F7;
     private bool _started;
 
+    [Header("테스트 버튼 (재련소/정제소 즉시 오픈)")]
+    [SerializeField] private bool showTestButtons = true;
+    private CrucibleRoomController _testCrucible;
+
     private void Awake()
     {
         if (bootstrapper == null)
@@ -174,6 +178,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private void OnGUI()
     {
+        if (showTestButtons) DrawTestButtons();
         if (!showGuiHints) return;   // 레거시 정리: 화면 힌트 비활성(키 동작은 Update에서 유지)
 
         var style = new GUIStyle(GUI.skin.label)
@@ -199,6 +204,53 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
         GUI.Label(new Rect(x, y,      300, 20), $"<b>[F5/F6]</b> 방 클리어 (출구 게이트 활성화)", style);
         GUI.Label(new Rect(x, y + 20, 300, 20), $"<b>[F7]</b> 아이템 스폰", style);
+    }
+
+    // ── 테스트 버튼 (재련소/정제소 즉시 오픈) ────────────────
+
+    private void DrawTestButtons()
+    {
+        const float bw = 168f, bh = 34f, bx = 10f;
+        float by = 10f;
+        var prev = GUI.color;
+        GUI.color = new Color(1f, 0.85f, 0.4f, 1f);
+        if (GUI.Button(new Rect(bx, by, bw, bh), "재련소 테스트"))
+            OpenCrucibleTestAsync().Forget();
+        if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소(룬판) 테스트"))
+            OpenRefineryTest();
+        GUI.color = prev;
+    }
+
+    /// <summary>테스트용 재련소 오픈 — NPC 없이 임시 컨트롤러를 만들어 UI만 직접 띄운다(컨트롤러 캐시·재사용).</summary>
+    private async UniTaskVoid OpenCrucibleTestAsync()
+    {
+        var run = GetCurrentRun();
+        if (run == null || !run.IsRunning)
+        {
+            Debug.LogWarning("[DebugTest] 재련소 — 진행 중인 런이 없습니다(먼저 런 시작).");
+            return;
+        }
+
+        if (_testCrucible == null)
+        {
+            var go = new GameObject("~TestCrucible");
+            go.transform.SetParent(transform, false);
+            _testCrucible = go.AddComponent<CrucibleRoomController>();
+            var table = await WeaponEnhanceService.EnsureLoadedAsync();
+            _testCrucible.Initialize(run, table, null, null);   // npcPrefab=null → NPC 없이, UI만 직접 오픈
+        }
+
+        var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_CruciblePanel>();
+        if (panel == null) { Debug.LogWarning("[DebugTest] UI_CruciblePanel 로드 실패"); return; }
+        panel.Bind(_testCrucible);
+    }
+
+    /// <summary>테스트용 정제소 — 전용 UI 미구현이라 룬판(기본 정제 surface)을 토글로 대체 오픈.</summary>
+    private static void OpenRefineryTest()
+    {
+        var panel = UI_GridPanel.Instance;
+        if (panel == null) { Debug.LogWarning("[DebugTest] 정제소 — 룬판(UI_GridPanel) 인스턴스 없음"); return; }
+        if (panel.IsOpen) panel.Close(); else panel.Open();
     }
 
     /// <summary>

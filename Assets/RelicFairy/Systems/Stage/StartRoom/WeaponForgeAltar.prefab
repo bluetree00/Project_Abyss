@@ -125,11 +125,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d19de0c36a468ec46a2b7c14dae8e1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponForgeAltar
-  meleeOptions:
-  - {fileID: 11400000, guid: 0d8b8950bf4141849b02fd45cdbb4974, type: 2}
-  - {fileID: 11400000, guid: dad215bb626832f4cbf0767639d63223, type: 2}
-  rangedOptions:
-  - {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
-  - {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
+  namelessWeapon: {fileID: 11400000, guid: 23a447e3dc3893141907288454da2c9d, type: 2}
+  bowOption: {fileID: 11400000, guid: 7058b68ce90bece428b74c8efe68b2f1, type: 2}
+  crossbowOption: {fileID: 11400000, guid: c33f8f85d5659fa48bd05821ab3bf5d2, type: 2}
   worldTextFont: {fileID: 11400000, guid: 2f45c19c426a4df43b40a87734416f1f, type: 2}
   textSize: 3

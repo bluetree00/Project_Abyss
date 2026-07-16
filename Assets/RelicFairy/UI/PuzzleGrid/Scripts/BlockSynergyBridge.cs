@@ -8,11 +8,13 @@ using Cysharp.Threading.Tasks;
 /// 서버 데이터 ↔ BoardManager ↔ 시너지 효과를 연결하는 브릿지.
 /// GameScene에 배치하여 사용.
 ///
+/// ⚠️ 파일명(BlockSynergyBridge.cs)과 클래스명(MerlinRuneBridge)이 다르다 — 검색 시 주의.
+///
 /// 역할:
 /// 1. UI_GridPanel.BoardContainer(DDOL 계층 직속 자식)에 Puzzle.prefab을 동적 스폰하여 BoardManager 확보
 /// 2. RuneDataManager에서 존 시너지 데이터 → GridAssetData → BoardManager에 등록
-/// 3. 아이템 획득 시 shape_id → ShapeData → BoardManager에 Shape 등록
-/// 4. BoardManager.OnGridFilled 구독 → 시너지 효과 PlayerRuntimeStats에 적용
+/// 3. 룬판 점유 변화(OnZoneCellsUpdated) → 속성별 <b>점유 셀 개수</b>로 단계 판정 → RuneEffects 적용/해제
+///    (연결성/클러스터는 판정에 쓰지 않는다)
 /// </summary>
 public class MerlinRuneBridge : MonoBehaviour
 {
@@ -37,15 +39,13 @@ public class MerlinRuneBridge : MonoBehaviour
     [SerializeField] private BoardManager boardManager;
 
     // ── Private ──
-    private readonly Dictionary<string, string> _gridIdBySOName = new();
     private readonly Dictionary<string, GridAssetData> _registeredGrids = new();
-    private readonly HashSet<string> _appliedGridIds = new();
     private GameObject _puzzleInstance;
     private bool _initialized;
 
     // 임계값·CENTER 체크
     private readonly Dictionary<string, HashSet<int>> _appliedThresholds = new();
-    private readonly Dictionary<string, int>           _lastClusterSizes  = new();
+    private readonly Dictionary<string, int>           _zoneOccupiedCounts  = new();
     private readonly List<int>                         _downgradeScratch  = new();   // 하강 해제 임계값(루프 중 수정 방지)
     private bool _centerBonusActive;
 
@@ -59,7 +59,6 @@ public class MerlinRuneBridge : MonoBehaviour
     {
         if (boardManager != null)
         {
-            boardManager.OnGridFilled -= HandleGridFilled;
             boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
         }
 
@@ -96,8 +95,6 @@ public class MerlinRuneBridge : MonoBehaviour
 
         if (isValidRef)
         {
-            boardManager.OnGridFilled -= HandleGridFilled;
-            boardManager.OnGridFilled += HandleGridFilled;
             boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
             boardManager.OnGridSessionActivated += HandleGridSessionActivated;
 
@@ -158,7 +155,6 @@ public class MerlinRuneBridge : MonoBehaviour
         // 1프레임 대기 (BoardManager.Awake/Start 실행 보장)
         await UniTask.Yield();
 
-        boardManager.OnGridFilled += HandleGridFilled;
         boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
         boardManager.OnGridSessionActivated += HandleGridSessionActivated;
 
@@ -174,10 +170,6 @@ public class MerlinRuneBridge : MonoBehaviour
     private void RegisterAllGrids(RuneDataManager blockData)
     {
         _initialized = true;
-
-        // 이벤트 구독 (중복 방지)
-        boardManager.OnGridFilled -= HandleGridFilled;
-        boardManager.OnGridFilled += HandleGridFilled;
 
         // order 순서로 Grid 데이터 수집
         var sortedIds = blockData.GetGridIdsSortedByOrder();
@@ -346,29 +338,6 @@ public class MerlinRuneBridge : MonoBehaviour
         le.ignoreLayout = true;
     }
 
-    // ── 치트 ──
-
-    /// <summary>디버그용: 특정 그리드의 시너지를 강제 발동한다.</summary>
-    public void CheatTriggerSynergy(string gridId)
-    {
-        ApplySynergyEffects(gridId);
-    }
-
-    // ── 아이템 획득 시 블록(Shape) 등록 ──
-
-    /// <summary>
-    /// 아이템의 shape_id로 블록을 생성하여 BoardManager에 Shape 등록.
-    /// </summary>
-    public void RegisterShapeFromItem(int shapeId)
-    {
-        var shapeSO = BuildShapeSO(shapeId);
-        if (shapeSO == null) return;
-
-        // 공용 풀에 직접 추가 (활성 그리드 없어도 누적됨)
-        boardManager.SpawnSharedShape(shapeSO);
-        Debug.Log($"[MerlinRuneBridge] Shape 추가(공용풀): {shapeSO.shapeName} (id={shapeId})");
-    }
-
     /// <summary>shape_id로 런타임 ShapeAssetSO를 생성한다(없으면 null).</summary>
     private ShapeAssetSO BuildShapeSO(int shapeId)
     {
@@ -388,117 +357,6 @@ public class MerlinRuneBridge : MonoBehaviour
         shapeSO.cellOffsets      = RuneDataManager.ParseCellOffsets(shapeEntry);
         shapeSO.cellSize         = shapeEntry.cell_size > 0 ? shapeEntry.cell_size : GRID_CELL_SIZE;
         return shapeSO;
-    }
-
-    // ── Grid 완성 시 시너지 효과 적용 ──
-
-    private void HandleGridFilled(GridAssetSO filledAsset)
-    {
-        if (filledAsset == null) return;
-
-        string gridId = null;
-        foreach (var kvp in _gridIdBySOName)
-        {
-            if (kvp.Key == filledAsset.name)
-            {
-                gridId = kvp.Value;
-                break;
-            }
-        }
-
-        if (string.IsNullOrEmpty(gridId))
-        {
-            Debug.LogWarning($"[MerlinRuneBridge] grid_id 매핑 실패: {filledAsset.name}");
-            return;
-        }
-
-        ApplySynergyEffects(gridId);
-    }
-
-    private void ApplySynergyEffects(string gridId)
-    {
-        // 이미 적용된 그리드는 중복 적용하지 않음
-        if (_appliedGridIds.Contains(gridId)) return;
-
-        var blockData = Managers.RuneData;
-        if (blockData == null) return;
-
-        var entries = blockData.GetGrid(gridId);
-        if (entries == null) return;
-
-        var run = AppBootstrapper.Instance?.CurrentRun;
-        var player = run?.Player;
-        if (player == null) return;
-
-        var stats = player.RuntimeStats;
-
-        _appliedGridIds.Add(gridId);
-
-        foreach (var entry in entries)
-        {
-            if (string.IsNullOrEmpty(entry.effect_type)) continue;
-
-            switch (entry.trigger)
-            {
-                case "Always":
-                    stats.ApplySynergyEffect(entry.effect_type, entry.value);
-                    break;
-
-                case "OnHit":
-                    stats.RegisterConditionalSynergy(new ConditionalSynergy
-                    {
-                        gridId     = gridId,
-                        effectType = entry.effect_type,
-                        trigger    = "OnHit",
-                        value      = entry.value,
-                        maxStack   = entry.max_stack > 0 ? entry.max_stack : 1,
-                        duration   = entry.duration,
-                    });
-                    break;
-
-                case "OnLowHp":
-                    stats.RegisterConditionalSynergy(new ConditionalSynergy
-                    {
-                        gridId     = gridId,
-                        effectType = entry.effect_type,
-                        trigger    = "OnLowHp",
-                        value      = entry.value,
-                        threshold  = entry.value2 > 0f ? entry.value2 : 0.3f,
-                    });
-                    break;
-            }
-
-            // GameRunSession에 이력 기록 (씬 전환 시 복원용)
-            run?.RecordSynergy(new SynergyRecord
-            {
-                gridId     = gridId,
-                effectType = entry.effect_type,
-                trigger    = entry.trigger,
-                value      = entry.value,
-                value2     = entry.value2,
-                maxStack   = entry.max_stack,
-                duration   = entry.duration,
-            });
-
-            RFLog.D($"[MerlinRuneBridge] 시너지 발동: {gridId} → {entry.effect_type} ({entry.trigger}) +{entry.value}");
-        }
-
-        var desc = BuildSynergyDescription(entries);
-        if (!string.IsNullOrEmpty(desc))
-            OnSynergyActivated?.Invoke(desc);
-    }
-
-    private static string BuildSynergyDescription(System.Collections.Generic.IEnumerable<RuneSynergyEntry> entries)
-    {
-        var sb = new System.Text.StringBuilder();
-        foreach (var entry in entries)
-        {
-            if (string.IsNullOrEmpty(entry.effect_type)) continue;
-            float pct = entry.value * 100f;
-            if (sb.Length > 0) sb.Append("  ");
-            sb.Append($"{entry.effect_type} {(pct >= 0f ? "+" : "")}{pct:F0}%");
-        }
-        return sb.ToString();
     }
 
     // ── 세이브/이어하기 (룬 보드 점유 셀) ──
@@ -571,13 +429,31 @@ public class MerlinRuneBridge : MonoBehaviour
         }
     }
 
-    /// <summary>런 종료 시 적용 이력 초기화. 외부에서 호출.</summary>
-    public void ClearAppliedGrids()
+    /// <summary>런 종료·이어하기 시 시너지 적용 상태(단계 가드·점유 수·중앙보너스) 초기화. 외부에서 호출.</summary>
+    public void ResetSynergyState()
     {
-        _appliedGridIds.Clear();
         _appliedThresholds.Clear();
-        _lastClusterSizes.Clear();
+        _zoneOccupiedCounts.Clear();
         _centerBonusActive = false;
+        _activeReactions.Clear();
+        // 반응 스탯도 0으로 되돌린다(플레이어가 살아 있으면).
+        AppBootstrapper.Instance?.CurrentRun?.Player?.RuntimeStats?
+            .SetReactionBonuses(0f, 0f, 0f, 0f, 0f, 0f);
+    }
+
+    /// <summary>
+    /// 현재 발동 중인 시너지 단계 수(세이브 슬롯 카드 표시용).
+    /// 과거엔 GameRunSession._appliedSynergies.Count를 썼는데, 그건 <b>하강 시 줄지 않아</b>
+    /// 누적 이력이었다(= 틀린 값). 여기 _appliedThresholds는 상승·하강 양방향으로 관리되는 실제 상태다.
+    /// </summary>
+    public int ActiveSynergyCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var kv in _appliedThresholds) n += kv.Value.Count;
+            return n;
+        }
     }
 
     // ── 임계값 기반 시너지 체크 ──────────────────────────────────
@@ -586,27 +462,70 @@ public class MerlinRuneBridge : MonoBehaviour
     /// MerlinRuneHexGridView.RefreshPlacedCells 이후 호출.
     /// 존별 점유 수를 받아 임계값 달성 여부를 확인하고 시너지를 적용한다.
     /// </summary>
-    public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts,
-                                    Dictionary<string, int> clusterSizes)
+    public void OnZoneCellsUpdated(Dictionary<string, int> zoneCounts)
     {
         // 단계 판정 = 속성별 점유 셀 "개수"(연결성 미고려). threshold는 데이터 구동(점유 셀 수).
-        // clusterSizes(연결 클러스터)는 더 이상 판정에 쓰지 않으나, 그리드 뷰 시그니처 호환을 위해 인자만 유지.
         zoneCounts ??= new Dictionary<string, int>();
 
         RFLog.D($"[GridChk] 시너지 갱신 수신 (frame {Time.frameCount}) zones={zoneCounts.Count}");
 
         // 전체 갱신: 제거된 존이 이전 값을 유지하지 않도록 먼저 초기화 (표시·판정 모두 점유 수 기준)
-        _lastClusterSizes.Clear();
+        _zoneOccupiedCounts.Clear();
         foreach (var kvp in zoneCounts)
-            _lastClusterSizes[kvp.Key] = kvp.Value;
+            _zoneOccupiedCounts[kvp.Key] = kvp.Value;
 
         CheckAndApplyThresholds(zoneCounts);
         CheckCenterBonus(zoneCounts);
+        RefreshReactions();
         OnSynergiesUpdated?.Invoke();
     }
 
     /// <summary>현재 존별 점유 셀 수(단계 판정·표시 공용). MerlinRuneSynergyStatusView에서 읽는다.</summary>
-    public IReadOnlyDictionary<string, int> GetLastClusterSizes() => _lastClusterSizes;
+    public IReadOnlyDictionary<string, int> GetZoneOccupiedCounts() => _zoneOccupiedCounts;
+
+    // ── 속성 반응 (인접 두 존 동시 활성) ──────────────────────────────
+
+    /// <summary>존 zoneId의 현재 달성 단계 수(0~4). _appliedThresholds가 상승·하락 반영.</summary>
+    public int GetZoneTier(string zoneId)
+        => _appliedThresholds.TryGetValue(zoneId, out var set) ? set.Count : 0;
+
+    private readonly List<RuneReactionDef.Def> _activeReactions = new();
+    /// <summary>현재 발동 중인 반응 목록(UI 표시용). min 단계 강도는 GetZoneTier로 재계산 가능.</summary>
+    public IReadOnlyList<RuneReactionDef.Def> ActiveReactions => _activeReactions;
+
+    /// <summary>
+    /// 활성 반응을 재평가해 플레이어 스탯에 합산한다.
+    /// 발동 조건: 두 인접 존이 각각 1단계 이상. 강도 = min(두 단계) × ValuePerTier.
+    /// 6쌍이 각기 다른 스탯을 주므로, 스탯별로 합산해 한 번에 SetReactionBonuses로 밀어넣는다.
+    /// </summary>
+    private void RefreshReactions()
+    {
+        _activeReactions.Clear();
+        float crit = 0f, critDmg = 0f, atkSpd = 0f, dmgPct = 0f, skillCdr = 0f, dr = 0f;
+
+        foreach (var def in RuneReactionDef.All)
+        {
+            int tierA = GetZoneTier(def.ZoneA);
+            int tierB = GetZoneTier(def.ZoneB);
+            if (tierA < 1 || tierB < 1) continue;   // 둘 다 1단계 이상이어야 발동
+
+            _activeReactions.Add(def);
+            float amount = Mathf.Min(tierA, tierB) * def.ValuePerTier;
+
+            switch (def.Stat)
+            {
+                case RuneReactionDef.StatKind.CritChance:      crit     += amount; break;
+                case RuneReactionDef.StatKind.CritDamage:      critDmg  += amount; break;
+                case RuneReactionDef.StatKind.AttackSpeed:     atkSpd   += amount; break;
+                case RuneReactionDef.StatKind.DamagePercent:   dmgPct   += amount; break;
+                case RuneReactionDef.StatKind.SkillCdr:        skillCdr += amount; break;
+                case RuneReactionDef.StatKind.DamageReduction: dr       += amount; break;
+            }
+        }
+
+        var stats = AppBootstrapper.Instance?.CurrentRun?.Player?.RuntimeStats;
+        stats?.SetReactionBonuses(crit, critDmg, atkSpd, dmgPct, skillCdr, dr);
+    }
 
     private void CheckAndApplyThresholds(Dictionary<string, int> zoneCounts)
     {
@@ -641,17 +560,9 @@ public class MerlinRuneBridge : MonoBehaviour
 
                 RFLog.D($"[MerlinRuneBridge] 점유 임계값 달성: {zoneId} 점유={occupiedCount} >= {entry.threshold} → {entry.effect_type}");
 
-                var run = AppBootstrapper.Instance?.CurrentRun;
-                run?.RecordSynergy(new SynergyRecord
-                {
-                    gridId     = zoneId,
-                    effectType = entry.effect_type,
-                    trigger    = entry.trigger,
-                    value      = entry.value,
-                    value2     = entry.value2,
-                    maxStack   = entry.max_stack,
-                    duration   = entry.duration,
-                });
+                // 구 SynergyRecord 원장에 기록하던 코드 제거 —
+                // 그 원장은 복원 시 구 '플랫 스탯' 스위치로 흘러가 신 속성 효과가 전부 no-op이 됐다.
+                // 시너지의 진실원본은 룬 보드 점유 셀(runeCellsJson)이고, 복원도 그쪽이 담당한다.
 
                 OnSynergyActivated?.Invoke($"{zoneId}: {entry.effect_type}");
             }
@@ -703,35 +614,47 @@ public class MerlinRuneBridge : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// 중앙(CENTER) 공명 — 자체 효과가 없고, <b>활성 속성 시너지 전부의 효과값을 증폭</b>한다.
+    /// 중앙은 6속성 존과 모두 맞닿은 허브이고, 채우는 만큼 속성 존을 못 채우는 순수 기회비용이라
+    /// 보상이 "질(효과 강도)"이어야 몰빵 빌드와 대비되는 두 번째 축이 된다.
+    ///
+    /// 배수는 CENTER 시너지 행(threshold 4/8/12/16 → value 0.10/0.20/0.35/0.50)에서 읽는다 = 데이터 구동.
+    /// RuneEffect로 만들지 않는 이유: 증폭 대상에 자기 자신이 포함돼 재귀가 된다.
+    /// </summary>
     private void CheckCenterBonus(Dictionary<string, int> zoneCounts)
     {
-        zoneCounts.TryGetValue("CENTER", out int centerCount);
-        bool shouldActivate = centerCount >= 2;
-        if (shouldActivate == _centerBonusActive) return;   // 상태 무변동 — 스킵
+        zoneCounts.TryGetValue(ElementDef.CenterId, out int centerCount);
 
-        _centerBonusActive = shouldActivate;
+        // 달성한 단계 중 가장 높은 것의 value가 보너스율.
+        float bonus = 0f;
+        var rows = Managers.RuneData?.GetZoneSynergies(ElementDef.CenterId);
+        if (rows != null)
+            foreach (var e in rows)
+                if (e != null && centerCount >= e.threshold && e.value > bonus)
+                    bonus = e.value;
 
+        bool active = bonus > 0f;
         var player = AppBootstrapper.Instance?.CurrentRun?.Player;
-        if (player != null)
-            player.RuntimeStats.SynergyMechanics.CenterBonusEnabled = shouldActivate;   // 하강 시에도 +25% 해제
+        player?.RuneEffects?.SetAmplifier(1f + bonus);   // 하강 시에도 그대로 되돌아온다(1 + 0)
 
-        // 구독자(UI 푸터)는 IsCenterBonusActive 상태를 다시 읽어 갱신하므로 양방향 전이 모두 통지한다.
+        if (active == _centerBonusActive) return;        // 상태 무변동 — 통지 스킵
+        _centerBonusActive = active;
+
         OnCenterBonusActivated?.Invoke();
-        Debug.Log($"[MerlinRuneBridge] CENTER 보너스 {(shouldActivate ? "활성화: 활성 듀오 시너지 +25%" : "해제")}");
+        Debug.Log($"[MerlinRuneBridge] 중앙 공명 {(active ? $"활성 — 속성 시너지 +{bonus * 100f:F0}% (점유 {centerCount})" : "해제")}");
     }
 
+    /// <summary>단계 도달 → 속성 효과 활성화. (구 ApplySynergyMechanicEffect 호출은 제거 — 신 24종은 그 스위치에 없어 항상 no-op이었다)</summary>
     private void ApplyMechanicEffect(string zoneId, RuneSynergyEntry entry)
     {
         var player = AppBootstrapper.Instance?.CurrentRun?.Player;
         if (player == null) return;
 
-        player.RuntimeStats.ApplySynergyMechanicEffect(entry);
-
-        // 속성 단계 효과 스켈레톤 연결: 단계 도달 시 효과 핸들러 활성화 (본문은 단계적 구현)
         player.RuneEffects.Activate(entry);
     }
 
-    /// <summary>등록된 GridAssetData 전체를 반환. GridGalleryView에서 참조.</summary>
+    /// <summary>등록된 GridAssetData 전체를 반환.</summary>
     public IReadOnlyDictionary<string, GridAssetData> GetRegisteredGrids()
         => _registeredGrids;
 
@@ -754,8 +677,6 @@ public class MerlinRuneBridge : MonoBehaviour
         var positions = Managers.RuneData?.GetZoneCellPositions(gridId)
                         ?? new System.Collections.Generic.List<UnityEngine.Vector2Int>();
         var (rows01, rowCount, colCount) = RuneDataManager.BuildZonePattern(positions);
-
-        _gridIdBySOName[gridId] = gridId;
 
         return new GridAssetData
         {

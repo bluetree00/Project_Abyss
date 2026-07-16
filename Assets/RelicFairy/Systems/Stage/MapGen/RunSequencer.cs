@@ -11,6 +11,7 @@ public enum RoomPlanKind
     Event,
     PreBoss,
     Boss,
+    Crucible,   // 재련소(무기 강화/승급 + 도박) — 마일스톤 강제 전용
 }
 
 /// <summary>한 출구 문의 계획. 종류 + 선택된 방 템플릿(entry).</summary>
@@ -262,6 +263,7 @@ public class RunSequencer
         RoomPlanKind.Event   => "Event",
         RoomPlanKind.PreBoss => "PreBoss",
         RoomPlanKind.Boss    => "Boss",
+        RoomPlanKind.Crucible => "Crucible",
         _                    => "Normal",
     };
 

@@ -5,12 +5,14 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// TFT 스타일 연결 클러스터 시너지 상태 뷰.
+/// 속성(존)별 시너지 상태 뷰.
 ///
-/// 블록이 배치되어 클러스터(cluster > 0)가 생기면 해당 존 행이 동적으로 추가되고,
-/// 제거되면 행이 사라진다. 비활성 존은 표시하지 않는다.
+/// ⚠️ 판정 기준은 <b>속성별 점유 셀 '개수'</b>다 — 셀이 서로 붙어 있는지(연결/클러스터)는 보지 않는다.
+///    과거 '연결 클러스터' 방식에서 개수 방식으로 바뀌었으니 이름·문구에 '연결'을 다시 쓰지 말 것.
 ///
-/// Refresh(clusterSizes) : MerlinRuneBridge.OnZoneCellsUpdated에서 호출.
+/// 점유 개수 > 0인 존만 행이 동적으로 추가되고, 0이 되면 행이 사라진다.
+///
+/// Refresh(zoneCounts) : MerlinRuneBridge.OnZoneCellsUpdated에서 호출.
 /// </summary>
 public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 {
@@ -25,10 +27,13 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     {
         var order = ElementDef.Order;
         int n = order.Count;
-        ZONE_ORDER  = new string[n];
-        ZONE_NAMES  = new string[n];
-        ZONE_ICONS  = new string[n];
-        ZONE_COLORS = new Color[n];
+
+        // 속성 6종 + 중앙(CENTER). 중앙은 자체 효과가 아니라 '활성 속성 시너지 증폭'이라
+        // 목록 맨 아래에 따로 붙인다(ElementDef.Order에는 포함되지 않는다).
+        ZONE_ORDER  = new string[n + 1];
+        ZONE_NAMES  = new string[n + 1];
+        ZONE_ICONS  = new string[n + 1];
+        ZONE_COLORS = new Color[n + 1];
         for (int i = 0; i < n; i++)
         {
             var e = ElementDef.GetById(order[i]);
@@ -37,6 +42,10 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             ZONE_ICONS[i]  = e.Icon;
             ZONE_COLORS[i] = e.Color;
         }
+        ZONE_ORDER[n]  = ElementDef.CenterId;
+        ZONE_NAMES[n]  = "중앙";
+        ZONE_ICONS[n]  = "◈";
+        ZONE_COLORS[n] = ElementDef.CenterColor;
     }
 
     private static readonly Color COLOR_BG_PANEL      = new(0.12f, 0.14f, 0.20f, 0.90f);
@@ -59,6 +68,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
     private readonly Dictionary<string, ZoneRow> _rows  = new();
     private Transform   _rowContainer;
     private GameObject  _emptyLabelGO;
+    private TMP_Text    _reactionText;   // 활성 속성 반응 배너(행 목록 최상단)
 
     // ── Tooltip ──
     private GameObject _tooltipGO;
@@ -77,15 +87,15 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     // ── Public API ──
 
-    public void Refresh(IReadOnlyDictionary<string, int> clusterSizes)
+    public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
         // 활성 존 판별
         var active = new HashSet<string>();
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
-            int cluster = 0;
-            clusterSizes?.TryGetValue(ZONE_ORDER[i], out cluster);
-            if (cluster > 0) active.Add(ZONE_ORDER[i]);
+            int count = 0;
+            zoneCounts?.TryGetValue(ZONE_ORDER[i], out count);
+            if (count > 0) active.Add(ZONE_ORDER[i]);
         }
 
         // 비활성 → 행 제거
@@ -102,28 +112,31 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         foreach (var zoneId in active)
         {
             int idx     = System.Array.IndexOf(ZONE_ORDER, zoneId);
-            int cluster = 0;
-            clusterSizes?.TryGetValue(zoneId, out cluster);
+            int count = 0;
+            zoneCounts?.TryGetValue(zoneId, out count);
 
             if (!_rows.TryGetValue(zoneId, out var row))
             {
                 row = BuildRow(zoneId, idx);
                 _rows[zoneId] = row;
             }
-            RefreshRow(row, zoneId, cluster);
+            RefreshRow(row, zoneId, count);
         }
 
         // 빈 상태 레이블
         _emptyLabelGO?.SetActive(active.Count == 0);
+
+        // 속성 반응 배너 — 브릿지가 계산한 활성 반응을 표시(둘 다 1단계 이상인 인접 쌍)
+        RefreshReactionBanner();
 
         // 툴팁 갱신
         if (!string.IsNullOrEmpty(_hoveredZoneId))
         {
             if (active.Contains(_hoveredZoneId) && _rows.TryGetValue(_hoveredZoneId, out var tr))
             {
-                int cluster = 0;
-                clusterSizes?.TryGetValue(_hoveredZoneId, out cluster);
-                UpdateTooltipContent(_hoveredZoneId, cluster);
+                int count = 0;
+                zoneCounts?.TryGetValue(_hoveredZoneId, out count);
+                UpdateTooltipContent(_hoveredZoneId, count);
             }
             else
             {
@@ -152,7 +165,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         trt.anchorMin = new Vector2(0.04f, 0f);
         trt.anchorMax = new Vector2(0.55f, 1f);
         trt.offsetMin = trt.offsetMax = Vector2.zero;
-        titleTxt.text          = "◆ 연결 시너지";
+        titleTxt.text          = "◆ 속성 시너지";
         titleTxt.fontSize      = 12f;
         titleTxt.fontStyle     = FontStyles.Bold;
         titleTxt.color         = new Color(0.75f, 0.90f, 1.00f, 1f);
@@ -172,6 +185,35 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         descTxt.alignment          = TextAlignmentOptions.MidlineRight;
         descTxt.textWrappingMode = TextWrappingModes.NoWrap;
         descTxt.raycastTarget      = false;
+    }
+
+    /// <summary>브릿지의 활성 반응 목록을 한 줄 배너로 표시. 반응 없으면 숨긴다.</summary>
+    private void RefreshReactionBanner()
+    {
+        if (_reactionText == null) return;
+
+        var reactions = MerlinRuneBridge.Instance?.ActiveReactions;
+        if (reactions == null || reactions.Count == 0)
+        {
+            _reactionText.gameObject.SetActive(false);
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder("✦ 반응  ");
+        for (int i = 0; i < reactions.Count; i++)
+        {
+            var d = reactions[i];
+            var a = ElementDef.GetById(d.ZoneA);
+            var b = ElementDef.GetById(d.ZoneB);
+            if (i > 0) sb.Append("   ");
+            sb.Append(a != null ? a.Icon : "?");
+            sb.Append(b != null ? b.Icon : "?");
+            sb.Append(' ');
+            sb.Append(d.DisplayName);
+        }
+        _reactionText.text = sb.ToString();
+        _reactionText.transform.SetAsFirstSibling();   // 항상 목록 맨 위
+        _reactionText.gameObject.SetActive(true);
     }
 
     private void BuildRowContainer()
@@ -216,6 +258,19 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         scrollRect.content  = contentRT;
         scrollRect.viewport = viewRT;
         _rowContainer = contentGO.transform;
+
+        // 속성 반응 배너 — 행 목록 최상단에 상시 자리. 반응 없으면 숨긴다.
+        var rxGO = new GameObject("ReactionBanner", typeof(RectTransform));
+        rxGO.transform.SetParent(_rowContainer, false);
+        _reactionText = rxGO.AddComponent<TextMeshProUGUI>();
+        _reactionText.fontSize      = 11f;
+        _reactionText.fontStyle     = FontStyles.Bold;
+        _reactionText.color         = new Color(1f, 0.82f, 0.45f, 1f);   // 반응 = 금빛
+        _reactionText.alignment     = TextAlignmentOptions.Left;
+        _reactionText.raycastTarget = false;
+        var rxLe = rxGO.AddComponent<UnityEngine.UI.LayoutElement>();
+        rxLe.minHeight = 18f;
+        rxGO.SetActive(false);
 
         // 빈 상태 안내 (존이 하나도 없을 때)
         _emptyLabelGO = new GameObject("EmptyLabel", typeof(RectTransform));
@@ -335,7 +390,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         {
             _hoveredZoneId = capturedId;
             int c = 0;
-            MerlinRuneBridge.Instance?.GetLastClusterSizes()?.TryGetValue(capturedId, out c);
+            MerlinRuneBridge.Instance?.GetZoneOccupiedCounts()?.TryGetValue(capturedId, out c);
             UpdateTooltipContent(capturedId, c);
             PositionTooltipNear(row.go.GetComponent<RectTransform>());
             _tooltipGO?.SetActive(true);
@@ -349,12 +404,12 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         return row;
     }
 
-    private void RefreshRow(ZoneRow row, string zoneId, int cluster)
+    private void RefreshRow(ZoneRow row, string zoneId, int count)
     {
         Color zoneColor = GetZoneColor(row.zoneIdx);
 
         if (row.countText != null)
-            row.countText.SetText(cluster.ToString());
+            row.countText.SetText(count.ToString());
 
         var synergies = Managers.RuneData?.GetZoneSynergies(zoneId);
         var sorted    = new List<RuneSynergyEntry>();
@@ -364,13 +419,13 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         // 현재 도달한 최고 단계 인덱스
         int curTier = -1;
         for (int i = 0; i < sorted.Count && i < 4; i++)
-            if (cluster >= sorted[i].threshold) curTier = i;
+            if (count >= sorted[i].threshold) curTier = i;
 
         for (int b = 0; b < 4; b++)
         {
             if (row.tierBGs[b] == null) continue;
             bool hasData = b < sorted.Count;
-            bool met     = hasData && cluster >= sorted[b].threshold;
+            bool met     = hasData && count >= sorted[b].threshold;
             bool isCur   = b == curTier;
 
             // 점등: 도달 시 존 색(현재 단계는 더 진하게), 미도달은 어둡게
@@ -475,7 +530,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         _tooltipGO.transform.SetAsLastSibling();
     }
 
-    private void UpdateTooltipContent(string zoneId, int cluster)
+    private void UpdateTooltipContent(string zoneId, int count)
     {
         if (_tooltipText == null) return;
         int idx = System.Array.IndexOf(ZONE_ORDER, zoneId);
@@ -485,7 +540,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         var sb = new System.Text.StringBuilder();
 
         sb.AppendLine($"<b><color=#B8E0FF>{ZONE_ICONS[idx]} {ZONE_NAMES[idx]} ({zoneId})</color></b>");
-        sb.AppendLine($"현재 채움: <b>{cluster}칸</b>");
+        sb.AppendLine($"현재 채움: <b>{count}칸</b>");
         sb.AppendLine();
 
         if (synergies != null && synergies.Count > 0)
@@ -496,20 +551,20 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             for (int i = 0; i < sorted.Count; i++)
             {
                 var s = sorted[i];
-                bool met   = cluster >= s.threshold;
+                bool met   = count >= s.threshold;
                 string chk = met ? "<color=#55FF88>●</color>" : "○";
                 string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
                 sb.AppendLine($"{chk} <b>({s.threshold}칸)</b> {desc}");
             }
 
             int maxThr = sorted[sorted.Count - 1].threshold;
-            if (cluster < maxThr)
+            if (count < maxThr)
             {
                 int nextThr = 0;
                 foreach (var s in sorted)
-                    if (cluster < s.threshold) { nextThr = s.threshold; break; }
+                    if (count < s.threshold) { nextThr = s.threshold; break; }
                 if (nextThr > 0)
-                    sb.AppendLine($"\n다음 단계까지 <b>{nextThr - cluster}칸</b> 더 필요");
+                    sb.AppendLine($"\n다음 단계까지 <b>{nextThr - count}칸</b> 더 필요");
             }
         }
         else

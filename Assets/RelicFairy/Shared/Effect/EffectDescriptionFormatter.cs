@@ -117,9 +117,38 @@ public static class EffectDescriptionFormatter
             case "poison": case "item_poison":
             case "poison_atk": case "vulnerable":             return "poison";
             case "shock":  case "static":                     return "lightning";
-            case "stun":                                       return "stun";
-            case "brand":  case "item_mark":                  return "dark";
+            case "stun":   case "petrify":                    return "stun";
+            case "brand":  case "item_mark": case "cov_curse": return "dark";
             default:                                           return "unknown";
+        }
+    }
+
+    /// <summary>
+    /// 상태이상 statusId → 화면에 띄울 한글 이름.
+    ///
+    /// 이 어휘는 원래 GuidelineVisual(개발용 마커)의 switch 안에만 있었다. 디버그 레이어에 갇혀 있어
+    /// 실제 UI가 쓸 수 없었다 — 표시 레이어인 여기로 끌어올려 라벨/아이콘의 단일 출처로 만든다.
+    /// 미등록 id는 원문을 그대로 노출한다(빠진 게 있으면 화면에서 바로 티가 나도록).
+    /// </summary>
+    public static string LabelForStatus(string statusId)
+    {
+        switch (statusId)
+        {
+            case "ignite":                    return "점화";
+            case "burn":                      return "화상";
+            case "frost":                     return "서리";
+            case "freeze":                    return "빙결";
+            case "shatter":                   return "분쇄";
+            case "poison": case "item_poison": return "중독";
+            case "poison_atk":                return "약화";
+            case "vulnerable":                return "취약";
+            case "item_mark":                 return "표식";
+            case "shock": case "static":      return "감전";
+            case "stun":                      return "기절";
+            case "petrify":                   return "석화";
+            case "brand":                     return "낙인";
+            case "cov_curse":                 return "저주";
+            default:                          return statusId;
         }
     }
 

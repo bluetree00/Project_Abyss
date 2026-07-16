@@ -148,7 +148,7 @@ public class PhantomSlashBehaviorSO : SkillBehaviorSO
 
             float dmg = ctx.CalculateDamage(_data.baseDamagePerHit);
             foreach (var target in _hitTargets)
-                target.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
 
             // 히트 이펙트
             foreach (var obj in _hitObjects)

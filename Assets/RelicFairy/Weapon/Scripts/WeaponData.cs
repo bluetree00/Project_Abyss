@@ -40,12 +40,30 @@ public class WeaponData
     public PromoteMode promoteMode;
     public int chargeStages;
 
+    // ── 강화(재련소) ─────────────────────────────────────────────────
+    // enhanceLevel: 재련소 강화 성공 누적(0 = 기본/무명). 실패 시 하락(하한 0).
+    // legendId    : 승급 전설 분기 id(엑스칼리버/갈라틴/아론다이트). 빈값 = 미승급.
+    // baseAttackRaw: 강화 이전 순수 공격력(마스터). baseAttack 은 강화가 반영된 "유효값"이며
+    //               씬 전환마다 재적용되는 ApplyServerOverride 이후에도 RecomputeEnhancedStats()로 보존한다.
+    public int    enhanceLevel;
+    public string legendId;
+    public float  baseAttackRaw;
+
     public int groundEndCount;
     public int airEndCount;
 
     public WeaponAnimationSetSO animationSet;
     public WeaponAbilitySetSO abilitySet;
     public WeaponType weaponType = WeaponType.None;
+
+    /// <summary>
+    /// 이 무기가 진화할 수 있는 분기 테이블(SO 참조 — 서버 차트는 미관여). null이면 최종 형태.
+    /// 진화하면 분기의 target WeaponSO로 통째 교체된다.
+    /// </summary>
+    public WeaponEvolutionSO evolution;
+
+    /// <summary>진화 가능한 분기가 하나라도 있는지.</summary>
+    public bool CanEvolve => evolution != null && evolution.Branches.Count > 0;
 
     /// <summary>공격 시 칼날 트레일 VFX 프리팹(INab Weapon Trail). SO에서만 채워짐(서버 차트는 미관여). 없으면 트레일 스킵.</summary>
     public GameObject trailVfxPrefab;
@@ -101,6 +119,21 @@ public class WeaponData
         animationSet = so.animationSet;
         abilitySet   = so.abilitySet;
         trailVfxPrefab = so.trailVfxPrefab;
+        evolution    = so.evolution;   // 진화 분기 — 서버 차트가 덮지 않는 SO 소유 참조
+
+        baseAttackRaw = baseAttack;   // 강화 재계산의 기준(마스터)
+    }
+
+    /// <summary>
+    /// baseAttackRaw + enhanceLevel + legendId 로 유효 공격력(baseAttack)을 재계산한다.
+    /// 곡선은 WeaponEnhanceCurve(정적 provider) — 기본 내장 곡선이며 재련소 데이터(EnhanceTableSO)가
+    /// 로드되면 WeaponEnhanceService가 실제 곡선으로 교체한다.
+    /// 획득/서버 오버라이드/복원 직후 반드시 호출해 강화가 씬 전환에도 보존되게 한다.
+    /// </summary>
+    public void RecomputeEnhancedStats()
+    {
+        if (baseAttackRaw <= 0f) baseAttackRaw = baseAttack; // raw 미설정 폴백
+        baseAttack = WeaponEnhanceCurve.Evaluate(baseAttackRaw, enhanceLevel, legendId);
     }
 
     /// <summary>SO 타입을 자동 판별해 적절한 WeaponData를 생성하는 팩토리</summary>
@@ -143,7 +176,12 @@ public class WeaponData
         }
 
         // weaponType, displayName, weaponPrefabKey, weaponDisplayKey, iconKey,
-        // abilitySet, skillQ/E 는 SO 값 유지
+        // abilitySet, skillQ/E, evolution 은 SO 값 유지
+
+        // 차트 값이 강화의 새 기준(raw). enhanceLevel 이 보존된 채 매 씬 전환마다 여기로 들어오므로
+        // 반드시 재계산하여 baseAttack 을 유효값으로 유지한다(강화 유실 방지).
+        baseAttackRaw = baseAttack;
+        RecomputeEnhancedStats();
     }
 
     /// <summary>
@@ -218,6 +256,7 @@ public class WeaponData
             skillQ           = null,
             skillE           = null,
         };
+        data.baseAttackRaw = data.baseAttack;   // 강화 재계산 기준
         UnityEngine.Debug.Log($"[WeaponData.FromServer] {entry.weapon_id} ({entry.weapon_name})");
         return data;
     }

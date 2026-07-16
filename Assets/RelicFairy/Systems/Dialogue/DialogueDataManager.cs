@@ -93,6 +93,43 @@ public class DialogueDataManager
         return GetLines(baseKey + "_First") ?? GetLines(baseKey);
     }
 
+    // 복귀 대사 티어 임계(내림차순). count가 이 값 이상이면 해당 티어 풀({base}_T{n}_R*)에서 뽑는다.
+    private static readonly int[] _tierThresholds = { 25, 10 };
+
+    /// <summary>
+    /// 카운트 기반 대사(사망/클리어 복귀 등). 반복 지루함 방지용 랜덤 풀 + 특정 횟수 특별 대사.
+    /// 선택 우선순위: 첫 회 <c>{base}_First</c> → 정확 마일스톤 <c>{base}_M{count}</c> →
+    /// count가 넘긴 최고 티어 풀 <c>{base}_T{n}_R*</c> 랜덤 → 기본 풀 <c>{base}_R*</c> 랜덤 → base.
+    /// (호출측이 count 관리 — RunReturnTracker.)
+    /// </summary>
+    public DialogueLine[] GetCountLines(string baseKey, int count)
+    {
+        if (string.IsNullOrEmpty(baseKey)) return null;
+
+        if (count <= 1)
+        {
+            var first = GetLines(baseKey + "_First");
+            if (first != null) return first;
+        }
+
+        var exact = GetLines(baseKey + "_M" + count);   // 특정 횟수 딱 그때만 나오는 특별 대사
+        if (exact != null) return exact;
+
+        foreach (int t in _tierThresholds)              // count가 넘긴 최고 티어 풀
+        {
+            if (count < t) continue;
+            var tierVariants = CollectVariantKeys(baseKey + "_T" + t + "_R");
+            if (tierVariants.Count > 0)
+                return GetLines(tierVariants[UnityEngine.Random.Range(0, tierVariants.Count)]);
+        }
+
+        var variants = CollectVariantKeys(baseKey + "_R");   // 기본 랜덤 풀
+        if (variants.Count > 0)
+            return GetLines(variants[UnityEngine.Random.Range(0, variants.Count)]);
+
+        return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+    }
+
     private List<string> CollectVariantKeys(string prefix)
     {
         var list = new List<string>();

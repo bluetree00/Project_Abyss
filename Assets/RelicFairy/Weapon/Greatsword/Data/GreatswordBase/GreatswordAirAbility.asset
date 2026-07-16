@@ -43,3 +43,33 @@ MonoBehaviour:
     hitEffectScale: 0.6
     oneShot: 0
     rotateToMouse: 1
+  - stepIndex: 1
+    order: 0
+    baseDamage: 15
+    knockbackMultiplier: 1.1
+    selfMovement: {x: 0, y: 0, z: 0}
+    effect:
+      payloadKey: BasicSlashBlue
+      socket: 0
+      space: 0
+      positionOffset: {x: 0, y: 1, z: 0.5}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      scaleMultiplier: 1
+      lifeTimeMultiplier: 1
+      behavior: {fileID: 0}
+    collider:
+      mode: 0
+      damage: 0
+      trailRadiusOverride: 0
+      colliderPrefabKey:
+      positionOffset: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      sizeMultiplier: 1.1
+      hitInterval: 0
+      duration: 0.4
+      shape: 1
+      behavior: {fileID: 0}
+    hitEffectKey: GreatswordImpact
+    hitEffectScale: 0.6
+    oneShot: 0
+    rotateToMouse: 1
