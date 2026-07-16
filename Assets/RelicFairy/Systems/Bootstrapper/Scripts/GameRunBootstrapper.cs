@@ -103,6 +103,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private GameObject gateSealDoorPrefab;
     public GameObject GateSealDoorPrefab => gateSealDoorPrefab;
 
+    [Tooltip("석문 착지 시 터지는 먼지/충격 VFX. 비우면 먼지 없음(카메라 흔들림만).")]
+    [SerializeField] private GameObject gateSealDustVfx;
+    public GameObject GateSealDustVfx => gateSealDustVfx;
+
+    [Tooltip("석문 착지(봉인) 사운드 클립. 비우면 무음. (열림 사운드는 SoundEvent.DoorOpen 이벤트 사용)")]
+    [SerializeField] private AudioClip gateSealSfx;
+    public AudioClip GateSealSfx => gateSealSfx;
+
     [Tooltip("상점 등급별 기본가 SO. ShopDataManager 초기화에 사용. " +
              "비어있으면 ResolvePrice는 price_override만 적용 + 기본가 0 폴백.")]
     [SerializeField] private ShopPriceTableSO shopPriceTable;

@@ -131,3 +131,21 @@ MonoBehaviour:
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0
+  - code: alt
+    prefab: {fileID: 1031119978, guid: abc00000000012857661513297908409, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 2
+    sizeZ: 2
+    faceNearestWall: 0
+    wallInset: 0
+  - code: sta
+    prefab: {fileID: 1031125134, guid: abc00000000003064275970823802713, type: 3}
+    yOffset: 0
+    scale: 1.2
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0

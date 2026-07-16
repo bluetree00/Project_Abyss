@@ -8,8 +8,8 @@ using UnityEngine;
 /// <summary>
 /// 시작방 무기대. [F] → <b>보조 원거리</b> 선택 팝업.
 ///
-/// 기획 피벗: 주무기는 무형검(무명)이 <b>기본 지급</b>이라 여기서 근접을 고르지 않는다.
-/// 곁에 둘 원거리만 고른다(활=선택, 석궁=특전 잠금). 확정 시 무형검=슬롯0, 원거리=슬롯1로 장착.
+/// 기획 피벗: 주무기 무형검은 <b>각성 제단(WorldSwordAwakening)에서 하사</b>되므로 여기서 근접을 고르지 않는다.
+/// 곁에 둘 원거리만 고른다(활=선택, 석궁=특전 잠금). 확정 시 원거리=슬롯1 장착(무형검은 이미 슬롯0).
 /// (RelicAltar 상호작용 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -124,7 +124,7 @@ public class WeaponForgeAltar : MonoBehaviour
             _claimed = true;
             await EquipChoiceAsync(loadout, ranged, ct);
 
-            Debug.Log($"[WeaponForgeAltar] 장비 확정: 무형검 + 원거리={ranged.displayName}");
+            Debug.Log($"[WeaponForgeAltar] 보조 원거리 확정: {ranged.displayName}");
             DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
         }
         catch (OperationCanceledException)
@@ -140,8 +140,8 @@ public class WeaponForgeAltar : MonoBehaviour
 
     private async UniTask EquipChoiceAsync(PlayerLoadout loadout, WeaponSO ranged, CancellationToken ct)
     {
-        // 주무기 = 무형검(기본 지급), 보조 = 고른 원거리.
-        loadout.SetWeaponSlot0(namelessWeapon);
+        // 무형검(슬롯0)은 각성 제단(WorldSwordAwakening)에서만 하사된다 — 무기대는 보조 원거리(슬롯1)만.
+        // 폴백 없음: 각성을 거치지 않았으면 무형검을 주지 않는다(원거리만).
         loadout.SetWeaponSlot1(ranged);
 
         // 퀘스트: 장비 선택 보고 (범용 채널)
@@ -150,14 +150,12 @@ public class WeaponForgeAltar : MonoBehaviour
         var player = _player;
         if (player == null) return;
 
-        // 무형검 → 슬롯0, 원거리 → 슬롯1 순서 장착 (둘 다 빈 슬롯 가정)
-        if (namelessWeapon != null)
-            await GameRunBootstrapper.EquipWeaponToPlayerAsync(namelessWeapon, player);
+        // 원거리 → 슬롯1 장착.
         await GameRunBootstrapper.EquipWeaponToPlayerAsync(ranged, player);
         ct.ThrowIfCancellationRequested();
 
-        // 마지막 장착(원거리)이 활성화되므로 무형검(슬롯0)으로 되돌려 시작
-        if (player.WeaponManager != null)
+        // 무형검(슬롯0)이 각성으로 이미 있으면 그쪽으로 되돌려 시작(원거리가 활성화됐을 수 있으므로). 없으면 그대로.
+        if (loadout.WeaponSlot0 != null && player.WeaponManager != null)
             await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
 
         // 장착 완료 → 허브에서 전투 HUD 표시(테스트용).
