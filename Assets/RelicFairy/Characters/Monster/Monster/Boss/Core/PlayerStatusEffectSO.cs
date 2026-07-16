@@ -52,7 +52,21 @@ public class PlayerStatusEffectSO : ScriptableObject
 
         switch (effectType)
         {
-            case StatusEffectType.Freeze: player.ApplyFreeze(duration);                break;
+            case StatusEffectType.Freeze:
+                int iceResult = player.AddIceStack(duration);
+                if (iceResult == 1)
+                {
+                    // 1단계: 화면 이펙트만 3초 표시 (사운드는 AddIceStack 내부에서 처리)
+                    PlayerStatusEffectVisuals.ApplyTimed(player, _screenEffectPrefab, _screenEffectScale, PlayerController.IceStageWindowDuration, "StatusEffectScreen_" + effectType);
+                }
+                else if (iceResult == 2)
+                {
+                    // 2단계: 장막 이펙트 추가 + 화면 이펙트 갱신 (빙결 사운드는 ApplyFreeze 내부에서 처리)
+                    float freezeDuration = duration * 0.5f;
+                    PlayerStatusEffectVisuals.ApplyTimed(player, _effectPrefab, _effectScale, freezeDuration, "StatusEffect_" + effectType);
+                    PlayerStatusEffectVisuals.ApplyTimed(player, _screenEffectPrefab, _screenEffectScale, freezeDuration, "StatusEffectScreen_" + effectType);
+                }
+                return;
             case StatusEffectType.Groggy: player.ApplyThunderGroggy(duration);         break;
             case StatusEffectType.Slow:   player.ApplySlow(slowScale, duration);       break;
         }

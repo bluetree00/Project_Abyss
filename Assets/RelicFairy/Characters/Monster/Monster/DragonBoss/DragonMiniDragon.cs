@@ -304,20 +304,17 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
 
     private void ApplyTint(Color tint)
     {
+        // 베이스 텍스처/색상은 유지하고 속성 색상을 발광(Emission)으로만 포인트
+        var block = new MaterialPropertyBlock();
         foreach (var r in GetComponentsInChildren<Renderer>(true))
         {
-            foreach (var mat in r.materials)
-            {
-                if (mat.HasProperty("_BaseColor"))     mat.SetColor("_BaseColor",     tint);
-                if (mat.HasProperty("_Color"))         mat.SetColor("_Color",         tint);
-                if (mat.HasProperty("_TintColor"))     mat.SetColor("_TintColor",     tint);
-                if (mat.HasProperty("_MainColor"))     mat.SetColor("_MainColor",     tint);
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    mat.SetColor("_EmissionColor", tint * 0.4f);
-                    mat.EnableKeyword("_EMISSION");
-                }
-            }
+            r.GetPropertyBlock(block);
+            block.SetColor("_EmissionColor", tint * 0.45f);
+            r.SetPropertyBlock(block);
+
+            // Emission 키워드는 머티리얼에 직접 활성화 (MaterialPropertyBlock은 키워드 제어 불가)
+            foreach (var mat in r.sharedMaterials)
+                mat?.EnableKeyword("_EMISSION");
         }
     }
 }

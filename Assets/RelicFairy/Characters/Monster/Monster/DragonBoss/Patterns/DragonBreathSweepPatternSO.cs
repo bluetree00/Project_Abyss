@@ -90,6 +90,11 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     [Header("Cooldown")]
     [SerializeField] private float _cooldown = 22f;
 
+    [Header("Player Visibility Aura")]
+    [Tooltip("브레스 스위프(탑뷰) 동안 플레이어에게 붙일 오라 프리팹 — 위치 가시성 향상. 데스나이트 흰색 오라 프리팹과 동일하게 할당.")]
+    [SerializeField] private GameObject _playerAuraPrefab;
+    [SerializeField] private float _playerAuraScale = 1f;
+
     [Header("Meteor Rain (브레스 스위프 연동)")]
     [Tooltip("브레스 스위프 진행 중 동시에 메테오를 내리꽂는 파라미터 SO. null이면 메테오 없음.")]
     [SerializeField] private DragonFireballRainPatternSO _meteorPattern;
@@ -139,6 +144,8 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float FireScaleMin       => _fireScaleMin;
     public float FireScaleMax       => _fireScaleMax;
     public float Cooldown => _cooldown;
+    public GameObject PlayerAuraPrefab => _playerAuraPrefab;
+    public float      PlayerAuraScale  => _playerAuraScale;
     public DragonFireballRainPatternSO MeteorPattern => _meteorPattern;
 
     private DragonBreathSweepState _runtimeState;
@@ -239,6 +246,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private GameObject  _flameBreathGo;
     private Light       _followLight;
     private AudioSource _flameBreathAudioSource;
+    private GameObject  _playerAuraInstance;
 
     // sweep(브레스 라인) 단위로 잔불 사운드 1개씩만 루프 재생 — 개별 화염 패치마다 재생하면 소리가 겹쳐 터진다.
     private readonly Dictionary<int, int>         _lineFireRemaining = new();
@@ -255,6 +263,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         CleanupAllTsunamis();
         CleanupAllScorches();
         CleanupAllMeteors();
+        RemovePlayerAura();
         _phase            = Phase.Done;
         _timer            = 0f;
         _currentFlyAnim   = null;
@@ -297,6 +306,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         GameCameraController.Instance?.ActivateDragonTopDownView(
             DragonBossRoomContext.WorldCenter,
             new Vector2(DragonBossRoomContext.Width * DragonBossRoomContext.CellSize, DragonBossRoomContext.Height * DragonBossRoomContext.CellSize));
+        ApplyPlayerAura(ctx);
         PickSweepLine(ctx);
     }
 
@@ -322,6 +332,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         CleanupAllTsunamis();
         CleanupAllScorches();
         CleanupAllMeteors();
+        RemovePlayerAura();
         _meteorSpawning = false;
         // 정상 종료(Done) 시 이미 카메라가 복귀 예약됨. 중단(Exit 강제) 시에만 즉시 복귀.
         if (!_cameraReturned)
@@ -1303,6 +1314,27 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (ctx.Animator == null || string.IsNullOrEmpty(stateName)) return;
         if (ctx.Animator.HasState(0, Animator.StringToHash(stateName)))
             ctx.Animator.CrossFade(stateName, 0.12f, 0, 0f);
+    }
+
+    private void ApplyPlayerAura(MonsterContext ctx)
+    {
+        if (Data.PlayerAuraPrefab == null || ctx?.Runtime?.PlayerTarget == null) return;
+        RemovePlayerAura();
+        _playerAuraInstance = Object.Instantiate(
+            Data.PlayerAuraPrefab,
+            ctx.Runtime.PlayerTarget.position,
+            Quaternion.identity,
+            ctx.Runtime.PlayerTarget);
+        _playerAuraInstance.name                    = "PlayerAura_BreathSweep";
+        _playerAuraInstance.transform.localPosition = Vector3.zero;
+        _playerAuraInstance.transform.localScale    = Vector3.one * Data.PlayerAuraScale;
+    }
+
+    private void RemovePlayerAura()
+    {
+        if (_playerAuraInstance == null) return;
+        Object.Destroy(_playerAuraInstance);
+        _playerAuraInstance = null;
     }
 
     private static void RestoreAgent(MonsterContext ctx)

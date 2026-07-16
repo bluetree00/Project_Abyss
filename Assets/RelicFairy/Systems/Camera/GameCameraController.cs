@@ -193,6 +193,16 @@ public class GameCameraController : MonoBehaviour
     }
 
     /// <summary>
+    /// 씬 시작 직후 플레이어 스폰 전에 호출. 카메라를 스폰 위치 기준 최종 위치로 즉시 이동.
+    /// 씬 에디터 카메라 위치가 벽 안에 있어 관통하는 현상을 방지한다.
+    /// </summary>
+    public void PrePositionAtSpawn(Vector3 spawnPos)
+    {
+        transform.position = spawnPos + _originalPosition;
+        transform.rotation = _originalRotation;
+    }
+
+    /// <summary>
     /// 시작방 투어 종료 후 게임플레이 FreeLook으로 카메라 제어권을 넘긴다.
     /// _introStarted를 점유해 레거시 OnPlayerBound→PlayIntroAsync 자동 줌인을 차단하고,
     /// 투어 종료 포즈에서 플레이어 추적 시점으로 부드럽게 보간한 뒤 Brain에 인계한다.
@@ -366,10 +376,8 @@ public class GameCameraController : MonoBehaviour
 
         float height = floorSize.sqrMagnitude > 0f ? ComputeTopDownHeight(floorSize) : topDownHeight;
 
-        // 중간 상태 없이 즉시 탑뷰 스냅 (비동기 상승 애니메이션 제거)
-        transform.position = new Vector3(mapCenter.x, mapCenter.y + height, mapCenter.z);
-        transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         _topDownViewActive = true;
+        ActivateDragonTopDownViewAsync(mapCenter, height).Forget();
     }
 
     /// <summary>Floor 전체(XZ)가 화면에 들어오도록 카메라 FOV/Aspect 기준으로 필요한 높이를 계산한다.</summary>
@@ -385,7 +393,7 @@ public class GameCameraController : MonoBehaviour
         return Mathf.Max(heightForDepth, heightForWidth);
     }
 
-    private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter)
+    private async UniTaskVoid ActivateDragonTopDownViewAsync(Vector3 mapCenter, float height)
     {
         _topDownAscendCts?.Cancel();
         _topDownAscendCts?.Dispose();
@@ -394,7 +402,7 @@ public class GameCameraController : MonoBehaviour
 
         Vector3    startPos  = transform.position;
         Quaternion startRot  = transform.rotation;
-        Vector3    targetPos = new Vector3(mapCenter.x, mapCenter.y + topDownHeight, mapCenter.z);
+        Vector3    targetPos = new Vector3(mapCenter.x, mapCenter.y + height, mapCenter.z);
         Quaternion targetRot = Quaternion.Euler(90f, 0f, 0f);
         float      duration  = Mathf.Max(0.01f, topDownAscendDuration);
 
@@ -418,33 +426,15 @@ public class GameCameraController : MonoBehaviour
 
     public void DeactivateDragonTopDownView(float duration)
     {
-        // duration 무시 — 중간 상태 없이 즉시 플레이어 시점으로 복귀
-        DeactivateDragonTopDownView();
+        if (duration <= 0f)
+            DeactivateDragonTopDownView();
+        else
+            DeactivateDragonTopDownViewAsync(duration).Forget();
     }
 
     public void DeactivateDragonTopDownView()
     {
-        if (!_topDownViewActive) return;
-        EnsureCinemachineRefs();
-        _topDownAscendCts?.Cancel();
-        _topDownReturnCts?.Cancel();
-
-        // 플레이어 현재 위치 기준으로 카메라 복원 (저장 당시 오프셋 유지)
-        if (_cinemachine?.Follow != null)
-        {
-            Vector3 offset = _savedCamPosBeforeTopDown - _savedFollowPosBeforeTopDown;
-            transform.position = _cinemachine.Follow.position + offset;
-        }
-        else
-        {
-            transform.position = _savedCamPosBeforeTopDown;
-        }
-        transform.rotation = _savedCamRotBeforeTopDown;
-
-        if (_brain       != null && _savedBrainBeforeTopDown) _brain.enabled       = true;
-        if (_cinemachine != null && _savedCmBeforeTopDown)    _cinemachine.enabled = true;
-
-        _topDownViewActive = false;
+        DeactivateDragonTopDownViewAsync(topDownAscendDuration).Forget();
     }
 
     private async UniTaskVoid DeactivateDragonTopDownViewAsync(float duration)
@@ -947,20 +937,31 @@ public class GameCameraController : MonoBehaviour
         if (_brain != null) _brain.enabled = false;
         if (_cinemachine != null) _cinemachine.enabled = false;
 
-        // PrepareMapViewAsync가 이미 카메라를 맵 위에 배치했을 수 있으므로
-        // 현재 위치에서 시작 — 고정 오프셋 재계산을 하지 않아 snap 없이 부드럽게 이어짐
-        Vector3 startPos = transform.position;
-        Quaternion startRot = transform.rotation;
-
         Vector3 offset = _originalPosition;
         Quaternion endRot = _originalRotation;
 
-        // PrepareMapViewAsync 미사용 시: 현재 위치가 씬 기본 카메라 위치 → 인트로 시작점 그대로 사용
-        // PrepareMapViewAsync 사용 시: 현재 위치가 맵 위 → 거기서 플레이어 쪽으로 줌인
-
-        // 줌인 + 조건부 페이드인
         // _fadeOverlay가 이미 투명(PrepareMapViewAsync 완료)이면 페이드 재실행 없이 줌만 수행
         bool needFade = _fadeOverlay != null && _fadeOverlay.color.a > 0.01f;
+
+        Vector3 startPos;
+        Quaternion startRot;
+
+        if (needFade)
+        {
+            // PrepareMapViewAsync 미사용(프리팹 맵 등): 오버레이로 가려진 상태이므로
+            // 씬 기본 카메라 위치 대신 플레이어 스폰 위치 기준으로 즉시 스냅.
+            // 페이드인 후 카메라가 이미 올바른 위치에 있어 스폰 전/후 위치가 동일해짐.
+            startPos = target.position + offset;
+            startRot = endRot;
+            transform.position = startPos;
+            transform.rotation = startRot;
+        }
+        else
+        {
+            // PrepareMapViewAsync가 이미 카메라를 맵 위에 배치했으므로 현재 위치에서 줌인 시작
+            startPos = transform.position;
+            startRot = transform.rotation;
+        }
 
         float elapsed = 0f;
         while (elapsed < introDuration)
@@ -1014,6 +1015,28 @@ public class GameCameraController : MonoBehaviour
             if (_cinemachine != null) _cinemachine.enabled = true;
             if (_brain != null)       _brain.enabled       = true;
         }
+    }
+
+    /// <summary>
+    /// 팬 없이 즉시 수동 카메라 제어를 시작한다.
+    /// Cinemachine/Brain을 비활성화하고 PanToZoneAndReturnAsync 없이 보스 등장 연출을 진행할 때 사용.
+    /// ReturnToPlayerAsync 호출 시 자동으로 원래 상태로 복원된다.
+    /// </summary>
+    public void TakeManualControl()
+    {
+        EnsureCinemachineRefs();
+        if (!_isPanning)
+        {
+            _prePanBrainEnabled = _brain != null && _brain.enabled;
+            _prePanCmEnabled    = _cinemachine != null && _cinemachine.enabled;
+        }
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = new CancellationTokenSource();
+        System.Threading.Interlocked.Increment(ref _panVersion);
+        _isPanning = true;
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
     }
 
     private void EnsureCinemachineRefs()
