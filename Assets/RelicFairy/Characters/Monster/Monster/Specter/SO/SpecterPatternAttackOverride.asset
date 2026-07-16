@@ -24,15 +24,15 @@ MonoBehaviour:
     damageMultiplier: 1
     knockbackMultiplier: 1
     attackShapeOverride: {fileID: 0}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
+    castVfxPrefab: {fileID: 1200950891393156, guid: 3c8cdaef9a07ac846b9846841efa05eb, type: 3}
+    castVfxDuration: 0.5
+    castVfxForwardOffset: 0.4
     castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxScale: 0.9
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3
@@ -55,15 +55,15 @@ MonoBehaviour:
     knockbackMultiplier: 1.05
     attackShapeOverride: {fileID: 11400000, guid: 9cb9209d55c6483cb9e93a4cbc5bd702,
       type: 2}
-    disableWarning: 0
+    disableWarning: 1
     warningRadius: 0
     warningDuration: 0
     warningShape: 0
-    castVfxPrefab: {fileID: 0}
-    castVfxDuration: 0
-    castVfxForwardOffset: 0
+    castVfxPrefab: {fileID: 1200950891393156, guid: 3c8cdaef9a07ac846b9846841efa05eb, type: 3}
+    castVfxDuration: 0.5
+    castVfxForwardOffset: 0.4
     castVfxVerticalOffset: 0.8
-    castVfxScale: 1
+    castVfxScale: 0.9
     castVfxAttachToMonster: 1
     useProceduralBeamVfx: 0
     proceduralBeamLength: 3

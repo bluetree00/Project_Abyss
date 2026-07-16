@@ -174,7 +174,6 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     private Vector3 _hoverPos;
     private int     _minionsSpawned;
     private int     _minionsAlive;
-    private bool    _nextPatternIsBreathSweep;
     private bool    _resuming;
     private bool    _handingOffToSubPattern;
 
@@ -185,7 +184,6 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         _phase                    = Phase.Done;
         _minionsSpawned           = 0;
         _minionsAlive             = 0;
-        _nextPatternIsBreathSweep = false;
         _resuming                 = false;
         _handingOffToSubPattern   = false;
     }
@@ -222,7 +220,6 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         _timer                    = 0f;
         _minionsSpawned           = 0;
         _minionsAlive             = 0;
-        _nextPatternIsBreathSweep = true;
         _takeoffHash              = Animator.StringToHash(Data.TakeoffStateName);
         _hoverPos                 = ctx.Transform.position;
         _hoverPos.y               = Mathf.Max(ctx.Transform.position.y, ctx.Runtime.SpawnPosition.y + Data.HoverHeight);
@@ -317,13 +314,11 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         TriggerAirPattern(ctx);
     }
 
-    /// <summary>BreathSweep/FireballRain 중 하나로 핸드오프하고, 종료 후 WaitMinions로 복귀하도록 예약한다.</summary>
+    /// <summary>BreathSweep(메테오 통합)으로 핸드오프하고, 종료 후 WaitMinions로 복귀하도록 예약한다.</summary>
     private void TriggerAirPattern(MonsterContext ctx)
     {
-        BossPatternSO pattern = _nextPatternIsBreathSweep
-            ? (BossPatternSO)Data.BreathSweepPattern
-            : Data.FireballRainPattern;
-        _nextPatternIsBreathSweep = !_nextPatternIsBreathSweep;
+        // BreathSweep에 메테오가 통합되었으므로 항상 BreathSweep만 사용
+        BossPatternSO pattern = Data.BreathSweepPattern;
         if (pattern == null) return;
 
         var runtimeState = pattern.GetRuntimeState();

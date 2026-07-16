@@ -484,6 +484,22 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 #endif
     }
 
+    private void LateUpdate()
+    {
+        if (_runtime == null || _runtime.IsDead || _runtime.PlayerTarget == null) return;
+        if (_agent == null || !_agent.isOnNavMesh || !_agent.isActiveAndEnabled || _agent.isStopped) return;
+
+        const float playerRadius = 0.35f;
+        Vector3 toMonster = transform.position - _runtime.PlayerTarget.position;
+        toMonster.y = 0f;
+        float dist = toMonster.magnitude;
+        float minSep = _agent.radius + playerRadius;
+
+        if (dist >= minSep || dist < 0.001f) return;
+
+        _agent.nextPosition = transform.position + toMonster.normalized * (minSep - dist);
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 공개 API (상태 클래스 → 몬스터 베이스 콜백)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -591,6 +607,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     public void DealDamageToPlayer()
     {
         if (_runtime?.PlayerTarget == null || _config == null) return;
+        if (_runtime.AttackHitDealt) return;
 
         int   damage         = (int)(_config.stat.attackPower * _runtime.AttackMultiplier);
         float knockbackForce = _config.stat.knockbackForce;

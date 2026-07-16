@@ -73,3 +73,4 @@ MonoBehaviour:
   _fireScaleMin: 0.13
   _fireScaleMax: 0.27
   _cooldown: 26
+  _meteorPattern: {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605, type: 2}

@@ -12,16 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12c090d0f87c7e241b789d4dc22b2d4f, type: 3}
   m_Name: FG_PunchPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGPunchPatternSO
-  weight: 0.065651245
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 0.045461874
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: punch
   breakOverride: 3
   range: 4
   arcHalfAngle: 90
-  warningDuration: 1
+  warningDuration: 0.4
+  hitTime: 0.55
   recoveryDuration: 1
   damageMultiplier: 1.2
   knockbackMultiplier: 1.5
+  punchSfx: {fileID: 8300000, guid: 21529d51ea0c8f0458373fe53a1c627a, type: 3}
   warningZonePrefab: {fileID: 4051754165087605920, guid: 44e9c95de212fa9428aa606d12d285a7,
     type: 3}

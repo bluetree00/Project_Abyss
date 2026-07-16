@@ -405,6 +405,17 @@ public class PlayerController : CharacterBase
         _slowTimer = Mathf.Max(_slowTimer, duration);
     }
 
+    /// <summary>슬로우 상태를 즉시 해제하고 부착된 VFX를 제거한다.</summary>
+    public void ClearSlow()
+    {
+        _slowTimer = 0f;
+        SetMoveScale(1f);
+        var fx = transform.Find("StatusEffect_Slow");
+        if (fx != null) Destroy(fx.gameObject);
+        var screenFx = transform.Find("StatusEffectScreen_Slow");
+        if (screenFx != null) Destroy(screenFx.gameObject);
+    }
+
     private float _freezeTimer;
     public bool IsFrozen => _freezeTimer > 0f;
 
@@ -958,13 +969,13 @@ public class PlayerController : CharacterBase
         _knockbackTimer = Mathf.Max(0f, _knockbackTimer - Time.deltaTime);
         if (_slowTimer > 0f)
         {
-            _slowTimer = Mathf.Max(0f, _slowTimer - Time.deltaTime);
+            _slowTimer = Mathf.Max(0f, _slowTimer - Time.unscaledDeltaTime);
             if (_slowTimer <= 0f)
                 SetMoveScale(1f);
         }
         if (_freezeTimer > 0f)
         {
-            _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.deltaTime);
+            _freezeTimer = Mathf.Max(0f, _freezeTimer - Time.unscaledDeltaTime);
             moveDirection = Vector3.zero;
             if (_freezeTimer <= 0f) StopFreezeLoopSfx();
             return;

@@ -50,6 +50,12 @@ public class FGBreathPatternSO : BossPatternSO
     [Tooltip("브레스 폭 (m)")]
     public float width = 1f;
 
+    [Header("Breath — Range Growth")]
+    [Tooltip("브레스 시작 시 사거리 비율 (0~1). 이 비율로 시작해서 전체 사거리까지 늘어남.")]
+    public float rangeStartRatio = 0.3f;
+    [Tooltip("전체 사거리까지 늘어나는 데 걸리는 시간 (초)")]
+    public float rangeGrowDuration = 1.5f;
+
     // ── 이동 ──────────────────────────────────────────────
     [Header("Breath — Rotation")]
     [Tooltip("플레이어 추적 회전 속도 (°/s)")]
@@ -70,6 +76,11 @@ public class FGBreathPatternSO : BossPatternSO
 
     [Tooltip("브레스 이펙트 프리팹 (EarthBeam 등). 보스 왼손 위치에 배치. null이면 재생 안 함.")]
     public GameObject breathVfxPrefab;
+
+    // ── 사운드 ────────────────────────────────────────────
+    [Header("Breath — Sound")]
+    [Tooltip("브레스 지속 중 루프 재생할 사운드. null이면 재생 안 함.")]
+    public AudioClip beamSfx;
 
     // ── 런타임 ────────────────────────────────────────────
     private FGBreathState _state;
@@ -106,9 +117,11 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     private Phase       _phase;
     private float       _timer;
     private float       _damageTimer;
+    private float       _currentRange;
     private GameObject  _warningGO;
     private RectWarning _rectWarning;
     private GameObject  _breathVfxGO;
+    private AudioSource _beamAudioSource;
 
     public FGBreathState(FGBreathPatternSO data) : base(data) { }
 
@@ -118,9 +131,10 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase       = Phase.Warning;
-        _timer       = 0f;
-        _damageTimer = 0f;
+        _phase        = Phase.Warning;
+        _timer        = 0f;
+        _damageTimer  = 0f;
+        _currentRange = 0f;
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -177,9 +191,13 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 {
                     var si = ctx.Animator.GetCurrentAnimatorStateInfo(0);
                     if (si.IsName(AnimBreathLoop) && si.normalizedTime >= 1f)
+                    {
+                        ctx.Animator.speed = SpeedMult(ctx);
                         ctx.Animator.Play(AnimBreathLoop, 0, 0f);
+                    }
                 }
 
+                UpdateCurrentRange();
                 RotateTowardPlayer(ctx);
                 UpdateBreathVfxTransform(ctx);
 
@@ -226,6 +244,19 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 사거리 점진 확장
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void UpdateCurrentRange()
+    {
+        float startRange = Data.range * Mathf.Clamp01(Data.rangeStartRatio);
+        float t = Data.rangeGrowDuration > 0.0001f
+            ? Mathf.Clamp01(_timer / Data.rangeGrowDuration)
+            : 1f;
+        _currentRange = Mathf.Lerp(startRange, Data.range, t);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 회전
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -263,7 +294,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         float   along     = Vector3.Dot(toPlayer, ctx.Transform.forward);
         float   perpDist  = (toPlayer - ctx.Transform.forward * along).magnitude;
 
-        if (along < 0f || along > Data.range) return;
+        if (along < 0f || along > _currentRange) return;
         if (perpDist > Data.width * 0.5f) return;
 
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
@@ -322,14 +353,26 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
 
     private void SpawnBreathVfx(MonsterContext ctx)
     {
-        if (Data.breathVfxPrefab == null) return;
+        if (Data.breathVfxPrefab != null)
+        {
+            _breathVfxGO = Object.Instantiate(Data.breathVfxPrefab);
+            UpdateBreathVfxTransform(ctx);
 
-        _breathVfxGO = Object.Instantiate(Data.breathVfxPrefab);
-        UpdateBreathVfxTransform(ctx);
+            // Phase 2에서 파티클 VFX를 애니메이션 속도와 동기화 후 Play
+            float speedMult = SpeedMult(ctx);
+            foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                if (!Mathf.Approximately(speedMult, 1f))
+                {
+                    var main = ps.main;
+                    main.simulationSpeed = speedMult;
+                }
+                ps.Play(withChildren: false);
+            }
+        }
 
-        // 루트에 ParticleSystem이 없는 BeamVfx 구조도 지원: 자식까지 포함해 Play
-        foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
-            ps.Play(withChildren: false);
+        if (Data.beamSfx != null)
+            _beamAudioSource = Managers.Sound?.PlayLoopingEffectAt(Data.beamSfx, ctx.Transform.position);
     }
 
     /// <summary>보스 왼손 위치에 VFX를 배치하고 보스 정면 방향으로 회전.</summary>
@@ -350,29 +393,33 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
             origin,
             Quaternion.LookRotation(ctx.Transform.forward));
 
-        // BeamBody Z 스케일을 사정거리에 맞춰 설정 (BeamVfx 코루틴 없이 빔 길이 직접 제어)
+        // BeamBody Z 스케일을 현재 사거리(_currentRange)에 맞춰 매 프레임 갱신
         var beamBody = _breathVfxGO.transform.Find("BeamBody");
         if (beamBody != null)
         {
             Vector3 s = beamBody.localScale;
-            s.z = Data.range;
+            s.z = _currentRange > 0f ? _currentRange : Data.range;
             beamBody.localScale = s;
         }
     }
 
     private void StopBreathVfx()
     {
-        if (_breathVfxGO == null) return;
-
-        float maxLifetime = 0f;
-        foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
+        if (_breathVfxGO != null)
         {
-            ps.Stop(withChildren: false, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
-            maxLifetime = Mathf.Max(maxLifetime, ps.main.startLifetime.constantMax);
+            float maxLifetime = 0f;
+            foreach (var ps in _breathVfxGO.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                ps.Stop(withChildren: false, stopBehavior: ParticleSystemStopBehavior.StopEmitting);
+                maxLifetime = Mathf.Max(maxLifetime, ps.main.startLifetime.constantMax);
+            }
+
+            Object.Destroy(_breathVfxGO, maxLifetime > 0f ? maxLifetime + 0.5f : 0f);
+            _breathVfxGO = null;
         }
 
-        Object.Destroy(_breathVfxGO, maxLifetime > 0f ? maxLifetime + 0.5f : 0f);
-        _breathVfxGO = null;
+        Managers.Sound?.StopLoopingEffect(_beamAudioSource);
+        _beamAudioSource = null;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -387,6 +434,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
             Debug.LogWarning($"[FGBreath] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, crossFade, 0, 0f);
     }
 
