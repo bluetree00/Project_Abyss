@@ -122,6 +122,8 @@ public class RunProgressManager : MonoBehaviour
         d.runEssence       = s.RunDelta?.GainedEssence ?? 0;
         d.fuelEnhanceMaterial = s.FuelBank?.EnhanceMaterial ?? 0;   // 이벤트방 연료 은행
         d.fuelRuneOre         = s.FuelBank?.RuneOre ?? 0;
+        d.potionCount         = s.PlayerState?.PotionCount ?? 0;
+        d.potionCapacity      = s.PlayerState?.PotionCapacity ?? PlayerRunState.DefaultPotionCapacity;
         // 현재 슬롯: 라이브 WeaponManager 우선(첫 방 -1 케이스 해결), 없으면 씬 전환 시 저장값
         int liveSlot       = s.Player?.WeaponManager?.CurrentSlotIndex ?? -1;
         d.weaponCurrentSlot = liveSlot >= 0 ? liveSlot : s.SavedCurrentSlotIndex;
@@ -183,9 +185,6 @@ public class RunProgressManager : MonoBehaviour
         var itemWrapper = new ItemListWrapper();
         itemWrapper.items.AddRange(session.ItemInventory.PlacedItems);
 
-        var synWrapper = new SynergyListWrapper();
-        synWrapper.items.AddRange(session.AppliedSynergies);
-
         var logWrapper = new RoomClearLogWrapper();
         logWrapper.records.AddRange(session.RoomClearRecords);
 
@@ -232,14 +231,13 @@ public class RunProgressManager : MonoBehaviour
             retryCount             = retryCount,
             progressPercent        = progress,
             itemCount              = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
-            synergyCount           = session.AppliedSynergies.Count,
+            synergyCount           = MerlinRuneBridge.Instance != null ? MerlinRuneBridge.Instance.ActiveSynergyCount : 0,
             roomClearCount         = session.RoomClearRecords.Count,
             characterKey           = charKey,
             characterName          = charName,
             weapon0PrefabKey       = weapon0Key,
             weapon1PrefabKey       = weapon1Key,
             itemsJson              = JsonUtility.ToJson(itemWrapper),
-            synergiesJson          = JsonUtility.ToJson(synWrapper),
             roomLogsJson           = JsonUtility.ToJson(logWrapper),
             savedAt                = DateTime.UtcNow.ToString("o"),
             isInStartRoom          = isInStartRoom,

@@ -16,12 +16,19 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private const string RelicKey = "gawain";
     private const int V_CHARGE = 0, V_NOON = 1, V_COOLDOWN = 2, V_MARK_THRESH = 7;
 
+    // 잔열 가속 상한 — 3배속까지. 없으면 학살 구간에서 정오가 끊기지 않고 도는 무한 루프가 된다.
+    private const float MaxChargeAccel = 2f;
+
     private float _chargeTime = 20f, _noonTime = 10f, _cooldownTime = 15f, _markThreshold = 0.8f;
 
     private ZPhase _phase = ZPhase.Charging;
     private float  _timer;        // 현재 구간 경과
-    private float  _chargeAccel;  // 잔열(황혼 처치) 충전 가속 — 후속
+    private float  _chargeAccel;  // 잔열 — 처치로 적립되는 충전 가속(0 = 정속)
     private bool   _markActiveLast;
+
+    // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
+    private string _label = "여명";
+    private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
 
@@ -78,15 +85,26 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
             ZPhase.Noon     => ZPhase.Cooldown,
             _               => ZPhase.Charging,
         };
-        if (_phase == ZPhase.Charging) _chargeAccel = 0f;
+
+        // ⚠️ 예전엔 여기서 Charging 진입 시 _chargeAccel을 0으로 지웠다.
+        //    가속은 <b>충전 구간에서만</b> 쓰이는데 충전에 들어가는 순간 지워버렸으니,
+        //    황혼에서 아무리 처치해도 단 1%도 반영되지 않았다 — 잔열 패시브가 100% 무효였다.
+        //    가속은 '해를 앞당기는' 적립이므로 정오에 도달했을 때(=보상을 받았을 때) 소진한다.
+        if (_phase == ZPhase.Noon) _chargeAccel = 0f;
     }
 
-    /// <summary>잔열: 황혼/충전 중 다음 충전 가속(처치 보상). 후속 패시브에서 호출.</summary>
+    /// <summary>
+    /// 잔열 — 처치로 <b>다음 해를 앞당긴다</b>. 황혼·충전 중 적립되고, 충전 속도에 곱해진다.
+    /// (게이지를 '채우는' 게 아니라 시간을 '당기는' 것 — 스택 누적형 유물과 구조가 다르다.)
+    /// </summary>
     public void AddChargeAccel(float pct)
     {
         if (_phase == ZPhase.Cooldown || _phase == ZPhase.Charging)
-            _chargeAccel += Mathf.Max(0f, pct);
+            _chargeAccel = Mathf.Min(_chargeAccel + Mathf.Max(0f, pct), MaxChargeAccel);
     }
+
+    /// <summary>현재 충전 가속(0 = 정속, 1 = 2배속). HUD/디버그 표시용.</summary>
+    public float ChargeAccel => _chargeAccel;
 
     // ── IRelicResource ──
     public float Fill => _phase switch
@@ -95,8 +113,31 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         ZPhase.Noon     => 1f - Mathf.Clamp01(_timer / Mathf.Max(0.01f, _noonTime)),
         _               => Mathf.Clamp01(_timer / Mathf.Max(0.01f, _cooldownTime)),
     };
-    public string Label => _phase switch { ZPhase.Charging => "정오 충전", ZPhase.Noon => "정오!", _ => "황혼" };
+    /// <summary>
+    /// 게이지 라벨. 잔열 가속이 붙어 있으면 배속을 함께 보여준다 —
+    /// 처치가 해를 앞당긴다는 사실이 화면에 보이지 않으면 플레이어는 그런 게 있는지도 모른다.
+    /// 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
+    /// </summary>
+    public string Label
+    {
+        get
+        {
+            int key = (int)_phase * 100 + Mathf.RoundToInt(_chargeAccel * 10f);
+            if (key != _labelKey)
+            {
+                _labelKey = key;
+                _label = _phase switch
+                {
+                    ZPhase.Noon     => "정오!",
+                    ZPhase.Charging => _chargeAccel > 0.01f ? $"여명 ×{1f + _chargeAccel:0.0}" : "여명",
+                    _               => _chargeAccel > 0.01f ? $"황혼 ×{1f + _chargeAccel:0.0}" : "황혼",
+                };
+            }
+            return _label;
+        }
+    }
     public int Phase => (int)_phase;
+    public RelicGaugeStyle Style => RelicGaugeStyle.Sun;   // 정오 태양 위젯(열림/닫힘 + 내부 감소)
     public Color BarColor => _phase switch
     {
         ZPhase.Noon     => new Color(1.00f, 0.85f, 0.25f),                                   // 정오 — 밝은 금

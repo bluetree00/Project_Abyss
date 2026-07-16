@@ -14,7 +14,9 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     private const string RelicKey = "lancelot";
     private const int V_MAX = 0, V_DECAY_DELAY = 1, V_DECAY_RATE = 2;
 
-    private int   _maxStacks  = 50;
+    // 서버(RELIC_STAT_DATA lancelot slot 0) 미도달 시 폴백. CSV와 같은 값으로 맞춰둔다
+    // — 어긋나 있으면 CDN 업로드 전후로 광란 빈도가 통째로 달라져 밸런싱이 헛돈다.
+    private int   _maxStacks  = 40;
     private float _decayDelay = 2f;
     private float _decayRate  = 1f;
 
@@ -25,6 +27,10 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     // 광란(Frenzy) 상태 — 빈틈 대체
     private bool  _frenzy;
     private float _frenzyEnd;
+
+    // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
+    private string _label = "광기 0%";
+    private int    _labelKey = int.MinValue;
 
     public event Action OnChanged;
     public event Action OnMaxReached;
@@ -120,8 +126,37 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
 
     // ── IRelicResource ──
     public float Fill => _frenzy ? 1f : Ratio;
-    public string Label => _frenzy ? "광란!" : "광기 " + _stacks;
-    public int Phase => _frenzy ? 5 : (_stacks >= _maxStacks ? 4 : (_stacks >= 31 ? 3 : (_stacks >= 16 ? 2 : (_stacks >= 1 ? 1 : 0))));
+
+    /// <summary>
+    /// 게이지 라벨 — 평시엔 충전률(%), 광란 중엔 남은 시간.
+    /// 매 프레임 문자열을 새로 만들면 GC가 쌓이므로 표시값이 바뀔 때만 다시 만든다
+    /// (광란 잔여는 0.1초 단위로만 갱신 → 초당 10회).
+    /// </summary>
+    public string Label
+    {
+        get
+        {
+            int key = _frenzy ? -Mathf.CeilToInt(FrenzyRemaining * 10f) : _stacks;
+            if (key != _labelKey)
+            {
+                _labelKey = key;
+                _label = _frenzy
+                    ? $"광란 {FrenzyRemaining:0.0}초"
+                    : $"광기 {Mathf.RoundToInt(Ratio * 100f)}%";
+            }
+            return _label;
+        }
+    }
+
+    // 단계는 MAX 대비 <b>비율</b>로 판정한다. 고정값(구 16/31)은 MAX가 50이던 시절 기준이라,
+    // MAX를 25로 내리면 3·4단계에 영영 도달하지 못해 바 연출이 죽는다.
+    public int Phase => _frenzy               ? 5
+                      : _stacks >= _maxStacks ? 4
+                      : Ratio   >= 0.6f       ? 3
+                      : Ratio   >= 0.3f       ? 2
+                      : _stacks >= 1          ? 1
+                                              : 0;
+    public RelicGaugeStyle Style => RelicGaugeStyle.Bar;   // 수평 광기 게이지
     public Color BarColor => _frenzy
         ? new Color(0.78f, 0.30f, 0.98f)                                                    // 광란 — 보라
         : Color.Lerp(new Color(0.55f, 0.22f, 0.20f), new Color(0.96f, 0.20f, 0.16f), Ratio); // 광기 — 붉은 강도

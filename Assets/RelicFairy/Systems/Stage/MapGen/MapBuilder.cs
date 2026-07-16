@@ -67,6 +67,7 @@ public class MapBuilder
                 float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter);
 
                 var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
+                ApplyBlockAdjust(go, blockDef);
                 Name(go, $"Block_{x}_{z}_{renderType}");
                 // 벽은 Wall(8) 레이어로 — 리치 등 공중 보스의 SphereCast 충돌 감지에 사용.
                 // 나머지 블록(바닥·버프·상점 등)은 Ground(3) 레이어.
@@ -75,15 +76,16 @@ public class MapBuilder
                 result.Add(new PlacedBlock
                 {
                     instance = go,
-                    targetPosition = worldPos,
+                    targetPosition = go.transform.position,
                     targetRotationY = rotY,
                     tileType = renderType,
                     cell = new Vector2Int(x, z),
                 });
 
-                // 벽 블록 수직 반복 — 같은 프리팹을 위로 쌓아 자연스러운 높이 연출.
+                // 벽 블록 수직 반복 — 같은 프리팹을 위로 쌓아 자연스러운 높이 연출(Stacked 모드).
                 // GPU 인스턴싱(URP 기본)으로 동일 메시+머티리얼은 자동 배칭되어 드로우콜 증가가 적다.
-                if (renderType == TileType.Wall && wallLayers > 1)
+                // Single 모드(절벽 등 자연지형)는 셀당 1개만 배치 — 높이는 프리팹 메시가 소유하므로 반복하지 않는다.
+                if (renderType == TileType.Wall && palette.WallMode == WallBuildMode.Stacked && wallLayers > 1)
                 {
                     for (int layer = 1; layer < wallLayers; layer++)
                     {
@@ -345,6 +347,8 @@ public class MapBuilder
         float ceilingHeight)
     {
         if (ceilingHeight <= 0f) return;
+        // 열린 하늘 테마(숲·심연)는 천장을 덮지 않는다.
+        if (palette != null && !palette.HasCeiling) return;
 
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -485,6 +489,12 @@ public class MapBuilder
         var ceilUse  = ceilDef ?? floorDef;
         if (floorDef?.prefab == null) return placed;
 
+        // 팔레트 수직 프로필 반영 — Single 모드는 벽 1개만.
+        int  wallReps  = palette.WallMode == WallBuildMode.Single ? 1 : wallLayers;
+        // 복도는 방이 열린 하늘이어도 항상 천장으로 감싼다 → 밖으로 이어지는 "터널"이 되어
+        // 끝(끝막이)이 어둠 속으로 사라지고 방과 연결된 느낌을 준다.
+        bool doCeiling = true;
+
         // 바깥/측면 단위 방향 (로컬 XZ)
         Vector3 outward, lateral;
         switch (edge)
@@ -511,13 +521,13 @@ public class MapBuilder
 
                 Vector3 cLocal = fLocal; cLocal.y = ceilingY;
                 var cRot = ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
-                if (ceilUse?.prefab != null)
+                if (doCeiling && ceilUse?.prefab != null)
                     Place(ceilUse, parent, cLocal, cRot, 3, $"Corridor_C_{step}_{lat}", TileType.Ceiling, placed);
             }
 
             if (wallDef?.prefab != null)
                 for (int sign = -1; sign <= 1; sign += 2)
-                    StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallLayers, $"Corridor_W_{step}_{sign}", placed);
+                    StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Corridor_W_{step}_{sign}", placed);
         }
 
         // 끝막이 — 마지막 칸 너머를 벽으로 닫아 또 다른 절벽이 보이지 않게
@@ -525,7 +535,7 @@ public class MapBuilder
         {
             Vector3 capAxis = openingCenterLocal + outward * ((lengthCells + 1) * cellSize);
             for (int lat = -(half + 1); lat <= half + 1; lat++)
-                StackWall(wallDef, parent, capAxis + lateral * (lat * cellSize), baseY, cellSize, wallLayers, $"Corridor_Cap_{lat}", placed);
+                StackWall(wallDef, parent, capAxis + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Corridor_Cap_{lat}", placed);
         }
 
         return placed;
@@ -538,9 +548,10 @@ public class MapBuilder
     {
         var world = parent.TransformPoint(local);
         var go = Object.Instantiate(def.prefab, world, rot, parent);
+        ApplyBlockAdjust(go, def); // 복도 블록도 BlockDef 스케일·오프셋 적용(기둥 등 건축 프롭이 방 벽과 일치)
         go.name = name;
         SetLayerRecursive(go, layer);
-        placed.Add(new PlacedBlock { instance = go, targetPosition = world, targetRotationY = rot.eulerAngles.y, tileType = tt, cell = Vector2Int.zero });
+        placed.Add(new PlacedBlock { instance = go, targetPosition = go.transform.position, targetRotationY = rot.eulerAngles.y, tileType = tt, cell = Vector2Int.zero });
     }
 
     /// <summary>한 위치에 벽을 wallLayers만큼 수직으로 쌓는다.</summary>
@@ -600,6 +611,16 @@ public class MapBuilder
         go.layer = layer;
         foreach (Transform child in go.transform)
             SetLayerRecursive(child.gameObject, layer);
+    }
+
+    /// <summary>BlockDef의 배치 보정(스케일·오프셋)을 인스턴스에 적용.
+    /// 건축 프롭처럼 피벗·크기가 셀과 안 맞는 메시를 셀에 앉힌다. 기본값(scale 1/offset 0)은 무영향.</summary>
+    private static void ApplyBlockAdjust(GameObject go, BlockDef def)
+    {
+        if (def.localScale != Vector3.one)
+            go.transform.localScale = Vector3.Scale(go.transform.localScale, def.localScale);
+        if (def.localOffset != Vector3.zero)
+            go.transform.position += def.localOffset;
     }
 
     /// <summary>디버그용 블록 명명. 릴리즈 빌드에서는 호출문(문자열 보간 포함)이 제거돼 GC 할당이 사라진다.

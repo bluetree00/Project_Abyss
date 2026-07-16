@@ -12,7 +12,8 @@ public sealed class SolarZone : MonoBehaviour
     private float      _radius, _tickInterval, _tickDamage, _burnDps;
     private GameObject _instigator;
     private float      _life, _tickAccum;
-    private readonly List<MonsterBase> _buffer = new(16);
+    // 몬스터로 좁히지 않는다 — 훈련용 허수아비 등 IDamageable 전반에 들어가야 검증이 가능하다.
+    private readonly List<GameObject> _buffer = new(16);
 
     public static SolarZone Spawn(Vector3 pos, float radius, float duration,
                                   float tickDamage, float burnDps, float tickInterval, GameObject instigator)
@@ -31,13 +32,13 @@ public sealed class SolarZone : MonoBehaviour
         if (_tickAccum >= _tickInterval)
         {
             _tickAccum -= _tickInterval;
-            CombatQuery.GetNearbyEnemies(transform.position, _radius, _instigator, 32, _buffer);
-            foreach (var mb in _buffer)
+            CombatQuery.GetNearbyDamageables(transform.position, _radius, _instigator, 32, _buffer);
+            foreach (var target in _buffer)
             {
-                if (mb == null) continue;
-                if (_tickDamage > 0f) CombatQuery.DealSynergyDamage(mb, _tickDamage, _instigator, 0.5f);
+                if (target == null) continue;
+                if (_tickDamage > 0f) CombatQuery.DealSynergyDamage(target, _tickDamage, _instigator, 0.5f);
                 if (_burnDps > 0f)
-                    MonsterBurnHandler.Apply(mb.gameObject, _burnDps, _tickInterval * 2f, _tickInterval, _instigator);
+                    MonsterBurnHandler.Apply(target, _burnDps, _tickInterval * 2f, _tickInterval, _instigator);
             }
         }
         if (_life <= 0f) Destroy(gameObject);

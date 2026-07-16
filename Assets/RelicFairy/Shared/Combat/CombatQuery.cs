@@ -105,6 +105,90 @@ public static class CombatQuery
     }
 
     /// <summary>
+    /// 반경 내 <b>피해를 받을 수 있는 모든 것</b>(IDamageable)을 가까운 순으로 채운다.
+    ///
+    /// GetNearbyEnemies는 MonsterBase만 돌려주므로 <b>훈련용 허수아비가 광역기에 전혀 안 맞는다</b>.
+    /// 더미로 스킬 피해를 검증하려면 몬스터로 좁히지 않은 이 경로가 필요하다.
+    /// 몬스터 전용 처리(낙인·시너지 피해 등)는 호출부에서 MonsterBase 여부를 다시 확인하면 된다.
+    /// </summary>
+    public static int GetNearbyDamageables(Vector3 center, float radius, GameObject exclude,
+                                           int max, List<GameObject> buffer)
+    {
+        if (buffer == null) return 0;
+        buffer.Clear();
+        if (radius <= 0f || max <= 0) return 0;
+
+        int n = Physics.OverlapSphereNonAlloc(center, radius, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
+        CollectDamageables(n, exclude, buffer);
+
+        SortByDistance(buffer, center);
+        if (buffer.Count > max) buffer.RemoveRange(max, buffer.Count - max);
+        return buffer.Count;
+    }
+
+    /// <summary>원뿔(halfAngleDeg) 내 IDamageable을 가까운 순으로 채운다. <see cref="GetNearbyDamageables"/>의 원뿔판.</summary>
+    public static int GetDamageablesInCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg,
+                                           GameObject exclude, int max, List<GameObject> buffer)
+    {
+        if (buffer == null) return 0;
+        buffer.Clear();
+        if (range <= 0f || max <= 0) return 0;
+
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) return 0;
+        forward.Normalize();
+        float cosHalf = Mathf.Cos(halfAngleDeg * Mathf.Deg2Rad);
+
+        GuidelineVisual.Cone(origin, forward, range, halfAngleDeg);
+
+        int n = Physics.OverlapSphereNonAlloc(origin, range, s_overlap, MonsterBase.HitLayerMask, QueryTriggerInteraction.Collide);
+        CollectDamageables(n, exclude, buffer);
+
+        // 원뿔 밖 제거(수집 후 각도 필터 — 중복 제거가 끝난 뒤라야 대상당 1회만 판정한다)
+        for (int i = buffer.Count - 1; i >= 0; i--)
+        {
+            Vector3 to = buffer[i].transform.position - origin;
+            to.y = 0f;
+            if (to.sqrMagnitude < 0.0001f) continue;          // 겹쳐 있으면 통과
+            if (Vector3.Dot(forward, to.normalized) < cosHalf) buffer.RemoveAt(i);
+        }
+
+        SortByDistance(buffer, origin);
+        if (buffer.Count > max) buffer.RemoveRange(max, buffer.Count - max);
+        return buffer.Count;
+    }
+
+    /// <summary>s_overlap[0..n) 에서 살아있는 IDamageable의 GameObject를 중복 없이 모은다.</summary>
+    private static void CollectDamageables(int n, GameObject exclude, List<GameObject> buffer)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            var col = s_overlap[i];
+            if (col == null) continue;
+
+            var dmg = col.GetComponentInParent<IDamageable>();
+            if (dmg is not Component comp) continue;          // 인터페이스만으론 GameObject를 못 얻는다
+
+            var go = comp.gameObject;
+            if (exclude != null && go == exclude) continue;
+            if (dmg is MonsterBase mb && mb.CurrentHp <= 0) continue;   // 시체는 제외(더미는 죽지 않는다)
+            if (buffer.Contains(go)) continue;                // 다중 콜라이더 1대상 중복 방지
+
+            buffer.Add(go);
+        }
+    }
+
+    private static void SortByDistance(List<GameObject> buffer, Vector3 from)
+    {
+        buffer.Sort((a, b) =>
+        {
+            float da = (a.transform.position - from).sqrMagnitude;
+            float db = (b.transform.position - from).sqrMagnitude;
+            return da.CompareTo(db);
+        });
+    }
+
+    /// <summary>
     /// 시너지 즉발 피해. MonsterBase면 방어 경감을 defenseIgnore(0~1)만큼 우회한다(기본=완전 무시).
     /// 그 외 IDamageable은 일반 TakeDamage(넉백 0).
     /// </summary>

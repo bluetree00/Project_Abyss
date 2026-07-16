@@ -218,32 +218,6 @@ public sealed class MarkExplodeEffect : ItemCombatEffectBase
     public override void OnRoomEnter(ItemEffectContext ctx) => _marks.Clear();
 }
 
-/// <summary>흡수의 자국 / 피의 순환 — 적중마다 흡혈 비율 누적(갭2s 리셋).
-/// value=기본 흡혈비, value2=적중당 증가, value3=증가 상한.</summary>
-public sealed class LifestealStackEffect : ItemCombatEffectBase
-{
-    private const float StreakGap = 2f;
-    private float _bonusP;
-    private float _lastTime = -999f;
-
-    public LifestealStackEffect(ItemEffectSlot s) : base(s) { }
-
-    public override void OnPostDealDamage(ItemEffectContext ctx, DamageReport report)
-    {
-        if (ctx.Player == null || report.DamageDealt <= 0f) return;
-        float now = Time.time;
-        if (now - _lastTime > StreakGap) _bonusP = 0f;
-        _lastTime = now;
-
-        float ratio = _value + Mathf.Min(_bonusP, _value3);
-        _bonusP += _value2;
-
-        int heal = Mathf.Max(1, (int)(report.DamageDealt * ratio));
-        ctx.Player.Heal(heal);
-    }
-
-    public override void OnRoomEnter(ItemEffectContext ctx) => _bonusP = 0f;
-}
 
 /// <summary>끝나지 않는 일격 / 천 번의 칼날 — 확률로 동일 피해 재발동(연쇄). value=확률, value2=재발동마다 확률 감소(T4).</summary>
 public sealed class RepeatChanceEffect : ItemCombatEffectBase

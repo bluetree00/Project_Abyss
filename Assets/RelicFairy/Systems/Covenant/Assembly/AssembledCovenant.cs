@@ -43,6 +43,10 @@ public sealed class AssembledCovenant : CovenantBase
     private bool  _buffActive;
     private float _buffEnd;
 
+    // 보호막 내부 쿨다운 — 매 타격 트리거로 리필되면 소모보다 리필이 빨라 사실상 무적이 되므로 발동 간격을 강제한다.
+    private const float ShieldIcd = 3f;
+    private float _shieldCd;
+
     /// <param name="causePart">"causeId" 또는 "causeId@tier"</param>
     /// <param name="effectPart">"effectId" 또는 "effectId@tier"</param>
     public AssembledCovenant(string causePart, string effectPart)
@@ -72,6 +76,10 @@ public sealed class AssembledCovenant : CovenantBase
         ? _cause.name + "[" + _causeTier.DisplayName() + "] × " + _effect.name + "[" + _effectTier.DisplayName() + "]"
         : CovenantId;
     public override string BasicDescription => _resolved ? _cause.desc + " → " + _effect.desc : string.Empty;
+
+    // 원인/결과를 따로 노출 → HUD가 한 줄로 이어붙이지 않고 줄을 나눠 보여준다.
+    public override string CauseText  => _resolved ? _cause.desc  : null;
+    public override string EffectText => _resolved ? _effect.desc : null;
 
     // ── 원인 트리거 → ApplyEffect ─────────────────────────
     public override void OnAttackHit(GameObject target, float dmg)
@@ -191,8 +199,14 @@ public sealed class AssembledCovenant : CovenantBase
             case EffectKind.DamageBuff:
                 _buffActive = true; _buffEnd = Time.time + _effect.duration;
                 break;
-            case EffectKind.Lifesteal:
-                Ctx.Player?.Heal(Mathf.RoundToInt(Mag * Coef));
+            case EffectKind.Shield:
+                // 상한(MaxHp×30%)만으로는 부족하다 — 매 타격 리필되면 소모 속도를 앞질러 무적이 된다.
+                // 내부 쿨다운으로 발동 간격을 벌려 '가끔 채워지는 완충'으로 묶는다. duration 지정 시 그 값 우선.
+                if (Time.time >= _shieldCd)
+                {
+                    Ctx.Player?.RuntimeStats?.AddShield(Mag * Coef);
+                    _shieldCd = Time.time + (_effect.duration > 0f ? _effect.duration : ShieldIcd);
+                }
                 break;
             case EffectKind.GoldBurst:
                 Ctx.Session?.AddGold(Mathf.RoundToInt(Mag * Coef));

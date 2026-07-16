@@ -9,6 +9,7 @@ public enum ShopCategory
 {
     Item   = 0,
     Weapon = 1,
+    Potion = 2,   // 퀵슬롯 포션(소모품). 랜덤 롤이 아닌 고정 슬롯으로 진열된다.
 }
 
 /// <summary>
@@ -19,6 +20,7 @@ public static class ShopCategoryExtensions
 {
     public const string CategoryItemString   = "item";
     public const string CategoryWeaponString = "weapon";
+    public const string CategoryPotionString = "potion";
 
     /// <summary>enum → 차트 문자열.</summary>
     public static string ToChartString(this ShopCategory cat)
@@ -27,6 +29,7 @@ public static class ShopCategoryExtensions
         {
             case ShopCategory.Item:   return CategoryItemString;
             case ShopCategory.Weapon: return CategoryWeaponString;
+            case ShopCategory.Potion: return CategoryPotionString;
             default:                  return CategoryItemString;
         }
     }
@@ -37,6 +40,8 @@ public static class ShopCategoryExtensions
         if (string.IsNullOrEmpty(raw)) return ShopCategory.Item;
         if (string.Equals(raw, CategoryWeaponString, StringComparison.OrdinalIgnoreCase))
             return ShopCategory.Weapon;
+        if (string.Equals(raw, CategoryPotionString, StringComparison.OrdinalIgnoreCase))
+            return ShopCategory.Potion;
         return ShopCategory.Item;
     }
 }

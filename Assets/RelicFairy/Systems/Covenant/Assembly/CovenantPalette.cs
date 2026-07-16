@@ -44,7 +44,7 @@ public static class CovenantPalette
     {
         ["supernova"] = new EffectDef { id="supernova", name="초신성",   desc="대상 중심 광역 폭발",        tag="공격", kind=EffectKind.AoeBurst,   magnitude=1.5f, radius=3.5f },
         ["fury"]      = new EffectDef { id="fury",      name="격노",     desc="일시적으로 피해가 증폭된다", tag="강화", kind=EffectKind.DamageBuff, magnitude=0.30f, duration=4f },
-        ["bloodmark"] = new EffectDef { id="bloodmark", name="흡혈각인", desc="체력을 회복한다",           tag="생존", kind=EffectKind.Lifesteal,  magnitude=6f },
+        ["bloodmark"] = new EffectDef { id="bloodmark", name="피의 보호막", desc="굳은 피가 보호막이 된다", tag="생존", kind=EffectKind.Shield,     magnitude=12f },
         ["goldrain"]  = new EffectDef { id="goldrain",  name="황금비",   desc="골드가 쏟아진다",           tag="경제", kind=EffectKind.GoldBurst,  magnitude=6f },
         ["curse"]     = new EffectDef { id="curse",     name="저주",     desc="대상이 받는 피해가 증폭된다", tag="상태이상", kind=EffectKind.Curse,   magnitude=0.20f, duration=5f },
         ["execute"]   = new EffectDef { id="execute",   name="처형",     desc="저체력 대상을 즉사시킨다",   tag="공격", kind=EffectKind.Execute,    magnitude=0.15f },

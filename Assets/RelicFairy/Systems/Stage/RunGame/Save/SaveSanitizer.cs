@@ -38,6 +38,8 @@ public static class SaveSanitizer
         d.runEssence      = ClampMin(d.runEssence,      0, ref changed);
         d.fuelEnhanceMaterial = ClampMin(d.fuelEnhanceMaterial, 0, ref changed);
         d.fuelRuneOre         = ClampMin(d.fuelRuneOre,         0, ref changed);
+        d.potionCapacity      = ClampMin(d.potionCapacity, PlayerRunState.DefaultPotionCapacity, ref changed);
+        d.potionCount         = Mathf.Clamp(d.potionCount, 0, d.potionCapacity);
         d.maxHp           = ClampMin(d.maxHp,           MinMaxHp, ref changed);
         // currentHp: [0, maxHp] — 0(사망 상태)도 허용해 정상값을 끌어올리지 않는다.
         d.currentHp       = ClampRange(d.currentHp,     0, d.maxHp, ref changed);
@@ -69,7 +71,6 @@ public static class SaveSanitizer
         // JSON 문자열 필드: 파싱 실패 시에만 빈 값 폴백(크래시 방지). 내용은 강제 수정 안 함.
         d.itemsJson              = SafeJson<ItemListWrapper>(d.itemsJson, ref changed);
         d.stagingItemsJson       = SafeJson<ItemListWrapper>(d.stagingItemsJson, ref changed);
-        d.synergiesJson          = SafeJson<SynergyListWrapper>(d.synergiesJson, ref changed);
         d.roomLogsJson           = SafeJson<RoomClearLogWrapper>(d.roomLogsJson, ref changed);
         d.clearedZoneIndicesJson = SafeJson<IntListWrapper>(d.clearedZoneIndicesJson, ref changed);
         d.covenantsJson          = SafeJson<CovenantListWrapper>(d.covenantsJson, ref changed);

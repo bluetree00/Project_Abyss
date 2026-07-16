@@ -19,15 +19,12 @@ public sealed class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
 
-    private const float WindowW = 1040f;
-    private const float WindowH = 780f;
+    private const float WindowW = 1160f;
+    private const float WindowH = 820f;
 
-    // 카드 배치
-    private const float CardW  = 490f;
-    private const float CardH  = 300f;
-    private const float Card0X = 30f;
-    private const float Card1X = 30f + CardW + 20f;
-    private const float CardY  = -150f;
+    // 단일 집중 레이아웃 — 슬롯0(근접) 큰 집중 카드 + 슬롯1(원거리) 작은 도킹 카드
+    private const float FocusW = 680f, FocusH = 400f, FocusX =  40f, FocusY = -170f;
+    private const float DockW  = 300f, DockH  = 240f, DockX  = -40f, DockY  = -170f;
 
     // ── 연출 노브 (도파민 레이어; 표시층 전용, 결과/데이터 불변) ──
     private const float PunchScale        = 0.14f;  // 성공 카드 스케일 펀치 진폭
@@ -198,60 +195,77 @@ public sealed class UI_CruciblePanel : UI_Popup
 
     private void BuildCards(Transform w)
     {
-        for (int i = 0; i < 2; i++)
-        {
-            int slot = i;
-            var card = ShopUIStyle.MakeFrame(w, $"Card{i}", ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 3f, raycast: true);
-            _cardBg[i] = (Image)card.transform.parent.GetComponent<Image>();
-            var cardRT = (RectTransform)card.transform.parent;
-            _cardBasePos[i] = new Vector2(i == 0 ? Card0X : Card1X, CardY);
-            ShopUIStyle.Anchor(cardRT, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                               _cardBasePos[i], new Vector2(CardW, CardH));
-            var c = card.transform;
+        BuildCard(w, 0, focus: true);   // 근접 — 집중(큼)
+        BuildCard(w, 1, focus: false);  // 원거리 — 도킹(작음)
+    }
 
-            var slotLabel = ShopUIStyle.MakeText(c, "Slot", 16f, FontStyles.Bold,
-                                                 TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-            slotLabel.text = i == 0 ? "슬롯 0 · 근접" : "슬롯 1 · 원거리";
-            ShopUIStyle.Anchor(slotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(20, -14), new Vector2(-40, 26));
+    /// <summary>슬롯 카드 1장. focus=true면 큰 집중 카드(근접), false면 작은 도킹 카드(원거리).</summary>
+    private void BuildCard(Transform w, int i, bool focus)
+    {
+        int slot = i;
+        var card = ShopUIStyle.MakeFrame(w, $"Card{i}", ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 3f, raycast: true);
+        _cardBg[i] = (Image)card.transform.parent.GetComponent<Image>();
+        var cardRT = (RectTransform)card.transform.parent;
 
-            _cardName[i] = ShopUIStyle.MakeText(c, "Name", 24f, FontStyles.Bold,
-                                                TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-            ShopUIStyle.Anchor(_cardName[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(20, -46), new Vector2(-40, 34));
+        Vector2 anchor = focus ? new Vector2(0, 1) : new Vector2(1, 1);
+        Vector2 pos    = focus ? new Vector2(FocusX, FocusY) : new Vector2(DockX, DockY);
+        Vector2 size   = focus ? new Vector2(FocusW, FocusH) : new Vector2(DockW, DockH);
+        _cardBasePos[i] = pos;
+        ShopUIStyle.Anchor(cardRT, anchor, anchor, anchor, pos, size);
+        var c = card.transform;
 
-            _cardLevel[i] = ShopUIStyle.MakeText(c, "Level", 44f, FontStyles.Bold,
-                                                 TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-            ShopUIStyle.Anchor(_cardLevel[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(20, -88), new Vector2(-40, 56));
+        // 내부 수치 — 집중(큼) vs 도킹(작음)
+        float pad      = focus ? 24f : 14f;
+        float nameSize = focus ? 28f : 18f;
+        float lvlSize  = focus ? 52f : 30f;
+        float atkSize  = focus ? 22f : 15f;
+        float nameY    = focus ? -54f : -36f;
+        float lvlY     = focus ? -110f : -70f;
+        float gaugeY   = focus ? -196f : -122f;
+        float gaugeH   = focus ? 28f : 16f;
+        float atkY     = focus ? -238f : -146f;
 
-            // 강화 게이지 바 (레벨/최대 채움) — "강화하는 느낌"
-            var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
-            ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(20, -160), new Vector2(-40, 24));
-            var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
-            var fr = fill.rectTransform;
-            fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
-            fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
-            _cardGaugeFill[i] = fr;
+        var slotLabel = ShopUIStyle.MakeText(c, "Slot", focus ? 16f : 13f, FontStyles.Bold,
+                                             TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
+        slotLabel.text = focus ? "근접 · 집중 강화" : "원거리";
+        ShopUIStyle.Anchor(slotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -12), new Vector2(-pad * 2, 24));
 
-            _cardAtk[i] = ShopUIStyle.MakeText(c, "Atk", 20f, FontStyles.Bold,
-                                               TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-            ShopUIStyle.Anchor(_cardAtk[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                               new Vector2(20, -196), new Vector2(-40, 32));
+        _cardName[i] = ShopUIStyle.MakeText(c, "Name", nameSize, FontStyles.Bold,
+                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(_cardName[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, nameY), new Vector2(-pad * 2, nameSize + 10));
 
-            // 대상 선택 (카드 전체 버튼)
-            var selBtn = card.transform.parent.gameObject.AddComponent<Button>();
-            selBtn.transition = Selectable.Transition.None;
-            selBtn.onClick.AddListener(() => { if (_animating) return; _targetSlot = slot; UpdateTargetDialogue(); RefreshAll(); });
-        }
+        _cardLevel[i] = ShopUIStyle.MakeText(c, "Level", lvlSize, FontStyles.Bold,
+                                             TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_cardLevel[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, lvlY), new Vector2(-pad * 2, lvlSize + 12));
+
+        var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
+        ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, gaugeY), new Vector2(-pad * 2, gaugeH));
+        var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
+        var fr = fill.rectTransform;
+        fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
+        fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
+        _cardGaugeFill[i] = fr;
+
+        _cardAtk[i] = ShopUIStyle.MakeText(c, "Atk", atkSize, FontStyles.Bold,
+                                           TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(_cardAtk[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, atkY), new Vector2(-pad * 2, atkSize + 12));
+
+        // 대상 선택 (카드 전체 버튼)
+        var selBtn = card.transform.parent.gameObject.AddComponent<Button>();
+        selBtn.transition = Selectable.Transition.None;
+        selBtn.onClick.AddListener(() => { if (_animating) return; _targetSlot = slot; UpdateTargetDialogue(); RefreshAll(); });
     }
 
     private void BuildInfo(Transform w)
     {
         var panel = ShopUIStyle.MakeImage(w, "Info", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(panel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -470), new Vector2(-60, 140));
+                           new Vector2(0, -592), new Vector2(-60, 140));
         var p = panel.transform;
 
         _successText = ShopUIStyle.MakeText(p, "Success", 22f, FontStyles.Bold,

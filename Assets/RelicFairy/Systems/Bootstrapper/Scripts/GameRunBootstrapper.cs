@@ -95,6 +95,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
              "TileType(ShopStallWeapon/ShopStallItem)에 따라 ShopStallInteraction.category를 자동 설정.")]
     [SerializeField] private GameObject blockShopStallPrefab;
 
+    [Tooltip("절차 방 출구 게이트 포탈 VFX 프리팹. RunFlowController(런타임 생성)가 이 참조를 읽어 게이트에 배치.")]
+    [SerializeField] private GameObject gatePortalPrefab;
+    public GameObject GatePortalPrefab => gatePortalPrefab;
+
+    [Tooltip("입구 봉인 석문 프리팹(Gothic 석재). RunFlowController가 입구를 막을 때 낙하시켜 봉인. 비우면 색 패널.")]
+    [SerializeField] private GameObject gateSealDoorPrefab;
+    public GameObject GateSealDoorPrefab => gateSealDoorPrefab;
+
     [Tooltip("상점 등급별 기본가 SO. ShopDataManager 초기화에 사용. " +
              "비어있으면 ResolvePrice는 price_override만 적용 + 기본가 0 폴백.")]
     [SerializeField] private ShopPriceTableSO shopPriceTable;
@@ -988,6 +996,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (palette == null)
             palette = PickBlockPalette(!string.IsNullOrEmpty(entry.theme) ? entry.theme : string.Empty);
 
+        // 유효 벽 높이 — 팔레트가 수직 프로필을 소유하면 그 값, 없으면 부트스트래퍼 전역 폴백.
+        // 벽 배치 방식(Stacked/Single)·천장 유무는 MapBuilder가 palette에서 직접 읽는다.
+        int effWallLayers = palette != null && palette.WallHeight > 0 ? palette.WallHeight : wallLayers;
+
         // 3. 파싱 (스포너 + 문)
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
         var doorInfos  = new System.Collections.Generic.Dictionary<Vector2Int, DoorInfo>();
@@ -1070,11 +1082,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
         {
             MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
-            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, effWallLayers);
             await UniTask.Yield(ct);
-            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize);
             await UniTask.Yield(ct);
-            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers, palette.Lighting);
             await UniTask.Yield(ct);
 
             // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
@@ -1089,7 +1101,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
-                        procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+                        procDoorCorridorLength, blockCellSize, blockBaseY, effWallLayers));
                 }
                 if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
                 if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
@@ -1149,7 +1161,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 : ResolvePlayerSpawnFromGrid(grid, anchor, w, h)),
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
-        float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
+        float openingH = effWallLayers * blockCellSize; // 개구부 높이 = 벽 높이
 
         // 커스텀 아레나에 Exit 마커가 있으면 그리드 DR 대신 사용 — 출구 게이트가 항상 프리팹 바닥 위에 배치된다.
         // (그리드는 프리팹 footprint보다 커서 DR 셀이 바닥 밖에 떨어지는 문제 회피. 입구 잠금은 생략 — 프리팹이 경계를 소유.)
@@ -2571,10 +2583,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 점유 셀이 룬 시너지의 단일 진실원본. 레코드 기반 중복 적용을 제거한 뒤
         // 점유 재주입으로 스탯+메커닉을 한 번만 재계산한다.
-        var stats = _run?.Player?.RuntimeStats;
-        stats?.RestoreSynergies(null);                  // 시너지 스탯 초기화 (멱등)
-        _run?.ClearAppliedSynergies();                  // 세션 시너지 이력 초기화
-        MerlinRuneBridge.Instance?.ClearAppliedGrids(); // 브릿지 적용 가드 초기화
+        MerlinRuneBridge.Instance?.ResetSynergyState(); // 브릿지 적용 가드 초기화(중복 적용 방지)
 
         // Shape 재구성(재편집 가능 상태) — 실패해도 점유 기반 복원으로 폴백(시너지 무영향)
         try

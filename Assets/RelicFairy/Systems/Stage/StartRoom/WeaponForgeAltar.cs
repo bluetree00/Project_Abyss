@@ -1,13 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 시작방 무기 모루. 범위 진입 후 [F]를 누르면 선택 팝업이 떠서
-/// 근거리(대검/카타나) 1종 + 원거리(보우/석궁) 1종을 고르고 확정한다.
-/// 확정 시 두 무기를 동시에 장착(근거리=슬롯0 활성, 원거리=슬롯1)하고 모루를 소비한다.
+/// 시작방 무기대. [F] → <b>보조 원거리</b> 선택 팝업.
+///
+/// 기획 피벗: 주무기는 무형검(무명)이 <b>기본 지급</b>이라 여기서 근접을 고르지 않는다.
+/// 곁에 둘 원거리만 고른다(활=선택, 석궁=특전 잠금). 확정 시 무형검=슬롯0, 원거리=슬롯1로 장착.
 /// (RelicAltar 상호작용 패턴 기반)
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -16,11 +18,13 @@ public class WeaponForgeAltar : MonoBehaviour
     private const float PromptOffsetY = 1.8f;
     private const float TextHeight = 1.4f;
 
-    [Header("근거리 옵션 (대검 / 카타나)")]
-    [SerializeField] private MainWeaponSO[] meleeOptions = new MainWeaponSO[2];
+    [Header("주무기 — 무형검(기본 지급)")]
+    [SerializeField] private MainWeaponSO namelessWeapon;
 
-    [Header("원거리 옵션 (보우 / 석궁)")]
-    [SerializeField] private MainWeaponSO[] rangedOptions = new MainWeaponSO[2];
+    [Header("원거리 옵션")]
+    [SerializeField] private MainWeaponSO bowOption;
+    [Tooltip("석궁 — 특전 무기. 팝업에 잠금 상태로만 노출(선택 불가).")]
+    [SerializeField] private MainWeaponSO crossbowOption;
 
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
@@ -92,29 +96,35 @@ public class WeaponForgeAltar : MonoBehaviour
 
         try
         {
-            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_WeaponForgePopup>();
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RangedForgePopup>();
             if (popup == null)
             {
-                Debug.LogWarning("[WeaponForgeAltar] UI_WeaponForgePopup 로드 실패.");
+                Debug.LogWarning("[WeaponForgeAltar] UI_RangedForgePopup 로드 실패.");
                 _busy = false;
                 return;
             }
 
-            popup.Setup(meleeOptions, rangedOptions);
-            var choice = await popup.WaitForChoiceAsync().AttachExternalCancellation(ct);
+            var entries = new List<UI_RangedForgePopup.Entry>(2);
+            if (bowOption != null)
+                entries.Add(new UI_RangedForgePopup.Entry { Weapon = bowOption });
+            if (crossbowOption != null)
+                entries.Add(new UI_RangedForgePopup.Entry { Weapon = crossbowOption, Locked = true, LockReason = "특전 해금" });
 
-            if (!choice.HasValue || choice.Value.Melee == null || choice.Value.Ranged == null)
+            popup.Setup(entries);
+            var ranged = await popup.WaitForChoiceAsync().AttachExternalCancellation(ct);
+
+            if (ranged == null)
             {
-                // 취소: 모루 유지, 재상호작용 허용
+                // 취소: 무기대 유지, 재상호작용 허용
                 _busy = false;
                 if (_player != null) ShowPrompt(true);
                 return;
             }
 
             _claimed = true;
-            await EquipChoiceAsync(loadout, choice.Value, ct);
+            await EquipChoiceAsync(loadout, ranged, ct);
 
-            Debug.Log($"[WeaponForgeAltar] 장비 확정: 근접={choice.Value.Melee.displayName}, 원거리={choice.Value.Ranged.displayName}");
+            Debug.Log($"[WeaponForgeAltar] 장비 확정: 무형검 + 원거리={ranged.displayName}");
             DissolveEffect.PlayDisappear(gameObject, 0.5f, () => { if (this != null) Destroy(gameObject); });
         }
         catch (OperationCanceledException)
@@ -128,23 +138,25 @@ public class WeaponForgeAltar : MonoBehaviour
         }
     }
 
-    private async UniTask EquipChoiceAsync(PlayerLoadout loadout, UI_WeaponForgePopup.ForgeChoice choice, CancellationToken ct)
+    private async UniTask EquipChoiceAsync(PlayerLoadout loadout, WeaponSO ranged, CancellationToken ct)
     {
-        loadout.SetWeaponSlot0(choice.Melee);
-        loadout.SetWeaponSlot1(choice.Ranged);
+        // 주무기 = 무형검(기본 지급), 보조 = 고른 원거리.
+        loadout.SetWeaponSlot0(namelessWeapon);
+        loadout.SetWeaponSlot1(ranged);
 
         // 퀘스트: 장비 선택 보고 (범용 채널)
-        QuestEvents.Report("Equip", choice.Melee != null ? choice.Melee.name : "Weapon");
+        QuestEvents.Report("Equip", ranged != null ? ranged.name : "Weapon");
 
         var player = _player;
         if (player == null) return;
 
-        // 근접 → 슬롯0, 원거리 → 슬롯1 순서 장착 (둘 다 빈 슬롯 가정)
-        await GameRunBootstrapper.EquipWeaponToPlayerAsync(choice.Melee, player);
-        await GameRunBootstrapper.EquipWeaponToPlayerAsync(choice.Ranged, player);
+        // 무형검 → 슬롯0, 원거리 → 슬롯1 순서 장착 (둘 다 빈 슬롯 가정)
+        if (namelessWeapon != null)
+            await GameRunBootstrapper.EquipWeaponToPlayerAsync(namelessWeapon, player);
+        await GameRunBootstrapper.EquipWeaponToPlayerAsync(ranged, player);
         ct.ThrowIfCancellationRequested();
 
-        // 마지막 장착(원거리)이 활성화되므로 근접(슬롯0)으로 되돌려 시작
+        // 마지막 장착(원거리)이 활성화되므로 무형검(슬롯0)으로 되돌려 시작
         if (player.WeaponManager != null)
             await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
 
@@ -169,7 +181,7 @@ public class WeaponForgeAltar : MonoBehaviour
 
         _worldText = go.AddComponent<TextMeshPro>();
         if (worldTextFont != null) _worldText.font = worldTextFont;
-        _worldText.text = "무기 모루";
+        _worldText.text = "무기대";
         _worldText.fontSize = textSize;
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.85f, 0.85f, 0.95f);
@@ -194,7 +206,7 @@ public class WeaponForgeAltar : MonoBehaviour
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.sortingOrder = 11;
         TMPOutlineHelper.ApplyDefault(tmp);
-        tmp.text = "<color=#FFD700>[F]</color> 무기 제작";
+        tmp.text = "<color=#FFD700>[F]</color> 보조 무기";
 
         _promptGo.SetActive(false);
     }

@@ -53,7 +53,7 @@ public readonly struct CovenantAssemblePreview
         {
             EffectKind.DamageBuff => $"피해 +{amt * 100f:0}% · {duration:0}초",
             EffectKind.AoeBurst   => $"광역 피해 ×{amt:0.0} · 반경 {radius:0.0}",
-            EffectKind.Lifesteal  => $"회복 {amt:0}",
+            EffectKind.Shield     => $"보호막 {amt:0}",
             EffectKind.GoldBurst  => $"골드 +{amt:0}",
             EffectKind.Curse      => $"받는 피해 +{amt * 100f:0}% · {duration:0}초",
             EffectKind.Execute    => $"체력 {magnitude * 100f:0}% 이하 즉사",

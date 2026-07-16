@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.VFX;
+using INab.CommonVFX;
 
 /// <summary>
 /// 유물 상태 피드백 VFX 관리자(활성/비활성 토글 구조). 플레이어에 부착.
@@ -30,6 +32,7 @@ public sealed class RelicStateVfx : MonoBehaviour
         if (_instances.TryGetValue(stateKey, out var go) && go != null)
         {
             if (go.activeSelf != on) go.SetActive(on);
+            ApplyPlayState(go, on);
             return;
         }
         if (on) EnsureAsync(stateKey).Forget();
@@ -57,8 +60,46 @@ public sealed class RelicStateVfx : MonoBehaviour
 
         if (this == null) { if (go != null) Destroy(go); return; }
         if (go == null) return;
+
+        BindToHost(go);
         _instances[stateKey] = go;
-        go.SetActive(_desired.TryGetValue(stateKey, out var d) && d); // 로드 중 토글 반영
+
+        bool on = _desired.TryGetValue(stateKey, out var d) && d;
+        go.SetActive(on);          // 로드 중 토글 반영
+        ApplyPlayState(go, on);
+    }
+
+    /// <summary>
+    /// VFX Graph 오라를 실제로 재생/정지시킨다.
+    ///
+    /// INab Character Effects는 <b>초기 이벤트가 비어 있게(m_InitialEventName 공란) 저작</b>돼 있다
+    /// — 즉 GameObject를 켜는 것만으로는 입자가 한 톨도 안 나오고, 스크립트가 Play()를 불러줘야 한다.
+    /// (에셋은 멀쩡한데 "아무것도 안 보이는" 상태의 원인.)
+    /// ParticleSystem 기반 이펙트에는 VisualEffect가 없으므로 이 호출은 그냥 지나간다.
+    /// </summary>
+    private static void ApplyPlayState(GameObject go, bool on)
+    {
+        var vfx = go.GetComponentsInChildren<VisualEffect>(true);
+        for (int i = 0; i < vfx.Length; i++)
+        {
+            if (on) vfx[i].Play();
+            else    vfx[i].Stop();
+        }
+    }
+
+    /// <summary>
+    /// VFX Graph 기반 오라(INab Character Effects 등)를 <b>몸에 감기게</b> 만든다.
+    ///
+    /// 이들 이펙트는 캐릭터를 감싸는 볼륨을 VFXLossyTransformBinder로 그래프에 먹인다.
+    /// 그런데 프리팹의 Target은 비어 있고(런타임에만 알 수 있으므로 저작 불가),
+    /// Target이 null이면 IsValid가 false라 바인딩이 아예 안 돌아 이펙트가 월드 원점에 뜬다
+    /// — "붙긴 붙었는데 몸에 안 감기는" 상태의 원인. 여기서 호스트(플레이어)를 물려준다.
+    /// </summary>
+    private void BindToHost(GameObject go)
+    {
+        var binders = go.GetComponentsInChildren<VFXLossyTransformBinder>(true);
+        for (int i = 0; i < binders.Length; i++)
+            if (binders[i].Target == null) binders[i].Target = transform;
     }
 
     private static async UniTaskVoid PlayOneShotAsync(string key, Vector3 pos, float scale, Vector3 forward)

@@ -3741,6 +3741,9 @@ MonoBehaviour:
     type: 3}
   relicGaugeReadySprite: {fileID: 21300000, guid: 0f40a310ec05db64fbe9d7811b7548b1,
     type: 3}
+  sunOpenSprite: {fileID: 21300000, guid: f202b91823827d94780fc6ff7231b9e3, type: 3}
+  sunClosedSprite: {fileID: 21300000, guid: 5a40b306be0f5d54da9128f9479982e6, type: 3}
+  sunGaugeSprite: {fileID: 21300000, guid: 347c07156f24e224a81d845e75d54f6c, type: 3}
   buffFrameSprite: {fileID: 21300000, guid: b5c1e01b8191e0443819e982ffd2fa81, type: 3}
   buffInnerSprite: {fileID: 21300000, guid: e17375d4fb5372f448f076c48faeb28b, type: 3}
   buffIconSpeed: {fileID: 21300000, guid: 317ace83867279d42a986801d9b90669, type: 3}

@@ -15,9 +15,9 @@ public readonly struct CovenantDraftCard
 /// </summary>
 public static class CovenantAssembleService
 {
-    // 티어 드래프트 확률(실버 60 / 골드 30 / 프리즘 10). 밸런스 시작점.
+    // 티어 드래프트 확률(실버 60 / 골드 30 / 루비 10). 밸런스 시작점.
     private const double GoldCut  = 0.60;
-    private const double PrismCut = 0.90;
+    private const double RubyCut = 0.90;
 
     public static List<CovenantDraftCard> DraftCauses(int count, System.Random rng, bool forceSilver)
         => DraftCards(CovenantPalette.CauseIds, count, rng, forceSilver);
@@ -40,8 +40,8 @@ public static class CovenantAssembleService
         if (forceSilver) return CovenantTier.Silver;
         double r = rng != null ? rng.NextDouble() : UnityEngine.Random.value;
         if (r < GoldCut)  return CovenantTier.Silver;
-        if (r < PrismCut) return CovenantTier.Gold;
-        return CovenantTier.Prism;
+        if (r < RubyCut) return CovenantTier.Gold;
+        return CovenantTier.Ruby;
     }
 
     // ── 내부 ─────────────────────────────────────────────

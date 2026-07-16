@@ -100,7 +100,6 @@ public static class ItemEffectRegistry
         Register("FirstHitBonus",              s => new FirstHitBonusEffect(s));
 
         // ── OnHit: 공격 적중 ────────────────────────────────
-        Register("Lifesteal",                  s => new LifestealEffect(s));
         Register("PoisonOnHit",                s => new PoisonOnHitEffect(s));
         Register("Freeze",                     s => new FreezeEffect(s));
         Register("ExtraAttack",                s => new ExtraAttackEffect(s));
@@ -161,7 +160,6 @@ public static class ItemEffectRegistry
         Register("SplitStrike",                s => new SplitStrikeEffect(s));
         Register("EchoArrow",                  s => new EchoArrowEffect(s));
         Register("MarkExplode",                s => new MarkExplodeEffect(s));
-        Register("LifestealStack",             s => new LifestealStackEffect(s));
         Register("RepeatChance",               s => new RepeatChanceEffect(s));
         Register("CritMomentum",               s => new CritMomentumEffect(s));
         Register("BrandChain",                 s => new BrandChainEffect(s));

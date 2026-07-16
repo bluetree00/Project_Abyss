@@ -73,8 +73,8 @@ public class LocoDodgeState : ILayerState<LocoState>
         _iframeApplied = false;
         _iframeOpen = false;
 
-        // 저스트 회피 판정 창 오픈 — 이 창 안에 공격이 스치면 슬로모 + 이동 보너스로 보상.
-        _controller.ArmPerfectDodge(data.perfectDodgeWindow);
+        // 저스트 회피 장전 — 대시 중(무적 구간)에 공격을 맞으면 슬로모 + 이동 보너스로 보상. 회피당 1회.
+        _controller.ArmPerfectDodge();
 
         _controller.Anim.CrossFade("Dodge", 0.05f);
         _controller.SetMoveScale(0f);
