@@ -425,13 +425,13 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
         bool any = false;
 
-        // 현재 cluster 크기 기반으로 활성 시너지만 표시 (제거 시 실시간 반영)
-        var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
-        if (clusterSizes != null && Managers.RuneData != null)
+        // 현재 count 크기 기반으로 활성 시너지만 표시 (제거 시 실시간 반영)
+        var zoneCounts = MerlinRuneBridge.Instance?.GetZoneOccupiedCounts();
+        if (zoneCounts != null && Managers.RuneData != null)
         {
             foreach (var zoneId in ElementDef.Order)
             {
-                if (!clusterSizes.TryGetValue(zoneId, out int cluster) || cluster <= 0) continue;
+                if (!zoneCounts.TryGetValue(zoneId, out int count) || count <= 0) continue;
 
                 var entries = Managers.RuneData.GetZoneSynergies(zoneId);
                 if (entries == null) continue;
@@ -441,7 +441,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
 
                 foreach (var e in sorted)
                 {
-                    if (cluster < e.threshold) break;
+                    if (count < e.threshold) break;
                     Color accent = GetZoneAccent(zoneId);
                     string badge = e.trigger switch
                     {

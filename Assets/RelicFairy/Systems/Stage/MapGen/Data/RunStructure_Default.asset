@@ -12,30 +12,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d50b93cfbd4465e40bcf2b1be9909901, type: 3}
   m_Name: RunStructure_Default
   m_EditorClassIdentifier: Assembly-CSharp::RunStructureConfig
-  _bossThreshold: 4
+  _bossThreshold: 10
   _preBossRoomKey:
-  _bossRoomKey: 
+  _bossRoomKey:
   _shopMaxPerChapter: 2
   _shopChance: 0.25
   _eventMaxPerChapter: 2
   _eventChance: 0.2
-  _eliteChance: 0.15
+  _eliteChance: 0.18
   _difficultyByVisit:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0.4
+      value: 0.5
       inSlope: 0
-      outSlope: 0.11666666
+      outSlope: 0.13
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 12
+      time: 10
       value: 1.8
-      inSlope: 0.11666666
+      inSlope: 0.13
       outSlope: 0
       tangentMode: 0
       weightedMode: 0
@@ -45,9 +45,11 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   _milestones:
-  - visitIndex: 3
+  - visitIndex: 4
     kind: 2
   - visitIndex: 5
     kind: 3
   - visitIndex: 7
+    kind: 6
+  - visitIndex: 9
     kind: 1

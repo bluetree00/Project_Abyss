@@ -63,6 +63,11 @@ public class StartRoomGate : MonoBehaviour
     private TextMeshProUGUI _distanceText;
     private bool            _flashActive;
 
+    // 봉인 석문(Gothic) — 스타트 방 모드에서 준비되면 위로 올라가며 열림. 절차 방 게이트와 일관.
+    private Transform       _sealDoor;
+    private const float     SealDoorMeshW = 7f;
+    private const float     SealDoorMeshH = 11.5f;
+
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
@@ -112,10 +117,16 @@ public class StartRoomGate : MonoBehaviour
             return;
         }
 
+        EnsureSealDoor();          // 석문 보장(최초 1회, 항상 닫힘으로 시작)
+
         bool ready = IsLoadoutReady();
         if (ready == _gateOpen) return;
         _gateOpen = ready;
         if (portalActive != null) portalActive.SetActive(ready);
+
+        // 준비 완료 → 석문이 위로 올라가며 열림(먼지·사운드). 미준비 → 닫힘.
+        if (ready) OpenSealDoorAsync().Forget();
+        else       SetSealDoorClosed();
     }
 
     private void OnDestroy()
@@ -143,6 +154,70 @@ public class StartRoomGate : MonoBehaviour
         bc.isTrigger = true;
         bc.size      = new Vector3(_gateWidth, _gateHeight, TriggerDepth);
         bc.center    = new Vector3(0f, _gateHeight * 0.5f, 0f);
+    }
+
+    // ── 봉인 석문 (스타트 방 모드) ──────────────────────────────────
+    private Vector3 SealDoorClosedPos => new Vector3(-_gateWidth * 0.5f, 0f, -0.25f); // 개구부 덮음(코너 피벗 중앙정렬)
+
+    private void EnsureSealDoor()
+    {
+        if (_sealDoor != null) return;
+        var prefab = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDoorPrefab : null;
+        if (prefab == null) return;
+        var door = Instantiate(prefab, transform);
+        door.name = "StartSealDoor";
+        door.transform.localRotation = Quaternion.identity;
+        door.transform.localScale    = new Vector3(_gateWidth / SealDoorMeshW, _gateHeight / SealDoorMeshH, 1f);
+        door.transform.localPosition = SealDoorClosedPos; // 닫힘으로 시작
+        SetSealDoorLayer(door, 8);
+        foreach (var col in door.GetComponentsInChildren<Collider>()) Destroy(col); // 콜라이더 불필요(게이트가 차단) — 비용 절감
+        _sealDoor = door.transform;
+
+        // 석문이 시각을 담당하므로 레거시 포탈 비주얼(portalActive)은 렌더러를 꺼서 제거.
+        // (준비 토글 로직은 유지되나 화면엔 안 보임 → 열리면 문 뒤로 개구부/맵이 드러남)
+        if (portalActive != null)
+            foreach (var r in portalActive.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
+    }
+
+    private void SetSealDoorClosed()
+    {
+        if (_sealDoor != null) _sealDoor.localPosition = SealDoorClosedPos;
+    }
+
+    private async UniTaskVoid OpenSealDoorAsync()
+    {
+        if (_sealDoor == null) return;
+        Vector3 closed = SealDoorClosedPos;
+        Vector3 open   = closed + Vector3.up * _gateHeight;
+
+        // 열림 임팩트 — 먼지 + 문 열림 사운드
+        var dust = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDustVfx : null;
+        if (dust != null) { var fx = Instantiate(dust, transform.position, Quaternion.identity); Destroy(fx, 3f); }
+        Managers.Sound?.PlayEvent(SoundEvent.DoorOpen);
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        float dur = 0.6f, t = 0f;
+        try
+        {
+            while (t < dur)
+            {
+                if (_sealDoor == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / dur);
+                float e = 1f - (1f - k) * (1f - k); // ease-out
+                _sealDoor.localPosition = Vector3.Lerp(closed, open, e);
+                await UniTask.Yield();
+            }
+            _sealDoor.localPosition = open;
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    private static void SetSealDoorLayer(GameObject go, int layer)
+    {
+        go.layer = layer;
+        foreach (Transform c in go.transform) SetSealDoorLayer(c.gameObject, layer);
     }
 
     private void ResizeGate()
@@ -250,7 +325,7 @@ public class StartRoomGate : MonoBehaviour
         if (_worldIndicatorGO != null) _worldIndicatorGO.SetActive(false);
         SetGatePassable();
 
-        // 스타트 방 게이트: 서약 선택 UI 동안 플레이어 이동 고정
+        // 스타트 방 게이트: 챕터 진입 연출/로딩 동안 플레이어 이동 고정
         if (_fromZoneIndex == -1)
         {
             // 퀘스트: 게이트로 챕터 입장 보고 (target='*')
@@ -326,16 +401,8 @@ public class StartRoomGate : MonoBehaviour
     {
         var bootstrapper = GameRunBootstrapper.Instance;
 
-        // [서약 픽업화] 게이트 선택 팝업 분리 — 베이스캠프에서 예약(PlayerLoadout)한 서약을 여기서 적용.
-        // 이 시점 플레이어는 이미 스폰·BindPlayer 완료(CovenantHandler.Initialize 후)라 TryAdd가 정상 동작.
-        // (ShowCovenantChoiceAsync는 이벤트방/후속 재사용 위해 메서드는 보존하되 미호출)
-        var run     = bootstrapper?.Run;
-        var loadout = AppBootstrapper.Instance?.Loadout;
-        if (run?.CovenantHandler != null && loadout != null)
-        {
-            foreach (var id in loadout.ReservedCovenants)
-                run.CovenantHandler.TryAdd(id);
-        }
+        // [서약 폐기] 사전제작 서약 예약(PlayerLoadout.ReservedCovenants) 적용을 폐기.
+        // 서약 획득은 챕터 시작 대기방의 조립 서약 제단(WorldCovenantAltar)으로 일원화됨.
 
         // 플레이어 이동 복구
         UnfreezePlayer();
@@ -345,53 +412,6 @@ public class StartRoomGate : MonoBehaviour
             await bootstrapper.StartProcGenRunAsync();
 
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
-    }
-
-    private static readonly object _covenantPauseOwner = new object();   // TimeScaleArbiter 요청 키
-
-    private static async UniTask ShowCovenantChoiceAsync(GameRunSession run, System.Threading.CancellationToken ct)
-    {
-        if (run?.CovenantHandler == null) return;
-        if (run.CovenantHandler.Covenants.Count > 0) return;
-
-        var ids = WorldCovenantPickup.PickRandomOptions(run.CovenantHandler, 3);
-        var covenants = new List<CovenantBase>(ids.Length);
-        foreach (var id in ids)
-        {
-            var c = CovenantFactory.Create(id);
-            if (c != null) covenants.Add(c);
-        }
-        if (covenants.Count == 0) return;
-
-        UI_CovenantChoice popup;
-        try
-        {
-            popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_CovenantChoice>();
-        }
-        catch (System.OperationCanceledException) { return; }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[StartRoomGate] 서약 선택 팝업 로드 실패: {e.Message}");
-            return;
-        }
-
-        if (popup == null) return;
-
-        popup.Setup(covenants.ToArray());
-
-        // 선택 UI가 열린 동안 게임 시간 정지 (플레이어 낙하·몬스터 이동 차단)
-        TimeScaleArbiter.Acquire(_covenantPauseOwner, 0f, TimeScaleArbiter.Priority.Pause);
-        int chosen;
-        try { chosen = await popup.WaitForChoiceAsync(); }
-        catch (System.OperationCanceledException) { TimeScaleArbiter.Release(_covenantPauseOwner); return; }
-        finally { TimeScaleArbiter.Release(_covenantPauseOwner); }
-
-        if (chosen >= 0 && chosen < covenants.Count)
-        {
-            string selectedId = covenants[chosen].CovenantId;
-            run.CovenantHandler.TryAdd(selectedId);
-            Debug.Log($"[StartRoomGate] 서약 획득: {selectedId}");
-        }
     }
 
     // ── Player freeze helpers ─────────────────────────────────────

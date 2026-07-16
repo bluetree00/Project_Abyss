@@ -14,7 +14,14 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     private float       _dps;
     private float       _tickInterval;
     private float       _remaining;
+    private float       _total;        // 게이지 비율용(부여된 최대 지속)
     private float       _tickAccum;
+
+    // ── Properties ────────────────────────────────────────────
+    /// <summary>남은 화상 시간(초). 디버프 UI가 읽는다.</summary>
+    public float Remaining => Mathf.Max(0f, _remaining);
+    /// <summary>남은 비율(0~1). 게이지용.</summary>
+    public float Remaining01 => _total > 0f ? Mathf.Clamp01(_remaining / _total) : 0f;
 
     // ── Public API ────────────────────────────────────────────
     /// <summary>대상 GameObject 에 화상을 적용한다. 컴포넌트가 없으면 추가, 있으면 갱신.</summary>
@@ -30,6 +37,23 @@ public sealed class MonsterBurnHandler : MonoBehaviour
             h = target.AddComponent<MonsterBurnHandler>();
 
         h.Configure(dmg, instigator, dps, tickInterval, duration);
+    }
+
+    /// <summary>대상의 화상을 즉시 폭발(잔여 총량을 1회 피해로) — 가웨인 정오 즉발.</summary>
+    public static void DetonateOn(GameObject target)
+    {
+        if (target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)) h.Detonate();
+    }
+
+    /// <summary>남은 화상 총량(dps × 잔여시간)을 즉시 피해로 가하고 소멸.</summary>
+    public void Detonate()
+    {
+        if (_target != null)
+        {
+            float burst = _dps * Mathf.Max(0f, _remaining);
+            if (burst > 0f) _target.TakeDamage(burst, _instigator);
+        }
+        Destroy(this);
     }
 
     // ── Lifecycle ─────────────────────────────────────────────
@@ -60,5 +84,6 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         _tickInterval = tickInterval;
         _dps          = Mathf.Max(_dps, dps);    // 더 강한 DPS 유지
         _remaining    = Mathf.Max(_remaining, duration); // 더 긴 지속시간 유지
+        _total        = Mathf.Max(_total, _remaining);   // 게이지 기준(부여 직후 = 100%)
     }
 }

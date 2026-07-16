@@ -87,18 +87,23 @@ public class ActAttackChargeState : ILayerState<ActState>
         var wd = _controller.WeaponManager?.CurrentWeaponData;
         float holdThreshold = wd != null ? wd.holdThreshold : 1.2f;
 
+        // 최대 차지 도달 → 자동 발동(풀 차지)
         if (_elapsed >= holdThreshold)
         {
-            _controller.CurrentAttackTypeForEffect = WeaponActionType.GroundHeavy;
-            _controller.ClearPendingAttack();
-            _controller.InputBuffer.TryConsume(Command.Heavy);
-            FireExit(ActState.HeavyAttack);
+            LaunchCharged(1f);
             return;
         }
 
-        var pending = _controller.PendingAttackCommand;
-        if (pending == Command.None) return;
+        // 버튼 릴리즈(PendingAttack) → 그 시점 차지량으로 발동
+        if (_controller.PendingAttackCommand == Command.None) return;
 
+        LaunchCharged(Mathf.Clamp01(_elapsed / Mathf.Max(0.01f, holdThreshold)));
+    }
+
+    // 차지레벨을 기록하고 강공격으로 전이. 원형 AoE 반경은 WeaponEffectHandler가 이 값으로 스케일한다.
+    private void LaunchCharged(float chargeLevel01)
+    {
+        _controller.HeavyChargeLevel01 = chargeLevel01;
         _controller.CurrentAttackTypeForEffect = WeaponActionType.GroundHeavy;
         _controller.ClearPendingAttack();
         _controller.InputBuffer.TryConsume(Command.Light);

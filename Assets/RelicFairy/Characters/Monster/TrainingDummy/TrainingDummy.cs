@@ -21,8 +21,26 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
     [SerializeField] private string displayName    = "허수아비";
     [SerializeField] private float  hpBarHeadOffset = 0.3f;
 
+    [Header("등급")]
+    // 유물/아이템 중엔 '상대의 격'으로 보상이 갈리는 것들이 있다(랜슬롯 광기 수급 등).
+    // 더미가 항상 Common이면 보스 상대 수급을 여기서 검증할 수 없다 → 등급을 지정 가능하게 둔다.
+    [Tooltip("이 더미를 어떤 격의 상대로 취급할지. 광기 스택 등 등급 기반 효과가 이 값을 읽는다.")]
+    [SerializeField] private MonsterGrade grade = MonsterGrade.Common;
+
     [Header("Hit Animation")]
     [SerializeField] private Animator animator;
+    // 컨트롤러마다 피격 표현 방식이 다르다.
+    //  · 허수아비(DummyAnimator) : "Hit" Trigger 파라미터 보유 → SetTrigger
+    //  · 몬스터(예: Skeleton)    : 파라미터가 아예 없고 상태 이름을 직접 재생 → CrossFade
+    // 둘 다 지원해야 아무 몬스터나 더미로 세울 수 있다.
+    [Tooltip("이 이름의 Trigger 파라미터가 Animator에 있으면 그걸 쓴다.")]
+    [SerializeField] private string hitTrigger = "Hit";
+    [Tooltip("Trigger가 없는 컨트롤러용 — 피격 시 직접 재생할 상태 이름(예: GetHit). 비우면 피격 모션 없음.")]
+    [SerializeField] private string hitStateName = "";
+    [Tooltip("피격 모션 후 되돌아갈 대기 상태 이름(예: IdleNormal). 비우면 되돌리지 않는다.")]
+    [SerializeField] private string idleStateName = "";
+    [Tooltip("피격 모션을 이 시간(초) 재생한 뒤 대기 상태로 복귀한다.")]
+    [SerializeField] private float hitReturnDelay = 0.8f;
 
     // ── Private ─────────────────────────────────────────────────────
 
@@ -30,15 +48,22 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
     private const float AnalysisResetIdle = 4f;  // 이 시간 이상 무타격이면 다음 타격 때 분석 리셋(교전 단위 집계)
     private const float LabelRefreshInterval = 0.1f;
 
-    private static readonly int HitHash = Animator.StringToHash("Hit");
-
     private MonsterHPBar _hpBar;
+
+    private int   _hitTriggerHash;
+    private bool  _hasHitTrigger;   // Animator에 hitTrigger 파라미터가 실제로 있는지(없으면 SetTrigger가 경고를 뱉는다)
+    private bool  _inHitAnim;
+    private float _hitAnimEnd;
 
     private float _currentHp;
     private float _lastHitTime;
 
     private readonly Queue<(float time, float damage)> _damageLog = new();
     private float _damageInWindow;
+
+    // 디버프 아이콘 행
+    private readonly List<BuffViewItem> _statusUiBuf = new();
+    private bool _statusUiWasEmpty = true;
 
     // 실시간 데미지 분석 집계 (교전 단위)
     private float _lastHit;
@@ -52,6 +77,9 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
     public bool IsDead => false;
 
+    /// <summary>이 더미를 어떤 격의 상대로 취급할지(랜슬롯 광기 등 등급 기반 효과가 읽는다).</summary>
+    public MonsterGrade Grade => grade;
+
     // ── Lifecycle ───────────────────────────────────────────────────
 
     private void Awake()
@@ -60,6 +88,9 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        ApplyHitLayer();
+        ResolveHitTrigger();
     }
 
     private void Start()
@@ -84,6 +115,15 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
 
+        // 상태 이름으로 피격을 재생한 경우, 일정 시간 뒤 대기 상태로 되돌린다
+        // (Trigger 방식과 달리 컨트롤러가 알아서 복귀시켜 주지 않는다 → 그냥 두면 피격 포즈로 굳는다).
+        if (_inHitAnim && Time.time >= _hitAnimEnd)
+        {
+            _inHitAnim = false;
+            if (animator != null && !string.IsNullOrEmpty(idleStateName))
+                animator.CrossFade(idleStateName, 0.15f);
+        }
+
         PruneDpsWindow();
 
         // 라벨 문자열 조립은 매 프레임 GC를 피해 저주기로만 갱신.
@@ -92,7 +132,27 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
         {
             _labelTimer = LabelRefreshInterval;
             RefreshAnalysisLabel();
+            RefreshStatusUi();
         }
+    }
+
+    /// <summary>
+    /// 더미에 걸린 상태이상을 HP바 디버프 행에 표시한다.
+    /// 더미는 MonsterBase가 아니라 상태 수신기가 없다 — 지금 붙을 수 있는 건 화상(독립 MonoBehaviour)뿐.
+    /// </summary>
+    private void RefreshStatusUi()
+    {
+        if (_hpBar == null) return;
+
+        _statusUiBuf.Clear();
+        if (TryGetComponent<MonsterBurnHandler>(out var burn) && burn.Remaining > 0f)
+            _statusUiBuf.Add(RelicFairy.Monster.MonsterStatusReceiver.MakeItem(
+                "burn", 1, burn.Remaining01, burn.Remaining));
+
+        if (_statusUiBuf.Count == 0 && _statusUiWasEmpty) return;
+        _statusUiWasEmpty = _statusUiBuf.Count == 0;
+
+        _hpBar.SetStatuses(_statusUiBuf);
     }
 
     // ── Public Methods (IDamageable) ─────────────────────────────────
@@ -116,16 +176,72 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
         LogDamage(amount);
 
-        if (animator != null)
-            animator.SetTrigger(HitHash);
+        PlayHitReaction();
 
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
 
         // 데미지 팝업 (허수아비도 일관 표시)
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * (hpBarHeadOffset + 0.9f), amount, isCrit);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * (hpBarHeadOffset + 0.9f), amount, isCrit, GetInstanceID());
     }
 
     // ── Private Methods ──────────────────────────────────────────────
+
+    /// <summary>
+    /// 콜라이더를 MonsterHit 레이어로 옮긴다.
+    ///
+    /// 플레이어 근접 판정(ColliderInstance)은 환경 콜라이더가 질의 버퍼를 채우는 걸 막으려고
+    /// <b>MonsterHit 레이어만</b> 훑는다. 몬스터는 MonsterBase가 런타임에 자동으로 얹어주지만
+    /// 더미는 MonsterBase가 아니다 — 여기서 직접 얹지 않으면 <b>때려도 아예 안 맞는다</b>.
+    /// </summary>
+    private void ApplyHitLayer()
+    {
+        int hitLayer = LayerMask.NameToLayer("MonsterHit");
+        if (hitLayer < 0) return;   // 레이어 미정의 → 기존 레이어 유지(회귀 0)
+
+        var cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+            cols[i].gameObject.layer = hitLayer;
+    }
+
+    /// <summary>
+    /// Animator에 hitTrigger 파라미터가 실제로 존재하는지 미리 확인해 캐싱한다.
+    /// 없는데 SetTrigger를 부르면 Unity가 매 타격마다 경고를 뱉는다(몬스터 컨트롤러는 대개 파라미터가 없다).
+    /// </summary>
+    private void ResolveHitTrigger()
+    {
+        _hasHitTrigger = false;
+        if (animator == null || string.IsNullOrEmpty(hitTrigger)) return;
+
+        _hitTriggerHash = Animator.StringToHash(hitTrigger);
+
+        var ps = animator.parameters;
+        for (int i = 0; i < ps.Length; i++)
+        {
+            if (ps[i].type == AnimatorControllerParameterType.Trigger && ps[i].nameHash == _hitTriggerHash)
+            {
+                _hasHitTrigger = true;
+                return;
+            }
+        }
+    }
+
+    /// <summary>피격 반응 — Trigger가 있으면 그걸, 없으면 상태 이름을 직접 재생한다.</summary>
+    private void PlayHitReaction()
+    {
+        if (animator == null) return;
+
+        if (_hasHitTrigger)
+        {
+            animator.SetTrigger(_hitTriggerHash);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(hitStateName)) return;
+
+        animator.CrossFade(hitStateName, 0.05f, 0, 0f);   // 연타 시 처음부터 다시
+        _inHitAnim  = true;
+        _hitAnimEnd = Time.time + hitReturnDelay;
+    }
 
     private void LogDamage(float amount)
     {

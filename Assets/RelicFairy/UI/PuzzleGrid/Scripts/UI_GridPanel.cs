@@ -30,6 +30,18 @@ public sealed class UI_GridPanel : UI_Base
     private StagingAreaView             _stagingArea;
     private ItemInfoPanel               _itemInfoPanel;
 
+    // ── 정제소 배치 팝업 스킨 (@UIRoot에서 배선; 미배선 시 기존 외형 유지) ──
+    [Header("정제소 스킨")]
+    [SerializeField] private Sprite _bgSprite;             // 자연바탕
+    [SerializeField] private Sprite _boardSprite;          // 속성판(헥사 그리드 배경)
+    [SerializeField] private Sprite _stagingBorderSprite;  // 룬 배치 테두리
+    [SerializeField] private Sprite _stagingBgSprite;      // 룬 배치 테두리 바탕
+    [SerializeField] private Sprite _synergyBorderSprite;  // 시너지 테두리
+    [SerializeField] private Sprite _synergyBgSprite;      // 시너지 바탕
+    [Header("그리드 타일 (디자이너 6속성 — F·I·T·P·L·D 순)")]
+    [SerializeField] private Sprite[] _zoneTiles;          // 존별 셀 타일 6장
+    [SerializeField] private Sprite   _centerTile;         // 중앙 타일(선택)
+
     // ── Private: Layout roots (코드로 생성) ──
     private RectTransform _headerRT;
     private RectTransform _mainAreaRT;
@@ -89,6 +101,7 @@ public sealed class UI_GridPanel : UI_Base
     // ── Private: State ──
     private RunItemInventory _inventory;
     private RuntimeItemData  _pendingNewItem;
+    private RuntimeItemData  _pendingAddItem;   // 보관함이 가득 차 아직 못 넣은 획득 아이템(자리 나면 자동 추가)
     private bool             _isOpen;
     private bool             _layoutBuilt;
     private int              _totalPlacedCells;
@@ -217,18 +230,19 @@ public sealed class UI_GridPanel : UI_Base
         OpenPanel();
     }
 
-    // ── GridManager 브리지 (MerlinRuneBridge에서 boardManager 없을 때 참조) ──
-
-    public void EnterGalleryMode()
+    /// <summary>
+    /// 보관함이 가득 차 <b>추가에 실패한</b> 아이템을 들고 패널을 연다.
+    /// 플레이어가 배치/폐기로 자리를 비우면 <see cref="TryFlushPendingAdd"/>가 자동으로 넣어준다.
+    /// </summary>
+    public void ShowWithPendingItem(RuntimeItemData item)
     {
-        // 단일 편집 화면으로 개편 후 갤러리 모드 없음 — 편집 화면 바로 진입
+        _pendingAddItem = item;
+        OpenPanel();
+        TryFlushPendingAdd();   // 여는 사이에 자리가 났을 수도 있다
     }
 
-    public void EnterEditMode(string gridId)
-    {
-        // 단일 편집 화면이므로 별도 편집 모드 전환 없음
-        // GridManager에 편집 대상 gridId 전달 (기존 연동 유지)
-    }
+    // 갤러리 모드(EnterGalleryMode)·편집 모드(EnterEditMode)는 단일 편집 화면으로 개편되며 폐기됐다.
+    // 두 함수 모두 빈 껍데기였고 호출처도 없어 제거함. 갤러리 뷰(GridGalleryView.cs)도 함께 삭제.
 
     // ── Open / Close ──
 
@@ -309,13 +323,25 @@ public sealed class UI_GridPanel : UI_Base
         // CanvasGroup — 페이드인에 사용
         _canvasGroup = gameObject.GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
 
-        // 전체 배경
+        // 전체 배경 (자연바탕 스킨 — 미배선 시 단색)
         var bg = gameObject.GetComponent<Image>() ?? gameObject.AddComponent<Image>();
         bg.color = new Color(0.10f, 0.12f, 0.18f, 0.97f);
+        SkinImage(bg, _bgSprite, fill: true);
 
         BuildHeader();
         BuildMainArea();
         BuildFooter();
+        if (_footerRT != null) _footerRT.gameObject.SetActive(false);   // 하단 정리 — 중앙보너스 푸터 숨김
+    }
+
+    /// <summary>이미지에 스프라이트 주입(비파괴 — sprite null이면 기존 유지). fill=true면 늘려 채움, false면 종횡비 보존.</summary>
+    private static void SkinImage(Image img, Sprite sprite, bool fill)
+    {
+        if (img == null || sprite == null) return;
+        img.sprite = sprite;
+        img.type = Image.Type.Simple;
+        img.color = Color.white;
+        img.preserveAspect = !fill;
     }
 
     // Header (60px 고정, 상단)
@@ -383,7 +409,7 @@ public sealed class UI_GridPanel : UI_Base
         _mainAreaRT = mainGO.GetComponent<RectTransform>();
         _mainAreaRT.anchorMin        = new Vector2(0f, 0f);
         _mainAreaRT.anchorMax        = new Vector2(1f, 1f);
-        _mainAreaRT.offsetMin        = new Vector2(0f, 50f);   // footer 50px
+        _mainAreaRT.offsetMin        = new Vector2(0f, 10f);   // footer 제거(하단 정리) — 최소 여백만
         _mainAreaRT.offsetMax        = new Vector2(0f, -60f);  // header 60px
 
         BuildLeftPanel(mainGO.transform);
@@ -401,14 +427,14 @@ public sealed class UI_GridPanel : UI_Base
         _leftPanelRT.anchorMax = new Vector2(0.20f, 1f);
         _leftPanelRT.offsetMin = _leftPanelRT.offsetMax = Vector2.zero;
 
-        _charInfoView = CharacterInfoPanelView.Create(go.transform);
-        if (_charInfoView != null)
-        {
-            var charRT = _charInfoView.GetComponent<RectTransform>();
-            charRT.anchorMin = Vector2.zero;
-            charRT.anchorMax = Vector2.one;
-            charRT.offsetMin = charRT.offsetMax = Vector2.zero;
-        }
+        // 좌측 = TFT식 시너지 패널(개수 + 호버 효과). 캐릭터 정보는 정리(제거).
+        var synGO = Go("SynergyStatusRoot");
+        synGO.transform.SetParent(go.transform, false);
+        _synergyStatusRoot = synGO.GetComponent<RectTransform>();
+        _synergyStatusRoot.anchorMin = Vector2.zero;
+        _synergyStatusRoot.anchorMax = Vector2.one;
+        _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
+        _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
     }
 
     // CenterPanel (20% ~ 75%)
@@ -422,18 +448,20 @@ public sealed class UI_GridPanel : UI_Base
         _centerPanelRT.offsetMin = new Vector2(2f, 0f);
         _centerPanelRT.offsetMax = new Vector2(-2f, 0f);
 
-        // 상단 72%: HexGrid (0.28 ~ 1.00)
+        // HexGrid 전체 높이 (0.0 ~ 1.0) — 하단 시너지 영역 제거로 그리드가 중앙 전체 사용
         var hexRootGO = Go("HexGridRoot");
         hexRootGO.transform.SetParent(go.transform, false);
         _hexGridRoot = hexRootGO.GetComponent<RectTransform>();
-        _hexGridRoot.anchorMin = new Vector2(0f, 0.28f);
-        _hexGridRoot.anchorMax = new Vector2(1f, 1.00f);
+        _hexGridRoot.anchorMin = new Vector2(0f, 0.0f);
+        _hexGridRoot.anchorMax = new Vector2(1f, 1.0f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
         var hexBG = hexRootGO.AddComponent<Image>();
         hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
+        SkinImage(hexBG, _boardSprite, fill: false);   // 속성판(종횡비 보존 — 그리드 셀 정렬은 후속 조정)
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
+        _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
 
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
@@ -441,8 +469,8 @@ public sealed class UI_GridPanel : UI_Base
             new Color(0.62f, 0.68f, 0.85f, 0.45f));
         _hexGridHintText = hintGO.GetComponent<TMP_Text>();
         var hintRT = hintGO.GetComponent<RectTransform>();
-        hintRT.anchorMin = new Vector2(0f, 0.28f);
-        hintRT.anchorMax = new Vector2(1f, 1.00f);
+        hintRT.anchorMin = new Vector2(0f, 0.0f);
+        hintRT.anchorMax = new Vector2(1f, 1.0f);
         hintRT.offsetMin = hintRT.offsetMax = Vector2.zero;
         _hexGridHintText.alignment         = TextAlignmentOptions.Center;
         _hexGridHintText.textWrappingMode = TextWrappingModes.Normal;
@@ -454,17 +482,6 @@ public sealed class UI_GridPanel : UI_Base
         _boardContainer.anchorMin = Vector2.zero;
         _boardContainer.anchorMax = Vector2.one;
         _boardContainer.offsetMin = _boardContainer.offsetMax = Vector2.zero;
-
-        // 하단 27%: 연결 클러스터 시너지 패널 (0.00 ~ 0.27)
-        var synRootGO = Go("SynergyStatusRoot");
-        synRootGO.transform.SetParent(go.transform, false);
-        _synergyStatusRoot = synRootGO.GetComponent<RectTransform>();
-        _synergyStatusRoot.anchorMin = new Vector2(0f, 0.00f);
-        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.27f);
-        _synergyStatusRoot.offsetMin = new Vector2(0f, 2f);
-        _synergyStatusRoot.offsetMax = Vector2.zero;
-
-        _synergyStatusView = synRootGO.AddComponent<MerlinRuneSynergyStatusView>();
     }
 
     // RightPanel (75% ~ 100%)
@@ -917,10 +934,33 @@ public sealed class UI_GridPanel : UI_Base
 
     private void OnStagingChanged()
     {
+        TryFlushPendingAdd();   // 보관함에 자리가 나면 대기 중이던 획득 아이템을 넣는다
+
         _stagingArea?.Refresh(_inventory);
         RefreshInfoPanelDefault();
         RefreshFooter();
         UpdatePlaceButtonState(_inventory?.StagingCount > 0);
+    }
+
+    /// <summary>
+    /// 보관함이 가득 찬 상태에서 획득한 아이템을 보류했다가, 자리가 나면 자동으로 추가한다.
+    /// (과거엔 AddToStaging 실패를 호출부가 무시해 <b>아이템이 조용히 사라졌다</b>.)
+    /// </summary>
+    private void TryFlushPendingAdd()
+    {
+        if (_pendingAddItem == null || _inventory == null) return;
+        if (_inventory.StagingCount >= RunItemInventory.MaxStagingCapacity) return;
+
+        var item = _pendingAddItem;
+        _pendingAddItem = null;                 // 재진입 방지 — AddToStaging이 OnStagingChanged를 다시 부른다
+        if (!_inventory.AddToStaging(item))
+        {
+            _pendingAddItem = item;             // 실패하면 다시 보류
+            return;
+        }
+
+        ItemEffectVfxHelper.ShowNotice($"<color=#7FE7FF>보관함에 추가</color> {item.displayName}");
+        _itemInfoPanel?.ShowItem(item, isNew: true);
     }
 
     private void OnPlacedChanged()
@@ -1054,7 +1094,7 @@ public sealed class UI_GridPanel : UI_Base
     {
         // 항상 최신 점유 상태에서 cluster를 계산한 뒤 갱신 (패널 재오픈 시 이전 결과 보존)
         _hexGridView?.RefreshOccupiedCells();
-        _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetLastClusterSizes());
+        _synergyStatusView?.Refresh(MerlinRuneBridge.Instance?.GetZoneOccupiedCounts());
     }
 
     // ── Footer Refresh ──
@@ -1073,7 +1113,7 @@ public sealed class UI_GridPanel : UI_Base
             return;
         }
 
-        var clusterSizes = MerlinRuneBridge.Instance?.GetLastClusterSizes();
+        var zoneCounts = MerlinRuneBridge.Instance?.GetZoneOccupiedCounts();
 
         var sb = new System.Text.StringBuilder("존 시너지  ");
 
@@ -1082,7 +1122,7 @@ public sealed class UI_GridPanel : UI_Base
             var synergies = runeData.GetZoneSynergies(zoneId);
             if (synergies == null) continue;
 
-            int count = (clusterSizes != null && clusterSizes.TryGetValue(zoneId, out var c)) ? c : 0;
+            int count = (zoneCounts != null && zoneCounts.TryGetValue(zoneId, out var c)) ? c : 0;
             bool anyMet = false;
             foreach (var s in synergies)
                 if (s.threshold > 0 && count >= s.threshold) { anyMet = true; break; }
@@ -1124,11 +1164,14 @@ public sealed class UI_GridPanel : UI_Base
     {
         if (_inventory != null)
         {
-            var allPlaced = new List<RuntimeItemData>(_inventory.StagingItems);
-            foreach (var item in allPlaced)
+            // ⚠️ 배치된 아이템은 PlacedItems에 있다(UnplaceItem이 placed → staging으로 되돌리는 구조).
+            //    과거엔 StagingItems를 순회해서 배치된 건 하나도 안 잡혔고,
+            //    셀만 지워져 '시너지는 사라졌는데 아이템 효과와 Shape는 남는' 상태가 됐다.
+            var placed = new List<RuntimeItemData>(_inventory.PlacedItems);
+            foreach (var item in placed)
             {
                 _stagingArea?.RemoveShapeForItem(item);
-                _inventory.UnplaceItem(item);
+                _inventory.UnplaceItem(item);   // PlacedItems → StagingItems 복귀
             }
         }
         _placedItemPositions.Clear();

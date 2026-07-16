@@ -105,6 +105,9 @@ public sealed class CovenantHandler
         // 퀘스트: 서약 획득 보고 (target='*'이면 어떤 서약이든 수용)
         QuestEvents.Report("Covenant", covenantId);
 
+        // S3: 서약 획득 확정 → 즉시 저장(방 경계 전에 종료해도 보존)
+        RunFlowController.Active?.SaveNow("covenant-add");
+
         // [가이드라인 비주얼] 서약 획득 토스트
         if (_player != null)
             GuidelineVisual.Toast(_player.transform.position + Vector3.up * 2.8f, "서약 획득: " + covenant.DisplayName, GuidelineVisual.ToastKind.Covenant);

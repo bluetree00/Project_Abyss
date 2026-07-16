@@ -16,8 +16,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     public static BaseCampBootstrapper Instance { get; private set; }
 
     [Header("Spawn")]
-    [Tooltip("플레이어 스폰 위치/회전. 비워두면 원점에 스폰(바닥 미배치 시 낙하하므로 씬에 바닥 필요).")]
+    [Tooltip("초회(온보딩) 스폰 위치/회전 — 입구. 비워두면 원점(바닥 미배치 시 낙하).")]
     [SerializeField] private Transform playerSpawnPoint;
+
+    [Tooltip("복귀(온보딩 완료 후) 스폰 위치 — 유물/장비 제단 부근. 비우면 playerSpawnPoint 사용.")]
+    [SerializeField] private Transform returnSpawnPoint;
 
     [Tooltip("스폰할 CombatGirl 베이스 몸 Addressables 키. GameRunBootstrapper.startBodyKey와 동일.")]
     [SerializeField] private string playerBodyKey = "PlayerCharacter";
@@ -110,8 +113,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             return;
         }
 
-        Vector3 pos    = overridePos ?? (playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero);
-        Quaternion rot = overrideRot ?? (playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity);
+        // 복귀(온보딩 완료) 시 유물/장비 제단 부근 스폰, 초회는 입구 스폰.
+        var spawn = (BaseCampOnboardingDirector.IsCompleted && returnSpawnPoint != null)
+            ? returnSpawnPoint : playerSpawnPoint;
+        Vector3 pos    = overridePos ?? (spawn != null ? spawn.position : Vector3.zero);
+        Quaternion rot = overrideRot ?? (spawn != null ? spawn.rotation : Quaternion.identity);
 
         var go = Instantiate(prefab, pos, rot);
         var player = go.GetComponent<PlayerController>();
@@ -196,16 +202,25 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             GameCameraController.Instance?.HandToGameplayCamera(_player.transform);
     }
 
-    /// <summary>베이스캠프 진입 대사 연출. 서버 CSV('StartRoom' 시퀀스) 우선, 없으면 인스펙터 SO 폴백.
-    /// GameRunBootstrapper.ShowStartRoomDialogueAsync와 동일 구성 — Zone0에서 이전.</summary>
+    /// <summary>
+    /// 베이스캠프 진입 대사. 복귀 사유별 분기 —
+    /// 사망 복귀=RunFail(카운트 기반 랜덤/마일스톤), 클리어 복귀=RunClear, 그 외(최초/일반)=StartRoom 방문분기.
+    /// 서버 CSV 우선, 없으면 SO 폴백.
+    /// </summary>
     private async UniTask ShowIntroDialogueAsync(CancellationToken ct)
     {
         var dlgMgr = Managers.DialogueData;
         if (dlgMgr != null && !dlgMgr.IsInitialized)
             await dlgMgr.InitializeAsync();
 
-        DialogueLine[] lines = dlgMgr?.GetLines(IntroSequenceId)
-                               ?? introDialogueSO?.Lines;
+        var reason = RunReturnTracker.ConsumeReason(out int count);
+        DialogueLine[] lines = reason switch
+        {
+            RunReturnTracker.Reason.Death => dlgMgr?.GetCountLines("RunFail", count),
+            RunReturnTracker.Reason.Clear => dlgMgr?.GetCountLines("RunClear", count),
+            _                             => dlgMgr?.GetVisitLines(IntroSequenceId),
+        };
+        lines ??= introDialogueSO?.Lines;
         if (lines == null || lines.Length == 0) return;
 
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();

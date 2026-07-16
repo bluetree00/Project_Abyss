@@ -66,14 +66,8 @@ public sealed class UIRootBootstrapper : MonoBehaviour
         _boundRun = null;
     }
 
-    private void Update()
-    {
-        if (!Input.GetKeyDown(KeyCode.Tab)) return;
-        var panel = UI_GridPanel.Instance;
-        if (panel == null) return;
-        if (panel.IsOpen) panel.Close();
-        else              panel.Open();
-    }
+    // 룬판 토글은 PlayerController.TogglePuzzleGrid(PuzzleToggle = Tab)가 단독으로 담당한다.
+    // 여기서 KeyCode.Tab을 폴링하면 같은 프레임에 두 번 토글되어 상쇄된다(= 런 중 룬판이 안 열림).
 
     private void OnDestroy()
     {

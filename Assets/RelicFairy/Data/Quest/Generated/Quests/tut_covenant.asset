@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: tut_covenant
   displayName: "\uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C"
-  description: "\uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uBC1B\uC544\uB4E4\uC5EC\uB77C"
+  description: "\uC2EC\uC5F0\uC758 \uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: f11c34493f75bf84a953e2f4f4a920e0, type: 2}

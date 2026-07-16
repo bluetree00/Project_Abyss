@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: 6edac1c2f6a8ccf47903b37ca4cad828, type: 2}
   codeName: tut_covenant
-  description: "\uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uBC1B\uC544\uB4E4\uC5EC\uB77C"
+  description: "\uC2EC\uC5F0\uC758 \uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: 2930be85ace7e4c4a966653d7e79061c, type: 2}

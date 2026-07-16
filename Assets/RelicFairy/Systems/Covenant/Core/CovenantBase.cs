@@ -27,6 +27,11 @@ public abstract class CovenantBase
     public virtual string BasicDescription    => string.Empty;
     public virtual string EnhancedDescription => string.Empty;
     public virtual string EvolvedDescription  => string.Empty;
+
+    /// <summary>발동 조건(원인). 조립 서약만 채운다 — HUD가 원인/결과를 줄 나눠 표시하는 데 쓴다.</summary>
+    public virtual string CauseText  => null;
+    /// <summary>발동 결과(효과). <see cref="CauseText"/>와 짝. 둘 다 있어야 분리 표시된다.</summary>
+    public virtual string EffectText => null;
     public virtual UnityEngine.Sprite Icon    => null;
 
     protected CovenantContext Ctx  { get; private set; }

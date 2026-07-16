@@ -159,7 +159,6 @@ public static class EffectMetaRegistry
         Register("FirstHitBonus",               "첫 타격 보너스",       EffectCategory.Proc,    EffectUnit.Ratio,   "dmg");
 
         // ── OnHit(적중 시) — value=발동확률/회복비율/회복량 혼재 ──
-        Register("Lifesteal",                   "흡혈",                 EffectCategory.Resource,EffectUnit.Ratio,   "lifesteal");
         Register("PoisonOnHit",                 "독 부여",              EffectCategory.Proc,    EffectUnit.Chance,  "poison");
         Register("Freeze",                      "빙결",                 EffectCategory.Proc,    EffectUnit.Chance,  "freeze");
         Register("ExtraAttack",                 "추가 타격",            EffectCategory.Proc,    EffectUnit.Chance,  "dmg");
@@ -220,7 +219,6 @@ public static class EffectMetaRegistry
         Register("SplitStrike",                 "분열 타격",            EffectCategory.Special, EffectUnit.Auto,    "dmg");
         Register("EchoArrow",                   "메아리 화살",          EffectCategory.Special, EffectUnit.Auto,    "projectile");
         Register("MarkExplode",                 "표식 폭발",            EffectCategory.Special, EffectUnit.Auto,    "dmg");
-        Register("LifestealStack",              "흡혈 중첩",            EffectCategory.Special, EffectUnit.Auto,    "lifesteal");
         Register("RepeatChance",                "반복 발동",            EffectCategory.Special, EffectUnit.Chance,  "dmg");
         Register("CritMomentum",                "치명 가속",            EffectCategory.Special, EffectUnit.Auto,    "crit");
         Register("BrandChain",                  "낙인 연쇄",            EffectCategory.Special, EffectUnit.Auto,    "dmg");

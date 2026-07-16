@@ -79,8 +79,9 @@ public class RuneSynergyEntryCollection
 
 /// <summary>
 /// 뒤끝 MERLIN_RUNE_ZONE_MAP 차트 1행 = 멀린의 룬판 한 행(row).
-/// hex_row(0~10), pattern(존 코드 문자열), stat_version.
-/// 존 코드: A=ATK, D=DEF, H=HP, S=SPD, M=MAG, L=LUCK, +=CENTER, 0=빈칸
+/// hex_row, pattern(존 코드 문자열 — 문자 1개 = 셀 1개), stat_version.
+/// 존 코드(<see cref="ElementDef"/>가 단일 소스): F=불, I=얼음, T=전기, P=풀, L=빛, D=어둠, +=CENTER
+/// ⚠️ 구버전 스탯존 코드(A=ATK, D=DEF, H=HP …)는 폐기됐다. Docs의 구 CSV와 혼동 주의.
 /// </summary>
 [System.Serializable]
 public class RuneZoneMapEntry

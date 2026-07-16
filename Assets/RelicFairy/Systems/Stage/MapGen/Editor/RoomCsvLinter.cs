@@ -34,7 +34,7 @@ public static class RoomCsvLinter
     private static readonly HashSet<string> BaseTiles = new HashSet<string>
     {
         "F", "W", "O", "P", "B", "S", "Sw", "Si", "N", "E", "X", "T", "C",
-        ".", "Pt", "R", "D", "CP", "WP", "SG",
+        ".", "Pt", "R", "D", "CP", "WP", "SG", "CV",
     };
 
     private static readonly Regex SpawnerRegex = new Regex(@"^[Mm]([cCrReE][0-9]*)+$", RegexOptions.Compiled);
@@ -334,7 +334,7 @@ public static class RoomCsvLinter
         }
 
         // (2) 핸들러 토큰: 레지스트리가 린터가 아는 코드만 갖는지
-        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt" };
+        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt", "CV" };
         foreach (var kv in TokenRegistry.ExactHandlers)
             if (!known.Contains(kv.Key))
             {

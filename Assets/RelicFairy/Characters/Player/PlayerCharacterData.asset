@@ -26,18 +26,19 @@ MonoBehaviour:
   heavyAttackReleaseTime: 0.4
   dashSpeed: 22
   dashDuration: 0.18
-  dodgeCooldown: 1.5
-  dodgeIFrameStartDelay: 0.05
+  dodgeCooldown: 0.25
+  dodgeIFrameStartDelay: 0
   dodgeIFrameDuration: 0.3
   dodgeMomentumBlend: 0
   dodgeRecoveryWindow: 0
-  dodgeGhostMaterial: {fileID: 0}
-  dodgeGhostInterval: 0.05
-  dodgeGhostLifetime: 0.25
+  dodgeGhostMaterial: {fileID: 2100000, guid: e355357bd41b38f4e8bdee996b722638, type: 2}
+  dodgeGhostInterval: 0.035
+  dodgeGhostLifetime: 0.3
   dodgeGhostColor: {r: 0.4, g: 0.7, b: 1, a: 0.6}
-  dodgeIFrameTint: {r: 0, g: 0, b: 0, a: 0}
+  dodgeIFrameTint: {r: 0.35, g: 0.75, b: 1, a: 0.45}
   dodgeIFrameTintEmission: 1.5
-  dodgeDustVfxPrefab: {fileID: 0}
+  dodgeDustVfxPrefab: {fileID: 6698804964025046612, guid: e57baca96b088474b8f34b94d3f04544,
+    type: 3}
   dodgeDustHeightOffset: 0.05
   dashTrailMaterial: {fileID: 2100000, guid: f8a6a786dd296664e8ae4c8eef1ef7a5, type: 2}
   dashTrailColor: {r: 0.55, g: 0.8, b: 1, a: 0.85}

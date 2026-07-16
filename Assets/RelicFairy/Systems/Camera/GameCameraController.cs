@@ -45,6 +45,15 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private Vector2 dkPlayerOrbitMiddle = new Vector2(5f,  2f);
     [SerializeField] private Vector2 dkPlayerOrbitBottom = new Vector2(5f, 4.7f);
 
+    [Header("Processional View (대성당 나브 — 낮은 정면 웅장)")]
+    [Tooltip("나브 구간 카메라 오빗(Height, Radius). 낮은 높이+큰 반경 = 낮게 뒤에서 정면. 인게임서 튜닝.")]
+    [SerializeField] private Vector2 processionalOrbitTop      = new Vector2(5f, 12f);
+    [SerializeField] private Vector2 processionalOrbitMiddle   = new Vector2(2.5f, 13f);
+    [SerializeField] private Vector2 processionalOrbitBottom   = new Vector2(0.8f, 12f);
+    [Tooltip("진행방향으로 카메라를 정렬(아케이드 축 정면). 끄면 현재 시야각만 낮아짐.")]
+    [SerializeField] private bool     processionalRecenter     = true;
+    [SerializeField] private float    processionalRecenterTime = 1.5f;
+
     // ── Private ──
     private Vector3 _originalPosition;
     private Quaternion _originalRotation;
@@ -66,6 +75,7 @@ public class GameCameraController : MonoBehaviour
     private Transform _savedBossLookAt;
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
     private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
+    private CinemachineFreeLook.Orbit[] _savedProcessionalOrbits;
     private CancellationTokenSource     _dkOrbitTransitionCts;
     private bool _topDownViewActive;
     private bool _savedBrainBeforeTopDown;
@@ -78,6 +88,15 @@ public class GameCameraController : MonoBehaviour
 
     // ── Properties ──
     public static GameCameraController Instance { get; private set; }
+
+    /// <summary>
+    /// 보스 시점·탑다운·패닝·DK 연출 등이 <b>FreeLook 궤도를 점유 중</b>인지.
+    /// 전투 동적 프레이밍(CombatCameraFraming)은 이 동안 궤도를 건드리지 않고 양보한다
+    /// — 안 그러면 연출이 저장/복원하는 궤도를 매 프레임 덮어써서 연출이 깨진다.
+    /// </summary>
+    public bool IsOrbitOverridden =>
+        _bossOrbitViewActive || _topDownViewActive || _isPanning
+        || _savedDKPlayerOrbits != null || _savedProcessionalOrbits != null;
 
     // ── Events ──
     /// <summary>카메라 인트로 줌인이 완전히 끝난 직후 발생</summary>
@@ -599,6 +618,55 @@ public class GameCameraController : MonoBehaviour
         catch (OperationCanceledException) { }
     }
 
+    // ── Processional View (대성당 나브) ─────────────────────────
+    /// <summary>
+    /// 나브 진입 시 호출 — FreeLook 오빗을 <b>낮은 정면 시점</b>으로 전환해 아치 아케이드가 위로 솟아 보이게 한다.
+    /// processionalRecenter가 켜지면 카메라가 진행방향(플레이어 뒤)으로 정렬돼 아케이드 축을 정면으로 본다.
+    /// 오빗 전환은 DK 전환(TransitionDKOrbitAsync)을 재사용한다. 값은 인게임서 튜닝.
+    /// </summary>
+    public void ActivateProcessionalView(float duration = 1.2f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        if (_savedProcessionalOrbits == null)
+        {
+            _savedProcessionalOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+        }
+
+        if (processionalRecenter)
+        {
+            _cinemachine.m_RecenterToTargetHeading.m_enabled        = true;
+            _cinemachine.m_RecenterToTargetHeading.m_RecenteringTime = processionalRecenterTime;
+        }
+
+        TransitionDKOrbitAsync(
+            processionalOrbitTop, processionalOrbitMiddle, processionalOrbitBottom,
+            duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>나브 이탈 시 호출 — 원래 게임플레이 오빗/리센터로 서서히 복원.</summary>
+    public void DeactivateProcessionalView(float duration = 1.2f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null || _savedProcessionalOrbits == null) return;
+
+        if (processionalRecenter)
+            _cinemachine.m_RecenterToTargetHeading.m_enabled = false;
+
+        var top = new Vector2(_savedProcessionalOrbits[0].m_Height, _savedProcessionalOrbits[0].m_Radius);
+        var mid = new Vector2(_savedProcessionalOrbits[1].m_Height, _savedProcessionalOrbits[1].m_Radius);
+        var bot = new Vector2(_savedProcessionalOrbits[2].m_Height, _savedProcessionalOrbits[2].m_Radius);
+        _savedProcessionalOrbits = null;
+
+        TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
     /// <summary>
     /// 스타트 방 캐릭터 선택 직후 호출. Cinemachine이 이미 player를 추적 중인 상태에서
     /// Brain을 끄고 현재 위치에서 player 쪽으로 줌인 후 Cinemachine 복귀.
@@ -856,6 +924,87 @@ public class GameCameraController : MonoBehaviour
                     if (_prePanBrainEnabled) _brain.enabled = true;
                 }
                 if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
+            }
+        }
+    }
+
+    /// <summary>방 진입 전용 연출 — 카메라가 방을 넓게 부감으로 끌어올려 보여주고(넓어진 순간 onWide 호출 → 문 잠금),
+    /// 잠깐 유지 후 플레이어로 복귀. 보스 팬과 별개의 전용 경로. 몬스터 스폰은 이 UniTask 완료 후 호출자가 시작한다.</summary>
+    /// <param name="wideHeight">방 중앙 위로 끌어올릴 높이(방 크기에 맞춰 조정).</param>
+    /// <param name="wideBack">뒤로 물러날 거리(부감 각도).</param>
+    public async UniTask PlayRoomEntryIntroAsync(
+        Vector3 roomCenter, Transform playerTransform,
+        float riseDuration, float holdDuration, float returnDuration,
+        float wideHeight, float wideBack,
+        System.Action onWide, CancellationToken ct)
+    {
+        if (this == null) return;
+
+        if (!_isPanning)
+        {
+            _prePanBrainEnabled = _brain != null && _brain.enabled;
+            _prePanCmEnabled    = _cinemachine != null && _cinemachine.enabled;
+        }
+        _panCts?.Cancel();
+        _panCts?.Dispose();
+        _panCts = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_panCts.Token, ct);
+        int myVersion = System.Threading.Interlocked.Increment(ref _panVersion);
+        _isPanning = true;
+
+        if (_brain != null)       _brain.enabled       = false;
+        if (_cinemachine != null) _cinemachine.enabled = false;
+
+        Vector3    fromPos = transform.position;
+        Quaternion fromRot = transform.rotation;
+
+        // 방 전체를 담는 넓은 부감 — 방 중앙 위로 끌어올려 내려다본다.
+        Vector3    toPos   = roomCenter + new Vector3(0f, wideHeight, -wideBack);
+        Vector3    lookDir = roomCenter - toPos;
+        Quaternion toRot   = lookDir.sqrMagnitude > 0.01f
+            ? Quaternion.LookRotation(lookDir, Vector3.up)
+            : fromRot;
+
+        try
+        {
+            // 1) 넓게 끌어올림
+            for (float t = 0f; t < riseDuration; t += Time.deltaTime)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                float e = PanEase(t / riseDuration);
+                transform.position = Vector3.Lerp(fromPos, toPos, e);
+                transform.rotation = Quaternion.Slerp(fromRot, toRot, e);
+                await UniTask.Yield(linked.Token);
+            }
+            transform.position = toPos;
+            transform.rotation = toRot;
+
+            // 넓게 보이는 순간 → 문 잠금 시작
+            onWide?.Invoke();
+
+            // 2) 방 조망 유지 (문이 잠기는 동안)
+            await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: linked.Token);
+
+            // 3) 넓은 뷰 → 플레이어 추적 게임플레이 포즈로 자연스럽게 수렴.
+            //    Cinemachine이 해석한 실제 포즈로 블렌드하므로 브레인 인계 시 팝(다시 위로 튐)이 없다.
+            //    (수동 오프셋 복귀 + SnapToTarget는 Cinemachine 해석 포즈와 어긋나 '한 번 더 위로 이동' 유발 → 폐기)
+            if (_cinemachine != null && playerTransform != null)
+            {
+                _cinemachine.Follow = playerTransform;
+                _cinemachine.LookAt = playerTransform;
+            }
+            await BlendToActiveCameraAsync(returnDuration, linked.Token);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (myVersion == _panVersion)
+            {
+                _isPanning = false;
+                // BlendToActiveCameraAsync가 정상 경로에선 이미 Cinemachine 해석 포즈로 수렴 + 브레인 복원.
+                // 취소 등 중단 시에만 게임플레이 카메라 복원을 보장한다.
+                if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
+                if (_brain != null && _prePanBrainEnabled)    _brain.enabled       = true;
             }
         }
     }

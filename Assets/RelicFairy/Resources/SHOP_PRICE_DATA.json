@@ -1,0 +1,13 @@
+{
+ "entries": [
+  {
+   "index": 2001,
+   "shop_entry_id": "shop_potion",
+   "category": "potion",
+   "target_id": "potion_hp",
+   "price_override": 50,
+   "weight": 10,
+   "stat_version": 1
+  }
+ ]
+}

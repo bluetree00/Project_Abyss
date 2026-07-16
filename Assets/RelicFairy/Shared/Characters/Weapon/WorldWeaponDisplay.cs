@@ -79,6 +79,7 @@ public class WorldWeaponDisplay : MonoBehaviour
     public static WorldWeaponDisplay SpawnFromData(WeaponData data, Vector3 position)
     {
         var go = new GameObject($"DroppedWeapon_{data.displayName}");
+        RoomScopedDrop.Mark(go);   // 방 전환 시 정리(부모 없어 방 파괴로는 안 지워짐)
         go.transform.position = position;
 
         var col = go.AddComponent<SphereCollider>();

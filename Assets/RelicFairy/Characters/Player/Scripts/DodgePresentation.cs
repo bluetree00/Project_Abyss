@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using INab.Common;
 
 /// <summary>
@@ -41,6 +42,18 @@ public class DodgePresentation : MonoBehaviour
     // ── Private (틴트) ────────────────────────────────────────────
     private bool _tintActive;
 
+    // ── Private (저스트 회피 연출) ─────────────────────────────────
+    // 공유 GameVolumeProfile은 전 챕터 공통이라 절대 건드리지 않는다.
+    // 대신 런타임 전용 Volume을 우선순위 최상으로 띄웠다 걷어내는 방식으로 화면 채도를 뺀다.
+    private Volume          _pdVolume;
+    private VolumeProfile   _pdProfile;
+    private ColorAdjustments _pdColor;
+    private Vignette        _pdVignette;
+    private bool  _perfectActive;          // 저스트 연출 진행 중 — i-frame OFF가 틴트/잔상을 걷어가지 않도록 보호
+    private int   _perfectGen;             // 중첩 발동 시 이전 연출 무효화
+    private float _ghostIntervalOverride = -1f;  // >0이면 이 간격으로 잔상 스폰
+    private bool  _ghostUnscaled;                // 잔상 간격을 실제시간(슬로모 무시)으로 셀지
+
     // ── Private (잔상 풀 — 인스턴스 범위) ──────────────────────────
     private sealed class Ghost
     {
@@ -74,6 +87,7 @@ public class DodgePresentation : MonoBehaviour
         _controller.OnDodgeIFrame += HandleDodgeIFrame;
         _controller.OnDodgeStart  += HandleDodgeStart;
         _controller.OnDodgeEnd    += HandleDodgeEnd;
+        _controller.OnPerfectDodge += HandlePerfectDodge;
     }
 
     private void OnDisable()
@@ -83,7 +97,11 @@ public class DodgePresentation : MonoBehaviour
             _controller.OnDodgeIFrame -= HandleDodgeIFrame;
             _controller.OnDodgeStart  -= HandleDodgeStart;
             _controller.OnDodgeEnd    -= HandleDodgeEnd;
+            _controller.OnPerfectDodge -= HandlePerfectDodge;
         }
+
+        // 저스트 연출이 걸린 채 비활성화되면 화면이 회색으로 남는다 → 반드시 원복.
+        EndPerfectFx();
 
         // 비활성/풀 반환 시 시각 잔류 0 보장 — 틴트 원복 + 스폰 중지 + 트레일 OFF.
         ClearIFrameTint();
@@ -116,6 +134,8 @@ public class DodgePresentation : MonoBehaviour
         }
         else
         {
+            // 저스트 연출 중이면 i-frame이 끝나도 틴트/잔상을 걷지 않는다(연출이 자기 수명까지 소유).
+            if (_perfectActive) return;
             ClearIFrameTint();
             StopGhostSpawn();
         }
@@ -128,6 +148,143 @@ public class DodgePresentation : MonoBehaviour
     }
 
     private void HandleDodgeEnd() => DisableTrail();
+
+    // ── 저스트 회피 연출 ───────────────────────────────────────────
+    // 레퍼런스: 베요네타 Witch Time — "세계는 변하고 플레이어는 안 변한다".
+    // 화면 채도를 빼 세계를 회색으로 만들고(공유 프로파일은 건드리지 않고 런타임 Volume으로),
+    // 플레이어에게만 발광 틴트를 입혀 회색 속에서 혼자 빛나게 한다. 잔상으로 속도 대비를 강조.
+    private void HandlePerfectDodge(float duration)
+    {
+        if (_data == null || duration <= 0f) return;
+
+        _perfectActive = true;
+        int gen = ++_perfectGen;
+
+        ApplyPerfectTint();
+
+        // 잔상 — 실제시간 간격으로 촘촘히(슬로모라도 실제 화면에선 촘촘하게 보이도록).
+        if (_data.perfectDodgeGhostInterval > 0f)
+        {
+            StopGhostSpawn();   // i-frame 잔상 루프를 접고 저스트 설정으로 다시 시작
+            _ghostIntervalOverride = _data.perfectDodgeGhostInterval;
+            _ghostUnscaled         = true;
+            StartGhostSpawn();
+        }
+
+        PerfectFxAsync(gen, duration).Forget();
+    }
+
+    private async UniTaskVoid PerfectFxAsync(int gen, float duration)
+    {
+        var token = destroyCancellationToken;
+        try
+        {
+            EnsurePerfectVolume();
+
+            _pdColor.saturation.value   = _data.perfectDodgeSaturation;
+            _pdVignette.intensity.value = _data.perfectDodgeVignette;
+
+            float fadeIn  = Mathf.Max(0.01f, _data.perfectDodgeFadeIn);
+            float fadeOut = Mathf.Max(0.01f, _data.perfectDodgeFadeOut);
+            float hold    = Mathf.Max(0f, duration - fadeIn - fadeOut);
+
+            // 모든 타이밍은 unscaled — 슬로모 중이라 스케일 시간을 쓰면 연출이 늘어져 버린다.
+            float t = 0f;
+            while (t < fadeIn && gen == _perfectGen)
+            {
+                t += Time.unscaledDeltaTime;
+                _pdVolume.weight = Mathf.Clamp01(t / fadeIn);
+                await UniTask.Yield(token);
+            }
+            if (gen != _perfectGen) return;
+            _pdVolume.weight = 1f;
+
+            float h = 0f;
+            while (h < hold && gen == _perfectGen)
+            {
+                h += Time.unscaledDeltaTime;
+                await UniTask.Yield(token);
+            }
+            if (gen != _perfectGen) return;
+
+            t = 0f;
+            while (t < fadeOut && gen == _perfectGen)
+            {
+                t += Time.unscaledDeltaTime;
+                _pdVolume.weight = 1f - Mathf.Clamp01(t / fadeOut);
+                await UniTask.Yield(token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (gen == _perfectGen) EndPerfectFx();
+        }
+    }
+
+    // 연출 종료 — 화면/틴트/잔상 전부 원복. 중단(비활성/파괴/중첩 발동) 경로에서도 호출된다.
+    private void EndPerfectFx()
+    {
+        if (!_perfectActive) return;
+        _perfectActive = false;
+        _perfectGen++;
+
+        if (_pdVolume != null) _pdVolume.weight = 0f;
+
+        _ghostIntervalOverride = -1f;
+        _ghostUnscaled         = false;
+
+        StopGhostSpawn();
+        ClearIFrameTint();
+    }
+
+    // 회색 필터용 런타임 Volume. 공유 GameVolumeProfile 대신 최상위 우선순위로 덮었다 걷는다.
+    private void EnsurePerfectVolume()
+    {
+        if (_pdVolume != null) return;
+
+        var go = new GameObject("~PerfectDodgeVolume") { hideFlags = HideFlags.HideAndDontSave };
+        _pdVolume = go.AddComponent<Volume>();
+        _pdVolume.isGlobal = true;
+        _pdVolume.priority = 1000f;   // 씬/챕터 볼륨보다 확실히 위
+        _pdVolume.weight   = 0f;
+
+        _pdProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+        _pdVolume.sharedProfile = _pdProfile;
+
+        _pdColor = _pdProfile.Add<ColorAdjustments>(true);
+        _pdColor.saturation.overrideState = true;
+
+        _pdVignette = _pdProfile.Add<Vignette>(true);
+        _pdVignette.intensity.overrideState = true;
+        _pdVignette.color.overrideState     = true;
+        _pdVignette.color.value             = Color.black;
+    }
+
+    // 저스트 전용 틴트 — i-frame 틴트와 같은 MPB 경로를 쓰되 색/발광을 더 강하게(회색 대비용).
+    private void ApplyPerfectTint()
+    {
+        if (_data == null) return;
+        EnsureRenderers();
+        if (_renderers == null || _renderers.Length == 0) return;
+
+        Color tint = _data.perfectDodgeTint;
+        if (tint.a <= 0.001f) return;
+
+        float strength = Mathf.Clamp01(tint.a);
+        Color tintRgb  = new Color(tint.r, tint.g, tint.b, 1f);
+        Color baseC    = Color.Lerp(Color.white, tintRgb, strength);
+        baseC.a = 1f;
+        Color emis = tintRgb * (_data.perfectDodgeTintEmission * strength);
+
+        _mpb.Clear();
+        _mpb.SetColor(BaseColorId, baseC);
+        _mpb.SetColor(EmissionColorId, emis);
+        for (int i = 0; i < _renderers.Length; i++)
+            if (_renderers[i] != null) _renderers[i].SetPropertyBlock(_mpb);
+
+        _tintActive = true;
+    }
 
     // 플레이어 비주얼이 한 프레임 늦게(유물 외형 등) 붙는 경우 대비 — 비어 있으면 1회 재수집.
     private void EnsureRenderers()
@@ -197,8 +354,15 @@ public class DodgePresentation : MonoBehaviour
             while (_ghostSpawnActive && gen == _ghostGen)
             {
                 SpawnGhostSnapshot();
-                float interval = Mathf.Max(0.01f, _data.dodgeGhostInterval);
-                await UniTask.Delay(TimeSpan.FromSeconds(interval), cancellationToken: token);
+
+                // 저스트 회피 중엔 간격을 덮어쓰고 실제시간으로 센다 —
+                // 슬로모라 스케일 시간으로 세면 잔상이 뚝뚝 끊겨 속도 대비가 죽는다.
+                float interval = _ghostIntervalOverride > 0f ? _ghostIntervalOverride : _data.dodgeGhostInterval;
+                interval = Mathf.Max(0.01f, interval);
+
+                await UniTask.Delay(TimeSpan.FromSeconds(interval),
+                    _ghostUnscaled ? DelayType.UnscaledDeltaTime : DelayType.DeltaTime,
+                    cancellationToken: token);
             }
         }
         catch (OperationCanceledException) { }

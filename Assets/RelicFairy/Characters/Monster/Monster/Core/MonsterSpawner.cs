@@ -136,6 +136,9 @@ public class MonsterSpawner : MonoBehaviour
     /// 방 클리어 카운터가 Σ로 합산해 킬 목표 수를 계산할 때 사용.</summary>
     public int MaxTotalSpawns => maxTotalSpawns;
 
+    /// <summary>이 스포너가 현재 살려두고 있는 몬스터 수. MonsterBudget이 전역 동시 상한을 계산할 때 합산한다.</summary>
+    public int AliveCount => _spawnedMonsters.Count;
+
     /// <summary>웨이브 모드 여부(단일 웨이브). 그룹이 하나라도 있으면 1, 없으면 0(자동 루프 모드).
     /// _waveEntries의 모든 그룹을 하나의 웨이브로 합쳐 연속 스폰한다.</summary>
     public int WaveCount => (_waveEntries != null && _waveEntries.Length > 0) ? 1 : 0;
@@ -147,6 +150,10 @@ public class MonsterSpawner : MonoBehaviour
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // 방 전체 동시 적 하드캡(MonsterBudget)이 이 스포너의 생존 수를 합산할 수 있도록 등록한다.
+    private void OnEnable()  => MonsterBudget.Register(this);
+    private void OnDisable() => MonsterBudget.Unregister(this);
 
     private void Start()
     {
@@ -187,7 +194,10 @@ public class MonsterSpawner : MonoBehaviour
         for (int i = 0; i < waves.Length; i++)
             _waveEntries[i] = new WaveEntry { spawnCount = waves[i].count, maxGrade = waves[i].grade };
 
-        gradeMode = GradeMatchMode.AtMost;
+        // Exact: 토큰의 등급 세그먼트가 정확히 그 등급으로 스폰됨(c=Common, r=Rare, e=Elite).
+        // AtMost였을 땐 상한만이라 e를 넣어도 엘리트가 확정 안 됐음 — 엘리트 믹스를 실제로 반영하려면 Exact.
+        // 전제: 각 챕터 풀에 c/r/e가 최소 1종씩 존재(현 로스터 충족).
+        gradeMode = GradeMatchMode.Exact;
 
         // Start()보다 먼저 SpawnWaveAsync가 호출될 수 있으므로 챕터 그룹을 여기서 즉시 적용.
         if (autoApplyChapterGroup)
@@ -208,7 +218,8 @@ public class MonsterSpawner : MonoBehaviour
             return;
         }
 
-        int chapterNum = (int)run.CurrentChapter + 1;
+        // 오프셋 제거: ChapterId.Chapter1=1 → poolTag 1 (태그=챕터, 직관적). 스폰테이블 poolTags도 이 규칙으로 재작성됨.
+        int chapterNum = (int)run.CurrentChapter;
         allowedPoolGroups = new() { chapterNum };
         Debug.Log($"[MonsterSpawner:{name}] 챕터 {run.CurrentChapter} 자동 적용 → allowedPoolGroups=[{chapterNum}]");
     }
@@ -249,7 +260,12 @@ public class MonsterSpawner : MonoBehaviour
                 return;
             }
 
-            if (_spawnedMonsters.Count < maxMonsterCount)
+            // 스폰 조건 2중:
+            //  ① 자기 몫(maxMonsterCount) — 죽으면 보충해 호드를 유지한다("많이 잡는 재미")
+            //  ② 방 전체 동시 상한(MonsterBudget) — 스포너가 여러 개일 때 합계가 폭증해
+            //     화면이 몹으로 꽉 차는 것을 막는다. 상한에 걸리면 이번 턴은 건너뛰고,
+            //     적이 죽어 자리가 나면 다음 턴에 다시 스폰된다(루프는 안 끝냄).
+            if (_spawnedMonsters.Count < maxMonsterCount && MonsterBudget.CanSpawn)
                 await TrySpawnOneAsync();
         }
     }
@@ -275,15 +291,18 @@ public class MonsterSpawner : MonoBehaviour
         // SpawnWaveAsync는 같은 인스턴스에 대해 순차 실행되므로 동시성 문제 없음.
         var prevGrade = targetGrade;
 
+        // 챕터 수량 배율(ChapterDataSO.monsterCountScale) — 높은 챕터일수록 웨이브 마릿수 증가.
+        float countScale = AppBootstrapper.Instance?.CurrentRun?.CurrentMonsterCountScale ?? 1f;
+
         // 총 스폰 대상 수 — 마지막 한 마리 뒤에는 대기하지 않도록 카운트다운에 사용.
         int remaining = 0;
-        foreach (var g in _waveEntries) remaining += Mathf.Max(0, g.spawnCount);
+        foreach (var g in _waveEntries) remaining += ScaleCount(g.spawnCount, countScale);
 
         int spawned = 0;
         for (int g = 0; g < _waveEntries.Length; g++)
         {
             targetGrade = _waveEntries[g].maxGrade; // 이 그룹의 등급 상한(AtMost)
-            int count   = _waveEntries[g].spawnCount;
+            int count   = ScaleCount(_waveEntries[g].spawnCount, countScale);
 
             for (int i = 0; i < count; i++)
             {
@@ -536,6 +555,10 @@ public class MonsterSpawner : MonoBehaviour
     /// <summary>X·Z 경계 포함 여부(Y 무시).</summary>
     private static bool ContainsXZ(Bounds b, Vector3 p)
         => p.x >= b.min.x && p.x <= b.max.x && p.z >= b.min.z && p.z <= b.max.z;
+
+    /// <summary>챕터 수량 배율을 적용한 스폰 마릿수. baseCount>0이면 최소 1 보장(반올림).</summary>
+    private static int ScaleCount(int baseCount, float scale)
+        => baseCount <= 0 ? 0 : Mathf.Max(1, Mathf.RoundToInt(baseCount * scale));
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 에디터 Gizmo

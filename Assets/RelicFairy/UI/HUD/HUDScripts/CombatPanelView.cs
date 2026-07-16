@@ -21,10 +21,101 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Image    hpFillImage;
     [SerializeField] private Image    hpGhostFillImage;
 
+    [Header("HP 스킨 (선택 — 지정 시 플랫색 대신 아트 사용)")]
+    [SerializeField] private Sprite hpFrameSprite;      // 체력바 테두리
+    [SerializeField] private Sprite hpTrackSprite;      // 체력바 바탕(트랙)
+    [SerializeField] private Sprite hpFillHighSprite;   // 체력바 초록(고체력)
+    [SerializeField] private Sprite hpFillLowSprite;    // 체력바 빨강(저체력)
+    [SerializeField, Range(0f, 1f)] private float hpFillSwapThreshold = 0.4f;
+
+    // 아트 실측: 텍스처 3379×368 안에서 가장 안쪽 선이 x 76~3302 / y 165~276
+    // → 안쪽 창 = 3225×111. 여백 비율 L·R 2.28% / T 44.84% / B 24.73%.
+    //   위쪽에 장식이 몰려 있어 T가 압도적으로 크다 — 여길 20으로 두면 필이 위로 넘친다.
+    // 패널 rect 650×71 기준 → (14.8, 17.6, 14.8, 31.8)
+    [Tooltip("체력바 프레임 아트의 '안쪽 창'에 트랙/필을 맞추는 여백 (Left, Bottom, Right, Top) — 아트 실측값.")]
+    [SerializeField] private Vector4 hpInnerPadding = new Vector4(15f, 18f, 15f, 32f);
+
+    // 아트 실측: 텍스처 1116×736 안에서 가장 안쪽 선이 x 60~992 / y 162~603
+    // → 안쪽 창 = 931×440. 여백 비율 L 5.5% / R 11.1% / T 22.2% / B 18.1%.
+    // 패널 rect 340×166 기준 → (18.6, 30.0, 37.8, 36.8)
+    [Tooltip("무기칸 바깥 프레임 안쪽 여백 (L,B,R,T) — 아트 실측값. 아트 여백이 비대칭(우·상이 큼)이라 값도 비대칭이다.")]
+    [SerializeField] private Vector4 weaponInnerPadding = new Vector4(19f, 30f, 38f, 37f);
+    [Tooltip("무기 두 칸 사이 간격(분할선 폭)")]
+    [SerializeField] private float weaponCellGap = 6f;
+
+    [Header("하단중앙 클러스터 위치 (체력바 · 유물게이지 · 스탯) — 화면 아래에서의 높이")]
+    [Tooltip("체력바 Y. 낮출수록 클러스터 전체가 아래로 내려간다(스탯은 체력바에 붙어 함께 이동).")]
+    [SerializeField] private float hpBarY    = 88f;
+    [Tooltip("유물게이지(검) Y. 체력바보다 낮아야 겹치지 않는다.")]
+    [SerializeField] private float relicBarY = 20f;
+
     [Header("HP 애니메이션")]
     [SerializeField] private float hpLerpSpeed   = 3f;
     [SerializeField] private float ghostDelay    = 0.35f;
     [SerializeField] private float ghostLerpSpeed = 1.2f;
+
+    private Image _hpFrameImg;
+    private bool HasHpSkin => hpTrackSprite != null || hpFillHighSprite != null || hpFillLowSprite != null;
+
+    [Header("무기 슬롯 스킨 (선택)")]
+    [SerializeField] private Sprite weaponFrameSprite;          // 무기칸 테두리 (2칸 통짜 프레임)
+    [SerializeField] private Sprite weaponFrameInactiveSprite;  // 무기칸 비활성화 테두리 (무기 없음)
+    [SerializeField] private Sprite weaponSlotInnerSprite;      // 무기칸 내부칸 (슬롯 1칸 배경)
+
+    [Header("스킬 슬롯 스킨 — E/R/액티브 (선택)")]
+    [SerializeField] private Sprite skillFrameSprite;       // er 액티브 테두리 (기본/쿨다운 중 — 흰색)
+    [SerializeField] private Sprite skillInnerSprite;       // er 액티브 내부
+    [SerializeField] private Sprite skillFrameReadySprite;  // er_2x (사용 가능 — 금색 장식)
+
+    [Header("유물(Q) 슬롯 스킨 (선택)")]
+    [SerializeField] private Sprite relicSlotFrameSprite;    // 유물칸 테두리
+    [SerializeField] private Sprite relicSlotInnerSprite;    // 유물칸 내부
+    [SerializeField] private Sprite relicSlotActiveSprite;   // 유물칸 활성화 (쿨다운 완료 시 스왑)
+
+    [Header("유물 게이지 스킨 (선택)")]
+    [SerializeField] private Sprite relicGaugeFrameSprite;   // 유물게이지 테두리 (검 실루엣 외곽)
+    [SerializeField] private Sprite relicGaugeTrackSprite;   // 유물 게이지 검정
+    [SerializeField] private Sprite relicGaugeFillSprite;    // 유물 게이지 보라 (평시)
+    [SerializeField] private Sprite relicGaugeReadySprite;   // 유물 게이지 빨강 (절정/IsSkillReady)
+
+    [Header("유물 태양 게이지 — 가웨인 전용 (선택)")]
+    [Tooltip("충전중(열린 태양) — 중앙 공간으로 충전 게이지가 통과한다.")]
+    [SerializeField] private Sprite sunOpenSprite;
+    [Tooltip("완성(닫힌 태양) — 정오. 내부의 채움을 줄이며 유지 시간을 표현.")]
+    [SerializeField] private Sprite sunClosedSprite;
+    [Tooltip("충전 게이지 바 — 열린 태양 중앙을 가로지른다.")]
+    [SerializeField] private Sprite sunGaugeSprite;
+    private bool HasSunSkin => sunOpenSprite != null && sunClosedSprite != null;
+
+    [Header("버프 셀 스킨 (선택)")]
+    [SerializeField] private Sprite buffFrameSprite;   // 버프 테두리
+    [SerializeField] private Sprite buffInnerSprite;   // 버프 내부
+
+    [Header("버프 아이콘 글리프 (선택 — IconKey 매핑, 추정)")]
+    [SerializeField] private Sprite buffIconSpeed;      // 버프 내용1 (날개)   → speed / atkspeed
+    [SerializeField] private Sprite buffIconCooldown;   // 버프 내용2 (모래시계) → cooldown
+    [SerializeField] private Sprite buffIconHeal;       // 버프 내용3 (꽃)     → heal
+    [SerializeField] private Sprite buffIconLuck;       // 버프 내용4 (반지)   → luck
+
+    [Header("스탯 아이콘 (선택)")]
+    [SerializeField] private Sprite atkIconSprite;   // 공격력_1
+    [SerializeField] private Sprite defIconSprite;   // 방어력_1
+
+    private bool HasWeaponSkin => weaponFrameSprite != null || weaponSlotInnerSprite != null;
+    private bool HasSkillSkin  => skillFrameSprite != null || skillInnerSprite != null;
+    private bool HasRelicSlotSkin  => relicSlotFrameSprite != null || relicSlotInnerSprite != null;
+    private bool HasRelicGaugeSkin => relicGaugeTrackSprite != null || relicGaugeFillSprite != null;
+
+    // 스킨 런타임 참조
+    // 무기칸 = 바깥 프레임 1장(두 칸 공용) + 칸 배경 2장(나란히 놓여 가운데 분할선을 이룸).
+    // 활성 무기 표시는 칸 배경 밝기로(프레임이 공용이라 프레임 스왑 불가).
+    private Image _weaponFrameImg;   // 바깥 프레임(WeaponPanel)
+    private Image _weaponInner0;     // 칸 배경 — 슬롯0
+    private Image _weaponInner1;     // 칸 배경 — 슬롯1
+    private int   _activeWeaponIndex = 0;
+    private Image _qFrameImg;         // 유물(Q) 슬롯 프레임(쿨다운 완료 시 활성 스프라이트 스왑)
+    private Image _relicGaugeFill;    // 유물 게이지 fill(Filled/Horizontal)
+    private bool  _hasWeaponEquipped; // 무기 슬롯 중 하나라도 장착됐는지(프레임 스왑용)
 
     [Header("Weapon Slots")]
     [SerializeField] private WeaponSlotUI slot0;
@@ -55,13 +146,21 @@ public sealed class CombatPanelView : MonoBehaviour
     // ── R 스킬 슬롯 런타임 (프리팹에 없어 코드로 생성) ──
     private Image      _rIconImg;
     private GameObject _rCooldownBg;
+    private Image      _rCooldownFill;   // R 차오름 필(E/Q와 동일 의미: fillAmount = remaining/total)
     private TMP_Text   _rCooldownTxt;
+
+    private bool _qCooldownReady = true; // Q 사용가능 = 쿨다운 완료 AND 유물 게이지 조건(IsSkillReady)
+
+    // E/R 슬롯 테두리 — 쿨다운 완료 시 금색(er_2x)으로 스왑
+    private Image _eFrameImg;
+    private Image _rFrameImg;
 
     // ── 스탯 표시 런타임 ──
     private TMP_Text _atkText;
     private TMP_Text _defText;
     private TMP_Text _hpMaxText;
     private GameObject _statRoot;
+    private bool       _statSkinned;   // 스탯 행이 아트 스킨 배치(아이콘+숫자)인지 — 래거시(라벨+검은 띠)와 분기
 
     // ── 버프 그리드 UI 런타임 ──
     private GridLayoutGroup _buffGrid;                       // buffListRoot에 부착(아이콘+스택)
@@ -87,8 +186,9 @@ public sealed class CombatPanelView : MonoBehaviour
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
     // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀). 게이지: 그리드 아래.
-    private const float BuffDockX       = 16f;    // 화면 왼쪽 가장자리 인셋
-    private const float BuffDockBottomY = 20f;    // 좌측중앙 앵커 기준 Y
+    // 목업 기준(1920×1080): 좌하단에서 좌 114 / 아래 275. 무기 패널(위쪽 끝 244) 위, 서약 박스(아래쪽 끝 337) 아래.
+    private const float BuffDockX       = 114f;
+    private const float BuffDockBottomY = 275f;
 
     // ── 캐릭터 HUD 레이아웃(원신/명조식): HP 하단중앙 · 스킬 우하단 2포드(유물 Q / 무기 E·R) ──
     private static readonly Color RelicColor  = new Color(1.00f, 0.80f, 0.30f, 1f);  // 유물=금
@@ -112,6 +212,16 @@ public sealed class CombatPanelView : MonoBehaviour
     private System.Action  _relicChanged;
     private bool           _lastSkillReady;  // 절정(정오 등) 진입 엣지
     private float          _relicFlash;      // 진입 플래시(1→0)
+
+    // 가웨인 태양 게이지(Style==Sun 전용) — 수평 바 대신 사용. 열린 태양(충전)+게이지 / 닫힌 태양(정오)+내부 감소.
+    private RectTransform _sunRoot;
+    private Image         _sunOpenImg;     // 열린 태양(충전 중)
+    private RectTransform _sunGaugeRoot;   // 충전 게이지 바(열린 태양 중앙 통과)
+    private Image         _sunGaugeFill;   // 충전 게이지 fill(Filled/Horizontal)
+    private Image         _sunClosedImg;   // 닫힌 태양(정오) — 어두운 베이스
+    private Image         _sunClosedFill;  // 닫힌 태양 내부 채움(Filled/Radial360, 정오 유지 1→0)
+    private TMP_Text      _sunLabel;
+    private bool          _useSunGauge;    // 현재 바인딩된 리소스가 태양형인지
 
     // 무기 슬롯 활성 강조
     private RectTransform _weaponSlot0, _weaponSlot1;
@@ -167,7 +277,16 @@ public sealed class CombatPanelView : MonoBehaviour
         if (hpFillImage != null)
         {
             hpFillImage.fillAmount = ratio;
-            hpFillImage.color = HpColorFor(ratio);   // 초록(가득)→노랑→빨강(위험)
+            if (HasHpSkin)
+            {
+                // 스킨: 색 틴트 대신 고/저체력 fill 스프라이트 스왑(둘 다 지정 시)
+                if (hpFillHighSprite != null && hpFillLowSprite != null)
+                    hpFillImage.sprite = ratio <= hpFillSwapThreshold ? hpFillLowSprite : hpFillHighSprite;
+            }
+            else
+            {
+                hpFillImage.color = HpColorFor(ratio);   // 초록(가득)→노랑→빨강(위험)
+            }
         }
 
         if (hpGhostFillImage != null)
@@ -186,6 +305,8 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>체력바의 늘어난 장식 스프라이트를 제거해 단색 플랫 바로 정리(억지 스트레치 방지). fill 색은 ApplyHpFill이 담당.</summary>
     private void CleanHpBarVisual()
     {
+        if (HasHpSkin) { ApplyHpSkin(); return; }   // 스킨 지정 시 아트 적용(플랫색 스킵)
+
         if (_hpBar != null && FindChildRecursive(_hpBar, "Background") is RectTransform bgRT
             && bgRT.TryGetComponent<Image>(out var bgImg))
         {
@@ -199,6 +320,426 @@ public sealed class CombatPanelView : MonoBehaviour
             hpFillImage.type   = Image.Type.Simple;
         }
         if (hpText != null) hpText.fontSize = 11f;   // 얇은 바에 맞춘 소형 수치
+    }
+
+    /// <summary>디자이너 아트로 체력바 스킨 적용: 트랙(바탕) + fill(초록/빨강) + 테두리 오버레이.</summary>
+    private void ApplyHpSkin()
+    {
+        // 트랙(배경) — 프레임 안쪽 창에 맞춰 인셋(넘침 방지)
+        if (hpTrackSprite != null && _hpBar != null && FindChildRecursive(_hpBar, "Background") is RectTransform bgRT
+            && bgRT.TryGetComponent<Image>(out var bgImg))
+        {
+            bgImg.sprite = hpTrackSprite;
+            bgImg.type   = Image.Type.Sliced;
+            bgImg.color  = Color.white;
+            InsetInside(bgRT, hpInnerPadding);
+        }
+        // fill(가로 채움) — 색 틴트 제거, 스프라이트는 ApplyHpFill이 체력별로 스왑
+        if (hpFillImage != null)
+        {
+            hpFillImage.type       = Image.Type.Filled;
+            hpFillImage.fillMethod = Image.FillMethod.Horizontal;
+            hpFillImage.color      = Color.white;
+            if (hpFillHighSprite != null) hpFillImage.sprite = hpFillHighSprite;
+
+            // Fill Area(슬라이더 컨테이너)를 인셋 — Slider는 fillRect의 '앵커'만 구동하므로
+            // 컨테이너를 줄이면 필이 프레임 창 안에 정확히 갇힌다.
+            var fillArea = hpSlider != null && hpSlider.fillRect != null
+                ? hpSlider.fillRect.parent as RectTransform : null;
+            if (fillArea != null) InsetInside(fillArea, hpInnerPadding);
+            else                  InsetInside(hpFillImage.rectTransform, hpInnerPadding);
+        }
+        // 테두리 오버레이(fill 위) — 1회 생성
+        if (hpFrameSprite != null && _hpBar != null && _hpFrameImg == null)
+        {
+            var f   = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+            var frt = (RectTransform)f.transform;
+            frt.SetParent(_hpBar, false);
+            frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+            frt.offsetMin = Vector2.zero; frt.offsetMax = Vector2.zero;
+            _hpFrameImg = f.GetComponent<Image>();
+            _hpFrameImg.sprite        = hpFrameSprite;
+            _hpFrameImg.type          = Image.Type.Sliced;
+            _hpFrameImg.raycastTarget = false;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 디자이너 아트 스킨 (슬롯 / 유물 게이지 / 스탯 아이콘)
+    // 스프라이트 미지정 시 아무 동작도 하지 않아 기존 절차 생성 외형이 그대로 유지된다(비파괴).
+    // ─────────────────────────────────────────────────────────
+
+    private const float FrameOverhang = 1.18f;   // 테두리 아트가 슬롯을 감싸도록 하는 여유 배율
+
+    /// <summary>슬롯·게이지·스탯 아이콘에 디자이너 아트를 입힌다(Awake 말미 1회).</summary>
+    private void ApplySlotSkins()
+    {
+        ApplyWeaponSkin();
+        ApplyRelicSlotSkin();
+        ApplySkillSkin();
+        ApplyRelicGaugeSkin();
+        ApplyStatIconSkin();
+    }
+
+    // 무기 테두리 아트 2종은 '그려진 선'이 989×500으로 <b>똑같은데 캔버스 크기가 다르다</b>.
+    //   활성  : 1116×736 — 선 x 32~1020 / y(위) 133~632  (위쪽 장식 여백이 큼)
+    //   비활성: 1055×552 — 선 x 32~1020 / y(위)  28~527  (거의 꽉 참)
+    // 같은 rect에 스트레치하면 비활성 선이 훨씬 크게 그려진다(세로 150 vs 113)
+    // → "장비를 얻기 전엔 크고 얻으면 작아지는" 현상. 스프라이트별로 rect를 역산해 선 위치를 고정한다.
+    // 값 = 텍스처 안에서 선이 차지하는 정규화 사각형 (x0, y0, x1, y1), y는 <b>아래가 0</b>.
+    private static readonly Vector4 FrameLineActive   = new Vector4(0.0287f, 0.1400f, 0.9149f, 0.8193f);
+    private static readonly Vector4 FrameLineInactive = new Vector4(0.0303f, 0.0435f, 0.9678f, 0.9493f);
+
+    /// <summary>무기 2칸: 각 칸에 내부칸 배경 + 패널 전체에 2칸 통짜 테두리(장착 여부로 스왑).</summary>
+    private void ApplyWeaponSkin()
+    {
+        if (!HasWeaponSkin) return;
+
+        // 칸 배경(밝기로 활성 무기 표시)만 슬롯에 남기고, 아트 배경판은 아래에서 '한 장'으로 깐다.
+        _weaponInner0 = SkinWeaponCell(_weaponSlot0);
+        _weaponInner1 = SkinWeaponCell(_weaponSlot1);
+
+        // 테두리: 두 칸을 함께 감싸는 바깥 프레임 1장 → 슬롯이 아니라 WeaponPanel에 얹는다.
+        var panel = _weaponSlot0 != null ? _weaponSlot0.parent as RectTransform : null;
+        if (panel == null) return;
+
+        // 패널 자체의 래거시 배경판은 칸 배경 아트가 대체하므로 투명 처리(뒤로 비치는 잔상 제거).
+        if (panel.TryGetComponent<Image>(out var panelBg))
+            panelBg.color = new Color(0f, 0f, 0f, 0f);
+
+        // 내부 배경판: '무기칸 내부칸'(941×451)은 프레임의 안쪽 창(931×440)과 크기·노치가 정확히 일치한다.
+        // → 칸마다 한 장씩이 아니라 <b>창 전체를 덮는 한 장</b>이다. 칸별로 깔면 노치가 두 번 나오고 세로로 찌그러진다.
+        if (weaponSlotInnerSprite != null)
+        {
+            var inner = AddSkinLayer(panel, "SkinInner", weaponSlotInnerSprite, false);
+            if (inner != null) InsetInside((RectTransform)inner.transform, weaponInnerPadding);
+        }
+
+        // 무기 프레임은 '아이콘을 감싸는 테두리'가 아니라 패널 그 자체다 →
+        // FrameSizeFor(비율맞춤)·오버행을 쓰면 텍스처의 투명 여백까지 비율에 포함돼 세로로 부푼다.
+        // 패널 rect에 그대로 스트레치한다(rect가 이미 여백을 감안한 크기).
+        if (weaponFrameSprite != null)
+        {
+            _weaponFrameImg = AddSkinLayer(panel, "SkinFrame", weaponFrameSprite, true);
+            FitWeaponFrame(panel, inactiveArt: false);   // 초기 상태(활성 아트) 기준 rect 확정
+        }
+
+        // 두 칸을 프레임 안쪽 창의 좌/우 반반으로 배치(배경 1장 + 양쪽 장비 1개씩)
+        LayoutWeaponCells(panel);
+
+        RefreshWeaponFrames();
+    }
+
+    /// <summary>부모를 꽉 채우되 (L,B,R,T) 만큼 안쪽으로 들여 배치. 프레임 아트의 '안쪽 창' 정합용.</summary>
+    private static void InsetInside(RectTransform rt, Vector4 pad)
+    {
+        if (rt == null) return;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(pad.x, pad.y);     // left, bottom
+        rt.offsetMax = new Vector2(-pad.z, -pad.w);   // -right, -top
+    }
+
+    /// <summary>
+    /// 무기 두 칸을 프레임 안쪽 창의 좌/우 반반에 배치(가운데 간격=분할선).
+    /// 레퍼런스처럼 "배경 한 장 + 양쪽에 장비 한 개씩" 구조를 만든다.
+    /// </summary>
+    private void LayoutWeaponCells(RectTransform panel)
+    {
+        if (panel == null) return;
+        float half = weaponCellGap * 0.5f;
+        Vector4 p = weaponInnerPadding;
+
+        PlaceHalf(_weaponSlot0, 0f, 0.5f, p.x, p.y, half, p.w);   // 좌: left=padL, right=gap/2
+        PlaceHalf(_weaponSlot1, 0.5f, 1f, half, p.y, p.z, p.w);   // 우: left=gap/2, right=padR
+    }
+
+    private static void PlaceHalf(RectTransform rt, float xMin, float xMax,
+                                  float left, float bottom, float right, float top)
+    {
+        if (rt == null) return;
+        rt.anchorMin = new Vector2(xMin, 0f);
+        rt.anchorMax = new Vector2(xMax, 1f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = new Vector2(left, bottom);
+        rt.offsetMax = new Vector2(-right, -top);
+        rt.localScale = Vector3.one;
+    }
+
+    /// <summary>
+    /// 무기 칸 1개. 배경 아트는 패널에 '한 장'으로 깔리므로 칸 자체의 래거시 Image는 <b>투명</b>으로 비운다.
+    /// 반환한 Image는 활성 무기 표시(RefreshWeaponFrames)에서 옅은 하이라이트 오버레이로만 쓴다.
+    /// </summary>
+    private Image SkinWeaponCell(RectTransform slot)
+    {
+        if (slot == null) return null;
+        if (!slot.TryGetComponent<Image>(out var body)) return null;
+
+        body.sprite        = null;
+        body.color         = Color.clear;
+        body.raycastTarget = false;
+        return body;
+    }
+
+    /// <summary>무기 장착 여부에 따라 테두리 아트 스왑(비장착 → 비활성화 테두리).</summary>
+    /// <summary>
+    /// Q(유물) 슬롯 활성 아트 판단 — <b>쿨다운 완료 AND 유물 게이지 조건(IRelicResource.IsSkillReady)</b>
+    /// 둘 다 만족해야 '사용 가능'이므로 두 조건을 합쳐 테두리를 스왑한다.
+    /// 유물 리소스가 없는 경우(게이지 게이팅 없음)엔 쿨다운만으로 판단.
+    /// </summary>
+    private void RefreshQFrame()
+    {
+        if (_qFrameImg == null || relicSlotActiveSprite == null) return;
+
+        bool gaugeReady = _relicResource == null || _relicResource.IsSkillReady;
+        bool ready      = _qCooldownReady && gaugeReady;
+
+        var target = ready ? relicSlotActiveSprite : relicSlotFrameSprite;
+        if (target != null && _qFrameImg.sprite != target)
+            _qFrameImg.sprite = target;
+    }
+
+    /// <summary>
+    /// 바깥 프레임은 두 칸 공용이라 스왑 대상이 아니다. "지금 든 무기"는 <b>칸 배경 밝기</b>로 표시한다
+    /// (활성 칸=밝게, 비활성 칸=어둡게). 무기 미장착이면 바깥 프레임을 비활성 아트로.
+    /// </summary>
+    private void RefreshWeaponFrames()
+    {
+        SetWeaponCellActive(_weaponInner0, _hasWeaponEquipped && _activeWeaponIndex == 0);
+        SetWeaponCellActive(_weaponInner1, _hasWeaponEquipped && _activeWeaponIndex == 1);
+
+        if (_weaponFrameImg != null)
+        {
+            bool useInactive = !_hasWeaponEquipped && weaponFrameInactiveSprite != null;
+            Sprite s = useInactive ? weaponFrameInactiveSprite : weaponFrameSprite;
+            if (s != null && _weaponFrameImg.sprite != s)
+            {
+                _weaponFrameImg.sprite = s;
+                // 두 아트의 캔버스 여백이 달라 rect를 그대로 두면 선 크기가 튄다 → 스왑할 때마다 역산.
+                FitWeaponFrame(_weaponFrameImg.transform.parent as RectTransform, useInactive);
+            }
+        }
+    }
+
+    /// <summary>배경 아트는 창 전체 한 장이라, 활성 칸은 <b>옅은 밝기 오버레이</b>로 표시한다(비활성=완전 투명).</summary>
+    private static void SetWeaponCellActive(Image cell, bool active)
+    {
+        if (cell == null) return;
+        cell.color = active ? new Color(1f, 1f, 1f, 0.22f) : Color.clear;
+    }
+
+    /// <summary>
+    /// 테두리 아트의 '그려진 선'이 스프라이트에 상관없이 <b>항상 같은 자리·같은 크기</b>로 오도록
+    /// 프레임 rect를 역산한다. 기준은 활성 아트가 패널 전체에 그려질 때의 선 박스.
+    /// (두 아트의 캔버스 여백이 달라 그냥 스트레치하면 크기가 튄다 — 위 상수 주석 참조)
+    /// </summary>
+    private void FitWeaponFrame(RectTransform panel, bool inactiveArt)
+    {
+        if (_weaponFrameImg == null || panel == null) return;
+
+        Vector2 p = panel.rect.size;
+        if (p.x <= 0f || p.y <= 0f) return;
+
+        // 목표 선 박스 = 활성 아트를 패널에 꽉 채웠을 때의 선 위치(= 지금까지 맞춰온 기준).
+        float tx0 = FrameLineActive.x * p.x, tx1 = FrameLineActive.z * p.x;
+        float ty0 = FrameLineActive.y * p.y, ty1 = FrameLineActive.w * p.y;
+
+        Vector4 line = inactiveArt ? FrameLineInactive : FrameLineActive;
+        float w = (tx1 - tx0) / Mathf.Max(0.0001f, line.z - line.x);
+        float h = (ty1 - ty0) / Mathf.Max(0.0001f, line.w - line.y);
+
+        var rt = _weaponFrameImg.rectTransform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.zero;
+        rt.pivot     = Vector2.zero;
+        rt.sizeDelta = new Vector2(w, h);
+        rt.anchoredPosition = new Vector2(tx0 - line.x * w, ty0 - line.y * h);
+    }
+
+    /// <summary>유물(Q) 슬롯: 마름모 내부 + 테두리. 쿨다운 완료 시 활성 테두리로 스왑.</summary>
+    private void ApplyRelicSlotSkin()
+    {
+        if (!HasRelicSlotSkin) return;
+        if (FindChildRecursive(transform, "HUD_QSkile") is not RectTransform q) return;
+
+        AddSkinLayer(q, "SkinBg", relicSlotInnerSprite, false);
+        _qFrameImg = AddSkinLayer(q, "SkinFrame", relicSlotFrameSprite, true,
+            FrameSizeFor(q, relicSlotFrameSprite, FrameOverhang));
+    }
+
+    /// <summary>E/R 스킬 + 액티브 아이템 슬롯: 내부 + 테두리.</summary>
+    private void ApplySkillSkin()
+    {
+        if (!HasSkillSkin) return;
+
+        // E/R 프레임은 캐싱 — 쿨다운 완료 시 금색(사용가능) 아트로 스왑한다.
+        _eFrameImg = SkinSquareSlot(FindChildRecursive(transform, "HUD_ESkile") as RectTransform);
+        _rFrameImg = SkinSquareSlot(FindChildRecursive(transform, "HUD_RSkile") as RectTransform);
+        SkinSquareSlot(FindChildRecursive(transform, "HUD_Active_01") as RectTransform);
+        SkinSquareSlot(FindChildRecursive(transform, "HUD_Active_02") as RectTransform);
+        SkinSquareSlot(FindChildRecursive(transform, "HUD_Active_03") as RectTransform);
+    }
+
+    /// <summary>E/R 슬롯 테두리 스왑: 사용 가능=금색(er_2x) / 쿨다운 중=기본(흰색).</summary>
+    private void SetSkillFrameReady(Image frame, bool ready)
+    {
+        if (frame == null) return;
+        var target = (ready && skillFrameReadySprite != null) ? skillFrameReadySprite : skillFrameSprite;
+        if (target != null && frame.sprite != target)
+            frame.sprite = target;
+    }
+
+    /// <summary>사각 슬롯(E/R/액티브)에 내부+테두리 아트를 얹고, 테두리 Image를 반환(상태 스왑용).</summary>
+    private Image SkinSquareSlot(RectTransform slot)
+    {
+        if (slot == null) return null;
+
+        // 슬롯 본체에 단색 Image가 있으면(R 슬롯 등) 내부 아트로 교체, 없으면 배경 레이어 추가.
+        if (skillInnerSprite != null && slot.TryGetComponent<Image>(out var body))
+        {
+            body.sprite = skillInnerSprite;
+            body.type   = Image.Type.Sliced;
+            body.color  = Color.white;
+        }
+        else
+        {
+            AddSkinLayer(slot, "SkinBg", skillInnerSprite, false);
+        }
+
+        return AddSkinLayer(slot, "SkinFrame", skillFrameSprite, true,
+            FrameSizeFor(slot, skillFrameSprite, FrameOverhang));
+    }
+
+    /// <summary>
+    /// 유물 아이덴티티 바: 검 실루엣 아트로 교체.
+    /// 폭(anchorMax.x) 방식은 검 모양을 가로로 찌그러뜨리므로, 스킨 시 Filled/Horizontal(fillAmount)로 전환한다.
+    /// </summary>
+    private void ApplyRelicGaugeSkin()
+    {
+        if (!HasRelicGaugeSkin || _relicBar == null || _relicBarFill == null) return;
+
+        // 검 실루엣 비율(약 7:1)에 맞춰 바 높이를 키운다(기본 360×14 → 과하게 눌림).
+        // 크기/위치는 CreateRelicBar가 스킨 기준(380×60, y=40)으로 이미 잡음 — 여기서 덮어쓰지 않는다.
+
+        // 트랙(바 본체)
+        if (_relicBar.TryGetComponent<Image>(out var track) && relicGaugeTrackSprite != null)
+        {
+            track.sprite = relicGaugeTrackSprite;
+            track.type   = Image.Type.Simple;
+            track.color  = Color.white;
+        }
+
+        // fill: 폭 대신 fillAmount로 채운다(rect는 트랙 전체로 스트레치).
+        var frt = _relicBarFill.rectTransform;
+        frt.anchorMin = Vector2.zero;
+        frt.anchorMax = Vector2.one;
+        frt.offsetMin = Vector2.zero;
+        frt.offsetMax = Vector2.zero;
+        _relicBarFill.type       = Image.Type.Filled;
+        _relicBarFill.fillMethod = Image.FillMethod.Horizontal;
+        _relicBarFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        _relicBarFill.color      = Color.white;
+        if (relicGaugeFillSprite != null) _relicBarFill.sprite = relicGaugeFillSprite;
+        _relicGaugeFill = _relicBarFill;
+
+        // 게이지 외곽 테두리(검 실루엣 라인)
+        AddSkinLayer(_relicBar, "SkinFrame", relicGaugeFrameSprite, true);
+
+        // 라벨이 검 실루엣에 묻히지 않도록 바 위쪽으로 뺀다.
+        if (_relicBarLabel != null)
+        {
+            var lrt = _relicBarLabel.rectTransform;
+            lrt.anchorMin = new Vector2(0f, 1f);
+            lrt.anchorMax = new Vector2(1f, 1f);
+            lrt.pivot     = new Vector2(0.5f, 0f);
+            lrt.offsetMin = new Vector2(0f, 0f);
+            lrt.offsetMax = new Vector2(0f, 14f);
+        }
+    }
+
+    /// <summary>ATK/DEF 텍스트 좌측에 검·방패 아이콘 배치.</summary>
+    private void ApplyStatIconSkin()
+    {
+        float size = _statSkinned ? 32f : 16f;   // 목업 아이콘은 32px — 16px는 절반 이하라 눈에 안 띈다
+        AddStatIcon(_atkText, atkIconSprite, size);
+        AddStatIcon(_defText, defIconSprite, size);
+    }
+
+    private static void AddStatIcon(TMP_Text label, Sprite icon, float size)
+    {
+        if (label == null || icon == null) return;
+
+        var go = new GameObject("StatIcon", typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(label.transform, false);
+
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = new Vector2(0f, 0.5f);
+        rt.anchorMax = new Vector2(0f, 0.5f);
+        rt.pivot     = new Vector2(1f, 0.5f);
+        rt.anchoredPosition = new Vector2(-2f, 0f);
+        rt.sizeDelta = new Vector2(size, size);
+
+        var img = go.GetComponent<Image>();
+        img.sprite         = icon;
+        img.preserveAspect = true;
+        img.raycastTarget  = false;
+    }
+
+    /// <summary>슬롯 아래/위에 스킨 이미지 레이어를 1회 생성(이름으로 재사용). size가 0이면 부모에 스트레치.</summary>
+    private static Image AddSkinLayer(Transform parent, string name, Sprite sprite, bool onTop, Vector2 size = default)
+    {
+        if (parent == null || sprite == null) return null;
+
+        var existing = parent.Find(name);
+        var go = existing != null
+            ? existing.gameObject
+            : new GameObject(name, typeof(RectTransform), typeof(Image));
+        go.transform.SetParent(parent, false);
+
+        var rt = (RectTransform)go.transform;
+        if (size == Vector2.zero)
+        {
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        }
+        else
+        {
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = size;
+        }
+
+        // ⚠️ 부모에 LayoutGroup(Grid/Horizontal/Vertical)이 있으면 이 스킨 레이어가 '레이아웃 아이템'으로
+        //    끼어들어 배경이 아니라 셀처럼 찌그러진다. 반드시 레이아웃에서 제외한다.
+        if (!go.TryGetComponent<LayoutElement>(out var le)) le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        if (!go.TryGetComponent<Image>(out var img)) img = go.AddComponent<Image>();
+        img.sprite        = sprite;
+        img.type          = Image.Type.Sliced;
+        img.color         = Color.white;
+        img.raycastTarget = false;
+
+        if (onTop) rt.SetAsLastSibling();
+        else       rt.SetAsFirstSibling();
+
+        return img;
+    }
+
+    /// <summary>테두리 아트가 슬롯을 감싸도록, 아트 비율을 유지한 채 부모를 덮는 rect 크기를 구한다(찌그러짐 방지).</summary>
+    private static Vector2 FrameSizeFor(RectTransform parent, Sprite art, float overhang)
+    {
+        if (parent == null || art == null) return Vector2.zero;
+
+        float aspect = art.rect.height > 0f ? art.rect.width / art.rect.height : 1f;
+        Vector2 p = parent.rect.size * overhang;
+        if (p.x <= 0f || p.y <= 0f) return Vector2.zero;
+
+        float w = Mathf.Max(p.x, p.y * aspect);
+        float h = w / Mathf.Max(0.0001f, aspect);
+        return new Vector2(w, h);
     }
 
     private void UpdateHpAnimation()
@@ -233,7 +774,16 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         var ui = index == 0 ? slot0 : index == 1 ? slot1 : null;
         ui?.Apply(info);
+
+        if (index == 0 || index == 1)
+        {
+            _slotHasWeapon[index] = info.HasWeapon;
+            _hasWeaponEquipped    = _slotHasWeapon[0] || _slotHasWeapon[1];
+            RefreshWeaponFrames();   // 스킨 시 활성/비활성 테두리 스왑(미지정이면 no-op)
+        }
     }
+
+    private readonly bool[] _slotHasWeapon = new bool[2];
 
     // ─────────────────────────────────────────────────────────
     // 스킬 슬롯
@@ -254,14 +804,31 @@ public sealed class CombatPanelView : MonoBehaviour
 
     public void SetSkillCooldown(SkillType skill, float remaining, float total)
     {
+        bool ready = remaining <= 0.05f;
+
         if (skill == SkillType.R)
         {
-            bool onCd = remaining > 0.05f;
+            bool onCd = !ready;
             if (_rCooldownBg != null) _rCooldownBg.SetActive(onCd);
+            if (_rCooldownFill != null)
+                _rCooldownFill.fillAmount = (onCd && total > 0f) ? remaining / total : 0f;
             if (_rCooldownTxt != null)
                 _rCooldownTxt.text = onCd ? Mathf.CeilToInt(remaining).ToString() : string.Empty;
+            SetSkillFrameReady(_rFrameImg, ready);   // 사용가능 → 금색 테두리
             return;
         }
+
+        // 유물(Q): 쿨다운 상태만 기록하고, 활성 아트 판단은 게이지 조건까지 합쳐 RefreshQFrame이 결정.
+        if (skill == SkillType.Q)
+        {
+            _qCooldownReady = ready;
+            RefreshQFrame();
+        }
+        else if (skill == SkillType.E)
+        {
+            SetSkillFrameReady(_eFrameImg, ready);   // 사용가능 → 금색 테두리
+        }
+
         GetSkillSlot(skill)?.SetCooldown(remaining, total);
     }
 
@@ -354,6 +921,57 @@ public sealed class CombatPanelView : MonoBehaviour
             iconImage.gameObject.SetActive(icon != null);
         }
 
+        /// <summary>
+        /// 쿨다운 <b>차오름 필</b>과 <b>숫자</b>를 확보한다.
+        /// 프리팹의 skillQ/skillE는 cooldownOverlay·cooldownText가 <b>모두 미할당(null)</b>이고,
+        /// cooldownBg도 슬롯 구석의 28×16 작은 뱃지로 배치돼 있어 R처럼 도는 연출이 안 보였다.
+        /// → 슬롯 전체를 덮는 어두운 베일로 정규화하고 숫자를 중앙에 두어 R 슬롯과 동일하게 맞춘다.
+        /// </summary>
+        internal void EnsureCooldownVisuals(Sprite fillSprite, TMP_FontAsset font)
+        {
+            if (cooldownBg == null) return;
+
+            // 슬롯 전체를 덮도록 스트레치 — 프리팹 값(구석 뱃지)은 R과 달라 스윕이 보이지 않는다.
+            var bgRT = (RectTransform)cooldownBg.transform;
+            bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
+            bgRT.offsetMin = Vector2.zero; bgRT.offsetMax = Vector2.zero;
+
+            // 쿨다운 배경 Image 자체를 Radial360 Filled로 전환 → 시계방향 스윕(R 슬롯과 동일 방식)
+            if (cooldownOverlay == null && cooldownBg.TryGetComponent<Image>(out var bgImg))
+            {
+                bgImg.raycastTarget = false;
+                bgImg.color         = new Color(0f, 0f, 0f, 0.65f);   // R과 동일한 어두운 베일
+                if (fillSprite != null)
+                {
+                    bgImg.sprite        = fillSprite;
+                    bgImg.type          = Image.Type.Filled;
+                    bgImg.fillMethod    = Image.FillMethod.Radial360;
+                    bgImg.fillOrigin    = (int)Image.Origin360.Top;
+                    bgImg.fillClockwise = true;
+                }
+                cooldownOverlay = bgImg;
+            }
+
+            // 남은 시간 숫자 — 베일 위 중앙
+            if (cooldownText == null)
+            {
+                var go = new GameObject("CooldownText", typeof(RectTransform));
+                go.transform.SetParent(cooldownBg.transform, false);
+                var rt = (RectTransform)go.transform;
+                rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
+                var tmp = go.AddComponent<TextMeshProUGUI>();
+                if (font != null) tmp.font = font;
+                tmp.fontSize      = 18f;
+                tmp.fontStyle     = FontStyles.Bold;
+                tmp.alignment     = TextAlignmentOptions.Center;
+                tmp.color         = Color.white;
+                tmp.raycastTarget = false;
+                cooldownText = tmp;
+            }
+        }
+
         public void SetCooldown(float remaining, float total)
         {
             bool onCooldown = remaining > 0.05f;
@@ -403,6 +1021,12 @@ public sealed class CombatPanelView : MonoBehaviour
         EnsureSlotLabels();
         EnsureRSlot();           // R → WeaponPod
         EnsureStatPanel();       // ATK/DEF → HpBar
+
+        // Q/E는 프리팹에 cooldownOverlay·cooldownText가 미할당이라 R처럼 도는 연출이 없었다 → 런타임 보강.
+        skillQ?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
+        skillE?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
+
+        ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
     }
 
     private void OnEnable()  => SceneManager.sceneLoaded += HandleSceneLoaded;
@@ -424,8 +1048,11 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_layoutBuilt) return;
         _layoutBuilt = true;
 
-        // HP → 하단중앙 얇은 모던 바 (올림 → 아래에 무기 2종 자리)
-        _hpBar = CreateContainer("HpBar", new Vector2(0.5f, 0f), new Vector2(0f, 96f), new Vector2(520f, 16f), new Vector2(0.5f, 0f));
+        // HP → 하단중앙. 스킨 시 프레임 아트 비율(3379×368 ≈ 9.2:1)에 맞춰 650×71 —
+        // 아트 높이엔 위아래 장식이 포함돼 있어 실제 트랙 창은 가운데 슬롯(= hpInnerPadding으로 인셋).
+        Vector2 hpSize = HasHpSkin ? new Vector2(650f, 71f) : new Vector2(520f, 16f);
+        float   hpY    = HasHpSkin ? hpBarY : 96f;
+        _hpBar = CreateContainer("HpBar", new Vector2(0.5f, 0f), new Vector2(0f, hpY), hpSize, new Vector2(0.5f, 0f));
         if (FindChildRecursive(transform, "HUD_Hp") is RectTransform hpRT)
         {
             hpRT.SetParent(_hpBar, false);
@@ -436,42 +1063,66 @@ public sealed class CombatPanelView : MonoBehaviour
             hpFillImage = hpSlider.fillRect.GetComponent<Image>();
         CleanHpBarVisual();   // 늘어난 장식 아트 → 단색 플랫 바
 
-        // 스킬 2포드(우하단): 유물(금) / 무기(청) — 스킬=최상위 위계(가장 큼)
-        _relicPod  = CreatePod("RelicPod",  new Vector2(-336f, 26f), new Vector2(118f, 118f), RelicColor);
-        _weaponPod = CreatePod("WeaponPod", new Vector2(-24f,  26f), new Vector2(300f, 118f), WeaponColor);
-        ReparentSkill("HUD_QSkile", _relicPod,  new Vector2(0.5f, 0.5f), new Vector2(0f, -6f), new Vector2(90f, 90f));
-        ReparentSkill("HUD_ESkile", _weaponPod, new Vector2(0f, 0.5f),   new Vector2(94f, -6f), new Vector2(78f, 78f));
-        AddPodLabel(_relicPod,  "유물", RelicColor);
-        AddPodLabel(_weaponPod, "무기", WeaponColor);
+        // 스킬 2포드(우하단): 유물(Q) / 무기(E·R).
+        // 스킨 시 래거시 색판(금/청 alpha 0.14)·Outline·"유물"/"무기" 라벨을 만들지 않는다 — 아트 프레임이 대체.
+        // 스킨 시 Y를 올려 아이템 행(y=300)과의 간격을 목업 수준(약 120)으로 좁힌다.
+        float podY = HasSkillSkin ? 120f : 26f;
+        _relicPod  = CreatePod("RelicPod",  new Vector2(-336f, podY), new Vector2(118f, 118f), RelicColor,  HasRelicSlotSkin);
+        _weaponPod = CreatePod("WeaponPod", new Vector2(-24f,  podY), new Vector2(300f, 118f), WeaponColor, HasSkillSkin);
+        // 슬롯 rect — 테두리는 오버행 1.18배로 그려지므로 '보이는 크기 ÷ 1.18'이 rect다.
+        // 목업 보이는 크기: Q 다이아 ≈123 / E ≈104 / R ≈118 → rect 104 / 88 / 100.
+        ReparentSkill("HUD_QSkile", _relicPod,  new Vector2(0.5f, 0.5f), new Vector2(0f, -6f), new Vector2(104f, 104f));
+        ReparentSkill("HUD_ESkile", _weaponPod, new Vector2(0f, 0.5f),   new Vector2(94f, -6f), new Vector2(88f, 88f));
+        if (!HasRelicSlotSkin) AddPodLabel(_relicPod,  "유물", RelicColor);
+        if (!HasSkillSkin)     AddPodLabel(_weaponPod, "무기", WeaponColor);
         // R은 EnsureRSlot이 _weaponPod 우측에 배치(궁극=가장 큼)
 
         // 무기 2종 → 좌하단(빈 공간), 확대. 활성 무기 강조용 슬롯/아웃라인 캐싱.
         if (FindChildRecursive(transform, "WeaponPanel") is RectTransform wpRT)
         {
             wpRT.SetParent(transform, false);
-            Anchor(wpRT, new Vector2(0f, 0f), new Vector2(30f, 60f), new Vector2(170f, 78f), new Vector2(0f, 0f));
+            // 스킨 시: 테두리 아트(1116×736)는 실제 선이 약 985×510이고 나머지가 투명 여백이다.
+            // 그래서 rect를 여백만큼 키워야(340×166) 보이는 테두리가 목업 크기(≈300×115, 2.6:1)로 떨어진다.
+            Vector2 wpSize = HasWeaponSkin ? new Vector2(340f, 166f) : new Vector2(170f, 78f);
+            Vector2 wpPos  = HasWeaponSkin ? new Vector2(79f,  108f) : new Vector2(30f,  60f);
+            Anchor(wpRT, new Vector2(0f, 0f), wpPos, wpSize, new Vector2(0f, 0f));
             wpRT.localScale = Vector3.one;   // 확대(0.85→1.0)
             _weaponSlot0 = FindChildRecursive(wpRT, "Weapon_01") as RectTransform;
             _weaponSlot1 = FindChildRecursive(wpRT, "Weapon_02") as RectTransform;
             _weaponOutline0 = EnsureSlotOutline(_weaponSlot0);
             _weaponOutline1 = EnsureSlotOutline(_weaponSlot1);
+            // 래거시 금색 강조선 — 아트 프레임과 중복이라 스킨 시 끔.
+            if (HasWeaponSkin)
+            {
+                if (_weaponOutline0 != null) _weaponOutline0.enabled = false;
+                if (_weaponOutline1 != null) _weaponOutline1.enabled = false;
+            }
             DisableChildrenNamed(wpRT, "EmptyText");   // 빈 슬롯 "비어있음" 텍스트 정리
         }
 
         // 유물 아이덴티티 바 (체력바 아래) — 활성 유물 IRelicResource 표시
         CreateRelicBar();
+        BuildSunGauge();   // 가웨인 태양형(Style==Sun) 위젯 — 스프라이트 지정 시에만 생성, 초기 숨김
 
-        // 중앙 하단 HUD 가시성↑: HP·유물바·스탯 뒤 어두운 배경 패널(밝은 바닥 대비)
-        var backdrop = CreateContainer("CenterBackdrop", new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(560f, 106f), new Vector2(0.5f, 0f));
-        var bdImg = backdrop.gameObject.AddComponent<Image>();
-        bdImg.color = new Color(0f, 0f, 0f, 0.34f);
-        bdImg.raycastTarget = false;
-        backdrop.SetAsFirstSibling();   // 중앙 요소들 뒤로
+        // 중앙 하단 HUD 가시성↑: HP·유물바·스탯 뒤 어두운 배경 패널(밝은 바닥 대비).
+        // 스킨 시엔 아트 자체가 대비를 가지므로 검은 반투명 판을 만들지 않는다(래거시 박스 잔상 방지).
+        if (!HasHpSkin)
+        {
+            var backdrop = CreateContainer("CenterBackdrop", new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(560f, 106f), new Vector2(0.5f, 0f));
+            var bdImg = backdrop.gameObject.AddComponent<Image>();
+            bdImg.color = new Color(0f, 0f, 0f, 0.34f);
+            bdImg.raycastTarget = false;
+            backdrop.SetAsFirstSibling();   // 중앙 요소들 뒤로
+        }
 
-        // 액티브 아이템 1/2/3 → 상단 좌측 소형 행(무기 슬롯과 분리)
-        ReanchorActive("HUD_Active_01", new Vector2(-300f, 172f));
-        ReanchorActive("HUD_Active_02", new Vector2(-346f, 172f));
-        ReanchorActive("HUD_Active_03", new Vector2(-392f, 172f));
+        // 액티브 아이템 1/2/3 → 스킬 클러스터 위쪽 행. 스킨 시 목업 비율(90px, 우측 여백 56)로 확대.
+        float aSize = HasSkillSkin ? 80f : 46f;   // 테두리 오버행 1.18배 → 보이는 크기 ≈95 (목업)
+        float aY    = HasSkillSkin ? 300f : 172f;
+        float aStep = HasSkillSkin ? 102f : 46f;
+        float aX    = HasSkillSkin ? -101f : -300f;
+        ReanchorActive("HUD_Active_01", new Vector2(aX,             aY), aSize);
+        ReanchorActive("HUD_Active_02", new Vector2(aX - aStep,     aY), aSize);
+        ReanchorActive("HUD_Active_03", new Vector2(aX - aStep * 2, aY), aSize);
 
         // 자식이 모두 빠져나간 원래 컨테이너(배경 이미지)를 숨김 — 하단중앙 빈 박스 잔류 방지
         if (FindChildRecursive(transform, "CombatStatusRoot") is RectTransform legacyRoot)
@@ -490,9 +1141,11 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     /// <summary>우하단 스킬 포드(반투명 배경 + 테두리). 색+형태 이중부호화(WCAG 1.4.1).</summary>
-    private RectTransform CreatePod(string name, Vector2 pos, Vector2 size, Color color)
+    private RectTransform CreatePod(string name, Vector2 pos, Vector2 size, Color color, bool skinned = false)
     {
         var rt = CreateContainer(name, new Vector2(1f, 0f), pos, size, new Vector2(1f, 0f));
+        if (skinned) return rt;   // 스킨: 래거시 색판·Outline 생략(아트 프레임이 대체)
+
         var img = rt.gameObject.AddComponent<Image>();
         img.color = new Color(color.r, color.g, color.b, 0.14f);
         img.raycastTarget = false;
@@ -510,11 +1163,11 @@ public sealed class CombatPanelView : MonoBehaviour
         Anchor(rt, anchor, pos, size, new Vector2(0.5f, 0.5f));
     }
 
-    private void ReanchorActive(string childName, Vector2 pos)
+    private void ReanchorActive(string childName, Vector2 pos, float size)
     {
         if (FindChildRecursive(transform, childName) is not RectTransform rt) return;
         rt.SetParent(transform, false);
-        Anchor(rt, new Vector2(1f, 0f), pos, new Vector2(46f, 46f), new Vector2(0.5f, 0.5f));
+        Anchor(rt, new Vector2(1f, 0f), pos, new Vector2(size, size), new Vector2(0.5f, 0.5f));
     }
 
     /// <summary>포드 상단 출처 라벨(유물/무기).</summary>
@@ -560,7 +1213,10 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>유물 아이덴티티 바(체력바 아래): 트랙 + fill(anchorMax.x로 폭) + 중앙 라벨. 유물 바인딩 전엔 숨김.</summary>
     private void CreateRelicBar()
     {
-        _relicBar = CreateContainer("RelicIdentityBar", new Vector2(0.5f, 0f), new Vector2(0f, 72f), new Vector2(360f, 14f), new Vector2(0.5f, 0f));
+        // 스킨 시 검 실루엣 아트 비율(≈7:1)에 맞춰 크게, 그리고 체력바 아래로 내려 겹침 방지.
+        Vector2 rbSize = HasRelicGaugeSkin ? new Vector2(380f, 60f) : new Vector2(360f, 14f);
+        float   rbY    = HasRelicGaugeSkin ? relicBarY : 72f;
+        _relicBar = CreateContainer("RelicIdentityBar", new Vector2(0.5f, 0f), new Vector2(0f, rbY), rbSize, new Vector2(0.5f, 0f));
         var track = _relicBar.gameObject.AddComponent<Image>();
         track.color = new Color(0f, 0f, 0f, 0.5f);
         track.raycastTarget = false;
@@ -597,6 +1253,152 @@ public sealed class CombatPanelView : MonoBehaviour
         _relicBar.gameObject.SetActive(false);
     }
 
+    // ─────────────────────────────────────────────────────────
+    // 가웨인 태양 게이지(Style==Sun) — 수평 바를 대체하는 라디얼 태양 위젯.
+    //   충전(여명·황혼) : 열린 태양 + 중앙을 가로지르는 충전 게이지(0→1)
+    //   정오            : 태양이 닫히고 게이지 사라짐 → 완성 태양의 내부 채움이 감소(1→0)로 유지시간 표현
+    // 스프라이트 미지정 시 아무 것도 만들지 않아 기존 수평 바만 남는다(비파괴).
+    // ─────────────────────────────────────────────────────────
+    // 체력바 아래 하단중앙. 태양은 크게, 게이지는 태양의 빈 중앙(입)을 관통한다.
+    private const float SunBoxSize   = 100f;   // 태양 표시 박스(정사각, preserveAspect로 비율 유지)
+    private const float SunClusterY  = 8f;     // 컨테이너 하단 y(화면 아래에서)
+    private const float SunCenterY   = 50f;    // 컨테이너 내 태양 중심
+    private const float SunGaugeOff  = 0f;     // 게이지 = 태양 정중앙(빈 공간)을 관통
+    private const float SunGaugeW     = 340f;   // 충전 게이지 폭(태양보다 넓어 양옆으로 통과)
+    private const float SunGaugeH     = 16f;
+
+    // 붉은 게이지 색 — 기본색도 밝은 주황빨강, 끝으로 갈수록 더 진하고 밝게.
+    private static readonly Color SunGaugeRedDark = new Color(0.95f, 0.32f, 0.10f, 1f);  // 시작(밝은 주황빨강)
+    private static readonly Color SunGaugeRedHot  = new Color(1.00f, 0.52f, 0.18f, 1f);  // 선단(더 밝은 주홍)
+    private static readonly Color SunNoonRed      = new Color(1.00f, 0.40f, 0.16f, 1f);  // 정오 내부 채움
+
+    private void BuildSunGauge()
+    {
+        if (!HasSunSkin) return;
+
+        // 태양은 세로로 크므로 하단중앙에 별도 컨테이너로 둔다. 큰 태양의 윗부분은 체력바 뒤로 tuck.
+        _sunRoot = CreateContainer("RelicSunGauge", new Vector2(0.5f, 0f),
+                                   new Vector2(0f, SunClusterY), new Vector2(360f, 104f), new Vector2(0.5f, 0f));
+
+        Vector2 sunCenter   = new Vector2(0f, SunCenterY);                 // 태양(열림/닫힘) 중심
+        Vector2 gaugeCenter = new Vector2(0f, SunCenterY + SunGaugeOff);   // 게이지는 태양의 빈 중앙을 관통
+
+        // 충전 게이지 — 태양의 빈 중앙을 가로지르는 수평 바(트랙 + fill). 태양보다 뒤(먼저)에 깔아 가운데 공간으로 보이게.
+        _sunGaugeRoot = MakeSunChild("SunGauge", gaugeCenter, new Vector2(SunGaugeW, SunGaugeH));
+        var track = _sunGaugeRoot.gameObject.AddComponent<Image>();
+        track.color = new Color(0.30f, 0.07f, 0.03f, 0.7f);   // 따뜻한 어두운 주황빨강 트랙(빈 구간)
+        track.raycastTarget = false;
+
+        var gaugeFillRT = MakeStretchChild(_sunGaugeRoot, "Fill");
+        _sunGaugeFill = gaugeFillRT.gameObject.AddComponent<Image>();
+        _sunGaugeFill.sprite      = sunGaugeSprite != null ? sunGaugeSprite : null;
+        _sunGaugeFill.type        = Image.Type.Filled;
+        _sunGaugeFill.fillMethod  = Image.FillMethod.Horizontal;
+        _sunGaugeFill.fillOrigin  = (int)Image.OriginHorizontal.Left;
+        _sunGaugeFill.color       = Color.white;   // 그라디언트가 정점색으로 곱해져 붉게 물든다
+        _sunGaugeFill.raycastTarget = false;
+        // 끝으로 갈수록 진하고 밝은 붉은색 — 정점 그라디언트(셰이더 없이).
+        var gaugeGrad = gaugeFillRT.gameObject.AddComponent<UIHorizontalGradient>();
+        gaugeGrad.SetColors(SunGaugeRedDark, SunGaugeRedHot);
+
+        // 열린 태양(충전) — 게이지 위. 중앙 공간이 비어 게이지가 그 사이로 보인다.
+        var openRT = MakeSunChild("SunOpen", sunCenter, new Vector2(SunBoxSize, SunBoxSize));
+        _sunOpenImg = openRT.gameObject.AddComponent<Image>();
+        _sunOpenImg.sprite         = sunOpenSprite;
+        _sunOpenImg.preserveAspect = true;
+        _sunOpenImg.raycastTarget  = false;
+
+        // 닫힌 태양(정오) — 어두운 베이스 + 밝은 내부 채움(라디얼 감소). 충전 중엔 숨김.
+        var closedRT = MakeSunChild("SunClosed", sunCenter, new Vector2(SunBoxSize, SunBoxSize));
+        _sunClosedImg = closedRT.gameObject.AddComponent<Image>();
+        _sunClosedImg.sprite         = sunClosedSprite;
+        _sunClosedImg.preserveAspect = true;
+        _sunClosedImg.color          = new Color(0.30f, 0.05f, 0.04f, 0.9f);   // 소진되어 남는 어두운 심홍 태양
+        _sunClosedImg.raycastTarget  = false;
+
+        var closedFillRT = MakeStretchChild(closedRT, "Fill");
+        _sunClosedFill = closedFillRT.gameObject.AddComponent<Image>();
+        _sunClosedFill.sprite         = sunClosedSprite;
+        _sunClosedFill.preserveAspect = true;
+        _sunClosedFill.type           = Image.Type.Filled;
+        _sunClosedFill.fillMethod     = Image.FillMethod.Radial360;
+        _sunClosedFill.fillOrigin     = (int)Image.Origin360.Top;
+        _sunClosedFill.fillClockwise  = true;
+        _sunClosedFill.color          = SunNoonRed;   // 정오 유지 게이지 = 붉은색
+        _sunClosedFill.raycastTarget  = false;
+        closedRT.gameObject.SetActive(false);
+
+        // 라벨(태양 아래 — 컨테이너 최하단)
+        var lblRT = MakeSunChild("Label", new Vector2(0f, 0f), new Vector2(300f, 15f));
+        lblRT.pivot = new Vector2(0.5f, 0f);
+        _sunLabel = lblRT.gameObject.AddComponent<TextMeshProUGUI>();
+        AssignSafeFont(_sunLabel);
+        _sunLabel.fontSize      = 11f;
+        _sunLabel.alignment     = TextAlignmentOptions.Center;
+        _sunLabel.color         = Color.white;
+        _sunLabel.raycastTarget = false;
+        var lblOl = lblRT.gameObject.AddComponent<Outline>();
+        lblOl.effectColor    = new Color(0f, 0f, 0f, 0.8f);
+        lblOl.effectDistance = new Vector2(1f, -1f);
+
+        // 큰 태양이라 윗부분이 체력바 영역에 닿을 수 있어 뒤(먼저)로 보내 체력바가 앞을 가리게 한다.
+        _sunRoot.SetAsFirstSibling();
+        _sunRoot.gameObject.SetActive(false);
+    }
+
+    /// <summary>_sunRoot 아래 중앙정렬 자식 RectTransform 생성(anchoredPosition=center).</summary>
+    private RectTransform MakeSunChild(string name, Vector2 center, Vector2 size)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(_sunRoot, false);
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = center;
+        rt.sizeDelta = size;
+        return rt;
+    }
+
+    private static RectTransform MakeStretchChild(RectTransform parent, string name)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        return rt;
+    }
+
+    /// <summary>가웨인 태양 위젯 갱신 — 정오면 닫힌 태양(내부 감소), 아니면 열린 태양+충전 게이지.</summary>
+    private void UpdateSunGauge()
+    {
+        float fill = Mathf.Clamp01(_relicResource.Fill);
+        bool  noon = _relicResource.IsSkillReady;
+
+        // 게이지 조건이 바뀌면 Q 슬롯 사용가능 표시도 즉시 따라간다(쿨다운과 AND).
+        RefreshQFrame();
+
+        if (_sunOpenImg   != null && _sunOpenImg.gameObject.activeSelf   == noon)  _sunOpenImg.gameObject.SetActive(!noon);
+        if (_sunGaugeRoot != null && _sunGaugeRoot.gameObject.activeSelf == noon)  _sunGaugeRoot.gameObject.SetActive(!noon);
+        if (_sunClosedImg != null && _sunClosedImg.gameObject.activeSelf != noon)  _sunClosedImg.gameObject.SetActive(noon);
+
+        if (noon)
+        {
+            if (_sunClosedFill != null) _sunClosedFill.fillAmount = fill;   // 정오 유지 1→0
+        }
+        else
+        {
+            if (_sunGaugeFill != null) _sunGaugeFill.fillAmount = fill;      // 충전 0→1
+        }
+
+        // 정오 진입 펀치(상승엣지).
+        if (noon && !_lastSkillReady) _relicFlash = 1f;
+        _lastSkillReady = noon;
+        if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
+        _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
+    }
+
     private Outline EnsureSlotOutline(RectTransform slot)
     {
         if (slot == null) return null;
@@ -607,11 +1409,14 @@ public sealed class CombatPanelView : MonoBehaviour
         return ol;
     }
 
-    /// <summary>활성 무기 슬롯 강조(아웃라인 + 확대 연출). HudPresenter가 CurrentSlotIndex로 호출.</summary>
+    /// <summary>활성 무기 슬롯 강조. 스킨 시 테두리 아트 스왑, 미스킨 시 래거시 금색 아웃라인.
+    /// HudPresenter가 CurrentSlotIndex로 호출.</summary>
     public void SetActiveWeapon(int index)
     {
+        _activeWeaponIndex = index;
         SetSlotActive(_weaponSlot0, _weaponOutline0, index == 0);
         SetSlotActive(_weaponSlot1, _weaponOutline1, index == 1);
+        RefreshWeaponFrames();   // 스킨 시 활성/비활성 테두리 교체(미지정이면 no-op)
     }
 
     private static void SetSlotActive(RectTransform slot, Outline ol, bool active)
@@ -628,18 +1433,32 @@ public sealed class CombatPanelView : MonoBehaviour
             _relicResource.OnChanged -= _relicChanged;
 
         _relicResource = res;
-        if (res == null) { _relicBar.gameObject.SetActive(false); return; }
+
+        // 태양형(가웨인)이고 스프라이트가 있으면 태양 위젯, 아니면 수평 바 — 종류를 몰라도 형태만 분기.
+        _useSunGauge = res != null && res.Style == RelicGaugeStyle.Sun && _sunRoot != null;
+
+        if (res == null)
+        {
+            _relicBar.gameObject.SetActive(false);
+            if (_sunRoot != null) _sunRoot.gameObject.SetActive(false);
+            return;
+        }
 
         _relicChanged ??= RefreshRelicLabel;
         res.OnChanged += _relicChanged;
-        _relicBar.gameObject.SetActive(true);
+
+        _relicBar.gameObject.SetActive(!_useSunGauge);
+        if (_sunRoot != null) _sunRoot.gameObject.SetActive(_useSunGauge);
+
+        _lastSkillReady = res.IsSkillReady;   // 바인딩 순간을 기준으로 — 첫 프레임 헛 플래시 방지
         RefreshRelicLabel();
     }
 
     private void RefreshRelicLabel()
     {
-        if (_relicBarLabel != null && _relicResource != null)
-            _relicBarLabel.text = _relicResource.Label;
+        if (_relicResource == null) return;
+        if (_useSunGauge) { if (_sunLabel != null) _sunLabel.text = _relicResource.Label; }
+        else if (_relicBarLabel != null) _relicBarLabel.text = _relicResource.Label;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -764,16 +1583,36 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_hpInitialized)
             UpdateHpAnimation();
 
+        // 가웨인 태양형: 라디얼 태양 위젯을 대신 구동(수평 바는 숨김).
+        if (_useSunGauge && _relicResource != null)
+        {
+            UpdateSunGauge();
+        }
         // 유물 아이덴티티 바: Fill(폭)·색 매 프레임 폴링 + 게이지 맥동/절정 연출(라벨은 OnChanged)
-        if (_relicResource != null && _relicBarFill != null)
+        else if (_relicResource != null && _relicBarFill != null)
         {
             float fill = Mathf.Clamp01(_relicResource.Fill);
-            _relicBarFill.rectTransform.anchorMax = new Vector2(fill, 1f);
             var c = _relicResource.BarColor;
-            _relicBarFill.color = c;
+
+            bool ready = _relicResource.IsSkillReady;
+
+            // 게이지 조건이 바뀌면 Q 슬롯 사용가능 표시도 즉시 따라간다(쿨다운과 AND).
+            RefreshQFrame();
+
+            if (_relicGaugeFill != null)
+            {
+                // 스킨: 폭 대신 fillAmount(검 실루엣 유지) + 상태별 fill 아트 스왑(평시 보라 / 절정 빨강)
+                _relicGaugeFill.fillAmount = fill;
+                var art = (ready && relicGaugeReadySprite != null) ? relicGaugeReadySprite : relicGaugeFillSprite;
+                if (art != null && _relicGaugeFill.sprite != art) _relicGaugeFill.sprite = art;
+            }
+            else
+            {
+                _relicBarFill.rectTransform.anchorMax = new Vector2(fill, 1f);
+                _relicBarFill.color = c;
+            }
 
             // 절정 구간(가웨인 정오 등 IsSkillReady): 진입 플래시 + 빠르고 강한 맥동. 랜슬롯은 게이지 비례.
-            bool ready = _relicResource.IsSkillReady;
             if (ready && !_lastSkillReady) _relicFlash = 1f;               // 정오 진입 플래시(상승엣지)
             _lastSkillReady = ready;
             if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
@@ -916,8 +1755,30 @@ public sealed class CombatPanelView : MonoBehaviour
         var go = new GameObject($"BuffCell_{_buffCells.Count}", typeof(RectTransform));
         go.transform.SetParent(_buffGrid.transform, false);
         var cell = go.AddComponent<BuffCell>();
-        cell.Initialize(GetSafeFont(), OnBuffCellHover);
+        _buffIconResolver ??= BuffIconFor;
+        cell.Initialize(GetSafeFont(), OnBuffCellHover, buffInnerSprite, buffFrameSprite, _buffIconResolver);
         return cell;
+    }
+
+    // ── 버프 아이콘 해석: 디자이너 글리프 우선, 없으면 기존 EffectIconRegistry ──
+    private Func<string, Sprite> _buffIconResolver;
+
+    /// <summary>IconKey → 스프라이트. 디자이너 글리프가 매핑된 키면 그 아트를, 아니면 기존 레지스트리 결과를 쓴다.</summary>
+    private Sprite BuffIconFor(string iconKey)
+        => GlyphFor(iconKey) ?? EffectIconRegistry.GetSprite(iconKey);
+
+    /// <summary>디자이너가 준 버프 글리프 4종의 IconKey 매핑(모양 기반 추정 — 날개/모래시계/꽃/반지).</summary>
+    private Sprite GlyphFor(string iconKey)
+    {
+        if (string.IsNullOrEmpty(iconKey)) return null;
+
+        if (Same(iconKey, "speed") || Same(iconKey, "atkspeed")) return buffIconSpeed;
+        if (Same(iconKey, "cooldown"))                           return buffIconCooldown;
+        if (Same(iconKey, "heal"))                               return buffIconHeal;
+        if (Same(iconKey, "luck"))                               return buffIconLuck;
+        return null;
+
+        static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── 호버 툴팁(재사용 1개) ────────────────────────────────
@@ -1152,7 +2013,20 @@ public sealed class CombatPanelView : MonoBehaviour
         cdRT.anchorMin = Vector2.zero;
         cdRT.anchorMax = Vector2.one;
         cdRT.sizeDelta  = Vector2.zero;
-        cdBG.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.65f);
+        var cdImg = cdBG.AddComponent<Image>();
+        cdImg.color         = new Color(0f, 0f, 0f, 0.65f);
+        cdImg.raycastTarget = false;
+        // 차오름 필 — E/Q와 동일 의미(fillAmount = remaining/total). Filled는 스프라이트가 있어야 동작하므로
+        // 슬롯 내부 아트가 있을 때만 radial 스윕, 없으면 기존 단순 토글(회귀 0).
+        if (skillInnerSprite != null)
+        {
+            cdImg.sprite        = skillInnerSprite;
+            cdImg.type          = Image.Type.Filled;
+            cdImg.fillMethod    = Image.FillMethod.Radial360;
+            cdImg.fillOrigin    = (int)Image.Origin360.Top;
+            cdImg.fillClockwise = true;
+        }
+        _rCooldownFill = cdImg;
         _rCooldownBg = cdBG;
         _rCooldownBg.SetActive(false);
 
@@ -1181,8 +2055,17 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>공격력·방어력을 HUD에 실시간 반영한다. HudPresenter.RefreshStats에서 호출.</summary>
     public void SetStats(int atk, int def)
     {
-        if (_atkText != null) _atkText.SetText($"ATK {atk}");
-        if (_defText != null) _defText.SetText($"DEF {def}");
+        // 스킨: 아이콘이 의미를 전달하므로 숫자만(목업 형식). 래거시: 라벨 포함.
+        if (_atkText != null)
+        {
+            if (_statSkinned) _atkText.SetText("{0}", atk);
+            else              _atkText.SetText($"ATK {atk}");
+        }
+        if (_defText != null)
+        {
+            if (_statSkinned) _defText.SetText("{0}", def);
+            else              _defText.SetText($"DEF {def}");
+        }
     }
 
     private void EnsureStatPanel()
@@ -1190,7 +2073,9 @@ public sealed class CombatPanelView : MonoBehaviour
         if (_statRoot != null) return;
         if (_hpBar == null) return;   // EnsureLayout이 먼저 생성
 
-        // 스탯 행: HP 바 바로 위 24px (ATK 좌 / DEF 우)
+        _statSkinned = HasHpSkin;
+
+        // 스탯 행: HP 바 바로 위
         var statGO = new GameObject("StatRow", typeof(RectTransform));
         statGO.transform.SetParent(_hpBar, false);
         _statRoot = statGO;
@@ -1199,22 +2084,27 @@ public sealed class CombatPanelView : MonoBehaviour
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(1f, 1f);
         rt.pivot     = new Vector2(0.5f, 0f);
-        rt.sizeDelta = new Vector2(0f, 24f);
-        rt.anchoredPosition = new Vector2(0f, 4f);
+        rt.sizeDelta = new Vector2(0f, _statSkinned ? 36f : 24f);
+        rt.anchoredPosition = new Vector2(0f, _statSkinned ? 2f : 4f);
 
-        // 반투명 배경
-        var bg = statGO.AddComponent<Image>();
-        bg.color         = new Color(0f, 0f, 0f, 0.35f);
-        bg.raycastTarget = false;
+        // 반투명 배경 — 스킨 시엔 만들지 않는다(목업엔 검은 띠가 없다. 아이콘+숫자만).
+        if (!_statSkinned)
+        {
+            var bg = statGO.AddComponent<Image>();
+            bg.color         = new Color(0f, 0f, 0f, 0.35f);
+            bg.raycastTarget = false;
+        }
 
-        // ── ATK 텍스트 (좌측 절반) ──
-        _atkText = MakeStatText(statGO.transform, "AtkText",
-            new Vector2(0f, 0f), new Vector2(0.5f, 1f),
+        // 스킨 시엔 아이콘+숫자 블록을 바 중앙 기준 좌우 대칭(±0.29)으로 모은다(래거시=좌우 절반 분할).
+        Vector2 atkMin = _statSkinned ? new Vector2(0.228f, 0f) : new Vector2(0f,   0f);
+        Vector2 atkMax = _statSkinned ? new Vector2(0.420f, 1f) : new Vector2(0.5f, 1f);
+        Vector2 defMin = _statSkinned ? new Vector2(0.802f, 0f) : new Vector2(0.5f, 0f);
+        Vector2 defMax = _statSkinned ? new Vector2(1.000f, 1f) : new Vector2(1f,   1f);
+
+        _atkText = MakeStatText(statGO.transform, "AtkText", atkMin, atkMax,
             new Color(1.0f, 0.55f, 0.25f, 1f));
 
-        // ── DEF 텍스트 (우측 절반) ──
-        _defText = MakeStatText(statGO.transform, "DefText",
-            new Vector2(0.5f, 0f), new Vector2(1f, 1f),
+        _defText = MakeStatText(statGO.transform, "DefText", defMin, defMax,
             new Color(0.35f, 0.70f, 1.00f, 1f));
     }
 
@@ -1233,10 +2123,11 @@ public sealed class CombatPanelView : MonoBehaviour
         var tmp = go.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(tmp);
         tmp.text      = "—";
-        tmp.fontSize  = 15f;
+        tmp.fontSize  = _statSkinned ? 22f : 15f;
         tmp.fontStyle = FontStyles.Bold;
         tmp.color     = color;
-        tmp.alignment = TextAlignmentOptions.Midline;
+        // 스킨: 아이콘이 라벨 왼쪽에 붙으므로 [아이콘][숫자]로 읽히려면 좌측 정렬이어야 한다.
+        tmp.alignment = _statSkinned ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Midline;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.raycastTarget = false;
 
@@ -1256,10 +2147,10 @@ public sealed class CombatPanelView : MonoBehaviour
         var go = new GameObject("BuffGridRoot", typeof(RectTransform));
         go.transform.SetParent(transform, false);
 
-        // 화면 좌측 중하단에 도킹 → 왼쪽에서 오른쪽으로 늘고 위로 쌓임(주변시야). 레이아웃은 EnsureBuffGrid에서 부착.
+        // 화면 좌하단 기준 도킹 → 왼쪽에서 오른쪽으로 늘고 위로 쌓임(주변시야). 레이아웃은 EnsureBuffGrid에서 부착.
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0.38f);
-        rect.anchorMax = new Vector2(0f, 0.38f);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
         rect.pivot = new Vector2(0f, 0f);   // 좌하단 피벗 → 좌측 기준 오른쪽+위로 확장
         rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY);
         rect.sizeDelta = new Vector2(250f, 100f);
@@ -1286,8 +2177,8 @@ public sealed class CombatPanelView : MonoBehaviour
 
         _buffGrid = rootGo.GetComponent<GridLayoutGroup>();
         if (_buffGrid == null) _buffGrid = rootGo.AddComponent<GridLayoutGroup>();
-        _buffGrid.cellSize        = new Vector2(46f, 46f);
-        _buffGrid.spacing         = new Vector2(4f, 4f);
+        _buffGrid.cellSize        = new Vector2(36f, 36f);   // 목업 아이콘 36px (step 41)
+        _buffGrid.spacing         = new Vector2(5f, 5f);
         _buffGrid.startCorner     = GridLayoutGroup.Corner.LowerLeft;   // 하단 행부터 채우고 위로 쌓기
         _buffGrid.startAxis       = GridLayoutGroup.Axis.Horizontal;
         _buffGrid.childAlignment  = TextAnchor.LowerLeft;
@@ -1349,8 +2240,8 @@ public sealed class CombatPanelView : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0.38f);
-        rect.anchorMax = new Vector2(0f, 0.38f);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
         rect.pivot = new Vector2(0f, 1f);   // 좌상단 피벗 → 그리드 아래에서 아래로 쌓임
         // 그리드(좌측) 바로 아래에 분리 배치.
         rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY - 8f);
@@ -1435,7 +2326,7 @@ public sealed class CombatPanelView : MonoBehaviour
         bar.go.SetActive(true);
 
         if (bar.icon != null)
-            bar.icon.sprite = EffectIconRegistry.GetSprite(item.IconKey);
+            bar.icon.sprite = BuffIconFor(item.IconKey);
 
         if (bar.fillImg != null)
             bar.fillImg.color = item.IsDebuff

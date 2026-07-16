@@ -191,7 +191,7 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
             float dmg = ctx.CalculateDamage(_data.baseDamagePerSlash);
 
             foreach (var target in _hitTargets)
-                target.TakeDamage(dmg, ctx.Controller.gameObject, _data.knockbackMultiplier);
+                ctx.DealDamage(target, dmg, _data.knockbackMultiplier);
 
             // 히트 이펙트
             foreach (var obj in _hitObjects)

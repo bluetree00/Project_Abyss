@@ -97,6 +97,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
              "TileType(ShopStallWeapon/ShopStallItem)에 따라 ShopStallInteraction.category를 자동 설정.")]
     [SerializeField] private GameObject blockShopStallPrefab;
 
+    [Tooltip("절차 방 출구 게이트 포탈 VFX 프리팹. RunFlowController(런타임 생성)가 이 참조를 읽어 게이트에 배치.")]
+    [SerializeField] private GameObject gatePortalPrefab;
+    public GameObject GatePortalPrefab => gatePortalPrefab;
+
+    [Tooltip("입구 봉인 석문 프리팹(Gothic 석재). RunFlowController가 입구를 막을 때 낙하시켜 봉인. 비우면 색 패널.")]
+    [SerializeField] private GameObject gateSealDoorPrefab;
+    public GameObject GateSealDoorPrefab => gateSealDoorPrefab;
+
+    [Tooltip("석문 착지 시 터지는 먼지/충격 VFX. 비우면 먼지 없음(카메라 흔들림만).")]
+    [SerializeField] private GameObject gateSealDustVfx;
+    public GameObject GateSealDustVfx => gateSealDustVfx;
+
+    [Tooltip("석문 착지(봉인) 사운드 클립. 비우면 무음. (열림 사운드는 SoundEvent.DoorOpen 이벤트 사용)")]
+    [SerializeField] private AudioClip gateSealSfx;
+    public AudioClip GateSealSfx => gateSealSfx;
+
     [Tooltip("상점 등급별 기본가 SO. ShopDataManager 초기화에 사용. " +
              "비어있으면 ResolvePrice는 price_override만 적용 + 기본가 0 폴백.")]
     [SerializeField] private ShopPriceTableSO shopPriceTable;
@@ -107,6 +123,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("상점 NPC 프리팹 Addressable 키. 플레이어가 F로 상호작용하면 상점 UI(UI_ShopPanel)를 연다. " +
              "기존 월드 매대는 ShopRoomController가 비활성화한다.")]
     [SerializeField] private string shopNpcAddressableKey = "Shop/ShopNpc";
+
+    [Tooltip("재련소 NPC 프리팹 Addressable 키. 미등록 시 상점 NPC(shopNpcAddressableKey)로 폴백.")]
+    [SerializeField] private string crucibleNpcAddressableKey = "Crucible/CrucibleNpc";
 
     [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
     [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
@@ -890,6 +909,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
             // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
             _run?.EndRun(isCleared, isCleared ? "clear" : "death");
+            RunReturnTracker.RecordRunEnd(isCleared);   // BaseCamp 복귀 대사(사망/클리어 카운트) 기록
             AppBootstrapper.Instance?.EndRun();
             AppBootstrapper.Instance?.RequestLoad(Define.Scene.BaseCamp);
         }
@@ -990,6 +1010,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (palette == null)
             palette = PickBlockPalette(!string.IsNullOrEmpty(entry.theme) ? entry.theme : string.Empty);
 
+        // 유효 벽 높이 — 팔레트가 수직 프로필을 소유하면 그 값, 없으면 부트스트래퍼 전역 폴백.
+        // 벽 배치 방식(Stacked/Single)·천장 유무는 MapBuilder가 palette에서 직접 읽는다.
+        int effWallLayers = palette != null && palette.WallHeight > 0 ? palette.WallHeight : wallLayers;
+
         // 3. 파싱 (스포너 + 문)
         var spawnInfos = new System.Collections.Generic.Dictionary<Vector2Int, MapDataLoader.CellSpawnInfo>();
         var doorInfos  = new System.Collections.Generic.Dictionary<Vector2Int, DoorInfo>();
@@ -1072,11 +1096,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
         {
             MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
-            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
+            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, effWallLayers);
             await UniTask.Yield(ct);
-            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
+            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize);
             await UniTask.Yield(ct);
-            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, wallLayers, palette.Lighting);
+            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers, palette.Lighting);
             await UniTask.Yield(ct);
 
             // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
@@ -1091,7 +1115,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
-                        procDoorCorridorLength, blockCellSize, blockBaseY, wallLayers));
+                        procDoorCorridorLength, blockCellSize, blockBaseY, effWallLayers));
                 }
                 if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
                 if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
@@ -1129,6 +1153,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // (MapBuilder가 stall 타일에서 ShopStallInteraction을 이미 생성한 시점)
         if (IsShopCategory(entry.category))
             await SetupShopRoomAsync(roomGO, entry.pool_key, roomRng);
+        else if (IsEventCategory(entry.category))
+            SetupEventRoom(roomGO, entry.pool_key, roomRng);   // 챌린지 종류는 pool_key 명명 규약으로 유추
+        else if (IsCrucibleCategory(entry.category))
+            await SetupCrucibleRoomAsync(roomGO, roomRng);
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1147,7 +1175,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 : ResolvePlayerSpawnFromGrid(grid, anchor, w, h)),
             exits    = new System.Collections.Generic.List<ProcExitSlot>(),
         };
-        float openingH = wallLayers * blockCellSize; // 개구부 높이 = 벽 높이
+        float openingH = effWallLayers * blockCellSize; // 개구부 높이 = 벽 높이
 
         // 커스텀 아레나에 Exit 마커가 있으면 그리드 DR 대신 사용 — 출구 게이트가 항상 프리팹 바닥 위에 배치된다.
         // (그리드는 프리팹 footprint보다 커서 DR 셀이 바닥 밖에 떨어지는 문제 회피. 입구 잠금은 생략 — 프리팹이 경계를 소유.)
@@ -1623,6 +1651,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // (레거시/단일세계 경로 — 방 시드 미보유 → roomRng=null 전역 Random 폴백)
         if (IsShopCategory(roomEntry.category))
             await SetupShopRoomAsync(mapGO, roomEntry.room_id);
+        else if (IsEventCategory(roomEntry.category))
+            SetupEventRoom(mapGO, roomEntry.room_id);   // 챌린지 종류는 room_id 명명 규약으로 유추
+        else if (IsCrucibleCategory(roomEntry.category))
+            await SetupCrucibleRoomAsync(mapGO, null);
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -1656,6 +1688,91 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (string.IsNullOrEmpty(category)) return false;
         return category.Trim().Equals("Shop", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsEventCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Event", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCrucibleCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Crucible", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>재련소 방 셋업 — 비전투 스테이션(상점과 동일 흐름). P5에서 CrucibleRoomController(NPC+강화/승급 UI) 부착.</summary>
+    private async UniTask SetupCrucibleRoomAsync(GameObject roomGO, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        var controller = roomGO.AddComponent<CrucibleRoomController>();
+
+        // 강화 데이터 로드(없으면 서비스 기본 곡선 폴백)
+        var table = await WeaponEnhanceService.EnsureLoadedAsync();
+
+        // 재련공 NPC 프리팹 로드 (전용 키 → 상점 NPC 폴백)
+        GameObject npcPrefab = null;
+        if (!string.IsNullOrEmpty(crucibleNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(crucibleNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(shopNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(shopNpcAddressableKey);
+        if (npcPrefab == null)
+            Debug.LogWarning("[GameRunBootstrapper] 재련소 NPC 프리팹 로드 실패 — 재련소 UI를 열 수 없습니다.");
+
+        controller.Initialize(_run, table, roomRng, npcPrefab);
+    }
+
+    /// <summary>
+    /// 이벤트방 셋업 — 전투 챌린지: 스포너가 있어 RoomWaveController가 붙은 방에 성과 오버레이를 얹는다.
+    /// arena_template_key로 챌린지 종류 지정("hitless"/"hitless:2"/"timelimit:30"), 미지정=속공 45초 기본.
+    /// 스포너 없는(비전투) 이벤트방은 상호작용 챌린지 담당(후속) — 여기선 무동작.
+    /// </summary>
+    private void SetupEventRoom(GameObject roomGO, string typeHint, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        if (roomGO.TryGetComponent<RoomWaveController>(out _))
+        {
+            // 전투 챌린지 — 스포너 있는 이벤트방에 성과 오버레이.
+            var (type, param) = ParseChallengeType(typeHint);
+            var overlay = roomGO.AddComponent<CombatChallengeOverlay>();
+            overlay.Initialize(_run, type, param);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 전투 챌린지 부착: {type}({param}) — {typeHint}");
+            return;
+        }
+
+        // 비전투 — pool_key에 "gamble" 포함 시 도박 상자 상호작용. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
+        if (!string.IsNullOrEmpty(typeHint) && typeHint.ToLowerInvariant().Contains("gamble"))
+        {
+            int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "gamble").GetHashCode());
+            var gamble = roomGO.AddComponent<GambleBoxChallenge>();
+            gamble.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 도박 상자 부착 (seed={seed}) — {typeHint}");
+        }
+    }
+
+    /// <summary>pool_key 등 키 문자열에서 챌린지 종류 유추: "hitless/flawless"=무결, "speed/timelimit/rush"=속공, 기본=속공45.
+    /// arena_template_key는 커스텀 아레나 프리팹 전용이므로 여기 쓰지 않고 pool_key 명명 규약을 사용한다.</summary>
+    private static (CombatChallengeOverlay.OverlayType type, float param) ParseChallengeType(string key)
+    {
+        if (!string.IsNullOrEmpty(key))
+        {
+            string k = key.Trim().ToLowerInvariant();
+            if (k.Contains("hitless") || k.Contains("flawless"))
+                return (CombatChallengeOverlay.OverlayType.Hitless, ParseChallengeParam(k, 2f));
+            if (k.Contains("speed") || k.Contains("timelimit") || k.Contains("rush"))
+                return (CombatChallengeOverlay.OverlayType.TimeLimit, ParseChallengeParam(k, 45f));
+        }
+        return (CombatChallengeOverlay.OverlayType.TimeLimit, 45f);
+    }
+
+    private static float ParseChallengeParam(string k, float fallback)
+    {
+        int i = k.IndexOf(':');
+        if (i >= 0 && float.TryParse(k.Substring(i + 1), out var v)) return v;
+        return fallback;
     }
 
     private static bool IsStartCategory(string category)
@@ -2197,6 +2314,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
+        // 챕터 시작 대기방: 조립 서약 제단 배치(선택 픽업은 억제해도 서약 제단은 항상 제공)
+        SpawnCovenantAltar(player.transform.position);
+
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
 
@@ -2226,6 +2346,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 각성 제단: 플레이어 스폰 지점 옆에 배치 (_pendingPlayerSpawnPos가 소비되기 전)
         SpawnAwakeningAltar();
+        SpawnCovenantAltar(_pendingPlayerSpawnPos ?? Vector3.zero);
 
         await ShowStartRoomDialogueAsync();
 
@@ -2241,6 +2362,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         var basePos = _pendingPlayerSpawnPos ?? Vector3.zero;
         WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
+    }
+
+    /// <summary>챕터 시작 대기방의 조립 서약 제단(원인×효과). 세 대기방 경로 공통 — 첫 서약=실버 고정은 제단이 판정.</summary>
+    private void SpawnCovenantAltar(Vector3 basePos)
+    {
+        WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
     }
 
     /// <summary>챕터 시작 대기방 도착 시 대사 재생(방문 변형). Chapter{N}_Enter: 첫 도착=컨셉 소개+준비, 재도착=지겨움/준비 변형.</summary>
@@ -2439,6 +2566,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.RequestHudMode(HUDIds.Mode.Combat);
         GameCameraController.Instance?.HandToGameplayCamera(player.transform);
 
+        // 챕터 시작 대기방: 조립 서약 제단 배치(챕터마다 서약 획득 기회)
+        SpawnCovenantAltar(player.transform.position);
+
         // 대기방 도착 대사(방문 변형 — 첫 도착/재도착 다른 스크립트)
         await ShowWaitingRoomDialogueAsync(ResolveCurrentChapter());
 
@@ -2467,6 +2597,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomPoolKey = save.currentRoomPoolKey,
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
+            currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
+            crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치
             cooldowns          = cooldowns,
         };
     }
@@ -2487,10 +2619,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 점유 셀이 룬 시너지의 단일 진실원본. 레코드 기반 중복 적용을 제거한 뒤
         // 점유 재주입으로 스탯+메커닉을 한 번만 재계산한다.
-        var stats = _run?.Player?.RuntimeStats;
-        stats?.RestoreSynergies(null);                  // 시너지 스탯 초기화 (멱등)
-        _run?.ClearAppliedSynergies();                  // 세션 시너지 이력 초기화
-        MerlinRuneBridge.Instance?.ClearAppliedGrids(); // 브릿지 적용 가드 초기화
+        MerlinRuneBridge.Instance?.ResetSynergyState(); // 브릿지 적용 가드 초기화(중복 적용 방지)
 
         // Shape 재구성(재편집 가능 상태) — 실패해도 점유 기반 복원으로 폴백(시너지 무영향)
         try

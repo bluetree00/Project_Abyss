@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fca197032da92624dad13766f5d4c427, type: 3}
   m_Name: BD_Floor_Abyss
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
-  prefab: {fileID: 2906908962528274904, guid: 638a136a9ae85e1488aaf6c352def86a, type: 3}
+  prefab: {fileID: 2906908962528274904, guid: 3651b86077e05054082d999ee0177f41, type: 3}
   tileType: 0
   facingRule: 0
   weight: 1

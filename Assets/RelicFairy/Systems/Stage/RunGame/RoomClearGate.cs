@@ -40,15 +40,18 @@ public class RoomClearGate : MonoBehaviour
     private GameRunSession _run;
     private bool _activated;
     private bool _isBossRoom;
+    private ChallengeGrade? _challengeGrade;   // 이벤트 챌린지 성과(있으면 보상 스케일·연료 지급)
 
     // ── Public Methods ─────────────────────────────────────────
 
     /// <summary>RoomWaveController에서 호출. run/luckTable/이펙트 프리팹 주입.</summary>
     public void Initialize(GameRunSession run, LuckRollTableSO table,
-        GameObject endEffect = null, GameObject endEffect2 = null, bool isBossRoom = false)
+        GameObject endEffect = null, GameObject endEffect2 = null, bool isBossRoom = false,
+        ChallengeGrade? challengeGrade = null)
     {
-        _run        = run;
-        _isBossRoom = isBossRoom;
+        _run            = run;
+        _isBossRoom     = isBossRoom;
+        _challengeGrade = challengeGrade;
         if (table      != null) luckTable        = table;
         if (endEffect  != null) endEffectPrefab  = endEffect;
         if (endEffect2 != null) endEffect2Prefab = endEffect2;
@@ -77,8 +80,27 @@ public class RoomClearGate : MonoBehaviour
 
         var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>();
 
-        var (itemData, itemSO) = RollRewardItem();
-        if (itemData != null) rewards.Add((itemData, itemSO));
+        if (_challengeGrade.HasValue)
+        {
+            // 이벤트 챌린지 성과 보상 — 등급×챕터로 개수/rarity floor/연료 스케일(§3-5·§4-2).
+            var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), false);
+            int count = Mathf.Max(1, cr.rewardCount);
+            for (int i = 0; i < count; i++)
+            {
+                var (d, s) = RollRewardItem(cr.baseRarity);
+                if (d != null) rewards.Add((d, s));
+            }
+            if (cr.fuelAmount > 0 && _run?.FuelBank != null)
+            {
+                _run.FuelBank.Add(cr.fuelKind, cr.fuelAmount);   // 연료는 아이템 인벤 밖(RunFuelBank) 직행
+                ShowFuelNotice(cr, _challengeGrade.Value);
+            }
+        }
+        else
+        {
+            var (itemData, itemSO) = RollRewardItem();
+            if (itemData != null) rewards.Add((itemData, itemSO));
+        }
 
         // [설계 ④] 보스방: 보스드랍 아이템 보유 시 추가 행운표 롤을 기존 풀에서 append.
         if (_isBossRoom)
@@ -109,12 +131,13 @@ public class RoomClearGate : MonoBehaviour
             ? Instantiate(endEffect2Prefab, center, Quaternion.identity)
             : new GameObject("ClearReward_Fallback");
         rewardGO.transform.position = center;
+        RoomScopedDrop.Mark(rewardGO);   // 안 주웠으면 방 전환 시 정리(다음 방 잔존 방지)
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
         trigger.Initialize(_run, rewards, _isBossRoom);
     }
 
-    private (RuntimeItemData data, ItemSO so) RollRewardItem()
+    private (RuntimeItemData data, ItemSO so) RollRewardItem(ItemRarity? floor = null)
     {
         if (luckTable == null)
         {
@@ -131,6 +154,7 @@ public class RoomClearGate : MonoBehaviour
         }
 
         var rarity = LuckRollService.RollRarity(luck, luckTable);
+        if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 챌린지 등급 rarity 하한
         var candidates = ItemSORegistry.GetByRarity(rarity);
         if (candidates == null || candidates.Count == 0)
         {
@@ -157,4 +181,22 @@ public class RoomClearGate : MonoBehaviour
         var stats = player.RuntimeStats;
         return stats != null ? stats.Luck : 0;
     }
+
+    private int ChapterNum() => _run != null ? (int)_run.CurrentChapter : 1;
+
+    private void ShowFuelNotice(ChallengeReward cr, ChallengeGrade grade)
+    {
+        var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        string fuelName = cr.fuelKind == FuelKind.RuneOre ? "원석" : "강화재료";
+        hud?.ShowBuffNotice($"<color=#8fd3ff>{GradeName(grade)}</color> · {fuelName} +{cr.fuelAmount}");
+    }
+
+    private static string GradeName(ChallengeGrade g) => g switch
+    {
+        ChallengeGrade.Platinum => "플래티넘",
+        ChallengeGrade.Gold     => "골드",
+        ChallengeGrade.Silver   => "실버",
+        ChallengeGrade.Bronze   => "브론즈",
+        _                       => "실패",
+    };
 }

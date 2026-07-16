@@ -22,6 +22,7 @@ public sealed class HudPresenter : MonoBehaviour
     [SerializeField] private HUDIds.Mode startMode = HUDIds.Mode.None;
 
     private PlayerRunState _state;
+    private RunFuelBank _fuelBank;
     private UIHudDataProvider _provider;
 
     private PlayerRuntimeStats _runtimeStats;
@@ -85,9 +86,15 @@ public sealed class HudPresenter : MonoBehaviour
             _state.OnGoldChanged -= HandleGoldChanged;
             _state = null;
         }
+        if (_fuelBank != null)
+        {
+            _fuelBank.OnFuelChanged -= HandleFuelChanged;
+            _fuelBank = null;
+        }
 
         _provider = provider;
         _state = run?.PlayerState;
+        _fuelBank = run?.FuelBank;
 
         // 버프 핸들러 구독
         UnbindBuffHandler();
@@ -132,6 +139,13 @@ public sealed class HudPresenter : MonoBehaviour
         _state.OnHpChanged += HandleHpChanged;
         _state.OnGoldChanged += HandleGoldChanged;
 
+        // 런 재화(강화재료·원석) 표시 — 골드와 동일 패턴
+        if (_fuelBank != null)
+        {
+            HandleFuelChanged();
+            _fuelBank.OnFuelChanged += HandleFuelChanged;
+        }
+
         // 현재 버프 즉시 반영
         HandleBuffsChanged();
 
@@ -156,6 +170,7 @@ public sealed class HudPresenter : MonoBehaviour
 
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
+        _weaponManager.OnEquippedWeaponRefreshed += HandleEquippedWeaponRefreshed;
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
 
         // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
@@ -186,6 +201,7 @@ public sealed class HudPresenter : MonoBehaviour
         if (_weaponManager != null)
         {
             _weaponManager.OnWeaponChanged -= HandleWeaponChanged;
+            _weaponManager.OnEquippedWeaponRefreshed -= HandleEquippedWeaponRefreshed;
             _weaponManager = null;
         }
 
@@ -295,7 +311,14 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
+    private void HandleFuelChanged()
+    {
+        if (_fuelBank == null || view == null) return;
+        view.SetEnhanceMaterial(_fuelBank.EnhanceMaterial);
+        view.SetRuneOre(_fuelBank.RuneOre);
+    }
     private void HandleWeaponChanged(WeaponData _, GameObject __) => RefreshWeaponSlots();
+    private void HandleEquippedWeaponRefreshed(WeaponData _) => RefreshWeaponSlots();
     private void HandleBuffsChanged() => RefreshBuffWindow();
 
     private enum BuffDiff { None, Values, Structure }
@@ -404,6 +427,11 @@ public sealed class HudPresenter : MonoBehaviour
             _state.OnHpChanged -= HandleHpChanged;
             _state.OnGoldChanged -= HandleGoldChanged;
             _state = null;
+        }
+        if (_fuelBank != null)
+        {
+            _fuelBank.OnFuelChanged -= HandleFuelChanged;
+            _fuelBank = null;
         }
 
         _provider = null;
