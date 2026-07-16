@@ -257,6 +257,9 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
             return;
         }
 
+        // 소환 패턴 완전 종료 시 무적 게이트 해제
+        (ctx.Monster as DragonBossMonster)?.DragonBlackboard.SetSummonGated(false);
+
         RestoreAgent(ctx);
         var bb = GetDragonBB(ctx);
         if (bb != null) bb.IsAirborne = false;

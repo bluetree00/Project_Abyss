@@ -26,7 +26,8 @@ public class DKDormantState : IMonsterState
     private static readonly Vector3 FallbackLookOffset = new Vector3(0f, 2f,  0f);
 
     // 입장 연출 — 프롭 파괴
-    private const float AttackHitDelay    = 1.0f; // Attack1 hitTime (이 순간 프롭 교체)
+    private const float AttackHitDelay    = 0.7f; // Attack1 hitTime (슬래시 사운드 타이밍)
+    private const float StageGapDelay     = 0.4f; // 슬래시 → 이펙트+프롭 사이 간격
     private const float PropsFlyViewDelay = 1.5f; // 프롭 날아가는 모습 오버뷰 카메라로 보여주는 시간
 
     private float _reFireTimer;
@@ -108,7 +109,9 @@ public class DKDormantState : IMonsterState
             dk.ShowSwordVisual();
             PlayAnim(ctx, "Attack1");
             await UniTask.Delay(TimeSpan.FromSeconds(AttackHitDelay), cancellationToken: ct);
-            dk.SpawnEntranceSlashVfx();
+            dk.PlayEntranceSlashSfx();
+            await UniTask.Delay(TimeSpan.FromSeconds(StageGapDelay), cancellationToken: ct);
+            dk.SpawnEntranceRadialVfx();
             SwapAndFlyProps(dk); // 물리는 백그라운드에서 계속 날아감
 
             // 오버뷰 카메라로 프롭 날아가는 모습 노출 후 클로즈업 전환
@@ -141,7 +144,7 @@ public class DKDormantState : IMonsterState
             }
             finally
             {
-                if (windVfx != null) UnityEngine.Object.Destroy(windVfx);
+                if (windVfx != null) BossEffectPool.Release(windVfx);
             }
 
             // 플레이어 카메라로 복귀

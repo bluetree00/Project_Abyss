@@ -58,6 +58,20 @@ public class DKStrikePatternSO : BossPatternSO
     public float swordHp            = 30f;
     [Tooltip("소환 검 스케일 (SM_Statue_01b ≈ 3 units, 검 메시 1.56 units → 기본 2.0으로 비슷하게 맞춤)")]
     public float swordScale          = 2f;
+    [Tooltip("부유 검 피격 CapsuleCollider 반지름 (로컬 기준, 스케일 적용 전).")]
+    public float swordColliderRadius = 0.5f;
+    [Tooltip("부유 검 피격 CapsuleCollider 높이 (로컬 기준, 스케일 적용 전). 위아래 피격 범위를 결정.")]
+    public float swordColliderHeight = 3.0f;
+
+    [Header("Sword Light")]
+    [Tooltip("스포트라이트 범위 (m). 0이면 라이트 생략.")]
+    public float swordLightRange     = 12f;
+    [Tooltip("스포트라이트 강도 — 무대 조명처럼 검을 강조하려면 높은 값 권장")]
+    public float swordLightIntensity = 25f;
+    [Tooltip("스포트라이트 외각 원뿔 각도 (도). 좁을수록 무대조명처럼 집중됨.")]
+    public float swordLightSpotAngle = 20f;
+    [Tooltip("라이트 세계 좌표 기준 검 루트 위 오프셋 (m)")]
+    public float swordLightYOffset   = 3.5f;
 
     [Header("Timing")]
     [Tooltip("맵 중앙 이동 최대 허용 시간")]
@@ -124,6 +138,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     // ── 부유 검 ───────────────────────────────────────────
     private readonly List<DKFloatingSword> _swords = new List<DKFloatingSword>();
     private bool                           _patternEnded;
+    private DeathKnightBossBlackboard      _dkBB;
 
     // ── 슬래시 ───────────────────────────────────────────
     private bool                    _damageDone;
@@ -156,6 +171,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         _vfxCts?.Dispose();
         _vfxCts = new CancellationTokenSource();
 
+        _dkBB   = (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard;
         _anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
         var anchor = _anchor;
         if (anchor != null)
@@ -196,6 +212,8 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         _vfxCts?.Dispose();
         _vfxCts = null;
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(false);
+        _dkBB?.SetGuardianShield(false);
+        _dkBB = null;
         if ((ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor != null)
             DKBossRoomContext.ClearWorldCenterOverride();
         CleanupEffects();
@@ -322,7 +340,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     private async UniTaskVoid FireAllRowSlashVfxAsync(CancellationToken ct)
     {
         if (Data.impactVfxPrefab == null) return;
-        Color tint = _swordColor == DKSwordColor.White ? Color.white : Color.black;
+        Color tint = _swordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkTint;
         float rowLen = DKGridPatternHelper.RowLineLength();
         const int perFrame = 5;
 
@@ -378,43 +396,51 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             Data.fireShieldPrefab, ctx.Transform.position, Quaternion.identity);
         if (_fireShieldVfx == null) return;
         _fireShieldVfx.transform.SetParent(ctx.Transform, worldPositionStays: true);
-        Color tint = _swordColor == DKSwordColor.White ? Color.white : Color.black;
-        DKGridPatternHelper.TintVfx(_fireShieldVfx, tint);
+        // Effect_09 셰이더는 _TintColor(HDR)로 색상 제어 — TintVfx의 _BaseColor/_Color 경로가 무효
+        DKGridPatternHelper.TintShieldVfx(_fireShieldVfx, _swordColor);
     }
 
     private void SpawnFloatingSwords(MonsterContext ctx)
     {
         if (Data.floatingSwordPrefab == null) return;
 
-        Vector3 dkPos   = ctx.Transform.position;
-        Vector3 dkRight = ctx.Transform.right;
-        var     dkBoss  = ctx.Monster as DeathKnightBossMonster;
+        Vector3 dkPos  = ctx.Transform.position;
+        var     dkBoss = ctx.Monster as DeathKnightBossMonster;
 
-        bool leftIsWhite   = UnityEngine.Random.value > 0.5f;
-        bool leftIsSame    = leftIsWhite == (_swordColor == DKSwordColor.White);
-        bool rightIsSame   = !leftIsSame;
+        bool leftIsWhite = UnityEngine.Random.value > 0.5f;
+        bool leftIsSame  = leftIsWhite == (_swordColor == DKSwordColor.White);
 
+        // 고정 세계 X축 기준 — 보스 시선 방향에 무관하게 항상 동일한 좌우 2지점에 소환
         SpawnOneSword(
-            dkPos - dkRight * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos - Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
             dkPos.y, dkBoss,
-            leftIsWhite  ? DKSwordColor.White : DKSwordColor.Black,
+            leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
             leftIsSame);
 
         SpawnOneSword(
-            dkPos + dkRight * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos + Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
             dkPos.y, dkBoss,
             !leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
-            rightIsSame);
+            !leftIsSame);
     }
 
     private void SpawnOneSword(Vector3 position, float groundY, DeathKnightBossMonster dkBoss,
                                 DKSwordColor color, bool isSameColorAsDK)
     {
         // 칼끝이 바닥을 향하도록 X축 180° 회전
-        var go = UnityEngine.Object.Instantiate(
+        var go = BossEffectPool.Spawn(
             Data.floatingSwordPrefab, position, Quaternion.Euler(180f, 0f, 0f));
         if (go == null) return;
         go.transform.localScale = Vector3.one * Data.swordScale;
+
+        // 풀에서 재사용 시 남아 있는 오라 자식 오브젝트 해제
+        for (int i = go.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = go.transform.GetChild(i);
+            if (child.name == "SwordSpotLight") continue;
+            child.SetParent(null, false);
+            BossEffectPool.Release(child.gameObject);
+        }
 
         // 색상 머티리얼 적용
         var rend = go.GetComponentInChildren<Renderer>();
@@ -425,11 +451,46 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
             if (mat != null) rend.material = mat;
         }
 
-        // 콜라이더 없으면 추가
-        if (go.GetComponentInChildren<Collider>() == null)
+        // 루트에 CapsuleCollider(Y축) 항상 확보 (위아래 피격 범위 보장)
+        var col = go.GetComponent<CapsuleCollider>();
+        if (col == null) col = go.AddComponent<CapsuleCollider>();
+        col.direction = 1; // Y축
+        col.radius    = Data.swordColliderRadius;
+        col.height    = Data.swordColliderHeight;
+
+        // Kinematic Rigidbody: OnTriggerEnter는 두 객체 중 하나에 Rigidbody가 있어야 발동
+        // 보스는 MonsterBase → Rigidbody 있음. 검은 없으므로 직접 추가.
+        var rb = go.GetComponent<Rigidbody>();
+        if (rb == null) rb = go.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity  = false;
+
+        // 스포트라이트 — 무대 조명처럼 검 아래를 집중 조명
+        if (Data.swordLightRange > 0f)
         {
-            var col = go.AddComponent<SphereCollider>();
-            col.radius = 0.6f;
+            Transform existingLight = go.transform.Find("SwordSpotLight");
+            Light lt;
+            if (existingLight == null)
+            {
+                var lightGo = new GameObject("SwordSpotLight");
+                lightGo.transform.SetParent(go.transform, false);
+                lightGo.transform.localPosition = Vector3.up * (Data.swordLightYOffset / Data.swordScale);
+                lightGo.transform.rotation = Quaternion.LookRotation(Vector3.down);
+                lt              = lightGo.AddComponent<Light>();
+                lt.type         = LightType.Spot;
+                lt.spotAngle    = Data.swordLightSpotAngle;
+                lt.innerSpotAngle = Data.swordLightSpotAngle * 0.4f;
+                lt.range        = Data.swordLightRange;
+                lt.intensity    = Data.swordLightIntensity;
+            }
+            else
+            {
+                lt = existingLight.GetComponent<Light>();
+            }
+            if (lt != null)
+                lt.color = color == DKSwordColor.White
+                    ? new Color(0.92f, 0.96f, 1f)
+                    : new Color(0.65f, 0.35f, 1f);
         }
 
         // DKFloatingSword 컴포넌트
@@ -445,10 +506,16 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
         SpawnSwordAura(position, groundY, dkBoss, color, go.transform);
 
+        // Monster 레이어 부여 — URP 외곽선 Render Objects가 검도 동일한 파란 테두리로 표시
+        int monsterLayer = LayerMask.NameToLayer("Monster");
+        if (monsterLayer >= 0)
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                r.gameObject.layer = monsterLayer;
+
         _swords.Add(sword);
     }
 
-    /// <summary>검 바로 아래 바닥에 보스와 동일한 색상의 오라를 띄운다 (검과 함께 파괴됨).</summary>
+    /// <summary>검 바로 아래 바닥에 보스와 동일한 색상의 오라를 띄운다 (검과 함께 반환됨).</summary>
     private static void SpawnSwordAura(Vector3 swordPos, float groundY, DeathKnightBossMonster dkBoss,
                                         DKSwordColor color, Transform parent)
     {
@@ -457,7 +524,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (auraPrefab == null) return;
 
         Vector3 groundPos = new Vector3(swordPos.x, groundY, swordPos.z);
-        var     auraGo    = UnityEngine.Object.Instantiate(auraPrefab, groundPos, Quaternion.identity, parent);
+        var     auraGo    = BossEffectPool.Spawn(auraPrefab, groundPos, Quaternion.identity, parent);
 
         // 보스용으로 꺼둔 바닥 마법진 이펙트는 검 아래에서는 그대로 보여줘도 된다.
         foreach (Transform child in auraGo.transform)
@@ -477,6 +544,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
                 : DKBossRoomContext.WorldCenter;
             _guardianShieldActive = true;
             _guardianShieldPos    = groundPos;
+            _dkBB?.SetGuardianShield(true, groundPos, Data.guardianShieldRadius);
 
             if (Data.guardianShieldPrefab != null)
             {
@@ -517,7 +585,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         foreach (var sword in _swords)
         {
             if (sword != null && sword.gameObject != null)
-                UnityEngine.Object.Destroy(sword.gameObject);
+                BossEffectPool.Release(sword.gameObject);
         }
         _swords.Clear();
     }

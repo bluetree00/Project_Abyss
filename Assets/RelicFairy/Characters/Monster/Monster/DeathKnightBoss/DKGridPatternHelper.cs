@@ -25,6 +25,9 @@ public static class DKGridPatternHelper
     private static readonly int ColorId         = Shader.PropertyToID("_Color");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
+    // 검정 계열 VFX 틴트 — 순수 black(0,0,0)은 파티클에 곱해져 소멸하므로 어두운 보라로 대체
+    public static readonly Color DarkTint = new Color(0.05f, 0f, 0.12f, 1f);
+
     // ── 타일 스폰/제거 ──────────────────────────────────────
 
     /// <summary>colorRule(x, z) 결과에 따라 내부 셀 전체에 타일 프리팹을 스폰한다.</summary>
@@ -87,7 +90,7 @@ public static class DKGridPatternHelper
     public static void SpawnCrossVfx(GameObject prefab, Vector2Int playerCell, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint  = swordColor == DKSwordColor.White ? Color.white : Color.black;
+        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkTint;
         float colLen = (DKBossRoomContext.Height - 2) * DKBossRoomContext.CellSize;
         float rowLen = (DKBossRoomContext.Width  - 2) * DKBossRoomContext.CellSize;
 
@@ -106,7 +109,7 @@ public static class DKGridPatternHelper
     public static void SpawnSingleRowVfx(GameObject prefab, int rowZ, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint = swordColor == DKSwordColor.White ? Color.white : Color.black;
+        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
         Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, rowZ, 0.1f);
         SpawnStretchedVfx(prefab, pos, Quaternion.Euler(0f, 90f, 0f), RowLineLength(), tint);
     }
@@ -156,7 +159,7 @@ public static class DKGridPatternHelper
                                              int ring, DKSwordColor swordColor)
     {
         if (prefab == null) return;
-        Color tint  = swordColor == DKSwordColor.White ? Color.white : Color.black;
+        Color tint  = swordColor == DKSwordColor.White ? Color.white : DarkTint;
         int   bx    = bossCell.x, bz = bossCell.y;
         float scale = (2 * ring + 1) * DKBossRoomContext.CellSize * 0.1f; // 변 길이(칸) × CellSize × 0.1
 
@@ -236,6 +239,31 @@ public static class DKGridPatternHelper
         }
     }
 
+    /// <summary>
+    /// Effect_09 계열 셰이더(_TintColor HDR)를 사용하는 방패 VFX 색상을 일괄 변경한다.
+    /// TintVfx의 _BaseColor/_Color 경로가 무효인 셰이더에 사용.
+    /// </summary>
+    public static void TintShieldVfx(GameObject go, DKSwordColor swordColor)
+    {
+        if (go == null) return;
+
+        Color particleTint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(particleTint);
+        }
+
+        // _TintColor HDR: White → 밝은 흰색, Black → 어두운 남색(additive blend에서 거의 검정)
+        Color hdrTint = swordColor == DKSwordColor.White
+            ? new Color(5f, 5.5f, 6f, 1f)
+            : new Color(0.1f, 0.0f, 0.3f, 1f);
+        foreach (var rend in go.GetComponentsInChildren<Renderer>(true))
+            foreach (var mat in rend.materials)
+                if (mat.HasProperty("_TintColor"))
+                    mat.SetColor("_TintColor", hdrTint);
+    }
+
     // ── lineLength 헬퍼 (Floor 기준 동적 계산) ──────────────
 
     /// <summary>세로줄(열, Z 방향) VFX를 방 높이에 맞게 늘리는 lineLength.</summary>
@@ -254,7 +282,7 @@ public static class DKGridPatternHelper
         DKSwordColor swordColor,
         DKVfxGroupMode mode)
     {
-        Color tint = swordColor == DKSwordColor.White ? Color.white : Color.black;
+        Color tint = swordColor == DKSwordColor.White ? Color.white : DarkTint;
 
         if (mode == DKVfxGroupMode.PerCell)
         {

@@ -135,8 +135,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         _breathParticles.Clear();
         _breathBaseSpeed.Clear();
         StopBreathSfx();
-        DestroyEffect(ref _breathEffect);
-        DestroyEffect(ref _warningEffect);
+        ReleasePooledEffect(ref _breathEffect);
+        ReleasePooledEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
     }
 
@@ -198,8 +198,8 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     {
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh) ctx.Agent.isStopped = false;
         StopBreathSfx();
-        DestroyEffect(ref _breathEffect);
-        DestroyEffect(ref _warningEffect);
+        ReleasePooledEffect(ref _breathEffect);
+        ReleasePooledEffect(ref _warningEffect);
         DestroyEffect(ref _rangeIndicator);
     }
 
@@ -213,7 +213,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
 
         if (_timer < Data.PrepareDuration) return;
 
-        DestroyEffect(ref _warningEffect);
+        ReleasePooledEffect(ref _warningEffect);
         _phase      = Phase.Breathing;
         _timer      = 0f;
         _damageTick = 0f;
@@ -245,7 +245,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         if (_timer >= Data.BreathDuration)
         {
             StopBreathSfx();
-            DestroyEffect(ref _breathEffect);
+            ReleasePooledEffect(ref _breathEffect);
             DestroyEffect(ref _rangeIndicator);
             _phase = Phase.EndPose;
             _timer = 0f;
@@ -319,8 +319,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     {
         if (Data.WarningEffectPrefab != null)
         {
-            _warningEffect = Object.Instantiate(Data.WarningEffectPrefab);
-            SyncEffect(_warningEffect, ctx);
+            _warningEffect = BossEffectPool.Spawn(Data.WarningEffectPrefab, GetMouthPos(ctx), ctx.Transform.rotation);
             TintEffect(_warningEffect, Data.BreathColor * 0.55f);
         }
 
@@ -332,8 +331,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
         _breathAudioSource = Managers.Sound?.PlayEffectAt(Data.BreathSfx, GetMouthPos(ctx));
 
         if (Data.BreathEffectPrefab == null) return;
-        _breathEffect = Object.Instantiate(Data.BreathEffectPrefab);
-        SyncEffect(_breathEffect, ctx);
+        _breathEffect = BossEffectPool.Spawn(Data.BreathEffectPrefab, GetMouthPos(ctx), ctx.Transform.rotation);
         TintEffect(_breathEffect, Data.BreathColor);
         CacheBreathParticleBaseSpeeds(_breathEffect);
     }
@@ -474,6 +472,13 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
     {
         if (go == null) return;
         Object.Destroy(go);
+        go = null;
+    }
+
+    private static void ReleasePooledEffect(ref GameObject go)
+    {
+        if (go == null) return;
+        BossEffectPool.Release(go);
         go = null;
     }
 

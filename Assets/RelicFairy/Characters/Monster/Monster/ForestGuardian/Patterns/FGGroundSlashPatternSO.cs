@@ -1,4 +1,3 @@
-using PixPlays.ElementalVFX;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -257,14 +256,14 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
 
         Vector3 pos = ctx.Transform.position;
         pos.y += 0.02f;
-        _warningGO = Object.Instantiate(Data.warningDiscPrefab, pos, Quaternion.identity);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(Data.warningDiscPrefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
         _warningGO.transform.localScale = _warningStartScale;
     }
 
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO = null;
     }
 
@@ -274,7 +273,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         if (Data.slamVfxPrefab == null) return;
 
         float s     = Data.GetHitVfxScale(hitIndex);
-        var   vfxGO = Object.Instantiate(Data.slamVfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
+        var   vfxGO = Managers.ObjectPooler.SpawnFromPrefab(Data.slamVfxPrefab, ObjectPoolerManager.PoolType.Effect, ctx.Transform.position, ctx.Transform.rotation);
         vfxGO.transform.localScale = new Vector3(s, s, s);
 
         // Phase 2에서 파티클 VFX를 애니메이션 속도와 동기화
@@ -288,13 +287,11 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
             }
         }
 
-        if (vfxGO.TryGetComponent<PlayableVfx>(out var pvfx))
-            pvfx.Play();
-
         float lifetime = Data.vfxLifetime;
         if (vfxGO.TryGetComponent<ParticleSystem>(out var ps))
             lifetime = ps.main.duration + ps.main.startLifetime.constantMax;
-        Object.Destroy(vfxGO, lifetime);
+        var vfxComp = vfxGO.GetComponent<PooledOneShotVfx>() ?? vfxGO.AddComponent<PooledOneShotVfx>();
+        vfxComp.Play(lifetime);
     }
 
     // ── 유틸 ──────────────────────────────────────────────

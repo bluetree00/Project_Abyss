@@ -1,10 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RelicFairy.Monster
 {
-[CreateAssetMenu(fileName = "DragonAirBitePattern",
-    menuName = "RelicFairy/Boss/Dragon/AirBitePattern")]
-public class DragonAirBitePatternSO : BossPatternSO
+[CreateAssetMenu(fileName = "DragonAirBreathPattern",
+    menuName = "RelicFairy/Boss/Dragon/AirBreathPattern")]
+public class DragonAirBreathPatternSO : BossPatternSO
 {
     [Header("Pattern")]
     [SerializeField] private int _biteCount = 3;
@@ -13,7 +14,7 @@ public class DragonAirBitePatternSO : BossPatternSO
     [Header("Flight")]
     [SerializeField] private float _takeoffDuration = 0.45f;
     [SerializeField] private float _takeoffHeight = 2.8f;
-    [SerializeField] private float _hoverHeight = 4f;
+    [SerializeField] private float _hoverHeight = 7f;
     [SerializeField] private float _approachSpeed = 22f;
     [SerializeField] private float _approachDuration = 0.75f;
     [SerializeField] private float _maxApproachDuration = 2.1f;
@@ -32,15 +33,21 @@ public class DragonAirBitePatternSO : BossPatternSO
     [SerializeField] private float _maxAnchorDistance = 6.5f;
     [SerializeField] private float _fallbackForwardOffset = 4.5f;
 
-    [Header("Bite")]
+    [Header("Breath Fire")]
     [SerializeField] private float _biteDuration = 1.05f;
     [SerializeField] private float _warningTime = 0.22f;
     [SerializeField] private float _hitTime = 0.52f;
-    [SerializeField] private float _biteAttackHeight = 1.45f;
+    [SerializeField] private float _biteAttackHeight = 6f;
     [SerializeField] private float _biteTriggerDistance = 3.1f;
     [SerializeField] private float _attackRadius = 2.8f;
     [SerializeField] private float _attackCenterForwardOffset = 1.4f;
     [SerializeField] private int _attackDamage = 24;
+
+    [Header("Fireball")]
+    [SerializeField] private GameObject _fireballPrefab;
+    [SerializeField] private float _fireballScale = 1.5f;
+    [SerializeField] private GameObject _explosionPrefab;
+    [SerializeField] private float _explosionScale = 1f;
 
     [Header("Warning Marker")]
     [SerializeField] private GameObject _warningMarkerPrefab;
@@ -52,8 +59,8 @@ public class DragonAirBitePatternSO : BossPatternSO
     [SerializeField] private float _endPoseDuration = 0.4f;
 
     [Header("사운드")]
-    [Tooltip("물 때마다(3회 각각) 재생할 사운드 클립")]
-    [SerializeField] private AudioClip _biteSfx;
+    [Tooltip("발사할 때마다(3회 각각) 재생할 사운드 클립")]
+    [SerializeField] private AudioClip _fireRainSfx;
 
     [Header("Animator State Names")]
     [SerializeField] private string _takeoffStateName = "Takeoff";
@@ -89,6 +96,10 @@ public class DragonAirBitePatternSO : BossPatternSO
     public float AttackRadius => _attackRadius;
     public float AttackCenterForwardOffset => _attackCenterForwardOffset;
     public int AttackDamage => _attackDamage;
+    public GameObject FireballPrefab => _fireballPrefab;
+    public float FireballScale => _fireballScale;
+    public GameObject ExplosionPrefab => _explosionPrefab;
+    public float ExplosionScale => _explosionScale;
     public GameObject WarningMarkerPrefab => _warningMarkerPrefab;
     public float WarningMarkerScale => _warningMarkerScale;
     public float WarningMarkerLifetime => _warningMarkerLifetime;
@@ -104,12 +115,12 @@ public class DragonAirBitePatternSO : BossPatternSO
     public string BiteStateName => _biteStateName;
     public string LandingStateName  => _landingStateName;
     public float  EndPoseDuration   => _endPoseDuration;
-    public AudioClip BiteSfx        => _biteSfx;
+    public AudioClip FireRainSfx    => _fireRainSfx;
 
-    private DragonAirBiteState _runtimeState;
+    private DragonAirBreathState _runtimeState;
 
     public override void Initialize(BossPatternContext ctx)
-        => _runtimeState = new DragonAirBiteState(this);
+        => _runtimeState = new DragonAirBreathState(this);
 
     public override void OnRecycled()
         => _runtimeState?.Reset();
@@ -125,7 +136,7 @@ public class DragonAirBitePatternSO : BossPatternSO
     public override SpecialStateBase GetRuntimeState() => _runtimeState;
 }
 
-internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
+internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatternSO>
 {
     private enum Phase
     {
@@ -155,8 +166,10 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
     private int _takeoffHash;
     private int _landingHash;
     private string _currentAirChaseAnim;
+    private GameObject _fireballGo;
+    private Vector3 _fireballStartPos;
 
-    internal DragonAirBiteState(DragonAirBitePatternSO data) : base(data) { }
+    internal DragonAirBreathState(DragonAirBreathPatternSO data) : base(data) { }
 
     internal void Reset()
     {
@@ -166,6 +179,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _hasStartedBiteSequence = false;
         _currentAirChaseAnim = null;
         _activeWarningZone = null;
+        ReleaseFireball();
     }
 
     public override void Enter(MonsterContext ctx)
@@ -217,7 +231,10 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         }
     }
 
-    public override void Exit(MonsterContext ctx) { }
+    public override void Exit(MonsterContext ctx)
+    {
+        ReleaseFireball();
+    }
 
     private void StartPreDash(MonsterContext ctx)
     {
@@ -247,26 +264,6 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             StartApproach(ctx);
     }
 
-    private void UpdateTakeoff(MonsterContext ctx)
-    {
-        FacePlayer(ctx, Data.AirChaseRotationSpeed);
-
-        // Takeoff 클립이 제자리로 변경됨 → 코드에서 Y 상승 처리
-        Vector3 p = ctx.Transform.position;
-        p.y = Mathf.MoveTowards(p.y, _lockedAttackY, ctx.Stat.moveSpeed * 2f * Time.deltaTime);
-        ctx.Transform.position = p;
-
-        if (!IsAnimNearEnd(ctx, _takeoffHash))
-            return;
-
-        Vector3 pos = ctx.Transform.position;
-        pos.y = _lockedAttackY;
-        ctx.Transform.position = pos;
-
-        _hoverAnchorPos = BuildAirAnchor(ctx, _completedBites);
-        StartApproach(ctx);
-    }
-
     private void UpdateApproach(MonsterContext ctx)
     {
         _hoverAnchorPos = _hasStartedBiteSequence
@@ -292,6 +289,14 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         ctx.Transform.position = _biteAttackPos;
         FacePlayer(ctx, Data.AirChaseRotationSpeed);
 
+        // 파이어볼을 드래곤 위치에서 경고 장판 center로 이동
+        if (_fireballGo != null && !_damageApplied)
+        {
+            float t = Mathf.Clamp01(_phaseTimer / Mathf.Max(0.01f, Data.HitTime));
+            Vector3 fireballTarget = _biteTargetGroundPos + Vector3.up * Data.WarningMarkerHeightOffset;
+            _fireballGo.transform.position = Vector3.Lerp(_fireballStartPos, fireballTarget, t);
+        }
+
         if (!_warningShown && _phaseTimer >= Data.WarningTime)
         {
             _warningShown = true;
@@ -303,7 +308,7 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             _damageApplied = true;
             _activeWarningZone?.TransitionToHitPhase(0.35f);
             _activeWarningZone = null;
-            ApplyHit();
+            ApplyFireballImpact(ctx);
         }
 
         if (_phaseTimer < duration)
@@ -330,20 +335,6 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         StartApproach(ctx);
     }
 
-    private void UpdateLanding(MonsterContext ctx)
-    {
-        Vector3 pos = ctx.Transform.position;
-        pos.y = Mathf.MoveTowards(pos.y, ctx.Runtime.SpawnPosition.y, Data.ApproachSpeed * Time.deltaTime);
-        ctx.Transform.position = pos;
-        FacePlayer(ctx, Data.AirChaseRotationSpeed);
-
-        if (!IsAnimNearEnd(ctx, _landingHash) || pos.y > ctx.Runtime.SpawnPosition.y + 0.1f)
-            return;
-
-        RestoreAgent(ctx);
-        ReturnToAirCombat(ctx);
-    }
-
     private void StartApproach(MonsterContext ctx)
     {
         _phase = Phase.Approach;
@@ -357,6 +348,8 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
 
     private void StartBite(MonsterContext ctx)
     {
+        ReleaseFireball();
+
         _phase = Phase.Bite;
         _phaseTimer = 0f;
         _warningShown = false;
@@ -375,7 +368,17 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         _currentAirChaseAnim = null;
 
         PlayAnim(ctx, Data.BiteStateName, 0.08f);
-        Managers.Sound?.PlayEffectAt(Data.BiteSfx, ctx.Transform.position);
+
+        // 드래곤 입 위치에서 파이어볼 스폰
+        _fireballStartPos = _biteAttackPos;
+        if (Data.FireballPrefab != null)
+        {
+            _fireballGo = BossEffectPool.Spawn(Data.FireballPrefab, _fireballStartPos, Quaternion.identity);
+            if (_fireballGo != null)
+                _fireballGo.transform.localScale = Vector3.one * Data.FireballScale;
+        }
+
+        Managers.Sound?.PlayEffectAt(Data.FireRainSfx, ctx.Transform.position);
     }
 
     private void StartEndPose(MonsterContext ctx)
@@ -399,19 +402,12 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
         UpdateAirChaseAnimation(ctx, BuildAttackAnchor(ctx, _completedBites), force: true);
     }
 
-    private void StartLanding(MonsterContext ctx)
-    {
-        _phase = Phase.Landing;
-        _phaseTimer = 0f;
-        PlayAnim(ctx, Data.LandingStateName, 0.1f);
-    }
-
     private void SpawnWarningMarker(MonsterContext ctx)
     {
         Vector3 pos = _biteTargetGroundPos;
         pos.y = ctx.Runtime.SpawnPosition.y;
         _activeWarningZone = DragonBossWarningZone.CreateCircle(
-            "DragonAirBiteWarning",
+            "DragonAirBreathWarning",
             pos,
             Data.AttackRadius,
             new Color(1f, 0.28f, 0.18f, 0.85f),
@@ -419,14 +415,20 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             Data.WarningMarkerHeightOffset);
     }
 
-    private void ApplyHit()
+    private void ApplyFireballImpact(MonsterContext ctx)
     {
-        if (Data.effectPrefab != null)
-            BossEffectPool.SpawnOneShot(
-                Data.effectPrefab,
-                _biteTargetGroundPos + Vector3.up * 0.2f,
+        if (Data.ExplosionPrefab != null)
+        {
+            var expGo = BossEffectPool.SpawnOneShot(
+                Data.ExplosionPrefab,
+                _biteTargetGroundPos,
                 Quaternion.identity,
-                fallbackLifetime: 1.2f);
+                fallbackLifetime: 3f);
+            if (expGo != null)
+                expGo.transform.localScale = Vector3.one * Data.ExplosionScale;
+        }
+
+        ReleaseFireball();
 
         var hits = Physics.OverlapSphere(_biteTargetGroundPos, Data.AttackRadius);
         foreach (var col in hits)
@@ -440,6 +442,15 @@ internal sealed class DragonAirBiteState : FullLockState<DragonAirBitePatternSO>
             Data.playerStatusEffect?.Apply(player);
             break;
         }
+    }
+
+    private void ReleaseFireball()
+    {
+        if (_fireballGo == null) return;
+        foreach (var ps in _fireballGo.GetComponentsInChildren<ParticleSystem>(true))
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        BossEffectPool.Release(_fireballGo);
+        _fireballGo = null;
     }
 
     private Vector3 BuildAirAnchor(MonsterContext ctx, int biteIndex)

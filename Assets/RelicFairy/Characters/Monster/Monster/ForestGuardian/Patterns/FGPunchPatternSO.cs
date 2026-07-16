@@ -182,14 +182,14 @@ public class FGPunchState : FullLockState<FGPunchPatternSO>
         Vector3 spawnPos = ctx.Transform.position;
         spawnPos.y += 0.02f;
         _warningTargetScale = new Vector3(Data.range, 1f, Data.range);
-        _warningGO = Object.Instantiate(prefab, spawnPos, ctx.Transform.rotation);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, spawnPos, ctx.Transform.rotation);
         _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → Update에서 서서히 확장
     }
 
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO = null;
     }
 
