@@ -4543,8 +4543,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 21d5b0d3a7a19f240adea9cefe5131de, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::UI_GridPanel
+  _bgSprite: {fileID: 21300000, guid: 57561b1cc4fa1bb4ebf73089f6df4007, type: 3}
+  _boardSprite: {fileID: 21300000, guid: a7537aa361bcf24418398907275a1fd6, type: 3}
+  _stagingBorderSprite: {fileID: 21300000, guid: d5a2a46d04b5d6544b38a2e02af35918, type: 3}
+  _stagingBgSprite: {fileID: 21300000, guid: 6ea62fe803f3a514f9b5d29b751dca60, type: 3}
+  _synergyBorderSprite: {fileID: 21300000, guid: 91971b6e61b862243b037ec6f63b5639, type: 3}
+  _synergyBgSprite: {fileID: 21300000, guid: 888756fd8c6a83343be9d02c7d65e9fd, type: 3}
 --- !u!222 &2551044872294124601
 CanvasRenderer:
   m_ObjectHideFlags: 0

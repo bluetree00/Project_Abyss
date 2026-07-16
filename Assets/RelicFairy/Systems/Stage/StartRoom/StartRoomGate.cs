@@ -63,6 +63,11 @@ public class StartRoomGate : MonoBehaviour
     private TextMeshProUGUI _distanceText;
     private bool            _flashActive;
 
+    // 봉인 석문(Gothic) — 스타트 방 모드에서 준비되면 위로 올라가며 열림. 절차 방 게이트와 일관.
+    private Transform       _sealDoor;
+    private const float     SealDoorMeshW = 7f;
+    private const float     SealDoorMeshH = 11.5f;
+
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
@@ -112,10 +117,16 @@ public class StartRoomGate : MonoBehaviour
             return;
         }
 
+        EnsureSealDoor();          // 석문 보장(최초 1회, 항상 닫힘으로 시작)
+
         bool ready = IsLoadoutReady();
         if (ready == _gateOpen) return;
         _gateOpen = ready;
         if (portalActive != null) portalActive.SetActive(ready);
+
+        // 준비 완료 → 석문이 위로 올라가며 열림(먼지·사운드). 미준비 → 닫힘.
+        if (ready) OpenSealDoorAsync().Forget();
+        else       SetSealDoorClosed();
     }
 
     private void OnDestroy()
@@ -143,6 +154,70 @@ public class StartRoomGate : MonoBehaviour
         bc.isTrigger = true;
         bc.size      = new Vector3(_gateWidth, _gateHeight, TriggerDepth);
         bc.center    = new Vector3(0f, _gateHeight * 0.5f, 0f);
+    }
+
+    // ── 봉인 석문 (스타트 방 모드) ──────────────────────────────────
+    private Vector3 SealDoorClosedPos => new Vector3(-_gateWidth * 0.5f, 0f, -0.25f); // 개구부 덮음(코너 피벗 중앙정렬)
+
+    private void EnsureSealDoor()
+    {
+        if (_sealDoor != null) return;
+        var prefab = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDoorPrefab : null;
+        if (prefab == null) return;
+        var door = Instantiate(prefab, transform);
+        door.name = "StartSealDoor";
+        door.transform.localRotation = Quaternion.identity;
+        door.transform.localScale    = new Vector3(_gateWidth / SealDoorMeshW, _gateHeight / SealDoorMeshH, 1f);
+        door.transform.localPosition = SealDoorClosedPos; // 닫힘으로 시작
+        SetSealDoorLayer(door, 8);
+        foreach (var col in door.GetComponentsInChildren<Collider>()) Destroy(col); // 콜라이더 불필요(게이트가 차단) — 비용 절감
+        _sealDoor = door.transform;
+
+        // 석문이 시각을 담당하므로 레거시 포탈 비주얼(portalActive)은 렌더러를 꺼서 제거.
+        // (준비 토글 로직은 유지되나 화면엔 안 보임 → 열리면 문 뒤로 개구부/맵이 드러남)
+        if (portalActive != null)
+            foreach (var r in portalActive.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
+    }
+
+    private void SetSealDoorClosed()
+    {
+        if (_sealDoor != null) _sealDoor.localPosition = SealDoorClosedPos;
+    }
+
+    private async UniTaskVoid OpenSealDoorAsync()
+    {
+        if (_sealDoor == null) return;
+        Vector3 closed = SealDoorClosedPos;
+        Vector3 open   = closed + Vector3.up * _gateHeight;
+
+        // 열림 임팩트 — 먼지 + 문 열림 사운드
+        var dust = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDustVfx : null;
+        if (dust != null) { var fx = Instantiate(dust, transform.position, Quaternion.identity); Destroy(fx, 3f); }
+        Managers.Sound?.PlayEvent(SoundEvent.DoorOpen);
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        float dur = 0.6f, t = 0f;
+        try
+        {
+            while (t < dur)
+            {
+                if (_sealDoor == null) return;
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / dur);
+                float e = 1f - (1f - k) * (1f - k); // ease-out
+                _sealDoor.localPosition = Vector3.Lerp(closed, open, e);
+                await UniTask.Yield();
+            }
+            _sealDoor.localPosition = open;
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    private static void SetSealDoorLayer(GameObject go, int layer)
+    {
+        go.layer = layer;
+        foreach (Transform c in go.transform) SetSealDoorLayer(c.gameObject, layer);
     }
 
     private void ResizeGate()

@@ -19,12 +19,12 @@ public sealed class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
 
-    private const float WindowW = 1160f;
-    private const float WindowH = 820f;
+    private const float WindowW = 1280f;
+    private const float WindowH = 900f;
 
-    // 단일 집중 레이아웃 — 슬롯0(근접) 큰 집중 카드 + 슬롯1(원거리) 작은 도킹 카드
-    private const float FocusW = 680f, FocusH = 400f, FocusX =  40f, FocusY = -170f;
-    private const float DockW  = 300f, DockH  = 240f, DockX  = -40f, DockY  = -170f;
+    // 단일 집중 레이아웃 — 슬롯0(근접) 큰 집중 카드 + 슬롯1(원거리) 도킹 카드(둘 다 확대)
+    private const float FocusW = 760f, FocusH = 450f, FocusX =  40f, FocusY = -186f;
+    private const float DockW  = 340f, DockH  = 450f, DockX  = -40f, DockY  = -186f;
 
     // ── 연출 노브 (도파민 레이어; 표시층 전용, 결과/데이터 불변) ──
     private const float PunchScale        = 0.14f;  // 성공 카드 스케일 펀치 진폭
@@ -65,11 +65,33 @@ public sealed class UI_CruciblePanel : UI_Popup
     private readonly RectTransform[] _cardGaugeFill = new RectTransform[2];
     private readonly Vector2[]       _cardBasePos   = new Vector2[2]; // 카드 기준 앵커 위치(쉐이크 복원용)
 
+    // 원거리 파츠(도킹 카드) — 진화로 해금(활2/석궁3), 재련소에서 제작/구매. 슬롯 UI는 레이아웃, 로직은 Phase 3.
+    private readonly Image[]    _partsSlots = new Image[3];
+    private readonly TMP_Text[] _partsMark  = new TMP_Text[3];
+    private Button _craftPartBtn;
+
+    // 근접 집중 카드 — 안전/도박 구간 배지 + 진화 마일스톤(실데이터: DropAt/레벨/승급)
+    private Image    _zoneBg;
+    private TMP_Text _zoneTag;
+    private TMP_Text _milestoneLabel;
+
+    // 이벤트 배너(HasEvent — Discount/Fever) + 진화 선택 패널(선택 연출)
+    private GameObject _eventBanner;
+    private TMP_Text   _eventBannerText;
+    private GameObject _evolvePanel;
+    private Button     _evolveBtn;
+    private TMP_Text   _branchAName, _branchBName;
+    private Button     _branchABtn,  _branchBBtn;
+
+    // 디테일 콘텐츠 — 무기 타입·티어 라인 + "다음 강화 상세"(성공/실패/잭팟) + 정보 잭팟·이벤트효과
+    private TMP_Text _focusTypeText;
+    private TMP_Text _detailSuccess, _detailFail, _detailJackpot;
+    private TMP_Text _dockTypeText;
+    private TMP_Text _eventEffectText;
+
     // 정보
     private TMP_Text _successText;
     private TMP_Text _costText;
-    private TMP_Text _dropText;
-    private TMP_Text _previewText;
     private TMP_Text _streakText;
     private TMP_Text _resultText;
 
@@ -116,7 +138,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.PlaySfx("shop_open");
         _targetSlot = PlayerWeaponManager.Slot0;
         BuildLegendButtons();
-        _dialogText.text = _controller.HasEvent ? _controller.EventBanner : _controller.GetDialogue(CrucibleMood.Idle);
+        _dialogText.text = _controller.GetDialogue(CrucibleMood.Idle);   // 이벤트는 이제 전용 배너로 표시
         RefreshAll();
     }
 
@@ -147,9 +169,11 @@ public sealed class UI_CruciblePanel : UI_Popup
         var w = fill.transform;
 
         BuildHeader(w);
+        BuildEventBanner(w);
         BuildCards(w);
         BuildInfo(w);
         BuildActions(w);
+        BuildEvolvePanel(w);   // 선택 연출 오버레이(최상단, 기본 비활성)
         BuildCloseButton(w);
     }
 
@@ -199,7 +223,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         BuildCard(w, 1, focus: false);  // 원거리 — 도킹(작음)
     }
 
-    /// <summary>슬롯 카드 1장. focus=true면 큰 집중 카드(근접), false면 작은 도킹 카드(원거리).</summary>
+    /// <summary>슬롯 카드 1장. focus=true면 큰 집중 카드(근접), false면 도킹 카드(원거리).</summary>
     private void BuildCard(Transform w, int i, bool focus)
     {
         int slot = i;
@@ -214,46 +238,15 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.Anchor(cardRT, anchor, anchor, anchor, pos, size);
         var c = card.transform;
 
-        // 내부 수치 — 집중(큼) vs 도킹(작음)
-        float pad      = focus ? 24f : 14f;
-        float nameSize = focus ? 28f : 18f;
-        float lvlSize  = focus ? 52f : 30f;
-        float atkSize  = focus ? 22f : 15f;
-        float nameY    = focus ? -54f : -36f;
-        float lvlY     = focus ? -110f : -70f;
-        float gaugeY   = focus ? -196f : -122f;
-        float gaugeH   = focus ? 28f : 16f;
-        float atkY     = focus ? -238f : -146f;
-
+        float pad = focus ? 24f : 14f;
         var slotLabel = ShopUIStyle.MakeText(c, "Slot", focus ? 16f : 13f, FontStyles.Bold,
                                              TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
         slotLabel.text = focus ? "근접 · 집중 강화" : "원거리";
         ShopUIStyle.Anchor(slotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(pad, -12), new Vector2(-pad * 2, 24));
+                           new Vector2(pad, -14), new Vector2(-pad * 2, 22));
 
-        _cardName[i] = ShopUIStyle.MakeText(c, "Name", nameSize, FontStyles.Bold,
-                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_cardName[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(pad, nameY), new Vector2(-pad * 2, nameSize + 10));
-
-        _cardLevel[i] = ShopUIStyle.MakeText(c, "Level", lvlSize, FontStyles.Bold,
-                                             TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_cardLevel[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(pad, lvlY), new Vector2(-pad * 2, lvlSize + 12));
-
-        var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
-        ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(pad, gaugeY), new Vector2(-pad * 2, gaugeH));
-        var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
-        var fr = fill.rectTransform;
-        fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
-        fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
-        _cardGaugeFill[i] = fr;
-
-        _cardAtk[i] = ShopUIStyle.MakeText(c, "Atk", atkSize, FontStyles.Bold,
-                                           TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_cardAtk[i].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(pad, atkY), new Vector2(-pad * 2, atkSize + 12));
+        if (focus) BuildFocusCard(c, pad);
+        else       BuildDockCard(c, pad);
 
         // 대상 선택 (카드 전체 버튼)
         var selBtn = card.transform.parent.gameObject.AddComponent<Button>();
@@ -261,42 +254,165 @@ public sealed class UI_CruciblePanel : UI_Popup
         selBtn.onClick.AddListener(() => { if (_animating) return; _targetSlot = slot; UpdateTargetDialogue(); RefreshAll(); });
     }
 
+    /// <summary>근접 집중 카드 — 타입·티어 · 이름 · 레벨 · 게이지+마일스톤 · 안전/도박 배지 · 다음 강화 상세 패널.</summary>
+    private void BuildFocusCard(Transform c, float pad)
+    {
+        _focusTypeText = ShopUIStyle.MakeText(c, "TypeTier", 15f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_focusTypeText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -44), new Vector2(-pad * 2, 22));
+
+        _zoneBg = ShopUIStyle.MakeImage(c, "ZoneBg", new Color(0.15f, 0.32f, 0.2f, 1f));
+        ShopUIStyle.Anchor(_zoneBg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
+                           new Vector2(-pad, -12), new Vector2(150, 30));
+        _zoneTag = ShopUIStyle.MakeText(_zoneBg.transform, "ZoneTag", 14f, FontStyles.Bold, TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        _zoneTag.text = "안전구간";
+        ShopUIStyle.Stretch(_zoneTag.rectTransform);
+
+        _cardName[0] = ShopUIStyle.MakeText(c, "Name", 30f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(_cardName[0].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -80), new Vector2(-pad * 2, 40));
+
+        _cardLevel[0] = ShopUIStyle.MakeText(c, "Level", 50f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_cardLevel[0].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -132), new Vector2(-pad * 2, 60));
+
+        var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
+        ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -214), new Vector2(-pad * 2, 30));
+        var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
+        var fr = fill.rectTransform;
+        fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
+        fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
+        _cardGaugeFill[0] = fr;
+
+        var tick = ShopUIStyle.MakeImage(track.transform, "MilestoneTick", ShopUIStyle.Gold);
+        var tr = tick.rectTransform;
+        tr.anchorMin = new Vector2(1f, -0.25f); tr.anchorMax = new Vector2(1f, 1.25f); tr.pivot = new Vector2(0.5f, 0.5f);
+        tr.sizeDelta = new Vector2(4f, 0f); tr.anchoredPosition = Vector2.zero;
+
+        _milestoneLabel = ShopUIStyle.MakeText(c, "MilestoneLabel", 15f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_milestoneLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -250), new Vector2(-pad * 2, 24));
+
+        // 다음 강화 상세 패널(성공/실패/잭팟)
+        var detail = ShopUIStyle.MakeImage(c, "Detail", ShopUIStyle.BandFill);
+        ShopUIStyle.Anchor(detail.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -288), new Vector2(-pad * 2, 146));
+        var dt = detail.transform;
+        var dh = ShopUIStyle.MakeText(dt, "H", 13f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
+        dh.text = "다음 강화";
+        ShopUIStyle.Anchor(dh.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(16, -10), new Vector2(-32, 20));
+        _detailSuccess = MakeDetailRow(dt, -36);
+        _detailFail    = MakeDetailRow(dt, -72);
+        _detailJackpot = MakeDetailRow(dt, -108);
+    }
+
+    private TMP_Text MakeDetailRow(Transform dt, float y)
+    {
+        var t = ShopUIStyle.MakeText(dt, "Row", 16f, FontStyles.Normal, TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(t.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(16, y), new Vector2(-32, 30));
+        return t;
+    }
+
+    /// <summary>원거리 도킹 카드 — 타입·티어 · 이름 · 레벨 · 게이지 · 공격 · 파츠 워크벤치.</summary>
+    private void BuildDockCard(Transform c, float pad)
+    {
+        _dockTypeText = ShopUIStyle.MakeText(c, "TypeTier", 12f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_dockTypeText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -38), new Vector2(-pad * 2, 20));
+
+        _cardName[1] = ShopUIStyle.MakeText(c, "Name", 20f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(_cardName[1].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -66), new Vector2(-pad * 2, 28));
+
+        _cardLevel[1] = ShopUIStyle.MakeText(c, "Level", 30f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
+        ShopUIStyle.Anchor(_cardLevel[1].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -100), new Vector2(-pad * 2, 42));
+
+        var track = ShopUIStyle.MakeImage(c, "GaugeTrack", GaugeTrack);
+        ShopUIStyle.Anchor(track.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -152), new Vector2(-pad * 2, 16));
+        var fill = ShopUIStyle.MakeImage(track.transform, "Fill", GaugeFillC);
+        var fr = fill.rectTransform;
+        fr.anchorMin = new Vector2(0f, 0f); fr.anchorMax = new Vector2(0f, 1f); fr.pivot = new Vector2(0f, 0.5f);
+        fr.offsetMin = Vector2.zero; fr.offsetMax = Vector2.zero;
+        _cardGaugeFill[1] = fr;
+
+        _cardAtk[1] = ShopUIStyle.MakeText(c, "Atk", 15f, FontStyles.Bold, TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(_cardAtk[1].rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(pad, -176), new Vector2(-pad * 2, 26));
+
+        BuildRangedParts(c);
+    }
+
+    /// <summary>원거리 도킹 카드에 파츠 슬롯 행 + 제작 버튼(진화로 해금 · 재련소 제작). 슬롯 UI만 — 로직은 Phase 3.</summary>
+    private void BuildRangedParts(Transform c)
+    {
+        var label = ShopUIStyle.MakeText(c, "PartsLabel", 13f, FontStyles.Bold,
+                                         TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
+        label.text = "파츠 · 진화로 해금";
+        ShopUIStyle.Anchor(label.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(14, -214), new Vector2(-28, 20));
+
+        const float box = 52f, gap = 14f;
+        for (int i = 0; i < _partsSlots.Length; i++)
+        {
+            var slot = ShopUIStyle.MakeImage(c, $"PartSlot{i}", GaugeTrack);
+            ShopUIStyle.Anchor(slot.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                               new Vector2(14 + i * (box + gap), -238), new Vector2(box, box));
+            _partsSlots[i] = slot;
+
+            var mark = ShopUIStyle.MakeText(slot.transform, "Mark", 16f, FontStyles.Bold,
+                                            TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+            mark.text = i < 2 ? "＋" : "잠금";       // i<2=해금(빈칸), 그 외=잠금(석궁 진화 시 해제)
+            ShopUIStyle.Stretch(mark.rectTransform);
+            _partsMark[i] = mark;
+        }
+
+        var hint = ShopUIStyle.MakeText(c, "PartsHint", 12f, FontStyles.Normal,
+                                        TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
+        hint.text = "슬롯: 활 2 / 석궁 3 · 연발·관통·멀티샷";
+        ShopUIStyle.Anchor(hint.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1),
+                           new Vector2(14, -300), new Vector2(-28, 20));
+
+        _craftPartBtn = MakeStyledButton(c, "CraftPart", "파츠 제작", out _);
+        ShopUIStyle.Anchor((RectTransform)_craftPartBtn.transform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -332), new Vector2(-28, 46));
+        _craftPartBtn.onClick.AddListener(OnCraftPartClicked);
+    }
+
+    private void OnCraftPartClicked()
+    {
+        // TODO(파츠 시스템): 재련소 파츠 제작/구매 UI 연결 (Phase 3)
+        if (_dialogText != null) _dialogText.text = "파츠 제작은 곧 열립니다 — 진화로 슬롯을 먼저 여세요.";
+        ShopUIStyle.PlaySfx("shop_reject");
+    }
+
     private void BuildInfo(Transform w)
     {
         var panel = ShopUIStyle.MakeImage(w, "Info", ShopUIStyle.BandFill);
         ShopUIStyle.Anchor(panel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-                           new Vector2(0, -592), new Vector2(-60, 140));
+                           new Vector2(0, -654), new Vector2(-60, 130));
         var p = panel.transform;
 
-        _successText = ShopUIStyle.MakeText(p, "Success", 22f, FontStyles.Bold,
-                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_successText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(24, -14), new Vector2(-24, 32));
+        // 상단 행: 성공률 · 재료 · 스트릭 (3열)
+        _successText = InfoCell(p, 0f,    0.34f, -16f, 22f, ShopUIStyle.TextPrimary,           FontStyles.Bold, false);
+        _costText    = InfoCell(p, 0.34f, 0.64f, -16f, 22f, ShopUIStyle.Gold,                  FontStyles.Bold, false);
+        _streakText  = InfoCell(p, 0.64f, 1f,    -16f, 20f, ShopUIStyle.Gold,                  FontStyles.Bold, false);
+        // 하단 행: 이벤트 효과(좌 넓게) · 결과(우)
+        _eventEffectText = InfoCell(p, 0f,    0.64f, -60f, 17f, new Color(0.95f, 0.66f, 0.22f, 1f), FontStyles.Bold, false);
+        _resultText      = InfoCell(p, 0.64f, 1f,    -60f, 20f, ShopUIStyle.TextPrimary,            FontStyles.Bold, true);
+    }
 
-        _costText = ShopUIStyle.MakeText(p, "Cost", 22f, FontStyles.Bold,
-                                         TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_costText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(12, -14), new Vector2(-24, 32));
-
-        _dropText = ShopUIStyle.MakeText(p, "Drop", 17f, FontStyles.Normal,
-                                         TextAlignmentOptions.TopLeft, ShopUIStyle.RejectRed);
-        ShopUIStyle.Anchor(_dropText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(24, -52), new Vector2(-24, 28));
-
-        _previewText = ShopUIStyle.MakeText(p, "Preview", 17f, FontStyles.Normal,
-                                            TextAlignmentOptions.TopLeft, ShopUIStyle.TextDim);
-        ShopUIStyle.Anchor(_previewText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(12, -52), new Vector2(-24, 28));
-
-        _streakText = ShopUIStyle.MakeText(p, "Streak", 18f, FontStyles.Bold,
-                                           TextAlignmentOptions.TopLeft, ShopUIStyle.Gold);
-        ShopUIStyle.Anchor(_streakText.rectTransform, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0, 1),
-                           new Vector2(24, -88), new Vector2(-24, 34));
-
-        _resultText = ShopUIStyle.MakeText(p, "Result", 20f, FontStyles.Bold,
-                                           TextAlignmentOptions.TopRight, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(_resultText.rectTransform, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0, 1),
-                           new Vector2(12, -88), new Vector2(-24, 34));
+    private static TMP_Text InfoCell(Transform p, float x0, float x1, float y, float size, Color color, FontStyles style, bool right)
+    {
+        var t = ShopUIStyle.MakeText(p, "Cell", size, style,
+                                     right ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft, color);
+        ShopUIStyle.Anchor(t.rectTransform, new Vector2(x0, 1), new Vector2(x1, 1), new Vector2(0, 1),
+                           new Vector2(24, y), new Vector2(-24, size + 14));
+        return t;
     }
 
     private void BuildActions(Transform w)
@@ -304,7 +420,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         _enhanceBtn = MakeStyledButton(w, "Enhance", "강 화", out _enhanceLabel);
         _enhanceLabel.fontSize = 26f;
         ShopUIStyle.Anchor((RectTransform)_enhanceBtn.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                           new Vector2(0.5f, 0), new Vector2(0, 100), new Vector2(400, 76));
+                           new Vector2(0.5f, 0), new Vector2(0, 26), new Vector2(440, 76));
         _enhanceBtn.onClick.AddListener(OnEnhanceClicked);
 
         var rowGo = ShopUIStyle.MakeRect(w, "PromoteRow", typeof(HorizontalLayoutGroup));
@@ -321,6 +437,14 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.Anchor((RectTransform)exitBtn.transform, new Vector2(1, 0), new Vector2(1, 0),
                            new Vector2(1, 0), new Vector2(-26, 24), new Vector2(170, 50));
         exitBtn.onClick.AddListener(ClosePopupUI);
+
+        // 진화 버튼(좌하단) — 진화 조건 충족 시에만 노출, 클릭 시 선택 연출 패널
+        _evolveBtn = MakeStyledButton(w, "Evolve", "진화", out _);
+        _evolveBtn.GetComponent<Image>().color = new Color(0.40f, 0.28f, 0.62f, 1f);   // 프리즘 톤
+        ShopUIStyle.Anchor((RectTransform)_evolveBtn.transform, new Vector2(0, 0), new Vector2(0, 0),
+                           new Vector2(0, 0), new Vector2(26, 24), new Vector2(170, 50));
+        _evolveBtn.onClick.AddListener(ShowEvolvePanel);
+        _evolveBtn.gameObject.SetActive(false);
     }
 
     private void BuildCloseButton(Transform w)
@@ -331,6 +455,101 @@ public sealed class UI_CruciblePanel : UI_Popup
         ShopUIStyle.Anchor((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
                            new Vector2(-14, -14), new Vector2(52, 52));
         close.onClick.AddListener(ClosePopupUI);
+    }
+
+    // ── 이벤트 배너 (헤더 아래 · HasEvent 시 표시) ───────────
+    private void BuildEventBanner(Transform w)
+    {
+        var banner = ShopUIStyle.MakeImage(w, "EventBanner", new Color(0.30f, 0.16f, 0.05f, 1f));
+        ShopUIStyle.Anchor(banner.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -142), new Vector2(-60, 36));
+        _eventBanner = banner.gameObject;
+        _eventBannerText = ShopUIStyle.MakeText(banner.transform, "Text", 16f, FontStyles.Bold,
+                                                TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        ShopUIStyle.Stretch(_eventBannerText.rectTransform);
+        _eventBanner.SetActive(false);
+    }
+
+    // ── 진화 선택 패널 (선택 연출 오버레이) ──────────────────
+    private void BuildEvolvePanel(Transform w)
+    {
+        var dim = ShopUIStyle.MakeImage(w, "EvolveDim", new Color(0.02f, 0.02f, 0.04f, 0.90f), raycast: true);
+        ShopUIStyle.Stretch(dim.rectTransform);
+        _evolvePanel = dim.gameObject;
+        var d = dim.transform;
+
+        var title = ShopUIStyle.MakeText(d, "EvolveTitle", 28f, FontStyles.Bold,
+                                         TextAlignmentOptions.Center, ShopUIStyle.Gold);
+        title.text = "무기가 형태를 선택한다";
+        ShopUIStyle.Anchor(title.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -120), new Vector2(760, 48));
+
+        var sub = ShopUIStyle.MakeText(d, "EvolveSub", 15f, FontStyles.Italic,
+                                       TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        sub.text = "✧ 되돌릴 수 없는 선택 ✧";
+        ShopUIStyle.Anchor(sub.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -172), new Vector2(760, 28));
+
+        _branchABtn = BuildBranchCard(d, -200f, out _branchAName);
+        _branchBBtn = BuildBranchCard(d,  200f, out _branchBName);
+        _branchABtn.onClick.AddListener(() => OnBranchClicked(0));
+        _branchBBtn.onClick.AddListener(() => OnBranchClicked(1));
+
+        var cancel = MakeStyledButton(d, "EvolveCancel", "취소", out _);
+        ShopUIStyle.Anchor((RectTransform)cancel.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                           new Vector2(0, 56), new Vector2(200, 50));
+        cancel.onClick.AddListener(HideEvolvePanel);
+
+        _evolvePanel.SetActive(false);
+    }
+
+    private Button BuildBranchCard(Transform d, float xCenter, out TMP_Text nameText)
+    {
+        var card = ShopUIStyle.MakeFrame(d, "Branch", ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 3f, raycast: true);
+        var rt = (RectTransform)card.transform.parent;
+        ShopUIStyle.Anchor(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                           new Vector2(xCenter, 10f), new Vector2(340, 300));
+        var c = card.transform;
+
+        nameText = ShopUIStyle.MakeText(c, "Name", 24f, FontStyles.Bold,
+                                        TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
+        ShopUIStyle.Anchor(nameText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
+                           new Vector2(0, -110), new Vector2(-24, 70));
+
+        var hint = ShopUIStyle.MakeText(c, "Hint", 14f, FontStyles.Normal,
+                                        TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+        hint.text = "클릭하여 이 형태로 진화";
+        ShopUIStyle.Anchor(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0),
+                           new Vector2(0, 30), new Vector2(-24, 24));
+
+        var pick = card.transform.parent.gameObject.AddComponent<Button>();
+        pick.transition = Selectable.Transition.None;
+        return pick;
+    }
+
+    private void ShowEvolvePanel()
+    {
+        if (_evolvePanel == null || _controller == null) return;
+        // 분기 이름 — WeaponEvolutionSO 미연결이라 무기 타입 기준 임시. Phase 3에서 실제 분기 데이터로 대체.
+        var wp = _controller.GetSlot(PlayerWeaponManager.Slot0);
+        bool sword = wp != null && (wp.weaponType == WeaponType.Katana || wp.weaponType == WeaponType.Greatsword);
+        if (_branchAName != null) _branchAName.text = sword ? "카타나\n<size=70%>아론다이트</size>" : "활\n<size=70%>연발형</size>";
+        if (_branchBName != null) _branchBName.text = sword ? "대검\n<size=70%>갈라틴</size>"   : "석궁\n<size=70%>관통형</size>";
+        _evolvePanel.SetActive(true);
+        ShopUIStyle.PlaySfx("shop_open");
+    }
+
+    private void HideEvolvePanel()
+    {
+        if (_evolvePanel != null) _evolvePanel.SetActive(false);
+    }
+
+    private void OnBranchClicked(int branch)
+    {
+        // TODO(진화): WeaponEvolutionSO 분기 → PlayerWeaponManager.EvolveCurrentWeaponAsync 연결 (Phase 3)
+        HideEvolvePanel();
+        if (_resultText != null) _resultText.text = "<color=#9D7EE6>진화 연결 예정 (Phase 3)</color>";
+        ShopUIStyle.PlaySfx("shop_reject");
     }
 
     private void BuildLegendButtons()
@@ -625,18 +844,29 @@ public sealed class UI_CruciblePanel : UI_Popup
 
         _fuelText.text = $"강화재료 {_controller.FuelAmount}";
 
+        if (_eventBanner != null)
+        {
+            bool ev = _controller.HasEvent;
+            _eventBanner.SetActive(ev);
+            if (ev && _eventBannerText != null) _eventBannerText.text = _controller.EventBanner;
+        }
+        if (_evolveBtn != null)
+            _evolveBtn.gameObject.SetActive(_controller.CanPromote(PlayerWeaponManager.Slot0));
+
         for (int i = 0; i < 2; i++)
         {
             var w = _controller.GetSlot(i);
             bool isTarget = i == _targetSlot;
 
             _cardBg[i].color = isTarget ? CardTargetBg : ShopUIStyle.CardFill;
+            var typeText = i == 0 ? _focusTypeText : _dockTypeText;
 
             if (w == null)
             {
                 _cardName[i].text = "—";
                 _cardLevel[i].text = "";
-                _cardAtk[i].text = "";
+                if (_cardAtk[i] != null) _cardAtk[i].text = "";
+                if (typeText != null)    typeText.text = "";
                 SetGauge(i, 0, 1);
                 continue;
             }
@@ -645,60 +875,110 @@ public sealed class UI_CruciblePanel : UI_Popup
             string legend = string.IsNullOrEmpty(w.legendId) ? "" : $"  <color=#FFD24A>[{LegendName(w.legendId)}]</color>";
             _cardName[i].text = $"{w.displayName}{legend}";
             _cardLevel[i].text = FormatLevel(w.enhanceLevel, max);
-            _cardAtk[i].text = $"공격 {w.baseAttack:F0}";
+            if (_cardAtk[i] != null) _cardAtk[i].text = $"공격 {w.baseAttack:F0}";
+            if (typeText != null)    typeText.text = TypeTierLabel(w, max);
             SetGauge(i, w.enhanceLevel, max);
         }
 
+        RefreshFocusExtras();
         RefreshInfo();
         RefreshPromoteRow();
+    }
+
+    /// <summary>근접 집중 카드의 안전/도박 구간 배지 + 진화 마일스톤 라벨(실데이터).</summary>
+    private void RefreshFocusExtras()
+    {
+        if (_zoneTag == null) return;
+        var w = _controller.GetSlot(PlayerWeaponManager.Slot0);
+        if (w == null) { _zoneTag.text = ""; if (_milestoneLabel != null) _milestoneLabel.text = ""; return; }
+
+        int  max    = _controller.MaxAt(PlayerWeaponManager.Slot0);
+        bool maxed  = !_controller.CanEnhance(PlayerWeaponManager.Slot0);
+        bool danger = _controller.DropAt(PlayerWeaponManager.Slot0) > 0;   // 실패 하락 시작 = 도박구간
+
+        _zoneTag.text = danger ? "도박구간" : "안전구간";
+        if (_zoneBg != null)
+            _zoneBg.color = danger ? new Color(0.42f, 0.14f, 0.16f, 1f) : new Color(0.15f, 0.32f, 0.2f, 1f);
+
+        if (_milestoneLabel != null)
+        {
+            if (_controller.CanPromote(PlayerWeaponManager.Slot0)) _milestoneLabel.text = "◆ 진화 가능!";
+            else if (!maxed) _milestoneLabel.text = $"◆ 진화까지 {Mathf.Max(0, max - w.enhanceLevel)}강";
+            else _milestoneLabel.text = "";
+        }
+
+        // 다음 강화 상세(성공 공격증가 / 실패 하락 / 잭팟 확률)
+        if (_detailSuccess != null)
+        {
+            if (maxed)
+            {
+                _detailSuccess.text = "최대 강화 도달";
+                _detailFail.text    = _controller.CanPromote(PlayerWeaponManager.Slot0) ? "진화 가능" : "";
+                _detailJackpot.text = "";
+            }
+            else
+            {
+                var table = _controller.Table;
+                float cur  = w.baseAttack;
+                float next = table != null ? (w.baseAttackRaw > 0f ? w.baseAttackRaw : w.baseAttack) * table.AttackMult(w.enhanceLevel + 1, w.legendId) : cur;
+                int drop = _controller.DropAt(PlayerWeaponManager.Slot0);
+                _detailSuccess.text = $"<color=#7AD46E>성공</color>  공격 {cur:F0} → {next:F0} <size=80%>(+{next - cur:F0})</size>";
+                _detailFail.text    = drop > 0 ? $"<color=#FF7A6A>실패</color>  강화 -{drop}"
+                                               : "<color=#7AD46E>실패</color>  하락 없음 (안전)";
+                _detailJackpot.text = $"<color=#FFD24A>잭팟</color>  {_controller.JackpotChance * 100f:F0}% <size=80%>스트릭 {_controller.Streak}</size>";
+            }
+        }
     }
 
     private void RefreshInfo()
     {
         var w = _controller.GetSlot(_targetSlot);
-        if (w == null) { _successText.text = _costText.text = _dropText.text = _previewText.text = ""; return; }
+        if (w == null)
+        {
+            if (_successText != null)     _successText.text = "";
+            if (_costText != null)        _costText.text = "";
+            if (_streakText != null)      _streakText.text = "";
+            if (_eventEffectText != null) _eventEffectText.text = "";
+            return;
+        }
 
         bool maxed = !_controller.CanEnhance(_targetSlot);
         if (maxed)
         {
             _successText.text = "<color=#8AB0D5>최대 강화 도달</color>";
-            _costText.text = "";
-            _dropText.text = "";
-            _previewText.text = _controller.CanPromote(_targetSlot) ? "승급 가능" : "";
+            _costText.text = _controller.CanPromote(_targetSlot) ? "진화 가능" : "";
         }
         else
         {
             float chance = _controller.SuccessChanceAt(_targetSlot);
             int cost = _controller.CostAt(_targetSlot);
-            int drop = _controller.DropAt(_targetSlot);
             _successText.text = $"성공률 <color=#7AD46E>{chance * 100f:F0}%</color>";
             _costText.text = $"재료 {cost}";
-            _dropText.text = drop > 0 ? $"실패 시 -{drop}" : "실패 시 유지";
-
-            var table = _controller.Table;
-            float cur  = w.baseAttack;
-            float next = table != null ? (w.baseAttackRaw > 0f ? w.baseAttackRaw : w.baseAttack) * table.AttackMult(w.enhanceLevel + 1, w.legendId) : cur;
-            _previewText.text = $"공격 {cur:F0} → <color=#7AD46E>{next:F0}</color>";
         }
 
-        _streakText.text = _controller.Streak > 0 ? $"🔥 연속 성공 {_controller.Streak}" : "";
+        _streakText.text = _controller.Streak > 0 ? $"🔥 연속 {_controller.Streak}" : "";
+        if (_eventEffectText != null)
+            _eventEffectText.text = _controller.HasEvent ? $"⚡ {_controller.EventEffectDesc}" : "";
+    }
+
+    /// <summary>무기 타입·티어 라벨(카드 상단 디테일). 티어는 강화 상한(6/9/12/15)으로 추정.</summary>
+    private string TypeTierLabel(WeaponData w, int max)
+    {
+        if (w == null) return "";
+        string type = w.weaponType switch
+        {
+            WeaponType.Katana     => "카타나",
+            WeaponType.Greatsword => "대검",
+            _                     => w.weaponType.ToString(),
+        };
+        int tier = max <= 6 ? 1 : max <= 9 ? 2 : max <= 12 ? 3 : 4;
+        return $"{type} · 티어 {tier}";
     }
 
     private void RefreshPromoteRow()
     {
-        bool canPromote = _controller.CanPromote(_targetSlot);
-        if (_promoteRow != null) _promoteRow.gameObject.SetActive(canPromote);
-        if (!canPromote) return;
-
-        for (int i = 0; i < _legendBtns.Count && i < _controller.Legends.Length; i++)
-        {
-            var legend = _controller.Legends[i];
-            int cost = legend.promoteCost;
-            bool afford = _controller.FuelAmount >= cost;
-            _legendBtns[i].interactable = afford;
-            var lbl = _legendBtns[i].GetComponentInChildren<TMP_Text>();
-            if (lbl != null) lbl.text = $"{legend.displayName}\n<size=60%>재료 {cost}</size>";
-        }
+        // legendId 승급행 폐기 예정 — 진화 패널(WeaponEvolutionSO)로 대체. 지금은 숨겨 레이아웃 정리.
+        if (_promoteRow != null) _promoteRow.gameObject.SetActive(false);
     }
 
     private string LegendName(string legendId)

@@ -19,8 +19,10 @@ public class CrucibleRoomController : MonoBehaviour
     private const float JackpotPerStreak  = 0.05f;
     private const float JackpotMaxChance   = 0.5f;
 
-    private const float DiscountCostMult   = 0.5f;   // 반값 재련
-    private const float FeverSuccessBonus  = 0.15f;  // 성공률 +15%p
+    private const float DiscountCostMult    = 0.5f;   // 반값 재련
+    private const float FeverSuccessBonus   = 0.15f;  // 성공률 +15%p
+    private const float BountyJackpotBonus  = 0.15f;  // 잭팟 확률 +15%p (방 전체)
+    private const float CurseSuccessPenalty = 0.10f;  // 성공률 -10%p (방 전체)
 
     // ── 비공개 필드 ─────────────────────────────────────────
     private GameRunSession _run;
@@ -52,15 +54,36 @@ public class CrucibleRoomController : MonoBehaviour
     public CrucibleEvent ActiveEvent => _event;
     public bool HasEvent => _event != CrucibleEvent.None;
     private float CostMult     => _event == CrucibleEvent.Discount ? DiscountCostMult : 1f;
-    private float SuccessBonus => _event == CrucibleEvent.Fever    ? FeverSuccessBonus : 0f;
+    private float SuccessBonus => _event switch
+    {
+        CrucibleEvent.Fever => FeverSuccessBonus,
+        CrucibleEvent.Curse => -CurseSuccessPenalty,
+        _                   => 0f,
+    };
+    private float BountyBonus  => _event == CrucibleEvent.Bounty ? BountyJackpotBonus : 0f;
 
     /// <summary>돌발 이벤트 배너 문구(없으면 빈 문자열).</summary>
     public string EventBanner => _event switch
     {
         CrucibleEvent.Discount => "⚡ 반값 재련! 안 지르면 손해지…",
         CrucibleEvent.Fever    => "🔥 열기 오른 화로 — 성공률 상승 중!",
+        CrucibleEvent.Bounty   => "💰 풍요로운 화로 — 잭팟이 가깝다!",
+        CrucibleEvent.Curse    => "🩸 저주받은 화로 — 성공률이 떨어진다…",
         _                      => string.Empty,
     };
+
+    /// <summary>돌발 이벤트 효과 요약(정보 패널 디테일 표시용).</summary>
+    public string EventEffectDesc => _event switch
+    {
+        CrucibleEvent.Discount => "재료 비용 50%",
+        CrucibleEvent.Fever    => "성공률 +15%p",
+        CrucibleEvent.Bounty   => "잭팟 확률 +15%p",
+        CrucibleEvent.Curse    => "성공률 -10%p",
+        _                      => string.Empty,
+    };
+
+    /// <summary>다음 성공 시 잭팟(재료 환불) 확률(표시용) — 스트릭 비례 + 풍요 보너스.</summary>
+    public float JackpotChance => Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * _streak + BountyBonus);
 
     /// <summary>강화/승급/연료 변동 시 UI 재렌더 통지.</summary>
     public event Action OnCrucibleChanged;
@@ -275,12 +298,14 @@ public class CrucibleRoomController : MonoBehaviour
 
     // ── 잭팟 / 스탯 갱신 ────────────────────────────────────
 
-    /// <summary>방 진입 시 돌발 이벤트 결정적 롤. None 55% / Discount 25% / Fever 20%.</summary>
+    /// <summary>방 진입 시 돌발 이벤트 결정적 롤. Discount 18 / Fever 15 / Bounty 12 / Curse 10 / None 45.</summary>
     private CrucibleEvent RollEvent()
     {
         double r = _roomRng.NextDouble();
-        if (r < 0.25) return CrucibleEvent.Discount;
-        if (r < 0.45) return CrucibleEvent.Fever;
+        if (r < 0.18) return CrucibleEvent.Discount;
+        if (r < 0.33) return CrucibleEvent.Fever;
+        if (r < 0.45) return CrucibleEvent.Bounty;
+        if (r < 0.55) return CrucibleEvent.Curse;
         return CrucibleEvent.None;
     }
 
@@ -336,7 +361,7 @@ public class CrucibleRoomController : MonoBehaviour
     private void RollJackpot(RunFuelBank fuel, int spent)
     {
         if (spent <= 0) return;
-        float chance = Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * (_streak - 1));
+        float chance = Mathf.Min(JackpotMaxChance, JackpotBaseChance + JackpotPerStreak * (_streak - 1) + BountyBonus);
 
         double roll = _roomRng.NextDouble();
         BumpRoll(1);   // 잭팟 굴림도 스트림을 소비 → 복원 시 동일하게 건너뛰어야 한다

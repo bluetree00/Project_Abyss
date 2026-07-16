@@ -30,6 +30,18 @@ public sealed class UI_GridPanel : UI_Base
     private StagingAreaView             _stagingArea;
     private ItemInfoPanel               _itemInfoPanel;
 
+    // ── 정제소 배치 팝업 스킨 (@UIRoot에서 배선; 미배선 시 기존 외형 유지) ──
+    [Header("정제소 스킨")]
+    [SerializeField] private Sprite _bgSprite;             // 자연바탕
+    [SerializeField] private Sprite _boardSprite;          // 속성판(헥사 그리드 배경)
+    [SerializeField] private Sprite _stagingBorderSprite;  // 룬 배치 테두리
+    [SerializeField] private Sprite _stagingBgSprite;      // 룬 배치 테두리 바탕
+    [SerializeField] private Sprite _synergyBorderSprite;  // 시너지 테두리
+    [SerializeField] private Sprite _synergyBgSprite;      // 시너지 바탕
+    [Header("그리드 타일 (디자이너 6속성 — F·I·T·P·L·D 순)")]
+    [SerializeField] private Sprite[] _zoneTiles;          // 존별 셀 타일 6장
+    [SerializeField] private Sprite   _centerTile;         // 중앙 타일(선택)
+
     // ── Private: Layout roots (코드로 생성) ──
     private RectTransform _headerRT;
     private RectTransform _mainAreaRT;
@@ -311,13 +323,25 @@ public sealed class UI_GridPanel : UI_Base
         // CanvasGroup — 페이드인에 사용
         _canvasGroup = gameObject.GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
 
-        // 전체 배경
+        // 전체 배경 (자연바탕 스킨 — 미배선 시 단색)
         var bg = gameObject.GetComponent<Image>() ?? gameObject.AddComponent<Image>();
         bg.color = new Color(0.10f, 0.12f, 0.18f, 0.97f);
+        SkinImage(bg, _bgSprite, fill: true);
 
         BuildHeader();
         BuildMainArea();
         BuildFooter();
+        if (_footerRT != null) _footerRT.gameObject.SetActive(false);   // 하단 정리 — 중앙보너스 푸터 숨김
+    }
+
+    /// <summary>이미지에 스프라이트 주입(비파괴 — sprite null이면 기존 유지). fill=true면 늘려 채움, false면 종횡비 보존.</summary>
+    private static void SkinImage(Image img, Sprite sprite, bool fill)
+    {
+        if (img == null || sprite == null) return;
+        img.sprite = sprite;
+        img.type = Image.Type.Simple;
+        img.color = Color.white;
+        img.preserveAspect = !fill;
     }
 
     // Header (60px 고정, 상단)
@@ -385,7 +409,7 @@ public sealed class UI_GridPanel : UI_Base
         _mainAreaRT = mainGO.GetComponent<RectTransform>();
         _mainAreaRT.anchorMin        = new Vector2(0f, 0f);
         _mainAreaRT.anchorMax        = new Vector2(1f, 1f);
-        _mainAreaRT.offsetMin        = new Vector2(0f, 50f);   // footer 50px
+        _mainAreaRT.offsetMin        = new Vector2(0f, 10f);   // footer 제거(하단 정리) — 최소 여백만
         _mainAreaRT.offsetMax        = new Vector2(0f, -60f);  // header 60px
 
         BuildLeftPanel(mainGO.transform);
@@ -403,14 +427,14 @@ public sealed class UI_GridPanel : UI_Base
         _leftPanelRT.anchorMax = new Vector2(0.20f, 1f);
         _leftPanelRT.offsetMin = _leftPanelRT.offsetMax = Vector2.zero;
 
-        _charInfoView = CharacterInfoPanelView.Create(go.transform);
-        if (_charInfoView != null)
-        {
-            var charRT = _charInfoView.GetComponent<RectTransform>();
-            charRT.anchorMin = Vector2.zero;
-            charRT.anchorMax = Vector2.one;
-            charRT.offsetMin = charRT.offsetMax = Vector2.zero;
-        }
+        // 좌측 = TFT식 시너지 패널(개수 + 호버 효과). 캐릭터 정보는 정리(제거).
+        var synGO = Go("SynergyStatusRoot");
+        synGO.transform.SetParent(go.transform, false);
+        _synergyStatusRoot = synGO.GetComponent<RectTransform>();
+        _synergyStatusRoot.anchorMin = Vector2.zero;
+        _synergyStatusRoot.anchorMax = Vector2.one;
+        _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
+        _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
     }
 
     // CenterPanel (20% ~ 75%)
@@ -424,18 +448,20 @@ public sealed class UI_GridPanel : UI_Base
         _centerPanelRT.offsetMin = new Vector2(2f, 0f);
         _centerPanelRT.offsetMax = new Vector2(-2f, 0f);
 
-        // 상단 72%: HexGrid (0.28 ~ 1.00)
+        // HexGrid 전체 높이 (0.0 ~ 1.0) — 하단 시너지 영역 제거로 그리드가 중앙 전체 사용
         var hexRootGO = Go("HexGridRoot");
         hexRootGO.transform.SetParent(go.transform, false);
         _hexGridRoot = hexRootGO.GetComponent<RectTransform>();
-        _hexGridRoot.anchorMin = new Vector2(0f, 0.28f);
-        _hexGridRoot.anchorMax = new Vector2(1f, 1.00f);
+        _hexGridRoot.anchorMin = new Vector2(0f, 0.0f);
+        _hexGridRoot.anchorMax = new Vector2(1f, 1.0f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
         var hexBG = hexRootGO.AddComponent<Image>();
         hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
+        SkinImage(hexBG, _boardSprite, fill: false);   // 속성판(종횡비 보존 — 그리드 셀 정렬은 후속 조정)
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
+        _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
 
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
@@ -443,8 +469,8 @@ public sealed class UI_GridPanel : UI_Base
             new Color(0.62f, 0.68f, 0.85f, 0.45f));
         _hexGridHintText = hintGO.GetComponent<TMP_Text>();
         var hintRT = hintGO.GetComponent<RectTransform>();
-        hintRT.anchorMin = new Vector2(0f, 0.28f);
-        hintRT.anchorMax = new Vector2(1f, 1.00f);
+        hintRT.anchorMin = new Vector2(0f, 0.0f);
+        hintRT.anchorMax = new Vector2(1f, 1.0f);
         hintRT.offsetMin = hintRT.offsetMax = Vector2.zero;
         _hexGridHintText.alignment         = TextAlignmentOptions.Center;
         _hexGridHintText.textWrappingMode = TextWrappingModes.Normal;
@@ -456,17 +482,6 @@ public sealed class UI_GridPanel : UI_Base
         _boardContainer.anchorMin = Vector2.zero;
         _boardContainer.anchorMax = Vector2.one;
         _boardContainer.offsetMin = _boardContainer.offsetMax = Vector2.zero;
-
-        // 하단 27%: 연결 클러스터 시너지 패널 (0.00 ~ 0.27)
-        var synRootGO = Go("SynergyStatusRoot");
-        synRootGO.transform.SetParent(go.transform, false);
-        _synergyStatusRoot = synRootGO.GetComponent<RectTransform>();
-        _synergyStatusRoot.anchorMin = new Vector2(0f, 0.00f);
-        _synergyStatusRoot.anchorMax = new Vector2(1f, 0.27f);
-        _synergyStatusRoot.offsetMin = new Vector2(0f, 2f);
-        _synergyStatusRoot.offsetMax = Vector2.zero;
-
-        _synergyStatusView = synRootGO.AddComponent<MerlinRuneSynergyStatusView>();
     }
 
     // RightPanel (75% ~ 100%)

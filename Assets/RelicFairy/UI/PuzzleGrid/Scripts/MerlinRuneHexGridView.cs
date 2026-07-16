@@ -47,7 +47,27 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private GridVisualSO  _runtimeVisualSO;
     private bool          _isBuilt;
 
+    // 존별 그리드 타일(디자이너 제공, 6속성 + 선택 중앙). 있으면 셀에 타일을 찍고 색 대신 명암만 틴트.
+    private Dictionary<char, Sprite> _tileByCode;
+
     // ── Public API ──
+
+    /// <summary>존별 셀 타일 스프라이트 주입(디자이너 6속성 순서 F·I·T·P·L·D + 선택 중앙). BuildGrid 전에 호출.</summary>
+    public void SetZoneTiles(IReadOnlyList<Sprite> byElementOrder, Sprite centerTile)
+    {
+        _tileByCode = new Dictionary<char, Sprite>();
+        var order = ElementDef.Order;   // F, I, T, P, L, D 순
+        if (byElementOrder != null)
+            for (int i = 0; i < order.Count && i < byElementOrder.Count; i++)
+            {
+                if (byElementOrder[i] == null) continue;
+                _tileByCode[ElementDef.IdToCode(order[i])] = byElementOrder[i];
+            }
+        if (centerTile != null) _tileByCode[ElementDef.CenterCode] = centerTile;
+    }
+
+    private Sprite TileForCode(char code)
+        => _tileByCode != null && _tileByCode.TryGetValue(code, out var s) ? s : null;
 
     /// <summary>BuildGrid() 후 GridManager에 등록할 Grid 컴포넌트.</summary>
     public Grid HexGrid => _gridSquaresRoot != null
@@ -374,7 +394,11 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
         var img = cellGO.AddComponent<Image>();
         var zoneColor     = GetZoneColor(zoneCode);
-        img.color         = EmptyColor(zoneColor);
+        var tile          = TileForCode(zoneCode);
+        // 타일이 있으면 색은 타일이 소유 → 베이스를 흰색으로 두고 명암(empty/occupied)만 틴트.
+        var baseColor     = tile != null ? Color.white : zoneColor;
+        if (tile != null) img.sprite = tile;
+        img.color         = EmptyColor(baseColor);
         img.raycastTarget = false;
 
         // 약간의 둥글기를 위해 배경 위에 내부 하이라이트 추가
@@ -402,7 +426,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellObjects.Add(cellGO);
         _cellImages[gridPos]      = img;
         _cellFlashImages[gridPos] = flashImg;
-        _cellBaseColors[gridPos]  = zoneColor;
+        _cellBaseColors[gridPos]  = baseColor;
         _cellZones[gridPos]       = zoneCode;
     }
 

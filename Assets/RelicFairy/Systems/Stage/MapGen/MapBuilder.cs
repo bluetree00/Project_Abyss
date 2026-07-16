@@ -530,12 +530,71 @@ public class MapBuilder
                     StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Corridor_W_{step}_{sign}", placed);
         }
 
-        // 끝막이 — 마지막 칸 너머를 벽으로 닫아 또 다른 절벽이 보이지 않게
-        if (wallDef?.prefab != null)
+        // 끝막이 대신 — 복도 끝을 복도보다 넓은 '어두운 방'으로 열어, 통로가 다른 방으로 이어진 것처럼 보이게 한다.
+        // (조명은 넣지 않아 어둡게 남고, 카메라가 올라가도 맵이 끊긴 게 아니라 계속되는 인상을 준다)
+        if (floorDef?.prefab != null && wallDef?.prefab != null)
         {
-            Vector3 capAxis = openingCenterLocal + outward * ((lengthCells + 1) * cellSize);
+            int chamberDepth = 5;              // 방 깊이(칸)
+            int chamberHalf  = half + 3;       // 방 반폭(복도 개구부보다 넓게)
+            int nearStep     = lengthCells + 1;
+            int farStep      = lengthCells + chamberDepth;
+            var cRot = ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
+
+            for (int step = nearStep; step <= farStep; step++)
+            {
+                Vector3 axis = openingCenterLocal + outward * (step * cellSize);
+                for (int lat = -chamberHalf; lat <= chamberHalf; lat++)
+                {
+                    Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
+                    Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Chamber_F_{step}_{lat}", TileType.Floor, placed);
+                    if (doCeiling && ceilUse?.prefab != null)
+                    {
+                        Vector3 cl = fLocal; cl.y = ceilingY;
+                        Place(ceilUse, parent, cl, cRot, 3, $"Chamber_C_{step}_{lat}", TileType.Ceiling, placed);
+                    }
+                }
+                for (int sign = -1; sign <= 1; sign += 2)
+                    StackWall(wallDef, parent, axis + lateral * (sign * (chamberHalf + 1) * cellSize), baseY, cellSize, wallReps, $"Chamber_W_{step}_{sign}", placed);
+            }
+            // 근벽(어깨) — 복도 개구부(±half) 밖의 넓어진 부분을 막아 '방 입구 틀'을 만든다.
+            Vector3 nearAxis = openingCenterLocal + outward * (lengthCells * cellSize);
+            for (int lat = half + 1; lat <= chamberHalf; lat++)
+            {
+                StackWall(wallDef, parent, nearAxis + lateral * (lat * cellSize),  baseY, cellSize, wallReps, $"Chamber_ShR_{lat}", placed);
+                StackWall(wallDef, parent, nearAxis + lateral * (-lat * cellSize), baseY, cellSize, wallReps, $"Chamber_ShL_{lat}", placed);
+            }
+            // 먼벽(방 끝) — 가운데에 통로 폭(±half)만큼 문틀 개구부를 남겨, 방이 더 깊은 어둠으로 '이어지는' 인상을 준다.
+            int     pocketDepth = 3;
+            int     farWallStep = farStep + 1;
+            Vector3 farAxis     = openingCenterLocal + outward * (farWallStep * cellSize);
+            for (int lat = -(chamberHalf + 1); lat <= chamberHalf + 1; lat++)
+            {
+                if (Mathf.Abs(lat) <= half) continue; // 중앙 문틀 개구부 — 벽 생략
+                StackWall(wallDef, parent, farAxis + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Chamber_Cap_{lat}", placed);
+            }
+            // 개구부 너머 짧은 어둠 포켓 — void 대신 바닥/천장/벽으로 막아 '통로가 계속되는' 인상만 남긴다.
+            // 바닥은 문턱(farWallStep)부터 이어 붙여 개구부 아래 void 틈이 안 보이게 한다.
+            for (int step = farWallStep; step <= farWallStep + pocketDepth; step++)
+            {
+                Vector3 axis = openingCenterLocal + outward * (step * cellSize);
+                for (int lat = -half; lat <= half; lat++)
+                {
+                    Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
+                    Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Pocket_F_{step}_{lat}", TileType.Floor, placed);
+                    if (doCeiling && ceilUse?.prefab != null)
+                    {
+                        Vector3 cl = fLocal; cl.y = ceilingY;
+                        Place(ceilUse, parent, cl, cRot, 3, $"Pocket_C_{step}_{lat}", TileType.Ceiling, placed);
+                    }
+                }
+                if (step > farWallStep) // farWallStep 측벽은 먼벽 타일과 겹치므로 그 다음 칸부터
+                    for (int sign = -1; sign <= 1; sign += 2)
+                        StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Pocket_W_{step}_{sign}", placed);
+            }
+            // 포켓 최종 끝막이(void 차단)
+            Vector3 pocketCap = openingCenterLocal + outward * ((farWallStep + pocketDepth + 1) * cellSize);
             for (int lat = -(half + 1); lat <= half + 1; lat++)
-                StackWall(wallDef, parent, capAxis + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Corridor_Cap_{lat}", placed);
+                StackWall(wallDef, parent, pocketCap + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Pocket_Cap_{lat}", placed);
         }
 
         return placed;

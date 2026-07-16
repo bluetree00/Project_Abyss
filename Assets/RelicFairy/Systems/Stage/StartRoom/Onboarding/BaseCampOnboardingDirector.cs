@@ -37,6 +37,15 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     [Header("단계 (유물 → 장비 순. 서약은 BaseCamp에서 폐기 — 심연 대기방으로 이동)")]
     [SerializeField] private Step[] steps;
 
+    [Header("무형검 각성 (인트로 첫 단계 — steps보다 먼저 실행)")]
+    [Tooltip("완료 감지 카테고리 (WorldSwordAwakening이 Report하는 값)")]
+    [SerializeField] private string     swordAwakenCategory  = "SwordAwaken";
+    [Tooltip("각성 제단 — 초회 카메라 연출/화살표 대상. 미할당 시 이 단계 스킵.")]
+    [SerializeField] private Transform  swordAwakenTarget;
+    [Tooltip("각성 완료 시 해제할 다음 구역 배리어(무기대 등, 선택).")]
+    [SerializeField] private GameObject swordAwakenBarrier;
+    [TextArea, SerializeField] private string swordAwakenGuideline = "제단의 검을 쥐어라 — [F]";
+
     [Header("게이트 (장비 완료 후 목표)")]
     [SerializeField] private Transform gateTarget;
     [SerializeField] private string gateGuideline = "준비 완료 — 포탈로 다음 영역에 진입하라.";
@@ -62,6 +71,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     private int _stepIndex = -1;
     private bool _active;
     private bool _entered;
+    private bool _swordPhase;
     private CancellationTokenSource _cts;
 
     /// <summary>현재 활성 슬롯의 온보딩 완료 여부. 초회 판정(입구 스폰 + 가이드) 근거.</summary>
@@ -110,7 +120,17 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         }
         catch (OperationCanceledException) { return; }
 
-        EnterStep(0, initial: true);   // 준비 완료 후 유물 연출
+        // 인트로 첫 단계: 무형검 각성(steps보다 먼저). 대상 없으면 스킵하고 기존 단계부터.
+        if (swordAwakenTarget != null) EnterSwordPhase();
+        else EnterStep(0, initial: true);
+    }
+
+    /// <summary>인트로 첫 단계 — 각성 제단을 초회 카메라 연출로 보여준다. SwordAwaken 보고 시 다음 단계로.</summary>
+    private void EnterSwordPhase()
+    {
+        _swordPhase = true;
+        guideArrow?.SetTarget(swordAwakenTarget);
+        RevealAsync(swordAwakenTarget, swordAwakenGuideline, waitDialogue: false, _cts.Token).Forget();
     }
 
     private void OnDestroy()
@@ -212,12 +232,14 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
 
     private void EnsureBarriersLocked()
     {
+        if (swordAwakenBarrier != null) swordAwakenBarrier.SetActive(true);
         for (int i = 0; i < steps.Length; i++)
             if (steps[i].unlockBarrier != null) steps[i].unlockBarrier.SetActive(true);
     }
 
     private void UnlockAll()
     {
+        if (swordAwakenBarrier != null) swordAwakenBarrier.SetActive(false);
         for (int i = 0; i < steps.Length; i++)
             if (steps[i].unlockBarrier != null) steps[i].unlockBarrier.SetActive(false);
     }
@@ -247,7 +269,19 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
 
     private void HandleReport(string category, object target, int amount)
     {
-        if (!_active || _stepIndex < 0 || _stepIndex >= steps.Length) return;
+        if (!_active) return;
+
+        // 인트로 첫 단계: 무형검 각성 완료 → 다음 구역 개방 후 기존 단계 시작.
+        if (_swordPhase)
+        {
+            if (!string.Equals(category, swordAwakenCategory)) return;
+            _swordPhase = false;
+            Unlock(swordAwakenBarrier);
+            EnterStep(0, initial: false);
+            return;
+        }
+
+        if (_stepIndex < 0 || _stepIndex >= steps.Length) return;
         if (!string.Equals(category, steps[_stepIndex].questCategory)) return;
 
         Unlock(steps[_stepIndex].unlockBarrier);   // 현재 단계 완료 → 다음 구역 개방
