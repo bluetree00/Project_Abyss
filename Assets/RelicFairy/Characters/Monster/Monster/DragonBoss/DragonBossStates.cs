@@ -795,6 +795,14 @@ public class DragonDieState : DieState
         }
         // Despawn 타이밍(3초)에 맞춰 HUD 해제 — 시체가 사라질 때 같이 없어짐
         (ctx.Monster as DragonBossMonster)?.UnbindBossHudAfterDelay(3f);
+
+        // 보스 사망 시 플레이어에게 걸린 슬로우 즉시 해제
+        if (ctx.Runtime.PlayerTarget != null
+            && ctx.Runtime.PlayerTarget.TryGetComponent<PlayerController>(out var player))
+        {
+            player.ClearSlow();
+        }
+
         base.Enter(ctx);
     }
 }

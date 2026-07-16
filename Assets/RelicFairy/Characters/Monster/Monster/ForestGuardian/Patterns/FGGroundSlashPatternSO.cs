@@ -73,6 +73,10 @@ public class FGGroundSlashPatternSO : BossPatternSO
     [Tooltip("임팩트 VFX 자동 소멸 시간 (초). ParticleSystem 없는 경우 적용.")]
     public float vfxLifetime = 2f;
 
+    [Header("GroundSlash — Sound")]
+    [Tooltip("각 타격(3회) 때 바닥 이펙트 발생 시 재생할 사운드")]
+    public AudioClip groundSfx;
+
     // ── 런타임 ────────────────────────────────────────────
     private FGGroundSlashState _state;
 
@@ -155,6 +159,8 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
                 if (!_vfxFired && _timer >= Data.vfxDelay)
                 {
                     _vfxFired = true;
+                    if (Data.groundSfx != null)
+                        Managers.Sound?.PlayEffectAt(Data.groundSfx, ctx.Transform.position);
                     SpawnSlamVfx(ctx, _hitIndex);
                     TryDealDamage(ctx, _hitIndex);
                 }
@@ -271,6 +277,17 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
         var   vfxGO = Object.Instantiate(Data.slamVfxPrefab, ctx.Transform.position, ctx.Transform.rotation);
         vfxGO.transform.localScale = new Vector3(s, s, s);
 
+        // Phase 2에서 파티클 VFX를 애니메이션 속도와 동기화
+        float speedMult = SpeedMult(ctx);
+        if (!Mathf.Approximately(speedMult, 1f))
+        {
+            foreach (var vfxPs in vfxGO.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = vfxPs.main;
+                main.simulationSpeed = speedMult;
+            }
+        }
+
         if (vfxGO.TryGetComponent<PlayableVfx>(out var pvfx))
             pvfx.Play();
 
@@ -298,6 +315,7 @@ public class FGGroundSlashState : FullLockState<FGGroundSlashPatternSO>
             Debug.LogWarning($"[FGGroundSlash] Animator state not found: '{stateName}'", ctx.Monster);
             return;
         }
+        ctx.Animator.speed = SpeedMult(ctx);
         ctx.Animator.CrossFade(stateName, crossFade, 0, 0f);
     }
 

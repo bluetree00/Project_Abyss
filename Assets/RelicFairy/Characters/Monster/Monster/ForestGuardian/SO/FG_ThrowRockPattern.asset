@@ -12,7 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 24a63ae3055e30448ae226d3f11b1ba8, type: 3}
   m_Name: FG_ThrowRockPattern
   m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.FGThrowRockPatternSO
-  weight: 0.2038719
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 0.1975366
   effectPrefab: {fileID: 0}
   playerStatusEffect: {fileID: 0}
   patternTag: 
@@ -20,14 +24,26 @@ MonoBehaviour:
   minRange: 5
   maxRange: 10
   throwNormalizedTime: 0.3
-  throwExtraDelay: 1
+  throwExtraDelay: 1.0
   recoveryDuration: 0.5
   projectileSpeed: 15
   throwHandBoneName: TreantLPalm
+  grabNormalizedTime: 0.15
   grabThreshold: 1
-  throwHand: 18
   damageMultiplier: 1.5
   knockbackMultiplier: 2
+  stoneLandSfx: {fileID: 8300000, guid: f7969cd033cac7442990349fcd4605cb, type: 3}
+  fragmentAngles:
+  - 0
+  - 120
+  - 240
+  fragmentAngleOffset: 90
+  fragmentSpreadRadius: 3.5
+  fragmentWarningRadius: 1.5
+  fragmentWarningStartDelay: 0.3
+  fragmentLandDelay: 1.2
+  fragmentDamageMultiplier: 0.8
+  fragmentImpactEffectPrefab: {fileID: 0}
   rockPrefab: {fileID: 5989109738682827018, guid: c29dda9756feca746b286fd129764121,
     type: 3}
   rockScale: {x: 2, y: 2, z: 2}

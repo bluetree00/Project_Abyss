@@ -17,7 +17,7 @@ MonoBehaviour:
   slowScale: 0.4
   _effectPrefab: {fileID: 1579383094300634310, guid: 0ee1e50150b2a4641be2b72c6588eccb,
     type: 3}
-  _effectScale: 1
+  _effectScale: 0.4
   _screenEffectPrefab: {fileID: 3942825033974895155, guid: 78e80e6b24aba274ca8fec7837e6a299,
     type: 3}
   _screenEffectScale: 1

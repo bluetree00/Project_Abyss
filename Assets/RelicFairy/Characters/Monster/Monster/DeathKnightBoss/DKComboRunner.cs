@@ -155,7 +155,7 @@ public class DKComboRunner
             foreach (var p in entry.patterns)
             {
                 var c = p as DKComboConfigSO;
-                if (c != null && c.CanExecute(_ctx))
+                if (c != null && c.CanExecute(_ctx) && c.usePhase1Position)
                     total += Mathf.Max(0f, c.weight);
             }
         }
@@ -169,11 +169,11 @@ public class DKComboRunner
             foreach (var p in entry.patterns)
             {
                 var c = p as DKComboConfigSO;
-                if (c == null || !c.CanExecute(_ctx)) continue;
+                if (c == null || !c.CanExecute(_ctx) || !c.usePhase1Position) continue;
                 acc += Mathf.Max(0f, c.weight);
                 if (roll <= acc)
                 {
-                    _currentComboUsePhase1Position = c.usePhase1Position;
+                    _currentComboUsePhase1Position = true;
                     return c;
                 }
             }

@@ -111,6 +111,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
     [SerializeField] private GameObject _entranceWindEffectPrefab;
 
+    [Header("Dragon — 발톱 트레일")]
+    [Tooltip("ClawAttackL/R 구간에 발톱 궤적을 표시하는 컨트롤러")]
+    [SerializeField] private DragonClawTrailController _clawTrailCtrl;
+
     [Header("Dragon — 날개 펄럭임 사운드 (AirChase 계열 전용)")]
     [Tooltip("날개 다운스트로크마다 랜덤 재생할 사운드 클립 (Wing1~5)")]
     [SerializeField] private AudioClip[] _wingFlapClips;
@@ -193,7 +197,6 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     private Vector3         _capsuleCenterNormal; // X/Z 중심 보존용
     private float           _capsuleRadiusNormal; // 지상 반경 보존용
     private bool            _airborneHitboxActive;
-    private bool            _hitStopActive;
     private int              _airChaseHash;
     private int              _airChaseLeftHash;
     private int              _airChaseRightHash;
@@ -212,6 +215,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
+    public DragonClawTrailController ClawTrailController => _clawTrailCtrl;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MonsterBase 추상 멤버
@@ -270,6 +274,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         InitializeRoomContext(); // OnEnable이 _runtime 생성 전에 호출된 경우를 위한 재시도
         BindBossHud();
+        if (_clawTrailCtrl == null)
+            _clawTrailCtrl = GetComponent<DragonClawTrailController>();
         _capsule = GetComponent<CapsuleCollider>();
         if (_capsule != null)
         {
@@ -496,7 +502,6 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         CacheTransitionPatternBaseWeights();
         UpdateTransitionPatternWeights();
         BindBossHud();
-        _hitStopActive = false;
         _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
         _pendingTriggerEntrance = false;
         _normalSfxTimer = 0f;
@@ -529,29 +534,12 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
 
         // 지상 피격 시 히트스톱 (poise 파괴 = 강타격, 일반 = 약타격)
+        // TimeScaleArbiter를 경유하는 HitFeelService 사용 — KillImpact 보호 윈도 자동 적용됨
         bool isAirborne = _dragonBB != null && _dragonBB.BodyState == BodyState.Airborne;
         if (!isAirborne)
         {
             float dur = (_dragonBB != null && _dragonBB.IsPoiseBroken) ? 0.14f : 0.05f;
-            HitStopAsync(dur, destroyCancellationToken).Forget();
-        }
-    }
-
-    private async UniTaskVoid HitStopAsync(float duration, System.Threading.CancellationToken ct)
-    {
-        if (_hitStopActive) return;
-        _hitStopActive = true;
-        float prev = Time.timeScale;
-        Time.timeScale = 0.05f;
-        try
-        {
-            await UniTask.Delay(TimeSpan.FromSeconds(duration), DelayType.Realtime, cancellationToken: ct);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            Time.timeScale = prev;
-            _hitStopActive = false;
+            HitFeelService.HitStop(0.05f, dur);
         }
     }
 
