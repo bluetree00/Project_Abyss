@@ -171,7 +171,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
         int found  = CombatQuery.GetDamageablesInCone(pos, fwd, JudgmentRange, JudgmentHalfAngle, owner, 32, buffer);
 
-        Debug.Log($"[랜슬롯Q] {hitIndex + 1}/{hitCount}타{(isLast ? " (마무리)" : "")} | 피해 {dmg:F0} | 적중 {found}");
+        RFLog.D($"[랜슬롯Q] {hitIndex + 1}/{hitCount}타{(isLast ? " (마무리)" : "")} | 피해 {dmg:F0} | 적중 {found}");
 
         foreach (var target in buffer)
         {

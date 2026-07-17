@@ -3,7 +3,8 @@ using UnityEngine;
 /// <summary>
 /// 가이드라인 비주얼(플레이스홀더) 정적 파사드 — 룬/서약/유물 효과를 단순 도형+색+라벨로 인게임 표시.
 ///
-/// • 전역 토글 <see cref="Enabled"/>(기본 ON, 개발용). OFF면 모든 호출이 즉시 무동작(분기 1개) — 회귀 0.
+/// • 전역 토글 <see cref="Enabled"/>(에디터·개발빌드만 기본 ON, 출시 빌드는 OFF).
+///   OFF면 모든 호출이 즉시 무동작(분기 1개) — 회귀 0.
 /// • 효과 발생 지점에서 이 파사드의 메서드를 "통지"로 1줄 호출한다(효과 로직은 변경하지 않음).
 /// • 카테고리(즉발/상태/장판/원뿔/체인/토스트) → 색/도형/수명 스펙은 여기 한 곳에 모았다.
 ///   나중에 진짜 VFX 프리팹을 같은 메서드 본문(GuidelineVisualRunner.Spawn*)에 끼우면 그대로 교체된다.
@@ -13,7 +14,13 @@ using UnityEngine;
 public static class GuidelineVisual
 {
     // ── 토글 ────────────────────────────────────────────
+    // 개발용 플레이스홀더라 출시 빌드에는 나가면 안 된다. Enabled/Toggle 호출처가 0이라
+    // 기본값이 곧 유일한 스위치 — 에디터·개발빌드만 ON으로 둔다.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     private static bool s_enabled = true;
+#else
+    private static bool s_enabled = false;
+#endif
 
     /// <summary>전역 디버그 표시 토글. OFF로 바꾸면 기존 표시도 즉시 정리된다.</summary>
     public static bool Enabled

@@ -250,6 +250,25 @@ public class UIManager
         CloseTopPopup(immediate: false);
     }
 
+    /// <summary>
+    /// ESC 공용 닫기 — 스택 최상단 팝업이 CloseOnEscape면 그것만 닫는다.
+    /// 반환 true = ESC를 소비했음(호출측은 기존 ESC 동작을 실행하면 안 된다).
+    /// 팝업이 열려있기만 하면(닫을 수 없는 팝업이어도) ESC는 소비된다 — 팝업 위로 ESC가
+    /// 흘러 다른 UI가 열리는 것을 막는다.
+    /// 중첩 팝업에서 최상단 1개만 닫히도록 Peek만 본다.
+    /// </summary>
+    public bool TryCloseTopPopupOnEscape()
+    {
+        if (_popupStack.Count == 0) return false;
+
+        UI_Popup top = _popupStack.Peek();
+        // 파괴됐는데 아직 pop되지 않은 항목은 건드리지 않는다(_order/_uiObjects 정합 유지).
+        if (top != null && top.CloseOnEscape)
+            top.ClosePopupUI();
+
+        return true;
+    }
+
     /// <param name="immediate">true면 애니메이션 없이 즉시 파괴 (씬 전환, 일괄 닫기용).</param>
     private void CloseTopPopup(bool immediate)
     {

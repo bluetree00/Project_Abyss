@@ -72,11 +72,7 @@ public sealed class PlayerRuntimeStats
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
-        _basePoise  = data.basePoise > 0f ? data.basePoise : DefaultBasePoise;
-        _poiseBonus = 0f;
-
-        _baseStamina  = data.maxStamina > 0f ? data.maxStamina : DefaultBaseStamina;
-        _staminaBonus = 0f;
+        ApplyPoiseStaminaBase(data);
 
         _baseMelee  = Mathf.Max(0, data.baseMeleeAttack);
         _baseRanged = Mathf.Max(0, data.baseRangedAttack);
@@ -116,8 +112,27 @@ public sealed class PlayerRuntimeStats
         ApplyPassive(data.passive);   // Recalculate + OnChanged 포함
     }
 
-    /// <summary>서버 PlayerStatEntry 기반 초기화.</summary>
-    public void InitializeFromServer(PlayerStatEntry entry, System.Collections.Generic.List<PassiveEntry> passives = null)
+    /// <summary>
+    /// 포이즈/스태미너 베이스 설정 — SO/서버 두 초기화 경로가 공유한다.
+    /// CHARACTER_DATA CSV에 포이즈/스태미너 컬럼이 없어 서버 경로도 이 SO 값을 기준으로 삼는다
+    /// (컬럼이 생기면 여기 대신 entry에서 읽도록 교체). data가 없거나 값이 0 이하면 상수 기본치.
+    /// </summary>
+    private void ApplyPoiseStaminaBase(CharacterData data)
+    {
+        _basePoise = (data != null && data.basePoise > 0f) ? data.basePoise : DefaultBasePoise;
+        _poiseBonus = 0f;
+
+        _baseStamina = (data != null && data.maxStamina > 0f) ? data.maxStamina : DefaultBaseStamina;
+        _staminaBonus = 0f;
+    }
+
+    /// <summary>
+    /// 서버 PlayerStatEntry 기반 초기화.
+    /// poiseStaminaSource는 포이즈/스태미너 베이스를 읽어올 SO(CSV에 해당 컬럼이 없다).
+    /// null이면 상수 기본치 — SO 경로와 같은 값이 나온다.
+    /// </summary>
+    public void InitializeFromServer(PlayerStatEntry entry, System.Collections.Generic.List<PassiveEntry> passives = null,
+                                     CharacterData poiseStaminaSource = null)
     {
         if (entry == null)
         {
@@ -129,11 +144,7 @@ public sealed class PlayerRuntimeStats
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
-        // CHARACTER_DATA CSV에 포이즈/스태미너 컬럼이 아직 없어 기본치 사용(추가 시 entry에서 읽도록 교체).
-        _basePoise    = DefaultBasePoise;
-        _poiseBonus   = 0f;
-        _baseStamina  = DefaultBaseStamina;
-        _staminaBonus = 0f;
+        ApplyPoiseStaminaBase(poiseStaminaSource);
 
         _baseMelee   = Mathf.Max(0, entry.base_melee_attack);
         _baseRanged  = Mathf.Max(0, entry.base_ranged_attack);

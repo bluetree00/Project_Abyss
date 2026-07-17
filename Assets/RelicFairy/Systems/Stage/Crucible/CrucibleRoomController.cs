@@ -28,6 +28,7 @@ public class CrucibleRoomController : MonoBehaviour
     private GameRunSession _run;
     private EnhanceTableSO _table;
     private System.Random  _roomRng;
+    private System.Random  _dialogueRng = new();   // 대사 전용 — _roomRng(강화/잭팟 결정성 스트림)과 절대 공유 금지
 
     private GameObject _npcInstance;
     private ShopNpcInteraction _npc;
@@ -112,6 +113,11 @@ public class CrucibleRoomController : MonoBehaviour
         _roomRng = roomRng ?? new System.Random();
 
         if (_table != null) WeaponEnhanceService.InstallTable(_table);
+
+        // 대사 스트림 분기 — 대사 롤이 _roomRng를 소비하면 BumpRoll에 안 잡혀 복원 시 스트림 위치가
+        // 어긋나고, 대사 호출이 플레이어 조작(슬롯 토글/호버)에 좌우돼 save-scum 통로가 된다.
+        // 분기 자체는 Initialize의 고정 위치에서 1회만 소비하므로 결정성은 그대로 유지된다.
+        _dialogueRng = new System.Random(_roomRng.Next());
 
         _event = RollEvent();   // 결정적 돌발 이벤트
 
@@ -322,7 +328,7 @@ public class CrucibleRoomController : MonoBehaviour
             _                    => IdleLines,
         };
         if (pool == null || pool.Length == 0) return string.Empty;
-        return pool[_roomRng.Next(pool.Length)];
+        return pool[_dialogueRng.Next(pool.Length)];
     }
 
     private static readonly string[] IdleLines =

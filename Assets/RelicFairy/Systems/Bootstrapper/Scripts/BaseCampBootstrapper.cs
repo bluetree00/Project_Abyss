@@ -150,20 +150,19 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         Debug.Log($"[BaseCampBootstrapper] 플레이어 스폰 완료: {playerBodyKey} at {pos}");
     }
 
-    /// <summary>Loadout에 기록된 무기(슬롯0/1)를 플레이어에 장착한다. 둘 다 없으면 no-op.
-    /// WeaponForgeAltar.EquipChoiceAsync와 동일한 장착 경로(빈 슬롯 순서 장착 → 슬롯0 복귀).</summary>
+    /// <summary>Loadout에 기록된 무기를 <b>고정 슬롯</b>으로 플레이어에 재적용한다(유물 재스폰 등). 둘 다 없으면 no-op.
+    /// 무형검=Slot0 활성, 원거리=Slot1 비활성 — 로드아웃의 슬롯 배정을 그대로 복원하므로 획득 순서와 무관하다
+    /// (유물 선택으로 인한 재스폰이 무기 슬롯을 뒤섞지 않는다).</summary>
     private async UniTask EquipLoadoutWeaponsAsync(PlayerController player, CancellationToken ct)
     {
         var lo = AppBootstrapper.Instance?.Loadout;
         if (lo == null || player == null) return;
 
-        bool any = false;
-        if (lo.WeaponSlot0 != null) { await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot0, player); any = true; }
-        if (lo.WeaponSlot1 != null) { await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot1, player); any = true; }
+        if (lo.WeaponSlot0 != null)
+            await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot0, player, PlayerWeaponManager.Slot0, setActive: true);
+        if (lo.WeaponSlot1 != null)
+            await GameRunBootstrapper.EquipWeaponToPlayerAsync(lo.WeaponSlot1, player, PlayerWeaponManager.Slot1, setActive: false);
         ct.ThrowIfCancellationRequested();
-
-        if (any && player.WeaponManager != null)
-            await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
     }
 
     /// <summary>장비/유물 보유 시 전투 HUD를 표시(허브 테스트), 없으면 억제 유지.</summary>

@@ -861,13 +861,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
-        // [서약] 플레이어발 피해 변조 — 방어 계산 전, 원본 데미지에 적용
-        if (IsPlayerInstigator(instigator))
-        {
-            var covHandler = GameRunBootstrapper.Instance?.Run?.CovenantHandler;
-            if (covHandler != null)
-                amount = covHandler.ModifyOutgoing(amount, new CombatContext { Target = gameObject, Damage = amount, IsCritical = isCrit });
-        }
+        // [서약] 출력 피해 변조는 여기서 하지 않는다 — 소유자는 CombatDamage 파이프라인 ③ 한 곳뿐이다.
+        // 여기서 또 걸면 주 피해가 파이프라인 ③ + 여기로 두 번 곱해져 배율이 제곱되고,
+        // 관통 경로(TakeSynergyDamage)만 한 번 적용돼 히트마다 배율이 달라진다.
 
         // 방어력 + 데미지 배율 + 받는 데미지 배율 + 디버프 증폭(statusId별 합연산) (최소 1 데미지)
         float defense = _baseDefense * _defenseMulti;
