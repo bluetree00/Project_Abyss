@@ -182,6 +182,19 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     }
 
     // ----------------------
+    // 무기 획득 (고정 슬롯 — 자동 빈슬롯 배정 없음)
+    // 각 스테이션(무형검=Slot0, 원거리=Slot1 등)이 획득 순서와 무관하게
+    // 자기 슬롯에 독립적으로 장착하기 위한 진입점. 다른 슬롯/스테이션을 참조하지 않는다.
+    // ----------------------
+    public async UniTask AcquireWeaponToSlotAsync(WeaponData runtimeData, int slotIndex, bool setActive = true)
+    {
+        if (runtimeData == null || slotIndex < 0 || slotIndex >= SlotCount) return;
+
+        _owned.Add(runtimeData);
+        await EquipToSlotAsync(slotIndex, runtimeData, setActive);
+    }
+
+    // ----------------------
     // 슬롯 장착 (기존 장비는 비활성화)
     // ----------------------
     private async UniTask EquipToSlotAsync(int slotIndex, WeaponData runtimeData, bool setActive = false)

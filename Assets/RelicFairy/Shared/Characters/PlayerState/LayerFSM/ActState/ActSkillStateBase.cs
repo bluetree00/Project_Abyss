@@ -19,6 +19,13 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
     protected PlayerController            _controller;
     protected ILayerStateChanger<TActState> _stateChanger;
 
+    /// <summary>
+    /// 스킬이 실제로 발동했는지. Enter()의 차단 분기가 Change(default)를 부르면 상태머신이
+    /// "방금 진입한 이 상태"의 Exit()를 그 자리에서 실행한다 — 이 플래그가 없으면 그 Exit이
+    /// 쿨다운을 새로 덮어써서, 쿨다운 중 연타 시 스킬이 영구히 안 나간다.
+    /// </summary>
+    private bool _entered;
+
     protected abstract SkillType Slot { get; }
 
     // ── ILayerState 구현 ─────────────────────────────────────────────────────
@@ -31,6 +38,8 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
     public void Enter()
     {
+        _entered = false;
+
         if (!_controller.CooldownTracker.IsReady(Slot))
         {
             UnityEngine.Debug.Log($"[SkillBase] {Slot} blocked by cooldown");
@@ -48,6 +57,8 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
             _stateChanger.Change(default);
             return;
         }
+
+        _entered = true;
 
         UnityEngine.Debug.Log($"[SkillBase] {Slot} Enter");
         _controller.FirePassive(PassiveTrigger.OnSkillUse,
@@ -70,6 +81,10 @@ public abstract class ActSkillStateBase<TActState> : ILayerState<TActState>
 
     public void Exit()
     {
+        // 차단 분기로 되돌아온 진입은 발동이 아니다 — 쿨다운도, OnExit 정리도 건드리지 않는다.
+        if (!_entered) return;
+        _entered = false;
+
         // 스킬 종료 시 쿨다운 시작 (SkillCooldownReduction 반영). 엘레인/베디비어 부활.
         float cd = GetCooldown();
         if (cd > 0f)

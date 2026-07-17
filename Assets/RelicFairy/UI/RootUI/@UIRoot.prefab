@@ -4546,11 +4546,19 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::UI_GridPanel
   _bgSprite: {fileID: 21300000, guid: 57561b1cc4fa1bb4ebf73089f6df4007, type: 3}
-  _boardSprite: {fileID: 21300000, guid: a7537aa361bcf24418398907275a1fd6, type: 3}
+  _boardSprite: {fileID: 0}
   _stagingBorderSprite: {fileID: 21300000, guid: d5a2a46d04b5d6544b38a2e02af35918, type: 3}
   _stagingBgSprite: {fileID: 21300000, guid: 6ea62fe803f3a514f9b5d29b751dca60, type: 3}
   _synergyBorderSprite: {fileID: 21300000, guid: 91971b6e61b862243b037ec6f63b5639, type: 3}
   _synergyBgSprite: {fileID: 21300000, guid: 888756fd8c6a83343be9d02c7d65e9fd, type: 3}
+  _zoneTiles:
+  - {fileID: 21300000, guid: 849e0f30f92a23d43866f8ee1edfcd54, type: 3}
+  - {fileID: 21300000, guid: 5ea03063be688a84ba29cdd8e2cf75da, type: 3}
+  - {fileID: 21300000, guid: 5dc22916bcbd12d42a68312acfa51c41, type: 3}
+  - {fileID: 21300000, guid: e4999281d65cd4749a4110fc14b066aa, type: 3}
+  - {fileID: 21300000, guid: 92270c3811c8fa645867f56a505ba8f2, type: 3}
+  - {fileID: 21300000, guid: 162516c0f25b9f44eb246d89b328cc41, type: 3}
+  _centerTile: {fileID: 21300000, guid: 4f2d1ac996f318a4995f2101b79d67f8, type: 3}
 --- !u!222 &2551044872294124601
 CanvasRenderer:
   m_ObjectHideFlags: 0

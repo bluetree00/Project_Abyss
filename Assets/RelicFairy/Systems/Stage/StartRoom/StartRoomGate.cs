@@ -43,6 +43,28 @@ public class StartRoomGate : MonoBehaviour
     [SerializeField, Tooltip("준비 미완료 시 노출할 안내 오브젝트 (스타트 방 전용)")]
     private GameObject notReadyIndicator;
 
+    [Header("스타트 방 게이트 너머 복도 (절차 방과 동일한 통로→다음 방 연출)")]
+    [SerializeField, Tooltip("복도/방을 지을 팔레트. 미지정 시 복도를 만들지 않음. 절차 방과 동일한 BlockPalette 사용")]
+    private BlockPalette startCorridorPalette;
+    [SerializeField, Tooltip("게이트 로컬 기준 바깥 방향. 복도가 허공 쪽으로 뻗도록 North/South 중 맞는 쪽 선택")]
+    private DoorEdge startCorridorEdge = DoorEdge.North;
+    [SerializeField, Min(0), Tooltip("복도 길이(칸). 0이면 방만, 절차 방 기본=12")]
+    private int startCorridorLength = 12;
+    [SerializeField, Min(1), Tooltip("복도/방 벽 높이(칸). 게이트 높이에 맞춰 조정")]
+    private int startCorridorWallLayers = 6;
+
+    [Header("게이트 열림 연출 (서약 선택 완료 후 카메라 집중 + 통로 조망)")]
+    [SerializeField, Tooltip("켜짐: 서약 없이 로드아웃(유물+무기)만으로 자동 연출. 끔(기본): 시작방 서약 제단 선택 완료 시 연출")]
+    private bool revealOnLoadoutReady = false;
+    [SerializeField, Min(0f), Tooltip("선택 완료 후 연출 시작까지 대기(초). 서약 알림/팝업이 정리될 여유")]
+    private float gateRevealDelay = 2.2f;
+    [SerializeField, Tooltip("연출 시 카메라가 게이트를 바라보는 위치 오프셋(게이트 로컬). 뒤/위로 빼서 통로를 조망")]
+    private Vector3 gateRevealViewOffset = new Vector3(0f, 9f, -11f);
+    [SerializeField, Tooltip("연출 카메라가 바라보는 지점의 높이(게이트 바닥 기준)")]
+    private float gateRevealLookHeight = 2f;
+    [SerializeField, Tooltip("연출: 이동/유지/복귀 시간(초)")]
+    private Vector3 gateRevealDurations = new Vector3(1.1f, 1.9f, 0.9f);
+
     // ── Private fields ────────────────────────────────────────────
     private int                    _fromZoneIndex = -1;
     private int                    _toZoneIndex   = -1;
@@ -68,6 +90,9 @@ public class StartRoomGate : MonoBehaviour
     private const float     SealDoorMeshW = 7f;
     private const float     SealDoorMeshH = 11.5f;
 
+    private bool _startCorridorBuilt;
+    private bool _gateRevealStarted;   // 열림 연출 1회 가드
+
     // ── Init ──────────────────────────────────────────────────────
 
     private void Awake()
@@ -75,6 +100,9 @@ public class StartRoomGate : MonoBehaviour
         ResizeTriggerCollider();
         ResizeGate();
     }
+
+    private void OnEnable()  => WorldCovenantAltar.OnCovenantAssembled += HandleCovenantAssembled;
+    private void OnDisable() => WorldCovenantAltar.OnCovenantAssembled -= HandleCovenantAssembled;
 
     /// <summary>Zone 1+ 게이트 초기화. 호출 시 스타트 방 모드에서 일반 방 모드로 전환된다.</summary>
     /// <param name="openingWidth">벽 개구부 월드 너비 (GateWidth × blockCellSize). 0 이하면 기본값 사용.</param>
@@ -118,15 +146,23 @@ public class StartRoomGate : MonoBehaviour
         }
 
         EnsureSealDoor();          // 석문 보장(최초 1회, 항상 닫힘으로 시작)
+        EnsureStartCorridor();     // 게이트 너머 복도+방 보장(최초 1회)
 
         bool ready = IsLoadoutReady();
         if (ready == _gateOpen) return;
         _gateOpen = ready;
         if (portalActive != null) portalActive.SetActive(ready);
 
-        // 준비 완료 → 석문이 위로 올라가며 열림(먼지·사운드). 미준비 → 닫힘.
-        if (ready) OpenSealDoorAsync().Forget();
-        else       SetSealDoorClosed();
+        // 준비 완료 → 몇 초 뒤 카메라가 게이트에 집중되며 문이 열리고 통로를 조망하는 연출(1회).
+        // 서약 오브젝트 배치 후엔 revealOnLoadoutReady를 끄고 선택 완료 흐름에서 TriggerGateReveal() 호출.
+        if (ready)
+        {
+            if (revealOnLoadoutReady) TriggerGateReveal();
+        }
+        else
+        {
+            SetSealDoorClosed();
+        }
     }
 
     private void OnDestroy()
@@ -218,6 +254,76 @@ public class StartRoomGate : MonoBehaviour
     {
         go.layer = layer;
         foreach (Transform c in go.transform) SetSealDoorLayer(c.gameObject, layer);
+    }
+
+    // ── 게이트 너머 복도 + 다음 방 (절차 방과 동일한 통로 연출) ──────────
+    private void EnsureStartCorridor()
+    {
+        if (_startCorridorBuilt) return;
+        _startCorridorBuilt = true; // 팔레트 미지정이어도 매 프레임 재시도 방지(1회만)
+        if (startCorridorPalette == null) return;
+
+        var root = new GameObject("StartGateCorridor").transform;
+        root.SetParent(transform, false); // 게이트 하위 → 게이트 회전이 복도 방향을 잡음
+        int widthCells = Mathf.Max(1, Mathf.RoundToInt(_gateWidth)); // 게이트 폭과 개구부 일치
+        MapBuilder.BuildDoorCorridor(
+            startCorridorPalette, root, Vector3.zero, startCorridorEdge, widthCells,
+            startCorridorLength, 1f, 0f, startCorridorWallLayers);
+    }
+
+    /// <summary>
+    /// 게이트 열림 연출을 1회 시작한다. 로드아웃 자동 트리거(revealOnLoadoutReady) 외에,
+    /// 시작방 서약 오브젝트 선택 완료 등 외부 흐름에서 직접 호출하는 진입점.
+    /// </summary>
+    public void TriggerGateReveal()
+    {
+        if (_gateRevealStarted) return;
+        _gateRevealStarted = true;
+        PlayGateRevealCinematicAsync().Forget();
+    }
+
+    // ── 로드아웃 완료 시 열림 연출 (카메라 집중 + 문 열림 + 통로 조망) ──────
+    private async UniTaskVoid PlayGateRevealCinematicAsync()
+    {
+        var ct     = this.GetCancellationTokenOnDestroy();
+        var player = Managers.Player != null ? Managers.Player.PlayerTransform : null;
+        var pc     = player != null ? player.GetComponentInParent<PlayerController>() : null;
+
+        // 연출 내내 입력 잠금 — 연출 도중 플레이어가 게이트로 걸어가 다이브가 조기 발동/카메라 충돌하는 것 방지.
+        // finally에서 반드시 해제(폴백·취소 포함).
+        if (pc != null) FreezePlayer(pc);
+        try
+        {
+            await UniTask.Delay(System.TimeSpan.FromSeconds(gateRevealDelay), cancellationToken: ct);
+
+            var cam = GameCameraController.Instance;
+            if (cam == null || player == null)
+            {
+                OpenSealDoorAsync().Forget(); // 폴백: 카메라/플레이어 없으면 문만 열기
+                return;
+            }
+
+            // 카메라가 게이트로 이동 → 도착 즈음 문 열림 → 통로 조망 유지 → 플레이어로 복귀
+            Vector3 target      = transform.position;
+            Vector3 worldOffset = transform.TransformVector(gateRevealViewOffset); // 게이트 로컬 오프셋을 월드로
+            OpenSealDoorAtAsync(gateRevealDurations.x * 0.85f, ct).Forget();
+
+            await cam.PlayOnboardingRevealAsync(
+                target, worldOffset, gateRevealLookHeight,
+                gateRevealDurations.x, gateRevealDurations.y, gateRevealDurations.z, player, ct);
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            if (pc != null) UnfreezePlayer();
+        }
+    }
+
+    private async UniTaskVoid OpenSealDoorAtAsync(float delaySec, System.Threading.CancellationToken ct)
+    {
+        try { await UniTask.Delay(System.TimeSpan.FromSeconds(delaySec), cancellationToken: ct); }
+        catch (System.OperationCanceledException) { return; }
+        OpenSealDoorAsync().Forget();
     }
 
     private void ResizeGate()
@@ -547,6 +653,14 @@ public class StartRoomGate : MonoBehaviour
         // 매 프레임 UpdateIndicator에서 distance만 갱신
         subTMP.text = $"{catKor}   <color=#aaaaaa>--m</color>";
         _distanceText = subTMP;
+    }
+
+    // ── Event Handlers ────────────────────────────────────────────
+    /// <summary>시작방 서약 제단 조립 완료 시 호출 — 몇 초 뒤 게이트 열림 연출(시작방 모드만).</summary>
+    private void HandleCovenantAssembled()
+    {
+        if (_fromZoneIndex != -1) return; // 시작방(Zone 0) 모드에서만
+        TriggerGateReveal();              // 딜레이(gateRevealDelay)는 연출 내부에서 적용
     }
 
     private void UpdateIndicatorText()

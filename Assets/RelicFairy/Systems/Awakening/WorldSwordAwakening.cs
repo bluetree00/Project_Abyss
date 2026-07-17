@@ -94,15 +94,15 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 
         try
         {
-            // 무형검 → 슬롯0 (로드아웃 + 실제 장착). WeaponForgeAltar와 동일 경로.
+            // 무형검 → 슬롯0 (로드아웃 예약 + 실제 장착).
+            // 항상 Slot0 고정·활성. 원거리 스테이션 상태를 참조하지 않는다(획득 순서 독립).
             loadout.SetWeaponSlot0(namelessWeapon);
             var player = _player;
             if (player != null)
             {
-                await GameRunBootstrapper.EquipWeaponToPlayerAsync(namelessWeapon, player);
+                await GameRunBootstrapper.EquipWeaponToPlayerAsync(
+                    namelessWeapon, player, PlayerWeaponManager.Slot0, setActive: true);
                 ct.ThrowIfCancellationRequested();
-                if (player.WeaponManager != null)
-                    await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
             }
 
             _claimed = true;

@@ -21,6 +21,11 @@ public class UI_Popup : UI_Base
     /// 또한 열려있는 동안 대사 이벤트가 대기한다. 선택/편집 UI·대사 팝업이 override한다.</summary>
     public virtual bool BlocksGameplay => false;
 
+    /// <summary>true면 ESC로 이 팝업을 닫을 수 있다(스택 최상단일 때만, EscKeyListener 경유).
+    /// 기본 false — 선택을 강제하는 팝업(보상/무기 모루 등)은 _tcs를 버튼으로만 완료시키므로
+    /// ESC로 닫히면 대기가 끝나지 않는다. 취소 경로가 검증된 팝업만 override해서 opt-in한다.</summary>
+    public virtual bool CloseOnEscape => false;
+
     // ── Init ─────────────────────────────────────────────────
 
     public override void Init()

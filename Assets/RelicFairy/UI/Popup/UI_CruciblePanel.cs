@@ -18,6 +18,7 @@ using UnityEngine.UI;
 public sealed class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
+    public override bool CloseOnEscape  => true; // ESC = 나가기(기존 동작, EscKeyListener 공용 경로)
 
     private const float WindowW = 1280f;
     private const float WindowH = 900f;
@@ -110,12 +111,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         base.Init();
         BuildChrome();
-    }
-
-    private void Update()
-    {
-        if (!_closing && Input.GetKeyDown(KeyCode.Escape))
-            ClosePopupUI();
     }
 
     private void OnDestroy()

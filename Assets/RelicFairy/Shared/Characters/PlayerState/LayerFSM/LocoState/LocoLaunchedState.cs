@@ -45,6 +45,8 @@ public class LocoLaunchedState : ILayerState<LocoState>
             _controller.Rigid.AddForce(dir * h + Vector3.up * up, ForceMode.VelocityChange);
         }
 
+        // TODO: 임시 플레이스홀더 — HitLaunch에 GhostSamurai_APose_Hit_Up_Inplace를 임시 배선한 상태.
+        // 정식 피격 애니 소싱 후 PlayerBaseController의 HitLaunch 스테이트 클립만 교체하면 된다(코드 변경 불필요).
         _controller.Anim.CrossFade("HitLaunch", 0.05f);
     }
 
@@ -100,6 +102,9 @@ public class LocoLaunchedState : ILayerState<LocoState>
         // 착지 직후 무적 — 체인 방지의 두 번째 축(넉백 면역과 별개로 '즉시 재피격'을 막는다)
         if (iframe > 0f) _controller.SetInvincible(iframe);
 
+        // TODO: 임시 플레이스홀더 — HitLand에 GhostSamurai_APose_Large_Hit_Inplace(선 자세 큰 피격)를 임시 배선.
+        // launchLandRecovery(0.25s)가 짧아 기상(GetUP) 계열은 엎드린 첫 프레임만 스치고 끊긴다.
+        // 회복 시간을 1s 이상으로 늘리게 되면 GhostSamurai_APose_Hit_Up_GetUP_Inplace가 더 맞는다.
         _controller.Anim.CrossFade("HitLand", 0.05f);
     }
 }

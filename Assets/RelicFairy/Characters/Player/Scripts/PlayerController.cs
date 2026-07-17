@@ -1215,13 +1215,16 @@ public class PlayerController : CharacterBase
             return false;
 
         var passives = mgr.GetPassives(entry.passive_id);
-        RuntimeStats.InitializeFromServer(entry, passives);
 
         var preloaded = Managers.CharacterData?.M_CharacterData;
 
         // SO 의 LayerMask/Sprite/Passive 참조는 유지하되 수치 컬럼은 CSV(서버) 로 덮어쓴다.
         // 원본 .asset 을 변경하지 않도록 Instantiate 로 런타임 클론을 만든 뒤 적용.
         var source = preloaded ?? characterData;
+
+        // 포이즈/스태미너는 CSV에 컬럼이 없다 — SO 경로와 같은 값이 나오도록 같은 SO를 넘긴다.
+        RuntimeStats.InitializeFromServer(entry, passives, source);
+
         if (source != null)
         {
             var clone = ScriptableObject.Instantiate(source);

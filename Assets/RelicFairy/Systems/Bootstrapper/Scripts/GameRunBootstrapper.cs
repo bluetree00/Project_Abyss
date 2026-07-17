@@ -2887,6 +2887,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
     }
 
+    /// <summary>
+    /// 무기를 <b>지정한 고정 슬롯</b>에 장착한다(빈슬롯 자동배정 없음).
+    /// 각 스테이션이 획득 순서와 무관하게 자기 슬롯에 독립 장착하는 용도
+    /// (무형검=Slot0 활성, 원거리=Slot1 비활성 등).
+    /// </summary>
+    public static async UniTask EquipWeaponToPlayerAsync(WeaponSO weaponSO, PlayerController player, int slotIndex, bool setActive = true)
+    {
+        var wm = player?.WeaponManager;
+        if (wm == null || weaponSO == null) return;
+        var weaponData = new WeaponData(weaponSO);
+        await PreloadWeaponClipsAsync(weaponData);
+        await wm.AcquireWeaponToSlotAsync(weaponData, slotIndex, setActive);
+    }
+
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>
     private static async UniTask PreloadWeaponClipsAsync(WeaponData data)
     {
