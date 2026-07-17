@@ -181,5 +181,9 @@ git lfs pull
 → `.gitattributes`에 전체 `*.prefab` LFS 규칙이 들어왔는지 확인 (§5-1)
 
 **"어드레서블 빌드했는데 그대로임"**
-→ 빌드가 **실패**했을 수 있습니다. `AddressablesBuildRunner`는 실패해도 `"build complete"`를 찍으니
-   콘솔에서 `Addressable content build failure` 가 있는지 직접 확인하세요.
+→ 빌드가 **실패**했을 수 있습니다. 콘솔에서 `RelicFairy > Addressables > Build Now` 의 결과 로그를 확인하세요.
+
+- 성공: `[AddressablesBuildRunner] 빌드 완료 — 395개 로케이션, 57.3초` (로케이션 수·소요시간이 찍힙니다)
+- 실패: `[AddressablesBuildRunner] 빌드 실패: ...` + 활성 빌더 이름과 해결 힌트가 함께 출력됩니다
+
+→ Play Mode가 `Use Existing Build` 인데도 그대로라면, 애초에 §1처럼 `Use Asset Database` 로 두는 게 편합니다.
