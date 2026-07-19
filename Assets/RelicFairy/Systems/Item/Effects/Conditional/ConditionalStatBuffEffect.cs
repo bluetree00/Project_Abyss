@@ -40,6 +40,8 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     private int   _streakCount;           // 임의 대상 연속 적중 수
     private float _lastDealTime = -999f;  // 마지막 적중 시각
 
+    private bool _warnedUnknownTrigger;   // 미인식 트리거 1회 경고용(틱마다 도니 스팸 방지)
+
     public ConditionalStatBuffEffect(ItemEffectSlot slot) : base(slot)
     {
         _channel = slot.effectType switch
@@ -55,6 +57,10 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
             "CondMaxHpPercent"   => Channel.MaxHpPercent,
             _                    => Channel.None,
         };
+
+        // 미인식 effect_type은 조용히 무동작이 되므로(ContributeDynamicStats 조기 반환) 즉시 알린다.
+        if (_channel == Channel.None)
+            Debug.LogWarning($"[ConditionalStatBuffEffect] 미인식 effect_type '{slot.effectType}' — 이 효과는 동작하지 않습니다.");
     }
 
     /// <summary>이벤트 훅/틱을 항상 수신하기 위해 활성 고정. 정적 스탯엔 기여하지 않는다.</summary>
@@ -124,6 +130,9 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
     {
         switch (_trigger)
         {
+            // 상시. case가 없으면 default로 떨어져 조용히 죽으므로 명시한다.
+            case "Always": return true;
+
             case "HPBelow50": return ctx.HpRatio <= 0.5f;
             case "HPBelow40": return ctx.HpRatio <= 0.4f;
             case "HPBelow30": return ctx.HpRatio <= 0.3f;
@@ -144,8 +153,9 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
                 int required = _value2 > 0f ? (int)_value2 : 2;
                 return CountNearby(ctx) >= required;
             }
+            // 단일 적 교전. '<= 1'이면 적이 0명(비전투)일 때도 참이 되어 상시 발동하므로 정확히 1명으로 판정한다.
             case "SingleEnemy":
-                return CountNearby(ctx) <= 1;
+                return CountNearby(ctx) == 1;
 
             case "WhileMoving":
                 return ctx?.Player != null && ctx.Player.MoveDirection.sqrMagnitude > 0.01f;
@@ -170,6 +180,12 @@ public sealed class ConditionalStatBuffEffect : ItemEffectBase, IItemBuffViewPro
 
             // 단발(Stationary/FirstAttackInRoom)은 FirstHitBonusEffect에서 처리.
             default:
+                // 오타 등 미인식 트리거는 진단 없이 아이템이 죽으므로 1회 경고한다.
+                if (!_warnedUnknownTrigger)
+                {
+                    _warnedUnknownTrigger = true;
+                    Debug.LogWarning($"[ConditionalStatBuffEffect] 미인식 trigger '{_trigger}' — 이 효과는 발동하지 않습니다.");
+                }
                 return false;
         }
     }
