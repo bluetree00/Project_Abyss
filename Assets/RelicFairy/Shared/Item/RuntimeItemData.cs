@@ -30,10 +30,26 @@ public class RuntimeItemData
 
     // ── 팩토리 ──
 
-    /// <summary>SO에서 생성 (에디터/테스트용).</summary>
+    /// <summary>
+    /// SO에서 생성.
+    /// 효과의 정본은 CSV(ITEM_DATA)이므로, 해당 itemId의 CSV 엔트리가 있으면
+    /// FromServer에 위임한다(FromServer가 ItemSORegistry로 SO 표시정보까지 병합).
+    /// CSV에 없는 SO만 아래 modifiers 기반 폴백을 탄다.
+    /// </summary>
     public static RuntimeItemData FromSO(ItemSO so)
     {
         if (so == null) return null;
+
+        if (!string.IsNullOrEmpty(so.itemId))
+        {
+            var csvEntries = Managers.ItemData?.GetItem(so.itemId);
+            if (csvEntries != null && csvEntries.Count > 0)
+            {
+                var fromCsv = FromServer(csvEntries);
+                if (fromCsv != null) return fromCsv;
+            }
+        }
+
         var data = new RuntimeItemData
         {
             itemId      = so.itemId,
