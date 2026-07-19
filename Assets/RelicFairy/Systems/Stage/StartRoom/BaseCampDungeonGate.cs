@@ -26,7 +26,6 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
     private string missingBothHint = "무형검과 유물이 필요하다 — <b>각성 제단</b>과 <b>빛나는 제단</b>을 먼저 들러라.";
 
     private bool _entered;
-    private bool _ready;
     private HudPresenter _hud;
     private float _lastNoticeTime = -999f;
 
@@ -37,26 +36,20 @@ public sealed class BaseCampDungeonGate : MonoBehaviour
 
     private void Start()
     {
-        if (portalActive != null) portalActive.SetActive(false);
-    }
-
-    private void Update()
-    {
-        bool ready = IsLoadoutReady();
-        if (ready == _ready) return;
-        _ready = ready;
-        if (portalActive != null) portalActive.SetActive(ready);
+        // 게이트는 항상 켜둔다 — 조건 미달이어도 접근 가능하고, 판정은 충돌 시점에 한다.
+        if (portalActive != null) portalActive.SetActive(true);
     }
 
     private void OnTriggerEnter(Collider other) => TryEnter(other);
     private void OnTriggerStay(Collider other)  => TryEnter(other);
 
+    /// <summary>충돌 시점에 전제조건을 검사한다(상시 폴링 없음). 미달이면 부족분 안내만 하고 통과시키지 않는다.</summary>
     private void TryEnter(Collider other)
     {
         if (_entered) return;
         if (other.GetComponentInParent<PlayerController>() == null) return;
 
-        if (!_ready)
+        if (!IsLoadoutReady())
         {
             ShowMissingNotice();
             return;
