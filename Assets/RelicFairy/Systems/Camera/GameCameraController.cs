@@ -50,9 +50,7 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private Vector2 processionalOrbitTop      = new Vector2(5f, 12f);
     [SerializeField] private Vector2 processionalOrbitMiddle   = new Vector2(2.5f, 13f);
     [SerializeField] private Vector2 processionalOrbitBottom   = new Vector2(0.8f, 12f);
-    [Tooltip("진행방향으로 카메라를 정렬(아케이드 축 정면). 끄면 현재 시야각만 낮아짐.")]
-    [SerializeField] private bool     processionalRecenter     = true;
-    [SerializeField] private float    processionalRecenterTime = 1.5f;
+    // 참고: 이 구간에서 heading(수평각)은 건드리지 않는다. 시선 방향은 CameraHeadingZone이 전담한다.
 
     // ── Private ──
     private Vector3 _originalPosition;
@@ -76,6 +74,9 @@ public class GameCameraController : MonoBehaviour
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
     private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
     private CinemachineFreeLook.Orbit[] _savedProcessionalOrbits;
+
+    // heading 회전 연출(RotateHeadingTo) 중복 실행 방지 — 새 요청이 오면 이전 회전을 취소한다.
+    private CancellationTokenSource _headingCts;
     private CancellationTokenSource     _dkOrbitTransitionCts;
     private bool _topDownViewActive;
     private bool _savedBrainBeforeTopDown;
@@ -227,10 +228,65 @@ public class GameCameraController : MonoBehaviour
         {
             _cinemachine.Follow = follow;
             _cinemachine.LookAt = follow;
+
+            // FreeLook 수평각은 이전 값을 그대로 유지하므로, 인계 시 대상이 보는 방향으로 맞춰준다.
+            // 이게 없으면 스폰 포인트 rotation을 바꿔도 카메라가 엉뚱한 각도에서 시작한다.
+            SetHeadingImmediate(follow.eulerAngles.y);
         }
 
         // 투어 종료 포즈 → 플레이어 추적 시점 수동 보간 후 제어권 인계 (스냅 없는 전환 연출)
         BlendToGameplayAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>FreeLook 수평 heading(m_XAxis)을 즉시 지정 각도로 맞춘다. 스폰/텔레포트 직후용.</summary>
+    public void SetHeadingImmediate(float yawDeg)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        _cinemachine.m_XAxis.Value = yawDeg;
+        _cinemachine.PreviousStateIsValid = false;   // 보간 없이 새 각도로 스냅
+    }
+
+    /// <summary>
+    /// FreeLook 수평 heading을 목표 각도로 <b>부드럽게</b> 돌린다(연출용).
+    /// 최단 회전 방향으로 보간하며, 도중 플레이어 입력이 있으면 중단하지 않는다(연출 우선).
+    /// </summary>
+    public void RotateHeadingTo(float targetYawDeg, float duration = 1.5f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        _headingCts?.Cancel();
+        _headingCts?.Dispose();
+        _headingCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        RotateHeadingAsync(targetYawDeg, duration, _headingCts.Token).Forget();
+    }
+
+    private async UniTaskVoid RotateHeadingAsync(float targetYawDeg, float duration, CancellationToken ct)
+    {
+        try
+        {
+            float start = _cinemachine.m_XAxis.Value;
+            float delta = Mathf.DeltaAngle(start, targetYawDeg);   // 최단 방향
+            if (duration <= 0f || Mathf.Abs(delta) < 0.1f)
+            {
+                _cinemachine.m_XAxis.Value = targetYawDeg;
+                return;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                ct.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                _cinemachine.m_XAxis.Value = start + delta * t;
+                await UniTask.Yield(ct);
+            }
+            _cinemachine.m_XAxis.Value = start + delta;
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>둘러보기 종료 포즈에서 플레이어 추적 시점으로 보간 (HandToGameplayCamera에서 fire-and-forget).</summary>
@@ -630,8 +686,9 @@ public class GameCameraController : MonoBehaviour
 
     // ── Processional View (대성당 나브) ─────────────────────────
     /// <summary>
-    /// 나브 진입 시 호출 — FreeLook 오빗을 <b>낮은 정면 시점</b>으로 전환해 아치 아케이드가 위로 솟아 보이게 한다.
-    /// processionalRecenter가 켜지면 카메라가 진행방향(플레이어 뒤)으로 정렬돼 아케이드 축을 정면으로 본다.
+    /// 나브 진입 시 호출 — FreeLook 오빗을 <b>낮은 시점</b>으로 전환해 아치 아케이드가 위로 솟아 보이게 한다.
+    /// <b>수평각(heading)은 건드리지 않는다</b> — 시선 방향은 CameraHeadingZone이 정하며, 여기서 리센터를 켜면
+    /// 이 리그의 m_Heading이 WorldForward라 월드 +Z로 끌려가 그 각도가 초기화된다.
     /// 오빗 전환은 DK 전환(TransitionDKOrbitAsync)을 재사용한다. 값은 인게임서 튜닝.
     /// </summary>
     public void ActivateProcessionalView(float duration = 1.2f)
@@ -649,11 +706,10 @@ public class GameCameraController : MonoBehaviour
             };
         }
 
-        if (processionalRecenter)
-        {
-            _cinemachine.m_RecenterToTargetHeading.m_enabled        = true;
-            _cinemachine.m_RecenterToTargetHeading.m_RecenteringTime = processionalRecenterTime;
-        }
+        // heading(수평각)은 건드리지 않는다 — 오빗(높이/거리)만 낮춘다.
+        // 이 리그는 m_Heading.m_Definition = WorldForward라, 리센터를 켜면 진행방향이 아니라
+        // 월드 +Z로 끌려가 CameraHeadingZone이 맞춰둔 각도가 초기화된다. 방어적으로 꺼둔다.
+        _cinemachine.m_RecenterToTargetHeading.m_enabled = false;
 
         TransitionDKOrbitAsync(
             processionalOrbitTop, processionalOrbitMiddle, processionalOrbitBottom,
@@ -665,9 +721,6 @@ public class GameCameraController : MonoBehaviour
     {
         EnsureCinemachineRefs();
         if (_cinemachine == null || _savedProcessionalOrbits == null) return;
-
-        if (processionalRecenter)
-            _cinemachine.m_RecenterToTargetHeading.m_enabled = false;
 
         var top = new Vector2(_savedProcessionalOrbits[0].m_Height, _savedProcessionalOrbits[0].m_Radius);
         var mid = new Vector2(_savedProcessionalOrbits[1].m_Height, _savedProcessionalOrbits[1].m_Radius);

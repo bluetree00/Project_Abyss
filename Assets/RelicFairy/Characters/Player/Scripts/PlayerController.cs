@@ -133,6 +133,14 @@ public class PlayerController : CharacterBase
             finalDmg = Mathf.Max(0, (int)fd);
         }
 
+        // [방어력] 체감 감소(diminishing returns) — 피해배율 = K / (K + 방어력).
+        // 가산 스택이 100%로 수렴하지 않아 상한 캡이 불필요하고, 방어력 K당 유효체력이 원 체력만큼 선형 증가한다.
+        // K는 밸런스 튜닝 값(기본 방어 32 기준 감소율 약 24%).
+        const float DefenseK = 100f;
+        int defense = RuntimeStats.Defense;
+        if (defense > 0)
+            finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (DefenseK / (DefenseK + defense))));
+
         // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
         // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
         float dr = RuntimeStats.DamageReduction;
@@ -1524,10 +1532,12 @@ public class PlayerController : CharacterBase
 
         var input = inputActions.Player.Move.ReadValue<Vector2>();
 
-        // 고정 탑다운(월드 정렬) 카메라 — 이동 기준은 월드축 고정.
-        // 시작 연출(오버헤드/투어)로 카메라가 움직이거나 거의 수직이 돼도 조작이 어긋나지 않도록
-        // 라이브 카메라 transform에 의존하지 않는다.
-        moveDirection = (Vector3.forward * input.y + Vector3.right * input.x).normalized;
+        // 이동 기준 = 카메라 수평 heading(FreeLook m_XAxis, BindingMode=WorldSpace라 월드 yaw와 동일).
+        // 라이브 카메라 transform이 아니라 heading 값만 쓰므로, 시작 연출(오버헤드/투어)로 카메라가
+        // 눕거나 거의 수직이 돼도(피치 변화) 조작이 어긋나지 않는다 — 기존 월드축 고정의 의도를 유지.
+        // heading이 0이면 월드축과 완전히 동일하므로 기존 구간(던전 등)의 조작감은 변하지 않는다.
+        float camYaw = cinemachineCamera != null ? cinemachineCamera.m_XAxis.Value : 0f;
+        moveDirection = (Quaternion.Euler(0f, camYaw, 0f) * new Vector3(input.x, 0f, input.y)).normalized;
     }
 
     /// <summary>
