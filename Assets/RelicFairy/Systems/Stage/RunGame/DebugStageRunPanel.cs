@@ -42,19 +42,19 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private static readonly string[] DebugSpawnItems =
     {
-        "item_frog_prince_ball",       // 근거리 공격력 +5 (Always)
-        "item_cinderella_shoes",       // 이동속도 +0.2 (Always)
-        "item_beauty_beast_rose",      // 체력+10, 흡혈2% (Always+OnHit)
-        "item_wolf_claw",              // HP50%이하 공격력+20% (HPBelow50)
-        "item_hansel_cookie",          // 방 클리어 시 체력3 회복 (OnRoomClear)
-        "item_sleeping_beauty_spindle",// 피격 시 5% 무효화 (OnHit)
-        "item_snow_white_mirror",      // 피해 10% 반사 (OnHit)
-        "item_aladdin_carpet",         // 점프 착지 범위 피해 (OnJumpLand)
-        "item_black_wings",            // 사망무효 + 10초 무적 (OnNearDeath)
-        "item_excalibur_fragment",     // 10% 확률 추가 타격 (OnHit)
-        "item_ifrit_ring",             // 불 무기+스킬 → 화염 폭발 (WithFireWeapon)
-        "item_thor_hammer_fragment",   // 번개 무기+스킬 → 번개 강타 (WithLightningWeapon)
-        "item_three_witches_thread",   // 시너지 완성 → 다음 공격 원소 (OnRecipeComplete)
+        "item_t1_dull_blade",          // 힘의 룬 — 전체 공격력 +4 (Always)
+        "item_t1_swift_charm",         // 쾌속의 룬 — 이동속도 +0.11 (Always)
+        "item_t1_old_deck",            // 방벽의 룬 — 방어력 +5 (Always)
+        "item_t1_crisis_blade",        // 위기의 룬 — 공격력 +18% (HPBelow50)
+        "item_t1_preempt_blade",       // 선제의 룬 — 이동속도 +25% (AfterRoomEnter)
+        "item_t1_threat_armor",        // 위협의 룬 — 방어력 +15% (EnemiesNearby)
+        "item_t1_calm_blade",          // 냉정의 룬 — 치명타 확률 +6% (NoHit)
+        "item_t2_first_strike",        // 선공의 룬 — 첫 타격 +40% (FirstAttackInRoom)
+        "item_t2_forged_hammer",       // 망치의 룬 — 전체 공격력 +10 (Always)
+        "item_t2_travel_bag",          // 여정의 룬 — 최대 체력 +50 (Always)
+        "item_t3_accumulation",        // 누적의 룬 — 대상별 누적 피해 +2% (OnHit)
+        "item_t3_infinite_hit",        // 무한타의 룬 — 5% 확률 추가 타격 (OnHit)
+        "item_t3_afterimage",          // 잔영의 룬 — 30% 잔상 추가타 (OnHit)
     };
     private int _spawnIndex;
     private readonly System.Collections.Generic.HashSet<string> _spawnedIds = new();
