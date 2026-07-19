@@ -19,7 +19,7 @@ MonoBehaviour:
   mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}
   mapBackgroundKey: map_8
   decorationSprites: []
-  theme: Castle
+  theme: Sacred
   bgmKey: bgm_castle
   difficultyScale: 1.7
   monsterCountScale: 1.4
