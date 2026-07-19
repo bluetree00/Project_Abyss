@@ -1010,6 +1010,7 @@ MonoBehaviour:
   decorationCatalogs:
   - {fileID: 11400000, guid: a0e4b1bdd0e55524e81ee90adceeda4f, type: 2}
   - {fileID: 11400000, guid: 8da2fca1ba714d8c974c330efda6c05c, type: 2}
+  - {fileID: 11400000, guid: b910ecc1c1bbcbd4c8299187517c2489, type: 2}
   covenantDataTable: {fileID: 0}
   essenceTracker: {fileID: 0}
 --- !u!1 &7934002030709558994

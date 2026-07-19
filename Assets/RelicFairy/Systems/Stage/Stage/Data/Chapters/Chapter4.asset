@@ -19,7 +19,7 @@ MonoBehaviour:
   mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}
   mapBackgroundKey: map_12
   decorationSprites: []
-  theme: Abyss
+  theme: Fortress
   bgmKey: bgm_abyss
   difficultyScale: 2.2
   monsterCountScale: 1.6

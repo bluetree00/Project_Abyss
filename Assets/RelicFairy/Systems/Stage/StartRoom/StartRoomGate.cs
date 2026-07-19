@@ -54,8 +54,10 @@ public class StartRoomGate : MonoBehaviour
     private int startCorridorWallLayers = 6;
 
     [Header("게이트 열림 연출 (서약 선택 완료 후 카메라 집중 + 통로 조망)")]
-    [SerializeField, Tooltip("켜짐: 서약 없이 로드아웃(유물+무기)만으로 자동 연출. 끔(기본): 시작방 서약 제단 선택 완료 시 연출")]
-    private bool revealOnLoadoutReady = false;
+    // ⚠️ 이름을 바꾼 이유: 구 필드(revealOnLoadoutReady)가 프리팹에 true로 직렬화돼 있어,
+    //    C# 기본값만 바꿔선 문이 시작부터 열리는 문제가 남았다. 새 이름은 저장값이 없어 아래 기본값이 적용된다.
+    [SerializeField, Tooltip("켜짐(기본): 시작방 서약 제단을 완료해야 문이 열리고 통과 가능. 끔: 서약 없이 로드아웃(유물+무기)만으로 열림")]
+    private bool requireCovenantForGate = true;
     [SerializeField, Min(0f), Tooltip("선택 완료 후 연출 시작까지 대기(초). 서약 알림/팝업이 정리될 여유")]
     private float gateRevealDelay = 2.2f;
     [SerializeField, Tooltip("연출 시 카메라가 게이트를 바라보는 위치 오프셋(게이트 로컬). 뒤/위로 빼서 통로를 조망")]
@@ -92,6 +94,8 @@ public class StartRoomGate : MonoBehaviour
 
     private bool _startCorridorBuilt;
     private bool _gateRevealStarted;   // 열림 연출 1회 가드
+    private bool _covenantDone;        // 시작방 서약 제단 완료 여부(통과 조건)
+    private bool _sealDoorPrefabWarned;
 
     // ── Init ──────────────────────────────────────────────────────
 
@@ -153,11 +157,11 @@ public class StartRoomGate : MonoBehaviour
         _gateOpen = ready;
         if (portalActive != null) portalActive.SetActive(ready);
 
-        // 준비 완료 → 몇 초 뒤 카메라가 게이트에 집중되며 문이 열리고 통로를 조망하는 연출(1회).
-        // 서약 오브젝트 배치 후엔 revealOnLoadoutReady를 끄고 선택 완료 흐름에서 TriggerGateReveal() 호출.
+        // 서약 필요 모드(기본): 로드아웃만으론 열리지 않는다 — 서약 제단 완료(HandleCovenantAssembled)가 트리거.
+        // 서약 불필요 모드: 기존처럼 로드아웃 준비되면 바로 연출.
         if (ready)
         {
-            if (revealOnLoadoutReady) TriggerGateReveal();
+            if (!requireCovenantForGate) TriggerGateReveal();
         }
         else
         {
@@ -199,7 +203,16 @@ public class StartRoomGate : MonoBehaviour
     {
         if (_sealDoor != null) return;
         var prefab = GameRunBootstrapper.Instance != null ? GameRunBootstrapper.Instance.GateSealDoorPrefab : null;
-        if (prefab == null) return;
+        if (prefab == null)
+        {
+            // 석문이 없으면 개구부가 그대로 보여 '문이 처음부터 열린' 것처럼 보인다 — 원인 추적용 1회 경고.
+            if (!_sealDoorPrefabWarned && GameRunBootstrapper.Instance != null)
+            {
+                _sealDoorPrefabWarned = true;
+                Debug.LogWarning("[StartRoomGate] GateSealDoorPrefab 미지정 — 석문이 생성되지 않아 게이트가 열린 것처럼 보입니다(@GameRun 프리팹에 지정 필요).");
+            }
+            return;
+        }
         var door = Instantiate(prefab, transform);
         door.name = "StartSealDoor";
         door.transform.localRotation = Quaternion.identity;
@@ -420,11 +433,21 @@ public class StartRoomGate : MonoBehaviour
 
         if (!isPlayer) return;
 
-        if (_fromZoneIndex == -1 && !IsLoadoutReady())
+        if (_fromZoneIndex == -1)
         {
-            if (notReadyIndicator != null) notReadyIndicator.SetActive(true);
-            Debug.LogWarning("[StartRoomGate] 캐릭터·무기 미선택 — 게이트 통과 불가");
-            return;
+            if (!IsLoadoutReady())
+            {
+                if (notReadyIndicator != null) notReadyIndicator.SetActive(true);
+                Debug.LogWarning("[StartRoomGate] 캐릭터·무기 미선택 — 게이트 통과 불가");
+                return;
+            }
+            // 서약 제단을 완료해야 문이 열리고 통과 가능(문이 닫힌 채 지나가는 것 방지).
+            if (requireCovenantForGate && !_covenantDone)
+            {
+                if (notReadyIndicator != null) notReadyIndicator.SetActive(true);
+                Debug.LogWarning("[StartRoomGate] 서약 미완료 — 게이트 통과 불가");
+                return;
+            }
         }
 
         _triggered = true;
@@ -660,6 +683,7 @@ public class StartRoomGate : MonoBehaviour
     private void HandleCovenantAssembled()
     {
         if (_fromZoneIndex != -1) return; // 시작방(Zone 0) 모드에서만
+        _covenantDone = true;             // 통과 조건 해제
         TriggerGateReveal();              // 딜레이(gateRevealDelay)는 연출 내부에서 적용
     }
 
