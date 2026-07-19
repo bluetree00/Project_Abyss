@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: ShopCatalog_Default
   m_EditorClassIdentifier: Assembly-CSharp::ShopCatalogSO
   entries:
-  - {fileID: 11400000, guid: 40fe11475eace4348b944c79692e0db3, type: 2}
-  - {fileID: 11400000, guid: 4bb5bc9246f6a8743b2608ea6af5ec23, type: 2}
-  - {fileID: 11400000, guid: 9277b0e89b40e05489443846abd73f96, type: 2}
-  - {fileID: 11400000, guid: b121d310e6c31da42977813591527d3a, type: 2}
-  - {fileID: 11400000, guid: f52a1b5c397edde4db86c13c1cb8d29a, type: 2}
-  - {fileID: 11400000, guid: cc0bf7d1be3cf6a479ac678417adc2ed, type: 2}
+  - {fileID: 11400000, guid: 62e7230efbab49343805f906454c85d6, type: 2}
+  - {fileID: 11400000, guid: b6d98931aa90369449b9bcfe42044e62, type: 2}
+  - {fileID: 11400000, guid: 1efb9575d596a43448ef2f9651a4f43a, type: 2}
+  - {fileID: 11400000, guid: fea14903d61965d4ab15bd2dd1891afa, type: 2}
+  - {fileID: 11400000, guid: b99ce81bfcf97bb459c79b0638772c43, type: 2}
+  - {fileID: 11400000, guid: 130830d83ab214b409a373e50f3097f5, type: 2}
