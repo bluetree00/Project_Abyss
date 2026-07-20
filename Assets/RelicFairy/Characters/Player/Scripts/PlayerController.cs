@@ -242,7 +242,10 @@ public class PlayerController : CharacterBase
             _dead = true;
             SetInputEnabled(false);
             ClearPerfectDodge();   // 사망했는데 슬로모가 남아 시간이 느린 채로 진행되는 것 방지
-            GameRunBootstrapper.Instance?.HandlePlayerDeath();
+            if (IntroBootstrapper.Instance != null)
+                IntroBootstrapper.Instance.HandleIntroDeath();
+            else
+                GameRunBootstrapper.Instance?.HandlePlayerDeath();
         }
     }
 
@@ -423,12 +426,45 @@ public class PlayerController : CharacterBase
     [SerializeField] private AudioClip _freezeLoopSfx;
     private AudioSource _freezeLoopAudioSource;
 
+    private int   _iceStage;       // 0=기본, 1=경고(화면이펙트 활성)
+    private float _iceStageTimer;
+    public const float IceStageWindowDuration = 3f;
+    private const float IceStage1SoundVolume  = 0.3f;
+
     /// <summary>빙결: duration초 동안 이동·행동·입력을 완전히 차단한다. 연속 피격 시 남은 시간을 연장.</summary>
     public void ApplyFreeze(float duration)
     {
         _freezeTimer = Mathf.Max(_freezeTimer, duration);
-        if (_freezeLoopAudioSource == null)
+        if (_freezeLoopAudioSource == null || !_freezeLoopAudioSource.isPlaying)
+        {
+            StopFreezeLoopSfx();
             _freezeLoopAudioSource = Managers.Sound?.PlayLoopingEffectAt(_freezeLoopSfx, transform.position);
+        }
+    }
+
+    /// <summary>
+    /// 얼음 공격 1회 처리. 반환값: 1=1단계(화면이펙트), 2=빙결 발동, 0=이미 빙결 중(연장만).
+    /// </summary>
+    public int AddIceStack(float fullDuration)
+    {
+        if (IsFrozen)
+        {
+            ApplyFreeze(fullDuration * 0.5f);
+            return 2;
+        }
+
+        if (_iceStage == 1 && _iceStageTimer > 0f)
+        {
+            _iceStage      = 0;
+            _iceStageTimer = 0f;
+            ApplyFreeze(fullDuration * 0.5f);
+            return 2;
+        }
+
+        _iceStage      = 1;
+        _iceStageTimer = IceStageWindowDuration;
+        Managers.Sound?.PlayEffect(_freezeLoopSfx, IceStage1SoundVolume);
+        return 1;
     }
 
     private void StopFreezeLoopSfx()
@@ -972,6 +1008,12 @@ public class PlayerController : CharacterBase
             _slowTimer = Mathf.Max(0f, _slowTimer - Time.unscaledDeltaTime);
             if (_slowTimer <= 0f)
                 SetMoveScale(1f);
+        }
+        if (_iceStage == 1)
+        {
+            _iceStageTimer -= Time.deltaTime;
+            if (_iceStageTimer <= 0f)
+                _iceStage = 0;
         }
         if (_freezeTimer > 0f)
         {

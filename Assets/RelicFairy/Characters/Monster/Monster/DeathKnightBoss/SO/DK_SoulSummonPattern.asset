@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5da3113b2e408e4c931f92085259c32, type: 3}
+  m_Name: DK_SoulSummonPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DKSoulSummonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  pillarVfxPrefab: {fileID: 782190285946635262, guid: a262d68e8d1662645821b86a332d5b3d,
+    type: 3}
+  pillarDestroyVfxPrefab: {fileID: 1992029900475280859, guid: 4dfb534a3a08e5d49bd0b6362fbedce1,
+    type: 3}
+  pillarDestroyVfxScale: 0.4
+  pillarHp: 300
+  pillarColliderHeight: 3.5
+  pillarColliderRadius: 0.5
+  pillarVfxScale: 1
+  bossShieldVfxPrefab: {fileID: 1586059801500780, guid: ac8484e80858b3c48925e94eb1014dc4,
+    type: 3}
+  pillarDestroySfx: {fileID: 8300000, guid: d795247655948904fa25373f9ea53606, type: 3}
+  moveToCenterTime: 3
+  summoningDuration: 1.5
+  waitTimeout: 10
+  recoveryTime: 0.5
+  gradualHealDuration: 2.5

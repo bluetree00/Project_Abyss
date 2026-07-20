@@ -143,6 +143,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     // 저글링 이동
     private bool    _isJuggling;
     private Vector3 _juggleStartPos;
+    private Vector3 _juggleTargetPos;
     private float   _juggleProgress;
     private float   _juggleDuration;
 
@@ -165,6 +166,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         {
             ctx.Agent.isStopped = true;
             ctx.Agent.ResetPath();
+            ctx.Agent.updatePosition = false;
         }
 
         FacePlayer(ctx);
@@ -281,6 +283,9 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
 
         if (ctx.Agent != null)
         {
+            if (ctx.Agent.isOnNavMesh)
+                ctx.Agent.nextPosition = ctx.Transform.position;
+            ctx.Agent.updatePosition = true;
             ctx.Agent.isStopped = false;
             if (!ctx.Agent.isOnNavMesh)
                 ctx.Monster.TrySnapAgentToNavMesh();
@@ -343,19 +348,18 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
             _juggleProgress += Time.deltaTime * SpeedMult(ctx) / Mathf.Max(0.01f, _juggleDuration);
             float t = Mathf.Clamp01(_juggleProgress);
 
-            // 포물선 arc: XZ는 선형 보간, Y는 사인 커브로 솟아오름
-            Vector3 pos = Vector3.Lerp(_juggleStartPos, targetPos, t);
+            // 저글링 목적지는 StartJuggle 시점에 고정 — 매 프레임 bone.position 재계산 금지
+            Vector3 pos = Vector3.Lerp(_juggleStartPos, _juggleTargetPos, t);
             pos.y += Mathf.Sin(t * Mathf.PI) * Data.juggleArcUp;
             _heldPlayer.transform.position = pos;
 
-            // Rigidbody가 물리로 간섭하지 않도록 velocity 초기화
             if (_heldPlayer.Rigid != null)
                 _heldPlayer.Rigid.linearVelocity = Vector3.zero;
 
             if (t >= 1f)
             {
                 _isJuggling = false;
-                _heldPlayer.transform.position = targetPos;
+                _heldPlayer.transform.position = _juggleTargetPos;
             }
         }
         else
@@ -369,12 +373,13 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     {
         if (_heldPlayer == null) return;
 
-        Vector3 target = targetBone != null
+        // 목적지를 이 시점에 한 번만 캐싱 — 애니메이션 본 위치가 프레임마다 변해도 영향 없음
+        _juggleTargetPos = targetBone != null
             ? targetBone.position
             : ctx.Transform.position + _bossForward * 1.2f + Vector3.up;
 
         _juggleStartPos = _heldPlayer.transform.position;
-        float dist      = Vector3.Distance(_juggleStartPos, target);
+        float dist      = Vector3.Distance(_juggleStartPos, _juggleTargetPos);
         _juggleDuration = dist / Mathf.Max(1f, Data.juggleSpeed);
         _juggleProgress = 0f;
         _isJuggling     = true;
@@ -441,14 +446,14 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         Vector3 pos = ctx.Transform.position;
         pos.y += 0.02f;
         _warningTargetScale = new Vector3(Data.range, 1f, Data.range);
-        _warningGO = Object.Instantiate(prefab, pos, ctx.Transform.rotation);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, ctx.Transform.rotation);
         _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → Update에서 서서히 확장
     }
 
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO = null;
     }
 

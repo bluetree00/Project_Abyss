@@ -385,14 +385,14 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
         _warningGrowTimer    = 0f;
         // 비행 시간만큼 장판이 서서히 커지도록 확장 시간 설정 (최소 0.3s)
         _warningGrowDuration = Mathf.Max(0.3f, Data.projectileSpeed > 0f ? _launchDist / Data.projectileSpeed : 0.5f);
-        _warningGO = Object.Instantiate(prefab, pos, Quaternion.identity);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
         _warningGO.transform.localScale = Vector3.zero;  // 처음엔 0 → PostThrow에서 서서히 확장
     }
 
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO = null;
     }
 
@@ -419,7 +419,7 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
 
             if (prefab == null) continue;
             pos.y += 0.02f;
-            _fragmentWarnings[i] = Object.Instantiate(prefab, pos, Quaternion.identity);
+            _fragmentWarnings[i] = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
             _fragmentWarnings[i].transform.localScale = Vector3.zero;
         }
     }
@@ -427,22 +427,21 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private void SpawnFragmentImpactEffect(Vector3 pos)
     {
         if (Data.fragmentImpactEffectPrefab == null) return;
-        var go = Object.Instantiate(Data.fragmentImpactEffectPrefab, pos, Quaternion.identity);
+        var go = Managers.ObjectPooler.SpawnFromPrefab(Data.fragmentImpactEffectPrefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
         float lifetime = 2f;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
-            var main = ps.main;
-            main.loop = false;
-            float end = main.duration + main.startLifetime.constantMax;
+            float end = ps.main.duration + ps.main.startLifetime.constantMax;
             if (end > lifetime) lifetime = end;
         }
-        Object.Destroy(go, lifetime);
+        var vfxComp = go.GetComponent<PooledOneShotVfx>() ?? go.AddComponent<PooledOneShotVfx>();
+        vfxComp.Play(lifetime);
     }
 
     private void DespawnFragmentWarning(int i)
     {
         if (_fragmentWarnings[i] == null) return;
-        Object.Destroy(_fragmentWarnings[i]);
+        Managers.ObjectPooler.Despawn(_fragmentWarnings[i]);
         _fragmentWarnings[i] = null;
     }
 
@@ -476,18 +475,17 @@ public class FGThrowRockState : FullLockState<FGThrowRockPatternSO>
     private void SpawnImpactEffect()
     {
         if (Data.impactEffectPrefab == null) return;
-        var go = Object.Instantiate(Data.impactEffectPrefab, _landingPos, Quaternion.identity);
+        var go = Managers.ObjectPooler.SpawnFromPrefab(Data.impactEffectPrefab, ObjectPoolerManager.PoolType.Effect, _landingPos, Quaternion.identity);
 
         float lifetime = 3f;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
-            var main = ps.main;
-            main.loop = false;
-            float end = main.duration + main.startLifetime.constantMax;
+            float end = ps.main.duration + ps.main.startLifetime.constantMax;
             if (end > lifetime) lifetime = end;
         }
 
-        Object.Destroy(go, lifetime);
+        var vfxComp = go.GetComponent<PooledOneShotVfx>() ?? go.AddComponent<PooledOneShotVfx>();
+        vfxComp.Play(lifetime);
     }
 
     // ── 유틸 ─────────────────────────────────────────────

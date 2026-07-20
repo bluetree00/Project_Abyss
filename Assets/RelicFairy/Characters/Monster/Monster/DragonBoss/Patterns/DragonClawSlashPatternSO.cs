@@ -100,21 +100,18 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     private int     _swingIndex;
     private int     _totalSwings;
     private bool    _hitApplied;
-    private bool    _dangerShown;
     private bool    _swingSfxPlayed;
-    private DragonBossWarningZone    _activeWarningZone;
     private DragonClawTrailController _clawTrail;
 
     internal DragonClawSlashState(DragonClawSlashPatternSO data) : base(data) { }
 
     internal void Reset()
     {
-        _phase             = Phase.Done;
-        _swingIndex        = 0;
-        _timer             = 0f;
-        _arcHeight         = 0f;
-        _activeWarningZone = null;
-        _clawTrail         = null;
+        _phase      = Phase.Done;
+        _swingIndex = 0;
+        _timer      = 0f;
+        _arcHeight  = 0f;
+        _clawTrail  = null;
     }
 
     public override void Enter(MonsterContext ctx)
@@ -209,7 +206,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         _swingIndex     = 0;
         _totalSwings    = Data.ClawCount * 2;
         _hitApplied     = false;
-        _dangerShown    = false;
         _swingSfxPlayed = false;
 
         PlayCurrentSwingAnim(ctx);
@@ -221,12 +217,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     {
         if (_swingIndex >= _totalSwings) { FinishPattern(ctx); return; }
 
-        if (!_dangerShown && _timer >= Data.WarnDuration)
-        {
-            _dangerShown = true;
-            SpawnDangerZone(ctx);
-        }
-
         if (!_swingSfxPlayed && _timer >= Data.SwingSfxDelay)
         {
             _swingSfxPlayed = true;
@@ -236,20 +226,16 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
         if (!_hitApplied && _timer >= Data.HitTime)
         {
             _hitApplied = true;
-            _activeWarningZone?.TransitionToHitPhase(0.25f);
-            _activeWarningZone = null;
             ApplyHit(ctx);
         }
 
         if (_timer >= Data.ClawAnimDuration)
         {
             _clawTrail?.StopTrail(_swingIndex % 2 == 0);
-            _swingIndex        = _swingIndex + 1;
-            _timer             = 0f;
-            _hitApplied        = false;
-            _dangerShown       = false;
-            _swingSfxPlayed    = false;
-            _activeWarningZone = null;
+            _swingIndex     = _swingIndex + 1;
+            _timer          = 0f;
+            _hitApplied     = false;
+            _swingSfxPlayed = false;
 
             if (_swingIndex < _totalSwings)
                 PlayCurrentSwingAnim(ctx);
@@ -272,19 +258,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
     {
         if (ctx.Animator != null && ctx.Animator.HasState(0, Animator.StringToHash(stateName)))
             ctx.Animator.CrossFade(stateName, 0.1f, 0, 0f);
-    }
-
-    private void SpawnDangerZone(MonsterContext ctx)
-    {
-        Vector3 pos = ctx.Transform.position
-            + ctx.Transform.forward * (Data.AttackRadius * 0.6f);
-        pos.y = ctx.Transform.position.y;
-        _activeWarningZone = DragonBossWarningZone.CreateCircle(
-            "DragonClawWarning",
-            pos,
-            Data.AttackRadius,
-            new Color(1f, 0.25f, 0.18f, 0.85f),
-            Data.HitTime + 0.2f);
     }
 
     private void ApplyHit(MonsterContext ctx)
