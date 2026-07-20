@@ -280,10 +280,8 @@ public class DragonDormantState : IMonsterState
 
         ctx.Transform.position = targetPos;
 
-        // 착지 위치 도달 후 추가 유지 — 브레스가 더 길게 이어지는 느낌
-        float extraHold = dragon.EntranceBreathExtraHoldTime;
-        if (extraHold > 0f)
-            await UniTask.Delay(TimeSpan.FromSeconds(extraHold), cancellationToken: ct);
+        // 착지 위치 도달 즉시 하강 자세로 전환하고 브레스 해제 — 정지 없이 바로 착지 시작
+        PlayAnim(ctx, DescendStateName, 0.2f);
 
         if (breathVfx != null)
             BossEffectPool.Release(breathVfx);
@@ -303,8 +301,6 @@ public class DragonDormantState : IMonsterState
         float triggerHeight = clipLen > 0f ? clipLen * slowSpeed : 3f;
 
         bool touchdownTriggered = false;
-
-        PlayAnim(ctx, DescendStateName, 0.15f);
 
         // [하강 추적] U-아크가 이미 추적 위치에 도달했으므로 블렌드 없이 즉시 추적 시작
         using var descentTrackCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
