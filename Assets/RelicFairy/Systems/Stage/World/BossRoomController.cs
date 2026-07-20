@@ -28,6 +28,9 @@ public class BossRoomController : MonoBehaviour
     [Tooltip("입장 직후 활성화할 배리어 오브젝트. null이면 배리어 없음.")]
     [SerializeField] private GameObject barrier;
 
+    [Tooltip("보스 연출 시작 시 활성화할 벽 오브젝트 배열.")]
+    [SerializeField] private GameObject[] introWalls;
+
     [Header("카메라 팬 설정")]
     [Tooltip("카메라가 이동할 목표 지점 (보스 주변 Transform).")]
     [SerializeField] private Transform bossZoneCenter;
@@ -89,6 +92,10 @@ public class BossRoomController : MonoBehaviour
 
         if (barrier != null)
             barrier.SetActive(true);
+
+        if (introWalls != null)
+            foreach (var wall in introWalls)
+                if (wall != null) wall.SetActive(true);
 
         // 이미 스폰된 보스가 있으면 소급 연결, 없으면 이벤트 구독 후 소환
         if (bossSpawner.SpawnedBoss != null)

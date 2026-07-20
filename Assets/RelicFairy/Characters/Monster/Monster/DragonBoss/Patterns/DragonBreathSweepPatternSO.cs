@@ -871,7 +871,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (player == null) return;
 
         player.TakeDamage(Data.BreathDamage);
-        PlayerStatusEffectVisuals.ApplyTimed(player, Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
+        PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
     private void ApplyTsunamiDamage(MonsterContext ctx, TsunamiEntry entry)
@@ -888,7 +888,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         if (player == null) return;
 
         player.TakeDamage(Data.TsunamiDamage);
-        PlayerStatusEffectVisuals.ApplyTimed(player, Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
+        PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
     private void ApplyDragonSlow(MonsterContext ctx)

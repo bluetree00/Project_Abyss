@@ -242,7 +242,10 @@ public class PlayerController : CharacterBase
             _dead = true;
             SetInputEnabled(false);
             ClearPerfectDodge();   // 사망했는데 슬로모가 남아 시간이 느린 채로 진행되는 것 방지
-            GameRunBootstrapper.Instance?.HandlePlayerDeath();
+            if (IntroBootstrapper.Instance != null)
+                IntroBootstrapper.Instance.HandleIntroDeath();
+            else
+                GameRunBootstrapper.Instance?.HandlePlayerDeath();
         }
     }
 

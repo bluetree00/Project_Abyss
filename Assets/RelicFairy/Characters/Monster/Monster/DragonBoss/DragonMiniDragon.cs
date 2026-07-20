@@ -109,6 +109,11 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
             _agent = gameObject.AddComponent<NavMeshAgent>();
         _animator  = GetComponentInChildren<Animator>(true);
         _mouthBone = FindDeepChild("Jaw");
+
+        int hitLayer = LayerMask.NameToLayer("MonsterHit");
+        if (hitLayer >= 0)
+            foreach (var col in GetComponentsInChildren<Collider>(true))
+                col.gameObject.layer = hitLayer;
     }
 
     // ── Update ──────────────────────────────────────────────────────────────
