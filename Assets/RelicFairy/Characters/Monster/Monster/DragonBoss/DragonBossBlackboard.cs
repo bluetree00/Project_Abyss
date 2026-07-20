@@ -43,6 +43,10 @@ public class DragonBossBlackboard : BossAttackBlackboard
     /// </summary>
     public SpecialStateBase AirLoopReturnState;
 
+    /// <summary>소환 패턴 임계값 돌파 후 소환 완료까지 데미지를 차단하는 무적 게이트.</summary>
+    public bool IsSummonGated { get; private set; }
+    public void SetSummonGated(bool value) => IsSummonGated = value;
+
     /// <summary>
     /// Legacy 호환 proxy — 기존 코드의 `bb.IsAirborne = true/false` 설정을
     /// 그대로 유지하면서 내부적으로는 BodyState 를 갱신한다.
@@ -126,6 +130,7 @@ public class DragonBossBlackboard : BossAttackBlackboard
         Poise                 = MaxPoise;
         IsPoiseBroken         = false;
         LastHitDirection      = HitDirection.Front;
+        IsSummonGated         = false;
     }
 }
 }

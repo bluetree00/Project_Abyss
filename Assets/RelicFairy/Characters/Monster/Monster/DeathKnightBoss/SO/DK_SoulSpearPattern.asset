@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98390872ea26b634bbd1d1aa86cbc661, type: 3}
+  m_Name: DK_SoulSpearPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.DKSoulSpearPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  whiteTilePrefab: {fileID: 1700000001, guid: 36c704cc48b1a834ba1cff41dbe566e4, type: 3}
+  blackTilePrefab: {fileID: 1800000001, guid: 85eb3de68405a0b4f989b56efc491cda, type: 3}
+  impactVfxPrefab: {fileID: 7699698589382392644, guid: 1fce1cd62fb86ed45865a6a14af30ec1,
+    type: 3}
+  beamSfx: {fileID: 8300000, guid: 63bebc3cef4f5d94ca240156706febee, type: 3}
+  windupDuration: 0.5
+  warningDuration: 0.5
+  beamHitDelay: 0.45
+  nextRoundDelay: 0.35
+  strikeCount: 3
+  recoveryTime: 0.4
+  damageMultiplier: 1
+  knockbackMultiplier: 1
+  passiveWarningDuration: 0.5
+  passiveBeamHitDelay: 0.4
+  passiveCooldownMin: 5
+  passiveCooldownMax: 8

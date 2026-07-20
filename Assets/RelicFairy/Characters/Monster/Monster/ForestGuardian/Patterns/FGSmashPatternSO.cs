@@ -1,4 +1,3 @@
-using PixPlays.ElementalVFX;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -273,14 +272,14 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
         pos.y       += 0.02f;
         float s      = Data.range;
         _warningTargetScale = new Vector3(s, 1f, s);
-        _warningGO = Object.Instantiate(prefab, pos, Quaternion.identity);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
         _warningGO.transform.localScale = Vector3.zero;
     }
 
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO = null;
     }
 
@@ -292,7 +291,7 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
 
         Vector3 pos  = _impactPos;
         pos.y       += 0.02f;
-        _shockwaveGO = Object.Instantiate(prefab, pos, Quaternion.identity);
+        _shockwaveGO = Managers.ObjectPooler.SpawnFromPrefab(prefab, ObjectPoolerManager.PoolType.Effect, pos, Quaternion.identity);
 
         float s = Data.shockwaveScale;
         if (!Mathf.Approximately(s, 1f))
@@ -309,14 +308,14 @@ public class FGSmashState : FullLockState<FGSmashPatternSO>
             }
         }
 
-        if (_shockwaveGO.TryGetComponent<PlayableVfx>(out var vfx))
-            vfx.Play();
+        // shockwaveDuration + lingerDuration 후 자동으로 풀 반환
+        var vfxComp = _shockwaveGO.GetComponent<PooledOneShotVfx>() ?? _shockwaveGO.AddComponent<PooledOneShotVfx>();
+        vfxComp.Play(Data.shockwaveDuration + Data.shockwaveLingerDuration);
     }
 
     private void DespawnShockwave()
     {
-        if (_shockwaveGO == null) return;
-        Object.Destroy(_shockwaveGO, Data.shockwaveLingerDuration);
+        // PooledOneShotVfx가 총 지속 시간 후 자동으로 풀에 반환
         _shockwaveGO = null;
     }
 

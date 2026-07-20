@@ -20,6 +20,7 @@ public class Define
         Tutorial,
         BaseCamp,
         Lobby,
+        Game_Intro,
         GameScene_Ch1,
         GameScene_Ch2,
         GameScene_Ch3,

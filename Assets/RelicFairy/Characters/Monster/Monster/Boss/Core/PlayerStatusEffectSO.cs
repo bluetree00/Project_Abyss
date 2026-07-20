@@ -52,13 +52,27 @@ public class PlayerStatusEffectSO : ScriptableObject
 
         switch (effectType)
         {
-            case StatusEffectType.Freeze: player.ApplyFreeze(duration);                break;
+            case StatusEffectType.Freeze:
+                int iceResult = player.AddIceStack(duration);
+                if (iceResult == 1)
+                {
+                    // 1단계: 화면 이펙트만 3초 표시 (사운드는 AddIceStack 내부에서 처리)
+                    PlayerStatusEffectVisuals.ApplyScreenEffectTimed(_screenEffectPrefab, _screenEffectScale, PlayerController.IceStageWindowDuration, "StatusEffectScreen_" + effectType);
+                }
+                else if (iceResult == 2)
+                {
+                    // 2단계: 장막 이펙트 추가 + 화면 이펙트 갱신 (빙결 사운드는 ApplyFreeze 내부에서 처리)
+                    float freezeDuration = duration * 0.5f;
+                    PlayerStatusEffectVisuals.ApplyTimed(player, _effectPrefab, _effectScale, freezeDuration, "StatusEffect_" + effectType);
+                    PlayerStatusEffectVisuals.ApplyScreenEffectTimed(_screenEffectPrefab, _screenEffectScale, freezeDuration, "StatusEffectScreen_" + effectType);
+                }
+                return;
             case StatusEffectType.Groggy: player.ApplyThunderGroggy(duration);         break;
             case StatusEffectType.Slow:   player.ApplySlow(slowScale, duration);       break;
         }
 
         PlayerStatusEffectVisuals.ApplyTimed(player, _effectPrefab, _effectScale, duration, "StatusEffect_" + effectType);
-        PlayerStatusEffectVisuals.ApplyTimed(player, _screenEffectPrefab, _screenEffectScale, duration, "StatusEffectScreen_" + effectType);
+        PlayerStatusEffectVisuals.ApplyScreenEffectTimed(_screenEffectPrefab, _screenEffectScale, duration, "StatusEffectScreen_" + effectType);
     }
 }
 
@@ -101,6 +115,32 @@ internal static class PlayerStatusEffectVisuals
         var go = Object.Instantiate(prefab, player.transform.position, Quaternion.identity, player.transform);
         go.name                    = markerName;
         go.transform.localPosition = Vector3.zero;
+        go.transform.localScale    = Vector3.one * scale;
+        go.AddComponent<StatusEffectInstance>().Init(duration);
+    }
+
+    /// <summary>
+    /// 카메라에 직접 부착하는 스크린 이펙트 전용 헬퍼.
+    /// HS_ScreenEffect가 카메라 자식으로 재부착하기 때문에 player.Find로 찾을 수 없는 문제를 해결한다.
+    /// </summary>
+    internal static void ApplyScreenEffectTimed(GameObject prefab, float scale, float duration, string markerName)
+    {
+        if (prefab == null) return;
+
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        var existing = cam.transform.Find(markerName);
+        if (existing != null)
+        {
+            existing.GetComponent<StatusEffectInstance>()?.Refresh(duration);
+            return;
+        }
+
+        var go = Object.Instantiate(prefab, cam.transform);
+        go.name                    = markerName;
+        go.transform.localPosition = Vector3.forward * 0.05f;
+        go.transform.localRotation = Quaternion.identity;
         go.transform.localScale    = Vector3.one * scale;
         go.AddComponent<StatusEffectInstance>().Init(duration);
     }

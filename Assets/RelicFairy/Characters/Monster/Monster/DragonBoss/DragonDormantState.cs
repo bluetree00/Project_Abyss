@@ -155,11 +155,13 @@ public class DragonDormantState : IMonsterState
         {
             var cam = GameCameraController.Instance;
 
-            // 브레스를 뿜으며 착지 지점 위까지 비행 → 도착 시 진입로 바위 파괴
-            await FlyInWithBreathAsync(ctx, dragon, ct);
+            // 브레스를 뿜으며 착지 지점 위까지 비행
+            await FlyInWithBreathAsync(ctx, dragon, cam, ct);
+
+            // FlyInWithBreathAsync 완료 시점에 카메라가 이미 하강 추적 위치에 도달 → 별도 아크 불필요
 
             // 착지 → Idle 전환
-            await DescendAndLandAsync(ctx, dragon, ct);
+            await DescendAndLandAsync(ctx, dragon, cam, ct);
 
             // 2단계: 보스 대각선 아래에서 올려다보는 클로즈업으로 서서히 전환 + 보스 이름 HUD (Idle 전환과 동시)
             dragon.PlayNormalSfx();
@@ -182,7 +184,7 @@ public class DragonDormantState : IMonsterState
             }
             finally
             {
-                if (windVfx != null) UnityEngine.Object.Destroy(windVfx);
+                if (windVfx != null) BossEffectPool.Release(windVfx);
             }
 
             // 3단계: HUD 소멸 → 플레이어 카메라로 복귀
@@ -203,12 +205,10 @@ public class DragonDormantState : IMonsterState
         _landed = true;
     }
 
-    private static async UniTask FlyInWithBreathAsync(MonsterContext ctx, DragonBossMonster dragon, CancellationToken ct)
+    private static async UniTask FlyInWithBreathAsync(MonsterContext ctx, DragonBossMonster dragon, GameCameraController cam, CancellationToken ct)
     {
-        Vector3 startPos  = ctx.Transform.position;
         Vector3 targetPos = ctx.Runtime.SpawnPosition + Vector3.up * dragon.EntranceDescendHeight;
         float   speed     = dragon.EntranceFlyInSpeed;
-        float   totalDist = Vector3.Distance(startPos, targetPos);
 
         // VFX보다 사운드를 먼저 재생 — 체감상 브레스 타이밍이 더 빠르게 느껴지도록
         dragon.PlayEntranceBreathSfx();
@@ -217,24 +217,62 @@ public class DragonDormantState : IMonsterState
 
         GameObject breathVfx = dragon.SpawnEntranceBreathVfx(ctx.Transform.forward);
 
-        int rockCount      = dragon.EntranceRockCount;
-        int destroyedCount = 0;
+        // 비행 방향 및 U자 아크 사전 계산
+        Vector3 flightHoriz = targetPos - ctx.Transform.position;
+        flightHoriz.y = 0f;
+        Vector3 horizFlight  = flightHoriz.sqrMagnitude > 0.01f ? flightHoriz.normalized : Vector3.back;
+        Vector3 rightDir     = Vector3.Cross(horizFlight, Vector3.up).normalized; // 비행방향 기준 우측
+        Quaternion dragonEndRot = Quaternion.LookRotation(horizFlight, Vector3.up);
 
+        // 카메라 시작: 플레이어 위치 기준 우측
+        // 카메라 끝:   착지 위치 기준 하강 추적 카메라 위치
+        float   totalDist = Vector3.Distance(ctx.Transform.position, targetPos);
+        Vector3 playerPos = ctx.Runtime.PlayerTarget != null
+            ? ctx.Runtime.PlayerTarget.position
+            : ctx.Runtime.SpawnPosition;
+
+        Vector3 camStart = playerPos
+            + rightDir   * dragon.EntranceBreathCamRightShift
+            + Vector3.up * dragon.EntranceBreathCamHeight;
+        Vector3 camEnd   = targetPos + dragonEndRot * dragon.EntranceDescentCamOffset;
+        Vector3 lookEnd  = targetPos + dragonEndRot * dragon.EntranceDescentCamLookOffset;
+        // 컨트롤 포인트: 드래곤 로컬 오프셋 → 월드 변환 (음수 X = 좌측 스윙 → U자)
+        Vector3 ctrlPos  = Vector3.Lerp(camStart, camEnd, 0.5f) + dragonEndRot * dragon.EntranceArcCtrlOffset;
+
+        if (cam != null)
+        {
+            // 카메라를 시작 위치로 즉시 배치
+            Vector3 initLook = ctx.Transform.position + Vector3.up * dragon.EntranceBreathCamLookElevation;
+            Vector3 initDir  = initLook - camStart;
+            cam.transform.position = camStart;
+            if (initDir.sqrMagnitude > 0.01f)
+                cam.transform.rotation = Quaternion.LookRotation(initDir, Vector3.up);
+        }
+
+        // 비행 루프 — 진행도에 맞춰 카메라를 U자 베지어 위에서 실시간 이동
         while (Vector3.Distance(ctx.Transform.position, targetPos) > 0.05f)
         {
             ct.ThrowIfCancellationRequested();
             ctx.Transform.position = Vector3.MoveTowards(ctx.Transform.position, targetPos, speed * Time.deltaTime);
 
-            // 브레스가 비행 경로를 따라 진행되며 바위를 하나씩 파괴
-            if (totalDist > 0.01f && rockCount > 0)
+            if (cam != null && totalDist > 0.01f)
             {
-                float progress       = 1f - Vector3.Distance(ctx.Transform.position, targetPos) / totalDist;
-                int   targetDestroyed = Mathf.Clamp(Mathf.FloorToInt(progress * rockCount), 0, rockCount);
-                while (destroyedCount < targetDestroyed)
-                {
-                    dragon.DestroyEntranceRock(destroyedCount);
-                    destroyedCount++;
-                }
+                float remaining = Vector3.Distance(ctx.Transform.position, targetPos);
+                float raw = Mathf.Clamp01(1f - remaining / totalDist);
+                float s   = raw * raw * (3f - 2f * raw); // smoothstep
+                float it  = 1f - s;
+
+                // 2차 베지어 위치
+                Vector3 camPos = it*it*camStart + 2f*it*s*ctrlPos + s*s*camEnd;
+                // 시선: 드래곤 현재 위치 추적 → 끝에서 하강 시선으로 전환
+                Vector3 lookAt = Vector3.Lerp(
+                    ctx.Transform.position + Vector3.up * dragon.EntranceBreathCamLookElevation,
+                    lookEnd, s);
+
+                cam.transform.position = camPos;
+                Vector3 dir = lookAt - camPos;
+                if (dir.sqrMagnitude > 0.01f)
+                    cam.transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
             }
 
             await UniTask.Yield(ct);
@@ -242,12 +280,15 @@ public class DragonDormantState : IMonsterState
 
         ctx.Transform.position = targetPos;
 
+        // 착지 위치 도달 즉시 하강 자세로 전환하고 브레스 해제 — 정지 없이 바로 착지 시작
+        PlayAnim(ctx, DescendStateName, 0.2f);
+
         if (breathVfx != null)
-            UnityEngine.Object.Destroy(breathVfx);
+            BossEffectPool.Release(breathVfx);
         dragon.StopEntranceBreathSfx();
     }
 
-    private static async UniTask DescendAndLandAsync(MonsterContext ctx, DragonBossMonster dragon, CancellationToken ct)
+    private static async UniTask DescendAndLandAsync(MonsterContext ctx, DragonBossMonster dragon, GameCameraController cam, CancellationToken ct)
     {
         float targetY     = DragonPatternFloorUtils.GetFloorY(ctx.Transform.position, ctx.Runtime.SpawnPosition.y);
         float fastSpeed   = dragon.EntranceDescendFastSpeed;
@@ -261,7 +302,11 @@ public class DragonDormantState : IMonsterState
 
         bool touchdownTriggered = false;
 
-        PlayAnim(ctx, DescendStateName, 0.15f);
+        // [하강 추적] U-아크가 이미 추적 위치에 도달했으므로 블렌드 없이 즉시 추적 시작
+        using var descentTrackCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (cam != null)
+            TrackCameraAsync(cam, ctx.Transform, dragon.EntranceDescentCamOffset, dragon.EntranceDescentCamLookOffset, 0f, descentTrackCts.Token)
+                .SuppressCancellationThrow().Forget();
 
         while (true)
         {
@@ -277,11 +322,11 @@ public class DragonDormantState : IMonsterState
                 break;
             }
 
-            // 착지 애니 전환 시점 — 클립 재생 시작 & 잔여 장애물 파괴
+            // 착지 애니 전환 시점 — 하강 추적 종료
             if (!touchdownTriggered && distToGround <= triggerHeight)
             {
                 touchdownTriggered = true;
-                dragon.TriggerRockDestruction();
+                descentTrackCts.Cancel();
                 PlayAnim(ctx, TouchdownStateName, 0.1f);
             }
 
@@ -302,7 +347,7 @@ public class DragonDormantState : IMonsterState
         // 착지 거리가 triggerHeight보다 짧은 경우 안전망
         if (!touchdownTriggered)
         {
-            dragon.TriggerRockDestruction();
+            descentTrackCts.Cancel();
             PlayAnim(ctx, TouchdownStateName, 0.1f);
         }
 
@@ -310,6 +355,77 @@ public class DragonDormantState : IMonsterState
 
         // 착지 즉시 Idle 전환 — 2단계 카메라 컷/HUD와 동시에 보여진다
         PlayAnim(ctx, ctx.Animation.idleStateName, ctx.Animation.crossFadeDuration);
+    }
+
+    /// <summary>
+    /// 현재 카메라 위치에서 endPos까지 2차 Bezier 아크를 따라 이동한다.
+    /// 컨트롤 포인트는 (start+end 중점 + arcCtrlOffset). 부드러운 U형 호를 만들려면 Y를 높인다.
+    /// </summary>
+    private static async UniTask BezierArcToCameraAsync(
+        GameCameraController cam,
+        Vector3 endPos, Vector3 endLookAt,
+        Vector3 arcCtrlOffset, float duration, CancellationToken ct)
+    {
+        Vector3    startPos    = cam.transform.position;
+        Vector3    startLookAt = startPos + cam.transform.forward * 20f;
+        Vector3    ctrlPos     = Vector3.Lerp(startPos, endPos, 0.5f) + arcCtrlOffset;
+        Vector3    ctrlLookAt  = Vector3.Lerp(startLookAt, endLookAt, 0.5f);
+        float      dur         = Mathf.Max(0.01f, duration);
+
+        for (float t = 0f; t < dur; t += Time.deltaTime)
+        {
+            ct.ThrowIfCancellationRequested();
+            float s  = Mathf.Clamp01(t / dur);
+            float sm = s * s * (3f - 2f * s); // smoothstep
+            float it = 1f - sm;
+
+            Vector3 pos    = it*it*startPos    + 2f*it*sm*ctrlPos    + sm*sm*endPos;
+            Vector3 lookAt = it*it*startLookAt + 2f*it*sm*ctrlLookAt + sm*sm*endLookAt;
+            Vector3 dir    = lookAt - pos;
+            cam.transform.position = pos;
+            if (dir.sqrMagnitude > 0.01f)
+                cam.transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
+            await UniTask.Yield(ct);
+        }
+
+        cam.transform.position = endPos;
+        Vector3 finalDir = endLookAt - endPos;
+        if (finalDir.sqrMagnitude > 0.01f)
+            cam.transform.rotation = Quaternion.LookRotation(finalDir, Vector3.up);
+    }
+
+    /// <summary>보간 진입 후 ct가 취소될 때까지 드래곤 위치 + 로컬 오프셋을 매 프레임 추적한다.</summary>
+    private static async UniTask TrackCameraAsync(GameCameraController cam, Transform target, Vector3 localOffset, Vector3 localLookOffset, float blendDuration, CancellationToken ct)
+    {
+        Vector3    fromPos = cam.transform.position;
+        Quaternion fromRot = cam.transform.rotation;
+
+        // 진입 보간
+        for (float t = 0f; t < blendDuration; t += Time.deltaTime)
+        {
+            ct.ThrowIfCancellationRequested();
+            float      k      = Mathf.Clamp01(t / blendDuration);
+            Vector3    toPos   = target.position + target.rotation * localOffset;
+            Vector3    lookAt  = target.position + target.rotation * localLookOffset;
+            Vector3    lookDir = lookAt - toPos;
+            Quaternion toRot   = lookDir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(lookDir, Vector3.up) : fromRot;
+            cam.transform.position = Vector3.Lerp(fromPos, toPos, k);
+            cam.transform.rotation = Quaternion.Slerp(fromRot, toRot, k);
+            await UniTask.Yield(ct);
+        }
+
+        // 실시간 추적 (ct 취소 = 착지 애니 시작 시점까지)
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            Vector3 trackPos = target.position + target.rotation * localOffset;
+            Vector3 lookAt   = target.position + target.rotation * localLookOffset;
+            Vector3 lookDir  = lookAt - trackPos;
+            cam.transform.position = trackPos;
+            if (lookDir.sqrMagnitude > 0.01f)
+                cam.transform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
+            await UniTask.Yield(ct);
+        }
     }
 
     private static float GetAnimClipLength(MonsterContext ctx, string stateName)

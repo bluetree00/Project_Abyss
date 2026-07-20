@@ -83,8 +83,6 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _entranceDescendFastSpeed = 35f;
     [Tooltip("등장 착지 애니메이션 재생 구간 속도 (m/s) — Landing_Touchdown 클립 재생 중 이 속도 유지")]
     [SerializeField] private float _entranceDescendSpeed = 5f;
-    [Tooltip("등장 브레스로 파괴할 진입로 바위들 (SM_grouped_cliffs_SM_Rock_31 + (1)~(6))")]
-    [SerializeField] private GameObject[] _entranceRockObjects;
     [Tooltip("지붕 파괴 임팩트 시점 생성할 브레스 VFX 프리팹")]
     [SerializeField] private GameObject _entranceBreathVfxPrefab;
     [Tooltip("브레스 VFX 생성 위치. 비워두면 드래곤 위치 사용")]
@@ -108,6 +106,32 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private Vector2 _entranceFlyInOffset = new Vector2(0f, 55f);
     [Tooltip("등장 비행 속도 (m/s)")]
     [SerializeField] private float _entranceFlyInSpeed = 25f;
+
+    [Header("Dragon — 등장 카메라 1: 브레스 (드래곤 상공)")]
+    [Tooltip("브레스 카메라 높이 — 드래곤 현재 Y + 이 값 (항상 드래곤보다 위에서 내려다봄)")]
+    [SerializeField] private float   _entranceBreathCamHeight        = 12f;
+    [Tooltip("브레스 카메라를 드래곤 비행방향 기준 우측으로 밀어내는 수평 거리 (m) — 클수록 측면 시점이 강해짐")]
+    [SerializeField] private float   _entranceBreathCamRightShift    = 18f;
+    [Tooltip("브레스 카메라 시선 목표: 드래곤 위치 기준 Y 오프셋 (0~3 권장 — 위에서 드래곤을 내려다보는 구도)")]
+    [SerializeField] private float   _entranceBreathCamLookElevation = 2f;
+    [Tooltip("현재 플레이어 카메라 → 브레스 카메라 전환 시간 (초)")]
+    [SerializeField] private float   _entranceBreathCamDuration      = 1.2f;
+    [Tooltip("드래곤이 착지 위치 위에 도달한 후 브레스 VFX를 추가 유지하는 시간 (초). 클수록 브레스가 더 길게 유지됨")]
+    [SerializeField] private float   _entranceBreathExtraHoldTime    = 1.0f;
+
+    [Header("Dragon — 등장 카메라 U-아크 (브레스 → 하강 연결)")]
+    [Tooltip("Bezier 아크 컨트롤 포인트 — 드래곤 비행방향 기준 로컬 오프셋 (X+=우측, X-=좌측, Y+=위). 음수 X값이 U자 좌측 스윙을 만든다")]
+    [SerializeField] private Vector3 _entranceArcCtrlOffset = new Vector3(-20f, 10f, 0f);
+    [Tooltip("U-아크 이동 시간 (초)")]
+    [SerializeField] private float   _entranceArcDuration    = 1.0f;
+
+    [Header("Dragon — 등장 카메라 2: 하강 추적 (드래곤 로컬 공간)")]
+    [Tooltip("하강 추적 카메라 오프셋 (드래곤 로컬 공간. Z+ = 진행방향 앞쪽, X+ = 오른쪽)")]
+    [SerializeField] private Vector3 _entranceDescentCamOffset     = new Vector3(8f, 10f, -6f);
+    [Tooltip("하강 추적 카메라 시선 오프셋 (드래곤 로컬 공간)")]
+    [SerializeField] private Vector3 _entranceDescentCamLookOffset = new Vector3(0f, 2f, 0f);
+
+    [Header("Dragon — 등장 바람 이펙트")]
     [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
     [SerializeField] private GameObject _entranceWindEffectPrefab;
 
@@ -173,8 +197,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public Vector2 EntranceFlyInOffset           => _entranceFlyInOffset;
     public float   EntranceFlyInSpeed            => _entranceFlyInSpeed;
     public float   EntranceBreathPitchDeg        => _entranceBreathPitchDeg;
-    public int     EntranceRockCount             => _entranceRockObjects?.Length ?? 0;
-    public GameObject EntranceWindEffectPrefab   => _entranceWindEffectPrefab;
+    public float   EntranceBreathCamHeight        => _entranceBreathCamHeight;
+    public float   EntranceBreathCamRightShift    => _entranceBreathCamRightShift;
+    public float   EntranceBreathCamLookElevation => _entranceBreathCamLookElevation;
+    public float   EntranceBreathCamDuration      => _entranceBreathCamDuration;
+    public float   EntranceBreathExtraHoldTime    => _entranceBreathExtraHoldTime;
+    public Vector3 EntranceArcCtrlOffset          => _entranceArcCtrlOffset;
+    public float   EntranceArcDuration            => _entranceArcDuration;
+    public Vector3 EntranceDescentCamOffset       => _entranceDescentCamOffset;
+    public Vector3 EntranceDescentCamLookOffset   => _entranceDescentCamLookOffset;
+    public GameObject EntranceWindEffectPrefab    => _entranceWindEffectPrefab;
     public float   EntranceBreathSfxLeadTime  => _entranceBreathSfxLeadTime;
 
     // ── IBoss ─────────────────────────────────────────────
@@ -531,6 +563,9 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             Vector3 dir = instigator.transform.position - transform.position;
             _dragonBB.SetHitDirection(dir, transform.forward);
         }
+
+        if (_dragonBB != null && _dragonBB.IsSummonGated) return;
+
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
 
         // 지상 피격 시 히트스톱 (poise 파괴 = 강타격, 일반 = 약타격)
@@ -546,6 +581,15 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     protected override void OnDamageTaken()
     {
         if (_dragonBB == null) return;
+
+        // 소환 임계값 돌파 시 무적 게이트 설정 — 소환 패턴 완료까지 이후 데미지 차단
+        float ratio = HpRatio;
+        if ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
+            (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
+            (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f))
+        {
+            _dragonBB.SetSummonGated(true);
+        }
 
         // 공중 상태 또는 쉴드가 이미 파괴된 상태에서는 GetHit 스킵
         if (_dragonBB.BodyState == BodyState.Airborne)
@@ -808,35 +852,15 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
             rot = Quaternion.LookRotation(aimDir, Vector3.up);
         }
 
-        GameObject vfx = Instantiate(_entranceBreathVfxPrefab, pos, rot);
-        vfx.transform.SetParent(transform, true);
-        return vfx;
+        return BossEffectPool.Spawn(_entranceBreathVfxPrefab, pos, rot, transform, true);
     }
 
     /// <summary>등장 브레스 VFX가 파괴되는 시점에 함께 호출 — 사운드가 VFX보다 길게 남지 않도록 정지.</summary>
     public void StopEntranceBreathSfx()
         => Managers.Sound?.StopEffect(_entranceBreathAudioSource, _entranceBreathSfx);
 
-    /// <summary>등장 비행 중 브레스 도달 시 호출 — 진입로를 막던 바위들을 전부 파괴.</summary>
-    public void TriggerRockDestruction()
-    {
-        if (_entranceRockObjects == null) return;
-
-        foreach (var rock in _entranceRockObjects)
-            if (rock != null) rock.SetActive(false);
-    }
-
-    /// <summary>등장 비행 중 브레스가 스치는 진행도에 맞춰 바위를 하나씩 파괴.</summary>
-    public void DestroyEntranceRock(int index)
-    {
-        if (_entranceRockObjects == null || index < 0 || index >= _entranceRockObjects.Length) return;
-
-        var rock = _entranceRockObjects[index];
-        if (rock != null) rock.SetActive(false);
-    }
-
     /// <summary>보스 이름 HUD 표시와 함께 호출 — 화면 전체 바람 이펙트를 생성한다. HUD 소멸 시 호출자가 Destroy한다.</summary>
     public GameObject SpawnEntranceWindVfx()
-        => _entranceWindEffectPrefab != null ? Instantiate(_entranceWindEffectPrefab) : null;
+        => _entranceWindEffectPrefab != null ? BossEffectPool.Spawn(_entranceWindEffectPrefab, Vector3.zero, Quaternion.identity) : null;
 }
 }

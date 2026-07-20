@@ -26,6 +26,7 @@ public sealed class GameFlow
         { Define.Scene.Tutorial,       GameFlowState.Tutorial  },
         { Define.Scene.BaseCamp,       GameFlowState.BaseCamp  },
         { Define.Scene.Lobby,          GameFlowState.Lobby     },
+        { Define.Scene.Game_Intro,     GameFlowState.InGame    },
         { Define.Scene.GameScene_Ch1,  GameFlowState.InGame    },
         { Define.Scene.GameScene_Ch2,  GameFlowState.InGame    },
         { Define.Scene.GameScene_Ch3,  GameFlowState.InGame    },
