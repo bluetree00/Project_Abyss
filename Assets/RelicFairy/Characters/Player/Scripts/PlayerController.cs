@@ -342,6 +342,13 @@ public class PlayerController : CharacterBase
     // Input / Movement State
     //============================================================
 
+    // 이동 기준으로 삼는 카메라 수평각. 입력을 누르고 있는 동안 고정된다(아래 CheckMovementInput 참조).
+    private float _moveBasisYaw;
+    private Vector2 _lastMoveInput;
+
+    // 입력이 "바뀌었다"고 볼 최소 변화량(제곱). 아날로그 스틱 미세 흔들림으로 기준이 재설정되지 않게 한다.
+    private const float MoveBasisRelatchThresholdSqr = 0.04f;   // 약 0.2 변화
+
     // PlayerController.cs (입력 시 클릭 위치 저장)
     private Vector3? _lastClickedPosition;
 
@@ -1384,7 +1391,8 @@ public class PlayerController : CharacterBase
         inputActions.Player.ESkill.performed += _ => InputBuffer.Push(Command.ESkill);
         inputActions.Player.RSkill.performed += _ => InputBuffer.Push(Command.RSkill);
 
-        inputActions.Player.Jump.performed += _ => ProcessJump();
+        // [점프 폐기] 자유 점프 제거 — 스페이스 입력을 점프에 연결하지 않는다. 공중 상태(낙하·넉백)는 유지.
+        // ProcessJump/JumpAbility.Jump는 이 구독이 유일한 진입점이라 도달 불가(사장) 상태가 된다.
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
         inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
@@ -1537,7 +1545,17 @@ public class PlayerController : CharacterBase
         // 눕거나 거의 수직이 돼도(피치 변화) 조작이 어긋나지 않는다 — 기존 월드축 고정의 의도를 유지.
         // heading이 0이면 월드축과 완전히 동일하므로 기존 구간(던전 등)의 조작감은 변하지 않는다.
         float camYaw = cinemachineCamera != null ? cinemachineCamera.m_XAxis.Value : 0f;
-        moveDirection = (Quaternion.Euler(0f, camYaw, 0f) * new Vector3(input.x, 0f, input.y)).normalized;
+
+        // [기준 고정] 카메라가 연출로 회전하는 동안 기준을 매 프레임 갱신하면, 입력을 누르고 있는 것만으로
+        // 이동 방향이 카메라를 따라 휩쓸려 조작이 어긋난다(계단에서 시선이 도는 동안 특히).
+        // 그래서 입력이 유지되는 동안에는 '누르기 시작한 시점의 카메라 기준'을 그대로 쓰고,
+        // 입력을 놓거나 방향을 바꿀 때만 현재 카메라 기준으로 다시 잡는다.
+        // → 회전 중에도 캐릭터는 일관된 월드 방향으로 계속 이동한다.
+        if (input.sqrMagnitude < 0.0001f || (input - _lastMoveInput).sqrMagnitude > MoveBasisRelatchThresholdSqr)
+            _moveBasisYaw = camYaw;
+        _lastMoveInput = input;
+
+        moveDirection = (Quaternion.Euler(0f, _moveBasisYaw, 0f) * new Vector3(input.x, 0f, input.y)).normalized;
     }
 
     /// <summary>

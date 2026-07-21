@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: BlockPalette_Castle
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
   themeMatch: Sacred
+  wallMode: 1
+  wallHeight: 11
+  hasCeiling: 1
+  lighting:
+    wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    wallLightSpacing: 4
+    wallLightHeightRatio: 0.5
+    maxWallLights: 24
   blocks:
   - {fileID: 11400000, guid: 3fb0670adf3ea8444937443f20187802, type: 2}
   - {fileID: 11400000, guid: bce95e81718979c46a676d9eb5a3a202, type: 2}

@@ -59,8 +59,30 @@ public sealed class DecorationHandler : ITokenHandler
         if (entry.scale != 1f)
             go.transform.localScale *= entry.scale;
 
+        // 바닥 스냅 — 렌더러 바운즈 최저점을 배치 지면(pos.y)에 맞춘다.
+        // 피벗이 메시 중심인 소품(잔해·제단 등)이 공중에 뜨는 문제를 프리팹 수정 없이 해결.
+        // (스케일 적용 뒤 계산해야 정확)
+        if (entry.snapToGround)
+            SnapBottomToY(go, pos.y);
+
         AttachNavMeshIgnore(go);
         DissolveEffect.PlayAppearAsync(go, 0.6f, ctx.Ct).Forget();
+    }
+
+    /// <summary>
+    /// 오브젝트의 렌더러 바운즈 최저점을 지면 y에 정렬한다(월드 공간).
+    /// 렌더러가 없으면 아무것도 하지 않는다. 파티클 전용 등은 카탈로그에서 snapToGround를 끄면 된다.
+    /// </summary>
+    private static void SnapBottomToY(GameObject go, float groundY)
+    {
+        var rends = go.GetComponentsInChildren<Renderer>();
+        if (rends.Length == 0) return;
+
+        var b = rends[0].bounds;
+        for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+
+        float delta = groundY - b.min.y;                 // 바닥 최저점을 groundY로
+        go.transform.position += new Vector3(0f, delta, 0f);
     }
 
     // 인접 4방향 중 Wall이 있는 방향의 반대(방 안쪽)를 반환. Wall 없으면 zero.

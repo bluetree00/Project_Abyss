@@ -275,8 +275,17 @@ public class UIManager
         if (_popupStack.Count == 0) return;
 
         UI_Popup popup = _popupStack.Pop();
-        _uiObjects.Remove(popup.gameObject.name);
         _order--;
+
+        // 이미 파괴된 팝업(씬 전환 중 자체 파괴 등)은 스택에서 빼기만 한다.
+        // gameObject 접근 시 MissingReferenceException이 나므로 반드시 먼저 검사.
+        if (popup == null)
+        {
+            RefreshGameplayBlock();
+            return;
+        }
+
+        _uiObjects.Remove(popup.gameObject.name);
         RefreshGameplayBlock();
 
         if (immediate)

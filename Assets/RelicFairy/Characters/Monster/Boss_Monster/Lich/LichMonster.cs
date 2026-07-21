@@ -27,7 +27,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
     private const float Phase2SpeedMult      = 1.3f;
     private const float Phase2AttackMult     = 1.25f;
     private const float Phase2HpRestoreRatio = 0.12f; // Phase 2 진입 시 최대 HP의 12% 회복
-    private const int   Phase2UnlockAt       = 3;     // 3차+ 조우부터 Phase 2 해금
+    private const int   Phase2UnlockAt       = 3;     // (구·디버그) 조우 횟수 기반 해금 임계. 출시 게이트는 BossSealService.
+    private const string SealBossId          = "lich"; // 봉인 서비스 키(메타 영구 페이즈2 해금)
     private const float RetreatDuration      = 2.5f;
     private const float Phase2PreviewDuration = 12f; // 2차 조우 Phase 2 미리보기 노출 시간 (GDD: 10~20s)
 
@@ -126,8 +127,8 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 #if UNITY_EDITOR
             if (_debugOverrideEncounter) return _debugSessionCount >= Phase2UnlockAt;
 #endif
-            // 출시 게이트 — 실제 투입 시 해금 정책을 여기에 반영한다.
-            return (BackendGameData.Instance?.Data?.lichEncounterCount ?? 0) >= Phase2UnlockAt;
+            // 출시 게이트 — 초회 클리어 시 봉인이 해제되면 이후 조우부터 페이즈2 해금(메타 영구).
+            return BossSealService.IsSealBroken(SealBossId);
         }
     }
 
@@ -439,7 +440,11 @@ public class LichMonster : MonsterBase, IBoss, IBossEntrance
 
         if (!IsPhase2Unlocked)
         {
-            // 1·2차 조우: 퇴각 연출 후 보스방 완료
+            // 봉인 상태 격파 = 초회 클리어 → 봉인 해제(메타 영구). 이후 조우부터 페이즈2가 열린다.
+            // (해제는 다음 조우부터 반영되므로 지금 판정 흐름은 그대로 '봉인 퇴각' 연출로 진행)
+            BossSealService.BreakSeal(SealBossId);
+
+            // 봉인 상태: 퇴각(사라짐) 연출 후 보스방 완료
             DoRetreatAsync(destroyCancellationToken).Forget();
             return;
         }

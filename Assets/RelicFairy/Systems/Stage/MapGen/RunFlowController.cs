@@ -389,15 +389,24 @@ public class RunFlowController : MonoBehaviour
 
         // 출구 문 봉인(석문 낙하) + 입구 잠금.
         void SealRoom() { CreateSealedGates(); if (result.hasEntrance) LockEntrance(result.entrance); }
+        // 봉인 없이 출구만 세운다(잠그지 않음) — 비전투 방(상점/재련소)은 자유 통행.
+        void OpenGatesOnly() { CreateGatesUnsealed(); }
 
-        // 신규 전투방이면 방 진입 연출 — 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
-        // (몬스터 Activate는 이 await 뒤에 있는 웨이브 분기에서 실행되므로 연출 종료 전까지 스폰되지 않는다)
-        bool freshCombat = !restoreCleared && result.roomGO != null
-                           && result.roomGO.GetComponent<RoomWaveController>() != null;
+        // 실제 전투가 있는 방인가 = 스포너로 RoomWaveController가 붙은 방.
+        // 봉인의 목적은 '전투 중 도주 차단'이므로, 이 여부가 봉인 여부를 결정한다.
+        //   - 전투방(Normal/Elite/PreBoss/Boss, Event 전투 챌린지): 봉인 → 클리어까지 가둠
+        //   - 비전투방(Shop/Crucible, 비전투 Event): 봉인 안 함 → 즉시 봉인·해제하던 깜빡임 제거
+        // (방 종류 무관하게 무조건 봉인 → 상점·보스에서도 강제 작동하던 문제 해소)
+        bool hasCombat = result.roomGO != null
+                         && result.roomGO.GetComponent<RoomWaveController>() != null;
+        bool freshCombat = !restoreCleared && hasCombat;
+
         var introCam    = GameCameraController.Instance;
         var introPlayer = GameRunBootstrapper.Instance?.Run?.Player;
         if (freshCombat && introCam != null)
         {
+            // 신규 전투방: 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
+            // (몬스터 Activate는 이 await 뒤 웨이브 분기에서 실행 → 연출 종료 전까지 스폰 안 됨)
             await introCam.PlayRoomEntryIntroAsync(
                 result.roomGO.transform.position,
                 introPlayer != null ? introPlayer.transform : null,
@@ -406,9 +415,13 @@ public class RunFlowController : MonoBehaviour
                 onWide: SealRoom, ct);
             if (this == null || ct.IsCancellationRequested) return;
         }
+        else if (hasCombat)
+        {
+            SealRoom();          // 이어하기 클리어 전 전투방 등 — 연출 없이 봉인
+        }
         else
         {
-            SealRoom();
+            OpenGatesOnly();     // 비전투방 — 문은 세우되 봉인하지 않는다
         }
 
         if (restoreCleared)
@@ -625,6 +638,19 @@ public class RunFlowController : MonoBehaviour
             _gates.Add(CreateSealedGate(slot));
     }
 
+    /// <summary>
+    /// 비전투 방(상점/재련소 등)용 — 출구 게이트를 만들되 <b>석문 낙하 봉인을 하지 않는다.</b>
+    /// 곧바로 HandleRoomCleared→RevealGates가 armed로 전환하므로, 봉인 연출 없이 자유 통행이 된다.
+    /// (모든 방을 무조건 봉인해 상점·보스에서도 석문이 떨어지고, 같은 프레임에 해제돼 깜빡이던 문제 해소)
+    /// </summary>
+    private void CreateGatesUnsealed()
+    {
+        ClearGates();
+        if (_current?.exits == null) return;
+        foreach (var slot in _current.exits)
+            _gates.Add(CreateSealedGate(slot, sealDoor: false));
+    }
+
     /// <summary>클리어 시 롤된 출구를 슬롯에 매칭해 색 전환+글로우로 공개하고 통과 가능하게 한다.</summary>
     private void RevealGates(List<DoorPlan> exits)
     {
@@ -634,7 +660,8 @@ public class RunFlowController : MonoBehaviour
         // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
     }
 
-    private GateView CreateSealedGate(ProcExitSlot slot)
+    /// <param name="sealDoor">true면 봉인 석문을 낙하시켜 가둔다(전투방). false면 석문 없이 통과 대기(비전투방).</param>
+    private GateView CreateSealedGate(ProcExitSlot slot, bool sealDoor = true)
     {
         var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker, withPortal: true);
 
@@ -649,8 +676,9 @@ public class RunFlowController : MonoBehaviour
         var portal = go.transform.Find("GatePortalVfx");
 
         // 출구 봉인 석문 — 전투 시작 시 웅장하게 낙하해 봉인(플레이어가 보는 앞쪽). 클리어 시 위로 열리며 포탈 공개.
+        // 비전투방(sealDoor=false)은 석문을 만들지 않는다 → 봉인 낙하/즉시해제 깜빡임 없음.
         float oh   = MarkerH(slot);
-        var   door = SpawnSealDoor(go.transform, MarkerW(slot), oh);
+        var   door = sealDoor ? SpawnSealDoor(go.transform, MarkerW(slot), oh) : null;
         if (door != null && marker != null) marker.enabled = false; // 석문이 시각 담당(색 패널 숨김)
 
         var view = new GateView { gate = gate, marker = marker, blocker = blocker, portal = portal != null ? portal.gameObject : null, door = door, openH = oh };

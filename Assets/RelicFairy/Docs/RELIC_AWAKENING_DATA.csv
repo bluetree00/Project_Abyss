@@ -1,4 +1,4 @@
-index,category_id,level,stat_type,value,cost,description
+﻿index,category_id,level,stat_type,value,cost,description
 1001,sword,1,AttackPower,3,50,검의 각성 1단계 — 공격력 +3
 1002,sword,2,AttackPower,3,100,검의 각성 2단계 — 공격력 +3
 1003,sword,3,AttackPower,4,150,검의 각성 3단계 — 공격력 +4

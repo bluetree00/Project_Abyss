@@ -17,6 +17,17 @@ public class DefaultJumpAbility : IJumpAbility
     // 플로팅: rideHeight + 이 값까지 적중하면 접지로 간주(호버 허용오차).
     private const float FloatGroundTolerance = 0.15f;
 
+    // 접지(호버) 중 허용할 최대 상승 속도(m/s).
+    // 대시처럼 빠른 속도로 경사/단차에 진입하면 지면이 순식간에 발밑으로 솟아 _floatHitDist가 급감하고,
+    // 스프링의 error(=rideHeight-hitDist)가 치솟아 캐릭터를 위로 쏘아올린다(램프 발사).
+    // 상승 속도에 상한을 둬 계단·경사 올라타기는 유지하면서 발사만 막는다.
+    // 점프는 _isGrounded=false 구간이라 이 클램프의 영향을 받지 않는다.
+    private const float MaxGroundedRiseSpeed = 4f;
+
+    // 호버 스프링이 낼 수 있는 '중력 상쇄분 위' 추가 상승 가속도 상한(m/s²).
+    // 단차/경사를 밀어올리기엔 충분하고, 캐릭터를 공중으로 쏘아올리기엔 부족한 값.
+    private const float MaxSpringLiftAccel = 25f;
+
     //============================================================
     // Private Fields
     //============================================================
@@ -223,6 +234,10 @@ public class DefaultJumpAbility : IJumpAbility
             //  · 스텝업(error>0): support↑ → 단차 위로 밀어올림.
             //  · 스텝다운(error<0): support가 0으로 클램프 → 중력이 자연스럽게 낙하시키고,
             //    바닥에 가까워지면 support(+ -vy 댐핑)가 다시 살아나 받아냄(쿵 박힘 방지).
+            // 램프 발사 방지: 접지 중 상승 속도 상한(누적 차단).
+            if (rb.linearVelocity.y > MaxGroundedRiseSpeed)
+                rb.linearVelocity = new Vector3(rb.linearVelocity.x, MaxGroundedRiseSpeed, rb.linearVelocity.z);
+
             float gAbs    = Mathf.Abs(_data.gravity);
             rb.AddForce(Vector3.down * gAbs, ForceMode.Acceleration);   // 중력(항상)
 
@@ -230,6 +245,14 @@ public class DefaultJumpAbility : IJumpAbility
             float vy      = rb.linearVelocity.y;
             float support = error * _data.floatSpring - vy * _data.floatDamper + gAbs * rb.mass;
             if (support < 0f) support = 0f;   // 아래로 당기지 않음 — 하강은 중력 몫
+
+            // 스프링 출력 상한 — 고속으로 경사에 진입하면 지면이 순식간에 솟아 error가 치솟고,
+            // support가 캐릭터를 발사할 만큼 커진다. 속도 클램프만으로는 막히지 않는다:
+            // 발사되는 순간 _isGrounded가 풀려 이 분기(=클램프) 자체를 안 타기 때문.
+            // '중력 상쇄 + 제한된 추가 상승 가속'까지만 허용해 단차 오르기는 유지하고 발사만 차단한다.
+            float maxSupport = (gAbs + MaxSpringLiftAccel) * rb.mass;
+            if (support > maxSupport) support = maxSupport;
+
             rb.AddForce(Vector3.up * support, ForceMode.Force);
             return;
         }
