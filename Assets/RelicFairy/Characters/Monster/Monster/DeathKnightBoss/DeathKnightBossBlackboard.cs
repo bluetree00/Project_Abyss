@@ -46,6 +46,11 @@ public class DeathKnightBossBlackboard
     // ── 무적 ─────────────────────────────────────────────
     public bool IsInvincible { get; private set; }
 
+    // ── 가디언 쉴드 (검 소환 패턴 — 같은 색 검 파괴 시 활성) ──
+    public bool    GuardianShieldActive { get; private set; }
+    public Vector3 GuardianShieldCenter { get; private set; }
+    public float   GuardianShieldRadius { get; private set; }
+
     // ── Phase1 고정 위치 (Phase2 텔레포트용) ──────────────
     public Vector3 Phase1FixedPosition { get; private set; }
     public bool    HasPhase1Position   { get; private set; }
@@ -53,6 +58,13 @@ public class DeathKnightBossBlackboard
     // ── 공개 API ──────────────────────────────────────────
 
     public void SetInvincible(bool value) => IsInvincible = value;
+
+    public void SetGuardianShield(bool active, Vector3 center = default, float radius = 0f)
+    {
+        GuardianShieldActive = active;
+        GuardianShieldCenter = center;
+        GuardianShieldRadius = radius;
+    }
 
     public void SetPhase1FixedPosition(Vector3 pos)
     {
@@ -68,8 +80,11 @@ public class DeathKnightBossBlackboard
         Armor             = MaxArmor;
         IsArmorBroken     = false;
         SwordColor        = DKSwordColor.White;
-        IsInvincible      = false;
-        HasPhase1Position = false;
+        IsInvincible         = false;
+        HasPhase1Position    = false;
+        GuardianShieldActive = false;
+        GuardianShieldCenter = Vector3.zero;
+        GuardianShieldRadius = 0f;
     }
 
     /// <summary>검 색상을 White↔Black 반전한다.</summary>

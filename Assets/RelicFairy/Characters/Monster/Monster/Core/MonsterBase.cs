@@ -492,12 +492,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         const float playerRadius = 0.35f;
         Vector3 toMonster = transform.position - _runtime.PlayerTarget.position;
         toMonster.y = 0f;
-        float dist = toMonster.magnitude;
         float minSep = _agent.radius + playerRadius;
 
-        if (dist >= minSep || dist < 0.001f) return;
+        // sqrMagnitude로 먼저 체크 — 겹치지 않는 대부분의 경우 sqrt 생략
+        float sqrDist = toMonster.sqrMagnitude;
+        if (sqrDist >= minSep * minSep || sqrDist < 0.001f * 0.001f) return;
 
-        _agent.nextPosition = transform.position + toMonster.normalized * (minSep - dist);
+        float dist = Mathf.Sqrt(sqrDist);
+        _agent.nextPosition = transform.position + (toMonster / dist) * (minSep - dist);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -569,6 +571,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// </summary>
     /// <summary>HP가 0 이하가 됐을 때 호출. 기본 동작은 DieState 전환. 보스에서 퇴각 등으로 오버라이드 가능.</summary>
     protected virtual void OnFatalDamage() => ChangeState<DieState>();
+
+    /// <summary>파생 클래스에서 _runtime.CurrentHp를 직접 수정한 후 HP바·이벤트를 갱신한다.</summary>
+    protected void NotifyHpChanged()
+    {
+        if (_runtime == null) return;
+        int effMax = EffectiveMaxHp;
+        _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
+        OnHPChanged?.Invoke(_runtime.CurrentHp, effMax);
+    }
 
     protected virtual void OnDamageTaken()
     {

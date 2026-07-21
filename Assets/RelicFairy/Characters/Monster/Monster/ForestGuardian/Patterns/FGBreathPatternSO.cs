@@ -1,3 +1,5 @@
+using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace RelicFairy.Monster
@@ -322,7 +324,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         Vector3 pos = ctx.Transform.position;
         pos.y += 0.02f;
 
-        _warningGO = Object.Instantiate(Data.warningPrefab, pos, ctx.Transform.rotation);
+        _warningGO = Managers.ObjectPooler.SpawnFromPrefab(Data.warningPrefab, ObjectPoolerManager.PoolType.Effect, pos, ctx.Transform.rotation);
         // 피벗이 근거리 끝 → scale Z = 사정거리, X = 폭
         _warningGO.transform.localScale = new Vector3(Data.width, 1f, Data.range);
 
@@ -342,7 +344,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     private void DespawnWarning()
     {
         if (_warningGO == null) return;
-        Object.Destroy(_warningGO);
+        Managers.ObjectPooler.Despawn(_warningGO);
         _warningGO   = null;
         _rectWarning = null;
     }
@@ -355,7 +357,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     {
         if (Data.breathVfxPrefab != null)
         {
-            _breathVfxGO = Object.Instantiate(Data.breathVfxPrefab);
+            _breathVfxGO = Managers.ObjectPooler.SpawnFromPrefab(Data.breathVfxPrefab, ObjectPoolerManager.PoolType.Effect, ctx.Transform.position, Quaternion.identity);
             UpdateBreathVfxTransform(ctx);
 
             // Phase 2에서 파티클 VFX를 애니메이션 속도와 동기화 후 Play
@@ -414,12 +416,24 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 maxLifetime = Mathf.Max(maxLifetime, ps.main.startLifetime.constantMax);
             }
 
-            Object.Destroy(_breathVfxGO, maxLifetime > 0f ? maxLifetime + 0.5f : 0f);
+            var captured = _breathVfxGO;
             _breathVfxGO = null;
+            ScheduledDespawnAsync(captured, maxLifetime > 0f ? maxLifetime + 0.5f : 0f).Forget();
         }
 
         Managers.Sound?.StopLoopingEffect(_beamAudioSource);
         _beamAudioSource = null;
+    }
+
+    private static async UniTaskVoid ScheduledDespawnAsync(GameObject go, float delay)
+    {
+        try
+        {
+            if (delay > 0f)
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), cancellationToken: go.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException) { return; }
+        Managers.ObjectPooler?.Despawn(go);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

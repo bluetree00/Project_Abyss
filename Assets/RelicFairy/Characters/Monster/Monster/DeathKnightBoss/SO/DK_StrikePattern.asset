@@ -38,7 +38,7 @@ MonoBehaviour:
   swordHeight: 1
   swordBobAmplitude: 0.25
   swordBobSpeed: 1.5
-  swordHp: 30
+  swordHp: 300
   swordScale: 3.5
   moveToCenterTime: 2.5
   tileLayerDelay: 0.4

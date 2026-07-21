@@ -34,6 +34,7 @@ public class DKComboRunner
     private BossPatternSO                 _lastFiredAttack;
     private float                         _lastFiredTime;
     private bool                          _currentComboUsePhase1Position;
+    private BossPatternSO                 _lastPickedInCombo;
 
     public bool  IsPatternActive               { get; private set; }
     public float PatternBreakCooldown          => _breakCooldown;
@@ -80,11 +81,12 @@ public class DKComboRunner
     /// <summary>보스 풀 재사용(OnEnable) 시 호출.</summary>
     public void Reset()
     {
-        _breakCooldown   = 0f;
-        _wasInPattern    = false;
+        _breakCooldown     = 0f;
+        _wasInPattern      = false;
         _comboQueue.Clear();
-        _lastFiredAttack = null;
-        IsPatternActive  = false;
+        _lastFiredAttack   = null;
+        _lastPickedInCombo = null;
+        IsPatternActive    = false;
     }
 
     // ── 메인 틱 ─────────────────────────────────────────────
@@ -129,38 +131,36 @@ public class DKComboRunner
         if (!inPattern && _comboQueue.Count == 0 &&
             _breakCooldown <= 0f && _isAlive() && _isInRange() && !_isStaggered())
         {
-            var combo = SelectComboConfig();
-            if (combo != null)
-            {
-                BuildComboQueue(combo.comboCount);
-                FireNextFromQueue();
-            }
+            TryFireNext();
         }
     }
 
-    // ── 콤보 설정 선택 ───────────────────────────────────────
+    // ── 패턴/콤보 선택 후 발동 ───────────────────────────────
 
     /// <summary>
-    /// patternEntries 의 DKComboConfigSO 중 가중치 기반 랜덤 선택.
-    /// 선택 결과의 usePhase1Position을 _currentComboUsePhase1Position에 캡처한다.
+    /// patternEntries에서 DKComboConfigSO(풀 기반)와 직접 BossPatternSO를 통합 가중치로 선택해 발동.
     /// </summary>
-    private DKComboConfigSO SelectComboConfig()
+    private void TryFireNext()
     {
-        if (_config?.patternEntries == null || _config.patternEntries.Count == 0) return null;
+        if (_config?.patternEntries == null || _config.patternEntries.Count == 0) return;
 
+        // ① 전체 가중치 집계
         float total = 0f;
         foreach (var entry in _config.patternEntries)
         {
             if (entry?.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
             foreach (var p in entry.patterns)
             {
-                var c = p as DKComboConfigSO;
-                if (c != null && c.CanExecute(_ctx) && c.usePhase1Position)
+                if (p == null || !p.CanExecute(_ctx)) continue;
+                if (p is DKComboConfigSO c)
                     total += Mathf.Max(0f, c.weight);
+                else if (p.GetRuntimeState() != null)
+                    total += ApplyRepeatPenalty(p);
             }
         }
-        if (total <= 0f) return null;
+        if (total <= 0f) return;
 
+        // ② 가중치 롤
         float roll = UnityEngine.Random.Range(0f, total);
         float acc  = 0f;
         foreach (var entry in _config.patternEntries)
@@ -168,17 +168,35 @@ public class DKComboRunner
             if (entry?.patterns == null || !entry.EvaluateConditions(_ctx)) continue;
             foreach (var p in entry.patterns)
             {
-                var c = p as DKComboConfigSO;
-                if (c == null || !c.CanExecute(_ctx) || !c.usePhase1Position) continue;
-                acc += Mathf.Max(0f, c.weight);
+                if (p == null || !p.CanExecute(_ctx)) continue;
+
+                float w;
+                if (p is DKComboConfigSO c)
+                    w = Mathf.Max(0f, c.weight);
+                else if (p.GetRuntimeState() != null)
+                    w = ApplyRepeatPenalty(p);
+                else
+                    continue;
+
+                acc += w;
                 if (roll <= acc)
                 {
-                    _currentComboUsePhase1Position = true;
-                    return c;
+                    if (p is DKComboConfigSO selectedCombo)
+                    {
+                        _currentComboUsePhase1Position = selectedCombo.usePhase1Position;
+                        BuildComboQueue(selectedCombo.comboCount);
+                    }
+                    else
+                    {
+                        // 직접 패턴 — 풀 없이 1회 발동
+                        _comboQueue.Clear();
+                        _comboQueue.Enqueue(p);
+                    }
+                    FireNextFromQueue();
+                    return;
                 }
             }
         }
-        return null;
     }
 
     // ── 콤보 큐 구성 ────────────────────────────────────────
@@ -186,11 +204,15 @@ public class DKComboRunner
     private void BuildComboQueue(int count)
     {
         _comboQueue.Clear();
+        _lastPickedInCombo = null;
         for (int i = 0; i < count; i++)
         {
             var attack = SelectAttack();
             if (attack != null)
+            {
                 _comboQueue.Enqueue(attack);
+                _lastPickedInCombo = attack;
+            }
         }
     }
 
@@ -225,6 +247,8 @@ public class DKComboRunner
 
         if (total <= 0f)
         {
+            foreach (var p in pool)
+                if (p != null && p.CanExecute(_ctx) && p != _lastPickedInCombo) return p;
             foreach (var p in pool)
                 if (p != null && p.CanExecute(_ctx)) return p;
             return null;
@@ -265,6 +289,8 @@ public class DKComboRunner
 
     private float ApplyRepeatPenalty(BossPatternSO pattern)
     {
+        if (pattern == _lastPickedInCombo)
+            return 0f;
         float w = pattern.weight;
         if (_config != null && _lastFiredAttack == pattern)
         {

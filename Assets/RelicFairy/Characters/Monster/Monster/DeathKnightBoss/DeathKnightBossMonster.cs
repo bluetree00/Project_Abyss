@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -41,6 +42,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("SwordColor.Black일 때 재생할 오라 프리팹 (Aura_Dark_LWRP)")]
     [SerializeField] private GameObject _blackAuraPrefab;
 
+    [Header("DeathKnight — 스테인드 글라스 (검 색상 연동)")]
+    [Tooltip("SM_GlassWindowCathedral_01a_2 (1)(2)(3) — Black 시 보라로 틴트, White 시 원본 복원")]
+    [SerializeField] private Renderer[] _windowRenderers;
+
     [Header("DeathKnight — 콤보 공격 풀")]
     [SerializeField] private List<BossPatternSO> _attackPool;
 
@@ -56,6 +61,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
     [Header("DeathKnight — 2페이즈 광역 공격 풀")]
     [SerializeField] private List<BossPatternSO> _phase2AreaPool;
+
+    [Header("DeathKnight — 2페이즈 패시브 공격 패턴")]
+    [SerializeField] private DKSoulSpearPatternSO   _passiveSoulSpear;
+    [SerializeField] private DKPhantomRushPatternSO _passivePhantomRush;
 
     [Header("DeathKnight — 1페이즈 고정 위치 앵커 (비워두면 초기 위치 자동 사용)")]
     [SerializeField] private Transform _phase1AnchorTransform;
@@ -77,8 +86,14 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float      _entranceCameraReturnDuration  = 1.2f;
     [Tooltip("보스 이름 HUD 등장과 함께 표시할 화면 전체 바람 이펙트 프리팹")]
     [SerializeField] private GameObject _entranceWindEffectPrefab;
-    [Tooltip("Attack1 스윙 적중 시점에 검 위치에서 재생할 슬래시 이펙트 (Basic Slash Blue)")]
-    [SerializeField] private GameObject _entranceSlashVfxPrefab;
+    [Tooltip("Attack1 스윙 적중 시점에 재생할 슬래시 사운드")]
+    [SerializeField] private AudioClip  _entranceSlashSfx;
+    [Tooltip("프롭(의자 등)이 날아갈 때 재생할 사운드")]
+    [SerializeField] private AudioClip  _entrancePropFlySfx;
+    [Tooltip("검 충격 시점에 보스 발 위치에서 원형으로 퍼지는 VFX")]
+    [SerializeField] private GameObject _entranceRadialVfxPrefab;
+    [Tooltip("원형 VFX와 동시에 재생할 Zone 사운드")]
+    [SerializeField] private AudioClip  _entranceZoneSfx;
 
     // ── MonsterBase 추상 멤버 ─────────────────────────────
     protected override string ConfigAddress   => "DeathKnightBoss/DeathKnightBossConfig";
@@ -118,6 +133,10 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     private bool                      _pendingTriggerEntrance;
     private GameObject                _auraInstance;
     private GameObject                _currentAuraPrefab;
+    private DKP2PassiveAttackRunner   _passiveRunner;
+    private CancellationTokenSource   _passiveCts;
+    private CancellationTokenSource   _healCts;
+    private bool                      _soulGateCleared;
 
     /// <summary>GetHitState 진입/종료 시 콤보 러너 차단 플래그.</summary>
     public void SetStagger(bool value) => _isStaggered = value;
@@ -274,8 +293,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
         _runner?.Tick(dt);
 
-        // 페이즈 전환 체크
-        if (!_dkBB.IsPhase2 && HpRatio <= Phase2HpThreshold && !IsInSpecialState)
+        // SoulSummon 완료 후 HP가 55% 이상 회복되면 다음 사이클을 위해 플래그 초기화
+        // (기둥을 파괴하지 않아 회복된 경우 → HP 클램프 재활성화 → 재발동 허용)
+        if (_soulGateCleared && !_dkBB.IsPhase2 && HpRatio > 0.55f)
+            _soulGateCleared = false;
+
+        // 페이즈 전환 체크: SoulSummon 완료(_soulGateCleared) 후에만 진입 허용
+        if (!_dkBB.IsPhase2 && _soulGateCleared && HpRatio <= Phase2HpThreshold && !IsInSpecialState)
             EnterPhase2();
 
         // 격노 체크
@@ -291,12 +315,18 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         base.OnEnable();
         InitializeRoomContext();
+        _passiveCts?.Cancel();
+        _passiveCts?.Dispose();
+        _passiveCts    = null;
+        _passiveRunner = null;
         _runner?.Reset();
         _coreBB?.Reset();
         _dkBB?.Reset();
         _prevPatternActive = false;
         _isStaggered       = false;
+        _soulGateCleared   = false;
         if (_dkBB != null) ApplyArmorTint(_dkBB.SwordColor);
+        ApplyWindowTint(_dkBB?.SwordColor ?? DKSwordColor.White);
         ApplyAuraColor(_dkBB?.SwordColor ?? DKSwordColor.White);
         if (_attackPool != null)
             foreach (var p in _attackPool)
@@ -315,6 +345,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
     protected override void OnDisable()
     {
+        _passiveCts?.Cancel();
+        _passiveCts?.Dispose();
+        _passiveCts    = null;
+        _passiveRunner = null;
+        _healCts?.Cancel();
+        _healCts?.Dispose();
+        _healCts = null;
         UnbindBossHudIfBound();
         base.OnDisable();
     }
@@ -371,6 +408,67 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 영혼 기둥 HP 연동 (무적 우회 — 기둥 피격 → 보스 HP 직접 변경)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public void SoulPillarApplyDamage(int amount)
+    {
+        if (_runtime == null || _runtime.IsDead) return;
+        _runtime.CurrentHp = Mathf.Max(0, _runtime.CurrentHp - amount);
+        NotifyHpChanged();
+        if (_runtime.CurrentHp <= 0)
+        {
+            _runtime.CurrentHp = 0;
+            _runtime.IsDead    = true;
+            OnFatalDamage();
+        }
+    }
+
+    public void SoulPillarHealBoss(int amount)
+    {
+        if (_runtime == null || _runtime.IsDead) return;
+        _runtime.CurrentHp = Mathf.Min(_runtime.CurrentHp + amount, EffectiveMaxHp);
+        NotifyHpChanged();
+    }
+
+    public void SoulPillarHealBossGradual(int total, float duration)
+    {
+        if (_runtime == null || _runtime.IsDead || total <= 0) return;
+        _healCts?.Cancel();
+        _healCts?.Dispose();
+        _healCts = new CancellationTokenSource();
+        HealGradualAsync(total, duration, _healCts.Token).Forget();
+    }
+
+    private async UniTaskVoid HealGradualAsync(int total, float duration, CancellationToken ct)
+    {
+        try
+        {
+            if (_runtime == null || _runtime.IsDead) return;
+            int startHp  = _runtime.CurrentHp;
+            int targetHp = Mathf.Min(startHp + total, EffectiveMaxHp);
+            int actual   = targetHp - startHp;
+            if (actual <= 0) return;
+
+            float elapsed  = 0f;
+            const float tickInterval = 0.05f;
+
+            while (elapsed < duration)
+            {
+                await UniTask.Delay(System.TimeSpan.FromSeconds(tickInterval), cancellationToken: ct);
+                elapsed += tickInterval;
+                if (_runtime == null || _runtime.IsDead) return;
+                _runtime.CurrentHp = startHp + Mathf.RoundToInt(actual * Mathf.Clamp01(elapsed / duration));
+                NotifyHpChanged();
+            }
+
+            _runtime.CurrentHp = targetHp;
+            NotifyHpChanged();
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 무적 처리 (피라미드 슬래시 패턴 중 데미지 차단)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -380,7 +478,20 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     {
         if (_dkBB != null && _dkBB.IsInvincible) return;
         base.TakeDamage(amount, instigator, knockbackMultiplier, isCrit);
+
+        // SoulSummon 완료 전까지 HP를 50%에서 클램프
+        if (_dkBB != null && !_dkBB.IsPhase2 && !_soulGateCleared && _runtime != null)
+        {
+            int minHp = Mathf.CeilToInt(EffectiveMaxHp * 0.5f);
+            if (_runtime.CurrentHp < minHp)
+            {
+                _runtime.CurrentHp = minHp;
+                NotifyHpChanged();
+            }
+        }
     }
+
+    public void NotifySoulSummonCompleted() => _soulGateCleared = true;
 
     /// <summary>
     /// 검 색상 논리값만 반전한다.
@@ -395,6 +506,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             _swordCtrl?.SetSwordColor(_dkBB.SwordColor);
         ApplyArmorTint(_dkBB.SwordColor);
         ApplyBarrierTint(_dkBB.SwordColor);
+        ApplyWindowTint(_dkBB.SwordColor);
         ApplyAuraColor(_dkBB.SwordColor);
     }
 
@@ -405,13 +517,20 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         if (auraPrefab == null) return;
         if (auraPrefab == _currentAuraPrefab) return;
 
-        if (_auraInstance != null) Destroy(_auraInstance);
+        if (_auraInstance != null)
+        {
+            BossEffectPool.Release(_auraInstance);
+            _auraInstance = null;
+        }
 
         Transform anchor = _auraAnchor != null ? _auraAnchor : transform;
-        _auraInstance = Instantiate(auraPrefab, anchor);
-        // 바닥 장판 잔여물이 바닥 아래로 가려지도록 살짝 낮춤 (뜨는 입자는 위로 올라가므로 영향 없음)
-        _auraInstance.transform.localPosition = new Vector3(0f, -1.5f, 0f);
-        _auraInstance.transform.localRotation = Quaternion.identity;
+        _auraInstance = BossEffectPool.Spawn(auraPrefab, anchor.position, Quaternion.identity, anchor);
+        if (_auraInstance != null)
+        {
+            // 바닥 장판 잔여물이 바닥 아래로 가려지도록 살짝 낮춤 (뜨는 입자는 위로 올라가므로 영향 없음)
+            _auraInstance.transform.localPosition = new Vector3(0f, -1.5f, 0f);
+            _auraInstance.transform.localRotation = Quaternion.identity;
+        }
         _currentAuraPrefab = auraPrefab;
     }
 
@@ -451,6 +570,24 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         _propBlock.SetColor("_BaseColor",      baseTint);
         _propBlock.SetColor("_EmissionColor",  emission);
         foreach (var r in _bodyRenderers)
+            if (r != null) r.SetPropertyBlock(_propBlock);
+    }
+
+    private void ApplyWindowTint(DKSwordColor color)
+    {
+        if (_windowRenderers == null || _windowRenderers.Length == 0) return;
+
+        if (color == DKSwordColor.White)
+        {
+            foreach (var r in _windowRenderers)
+                if (r != null) r.SetPropertyBlock(null);
+            return;
+        }
+
+        if (_propBlock == null) _propBlock = new MaterialPropertyBlock();
+        _propBlock.SetColor(BaseColorId,     new Color(0.15f, 0f, 0.25f, 0.4f));
+        _propBlock.SetColor(EmissionColorId, new Color(0.5f,  0f, 0.6f,  1f));
+        foreach (var r in _windowRenderers)
             if (r != null) r.SetPropertyBlock(_propBlock);
     }
 
@@ -556,9 +693,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     private void EnterPhase2()
     {
         _dkBB.SetPhase2();
-
-        if (_runtime != null)
-            _runtime.SpeedMultiplier = Phase2SpeedMult;
+        _dkBB.SetInvincible(true);
+        Phase2InvincibleAsync(this.GetCancellationTokenOnDestroy()).Forget();
 
         if (_config is BossConfigSO bossConfig)
         {
@@ -566,7 +702,27 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
             bossConfig.patternBreakDurationMax = Phase2BreakMax;
         }
 
+        // 2페이즈 패시브 공격 루프 시작
+        if (_passiveSoulSpear != null || _passivePhantomRush != null)
+        {
+            _passiveCts?.Cancel();
+            _passiveCts?.Dispose();
+            _passiveCts    = new CancellationTokenSource();
+            _passiveRunner = new DKP2PassiveAttackRunner(_ctx, _passiveSoulSpear, _passivePhantomRush);
+            _passiveRunner.Start(_passiveCts.Token);
+        }
+
         Debug.Log($"[DK] Phase2 진입 — HP={HpRatio:F2}", this);
+    }
+
+    private async Cysharp.Threading.Tasks.UniTaskVoid Phase2InvincibleAsync(System.Threading.CancellationToken ct)
+    {
+        try
+        {
+            await Cysharp.Threading.Tasks.UniTask.Delay(System.TimeSpan.FromSeconds(2f), cancellationToken: ct);
+            _dkBB?.SetInvincible(false);
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     // ── 격노 ───────────────────────────────────────────────
@@ -611,16 +767,28 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     }
 
     public GameObject SpawnEntranceWindVfx()
-        => _entranceWindEffectPrefab != null ? Instantiate(_entranceWindEffectPrefab) : null;
+        => _entranceWindEffectPrefab != null
+            ? BossEffectPool.Spawn(_entranceWindEffectPrefab, Vector3.zero, Quaternion.identity)
+            : null;
 
-    /// <summary>등장 연출 Attack1 스윙 적중 시점에 검 위치/방향으로 슬래시 VFX를 재생한다.</summary>
-    public void SpawnEntranceSlashVfx()
+    /// <summary>등장 연출 Attack1 스윙 적중 시점에 슬래시 사운드를 재생한다.</summary>
+    public void PlayEntranceSlashSfx()
+        => Managers.Sound?.PlayEffect(_entranceSlashSfx);
+
+    /// <summary>프롭이 날아가는 시점에 Soul 사운드를 재생한다.</summary>
+    public void PlayEntrancePropFlySfx()
+        => Managers.Sound?.PlayEffect(_entrancePropFlySfx);
+
+    /// <summary>검 충격 시점에 바닥 위치에서 원형 VFX를 스폰하고 Zone 사운드를 재생한다.</summary>
+    public void SpawnEntranceRadialVfx()
     {
-        if (_entranceSlashVfxPrefab == null) return;
-        Transform swordTf = _swordCtrl?.SwordTransform;
-        Vector3    pos = swordTf != null ? swordTf.position : transform.position;
-        Quaternion rot = swordTf != null ? swordTf.rotation : transform.rotation;
-        BossEffectPool.SpawnOneShot(_entranceSlashVfxPrefab, pos, rot, fallbackLifetime: 2f);
+        if (_entranceRadialVfxPrefab != null)
+        {
+            float floorY = DKBossRoomContext.CellToWorld(0, 0, 0f).y;
+            Vector3 spawnPos = new Vector3(transform.position.x, floorY, transform.position.z);
+            BossEffectPool.SpawnOneShot(_entranceRadialVfxPrefab, spawnPos, Quaternion.identity, fallbackLifetime: 3f);
+        }
+        Managers.Sound?.PlayEffect(_entranceZoneSfx);
     }
 }
 }

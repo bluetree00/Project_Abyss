@@ -46,7 +46,9 @@
       "Bash(python -c ' *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\User\\\\Project_Abyss\\\\Project_Abyss\\\\Assets\\\\Abyss\\\\UI\" -Recurse -Filter \"*Lobby*\" -ErrorAction SilentlyContinue)",
       "Bash(Select-String -Path \"c:\\\\Users\\\\User\\\\Project_Abyss\\\\Project_Abyss\\\\Assets\\\\Abyss\\\\UI\\\\Scene\\\\ScenePrefabs\\\\LobbyRoot.prefab\" -Pattern \"m_Script.*{fileID: 0}\")",
-      "Bash(Select-Object -First 10)"
+      "Bash(Select-Object -First 10)",
+      "Bash(dir \"Assets\\\\RelicFairy\\\\Scenes\\\\GameScenes\\\\\" /B)",
+      "mcp__mcp-for-unity__manage_vfx"
     ],
     "additionalDirectories": [
       "C:\\Users\\u\\Documents\\GitHub\\Project_Abyss\\.claude",

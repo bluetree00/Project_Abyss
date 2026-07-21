@@ -15,6 +15,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("시작방에서 바로 스폰할 CombatGirl 베이스 몸 Addressables 키 (유물 없는 상태). 유물은 시작방 유물 오브젝트에서 획득.")]
     [SerializeField] private string startBodyKey = "PlayerCharacter";
     [SerializeField] private string debugDefaultWeaponKey = "T3_Katana";
+    [Tooltip("에디터 직접 전투 테스트 시 슬롯 1에 장착할 기본 무기 키. 비우면 슬롯 1 미장착.")]
+    [SerializeField] private string debugDefaultWeaponSlot1Key = "";
     [Tooltip("Loadout에 유물이 없을 때(에디터 직접 전투 테스트) 적용할 기본 유물 클래스. 비우면 유물 미적용. 시작방 경로에는 영향 없음.")]
     [SerializeField] private RelicClassSO debugDefaultRelic;
     [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
@@ -331,6 +333,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         // 카메라 인트로 준비 (즉시 멀리 배치 + OnPlayerBound 이벤트 대기)
         EnsureCameraController();
+        var startSpawnMarker = playerSpawnPoint
+            ?? (GameObject.Find("PlayerSpawn") ?? GameObject.Find("PlayerSpawnPoint"))?.transform;
+        if (startSpawnMarker != null)
+            GameCameraController.Instance?.PrePositionAtSpawn(startSpawnMarker.position);
 
         // AppBootstrapper 준비 대기 (자동 로그인 포함)
         // null인 경우(씬 직접 실행)는 즉시 통과
@@ -2640,6 +2646,28 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                         await player.WeaponManager.AcquireWeaponAsync(wd);
                     }
                 }
+
+                // 슬롯 1: 로드아웃 무기 우선, 없으면 debugDefaultWeaponSlot1Key
+                var slot1SO = loadout?.WeaponSlot1;
+                if (slot1SO != null)
+                {
+                    var wd1 = WeaponData.FromSO(slot1SO);
+                    await PreloadWeaponClipsAsync(wd1);
+                    await player.WeaponManager.AcquireWeaponAsync(wd1);
+                    Debug.Log($"[GameRunBootstrapper] 테스트: 로드아웃 슬롯1 무기 장착 ({slot1SO.displayName})");
+                }
+                else if (!string.IsNullOrEmpty(debugDefaultWeaponSlot1Key))
+                {
+                    var h1 = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<WeaponSO>(debugDefaultWeaponSlot1Key);
+                    await h1.Task;
+                    if (h1.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded && h1.Result != null)
+                    {
+                        var wd1 = WeaponData.FromSO(h1.Result);
+                        await PreloadWeaponClipsAsync(wd1);
+                        await player.WeaponManager.AcquireWeaponAsync(wd1);
+                        Debug.Log($"[GameRunBootstrapper] 테스트: 기본 슬롯1 무기 장착 ({debugDefaultWeaponSlot1Key})");
+                    }
+                }
             }
 
             // 무기 장착 완료 후 숨김 → 카메라 인트로 → 등장 연출
@@ -3189,18 +3217,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return null;
         }
 
-        // grid_csv의 P 토큰 위치 우선 — 없으면 인스펙터 playerSpawnPoint Transform 폴백
+        // grid_csv의 P 토큰 위치 우선 → 인스펙터 playerSpawnPoint → 씬 내 PlayerSpawn/PlayerSpawnPoint 자동 탐지
         Vector3 pos;
+        Quaternion rot;
         if (_pendingPlayerSpawnPos.HasValue)
         {
             pos = _pendingPlayerSpawnPos.Value;
             _pendingPlayerSpawnPos = null;
+            rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
         }
         else
         {
-            pos = playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero;
+            var spawnMarker = playerSpawnPoint
+                ?? (GameObject.Find("PlayerSpawn") ?? GameObject.Find("PlayerSpawnPoint"))?.transform;
+            pos = spawnMarker != null ? spawnMarker.position : Vector3.zero;
+            rot = spawnMarker != null ? spawnMarker.rotation : Quaternion.identity;
         }
-        Quaternion rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
 
         var go = Instantiate(prefab, pos, rot);
         var player = go.GetComponent<PlayerController>();
