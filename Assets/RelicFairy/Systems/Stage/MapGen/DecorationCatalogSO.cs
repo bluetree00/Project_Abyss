@@ -25,6 +25,9 @@ public sealed class DecorationCatalogSO : ScriptableObject
         [Tooltip("Y축 배치 오프셋. 나무는 0, 파티클은 0.1~0.5 등 프리팹별 조정.")]
         public float yOffset;
 
+        [Tooltip("켜면 렌더러 바운즈 최저점을 바닥에 자동 정렬(피벗이 메시 중심인 소품이 뜨는 문제 해결). yOffset은 정렬 후 추가 적용.")]
+        public bool snapToGround = true;
+
         [Tooltip("스케일 조정 (1 = 원본 크기).")]
         [Min(0.01f)] public float scale = 1f;
 

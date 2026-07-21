@@ -25,8 +25,10 @@ public class ActAttackReadyState : ILayerState<ActState>
 
         var isAir = !_controller.IsGrounded();
 
-        // 공중 공격 1사이클 제한: 이미 사용했으면 공중 공격 불가
-        if (isAir && _controller.AirAttackUsed)
+        // [점프 공격 폐기] 공중(낙하·넉백 포함)에서는 공격 진입 자체를 막는다 → 공중/플런지 공격 제거.
+        // 공중 상태 자체는 이동/물리용으로 유지하되, '공중에서 공격'이라는 플레이어 동작만 없앤다.
+        // (이 가드로 아래 isAir 분기들은 도달 불가가 된다.)
+        if (isAir)
         {
             _stateChanger.Change(ActState.None);
             return;

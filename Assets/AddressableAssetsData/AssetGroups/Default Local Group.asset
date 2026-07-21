@@ -80,6 +80,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7030943ff0db8b143aa282079060903f
+    m_Address: UI/Popup/UI_RuneSelectPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0f14191108fddf644b2b93fb6eac8b7b
+    m_Address: UI/Popup/UI_RelicPartDraftPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e5500b67cc9173243b4667c2128b9e37
     m_Address: UI/Popup/UI_RelicInfoPopup
     m_ReadOnly: 0

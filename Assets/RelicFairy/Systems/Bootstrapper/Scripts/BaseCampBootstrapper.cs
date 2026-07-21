@@ -197,8 +197,10 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         catch (OperationCanceledException) { return; }
 
         // 재스폰된 플레이어로 게임플레이 카메라 추적 재인계.
+        // alignHeadingToTarget=false: 유물 핫스왑 재스폰에서 카메라 heading을 플레이어가 보던 방향으로
+        // 덮어쓰지 않는다(그러면 온보딩 연출 복귀 직후 시점이 틀어진다). 현재 시점을 그대로 유지.
         if (_player != null)
-            GameCameraController.Instance?.HandToGameplayCamera(_player.transform);
+            GameCameraController.Instance?.HandToGameplayCamera(_player.transform, alignHeadingToTarget: false);
     }
 
     /// <summary>

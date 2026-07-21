@@ -89,29 +89,29 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
-        // 활성 존 판별
-        var active = new HashSet<string>();
+        // 시너지 정의가 있는 전 존을 항상 표시한다 — 설계 레이아웃대로 6속성 구조를 늘 보여줘,
+        // 빈 판에서도 어떤 시너지가 있고 몇 칸이 필요한지 파악하게 한다(과거: count>0 존만 노출 → 첫 판이 빈 플레이스홀더).
+        var shown = new List<string>();
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
-            int count = 0;
-            zoneCounts?.TryGetValue(ZONE_ORDER[i], out count);
-            if (count > 0) active.Add(ZONE_ORDER[i]);
+            var syn = Managers.RuneData?.GetZoneSynergies(ZONE_ORDER[i]);
+            if (syn != null && syn.Count > 0) shown.Add(ZONE_ORDER[i]);
         }
 
-        // 비활성 → 행 제거
+        // 시너지 정의가 없는(구성 변경 등) 존 행은 제거
         var toRemove = new List<string>();
         foreach (var key in _rows.Keys)
-            if (!active.Contains(key)) toRemove.Add(key);
+            if (!shown.Contains(key)) toRemove.Add(key);
         foreach (var key in toRemove)
         {
             if (_rows[key].go != null) Destroy(_rows[key].go);
             _rows.Remove(key);
         }
 
-        // 활성 → 행 추가/갱신
-        foreach (var zoneId in active)
+        // 전 존 행 추가/갱신 (count=0이면 임계 'N칸'만 어둡게 표시)
+        foreach (var zoneId in shown)
         {
-            int idx     = System.Array.IndexOf(ZONE_ORDER, zoneId);
+            int idx   = System.Array.IndexOf(ZONE_ORDER, zoneId);
             int count = 0;
             zoneCounts?.TryGetValue(zoneId, out count);
 
@@ -123,8 +123,8 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             RefreshRow(row, zoneId, count);
         }
 
-        // 빈 상태 레이블
-        _emptyLabelGO?.SetActive(active.Count == 0);
+        // 빈 상태 레이블 — 시너지 정의 자체가 없을 때만(데이터 미로드 등)
+        _emptyLabelGO?.SetActive(shown.Count == 0);
 
         // 속성 반응 배너 — 브릿지가 계산한 활성 반응을 표시(둘 다 1단계 이상인 인접 쌍)
         RefreshReactionBanner();
@@ -132,7 +132,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         // 툴팁 갱신
         if (!string.IsNullOrEmpty(_hoveredZoneId))
         {
-            if (active.Contains(_hoveredZoneId) && _rows.TryGetValue(_hoveredZoneId, out var tr))
+            if (shown.Contains(_hoveredZoneId) && _rows.TryGetValue(_hoveredZoneId, out var tr))
             {
                 int count = 0;
                 zoneCounts?.TryGetValue(_hoveredZoneId, out count);

@@ -52,9 +52,6 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         "item_t2_first_strike",        // 선공의 룬 — 첫 타격 +40% (FirstAttackInRoom)
         "item_t2_forged_hammer",       // 망치의 룬 — 전체 공격력 +10 (Always)
         "item_t2_travel_bag",          // 여정의 룬 — 최대 체력 +50 (Always)
-        "item_t3_accumulation",        // 누적의 룬 — 대상별 누적 피해 +2% (OnHit)
-        "item_t3_infinite_hit",        // 무한타의 룬 — 5% 확률 추가 타격 (OnHit)
-        "item_t3_afterimage",          // 잔영의 룬 — 30% 잔상 추가타 (OnHit)
     };
     private int _spawnIndex;
     private readonly System.Collections.Generic.HashSet<string> _spawnedIds = new();

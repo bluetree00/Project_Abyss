@@ -56,9 +56,23 @@ public sealed class GameRunSession
     public MonsterSpawnTableSO CurrentBossSpawnTable =>
         _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
 
-    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale. 미주입/미설정 시 1.</summary>
-    public float CurrentDifficultyScale =>
-        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+    /// <summary>무한 루프 회차(심연 깊이). 0 = 스토리 1회차. 최종 보스 클리어 후 '계속' 선택 시 +1.
+    /// 세션(런) 스코프 인메모리 — 챕터 전환 간 유지되나, 이어하기 저장에는 아직 포함하지 않는다(v1).</summary>
+    public int AbyssDepth { get; private set; }
+
+    /// <summary>루프 1회당 적 스탯(HP·공격력) 가산 배율. 밸런스 대상(시작값 +25%/회차).</summary>
+    private const float LoopScalePerDepth = 0.25f;
+
+    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale × 루프 깊이 배율. 미주입/미설정 시 1.</summary>
+    public float CurrentDifficultyScale
+    {
+        get
+        {
+            float chapterScale = _chapterRegistry != null
+                ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+            return chapterScale * (1f + AbyssDepth * LoopScalePerDepth);
+        }
+    }
 
     /// <summary>현재 챕터의 몬스터 수량 배율. ChapterDataSO.monsterCountScale. 미주입/미설정 시 1.</summary>
     public float CurrentMonsterCountScale =>
@@ -521,6 +535,10 @@ public sealed class GameRunSession
     /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
     public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
 
+    /// <summary>현재 챕터가 '최종 직전'인지 — 이 보스를 깨면 다음이 최종 챕터.
+    /// 유물 코어 진화 드래프트를 여기에 배치해, 최종 챕터를 진화형으로 플레이하게 한다(설계서 §1-6).</summary>
+    public bool IsNextChapterFinal() => CurrentChapter + 1 == FinalChapter;
+
     /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
     public bool AdvanceToNextChapter()
     {
@@ -534,6 +552,18 @@ public sealed class GameRunSession
 
         ChangeRunState(RunState.Map);
         return true;
+    }
+
+    /// <summary>무한 루프 진입 — 심연 깊이를 올리고 Ch1으로 회귀한다(로드아웃은 유지, 적 스탯만 스케일↑).
+    /// 최종 보스 클리어 후 '계속'을 선택했을 때 호출. 챕터 전환 기계를 재사용하되 목적지만 Ch1으로 되돌린다.</summary>
+    public void BeginAbyssLoop()
+    {
+        if (!IsRunning) return;
+
+        AbyssDepth++;
+        CurrentChapter = ChapterId.Chapter1;
+        ResolveActiveTheme();
+        ChangeRunState(RunState.Map);
     }
 
     /// <summary>

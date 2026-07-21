@@ -215,37 +215,31 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         var squares = grid.GetGridSquares();
         if (squares == null) return;
 
-        bool hasOccupied = _occupiedPositions.Count > 0;
-
-        if (!hasOccupied)
-        {
-            foreach (var sq in squares)
-                if (!sq.isOccupied) sq.isPlaceable = true;
-            return;
-        }
-
-        // BFS: 점유 셀 경계에서 ADJACENCY_REACH 거리까지 확장
-        var reachable = new HashSet<Vector2Int>();
-        var frontier  = new Queue<(Vector2Int pos, int depth)>();
-
-        foreach (var occ in _occupiedPositions)
-            frontier.Enqueue((occ, 0));
-
-        while (frontier.Count > 0)
-        {
-            var (pos, depth) = frontier.Dequeue();
-            if (depth >= ADJACENCY_REACH) continue;
-
-            TryExpandBFS(pos + new Vector2Int(-1, 0), reachable, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 1, 0), reachable, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 0,-1), reachable, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 0, 1), reachable, frontier, depth);
-        }
+        // 판정 규칙은 BuildPlaceableSet 하나로 통일(빈 판=전체 개방 / 점유 있으면 인접 도달 범위).
+        var placeable = BuildPlaceableSet();
 
         foreach (var sq in squares)
         {
             if (sq.isOccupied) continue;
-            sq.isPlaceable = reachable.Contains(new Vector2Int(sq.col, sq.row));
+            sq.isPlaceable = placeable.Contains(new Vector2Int(sq.col, sq.row));
+        }
+
+        // 시각 갱신 — "여기 놓을 수 있다"를 직접 표기(빈 어두움 vs 배치 가능 밝음). 배치/제거/패널 오픈 시 반영.
+        RefreshPlaceableTint(placeable);
+    }
+
+    /// <summary>배치 가능 셀을 밝게 틴트해 배치 위치를 시각적으로 안내한다. 점유=밝음, 배치가능=중간, 그 외=어두움.</summary>
+    private void RefreshPlaceableTint(HashSet<Vector2Int> placeable)
+    {
+        foreach (var kvp in _cellImages)
+        {
+            if (!_cellBaseColors.TryGetValue(kvp.Key, out var bc)) continue;
+            if (_occupiedPositions.Contains(kvp.Key))
+                kvp.Value.color = OccupiedColor(bc);
+            else if (placeable.Contains(kvp.Key))
+                kvp.Value.color = PlaceableColor(bc);
+            else
+                kvp.Value.color = EmptyColor(bc);
         }
     }
 
@@ -258,6 +252,67 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         if (!_cellZones.ContainsKey(n)) return;
         if (reachable.Add(n))
             frontier.Enqueue((n, depth + 1));
+    }
+
+    /// <summary>
+    /// 주어진 모양(셀 오프셋)을 판 어딘가에 놓을 수 있는지 조회한다. <b>읽기 전용 · 부작용 없음.</b>
+    /// <para>
+    /// GridSquare가 아니라 <see cref="_occupiedPositions"/>·<see cref="_cellZones"/>만 보므로
+    /// 패널이 SetActive(false)여도 동작한다(선택 팝업이 배치 화면 밖에서 판정해야 하기 때문).
+    /// 판정 규칙은 <see cref="UpdateAdjacencyConstraints"/> + GridManager.TryPlaceShape과 동일하다:
+    /// 모든 셀이 판 위에 있고, 비어 있고, (판에 뭔가 있다면) 전부 인접 도달 범위 안이어야 한다.
+    /// </para>
+    /// 회전은 미지원이므로 주어진 방향 그대로만 검사한다.
+    /// </summary>
+    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets)
+    {
+        if (offsets == null || offsets.Count == 0) return false;
+        // 판이 아직 빌드된 적 없으면(첫 룬 획득 등) 판정 불가 → 막지 않는다(permissive).
+        // 배치 화면을 한 번도 연 적 없을 때 모든 카드가 '놓을 자리 없음'으로 뜨던 첫 사용 버그 방지.
+        if (_cellZones.Count == 0) return true;
+
+        var placeable = BuildPlaceableSet();
+        if (placeable.Count == 0) return false;
+
+        foreach (var anchor in _cellZones.Keys)
+        {
+            bool fits = true;
+            for (int i = 0; i < offsets.Count; i++)
+            {
+                if (!placeable.Contains(anchor + offsets[i])) { fits = false; break; }
+            }
+            if (fits) return true;
+        }
+        return false;
+    }
+
+    /// <summary>배치 가능한(판 위 · 비어 있음 · 인접 조건 충족) 셀 집합. UpdateAdjacencyConstraints의 순수 함수 버전.</summary>
+    private HashSet<Vector2Int> BuildPlaceableSet()
+    {
+        var result = new HashSet<Vector2Int>();
+
+        // 판이 비었으면 전체 개방
+        if (_occupiedPositions.Count == 0)
+        {
+            foreach (var pos in _cellZones.Keys) result.Add(pos);
+            return result;
+        }
+
+        var frontier = new Queue<(Vector2Int pos, int depth)>();
+        foreach (var occ in _occupiedPositions) frontier.Enqueue((occ, 0));
+
+        while (frontier.Count > 0)
+        {
+            var (pos, depth) = frontier.Dequeue();
+            if (depth >= ADJACENCY_REACH) continue;
+
+            TryExpandBFS(pos + new Vector2Int(-1, 0), result, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 1, 0), result, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 0,-1), result, frontier, depth);
+            TryExpandBFS(pos + new Vector2Int( 0, 1), result, frontier, depth);
+        }
+
+        return result;   // TryExpandBFS가 점유 셀·판 밖을 이미 배제한다
     }
 
     /// <summary>존별 점유 셀 수를 반환한다. key = zone_id 문자열.</summary>
@@ -503,6 +558,10 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     // 비어 있음: 어둡고 반투명
     private static Color EmptyColor(Color c) =>
         new(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, 0.55f);
+
+    // 배치 가능(빈 셀): 어두움(Empty)과 점유(Occupied) 사이 — "여기 놓을 수 있다"를 밝기로 안내
+    private static Color PlaceableColor(Color c) =>
+        new(Mathf.Min(1f, c.r * 1.05f), Mathf.Min(1f, c.g * 1.05f), Mathf.Min(1f, c.b * 1.05f), 0.85f);
 
     // 드래그 호버: 존 색상 그대로, 기본 알파
     private static Color NormalColor(Color c) =>

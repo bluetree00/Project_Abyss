@@ -512,7 +512,8 @@ public sealed class AppBootstrapper : MonoBehaviour
             await UniTask.WhenAll(
                 Managers.ItemData.InitializeAsync(),
                 Managers.RuneData.InitializeAsync(),
-                Managers.RelicStatData.InitializeAsync()
+                Managers.RelicStatData.InitializeAsync(),
+                Managers.RelicParts.InitializeAsync()
             );
             startScene = Define.Scene.Lobby;
         }
@@ -529,6 +530,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                     Managers.ItemData.InitializeAsync(),
                     Managers.RuneData.InitializeAsync(),
                     Managers.RelicStatData.InitializeAsync(),
+                    Managers.RelicParts.InitializeAsync(),
                     BackendGameData.Instance.LoadAsync()
                 );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공");
@@ -540,7 +542,8 @@ public sealed class AppBootstrapper : MonoBehaviour
                 await UniTask.WhenAll(
                     Managers.ItemData.InitializeAsync(),
                     Managers.RuneData.InitializeAsync(),
-                    Managers.RelicStatData.InitializeAsync()
+                    Managers.RelicStatData.InitializeAsync(),
+                    Managers.RelicParts.InitializeAsync()
                 );
             }
             if (startScene == Define.Scene.Logo)
