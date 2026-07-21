@@ -28,6 +28,9 @@ public class BossRoomController : MonoBehaviour
     [Tooltip("입장 직후 활성화할 배리어 오브젝트. null이면 배리어 없음.")]
     [SerializeField] private GameObject barrier;
 
+    [Tooltip("보스 연출 시작 시 활성화할 벽 오브젝트 배열.")]
+    [SerializeField] private GameObject[] introWalls;
+
     [Header("카메라 팬 설정")]
     [Tooltip("카메라가 이동할 목표 지점 (보스 주변 Transform).")]
     [SerializeField] private Transform bossZoneCenter;
@@ -47,6 +50,9 @@ public class BossRoomController : MonoBehaviour
 
     [Tooltip("카메라가 바라볼 시선 대상 (bossZoneCenter 기준 월드 좌표 오프셋).")]
     [SerializeField] private Vector3 bossCloseUpLookOffset = new Vector3(0f, 1.5f, 0f);
+
+    [Tooltip("true 시 카메라 팬을 생략하고 즉시 보스 등장 연출을 시작한다. 연출 내부에서 카메라를 직접 제어하는 경우 사용.")]
+    [SerializeField] private bool _skipCameraPan = false;
 
     // ── Private ──────────────────────────────────────────────────
     private bool             _triggered;
@@ -86,6 +92,10 @@ public class BossRoomController : MonoBehaviour
 
         if (barrier != null)
             barrier.SetActive(true);
+
+        if (introWalls != null)
+            foreach (var wall in introWalls)
+                if (wall != null) wall.SetActive(true);
 
         // 이미 스폰된 보스가 있으면 소급 연결, 없으면 이벤트 구독 후 소환
         if (bossSpawner.SpawnedBoss != null)
@@ -156,6 +166,15 @@ public class BossRoomController : MonoBehaviour
     private async UniTaskVoid DoCameraAndTriggerAsync(IBossEntrance entrance, CancellationToken ct)
     {
         var cam = GameCameraController.Instance;
+
+        // 카메라 팬 생략 모드: 즉시 수동 제어 전환 후 연출 시작
+        if (_skipCameraPan)
+        {
+            cam?.TakeManualControl();
+            entrance.TriggerEntrance();
+            return;
+        }
+
         if (cam != null && bossZoneCenter != null)
         {
             try

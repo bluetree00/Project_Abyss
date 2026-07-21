@@ -2333,17 +2333,15 @@ MonoBehaviour:
   _teleportVfxDuration: 0.5
   _teleportInSfx: {fileID: 8300000, guid: 843f88f7315a7b34384ff4b7fb882ad8, type: 3}
   _teleportOutSfx: {fileID: 8300000, guid: 9d4c1b34966ce5140815b611bd572b0b, type: 3}
-  _phase2BasicPool:
-  - {fileID: 11400000, guid: 354f3dee0a05dde40963eaede4c00777, type: 2}
-  - {fileID: 11400000, guid: 4b27db7900ffe704fa974e306ea4486f, type: 2}
-  - {fileID: 11400000, guid: 58b11ee0303bfc440a472e5007433b47, type: 2}
-  - {fileID: 11400000, guid: d77e2803a97843449b905cd85c470308, type: 2}
+  _phase2BasicPool: []
   _phase2AreaPool:
   - {fileID: 11400000, guid: 319e3f071fd9121469eca78d7144e426, type: 2}
   - {fileID: 11400000, guid: ab31f0eb2d931fb4fa3feb334a8829b2, type: 2}
   - {fileID: 11400000, guid: fcfd1f3cacf82144f91ba7a36125a55c, type: 2}
   - {fileID: 11400000, guid: 1150cdc212785954ca3d3f1ea2ba8e4d, type: 2}
   - {fileID: 11400000, guid: b03018b7b30b24e449747552137e93f2, type: 2}
+  _passiveSoulSpear: {fileID: 0}
+  _passivePhantomRush: {fileID: 0}
   _phase1AnchorTransform: {fileID: 0}
   _pyramidStrikeAnchor: {fileID: 0}
   _entranceEndBarriers: []
@@ -2352,8 +2350,11 @@ MonoBehaviour:
   _entranceCameraCloseUpDuration: 1
   _entranceCameraReturnDuration: 1.2
   _entranceWindEffectPrefab: {fileID: 0}
-  _entranceSlashVfxPrefab: {fileID: 5503505460791601945, guid: 7981772f8929edc4bb90c4e960c81cd8,
+  _entranceSlashSfx: {fileID: 8300000, guid: e5efd731d55ee4c4ebd407ed3f949a33, type: 3}
+  _entrancePropFlySfx: {fileID: 8300000, guid: d795247655948904fa25373f9ea53606, type: 3}
+  _entranceRadialVfxPrefab: {fileID: 7230900929259635890, guid: 80eee9b8c7202074fa198fe5e19ff9cb,
     type: 3}
+  _entranceZoneSfx: {fileID: 8300000, guid: 3a39861fff5dbef4bbb1fd94e286c037, type: 3}
 --- !u!195 &8839149076850127432
 NavMeshAgent:
   m_ObjectHideFlags: 0

@@ -40,5 +40,5 @@ MonoBehaviour:
   _warningEffectPrefab: {fileID: 0}
   _breathSfx: {fileID: 8300000, guid: fb00b1c11a5aad4438670d7530866a66, type: 3}
   _breathColor: {r: 1, g: 0.35, b: 0.1, a: 1}
-  _statusEffect: {fileID: 11400000, guid: b10ccd161dd874a4cb22d5a0971b1c2c, type: 2}
+  _statusEffect: {fileID: 0}
   _endPoseDuration: 0.4

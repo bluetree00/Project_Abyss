@@ -94,6 +94,12 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     /// (GameRunBootstrapper.StartWaitingRoomAsync). 여기서는 씬 전환만 책임진다.</summary>
     public void EnterDungeon()
     {
+        if (!IntroCompletionTracker.IsCompleted)
+        {
+            AppBootstrapper.Instance?.RequestLoad(Define.Scene.Game_Intro);
+            return;
+        }
+
         // 게이트 통과 = 새 런 시작. 로비를 거치지 않은 진입(에디터 직접 Play 등)에서도
         // Ch1 부트스트래퍼가 대기 방 흐름(newRunFromHub)을 타도록 새 런 신호를 세운다.
         AppBootstrapper.Instance?.MarkNewRunPending();

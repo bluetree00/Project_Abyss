@@ -51,7 +51,7 @@ MonoBehaviour:
   _iceStatusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
   _thunderStatusEffect: {fileID: 11400000, guid: 13fc451eb7c351a498e908777b2ba39d,
     type: 2}
-  _fireStatusEffect: {fileID: 11400000, guid: b10ccd161dd874a4cb22d5a0971b1c2c, type: 2}
+  _fireStatusEffect: {fileID: 0}
   _miniBreathWarningPrefab: {fileID: 1173698457435006, guid: cbe5151d1ac46c44dadb19833a241e92,
     type: 3}
   _miniBreathWarningScale: 1.5

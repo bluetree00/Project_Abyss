@@ -55,7 +55,7 @@ MonoBehaviour:
   _breathDamage: 20
   _tsunamiDamage: 10
   _tsunamiDuration: 5
-  _tsunamiTickInterval: 1
+  _tsunamiTickInterval: 0.25
   _tsunamiLagCells: 4
   _breathBlockMask:
     serializedVersion: 2
@@ -73,4 +73,7 @@ MonoBehaviour:
   _fireScaleMin: 0.13
   _fireScaleMax: 0.27
   _cooldown: 26
+  _playerAuraPrefab: {fileID: 174211133732289389, guid: 6f33d5b0319dbdf4e95edc7a2c267e53,
+    type: 3}
+  _playerAuraScale: 1
   _meteorPattern: {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605, type: 2}
