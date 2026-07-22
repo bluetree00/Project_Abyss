@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T1_Katana_Display
   weaponPrefabKey: T1_Katana_Weapon
-  displayName: "\uAE30\uBCF8 \uCE74\uD0C0\uB098"
+  displayName: 클라렌트
   iconKey: T1_KatanaIcon
   icon: {fileID: 21300000, guid: 2e8414774381f0444805c23b0d8bf7a8, type: 3}
   tier: 1

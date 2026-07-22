@@ -32,12 +32,16 @@ public abstract class GroundFieldBase : MonoBehaviour
     protected bool       _active;
 
     private int _visualHandle;            // [가이드라인 비주얼] 장판 디스크 해제 핸들
+    private int _auraHandle;              // [실제 VFX] 장판 속성 오라 해제 핸들
 
     protected readonly List<MonsterBase> _enemyBuffer = new();
 
     public bool    IsActive => _active;
     public float   Radius   => _radius;
     public Vector3 Center   => transform.position;
+
+    /// <summary>이 장판의 속성(실제 VFX 오라용). null이면 오라 미부착. 파생이 override(독=Grass, 빛=Light).</summary>
+    protected virtual RuneElement? FieldElement => null;
 
     protected virtual void OnEnable()
     {
@@ -52,6 +56,10 @@ public abstract class GroundFieldBase : MonoBehaviour
         // [가이드라인 비주얼] 장판 디스크 해제(Despawn/풀 반환/씬 언로드 공통 경로)
         GuidelineVisual.ReleaseGroundField(_visualHandle);
         _visualHandle = 0;
+
+        // [실제 VFX] 장판 속성 오라 해제
+        ElementVfxPlayer.ReleaseAura(_auraHandle);
+        _auraHandle = 0;
     }
 
     /// <summary>장판 생성 초기화. 고정 위치(추적 없음).</summary>
@@ -68,6 +76,12 @@ public abstract class GroundFieldBase : MonoBehaviour
         // [가이드라인 비주얼] 장판 디스크 부착(통지만 — 토글 OFF면 핸들 0)
         GuidelineVisual.ReleaseGroundField(_visualHandle);
         _visualHandle = GuidelineVisual.GroundField(transform, _radius, GetType().Name);
+
+        // [실제 VFX] 장판 속성 오라 — 반경에 맞춰 스케일. 수명 만료/추적대상 비활성 시 자동 해제.
+        ElementVfxPlayer.ReleaseAura(_auraHandle);
+        _auraHandle = 0;
+        if (FieldElement.HasValue && _lifetime > 0f)
+            _auraHandle = ElementVfxPlayer.AttachAura(FieldElement.Value, transform, _lifetime, _radius);
     }
 
     /// <summary>플레이어 등 대상을 추적하는 장판으로 전환(빛 4단계 빛장판).</summary>

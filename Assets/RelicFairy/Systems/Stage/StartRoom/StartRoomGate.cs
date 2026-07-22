@@ -316,9 +316,13 @@ public class StartRoomGate : MonoBehaviour
                 return;
             }
 
-            // 카메라가 게이트로 이동 → 도착 즈음 문 열림 → 통로 조망 유지 → 플레이어로 복귀
-            Vector3 target      = transform.position;
-            Vector3 worldOffset = transform.TransformVector(gateRevealViewOffset); // 게이트 로컬 오프셋을 월드로
+            // 통로 방향 기준으로 카메라를 잡는다 — 고정 오프셋은 게이트가 회전돼 있으면 통로와 어긋나
+            // '문 뒤 빈 배경'이 보인다. 항상 플레이어 쪽(통로 반대편)에서 통로를 정면으로 조망하게 한다.
+            Vector3 outward = transform.TransformDirection(CorridorLocalDir(startCorridorEdge)); // 통로가 뻗는 월드 방향
+            float   back    = Mathf.Max(4f, Mathf.Abs(gateRevealViewOffset.z));                 // 게이트 뒤 거리
+            float   up      = gateRevealViewOffset.y;                                            // 높이
+            Vector3 worldOffset = -outward * back + Vector3.up * up;   // 통로 반대편(플레이어 쪽) + 위
+            Vector3 target      = transform.position + outward * (back * 0.4f); // 통로 안쪽을 살짝 겨눠 통로+방을 프레임에
             OpenSealDoorAtAsync(gateRevealDurations.x * 0.85f, ct).Forget();
 
             await cam.PlayOnboardingRevealAsync(
@@ -331,6 +335,16 @@ public class StartRoomGate : MonoBehaviour
             if (pc != null) UnfreezePlayer();
         }
     }
+
+    /// <summary>DoorEdge → 게이트 로컬 기준 통로가 뻗는 방향(BuildDoorCorridor의 outward와 동일 규약).</summary>
+    private static Vector3 CorridorLocalDir(DoorEdge edge) => edge switch
+    {
+        DoorEdge.North => Vector3.forward,
+        DoorEdge.South => Vector3.back,
+        DoorEdge.East  => Vector3.right,
+        DoorEdge.West  => Vector3.left,
+        _              => Vector3.forward,
+    };
 
     private async UniTaskVoid OpenSealDoorAtAsync(float delaySec, System.Threading.CancellationToken ct)
     {

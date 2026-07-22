@@ -79,9 +79,10 @@ public class DialogueDataManager
     {
         if (string.IsNullOrEmpty(baseKey)) return null;
 
-        string prefsKey = "dlgVisit_" + baseKey;
+        string prefsKey = VisitPrefix + baseKey;
         int count = PlayerPrefs.GetInt(prefsKey, 0);
         PlayerPrefs.SetInt(prefsKey, count + 1);
+        RememberVisitKey(baseKey); // 새 게임 시 일괄 초기화할 수 있도록 키를 인덱스에 남긴다
 
         if (count == 0)
             return GetLines(baseKey + "_First") ?? GetLines(baseKey);
@@ -91,6 +92,39 @@ public class DialogueDataManager
             return GetLines(variants[UnityEngine.Random.Range(0, variants.Count)]);
 
         return GetLines(baseKey + "_First") ?? GetLines(baseKey);
+    }
+
+    // ── 방문 횟수 영속 관리 ────────────────────────────────────────────
+    private const string VisitPrefix   = "dlgVisit_";
+    private const string VisitIndexKey = "dlgVisit_index";
+
+    /// <summary>방문 키를 인덱스(쉼표 구분)에 누적 기록. ResetVisitCounts가 이걸로 전부 지운다.</summary>
+    private static void RememberVisitKey(string baseKey)
+    {
+        string index = PlayerPrefs.GetString(VisitIndexKey, string.Empty);
+        if (index.Length == 0)
+        {
+            PlayerPrefs.SetString(VisitIndexKey, baseKey);
+            return;
+        }
+        // 이미 기록된 키면 스킵(중복 누적 방지)
+        foreach (var k in index.Split(','))
+            if (k == baseKey) return;
+
+        PlayerPrefs.SetString(VisitIndexKey, index + "," + baseKey);
+    }
+
+    /// <summary>새 게임 시작 — 모든 방문 횟수를 초기화한다.
+    /// 이게 없으면 이전 플레이의 카운트가 남아 첫 진입부터 재방문(_R*) 대사가 나온다.</summary>
+    public static void ResetVisitCounts()
+    {
+        string index = PlayerPrefs.GetString(VisitIndexKey, string.Empty);
+        if (index.Length > 0)
+            foreach (var k in index.Split(','))
+                if (!string.IsNullOrEmpty(k)) PlayerPrefs.DeleteKey(VisitPrefix + k);
+
+        PlayerPrefs.DeleteKey(VisitIndexKey);
+        PlayerPrefs.Save();
     }
 
     // 복귀 대사 티어 임계(내림차순). count가 이 값 이상이면 해당 티어 풀({base}_T{n}_R*)에서 뽑는다.

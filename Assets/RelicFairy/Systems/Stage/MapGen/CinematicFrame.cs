@@ -51,12 +51,17 @@ public static class CinematicFrame
         _canvas.enabled = false;
     }
 
-    /// <summary>레터박스 프레임을 슬라이드 인. title이 있으면 삼분할 하단선에 표시한다.</summary>
+    /// <summary>
+    /// 레터박스 프레임을 슬라이드 인. title이 있으면 삼분할 하단선에 표시한다.
+    /// sortingOrder를 낮추면 대사 팝업(200~) 아래에 깔린다 — 대사와 함께 쓰는 컷신용.
+    /// </summary>
     public static async UniTask ShowAsync(
         float duration, AnimationCurve ease, CancellationToken ct = default,
-        float aspect = DefaultAspect, float dimAlpha = 0.25f, string title = null)
+        float aspect = DefaultAspect, float dimAlpha = 0.25f, string title = null,
+        int sortingOrder = SortingOrder)
     {
         Ensure();
+        _canvas.sortingOrder = sortingOrder;
         _canvas.enabled = true;
         _barFrac   = BarFraction(aspect);
         _dimTarget = Mathf.Clamp01(dimAlpha);

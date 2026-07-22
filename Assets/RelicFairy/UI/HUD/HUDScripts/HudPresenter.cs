@@ -31,6 +31,8 @@ public sealed class HudPresenter : MonoBehaviour
     private RoomBuffHandler _buffHandler;
     private readonly BuffViewAggregator _buffAggregator = new();
     private PlayerBuffViewSource _playerBuffSource;
+    // 스킬 슬롯 잠금 판정(HasSkillInSlot)용 — 무기 교체/진화 시 재평가한다.
+    private PlayerController     _player;
     private ItemBuffViewSource _itemBuffSource;
     private bool _hasDynamicBuffSources;          // 룬/유물 등 폴링 기반 소스 등록 여부
     private float _buffPollAccum;
@@ -84,6 +86,7 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _state.OnHpChanged -= HandleHpChanged;
             _state.OnGoldChanged -= HandleGoldChanged;
+            _state.OnPotionChanged -= HandlePotionChanged;
             _state = null;
         }
         if (_fuelBank != null)
@@ -139,6 +142,10 @@ public sealed class HudPresenter : MonoBehaviour
         _state.OnHpChanged += HandleHpChanged;
         _state.OnGoldChanged += HandleGoldChanged;
 
+        // 포션 슬롯(Q/E 위 첫 칸) — 개수 즉시 반영 후 변화 구독
+        HandlePotionChanged(_state.PotionCount, _state.PotionCapacity);
+        _state.OnPotionChanged += HandlePotionChanged;
+
         // 런 재화(강화재료·원석) 표시 — 골드와 동일 패턴
         if (_fuelBank != null)
         {
@@ -159,6 +166,7 @@ public sealed class HudPresenter : MonoBehaviour
         UnbindPlayer();
         if (player == null) return;
 
+        _player = player;
         _runtimeStats = player.RuntimeStats;
         _weaponManager = player.WeaponManager;
         _cooldownTracker = player.CooldownTracker;
@@ -183,6 +191,7 @@ public sealed class HudPresenter : MonoBehaviour
 
     public void UnbindPlayer()
     {
+        _player = null;
         view?.CombatPanel?.SetRelicResource(null);   // 유물 아이덴티티 바 해제
         if (_playerBuffSource != null)
         {
@@ -311,6 +320,10 @@ public sealed class HudPresenter : MonoBehaviour
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
     private void HandleGoldChanged(int gold) => view?.SetGold(gold);
+
+    /// <summary>포션 개수 변화 → HUD 슬롯(Q/E 위 첫 칸) 갱신.</summary>
+    private void HandlePotionChanged(int count, int capacity)
+        => view?.CombatPanel?.SetPotion(count, capacity);
     private void HandleFuelChanged()
     {
         if (_fuelBank == null || view == null) return;
@@ -417,6 +430,15 @@ public sealed class HudPresenter : MonoBehaviour
         view.CombatPanel.SetSkillIcon(SkillType.Q, current?.skillQIcon);
         view.CombatPanel.SetSkillIcon(SkillType.E, current?.skillEIcon);
         view.CombatPanel.SetSkillIcon(SkillType.R, current?.skillRIcon);
+
+        // 스킬 없는 슬롯(무형검 등)은 잠금 표시. 무기 교체·진화 때마다 이 경로가 다시 돌아
+        // 스킬이 생기면 자동으로 풀린다(별도 해제 처리 불필요).
+        if (_player != null)
+        {
+            view.CombatPanel.SetSkillLocked(SkillType.Q, !_player.HasSkillInSlot(SkillType.Q));
+            view.CombatPanel.SetSkillLocked(SkillType.E, !_player.HasSkillInSlot(SkillType.E));
+            view.CombatPanel.SetSkillLocked(SkillType.R, !_player.HasSkillInSlot(SkillType.R));
+        }
         view.CombatPanel.SetActiveWeapon(_weaponManager.CurrentSlotIndex);   // 활성 무기 강조
     }
 
@@ -426,6 +448,7 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _state.OnHpChanged -= HandleHpChanged;
             _state.OnGoldChanged -= HandleGoldChanged;
+            _state.OnPotionChanged -= HandlePotionChanged;
             _state = null;
         }
         if (_fuelBank != null)

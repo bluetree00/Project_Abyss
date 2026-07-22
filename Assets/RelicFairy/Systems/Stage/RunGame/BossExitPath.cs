@@ -26,6 +26,10 @@ public sealed class BossExitPath : MonoBehaviour
     private const float TileRiseHeight = 0.8f;  // 타일이 아래에서 솟아오르는 높이
     private const float TileRiseTime   = 0.25f;
 
+    /// <summary>바닥 레이어 — MapBuilder가 방 바닥에 쓰는 값과 동일해야 한다(플레이어 접지 판정·카메라가 이 레이어를 본다).
+    /// CreatePrimitive는 Default(0)로 생성되므로 반드시 덮어써야 길 위에서 접지가 성립한다.</summary>
+    private const int   GroundLayer   = 3;
+
     /// <summary>폴백 타일 색 — 아레나 바닥 머티리얼을 못 구했을 때만 사용.</summary>
     private static readonly Color FallbackTileColor = new Color(0.32f, 0.30f, 0.28f, 1f);
 
@@ -215,8 +219,18 @@ public sealed class BossExitPath : MonoBehaviour
             }
         }
 
+        // 프리팹 경로/프리미티브 경로 모두 Ground로 통일 — 안 하면 길 위에서 접지 판정이 실패한다.
+        SetLayerRecursive(go, GroundLayer);
+
         RiseInAsync(go.transform, this.GetCancellationTokenOnDestroy()).Forget();
         return go.transform;
+    }
+
+    private static void SetLayerRecursive(GameObject go, int layer)
+    {
+        go.layer = layer;
+        foreach (Transform child in go.transform)
+            SetLayerRecursive(child.gameObject, layer);
     }
 
     /// <summary>타일이 아래에서 솟아오르며 자리잡는다 — 길이 만들어지는 느낌.</summary>

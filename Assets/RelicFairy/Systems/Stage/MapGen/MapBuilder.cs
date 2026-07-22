@@ -607,9 +607,9 @@ public class MapBuilder
         // → 지붕 덮인 복도 터널이 '개방된 방'으로 이어지는 대비가 생겨, 덩어리가 아니라 실제 방으로 읽힌다.
         if (floorDef?.prefab != null && wallDef?.prefab != null)
         {
-            // 다음 방과 비슷한 규모로 — 작으면 통로 끝이 '섬'처럼 보인다. 실제 방(폭 38~49)에 근접하게 넓고 깊게.
-            int chamberDepth = 14;             // 방 깊이(칸)
-            int chamberHalf  = half + 11;      // 방 반폭 → 폭 약 2*(half+11)+1 ≈ 27칸(방 규모)
+            // 다음 방과 비슷한 규모로 — 작으면 통로 끝이 '섬'처럼 보인다. 실제 방(폭 38~49)에 맞먹게 크게.
+            int chamberDepth = 20;             // 방 깊이(칸) — 실제 방 깊이급
+            int chamberHalf  = half + 17;      // 방 반폭 → 폭 약 2*(half+17)+1 ≈ 39칸(방 규모)
             int nearStep     = lengthCells + 1;
             int farStep      = lengthCells + chamberDepth;
 

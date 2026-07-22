@@ -276,6 +276,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 413e42b5ba160154bb95ad2c894bcff7
+    m_Address: ElementVfxRegistry
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0

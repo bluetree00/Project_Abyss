@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
   weaponDisplayKey: T1_Greatsword_Display
   weaponPrefabKey: T1_Greatsword_Weapon
-  displayName: "\uAE30\uBCF8 \uB300\uAC80"
+  displayName: 마르미아도아즈
   iconKey: T1_GreatswordIcon
   icon: {fileID: 21300000, guid: 241382dec3ea95c4b9172945626373fb, type: 3}
   tier: 1

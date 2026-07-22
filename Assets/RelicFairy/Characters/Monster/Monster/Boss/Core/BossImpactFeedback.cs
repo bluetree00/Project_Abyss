@@ -100,6 +100,9 @@ public sealed class BossImpactFeedbackHost : MonoBehaviour
 
         while (elapsed < duration)
         {
+            // 씬 전환 등으로 카메라가 파괴되면 즉시 중단(파괴된 Transform 접근 방지).
+            if (cam == null) { _activeShake = null; yield break; }
+
             elapsed += Time.unscaledDeltaTime;
             float t        = 1f - elapsed / duration;
             float strength = amplitude * t;
@@ -110,7 +113,7 @@ public sealed class BossImpactFeedbackHost : MonoBehaviour
             yield return null;
         }
 
-        cam.transform.localPosition = _cameraBaseLocalPos;
+        if (cam != null) cam.transform.localPosition = _cameraBaseLocalPos;
         _activeShake = null;
     }
 

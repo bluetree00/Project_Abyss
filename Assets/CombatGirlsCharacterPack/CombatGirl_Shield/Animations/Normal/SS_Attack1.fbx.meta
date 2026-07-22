@@ -27,9 +27,9 @@ ModelImporter:
     removeConstantScaleCurves: 1
     motionNodeName: root
     animationImportErrors: 
-    animationImportWarnings: Event AE_EndTrail has a time (2.531250) outside the
+    animationImportWarnings: Event AE_EndTrail has a time (3.796876) outside the
       clip's valid range (0.000000..1.500000). It will never be firedEvent AE_AttackEnd
-      has a time (3.375000) outside the clip's valid range (0.000000..1.500000).
+      has a time (5.062501) outside the clip's valid range (0.000000..1.500000).
       It will never be fired
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
@@ -68,28 +68,28 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.8437501
+      - time: 1.2656252
         functionName: AE_BeginTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.8437501
+      - time: 1.2656252
         functionName: SpawnSlashEffect0
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 2.5312505
+      - time: 3.7968757
         functionName: AE_EndTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 3.3750005
+      - time: 5.062501
         functionName: AE_AttackEnd
         data: 
         objectReferenceParameter: {instanceID: 0}

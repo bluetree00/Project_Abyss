@@ -151,7 +151,7 @@ public class UI_SaveSlotPanel : UI_Base
         if (rpm == null || slotIndex < 0) return;
 
         // 이 슬롯의 로컬 런 세이브만 폐기(다른 슬롯 무영향). 로컬이 단독 권위.
-        rpm.ClearLocalRun(slotIndex);
+        rpm.ResetSlot(slotIndex);   // 슬롯 삭제 = 이 슬롯으로 다시 시작하면 초회부터
         RefreshCard(slotIndex);
     }
 }

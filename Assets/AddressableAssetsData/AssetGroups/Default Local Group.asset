@@ -60,6 +60,26 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5ad6173f365f3a84093ab916a594ac29
+    m_Address: Illust_Intro_Page01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b96409764644cba44b9841b9c069e8ed
+    m_Address: Illust_Intro_Page02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9b097f7e7ab5a134fb5d5e38ead48cb1
+    m_Address: Illust_Intro_Page03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4a9f9e6fb8ecb642a3cae3f5c336628
+    m_Address: Illust_MerlinRevive
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 38e2ad2405a73b94ca4acff97076788a
     m_Address: SoftBlueBuff
     m_ReadOnly: 0
@@ -87,6 +107,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0f14191108fddf644b2b93fb6eac8b7b
     m_Address: UI/Popup/UI_RelicPartDraftPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c7fb6fbc39560845a086e84d9f1ce15
+    m_Address: UI/Popup/UI_RefineryPanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c004dd9604a3985439fb2e97d98773a6
+    m_Address: RuneArtLibrary
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

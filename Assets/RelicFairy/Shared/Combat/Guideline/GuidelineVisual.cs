@@ -89,6 +89,12 @@ public static class GuidelineVisual
 
     public static void StatusApplied(Transform target, string statusId, float duration)
     {
+        // [실제 VFX] 속성 상태 이펙트 — 개발 토글과 무관하게 항상(릴리스 포함). 모든 상태부여 지점의 단일 choke.
+        // 적 '몸'에 붙인다(바닥 원반 아님) — 장판으로 오독되면 전투 판단을 흐린다.
+        if (target != null && duration > 0f && RuneElementMap.FromStatusId(statusId, out var element))
+            ElementVfxPlayer.AttachStatus(element, target, duration);
+
+        // 이하 개발용 플레이스홀더 마커(기본 OFF)
         if (!StatusMarkersEnabled) return;
         if (!s_enabled || target == null || string.IsNullOrEmpty(statusId)) return;
         var r = GuidelineVisualRunner.Instance; if (r == null) return;

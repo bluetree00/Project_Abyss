@@ -995,6 +995,20 @@ MonoBehaviour:
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}
   shopNpcAddressableKey: Shop/ShopNpc
+  crucibleDecorPrefabs:
+  - {fileID: 1031028762, guid: abc00000000008081074528185519464, type: 3}
+  - {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
+  - {fileID: 1031121807, guid: abc00000000015621552751496305851, type: 3}
+  - {fileID: 1031120874, guid: abc00000000016499392018549566722, type: 3}
+  - {fileID: 1031121422, guid: abc00000000014108594664492169955, type: 3}
+  - {fileID: 1031125914, guid: abc00000000007992870104272310159, type: 3}
+  refineryDecorPrefabs:
+  - {fileID: 1031119978, guid: abc00000000012857661513297908409, type: 3}
+  - {fileID: 1031046526, guid: abc00000000004322943757876445495, type: 3}
+  - {fileID: 1111877795530166, guid: 3f122a074538fc646b8821db82fbbbb8, type: 3}
+  - {fileID: 1109459705200030, guid: 70b62e0f3bbfee4409228673d6c15926, type: 3}
+  - {fileID: 1266006545755398, guid: aafb963400638ab46a33e9fe42afa648, type: 3}
+  - {fileID: 1031121356, guid: abc00000000008136434539379879985, type: 3}
   shopWeaponSlotFallback: 1
   shopRerollEnabled: 0
   shopRerollCost: 50

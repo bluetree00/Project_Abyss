@@ -419,6 +419,11 @@ public class GameCameraController : MonoBehaviour
     {
         if (_cinemachine == null) return;
 
+        // 이 블렌드가 도는 중에 컷신이 TakeManualControl()을 걸 수 있다(부트 인계 ↔ 오프닝 연출 경합).
+        // 버전을 캡처해 두고, 중간에 바뀌면 즉시 물러난다. 이게 없으면 블렌드가 끝나며
+        // Brain을 다시 켜고 _isPanning을 풀어버려 컷신 카메라가 통째로 무시된다.
+        int myVersion = _panVersion;
+
         if (_brain != null) _brain.enabled = false;
         _cinemachine.enabled = true; // vcam이 State를 계산하도록 활성화 (Brain은 꺼두어 스냅 방지)
 
@@ -430,6 +435,7 @@ public class GameCameraController : MonoBehaviour
         while (t < dur)
         {
             if (this == null) return;
+            if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다
             ct.ThrowIfCancellationRequested();
             t += Time.deltaTime;
             float k    = Mathf.Clamp01(t / dur);
@@ -445,10 +451,15 @@ public class GameCameraController : MonoBehaviour
         }
 
         if (this == null) return;
+        if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다면 인계하지 않는다
 
         // Cinemachine에 제어권 인계 — 카메라가 이미 목표 포즈에 도달했으므로 스냅해도 끊김 없음
         _cinemachine.PreviousStateIsValid = false;
         if (_brain != null) _brain.enabled = true;
+
+        // 수동 제어(TakeManualControl) 잠금 해제 — 이게 없으면 _isPanning이 true로 남아
+        // 이후 보스전 오빗 전환·구역 카메라가 전부 무시되고 카메라가 고정된다.
+        _isPanning = false;
     }
 
     public void ActivateBossOrbitView(Transform bossTarget, Transform lookAtTarget = null)

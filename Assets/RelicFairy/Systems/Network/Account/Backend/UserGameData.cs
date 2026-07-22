@@ -86,11 +86,11 @@ public class UserGameData
         if (chapterNum > highestChapter)
             highestChapter = chapterNum;
 
+        // 골드는 <b>런 재화</b>다(상점 소비 = PlayerRunState.TempGold). 런을 넘겨 쌓지 않는다.
+        // 과거엔 gold 에도 누적했는데 소비처가 하나도 없어, 로비에 "쓸 수 없는 숫자"만 불어났다.
+        // 영구 이월은 각성 정수(abyssEssence) 하나뿐 — 통계용 누적만 남긴다.
         if (result.GainedGold > 0)
-        {
-            gold            += result.GainedGold;
             totalGoldEarned += result.GainedGold;
-        }
 
         if (result.GainedEssence > 0)
             abyssEssence += result.GainedEssence;
