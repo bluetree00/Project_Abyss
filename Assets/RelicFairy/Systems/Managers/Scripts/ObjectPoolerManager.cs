@@ -98,6 +98,10 @@ public class ObjectPoolerManager
         object param = null
     )
     {
+        // [임시 추적] 초록 이펙트 출처 확인용 — 확인 후 제거할 것.
+        if (resourceKey != null && (resourceKey.Contains("Dark") || resourceKey.Contains("Explosion") || resourceKey.Contains("Smoke")))
+            Debug.Log($"[VFX추적] ObjectPooler.SpawnAsync: {resourceKey}\n{System.Environment.StackTrace}");
+
         await EnsurePoolAsync(resourceKey, category, initialSize);
         return SpawnInternal(resourceKey, position, rotation, param);
     }

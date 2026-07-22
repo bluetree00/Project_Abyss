@@ -15,7 +15,27 @@ MonoBehaviour:
   themeMatch: Forest
   entries:
   - code: t
-    prefab: {fileID: 6311773184561708073, guid: 0f9c006fb32f5154485a8e57fc34c0cb,
+    prefab: {fileID: 3896737664713206570, guid: 805d7f6afd06de14aaa8e3a53e62c3e1,
+      type: 3}
+    yOffset: 0
+    scale: 0.42
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: p
+    prefab: {fileID: 7013660787077639941, guid: f6e828628267561408dfe173c70c4246,
+      type: 3}
+    yOffset: 0
+    scale: 0.38
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: tb
+    prefab: {fileID: 4055896239770210117, guid: c7746c2acf35be34b89ddd83b9af4bcb,
       type: 3}
     yOffset: 0
     scale: 0.4
@@ -24,38 +44,38 @@ MonoBehaviour:
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0.45
-  - code: p
-    prefab: {fileID: 6582730512412793593, guid: 81a4ae3b32471cc469f44a6af7acd727,
+  - code: tc
+    prefab: {fileID: 730165899074531412, guid: bf3cb3e31c6b90141a4aefeb4da7373e,
       type: 3}
     yOffset: 0
-    scale: 0.35
+    scale: 0.44
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: td
+    prefab: {fileID: 9188393060782003271, guid: c395f4c0b3f1f1241b793eed31bb55ca,
+      type: 3}
+    yOffset: 0
+    scale: 0.4
     randomYRotation: 1
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0.45
   - code: n
-    prefab: {fileID: 6458907534031036834, guid: 8027a374f0ceca94480a5bc31377188b,
+    prefab: {fileID: 730165899074531412, guid: bf3cb3e31c6b90141a4aefeb4da7373e,
       type: 3}
     yOffset: 0
-    scale: 0.45
+    scale: 0.4
     randomYRotation: 1
     sizeX: 1
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0.45
   - code: f
-    prefab: {fileID: 4984988325240244053, guid: d350eb392248fd048a2c03fb449f79c5,
-      type: 3}
-    yOffset: 0
-    scale: 1.5
-    randomYRotation: 1
-    sizeX: 1
-    sizeZ: 1
-    faceNearestWall: 0
-    wallInset: 0.45
-  - code: l
-    prefab: {fileID: 3388537039447241905, guid: 0763e557dfa7dc54798bfd19e2fcb0e4,
+    prefab: {fileID: 1031125914, guid: abc00000000007992870104272310159,
       type: 3}
     yOffset: 0
     scale: 1
@@ -64,10 +84,20 @@ MonoBehaviour:
     sizeZ: 1
     faceNearestWall: 0
     wallInset: 0.45
-  - code: m
-    prefab: {fileID: 863546763990780396, guid: 6f75e5dcad3441e4d9c06313c8dd1d13, type: 3}
+  - code: l
+    prefab: {fileID: 4055896239770210117, guid: c7746c2acf35be34b89ddd83b9af4bcb,
+      type: 3}
     yOffset: 0
-    scale: 1.2
+    scale: 0.26
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: m
+    prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
+    yOffset: 0
+    scale: 1
     randomYRotation: 1
     sizeX: 1
     sizeZ: 1

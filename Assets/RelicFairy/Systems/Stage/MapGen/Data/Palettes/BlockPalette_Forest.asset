@@ -19,7 +19,8 @@ MonoBehaviour:
   lighting:
     wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
       type: 3}
-    centerLightPrefab: {fileID: 0}
+    centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
     wallLightSpacing: 6
     wallLightHeightRatio: 0.4
     maxWallLights: 16
@@ -31,3 +32,4 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 41da9f765c0fa0e4ba5db242685baa9e, type: 2}
   - {fileID: 11400000, guid: d9d3d6e5e7a99af41b567bbfbfbca59b, type: 2}
   - {fileID: 11400000, guid: cdd01111ae2827d4c82f03699eb2da52, type: 2}
+  - {fileID: 11400000, guid: d406d13028b6aad4b860d6d7985d36af, type: 2}

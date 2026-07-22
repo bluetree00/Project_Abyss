@@ -71,10 +71,83 @@ public class RunProgressManager : MonoBehaviour
     /// <summary>지정 슬롯의 로컬 런 세이브를 삭제한다(사망/클리어/새 런 시작 시). 다른 슬롯 무영향.</summary>
     /// <summary>슬롯 삭제 — 런 세이브와 함께 <b>온보딩 완료 기록</b>도 초기화한다.
     /// (안 지우면 슬롯을 지우고 새로 시작해도 초회 온보딩이 스킵된다)</summary>
+    /// <summary>
+    /// 진행 중이던 런 세이브만 버린다. <b>초회 여부(온보딩)는 건드리지 않는다.</b>
+    /// 런 종료(사망/클리어)와 "스타트룸 미퇴장 세이브 폐기"가 이 경로다 —
+    /// 튜토리얼을 이미 마친 플레이어를 매번 초회로 되돌리면 안 된다.
+    /// </summary>
     public void ClearLocalRun(int slot)
     {
         _localStore.Delete(slot);
+    }
+
+    /// <summary>
+    /// 슬롯을 <b>처음 상태</b>로 되돌린다 — 세이브 + 초회 진행도(온보딩) + 시도 횟수.
+    /// "새 게임"과 "슬롯 삭제"만 이 경로다. 이 슬롯으로 다시 시작하면 초회 경험이 그대로 재현된다.
+    /// </summary>
+    public void ResetSlot(int slot)
+    {
+        _localStore.Delete(slot);
         BaseCampOnboardingDirector.ClearForSlot(slot);
+        ClearRetryCount(slot);
+    }
+
+    // ── 시도 횟수 (슬롯별) ─────────────────────────────────────
+    // 세이브 파일에 두면 런 종료 시 파일과 함께 지워져 항상 0이 된다. 슬롯 스코프 PlayerPrefs가 정본.
+
+    private static string RetryKey(int slot) => "run_retry_count_slot" + slot;
+
+    /// <summary>이 슬롯에서 런을 시작한 누적 횟수.</summary>
+    public static int GetRetryCount(int slot) => Mathf.Max(0, PlayerPrefs.GetInt(RetryKey(slot), 0));
+
+    /// <summary>새 런 진입 시 +1. 세이브 표시(로비 카드)의 "시도 N회" 근거.</summary>
+    public static void BumpRetryCount(int slot)
+    {
+        PlayerPrefs.SetInt(RetryKey(slot), GetRetryCount(slot) + 1);
+        PlayerPrefs.Save();
+    }
+
+    public static void ClearRetryCount(int slot)
+    {
+        PlayerPrefs.DeleteKey(RetryKey(slot));
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// 허브(베이스캠프) 체류를 저장한다. 런 세이브와 달리 <b>진행 중인 세션이 없어도</b> 쓴다.
+    ///
+    /// 예전엔 세이브가 런 안에서만 생겨서, 인트로를 깨고 게임을 끄면 슬롯이 빈 채로 남았다.
+    /// 그러면 다음 실행에서 "새 게임"밖에 못 누르고 → ResetSlot이 인트로 완료 플래그까지 지워
+    /// <b>프롤로그를 처음부터 다시 봐야 했다.</b> 허브에서 보낸 시간이 통째로 휘발된 것.
+    ///
+    /// 담는 건 "이 슬롯은 허브까지 왔다"는 사실뿐이다(isInStartRoom=true).
+    /// 무기·유물은 매 런 시작 의식(무형검 각성)에서 다시 갖추므로 저장하지 않는다.
+    /// </summary>
+    public void SaveHubProgress()
+    {
+        int slot = ActiveSlotIndex;
+        var prev = _localStore.Load(slot);
+
+        // 진행 중인 런 세이브를 허브 세이브로 덮지 않는다 — 런 중엔 허브에 올 일이 없지만,
+        // 순서가 꼬여도 실제 진행이 날아가지 않게 막는다.
+        if (prev != null && prev.hasActiveRun && !prev.isInStartRoom) return;
+
+        var d = new RunSaveData
+        {
+            slotIndex         = slot,
+            hasActiveRun      = true,
+            isInStartRoom     = true,                    // 이어하기 → 베이스캠프로 복귀
+            chapter           = prev?.chapter ?? (int)ChapterId.Chapter1,
+            retryCount        = GetRetryCount(slot),
+            playSeconds       = prev?.playSeconds ?? 0,  // 허브는 플레이 시계가 없어 직전 누적을 잇는다
+            progressPercent   = prev?.progressPercent ?? 0,
+            characterKey      = AppBootstrapper.Instance?.Loadout?.CharacterPrefabKey ?? string.Empty,
+            savedAt           = DateTime.UtcNow.ToString("o"),
+            saveVersion       = 1,
+            weaponCurrentSlot = -1,
+        };
+
+        _localStore.Save(slot, d);
     }
 
     /// <summary>
@@ -85,9 +158,15 @@ public class RunProgressManager : MonoBehaviour
     {
         if (session == null || !session.IsRunning) return;
 
+        // 저장 직전에 무기 상태를 캡처한다 — 강화/진화/승급은 런 도중 바뀌는데,
+        // 예전엔 씬 이탈에서만 캡처해 방 경계 저장·재련소 즉시저장이 낡은 값을 썼다.
+        session.CaptureWeaponSlotsFromPlayer();
+
         int slot  = ActiveSlotIndex;
         var prev  = _localStore.Load(slot);
-        int retry = prev?.retryCount ?? 0;
+        // 시도 횟수는 세이브 파일이 아니라 슬롯 카운터가 정본 — 런이 끝나면 세이브가 지워지므로
+        // 파일에서 이어받으면 영원히 0에 머문다.
+        int retry = GetRetryCount(slot);
 
         var data = BuildSaveData(session, slot, retry, false, prev);
         ApplyExtendedFields(data, session, meta);
@@ -167,6 +246,8 @@ public class RunProgressManager : MonoBehaviour
         WeaponData w1 = wm?.Weapon1Data ?? SlotFromSaved(s, 1);
         d.weapon0EnhanceLevel = w0?.enhanceLevel ?? 0;
         d.weapon1EnhanceLevel = w1?.enhanceLevel ?? 0;
+        d.weapon0EvolutionStage = w0?.evolutionStage ?? 0;
+        d.weapon1EvolutionStage = w1?.evolutionStage ?? 0;
         d.weapon0LegendId     = w0?.legendId ?? string.Empty;
         d.weapon1LegendId     = w1?.legendId ?? string.Empty;
     }
@@ -229,6 +310,7 @@ public class RunProgressManager : MonoBehaviour
             maxHp                  = ps?.MaxHp    ?? 100,
             runGold                = ps?.TempGold ?? 0,
             retryCount             = retryCount,
+            playSeconds            = session.PlaySeconds,
             progressPercent        = progress,
             itemCount              = session.ItemInventory.PlacedCount + session.ItemInventory.StagingCount,
             synergyCount           = MerlinRuneBridge.Instance != null ? MerlinRuneBridge.Instance.ActiveSynergyCount : 0,

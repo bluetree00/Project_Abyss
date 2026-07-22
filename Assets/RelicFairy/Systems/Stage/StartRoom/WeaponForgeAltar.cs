@@ -150,13 +150,11 @@ public class WeaponForgeAltar : MonoBehaviour
         var player = _player;
         if (player == null) return;
 
-        // 원거리 → 슬롯1 장착.
-        await GameRunBootstrapper.EquipWeaponToPlayerAsync(ranged, player);
+        // 원거리 → 항상 슬롯1(보조/Q) 고정 장착. 비활성으로 두어 주무기(무형검) 활성 상태를 건드리지 않는다.
+        // 무형검 스테이션을 참조하지 않음 — 획득 순서 독립.
+        await GameRunBootstrapper.EquipWeaponToPlayerAsync(
+            ranged, player, PlayerWeaponManager.Slot1, setActive: false);
         ct.ThrowIfCancellationRequested();
-
-        // 무형검(슬롯0)이 각성으로 이미 있으면 그쪽으로 되돌려 시작(원거리가 활성화됐을 수 있으므로). 없으면 그대로.
-        if (loadout.WeaponSlot0 != null && player.WeaponManager != null)
-            await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
 
         // 장착 완료 → 허브에서 전투 HUD 표시(테스트용).
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);

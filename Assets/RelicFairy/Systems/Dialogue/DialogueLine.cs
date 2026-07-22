@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public enum DialogueSpeaker { None, God, Shadow, Lich }
+public enum DialogueSpeaker { None, God, Shadow, Lich, Mordred, Arthur, Knight }
 
 [Serializable]
 public class DialogueLine

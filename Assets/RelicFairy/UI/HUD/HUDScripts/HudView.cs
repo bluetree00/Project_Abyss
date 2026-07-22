@@ -13,6 +13,20 @@ public sealed class HudView : MonoBehaviour
     private static readonly Color EnhanceMatIcon = new(0.90f, 0.55f, 0.20f); // 강화재료(주황)
     private static readonly Color RuneOreIcon    = new(0.35f, 0.70f, 0.95f); // 원석(청록)
 
+    // 재화별 테두리 틴트 — 같은 테두리 아트를 색으로만 구분한다(재화당 아트를 따로 받지 않기 위함).
+    // 소비처와 색을 1:1로 묶어 "이 색 = 이 방에서 쓰는 것"이 학습되게 한다.
+    private static readonly Color GoldFrameTint    = new(0.85f, 0.70f, 0.29f); // 골드   → 상점
+    private static readonly Color EnhanceFrameTint = new(0.90f, 0.55f, 0.20f); // 강화재료 → 재련소
+    private static readonly Color RuneOreFrameTint = new(0.35f, 0.70f, 0.95f); // 원석    → 정제소
+
+    // 툴팁 문구 — 소비처 + "런이 끝나면 사라진다"(하드리셋 규칙을 재화 단에서 알린다).
+    private const string TipGoldTitle    = "골드";
+    private const string TipGoldBody     = "상점에서 물건과 서비스를 산다.\n런이 끝나면 사라진다.";
+    private const string TipEnhanceTitle = "강화재료";
+    private const string TipEnhanceBody  = "재련소에서 무기를 강화·진화한다.\n런이 끝나면 사라진다.";
+    private const string TipRuneOreTitle = "원석";
+    private const string TipRuneOreBody  = "정제소에서 존핵 룬을 벼린다.\n런이 끝나면 사라진다.";
+
     [Header("Sections")]
     [SerializeField] private GameObject topBarRoot;
     [SerializeField] private CombatPanelView combatPanel;
@@ -126,11 +140,13 @@ public sealed class HudView : MonoBehaviour
 
         // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리). 테두리엔 코인이 포함됨.
         MakeCurrencyPill("Pill_Gold", goldFrameSprite != null ? goldFrameSprite : currencyFrameSprite,
-                         iconColor: null, out _, reuseText: goldText);
+                         iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _, reuseText: goldText);
 
         // 강화재료 / 원석 — 코인 없는 공용 테두리가 있으면 그걸, 없으면 배경(내부)만.
-        _enhanceMatSlot = MakeCurrencyPill("Pill_EnhanceMat", currencyFrameSprite, EnhanceMatIcon, out _enhanceMatText);
-        _runeOreSlot    = MakeCurrencyPill("Pill_RuneOre",    currencyFrameSprite, RuneOreIcon,    out _runeOreText);
+        _enhanceMatSlot = MakeCurrencyPill("Pill_EnhanceMat", currencyFrameSprite, EnhanceMatIcon,
+                                           EnhanceFrameTint, TipEnhanceTitle, TipEnhanceBody, out _enhanceMatText);
+        _runeOreSlot    = MakeCurrencyPill("Pill_RuneOre",    currencyFrameSprite, RuneOreIcon,
+                                           RuneOreFrameTint, TipRuneOreTitle, TipRuneOreBody, out _runeOreText);
         _enhanceMatSlot.SetActive(false);
         _runeOreSlot.SetActive(false);
 
@@ -150,6 +166,7 @@ public sealed class HudView : MonoBehaviour
 
     /// <summary>재화 pill 1개: 공통 배경(골드바 내부) + 테두리(선택) + 아이콘(선택) + 수치.</summary>
     private GameObject MakeCurrencyPill(string name, Sprite frame, Color? iconColor,
+                                        Color frameTint, string tipTitle, string tipBody,
                                         out TMP_Text valueText, TMP_Text reuseText = null)
     {
         var pill = new GameObject(name, typeof(RectTransform));
@@ -160,8 +177,14 @@ public sealed class HudView : MonoBehaviour
         le.preferredWidth = currencyPillSize.x; le.preferredHeight = currencyPillSize.y;
         le.minWidth       = currencyPillSize.x; le.minHeight       = currencyPillSize.y;
 
-        AddStretchedImage(prt, "Inner", goldInnerSprite);   // 모든 재화 공통 배경
-        AddStretchedImage(prt, "Frame", frame);
+        // 호버 판정면 — pill 자체 이미지는 전부 raycastTarget=false라 이게 없으면 툴팁이 안 뜬다.
+        var hit = prt.gameObject.AddComponent<Image>();
+        hit.color = new Color(0f, 0f, 0f, 0f);
+        hit.raycastTarget = true;
+
+        AddStretchedImage(prt, "Inner", goldInnerSprite);            // 모든 재화 공통 배경
+        AddStretchedImage(prt, "Frame", frame, frameTint);           // 테두리는 재화색으로 틴트
+        UITooltipTrigger.Attach(prt.gameObject, tipTitle, tipBody, frameTint);
 
         // 내용(아이콘 + 수치) — 테두리 안쪽으로 인셋
         var content = new GameObject("Content", typeof(RectTransform), typeof(HorizontalLayoutGroup));
@@ -208,7 +231,7 @@ public sealed class HudView : MonoBehaviour
         return pill;
     }
 
-    private static void AddStretchedImage(Transform parent, string name, Sprite sprite)
+    private static void AddStretchedImage(Transform parent, string name, Sprite sprite, Color? tint = null)
     {
         if (sprite == null) return;
 
@@ -223,7 +246,7 @@ public sealed class HudView : MonoBehaviour
         var img = go.GetComponent<Image>();
         img.sprite        = sprite;
         img.type          = Image.Type.Sliced;
-        img.color         = Color.white;
+        img.color         = tint ?? Color.white;
         img.raycastTarget = false;
     }
 

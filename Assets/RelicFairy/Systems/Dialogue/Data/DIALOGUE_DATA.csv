@@ -1,11 +1,13 @@
 sequence_id,line_order,speaker,illustration_key,text
-StartRoom,0,God,Illust_God_Default,"눈을 떴는가, 기사여. ...오래도 잠들어 있었군."
-StartRoom,1,God,Illust_God_Default,그대는 원탁 앞에서 스러졌다 — 검이 어깨에 닿기도 전에.
-StartRoom,2,Shadow,Illust_Shadow_Default,...또 하나. 이번엔 얼마나 버틸까.
-StartRoom,3,God,Illust_God_Default,허나 이번 생엔 다르다. 빛을 따라 오르라 — 그대가 무릎 꿇었던 그 자리로.
+StartRoom,0,God,Illust_God_Default,"눈을 떴는가, 기사여. ……그대의 영혼은 내가 붙들어 두었다."
+StartRoom,1,God,Illust_God_Default,이곳은 어느 땅에도 없는 자리다. 그대를 붙들기 위해 <b>내가 불러낸 공간이지.</b>
+StartRoom,2,God,Illust_God_Default,그대가 받았던 무형검은 잃지 않았다. <b>내가 다시 그대 손에 쥐어주마.</b>
+StartRoom,3,Shadow,Illust_Shadow_Default,…또 하나. 이번엔 얼마나 버틸까.
+StartRoom,4,God,Illust_God_Default,"허나 검 하나로는 닿지 못한다. 스러진 기사들의 의지, <b>유물</b>의 힘을 함께 지녀라."
+StartRoom,5,God,Illust_God_Default,채비를 갖추었거든 그대가 무릎 꿇었던 <b>그날의 자리로 돌아가라.</b>
 StartRoom_R1,0,Shadow,Illust_Shadow_Default,...또 돌아왔군. 유물도 무기도 늘 같은 자리에서 널 기다려.
 StartRoom_R1,1,God,Illust_God_Default,"채비를 갖추렴, 작은 빛. 문은 언제든 열려 있어."
-StartRoom_R2,0,God,Illust_God_Default,다시 깨어났구나. 유물도, 무기도 — 네 손길을 기다리고 있어.
+StartRoom_R2,0,God,Illust_God_Default,"다시 깨어났구나. 유물도, 무기도 네 손길을 기다리고 있어."
 StartRoom_R2,1,Shadow,Illust_Shadow_Default,순환은 지치지 않아. ...너는 어떨지 모르겠지만.
 SwordAwaken,0,God,Illust_God_Default,"원탁 앞에 무릎 꿇던 순간을 기억하는가. 검이 어깨에 닿기도 전에, 그대는 스러졌지."
 SwordAwaken,1,God,Illust_God_Default,그 검은 끝내 형(形)을 얻지 못했다. 어떤 검이 될지 정해지지 않은 채로.
@@ -17,53 +19,63 @@ BossRoom,1,God,Illust_God_Default,두려워하지 마. 너는 신성한 빛을 �
 RunClear,0,God,Illust_God_Default,"해냈어. 잘했어, 나의 영혼."
 RunClear,1,Shadow,Illust_Shadow_Default,순환이 한 바퀴 돌았군. 하지만 심연은 끝이 없어.
 RunClear,2,God,Illust_God_Default,"잠시 쉬어. 유물도, 영혼도 지쳐 있을 테니."
-RunFail_First,0,God,Illust_God_Default,"...돌아왔구나. 처음이지? 많이 놀랐을 거야."
-RunFail_First,1,God,Illust_God_Default,"괜찮아. 영혼은 죽지 않아. 그저 유물을 떠나 내게 돌아온 것뿐이야."
-RunFail_First,2,Shadow,Illust_Shadow_Default,"...벌써 한 번. 심연은 이제 막 네 이름을 외우기 시작했어."
+RunClear_First,0,God,Illust_God_Default,"네가... 정말로 끝까지 갔구나. 이런 날이 오리라 믿었지만, 이렇게 빨리는 아니었어."
+RunClear_First,1,Shadow,Illust_Shadow_Default,심연이 처음으로 제 바닥을 보였다. ...그건 축하할 일이 아니야.
+RunClear_First,2,God,Illust_God_Default,무슨 뜻이지.
+RunClear_First,3,Shadow,Illust_Shadow_Default,"바닥을 본 자는 그 아래가 궁금해지는 법이거든. ...또 갈 거잖아, 너."
+RunClear_R1,0,God,Illust_God_Default,돌아왔구나. 이번엔 제 발로. ...그게 얼마나 드문 일인지 아니?
+RunClear_R1,1,Shadow,Illust_Shadow_Default,심연은 네가 나간 걸 눈치채지 못했어. 그저 잠깐 조용해졌을 뿐이지.
+RunClear_R2,0,Shadow,Illust_Shadow_Default,또 살아 나왔군. ...슬슬 재미없어지는데.
+RunClear_R2,1,God,Illust_God_Default,"재미로 하는 게 아니야. 하나씩, 되찾고 있는 거지."
+RunClear_R3,0,God,Illust_God_Default,유물이 따뜻해. 네가 잘 써줬다는 뜻이야.
+RunClear_R3,1,Shadow,Illust_Shadow_Default,따뜻한 건 잠깐이야. 식으면 또 아래가 그리워질 테니.
+RunFail_First,0,God,Illust_God_Default,...돌아왔구나. 처음이지? 많이 놀랐을 거야.
+RunFail_First,1,God,Illust_God_Default,괜찮아. 영혼은 죽지 않아. 그저 유물을 떠나 내게 돌아온 것뿐이야.
+RunFail_First,2,Shadow,Illust_Shadow_Default,...벌써 한 번. 심연은 이제 막 네 이름을 외우기 시작했어.
 RunFail_R1,0,Shadow,Illust_Shadow_Default,"...또 돌아왔군, 작은 빛."
-RunFail_R1,1,God,Illust_God_Default,"다시 깃들면 돼. 유물은 아직 널 기다려."
-RunFail_R2,0,God,Illust_God_Default,"아파했겠구나. 하지만 넌 다시 여기 있어."
+RunFail_R1,1,God,Illust_God_Default,다시 깃들면 돼. 유물은 아직 널 기다려.
+RunFail_R2,0,God,Illust_God_Default,아파했겠구나. 하지만 넌 다시 여기 있어.
 RunFail_R2,1,Shadow,Illust_Shadow_Default,"순환은 그런 거야. 익숙해지든지, 부서지든지."
-RunFail_R3,0,God,Illust_God_Default,"숨을 골라. 심연은 어디 가지 않아."
-RunFail_R4,0,Shadow,Illust_Shadow_Default,"몇 번째였더라. ...세는 걸 그만둔 지 오래야."
-RunFail_R4,1,God,Illust_God_Default,"숫자는 중요하지 않아. 네가 다시 일어선다는 것만 중요해."
+RunFail_R3,0,God,Illust_God_Default,숨을 골라. 심연은 어디 가지 않아.
+RunFail_R4,0,Shadow,Illust_Shadow_Default,몇 번째였더라. ...세는 걸 그만둔 지 오래야.
+RunFail_R4,1,God,Illust_God_Default,숫자는 중요하지 않아. 네가 다시 일어선다는 것만 중요해.
 RunFail_R5,0,God,Illust_God_Default,"돌아온 걸 환영해, 나의 영혼."
 RunFail_R6,0,Shadow,Illust_Shadow_Default,"그 상처, 유물에는 남지 않아. 하지만 너는... 기억하겠지."
-RunFail_R7,0,God,Illust_God_Default,"실패가 아니야. 그저 한 걸음 물러선 것뿐."
-RunFail_R7,1,Shadow,Illust_Shadow_Default,"...위로가 참 한결같군."
-RunFail_R8,0,Shadow,Illust_Shadow_Default,"또 너야. 심연도 슬슬 지겨워할 텐데."
-RunFail_R9,0,God,Illust_God_Default,"다시 채비를 갖추렴. 이번엔 조금 더 멀리 갈 수 있을 거야."
-RunFail_R10,0,Shadow,Illust_Shadow_Default,"죽음은 문이야. 넌 그저 자꾸 되돌아오는 열쇠고."
-RunFail_R11,0,God,Illust_God_Default,"두렵니? ...두려워도 괜찮아. 두려움도 빛의 일부야."
-RunFail_R12,0,Shadow,Illust_Shadow_Default,"유물은 흠집 하나 없어. ...참 편리한 몸이지."
+RunFail_R7,0,God,Illust_God_Default,실패가 아니야. 그저 한 걸음 물러선 것뿐.
+RunFail_R7,1,Shadow,Illust_Shadow_Default,...위로가 참 한결같군.
+RunFail_R8,0,Shadow,Illust_Shadow_Default,또 너야. 심연도 슬슬 지겨워할 텐데.
+RunFail_R9,0,God,Illust_God_Default,다시 채비를 갖추렴. 이번엔 조금 더 멀리 갈 수 있을 거야.
+RunFail_R10,0,Shadow,Illust_Shadow_Default,죽음은 문이야. 넌 그저 자꾸 되돌아오는 열쇠고.
+RunFail_R11,0,God,Illust_God_Default,두렵니? ...두려워도 괜찮아. 두려움도 빛의 일부야.
+RunFail_R12,0,Shadow,Illust_Shadow_Default,유물은 흠집 하나 없어. ...참 편리한 몸이지.
 RunFail_R12,1,God,Illust_God_Default,"그러니 다시 깃들어. 처음부터, 몇 번이고."
-RunFail_T10_R1,0,Shadow,Illust_Shadow_Default,"열 번을 넘겼군. 이쯤 되면 순환도 너를 손님이 아니라 주민으로 여길 거야."
-RunFail_T10_R1,1,God,Illust_God_Default,"...그래도 넌 매번 돌아와. 그게 답이야."
-RunFail_T10_R2,0,God,Illust_God_Default,"지쳤지. 알아. 나도... 이 반복이 마냥 편치만은 않아."
-RunFail_T10_R3,0,Shadow,Illust_Shadow_Default,"너는 왜 자꾸 돌아오는 걸까. ...누가 널 이렇게까지 부르는 걸까."
-RunFail_T10_R4,0,God,Illust_God_Default,"유물은 여전히 널 기다려. 하지만 나는... 가끔 궁금해. 이게 정말 구원인지."
+RunFail_T10_R1,0,Shadow,Illust_Shadow_Default,열 번을 넘겼군. 이쯤 되면 순환도 너를 손님이 아니라 주민으로 여길 거야.
+RunFail_T10_R1,1,God,Illust_God_Default,...그래도 넌 매번 돌아와. 그게 답이야.
+RunFail_T10_R2,0,God,Illust_God_Default,지쳤지. 알아. 나도... 이 반복이 마냥 편치만은 않아.
+RunFail_T10_R3,0,Shadow,Illust_Shadow_Default,너는 왜 자꾸 돌아오는 걸까. ...누가 널 이렇게까지 부르는 걸까.
+RunFail_T10_R4,0,God,Illust_God_Default,유물은 여전히 널 기다려. 하지만 나는... 가끔 궁금해. 이게 정말 구원인지.
 RunFail_T10_R5,0,Shadow,Illust_Shadow_Default,"이 정도 반복했으면 뭔가 이상하다는 걸 눈치챘을 텐데. ...아니면, 모르는 편이 나을지도."
-RunFail_T10_R6,0,God,Illust_God_Default,"다시 일어서. 몇 번이든. 내가 널 부른 이유가 분명 있으니까."
+RunFail_T10_R6,0,God,Illust_God_Default,다시 일어서. 몇 번이든. 내가 널 부른 이유가 분명 있으니까.
 RunFail_T10_R6,1,Shadow,Illust_Shadow_Default,"...그 '이유'라는 거, 정말 네 것이 맞긴 할까."
 RunFail_T25_R1,0,Shadow,Illust_Shadow_Default,"스물다섯 번. ...멀린이 부른 영혼치고는, 참 오래도 버티는군."
-RunFail_T25_R1,1,God,Illust_God_Default,"그 이름을... 네가 어떻게."
+RunFail_T25_R1,1,God,Illust_God_Default,그 이름을... 네가 어떻게.
 RunFail_T25_R2,0,Shadow,Illust_Shadow_Default,"너 이전에도 영혼은 있었어. 전부 이 자리에 서서, 똑같은 위로를 들었지."
-RunFail_T25_R3,0,God,Illust_God_Default,"...미안해. 나는 너에게 다 말해주지 못했어."
-RunFail_T25_R3,1,Shadow,Illust_Shadow_Default,"이제야 양심이 찔리나 보군."
+RunFail_T25_R3,0,God,Illust_God_Default,...미안해. 나는 너에게 다 말해주지 못했어.
+RunFail_T25_R3,1,Shadow,Illust_Shadow_Default,이제야 양심이 찔리나 보군.
 RunFail_T25_R4,0,Shadow,Illust_Shadow_Default,"이 순환을 누가 설계했는지, 슬슬 묻고 싶지 않아?"
-RunFail_M5,0,God,Illust_God_Default,"다섯 번째로구나. ...너는 참 강해. 어떤 영혼은 두 번째를 넘기지 못했는데."
+RunFail_M5,0,God,Illust_God_Default,다섯 번째로구나. ...너는 참 강해. 어떤 영혼은 두 번째를 넘기지 못했는데.
 RunFail_M5,1,Shadow,Illust_Shadow_Default,"그건 강한 게 아니라 벗어나지 못하는 거야. ...하지만 인정하지, 끈질기긴 해."
-RunFail_M10,0,Shadow,Illust_Shadow_Default,"열 번. ...나는 이 숫자를 기억해. 이쯤에서 대부분의 영혼이 무너졌거든."
+RunFail_M10,0,Shadow,Illust_Shadow_Default,열 번. ...나는 이 숫자를 기억해. 이쯤에서 대부분의 영혼이 무너졌거든.
 RunFail_M10,1,God,Illust_God_Default,"하지만 너는 여기 서 있어, 나의 빛."
 RunFail_M10,2,Shadow,Illust_Shadow_Default,"...그래, 서 있군. 그게 축복인지 저주인지는 아직 모르겠지만."
-RunFail_M20,0,God,Illust_God_Default,"스무 번이야. 나조차 이 순환이 어디로 향하는지 확신이 흐려져."
-RunFail_M20,1,Shadow,Illust_Shadow_Default,"확신이 흐려진다라. ...신이 그런 말을 할 줄이야."
-RunFail_M20,2,God,Illust_God_Default,"...그래도 나는 너를 구하려 불렀어. 그건 변하지 않아."
+RunFail_M20,0,God,Illust_God_Default,스무 번이야. 나조차 이 순환이 어디로 향하는지 확신이 흐려져.
+RunFail_M20,1,Shadow,Illust_Shadow_Default,확신이 흐려진다라. ...신이 그런 말을 할 줄이야.
+RunFail_M20,2,God,Illust_God_Default,...그래도 나는 너를 구하려 불렀어. 그건 변하지 않아.
 RunFail_M30,0,Shadow,Illust_Shadow_Default,"서른 번. 너는 이제 이 심연의 일부야. 흉터가 아니라, 뼈대지."
-RunFail_M30,1,God,Illust_God_Default,"그만두고 싶니? ...그래도 돼. 나는 널 원망하지 않아."
-RunFail_M30,2,Shadow,Illust_Shadow_Default,"봐. 신도 지쳤어. ...하지만 너는? 너는 아직 눈이 살아있군."
-RunFail_M50,0,Shadow,Illust_Shadow_Default,"쉰 번. ...이제 인정해야겠어. 너는 실험체가 아니야. 너는 예외야."
-RunFail_M50,1,God,Illust_God_Default,"예외?"
+RunFail_M30,1,God,Illust_God_Default,그만두고 싶니? ...그래도 돼. 나는 널 원망하지 않아.
+RunFail_M30,2,Shadow,Illust_Shadow_Default,봐. 신도 지쳤어. ...하지만 너는? 너는 아직 눈이 살아있군.
+RunFail_M50,0,Shadow,Illust_Shadow_Default,쉰 번. ...이제 인정해야겠어. 너는 실험체가 아니야. 너는 예외야.
+RunFail_M50,1,God,Illust_God_Default,예외?
 RunFail_M50,2,Shadow,Illust_Shadow_Default,"설계를 벗어난 영혼. 누군가는 이걸 두려워할 거야. ...그 누군가가 누군지는, 너도 곧 알게 될 테고."
 RunFail_M50,3,God,Illust_God_Default,"...작은 빛. 네가 여기까지 온 건, 내가 부른 힘 때문만은 아닐지도 몰라."
 Lich_Intro,0,Lich,Lich_Portrait,알고 있었어.
@@ -148,3 +160,23 @@ Dragon_Encounter_R2,0,Dragon,,"끈질긴 불씨로군. ...태워주마, 몇 번�
 DeathKnight_Encounter_First,0,DeathKnight,,살아있는 자여. 죽음의 영역에 잘 왔다.
 DeathKnight_Encounter_R1,0,DeathKnight,,또 돌아왔나. 죽음은 너를 환영한다.
 DeathKnight_Encounter_R2,0,DeathKnight,,너의 집착이 가상하군. ...영원히 이곳에 머물게 해주마.
+Intro_Walk1,0,Knight,,평생을 이 하루를 위해 걸었다.
+Intro_Walk1,1,Knight,,원탁의 검을 받는다. ……단 한 번뿐인 순간.
+Intro_Walk2,0,Shadow,Illust_Shadow_Default,그 검을 받으면 그대는 무엇이 되지?
+Intro_Walk2,1,Knight,,누구냐. 지금 말한 자가.
+Intro_Walk3,0,Shadow,Illust_Shadow_Default,……돌아가라. 아직은 늦지 않았다.
+Intro_Mordred,0,Mordred,,고개를 들라. 이 검은 아직 아무것도 아니다.
+Intro_Mordred,1,Mordred,,무엇이 될지는 그대의 생애가 정한다.
+Intro_Mordred,2,Mordred,,받으라. <b>무한의 가능성</b>을.
+Intro_LichCorrupt,0,Lich,,<color=#A855F7>……거기까지다.</color>
+Intro_LichCorrupt,1,Lich,,<color=#A855F7>이 대관은 없던 일이 된다. <b>네가 무엇이 될 수 있었든.</b></color>
+Intro_LichCorrupt,2,Lich,,<color=#A855F7>허나 내 손은 쓰지 않지. 저 사내의 손으로 끝내주마.</color>
+Intro_LichCorrupt,3,Mordred,,누구냐! <b>모습을 드러내라.</b>
+Intro_LichCorrupt,4,Lich,,"<color=#A855F7>원탁 최강의 기사여. <b>네 그 강함째로, 내 것이 되어라.</b></color>"
+Intro_LichCorrupt,5,Mordred,,<color=#9A6B6B>크… 아…</color>
+Intro_LichCorrupt,6,Mordred,,<color=#8B2020>아아—</color>
+Mordred_Corrupted,0,Mordred,,<color=#E0453F>……검을. 내가. 전한다.</color>
+Mordred_Corrupted,1,Mordred,,<color=#E0453F>그대의 어깨에. <b>죽음으로.</b></color>
+Intro_Prologue,0,None,Illust_Intro_Page03,아서의 시대. 원탁에 앉을 자격은 오직 검으로 주어졌다.
+Intro_Prologue,1,None,Illust_Intro_Page02,그 검은 왕이 내리지 않는다. 원탁의 가장 강한 기사가 건넨다.
+Intro_Prologue,2,None,Illust_Intro_Page01,"오늘, 한 기사가 자신의 검을 받으러 간다."

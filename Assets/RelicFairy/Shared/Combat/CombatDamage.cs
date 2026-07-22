@@ -21,11 +21,31 @@ using UnityEngine;
 /// ⑪에서 서약 OnAttackHit을 부르므로, 서약이 주는 피해를 여기로 넣으면 <b>무한 재귀</b>한다.
 /// 서약 AoE·화상 DoT·시너지·처형은 <see cref="CombatQuery.DealSynergyDamage"/> /
 /// MonsterBase.TakeSynergyDamage(경량 경로)를 계속 사용한다.
+/// 이 규약이 깨져도 게임이 멈추지 않도록 <see cref="MaxDepth"/> 깊이 제한이 최후의 안전망으로 깔려 있다.
 /// </summary>
 public static class CombatDamage
 {
     // hitEffectKey 미할당 시 사용할 공용 히트 VFX.
     private const string FallbackHitEffectKey = "HitEffect_02";
+
+    /// <summary>
+    /// Deal() 중첩 허용 깊이. 중첩 자체는 <b>정상</b>이다 — ⑪의 패시브/서약이 다시 주 피해를 내는
+    /// 설계가 들어오면 깊이 2~3이 정상 동작이 된다. 막으려는 건 자기 자신으로 되돌아오는
+    /// <b>순환</b>뿐이라, 실제 설계가 쓸 만한 깊이보다 넉넉히 잡고 그 위에서만 끊는다.
+    /// </summary>
+    private const int MaxDepth = 4;
+
+    // 현재 Deal() 중첩 깊이. 전투는 메인 스레드 전용이라 static 카운터로 충분하다.
+    private static int s_depth;
+    private static bool s_depthWarned;   // 폭주 시 콘솔이 같은 경고로 뒤덮이지 않게 1회만 경고
+
+    // 도메인 리로드 OFF: 2회차 진입 시 예외로 남은 깊이/경고 플래그가 잔류해 Deal이 통째로 막힌다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        s_depth = 0;
+        s_depthWarned = false;
+    }
 
     // 아이템 형태변형 추가타 질의 버퍼(재사용 — alloc 방지)
     private static readonly List<MonsterBase> s_shapeBuf = new();
@@ -84,8 +104,32 @@ public static class CombatDamage
     public static bool IsSkillAction(WeaponActionType a) =>
         a == WeaponActionType.QSkill || a == WeaponActionType.ESkill || a == WeaponActionType.RSkill;
 
-    /// <summary>주 피해를 적용한다. 반환값은 실제 적용된 최종 피해(0이면 무효/무피해).</summary>
+    /// <summary>
+    /// 주 피해를 적용한다. 반환값은 실제 적용된 최종 피해(0이면 무효/무피해).
+    ///
+    /// 깊이 제한만 담당하고 실제 처리는 <see cref="DealInternal"/>에 있다.
+    /// 정상 중첩(깊이 1~<see cref="MaxDepth"/>)은 그대로 통과하고, 그 위로 쌓이는 순환만 끊는다.
+    /// </summary>
     public static float Deal(in Request req)
+    {
+        if (s_depth >= MaxDepth)
+        {
+            if (!s_depthWarned)
+            {
+                s_depthWarned = true;
+                Debug.LogWarning(
+                    $"[CombatDamage] Deal() 중첩이 {MaxDepth}를 넘어 중단했다 — 주 피해가 자기 자신을 다시 부르는 순환이 생겼다. " +
+                    "2차 피해(서약 AoE·DoT·시너지)는 CombatQuery.DealSynergyDamage / TakeSynergyDamage를 써야 한다.");
+            }
+            return 0f;
+        }
+
+        s_depth++;
+        try     { return DealInternal(in req); }
+        finally { s_depth--; }   // 중간에 예외가 나도 깊이가 새지 않게 보장
+    }
+
+    private static float DealInternal(in Request req)
     {
         var target = req.Target;
         var owner  = req.Owner;

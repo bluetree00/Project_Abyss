@@ -17,6 +17,7 @@ using UnityEngine.UI;
 public sealed class UI_ShopPanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 상점 이용 중 시간정지 + 입력잠금
+    public override bool CloseOnEscape  => true; // ESC = 나가기(기존 동작, EscKeyListener 공용 경로)
 
     private const float WindowW = 1100f;
     // 카드 셀 높이를 308로 올려 셀 내부 여유(=308-8-292=8px)를 확보하고, 5개 이상(2행) 슬롯이
@@ -41,12 +42,6 @@ public sealed class UI_ShopPanel : UI_Popup
     {
         base.Init();
         BuildChrome();
-    }
-
-    private void Update()
-    {
-        if (!_closing && Input.GetKeyDown(KeyCode.Escape))
-            ClosePopupUI();
     }
 
     private void OnDestroy()

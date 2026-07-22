@@ -27,12 +27,12 @@ ModelImporter:
     removeConstantScaleCurves: 1
     motionNodeName: root
     animationImportErrors: 
-    animationImportWarnings: Event AE_BeginTrail has a time (2.206741) outside the
+    animationImportWarnings: Event AE_BeginTrail has a time (4.560598) outside the
       clip's valid range (0.000000..2.066667). It will never be firedEvent SpawnSlashEffect1
-      has a time (2.206741) outside the clip's valid range (0.000000..2.066667).
-      It will never be firedEvent AE_EndTrail has a time (6.620223) outside the clip's
-      valid range (0.000000..2.066667). It will never be firedEvent AE_AttackEnd
-      has a time (8.826964) outside the clip's valid range (0.000000..2.066667).
+      has a time (4.560598) outside the clip's valid range (0.000000..2.066667).
+      It will never be firedEvent AE_EndTrail has a time (13.681794) outside the
+      clip's valid range (0.000000..2.066667). It will never be firedEvent AE_AttackEnd
+      has a time (18.242392) outside the clip's valid range (0.000000..2.066667).
       It will never be fired
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
@@ -71,28 +71,28 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 2.206741
+      - time: 4.560598
         functionName: AE_BeginTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 2.206741
+      - time: 4.560598
         functionName: SpawnSlashEffect1
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 6.620223
+      - time: 13.681793
         functionName: AE_EndTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 8.826964
+      - time: 18.242392
         functionName: AE_AttackEnd
         data: 
         objectReferenceParameter: {instanceID: 0}

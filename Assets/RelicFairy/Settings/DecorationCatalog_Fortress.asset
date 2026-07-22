@@ -1,0 +1,164 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbb2e2e4921128a43971504ab20ce783, type: 3}
+  m_Name: DecorationCatalog_Fortress
+  m_EditorClassIdentifier: Assembly-CSharp::DecorationCatalogSO
+  themeMatch: Fortress
+  entries:
+  - code: chn
+    prefab: {fileID: 1031056124, guid: abc00000000015661364633905279111, type: 3}
+    yOffset: 4
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.3
+  - code: bar
+    prefab: {fileID: 1031059812, guid: abc00000000010578237719623336501, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.2
+  - code: skl
+    prefab: {fileID: 1031124622, guid: abc00000000004599608608191042394, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: rib
+    prefab: {fileID: 1031123950, guid: abc00000000001009201961305425443, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: web
+    prefab: {fileID: 1031129995, guid: abc00000000012134693225591956782, type: 3}
+    yOffset: 5
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.25
+  - code: cab
+    prefab: {fileID: 1031120906, guid: abc00000000016608271266747111605, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 2
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.3
+  - code: dor
+    prefab: {fileID: 1031122542, guid: abc00000000001102302309030199405, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: wdb
+    prefab: {fileID: 1031125914, guid: abc00000000007992870104272310159, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: cst
+    prefab: {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: ben
+    prefab: {fileID: 1031120411, guid: abc00000000000075666681204580267, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r1
+    prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r2
+    prefab: {fileID: 1031125300, guid: abc00000000015461637500741923270, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: lL
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 2
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lM
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 4
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lH
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 6
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lC
+    prefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0

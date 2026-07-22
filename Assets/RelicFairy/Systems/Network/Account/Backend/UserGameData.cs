@@ -15,8 +15,31 @@ public class UserGameData
     public int totalGoldEarned;   // 누적 골드 획득량 (통계용)
 
     // ── 보스 조우 기록 ─────────────────────────────────
-    /// <summary>리치 보스방에 진입한 누적 횟수. 3 이상이면 Phase 2 해금.</summary>
+    /// <summary>리치 보스방에 진입한 누적 횟수(대사 변주·통계용). 봉인 해금은 sealBrokenBossIds가 담당.</summary>
     public int lichEncounterCount;
+
+    // ── 보스 봉인(2페이지) 해금 — 메타 영구 ──────────────
+    /// <summary>봉인이 해제된 보스 id 목록(쉼표 구분 문자열). 초회 클리어 시 해당 보스 id 추가 → 이후 페이즈2 해금.
+    /// 백엔드가 flat 컬럼(int/문자열)만 저장하므로 리스트 대신 CSV 문자열로 보관한다.</summary>
+    public string sealBrokenBossIds = "";
+
+    /// <summary>해당 보스의 봉인이 해제됐는지(페이즈2 해금 여부).</summary>
+    public bool IsBossSealBroken(string bossId)
+    {
+        if (string.IsNullOrEmpty(bossId) || string.IsNullOrEmpty(sealBrokenBossIds)) return false;
+        foreach (var id in sealBrokenBossIds.Split(','))
+            if (id == bossId) return true;
+        return false;
+    }
+
+    /// <summary>보스 봉인을 해제한다(초회 클리어). 이미 해제됐으면 false(중복 저장 방지).</summary>
+    public bool BreakBossSeal(string bossId)
+    {
+        if (string.IsNullOrEmpty(bossId) || IsBossSealBroken(bossId)) return false;
+        sealBrokenBossIds = string.IsNullOrEmpty(sealBrokenBossIds)
+            ? bossId : sealBrokenBossIds + "," + bossId;
+        return true;
+    }
 
     // ── 유물의 각성 ────────────────────────────────────
     public int abyssEssence;           // 심연의 정수 (각성 재화)
@@ -40,6 +63,7 @@ public class UserGameData
         totalGoldEarned  = 0;
 
         lichEncounterCount   = 0;
+        sealBrokenBossIds    = "";
 
         abyssEssence         = 0;
         awakeningLevelSword  = 0;
@@ -62,11 +86,11 @@ public class UserGameData
         if (chapterNum > highestChapter)
             highestChapter = chapterNum;
 
+        // 골드는 <b>런 재화</b>다(상점 소비 = PlayerRunState.TempGold). 런을 넘겨 쌓지 않는다.
+        // 과거엔 gold 에도 누적했는데 소비처가 하나도 없어, 로비에 "쓸 수 없는 숫자"만 불어났다.
+        // 영구 이월은 각성 정수(abyssEssence) 하나뿐 — 통계용 누적만 남긴다.
         if (result.GainedGold > 0)
-        {
-            gold            += result.GainedGold;
             totalGoldEarned += result.GainedGold;
-        }
 
         if (result.GainedEssence > 0)
             abyssEssence += result.GainedEssence;

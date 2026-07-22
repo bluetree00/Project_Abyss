@@ -123,7 +123,7 @@ public sealed class SolarDescentSkillRuntime : ISkillRuntime
         // 몬스터로 좁히지 않고 IDamageable 전체를 잡는다 — 그래야 훈련용 허수아비에도 들어간다.
         int found = CombatQuery.GetNearbyDamageables(impact, ImpactRadius, owner, 32, buffer);
 
-        Debug.Log($"[가웨인Q] 착탄 | dmg={dmg:F0} | 반경({ImpactRadius}m) 적중 {found}");
+        RFLog.D($"[가웨인Q] 착탄 | dmg={dmg:F0} | 반경({ImpactRadius}m) 적중 {found}");
 
         foreach (var target in buffer)
         {

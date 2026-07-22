@@ -51,5 +51,7 @@ MonoBehaviour:
     kind: 3
   - visitIndex: 7
     kind: 6
+  - visitIndex: 8
+    kind: 7
   - visitIndex: 10
     kind: 1

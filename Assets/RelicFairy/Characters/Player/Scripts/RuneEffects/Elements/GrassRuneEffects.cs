@@ -109,6 +109,8 @@ public sealed class PoisonField : GroundFieldBase
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ClearList() => s_fields.Clear();
 
+    protected override RuneElement? FieldElement => RuneElement.Grass;
+
     private PlayerController _player;
     private Config _cfg;
     private float  _reapplyTimer;

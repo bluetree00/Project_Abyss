@@ -19,6 +19,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 {
     private const float PromptOffsetY = 2.0f;
     private const float TextHeight    = 1.4f;
+    private const float SwordVisualHeight = 0.6f;   // 제단 위에 뜬 검의 높이
 
     [Header("무형검 (기본 지급 주무기)")]
     [SerializeField] private MainWeaponSO namelessWeapon;
@@ -36,6 +37,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
     private Transform _camTransform;
     private TextMeshPro _worldText;
     private GameObject _promptGo;
+    private GameObject _swordVisual;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
@@ -43,9 +45,22 @@ public sealed class WorldSwordAwakening : MonoBehaviour
 
     private void Start()
     {
+        // 이미 주무기를 가진 상태(복귀 런)면 제단은 존재 이유가 없다 — 이 제단은 '첫' 주무기를 하사하는 곳이다.
+        // 남겨두면 F로 재획득돼 강화·진화한 슬롯0 무기가 T0 무형검으로 덮어써진다.
+        // (제단은 획득 시 자기를 Destroy하지만 그건 그 세션 한정 — 씬을 다시 로드하면 _claimed=false로 되살아난다.)
+        if (AlreadyArmed()) { Destroy(gameObject); return; }
+
         _camTransform = Camera.main != null ? Camera.main.transform : null;
         CreateWorldText();
         CreatePrompt();
+        SpawnSwordVisualAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>이미 주무기(슬롯0)를 보유했는가. 세이브 복원이 늦게 끝나는 경우를 대비해 매 판정 시점에 다시 확인한다.</summary>
+    private static bool AlreadyArmed()
+    {
+        var lo = AppBootstrapper.Instance?.Loadout;
+        return lo != null && lo.WeaponSlot0 != null;
     }
 
     private void Update()
@@ -59,6 +74,8 @@ public sealed class WorldSwordAwakening : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (_claimed) return;
+        // 세이브 복원이 Start 이후에 끝난 경우를 대비한 재확인 — 이미 무장했으면 프롬프트조차 띄우지 않는다.
+        if (AlreadyArmed()) return;
         var p = other.GetComponentInParent<PlayerController>();
         if (p == null) return;
         _player = p;
@@ -88,21 +105,31 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             Debug.LogWarning("[WorldSwordAwakening] namelessWeapon 미할당.");
             return;
         }
+        // [최종 방어] 이미 주무기가 있으면 절대 덮어쓰지 않는다.
+        // 재련소에서 강화·진화한 무기를 T0 무형검으로 되돌리는 사고를 막는 마지막 관문.
+        if (loadout.WeaponSlot0 != null)
+        {
+            Debug.LogWarning($"[WorldSwordAwakening] 이미 주무기 보유({loadout.WeaponSlot0.name}) — 무형검 재지급을 건너뛴다.");
+            _claimed = true;
+            ShowPrompt(false);
+            if (this != null) Destroy(gameObject);
+            return;
+        }
 
         _busy = true;
         ShowPrompt(false);
 
         try
         {
-            // 무형검 → 슬롯0 (로드아웃 + 실제 장착). WeaponForgeAltar와 동일 경로.
+            // 무형검 → 슬롯0 (로드아웃 예약 + 실제 장착).
+            // 항상 Slot0 고정·활성. 원거리 스테이션 상태를 참조하지 않는다(획득 순서 독립).
             loadout.SetWeaponSlot0(namelessWeapon);
             var player = _player;
             if (player != null)
             {
-                await GameRunBootstrapper.EquipWeaponToPlayerAsync(namelessWeapon, player);
+                await GameRunBootstrapper.EquipWeaponToPlayerAsync(
+                    namelessWeapon, player, PlayerWeaponManager.Slot0, setActive: true);
                 ct.ThrowIfCancellationRequested();
-                if (player.WeaponManager != null)
-                    await player.WeaponManager.SwitchToSlotAsync(PlayerWeaponManager.Slot0);
             }
 
             _claimed = true;
@@ -125,6 +152,35 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             Debug.LogWarning($"[WorldSwordAwakening] AwakenAsync 실패: {ex.Message}");
             _busy = false;
             if (_player != null) ShowPrompt(true);
+        }
+    }
+
+    // ── 검 비주얼 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// 제단에 무형검 본체를 띄운다. 프리팹은 무기 SO의 weaponDisplayKey(= 인트로에 놓인 것과 동일한
+    /// 메시·안개 머티리얼)를 그대로 쓴다 — 인트로에서 본 검과 여기서 쥐는 검이 어긋나면 안 된다.
+    /// 로드 실패해도 각성 상호작용 자체는 계속 동작해야 하므로 예외를 삼킨다.
+    /// </summary>
+    private async UniTaskVoid SpawnSwordVisualAsync(CancellationToken ct)
+    {
+        string key = namelessWeapon != null ? namelessWeapon.weaponDisplayKey : null;
+        if (string.IsNullOrEmpty(key)) return;
+
+        try
+        {
+            var prefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(key);
+            ct.ThrowIfCancellationRequested();
+            if (prefab == null || this == null) return;
+
+            _swordVisual = Instantiate(prefab, transform);
+            _swordVisual.transform.localPosition = Vector3.up * SwordVisualHeight;
+            _swordVisual.transform.localRotation = Quaternion.identity;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[WorldSwordAwakening] 검 비주얼 로드 실패({key}): {ex.Message}");
         }
     }
 

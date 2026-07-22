@@ -11,6 +11,9 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class WorldCovenantAltar : MonoBehaviour
 {
+    /// <summary>서약 조립이 성공해 제단이 소진된 순간 발생. 시작방 게이트 열림 연출 등이 구독.</summary>
+    public static event Action OnCovenantAssembled;
+
     // ── Constants ────────────────────────────────────────
     private const float PromptOffsetY = 1.8f;
     private const string GuideShownKey = "covenant_altar_guide_v1";   // 최초 1회 가이드(계정 영속)
@@ -89,6 +92,7 @@ public class WorldCovenantAltar : MonoBehaviour
                 ShowNotice($"<color=#CC88FF>서약</color> {covenant?.DisplayName ?? id} 새김!");
                 SetSpentVisual();
                 ClearGuide(markDone: true);   // 첫 서약 완성 → 가이드 종료(영속 기록)
+                OnCovenantAssembled?.Invoke();  // 시작방 게이트 열림 연출 트리거(수신측이 딜레이 적용)
             }
         }
         catch (OperationCanceledException) { }

@@ -42,6 +42,15 @@ public class EnhanceTableSO : ScriptableObject
     [SerializeField] private int _maxEpic      = 12;
     [SerializeField] private int _maxLegendary = 15;
 
+    [Header("진화 1회당 상한 확장 (진화 = 강화의 끝이 아니라 다음 구간의 문)")]
+    [SerializeField] private int _maxPerEvolution = 6;
+
+    [Header("마스터리(진화 후 추가 구간) 1단계당 스킬 확장")]
+    [Tooltip("스킬 피해 % 가산 (0.06 = +6%/단계)")]
+    [SerializeField] private float _masterySkillDamagePerLevel = 0.06f;
+    [Tooltip("스킬 쿨다운 감소 % (0.03 = -3%/단계)")]
+    [SerializeField] private float _masterySkillCdrPerLevel = 0.03f;
+
     [Header("승급 전설 (택1 분기)")]
     [SerializeField] private LegendDef[] _legends;
 
@@ -69,7 +78,7 @@ public class EnhanceTableSO : ScriptableObject
         return Mathf.Max(0, _steps[i].cost);
     }
 
-    /// <summary>등급별 강화 상한.</summary>
+    /// <summary>등급별 강화 상한(진화 미반영 기본 구간).</summary>
     public int MaxFor(ItemRarity rarity) => rarity switch
     {
         ItemRarity.Common    => _maxCommon,
@@ -78,6 +87,22 @@ public class EnhanceTableSO : ScriptableObject
         ItemRarity.Legendary => _maxLegendary,
         _                    => _maxCommon,
     };
+
+    /// <summary>진화 단계까지 반영한 실제 강화 상한. 진화할 때마다 구간이 한 뼘씩 열린다.</summary>
+    public int MaxFor(ItemRarity rarity, int evolutionStage)
+        => MaxFor(rarity) + Mathf.Max(0, evolutionStage) * Mathf.Max(0, _maxPerEvolution);
+
+    /// <summary>진화 구간(마스터리)에서 올린 단계 수. 미진화면 0.</summary>
+    public int MasteryLevel(ItemRarity rarity, int evolutionStage, int enhanceLevel)
+        => evolutionStage <= 0 ? 0 : Mathf.Max(0, enhanceLevel - MaxFor(rarity));
+
+    /// <summary>마스터리 단계 → 스킬 피해 % 가산(0.36 = +36%).</summary>
+    public float MasterySkillDamage(int masteryLevel)
+        => Mathf.Max(0, masteryLevel) * _masterySkillDamagePerLevel;
+
+    /// <summary>마스터리 단계 → 스킬 쿨다운 감소(0.18 = -18%).</summary>
+    public float MasterySkillCdr(int masteryLevel)
+        => Mathf.Max(0, masteryLevel) * _masterySkillCdrPerLevel;
 
     /// <summary>강화단계 + 승급 전설 → 공격 배율. baseAttackRaw 에 곱해 유효 공격력을 낸다.</summary>
     public float AttackMult(int level, string legendId)

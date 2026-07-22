@@ -30,7 +30,8 @@ public static class CovenantAssembleUI
 
         popup.Setup(forceSilver, rng);
 
-        try { return await popup.WaitForResultAsync(); }
+        // ct를 대기에 실제로 연결한다 — 미연결이면 호출측 수명 토큰(GetCancellationTokenOnDestroy)이 무력해진다.
+        try { return await popup.WaitForResultAsync().AttachExternalCancellation(ct); }
         catch (OperationCanceledException) { return null; }
     }
 }

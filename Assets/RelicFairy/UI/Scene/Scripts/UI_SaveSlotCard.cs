@@ -71,47 +71,35 @@ public class UI_SaveSlotCard : MonoBehaviour
 
         if (!_hasSave) return;
 
-        if (nameText     != null) nameText.text     = FormatName(data);
-        if (progressText != null) progressText.text = FormatProgress(data);
-        if (retryText    != null) retryText.text    = FormatStats(data);
-        if (savedAtText  != null) savedAtText.text  = FormatSavedAt(data.savedAt);
+        // 슬롯에 필요한 정보는 "얼마나 오래" "몇 번 시도했나" 둘뿐이다.
+        // 챕터·HP·아이템·시너지·골드·저장시각은 인게임에서 다 보이므로 카드에선 뺀다(정보 과밀 제거).
+        //
+        // 예외 — 허브(베이스캠프) 세이브는 아직 플레이 시간이 안 쌓였을 수 있어 "--"만 뜨면
+        // 빈 슬롯처럼 보인다. 어디서 이어지는지를 대신 알려준다.
+        if (progressText != null)
+            progressText.text = (data.isInStartRoom && data.playSeconds <= 0)
+                ? "베이스캠프"
+                : FormatPlayTime(data.playSeconds);
+        if (retryText    != null) retryText.text    = $"시도 {Mathf.Max(1, data.retryCount)}회";
+
+        // 남는 슬롯은 숨겨 카드가 비대해지지 않게 한다.
+        if (nameText    != null) nameText.gameObject.SetActive(false);
+        if (savedAtText != null) savedAtText.gameObject.SetActive(false);
     }
 
     // ─────────────────────────────────────────────────────────
     // Private Methods — Format
     // ─────────────────────────────────────────────────────────
 
-    private static string FormatName(RunSaveData d)
+    /// <summary>누적 플레이 시간 — 1시간 미만은 분:초, 넘으면 시간:분.</summary>
+    private static string FormatPlayTime(int seconds)
     {
-        return string.IsNullOrEmpty(d.characterName) ? "???" : d.characterName;
-    }
+        if (seconds <= 0) return "플레이 시간 --";
 
-    private static string FormatProgress(RunSaveData d)
-    {
-        // "챕터 N | HP X / Y"
-        int chapter = Mathf.Max(1, d.chapter);
-        int hp      = Mathf.Clamp(d.currentHp, 0, d.maxHp);
-        int maxHp   = Mathf.Max(1, d.maxHp);
-        return $"챕터 {chapter}  |  HP {hp} / {maxHp}";
-    }
-
-    private static string FormatStats(RunSaveData d)
-    {
-        // "클리어 N방  아이템 N  시너지 N  골드 N"
-        return $"클리어 {d.roomClearCount}방   아이템 {d.itemCount}   시너지 {d.synergyCount}   골드 {d.runGold}";
-    }
-
-    private static string FormatSavedAt(string iso8601)
-    {
-        if (string.IsNullOrEmpty(iso8601)) return string.Empty;
-
-        if (DateTime.TryParse(iso8601, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
-        {
-            var local = dt.ToLocalTime();
-            return local.ToString("yyyy-MM-dd HH:mm");
-        }
-
-        return iso8601;
+        var t = TimeSpan.FromSeconds(seconds);
+        return t.TotalHours >= 1d
+            ? $"플레이 시간 {(int)t.TotalHours}시간 {t.Minutes}분"
+            : $"플레이 시간 {t.Minutes}분 {t.Seconds}초";
     }
 
     // ─────────────────────────────────────────────────────────

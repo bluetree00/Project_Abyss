@@ -27,6 +27,8 @@ public class MerlinRuneBridge : MonoBehaviour
 
     // 그리드 완성 시 UI_GridPanel에 시각 피드백 전달
     public event System.Action<string> OnSynergyActivated;
+    /// <summary>시너지 단계 신규 달성 시 zoneId 전달 — 판(뷰)이 해당 속성 존을 터뜨리는 연출용.</summary>
+    public event System.Action<string> OnZoneSynergyBurst;
     public event System.Action         OnCenterBonusActivated;
     /// <summary>블록 추가/제거 시마다 발생. CharacterInfoPanelView가 활성효과를 갱신하는 데 사용.</summary>
     public event System.Action         OnSynergiesUpdated;
@@ -381,6 +383,26 @@ public class MerlinRuneBridge : MonoBehaviour
         view.RestoreOccupiedCells(cells);
     }
 
+    // ── 배치 가능 조회 (선택 팝업용) ──
+
+    /// <summary>
+    /// 해당 모양을 지금 판에 놓을 자리가 있는지. <b>읽기 전용</b>이며 배치 화면이 닫혀 있어도 동작한다.
+    /// 룬 선택 팝업이 후보마다 "배치 가능/자리 없음"을 표시하는 데 쓴다.
+    /// </summary>
+    public bool CanPlaceShape(IReadOnlyList<Vector2Int> cellOffsets)
+    {
+        if (cellOffsets == null || cellOffsets.Count == 0) return false;
+
+        var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+        if (view == null)
+        {
+            // 보드가 아직 구성 전이면 판정 불가 — 막지 말고 통과시킨다(선택 자체는 허용).
+            Debug.LogWarning("[MerlinRuneBridge] CanPlaceShape: HexGridView 없음 — 배치 가능으로 간주");
+            return true;
+        }
+        return view.CanPlaceAnywhere(cellOffsets);
+    }
+
     /// <summary>현재 배치된 Shape 스냅샷(재구성용). 점유 셀(CaptureRuneCells)과 별개.</summary>
     public IReadOnlyList<RunePlacementEntry> CaptureRunePlacements()
         => boardManager != null ? boardManager.CapturePlacements() : null;
@@ -427,6 +449,33 @@ public class MerlinRuneBridge : MonoBehaviour
 
             boardManager.RestorePlacedShape(shapeSO, item, targets);
         }
+    }
+
+    /// <summary>
+    /// 런 하드리셋 — 판에 놓인 룬까지 <b>전부</b> 버린다.
+    ///
+    /// 이 브릿지는 DDOL(@UIRoot)에 살아 씬 전환·런 종료로 죽지 않는다. <see cref="ResetSynergyState"/>는
+    /// 효과 적용 이력만 지우므로, 그것만 호출하면 <b>판 위의 룬이 다음 런까지 남아</b>
+    /// 새 런의 빈 인벤토리와 어긋난다(보유 목록엔 없는 룬이 판에 놓여 있음).
+    ///
+    /// 부분 철거(배치 하나씩 제거)는 GridSquare 점유·공용 Shape 풀·슬롯 리플로우가 얽혀 누락되기 쉬우므로,
+    /// <b>퍼즐 인스턴스를 통째로 파괴하고 다음 InitializeGridsFromServer에서 새로 짓는다.</b>
+    /// 판은 런 상태의 뷰일 뿐이라 밑바닥부터 다시 짓는 것이 곧 하드리셋의 정의다.
+    /// </summary>
+    public void ClearBoard()
+    {
+        ResetSynergyState();
+
+        if (boardManager != null)
+            boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
+
+        if (_puzzleInstance != null)
+            Destroy(_puzzleInstance);
+
+        _puzzleInstance = null;
+        boardManager    = null;
+        _initialized    = false;
+        _registeredGrids.Clear();
     }
 
     /// <summary>런 종료·이어하기 시 시너지 적용 상태(단계 가드·점유 수·중앙보너스) 초기화. 외부에서 호출.</summary>
@@ -565,6 +614,7 @@ public class MerlinRuneBridge : MonoBehaviour
                 // 시너지의 진실원본은 룬 보드 점유 셀(runeCellsJson)이고, 복원도 그쪽이 담당한다.
 
                 OnSynergyActivated?.Invoke($"{zoneId}: {entry.effect_type}");
+                OnZoneSynergyBurst?.Invoke(zoneId);   // 판 연출: 해당 속성 존 터짐
             }
         }
     }
@@ -652,6 +702,16 @@ public class MerlinRuneBridge : MonoBehaviour
         if (player == null) return;
 
         player.RuneEffects.Activate(entry);
+    }
+
+    /// <summary>
+    /// [정제소 존핵] 룬판이 계산한 존별 증폭 배수를 디스패처에 전달한다.
+    /// 매칭 존에 놓인 존핵만 그 존 시너지 효과를 강화한다(중앙 공명과 곱연산).
+    /// </summary>
+    public void OnZoneAmplifiersUpdated(IReadOnlyDictionary<string, float> zoneAmps)
+    {
+        var player = AppBootstrapper.Instance?.CurrentRun?.Player;
+        player?.RuneEffects?.SetZoneAmplifiers(zoneAmps);
     }
 
     /// <summary>등록된 GridAssetData 전체를 반환.</summary>

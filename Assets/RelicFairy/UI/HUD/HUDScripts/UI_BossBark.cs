@@ -36,6 +36,16 @@ namespace RelicFairy.UI
         [SerializeField] private TMP_Text      _label;
         [SerializeField] private RectTransform _container;
 
+        [Header("Speaker (선택) — 화자가 없으면 통째로 숨겨져 기존 연출과 동일하게 동작")]
+        [SerializeField] private TMP_Text _speakerLabel;
+        [SerializeField] private Image    _speakerDivider;
+
+        [Header("Speaker Colors")]
+        [SerializeField] private Color _lichColor    = new Color(0.66f, 0.33f, 0.97f); // 아케인 보라
+        [SerializeField] private Color _mordredColor = new Color(0.88f, 0.27f, 0.25f); // 타락 적
+        [SerializeField] private Color _knightColor  = new Color(0.85f, 0.84f, 0.80f); // 기사 회백
+        [SerializeField] private Color _merlinColor  = new Color(0.31f, 0.66f, 0.88f); // 멀린 청
+
         [Header("PatternAnnounce")]
         [SerializeField] private float _patternFontSize  = 44f;
         [SerializeField] private float _patternDuration  = 1.5f;
@@ -65,7 +75,7 @@ namespace RelicFairy.UI
         [SerializeField] private float _fadeInDuration   = 0.15f;
         [SerializeField] private float _fadeOutDuration  = 0.45f;
 
-        private readonly Queue<(string text, BossBarkType type, UniTaskCompletionSource tcs)> _queue = new();
+        private readonly Queue<(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs)> _queue = new();
         private CancellationTokenSource _cts;
         private bool _showing;
 
@@ -90,24 +100,27 @@ namespace RelicFairy.UI
 
         // ─── Public API ───────────────────────────────────────────────
 
-        public static void Show(string text, BossBarkType type = BossBarkType.Bark)
+        /// <summary>speaker를 넘기면 본문 위에 화자줄이 붙는다. 생략하면 기존 동작 그대로.</summary>
+        public static void Show(string text, BossBarkType type = BossBarkType.Bark,
+                               DialogueSpeaker speaker = DialogueSpeaker.None)
         {
             if (Instance == null) return;
-            Instance.Enqueue(text, type, null);
+            Instance.Enqueue(text, type, speaker, null);
         }
 
         /// <summary>표시 후 페이드아웃까지 완료될 때까지 대기한다. (보스 등장 연출의 카메라 단계 동기화용)</summary>
-        public static UniTask ShowAndWaitAsync(string text, BossBarkType type = BossBarkType.Bark)
+        public static UniTask ShowAndWaitAsync(string text, BossBarkType type = BossBarkType.Bark,
+                                               DialogueSpeaker speaker = DialogueSpeaker.None)
         {
             if (Instance == null) return UniTask.CompletedTask;
             var tcs = new UniTaskCompletionSource();
-            Instance.Enqueue(text, type, tcs);
+            Instance.Enqueue(text, type, speaker, tcs);
             return tcs.Task;
         }
 
         // ─── Internal ─────────────────────────────────────────────────
 
-        private void Enqueue(string text, BossBarkType type, UniTaskCompletionSource tcs)
+        private void Enqueue(string text, BossBarkType type, DialogueSpeaker speaker, UniTaskCompletionSource tcs)
         {
             // PhaseAnnounce는 큐를 비우고 즉시 표시 (페이즈 전환은 최우선)
             // MerlinNarration은 큐 유지 — 서사 대사는 순서대로 출력
@@ -117,7 +130,7 @@ namespace RelicFairy.UI
                 InterruptCurrent();
             }
 
-            _queue.Enqueue((text, type, tcs));
+            _queue.Enqueue((text, type, speaker, tcs));
 
             if (!_showing)
                 RunQueue(destroyCancellationToken).Forget();
@@ -137,14 +150,14 @@ namespace RelicFairy.UI
             {
                 if (lifetimeToken.IsCancellationRequested) return;
 
-                var (text, type, tcs) = _queue.Dequeue();
+                var (text, type, speaker, tcs) = _queue.Dequeue();
                 _showing = true;
 
                 _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
 
                 try
                 {
-                    await DisplayOne(text, type, _cts.Token);
+                    await DisplayOne(text, type, speaker, _cts.Token);
                 }
                 catch (System.OperationCanceledException) { }
                 finally
@@ -157,9 +170,10 @@ namespace RelicFairy.UI
             }
         }
 
-        private async UniTask DisplayOne(string text, BossBarkType type, CancellationToken ct)
+        private async UniTask DisplayOne(string text, BossBarkType type, DialogueSpeaker speaker, CancellationToken ct)
         {
             ApplyLayout(text, type);
+            ApplySpeaker(speaker);
 
             float holdDuration = type switch
             {
@@ -214,6 +228,52 @@ namespace RelicFairy.UI
             if (_container != null)
                 _container.anchoredPosition = new Vector2(0f, offsetY);
         }
+
+        /// <summary>화자줄 표시/숨김. None이면 라벨·구분선을 끄고 기존 레이아웃 그대로 둔다.</summary>
+        private void ApplySpeaker(DialogueSpeaker speaker)
+        {
+            bool has = speaker != DialogueSpeaker.None;
+
+            if (_speakerLabel != null)
+            {
+                _speakerLabel.gameObject.SetActive(has);
+                if (has)
+                {
+                    _speakerLabel.text  = SpeakerName(speaker);
+                    _speakerLabel.color = SpeakerColor(speaker);
+                }
+            }
+
+            if (_speakerDivider != null)
+            {
+                _speakerDivider.gameObject.SetActive(has);
+                if (has)
+                {
+                    var c = SpeakerColor(speaker);
+                    c.a = 0.5f;
+                    _speakerDivider.color = c;
+                }
+            }
+        }
+
+        private static string SpeakerName(DialogueSpeaker speaker) => speaker switch
+        {
+            DialogueSpeaker.Lich    => "리치",
+            DialogueSpeaker.Mordred => "모르드레드",
+            DialogueSpeaker.Knight  => "기사",
+            DialogueSpeaker.God     => "???",
+            DialogueSpeaker.Shadow  => "그림자",
+            DialogueSpeaker.Arthur  => "아서왕",
+            _                       => string.Empty,
+        };
+
+        private Color SpeakerColor(DialogueSpeaker speaker) => speaker switch
+        {
+            DialogueSpeaker.Lich    => _lichColor,
+            DialogueSpeaker.Mordred => _mordredColor,
+            DialogueSpeaker.Knight  => _knightColor,
+            _                       => _merlinColor,
+        };
 
         private async UniTask FadeTo(float target, float duration, CancellationToken ct)
         {

@@ -50,9 +50,7 @@ public class GameCameraController : MonoBehaviour
     [SerializeField] private Vector2 processionalOrbitTop      = new Vector2(5f, 12f);
     [SerializeField] private Vector2 processionalOrbitMiddle   = new Vector2(2.5f, 13f);
     [SerializeField] private Vector2 processionalOrbitBottom   = new Vector2(0.8f, 12f);
-    [Tooltip("진행방향으로 카메라를 정렬(아케이드 축 정면). 끄면 현재 시야각만 낮아짐.")]
-    [SerializeField] private bool     processionalRecenter     = true;
-    [SerializeField] private float    processionalRecenterTime = 1.5f;
+    // 참고: 이 구간에서 heading(수평각)은 건드리지 않는다. 시선 방향은 CameraHeadingZone이 전담한다.
 
     // ── Private ──
     private Vector3 _originalPosition;
@@ -76,6 +74,12 @@ public class GameCameraController : MonoBehaviour
     private CinemachineFreeLook.Orbit[] _savedBossOrbits;
     private CinemachineFreeLook.Orbit[] _savedDKPlayerOrbits;
     private CinemachineFreeLook.Orbit[] _savedProcessionalOrbits;
+
+    // heading 회전 연출(RotateHeadingTo) 중복 실행 방지 — 새 요청이 오면 이전 회전을 취소한다.
+    private CancellationTokenSource _headingCts;
+
+    // 구역 카메라 진입 전 기본 오빗. 최초 ApplyZoneOrbit에서 1회 저장하고 계속 유지한다(구역 릴레이).
+    private CinemachineFreeLook.Orbit[] _savedZoneOrbits;
     private CancellationTokenSource     _dkOrbitTransitionCts;
     private bool _topDownViewActive;
     private bool _savedBrainBeforeTopDown;
@@ -226,7 +230,11 @@ public class GameCameraController : MonoBehaviour
     /// _introStarted를 점유해 레거시 OnPlayerBound→PlayIntroAsync 자동 줌인을 차단하고,
     /// 투어 종료 포즈에서 플레이어 추적 시점으로 부드럽게 보간한 뒤 Brain에 인계한다.
     /// </summary>
-    public void HandToGameplayCamera(Transform follow)
+    /// <param name="alignHeadingToTarget">
+    /// true면 heading을 대상 rotation으로 맞춘다(최초 스폰 — 카메라를 등 뒤로 정렬).
+    /// false면 현재 heading을 유지한다(허브 재스폰 등 — 대상의 '바라보는 방향'으로 카메라가 튀는 것 방지).
+    /// </param>
+    public void HandToGameplayCamera(Transform follow, bool alignHeadingToTarget = true)
     {
         _introStarted = true; // 레거시 줌인 인트로(OnPlayerBound) 차단
 
@@ -237,10 +245,125 @@ public class GameCameraController : MonoBehaviour
         {
             _cinemachine.Follow = follow;
             _cinemachine.LookAt = follow;
+
+            // FreeLook 수평각은 이전 값을 그대로 유지하므로, 최초 인계 시엔 대상이 보는 방향으로 맞춰준다.
+            // 단 허브 재스폰(유물 핫스왑 등)에서는 대상 rotation이 '플레이어가 제단을 보던 방향'이라
+            // 이걸 heading으로 쓰면 카메라가 틀어진다 → 그때는 현재 heading을 유지한다(alignHeadingToTarget=false).
+            if (alignHeadingToTarget)
+                SetHeadingImmediate(follow.eulerAngles.y);
         }
 
         // 투어 종료 포즈 → 플레이어 추적 시점 수동 보간 후 제어권 인계 (스냅 없는 전환 연출)
         BlendToGameplayAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    // ── Camera Zone (구역별 카메라) ─────────────────────────────
+    /// <summary>
+    /// 구역 진입 시 오빗을 그 구역 값으로 전환한다. <see cref="CameraZone"/>이 호출.
+    /// 최초 1회 현재(기본) 오빗을 저장해 <see cref="RestoreZoneOrbit"/>의 복귀 기준으로 삼는다.
+    /// 구역끼리는 릴레이(다음 구역이 덮어씀)이므로 저장값은 계속 유지한다.
+    /// </summary>
+    public void ApplyZoneOrbit(Vector2 top, Vector2 mid, Vector2 bot, float duration = 1.2f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        if (_savedZoneOrbits == null)
+        {
+            _savedZoneOrbits = new CinemachineFreeLook.Orbit[]
+            {
+                _cinemachine.m_Orbits[0],
+                _cinemachine.m_Orbits[1],
+                _cinemachine.m_Orbits[2],
+            };
+        }
+
+        TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>구역 이탈 시 기본(구역 진입 전) 오빗으로 복귀. 저장값이 없으면 무시.</summary>
+    public void RestoreZoneOrbit(float duration = 1.2f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null || _savedZoneOrbits == null) return;
+
+        var top = new Vector2(_savedZoneOrbits[0].m_Height, _savedZoneOrbits[0].m_Radius);
+        var mid = new Vector2(_savedZoneOrbits[1].m_Height, _savedZoneOrbits[1].m_Radius);
+        var bot = new Vector2(_savedZoneOrbits[2].m_Height, _savedZoneOrbits[2].m_Radius);
+        TransitionDKOrbitAsync(top, mid, bot, duration, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>현재 FreeLook 수평 heading(도). 연속 보간(CameraBlendZone)에서 현재값 기준으로 damp할 때 사용.</summary>
+    public float CurrentHeading
+    {
+        get
+        {
+            EnsureCinemachineRefs();
+            return _cinemachine != null ? _cinemachine.m_XAxis.Value : 0f;
+        }
+    }
+
+    /// <summary>
+    /// heading 값만 갱신한다(스냅 플래그 없음). <see cref="CameraBlendZone"/>처럼 <b>매 프레임 비율로</b>
+    /// 값을 넣는 용도. SetHeadingImmediate는 PreviousStateIsValid를 꺼서 보간을 끊으므로
+    /// 매 프레임 호출하면 카메라가 떨린다 — 연속 갱신에는 이쪽을 쓴다.
+    /// </summary>
+    public void SetHeadingRaw(float yawDeg)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+        _cinemachine.m_XAxis.Value = yawDeg;
+    }
+
+    /// <summary>FreeLook 수평 heading(m_XAxis)을 즉시 지정 각도로 맞춘다. 스폰/텔레포트 직후용.</summary>
+    public void SetHeadingImmediate(float yawDeg)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        _cinemachine.m_XAxis.Value = yawDeg;
+        _cinemachine.PreviousStateIsValid = false;   // 보간 없이 새 각도로 스냅
+    }
+
+    /// <summary>
+    /// FreeLook 수평 heading을 목표 각도로 <b>부드럽게</b> 돌린다(연출용).
+    /// 최단 회전 방향으로 보간하며, 도중 플레이어 입력이 있으면 중단하지 않는다(연출 우선).
+    /// </summary>
+    public void RotateHeadingTo(float targetYawDeg, float duration = 1.5f)
+    {
+        EnsureCinemachineRefs();
+        if (_cinemachine == null) return;
+
+        _headingCts?.Cancel();
+        _headingCts?.Dispose();
+        _headingCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        RotateHeadingAsync(targetYawDeg, duration, _headingCts.Token).Forget();
+    }
+
+    private async UniTaskVoid RotateHeadingAsync(float targetYawDeg, float duration, CancellationToken ct)
+    {
+        try
+        {
+            float start = _cinemachine.m_XAxis.Value;
+            float delta = Mathf.DeltaAngle(start, targetYawDeg);   // 최단 방향
+            if (duration <= 0f || Mathf.Abs(delta) < 0.1f)
+            {
+                _cinemachine.m_XAxis.Value = targetYawDeg;
+                return;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                ct.ThrowIfCancellationRequested();
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                _cinemachine.m_XAxis.Value = start + delta * t;
+                await UniTask.Yield(ct);
+            }
+            _cinemachine.m_XAxis.Value = start + delta;
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>둘러보기 종료 포즈에서 플레이어 추적 시점으로 보간 (HandToGameplayCamera에서 fire-and-forget).</summary>
@@ -296,6 +419,11 @@ public class GameCameraController : MonoBehaviour
     {
         if (_cinemachine == null) return;
 
+        // 이 블렌드가 도는 중에 컷신이 TakeManualControl()을 걸 수 있다(부트 인계 ↔ 오프닝 연출 경합).
+        // 버전을 캡처해 두고, 중간에 바뀌면 즉시 물러난다. 이게 없으면 블렌드가 끝나며
+        // Brain을 다시 켜고 _isPanning을 풀어버려 컷신 카메라가 통째로 무시된다.
+        int myVersion = _panVersion;
+
         if (_brain != null) _brain.enabled = false;
         _cinemachine.enabled = true; // vcam이 State를 계산하도록 활성화 (Brain은 꺼두어 스냅 방지)
 
@@ -307,6 +435,7 @@ public class GameCameraController : MonoBehaviour
         while (t < dur)
         {
             if (this == null) return;
+            if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다
             ct.ThrowIfCancellationRequested();
             t += Time.deltaTime;
             float k    = Mathf.Clamp01(t / dur);
@@ -322,10 +451,15 @@ public class GameCameraController : MonoBehaviour
         }
 
         if (this == null) return;
+        if (myVersion != _panVersion) return;   // 컷신이 제어권을 가져갔다면 인계하지 않는다
 
         // Cinemachine에 제어권 인계 — 카메라가 이미 목표 포즈에 도달했으므로 스냅해도 끊김 없음
         _cinemachine.PreviousStateIsValid = false;
         if (_brain != null) _brain.enabled = true;
+
+        // 수동 제어(TakeManualControl) 잠금 해제 — 이게 없으면 _isPanning이 true로 남아
+        // 이후 보스전 오빗 전환·구역 카메라가 전부 무시되고 카메라가 고정된다.
+        _isPanning = false;
     }
 
     public void ActivateBossOrbitView(Transform bossTarget, Transform lookAtTarget = null)
@@ -620,8 +754,9 @@ public class GameCameraController : MonoBehaviour
 
     // ── Processional View (대성당 나브) ─────────────────────────
     /// <summary>
-    /// 나브 진입 시 호출 — FreeLook 오빗을 <b>낮은 정면 시점</b>으로 전환해 아치 아케이드가 위로 솟아 보이게 한다.
-    /// processionalRecenter가 켜지면 카메라가 진행방향(플레이어 뒤)으로 정렬돼 아케이드 축을 정면으로 본다.
+    /// 나브 진입 시 호출 — FreeLook 오빗을 <b>낮은 시점</b>으로 전환해 아치 아케이드가 위로 솟아 보이게 한다.
+    /// <b>수평각(heading)은 건드리지 않는다</b> — 시선 방향은 CameraHeadingZone이 정하며, 여기서 리센터를 켜면
+    /// 이 리그의 m_Heading이 WorldForward라 월드 +Z로 끌려가 그 각도가 초기화된다.
     /// 오빗 전환은 DK 전환(TransitionDKOrbitAsync)을 재사용한다. 값은 인게임서 튜닝.
     /// </summary>
     public void ActivateProcessionalView(float duration = 1.2f)
@@ -639,11 +774,10 @@ public class GameCameraController : MonoBehaviour
             };
         }
 
-        if (processionalRecenter)
-        {
-            _cinemachine.m_RecenterToTargetHeading.m_enabled        = true;
-            _cinemachine.m_RecenterToTargetHeading.m_RecenteringTime = processionalRecenterTime;
-        }
+        // heading(수평각)은 건드리지 않는다 — 오빗(높이/거리)만 낮춘다.
+        // 이 리그는 m_Heading.m_Definition = WorldForward라, 리센터를 켜면 진행방향이 아니라
+        // 월드 +Z로 끌려가 CameraHeadingZone이 맞춰둔 각도가 초기화된다. 방어적으로 꺼둔다.
+        _cinemachine.m_RecenterToTargetHeading.m_enabled = false;
 
         TransitionDKOrbitAsync(
             processionalOrbitTop, processionalOrbitMiddle, processionalOrbitBottom,
@@ -655,9 +789,6 @@ public class GameCameraController : MonoBehaviour
     {
         EnsureCinemachineRefs();
         if (_cinemachine == null || _savedProcessionalOrbits == null) return;
-
-        if (processionalRecenter)
-            _cinemachine.m_RecenterToTargetHeading.m_enabled = false;
 
         var top = new Vector2(_savedProcessionalOrbits[0].m_Height, _savedProcessionalOrbits[0].m_Radius);
         var mid = new Vector2(_savedProcessionalOrbits[1].m_Height, _savedProcessionalOrbits[1].m_Radius);
@@ -769,7 +900,14 @@ public class GameCameraController : MonoBehaviour
         Vector3    startPos = transform.position;
         Quaternion startRot = transform.rotation;
 
-        Vector3 toPos   = target + viewOffset;
+        // viewOffset(예: (0,3,-6))은 "대상 뒤/위"를 뜻하는 <b>로컬</b> 오프셋이다.
+        // 그대로 월드에 더하면 항상 월드 −Z(고정 방위)에서만 대상을 바라봐, 플레이어가 어느 방향에서
+        // 접근하든·카메라 heading이 무엇이든 연출 각도가 고정된다. 현재 카메라 heading을 기준으로 오프셋을
+        // 회전시켜, 지금 보고 있던 축을 유지한 채 대상으로 다가가게 한다(연출 전후 시점 연속).
+        float headingYaw = _cinemachine != null ? _cinemachine.m_XAxis.Value : transform.eulerAngles.y;
+        Vector3 worldOffset = Quaternion.Euler(0f, headingYaw, 0f) * viewOffset;
+
+        Vector3 toPos   = target + worldOffset;
         Vector3 lookDir = (target + Vector3.up * lookHeight) - toPos;
         Quaternion toRot = lookDir.sqrMagnitude > 0.001f ? Quaternion.LookRotation(lookDir, Vector3.up) : startRot;
 
@@ -784,6 +922,12 @@ public class GameCameraController : MonoBehaviour
             {
                 _cinemachine.Follow = playerTransform;
                 _cinemachine.LookAt = playerTransform;
+
+                // heading(m_XAxis) 복원 — 연출 진입 시점의 값으로 되돌린다.
+                // 연출 동안 Cinemachine을 끄고 transform을 직접 돌렸을 뿐 m_XAxis는 그대로이므로,
+                // 이 값을 안 맞추면 재활성화된 vcam이 '연출 각도'가 아니라 옛 heading으로 포즈를 계산해
+                // 복귀 후 시선이 틀어진다. 진입 heading으로 고정하면 원래 게임플레이 시점으로 정확히 돌아온다.
+                _cinemachine.m_XAxis.Value = headingYaw;
             }
             await BlendToActiveCameraAsync(returnDuration, ct);   // 라이브 플레이어 vcam 포즈로 + brain 복원
         }

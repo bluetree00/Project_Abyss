@@ -30,6 +30,10 @@ public class ClearRewardTrigger : MonoBehaviour
     private bool _playerInRange;
     private bool _rewarded;
     private bool _isBossRoom;
+    private bool _isChoice;   // true = 후보 중 1개 선택(룬 선택 팝업)
+
+    /// <summary>선택을 넘겼을 때 주는 원석 수(밸런스 값).</summary>
+    private const int SkipOreReward = 1;
 
     private GameObject _promptGO;
     private GameObject _worldIndicatorGO;
@@ -40,11 +44,17 @@ public class ClearRewardTrigger : MonoBehaviour
 
     // ── Public Methods ─────────────────────────────────────────
 
-    public void Initialize(GameRunSession run, List<(RuntimeItemData data, ItemSO so)> rewards, bool isBossRoom = false)
+    /// <param name="isChoice">
+    /// true면 <paramref name="rewards"/>를 <b>선택 후보</b>로 보고 1개만 고르게 한다(룬 선택 팝업).
+    /// false면 기존대로 전부 순차 지급한다(챌린지 다중 보상·보스 보너스).
+    /// </param>
+    public void Initialize(GameRunSession run, List<(RuntimeItemData data, ItemSO so)> rewards,
+                           bool isBossRoom = false, bool isChoice = false)
     {
         _run        = run;
         _rewards    = rewards;
         _isBossRoom = isBossRoom;
+        _isChoice   = isChoice;
 
         if (!TryGetComponent<SphereCollider>(out var col))
             col = gameObject.AddComponent<SphereCollider>();
@@ -132,21 +142,9 @@ public class ClearRewardTrigger : MonoBehaviour
             catch (OperationCanceledException) { return; }
         }
 
-        if (_isBossRoom && _run != null)
-        {
-            if (!_run.HasNextChapter())
-            {
-                // 최종 챕터 보스 격파 = 런 클리어. 종료 시퀀스가 메타 저장·세이브 폐기·BaseCamp 복귀를 담당하므로
-                // 이후 방 경계 저장/게이트 로직은 건너뛴다(끝난 런을 재개 가능 상태로 저장하지 않도록).
-                Debug.Log("[ClearRewardTrigger] 최종 보스 격파 — 런 클리어");
-                GameRunBootstrapper.Instance?.HandleRunClear();
-                return;
-            }
-
-            // 비최종 보스: 챕터 전환은 보스 클리어 시 스폰된 ChapterGate(플레이어 통과)가 담당한다.
-            // 여기서는 보상만 수령하고 아래 공통 정리로 진행한다(자동 전환 제거).
-            Debug.Log("[ClearRewardTrigger] 보스방 보상 수령 — 챕터 전환은 ChapterGate가 담당");
-        }
+        // [보스 후처리 이관] 보스 클리어의 드래프트·런클리어·챕터 전환은 모두
+        // GameRunBootstrapper.OnBossRoomClearedHandler(NotifyBossRoomCleared 구독)가 전담한다.
+        // 보스방은 이제 이 트리거를 스폰하지 않으므로(RoomClearGate 참조) _isBossRoom 분기는 여기서 다루지 않는다.
 
         // 방 경계 저장은 로컬 권위(RunFlowController.SaveRunState)가 담당하므로 여기서는 별도 저장하지 않는다.
 
@@ -173,6 +171,12 @@ public class ClearRewardTrigger : MonoBehaviour
     {
         if (_run?.ItemInventory == null || _rewards == null) return;
 
+        if (_isChoice)
+        {
+            await ShowRuneSelectAsync(ct);
+            return;
+        }
+
         foreach (var (data, _) in _rewards)
         {
             if (data == null) continue;
@@ -194,6 +198,40 @@ public class ClearRewardTrigger : MonoBehaviour
             await popup.WaitForInteractionAsync(ct);
 
         }
+    }
+
+    /// <summary>
+    /// 룬 선택 팝업 — 후보 중 1개만 고른다. 넘기면 원석으로 환원한다.
+    /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
+    /// </summary>
+    private async UniTask ShowRuneSelectAsync(System.Threading.CancellationToken ct)
+    {
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>();
+        if (popup == null)
+        {
+            var fallback = _rewards[0].data;
+            if (fallback != null)
+            {
+                _run.EffectManager?.OnItemPickup(fallback);
+                _run.ItemInventory.AddToStaging(fallback);
+                Debug.LogWarning($"[ClearRewardTrigger] 선택 팝업 로드 실패 — 첫 후보 자동 지급: {fallback.displayName}");
+            }
+            return;
+        }
+
+        popup.Setup(_rewards, _run.ItemInventory);
+        await popup.WaitForInteractionAsync(ct);
+
+        if (popup.Skipped)
+        {
+            // 넘기기 보상 — 원석. 죽은 화폐(RuneOre)에 생산 경로를 주는 지점이기도 하다.
+            _run.FuelBank?.Add(FuelKind.RuneOre, SkipOreReward);
+            Debug.Log($"[ClearRewardTrigger] 룬 선택 넘김 — 원석 +{SkipOreReward}");
+            return;
+        }
+
+        if (popup.Result != null)
+            _run.EffectManager?.OnItemPickup(popup.Result);   // 획득 훅은 실제로 고른 것에만
     }
 
     // ── World Indicator (아이콘 + 거리) ───────────────────────

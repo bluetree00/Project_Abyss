@@ -32,6 +32,14 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     /// <summary>현재 중앙 공명 배수(1 = 증폭 없음).</summary>
     public float Amplifier => _amplifier;
 
+    // [정제소 존핵] 존별 추가 배수 — 매칭 존에 놓인 존핵이 그 존 시너지만 강화한다.
+    // 중앙 공명(_amplifier, 전역)과 곱연산으로 합쳐진다. 값 = 1.0 기준(1.3 = +30%).
+    private readonly Dictionary<string, float> _zoneAmp = new();
+
+    /// <summary>해당 존의 존핵 배수(없으면 1).</summary>
+    public float ZoneAmplifier(string zoneId)
+        => zoneId != null && _zoneAmp.TryGetValue(zoneId, out var m) ? m : 1f;
+
     // [가이드라인 비주얼] 룬 리소스 배지 폴링(0.25s throttle). key→라벨/아이콘/색 고정 테이블.
     private float _badgePollAccum;
     private static readonly (string key, string label, string iconKey, GuidelineVisual.BadgeTint tint)[] s_resourceBadges =
@@ -108,6 +116,40 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         RebuildActive();
     }
 
+    /// <summary>
+    /// [정제소 존핵] 존별 배수 일괄 설정. 판에 놓인 존핵을 스캔한 결과를 룬판이 통보한다.
+    /// 실제로 달라진 게 있을 때만 활성 효과를 재생성한다(전투 중 호출 없음 — 룬판은 시간정지).
+    /// </summary>
+    public void SetZoneAmplifiers(IReadOnlyDictionary<string, float> amps)
+    {
+        bool changed = false;
+
+        // 새로 들어온 값 반영
+        if (amps != null)
+        {
+            foreach (var kv in amps)
+            {
+                float v = Mathf.Max(0.01f, kv.Value);
+                if (!_zoneAmp.TryGetValue(kv.Key, out var cur) || !Mathf.Approximately(cur, v))
+                {
+                    _zoneAmp[kv.Key] = v;
+                    changed = true;
+                }
+            }
+        }
+
+        // 사라진 존(존핵 제거) 정리
+        if (_zoneAmp.Count > 0)
+        {
+            var stale = new List<string>();
+            foreach (var key in _zoneAmp.Keys)
+                if (amps == null || !amps.ContainsKey(key)) stale.Add(key);
+            for (int i = 0; i < stale.Count; i++) { _zoneAmp.Remove(stale[i]); changed = true; }
+        }
+
+        if (changed) RebuildActive();
+    }
+
     /// <summary>원본 엔트리로 활성 효과 전체를 재생성(증폭 반영).</summary>
     private void RebuildActive()
     {
@@ -128,7 +170,10 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         }
 
         _active.Sort(CompareByThreshold);
-        for (int i = 0; i < _active.Count; i++) _active[i].OnActivate(_player);
+        // 공명 재구성은 룬판(시간정지)에서 전체 재활성이라 발동 버스트가 무더기로 뜨는 걸 막는다.
+        ElementVfxPlayer.SuppressBursts = true;
+        try { for (int i = 0; i < _active.Count; i++) _active[i].OnActivate(_player); }
+        finally { ElementVfxPlayer.SuppressBursts = false; }
     }
 
     /// <summary>
@@ -137,7 +182,11 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     /// </summary>
     private RuneSynergyEntry Amplified(RuneSynergyEntry src)
     {
-        if (src == null || Mathf.Approximately(_amplifier, 1f)) return src;
+        if (src == null) return null;
+
+        // 전역(중앙 공명) × 존별(정제소 존핵). 둘 다 1이면 원본 그대로.
+        float mult = _amplifier * ZoneAmplifier(src.zone_id);
+        if (Mathf.Approximately(mult, 1f)) return src;
 
         return new RuneSynergyEntry
         {
@@ -146,7 +195,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             threshold    = src.threshold,
             effect_type  = src.effect_type,
             trigger      = src.trigger,
-            value        = src.value * _amplifier,   // ← 증폭 지점
+            value        = src.value * mult,         // ← 증폭 지점(중앙 공명 × 존핵)
             value2       = src.value2,
             value3       = src.value3,
             max_stack    = src.max_stack,
@@ -182,6 +231,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         _activeTypes.Clear();
         _sourceEntries.Clear();
         _amplifier = 1f;
+        _zoneAmp.Clear();
         _resources.Clear();
 
         // [가이드라인 비주얼] 리소스 배지 정리

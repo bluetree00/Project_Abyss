@@ -22,18 +22,52 @@ public class RuntimeItemData
     // ── 블록 ──
     public int shapeId;
 
+    // ── 속성(랜덤) ──
+    /// <summary>룬 고유 속성(ElementDef Id: FIRE/ICE/ELECTRIC/GRASS/LIGHT/DARK). 생성 시 랜덤 배정.
+    /// 이 속성의 존에 배치하면 해당 속성 시너지가 쌓인다(배치 유도용 — 판이 매칭 칸을 강조).
+    /// 직렬화되므로 세이브 복원 시 유지된다(빈 경우에만 새로 배정).</summary>
+    public string element;
+
     // ── 액티브 ──
     public float cooldown;
 
     // ── 효과 슬롯 ──
     public List<ItemEffectSlot> effects = new List<ItemEffectSlot>();
 
+    // ── 속성 배정 ──
+
+    /// <summary>속성이 비어 있으면 6속성 중 하나를 무작위 배정한다(생성 1회). 이미 있으면 유지(세이브 복원).</summary>
+    public void EnsureElement()
+    {
+        if (!string.IsNullOrEmpty(element)) return;
+        var order = ElementDef.Order;
+        element = order != null && order.Count > 0
+            ? order[UnityEngine.Random.Range(0, order.Count)]
+            : ElementDef.CenterId;
+    }
+
     // ── 팩토리 ──
 
-    /// <summary>SO에서 생성 (에디터/테스트용).</summary>
+    /// <summary>
+    /// SO에서 생성.
+    /// 효과의 정본은 CSV(ITEM_DATA)이므로, 해당 itemId의 CSV 엔트리가 있으면
+    /// FromServer에 위임한다(FromServer가 ItemSORegistry로 SO 표시정보까지 병합).
+    /// CSV에 없는 SO만 아래 modifiers 기반 폴백을 탄다.
+    /// </summary>
     public static RuntimeItemData FromSO(ItemSO so)
     {
         if (so == null) return null;
+
+        if (!string.IsNullOrEmpty(so.itemId))
+        {
+            var csvEntries = Managers.ItemData?.GetItem(so.itemId);
+            if (csvEntries != null && csvEntries.Count > 0)
+            {
+                var fromCsv = FromServer(csvEntries);
+                if (fromCsv != null) return fromCsv;
+            }
+        }
+
         var data = new RuntimeItemData
         {
             itemId      = so.itemId,
@@ -72,6 +106,7 @@ public class RuntimeItemData
             Debug.LogWarning($"[RuntimeItemData] {data.itemId}: shapeId 미설정 — 임시 할당 shapeId={data.shapeId}");
         }
 
+        data.EnsureElement();
         return data;
     }
 
@@ -161,6 +196,7 @@ public class RuntimeItemData
             });
         }
 
+        data.EnsureElement();
         return data;
     }
 

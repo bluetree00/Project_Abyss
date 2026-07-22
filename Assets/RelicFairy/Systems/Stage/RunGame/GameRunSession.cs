@@ -56,9 +56,44 @@ public sealed class GameRunSession
     public MonsterSpawnTableSO CurrentBossSpawnTable =>
         _chapterRegistry != null ? _chapterRegistry.GetData(CurrentChapter)?.bossSpawnTable : null;
 
-    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale. 미주입/미설정 시 1.</summary>
-    public float CurrentDifficultyScale =>
-        _chapterRegistry != null ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+    /// <summary>무한 루프 회차(심연 깊이). 0 = 스토리 1회차. 최종 보스 클리어 후 '계속' 선택 시 +1.
+    /// 세션(런) 스코프 인메모리 — 챕터 전환 간 유지되나, 이어하기 저장에는 아직 포함하지 않는다(v1).</summary>
+    public int AbyssDepth { get; private set; }
+
+    // ── 누적 플레이 시간 ──
+    // 세션은 씬 전환에도 살아남으므로(DDOL), 복원 시점의 누적치에 '이번 세션 경과'를 더해 계산한다.
+    // 앱을 껐다 켜도 세이브의 playSeconds가 누적치로 들어와 이어진다.
+    private double _playSecondsAccum;
+    private float  _playSessionStart;
+
+    /// <summary>이 런의 누적 플레이 시간(초). 세이브·로비 표시에 사용.</summary>
+    public int PlaySeconds =>
+        (int)(_playSecondsAccum + Mathf.Max(0f, Time.realtimeSinceStartup - _playSessionStart));
+
+    /// <summary>플레이 시간 기준점 설정. 신규 런=0, 이어하기=세이브 누적치.</summary>
+    private void ResetPlayClock(int accumSeconds)
+    {
+        _playSecondsAccum = Mathf.Max(0, accumSeconds);
+        _playSessionStart = Time.realtimeSinceStartup;
+    }
+
+    private RefineryService _refinery;
+    /// <summary>정제소(특수 룬 제작). 런 스코프 — 피버·비용·버프 상태를 유지한다. 최초 접근 시 생성.</summary>
+    public RefineryService Refinery => _refinery ??= new RefineryService(FuelBank, ItemInventory);
+
+    /// <summary>루프 1회당 적 스탯(HP·공격력) 가산 배율. 밸런스 대상(시작값 +25%/회차).</summary>
+    private const float LoopScalePerDepth = 0.25f;
+
+    /// <summary>현재 챕터의 몬스터 스탯 배율(HP·공격력). ChapterDataSO.difficultyScale × 루프 깊이 배율. 미주입/미설정 시 1.</summary>
+    public float CurrentDifficultyScale
+    {
+        get
+        {
+            float chapterScale = _chapterRegistry != null
+                ? (_chapterRegistry.GetData(CurrentChapter)?.difficultyScale ?? 1f) : 1f;
+            return chapterScale * (1f + AbyssDepth * LoopScalePerDepth);
+        }
+    }
 
     /// <summary>현재 챕터의 몬스터 수량 배율. ChapterDataSO.monsterCountScale. 미주입/미설정 시 1.</summary>
     public float CurrentMonsterCountScale =>
@@ -139,6 +174,26 @@ public sealed class GameRunSession
     {
         SavedWeaponSlots = slots;
         SavedCurrentSlotIndex = currentIndex;
+    }
+
+    /// <summary>
+    /// 살아 있는 플레이어의 무기 슬롯을 세션에 즉시 캡처한다. 플레이어가 없으면 아무것도 하지 않는다
+    /// (이전 캡처를 지우면 안 된다 — 씬 전환 중 저장에서 무기 정보가 통째로 날아간다).
+    ///
+    /// 과거엔 씬 이탈(GameRunBootstrapper.OnDestroy)에서만 캡처해서, 방 경계 자동저장이나
+    /// 재련소 SaveNow("crucible-enhance")가 <b>낡거나 비어 있는</b> 값을 저장했다.
+    /// 그래서 강화·진화를 하고 게임을 끄면 이어하기에서 0강으로 돌아갔다. 저장 직전에 반드시 부른다.
+    /// </summary>
+    public void CaptureWeaponSlotsFromPlayer()
+    {
+        var wm = Player != null ? Player.WeaponManager : null;
+        if (wm == null || wm.slots == null) return;
+
+        var slots = new WeaponData[wm.SlotCount];
+        for (int i = 0; i < wm.SlotCount && i < wm.slots.Length; i++)
+            slots[i] = wm.slots[i]?.runtimeData;
+
+        SaveWeaponSlots(slots, wm.CurrentSlotIndex);
     }
 
     // --------------------
@@ -239,6 +294,7 @@ public sealed class GameRunSession
             // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
             FuelBank.Add(FuelKind.EnhanceMaterial, NewRunStartingEnhanceMaterial);
             PlayerState.AddPotion(NewRunStartingPotions);   // 신규 런 포션 지급(이어하기는 세이브 복원)
+            ResetPlayClock(0);                              // 신규 런 = 플레이 시간 0부터
 
             // PlayerState ready (HUD may already exist)
             OnPlayerStateReady?.Invoke(PlayerState);
@@ -277,6 +333,7 @@ public sealed class GameRunSession
 
         Phase = RunPhase.Starting;
         CurrentChapter = (ChapterId)save.chapter;
+        ResetPlayClock(save.playSeconds);   // 이어하기 = 저장된 누적 시간부터 계속
         ResolveActiveTheme();
         CurrentHudMode = HUDIds.Mode.None;
         _hudModeSet = false;
@@ -344,9 +401,10 @@ public sealed class GameRunSession
 
         Phase = RunPhase.Ending;
 
-        // 미소비 연료(강화재료·원석) → abyssEssence(메타) 환산 (로스 0). Phase=Ending이라 AddEssence 가드 우회, RunDelta 직접 가산.
-        int fuelConverted = FuelBank.TotalRemaining();
-        if (fuelConverted > 0) RunDelta.GainedEssence += fuelConverted;
+        // 연료(강화재료·원석)는 <b>회수하지 않는다.</b> 런을 넘어 남는 것은 각성 정수(abyssEssence)뿐이다.
+        // 과거엔 미소비 연료를 전액 정수로 환산했는데, 그러면 "아껴두면 죽어도 전액 회수"가 되어
+        // 정제소·재련소 도박을 안 하는 것이 최적이 됐다(하드리셋의 무게가 사라짐).
+        // 정수는 런 중 실제로 정수로 획득한 분(RunDelta.GainedEssence)만 이월된다.
 
         // 종료 상태 발행 (OnRunEnded 전에 구독자가 반응할 수 있도록)
         var endState = isCleared ? RunState.RunClear : RunState.RunEnd;
@@ -367,8 +425,9 @@ public sealed class GameRunSession
         try { PlayerState?.Deactivate(); }
         catch (Exception e) { Debug.LogWarning($"[GameRun] PlayerState.Deactivate() error: {e.Message}"); }
 
-        // MerlinRuneBridge 적용 이력 초기화 (DDOL이므로 수동 정리)
-        MerlinRuneBridge.Instance?.ResetSynergyState();
+        // 룬판 하드리셋 (DDOL이라 씬 전환으로 안 죽으므로 수동 정리).
+        // 적용 이력만 지우면 판 위의 룬이 다음 런까지 남아 빈 인벤토리와 어긋난다 → 판째로 버린다.
+        MerlinRuneBridge.Instance?.ClearBoard();
 
         // Optional: end => none (keeps HUD consistent if it remains alive)
         RequestHudMode(HUDIds.Mode.None);
@@ -521,6 +580,10 @@ public sealed class GameRunSession
     /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
     public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
 
+    /// <summary>현재 챕터가 '최종 직전'인지 — 이 보스를 깨면 다음이 최종 챕터.
+    /// 유물 코어 진화 드래프트를 여기에 배치해, 최종 챕터를 진화형으로 플레이하게 한다(설계서 §1-6).</summary>
+    public bool IsNextChapterFinal() => CurrentChapter + 1 == FinalChapter;
+
     /// <summary>다음 챕터로 진행. 마지막 챕터면 false 반환.</summary>
     public bool AdvanceToNextChapter()
     {
@@ -534,6 +597,18 @@ public sealed class GameRunSession
 
         ChangeRunState(RunState.Map);
         return true;
+    }
+
+    /// <summary>무한 루프 진입 — 심연 깊이를 올리고 Ch1으로 회귀한다(로드아웃은 유지, 적 스탯만 스케일↑).
+    /// 최종 보스 클리어 후 '계속'을 선택했을 때 호출. 챕터 전환 기계를 재사용하되 목적지만 Ch1으로 되돌린다.</summary>
+    public void BeginAbyssLoop()
+    {
+        if (!IsRunning) return;
+
+        AbyssDepth++;
+        CurrentChapter = ChapterId.Chapter1;
+        ResolveActiveTheme();
+        ChangeRunState(RunState.Map);
     }
 
     /// <summary>

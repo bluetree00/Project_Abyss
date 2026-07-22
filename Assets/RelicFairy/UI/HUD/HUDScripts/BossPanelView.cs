@@ -28,6 +28,14 @@ public sealed class BossPanelView : MonoBehaviour
     [SerializeField] private Sprite bossTrackSprite;   // 보스바 내부 검정
     [SerializeField] private Sprite bossFillSprite;    // 보스바 내부 빨강
 
+    // 테두리 아트에는 위아래 장식이 포함돼 있어, 실제 채워지는 '창'은 그중 일부다(아트 실측 2819×57 / 2867×319).
+    // 픽셀 여백 대신 비율로 잡아야 패널 크기가 바뀌어도 창이 프레임에서 벗어나지 않는다.
+    [Header("내부 창 (테두리 아트 대비 비율) — 트랙/필이 앉을 자리")]
+    [SerializeField, Tooltip("프레임 대비 내부 창 크기 (가로, 세로). 아트 실측 2819/2867, 57/319.")]
+    private Vector2 innerWindowRatio = new Vector2(0.983f, 0.179f);
+    [SerializeField, Range(0f, 1f), Tooltip("내부 창의 세로 중심 (0=하단, 1=상단). 아트에서 창이 치우쳐 있으면 조정.")]
+    private float innerWindowCenterY = 0.5f;
+
     private int _maxHp;
     private bool _skinApplied;
 
@@ -128,6 +136,17 @@ public sealed class BossPanelView : MonoBehaviour
         if (_skinApplied || !HasSkin) return;
         _skinApplied = true;
 
+        // 슬라이더를 프레임(패널 전체)과 같은 자리로 편다 — 프레임은 패널 전체를 덮는데
+        // 슬라이더만 바닥 스트립에 있으면 채움이 테두리 창을 벗어난다.
+        if (hpSlider != null)
+        {
+            var srt = (RectTransform)hpSlider.transform;
+            srt.anchorMin = Vector2.zero;
+            srt.anchorMax = Vector2.one;
+            srt.offsetMin = Vector2.zero;
+            srt.offsetMax = Vector2.zero;
+        }
+
         if (hpSlider != null && bossTrackSprite != null)
         {
             var bg = hpSlider.transform.Find("Background");
@@ -136,8 +155,14 @@ public sealed class BossPanelView : MonoBehaviour
                 bgImg.sprite = bossTrackSprite;
                 bgImg.type   = Image.Type.Sliced;
                 bgImg.color  = Color.white;
+                FitInnerWindow((RectTransform)bg);
             }
         }
+
+        // Fill Area(슬라이더 컨테이너)를 창에 맞춘다. fillRect 자체의 앵커는 Slider가 매 프레임 덮어쓰므로
+        // 반드시 '부모'를 맞춰야 한다.
+        if (hpSlider != null && hpSlider.fillRect != null)
+            FitInnerWindow(hpSlider.fillRect.parent as RectTransform);
 
         if (hpFillImage != null && bossFillSprite != null)
         {
@@ -155,6 +180,14 @@ public sealed class BossPanelView : MonoBehaviour
 
         if (bossFrameSprite != null)
         {
+            // 패널 높이를 테두리 아트 비율에 맞춘다 — 안 맞추면 장식이 세로로 눌려 보이고,
+            // 비율로 잡은 내부 창도 아트의 실제 창과 어긋난다.
+            if (transform is RectTransform root && bossFrameSprite.rect.width > 0f)
+            {
+                float aspect = bossFrameSprite.rect.height / bossFrameSprite.rect.width;
+                root.sizeDelta = new Vector2(root.sizeDelta.x, root.sizeDelta.x * aspect);
+            }
+
             var frame = EnsureImage("BossBarFrame", transform, Color.white);
             var frt = (RectTransform)frame.transform;
             frt.anchorMin = Vector2.zero;
@@ -165,6 +198,26 @@ public sealed class BossPanelView : MonoBehaviour
             frame.type   = Image.Type.Sliced;
             frt.SetAsLastSibling();   // 슬라이더 위
         }
+
+        // 텍스트는 테두리보다 위 — 프레임을 마지막 형제로 올리면 이름/수치가 장식에 가린다.
+        if (nameText != null) nameText.transform.SetAsLastSibling();
+        if (hpText   != null) hpText.transform.SetAsLastSibling();
+    }
+
+    /// <summary>테두리 아트의 내부 창 비율로 rect를 앉힌다(픽셀 오프셋 0 → 앵커만으로 크기 결정).</summary>
+    private void FitInnerWindow(RectTransform rt)
+    {
+        if (rt == null) return;
+
+        float w = Mathf.Clamp01(innerWindowRatio.x);
+        float h = Mathf.Clamp01(innerWindowRatio.y);
+        float cx = 0.5f;
+        float cy = Mathf.Clamp(innerWindowCenterY, h * 0.5f, 1f - h * 0.5f);
+
+        rt.anchorMin = new Vector2(cx - w * 0.5f, cy - h * 0.5f);
+        rt.anchorMax = new Vector2(cx + w * 0.5f, cy + h * 0.5f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
     }
 
     private void BuildRuntimeFallback()

@@ -49,6 +49,13 @@ public class WeaponData
     public string legendId;
     public float  baseAttackRaw;
 
+    /// <summary>
+    /// 진화를 몇 번 거쳤는지(0 = 무명/미진화). 진화할 때마다 +1.
+    /// 강화 상한을 밀어올리는 값 — 진화가 강화의 끝이 아니라 "다음 구간의 문"이 되게 한다.
+    /// rarity 는 서버 차트가 덮으므로 상한 확장을 rarity 로 표현할 수 없어 별도 필드로 둔다.
+    /// </summary>
+    public int evolutionStage;
+
     public int groundEndCount;
     public int airEndCount;
 

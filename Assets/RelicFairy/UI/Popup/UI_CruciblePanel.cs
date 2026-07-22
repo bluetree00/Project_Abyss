@@ -18,6 +18,7 @@ using UnityEngine.UI;
 public sealed class UI_CruciblePanel : UI_Popup
 {
     public override bool BlocksGameplay => true; // 재련 중 시간정지 + 입력잠금
+    public override bool CloseOnEscape  => true; // ESC = 나가기(기존 동작, EscKeyListener 공용 경로)
 
     private const float WindowW = 1280f;
     private const float WindowH = 900f;
@@ -110,12 +111,6 @@ public sealed class UI_CruciblePanel : UI_Popup
     {
         base.Init();
         BuildChrome();
-    }
-
-    private void Update()
-    {
-        if (!_closing && Input.GetKeyDown(KeyCode.Escape))
-            ClosePopupUI();
     }
 
     private void OnDestroy()
@@ -527,16 +522,51 @@ public sealed class UI_CruciblePanel : UI_Popup
         return pick;
     }
 
+    /// <summary>현재 장착 무기의 진화 분기(WeaponEvolutionSO). 진화 불가면 빈 목록.</summary>
+    private IReadOnlyList<WeaponEvolutionSO.Branch> CurrentBranches
+    {
+        get
+        {
+            var wd = _controller?.Run?.Player?.WeaponManager?.CurrentWeaponData;
+            return wd?.evolution != null ? wd.evolution.Branches : System.Array.Empty<WeaponEvolutionSO.Branch>();
+        }
+    }
+
     private void ShowEvolvePanel()
     {
         if (_evolvePanel == null || _controller == null) return;
-        // 분기 이름 — WeaponEvolutionSO 미연결이라 무기 타입 기준 임시. Phase 3에서 실제 분기 데이터로 대체.
-        var wp = _controller.GetSlot(PlayerWeaponManager.Slot0);
-        bool sword = wp != null && (wp.weaponType == WeaponType.Katana || wp.weaponType == WeaponType.Greatsword);
-        if (_branchAName != null) _branchAName.text = sword ? "카타나\n<size=70%>아론다이트</size>" : "활\n<size=70%>연발형</size>";
-        if (_branchBName != null) _branchBName.text = sword ? "대검\n<size=70%>갈라틴</size>"   : "석궁\n<size=70%>관통형</size>";
+
+        var wd       = _controller.Run?.Player?.WeaponManager?.CurrentWeaponData;
+        var branches = CurrentBranches;
+
+        if (branches.Count == 0)
+        {
+            if (_resultText != null) _resultText.text = "<color=#9A8FB5>이 무기는 더 진화하지 않는다</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
+
+        int lv = wd?.enhanceLevel ?? 0;
+        SetBranchLabel(_branchAName, branches.Count > 0 ? branches[0] : null, lv);
+        SetBranchLabel(_branchBName, branches.Count > 1 ? branches[1] : null, lv);
+
         _evolvePanel.SetActive(true);
         ShopUIStyle.PlaySfx("shop_open");
+    }
+
+    /// <summary>분기 라벨 — 진화 후 이름 + 잠금 조건(강화 레벨 미달 시 회색 안내).</summary>
+    private static void SetBranchLabel(TMP_Text label, WeaponEvolutionSO.Branch b, int enhanceLevel)
+    {
+        if (label == null) return;
+        if (b == null || !b.IsValid) { label.text = "—"; return; }
+
+        string name = b.target != null && !string.IsNullOrEmpty(b.target.displayName)
+            ? b.target.displayName : b.branchId;
+
+        if (!WeaponEvolutionSO.IsUnlocked(b, enhanceLevel))
+            label.text = $"<color=#7A7290>{name}\n<size=70%>강화 {b.requiredEnhanceLevel} 필요</size></color>";
+        else
+            label.text = $"{name}\n<size=70%>{(b.cost > 0 ? $"재료 {b.cost}" : "진화 가능")}</size>";
     }
 
     private void HideEvolvePanel()
@@ -544,12 +574,64 @@ public sealed class UI_CruciblePanel : UI_Popup
         if (_evolvePanel != null) _evolvePanel.SetActive(false);
     }
 
-    private void OnBranchClicked(int branch)
+    private void OnBranchClicked(int branch) => EvolveAsync(branch).Forget();
+
+    /// <summary>진화 실행 — 무기를 통째로 교체하고 강화 레벨은 계승된다(PlayerWeaponManager가 처리).</summary>
+    private async UniTaskVoid EvolveAsync(int branchIndex)
     {
-        // TODO(진화): WeaponEvolutionSO 분기 → PlayerWeaponManager.EvolveCurrentWeaponAsync 연결 (Phase 3)
+        var branches = CurrentBranches;
+        if (branchIndex < 0 || branchIndex >= branches.Count)
+        {
+            HideEvolvePanel();
+            if (_resultText != null) _resultText.text = "<color=#C7554A>진화 분기가 없다</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
+
+        var b  = branches[branchIndex];
+        var wm = _controller?.Run?.Player?.WeaponManager;
+        var wd = wm?.CurrentWeaponData;
+        if (wm == null || wd == null) { HideEvolvePanel(); return; }
+
+        // 조건: 강화 레벨
+        if (!WeaponEvolutionSO.IsUnlocked(b, wd.enhanceLevel))
+        {
+            if (_resultText != null)
+                _resultText.text = $"<color=#C7554A>강화 {b.requiredEnhanceLevel} 이상이어야 한다</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
+
+        // 조건: 재료(설정된 경우만 차감)
+        var fuel = _controller.Run?.FuelBank;
+        if (b.cost > 0 && !(fuel?.TrySpend(FuelKind.EnhanceMaterial, b.cost) ?? false))
+        {
+            if (_resultText != null) _resultText.text = "<color=#C7554A>재료가 부족하다</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+            return;
+        }
+
         HideEvolvePanel();
-        if (_resultText != null) _resultText.text = "<color=#9D7EE6>진화 연결 예정 (Phase 3)</color>";
-        ShopUIStyle.PlaySfx("shop_reject");
+
+        bool ok;
+        try { ok = await wm.EvolveCurrentWeaponAsync(b, this.GetCancellationTokenOnDestroy()); }
+        catch (System.OperationCanceledException) { return; }
+
+        if (ok)
+        {
+            string name = b.target != null ? b.target.displayName : b.branchId;
+            if (_resultText != null) _resultText.text = $"<color=#9D7EE6>진화 — {name}</color>";
+            ShopUIStyle.PlaySfx("enhance_success");
+        }
+        else
+        {
+            // 실패 시 재료 환불(차감했다면)
+            if (b.cost > 0) fuel?.Add(FuelKind.EnhanceMaterial, b.cost);
+            if (_resultText != null) _resultText.text = "<color=#C7554A>진화에 실패했다</color>";
+            ShopUIStyle.PlaySfx("shop_reject");
+        }
+
+        RefreshAll();
     }
 
     private void BuildLegendButtons()
@@ -875,7 +957,7 @@ public sealed class UI_CruciblePanel : UI_Popup
             string legend = string.IsNullOrEmpty(w.legendId) ? "" : $"  <color=#FFD24A>[{LegendName(w.legendId)}]</color>";
             _cardName[i].text = $"{w.displayName}{legend}";
             _cardLevel[i].text = FormatLevel(w.enhanceLevel, max);
-            if (_cardAtk[i] != null) _cardAtk[i].text = $"공격 {w.baseAttack:F0}";
+            if (_cardAtk[i] != null) _cardAtk[i].text = $"공격 {w.baseAttack:F1}";
             if (typeText != null)    typeText.text = TypeTierLabel(w, max);
             SetGauge(i, w.enhanceLevel, max);
         }
@@ -901,19 +983,15 @@ public sealed class UI_CruciblePanel : UI_Popup
             _zoneBg.color = danger ? new Color(0.42f, 0.14f, 0.16f, 1f) : new Color(0.15f, 0.32f, 0.2f, 1f);
 
         if (_milestoneLabel != null)
-        {
-            if (_controller.CanPromote(PlayerWeaponManager.Slot0)) _milestoneLabel.text = "◆ 진화 가능!";
-            else if (!maxed) _milestoneLabel.text = $"◆ 진화까지 {Mathf.Max(0, max - w.enhanceLevel)}강";
-            else _milestoneLabel.text = "";
-        }
+            _milestoneLabel.text = MilestoneText(w, max, maxed);
 
         // 다음 강화 상세(성공 공격증가 / 실패 하락 / 잭팟 확률)
         if (_detailSuccess != null)
         {
             if (maxed)
             {
-                _detailSuccess.text = "최대 강화 도달";
-                _detailFail.text    = _controller.CanPromote(PlayerWeaponManager.Slot0) ? "진화 가능" : "";
+                _detailSuccess.text = w.CanEvolve ? "이 구간의 최대 — 진화로 다음 구간이 열린다" : "최대 강화 도달";
+                _detailFail.text    = MasteryText(w);
                 _detailJackpot.text = "";
             }
             else
@@ -922,12 +1000,48 @@ public sealed class UI_CruciblePanel : UI_Popup
                 float cur  = w.baseAttack;
                 float next = table != null ? (w.baseAttackRaw > 0f ? w.baseAttackRaw : w.baseAttack) * table.AttackMult(w.enhanceLevel + 1, w.legendId) : cur;
                 int drop = _controller.DropAt(PlayerWeaponManager.Slot0);
-                _detailSuccess.text = $"<color=#7AD46E>성공</color>  공격 {cur:F0} → {next:F0} <size=80%>(+{next - cur:F0})</size>";
+                // F0으로 찍으면 저스케일 무기에서 "6 → 6"으로 보여 강화가 무의미해 보인다 — 소수 1자리 + 누적 %.
+                float raw   = w.baseAttackRaw > 0f ? w.baseAttackRaw : w.baseAttack;
+                float total = raw > 0f ? (next / raw - 1f) * 100f : 0f;
+                _detailSuccess.text = $"<color=#7AD46E>성공</color>  공격 {cur:F1} → {next:F1} " +
+                                      $"<size=80%>(+{next - cur:F1} · 원본 대비 +{total:F0}%)</size>";
                 _detailFail.text    = drop > 0 ? $"<color=#FF7A6A>실패</color>  강화 -{drop}"
                                                : "<color=#7AD46E>실패</color>  하락 없음 (안전)";
                 _detailJackpot.text = $"<color=#FFD24A>잭팟</color>  {_controller.JackpotChance * 100f:F0}% <size=80%>스트릭 {_controller.Streak}</size>";
             }
         }
+    }
+
+    /// <summary>
+    /// 마일스톤 한 줄. 진화 전에는 "진화까지", 진화 후에는 마스터리 구간을 가리킨다.
+    /// 진화가 강화의 종점이 아니라는 걸 이 줄에서 읽히게 하는 게 목적.
+    /// </summary>
+    private string MilestoneText(WeaponData w, int max, bool maxed)
+    {
+        int left = Mathf.Max(0, max - w.enhanceLevel);
+
+        if (w.CanEvolve)
+            return maxed ? "◆ 진화 가능!" : $"◆ 진화까지 {left}강";
+
+        if (w.evolutionStage > 0)
+        {
+            int mastery = WeaponEnhanceService.MasteryLevel(w, _controller.Table);
+            if (maxed)      return $"◆ 마스터리 {mastery}단계 (최종)";
+            if (mastery > 0) return $"◆ 마스터리 {mastery}단계 · 앞으로 {left}강";
+            return $"◆ 마스터리 개방까지 {Mathf.Max(0, WeaponEnhanceService.BaseEnhanceCap(w, _controller.Table) - w.enhanceLevel)}강";
+        }
+
+        return maxed ? "" : $"◆ 최대까지 {left}강";
+    }
+
+    /// <summary>마스터리 누적 효과(스킬 확장) 한 줄. 없으면 빈 문자열.</summary>
+    private string MasteryText(WeaponData w)
+    {
+        var table = _controller.Table;
+        int mastery = WeaponEnhanceService.MasteryLevel(w, table);
+        if (table == null || mastery <= 0) return "";
+        return $"<color=#C9A6FF>마스터리 {mastery}</color>  스킬 피해 +{table.MasterySkillDamage(mastery) * 100f:F0}%" +
+               $" · 쿨다운 -{table.MasterySkillCdr(mastery) * 100f:F0}%";
     }
 
     private void RefreshInfo()
@@ -945,8 +1059,10 @@ public sealed class UI_CruciblePanel : UI_Popup
         bool maxed = !_controller.CanEnhance(_targetSlot);
         if (maxed)
         {
-            _successText.text = "<color=#8AB0D5>최대 강화 도달</color>";
-            _costText.text = _controller.CanPromote(_targetSlot) ? "진화 가능" : "";
+            _successText.text = w.CanEvolve
+                ? "<color=#8AB0D5>진화 대기 — 다음 구간이 열린다</color>"
+                : "<color=#8AB0D5>최대 강화 도달</color>";
+            _costText.text = MasteryText(w);
         }
         else
         {

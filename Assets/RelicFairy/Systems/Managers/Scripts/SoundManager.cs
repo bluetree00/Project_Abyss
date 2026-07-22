@@ -30,6 +30,7 @@ public sealed class SoundManager
     private bool _initialized;
     private int _bgmRequestVersion;
     private int _effectPoolVersion;
+    private System.Threading.CancellationTokenSource _bgmFadeCts;
     private int _nextPoolId;
     private float _bgmVolume    = 1f;
     private float _effectVolume = 1f;
@@ -148,6 +149,9 @@ public sealed class SoundManager
 
     public void Clear()
     {
+        _bgmFadeCts?.Cancel();
+        _bgmFadeCts?.Dispose();
+        _bgmFadeCts = null;
         _bgmRequestVersion++;
         _effectPoolVersion++;
         _availableEffects.Clear();
@@ -176,6 +180,69 @@ public sealed class SoundManager
     public UniTask PlayBgmAsync(string key, float volume = 1f, float pitch = 1f)
         => PlayAsync(key, Define.Sound.Bgm, volume, pitch);
 
+    public async UniTask FadeOutBgmAsync(float duration = 1.5f, System.Threading.CancellationToken ct = default)
+    {
+        _bgmRequestVersion++;
+        _bgmFadeCts?.Cancel();
+        _bgmFadeCts?.Dispose();
+        _bgmFadeCts = new System.Threading.CancellationTokenSource();
+
+        using var linkedCts = ct == default
+            ? null
+            : System.Threading.CancellationTokenSource.CreateLinkedTokenSource(ct, _bgmFadeCts.Token);
+        var linkedCt = linkedCts?.Token ?? _bgmFadeCts.Token;
+
+        try
+        {
+            var src = GetAudioSource(Define.Sound.Bgm);
+            if (src == null || !src.isPlaying) return;
+
+            await FadeBgmSourceAsync(src, 0f, duration, linkedCt);
+            src.Stop();
+            src.clip = null;
+            src.volume = 1f;
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>현재 BGM을 fadeOutDuration 초 동안 페이드아웃하면서 동시에 다음 클립을 로드한 뒤
+    /// 갭 없이 재생을 이어간다. 중첩 호출 시 이전 페이드를 취소하고 새 전환을 시작한다.</summary>
+    public async UniTask CrossfadeBgmAsync(string key, float fadeOutDuration = 1.5f, System.Threading.CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return;
+
+        _bgmRequestVersion++;
+        _bgmFadeCts?.Cancel();
+        _bgmFadeCts?.Dispose();
+        _bgmFadeCts = new System.Threading.CancellationTokenSource();
+
+        using var linkedCts = ct == default
+            ? null
+            : System.Threading.CancellationTokenSource.CreateLinkedTokenSource(ct, _bgmFadeCts.Token);
+        var linkedCt = linkedCts?.Token ?? _bgmFadeCts.Token;
+
+        try
+        {
+            var loadTask = GetOrAddAudioClipAsync(key);
+
+            var src = GetAudioSource(Define.Sound.Bgm);
+            if (src != null && src.isPlaying)
+            {
+                await FadeBgmSourceAsync(src, 0f, fadeOutDuration, linkedCt);
+                src.Stop();
+                src.clip = null;
+                src.volume = 1f;
+            }
+
+            var clip = await loadTask;
+            if (clip == null) return;
+
+            linkedCt.ThrowIfCancellationRequested();
+            Play(clip, Define.Sound.Bgm);
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
     public UniTask PlayEffectAsync(string key, float volume = 1f, float pitch = 1f)
         => PlayAsync(key, Define.Sound.Effect, volume, pitch);
 
@@ -200,7 +267,16 @@ public sealed class SoundManager
         if (string.IsNullOrWhiteSpace(key))
             return;
 
-        int requestVersion = type == Define.Sound.Bgm ? ++_bgmRequestVersion : 0;
+        int requestVersion;
+        if (type == Define.Sound.Bgm)
+        {
+            _bgmFadeCts?.Cancel(); // 진행 중인 페이드아웃 중단
+            requestVersion = ++_bgmRequestVersion;
+        }
+        else
+        {
+            requestVersion = 0;
+        }
         var audioClip = await GetOrAddAudioClipAsync(key);
 
         if (type == Define.Sound.Bgm && requestVersion != _bgmRequestVersion)
@@ -268,6 +344,19 @@ public sealed class SoundManager
 
         audioSource.Stop();
         audioSource.clip = null;
+    }
+
+    private async UniTask FadeBgmSourceAsync(AudioSource source, float targetVolume, float duration, System.Threading.CancellationToken ct)
+    {
+        float start = source.volume;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            source.volume = Mathf.Lerp(start, targetVolume, Mathf.Clamp01(elapsed / duration));
+            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+        }
+        source.volume = targetVolume;
     }
 
     private async UniTask<AudioClip> GetOrAddAudioClipAsync(string key)

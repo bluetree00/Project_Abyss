@@ -152,7 +152,8 @@ public class DamagePopup : MonoBehaviour
     /// 스폰 — 풀에서 꺼낸 직후 호출. damage 의 절댓값을 숫자로 표기(스포너가 damage&lt;=0 은 차단).
     /// kind: 피해 출처(색). cascadeIndex: 같은 대상에 연달아 꽂힌 순번(0부터) — 위로 쌓아 영수증처럼 읽힌다.
     /// </summary>
-    public void Show(Vector3 worldPos, float damage, bool isCrit, DamageKind kind, int cascadeIndex = 0)
+    public void Show(Vector3 worldPos, float damage, bool isCrit, DamageKind kind, int cascadeIndex = 0,
+                     RuneElement? element = null)
     {
         _elapsed = 0f;
         _active = true;
@@ -175,7 +176,7 @@ public class DamagePopup : MonoBehaviour
         {
             int amount = Mathf.RoundToInt(Mathf.Abs(damage));
             label.text = isCrit ? $"{amount}!" : amount.ToString();
-            ApplyStyle(isCrit, kind);
+            ApplyStyle(isCrit, kind, element);
             label.transform.localScale = Vector3.zero;   // 팝이 0에서 시작
         }
 
@@ -190,19 +191,34 @@ public class DamagePopup : MonoBehaviour
     /// 치명타는 <b>색이 아니라 재질</b>로 구분한다 — 백열→적열 세로 그라데이션 + 진홍 아웃라인 + 발광.
     /// 일반 피해는 그라데이션을 끄고 출처 색 단색으로 조용히 둔다("기본 타는 조용해야 한다").
     /// </summary>
-    private void ApplyStyle(bool isCrit, DamageKind kind)
+    private void ApplyStyle(bool isCrit, DamageKind kind, RuneElement? element)
     {
         if (isCrit)
         {
             label.fontSharedMaterial = s_critMat != null ? s_critMat : label.fontSharedMaterial;
             label.enableVertexGradient = true;
-            label.colorGradient = new VertexGradient(
-                critGradientTop, critGradientTop, critGradientBottom, critGradientBottom);
+            // 속성 치명타는 그 속성의 색으로 달아오르게 — 치명타 재질(발광)은 그대로 쓰되 색만 속성으로.
+            Color top = element.HasValue ? ElementPalette.Bright(element.Value) : critGradientTop;
+            Color bot = element.HasValue ? ElementPalette.Deep(element.Value)   : critGradientBottom;
+            label.colorGradient = new VertexGradient(top, top, bot, bot);
             label.color = Color.white;   // 그라데이션은 color에 곱해지므로 흰색으로 둔다
             return;
         }
 
         label.fontSharedMaterial = s_outlineMat != null ? s_outlineMat : label.fontSharedMaterial;
+
+        // 속성 피해는 단색이 아니라 세로 그라데이션(밝은 심지 → 짙은 가장자리)으로 준다.
+        // 화상/독/감전이 "주황 숫자"가 아니라 "타오르는 숫자"로 읽히게 하는 것이 목적.
+        if (element.HasValue)
+        {
+            label.enableVertexGradient = true;
+            Color top = ElementPalette.Bright(element.Value);
+            Color bot = ElementPalette.Deep(element.Value);
+            label.colorGradient = new VertexGradient(top, top, bot, bot);
+            label.color = Color.white;
+            return;
+        }
+
         label.enableVertexGradient = false;
         label.color = ColorForKind(kind);
     }

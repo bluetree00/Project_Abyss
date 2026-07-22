@@ -298,6 +298,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StartRoomGate
   portalActive: {fileID: 2960488401062698020}
   notReadyIndicator: {fileID: 0}
+  startCorridorPalette: {fileID: 11400000, guid: 5915c923e0c64604a91f3c9d1015f5eb,
+    type: 2}
+  startCorridorEdge: 2
+  startCorridorLength: 12
+  startCorridorWallLayers: 6
+  requireCovenantForGate: 1
+  gateRevealDelay: 2.2
+  gateRevealViewOffset: {x: 0, y: 9, z: -11}
+  gateRevealLookHeight: 2
+  gateRevealDurations: {x: 1.1, y: 1.9, z: 0.9}
 --- !u!1 &7168766301372141468
 GameObject:
   m_ObjectHideFlags: 0

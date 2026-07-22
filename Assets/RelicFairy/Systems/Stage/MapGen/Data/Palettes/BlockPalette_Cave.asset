@@ -12,7 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b0c3a74d232eda46aab9f9984eb60e0, type: 3}
   m_Name: BlockPalette_Cave
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
-  themeMatch: Lava
+  themeMatch: Ruins
+  wallMode: 1
+  wallHeight: 7
+  hasCeiling: 0
+  lighting:
+    wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    wallLightSpacing: 5
+    wallLightHeightRatio: 0.45
+    maxWallLights: 18
   blocks:
   - {fileID: 11400000, guid: 93afa8f895c85bf4f96570ae5c3ed1e8, type: 2}
   - {fileID: 11400000, guid: 796314963f87a4646aca71b4dcab22c7, type: 2}
@@ -21,3 +32,4 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 41da9f765c0fa0e4ba5db242685baa9e, type: 2}
   - {fileID: 11400000, guid: d9d3d6e5e7a99af41b567bbfbfbca59b, type: 2}
   - {fileID: 11400000, guid: cdd01111ae2827d4c82f03699eb2da52, type: 2}
+  - {fileID: 11400000, guid: ca1a4ca00f5c65e43b10efeb5e9a1d73, type: 2}

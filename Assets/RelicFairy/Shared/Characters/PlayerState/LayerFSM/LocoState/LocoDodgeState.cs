@@ -9,6 +9,12 @@ public class LocoDodgeState : ILayerState<LocoState>
     // 구르기 → 로코모션 복귀 크로스페이드 길이. 기본(0.05s)은 자세 차가 커서 스냅이 보인다.
     private const float DodgeExitBlend = 0.15f;
 
+    // 대시 중 허용할 최대 상승 속도(m/s).
+    // 경사/계단을 고속으로 타면 호버 스프링(지면이 급히 솟아 error 급증)과 콜라이더 충돌 반발이
+    // 겹쳐 캐릭터가 위로 쏘아올려진다. 대시는 매 프레임 속도를 덮어쓰므로, 여기서 상승분만
+    // 잘라내면 원인이 무엇이든 확실히 막힌다(오르막 주행은 그대로 가능).
+    private const float MaxDashRiseSpeed = 3f;
+
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
@@ -105,6 +111,10 @@ public class LocoDodgeState : ILayerState<LocoState>
             // 수평 이동. y는 중력/점프 유지
             float spd = _controller.CharacterData.dashSpeed;
             float vy = _controller.Rigid.linearVelocity.y;
+
+            // 램프 발사 차단 — 경사/단차를 고속으로 탈 때 위로 쏘아올려지는 상승분을 잘라낸다.
+            // 하강(중력)은 건드리지 않는다.
+            if (vy > MaxDashRiseSpeed) vy = MaxDashRiseSpeed;
 
             // 대시 수평 속도. 기본은 _dodgeDir × dashSpeed(현행).
             Vector3 dashVel = _dodgeDir * spd;

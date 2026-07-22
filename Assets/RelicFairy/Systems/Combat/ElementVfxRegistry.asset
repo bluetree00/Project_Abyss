@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6531018271a5f7a43b2cf77259e225a0, type: 3}
+  m_Name: ElementVfxRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::ElementVfxRegistry
+  entries:
+  - element: 0
+    statusAura: {fileID: 5869229029559480062, guid: 330064799c16df14cbc20619b3bf90e8,
+      type: 3}
+    statusBody: {fileID: 4575266098599803146, guid: c33ab00ec16ab834fbe4e1081a556052,
+      type: 3}
+    burst: {fileID: 7812585453298936655, guid: 4da2216bfcbd6764c9dee834c281d43d, type: 3}
+  - element: 1
+    statusAura: {fileID: 1814480919851174754, guid: f2a5aea27a74c6042a7394e7e68f3790,
+      type: 3}
+    statusBody: {fileID: 5196588141490927088, guid: ef97fb7c2d6dc3f46bef65213ad7bc91,
+      type: 3}
+    burst: {fileID: 3317504816819617755, guid: 3b8254cffe7d654418b77c0f62d117a7, type: 3}
+  - element: 2
+    statusAura: {fileID: 282865943274501379, guid: 43ef130d1023d7e4695fe417f4dd035f,
+      type: 3}
+    statusBody: {fileID: 0}
+    burst: {fileID: 3594099513468408576, guid: 68df5f4680898db4a87fcead70933ca1, type: 3}
+  - element: 3
+    statusAura: {fileID: 5149745296654590901, guid: b354441b8b822074f8e52d84f17bad97,
+      type: 3}
+    statusBody: {fileID: 1940399089656608725, guid: 8f2cc0744d4350643b9939d8d1e723ed,
+      type: 3}
+    burst: {fileID: 3036939298300616702, guid: da69781804b66944c97da1ac8d69234b, type: 3}
+  - element: 4
+    statusAura: {fileID: 174211133732289389, guid: 6f33d5b0319dbdf4e95edc7a2c267e53,
+      type: 3}
+    statusBody: {fileID: 8125239696695069680, guid: d504297ecf823d244a67470460b61e67,
+      type: 3}
+    burst: {fileID: 6476038097601970992, guid: 1a406f3dc6fc66740a860063ae7cc6eb, type: 3}
+  - element: 5
+    statusAura: {fileID: 4832121135125949560, guid: d67be8e74f13e26429aece1e53a117b7,
+      type: 3}
+    statusBody: {fileID: 7846557733909052269, guid: 20cd848ce0a9abd429dd593fb90179bf,
+      type: 3}
+    burst: {fileID: 5778512669574036082, guid: 9c4a250767dd5724db010a9bfa40e0c3, type: 3}
