@@ -33,6 +33,34 @@ public sealed class HudBootstrapper : MonoBehaviour
         }
     }
 
+    /// <summary>HUD를 페이드로 표시(전투 진입 연출). 억제 해제 후 CanvasGroup 알파 0→1.</summary>
+    public async Cysharp.Threading.Tasks.UniTask FadeInStartRoomAsync(float duration)
+    {
+        _startRoomSuppressed = false;
+        EnsureHudHierarchyVisible();
+
+        // 억제 중에는 SetMode를 막아뒀으므로, 해제 시 전투 패널을 여기서 켜준다.
+        if (presenter != null) presenter.SetMode(HUDIds.Mode.Combat);
+
+        var target = hudVisualRoot != null ? hudVisualRoot : presenter?.transform;
+        if (target == null) return;
+
+        var cg = target.GetComponent<CanvasGroup>();
+        if (cg == null) cg = target.gameObject.AddComponent<CanvasGroup>();
+
+        if (duration <= 0f) { cg.alpha = 1f; return; }
+
+        cg.alpha = 0f;
+        float e = 0f;
+        while (e < duration)
+        {
+            e += Time.deltaTime;
+            cg.alpha = Mathf.Clamp01(e / duration);
+            await Cysharp.Threading.Tasks.UniTask.Yield();
+        }
+        cg.alpha = 1f;
+    }
+
     private void Awake()
     {
         if (presenter == null)
@@ -209,9 +237,15 @@ public sealed class HudBootstrapper : MonoBehaviour
             presenter = GetComponentInChildren<HudPresenter>(true);
         if (presenter == null || player == null) return;
 
+        // 바인딩(데이터 연결)은 항상 해둔다 — 나중에 표시될 때 값이 비어 있으면 안 되므로.
+        presenter.BindPlayer(player);
+
+        // 표시는 억제 중이면 하지 않는다.
+        // 이 경로는 플레이어 스폰(OnPlayerSpawned)에서 불려, 인트로 컷신 중에도 HUD를 켜버렸다.
+        if (_startRoomSuppressed) return;
+
         EnsureHudHierarchyVisible();
         presenter.SetMode(HUDIds.Mode.Combat);
-        presenter.BindPlayer(player);
     }
 
     private void BindStateNow(PlayerRunState st)
@@ -231,6 +265,7 @@ public sealed class HudBootstrapper : MonoBehaviour
 
     private void HandleHudModeChanged(HUDIds.Mode mode)
     {
+        if (_startRoomSuppressed) return;   // 억제 중엔 모드 전환으로도 HUD를 켜지 않는다
         EnsureHudHierarchyVisible();
         presenter.SetMode(ResolveMode(mode));
     }

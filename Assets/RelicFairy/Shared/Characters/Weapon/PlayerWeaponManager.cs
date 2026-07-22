@@ -203,8 +203,11 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         var slot = slots[slotIndex];
 
-        // 현재 장착 중인 슬롯 비활성화
-        if (currentSlotIndex >= 0 && currentSlotIndex != slotIndex)
+        // 현재 장착 중인 슬롯 비활성화 — <b>이번 장착이 실제로 활성화될 때만</b>.
+        // setActive=false(예비 슬롯 채우기)인데도 껐더니, 재스폰 시 Slot0(활성)→Slot1(비활성) 순서로
+        // 복원하는 과정에서 Slot1 장착이 방금 켠 Slot0을 꺼버려 손에 무기가 사라졌다
+        // (유물 획득=재스폰 시점에 무기를 둘 다 들고 있어서 그때만 재현됐다).
+        if (setActive && currentSlotIndex >= 0 && currentSlotIndex != slotIndex)
         {
             var cur = slots[currentSlotIndex];
             if (cur.instance != null) cur.instance.SetActive(false);
@@ -626,7 +629,8 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
             // 2) 강화 계승 — ApplyServerOverride가 baseAttackRaw를 새로 잡으므로 그 뒤에 재계산해야 한다.
             //    승급(legendId)은 진화가 대체하므로 넘기지 않는다(빈 값 유지).
-            evolved.enhanceLevel = current.enhanceLevel;
+            evolved.enhanceLevel   = current.enhanceLevel;
+            evolved.evolutionStage = current.evolutionStage + 1;   // 상한이 한 구간 열린다(마스터리 시작)
             evolved.RecomputeEnhancedStats();
 
             // 3) 새 무브셋 클립 프리로드 — 안 하면 진화 직후 첫 공격이 빈 클립으로 나간다.
@@ -645,7 +649,7 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
             await EquipToSlotAsync(slotIndex, evolved, setActive: true);
 
             Debug.Log($"[PlayerWeaponManager] 진화: {current.displayName} → {evolved.displayName} " +
-                      $"(branch={branch.branchId}, 강화 {evolved.enhanceLevel} 계승)");
+                      $"(branch={branch.branchId}, 강화 {evolved.enhanceLevel} 계승, 진화단계 {evolved.evolutionStage})");
             return true;
         }
         catch (OperationCanceledException)

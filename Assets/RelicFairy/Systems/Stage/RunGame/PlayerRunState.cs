@@ -20,6 +20,9 @@ public sealed class PlayerRunState
 
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>NoHeal(고행) 이벤트 챌린지 중 회복 봉인 — 포션·Heal 무효화. 방 수명 동안만 true.</summary>
+    public bool HealLocked { get; set; }
+
     public event Action<int, int> OnHpChanged;       // (hp, maxHp)
     public event Action<int> OnGoldChanged;          // tempGold
     public event Action<int, int> OnPotionChanged;   // (count, capacity)
@@ -75,7 +78,7 @@ public sealed class PlayerRunState
     /// <summary>포션 1개 소모 시도. 없으면 false(회복도 없음).</summary>
     public bool TryConsumePotion()
     {
-        if (!IsActive || PotionCount <= 0) return false;
+        if (!IsActive || HealLocked || PotionCount <= 0) return false;
         PotionCount--;
         OnPotionChanged?.Invoke(PotionCount, PotionCapacity);
         return true;
@@ -148,7 +151,7 @@ public sealed class PlayerRunState
 
     public void Heal(int amount)
     {
-        if (amount <= 0) return;
+        if (amount <= 0 || HealLocked) return;
         SetHp(Hp + amount);
     }
 }

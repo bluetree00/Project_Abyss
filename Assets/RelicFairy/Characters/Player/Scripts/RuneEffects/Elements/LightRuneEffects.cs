@@ -100,9 +100,12 @@ public sealed class LightBurstEffect : LightRuneEffectBase
         Vector3 origin = player.transform.position;
         Vector3 fwd    = player.transform.forward;
 
+        // [실제 VFX] 광폭발 — 원뿔(range=7,half=50°) 판정을 근사. 전방 중앙에 배치하고 원뿔 길이 절반으로 스케일.
+        ElementVfxPlayer.PlayBurst(RuneElement.Light, origin + fwd * (CONE_RANGE * 0.4f), CONE_RANGE * 0.5f);
+
         int n = CombatQuery.GetEnemiesInCone(origin, fwd, CONE_RANGE, CONE_HALF_ANGLE, 16, _buf);
         for (int i = 0; i < n; i++)
-            CombatQuery.DealSynergyDamage(_buf[i], dmg, player.gameObject);
+            CombatQuery.DealSynergyDamage(_buf[i], dmg, player.gameObject, element: RuneElement.Light);
 
         res.Consume(KEY_STACK);
 
@@ -149,6 +152,8 @@ public sealed class LightField : GroundFieldBase
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ClearSingleton() => s_current = null;
+
+    protected override RuneElement? FieldElement => RuneElement.Light;
 
     private PlayerController _player;
     private float _bonusCC;

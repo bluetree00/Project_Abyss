@@ -8,7 +8,13 @@ public abstract class RuneElementEffectBase : RuneEffect
 {
     protected PlayerController CachedPlayer;
 
-    public override void OnActivate(PlayerController player) => CachedPlayer = player;
+    public override void OnActivate(PlayerController player)
+    {
+        CachedPlayer = player;
+        // [실제 VFX] 단계 도달 시 속성 버스트 1회 — 6속성 자기연출(빛/전기/어둠 자기강화 포함).
+        if (player != null && RuneElementMap.FromEffectType(EffectType, out var element))
+            ElementVfxPlayer.PlayBurst(element, player.transform.position);
+    }
 
     /// <summary>플레이어 공유 리소스 컨테이너(스택/게이지/레지스터).</summary>
     protected static RuneResourceState Res(PlayerController player) => player?.RuneEffects?.Resources;

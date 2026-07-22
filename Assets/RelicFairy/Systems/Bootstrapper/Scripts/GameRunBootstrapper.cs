@@ -128,6 +128,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("재련소 NPC 프리팹 Addressable 키. 미등록 시 상점 NPC(shopNpcAddressableKey)로 폴백.")]
     [SerializeField] private string crucibleNpcAddressableKey = "Crucible/CrucibleNpc";
 
+    [Tooltip("정제소 NPC 프리팹 Addressable 키. 미등록 시 재련소→상점 NPC로 폴백.")]
+    [SerializeField] private string refineryNpcAddressableKey = "Refinery/RefineryNpc";
+
+    [Header("스테이션 방 장식 프리팹 (NPC 주변에 배치)")]
+    [Tooltip("재련소(대장간) 소품 — 작업대·재료·화로 등. NPC 주변에 링으로 배치된다.")]
+    [SerializeField] private GameObject[] crucibleDecorPrefabs;
+    [Tooltip("정제소(룬) 소품·VFX — 룬 마법진·제단 등. NPC 주변에 링으로 배치된다.")]
+    [SerializeField] private GameObject[] refineryDecorPrefabs;
+
+    public GameObject[] CrucibleDecorPrefabs => crucibleDecorPrefabs;
+    public GameObject[] RefineryDecorPrefabs => refineryDecorPrefabs;
+
     [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
     [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
 
@@ -1172,8 +1184,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>
-    /// 사망 → 멀린 부활 빌드업. 영혼이 흩어진 뒤 멀린이 빛으로 다시 엮어 베이스캠프로 돌려보내는 연출.
-    /// 바로 베이스캠프로 끊지 않고 "왜 돌아왔는지"를 서사적으로 잇는다(서사: 죽음=영혼 귀환, 멀린=영혼 복구자).
+    /// 사망 → 멀린 부활 연출. 흩어진 영혼을 멀린이 빛으로 다시 엮는 <b>일러스트</b>가 화면을 채우고,
+    /// 문구가 그 위에 얹힌다. 바로 베이스캠프로 끊지 않고 "왜 돌아왔는지"를 서사적으로 잇는다
+    /// (서사: 죽음=영혼 귀환, 멀린=영혼 복구자).
     /// 전 구간 스킵 입력 지원, 취소/파괴 시 오버레이 정리 보장.
     /// </summary>
     private async UniTask ShowMerlinRevivalAsync(CancellationToken ct)
@@ -1185,100 +1198,116 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         try
         {
-            // 배경 암전(이미 ScreenFade로 검게 덮여 있지만 오버레이 소유 배경을 따로 둔다)
+            // 배경 암전 — 일러스트 배경도 검정이라 이음새 없이 이어진다.
             var bg = MakeFullRect(go.transform, "BG");
             var bgImg = bg.gameObject.AddComponent<Image>();
             bgImg.color = Color.black;
 
-            // 소울 글로우(절차 생성 라디얼) — 멀린의 마력이 모이는 빛
-            var glowSprite = BuildRadialSprite();
-            var glow = new GameObject("SoulGlow").AddComponent<Image>();
-            glow.transform.SetParent(go.transform, false);
-            glow.sprite = glowSprite;
-            glow.color  = new Color(0.55f, 0.45f, 0.95f, 0f);   // 비의(秘儀) 보랏빛
-            var grt = glow.rectTransform;
-            grt.anchorMin = grt.anchorMax = new Vector2(0.5f, 0.5f);
-            grt.sizeDelta = new Vector2(720f, 720f);
+            // 부활 일러스트 — 화면을 채우고 아주 천천히 다가온다(정지 화면이 아니라는 감각).
+            var artRt  = MakeFullRect(go.transform, "Art");
+            var artImg = artRt.gameObject.AddComponent<Image>();
+            artImg.color          = new Color(1f, 1f, 1f, 0f);
+            artImg.raycastTarget  = false;
+            artImg.preserveAspect = true;
+            var artSprite = await LoadRevivalArtAsync();
+            if (artSprite != null) artImg.sprite = artSprite;
 
-            var core = new GameObject("SoulCore").AddComponent<Image>();
-            core.transform.SetParent(go.transform, false);
-            core.sprite = glowSprite;
-            core.color  = new Color(0.85f, 0.9f, 1f, 0f);
-            var crt = core.rectTransform;
-            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
-            crt.sizeDelta = new Vector2(240f, 240f);
-
-            // 사망 문구(위)
+            // 사망 문구(상단) — 일러스트의 룬 고리보다 위쪽 여백에 얹는다.
             var deadTxt = MakeCenterText(go.transform, "그대의 영혼이 흩어졌다...",
-                34f, new Color(0.75f, 0.35f, 0.35f), new Vector2(0f, 150f), 44f);
+                34f, new Color(0.75f, 0.35f, 0.35f), new Vector2(0f, 380f), 44f);
             deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 0f);
 
-            // 멀린 대사(아래)
+            // 멀린 대사(하단)
             var merlinTxt = MakeCenterText(go.transform,
                 "멀린 —  「일어나라. 그대의 이야기는 아직 끝나지 않았다.」",
-                26f, new Color(0.7f, 0.68f, 0.82f), new Vector2(0f, -190f), 40f);
+                26f, new Color(0.78f, 0.74f, 0.92f), new Vector2(0f, -400f), 40f);
             merlinTxt.fontStyle = FontStyles.Italic;
-            merlinTxt.color = new Color(0.7f, 0.68f, 0.82f, 0f);
+            merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 0f);
 
             bool skipped = false;
 
-            // [연출 1] 사망 문구 페이드 인 + 잠시 정적 (영혼이 흩어짐)
+            // [연출 1] 사망 문구 — 영혼이 흩어진 정적
             await FadeGraphicAsync(deadTxt, 0f, 1f, 0.6f, ct, () => skipped |= Input.anyKeyDown);
-            if (!skipped) await HoldSkippable(0.7f, ct, () => skipped = true);
+            if (!skipped) await HoldSkippable(0.6f, ct, () => skipped = true);
 
-            // [연출 2] 멀린의 빛이 모임 — 글로우 확장 + 회전, 코어 밝아짐, 멀린 대사 등장
-            float t = 0f; const float bloom = 1.4f;
+            // [연출 2] 멀린이 어둠에서 떠오른다 — 일러스트 페이드 인 + 완만한 푸시인, 이어서 대사
+            float t = 0f; const float bloom = 1.8f;
             while (t < bloom && !skipped)
             {
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / bloom);
                 float ease = 1f - (1f - k) * (1f - k);
-                if (glow != null)
+                if (artImg != null)
                 {
-                    glow.color = new Color(0.55f, 0.45f, 0.95f, 0.55f * ease);
-                    glow.rectTransform.localScale = Vector3.one * (0.6f + 0.6f * ease);
-                    glow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, k * 40f);
+                    artImg.color = new Color(1f, 1f, 1f, ease);
+                    artImg.rectTransform.localScale = Vector3.one * (1.00f + 0.05f * ease);
                 }
-                if (core != null)
-                {
-                    float pulse = 0.5f + 0.5f * Mathf.Sin(k * Mathf.PI);
-                    core.color = new Color(0.85f, 0.9f, 1f, (0.35f + 0.45f * pulse) * ease);
-                    core.rectTransform.localScale = Vector3.one * (0.4f + 0.5f * ease);
-                }
-                if (merlinTxt != null && k > 0.35f)
-                    merlinTxt.color = new Color(0.7f, 0.68f, 0.82f, Mathf.Clamp01((k - 0.35f) / 0.4f));
+                if (merlinTxt != null && k > 0.4f)
+                    merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, Mathf.Clamp01((k - 0.4f) / 0.4f));
                 if (Input.anyKeyDown) skipped = true;
                 await UniTask.Yield(ct);
             }
-            if (merlinTxt != null) merlinTxt.color = new Color(0.7f, 0.68f, 0.82f, 1f);
+            if (artImg    != null) artImg.color    = Color.white;
+            if (merlinTxt != null) merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 1f);
 
-            // [연출 3] 대사를 읽을 시간
-            if (!skipped) await HoldSkippable(1.8f, ct, () => skipped = true);
+            // [연출 3] 대사를 읽을 시간 — 그동안에도 푸시인은 계속된다.
+            float hold = 0f; const float holdDur = 1.8f;
+            while (hold < holdDur && !skipped)
+            {
+                hold += Time.unscaledDeltaTime;
+                if (artImg != null)
+                    artImg.rectTransform.localScale = Vector3.one * (1.05f + 0.03f * (hold / holdDur));
+                if (Input.anyKeyDown) skipped = true;
+                await UniTask.Yield(ct);
+            }
 
-            // [연출 4] 영혼 재결합 — 밝은 섬광(부활 확정감)
-            var burst = new GameObject("ReviveFlash").AddComponent<Image>();
-            burst.transform.SetParent(go.transform, false);
-            burst.sprite = glowSprite;
-            var brt = burst.rectTransform;
-            brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f);
-            brt.sizeDelta = new Vector2(200f, 200f);
+            // [연출 4] 영혼 재결합 — 화면 전체가 흰빛으로 차오르며 부활 확정
+            var flashRt  = MakeFullRect(go.transform, "ReviveFlash");
+            var flashImg = flashRt.gameObject.AddComponent<Image>();
+            flashImg.color         = new Color(1f, 1f, 1f, 0f);
+            flashImg.raycastTarget = false;
             float f = 0f; const float flashDur = 0.5f;
             while (f < flashDur)
             {
                 f += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(f / flashDur);
-                if (burst != null)
-                {
-                    burst.color = new Color(1f, 1f, 1f, k < 0.4f ? k / 0.4f : 1f - (k - 0.4f) / 0.6f);
-                    burst.rectTransform.localScale = Vector3.one * (1f + k * 12f);
-                }
+                if (flashImg != null)
+                    flashImg.color = new Color(1f, 1f, 1f, k < 0.4f ? k / 0.4f : 1f - (k - 0.4f) / 0.6f);
                 await UniTask.Yield(ct);
             }
         }
         finally
         {
             if (go != null) Destroy(go);
+            ReleaseRevivalArt();
         }
+    }
+
+    private const string RevivalArtKey = "Illust_MerlinRevive";
+    private bool _revivalArtLoaded;
+
+    /// <summary>부활 일러스트 로드. 키가 없으면 null — 연출은 문구만으로 진행된다.</summary>
+    private async UniTask<Sprite> LoadRevivalArtAsync()
+    {
+        var addressables = Managers.AddressableManager;
+        if (addressables == null) return null;
+
+        var sprite = await addressables.TryLoadAssetAsync<Sprite>(RevivalArtKey);
+        if (sprite == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 부활 일러스트 키 없음: {RevivalArtKey}");
+            return null;
+        }
+
+        _revivalArtLoaded = true;
+        return sprite;
+    }
+
+    private void ReleaseRevivalArt()
+    {
+        if (!_revivalArtLoaded) return;
+        _revivalArtLoaded = false;
+        Managers.AddressableManager?.ReleaseAsset<Sprite>(RevivalArtKey);
     }
 
     /// <summary>지정 시간 동안 대기하되 아무 키 입력 시 즉시 종료. onSkip으로 스킵 여부를 호출자에 전달.</summary>
@@ -1307,26 +1336,6 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await UniTask.Yield(ct);
         }
         if (g != null) { var c = g.color; c.a = to; g.color = c; }
-    }
-
-    /// <summary>부드러운 라디얼(중심 밝고 가장자리 투명) 스프라이트를 런타임 생성. 글로우 에셋 의존 제거.</summary>
-    private static Sprite BuildRadialSprite()
-    {
-        const int size = 128;
-        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        float c = (size - 1) * 0.5f;
-        var px = new Color[size * size];
-        for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
-        {
-            float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
-            float a = Mathf.Clamp01(1f - d);
-            a = a * a;   // 가장자리로 갈수록 급감 → 부드러운 글로우
-            px[y * size + x] = new Color(1f, 1f, 1f, a);
-        }
-        tex.SetPixels(px);
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 
     private static RectTransform MakeFullRect(Transform parent, string name)
@@ -1528,9 +1537,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 {
                     var info        = doorInfos[cell];
                     var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
+                    // 통로 길이를 문마다 결정적으로 변주 — 균일하면 인공적이라 '진짜 구조'로 안 읽힌다.
+                    // 셀 좌표 해시로 안정 변주(±): rng 스트림을 소비하지 않아 save/restore 결정성 유지.
+                    int hash = ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0xF;   // 0..15
+                    int len  = procDoorCorridorLength + 4 + hash;                    // 기본+4 ~ +19 → 더 길고 제각각
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
-                        procDoorCorridorLength, blockCellSize, blockBaseY, effWallLayers));
+                        len, blockCellSize, blockBaseY, effWallLayers));
                 }
                 if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
                 if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
@@ -1572,6 +1585,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             SetupEventRoom(roomGO, entry.pool_key, roomRng);   // 챌린지 종류는 pool_key 명명 규약으로 유추
         else if (IsCrucibleCategory(entry.category))
             await SetupCrucibleRoomAsync(roomGO, roomRng);
+        else if (IsRefineryCategory(entry.category))
+            await SetupRefineryRoomAsync(roomGO, roomRng);
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -2070,6 +2085,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             SetupEventRoom(mapGO, roomEntry.room_id);   // 챌린지 종류는 room_id 명명 규약으로 유추
         else if (IsCrucibleCategory(roomEntry.category))
             await SetupCrucibleRoomAsync(mapGO, null);
+        else if (IsRefineryCategory(roomEntry.category))
+            await SetupRefineryRoomAsync(mapGO, null);
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -2136,7 +2153,36 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (npcPrefab == null)
             Debug.LogWarning("[GameRunBootstrapper] 재련소 NPC 프리팹 로드 실패 — 재련소 UI를 열 수 없습니다.");
 
+        controller.SetDecorPrefabs(crucibleDecorPrefabs);
         controller.Initialize(_run, table, roomRng, npcPrefab);
+    }
+
+    private static bool IsRefineryCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Refinery", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>정제소 방 셋업 — 비전투 스테이션(재련소와 동일 흐름). NPC 상호작용 → 룬판(UI_GridPanel).</summary>
+    private async UniTask SetupRefineryRoomAsync(GameObject roomGO, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        var controller = roomGO.AddComponent<RefineryRoomController>();
+
+        // 정제소 NPC 프리팹 로드 (전용 키 → 재련소 → 상점 NPC 폴백)
+        GameObject npcPrefab = null;
+        if (!string.IsNullOrEmpty(refineryNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(refineryNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(crucibleNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(crucibleNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(shopNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(shopNpcAddressableKey);
+        if (npcPrefab == null)
+            Debug.LogWarning("[GameRunBootstrapper] 정제소 NPC 프리팹 로드 실패 — 룬판을 열 수 없습니다.");
+
+        controller.SetDecorPrefabs(refineryDecorPrefabs);
+        controller.Initialize(_run, roomRng, npcPrefab);
     }
 
     /// <summary>
@@ -2158,13 +2204,32 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 비전투 — pool_key에 "gamble" 포함 시 도박 상자 상호작용. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
-        if (!string.IsNullOrEmpty(typeHint) && typeHint.ToLowerInvariant().Contains("gamble"))
+        // 비전투 — pool_key 키워드로 상호작용 챌린지 선택. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
+        string kh = typeHint?.ToLowerInvariant() ?? string.Empty;
+        int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "event").GetHashCode());
+        if (kh.Contains("gamble"))
         {
-            int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "gamble").GetHashCode());
             var gamble = roomGO.AddComponent<GambleBoxChallenge>();
             gamble.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
             Debug.Log($"[GameRunBootstrapper] 이벤트 도박 상자 부착 (seed={seed}) — {typeHint}");
+        }
+        else if (kh.Contains("sacrifice"))
+        {
+            var c = roomGO.AddComponent<SacrificeAltarChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 제물 제단 부착 — {typeHint}");
+        }
+        else if (kh.Contains("oracle"))
+        {
+            var c = roomGO.AddComponent<OracleChoiceChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 신탁 갈림길 부착 — {typeHint}");
+        }
+        else if (kh.Contains("vault") || kh.Contains("treasure"))
+        {
+            var c = roomGO.AddComponent<TreasureVaultChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 — {typeHint}");
         }
     }
 
@@ -2179,6 +2244,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 return (CombatChallengeOverlay.OverlayType.Hitless, ParseChallengeParam(k, 2f));
             if (k.Contains("speed") || k.Contains("timelimit") || k.Contains("rush"))
                 return (CombatChallengeOverlay.OverlayType.TimeLimit, ParseChallengeParam(k, 45f));
+            if (k.Contains("survival") || k.Contains("siege"))
+                return (CombatChallengeOverlay.OverlayType.Survival, 0f);
+            if (k.Contains("noheal") || k.Contains("ascetic"))
+                return (CombatChallengeOverlay.OverlayType.NoHeal, 0f);
+            if (k.Contains("berserk") || k.Contains("lowhp"))
+                return (CombatChallengeOverlay.OverlayType.Berserk, 0f);
         }
         return (CombatChallengeOverlay.OverlayType.TimeLimit, 45f);
     }

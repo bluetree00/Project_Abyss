@@ -655,8 +655,21 @@ public class RunFlowController : MonoBehaviour
     private void RevealGates(List<DoorPlan> exits)
     {
         int n = Mathf.Min(_gates.Count, exits.Count);
+        var marks = new List<(Transform target, string label, Color color)>(n);
         for (int i = 0; i < n; i++)
-            if (_gates[i] != null) RevealGateAsync(_gates[i], exits[i]).Forget();
+        {
+            if (_gates[i] == null) continue;
+            RevealGateAsync(_gates[i], exits[i]).Forget();
+
+            // 카메라가 정면 고정이라 옆쪽 출구는 화면 밖으로 나간다 —
+            // 나침반 HUD로 "어느 방향에 어떤 방"인지 항상 보이게 한다.
+            var tr = _gates[i].gate != null ? _gates[i].gate.transform : null;
+            if (tr != null)
+                marks.Add((tr,
+                           KindGlyph(exits[i].kind) + " " + KindKor(exits[i].kind),
+                           KindBrightColor(exits[i].kind)));
+        }
+        if (marks.Count > 0) ExitCompassHud.Create().SetExits(marks);
         // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
     }
 
@@ -877,11 +890,13 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Shop    => new Color(0.08f, 0.32f, 0.12f),
         RoomPlanKind.Event   => new Color(0.30f, 0.20f, 0.05f),
         RoomPlanKind.Crucible => new Color(0.52f, 0.25f, 0.08f), // 구리톤(대장간)
+        RoomPlanKind.Refinery => new Color(0.10f, 0.30f, 0.45f), // 청록톤(정제소)
         _                    => new Color(0.05f, 0.06f, 0.10f), // Normal
     };
 
     private void ClearGates()
     {
+        ExitCompassHud.Instance?.Clear();   // 방 전환 — 이전 방 출구 안내 제거
         for (int i = 0; i < _gates.Count; i++)
             if (_gates[i]?.gate != null) Destroy(_gates[i].gate.gameObject);
         _gates.Clear();
@@ -985,6 +1000,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Shop     => new Color(0.40f, 1f, 0.55f),
         RoomPlanKind.Event    => new Color(1f, 0.85f, 0.35f),
         RoomPlanKind.Crucible => new Color(1f, 0.60f, 0.25f),
+        RoomPlanKind.Refinery => new Color(0.45f, 0.85f, 1f),
         _                     => new Color(0.85f, 0.90f, 1f), // 전투(Normal)
     };
 
@@ -997,6 +1013,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Shop     => "■",
         RoomPlanKind.Event    => "◇",
         RoomPlanKind.Crucible => "●",
+        RoomPlanKind.Refinery => "◈",
         _                     => "▪",
     };
 
@@ -1009,6 +1026,7 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Shop    => "상점",
         RoomPlanKind.Event   => "이벤트",
         RoomPlanKind.Crucible => "재련소",
+        RoomPlanKind.Refinery => "정제소",
         _                    => "전투",
     };
 

@@ -153,7 +153,7 @@ public sealed class DarkAfterimageEffect : DarkRuneEffectBase
             p.t -= dt;
             if (p.t <= 0f)
             {
-                CombatQuery.DealSynergyDamage(p.target, p.dmg, instigator);
+                CombatQuery.DealSynergyDamage(p.target, p.dmg, instigator, element: RuneElement.Dark);
                 _pending.RemoveAt(i);
             }
             else _pending[i] = p;

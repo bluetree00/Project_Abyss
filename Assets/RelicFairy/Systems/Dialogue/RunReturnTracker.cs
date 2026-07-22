@@ -28,6 +28,16 @@ public static class RunReturnTracker
         PlayerPrefs.Save();
     }
 
+    /// <summary>새 게임 시작 — 사유·누적 횟수를 전부 초기화한다. 이게 없으면 이전 플레이의
+    /// 사망/클리어 횟수가 남아 첫 복귀부터 반복 대사가 나온다.</summary>
+    public static void ResetAll()
+    {
+        PlayerPrefs.DeleteKey(ReasonKey);
+        PlayerPrefs.DeleteKey(DeathCountKey);
+        PlayerPrefs.DeleteKey(ClearCountKey);
+        PlayerPrefs.Save();
+    }
+
     /// <summary>BaseCamp 진입 시 호출 — 사유를 읽고 1회성 소비. count=해당 사유의 누적 횟수(없으면 0).</summary>
     public static Reason ConsumeReason(out int count)
     {

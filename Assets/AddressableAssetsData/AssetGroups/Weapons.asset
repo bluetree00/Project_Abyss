@@ -161,6 +161,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 79e128fbd9569bb45b43779290303c36
+    m_Address: T0_Nameless_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d5279a4841651514dbd637a48b4bc376
+    m_Address: T0_Nameless_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bd2ae7b2c5961234ca9ecde42e44317d
     m_Address: T3_Katana_Display
     m_ReadOnly: 0

@@ -44,7 +44,20 @@ public static class GrruzamGreatswordEvents
         new Def{ path = A + "/2_Attacks/5__Upper_Attack/M_Big_Sword@UpperAttack_ZeroHeight.FBX",        fx = 0 },
         new Def{ path = A + "/5_Revenges/Guard_Revenges/M_Big_Sword@Revenge_Guard_Attack.FBX",          fx = 0 },
         new Def{ path = A + "/3_Skills/M_Big_Sword@Skill_C.FBX",                                        fx = 0 },
+
+        // ── 뼈 안 맞는 Grruzam 클립을 사무라이로 교체한 분(주소는 그대로, 클립만 스왑) ──
+        // 공중/스킬/가드 계열. fx는 각 어빌리티의 stepIndex 범위 안이어야 한다(대부분 0 뿐).
+        new Def{ path = G + "GhostSamurai_APose_JumpAttack02_Inplace.FBX",     fx = 0 },  // AirLight_01
+        new Def{ path = G + "GhostSamurai_APose_JumpAttack03_Inplace.FBX",     fx = 1 },  // AirLight_02
+        new Def{ path = G + "GhostSamurai_APose_JumpAttack04_Inplace.FBX",     fx = 0 },  // AirHeavy
+        new Def{ path = G + "GhostSamurai_APose_Air_Attack03_End_Inplace.FBX", fx = 0 },  // AirPlunge
+        new Def{ path = G + "GhostSamurai_APose_SPAttack03_Inplace.FBX",       fx = 0 },  // ESkill_T3
+        new Def{ path = G + "GhostSamurai_LAttack_DeflectL90_Inplace.FBX",     fx = 0 },  // GuardAttack(반격)
+        // GuardLoop/GuardAccept은 공격이 아니라 판정 이벤트를 넣지 않는다(트레일/종료도 불필요).
     };
+
+    private const string G =
+        "Assets/RelicFairy/_Imported/GhostSamurai_Animset/Animation/katana/Greatsword/";
 
     [MenuItem("Tools/RelicFairy/Setup Greatsword Anim Events")]
     public static void Setup()

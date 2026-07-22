@@ -39,7 +39,7 @@ MonoBehaviour:
       duration: 0.35
       shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: SwordHitImpact
+    hitEffectKey: BloodShot
     hitEffectScale: 0.2
     oneShot: 0
     rotateToMouse: 0

@@ -32,8 +32,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float CardGap = 24f;
     private const float CardY   = -40f;
 
-    private const float MiniCell = 22f;
-    private const float MiniGap  = 3f;
+    // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
+    // 고정 22px이던 시절엔 1칸 룬이 점처럼 보여 무슨 모양인지 분간이 안 됐다.
+    private const float ShapeBoxH   = 150f;  // 모양 미리보기 박스 높이
+    private const float MiniGap     = 4f;
+    private const float MiniCellMax = 62f;   // 1~2칸 룬이 시원하게 보이는 상한
+    private const float MiniCellMin = 18f;   // 9칸(3×3)도 박스를 안 넘도록 하한
 
     private static readonly Color CardSelected  = new(0.20f, 0.17f, 0.10f, 1f);
     private static readonly Color SelectBorder  = new(0.88f, 0.72f, 0.32f, 1f);
@@ -219,7 +223,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var shapeBox = ShopUIStyle.MakeImage(card, "ShapeBox", ShopUIStyle.IconBg);
         ShopUIStyle.Anchor(shapeBox.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -18f), new Vector2(CardW - 40f, 130f));
+            new Vector2(0f, -18f), new Vector2(CardW - 40f, ShapeBoxH));
 
         bool canPlace = BuildShapePreview(shapeBox.transform, data);
 
@@ -228,23 +232,26 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -158f), new Vector2(CardW - 24f, 26f));
+            new Vector2(0f, -172f), new Vector2(CardW - 24f, 26f));
         name.text = data.displayName ?? data.itemId;
 
-        // 등급 · 칸수
+        // 등급 · 칸수 · 속성 — 속성명은 속성색으로 표시(어느 존에 놓을지 판단 근거)
         int cells = CellCount(data.shapeId);
+        var elem  = ElementDef.GetById(data.element);
+        string elemTag = elem != null ? $"  ·  <color={ElementDef.IdHex(data.element)}>{elem.Icon}{elem.Name}</color>" : "";
         var meta = ShopUIStyle.MakeText(card, "Meta", 14f, FontStyles.Normal,
             TextAlignmentOptions.Center, ShopUIStyle.RarityGlow(data.rarity));
+        meta.richText = true;
         ShopUIStyle.Anchor(meta.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -186f), new Vector2(CardW - 24f, 22f));
-        meta.text = cells > 0 ? $"{RarityLabel(data.rarity)} · {cells}칸" : RarityLabel(data.rarity);
+            new Vector2(0f, -200f), new Vector2(CardW - 24f, 22f));
+        meta.text = (cells > 0 ? $"{RarityLabel(data.rarity)} · {cells}칸" : RarityLabel(data.rarity)) + elemTag;
 
         // 효과 목록
         var fxRoot = ShopUIStyle.MakeRect(card, "Effects").GetComponent<RectTransform>();
         ShopUIStyle.Anchor(fxRoot,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -214f), new Vector2(CardW - 32f, 90f));
+            new Vector2(0f, -228f), new Vector2(CardW - 32f, 86f));
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = false; vlg.childForceExpandHeight = false;
         vlg.spacing = 2f;
@@ -297,14 +304,22 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         }
         int cols = maxX - minX + 1, rows = maxY - minY + 1;
 
-        float totalW = cols * (MiniCell + MiniGap) - MiniGap;
-        float totalH = rows * (MiniCell + MiniGap) - MiniGap;
-        float startX = -totalW * 0.5f + MiniCell * 0.5f;
-        float startY =  totalH * 0.5f - MiniCell * 0.5f;
+        // 박스에 꽉 차도록 셀 크기를 역산 — 1칸 룬은 크게, 큰 모양은 줄여서 항상 형태가 읽히게 한다.
+        float boxW = CardW - 40f - 16f;   // ShapeBox 폭 - 여백
+        float boxH = ShapeBoxH   - 16f;
+        float fitW = (boxW - (cols - 1) * MiniGap) / Mathf.Max(1, cols);
+        float fitH = (boxH - (rows - 1) * MiniGap) / Mathf.Max(1, rows);
+        float cellSize = Mathf.Clamp(Mathf.Min(fitW, fitH), MiniCellMin, MiniCellMax);
 
-        // 룬별 고유색 — 그리드 썸네일(GridThumbnail.GetItemColor)과 같은 해시 팔레트를 써서 카드/보관함/판 색을 일치.
-        Color runeColor = GridThumbnail.GetItemColor(data.instanceId);
+        float totalW = cols * (cellSize + MiniGap) - MiniGap;
+        float totalH = rows * (cellSize + MiniGap) - MiniGap;
+        float startX = -totalW * 0.5f + cellSize * 0.5f;
+        float startY =  totalH * 0.5f - cellSize * 0.5f;
+
+        // 룬 색 = 랜덤 속성 색. 등급 아트 스프라이트를 속성색으로 틴트해 "속성 있는 룬"을 나타낸다.
+        Color runeColor = ElementDef.IdColor(data.element, new Color(0.7f, 0.7f, 0.75f));
         Color dimColor  = new Color(runeColor.r * 0.5f, runeColor.g * 0.5f, runeColor.b * 0.5f, 0.7f);
+        Sprite art      = RuneArt.GetArt(data.rarity);
 
         foreach (var o in offsets)
         {
@@ -313,10 +328,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
             var cell = ShopUIStyle.MakeImage(root, $"C{o.x}_{o.y}",
                 canPlace ? runeColor : dimColor);
+            if (art != null) cell.sprite = art;   // 등급 아트(속성색 틴트) — 미로드 시 색상 폴백
             ShopUIStyle.Anchor(cell.rectTransform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(startX + col * (MiniCell + MiniGap), startY - row * (MiniCell + MiniGap)),
-                Vector2.one * MiniCell);
+                new Vector2(startX + col * (cellSize + MiniGap), startY - row * (cellSize + MiniGap)),
+                Vector2.one * cellSize);
         }
 
         return canPlace;

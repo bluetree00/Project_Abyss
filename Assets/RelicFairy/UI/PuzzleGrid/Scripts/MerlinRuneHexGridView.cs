@@ -41,6 +41,12 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private readonly HashSet<Vector2Int>             _occupiedPositions = new();
     private readonly Dictionary<Vector2Int, char>    _cellZones         = new();
 
+    // 배치할 룬의 속성 힌트(매칭 존 강조용). '\0' = 힌트 없음.
+    private char _hintElementCode = '\0';
+
+    /// <summary>한 존에 존핵이 겹쳤을 때 허용하는 최대 합산 증폭(%). 폭주 방지 상한.</summary>
+    private const float MaxZoneAmpBonus = 60f;
+
     // 드래그 배치용 GridSquare 레이어
     private GameObject    _gridSquaresRoot;
     private GridAssetSO   _runtimeGridAsset;
@@ -200,7 +206,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             kvp.Value.color = placed ? OccupiedColor(bc) : EmptyColor(bc);
         }
 
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
+        NotifyBridge();
     }
 
     /// <summary>
@@ -228,19 +234,36 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         RefreshPlaceableTint(placeable);
     }
 
-    /// <summary>배치 가능 셀을 밝게 틴트해 배치 위치를 시각적으로 안내한다. 점유=밝음, 배치가능=중간, 그 외=어두움.</summary>
+    /// <summary>
+    /// 배치 가능 셀을 밝게 틴트해 배치 위치를 안내한다. 점유=밝음, 배치가능=중간, 그 외=어두움.
+    /// 배치할 룬의 속성 힌트(_hintElementCode)가 있으면 <b>매칭 속성 존</b> 셀을 그 속성색으로 강하게 강조하고
+    /// 나머지 배치가능 셀은 한 단계 낮춰, "이 룬은 여기(매칭 속성칸)에 놓으면 시너지"를 판에서 직접 보여준다.
+    /// </summary>
     private void RefreshPlaceableTint(HashSet<Vector2Int> placeable)
     {
+        bool hintOn = _hintElementCode != '\0';
+
         foreach (var kvp in _cellImages)
         {
             if (!_cellBaseColors.TryGetValue(kvp.Key, out var bc)) continue;
-            if (_occupiedPositions.Contains(kvp.Key))
-                kvp.Value.color = OccupiedColor(bc);
-            else if (placeable.Contains(kvp.Key))
-                kvp.Value.color = PlaceableColor(bc);
-            else
-                kvp.Value.color = EmptyColor(bc);
+
+            if (_occupiedPositions.Contains(kvp.Key)) { kvp.Value.color = OccupiedColor(bc); continue; }
+
+            bool canPlace = placeable.Contains(kvp.Key);
+            bool match    = hintOn && _cellZones.TryGetValue(kvp.Key, out var zc) && zc == _hintElementCode;
+
+            if (canPlace && match)      kvp.Value.color = MatchHighlightColor(bc);      // 매칭 속성칸 — 강조
+            else if (canPlace)          kvp.Value.color = hintOn ? DimPlaceable(bc)      // 힌트 중 비매칭 — 낮춤
+                                                                 : PlaceableColor(bc);
+            else                        kvp.Value.color = EmptyColor(bc);
         }
+    }
+
+    /// <summary>배치할 룬의 속성 힌트를 설정하고 판을 갱신한다. null/빈값이면 힌트 해제.</summary>
+    public void SetPlacementElementHint(string elementId)
+    {
+        _hintElementCode = string.IsNullOrEmpty(elementId) ? '\0' : ElementDef.IdToCode(elementId);
+        UpdateAdjacencyConstraints();
     }
 
     private void TryExpandBFS(Vector2Int n,
@@ -313,6 +336,70 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
 
         return result;   // TryExpandBFS가 점유 셀·판 밖을 이미 배제한다
+    }
+
+    /// <summary>
+    /// 판 상태를 브릿지에 통보한다 — 존별 점유 수(시너지 단계) + 존핵 배수(정제소 증폭)를 함께 보낸다.
+    /// 배치/제거/복원 등 점유가 바뀌는 모든 지점에서 이 하나만 호출하면 둘이 어긋나지 않는다.
+    /// </summary>
+    private void NotifyBridge()
+    {
+        var bridge = MerlinRuneBridge.Instance;
+        if (bridge == null) return;
+        bridge.OnZoneCellsUpdated(GetZoneOccupiedCounts());
+        bridge.OnZoneAmplifiersUpdated(GetZoneAmplifiers());
+    }
+
+    /// <summary>
+    /// [정제소 존핵] 판에 놓인 존핵이 만드는 <b>존별 배수</b>를 계산한다(key=zone_id, 1.3 = +30%).
+    /// 존핵은 <b>자기 속성과 같은 존</b>에 놓였을 때만 발동한다(안 맞는 존에 놓으면 무효).
+    /// 같은 존에 여러 개면 합연산하되 상한(<see cref="MaxZoneAmpBonus"/>)으로 폭주를 막는다.
+    /// </summary>
+    public Dictionary<string, float> GetZoneAmplifiers()
+    {
+        var result = new Dictionary<string, float>();
+        var squares = HexGrid?.GetGridSquares();
+        if (squares == null) return result;
+
+        // 한 룬이 여러 칸을 점유하므로 instanceId로 1회만 집계
+        var counted = new HashSet<string>();
+
+        foreach (var sq in squares)
+        {
+            if (sq == null || !sq.isOccupied) continue;
+            var item = sq.occupyingItem;
+            if (item == null || string.IsNullOrEmpty(item.element)) continue;
+            if (!string.IsNullOrEmpty(item.instanceId) && !counted.Add(item.instanceId)) continue;
+
+            float amp = AmplifyPercentOf(item);
+            if (amp <= 0f) continue;
+
+            // 이 룬이 놓인 칸의 존이 자기 속성과 같아야 발동
+            var pos = new Vector2Int(sq.col, sq.row);
+            if (!_cellZones.TryGetValue(pos, out var code)) continue;
+            string zoneId = ZoneCharToId(code);
+            if (zoneId == null || zoneId != item.element) continue;
+
+            result.TryGetValue(zoneId, out float cur);
+            result[zoneId] = cur + amp;
+        }
+
+        // 퍼센트 합 → 배수로 변환(상한 적용)
+        var keys = new List<string>(result.Keys);
+        foreach (var k in keys)
+            result[k] = 1f + Mathf.Min(MaxZoneAmpBonus, result[k]) / 100f;
+
+        return result;
+    }
+
+    /// <summary>존핵 효과(AmplifyZone)의 퍼센트. 존핵이 아니면 0.</summary>
+    private static float AmplifyPercentOf(RuntimeItemData item)
+    {
+        if (item?.effects == null) return 0f;
+        float sum = 0f;
+        foreach (var slot in item.effects)
+            if (slot != null && slot.effectType == "AmplifyZone") sum += slot.value;
+        return sum;
     }
 
     /// <summary>존별 점유 셀 수를 반환한다. key = zone_id 문자열.</summary>
@@ -394,7 +481,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
                 img.color = EmptyColor(bc);
         }
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
+        NotifyBridge();
     }
 
     /// <summary>현재 점유된 셀 좌표(col,row) 스냅샷. 세이브 캡처용.</summary>
@@ -434,6 +521,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
                 img.color = EmptyColor(bc);
         _occupiedPositions.Clear();
         MerlinRuneBridge.Instance?.OnZoneCellsUpdated(new Dictionary<string, int>());
+        MerlinRuneBridge.Instance?.OnZoneAmplifiersUpdated(null);
     }
 
     // ── Private methods ──
@@ -563,6 +651,14 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private static Color PlaceableColor(Color c) =>
         new(Mathf.Min(1f, c.r * 1.05f), Mathf.Min(1f, c.g * 1.05f), Mathf.Min(1f, c.b * 1.05f), 0.85f);
 
+    // 매칭 속성칸 강조: 존 색을 강하게 + 높은 알파(배치 유도 하이라이트)
+    private static Color MatchHighlightColor(Color c) =>
+        new(Mathf.Min(1f, c.r * 1.6f), Mathf.Min(1f, c.g * 1.6f), Mathf.Min(1f, c.b * 1.6f), 1f);
+
+    // 힌트 중 비매칭 배치가능 셀: 매칭칸이 도드라지도록 한 단계 낮춘 밝기
+    private static Color DimPlaceable(Color c) =>
+        new(c.r * 0.7f, c.g * 0.7f, c.b * 0.7f, 0.6f);
+
     // 드래그 호버: 존 색상 그대로, 기본 알파
     private static Color NormalColor(Color c) =>
         new(c.r, c.g, c.b, NORMAL_ALPHA);
@@ -595,7 +691,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         }
 
         // Bridge에 클러스터 업데이트 알림 (시너지 패널 즉시 갱신)
-        MerlinRuneBridge.Instance?.OnZoneCellsUpdated(GetZoneOccupiedCounts());
+        NotifyBridge();
 
         // ── 애니메이션 ───────────────────────────────────────────────────
         // 신규 셀: 흰색 플래시  0→0.6(30%)→0 (420ms)
@@ -653,4 +749,73 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     }
 
     private void OnDestroy() => ClearGrid();
+
+    // ── 시너지 완성 연출 ──────────────────────────────────────────────
+
+    /// <summary>시너지 단계 달성 시 UI_GridPanel이 브릿지 이벤트를 받아 호출. 해당 속성 존을 터뜨린다.</summary>
+    public void PlayZoneSynergyBurst(string zoneId)
+    {
+        char code = ElementDef.IdToCode(zoneId);
+        if (code == '\0') return;
+        PlaySynergyBurstAsync(code, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>
+    /// 시너지 단계 달성 시 해당 속성 존 전체를 속성색으로 <b>파도치듯 터뜨린다</b>.
+    /// 존 중심에서 바깥으로 퍼지는 웨이브(셀별 거리 지연) + 밝은 섬광 후 정착. 배치 플래시와 겹쳐도 안전(플래시 오버레이 공유).
+    /// </summary>
+    private async UniTaskVoid PlaySynergyBurstAsync(char zoneCode, CancellationToken ct)
+    {
+        // 대상 셀 수집 + 존 중심 계산(웨이브 기준점)
+        var cells = new List<Vector2Int>();
+        Vector2 centroid = Vector2.zero;
+        foreach (var kvp in _cellZones)
+            if (kvp.Value == zoneCode) { cells.Add(kvp.Key); centroid += kvp.Key; }
+        if (cells.Count == 0) return;
+        centroid /= cells.Count;
+
+        Color elem = ElementDef.TryGetCodeColor(zoneCode, out var ec) ? ec : Color.white;
+        Color burst = new Color(Mathf.Min(1f, elem.r * 1.4f + 0.2f),
+                                Mathf.Min(1f, elem.g * 1.4f + 0.2f),
+                                Mathf.Min(1f, elem.b * 1.4f + 0.2f), 1f);
+
+        // 셀별 웨이브 시작 지연(중심에서의 거리 비례)
+        float maxDist = 0.01f;
+        var delay = new Dictionary<Vector2Int, float>(cells.Count);
+        foreach (var p in cells)
+        {
+            float d = Vector2.Distance(p, centroid);
+            delay[p] = d;
+            if (d > maxDist) maxDist = d;
+        }
+
+        const int   STEPS     = 26;
+        const float TOTAL_MS  = 620f;
+        const float WAVE_SPAN = 0.45f;  // 웨이브가 판을 훑는 데 쓰는 전체 진행 비율
+        const float RISE      = 0.25f;  // 각 셀 섬광 상승 구간
+        const float PEAK      = 0.95f;
+
+        try
+        {
+            for (int i = 0; i <= STEPS; i++)
+            {
+                float t = i / (float)STEPS;
+                foreach (var p in cells)
+                {
+                    if (!_cellFlashImages.TryGetValue(p, out var flash)) continue;
+                    float start = (delay[p] / maxDist) * WAVE_SPAN;   // 이 셀의 섬광 시작 시점
+                    float lt = (t - start) / (1f - WAVE_SPAN);
+                    float a = lt <= 0f || lt >= 1f ? 0f
+                            : (lt < RISE ? lt / RISE : 1f - (lt - RISE) / (1f - RISE)) * PEAK;
+                    flash.color = new Color(burst.r, burst.g, burst.b, a);
+                }
+                await UniTask.Delay((int)(TOTAL_MS / STEPS), ignoreTimeScale: true, cancellationToken: ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+
+        foreach (var p in cells)
+            if (_cellFlashImages.TryGetValue(p, out var flash))
+                flash.color = new Color(1f, 1f, 1f, 0f);
+    }
 }

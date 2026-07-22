@@ -1,4 +1,5 @@
 using UnityEngine;
+using RelicFairy.Monster;
 
 /// <summary>
 /// 몬스터에 부착되는 화상 DoT 핸들러.
@@ -10,6 +11,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
 {
     // ── Private ───────────────────────────────────────────────
     private IDamageable _target;
+    private MonsterBase _monster;     // DoT 경로(TakeSynergyDamage)용 — 넉백·GetHit 없이 피해만
     private GameObject  _instigator;
     private float       _dps;
     private float       _tickInterval;
@@ -51,7 +53,7 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         if (_target != null)
         {
             float burst = _dps * Mathf.Max(0f, _remaining);
-            if (burst > 0f) _target.TakeDamage(burst, _instigator);
+            if (burst > 0f) DealDot(burst);
         }
         Destroy(this);
     }
@@ -67,8 +69,8 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         if (_tickAccum >= _tickInterval)
         {
             float damage = _dps * _tickInterval;
-            _target.TakeDamage(damage, _instigator);
-            // 팝업은 대상측(MonsterBase.TakeDamage) 자체 처리
+            DealDot(damage);
+            // 팝업은 대상측(TakeSynergyDamage) 자체 처리
             _tickAccum -= _tickInterval;
         }
 
@@ -77,9 +79,17 @@ public sealed class MonsterBurnHandler : MonoBehaviour
     }
 
     // ── Private Methods ───────────────────────────────────────
+    /// <summary>화상은 DoT다 — 넉백·GetHit 없는 시너지 경로로 피해만 가한다(방어 그대로 적용).</summary>
+    private void DealDot(float amount)
+    {
+        if (_monster != null) _monster.TakeSynergyDamage(amount, _instigator, 0f, false, DamageKind.Dot, RuneElement.Fire);
+        else                  _target.TakeDamage(amount, _instigator, 0f);   // 몬스터가 아닌 대상 폴백
+    }
+
     private void Configure(IDamageable target, GameObject instigator, float dps, float tickInterval, float duration)
     {
         _target       = target;
+        _monster      = target as MonsterBase;
         _instigator   = instigator;
         _tickInterval = tickInterval;
         _dps          = Mathf.Max(_dps, dps);    // 더 강한 DPS 유지

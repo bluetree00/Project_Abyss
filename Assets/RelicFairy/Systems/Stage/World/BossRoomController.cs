@@ -54,8 +54,12 @@ public class BossRoomController : MonoBehaviour
     [Tooltip("true 시 카메라 팬을 생략하고 즉시 보스 등장 연출을 시작한다. 연출 내부에서 카메라를 직접 제어하는 경우 사용.")]
     [SerializeField] private bool _skipCameraPan = false;
 
+    [Tooltip("true 시 콜라이더 자동 트리거를 무시하고, 외부(연출 디렉터)의 BeginBossFightExternally 호출로만 전투를 시작한다. 인트로 프롤로그용.")]
+    [SerializeField] private bool externalTriggerOnly = false;
+
     // ── Private ──────────────────────────────────────────────────
     private bool             _triggered;
+    private bool             _unbeatable;
     private bool             _playerPassing;
     private Transform        _playerTransform;
     private PlayerController _playerController;
@@ -66,7 +70,7 @@ public class BossRoomController : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (_triggered) return;
+        if (externalTriggerOnly || _triggered) return;
         var player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;
         _playerPassing    = true;
@@ -75,7 +79,7 @@ public class BossRoomController : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        if (_triggered || !_playerPassing) return;
+        if (externalTriggerOnly || _triggered || !_playerPassing) return;
         var player = other.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
@@ -113,9 +117,21 @@ public class BossRoomController : MonoBehaviour
     // 보스 감지 → 입력 차단 → 카메라 팬 → TriggerEntrance → 입력 복구
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>외부 연출(예: IntroMordredDirector)이 상호작용·컷신 뒤 전투를 시작할 때 호출.
+    /// 콜라이더 자동 트리거 대신 이 경로로 barrier·소환·등장 연출을 실행한다. unbeatable=true면 보스 HP 바닥(무적).</summary>
+    public void BeginBossFightExternally(PlayerController player, bool unbeatable = false)
+    {
+        if (_triggered || player == null) return;
+        _triggered  = true;
+        _unbeatable = unbeatable;
+        OnPlayerEntered(player);
+    }
+
     private void OnBossSpawned(MonsterBase boss)
     {
         bossSpawner.OnMonsterSpawned -= OnBossSpawned;
+
+        if (_unbeatable && boss != null) boss.HpFloorMin1 = true;
 
         // 등장 연출(IBossEntrance) 없는 보스(예: ForestGuardian)는 입장 시 차단한 입력을
         // 복구해줄 OnCombatReady 시퀀스가 없다 — 여기서 즉시 복구하지 않으면 플레이어가 영구 이동 불가.

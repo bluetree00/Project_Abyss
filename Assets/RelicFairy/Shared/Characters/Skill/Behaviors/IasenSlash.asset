@@ -23,7 +23,7 @@ MonoBehaviour:
   dashEffectKey:
   dashTrailKey: IasenDashFire
   slashEffectKey: IasenFinishFlash
-  hitEffectKey: BlueShootHit
+  hitEffectKey: BloodShot
   hitEffectScale: 2
   useWeaponTrail: 0
   playerTrailKey: 

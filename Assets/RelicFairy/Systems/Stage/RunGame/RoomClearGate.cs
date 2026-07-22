@@ -22,6 +22,9 @@ public class RoomClearGate : MonoBehaviour
     /// <summary>일반 룸 클리어 시 제시할 룬 후보 수(3지선다).</summary>
     private const int RuneChoiceCount = 3;
 
+    /// <summary>일반 방 클리어 시 지급하는 원석(정제소 연료). 설계 §2.8 기준 방당 4.</summary>
+    private const int ClearOreReward = 4;
+
     // ── [SerializeField] ───────────────────────────────────────
     [Header("클리어 이펙트")]
     [SerializeField, Tooltip("방 클리어 시 맵 중앙에 재생할 이펙트 프리팹 (EndEffect).")]
@@ -44,6 +47,7 @@ public class RoomClearGate : MonoBehaviour
     private bool _activated;
     private bool _isBossRoom;
     private ChallengeGrade? _challengeGrade;   // 이벤트 챌린지 성과(있으면 보상 스케일·연료 지급)
+    private bool _isInteraction;               // 상호작용 챌린지 보상이면 천장 클램프(§6-3)
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -59,6 +63,9 @@ public class RoomClearGate : MonoBehaviour
         if (endEffect  != null) endEffectPrefab  = endEffect;
         if (endEffect2 != null) endEffect2Prefab = endEffect2;
     }
+
+    /// <summary>상호작용 챌린지 보상 여부 — true면 개수/연료를 천장 비율로 클램프(§6-3). Activate 전에 호출.</summary>
+    public void SetInteractionReward(bool isInteraction) => _isInteraction = isInteraction;
 
     /// <summary>방 클리어 시점에 호출. 이펙트 시퀀스 시작.</summary>
     public void Activate(Vector3 roomCenterWorld)
@@ -94,7 +101,7 @@ public class RoomClearGate : MonoBehaviour
         else if (_challengeGrade.HasValue)
         {
             // 이벤트 챌린지 성과 보상 — 등급×챕터로 개수/rarity floor/연료 스케일(§3-5·§4-2).
-            var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), false);
+            var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), _isInteraction);
             int count = Mathf.Max(1, cr.rewardCount);
             for (int i = 0; i < count; i++)
             {
@@ -112,6 +119,10 @@ public class RoomClearGate : MonoBehaviour
             // 일반 룸 클리어 = 3지선다. 후보를 담고 ClearRewardTrigger에 '선택형'으로 넘긴다.
             rewards.AddRange(RollRewardChoices(RuneChoiceCount));
             isChoice = rewards.Count > 0;
+
+            // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
+            // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
+            GrantClearOre();
         }
 
         // [보류] 보스드랍 아이템(EffectManager.GetBonusBossDropCount)의 '보스방 추가 롤' 보너스.
@@ -150,6 +161,16 @@ public class RoomClearGate : MonoBehaviour
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
         trigger.Initialize(_run, rewards, _isBossRoom, isChoice);
+    }
+
+    /// <summary>방 클리어 원석 지급 — 정제소 연료. 드랍 판정과 무관하게 확정 지급(생산 경로 보장).</summary>
+    private void GrantClearOre()
+    {
+        var bank = _run?.FuelBank;
+        if (bank == null || ClearOreReward <= 0) return;
+
+        bank.Add(FuelKind.RuneOre, ClearOreReward);
+        ItemEffectVfxHelper.ShowNotice($"<color=#7FD0FF>원석 +{ClearOreReward}</color>  (정제소 연료)");
     }
 
     private (RuntimeItemData data, ItemSO so) RollRewardItem(ItemRarity? floor = null)

@@ -1,7 +1,7 @@
 fileFormatVersion: 2
 guid: 77fc626278dbd774a9e6b1fee68562c4
 ModelImporter:
-  serializedVersion: 22200
+  serializedVersion: 24200
   internalIDToNameTable:
   - first:
       1: 100000
@@ -505,11 +505,6 @@ ModelImporter:
     optimizeGameObjects: 0
     removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: "Copied Avatar Rig Configuration mis-match. Bone length in
-      copied configuration does not match position in animation file:\n\t'calf_l'
-      : position error = 1.986649 mm\n\t'foot_l' : position error = 2.208445 mm\n\t'calf_r'
-      : position error = 4.488631 mm\n\t'foot_r' : position error = 4.623042 mm\n"
     animationImportErrors: 
     animationImportWarnings: "\nClip 'GhostSamurai_APose_Attack01_2_Root' has import
       animation warnings that might lower retargeting quality:\nNote: Activate translation
@@ -554,7 +549,7 @@ ModelImporter:
     - serializedVersion: 16
       name: GroundLightAttack_02
       takeName: GhostSamurai_APose_Attack01_2_Root
-      internalID: 0
+      internalID: 7400000
       firstFrame: 1048
       lastFrame: 1284
       wrapMode: 0
@@ -578,28 +573,28 @@ ModelImporter:
       events:
       - time: 0.2
         functionName: AE_BeginTrail
-        data:
+        data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
       - time: 0.1794872
-        functionName: SpawnSlashEffect2
-        data:
+        functionName: SpawnSlashEffect1
+        data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
       - time: 0.7
         functionName: AE_EndTrail
-        data:
+        data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
       - time: 1
         functionName: AE_AttackEnd
-        data:
+        data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
@@ -634,6 +629,9 @@ ModelImporter:
     maxBonesPerVertex: 4
     minBoneWeight: 0.001
     optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8

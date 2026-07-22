@@ -30,7 +30,7 @@ public class PerimeterGuardBehaviorSO : SkillBehaviorSO
     [Header("이펙트")]
     [SerializeField] private string slashEffectKey = "BasicSlashBlue";
     [SerializeField] private float slashEffectScale = 1.2f;
-    [SerializeField] private string hitEffectKey = "GreatswordImpact";
+    [SerializeField] private string hitEffectKey = "BloodShot";
     [SerializeField] private float hitEffectScale = 0.5f;
 
     [Header("마무리")]

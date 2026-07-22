@@ -16,10 +16,10 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     public static BaseCampBootstrapper Instance { get; private set; }
 
     [Header("Spawn")]
-    [Tooltip("초회(온보딩) 스폰 위치/회전 — 입구. 비워두면 원점(바닥 미배치 시 낙하).")]
+    [Tooltip("입구 스폰 — 프롤로그(Game_Intro)에서 곧장 넘어온 진입에서만 사용. 비우면 returnSpawnPoint 사용.")]
     [SerializeField] private Transform playerSpawnPoint;
 
-    [Tooltip("복귀(온보딩 완료 후) 스폰 위치 — 유물/장비 제단 부근. 비우면 playerSpawnPoint 사용.")]
+    [Tooltip("기본 스폰 — 유물층(유물/장비 제단 부근). 인트로발을 제외한 모든 진입(사망·클리어 복귀 포함). 비우면 playerSpawnPoint 사용.")]
     [SerializeField] private Transform returnSpawnPoint;
 
     [Tooltip("스폰할 CombatGirl 베이스 몸 Addressables 키. GameRunBootstrapper.startBodyKey와 동일.")]
@@ -78,6 +78,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // 로딩 UI 해제 — Tutorial/InGame과 동일하게 부트스트래퍼가 책임진다.
         AppBootstrapper.Instance?.NotifySceneReady();
 
+        // 허브에 도착했다는 사실을 저장한다. 이게 없으면 인트로를 깨고 게임을 꺼도 슬롯이 비어 있어,
+        // 다음 실행에서 "새 게임"으로만 들어갈 수 있고 프롤로그를 처음부터 다시 봐야 한다.
+        // 인트로 직후·사망 복귀·클리어 복귀가 모두 이 지점을 지나므로 한 곳이면 충분하다.
+        RunProgressManager.Instance?.SaveHubProgress();
+
         // Zone0(시작방)에 있던 진입 대사 연출 — 영속 허브로 이전. 로딩 해제 후 재생.
         try { await ShowIntroDialogueAsync(ct); }
         catch (OperationCanceledException) { }
@@ -103,6 +108,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // 게이트 통과 = 새 런 시작. 로비를 거치지 않은 진입(에디터 직접 Play 등)에서도
         // Ch1 부트스트래퍼가 대기 방 흐름(newRunFromHub)을 타도록 새 런 신호를 세운다.
         AppBootstrapper.Instance?.MarkNewRunPending();
+
+        // 시도 횟수 +1 — 로비 세이브 카드의 "시도 N회" 근거. 던전에 실제로 들어갈 때만 센다
+        // (허브를 돌아다니는 것은 시도가 아니다). 새 게임/슬롯 삭제에서 0으로 리셋된다.
+        var rpm = RunProgressManager.Instance;
+        if (rpm != null) RunProgressManager.BumpRetryCount(rpm.ActiveSlotIndex);
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.GameScene_Ch1);
     }
 
@@ -119,9 +129,18 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             return;
         }
 
-        // 복귀(온보딩 완료) 시 유물/장비 제단 부근 스폰, 초회는 입구 스폰.
-        var spawn = (BaseCampOnboardingDirector.IsCompleted && returnSpawnPoint != null)
-            ? returnSpawnPoint : playerSpawnPoint;
+        // 스폰 지점 — 기본은 <b>유물층</b>이고, 입구 스폰은 프롤로그에서 곧장 넘어온 그 한 번뿐이다.
+        //
+        // 과거엔 "온보딩 완료 여부"로 갈랐는데, 그건 죽고 돌아온 것과 무관한 조건이었다.
+        // 온보딩은 정해진 순서(각성→장비→유물)대로 보고가 들어와야만 완료로 기록되므로,
+        // 입구 트리거를 안 밟거나 순서를 건너뛰면 영영 미완료로 남아 죽어도 계속 입구에서 스폰됐다.
+        // 진입 경로로 직접 판정한다 — 인트로발이면 입구, 그 외(사망/클리어 복귀, 재진입)는 유물층.
+        // 위치를 직접 받은 재스폰(유물 핫스왑)은 스폰 지점 판정과 무관하므로 신호를 소비하지 않는다.
+        bool fromIntro = !overridePos.HasValue
+                      && (AppBootstrapper.Instance?.ConsumeFromIntro() ?? false);
+        var  spawn     = fromIntro
+            ? (playerSpawnPoint != null ? playerSpawnPoint : returnSpawnPoint)
+            : (returnSpawnPoint != null ? returnSpawnPoint : playerSpawnPoint);
         Vector3 pos    = overridePos ?? (spawn != null ? spawn.position : Vector3.zero);
         Quaternion rot = overrideRot ?? (spawn != null ? spawn.rotation : Quaternion.identity);
 

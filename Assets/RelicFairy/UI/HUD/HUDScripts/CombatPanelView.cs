@@ -58,6 +58,11 @@ public sealed class CombatPanelView : MonoBehaviour
     private bool HasHpSkin => hpTrackSprite != null || hpFillHighSprite != null || hpFillLowSprite != null;
 
     [Header("무기 슬롯 스킨 (선택)")]
+    [Tooltip("무기 아이콘을 원형으로 자를 마스크 스프라이트(예: Bamao C_circle). 미지정 시 원형 처리 생략.")]
+    [SerializeField] private Sprite weaponIconCircleMask;
+    [Tooltip("원형 칸의 배경(미지정 시 마스크 스프라이트를 그대로 배경으로 사용).")]
+    [SerializeField] private Sprite weaponIconCircleBackdrop;
+
     [SerializeField] private Sprite weaponFrameSprite;          // 무기칸 테두리 (2칸 통짜 프레임)
     [SerializeField] private Sprite weaponFrameInactiveSprite;  // 무기칸 비활성화 테두리 (무기 없음)
     [SerializeField] private Sprite weaponSlotInnerSprite;      // 무기칸 내부칸 (슬롯 1칸 배경)
@@ -128,6 +133,20 @@ public sealed class CombatPanelView : MonoBehaviour
     [Header("Active Slots")]
     [SerializeField] private ActiveSlotUI[] activeSlots = new ActiveSlotUI[3];
 
+    [Header("포션")]
+    [SerializeField, Tooltip("포션 슬롯 아이콘. 비우면 아이콘 없이 개수만 표시.")]
+    private Sprite potionIcon;
+
+    [Header("스킬 아이콘 폴백 (임시 — 무기/유물 SO에 아이콘이 없을 때만 사용)")]
+    [SerializeField] private Sprite skillQFallbackIcon;
+    [SerializeField] private Sprite skillEFallbackIcon;
+    [SerializeField] private Sprite skillRFallbackIcon;
+
+    private const string PotionKeyLabel  = "C";
+    private static readonly Color PotionCountColor = new(1f, 1f, 1f, 1f);
+    private static readonly Color PotionEmptyColor = new(0.55f, 0.52f, 0.60f, 1f);
+    private TMP_Text _potionCountLabel;
+
     [Header("Buff Display")]
     [SerializeField] private Transform buffListRoot;
     [SerializeField] private TMP_Text buffNoticeText;
@@ -150,6 +169,7 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text   _rCooldownTxt;
 
     private bool _qCooldownReady = true; // Q 사용가능 = 쿨다운 완료 AND 유물 게이지 조건(IsSkillReady)
+    private bool _qHasSkill = true;      // 유물이 Q를 제공하는가(구조적 보유) — 프레젠터가 무기/유물 변경 시 갱신
 
     // E/R 슬롯 테두리 — 쿨다운 완료 시 금색(er_2x)으로 스왑
     private Image _eFrameImg;
@@ -349,6 +369,18 @@ public sealed class CombatPanelView : MonoBehaviour
             if (fillArea != null) InsetInside(fillArea, hpInnerPadding);
             else                  InsetInside(hpFillImage.rectTransform, hpInnerPadding);
         }
+
+        // 감소 잔상(고스트)은 <b>본 fill과 같은 스프라이트</b>를 써야 한다.
+        // 같은 rect라도 스프라이트가 다르면 아트 내부의 바 두께·여백이 달라 잔상만 굵거나 얇게 보인다
+        // (레거시 Hp_bar.png는 1476×528, 디자이너 fill 아트는 3233×120 — 비율 자체가 다르다).
+        // 색은 유지 — 잔상은 틴트로 구분한다.
+        if (hpGhostFillImage != null && hpFillHighSprite != null)
+        {
+            hpGhostFillImage.sprite     = hpFillHighSprite;
+            hpGhostFillImage.type       = Image.Type.Filled;
+            hpGhostFillImage.fillMethod = Image.FillMethod.Horizontal;
+            hpGhostFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        }
         // 테두리 오버레이(fill 위) — 1회 생성
         if (hpFrameSprite != null && _hpBar != null && _hpFrameImg == null)
         {
@@ -489,10 +521,16 @@ public sealed class CombatPanelView : MonoBehaviour
     /// </summary>
     private void RefreshQFrame()
     {
+        bool gaugeReady = _relicResource == null || _relicResource.IsSkillReady;
+
+        // Q는 '사용할 수 있을 때만' 열어둔다 — 스킬 자체가 없거나 게이지 조건(정오 등)이 닫혀 있으면 잠금.
+        // 쿨다운은 전용 연출이 따로 있으므로 잠금 조건에서 제외한다.
+        // Q 잠금의 단일 소유자가 여기다(게이지가 매 프레임 변하므로). 프레젠터는 _qHasSkill만 갱신한다.
+        skillQ?.SetLocked(!_qHasSkill || !gaugeReady, GetSafeFont());
+
         if (_qFrameImg == null || relicSlotActiveSprite == null) return;
 
-        bool gaugeReady = _relicResource == null || _relicResource.IsSkillReady;
-        bool ready      = _qCooldownReady && gaugeReady;
+        bool ready = _qCooldownReady && gaugeReady;
 
         var target = ready ? relicSlotActiveSprite : relicSlotFrameSprite;
         if (target != null && _qFrameImg.sprite != target)
@@ -790,6 +828,19 @@ public sealed class CombatPanelView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     public void SetSkillIcon(SkillType skill, Sprite icon)
     {
+        // [임시] 무기/유물 SO에 스킬 아이콘이 아직 없어 슬롯이 비어 보인다.
+        //        아트가 들어오면 폴백 필드를 비우기만 하면 원래대로 동작한다.
+        if (icon == null)
+        {
+            icon = skill switch
+            {
+                SkillType.Q => skillQFallbackIcon,
+                SkillType.E => skillEFallbackIcon,
+                SkillType.R => skillRFallbackIcon,
+                _           => null,
+            };
+        }
+
         if (skill == SkillType.R)
         {
             if (_rIconImg != null)
@@ -839,6 +890,38 @@ public sealed class CombatPanelView : MonoBehaviour
         _           => null,
     };
 
+    /// <summary>
+    /// 스킬 슬롯 잠금 표시. 해당 슬롯에 스킬이 없으면(예: 무형검) 어둡게 덮고 자물쇠를 띄운다.
+    /// 무기 진화로 스킬이 생기면 같은 경로가 locked=false로 다시 불려 자동 해제된다.
+    /// R 슬롯은 별도 이미지 구조라 프레임/쿨다운 표시만 정리한다.
+    /// </summary>
+    public void SetSkillLocked(SkillType skill, bool locked)
+    {
+        // Q의 잠금은 RefreshQFrame이 게이지와 함께 매 갱신마다 결정한다(여기선 보유 여부만 반영).
+        if (skill == SkillType.Q)
+        {
+            _qHasSkill = !locked;
+            RefreshQFrame();
+            return;
+        }
+
+        if (skill == SkillType.R)
+        {
+            // R은 Q/E와 UI 구조가 달라(별도 이미지) 프레임을 어둡게 죽이는 것으로 통일한다.
+            // 이모지 자물쇠는 폰트에 글리프가 없으면 네모로 깨지므로 쓰지 않는다.
+            if (_rCooldownBg  != null) _rCooldownBg.SetActive(false);
+            if (_rCooldownTxt != null) _rCooldownTxt.text = string.Empty;
+            if (_rFrameImg    != null)
+            {
+                var c = _rFrameImg.color;
+                _rFrameImg.color = new Color(c.r, c.g, c.b, locked ? 0.4f : 1f);
+            }
+            return;
+        }
+
+        GetSkillSlot(skill)?.SetLocked(locked, GetSafeFont());
+    }
+
     // ─────────────────────────────────────────────────────────
     // Active 슬롯
     // ─────────────────────────────────────────────────────────
@@ -846,6 +929,56 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         if (index >= 0 && index < activeSlots.Length)
             activeSlots[index]?.SetIcon(icon);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 포션 슬롯 — Q/E 위쪽 액티브 슬롯 첫 칸(HUD_Active_01)을 쓴다.
+    // 라벨은 사용 키(C), 우측에 남은 개수를 표시한다.
+    // ─────────────────────────────────────────────────────────
+
+    private const int PotionSlotIndex = 0;
+
+    /// <summary>포션 보유 갱신. PlayerRunState.OnPotionChanged → HudPresenter가 호출.</summary>
+    public void SetPotion(int count, int capacity)
+    {
+        if (activeSlots == null || activeSlots.Length <= PotionSlotIndex) return;
+        var slot = activeSlots[PotionSlotIndex];
+        if (slot == null) return;
+
+        if (potionIcon != null) slot.SetIcon(potionIcon);
+
+        // 코너 라벨은 키(C) 고정 — 개수는 별도 라벨로 크게 보여준다.
+        EnsureActiveLabel(slot, PotionKeyLabel);
+
+        EnsurePotionCountLabel();
+        if (_potionCountLabel != null)
+        {
+            _potionCountLabel.text  = count.ToString();
+            // 0개면 흐리게 — 눌러도 안 나간다는 걸 색으로 먼저 알린다.
+            _potionCountLabel.color = count > 0 ? PotionCountColor : PotionEmptyColor;
+        }
+    }
+
+    private void EnsurePotionCountLabel()
+    {
+        if (_potionCountLabel != null) return;
+        var slotGo = FindChildRecursive(transform, "HUD_Active_01");
+        if (slotGo == null) return;
+
+        var go = new GameObject("PotionCount", typeof(RectTransform));
+        go.transform.SetParent(slotGo, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, -2f);
+        rt.sizeDelta = new Vector2(48f, 26f);
+
+        _potionCountLabel = go.AddComponent<TextMeshProUGUI>();
+        if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
+        _potionCountLabel.fontSize  = 20f;
+        _potionCountLabel.fontStyle = FontStyles.Bold;
+        _potionCountLabel.alignment = TextAlignmentOptions.Center;
+        _potionCountLabel.raycastTarget = false;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -882,6 +1015,53 @@ public sealed class CombatPanelView : MonoBehaviour
             }
         }
 
+        /// <summary>
+        /// 무기 아이콘을 <b>원형으로 잘라 칸 안에 맞춘다</b>.
+        /// 원본 아이콘이 칸보다 커서 슬롯 밖으로 삐져나오고 배경도 사각이라 겉돌았다.
+        /// 아이콘과 같은 자리에 원형 마스크 부모를 끼워 넣고(기존 계층 위치·크기 유지),
+        /// 그 안에서 아이콘을 IconInset 비율로 줄인다. 프리팹 수정 없이 런타임 1회 구성.
+        /// </summary>
+        internal void EnsureRoundIcon(Sprite circleSprite, Sprite backdropSprite)
+        {
+            if (_roundedIcon || iconImage == null || circleSprite == null) return;
+            _roundedIcon = true;
+
+            var iconRt = iconImage.rectTransform;
+            var parent = iconRt.parent as RectTransform;
+            if (parent == null) return;
+
+            // 아이콘이 있던 자리를 그대로 물려받는 마스크 컨테이너
+            var maskGo = new GameObject("IconRoundMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+            var maskRt = (RectTransform)maskGo.transform;
+            maskRt.SetParent(parent, false);
+            maskRt.SetSiblingIndex(iconRt.GetSiblingIndex());
+            maskRt.anchorMin        = iconRt.anchorMin;
+            maskRt.anchorMax        = iconRt.anchorMax;
+            maskRt.pivot            = iconRt.pivot;
+            maskRt.anchoredPosition = iconRt.anchoredPosition;
+            maskRt.sizeDelta        = iconRt.sizeDelta;
+
+            var maskImg = maskGo.GetComponent<Image>();
+            maskImg.sprite        = backdropSprite != null ? backdropSprite : circleSprite;
+            maskImg.type          = Image.Type.Simple;
+            maskImg.raycastTarget = false;
+            // 배경을 보여줘야 사각 배경 대신 원형 배경으로 읽힌다.
+            maskGo.GetComponent<Mask>().showMaskGraphic = true;
+
+            // 아이콘을 마스크 안으로 옮기고 안쪽으로 줄인다(칸 이탈 방지).
+            iconRt.SetParent(maskRt, false);
+            iconRt.anchorMin        = new Vector2(0.5f, 0.5f);
+            iconRt.anchorMax        = new Vector2(0.5f, 0.5f);
+            iconRt.pivot            = new Vector2(0.5f, 0.5f);
+            iconRt.anchoredPosition = Vector2.zero;
+            iconRt.sizeDelta        = maskRt.sizeDelta * IconInset;
+            iconImage.preserveAspect = true;   // 비율 깨짐 방지
+        }
+
+        private bool _roundedIcon;
+        /// <summary>원형 배경 대비 아이콘 크기 비율(1=꽉 참). 작을수록 여백이 커진다.</summary>
+        private const float IconInset = 0.62f;
+
         private Sprite ResolveTypeIcon(WeaponType type) => type switch
         {
             WeaponType.Katana     => iconKatana,
@@ -914,11 +1094,53 @@ public sealed class CombatPanelView : MonoBehaviour
         /// <summary>슬롯 우측 하단 키 레이블 (Q / E). Inspector 또는 런타임 생성.</summary>
         [SerializeField] internal TMP_Text  keyLabel;
 
+        /// <summary>스킬을 쓸 수 없는 상태인가 — 아이콘을 어둡게 죽여 표시한다.</summary>
+        private bool _locked;
+
+        public bool IsLocked => _locked;
+
         public void SetIcon(Sprite icon)
         {
             if (iconImage == null) return;
             iconImage.sprite = icon;
             iconImage.gameObject.SetActive(icon != null);
+            // 잠금 중이면 새 아이콘도 어둡게 유지(SetIcon이 SetLocked보다 늦게 와도 톤이 안 튄다).
+            iconImage.color = _locked ? new Color(0.30f, 0.30f, 0.34f, 0.85f) : Color.white;
+        }
+
+        /// <summary>
+        /// 슬롯 잠금 표시. 스킬이 없는 슬롯(예: 무형검의 E/R)을 어둡게 덮고 자물쇠를 띄운다.
+        /// 무기가 진화해 스킬이 생기면 <b>같은 경로가 false로 다시 호출</b>돼 자동 해제된다.
+        /// </summary>
+        /// <summary>
+        /// 슬롯 잠금 표시. <b>아이콘 자체를 어둡게 죽이는</b> 방식 —
+        /// 슬롯을 덮는 베일을 만들면 Q(유물칸)처럼 프레임 모양이 다른 슬롯에서 배경과 어긋난다.
+        /// 아이콘만 건드리므로 어떤 프레임 아트에도 안전하다.
+        /// </summary>
+        internal void SetLocked(bool locked, TMP_FontAsset font)
+        {
+            _locked = locked;
+
+            if (iconImage != null)
+            {
+                // 아이콘은 계속 보이되 어둡게 — 슬롯이 비어 보이지 않으면서 "못 쓴다"가 읽힌다.
+                iconImage.gameObject.SetActive(iconImage.sprite != null);
+                iconImage.color = locked ? new Color(0.30f, 0.30f, 0.34f, 0.85f) : Color.white;
+            }
+
+            if (keyLabel != null)
+            {
+                var c = keyLabel.color;
+                keyLabel.color = new Color(c.r, c.g, c.b, locked ? 0.35f : 1f);
+            }
+
+            // 잠긴 슬롯엔 쿨다운 연출이 남아있으면 안 된다.
+            if (locked)
+            {
+                if (cooldownBg      != null) cooldownBg.SetActive(false);
+                if (cooldownOverlay != null) cooldownOverlay.gameObject.SetActive(false);
+                if (cooldownText    != null) cooldownText.text = string.Empty;
+            }
         }
 
         /// <summary>
@@ -1025,6 +1247,10 @@ public sealed class CombatPanelView : MonoBehaviour
         // Q/E는 프리팹에 cooldownOverlay·cooldownText가 미할당이라 R처럼 도는 연출이 없었다 → 런타임 보강.
         skillQ?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
         skillE?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
+
+        // 무기 아이콘 원형화 — 원본이 칸을 벗어나고 배경이 사각이라 겉돌던 것을 원형으로 잘라 맞춘다.
+        slot0?.EnsureRoundIcon(weaponIconCircleMask, weaponIconCircleBackdrop);
+        slot1?.EnsureRoundIcon(weaponIconCircleMask, weaponIconCircleBackdrop);
 
         ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
     }
@@ -1464,16 +1690,38 @@ public sealed class CombatPanelView : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     // 슬롯 레이블 초기화 (Q/E/1/2/3)
     // ─────────────────────────────────────────────────────────
-    private static readonly string[] ActiveLabelTexts = { "1", "2", "3" };
+    // 첫 액티브 칸은 포션(C)이 쓴다. 2·3은 액티브 아이템용이나 아직 채우는 쪽이 없어 숨긴다.
+    private static readonly string[] ActiveLabelTexts = { PotionKeyLabel, "2", "3" };
     private static readonly string[] SkillLabelTexts  = { "Q", "E" };
+
+    /// <summary>액티브 아이템 시스템이 붙기 전까지 빈 슬롯(02·03)을 숨긴다. 구현되면 false로.</summary>
+    private const bool HideUnusedActiveSlots = true;
 
     private void EnsureSlotLabels()
     {
         EnsureSkillLabel(skillQ, SkillLabelTexts[0]);
         EnsureSkillLabel(skillE, SkillLabelTexts[1]);
 
-        for (int i = 0; i < activeSlots.Length && i < ActiveLabelTexts.Length; i++)
-            EnsureActiveLabel(activeSlots[i], ActiveLabelTexts[i]);
+        // 포션 슬롯(첫 칸)만 라벨링 — 나머지는 아래에서 숨긴다.
+        if (activeSlots != null && activeSlots.Length > 0)
+            EnsureActiveLabel(activeSlots[0], ActiveLabelTexts[0]);
+
+        if (HideUnusedActiveSlots)
+        {
+            var a02 = FindChildRecursive(transform, "HUD_Active_02");
+            var a03 = FindChildRecursive(transform, "HUD_Active_03");
+            if (a02 != null) a02.gameObject.SetActive(false);
+            if (a03 != null) a03.gameObject.SetActive(false);
+        }
+        else
+        {
+            for (int i = 1; i < activeSlots.Length && i < ActiveLabelTexts.Length; i++)
+                EnsureActiveLabel(activeSlots[i], ActiveLabelTexts[i]);
+        }
+
+        // 무기 교체 키 — 스킬·포션과 같은 규격으로 붙여 키 표기가 한 줄로 읽히게 한다.
+        EnsureWeaponLabel("Slot_0", "1");
+        EnsureWeaponLabel("Slot_1", "2");
     }
 
     private void EnsureSkillLabel(SkillSlotUI slot, string text)
@@ -1481,7 +1729,7 @@ public sealed class CombatPanelView : MonoBehaviour
         if (slot == null) return;
         if (slot.keyLabel != null)
         {
-            slot.keyLabel.text = text;
+            StyleKeyLabel(slot.keyLabel, text);   // 프리팹 라벨도 공통 규격으로 정규화
             return;
         }
 
@@ -1500,18 +1748,17 @@ public sealed class CombatPanelView : MonoBehaviour
         if (slot == null) return;
         if (slot.indexLabel != null)
         {
-            slot.indexLabel.text = text;
+            StyleKeyLabel(slot.indexLabel, text);   // 프리팹 라벨도 공통 규격으로 정규화
             return;
         }
 
+        // 포션 슬롯(C)은 첫 칸을 쓰므로 숫자 대신 키 문자가 들어온다 → 슬롯 이름은 인덱스로 찾는다.
         string goName = text switch
         {
-            "1" => "HUD_Active_01",
             "2" => "HUD_Active_02",
             "3" => "HUD_Active_03",
-            _   => null,
+            _   => "HUD_Active_01",
         };
-        if (goName == null) return;
 
         var slotGo = FindChildRecursive(transform, goName);
         if (slotGo == null) return;
@@ -1519,34 +1766,65 @@ public sealed class CombatPanelView : MonoBehaviour
         slot.indexLabel = CreateCornerLabel(slotGo, text);
     }
 
-    /// <summary>
-    /// 슬롯 오브젝트 우측 하단 외부에 작은 레이블 TMP_Text를 생성한다.
-    /// anchoredPosition을 슬롯 우측 하단 바깥쪽으로 배치한다.
-    /// </summary>
+    /// <summary>무기 슬롯(1·2) 키 라벨 — 스킬·액티브와 같은 규격으로 붙인다.</summary>
+    private void EnsureWeaponLabel(string goName, string text)
+    {
+        var slotGo = FindChildRecursive(transform, goName);
+        if (slotGo == null) return;
+
+        var existing = slotGo.Find($"Label_{text}");
+        if (existing != null && existing.TryGetComponent<TMP_Text>(out var tmp))
+        {
+            StyleKeyLabel(tmp, text);
+            return;
+        }
+        CreateCornerLabel(slotGo, text);
+    }
+    // ── 키 표기 라벨 규격 (모든 슬롯 공통) ─────────────────────────
+    // 슬롯마다 제각각이면 눈이 키를 못 찾는다. 위치·크기·색을 한 곳에서 강제한다.
+    private const  float KeyLabelSize     = 12f;                        // 작게 — 슬롯 아이콘을 가리지 않는다
+    private const  float KeyLabelBoxW     = 18f;
+    private const  float KeyLabelBoxH     = 16f;
+    private static readonly Vector2 KeyLabelPivot  = new(1f, 0f);       // 슬롯 우하단 안쪽
+    private static readonly Vector2 KeyLabelOffset = new(-3f, 3f);
+    private static readonly Color   KeyLabelColor  = new(1f, 0.90f, 0.62f, 0.95f);
+
     private TMP_Text CreateCornerLabel(Transform slotRoot, string text)
     {
         var go = new GameObject($"Label_{text}", typeof(RectTransform));
         go.transform.SetParent(slotRoot, false);
-
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin  = new Vector2(1f, 0f);
-        rect.anchorMax  = new Vector2(1f, 0f);
-        rect.pivot      = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(2f, -2f);
-        rect.sizeDelta  = new Vector2(20f, 20f);
-
         var tmp = go.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(tmp);
-        tmp.text      = text;
-        tmp.fontSize  = 14f;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.color     = new Color(1f, 0.9f, 0.6f, 1f);
-        tmp.alignment = TextAlignmentOptions.TopLeft;
-
-        if (slotLabelFont != null)
-            tmp.font = slotLabelFont;
-
+        StyleKeyLabel(tmp, text);
         return tmp;
+    }
+
+    /// <summary>
+    /// 키 라벨을 공통 규격으로 강제한다. 프리팹에 이미 배선된 라벨도 이 규격으로 맞춰
+    /// 슬롯 간 위치·크기가 어긋나지 않게 한다(과거: 프리팹 라벨은 텍스트만 바꿔 제각각이었음).
+    /// </summary>
+    private void StyleKeyLabel(TMP_Text tmp, string text)
+    {
+        if (tmp == null) return;
+
+        var rect = tmp.rectTransform;
+        rect.anchorMin        = KeyLabelPivot;
+        rect.anchorMax        = KeyLabelPivot;
+        rect.pivot            = KeyLabelPivot;
+        rect.anchoredPosition = KeyLabelOffset;
+        rect.sizeDelta        = new Vector2(KeyLabelBoxW, KeyLabelBoxH);
+        rect.localScale       = Vector3.one;
+
+        tmp.text          = text;
+        tmp.fontSize      = KeyLabelSize;
+        tmp.fontStyle     = FontStyles.Bold;
+        tmp.color         = KeyLabelColor;
+        tmp.alignment     = TextAlignmentOptions.BottomRight;
+        tmp.enableWordWrapping = false;
+        tmp.overflowMode  = TextOverflowModes.Overflow;
+        tmp.raycastTarget = false;
+
+        if (slotLabelFont != null) tmp.font = slotLabelFont;
     }
 
     private static TMP_FontAsset _safeFontCache;

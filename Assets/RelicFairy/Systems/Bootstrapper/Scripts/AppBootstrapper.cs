@@ -79,6 +79,7 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         // PR1: 진행 중 런 세이브(로컬)를 폐기. 메타 반영은 HandleRunEnded → ApplyRunResultAsync.
         // 종료된 런의 슬롯만 클리어(다른 슬롯 무영향).
+        // ClearLocalRun = 세이브만 — 온보딩(초회 진행도)은 유지한다. 죽었다고 튜토리얼을 다시 시킬 순 없다.
         var rpm = RunProgressManager.Instance;
         rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
         CurrentRun = null;
@@ -178,9 +179,16 @@ public sealed class AppBootstrapper : MonoBehaviour
         try
         {
             IsNewRunPending = true;
-            // 새 런 시작 — 선택 슬롯의 로컬 런 세이브만 폐기(다른 슬롯 무영향).
+            // "새 게임" — 이 슬롯을 처음 상태로 되돌린다(세이브 + 온보딩 + 시도 횟수).
+            // 여기만 초회를 재현하는 경로다. 사망/클리어 복귀는 ClearLocalRun(세이브만)을 탄다.
             var rpm = RunProgressManager.Instance;
-            rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
+            rpm?.ResetSlot(rpm.ActiveSlotIndex);
+            // "새 게임"은 처음부터다 — 인트로 완료 플래그와 대사 진행도(방문 횟수·복귀 사유)를 함께 초기화한다.
+            // 이게 없으면 이전 플레이의 카운트가 남아 첫 진입부터 반복(_R*) 대사가 나온다.
+            // (이어하기는 이 경로를 타지 않으므로 영향 없음)
+            IntroCompletionTracker.ClearForSlot(rpm?.ActiveSlotIndex ?? 0);
+            DialogueDataManager.ResetVisitCounts();
+            RunReturnTracker.ResetAll();
 
             var vp = UIRootBootstrapper.Instance != null
                 ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
@@ -188,7 +196,11 @@ public sealed class AppBootstrapper : MonoBehaviour
             if (vp != null)
                 await vp.PlayAsync(token);
 
-            RequestLoad(Define.Scene.BaseCamp); // 새 런은 영속 허브(BaseCamp)부터 — 던전 진입은 BaseCamp 게이트가 담당
+            // 초회 플레이(인트로 미완료)면 프롤로그 Game_Intro부터 — 인트로 사망 시 IntroBootstrapper가 BaseCamp로 인계.
+            // 인트로 완료 이후엔 곧장 영속 허브(BaseCamp). 던전 진입은 BaseCamp 게이트가 담당.
+            RequestLoad(IntroCompletionTracker.IsCompleted
+                ? Define.Scene.BaseCamp
+                : Define.Scene.Game_Intro);
         }
         catch (OperationCanceledException) { }
     }
@@ -203,6 +215,19 @@ public sealed class AppBootstrapper : MonoBehaviour
     /// <summary>새 런 진입 신호를 세운다. 베이스캠프 던전 게이트 통과처럼 로비(RequestStartRun)를 거치지 않은
     /// 진입에서도 Ch1 부트스트래퍼가 대기 방(StartWaitingRoomAsync) 흐름을 타도록 보장한다. ConsumeNewRunPending에서 소비.</summary>
     public void MarkNewRunPending() => IsNewRunPending = true;
+
+    /// <summary>프롤로그(Game_Intro)에서 곧장 넘어온 진입인지. BaseCamp가 스폰 지점을 고르는 데 쓴다.</summary>
+    public bool IsFromIntroPending { get; private set; }
+
+    /// <summary>인트로 → BaseCamp 인계 시 세운다. IntroBootstrapper가 씬을 넘기기 직전에 호출.</summary>
+    public void MarkFromIntro() => IsFromIntroPending = true;
+
+    public bool ConsumeFromIntro()
+    {
+        bool was = IsFromIntroPending;
+        IsFromIntroPending = false;
+        return was;
+    }
 
     /// <summary>챕터 전환 진입 신호를 세운다. AdvanceChapter가 다음 챕터 씬 로드 직전에 호출.
     /// 로드된 GameScene의 GameRunBootstrapper가 ConsumeChapterAdvance로 소비해 새 챕터를 처음부터 시작한다.</summary>
@@ -239,13 +264,14 @@ public sealed class AppBootstrapper : MonoBehaviour
             return;
         }
 
-        // 스타트룸 미퇴장 상태에서 종료 → 선택 초기화 후 새로 시작
+        // 허브(베이스캠프) 체류 상태에서 종료한 세이브 — 런이 아니므로 복원할 세션이 없다.
+        // 그냥 허브로 돌려보낸다. 세이브는 <b>지우지 않는다</b>(다시 껐다 켜도 이어하기가 남아야 한다).
+        // 무기·유물은 저장하지 않았으므로 허브에서 다시 갖춘다 — 무형검 각성이 매 런의 시작 의식이다.
         if (save.isInStartRoom)
         {
-            Debug.Log("[AppBootstrapper] RestoreRun: isInStartRoom=true — 세이브 초기화 후 새로 시작");
+            Debug.Log("[AppBootstrapper] RestoreRun: 허브 세이브 — 베이스캠프로 복귀");
             Loadout.Clear();
-            rpm.ClearLocalRun(slot);
-            RequestLoad(Define.Scene.GameScene_Ch1);
+            RequestLoad(Define.Scene.BaseCamp);
             return;
         }
 
@@ -326,8 +352,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         var w0 = ws0 != null ? WeaponData.FromSO(ws0) : null;
         var w1 = ws1 != null ? WeaponData.FromSO(ws1) : null;
         // 강화/승급 복원 — 씬 진입 시 ApplyServerOverride가 RecomputeEnhancedStats()로 유효값을 재계산한다.
-        if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.RecomputeEnhancedStats(); }
-        if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.RecomputeEnhancedStats(); }
+        if (w0 != null) { w0.enhanceLevel = Mathf.Max(0, save.weapon0EnhanceLevel); w0.legendId = save.weapon0LegendId; w0.evolutionStage = Mathf.Max(0, save.weapon0EvolutionStage); w0.RecomputeEnhancedStats(); }
+        if (w1 != null) { w1.enhanceLevel = Mathf.Max(0, save.weapon1EnhanceLevel); w1.legendId = save.weapon1LegendId; w1.evolutionStage = Mathf.Max(0, save.weapon1EvolutionStage); w1.RecomputeEnhancedStats(); }
         if (w0 != null || w1 != null)
         {
             // 저장된 현재 슬롯 복원(미설정 시 0). SpawnPlayerAsync가 SwitchToSlotAsync로 적용.
@@ -552,6 +578,10 @@ public sealed class AppBootstrapper : MonoBehaviour
 
         // 무기 강화 곡선 사전 설치(이어하기 복원 시 유효 스탯 재계산에 사용). 실패해도 기본 곡선 폴백.
         WeaponEnhanceService.EnsureLoadedAsync().Forget();
+
+        // 룬 등급 아트 라이브러리 사전 로드(로컬 Addressable, 로그인 무관). 실패해도 색상 폴백.
+        RuneArt.PreloadAsync().Forget();
+        UISkin.PreloadAsync().Forget();   // 화면별 아트 스킨(정제소 등) — 미등록이면 색 폴백
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)

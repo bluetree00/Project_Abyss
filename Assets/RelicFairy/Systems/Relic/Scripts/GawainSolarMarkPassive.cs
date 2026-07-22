@@ -17,6 +17,10 @@ public sealed class GawainSolarMarkPassive : CharacterPassiveBase
     public override bool CanApply(PlayerController ctrl, in PassiveContext ctx)
         => ctx.target != null && ctx.damage > 0f && ctrl.RelicBehavior is GawainZenithRelic;
 
+    // CanApply는 매 타 통과하지만 실제 발동은 각인이 적립된 첫 타 1회뿐 —
+    // 자동 토스트를 그대로 두면 발동하지 않은 타격마다 "태양의 각인"이 떠서 거짓 표시가 된다.
+    public override bool SuppressAutoToast => true;
+
     public override void Apply(PlayerController ctrl, in PassiveContext ctx)
     {
         if (ctrl.RelicBehavior is not GawainZenithRelic gz) return;
@@ -28,5 +32,8 @@ public sealed class GawainSolarMarkPassive : CharacterPassiveBase
 
         if (ctx.target.TryGetComponent<IDamageable>(out var d))
             d.TakeDamage(bonus, ctrl.gameObject, 0f);
+
+        // 실제로 각인이 소비된 이 순간에만 표시(자동 토스트는 SuppressAutoToast로 꺼둠).
+        GuidelineVisual.Toast(ctrl.transform.position + Vector3.up * 2.4f, PassiveName, GuidelineVisual.ToastKind.Relic);
     }
 }

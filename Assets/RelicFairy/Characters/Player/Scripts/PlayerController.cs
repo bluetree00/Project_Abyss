@@ -274,10 +274,21 @@ public class PlayerController : CharacterBase
     /// </summary>
     public void SetInputEnabled(bool enabled)
     {
+        // 컷신이 inputActions 생성(비동기 초기화) 전에 차단을 걸 수 있다.
+        // 의도를 플래그로 남겨두지 않으면 InitInputActions()의 Enable()이 차단을 덮어써 조작이 되살아난다.
+        _inputDisabledExternally = !enabled;
+
+        // 입력을 끊으면 moveDirection 갱신도 멈춘다 → 마지막 입력값이 그대로 남아
+        // 컷신 내내 달리는 자세로 이동한다. 차단 시 즉시 0으로 비운다.
+        if (!enabled) moveDirection = Vector3.zero;
+
         if (inputActions == null) return;
         if (enabled) inputActions.Player.Enable();
         else         inputActions.Player.Disable();
     }
+
+    // 외부(컷신 등)가 요청한 입력 차단이 유효한지. InitInputActions()가 이 의도를 존중한다.
+    private bool _inputDisabledExternally;
 
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
@@ -757,9 +768,26 @@ public class PlayerController : CharacterBase
             if (p.Trigger == trigger && p.CanApply(this, ctx))
             {
                 p.Apply(this, ctx);
-                // [가이드라인 비주얼] 유물/캐릭터 패시브 발동 토스트(통지만)
+                // [가이드라인 비주얼] 유물/캐릭터 패시브 발동 토스트(통지만).
+                // OnAttackHit 패시브가 4종이라 매 타 4줄이 쏟아져 화면을 덮었다 → 이름별 스로틀.
+                // (CovenantHandler.ProcToast와 같은 패턴)
+                if (p is CharacterPassiveBase cb && cb.SuppressAutoToast) continue;
+                if (!PassiveToastReady(p.PassiveName)) continue;
                 GuidelineVisual.Toast(transform.position + Vector3.up * 2.4f, p.PassiveName, GuidelineVisual.ToastKind.Relic);
             }
+    }
+
+    // 패시브명별 토스트 스로틀 — 같은 패시브는 이 간격 안에 1회만 표시.
+    private const float PassiveToastInterval = 2f;
+    private readonly Dictionary<string, float> _passiveToastAt = new();
+
+    private bool PassiveToastReady(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        float now = UnityEngine.Time.unscaledTime;   // 토스트는 unscaled 수명이라 동일 기준
+        if (_passiveToastAt.TryGetValue(name, out float last) && now - last < PassiveToastInterval) return false;
+        _passiveToastAt[name] = now;
+        return true;
     }
 
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>
@@ -856,6 +884,50 @@ public class PlayerController : CharacterBase
 
     /// <summary>캐릭터 고유 스킬의 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
     public virtual float GetCharacterSkillCooldown(SkillType slot) => RelicBehavior?.GetSkillCooldown(slot) ?? 0f;
+
+    /// <summary>
+    /// 해당 슬롯에 실제 발동 가능한 스킬이 있는가. <see cref="ActSkillState"/>의 해석 순서와 동일하게
+    /// 유물(캐릭터) 런타임 → 무기 슬롯 순으로 확인한다.
+    /// 빈 슬롯 입력이 스킬 상태로 진입해 진행 중인 모션만 끊는 것을 막고, HUD 잠금 표시의 근거로도 쓴다.
+    /// </summary>
+    public bool HasSkillInSlot(SkillType slot)
+    {
+        // 유물 제공 스킬(주로 Q) — 런타임이 만들어지면 보유로 본다.
+        if (CreateCharacterSkillRuntime(slot) != null) return true;
+
+        // 장비(무기) 제공 스킬 — ActSkillState.GetSkillSO와 동일 매핑(R은 skillQ를 쓴다).
+        var wd = WeaponManager?.CurrentWeaponData;
+        return slot switch
+        {
+            SkillType.E => wd?.skillE != null,
+            SkillType.R => wd?.skillQ != null,
+            _           => false,
+        };
+    }
+
+    /// <summary>
+    /// 유물 게이트가 열려 있는가(가웨인 정오 구간 등). <see cref="ActSkillStateBase"/>의 게이팅과 동일 조건 —
+    /// <b>유물이 소유한 슬롯</b>에만 적용하고, 무기 스킬 슬롯은 항상 열린 것으로 본다.
+    /// 쿨다운은 포함하지 않는다(쿨다운은 HUD에 별도 연출이 있다).
+    /// </summary>
+    public bool IsSkillGateOpen(SkillType slot)
+    {
+        if (RelicBehavior == null) return true;
+        if (CreateCharacterSkillRuntime(slot) == null) return true;   // 유물 미소유 슬롯 → 게이팅 대상 아님
+        return RelicBehavior.CanUseSkill(slot);
+    }
+
+    /// <summary>
+    /// 지금 당장 발동 가능한가 = 보유 + 유물 게이트 + 쿨다운.
+    /// 입력 단계에서 이걸로 막지 않으면 스킬 상태에 <b>진입했다가 되돌아 나오면서</b>
+    /// 진행 중이던 공격 모션만 끊긴다(ActSkillStateBase가 OnEnter에서 되돌리는 구조).
+    /// </summary>
+    public bool CanUseSkillNow(SkillType slot)
+    {
+        if (!HasSkillInSlot(slot)) return false;
+        if (!IsSkillGateOpen(slot)) return false;
+        return CooldownTracker == null || CooldownTracker.IsReady(slot);
+    }
 
     //============================================================
     // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
@@ -1003,7 +1075,9 @@ public class PlayerController : CharacterBase
     }
 
     [Header("포션")]
-    [SerializeField] private KeyCode potionKey = KeyCode.H;   // 퀵슬롯 포션 사용 키(자유 키)
+    // WASD에 손을 얹은 채 검지/중지가 한 칸 아래로 바로 닿는 자리.
+    // (Q·E·R=스킬, 1·2=무기교체, F=상호작용, Space/Shift=점프/달리기로 이미 점유)
+    [SerializeField] private KeyCode potionKey = KeyCode.C;
 
     protected override void Update()
     {
@@ -1370,6 +1444,8 @@ public class PlayerController : CharacterBase
         }
         inputActions = new PlayerInputActions();
         inputActions.Enable();
+        // 초기화 이전에 컷신이 걸어둔 차단을 존중한다(이게 없으면 컷신 중 조작이 되살아난다).
+        if (_inputDisabledExternally) inputActions.Player.Disable();
         inputReady = true;
     }
 
@@ -1507,20 +1583,22 @@ public class PlayerController : CharacterBase
         bool isDodging = locoSM.CurrentId == LocoState.Dodge;
         bool isInAct   = actSM.CurrentId != ActState.None || isDodging;
 
+        // 빈 슬롯(예: 무형검은 skillE/skillQ 모두 없음)으로 전환하면 스킬 없는 상태에 들어가
+        // 진행 중이던 공격 모션만 끊기고 아무것도 안 나간다 → HasSkillInSlot으로 입력 자체를 막는다.
         if (InputBuffer.TryConsume(Game.Inputs.Command.QSkill))
         {
             Debug.Log($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={actSM.CurrentId}");
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.QSkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.Q)) actSM.Change(ActState.QSkill);
             return;
         }
         if (InputBuffer.TryConsume(Game.Inputs.Command.ESkill))
         {
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.ESkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.E)) actSM.Change(ActState.ESkill);
             return;
         }
         if (InputBuffer.TryConsume(Game.Inputs.Command.RSkill))
         {
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.RSkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.R)) actSM.Change(ActState.RSkill);
             return;
         }
 
@@ -1650,13 +1728,22 @@ public class PlayerController : CharacterBase
         if (newWeapon == null)
         {
             RuntimeStats.SetWeaponStats(0, 0, 0);
+            RuntimeStats.SetWeaponMastery(0f, 0f);
             return;
         }
 
         var kind = newWeapon.weaponType.GetAttackStatKind();
-        int melee  = kind == AttackStatKind.Melee  ? (int)newWeapon.baseAttack : 0;
-        int ranged = kind == AttackStatKind.Ranged ? (int)newWeapon.baseAttack : 0;
-        RuntimeStats.SetWeaponStats(melee, ranged, (int)newWeapon.baseDefense);
+        // 절삭하지 않고 소수 그대로 넘긴다 — 강화 배율이 여기서 잘리면 강화가 공격력에 안 닿는다.
+        float melee  = kind == AttackStatKind.Melee  ? newWeapon.baseAttack : 0f;
+        float ranged = kind == AttackStatKind.Ranged ? newWeapon.baseAttack : 0f;
+        RuntimeStats.SetWeaponStats(melee, ranged, newWeapon.baseDefense);
+
+        // 진화 후 추가 강화 구간(마스터리) → 스킬 확장. 테이블 미로드면 0(무보정).
+        var table   = WeaponEnhanceService.Table;
+        int mastery = WeaponEnhanceService.MasteryLevel(newWeapon, table);
+        RuntimeStats.SetWeaponMastery(
+            table != null ? table.MasterySkillDamage(mastery) : 0f,
+            table != null ? table.MasterySkillCdr(mastery)    : 0f);
     }
 
     /// <summary>강화/승급으로 장착 무기 스탯만 갱신됐을 때 — 교체 없이 데미지 스탯만 재적용.</summary>

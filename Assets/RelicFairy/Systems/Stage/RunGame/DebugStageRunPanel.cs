@@ -213,8 +213,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         GUI.color = new Color(1f, 0.85f, 0.4f, 1f);
         if (GUI.Button(new Rect(bx, by, bw, bh), "재련소 테스트"))
             OpenCrucibleTestAsync().Forget();
-        if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소(룬판) 테스트"))
-            OpenRefineryTest();
+        if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소 테스트"))
+            OpenRefineryTestAsync().Forget();
         GUI.color = prev;
     }
 
@@ -242,12 +242,22 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         panel.Bind(_testCrucible);
     }
 
-    /// <summary>테스트용 정제소 — 전용 UI 미구현이라 룬판(기본 정제 surface)을 토글로 대체 오픈.</summary>
-    private static void OpenRefineryTest()
+    /// <summary>테스트용 정제소 — 실제 정제소 패널(UI_RefineryPanel)을 연다. 원석이 부족하면 테스트용으로 20 지급.</summary>
+    private async UniTaskVoid OpenRefineryTestAsync()
     {
-        var panel = UI_GridPanel.Instance;
-        if (panel == null) { Debug.LogWarning("[DebugTest] 정제소 — 룬판(UI_GridPanel) 인스턴스 없음"); return; }
-        if (panel.IsOpen) panel.Close(); else panel.Open();
+        var run = GetCurrentRun();
+        if (run == null || !run.IsRunning)
+        {
+            Debug.LogWarning("[DebugTest] 정제소 — 진행 중인 런이 없습니다(먼저 런 시작).");
+            return;
+        }
+
+        // 테스트 편의: 돌릴 원석이 없으면 조금 지급
+        if (run.FuelBank != null && run.FuelBank.RuneOre < 8)
+            run.FuelBank.Add(FuelKind.RuneOre, 20);
+
+        var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_RefineryPanel>();
+        if (panel == null) Debug.LogWarning("[DebugTest] UI_RefineryPanel 로드 실패");
     }
 
     /// <summary>

@@ -44,7 +44,15 @@ public static class WeaponEnhanceService
     // ── 조회 ─────────────────────────────────────────────────────────
 
     public static int MaxEnhance(WeaponData w, EnhanceTableSO t)
+        => (w == null || t == null) ? 0 : t.MaxFor(w.rarity, w.evolutionStage);
+
+    /// <summary>진화 이전 구간의 상한 — 여기까지가 "기본 강화", 그 위가 마스터리.</summary>
+    public static int BaseEnhanceCap(WeaponData w, EnhanceTableSO t)
         => (w == null || t == null) ? 0 : t.MaxFor(w.rarity);
+
+    /// <summary>진화 후 추가 구간에서 올린 단계 수(= 스킬 확장 단계). 미진화면 0.</summary>
+    public static int MasteryLevel(WeaponData w, EnhanceTableSO t)
+        => (w == null || t == null) ? 0 : t.MasteryLevel(w.rarity, w.evolutionStage, w.enhanceLevel);
 
     public static bool IsMaxed(WeaponData w, EnhanceTableSO t)
         => w != null && t != null && w.enhanceLevel >= MaxEnhance(w, t);

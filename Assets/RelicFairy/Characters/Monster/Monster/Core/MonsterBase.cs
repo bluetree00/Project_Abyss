@@ -799,7 +799,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// </summary>
     /// <param name="kind">데미지 숫자 색 구분용. DoT 틱은 Dot을 넘긴다(기본은 즉발 시너지).</param>
     public void TakeSynergyDamage(float amount, GameObject instigator, float defenseIgnore = 1f, bool isCrit = false,
-                                  DamageKind kind = DamageKind.Synergy)
+                                  DamageKind kind = DamageKind.Synergy, RuneElement? element = null)
     {
         if (_runtime == null || _runtime.IsDead || amount <= 0f) return;
 
@@ -809,11 +809,15 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
+        if (HpFloorMin1 && _runtime.CurrentHp < 1) _runtime.CurrentHp = 1; // [인트로] 이길 수 없는 연출: 처치 방지
 
-        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind);
+        DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID(), kind, element);
 
-        // [가이드라인 비주얼] 시너지 즉발/DoT 피해 표시(통지만 — 토글 OFF면 무동작)
-        GuidelineVisual.SynergyDamage(transform.position + Vector3.up * 1.2f, isCrit);
+        // [가이드라인 비주얼] 시너지 '즉발' 피해만 플래시. DoT는 제외 —
+        // 화상·독은 0.5~1초마다 틱이라 구체가 지속 내내 깜빡여 화면을 어지럽힌다.
+        // DoT는 데미지 숫자(속성색) + 속성 몸 이펙트로 이미 충분히 읽힌다.
+        if (kind != DamageKind.Dot)
+            GuidelineVisual.SynergyDamage(transform.position + Vector3.up * 1.2f, isCrit);
 
         int effMax = EffectiveMaxHp;
         _hpBar?.UpdateHP(_runtime.CurrentHp, effMax);
@@ -863,6 +867,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _status.ApplyCc("stun", duration);
     }
 
+    /// <summary>인트로 등 "이길 수 없는" 연출용 — true면 피해로 HP가 1 미만으로 떨어지지 않아 처치되지 않는다. 기본 false(무변화).</summary>
+    public bool HpFloorMin1 { get; set; }
+
     public virtual void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)
     {
         if (_runtime == null || _runtime.IsDead) return;
@@ -880,6 +887,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         float defense = _baseDefense * _defenseMulti;
         float actual = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
+        if (HpFloorMin1 && _runtime.CurrentHp < 1) _runtime.CurrentHp = 1; // [인트로] 이길 수 없는 연출: 처치 방지
 
         // 데미지 팝업 — 모든 데미지 소스에 일관 표시 (각 호출처에서 별도 호출 불필요)
         DamagePopupSpawner.Spawn(transform.position + Vector3.up * 1.2f, actual, isCrit, GetInstanceID());

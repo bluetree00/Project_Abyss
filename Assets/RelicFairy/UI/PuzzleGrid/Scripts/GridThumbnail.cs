@@ -193,16 +193,33 @@ public class GridThumbnail : MonoBehaviour, IPointerClickHandler
             Destroy(gridContainer.GetChild(i).gameObject);
     }
 
-    public static Color GetItemColor(string instanceId)
+    /// <summary>
+    /// 룬 <b>타입(itemId)</b> 고유색. 같은 룬은 언제 뽑아도 같은 색 → 플레이어가 색으로 룬을 식별해
+    /// 시너지·효과를 견주며 고민할 수 있다. (과거: instanceId 해시 → 뽑을 때마다 색이 바뀌어 식별 불가)
+    /// itemId 해시를 HSV 색상환에 매핑해 135종을 폭넓게 구분한다.
+    /// </summary>
+    public static Color GetItemColor(string itemId)
     {
-        if (string.IsNullOrEmpty(instanceId)) return SHAPE_PALETTE[0];
-        int hash = System.Math.Abs(instanceId.GetHashCode());
-        return SHAPE_PALETTE[hash % SHAPE_PALETTE.Length];
+        if (string.IsNullOrEmpty(itemId)) return SHAPE_PALETTE[0];
+
+        // 안정적 해시(문자열 GetHashCode는 런타임/플랫폼에 따라 달라질 수 있어 자체 FNV로 고정).
+        uint h = 2166136261u;
+        for (int i = 0; i < itemId.Length; i++) { h ^= itemId[i]; h *= 16777619u; }
+
+        float hue = (h % 360u) / 360f;
+        float sat = 0.62f + ((h >> 9) % 24u) / 100f;   // 0.62~0.85
+        float val = 0.82f + ((h >> 17) % 14u) / 100f;  // 0.82~0.95
+        var c = Color.HSVToRGB(hue, sat, val);
+        c.a = 0.92f;
+        return c;
     }
 
     private static Color ItemColor(RuntimeItemData item)
     {
-        return GetItemColor(item?.instanceId);
+        // 룬 색 = 랜덤 속성 색. 속성이 없으면(구 데이터) itemId 고유색으로 폴백.
+        if (item != null && !string.IsNullOrEmpty(item.element))
+            return ElementDef.IdColor(item.element, GetItemColor(item.itemId));
+        return GetItemColor(item?.itemId);
     }
 
     private static bool IsPlaceable(GridPatternData pattern, int row, int col)

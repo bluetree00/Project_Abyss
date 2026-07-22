@@ -169,4 +169,20 @@ public static class ShopUIStyle
         rt.sizeDelta = size;
         rt.anchoredPosition = pos;
     }
+
+    /// <summary>
+    /// 코드로 그린 색 박스에 디자이너 아트를 얹는다. <b>스프라이트가 없으면 아무것도 하지 않는다</b> —
+    /// 아트가 한 장도 없는 상태에서도 화면이 지금과 똑같이 보이는 것이 이 레이어의 계약이다.
+    ///
+    /// tint를 주면 회색조 아트에 색을 곱한다(속성색이 걸리는 요소: 존 타일·응축 시퀀스 등).
+    /// 주지 않으면 흰색 = 아트 그대로.
+    /// </summary>
+    public static void Skin(Image img, Sprite sprite, bool sliced = false, Color? tint = null)
+    {
+        if (img == null || sprite == null) return;
+
+        img.sprite = sprite;
+        img.type   = sliced ? Image.Type.Sliced : Image.Type.Simple;
+        img.color  = tint ?? Color.white;
+    }
 }

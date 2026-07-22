@@ -35,7 +35,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 12fd0b9c43bf23b458ba50c883cddd22
+  - m_GUID: a242f1191bb0dbf499fb08d5fe28394b
     m_Address: GreatswordESkill_T3
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -50,7 +50,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1ded6755ac20999408645f8a76b95ee2
+  - m_GUID: fdd766be120f6f04780298f62dce5940
     m_Address: GreatswordAirHeavy
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -65,7 +65,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 275bcd57e88f81f48bbff2be567c4fbc
+  - m_GUID: 4d124778c911ad243b9c38e4d82b2c5f
     m_Address: GreatswordGuardAccept
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -95,12 +95,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6be7ea595e5ec794790dbd4f2aeccb5b
+  - m_GUID: 60b4d355ddea6384bb6a30d889d08638
     m_Address: GreatswordAirPlunge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6f423919d9bd20746a6fd16321280f00
+  - m_GUID: 32257bd4adee44d47aa960eac5b2000b
     m_Address: GreatswordGuardLoop
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -120,7 +120,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8c2610a832de8244d81483c9e131ef31
+  - m_GUID: b2cc7c42fd87bce4d8e1c169c561e937
     m_Address: GreatswordGuardAttack
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -160,7 +160,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cea18b9bde235954a80961d090b435fd
+  - m_GUID: 12f3ca945177aff49ac41ed5d9a5109c
     m_Address: GreatswordAirLight_01
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -175,7 +175,7 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: dbca79f1daf54f748a17891e44ac0810
+  - m_GUID: 8aeb33eaa0e51934183e7d9b2fb74110
     m_Address: GreatswordAirLight_02
     m_ReadOnly: 0
     m_SerializedLabels: []

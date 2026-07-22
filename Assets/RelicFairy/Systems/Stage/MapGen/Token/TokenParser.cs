@@ -10,6 +10,10 @@ using UnityEngine;
 /// </summary>
 public static class TokenParser
 {
+    /// <summary>토큰 배치 기준 Y 오프셋(baseY 기준, 로컬). 바닥에 얹혀야 하는 장식은
+    /// 이 값이 아니라 팔레트의 실제 바닥 블록 윗면으로 스냅된다(DecorationHandler).</summary>
+    public const float TokenLocalYOffset = 0.5f;
+
     /// <summary>
     /// grid_csv 전체를 순회해 지정 phase에 등록된 핸들러가 있는 토큰만 Execute한다.
     /// </summary>
@@ -54,10 +58,13 @@ public static class TokenParser
                 var handler = TokenRegistry.Resolve(raw, phase);
                 if (handler == null) continue;
 
-                // 장식은 바닥 블록 위에 얹히므로 Y = baseY + 0.5f (블록 상단)
+                // 토큰 기준 Y = baseY + TokenLocalYOffset.
+                // ⚠️이 값은 '1m 큐브 바닥 블록의 상단'을 가정한 역사적 상수다. 실제 바닥 블록은
+                //   Cube × scale.y(0.2)라 진짜 윗면은 baseY + 0.1 — 바닥에 얹혀야 하는 장식은
+                //   DecorationHandler가 팔레트에서 실제 윗면을 계산해 스냅한다(ResolveFloorTopY).
                 var localPos = new Vector3(
                     x * cs - offset.x,
-                    baseY + 0.5f,
+                    baseY + TokenLocalYOffset,
                     rowZ * cs - offset.z);
 
                 baseCtx.RawToken = raw;

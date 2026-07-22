@@ -64,6 +64,7 @@ public sealed class UI_GridPanel : UI_Base
     private Button  _backButton;
     private Button  _resetButton;
     private Button  _confirmButton;
+    private Button  _refineryButton;   // 정제소 상시 진입
 
     // ── Private: Footer ──
     private TMP_Text _footerActiveSynText;
@@ -148,6 +149,7 @@ public sealed class UI_GridPanel : UI_Base
         if (MerlinRuneBridge.Instance != null)
         {
             MerlinRuneBridge.Instance.OnSynergyActivated    += ShowSynergyActivated;
+            MerlinRuneBridge.Instance.OnZoneSynergyBurst    += HandleZoneSynergyBurst;
             MerlinRuneBridge.Instance.OnCenterBonusActivated += HandleCenterBonusActivated;
         }
 
@@ -165,6 +167,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_resetButton   != null) _resetButton.onClick.AddListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.AddListener(OnConfirmClicked);
         if (_placeButton   != null) _placeButton.onClick.AddListener(OnPlaceClicked);
+        if (_refineryButton != null) _refineryButton.onClick.AddListener(OnRefineryClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
@@ -184,6 +187,7 @@ public sealed class UI_GridPanel : UI_Base
         if (MerlinRuneBridge.Instance != null)
         {
             MerlinRuneBridge.Instance.OnSynergyActivated    -= ShowSynergyActivated;
+            MerlinRuneBridge.Instance.OnZoneSynergyBurst    -= HandleZoneSynergyBurst;
             MerlinRuneBridge.Instance.OnCenterBonusActivated -= HandleCenterBonusActivated;
         }
 
@@ -203,6 +207,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_resetButton   != null) _resetButton.onClick.RemoveListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.RemoveListener(OnConfirmClicked);
         if (_placeButton   != null) _placeButton.onClick.RemoveListener(OnPlaceClicked);
+        if (_refineryButton != null) _refineryButton.onClick.RemoveListener(OnRefineryClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
@@ -278,6 +283,9 @@ public sealed class UI_GridPanel : UI_Base
             // 초기 점유 상태 반영 (재오픈 시 이전 배치 복원)
             _hexGridView.RefreshOccupiedCells();
             _hexGridView.UpdateAdjacencyConstraints();
+
+            // 배치할 룬이 있으면 그 속성의 매칭 존을 판에서 강조(어디 놓으면 시너지인지 안내).
+            _hexGridView.SetPlacementElementHint(_pendingNewItem?.element ?? _pendingAddItem?.element);
         }
 
         run?.EnterGridSynergy();
@@ -388,6 +396,15 @@ public sealed class UI_GridPanel : UI_Base
         resetRT.pivot           = new Vector2(1f, 0.5f);
         resetRT.anchoredPosition = new Vector2(-110f, 0f);
 
+        // [정제소] 상시 접근 — 판을 보다가 바로 특수 룬을 벼릴 수 있어야 한다(설계 §2.7 "방이 아니라 상시").
+        _refineryButton = MakeButton(headerGO.transform, "RefineryBtn",
+            new Vector2(1f, 0f), new Vector2(1f, 1f),
+            new Vector2(104f, -14f), new Vector2(-216f, 0f),
+            new Color(0.42f, 0.30f, 0.14f, 0.95f), "◆ 정제소");
+        var refineRT = _refineryButton.GetComponent<RectTransform>();
+        refineRT.pivot            = new Vector2(1f, 0.5f);
+        refineRT.anchoredPosition = new Vector2(-206f, 0f);
+
         // [완료 ✓] 버튼 (우측 끝)
         _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
             new Vector2(1f, 0f), new Vector2(1f, 1f),
@@ -458,7 +475,10 @@ public sealed class UI_GridPanel : UI_Base
 
         var hexBG = hexRootGO.AddComponent<Image>();
         hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
-        SkinImage(hexBG, _boardSprite, fill: false);   // 속성판(종횡비 보존 — 그리드 셀 정렬은 후속 조정)
+        // 판 배경(자연바탕). 격자 정렬을 강제하는 그림이 아니라 배경 텍스처라 패널을 꽉 채운다.
+        // 그 위에 놓이는 속성 타일이 묻히지 않도록 살짝 어둡게 틴트한다.
+        SkinImage(hexBG, _boardSprite, fill: true);
+        if (_boardSprite != null) hexBG.color = new Color(0.62f, 0.66f, 0.72f, 1f);
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
         _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
@@ -888,6 +908,12 @@ public sealed class UI_GridPanel : UI_Base
         ShowSynergyToastAsync(description).Forget();
     }
 
+    /// <summary>시너지 단계 달성 → 판(뷰)이 해당 속성 존을 터뜨리는 연출. 브릿지 이벤트 포워딩(뷰 생명주기 무관하게 안전).</summary>
+    private void HandleZoneSynergyBurst(string zoneId)
+    {
+        _hexGridView?.PlayZoneSynergyBurst(zoneId);
+    }
+
     private async UniTaskVoid ShowSynergyToastAsync(string description)
     {
         _toastCts?.Cancel();
@@ -978,6 +1004,9 @@ public sealed class UI_GridPanel : UI_Base
         _itemInfoPanel?.ShowItem(item, isNew: false);
         _totalPlacedCells += GetItemCellCount(item);
         UpdateHexGridHint();
+
+        // 룬을 놓았으면 속성 매칭 강조는 역할을 다했으므로 해제한다.
+        _hexGridView?.SetPlacementElementHint(null);
 
         if (_hexGridView != null)
         {
@@ -1152,6 +1181,19 @@ public sealed class UI_GridPanel : UI_Base
     private void OnBackClicked()
     {
         ClosePanel();
+    }
+
+    /// <summary>정제소 열기 — 판을 보다가 바로 특수 룬(존핵)을 벼린다. 만든 룬은 보관함으로 들어가 이 판에 배치된다.</summary>
+    private void OnRefineryClicked() => OpenRefineryAsync().Forget();
+
+    private async UniTaskVoid OpenRefineryAsync()
+    {
+        try
+        {
+            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_RefineryPanel>();
+            if (panel == null) Debug.LogWarning("[UI_GridPanel] UI_RefineryPanel 로드 실패");
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     private void OnResetClicked()
