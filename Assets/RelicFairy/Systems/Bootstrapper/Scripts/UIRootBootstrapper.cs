@@ -56,7 +56,31 @@ public sealed class UIRootBootstrapper : MonoBehaviour
 
     /// <summary>스타트 방 구간(대화·위스프) 동안 HUD를 숨긴다. false로 복원하면 즉시 표시.</summary>
     public void SetHudStartRoomSuppressed(bool suppress)
-        => hudBootstrapper?.SetStartRoomSuppressed(suppress);
+    {
+        // Awake에서 참조를 못 잡았을 수 있다(HUD가 나중에 활성/생성되는 경우).
+        // 여기서 다시 찾지 않으면 ?. 가 억제 요청을 통째로 삼켜, 전투 전인데 HUD가 그대로 뜬다.
+        EnsureHudBootstrapper();
+        if (hudBootstrapper == null)
+        {
+            Debug.LogWarning("[UIRoot] HudBootstrapper 없음 — HUD 억제 요청이 무시됐다.");
+            return;
+        }
+        hudBootstrapper.SetStartRoomSuppressed(suppress);
+    }
+
+    /// <summary>HUD를 페이드로 표시(전투 진입 연출).</summary>
+    public Cysharp.Threading.Tasks.UniTask FadeInHudAsync(float duration)
+    {
+        EnsureHudBootstrapper();
+        return hudBootstrapper != null ? hudBootstrapper.FadeInStartRoomAsync(duration)
+                                       : Cysharp.Threading.Tasks.UniTask.CompletedTask;
+    }
+
+    private void EnsureHudBootstrapper()
+    {
+        if (hudBootstrapper == null)
+            hudBootstrapper = GetComponentInChildren<HudBootstrapper>(true);
+    }
 
     public MinimapView GetMinimapView() => hudBootstrapper?.MinimapView;
 

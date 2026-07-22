@@ -11,6 +11,8 @@ using UnityEngine;
 public sealed class DialogueZoneTrigger : MonoBehaviour
 {
     [Header("대사")]
+    [Tooltip("설정 시 DIALOGUE_DATA.csv의 이 시퀀스를 우선 재생(구간별 시나리오 대사). 비어 있으면 아래 SO 사용.")]
+    [SerializeField] private string csvSequenceId;
     [SerializeField] private DialogueSequenceSO dialogue;
     [SerializeField] private bool blockPlayerInput = true;
     [SerializeField] private bool triggerOnce = true;
@@ -40,9 +42,24 @@ public sealed class DialogueZoneTrigger : MonoBehaviour
         {
             if (blockPlayerInput) player.SetInputEnabled(false);
 
+            // CSV(DIALOGUE_DATA) 우선 — 구간별 시나리오 대사. 미설정 시 SO 폴백.
+            DialogueLine[] csvLines = null;
+            if (!string.IsNullOrEmpty(csvSequenceId))
+            {
+                var dlg = Managers.DialogueData;
+                if (dlg != null)
+                {
+                    if (!dlg.IsInitialized) await dlg.InitializeAsync();
+                    csvLines = dlg.GetLines(csvSequenceId);
+                }
+            }
+
             var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
-            if (popup != null && dialogue != null)
-                await popup.ShowAsync(dialogue);
+            if (popup != null)
+            {
+                if (csvLines != null && csvLines.Length > 0) await popup.ShowAsync(csvLines);
+                else if (dialogue != null)                   await popup.ShowAsync(dialogue);
+            }
         }
         catch (OperationCanceledException) { }
         finally

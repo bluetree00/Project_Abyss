@@ -48,10 +48,10 @@ public static class DamagePopupSpawner
     /// kind: 피해 출처 — 색으로 구분된다(일반/시너지/DoT).
     /// </summary>
     public static void Spawn(Vector3 worldPos, float damage, bool isCrit = false, int targetId = 0,
-                             DamageKind kind = DamageKind.Normal)
+                             DamageKind kind = DamageKind.Normal, RuneElement? element = null)
     {
         if (damage <= 0f) return;
-        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind).Forget();
+        SpawnAsync(worldPos, damage, isCrit, NextCascadeIndex(targetId), kind, element).Forget();
     }
 
     /// <summary>대상별 연타 순번. 창(CascadeWindow) 안에 다시 맞으면 +1, 지나면 0으로 리셋.</summary>
@@ -70,7 +70,7 @@ public static class DamagePopupSpawner
     }
 
     private static async UniTaskVoid SpawnAsync(Vector3 worldPos, float damage, bool isCrit, int cascadeIndex,
-                                                DamageKind kind)
+                                                DamageKind kind, RuneElement? element)
     {
         await EnsurePrefabAsync();
         if (_prefab == null) return;
@@ -78,7 +78,7 @@ public static class DamagePopupSpawner
         var popup = GetFromPool();
         if (popup == null) return;
 
-        popup.Show(worldPos, damage, isCrit, kind, cascadeIndex);
+        popup.Show(worldPos, damage, isCrit, kind, cascadeIndex, element);
     }
 
     private static async UniTask EnsurePrefabAsync()

@@ -35,6 +35,51 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 165130b8a71020641b870cab32d18c5e
+    m_Address: Nameless_GroundLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b285d65889a8c414784007cbd6eb7bcc
+    m_Address: Nameless_GroundLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4263221de5102548a26722e06080ab4
+    m_Address: Nameless_GroundLight_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 679a031c10fa6e74c89b97a739405d0b
+    m_Address: Nameless_GroundHeavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf73bdf8395ba6b439fc8aa1723feddc
+    m_Address: Nameless_AirLight_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 90fe648682d1f4046906ba56a20a3042
+    m_Address: Nameless_AirLight_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1a3bb0c5a9a6a0b45b28cf9676820de1
+    m_Address: Nameless_AirLight_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87e6801dab4ba7548860abbec171eb70
+    m_Address: Nameless_AirPlunge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d0b40337e2a96b943a8cf513ff2c4ff7
+    m_Address: NamelessSlash
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:

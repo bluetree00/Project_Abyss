@@ -7,6 +7,14 @@ using UnityEngine;
 /// </summary>
 public class MapBuilder
 {
+    // ── 출구 조명 위계 (웨이파인딩) ──────────────────────────────
+    // 출구를 '더 중요해 보이는 조명'으로 승격해 밝기 대비로 경로를 읽히게 한다.
+    // 근거: R. Yang, "How to Light a Level"(GDC 2018) — 출구가 여럿이면 균일이 아니라
+    //       중요도에 따라 다르게 밝힌다. 값은 인게임에서 튜닝.
+    private const float DoorLightIntensityMul = 1.6f;
+    private const float DoorLightRangeMul     = 1.35f;
+    private const int   DoorLightsPerDoor     = 2;
+
     /// <summary>생성된 블록 정보.</summary>
     public struct PlacedBlock
     {
@@ -385,13 +393,20 @@ public class MapBuilder
     /// </summary>
     /// <param name="spacing">몇 칸마다 조명 1개를 배치할지 (낮을수록 조밀).</param>
     /// <param name="heightRatio">벽 높이 중 어느 위치에 배치할지 (0=하단, 1=상단). 0.4 권장.</param>
+    /// <param name="doorCells">
+    /// 문(입구/출구) 셀. 넘기면 <b>출구 주변을 최우선으로</b> 밝히고 조명을 승격(강도·범위 증폭)한다.
+    /// 근거: 레벨 조명의 1차 역할은 웨이파인딩이며, 출구가 여럿이면 균일하게가 아니라
+    /// 중요도에 따라 다르게 밝혀야 한다(R. Yang, "How to Light a Level", GDC 2018).
+    /// 균일 배치만 하면 "밝은 곳이 갈 곳"이라는 신호가 성립하지 않는다.
+    /// </param>
     public static void BuildRoomLights(
         TileType[,]        grid,
         Transform          parent,
         float              cellSize,
         float              baseY,
         int                wallLayers,
-        RoomLightingConfig cfg)
+        RoomLightingConfig cfg,
+        IReadOnlyCollection<Vector2Int> doorCells = null)
     {
         if (cfg == null || (cfg.wallLightPrefab == null && cfg.centerLightPrefab == null)) return;
 
@@ -406,45 +421,102 @@ public class MapBuilder
 
         int counter = 0;
         int placed  = 0;
+        var lit     = new HashSet<Vector2Int>();   // 이미 조명이 붙은 벽 셀
+
+        // 벽 셀 (x,z)가 방 안쪽(Floor)을 향하는지 판정하고 그 방향을 돌려준다.
+        bool TryInward(int x, int z, out Vector3 inwardDir)
+        {
+            inwardDir = Vector3.zero;
+            if (x < 0 || x >= w || z < 0 || z >= h) return false;
+            if (grid[x, z] != TileType.Wall) return false;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = x + dx[d], nz = z + dz[d];
+                if (nx < 0 || nx >= w || nz < 0 || nz >= h) continue;
+                var t = grid[nx, nz];
+                if (t != TileType.Wall && t != TileType.Empty)
+                {
+                    inwardDir = new Vector3(dx[d], 0f, dz[d]);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 벽 조명 1개 배치. boost=true면 출구 조명으로 승격(강도·범위 증폭).
+        void PlaceWallLight(int x, int z, Vector3 inwardDir, bool boost)
+        {
+            var wallLocal  = new Vector3(x * cellSize - offset.x, lightY, z * cellSize - offset.z);
+            var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
+            var go = Object.Instantiate(cfg.wallLightPrefab,
+                parent.TransformPoint(lightLocal), Quaternion.LookRotation(inwardDir), parent);
+
+            if (boost)
+            {
+                // 주 출구를 '더 중요해 보이는 조명'으로 — 밝기 위계로 경로를 읽히게 한다.
+                var lt = go.GetComponentInChildren<Light>();
+                if (lt != null)
+                {
+                    lt.intensity *= DoorLightIntensityMul;
+                    lt.range     *= DoorLightRangeMul;
+                }
+            }
+
+            lit.Add(new Vector2Int(x, z));
+            placed++;
+        }
 
         if (cfg.wallLightPrefab != null)
         {
+            // ── 패스 1: 출구 조명 (웨이파인딩 우선, 예산을 여기서 먼저 쓴다) ──
+            if (doorCells != null)
+            {
+                foreach (var door in doorCells)
+                {
+                    if (cfg.maxWallLights > 0 && placed >= cfg.maxWallLights) break;
+
+                    int found = 0;
+                    // 문 셀을 링(반경 1→2)으로 훑어 개구부 양옆 벽을 최대 2개 밝힌다.
+                    for (int r = 1; r <= 2 && found < DoorLightsPerDoor; r++)
+                    {
+                        for (int ox = -r; ox <= r && found < DoorLightsPerDoor; ox++)
+                        {
+                            for (int oz = -r; oz <= r && found < DoorLightsPerDoor; oz++)
+                            {
+                                if (Mathf.Abs(ox) != r && Mathf.Abs(oz) != r) continue; // 링 경계만
+                                int x = door.x + ox, z = door.y + oz;
+                                var cell = new Vector2Int(x, z);
+                                if (lit.Contains(cell)) continue;
+                                if (!TryInward(x, z, out var inward)) continue;
+                                if (cfg.maxWallLights > 0 && placed >= cfg.maxWallLights) break;
+
+                                PlaceWallLight(x, z, inward, boost: true);
+                                found++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 패스 2: 균일 채움 (남은 예산). 출구 조명 주변은 건너뛴다 ──
             for (int x = 0; x < w; x++)
             {
                 for (int z = 0; z < h; z++)
                 {
-                    if (grid[x, z] != TileType.Wall) continue;
-
-                    // Floor에 인접한 방향(안쪽) 탐색
-                    bool      hasInner  = false;
-                    Vector3   inwardDir = Vector3.zero;
-                    for (int d = 0; d < 4; d++)
-                    {
-                        int nx = x + dx[d], nz = z + dz[d];
-                        if (nx < 0 || nx >= w || nz < 0 || nz >= h) continue;
-                        var t = grid[nx, nz];
-                        if (t != TileType.Wall && t != TileType.Empty)
-                        {
-                            hasInner  = true;
-                            inwardDir = new Vector3(dx[d], 0f, dz[d]);
-                            break;
-                        }
-                    }
-
-                    if (!hasInner) continue;
-
+                    if (!TryInward(x, z, out var inwardDir)) continue;
                     if (counter++ % cfg.wallLightSpacing != 0) continue;
 
                     // 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.
                     if (cfg.maxWallLights > 0 && placed >= cfg.maxWallLights) continue;
 
-                    var wallLocal  = new Vector3(x * cellSize - offset.x, lightY, z * cellSize - offset.z);
-                    var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
-                    var worldPos   = parent.TransformPoint(lightLocal);
-                    var rot        = Quaternion.LookRotation(inwardDir);
+                    // 출구 조명과 뭉치지 않게 인접 셀 회피
+                    bool nearDoorLight = false;
+                    for (int ox = -1; ox <= 1 && !nearDoorLight; ox++)
+                        for (int oz = -1; oz <= 1; oz++)
+                            if (lit.Contains(new Vector2Int(x + ox, z + oz))) { nearDoorLight = true; break; }
+                    if (nearDoorLight) continue;
 
-                    Object.Instantiate(cfg.wallLightPrefab, worldPos, rot, parent);
-                    placed++;
+                    PlaceWallLight(x, z, inwardDir, boost: false);
                 }
             }
         }
@@ -530,16 +602,18 @@ public class MapBuilder
                     StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Corridor_W_{step}_{sign}", placed);
         }
 
-        // 끝막이 대신 — 복도 끝을 복도보다 넓은 '어두운 방'으로 열어, 통로가 다른 방으로 이어진 것처럼 보이게 한다.
-        // (조명은 넣지 않아 어둡게 남고, 카메라가 올라가도 맵이 끊긴 게 아니라 계속되는 인상을 준다)
+        // 끝막이 대신 — 복도 끝을 '다음 방'으로 열어, 통로가 실제 다른 방으로 이어진 것처럼 보이게 한다.
+        // 핵심 두 가지: (1) 방 규모로 넓고 깊게, (2) 천장을 덮지 않아(개방) 부감 카메라가 방 안을 들여다볼 수 있게.
+        // → 지붕 덮인 복도 터널이 '개방된 방'으로 이어지는 대비가 생겨, 덩어리가 아니라 실제 방으로 읽힌다.
         if (floorDef?.prefab != null && wallDef?.prefab != null)
         {
-            int chamberDepth = 5;              // 방 깊이(칸)
-            int chamberHalf  = half + 3;       // 방 반폭(복도 개구부보다 넓게)
+            // 다음 방과 비슷한 규모로 — 작으면 통로 끝이 '섬'처럼 보인다. 실제 방(폭 38~49)에 맞먹게 크게.
+            int chamberDepth = 20;             // 방 깊이(칸) — 실제 방 깊이급
+            int chamberHalf  = half + 17;      // 방 반폭 → 폭 약 2*(half+17)+1 ≈ 39칸(방 규모)
             int nearStep     = lengthCells + 1;
             int farStep      = lengthCells + chamberDepth;
-            var cRot = ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
 
+            // 바닥만 깔고 천장은 덮지 않는다(개방) — 본 방과 동일한 개방형이라 부감에서 '방'으로 보인다.
             for (int step = nearStep; step <= farStep; step++)
             {
                 Vector3 axis = openingCenterLocal + outward * (step * cellSize);
@@ -547,54 +621,33 @@ public class MapBuilder
                 {
                     Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
                     Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Chamber_F_{step}_{lat}", TileType.Floor, placed);
-                    if (doCeiling && ceilUse?.prefab != null)
-                    {
-                        Vector3 cl = fLocal; cl.y = ceilingY;
-                        Place(ceilUse, parent, cl, cRot, 3, $"Chamber_C_{step}_{lat}", TileType.Ceiling, placed);
-                    }
                 }
                 for (int sign = -1; sign <= 1; sign += 2)
                     StackWall(wallDef, parent, axis + lateral * (sign * (chamberHalf + 1) * cellSize), baseY, cellSize, wallReps, $"Chamber_W_{step}_{sign}", placed);
             }
-            // 근벽(어깨) — 복도 개구부(±half) 밖의 넓어진 부분을 막아 '방 입구 틀'을 만든다.
+            // 근벽(어깨) — 복도 개구부(±half) 밖의 넓어진 부분을 막아 '방 입구(문틀)'를 만든다.
             Vector3 nearAxis = openingCenterLocal + outward * (lengthCells * cellSize);
             for (int lat = half + 1; lat <= chamberHalf; lat++)
             {
                 StackWall(wallDef, parent, nearAxis + lateral * (lat * cellSize),  baseY, cellSize, wallReps, $"Chamber_ShR_{lat}", placed);
                 StackWall(wallDef, parent, nearAxis + lateral * (-lat * cellSize), baseY, cellSize, wallReps, $"Chamber_ShL_{lat}", placed);
             }
-            // 먼벽(방 끝) — 가운데에 통로 폭(±half)만큼 문틀 개구부를 남겨, 방이 더 깊은 어둠으로 '이어지는' 인상을 준다.
-            int     pocketDepth = 3;
-            int     farWallStep = farStep + 1;
-            Vector3 farAxis     = openingCenterLocal + outward * (farWallStep * cellSize);
+            // 먼벽(방 끝) — 완전히 막아 bounded 방으로 마감(void 차단).
+            Vector3 farAxis = openingCenterLocal + outward * ((farStep + 1) * cellSize);
             for (int lat = -(chamberHalf + 1); lat <= chamberHalf + 1; lat++)
-            {
-                if (Mathf.Abs(lat) <= half) continue; // 중앙 문틀 개구부 — 벽 생략
                 StackWall(wallDef, parent, farAxis + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Chamber_Cap_{lat}", placed);
-            }
-            // 개구부 너머 짧은 어둠 포켓 — void 대신 바닥/천장/벽으로 막아 '통로가 계속되는' 인상만 남긴다.
-            // 바닥은 문턱(farWallStep)부터 이어 붙여 개구부 아래 void 틈이 안 보이게 한다.
-            for (int step = farWallStep; step <= farWallStep + pocketDepth; step++)
+
+            // 내부 기둥 — 빈 슬래브가 아니라 '내용이 있는 방'으로 읽히게 스케일 기준을 준다.
+            // 깊어진 방에 맞춰 양옆 2열(안/바깥)을 깊이 방향 여러 지점에 세운다.
+            for (int row = 3; row <= chamberDepth - 2; row += 4)
             {
-                Vector3 axis = openingCenterLocal + outward * (step * cellSize);
-                for (int lat = -half; lat <= half; lat++)
+                Vector3 pAxis = openingCenterLocal + outward * ((nearStep + row) * cellSize);
+                foreach (int pl in new[] { chamberHalf - 2, half + 4 })
                 {
-                    Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
-                    Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Pocket_F_{step}_{lat}", TileType.Floor, placed);
-                    if (doCeiling && ceilUse?.prefab != null)
-                    {
-                        Vector3 cl = fLocal; cl.y = ceilingY;
-                        Place(ceilUse, parent, cl, cRot, 3, $"Pocket_C_{step}_{lat}", TileType.Ceiling, placed);
-                    }
+                    StackWall(wallDef, parent, pAxis + lateral * ( pl * cellSize), baseY, cellSize, wallReps, $"Chamber_Pillar_{row}_{pl}_R", placed);
+                    StackWall(wallDef, parent, pAxis + lateral * (-pl * cellSize), baseY, cellSize, wallReps, $"Chamber_Pillar_{row}_{pl}_L", placed);
                 }
-                if (step > farWallStep) // farWallStep 측벽은 먼벽 타일과 겹치므로 그 다음 칸부터
-                    for (int sign = -1; sign <= 1; sign += 2)
-                        StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Pocket_W_{step}_{sign}", placed);
             }
-            // 포켓 최종 끝막이(void 차단)
-            Vector3 pocketCap = openingCenterLocal + outward * ((farWallStep + pocketDepth + 1) * cellSize);
-            for (int lat = -(half + 1); lat <= half + 1; lat++)
-                StackWall(wallDef, parent, pocketCap + lateral * (lat * cellSize), baseY, cellSize, wallReps, $"Pocket_Cap_{lat}", placed);
         }
 
         return placed;

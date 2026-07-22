@@ -30,7 +30,7 @@ public sealed class PlayerRuntimeStats
     public float AllDamagePercent { get; private set; }
     /// <summary>스킬 전용 피해 % 보너스 합(정적 SkillDamage 아이템 + 동적 스킬피해).
     /// allDamage는 공격스탯(dmgMul)에 이미 반영돼 스킬 base에 들어가므로 제외 — 안 그러면 ColliderInstance에서 이중곱.</summary>
-    public float SkillDamageBonus => _itemSkillDamage + _itemDyn.skillDamage;
+    public float SkillDamageBonus => _itemSkillDamage + _itemDyn.skillDamage + _masterySkillDamage;
     public float DamageReduction { get; private set; }
     public float ItemLifesteal { get; private set; }
     // 시스템
@@ -72,11 +72,7 @@ public sealed class PlayerRuntimeStats
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
-        _basePoise  = data.basePoise > 0f ? data.basePoise : DefaultBasePoise;
-        _poiseBonus = 0f;
-
-        _baseStamina  = data.maxStamina > 0f ? data.maxStamina : DefaultBaseStamina;
-        _staminaBonus = 0f;
+        ApplyPoiseStaminaBase(data);
 
         _baseMelee  = Mathf.Max(0, data.baseMeleeAttack);
         _baseRanged = Mathf.Max(0, data.baseRangedAttack);
@@ -116,8 +112,27 @@ public sealed class PlayerRuntimeStats
         ApplyPassive(data.passive);   // Recalculate + OnChanged 포함
     }
 
-    /// <summary>서버 PlayerStatEntry 기반 초기화.</summary>
-    public void InitializeFromServer(PlayerStatEntry entry, System.Collections.Generic.List<PassiveEntry> passives = null)
+    /// <summary>
+    /// 포이즈/스태미너 베이스 설정 — SO/서버 두 초기화 경로가 공유한다.
+    /// CHARACTER_DATA CSV에 포이즈/스태미너 컬럼이 없어 서버 경로도 이 SO 값을 기준으로 삼는다
+    /// (컬럼이 생기면 여기 대신 entry에서 읽도록 교체). data가 없거나 값이 0 이하면 상수 기본치.
+    /// </summary>
+    private void ApplyPoiseStaminaBase(CharacterData data)
+    {
+        _basePoise = (data != null && data.basePoise > 0f) ? data.basePoise : DefaultBasePoise;
+        _poiseBonus = 0f;
+
+        _baseStamina = (data != null && data.maxStamina > 0f) ? data.maxStamina : DefaultBaseStamina;
+        _staminaBonus = 0f;
+    }
+
+    /// <summary>
+    /// 서버 PlayerStatEntry 기반 초기화.
+    /// poiseStaminaSource는 포이즈/스태미너 베이스를 읽어올 SO(CSV에 해당 컬럼이 없다).
+    /// null이면 상수 기본치 — SO 경로와 같은 값이 나온다.
+    /// </summary>
+    public void InitializeFromServer(PlayerStatEntry entry, System.Collections.Generic.List<PassiveEntry> passives = null,
+                                     CharacterData poiseStaminaSource = null)
     {
         if (entry == null)
         {
@@ -129,11 +144,7 @@ public sealed class PlayerRuntimeStats
         Hp = MaxHp;
         _maxHpItemContribution = 0;   // 베이스 재설정 — 아이템 MaxHp 기여 스냅샷 초기화
 
-        // CHARACTER_DATA CSV에 포이즈/스태미너 컬럼이 아직 없어 기본치 사용(추가 시 entry에서 읽도록 교체).
-        _basePoise    = DefaultBasePoise;
-        _poiseBonus   = 0f;
-        _baseStamina  = DefaultBaseStamina;
-        _staminaBonus = 0f;
+        ApplyPoiseStaminaBase(poiseStaminaSource);
 
         _baseMelee   = Mathf.Max(0, entry.base_melee_attack);
         _baseRanged  = Mathf.Max(0, entry.base_ranged_attack);
@@ -297,9 +308,11 @@ public sealed class PlayerRuntimeStats
     private float _passiveActiveItemCdr;
 
     // -- Weapon --
-    private int _weaponMelee;
-    private int _weaponRanged;
-    private int _weaponDefense;
+    // 무기 기여분만 float — 강화 배율(레벨당 +8%)이 소수로 실리므로 int로 받으면
+    // 절삭에 먹혀 강화 단계 절반이 최종 공격력을 못 움직인다(6 → 6.48 → 6).
+    private float _weaponMelee;
+    private float _weaponRanged;
+    private float _weaponDefense;
 
     // -- Item --
     private int _itemMelee;
@@ -315,6 +328,9 @@ public sealed class PlayerRuntimeStats
     private int   _maxHpItemContribution;
     private float _itemAllDamagePercent;
     private float _itemSkillDamage;        // 스킬 피해 % (acc.SkillDamagePercent). 소비처: SkillDamageBonus 프로퍼티
+    // 무기 마스터리(진화 후 추가 강화 구간) 기여분 — 소비처: SkillDamageBonus / SkillCooldownReduction
+    private float _masterySkillDamage;
+    private float _masterySkillCdr;
     private float _itemCritChance;         // 정적 치명타 확률 %포인트
     private float _itemCritDamage;         // 정적 치명타 피해 배율 가산
     private float _itemDefensePercent;     // 정적 방어력 %
@@ -443,11 +459,23 @@ public sealed class PlayerRuntimeStats
     // ── 무기 ─────────────────────────────────────────────────────────────────────
 
     /// <summary>무기 장착/해제 시 호출.</summary>
-    public void SetWeaponStats(int melee, int ranged, int defense)
+    public void SetWeaponStats(float melee, float ranged, float defense)
     {
-        _weaponMelee   = Mathf.Max(0, melee);
-        _weaponRanged  = Mathf.Max(0, ranged);
-        _weaponDefense = Mathf.Max(0, defense);
+        _weaponMelee   = Mathf.Max(0f, melee);
+        _weaponRanged  = Mathf.Max(0f, ranged);
+        _weaponDefense = Mathf.Max(0f, defense);
+        Recalculate();
+    }
+
+    /// <summary>
+    /// 무기 마스터리(진화 후 추가 강화 구간) 보상을 반영한다.
+    /// 강화가 진화에서 끝나지 않고 "쌓을수록 스킬이 커지는" 구간으로 이어지게 하는 소비처.
+    /// 장착 무기 1자루분만 유지되므로 대입(가산 아님) — 무기 교체/강화 시마다 덮어쓴다.
+    /// </summary>
+    public void SetWeaponMastery(float skillDamage, float skillCdr)
+    {
+        _masterySkillDamage = Mathf.Max(0f, skillDamage);
+        _masterySkillCdr    = Mathf.Max(0f, skillCdr);
         Recalculate();
     }
 
@@ -874,9 +902,10 @@ public sealed class PlayerRuntimeStats
         float defMul  = (1f + _itemAllStatsPercent + _itemDefensePercent + _itemDyn.defensePercent) * _characterDefenseMult;
         float luckMul = 1f + _itemAllStatsPercent;
 
-        int baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee   + _awakeningMelee  + _relicMelee  ;
-        int baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _awakeningRanged + _relicRanged ;
-        int baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _awakeningDefense + _relicDefense;
+        // 무기 기여분이 소수라 합도 float — 반올림은 마지막 한 번만 한다(단계별 절삭 누락 방지).
+        float baseMeleeSum  = _baseMelee  + _passiveMelee  + _weaponMelee  + _itemMelee  + _roomMelee  + _covenantMelee   + _awakeningMelee  + _relicMelee  ;
+        float baseRangedSum = _baseRanged + _passiveRanged + _weaponRanged + _itemRanged + _roomRanged + _covenantRanged + _awakeningRanged + _relicRanged ;
+        float baseDefSum    = _baseDefense + _passiveDefense + _weaponDefense + _itemDefense + _roomDefense + _covenantDefense + _awakeningDefense + _relicDefense;
         int baseLuckSum   = _baseLuck + _passiveLuck + _itemLuck + _awakeningLuck + _relicLuck;
 
         MeleeAttack  = Mathf.Max(0, Mathf.RoundToInt(baseMeleeSum * dmgMul));
@@ -904,7 +933,7 @@ public sealed class PlayerRuntimeStats
         AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
         BonusProjectile      = Mathf.Max(0, _roomProjectile);
-        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr);
+        SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
 
         // 확장 스탯 공개 프로퍼티 갱신

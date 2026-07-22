@@ -28,6 +28,7 @@ public class CrucibleRoomController : MonoBehaviour
     private GameRunSession _run;
     private EnhanceTableSO _table;
     private System.Random  _roomRng;
+    private System.Random  _dialogueRng = new();   // 대사 전용 — _roomRng(강화/잭팟 결정성 스트림)과 절대 공유 금지
 
     private GameObject _npcInstance;
     private ShopNpcInteraction _npc;
@@ -44,6 +45,9 @@ public class CrucibleRoomController : MonoBehaviour
     private bool _goldHooked;
 
     // ── Properties (UI가 읽음) ──────────────────────────────
+    /// <summary>이 재련소가 붙은 런 세션(진화·연료 조회용). UI가 참조한다.</summary>
+    public GameRunSession Run => _run;
+
     public EnhanceTableSO Table => _table;
     public int FuelAmount => _run?.FuelBank?.EnhanceMaterial ?? 0;
     public int Streak => _streak;
@@ -113,6 +117,11 @@ public class CrucibleRoomController : MonoBehaviour
 
         if (_table != null) WeaponEnhanceService.InstallTable(_table);
 
+        // 대사 스트림 분기 — 대사 롤이 _roomRng를 소비하면 BumpRoll에 안 잡혀 복원 시 스트림 위치가
+        // 어긋나고, 대사 호출이 플레이어 조작(슬롯 토글/호버)에 좌우돼 save-scum 통로가 된다.
+        // 분기 자체는 Initialize의 고정 위치에서 1회만 소비하므로 결정성은 그대로 유지된다.
+        _dialogueRng = new System.Random(_roomRng.Next());
+
         _event = RollEvent();   // 결정적 돌발 이벤트
 
         // ── save-scum 방지 ──
@@ -126,6 +135,7 @@ public class CrucibleRoomController : MonoBehaviour
 
         var (npcPos, npcRot) = ResolveNpcPlacement();
         SpawnNpc(npcPrefab, npcPos, npcRot);
+        SpawnDecor(npcPos, npcRot);   // 대장간 소품을 NPC 뒤/옆에 배치
         HookRunEvents();
 
         _initialized = true;
@@ -238,6 +248,46 @@ public class CrucibleRoomController : MonoBehaviour
 
     // ── NPC / UI ────────────────────────────────────────────
 
+    private GameObject[] _decorPrefabs;
+
+    /// <summary>Initialize 전에 호출 — NPC 주변에 배치할 방 소품(대장간 등) 프리팹 배열.</summary>
+    public void SetDecorPrefabs(GameObject[] prefabs) => _decorPrefabs = prefabs;
+
+    /// <summary>NPC 뒤쪽 반원에 소품을 배치해 '작업장' 무대를 만든다. 결정적(_roomRng).</summary>
+    private void SpawnDecor(Vector3 npcPos, Quaternion npcRot)
+    {
+        if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
+
+        Vector3 back  = npcRot * Vector3.back;   // NPC가 바라보는 반대(무대 안쪽)
+        Vector3 right = npcRot * Vector3.right;
+        int n = _decorPrefabs.Length;
+        for (int i = 0; i < n; i++)
+        {
+            var prefab = _decorPrefabs[i];
+            if (prefab == null) continue;
+
+            // NPC 뒤쪽 반원(-70°~+70°)에 반경 3.5m로 분산 배치
+            float t     = n > 1 ? (float)i / (n - 1) : 0.5f;
+            float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
+            float rad   = 3.5f + (float)_roomRng.NextDouble() * 1.2f;
+            Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
+            Vector3 pos = npcPos + dir * rad;
+            pos.y = npcPos.y - NpcStandHeight;   // 지면(NPC는 StandHeight만큼 떠 있음)
+
+            float yaw = Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg; // 소품이 NPC를 향하게
+            var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
+
+            // 바닥 스냅 — 피벗이 메시 중심인 Gothic 소품(잔해 등)이 뜨지 않게 렌더러 바운즈 최저점을 지면에 맞춘다.
+            var rends = go.GetComponentsInChildren<Renderer>();
+            if (rends.Length > 0)
+            {
+                var b = rends[0].bounds;
+                for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
+                go.transform.position += new Vector3(0f, pos.y - b.min.y, 0f);
+            }
+        }
+    }
+
     private void SpawnNpc(GameObject npcPrefab, Vector3 pos, Quaternion rot)
     {
         if (npcPrefab == null)
@@ -322,7 +372,7 @@ public class CrucibleRoomController : MonoBehaviour
             _                    => IdleLines,
         };
         if (pool == null || pool.Length == 0) return string.Empty;
-        return pool[_roomRng.Next(pool.Length)];
+        return pool[_dialogueRng.Next(pool.Length)];
     }
 
     private static readonly string[] IdleLines =

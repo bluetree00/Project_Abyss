@@ -25,7 +25,7 @@ public class PhantomSlashBehaviorSO : SkillBehaviorSO
     [Header("이펙트")]
     public string attackEffectKey = "SlashAttack";
     public float attackEffectScale = 1f;
-    public string hitEffectKey = "SwordHitImpact";
+    public string hitEffectKey = "BloodShot";
     public float hitEffectScale = 0.5f;
     public string finishEffectKey;
     public float finishEffectScale = 1f;

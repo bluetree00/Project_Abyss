@@ -12,6 +12,7 @@ public enum RoomPlanKind
     PreBoss,
     Boss,
     Crucible,   // 재련소(무기 강화/승급 + 도박) — 마일스톤 강제 전용
+    Refinery,   // 정제소(룬 지급/룬판) — 마일스톤 강제 전용
 }
 
 /// <summary>한 출구 문의 계획. 종류 + 선택된 방 템플릿(entry).</summary>
@@ -71,6 +72,9 @@ public class RunSequencer
     private int   _visitCount;
     private int   _shopUsed;
     private int   _eventUsed;
+    private int   _crucibleUsed;   // 챕터당 1 (마일스톤 강제 전용)
+    private int   _refineryUsed;   // 챕터당 1 (마일스톤 강제 전용)
+    private RoomPlanKind _lastCommittedKind = RoomPlanKind.Normal; // 직전 진입 방(같은 특수방 연속 방지)
 
     public int  VisitCount     => _visitCount;
     public bool InBossApproach => _phase != Phase.Normal;
@@ -158,15 +162,30 @@ public class RunSequencer
         // Boss/PreBoss는 BossThreshold 게이팅이 담당하므로 마일스톤 종류로 와도 무시(null 처리).
         RoomPlanKind? forced = _config?.GetMilestoneKind(_visitCount + 1);
         if (forced == RoomPlanKind.Boss || forced == RoomPlanKind.PreBoss) forced = null;
-        if (forced.HasValue) NoteForcedSpecial(forced.Value); // 상점/이벤트 캡 카운터에 반영(확률형과 합산)
+        // 챕터 캡을 넘는 마일스톤은 무시 — 캡이 우선(상점 등이 무제한으로 늘어나는 것 방지).
+        if (forced.HasValue && IsSpecialKind(forced.Value) && !CanUseSpecial(forced.Value)) forced = null;
+        if (forced.HasValue) NoteForcedSpecial(forced.Value); // 특수방 캡 카운터에 반영(확률형과 합산)
 
-        // 일반 페이즈 — 2슬롯(직진/턴). 특수방(상점/이벤트)은 한 문쌍 최대 1개.
-        // 마일스톤 강제 시 두 출구 모두 해당 종류로 확정(선택지가 아니라 보장된 배치).
+        // 일반 페이즈 — 2슬롯(직진/턴). 특수방(상점/이벤트/재련소/정제소)은 한 문쌍 최대 1개.
+        // 마일스톤 강제는 '문 하나'에만 적용한다 — 두 문을 같은 종류로 채우면
+        // "상점 | 상점"처럼 중복 선택지가 되어 고르는 의미가 사라진다.
         bool specialUsed = false;
         for (int i = 0; i < 2; i++)
         {
-            var kind = forced ?? RollKind(rng, ref specialUsed);
-            result.Add(MakeDoor(rng, kind));
+            RoomPlanKind kind;
+            if (forced.HasValue && i == 0)
+            {
+                kind = forced.Value;
+                if (IsSpecialKind(kind)) specialUsed = true;   // 나머지 문은 특수방 금지
+            }
+            else kind = RollKind(rng, ref specialUsed);
+
+            // 같은 특수 종류가 두 문에 겹치면 강등(중복 선택지 방지)
+            if (i > 0 && IsSpecialKind(kind) && result[0].kind == kind) kind = RoomPlanKind.Normal;
+
+            // 다른 문과 같은 방 템플릿도 배제
+            string exclude = i > 0 ? result[0].entry?.pool_key : null;
+            result.Add(MakeDoor(rng, kind, exclude));
         }
         return result;
     }
@@ -180,6 +199,8 @@ public class RunSequencer
         if (chosen.entry != null && !string.IsNullOrEmpty(chosen.entry.pool_key))
             _cooldowns[chosen.entry.pool_key] = CooldownFor(chosen.kind);
 
+        _lastCommittedKind = chosen.kind;   // 같은 특수방 연속 배치 방지용
+
         if (chosen.kind == RoomPlanKind.PreBoss) _phase = Phase.Boss;
         else if (chosen.kind == RoomPlanKind.Boss) _phase = Phase.Done;
     }
@@ -188,23 +209,40 @@ public class RunSequencer
 
     /// <summary>종류에 맞는 방 템플릿을 골라 DoorPlan을 만든다. 템플릿이 풀에 없으면 Normal로 안전 폴백
     /// (게이트가 빈 목적지를 가리켜 소프트락 나는 것을 방지). kind/entry를 함께 강등해 라벨·색도 일치.</summary>
-    private DoorPlan MakeDoor(System.Random rng, RoomPlanKind kind)
+    private DoorPlan MakeDoor(System.Random rng, RoomPlanKind kind, string excludeKey = null)
     {
-        var entry = PickEntry(rng, kind);
+        var entry = PickEntry(rng, kind, excludeKey);
         if (entry == null && kind != RoomPlanKind.Normal)
         {
             Debug.LogWarning($"[RunSequencer] '{kind}' 방 템플릿 없음 — Normal 폴백 (visit={_visitCount + 1}). 템플릿 추가 필요.");
             kind  = RoomPlanKind.Normal;
-            entry = PickEntry(rng, kind);
+            entry = PickEntry(rng, kind, excludeKey);
         }
         return new DoorPlan { kind = kind, entry = entry };
     }
 
-    /// <summary>강제(마일스톤) 상점/이벤트도 챕터 캡 카운터에 반영 — 확률형 추가 발생을 억제한다.</summary>
+    /// <summary>한 문쌍에 1개만 허용되는 특수방 종류(상점/이벤트/재련소/정제소).</summary>
+    private static bool IsSpecialKind(RoomPlanKind k) =>
+        k == RoomPlanKind.Shop || k == RoomPlanKind.Event ||
+        k == RoomPlanKind.Crucible || k == RoomPlanKind.Refinery;
+
+    /// <summary>챕터 캡 잔여 여부. 재련소/정제소는 챕터당 1개(마일스톤 강제 전용).</summary>
+    private bool CanUseSpecial(RoomPlanKind k) => k switch
+    {
+        RoomPlanKind.Shop     => _config == null || _shopUsed  < _config.ShopMaxPerChapter,
+        RoomPlanKind.Event    => _config == null || _eventUsed < _config.EventMaxPerChapter,
+        RoomPlanKind.Crucible => _crucibleUsed < 1,
+        RoomPlanKind.Refinery => _refineryUsed < 1,
+        _                     => true,
+    };
+
+    /// <summary>강제(마일스톤) 특수방도 챕터 캡 카운터에 반영 — 확률형 추가 발생을 억제한다.</summary>
     private void NoteForcedSpecial(RoomPlanKind kind)
     {
-        if (kind == RoomPlanKind.Shop)       _shopUsed++;
-        else if (kind == RoomPlanKind.Event) _eventUsed++;
+        if (kind == RoomPlanKind.Shop)          _shopUsed++;
+        else if (kind == RoomPlanKind.Event)    _eventUsed++;
+        else if (kind == RoomPlanKind.Crucible) _crucibleUsed++;
+        else if (kind == RoomPlanKind.Refinery) _refineryUsed++;
     }
 
     /// <summary>보스/보스전방 템플릿 해석: 지정 pool_key 우선, 비었거나 못 찾으면 카테고리 첫 항목으로 폴백.
@@ -219,11 +257,13 @@ public class RunSequencer
     {
         if (_config == null) return RoomPlanKind.Normal;
 
-        if (!specialUsed && _shopUsed < _config.ShopMaxPerChapter && Roll(rng, _config.ShopChance))
+        if (!specialUsed && CanRollRandomSpecial(RoomPlanKind.Shop, _shopUsed, _config.ShopMaxPerChapter)
+            && Roll(rng, _config.ShopChance))
         {
             _shopUsed++; specialUsed = true; return RoomPlanKind.Shop;
         }
-        if (!specialUsed && _eventUsed < _config.EventMaxPerChapter && Roll(rng, _config.EventChance))
+        if (!specialUsed && CanRollRandomSpecial(RoomPlanKind.Event, _eventUsed, _config.EventMaxPerChapter)
+            && Roll(rng, _config.EventChance))
         {
             _eventUsed++; specialUsed = true; return RoomPlanKind.Event;
         }
@@ -231,11 +271,39 @@ public class RunSequencer
         return RoomPlanKind.Normal;
     }
 
-    private ZonePoolEntry PickEntry(System.Random rng, RoomPlanKind kind)
+    /// <summary>확률형 특수방 허용 여부.
+    /// (1) 뒤에 올 <b>마일스톤 몫을 예약</b>해 캡을 미리 소진하지 않는다 — 설계된 배치가 사라지는 것 방지.
+    /// (2) <b>직전 방과 같은 특수 종류</b>면 거른다 — "상점 → 상점" 연속 방지.</summary>
+    private bool CanRollRandomSpecial(RoomPlanKind kind, int used, int max)
+    {
+        if (_lastCommittedKind == kind) return false;
+        return used + RemainingMilestones(kind) < max;
+    }
+
+    /// <summary>다음 방 이후(보스 게이팅 전)로 남아 있는 해당 종류 마일스톤 수.</summary>
+    private int RemainingMilestones(RoomPlanKind kind)
+    {
+        if (_config == null) return 0;
+        int last = Mathf.Max(_config.BossThreshold, _visitCount + 1);
+        int n = 0;
+        for (int v = _visitCount + 2; v <= last; v++)
+            if (_config.GetMilestoneKind(v) == kind) n++;
+        return n;
+    }
+
+    private ZonePoolEntry PickEntry(System.Random rng, RoomPlanKind kind, string excludeKey = null)
     {
         string category = CategoryName(kind);
         var byCategory = _pool.FindAll(p => string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase));
         if (byCategory.Count == 0) return null;
+
+        // 같은 문쌍의 다른 문과 동일 템플릿 배제(같은 방이 두 선택지로 뜨는 것 방지).
+        // 후보가 그것뿐이면 배제하지 않는다(선택지 소멸 방지).
+        if (!string.IsNullOrEmpty(excludeKey) && byCategory.Count > 1)
+        {
+            var deduped = byCategory.FindAll(p => !string.Equals(p.pool_key, excludeKey, StringComparison.OrdinalIgnoreCase));
+            if (deduped.Count > 0) byCategory = deduped;
+        }
 
         // 쿨다운 미적용 우선
         var available = byCategory.FindAll(p => !IsOnCooldown(p.pool_key));
@@ -264,6 +332,7 @@ public class RunSequencer
         RoomPlanKind.PreBoss => "PreBoss",
         RoomPlanKind.Boss    => "Boss",
         RoomPlanKind.Crucible => "Crucible",
+        RoomPlanKind.Refinery => "Refinery",
         _                    => "Normal",
     };
 

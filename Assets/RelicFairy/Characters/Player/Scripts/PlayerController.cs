@@ -133,6 +133,14 @@ public class PlayerController : CharacterBase
             finalDmg = Mathf.Max(0, (int)fd);
         }
 
+        // [방어력] 체감 감소(diminishing returns) — 피해배율 = K / (K + 방어력).
+        // 가산 스택이 100%로 수렴하지 않아 상한 캡이 불필요하고, 방어력 K당 유효체력이 원 체력만큼 선형 증가한다.
+        // K는 밸런스 튜닝 값(기본 방어 32 기준 감소율 약 24%).
+        const float DefenseK = 100f;
+        int defense = RuntimeStats.Defense;
+        if (defense > 0)
+            finalDmg = Mathf.Max(0, Mathf.RoundToInt(finalDmg * (DefenseK / (DefenseK + defense))));
+
         // [받피감소 통합 채널] 아이템/캐릭터/어둠룬 피해감소(%)를 한 곳에서 1회 적용.
         // (DamageReductionEffect.OnPreTakeDamage 제거 → 여기로 통합. DamageReduction은 Recalculate에서 Clamp01.)
         float dr = RuntimeStats.DamageReduction;
@@ -266,10 +274,21 @@ public class PlayerController : CharacterBase
     /// </summary>
     public void SetInputEnabled(bool enabled)
     {
+        // 컷신이 inputActions 생성(비동기 초기화) 전에 차단을 걸 수 있다.
+        // 의도를 플래그로 남겨두지 않으면 InitInputActions()의 Enable()이 차단을 덮어써 조작이 되살아난다.
+        _inputDisabledExternally = !enabled;
+
+        // 입력을 끊으면 moveDirection 갱신도 멈춘다 → 마지막 입력값이 그대로 남아
+        // 컷신 내내 달리는 자세로 이동한다. 차단 시 즉시 0으로 비운다.
+        if (!enabled) moveDirection = Vector3.zero;
+
         if (inputActions == null) return;
         if (enabled) inputActions.Player.Enable();
         else         inputActions.Player.Disable();
     }
+
+    // 외부(컷신 등)가 요청한 입력 차단이 유효한지. InitInputActions()가 이 의도를 존중한다.
+    private bool _inputDisabledExternally;
 
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
@@ -336,6 +355,13 @@ public class PlayerController : CharacterBase
     //============================================================
     // Input / Movement State
     //============================================================
+
+    // 이동 기준으로 삼는 카메라 수평각. 입력을 누르고 있는 동안 고정된다(아래 CheckMovementInput 참조).
+    private float _moveBasisYaw;
+    private Vector2 _lastMoveInput;
+
+    // 입력이 "바뀌었다"고 볼 최소 변화량(제곱). 아날로그 스틱 미세 흔들림으로 기준이 재설정되지 않게 한다.
+    private const float MoveBasisRelatchThresholdSqr = 0.04f;   // 약 0.2 변화
 
     // PlayerController.cs (입력 시 클릭 위치 저장)
     private Vector3? _lastClickedPosition;
@@ -742,9 +768,26 @@ public class PlayerController : CharacterBase
             if (p.Trigger == trigger && p.CanApply(this, ctx))
             {
                 p.Apply(this, ctx);
-                // [가이드라인 비주얼] 유물/캐릭터 패시브 발동 토스트(통지만)
+                // [가이드라인 비주얼] 유물/캐릭터 패시브 발동 토스트(통지만).
+                // OnAttackHit 패시브가 4종이라 매 타 4줄이 쏟아져 화면을 덮었다 → 이름별 스로틀.
+                // (CovenantHandler.ProcToast와 같은 패턴)
+                if (p is CharacterPassiveBase cb && cb.SuppressAutoToast) continue;
+                if (!PassiveToastReady(p.PassiveName)) continue;
                 GuidelineVisual.Toast(transform.position + Vector3.up * 2.4f, p.PassiveName, GuidelineVisual.ToastKind.Relic);
             }
+    }
+
+    // 패시브명별 토스트 스로틀 — 같은 패시브는 이 간격 안에 1회만 표시.
+    private const float PassiveToastInterval = 2f;
+    private readonly Dictionary<string, float> _passiveToastAt = new();
+
+    private bool PassiveToastReady(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        float now = UnityEngine.Time.unscaledTime;   // 토스트는 unscaled 수명이라 동일 기준
+        if (_passiveToastAt.TryGetValue(name, out float last) && now - last < PassiveToastInterval) return false;
+        _passiveToastAt[name] = now;
+        return true;
     }
 
     /// <summary>캐릭터별 패시브 등록 — 파생 클래스에서 override.</summary>
@@ -841,6 +884,50 @@ public class PlayerController : CharacterBase
 
     /// <summary>캐릭터 고유 스킬의 쿨다운(초). 0이면 무기 쿨다운 사용.</summary>
     public virtual float GetCharacterSkillCooldown(SkillType slot) => RelicBehavior?.GetSkillCooldown(slot) ?? 0f;
+
+    /// <summary>
+    /// 해당 슬롯에 실제 발동 가능한 스킬이 있는가. <see cref="ActSkillState"/>의 해석 순서와 동일하게
+    /// 유물(캐릭터) 런타임 → 무기 슬롯 순으로 확인한다.
+    /// 빈 슬롯 입력이 스킬 상태로 진입해 진행 중인 모션만 끊는 것을 막고, HUD 잠금 표시의 근거로도 쓴다.
+    /// </summary>
+    public bool HasSkillInSlot(SkillType slot)
+    {
+        // 유물 제공 스킬(주로 Q) — 런타임이 만들어지면 보유로 본다.
+        if (CreateCharacterSkillRuntime(slot) != null) return true;
+
+        // 장비(무기) 제공 스킬 — ActSkillState.GetSkillSO와 동일 매핑(R은 skillQ를 쓴다).
+        var wd = WeaponManager?.CurrentWeaponData;
+        return slot switch
+        {
+            SkillType.E => wd?.skillE != null,
+            SkillType.R => wd?.skillQ != null,
+            _           => false,
+        };
+    }
+
+    /// <summary>
+    /// 유물 게이트가 열려 있는가(가웨인 정오 구간 등). <see cref="ActSkillStateBase"/>의 게이팅과 동일 조건 —
+    /// <b>유물이 소유한 슬롯</b>에만 적용하고, 무기 스킬 슬롯은 항상 열린 것으로 본다.
+    /// 쿨다운은 포함하지 않는다(쿨다운은 HUD에 별도 연출이 있다).
+    /// </summary>
+    public bool IsSkillGateOpen(SkillType slot)
+    {
+        if (RelicBehavior == null) return true;
+        if (CreateCharacterSkillRuntime(slot) == null) return true;   // 유물 미소유 슬롯 → 게이팅 대상 아님
+        return RelicBehavior.CanUseSkill(slot);
+    }
+
+    /// <summary>
+    /// 지금 당장 발동 가능한가 = 보유 + 유물 게이트 + 쿨다운.
+    /// 입력 단계에서 이걸로 막지 않으면 스킬 상태에 <b>진입했다가 되돌아 나오면서</b>
+    /// 진행 중이던 공격 모션만 끊긴다(ActSkillStateBase가 OnEnter에서 되돌리는 구조).
+    /// </summary>
+    public bool CanUseSkillNow(SkillType slot)
+    {
+        if (!HasSkillInSlot(slot)) return false;
+        if (!IsSkillGateOpen(slot)) return false;
+        return CooldownTracker == null || CooldownTracker.IsReady(slot);
+    }
 
     //============================================================
     // Runtime Flags (점프 모듈에서 관리하는 상태를 위임)
@@ -988,7 +1075,9 @@ public class PlayerController : CharacterBase
     }
 
     [Header("포션")]
-    [SerializeField] private KeyCode potionKey = KeyCode.H;   // 퀵슬롯 포션 사용 키(자유 키)
+    // WASD에 손을 얹은 채 검지/중지가 한 칸 아래로 바로 닿는 자리.
+    // (Q·E·R=스킬, 1·2=무기교체, F=상호작용, Space/Shift=점프/달리기로 이미 점유)
+    [SerializeField] private KeyCode potionKey = KeyCode.C;
 
     protected override void Update()
     {
@@ -1257,13 +1346,16 @@ public class PlayerController : CharacterBase
             return false;
 
         var passives = mgr.GetPassives(entry.passive_id);
-        RuntimeStats.InitializeFromServer(entry, passives);
 
         var preloaded = Managers.CharacterData?.M_CharacterData;
 
         // SO 의 LayerMask/Sprite/Passive 참조는 유지하되 수치 컬럼은 CSV(서버) 로 덮어쓴다.
         // 원본 .asset 을 변경하지 않도록 Instantiate 로 런타임 클론을 만든 뒤 적용.
         var source = preloaded ?? characterData;
+
+        // 포이즈/스태미너는 CSV에 컬럼이 없다 — SO 경로와 같은 값이 나오도록 같은 SO를 넘긴다.
+        RuntimeStats.InitializeFromServer(entry, passives, source);
+
         if (source != null)
         {
             var clone = ScriptableObject.Instantiate(source);
@@ -1352,6 +1444,8 @@ public class PlayerController : CharacterBase
         }
         inputActions = new PlayerInputActions();
         inputActions.Enable();
+        // 초기화 이전에 컷신이 걸어둔 차단을 존중한다(이게 없으면 컷신 중 조작이 되살아난다).
+        if (_inputDisabledExternally) inputActions.Player.Disable();
         inputReady = true;
     }
 
@@ -1415,7 +1509,8 @@ public class PlayerController : CharacterBase
         inputActions.Player.ESkill.performed += _ => InputBuffer.Push(Command.ESkill);
         inputActions.Player.RSkill.performed += _ => InputBuffer.Push(Command.RSkill);
 
-        inputActions.Player.Jump.performed += _ => ProcessJump();
+        // [점프 폐기] 자유 점프 제거 — 스페이스 입력을 점프에 연결하지 않는다. 공중 상태(낙하·넉백)는 유지.
+        // ProcessJump/JumpAbility.Jump는 이 구독이 유일한 진입점이라 도달 불가(사장) 상태가 된다.
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
         inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
@@ -1488,20 +1583,22 @@ public class PlayerController : CharacterBase
         bool isDodging = locoSM.CurrentId == LocoState.Dodge;
         bool isInAct   = actSM.CurrentId != ActState.None || isDodging;
 
+        // 빈 슬롯(예: 무형검은 skillE/skillQ 모두 없음)으로 전환하면 스킬 없는 상태에 들어가
+        // 진행 중이던 공격 모션만 끊기고 아무것도 안 나간다 → HasSkillInSlot으로 입력 자체를 막는다.
         if (InputBuffer.TryConsume(Game.Inputs.Command.QSkill))
         {
             Debug.Log($"[Input] Q pressed: CanAttack={CanAttack()}, isInSkill={isInSkill}, actState={actSM.CurrentId}");
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.QSkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.Q)) actSM.Change(ActState.QSkill);
             return;
         }
         if (InputBuffer.TryConsume(Game.Inputs.Command.ESkill))
         {
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.ESkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.E)) actSM.Change(ActState.ESkill);
             return;
         }
         if (InputBuffer.TryConsume(Game.Inputs.Command.RSkill))
         {
-            if (CanAttack() && !isInSkill) actSM.Change(ActState.RSkill);
+            if (CanAttack() && !isInSkill && CanUseSkillNow(SkillType.R)) actSM.Change(ActState.RSkill);
             return;
         }
 
@@ -1563,10 +1660,22 @@ public class PlayerController : CharacterBase
 
         var input = inputActions.Player.Move.ReadValue<Vector2>();
 
-        // 고정 탑다운(월드 정렬) 카메라 — 이동 기준은 월드축 고정.
-        // 시작 연출(오버헤드/투어)로 카메라가 움직이거나 거의 수직이 돼도 조작이 어긋나지 않도록
-        // 라이브 카메라 transform에 의존하지 않는다.
-        moveDirection = (Vector3.forward * input.y + Vector3.right * input.x).normalized;
+        // 이동 기준 = 카메라 수평 heading(FreeLook m_XAxis, BindingMode=WorldSpace라 월드 yaw와 동일).
+        // 라이브 카메라 transform이 아니라 heading 값만 쓰므로, 시작 연출(오버헤드/투어)로 카메라가
+        // 눕거나 거의 수직이 돼도(피치 변화) 조작이 어긋나지 않는다 — 기존 월드축 고정의 의도를 유지.
+        // heading이 0이면 월드축과 완전히 동일하므로 기존 구간(던전 등)의 조작감은 변하지 않는다.
+        float camYaw = cinemachineCamera != null ? cinemachineCamera.m_XAxis.Value : 0f;
+
+        // [기준 고정] 카메라가 연출로 회전하는 동안 기준을 매 프레임 갱신하면, 입력을 누르고 있는 것만으로
+        // 이동 방향이 카메라를 따라 휩쓸려 조작이 어긋난다(계단에서 시선이 도는 동안 특히).
+        // 그래서 입력이 유지되는 동안에는 '누르기 시작한 시점의 카메라 기준'을 그대로 쓰고,
+        // 입력을 놓거나 방향을 바꿀 때만 현재 카메라 기준으로 다시 잡는다.
+        // → 회전 중에도 캐릭터는 일관된 월드 방향으로 계속 이동한다.
+        if (input.sqrMagnitude < 0.0001f || (input - _lastMoveInput).sqrMagnitude > MoveBasisRelatchThresholdSqr)
+            _moveBasisYaw = camYaw;
+        _lastMoveInput = input;
+
+        moveDirection = (Quaternion.Euler(0f, _moveBasisYaw, 0f) * new Vector3(input.x, 0f, input.y)).normalized;
     }
 
     /// <summary>
@@ -1619,13 +1728,22 @@ public class PlayerController : CharacterBase
         if (newWeapon == null)
         {
             RuntimeStats.SetWeaponStats(0, 0, 0);
+            RuntimeStats.SetWeaponMastery(0f, 0f);
             return;
         }
 
         var kind = newWeapon.weaponType.GetAttackStatKind();
-        int melee  = kind == AttackStatKind.Melee  ? (int)newWeapon.baseAttack : 0;
-        int ranged = kind == AttackStatKind.Ranged ? (int)newWeapon.baseAttack : 0;
-        RuntimeStats.SetWeaponStats(melee, ranged, (int)newWeapon.baseDefense);
+        // 절삭하지 않고 소수 그대로 넘긴다 — 강화 배율이 여기서 잘리면 강화가 공격력에 안 닿는다.
+        float melee  = kind == AttackStatKind.Melee  ? newWeapon.baseAttack : 0f;
+        float ranged = kind == AttackStatKind.Ranged ? newWeapon.baseAttack : 0f;
+        RuntimeStats.SetWeaponStats(melee, ranged, newWeapon.baseDefense);
+
+        // 진화 후 추가 강화 구간(마스터리) → 스킬 확장. 테이블 미로드면 0(무보정).
+        var table   = WeaponEnhanceService.Table;
+        int mastery = WeaponEnhanceService.MasteryLevel(newWeapon, table);
+        RuntimeStats.SetWeaponMastery(
+            table != null ? table.MasterySkillDamage(mastery) : 0f,
+            table != null ? table.MasterySkillCdr(mastery)    : 0f);
     }
 
     /// <summary>강화/승급으로 장착 무기 스탯만 갱신됐을 때 — 교체 없이 데미지 스탯만 재적용.</summary>

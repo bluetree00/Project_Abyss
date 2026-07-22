@@ -242,7 +242,9 @@ namespace RelicFairy.Monster
                     d.timer -= dt;
                     while (d.timer <= 0f && d.remainingTicks > 0)
                     {
-                        owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot);
+                        // 상태 id로 속성을 해석해 데미지 텍스트에 속성색을 입힌다(점화=불, 독=풀 …).
+                        RuneElement? el = RuneElementMap.FromStatusId(kv.Key, out var e) ? e : (RuneElement?)null;
+                        owner.TakeSynergyDamage(d.damagePerTick, d.instigator, d.defenseIgnore, false, DamageKind.Dot, el);
                         d.onTick?.Invoke();
                         d.remainingTicks--;
                         d.timer += d.interval;

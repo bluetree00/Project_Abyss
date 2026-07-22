@@ -88,9 +88,12 @@ public sealed class ElecDischargeEffect : ElectricRuneEffectBase
         res.SetTarget(KEY_TARGET, target.gameObject);
 
         float dmg = stacks * Entry.value * GetEffectiveAttack(player);
-        if (dmg > 0f) CombatQuery.DealSynergyDamage(target, dmg, player.gameObject);
+        if (dmg > 0f) CombatQuery.DealSynergyDamage(target, dmg, player.gameObject, element: RuneElement.Electric);
 
-        // [가이드라인 비주얼] 방전 볼트(플레이어→대상)
+        // [실제 VFX] 방전 볼트(플레이어→대상) 번개 아크 + 대상 임팩트
+        ElementVfxPlayer.PlayBeam(RuneElement.Electric, player.transform.position + Vector3.up, target.transform.position + Vector3.up);
+        ElementVfxPlayer.PlayBurst(RuneElement.Electric, target.transform.position);
+        // [가이드라인 비주얼] 방전 볼트(개발 전용)
         GuidelineVisual.Chain(player.transform.position + Vector3.up, target.transform.position + Vector3.up);
     }
 }
@@ -161,8 +164,11 @@ public sealed class ElecOverloadEffect : ElectricRuneEffectBase
         {
             for (int i = 0; i < _buf.Count; i++)
             {
-                CombatQuery.DealSynergyDamage(_buf[i], dmg, player.gameObject);
-                // [가이드라인 비주얼] 체인 라이트닝(원점→체인 대상)
+                CombatQuery.DealSynergyDamage(_buf[i], dmg, player.gameObject, element: RuneElement.Electric);
+                // [실제 VFX] 원점→대상 번개 아크 + 대상 임팩트 버스트
+                ElementVfxPlayer.PlayBeam(RuneElement.Electric, origin + Vector3.up, _buf[i].transform.position + Vector3.up);
+                ElementVfxPlayer.PlayBurst(RuneElement.Electric, _buf[i].transform.position);
+                // [가이드라인 비주얼] 체인 라이트닝(개발 전용)
                 GuidelineVisual.Chain(origin + Vector3.up, _buf[i].transform.position + Vector3.up);
             }
         }
@@ -170,7 +176,8 @@ public sealed class ElecOverloadEffect : ElectricRuneEffectBase
         {
             // 주변에 없으면 같은 적 추가 타격
             for (int i = 0; i < chainCount; i++)
-                CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject);
+                CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject, element: RuneElement.Electric);
+            ElementVfxPlayer.PlayBurst(RuneElement.Electric, hit.Target.transform.position);   // [실제 VFX] 임팩트
         }
     }
 }

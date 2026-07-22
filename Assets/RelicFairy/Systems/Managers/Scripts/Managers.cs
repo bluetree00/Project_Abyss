@@ -53,6 +53,7 @@ public sealed class Managers : MonoBehaviour
     private CovenantDataManager _covenantDataManager;
     private RelicStatDataManager _relicStatDataManager;
     private RelicAwakeningDataManager _relicAwakeningDataManager;
+    private RelicPartsDataManager _relicPartsDataManager;
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
     private ShopDataManager _shopDataManager;
     private QuestManager _questManager;
@@ -345,6 +346,20 @@ public sealed class Managers : MonoBehaviour
                 inst._relicAwakeningDataManager = new RelicAwakeningDataManager();
 
             return inst._relicAwakeningDataManager;
+        }
+    }
+
+    public static RelicPartsDataManager RelicParts
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._relicPartsDataManager == null)
+                inst._relicPartsDataManager = new RelicPartsDataManager();
+
+            return inst._relicPartsDataManager;
         }
     }
 

@@ -61,6 +61,8 @@ public static class SaveSanitizer
         // 강화 레벨: ≥0만. 상한은 재련소 차트(EnhanceTableSO) 구동이라 여기서 강제하지 않는다.
         d.weapon0EnhanceLevel = ClampMin(d.weapon0EnhanceLevel, 0, ref changed);
         d.weapon1EnhanceLevel = ClampMin(d.weapon1EnhanceLevel, 0, ref changed);
+        d.weapon0EvolutionStage = ClampMin(d.weapon0EvolutionStage, 0, ref changed);
+        d.weapon1EvolutionStage = ClampMin(d.weapon1EvolutionStage, 0, ref changed);
 
         // 재련소 RNG 소비 수: ≥0. 음수면 스트림 진행이 깨져 save-scum이 뚫린다.
         d.crucibleRollIndex = ClampMin(d.crucibleRollIndex, 0, ref changed);

@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 59ef79745dfc7bd4eb2de2fbba386294, type: 3}
   m_Name: T0_Nameless
   m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
-  weaponDisplayKey: T1_Katana_Display
-  weaponPrefabKey: T1_Katana_Weapon
+  weaponDisplayKey: T0_Nameless_Display
+  weaponPrefabKey: T0_Nameless_Weapon
   displayName: "무명의 형상"
   iconKey: T1_KatanaIcon
   icon: {fileID: 21300000, guid: 2e8414774381f0444805c23b0d8bf7a8, type: 3}
   tier: 1
   rarity: 0
-  baseAttack: 18
+  baseAttack: 5
   baseDefense: 1
   attackSpeed: 1.6
   attackRange: 0.8
@@ -28,8 +28,8 @@ MonoBehaviour:
   critDamage: 1.25
   groundEndCount: 3
   airEndCount: 3
-  animationSet: {fileID: 11400000, guid: b11c40e7008eefa4a965103378c5ef86, type: 2}
-  abilitySet: {fileID: 11400000, guid: ff28d03c9d5f86d46a4e5760ec8135c5, type: 2}
+  animationSet: {fileID: 11400000, guid: 04120a1cc0bb33149871b08610da289c, type: 2}
+  abilitySet: {fileID: 11400000, guid: b8c43a959daa5a74d928a324879e0ddf, type: 2}
   trailVfxPrefab: {fileID: 0}
   weaponType: 4
   evolution: {fileID: 11400000, guid: d304dc9e4d717bf4e883f9568f239aae, type: 2}

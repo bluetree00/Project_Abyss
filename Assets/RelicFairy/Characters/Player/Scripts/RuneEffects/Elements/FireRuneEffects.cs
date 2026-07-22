@@ -29,7 +29,7 @@ public sealed class FireEmberEffect : FireRuneEffectBase
     {
         if (hit.Target == null) return;
         float dmg = Entry.value * GetEffectiveAttack(player);
-        if (dmg > 0f) CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject);
+        if (dmg > 0f) CombatQuery.DealSynergyDamage(hit.Target, dmg, player.gameObject, element: RuneElement.Fire);
     }
 }
 
@@ -88,7 +88,7 @@ public sealed class FireBlazeEffect : FireRuneEffectBase
         if (mb == null || !mb.Status.HasDot(IGNITE_ID)) return;
 
         float bonus = hit.Damage * Entry.value;
-        if (bonus > 0f) CombatQuery.DealSynergyDamage(mb, bonus, player.gameObject);
+        if (bonus > 0f) CombatQuery.DealSynergyDamage(mb, bonus, player.gameObject, element: RuneElement.Fire);
     }
 }
 
@@ -108,8 +108,11 @@ public sealed class FireScorchEffect : FireRuneEffectBase
         if (damage <= 0f) return;
         Vector3 origin = (target != null && target.activeInHierarchy) ? target.transform.position : snapPos;
 
+        // [실제 VFX] 작열 폭발 — 크기를 실제 판정 반경(EXPLOSION_RADIUS)에 일치시킨다(보이는 범위=타격 범위).
+        ElementVfxPlayer.PlayBurst(RuneElement.Fire, origin, EXPLOSION_RADIUS);
+
         int n = CombatQuery.GetNearbyEnemies(origin, EXPLOSION_RADIUS, null, 16, s_explodeBuf);
         for (int i = 0; i < n; i++)
-            CombatQuery.DealSynergyDamage(s_explodeBuf[i], damage, instigator);
+            CombatQuery.DealSynergyDamage(s_explodeBuf[i], damage, instigator, element: RuneElement.Fire);
     }
 }

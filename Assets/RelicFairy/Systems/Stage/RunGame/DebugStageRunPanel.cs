@@ -42,19 +42,16 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     private static readonly string[] DebugSpawnItems =
     {
-        "item_frog_prince_ball",       // 근거리 공격력 +5 (Always)
-        "item_cinderella_shoes",       // 이동속도 +0.2 (Always)
-        "item_beauty_beast_rose",      // 체력+10, 흡혈2% (Always+OnHit)
-        "item_wolf_claw",              // HP50%이하 공격력+20% (HPBelow50)
-        "item_hansel_cookie",          // 방 클리어 시 체력3 회복 (OnRoomClear)
-        "item_sleeping_beauty_spindle",// 피격 시 5% 무효화 (OnHit)
-        "item_snow_white_mirror",      // 피해 10% 반사 (OnHit)
-        "item_aladdin_carpet",         // 점프 착지 범위 피해 (OnJumpLand)
-        "item_black_wings",            // 사망무효 + 10초 무적 (OnNearDeath)
-        "item_excalibur_fragment",     // 10% 확률 추가 타격 (OnHit)
-        "item_ifrit_ring",             // 불 무기+스킬 → 화염 폭발 (WithFireWeapon)
-        "item_thor_hammer_fragment",   // 번개 무기+스킬 → 번개 강타 (WithLightningWeapon)
-        "item_three_witches_thread",   // 시너지 완성 → 다음 공격 원소 (OnRecipeComplete)
+        "item_t1_dull_blade",          // 힘의 룬 — 전체 공격력 +4 (Always)
+        "item_t1_swift_charm",         // 쾌속의 룬 — 이동속도 +0.11 (Always)
+        "item_t1_old_deck",            // 방벽의 룬 — 방어력 +5 (Always)
+        "item_t1_crisis_blade",        // 위기의 룬 — 공격력 +18% (HPBelow50)
+        "item_t1_preempt_blade",       // 선제의 룬 — 이동속도 +25% (AfterRoomEnter)
+        "item_t1_threat_armor",        // 위협의 룬 — 방어력 +15% (EnemiesNearby)
+        "item_t1_calm_blade",          // 냉정의 룬 — 치명타 확률 +6% (NoHit)
+        "item_t2_first_strike",        // 선공의 룬 — 첫 타격 +40% (FirstAttackInRoom)
+        "item_t2_forged_hammer",       // 망치의 룬 — 전체 공격력 +10 (Always)
+        "item_t2_travel_bag",          // 여정의 룬 — 최대 체력 +50 (Always)
     };
     private int _spawnIndex;
     private readonly System.Collections.Generic.HashSet<string> _spawnedIds = new();
@@ -216,8 +213,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         GUI.color = new Color(1f, 0.85f, 0.4f, 1f);
         if (GUI.Button(new Rect(bx, by, bw, bh), "재련소 테스트"))
             OpenCrucibleTestAsync().Forget();
-        if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소(룬판) 테스트"))
-            OpenRefineryTest();
+        if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소 테스트"))
+            OpenRefineryTestAsync().Forget();
         GUI.color = prev;
     }
 
@@ -245,12 +242,22 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         panel.Bind(_testCrucible);
     }
 
-    /// <summary>테스트용 정제소 — 전용 UI 미구현이라 룬판(기본 정제 surface)을 토글로 대체 오픈.</summary>
-    private static void OpenRefineryTest()
+    /// <summary>테스트용 정제소 — 실제 정제소 패널(UI_RefineryPanel)을 연다. 원석이 부족하면 테스트용으로 20 지급.</summary>
+    private async UniTaskVoid OpenRefineryTestAsync()
     {
-        var panel = UI_GridPanel.Instance;
-        if (panel == null) { Debug.LogWarning("[DebugTest] 정제소 — 룬판(UI_GridPanel) 인스턴스 없음"); return; }
-        if (panel.IsOpen) panel.Close(); else panel.Open();
+        var run = GetCurrentRun();
+        if (run == null || !run.IsRunning)
+        {
+            Debug.LogWarning("[DebugTest] 정제소 — 진행 중인 런이 없습니다(먼저 런 시작).");
+            return;
+        }
+
+        // 테스트 편의: 돌릴 원석이 없으면 조금 지급
+        if (run.FuelBank != null && run.FuelBank.RuneOre < 8)
+            run.FuelBank.Add(FuelKind.RuneOre, 20);
+
+        var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_RefineryPanel>();
+        if (panel == null) Debug.LogWarning("[DebugTest] UI_RefineryPanel 로드 실패");
     }
 
     /// <summary>

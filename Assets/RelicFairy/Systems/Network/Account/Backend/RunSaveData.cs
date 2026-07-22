@@ -20,6 +20,7 @@ public class RunSaveData
     public int    maxHp;
     public int    runGold;
     public int    retryCount;        // 이 슬롯에서 새 런을 시작한 누적 횟수
+    public int    playSeconds;       // 이 슬롯의 누적 플레이 시간(초) — 이어하기로 계속 쌓인다
     public int    progressPercent;   // 0-100 — 챕터 기반 진행도
     public string characterKey;      // PlayerLoadout.CharacterPrefabKey
     public string characterName;     // CharacterData.characterName (표시용)
@@ -45,6 +46,8 @@ public class RunSaveData
     public int    weaponCurrentSlot = -1; // 현재 무기 슬롯 인덱스
     public int    weapon0EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 0)
     public int    weapon1EnhanceLevel;    // WeaponData.enhanceLevel (슬롯 1)
+    public int    weapon0EvolutionStage;  // WeaponData.evolutionStage (슬롯 0) — 강화 상한 확장분
+    public int    weapon1EvolutionStage;  // WeaponData.evolutionStage (슬롯 1)
     public string weapon0LegendId;        // WeaponData.legendId (슬롯 0 승급 분기)
     public string weapon1LegendId;        // WeaponData.legendId (슬롯 1 승급 분기)
 

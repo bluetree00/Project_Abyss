@@ -193,14 +193,15 @@ public static class CombatQuery
     /// 그 외 IDamageable은 일반 TakeDamage(넉백 0).
     /// </summary>
     public static void DealSynergyDamage(GameObject target, float amount, GameObject instigator,
-                                         float defenseIgnore = 1f, bool isCrit = false)
+                                         float defenseIgnore = 1f, bool isCrit = false,
+                                         RuneElement? element = null)
     {
         if (target == null || amount <= 0f) return;
 
         var mb = target.GetComponentInParent<MonsterBase>();
         if (mb != null)
         {
-            mb.TakeSynergyDamage(amount, instigator, defenseIgnore, isCrit);
+            mb.TakeSynergyDamage(amount, instigator, defenseIgnore, isCrit, DamageKind.Synergy, element);
             return;
         }
 
@@ -208,11 +209,12 @@ public static class CombatQuery
             dmg.TakeDamage(amount, instigator, 0f, isCrit);
     }
 
-    /// <summary>몬스터 직접 대상 즉발 피해(체인 등 이미 MonsterBase를 가진 경우).</summary>
+    /// <summary>몬스터 직접 대상 즉발 피해(체인 등 이미 MonsterBase를 가진 경우). element=데미지 텍스트 속성색.</summary>
     public static void DealSynergyDamage(MonsterBase target, float amount, GameObject instigator,
-                                         float defenseIgnore = 1f, bool isCrit = false)
+                                         float defenseIgnore = 1f, bool isCrit = false,
+                                         RuneElement? element = null)
     {
         if (target == null || amount <= 0f) return;
-        target.TakeSynergyDamage(amount, instigator, defenseIgnore, isCrit);
+        target.TakeSynergyDamage(amount, instigator, defenseIgnore, isCrit, DamageKind.Synergy, element);
     }
 }

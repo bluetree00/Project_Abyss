@@ -76,6 +76,17 @@ public class UI_CovenantAssemble : UI_Popup
     // ── Public Properties ────────────────────────────────
     public override bool BlocksGameplay => true;
 
+    /// <summary>ESC = 조립 취소. OnDestroy가 _tcs를 null로 완료시켜 ChooseAsync가 취소로 끝난다.</summary>
+    public override bool CloseOnEscape => true;
+
+    // ── Lifecycle ────────────────────────────────────────
+    /// <summary>
+    /// 벼리지 않고 팝업이 사라지는 모든 경로(씬 전환 CloseAllPopupUI 등)에서 대기를 끝낸다.
+    /// 이게 없으면 _tcs가 영구 미완료 → ChooseAsync가 무한 대기 → 제단이 영구 잠긴다.
+    /// OnForge가 이미 결과를 넣었으면 TrySetResult가 false를 반환하고 무시된다.
+    /// </summary>
+    private void OnDestroy() => _tcs?.TrySetResult(null);
+
     // ── Public Methods ───────────────────────────────────
     /// <summary>드래프트를 굴려 팝업을 구성한다. forceSilver=true면 첫 서약(실버 고정).</summary>
     public void Setup(bool forceSilver, System.Random rng)

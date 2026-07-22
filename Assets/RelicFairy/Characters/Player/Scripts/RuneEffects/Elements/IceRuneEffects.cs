@@ -99,10 +99,12 @@ public sealed class IceFreezeEffect : IceRuneEffectBase
             if (glacier && glacierDmg > 0f)
             {
                 Vector3 origin = mb.transform.position;
+                // [실제 VFX] 빙하 연쇄 — 크기를 실제 판정 반경(GLACIER_RADIUS)에 일치.
+                ElementVfxPlayer.PlayBurst(RuneElement.Ice, origin, GLACIER_RADIUS);
                 int n = CombatQuery.GetNearbyEnemies(origin, GLACIER_RADIUS, null, 16, s_buf);
                 for (int i = 0; i < n; i++)
                 {
-                    CombatQuery.DealSynergyDamage(s_buf[i], glacierDmg, instigator);
+                    CombatQuery.DealSynergyDamage(s_buf[i], glacierDmg, instigator, element: RuneElement.Ice);
                     s_buf[i].Status.ApplySlow(ID_FROST, frostMag, frostDur, frostMax);
                 }
             }
@@ -123,7 +125,7 @@ public sealed class IceShatterEffect : IceRuneEffectBase
         if (mb == null || !mb.Status.HasCc(ID_FREEZE)) return;
 
         float bonus = hit.Damage * Entry.value;
-        if (bonus > 0f) CombatQuery.DealSynergyDamage(mb, bonus, player.gameObject);
+        if (bonus > 0f) CombatQuery.DealSynergyDamage(mb, bonus, player.gameObject, element: RuneElement.Ice);
     }
 }
 

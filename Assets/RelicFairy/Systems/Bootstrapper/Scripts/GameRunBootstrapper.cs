@@ -1,9 +1,11 @@
 using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
 using TMPro;
+using UnityEngine.UI;
 using RelicFairy.Monster;
 
 public sealed class GameRunBootstrapper : MonoBehaviour
@@ -127,6 +129,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("재련소 NPC 프리팹 Addressable 키. 미등록 시 상점 NPC(shopNpcAddressableKey)로 폴백.")]
     [SerializeField] private string crucibleNpcAddressableKey = "Crucible/CrucibleNpc";
 
+    [Tooltip("정제소 NPC 프리팹 Addressable 키. 미등록 시 재련소→상점 NPC로 폴백.")]
+    [SerializeField] private string refineryNpcAddressableKey = "Refinery/RefineryNpc";
+
+    [Header("스테이션 방 장식 프리팹 (NPC 주변에 배치)")]
+    [Tooltip("재련소(대장간) 소품 — 작업대·재료·화로 등. NPC 주변에 링으로 배치된다.")]
+    [SerializeField] private GameObject[] crucibleDecorPrefabs;
+    [Tooltip("정제소(룬) 소품·VFX — 룬 마법진·제단 등. NPC 주변에 링으로 배치된다.")]
+    [SerializeField] private GameObject[] refineryDecorPrefabs;
+
+    public GameObject[] CrucibleDecorPrefabs => crucibleDecorPrefabs;
+    public GameObject[] RefineryDecorPrefabs => refineryDecorPrefabs;
+
     [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
     [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
 
@@ -173,6 +187,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     private bool _isSpawning;
 
     private GameRunSession _run;
+
+    /// <summary>현재 방의 커스텀 아레나 루트. 보스방 클리어 연출(BossExitPath)이 출구 방향·바닥 경계를 읽는다.
+    /// 커스텀 아레나가 아닌 방에서는 null — 그 경우 기존 챕터 게이트로 폴백한다.</summary>
+    private Transform _currentArena;
     public GameRunSession Run => _run;
 
     // 미니맵 스포너 이벤트 구독 추적 (새 방 진입 시 해제)
@@ -212,12 +230,116 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run.OnBossRoomCleared += OnBossRoomClearedHandler;
     }
 
-    /// <summary>보스방 클리어 신호 → 비최종 챕터면 챕터 전환 게이트를 스폰(등장 연출).
-    /// 최종 챕터는 게이트 없이 ClearRewardTrigger가 런 클리어를 담당한다. 보상은 별개(ClearRewardTrigger).</summary>
+    /// <summary>보스방 클리어 신호 → 유물 파츠 드래프트 → (비최종)이어지는 길 / (최종)런 클리어.
+    /// 보스 클리어의 모든 후처리를 이 한 곳에서 순차 오케스트레이션한다(런 클리어 이중 발화 방지).</summary>
     private void OnBossRoomClearedHandler(Vector3 center)
     {
-        if (_run != null && _run.HasNextChapter())
-            ChapterGate.Spawn(center);
+        BossClearSequenceAsync(center).Forget();
+    }
+
+    private async UniTaskVoid BossClearSequenceAsync(Vector3 center)
+    {
+        var ct = this.GetCancellationTokenOnDestroy();
+        bool isFinal = !(_run?.HasNextChapter() ?? false);
+
+        // 1) 유물 파츠 드래프트 — 설계서 §1-6: Ch1·Ch2·Ch3 클리어에 픽, Ch4(최종)는 픽 없음(승리).
+        if (!isFinal)
+        {
+            try { await ShowRelicPartDraftAsync(ct); }
+            catch (System.OperationCanceledException) { return; }
+        }
+
+        // 2) 최종 보스: 무한 루프 갈림길(계속=심연 회귀 / 귀환=런 종료). 비최종: 이어지는 길로 다음 챕터.
+        if (isFinal)
+        {
+            bool goDeeper;
+            try { goDeeper = await ShowAbyssLoopChoiceAsync(ct); }
+            catch (System.OperationCanceledException) { return; }
+
+            if (goDeeper) EnterAbyssLoop();
+            else          HandleRunClear();
+        }
+        else
+        {
+            // 코리더 스타일(CorridorStyleSO)은 레거시 존맵 데이터에 묶여 있어 절차 생성 방에는 없다.
+            // null을 넘기면 BossExitPath가 아레나 바닥 머티리얼을 그대로 빌려 톤을 맞춘다.
+            BossExitPath.Spawn(center, _currentArena, null);
+        }
+    }
+
+    /// <summary>무한 루프 진입 — 심연 깊이 +1, Ch1으로 회귀. 챕터 전환 기계를 재사용해 로드아웃을 유지한 채 Ch1 씬을 새로 시작한다.</summary>
+    private void EnterAbyssLoop()
+    {
+        var run = _run;
+        if (run == null) { HandleRunClear(); return; }
+
+        run.BeginAbyssLoop();   // 깊이++ · CurrentChapter=Ch1 · 상태=Map
+
+        // 챕터 전환과 동일: 다음 씬의 부트스트래퍼가 '새 챕터 시작'으로 처리(이어하기 아님) → 로드아웃/서약/파츠/아이템 유지.
+        AppBootstrapper.Instance?.MarkChapterAdvance();
+        AppBootstrapper.Instance?.RequestLoad(AppBootstrapper.GetSceneForChapter(ChapterId.Chapter1));
+        Debug.Log($"[GameRunBootstrapper] 무한 루프 진입 — 심연 깊이 {run.AbyssDepth}, Ch1 회귀");
+    }
+
+    /// <summary>보스 클리어 드래프트 — 현재 유물의 파츠 후보 3개를 제시하고 택1해 이번 런 로드아웃에 추가한다.</summary>
+    private async UniTask ShowRelicPartDraftAsync(CancellationToken ct)
+    {
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        var relic   = loadout?.Relic;
+        if (loadout == null || relic == null || relic.Id == RelicId.None)
+        {
+            Debug.Log("[GameRunBootstrapper] 유물 없음 — 파츠 드래프트 스킵");
+            return;
+        }
+
+        string relicId = relic.Id.ToString().ToLower();   // Gawain → "gawain"
+
+        // 드래프트 티어: 최종 직전 챕터 클리어 = 코어 진화(3), 그 외 = 기능 파츠(1). 설계서 §1-6.
+        // (현재 최종=Ch3이므로 Ch1=기능·Ch2=코어·Ch3=승리. 최종이 바뀌어도 자동으로 따라간다.)
+        int bossTier = (_run != null && _run.IsNextChapterFinal()) ? 3 : 1;
+
+        var pool = Managers.RelicParts?.GetDraftPool(relicId, bossTier, loadout.RelicPartIds);
+        if (pool == null || pool.Count == 0)
+        {
+            Debug.Log($"[GameRunBootstrapper] 파츠 드래프트 후보 없음 (relic={relicId}, tier={bossTier}) — 스킵");
+            return;
+        }
+
+        var candidates = PickRandomParts(pool, 3);
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicPartDraftPopup>();
+        if (popup == null)
+        {
+            // 팝업 로드 실패 — 보상이 조용히 증발하지 않도록 첫 후보를 자동 지급한다.
+            loadout.AddRelicPart(candidates[0].part_id);
+            Debug.LogWarning("[GameRunBootstrapper] 파츠 드래프트 팝업 로드 실패 — 첫 후보 자동 지급");
+            return;
+        }
+
+        popup.Setup(candidates);
+        await popup.WaitForInteractionAsync(ct);
+
+        if (popup.Result != null)
+        {
+            loadout.AddRelicPart(popup.Result.part_id);
+            Debug.Log($"[GameRunBootstrapper] 파츠 획득: {popup.Result.part_id} ({popup.Result.part_name})");
+        }
+    }
+
+    /// <summary>풀에서 중복 없이 count개를 무작위로 뽑는다(풀이 작으면 있는 만큼).</summary>
+    private static System.Collections.Generic.List<RelicPartEntry> PickRandomParts(
+        System.Collections.Generic.List<RelicPartEntry> pool, int count)
+    {
+        var copy   = new System.Collections.Generic.List<RelicPartEntry>(pool);
+        var result = new System.Collections.Generic.List<RelicPartEntry>(count);
+        int n = Mathf.Min(count, copy.Count);
+        for (int i = 0; i < n; i++)
+        {
+            int idx = Random.Range(0, copy.Count);
+            result.Add(copy[idx]);
+            copy.RemoveAt(idx);
+        }
+        return result;
     }
 
     private async void Start()
@@ -232,6 +354,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // AppBootstrapper 준비 대기 (자동 로그인 포함)
         // null인 경우(씬 직접 실행)는 즉시 통과
         await UniTask.WaitUntil(() => AppBootstrapper.Instance == null || AppBootstrapper.Instance.IsReady);
+
+        var mapBgmKey = SceneManager.GetActiveScene().name switch
+        {
+            "GameScene_Ch1" => "Ch1_Map",
+            "GameScene_Ch2" => "Ch2_Map",
+            "GameScene_Ch3" => "Ch3_Map",
+            _               => (string)null,
+        };
+        if (mapBgmKey != null) Managers.Sound.PlayBgmAsync(mapBgmKey).Forget();
 
         // 데이터 매니저 초기화 (로그인 완료 후 CDN 사용 가능)
         await InitMapDataAsync();
@@ -904,8 +1035,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             }
             await ScreenFade.Out(1.0f, ct);
 
-            // 3) 종료 메시지(영혼 회수) — 스킵 입력 지원
-            await ShowRunEndMessageAsync(isCleared, ct);
+            // 3) 종료 연출
+            //    · 클리어 = 종료 메시지(다음 회차 암시)
+            //    · 사망   = 멀린이 영혼을 다시 엮는 부활 빌드업(바로 베이스캠프로 끊지 않는다)
+            if (isCleared) await ShowRunEndMessageAsync(true, ct);
+            else           await ShowMerlinRevivalAsync(ct);
 
             // 4) 메타 저장(OnRunEnded) 먼저 → 정리(ClearLocalRun+Loadout.Clear) → 허브 복귀
             _run?.EndRun(isCleared, isCleared ? "clear" : "death");
@@ -937,7 +1071,32 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
 
-        const float hold = 2.0f;
+        // 클리어(귀환) = 심연에서 스스로 물러나 베이스캠프로 귀환. 도달한 깊이를 곁들여 여운을 준다.
+        if (isCleared)
+        {
+            int depth = _run?.AbyssDepth ?? 0;
+            string sub2 = depth > 0
+                ? $"심연 {depth}층까지 내려갔다 돌아왔다\n<size=24>각성으로 더 깊이 — 다음 여정에서</size>"
+                : "…그러나 심연은 언제든 다시 그대를 부를 것이다";
+
+            var subGO = new GameObject("Subtext");
+            var sub = subGO.AddComponent<TextMeshProUGUI>();
+            sub.transform.SetParent(go.transform, false);
+            if (TMP_Settings.defaultFontAsset != null) sub.font = TMP_Settings.defaultFontAsset;
+            sub.text          = sub2;
+            sub.fontSize      = 30f;
+            sub.fontStyle     = FontStyles.Italic;
+            sub.alignment     = TextAlignmentOptions.Center;
+            sub.color         = new Color(0.62f, 0.58f, 0.72f);
+            var srt = sub.rectTransform;
+            srt.anchorMin = new Vector2(0f, 0.5f); srt.anchorMax = new Vector2(1f, 0.5f);
+            srt.pivot     = new Vector2(0.5f, 1f);
+            srt.anchoredPosition = new Vector2(0f, -48f);   // 본문 아래
+            srt.sizeDelta        = new Vector2(0f, 120f);
+        }
+
+        // 클리어는 여운 문구를 읽을 시간을 조금 더 준다.
+        float hold = isCleared ? 3.5f : 2.0f;
         float t = 0f;
         try
         {
@@ -952,6 +1111,268 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             if (go != null) Destroy(go);       // 취소(객체 파괴) 시에도 오버레이 정리 보장
         }
+    }
+
+    /// <summary>
+    /// 최종 보스 클리어 후 무한 루프 갈림길 — '더 깊이(계속)' vs '귀환(종료)' 모달.
+    /// 게임을 정지(TimeScaleArbiter)하고 클릭을 기다린다. true=계속(회귀). 취소 시 예외 전파.
+    /// </summary>
+    private async UniTask<bool> ShowAbyssLoopChoiceAsync(CancellationToken ct)
+    {
+        int nextDepth = (_run?.AbyssDepth ?? 0) + 1;
+
+        var tcs = new UniTaskCompletionSource<bool>();
+
+        var go = new GameObject("@AbyssLoopChoice");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32050;
+        go.AddComponent<GraphicRaycaster>();
+
+        TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
+        try
+        {
+            var veil = MakeFullRect(go.transform, "Veil");
+            veil.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.72f);
+
+            MakeCenterText(go.transform, "심연이 그대를 놓아주지 않는다",
+                34f, new Color(0.82f, 0.78f, 0.92f), new Vector2(0f, 210f), 46f);
+            MakeCenterText(go.transform, $"더 깊이 들어갈수록 적은 강해진다   ·   심연 깊이 {nextDepth}",
+                20f, new Color(0.66f, 0.63f, 0.76f), new Vector2(0f, 150f), 30f);
+
+            // [계속] — 더 깊은 심연으로
+            MakeChoiceButton(go.transform, new Vector2(-190f, -20f),
+                "더 깊이", "적이 강해지지만 성장을 잇는다", new Color(0.55f, 0.45f, 0.95f),
+                () => tcs.TrySetResult(true));
+
+            // [귀환] — 베이스캠프로
+            MakeChoiceButton(go.transform, new Vector2(190f, -20f),
+                "귀환", "여기서 마치고 베이스캠프로 돌아간다", new Color(0.45f, 0.55f, 0.62f),
+                () => tcs.TrySetResult(false));
+
+            using (ct.Register(() => tcs.TrySetCanceled()))
+                return await tcs.Task;
+        }
+        finally
+        {
+            TimeScaleArbiter.Release(this);
+            if (go != null) Destroy(go);
+        }
+    }
+
+    /// <summary>루프 갈림길용 큰 선택 버튼(코드 생성). 제목 + 설명 2줄.</summary>
+    private void MakeChoiceButton(Transform parent, Vector2 pos, string title, string desc, Color accent, System.Action onClick)
+    {
+        var card = new GameObject($"Choice_{title}").AddComponent<Image>();
+        card.transform.SetParent(parent, false);
+        card.color = new Color(0.12f, 0.11f, 0.16f, 0.98f);
+        var rt = card.rectTransform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(340f, 200f);
+
+        // 상단 액센트 띠
+        var bar = new GameObject("Accent").AddComponent<Image>();
+        bar.transform.SetParent(card.transform, false);
+        bar.color = accent;
+        var brt = bar.rectTransform;
+        brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f);
+        brt.pivot = new Vector2(0.5f, 1f);
+        brt.anchoredPosition = Vector2.zero; brt.sizeDelta = new Vector2(0f, 6f);
+
+        var titleTmp = MakeCenterText(card.transform, title, 26f, new Color(0.92f, 0.9f, 0.96f), new Vector2(0f, 40f), 36f);
+        titleTmp.fontStyle = FontStyles.Bold;
+        MakeCenterText(card.transform, desc, 15f, new Color(0.68f, 0.66f, 0.74f), new Vector2(0f, -30f), 60f).enableWordWrapping = true;
+
+        var btn = card.gameObject.AddComponent<Button>();
+        btn.transition = Selectable.Transition.ColorTint;
+        btn.targetGraphic = card;
+        var cb = btn.colors; cb.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f); cb.fadeDuration = 0.08f;
+        btn.colors = cb;
+        btn.onClick.AddListener(() => onClick?.Invoke());
+    }
+
+    /// <summary>
+    /// 사망 → 멀린 부활 연출. 흩어진 영혼을 멀린이 빛으로 다시 엮는 <b>일러스트</b>가 화면을 채우고,
+    /// 문구가 그 위에 얹힌다. 바로 베이스캠프로 끊지 않고 "왜 돌아왔는지"를 서사적으로 잇는다
+    /// (서사: 죽음=영혼 귀환, 멀린=영혼 복구자).
+    /// 전 구간 스킵 입력 지원, 취소/파괴 시 오버레이 정리 보장.
+    /// </summary>
+    private async UniTask ShowMerlinRevivalAsync(CancellationToken ct)
+    {
+        var go = new GameObject("@MerlinRevival");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32000;
+
+        try
+        {
+            // 배경 암전 — 일러스트 배경도 검정이라 이음새 없이 이어진다.
+            var bg = MakeFullRect(go.transform, "BG");
+            var bgImg = bg.gameObject.AddComponent<Image>();
+            bgImg.color = Color.black;
+
+            // 부활 일러스트 — 화면을 채우고 아주 천천히 다가온다(정지 화면이 아니라는 감각).
+            var artRt  = MakeFullRect(go.transform, "Art");
+            var artImg = artRt.gameObject.AddComponent<Image>();
+            artImg.color          = new Color(1f, 1f, 1f, 0f);
+            artImg.raycastTarget  = false;
+            artImg.preserveAspect = true;
+            var artSprite = await LoadRevivalArtAsync();
+            if (artSprite != null) artImg.sprite = artSprite;
+
+            // 사망 문구(상단) — 일러스트의 룬 고리보다 위쪽 여백에 얹는다.
+            var deadTxt = MakeCenterText(go.transform, "그대의 영혼이 흩어졌다...",
+                34f, new Color(0.75f, 0.35f, 0.35f), new Vector2(0f, 380f), 44f);
+            deadTxt.color = new Color(0.75f, 0.35f, 0.35f, 0f);
+
+            // 멀린 대사(하단)
+            var merlinTxt = MakeCenterText(go.transform,
+                "멀린 —  「일어나라. 그대의 이야기는 아직 끝나지 않았다.」",
+                26f, new Color(0.78f, 0.74f, 0.92f), new Vector2(0f, -400f), 40f);
+            merlinTxt.fontStyle = FontStyles.Italic;
+            merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 0f);
+
+            bool skipped = false;
+
+            // [연출 1] 사망 문구 — 영혼이 흩어진 정적
+            await FadeGraphicAsync(deadTxt, 0f, 1f, 0.6f, ct, () => skipped |= Input.anyKeyDown);
+            if (!skipped) await HoldSkippable(0.6f, ct, () => skipped = true);
+
+            // [연출 2] 멀린이 어둠에서 떠오른다 — 일러스트 페이드 인 + 완만한 푸시인, 이어서 대사
+            float t = 0f; const float bloom = 1.8f;
+            while (t < bloom && !skipped)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / bloom);
+                float ease = 1f - (1f - k) * (1f - k);
+                if (artImg != null)
+                {
+                    artImg.color = new Color(1f, 1f, 1f, ease);
+                    artImg.rectTransform.localScale = Vector3.one * (1.00f + 0.05f * ease);
+                }
+                if (merlinTxt != null && k > 0.4f)
+                    merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, Mathf.Clamp01((k - 0.4f) / 0.4f));
+                if (Input.anyKeyDown) skipped = true;
+                await UniTask.Yield(ct);
+            }
+            if (artImg    != null) artImg.color    = Color.white;
+            if (merlinTxt != null) merlinTxt.color = new Color(0.78f, 0.74f, 0.92f, 1f);
+
+            // [연출 3] 대사를 읽을 시간 — 그동안에도 푸시인은 계속된다.
+            float hold = 0f; const float holdDur = 1.8f;
+            while (hold < holdDur && !skipped)
+            {
+                hold += Time.unscaledDeltaTime;
+                if (artImg != null)
+                    artImg.rectTransform.localScale = Vector3.one * (1.05f + 0.03f * (hold / holdDur));
+                if (Input.anyKeyDown) skipped = true;
+                await UniTask.Yield(ct);
+            }
+
+            // [연출 4] 영혼 재결합 — 화면 전체가 흰빛으로 차오르며 부활 확정
+            var flashRt  = MakeFullRect(go.transform, "ReviveFlash");
+            var flashImg = flashRt.gameObject.AddComponent<Image>();
+            flashImg.color         = new Color(1f, 1f, 1f, 0f);
+            flashImg.raycastTarget = false;
+            float f = 0f; const float flashDur = 0.5f;
+            while (f < flashDur)
+            {
+                f += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(f / flashDur);
+                if (flashImg != null)
+                    flashImg.color = new Color(1f, 1f, 1f, k < 0.4f ? k / 0.4f : 1f - (k - 0.4f) / 0.6f);
+                await UniTask.Yield(ct);
+            }
+        }
+        finally
+        {
+            if (go != null) Destroy(go);
+            ReleaseRevivalArt();
+        }
+    }
+
+    private const string RevivalArtKey = "Illust_MerlinRevive";
+    private bool _revivalArtLoaded;
+
+    /// <summary>부활 일러스트 로드. 키가 없으면 null — 연출은 문구만으로 진행된다.</summary>
+    private async UniTask<Sprite> LoadRevivalArtAsync()
+    {
+        var addressables = Managers.AddressableManager;
+        if (addressables == null) return null;
+
+        var sprite = await addressables.TryLoadAssetAsync<Sprite>(RevivalArtKey);
+        if (sprite == null)
+        {
+            Debug.LogWarning($"[GameRunBootstrapper] 부활 일러스트 키 없음: {RevivalArtKey}");
+            return null;
+        }
+
+        _revivalArtLoaded = true;
+        return sprite;
+    }
+
+    private void ReleaseRevivalArt()
+    {
+        if (!_revivalArtLoaded) return;
+        _revivalArtLoaded = false;
+        Managers.AddressableManager?.ReleaseAsset<Sprite>(RevivalArtKey);
+    }
+
+    /// <summary>지정 시간 동안 대기하되 아무 키 입력 시 즉시 종료. onSkip으로 스킵 여부를 호출자에 전달.</summary>
+    private static async UniTask HoldSkippable(float seconds, CancellationToken ct, System.Action onSkip)
+    {
+        float t = 0f;
+        while (t < seconds)
+        {
+            if (Input.anyKeyDown) { onSkip?.Invoke(); return; }
+            t += Time.unscaledDeltaTime;
+            await UniTask.Yield(ct);
+        }
+    }
+
+    /// <summary>그래픽 알파를 from→to로 보간(unscaled). 매 프레임 onTick으로 스킵 감지 등을 허용.</summary>
+    private static async UniTask FadeGraphicAsync(
+        Graphic g, float from, float to, float dur, CancellationToken ct, System.Action onTick = null)
+    {
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float a = Mathf.Lerp(from, to, Mathf.Clamp01(t / dur));
+            if (g != null) { var c = g.color; c.a = a; g.color = c; }
+            onTick?.Invoke();
+            await UniTask.Yield(ct);
+        }
+        if (g != null) { var c = g.color; c.a = to; g.color = c; }
+    }
+
+    private static RectTransform MakeFullRect(Transform parent, string name)
+    {
+        var rt = new GameObject(name).AddComponent<RectTransform>();
+        rt.SetParent(parent, false);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        return rt;
+    }
+
+    private static TextMeshProUGUI MakeCenterText(
+        Transform parent, string text, float fontSize, Color color, Vector2 anchoredPos, float height)
+    {
+        var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
+        tmp.transform.SetParent(parent, false);
+        if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
+        tmp.text      = text;
+        tmp.fontSize  = fontSize;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = color;
+        var rt = tmp.rectTransform;
+        rt.anchorMin = new Vector2(0f, 0.5f); rt.anchorMax = new Vector2(1f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = anchoredPos;
+        rt.sizeDelta = new Vector2(0f, height);
+        return tmp;
     }
 
     /// <summary>세션 챕터가 미설정(기본 0, 유효하지 않음)이면 활성 씬 이름(GameScene_ChN)에서 챕터를 유추한다.</summary>
@@ -1059,6 +1480,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         //    화면은 전환 커버로 가려져 있고(EnterRoomAsync), 블록은 아래 HideAllBlockRenderers까지 숨김 상태이며
         //    리프프로그 앵커로 카메라 밖(+300)에 빌드되므로 순서/연출에 영향 없음. 순서는 await로 보존된다.
         var blocks = new System.Collections.Generic.List<MapBuilder.PlacedBlock>();
+        _currentArena = null;   // 방마다 초기화 — 이전 방 아레나가 남아 보스 연출이 엉뚱한 곳에 길을 깔지 않도록.
         if (useCustomArena)
         {
             // NavMesh(아래 BuildMapNavMeshAsync)가 프리팹 바닥을 포함하도록 roomGO 자식으로 먼저 인스턴스화한다.
@@ -1087,6 +1509,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
                 // 출구: 프리팹 Exit 마커(Exit/Exit1/Exit2…)를 우선 사용 — PlayerSpawn 규약과 동일.
                 customArenaExits = CollectArenaExitSlots(arena.transform, wallLayers * blockCellSize);
+
+                // 보스방 클리어 연출(BossExitPath)이 출구 방향·바닥 경계를 읽어야 해서 참조를 보관한다.
+                _currentArena = arena.transform;
             }
             else
             {
@@ -1100,7 +1525,16 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             await UniTask.Yield(ct);
             MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize);
             await UniTask.Yield(ct);
-            if (palette != null) MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers, palette.Lighting);
+            if (palette != null)
+            {
+                // 출구 셀을 넘겨 문 주변을 최우선·승격 조명으로 밝힌다(밝기 대비 웨이파인딩).
+                var lightDoorCells = new System.Collections.Generic.List<Vector2Int>();
+                if (cls.entrance.HasValue) lightDoorCells.Add(cls.entrance.Value);
+                if (cls.forward.HasValue)  lightDoorCells.Add(cls.forward.Value);
+                lightDoorCells.AddRange(cls.turns);
+                MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers,
+                    palette.Lighting, lightDoorCells);
+            }
             await UniTask.Yield(ct);
 
             // 7-b. 문 복도 스텁 — 각 문(입구/출구) 바깥으로 통로를 뻗어 너머가 허공(절벽)으로 보이지 않게.
@@ -1113,9 +1547,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 {
                     var info        = doorInfos[cell];
                     var centerLocal = new Vector3(cell.x * blockCellSize - offX, blockBaseY, cell.y * blockCellSize - offZ);
+                    // 통로 길이를 문마다 결정적으로 변주 — 균일하면 인공적이라 '진짜 구조'로 안 읽힌다.
+                    // 셀 좌표 해시로 안정 변주(±): rng 스트림을 소비하지 않아 save/restore 결정성 유지.
+                    int hash = ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0xF;   // 0..15
+                    int len  = procDoorCorridorLength + 4 + hash;                    // 기본+4 ~ +19 → 더 길고 제각각
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
-                        procDoorCorridorLength, blockCellSize, blockBaseY, effWallLayers));
+                        len, blockCellSize, blockBaseY, effWallLayers));
                 }
                 if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
                 if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
@@ -1157,6 +1595,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             SetupEventRoom(roomGO, entry.pool_key, roomRng);   // 챌린지 종류는 pool_key 명명 규약으로 유추
         else if (IsCrucibleCategory(entry.category))
             await SetupCrucibleRoomAsync(roomGO, roomRng);
+        else if (IsRefineryCategory(entry.category))
+            await SetupRefineryRoomAsync(roomGO, roomRng);
 
         // 스포너 활성화 (Start 준비). 웨이브 Activate는 플레이어 배치 후 호출자가 수행.
         for (int i = 0; i < deferredSpawners.Count; i++)
@@ -1655,6 +2095,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             SetupEventRoom(mapGO, roomEntry.room_id);   // 챌린지 종류는 room_id 명명 규약으로 유추
         else if (IsCrucibleCategory(roomEntry.category))
             await SetupCrucibleRoomAsync(mapGO, null);
+        else if (IsRefineryCategory(roomEntry.category))
+            await SetupRefineryRoomAsync(mapGO, null);
     }
 
     /// <summary>FieldPrefab을 로드해 mapParent 하위에 배치. NavMesh 빌드 전에 호출해 수동 배치 오브젝트를 NavMesh에 반영한다.</summary>
@@ -1721,7 +2163,36 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (npcPrefab == null)
             Debug.LogWarning("[GameRunBootstrapper] 재련소 NPC 프리팹 로드 실패 — 재련소 UI를 열 수 없습니다.");
 
+        controller.SetDecorPrefabs(crucibleDecorPrefabs);
         controller.Initialize(_run, table, roomRng, npcPrefab);
+    }
+
+    private static bool IsRefineryCategory(string category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        return category.Trim().Equals("Refinery", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>정제소 방 셋업 — 비전투 스테이션(재련소와 동일 흐름). NPC 상호작용 → 룬판(UI_GridPanel).</summary>
+    private async UniTask SetupRefineryRoomAsync(GameObject roomGO, System.Random roomRng = null)
+    {
+        if (roomGO == null || _run == null) return;
+
+        var controller = roomGO.AddComponent<RefineryRoomController>();
+
+        // 정제소 NPC 프리팹 로드 (전용 키 → 재련소 → 상점 NPC 폴백)
+        GameObject npcPrefab = null;
+        if (!string.IsNullOrEmpty(refineryNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(refineryNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(crucibleNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(crucibleNpcAddressableKey);
+        if (npcPrefab == null && !string.IsNullOrEmpty(shopNpcAddressableKey))
+            npcPrefab = await Managers.AddressableManager.TryLoadAssetAsync<GameObject>(shopNpcAddressableKey);
+        if (npcPrefab == null)
+            Debug.LogWarning("[GameRunBootstrapper] 정제소 NPC 프리팹 로드 실패 — 룬판을 열 수 없습니다.");
+
+        controller.SetDecorPrefabs(refineryDecorPrefabs);
+        controller.Initialize(_run, roomRng, npcPrefab);
     }
 
     /// <summary>
@@ -1743,13 +2214,32 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        // 비전투 — pool_key에 "gamble" 포함 시 도박 상자 상호작용. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
-        if (!string.IsNullOrEmpty(typeHint) && typeHint.ToLowerInvariant().Contains("gamble"))
+        // 비전투 — pool_key 키워드로 상호작용 챌린지 선택. 그 외(서약 sanctum 등)는 무동작(즉시 클리어).
+        string kh = typeHint?.ToLowerInvariant() ?? string.Empty;
+        int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "event").GetHashCode());
+        if (kh.Contains("gamble"))
         {
-            int seed = roomRng?.Next() ?? Mathf.Abs((typeHint ?? "gamble").GetHashCode());
             var gamble = roomGO.AddComponent<GambleBoxChallenge>();
             gamble.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
             Debug.Log($"[GameRunBootstrapper] 이벤트 도박 상자 부착 (seed={seed}) — {typeHint}");
+        }
+        else if (kh.Contains("sacrifice"))
+        {
+            var c = roomGO.AddComponent<SacrificeAltarChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 제물 제단 부착 — {typeHint}");
+        }
+        else if (kh.Contains("oracle"))
+        {
+            var c = roomGO.AddComponent<OracleChoiceChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab, seed);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 신탁 갈림길 부착 — {typeHint}");
+        }
+        else if (kh.Contains("vault") || kh.Contains("treasure"))
+        {
+            var c = roomGO.AddComponent<TreasureVaultChallenge>();
+            c.Initialize(_run, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
+            Debug.Log($"[GameRunBootstrapper] 이벤트 보물고 부착 — {typeHint}");
         }
     }
 
@@ -1764,6 +2254,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 return (CombatChallengeOverlay.OverlayType.Hitless, ParseChallengeParam(k, 2f));
             if (k.Contains("speed") || k.Contains("timelimit") || k.Contains("rush"))
                 return (CombatChallengeOverlay.OverlayType.TimeLimit, ParseChallengeParam(k, 45f));
+            if (k.Contains("survival") || k.Contains("siege"))
+                return (CombatChallengeOverlay.OverlayType.Survival, 0f);
+            if (k.Contains("noheal") || k.Contains("ascetic"))
+                return (CombatChallengeOverlay.OverlayType.NoHeal, 0f);
+            if (k.Contains("berserk") || k.Contains("lowhp"))
+                return (CombatChallengeOverlay.OverlayType.Berserk, 0f);
         }
         return (CombatChallengeOverlay.OverlayType.TimeLimit, 45f);
     }
@@ -2272,7 +2768,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask StartWaitingRoomAsync()
     {
-        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+        Managers.Sound?.PlayBgmAsync("Ch1_Map").Forget();
 
         // 대기 방 동안 전투 HUD 억제 — 출구 게이트 통과 시 ExitStartRoomAsync가 복원한다.
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
@@ -2461,7 +2957,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+        var combatMapKey = ResolveCurrentChapter() switch
+        {
+            ChapterId.Chapter1 => "Ch1_Map",
+            ChapterId.Chapter2 => "Ch2_Map",
+            ChapterId.Chapter3 => "Ch3_Map",
+            _                  => (string)null,
+        };
+        if (combatMapKey != null) Managers.Sound?.PlayBgmAsync(combatMapKey).Forget();
 
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
@@ -2917,6 +3420,20 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var weaponData = new WeaponData(weaponSO);
         await PreloadWeaponClipsAsync(weaponData);
         await wm.AcquireWeaponAsync(weaponData, autoEquip: true);
+    }
+
+    /// <summary>
+    /// 무기를 <b>지정한 고정 슬롯</b>에 장착한다(빈슬롯 자동배정 없음).
+    /// 각 스테이션이 획득 순서와 무관하게 자기 슬롯에 독립 장착하는 용도
+    /// (무형검=Slot0 활성, 원거리=Slot1 비활성 등).
+    /// </summary>
+    public static async UniTask EquipWeaponToPlayerAsync(WeaponSO weaponSO, PlayerController player, int slotIndex, bool setActive = true)
+    {
+        var wm = player?.WeaponManager;
+        if (wm == null || weaponSO == null) return;
+        var weaponData = new WeaponData(weaponSO);
+        await PreloadWeaponClipsAsync(weaponData);
+        await wm.AcquireWeaponToSlotAsync(weaponData, slotIndex, setActive);
     }
 
     /// <summary>무기 데이터의 애니메이션 클립을 AcquireWeapon 전에 로드</summary>

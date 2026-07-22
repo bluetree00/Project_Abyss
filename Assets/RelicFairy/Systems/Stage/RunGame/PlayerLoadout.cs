@@ -24,6 +24,10 @@ public class PlayerLoadout
     private readonly List<string> _reservedCovenants = new();
     public IReadOnlyList<string> ReservedCovenants => _reservedCovenants;
 
+    // 보스 클리어 드래프트로 이번 런에 획득한 유물 파츠 id(개화 = 런 내 임시 성장). Clear()에서 리셋.
+    private readonly List<string> _relicPartIds = new();
+    public IReadOnlyList<string> RelicPartIds => _relicPartIds;
+
     // CombatGirl 단일 몸 체제: CharacterData 없이 body 키만 있어도 준비 완료(무기 픽업 허용).
     public bool IsReady => CharacterData != null || !string.IsNullOrEmpty(CharacterPrefabKey);
 
@@ -45,6 +49,16 @@ public class PlayerLoadout
             _reservedCovenants.Add(id);
     }
 
+    /// <summary>보스 클리어 드래프트가 호출. 중복 part_id는 무시.</summary>
+    public void AddRelicPart(string partId)
+    {
+        if (!string.IsNullOrEmpty(partId) && !_relicPartIds.Contains(partId))
+            _relicPartIds.Add(partId);
+    }
+
+    /// <summary>이미 보유한 파츠인지 — 드래프트 후보 중복 배제에 사용.</summary>
+    public bool HasRelicPart(string partId) => _relicPartIds.Contains(partId);
+
     public void Clear()
     {
         CharacterData      = null;
@@ -53,5 +67,6 @@ public class PlayerLoadout
         WeaponSlot0        = null;
         WeaponSlot1        = null;
         _reservedCovenants.Clear();
+        _relicPartIds.Clear();
     }
 }

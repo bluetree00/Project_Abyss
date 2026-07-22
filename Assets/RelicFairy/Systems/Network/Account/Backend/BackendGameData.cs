@@ -192,6 +192,7 @@ public class BackendGameData : MonoBehaviour
 
         // 유물의 각성
         Data.lichEncounterCount   = SafeInt(row, "lichEncounterCount",   0);
+        Data.sealBrokenBossIds    = SafeString(row, "sealBrokenBossIds", "");
 
         Data.abyssEssence         = SafeInt(row, "abyssEssence",         0);
         Data.awakeningLevelSword  = SafeInt(row, "awakeningLevelSword",  0);
@@ -215,6 +216,7 @@ public class BackendGameData : MonoBehaviour
         { "totalGoldEarned",      Data.totalGoldEarned      },
         // 유물의 각성
         { "lichEncounterCount",   Data.lichEncounterCount   },
+        { "sealBrokenBossIds",    Data.sealBrokenBossIds ?? "" },
         { "abyssEssence",         Data.abyssEssence         },
         { "awakeningLevelSword",  Data.awakeningLevelSword  },
         { "awakeningLevelShield", Data.awakeningLevelShield },
@@ -233,6 +235,12 @@ public class BackendGameData : MonoBehaviour
     private static float SafeFloat(JsonData row, string key, float fallback)
     {
         try { return row.ContainsKey(key) ? float.Parse(row[key].ToString()) : fallback; }
+        catch { return fallback; }
+    }
+
+    private static string SafeString(JsonData row, string key, string fallback)
+    {
+        try { return row.ContainsKey(key) ? row[key].ToString() : fallback; }
         catch { return fallback; }
     }
 }
