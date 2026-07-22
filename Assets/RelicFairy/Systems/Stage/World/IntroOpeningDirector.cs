@@ -98,6 +98,8 @@ public sealed class IntroOpeningDirector : MonoBehaviour
                 SetCamera(p + new Vector3(0f, 2.6f, -5.5f), p + new Vector3(0f, 1.4f, 6f));
                 cam?.HandToGameplayCamera(player.transform);
             }
+            // 화면이 밝아지는 동안 BGM도 Game_Intro_play로 페이드 전환
+            Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
             await ScreenFade.In(fadeDuration, ct);
 
             // 통로 이동 구간에서도 HUD는 계속 숨긴다(전투 진입 시 FadeInHudAsync가 띄운다).

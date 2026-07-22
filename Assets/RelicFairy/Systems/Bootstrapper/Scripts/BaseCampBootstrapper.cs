@@ -52,6 +52,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
+            Managers.Sound.PlayBgmAsync("BaseCamp").Forget();
             EnsureCameraController();
 
             // 허브에서는 전투 HUD를 억제(시작방과 동일 처리).
@@ -113,6 +114,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         // (허브를 돌아다니는 것은 시도가 아니다). 새 게임/슬롯 삭제에서 0으로 리셋된다.
         var rpm = RunProgressManager.Instance;
         if (rpm != null) RunProgressManager.BumpRetryCount(rpm.ActiveSlotIndex);
+        Managers.Sound.FadeOutBgmAsync().Forget();
         AppBootstrapper.Instance?.RequestLoad(Define.Scene.GameScene_Ch1);
     }
 
