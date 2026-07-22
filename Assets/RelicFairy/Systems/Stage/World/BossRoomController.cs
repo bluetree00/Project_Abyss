@@ -4,6 +4,7 @@ using Cysharp.Threading.Tasks;
 using RelicFairy.Monster;
 using RelicFairy.UI;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 보스방 입장 감지 + 연출 제어.
@@ -93,6 +94,15 @@ public class BossRoomController : MonoBehaviour
         _playerTransform  = player.transform;
         _playerController = player;
         player.SetInputEnabled(false);
+
+        var bossBgmKey = SceneManager.GetActiveScene().name switch
+        {
+            "GameScene_Ch1" => "Ch1_Boss",
+            "GameScene_Ch2" => "Ch2_Boss",
+            "GameScene_Ch3" => "Ch3_Boss",
+            _               => (string)null,
+        };
+        if (bossBgmKey != null) Managers.Sound.CrossfadeBgmAsync(bossBgmKey).Forget();
 
         if (barrier != null)
             barrier.SetActive(true);

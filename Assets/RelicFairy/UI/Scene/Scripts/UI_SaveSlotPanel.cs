@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -123,6 +124,8 @@ public class UI_SaveSlotPanel : UI_Base
         if (rpm != null) rpm.ActiveSlotIndex = slotIndex;
 
         Close();
+
+        Managers.Sound.FadeOutBgmAsync().Forget();
 
         if (hasSave)
             AppBootstrapper.Instance?.RequestRestoreRun(onFailed: Open);

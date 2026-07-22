@@ -33,6 +33,7 @@ public sealed class IntroBootstrapper : MonoBehaviour
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
+            Managers.Sound.PlayBgmAsync("Game_Intro").Forget();
             EnsureCameraController();
 
             // @UIRoot는 Addressable 비동기 로드라 이 시점에 아직 없을 수 있다.
@@ -55,6 +56,7 @@ public sealed class IntroBootstrapper : MonoBehaviour
             {
                 if (_player != null)
                     cam?.HandToGameplayCamera(_player.transform);
+                Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
                 await ScreenFade.In(0.4f, ct);
             }
         }

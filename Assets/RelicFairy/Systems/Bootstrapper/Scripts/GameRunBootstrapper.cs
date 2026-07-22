@@ -1,6 +1,7 @@
 using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 using Unity.AI.Navigation;
 using Cysharp.Threading.Tasks;
 using TMPro;
@@ -353,6 +354,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // AppBootstrapper 준비 대기 (자동 로그인 포함)
         // null인 경우(씬 직접 실행)는 즉시 통과
         await UniTask.WaitUntil(() => AppBootstrapper.Instance == null || AppBootstrapper.Instance.IsReady);
+
+        var mapBgmKey = SceneManager.GetActiveScene().name switch
+        {
+            "GameScene_Ch1" => "Ch1_Map",
+            "GameScene_Ch2" => "Ch2_Map",
+            "GameScene_Ch3" => "Ch3_Map",
+            _               => (string)null,
+        };
+        if (mapBgmKey != null) Managers.Sound.PlayBgmAsync(mapBgmKey).Forget();
 
         // 데이터 매니저 초기화 (로그인 완료 후 CDN 사용 가능)
         await InitMapDataAsync();
@@ -2758,7 +2768,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     private async UniTask StartWaitingRoomAsync()
     {
-        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+        Managers.Sound?.PlayBgmAsync("Ch1_Map").Forget();
 
         // 대기 방 동안 전투 HUD 억제 — 출구 게이트 통과 시 ExitStartRoomAsync가 복원한다.
         UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
@@ -2947,7 +2957,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
-        Managers.Sound?.PlayBgmAsync(SoundKey.Bgm.InGame).Forget();
+        var combatMapKey = ResolveCurrentChapter() switch
+        {
+            ChapterId.Chapter1 => "Ch1_Map",
+            ChapterId.Chapter2 => "Ch2_Map",
+            ChapterId.Chapter3 => "Ch3_Map",
+            _                  => (string)null,
+        };
+        if (combatMapKey != null) Managers.Sound?.PlayBgmAsync(combatMapKey).Forget();
 
         var uiRoot = UIRootBootstrapper.Instance;
         if (uiRoot != null)
