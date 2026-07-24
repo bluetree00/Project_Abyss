@@ -192,10 +192,11 @@ public sealed class ItemInfoPanel : MonoBehaviour
         int cols = maxX - minX + 1;
         int rows = maxY - minY + 1;
 
-        // 셀 색 = 룬의 속성색. 고정 초록이면 판의 속성 존과 아무 관계가 없어
-        // "어디에 놓아야 하는가"가 이 패널에서 읽히지 않는다.
-        var cellColor = ElementDef.IdColor(item.element, new Color(0.3f, 0.85f, 0.45f, 0.9f));
-        var art       = RuneArt.GetArt(item.rarity);
+        // 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell 한곳에서 정한다(네 경로 동일 규칙).
+        // 예전엔 여기만 속성 각인석을 안 쓰고 등급 아트를 통째로 속성색으로 덮어써서,
+        // 같은 룬이 보관함·판·선택 팝업과 다르게 보였다.
+        RuneArt.ResolveRuneCell(item.element, item.rarity, new Color(0.3f, 0.85f, 0.45f, 0.9f),
+            out var art, out var cellColor);
 
         float totalW = cols * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float totalH = rows * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
@@ -217,9 +218,10 @@ public sealed class ItemInfoPanel : MonoBehaviour
                 startY - row * (MINI_CELL_SIZE + MINI_CELL_GAP));
 
             var img  = cellGO.GetComponent<Image>();
-            if (art != null) img.sprite = art;   // 등급 아트를 속성색으로 틴트 — 미로드 시 색상 폴백
-            img.color         = cellColor;
-            img.raycastTarget = false;
+            if (art != null) img.sprite = art;
+            img.color          = cellColor;
+            img.preserveAspect = art != null;   // 껐더니 룬이 정사각 22×22로 눌려 보였다
+            img.raycastTarget  = false;
 
             _shapeCells.Add(cellGO);
         }
