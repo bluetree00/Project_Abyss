@@ -134,6 +134,9 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         // 런타임 GridVisualSO — GridManager.GetGap()이 44f를 반환하도록 squareGap 설정
         _runtimeVisualSO = ScriptableObject.CreateInstance<GridVisualSO>();
         _runtimeVisualSO.squareGap = CELL_STEP;
+        // 배치 블록도 시각 셀(50)과 같은 크기로 그려지도록 알려준다 — 스텝(54)으로 그리면
+        // 블록이 존 타일 경계를 양옆 2px씩 잠식해 존 구분선이 끊겨 보였다.
+        _runtimeVisualSO.squareVisualSize = CELL_SIZE;
         _runtimeVisualSO.autoCenter = false;
 
         _runtimeGridAsset = ScriptableObject.CreateInstance<GridAssetSO>();
@@ -199,12 +202,11 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         if (placedPositions != null)
             foreach (var p in placedPositions) _occupiedPositions.Add(p);
 
-        foreach (var kvp in _cellImages)
-        {
-            if (!_cellBaseColors.TryGetValue(kvp.Key, out var bc)) continue;
-            bool placed = _occupiedPositions.Contains(kvp.Key);
-            kvp.Value.color = placed ? OccupiedColor(bc) : EmptyColor(bc);
-        }
+        // 칸 색은 RefreshPlaceableTint 한 곳에서만 칠한다.
+        // 예전엔 여기서 빈 칸을 전부 EmptyColor로 덮었는데, 이 함수가 모든 흐름의 <b>맨 끝</b>에서
+        // (RefreshSynergyStatus → RefreshOccupiedCells 경유) 불리는 바람에 방금 세운 배치 힌트가
+        // 매번 지워졌다 — 룬을 하나 놓고 나면 "다음 룬을 어디 놓을 수 있는지"가 화면에서 사라지던 원인.
+        RefreshPlaceableTint(BuildPlaceableSet());
 
         NotifyBridge();
     }
@@ -322,28 +324,63 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     {
         var result = new HashSet<Vector2Int>();
 
-        // 판이 비었으면 전체 개방
-        if (_occupiedPositions.Count == 0)
-        {
-            foreach (var pos in _cellZones.Keys) result.Add(pos);
-            return result;
-        }
+        // 인접 제약은 <b>존 안에서만</b> 본다.
+        //
+        // 예전엔 판 전체를 하나로 보고 "이미 놓인 칸에서 5칸 이내"만 열었다. 그런데 룬은 자기 속성
+        // 존에만 놓이므로(RuneZoneRule), 첫 룬을 얼음 존에 놓으면 5칸 밖에 있는 불 존은 영원히
+        // 닿지 못한다 — 두 번째 룬부터 놓을 자리가 아예 사라지고 판도 아무 데도 빛나지 않았다.
+        // 존을 건너뛰는 인접은 애초에 의미가 없으므로, 각 존을 독립된 판처럼 다룬다:
+        // 비어 있는 존은 전체 개방, 이미 룬이 있는 존은 그 룬에서 뻗어 나가게.
+        var zones = new HashSet<char>();
+        foreach (var z in _cellZones.Values) zones.Add(z);
 
         var frontier = new Queue<(Vector2Int pos, int depth)>();
-        foreach (var occ in _occupiedPositions) frontier.Enqueue((occ, 0));
 
-        while (frontier.Count > 0)
+        foreach (var zone in zones)
         {
-            var (pos, depth) = frontier.Dequeue();
-            if (depth >= ADJACENCY_REACH) continue;
+            frontier.Clear();
+            bool zoneHasRune = false;
 
-            TryExpandBFS(pos + new Vector2Int(-1, 0), result, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 1, 0), result, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 0,-1), result, frontier, depth);
-            TryExpandBFS(pos + new Vector2Int( 0, 1), result, frontier, depth);
+            foreach (var occ in _occupiedPositions)
+            {
+                if (!_cellZones.TryGetValue(occ, out var zc) || zc != zone) continue;
+                zoneHasRune = true;
+                frontier.Enqueue((occ, 0));
+            }
+
+            if (!zoneHasRune)
+            {
+                // 빈 존 — 어디서든 시작할 수 있다.
+                foreach (var kv in _cellZones)
+                    if (kv.Value == zone && !_occupiedPositions.Contains(kv.Key)) result.Add(kv.Key);
+                continue;
+            }
+
+            while (frontier.Count > 0)
+            {
+                var (pos, depth) = frontier.Dequeue();
+                if (depth >= ADJACENCY_REACH) continue;
+
+                TryExpandInZone(pos + new Vector2Int(-1, 0), zone, result, frontier, depth);
+                TryExpandInZone(pos + new Vector2Int( 1, 0), zone, result, frontier, depth);
+                TryExpandInZone(pos + new Vector2Int( 0,-1), zone, result, frontier, depth);
+                TryExpandInZone(pos + new Vector2Int( 0, 1), zone, result, frontier, depth);
+            }
         }
 
-        return result;   // TryExpandBFS가 점유 셀·판 밖을 이미 배제한다
+        return result;   // TryExpandInZone이 점유 셀·판 밖·타존을 이미 배제한다
+    }
+
+    /// <summary>같은 존 안의 빈 칸으로만 인접 확장한다.</summary>
+    private void TryExpandInZone(Vector2Int n, char zone,
+        HashSet<Vector2Int> reachable,
+        Queue<(Vector2Int, int)> frontier,
+        int depth)
+    {
+        if (_occupiedPositions.Contains(n)) return;
+        if (!_cellZones.TryGetValue(n, out var zc) || zc != zone) return;
+        if (reachable.Add(n))
+            frontier.Enqueue((n, depth + 1));
     }
 
     /// <summary>

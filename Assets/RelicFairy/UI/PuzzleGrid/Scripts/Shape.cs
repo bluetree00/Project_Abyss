@@ -95,20 +95,25 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         if (shapeBlockPrefab == null) return;
 
+        // 간격은 스텝(cellSize)으로, 크기는 칸의 시각 크기로 그린다.
+        // 둘을 같은 값으로 쓰면 블록이 칸 사이 여백까지 덮어 존 타일 경계선이 잠식된다.
+        float visualSize = (GridManager.Instance != null && GridManager.Instance.HasGrid)
+                           ? GridManager.Instance.GetSquareVisualSize()
+                           : cellSize;
+
         foreach (var offset in cellOffsets)
         {
             var blockObj = Instantiate(shapeBlockPrefab, transform);
             var brt = blockObj.GetComponent<RectTransform>();
             if (brt != null)
             {
-                // 블록 시각 크기를 그리드 gap(cellSize)에 맞춤 — 크기 불일치 시 호버 영역 오감지 방지
-                brt.sizeDelta = new Vector2(cellSize, cellSize);
+                brt.sizeDelta = new Vector2(visualSize, visualSize);
                 brt.anchoredPosition = new Vector2(offset.x * cellSize, offset.y * cellSize);
             }
 
-            // BoxCollider2D 크기도 cellSize 기준으로 동기화 (약 80% 인셋)
+            // BoxCollider2D 크기도 시각 크기 기준으로 동기화 (약 80% 인셋)
             if (blockObj.TryGetComponent<BoxCollider2D>(out var col))
-                col.size = new Vector2(cellSize * 0.8f, cellSize * 0.8f);
+                col.size = new Vector2(visualSize * 0.8f, visualSize * 0.8f);
         }
 
         ApplyRuneArt();   // 재생성(칸 크기 변경 등) 후에도 룬 외형이 유지되도록
@@ -201,14 +206,16 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     /// <summary>
     /// 드래그하는 블록의 겉모습을 <b>그 아이템의 속성 룬</b>으로 바꾼다.
     /// 블록 프리팹은 속성을 모르는 공용 사각 타일이라, 아이템이 붙는 이 시점에만 알 수 있다.
-    /// 속성 아트가 없으면 등급 아트로, 그것도 없으면 프리팹 기본 외형을 그대로 둔다.
+    /// 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell에 맡긴다 — 예전엔 여기서만 틴트를
+    /// 흰색으로 강제해서, 전용 아트가 없는 빛 룬이 손에 쥔 순간 흰 돌로 바뀌었다.
+    /// 아트가 아예 없으면 프리팹 기본 외형을 그대로 둔다.
     /// </summary>
     private void ApplyRuneArt()
     {
         if (ItemData == null) return;
 
-        var art = RuneArt.GetArtByElement(ItemData.element);
-        if (art == null) art = RuneArt.GetArt(ItemData.rarity);
+        RuneArt.ResolveRuneCell(ItemData.element, ItemData.rarity, Color.white,
+            out var art, out var tint);
         if (art == null) return;
 
         foreach (Transform child in transform)
@@ -216,7 +223,7 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             if (!child.TryGetComponent<Image>(out var img)) continue;
             img.sprite         = art;
             img.type           = Image.Type.Simple;
-            img.color          = Color.white;   // 아트가 이미 속성색으로 채색돼 있다
+            img.color          = tint;
             img.preserveAspect = true;
         }
     }

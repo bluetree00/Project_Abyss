@@ -126,6 +126,18 @@ public class GridManager : MonoBehaviour
         (grid != null && grid.gridAsset != null && grid.gridAsset.visual != null)
             ? grid.gridAsset.visual.squareGap : 90f;
 
+    /// <summary>
+    /// 칸 하나의 시각 크기. 배치 블록을 이 크기로 그리면 칸 사이 여백(= gap - visualSize)을
+    /// 침범하지 않는다. 미설정(0)이면 gap과 동일 — 기존 보드는 동작이 바뀌지 않는다.
+    /// </summary>
+    public float GetSquareVisualSize()
+    {
+        float gap = GetGap();
+        if (grid == null || grid.gridAsset == null || grid.gridAsset.visual == null) return gap;
+        float v = grid.gridAsset.visual.squareVisualSize;
+        return v > 0f ? v : gap;
+    }
+
     public bool TryPlaceShape(Shape shape)
     {
         if (grid == null || shape == null) return false;
