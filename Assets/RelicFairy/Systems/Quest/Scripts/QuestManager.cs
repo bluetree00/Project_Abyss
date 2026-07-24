@@ -70,8 +70,12 @@ public class QuestManager
 
         if (!Load())
         {
+            // 최초 부팅: 업적 전체 등록. 항목마다 저장하면 PlayerPrefs를 수십 번 쓰므로 끝에 1회만 저장한다.
+            _suppressSave = true;
             foreach (var achievement in _achievementDatabase.Quests)
                 Register(achievement);
+            _suppressSave = false;
+            Save();
         }
 
         onInitialized?.Invoke();
@@ -81,7 +85,12 @@ public class QuestManager
     // Public API
     // ──────────────────────────────────────────────────────────
 
-    public Quest Register(Quest quest)
+    /// <param name="notify">
+    /// false면 등장(onQuestRegistered) 이벤트를 발행하지 않는다. 세이브 <b>복원</b> 전용 —
+    /// 복원은 '새로 수락'이 아닌데도 이벤트를 쏘면 QuestFeedbackPresenter가 등장 대사를 다시 재생해
+    /// 게임을 켤 때마다 튜토리얼 안내가 반복된다.
+    /// </param>
+    public Quest Register(Quest quest, bool notify = true)
     {
         var newQuest = quest.Clone();
 
@@ -90,7 +99,7 @@ public class QuestManager
             newQuest.onCompleted += OnAchievementCompleted;
             _activeAchievements.Add(newQuest);
             newQuest.OnRegister();
-            onAchievementRegistered?.Invoke(newQuest);
+            if (notify) onAchievementRegistered?.Invoke(newQuest);
         }
         else
         {
@@ -98,9 +107,10 @@ public class QuestManager
             newQuest.onCanceled  += OnQuestCanceled;
             _activeQuests.Add(newQuest);
             newQuest.OnRegister();
-            onQuestRegistered?.Invoke(newQuest);
+            if (notify) onQuestRegistered?.Invoke(newQuest);
         }
 
+        if (notify) Save();   // 수락 상태를 즉시 영속화(복원 경로는 이미 저장본이므로 재저장 불필요)
         return newQuest;
     }
 
@@ -167,8 +177,13 @@ public class QuestManager
     public bool ContainInCompleteAchievement(Quest quest)
         => _completedAchievements.Any(x => x.CodeName == quest.CodeName);
 
+    // 일괄 등록(최초 부팅 업적 등록) 중 항목별 저장을 막는 가드. 끝에서 1회만 저장한다.
+    private bool _suppressSave;
+
     public void Save()
     {
+        if (_suppressSave) return;
+
         var root = new JObject();
         root.Add(kActiveQuestsSavePath,         CreateSaveData(_activeQuests));
         root.Add(kCompletedQuestsSavePath,      CreateSaveData(_completedQuests));
@@ -238,7 +253,7 @@ public class QuestManager
 
     private void LoadActiveQuest(QuestSaveData saveData, Quest quest)
     {
-        var newQuest = Register(quest);
+        var newQuest = Register(quest, notify: false);   // 복원 — 등장 대사 재생 금지
         newQuest.LoadFrom(saveData);
     }
 
@@ -257,17 +272,22 @@ public class QuestManager
     // Callbacks
     // ──────────────────────────────────────────────────────────
 
+    // 상태 전이(수락/완료/취소)마다 저장한다. 리포트마다 저장하면 처치 1회당 PlayerPrefs 쓰기가 되어
+    // 비용이 크고, 정작 중요한 건 "이 퀘스트를 이미 받았/끝냈다"는 사실이다.
+
     private void OnQuestCompleted(Quest quest)
     {
         _activeQuests.Remove(quest);
         _completedQuests.Add(quest);
         onQuestCompleted?.Invoke(quest);
+        Save();
     }
 
     private void OnQuestCanceled(Quest quest)
     {
         _activeQuests.Remove(quest);
         onQuestCanceled?.Invoke(quest);
+        Save();
     }
 
     private void OnAchievementCompleted(Quest achievement)
@@ -275,5 +295,6 @@ public class QuestManager
         _activeAchievements.Remove(achievement);
         _completedAchievements.Add(achievement);
         onAchievementCompleted?.Invoke(achievement);
+        Save();
     }
 }

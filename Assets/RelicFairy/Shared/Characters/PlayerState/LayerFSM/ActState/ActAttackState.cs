@@ -668,6 +668,14 @@ public class ActAttackState : ILayerState<ActState>
     // ── 타이밍 해석 ──────────────────────────────────────────────────────────
     /// <summary>
     /// ClipMapping override → AnimSet 기본값 → 하드코딩 fallback 순으로 타이밍을 결정한다.
+    ///
+    /// 세 값은 <b>open &lt; close ≤ end</b> 순서를 지켜야 한다. 콤보 창이 닫히기도 전에 공격이
+    /// 끝나버리면(end &lt; close) 창은 열려 있는데 상태는 이미 다음 스텝을 판단해버려,
+    /// 입력이 먹다 말다 하는 조작감이 된다. 무형검이 실제로 이 상태였다
+    /// (지상·공중 전 타 open 0.30 / close 0.72 / <b>end 0.55</b>).
+    ///
+    /// 데이터가 어긋나도 동작이 무너지지 않도록 여기서 순서를 강제한다 — 창을 줄이는 대신
+    /// 공격 종료를 창 끝까지 미룬다(카타나 0.45/0.80/0.85, 대검 0.25/0.35/0.35과 같은 형태).
     /// </summary>
     private static (float open, float close, float end) ResolveTiming(
         WeaponAnimationSetSO.ClipMapping mapping,
@@ -680,6 +688,9 @@ public class ActAttackState : ILayerState<ActState>
         float open  = (mapping != null && mapping.comboWindowOpen  >= 0f) ? mapping.comboWindowOpen  : defOpen;
         float close = (mapping != null && mapping.comboWindowClose >= 0f) ? mapping.comboWindowClose : defClose;
         float end   = (mapping != null && mapping.attackEndAt      >= 0f) ? mapping.attackEndAt      : defEnd;
+
+        if (close < open) close = open;   // 창 자체가 뒤집힌 경우
+        if (end   < close) end   = close; // 공격 종료가 창보다 앞선 경우
 
         return (open, close, end);
     }

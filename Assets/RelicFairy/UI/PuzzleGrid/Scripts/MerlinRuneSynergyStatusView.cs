@@ -44,7 +44,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         }
         ZONE_ORDER[n]  = ElementDef.CenterId;
         ZONE_NAMES[n]  = "중앙";
-        ZONE_ICONS[n]  = "◈";
+        ZONE_ICONS[n]  = "◆";
         ZONE_COLORS[n] = ElementDef.CenterColor;
     }
 
@@ -66,6 +66,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     // ── Private fields ──
     private readonly Dictionary<string, ZoneRow> _rows  = new();
+    private readonly List<string> _activeOrder = new();   // 활성화된 순서(완성본: 활성만 활성순 표시)
     private Transform   _rowContainer;
     private GameObject  _emptyLabelGO;
     private TMP_Text    _reactionText;   // 활성 속성 반응 배너(행 목록 최상단)
@@ -89,30 +90,44 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
-        // 시너지 정의가 있는 전 존을 항상 표시한다 — 설계 레이아웃대로 6속성 구조를 늘 보여줘,
-        // 빈 판에서도 어떤 시너지가 있고 몇 칸이 필요한지 파악하게 한다(과거: count>0 존만 노출 → 첫 판이 빈 플레이스홀더).
-        var shown = new List<string>();
+        // 완성본: 활성화된 시너지만 활성 순서로 실시간 표시.
+        // 활성 = 그 존이 최저 임계(첫 단계)에 도달. 활성 순서는 처음 활성된 시점 기준으로 유지한다.
+        var nowActive = new HashSet<string>();
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
-            var syn = Managers.RuneData?.GetZoneSynergies(ZONE_ORDER[i]);
-            if (syn != null && syn.Count > 0) shown.Add(ZONE_ORDER[i]);
+            var zone = ZONE_ORDER[i];
+            var syn = Managers.RuneData?.GetZoneSynergies(zone);
+            if (syn == null || syn.Count == 0) continue;
+            int minTh = int.MaxValue;
+            foreach (var s in syn) if (s.threshold < minTh) minTh = s.threshold;
+            int c = 0; zoneCounts?.TryGetValue(zone, out c);
+            if (c >= minTh) nowActive.Add(zone);
         }
 
-        // 시너지 정의가 없는(구성 변경 등) 존 행은 제거
+        // 활성 순서 갱신: 비활성된 존 제거 + 새로 활성된 존 append(활성화 순서 = 등장 순서)
+        _activeOrder.RemoveAll(z => !nowActive.Contains(z));
+        for (int i = 0; i < ZONE_ORDER.Length; i++)
+        {
+            var zone = ZONE_ORDER[i];
+            if (nowActive.Contains(zone) && !_activeOrder.Contains(zone)) _activeOrder.Add(zone);
+        }
+
+        // 목록에서 빠진(비활성) 행 파괴
         var toRemove = new List<string>();
         foreach (var key in _rows.Keys)
-            if (!shown.Contains(key)) toRemove.Add(key);
+            if (!_activeOrder.Contains(key)) toRemove.Add(key);
         foreach (var key in toRemove)
         {
             if (_rows[key].go != null) Destroy(_rows[key].go);
             _rows.Remove(key);
         }
 
-        // 전 존 행 추가/갱신 (count=0이면 임계 'N칸'만 어둡게 표시)
-        foreach (var zoneId in shown)
+        // 활성 순서대로 행 추가/갱신 + 형제 순서를 활성 순서에 맞춘다
+        for (int i = 0; i < _activeOrder.Count; i++)
         {
-            int idx   = System.Array.IndexOf(ZONE_ORDER, zoneId);
-            int count = 0;
+            var zoneId = _activeOrder[i];
+            int idx    = System.Array.IndexOf(ZONE_ORDER, zoneId);
+            int count  = 0;
             zoneCounts?.TryGetValue(zoneId, out count);
 
             if (!_rows.TryGetValue(zoneId, out var row))
@@ -121,10 +136,11 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
                 _rows[zoneId] = row;
             }
             RefreshRow(row, zoneId, count);
+            if (row.go != null) row.go.transform.SetSiblingIndex(i);
         }
 
-        // 빈 상태 레이블 — 시너지 정의 자체가 없을 때만(데이터 미로드 등)
-        _emptyLabelGO?.SetActive(shown.Count == 0);
+        // 활성 시너지가 하나도 없으면 안내 레이블
+        _emptyLabelGO?.SetActive(_activeOrder.Count == 0);
 
         // 속성 반응 배너 — 브릿지가 계산한 활성 반응을 표시(둘 다 1단계 이상인 인접 쌍)
         RefreshReactionBanner();
@@ -132,7 +148,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         // 툴팁 갱신
         if (!string.IsNullOrEmpty(_hoveredZoneId))
         {
-            if (shown.Contains(_hoveredZoneId) && _rows.TryGetValue(_hoveredZoneId, out var tr))
+            if (_activeOrder.Contains(_hoveredZoneId) && _rows.TryGetValue(_hoveredZoneId, out var tr))
             {
                 int count = 0;
                 zoneCounts?.TryGetValue(_hoveredZoneId, out count);
@@ -199,7 +215,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             return;
         }
 
-        var sb = new System.Text.StringBuilder("✦ 반응  ");
+        var sb = new System.Text.StringBuilder("◆ 반응  ");
         for (int i = 0; i < reactions.Count; i++)
         {
             var d = reactions[i];
@@ -288,6 +304,10 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         _emptyLabelGO.SetActive(true);
     }
 
+    // 시너지 엔트리 스킨(시너지 바탕/테두리) — UI_GridPanel이 주입.
+    private Sprite _rowBgSkin, _rowBorderSkin;
+    public void SetSkin(Sprite bg, Sprite border) { _rowBgSkin = bg; _rowBorderSkin = border; }
+
     private ZoneRow BuildRow(string zoneId, int idx)
     {
         var row = new ZoneRow { zoneIdx = idx };
@@ -295,7 +315,22 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
         row.go = new GameObject($"Row_{zoneId}", typeof(RectTransform));
         row.go.transform.SetParent(_rowContainer, false);
         row.go.AddComponent<LayoutElement>().preferredHeight = 34f;
-        row.go.AddComponent<Image>().color = COLOR_ROW_BG_ACTIVE;
+        var rowBg = row.go.AddComponent<Image>();
+        rowBg.color = COLOR_ROW_BG_ACTIVE;
+        if (_rowBgSkin != null)   // 시너지 바탕
+        {
+            rowBg.sprite = _rowBgSkin; rowBg.type = Image.Type.Sliced; rowBg.color = Color.white;
+        }
+        if (_rowBorderSkin != null)   // 시너지 테두리 — 위에 얹는 프레임
+        {
+            var bd = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            bd.transform.SetParent(row.go.transform, false);
+            var brt = (RectTransform)bd.transform;
+            brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
+            var bi = bd.GetComponent<Image>();
+            bi.sprite = _rowBorderSkin; bi.type = Image.Type.Sliced; bi.raycastTarget = false;
+            brt.SetAsLastSibling();
+        }
 
         Color zoneColor = GetZoneColor(idx);
 
@@ -552,7 +587,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
             {
                 var s = sorted[i];
                 bool met   = count >= s.threshold;
-                string chk = met ? "<color=#55FF88>●</color>" : "○";
+                string chk = met ? "<color=#55FF88>●</color>" : "◇";
                 string desc = string.IsNullOrEmpty(s.description) ? s.effect_type : s.description;
                 sb.AppendLine($"{chk} <b>({s.threshold}칸)</b> {desc}");
             }

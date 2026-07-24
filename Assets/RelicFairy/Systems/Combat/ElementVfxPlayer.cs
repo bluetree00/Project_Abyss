@@ -228,10 +228,6 @@ public sealed class ElementVfxPlayer : MonoBehaviour
     // ── 풀 ──────────────────────────────────────────────
     private VfxItem Spawn(GameObject prefab, Vector3 pos, float scale)
     {
-        // [임시 추적] 초록 이펙트 출처 확인용 — 확인 후 제거할 것.
-        if (prefab != null)
-            Debug.Log($"[VFX추적] ElementVfxPlayer.Spawn: {prefab.name}\n{System.Environment.StackTrace}");
-
         VfxItem it = null;
         if (_pools.TryGetValue(prefab, out var stack) && stack.Count > 0)
             it = stack.Pop();

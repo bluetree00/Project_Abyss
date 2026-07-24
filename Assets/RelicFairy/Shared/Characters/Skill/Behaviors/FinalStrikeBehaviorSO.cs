@@ -37,7 +37,7 @@ public class FinalStrikeBehaviorSO : SkillBehaviorSO
     [Header("이펙트")]
     [SerializeField] private string strikeEffectKey = "GreatswordSlash";
     [SerializeField] private float strikeEffectScale = 0.5f;
-    [SerializeField] private string hitEffectKey = "BloodShot";
+    [SerializeField] private string hitEffectKey = "SwordHitImpact";
     [SerializeField] private float hitEffectScale = 0.5f;
 
     [Header("마무리")]

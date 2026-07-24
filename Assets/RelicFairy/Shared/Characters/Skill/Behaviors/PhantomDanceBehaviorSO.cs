@@ -44,7 +44,7 @@ public class PhantomDanceBehaviorSO : SkillBehaviorSO
     [Header("이펙트")]
     public string attackEffectKey = "SlashAttack";
     public float attackEffectScale = 1f;
-    public string hitEffectKey = "BloodShot";
+    public string hitEffectKey = "SwordHitImpact";
     public float hitEffectScale = 0.5f;
     public string finishEffectKey = "IasenFinishFlash";
     public float finishEffectScale = 1f;

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e50bd5899d45ce46a6fb8136a1794e2, type: 3}
+  m_Name: RuneSelectSkin
+  m_EditorClassIdentifier:
+  background: {fileID: 21300000, guid: 13d04837f1ca4954dacbfb6aac51bafc, type: 3}
+  titleBar: {fileID: 21300000, guid: d6636f398ccad314896e215808e7582b, type: 3}
+  cardFrame: {fileID: 21300000, guid: 151d11539b14ef746b0ff0103fb387b6, type: 3}
+  cardFill: {fileID: 21300000, guid: 213820e86d60e884787c6b15f61e29bc, type: 3}
+  elementRibbon:
+  - {fileID: 21300000, guid: 7c4f2b0796d43984da595cbe02545396, type: 3}
+  - {fileID: 21300000, guid: 75957a2b225248f42a222ae164f034f2, type: 3}
+  - {fileID: 21300000, guid: 4bee5a820fcd97348b393a366eae9c8c, type: 3}
+  - {fileID: 21300000, guid: 86c4a37df46e2c142afbab3006c0ec27, type: 3}
+  - {fileID: 21300000, guid: 99d7a1123d83e804fbe3349fb06eac9d, type: 3}
+  - {fileID: 21300000, guid: e6f5c4a43a873df4fb505fed878b915f, type: 3}
+  runeTile: {fileID: 21300000, guid: 665d0bfd8cda6594a9e472eab761a636, type: 3}
+  elementPiece:
+  - {fileID: 21300000, guid: b8c13e4a03beaa74c96a7147562c4bcc, type: 3}
+  - {fileID: 21300000, guid: 507a3f0d3c40412449f6219ca2e55a4b, type: 3}
+  - {fileID: 21300000, guid: 6a3c9c94fc20306499a16aa8022a0341, type: 3}
+  - {fileID: 21300000, guid: cb27c169dc00d5942bc16caa1ff63d14, type: 3}
+  - {fileID: 21300000, guid: 0c34c29a70fb17d409b1d0044c431ac5, type: 3}
+  - {fileID: 21300000, guid: 61a1dde362f13804fa7a78d35e7af5ce, type: 3}
+  effectBox: {fileID: 21300000, guid: 54b1a0c9387011a498ca528e71fc4d80, type: 3}
+  placeOk: {fileID: 21300000, guid: 42e5d53eb4927034885441c352d3edbb, type: 3}
+  placeNo: {fileID: 21300000, guid: 928254b490531d742b95e927232a2e46, type: 3}
+  confirmButton: {fileID: 21300000, guid: 11570f46a78809b46997b72009863858, type: 3}
+  skipButton: {fileID: 21300000, guid: caed8cf7fefcdd0449a279e119705243, type: 3}

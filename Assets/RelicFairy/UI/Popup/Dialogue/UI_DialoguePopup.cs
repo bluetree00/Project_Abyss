@@ -39,12 +39,16 @@ public class UI_DialoguePopup : UI_Popup
     [SerializeField] private Button advanceButton;
 
     [Header("Speaker Names")]
-    [SerializeField] private string godName     = "???";
+    [Tooltip("멀린 — 정체를 감추는 동안 \"???\"로 표기.")]
+    [SerializeField] private string merlinName  = "???";
     [SerializeField] private string shadowName  = "그림자";
     [SerializeField] private string lichName    = "리치";
     [SerializeField] private string mordredName = "모르드레드";
     [SerializeField] private string arthurName  = "아서왕";
     [SerializeField] private string knightName  = "기사";
+    [SerializeField] private string forestGuardianName = "숲의 수호자";
+    [SerializeField] private string dragonName  = "화룡";
+    [SerializeField] private string deathKnightName = "죽음의 기사";
 
     [Header("Typewriter")]
     [SerializeField, Min(0.01f)] private float charDelay = 0.03f;
@@ -80,8 +84,9 @@ public class UI_DialoguePopup : UI_Popup
             OnAdvanceClicked();
     }
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
         if (advanceButton != null)
             advanceButton.onClick.RemoveListener(OnAdvanceClicked);
         ReleaseIllustrations();
@@ -288,12 +293,15 @@ public class UI_DialoguePopup : UI_Popup
         if (speakerNameText == null) return;
         speakerNameText.text = speaker switch
         {
-            DialogueSpeaker.God     => godName,
+            DialogueSpeaker.Merlin  => merlinName,
             DialogueSpeaker.Shadow  => shadowName,
             DialogueSpeaker.Lich    => lichName,
             DialogueSpeaker.Mordred => mordredName,
             DialogueSpeaker.Arthur  => arthurName,
             DialogueSpeaker.Knight  => knightName,
+            DialogueSpeaker.ForestGuardian => forestGuardianName,
+            DialogueSpeaker.Dragon  => dragonName,
+            DialogueSpeaker.DeathKnight    => deathKnightName,
             _                      => string.Empty,
         };
     }

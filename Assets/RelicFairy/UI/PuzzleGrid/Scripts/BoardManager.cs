@@ -182,7 +182,15 @@ public class BoardManager : MonoBehaviour
             }
         }
         if (backButton != null)
+        {
             backButton.onClick.AddListener(BackToSelection);
+
+            // Puzzle 프리팹에 남아 있는 <b>레거시 버튼</b>이다. 돌아갈 곳(그리드 선택 화면)이
+            // 단일 편집 화면으로 개편되며 폐기돼, 지금은 배치 화면 우하단에 정체불명의 아트로만
+            // 떠 있었다(보관함 버튼 위에 겹침). 참조는 남기되 화면에서는 감춘다 —
+            // 되돌리려면 이 한 줄만 지우면 된다.
+            backButton.gameObject.SetActive(false);
+        }
 
         var go = new GameObject("CacheRoot", typeof(RectTransform));
         cacheRoot = (RectTransform)go.transform;
@@ -858,6 +866,35 @@ public class BoardManager : MonoBehaviour
     {
         if (session.gridInstance != null)
             session.gridInstance.gameObject.SetActive(active);
+    }
+
+    /// <summary>
+    /// 셰이프 주차 구역(shapeHost)을 화면에서 감춘다.
+    /// 배치가 <b>칸 클릭</b>으로 바뀌면서 주차된 셰이프를 보여줄 이유가 없어졌다 —
+    /// 판 옆에 룬 덩어리가 떠 있는 것으로만 보였다. 주차 자체는 유지한다(배치 실패 시 되돌아갈 자리).
+    /// </summary>
+    public void SetSpawnAreaVisible(bool visible)
+    {
+        // 주차 구역은 ShapeScrollView(마스크·스크롤바 포함) 안에 있고, 그 뒤에 장식 배경
+        // ShapeAreaBG가 깔린다. shapeHost만 숨기면 이 둘이 빈 껍데기로 남아
+        // 새 '아이템 목록' 패널과 같은 자리에 겹쳐 보인다 — 셋 다 함께 감춘다.
+        // SetActive가 아니라 알파로 감추는 이유: 주차된 셰이프의 RectTransform 좌표가
+        // 살아 있어야 클릭 배치가 첫 블록 위치를 계산할 수 있다.
+        HideChrome(shapeHost != null ? shapeHost.parent as RectTransform : null, visible);
+        HideChrome(shapeHost, visible);
+
+        if (gameplayRoot != null)
+            HideChrome(gameplayRoot.transform.Find("ShapeAreaBG") as RectTransform, visible);
+    }
+
+    private static void HideChrome(RectTransform rt, bool visible)
+    {
+        if (rt == null) return;
+        if (!rt.TryGetComponent<CanvasGroup>(out var cg))
+            cg = rt.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha          = visible ? 1f : 0f;
+        cg.blocksRaycasts = visible;
+        cg.interactable   = visible;
     }
 
     private void PlaceSharedShapeToSlot(Shape shape)

@@ -327,8 +327,44 @@ public static class CombatDamage
 
         if (effectObj == null) return;
 
-        effectObj.transform.localScale = Vector3.one * scale;
         if (effectObj.TryGetComponent<EffectBehaviour>(out var eb))
-            eb.Initialize(eb.behaviorSO, null, 1f);
+        {
+            eb.Initialize(eb.behaviorSO, null, 1f);   // 자체 수명 관리 — 회수는 EffectBehaviour가 담당
+
+            // ⚠️ 스케일은 Initialize <b>뒤에</b> 적용해야 한다.
+            // Initialize가 behaviorSO.startScale로 localScale을 덮어쓰기 때문에,
+            // 먼저 적용하면 hitEffectScale이 통째로 무시되고 SO 기본 크기로 나온다.
+            effectObj.transform.localScale = Vector3.one * scale;
+            return;
+        }
+
+        effectObj.transform.localScale = Vector3.one * scale;
+
+        // EffectBehaviour가 없는 프리팹은 <b>스스로 사라지지 못한다</b> — 풀에 반환되지 않고 월드에 영원히 남는다.
+        // 히트 이펙트 프리팹이 교체되면서 실제로 이 경로를 타는 이펙트가 필드에 계속 쌓였다.
+        //
+        // 수명은 인스턴스 자신에게 맡긴다(PooledVfxLifetime). 여기서 타이머를 들고 있으면
+        // 그 인스턴스가 먼저 풀로 돌아갔다가 다른 히트로 재사용된 뒤 예전 타이머가 깨어나
+        // 남의 이펙트를 꺼버린다 — 컴포넌트가 OnEnable에서 리셋하므로 그 문제가 생기지 않는다.
+        if (!effectObj.TryGetComponent<PooledVfxLifetime>(out var life))
+            life = effectObj.AddComponent<PooledVfxLifetime>();
+        life.SetLife(ResolveVfxLifetime(effectObj));
+    }
+
+    /// <summary>히트 VFX 안전 수명 상한(초). 어떤 프리팹이든 이 시간 안에 회수된다.</summary>
+    private const float MaxHitVfxLife = 3f;
+    private const float MinHitVfxLife = 0.5f;
+
+    /// <summary>파티클 길이에서 필요한 수명을 추정하고 상·하한으로 조인다.</summary>
+    private static float ResolveVfxLifetime(GameObject go)
+    {
+        float longest = 0f;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            if (ps == null) continue;
+            var main = ps.main;
+            longest = Mathf.Max(longest, main.duration + main.startLifetime.constantMax);
+        }
+        return Mathf.Clamp(longest, MinHitVfxLife, MaxHitVfxLife);
     }
 }

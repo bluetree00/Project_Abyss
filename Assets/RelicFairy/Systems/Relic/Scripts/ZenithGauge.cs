@@ -58,6 +58,11 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
 
     private void Update()
     {
+        // 해는 던전 안에서만 돈다. 예전엔 무조건 흘러서 베이스캠프에 서 있기만 해도
+        // 정오가 왔다 갔다 하며 실제 전투에 쓸 사이클을 허공에 버렸다.
+        // (차단형 팝업 구간은 timeScale=0이라 deltaTime이 0 → 별도 처리 불필요)
+        if (!IsRunActive) return;
+
         float accel = _phase == ZPhase.Charging ? _chargeAccel : 0f;
         _timer += Time.deltaTime * (1f + accel);
 
@@ -69,6 +74,10 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
 
         if (changed) OnChanged?.Invoke();
     }
+
+    /// <summary>런(던전)이 실제로 진행 중인가. 허브·런 종료 구간에서는 사이클을 멈춘다.</summary>
+    private static bool IsRunActive
+        => GameRunBootstrapper.Instance?.Run?.IsRunning ?? false;
 
     private float CurrentDuration() => _phase switch
     {

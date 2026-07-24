@@ -23,6 +23,10 @@ public class RelicAltar : MonoBehaviour
     [Header("유물")]
     [SerializeField] private RelicClassSO relicClass;
 
+    [Header("표현 이펙트")]
+    [Tooltip("유물을 표현하는 VFX(형제 오브젝트). 큐브 메시 대체 — 제단 선택 시 함께 숨기고 복귀 시 다시 표시.")]
+    [SerializeField] private GameObject relicVfx;
+
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
     [SerializeField] private float textHeight = 1.4f;
@@ -74,16 +78,22 @@ public class RelicAltar : MonoBehaviour
     /// 무엇을 고르는지 모르고 확정하던 흐름이었다(제단 위엔 이름만 떠 있었다).
     /// 팝업에서 '선택'을 눌러야 Claim이 실제로 실행된다.
     /// </summary>
+    // 중복 오픈 가드 — 팝업은 BlocksGameplay라 timeScale=0이 되지만 Input.GetKeyDown(F)는 raw라 계속 먹힌다.
+    // F를 두 번 누르면 두 번째 유물 팝업이 스택 밑에 좀비로 남아, 위 팝업을 닫아도 시간정지가 영구 고착됐다.
+    private bool _opening;
+
     private void OpenInfoPopup()
     {
         if (_player == null || relicClass == null) return;
         if (s_selected == this) return;   // 이미 선택된 제단 — 무동작
+        if (_opening || Managers.UI.HasPopup<UI_RelicInfoPopup>()) return;   // 이미 열림/여는 중 — 중복 금지
 
         OpenInfoPopupAsync().Forget();
     }
 
     private async UniTaskVoid OpenInfoPopupAsync()
     {
+        _opening = true;
         try
         {
             var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RelicInfoPopup>();
@@ -91,6 +101,7 @@ public class RelicAltar : MonoBehaviour
             popup.Setup(relicClass, Claim);
         }
         catch (OperationCanceledException) { }
+        finally { _opening = false; }
     }
 
     private void Claim()
@@ -122,6 +133,7 @@ public class RelicAltar : MonoBehaviour
         _claimed = true;
         _player = null;
         ShowPrompt(false);
+        if (relicVfx != null) relicVfx.SetActive(false);   // 유물 표현 이펙트도 함께 숨김
         gameObject.SetActive(false);
     }
 
@@ -131,6 +143,7 @@ public class RelicAltar : MonoBehaviour
         _claimed = false;
         _player = null;
         ShowPrompt(false);
+        if (relicVfx != null) relicVfx.SetActive(true);    // 복귀 시 유물 표현 이펙트 재등장
         DissolveEffect.PlayAppear(gameObject, 0.5f);
     }
 

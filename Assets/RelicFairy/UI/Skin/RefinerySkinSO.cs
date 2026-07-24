@@ -31,6 +31,8 @@ public sealed class RefinerySkinSO : ScriptableObject
 
     [Header("R5 결과 슬롯")]
     public Sprite slotFrame;
+    [Tooltip("중앙 원 바탕 — 제단 코어 채움(결과 뒤).")]
+    public Sprite altarCore;
     [Tooltip("등급 테두리. 0=Common 1=Rare 2=Epic 3=Legendary")]
     public Sprite[] gradeBorder = new Sprite[4];
     public Sprite[] gradeGlow   = new Sprite[4];
@@ -42,6 +44,10 @@ public sealed class RefinerySkinSO : ScriptableObject
 
     [Header("R7 확률 막대")]
     public Sprite barTrack;
+    [Tooltip("확률막대 바탕 — 확률 패널 전체 배경.")]
+    public Sprite oddsPanel;
+    [Tooltip("확률 막대 테두리 — 칸별 프레임 오버레이.")]
+    public Sprite barFrame;
     [Tooltip("0=Rare 1=Epic 2=Legendary")]
     public Sprite[] barFill       = new Sprite[3];
     [Tooltip("과열(다음 회 확률 2배) 상태 채움. 비우면 barFill을 그대로 쓴다.")]

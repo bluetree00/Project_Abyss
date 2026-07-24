@@ -85,7 +85,11 @@ public class UI_CovenantAssemble : UI_Popup
     /// 이게 없으면 _tcs가 영구 미완료 → ChooseAsync가 무한 대기 → 제단이 영구 잠긴다.
     /// OnForge가 이미 결과를 넣었으면 TrySetResult가 false를 반환하고 무시된다.
     /// </summary>
-    private void OnDestroy() => _tcs?.TrySetResult(null);
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
+        _tcs?.TrySetResult(null);
+    }
 
     // ── Public Methods ───────────────────────────────────
     /// <summary>드래프트를 굴려 팝업을 구성한다. forceSilver=true면 첫 서약(실버 고정).</summary>
@@ -96,7 +100,9 @@ public class UI_CovenantAssemble : UI_Popup
         _rerollsLeft = DefaultRerolls;
         _tcs         = new UniTaskCompletionSource<string>();
         SetText(_titleText, "봉인된 예언자의 서약서");
+        if (_titleText) { _titleText.fontSize = 28f; FitSingleLine(_titleText); }
 
+        ConfigureTextFitting();
         ApplyPanelSkin();
 
         _causes   = CovenantAssembleService.DraftCauses(DraftCount, _rng, _forceSilver);
@@ -142,6 +148,7 @@ public class UI_CovenantAssemble : UI_Popup
             {
                 card.RerollButton.onClick.RemoveAllListeners();
                 card.RerollButton.onClick.AddListener(() => Reroll(isCause, idx));
+                FixRerollLabel(card.RerollButton);
             }
         }
     }
@@ -259,7 +266,7 @@ public class UI_CovenantAssemble : UI_Popup
         SetText(_previewCondition, $"발동 조건  {p.causeDesc}");
         SetText(_previewCoef,      $"봉인 계수  ×{p.coefficient:0.0}");
         SetText(_previewEffect,    $"효과  {p.EffectAmountLabel()}");
-        SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  ➜  {p.effectDesc}");
+        SetText(_forgeSummary,     $"{p.causeName} × {p.effectName}  →  {p.effectDesc}");
     }
 
     private void RefreshRerollText() => SetText(_rerollCountText, $"리롤 {_rerollsLeft}");
@@ -281,4 +288,62 @@ public class UI_CovenantAssemble : UI_Popup
     };
 
     private static void SetText(TMP_Text t, string v) { if (t) t.text = v; }
+
+    /// <summary>
+    /// 리롤 버튼 라벨. 프리팹은 ↻(U+21BB)로 authoring 돼 있는데 본문 폰트(DNFForgedBlade)에
+    /// 그 글리프가 없어 화면에는 빈 네모(□)만 나온다 — 폰트에 있는 글자로 바꿔 준다.
+    /// </summary>
+    private static void FixRerollLabel(Button btn)
+    {
+        var lbl = btn.GetComponentInChildren<TMP_Text>(true);
+        if (lbl == null) return;
+        lbl.text     = "리롤";
+        lbl.fontSize = 14f;
+    }
+
+    /// <summary>
+    /// 미리보기 텍스트들의 넘침 처리를 코드에서 확정한다.
+    ///
+    /// 여기 들어가는 문자열은 전부 <b>길이가 가변</b>이다 — 원인/효과 이름과 티어가 조합될 때마다
+    /// 길이가 달라지는데 프리팹은 고정 크기 박스에 자동 축소도 줄바꿈도 없이 authoring 돼 있었다.
+    /// 그래서 조합에 따라 중앙 결과 문장이 박스를 뚫고 나가 옆 요소 위에 겹쳤다.
+    ///
+    /// 한 줄짜리 라벨은 줄바꿈 없이 말줄임(…), 중앙 결과 문장은 줄바꿈 + 자동 축소로 박스 안에 가둔다.
+    /// 프리팹을 고쳐도 되지만, 값이 코드에서 오는 이상 제약도 코드가 쥐고 있어야 다시 깨지지 않는다.
+    /// </summary>
+    private void ConfigureTextFitting()
+    {
+        // 한 줄 라벨 — 넘치면 말줄임(레이아웃을 밀지 않는다)
+        FitSingleLine(_previewTitle);
+        FitSingleLine(_previewCondition);
+        FitSingleLine(_previewCoef);
+        FitSingleLine(_previewEffect);
+        FitSingleLine(_forgeSummary);
+
+        // 중앙 결과 문장 — 여러 줄 허용 + 박스에 맞게 자동 축소(최대 62%까지만 줄인다)
+        FitWrapped(_previewSentence, minRatio: 0.62f);
+    }
+
+    private static void FitSingleLine(TMP_Text t)
+    {
+        if (!t) return;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.overflowMode     = TextOverflowModes.Ellipsis;
+    }
+
+    /// <summary>
+    /// 박스에 맞게 <b>줄이기만</b> 한다. 예전엔 fontSizeMax를 minSize*2로 올려버려서,
+    /// authoring 값(17)보다 하한(18)이 크면 상한이 36으로 튀어 결과 문장이 원래보다 두 배로 커졌다
+    /// — 화면에서 중앙 문장만 유독 거대해 보이던 원인이다. 자동 크기는 authoring 값을 넘지 않는다.
+    /// </summary>
+    private static void FitWrapped(TMP_Text t, float minRatio)
+    {
+        if (!t) return;
+        float authored = t.fontSize;
+        t.textWrappingMode  = TextWrappingModes.Normal;
+        t.overflowMode      = TextOverflowModes.Truncate;
+        t.enableAutoSizing  = true;
+        t.fontSizeMax       = authored;
+        t.fontSizeMin       = Mathf.Max(10f, authored * minRatio);
+    }
 }

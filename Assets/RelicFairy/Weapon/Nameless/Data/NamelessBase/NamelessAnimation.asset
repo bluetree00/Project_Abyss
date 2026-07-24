@@ -36,12 +36,12 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.3
-      comboWindowClose: 0.72
-      attackEndAt: 0.55
+      comboWindowOpen: 0.1
+      comboWindowClose: 0.32
+      attackEndAt: 0.35
       attackStepDistance: 1.0
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.50
+      attackStepEndNorm: 0.33
       aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: GroundLightAttack_02
@@ -51,12 +51,12 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.3
-      comboWindowClose: 0.72
-      attackEndAt: 0.55
+      comboWindowOpen: 0.1
+      comboWindowClose: 0.32
+      attackEndAt: 0.35
       attackStepDistance: 1.0
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.50
+      attackStepEndNorm: 0.33
       aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: GroundLightAttack_03
@@ -66,12 +66,12 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.3
-      comboWindowClose: 0.72
-      attackEndAt: 0.55
+      comboWindowOpen: 0.1
+      comboWindowClose: 0.32
+      attackEndAt: 0.35
       attackStepDistance: 1.8
       attackStepStartNorm: 0.05
-      attackStepEndNorm: 0.55
+      attackStepEndNorm: 0.33
       aimCompleteStepBonus: 0.7
       moveInputScale: 0.08
     - baseClipName: HeavyCharge
@@ -133,9 +133,9 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.32
-      comboWindowClose: 0.75
-      attackEndAt: 0.58
+      comboWindowOpen: 0.1
+      comboWindowClose: 0.34
+      attackEndAt: 0.38
     - baseClipName: AirLightAttack_02
       addressableKey: Nameless_AirLight_02
       actionType: 6
@@ -143,9 +143,9 @@ MonoBehaviour:
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0
-      comboWindowOpen: 0.32
-      comboWindowClose: 0.75
-      attackEndAt: 0.58
+      comboWindowOpen: 0.1
+      comboWindowClose: 0.34
+      attackEndAt: 0.38
     - baseClipName: AirLightAttack_03
       addressableKey: Nameless_AirLight_03
       actionType: 6
@@ -155,7 +155,7 @@ MonoBehaviour:
       plungeDescendAt: 0
       comboWindowOpen: -1
       comboWindowClose: -1
-      attackEndAt: 0.58
+      attackEndAt: 0.38
     - baseClipName: AirHeavyAttack
       addressableKey: AirHeavyAttack
       actionType: 7

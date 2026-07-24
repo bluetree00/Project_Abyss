@@ -19,9 +19,11 @@ public sealed class SolarNoonSun : MonoBehaviour
     private const string SunVfxKey = "vfx_gawain_noon_sun";   // 태양(루프)
     // 캐릭터 머리 위 상공에 <b>수직으로 세워</b> 띄운다(빌보드 — 카메라를 정면으로 마주 봄).
     // 마법진을 눕히거나 기울이면 옆으로 퍼져 화면을 덮는다 → 항상 카메라를 마주 보게 세운다.
-    private const float  Height    = 5.8f;   // 머리 위 상공 높이
+    // PlanetCrash 아트는 원본 자체가 거대해서(반경 수십 m) 낮게·크게 두면 화면을 통째로 덮는다.
+    // '하늘에 떠 있는 먼 태양'으로 읽히도록 <b>높이 올리고 크기는 줄인다</b>.
+    private const float  Height    = 14f;    // 머리 위 상공 높이
     private const float  Forward   = 1.6f;   // 캐릭터 정면(로컬 +Z)으로 살짝 앞 — 카메라 가림 완화(높이는 유지)
-    private const float  Scale     = 6.5f;   // 태양 크기(머리 위 정오 태양)
+    private const float  Scale     = 2.5f;   // 태양 크기(머리 위 정오 태양)
     private const float  FadeTime  = 0.4f;   // 등장/퇴장 페이드
 
     private Transform _host;
