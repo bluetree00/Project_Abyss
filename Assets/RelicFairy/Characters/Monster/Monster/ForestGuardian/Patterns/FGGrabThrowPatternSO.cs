@@ -327,6 +327,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
         _bossForward = ctx.Transform.forward;
 
         player.SetMoveScale(0f);
+        player.SetGrabbed(true);   // 붙들린 동안 포이즈 브레이크(날아감/누움) 억제
     }
 
     // ── RightHand → LeftHand → RightHand 순서로 손바닥 위치에 고정 ──
@@ -396,6 +397,9 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
             _heldPlayer.TakeDamage(dmg);
         }
 
+        // 던지기 피해는 잡힘 해제 <b>후</b> 판정돼야 날아가는 자세가 정상 발동한다 —
+        // 위 TakeDamage는 아직 붙들린 상태로 처리하고, 여기서 풀며 던진다.
+        _heldPlayer.SetGrabbed(false);
         _heldPlayer.SetMoveScale(1f);
 
         // Rigidbody velocity 직접 설정 — ApplyKnockback의 _knockbackTimer도 함께 설정해
@@ -424,6 +428,7 @@ public class FGGrabThrowState : FullLockState<FGGrabThrowPatternSO>
     private void ReleasePlayer()
     {
         if (_heldPlayer == null) return;
+        _heldPlayer.SetGrabbed(false);   // Exit 경로 포함 — 여기서 반드시 풀려야 영구 포이즈 면역이 안 된다
         _heldPlayer.SetMoveScale(1f);
         _heldPlayer = null;
         _grabbed    = false;

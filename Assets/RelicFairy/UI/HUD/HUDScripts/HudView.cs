@@ -41,7 +41,7 @@ public sealed class HudView : MonoBehaviour
     [SerializeField] private TMP_Text goldText;
 
     [Header("재화 라인 (골드·강화재료·원석 — 한 줄, 같은 배경 공유)")]
-    [Tooltip("골드바 테두리 — ⚠️ 아트에 금색 코인이 박혀 있어 골드 전용. 다른 재화엔 못 씀.")]
+    [Tooltip("골드바 테두리 — ! 아트에 금색 코인이 박혀 있어 골드 전용. 다른 재화엔 못 씀.")]
     [SerializeField] private Sprite goldFrameSprite;
     [Tooltip("골드바 내부 — 코인이 없어 모든 재화가 공유하는 공통 플레이트 배경.")]
     [SerializeField] private Sprite goldInnerSprite;

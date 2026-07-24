@@ -20,11 +20,11 @@ MonoBehaviour:
     selfMovement: {x: 0, y: 0, z: 0}
     effect:
       payloadKey: NamelessSlash
-      socket: 3
+      socket: 0
       space: 0
-      positionOffset: {x: 0, y: 0, z: 0}
-      rotationEuler: {x: -90, y: 0, z: 0}
-      scaleMultiplier: 0.55
+      positionOffset: {x: 0, y: 1, z: 0.5}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      scaleMultiplier: 0.7
       lifeTimeMultiplier: 1.5
       behavior: {fileID: 0}
     collider:
@@ -39,7 +39,7 @@ MonoBehaviour:
       duration: 0.4
       shape: 0
       behavior: {fileID: 0}
-    hitEffectKey: BloodShot
-    hitEffectScale: 0.5
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.42
     oneShot: 1
     rotateToMouse: 0

@@ -10,36 +10,71 @@ using UnityEngine;
 /// </summary>
 public static class UISkin
 {
-    private const string RefineryAddress = "UI/RefinerySkin";
+    private const string RefineryAddress    = "UI/RefinerySkin";
+    private const string RuneSelectAddress  = "UI/RuneSelectSkin";
+    private const string WeaponForgeAddress = "UI/WeaponForgeSkin";
+    private const string CrucibleAddress    = "UI/CrucibleSkin";
+    private const string ShopAddress        = "UI/ShopSkin";
 
-    private static RefinerySkinSO _refinery;
-    private static bool _refineryTried;
+    private static RefinerySkinSO    _refinery;
+    private static RuneSelectSkinSO  _runeSelect;
+    private static WeaponForgeSkinSO _weaponForge;
+    private static CrucibleSkinSO    _crucible;
+    private static ShopSkinSO        _shop;
+    private static bool _tried;
 
     /// <summary>정제소 스킨. 미로드/미등록이면 null → 코드로 그린 색 박스가 그대로 보인다.</summary>
     public static RefinerySkinSO Refinery => _refinery;
 
+    /// <summary>룬 획득 팝업 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static RuneSelectSkinSO RuneSelect => _runeSelect;
+
+    /// <summary>무기 선택(모루) 팝업 스킨. 미로드/미등록이면 null → 프리팹 기존 색.</summary>
+    public static WeaponForgeSkinSO WeaponForge => _weaponForge;
+
+    /// <summary>재련소 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static CrucibleSkinSO Crucible => _crucible;
+
+    /// <summary>상점(심연의 행상) 스킨. 미로드/미등록이면 null → 색 폴백.</summary>
+    public static ShopSkinSO Shop => _shop;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
-        _refinery = null;
-        _refineryTried = false;
+        _refinery    = null;
+        _runeSelect  = null;
+        _weaponForge = null;
+        _crucible    = null;
+        _shop        = null;
+        _tried       = false;
     }
 
     /// <summary>앱 부트에서 1회 호출. 이미 시도했으면 즉시 반환.</summary>
     public static async UniTask PreloadAsync()
     {
-        if (_refineryTried) return;
-        _refineryTried = true;
+        if (_tried) return;
+        _tried = true;
 
+        _refinery    = await LoadOrNull<RefinerySkinSO>(RefineryAddress, "정제소");
+        _runeSelect  = await LoadOrNull<RuneSelectSkinSO>(RuneSelectAddress, "룬 획득");
+        _weaponForge = await LoadOrNull<WeaponForgeSkinSO>(WeaponForgeAddress, "무기 선택");
+        _crucible    = await LoadOrNull<CrucibleSkinSO>(CrucibleAddress, "재련소");
+        _shop        = await LoadOrNull<ShopSkinSO>(ShopAddress, "상점");
+    }
+
+    private static async UniTask<T> LoadOrNull<T>(string address, string label) where T : Object
+    {
         try
         {
-            _refinery = await Managers.AddressableManager.TryLoadAssetAsync<RefinerySkinSO>(RefineryAddress);
-            if (_refinery == null)
-                Debug.Log($"[UISkin] '{RefineryAddress}' 미등록 — 정제소는 색 폴백으로 동작(정상)");
+            var so = await Managers.AddressableManager.TryLoadAssetAsync<T>(address);
+            if (so == null)
+                Debug.Log($"[UISkin] '{address}' 미등록 — {label}는 색 폴백으로 동작(정상)");
+            return so;
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[UISkin] 정제소 스킨 로드 예외: {e.Message}");
+            Debug.LogWarning($"[UISkin] {label} 스킨 로드 예외: {e.Message}");
+            return null;
         }
     }
 }

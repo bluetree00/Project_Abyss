@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: tut_enter_gate
   displayName: "\uC2EC\uC5F0\uC73C\uB85C"
-  description: "\uD3EC\uD0C8\uC744 \uC9C0\uB098 \uC2EC\uC5F0\uC5D0 \uC9C4\uC785\uD558\uB77C"
+  description: "\uD3EC\uD0C8\uC744 \uC9C0\uB098 \uC2EC\uC5F0\uC73C\uB85C"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 1274786773e08ef408f77f0d84e81965, type: 2}

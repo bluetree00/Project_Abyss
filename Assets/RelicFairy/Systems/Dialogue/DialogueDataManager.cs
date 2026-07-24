@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using LitJson;
 using UnityEngine;
 
 /// <summary>
-/// CDN(Addressables) 또는 로컬 TextAsset에서 대화 CSV를 로드해 시퀀스를 제공.
-/// Addressable 키: "DIALOGUE_DATA" (TextAsset, CSV 파일)
+/// 대화 데이터 로드 — <b>서버(뒤끝 CDN) 우선, 프로젝트 CSV 폴백</b>.
 ///
-/// CSV 포맷 (헤더 1행 포함):
+/// 서버를 먼저 보는 이유는 <b>라이브 대사 수정</b> 때문이다. 차트만 갈아끼우면
+/// 클라이언트 재빌드 없이 대사가 바뀐다. 차트가 없거나 오프라인이면 프로젝트에
+/// 동봉된 Addressable TextAsset으로 폴백하므로, 서버 미등록 상태에서도 그대로 동작한다.
+///
+/// 두 소스의 컬럼은 동일하다:
 ///   sequence_id, line_order, speaker, illustration_key, text
 ///   StartRoom, 0, God, Illust_God_Default, "잠에서 깨어나라..."
 /// </summary>
@@ -18,6 +22,7 @@ public class DialogueDataManager
     // ─────────────────────────────────────────────────────────
 
     private const string AddressableKey = "DIALOGUE_DATA";
+    private const string ChartName      = "DIALOGUE_DATA";
 
     // ─────────────────────────────────────────────────────────
     // Properties
@@ -39,11 +44,20 @@ public class DialogueDataManager
     {
         try
         {
+            // ① 서버(CDN) 우선 — 라이브 대사 수정이 재빌드 없이 반영된다.
+            int fromServer = LoadFromServer();
+            if (fromServer > 0)
+            {
+                Debug.Log($"[DialogueDataManager] CDN에서 {_sequences.Count}개 시퀀스 로드 ({fromServer}행)");
+                return;
+            }
+
+            // ② 폴백 — 프로젝트에 동봉된 CSV(오프라인 · 차트 미등록 시)
             var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>(AddressableKey);
             if (textAsset != null)
             {
                 ParseCsv(textAsset.text);
-                Debug.Log($"[DialogueDataManager] {_sequences.Count}개 시퀀스 로드 완료");
+                Debug.Log($"[DialogueDataManager] 로컬 CSV에서 {_sequences.Count}개 시퀀스 로드 완료");
             }
             else
             {
@@ -93,6 +107,19 @@ public class DialogueDataManager
 
         return GetLines(baseKey + "_First") ?? GetLines(baseKey);
     }
+
+    /// <summary>
+    /// 보스 <b>조우</b> 대사 전용 조회. 인트로(프롤로그) 씬에서는 <b>항상 null</b>을 준다.
+    ///
+    /// 조우 대사 키는 보스 클래스명에서 자동 유도되는데(<c>DeathKnightMonster → DeathKnight_Encounter</c>),
+    /// 인트로는 실제 챕터 보스 프리팹을 '타락한 모르드레드' 대역으로 쓴다. 그래서 프롤로그 한복판에
+    /// 그 보스의 챕터 조우 대사가 끼어들어, 인트로 전용 대사와 뒤섞였다.
+    /// 인트로의 대사는 IntroMordredDirector가 전부 소유하므로 여기서는 내보내지 않는다.
+    ///
+    /// 방문 횟수도 올리지 않는다 — 인트로에서 소비되면 실제 첫 조우가 '재방문'이 되어버린다.
+    /// </summary>
+    public DialogueLine[] GetBossEncounterLines(string baseKey)
+        => IntroBootstrapper.Instance != null ? null : GetVisitLines(baseKey);
 
     // ── 방문 횟수 영속 관리 ────────────────────────────────────────────
     private const string VisitPrefix   = "dlgVisit_";
@@ -176,6 +203,56 @@ public class DialogueDataManager
     // ─────────────────────────────────────────────────────────
     // Private Methods
     // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 뒤끝 CDN 차트에서 대사를 읽는다. 로드된 행 수를 반환하고, 실패·미등록이면 0.
+    ///
+    /// CSV 파일과 달리 <b>행 순서가 보장되지 않으므로</b> line_order로 직접 정렬한다.
+    /// 실패해도 예외를 밖으로 내보내지 않는다 — 폴백이 이어받아야 하기 때문.
+    /// </summary>
+    private int LoadFromServer()
+    {
+        var buffer = new List<(string seq, int order, int idx, DialogueLine line)>();
+        int rows;
+
+        try
+        {
+            rows = ChartLoader.Load(ChartName, row =>
+            {
+                string seqId = row.TryGetString("sequence_id");
+                if (string.IsNullOrEmpty(seqId)) return;
+
+                if (!Enum.TryParse<DialogueSpeaker>(row.TryGetString("speaker"), ignoreCase: true, out var spk))
+                    spk = DialogueSpeaker.None;
+
+                buffer.Add((seqId, row.TryGetInt("line_order"), buffer.Count, new DialogueLine
+                {
+                    speaker         = spk,
+                    illustrationKey = row.TryGetString("illustration_key"),
+                    text            = row.TryGetString("text"),
+                }));
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[DialogueDataManager] CDN 로드 실패 — 로컬 CSV로 폴백: {e.Message}");
+            return 0;
+        }
+
+        if (rows <= 0 || buffer.Count == 0) return 0;
+
+        // line_order 우선, 동률(또는 미기입 0)이면 도착 순으로 안정 정렬.
+        buffer.Sort((a, b) => a.order != b.order ? a.order.CompareTo(b.order) : a.idx.CompareTo(b.idx));
+
+        _sequences.Clear();
+        foreach (var (seq, _, _, line) in buffer)
+        {
+            if (!_sequences.TryGetValue(seq, out var list))
+                _sequences[seq] = list = new List<DialogueLine>();
+            list.Add(line);
+        }
+        return buffer.Count;
+    }
 
     private void ParseCsv(string csv)
     {

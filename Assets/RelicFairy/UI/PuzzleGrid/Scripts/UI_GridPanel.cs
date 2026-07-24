@@ -33,7 +33,9 @@ public sealed class UI_GridPanel : UI_Base
     // ── 정제소 배치 팝업 스킨 (@UIRoot에서 배선; 미배선 시 기존 외형 유지) ──
     [Header("정제소 스킨")]
     [SerializeField] private Sprite _bgSprite;             // 자연바탕
-    [SerializeField] private Sprite _boardSprite;          // 속성판(헥사 그리드 배경)
+    // 속성판(헥사 그리드 배경) 아트는 더 이상 깔지 않는다 — 존 타일 가독성을 먹었다.
+    // 슬롯은 프리팹 호환을 위해 남겨 두되 사용하지 않는다(BuildMainArea 주석 참고).
+    [SerializeField, HideInInspector] private Sprite _boardSprite;
     [SerializeField] private Sprite _stagingBorderSprite;  // 룬 배치 테두리
     [SerializeField] private Sprite _stagingBgSprite;      // 룬 배치 테두리 바탕
     [SerializeField] private Sprite _synergyBorderSprite;  // 시너지 테두리
@@ -64,7 +66,6 @@ public sealed class UI_GridPanel : UI_Base
     private Button  _backButton;
     private Button  _resetButton;
     private Button  _confirmButton;
-    private Button  _refineryButton;   // 정제소 상시 진입
 
     // ── Private: Footer ──
     private TMP_Text _footerActiveSynText;
@@ -144,6 +145,8 @@ public sealed class UI_GridPanel : UI_Base
             GridManager.Instance.OnItemPlaced   += HandleItemPlaced;
             GridManager.Instance.OnItemRemoved  += HandleItemRemoved;
             GridManager.Instance.OnItemSelected += HandleItemSelected;
+            GridManager.Instance.OnSquareClicked += HandleSquareClicked;
+            GridManager.Instance.OnSquareHovered += HandleSquareHovered;
         }
 
         if (MerlinRuneBridge.Instance != null)
@@ -167,7 +170,6 @@ public sealed class UI_GridPanel : UI_Base
         if (_resetButton   != null) _resetButton.onClick.AddListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.AddListener(OnConfirmClicked);
         if (_placeButton   != null) _placeButton.onClick.AddListener(OnPlaceClicked);
-        if (_refineryButton != null) _refineryButton.onClick.AddListener(OnRefineryClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.AddListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.AddListener(OnDialogDiscardAll);
@@ -182,6 +184,8 @@ public sealed class UI_GridPanel : UI_Base
             GridManager.Instance.OnItemPlaced   -= HandleItemPlaced;
             GridManager.Instance.OnItemRemoved  -= HandleItemRemoved;
             GridManager.Instance.OnItemSelected -= HandleItemSelected;
+            GridManager.Instance.OnSquareClicked -= HandleSquareClicked;
+            GridManager.Instance.OnSquareHovered -= HandleSquareHovered;
         }
 
         if (MerlinRuneBridge.Instance != null)
@@ -207,7 +211,6 @@ public sealed class UI_GridPanel : UI_Base
         if (_resetButton   != null) _resetButton.onClick.RemoveListener(OnResetClicked);
         if (_confirmButton != null) _confirmButton.onClick.RemoveListener(OnConfirmClicked);
         if (_placeButton   != null) _placeButton.onClick.RemoveListener(OnPlaceClicked);
-        if (_refineryButton != null) _refineryButton.onClick.RemoveListener(OnRefineryClicked);
 
         if (_confirmDialogKeepBtn    != null) _confirmDialogKeepBtn.onClick.RemoveListener(OnDialogKeep);
         if (_confirmDialogDiscardBtn != null) _confirmDialogDiscardBtn.onClick.RemoveListener(OnDialogDiscardAll);
@@ -256,6 +259,7 @@ public sealed class UI_GridPanel : UI_Base
         _isOpen = true;
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
         gameObject.SetActive(true);
+        BringToFront();
         FadeInAsync().Forget();
 
         var run   = GameRunBootstrapper.Instance?.Run;
@@ -275,7 +279,10 @@ public sealed class UI_GridPanel : UI_Base
             if (hexGrid != null)
             {
                 if (BoardManager.Instance != null)
+                {
                     BoardManager.Instance.EnterExternalGrid(hexGrid, hexGrid.gridAsset);
+                    BoardManager.Instance.SetSpawnAreaVisible(false);   // 배치는 칸 클릭으로 한다
+                }
                 else if (GridManager.Instance != null)
                     GridManager.Instance.SetActiveGrid(hexGrid);
             }
@@ -284,8 +291,6 @@ public sealed class UI_GridPanel : UI_Base
             _hexGridView.RefreshOccupiedCells();
             _hexGridView.UpdateAdjacencyConstraints();
 
-            // 배치할 룬이 있으면 그 속성의 매칭 존을 판에서 강조(어디 놓으면 시너지인지 안내).
-            _hexGridView.SetPlacementElementHint(_pendingNewItem?.element ?? _pendingAddItem?.element);
         }
 
         run?.EnterGridSynergy();
@@ -298,11 +303,31 @@ public sealed class UI_GridPanel : UI_Base
         RefreshInfoPanelDefault();
         UpdateHexGridHint();
 
+        // 배치할 룬의 속성 존을 판에서 강조(어디 놓으면 시너지인지 안내).
+        // RefreshSynergyStatus가 칸 색을 다시 칠하므로 반드시 그 뒤에 세운다.
+        RefreshPlacementHint();
+
         if (_pendingNewItem != null)
         {
             _itemInfoPanel?.ShowItem(_pendingNewItem, isNew: true);
             _pendingNewItem = null;
         }
+    }
+
+    /// <summary>
+    /// 이 패널이 속한 캔버스 안에서 맨 앞으로 올린다.
+    /// 퀘스트 추적·알림 위젯이 같은 캔버스의 <b>뒤쪽 형제</b>라, 전체화면인 이 패널 위에
+    /// "무장 / 모루에서 장비 선택" 같은 글자가 그대로 겹쳐 보였다. 위젯 이름에 의존하지 않도록
+    /// 캔버스 직속 조상까지 올라가 그 조상을 맨 뒤 형제(=최상단 렌더)로 옮긴다.
+    /// </summary>
+    private void BringToFront()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        var t = transform;
+        while (t.parent != null && t.parent != canvas.transform) t = t.parent;
+        if (t.parent == canvas.transform) t.SetAsLastSibling();
     }
 
     private void ClosePanel()
@@ -396,20 +421,14 @@ public sealed class UI_GridPanel : UI_Base
         resetRT.pivot           = new Vector2(1f, 0.5f);
         resetRT.anchoredPosition = new Vector2(-110f, 0f);
 
-        // [정제소] 상시 접근 — 판을 보다가 바로 특수 룬을 벼릴 수 있어야 한다(설계 §2.7 "방이 아니라 상시").
-        _refineryButton = MakeButton(headerGO.transform, "RefineryBtn",
-            new Vector2(1f, 0f), new Vector2(1f, 1f),
-            new Vector2(104f, -14f), new Vector2(-216f, 0f),
-            new Color(0.42f, 0.30f, 0.14f, 0.95f), "◆ 정제소");
-        var refineRT = _refineryButton.GetComponent<RectTransform>();
-        refineRT.pivot            = new Vector2(1f, 0.5f);
-        refineRT.anchoredPosition = new Vector2(-206f, 0f);
+        // [정제소] 버튼은 이 화면에서 뺐다 — 정제소는 자기 방(NPC)에서 들어가는 콘텐츠라
+        // 배치 화면에 입구를 하나 더 두면 두 화면의 경계가 흐려진다. OpenRefinery()는 남겨 둔다.
 
-        // [완료 ✓] 버튼 (우측 끝)
+        // [완료] 버튼 (우측 끝)
         _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
             new Vector2(1f, 0f), new Vector2(1f, 1f),
             new Vector2(96f, -14f), new Vector2(-8f, 0f),
-            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료 ✓");
+            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료");
         var confirmRT = _confirmButton.GetComponent<RectTransform>();
         confirmRT.pivot = new Vector2(1f, 0.5f);
         confirmRT.anchorMin = new Vector2(1f, 0f);
@@ -452,6 +471,7 @@ public sealed class UI_GridPanel : UI_Base
         _synergyStatusRoot.anchorMax = Vector2.one;
         _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
         _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
+        _synergyStatusView.SetSkin(_synergyBgSprite, _synergyBorderSprite);   // 시너지 바탕/테두리
     }
 
     // CenterPanel (20% ~ 75%)
@@ -473,19 +493,17 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridRoot.anchorMax = new Vector2(1f, 1.0f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
+        // 판 배경 그림은 쓰지 않는다 — 속성 존 타일이 판 텍스처에 묻혀 어느 칸이 무슨 속성인지
+        // 읽히지 않았다. 여기는 어두운 단색으로 두고, 색을 갖는 건 존 타일과 룬 블록뿐이다.
         var hexBG = hexRootGO.AddComponent<Image>();
-        hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
-        // 판 배경(자연바탕). 격자 정렬을 강제하는 그림이 아니라 배경 텍스처라 패널을 꽉 채운다.
-        // 그 위에 놓이는 속성 타일이 묻히지 않도록 살짝 어둡게 틴트한다.
-        SkinImage(hexBG, _boardSprite, fill: true);
-        if (_boardSprite != null) hexBG.color = new Color(0.62f, 0.66f, 0.72f, 1f);
+        hexBG.color = new Color(0.055f, 0.065f, 0.095f, 0.98f);
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
         _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
 
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
-            "아이템 카드를 드래그해\n그리드에 배치하세요", 15f,
+            "보관함의 룬을 끌어\n판에 놓으세요", 15f,
             new Color(0.62f, 0.68f, 0.85f, 0.45f));
         _hexGridHintText = hintGO.GetComponent<TMP_Text>();
         var hintRT = hintGO.GetComponent<RectTransform>();
@@ -530,11 +548,16 @@ public sealed class UI_GridPanel : UI_Base
         var scrollGO = Go("StagingScroll");
         scrollGO.transform.SetParent(parent, false);
         _stagingScrollRT = scrollGO.GetComponent<RectTransform>();
+        // 위쪽 0.62~1.0은 아무것도 없이 비어 있었고, 정작 슬롯은 가로로 넘쳐 잘렸다.
+        // 2열 그리드(약 470×472)가 통째로 들어가도록 위로 넓힌다.
         _stagingScrollRT.anchorMin = new Vector2(0f, 0.27f);
-        _stagingScrollRT.anchorMax = new Vector2(1f, 0.62f);
+        _stagingScrollRT.anchorMax = new Vector2(1f, 0.88f);
         _stagingScrollRT.offsetMin = new Vector2(4f, 4f);
         _stagingScrollRT.offsetMax = new Vector2(-4f, -4f);
 
+        // 룬 배치 테두리(326×214@2x)·바탕(287×204@2x)은 <b>슬롯 한 칸</b>용 아트다.
+        // 목록 패널 전체에 늘려 쓰면 장식이 뭉개지므로, 여기는 어두운 판만 두고
+        // 아트는 StagingAreaView가 칸마다 얹는다.
         var scrollBG = scrollGO.AddComponent<Image>();
         scrollBG.color = new Color(0.10f, 0.12f, 0.18f, 0.75f);
 
@@ -559,27 +582,76 @@ public sealed class UI_GridPanel : UI_Base
         viewportGO.AddComponent<RectMask2D>();
 
         var scrollRect = scrollGO.AddComponent<ScrollRect>();
-        scrollRect.horizontal        = true;
-        scrollRect.vertical          = false;
+        scrollRect.horizontal        = false;   // 슬롯이 2열 그리드라 넘치면 세로로 넘친다
+        scrollRect.vertical          = true;
         scrollRect.scrollSensitivity = 30f;
         scrollRect.movementType      = ScrollRect.MovementType.Clamped;
         scrollRect.inertia           = true;
 
-        // ScrollContent — StagingAreaView가 가로 방향으로 슬롯을 배치하므로 좌측 앵커
+        // ScrollContent — StagingAreaView가 좌상단 기준 2열 그리드로 슬롯을 놓으므로
+        // 좌상단 고정 앵커로 두고 크기는 StagingAreaView가 sizeDelta로 정한다.
         var contentGO = Go("ScrollContent");
         contentGO.transform.SetParent(viewportGO.transform, false);
         var contentRT = contentGO.GetComponent<RectTransform>();
-        contentRT.anchorMin = new Vector2(0f, 0f);
-        contentRT.anchorMax = new Vector2(0f, 1f);
-        contentRT.pivot     = new Vector2(0f, 0.5f);
-        contentRT.offsetMin = contentRT.offsetMax = Vector2.zero;
+        contentRT.anchorMin        = new Vector2(0f, 1f);
+        contentRT.anchorMax        = new Vector2(0f, 1f);
+        contentRT.pivot            = new Vector2(0f, 1f);
+        contentRT.anchoredPosition = Vector2.zero;
 
         scrollRect.content  = contentRT;
         scrollRect.viewport = viewportRT;
 
+        // 세로 스크롤바 — 카드를 끌면 그 드래그가 배치용으로 소비되므로(SlotDragHandler),
+        // 목록을 훑을 수단이 휠밖에 없어진다. 잡고 내릴 수 있는 막대를 오른쪽에 세운다.
+        scrollRect.verticalScrollbar = BuildStagingScrollbar(scrollGO.transform, viewportRT);
+        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+
         // StagingAreaView 추가 후 Init으로 scrollContent 전달 + 슬롯 빌드
         _stagingArea = scrollGO.AddComponent<StagingAreaView>();
+        _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
         _stagingArea.Init(contentRT);
+    }
+
+    /// <summary>
+    /// 보관함 목록의 세로 스크롤바를 만든다(뷰포트 오른쪽에 세로 막대).
+    /// AutoHideAndExpandViewport라 넘칠 때만 나타나고, 없을 땐 목록이 폭을 온전히 쓴다.
+    /// </summary>
+    private Scrollbar BuildStagingScrollbar(Transform parent, RectTransform viewportRT)
+    {
+        const float BarW = 10f;
+
+        var barGO = Go("StagingScrollbar");
+        barGO.transform.SetParent(parent, false);
+        var barRT = barGO.GetComponent<RectTransform>();
+        barRT.anchorMin        = new Vector2(1f, 0f);
+        barRT.anchorMax        = new Vector2(1f, 1f);
+        barRT.pivot            = new Vector2(1f, 0.5f);
+        barRT.sizeDelta        = new Vector2(BarW, viewportRT.sizeDelta.y);
+        barRT.anchoredPosition = new Vector2(-2f, 0f);
+
+        var barBg = barGO.AddComponent<Image>();
+        barBg.color = new Color(0.06f, 0.07f, 0.11f, 0.75f);
+
+        var slideGO = Go("SlidingArea");
+        slideGO.transform.SetParent(barGO.transform, false);
+        var slideRT = slideGO.GetComponent<RectTransform>();
+        slideRT.anchorMin = Vector2.zero;
+        slideRT.anchorMax = Vector2.one;
+        slideRT.offsetMin = new Vector2(1f, 1f);
+        slideRT.offsetMax = new Vector2(-1f, -1f);
+
+        var handleGO = Go("Handle");
+        handleGO.transform.SetParent(slideGO.transform, false);
+        var handleRT = handleGO.GetComponent<RectTransform>();
+        handleRT.sizeDelta = Vector2.zero;
+        var handleImg = handleGO.AddComponent<Image>();
+        handleImg.color = new Color(0.45f, 0.52f, 0.68f, 0.95f);
+
+        var bar = barGO.AddComponent<Scrollbar>();
+        bar.direction     = Scrollbar.Direction.BottomToTop;
+        bar.handleRect    = handleRT;
+        bar.targetGraphic = handleImg;
+        return bar;
     }
 
     /// <summary>
@@ -755,7 +827,7 @@ public sealed class UI_GridPanel : UI_Base
         _placeButton  = placeGO.AddComponent<Button>();
         _placeButton.targetGraphic = _placeBG;
 
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "드래그로 배치", 13f,
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "끌어서 배치", 13f,
             new Color(0.7f, 0.78f, 0.90f, 0.8f), bold: true);
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;
@@ -914,7 +986,12 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView?.PlayZoneSynergyBurst(zoneId);
     }
 
-    private async UniTaskVoid ShowSynergyToastAsync(string description)
+    /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다.</summary>
+    private void ShowToast(string message) => ShowSynergyToastAsync(message, prefix: false).Forget();
+
+    private UniTaskVoid ShowSynergyToastAsync(string description) => ShowSynergyToastAsync(description, prefix: true);
+
+    private async UniTaskVoid ShowSynergyToastAsync(string description, bool prefix)
     {
         _toastCts?.Cancel();
         _toastCts?.Dispose();
@@ -922,7 +999,7 @@ public sealed class UI_GridPanel : UI_Base
         var ct = _toastCts.Token;
 
         if (_synergyToastText != null)
-            _synergyToastText.text = $"★ 시너지 활성화!  {description}";
+            _synergyToastText.text = prefix ? $"◆ 시너지 활성화!  {description}" : description;
         if (_synergyToast != null)
             _synergyToast.SetActive(true);
 
@@ -1039,6 +1116,7 @@ public sealed class UI_GridPanel : UI_Base
         // hexgrid가 _occupiedPositions와 Bridge를 갱신한 뒤 시너지 뷰 갱신
         RefreshSynergyStatus();
         RefreshFooter();
+        RefreshPlacementHint();   // 방금 놓았으니 다음 룬의 놓을 자리를 보여준다
     }
 
     private void HandleItemRemoved(RuntimeItemData item)
@@ -1065,6 +1143,7 @@ public sealed class UI_GridPanel : UI_Base
 
         RefreshSynergyStatus();
         RefreshFooter();
+        RefreshPlacementHint();
     }
 
     private int GetItemCellCount(RuntimeItemData item)
@@ -1080,21 +1159,118 @@ public sealed class UI_GridPanel : UI_Base
         _itemInfoPanel?.ShowItem(item, isNew: false);
     }
 
+    // ── 클릭 배치 ──
+    // 드래그로 다중 칸 룬을 얹는 건 손이 커서 어려웠다. 보관함에서 룬을 고른 뒤 판의 칸을 누르면
+    // 그 칸을 기준으로 놓인다. 판정·점유·통보는 드래그와 같은 경로(GridManager.TryPlaceShape)를 탄다.
+
+    /// <summary>지금 놓으려는 룬. 보관함에서 고른 것 → 없으면 보관함 첫 룬.</summary>
+    private RuntimeItemData PlacementTarget
+        => _stagingArea?.HighlightedItem
+           ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
+
+    private void HandleSquareClicked(GridSquare square)
+    {
+        if (square == null) return;
+
+        // 이미 놓인 칸을 누르면 회수 — 클릭 조작만으로 배치/취소가 모두 되게 한다.
+        if (square.isOccupied)
+        {
+            if (square.occupyingItem != null) RemovePlacedItem(square.occupyingItem);
+            return;
+        }
+
+        var item = PlacementTarget;
+        if (item == null) { ShowToast("보관함에서 룬을 먼저 고르세요"); return; }
+
+        var shape = _stagingArea?.GetShapeForItem(item);
+        if (shape == null) { ShowToast("이 룬의 모양 정보를 찾지 못했습니다"); return; }
+
+        // 판 좌표계로 먼저 옮긴다. 주차 구역(shapeHost)은 스케일이 다르고 마스크에 잘려 있어,
+        // 거기 둔 채로 위치를 계산하면 블록이 칸과 어긋난다. 블록은 그리드 gap 크기로 만들어져
+        // 있으므로 판 위에서는 스케일 1이 정답이다.
+        var gridHost = BoardManager.Instance?.gridHost;
+        if (gridHost != null && shape.transform.parent != gridHost)
+        {
+            shape.transform.SetParent(gridHost, false);
+            shape.transform.localScale = Vector3.one;
+        }
+
+        if (!GridManager.Instance.TryPlaceShapeAt(shape, square))
+        {
+            BoardManager.Instance?.ReSlotAndReturn(shape);   // 주차 구역으로 되돌린다
+            ShowToast("여기엔 놓을 수 없습니다");
+            return;
+        }
+
+        BoardManager.Instance?.OnShapePlaced(shape);
+        GridManager.Instance.ClearPreview();
+    }
+
+    /// <summary>판에서 룬을 회수해 보관함으로 되돌린다. 드래그로 빼낼 때와 같은 경로.</summary>
+    private void RemovePlacedItem(RuntimeItemData item)
+    {
+        var shape = _stagingArea?.GetShapeForItem(item);
+        if (shape == null) return;
+
+        BoardManager.Instance?.OnShapePickedUp(shape);
+        GridManager.Instance?.ReleaseShape(shape);   // 점유 해제 + OnItemRemoved 통보
+        BoardManager.Instance?.ReSlotAndReturn(shape);
+        GridManager.Instance?.ClearPreview();
+    }
+
+    private void HandleSquareHovered(GridSquare square)
+    {
+        if (GridManager.Instance == null) return;
+
+        if (square == null || square.isOccupied) { GridManager.Instance.ClearPreview(); return; }
+
+        var item  = PlacementTarget;
+        var shape = item != null ? _stagingArea?.GetShapeForItem(item) : null;
+        if (shape == null) { GridManager.Instance.ClearPreview(); return; }
+
+        GridManager.Instance.PreviewShapeAt(shape, square);
+    }
+
     private void OnStagingItemSelected(RuntimeItemData item)
     {
         _stagingArea?.HighlightItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         UpdatePlaceButtonState(item != null);
+
+        // 고른 룬의 속성 존을 판에서 강조한다. 이게 없으면 판이 전 칸 균일하게 밝아
+        // "어디에 놓을 수 있는지"가 화면에 전혀 안 나온다(빈 판은 모든 칸이 배치 가능이라 대비가 0).
+        _hexGridView?.SetPlacementElementHint(item?.element);
     }
 
     private void OnStagingItemHovered(RuntimeItemData item)
     {
         _itemInfoPanel?.ShowItem(item, isNew: false);
+        if (item != null) _hexGridView?.SetPlacementElementHint(item.element);
     }
 
     private void OnStagingItemUnhovered()
     {
         RefreshInfoPanelDefault();
+        RefreshPlacementHint();   // 호버 해제 → 지금 고른 룬 기준으로 되돌린다
+    }
+
+    /// <summary>
+    /// 판의 배치 힌트를 <b>"플레이어가 다음에 놓을 룬"</b> 하나로 다시 맞춘다.
+    ///
+    /// 힌트를 세우는 곳이 여러 군데(패널 오픈·보관함 선택·호버)라 배치·제거 뒤에는
+    /// 아무도 갱신하지 않아, 룬을 하나 놓고 나면 다음 룬의 놓을 자리가 표시되지 않았다.
+    /// 기준을 한 줄로 못 박아 어느 경로로 들어오든 같은 결과가 나오게 한다.
+    /// </summary>
+    private void RefreshPlacementHint()
+    {
+        if (_hexGridView == null) return;
+
+        var target = _pendingNewItem
+                  ?? _pendingAddItem
+                  ?? _stagingArea?.HighlightedItem
+                  ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
+
+        _hexGridView.SetPlacementElementHint(target?.element);
     }
 
     // ── Info Panel Default ──
@@ -1161,7 +1337,7 @@ public sealed class UI_GridPanel : UI_Base
             if (anyMet)
                 sb.Append($"<color={hex}><b>●{zoneId}</b></color>  ");
             else
-                sb.Append($"<color=#445566>○{zoneId}</color>  ");
+                sb.Append($"<color=#445566>◇{zoneId}</color>  ");
         }
 
         _footerActiveSynText.SetText(sb.ToString().TrimEnd());
@@ -1169,7 +1345,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_footerCenterText != null)
         {
             bool centerActive = MerlinRuneBridge.Instance?.IsCenterBonusActive ?? false;
-            _footerCenterText.text  = centerActive ? "◉ 중앙 보너스" : "◎ 중앙";
+            _footerCenterText.text  = centerActive ? "◆ 중앙 보너스" : "◇ 중앙";
             _footerCenterText.color = centerActive
                 ? new Color(1.00f, 0.88f, 0.40f, 0.95f)
                 : new Color(0.50f, 0.55f, 0.70f, 0.55f);
@@ -1183,8 +1359,13 @@ public sealed class UI_GridPanel : UI_Base
         ClosePanel();
     }
 
-    /// <summary>정제소 열기 — 판을 보다가 바로 특수 룬(존핵)을 벼린다. 만든 룬은 보관함으로 들어가 이 판에 배치된다.</summary>
-    private void OnRefineryClicked() => OpenRefineryAsync().Forget();
+    /// <summary>
+    /// 정제소 열기 — 판을 보다가 바로 특수 룬(존핵)을 벼린다. 만든 룬은 보관함으로 들어가 이 판에 배치된다.
+    /// UI에 직접 만든 버튼의 onClick을 이 메서드로 지정하면 그리드를 거치지 않고 정제소를 연다(미리보기용).
+    /// </summary>
+    public void OpenRefinery() => OpenRefineryAsync().Forget();
+
+    private void OnRefineryClicked() => OpenRefinery();
 
     private async UniTaskVoid OpenRefineryAsync()
     {

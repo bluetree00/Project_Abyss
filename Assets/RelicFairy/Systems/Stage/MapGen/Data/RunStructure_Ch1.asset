@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d50b93cfbd4465e40bcf2b1be9909901, type: 3}
   m_Name: RunStructure_Ch1
   m_EditorClassIdentifier: Assembly-CSharp::RunStructureConfig
-  _bossThreshold: 10
+  _bossThreshold: 8
   _preBossRoomKey:
   _bossRoomKey:
   _shopMaxPerChapter: 2
@@ -49,9 +49,7 @@ MonoBehaviour:
     kind: 2
   - visitIndex: 5
     kind: 3
-  - visitIndex: 7
+  - visitIndex: 6
     kind: 6
-  - visitIndex: 8
+  - visitIndex: 7
     kind: 7
-  - visitIndex: 9
-    kind: 1

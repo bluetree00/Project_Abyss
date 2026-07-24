@@ -261,9 +261,12 @@ namespace RelicFairy.UI
             DialogueSpeaker.Lich    => "리치",
             DialogueSpeaker.Mordred => "모르드레드",
             DialogueSpeaker.Knight  => "기사",
-            DialogueSpeaker.God     => "???",
+            DialogueSpeaker.Merlin  => "???",
             DialogueSpeaker.Shadow  => "그림자",
             DialogueSpeaker.Arthur  => "아서왕",
+            DialogueSpeaker.ForestGuardian => "숲의 수호자",
+            DialogueSpeaker.Dragon  => "화룡",
+            DialogueSpeaker.DeathKnight    => "죽음의 기사",
             _                       => string.Empty,
         };
 

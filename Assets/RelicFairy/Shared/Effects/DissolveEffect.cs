@@ -28,9 +28,18 @@ public static class DissolveEffect
     private const int MatPoolCap = 256;
     private static readonly Stack<Material> _matPool = new();
 
+    // 재진입 가드 — 같은 오브젝트에 디졸브가 겹치면 2번째가 "원본"으로 <b>1번째의 디졸브 머티리얼</b>을 캡처한다.
+    // 그 상태로 복원되면 렌더러가 풀 머티리얼을 물고, 그게 풀로 반환돼 다른 대상에 재사용되는 순간
+    // 원본 텍스처를 잃고 마젠타로 보인다(무기 재장착·보스 등장 등 호출 경로가 둘 이상인 곳에서 발생).
+    private static readonly HashSet<int> _dissolving = new();
+
     // 도메인 리로드 OFF: 2회차 진입 시 _matPool에 파괴된(Unity-null) Material이 잔류 → RentMaterial에서 예외.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() => _matPool.Clear();
+    private static void ResetStatics()
+    {
+        _matPool.Clear();
+        _dissolving.Clear();
+    }
 
     // ─────────────────── 공개 API ───────────────────
 
@@ -132,6 +141,7 @@ public static class DissolveEffect
         Renderer[]      renderers = null;
         Material[][]    origMats  = null;
         List<Material>  instances = null;
+        List<int>       claimed   = null;   // 이번 호출이 점유한 렌더러 ID(finally에서 해제)
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -151,6 +161,17 @@ public static class DissolveEffect
             if (renderers.Length == 0)
             {
                 Debug.LogWarning($"[DissolveEffect] '{target.name}' Renderer 없음 — 등장 디졸브 스킵");
+                if (!target.activeSelf) target.SetActive(true);
+                onComplete?.Invoke();
+                return;
+            }
+
+            // 중첩/재진입 차단 — 같은 렌더러가 두 디졸브에 동시에 걸리면 뒤늦은 쪽이 "원본"으로
+            // 앞선 쪽의 디졸브 머티리얼을 캡처해 복원이 오염된다(→ 풀 재사용 시 마젠타).
+            // 부모(아레나·필드구조물·타일)와 자식(보스)처럼 계층이 겹치는 경우까지 잡으려면
+            // GameObject가 아니라 렌더러 단위로 점유를 판정해야 한다.
+            if (!TryClaimRenderers(renderers, out claimed))
+            {
                 if (!target.activeSelf) target.SetActive(true);
                 onComplete?.Invoke();
                 return;
@@ -210,11 +231,39 @@ public static class DissolveEffect
         finally
         {
             linkedCts?.Dispose();
+            ReleaseRenderers(claimed);
             // 등장 완료/취소 시 렌더러는 이미 origMats로 복원됨 → 풀 머티리얼을 더 이상 참조하지 않아 재사용 안전
             if (instances != null)
                 foreach (var m in instances)
                     if (m != null) ReturnMaterial(m);
         }
+    }
+
+    /// <summary>렌더러 점유 시도 — 하나라도 이미 다른 디졸브가 쓰는 중이면 false(전부 미점유로 롤백).</summary>
+    private static bool TryClaimRenderers(Renderer[] renderers, out List<int> claimed)
+    {
+        claimed = null;
+        if (renderers == null) return true;
+
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null && _dissolving.Contains(renderers[i].GetInstanceID()))
+                return false;
+
+        claimed = new List<int>(renderers.Length);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] == null) continue;
+            int id = renderers[i].GetInstanceID();
+            _dissolving.Add(id);
+            claimed.Add(id);
+        }
+        return true;
+    }
+
+    private static void ReleaseRenderers(List<int> claimed)
+    {
+        if (claimed == null) return;
+        for (int i = 0; i < claimed.Count; i++) _dissolving.Remove(claimed[i]);
     }
 
     private static async UniTask DissolveOutAsync(
@@ -268,6 +317,7 @@ public static class DissolveEffect
         Material[][]   origMats  = null;
         List<Material> instances = null;
         bool despawned = false;
+        List<int> claimed = null;   // 등장 경로와 동일한 렌더러 단위 점유(중첩 디졸브 차단)
         try
         {
             var mat = await Managers.AddressableManager.TryLoadAssetAsync<Material>(MaterialKey);
@@ -282,6 +332,13 @@ public static class DissolveEffect
             if (target == null) { onDespawn?.Invoke(); return; }
             renderers = CollectDissolveRenderers(target);
             if (renderers.Length == 0) { onDespawn?.Invoke(); return; }
+
+            if (!TryClaimRenderers(renderers, out claimed))
+            {
+                renderers = null;   // finally의 origMats 복원이 남의 디졸브를 덮어쓰지 않도록
+                onDespawn?.Invoke();
+                return;
+            }
 
             origMats = new Material[renderers.Length][];
             for (int i = 0; i < renderers.Length; i++)
@@ -315,6 +372,8 @@ public static class DissolveEffect
             if (renderers != null && origMats != null)
                 for (int i = 0; i < renderers.Length && i < origMats.Length; i++)
                     if (renderers[i] != null) renderers[i].sharedMaterials = origMats[i];
+
+            ReleaseRenderers(claimed);
 
             if (instances != null)
                 foreach (var m in instances)

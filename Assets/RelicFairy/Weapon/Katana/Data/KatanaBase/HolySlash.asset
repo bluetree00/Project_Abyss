@@ -29,8 +29,8 @@ MonoBehaviour:
   dashEffectKey:
   dashTrailKey:
   slashEffectKey: IasenFinishFlash
-  hitEffectKey: BloodShot
-  hitEffectScale: 0.4
+  hitEffectKey: SwordHitImpact
+  hitEffectScale: 0.34
   dashLineEffectKey: KatanaDashLine
   dashLineScale: 1.5
   tier2ExtraHitKey: KatanaSlashHit
