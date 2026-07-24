@@ -15,8 +15,8 @@ MonoBehaviour:
   category: {fileID: 11400000, guid: 6edac1c2f6a8ccf47903b37ca4cad828, type: 2}
   icon: {fileID: 0}
   codeName: tut_covenant
-  displayName: "\uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C"
-  description: "\uC2EC\uC5F0\uC758 \uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D\uC744 \uB9FA\uC5B4\uB77C"
+  displayName: "\uC11C\uC57D"
+  description: "\uC2EC\uC5F0\uC758 \uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: f11c34493f75bf84a953e2f4f4a920e0, type: 2}

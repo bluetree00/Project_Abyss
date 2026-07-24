@@ -179,6 +179,7 @@ public sealed class HudPresenter : MonoBehaviour
         _runtimeStats.OnChanged += RefreshStats;
         _weaponManager.OnWeaponChanged += HandleWeaponChanged;
         _weaponManager.OnEquippedWeaponRefreshed += HandleEquippedWeaponRefreshed;
+        _weaponManager.OnSlotsChanged += RefreshWeaponSlots;   // 비활성 슬롯 장착(예비 원거리 지급 등) 반영
         _cooldownTracker.OnCooldownChanged += HandleCooldownChanged;
 
         // 동적 지속 버프 소스(룬 리소스 + 유물 메커닉) 등록 → 버프창 폴링 갱신
@@ -211,6 +212,7 @@ public sealed class HudPresenter : MonoBehaviour
         {
             _weaponManager.OnWeaponChanged -= HandleWeaponChanged;
             _weaponManager.OnEquippedWeaponRefreshed -= HandleEquippedWeaponRefreshed;
+            _weaponManager.OnSlotsChanged -= RefreshWeaponSlots;
             _weaponManager = null;
         }
 
@@ -305,6 +307,16 @@ public sealed class HudPresenter : MonoBehaviour
 
     public void UnbindBoss()
     {
+        DetachBoss();
+
+        if (_currentMode == HUDIds.Mode.Boss)
+            SetMode(HUDIds.Mode.Combat);
+    }
+
+    /// <summary>보스 구독 해제만 — 모드 전환 cascade 없음.
+    /// 파괴 중(OnDestroy)이나 런 종료 teardown처럼 SetMode를 태우면 안 되는 경로가 쓴다.</summary>
+    private void DetachBoss()
+    {
         if (_boss != null)
         {
             _boss.OnHPChanged -= HandleBossHPChanged;
@@ -313,9 +325,6 @@ public sealed class HudPresenter : MonoBehaviour
         }
 
         _bossPanelSuppressed = false;
-
-        if (_currentMode == HUDIds.Mode.Boss)
-            SetMode(HUDIds.Mode.Combat);
     }
 
     private void HandleHpChanged(int hp, int maxHp) => view?.CombatPanel?.SetHp(hp, maxHp);
@@ -458,6 +467,9 @@ public sealed class HudPresenter : MonoBehaviour
         }
 
         _provider = null;
+        // @UIRoot는 DDOL이라 씬 전환으로 파괴되지 않는다 — 여기서 보스를 떼지 않으면
+        // 사망 복귀 후에도 이전 런의 보스 체력바가 그대로 남는다.
+        DetachBoss();
         UnbindPlayer();
         UnbindLobby();
         UnbindBuffHandler();
@@ -517,12 +529,7 @@ public sealed class HudPresenter : MonoBehaviour
     private void OnDestroy()
     {
         // UnbindBoss 의 SetMode(Combat) cascade 는 파괴 중인 GameObject 에
-        // SetActive 를 호출해 Unity 예외를 유발하므로 이벤트 해제만 수행한다.
-        if (_boss != null)
-        {
-            _boss.OnHPChanged -= HandleBossHPChanged;
-            _boss = null;
-        }
+        // SetActive 를 호출해 Unity 예외를 유발하므로 이벤트 해제만 수행한다(DetachBoss).
         Dispose();
     }
 

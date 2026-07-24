@@ -15,6 +15,21 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: f1076af87ac402947b621c4a9f046477
   m_SerializeEntries:
+  - m_GUID: b78b1e18c2d250c44943095a861d0000
+    m_Address: Covenant/CovenantTome
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8943c0e696b59cc448db461a0ed4ee21
+    m_Address: Refinery/RefineryNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 364dd7223b1b6cb44a74230a5b252eaa
+    m_Address: Crucible/CrucibleNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 07757cf211bd45044a1f1917658b9e66
     m_Address: VFX_ExtraAttack
     m_ReadOnly: 0
@@ -117,6 +132,36 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c004dd9604a3985439fb2e97d98773a6
     m_Address: RuneArtLibrary
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2233958ca04e2474fb9dd492603df663
+    m_Address: UI/RefinerySkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e007a5fd4cfd4a54dbb92f4df1c51e9b
+    m_Address: UI/RuneSelectSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0ff3261f220cae74ca111c09d5947259
+    m_Address: UI/WeaponForgeSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 573fc951263aaca4ab0ed43304b89f42
+    m_Address: UI/CrucibleSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87d94fcbc6a73d14799fa351a42cfb8d
+    m_Address: UI/ShopSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51ffee94d37c90e4c8e731be00a3d519
+    m_Address: SHOP_BUFF_DATA
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

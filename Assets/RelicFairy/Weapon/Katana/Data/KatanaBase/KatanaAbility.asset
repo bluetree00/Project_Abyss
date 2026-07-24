@@ -39,8 +39,8 @@ MonoBehaviour:
       duration: 0.4
       shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: BloodShot
-    hitEffectScale: 0.25
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.20
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 1
@@ -69,8 +69,8 @@ MonoBehaviour:
       duration: 0.4
       shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: BloodShot
-    hitEffectScale: 0.25
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.20
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 2
@@ -99,8 +99,8 @@ MonoBehaviour:
       duration: 0.4
       shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: BloodShot
-    hitEffectScale: 0.25
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.20
     oneShot: 0
     rotateToMouse: 0
   - stepIndex: 3
@@ -129,7 +129,7 @@ MonoBehaviour:
       duration: 0.4
       shape: 1
       behavior: {fileID: 0}
-    hitEffectKey: BloodShot
-    hitEffectScale: 0.25
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.20
     oneShot: 0
     rotateToMouse: 0

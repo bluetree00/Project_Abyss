@@ -24,6 +24,26 @@ public abstract class GroundFieldBase : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ClearRegistry() => s_active.Clear();
 
+    /// <summary>
+    /// 살아있는 장판을 전부 걷는다. 방 전환에서 호출 — 장판은 씬 루트에 스폰돼 방 파괴로는 안 지워지고,
+    /// 수명이 길거나 추적형이라 <b>다음 방까지 따라와 바닥에 남는다.</b>
+    /// Despawn 경로를 그대로 타므로 풀 반환·오라/디스크 해제가 누락되지 않는다.
+    /// </summary>
+    public static void DespawnAll()
+    {
+        if (s_active.Count == 0) return;
+
+        int n = s_active.Count;
+        for (int i = s_active.Count - 1; i >= 0; i--)
+        {
+            var f = s_active[i];
+            if (f != null) f.Despawn();   // Despawn → OnDisable → s_active에서 자기 제거
+        }
+        s_active.Clear();                 // 비활성 상태로 남은 잔여 참조 정리
+
+        Debug.Log($"[GroundField] 방 전환 — 장판 {n}개 정리");
+    }
+
     protected GameObject _instigator;
     protected float      _radius;
     protected float      _lifetime;

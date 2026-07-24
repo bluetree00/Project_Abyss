@@ -21,8 +21,8 @@ MonoBehaviour:
   endDelay: 0.3
   attackEffectKey: SlashAttack
   attackEffectScale: 0.3
-  hitEffectKey: BloodShot
-  hitEffectScale: 0.3
+  hitEffectKey: SwordHitImpact
+  hitEffectScale: 0.21
   finishEffectKey: ShinySlash
   finishEffectScale: 0.5
   animationOverride: QSkill_01

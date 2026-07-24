@@ -92,13 +92,16 @@ public sealed class IntroOpeningDirector : MonoBehaviour
 
             // ⑥ 암전 → 플레이어 뒤로 → 밝힘 → 조작 인계
             await ScreenFade.Out(fadeDuration, ct);
+            var handOff = UniTask.CompletedTask;
             if (player != null)
             {
                 Vector3 p = player.transform.position;
                 SetCamera(p + new Vector3(0f, 2.6f, -5.5f), p + new Vector3(0f, 1.4f, 6f));
-                cam?.HandToGameplayCamera(player.transform);
+                if (cam != null) handOff = cam.HandToGameplayCameraAsync(player.transform, ct: ct);
             }
             await ScreenFade.In(fadeDuration, ct);
+            // 카메라 보간이 끝난 뒤에 조작을 넘긴다 — 블렌드 중에 조작이 들어가면 시점이 튄다.
+            await handOff;
 
             // 통로 이동 구간에서도 HUD는 계속 숨긴다(전투 진입 시 FadeInHudAsync가 띄운다).
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);

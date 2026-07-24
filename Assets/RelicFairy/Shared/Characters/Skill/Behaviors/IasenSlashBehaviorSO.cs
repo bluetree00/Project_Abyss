@@ -28,7 +28,7 @@ public class IasenSlashBehaviorSO : SkillBehaviorSO
     public string dashEffectKey = "WindBlast";
     public string dashTrailKey = "DashTrail";
     public string slashEffectKey = "MultiSlash";
-    public string hitEffectKey = "BloodShot";
+    public string hitEffectKey = "SwordHitImpact";
     public float hitEffectScale = 0.3f;
 
     [Header("트레일")]

@@ -16,8 +16,8 @@ using UnityEngine.UI;
 ///  - 이름 / 등급·칸수 / 효과
 ///  - <b>배치 가능 배지</b> — 인접 제약 때문에 실제로 못 놓는 룬이 생긴다. 경고일 뿐 선택은 막지 않는다.
 ///
-/// 속성(불·얼음 등)은 <b>표시하지 않는다</b>. 확정 모델상 속성은 배치 위치가 정하며,
-/// 카드에 속성을 붙이면 "효과=조각 / 시너지=위치" 2층 구조가 무너진다.
+/// 속성은 <b>상단 리본색 + 이름/태그</b>로 표시한다 — 어느 존에 놓을지 판단하는 근거이자
+/// 디자이너 완성본(0_룬 획득_260723)의 확정 표현. 효과=조각 / 시너지=위치 2층 구조는 그대로다.
 /// </summary>
 public sealed class UI_RuneSelectPopup : UI_Popup
 {
@@ -25,7 +25,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     public override bool CloseOnEscape  => false;   // 보상 결정이라 실수로 닫히면 안 된다 — 선택/넘기기로만 종료
 
     // ── 레이아웃 ──
-    private const float WindowW = 1100f;
+    private const float WindowW = 1040f;   // 룬 획득 바탕 아트 실측(2081×1241 @2x → 1040×620)
     private const float WindowH = 620f;
     private const float CardW   = 300f;
     private const float CardH   = 380f;
@@ -50,6 +50,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private RunItemInventory _inventory;
     private int _selected = -1;
     private bool _built;
+    private bool _skinned;   // 아트 로드 성공 — 선택 피드백을 색 틴트 대신 밝기로 처리
 
     private UniTaskCompletionSource _interactionTcs;
 
@@ -126,6 +127,21 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             Vector2.zero, new Vector2(WindowW, WindowH));
         _windowRoot = window.transform;
 
+        var skin = UISkin.RuneSelect;
+        _skinned = skin != null;
+        // 창 바탕 — 전면 일러스트로 교체(9-slice 아님). 미로드면 기존 색 창 유지.
+        ShopUIStyle.Skin(window, skin?.background);
+
+        // 타이틀바 — 제목/카운터 뒤에 깔린다. 아트 없으면 표시 안 됨(투명 폴백).
+        if (skin?.titleBar != null)
+        {
+            var titleBar = ShopUIStyle.MakeImage(_windowRoot, "TitleBar", Color.white);
+            ShopUIStyle.Skin(titleBar, skin.titleBar, sliced: true);
+            ShopUIStyle.Anchor(titleBar.rectTransform,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -14f), new Vector2(WindowW - 48f, 52f));
+        }
+
         // 제목
         var title = ShopUIStyle.MakeText(_windowRoot, "Title", 26f, FontStyles.Bold,
             TextAlignmentOptions.Left, ShopUIStyle.TextPrimary);
@@ -148,6 +164,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private void BuildFooter()
     {
+        var skin = UISkin.RuneSelect;
+
         // [선택]
         var confirm = ShopUIStyle.MakeFrame(_windowRoot, "ConfirmBtn",
             ShopUIStyle.BronzeLine, ShopUIStyle.BandFill, 2f, raycast: true);
@@ -155,6 +173,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
             new Vector2(-90f, 34f), new Vector2(200f, 56f));
         _confirmBtnImg = confirm;
+        ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
         AddClick(confirm.transform.parent.gameObject, OnConfirmClicked);
 
         _confirmLabel = ShopUIStyle.MakeText(confirm.transform, "Label", 20f, FontStyles.Bold,
@@ -168,6 +187,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         ShopUIStyle.Anchor((RectTransform)skip.transform.parent,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
             new Vector2(120f, 34f), new Vector2(140f, 56f));
+        ShopUIStyle.Skin(skip, skin?.skipButton, sliced: true);
         AddClick(skip.transform.parent.gameObject, OnSkipClicked);
 
         var skipLbl = ShopUIStyle.MakeText(skip.transform, "Label", 18f, FontStyles.Normal,
@@ -205,6 +225,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                 Border = cardRT.GetComponent<Image>(),
                 Fill   = card,
             };
+            // 카드 테두리 라인아트 + 채움 — 미로드면 색 박스 유지
+            var skin = UISkin.RuneSelect;
+            ShopUIStyle.Skin(view.Border, skin?.cardFrame, sliced: true);
+            ShopUIStyle.Skin(view.Fill,   skin?.cardFill,  sliced: true);
             _cards.Add(view);
 
             BuildCardContent(card.transform, data, so);
@@ -213,11 +237,25 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private void BuildCardContent(Transform card, RuntimeItemData data, ItemSO so)
     {
-        // 등급 리본
-        var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", ShopUIStyle.RarityGlow(data.rarity));
+        // 상단 속성 리본 — 완성본의 색 막대. 어느 존에 놓을지 알려주는 근거색이다.
+        int elemIdx = ElementIndex(data.element);
+        Color ribbonCol = ElementDef.IdColor(data.element, ShopUIStyle.RarityGlow(data.rarity));
+        var ribbon = ShopUIStyle.MakeImage(card, "Ribbon", ribbonCol);
         ShopUIStyle.Anchor(ribbon.rectTransform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            Vector2.zero, new Vector2(0f, 4f));
+            new Vector2(0f, -10f), new Vector2(-32f, 14f));
+        ShopUIStyle.Skin(ribbon, UISkin.RuneSelect?.ElementRibbon(elemIdx), sliced: true);
+
+        // 속성 엠블럼(룬조각) — 카드 좌상단 배지. 어느 속성 룬인지 한눈에.
+        var piece = UISkin.RuneSelect?.ElementPiece(elemIdx);
+        if (piece != null)
+        {
+            var emblem = ShopUIStyle.MakeImage(card, "Emblem", Color.white);
+            ShopUIStyle.Skin(emblem, piece);
+            emblem.preserveAspect = true;
+            ShopUIStyle.Anchor(emblem.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(12f, -28f), new Vector2(34f, 34f));
+        }
 
         // 모양 미리보기
         var shapeBox = ShopUIStyle.MakeImage(card, "ShapeBox", ShopUIStyle.IconBg);
@@ -234,6 +272,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -172f), new Vector2(CardW - 24f, 26f));
         name.text = data.displayName ?? data.itemId;
+        FitSingleLine(name);
 
         // 등급 · 칸수 · 속성 — 속성명은 속성색으로 표시(어느 존에 놓을지 판단 근거)
         int cells = CellCount(data.shapeId);
@@ -246,6 +285,18 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -200f), new Vector2(CardW - 24f, 22f));
         meta.text = (cells > 0 ? $"{RarityLabel(data.rarity)} · {cells}칸" : RarityLabel(data.rarity)) + elemTag;
+        FitSingleLine(meta);
+
+        // 효과 칸 배경 — 아트 있으면 박스로, 없으면 표시 안 함(투명 폴백)
+        var fxSkin = UISkin.RuneSelect?.effectBox;
+        if (fxSkin != null)
+        {
+            var fxBg = ShopUIStyle.MakeImage(card, "EffectBox", Color.white);
+            ShopUIStyle.Skin(fxBg, fxSkin, sliced: true);
+            ShopUIStyle.Anchor(fxBg.rectTransform,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -224f), new Vector2(CardW - 28f, 96f));
+        }
 
         // 효과 목록
         var fxRoot = ShopUIStyle.MakeRect(card, "Effects").GetComponent<RectTransform>();
@@ -257,14 +308,46 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         vlg.spacing = 2f;
         BuildEffectRows(fxRoot, data);
 
-        // 배치 가능 배지
-        var badge = ShopUIStyle.MakeText(card, "PlaceBadge", 14f, FontStyles.Bold,
-            TextAlignmentOptions.Center, canPlace ? OkColor : NoColor);
-        ShopUIStyle.Anchor(badge.rectTransform,
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0f, 14f), new Vector2(CardW - 24f, 24f));
-        badge.text = canPlace ? "▸ 지금 판에 배치 가능" : "✕ 놓을 자리 없음";
+        // 배치 상태 바 — 완성본의 하단 초록/빨강 막대. 아트 있으면 바로, 없으면 텍스트만.
+        var placeSkin = canPlace ? UISkin.RuneSelect?.placeOk : UISkin.RuneSelect?.placeNo;
+        Transform badgeParent = card;
+        if (placeSkin != null)
+        {
+            var bar = ShopUIStyle.MakeImage(card, "PlaceBar", Color.white);
+            ShopUIStyle.Skin(bar, placeSkin, sliced: true);
+            ShopUIStyle.Anchor(bar.rectTransform,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 16f), new Vector2(CardW - 28f, 32f));
+            badgeParent = bar.transform;
+        }
+
+        var badge = ShopUIStyle.MakeText(badgeParent, "PlaceBadge", 14f, FontStyles.Bold,
+            TextAlignmentOptions.Center, placeSkin != null ? Color.white : (canPlace ? OkColor : NoColor));
+        if (placeSkin != null)
+            ShopUIStyle.Stretch(badge.rectTransform);
+        else
+            ShopUIStyle.Anchor(badge.rectTransform,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 14f), new Vector2(CardW - 24f, 24f));
+        badge.text = canPlace ? "놓을 자리 있음" : "놓을 자리 없음";
+        FitSingleLine(badge);
     }
+
+    /// <summary>
+    /// 한 줄 라벨의 넘침을 말줄임으로 가둔다.
+    ///
+    /// 카드 안의 값(룬 이름·등급/칸수/속성 태그·배지)은 전부 <b>길이가 가변</b>인데 박스는 1줄 높이로 고정돼 있다.
+    /// 기본 설정에서는 긴 이름이 줄바꿈되며 두 번째 줄이 박스를 뚫고 아래 요소 위로 겹쳤다.
+    /// </summary>
+    private static void FitSingleLine(TMP_Text t)
+    {
+        if (t == null) return;
+        t.textWrappingMode = TextWrappingModes.NoWrap;
+        t.overflowMode     = TextOverflowModes.Ellipsis;
+    }
+
+    /// <summary>효과 목록 박스(높이 86 · 행 20 + 간격 2)에 들어가는 최대 행 수.</summary>
+    private const int MaxEffectRows = 4;
 
     private void BuildEffectRows(RectTransform parent, RuntimeItemData data)
     {
@@ -276,11 +359,31 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         style.rowHeight       = 20f;
         style.usePrefixArrows = true;
 
+        // 효과가 많은 룬은 행이 박스를 넘어 아래 배지·카드 밖까지 밀고 나갔다(레이아웃이 뭉개진 주범).
+        // 박스에 들어가는 만큼만 그리고, 잘린 개수는 마지막 줄에 알린다.
+        int shown = 0, hidden = 0;
         foreach (var slot in data.effects)
         {
             if (string.IsNullOrEmpty(slot.effectType)) continue;
+            if (shown >= MaxEffectRows) { hidden++; continue; }
             EffectRowWidget.Create(parent, style, slot);
+            shown++;
         }
+
+        if (hidden > 0 && shown > 0)
+        {
+            // 마지막 행을 "+N개 더"로 대체 — 잘렸다는 사실이 화면에 보여야 한다.
+            var last = parent.GetChild(parent.childCount - 1);
+            if (last != null) Destroy(last.gameObject);
+
+            var more = ShopUIStyle.MakeText(parent, "MoreEffects", 13f, FontStyles.Italic,
+                TextAlignmentOptions.Center, ShopUIStyle.TextDim);
+            more.text = $"+{hidden + 1}개 더";
+            FitSingleLine(more);
+            var le = more.gameObject.AddComponent<LayoutElement>();
+            le.preferredHeight = style.rowHeight;
+        }
+
         LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
     }
 
@@ -293,8 +396,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var offsets = RuneDataManager.ParseCellOffsets(entry);
         if (offsets == null || offsets.Length == 0) return true;
 
+        // 속성까지 넘긴다 — 룬은 자기 속성 존(또는 중앙)에만 놓이므로,
+        // 모양만 보고 판정하면 "자리 있음"으로 뜬 룬이 막상 판에서는 들어갈 곳이 없다.
         bool canPlace = MerlinRuneBridge.Instance == null
-            || MerlinRuneBridge.Instance.CanPlaceShape(offsets);
+            || MerlinRuneBridge.Instance.CanPlaceShape(offsets, data.element);
 
         int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
         foreach (var o in offsets)
@@ -316,10 +421,13 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         float startX = -totalW * 0.5f + cellSize * 0.5f;
         float startY =  totalH * 0.5f - cellSize * 0.5f;
 
-        // 룬 색 = 랜덤 속성 색. 등급 아트 스프라이트를 속성색으로 틴트해 "속성 있는 룬"을 나타낸다.
-        Color runeColor = ElementDef.IdColor(data.element, new Color(0.7f, 0.7f, 0.75f));
-        Color dimColor  = new Color(runeColor.r * 0.5f, runeColor.g * 0.5f, runeColor.b * 0.5f, 0.7f);
-        Sprite art      = RuneArt.GetArt(data.rarity);
+        // 속성 룬 조각 아트가 있으면 그대로(이미 속성색으로 채색됨), 없을 때만
+        // 공용 타일을 속성색으로 틴트한다 — 예전엔 항상 공용 타일이라 속성이 모양으로 안 읽혔다.
+        Color  runeColor = ElementDef.IdColor(data.element, new Color(0.7f, 0.7f, 0.75f));
+        Sprite elemArt   = RuneArt.GetArtByElement(data.element);
+        Sprite art       = elemArt != null ? elemArt : (UISkin.RuneSelect?.runeTile ?? RuneArt.GetArt(data.rarity));
+        Color  tint      = elemArt != null ? Color.white : runeColor;
+        Color  dimTint   = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.7f);
 
         foreach (var o in offsets)
         {
@@ -327,8 +435,8 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             int row = maxY - o.y;
 
             var cell = ShopUIStyle.MakeImage(root, $"C{o.x}_{o.y}",
-                canPlace ? runeColor : dimColor);
-            if (art != null) cell.sprite = art;   // 등급 아트(속성색 틴트) — 미로드 시 색상 폴백
+                canPlace ? tint : dimTint);
+            if (art != null) { cell.sprite = art; cell.preserveAspect = true; }
             ShopUIStyle.Anchor(cell.rectTransform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(startX + col * (cellSize + MiniGap), startY - row * (cellSize + MiniGap)),
@@ -347,17 +455,21 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         for (int i = 0; i < _cards.Count; i++)
         {
             bool on = (i == index);
+            // 스킨 시: 아트를 물들이지 않도록 선택=흰색·비선택=살짝 어둡게(밝기)로 피드백.
             if (_cards[i].Border != null)
-                _cards[i].Border.color = on ? SelectBorder : ShopUIStyle.CardBorder;
+                _cards[i].Border.color = _skinned ? (on ? Color.white : new Color(0.62f, 0.62f, 0.66f))
+                                                  : (on ? SelectBorder : ShopUIStyle.CardBorder);
             if (_cards[i].Fill != null)
-                _cards[i].Fill.color = on ? CardSelected : ShopUIStyle.CardFill;
+                _cards[i].Fill.color = _skinned ? Color.white
+                                                : (on ? CardSelected : ShopUIStyle.CardFill);
         }
 
         bool hasSel = index >= 0;
         if (_confirmLabel != null)
             _confirmLabel.color = hasSel ? ShopUIStyle.TextPrimary : ShopUIStyle.TextDim;
         if (_confirmBtnImg != null)
-            _confirmBtnImg.color = hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill;
+            _confirmBtnImg.color = _skinned ? (hasSel ? Color.white : new Color(1f, 1f, 1f, 0.5f))
+                                            : (hasSel ? ShopUIStyle.GoldPillBg : ShopUIStyle.BandFill);
     }
 
     private void RefreshCounter()
@@ -413,6 +525,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         btn.onClick.AddListener(() => onClick?.Invoke());
     }
 
+    /// <summary>ElementDef.Order 내 인덱스(리본 아트 배열 접근용). 미지정/미발견은 -1 → 색 폴백.</summary>
+    private static int ElementIndex(string elementId)
+    {
+        if (string.IsNullOrEmpty(elementId)) return -1;
+        var order = ElementDef.Order;
+        for (int i = 0; i < order.Count; i++)
+            if (order[i] == elementId) return i;
+        return -1;
+    }
+
     private static int CellCount(int shapeId)
     {
         var entry = Managers.RuneData?.GetShape(shapeId);
@@ -425,7 +547,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "✦ Legendary",
+        ItemRarity.Legendary => "◆ Legendary",
         _                    => "· Common",
     };
 }

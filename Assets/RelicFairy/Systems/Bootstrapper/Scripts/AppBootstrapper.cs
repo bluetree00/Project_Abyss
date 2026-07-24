@@ -84,6 +84,10 @@ public sealed class AppBootstrapper : MonoBehaviour
         rpm?.ClearLocalRun(rpm.ActiveSlotIndex);
         CurrentRun = null;
         Loadout.Clear();
+
+        // HUD teardown. @UIRoot는 DontDestroyOnLoad라 씬 전환으로 OnDestroy가 오지 않는다 —
+        // 여기서 끊지 않으면 보스 체력바·서약 목록·골드가 이전 런 값 그대로 허브에 남는다.
+        UIRootBootstrapper.Instance?.UnbindHud();
     }
 
     /// <summary>
@@ -582,6 +586,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 룬 등급 아트 라이브러리 사전 로드(로컬 Addressable, 로그인 무관). 실패해도 색상 폴백.
         RuneArt.PreloadAsync().Forget();
         UISkin.PreloadAsync().Forget();   // 화면별 아트 스킨(정제소 등) — 미등록이면 색 폴백
+        ShopBuffTable.PreloadAsync().Forget();   // 상점 판매 버프 표(SHOP_BUFF_DATA.csv)
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)
         if (startFlow)

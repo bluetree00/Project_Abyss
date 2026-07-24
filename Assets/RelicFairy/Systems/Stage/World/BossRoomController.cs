@@ -174,7 +174,7 @@ public class BossRoomController : MonoBehaviour
         const string suffix = "Monster";
         if (typeName.EndsWith(suffix)) typeName = typeName.Substring(0, typeName.Length - suffix.Length);
 
-        var lines = Managers.DialogueData?.GetVisitLines($"{typeName}_Encounter");
+        var lines = Managers.DialogueData?.GetBossEncounterLines($"{typeName}_Encounter");
         if (lines != null && lines.Length > 0)
             UI_BossBark.Show(lines[0].text, BossBarkType.BossIntro);
     }

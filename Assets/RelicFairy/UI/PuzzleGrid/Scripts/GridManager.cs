@@ -77,6 +77,7 @@ public class GridManager : MonoBehaviour
         GridSquare firstTargetSq = null;
         bool allValid = true;
         var targets = new List<GridSquare>();
+        string element = RuneZoneRule.ElementOf(shape.ItemData);
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -88,6 +89,8 @@ public class GridManager : MonoBehaviour
 
             if (firstBlock == null) { firstBlock = block; firstTargetSq = sq; }
             if (!sq.isPlaceable || sq.isOccupied) allValid = false;
+            // 속성 불일치 칸은 프리뷰에서 빨강 — 손을 놓기 전에 왜 안 되는지 보이게 한다.
+            if (!RuneZoneRule.Accepts(sq, element)) allValid = false;
             if (!targets.Contains(sq)) targets.Add(sq);
         }
 
@@ -133,6 +136,7 @@ public class GridManager : MonoBehaviour
         // 블록 프리팹 내부 자식 오브젝트가 엉뚱한 Square에 매핑되는 버그가 생김
         RectTransform firstBlock = null;
         RectTransform firstTarget = null;
+        string element = RuneZoneRule.ElementOf(shape.ItemData);
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -144,6 +148,8 @@ public class GridManager : MonoBehaviour
             if (square == null) return false;
             if (!square.isPlaceable) return false;
             if (square.isOccupied) return false;
+            // 룬은 자기 속성 존(또는 중앙)에만 놓인다.
+            if (!RuneZoneRule.Accepts(square, element)) return false;
 
             if (!candidateSquares.Contains(square))
                 candidateSquares.Add(square);

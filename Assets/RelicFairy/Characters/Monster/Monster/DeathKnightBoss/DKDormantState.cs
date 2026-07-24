@@ -135,7 +135,7 @@ public class DKDormantState : IMonsterState
                 {
                     // 인카운터 대사(방문 변형) — 미로드 시 "Death Knight" 폴백
                     string bark = "Death Knight";
-                    var encounterLines = Managers.DialogueData?.GetVisitLines("DeathKnight_Encounter");
+                    var encounterLines = Managers.DialogueData?.GetBossEncounterLines("DeathKnight_Encounter");
                     if (encounterLines != null && encounterLines.Length > 0) bark = encounterLines[0].text;
                     await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
                 }

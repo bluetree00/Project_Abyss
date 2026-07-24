@@ -15,6 +15,15 @@ public static class RuneArt
 
     public static bool IsLoaded => _lib != null;
 
+    // 도메인리로드 비활성(fast play mode)에서도 정적 상태가 새 세션으로 새로 시작하도록 초기화
+    // (라이브러리는 불변이라 성능 폴백일 뿐이지만, UISkin/EffectIconRegistry 관례와 맞춘다).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        _lib = null;
+        _loading = false;
+    }
+
     /// <summary>앱 부트에서 1회 호출. 이미 로드됐으면 즉시 반환.</summary>
     public static async UniTask PreloadAsync()
     {
@@ -34,4 +43,18 @@ public static class RuneArt
 
     /// <summary>등급 룬 테두리(미로드 시 null).</summary>
     public static Sprite GetBorder(ItemRarity rarity) => _lib != null ? _lib.GetBorder(rarity) : null;
+
+    /// <summary>속성 룬 아트(ElementDef.Order). 미로드/미할당 시 null → 색 틴트 폴백.</summary>
+    public static Sprite GetArtByElement(string elementId) => _lib != null ? _lib.GetArtByElement(ElementIndex(elementId)) : null;
+
+    /// <summary>속성 룬 테두리.</summary>
+    public static Sprite GetBorderByElement(string elementId) => _lib != null ? _lib.GetBorderByElement(ElementIndex(elementId)) : null;
+
+    private static int ElementIndex(string elementId)
+    {
+        if (string.IsNullOrEmpty(elementId)) return -1;
+        var order = ElementDef.Order;
+        for (int i = 0; i < order.Count; i++) if (order[i] == elementId) return i;
+        return -1;
+    }
 }

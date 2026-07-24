@@ -127,7 +127,7 @@ public class UI_RangedForgePopup : UI_Popup
         _name.color = e.Locked ? LockColor : accent;
 
         _badge.gameObject.SetActive(e.Locked);
-        if (e.Locked) _badge.text = "🔒 " + (string.IsNullOrEmpty(e.LockReason) ? "잠금" : e.LockReason);
+        if (e.Locked) _badge.text = "■ " + (string.IsNullOrEmpty(e.LockReason) ? "잠금" : e.LockReason);
 
         _tag.text   = w.tagline ?? string.Empty;
         _tag.color  = e.Locked ? LockColor : SubColor;

@@ -75,7 +75,7 @@ public sealed class UI_CovenantSlot : MonoBehaviour
                     _                      => covenant.BasicDescription,
                 };
                 _descText.fontStyle = FontStyles.Italic;
-                text = string.IsNullOrWhiteSpace(desc) ? string.Empty : $"“{desc}”";
+                text = string.IsNullOrWhiteSpace(desc) ? string.Empty : $"\"{desc}\"";
             }
 
             bool has = !string.IsNullOrEmpty(text);

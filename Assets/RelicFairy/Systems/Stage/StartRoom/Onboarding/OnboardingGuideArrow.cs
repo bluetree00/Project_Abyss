@@ -137,7 +137,7 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
         go.transform.SetParent(canvasGo.transform, false);
         var tmp = go.AddComponent<TextMeshProUGUI>();
         ApplyFontUI(tmp);
-        tmp.text = "➤";
+        tmp.text = "▶";
         tmp.fontSize = 56f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = new Color(1f, 0.85f, 0.2f);

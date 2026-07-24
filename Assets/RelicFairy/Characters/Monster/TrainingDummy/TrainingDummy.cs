@@ -176,7 +176,12 @@ public class TrainingDummy : MonoBehaviour, IDamageable, IKillable
 
         LogDamage(amount);
 
-        PlayHitReaction();
+        // 속성·DoT 등 2차 피해는 넉백 0으로 들어온다
+        // (CombatQuery.DealSynergyDamage / MonsterBurnHandler.DealDot의 비-MonsterBase 폴백).
+        // 실제 몬스터는 이 경로가 TakeSynergyDamage라 GetHitState 전환이 없다 —
+        // 더미도 똑같이 피격 모션을 내지 않아야 화상 틱마다 경직처럼 보이지 않는다.
+        if (knockbackMultiplier > 0f)
+            PlayHitReaction();
 
         _hpBar?.UpdateHP((int)_currentHp, (int)maxHp);
 

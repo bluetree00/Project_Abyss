@@ -234,7 +234,7 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
     {
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "✦ Legendary",
+        ItemRarity.Legendary => "◆ Legendary",
         _                    => "· Common",
     };
 }

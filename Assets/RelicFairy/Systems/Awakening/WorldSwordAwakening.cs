@@ -144,6 +144,18 @@ public sealed class WorldSwordAwakening : MonoBehaviour
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(false);
 
             Debug.Log($"[WorldSwordAwakening] 무형검 각성: {namelessWeapon.displayName} → 슬롯0");
+
+            // 제단 위의 검은 <b>디졸브를 쓰지 않는다</b>. DissolveEffect는 머티리얼을 통째로 갈아끼우는데
+            // 무형검 비주얼은 반투명 안개 머티리얼(M_NamelessFog)이라 셰이더가 맞지 않아 핑크로 깨진다
+            // (인트로 IntroMordredDirector가 같은 이유로 알파 페이드를 쓴다). 알파만 낮춰 지운다.
+            if (_swordVisual != null)
+            {
+                await MaterialFade.FadeOutAsync(_swordVisual, 0.6f, ct);
+                // 제단 디졸브가 이 렌더러까지 집어삼켜 머티리얼을 되살리지 않도록 먼저 걷어낸다.
+                Destroy(_swordVisual);
+                _swordVisual = null;
+            }
+
             DissolveEffect.PlayDisappear(gameObject, 0.6f, () => { if (this != null) Destroy(gameObject); });
         }
         catch (OperationCanceledException) { }

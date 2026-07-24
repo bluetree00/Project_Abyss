@@ -11,6 +11,9 @@ public class GridSquare : MonoBehaviour
     public int col;
     // Shape를 놓을 수 있는 칸인지 여부 (false면 막힌 칸)
     public bool isPlaceable = true;
+    // 이 칸이 속한 속성 존 코드(F/I/T/P/L/D, '+'=CENTER). '\0'=속성 없는 판(레거시 그리드).
+    // 멀린 룬판이 셀을 만들 때 심는다 — 속성 배치 제약(RuneZoneRule)의 판정 근거.
+    [HideInInspector] public char zoneCode;
 
     [Header("Background")]
     // 칸 기본 배경 이미지 (색으로 placeable/blocked 구분)

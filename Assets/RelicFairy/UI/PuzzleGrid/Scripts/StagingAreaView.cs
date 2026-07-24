@@ -308,6 +308,17 @@ public sealed class StagingAreaView : MonoBehaviour
         }
     }
 
+    /// <summary>배치룬 카드 하단 효과 한 줄 — 첫 효과를 "라벨 +값"으로. 효과 없으면 빈 문자열.</summary>
+    private static string EffectLine(RuntimeItemData item)
+    {
+        if (item?.effects == null || item.effects.Count == 0) return "";
+        var slot = item.effects[0];
+        if (string.IsNullOrEmpty(slot.effectType)) return "";
+        var meta = EffectMetaRegistry.Get(slot.effectType);
+        string val = EffectDescriptionFormatter.FormatValue(meta.Unit, slot.value);
+        return $"{meta.Label} {val}";
+    }
+
     private void BuildCardContent(GameObject slotGO, RuntimeItemData item, bool isNew)
     {
         // 레어도 라인 (상단)
@@ -321,44 +332,55 @@ public sealed class StagingAreaView : MonoBehaviour
         var rbImg = rarityBar.AddComponent<Image>();
         rbImg.color = RarityColor(item.rarity);
 
-        // 아이콘 (위쪽으로 올려 모양 프리뷰 공간 확보)
-        if (item.icon != null)
-        {
-            var iconGO  = new GameObject("Icon", typeof(RectTransform));
-            iconGO.transform.SetParent(slotGO.transform, false);
-            var iconRT  = iconGO.GetComponent<RectTransform>();
-            iconRT.anchorMin       = new Vector2(0.1f, 0.55f);
-            iconRT.anchorMax       = new Vector2(0.9f, 0.88f);
-            iconRT.sizeDelta       = Vector2.zero;
-            var iconImg            = iconGO.AddComponent<Image>();
-            iconImg.sprite         = item.icon;
-            iconImg.preserveAspect = true;
-        }
-
-        // 모양 프리뷰 (아이콘 아래, 이름 위)
+        // 모양 프리뷰 — 카드의 <b>주인공</b>. 룬은 "효과가 좋아도 판에 안 들어가면 무의미"하므로
+        // 플레이어가 가장 먼저 보는 것이 모양이어야 한다. 카드 상단 대부분을 차지한다.
+        //
+        // 예전엔 위쪽 2/3를 item.icon(레거시 아이템 아이콘 — 노란 블록 그림)이 차지하고
+        // 모양은 그 아래 좁은 띠에 6px 점으로 그려져, 정작 필요한 정보가 안 보였다.
         var shapePreviewGO = new GameObject("ShapePreview", typeof(RectTransform));
         shapePreviewGO.transform.SetParent(slotGO.transform, false);
         var shapePreviewRT = shapePreviewGO.GetComponent<RectTransform>();
-        shapePreviewRT.anchorMin        = new Vector2(0f, 0.30f);
-        shapePreviewRT.anchorMax        = new Vector2(1f, 0.54f);
+        shapePreviewRT.anchorMin        = new Vector2(0.08f, 0.30f);
+        shapePreviewRT.anchorMax        = new Vector2(0.92f, 0.90f);
         shapePreviewRT.sizeDelta        = Vector2.zero;
         shapePreviewRT.anchoredPosition = Vector2.zero;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(shapePreviewRT);   // rect 확정 후 셀 크기 역산
         BuildCardShapePreview(shapePreviewRT, item);
 
-        // 이름
+        // 이름 (하단 상단부)
         var nameTxtGO = new GameObject("Name", typeof(RectTransform));
         nameTxtGO.transform.SetParent(slotGO.transform, false);
         var nameRT = nameTxtGO.GetComponent<RectTransform>();
-        nameRT.anchorMin        = new Vector2(0f, 0.04f);
-        nameRT.anchorMax        = new Vector2(1f, 0.28f);
+        nameRT.anchorMin        = new Vector2(0f, 0.17f);
+        nameRT.anchorMax        = new Vector2(1f, 0.30f);
         nameRT.sizeDelta        = Vector2.zero;
         nameRT.anchoredPosition = Vector2.zero;
         var nameTxt = nameTxtGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) nameTxt.font = cardFont;
         nameTxt.text              = item.displayName ?? item.itemId;
-        nameTxt.fontSize          = 13f;
+        nameTxt.fontSize          = 12f;
         nameTxt.alignment         = TextAlignmentOptions.Center;
-        nameTxt.textWrappingMode = TextWrappingModes.Normal;
+        nameTxt.textWrappingMode = TextWrappingModes.NoWrap;
+        nameTxt.overflowMode      = TextOverflowModes.Ellipsis;
+
+        // 효과(기능) — 완성본: 배치룬 카드 아래에 해당 기능을 표기
+        var fxTxtGO = new GameObject("Effect", typeof(RectTransform));
+        fxTxtGO.transform.SetParent(slotGO.transform, false);
+        var fxRT = fxTxtGO.GetComponent<RectTransform>();
+        fxRT.anchorMin        = new Vector2(0f, 0.02f);
+        fxRT.anchorMax        = new Vector2(1f, 0.16f);
+        fxRT.sizeDelta        = Vector2.zero;
+        fxRT.anchoredPosition = Vector2.zero;
+        var fxTxt = fxTxtGO.AddComponent<TextMeshProUGUI>();
+        if (cardFont != null) fxTxt.font = cardFont;
+        fxTxt.text              = EffectLine(item);
+        fxTxt.fontSize          = 11f;
+        fxTxt.fontStyle         = FontStyles.Bold;
+        fxTxt.color             = new Color(0.86f, 0.92f, 0.66f, 1f);
+        fxTxt.alignment         = TextAlignmentOptions.Center;
+        fxTxt.textWrappingMode = TextWrappingModes.NoWrap;
+        fxTxt.overflowMode      = TextOverflowModes.Ellipsis;
+        fxTxt.raycastTarget     = false;
 
         // NEW 뱃지
         if (isNew)
@@ -522,7 +544,7 @@ public sealed class StagingAreaView : MonoBehaviour
         labelRT.sizeDelta = Vector2.zero;
         var labelTxt = labelGO.AddComponent<TextMeshProUGUI>();
         if (cardFont != null) labelTxt.font = cardFont;
-        labelTxt.text          = "✦";
+        labelTxt.text          = "◆";
         labelTxt.fontSize      = 10f;
         labelTxt.alignment     = TextAlignmentOptions.Center;
         labelTxt.color         = new Color(0.95f, 0.82f, 0.3f, 0.85f);
@@ -606,14 +628,28 @@ public sealed class StagingAreaView : MonoBehaviour
         int cols = maxX - minX + 1;
         int rows = maxY - minY + 1;
 
-        const float CELL = 6f;
-        const float GAP  = 1f;
+        // 셀은 고정 크기가 아니라 <b>미리보기 칸에 맞춰 확대</b>한다.
+        // 6px 고정이던 시절엔 1칸 룬이 점 하나로 보여 무슨 모양인지 분간이 안 됐다.
+        const float GAP     = 2f;
+        const float CELL_MAX = 22f;
+        const float CELL_MIN = 5f;
+        float boxW = Mathf.Max(1f, root.rect.width  - 6f);
+        float boxH = Mathf.Max(1f, root.rect.height - 4f);
+        float fitW = (boxW - (cols - 1) * GAP) / Mathf.Max(1, cols);
+        float fitH = (boxH - (rows - 1) * GAP) / Mathf.Max(1, rows);
+        float CELL = Mathf.Clamp(Mathf.Min(fitW, fitH), CELL_MIN, CELL_MAX);
+
         float totalW = cols * CELL + (cols - 1) * GAP;
         float totalH = rows * CELL + (rows - 1) * GAP;
         float startX = -totalW * 0.5f + CELL * 0.5f;
         float startY =  totalH * 0.5f - CELL * 0.5f;
 
-        var color = GridThumbnail.GetItemColor(item.instanceId);
+        // 속성별 룬 글리프(룬1~5) 우선 — 자체 채색이라 틴트하지 않는다.
+        // 빛(전용 룬 없음)·미로드 시엔 등급 아트를 속성색으로 틴트(폴백).
+        var color   = ElementDef.IdColor(item.element, GridThumbnail.GetItemColor(item.instanceId));
+        var elemArt = RuneArt.GetArtByElement(item.element);
+        var art     = elemArt != null ? elemArt : RuneArt.GetArt(item.rarity);
+        bool preColored = elemArt != null;
 
         foreach (var o in offsets)
         {
@@ -628,7 +664,9 @@ public sealed class StagingAreaView : MonoBehaviour
                 startX + col * (CELL + GAP),
                 startY - row * (CELL + GAP));
             var img = cellGO.GetComponent<Image>();
-            img.color         = color;
+            if (art != null) img.sprite = art;
+            img.color         = (art != null && preColored) ? Color.white : color;   // 속성 글리프=흰색, 폴백=속성색
+            img.preserveAspect = art != null;
             img.raycastTarget = false;
         }
     }

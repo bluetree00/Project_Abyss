@@ -543,7 +543,13 @@ ModelImporter:
       animation that will be discarded.\n\t'ball_l' has translation animation that
       will be discarded.\n\t'calf_r' has translation animation that will be discarded.\n\t'foot_r'
       has translation animation that will be discarded.\n\t'ball_r' has translation
-      animation that will be discarded.\n"
+      animation that will be discarded.\nEvent AE_BeginTrail has a time (3.819888)
+      outside the clip's valid range (0.000000..2.166667). It will never be firedEvent
+      SpawnSlashEffect0 has a time (4.774860) outside the clip's valid range (0.000000..2.166667).
+      It will never be firedEvent AE_EndTrail has a time (23.874298) outside the
+      clip's valid range (0.000000..2.166667). It will never be firedEvent AE_AttackEnd
+      has a time (47.748596) outside the clip's valid range (0.000000..2.166667).
+      It will never be fired"
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
@@ -581,28 +587,28 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.39000008
+      - time: 0.17333333
         functionName: AE_BeginTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.52000004
+      - time: 0.21666668
         functionName: SpawnSlashEffect0
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 1.5600003
+      - time: 1.0833334
         functionName: AE_EndTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 2.166667
+      - time: 2.1666667
         functionName: AE_AttackEnd
         data: 
         objectReferenceParameter: {instanceID: 0}

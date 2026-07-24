@@ -96,11 +96,17 @@ public sealed class ItemInfoPanel : MonoBehaviour
         if (itemName != null)
             itemName.text = item.displayName ?? item.itemId;
 
-        // 레어도
+        // 레어도 + 속성
+        // 속성은 "이 룬을 어느 존에 놓아야 하는가"를 정하는 값이라 등급만큼 중요하다.
+        // 룬 선택 팝업(UI_RuneSelectPopup)과 같은 표기를 써서 화면 간 일관성을 유지한다.
         var rarityColor = RarityColor(item.rarity);
         if (rarityText != null)
         {
-            rarityText.text  = RarityLabel(item.rarity);
+            var elem = ElementDef.GetById(item.element);
+            rarityText.richText = true;
+            rarityText.text = elem != null
+                ? $"{RarityLabel(item.rarity)}  ·  <color={ElementDef.IdHex(item.element)}>{elem.Icon}{elem.Name}</color>"
+                : RarityLabel(item.rarity);
             rarityText.color = rarityColor;
         }
         if (rarityBar != null)
@@ -186,6 +192,11 @@ public sealed class ItemInfoPanel : MonoBehaviour
         int cols = maxX - minX + 1;
         int rows = maxY - minY + 1;
 
+        // 셀 색 = 룬의 속성색. 고정 초록이면 판의 속성 존과 아무 관계가 없어
+        // "어디에 놓아야 하는가"가 이 패널에서 읽히지 않는다.
+        var cellColor = ElementDef.IdColor(item.element, new Color(0.3f, 0.85f, 0.45f, 0.9f));
+        var art       = RuneArt.GetArt(item.rarity);
+
         float totalW = cols * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float totalH = rows * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float startX = -totalW * 0.5f + MINI_CELL_SIZE * 0.5f;
@@ -206,7 +217,8 @@ public sealed class ItemInfoPanel : MonoBehaviour
                 startY - row * (MINI_CELL_SIZE + MINI_CELL_GAP));
 
             var img  = cellGO.GetComponent<Image>();
-            img.color         = new Color(0.3f, 0.85f, 0.45f, 0.9f);
+            if (art != null) img.sprite = art;   // 등급 아트를 속성색으로 틴트 — 미로드 시 색상 폴백
+            img.color         = cellColor;
             img.raycastTarget = false;
 
             _shapeCells.Add(cellGO);
@@ -273,7 +285,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
     {
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "✦ Legendary",
+        ItemRarity.Legendary => "◆ Legendary",
         _                    => "· Common",
     };
 }

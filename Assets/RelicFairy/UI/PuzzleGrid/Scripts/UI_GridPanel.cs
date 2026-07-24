@@ -33,7 +33,9 @@ public sealed class UI_GridPanel : UI_Base
     // ── 정제소 배치 팝업 스킨 (@UIRoot에서 배선; 미배선 시 기존 외형 유지) ──
     [Header("정제소 스킨")]
     [SerializeField] private Sprite _bgSprite;             // 자연바탕
-    [SerializeField] private Sprite _boardSprite;          // 속성판(헥사 그리드 배경)
+    // 속성판(헥사 그리드 배경) 아트는 더 이상 깔지 않는다 — 존 타일 가독성을 먹었다.
+    // 슬롯은 프리팹 호환을 위해 남겨 두되 사용하지 않는다(BuildMainArea 주석 참고).
+    [SerializeField, HideInInspector] private Sprite _boardSprite;
     [SerializeField] private Sprite _stagingBorderSprite;  // 룬 배치 테두리
     [SerializeField] private Sprite _stagingBgSprite;      // 룬 배치 테두리 바탕
     [SerializeField] private Sprite _synergyBorderSprite;  // 시너지 테두리
@@ -409,7 +411,7 @@ public sealed class UI_GridPanel : UI_Base
         _confirmButton = MakeButton(headerGO.transform, "ConfirmBtn",
             new Vector2(1f, 0f), new Vector2(1f, 1f),
             new Vector2(96f, -14f), new Vector2(-8f, 0f),
-            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료 ✓");
+            new Color(0.18f, 0.45f, 0.22f, 0.95f), "완료");
         var confirmRT = _confirmButton.GetComponent<RectTransform>();
         confirmRT.pivot = new Vector2(1f, 0.5f);
         confirmRT.anchorMin = new Vector2(1f, 0f);
@@ -452,6 +454,7 @@ public sealed class UI_GridPanel : UI_Base
         _synergyStatusRoot.anchorMax = Vector2.one;
         _synergyStatusRoot.offsetMin = _synergyStatusRoot.offsetMax = Vector2.zero;
         _synergyStatusView = synGO.AddComponent<MerlinRuneSynergyStatusView>();
+        _synergyStatusView.SetSkin(_synergyBgSprite, _synergyBorderSprite);   // 시너지 바탕/테두리
     }
 
     // CenterPanel (20% ~ 75%)
@@ -473,12 +476,10 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridRoot.anchorMax = new Vector2(1f, 1.0f);
         _hexGridRoot.offsetMin = _hexGridRoot.offsetMax = Vector2.zero;
 
+        // 판 배경 그림은 쓰지 않는다 — 속성 존 타일이 판 텍스처에 묻혀 어느 칸이 무슨 속성인지
+        // 읽히지 않았다. 여기는 어두운 단색으로 두고, 색을 갖는 건 존 타일과 룬 블록뿐이다.
         var hexBG = hexRootGO.AddComponent<Image>();
-        hexBG.color = new Color(0.10f, 0.12f, 0.16f, 0.95f);
-        // 판 배경(자연바탕). 격자 정렬을 강제하는 그림이 아니라 배경 텍스처라 패널을 꽉 채운다.
-        // 그 위에 놓이는 속성 타일이 묻히지 않도록 살짝 어둡게 틴트한다.
-        SkinImage(hexBG, _boardSprite, fill: true);
-        if (_boardSprite != null) hexBG.color = new Color(0.62f, 0.66f, 0.72f, 1f);
+        hexBG.color = new Color(0.055f, 0.065f, 0.095f, 0.98f);
 
         _hexGridView = hexRootGO.AddComponent<MerlinRuneHexGridView>();
         _hexGridView.SetZoneTiles(_zoneTiles, _centerTile);   // 타일 미배선 시 기존 색상 방식 유지
@@ -537,6 +538,21 @@ public sealed class UI_GridPanel : UI_Base
 
         var scrollBG = scrollGO.AddComponent<Image>();
         scrollBG.color = new Color(0.10f, 0.12f, 0.18f, 0.75f);
+        // 배치할 룬(인벤토리) 바탕/테두리 — 룬 배치 테두리 바탕 + 룬 배치 테두리
+        if (_stagingBgSprite != null)
+        {
+            scrollBG.sprite = _stagingBgSprite; scrollBG.type = Image.Type.Sliced; scrollBG.color = Color.white;
+        }
+        if (_stagingBorderSprite != null)
+        {
+            var bd = Go("StagingBorder");
+            bd.transform.SetParent(scrollGO.transform, false);
+            var brt = bd.GetComponent<RectTransform>();
+            brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
+            var bi = bd.AddComponent<Image>();
+            bi.sprite = _stagingBorderSprite; bi.type = Image.Type.Sliced; bi.raycastTarget = false;
+            brt.SetAsLastSibling();
+        }
 
         // "보관함" 레이블
         var lblGO = MakeTxt(scrollGO.transform, "StagingLabel", "아이템 목록", 15f,
@@ -922,7 +938,7 @@ public sealed class UI_GridPanel : UI_Base
         var ct = _toastCts.Token;
 
         if (_synergyToastText != null)
-            _synergyToastText.text = $"★ 시너지 활성화!  {description}";
+            _synergyToastText.text = $"◆ 시너지 활성화!  {description}";
         if (_synergyToast != null)
             _synergyToast.SetActive(true);
 
@@ -1085,11 +1101,16 @@ public sealed class UI_GridPanel : UI_Base
         _stagingArea?.HighlightItem(item);
         _itemInfoPanel?.ShowItem(item, isNew: false);
         UpdatePlaceButtonState(item != null);
+
+        // 고른 룬의 속성 존을 판에서 강조한다. 이게 없으면 판이 전 칸 균일하게 밝아
+        // "어디에 놓을 수 있는지"가 화면에 전혀 안 나온다(빈 판은 모든 칸이 배치 가능이라 대비가 0).
+        _hexGridView?.SetPlacementElementHint(item?.element);
     }
 
     private void OnStagingItemHovered(RuntimeItemData item)
     {
         _itemInfoPanel?.ShowItem(item, isNew: false);
+        if (item != null) _hexGridView?.SetPlacementElementHint(item.element);
     }
 
     private void OnStagingItemUnhovered()
@@ -1161,7 +1182,7 @@ public sealed class UI_GridPanel : UI_Base
             if (anyMet)
                 sb.Append($"<color={hex}><b>●{zoneId}</b></color>  ");
             else
-                sb.Append($"<color=#445566>○{zoneId}</color>  ");
+                sb.Append($"<color=#445566>◇{zoneId}</color>  ");
         }
 
         _footerActiveSynText.SetText(sb.ToString().TrimEnd());
@@ -1169,7 +1190,7 @@ public sealed class UI_GridPanel : UI_Base
         if (_footerCenterText != null)
         {
             bool centerActive = MerlinRuneBridge.Instance?.IsCenterBonusActive ?? false;
-            _footerCenterText.text  = centerActive ? "◉ 중앙 보너스" : "◎ 중앙";
+            _footerCenterText.text  = centerActive ? "◆ 중앙 보너스" : "◇ 중앙";
             _footerCenterText.color = centerActive
                 ? new Color(1.00f, 0.88f, 0.40f, 0.95f)
                 : new Color(0.50f, 0.55f, 0.70f, 0.55f);
@@ -1183,8 +1204,13 @@ public sealed class UI_GridPanel : UI_Base
         ClosePanel();
     }
 
-    /// <summary>정제소 열기 — 판을 보다가 바로 특수 룬(존핵)을 벼린다. 만든 룬은 보관함으로 들어가 이 판에 배치된다.</summary>
-    private void OnRefineryClicked() => OpenRefineryAsync().Forget();
+    /// <summary>
+    /// 정제소 열기 — 판을 보다가 바로 특수 룬(존핵)을 벼린다. 만든 룬은 보관함으로 들어가 이 판에 배치된다.
+    /// UI에 직접 만든 버튼의 onClick을 이 메서드로 지정하면 그리드를 거치지 않고 정제소를 연다(미리보기용).
+    /// </summary>
+    public void OpenRefinery() => OpenRefineryAsync().Forget();
+
+    private void OnRefineryClicked() => OpenRefinery();
 
     private async UniTaskVoid OpenRefineryAsync()
     {

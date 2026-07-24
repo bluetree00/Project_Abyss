@@ -312,6 +312,11 @@ public sealed class HudBootstrapper : MonoBehaviour
         _provider?.Unbind();
         _run = null;
         _panelGuardTimer = 0f;
+
+        // 데이터를 뗐으면 화면도 내린다. @UIRoot는 DDOL이라 이걸 안 하면 이전 런의 마지막 프레임
+        // (보스 패널·서약 목록·골드)이 허브까지 그대로 따라온다.
+        // BindRun 선행 호출 경로에서는 곧바로 알맞은 모드로 다시 켜지므로 부작용이 없다.
+        presenter?.SetMode(HUDIds.Mode.None);
     }
 
     private void OnDestroy() => Unbind();

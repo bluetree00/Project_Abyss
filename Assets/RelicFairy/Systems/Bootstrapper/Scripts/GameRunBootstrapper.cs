@@ -136,9 +136,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private GameObject[] crucibleDecorPrefabs;
     [Tooltip("정제소(룬) 소품·VFX — 룬 마법진·제단 등. NPC 주변에 링으로 배치된다.")]
     [SerializeField] private GameObject[] refineryDecorPrefabs;
+    [Tooltip("상점 소품 — 첫 항목이 NPC 앞 판매대가 되고 나머지는 뒤쪽에 배치된다.")]
+    [SerializeField] private GameObject[] shopDecorPrefabs;
 
     public GameObject[] CrucibleDecorPrefabs => crucibleDecorPrefabs;
     public GameObject[] RefineryDecorPrefabs => refineryDecorPrefabs;
+    public GameObject[] ShopDecorPrefabs     => shopDecorPrefabs;
 
     [Tooltip("매대 타일이 없는 상점 방의 무기 슬롯 수 폴백. 매대가 있으면 매대 카테고리를 그대로 사용.")]
     [SerializeField, Min(0)] private int shopWeaponSlotFallback = 1;
@@ -2604,6 +2607,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (npcPrefab == null)
             Debug.LogWarning($"[GameRunBootstrapper] 상점 NPC 프리팹 로드 실패: {shopNpcAddressableKey}. 상점 UI를 열 수 없습니다.");
 
+        controller.SetDecorPrefabs(shopDecorPrefabs);   // 판매대 + 뒤쪽 소품(Initialize 전에)
         controller.Initialize(_run, catalog, luckRollTable, shopSlotCount, roomRng,
                               npcPrefab, shopWeaponSlotFallback, shopRerollEnabled, shopRerollCost);
     }

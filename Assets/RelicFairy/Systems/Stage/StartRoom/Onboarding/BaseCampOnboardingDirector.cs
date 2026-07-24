@@ -62,15 +62,6 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     [SerializeField, Tooltip("단계 전환 시 획득 대사 닫힘 후 연출까지 지연(초)")]
     private float transitionDelay = 0.8f;
 
-    [Header("연출 카메라 (천천히 넓게 클로즈업 → 빠르게 복귀)")]
-    [SerializeField, Tooltip("대상 기준 카메라 배치 오프셋(뒤/위) — 클로즈업 거리")]
-    private Vector3 revealViewOffset = new Vector3(0f, 3f, -6f);
-    [SerializeField, Tooltip("바라볼 높이(제단 표시 등)")]
-    private float revealLookHeight = 1.2f;
-    [SerializeField, Tooltip("이동(천천히)")] private float revealMoveDuration = 2.5f;
-    [SerializeField, Tooltip("비추는 유지")] private float revealHoldDuration = 1.0f;
-    [SerializeField, Tooltip("복귀(빠르게)")] private float revealReturnDuration = 0.8f;
-
     [Header("디버그")]
     [SerializeField, Tooltip("켜면 완료 기록 무시하고 항상 초회로 동작")]
     private bool forceFirstRun;
@@ -137,7 +128,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
     {
         _swordPhase = true;
         guideArrow?.SetTarget(swordAwakenTarget);
-        RevealAsync(swordAwakenTarget, swordAwakenGuideline, waitDialogue: false, _cts.Token).Forget();
+        ShowStepGuideAsync(swordAwakenGuideline, waitDialogue: false, _cts.Token).Forget();
     }
 
     private void OnDestroy()
@@ -166,7 +157,7 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         }
 
         guideArrow?.SetTarget(steps[i].target);
-        RevealAsync(steps[i].target, steps[i].guideline, waitDialogue: !initial, _cts.Token).Forget();
+        ShowStepGuideAsync(steps[i].guideline, waitDialogue: !initial, _cts.Token).Forget();
     }
 
     /// <summary>단계 i 완료 후 다음으로 — 마지막이면 게이트 연출 + 완료 기록.</summary>
@@ -181,13 +172,13 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
         {
             _stepIndex = steps.Length;
             guideArrow?.SetTarget(gateTarget);
-            RevealAsync(gateTarget, gateGuideline, waitDialogue: true, _cts.Token).Forget();
+            ShowStepGuideAsync(gateGuideline, waitDialogue: true, _cts.Token).Forget();
             MarkCompleted();
         }
     }
 
-    /// <summary>획득 대사가 닫힌 뒤(전환), 현재 카메라 위치에서 대상으로 이동→비추기→플레이어 복귀(orbit 아님). 연출 중 입력 잠금.</summary>
-    private async UniTaskVoid RevealAsync(Transform target, string guideline, bool waitDialogue, CancellationToken ct)
+    /// <summary>획득 대사가 닫힌 뒤(전환) 다음 단계 가이드 문구를 띄운다. 대상 지시는 가이드 화살표가 담당.</summary>
+    private async UniTaskVoid ShowStepGuideAsync(string guideline, bool waitDialogue, CancellationToken ct)
     {
         try
         {
@@ -218,23 +209,9 @@ public sealed class BaseCampOnboardingDirector : MonoBehaviour
 
         ShowGuideline(guideline);   // 임시 대사(자동) — 추후 대사 시퀀스+자동넘김으로 교체
 
-        var cam = GameCameraController.Instance;
-        if (cam == null || target == null) return;
-
-        var pt = Managers.Player?.PlayerTransform;
-        var player = pt != null ? pt.GetComponent<PlayerController>() : null;
-        player?.SetInputEnabled(false);
-
-        try
-        {
-            await cam.PlayOnboardingRevealAsync(
-                target.position, revealViewOffset, revealLookHeight,
-                revealMoveDuration, revealHoldDuration, revealReturnDuration,
-                pt, ct);   // 천천히 넓게 클로즈업 → 플레이어 현재 위치로 빠르게 복귀
-        }
-        catch (OperationCanceledException) { player?.SetInputEnabled(true); return; }
-
-        player?.SetInputEnabled(true);
+        // 카메라 연출은 걷어냈다. 유물층·무기대는 어차피 한눈에 보이는 공간이라
+        // 매번 조작을 뺏고 클로즈업까지 다녀오는 것이 안내가 아니라 방해였다 —
+        // 대상 지시는 가이드 화살표(guideArrow)와 위 가이드 문구가 담당한다.
     }
 
     private void EnsureBarriersLocked()

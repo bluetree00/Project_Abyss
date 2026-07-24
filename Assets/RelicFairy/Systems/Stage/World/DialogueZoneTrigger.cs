@@ -40,7 +40,9 @@ public sealed class DialogueZoneTrigger : MonoBehaviour
     {
         try
         {
-            if (blockPlayerInput) player.SetInputEnabled(false);
+            // UI 채널로 막는다. 컷신 채널(SetInputEnabled)을 쓰면 대사가 끝나는 순간
+            // 컷신이 걸어둔 차단까지 풀려 연출 중에 이동·공격이 가능해진다.
+            if (blockPlayerInput) player.SetUiBlocked(true);
 
             // CSV(DIALOGUE_DATA) 우선 — 구간별 시나리오 대사. 미설정 시 SO 폴백.
             DialogueLine[] csvLines = null;
@@ -65,7 +67,7 @@ public sealed class DialogueZoneTrigger : MonoBehaviour
         finally
         {
             if (blockPlayerInput && player != null)
-                player.SetInputEnabled(true);
+                player.SetUiBlocked(false);   // 자기 사유만 해제 — 컷신 차단은 그대로 둔다
         }
     }
 

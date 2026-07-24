@@ -73,8 +73,10 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void Bind(string title, string sub, CovenantTier tier, Color tierColor)
     {
-        if (_nameText) _nameText.text = title;
-        if (_subText)  _subText.text  = sub;
+        // 이름·설명은 팔레트에서 오는 가변 길이 문자열이라 고정 박스를 넘기기 쉽다.
+        // 카드 밖으로 흘러 옆 카드 위에 겹치지 않도록, 여기서 박스 안에 가둔다.
+        if (_nameText) { _nameText.text = title; FitInBox(_nameText, wrap: false); }
+        if (_subText)  { _subText.text  = sub;   FitInBox(_subText,  wrap: true);  }
         if (_tierText)
         {
             _tierText.text  = tier.DisplayName();
@@ -126,6 +128,18 @@ public class UI_AssembleCard : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public void OnPointerExit(PointerEventData e)  { _hover = false; RefreshVisual(false); }
 
     // ── Private Methods ──────────────────────────────────
+
+    /// <summary>박스 안에 가둔다 — 자동 크기는 authoring 값을 넘지 않고 줄이기만 한다.</summary>
+    private static void FitInBox(TMP_Text t, bool wrap)
+    {
+        float authored = t.fontSize;
+        t.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        t.overflowMode     = wrap ? TextOverflowModes.Truncate : TextOverflowModes.Ellipsis;
+        t.enableAutoSizing = true;
+        t.fontSizeMax      = authored;
+        t.fontSizeMin      = Mathf.Max(9f, authored * 0.6f);
+    }
+
     private Sprite FrameFor(CovenantTier tier) => tier switch
     {
         CovenantTier.Gold => _goldFrame,

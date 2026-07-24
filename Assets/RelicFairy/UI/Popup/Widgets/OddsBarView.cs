@@ -11,7 +11,7 @@ using UnityEngine.UI;
 public sealed class OddsBarView : MonoBehaviour
 {
     private const int Tiers = 3;                 // 0=Rare 1=Epic 2=Legendary
-    private const float TitleH = 20f;
+    private const float TopPad = 12f;            // 완성본엔 제목이 없다 — 막대 3줄이 패널을 채운다
     private const float RowGap = 6f;
     private const float LabelW = 74f;
     private const float PctW   = 46f;
@@ -24,7 +24,6 @@ public sealed class OddsBarView : MonoBehaviour
     private RectTransform[] _fillRT;
     private Image[]   _fillImg;
     private TMP_Text[] _pct;
-    private TMP_Text  _title;
     private float _trackW;
 
     public static OddsBarView Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax,
@@ -36,18 +35,18 @@ public sealed class OddsBarView : MonoBehaviour
             ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f);
         var rootRT = (RectTransform)frame.transform.parent;
         ShopUIStyle.Anchor(rootRT, anchorMin, anchorMax, pivot, pos, size);
+        // 확률막대 바탕 — 패널 전체 배경 아트
+        if (rootRT.TryGetComponent<Image>(out var oddsBg))
+            ShopUIStyle.Skin(oddsBg, skin != null ? skin.oddsPanel : null, sliced: true);
+
+        // 바탕 아트는 바깥 프레임에 깔린다 — 안쪽 채움을 비워야 아트가 가려지지 않는다.
+        if (oddsBg != null && oddsBg.sprite != null) frame.color = Color.clear;
 
         var view = rootRT.gameObject.AddComponent<OddsBarView>();
         var inner = frame.transform;
 
-        view._title = ShopUIStyle.MakeText(inner, "Title", 13f, FontStyles.Bold,
-            TextAlignmentOptions.Left, ShopUIStyle.TextPrimary);
-        ShopUIStyle.Anchor(view._title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(12f, -6f), new Vector2(size.x - 24f, TitleH));
-        view._title.text = "이번 확률";
-
-        float padX  = 12f;
-        float rowH  = Mathf.Max(16f, (size.y - TitleH - 20f - RowGap * (Tiers - 1)) / Tiers);
+        float padX  = 14f;
+        float rowH  = Mathf.Max(16f, (size.y - TopPad * 2f - RowGap * (Tiers - 1)) / Tiers);
         view._trackW = size.x - padX * 2f - LabelW - PctW;
 
         view._fillRT  = new RectTransform[Tiers];
@@ -56,7 +55,7 @@ public sealed class OddsBarView : MonoBehaviour
 
         for (int i = 0; i < Tiers; i++)
         {
-            float y = -(TitleH + 6f + i * (rowH + RowGap));
+            float y = -(TopPad + i * (rowH + RowGap));
             var rar = TierRarity[i];
 
             var lbl = ShopUIStyle.MakeText(inner, $"L{i}", 12f, FontStyles.Bold,
@@ -76,6 +75,15 @@ public sealed class OddsBarView : MonoBehaviour
                 Vector2.zero, new Vector2(0f, 0f));
             view._fillRT[i]  = fill.rectTransform;
             view._fillImg[i] = fill;
+
+            // 확률 막대 테두리 — 채움 위에 얹는 칸별 프레임(테두리가 항상 보이게)
+            if (skin != null && skin.barFrame != null)
+            {
+                var bf = ShopUIStyle.MakeImage(track.transform, "BarFrame", Color.white);
+                ShopUIStyle.Stretch(bf.rectTransform);
+                bf.raycastTarget = false;
+                ShopUIStyle.Skin(bf, skin.barFrame, sliced: true);
+            }
 
             var pct = ShopUIStyle.MakeText(inner, $"P{i}", 12f, FontStyles.Bold,
                 TextAlignmentOptions.Right, ShopUIStyle.TextPrimary);
@@ -122,8 +130,5 @@ public sealed class OddsBarView : MonoBehaviour
             if (_pct[i] != null)
                 _pct[i].text = $"{Mathf.RoundToInt(p * 100f)}%";
         }
-
-        if (_title != null)
-            _title.text = heated ? "이번 확률  <color=#FF8A3A>과열</color>" : "이번 확률";
     }
 }
