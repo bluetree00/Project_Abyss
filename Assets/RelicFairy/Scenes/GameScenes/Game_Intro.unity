@@ -20362,19 +20362,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!134 &1336252448
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &1338341427
 GameObject:
   m_ObjectHideFlags: 0
@@ -29865,6 +29852,19 @@ Transform:
   - {fileID: 194242412}
   m_Father: {fileID: 304771587}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &2005788854
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!1 &2018096452
 GameObject:
   m_ObjectHideFlags: 0
@@ -32096,7 +32096,12 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Material
       value: 
-      objectReference: {fileID: 1336252448}
+      objectReference: {fileID: 2005788854}
+    - target: {fileID: 351204726080617261, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
+        type: 3}
+      propertyPath: m_IsTrigger
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 360047617196361245, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
       propertyPath: m_Layer
@@ -35668,7 +35673,7 @@ PrefabInstance:
     - target: {fileID: 8251630338419376029, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8260657006874528007, guid: d76c3a76bc3a6c9428656ac3ca332a9f,
         type: 3}

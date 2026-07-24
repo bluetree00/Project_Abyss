@@ -244,72 +244,15 @@ public class MerlinRuneBridge : MonoBehaviour
             // spawnOrigin: X=0(중앙), Y=120(탭스트립 + 여백 확보)
             boardManager.spawnOrigin = new Vector2(0f, 120f);
 
-            // 셰이프 패널 배경 (스타일 패널)
-            EnsureStyledShapePanel(boardManager.gameplayRoot);
+            // 셰이프 패널 배경(ShapeAreaBG)은 더 이상 만들지 않는다.
+            // 드래그 스테이징이 배치 화면의 '아이템 목록'으로 대체되면서, 이 장식 패널은
+            // 같은 자리(우측 0.75~1.00)에 겹쳐 뜨는 레거시 껍데기만 남았다.
         }
 
     }
 
     private void HandleGridSessionActivated(Grid gridInstance) { }
 
-    /// <summary>
-    /// ShapeHost 우측 영역(63%~94%)에 디자인된 모양 스테이징 패널을 생성한다.
-    /// 어두운 배경 + 상단 파란 액센트 선 + 안내 레이블로 구성.
-    /// </summary>
-    private static void EnsureStyledShapePanel(GameObject root)
-    {
-        if (root == null) return;
-        const string NAME = "ShapeAreaBG";
-        if (root.transform.Find(NAME) != null) return;
-
-        // 메인 배경
-        var go = new GameObject(NAME, typeof(RectTransform), typeof(Image));
-        go.transform.SetParent(root.transform, false);
-        go.transform.SetAsFirstSibling();
-
-        var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.75f, 0.60f);
-        rt.anchorMax = new Vector2(1.00f, 0.944f); // 헤더 침범 방지
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-        rt.pivot     = new Vector2(0.5f, 0.5f);
-
-        var bg = go.GetComponent<Image>();
-        bg.color         = new Color(0.10f, 0.12f, 0.18f, 0.88f);
-        bg.raycastTarget = false;
-
-        var le = go.AddComponent<LayoutElement>();
-        le.ignoreLayout = true;
-
-        // 상단 파란 액센트 선
-        var accentGO = new GameObject("Accent", typeof(RectTransform), typeof(Image));
-        accentGO.transform.SetParent(go.transform, false);
-        var accentRT = accentGO.GetComponent<RectTransform>();
-        accentRT.anchorMin = new Vector2(0f, 1f);
-        accentRT.anchorMax = Vector2.one;
-        accentRT.offsetMin = Vector2.zero;
-        accentRT.offsetMax = new Vector2(0f, -3f);
-        accentRT.pivot     = new Vector2(0.5f, 1f);
-        var accentImg = accentGO.GetComponent<Image>();
-        accentImg.color         = new Color(0.3f, 0.6f, 1.0f, 0.8f);
-        accentImg.raycastTarget = false;
-
-        // 안내 레이블
-        var labelGO = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-        labelGO.transform.SetParent(go.transform, false);
-        var labelRT = labelGO.GetComponent<RectTransform>();
-        labelRT.anchorMin = new Vector2(0f, 0.88f);
-        labelRT.anchorMax = Vector2.one;
-        labelRT.offsetMin = new Vector2(6f, 0f);
-        labelRT.offsetMax = Vector2.zero;
-        labelRT.pivot     = new Vector2(0.5f, 1f);
-        var label = labelGO.GetComponent<TextMeshProUGUI>();
-        label.text      = "드래그하여 배치";
-        label.fontSize  = 10f;
-        label.color     = new Color(0.55f, 0.65f, 0.85f, 0.9f);
-        label.alignment = TextAlignmentOptions.TopLeft;
-        label.raycastTarget = false;
-    }
 
     /// <summary>
     /// GameplayRoot 아래에 반투명 배경 Image를 생성한다.

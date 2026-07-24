@@ -145,6 +145,8 @@ public sealed class UI_GridPanel : UI_Base
             GridManager.Instance.OnItemPlaced   += HandleItemPlaced;
             GridManager.Instance.OnItemRemoved  += HandleItemRemoved;
             GridManager.Instance.OnItemSelected += HandleItemSelected;
+            GridManager.Instance.OnSquareClicked += HandleSquareClicked;
+            GridManager.Instance.OnSquareHovered += HandleSquareHovered;
         }
 
         if (MerlinRuneBridge.Instance != null)
@@ -182,6 +184,8 @@ public sealed class UI_GridPanel : UI_Base
             GridManager.Instance.OnItemPlaced   -= HandleItemPlaced;
             GridManager.Instance.OnItemRemoved  -= HandleItemRemoved;
             GridManager.Instance.OnItemSelected -= HandleItemSelected;
+            GridManager.Instance.OnSquareClicked -= HandleSquareClicked;
+            GridManager.Instance.OnSquareHovered -= HandleSquareHovered;
         }
 
         if (MerlinRuneBridge.Instance != null)
@@ -275,7 +279,10 @@ public sealed class UI_GridPanel : UI_Base
             if (hexGrid != null)
             {
                 if (BoardManager.Instance != null)
+                {
                     BoardManager.Instance.EnterExternalGrid(hexGrid, hexGrid.gridAsset);
+                    BoardManager.Instance.SetSpawnAreaVisible(false);   // 배치는 칸 클릭으로 한다
+                }
                 else if (GridManager.Instance != null)
                     GridManager.Instance.SetActiveGrid(hexGrid);
             }
@@ -496,7 +503,7 @@ public sealed class UI_GridPanel : UI_Base
 
         // 드래그 힌트 (아이템 미배치 시 표시, CenterPanel 직속 → 최후 렌더 보장)
         var hintGO = MakeTxt(go.transform, "DragHint",
-            "아이템 카드를 드래그해\n그리드에 배치하세요", 15f,
+            "보관함의 룬을 끌어\n판에 놓으세요", 15f,
             new Color(0.62f, 0.68f, 0.85f, 0.45f));
         _hexGridHintText = hintGO.GetComponent<TMP_Text>();
         var hintRT = hintGO.GetComponent<RectTransform>();
@@ -594,10 +601,57 @@ public sealed class UI_GridPanel : UI_Base
         scrollRect.content  = contentRT;
         scrollRect.viewport = viewportRT;
 
+        // 세로 스크롤바 — 카드를 끌면 그 드래그가 배치용으로 소비되므로(SlotDragHandler),
+        // 목록을 훑을 수단이 휠밖에 없어진다. 잡고 내릴 수 있는 막대를 오른쪽에 세운다.
+        scrollRect.verticalScrollbar = BuildStagingScrollbar(scrollGO.transform, viewportRT);
+        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+
         // StagingAreaView 추가 후 Init으로 scrollContent 전달 + 슬롯 빌드
         _stagingArea = scrollGO.AddComponent<StagingAreaView>();
         _stagingArea.SetSlotSkin(_stagingBgSprite, _stagingBorderSprite);   // 슬롯 빌드 전에 주입
         _stagingArea.Init(contentRT);
+    }
+
+    /// <summary>
+    /// 보관함 목록의 세로 스크롤바를 만든다(뷰포트 오른쪽에 세로 막대).
+    /// AutoHideAndExpandViewport라 넘칠 때만 나타나고, 없을 땐 목록이 폭을 온전히 쓴다.
+    /// </summary>
+    private Scrollbar BuildStagingScrollbar(Transform parent, RectTransform viewportRT)
+    {
+        const float BarW = 10f;
+
+        var barGO = Go("StagingScrollbar");
+        barGO.transform.SetParent(parent, false);
+        var barRT = barGO.GetComponent<RectTransform>();
+        barRT.anchorMin        = new Vector2(1f, 0f);
+        barRT.anchorMax        = new Vector2(1f, 1f);
+        barRT.pivot            = new Vector2(1f, 0.5f);
+        barRT.sizeDelta        = new Vector2(BarW, viewportRT.sizeDelta.y);
+        barRT.anchoredPosition = new Vector2(-2f, 0f);
+
+        var barBg = barGO.AddComponent<Image>();
+        barBg.color = new Color(0.06f, 0.07f, 0.11f, 0.75f);
+
+        var slideGO = Go("SlidingArea");
+        slideGO.transform.SetParent(barGO.transform, false);
+        var slideRT = slideGO.GetComponent<RectTransform>();
+        slideRT.anchorMin = Vector2.zero;
+        slideRT.anchorMax = Vector2.one;
+        slideRT.offsetMin = new Vector2(1f, 1f);
+        slideRT.offsetMax = new Vector2(-1f, -1f);
+
+        var handleGO = Go("Handle");
+        handleGO.transform.SetParent(slideGO.transform, false);
+        var handleRT = handleGO.GetComponent<RectTransform>();
+        handleRT.sizeDelta = Vector2.zero;
+        var handleImg = handleGO.AddComponent<Image>();
+        handleImg.color = new Color(0.45f, 0.52f, 0.68f, 0.95f);
+
+        var bar = barGO.AddComponent<Scrollbar>();
+        bar.direction     = Scrollbar.Direction.BottomToTop;
+        bar.handleRect    = handleRT;
+        bar.targetGraphic = handleImg;
+        return bar;
     }
 
     /// <summary>
@@ -773,7 +827,7 @@ public sealed class UI_GridPanel : UI_Base
         _placeButton  = placeGO.AddComponent<Button>();
         _placeButton.targetGraphic = _placeBG;
 
-        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "드래그로 배치", 13f,
+        var placeTxtGO = MakeTxt(placeGO.transform, "PlaceLabel", "끌어서 배치", 13f,
             new Color(0.7f, 0.78f, 0.90f, 0.8f), bold: true);
         var placeTxtRT = placeTxtGO.GetComponent<RectTransform>();
         placeTxtRT.anchorMin = Vector2.zero;
@@ -932,7 +986,12 @@ public sealed class UI_GridPanel : UI_Base
         _hexGridView?.PlayZoneSynergyBurst(zoneId);
     }
 
-    private async UniTaskVoid ShowSynergyToastAsync(string description)
+    /// <summary>짧은 안내 문구(배치 실패 사유 등). 시너지 토스트와 같은 자리를 쓴다.</summary>
+    private void ShowToast(string message) => ShowSynergyToastAsync(message, prefix: false).Forget();
+
+    private UniTaskVoid ShowSynergyToastAsync(string description) => ShowSynergyToastAsync(description, prefix: true);
+
+    private async UniTaskVoid ShowSynergyToastAsync(string description, bool prefix)
     {
         _toastCts?.Cancel();
         _toastCts?.Dispose();
@@ -940,7 +999,7 @@ public sealed class UI_GridPanel : UI_Base
         var ct = _toastCts.Token;
 
         if (_synergyToastText != null)
-            _synergyToastText.text = $"◆ 시너지 활성화!  {description}";
+            _synergyToastText.text = prefix ? $"◆ 시너지 활성화!  {description}" : description;
         if (_synergyToast != null)
             _synergyToast.SetActive(true);
 
@@ -1098,6 +1157,78 @@ public sealed class UI_GridPanel : UI_Base
     private void HandleItemSelected(RuntimeItemData item)
     {
         _itemInfoPanel?.ShowItem(item, isNew: false);
+    }
+
+    // ── 클릭 배치 ──
+    // 드래그로 다중 칸 룬을 얹는 건 손이 커서 어려웠다. 보관함에서 룬을 고른 뒤 판의 칸을 누르면
+    // 그 칸을 기준으로 놓인다. 판정·점유·통보는 드래그와 같은 경로(GridManager.TryPlaceShape)를 탄다.
+
+    /// <summary>지금 놓으려는 룬. 보관함에서 고른 것 → 없으면 보관함 첫 룬.</summary>
+    private RuntimeItemData PlacementTarget
+        => _stagingArea?.HighlightedItem
+           ?? (_inventory != null && _inventory.StagingCount > 0 ? _inventory.StagingItems[0] : null);
+
+    private void HandleSquareClicked(GridSquare square)
+    {
+        if (square == null) return;
+
+        // 이미 놓인 칸을 누르면 회수 — 클릭 조작만으로 배치/취소가 모두 되게 한다.
+        if (square.isOccupied)
+        {
+            if (square.occupyingItem != null) RemovePlacedItem(square.occupyingItem);
+            return;
+        }
+
+        var item = PlacementTarget;
+        if (item == null) { ShowToast("보관함에서 룬을 먼저 고르세요"); return; }
+
+        var shape = _stagingArea?.GetShapeForItem(item);
+        if (shape == null) { ShowToast("이 룬의 모양 정보를 찾지 못했습니다"); return; }
+
+        // 판 좌표계로 먼저 옮긴다. 주차 구역(shapeHost)은 스케일이 다르고 마스크에 잘려 있어,
+        // 거기 둔 채로 위치를 계산하면 블록이 칸과 어긋난다. 블록은 그리드 gap 크기로 만들어져
+        // 있으므로 판 위에서는 스케일 1이 정답이다.
+        var gridHost = BoardManager.Instance?.gridHost;
+        if (gridHost != null && shape.transform.parent != gridHost)
+        {
+            shape.transform.SetParent(gridHost, false);
+            shape.transform.localScale = Vector3.one;
+        }
+
+        if (!GridManager.Instance.TryPlaceShapeAt(shape, square))
+        {
+            BoardManager.Instance?.ReSlotAndReturn(shape);   // 주차 구역으로 되돌린다
+            ShowToast("여기엔 놓을 수 없습니다");
+            return;
+        }
+
+        BoardManager.Instance?.OnShapePlaced(shape);
+        GridManager.Instance.ClearPreview();
+    }
+
+    /// <summary>판에서 룬을 회수해 보관함으로 되돌린다. 드래그로 빼낼 때와 같은 경로.</summary>
+    private void RemovePlacedItem(RuntimeItemData item)
+    {
+        var shape = _stagingArea?.GetShapeForItem(item);
+        if (shape == null) return;
+
+        BoardManager.Instance?.OnShapePickedUp(shape);
+        GridManager.Instance?.ReleaseShape(shape);   // 점유 해제 + OnItemRemoved 통보
+        BoardManager.Instance?.ReSlotAndReturn(shape);
+        GridManager.Instance?.ClearPreview();
+    }
+
+    private void HandleSquareHovered(GridSquare square)
+    {
+        if (GridManager.Instance == null) return;
+
+        if (square == null || square.isOccupied) { GridManager.Instance.ClearPreview(); return; }
+
+        var item  = PlacementTarget;
+        var shape = item != null ? _stagingArea?.GetShapeForItem(item) : null;
+        if (shape == null) { GridManager.Instance.ClearPreview(); return; }
+
+        GridManager.Instance.PreviewShapeAt(shape, square);
     }
 
     private void OnStagingItemSelected(RuntimeItemData item)

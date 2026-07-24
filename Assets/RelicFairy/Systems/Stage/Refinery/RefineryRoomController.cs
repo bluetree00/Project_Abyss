@@ -73,7 +73,8 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         Vector3 pos = transform.position;
         pos.y += NpcStandHeight;
-        return (pos, Quaternion.identity);
+        // 고정 +Z 대신 가장 트인 쪽 — 벽을 보고 서거나 정제대가 벽에 박히는 것을 방지.
+        return (pos, ServiceRoomDecorPlacer.ResolveFacing(pos, Quaternion.identity));
     }
 
     private void SpawnNpc(GameObject npcPrefab, Vector3 pos, Quaternion rot)
@@ -123,18 +124,20 @@ public sealed class RefineryRoomController : MonoBehaviour
     {
         if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
 
+        ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
+
         Vector3 fwd   = npcRot * Vector3.forward;   // NPC가 바라보는 방향(=플레이어 쪽)
         Vector3 back  = -fwd;
         Vector3 right = npcRot * Vector3.right;
         float groundY = npcPos.y - NpcStandHeight;
 
-        // 1) 정제대 — NPC 앞에, NPC를 마주보게.
-        if (_decorPrefabs[0] != null)
+        // 1) 정제대 — NPC 앞. 벽이면 빈 자리를 탐색(못 찾으면 생략).
+        if (_decorPrefabs[0] != null &&
+            ServiceRoomDecorPlacer.TryFindSpot(npcPos, fwd, CounterDistance, groundY, out var tablePos))
         {
-            Vector3 tablePos = npcPos + fwd * CounterDistance;
-            tablePos.y = groundY;
-            float tableYaw = Mathf.Atan2(-fwd.x, -fwd.z) * Mathf.Rad2Deg;
-            PlaceProp(_decorPrefabs[0], tablePos, tableYaw, groundY, "RefineryCounter");
+            Vector3 faceBack = npcPos - tablePos;
+            float tableYaw = Mathf.Atan2(-faceBack.x, -faceBack.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(_decorPrefabs[0], tablePos, tableYaw, groundY, transform, "RefineryCounter");
         }
 
         // 2) 나머지 — NPC 뒤쪽 반원
@@ -148,24 +151,12 @@ public sealed class RefineryRoomController : MonoBehaviour
             float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
             float rad   = 3.5f + (float)_roomRng.NextDouble() * 1.2f;
             Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
-            Vector3 pos = npcPos + dir * rad;
-            pos.y = groundY;
 
-            float yaw = Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg;
-            PlaceProp(prefab, pos, yaw, groundY, null);
+            if (!ServiceRoomDecorPlacer.TryFindSpot(npcPos, dir, rad, groundY, out var pos)) continue;
+
+            Vector3 toNpc = npcPos - pos;
+            float yaw = Mathf.Atan2(-toNpc.x, -toNpc.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(prefab, pos, yaw, groundY, transform);
         }
-    }
-
-    /// <summary>소품 1개 배치 + 바닥 스냅. VFX(MeshRenderer 없음)는 원위치 유지.</summary>
-    private void PlaceProp(GameObject prefab, Vector3 pos, float yaw, float groundY, string name)
-    {
-        var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
-        if (!string.IsNullOrEmpty(name)) go.name = name;
-
-        var rends = go.GetComponentsInChildren<MeshRenderer>();
-        if (rends.Length == 0) return;
-        var b = rends[0].bounds;
-        for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
-        go.transform.position += new Vector3(0f, groundY - b.min.y, 0f);
     }
 }

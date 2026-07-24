@@ -22,7 +22,7 @@ public class UI_RangedForgePopup : UI_Popup
 {
     // ── Constants ─────────────────────────────────────────────
     private const float PanelWidth  = 620f;
-    private const float PanelHeight = 560f;
+    private const float PanelHeight = 640f;   // 카드 내용(아이콘+4줄 스탯)이 눌리지 않을 최소치
     private const float SlideTime   = 0.18f;
 
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
@@ -304,6 +304,8 @@ public class UI_RangedForgePopup : UI_Popup
         _stageGlow = NewImage("Glow", _slider, new Color(1f, 1f, 1f, 0f));
         Stretch(_stageGlow.rectTransform);
         _stageGlow.raycastTarget = false;
+        // 배경 판이라 세로 레이아웃의 한 칸을 차지하면 안 된다 — 카드 내용이 그만큼 밀려 눌린다.
+        _stageGlow.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
 
         BuildCardBody(_slider);
 
@@ -338,24 +340,44 @@ public class UI_RangedForgePopup : UI_Popup
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
 
-        // 큰 아이콘
+        // 무대에 들어갈 세로 예산이 카드 내용보다 작으면 VerticalLayoutGroup이 자식을 최소높이까지
+        // 눌러버린다. TMP의 최소높이는 0이라 글자는 그대로 그려지면서 칸만 사라져 서로 겹쳐 보였다
+        // (이름·설명·스탯이 한 덩어리로 뭉치던 원인). 그래서 각 줄에 높이를 못 박는다.
         var iconBox = NewRect("IconBox", stage);
-        iconBox.gameObject.AddComponent<LayoutElement>().preferredHeight = 180f;
+        FixHeight(iconBox.gameObject, 130f);
         _icon = NewImage("Icon", iconBox, Color.white);
         Stretch(_icon.rectTransform);
         _icon.preserveAspect = true;
 
         // 이름 + 잠금 배지
-        _name = NewText("Name", stage, 30f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
+        _name = NewText("Name", stage, 26f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
+        _name.textWrappingMode = TextWrappingModes.NoWrap;
+        _name.overflowMode     = TextOverflowModes.Ellipsis;
+        FixHeight(_name.gameObject, 34f);
+
         _badge = NewText("Badge", stage, 15f, LockColor, FontStyles.Bold, TextAlignmentOptions.Center);
         _badge.textWrappingMode = TextWrappingModes.NoWrap;
+        FixHeight(_badge.gameObject, 20f);
 
         // 한 줄 설명
-        _tag = NewText("Tag", stage, 15f, SubColor, FontStyles.Italic, TextAlignmentOptions.Center);
+        _tag = NewText("Tag", stage, 14f, SubColor, FontStyles.Italic, TextAlignmentOptions.Center);
+        _tag.textWrappingMode = TextWrappingModes.NoWrap;
+        _tag.overflowMode     = TextOverflowModes.Ellipsis;
+        FixHeight(_tag.gameObject, 22f);
 
-        // 스탯 블록(세로 정렬)
-        _stats = NewText("Stats", stage, 17f, BodyColor, FontStyles.Normal, TextAlignmentOptions.Center);
-        _stats.lineSpacing = 8f;
+        // 스탯 블록(4줄 세로 정렬)
+        _stats = NewText("Stats", stage, 16f, BodyColor, FontStyles.Normal, TextAlignmentOptions.Center);
+        _stats.lineSpacing = 6f;
+        FixHeight(_stats.gameObject, 104f);
+    }
+
+    /// <summary>레이아웃 그룹이 눌러도 줄지 않도록 높이를 고정한다(min=preferred, flexible=0).</summary>
+    private static void FixHeight(GameObject go, float height)
+    {
+        var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
+        le.minHeight       = height;
+        le.preferredHeight = height;
+        le.flexibleHeight  = 0f;
     }
 
     private void BuildDotsRow(RectTransform parent)
@@ -387,7 +409,7 @@ public class UI_RangedForgePopup : UI_Popup
     private void BuildButtons(RectTransform parent)
     {
         var row = NewRect("Buttons", parent);
-        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 52f;
+        FixHeight(row.gameObject, 56f);   // 남는 세로를 버튼이 먹어 정사각형처럼 커지지 않게 고정
         var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
         h.spacing = 14f;
         h.childControlWidth = true;  h.childForceExpandWidth  = true;

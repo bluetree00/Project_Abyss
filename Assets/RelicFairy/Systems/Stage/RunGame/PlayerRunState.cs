@@ -32,6 +32,11 @@ public sealed class PlayerRunState
         MaxHp = Math.Max(1, maxHp);
         Hp = MaxHp;
         TempGold = Math.Max(0, startGold);
+
+        // 포션은 <b>가득 채워 시작</b>한다. 예전엔 0으로 시작해 아무도 채워주지 않으면
+        // C를 눌러도 재고가 없어 조용히 무시됐다(포션이 아예 안 쓰이던 원인).
+        // 이어하기는 RestorePotions가 저장값으로 덮어쓰므로 영향 없다.
+        PotionCount = PotionCapacity;
     }
 
     public void Deactivate()

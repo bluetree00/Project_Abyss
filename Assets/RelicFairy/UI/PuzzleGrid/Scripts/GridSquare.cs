@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class GridSquare : MonoBehaviour
+public class GridSquare : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Grid Info")]
     // 이 칸의 행/열 인덱스
@@ -89,6 +90,26 @@ public class GridSquare : MonoBehaviour
             hoverImage.enabled = on;
             if (on) hoverImage.color = color;
         }
+    }
+
+    // ── 클릭 배치 (드래그 없이 칸을 눌러 놓기) ────────────────
+    // 드래그는 손이 큰 조작이라 다중 칸 룬을 정확히 얹기 어려웠다. 칸을 직접 누르는 쪽이
+    // 판정이 명확해서, 보관함에서 룬을 고른 뒤 칸을 누르면 그 칸을 기준으로 놓인다.
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.dragging) return;   // 드래그 종료 클릭은 무시(기존 드래그 배치와 충돌 방지)
+        GridManager.Instance?.NotifySquareClicked(this);
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        GridManager.Instance?.NotifySquareHovered(this);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        GridManager.Instance?.NotifySquareHovered(null);
     }
 
     // 이 칸 위에 겹쳐져 있는 ShapeBlock 개수 (여러 조각이 동시에 겹칠 수 있으므로)

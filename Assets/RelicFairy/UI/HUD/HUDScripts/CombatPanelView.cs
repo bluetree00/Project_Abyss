@@ -169,23 +169,11 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text   _buffTooltipText;
     private BuffCell   _hoveredCell;
 
-    // ── 분리된 게이지 영역 런타임(그리드와 별개) ──
-    private Transform _gaugeRoot;
-    private readonly List<GaugeBar> _gaugeBars = new();      // 게이지 바 풀(재사용)
-
-    /// <summary>분리 게이지 바 1개의 위젯 참조.</summary>
-    private struct GaugeBar
-    {
-        public GameObject    go;
-        public Image         icon;
-        public RectTransform fill;   // 폭=anchorMax.x
-        public Image         fillImg;
-    }
-
     private float _noticeTimer;
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
-    // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀). 게이지: 그리드 아래.
+    // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
+    // 잔여 시간은 칸 위 스윕(BuffCell)이 직접 그린다 — 아래로 막대를 깔 세로 여유가 없다.
     // 목업 기준(1920×1080): 좌하단에서 좌 114 / 아래 275. 무기 패널(위쪽 끝 244) 위, 서약 박스(아래쪽 끝 337) 아래.
     private const float BuffDockX       = 114f;
     private const float BuffDockBottomY = 275f;
@@ -849,7 +837,11 @@ public sealed class CombatPanelView : MonoBehaviour
             {
                 if (info.HasWeapon)
                 {
-                    Sprite resolved = info.Icon != null ? info.Icon : ResolveTypeIcon(info.Type);
+                    // 무기 타입 기본 아이콘을 먼저 쓴다. WeaponSO의 개별 아이콘을 우선하면
+                    // 진화할 때마다 HUD 칸 그림이 제각각으로 바뀌어 무기 계열이 안 읽힌다.
+                    // 진화별 아이콘이 갖춰지면 우선순위를 되돌리면 된다(줄 하나).
+                    Sprite typeIcon = ResolveTypeIcon(info.Type);
+                    Sprite resolved  = typeIcon != null ? typeIcon : info.Icon;
                     iconImage.sprite = resolved;
                     iconImage.gameObject.SetActive(resolved != null);
                 }
@@ -1741,25 +1733,8 @@ public sealed class CombatPanelView : MonoBehaviour
             else           _buffCells[i].Hide();
         }
 
-        // ── 분리된 게이지 영역 — Remaining01>=0 항목만 ──
-        EnsureGaugeArea();
-        RepositionGaugeBelowGrid(count);   // 그리드 실제 높이만큼 게이지를 아래로(침범 방지)
-        int gaugeCount = 0;
-        for (int i = 0; i < count; i++)
-            if (items[i].Remaining01 >= 0f) gaugeCount++;
-
-        while (_gaugeBars.Count < gaugeCount)
-            _gaugeBars.Add(CreateGaugeBar());
-
-        int gi = 0;
-        for (int i = 0; i < count; i++)
-        {
-            if (items[i].Remaining01 < 0f) continue;
-            BindGauge(_gaugeBars[gi], items[i]);
-            gi++;
-        }
-        for (; gi < _gaugeBars.Count; gi++)
-            if (_gaugeBars[gi].go != null) _gaugeBars[gi].go.SetActive(false);
+        // 잔여 시간은 칸 위 스윕(BuffCell)이 직접 표시한다 — 예전엔 그리드 아래 별도 막대 영역을 뒀는데
+        // 좌측 도크에 세로 여유가 없어 막대 4줄이 무기 패널을 가로질렀다(설계상 그 사이 공간이 31px뿐).
 
         // 호버 중이던 셀이 숨겨졌으면 툴팁 정리, 살아있으면 내용 갱신
         if (_hoveredCell != null)
@@ -1782,17 +1757,6 @@ public sealed class CombatPanelView : MonoBehaviour
         for (int i = 0; i < n; i++)
             if (_buffCells[i].gameObject.activeSelf)
                 _buffCells[i].UpdateValues(items[i]);
-
-        // 게이지 채움(분리 영역) — Remaining01 보유 항목 순서대로 바와 매칭
-        int gi = 0;
-        for (int i = 0; i < items.Count && gi < _gaugeBars.Count; i++)
-        {
-            if (items[i].Remaining01 < 0f) continue;
-            var bar = _gaugeBars[gi];
-            if (bar.fill != null)
-                bar.fill.anchorMax = new Vector2(Mathf.Clamp01(items[i].Remaining01), 1f);
-            gi++;
-        }
 
         if (_hoveredCell != null && _hoveredCell.gameObject.activeSelf)
             SetTooltipContent(_hoveredCell.Item);
@@ -2278,112 +2242,6 @@ public sealed class CombatPanelView : MonoBehaviour
         _buffTooltip = go;
     }
 
-    // ── 분리된 게이지 영역 ───────────────────────────────────
-    /// <summary>그리드와 구분된 게이지 영역(세로 바 목록) 보장. 그리드 아래쪽에 별도 배치.</summary>
-    private void EnsureGaugeArea()
-    {
-        if (_gaugeRoot != null) return;
-
-        var go = new GameObject("BuffGaugeArea", typeof(RectTransform));
-        go.transform.SetParent(transform, false);
-
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.zero;
-        rect.pivot = new Vector2(0f, 1f);   // 좌상단 피벗 → 그리드 아래에서 아래로 쌓임
-        // 그리드(좌측) 바로 아래에 분리 배치.
-        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY - 8f);
-        rect.sizeDelta = new Vector2(210f, 100f);
-
-        var layout = go.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 3f;
-        layout.childAlignment = TextAnchor.LowerLeft;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
-        var fitter = go.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        _gaugeRoot = go.transform;
-    }
-
-    /// <summary>게이지 영역을 그리드 시작점 왼쪽에 고정 배치(분리 영역). 그리드는 오른쪽+위로 자라므로 buffCount와 무관.</summary>
-    private void RepositionGaugeBelowGrid(int buffCount)
-    {
-        if (_gaugeRoot == null) return;
-        ((RectTransform)_gaugeRoot).anchoredPosition =
-            new Vector2(BuffDockX, BuffDockBottomY - 8f);
-    }
-
-    private GaugeBar CreateGaugeBar()
-    {
-        var go = new GameObject($"BuffGauge_{_gaugeBars.Count}", typeof(RectTransform));
-        go.transform.SetParent(_gaugeRoot, false);
-
-        var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(210f, 16f);
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 16f;
-        le.minHeight = 16f;
-
-        // 아이콘(좌측)
-        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-        iconGo.transform.SetParent(go.transform, false);
-        var irt = iconGo.GetComponent<RectTransform>();
-        irt.anchorMin = new Vector2(0f, 0.5f);
-        irt.anchorMax = new Vector2(0f, 0.5f);
-        irt.pivot     = new Vector2(0f, 0.5f);
-        irt.anchoredPosition = new Vector2(0f, 0f);
-        irt.sizeDelta = new Vector2(14f, 14f);
-        var icon = iconGo.GetComponent<Image>();
-        icon.preserveAspect = true;
-        icon.raycastTarget = false;
-
-        // 트랙(아이콘 우측 ~ 우측 끝)
-        var trackGo = new GameObject("Track", typeof(RectTransform));
-        trackGo.transform.SetParent(go.transform, false);
-        var trt = trackGo.GetComponent<RectTransform>();
-        trt.anchorMin = new Vector2(0f, 0.5f);
-        trt.anchorMax = new Vector2(1f, 0.5f);
-        trt.pivot     = new Vector2(0f, 0.5f);
-        trt.offsetMin = new Vector2(18f, -4f);
-        trt.offsetMax = new Vector2(0f, 4f);
-        var trackImg = trackGo.AddComponent<Image>();
-        trackImg.color = new Color(0f, 0f, 0f, 0.55f);
-        trackImg.raycastTarget = false;
-
-        // 채움(anchorMax.x로 폭 — 스프라이트 불필요, in-place 갱신 가벼움)
-        var fillGo = new GameObject("Fill", typeof(RectTransform));
-        fillGo.transform.SetParent(trackGo.transform, false);
-        var frt = fillGo.GetComponent<RectTransform>();
-        frt.anchorMin = new Vector2(0f, 0f);
-        frt.anchorMax = new Vector2(0f, 1f);
-        frt.offsetMin = Vector2.zero;
-        frt.offsetMax = Vector2.zero;
-        var fillImg = fillGo.AddComponent<Image>();
-        fillImg.raycastTarget = false;
-
-        return new GaugeBar { go = go, icon = icon, fill = frt, fillImg = fillImg };
-    }
-
-    private void BindGauge(in GaugeBar bar, in BuffViewItem item)
-    {
-        if (bar.go == null) return;
-        bar.go.SetActive(true);
-
-        if (bar.icon != null)
-            bar.icon.sprite = BuffIconFor(item.IconKey);
-
-        if (bar.fillImg != null)
-            bar.fillImg.color = item.IsDebuff
-                ? new Color(0.90f, 0.40f, 0.40f, 0.95f)
-                : new Color(0.40f, 0.80f, 0.85f, 0.95f);
-
-        if (bar.fill != null)
-            bar.fill.anchorMax = new Vector2(Mathf.Clamp01(item.Remaining01), 1f);
-    }
 
     private void EnsureBuffNoticeText()
     {

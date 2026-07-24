@@ -60,6 +60,12 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // 허브에서는 전투 HUD를 억제(시작방과 동일 처리).
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
+            // 보스 체력바 강제 해제 — 허브엔 보스가 없으므로 어떤 경로로 들어와도 남아 있으면 안 된다.
+            // 보스 쪽 OnDisable(UnbindBossHudIfBound)에만 맡기면, 씬 언로드 파괴 순서에 따라
+            // HudPresenter를 못 찾거나 억제 모드 전환과 엇갈려 보스바가 그대로 남는다
+            // (인트로 보스전 도중 허브 복귀 시 재현). 허브 진입 시 한 번 끊어주면 경로와 무관하게 안전하다.
+            FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.UnbindBoss();
+
             // 시작 연출: 검정으로 가린 뒤 플레이어 스폰 → 게임플레이 카메라 인계 → 페이드인.
             // (예전 '둘러보기 패닝 투어'는 제거됨 — 주변을 보여주지 않고 곧장 플레이어 시점으로 시작)
             await ScreenFade.Out(0f);

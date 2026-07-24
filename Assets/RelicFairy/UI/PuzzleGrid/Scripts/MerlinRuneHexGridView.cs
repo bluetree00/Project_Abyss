@@ -634,6 +634,20 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         hoverImg.enabled       = false;
         hoverImg.raycastTarget = false;
 
+        // 클릭 판 — 칸을 눌러 배치하려면 <b>레이캐스트를 받는 그래픽</b>이 필요하다.
+        // hoverImg는 평소 enabled=false + raycastTarget=false라 포인터가 아예 닿지 않았다.
+        // Graphic은 한 오브젝트에 하나만 붙으므로(DisallowMultipleComponent) 자식으로 깐다.
+        // 완전 투명이어도 유니티 UI는 레이캐스트를 받는다(알파 임계값 미설정 시).
+        var clickGO = new GameObject("ClickArea", typeof(RectTransform));
+        clickGO.transform.SetParent(sqGO.transform, false);
+        var clickRT = clickGO.GetComponent<RectTransform>();
+        clickRT.anchorMin = Vector2.zero;
+        clickRT.anchorMax = Vector2.one;
+        clickRT.offsetMin = clickRT.offsetMax = Vector2.zero;
+        var clickImg = clickGO.AddComponent<Image>();
+        clickImg.color         = Color.clear;
+        clickImg.raycastTarget = true;
+
         var sq = sqGO.AddComponent<GridSquare>();
         sq.hoverImage = hoverImg;
         sq.zoneCode   = zoneCode;     // 속성 배치 제약(RuneZoneRule) 판정 근거
