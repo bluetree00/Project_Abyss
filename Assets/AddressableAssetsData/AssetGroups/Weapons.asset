@@ -101,6 +101,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 79e128fbd9569bb45b43779290303c36
+    m_Address: T0_Nameless_Weapon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7a6d1f622a1a6be44919610e75b7bbe1
     m_Address: T3_Crossbow_Weapon
     m_ReadOnly: 0
@@ -151,33 +156,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: aae8f0f888f36fb4294032a50f519abe
-    m_Address: UI/Popup/UI_ClearReward
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b12bcf6cbd9761c489488d993a61d7ee
     m_Address: T1_Katana_Weapon
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 79e128fbd9569bb45b43779290303c36
-    m_Address: T0_Nameless_Weapon
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d5279a4841651514dbd637a48b4bc376
-    m_Address: T0_Nameless_Display
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bd2ae7b2c5961234ca9ecde42e44317d
     m_Address: T3_Katana_Display
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: dc3cbb3ad4fafba4db517e2b8ecbd5d5
-    m_Address: T3_Katana
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -206,8 +191,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d5279a4841651514dbd637a48b4bc376
+    m_Address: T0_Nameless_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: db65e169d1514aa4293acaeed3b85e05
     m_Address: T1_Katana_Display
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc3cbb3ad4fafba4db517e2b8ecbd5d5
+    m_Address: T3_Katana
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

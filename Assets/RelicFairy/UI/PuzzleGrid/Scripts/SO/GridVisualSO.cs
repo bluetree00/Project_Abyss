@@ -7,7 +7,13 @@ public class GridVisualSO : ScriptableObject
     public GameObject gridSquarePrefab;
 
     [Header("Layout")]
+    [Tooltip("칸 중심 간 거리(스텝). 배치 블록의 간격 기준이기도 하다.")]
     public float squareGap = 90f;
+
+    [Tooltip("칸 하나의 시각 크기. 0이면 squareGap과 같게 본다(칸 사이 여백 없음).\n" +
+             "squareGap보다 작게 두면 그 차이가 칸 사이 여백이 되고, 배치 블록도 같은 크기로 그려져 " +
+             "타일 경계선을 덮지 않는다.")]
+    public float squareVisualSize = 0f;
     [Tooltip("If true, startPosition is ignored and the grid auto-centers around (0,0) of the Grid root RectTransform.")]
     public bool autoCenter = true;
 

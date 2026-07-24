@@ -15,8 +15,8 @@ MonoBehaviour:
   category: {fileID: 11400000, guid: 564abeb724975a94b832adfb9253b91c, type: 2}
   icon: {fileID: 0}
   codeName: tut_select_equip
-  displayName: "\uBB34\uC7A5\uD558\uB77C"
-  description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44\uB97C \uC120\uD0DD\uD558\uB77C"
+  displayName: "\uBB34\uC7A5"
+  description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44 \uC120\uD0DD"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 6aae4281bfa36fa4eaae42471e887d33, type: 2}

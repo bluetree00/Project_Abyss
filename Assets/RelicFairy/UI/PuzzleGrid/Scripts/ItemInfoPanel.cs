@@ -96,11 +96,17 @@ public sealed class ItemInfoPanel : MonoBehaviour
         if (itemName != null)
             itemName.text = item.displayName ?? item.itemId;
 
-        // 레어도
+        // 레어도 + 속성
+        // 속성은 "이 룬을 어느 존에 놓아야 하는가"를 정하는 값이라 등급만큼 중요하다.
+        // 룬 선택 팝업(UI_RuneSelectPopup)과 같은 표기를 써서 화면 간 일관성을 유지한다.
         var rarityColor = RarityColor(item.rarity);
         if (rarityText != null)
         {
-            rarityText.text  = RarityLabel(item.rarity);
+            var elem = ElementDef.GetById(item.element);
+            rarityText.richText = true;
+            rarityText.text = elem != null
+                ? $"{RarityLabel(item.rarity)}  ·  <color={ElementDef.IdHex(item.element)}>{elem.Icon}{elem.Name}</color>"
+                : RarityLabel(item.rarity);
             rarityText.color = rarityColor;
         }
         if (rarityBar != null)
@@ -186,6 +192,12 @@ public sealed class ItemInfoPanel : MonoBehaviour
         int cols = maxX - minX + 1;
         int rows = maxY - minY + 1;
 
+        // 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell 한곳에서 정한다(네 경로 동일 규칙).
+        // 예전엔 여기만 속성 각인석을 안 쓰고 등급 아트를 통째로 속성색으로 덮어써서,
+        // 같은 룬이 보관함·판·선택 팝업과 다르게 보였다.
+        RuneArt.ResolveRuneCell(item.element, item.rarity, new Color(0.3f, 0.85f, 0.45f, 0.9f),
+            out var art, out var cellColor);
+
         float totalW = cols * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float totalH = rows * (MINI_CELL_SIZE + MINI_CELL_GAP) - MINI_CELL_GAP;
         float startX = -totalW * 0.5f + MINI_CELL_SIZE * 0.5f;
@@ -206,8 +218,10 @@ public sealed class ItemInfoPanel : MonoBehaviour
                 startY - row * (MINI_CELL_SIZE + MINI_CELL_GAP));
 
             var img  = cellGO.GetComponent<Image>();
-            img.color         = new Color(0.3f, 0.85f, 0.45f, 0.9f);
-            img.raycastTarget = false;
+            if (art != null) img.sprite = art;
+            img.color          = cellColor;
+            img.preserveAspect = art != null;   // 껐더니 룬이 정사각 22×22로 눌려 보였다
+            img.raycastTarget  = false;
 
             _shapeCells.Add(cellGO);
         }
@@ -273,7 +287,7 @@ public sealed class ItemInfoPanel : MonoBehaviour
     {
         ItemRarity.Rare      => "◇ Rare",
         ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "✦ Legendary",
+        ItemRarity.Legendary => "◆ Legendary",
         _                    => "· Common",
     };
 }

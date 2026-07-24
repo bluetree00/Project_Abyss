@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: hidden_elite_ambush
   displayName: "\uC608\uAE30\uCE58 \uBABB\uD55C \uC2B5\uACA9"
-  description: "\uC81C\uD55C \uC2DC\uAC04 \uB0B4\uC5D0 \uC815\uC608\uB97C \uCC98\uCE58\uD558\uB77C"
+  description: "\uC81C\uD55C \uC2DC\uAC04 \uB0B4 \uC815\uC608 \uCC98\uCE58"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 2933de92331fd064881619f0ab8315f3, type: 2}

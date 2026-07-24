@@ -14,7 +14,8 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     private bool _started;
 
     [Header("테스트 버튼 (재련소/정제소 즉시 오픈)")]
-    [SerializeField] private bool showTestButtons = true;
+    [Tooltip("개발 편의용 좌상단 버튼. 두 방 모두 실제 진입 경로가 생겨 평시엔 꺼 둔다 — 필요할 때만 켤 것.")]
+    [SerializeField] private bool showTestButtons = false;
     private CrucibleRoomController _testCrucible;
 
     private void Awake()

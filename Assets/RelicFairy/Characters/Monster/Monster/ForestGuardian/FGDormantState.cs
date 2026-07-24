@@ -91,7 +91,7 @@ public class FGDormantState : IMonsterState
             if (UI_BossBark.Instance != null)
             {
                 string bark = "Forest Guardian";
-                var lines = Managers.DialogueData?.GetVisitLines("ForestGuardian_Encounter");
+                var lines = Managers.DialogueData?.GetBossEncounterLines("ForestGuardian_Encounter");
                 if (lines != null && lines.Length > 0) bark = lines[0].text;
                 await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
             }

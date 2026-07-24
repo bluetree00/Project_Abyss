@@ -236,25 +236,44 @@ public class GameCameraController : MonoBehaviour
     /// </param>
     public void HandToGameplayCamera(Transform follow, bool alignHeadingToTarget = true)
     {
+        BindGameplayFollow(follow, alignHeadingToTarget);
+        // 투어 종료 포즈 → 플레이어 추적 시점 수동 보간 후 제어권 인계 (스냅 없는 전환 연출)
+        BlendToGameplayAsync(this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>
+    /// <see cref="HandToGameplayCamera"/>의 대기 가능 버전 — <b>보간이 끝나야 반환한다</b>.
+    ///
+    /// 컷신은 인계 뒤 곧바로 대사를 띄우는데, fire-and-forget 판은 완료를 알 방법이 없어 호출측이
+    /// 고정 딜레이로 추측할 수밖에 없었다(블렌드와 딜레이가 같은 1.2초라 항상 덜 끝난 채 대사가 나갔다).
+    /// 카메라가 자리를 잡은 뒤 대사가 나가야 하는 구간에서는 이쪽을 쓴다.
+    /// </summary>
+    public async UniTask HandToGameplayCameraAsync(Transform follow, bool alignHeadingToTarget = true,
+                                                   CancellationToken ct = default)
+    {
+        BindGameplayFollow(follow, alignHeadingToTarget);
+        try { await BlendToActiveCameraAsync(startRoomPlayerBlendDuration, ct); }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>인계 공통 준비 — 레거시 줌인 차단 + FreeLook Follow/LookAt·heading 세팅.</summary>
+    private void BindGameplayFollow(Transform follow, bool alignHeadingToTarget)
+    {
         _introStarted = true; // 레거시 줌인 인트로(OnPlayerBound) 차단
 
         if (_cinemachine == null) _cinemachine = FindFirstObjectByType<CinemachineFreeLook>(FindObjectsInactive.Include);
         if (_brain == null) _brain = GetComponent<CinemachineBrain>();
 
-        if (_cinemachine != null && follow != null)
-        {
-            _cinemachine.Follow = follow;
-            _cinemachine.LookAt = follow;
+        if (_cinemachine == null || follow == null) return;
 
-            // FreeLook 수평각은 이전 값을 그대로 유지하므로, 최초 인계 시엔 대상이 보는 방향으로 맞춰준다.
-            // 단 허브 재스폰(유물 핫스왑 등)에서는 대상 rotation이 '플레이어가 제단을 보던 방향'이라
-            // 이걸 heading으로 쓰면 카메라가 틀어진다 → 그때는 현재 heading을 유지한다(alignHeadingToTarget=false).
-            if (alignHeadingToTarget)
-                SetHeadingImmediate(follow.eulerAngles.y);
-        }
+        _cinemachine.Follow = follow;
+        _cinemachine.LookAt = follow;
 
-        // 투어 종료 포즈 → 플레이어 추적 시점 수동 보간 후 제어권 인계 (스냅 없는 전환 연출)
-        BlendToGameplayAsync(this.GetCancellationTokenOnDestroy()).Forget();
+        // FreeLook 수평각은 이전 값을 그대로 유지하므로, 최초 인계 시엔 대상이 보는 방향으로 맞춰준다.
+        // 단 허브 재스폰(유물 핫스왑 등)에서는 대상 rotation이 '플레이어가 제단을 보던 방향'이라
+        // 이걸 heading으로 쓰면 카메라가 틀어진다 → 그때는 현재 heading을 유지한다(alignHeadingToTarget=false).
+        if (alignHeadingToTarget)
+            SetHeadingImmediate(follow.eulerAngles.y);
     }
 
     // ── Camera Zone (구역별 카메라) ─────────────────────────────

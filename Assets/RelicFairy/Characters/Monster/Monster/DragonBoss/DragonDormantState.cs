@@ -175,7 +175,7 @@ public class DragonDormantState : IMonsterState
                 {
                     // 인카운터 대사(방문 변형) — 미로드 시 "Dragon Boss" 폴백
                     string bark = "Dragon Boss";
-                    var encounterLines = Managers.DialogueData?.GetVisitLines("Dragon_Encounter");
+                    var encounterLines = Managers.DialogueData?.GetBossEncounterLines("Dragon_Encounter");
                     if (encounterLines != null && encounterLines.Length > 0) bark = encounterLines[0].text;
                     await UI_BossBark.ShowAndWaitAsync(bark, BossBarkType.BossIntro);
                 }

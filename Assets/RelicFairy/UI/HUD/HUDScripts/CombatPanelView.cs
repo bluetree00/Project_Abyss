@@ -35,14 +35,6 @@ public sealed class CombatPanelView : MonoBehaviour
     [Tooltip("체력바 프레임 아트의 '안쪽 창'에 트랙/필을 맞추는 여백 (Left, Bottom, Right, Top) — 아트 실측값.")]
     [SerializeField] private Vector4 hpInnerPadding = new Vector4(15f, 18f, 15f, 32f);
 
-    // 아트 실측: 텍스처 1116×736 안에서 가장 안쪽 선이 x 60~992 / y 162~603
-    // → 안쪽 창 = 931×440. 여백 비율 L 5.5% / R 11.1% / T 22.2% / B 18.1%.
-    // 패널 rect 340×166 기준 → (18.6, 30.0, 37.8, 36.8)
-    [Tooltip("무기칸 바깥 프레임 안쪽 여백 (L,B,R,T) — 아트 실측값. 아트 여백이 비대칭(우·상이 큼)이라 값도 비대칭이다.")]
-    [SerializeField] private Vector4 weaponInnerPadding = new Vector4(19f, 30f, 38f, 37f);
-    [Tooltip("무기 두 칸 사이 간격(분할선 폭)")]
-    [SerializeField] private float weaponCellGap = 6f;
-
     [Header("하단중앙 클러스터 위치 (체력바 · 유물게이지 · 스탯) — 화면 아래에서의 높이")]
     [Tooltip("체력바 Y. 낮출수록 클러스터 전체가 아래로 내려간다(스탯은 체력바에 붙어 함께 이동).")]
     [SerializeField] private float hpBarY    = 88f;
@@ -57,15 +49,9 @@ public sealed class CombatPanelView : MonoBehaviour
     private Image _hpFrameImg;
     private bool HasHpSkin => hpTrackSprite != null || hpFillHighSprite != null || hpFillLowSprite != null;
 
-    [Header("무기 슬롯 스킨 (선택)")]
-    [Tooltip("무기 아이콘을 원형으로 자를 마스크 스프라이트(예: Bamao C_circle). 미지정 시 원형 처리 생략.")]
-    [SerializeField] private Sprite weaponIconCircleMask;
-    [Tooltip("원형 칸의 배경(미지정 시 마스크 스프라이트를 그대로 배경으로 사용).")]
-    [SerializeField] private Sprite weaponIconCircleBackdrop;
-
-    [SerializeField] private Sprite weaponFrameSprite;          // 무기칸 테두리 (2칸 통짜 프레임)
-    [SerializeField] private Sprite weaponFrameInactiveSprite;  // 무기칸 비활성화 테두리 (무기 없음)
-    [SerializeField] private Sprite weaponSlotInnerSprite;      // 무기칸 내부칸 (슬롯 1칸 배경)
+    // 무기 슬롯(배경·테두리·아이콘 원형)은 <b>프리팹이 정본</b>이다 — @UIRoot/WeaponPanel 하위에
+    // CellBg·Icon·CellFrame이 실제 오브젝트로 authoring 돼 있고, 코드는 아이콘 교체와
+    // 활성 칸 강조만 담당한다(WeaponSlotUI). 런타임 레이아웃/스킨 생성은 하지 않는다.
 
     [Header("스킬 슬롯 스킨 — E/R/액티브 (선택)")]
     [SerializeField] private Sprite skillFrameSprite;       // er 액티브 테두리 (기본/쿨다운 중 — 흰색)
@@ -106,17 +92,11 @@ public sealed class CombatPanelView : MonoBehaviour
     [SerializeField] private Sprite atkIconSprite;   // 공격력_1
     [SerializeField] private Sprite defIconSprite;   // 방어력_1
 
-    private bool HasWeaponSkin => weaponFrameSprite != null || weaponSlotInnerSprite != null;
     private bool HasSkillSkin  => skillFrameSprite != null || skillInnerSprite != null;
     private bool HasRelicSlotSkin  => relicSlotFrameSprite != null || relicSlotInnerSprite != null;
     private bool HasRelicGaugeSkin => relicGaugeTrackSprite != null || relicGaugeFillSprite != null;
 
     // 스킨 런타임 참조
-    // 무기칸 = 바깥 프레임 1장(두 칸 공용) + 칸 배경 2장(나란히 놓여 가운데 분할선을 이룸).
-    // 활성 무기 표시는 칸 배경 밝기로(프레임이 공용이라 프레임 스왑 불가).
-    private Image _weaponFrameImg;   // 바깥 프레임(WeaponPanel)
-    private Image _weaponInner0;     // 칸 배경 — 슬롯0
-    private Image _weaponInner1;     // 칸 배경 — 슬롯1
     private int   _activeWeaponIndex = 0;
     private Image _qFrameImg;         // 유물(Q) 슬롯 프레임(쿨다운 완료 시 활성 스프라이트 스왑)
     private Image _relicGaugeFill;    // 유물 게이지 fill(Filled/Horizontal)
@@ -189,23 +169,11 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text   _buffTooltipText;
     private BuffCell   _hoveredCell;
 
-    // ── 분리된 게이지 영역 런타임(그리드와 별개) ──
-    private Transform _gaugeRoot;
-    private readonly List<GaugeBar> _gaugeBars = new();      // 게이지 바 풀(재사용)
-
-    /// <summary>분리 게이지 바 1개의 위젯 참조.</summary>
-    private struct GaugeBar
-    {
-        public GameObject    go;
-        public Image         icon;
-        public RectTransform fill;   // 폭=anchorMax.x
-        public Image         fillImg;
-    }
-
     private float _noticeTimer;
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
-    // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀). 게이지: 그리드 아래.
+    // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
+    // 잔여 시간은 칸 위 스윕(BuffCell)이 직접 그린다 — 아래로 막대를 깔 세로 여유가 없다.
     // 목업 기준(1920×1080): 좌하단에서 좌 114 / 아래 275. 무기 패널(위쪽 끝 244) 위, 서약 박스(아래쪽 끝 337) 아래.
     private const float BuffDockX       = 114f;
     private const float BuffDockBottomY = 275f;
@@ -244,8 +212,6 @@ public sealed class CombatPanelView : MonoBehaviour
     private bool          _useSunGauge;    // 현재 바인딩된 리소스가 태양형인지
 
     // 무기 슬롯 활성 강조
-    private RectTransform _weaponSlot0, _weaponSlot1;
-    private Outline       _weaponOutline0, _weaponOutline1;
 
     // 툴팁 화면 클램프용 코너 버퍼(재사용 — 호버 시 GC 억제).
     private static readonly Vector3[] _tooltipCorners = new Vector3[4];
@@ -406,60 +372,10 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>슬롯·게이지·스탯 아이콘에 디자이너 아트를 입힌다(Awake 말미 1회).</summary>
     private void ApplySlotSkins()
     {
-        ApplyWeaponSkin();
         ApplyRelicSlotSkin();
         ApplySkillSkin();
         ApplyRelicGaugeSkin();
         ApplyStatIconSkin();
-    }
-
-    // 무기 테두리 아트 2종은 '그려진 선'이 989×500으로 <b>똑같은데 캔버스 크기가 다르다</b>.
-    //   활성  : 1116×736 — 선 x 32~1020 / y(위) 133~632  (위쪽 장식 여백이 큼)
-    //   비활성: 1055×552 — 선 x 32~1020 / y(위)  28~527  (거의 꽉 참)
-    // 같은 rect에 스트레치하면 비활성 선이 훨씬 크게 그려진다(세로 150 vs 113)
-    // → "장비를 얻기 전엔 크고 얻으면 작아지는" 현상. 스프라이트별로 rect를 역산해 선 위치를 고정한다.
-    // 값 = 텍스처 안에서 선이 차지하는 정규화 사각형 (x0, y0, x1, y1), y는 <b>아래가 0</b>.
-    private static readonly Vector4 FrameLineActive   = new Vector4(0.0287f, 0.1400f, 0.9149f, 0.8193f);
-    private static readonly Vector4 FrameLineInactive = new Vector4(0.0303f, 0.0435f, 0.9678f, 0.9493f);
-
-    /// <summary>무기 2칸: 각 칸에 내부칸 배경 + 패널 전체에 2칸 통짜 테두리(장착 여부로 스왑).</summary>
-    private void ApplyWeaponSkin()
-    {
-        if (!HasWeaponSkin) return;
-
-        // 칸 배경(밝기로 활성 무기 표시)만 슬롯에 남기고, 아트 배경판은 아래에서 '한 장'으로 깐다.
-        _weaponInner0 = SkinWeaponCell(_weaponSlot0);
-        _weaponInner1 = SkinWeaponCell(_weaponSlot1);
-
-        // 테두리: 두 칸을 함께 감싸는 바깥 프레임 1장 → 슬롯이 아니라 WeaponPanel에 얹는다.
-        var panel = _weaponSlot0 != null ? _weaponSlot0.parent as RectTransform : null;
-        if (panel == null) return;
-
-        // 패널 자체의 래거시 배경판은 칸 배경 아트가 대체하므로 투명 처리(뒤로 비치는 잔상 제거).
-        if (panel.TryGetComponent<Image>(out var panelBg))
-            panelBg.color = new Color(0f, 0f, 0f, 0f);
-
-        // 내부 배경판: '무기칸 내부칸'(941×451)은 프레임의 안쪽 창(931×440)과 크기·노치가 정확히 일치한다.
-        // → 칸마다 한 장씩이 아니라 <b>창 전체를 덮는 한 장</b>이다. 칸별로 깔면 노치가 두 번 나오고 세로로 찌그러진다.
-        if (weaponSlotInnerSprite != null)
-        {
-            var inner = AddSkinLayer(panel, "SkinInner", weaponSlotInnerSprite, false);
-            if (inner != null) InsetInside((RectTransform)inner.transform, weaponInnerPadding);
-        }
-
-        // 무기 프레임은 '아이콘을 감싸는 테두리'가 아니라 패널 그 자체다 →
-        // FrameSizeFor(비율맞춤)·오버행을 쓰면 텍스처의 투명 여백까지 비율에 포함돼 세로로 부푼다.
-        // 패널 rect에 그대로 스트레치한다(rect가 이미 여백을 감안한 크기).
-        if (weaponFrameSprite != null)
-        {
-            _weaponFrameImg = AddSkinLayer(panel, "SkinFrame", weaponFrameSprite, true);
-            FitWeaponFrame(panel, inactiveArt: false);   // 초기 상태(활성 아트) 기준 rect 확정
-        }
-
-        // 두 칸을 프레임 안쪽 창의 좌/우 반반으로 배치(배경 1장 + 양쪽 장비 1개씩)
-        LayoutWeaponCells(panel);
-
-        RefreshWeaponFrames();
     }
 
     /// <summary>부모를 꽉 채우되 (L,B,R,T) 만큼 안쪽으로 들여 배치. 프레임 아트의 '안쪽 창' 정합용.</summary>
@@ -472,48 +388,6 @@ public sealed class CombatPanelView : MonoBehaviour
         rt.offsetMax = new Vector2(-pad.z, -pad.w);   // -right, -top
     }
 
-    /// <summary>
-    /// 무기 두 칸을 프레임 안쪽 창의 좌/우 반반에 배치(가운데 간격=분할선).
-    /// 레퍼런스처럼 "배경 한 장 + 양쪽에 장비 한 개씩" 구조를 만든다.
-    /// </summary>
-    private void LayoutWeaponCells(RectTransform panel)
-    {
-        if (panel == null) return;
-        float half = weaponCellGap * 0.5f;
-        Vector4 p = weaponInnerPadding;
-
-        PlaceHalf(_weaponSlot0, 0f, 0.5f, p.x, p.y, half, p.w);   // 좌: left=padL, right=gap/2
-        PlaceHalf(_weaponSlot1, 0.5f, 1f, half, p.y, p.z, p.w);   // 우: left=gap/2, right=padR
-    }
-
-    private static void PlaceHalf(RectTransform rt, float xMin, float xMax,
-                                  float left, float bottom, float right, float top)
-    {
-        if (rt == null) return;
-        rt.anchorMin = new Vector2(xMin, 0f);
-        rt.anchorMax = new Vector2(xMax, 1f);
-        rt.pivot     = new Vector2(0.5f, 0.5f);
-        rt.offsetMin = new Vector2(left, bottom);
-        rt.offsetMax = new Vector2(-right, -top);
-        rt.localScale = Vector3.one;
-    }
-
-    /// <summary>
-    /// 무기 칸 1개. 배경 아트는 패널에 '한 장'으로 깔리므로 칸 자체의 래거시 Image는 <b>투명</b>으로 비운다.
-    /// 반환한 Image는 활성 무기 표시(RefreshWeaponFrames)에서 옅은 하이라이트 오버레이로만 쓴다.
-    /// </summary>
-    private Image SkinWeaponCell(RectTransform slot)
-    {
-        if (slot == null) return null;
-        if (!slot.TryGetComponent<Image>(out var body)) return null;
-
-        body.sprite        = null;
-        body.color         = Color.clear;
-        body.raycastTarget = false;
-        return body;
-    }
-
-    /// <summary>무기 장착 여부에 따라 테두리 아트 스왑(비장착 → 비활성화 테두리).</summary>
     /// <summary>
     /// Q(유물) 슬롯 활성 아트 판단 — <b>쿨다운 완료 AND 유물 게이지 조건(IRelicResource.IsSkillReady)</b>
     /// 둘 다 만족해야 '사용 가능'이므로 두 조건을 합쳐 테두리를 스왑한다.
@@ -538,60 +412,13 @@ public sealed class CombatPanelView : MonoBehaviour
     }
 
     /// <summary>
-    /// 바깥 프레임은 두 칸 공용이라 스왑 대상이 아니다. "지금 든 무기"는 <b>칸 배경 밝기</b>로 표시한다
-    /// (활성 칸=밝게, 비활성 칸=어둡게). 무기 미장착이면 바깥 프레임을 비활성 아트로.
+    /// "지금 든 무기" 강조 — 칸 배경/테두리는 <b>프리팹이 authoring한 실제 오브젝트</b>이고,
+    /// 코드는 밝기만 토글한다(활성 칸=밝게, 비활성=옅게, 미장착=더 어둡게).
     /// </summary>
     private void RefreshWeaponFrames()
     {
-        SetWeaponCellActive(_weaponInner0, _hasWeaponEquipped && _activeWeaponIndex == 0);
-        SetWeaponCellActive(_weaponInner1, _hasWeaponEquipped && _activeWeaponIndex == 1);
-
-        if (_weaponFrameImg != null)
-        {
-            bool useInactive = !_hasWeaponEquipped && weaponFrameInactiveSprite != null;
-            Sprite s = useInactive ? weaponFrameInactiveSprite : weaponFrameSprite;
-            if (s != null && _weaponFrameImg.sprite != s)
-            {
-                _weaponFrameImg.sprite = s;
-                // 두 아트의 캔버스 여백이 달라 rect를 그대로 두면 선 크기가 튄다 → 스왑할 때마다 역산.
-                FitWeaponFrame(_weaponFrameImg.transform.parent as RectTransform, useInactive);
-            }
-        }
-    }
-
-    /// <summary>배경 아트는 창 전체 한 장이라, 활성 칸은 <b>옅은 밝기 오버레이</b>로 표시한다(비활성=완전 투명).</summary>
-    private static void SetWeaponCellActive(Image cell, bool active)
-    {
-        if (cell == null) return;
-        cell.color = active ? new Color(1f, 1f, 1f, 0.22f) : Color.clear;
-    }
-
-    /// <summary>
-    /// 테두리 아트의 '그려진 선'이 스프라이트에 상관없이 <b>항상 같은 자리·같은 크기</b>로 오도록
-    /// 프레임 rect를 역산한다. 기준은 활성 아트가 패널 전체에 그려질 때의 선 박스.
-    /// (두 아트의 캔버스 여백이 달라 그냥 스트레치하면 크기가 튄다 — 위 상수 주석 참조)
-    /// </summary>
-    private void FitWeaponFrame(RectTransform panel, bool inactiveArt)
-    {
-        if (_weaponFrameImg == null || panel == null) return;
-
-        Vector2 p = panel.rect.size;
-        if (p.x <= 0f || p.y <= 0f) return;
-
-        // 목표 선 박스 = 활성 아트를 패널에 꽉 채웠을 때의 선 위치(= 지금까지 맞춰온 기준).
-        float tx0 = FrameLineActive.x * p.x, tx1 = FrameLineActive.z * p.x;
-        float ty0 = FrameLineActive.y * p.y, ty1 = FrameLineActive.w * p.y;
-
-        Vector4 line = inactiveArt ? FrameLineInactive : FrameLineActive;
-        float w = (tx1 - tx0) / Mathf.Max(0.0001f, line.z - line.x);
-        float h = (ty1 - ty0) / Mathf.Max(0.0001f, line.w - line.y);
-
-        var rt = _weaponFrameImg.rectTransform;
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.zero;
-        rt.pivot     = Vector2.zero;
-        rt.sizeDelta = new Vector2(w, h);
-        rt.anchoredPosition = new Vector2(tx0 - line.x * w, ty0 - line.y * h);
+        slot0?.SetSelected(_hasWeaponEquipped && _activeWeaponIndex == 0);
+        slot1?.SetSelected(_hasWeaponEquipped && _activeWeaponIndex == 1);
     }
 
     /// <summary>유물(Q) 슬롯: 마름모 내부 + 테두리. 쿨다운 완료 시 활성 테두리로 스왑.</summary>
@@ -990,6 +817,12 @@ public sealed class CombatPanelView : MonoBehaviour
         [SerializeField] private GameObject emptyRoot;
         [SerializeField] private Image      iconImage;
 
+        [Header("프리팹 authoring (칸 배경 / 장식 테두리)")]
+        [Tooltip("칸 배경(바탕). 활성 무기 칸을 밝게 표시한다.")]
+        [SerializeField] private Image cellBg;
+        [Tooltip("칸 장식 테두리(근거리/원거리 아트). 활성 무기 칸을 밝게 표시한다.")]
+        [SerializeField] private Image cellFrame;
+
         [Header("무기 타입 기본 아이콘 (WeaponSO icon이 없을 때 폴백)")]
         [SerializeField] private Sprite iconKatana;
         [SerializeField] private Sprite iconSword;
@@ -1004,7 +837,11 @@ public sealed class CombatPanelView : MonoBehaviour
             {
                 if (info.HasWeapon)
                 {
-                    Sprite resolved = info.Icon != null ? info.Icon : ResolveTypeIcon(info.Type);
+                    // 무기 타입 기본 아이콘을 먼저 쓴다. WeaponSO의 개별 아이콘을 우선하면
+                    // 진화할 때마다 HUD 칸 그림이 제각각으로 바뀌어 무기 계열이 안 읽힌다.
+                    // 진화별 아이콘이 갖춰지면 우선순위를 되돌리면 된다(줄 하나).
+                    Sprite typeIcon = ResolveTypeIcon(info.Type);
+                    Sprite resolved  = typeIcon != null ? typeIcon : info.Icon;
                     iconImage.sprite = resolved;
                     iconImage.gameObject.SetActive(resolved != null);
                 }
@@ -1016,51 +853,15 @@ public sealed class CombatPanelView : MonoBehaviour
         }
 
         /// <summary>
-        /// 무기 아이콘을 <b>원형으로 잘라 칸 안에 맞춘다</b>.
-        /// 원본 아이콘이 칸보다 커서 슬롯 밖으로 삐져나오고 배경도 사각이라 겉돌았다.
-        /// 아이콘과 같은 자리에 원형 마스크 부모를 끼워 넣고(기존 계층 위치·크기 유지),
-        /// 그 안에서 아이콘을 IconInset 비율로 줄인다. 프리팹 수정 없이 런타임 1회 구성.
+        /// 현재 든 무기 칸을 밝기로 강조한다. 배경·테두리 오브젝트는 프리팹이 정본이라
+        /// 여기서는 <b>색(밝기)만</b> 건드린다(생성·배치 없음).
         /// </summary>
-        internal void EnsureRoundIcon(Sprite circleSprite, Sprite backdropSprite)
+        internal void SetSelected(bool selected)
         {
-            if (_roundedIcon || iconImage == null || circleSprite == null) return;
-            _roundedIcon = true;
-
-            var iconRt = iconImage.rectTransform;
-            var parent = iconRt.parent as RectTransform;
-            if (parent == null) return;
-
-            // 아이콘이 있던 자리를 그대로 물려받는 마스크 컨테이너
-            var maskGo = new GameObject("IconRoundMask", typeof(RectTransform), typeof(Image), typeof(Mask));
-            var maskRt = (RectTransform)maskGo.transform;
-            maskRt.SetParent(parent, false);
-            maskRt.SetSiblingIndex(iconRt.GetSiblingIndex());
-            maskRt.anchorMin        = iconRt.anchorMin;
-            maskRt.anchorMax        = iconRt.anchorMax;
-            maskRt.pivot            = iconRt.pivot;
-            maskRt.anchoredPosition = iconRt.anchoredPosition;
-            maskRt.sizeDelta        = iconRt.sizeDelta;
-
-            var maskImg = maskGo.GetComponent<Image>();
-            maskImg.sprite        = backdropSprite != null ? backdropSprite : circleSprite;
-            maskImg.type          = Image.Type.Simple;
-            maskImg.raycastTarget = false;
-            // 배경을 보여줘야 사각 배경 대신 원형 배경으로 읽힌다.
-            maskGo.GetComponent<Mask>().showMaskGraphic = true;
-
-            // 아이콘을 마스크 안으로 옮기고 안쪽으로 줄인다(칸 이탈 방지).
-            iconRt.SetParent(maskRt, false);
-            iconRt.anchorMin        = new Vector2(0.5f, 0.5f);
-            iconRt.anchorMax        = new Vector2(0.5f, 0.5f);
-            iconRt.pivot            = new Vector2(0.5f, 0.5f);
-            iconRt.anchoredPosition = Vector2.zero;
-            iconRt.sizeDelta        = maskRt.sizeDelta * IconInset;
-            iconImage.preserveAspect = true;   // 비율 깨짐 방지
+            var c = selected ? Color.white : new Color(1f, 1f, 1f, 0.5f);
+            if (cellBg    != null) cellBg.color    = c;
+            if (cellFrame != null) cellFrame.color = c;
         }
-
-        private bool _roundedIcon;
-        /// <summary>원형 배경 대비 아이콘 크기 비율(1=꽉 참). 작을수록 여백이 커진다.</summary>
-        private const float IconInset = 0.62f;
 
         private Sprite ResolveTypeIcon(WeaponType type) => type switch
         {
@@ -1248,10 +1049,6 @@ public sealed class CombatPanelView : MonoBehaviour
         skillQ?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
         skillE?.EnsureCooldownVisuals(skillInnerSprite, GetSafeFont());
 
-        // 무기 아이콘 원형화 — 원본이 칸을 벗어나고 배경이 사각이라 겉돌던 것을 원형으로 잘라 맞춘다.
-        slot0?.EnsureRoundIcon(weaponIconCircleMask, weaponIconCircleBackdrop);
-        slot1?.EnsureRoundIcon(weaponIconCircleMask, weaponIconCircleBackdrop);
-
         ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
     }
 
@@ -1303,28 +1100,8 @@ public sealed class CombatPanelView : MonoBehaviour
         if (!HasSkillSkin)     AddPodLabel(_weaponPod, "무기", WeaponColor);
         // R은 EnsureRSlot이 _weaponPod 우측에 배치(궁극=가장 큼)
 
-        // 무기 2종 → 좌하단(빈 공간), 확대. 활성 무기 강조용 슬롯/아웃라인 캐싱.
-        if (FindChildRecursive(transform, "WeaponPanel") is RectTransform wpRT)
-        {
-            wpRT.SetParent(transform, false);
-            // 스킨 시: 테두리 아트(1116×736)는 실제 선이 약 985×510이고 나머지가 투명 여백이다.
-            // 그래서 rect를 여백만큼 키워야(340×166) 보이는 테두리가 목업 크기(≈300×115, 2.6:1)로 떨어진다.
-            Vector2 wpSize = HasWeaponSkin ? new Vector2(340f, 166f) : new Vector2(170f, 78f);
-            Vector2 wpPos  = HasWeaponSkin ? new Vector2(79f,  108f) : new Vector2(30f,  60f);
-            Anchor(wpRT, new Vector2(0f, 0f), wpPos, wpSize, new Vector2(0f, 0f));
-            wpRT.localScale = Vector3.one;   // 확대(0.85→1.0)
-            _weaponSlot0 = FindChildRecursive(wpRT, "Weapon_01") as RectTransform;
-            _weaponSlot1 = FindChildRecursive(wpRT, "Weapon_02") as RectTransform;
-            _weaponOutline0 = EnsureSlotOutline(_weaponSlot0);
-            _weaponOutline1 = EnsureSlotOutline(_weaponSlot1);
-            // 래거시 금색 강조선 — 아트 프레임과 중복이라 스킨 시 끔.
-            if (HasWeaponSkin)
-            {
-                if (_weaponOutline0 != null) _weaponOutline0.enabled = false;
-                if (_weaponOutline1 != null) _weaponOutline1.enabled = false;
-            }
-            DisableChildrenNamed(wpRT, "EmptyText");   // 빈 슬롯 "비어있음" 텍스트 정리
-        }
+        // 무기 2칸(WeaponPanel)은 프리팹이 정본 — 위치·크기·배경·테두리 모두 프리팹에 authoring 돼 있다.
+        // 여기서 재배치하면 에디터에서 맞춘 배치가 실행 시 되돌아가므로 <b>건드리지 않는다</b>.
 
         // 유물 아이덴티티 바 (체력바 아래) — 활성 유물 IRelicResource 표시
         CreateRelicBar();
@@ -1350,9 +1127,13 @@ public sealed class CombatPanelView : MonoBehaviour
         ReanchorActive("HUD_Active_02", new Vector2(aX - aStep,     aY), aSize);
         ReanchorActive("HUD_Active_03", new Vector2(aX - aStep * 2, aY), aSize);
 
-        // 자식이 모두 빠져나간 원래 컨테이너(배경 이미지)를 숨김 — 하단중앙 빈 박스 잔류 방지
-        if (FindChildRecursive(transform, "CombatStatusRoot") is RectTransform legacyRoot)
-            legacyRoot.gameObject.SetActive(false);
+        // 원래 컨테이너는 <b>끄지 않고 배경 이미지만</b> 숨긴다.
+        // HP·스킬·액티브는 위에서 전부 다른 부모로 옮겨가고 여기 남는 건 WeaponPanel 하나인데,
+        // WeaponPanel은 프리팹이 정본이라 이 컨테이너를 끄면 함께 사라진다.
+        // (예전엔 WeaponPanel도 코드가 옮겼기 때문에 통째로 꺼도 됐다 → 지금은 배경만 숨김.)
+        if (FindChildRecursive(transform, "CombatStatusRoot") is RectTransform legacyRoot
+            && legacyRoot.TryGetComponent<Image>(out var legacyBg))
+            legacyBg.enabled = false;   // 하단중앙 빈 박스 잔류 방지
     }
 
     /// <summary>transform 직속 빈 RectTransform 컨테이너 생성.</summary>
@@ -1625,30 +1406,11 @@ public sealed class CombatPanelView : MonoBehaviour
         _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
     }
 
-    private Outline EnsureSlotOutline(RectTransform slot)
-    {
-        if (slot == null) return null;
-        if (!slot.TryGetComponent<Outline>(out var ol)) ol = slot.gameObject.AddComponent<Outline>();
-        ol.effectColor = new Color(1f, 0.85f, 0.30f, 0.95f);   // 금색 강조
-        ol.effectDistance = new Vector2(3f, -3f);
-        ol.enabled = false;
-        return ol;
-    }
-
-    /// <summary>활성 무기 슬롯 강조. 스킨 시 테두리 아트 스왑, 미스킨 시 래거시 금색 아웃라인.
-    /// HudPresenter가 CurrentSlotIndex로 호출.</summary>
+    /// <summary>활성 무기 칸 강조(칸 배경·테두리 밝기). HudPresenter가 CurrentSlotIndex로 호출.</summary>
     public void SetActiveWeapon(int index)
     {
         _activeWeaponIndex = index;
-        SetSlotActive(_weaponSlot0, _weaponOutline0, index == 0);
-        SetSlotActive(_weaponSlot1, _weaponOutline1, index == 1);
-        RefreshWeaponFrames();   // 스킨 시 활성/비활성 테두리 교체(미지정이면 no-op)
-    }
-
-    private static void SetSlotActive(RectTransform slot, Outline ol, bool active)
-    {
-        if (ol != null)   ol.enabled = active;
-        if (slot != null) slot.localScale = Vector3.one * (active ? 1.15f : 1.0f);
+        RefreshWeaponFrames();
     }
 
     /// <summary>유물 아이덴티티 바에 활성 유물 리소스를 연결(null이면 숨김). 라벨은 OnChanged, Fill/색은 Update 폴링.</summary>
@@ -1971,25 +1733,8 @@ public sealed class CombatPanelView : MonoBehaviour
             else           _buffCells[i].Hide();
         }
 
-        // ── 분리된 게이지 영역 — Remaining01>=0 항목만 ──
-        EnsureGaugeArea();
-        RepositionGaugeBelowGrid(count);   // 그리드 실제 높이만큼 게이지를 아래로(침범 방지)
-        int gaugeCount = 0;
-        for (int i = 0; i < count; i++)
-            if (items[i].Remaining01 >= 0f) gaugeCount++;
-
-        while (_gaugeBars.Count < gaugeCount)
-            _gaugeBars.Add(CreateGaugeBar());
-
-        int gi = 0;
-        for (int i = 0; i < count; i++)
-        {
-            if (items[i].Remaining01 < 0f) continue;
-            BindGauge(_gaugeBars[gi], items[i]);
-            gi++;
-        }
-        for (; gi < _gaugeBars.Count; gi++)
-            if (_gaugeBars[gi].go != null) _gaugeBars[gi].go.SetActive(false);
+        // 잔여 시간은 칸 위 스윕(BuffCell)이 직접 표시한다 — 예전엔 그리드 아래 별도 막대 영역을 뒀는데
+        // 좌측 도크에 세로 여유가 없어 막대 4줄이 무기 패널을 가로질렀다(설계상 그 사이 공간이 31px뿐).
 
         // 호버 중이던 셀이 숨겨졌으면 툴팁 정리, 살아있으면 내용 갱신
         if (_hoveredCell != null)
@@ -2012,17 +1757,6 @@ public sealed class CombatPanelView : MonoBehaviour
         for (int i = 0; i < n; i++)
             if (_buffCells[i].gameObject.activeSelf)
                 _buffCells[i].UpdateValues(items[i]);
-
-        // 게이지 채움(분리 영역) — Remaining01 보유 항목 순서대로 바와 매칭
-        int gi = 0;
-        for (int i = 0; i < items.Count && gi < _gaugeBars.Count; i++)
-        {
-            if (items[i].Remaining01 < 0f) continue;
-            var bar = _gaugeBars[gi];
-            if (bar.fill != null)
-                bar.fill.anchorMax = new Vector2(Mathf.Clamp01(items[i].Remaining01), 1f);
-            gi++;
-        }
 
         if (_hoveredCell != null && _hoveredCell.gameObject.activeSelf)
             SetTooltipContent(_hoveredCell.Item);
@@ -2508,112 +2242,6 @@ public sealed class CombatPanelView : MonoBehaviour
         _buffTooltip = go;
     }
 
-    // ── 분리된 게이지 영역 ───────────────────────────────────
-    /// <summary>그리드와 구분된 게이지 영역(세로 바 목록) 보장. 그리드 아래쪽에 별도 배치.</summary>
-    private void EnsureGaugeArea()
-    {
-        if (_gaugeRoot != null) return;
-
-        var go = new GameObject("BuffGaugeArea", typeof(RectTransform));
-        go.transform.SetParent(transform, false);
-
-        var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.zero;
-        rect.pivot = new Vector2(0f, 1f);   // 좌상단 피벗 → 그리드 아래에서 아래로 쌓임
-        // 그리드(좌측) 바로 아래에 분리 배치.
-        rect.anchoredPosition = new Vector2(BuffDockX, BuffDockBottomY - 8f);
-        rect.sizeDelta = new Vector2(210f, 100f);
-
-        var layout = go.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 3f;
-        layout.childAlignment = TextAnchor.LowerLeft;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
-        var fitter = go.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        _gaugeRoot = go.transform;
-    }
-
-    /// <summary>게이지 영역을 그리드 시작점 왼쪽에 고정 배치(분리 영역). 그리드는 오른쪽+위로 자라므로 buffCount와 무관.</summary>
-    private void RepositionGaugeBelowGrid(int buffCount)
-    {
-        if (_gaugeRoot == null) return;
-        ((RectTransform)_gaugeRoot).anchoredPosition =
-            new Vector2(BuffDockX, BuffDockBottomY - 8f);
-    }
-
-    private GaugeBar CreateGaugeBar()
-    {
-        var go = new GameObject($"BuffGauge_{_gaugeBars.Count}", typeof(RectTransform));
-        go.transform.SetParent(_gaugeRoot, false);
-
-        var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(210f, 16f);
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 16f;
-        le.minHeight = 16f;
-
-        // 아이콘(좌측)
-        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-        iconGo.transform.SetParent(go.transform, false);
-        var irt = iconGo.GetComponent<RectTransform>();
-        irt.anchorMin = new Vector2(0f, 0.5f);
-        irt.anchorMax = new Vector2(0f, 0.5f);
-        irt.pivot     = new Vector2(0f, 0.5f);
-        irt.anchoredPosition = new Vector2(0f, 0f);
-        irt.sizeDelta = new Vector2(14f, 14f);
-        var icon = iconGo.GetComponent<Image>();
-        icon.preserveAspect = true;
-        icon.raycastTarget = false;
-
-        // 트랙(아이콘 우측 ~ 우측 끝)
-        var trackGo = new GameObject("Track", typeof(RectTransform));
-        trackGo.transform.SetParent(go.transform, false);
-        var trt = trackGo.GetComponent<RectTransform>();
-        trt.anchorMin = new Vector2(0f, 0.5f);
-        trt.anchorMax = new Vector2(1f, 0.5f);
-        trt.pivot     = new Vector2(0f, 0.5f);
-        trt.offsetMin = new Vector2(18f, -4f);
-        trt.offsetMax = new Vector2(0f, 4f);
-        var trackImg = trackGo.AddComponent<Image>();
-        trackImg.color = new Color(0f, 0f, 0f, 0.55f);
-        trackImg.raycastTarget = false;
-
-        // 채움(anchorMax.x로 폭 — 스프라이트 불필요, in-place 갱신 가벼움)
-        var fillGo = new GameObject("Fill", typeof(RectTransform));
-        fillGo.transform.SetParent(trackGo.transform, false);
-        var frt = fillGo.GetComponent<RectTransform>();
-        frt.anchorMin = new Vector2(0f, 0f);
-        frt.anchorMax = new Vector2(0f, 1f);
-        frt.offsetMin = Vector2.zero;
-        frt.offsetMax = Vector2.zero;
-        var fillImg = fillGo.AddComponent<Image>();
-        fillImg.raycastTarget = false;
-
-        return new GaugeBar { go = go, icon = icon, fill = frt, fillImg = fillImg };
-    }
-
-    private void BindGauge(in GaugeBar bar, in BuffViewItem item)
-    {
-        if (bar.go == null) return;
-        bar.go.SetActive(true);
-
-        if (bar.icon != null)
-            bar.icon.sprite = BuffIconFor(item.IconKey);
-
-        if (bar.fillImg != null)
-            bar.fillImg.color = item.IsDebuff
-                ? new Color(0.90f, 0.40f, 0.40f, 0.95f)
-                : new Color(0.40f, 0.80f, 0.85f, 0.95f);
-
-        if (bar.fill != null)
-            bar.fill.anchorMax = new Vector2(Mathf.Clamp01(item.Remaining01), 1f);
-    }
 
     private void EnsureBuffNoticeText()
     {
@@ -2623,11 +2251,14 @@ public sealed class CombatPanelView : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         var rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.7f);
-        rect.anchorMax = new Vector2(0.5f, 0.7f);
+        // 화면 하단 1/3 중앙. 예전에는 0.7(상반부)이었는데, 출구 나침반(ExitCompassHud)이
+        // 출구를 월드 투영해 그리는 자리가 바로 그 띠라 안내 문구와 겹쳤다.
+        // 출구는 항상 플레이어보다 카메라에서 멀어 화면 위쪽에 맺히므로, 아래로 내리면 서로 침범하지 않는다.
+        rect.anchorMin = new Vector2(0.5f, 0.3f);
+        rect.anchorMax = new Vector2(0.5f, 0.3f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = Vector2.zero;
-        rect.sizeDelta = new Vector2(400f, 40f);
+        rect.sizeDelta = new Vector2(560f, 40f);
 
         buffNoticeText = go.AddComponent<TextMeshProUGUI>();
         AssignSafeFont(buffNoticeText);

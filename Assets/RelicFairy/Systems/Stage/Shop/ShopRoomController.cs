@@ -30,10 +30,23 @@ public enum ShopPurchaseResult
 /// </summary>
 public class ShopRoomController : MonoBehaviour
 {
+    /// <summary>상인 잡담 — 월드스페이스 말풍선으로 주기 출력.</summary>
+    private static readonly string[] ShopChatterLines =
+    {
+        "천천히 둘러보게. 급할 것 없어.",
+        "심연 아래선 골드보다 목숨이 비싸지.",
+        "오늘 물건은 특별하다네.",
+        "값은 정직하게 받는다네.",
+        "살아서 돌아오면 또 오게나.",
+    };
+
     // ── Constants ───────────────────────────────────────────
     private const int MaxRarityFallbackAttempts = 4;
     private const string PotionEntryId = "shop_potion";   // SHOP_DATA의 포션 엔트리 id(가격 원본)
     private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록(캡슐 height=2의 절반).
+
+    /// <summary>NPC 앞 판매대까지의 거리(m) — 상인이 카운터 뒤에 선 구도.</summary>
+    private const float CounterDistance = 1.6f;
     private static readonly string[] DeadStallChildren = { "SoldOutLabel", "DisplayVfxRoot" }; // 과거 월드 구매 상태연출 — NPC+UI로 대체됨.
 
     // ── 비공개 필드 ─────────────────────────────────────────
@@ -50,6 +63,7 @@ public class ShopRoomController : MonoBehaviour
     private int _rerollCost;
 
     private GameObject _npcInstance;
+    private GameObject[] _decorPrefabs;   // [0]=판매대(NPC 정면), 나머지=뒤쪽 소품
     private ShopNpcInteraction _npc;
 
     private bool _initialized;
@@ -59,11 +73,21 @@ public class ShopRoomController : MonoBehaviour
     private bool _goldHooked;
     private PlayerWeaponManager _hookedWeaponManager;
 
+    // 심연의 행상(신규 진열) — 버프/룬/재료/포션 정규 상품 + 오늘의 특가.
+    private AbyssPeddlerCatalog.Result _peddler;
+
     // ── Properties (UI가 읽음) ──────────────────────────────
     public IReadOnlyList<ShopSlot> Slots => _slots;
     public int PlayerGold => _run?.PlayerState?.TempGold ?? 0;
     public bool RerollEnabled => _rerollEnabled;
     public int RerollCost => _rerollCost;
+
+    /// <summary>심연의 행상 정규 상품(6칸).</summary>
+    public IReadOnlyList<ShopProduct> Products => (IReadOnlyList<ShopProduct>)_peddler?.Products ?? Array.Empty<ShopProduct>();
+    /// <summary>오늘의 특가(전 상품 중 무작위 할인). 없으면 null.</summary>
+    public ShopProduct SpecialDeal => _peddler?.Special;
+    /// <summary>특가 취소선 표시용 원가.</summary>
+    public int SpecialOriginalPrice => _peddler?.SpecialOriginalPrice ?? 0;
 
     /// <summary>슬롯/골드 상태가 바뀌어 UI 재렌더가 필요할 때 발생.</summary>
     public event Action OnShopChanged;
@@ -109,7 +133,9 @@ public class ShopRoomController : MonoBehaviour
 
         var (npcPos, npcRot) = ResolveNpcPlacement();
         BuildSlots(_roomRng);
+        _peddler = AbyssPeddlerCatalog.Build(_roomRng);   // 심연의 행상 진열(방 시드 = 결정성 유지)
         SpawnNpc(npcPrefab, npcPos, npcRot);
+        SpawnDecor(npcPos, npcRot);                       // 판매대(정면) + 뒤쪽 소품
         HookRunEvents();
         RefreshOwnership();
 
@@ -137,6 +163,52 @@ public class ShopRoomController : MonoBehaviour
         return slot.Entry != null
             ? PurchaseFromEntry(slot, slot.Entry, playerState)
             : PurchaseFromLegacy(slot, slot.LegacyItem, playerState);
+    }
+
+    /// <summary>심연의 행상 정규 상품 구매(인덱스). 골드 차감 → 지급 → 품절 처리.</summary>
+    public ShopPurchaseResult TryBuyProduct(int index)
+    {
+        var list = _peddler?.Products;
+        if (list == null || index < 0 || index >= list.Count) return ShopPurchaseResult.Unavailable;
+        return BuyProduct(list[index]);
+    }
+
+    /// <summary>오늘의 특가 구매. 성공 시 특가는 사라진다(1회성).</summary>
+    public ShopPurchaseResult TryBuySpecial()
+    {
+        var deal = _peddler?.Special;
+        if (deal == null) return ShopPurchaseResult.Unavailable;
+
+        var r = BuyProduct(deal);
+        if (r == ShopPurchaseResult.Success) _peddler.Special = null;
+        return r;
+    }
+
+    /// <summary>상품 1건 구매 공통 — 구매 가능/골드/지급/품절/저장/통지.</summary>
+    private ShopPurchaseResult BuyProduct(ShopProduct p)
+    {
+        if (p == null || !p.Purchasable) return ShopPurchaseResult.Unavailable;
+        if (_run == null || !_run.IsRunning) return ShopPurchaseResult.Unavailable;
+
+        var playerState = _run.PlayerState;
+        if (playerState == null) return ShopPurchaseResult.Unavailable;
+        if (playerState.TempGold < p.Price) return ShopPurchaseResult.InsufficientGold;
+        if (!playerState.TrySpendGold(p.Price)) return ShopPurchaseResult.InsufficientGold;
+
+        bool granted = false;
+        try { granted = p.Grant != null && p.Grant(_run); }
+        catch (Exception e) { Debug.LogWarning($"[ShopRoom] 상품 지급 예외: {e.Message}"); }
+
+        if (!granted)
+        {
+            playerState.AddTempGold(p.Price);   // 지급 실패 → 환불
+            return ShopPurchaseResult.Failed;
+        }
+
+        p.Sold = true;
+        RunFlowController.Active?.SaveNow("shop-product");
+        OnShopChanged?.Invoke();
+        return ShopPurchaseResult.Success;
     }
 
     /// <summary>정비소 서비스 구매 — ShopServiceRunner에 위임하고 결과를 상점 결과로 매핑한다.</summary>
@@ -175,6 +247,7 @@ public class ShopRoomController : MonoBehaviour
 
         _rerollRng ??= new System.Random();
         BuildSlots(_rerollRng); // 의도적 비결정 — 이어하기 복원 대상 아님
+        _peddler = AbyssPeddlerCatalog.Build(_rerollRng);   // 상품 돌리기 = 행상 진열도 새로 롤
         RefreshOwnership();
         OnShopChanged?.Invoke();
         Debug.Log($"[ShopRoom] 리롤 완료 ({_rerollCost}G 차감) — 슬롯 {_slots.Count}개 재생성");
@@ -199,6 +272,57 @@ public class ShopRoomController : MonoBehaviour
             _npc.OnInteract += HandleNpcInteract;
         else
             Debug.LogWarning("[ShopRoom] NPC 프리팹에 ShopNpcInteraction 없음");
+
+        // 주기적 월드스페이스 잡담 — 상인 컨셉.
+        _npcInstance.AddComponent<NpcAmbientChatter>()
+                    .Initialize(ShopChatterLines, 9f, new Color(1f, 0.9f, 0.6f));
+    }
+
+    /// <summary>Initialize 전에 호출 — [0]=NPC 앞 판매대, 나머지=뒤쪽 소품.</summary>
+    public void SetDecorPrefabs(GameObject[] prefabs) => _decorPrefabs = prefabs;
+
+    /// <summary>
+    /// 상인 무대 구성 — 첫 소품을 NPC 정면 판매대로, 나머지는 뒤쪽 반원에 배치.
+    /// 재련소·정제소와 동일 규약(카운터 뒤에 선 상인 구도).
+    /// </summary>
+    private void SpawnDecor(Vector3 npcPos, Quaternion npcRot)
+    {
+        if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
+
+        ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
+
+        var rng = _roomRng ?? new System.Random();
+        Vector3 fwd   = npcRot * Vector3.forward;   // 플레이어 쪽
+        Vector3 back  = -fwd;
+        Vector3 right = npcRot * Vector3.right;
+        float groundY = npcPos.y - NpcStandHeight;
+
+        // 판매대 — NPC 정면. 벽이면 각도/거리를 조정해 빈 자리를 찾는다(못 찾으면 배치 생략).
+        if (_decorPrefabs[0] != null &&
+            ServiceRoomDecorPlacer.TryFindSpot(npcPos, fwd, CounterDistance, groundY, out var tablePos))
+        {
+            Vector3 faceBack = npcPos - tablePos;   // 카운터는 NPC를 마주본다
+            float yaw = Mathf.Atan2(-faceBack.x, -faceBack.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(_decorPrefabs[0], tablePos, yaw, groundY, transform, "ShopCounter");
+        }
+
+        int n = _decorPrefabs.Length;
+        for (int i = 1; i < n; i++)
+        {
+            var prefab = _decorPrefabs[i];
+            if (prefab == null) continue;
+
+            float t     = n > 2 ? (float)(i - 1) / (n - 2) : 0.5f;
+            float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
+            float rad   = 3.5f + (float)rng.NextDouble() * 1.2f;
+            Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
+
+            if (!ServiceRoomDecorPlacer.TryFindSpot(npcPos, dir, rad, groundY, out var pos)) continue;
+
+            Vector3 toNpc = npcPos - pos;
+            float yaw = Mathf.Atan2(-toNpc.x, -toNpc.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(prefab, pos, yaw, groundY, transform);
+        }
     }
 
     private void HandleNpcInteract()
@@ -245,7 +369,10 @@ public class ShopRoomController : MonoBehaviour
 
         Vector3 pos = hasStalls ? stallCenter : transform.position;
         pos.y += NpcStandHeight; // 앵커가 정확한 높이를 주므로 폴백에서만 보정.
-        return (pos, Quaternion.identity);
+
+        // 매대 중심은 방 가장자리(벽)에 붙는 경우가 많다 → 고정 +Z가 아니라 가장 트인 쪽을 보게 한다.
+        // (NPC가 벽을 보고 서거나, 카운터가 벽 안에 박히는 것을 방지)
+        return (pos, ServiceRoomDecorPlacer.ResolveFacing(pos, Quaternion.identity));
     }
 
     /// <summary>매대(ShopStallInteraction) 마커를 수집해 슬롯 카테고리 소스로 쓰고, 중심점을 산출한다.

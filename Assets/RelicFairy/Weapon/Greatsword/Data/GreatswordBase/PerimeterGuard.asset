@@ -23,7 +23,7 @@ MonoBehaviour:
   expandEffectScale: 2
   slashEffectKey: BasicSlashBlue
   slashEffectScale: 0.7
-  hitEffectKey: BloodShot
-  hitEffectScale: 0.5
+  hitEffectKey: SwordHitImpact
+  hitEffectScale: 0.42
   endDelay: 0.3
   animationOverride: 
