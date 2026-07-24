@@ -30,7 +30,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float CardW   = 300f;
     private const float CardH   = 380f;
     private const float CardGap = 24f;
-    private const float CardY   = -40f;
+    private const float CardY   = -26f;   // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다
 
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
     // 고정 22px이던 시절엔 1칸 룬이 점처럼 보여 무슨 모양인지 분간이 안 됐다.
@@ -171,7 +171,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.BronzeLine, ShopUIStyle.BandFill, 2f, raycast: true);
         ShopUIStyle.Anchor((RectTransform)confirm.transform.parent,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(-90f, 34f), new Vector2(200f, 56f));
+            new Vector2(-90f, 14f), new Vector2(200f, 52f));
         _confirmBtnImg = confirm;
         ShopUIStyle.Skin(_confirmBtnImg, skin?.confirmButton, sliced: true);
         AddClick(confirm.transform.parent.gameObject, OnConfirmClicked);
@@ -186,7 +186,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.CardBorder, ShopUIStyle.CardFill, 2f, raycast: true);
         ShopUIStyle.Anchor((RectTransform)skip.transform.parent,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(120f, 34f), new Vector2(140f, 56f));
+            new Vector2(120f, 14f), new Vector2(140f, 52f));
         ShopUIStyle.Skin(skip, skin?.skipButton, sliced: true);
         AddClick(skip.transform.parent.gameObject, OnSkipClicked);
 
@@ -421,13 +421,13 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         float startX = -totalW * 0.5f + cellSize * 0.5f;
         float startY =  totalH * 0.5f - cellSize * 0.5f;
 
-        // 속성 룬 조각 아트가 있으면 그대로(이미 속성색으로 채색됨), 없을 때만
-        // 공용 타일을 속성색으로 틴트한다 — 예전엔 항상 공용 타일이라 속성이 모양으로 안 읽혔다.
-        Color  runeColor = ElementDef.IdColor(data.element, new Color(0.7f, 0.7f, 0.75f));
-        Sprite elemArt   = RuneArt.GetArtByElement(data.element);
-        Sprite art       = elemArt != null ? elemArt : (UISkin.RuneSelect?.runeTile ?? RuneArt.GetArt(data.rarity));
-        Color  tint      = elemArt != null ? Color.white : runeColor;
-        Color  dimTint   = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.7f);
+        // 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell 한곳에서 정한다(네 경로 동일 규칙).
+        // 각인석이 아예 없을 때만 공용 룬 타일로 한 단계 더 떨어진다 —
+        // 룬 타일은 단색 둥근 사각형이라 먼저 잡으면 모든 룬이 색 블록으로 보인다.
+        RuneArt.ResolveRuneCell(data.element, data.rarity, new Color(0.7f, 0.7f, 0.75f),
+            out Sprite art, out Color tint);
+        if (art == null) art = UISkin.RuneSelect?.runeTile;
+        Color dimTint = new Color(tint.r * 0.5f, tint.g * 0.5f, tint.b * 0.5f, 0.7f);
 
         foreach (var o in offsets)
         {
