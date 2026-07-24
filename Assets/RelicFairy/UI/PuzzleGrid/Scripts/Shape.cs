@@ -204,6 +204,20 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     public void UnbindItem() => ItemData = null;
 
     /// <summary>
+    /// <b>첫 블록을 (0,0)으로 본</b> 각 블록의 칸 오프셋. 클릭 배치가 "이 칸을 누르면 어디까지 덮이나"를
+    /// 계산하는 데 쓴다. cellOffsets 원본은 기준점이 모양마다 달라(음수 포함) 그대로 못 쓴다.
+    /// </summary>
+    public List<Vector2Int> CellOffsetsFromFirstBlock()
+    {
+        if (cellOffsets == null || cellOffsets.Count == 0) return null;
+
+        var origin = cellOffsets[0];
+        var result = new List<Vector2Int>(cellOffsets.Count);
+        foreach (var o in cellOffsets) result.Add(o - origin);
+        return result;
+    }
+
+    /// <summary>
     /// 드래그하는 블록의 겉모습을 <b>그 아이템의 속성 룬</b>으로 바꾼다.
     /// 블록 프리팹은 속성을 모르는 공용 사각 타일이라, 아이템이 붙는 이 시점에만 알 수 있다.
     /// 스프라이트/틴트 규칙은 RuneArt.ResolveRuneCell에 맡긴다 — 예전엔 여기서만 틴트를

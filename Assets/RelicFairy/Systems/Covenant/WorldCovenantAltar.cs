@@ -28,7 +28,9 @@ public class WorldCovenantAltar : MonoBehaviour
     // ── [SerializeField] ─────────────────────────────────
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
-    [SerializeField] private float textHeight = 1.2f;
+    // 마도서가 바닥에서 1.0 높이에 떠 있어(TomeVisualY) 1.2에 두면 글자가 책에 걸쳐 보였다.
+    // 프롬프트(1.8) 위로 올려 [책 → [F] 안내 → 이름] 순으로 읽히게 한다.
+    [SerializeField] private float textHeight = 2.15f;
     [SerializeField] private float textSize   = 3f;
 
     // ── Private ──────────────────────────────────────────

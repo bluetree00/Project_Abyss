@@ -137,6 +137,13 @@ public class BasicArrow : MonoBehaviour
         var damageable = other.GetComponent<IDamageable>() ?? other.GetComponentInParent<IDamageable>();
         GameObject victim = damageable is Component c ? c.gameObject : other.gameObject;
 
+        // 피해 대상이 아닌 '트리거 볼륨'은 통과시킨다.
+        // 이 아래는 어떤 콜라이더든 히트 이펙트를 띄우고 Deactivate() 한다 — 즉 예전엔 게이트·배리어·
+        // 존 진입 트리거·제단 상호작용 범위 같은 비물리 볼륨에 화살이 닿는 즉시 사라졌다.
+        // 보스룸처럼 트리거가 깔린 방에서 "화살이 안 맞는" 증상의 원인.
+        // 벽·바닥 같은 실체 콜라이더(비트리거)에는 그대로 막혀야 하므로 isTrigger인 것만 무시한다.
+        if (damageable == null && other.isTrigger) return;
+
         // 관통 중복 판정도 콜라이더가 아니라 대상 단위로 — 몬스터가 콜라이더를 여러 개 가지면 중복 피격된다.
         if (_pierce && _pierced != null && _pierced.Contains(victim)) return;
 

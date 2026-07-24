@@ -198,13 +198,40 @@ public sealed class AppBootstrapper : MonoBehaviour
                 ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
                 : null;
             if (vp != null)
-                await vp.PlayAsync(token);
+                await vp.PlayAsync(token);   // 끝나도 검은 막으로 화면을 계속 덮고 있다
 
             // 초회 플레이(인트로 미완료)면 프롤로그 Game_Intro부터 — 인트로 사망 시 IntroBootstrapper가 BaseCamp로 인계.
             // 인트로 완료 이후엔 곧장 영속 허브(BaseCamp). 던전 진입은 BaseCamp 게이트가 담당.
             RequestLoad(IntroCompletionTracker.IsCompleted
                 ? Define.Scene.BaseCamp
                 : Define.Scene.Game_Intro);
+
+            // 영상 레이어는 로딩 오버레이가 화면을 덮은 뒤에 내린다 — 사이에 빈 프레임이 생기면
+            // 그 순간 유니티 기본 배경이 그대로 드러난다.
+            if (vp != null) HideVideoCoverAsync(vp, token).Forget();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// 로딩 오버레이가 화면을 다 덮으면 게임 시작 영상 레이어를 내린다.
+    /// 순서를 뒤집어 먼저 내리면 오버레이 페이드인(0.4초) 동안 아무것도 화면을 가리지 않는다.
+    /// 로드가 어떤 이유로든 진행되지 않는 경우를 대비해 상한을 둔다 — 검은 화면에 갇히지 않게.
+    /// </summary>
+    private static async UniTaskVoid HideVideoCoverAsync(GameStartVideoPlayer vp, CancellationToken token)
+    {
+        const float MaxWait = 3f;
+        try
+        {
+            float waited = 0f;
+            while (waited < MaxWait)
+            {
+                var loading = UI_SceneLoading.Instance;
+                if (loading != null && loading.IsCovering) break;
+                waited += Time.unscaledDeltaTime;
+                await UniTask.Yield(PlayerLoopTiming.Update, token);
+            }
+            if (vp != null) vp.HideNow();
         }
         catch (OperationCanceledException) { }
     }

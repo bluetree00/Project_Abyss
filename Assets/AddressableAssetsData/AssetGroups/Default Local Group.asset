@@ -220,6 +220,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0dcd06a6e50fec48afa69029c4dbd9a
+    m_Address: RELIC_PARTS_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7d70eb2b598c6fe47a2073d65c24ce90
     m_Address: sword_1
     m_ReadOnly: 0

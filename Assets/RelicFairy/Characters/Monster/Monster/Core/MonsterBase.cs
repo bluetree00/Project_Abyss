@@ -191,6 +191,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>사망 처리됨(런타임). 서약 등 외부 타겟팅에서 시체 제외용.</summary>
     public bool IsDead => _runtime != null && _runtime.IsDead;
     public int    BossMaxHp => EffectiveMaxHp;
+
+    /// <summary>파생 클래스가 HP바 부가 표기에 접근하기 위한 읽기 전용 핸들(허수아비 DPS 분석 등). 아직 없으면 null.</summary>
+    protected MonsterHPBar HpBar => _hpBar;
     public string BossName  => _config != null ? _config.monsterName : string.Empty;
 
     // ── 특수 상태 인스턴스 (SO 데이터로 자동 생성) ────────

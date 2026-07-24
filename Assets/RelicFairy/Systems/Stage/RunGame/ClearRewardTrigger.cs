@@ -128,27 +128,11 @@ public class ClearRewardTrigger : MonoBehaviour
 
         var ct = this.GetCancellationTokenOnDestroy();
 
-        // 1단계: 수령 확인 팝업 (Addressable)
-        var acquirePopup = await Managers.UI.ShowPopupUIAndGetAsync<UI_ClearReward>();
-        if (acquirePopup == null)
-        {
-            try { await GiveAllRewardsWithPopupAsync(ct); }
-            catch (OperationCanceledException) { return; }
-        }
-        else
-        {
-            try
-            {
-                await acquirePopup.WaitForConfirmAsync().AttachExternalCancellation(ct);
-            }
-            catch (OperationCanceledException)
-            {
-                Destroy(gameObject);
-                return;
-            }
-            try { await GiveAllRewardsWithPopupAsync(ct); }
-            catch (OperationCanceledException) { return; }
-        }
+        // 수령 확인 팝업(UI_ClearReward)은 뺐다 — [F]로 이미 "받겠다"고 누른 뒤라
+        // 같은 질문을 한 번 더 하는 셈이었고, 실제 보상 화면(룬 선택/획득)이 바로 뒤에 또 뜬다.
+        // 클릭 두 번이 늘 뿐 정보가 없어, 곧장 보상 지급 화면으로 넘어간다.
+        try { await GiveAllRewardsWithPopupAsync(ct); }
+        catch (OperationCanceledException) { return; }
 
         // [보스 후처리 이관] 보스 클리어의 드래프트·런클리어·챕터 전환은 모두
         // GameRunBootstrapper.OnBossRoomClearedHandler(NotifyBossRoomCleared 구독)가 전담한다.

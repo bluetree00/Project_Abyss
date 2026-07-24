@@ -43,6 +43,112 @@ public class GridManager : MonoBehaviour
             OnItemSelected?.Invoke(item);
     }
 
+    // ── 클릭 배치 ─────────────────────────────────────────────────────
+    // 드래그와 <b>같은 종착점</b>(TryPlaceShape)을 쓴다. 검증(존·인접·점유)·점유 마킹·
+    // OnItemPlaced 통보가 전부 그쪽에 있어, 조작 방식만 바꾸고 규칙은 하나로 유지된다.
+
+    /// <summary>빈 칸이 클릭됐다. 패널이 고른 룬을 이 칸 기준으로 놓는다.</summary>
+    public event System.Action<GridSquare> OnSquareClicked;
+
+    /// <summary>칸 위로 커서가 올라왔다(벗어나면 null). 패널이 배치 미리보기를 그린다.</summary>
+    public event System.Action<GridSquare> OnSquareHovered;
+
+    public void NotifySquareClicked(GridSquare square)
+    {
+        if (square != null) OnSquareClicked?.Invoke(square);
+    }
+
+    public void NotifySquareHovered(GridSquare square) => OnSquareHovered?.Invoke(square);
+
+    /// <summary>
+    /// 셰이프의 <b>첫 블록</b>이 <paramref name="anchor"/> 칸 중심에 오도록 옮긴 뒤 배치를 시도한다.
+    /// 실제 판정·점유·통보는 전부 <see cref="TryPlaceShape"/>가 한다(드래그와 동일 경로).
+    /// 실패하면 옮기기 전 위치로 되돌려 놓는다.
+    /// </summary>
+    public bool TryPlaceShapeAt(Shape shape, GridSquare anchor)
+    {
+        if (shape == null || anchor == null) return false;
+
+        var shapeRT = (RectTransform)shape.transform;
+        Vector2 before = shapeRT.anchoredPosition;
+
+        if (!MoveShapeAnchorTo(shape, anchor)) return false;
+        if (TryPlaceShape(shape)) return true;
+
+        shapeRT.anchoredPosition = before;
+        return false;
+    }
+
+    /// <summary>앵커 칸 기준으로 배치 가능 여부를 미리 칠한다(초록/빨강). 드래그 프리뷰와 같은 표현.</summary>
+    public void PreviewShapeAt(Shape shape, GridSquare anchor)
+    {
+        ClearPreview();
+        if (shape == null || anchor == null) return;
+
+        var squares = ResolveFootprint(shape, anchor, out bool allValid);
+        if (squares == null) return;
+
+        Color color = allValid
+            ? new Color(0.2f, 0.9f, 0.3f, 0.85f)
+            : new Color(1f, 0.25f, 0.25f, 0.85f);
+
+        foreach (var sq in squares) sq.SetPreviewHighlight(true, color);
+        _previewSquares.AddRange(squares);
+    }
+
+    /// <summary>앵커 칸에 놓았을 때 덮게 될 칸들. allValid=false면 어딘가 막혀 있다.</summary>
+    private List<GridSquare> ResolveFootprint(Shape shape, GridSquare anchor, out bool allValid)
+    {
+        allValid = true;
+        if (grid == null) return null;
+
+        var squares = grid.GetGridSquares();
+        if (squares == null) return null;
+
+        // 첫 블록을 기준(0,0)으로 본 나머지 블록의 칸 오프셋.
+        var offsets = shape.CellOffsetsFromFirstBlock();
+        if (offsets == null || offsets.Count == 0) return null;
+
+        var result = new List<GridSquare>(offsets.Count);
+        string element = RuneZoneRule.ElementOf(shape.ItemData);
+
+        foreach (var off in offsets)
+        {
+            GridSquare found = null;
+            int targetCol = anchor.col + off.x;
+            int targetRow = anchor.row - off.y;   // 화면 위(+y) = row 감소
+
+            foreach (var sq in squares)
+                if (sq != null && sq.col == targetCol && sq.row == targetRow) { found = sq; break; }
+
+            if (found == null) { allValid = false; continue; }   // 판 밖
+            if (!found.isPlaceable || found.isOccupied) allValid = false;
+            if (!RuneZoneRule.Accepts(found, element))    allValid = false;
+            if (!result.Contains(found)) result.Add(found);
+        }
+
+        return result;
+    }
+
+    /// <summary>셰이프의 첫 블록이 앵커 칸 중심에 오도록 이동.</summary>
+    private static bool MoveShapeAnchorTo(Shape shape, GridSquare anchor)
+    {
+        if (shape.transform.childCount == 0) return false;
+        if (shape.transform.GetChild(0) is not RectTransform firstBlock) return false;
+
+        var shapeRT     = (RectTransform)shape.transform;
+        var shapeParent = (RectTransform)shapeRT.parent;
+        if (shapeParent == null) return false;
+
+        var anchorRT = anchor.GetComponent<RectTransform>();
+        if (anchorRT == null) return false;
+
+        Vector3 worldDelta = anchorRT.position - firstBlock.position;
+        Vector3 localDelta = shapeParent.InverseTransformVector(worldDelta);
+        shapeRT.anchoredPosition += new Vector2(localDelta.x, localDelta.y);
+        return true;
+    }
+
     public void SetActiveGrid(Grid active)
     {
         grid = active;

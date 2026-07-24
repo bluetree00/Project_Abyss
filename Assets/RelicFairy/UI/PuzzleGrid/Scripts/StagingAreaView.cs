@@ -196,6 +196,10 @@ public sealed class StagingAreaView : MonoBehaviour
         }
     }
 
+    /// <summary>이 아이템에 연결된 Shape. 클릭 배치가 "무엇을 놓을지" 찾는 데 쓴다. 없으면 null.</summary>
+    public Shape GetShapeForItem(RuntimeItemData item)
+        => item != null && _shapeByInstanceId.TryGetValue(item.instanceId, out var s) ? s : null;
+
     /// <summary>특정 아이템의 Shape를 제거한다. 폐기 시 UI_GridPanel에서 호출.</summary>
     public void RemoveShapeForItem(RuntimeItemData item)
     {
@@ -308,6 +312,11 @@ public sealed class StagingAreaView : MonoBehaviour
             hover.onEnter = item => OnItemHovered?.Invoke(item);
             hover.onExit  = ()   => OnItemUnhovered?.Invoke();
 
+            // 카드에서 바로 끌어 판에 놓는다. 주차 구역(레거시 패널)은 감춰 둔 채,
+            // 이 카드가 그 셰이프의 손잡이 역할을 한다 — 드래그 본체는 Shape가 그대로 처리한다.
+            var drag = slotGO.AddComponent<SlotDragHandler>();
+            drag.owner = this;
+
             _slotGOs[i] = slotGO;
         }
 
@@ -346,6 +355,9 @@ public sealed class StagingAreaView : MonoBehaviour
 
         var hover = slotGO.GetComponent<SlotHoverHandler>();
         if (hover != null) hover.item = item;
+
+        var drag = slotGO.GetComponent<SlotDragHandler>();
+        if (drag != null) drag.item = item;   // 빈 칸이면 null → 드래그해도 아무 일 없음
 
         // 디자이너 바탕 아트가 깔린 슬롯은 색을 덮어쓰지 않는다 — 어두운 색을 곱하면
         // 흰 바탕 아트가 그대로 죽어서, 아트를 주입한 의미가 없어진다.
@@ -885,6 +897,58 @@ public sealed class StagingAreaView : MonoBehaviour
         ItemRarity.Legendary => COLOR_LEGENDARY,
         _                    => COLOR_COMMON,
     };
+
+    // ── Nested: Drag Handler ──
+
+    /// <summary>
+    /// 보관함 카드를 잡으면 그 룬의 Shape를 손에 쥐어 준다.
+    ///
+    /// 셰이프는 감춰진 주차 구역(shapeHost)에 있어 직접 잡을 수 없다. 카드가 손잡이가 되어
+    /// 드래그 이벤트를 Shape에게 그대로 넘기면, 판정·스냅·배치는 기존 드래그 경로가 전부 처리한다
+    /// (조작 진입점만 카드로 옮긴 것이라 규칙이 갈라지지 않는다).
+    /// </summary>
+    private sealed class SlotDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        public RuntimeItemData item;
+        public StagingAreaView owner;
+
+        private Shape _shape;
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            _shape = owner != null ? owner.GetShapeForItem(item) : null;
+            if (_shape == null) return;
+
+            _shape.OnBeginDrag(eventData);   // 부모가 gameplayRoot로 바뀌며 감춤(알파0)에서 벗어난다
+            MoveToPointer(eventData);
+        }
+
+        public void OnDrag(PointerEventData eventData) => _shape?.OnDrag(eventData);
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (_shape == null) return;
+            _shape.OnEndDrag(eventData);
+            _shape = null;
+        }
+
+        /// <summary>
+        /// 주차돼 있던 셰이프를 <b>지금 잡은 지점</b>으로 옮긴다 — 커서 아래에서 바로 끌리게.
+        ///
+        /// 월드 좌표로 맞추는 이유: anchoredPosition은 <b>앵커 기준</b> 오프셋인데 주차용 셰이프는
+        /// 앵커가 상단(0.5, 1)이라, 중심 기준 좌표를 그대로 넣으면 부모 높이의 절반만큼 위로 튄다.
+        /// 이후 이동은 Shape.OnDrag가 델타로 처리하므로 커서를 계속 따라온다.
+        /// </summary>
+        private void MoveToPointer(PointerEventData eventData)
+        {
+            var rt = (RectTransform)_shape.transform;
+            if (rt.parent is not RectTransform parent) return;
+
+            if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    parent, eventData.position, eventData.pressEventCamera, out var world))
+                rt.position = world;
+        }
+    }
 
     // ── Nested: Hover Handler ──
 

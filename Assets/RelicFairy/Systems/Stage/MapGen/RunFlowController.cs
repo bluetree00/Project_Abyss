@@ -557,8 +557,16 @@ public class RunFlowController : MonoBehaviour
             rb.linearVelocity  = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
-        GameCameraController.Instance?.SnapToTarget(); // 텔레포트 후 카메라 즉시 스냅(슬로우 패닝/인트로 잔존 방지)
-        Debug.Log($"[RunFlow] 플레이어 이동 → {pos}");
+        // 카메라를 새 방의 진행 방향으로 정렬한다.
+        //
+        // 방은 _heading에 맞춰 90° 단위로 회전해 지어지지만(BuildProcRoomAsync: 입구=뒤, 직진=헤딩),
+        // FreeLook의 수평각(m_XAxis)은 이전 값을 그대로 유지한다. 예전엔 SnapToTarget()만 불렀는데
+        // 그건 위치만 스냅하고 각도는 건드리지 않아, 출구 방향(N/E/S/W)이 바뀔 때마다
+        // "화면 기준 앞쪽"이 방마다 달라졌다.
+        // SetHeadingImmediate는 내부에서 PreviousStateIsValid도 꺼주므로 SnapToTarget을 대체한다.
+        // 전환 커버로 화면이 가려진 동안 호출되므로 회전이 눈에 띄지 않는다.
+        GameCameraController.Instance?.SetHeadingImmediate(_heading * 90f);
+        Debug.Log($"[RunFlow] 플레이어 이동 → {pos} (heading={(DoorEdge)_heading})");
     }
 
     /// <summary>이전 방을 자식 단위로 몇 프레임에 나눠 파괴해 단발 대량 Destroy 스파이크를 분산한다.

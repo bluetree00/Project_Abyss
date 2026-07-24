@@ -30,10 +30,9 @@ public class UI_Pause : UI_Popup
 		ExitButton
 	}
 
-	// 탭 전환을 위한 변수
+	// 탭 전환 상태 — 전환은 탭 버튼 클릭이 유일한 경로다.
+	// (Tab키 순환은 제거했다. Tab은 룬판 토글 전용인데 raw 폴링이라 일시정지 중에도 함께 먹혔다.)
 	private string _currentTab = "Chapter";
-	private int _tabIndex = 0;
-	private readonly string[] _tabNames = { "Chapter", "Weapon", "Inven" };
 
 	public override void Init()
 	{
@@ -46,12 +45,6 @@ public class UI_Pause : UI_Popup
 		Bind<GameObject>(typeof(GameObjects));
 		Bind<TextMeshProUGUI>(typeof(Texts));
 		Bind<Button>(typeof(Buttons));
-
-		// 현재 탭 인덱스 초기화
-    	_tabIndex = System.Array.IndexOf(_tabNames, _currentTab);
-
-    	// 초기 탭 설정
-    	ShowTab(_tabNames[_tabIndex]);
 
 		GetTMPText((int)Texts.resumeText).text = "Resume";
 		GetTMPText((int)Texts.exitText).text = "Exit";
@@ -78,22 +71,8 @@ public class UI_Pause : UI_Popup
 			//UpdateInventoryInfo();  // 인벤토리 정보 업데이트
 		}, Define.UIEvent.Click);
 
-		// 초기 탭 설정
-		if (_currentTab == "Chapter")
-		{
-			ShowTab("Chapter");
-			//UpdateChapterInfo();
-		}
-		else if (_currentTab == "Weapon")
-		{
-			ShowTab("Weapon");
-			//UpdateWeaponInfo();
-		}
-		else if (_currentTab == "Inven")
-		{
-			ShowTab("Inven");
-			//UpdateInventoryInfo();
-		}
+		// 초기 탭 설정 — 마지막으로 보던 탭을 복원한다.
+		ShowTab(_currentTab);
 
 		GameObject resumeGo = GetButton((int)Buttons.ResumeButton).gameObject;
 		BindEvent(resumeGo, (PointerEventData data) =>
@@ -123,23 +102,6 @@ public class UI_Pause : UI_Popup
 		Get<GameObject>((int)GameObjects.Panel_Inven).SetActive(tabName == "Inven");
 
 		_currentTab = tabName;  // 현재 탭 상태 저장
-
-		// ★ 탭이 바뀔 때마다 _tabIndex도 동기화
-    	_tabIndex = System.Array.IndexOf(_tabNames, tabName);
-	}
-
-	private void Update() {
-
-		if (gameObject.activeInHierarchy)
-		{
-			// UI_Pause가 활성화된 상태에서만 Tab키 입력 처리
-			if (Input.GetKeyDown(KeyCode.Tab))
-			{
-				_tabIndex = (_tabIndex + 1) % _tabNames.Length;
-				ShowTab(_tabNames[_tabIndex]);
-			}
-		}
-
 	}
 
 	private void OnDestroy()

@@ -289,18 +289,21 @@ public class ShopRoomController : MonoBehaviour
     {
         if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
 
+        ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
+
         var rng = _roomRng ?? new System.Random();
         Vector3 fwd   = npcRot * Vector3.forward;   // 플레이어 쪽
         Vector3 back  = -fwd;
         Vector3 right = npcRot * Vector3.right;
         float groundY = npcPos.y - NpcStandHeight;
 
-        if (_decorPrefabs[0] != null)
+        // 판매대 — NPC 정면. 벽이면 각도/거리를 조정해 빈 자리를 찾는다(못 찾으면 배치 생략).
+        if (_decorPrefabs[0] != null &&
+            ServiceRoomDecorPlacer.TryFindSpot(npcPos, fwd, CounterDistance, groundY, out var tablePos))
         {
-            Vector3 tablePos = npcPos + fwd * CounterDistance;
-            tablePos.y = groundY;
-            float yaw = Mathf.Atan2(-fwd.x, -fwd.z) * Mathf.Rad2Deg;
-            PlaceProp(_decorPrefabs[0], tablePos, yaw, groundY, "ShopCounter");
+            Vector3 faceBack = npcPos - tablePos;   // 카운터는 NPC를 마주본다
+            float yaw = Mathf.Atan2(-faceBack.x, -faceBack.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(_decorPrefabs[0], tablePos, yaw, groundY, transform, "ShopCounter");
         }
 
         int n = _decorPrefabs.Length;
@@ -313,25 +316,13 @@ public class ShopRoomController : MonoBehaviour
             float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
             float rad   = 3.5f + (float)rng.NextDouble() * 1.2f;
             Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
-            Vector3 pos = npcPos + dir * rad;
-            pos.y = groundY;
 
-            float yaw = Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg;
-            PlaceProp(prefab, pos, yaw, groundY, null);
+            if (!ServiceRoomDecorPlacer.TryFindSpot(npcPos, dir, rad, groundY, out var pos)) continue;
+
+            Vector3 toNpc = npcPos - pos;
+            float yaw = Mathf.Atan2(-toNpc.x, -toNpc.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(prefab, pos, yaw, groundY, transform);
         }
-    }
-
-    /// <summary>소품 1개 배치 + 바닥 스냅(피벗이 메시 중심인 Gothic 소품이 뜨는 것 방지).</summary>
-    private void PlaceProp(GameObject prefab, Vector3 pos, float yaw, float groundY, string name)
-    {
-        var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
-        if (!string.IsNullOrEmpty(name)) go.name = name;
-
-        var rends = go.GetComponentsInChildren<MeshRenderer>();
-        if (rends.Length == 0) return;
-        var b = rends[0].bounds;
-        for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
-        go.transform.position += new Vector3(0f, groundY - b.min.y, 0f);
     }
 
     private void HandleNpcInteract()
@@ -378,7 +369,10 @@ public class ShopRoomController : MonoBehaviour
 
         Vector3 pos = hasStalls ? stallCenter : transform.position;
         pos.y += NpcStandHeight; // 앵커가 정확한 높이를 주므로 폴백에서만 보정.
-        return (pos, Quaternion.identity);
+
+        // 매대 중심은 방 가장자리(벽)에 붙는 경우가 많다 → 고정 +Z가 아니라 가장 트인 쪽을 보게 한다.
+        // (NPC가 벽을 보고 서거나, 카운터가 벽 안에 박히는 것을 방지)
+        return (pos, ServiceRoomDecorPlacer.ResolveFacing(pos, Quaternion.identity));
     }
 
     /// <summary>매대(ShopStallInteraction) 마커를 수집해 슬롯 카테고리 소스로 쓰고, 중심점을 산출한다.
