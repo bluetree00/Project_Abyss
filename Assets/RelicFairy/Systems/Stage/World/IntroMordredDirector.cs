@@ -45,6 +45,8 @@ public sealed class IntroMordredDirector : MonoBehaviour
              "연출용 액터는 LichMonster를 제거해 MonsterBase의 런타임 주입을 못 받으므로 여기서 직접 로드한다.")]
     [SerializeField] private string     lichAnimatorKey = "Lich/LichAnimator";
     [SerializeField] private float      lichLingerAfter = 0.5f;
+    [Tooltip("리치가 디졸브로 사라지는 시간(초). 포탈 VFX 길이와 맞추면 자연스럽다.")]
+    [SerializeField] private float      lichVanishDuration = 1.0f;
 
     [Header("모르드레드 연출 액터")]
     [SerializeField] private Transform  mordredTransform;    // 타락 VFX 부착 지점
@@ -81,8 +83,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [SerializeField] private float grandTransitionDuration = 2.5f;
     [Tooltip("컷신 카메라 샷 전환 시간(초).")]
     [SerializeField] private float camMoveDuration = 1.6f;
-    [Tooltip("붕괴 구간에서 기본 플레이어 카메라로 되돌아가는 블렌드를 기다리는 시간(초).")]
-    [SerializeField] private float cameraReturnBlend = 1.2f;
 
     [Header("시네마틱 레터박스")]
     [Tooltip("카메라 연출 구간(컷신 샷)에만 위아래 검은 바를 넣는다. 기본 카메라 복귀 시 걷힌다.")]
@@ -221,19 +221,25 @@ public sealed class IntroMordredDirector : MonoBehaviour
             // ── ③ 리치 강림 — 디졸브 인 + Appear + 로우앵글 푸시인
             await AwakenLichAsync(ct);
 
-            // 강림 샷 ①: 바닥 가까이서 올려다보며 리치를 크게 잡는다(위압).
-            await FrameCameraAsync(lichPos + new Vector3(-3.2f, -1.4f, -5.2f), lichPos + new Vector3(0f, 0.6f, 0f), camMoveDuration, ct);
+            // 강림 샷 ①: 리치 <b>정면 상단</b>에서 잡는다 — 얼굴이 보여야 강림이 읽힌다.
+            // ShotAwayFrom은 +Z가 리치 뒤이므로 정면은 −Z. 정면이면 모르드레드가 카메라와 리치
+            // 사이에 낄 수 있는데, Y를 충분히 올려 그의 머리 위를 넘어가는 각으로 피한다.
+            await FrameCameraAsync(ShotAwayFrom(lichPos, mordredPos, new Vector3(-2.2f, 3.4f, -6.2f)),
+                                   lichPos + new Vector3(0f, 1.0f, 0f), camMoveDuration, ct);
             await BarkAsync(lines, 1, 2.6f, ct);
-            // 강림 샷 ②: 리치 주위를 돌며 천천히 다가간다(궤도 이동으로 존재감 유지).
-            await FrameCameraAsync(lichPos + new Vector3(2.6f, 0.4f, -3.6f), lichPos + new Vector3(0f, 0.2f, 0f), camMoveDuration * 1.2f, ct);
+            // 강림 샷 ②: 정면을 유지한 채 반대쪽으로 돌며 다가간다(존재감 유지).
+            await FrameCameraAsync(ShotAwayFrom(lichPos, mordredPos, new Vector3(2.4f, 2.6f, -4.4f)),
+                                   lichPos + new Vector3(0f, 0.8f, 0f), camMoveDuration * 1.2f, ct);
             await BarkAsync(lines, 2, 2.4f, ct);
 
             // ── ④ 카메라 연출은 여기까지 — 리치를 보여줬으니 <b>기본 플레이어 카메라</b>로 되돌린다.
             //     이후 저항·타락·붕괴는 전부 평소 조작 시점에서 진행된다. 레터박스도 함께 걷는다.
             if (useLetterbox)
                 CinematicFrame.HideAsync(letterboxDuration, null, ct).Forget();
-            if (player != null) cam?.HandToGameplayCamera(player.transform);
-            await DelaySafe(cameraReturnBlend, ct);
+            // 인계 완료를 실제로 기다린다 — 예전엔 fire-and-forget + 고정 딜레이라
+            // 카메라가 아직 블렌드 중인데 아래 대사가 먼저 나갔다.
+            if (player != null && cam != null)
+                await cam.HandToGameplayCameraAsync(player.transform, ct: ct);
 
             // 모르드레드 경계 — 검을 겨눈 뒤 저항 대사
             PlayMordred("AttackReady");
@@ -265,9 +271,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
             // ── ⑦ 완성 — 속박 해제 + 리치 소멸 + 기립
             PlayLich("DeathRayEnd");
             if (castVfx != null) Destroy(castVfx);
-            if (bindVfx != null) Destroy(bindVfx);
             await DelaySafe(lichLingerAfter, ct);
-            if (lichActor != null) lichActor.SetActive(false);
+            // 리치는 등장과 대칭으로 사라진다 — 어둠 포탈이 다시 열리고, 몸이 디졸브로 삼켜진다.
+            await VanishLichAsync(bindVfx, ct);
             PlayMordred("Idle2");
             await DelaySafe(0.8f, ct);
 
@@ -347,6 +353,32 @@ public sealed class IntroMordredDirector : MonoBehaviour
         SpawnAttached(lichAuraVfxPrefab, lichActor.transform);
     }
 
+    /// <summary>
+    /// 리치 소멸 — 등장과 대칭. 어둠 포탈이 다시 열리고, 몸이 디졸브로 삼켜지며,
+    /// 몸에 두른 오라도 함께 사라진다(연출요소: 포탈 VFX + 디졸브 + 오라 정리).
+    /// </summary>
+    private async UniTask VanishLichAsync(GameObject bindVfx, CancellationToken ct)
+    {
+        if (lichActor == null)
+        {
+            if (bindVfx != null) Destroy(bindVfx);
+            return;
+        }
+
+        // 어둠 포탈이 다시 열려 리치를 거둬간다 — 등장 때와 같은 VFX로 왕복의 대칭을 만든다.
+        if (lichPortalVfxPrefab != null)
+            Instantiate(lichPortalVfxPrefab, lichActor.transform.position, lichActor.transform.rotation);
+
+        // 몸을 디졸브로 지운다(리치 머티리얼은 폼 전환에 이미 디졸브를 쓰므로 호환).
+        DissolveEffect.PlayDisappear(lichActor, lichVanishDuration);
+
+        // 오라는 포탈이 삼키는 동안 함께 걷힌다.
+        if (bindVfx != null) Destroy(bindVfx);
+
+        await DelaySafe(lichVanishDuration, ct);
+        if (lichActor != null) lichActor.SetActive(false);
+    }
+
     /// <summary>리치 애니메이터에 컨트롤러가 없으면 Addressable로 로드해 채운다.</summary>
     private async UniTask EnsureLichAnimatorAsync()
     {
@@ -382,58 +414,16 @@ public sealed class IntroMordredDirector : MonoBehaviour
         var drifter = sword.GetComponentInParent<VoidDrifter>();
         if (drifter != null) drifter.enabled = false;
 
-        // 검에 붙은 이펙트(FogAura)를 먼저 끈다 — 검이 사라져도 파티클만 공중에 남는 것 방지.
-        foreach (var ps in sword.GetComponentsInChildren<ParticleSystem>(true))
-            ps.gameObject.SetActive(false);
-
         // 손의 검이 디졸브로 나타난다(장착 시 PlayerWeaponManager가 PlayAppear 재생).
         await EquipToSlotAsync(player, namelessWeaponKey, MeleeSlot, setActive: true);
 
         // 제단의 검은 <b>머티리얼을 교체하지 않고</b> 알파만 낮추며 사라진다.
         // DissolveEffect는 머티리얼을 통째로 갈아끼우는 방식이라, 반투명 안개 머티리얼
         // (M_NamelessFog, alpha 0.32)에 씌우면 셰이더가 맞지 않아 핑크 잔상이 남는다.
-        await FadeOutSwordAsync(swordRenderer, swordHandOverDuration, ct);
+        await MaterialFade.FadeOutAsync(sword, swordHandOverDuration, ct);
 
         sword.SetActive(false);
         await DelaySafe(0.3f, ct);
-    }
-
-    /// <summary>렌더러의 색 알파를 0까지 낮추며 서서히 지운다(머티리얼 교체 없음 → 셰이더 깨짐 없음).</summary>
-    private static async UniTask FadeOutSwordAsync(Renderer renderer, float dur, CancellationToken ct)
-    {
-        if (renderer == null) return;
-
-        var mats = renderer.materials;              // 접근 시점에 인스턴스 복제 — 원본 에셋 무오염
-        if (mats == null || mats.Length == 0) return;
-
-        var startColors = new Color[mats.Length];
-        for (int i = 0; i < mats.Length; i++)
-        {
-            if (mats[i] == null) continue;
-            startColors[i] = mats[i].HasProperty(BaseColorId) ? mats[i].GetColor(BaseColorId)
-                           : mats[i].HasProperty(ColorId)     ? mats[i].GetColor(ColorId)
-                           : Color.white;
-        }
-
-        float t = 0f;
-        try
-        {
-            while (t < dur)
-            {
-                t += Time.deltaTime;
-                float k = Mathf.Clamp01(t / dur);
-                for (int i = 0; i < mats.Length; i++)
-                {
-                    if (mats[i] == null) continue;
-                    var c = startColors[i];
-                    c.a = Mathf.Lerp(startColors[i].a, 0f, k);
-                    if (mats[i].HasProperty(BaseColorId)) mats[i].SetColor(BaseColorId, c);
-                    if (mats[i].HasProperty(ColorId))     mats[i].SetColor(ColorId, c);
-                }
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            }
-        }
-        catch (OperationCanceledException) { }
     }
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -447,8 +437,6 @@ public sealed class IntroMordredDirector : MonoBehaviour
     private GameObject SpawnAttached(GameObject prefab, Transform parent)
     {
         if (prefab == null || parent == null) return null;
-        // [임시 추적] 초록 이펙트 출처 확인용 — 확인 후 제거할 것.
-        Debug.Log($"[VFX추적] IntroMordredDirector.SpawnAttached: {prefab.name} → {parent.name}");
         return Instantiate(prefab, parent.position, parent.rotation, parent);
     }
 
@@ -715,6 +703,23 @@ public sealed class IntroMordredDirector : MonoBehaviour
         if (lines == null) return;
         foreach (var l in lines)
             RelicFairy.UI.UI_BossBark.Show(l.text, RelicFairy.UI.BossBarkType.Bark, l.speaker);
+    }
+
+    /// <summary>
+    /// 차폐물(<paramref name="blocker"/>) 반대편에서 대상을 잡는 카메라 위치를 구한다.
+    ///
+    /// <paramref name="localOffset"/>은 "blocker→target 수평 방향"을 앞(+Z)으로 삼는 로컬 오프셋이다.
+    /// +Z를 주면 대상 너머(차폐물 반대편)에 서게 되어, 두 앵커를 씬에서 어떻게 옮기든
+    /// 차폐물이 카메라와 대상 사이에 끼지 않는다.
+    /// </summary>
+    private static Vector3 ShotAwayFrom(Vector3 target, Vector3 blocker, Vector3 localOffset)
+    {
+        Vector3 dir = target - blocker;
+        dir.y = 0f;
+        Quaternion yaw = dir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(dir.normalized, Vector3.up)
+            : Quaternion.identity;
+        return target + yaw * localOffset;
     }
 
     /// <summary>컷신 카메라를 지정 위치/시선으로 부드럽게 이동(TakeManualControl 전제).</summary>

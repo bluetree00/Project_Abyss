@@ -229,8 +229,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     /// <summary>비-보스 몬스터 시각 크기 배율(핵앤슬래시 가독성). 1이면 미적용. 보스는 항상 원본 크기.</summary>
     private const float NonBossVisualScale = 0.8f;
 
-    /// <summary>전 몬스터 플레이어 탐색 범위 배율. 1이면 미적용. detectionRange/chaseGiveUpRange에 곱해진다.</summary>
-    private const float DetectionRangeMultiplier = 1.5f;
+    /// <summary>전 몬스터 플레이어 탐색 범위 배율. 1이면 미적용. detectionRange/chaseGiveUpRange에 곱해진다.
+    /// 차트 기본값(detectionRange 5m)에 1.5배는 방 크기에 비해 너무 좁아, 플레이어가 안 오는 몹을
+    /// 일일이 찾아다니는 피로가 컸다 → 3배로 올려 방에 들어서면 대부분 스스로 붙게 한다.</summary>
+    private const float DetectionRangeMultiplier = 3.0f;
 
     private async void Awake()
     {

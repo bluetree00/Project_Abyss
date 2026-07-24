@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: kill_monster_20
   displayName: "\uC0AC\uB0E5 \uC2DC\uC791"
-  description: "\uBAAC\uC2A4\uD130 20\uB9C8\uB9AC\uB97C \uCC98\uCE58\uD558\uB77C"
+  description: "\uBAAC\uC2A4\uD130 20\uB9C8\uB9AC \uCC98\uCE58"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: d64603d30809291489b7bdc961f5aeb4, type: 2}

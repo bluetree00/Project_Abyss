@@ -130,9 +130,17 @@ public class BasicArrow : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (other.gameObject == _instigator) return;
-        if (_pierce && _pierced != null && _pierced.Contains(other.gameObject)) return;
 
-        if (other.TryGetComponent<IDamageable>(out _))
+        // IDamageable은 루트(MonsterBase/TrainingDummy)에 있고 피격 콜라이더는 자식(MonsterHit 레이어)이다.
+        // 콜라이더 자신만 보면(TryGetComponent) 대상을 못 찾아 화살이 맞아도 피해가 0이었다.
+        // 근접 판정(ActAttackState)과 동일한 해석 규칙으로 부모까지 훑는다.
+        var damageable = other.GetComponent<IDamageable>() ?? other.GetComponentInParent<IDamageable>();
+        GameObject victim = damageable is Component c ? c.gameObject : other.gameObject;
+
+        // 관통 중복 판정도 콜라이더가 아니라 대상 단위로 — 몬스터가 콜라이더를 여러 개 가지면 중복 피격된다.
+        if (_pierce && _pierced != null && _pierced.Contains(victim)) return;
+
+        if (damageable != null)
         {
             // 주 피해 파이프라인 위임 — 예전엔 이 아래로 파이프라인(사전보정·서약·크릿·타격감·사후효과)을
             // 통째로 복제해 두고 있었다. 콜라이더 경로와 따로 놀며 드리프트하던 원인이라 단일 경로로 합쳤다.
@@ -140,7 +148,7 @@ public class BasicArrow : MonoBehaviour
             //  · SkipHitVfx : 화살은 아래 SpawnHitEffect로 자체 히트 VFX를 띄운다(이중 스폰 방지)
             CombatDamage.Deal(new CombatDamage.Request
             {
-                Target              = other.gameObject,
+                Target              = victim,
                 BaseDamage          = damage,
                 Owner               = _instigator,
                 ActionType          = WeaponActionType.GroundLight,
@@ -161,7 +169,7 @@ public class BasicArrow : MonoBehaviour
         // 관통 처리
         if (_pierce)
         {
-            _pierced?.Add(other.gameObject);
+            _pierced?.Add(victim);
             _pierceCount++;
             if (_pierceCount >= _maxPierceCount)
                 Deactivate();
@@ -200,12 +208,18 @@ public class BasicArrow : MonoBehaviour
         var hits = Physics.OverlapSphere(center, _explodeRadius);
         foreach (var col in hits)
         {
-            if (col.gameObject == _instigator) return;
-            // 직접 맞은 대상은 이미 데미지 받음 — 주변 적만
-            if (_pierce && _pierced != null && _pierced.Contains(col.gameObject)) continue;
+            // continue여야 한다 — return이면 시전자 콜라이더를 만나는 순간 나머지 대상이 통째로 스킵됐다.
+            if (col.gameObject == _instigator) continue;
 
-            if (col.TryGetComponent<IDamageable>(out var d))
-                d.TakeDamage(_explodeDamage, _instigator);
+            // 직접 판정과 동일하게 루트의 IDamageable을 찾는다(콜라이더는 자식에 있다).
+            var d = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>();
+            if (d == null) continue;
+
+            GameObject victim = d is Component c ? c.gameObject : col.gameObject;
+            // 직접 맞은 대상은 이미 데미지 받음 — 주변 적만
+            if (_pierce && _pierced != null && _pierced.Contains(victim)) continue;
+
+            d.TakeDamage(_explodeDamage, _instigator);
         }
     }
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: ef4f07a544106a447b90df75f3fc0c64, type: 2}
   codeName: tut_acquire_relic
-  description: "\uCCAB \uC720\uBB3C\uC744 \uC190\uC5D0 \uB123\uC5B4\uB77C"
+  description: "\uCCAB \uC720\uBB3C \uD68D\uB4DD"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: 1f390d94867a3794da501a112d5486f4, type: 2}

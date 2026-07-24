@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: 02738821a9744954bbe92d3d366f9c96, type: 2}
   codeName: collect_gold_1000
-  description: "\uACE8\uB4DC 1000\uC744 \uBAA8\uC544\uB77C"
+  description: "\uACE8\uB4DC 1000 \uBAA8\uC73C\uAE30"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: 9bd9bc202a0f8464db0b749c77ec41dc, type: 2}

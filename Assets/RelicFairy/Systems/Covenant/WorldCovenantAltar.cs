@@ -18,6 +18,13 @@ public class WorldCovenantAltar : MonoBehaviour
     private const float PromptOffsetY = 1.8f;
     private const string GuideShownKey = "covenant_altar_guide_v1";   // 최초 1회 가이드(계정 영속)
 
+    /// <summary>제단 비주얼(떠 있는 마도서) Addressable 키. 없으면 콜라이더만 있는 투명 제단이 된다.</summary>
+    private const string TomeVisualKey  = "Covenant/CovenantTome";
+    private const float  TomeVisualY    = 1.0f;    // 바닥에서 책이 떠 있는 높이
+    private const float  TomeSpinSpeed  = 18f;     // 초당 회전(도) — 눈에 띄되 어지럽지 않게
+    private const float  TomeBobHeight  = 0.12f;   // 상하 부유 진폭
+    private const float  TomeBobSpeed   = 1.6f;
+
     // ── [SerializeField] ─────────────────────────────────
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
@@ -33,6 +40,8 @@ public class WorldCovenantAltar : MonoBehaviour
     private GameObject   _promptGo;
     private TextMeshPro  _promptText;
     private OnboardingGuideArrow _guideArrow;
+    private Transform    _tomeVisual;      // 떠 있는 마도서(있으면 회전·부유)
+    private Vector3      _tomeBasePos;
 
     // ── Lifecycle ────────────────────────────────────────
     private void Start()
@@ -41,11 +50,13 @@ public class WorldCovenantAltar : MonoBehaviour
         CreateWorldText();
         CreatePrompt();
         TrySpawnFirstTimeGuide();
+        SpawnTomeVisualAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
 
     private void Update()
     {
         BillboardTexts();
+        AnimateTome();
 
         if (_opening || _used || !_playerInRange) return;
         if (Input.GetKeyDown(KeyCode.F))
@@ -66,6 +77,33 @@ public class WorldCovenantAltar : MonoBehaviour
     }
 
     // ── Private Methods ──────────────────────────────────
+
+    /// <summary>제단 비주얼(마도서) 로드·부착. 키가 없거나 실패하면 조용히 넘어간다(제단 기능은 그대로).</summary>
+    private async UniTaskVoid SpawnTomeVisualAsync(System.Threading.CancellationToken ct)
+    {
+        var addr = Managers.AddressableManager;
+        if (addr == null) return;
+
+        GameObject prefab;
+        try { prefab = await addr.TryLoadAssetAsync<GameObject>(TomeVisualKey); }
+        catch (OperationCanceledException) { return; }
+        if (prefab == null || this == null) return;
+
+        _tomeBasePos = transform.position + Vector3.up * TomeVisualY;
+        var go = Instantiate(prefab, _tomeBasePos, Quaternion.identity, transform);
+        go.name = "CovenantTome";
+        _tomeVisual = go.transform;
+    }
+
+    /// <summary>마도서를 천천히 회전·부유시켜 "벼려지길 기다리는 서약"으로 읽히게 한다.</summary>
+    private void AnimateTome()
+    {
+        if (_tomeVisual == null) return;
+        _tomeVisual.Rotate(0f, TomeSpinSpeed * Time.deltaTime, 0f, Space.World);
+        float bob = Mathf.Sin(Time.time * TomeBobSpeed) * TomeBobHeight;
+        _tomeVisual.position = _tomeBasePos + new Vector3(0f, bob, 0f);
+    }
+
     private async UniTaskVoid OpenAsync(System.Threading.CancellationToken ct)
     {
         var run = GameRunBootstrapper.Instance?.Run;
@@ -113,6 +151,12 @@ public class WorldCovenantAltar : MonoBehaviour
         hud?.ShowBuffNotice(msg);
     }
 
+    /// <summary>
+    /// 소진 처리 — "서약 완료"를 잠깐 보여준 뒤 <b>제단을 필드에서 치운다.</b>
+    ///
+    /// 예전에는 라벨만 "서약 완료"로 바꾸고 오브젝트를 그대로 뒀다. 이미 역할이 끝난 제단이
+    /// 방을 나갈 때까지 남아 상호작용할 것처럼 보였다(무기대·각성 제단은 획득 즉시 사라진다 — 그 규칙에 맞춘다).
+    /// </summary>
     private void SetSpentVisual()
     {
         ShowPrompt(false);
@@ -121,7 +165,21 @@ public class WorldCovenantAltar : MonoBehaviour
             _worldText.text  = "서약 완료";
             _worldText.color = new Color(0.55f, 0.5f, 0.6f);
         }
+        DespawnAsync(this.GetCancellationTokenOnDestroy()).Forget();
     }
+
+    /// <summary>완료 표기를 읽을 시간을 준 뒤 디졸브로 사라진다.</summary>
+    private async UniTaskVoid DespawnAsync(System.Threading.CancellationToken ct)
+    {
+        try { await UniTask.Delay(TimeSpan.FromSeconds(SpentLingerSec), cancellationToken: ct); }
+        catch (OperationCanceledException) { return; }
+
+        if (this == null) return;
+        DissolveEffect.PlayDisappear(gameObject, 0.6f, () => { if (this != null) Destroy(gameObject); });
+    }
+
+    /// <summary>"서약 완료" 표기를 유지하는 시간(초). 이후 제단이 사라진다.</summary>
+    private const float SpentLingerSec = 1.4f;
 
     /// <summary>최초 서약(계정 1회)일 때만 제단으로 유도하는 가이드 화살표+안내를 띄운다.</summary>
     private void TrySpawnFirstTimeGuide()

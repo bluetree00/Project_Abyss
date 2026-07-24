@@ -543,7 +543,10 @@ ModelImporter:
       animation that will be discarded.\n\t'foot_l' has translation animation that
       will be discarded.\n\t'ball_l' has translation animation that will be discarded.\n\t'calf_r'
       has translation animation that will be discarded.\n\t'foot_r' has translation
-      animation that will be discarded.\n"
+      animation that will be discarded.\nEvent AE_EndTrail has a time (1.244160)
+      outside the clip's valid range (0.000000..1.200000). It will never be firedEvent
+      AE_AttackEnd has a time (2.488320) outside the clip's valid range (0.000000..1.200000).
+      It will never be fired"
     animationRetargetingWarnings: "\nRetargeting quality report for clip 'GhostSamurai_APose_Air_Attack01_2_Inplace':\n\tLeftLowerLeg
       average position error 3.6 mm and maximum position error 5.2 mm at time 0:82
       (56.9%) Frame 82\n\tLeftFoot average position error 4.5 mm and maximum position
@@ -596,21 +599,21 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.21600002
+      - time: 0.096
         functionName: AE_BeginTrail
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.28800002
+      - time: 0.120000005
         functionName: SpawnSlashEffect0
         data: 
         objectReferenceParameter: {instanceID: 0}
         floatParameter: 0
         intParameter: 0
         messageOptions: 0
-      - time: 0.8640001
+      - time: 0.6
         functionName: AE_EndTrail
         data: 
         objectReferenceParameter: {instanceID: 0}

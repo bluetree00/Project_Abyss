@@ -77,6 +77,8 @@ public class RunFlowController : MonoBehaviour
         public GameObject   portal;  // 게이트 포탈 VFX — 봉인 시 비활성, 공개 시 활성(열림 연출)
         public Transform    door;    // 봉인 석문 — 봉인 시 닫힘(낙하), 공개 시 위로 올라가며 열림
         public float        openH;   // 개구부 높이(문 낙하/상승 거리)
+        public Vector3      sealedLocalPos; // 석문의 닫힘(봉인) 로컬 위치 — 낙하 대기 중에도 목표를 잃지 않게 보관
+        public bool         opening;        // 공개(상승) 시작됨 — 진행 중인 낙하가 이걸 보고 물러난다
     }
 
     private Vector3 _baseAnchor;
@@ -387,8 +389,12 @@ public class RunFlowController : MonoBehaviour
         bool restoreCleared = _resuming && _resumedRoomCleared;
         _resumedRoomCleared = false;   // 1회성 — 다음 방으로 새어나가지 않게
 
-        // 출구 문 봉인(석문 낙하) + 입구 잠금.
-        void SealRoom() { CreateSealedGates(); if (result.hasEntrance) LockEntrance(result.entrance); }
+        // 출구 문 봉인 + 입구 잠금. entry로 석문 등장 방식을 고른다.
+        void SealRoom(SealDoorEntry entry)
+        {
+            CreateSealedGates(entry);
+            if (result.hasEntrance) LockEntrance(result.entrance);
+        }
         // 봉인 없이 출구만 세운다(잠그지 않음) — 비전투 방(상점/재련소)은 자유 통행.
         void OpenGatesOnly() { CreateGatesUnsealed(); }
 
@@ -399,7 +405,9 @@ public class RunFlowController : MonoBehaviour
         // (방 종류 무관하게 무조건 봉인 → 상점·보스에서도 강제 작동하던 문제 해소)
         bool hasCombat = result.roomGO != null
                          && result.roomGO.GetComponent<RoomWaveController>() != null;
-        bool freshCombat = !restoreCleared && hasCombat;
+        // 보스방은 방 소개 연출(부감 팬)도, 석문 낙하도 하지 않는다 — 보스 자체 등장 연출을 깬다.
+        bool isBossRoom  = plan.kind == RoomPlanKind.Boss;
+        bool freshCombat = !restoreCleared && hasCombat && !isBossRoom;
 
         var introCam    = GameCameraController.Instance;
         var introPlayer = GameRunBootstrapper.Instance?.Run?.Player;
@@ -407,17 +415,23 @@ public class RunFlowController : MonoBehaviour
         {
             // 신규 전투방: 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
             // (몬스터 Activate는 이 await 뒤 웨이브 분기에서 실행 → 연출 종료 전까지 스폰 안 됨)
+            //
+            // 게이트(통과 차단 콜라이더)는 연출 <b>전</b>에 세운다. 예전엔 onWide에서야 만들어져
+            // 부감 팬이 올라가는 ~0.9초 동안 출구가 뻥 뚫려 있었고, 그 사이 통로로 나간 플레이어는
+            // 뒤에서 석문이 떨어지며 통로에 갇혔다. 낙하 <b>연출</b>만 와이드샷 시점으로 미룬다.
+            SealRoom(SealDoorEntry.Parked);
             await introCam.PlayRoomEntryIntroAsync(
                 result.roomGO.transform.position,
                 introPlayer != null ? introPlayer.transform : null,
                 riseDuration: 0.9f, holdDuration: 1.0f, returnDuration: 0.7f,
                 wideHeight: 48f, wideBack: 20f,
-                onWide: SealRoom, ct);
+                onWide: PlaySealDoorDrops, ct);
             if (this == null || ct.IsCancellationRequested) return;
         }
         else if (hasCombat)
         {
-            SealRoom();          // 이어하기 클리어 전 전투방 등 — 연출 없이 봉인
+            // 보스방 / 이어하기 클리어 전 전투방 — 연출 없이 닫힌 상태로 봉인
+            SealRoom(SealDoorEntry.Closed);
         }
         else
         {
@@ -556,6 +570,8 @@ public class RunFlowController : MonoBehaviour
         // 이전 방의 드랍(골드 코인·클리어 보상·버린 아이템)은 부모가 없어 방 파괴로 안 지워진다.
         // → 다음 방에 흔적으로 떠다니지 않도록 여기서 일괄 정리.
         RoomScopedDrop.ClearAll();
+        // 장판(독/빛 등)도 씬 루트 스폰 + 긴 수명이라 방 파괴로 안 지워지고 다음 방 바닥에 남는다.
+        GroundFieldBase.DespawnAll();
 
         var children = new List<Transform>(room.transform.childCount);
         foreach (Transform c in room.transform) children.Add(c);
@@ -629,13 +645,38 @@ public class RunFlowController : MonoBehaviour
         }
     }
 
+    /// <summary>봉인 석문이 등장하는 방식.</summary>
+    private enum SealDoorEntry
+    {
+        /// <summary>즉시 낙하 연출.</summary>
+        Drop,
+        /// <summary>개구부 위에 대기 — <see cref="PlaySealDoorDrops"/>가 일제히 낙하시킨다.
+        /// 통과 차단 콜라이더는 이미 서 있으므로 대기 중에도 방 밖으로 나갈 수 없다.</summary>
+        Parked,
+        /// <summary>연출 없이 닫힌 상태로 시작(보스방 — 낙하 연출이 보스 등장을 깬다).</summary>
+        Closed,
+    }
+
     /// <summary>빌드 시 모든 출구 슬롯에 봉인(막힌) 게이트를 미리 만든다 — 전투 중엔 통과 불가.</summary>
-    private void CreateSealedGates()
+    private void CreateSealedGates(SealDoorEntry entry = SealDoorEntry.Drop)
     {
         ClearGates();
         if (_current?.exits == null) return;
         foreach (var slot in _current.exits)
-            _gates.Add(CreateSealedGate(slot));
+            _gates.Add(CreateSealedGate(slot, sealDoor: true, entry));
+    }
+
+    /// <summary>대기(Parked) 중인 석문을 일제히 낙하시킨다. 카메라가 방을 넓게 잡은 순간 호출.</summary>
+    private void PlaySealDoorDrops()
+    {
+        bool primaryAssigned = false;
+        for (int i = 0; i < _gates.Count; i++)
+        {
+            var door = _gates[i]?.door;
+            if (door == null) continue;
+            SealDoorDropAsync(_gates[i], primary: !primaryAssigned).Forget();
+            primaryAssigned = true;   // 흔들림·사운드는 대표 문 1회(중복 방지)
+        }
     }
 
     /// <summary>
@@ -648,7 +689,7 @@ public class RunFlowController : MonoBehaviour
         ClearGates();
         if (_current?.exits == null) return;
         foreach (var slot in _current.exits)
-            _gates.Add(CreateSealedGate(slot, sealDoor: false));
+            _gates.Add(CreateSealedGate(slot, sealDoor: false, SealDoorEntry.Drop));
     }
 
     /// <summary>클리어 시 롤된 출구를 슬롯에 매칭해 색 전환+글로우로 공개하고 통과 가능하게 한다.</summary>
@@ -673,8 +714,9 @@ public class RunFlowController : MonoBehaviour
         // 매칭 안 된 여분 슬롯은 봉인 상태 유지(목적지 없음)
     }
 
-    /// <param name="sealDoor">true면 봉인 석문을 낙하시켜 가둔다(전투방). false면 석문 없이 통과 대기(비전투방).</param>
-    private GateView CreateSealedGate(ProcExitSlot slot, bool sealDoor = true)
+    /// <param name="sealDoor">true면 봉인 석문을 세워 가둔다(전투방). false면 석문 없이 통과 대기(비전투방).</param>
+    /// <param name="entry">석문 등장 방식(즉시 낙하 / 대기 / 연출 없이 닫힘).</param>
+    private GateView CreateSealedGate(ProcExitSlot slot, bool sealDoor, SealDoorEntry entry)
     {
         var go = CreateGatePanel("ProcGate_Sealed", slot, SealedColor, out var marker, out var blocker, withPortal: true);
 
@@ -694,19 +736,35 @@ public class RunFlowController : MonoBehaviour
         var   door = sealDoor ? SpawnSealDoor(go.transform, MarkerW(slot), oh) : null;
         if (door != null && marker != null) marker.enabled = false; // 석문이 시각 담당(색 패널 숨김)
 
-        var view = new GateView { gate = gate, marker = marker, blocker = blocker, portal = portal != null ? portal.gameObject : null, door = door, openH = oh };
-        if (door != null) SealDoorDropAsync(door, oh, primary: _gates.Count == 0).Forget(); // 첫 문에서만 흔들림·사운드(중복 방지)
+        var view = new GateView
+        {
+            gate = gate, marker = marker, blocker = blocker,
+            portal = portal != null ? portal.gameObject : null,
+            door = door, openH = oh,
+            sealedLocalPos = door != null ? door.localPosition : Vector3.zero,
+        };
+
+        // 통과 차단 콜라이더(blocker)는 이 시점에 이미 서 있다 — 석문이 언제 내려오든 방 밖으로 못 나간다.
+        if (door != null && entry == SealDoorEntry.Parked)
+            door.localPosition = view.sealedLocalPos + Vector3.up * Mathf.Max(1f, oh);   // 낙하 대기 위치
+        else if (door != null && entry == SealDoorEntry.Drop)
+            SealDoorDropAsync(view, primary: _gates.Count == 0).Forget(); // 첫 문에서만 흔들림·사운드
+        // Closed: 생성 위치가 곧 봉인 위치 — 아무것도 하지 않는다.
+
         return view;
     }
 
     /// <summary>봉인 석문이 높은 곳에서 강하게 가속 낙하해 "쿵" 봉인 — 웅장한 동적 연출.
     /// primary=대표 문(카메라 흔들림+사운드 1회, 중복 방지). 착지 시 먼지 VFX.</summary>
-    private async UniTaskVoid SealDoorDropAsync(Transform door, float openH, bool primary)
+    private async UniTaskVoid SealDoorDropAsync(GateView view, bool primary)
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
-        if (door == null) return;
-        Vector3 sealedPos = door.localPosition;
-        Vector3 upPos     = sealedPos + Vector3.up * Mathf.Max(1f, openH); // 개구부 바로 위에서 시작(불필요한 장거리 낙하 제거)
+        if (view?.door == null) return;
+
+        var     door      = view.door;
+        float   openH     = view.openH;
+        Vector3 sealedPos = view.sealedLocalPos;
+        Vector3 upPos = sealedPos + Vector3.up * Mathf.Max(1f, openH); // 개구부 바로 위에서 시작(불필요한 장거리 낙하 제거)
         float   dur       = 0.6f;
         door.localPosition = upPos;
         try
@@ -717,7 +775,7 @@ public class RunFlowController : MonoBehaviour
             float t = 0f;
             while (t < dur)
             {
-                if (door == null) return;
+                if (door == null || view.opening) return;   // 클리어로 이미 열리기 시작했으면 낙하는 물러난다
                 ct.ThrowIfCancellationRequested();
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / dur);
@@ -725,6 +783,7 @@ public class RunFlowController : MonoBehaviour
                 door.localPosition = Vector3.Lerp(upPos, sealedPos, Mathf.SmoothStep(0f, 1f, k));
                 await UniTask.Yield();
             }
+            if (view.opening) return;
             door.localPosition = sealedPos;
         }
         catch (OperationCanceledException) { return; }
@@ -735,10 +794,12 @@ public class RunFlowController : MonoBehaviour
     /// <summary>석문 착지 임팩트 — 먼지 VFX(모든 문) + 카메라 흔들림·봉인 사운드(대표 문 1회). 리소스 없으면 해당 요소 생략.</summary>
     private void PlayDoorImpact(Transform door, float openH, bool primary)
     {
-        if (door == null || !primary) return; // 임팩트(먼지·흔들림·사운드)는 대표 문 1회 — 다중 인스턴스화 스파이크 방지
+        if (door == null) return;
         var grb = GameRunBootstrapper.Instance;
 
         // 먼지 — 개구부 바닥 중앙에 스폰. (게이트 원점 = 개구부 중앙, 지면은 openH/2 아래)
+        // 문마다 낸다. 예전엔 primary 체크가 위에 있어 대표 문에서만 먼지가 나서
+        // 나머지 문은 소리 없이 툭 내려앉는 것처럼 보였다(문 하나만 제대로 닫히는 느낌).
         var dust = grb != null ? grb.GateSealDustVfx : null;
         if (dust != null)
         {
@@ -749,18 +810,25 @@ public class RunFlowController : MonoBehaviour
             Destroy(fx, 3f);
         }
 
+        if (!primary) return;   // 흔들림·사운드만 대표 문 1회 — 중복 재생 방지
+
         HitFeelService.CameraShake(0.30f, 0.32f);              // 웅장한 착지 임팩트
         if (grb != null && grb.GateSealSfx != null)
             Managers.Sound?.Play(grb.GateSealSfx);              // 봉인 사운드(사용자 클립)
     }
 
     /// <summary>봉인 석문이 위로 올라가며 열림(클리어 공개). 감속 정착.</summary>
-    private async UniTaskVoid SealDoorRaiseAsync(Transform door, float openH)
+    /// <param name="view">봉인 위치·상태를 들고 있는 게이트. 현재 위치에서 열림 위치로 올린다 —
+    /// 대기(Parked)·낙하 중 어느 상태에서 불려도 목표가 어긋나지 않는다
+    /// (예전엔 호출 시점의 localPosition을 '봉인 위치'로 오인해 낙하 도중 열리면 엉뚱한 높이로 갔다).</param>
+    private async UniTaskVoid SealDoorRaiseAsync(GateView view)
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
-        if (door == null) return;
-        Vector3 sealedPos = door.localPosition;
-        Vector3 upPos     = sealedPos + Vector3.up * Mathf.Max(1f, openH);
+        if (view?.door == null) return;
+
+        var     door      = view.door;
+        Vector3 sealedPos = door.localPosition;              // 시작 = 지금 있는 자리(중간에서 이어받기)
+        Vector3 upPos     = view.sealedLocalPos + Vector3.up * Mathf.Max(1f, view.openH);
         float   dur       = 0.5f;
         try
         {
@@ -913,7 +981,8 @@ public class RunFlowController : MonoBehaviour
         // 봉인 석문이 위로 올라가며 열림 → 그 뒤 포탈이 드러난다. + 열림 사운드.
         if (view.door != null)
         {
-            SealDoorRaiseAsync(view.door, view.openH).Forget();
+            view.opening = true;   // 진행 중인 낙하가 있으면 여기서 손을 뗀다
+            SealDoorRaiseAsync(view).Forget();
             Managers.Sound?.PlayEvent(SoundEvent.DoorOpen);
         }
 

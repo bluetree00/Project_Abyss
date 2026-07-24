@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: tut_acquire_relic
   displayName: "\uC720\uBB3C\uC758 \uBD80\uB984"
-  description: "\uCCAB \uC720\uBB3C\uC744 \uC190\uC5D0 \uB123\uC5B4\uB77C"
+  description: "\uCCAB \uC720\uBB3C \uD68D\uB4DD"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 746553ce81089aa44aada5ce89ddb95d, type: 2}

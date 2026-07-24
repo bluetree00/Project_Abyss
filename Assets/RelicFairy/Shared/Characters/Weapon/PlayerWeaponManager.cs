@@ -58,6 +58,10 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
     // OnWeaponChanged와 달리 애니 재적용·서약 스왑·트레일 재생성 부작용 없이 스탯/표시만 갱신하는 용도.
     public event Action<WeaponData> OnEquippedWeaponRefreshed;
 
+    // 슬롯 구성(어떤 슬롯에 무엇이 들어있는지)이 바뀌었을 때 발행. 활성 무기 교체와 무관하므로
+    // 비활성 슬롯 장착(예비 원거리 지급 등)도 여기서 알린다. HUD 무기칸 표시 갱신용.
+    public event Action OnSlotsChanged;
+
     // ----------------------
     // 편의 접근자 / IWeaponProvider 구현
     // ----------------------
@@ -262,6 +266,11 @@ public class PlayerWeaponManager : MonoBehaviour, IWeaponProvider
 
         if (setActive)
             await SetCurrentSlotInternalAsync(slotIndex);
+
+        // 슬롯 구성 변경 통지. OnWeaponChanged는 '활성 무기 교체'만 알리므로, setActive=false로
+        // 예비 슬롯(원거리)을 채우면 아무 이벤트도 안 나가 HUD 슬롯이 비어 보였다
+        // (실제로 [2]로 들어서 활성화해야 그제서야 갱신됐다).
+        OnSlotsChanged?.Invoke();
 
         Debug.Log($"[WeaponManager] Equipped {runtimeData.displayName} to slot {slotIndex} (active={setActive})");
     }

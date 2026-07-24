@@ -110,6 +110,8 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             if (blockObj.TryGetComponent<BoxCollider2D>(out var col))
                 col.size = new Vector2(cellSize * 0.8f, cellSize * 0.8f);
         }
+
+        ApplyRuneArt();   // 재생성(칸 크기 변경 등) 후에도 룬 외형이 유지되도록
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -187,10 +189,37 @@ public class Shape : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     }
 
     /// <summary>아이템 데이터를 이 Shape에 연결한다. StagingAreaView에서 보관함 아이템 드래그 시 호출.</summary>
-    public void BindItem(RuntimeItemData item) => ItemData = item;
+    public void BindItem(RuntimeItemData item)
+    {
+        ItemData = item;
+        ApplyRuneArt();
+    }
 
     /// <summary>아이템 연결 해제. 보관함 반환 또는 폐기 시 호출.</summary>
     public void UnbindItem() => ItemData = null;
+
+    /// <summary>
+    /// 드래그하는 블록의 겉모습을 <b>그 아이템의 속성 룬</b>으로 바꾼다.
+    /// 블록 프리팹은 속성을 모르는 공용 사각 타일이라, 아이템이 붙는 이 시점에만 알 수 있다.
+    /// 속성 아트가 없으면 등급 아트로, 그것도 없으면 프리팹 기본 외형을 그대로 둔다.
+    /// </summary>
+    private void ApplyRuneArt()
+    {
+        if (ItemData == null) return;
+
+        var art = RuneArt.GetArtByElement(ItemData.element);
+        if (art == null) art = RuneArt.GetArt(ItemData.rarity);
+        if (art == null) return;
+
+        foreach (Transform child in transform)
+        {
+            if (!child.TryGetComponent<Image>(out var img)) continue;
+            img.sprite         = art;
+            img.type           = Image.Type.Simple;
+            img.color          = Color.white;   // 아트가 이미 속성색으로 채색돼 있다
+            img.preserveAspect = true;
+        }
+    }
 
     // Placement occupancy
     public void SetOccupiedSquares(List<GridSquare> squares) => occupiedSquares = squares;

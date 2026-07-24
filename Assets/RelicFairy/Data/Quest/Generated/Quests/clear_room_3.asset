@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: clear_room_3
   displayName: "\uCCAB \uBC1C\uAC78\uC74C"
-  description: "\uBC29 3\uAC1C\uB97C \uD074\uB9AC\uC5B4\uD558\uB77C"
+  description: "\uBC29 3\uAC1C \uD074\uB9AC\uC5B4"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 61be4579b0afd384fa166c2dc9e61c76, type: 2}

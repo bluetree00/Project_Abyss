@@ -19,7 +19,9 @@ using UnityEngine.UI;
 public class ClearRewardTrigger : MonoBehaviour
 {
     // ── Constants ──────────────────────────────────────────────
-    private const float TriggerRadius    = 2.5f;
+    // 보상 획득 반경. 2.5m는 정확히 그 위에 올라서야 잡히는 수준이라, 클리어 후 보상을 주우려고
+    // 위치를 미세조정하는 불편이 있었다 — 지나가듯 스쳐도 잡히도록 넉넉히 잡는다.
+    private const float TriggerRadius    = 4.5f;
     private const float WorldIconHeight  = 2.8f;
     private const float WorldCanvasScale = 0.005f;
 
@@ -30,7 +32,8 @@ public class ClearRewardTrigger : MonoBehaviour
     private bool _playerInRange;
     private bool _rewarded;
     private bool _isBossRoom;
-    private bool _isChoice;   // true = 후보 중 1개 선택(룬 선택 팝업)
+    private bool _isChoice;      // true = 후보 중 1개 선택(룬 선택 팝업)
+    private int  _choiceRounds = 1;  // 3지선다를 몇 번 반복할지(챌린지 다중 보상)
 
     /// <summary>선택을 넘겼을 때 주는 원석 수(밸런스 값).</summary>
     private const int SkipOreReward = 1;
@@ -45,16 +48,21 @@ public class ClearRewardTrigger : MonoBehaviour
     // ── Public Methods ─────────────────────────────────────────
 
     /// <param name="isChoice">
-    /// true면 <paramref name="rewards"/>를 <b>선택 후보</b>로 보고 1개만 고르게 한다(룬 선택 팝업).
-    /// false면 기존대로 전부 순차 지급한다(챌린지 다중 보상·보스 보너스).
+    /// true면 <paramref name="rewards"/>를 <b>선택 후보</b>로 보고 고르게 한다(룬 선택 팝업).
+    /// false면 전부 순차 지급한다(현재 룬 경로에서는 쓰이지 않는다 — 룬은 언제나 3지선다).
+    /// </param>
+    /// <param name="choiceRounds">
+    /// 3지선다를 몇 번 반복할지. <paramref name="rewards"/>를 이 수만큼 균등 분할해 라운드마다 한 벌씩 제시한다.
+    /// 챌린지 다중 보상(개수 N)이 N번의 3지선다가 되는 지점 — 보상 개수는 그대로 두고 획득 경험만 통일한다.
     /// </param>
     public void Initialize(GameRunSession run, List<(RuntimeItemData data, ItemSO so)> rewards,
-                           bool isBossRoom = false, bool isChoice = false)
+                           bool isBossRoom = false, bool isChoice = false, int choiceRounds = 1)
     {
-        _run        = run;
-        _rewards    = rewards;
-        _isBossRoom = isBossRoom;
-        _isChoice   = isChoice;
+        _run          = run;
+        _rewards      = rewards;
+        _isBossRoom   = isBossRoom;
+        _isChoice     = isChoice;
+        _choiceRounds = Mathf.Max(1, choiceRounds);
 
         if (!TryGetComponent<SphereCollider>(out var col))
             col = gameObject.AddComponent<SphereCollider>();
@@ -201,15 +209,40 @@ public class ClearRewardTrigger : MonoBehaviour
     }
 
     /// <summary>
-    /// 룬 선택 팝업 — 후보 중 1개만 고른다. 넘기면 원석으로 환원한다.
-    /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
+    /// 룬 선택 — 후보를 <see cref="_choiceRounds"/>벌로 나눠 라운드마다 1개씩 고르게 한다.
+    /// 일반 클리어는 1라운드, 챌린지 다중 보상은 개수만큼 라운드가 돈다.
     /// </summary>
     private async UniTask ShowRuneSelectAsync(System.Threading.CancellationToken ct)
     {
+        int rounds  = Mathf.Clamp(_choiceRounds, 1, _rewards.Count);
+        int perRound = Mathf.Max(1, _rewards.Count / rounds);
+
+        for (int r = 0; r < rounds; r++)
+        {
+            int start = r * perRound;
+            if (start >= _rewards.Count) break;
+
+            // 마지막 라운드는 나눠떨어지지 않고 남은 후보를 전부 가져간다(후보 유실 방지).
+            int len = (r == rounds - 1) ? _rewards.Count - start
+                                        : Mathf.Min(perRound, _rewards.Count - start);
+
+            await ShowOneRuneChoiceAsync(_rewards.GetRange(start, len), ct);
+        }
+    }
+
+    /// <summary>
+    /// 3지선다 1회. 넘기면 원석으로 환원한다.
+    /// 팝업 로드 실패 시 첫 후보를 자동 지급해 보상이 증발하지 않게 한다.
+    /// </summary>
+    private async UniTask ShowOneRuneChoiceAsync(
+        List<(RuntimeItemData data, ItemSO so)> candidates, System.Threading.CancellationToken ct)
+    {
+        if (candidates == null || candidates.Count == 0) return;
+
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>();
         if (popup == null)
         {
-            var fallback = _rewards[0].data;
+            var fallback = candidates[0].data;
             if (fallback != null)
             {
                 _run.EffectManager?.OnItemPickup(fallback);
@@ -219,7 +252,7 @@ public class ClearRewardTrigger : MonoBehaviour
             return;
         }
 
-        popup.Setup(_rewards, _run.ItemInventory);
+        popup.Setup(candidates, _run.ItemInventory);
         await popup.WaitForInteractionAsync(ct);
 
         if (popup.Skipped)

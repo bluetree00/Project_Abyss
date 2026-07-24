@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: clear_50_rooms
   displayName: "\uBC29 \uD0D0\uD5D8\uAC00"
-  description: "\uBC29 50\uAC1C\uB97C \uD074\uB9AC\uC5B4\uD558\uB77C"
+  description: "\uBC29 50\uAC1C \uD074\uB9AC\uC5B4"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 611b3d19ff6d8d94aac316ee6358dfe3, type: 2}

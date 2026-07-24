@@ -196,7 +196,11 @@ public class PlayerController : CharacterBase
         // 포이즈(아머치) — 누적 임팩트가 최대치를 넘으면 날아감(LocoState.Launched) 발동.
         // 회복이 붙어 있어 연타로 맞을 때만 브레이크된다(띄엄띄엄 맞으면 회복돼 안 날아감).
         // 넉백 면역 중이면 PoiseController가 알아서 무시 → 무한 저글링 방지. 사망했으면 생략.
-        if (!_dead && Poise != null && CharacterData != null && RuntimeStats != null)
+        //
+        // 잡힌 상태(IsGrabbed)에서도 생략한다. 보스 손에 붙들린 채 내리찍히는 동안 포이즈가 터지면
+        // 몸은 손바닥에 고정돼 있는데 자세만 '날아감(누움)'으로 바뀌어, 잡혀 있는데 누워 있는 그림이 된다.
+        // 붙들린 동안의 연출 권한은 잡기 패턴이 가진다.
+        if (!_dead && !IsGrabbed && Poise != null && CharacterData != null && RuntimeStats != null)
         {
             float maxPoise = RuntimeStats.MaxPoise;
             float immunity = CharacterData.knockbackImmunity;
@@ -268,8 +272,14 @@ public class PlayerController : CharacterBase
     /// <summary>무적 중 여부 (debugInvincible 포함).</summary>
     public bool IsInvincible => debugInvincible || Time.time < _invincibleEnd;
 
+    /// <summary>보스 잡기 패턴에 붙들려 있는 중인가. 이 동안은 포이즈 브레이크(날아감)를 발동하지 않는다.</summary>
+    public bool IsGrabbed { get; private set; }
+
+    /// <summary>잡기 패턴이 붙들기 시작/해제 시 호출. 이동 잠금(SetMoveScale)과 같은 수명으로 다뤄야 한다.</summary>
+    public void SetGrabbed(bool grabbed) => IsGrabbed = grabbed;
+
     /// <summary>
-    /// 플레이어 입력 전체를 활성/비활성화한다.
+    /// 플레이어 입력 전체를 활성/비활성화한다(컷신·연출 채널).
     /// 보스 등장 연출 등 컷씬 구간에서 false로 호출해 행동을 막는다.
     /// </summary>
     public void SetInputEnabled(bool enabled)
@@ -277,6 +287,26 @@ public class PlayerController : CharacterBase
         // 컷신이 inputActions 생성(비동기 초기화) 전에 차단을 걸 수 있다.
         // 의도를 플래그로 남겨두지 않으면 InitInputActions()의 Enable()이 차단을 덮어써 조작이 되살아난다.
         _inputDisabledExternally = !enabled;
+        ApplyInputState();
+    }
+
+    /// <summary>
+    /// UI 차단(BlocksGameplay 팝업) 전용 채널. <see cref="SetInputEnabled"/>와 <b>독립</b>이다.
+    ///
+    /// 하나의 bool을 공유하면, 컷신이 입력을 끈 뒤 그 안에서 띄운 차단형 대사 팝업이 닫히는 순간
+    /// UIManager가 무조건 입력을 되살려 컷신 내내 이동·회전·공격이 가능해진다(인트로 연출 조작 버그).
+    /// 두 채널을 분리해 각자 자기 사유만 해제하게 한다.
+    /// </summary>
+    public void SetUiBlocked(bool blocked)
+    {
+        _inputBlockedByUI = blocked;
+        ApplyInputState();
+    }
+
+    /// <summary>두 차단 사유(컷신/UI)를 합쳐 실제 InputAction 활성 상태에 반영한다.</summary>
+    private void ApplyInputState()
+    {
+        bool enabled = !_inputDisabledExternally && !_inputBlockedByUI;
 
         // 입력을 끊으면 moveDirection 갱신도 멈춘다 → 마지막 입력값이 그대로 남아
         // 컷신 내내 달리는 자세로 이동한다. 차단 시 즉시 0으로 비운다.
@@ -289,6 +319,8 @@ public class PlayerController : CharacterBase
 
     // 외부(컷신 등)가 요청한 입력 차단이 유효한지. InitInputActions()가 이 의도를 존중한다.
     private bool _inputDisabledExternally;
+    // 차단형 UI 팝업이 걸어둔 입력 차단. 컷신 차단과 독립.
+    private bool _inputBlockedByUI;
 
     //============================================================
     // Thunder Groggy (번개 그로기 — 비네트로 시야 축소)
@@ -1444,8 +1476,8 @@ public class PlayerController : CharacterBase
         }
         inputActions = new PlayerInputActions();
         inputActions.Enable();
-        // 초기화 이전에 컷신이 걸어둔 차단을 존중한다(이게 없으면 컷신 중 조작이 되살아난다).
-        if (_inputDisabledExternally) inputActions.Player.Disable();
+        // 초기화 이전에 컷신/UI가 걸어둔 차단을 존중한다(이게 없으면 컷신 중 조작이 되살아난다).
+        if (_inputDisabledExternally || _inputBlockedByUI) inputActions.Player.Disable();
         inputReady = true;
     }
 

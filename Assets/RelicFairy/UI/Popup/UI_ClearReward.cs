@@ -35,7 +35,10 @@ public class UI_ClearReward : UI_Popup
 
     private void OnConfirmClicked()
     {
-        _confirmTcs?.TrySetResult();
+        // ⚠️ 닫기가 먼저다. TrySetResult의 대기자(ClearRewardTrigger)가 <b>동기로 이어져</b>
+        // 곧바로 다음 팝업(룬 선택)을 push하는데, ClosePopupUI는 자기가 스택 최상단일 때만 닫힌다.
+        // 순서가 반대면 닫기가 조용히 실패해 이 팝업이 스택에 남고, 위 팝업을 닫는 순간 다시 드러난다.
         ClosePopupUI();
+        _confirmTcs?.TrySetResult();
     }
 }

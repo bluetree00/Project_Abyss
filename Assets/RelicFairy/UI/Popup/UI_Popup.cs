@@ -76,6 +76,17 @@ public class UI_Popup : UI_Base
         Managers.UI.ClosePopupUI(this);
     }
 
+    /// <summary>
+    /// 정상 경로(ClosePopupUI)를 거치지 않고 파괴되는 경우가 있다 — 부모 캔버스 파괴, 외부 Destroy 등.
+    /// 그때 스택에는 항목이 남고 게임플레이 차단(시간정지·입력잠금)이 <b>영구히 걸린 채</b>로 남는다.
+    /// 파괴 시점에 차단 상태를 재평가시켜 그 잠금이 새지 않게 한다
+    /// (IsGameplayBlocked는 파괴된 항목을 세지 않으므로 재평가만으로 해제된다).
+    /// </summary>
+    protected virtual void OnDestroy()
+    {
+        if (BlocksGameplay) Managers.UI?.RefreshGameplayBlockExternally();
+    }
+
     /// <summary>UIManager가 스택에서 팝업을 제거한 뒤 호출. 애니메이션 후 자신을 파괴한다.</summary>
     internal void StartCloseAndDestroy()
     {

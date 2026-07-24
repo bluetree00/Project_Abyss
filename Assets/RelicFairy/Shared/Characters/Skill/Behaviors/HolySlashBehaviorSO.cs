@@ -42,7 +42,7 @@ public class HolySlashBehaviorSO : SkillBehaviorSO
     public string dashEffectKey = "IasenDashLaser";
     public string dashTrailKey = "IasenDashFire";
     public string slashEffectKey = "IasenFinishFlash";
-    public string hitEffectKey = "BloodShot";
+    public string hitEffectKey = "SwordHitImpact";
     public float hitEffectScale = 0.4f;
 
     [Header("대시 라인 이펙트 (전 티어)")]

@@ -14,6 +14,19 @@ public sealed class RefineryRoomController : MonoBehaviour
 {
     private const float NpcStandHeight = 1f;   // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록.
 
+    /// <summary>NPC 앞 정제대까지의 거리(m) — NPC가 제단 뒤에 선 구도.</summary>
+    private const float CounterDistance = 1.6f;
+
+    /// <summary>정제사 잡담 — 원석/존핵 룬 컨셉.</summary>
+    private static readonly string[] ChatterLines =
+    {
+        "원석 속에 잠든 속성을 깨워주지.",
+        "판을 채우면… 힘이 공명한다.",
+        "존핵은 아무렇게나 벼려지지 않아.",
+        "이번엔 어떤 속성을 응축할까?",
+        "돌은 거짓말을 하지 않는다.",
+    };
+
     private GameRunSession _run;
     private System.Random  _roomRng;
     private GameObject[]   _decorPrefabs;
@@ -77,6 +90,10 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         if (_npc != null) _npc.OnInteract += HandleNpcInteract;
         else Debug.LogWarning("[Refinery] NPC 프리팹에 ShopNpcInteraction 없음");
+
+        // 주기적 월드스페이스 잡담 — 정제소 컨셉(원석·속성 응축).
+        _npcInstance.AddComponent<NpcAmbientChatter>()
+                    .Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f));
     }
 
     private void HandleNpcInteract() => OpenRefineryAsync().Forget();
@@ -101,37 +118,54 @@ public sealed class RefineryRoomController : MonoBehaviour
         catch (OperationCanceledException) { svc.ClearRoomPerk(); }
     }
 
-    // ── 소품 배치 (재련소와 동일 규약: NPC 뒤 반원 + 바닥 스냅) ───────
+    // ── 소품 배치 (재련소와 동일 규약: 첫 소품=정제대(정면), 나머지=NPC 뒤 반원) ───────
     private void SpawnDecor(Vector3 npcPos, Quaternion npcRot)
     {
         if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
 
-        Vector3 back  = npcRot * Vector3.back;
+        Vector3 fwd   = npcRot * Vector3.forward;   // NPC가 바라보는 방향(=플레이어 쪽)
+        Vector3 back  = -fwd;
         Vector3 right = npcRot * Vector3.right;
+        float groundY = npcPos.y - NpcStandHeight;
+
+        // 1) 정제대 — NPC 앞에, NPC를 마주보게.
+        if (_decorPrefabs[0] != null)
+        {
+            Vector3 tablePos = npcPos + fwd * CounterDistance;
+            tablePos.y = groundY;
+            float tableYaw = Mathf.Atan2(-fwd.x, -fwd.z) * Mathf.Rad2Deg;
+            PlaceProp(_decorPrefabs[0], tablePos, tableYaw, groundY, "RefineryCounter");
+        }
+
+        // 2) 나머지 — NPC 뒤쪽 반원
         int n = _decorPrefabs.Length;
-        for (int i = 0; i < n; i++)
+        for (int i = 1; i < n; i++)
         {
             var prefab = _decorPrefabs[i];
             if (prefab == null) continue;
 
-            float t     = n > 1 ? (float)i / (n - 1) : 0.5f;
+            float t     = n > 2 ? (float)(i - 1) / (n - 2) : 0.5f;
             float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
             float rad   = 3.5f + (float)_roomRng.NextDouble() * 1.2f;
             Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
             Vector3 pos = npcPos + dir * rad;
-            pos.y = npcPos.y - NpcStandHeight;
+            pos.y = groundY;
 
             float yaw = Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg;
-            var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
-
-            // 바닥 스냅 — 피벗이 메시 중심인 소품이 뜨지 않게. VFX(렌더러 없음/파티클만)는 원위치 유지.
-            var rends = go.GetComponentsInChildren<MeshRenderer>();
-            if (rends.Length > 0)
-            {
-                var b = rends[0].bounds;
-                for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
-                go.transform.position += new Vector3(0f, pos.y - b.min.y, 0f);
-            }
+            PlaceProp(prefab, pos, yaw, groundY, null);
         }
+    }
+
+    /// <summary>소품 1개 배치 + 바닥 스냅. VFX(MeshRenderer 없음)는 원위치 유지.</summary>
+    private void PlaceProp(GameObject prefab, Vector3 pos, float yaw, float groundY, string name)
+    {
+        var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
+        if (!string.IsNullOrEmpty(name)) go.name = name;
+
+        var rends = go.GetComponentsInChildren<MeshRenderer>();
+        if (rends.Length == 0) return;
+        var b = rends[0].bounds;
+        for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
+        go.transform.position += new Vector3(0f, groundY - b.min.y, 0f);
     }
 }

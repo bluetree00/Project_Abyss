@@ -177,7 +177,7 @@ MonoBehaviour:
   speakerNameText: {fileID: 2493154929372295143}
   bodyText: {fileID: 7026891823231694902}
   advanceButton: {fileID: 2181653436244156933}
-  godName: ???
+  merlinName: ???
   shadowName: "\uADF8\uB9BC\uC790"
   charDelay: 0.03
 --- !u!1 &3334954979854555215

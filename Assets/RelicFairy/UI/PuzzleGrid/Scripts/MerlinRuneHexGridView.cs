@@ -162,7 +162,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
                 float posX  = globalStartX + absCol * CELL_STEP;
 
                 CreateCell(pos, posX, posY, code);
-                CreateGridSquare(pos, posX, posY, row.hex_row, absCol, squares);
+                CreateGridSquare(pos, posX, posY, row.hex_row, absCol, code, squares);
             }
         }
 
@@ -236,12 +236,14 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
     /// <summary>
     /// 배치 가능 셀을 밝게 틴트해 배치 위치를 안내한다. 점유=밝음, 배치가능=중간, 그 외=어두움.
-    /// 배치할 룬의 속성 힌트(_hintElementCode)가 있으면 <b>매칭 속성 존</b> 셀을 그 속성색으로 강하게 강조하고
-    /// 나머지 배치가능 셀은 한 단계 낮춰, "이 룬은 여기(매칭 속성칸)에 놓으면 시너지"를 판에서 직접 보여준다.
+    /// 배치할 룬의 속성 힌트(_hintElementCode)가 있으면 <b>그 룬이 실제로 놓일 수 있는 칸</b>
+    /// (매칭 속성 존 + 중앙)만 밝게 남긴다. 속성 제약(<see cref="RuneZoneRule"/>)이 배치를 거부하는 칸을
+    /// "놓을 수 있어 보이게" 칠하면 안 되므로, 비매칭 칸은 빈 칸과 같은 명암으로 내린다.
     /// </summary>
     private void RefreshPlaceableTint(HashSet<Vector2Int> placeable)
     {
-        bool hintOn = _hintElementCode != '\0';
+        bool   hintOn    = _hintElementCode != '\0';
+        string hintZone  = hintOn ? ElementDef.CodeToId(_hintElementCode) : null;
 
         foreach (var kvp in _cellImages)
         {
@@ -249,11 +251,12 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
             if (_occupiedPositions.Contains(kvp.Key)) { kvp.Value.color = OccupiedColor(bc); continue; }
 
-            bool canPlace = placeable.Contains(kvp.Key);
-            bool match    = hintOn && _cellZones.TryGetValue(kvp.Key, out var zc) && zc == _hintElementCode;
+            _cellZones.TryGetValue(kvp.Key, out var zc);
+            bool canPlace = placeable.Contains(kvp.Key) && RuneZoneRule.Accepts(zc, hintZone);
+            bool match    = hintOn && zc == _hintElementCode;
 
-            if (canPlace && match)      kvp.Value.color = MatchHighlightColor(bc);      // 매칭 속성칸 — 강조
-            else if (canPlace)          kvp.Value.color = hintOn ? DimPlaceable(bc)      // 힌트 중 비매칭 — 낮춤
+            if (canPlace && match)      kvp.Value.color = MatchHighlightColor(bc);   // 매칭 속성칸 — 강조
+            else if (canPlace)          kvp.Value.color = hintOn ? DimPlaceable(bc)   // 중앙(중립 허브) — 한 단계 낮춤
                                                                  : PlaceableColor(bc);
             else                        kvp.Value.color = EmptyColor(bc);
         }
@@ -286,8 +289,10 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     /// 모든 셀이 판 위에 있고, 비어 있고, (판에 뭔가 있다면) 전부 인접 도달 범위 안이어야 한다.
     /// </para>
     /// 회전은 미지원이므로 주어진 방향 그대로만 검사한다.
+    /// <paramref name="elementId"/>를 주면 속성 배치 제약(<see cref="RuneZoneRule"/>)까지 함께 본다 —
+    /// 이게 없으면 "놓을 자리 있음"으로 표시된 룬이 막상 판에서는 어디에도 안 들어간다.
     /// </summary>
-    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets)
+    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets, string elementId = null)
     {
         if (offsets == null || offsets.Count == 0) return false;
         // 판이 아직 빌드된 적 없으면(첫 룬 획득 등) 판정 불가 → 막지 않는다(permissive).
@@ -302,7 +307,10 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             bool fits = true;
             for (int i = 0; i < offsets.Count; i++)
             {
-                if (!placeable.Contains(anchor + offsets[i])) { fits = false; break; }
+                var cell = anchor + offsets[i];
+                if (!placeable.Contains(cell)) { fits = false; break; }
+                if (!_cellZones.TryGetValue(cell, out var zc) || !RuneZoneRule.Accepts(zc, elementId))
+                { fits = false; break; }
             }
             if (fits) return true;
         }
@@ -574,7 +582,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     }
 
     private void CreateGridSquare(Vector2Int gridPos, float posX, float posY,
-                                   int hexRow, int col, List<GridSquare> squares)
+                                   int hexRow, int col, char zoneCode, List<GridSquare> squares)
     {
         var sqGO = new GameObject($"Sq_{col}_{hexRow}", typeof(RectTransform));
         sqGO.transform.SetParent(_gridSquaresRoot.transform, false);
@@ -591,6 +599,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
 
         var sq = sqGO.AddComponent<GridSquare>();
         sq.hoverImage = hoverImg;
+        sq.zoneCode   = zoneCode;     // 속성 배치 제약(RuneZoneRule) 판정 근거
         sq.Init(hexRow, col, true);   // 존맵의 모든 셀은 배치 가능
 
         // BoxCollider2D: ShapeBlock 트리거 충돌 감지용 (물리 호버 하이라이트)
