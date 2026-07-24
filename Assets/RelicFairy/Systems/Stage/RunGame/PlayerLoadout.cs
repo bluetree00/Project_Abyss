@@ -37,7 +37,16 @@ public class PlayerLoadout
         CharacterPrefabKey = prefabKey;
     }
 
-    public void SetRelic(RelicClassSO relic) => Relic = relic;
+    /// <summary>
+    /// 유물 교체. 파츠(개화)는 <b>유물 전용</b>이라 유물이 바뀌면 반드시 비운다.
+    /// (안 비우면 랜슬롯으로 얻은 파츠가 가웨인 런에 그대로 남아 드래프트·효과가 섞인다.)
+    /// </summary>
+    public void SetRelic(RelicClassSO relic)
+    {
+        bool changed = Relic != relic;
+        Relic = relic;
+        if (changed) _relicPartIds.Clear();
+    }
 
     public void SetWeaponSlot0(WeaponSO weapon) => WeaponSlot0 = weapon;
     public void SetWeaponSlot1(WeaponSO weapon) => WeaponSlot1 = weapon;

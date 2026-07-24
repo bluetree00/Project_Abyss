@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class GridSquare : MonoBehaviour
+public class GridSquare : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Grid Info")]
     // 이 칸의 행/열 인덱스
@@ -11,6 +12,9 @@ public class GridSquare : MonoBehaviour
     public int col;
     // Shape를 놓을 수 있는 칸인지 여부 (false면 막힌 칸)
     public bool isPlaceable = true;
+    // 이 칸이 속한 속성 존 코드(F/I/T/P/L/D, '+'=CENTER). '\0'=속성 없는 판(레거시 그리드).
+    // 멀린 룬판이 셀을 만들 때 심는다 — 속성 배치 제약(RuneZoneRule)의 판정 근거.
+    [HideInInspector] public char zoneCode;
 
     [Header("Background")]
     // 칸 기본 배경 이미지 (색으로 placeable/blocked 구분)
@@ -86,6 +90,26 @@ public class GridSquare : MonoBehaviour
             hoverImage.enabled = on;
             if (on) hoverImage.color = color;
         }
+    }
+
+    // ── 클릭 배치 (드래그 없이 칸을 눌러 놓기) ────────────────
+    // 드래그는 손이 큰 조작이라 다중 칸 룬을 정확히 얹기 어려웠다. 칸을 직접 누르는 쪽이
+    // 판정이 명확해서, 보관함에서 룬을 고른 뒤 칸을 누르면 그 칸을 기준으로 놓인다.
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.dragging) return;   // 드래그 종료 클릭은 무시(기존 드래그 배치와 충돌 방지)
+        GridManager.Instance?.NotifySquareClicked(this);
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        GridManager.Instance?.NotifySquareHovered(this);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        GridManager.Instance?.NotifySquareHovered(null);
     }
 
     // 이 칸 위에 겹쳐져 있는 ShapeBlock 개수 (여러 조각이 동시에 겹칠 수 있으므로)

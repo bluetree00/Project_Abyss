@@ -29,6 +29,9 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     [Tooltip("베이스캠프 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
     [SerializeField] private DialogueSequenceSO introDialogueSO;
 
+    [Tooltip("카메라 인계·페이드인이 끝난 뒤 시작 대사를 띄우기까지의 여유(초). 0이면 즉시.")]
+    [SerializeField, Min(0f)] private float introDialogueDelay = 0.8f;
+
     private PlayerController _player;
 
     public PlayerController Player => _player;
@@ -58,6 +61,12 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             // 허브에서는 전투 HUD를 억제(시작방과 동일 처리).
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
+            // 보스 체력바 강제 해제 — 허브엔 보스가 없으므로 어떤 경로로 들어와도 남아 있으면 안 된다.
+            // 보스 쪽 OnDisable(UnbindBossHudIfBound)에만 맡기면, 씬 언로드 파괴 순서에 따라
+            // HudPresenter를 못 찾거나 억제 모드 전환과 엇갈려 보스바가 그대로 남는다
+            // (인트로 보스전 도중 허브 복귀 시 재현). 허브 진입 시 한 번 끊어주면 경로와 무관하게 안전하다.
+            FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include)?.UnbindBoss();
+
             // 시작 연출: 검정으로 가린 뒤 플레이어 스폰 → 게임플레이 카메라 인계 → 페이드인.
             // (예전 '둘러보기 패닝 투어'는 제거됨 — 주변을 보여주지 않고 곧장 플레이어 시점으로 시작)
             await ScreenFade.Out(0f);
@@ -69,8 +78,10 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             cam?.ClearIntroFade();
 
             // 둘러보기 투어 없이 곧장 플레이어 추적 게임플레이 카메라로 인계 (CinemachineFreeLook 리그 필요).
-            if (_player != null)
-                cam?.HandToGameplayCamera(_player.transform);
+            // await 판을 쓴다 — fire-and-forget이면 블렌드가 끝나기 전에 페이드인/시작 대사가 나가
+            // 카메라가 자리를 못 잡은 화면 위로 대사창이 뜬다.
+            if (_player != null && cam != null)
+                await cam.HandToGameplayCameraAsync(_player.transform, true, ct);
 
             await ScreenFade.In(0.4f, ct);
         }
@@ -85,7 +96,15 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
         RunProgressManager.Instance?.SaveHubProgress();
 
         // Zone0(시작방)에 있던 진입 대사 연출 — 영속 허브로 이전. 로딩 해제 후 재생.
-        try { await ShowIntroDialogueAsync(ct); }
+        // 카메라 블렌드가 끝난 뒤에도 한 박자 쉬고 시작한다 — 페이드인 직후 곧바로 대사창이 뜨면
+        // 플레이어가 화면을 인지하기 전에 UI가 덮는다.
+        try
+        {
+            if (introDialogueDelay > 0f)
+                await UniTask.Delay(TimeSpan.FromSeconds(introDialogueDelay), cancellationToken: ct);
+
+            await ShowIntroDialogueAsync(ct);
+        }
         catch (OperationCanceledException) { }
     }
 
@@ -204,6 +223,11 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 
     /// <summary>유물 등 로드아웃 변경 후 허브 플레이어를 제자리에서 재스폰해 클린하게 재적용한다
     /// (유물 핫스왑 시 패시브/컴포넌트 중첩을 피하기 위한 재스폰-온-스왑).</summary>
+    // 재스폰 재진입 가드 — 이전 재스폰(플레이어 파괴+비동기 재생성)이 아직 진행 중인데 또 부르면
+    // 두 번째가 첫 번째의 갓 스폰된 플레이어를 파괴하거나 _player/Managers.Player가 엇갈려
+    // 허브에 조작 가능한 플레이어가 사라진다(= 화면 정지처럼 보임, 오류 없음).
+    private bool _respawning;
+
     public void RespawnWithLoadout()
     {
         RespawnAsync(this.GetCancellationTokenOnDestroy()).Forget();
@@ -211,6 +235,13 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
 
     private async UniTaskVoid RespawnAsync(CancellationToken ct)
     {
+        if (_respawning)
+        {
+            Debug.LogWarning("[BaseCampBootstrapper] 재스폰이 이미 진행 중 — 중복 요청 무시(플레이어 유실 방지).");
+            return;
+        }
+        _respawning = true;
+
         Vector3 pos = _player != null ? _player.transform.position
                     : (playerSpawnPoint != null ? playerSpawnPoint.position : Vector3.zero);
         Quaternion rot = _player != null ? _player.transform.rotation : Quaternion.identity;
@@ -222,6 +253,7 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
             await SpawnPlayerAsync(ct, pos, rot);
         }
         catch (OperationCanceledException) { return; }
+        finally { _respawning = false; }
 
         // 재스폰된 플레이어로 게임플레이 카메라 추적 재인계.
         // alignHeadingToTarget=false: 유물 핫스왑 재스폰에서 카메라 heading을 플레이어가 보던 방향으로

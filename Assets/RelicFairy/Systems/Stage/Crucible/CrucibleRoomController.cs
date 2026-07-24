@@ -15,6 +15,19 @@ public class CrucibleRoomController : MonoBehaviour
 {
     // ── Constants ───────────────────────────────────────────
     private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록.
+
+    /// <summary>NPC 앞 작업대까지의 거리(m) — NPC가 카운터 뒤에 선 구도를 만든다.</summary>
+    private const float CounterDistance = 1.6f;
+
+    /// <summary>재련공 잡담 — 무기 강화/승급 컨셉.</summary>
+    private static readonly string[] ChatterLines =
+    {
+        "쇠는 두드릴수록 단단해지지.",
+        "그 무기… 아직 잠재력이 남았군.",
+        "불을 지펴뒀다. 올려놓기만 해라.",
+        "승급은 도박이야. 각오는 됐나?",
+        "좋은 재료를 가져오면 좋은 결과가 나온다.",
+    };
     private const float JackpotBaseChance = 0.05f;
     private const float JackpotPerStreak  = 0.05f;
     private const float JackpotMaxChance   = 0.5f;
@@ -69,10 +82,10 @@ public class CrucibleRoomController : MonoBehaviour
     /// <summary>돌발 이벤트 배너 문구(없으면 빈 문자열).</summary>
     public string EventBanner => _event switch
     {
-        CrucibleEvent.Discount => "⚡ 반값 재련! 안 지르면 손해지…",
-        CrucibleEvent.Fever    => "🔥 열기 오른 화로 — 성공률 상승 중!",
-        CrucibleEvent.Bounty   => "💰 풍요로운 화로 — 잭팟이 가깝다!",
-        CrucibleEvent.Curse    => "🩸 저주받은 화로 — 성공률이 떨어진다…",
+        CrucibleEvent.Discount => "↗ 반값 재련! 안 지르면 손해지…",
+        CrucibleEvent.Fever    => "▲ 열기 오른 화로 — 성공률 상승 중!",
+        CrucibleEvent.Bounty   => "◆ 풍요로운 화로 — 잭팟이 가깝다!",
+        CrucibleEvent.Curse    => "◆ 저주받은 화로 — 성공률이 떨어진다…",
         _                      => string.Empty,
     };
 
@@ -253,38 +266,48 @@ public class CrucibleRoomController : MonoBehaviour
     /// <summary>Initialize 전에 호출 — NPC 주변에 배치할 방 소품(대장간 등) 프리팹 배열.</summary>
     public void SetDecorPrefabs(GameObject[] prefabs) => _decorPrefabs = prefabs;
 
-    /// <summary>NPC 뒤쪽 반원에 소품을 배치해 '작업장' 무대를 만든다. 결정적(_roomRng).</summary>
+    /// <summary>
+    /// 무대 구성: 배열 첫 소품을 <b>작업대</b>로 승격해 NPC 정면(플레이어 쪽)에 놓고,
+    /// 나머지는 NPC 뒤쪽 반원에 배치해 '작업장'을 만든다. 결정적(_roomRng).
+    /// → NPC가 카운터 뒤에 선 대장장이처럼 읽힌다.
+    /// </summary>
     private void SpawnDecor(Vector3 npcPos, Quaternion npcRot)
     {
         if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
 
-        Vector3 back  = npcRot * Vector3.back;   // NPC가 바라보는 반대(무대 안쪽)
+        ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
+
+        Vector3 fwd   = npcRot * Vector3.forward; // NPC가 바라보는 방향(=플레이어 쪽)
+        Vector3 back  = -fwd;                     // 무대 안쪽
         Vector3 right = npcRot * Vector3.right;
+        float groundY = npcPos.y - NpcStandHeight;
+
+        // 1) 작업대 — NPC 앞. 벽이면 빈 자리를 탐색(못 찾으면 생략).
+        if (_decorPrefabs[0] != null &&
+            ServiceRoomDecorPlacer.TryFindSpot(npcPos, fwd, CounterDistance, groundY, out var tablePos))
+        {
+            Vector3 faceBack = npcPos - tablePos;
+            float tableYaw = Mathf.Atan2(-faceBack.x, -faceBack.z) * Mathf.Rad2Deg;
+            ServiceRoomDecorPlacer.Place(_decorPrefabs[0], tablePos, tableYaw, groundY, transform, "CrucibleCounter");
+        }
+
+        // 2) 나머지 소품 — NPC 뒤쪽 반원(-70°~+70°)
         int n = _decorPrefabs.Length;
-        for (int i = 0; i < n; i++)
+        for (int i = 1; i < n; i++)
         {
             var prefab = _decorPrefabs[i];
             if (prefab == null) continue;
 
-            // NPC 뒤쪽 반원(-70°~+70°)에 반경 3.5m로 분산 배치
-            float t     = n > 1 ? (float)i / (n - 1) : 0.5f;
+            float t     = n > 2 ? (float)(i - 1) / (n - 2) : 0.5f;
             float ang   = Mathf.Lerp(-70f, 70f, t) * Mathf.Deg2Rad;
             float rad   = 3.5f + (float)_roomRng.NextDouble() * 1.2f;
             Vector3 dir = back * Mathf.Cos(ang) + right * Mathf.Sin(ang);
-            Vector3 pos = npcPos + dir * rad;
-            pos.y = npcPos.y - NpcStandHeight;   // 지면(NPC는 StandHeight만큼 떠 있음)
 
-            float yaw = Mathf.Atan2(-dir.x, -dir.z) * Mathf.Rad2Deg; // 소품이 NPC를 향하게
-            var go = Instantiate(prefab, pos, Quaternion.Euler(0f, yaw, 0f), transform);
+            if (!ServiceRoomDecorPlacer.TryFindSpot(npcPos, dir, rad, groundY, out var pos)) continue;
 
-            // 바닥 스냅 — 피벗이 메시 중심인 Gothic 소품(잔해 등)이 뜨지 않게 렌더러 바운즈 최저점을 지면에 맞춘다.
-            var rends = go.GetComponentsInChildren<Renderer>();
-            if (rends.Length > 0)
-            {
-                var b = rends[0].bounds;
-                for (int r = 1; r < rends.Length; r++) b.Encapsulate(rends[r].bounds);
-                go.transform.position += new Vector3(0f, pos.y - b.min.y, 0f);
-            }
+            Vector3 toNpc = npcPos - pos;
+            float yaw = Mathf.Atan2(-toNpc.x, -toNpc.z) * Mathf.Rad2Deg; // 소품이 NPC를 향하게
+            ServiceRoomDecorPlacer.Place(prefab, pos, yaw, groundY, transform);
         }
     }
 
@@ -302,6 +325,10 @@ public class CrucibleRoomController : MonoBehaviour
 
         if (_npc != null) _npc.OnInteract += HandleNpcInteract;
         else Debug.LogWarning("[Crucible] NPC 프리팹에 ShopNpcInteraction 없음");
+
+        // 주기적 월드스페이스 잡담 — 방이 '사람이 일하는 장소'로 읽히게.
+        _npcInstance.AddComponent<NpcAmbientChatter>()
+                    .Initialize(ChatterLines, 9f, new Color(1f, 0.82f, 0.55f));
     }
 
     private void HandleNpcInteract()
@@ -343,7 +370,8 @@ public class CrucibleRoomController : MonoBehaviour
 
         Vector3 pos = transform.position;
         pos.y += NpcStandHeight;
-        return (pos, Quaternion.identity);
+        // 고정 +Z 대신 가장 트인 쪽 — 벽을 보고 서거나 작업대가 벽에 박히는 것을 방지.
+        return (pos, ServiceRoomDecorPlacer.ResolveFacing(pos, Quaternion.identity));
     }
 
     // ── 잭팟 / 스탯 갱신 ────────────────────────────────────

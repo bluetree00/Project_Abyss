@@ -51,9 +51,48 @@ public static class TimeScaleArbiter
     /// <summary>현재 owner 가 요청을 들고 있는지.</summary>
     public static bool IsHeldBy(object owner) => owner != null && _requests.ContainsKey(owner);
 
+    /// <summary>현재 timeScale을 잡고 있는 소유자들을 사람이 읽는 문자열로. 디버그/진단용.</summary>
+    public static string DescribeHolders()
+    {
+        if (_requests.Count == 0) return "(none)";
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in _requests)
+        {
+            string name = kv.Key is Object uo
+                ? (uo == null ? "<destroyed>" : uo.GetType().Name + ":" + uo.name)
+                : kv.Key.GetType().Name;
+            sb.Append($"[{name} scale={kv.Value.Scale:0.##} pri={kv.Value.PriorityValue}] ");
+        }
+        return sb.ToString();
+    }
+
     // ── Private Methods ──────────────────────────────────────────────
+    private static readonly List<object> s_deadScratch = new List<object>();
+
+    /// <summary>
+    /// 파괴된 Unity 객체 소유자를 정리한다. Acquire한 컴포넌트/GameObject가 Release 없이 파괴되면
+    /// (예: 재스폰이 플레이어를 파괴) 그 요청이 딕셔너리에 영영 남아 timeScale이 고착된다
+    /// (특히 Pause=0이면 화면이 멈춘다). Recompute마다 죽은 소유자를 걷어내 자가치유한다.
+    /// </summary>
+    private static void PurgeDeadOwners()
+    {
+        s_deadScratch.Clear();
+        foreach (var kv in _requests)
+            if (kv.Key is Object uo && uo == null)   // Unity의 파괴된 객체 == null (오버로드된 ==)
+                s_deadScratch.Add(kv.Key);
+
+        for (int i = 0; i < s_deadScratch.Count; i++)
+        {
+            _requests.Remove(s_deadScratch[i]);
+            Debug.LogWarning("[TimeScaleArbiter] 파괴된 소유자의 timeScale 요청을 정리했다(누수 방지).");
+        }
+        s_deadScratch.Clear();
+    }
+
     private static void Recompute()
     {
+        PurgeDeadOwners();
+
         if (_requests.Count == 0)
         {
             Time.timeScale = 1f;
@@ -75,6 +114,10 @@ public static class TimeScaleArbiter
             }
         }
         Time.timeScale = effective;
+
+        // [진단] 완전정지(0)로 떨어질 땐 누가 잡았는지 남긴다 — '멈춤' 재현 시 범인 특정용.
+        if (effective <= 0.001f)
+            Debug.LogWarning($"[TimeScaleArbiter] timeScale=0 (완전정지). 보유자: {DescribeHolders()}");
     }
 
     // 에디터 "도메인 리로드 비활성" 설정 시 정적 상태가 새 플레이세션으로 새지 않도록 초기화.

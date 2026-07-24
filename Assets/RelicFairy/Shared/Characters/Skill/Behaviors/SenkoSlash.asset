@@ -23,8 +23,8 @@ MonoBehaviour:
   dashEffectKey: WindBlast
   dashTrailKey: DashTrail
   slashEffectKey: SlashAttack
-  hitEffectKey: BloodShot
-  hitEffectScale: 0.5
+  hitEffectKey: SwordHitImpact
+  hitEffectScale: 0.35
   useWeaponTrail: 1
   playerTrailKey: 
   playerTrailScale: 1

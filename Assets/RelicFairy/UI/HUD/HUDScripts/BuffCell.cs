@@ -5,8 +5,11 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// 버프 그리드의 정사각형 셀 1개(절차 생성, 풀 재사용). 아이콘 + 칸 안 작은 스택 숫자만 표시.
-/// 게이지는 셀에 얹지 않는다(분리된 게이지 영역에서 별도 표시). 마우스 오버 시 호버 콜백으로 툴팁 요청.
+/// 버프 그리드의 정사각형 셀 1개(절차 생성, 풀 재사용). 아이콘 + 스택 숫자 + <b>잔여 시간 스윕</b>.
+///
+/// 잔여 시간은 예전엔 그리드 아래 별도 막대 영역에 그렸는데, 좌측 도크(무기 패널 위 · 서약 박스 아래)에
+/// 막대가 들어갈 세로 여유가 없어 무기 패널을 침범했다. 그래서 칸 위에 시계방향으로 걷히는
+/// 어두운 부채꼴(Radial360)로 얹는다 — 공간을 전혀 더 쓰지 않고 남은 시간이 그대로 읽힌다.
 ///
 /// 데이터는 BuffViewItem(읽기 전용 뷰모델)만 받는다. 위치/크기는 부모 GridLayoutGroup이 제어.
 /// </summary>
@@ -19,8 +22,29 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
     private static readonly Color SkinBuffTint   = Color.white;
     private static readonly Color SkinDebuffTint = new(1f, 0.62f, 0.62f, 1f);
 
+    // 잔여 시간 스윕 — 남은 비율만큼 '덜 가려지는' 어두운 부채꼴(0=거의 다 가림, 1=안 가림).
+    private static readonly Color SweepColor = new(0.02f, 0.02f, 0.05f, 0.62f);
+
+    private static Sprite s_white;
+
+    /// <summary>Filled 이미지용 1×1 흰 스프라이트(전 셀 공용, 1회 생성).</summary>
+    private static Sprite WhiteSprite
+    {
+        get
+        {
+            if (s_white != null) return s_white;
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false) { name = "BuffSweepWhite" };
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            s_white = Sprite.Create(tex, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            s_white.name = "BuffSweepWhite";
+            return s_white;
+        }
+    }
+
     private Image    _bg;
     private Image    _icon;
+    private Image    _sweep;
     private TMP_Text _stack;
 
     private bool _hasSkin;
@@ -63,6 +87,20 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         _icon = CreateChildImage("Icon", new Vector2(0.14f, 0.14f), new Vector2(0.86f, 0.86f));
         _icon.preserveAspect = true;
         _icon.raycastTarget = false;
+
+        // 잔여 시간 스윕 — 아이콘 위, 장식 테두리 아래. 남은 비율만큼 덜 가려진다.
+        // Image.Type.Filled는 스프라이트가 없으면 fillAmount를 무시하고 통짜로 그려지므로
+        // 1×1 흰 스프라이트를 물려준다.
+        _sweep = CreateChildImage("Sweep", Vector2.zero, Vector2.one);
+        _sweep.sprite         = WhiteSprite;
+        _sweep.color          = SweepColor;
+        _sweep.raycastTarget  = false;
+        _sweep.type           = Image.Type.Filled;
+        _sweep.fillMethod     = Image.FillMethod.Radial360;
+        _sweep.fillOrigin     = (int)Image.Origin360.Top;
+        _sweep.fillClockwise  = true;
+        _sweep.fillAmount     = 0f;
+        _sweep.gameObject.SetActive(false);
 
         // 테두리 오버레이(아이콘 위) — 스킨 시에만 생성
         if (frameSprite != null)
@@ -112,14 +150,28 @@ public sealed class BuffCell : MonoBehaviour, IPointerEnterHandler, IPointerExit
         bool hasStack = item.Stacks > 1;
         _stack.gameObject.SetActive(hasStack);
         if (hasStack) _stack.text = "×" + item.Stacks;
+
+        ApplyRemaining(item.Remaining01);
     }
 
-    /// <summary>동적 값(스택 수)만 in-place 갱신.</summary>
+    /// <summary>잔여 비율(0~1)을 칸 위 스윕으로 반영. 음수(무한/해당없음)면 숨긴다.</summary>
+    private void ApplyRemaining(float remaining01)
+    {
+        if (_sweep == null) return;
+
+        bool show = remaining01 >= 0f;
+        if (_sweep.gameObject.activeSelf != show) _sweep.gameObject.SetActive(show);
+        if (show) _sweep.fillAmount = 1f - Mathf.Clamp01(remaining01);   // 지난 만큼 가린다
+    }
+
+    /// <summary>동적 값(스택 수·잔여 시간)만 in-place 갱신.</summary>
     public void UpdateValues(in BuffViewItem item)
     {
         _item = item;
         if (_stack.gameObject.activeSelf && item.Stacks > 1)
             _stack.text = "×" + item.Stacks;
+
+        ApplyRemaining(item.Remaining01);
     }
 
     public void Hide()

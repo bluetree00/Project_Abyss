@@ -15,6 +15,21 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: f1076af87ac402947b621c4a9f046477
   m_SerializeEntries:
+  - m_GUID: b78b1e18c2d250c44943095a861d0000
+    m_Address: Covenant/CovenantTome
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8943c0e696b59cc448db461a0ed4ee21
+    m_Address: Refinery/RefineryNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 364dd7223b1b6cb44a74230a5b252eaa
+    m_Address: Crucible/CrucibleNpc
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 07757cf211bd45044a1f1917658b9e66
     m_Address: VFX_ExtraAttack
     m_ReadOnly: 0
@@ -90,6 +105,66 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e46de729db3a82544a974f5ba870e90d
+    m_Address: UI/Popup/UI_CruciblePanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7030943ff0db8b143aa282079060903f
+    m_Address: UI/Popup/UI_RuneSelectPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c7fb6fbc39560845a086e84d9f1ce15
+    m_Address: UI/Popup/UI_RefineryPanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c004dd9604a3985439fb2e97d98773a6
+    m_Address: RuneArtLibrary
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2233958ca04e2474fb9dd492603df663
+    m_Address: UI/RefinerySkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e007a5fd4cfd4a54dbb92f4df1c51e9b
+    m_Address: UI/RuneSelectSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0ff3261f220cae74ca111c09d5947259
+    m_Address: UI/WeaponForgeSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 573fc951263aaca4ab0ed43304b89f42
+    m_Address: UI/CrucibleSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87d94fcbc6a73d14799fa351a42cfb8d
+    m_Address: UI/ShopSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51ffee94d37c90e4c8e731be00a3d519
+    m_Address: SHOP_BUFF_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e5500b67cc9173243b4667c2128b9e37
+    m_Address: UI/Popup/UI_RelicInfoPopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 408a2411a3cc3b1459e70e1b22fcdbc3
+    m_Address: UI/Popup/UI_RangedForgePopup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3dfb7bb4b2202e74caeabb7118bcddb9
     m_Address: Ch1_Boss
     m_ReadOnly: 0
@@ -100,18 +175,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 408a2411a3cc3b1459e70e1b22fcdbc3
-    m_Address: UI/Popup/UI_RangedForgePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4142df55bc257a045bfc97c60ca08f7b
     m_Address: VFX_DeathNegateAura
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4c7fb6fbc39560845a086e84d9f1ce15
-    m_Address: UI/Popup/UI_RefineryPanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -155,11 +220,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7030943ff0db8b143aa282079060903f
-    m_Address: UI/Popup/UI_RuneSelectPopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 721cfe8018b2cd04abd0748143d2a312
     m_Address: VFX_Heal
     m_ReadOnly: 0
@@ -172,6 +232,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7c03889ac0e163046a11315e156de051
     m_Address: RELIC_AWAKENING_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0dcd06a6e50fec48afa69029c4dbd9a
+    m_Address: RELIC_PARTS_DATA
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -245,11 +310,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c004dd9604a3985439fb2e97d98773a6
-    m_Address: RuneArtLibrary
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c2d35a1ffee495648a3ba8c850078037
     m_Address: UI/Popup/UI_AwakeningPanel
     m_ReadOnly: 0
@@ -296,11 +356,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e46de729db3a82544a974f5ba870e90d
-    m_Address: UI/Popup/UI_CruciblePanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e4a9f9e6fb8ecb642a3cae3f5c336628
     m_Address: Illust_MerlinRevive
     m_ReadOnly: 0
@@ -308,11 +363,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e4cb61af80a22f6409945eaa346f0208
     m_Address: DIALOGUE_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e5500b67cc9173243b4667c2128b9e37
-    m_Address: UI/Popup/UI_RelicInfoPopup
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

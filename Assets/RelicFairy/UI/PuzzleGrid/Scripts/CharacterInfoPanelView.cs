@@ -326,7 +326,7 @@ public sealed class CharacterInfoPanelView : MonoBehaviour
         Anc(hdr.GetComponent<RectTransform>(),
             new Vector2(0f, 0.356f), new Vector2(1f, 0.388f));
         hdr.AddComponent<Image>().color = C_SECTION_BG;
-        var hdrTxt = Txt(hdr.transform, "Title", "✦ 활성 효과", 10f, C_HDR_TXT);
+        var hdrTxt = Txt(hdr.transform, "Title", "◆ 활성 효과", 10f, C_HDR_TXT);
         Anc(hdrTxt.GetComponent<RectTransform>(),
             new Vector2(0.04f, 0f), new Vector2(1f, 1f));
         hdrTxt.alignment = TextAlignmentOptions.MidlineLeft;

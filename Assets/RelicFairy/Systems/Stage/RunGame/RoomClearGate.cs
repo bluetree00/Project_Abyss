@@ -89,7 +89,8 @@ public class RoomClearGate : MonoBehaviour
             Instantiate(endEffectPrefab, center, Quaternion.identity);
 
         var rewards = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>();
-        bool isChoice = false;   // 일반 클리어만 선택형(3지선다). 챌린지는 전부 지급, 보스는 룬 자체가 없음.
+        bool isChoice = false;      // 룬 보상은 전부 선택형(3지선다). 보스방은 룬 자체가 없음.
+        int  choiceRounds = 1;      // 3지선다를 몇 번 반복할지(챌린지 다중 보상 = 라운드 수)
 
         if (_isBossRoom)
         {
@@ -101,13 +102,19 @@ public class RoomClearGate : MonoBehaviour
         else if (_challengeGrade.HasValue)
         {
             // 이벤트 챌린지 성과 보상 — 등급×챕터로 개수/rarity floor/연료 스케일(§3-5·§4-2).
+            //
+            // 룬 획득은 <b>언제나 3지선다</b>다. 예전엔 여기서만 후보 없이 전부 지급해
+            // 레거시 아이템 획득 팝업이 떴다(일반 클리어와 UI가 갈렸다).
+            // 보상 '개수'는 그대로 두고, 각 개수를 3지선다 <b>라운드</b>로 바꾼다 —
+            // 경제는 유지하면서 획득 경험만 통일된다.
             var cr = ChallengeRewardTable.DefaultReward(_challengeGrade.Value, ChapterNum(), _isInteraction);
             int count = Mathf.Max(1, cr.rewardCount);
             for (int i = 0; i < count; i++)
-            {
-                var (d, s) = RollRewardItem(cr.baseRarity);
-                if (d != null) rewards.Add((d, s));
-            }
+                rewards.AddRange(RollRewardChoices(RuneChoiceCount, cr.baseRarity));
+
+            choiceRounds = count;
+            isChoice     = rewards.Count > 0;
+
             if (cr.fuelAmount > 0 && _run?.FuelBank != null)
             {
                 _run.FuelBank.Add(cr.fuelKind, cr.fuelAmount);   // 연료는 아이템 인벤 밖(RunFuelBank) 직행
@@ -147,11 +154,11 @@ public class RoomClearGate : MonoBehaviour
         // 보스방은 룬 보상이 없고(위에서 미굴림) 클리어 후처리(드래프트·런클리어·길)를
         // GameRunBootstrapper.OnBossRoomClearedHandler가 전담하므로 트리거를 스폰하지 않는다.
         if (rewards.Count > 0)
-            SpawnRewardObject(center, rewards, isChoice);
+            SpawnRewardObject(center, rewards, isChoice, choiceRounds);
         // 일반 방에서 아이템이 없으면 별도 처리 불필요 — 출구 게이트는 RunFlowController가 담당한다.
     }
 
-    private void SpawnRewardObject(Vector3 center, System.Collections.Generic.List<(RuntimeItemData, ItemSO)> rewards, bool isChoice)
+    private void SpawnRewardObject(Vector3 center, System.Collections.Generic.List<(RuntimeItemData, ItemSO)> rewards, bool isChoice, int choiceRounds)
     {
         var rewardGO = endEffect2Prefab != null
             ? Instantiate(endEffect2Prefab, center, Quaternion.identity)
@@ -160,7 +167,7 @@ public class RoomClearGate : MonoBehaviour
         RoomScopedDrop.Mark(rewardGO);   // 안 주웠으면 방 전환 시 정리(다음 방 잔존 방지)
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
-        trigger.Initialize(_run, rewards, _isBossRoom, isChoice);
+        trigger.Initialize(_run, rewards, _isBossRoom, isChoice, choiceRounds);
     }
 
     /// <summary>방 클리어 원석 지급 — 정제소 연료. 드랍 판정과 무관하게 확정 지급(생산 경로 보장).</summary>

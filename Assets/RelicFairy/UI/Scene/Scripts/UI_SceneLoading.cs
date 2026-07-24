@@ -30,8 +30,15 @@ public sealed class UI_SceneLoading : MonoBehaviour
 
     public float ProgressSpeed => progressSpeed;
 
+    /// <summary>
+    /// 오버레이가 화면을 <b>완전히</b> 덮고 있는지. 페이드인 중(alpha&lt;1)은 false다 —
+    /// 앞 레이어를 내려도 되는 시점을 이 값으로 판단한다.
+    /// </summary>
+    public bool IsCovering => _shown && (canvasGroup == null || canvasGroup.alpha >= 0.999f);
+
     private float _showStartTime;
     private RenderTexture _rt;
+    private bool _shown;   // 이미 화면을 덮고 있는지 — 중복 Show가 영상·진행도를 되감지 않게 한다
 
     private void Awake()
     {
@@ -83,8 +90,16 @@ public sealed class UI_SceneLoading : MonoBehaviour
     // Public API
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// 로딩 오버레이를 띄운다. <b>이미 떠 있으면 아무것도 하지 않는다</b> —
+    /// 씬 전환 경로에 따라 호출자가 먼저 덮어 두고 SceneTransitionManager가 다시 부르는 경우가 있는데,
+    /// 그때 영상을 되감고 진행도를 0으로 되돌리면 화면이 한 번 튄다.
+    /// </summary>
     public async UniTask ShowAsync()
     {
+        if (_shown) return;
+        _shown = true;
+
         gameObject.SetActive(true);
 
         // 레이아웃 리빌드가 끝난 뒤 Prepare 시작해 같은 프레임 작업 분산
@@ -117,6 +132,9 @@ public sealed class UI_SceneLoading : MonoBehaviour
 
     public async UniTask HideAsync()
     {
+        if (!_shown) return;
+        _shown = false;
+
         if (_videoPlayer != null)
         {
             _videoPlayer.Stop();

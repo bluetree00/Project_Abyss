@@ -202,6 +202,43 @@ public sealed class BossPanelView : MonoBehaviour
         // 텍스트는 테두리보다 위 — 프레임을 마지막 형제로 올리면 이름/수치가 장식에 가린다.
         if (nameText != null) nameText.transform.SetAsLastSibling();
         if (hpText   != null) hpText.transform.SetAsLastSibling();
+
+        PlaceHpTextInside();
+    }
+
+    /// <summary>
+    /// HP 수치를 <b>바 안쪽</b> 오른쪽 끝에 앉힌다.
+    ///
+    /// 예전엔 패널 하단(anchor y=0)에 매달려 있었는데, 스킨을 씌우면 바가 패널 세로 <b>가운데</b>로
+    /// 올라가서(FitInnerWindow) 수치만 바 아래에 남아 테두리를 밟았다. 바와 같은 창(innerWindow)에
+    /// 붙이면 프레임 높이가 어떻게 잡히든 항상 바 안에 들어온다.
+    /// </summary>
+    private void PlaceHpTextInside()
+    {
+        if (hpText == null) return;
+
+        var rt = hpText.rectTransform;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+
+        if (HasSkin)
+        {
+            FitInnerWindow(rt);                              // 바와 같은 창
+            rt.offsetMin = new Vector2(0f, -6f);
+            rt.offsetMax = new Vector2(-46f, 6f);            // 우측 장식(화살촉) 피하기
+        }
+        else
+        {
+            // 색 폴백: 슬라이더(y 14~38) 위쪽 줄에 둔다.
+            rt.anchorMin = new Vector2(1f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot     = new Vector2(1f, 0.5f);
+            rt.sizeDelta = new Vector2(190f, 26f);
+            rt.anchoredPosition = new Vector2(-28f, 52f);
+        }
+
+        hpText.alignment        = TextAlignmentOptions.MidlineRight;
+        hpText.textWrappingMode = TextWrappingModes.NoWrap;
+        hpText.overflowMode     = TextOverflowModes.Overflow;
     }
 
     /// <summary>테두리 아트의 내부 창 비율로 rect를 앉힌다(픽셀 오프셋 0 → 앵커만으로 크기 결정).</summary>

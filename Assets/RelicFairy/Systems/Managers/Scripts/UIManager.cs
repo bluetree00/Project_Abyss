@@ -309,6 +309,12 @@ public class UIManager
     public async UniTask WaitUntilNoBlockingPopupAsync()
         => await UniTask.WaitUntil(() => !IsGameplayBlocked);
 
+    /// <summary>
+    /// 차단형 팝업이 정상 경로 밖에서 파괴됐을 때 <see cref="UI_Popup.OnDestroy"/>가 호출.
+    /// 스택에 남은 항목은 파괴돼 null이므로 재평가만으로 차단이 풀린다(스택 정리는 다음 pop이 처리).
+    /// </summary>
+    public void RefreshGameplayBlockExternally() => RefreshGameplayBlock();
+
     /// <summary>스택의 BlocksGameplay 팝업 유무에 따라 시간정지·입력잠금을 동기화한다(push/pop마다 호출).</summary>
     private void RefreshGameplayBlock()
     {
@@ -318,6 +324,12 @@ public class UIManager
 
         if (shouldBlock)
         {
+            // [진단] 시간정지를 거는 '차단 팝업'이 무엇인지 남긴다 — 안 닫혀 고착되는 범인 특정용.
+            var sb = new System.Text.StringBuilder();
+            foreach (var p in _popupStack)
+                if (p != null && p.BlocksGameplay) sb.Append(p.GetType().Name).Append(' ');
+            Debug.LogWarning($"[UIManager] 게임플레이 차단 ON(시간정지). 차단 팝업: {sb}");
+
             TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
             SetPlayerInput(false);
         }
@@ -328,11 +340,15 @@ public class UIManager
         }
     }
 
+    /// <summary>
+    /// 팝업 차단 전용 입력 채널(SetUiBlocked). 컷신이 건 차단(SetInputEnabled)과 독립이라
+    /// 팝업이 닫혀도 컷신 차단을 덮어쓰지 않는다 — 컷신 중 대사 팝업이 닫히면 조작이 되살아나던 문제.
+    /// </summary>
     private void SetPlayerInput(bool enabled)
     {
         var t = Managers.Player?.PlayerTransform;
         if (t != null && t.TryGetComponent<PlayerController>(out var pc))
-            pc.SetInputEnabled(enabled);
+            pc.SetUiBlocked(!enabled);
     }
 
     public void Clear()

@@ -47,6 +47,9 @@ public sealed class FeverGaugeView : MonoBehaviour
         var rootRT = (RectTransform)frame.transform.parent;
         ShopUIStyle.Anchor(rootRT, anchorMin, anchorMax, pivot, pos, size);
         ShopUIStyle.Skin(frame, skin != null ? skin.feverTrack : null, sliced: true);
+        // 트랙 아트가 자체 테두리를 갖고 있어 코드가 그린 청동선을 지운다(이중 테두리 방지).
+        if (frame.sprite != null && rootRT.TryGetComponent<Image>(out var outer))
+            outer.color = Color.clear;
 
         var view = rootRT.gameObject.AddComponent<FeverGaugeView>();
         var inner = frame.transform;
@@ -55,7 +58,7 @@ public sealed class FeverGaugeView : MonoBehaviour
             TextAlignmentOptions.Left, ShopUIStyle.RarityGlow(ItemRarity.Legendary));
         ShopUIStyle.Anchor(view._label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
             new Vector2(12f, -6f), new Vector2(90f, LabelH));
-        view._label.text = "열기";
+        view._label.text = "피버";
 
         view._hint = ShopUIStyle.MakeText(inner, "Hint", 11.5f, FontStyles.Normal,
             TextAlignmentOptions.Right, ShopUIStyle.TextDim);
@@ -97,8 +100,8 @@ public sealed class FeverGaugeView : MonoBehaviour
             var img = _cells[i];
             if (img == null) continue;
 
-            // 아트가 있으면 단계별 칸 스프라이트, 없으면 열 색 계단으로 폴백.
-            var sprite = lit && skin != null ? skin.FeverCell(i + 1) : null;
+            // 아트가 있으면 단계별 칸 스프라이트(0=식은 칸), 없으면 열 색 계단으로 폴백.
+            var sprite = skin != null ? skin.FeverCell(lit ? i + 1 : 0) : null;
             if (sprite != null)
             {
                 ShopUIStyle.Skin(img, sprite, sliced: true);
@@ -114,7 +117,7 @@ public sealed class FeverGaugeView : MonoBehaviour
         {
             _hint.text = clamped >= MaxLevel
                 ? "<color=#FFCB5A>최고조 — 상위 등급 최대</color>"
-                : (clamped > 0 ? $"{clamped} / {MaxLevel}  ▲ 확률 상승중" : $"0 / {MaxLevel}  연속으로 돌리면 오른다");
+                : (clamped > 0 ? $"{clamped}/{MaxLevel}  확률 상승 중" : $"0/{MaxLevel}  연속으로 돌리면 오른다");
         }
     }
 }

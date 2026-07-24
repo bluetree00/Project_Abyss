@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 473dba8bbb6991a45af55fe5a48b5615, type: 3}
+  m_Name: RefinerySkin
+  m_EditorClassIdentifier:
+  windowFrame: {fileID: 21300000, guid: e2f62482bd5cc04438fc39212cb8e625, type: 3}
+  titleBar: {fileID: 21300000, guid: bc3bc3e9ed82aee4ea9a0925955b75fc, type: 3}
+  oreIcon: {fileID: 0}
+  altarBackground: {fileID: 21300000, guid: e2f62482bd5cc04438fc39212cb8e625, type: 3}
+  nodeBase:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  nodeGlyph:
+  - {fileID: 21300000, guid: 4d583ed53be1c4d4f975c764ba1f3bb7, type: 3}
+  - {fileID: 21300000, guid: 559858266b2de06419e1034f400eb41c, type: 3}
+  - {fileID: 21300000, guid: a56c7bc91aaf09d4e86bc4d9e7df8d9c, type: 3}
+  - {fileID: 21300000, guid: fa86e8a7e357cfa4295a51fb424fe1e5, type: 3}
+  - {fileID: 21300000, guid: e4d070aea52be56458c20343a7d0c1b2, type: 3}
+  - {fileID: 21300000, guid: cdf767890338d08468d584757b361e13, type: 3}
+  slotFrame: {fileID: 21300000, guid: a01a1b223520b9a4e86dc029c80318ea, type: 3}
+  altarCore: {fileID: 21300000, guid: 67f4504862633824b9482408bd243f93, type: 3}
+  gradeBorder:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  gradeGlow:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  feverTrack: {fileID: 21300000, guid: 955c9c47f8c6b974999daaa14b5cd0f5, type: 3}
+  feverCell:
+  - {fileID: 21300000, guid: e0dba11820aeffc4b848c5d6a67870b4, type: 3}
+  - {fileID: 21300000, guid: aa0d4cbad5fb8d64288978aeedc51f4e, type: 3}
+  - {fileID: 21300000, guid: 385d5e09ed0418346a1b53293f33a755, type: 3}
+  - {fileID: 21300000, guid: a8af4b73c64494648a20a9a6d6ae7cd2, type: 3}
+  - {fileID: 21300000, guid: 44e5a2adb1f6c01469f8226b54378ec2, type: 3}
+  - {fileID: 21300000, guid: 2497101df971af44eb54ba264d4fad3c, type: 3}
+  - {fileID: 21300000, guid: 4b9bf5055164e8c408752c2104b9a5db, type: 3}
+  - {fileID: 21300000, guid: fcb5f671c1577a64abc1667f46db59f3, type: 3}
+  barTrack: {fileID: 21300000, guid: 8e075da0701c4ba45b5a339bcf2b31bc, type: 3}
+  oddsPanel: {fileID: 21300000, guid: 7efec974caffb3e4090c1c9609c117dc, type: 3}
+  barFrame: {fileID: 21300000, guid: 33c437d87ba102f4da5160e453e4e074, type: 3}
+  barFill:
+  - {fileID: 21300000, guid: 22649799b53120748b28f9c50b43ee60, type: 3}
+  - {fileID: 21300000, guid: a38dcc90ea888d24faf38f17f8f49fc4, type: 3}
+  - {fileID: 21300000, guid: 755ee931fdd475d41a3ceff434ae0ccd, type: 3}
+  barFillHeated:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  bannerReignite: {fileID: 21300000, guid: 902ada6e399800f4d9dcaca119861772, type: 3}
+  bannerSmall:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  reservedBadge: {fileID: 0}
+  costPlate:
+  - {fileID: 21300000, guid: 9e05086e7fd811e4697852607a87e3df, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  spinButton:
+  - {fileID: 21300000, guid: 4ca753fc7c624a446be9b98cfe327fe7, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  reforgeButton:
+  - {fileID: 21300000, guid: bc0ebf990bb58f041ae3e59465197482, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  perkBadge:
+  - {fileID: 21300000, guid: 09703447bc8f30442b74a8a6aed71bb8, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  condenseRare: []
+  condenseEpic: []
+  condenseLegendary: []

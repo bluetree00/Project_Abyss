@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,12 +12,14 @@ using UnityEngine;
 ///   • AE_BeginTrail / AE_EndTrail → PlayerWeaponTrailVfx → <b>판정 없는 트레일</b>
 ///   • AE_AttackEnd → 공격 종료
 ///
-/// ⚠️ N은 반드시 해당 actionType 어빌리티가 보유한 stepIndex 범위 안이어야 한다. 벗어나면 그 타는 무판정이다.
-///   지상(KatanaAbility)=0~3 / 강공·공중·낙하=0 뿐 → 아래 fx 배정이 그 제약을 지킨다.
-///   (참고: 기존 카타나 3타는 SpawnSlashEffect4를 쏘는데 지상 step 최대가 3이라 그 타가 무판정이다.
-///    무형검은 그 결함을 복제하지 않고 0/1/2로 배정했다.)
+/// <b>타이밍은 카타나(Test_01)의 비율을 그대로 복제</b>한다. 무형검 클립은 카타나(~1초)보다 훨씬 길어(2~2.7초)
+/// 절대 초를 쓰면 타격이 늦게 나가므로, 카타나의 <b>정규화 비율(0~1)</b>을 각 클립 실제 길이에 곱해 넣는다.
 ///
-/// 이벤트 time은 <b>초 단위</b>라 클립 실제 길이에 비율을 곱해 넣는다.
+/// 카타나 지상 3타는 마무리 <b>2연격</b>(step2 0.17 + step3 0.31)이다 — 무형검도 동일하게 맞춘다.
+///
+/// ⚠️ SpawnSlashEffect 번호는 해당 actionType 어빌리티의 stepIndex 범위 안이어야 한다(벗어나면 무판정).
+///   지상(NamelessAbility)=0~3 / 강공·공중·낙하=0 뿐.
+///
 /// 메뉴: Tools/RelicFairy/Setup Nameless Anim Events
 /// </summary>
 public static class NamelessSwordEvents
@@ -24,37 +27,59 @@ public static class NamelessSwordEvents
     private const string Dir =
         "Assets/RelicFairy/_Imported/GhostSamurai_Animset/Animation/katana/Nameless/";
 
-    // 타이밍 비율(0~1). 트레일이 스윙 시작에 켜지고, 판정은 칼이 지나가는 지점에 오도록 약간 뒤에 둔다.
-    // 모션을 눈으로 보고 조정할 여지가 큰 값이라 한 곳에 모아둔다.
-    private const float TrailBegin = 0.18f;
-    private const float Slash      = 0.24f;
-    private const float TrailEnd   = 0.72f;
-    private const float AttackEnd  = 1.00f;
+    private struct Ev
+    {
+        public float  t;    // 정규화 비율(0~1) — 클립 길이에 곱해 초로 환산
+        public string fn;
+        public Ev(float t, string fn) { this.t = t; this.fn = fn; }
+    }
 
     private struct Def
     {
-        public string file;   // Dir 기준 파일명
-        public int    fx;     // SpawnSlashEffect 번호 = 어빌리티 stepIndex
+        public string file;
+        public Ev[]   events;
         public string note;
     }
 
+    // 이펙트를 '공격 시작'에 내보낸다 — 슬래시·트레일을 클립 앞쪽(~10%)에 둔다.
+    // 콤보/이동 해제(comboWindowOpen·attackEndAt)는 NamelessAnimation.asset에서 함께 앞당겨,
+    // 이펙트 직후 다음 공격을 잇고 긴 후딜을 잘라 움직임이 빨리 풀리게 한다.
     private static readonly Def[] Defs =
     {
-        // 지상 3연타 — KatanaAbility step 0/1/2 (step3은 여분)
-        new Def{ file = "GhostSamurai_APose_Attack01_1_ALL_Inplace.FBX", fx = 0, note = "지상 1타" },
-        new Def{ file = "GhostSamurai_APose_Attack01_2_Inplace.FBX",     fx = 1, note = "지상 2타" },
-        new Def{ file = "GhostSamurai_APose_Attack01_4_Inplace.FBX",     fx = 2, note = "지상 3타(마무리)" },
+        // ── 지상 3연타 ──
+        new Def { file = "GhostSamurai_APose_Attack01_1_ALL_Inplace.FBX", note = "지상 1타",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
 
-        // 강공 — KatanaHeavyAbility step 0 뿐
-        new Def{ file = "GhostSamurai_APose_SPAttack02_Inplace.FBX",     fx = 0, note = "강공격" },
+        new Def { file = "GhostSamurai_APose_Attack01_2_Inplace.FBX", note = "지상 2타",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect1"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
 
-        // 공중 3연타 — KatanaAirAbility step 0 뿐이라 전부 0
-        new Def{ file = "GhostSamurai_APose_Air_Attack01_1_Inplace.FBX", fx = 0, note = "공중 1타" },
-        new Def{ file = "GhostSamurai_APose_Air_Attack01_2_Inplace.FBX", fx = 0, note = "공중 2타" },
-        new Def{ file = "GhostSamurai_APose_Air_Attack02_Inplace.FBX",   fx = 0, note = "공중 3타" },
+        // 3타 = 무형검 애니는 '한 번 베기'라 슬래시 1개(step2)만.
+        new Def { file = "GhostSamurai_APose_Attack01_4_Inplace.FBX", note = "지상 3타(단일 베기)",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.12f,"SpawnSlashEffect2"),
+                             new Ev(0.55f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
 
-        // 낙하 — KatanaPlungeAbility step 0 뿐
-        new Def{ file = "GhostSamurai_APose_JumpAttack01_Inplace.FBX",   fx = 0, note = "낙하 공격" },
+        // ── 강공 (step0 뿐) ──
+        new Def { file = "GhostSamurai_APose_SPAttack02_Inplace.FBX", note = "강공격",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
+
+        // ── 공중 3연타 (Air 어빌리티 step0 뿐 → 전부 0) ──
+        new Def { file = "GhostSamurai_APose_Air_Attack01_1_Inplace.FBX", note = "공중 1타",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
+        new Def { file = "GhostSamurai_APose_Air_Attack01_2_Inplace.FBX", note = "공중 2타",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
+        new Def { file = "GhostSamurai_APose_Air_Attack02_Inplace.FBX", note = "공중 3타",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
+
+        // ── 낙하 (step0 뿐) ──
+        new Def { file = "GhostSamurai_APose_JumpAttack01_Inplace.FBX", note = "낙하 공격",
+            events = new[] { new Ev(0.08f,"AE_BeginTrail"), new Ev(0.10f,"SpawnSlashEffect0"),
+                             new Ev(0.50f,"AE_EndTrail"),   new Ev(1.00f,"AE_AttackEnd") } },
     };
 
     [MenuItem("Tools/RelicFairy/Setup Nameless Anim Events")]
@@ -68,14 +93,17 @@ public static class NamelessSwordEvents
             var imp = AssetImporter.GetAtPath(path) as ModelImporter;
             if (imp == null) { Debug.LogWarning($"[NamelessEvents] 임포터 없음: {path}"); continue; }
 
-            // user 클립 → default → importedTakeInfos 순으로 클립 확보(대검 스크립트와 동일)
             var clips = imp.clipAnimations;
             if (clips == null || clips.Length == 0) clips = imp.defaultClipAnimations;
 
-            float len = 1f;
+            // 샘플레이트(이 팩은 120fps 모카프) — take에서 읽는다.
+            float sampleRate = 30f;
+            var takes = imp.importedTakeInfos;
+            if (takes != null && takes.Length > 0 && takes[0].sampleRate > 0f)
+                sampleRate = takes[0].sampleRate;
+
             if (clips == null || clips.Length == 0)
             {
-                var takes = imp.importedTakeInfos;
                 if (takes == null || takes.Length == 0)
                 {
                     Debug.LogWarning($"[NamelessEvents] take 없음: {path}");
@@ -93,32 +121,26 @@ public static class NamelessSwordEvents
                         loopTime   = false,
                     }
                 };
-                len = Mathf.Max(0.01f, t.stopTime - t.startTime);
             }
 
-            // 실제 로드된 AnimationClip 길이가 가장 정확 — 있으면 그걸로 덮는다.
-            foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(path))
-                if (o is AnimationClip c) { len = Mathf.Max(0.01f, c.length); break; }
+            // ⚠️ 게임이 재생하는 건 '트림된 서브클립'(firstFrame~lastFrame)이다.
+            // LoadAllAssetRepresentationsAtPath는 전체 take(22초 등)를 돌려줘 이벤트가 밀렸다 →
+            // 길이는 반드시 트림 프레임 범위 ÷ 샘플레이트로 계산한다(게임 클립과 일치).
+            float len = Mathf.Max(0.01f, (clips[0].lastFrame - clips[0].firstFrame) / sampleRate);
 
-            clips[0].events = new[]
-            {
-                Ev(TrailBegin * len, "AE_BeginTrail"),
-                Ev(Slash      * len, "SpawnSlashEffect" + d.fx),
-                Ev(TrailEnd   * len, "AE_EndTrail"),
-                Ev(AttackEnd  * len, "AE_AttackEnd"),
-            };
+            var events = new List<AnimationEvent>(d.events.Length);
+            foreach (var e in d.events)
+                events.Add(new AnimationEvent { time = Mathf.Clamp01(e.t) * len, functionName = e.fn });
 
+            clips[0].events = events.ToArray();
             imp.clipAnimations = clips;
             imp.SaveAndReimport();
             done++;
-            Debug.Log($"[NamelessEvents] {d.note}: {d.file} ← SpawnSlashEffect{d.fx} (len {len:F2}s)");
+            Debug.Log($"[NamelessEvents] {d.note}: {d.file} (len {len:F2}s, 이벤트 {events.Count}개)");
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[NamelessEvents] 무형검 이벤트 주입 완료: {done}/{Defs.Length}");
+        Debug.Log($"[NamelessEvents] 무형검 이벤트 주입 완료(카타나 비율): {done}/{Defs.Length}");
     }
-
-    private static AnimationEvent Ev(float time, string fn)
-        => new AnimationEvent { time = time, functionName = fn };
 }
 #endif

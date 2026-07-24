@@ -16,11 +16,25 @@ public sealed class RuneArtLibrarySO : ScriptableObject
     [SerializeField, Tooltip("등급별 룬 테두리. gradeArt와 동일 인덱스")]
     private Sprite[] borderArt = new Sprite[5];
 
+    [SerializeField, Tooltip("속성별 룬 아트. ElementDef.Order(불/얼음/전기/풀/빛/어둠). 빈 칸은 null → 색 틴트 폴백.")]
+    private Sprite[] elementArt = new Sprite[6];
+
+    [SerializeField, Tooltip("속성별 룬 테두리. elementArt와 동일 인덱스.")]
+    private Sprite[] elementBorder = new Sprite[6];
+
     /// <summary>등급에 해당하는 룬 아트. 범위를 벗어나면 마지막(또는 첫) 유효 스프라이트로 폴백.</summary>
     public Sprite GetArt(ItemRarity rarity) => Pick(gradeArt, (int)rarity);
 
     /// <summary>등급에 해당하는 룬 테두리.</summary>
     public Sprite GetBorder(ItemRarity rarity) => Pick(borderArt, (int)rarity);
+
+    /// <summary>속성 인덱스별 룬 아트(ElementDef.Order). 미할당은 null → 호출측이 색 틴트로 폴백.</summary>
+    public Sprite GetArtByElement(int elementIndex)
+        => (elementArt == null || elementIndex < 0 || elementIndex >= elementArt.Length) ? null : elementArt[elementIndex];
+
+    /// <summary>속성 인덱스별 룬 테두리. 미할당은 null.</summary>
+    public Sprite GetBorderByElement(int elementIndex)
+        => (elementBorder == null || elementIndex < 0 || elementIndex >= elementBorder.Length) ? null : elementBorder[elementIndex];
 
     private static Sprite Pick(Sprite[] arr, int idx)
     {

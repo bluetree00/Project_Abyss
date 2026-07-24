@@ -30,12 +30,12 @@ public static class ElementDef
     // 보드 코드(char)는 ZONE_MAP과 호환 유지: 'T'=전기(Electric), 'P'=풀(Grass).
     private static readonly Entry[] s_Elements =
     {
-        new("FIRE",     'F', "불",   "🔥", new Color(1.00f, 0.38f, 0.22f)),
-        new("ICE",      'I', "얼음", "❄",  new Color(0.45f, 0.80f, 1.00f)),
-        new("ELECTRIC", 'T', "전기", "⚡", new Color(1.00f, 0.88f, 0.25f)),
-        new("GRASS",    'P', "풀",   "☘",  new Color(0.55f, 0.82f, 0.30f)),
-        new("LIGHT",    'L', "빛",   "✦",  new Color(1.00f, 0.95f, 0.65f)),
-        new("DARK",     'D', "어둠", "🌑", new Color(0.62f, 0.40f, 0.92f)),
+        new("FIRE",     'F', "불",   "▲", new Color(1.00f, 0.38f, 0.22f)),
+        new("ICE",      'I', "얼음", "◇",  new Color(0.45f, 0.80f, 1.00f)),
+        new("ELECTRIC", 'T', "전기", "↗", new Color(1.00f, 0.88f, 0.25f)),
+        new("GRASS",    'P', "풀",   "▼",  new Color(0.55f, 0.82f, 0.30f)),
+        new("LIGHT",    'L', "빛",   "◆",  new Color(1.00f, 0.95f, 0.65f)),
+        new("DARK",     'D', "어둠", "■", new Color(0.62f, 0.40f, 0.92f)),
     };
 
     // CENTER 특수 존 (시너지 목록 제외, 보너스 전용)

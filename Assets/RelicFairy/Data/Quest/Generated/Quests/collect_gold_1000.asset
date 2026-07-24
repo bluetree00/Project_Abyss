@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   codeName: collect_gold_1000
   displayName: "\uC7AC\uB825\uAC00"
-  description: "\uACE8\uB4DC 1000\uC744 \uBAA8\uC544\uB77C"
+  description: "\uACE8\uB4DC 1000 \uBAA8\uC73C\uAE30"
   taskGroups:
   - tasks:
     - {fileID: 11400000, guid: 5565eb8cff1cc40429668d01a0e07e18, type: 2}

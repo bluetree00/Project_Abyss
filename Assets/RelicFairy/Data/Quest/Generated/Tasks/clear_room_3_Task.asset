@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: 0912c96fd3e6cf0429209aa4b4ad45dd, type: 2}
   codeName: clear_room_3
-  description: "\uBC29 3\uAC1C\uB97C \uD074\uB9AC\uC5B4\uD558\uB77C"
+  description: "\uBC29 3\uAC1C \uD074\uB9AC\uC5B4"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: d6712c5f63a420f4e92f9781f0ff8e38, type: 2}

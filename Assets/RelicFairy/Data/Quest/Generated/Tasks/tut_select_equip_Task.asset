@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: 564abeb724975a94b832adfb9253b91c, type: 2}
   codeName: tut_select_equip
-  description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44\uB97C \uC120\uD0DD\uD558\uB77C"
+  description: "\uBAA8\uB8E8\uC5D0\uC11C \uC7A5\uBE44 \uC120\uD0DD"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: d2fb8e6103bee134a99acea4bda9ae49, type: 2}

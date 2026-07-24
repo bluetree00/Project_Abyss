@@ -812,12 +812,36 @@ public sealed class GameRunSession
     public bool TryUsePotion()
     {
         if (Player?.RuntimeStats == null || PlayerState == null) return false;
-        if (Player.RuntimeStats.Hp >= Player.RuntimeStats.MaxHp) return false;   // 만피면 낭비 방지
-        if (!PlayerState.TryConsumePotion()) return false;                       // 재고 없음
+
+        // 못 쓰는 경우엔 <b>이유를 말해준다</b>. 예전엔 조용히 false만 반환해서
+        // 만피·재고0·회복봉인 어느 쪽이든 "포션이 고장났다"로만 보였다.
+        if (Player.RuntimeStats.Hp >= Player.RuntimeStats.MaxHp)
+        {
+            NotifyPotionBlocked("체력이 가득 찼다");
+            return false;
+        }
+        if (PlayerState.HealLocked)
+        {
+            NotifyPotionBlocked("회복이 봉인되어 있다");
+            return false;
+        }
+        if (PlayerState.PotionCount <= 0)
+        {
+            NotifyPotionBlocked("포션이 없다");
+            return false;
+        }
+        if (!PlayerState.TryConsumePotion()) return false;
 
         int heal = Mathf.Max(1, Mathf.RoundToInt(Player.RuntimeStats.MaxHp * PotionHealRatio));
         Player.Heal(heal);
         return true;
+    }
+
+    /// <summary>포션을 못 쓴 이유를 HUD 알림으로 알린다(무반응 = 고장으로 읽히지 않게).</summary>
+    private static void NotifyPotionBlocked(string reason)
+    {
+        var hud = UnityEngine.Object.FindFirstObjectByType<HudPresenter>(FindObjectsInactive.Include);
+        hud?.ShowBuffNotice($"<color=#9AA0A6>{reason}</color>");
     }
 
     /// <summary>대기방 회복 오브젝트 — 만피 + 포션 가득 보충.</summary>

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Task
   category: {fileID: 11400000, guid: e80ec1002c6239a42977fb8300370ba5, type: 2}
   codeName: kill_100_any
-  description: "\uBAAC\uC2A4\uD130 100\uB9C8\uB9AC\uB97C \uCC98\uCE58\uD558\uB77C"
+  description: "\uBAAC\uC2A4\uD130 100\uB9C8\uB9AC \uCC98\uCE58"
   action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
   targets:
   - {fileID: 11400000, guid: dd6027e2141b50741ae41d122a951ff1, type: 2}
