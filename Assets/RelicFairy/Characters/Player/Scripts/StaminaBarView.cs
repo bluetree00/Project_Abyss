@@ -16,7 +16,7 @@ public class StaminaBarView : MonoBehaviour
     // ── Constants ─────────────────────────────────────────────────
     private const float BarWidth   = 220f;
     private const float BarHeight  = 10f;
-    private const float BarOffsetY = -210f;   // 화면 중앙(캐릭터) 기준 아래로 — 캐릭터 몸에 안 가리게 발밑 쪽으로 내림
+    private const float BarOffsetY = -248f;   // 화면 중앙(캐릭터) 기준 아래로 — 캐릭터 몸에 안 가리게 발밑 쪽으로 내림
     private const float FadeSpeed  = 8f;      // 표시/숨김 페이드 속도(초당)
 
     private static readonly Color FillNormal    = new Color(1f, 0.85f, 0.30f, 1f);   // 원신식 노랑
