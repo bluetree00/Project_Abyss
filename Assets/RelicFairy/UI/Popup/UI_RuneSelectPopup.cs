@@ -490,7 +490,6 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var item = _candidates[_selected].data;
         Result  = item;
         Skipped = false;
-        _interactionTcs?.TrySetResult();
 
         // 보관함 만차 시 조용히 사라지지 않도록, 실패해도 그리드가 '보류'로 들고 간다.
         bool added = _inventory != null && _inventory.AddToStaging(item);
@@ -498,22 +497,32 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ItemEffectVfxHelper.ShowNotice(
                 $"<color=#FFCC44>보관함 가득 참</color> ({RunItemInventory.MaxStagingCapacity}칸) — 자리를 비우면 자동으로 추가됩니다");
 
+        // 닫기(ClosePopupUI)를 resolve(TrySetResult)보다 먼저 — 순서가 뒤집히면 이벤트방에서 시간이 고착된다.
+        // TrySetResult는 대기자(ClearRewardTrigger의 다중 라운드 3지선다)를 동기로 이어 곧바로 다음 라운드
+        // 팝업을 push한다. 그 뒤에 ClosePopupUI를 부르면 이 팝업은 더 이상 스택 최상단이 아니라 닫기가
+        // 무시되고("Close Popup Failed!"), 살아있는 좀비로 남아 BlocksGameplay가 계속 걸린 채 timeScale=0이
+        // 영구 고착된다(이벤트방 Gold/Platinum 2라운드 이상 보상에서 재현). 그리드는 다음 라운드 팝업보다
+        // 밑에 깔리도록 resolve 전에 연다.
         ClosePopupUI();
 
         if (UI_GridPanel.Instance == null)
             Managers.UI?.ShowOverlayUI<UI_GridPanel>();
-        if (UI_GridPanel.Instance == null) return;
+        if (UI_GridPanel.Instance != null)
+        {
+            if (added) UI_GridPanel.Instance.ShowWithNewItem(item);
+            else       UI_GridPanel.Instance.ShowWithPendingItem(item);
+        }
 
-        if (added) UI_GridPanel.Instance.ShowWithNewItem(item);
-        else       UI_GridPanel.Instance.ShowWithPendingItem(item);
+        _interactionTcs?.TrySetResult();
     }
 
     private void OnSkipClicked()
     {
         Result  = null;
         Skipped = true;
-        _interactionTcs?.TrySetResult();
+        // 닫기를 resolve보다 먼저 — OnConfirmClicked와 동일 이유(다중 라운드 좀비 팝업 → timeScale 고착 방지).
         ClosePopupUI();
+        _interactionTcs?.TrySetResult();
     }
 
     // ── Helpers ──
