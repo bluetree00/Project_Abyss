@@ -238,6 +238,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
 
     private void SetSelected(int index)
     {
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         _selected = index;
 
         for (int i = 0; i < _cards.Count; i++)
@@ -263,6 +264,7 @@ public sealed class UI_RelicPartDraftPopup : UI_Popup
         if (_selected < 0 || _candidates == null || _selected >= _candidates.Count)
             return;   // 미선택 — 아무 일도 하지 않는다
 
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         Result = _candidates[_selected];
         _interactionTcs?.TrySetResult();
         ClosePopupUI();

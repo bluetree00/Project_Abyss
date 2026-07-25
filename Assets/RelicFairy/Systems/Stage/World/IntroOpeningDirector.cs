@@ -99,8 +99,6 @@ public sealed class IntroOpeningDirector : MonoBehaviour
                 SetCamera(p + new Vector3(0f, 2.6f, -5.5f), p + new Vector3(0f, 1.4f, 6f));
                 if (cam != null) handOff = cam.HandToGameplayCameraAsync(player.transform, ct: ct);
             }
-            // 화면이 밝아지는 동안 BGM도 Game_Intro_play로 페이드 전환
-            Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
             await ScreenFade.In(fadeDuration, ct);
             // 카메라 보간이 끝난 뒤에 조작을 넘긴다 — 블렌드 중에 조작이 들어가면 시점이 튄다.
             await handOff;

@@ -19,7 +19,7 @@ public class ForestGuardianBlackboard
 
     // ── 방어도(Poise) 상수 ───────────────────────────────
     public const float MaxPoise          = 50f;
-    public const float NormalPoiseDamage = 20f;  // 일반 피격: 3회 적중 시 파괴
+    public const float NormalPoiseDamage = 5f;   // 일반 피격: 10회 적중 시 파괴
     public const float HeavyPoiseDamage  = 50f;  // 빅윈도우 피격: 1회에 즉시 파괴
     public const float PoiseStaggerTime  = 0.7f; // 방어도 파괴 시 경직 지속 시간
 
