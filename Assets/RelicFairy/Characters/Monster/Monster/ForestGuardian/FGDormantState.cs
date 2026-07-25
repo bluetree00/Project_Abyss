@@ -99,7 +99,7 @@ public class FGDormantState : IMonsterState
                 await UniTask.Delay(TimeSpan.FromSeconds(BossIntroFallbackDuration), cancellationToken: ct);
 
             // ③ 플레이어 카메라 복귀(이동2) — 내부에서 ①의 팬을 캔슬하고 이어받음
-            await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, fg.EntranceCamReturnDuration, ct);
+            await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
         }
         catch (OperationCanceledException) { return; }
 

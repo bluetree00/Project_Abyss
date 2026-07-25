@@ -198,7 +198,10 @@ public sealed class AppBootstrapper : MonoBehaviour
                 ? UIRootBootstrapper.Instance.GetComponentInChildren<GameStartVideoPlayer>(true)
                 : null;
             if (vp != null)
+            {
+                Managers.Sound.PlayEffectAsync(SoundKey.Sfx.OpenDoor).Forget();
                 await vp.PlayAsync(token);   // 끝나도 검은 막으로 화면을 계속 덮고 있다
+            }
 
             // 초회 플레이(인트로 미완료)면 프롤로그 Game_Intro부터 — 인트로 사망 시 IntroBootstrapper가 BaseCamp로 인계.
             // 인트로 완료 이후엔 곧장 영속 허브(BaseCamp). 던전 진입은 BaseCamp 게이트가 담당.

@@ -319,8 +319,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             return;
         }
 
+        var interactionTask = popup.WaitForInteractionAsync(ct);
         popup.Setup(candidates);
-        await popup.WaitForInteractionAsync(ct);
+        await interactionTask;
 
         if (popup.Result != null)
         {
@@ -891,8 +892,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         _run?.ZoneProgression?.RegisterSpawnedZone(zoneIndex, worldCenter);
         SpawnCorridorsForZone(zone, worldCenter, zones, root);
 
-        // 게이트 통과 즉시 방 등장 연출 — 플레이어가 걸어오는 동안 방이 생성되는 것처럼 보임
-        await new DissolveEntrance().PlayAsync(blocks, default, ct);
+        // 게이트 통과 즉시 방 등장 연출 — 보스 방은 보스 입장 연출과 겹치지 않도록 즉시 표시
+        if (string.Equals(zone.category, "Boss", System.StringComparison.OrdinalIgnoreCase))
+            ShowAllBlockRenderers(blocks);
+        else
+            await new DissolveEntrance().PlayAsync(blocks, default, ct);
 
         // 디졸브/NavMesh await 도중 전이가 취소되거나(게이트 파괴 등) 존이 파괴되면 중단
         // — DissolveEntrance가 취소를 삼키므로 여기서 직접 검사한다
@@ -2591,6 +2595,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             var rs = blocks[i].instance.GetComponentsInChildren<Renderer>(true);
             for (int j = 0; j < rs.Length; j++)
                 rs[j].enabled = false;
+        }
+    }
+
+    private static void ShowAllBlockRenderers(
+        System.Collections.Generic.IReadOnlyList<MapBuilder.PlacedBlock> blocks)
+    {
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            if (blocks[i].instance == null) continue;
+            var rs = blocks[i].instance.GetComponentsInChildren<Renderer>(true);
+            for (int j = 0; j < rs.Length; j++)
+                rs[j].enabled = true;
         }
     }
 

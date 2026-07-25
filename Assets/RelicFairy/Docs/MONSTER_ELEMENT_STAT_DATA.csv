@@ -24,7 +24,7 @@ BishopKnight,비숍기사,Elite,Ranged,180,24,3,2.0,3,1
 EvilMage,사악한 마법사,Elite,Ranged,150,26,2,2.0,3,1
 NagaWizard,나가 마법사,Elite,Ranged,170,24,2,2.0,4,1
 Salamander,살라만더,Elite,Ranged,180,22,3,2.0,4,1
-ForestGuardian,숲의 수호자,Boss,Melee,700,45,6,8.0,,1
+ForestGuardian,숲의 수호자,Boss,Melee,7000,45,6,8.0,,2
 DemonKing,마왕,Boss,Melee,900,55,8,8.0,,1
-DragonBoss,용왕,Boss,Ranged,1000,60,7,8.0,,1
+DragonBoss,용왕,Boss,Ranged,15000,60,7,8.0,,2
 Dragon,드래곤,Boss,Ranged,800,50,6,8.0,,1

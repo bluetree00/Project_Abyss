@@ -272,11 +272,7 @@ public class DKAttackReadyState : IMonsterState
         // 패턴 사용 중에만 플레이어를 바라봄 — 대기 중에는 회전 없음
     }
 
-    public void Exit(MonsterContext ctx)
-    {
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
-    }
+    public void Exit(MonsterContext ctx) { }
 
     private static void FacePlayer(MonsterContext ctx)
     {
@@ -352,9 +348,6 @@ public class DKGetHitState : GetHitState
 
     public override void Exit(MonsterContext ctx)
     {
-        if (ctx.Agent != null && ctx.Agent.isActiveAndEnabled && ctx.Agent.isOnNavMesh)
-            ctx.Agent.isStopped = false;
-
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.ClearArmorBroken();
 
         // 경직 해제
