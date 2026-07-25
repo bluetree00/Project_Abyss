@@ -201,6 +201,23 @@ public sealed class UI_ShopPanel : UI_Popup
                                          TextAlignmentOptions.MidlineRight, ShopUIStyle.Gold);
         ShopUIStyle.Anchor(_goldText.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f),
                            new Vector2(-176, 0), new Vector2(200, 34));
+
+        BuildExitButton(w);
+    }
+
+    /// <summary>
+    /// 나가기 버튼 — 창 우상단 모서리. 상단바 안쪽은 리롤·골드가 차지하고 있어 그 위 모서리에 둔다.
+    /// ClosePopupUI로 상점을 닫는다(ESC와 같은 종료 경로).
+    /// </summary>
+    private void BuildExitButton(Transform w)
+    {
+        var exit = MakeButton(w, "Exit", "나가기", null, out var lbl);
+        lbl.fontSize = 16f;
+        lbl.color    = ShopUIStyle.TextPrimary;
+        exit.GetComponent<Image>().color = new Color(0.42f, 0.16f, 0.16f, 0.96f);
+        ShopUIStyle.Anchor((RectTransform)exit.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
+                           new Vector2(-Margin + 4f, -12f), new Vector2(96, 40));
+        exit.onClick.AddListener(ClosePopupUI);
     }
 
     /// <summary>오늘의 특가 — 탭 라벨 + 히어로 카드(아이콘/이름/설명/원가·할인가).</summary>

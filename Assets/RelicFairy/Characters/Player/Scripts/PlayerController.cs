@@ -1113,18 +1113,10 @@ public class PlayerController : CharacterBase
         if (inputReady) BindInputActions();
     }
 
-    [Header("포션")]
-    // WASD에 손을 얹은 채 검지/중지가 한 칸 아래로 바로 닿는 자리.
-    // (Q·E·R=스킬, 1·2=무기교체, F=상호작용, Space/Shift=점프/달리기로 이미 점유)
-    [SerializeField] private KeyCode potionKey = KeyCode.C;
-
     protected override void Update()
     {
         if (!inputReady || characterData == null || cinemachineCamera == null) return;
 
-        // 포션(퀵슬롯) — 즉발 % 회복. 시간정지(그리드/일시정지) 중엔 무시.
-        if (Time.timeScale > 0f && Input.GetKeyDown(potionKey))
-            GameRunBootstrapper.Instance?.Run?.TryUsePotion();
 
         _runeEffects?.Tick(Time.deltaTime);
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.Tick(Time.deltaTime);
@@ -1553,6 +1545,14 @@ public class PlayerController : CharacterBase
         inputActions.Player.ChangeWeapon1.performed += _ => ChangeWeapon(0);
         inputActions.Player.ChangeWeapon2.performed += _ => ChangeWeapon(1);
         inputActions.Player.PuzzleToggle.performed += _ => TogglePuzzleGrid();
+
+        // 포션(C) — New Input System 액션. 레거시 Input.GetKeyDown은 이 프로젝트(Both 모드에서
+        // New Input System 활성)에서 안 잡혀 포션이 아예 눌리지 않았다. 시간정지 중엔 무시.
+        inputActions.Player.Potion.performed += _ =>
+        {
+            if (Time.timeScale > 0f)
+                GameRunBootstrapper.Instance?.Run?.TryUsePotion();
+        };
     }
 
     /// <summary>
