@@ -437,12 +437,23 @@ public class RunFlowController : MonoBehaviour
             // 부감 팬이 올라가는 ~0.9초 동안 출구가 뻥 뚫려 있었고, 그 사이 통로로 나간 플레이어는
             // 뒤에서 석문이 떨어지며 통로에 갇혔다. 낙하 <b>연출</b>만 와이드샷 시점으로 미룬다.
             SealRoom(SealDoorEntry.Parked);
-            await introCam.PlayRoomEntryIntroAsync(
-                result.roomGO.transform.position,
-                introPlayer != null ? introPlayer.transform : null,
-                riseDuration: 0.9f, holdDuration: 1.0f, returnDuration: 0.7f,
-                wideHeight: 48f, wideBack: 20f,
-                onWide: PlaySealDoorDrops, ct);
+            if (result.hasCeiling)
+            {
+                // 천장 있는 실내 방(성채 등): 상공 부감 팬은 천장만 비추므로 생략한다.
+                // 카메라는 게임플레이 시점 유지, 문 봉인·몬스터 스폰 페이싱은 동일(연출 시간만큼 대기 후 석문 낙하).
+                await UniTask.Delay(TimeSpan.FromSeconds(0.9f), ignoreTimeScale: true, cancellationToken: ct);
+                PlaySealDoorDrops();
+                await UniTask.Delay(TimeSpan.FromSeconds(1.0f), ignoreTimeScale: true, cancellationToken: ct);
+            }
+            else
+            {
+                await introCam.PlayRoomEntryIntroAsync(
+                    result.roomGO.transform.position,
+                    introPlayer != null ? introPlayer.transform : null,
+                    riseDuration: 0.9f, holdDuration: 1.0f, returnDuration: 0.7f,
+                    wideHeight: 48f, wideBack: 20f,
+                    onWide: PlaySealDoorDrops, ct);
+            }
             if (this == null || ct.IsCancellationRequested) return;
         }
         else if (hasCombat)
