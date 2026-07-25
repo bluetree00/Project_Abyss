@@ -45,11 +45,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3defb73d0de15bf438a5b9bfda84e670
-    m_Address: UI/Popup/UI_ClearResult
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3e07f70b993baae40947d85b2813b0e6
     m_Address: T2_Crossbow_Weapon
     m_ReadOnly: 0

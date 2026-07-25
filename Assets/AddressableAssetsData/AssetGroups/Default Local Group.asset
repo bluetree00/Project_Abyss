@@ -245,11 +245,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 813a84120a8c453488b7cc49058dfb9d
-    m_Address: UI/Popup/UI_WeaponForgePopup
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a915dbbc4b23bf4f931629039cfbf6f
     m_Address: VFX_FireExplosion
     m_ReadOnly: 0
