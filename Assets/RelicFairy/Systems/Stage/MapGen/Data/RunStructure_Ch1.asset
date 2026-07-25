@@ -15,7 +15,7 @@ MonoBehaviour:
   _bossThreshold: 8
   _preBossRoomKey:
   _bossRoomKey:
-  _shopMaxPerChapter: 2
+  _shopMaxPerChapter: 1
   _shopChance: 0.25
   _eventMaxPerChapter: 2
   _eventChance: 0.2

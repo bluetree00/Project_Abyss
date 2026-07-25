@@ -16,6 +16,26 @@ public static class AddressablesBuildRunner
             return;
         }
 
+        // AddressablesPlayModeFixEditor가 활성 빌더를 매 refresh마다 FastMode(0)로 되돌린다.
+        // 그 상태로 BuildPlayerContent를 부르면 0초 만에 실패하므로, 빌드 직전에 PackedMode 빌더를
+        // 직접 선택한다. 이 메서드는 동기 실행이라 도중 도메인 리로드/복귀가 끼어들지 않는다.
+        int packedIndex = -1;
+        for (int i = 0; i < settings.DataBuilders.Count; i++)
+        {
+            var b = settings.DataBuilders[i] as UnityEditor.AddressableAssets.Build.DataBuilders.BuildScriptPackedMode;
+            if (b != null) { packedIndex = i; break; }
+        }
+        if (packedIndex < 0)
+        {
+            Debug.LogError("[AddressablesBuildRunner] BuildScriptPackedMode 빌더를 찾을 수 없습니다.");
+            return;
+        }
+        if (settings.ActivePlayerDataBuilderIndex != packedIndex)
+        {
+            settings.ActivePlayerDataBuilderIndex = packedIndex;
+            Debug.Log($"[AddressablesBuildRunner] 빌드용 활성 빌더 → PackedMode(index {packedIndex})로 강제.");
+        }
+
         AddressableAssetSettings.CleanPlayerContent(settings.ActivePlayerDataBuilder);
         AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
 
