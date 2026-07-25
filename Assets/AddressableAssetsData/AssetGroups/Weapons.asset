@@ -91,11 +91,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7941080ed78535c4cad4a88a59e09ae4
-    m_Address: Assets/Abyss/Weapon/Shared/TestCollider.prefab
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 79e128fbd9569bb45b43779290303c36
     m_Address: T0_Nameless_Weapon
     m_ReadOnly: 0
@@ -111,11 +106,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7d34b013aae4f1443b71021021cf2e2c
-    m_Address: TestBowDisplayPrefab
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7da5ed58d5bdede4ab8b58ea66e3202c
     m_Address: T2_Katana_Display
     m_ReadOnly: 0
@@ -123,11 +113,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 81375510cf0b5334b9104b449dfda120
     m_Address: T2_Greatsword
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 83d2636d9fbb0d442a0cddaac7e6d048
-    m_Address: TestSwordDisplayPrefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -168,11 +153,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c10c58d91770a6f42b34613fac886228
     m_Address: T3_Crossbow_Display
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c8ac457690045be4f89e74126a0b1227
-    m_Address: TestBowPrefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
