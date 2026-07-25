@@ -20,7 +20,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private string debugDefaultWeaponSlot1Key = "";
     [Tooltip("Loadout에 유물이 없을 때(에디터 직접 전투 테스트) 적용할 기본 유물 클래스. 비우면 유물 미적용. 시작방 경로에는 영향 없음.")]
     [SerializeField] private RelicClassSO debugDefaultRelic;
-    [SerializeField] private string directCombatMapPrefabKey = "TestNomarStage_01";
+    [SerializeField] private string directCombatMapPrefabKey = "";
     [SerializeField] private Transform playerSpawnPoint;
     [SerializeField] private Transform mapRoot;
     [SerializeField] private bool buildRuntimeNavMesh = true;
