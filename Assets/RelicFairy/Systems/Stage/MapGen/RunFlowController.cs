@@ -405,13 +405,23 @@ public class RunFlowController : MonoBehaviour
         // (방 종류 무관하게 무조건 봉인 → 상점·보스에서도 강제 작동하던 문제 해소)
         bool hasCombat = result.roomGO != null
                          && result.roomGO.GetComponent<RoomWaveController>() != null;
-        // 보스방은 방 소개 연출(부감 팬)도, 석문 낙하도 하지 않는다 — 보스 자체 등장 연출을 깬다.
+        // 보스방은 procgen 봉인 석문(입구 잠금·출구 게이트)·부감 팬·낙하/슬램 연출을 일절 하지 않는다.
+        // 경계(전투 중 이탈 차단)와 출구는 커스텀 아레나 프리팹이 소유하기 때문 — 아래 isBossRoom 분기 참조.
         bool isBossRoom  = plan.kind == RoomPlanKind.Boss;
         bool freshCombat = !restoreCleared && hasCombat && !isBossRoom;
 
         var introCam    = GameCameraController.Instance;
         var introPlayer = GameRunBootstrapper.Instance?.Run?.Player;
-        if (freshCombat && introCam != null)
+        if (isBossRoom)
+        {
+            // 보스방: procgen 봉인 석문을 입구·출구 어디에도 만들지 않는다(오브젝트·연출 모두 없음).
+            //   · 전투 중 이탈 차단(경계)은 커스텀 아레나 프리팹(BossRoomController의 barrier/introWalls)이 소유.
+            //   · 출구는 보스 처치 후 BossExitPath→ChapterGate가 담당 — RollExits가 Phase.Done이라
+            //     RevealGates가 애초에 호출되지 않으므로 여기서 게이트를 세워도 영영 공개되지 않는다(순수 사장).
+            // 입구 석문 슬램·출구 석문 낙하가 보스 등장 연출을 깨던 문제 제거.
+            ClearGates();   // 이전 방 게이트 잔재만 정리 — 새 게이트는 만들지 않는다
+        }
+        else if (freshCombat && introCam != null)
         {
             // 신규 전투방: 카메라가 방을 넓게 보여주는 동안 문이 잠기고, 그 후에 몬스터가 나온다.
             // (몬스터 Activate는 이 await 뒤 웨이브 분기에서 실행 → 연출 종료 전까지 스폰 안 됨)
@@ -430,7 +440,7 @@ public class RunFlowController : MonoBehaviour
         }
         else if (hasCombat)
         {
-            // 보스방 / 이어하기 클리어 전 전투방 — 연출 없이 닫힌 상태로 봉인
+            // 이어하기 클리어 전(재생성) 전투방 — 연출 없이 닫힌 상태로 봉인 (보스방은 위 분기에서 처리)
             SealRoom(SealDoorEntry.Closed);
         }
         else
