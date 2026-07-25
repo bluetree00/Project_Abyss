@@ -18,9 +18,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   stat:
-    maxHp: 2000
+    maxHp: 7000
     defense: 5
-    attackPower: 25
+    attackPower: 100
     moveSpeed: 3
     attackRange: 2.5
     attackRadius: 1
@@ -74,8 +74,8 @@ MonoBehaviour:
     killHitStopDuration: 0.09
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 1.2
-  patternBreakDurationMax: 2.5
+  patternBreakDurationMin: 0.7
+  patternBreakDurationMax: 1
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.5

@@ -121,7 +121,7 @@ public sealed class SoundManager
         if (_initialized)
             return;
 
-        _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    1f);
+        _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    0.25f);
         _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 1f);
         _masterVolume = PlayerPrefs.GetFloat(kMasterVolKey, 1f);
         _uiVolume     = PlayerPrefs.GetFloat(kUiVolKey,     1f);

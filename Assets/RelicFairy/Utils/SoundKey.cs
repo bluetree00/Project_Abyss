@@ -20,6 +20,9 @@ public static class SoundKey
 
         // Monster
         public const string MonsterHit    = "sfx_monster_hit";
+        public const string MonsterHit1   = "sfx_monster_hit1";
+        public const string MonsterHit2   = "sfx_monster_hit2";
+        public const string MonsterHit3   = "sfx_monster_hit3";
         public const string MonsterDie    = "sfx_monster_die";
         public const string MonsterAttack = "sfx_monster_attack";
 
@@ -27,12 +30,16 @@ public static class SoundKey
         public const string RoomClear = "sfx_room_clear";
         public const string DoorOpen  = "sfx_door_open";
 
+        // Cinematic
+        public const string OpenDoor = "OpenDoor";
+
         // Item / Economy
         public const string ItemPickup = "sfx_item_pickup";
         public const string GoldPickup = "sfx_gold_pickup";
 
         // UI
-        public const string UiClick = "sfx_ui_click";
-        public const string UiHover = "sfx_ui_hover";
+        public const string UiClick  = "sfx_ui_click";
+        public const string UiHover  = "sfx_ui_hover";
+        public const string UiButton = "Button";
     }
 }

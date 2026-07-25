@@ -383,12 +383,12 @@
       "grade": "Boss",
       "attack_type": "Melee",
       "element": "Grass",
-      "max_hp": 1200,
+      "max_hp": 7000,
       "base_attack": 45,
       "base_defense": 20,
       "max_accumulation": 8.0,
       "monster_pool_tag": "",
-      "stat_version": 1
+      "stat_version": 2
     },
     {
       "monster_id": "DemonKing",
@@ -409,12 +409,12 @@
       "grade": "Boss",
       "attack_type": "Ranged",
       "element": "Fire",
-      "max_hp": 1800,
+      "max_hp": 15000,
       "base_attack": 60,
       "base_defense": 22,
       "max_accumulation": 8.0,
       "monster_pool_tag": "",
-      "stat_version": 1
+      "stat_version": 2
     },
     {
       "monster_id": "Dragon",

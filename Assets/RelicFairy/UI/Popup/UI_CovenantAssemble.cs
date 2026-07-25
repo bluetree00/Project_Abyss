@@ -181,6 +181,7 @@ public class UI_CovenantAssemble : UI_Popup
 
     private void Select(bool isCause, int idx)
     {
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         if (isCause) _selCause = idx;
         else         _selEffect = idx;
         RefreshSelection();
@@ -189,6 +190,7 @@ public class UI_CovenantAssemble : UI_Popup
     private void Reroll(bool isCause, int idx)
     {
         if (_rerollsLeft <= 0) return;
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
 
         var pool = isCause ? CovenantPalette.CauseIds : CovenantPalette.EffectIds;
         var data = isCause ? _causes : _effects;
@@ -273,6 +275,7 @@ public class UI_CovenantAssemble : UI_Popup
 
     private void OnForge()
     {
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         var cause  = _causes[_selCause];
         var effect = _effects[_selEffect];
         string id = AssembledCovenant.MakeId(cause.id, cause.tier, effect.id, effect.tier);
