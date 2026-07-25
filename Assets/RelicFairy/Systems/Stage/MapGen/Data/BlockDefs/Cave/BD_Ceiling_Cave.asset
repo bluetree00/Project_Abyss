@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fca197032da92624dad13766f5d4c427, type: 3}
   m_Name: BD_Ceiling_Cave
   m_EditorClassIdentifier: Assembly-CSharp::BlockDef
-  prefab: {fileID: 2906908962528274904, guid: 447519c5befa7934a91848c4388963fa, type: 3}
+  prefab: {fileID: 2906908962528274904, guid: 474a6b6d6348c1342a3e80b7240d295e, type: 3}
   tileType: 21
   facingRule: 0
   weight: 1
