@@ -1613,6 +1613,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             roomGO   = roomGO,
             blocks   = blocks,
+            hasCeiling = palette != null && palette.HasCeiling, // 천장 방이면 상공 부감 인트로 스킵(천장만 비치는 문제)
+
             entryPos = customArenaEntryPos ?? (cls.entrance.HasValue
                 ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
                 : ResolvePlayerSpawnFromGrid(grid, anchor, w, h)),

@@ -10,6 +10,7 @@ public sealed class ProcRoomResult
     public GameObject                   roomGO;       // 빌드된 방 루트 (디스폰 시 사용)
     public Vector3                      entryPos;     // 플레이어 진입(등장) 위치 (개구부 안쪽)
     public bool                         hasEntrance;  // 입구 문 존재 여부 (시작방은 false)
+    public bool                         hasCeiling;   // 팔레트 천장 유무 — 상공 부감 인트로 카메라가 천장 방을 스킵할지 판단
     public ProcExitSlot                 entrance;     // 들어온 입구 — 진입 후 잠금(봉인) 패널 배치용
     public List<ProcExitSlot>           exits;        // 클리어 후 공개할 출구 슬롯
     public List<MapBuilder.PlacedBlock> blocks;       // 디졸브 등장용 블록(빌드 시 렌더러 숨김 상태) — 화면 복귀 후 호출자가 재생
