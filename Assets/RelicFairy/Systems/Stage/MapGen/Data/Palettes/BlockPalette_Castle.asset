@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BlockPalette_Castle
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
   themeMatch: Sacred
-  wallMode: 1
+  wallMode: 0
   wallHeight: 11
   hasCeiling: 1
   lighting:
