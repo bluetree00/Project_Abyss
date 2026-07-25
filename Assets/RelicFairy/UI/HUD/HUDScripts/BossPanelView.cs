@@ -147,8 +147,8 @@ public sealed class BossPanelView : MonoBehaviour
             var srt = (RectTransform)hpSlider.transform;
             srt.anchorMin = Vector2.zero;
             srt.anchorMax = Vector2.one;
-            srt.offsetMin = Vector2.zero;
-            srt.offsetMax = Vector2.zero;
+            srt.offsetMin = new Vector2(0f, -10f);
+            srt.offsetMax = new Vector2(0f, -10f);
         }
 
         if (hpSlider != null && bossTrackSprite != null)
@@ -227,8 +227,8 @@ public sealed class BossPanelView : MonoBehaviour
         if (HasSkin)
         {
             FitInnerWindow(rt);                              // 바와 같은 창
-            rt.offsetMin = new Vector2(0f, -6f);
-            rt.offsetMax = new Vector2(-46f, 6f);            // 우측 장식(화살촉) 피하기
+            rt.offsetMin = new Vector2(0f, -16.6f);
+            rt.offsetMax = new Vector2(-46f, -4.6f);         // 우측 장식(화살촉) 피하기
         }
         else
         {

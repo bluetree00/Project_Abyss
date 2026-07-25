@@ -1086,6 +1086,12 @@ public sealed class CombatPanelView : MonoBehaviour
         if (hpFillImage == null && hpSlider != null && hpSlider.fillRect != null)
             hpFillImage = hpSlider.fillRect.GetComponent<Image>();
         CleanHpBarVisual();   // 늘어난 장식 아트 → 단색 플랫 바
+        if (hpText != null)
+        {
+            var hpTxtRt = hpText.rectTransform;
+            hpTxtRt.offsetMin = new Vector2(hpTxtRt.offsetMin.x, -6.7f);
+            hpTxtRt.offsetMax = new Vector2(hpTxtRt.offsetMax.x, -6.7f);
+        }
 
         // 스킬 2포드(우하단): 유물(Q) / 무기(E·R).
         // 스킨 시 래거시 색판(금/청 alpha 0.14)·Outline·"유물"/"무기" 라벨을 만들지 않는다 — 아트 프레임이 대체.
