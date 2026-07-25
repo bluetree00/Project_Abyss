@@ -317,6 +317,13 @@ public class RunFlowController : MonoBehaviour
 
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
+
+        // 보스방은 직전 방의 회전이 어떻게 들어갔든 항상 정면(회전 0)으로 입장한다.
+        // _heading은 방 빌드 회전(BuildProcRoomAsync)과 카메라 heading 스냅(MovePlayer→SetHeadingImmediate) 둘 다의 소스라,
+        // 여기서 0(North=정면)으로 강제하면 방·카메라·이동 입력 기준이 모두 정면으로 일치한다.
+        // (카메라가 heading 0으로 스냅되면 PlayerController가 불연속 스냅을 감지해 이동 기준도 정면으로 재정렬한다.)
+        if (plan.kind == RoomPlanKind.Boss) _heading = (int)DoorEdge.North;
+
         await ScreenFade.CoverAsync(dir, KindColor(plan.kind), _coverDuration, _coverCurve, ct); // 짧게 덮어 텔레포트 가림
 
         var prevRoom = _current?.roomGO; // 새 방 준비까지 이전 방 유지 → 플레이어 발판 보존(추락 방지)
