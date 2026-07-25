@@ -46,7 +46,7 @@ public class ShopRoomController : MonoBehaviour
     private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록(캡슐 height=2의 절반).
 
     /// <summary>NPC 앞 판매대까지의 거리(m) — 상인이 카운터 뒤에 선 구도.</summary>
-    private const float CounterDistance = 1.6f;
+    private const float CounterDistance = 2.5f;
     private static readonly string[] DeadStallChildren = { "SoldOutLabel", "DisplayVfxRoot" }; // 과거 월드 구매 상태연출 — NPC+UI로 대체됨.
 
     // ── 비공개 필드 ─────────────────────────────────────────

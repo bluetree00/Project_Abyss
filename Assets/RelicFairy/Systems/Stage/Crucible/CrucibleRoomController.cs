@@ -17,7 +17,7 @@ public class CrucibleRoomController : MonoBehaviour
     private const float NpcStandHeight = 1f; // 앵커 없는 폴백 스폰 시 캡슐 바닥이 지면에 닿도록.
 
     /// <summary>NPC 앞 작업대까지의 거리(m) — NPC가 카운터 뒤에 선 구도를 만든다.</summary>
-    private const float CounterDistance = 1.6f;
+    private const float CounterDistance = 2.5f;
 
     /// <summary>재련공 잡담 — 무기 강화/승급 컨셉.</summary>
     private static readonly string[] ChatterLines =

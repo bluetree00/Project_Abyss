@@ -14,6 +14,7 @@ public static class ServiceRoomDecorPlacer
     private const int   WallLayer     = 8;      // MapBuilder 규약(Wall=8, Ground=3)
     private const float ClearRadius   = 0.75f;  // 소품이 차지한다고 보는 반경(m)
     private const float WallKeepOut   = 1.1f;   // 벽에서 최소 이 정도는 떨어뜨린다
+    private const float NpcClearRadius= 2.0f;   // NPC 몸에서 이보다 가까이는 소품을 두지 않는다(관통 방지)
     private const int   AngleTries    = 12;     // 후보 각도 재시도 수
     private const float RadiusShrink  = 0.65f;  // 자리가 없으면 반경을 줄여 재시도
 
@@ -44,7 +45,8 @@ public static class ServiceRoomDecorPlacer
         for (int pass = 0; pass < 3; pass++)
         {
             float r = radius * Mathf.Pow(RadiusShrink, pass);
-            if (r < WallKeepOut) break;
+            // NPC 관통 방지 — 요청 반경이 처음부터 작아도(카운터 등) 이보다 가까이는 절대 두지 않는다.
+            if (r < NpcClearRadius) { if (pass == 0) r = NpcClearRadius; else break; }
 
             for (int i = 0; i < AngleTries; i++)
             {

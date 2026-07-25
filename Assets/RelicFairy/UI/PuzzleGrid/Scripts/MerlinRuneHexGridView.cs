@@ -37,6 +37,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     private readonly List<GameObject>              _cellObjects       = new();
     private readonly Dictionary<Vector2Int, Image> _cellImages        = new();
     private readonly Dictionary<Vector2Int, Image> _cellFlashImages   = new();
+    private readonly Dictionary<Vector2Int, Image> _cellBorderImages  = new();   // 점유 셀 상시 테두리
     private readonly Dictionary<Vector2Int, Color>  _cellBaseColors    = new();
     private readonly HashSet<Vector2Int>             _occupiedPositions = new();
     private readonly Dictionary<Vector2Int, char>    _cellZones         = new();
@@ -261,6 +262,23 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             else if (canPlace)          kvp.Value.color = hintOn ? DimPlaceable(bc)   // 중앙(중립 허브) — 한 단계 낮춤
                                                                  : PlaceableColor(bc);
             else                        kvp.Value.color = EmptyColor(bc);
+        }
+
+        RefreshOccupiedBorders();
+    }
+
+    /// <summary>점유 셀에 상시 금테를 켜고, 빈 셀은 끈다. 색 갱신과 항상 같이 돈다.</summary>
+    private void RefreshOccupiedBorders()
+    {
+        foreach (var kvp in _cellBorderImages)
+        {
+            bool occupied = _occupiedPositions.Contains(kvp.Key);
+            var frame = kvp.Value;
+            if (frame == null) continue;
+
+            frame.color = occupied ? new Color(1f, 0.86f, 0.42f, 0.95f) : Color.clear;
+            var hole = frame.transform.childCount > 0 ? frame.transform.GetChild(0).gameObject : null;
+            if (hole != null && hole.activeSelf != occupied) hole.SetActive(occupied);
         }
     }
 
@@ -520,13 +538,53 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     public void RemovePlacedCells(Vector2Int[] positions)
     {
         if (positions == null) return;
+
+        var removed = new List<Vector2Int>(positions.Length);
         foreach (var pos in positions)
         {
             _occupiedPositions.Remove(pos);
             if (_cellImages.TryGetValue(pos, out var img) && _cellBaseColors.TryGetValue(pos, out var bc))
                 img.color = EmptyColor(bc);
+            // 금테는 점유 해제와 동시에 즉시 끈다(RefreshOccupiedBorders를 기다리지 않게).
+            if (_cellBorderImages.TryGetValue(pos, out var frame) && frame != null)
+            {
+                frame.color = Color.clear;
+                if (frame.transform.childCount > 0) frame.transform.GetChild(0).gameObject.SetActive(false);
+            }
+            removed.Add(pos);
         }
+
         NotifyBridge();
+        TriggerRemovalEffectAsync(removed, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    /// <summary>
+    /// 룬을 뺀 칸에 <b>회수 연출</b>을 준다 — 배치(흰색 번쩍임)의 반대로, 붉은 기운이
+    /// 짧게 번졌다가 사그라든다. 배치엔 있고 제거엔 없어 "그냥 사라진다"로 보이던 것을 보완.
+    /// </summary>
+    private async UniTaskVoid TriggerRemovalEffectAsync(List<Vector2Int> positions, CancellationToken ct)
+    {
+        const int   STEPS    = 14;
+        const float TOTAL_MS = 300f;
+        const float PEAK_A   = 0.55f;
+        var tone = new Color(1f, 0.42f, 0.34f, 0f);   // 빠져나가는 붉은 기운
+
+        for (int i = 0; i <= STEPS; i++)
+        {
+            float t = i / (float)STEPS;
+            float a = (1f - t) * PEAK_A;               // 처음이 가장 진하고 서서히 사라진다
+            tone.a = a;
+            foreach (var pos in positions)
+                if (_cellFlashImages.TryGetValue(pos, out var flash))
+                    flash.color = tone;
+
+            try { await UniTask.Delay((int)(TOTAL_MS / STEPS), ignoreTimeScale: true, cancellationToken: ct); }
+            catch (System.OperationCanceledException) { return; }
+        }
+
+        foreach (var pos in positions)
+            if (_cellFlashImages.TryGetValue(pos, out var flash))
+                flash.color = new Color(1f, 1f, 1f, 0f);
     }
 
     /// <summary>현재 점유된 셀 좌표(col,row) 스냅샷. 세이브 캡처용.</summary>
@@ -600,6 +658,35 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         innerImg.color         = new Color(1f, 1f, 1f, 0.08f);
         innerImg.raycastTarget = false;
 
+        // 점유 셀 상시 테두리 — 룬이 놓인 칸을 계속 밝은 윤곽으로 감싼다.
+        // "어느 칸이 채워졌나"가 색 명암 차이만으로는 안 읽혀서, 금테로 명시한다.
+        // 안쪽을 비워 <b>프레임(외곽 링)</b>만 보이게 만든다: 바깥 테두리 Image 위에
+        // 칸 색과 같은 안쪽 마스크를 덮어 가운데를 뚫는다.
+        var borderGO = new GameObject("Border", typeof(RectTransform));
+        borderGO.transform.SetParent(cellGO.transform, false);
+        var borderRT = borderGO.GetComponent<RectTransform>();
+        borderRT.anchorMin = Vector2.zero;
+        borderRT.anchorMax = Vector2.one;
+        borderRT.sizeDelta = Vector2.zero;
+        var borderImg = borderGO.AddComponent<Image>();
+        borderImg.color         = Color.clear;   // 평소 숨김 → 점유 시 금색으로
+        borderImg.raycastTarget = false;
+
+        var borderHoleGO = new GameObject("Hole", typeof(RectTransform));
+        borderHoleGO.transform.SetParent(borderGO.transform, false);
+        var holeRT = borderHoleGO.GetComponent<RectTransform>();
+        holeRT.anchorMin = Vector2.zero;
+        holeRT.anchorMax = Vector2.one;
+        holeRT.offsetMin = new Vector2(2f, 2f);      // 2px 링만 남기고 안쪽을 판 색으로 덮는다
+        holeRT.offsetMax = new Vector2(-2f, -2f);
+        var holeImg = borderHoleGO.AddComponent<Image>();
+        holeImg.sprite        = tile;                // 칸과 같은 타일/색 → 프레임만 노출
+        holeImg.color         = OccupiedColor(baseColor);
+        holeImg.raycastTarget = false;
+        borderHoleGO.SetActive(false);               // 테두리와 함께 켜고 끈다
+
+        _cellBorderImages[gridPos] = borderImg;
+
         // 배치 플래시 오버레이 (투명 → 흰색 → 투명 애니메이션용)
         var flashGO = new GameObject("Flash", typeof(RectTransform));
         flashGO.transform.SetParent(cellGO.transform, false);
@@ -669,6 +756,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         _cellObjects.Clear();
         _cellImages.Clear();
         _cellFlashImages.Clear();
+        _cellBorderImages.Clear();
         _cellBaseColors.Clear();
         _occupiedPositions.Clear();
         _cellZones.Clear();

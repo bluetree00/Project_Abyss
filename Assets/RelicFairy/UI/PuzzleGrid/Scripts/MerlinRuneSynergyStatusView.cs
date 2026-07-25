@@ -66,7 +66,7 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     // ── Private fields ──
     private readonly Dictionary<string, ZoneRow> _rows  = new();
-    private readonly List<string> _activeOrder = new();   // 활성화된 순서(완성본: 활성만 활성순 표시)
+    private readonly List<string> _activeOrder = new();   // 룬이 놓인 존(처음 놓은 순서). 임계 미달도 포함.
     private Transform   _rowContainer;
     private GameObject  _emptyLabelGO;
     private TMP_Text    _reactionText;   // 활성 속성 반응 배너(행 목록 최상단)
@@ -90,26 +90,25 @@ public sealed class MerlinRuneSynergyStatusView : MonoBehaviour
 
     public void Refresh(IReadOnlyDictionary<string, int> zoneCounts)
     {
-        // 완성본: 활성화된 시너지만 활성 순서로 실시간 표시.
-        // 활성 = 그 존이 최저 임계(첫 단계)에 도달. 활성 순서는 처음 활성된 시점 기준으로 유지한다.
-        var nowActive = new HashSet<string>();
+        // 룬을 <b>하나라도 놓은</b> 존은 목록에 띄운다(예전엔 첫 임계에 도달해야만 나타나서,
+        // 효과를 다 채우기 전엔 무슨 시너지인지 알 수 없었다). 각 행은 현재 개수와
+        // "다음 단계까지 얼마나 남았는지"를 함께 보여준다(RefreshRow). 순서 = 처음 놓은 순서.
+        var placed = new HashSet<string>();
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
             var zone = ZONE_ORDER[i];
             var syn = Managers.RuneData?.GetZoneSynergies(zone);
             if (syn == null || syn.Count == 0) continue;
-            int minTh = int.MaxValue;
-            foreach (var s in syn) if (s.threshold < minTh) minTh = s.threshold;
             int c = 0; zoneCounts?.TryGetValue(zone, out c);
-            if (c >= minTh) nowActive.Add(zone);
+            if (c > 0) placed.Add(zone);
         }
 
-        // 활성 순서 갱신: 비활성된 존 제거 + 새로 활성된 존 append(활성화 순서 = 등장 순서)
-        _activeOrder.RemoveAll(z => !nowActive.Contains(z));
+        // 표시 순서 갱신: 빈 존 제거 + 새로 채워진 존 append(놓은 순서 = 등장 순서)
+        _activeOrder.RemoveAll(z => !placed.Contains(z));
         for (int i = 0; i < ZONE_ORDER.Length; i++)
         {
             var zone = ZONE_ORDER[i];
-            if (nowActive.Contains(zone) && !_activeOrder.Contains(zone)) _activeOrder.Add(zone);
+            if (placed.Contains(zone) && !_activeOrder.Contains(zone)) _activeOrder.Add(zone);
         }
 
         // 목록에서 빠진(비활성) 행 파괴

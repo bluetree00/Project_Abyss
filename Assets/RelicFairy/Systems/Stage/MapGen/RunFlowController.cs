@@ -347,6 +347,12 @@ public class RunFlowController : MonoBehaviour
 
         _current = result;
         MovePlayer(result.entryPos);
+
+        // 방 진입 연출(디졸브·리빌·대사·봉인) 동안 입력 잠금 — 봉인이 리빌/대사 뒤에 서므로,
+        // 그 전에 플레이어가 출구로 달려나가면 뒤에서 석문이 떨어져 통로에 갇히는 문제를 막는다.
+        // 봉인 완료 후 해제한다(SetPlayerInput(true)). 취소 경로들에서도 반드시 해제.
+        SetPlayerInput(false);
+
         // [서약] 방 진입 통보
         GameRunBootstrapper.Instance?.Run?.CovenantHandler?.OnRoomEnter();
         // 이동 완료 후 이전 방 디스폰 — 자식 배치 파괴로 단발 Destroy 스파이크를 분산(플레이어는 이미 신규 방).
@@ -371,11 +377,11 @@ public class RunFlowController : MonoBehaviour
         await dissolve;
 
         // 전환 중 컨트롤러 파괴/취소(플레이 종료 등) 가드 — 이후 transform 접근 시 MissingReferenceException 방지
-        if (this == null || ct.IsCancellationRequested) return;
+        if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
 
         // 방 입장 대사 이벤트 — 보스룸 등 특정 방 진입 시 챕터별/방문변형 대사 재생.
         await PlayRoomEntryDialogueAsync(plan.kind, ct);
-        if (this == null || ct.IsCancellationRequested) return;
+        if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
 
         // 재저장(S2/S3)용 캐시 — 방 정보를 들고 있어야 임의 시점에 다시 저장할 수 있다.
         _lastPlan    = plan;
@@ -454,7 +460,7 @@ public class RunFlowController : MonoBehaviour
                     wideHeight: 48f, wideBack: 20f,
                     onWide: PlaySealDoorDrops, ct);
             }
-            if (this == null || ct.IsCancellationRequested) return;
+            if (this == null || ct.IsCancellationRequested) { SetPlayerInput(true); return; }
         }
         else if (hasCombat)
         {
@@ -465,6 +471,9 @@ public class RunFlowController : MonoBehaviour
         {
             OpenGatesOnly();     // 비전투방 — 문은 세우되 봉인하지 않는다
         }
+
+        // 봉인/게이트가 서고 나서야 조작 복원 — 리빌·대사 창 동안 출구로 못 나가게 잠갔던 것을 푼다.
+        SetPlayerInput(true);
 
         if (restoreCleared)
         {
@@ -595,6 +604,16 @@ public class RunFlowController : MonoBehaviour
         // 전환 커버로 화면이 가려진 동안 호출되므로 회전이 눈에 띄지 않는다.
         GameCameraController.Instance?.SetHeadingImmediate(_heading * 90f);
         Debug.Log($"[RunFlow] 플레이어 이동 → {pos} (heading={(DoorEdge)_heading})");
+    }
+
+    /// <summary>방 진입 연출 동안 플레이어 조작을 잠그거나(false) 푼다(true).
+    /// 봉인이 리빌·대사 뒤에 서므로, 그 창에서 출구로 달려나가 통로에 갇히는 것을 막는 컷신 채널.
+    /// MovePlayer와 동일하게 바인딩 런 우선 → AppBootstrapper 폴백으로 플레이어를 찾는다.</summary>
+    private void SetPlayerInput(bool enabled)
+    {
+        var player = GameRunBootstrapper.Instance?.Run?.Player
+                  ?? AppBootstrapper.Instance?.CurrentRun?.Player;
+        player?.SetInputEnabled(enabled);
     }
 
     /// <summary>이전 방을 자식 단위로 몇 프레임에 나눠 파괴해 단발 대량 Destroy 스파이크를 분산한다.
