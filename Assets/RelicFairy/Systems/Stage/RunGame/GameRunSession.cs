@@ -860,9 +860,7 @@ public sealed class GameRunSession
         if (charData == null)
             Debug.LogWarning("[GameRun] CharacterData not set — PlayerRunState uses default maxHp=100.");
 
-        // 디버그/테스트용 시작 골드 — 출시 전 정책. 추후 0 또는 메타-프로그레션 값으로 교체.
-        const int DebugStartGold = 99999;
-        return new PlayerRunState(maxHp, DebugStartGold);
+        return new PlayerRunState(maxHp);
     }
 
     private void SubscribePlayerStateSource(PlayerController player)

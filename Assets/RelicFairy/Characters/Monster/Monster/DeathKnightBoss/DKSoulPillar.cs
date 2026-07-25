@@ -21,6 +21,7 @@ public class DKSoulPillar : MonoBehaviour, IDamageable
 
     private Renderer[]            _visualRenderers;
     private int[]                 _originalLayers;
+    private int                   _originalRootLayer;
     private MaterialPropertyBlock _propBlock;
     private Coroutine             _hitBlinkCoroutine;
 
@@ -63,7 +64,13 @@ public class DKSoulPillar : MonoBehaviour, IDamageable
         _visualRenderers = rendList.ToArray();
         _originalLayers  = new int[_visualRenderers.Length];
 
-        int monsterLayer = LayerMask.NameToLayer("Monster");
+        int monsterLayer    = LayerMask.NameToLayer("Monster");
+        int monsterHitLayer = LayerMask.NameToLayer("MonsterHit");
+
+        // BoxCollider GO(root)를 MonsterHit 레이어로 설정해야 무기 OverlapBox에 감지됨
+        _originalRootLayer = gameObject.layer;
+        gameObject.layer   = monsterHitLayer;
+
         for (int i = 0; i < _visualRenderers.Length; i++)
         {
             if (_visualRenderers[i] == null) continue;
@@ -138,6 +145,8 @@ public class DKSoulPillar : MonoBehaviour, IDamageable
 
     private void RestoreRendererLayers()
     {
+        gameObject.layer = _originalRootLayer;
+
         if (_visualRenderers == null || _originalLayers == null) return;
         for (int i = 0; i < _visualRenderers.Length; i++)
         {
