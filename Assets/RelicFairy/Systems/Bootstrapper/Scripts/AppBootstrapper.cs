@@ -497,6 +497,9 @@ public sealed class AppBootstrapper : MonoBehaviour
         int h = Mathf.Min(disp.height, Mathf.RoundToInt(disp.width * 9f / 16f));
         int w = Mathf.RoundToInt(h * 16f / 9f);
         Screen.SetResolution(w, h, FullScreenMode.FullScreenWindow, disp.refreshRateRatio);
+
+        // VSync 미사용 품질 티어(Performant)에서 프레임 무제한 방지 — 모니터 주사율로 캡(최소 60).
+        Application.targetFrameRate = Mathf.Max(60, Mathf.RoundToInt((float)disp.refreshRateRatio.value));
     }
 
     private async void Start()
