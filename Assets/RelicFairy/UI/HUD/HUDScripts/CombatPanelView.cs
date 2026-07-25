@@ -793,20 +793,24 @@ public sealed class CombatPanelView : MonoBehaviour
         var slotGo = FindChildRecursive(transform, "HUD_Active_01");
         if (slotGo == null) return;
 
+        // 개수는 우하단 모서리 — 아이콘(가운데)·C키(좌상단 코너)와 자리를 나눠 겹치지 않게 한다.
         var go = new GameObject("PotionCount", typeof(RectTransform));
         go.transform.SetParent(slotGo, false);
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot     = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, -2f);
-        rt.sizeDelta = new Vector2(48f, 26f);
+        rt.anchorMin = rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot     = new Vector2(1f, 0f);
+        rt.anchoredPosition = new Vector2(-3f, 2f);
+        rt.sizeDelta = new Vector2(40f, 22f);
 
         _potionCountLabel = go.AddComponent<TextMeshProUGUI>();
         if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
-        _potionCountLabel.fontSize  = 20f;
+        _potionCountLabel.fontSize  = 18f;
         _potionCountLabel.fontStyle = FontStyles.Bold;
-        _potionCountLabel.alignment = TextAlignmentOptions.Center;
+        _potionCountLabel.alignment = TextAlignmentOptions.BottomRight;
         _potionCountLabel.raycastTarget = false;
+        var ol = go.AddComponent<UnityEngine.UI.Outline>();   // 아이콘 위에서도 읽히게 외곽선
+        ol.effectColor    = new Color(0f, 0f, 0f, 0.9f);
+        ol.effectDistance = new Vector2(1f, -1f);
     }
 
     // ─────────────────────────────────────────────────────────

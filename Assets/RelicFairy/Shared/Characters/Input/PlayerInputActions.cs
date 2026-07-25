@@ -253,6 +253,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Potion"",
+                    ""type"": ""Button"",
+                    ""id"": ""c0000000-0000-4000-8000-000000000001"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -497,6 +506,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""PuzzleToggle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c0000000-0000-4000-8000-000000000002"",
+                    ""path"": ""<Keyboard>/c"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Potion"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -523,6 +543,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_testKey2 = m_Player.FindAction("testKey2", throwIfNotFound: true);
         m_Player_RSkill = m_Player.FindAction("RSkill", throwIfNotFound: true);
         m_Player_PuzzleToggle = m_Player.FindAction("PuzzleToggle", throwIfNotFound: true);
+        m_Player_Potion = m_Player.FindAction("Potion", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -621,6 +642,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_testKey2;
     private readonly InputAction m_Player_RSkill;
     private readonly InputAction m_Player_PuzzleToggle;
+    private readonly InputAction m_Player_Potion;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player ".
     /// </summary>
@@ -705,6 +727,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @PuzzleToggle => m_Wrapper.m_Player_PuzzleToggle;
         /// <summary>
+        /// Provides access to the underlying input action "Player/Potion".
+        /// </summary>
+        public InputAction @Potion => m_Wrapper.m_Player_Potion;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -784,6 +810,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @PuzzleToggle.started += instance.OnPuzzleToggle;
             @PuzzleToggle.performed += instance.OnPuzzleToggle;
             @PuzzleToggle.canceled += instance.OnPuzzleToggle;
+            @Potion.started += instance.OnPotion;
+            @Potion.performed += instance.OnPotion;
+            @Potion.canceled += instance.OnPotion;
         }
 
         /// <summary>
@@ -849,6 +878,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @PuzzleToggle.started -= instance.OnPuzzleToggle;
             @PuzzleToggle.performed -= instance.OnPuzzleToggle;
             @PuzzleToggle.canceled -= instance.OnPuzzleToggle;
+            @Potion.started -= instance.OnPotion;
+            @Potion.performed -= instance.OnPotion;
+            @Potion.canceled -= instance.OnPotion;
         }
 
         /// <summary>
@@ -1015,5 +1047,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnPuzzleToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Potion" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPotion(InputAction.CallbackContext context);
     }
 }
