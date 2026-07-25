@@ -208,6 +208,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         if (bb != null)
         {
             Data.SetSummonFlag(bb, true);
+            bb.SetSummonGated(true);
             bb.IsAirborne = true;
         }
 
@@ -292,7 +293,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         if (_minionsSpawned >= TotalMinions)
         {
             _phase = Phase.WaitMinions;
-            _timer = 0f;
+            _timer = Data.AirPatternInterval; // 진입 즉시 BreathSweep 발동
         }
     }
 

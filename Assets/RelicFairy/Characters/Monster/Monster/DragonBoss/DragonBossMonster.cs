@@ -69,8 +69,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [SerializeField] private float _airOrbitRadiusTolerance = 1.2f;
     [Tooltip("선회 반경 = Floor 내접원 반지름 * 이 비율 (1=내접원에 정확히 접함, 작을수록 카메라 안쪽으로)")]
     [SerializeField] private float _airOrbitRadiusRatio = 0.8f;
-    [Tooltip("공중 패턴 발동 잠금에 필요한 최소 선회량 (1=한 바퀴). 너무 크면 원거리 공격 윈도우가 루즈해짐")]
-    [SerializeField] private float _airMinOrbitTurnsBeforePattern = 0.5f;
+    [Tooltip("공중 진입 직후 패턴 발동 잠금 최소 선회량 랜덤 범위 하한 (1=한 바퀴)")]
+    [SerializeField] private float _airOrbitMinTurnsMin = 0.05f;
+    [Tooltip("공중 진입 직후 패턴 발동 잠금 최소 선회량 랜덤 범위 상한 (1=한 바퀴)")]
+    [SerializeField] private float _airOrbitMinTurnsMax = 0.5f;
     [SerializeField] private float _airOrbitRecenterThreshold = 9f;
     [SerializeField] private float _airOrbitCenterMoveSpeedMult = 1.1f;
 
@@ -183,7 +185,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public float  AirOrbitAngularSpeed => _airOrbitAngularSpeed;
     public float  AirOrbitCatchUpSpeedMult => _airOrbitCatchUpSpeedMult;
     public float  AirOrbitRadiusTolerance => _airOrbitRadiusTolerance;
-    public float  AirMinOrbitTurnsBeforePattern => _airMinOrbitTurnsBeforePattern;
+    public float  AirOrbitMinTurnsMin => _airOrbitMinTurnsMin;
+    public float  AirOrbitMinTurnsMax => _airOrbitMinTurnsMax;
     public float  AirOrbitRecenterThreshold => _airOrbitRecenterThreshold;
     public float  AirOrbitCenterMoveSpeedMult => _airOrbitCenterMoveSpeedMult;
 
@@ -244,6 +247,8 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     private float            _footstepPrevTime;
     private float            _normalSfxTimer;
     private float            _normalSfxNextInterval;
+    private float            _airOrbitCurrentLockDegrees;
+    private BodyState        _prevBodyState;
 
     // ── 외부 접근 ─────────────────────────────────────────
     public DragonBossBlackboard DragonBlackboard => _dragonBB;
@@ -366,9 +371,14 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
         UpdateTransitionPatternWeights();
 
-        // 공중 상태에서 최소 선회량을 채울 때까지 패턴 발동 잠금
+        // 지상→공중 전환 시 선회 잠금 임계값 랜덤 재설정
+        if (_dragonBB.BodyState == BodyState.Airborne && _prevBodyState == BodyState.Grounded)
+            _airOrbitCurrentLockDegrees = UnityEngine.Random.Range(_airOrbitMinTurnsMin, _airOrbitMinTurnsMax) * 360f;
+        _prevBodyState = _dragonBB.BodyState;
+
+        // 공중 진입 직후 랜덤 선회량 채울 때까지 패턴 발동 잠금
         bool airPatternLocked = _dragonBB.BodyState == BodyState.Airborne
-            && _dragonBB.AirOrbitAccumulatedDegrees < _airMinOrbitTurnsBeforePattern * 360f;
+            && _dragonBB.AirOrbitAccumulatedDegrees < _airOrbitCurrentLockDegrees;
         if (!airPatternLocked)
             _runner?.Tick(Time.deltaTime);
 
@@ -534,8 +544,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         CacheTransitionPatternBaseWeights();
         UpdateTransitionPatternWeights();
         BindBossHud();
-        _airborneHitboxActive = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
-        _pendingTriggerEntrance = false;
+        _airborneHitboxActive       = true; // 다음 프레임 SyncAirborneHitbox에서 지상 상태로 강제 복원
+        _prevBodyState              = BodyState.Grounded;
+        _airOrbitCurrentLockDegrees = 0f;
+        _pendingTriggerEntrance     = false;
         _normalSfxTimer = 0f;
         _normalSfxNextInterval = UnityEngine.Random.Range(_normalSfxIntervalMin, _normalSfxIntervalMax);
         // pool 재활성: 등장 연출 재진입
@@ -562,6 +574,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         {
             Vector3 dir = instigator.transform.position - transform.position;
             _dragonBB.SetHitDirection(dir, transform.forward);
+        }
+
+        // HP가 소환 임계값에 이미 도달해 있고 해당 소환이 미발동이면 데미지 전 즉시 무적
+        if (_dragonBB != null && _config != null && _runtime != null && _config.stat.maxHp > 0)
+        {
+            float ratio = HpRatio;
+            if ((!_dragonBB.HasSummonedAt70 && ratio <= 0.7f) ||
+                (!_dragonBB.HasSummonedAt40 && ratio <= 0.4f) ||
+                (!_dragonBB.HasSummonedAt10 && ratio <= 0.1f))
+                _dragonBB.SetSummonGated(true);
         }
 
         if (_dragonBB != null && _dragonBB.IsSummonGated) return;

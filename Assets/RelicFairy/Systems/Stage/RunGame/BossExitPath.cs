@@ -113,7 +113,7 @@ public sealed class BossExitPath : MonoBehaviour
     /// <summary>아레나 바닥 렌더러 경계에서 dir 방향 끝점을 구한다. 바닥을 못 찾으면 방 중앙에서 고정 거리.</summary>
     private static Vector3 ProjectToFloorEdge(Transform arena, Vector3 roomCenter, Vector3 dir)
     {
-        var floor = arena.Find("Floor");
+        var floor = FindFloor(arena);
         var rend  = floor != null ? floor.GetComponent<Renderer>() : null;
         if (rend == null)
         {
@@ -124,7 +124,18 @@ public sealed class BossExitPath : MonoBehaviour
         var b = rend.bounds;
         // dir 축으로 경계까지의 거리(사각 바닥 가정 — 지배적인 축만 사용)
         float reach = Mathf.Abs(dir.z) >= Mathf.Abs(dir.x) ? b.extents.z : b.extents.x;
-        return new Vector3(b.center.x, b.min.y, b.center.z) + dir * reach;
+        return new Vector3(b.center.x, b.max.y, b.center.z) + dir * reach;
+    }
+
+    /// <summary>"Floor" 또는 "~Floor" 등 이름에 Floor가 포함된 직계 자식을 찾는다.</summary>
+    private static Transform FindFloor(Transform arena)
+    {
+        foreach (Transform child in arena)
+        {
+            if (child.name.IndexOf("Floor", StringComparison.OrdinalIgnoreCase) >= 0)
+                return child;
+        }
+        return null;
     }
 
     /// <summary>
@@ -155,7 +166,7 @@ public sealed class BossExitPath : MonoBehaviour
     /// <summary>아레나 바닥 머티리얼을 그대로 빌려 길의 톤을 방과 일치시킨다(폴백 타일용).</summary>
     private static Material SampleFloorMaterial(Transform arena)
     {
-        var floor = arena.Find("Floor");
+        var floor = FindFloor(arena);
         var rend  = floor != null ? floor.GetComponent<Renderer>() : null;
         return rend != null ? rend.sharedMaterial : null;
     }

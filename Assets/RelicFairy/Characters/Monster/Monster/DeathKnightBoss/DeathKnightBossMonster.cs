@@ -138,6 +138,8 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     private CancellationTokenSource   _healCts;
     private bool                      _soulGateCleared;
 
+    public bool SoulGateCleared => _soulGateCleared;
+
     /// <summary>GetHitState 진입/종료 시 콤보 러너 차단 플래그.</summary>
     public void SetStagger(bool value) => _isStaggered = value;
 
@@ -440,6 +442,13 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
         HealGradualAsync(total, duration, _healCts.Token).Forget();
     }
 
+    public void CancelGradualHeal()
+    {
+        _healCts?.Cancel();
+        _healCts?.Dispose();
+        _healCts = null;
+    }
+
     private async UniTaskVoid HealGradualAsync(int total, float duration, CancellationToken ct)
     {
         try
@@ -597,6 +606,7 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
 
     // 추적 없음 — 제자리 대기 전용 보스
     public override bool ShouldStartChase(MonsterContext ctx) => false;
+    protected override bool LocksNavPosition => true;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 내부 헬퍼

@@ -59,6 +59,8 @@ public class DKSoulSummonPatternSO : BossPatternSO
     {
         var dk = ctx.Ctx.Monster as DeathKnightBossMonster;
         if (dk == null) return false;
+        // _soulGateCleared=true: 기둥 성공 파괴 → HP 55% 이상 회복 전까지 재발동 불가
+        if (dk.SoulGateCleared) return false;
         return dk.HpRatio <= 0.5f && !dk.DKBlackboard.IsPhase2;
     }
 
@@ -80,7 +82,7 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
         "SM_Pillar_Base_02a60", "SM_Pillar_Base_02a61"
     };
 
-    private enum Phase { MovingToCenter, Summoning, PillarWait, Recovery }
+    private enum Phase { Summoning, PillarWait, Recovery }
 
     private Phase              _phase;
     private float              _timer;
@@ -94,7 +96,10 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase          = Phase.MovingToCenter;
+        // 이전 사이클의 잔여 힐 비동기 작업 취소 (타임아웃 힐이 다음 사이클까지 이어지는 것 방지)
+        (ctx.Monster as DeathKnightBossMonster)?.CancelGradualHeal();
+
+        _phase          = Phase.Summoning;
         _timer          = 0f;
         _pillarsSpawned = false;
         _patternEnded   = false;
@@ -102,44 +107,9 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
         _destroyedCount = 0;
         _pillars.Clear();
 
-        StartMoveToCenter(ctx);
-        PlayAnim(ctx, AnimWalk);
-    }
-
-    public override void Update(MonsterContext ctx)
-    {
-        _timer += Time.deltaTime;
-
-        switch (_phase)
-        {
-            case Phase.MovingToCenter: UpdateMovingToCenter(ctx); break;
-            case Phase.Summoning:      UpdateSummoning(ctx);      break;
-            case Phase.PillarWait:     UpdatePillarWait(ctx);     break;
-            case Phase.Recovery:       UpdateRecovery(ctx);       break;
-        }
-    }
-
-    public override void Exit(MonsterContext ctx)
-    {
-        _patternEnded = true;
-        Cleanup(ctx);
-        RestoreAgent(ctx);
-        (ctx.Monster as DeathKnightBossMonster)?.NotifySoulSummonCompleted();
-    }
-
-    // ── Phase: MovingToCenter ──────────────────────────────────
-
-    private void UpdateMovingToCenter(MonsterContext ctx)
-    {
-        bool arrived = ctx.Agent != null && ctx.Agent.isOnNavMesh
-                       && !ctx.Agent.pathPending
-                       && ctx.Agent.remainingDistance <= ctx.Agent.stoppingDistance;
-
-        if (!arrived && _timer < Data.moveToCenterTime) return;
-
+        // 보스는 초기 위치 고정 — 이동 없이 즉시 소환 페이즈 진입
         StopAgent(ctx);
         PlayAnim(ctx, AnimIdle2);
-
         (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
 
         if (Data.bossShieldVfxPrefab != null)
@@ -154,9 +124,26 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
                 DKGridPatternHelper.TintShieldVfx(_shieldVfxGo, sc);
             }
         }
+    }
 
-        _phase = Phase.Summoning;
-        _timer = 0f;
+    public override void Update(MonsterContext ctx)
+    {
+        _timer += Time.deltaTime;
+
+        switch (_phase)
+        {
+            case Phase.Summoning:  UpdateSummoning(ctx);  break;
+            case Phase.PillarWait: UpdatePillarWait(ctx); break;
+            case Phase.Recovery:   UpdateRecovery(ctx);   break;
+        }
+    }
+
+    public override void Exit(MonsterContext ctx)
+    {
+        _patternEnded = true;
+        Cleanup(ctx);
+        RestoreAgent(ctx);
+        (ctx.Monster as DeathKnightBossMonster)?.NotifySoulSummonCompleted();
     }
 
     // ── Phase: Summoning ───────────────────────────────────────
@@ -312,19 +299,6 @@ public class DKSoulSummonState : FullLockState<DKSoulSummonPatternSO>
         _shieldVfxGo.transform.SetParent(null);
         BossEffectPool.Release(_shieldVfxGo);
         _shieldVfxGo = null;
-    }
-
-    private static void StartMoveToCenter(MonsterContext ctx)
-    {
-        Vector3 center = DKBossRoomContext.CellToWorld(
-            DKBossRoomContext.Width  / 2,
-            DKBossRoomContext.Height / 2, 0f);
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped        = false;
-            ctx.Agent.stoppingDistance = 0.5f;
-            ctx.Agent.SetDestination(center);
-        }
     }
 
     private static void StopAgent(MonsterContext ctx)

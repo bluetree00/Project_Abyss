@@ -189,7 +189,7 @@ public class DragonDormantState : IMonsterState
 
             // 3단계: HUD 소멸 → 플레이어 카메라로 복귀
             if (cam != null)
-                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, dragon.EntranceCameraMoveDuration, ct);
+                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
         }
         catch (OperationCanceledException)
         {

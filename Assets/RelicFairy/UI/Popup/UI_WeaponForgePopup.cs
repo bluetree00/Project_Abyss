@@ -106,7 +106,7 @@ public class UI_WeaponForgePopup : UI_Popup
         BindCategory(_ranged, ranged, isMelee: false);
 
         cancelButton?.onClick.RemoveAllListeners();
-        cancelButton?.onClick.AddListener(() => Complete(null));
+        cancelButton?.onClick.AddListener(() => { Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget(); Complete(null); });
 
         confirmButton?.onClick.RemoveAllListeners();
         confirmButton?.onClick.AddListener(OnConfirm);
@@ -191,6 +191,7 @@ public class UI_WeaponForgePopup : UI_Popup
 
     private void OnSelect(Option[] options, WeaponSO weapon, bool isMelee)
     {
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         WeaponSO current = isMelee ? _selectedMelee : _selectedRanged;
         // 이미 선택된 항목을 다시 누르면 선택 취소(토글)
         WeaponSO next = current == weapon ? null : weapon;
@@ -213,6 +214,7 @@ public class UI_WeaponForgePopup : UI_Popup
     private void OnConfirm()
     {
         if (_selectedMelee == null || _selectedRanged == null) return;
+        Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         Complete(new ForgeChoice { Melee = _selectedMelee, Ranged = _selectedRanged });
     }
 

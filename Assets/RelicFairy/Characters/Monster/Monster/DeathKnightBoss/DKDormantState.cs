@@ -149,7 +149,7 @@ public class DKDormantState : IMonsterState
 
             // 플레이어 카메라로 복귀
             if (cam != null)
-                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, dk.EntranceCameraReturnDuration, ct);
+                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
         }
         catch (OperationCanceledException)
         {
