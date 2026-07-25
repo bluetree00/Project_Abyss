@@ -18,9 +18,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   stat:
-    maxHp: 3000
+    maxHp: 20000
     defense: 1
-    attackPower: 120
+    attackPower: 300
     moveSpeed: 4.5
     attackRange: 2
     attackRadius: 1

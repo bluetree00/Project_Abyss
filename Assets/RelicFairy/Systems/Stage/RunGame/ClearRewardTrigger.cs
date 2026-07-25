@@ -101,6 +101,9 @@ public class ClearRewardTrigger : MonoBehaviour
     {
         if (_promptGO         != null) Destroy(_promptGO);
         if (_worldIndicatorGO != null) Destroy(_worldIndicatorGO);
+        // 외부 destroy 시 GridPanel이 열린 채 timeScale=0 고착 방지
+        if (UI_GridPanel.Instance != null && UI_GridPanel.Instance.IsOpen)
+            UI_GridPanel.Instance.Close();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -133,6 +136,13 @@ public class ClearRewardTrigger : MonoBehaviour
         // 클릭 두 번이 늘 뿐 정보가 없어, 곧장 보상 지급 화면으로 넘어간다.
         try { await GiveAllRewardsWithPopupAsync(ct); }
         catch (OperationCanceledException) { return; }
+        catch (Exception e)
+        {
+            Debug.LogError($"[ClearRewardTrigger] 보상 지급 중 예외: {e}");
+            UI_GridPanel.Instance?.Close();
+            Destroy(gameObject);
+            return;
+        }
 
         // [보스 후처리 이관] 보스 클리어의 드래프트·런클리어·챕터 전환은 모두
         // GameRunBootstrapper.OnBossRoomClearedHandler(NotifyBossRoomCleared 구독)가 전담한다.
@@ -236,8 +246,9 @@ public class ClearRewardTrigger : MonoBehaviour
             return;
         }
 
+        var interactionTask = popup.WaitForInteractionAsync(ct);
         popup.Setup(candidates, _run.ItemInventory);
-        await popup.WaitForInteractionAsync(ct);
+        await interactionTask;
 
         if (popup.Skipped)
         {
@@ -249,6 +260,14 @@ public class ClearRewardTrigger : MonoBehaviour
 
         if (popup.Result != null)
             _run.EffectManager?.OnItemPickup(popup.Result);   // 획득 훅은 실제로 고른 것에만
+
+        // 다중 라운드 보상: 다음 라운드 팝업을 열기 전에 그리드 패널이 닫힐 때까지 대기.
+        // 대기 없이 즉시 다음 라운드로 진입하면 그리드 패널 열린 채로 새 팝업이 UIManager 스택에
+        // 쌓여 UIManager·GridPanel 이 동시에 Pause를 점유하고, 사용자가 그리드를 닫아도
+        // UIManager Pause 가 남아 timeScale=0 이 고착된다.
+        await UniTask.WaitUntil(
+            () => UI_GridPanel.Instance == null || !UI_GridPanel.Instance.IsOpen,
+            cancellationToken: ct);
     }
 
     // ── World Indicator (아이콘 + 거리) ───────────────────────
