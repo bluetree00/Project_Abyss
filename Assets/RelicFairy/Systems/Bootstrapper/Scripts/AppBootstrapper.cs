@@ -492,9 +492,11 @@ public sealed class AppBootstrapper : MonoBehaviour
         Application.runInBackground = true;
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
-        int width = Screen.width;
-        int height = (int)(Screen.width * 9f / 16f);
-        Screen.SetResolution(width, height, true);
+        // 16:9 고정 백버퍼 — 데스크톱 물리 해상도를 넘지 않도록 클램프(울트라와이드/16:10 안전).
+        var disp = Screen.currentResolution;
+        int h = Mathf.Min(disp.height, Mathf.RoundToInt(disp.width * 9f / 16f));
+        int w = Mathf.RoundToInt(h * 16f / 9f);
+        Screen.SetResolution(w, h, FullScreenMode.FullScreenWindow, disp.refreshRateRatio);
     }
 
     private async void Start()
