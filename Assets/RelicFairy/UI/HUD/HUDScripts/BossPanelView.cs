@@ -33,8 +33,12 @@ public sealed class BossPanelView : MonoBehaviour
     [Header("내부 창 (테두리 아트 대비 비율) — 트랙/필이 앉을 자리")]
     [SerializeField, Tooltip("프레임 대비 내부 창 크기 (가로, 세로). 아트 실측 2819/2867, 57/319.")]
     private Vector2 innerWindowRatio = new Vector2(0.983f, 0.179f);
-    [SerializeField, Range(0f, 1f), Tooltip("내부 창의 세로 중심 (0=하단, 1=상단). 아트에서 창이 치우쳐 있으면 조정.")]
-    private float innerWindowCenterY = 0.5f;
+    // 프레임 아트(2867×319) 알파 프로파일 실측: 바깥 프레임 상/하 테두리가 png-y 140~149 / 255~264,
+    // 그 사이 실제 바 채널(주 슬롯 png-y 178~222)의 세로 중심이 png-y ≈ 201.
+    // RectTransform 기준(하단=0) centerY = 1 − 201/319 ≈ 0.37. 0.5로 두면 창이 위 테두리 쪽으로
+    // 떠서 필이 홈보다 높게 보였다(플레이어 바도 창이 중앙 아님 — hpInnerPadding T32/B18 → 0.40).
+    [SerializeField, Range(0f, 1f), Tooltip("내부 창의 세로 중심 (0=하단, 1=상단). 아트 알파 실측 기준 0.37.")]
+    private float innerWindowCenterY = 0.37f;
 
     private int _maxHp;
     private bool _skinApplied;
