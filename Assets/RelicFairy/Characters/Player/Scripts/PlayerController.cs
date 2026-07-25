@@ -392,8 +392,15 @@ public class PlayerController : CharacterBase
     private float _moveBasisYaw;
     private Vector2 _lastMoveInput;
 
+    // 직전 프레임 카메라 heading. 한 프레임에 크게 튀는 '불연속 스냅'(방 전환의 SetHeadingImmediate 등) 감지용.
+    private float _prevCamYaw;
+
     // 입력이 "바뀌었다"고 볼 최소 변화량(제곱). 아날로그 스틱 미세 흔들림으로 기준이 재설정되지 않게 한다.
     private const float MoveBasisRelatchThresholdSqr = 0.04f;   // 약 0.2 변화
+
+    // 이 각도(도)를 초과하는 한 프레임 heading 변화는 불연속 스냅으로 보고 이동 기준을 즉시 재정렬한다.
+    // 방 회전(90° 단위 스냅)은 이 문턱을 넘고, 연출용 부드러운 회전(RotateHeadingTo)은 프레임당 변화가 훨씬 작아 걸리지 않는다.
+    private const float MoveBasisSnapRelatchDeg = 60f;
 
     // PlayerController.cs (입력 시 클릭 위치 저장)
     private Vector3? _lastClickedPosition;
@@ -1698,12 +1705,18 @@ public class PlayerController : CharacterBase
         // heading이 0이면 월드축과 완전히 동일하므로 기존 구간(던전 등)의 조작감은 변하지 않는다.
         float camYaw = cinemachineCamera != null ? cinemachineCamera.m_XAxis.Value : 0f;
 
+        // [스냅 재정렬] 카메라 heading이 한 프레임에 크게 튀면(방 전환의 SetHeadingImmediate 등 불연속 스냅)
+        // 키를 계속 누르고 있어도 이동 기준을 즉시 새 heading으로 재정렬한다 — 방이 90° 회전하면 '화면 위'가
+        // 바뀌므로 기준도 따라가야 조작이 화면과 맞는다. 이게 없으면 방 회전 후 키를 누른 채면 옛 방향으로 계속 간다.
+        bool headingSnapped = Mathf.Abs(Mathf.DeltaAngle(camYaw, _prevCamYaw)) > MoveBasisSnapRelatchDeg;
+        _prevCamYaw = camYaw;
+
         // [기준 고정] 카메라가 연출로 회전하는 동안 기준을 매 프레임 갱신하면, 입력을 누르고 있는 것만으로
         // 이동 방향이 카메라를 따라 휩쓸려 조작이 어긋난다(계단에서 시선이 도는 동안 특히).
         // 그래서 입력이 유지되는 동안에는 '누르기 시작한 시점의 카메라 기준'을 그대로 쓰고,
-        // 입력을 놓거나 방향을 바꿀 때만 현재 카메라 기준으로 다시 잡는다.
-        // → 회전 중에도 캐릭터는 일관된 월드 방향으로 계속 이동한다.
-        if (input.sqrMagnitude < 0.0001f || (input - _lastMoveInput).sqrMagnitude > MoveBasisRelatchThresholdSqr)
+        // 입력을 놓거나 방향을 바꿀 때 — 또는 위처럼 heading이 불연속으로 스냅될 때 — 현재 카메라 기준으로 다시 잡는다.
+        // → 부드러운 회전 중에는 캐릭터가 일관된 월드 방향으로 계속 이동(연출 유지), 방 전환 스냅에서는 즉시 새 방 기준으로 정렬.
+        if (headingSnapped || input.sqrMagnitude < 0.0001f || (input - _lastMoveInput).sqrMagnitude > MoveBasisRelatchThresholdSqr)
             _moveBasisYaw = camYaw;
         _lastMoveInput = input;
 
