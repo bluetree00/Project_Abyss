@@ -274,7 +274,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 if (this == null) return;
 
                 // 2-1. 서버 CDN으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
-                ApplyServerStatOverride();
+                // ApplyServerStatOverride(); // 임시 비활성화
 
                 // 2-2. 전 몬스터 플레이어 탐색 범위 상향. 캐시 채움 시(타입당 1회)만 적용 → 인스턴스 누적 없음.
                 ApplyDetectionRangeBoost(_config);
@@ -465,7 +465,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (_statusCcActive)
         {
             _statusCcActive = false;
-            if (_agent != null && _agent.isOnNavMesh && _agent.isActiveAndEnabled)
+            if (!LocksNavPosition && _agent != null && _agent.isOnNavMesh && _agent.isActiveAndEnabled)
                 _agent.isStopped = false;
         }
 
@@ -491,6 +491,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     private void LateUpdate()
     {
+        if (LocksNavPosition) return;
         if (_runtime == null || _runtime.IsDead || _runtime.PlayerTarget == null) return;
         if (_agent == null || !_agent.isOnNavMesh || !_agent.isActiveAndEnabled || _agent.isStopped) return;
 
@@ -525,6 +526,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
     /// <summary>true면 근접 공격(ColliderInstance) 판정을 무시한다. 원거리 투사체(BasicArrow 등)는 영향 없음.</summary>
     public virtual bool IsMeleeImmuneNow => false;
+
+    /// <summary>true면 NavMeshAgent 이동을 영구 잠금한다. CC 해제·LateUpdate push 모두 차단.</summary>
+    protected virtual bool LocksNavPosition => false;
 
     /// <summary>Patrol → Chase 전환 조건. 오버라이드로 몬스터별 감지 로직 교체.</summary>
     public virtual bool ShouldStartChase(MonsterContext ctx)

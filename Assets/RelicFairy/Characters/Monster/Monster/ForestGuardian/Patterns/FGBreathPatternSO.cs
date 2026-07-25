@@ -124,6 +124,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     private RectWarning _rectWarning;
     private GameObject  _breathVfxGO;
     private AudioSource _beamAudioSource;
+    private Bounds      _arenaBounds;
 
     public FGBreathState(FGBreathPatternSO data) : base(data) { }
 
@@ -137,6 +138,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         _timer        = 0f;
         _damageTimer  = 0f;
         _currentRange = 0f;
+        _arenaBounds  = DragonPatternFloorUtils.ResolveArenaBoundsXZ(ctx.Transform.position, Data.range);
 
         if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
         {
@@ -199,7 +201,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                     }
                 }
 
-                UpdateCurrentRange();
+                UpdateCurrentRange(ctx);
                 RotateTowardPlayer(ctx);
                 UpdateBreathVfxTransform(ctx);
 
@@ -249,13 +251,38 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     // 사거리 점진 확장
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private void UpdateCurrentRange()
+    private void UpdateCurrentRange(MonsterContext ctx)
     {
-        float startRange = Data.range * Mathf.Clamp01(Data.rangeStartRatio);
+        float fullRange  = GetFullRange(ctx);
+        float startRange = fullRange * Mathf.Clamp01(Data.rangeStartRatio);
         float t = Data.rangeGrowDuration > 0.0001f
             ? Mathf.Clamp01(_timer / Data.rangeGrowDuration)
             : 1f;
-        _currentRange = Mathf.Lerp(startRange, Data.range, t);
+        _currentRange = Mathf.Lerp(startRange, fullRange, t);
+    }
+
+    // 현재 보스 전방 기준으로 아레나 경계까지의 거리를 반환한다. 경계를 못 찾으면 Data.range 사용.
+    private float GetFullRange(MonsterContext ctx)
+    {
+        Vector3 origin  = ctx.Transform.position;
+        Vector3 forward = ctx.Transform.forward; forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) return Data.range;
+        forward.Normalize();
+
+        float result = Data.range;
+        if (Mathf.Abs(forward.x) > 0.0001f)
+        {
+            float bx = forward.x > 0f ? _arenaBounds.max.x : _arenaBounds.min.x;
+            float t  = (bx - origin.x) / forward.x;
+            if (t > 0f) result = Mathf.Min(result, t);
+        }
+        if (Mathf.Abs(forward.z) > 0.0001f)
+        {
+            float bz = forward.z > 0f ? _arenaBounds.max.z : _arenaBounds.min.z;
+            float t  = (bz - origin.z) / forward.z;
+            if (t > 0f) result = Mathf.Min(result, t);
+        }
+        return result;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -325,8 +352,8 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         pos.y += 0.02f;
 
         _warningGO = Managers.ObjectPooler.SpawnFromPrefab(Data.warningPrefab, ObjectPoolerManager.PoolType.Effect, pos, ctx.Transform.rotation);
-        // 피벗이 근거리 끝 → scale Z = 사정거리, X = 폭
-        _warningGO.transform.localScale = new Vector3(Data.width, 1f, Data.range);
+        // 피벗이 근거리 끝 → scale Z = 사정거리(맵 경계까지), X = 폭
+        _warningGO.transform.localScale = new Vector3(Data.width, 1f, GetFullRange(ctx));
 
         _rectWarning = _warningGO.GetComponent<RectWarning>();
         _rectWarning?.SetFillProgress(0f);

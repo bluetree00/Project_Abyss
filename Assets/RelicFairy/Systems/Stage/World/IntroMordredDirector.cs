@@ -177,6 +177,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
 
         try
         {
+            // 무형검을 집는 순간 BGM을 Game_Intro_play로 전환
+            Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
+
             // 플레이어 통제 — 컷신 동안 입력 차단 + 남은 관성 제거 + 카메라 수동 제어 인계.
             player?.SetInputEnabled(false);
             FreezePlayerGrounded(player);

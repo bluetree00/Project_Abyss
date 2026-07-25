@@ -88,10 +88,21 @@ public class VictimHitFeedback : MonoBehaviour, IHitReceiver
 
     private void OnDestroy() => CancelAll();
 
+    // ── Constants ─────────────────────────────────────────────────
+    private static readonly string[] s_hitSfxKeys =
+    {
+        SoundKey.Sfx.MonsterHit1,
+        SoundKey.Sfx.MonsterHit2,
+        SoundKey.Sfx.MonsterHit3,
+    };
+
     // ── Public Methods (IHitReceiver) ─────────────────────────────
     public void OnReceiveHit(in HitInfo info)
     {
         if (_profile == null) return;
+
+        var sfxKey = s_hitSfxKeys[UnityEngine.Random.Range(0, s_hitSfxKeys.Length)];
+        Managers.Sound?.PlayEffectAsync(sfxKey).Forget();
 
         Color flashColor = _profile.FlashColor;
         Color lightColor = _profile.LightColor;

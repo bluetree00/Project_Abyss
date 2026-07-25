@@ -74,8 +74,6 @@ public class DKStrikePatternSO : BossPatternSO
     public float swordLightYOffset   = 3.5f;
 
     [Header("Timing")]
-    [Tooltip("맵 중앙 이동 최대 허용 시간")]
-    public float moveToCenterTime   = 2.5f;
     [Tooltip("타일 링 1층 확장 간격 (초)")]
     public float tileLayerDelay     = 0.35f;
     [Tooltip("전체 맵 덮인 후 슬래시 발동까지 대기")]
@@ -106,10 +104,9 @@ public class DKStrikePatternSO : BossPatternSO
 
 public class DKStrikeState : FullLockState<DKStrikePatternSO>
 {
-    private const string AnimWalk  = "Walk1";
     private const string AnimIdle2 = "Idle2";
 
-    private enum Phase { MovingToCenter, TileExpansion, SlashAttack, Recovery }
+    private enum Phase { TileExpansion, SlashAttack, Recovery }
 
     // ── 페이즈 ────────────────────────────────────────────
     private Phase _phase;
@@ -152,7 +149,7 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
     public override void Enter(MonsterContext ctx)
     {
-        _phase                = Phase.MovingToCenter;
+        _phase                = Phase.TileExpansion;
         _timer                = 0f;
         _tiles                = new List<DKTileInfo>();
         _currentRow           = 0;
@@ -186,23 +183,15 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
         if (fwd.z <= 0f) { _tileZStart = DKBossRoomContext.Height - 2;      _tileZStep = -1; }
         else              { _tileZStart = 1;                                 _tileZStep = 1;  }
 
-        if (anchor != null)
-        {
-            // 보스는 단상에 고정 — MovingToCenter 페이즈를 건너뛰고 즉시 TileExpansion 시작
-            StopAgent(ctx);
-            PlayAnim(ctx, AnimIdle2);
-            (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
-            SpawnFireShield(ctx);
-            SpawnFloatingSwords(ctx);
-            _phase          = Phase.TileExpansion;
-            _timer          = 0f;
-            _tileLayerTimer = 0f;
-        }
-        else
-        {
-            MoveToCenter(ctx);
-            PlayAnim(ctx, AnimWalk);
-        }
+        // 보스는 항상 현재 위치 고정 — 앵커 유무와 무관하게 이동 없이 즉시 TileExpansion 시작
+        StopAgent(ctx);
+        PlayAnim(ctx, AnimIdle2);
+        (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
+        SpawnFireShield(ctx);
+        SpawnFloatingSwords(ctx);
+        _phase          = Phase.TileExpansion;
+        _timer          = 0f;
+        _tileLayerTimer = 0f;
     }
 
     public override void Exit(MonsterContext ctx)
@@ -231,32 +220,10 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
 
         switch (_phase)
         {
-            case Phase.MovingToCenter: UpdateMovingToCenter(ctx); break;
             case Phase.TileExpansion:  UpdateTileExpansion(ctx);  break;
             case Phase.SlashAttack:    UpdateSlashAttack(ctx);    break;
             case Phase.Recovery:       UpdateRecovery(ctx);       break;
         }
-    }
-
-    // ── Phase: MovingToCenter ──────────────────────────────
-
-    private void UpdateMovingToCenter(MonsterContext ctx)
-    {
-        bool arrived = ctx.Agent != null && ctx.Agent.isOnNavMesh &&
-                       !ctx.Agent.pathPending && ctx.Agent.remainingDistance < 0.8f;
-        if (!arrived && _timer < Data.moveToCenterTime) return;
-
-        StopAgent(ctx);
-        PlayAnim(ctx, AnimIdle2);
-
-        // 무적 + FireShield + 부유검 소환
-        (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
-        SpawnFireShield(ctx);
-        SpawnFloatingSwords(ctx);
-
-        _phase         = Phase.TileExpansion;
-        _timer         = 0f;
-        _tileLayerTimer = 0f;
     }
 
     // ── Phase: TileExpansion ───────────────────────────────
@@ -593,18 +560,6 @@ public class DKStrikeState : FullLockState<DKStrikePatternSO>
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 헬퍼
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    private void MoveToCenter(MonsterContext ctx)
-    {
-        Vector3 centerWorld = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, DKBossRoomContext.Height / 2, 0f);
-        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
-        {
-            ctx.Agent.isStopped        = false;
-            ctx.Agent.stoppingDistance = 0.5f;
-            ctx.Agent.speed            = ctx.Stat.moveSpeed * ctx.Runtime.SpeedMultiplier;
-            ctx.Agent.SetDestination(centerWorld);
-        }
-    }
 
     private static void StopAgent(MonsterContext ctx)
     {
