@@ -780,7 +780,8 @@ public sealed class CombatPanelView : MonoBehaviour
         EnsurePotionCountLabel();
         if (_potionCountLabel != null)
         {
-            _potionCountLabel.text  = count.ToString();
+            // 현재개수/용량("2/3") — 용량이 0(포션 미보유 체계)이면 개수만.
+            _potionCountLabel.text  = capacity > 0 ? $"{count}/{capacity}" : count.ToString();
             // 0개면 흐리게 — 눌러도 안 나간다는 걸 색으로 먼저 알린다.
             _potionCountLabel.color = count > 0 ? PotionCountColor : PotionEmptyColor;
         }
