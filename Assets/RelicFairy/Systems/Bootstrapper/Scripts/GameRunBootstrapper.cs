@@ -189,6 +189,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
     // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
     private Vector3? _pendingPlayerSpawnPos;
+
+    /// <summary>
+    /// 시작방 출구(StartRoomGate) 월드 위치. 시작방에서만 채워지고, 플레이어 스폰 회전을
+    /// 잡는 데 한 번 쓰고 비운다. 절차 생성 방은 grid의 P 토큰이 위치만 정하고 회전은
+    /// 늘 월드 아이덴티티라, 방 방향과 무관하게 +Z를 보고 시작하던 문제를 시작방 한정으로 보정한다.
+    /// </summary>
+    private Vector3? _startRoomExitWorldPos;
     private bool _isSpawning;
 
     private GameRunSession _run;
@@ -1724,6 +1731,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>
+    /// <summary>
+    /// 시작방이면 출구를 바라보는 회전을 돌려준다. 시작방이 아니거나 출구가 스폰 지점과
+    /// 겹칠 만큼 가까우면 <paramref name="fallback"/>을 그대로 돌려준다.
+    /// 기준은 한 번만 쓰고 비우므로 이후 방들은 기존 동작(월드 아이덴티티)을 유지한다.
+    /// </summary>
+    private Quaternion FaceStartRoomExit(Vector3 spawnPos, Quaternion fallback)
+    {
+        if (!_startRoomExitWorldPos.HasValue) return fallback;
+
+        var toExit = _startRoomExitWorldPos.Value - spawnPos;
+        _startRoomExitWorldPos = null;   // 시작방 1회성
+
+        toExit.y = 0f;                   // 수평 방향만 — 게이트가 위/아래에 있어도 고개를 들지 않는다
+        if (toExit.sqrMagnitude < 0.01f) return fallback;
+
+        return Quaternion.LookRotation(toExit.normalized, Vector3.up);
+    }
+
     private Vector3 ResolvePlayerSpawnFromGrid(TileType[,] grid, Vector3 anchor, int w, int h)
     {
         var p = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
@@ -1852,6 +1877,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         gateGO.transform.localPosition = gateLocalPos;
         gateGO.transform.localRotation = gateLocalRot;
         gateGO.name = "StartRoomGate";
+
+        // 스폰 회전 기준 — 플레이어가 이 게이트를 보고 시작한다(시작방 한정).
+        _startRoomExitWorldPos = gateGO.transform.position;
 
         if (!gateGO.TryGetComponent<StartRoomGate>(out var gate))
             gate = gateGO.AddComponent<StartRoomGate>();
@@ -3351,6 +3379,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             pos = _pendingPlayerSpawnPos.Value;
             _pendingPlayerSpawnPos = null;
             rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
+
+            // 시작방 한정 — 출구를 정면에 두고 시작한다.
+            // 카메라 인계(HandToGameplayCamera)가 alignHeadingToTarget:true라
+            // 플레이어 정면이 그대로 카메라 기준 헤딩이 된다. 별도 카메라 조작이 필요 없다.
+            rot = FaceStartRoomExit(pos, rot);
         }
         else
         {
