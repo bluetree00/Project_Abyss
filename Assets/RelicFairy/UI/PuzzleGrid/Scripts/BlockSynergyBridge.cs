@@ -420,6 +420,11 @@ public class MerlinRuneBridge : MonoBehaviour
     {
         ResetSynergyState();
 
+        // 판(헥사 뷰)은 UI_GridPanel(DDOL) 소속이라 퍼즐 인스턴스와 함께 죽지 않는다 —
+        // 칸 점유를 여기서 직접 비우지 않으면 지난 런의 배치가 다음 런 판에 그대로 남는다.
+        Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include)?
+            .ResetBoardOccupancy();
+
         if (boardManager != null)
             boardManager.OnGridSessionActivated -= HandleGridSessionActivated;
 
