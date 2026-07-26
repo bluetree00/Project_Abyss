@@ -50,8 +50,14 @@ public static class CovenantPalette
         ["execute"]   = new EffectDef { id="execute",   name="처형",     desc="저체력 대상을 즉사시킨다",   tag="공격", kind=EffectKind.Execute,    magnitude=0.15f },
     };
 
+    // 뽑기 풀에서 제외할 효과. 정의는 남겨둔다 — 이미 저장된 서약("asm:cause@tier|effect@tier")이
+    // 이 id를 참조하고 있으면 TryGetEffect로 그대로 해석돼야 하기 때문이다.
+    // goldrain(황금비): 골드 보상은 서약이 아니라 상점·보상 쪽에서 다루기로 해 등장시키지 않는다.
+    private static readonly HashSet<string> _draftExcluded = new() { "goldrain" };
+
     private static readonly List<string> _causeIds  = new(_causes.Keys);
-    private static readonly List<string> _effectIds = new(_effects.Keys);
+    private static readonly List<string> _effectIds =
+        new(System.Linq.Enumerable.Where(_effects.Keys, id => !_draftExcluded.Contains(id)));
 
     public static IReadOnlyList<string> CauseIds  => _causeIds;
     public static IReadOnlyList<string> EffectIds => _effectIds;
