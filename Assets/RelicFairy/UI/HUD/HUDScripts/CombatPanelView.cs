@@ -798,20 +798,23 @@ public sealed class CombatPanelView : MonoBehaviour
         var slotGo = FindChildRecursive(transform, "HUD_Active_01");
         if (slotGo == null) return;
 
-        // 개수는 우하단 모서리 — 아이콘(가운데)·C키(좌상단 코너)와 자리를 나눠 겹치지 않게 한다.
+        // 개수는 좌상단 모서리 — 아이콘(가운데)·키 라벨(우하단)과 자리를 나눠 겹치지 않게 한다.
+        // 키 라벨은 StyleKeyLabel이 모든 슬롯을 우하단(KeyLabelPivot)으로 정규화하므로,
+        // 자리를 비켜주는 쪽은 포션에만 있는 개수 라벨이다. 우하단에 두면 18pt 볼드 개수가
+        // 12pt 키(C)를 덮어 "무슨 키로 먹는지" 표시가 사라진다.
         var go = new GameObject("PotionCount", typeof(RectTransform));
         go.transform.SetParent(slotGo, false);
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(1f, 0f);
-        rt.pivot     = new Vector2(1f, 0f);
-        rt.anchoredPosition = new Vector2(-3f, 2f);
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot     = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(3f, -2f);
         rt.sizeDelta = new Vector2(40f, 22f);
 
         _potionCountLabel = go.AddComponent<TextMeshProUGUI>();
         if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
         _potionCountLabel.fontSize  = 18f;
         _potionCountLabel.fontStyle = FontStyles.Bold;
-        _potionCountLabel.alignment = TextAlignmentOptions.BottomRight;
+        _potionCountLabel.alignment = TextAlignmentOptions.TopLeft;
         _potionCountLabel.raycastTarget = false;
         var ol = go.AddComponent<UnityEngine.UI.Outline>();   // 아이콘 위에서도 읽히게 외곽선
         ol.effectColor    = new Color(0f, 0f, 0f, 0.9f);
