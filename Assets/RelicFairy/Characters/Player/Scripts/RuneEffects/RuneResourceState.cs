@@ -39,10 +39,6 @@ public sealed class RuneResourceState
     private readonly Dictionary<string, GameObject>    _targets    = new();
     private readonly Dictionary<string, ThresholdHook> _thresholds = new();
 
-    // [가이드라인 비주얼] 임계 도달 토스트 위치(플레이어). 통지 전용 — 리소스 로직엔 미사용.
-    private Transform _anchor;
-    public void SetAnchor(Transform anchor) => _anchor = anchor;
-
     // ── 스택 / 게이지 ──────────────────────────────────────
 
     /// <summary>amount만큼 증가(0~max 클램프). duration>0이면 유지 타이머 충전, <=0이면 비감쇠 게이지.</summary>
@@ -105,8 +101,8 @@ public sealed class RuneResourceState
         {
             h.fired = true;
             h.onReached?.Invoke();
-            if (_anchor != null)
-                GuidelineVisual.Toast(_anchor.position + Vector3.up * 2.6f, key + " MAX", GuidelineVisual.ToastKind.Resource);
+            // 임계 도달을 화면에 "ElecStatic MAX" 월드 라벨로 띄우던 레거시 통지는 제거했다.
+            // 리소스 상태는 버프칸(RuneEffectDispatcher.Contribute)이 단독으로 표시한다.
         }
         else if (value < h.threshold) h.fired = false;
     }

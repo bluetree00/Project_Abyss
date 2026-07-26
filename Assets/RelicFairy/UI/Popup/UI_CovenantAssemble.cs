@@ -279,8 +279,11 @@ public class UI_CovenantAssemble : UI_Popup
         var cause  = _causes[_selCause];
         var effect = _effects[_selEffect];
         string id = AssembledCovenant.MakeId(cause.id, cause.tier, effect.id, effect.tier);
-        _tcs?.TrySetResult(id);
+
+        // 닫기가 먼저다. TrySetResult가 대기 측(WorldCovenantAltar.OpenAsync) 후속을 동기로 재개시킬 수 있어,
+        // 순서를 뒤집으면 팝업이 열린 채(=HUD 차단/timeScale 0) 획득 안내가 떠 안내가 화면에 눌어붙는다.
         ClosePopupUI();
+        _tcs?.TrySetResult(id);
     }
 
     private static Color TierColor(CovenantTier t) => t switch
