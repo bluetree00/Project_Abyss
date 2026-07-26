@@ -1566,12 +1566,17 @@ public sealed class CombatPanelView : MonoBehaviour
     }
     // ── 키 표기 라벨 규격 (모든 슬롯 공통) ─────────────────────────
     // 슬롯마다 제각각이면 눈이 키를 못 찾는다. 위치·크기·색을 한 곳에서 강제한다.
-    private const  float KeyLabelSize     = 12f;                        // 작게 — 슬롯 아이콘을 가리지 않는다
-    private const  float KeyLabelBoxW     = 18f;
-    private const  float KeyLabelBoxH     = 16f;
-    private static readonly Vector2 KeyLabelPivot  = new(1f, 0f);       // 슬롯 우하단 안쪽
-    private static readonly Vector2 KeyLabelOffset = new(-3f, 3f);
-    private static readonly Color   KeyLabelColor  = new(1f, 0.90f, 0.62f, 0.95f);
+    // 예전엔 슬롯 rect 우하단 '안쪽'에 12pt로 얹었는데, 사각 슬롯은 바로 그 자리가 프레임의
+    // 코너 장식이라 글자가 파묻혀 안 보였다(다이아몬드 슬롯만 rect 모서리가 비어 Q가 보였던 것).
+    // 슬롯 아래 바깥의 빈 공간으로 내리고, 크기를 키우고 외곽선을 넣어 배경과 무관하게 읽히게 한다.
+    private const  float KeyLabelSize     = 17f;
+    private const  float KeyLabelBoxW     = 24f;
+    private const  float KeyLabelBoxH     = 20f;
+    private static readonly Vector2 KeyLabelAnchor = new(1f, 0f);       // 슬롯 우하단 모서리에 고정
+    private static readonly Vector2 KeyLabelPivot  = new(1f, 1f);       // 라벨은 그 아래로 늘어뜨린다
+    private static readonly Vector2 KeyLabelOffset = new(-2f, -1f);
+    private static readonly Color   KeyLabelColor  = new(1f, 0.88f, 0.55f, 1f);
+    private static readonly Color   KeyLabelOutline = new(0f, 0f, 0f, 0.85f);
 
     private TMP_Text CreateCornerLabel(Transform slotRoot, string text)
     {
@@ -1592,8 +1597,8 @@ public sealed class CombatPanelView : MonoBehaviour
         if (tmp == null) return;
 
         var rect = tmp.rectTransform;
-        rect.anchorMin        = KeyLabelPivot;
-        rect.anchorMax        = KeyLabelPivot;
+        rect.anchorMin        = KeyLabelAnchor;
+        rect.anchorMax        = KeyLabelAnchor;
         rect.pivot            = KeyLabelPivot;
         rect.anchoredPosition = KeyLabelOffset;
         rect.sizeDelta        = new Vector2(KeyLabelBoxW, KeyLabelBoxH);
@@ -1603,10 +1608,16 @@ public sealed class CombatPanelView : MonoBehaviour
         tmp.fontSize      = KeyLabelSize;
         tmp.fontStyle     = FontStyles.Bold;
         tmp.color         = KeyLabelColor;
-        tmp.alignment     = TextAlignmentOptions.BottomRight;
+        tmp.alignment     = TextAlignmentOptions.TopRight;
         tmp.enableWordWrapping = false;
         tmp.overflowMode  = TextOverflowModes.Overflow;
         tmp.raycastTarget = false;
+
+        // 어떤 배경(밝은 프레임·밝은 바닥) 위에서도 읽히도록 외곽선을 강제한다.
+        if (!tmp.TryGetComponent<UnityEngine.UI.Outline>(out var ol))
+            ol = tmp.gameObject.AddComponent<UnityEngine.UI.Outline>();
+        ol.effectColor    = KeyLabelOutline;
+        ol.effectDistance = new Vector2(1.5f, -1.5f);
 
         if (slotLabelFont != null) tmp.font = slotLabelFont;
     }
