@@ -43,6 +43,10 @@ public sealed class IntroBootstrapper : MonoBehaviour
             UIRootBootstrapper.Instance?.SetHudStartRoomSuppressed(true);
 
             await ScreenFade.Out(0f);
+
+            // 성당 아레나는 런타임 Addressable 생성이다 — 바닥이 생기기 전에 스폰하면 플레이어가 낙하한다.
+            await IntroArenaLoader.ReadyAsync();
+
             await SpawnPlayerAsync(ct);
 
             var cam = GameCameraController.Instance;
