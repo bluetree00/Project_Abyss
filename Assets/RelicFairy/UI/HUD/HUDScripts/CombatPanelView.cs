@@ -175,7 +175,6 @@ public sealed class CombatPanelView : MonoBehaviour
     // 철 지난 알림이 되살아나고, 안 켜지면 그대로 잔류했다.
     // 절대 시각이면 꺼져 있던 동안에도 만료가 흘러가 재활성 즉시 사라진다.
     private float _noticeHideAt = -1f;   // <0 = 표시 중 아님
-    private float _noticeDiagLastLog = -1f;   // [임시 진단] 심박 로그 스로틀. 원인 확정 후 제거.
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
     // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
@@ -1066,18 +1065,11 @@ public sealed class CombatPanelView : MonoBehaviour
     private void OnEnable()
     {
         SceneManager.sceneLoaded += HandleSceneLoaded;
-        // [임시 진단] 패널 on/off 추적. 원인 확정 후 제거.
-        Debug.LogWarning($"[NoticeDiag] PANEL-ON inst={GetInstanceID()} t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2}");
         // 꺼져 있는 동안 만료된 알림이 한 프레임 번쩍이지 않게 즉시 정리한다.
         UpdateBuffNotice();
     }
 
-    private void OnDisable()
-    {
-        SceneManager.sceneLoaded -= HandleSceneLoaded;
-        // [임시 진단] 원인 확정 후 제거.
-        Debug.LogWarning($"[NoticeDiag] PANEL-OFF inst={GetInstanceID()} t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2}");
-    }
+    private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
 
     /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -1722,29 +1714,29 @@ public sealed class CombatPanelView : MonoBehaviour
         buffNoticeText.color = c;
 
         _noticeHideAt = Time.unscaledTime + NoticeDuration + NoticeFadeTime;
-
-        // [임시 진단] 안내 잔류 추적 — 원인 확정 후 제거할 것.
-        Debug.LogWarning($"[NoticeDiag] SHOW inst={GetInstanceID()} act={gameObject.activeInHierarchy} " +
-                         $"t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2} ts={Time.timeScale} msg={message}");
     }
 
     /// <summary>표시 중인 알림의 페이드/만료 처리. Update와 OnEnable에서 호출.</summary>
     private void UpdateBuffNotice()
     {
-        if (_noticeHideAt < 0f) return;
+        if (_noticeHideAt < 0f)
+        {
+            // 불변식: 대기 중인 알림이 없으면 텍스트 오브젝트는 꺼져 있어야 한다.
+            //
+            // 만료로 껐는데 <b>외부가 다시 켜는</b> 경로가 실재한다 —
+            // HudBootstrapper.ForceTextsVisible이 방 전환마다 Panel_Combat 하위의
+            // TextMeshProUGUI를 비활성 포함으로 긁어 전부 SetActive(true) + 알파 1로 되돌린다.
+            // 그때 _noticeHideAt은 이미 -1이라 만료 감시가 꺼져 있어 낡은 문구가 영구히 남았다
+            // ("2.5초 뒤 사라졌다가 다음 방에서 다시 나타나 안 없어짐" 재현 경로).
+            // 되살아나면 여기서 즉시 되돌린다.
+            if (buffNoticeText != null && buffNoticeText.gameObject.activeSelf)
+                buffNoticeText.gameObject.SetActive(false);
+            return;
+        }
 
         if (buffNoticeText == null) { _noticeHideAt = -1f; return; }
 
         float remain = _noticeHideAt - Time.unscaledTime;
-
-        // [임시 진단] 1초에 한 번 심박 — 이 로그가 안 찍히면 Update 자체가 안 도는 것이고,
-        // remain이 계속 되돌아가면 ShowBuffNotice가 반복 호출되는 것이다. 원인 확정 후 제거.
-        if (Time.unscaledTime - _noticeDiagLastLog >= 1f)
-        {
-            _noticeDiagLastLog = Time.unscaledTime;
-            Debug.LogWarning($"[NoticeDiag] TICK inst={GetInstanceID()} act={gameObject.activeInHierarchy} " +
-                             $"t={Time.unscaledTime:F2} remain={remain:F2} txtAct={buffNoticeText.gameObject.activeSelf}");
-        }
 
         if (remain <= 0f)
         {
@@ -1763,10 +1755,6 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>알림 강제 종료 — 알파까지 되돌려 다음 표시가 흐리게 뜨는 일이 없게 한다.</summary>
     private void HideBuffNotice()
     {
-        // [임시 진단] 원인 확정 후 제거.
-        if (_noticeHideAt >= 0f)
-            Debug.LogWarning($"[NoticeDiag] HIDE inst={GetInstanceID()} t={Time.unscaledTime:F2}");
-
         _noticeHideAt = -1f;
         if (buffNoticeText == null) return;
 
