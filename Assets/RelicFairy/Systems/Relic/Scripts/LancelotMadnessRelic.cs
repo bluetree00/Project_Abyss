@@ -7,18 +7,19 @@ using RelicFairy.Monster;
 /// 영웅 유물 — 랜슬롯(찢긴 서약의 검). 리워크 v2.
 ///   리소스: 광기 스택(MadnessStack) — 적중 누적, 미공격 감쇠.
 ///   스택↑ → 공격력 상승 + 받는피해 증가(기사의 긍지로 희석, 상한 완화).
-///   <b>MAX 50 → 광란(Frenzy) 6초 진입</b>: 이동속도↑ + 흡혈, 심판의 일격 <b>수동 1회</b> 활성.
+///   <b>MAX 50 → 광란(Frenzy) 6초 진입</b>: 이동속도↑, 심판의 일격 <b>수동 1회</b> 활성.
 ///   광란 종료 → 게이지 초기화. (빈틈·49홀드·자동발동 제거)
 /// 수치는 RELIC_STAT_DATA(lancelot) 슬롯 구동. 낙인은 MonsterBase.ApplyDamageTakenAmp 재사용.
 /// </summary>
 public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRelicResourceProvider
 {
     private const string RelicKey = "lancelot";
+    // 슬롯 7(흡혈)은 광란 회복 제거로 더 이상 읽지 않는다 — 번호는 서버 차트와 맞춰 비워둔다.
     private const int V_STACK_ATK = 3, V_TAKEN_CAP = 4, V_GUARD = 5, V_FRENZY_DUR = 6,
-                      V_LIFESTEAL = 7, V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
+                      V_FRENZY_MOVE = 8, V_SKILL_BASE = 10,
                       V_SKILL_PER = 11, V_BRAND_DUR = 12, V_BRAND_AMP = 13;
     private const string PassiveTip =
-        "찢긴 서약의 검 — 적중으로 광기를 쌓아 공격력이 오르지만 받는 피해도 늘어난다. 광기 최대치에서 '광란'(이속·흡혈)에 들며 심판의 일격을 쓸 수 있다";
+        "찢긴 서약의 검 — 적중으로 광기를 쌓아 공격력이 오르지만 받는 피해도 늘어난다. 광기 최대치에서 '광란'(이속)에 들며 심판의 일격을 쓸 수 있다";
 
     // VFX Addressable 키(에셋 배선 후 실 프리팹 등록). 미등록 시 무해.
     // 광란 오라는 2겹이다 — 붉은 분노(Rage) 위에 검보라 저주(Cursed)를 얹어
@@ -53,7 +54,6 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     public MadnessStack Madness => _madness;
     public IRelicResource RelicResource => _madness;   // HUD 아이덴티티 바 연결
     public bool  IsFrenzy      => _madness != null && _madness.IsFrenzy;
-    public float LifestealPct  => V(V_LIFESTEAL, 0.40f);
 
     public void OnAttach(PlayerController owner)
     {
@@ -65,7 +65,6 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
         _vfx.Register(CursedState, CursedVfxKey);
 
         owner.RegisterRelicPassive(new LancelotMadnessPassive());          // OnAttackHit → 스택 +1
-        owner.RegisterRelicPassive(new LancelotFrenzyLifestealPassive());  // OnAttackHit(광란) → 흡혈
         owner.RegisterRelicPassive(new LancelotBetrayalPassive());         // OnKill(광란) → 지속 연장
 
         _onChanged = RefreshStackBuff;
@@ -117,7 +116,7 @@ public sealed class LancelotMadnessRelic : IRelicBehavior, IBuffViewSource, IRel
     /// 시나리오: <b>빠른 연타로 몰아친 뒤 마지막에 강력한 일격</b>.
     /// 총 피해는 단발이던 시절과 동일하고, 마무리 타가 그중 <see cref="JudgmentFinisherShare"/>를
     /// 가져가며 나머지를 앞선 연타가 균등 분할한다(밸런스 중립).
-    /// 흡혈은 피해 비례라 합계가 그대로고, 광기 스택은 광란 중 동결이라 다타로도 안 불어난다.
+    /// 광기 스택은 광란 중 동결이라 다타로도 안 불어난다.
     ///
     /// 매 타마다 콘을 <b>다시 질의</b>하므로 도중에 들어온 적도 맞는다.
     /// 낙인은 1타에서 걸리므로 뒤 타들, 특히 마무리 강타가 증폭된 피해로 꽂힌다(연타의 보상).
