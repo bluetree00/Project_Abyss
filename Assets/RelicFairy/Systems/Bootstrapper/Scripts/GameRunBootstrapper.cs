@@ -184,6 +184,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private EssenceTracker essenceTracker;
 
     private GameObject _currentMapGO;
+    // SpawnBlockMapAsync가 해석한 챕터 팔레트. StartRoomGate 통로를 같은 팔레트로 짓기 위해 보관.
+    private BlockPalette _currentMapPalette;
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
     // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
     private Vector3? _pendingPlayerSpawnPos;
@@ -788,7 +790,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // Zone 0 출구에 StartRoomGate 배치 — 로드아웃 준비 완료 시 픽업이 활성화
         if (_currentMapGO != null)
-            CreateStartRoomGates(startZone, zones, _currentMapGO);
+            CreateStartRoomGates(startZone, zones, _currentMapGO, _currentMapPalette);
 
         Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. 플레이어 예정 위치: {_pendingPlayerSpawnPos}");
     }
@@ -1813,10 +1815,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// next_zone_indices가 여러 개여도 물리 게이트는 1개만 생성 —
     /// 실제 진출 존 선택은 트리거 후 ShowZoneSelectionAsync가 UI로 처리한다.
     /// </summary>
+    /// <param name="chapterPalette">
+    /// 시작방을 지은 챕터 팔레트. 게이트 너머 통로를 같은 팔레트로 짓도록 주입한다.
+    /// null이면 게이트 프리팹의 직렬화값(Forest 고정)이 그대로 쓰인다.
+    /// </param>
     private void CreateStartRoomGates(
         ZoneLayoutEntry startZone,
         System.Collections.Generic.List<ZoneLayoutEntry> allZones,
-        GameObject zoneGO)
+        GameObject zoneGO,
+        BlockPalette chapterPalette = null)
     {
         if (startGatePrefab == null || string.IsNullOrEmpty(startZone.next_zone_indices))
         {
@@ -1846,10 +1853,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         gateGO.transform.localRotation = gateLocalRot;
         gateGO.name = "StartRoomGate";
 
-        if (gateGO.GetComponent<StartRoomGate>() == null)
-            gateGO.AddComponent<StartRoomGate>();
+        if (!gateGO.TryGetComponent<StartRoomGate>(out var gate))
+            gate = gateGO.AddComponent<StartRoomGate>();
 
-        Debug.Log($"[GameRunBootstrapper] StartRoomGate 배치 완료 → Zone {primaryToIdx} 방향");
+        // 통로 팔레트/벽높이 주입 — 프리팹은 Forest 고정이라 주입 없이는 Ch2+ 통로만 Ch1 룩이 된다.
+        // 벽 높이는 절차 방(BuildProcRoomAsync의 effWallLayers)과 동일 규약: 팔레트 프로필 우선, 없으면 전역 폴백.
+        if (chapterPalette != null)
+        {
+            int corridorWallLayers = chapterPalette.WallHeight > 0 ? chapterPalette.WallHeight : wallLayers;
+            gate.ConfigureStartCorridor(chapterPalette, corridorWallLayers);
+        }
+
+        Debug.Log($"[GameRunBootstrapper] StartRoomGate 배치 완료 → Zone {primaryToIdx} 방향 (통로 팔레트: {(chapterPalette != null ? chapterPalette.name : "프리팹 폴백")})");
     }
 
     private void CreateZoneExitGates(int zoneIndex, ZoneLayoutEntry zone,
@@ -1997,6 +2012,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
         if (activePalette == null)
             activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
+        _currentMapPalette = activePalette; // CreateStartRoomGates가 통로를 같은 팔레트로 짓도록 보관
         var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
         MapBuilder.BuildCeiling(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
         if (activePalette != null) MapBuilder.BuildRoomLights(grid, mapGO.transform, blockCellSize, blockBaseY, wallLayers, activePalette.Lighting);
