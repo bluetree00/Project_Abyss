@@ -160,6 +160,10 @@ public sealed class IntroMordredDirector : MonoBehaviour
         if (swordPickup != null) swordPickup.OnPickup -= HandleSwordPickup;
     }
 
+    // ── Public Methods ───────────────────────────────────────────────
+    /// <summary>아레나가 런타임 생성이라 보스룸은 IntroArenaLoader가 로드 후 주입한다.</summary>
+    public void SetBossRoom(BossRoomController room) => bossRoom = room;
+
     /// <summary>무형검을 F로 획득한 순간 시퀀스를 시작한다. 1회만.</summary>
     private void HandleSwordPickup(PlayerController player)
     {
@@ -177,6 +181,9 @@ public sealed class IntroMordredDirector : MonoBehaviour
 
         try
         {
+            // 보스룸은 런타임 생성 아레나에서 주입된다 — 주입 전에 시퀀스가 진행되면 전투가 시작되지 않는다.
+            await IntroArenaLoader.ReadyAsync();
+
             // 무형검을 집는 순간 BGM을 Game_Intro_play로 전환
             Managers.Sound.CrossfadeBgmAsync("Game_Intro_play").Forget();
 
