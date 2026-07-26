@@ -175,6 +175,7 @@ public sealed class CombatPanelView : MonoBehaviour
     // 철 지난 알림이 되살아나고, 안 켜지면 그대로 잔류했다.
     // 절대 시각이면 꺼져 있던 동안에도 만료가 흘러가 재활성 즉시 사라진다.
     private float _noticeHideAt = -1f;   // <0 = 표시 중 아님
+    private float _noticeDiagLastLog = -1f;   // [임시 진단] 심박 로그 스로틀. 원인 확정 후 제거.
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
     // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
@@ -1065,11 +1066,18 @@ public sealed class CombatPanelView : MonoBehaviour
     private void OnEnable()
     {
         SceneManager.sceneLoaded += HandleSceneLoaded;
+        // [임시 진단] 패널 on/off 추적. 원인 확정 후 제거.
+        Debug.LogWarning($"[NoticeDiag] PANEL-ON inst={GetInstanceID()} t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2}");
         // 꺼져 있는 동안 만료된 알림이 한 프레임 번쩍이지 않게 즉시 정리한다.
         UpdateBuffNotice();
     }
 
-    private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        // [임시 진단] 원인 확정 후 제거.
+        Debug.LogWarning($"[NoticeDiag] PANEL-OFF inst={GetInstanceID()} t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2}");
+    }
 
     /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -1419,7 +1427,10 @@ public sealed class CombatPanelView : MonoBehaviour
         if (noon && !_lastSkillReady) _relicFlash = 1f;
         _lastSkillReady = noon;
         if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
-        _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
+        // 이 메서드의 다른 위젯 참조는 전부 널 체크를 하는데 여기만 빠져 있었다.
+        // _sunRoot가 비면 Update가 매 프레임 던져 뒤쪽(알림 만료 등)이 통째로 죽는다.
+        if (_sunRoot != null)
+            _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
     }
 
     /// <summary>활성 무기 칸 강조(칸 배경·테두리 밝기). HudPresenter가 CurrentSlotIndex로 호출.</summary>
@@ -1681,7 +1692,9 @@ public sealed class CombatPanelView : MonoBehaviour
                 _relicBarGlow.effectColor = new Color(c.r, c.g, c.b, Mathf.Clamp01(glow));
             }
             // 정오 진입 시 바를 잠깐 확대(펀치) — 절정 강조
-            _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
+            // 분기 조건이 _relicBarFill만 보고 _relicBar는 안 봐서 여기만 무방비였다(_sunRoot와 같은 결함).
+            if (_relicBar != null)
+                _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
         }
 
         UpdateBuffNotice();
@@ -1709,6 +1722,10 @@ public sealed class CombatPanelView : MonoBehaviour
         buffNoticeText.color = c;
 
         _noticeHideAt = Time.unscaledTime + NoticeDuration + NoticeFadeTime;
+
+        // [임시 진단] 안내 잔류 추적 — 원인 확정 후 제거할 것.
+        Debug.LogWarning($"[NoticeDiag] SHOW inst={GetInstanceID()} act={gameObject.activeInHierarchy} " +
+                         $"t={Time.unscaledTime:F2} hideAt={_noticeHideAt:F2} ts={Time.timeScale} msg={message}");
     }
 
     /// <summary>표시 중인 알림의 페이드/만료 처리. Update와 OnEnable에서 호출.</summary>
@@ -1719,6 +1736,16 @@ public sealed class CombatPanelView : MonoBehaviour
         if (buffNoticeText == null) { _noticeHideAt = -1f; return; }
 
         float remain = _noticeHideAt - Time.unscaledTime;
+
+        // [임시 진단] 1초에 한 번 심박 — 이 로그가 안 찍히면 Update 자체가 안 도는 것이고,
+        // remain이 계속 되돌아가면 ShowBuffNotice가 반복 호출되는 것이다. 원인 확정 후 제거.
+        if (Time.unscaledTime - _noticeDiagLastLog >= 1f)
+        {
+            _noticeDiagLastLog = Time.unscaledTime;
+            Debug.LogWarning($"[NoticeDiag] TICK inst={GetInstanceID()} act={gameObject.activeInHierarchy} " +
+                             $"t={Time.unscaledTime:F2} remain={remain:F2} txtAct={buffNoticeText.gameObject.activeSelf}");
+        }
+
         if (remain <= 0f)
         {
             HideBuffNotice();
@@ -1736,6 +1763,10 @@ public sealed class CombatPanelView : MonoBehaviour
     /// <summary>알림 강제 종료 — 알파까지 되돌려 다음 표시가 흐리게 뜨는 일이 없게 한다.</summary>
     private void HideBuffNotice()
     {
+        // [임시 진단] 원인 확정 후 제거.
+        if (_noticeHideAt >= 0f)
+            Debug.LogWarning($"[NoticeDiag] HIDE inst={GetInstanceID()} t={Time.unscaledTime:F2}");
+
         _noticeHideAt = -1f;
         if (buffNoticeText == null) return;
 
