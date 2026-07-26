@@ -43,6 +43,8 @@ public sealed class IntroArenaLoader : MonoBehaviour
     private void OnDestroy()
     {
         if (ReferenceEquals(_instance, this)) _instance = null;
+        // 씬이 먼저 내려가면 로드가 취소된 채 끝난다 — 대기 중인 연출이 영영 풀리지 않도록 여기서 닫는다.
+        _ready.TrySetResult();
     }
 
     // ── Public Methods ───────────────────────────────────────────────
