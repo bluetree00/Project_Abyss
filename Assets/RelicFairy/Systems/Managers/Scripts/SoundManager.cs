@@ -122,7 +122,9 @@ public sealed class SoundManager
             return;
 
         _bgmVolume    = PlayerPrefs.GetFloat(kBgmVolKey,    0.25f);
-        _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 1f);
+        // 효과음 기본값 — 전투 타격음이 체감상 과했다. 믹서 에셋이 아직 없어 마스터 볼륨이
+        // 폴백 경로에서 적용되지 않으므로, 실질적인 조절 레버는 이 채널 값이다.
+        _effectVolume = PlayerPrefs.GetFloat(kEffectVolKey, 0.6f);
         _masterVolume = PlayerPrefs.GetFloat(kMasterVolKey, 1f);
         _uiVolume     = PlayerPrefs.GetFloat(kUiVolKey,     1f);
 
@@ -297,7 +299,9 @@ public sealed class SoundManager
             return;
 
         audioSource.pitch = pitch;
-        audioSource.volume = type == Define.Sound.Bgm ? volume * ChannelScale(Define.Sound.Bgm) : volume;
+        // 채널 음량은 BGM·효과음 모두에 적용한다. 예전엔 BGM만 곱해서, 공용 효과음 소스만
+        // 효과음 볼륨 설정을 무시하고 원본 크기로 나갔다(풀 경로는 정상 적용 중).
+        audioSource.volume = volume * ChannelScale(type);
 
         if (type == Define.Sound.Bgm)
         {
