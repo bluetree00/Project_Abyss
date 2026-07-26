@@ -136,37 +136,46 @@ namespace RelicFairy.UI
                 RunQueue(destroyCancellationToken).Forget();
         }
 
-        private void InterruptCurrent()
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = null;
-            _showing = false;
-        }
+        /// <summary>
+        /// 표시 중인 자막만 취소한다. <b>_showing/_cts는 건드리지 않는다</b> —
+        /// 여기서 _showing을 내리면 뒤이은 Enqueue가 RunQueue를 하나 더 띄우고,
+        /// 먼저 돌던 루프의 finally가 새 루프의 _cts를 지워 이후 취소가 먹지 않았다
+        /// (그 상태로 페이드 도중 취소되면 알파가 중간값으로 굳어 자막이 화면에 남는다).
+        /// 취소된 루프는 자기 while로 돌아와 새로 들어온 항목을 그대로 이어 처리한다.
+        /// </summary>
+        private void InterruptCurrent() => _cts?.Cancel();
 
         private async UniTaskVoid RunQueue(CancellationToken lifetimeToken)
         {
-            while (_queue.Count > 0)
+            _showing = true;
+            try
             {
-                if (lifetimeToken.IsCancellationRequested) return;
-
-                var (text, type, speaker, tcs) = _queue.Dequeue();
-                _showing = true;
-
-                _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
-
-                try
+                while (_queue.Count > 0)
                 {
-                    await DisplayOne(text, type, speaker, _cts.Token);
+                    if (lifetimeToken.IsCancellationRequested) return;
+
+                    var (text, type, speaker, tcs) = _queue.Dequeue();
+
+                    _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
+
+                    try
+                    {
+                        await DisplayOne(text, type, speaker, _cts.Token);
+                    }
+                    catch (System.OperationCanceledException) { }
+                    finally
+                    {
+                        _cts?.Dispose();
+                        _cts = null;
+                        tcs?.TrySetResult();
+                    }
                 }
-                catch (System.OperationCanceledException) { }
-                finally
-                {
-                    _cts?.Dispose();
-                    _cts = null;
-                    _showing = false;
-                    tcs?.TrySetResult();
-                }
+            }
+            finally
+            {
+                _showing = false;
+                // 페이드 도중 취소로 빠져나오면 알파가 중간값이다 — 이어받을 자막이 없으면 확실히 숨긴다.
+                if (_canvasGroup != null && _queue.Count == 0) _canvasGroup.alpha = 0f;
             }
         }
 
@@ -185,8 +194,11 @@ namespace RelicFairy.UI
             };
 
             await FadeTo(1f, _fadeInDuration, ct);
+            // UnscaledDeltaTime 필수 — 기본(스케일드)이면 timeScale=0(일시정지·차단 팝업) 동안
+            // 유지 시간이 흐르지 않아 자막이 화면에 굳는다. 페이드(FadeTo)도 이미 unscaled다.
             await UniTask.Delay(
                 System.TimeSpan.FromSeconds(holdDuration),
+                DelayType.UnscaledDeltaTime,
                 cancellationToken: ct);
             await FadeTo(0f, _fadeOutDuration, ct);
         }

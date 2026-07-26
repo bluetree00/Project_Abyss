@@ -169,7 +169,12 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text   _buffTooltipText;
     private BuffCell   _hoveredCell;
 
-    private float _noticeTimer;
+    // 알림 만료는 '남은 시간 누산'이 아니라 <b>절대 시각(unscaled)</b>으로 잡는다.
+    // 누산식은 Update가 도는 동안에만 줄어서, HUD 모드 전환(HudView.SetSections)으로
+    // 이 패널 GO가 꺼지면 타이머가 얼어붙고 텍스트는 켜진 채 남았다 — 다시 켜질 때
+    // 철 지난 알림이 되살아나고, 안 켜지면 그대로 잔류했다.
+    // 절대 시각이면 꺼져 있던 동안에도 만료가 흘러가 재활성 즉시 사라진다.
+    private float _noticeHideAt = -1f;   // <0 = 표시 중 아님
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
     // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
@@ -1057,14 +1062,20 @@ public sealed class CombatPanelView : MonoBehaviour
         ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
     }
 
-    private void OnEnable()  => SceneManager.sceneLoaded += HandleSceneLoaded;
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        // 꺼져 있는 동안 만료된 알림이 한 프레임 번쩍이지 않게 즉시 정리한다.
+        UpdateBuffNotice();
+    }
+
     private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
 
     /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        _noticeTimer = 0f;
-        if (buffNoticeText != null) buffNoticeText.gameObject.SetActive(false);
+        HideBuffNotice();
+        ClearItemNotices();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -1673,25 +1684,7 @@ public sealed class CombatPanelView : MonoBehaviour
             _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
         }
 
-        if (_noticeTimer > 0f)
-        {
-            _noticeTimer -= Time.unscaledDeltaTime;   // 씬 전환/일시정지(timeScale=0)에도 얼지 않게 — 알림 잔류 방지
-
-            if (buffNoticeText != null)
-            {
-                if (_noticeTimer <= 0f)
-                {
-                    buffNoticeText.gameObject.SetActive(false);
-                }
-                else if (_noticeTimer < NoticeFadeTime)
-                {
-                    float alpha = _noticeTimer / NoticeFadeTime;
-                    var c = buffNoticeText.color;
-                    c.a = alpha;
-                    buffNoticeText.color = c;
-                }
-            }
-        }
+        UpdateBuffNotice();
 
         if (_itemNotices.Count > 0)
             UpdateItemNotices();
@@ -1706,6 +1699,7 @@ public sealed class CombatPanelView : MonoBehaviour
             if (buffNoticeText == null) return;
         }
 
+        // 연속 획득: 이전 표시분을 덮어쓰고 만료 시각도 새로 잡는다(핸들 누적 없음 — 슬롯 1개).
         buffNoticeText.text = message;
         buffNoticeText.gameObject.SetActive(true);
 
@@ -1714,7 +1708,41 @@ public sealed class CombatPanelView : MonoBehaviour
         c.a = 1f;
         buffNoticeText.color = c;
 
-        _noticeTimer = NoticeDuration + NoticeFadeTime;
+        _noticeHideAt = Time.unscaledTime + NoticeDuration + NoticeFadeTime;
+    }
+
+    /// <summary>표시 중인 알림의 페이드/만료 처리. Update와 OnEnable에서 호출.</summary>
+    private void UpdateBuffNotice()
+    {
+        if (_noticeHideAt < 0f) return;
+
+        if (buffNoticeText == null) { _noticeHideAt = -1f; return; }
+
+        float remain = _noticeHideAt - Time.unscaledTime;
+        if (remain <= 0f)
+        {
+            HideBuffNotice();
+            return;
+        }
+
+        if (remain < NoticeFadeTime)
+        {
+            var c = buffNoticeText.color;
+            c.a = remain / NoticeFadeTime;
+            buffNoticeText.color = c;
+        }
+    }
+
+    /// <summary>알림 강제 종료 — 알파까지 되돌려 다음 표시가 흐리게 뜨는 일이 없게 한다.</summary>
+    private void HideBuffNotice()
+    {
+        _noticeHideAt = -1f;
+        if (buffNoticeText == null) return;
+
+        var c = buffNoticeText.color;
+        c.a = 1f;
+        buffNoticeText.color = c;
+        buffNoticeText.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -1897,7 +1925,7 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         public GameObject go;
         public TMP_Text text;
-        public float timer;
+        public float hideAt;   // Time.unscaledTime 기준 만료 시각(버프 알림과 동일 규칙)
     }
 
     /// <summary>아이템 효과 발동 시 왼쪽에 스택형 알림 표시.</summary>
@@ -1935,31 +1963,41 @@ public sealed class CombatPanelView : MonoBehaviour
         {
             go = go,
             text = text,
-            timer = ItemNoticeDuration + ItemNoticeFadeTime,
+            hideAt = Time.unscaledTime + ItemNoticeDuration + ItemNoticeFadeTime,
         });
     }
 
     private void UpdateItemNotices()
     {
+        // Time.deltaTime을 쓰던 시절엔 timeScale=0(일시정지·차단 팝업) 동안 만료가 멈춰
+        // 알림이 화면에 그대로 굳었다. 만료는 절대 시각(unscaled)으로 판정한다.
+        float now = Time.unscaledTime;
+
         for (int i = _itemNotices.Count - 1; i >= 0; i--)
         {
             var entry = _itemNotices[i];
-            entry.timer -= Time.deltaTime;
-            _itemNotices[i] = entry;
+            float remain = entry.hideAt - now;
 
-            if (entry.timer <= 0f)
+            if (remain <= 0f)
             {
                 if (entry.go != null) Destroy(entry.go);
                 _itemNotices.RemoveAt(i);
             }
-            else if (entry.timer < ItemNoticeFadeTime && entry.text != null)
+            else if (remain < ItemNoticeFadeTime && entry.text != null)
             {
-                float alpha = entry.timer / ItemNoticeFadeTime;
                 var c = entry.text.color;
-                c.a = alpha;
+                c.a = remain / ItemNoticeFadeTime;
                 entry.text.color = c;
             }
         }
+    }
+
+    /// <summary>스택형 아이템 알림 전부 즉시 제거(씬 전환 등) — 다음 씬으로 잔류 방지.</summary>
+    private void ClearItemNotices()
+    {
+        for (int i = 0; i < _itemNotices.Count; i++)
+            if (_itemNotices[i].go != null) Destroy(_itemNotices[i].go);
+        _itemNotices.Clear();
     }
 
     private void EnsureItemNoticeRoot()
