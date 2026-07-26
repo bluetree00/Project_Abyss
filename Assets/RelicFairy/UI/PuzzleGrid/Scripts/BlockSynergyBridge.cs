@@ -356,9 +356,20 @@ public class MerlinRuneBridge : MonoBehaviour
     /// </summary>
     public void RestoreRunePlacements(IReadOnlyList<RunePlacementEntry> placements)
     {
-        if (placements == null || placements.Count == 0 || boardManager == null) return;
+        if (placements == null || placements.Count == 0) return;
+        if (boardManager == null)
+        {
+            Debug.LogWarning("[MerlinRuneBridge] RestoreRunePlacements: BoardManager 없음 — Shape 재구성 생략");
+            return;
+        }
 
         var view = Object.FindFirstObjectByType<MerlinRuneHexGridView>(FindObjectsInactive.Include);
+
+        // 이어하기는 배치 화면을 한 번도 열지 않은 상태에서 불린다 — 그때는 GridSquare가 아직
+        // 없어(BuildGrid는 패널 오픈 시점 호출) 여기서 그냥 돌아갔고, 저장된 룬이 판에 하나도
+        // 그려지지 않았다. 판을 먼저 세운다(이미 세워져 있으면 무동작).
+        if (view != null && view.HexGrid == null) view.BuildGrid();
+
         var grid = view != null ? view.HexGrid : null;
         var squares = grid != null ? grid.GetGridSquares() : null;
         if (squares == null)
