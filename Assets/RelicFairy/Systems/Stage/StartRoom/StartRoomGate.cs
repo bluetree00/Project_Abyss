@@ -93,6 +93,9 @@ public class StartRoomGate : MonoBehaviour
     private const float     SealDoorMeshH = 11.5f;
 
     private bool _startCorridorBuilt;
+    // 챕터 팔레트 주입값(ConfigureStartCorridor). null/0이면 프리팹 직렬화값 폴백.
+    private BlockPalette _injectedCorridorPalette;
+    private int          _injectedCorridorWallLayers;
     private bool _gateRevealStarted;   // 열림 연출 1회 가드
     private bool _covenantDone;        // 시작방 서약 제단 완료 여부(통과 조건)
     private bool _sealDoorPrefabWarned;
@@ -270,18 +273,34 @@ public class StartRoomGate : MonoBehaviour
     }
 
     // ── 게이트 너머 복도 + 다음 방 (절차 방과 동일한 통로 연출) ──────────
+
+    /// <summary>
+    /// 게이트 너머 복도를 지을 챕터 팔레트를 주입한다. 프리팹 직렬화값은 Forest 고정이라
+    /// 주입이 없으면 Ch2+에서도 통로만 Ch1 룩이 된다. 복도 생성(Update의 EnsureStartCorridor) 전에 호출할 것.
+    /// </summary>
+    /// <param name="palette">챕터 팔레트. null이면 프리팹 값 유지.</param>
+    /// <param name="wallLayers">벽 높이(칸). 0 이하면 프리팹 값 유지.</param>
+    public void ConfigureStartCorridor(BlockPalette palette, int wallLayers)
+    {
+        if (palette != null)   _injectedCorridorPalette    = palette;
+        if (wallLayers > 0)    _injectedCorridorWallLayers = wallLayers;
+    }
+
     private void EnsureStartCorridor()
     {
         if (_startCorridorBuilt) return;
         _startCorridorBuilt = true; // 팔레트 미지정이어도 매 프레임 재시도 방지(1회만)
-        if (startCorridorPalette == null) return;
+
+        var palette    = _injectedCorridorPalette != null ? _injectedCorridorPalette : startCorridorPalette;
+        int wallLayers = _injectedCorridorWallLayers > 0 ? _injectedCorridorWallLayers : startCorridorWallLayers;
+        if (palette == null) return;
 
         var root = new GameObject("StartGateCorridor").transform;
         root.SetParent(transform, false); // 게이트 하위 → 게이트 회전이 복도 방향을 잡음
         int widthCells = Mathf.Max(1, Mathf.RoundToInt(_gateWidth)); // 게이트 폭과 개구부 일치
         MapBuilder.BuildDoorCorridor(
-            startCorridorPalette, root, Vector3.zero, startCorridorEdge, widthCells,
-            startCorridorLength, 1f, 0f, startCorridorWallLayers);
+            palette, root, Vector3.zero, startCorridorEdge, widthCells,
+            startCorridorLength, 1f, 0f, wallLayers);
     }
 
     /// <summary>
