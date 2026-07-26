@@ -86,6 +86,9 @@ public class BoardManager : MonoBehaviour
         public GridAssetSO    grid;
         public List<GridSquare> squares;
         public Vector2           anchoredPosition;
+        /// <summary>이어하기 복원 배치 — 판이 실제로 열릴 때 칸 기준으로 위치를 다시 잡아야 한다.
+        /// 복원 시점(패널 비활성)엔 레이아웃이 확정되지 않아 좌표가 어긋날 수 있다.</summary>
+        public bool needsRealign;
     }
 
     // ── Inspector 이벤트 ──────────────────────────────────────────────
@@ -406,6 +409,15 @@ public class BoardManager : MonoBehaviour
                 rt.anchoredPosition = gp.anchoredPosition;
                 rt.localRotation    = Quaternion.identity;
                 rt.localScale       = Vector3.one * GetGameplayScale();
+
+                // 이어하기 복원분은 지금(판 활성) 칸 기준으로 다시 정렬한다 — 저장된 좌표가
+                // 아니라 칸이 진실원본이므로, 복원 시점의 레이아웃 상태에 좌표가 흔들리지 않는다.
+                // 스케일 확정 뒤에 잡는다(블록 월드 위치가 스케일에 딸려 움직인다).
+                if (gp.needsRealign && AlignShapeToSquares(s, gp.squares))
+                {
+                    gp.anchoredPosition = rt.anchoredPosition;
+                    gp.needsRealign     = false;
+                }
                 foreach (var sq in gp.squares)
                 {
                     sq?.SetOccupied(true);
@@ -629,8 +641,7 @@ public class BoardManager : MonoBehaviour
         var rt = (RectTransform)shape.transform;
         rt.localScale    = Vector3.one * GetGameplayScale();
         rt.localRotation = Quaternion.identity;
-        var firstSqRT = squares[0] != null ? squares[0].GetComponent<RectTransform>() : null;
-        if (firstSqRT != null) rt.anchoredPosition = firstSqRT.anchoredPosition;
+        AlignShapeToSquares(shape, squares);
 
         foreach (var sq in squares)
         {
@@ -641,14 +652,46 @@ public class BoardManager : MonoBehaviour
         shape.SetOccupiedSquares(squares);
         shape.CacheStartTransform();
 
+        // 복원은 판을 열기 전에 불려 activeAsset이 아직 없다. 그대로 두면 첫 오픈의
+        // EnterExternalGrid가 이 배치를 "다른 그리드의 낡은 배치"로 보고 판에서 걷어내
+        // 보관함 슬롯으로 되돌린다 — 칸이 속한 그리드에서 직접 얻는다.
+        var owningAsset = activeAsset;
+        if (owningAsset == null)
+        {
+            var ownerGrid = squares[0] != null ? squares[0].GetComponentInParent<Grid>() : null;
+            if (ownerGrid != null) owningAsset = ownerGrid.gridAsset;
+        }
+
         _sharedShapes.Add(shape);
         _globalPlacements[shape] = new GlobalPlacement
         {
-            grid             = activeAsset,
+            grid             = owningAsset,
             squares          = new List<GridSquare>(squares),
             anchoredPosition = rt.anchoredPosition,
+            needsRealign     = true,
         };
         return shape;
+    }
+
+    /// <summary>
+    /// 셰이프의 <b>첫 블록</b>이 첫 칸 중심에 오도록 옮긴다(GridManager 클릭 배치와 동일한 월드 델타 방식).
+    /// cellOffsets 기준점이 모양마다 달라 칸의 anchoredPosition을 그대로 복사하면 한 칸씩 밀린다.
+    /// </summary>
+    private static bool AlignShapeToSquares(Shape shape, List<GridSquare> squares)
+    {
+        if (shape == null || squares == null || squares.Count == 0 || squares[0] == null) return false;
+        if (shape.transform.childCount == 0) return false;
+        if (shape.transform.GetChild(0) is not RectTransform firstBlock) return false;
+
+        var rt = (RectTransform)shape.transform;
+        if (rt.parent is not RectTransform parent) return false;
+
+        var firstSqRT = squares[0].GetComponent<RectTransform>();
+        if (firstSqRT == null) return false;
+
+        Vector3 localDelta = parent.InverseTransformVector(firstSqRT.position - firstBlock.position);
+        rt.anchoredPosition += new Vector2(localDelta.x, localDelta.y);
+        return true;
     }
 
     /// <summary>공용 풀에서 Shape를 제거하고 파괴한다. 보관함 아이템 폐기 시 호출.</summary>
