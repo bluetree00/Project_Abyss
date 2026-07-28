@@ -26,9 +26,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch3.unity
     guid: b8013b35c501d334caf0a5fe95d20fb3
-  - enabled: 1
-    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch4.unity
-    guid: f2deb1da329cb2e41a7666b674f6563b
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 9ab410270870c5d438a3caf7889cab42,
       type: 2}

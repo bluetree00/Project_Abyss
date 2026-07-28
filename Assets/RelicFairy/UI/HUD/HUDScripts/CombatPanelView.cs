@@ -169,7 +169,12 @@ public sealed class CombatPanelView : MonoBehaviour
     private TMP_Text   _buffTooltipText;
     private BuffCell   _hoveredCell;
 
-    private float _noticeTimer;
+    // 알림 만료는 '남은 시간 누산'이 아니라 <b>절대 시각(unscaled)</b>으로 잡는다.
+    // 누산식은 Update가 도는 동안에만 줄어서, HUD 모드 전환(HudView.SetSections)으로
+    // 이 패널 GO가 꺼지면 타이머가 얼어붙고 텍스트는 켜진 채 남았다 — 다시 켜질 때
+    // 철 지난 알림이 되살아나고, 안 켜지면 그대로 잔류했다.
+    // 절대 시각이면 꺼져 있던 동안에도 만료가 흘러가 재활성 즉시 사라진다.
+    private float _noticeHideAt = -1f;   // <0 = 표시 중 아님
 
     // ── 버프창 도킹(좌측 중앙 — 원신/명조식, 주변시야 배치) ──
     // 그리드: 화면 왼쪽에서 오른쪽으로 늘고 위로 쌓임(유물 패시브=좌하단 첫 셀).
@@ -793,20 +798,27 @@ public sealed class CombatPanelView : MonoBehaviour
         var slotGo = FindChildRecursive(transform, "HUD_Active_01");
         if (slotGo == null) return;
 
+        // 개수는 좌상단 모서리 — 아이콘(가운데)·키 라벨(우하단)과 자리를 나눠 겹치지 않게 한다.
+        // 키 라벨은 StyleKeyLabel이 모든 슬롯을 우하단(KeyLabelPivot)으로 정규화하므로,
+        // 자리를 비켜주는 쪽은 포션에만 있는 개수 라벨이다. 우하단에 두면 18pt 볼드 개수가
+        // 12pt 키(C)를 덮어 "무슨 키로 먹는지" 표시가 사라진다.
         var go = new GameObject("PotionCount", typeof(RectTransform));
         go.transform.SetParent(slotGo, false);
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot     = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, -2f);
-        rt.sizeDelta = new Vector2(48f, 26f);
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot     = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(3f, -2f);
+        rt.sizeDelta = new Vector2(40f, 22f);
 
         _potionCountLabel = go.AddComponent<TextMeshProUGUI>();
         if (slotLabelFont != null) _potionCountLabel.font = slotLabelFont;
-        _potionCountLabel.fontSize  = 20f;
+        _potionCountLabel.fontSize  = 18f;
         _potionCountLabel.fontStyle = FontStyles.Bold;
-        _potionCountLabel.alignment = TextAlignmentOptions.Center;
+        _potionCountLabel.alignment = TextAlignmentOptions.TopLeft;
         _potionCountLabel.raycastTarget = false;
+        var ol = go.AddComponent<UnityEngine.UI.Outline>();   // 아이콘 위에서도 읽히게 외곽선
+        ol.effectColor    = new Color(0f, 0f, 0f, 0.9f);
+        ol.effectDistance = new Vector2(1f, -1f);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -1053,14 +1065,20 @@ public sealed class CombatPanelView : MonoBehaviour
         ApplySlotSkins();        // 디자이너 아트 스킨(미지정 시 기존 플랫 외형 유지)
     }
 
-    private void OnEnable()  => SceneManager.sceneLoaded += HandleSceneLoaded;
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        // 꺼져 있는 동안 만료된 알림이 한 프레임 번쩍이지 않게 즉시 정리한다.
+        UpdateBuffNotice();
+    }
+
     private void OnDisable() => SceneManager.sceneLoaded -= HandleSceneLoaded;
 
     /// <summary>씬 전환(예: 게이트 통과) 시 전환성 획득/안내 알림을 즉시 클리어 — 다음 씬으로 잔류 방지.</summary>
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        _noticeTimer = 0f;
-        if (buffNoticeText != null) buffNoticeText.gameObject.SetActive(false);
+        HideBuffNotice();
+        ClearItemNotices();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -1410,7 +1428,10 @@ public sealed class CombatPanelView : MonoBehaviour
         if (noon && !_lastSkillReady) _relicFlash = 1f;
         _lastSkillReady = noon;
         if (_relicFlash > 0f) _relicFlash = Mathf.Max(0f, _relicFlash - Time.unscaledDeltaTime * 2.5f);
-        _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
+        // 이 메서드의 다른 위젯 참조는 전부 널 체크를 하는데 여기만 빠져 있었다.
+        // _sunRoot가 비면 Update가 매 프레임 던져 뒤쪽(알림 만료 등)이 통째로 죽는다.
+        if (_sunRoot != null)
+            _sunRoot.localScale = Vector3.one * (1f + _relicFlash * 0.12f);
     }
 
     /// <summary>활성 무기 칸 강조(칸 배경·테두리 밝기). HudPresenter가 CurrentSlotIndex로 호출.</summary>
@@ -1551,12 +1572,17 @@ public sealed class CombatPanelView : MonoBehaviour
     }
     // ── 키 표기 라벨 규격 (모든 슬롯 공통) ─────────────────────────
     // 슬롯마다 제각각이면 눈이 키를 못 찾는다. 위치·크기·색을 한 곳에서 강제한다.
-    private const  float KeyLabelSize     = 12f;                        // 작게 — 슬롯 아이콘을 가리지 않는다
-    private const  float KeyLabelBoxW     = 18f;
-    private const  float KeyLabelBoxH     = 16f;
-    private static readonly Vector2 KeyLabelPivot  = new(1f, 0f);       // 슬롯 우하단 안쪽
-    private static readonly Vector2 KeyLabelOffset = new(-3f, 3f);
-    private static readonly Color   KeyLabelColor  = new(1f, 0.90f, 0.62f, 0.95f);
+    // 예전엔 슬롯 rect 우하단 '안쪽'에 12pt로 얹었는데, 사각 슬롯은 바로 그 자리가 프레임의
+    // 코너 장식이라 글자가 파묻혀 안 보였다(다이아몬드 슬롯만 rect 모서리가 비어 Q가 보였던 것).
+    // 슬롯 아래 바깥의 빈 공간으로 내리고, 크기를 키우고 외곽선을 넣어 배경과 무관하게 읽히게 한다.
+    private const  float KeyLabelSize     = 17f;
+    private const  float KeyLabelBoxW     = 24f;
+    private const  float KeyLabelBoxH     = 20f;
+    private static readonly Vector2 KeyLabelAnchor = new(1f, 0f);       // 슬롯 우하단 모서리에 고정
+    private static readonly Vector2 KeyLabelPivot  = new(1f, 1f);       // 라벨은 그 아래로 늘어뜨린다
+    private static readonly Vector2 KeyLabelOffset = new(-2f, -1f);
+    private static readonly Color   KeyLabelColor  = new(1f, 0.88f, 0.55f, 1f);
+    private static readonly Color   KeyLabelOutline = new(0f, 0f, 0f, 0.85f);
 
     private TMP_Text CreateCornerLabel(Transform slotRoot, string text)
     {
@@ -1577,8 +1603,8 @@ public sealed class CombatPanelView : MonoBehaviour
         if (tmp == null) return;
 
         var rect = tmp.rectTransform;
-        rect.anchorMin        = KeyLabelPivot;
-        rect.anchorMax        = KeyLabelPivot;
+        rect.anchorMin        = KeyLabelAnchor;
+        rect.anchorMax        = KeyLabelAnchor;
         rect.pivot            = KeyLabelPivot;
         rect.anchoredPosition = KeyLabelOffset;
         rect.sizeDelta        = new Vector2(KeyLabelBoxW, KeyLabelBoxH);
@@ -1588,10 +1614,16 @@ public sealed class CombatPanelView : MonoBehaviour
         tmp.fontSize      = KeyLabelSize;
         tmp.fontStyle     = FontStyles.Bold;
         tmp.color         = KeyLabelColor;
-        tmp.alignment     = TextAlignmentOptions.BottomRight;
+        tmp.alignment     = TextAlignmentOptions.TopRight;
         tmp.enableWordWrapping = false;
         tmp.overflowMode  = TextOverflowModes.Overflow;
         tmp.raycastTarget = false;
+
+        // 어떤 배경(밝은 프레임·밝은 바닥) 위에서도 읽히도록 외곽선을 강제한다.
+        if (!tmp.TryGetComponent<UnityEngine.UI.Outline>(out var ol))
+            ol = tmp.gameObject.AddComponent<UnityEngine.UI.Outline>();
+        ol.effectColor    = KeyLabelOutline;
+        ol.effectDistance = new Vector2(1.5f, -1.5f);
 
         if (slotLabelFont != null) tmp.font = slotLabelFont;
     }
@@ -1672,28 +1704,12 @@ public sealed class CombatPanelView : MonoBehaviour
                 _relicBarGlow.effectColor = new Color(c.r, c.g, c.b, Mathf.Clamp01(glow));
             }
             // 정오 진입 시 바를 잠깐 확대(펀치) — 절정 강조
-            _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
+            // 분기 조건이 _relicBarFill만 보고 _relicBar는 안 봐서 여기만 무방비였다(_sunRoot와 같은 결함).
+            if (_relicBar != null)
+                _relicBar.localScale = Vector3.one * (1f + _relicFlash * 0.10f);
         }
 
-        if (_noticeTimer > 0f)
-        {
-            _noticeTimer -= Time.unscaledDeltaTime;   // 씬 전환/일시정지(timeScale=0)에도 얼지 않게 — 알림 잔류 방지
-
-            if (buffNoticeText != null)
-            {
-                if (_noticeTimer <= 0f)
-                {
-                    buffNoticeText.gameObject.SetActive(false);
-                }
-                else if (_noticeTimer < NoticeFadeTime)
-                {
-                    float alpha = _noticeTimer / NoticeFadeTime;
-                    var c = buffNoticeText.color;
-                    c.a = alpha;
-                    buffNoticeText.color = c;
-                }
-            }
-        }
+        UpdateBuffNotice();
 
         if (_itemNotices.Count > 0)
             UpdateItemNotices();
@@ -1708,6 +1724,7 @@ public sealed class CombatPanelView : MonoBehaviour
             if (buffNoticeText == null) return;
         }
 
+        // 연속 획득: 이전 표시분을 덮어쓰고 만료 시각도 새로 잡는다(핸들 누적 없음 — 슬롯 1개).
         buffNoticeText.text = message;
         buffNoticeText.gameObject.SetActive(true);
 
@@ -1716,7 +1733,55 @@ public sealed class CombatPanelView : MonoBehaviour
         c.a = 1f;
         buffNoticeText.color = c;
 
-        _noticeTimer = NoticeDuration + NoticeFadeTime;
+        _noticeHideAt = Time.unscaledTime + NoticeDuration + NoticeFadeTime;
+    }
+
+    /// <summary>표시 중인 알림의 페이드/만료 처리. Update와 OnEnable에서 호출.</summary>
+    private void UpdateBuffNotice()
+    {
+        if (_noticeHideAt < 0f)
+        {
+            // 불변식: 대기 중인 알림이 없으면 텍스트 오브젝트는 꺼져 있어야 한다.
+            //
+            // 만료로 껐는데 <b>외부가 다시 켜는</b> 경로가 실재한다 —
+            // HudBootstrapper.ForceTextsVisible이 방 전환마다 Panel_Combat 하위의
+            // TextMeshProUGUI를 비활성 포함으로 긁어 전부 SetActive(true) + 알파 1로 되돌린다.
+            // 그때 _noticeHideAt은 이미 -1이라 만료 감시가 꺼져 있어 낡은 문구가 영구히 남았다
+            // ("2.5초 뒤 사라졌다가 다음 방에서 다시 나타나 안 없어짐" 재현 경로).
+            // 되살아나면 여기서 즉시 되돌린다.
+            if (buffNoticeText != null && buffNoticeText.gameObject.activeSelf)
+                buffNoticeText.gameObject.SetActive(false);
+            return;
+        }
+
+        if (buffNoticeText == null) { _noticeHideAt = -1f; return; }
+
+        float remain = _noticeHideAt - Time.unscaledTime;
+
+        if (remain <= 0f)
+        {
+            HideBuffNotice();
+            return;
+        }
+
+        if (remain < NoticeFadeTime)
+        {
+            var c = buffNoticeText.color;
+            c.a = remain / NoticeFadeTime;
+            buffNoticeText.color = c;
+        }
+    }
+
+    /// <summary>알림 강제 종료 — 알파까지 되돌려 다음 표시가 흐리게 뜨는 일이 없게 한다.</summary>
+    private void HideBuffNotice()
+    {
+        _noticeHideAt = -1f;
+        if (buffNoticeText == null) return;
+
+        var c = buffNoticeText.color;
+        c.a = 1f;
+        buffNoticeText.color = c;
+        buffNoticeText.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -1899,7 +1964,7 @@ public sealed class CombatPanelView : MonoBehaviour
     {
         public GameObject go;
         public TMP_Text text;
-        public float timer;
+        public float hideAt;   // Time.unscaledTime 기준 만료 시각(버프 알림과 동일 규칙)
     }
 
     /// <summary>아이템 효과 발동 시 왼쪽에 스택형 알림 표시.</summary>
@@ -1937,31 +2002,41 @@ public sealed class CombatPanelView : MonoBehaviour
         {
             go = go,
             text = text,
-            timer = ItemNoticeDuration + ItemNoticeFadeTime,
+            hideAt = Time.unscaledTime + ItemNoticeDuration + ItemNoticeFadeTime,
         });
     }
 
     private void UpdateItemNotices()
     {
+        // Time.deltaTime을 쓰던 시절엔 timeScale=0(일시정지·차단 팝업) 동안 만료가 멈춰
+        // 알림이 화면에 그대로 굳었다. 만료는 절대 시각(unscaled)으로 판정한다.
+        float now = Time.unscaledTime;
+
         for (int i = _itemNotices.Count - 1; i >= 0; i--)
         {
             var entry = _itemNotices[i];
-            entry.timer -= Time.deltaTime;
-            _itemNotices[i] = entry;
+            float remain = entry.hideAt - now;
 
-            if (entry.timer <= 0f)
+            if (remain <= 0f)
             {
                 if (entry.go != null) Destroy(entry.go);
                 _itemNotices.RemoveAt(i);
             }
-            else if (entry.timer < ItemNoticeFadeTime && entry.text != null)
+            else if (remain < ItemNoticeFadeTime && entry.text != null)
             {
-                float alpha = entry.timer / ItemNoticeFadeTime;
                 var c = entry.text.color;
-                c.a = alpha;
+                c.a = remain / ItemNoticeFadeTime;
                 entry.text.color = c;
             }
         }
+    }
+
+    /// <summary>스택형 아이템 알림 전부 즉시 제거(씬 전환 등) — 다음 씬으로 잔류 방지.</summary>
+    private void ClearItemNotices()
+    {
+        for (int i = 0; i < _itemNotices.Count; i++)
+            if (_itemNotices[i].go != null) Destroy(_itemNotices[i].go);
+        _itemNotices.Clear();
     }
 
     private void EnsureItemNoticeRoot()

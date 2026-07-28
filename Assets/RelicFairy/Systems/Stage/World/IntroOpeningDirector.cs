@@ -40,6 +40,10 @@ public sealed class IntroOpeningDirector : MonoBehaviour
     // ── Lifecycle ────────────────────────────────────────────────────
     private void Start() => PlayAsync(this.GetCancellationTokenOnDestroy()).Forget();
 
+    // ── Public Methods ───────────────────────────────────────────────
+    /// <summary>아레나가 런타임 생성이라 제단 앵커는 IntroArenaLoader가 로드 후 주입한다.</summary>
+    public void SetAltarAnchor(Transform anchor) => altarAnchor = anchor;
+
     // ── 시퀀스 ───────────────────────────────────────────────────────
     private async UniTaskVoid PlayAsync(CancellationToken ct)
     {
@@ -68,6 +72,9 @@ public sealed class IntroOpeningDirector : MonoBehaviour
             IntroPageBook.Open();
             await ScreenFade.In(0f, ct); // 페이지북 자체 검은 배경이 화면을 가리므로 암전은 즉시 해제
             await PlaySequenceAsync(prologueSequenceId);
+
+            // 성당은 런타임 Addressable 생성이다 — 앵커를 읽기 전에 배치가 끝나 있어야 구도가 맞는다.
+            await IntroArenaLoader.ReadyAsync();
 
             Vector3 altar   = altarAnchor   != null ? altarAnchor.position   : new Vector3(0f, 1f, 18f);
             Vector3 sword   = swordAnchor   != null ? swordAnchor.position   : new Vector3(0.2f, 1f, -2.4f);

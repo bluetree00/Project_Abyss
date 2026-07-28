@@ -59,8 +59,10 @@ public class GridSquare : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
 
     void Start()
     {
-        // 시작 시 점유/하이라이트 초기화
-        SetOccupied(false);
+        // 점유 표시(activeImage)를 현재 상태에 맞춘다. 예전엔 무조건 false로 밀었는데,
+        // 칸이 <b>비활성 계층</b>(닫힌 배치 화면)에서 만들어지면 Start가 패널을 처음 열 때까지
+        // 늦춰져, 이어하기로 복원해 둔 점유가 그 시점에 통째로 지워졌다(룬은 판에 있는데 칸은 빈 것으로).
+        SetOccupied(isOccupied);
         SetHighlight(false);
     }
 

@@ -574,8 +574,9 @@ public sealed class GameRunSession
         ChangeRunState(RunState.ChapterClear);
     }
 
-    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter4).</summary>
-    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter4;
+    /// <summary>설정상 진행 가능한 마지막 챕터. ChapterRegistry._finalChapter(없으면 Chapter3).
+    /// Ch4는 빌드에서 제외된 미완 콘텐츠라, 레지스트리 유실 시에도 없는 씬으로 진행하지 않도록 Chapter3로 폴백한다.</summary>
+    private ChapterId FinalChapter => _chapterRegistry != null ? _chapterRegistry.FinalChapter : ChapterId.Chapter3;
 
     /// <summary>현재 챕터 다음에 진행할 챕터가 남아 있으면 true. 마지막 챕터면 false(= 보스 클리어 시 런 클리어).</summary>
     public bool HasNextChapter() => CurrentChapter + 1 <= FinalChapter;
@@ -860,7 +861,9 @@ public sealed class GameRunSession
         if (charData == null)
             Debug.LogWarning("[GameRun] CharacterData not set — PlayerRunState uses default maxHp=100.");
 
-        return new PlayerRunState(maxHp);
+        // 출시 정책: 신규 런은 골드 0에서 시작 — 방 보상/전투 드롭으로만 확보한다.
+        const int NewRunStartingGold = 0;
+        return new PlayerRunState(maxHp, NewRunStartingGold);
     }
 
     private void SubscribePlayerStateSource(PlayerController player)
