@@ -446,6 +446,18 @@ public sealed class HudBootstrapper : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 수명을 스스로 관리하는 <b>일시 알림</b> 텍스트인지. 이런 건 하드가드가 건드리면 안 된다.
+    ///
+    /// ForceTextsVisible은 "HUD 텍스트가 꺼져 있으면 무조건 켠다"는 무딘 보정이라,
+    /// 만료돼 꺼둔 안내 문구까지 되살려 화면에 영구히 남겼다(방 전환마다 재현).
+    /// 페이드 중인 알림의 알파를 1로 되돌려 연출을 끊는 문제도 같이 있었다.
+    /// 이 오브젝트들은 CombatPanelView가 코드로 만들므로 이름이 곧 계약이다.
+    /// </summary>
+    private static bool IsSelfManagedNotice(string goName)
+        => goName.StartsWith("BuffNoticeText", System.StringComparison.Ordinal)
+        || goName.StartsWith("ItemNotice", System.StringComparison.Ordinal);
+
     private static void ForceTextsVisible(Transform from)
     {
         if (from == null) return;
@@ -455,6 +467,7 @@ public sealed class HudBootstrapper : MonoBehaviour
         {
             var t = texts[i];
             if (t == null) continue;
+            if (IsSelfManagedNotice(t.gameObject.name)) continue;
 
             if (!t.gameObject.activeSelf)
                 t.gameObject.SetActive(true);
