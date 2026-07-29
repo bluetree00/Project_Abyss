@@ -59,6 +59,16 @@ public static class TokenRegistry
             count++;
         }
 
+        // 접두 핸들러는 '최장 일치 우선'으로 정렬한다.
+        // 리플렉션 타입 순서는 보장되지 않아, 한 토큰이 두 접두에 걸릴 때(예: "d"와 "de")
+        // 어느 쪽이 잡히는지가 실행마다 달라질 수 있었다. 긴 코드를 먼저 검사하면
+        // 항상 더 구체적인 핸들러가 이기고, 같은 길이는 Ordinal로 묶어 순서가 고정된다.
+        _prefix.Sort((a, b) =>
+        {
+            int byLen = b.Code.Length.CompareTo(a.Code.Length);
+            return byLen != 0 ? byLen : string.CompareOrdinal(a.Code, b.Code);
+        });
+
         Debug.Log($"[TokenRegistry] {count}개 핸들러 등록 완료");
     }
 
