@@ -184,9 +184,18 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [SerializeField] private EssenceTracker essenceTracker;
 
     private GameObject _currentMapGO;
+    // SpawnBlockMapAsync가 해석한 챕터 팔레트. StartRoomGate 통로를 같은 팔레트로 짓기 위해 보관.
+    private BlockPalette _currentMapPalette;
     // grid_csv의 P 토큰에서 계산한 플레이어 스폰 월드 좌표.
     // SpawnBlockMapAsync에서 채워지고 SpawnPlayerAsync에서 소비.
     private Vector3? _pendingPlayerSpawnPos;
+
+    /// <summary>
+    /// 시작방 출구(StartRoomGate) 월드 위치. 시작방에서만 채워지고, 플레이어 스폰 회전을
+    /// 잡는 데 한 번 쓰고 비운다. 절차 생성 방은 grid의 P 토큰이 위치만 정하고 회전은
+    /// 늘 월드 아이덴티티라, 방 방향과 무관하게 +Z를 보고 시작하던 문제를 시작방 한정으로 보정한다.
+    /// </summary>
+    private Vector3? _startRoomExitWorldPos;
     private bool _isSpawning;
 
     private GameRunSession _run;
@@ -788,7 +797,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // Zone 0 출구에 StartRoomGate 배치 — 로드아웃 준비 완료 시 픽업이 활성화
         if (_currentMapGO != null)
-            CreateStartRoomGates(startZone, zones, _currentMapGO);
+            CreateStartRoomGates(startZone, zones, _currentMapGO, _currentMapPalette);
 
         Debug.Log($"[GameRunBootstrapper] Zone 0 ({startZone.label}) 스폰 완료. 플레이어 예정 위치: {_pendingPlayerSpawnPos}");
     }
@@ -1722,6 +1731,24 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     }
 
     /// <summary>grid의 P 토큰 위치 → 월드. 없으면 anchor.</summary>
+    /// <summary>
+    /// 시작방이면 출구를 바라보는 회전을 돌려준다. 시작방이 아니거나 출구가 스폰 지점과
+    /// 겹칠 만큼 가까우면 <paramref name="fallback"/>을 그대로 돌려준다.
+    /// 기준은 한 번만 쓰고 비우므로 이후 방들은 기존 동작(월드 아이덴티티)을 유지한다.
+    /// </summary>
+    private Quaternion FaceStartRoomExit(Vector3 spawnPos, Quaternion fallback)
+    {
+        if (!_startRoomExitWorldPos.HasValue) return fallback;
+
+        var toExit = _startRoomExitWorldPos.Value - spawnPos;
+        _startRoomExitWorldPos = null;   // 시작방 1회성
+
+        toExit.y = 0f;                   // 수평 방향만 — 게이트가 위/아래에 있어도 고개를 들지 않는다
+        if (toExit.sqrMagnitude < 0.01f) return fallback;
+
+        return Quaternion.LookRotation(toExit.normalized, Vector3.up);
+    }
+
     private Vector3 ResolvePlayerSpawnFromGrid(TileType[,] grid, Vector3 anchor, int w, int h)
     {
         var p = MapDataLoader.FindFirst(grid, TileType.PlayerSpawn);
@@ -1813,10 +1840,15 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// next_zone_indices가 여러 개여도 물리 게이트는 1개만 생성 —
     /// 실제 진출 존 선택은 트리거 후 ShowZoneSelectionAsync가 UI로 처리한다.
     /// </summary>
+    /// <param name="chapterPalette">
+    /// 시작방을 지은 챕터 팔레트. 게이트 너머 통로를 같은 팔레트로 짓도록 주입한다.
+    /// null이면 게이트 프리팹의 직렬화값(Forest 고정)이 그대로 쓰인다.
+    /// </param>
     private void CreateStartRoomGates(
         ZoneLayoutEntry startZone,
         System.Collections.Generic.List<ZoneLayoutEntry> allZones,
-        GameObject zoneGO)
+        GameObject zoneGO,
+        BlockPalette chapterPalette = null)
     {
         if (startGatePrefab == null || string.IsNullOrEmpty(startZone.next_zone_indices))
         {
@@ -1846,10 +1878,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         gateGO.transform.localRotation = gateLocalRot;
         gateGO.name = "StartRoomGate";
 
-        if (gateGO.GetComponent<StartRoomGate>() == null)
-            gateGO.AddComponent<StartRoomGate>();
+        // 스폰 회전 기준 — 플레이어가 이 게이트를 보고 시작한다(시작방 한정).
+        _startRoomExitWorldPos = gateGO.transform.position;
 
-        Debug.Log($"[GameRunBootstrapper] StartRoomGate 배치 완료 → Zone {primaryToIdx} 방향");
+        if (!gateGO.TryGetComponent<StartRoomGate>(out var gate))
+            gate = gateGO.AddComponent<StartRoomGate>();
+
+        // 통로 팔레트/벽높이 주입 — 프리팹은 Forest 고정이라 주입 없이는 Ch2+ 통로만 Ch1 룩이 된다.
+        // 벽 높이는 절차 방(BuildProcRoomAsync의 effWallLayers)과 동일 규약: 팔레트 프로필 우선, 없으면 전역 폴백.
+        if (chapterPalette != null)
+        {
+            int corridorWallLayers = chapterPalette.WallHeight > 0 ? chapterPalette.WallHeight : wallLayers;
+            gate.ConfigureStartCorridor(chapterPalette, corridorWallLayers);
+        }
+
+        Debug.Log($"[GameRunBootstrapper] StartRoomGate 배치 완료 → Zone {primaryToIdx} 방향 (통로 팔레트: {(chapterPalette != null ? chapterPalette.name : "프리팹 폴백")})");
     }
 
     private void CreateZoneExitGates(int zoneIndex, ZoneLayoutEntry zone,
@@ -1997,6 +2040,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             activePalette = await Managers.AddressableManager.TryLoadAssetAsync<BlockPalette>(paletteKey);
         if (activePalette == null)
             activePalette = PickBlockPalette(!string.IsNullOrEmpty(activeTheme) ? activeTheme : roomEntry.theme);
+        _currentMapPalette = activePalette; // CreateStartRoomGates가 통로를 같은 팔레트로 짓도록 보관
         var blocks = MapBuilder.Build(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, wallLayers);
         MapBuilder.BuildCeiling(grid, activePalette, mapGO.transform, blockCellSize, blockBaseY, wallLayers * blockCellSize);
         if (activePalette != null) MapBuilder.BuildRoomLights(grid, mapGO.transform, blockCellSize, blockBaseY, wallLayers, activePalette.Lighting);
@@ -3335,6 +3379,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             pos = _pendingPlayerSpawnPos.Value;
             _pendingPlayerSpawnPos = null;
             rot = playerSpawnPoint != null ? playerSpawnPoint.rotation : Quaternion.identity;
+
+            // 시작방 한정 — 출구를 정면에 두고 시작한다.
+            // 카메라 인계(HandToGameplayCamera)가 alignHeadingToTarget:true라
+            // 플레이어 정면이 그대로 카메라 기준 헤딩이 된다. 별도 카메라 조작이 필요 없다.
+            rot = FaceStartRoomExit(pos, rot);
         }
         else
         {

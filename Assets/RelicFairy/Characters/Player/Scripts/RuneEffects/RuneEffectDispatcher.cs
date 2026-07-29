@@ -40,19 +40,19 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     public float ZoneAmplifier(string zoneId)
         => zoneId != null && _zoneAmp.TryGetValue(zoneId, out var m) ? m : 1f;
 
-    // [가이드라인 비주얼] 룬 리소스 배지 폴링(0.25s throttle). key→라벨/아이콘/색 고정 테이블.
-    private float _badgePollAccum;
-    private static readonly (string key, string label, string iconKey, GuidelineVisual.BadgeTint tint)[] s_resourceBadges =
+    // 룬 리소스 표시 테이블(key→라벨/아이콘). 표출처는 <b>버프칸 하나뿐</b>이다(Contribute).
+    // 예전엔 같은 값을 플레이어 머리 위 월드 라벨("전기 3"/"어둠 5")로도 띄웠는데,
+    // 버프칸이 들어오면서 같은 정보가 화면 한가운데 두 번 나오는 꼴이 돼 레거시 표출을 걷어냈다.
+    private static readonly (string key, string label, string iconKey)[] s_resourceBadges =
     {
-        ("ElecStatic",    "전기", "lightning", GuidelineVisual.BadgeTint.Electric),
-        ("LightRadiance", "광채", "light",     GuidelineVisual.BadgeTint.Light),
-        ("darkGauge",     "어둠", "dark",      GuidelineVisual.BadgeTint.Dark),
+        ("ElecStatic",    "전기", "lightning"),
+        ("LightRadiance", "광채", "light"),
+        ("darkGauge",     "어둠", "dark"),
     };
 
     public RuneEffectDispatcher(PlayerController player)
     {
         _player = player;
-        _resources.SetAnchor(player != null ? player.transform : null);   // [가이드라인 비주얼] 리소스 토스트 위치
         QuestEvents.OnMonsterKilled += HandleKill;
         _subscribed = true;
     }
@@ -233,10 +233,6 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
         _amplifier = 1f;
         _zoneAmp.Clear();
         _resources.Clear();
-
-        // [가이드라인 비주얼] 리소스 배지 정리
-        for (int i = 0; i < s_resourceBadges.Length; i++)
-            GuidelineVisual.ClearBadge("rune_" + s_resourceBadges[i].key);
     }
 
     /// <summary>구독 해제 + 정리. PlayerController.OnDestroy에서 호출.</summary>
@@ -254,24 +250,6 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         _resources.Tick(dt);
         for (int i = 0; i < _active.Count; i++) _active[i].Tick(dt, _player);
-
-        // [가이드라인 비주얼] 룬 리소스 배지 갱신(throttle)
-        _badgePollAccum += dt;
-        if (_badgePollAccum >= 0.25f) { _badgePollAccum = 0f; UpdateResourceBadges(); }
-    }
-
-    private void UpdateResourceBadges()
-    {
-        if (_player == null) return;
-        var t = _player.transform;
-        for (int i = 0; i < s_resourceBadges.Length; i++)
-        {
-            var b = s_resourceBadges[i];
-            int v = _resources.Get(b.key);
-            string badgeKey = "rune_" + b.key;
-            if (v > 0) GuidelineVisual.SetBadge(t, badgeKey, b.label + " " + v, b.tint);
-            else       GuidelineVisual.ClearBadge(badgeKey);
-        }
     }
 
     // ── 버프창 수집(IBuffViewSource) ────────────────────────

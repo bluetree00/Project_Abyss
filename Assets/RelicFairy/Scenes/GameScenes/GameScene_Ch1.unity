@@ -166,6 +166,8 @@ MonoBehaviour:
   gradeMode: 0
   targetGrade: 0
   _waveEntries: []
+  _waveSpawnDelayMin: 0.15
+  _waveSpawnDelayMax: 0.4
 --- !u!4 &13670620
 Transform:
   m_ObjectHideFlags: 0
@@ -446,51 +448,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &589569919
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 589569921}
-  - component: {fileID: 589569920}
-  m_Layer: 0
-  m_Name: CovenantTestTrigger
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &589569920
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 589569919}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f802076f2d578cb46a8a88a12d19f035, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CovenantChoiceTestTrigger
-  spawnDistance: 3
---- !u!4 &589569921
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 589569919}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -945,7 +902,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!222 &1276884616
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1848,6 +1805,8 @@ MonoBehaviour:
   bootstrapper: {fileID: 0}
   clearRoomKey: 286
   spawnItemKey: 288
+  showTestButtons: 0
+  showGuiHints: 0
 --- !u!114 &1881724120
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2185,6 +2144,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: '@GameRun'
       objectReference: {fileID: 0}
+    - target: {fileID: 6119104518050800690, guid: 2855671160247ae4fb7035a99f996909,
+        type: 3}
+      propertyPath: field of view
+      value: 78
+      objectReference: {fileID: 0}
     - target: {fileID: 7227992635940433738, guid: 2855671160247ae4fb7035a99f996909,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -2252,7 +2216,6 @@ SceneRoots:
   - {fileID: 2104426524}
   - {fileID: 1395062301}
   - {fileID: 1350179239}
-  - {fileID: 589569921}
   - {fileID: 1347629739}
   - {fileID: 923893144}
   - {fileID: 6222929533723699944}

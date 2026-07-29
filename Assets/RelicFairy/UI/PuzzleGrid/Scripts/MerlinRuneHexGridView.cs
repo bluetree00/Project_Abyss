@@ -616,6 +616,24 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
         UpdateAdjacencyConstraints();
     }
 
+    /// <summary>
+    /// 런 하드리셋 — 판의 점유를 <b>칸까지</b> 전부 비운다(런 종료 시 MerlinRuneBridge.ClearBoard에서 호출).
+    ///
+    /// 이 뷰는 Puzzle 인스턴스가 아니라 <b>UI_GridPanel(DDOL)</b> 소속이라, 판째로 버리는
+    /// ClearBoard의 사정권 밖이었다. 그래서 지난 런의 점유(칸·금테·존 카운트)가 남아
+    /// 다음 런에서 룬 없이 시너지가 붙고 그 칸에 새 룬을 놓을 수 없었다.
+    /// </summary>
+    public void ResetBoardOccupancy()
+    {
+        var squares = HexGrid?.GetGridSquares();
+        if (squares != null)
+            foreach (var sq in squares)
+                if (sq != null) sq.SetOccupied(false);
+
+        RefreshPlacedCells(null);        // _occupiedPositions 비움 + 색/금테 + 브릿지 통보(빈 카운트)
+        UpdateAdjacencyConstraints();
+    }
+
     /// <summary>모든 배치 셀을 초기화한다. DoReset 에서 호출.</summary>
     public void ClearAllPlacedCells()
     {
