@@ -1426,7 +1426,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     /// </summary>
     public async UniTask<ProcRoomResult> BuildProcRoomAsync(
         ZonePoolEntry entry, Vector3 anchor, bool mirror, int quarterTurns, CancellationToken ct = default,
-        System.Random roomRng = null)
+        System.Random roomRng = null, System.Random visualRng = null)
     {
         ct = ct == default ? this.GetCancellationTokenOnDestroy() : ct;
         if (entry == null || string.IsNullOrWhiteSpace(entry.grid_csv))
@@ -1537,9 +1537,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         else
         {
             MapBuilder.CreateSafeFloor(w, h, blockCellSize, 0f, roomGO.transform);
-            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, effWallLayers);
+            blocks = MapBuilder.Build(grid, palette, roomGO.transform, blockCellSize, blockBaseY, blockShopStallPrefab, effWallLayers, visualRng);
             await UniTask.Yield(ct);
-            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize);
+            MapBuilder.BuildCeiling(grid, palette, roomGO.transform, blockCellSize, blockBaseY, effWallLayers * blockCellSize, visualRng);
             await UniTask.Yield(ct);
             if (palette != null)
             {
@@ -1569,7 +1569,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     int len  = procDoorCorridorLength + 4 + hash;                    // 기본+4 ~ +19 → 더 길고 제각각
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
-                        len, blockCellSize, blockBaseY, effWallLayers));
+                        len, blockCellSize, blockBaseY, effWallLayers, visualRng));
                 }
                 if (cls.entrance.HasValue) AddCorridor(cls.entrance.Value);
                 if (cls.forward.HasValue)  AddCorridor(cls.forward.Value);
@@ -1592,6 +1592,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             Grid               = grid,
             SpawnInfos         = spawnInfos,
             DeferredSpawners   = deferredSpawners,
+            Rng                = visualRng,
             Ct                 = ct,
         };
         if (!useCustomArena) TokenParser.Execute(csv, w, h, tokenCtx, TokenPhase.PreBuild);

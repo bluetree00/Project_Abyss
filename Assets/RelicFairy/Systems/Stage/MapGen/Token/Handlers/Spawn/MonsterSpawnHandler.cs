@@ -37,7 +37,7 @@ internal static class MonsterSpawnUtil
             return;
         }
 
-        var def = ctx.ActivePalette.Pick(TileType.MonsterSpawn);
+        var def = ctx.ActivePalette.Pick(TileType.MonsterSpawn, ctx.Rng);
         if (def == null || def.prefab == null)
         {
             Debug.LogWarning($"[MonsterSpawnHandler] 팔레트에 MonsterSpawn BlockDef 없음 — 미배치 ({ctx.Cell})");

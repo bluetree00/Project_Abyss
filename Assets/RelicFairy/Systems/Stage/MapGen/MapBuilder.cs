@@ -29,6 +29,8 @@ public class MapBuilder
     /// 그리드 기반으로 블록을 인스턴스화.
     /// </summary>
     /// <param name="shopStallPrefab">상점 매대 프리팹(Block_ShopStall). null이면 임시 큐브로 폴백.</param>
+    /// <param name="rng">시드 RNG. 넘기면 블록 배리언트·Random 페이싱이 결정적이 된다(이어하기 재현).
+    /// null이면 Unity 전역 Random(레거시 존 빌드·에디터 툴).</param>
     public static List<PlacedBlock> Build(
         TileType[,] grid,
         BlockPalette palette,
@@ -36,7 +38,8 @@ public class MapBuilder
         float cellSize = 1f,
         float baseY = 0f,
         GameObject shopStallPrefab = null,
-        int wallLayers = 1)
+        int wallLayers = 1,
+        System.Random rng = null)
     {
         int w = grid.GetLength(0);
         int h = grid.GetLength(1);
@@ -63,16 +66,16 @@ public class MapBuilder
 
                 // 오버레이 타일(버프/상점/몬스터스폰): 바닥 블록을 먼저 깔고 그 위에 기능 오브젝트 배치
                 var renderType = isOverlayTile ? TileType.Floor : type;
-                var blockDef = palette.Pick(renderType);
+                var blockDef = palette.Pick(renderType, rng);
                 if (blockDef == null)
                 {
-                    blockDef = palette.Pick(TileType.Floor);
+                    blockDef = palette.Pick(TileType.Floor, rng);
                     if (blockDef == null) continue;
                 }
 
                 var localPos = new Vector3(x * cellSize - offset.x, baseY, z * cellSize - offset.z);
                 var worldPos = parent.TransformPoint(localPos);
-                float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter);
+                float rotY = CalcRotation(blockDef.facingRule, localPos, gridCenter, rng);
 
                 var go = Object.Instantiate(blockDef.prefab, worldPos, Quaternion.Euler(0, rotY, 0), parent);
                 ApplyBlockAdjust(go, blockDef);
@@ -115,7 +118,7 @@ public class MapBuilder
                 // 버프 타일: 전용 프리팹이 있으면 사용, 없으면 기본 트리거 오브젝트 생성
                 if (isBuffTile)
                 {
-                    var buffDef = palette.Pick(type);
+                    var buffDef = palette.Pick(type, rng);
                     PlacedBlock buffBlock;
 
                     if (buffDef != null)
@@ -169,7 +172,7 @@ public class MapBuilder
                     else
                     {
                         // 폴백 1: 팔레트에 등록된 별도 프리팹
-                        var shopDef = palette.Pick(type);
+                        var shopDef = palette.Pick(type, rng);
                         if (shopDef != null && shopDef.prefab != null)
                         {
                             var shopGo = Object.Instantiate(shopDef.prefab, worldPos, Quaternion.identity, parent);
@@ -352,7 +355,8 @@ public class MapBuilder
         Transform parent,
         float cellSize,
         float baseY,
-        float ceilingHeight)
+        float ceilingHeight,
+        System.Random rng = null)
     {
         if (ceilingHeight <= 0f) return;
         // 열린 하늘 테마(숲·심연)는 천장을 덮지 않는다.
@@ -363,8 +367,8 @@ public class MapBuilder
         var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
         float ceilingY = baseY + ceilingHeight;
 
-        var ceilingDef = palette?.Pick(TileType.Ceiling);
-        var floorDef   = palette?.Pick(TileType.Floor);
+        var ceilingDef = palette?.Pick(TileType.Ceiling, rng);
+        var floorDef   = palette?.Pick(TileType.Floor, rng);
         var useDef     = ceilingDef ?? floorDef;
         if (useDef?.prefab == null) return;
 
@@ -549,14 +553,15 @@ public class MapBuilder
         int          lengthCells,
         float        cellSize,
         float        baseY,
-        int          wallLayers)
+        int          wallLayers,
+        System.Random rng = null)
     {
         var placed = new List<PlacedBlock>();
         if (palette == null || lengthCells <= 0) return placed;
 
-        var floorDef = palette.Pick(TileType.Floor);
-        var wallDef  = palette.Pick(TileType.Wall);
-        var ceilDef  = palette.Pick(TileType.Ceiling);
+        var floorDef = palette.Pick(TileType.Floor, rng);
+        var wallDef  = palette.Pick(TileType.Wall, rng);
+        var ceilDef  = palette.Pick(TileType.Ceiling, rng);
         bool ceilFlip = ceilDef == null;          // 전용 천장 없으면 바닥 타일 뒤집기(BuildCeiling과 동일)
         var ceilUse  = ceilDef ?? floorDef;
         if (floorDef?.prefab == null) return placed;
@@ -696,7 +701,7 @@ public class MapBuilder
         return go;
     }
 
-    private static float CalcRotation(FacingRule rule, Vector3 pos, Vector3 center)
+    private static float CalcRotation(FacingRule rule, Vector3 pos, Vector3 center, System.Random rng = null)
     {
         switch (rule)
         {
@@ -711,7 +716,7 @@ public class MapBuilder
                 return Mathf.Atan2(outDir.x, outDir.z) * Mathf.Rad2Deg;
 
             case FacingRule.Random:
-                return Random.Range(0, 4) * 90f;
+                return (rng != null ? rng.Next(0, 4) : Random.Range(0, 4)) * 90f;
 
             default:
                 return 0f;
