@@ -39,7 +39,9 @@ public sealed class DecorationHandler : ITokenHandler
 
         float rotY = (entry.faceNearestWall && inwardDir != Vector3.zero)
             ? Mathf.Atan2(inwardDir.x, inwardDir.z) * Mathf.Rad2Deg
-            : (entry.randomYRotation ? Random.Range(0f, 360f) : 0f);
+            : (entry.randomYRotation
+                ? (ctx.Rng != null ? (float)ctx.Rng.NextDouble() * 360f : Random.Range(0f, 360f))
+                : 0f);
 
         // 멀티셀 오브젝트: anchor 셀(좌하단)에서 크기 중심으로 오프셋
         var centerOffset = new Vector3(
@@ -79,7 +81,7 @@ public sealed class DecorationHandler : ITokenHandler
     /// </summary>
     private static float ResolveFloorTopY(TokenContext ctx)
     {
-        var def = ctx.ActivePalette != null ? ctx.ActivePalette.Pick(TileType.Floor) : null;
+        var def = ctx.ActivePalette != null ? ctx.ActivePalette.Pick(TileType.Floor, ctx.Rng) : null;
         if (def == null || def.prefab == null) return ctx.WorldPos.y;
 
         float meshTop = 0.5f;                                   // 기본 큐브 상단(로컬)

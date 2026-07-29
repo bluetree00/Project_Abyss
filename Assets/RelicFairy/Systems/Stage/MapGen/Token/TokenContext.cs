@@ -37,6 +37,10 @@ public class TokenContext
     /// <summary>비활성화된 스포너 목록. 입장 연출 후 또는 존 진입 시 re-enable됨.</summary>
     public System.Collections.Generic.List<UnityEngine.MonoBehaviour> DeferredSpawners;
 
+    /// <summary>시드 RNG. 장식 회전·블록 배리언트 선택을 결정적으로 만들어 같은 시드면 같은 방이 나온다(이어하기).
+    /// null이면 Unity 전역 Random으로 폴백 — 재현이 필요 없는 경로(레거시 존 빌드)용.</summary>
+    public System.Random Rng;
+
     /// <summary>방 걷기셀들의 월드 AABB(벽/구멍 안쪽으로 inset). TokenParser가 1회 계산.
     /// MonsterSpawner가 이 경계 안으로만 스폰해 게이트/복도로 새는 것을 막는다. null = 미계산(현행 동작).</summary>
     public Bounds? FieldBounds;

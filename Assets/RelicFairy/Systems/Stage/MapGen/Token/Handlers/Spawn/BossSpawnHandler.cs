@@ -16,7 +16,7 @@ public sealed class BossSpawnHandler : ITokenHandler
             return;
         }
 
-        var def = ctx.ActivePalette.Pick(TileType.BossSpawn);
+        var def = ctx.ActivePalette.Pick(TileType.BossSpawn, ctx.Rng);
         if (def == null || def.prefab == null)
         {
             Debug.LogWarning($"[BossSpawnHandler] 팔레트에 BossSpawn BlockDef 없음 — 미배치 (palette={ctx.ActivePalette.name})");
