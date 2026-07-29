@@ -20,8 +20,38 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 388a70aae94b9fc409d14bef2249bcb9
+    m_Address: Shop_Custom_Ch3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 773ea57023789734faabd57e4ba61d73
+    m_Address: Road_Boss_Ch2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 78f9a44eacc9e934cb37c54ce041fb0c
     m_Address: Arena_Boss_Ch1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7a7f6c66d45dbe049b7272bea33b1ef0
+    m_Address: Shop_Custom_Ch4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8d2f750b0b13efd4eba02ca0233db878
+    m_Address: Arena_Boss_Ch4
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9cef999bcb09aa542bd36dfab694eb3e
+    m_Address: Arena_Boss_Ch3_Intro
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9d08ddc984f90d04eba9fd39de64daa0
+    m_Address: Road_Boss_Ch1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -35,33 +65,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 388a70aae94b9fc409d14bef2249bcb9
-    m_Address: Shop_Custom_Ch3
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7a7f6c66d45dbe049b7272bea33b1ef0
-    m_Address: Shop_Custom_Ch4
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d76c3a76bc3a6c9428656ac3ca332a9f
     m_Address: Arena_Boss_Ch3
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dd9c3a810a866cc4db709b61f83f3d94
+    m_Address: Road_Boss_Ch3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e6a92243ca6e30e47ab4002a0b16500d
     m_Address: Arena_Boss_Ch2
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8d2f750b0b13efd4eba02ca0233db878
-    m_Address: Arena_Boss_Ch4
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9cef999bcb09aa542bd36dfab694eb3e
-    m_Address: Arena_Boss_Ch3_Intro
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
