@@ -3725,7 +3725,7 @@ MonoBehaviour:
     indexLabel: {fileID: 2953774991022881679}
   - iconImage: {fileID: 5019603504717614929}
     indexLabel: {fileID: 1602278572768913200}
-  potionIcon: {fileID: 21300000, guid: fc485a9b37b0c2947a29b9cdbbf3d2ff, type: 3}
+  potionIcon: {fileID: 21300000, guid: 8e00144e5b27a5148a7c066b2b2821cd, type: 3}
   skillQFallbackIcon: {fileID: 21300000, guid: 3bf6d2f3cb12e634c980731764b111ce, type: 3}
   skillEFallbackIcon: {fileID: 21300000, guid: 80bfe4762b053884495e8877ef309150, type: 3}
   skillRFallbackIcon: {fileID: 21300000, guid: ea5d9aa3689141f4da41f072b5dd4d64, type: 3}

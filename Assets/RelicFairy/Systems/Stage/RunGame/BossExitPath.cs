@@ -68,6 +68,12 @@ public sealed class BossExitPath : MonoBehaviour
             return;
         }
 
+        // 출구 Y를 실제 걷는 바닥 표면으로 스냅한다.
+        // Exit 마커가 기둥(SM_PROXY_Tower 등) 피벗에 붙으면 그 Y가 바닥 밑동일 수 있고(Ch2 사례),
+        // 그대로 쓰면 길이 걷는 바닥 아래로 깔려 넘어갈 수 없다. 길은 항상 지면 복도이므로
+        // 출구 지점에서 Ground를 내리쏴 실제 표면 Y로 맞춘다(못 찾으면 원래 Y 유지 — 회귀 0).
+        exitPos.y = SnapToGroundY(exitPos);
+
         OpenWallAt(exitPos, dir, arena);
 
         Material tileMat = style?.floorTilePrefab != null ? null : SampleFloorMaterial(arena);
@@ -108,6 +114,17 @@ public sealed class BossExitPath : MonoBehaviour
         // 바닥 경계까지 전진해 벽 위치를 출구로 삼는다.
         exitPos = ProjectToFloorEdge(arena, roomCenter, dir);
         return true;
+    }
+
+    /// <summary>출구 XZ에서 Ground 레이어를 내리쏴 걷는 바닥 표면 Y를 구한다. 못 맞히면 원래 Y 유지.</summary>
+    private static float SnapToGroundY(Vector3 exitPos)
+    {
+        int mask = 1 << GroundLayer;
+        var origin = exitPos + Vector3.up * 10f;
+        // 바닥이 트리거일 수도 있어(예: 일부 아레나 Floor) Collide로 강제 검사.
+        return Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Collide)
+            ? hit.point.y
+            : exitPos.y;
     }
 
     /// <summary>아레나 바닥 렌더러 경계에서 dir 방향 끝점을 구한다. 바닥을 못 찾으면 방 중앙에서 고정 거리.</summary>

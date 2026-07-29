@@ -54,4 +54,50 @@ public static class AddressablesBuildRunner
             $"[AddressablesBuildRunner] 빌드 완료 — {result.LocationCount}개 로케이션, " +
             $"{result.Duration:0.0}초\n출력: {result.OutputPath}");
     }
+
+    /// <summary>
+    /// 활성 플레이어 데이터 빌더를 PackedMode로 고정하고 에셋에 저장한다.
+    ///
+    /// 이 값은 계속 0(FastMode)으로 회귀해 두 가지 문제를 만든다.
+    ///   1) 작업트리가 늘 더러워져 0을 오커밋할 위험 — 커밋되면 팀 전체 플레이어 빌드가 깨진다.
+    ///   2) 패키지의 AddressablesPlayerBuildProcessor가 플레이어 빌드 전에 자동으로
+    ///      콘텐츠를 구우려 할 때 FastMode라 0초 만에 실패하고, 옛 번들이 그대로 포장된다.
+    ///
+    /// 파일 직접 편집이나 SerializedProperty 패치는 되돌아간다 — 실행 중인 에디터가
+    /// 설정 인스턴스를 메모리에 들고 있다가 refresh마다 디스크로 덮어쓰기 때문이다.
+    /// 그래서 메모리의 그 인스턴스를 직접 바꾼 뒤 저장한다(Groups 창 드롭다운과 같은 경로).
+    /// </summary>
+    [MenuItem("RelicFairy/Addressables/Fix Player Builder (PackedMode)")]
+    public static void FixPlayerBuilder()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            Debug.LogError("[AddressablesBuildRunner] AddressableAssetSettings를 찾을 수 없습니다.");
+            return;
+        }
+
+        int packedIndex = -1;
+        for (int i = 0; i < settings.DataBuilders.Count; i++)
+        {
+            if (settings.DataBuilders[i] is UnityEditor.AddressableAssets.Build.DataBuilders.BuildScriptPackedMode)
+            {
+                packedIndex = i;
+                break;
+            }
+        }
+        if (packedIndex < 0)
+        {
+            Debug.LogError("[AddressablesBuildRunner] BuildScriptPackedMode 빌더를 찾을 수 없습니다.");
+            return;
+        }
+
+        int before = settings.ActivePlayerDataBuilderIndex;
+        settings.ActivePlayerDataBuilderIndex = packedIndex;
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[AddressablesBuildRunner] 활성 플레이어 빌더 {before} -> {packedIndex} " +
+                  $"({settings.ActivePlayerDataBuilder?.Name}) 저장 완료.");
+    }
 }

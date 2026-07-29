@@ -119,11 +119,10 @@ public sealed class BaseCampBootstrapper : MonoBehaviour
     /// (GameRunBootstrapper.StartWaitingRoomAsync). 여기서는 씬 전환만 책임진다.</summary>
     public void EnterDungeon()
     {
-        if (!IntroCompletionTracker.IsCompleted)
-        {
-            AppBootstrapper.Instance?.RequestLoad(Define.Scene.Game_Intro);
-            return;
-        }
+        // 프롤로그(Game_Intro)는 '새 게임' 경로(AppBootstrapper)가 이미 담당한다.
+        // 베이스캠프에 있다는 것 자체가 그 흐름을 지났다는 뜻이므로, 게이트는 인트로를 다시 검사하지 않고
+        // 곧장 던전으로 보낸다. (예전엔 완료 플래그가 0이면 인트로로 되돌려, 에디터 직접 Play나
+        //  플래그 미설정 상태에서 던전 대신 프롤로그가 뜨는 문제가 있었다.)
 
         // 게이트 통과 = 새 런 시작. 로비를 거치지 않은 진입(에디터 직접 Play 등)에서도
         // Ch1 부트스트래퍼가 대기 방 흐름(newRunFromHub)을 타도록 새 런 신호를 세운다.

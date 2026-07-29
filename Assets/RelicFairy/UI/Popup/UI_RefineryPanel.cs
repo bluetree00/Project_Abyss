@@ -37,7 +37,6 @@ public sealed class UI_RefineryPanel : UI_Popup
     private static readonly Color HeatDefault = new(0.92f, 0.64f, 0.29f, 1f);
 
     private RefineryService _svc;
-    private RuntimeItemData _lastCrafted;   // 닫을 때 판으로 이어줄 마지막 결과
     private string _selectedElement;
     private bool _busy;
     private bool _built;
@@ -78,27 +77,21 @@ public sealed class UI_RefineryPanel : UI_Popup
         Refresh();
     }
 
-    /// <summary>
-    /// 방 특전은 이 패널을 닫으면 사라진다 — 상시 탭(룬판 버튼)으로 다시 열면 특전 없이 열려야 한다.
-    ///
-    /// 여기서 벼린 존핵은 <b>닫자마자 판으로 이어진다</b>. 예전엔 보관함에만 들어가서
-    /// 판을 따로 열어야 했다. 돌리는 도중에 끼어들지 않도록 배치는 '닫을 때' 한 번만 연결한다.
-    /// </summary>
+    /// <summary>방 특전은 이 패널을 닫으면 사라진다 — 상시 탭(룬판 버튼)으로 다시 열면 특전 없이 열려야 한다.</summary>
     public override void ClosePopupUI()
     {
         _svc?.ClearRoomPerk();
-
-        var crafted = _lastCrafted;
-        _lastCrafted = null;
-
         base.ClosePopupUI();
-
-        if (crafted != null) OpenGridForRune(crafted);
     }
 
-    /// <summary>정제한 룬을 들고 배치 화면을 연다(상점 구매와 같은 흐름).</summary>
-    private static void OpenGridForRune(RuntimeItemData rune)
+    /// <summary>
+    /// 정제한 룬을 들고 배치 화면을 연다 — 정제소는 닫고 그 룬을 판에 올린다.
+    /// 결과가 드러나고 잠시 뒤(PlayRevealAsync 끝) 자동 호출된다. 상점 구매와 같은 흐름.
+    /// </summary>
+    private void OpenGridForRune(RuntimeItemData rune)
     {
+        if (rune == null) return;
+        base.ClosePopupUI();   // 정제소 팝업을 먼저 닫고
         if (UI_GridPanel.Instance == null) Managers.UI?.ShowOverlayUI<UI_GridPanel>();
         if (UI_GridPanel.Instance == null) return;
         UI_GridPanel.Instance.ShowWithNewItem(rune);
@@ -439,11 +432,15 @@ public sealed class UI_RefineryPanel : UI_Popup
         var outcome = _svc.Craft(_selectedElement);
         if (!outcome.Success) { _hint.text = outcome.FailReason; _busy = false; Refresh(); return; }
 
-        _lastCrafted = outcome.Rune;
         await PlayRevealAsync(outcome);
 
         _busy = false;
         Refresh();
+
+        // 재점화(다시 굴리기)를 쓸 수 있으면 그 선택을 기다린다 — 그 경우가 아니면
+        // 결과를 잠깐 보여준 뒤 배치 화면으로 자동으로 넘긴다.
+        if (!_svc.CanReforge)
+            await HandOffToGridAsync(outcome.Rune);
     }
 
     private void OnReforgeClicked()
@@ -460,10 +457,23 @@ public sealed class UI_RefineryPanel : UI_Popup
         Refresh();
 
         var outcome = _svc.Reforge(_selectedElement);
-        if (outcome.Success) { _lastCrafted = outcome.Rune; await PlayRevealAsync(outcome); }
+        if (outcome.Success) await PlayRevealAsync(outcome);
 
         _busy = false;
         Refresh();
+
+        // 재점화는 1회뿐(이미 소진) → 결과를 잠깐 보여준 뒤 배치 화면으로 넘긴다.
+        if (outcome.Success) await HandOffToGridAsync(outcome.Rune);
+    }
+
+    /// <summary>결과를 잠깐 보여준 뒤(≈0.9초) 정제소를 닫고 그 룬을 판에 올린다.</summary>
+    private async UniTask HandOffToGridAsync(RuntimeItemData rune)
+    {
+        if (rune == null) return;
+        try { await UniTask.Delay(900, ignoreTimeScale: true, cancellationToken: this.GetCancellationTokenOnDestroy()); }
+        catch (OperationCanceledException) { return; }
+
+        OpenGridForRune(rune);
     }
 
     private async UniTask PlayRevealAsync(RefineryOutcome outcome)

@@ -2616,6 +2616,10 @@ MonoBehaviour:
   confirmRoot: {fileID: 3008426344709701166}
   btnConfirmDelete: {fileID: 8784984614096770646}
   btnCancelDelete: {fileID: 724926856229875271}
+  blockResume: 0
+  blockResumeMessage: "\uD604\uC7AC \uC138\uBC00 \uC791\uC5C5\uC774 \uC9C4\uD589
+    \uC911\uC785\uB2C8\uB2E4.\n\uC800\uC7A5\uB41C \uAC8C\uC784\uC744 <b>\uC0AD\uC81C</b>\uD55C
+    \uB4A4 \uC0C8\uB85C \uC2DC\uC791\uD574 \uC8FC\uC138\uC694."
 --- !u!1 &2664542178737267237
 GameObject:
   m_ObjectHideFlags: 0

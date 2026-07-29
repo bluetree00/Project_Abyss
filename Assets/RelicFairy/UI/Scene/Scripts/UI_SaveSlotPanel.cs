@@ -44,6 +44,13 @@ public class UI_SaveSlotPanel : UI_Base
     [SerializeField] private Button     btnConfirmDelete;
     [SerializeField] private Button     btnCancelDelete;
 
+    [Header("이어하기 임시 차단")]
+    [Tooltip("켜면 저장된 슬롯을 눌러도 이어하기 대신 '세밀 작업 중' 안내를 띄운다. 재개하려면 끄면 된다.")]
+    [SerializeField] private bool blockResume = true;
+    [TextArea, SerializeField]
+    private string blockResumeMessage =
+        "현재 세밀 작업이 진행 중입니다.\n저장된 게임을 <b>삭제</b>한 뒤 새로 시작해 주세요.";
+
     // ─────────────────────────────────────────────────────────
     // Events
     // ─────────────────────────────────────────────────────────
@@ -54,7 +61,8 @@ public class UI_SaveSlotPanel : UI_Base
     // Private
     // ─────────────────────────────────────────────────────────
 
-    private int _pendingDeleteSlot = -1;
+    private int        _pendingDeleteSlot = -1;
+    private GameObject _noticeRoot;   // 이어하기 차단 안내 오버레이(코드 생성, 1회)
 
     // ─────────────────────────────────────────────────────────
     // Lifecycle
@@ -87,6 +95,7 @@ public class UI_SaveSlotPanel : UI_Base
     public override void Open()
     {
         HideConfirm();
+        HideNotice();
         RefreshAllCards();
         gameObject.SetActive(true);
     }
@@ -94,6 +103,7 @@ public class UI_SaveSlotPanel : UI_Base
     public override void Close()
     {
         HideConfirm();
+        HideNotice();
         gameObject.SetActive(false);
         OnClosed?.Invoke();
     }
@@ -221,11 +231,104 @@ public class UI_SaveSlotPanel : UI_Base
     }
 
     // ─────────────────────────────────────────────────────────
+    // Private Methods — 이어하기 차단 안내
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>이어하기 차단 안내를 띄운다. 오버레이는 1회 생성 후 재사용.</summary>
+    private void ShowResumeBlockedNotice()
+    {
+        if (_noticeRoot == null) BuildNoticeRoot();
+        if (_noticeRoot == null) return;   // 폰트/부모를 못 구한 극단 상황 — 조용히 무시(재개는 막힌 채)
+
+        _noticeRoot.SetActive(true);
+        _noticeRoot.transform.SetAsLastSibling();
+    }
+
+    /// <summary>안내 오버레이를 삭제 확인 다이얼로그와 같은 막·판 스타일로 코드 생성한다(폰트는 그 다이얼로그에서 빌려옴).</summary>
+    private void BuildNoticeRoot()
+    {
+        // 텍스트가 확실히 렌더되도록 기존 확인 다이얼로그의 폰트를 재사용한다(새 TMP는 폰트가 없으면 공백).
+        var srcMsg = confirmRoot != null ? confirmRoot.GetComponentInChildren<TMP_Text>(true) : null;
+        var font   = srcMsg != null ? srcMsg.font : null;
+
+        var root = new GameObject("ResumeBlockedNotice", typeof(RectTransform), typeof(Image));
+        root.transform.SetParent(transform, false);
+        if (root.transform is RectTransform rootRT)
+        {
+            rootRT.anchorMin = Vector2.zero;
+            rootRT.anchorMax = Vector2.one;
+            rootRT.offsetMin = rootRT.offsetMax = Vector2.zero;
+        }
+        var veil = root.GetComponent<Image>();
+        veil.color         = VeilColor;
+        veil.raycastTarget = true;   // 뒤쪽 클릭 차단
+
+        // 판
+        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(root.transform, false);
+        panelGo.GetComponent<Image>().color = DialogEdge;
+        var panel = (RectTransform)panelGo.transform;
+        Center(panel, Vector2.zero, new Vector2(DialogW, DialogH));
+
+        var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fillGo.transform.SetParent(panel, false);
+        var fill = (RectTransform)fillGo.transform;
+        fill.anchorMin = Vector2.zero; fill.anchorMax = Vector2.one;
+        fill.offsetMin = new Vector2(2f, 2f); fill.offsetMax = new Vector2(-2f, -2f);
+        fillGo.GetComponent<Image>().color = DialogFill;
+
+        // 메시지
+        var msgGo = new GameObject("Message", typeof(RectTransform));
+        msgGo.transform.SetParent(panel, false);
+        var msg = msgGo.AddComponent<TextMeshProUGUI>();
+        if (font != null) msg.font = font;
+        msg.text             = blockResumeMessage;
+        msg.fontSize         = 26f;
+        msg.alignment        = TextAlignmentOptions.Center;
+        msg.textWrappingMode = TextWrappingModes.Normal;
+        Center(msg.rectTransform, new Vector2(0f, DialogMsgY), new Vector2(DialogW - 60f, 120f));
+
+        // 확인 버튼 — 누르면 안내만 닫는다(패널은 그대로 열려 있어 바로 삭제 가능)
+        var btnGo = new GameObject("Btn_OK", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnGo.transform.SetParent(panel, false);
+        btnGo.GetComponent<Image>().color = DialogEdge;
+        Center((RectTransform)btnGo.transform, new Vector2(0f, -DialogH * 0.5f + BtnY), new Vector2(BtnW, BtnH));
+        btnGo.GetComponent<Button>().onClick.AddListener(HideNotice);
+
+        var okGo = new GameObject("Label", typeof(RectTransform));
+        okGo.transform.SetParent(btnGo.transform, false);
+        var ok = okGo.AddComponent<TextMeshProUGUI>();
+        if (font != null) ok.font = font;
+        ok.text      = "확인";
+        ok.fontSize  = 28f;
+        ok.alignment = TextAlignmentOptions.Center;
+        var okRT = ok.rectTransform;
+        okRT.anchorMin = Vector2.zero; okRT.anchorMax = Vector2.one;
+        okRT.offsetMin = okRT.offsetMax = Vector2.zero;
+
+        _noticeRoot = root;
+        _noticeRoot.SetActive(false);
+    }
+
+    private void HideNotice()
+    {
+        if (_noticeRoot != null) _noticeRoot.SetActive(false);
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Event Handlers
     // ─────────────────────────────────────────────────────────
 
     private void OnSlotStartClicked(int slotIndex, bool hasSave)
     {
+        // [임시] 이어하기 차단 — 저장된 슬롯을 눌러도 재개하지 않고 안내만 띄운다.
+        // 패널은 열어 둔 채라 사용자가 곧바로 삭제 버튼을 누를 수 있다. (blockResume 끄면 원복)
+        if (hasSave && blockResume)
+        {
+            ShowResumeBlockedNotice();
+            return;
+        }
+
         var rpm = RunProgressManager.Instance;
         if (rpm != null) rpm.ActiveSlotIndex = slotIndex;
 

@@ -16,7 +16,7 @@ public class ChapterRegistry : ScriptableObject
 
     [Header("빌드 진행 범위")]
     [Tooltip("이 챕터까지만 진행한다. 이 챕터의 보스를 클리어하면 런 클리어로 종료(다음 챕터로 넘어가지 않음). 데모는 Chapter1.")]
-    [SerializeField] private ChapterId _finalChapter = ChapterId.Chapter4;
+    [SerializeField] private ChapterId _finalChapter = ChapterId.Chapter3;
 
     private Dictionary<ChapterId, ChapterDataSO>   _dataLookup;
     private Dictionary<ChapterId, ChapterLayoutSO> _layoutLookup;
