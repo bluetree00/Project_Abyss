@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 345def18d0906d544b7d12b050937392
+timeCreated: 1482812523
+licenseType: Store
+ShaderImporter:
+  defaultTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 355960
+  packageName: CombatGirls_SwordShieldCharacterPack
+  packageVersion: 1.1
+  assetPath: Assets/CombatGirlsCharacterPack/Unity Chan Toon Shader-built in/Shader/Toon_DoubleShadeWithFeather_Clipping.shader
+  uploadId: 848774

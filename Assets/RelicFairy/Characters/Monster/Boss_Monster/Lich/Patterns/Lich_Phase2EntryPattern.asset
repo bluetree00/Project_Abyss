@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d43d424736071fb418b34dfc89e8df0e, type: 3}
+  m_Name: Lich_Phase2EntryPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichPhase2EntryPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 3802098707266296607, guid: 58c55f68faacae24a840b257e8e54862,
+    type: 3}
+  playerStatusEffect: {fileID: 0}
+  patternTag: phase2entry
+  breakOverride: 0.3
+  entryDuration: 2
+  recoveryDuration: 0.5
+  blastTiming: 0.6
+  blastRadius: 10
+  damageMultiplier: 0
+  knockbackMultiplier: 3

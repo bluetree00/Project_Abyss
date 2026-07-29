@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 92a5877ef3eb5c34d984a83fd94883e4
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/_ThirdParty/TheReaper/Scrips/Balrond3Pcontroller/Balrond3pCameraFollow.cs
+  uploadId: 467556

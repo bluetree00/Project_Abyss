@@ -15,57 +15,19 @@ MonoBehaviour:
   m_GroupName: GameData
   m_GUID: 9d7397ccff4ede3478017cf3a6f90b96
   m_SerializeEntries:
-  - m_GUID: 0578341d47ad7104aba0aa2fe874ab2a
-    m_Address: PASSIVE_DATA
+  - m_GUID: 5ca2241dfaaa1d54d8631198e1a20bed
+    m_Address: QuestDatabase
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 19ba6f7838ce2ea4c9b883f2d0669abf
-    m_Address: ITEM_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2d25a782b11487e4690ba3f4dc7a1657
-    m_Address: EQUIPMENT_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4130199b90d734344a5d243b740a7451
-    m_Address: PLAYER_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 60a0963c1131fae449eb9e6685fb4788
-    m_Address: BLOCK_SHAPE_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bde9bac67a53eb449bacbe127a883b6b
-    m_Address: STAGEDATA_MAP
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ce7db0e6e5c857b45ade36ccab8a1b27
-    m_Address: MONSTER_ELEMENT_STAT_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f247a83afe5719f4592eb8da72b37006
-    m_Address: BUFF_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f7d99bfb6cff400448b6a210a7708bcd
-    m_Address: BLOCK_GRID_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fa910990508470e4ba131f764f201eaa
-    m_Address: ELEMENT_EFFECT_DATA
+  - m_GUID: f29dbb5f387aa02408ffaffe55e82488
+    m_Address: AchievementDatabase
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
   m_SchemaSet:
-    m_Schemas: []
+    m_Schemas:
+    - {fileID: 11400000, guid: 2173d83ae5f243a45bede8acf2ba8193, type: 2}
+    - {fileID: 11400000, guid: d61be7dac31a2cd4b954da2b2b89285f, type: 2}

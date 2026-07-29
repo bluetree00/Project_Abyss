@@ -4,7 +4,7 @@
 QualitySettings:
   m_ObjectHideFlags: 0
   serializedVersion: 5
-  m_CurrentQuality: 2
+  m_CurrentQuality: 1
   m_QualitySettings:
   - serializedVersion: 5
     name: Performant
@@ -131,7 +131,7 @@ QualitySettings:
     textureMipmapLimitSettings: []
     anisotropicTextures: 2
     antiAliasing: 4
-    softParticles: 0
+    softParticles: 1
     softVegetation: 1
     realtimeReflectionProbes: 1
     billboardsFaceCameraPosition: 1
@@ -143,7 +143,7 @@ QualitySettings:
     adaptiveVsyncExtraB: 0
     lodBias: 2
     meshLodThreshold: 1
-    maximumLODLevel: 0
+    maximumLODLevel: 1
     enableLODCrossFade: 1
     streamingMipmapsActive: 0
     streamingMipmapsAddAllCameras: 1

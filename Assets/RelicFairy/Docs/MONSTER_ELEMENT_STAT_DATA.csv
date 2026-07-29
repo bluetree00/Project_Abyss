@@ -1,0 +1,30 @@
+﻿monster_id,monster_name,grade,attack_type,max_hp,base_attack,base_defense,max_accumulation,monster_pool_tag,stat_version
+Slime,슬라임,Common,Melee,40,5,1,1.0,2,1
+Snail,달팽이,Common,Melee,60,4,2,1.0,4,1
+Skeleton,스켈레턴,Common,Melee,50,7,1,1.0,3,1
+Spider,거미,Common,Melee,45,6,1,1.0,1,1
+RatAssassin,쥐 암살자,Common,Melee,35,9,1,1.0,3,1
+BattleBee,전투벌,Common,Melee,30,6,1,1.0,1,1
+FairyBat,요정 박쥐,Common,Melee,40,7,1,1.0,2,1
+WormMonster,지렁이,Common,Melee,55,5,1,1.0,,1
+Orc,오크,Rare,Melee,90,12,2,1.3,3,1
+Fishman,어인,Rare,Melee,80,10,2,1.3,2,1
+Golem,골렘,Rare,Melee,120,11,3,1.3,3,1
+StingRay,가오리,Rare,Ranged,65,8,1,1.3,2,1
+MonsterPlant,식인식물,Rare,Ranged,75,8,2,1.3,1,1
+Cyclops,사이클롭스,Elite,Melee,180,18,3,2.0,4,1
+LizardWarrior,도마뱀 전사,Elite,Melee,150,20,3,2.0,1,1
+BlackKnight,흑기사,Elite,Melee,220,22,5,2.0,3,1
+CrabMonster,게 몬스터,Elite,Melee,250,16,6,2.0,,1
+FlyingDemon,비행악마,Elite,Melee,160,25,3,2.0,4,1
+Werewolf,늑대인간,Elite,Melee,200,28,3,2.0,1,1
+Specter,스펙터,Elite,Melee,140,18,2,2.0,2,1
+Beholder,비홀더,Elite,Ranged,160,22,2,2.0,2,1
+BishopKnight,비숍기사,Elite,Ranged,180,24,3,2.0,3,1
+EvilMage,사악한 마법사,Elite,Ranged,150,26,2,2.0,3,1
+NagaWizard,나가 마법사,Elite,Ranged,170,24,2,2.0,4,1
+Salamander,살라만더,Elite,Ranged,180,22,3,2.0,4,1
+ForestGuardian,숲의 수호자,Boss,Melee,7000,45,6,8.0,,2
+DemonKing,마왕,Boss,Melee,900,55,8,8.0,,1
+DragonBoss,용왕,Boss,Ranged,15000,60,7,8.0,,2
+Dragon,드래곤,Boss,Ranged,800,50,6,8.0,,1

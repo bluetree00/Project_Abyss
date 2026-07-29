@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c45c0b85a7fa1643b9a07636c7fbe8c, type: 3}
+  m_Name: SenkoSlash
+  m_EditorClassIdentifier: Assembly-CSharp::IasenSlashBehaviorSO
+  dashDuration: 0.15
+  dashDistance: 5
+  detectRadius: 2
+  slashCount: 3
+  slashDelay: 0.15
+  baseDamagePerSlash: 8
+  knockbackMultiplier: 0.2
+  endDelay: 0.2
+  dashEffectKey: WindBlast
+  dashTrailKey: DashTrail
+  slashEffectKey: SlashAttack
+  hitEffectKey: SwordHitImpact
+  hitEffectScale: 0.35
+  useWeaponTrail: 1
+  playerTrailKey: 
+  playerTrailScale: 1
+  animationOverride: QSkill_01

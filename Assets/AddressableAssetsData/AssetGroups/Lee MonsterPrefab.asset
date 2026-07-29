@@ -45,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f289c5191a682d946a5b83bfa88c5582
+    m_Address: DeathKnightBoss/DeathKnightBoss
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bb174a4bda865994eb28c1089bb22dab
     m_Address: Spider/Spider
     m_ReadOnly: 0

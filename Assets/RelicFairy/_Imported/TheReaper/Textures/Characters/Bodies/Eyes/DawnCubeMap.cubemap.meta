@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a742aa9b1c8d8d5478b76690c3a7977d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 8900000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159761
+  packageName: The Reaper
+  packageVersion: 2.0
+  assetPath: Assets/_ThirdParty/TheReaper/Textures/Characters/Bodies/Eyes/DawnCubeMap.cubemap
+  uploadId: 467556

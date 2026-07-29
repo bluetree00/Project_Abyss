@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7fe233f55407a643ae7cbe70e94d049, type: 3}
+  m_Name: Lich_ScytheSweepPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichScytheSweepPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  minTriggerRange: 3
+  maxTriggerRange: 20
+  approachDuration: 0.8
+  sweepDelay: 0.5
+  recoveryDuration: 0.5
+  sweepRadius: 4
+  sweepHalfAngle: 70
+  damageMultiplier: 0
+  knockbackMultiplier: 2
+  patternCooldown: 7

@@ -1,0 +1,29 @@
+﻿zone_id,zone_name,threshold,effect_type,trigger,value,value2,value3,max_stack,duration,description,stat_version
+FIRE,불,6,FireEmber,OnHit,0.08,0.0,0.0,1,0,1단계 잔불: 공격 적중 시 공격력 8% 화염 피해 추가,1
+FIRE,불,10,FireIgnite,OnHit,0.16,3.0,5.0,3,3,2단계 점화: 잔불 5회마다 점화 3초(초당 공격력 16% 3회),1
+FIRE,불,13,FireBlaze,Always,0.35,0.0,0.0,1,0,3단계 폭염: 점화 상태 적 공격 시 화염 피해 +35%,1
+FIRE,불,19,FireScorch,Always,1.5,0.0,0.0,1,0,4단계 작열: 점화 만료 시 남은 DoT 합산 × 공격력 150% 광역 폭발,1
+ICE,얼음,6,IceFrost,OnHit,0.12,0.0,0.0,2,3,1단계 서리: 적중 시 이동속도 -12% 3초(중첩 최대 -24%),1
+ICE,얼음,10,IceFreeze,OnHit,1.5,2.0,10.0,1,0,2단계 빙결: 서리 2중첩 적 스킬 적중 시 빙결 1.5초(내부쿨 10초),1
+ICE,얼음,13,IceShatter,Always,0.3,0.2,0.0,1,5,"3단계 분쇄: 빙결 적 피해 +30%, 빙결 해제 시 방어 -20% 5초",1
+ICE,얼음,19,IceGlacier,Always,1.5,0.0,0.0,1,0,4단계 빙하 연쇄: 빙결 해제 시 빙하 낙하 공격력 150% 광역 + 서리 1중첩,1
+ELECTRIC,전기,6,ElecStatic,OnHit,0.1,0.01,0.0,10,10,"1단계 정전기: 공속 +10%, 적중 시 스택+1 스택당 공속 +1%(최대10 10초)",1
+ELECTRIC,전기,10,ElecDischarge,OnUse,0.04,0.0,0.0,1,0,2단계 방전: 스킬 시 정전기 전량 소모 스택당 공격력 4% 번개 즉발,1
+ELECTRIC,전기,13,ElecShock,OnUse,1.0,3.0,0.08,1,0,3단계 감전: 방전 시 감전(마비 1~3초) 감전 중 공속 +8%,1
+ELECTRIC,전기,19,ElecOverload,OnHit,0.5,2.0,0.0,1,0,4단계 과부하: 공격 시 체인 라이트닝 주변 최대 2명 50% 피해,1
+GRASS,풀,6,GrassMist,OnHit,0.04,0.0,0.0,3,10,1단계 독안개 살포: 적중 자리 독안개 10초(최대3) 초당 공격력 4% 독,1
+GRASS,풀,10,GrassMistPlus,Always,0.5,0.5,0.0,1,0,"2단계 독안개 강화: 장판 크기 +50%, 겹침 영역 독 피해 +50%",1
+GRASS,풀,14,GrassMistInsight,Always,0.5,0.001,0.2,1,0,3단계 독안개 간파: 크기 +50% 독피해시 0.1% 회복 겹침3초 공격력 -20%,1
+GRASS,풀,20,GrassMistDominion,Always,2.0,0.002,0.15,1,0,4단계 독무 지배: 장판 닿으면 전체 겹침판정 독피해 ×2 회복0.2% 보스받뎀 +15%,1
+LIGHT,빛,6,LightRadiance,OnCrit,0.01,0.0,0.0,10,0,1단계 광채: 치명타 시 스택+1(최대10) 스택당 치확 +1%,1
+LIGHT,빛,10,LightBurst,OnCrit,1.5,10.0,0.0,1,0,2단계 광폭발: 광채 10스택 소모 전방 원뿔 공격력 150% 폭발,1
+LIGHT,빛,14,LightSanctuary,OnCrit,3.0,3.0,0.0,1,3,3단계 성역: 광폭발 자리 빛 장판 3초 장판 위 치명타 시 광채 +3,1
+LIGHT,빛,20,LightField,Always,0.2,0.3,0.0,1,0,4단계 빛의 장판: 장판 추종 장판 위 공격 치확 +20% 치피 +30%,1
+DARK,어둠,6,DarkErosion,OnHit,0.15,10.0,3.0,100,0,1단계 잠식: 피격 게이지+10 적중+3(최대100) 게이지 비례 공격력 최대 +15%,1
+DARK,어둠,10,DarkRelease,Always,0.25,0.15,0.0,1,5,2단계 암흑 해방: 게이지 100 시 5초 암흑 공격력 +25% 받뎀 -15%,1
+DARK,어둠,13,DarkAfterimage,Always,0.4,0.0,0.0,1,0.5,3단계 그림자 잔상: 암흑 중 적중 시 40% 피해 0.5초 후 추가,1
+DARK,어둠,19,DarkAbyss,Always,0.0,0.0,0.0,1,0,4단계 심연 각성: 게이지 달성 시 랜덤 버프 부여,1
+CENTER,중앙,4,CenterResonance,Always,0.1,0.0,0.0,1,0,1단계 공명: 활성 속성 시너지 효과 +10%,1
+CENTER,중앙,8,CenterAmplify,Always,0.2,0.0,0.0,1,0,2단계 증폭: 활성 속성 시너지 효과 +20%,1
+CENTER,중앙,12,CenterDeepen,Always,0.35,0.0,0.0,1,0,3단계 심화: 활성 속성 시너지 효과 +35%,1
+CENTER,중앙,16,CenterGrand,Always,0.5,0.0,0.0,1,0,4단계 대공명: 활성 속성 시너지 효과 +50%,1

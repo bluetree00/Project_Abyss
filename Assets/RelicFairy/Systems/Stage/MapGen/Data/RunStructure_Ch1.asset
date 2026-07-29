@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d50b93cfbd4465e40bcf2b1be9909901, type: 3}
+  m_Name: RunStructure_Ch1
+  m_EditorClassIdentifier: Assembly-CSharp::RunStructureConfig
+  _bossThreshold: 8
+  _preBossRoomKey:
+  _bossRoomKey:
+  _shopMaxPerChapter: 1
+  _shopChance: 0.25
+  _eventMaxPerChapter: 2
+  _eventChance: 0.2
+  _eliteChance: 0.15
+  _difficultyByVisit:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.4
+      inSlope: 0
+      outSlope: 0.11666666
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 12
+      value: 1.8
+      inSlope: 0.11666666
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  _milestones:
+  - visitIndex: 4
+    kind: 2
+  - visitIndex: 5
+    kind: 3
+  - visitIndex: 6
+    kind: 6
+  - visitIndex: 7
+    kind: 7

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f19af268d44fc2a4899277358e672532, type: 3}
+  m_Name: StatusEffect_Fire
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PlayerStatusEffectSO
+  effectType: 2
+  duration: 2
+  slowScale: 0.4
+  _effectPrefab: {fileID: 1579383094300634310, guid: 0ee1e50150b2a4641be2b72c6588eccb,
+    type: 3}
+  _effectScale: 0.4
+  _screenEffectPrefab: {fileID: 3942825033974895155, guid: 78e80e6b24aba274ca8fec7837e6a299,
+    type: 3}
+  _screenEffectScale: 1

@@ -1,0 +1,99 @@
+using UnityEngine;
+using RelicFairy.Monster;
+
+/// <summary>
+/// 몬스터에 부착되는 화상 DoT 핸들러.
+/// 정해진 간격마다 IDamageable.TakeDamage 를 호출해 지속 피해를 가한다.
+/// 같은 대상에 다시 적용되면 더 강한 쪽 DPS 유지 + 지속시간 갱신.
+/// </summary>
+[DisallowMultipleComponent]
+public sealed class MonsterBurnHandler : MonoBehaviour
+{
+    // ── Private ───────────────────────────────────────────────
+    private IDamageable _target;
+    private MonsterBase _monster;     // DoT 경로(TakeSynergyDamage)용 — 넉백·GetHit 없이 피해만
+    private GameObject  _instigator;
+    private float       _dps;
+    private float       _tickInterval;
+    private float       _remaining;
+    private float       _total;        // 게이지 비율용(부여된 최대 지속)
+    private float       _tickAccum;
+
+    // ── Properties ────────────────────────────────────────────
+    /// <summary>남은 화상 시간(초). 디버프 UI가 읽는다.</summary>
+    public float Remaining => Mathf.Max(0f, _remaining);
+    /// <summary>남은 비율(0~1). 게이지용.</summary>
+    public float Remaining01 => _total > 0f ? Mathf.Clamp01(_remaining / _total) : 0f;
+
+    // ── Public API ────────────────────────────────────────────
+    /// <summary>대상 GameObject 에 화상을 적용한다. 컴포넌트가 없으면 추가, 있으면 갱신.</summary>
+    public static void Apply(GameObject target, float dps, float duration, float tickInterval, GameObject instigator)
+    {
+        if (target == null || dps <= 0f || duration <= 0f || tickInterval <= 0f) return;
+        if (!target.TryGetComponent<IDamageable>(out var dmg)) return;
+
+        // [가이드라인 비주얼] 화상 마커(점화색 재사용) — 모든 화상 사용처 공통 단일 지점
+        GuidelineVisual.StatusApplied(target.transform, "burn", duration);
+
+        if (!target.TryGetComponent<MonsterBurnHandler>(out var h))
+            h = target.AddComponent<MonsterBurnHandler>();
+
+        h.Configure(dmg, instigator, dps, tickInterval, duration);
+    }
+
+    /// <summary>대상의 화상을 즉시 폭발(잔여 총량을 1회 피해로) — 가웨인 정오 즉발.</summary>
+    public static void DetonateOn(GameObject target)
+    {
+        if (target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)) h.Detonate();
+    }
+
+    /// <summary>남은 화상 총량(dps × 잔여시간)을 즉시 피해로 가하고 소멸.</summary>
+    public void Detonate()
+    {
+        if (_target != null)
+        {
+            float burst = _dps * Mathf.Max(0f, _remaining);
+            if (burst > 0f) DealDot(burst);
+        }
+        Destroy(this);
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────
+    private void Update()
+    {
+        if (_target == null) { Destroy(this); return; }
+
+        _remaining -= Time.deltaTime;
+        _tickAccum += Time.deltaTime;
+
+        if (_tickAccum >= _tickInterval)
+        {
+            float damage = _dps * _tickInterval;
+            DealDot(damage);
+            // 팝업은 대상측(TakeSynergyDamage) 자체 처리
+            _tickAccum -= _tickInterval;
+        }
+
+        if (_remaining <= 0f)
+            Destroy(this);
+    }
+
+    // ── Private Methods ───────────────────────────────────────
+    /// <summary>화상은 DoT다 — 넉백·GetHit 없는 시너지 경로로 피해만 가한다(방어 그대로 적용).</summary>
+    private void DealDot(float amount)
+    {
+        if (_monster != null) _monster.TakeSynergyDamage(amount, _instigator, 0f, false, DamageKind.Dot, RuneElement.Fire);
+        else                  _target.TakeDamage(amount, _instigator, 0f);   // 몬스터가 아닌 대상 폴백
+    }
+
+    private void Configure(IDamageable target, GameObject instigator, float dps, float tickInterval, float duration)
+    {
+        _target       = target;
+        _monster      = target as MonsterBase;
+        _instigator   = instigator;
+        _tickInterval = tickInterval;
+        _dps          = Mathf.Max(_dps, dps);    // 더 강한 DPS 유지
+        _remaining    = Mathf.Max(_remaining, duration); // 더 긴 지속시간 유지
+        _total        = Mathf.Max(_total, _remaining);   // 게이지 기준(부여 직후 = 100%)
+    }
+}

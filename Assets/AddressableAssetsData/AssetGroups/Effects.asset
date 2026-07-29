@@ -15,6 +15,46 @@ MonoBehaviour:
   m_GroupName: Effects
   m_GUID: 9312e00a4bcb9af4bb0b7e7c943aa1c8
   m_SerializeEntries:
+  - m_GUID: 63e8dd4e6545e2541b0b3fc31c548509
+    m_Address: ProcGatePortal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7729da45929289440920f837ba94356b
+    m_Address: vfx_gawain_noon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ae002e2c60220eb40b2e208979e6af87
+    m_Address: vfx_gawain_noon_sun
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6dec892bf19f7641bf928b5799acd28
+    m_Address: vfx_gawain_meteor_fall
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 41c6cf460272cbc42bac60a67095f27b
+    m_Address: vfx_gawain_solar_impact
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 20cd848ce0a9abd429dd593fb90179bf
+    m_Address: vfx_lancelot_frenzy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 198865771bd44f0408d1f9021987908c
+    m_Address: vfx_lancelot_cursed
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61227a6b4f61dda42b934defae1450db
+    m_Address: vfx_lancelot_judgment
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 026db729cc472d143869e7605498ec72
     m_Address: KatanaDashMuzzle
     m_ReadOnly: 0
@@ -97,11 +137,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2ec0f779be4a3cb469d85da7fe4da447
     m_Address: BowQTier2Muzzle
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2f2d4e6b133dd204b98d767461befc6d
-    m_Address: VFX_Item_Rare
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -241,6 +276,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 413e42b5ba160154bb95ad2c894bcff7
+    m_Address: ElementVfxRegistry
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a2ab56839e1c9504ea9d141e95d0b16b
     m_Address: DieEffect_01
     m_ReadOnly: 0
@@ -269,11 +309,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b4069a656bda4d940bf63c71279f5c95
     m_Address: Buff1
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b4f9efd16e8b5c04c91abcf7f00f5166
-    m_Address: VFX_Item_Epic
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -344,11 +379,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e9a61902ec4cb8f42b1b2a59fe27cf07
-    m_Address: VFX_Item_Common
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ec3f674830402cc45bce805cf6493db7
     m_Address: GreatswordImpact
     m_ReadOnly: 0
@@ -374,11 +404,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fabdc41743036b945ade90d43535856b
-    m_Address: VFX_Item_Legendary
-    m_ReadOnly: 0
-    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fb2df51e77abde1429eb83c0317784af
     m_Address: DragonPunch

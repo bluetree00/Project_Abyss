@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 202e942b773d4964e8b1acd184aa7fea, type: 3}
+  m_Name: KatanaAbilityPack
+  m_EditorClassIdentifier: 
+  groups:
+  - actionType: 1
+    abilities:
+    - {fileID: 11400000, guid: cb9aceca967c7da45aae479d66a29df8, type: 2}
+  - actionType: 2
+    abilities:
+    - {fileID: 11400000, guid: cbf059b390b25b94a9c8e74fec836dec, type: 2}
+  - actionType: 6
+    abilities:
+    - {fileID: 11400000, guid: a42515af63628324b87cb8c2e9fdda7c, type: 2}
+  - actionType: 8
+    abilities:
+    - {fileID: 11400000, guid: bb541f8daf758084f99117b6658d37d6, type: 2}

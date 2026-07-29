@@ -27,8 +27,8 @@ TagManager:
   - UI
   - Player
   - Monster
-  - 
-  - 
+  - Wall
+  - MonsterHit
   - 
   - 
   - 

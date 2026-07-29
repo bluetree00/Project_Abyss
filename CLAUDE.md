@@ -1,40 +1,74 @@
-# Project Abyss - Claude 지침
+# Project RelicFairy - Claude 지침
 
-## 세션 시작 시 자동 실행
-- 대화 시작 시 `git fetch origin`으로 원격 패치를 확인한다
-- 업데이트가 있으면 `git pull --ff-only`로 자동 풀 받는다
-- 현재 브랜치: `dev/KBG-D`, 메인 브랜치: `main`, 통합 브랜치: `develop`
+## Karpathy Guidelines
 
-## 커밋 컨벤션
-- `feat:` 새 기능
-- `fix:` 버그 수정
-- `docs:` 문서 변경
-- `refactor:` 리팩토링
-- `chore:` 기타 작업
+출처: [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)
 
-## 프로젝트 아키텍처 요약
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-### 부트 플로우
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
 ```
-AppBootstrapper (DDOL) → Managers (서비스 로케이터, DDOL) → GameFlow (상태 머신)
-Logo → Login → Lobby → StageMap → GameScene → Result
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-### 핵심 시스템 위치
-- 부트스트래퍼: `Assets/Abyss/Systems/Bootstrapper/Scripts/` (AppBootstrapper, GameRunBootstrapper, StageMapBootstrapper, HudBootstrapper, UIRootBootstrapper)
-- 매니저: `Assets/Abyss/Systems/Managers/Scripts/` (Managers, UIManager, AddressableManager, InputManager 등)
-- 게임 세션: `Assets/Abyss/Systems/Stage/RunGame/` (GameRunSession, PlayerLoadout, PlayerRunState)
-- 스테이지: `Assets/Abyss/Systems/Stage/Stage/` (RoomManager, StagePointManager)
-- 게임 플로우: `Assets/Abyss/Systems/Stage/GameFlow/GameFlow.cs`
-- 플레이어: `Assets/Abyss/Characters/Player/Scripts/PlayerController.cs`
-- 씬: `Assets/Abyss/Scenes/` (Logo, Login, Lobby, StageMap, GameScene, Result)
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-### 주요 패턴
-- 서비스 로케이터: `Managers.Instance` → 하위 매니저 접근
-- DDOL 싱글톤: AppBootstrapper, Managers, @UIRoot
-- 비동기: UniTask 기반
-- 세션 캡슐화: GameRunSession이 런 전체 상태 보유
-- MVP: HudPresenter ↔ HudView ↔ CombatPanelView
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
 
 ## 코드 컨벤션 (필수 준수)
 - **비동기**: `UniTask` 사용 (코루틴 사용 금지), `CancellationToken` 전달 및 `OperationCanceledException` catch 필수
@@ -61,26 +95,74 @@ Logo → Login → Lobby → StageMap → GameScene → Result
 - 에러가 0이 될 때까지 반복한다
 - 매 파일 수정마다가 아니라, 한 질문(작업 단위)이 끝난 시점에 1회 수행한다
 
-## 현재 개발 상태
-- **Phase 1 (인게임 루프)** 진행 중
-- **참고 문서**: `Assets/Abyss/Docs/` (Core Architecture, BG_Abyss_Worklog, Lee_Abyss)
-- **참고**: `DevTracker.md` 2026-05-11 업데이트 완료. ResourceManager 제거, Addressables 전환 반영됨
+## 핵심 시스템 위치
 
-## 에이전트 팀 구조
-역할 정의 파일은 `.claude/agents/`에 위치:
-- `lead.md` — 팀장 (기획/조율): 작업 분해, 배분, 결과 평가
-- `client.md` — 클라이언트 개발: 게임 로직, 무기/스킬, 네트워크
-- `uiux.md` — UIUX 개발: HUD, Canvas, UI 프리팹
+### 부트스트래퍼 — `Assets/RelicFairy/Systems/Bootstrapper/Scripts/`
+- `AppBootstrapper.cs` — 앱 시작점 (DDOL)
+- `GameRunBootstrapper.cs` — 런(전투) 진입 부트
+- `HudBootstrapper.cs` — HUD 초기화
+- `UIRootBootstrapper.cs` — UI 루트(@UIRoot) 초기화
+- `SteamManager.cs` — Steamworks 초기화
 
-### 팀 워크플로우
-1. 사용자 → 팀장에게 목표 전달
-2. 팀장 → 작업 분해 후 클라이언트/UIUX에게 배분
-3. 클라이언트/UIUX → 작업 완료 후 팀장에게 결과 보고
-4. 팀장 → 기획 의도 기준으로 평가, 부적절 시 피드백 반환
-5. 팀장 → 모든 결과 적절 시 사용자에게 최종 보고
+### 매니저 — `Assets/RelicFairy/Systems/Managers/Scripts/`
+- `Managers.cs` — 서비스 로케이터 (`Managers.Instance`)
+- `AddressableManager.cs` — Addressables 리소스 로딩 (Resources.Load 대체)
+- `UIManager.cs` — UI 라이프사이클/데이터
+- `InputManager.cs` — 입력
+- `SoundManager.cs` — 사운드
+- `SceneTransitionManager.cs` — 씬 전환
+- `ObjectPoolerManager.cs` — 오브젝트 풀
+- `PlayerManager.cs` — 플레이어 인스턴스 관리
+- `CharacterDataManager.cs` / `MonsterDataManager.cs` — 캐릭터/몬스터 데이터
+- `ChartLoader.cs` — 차트 CSV 로딩
+- `AnimationResourceManager.cs` — 애니메이션 리소스
 
-### 파일 소유권
-- 클라이언트: `Assets/Abyss/Shared/Characters/`, `Assets/Abyss/Systems/Network/`
-- UIUX: `Assets/Abyss/UI/`
-- 공유(수정 시 팀장 조율): `Assets/Abyss/Systems/Bootstrapper/`, `Assets/Abyss/Systems/Managers/`
-- 서로의 영역을 직접 수정하지 않는다
+### 게임 런(전투) — `Assets/RelicFairy/Systems/Stage/RunGame/`
+- `GameRunSession.cs` — 런 전체 상태 캡슐화
+- `PlayerLoadout.cs` / `PlayerRunState.cs` — 플레이어 빌드/런 상태
+- `RunItemInventory.cs` / `ItemStack.cs` / `ItemId.cs` — 인벤토리
+- `BuffDataManager.cs` / `BuffRoller.cs` / `BuffEntry.cs` — 버프
+- `RoomClearController.cs` / `RoomClearGate.cs` / `RoomWaveController.cs` — 룸 클리어 흐름
+- `RoomExitTrigger.cs` / `ZoneEntryTrigger.cs` / `ClearRewardTrigger.cs` — 트리거
+- `CombatBarrier.cs` — 전투 봉쇄
+- `EndRunResult.cs` — 런 종료 결과
+- `StatModifier.cs` / `SynergyRecord.cs` / `RunDelta.cs` — 스탯/시너지
+
+### 게임 플로우 — `Assets/RelicFairy/Systems/Stage/GameFlow/`
+- `GameFlow.cs` — 전체 상태 머신
+
+### 맵/스테이지 — `Assets/RelicFairy/Systems/Stage/MapGen/`
+- `MapBuilder.cs` / `MapDataManager.cs` / `MapDataLoader.cs` — 맵 생성/데이터 로딩
+- `ZoneLayoutManager.cs` / `ZoneProgressionService.cs` / `ZoneMapSlot.cs` — 존 레이아웃/진행
+- `CorridorBridgeSpawner.cs` / `CorridorStyleSO.cs` — 복도 생성
+- `BlockDef.cs` / `BlockPalette.cs` / `TileType.cs` — 블록/타일 정의
+- `DecorationCatalogSO.cs` — 데코레이션 카탈로그
+- `Entrances/` — 맵 입장 연출 (`DissolveEntrance`, `MapEntranceRegistry`)
+- `Token/` — 토큰 파서/핸들러 시스템 (`TokenParser`, `TokenRegistry`, `Handlers/`)
+
+### 챕터 정의 — `Assets/RelicFairy/Systems/Stage/Stage/`
+- `ChapterDataSO.cs` / `ChapterLayoutSO.cs` / `ChapterRegistry.cs` — 챕터 데이터
+
+### 시작방(베이스캠프) — `Assets/RelicFairy/Systems/Stage/StartRoom/`
+- `WispController.cs` / `WispCameraFollow.cs` — 위습(요정) 조작
+- `CharacterDisplayStand.cs` — 캐릭터 선택대 (무기 선택은 `WeaponForgeAltar.cs`로 대체됨)
+- `StartRoomPickup.cs` / `StartRoomGate.cs` — 픽업/게이트
+
+### 상점 — `Assets/RelicFairy/Systems/Stage/Shop/`
+- `ShopRoomController.cs` / `ShopStallInteraction.cs` — 상점 룸 컨트롤러
+- `ShopCatalogSO.cs` / `ShopItemSO.cs` / `ShopPriceTableSO.cs` — 상점 데이터
+
+### 월드 — `Assets/RelicFairy/Systems/Stage/World/`
+- `BossRoomController.cs` — 보스룸
+- `RoomPlatform.cs` / `RoomOpenSequencer.cs` — 룸 플랫폼/연출
+- `BarrierVolume.cs` / `CheckpointZone.cs` — 배리어/체크포인트
+
+### 플레이어 — `Assets/RelicFairy/Characters/Player/Scripts/`
+- `PlayerController.cs` — 플레이어 컨트롤러
+
+### 씬 — `Assets/RelicFairy/Scenes/`
+- `Logo.unity`, `Lobby.unity`
+- `GameScenes/BaseCamp.unity` — 베이스캠프
+- `GameScenes/Tutorial.unity`
+- `GameScenes/GameScene_Ch1.unity` ~ `GameScene_Ch4.unity` — 챕터별 인게임
+- `GameScenes/GameScene_LichTest.unity` — 리치 보스 테스트씬

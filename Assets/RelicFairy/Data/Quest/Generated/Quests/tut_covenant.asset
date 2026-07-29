@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7ad26eea9c2be342ae3bca63118ad71, type: 3}
+  m_Name: tut_covenant
+  m_EditorClassIdentifier: Assembly-CSharp::Quest
+  category: {fileID: 11400000, guid: 6edac1c2f6a8ccf47903b37ca4cad828, type: 2}
+  icon: {fileID: 0}
+  codeName: tut_covenant
+  displayName: "\uC11C\uC57D"
+  description: "\uC2EC\uC5F0\uC758 \uC81C\uB2E8\uC5D0\uC11C \uC11C\uC57D"
+  taskGroups:
+  - tasks:
+    - {fileID: 11400000, guid: f11c34493f75bf84a953e2f4f4a920e0, type: 2}
+  rewards: []
+  useAutoCompletion: 1
+  isCancelable: 0
+  isSavable: 0
+  acceptionConditions: []
+  cancelConditions: []
+  afterQuest: {fileID: 0}
+  acceptFeedbackType: 0
+  acceptFeedbackId: 
+  completeFeedbackType: 2
+  completeFeedbackId: Quest_TutCovenant_Complete
+  timeLimit: 0

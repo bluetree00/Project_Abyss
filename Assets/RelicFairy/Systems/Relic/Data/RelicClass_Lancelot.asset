@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91370ee1973d2eb44bdd095866f5512f, type: 3}
+  m_Name: RelicClass_Lancelot
+  m_EditorClassIdentifier: Assembly-CSharp::RelicClassSO
+  id: 3
+  displayName: "\uB79C\uC2AC\uB86F"
+  loreDesc: "\uC6D0\uD0C1\uC758 \uB9F9\uC138\uB97C \uC800\uBC84\uB9B0 \uAE30\uC0AC\uC758
+    \uC794\uC0C1. \uADF8\uB97C \uC0BC\uD0A8 \uAD11\uAE30\uAC00 \uACF0 \uADF8\uC758
+    \uAC80\uC774 \uB410\uB2E4."
+  tagline: "\uCC22\uAE34 \uC11C\uC57D\uC758 \uAC80"
+  tags:
+  - "\uC2A4\uD0DD\uD615"
+  - "\uACE0\uC704\uD5D8 \uACE0\uBCF4\uC0C1"
+  - "\uAD11\uC5ED \uB9C8\uBB34\uB9AC"
+  abilities:
+  - name: "\uAD11\uAE30"
+    kind: 0
+    badge: "\uD328\uC2DC\uBE0C \xB7 \uCD5C\uB300 40\uC2A4\uD0DD"
+    summary: "\uC801\uC911 \uC2DC \uAD11\uAE30 \uC2A4\uD0DD\uC744 \uC5BB\uB294\uB2E4.
+      \uC313\uC744\uC218\uB85D \uAC15\uD574\uC9C0\uACE0, \uB3D9\uC2DC\uC5D0 \uB354
+      \uC57D\uD574\uC9C4\uB2E4."
+    stats:
+    - "\uACF5\uACA9\uB825|\uC2A4\uD0DD\uB2F9 +1% (\uCD5C\uB300 +40%)"
+    - "\uBC1B\uB294 \uD53C\uD574|\uC2A4\uD0DD\uB2F9 +0.75% (\uCD5C\uB300 +30%)"
+    - "\uC2A4\uD0DD \uD68D\uB4DD|\uC77C\uBC18 1 \xB7 \uC815\uC608 2 \xB7 \uC5D8\uB9AC\uD2B8
+      3 \xB7 \uBCF4\uC2A4 5"
+  - name: "\uAD11\uB780"
+    kind: 1
+    badge: "40\uC2A4\uD0DD \uB3C4\uB2EC \xB7 4\uCD08"
+    summary: "\uAD11\uAE30 40\uC2A4\uD0DD \uB3C4\uB2EC \uC2DC 4\uCD08\uAC04 \uBC1C\uB3D9.
+      \uC885\uB8CC \uC2DC \uC2A4\uD0DD 0\uC73C\uB85C \uCD08\uAE30\uD654\uB41C\uB2E4."
+    stats:
+    - "\uC774\uB3D9 \uC18D\uB3C4|+20%"
+  - name: "\uC2EC\uD310\uC758 \uC77C\uACA9"
+    kind: 2
+    badge: "Q \xB7 \uAD11\uB780 \uC911 1\uD68C"
+    summary: "\uAD11\uB780 \uC911\uC5D0\uB9CC \uC0AC\uC6A9 \uAC00\uB2A5. \uC804\uBC29
+      \uBD80\uCC44\uAF34\uC744 \uC5F0\uD0C0\uD55C \uB4A4 \uB9C8\uBB34\uB9AC \uAC15\uD0C0\uB85C
+      \uB9C8\uAC10\uD55C\uB2E4."
+    stats:
+    - "\uD53C\uD574|\uACF5\uACA9\uB825\uC758 520% (40\uC2A4\uD0DD \uAE30\uC900)"
+    - "\uB099\uC778|\uB300\uC0C1\uC758 \uBC1B\uB294 \uD53C\uD574 +20% \xB7 4\uCD08"
+    - "\uBC94\uC704|\uC804\uBC29 \uBD80\uCC44\uAF34 6m"
+  themeColor: {r: 0.86, g: 0.24, b: 0.24, a: 1}
+  portrait: {fileID: 0}
+  rosterIllust: {fileID: 0}
+  passives: []
+  qSkillClipKey: 
+  qSkillCinematic: {fileID: 0}
+  stats: []
+  auraVfxKey: 
+  auraSocket: 

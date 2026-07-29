@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: ChartData
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: ChartData
+  m_GUID: 6a6364ffb430dbc46ba2b96807f580b2
+  m_SerializeEntries:
+  - m_GUID: 0880ce3f486b4544db24191b3e982938
+    m_Address: MERLIN_RUNE_PIECE_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 119fe1fcff857794a98a4beda47082d2
+    m_Address: CHAPTER_2_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c92d64ad1cef4748b60f3a6c88256e8
+    m_Address: CHAPTER_1_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3f5dbb3250dc9054793e2f8dcb95699c
+    m_Address: CHAPTER_3_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6c1dee3c13f9fc64caac707f2f7685ec
+    m_Address: MERLIN_RUNE_SYNERGY_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9212f645dffa57e4c80ba4fee87a4dc4
+    m_Address: CHAPTER_4_ROOM_POOL
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6932adaa3c69d84b95a705480cc0623
+    m_Address: MERLIN_RUNE_ZONE_MAP
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 87384e38f5ec8514f83c64b6be5714a9, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 4883e2b0daef68e42a9ab79805a00f38, type: 2}
+    - {fileID: 11400000, guid: d34c787d6d6ee1a4795e7959506cd247, type: 2}

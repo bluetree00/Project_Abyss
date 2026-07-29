@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841f0d6354dd4e8c94990ea5b5f00e8a, type: 3}
+  m_Name: EvilMagePatternAttackOverride
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.PatternAttackOverrideSO
+  patterns:
+  - name: Bolt
+    animationStateName: Attack01
+    minDistance: 0
+    maxDistance: 8
+    priority: 0
+    cooldown: 0.2
+    damageDelay: 0.45
+    attackDuration: 0.65
+    damageMultiplier: 1
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 610e7d37366c8ac48b57b1d0e382f47d,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  - name: Burst
+    animationStateName: Attack01
+    minDistance: 0
+    maxDistance: 8
+    priority: 0
+    cooldown: 1.5
+    damageDelay: 0.8
+    attackDuration: 1
+    damageMultiplier: 1.15
+    knockbackMultiplier: 1
+    attackShapeOverride: {fileID: 11400000, guid: 0d17a360f9cc4a12b2a15ac7812e3104,
+      type: 2}
+    disableWarning: 1
+    warningRadius: 0
+    warningDuration: 0
+    warningShape: 0
+    castVfxPrefab: {fileID: 0}
+    castVfxDuration: 0
+    castVfxForwardOffset: 0
+    castVfxVerticalOffset: 0.8
+    castVfxScale: 1
+    castVfxAttachToMonster: 1
+    useProceduralBeamVfx: 0
+    proceduralBeamLength: 3
+    proceduralBeamWidth: 0.16
+    proceduralBeamColor: {r: 1, g: 0.2, b: 0.2, a: 0.95}
+    slowScale: 0
+    slowDuration: 0
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  selectionMode: 1
+  engageDistance: 6.5
+  engageDistanceScale: 0.85

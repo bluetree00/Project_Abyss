@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a47a37ab628dfe246b83d5c984a79b2a, type: 3}
+  m_Name: Chapter2
+  m_EditorClassIdentifier: Assembly-CSharp::ChapterDataSO
+  chapterId: 2
+  chapterName: "\uC5B4\uB460\uC774 \uB4DC\uB9AC\uC6B4 \uC232"
+  description: "\uAE4A\uC740 \uACF3\uC5D0 \uC6B8\uB9AC\uB294 \uBA54\uC544\uB9AC"
+  mapBackground: {fileID: 0}
+  mapBackgroundTint: {r: 1, g: 1, b: 1, a: 1}
+  mapBackgroundKey: map_5
+  decorationSprites: []
+  theme: Ruins
+  bgmKey: bgm_cave
+  difficultyScale: 1.3
+  monsterCountScale: 1.2
+  monsterPoolTag: 2
+  bossSpawnTable: {fileID: 11400000, guid: bca241749098d454192c3ba57ae96340, type: 2}
+  goldMultiplier: 1.2
+  itemDropMultiplier: 1
+  middleLayers: 7
+  peakLayer: 5
+  fieldPrefabKey: FieldPrefab_Cave

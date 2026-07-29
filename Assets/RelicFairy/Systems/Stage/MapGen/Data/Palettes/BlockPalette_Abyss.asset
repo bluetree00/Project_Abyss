@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b0c3a74d232eda46aab9f9984eb60e0, type: 3}
+  m_Name: BlockPalette_Abyss
+  m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
+  themeMatch: Abyss
+  wallMode: 1
+  wallHeight: 8
+  hasCeiling: 0
+  lighting:
+    wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    wallLightSpacing: 6
+    wallLightHeightRatio: 0.4
+    maxWallLights: 16
+  blocks:
+  - {fileID: 11400000, guid: 6bfba40b082f66549bb9192b1f434331, type: 2}
+  - {fileID: 11400000, guid: 6210a5df7c32f604e86b821372770ad1, type: 2}
+  - {fileID: 11400000, guid: 258b2e752cd469c4383375a3b0785d1c, type: 2}
+  - {fileID: 11400000, guid: d267a1c98cac4da4491fad6466729dc4, type: 2}
+  - {fileID: 11400000, guid: 41da9f765c0fa0e4ba5db242685baa9e, type: 2}
+  - {fileID: 11400000, guid: d9d3d6e5e7a99af41b567bbfbfbca59b, type: 2}
+  - {fileID: 11400000, guid: cdd01111ae2827d4c82f03699eb2da52, type: 2}

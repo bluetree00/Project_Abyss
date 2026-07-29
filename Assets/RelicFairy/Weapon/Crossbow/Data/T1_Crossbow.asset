@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59ef79745dfc7bd4eb2de2fbba386294, type: 3}
+  m_Name: T1_Crossbow
+  m_EditorClassIdentifier: Assembly-CSharp::MainWeaponSO
+  weaponDisplayKey: T1_Crossbow_Display
+  weaponPrefabKey: T1_Crossbow_Weapon
+  displayName: "\uAE30\uBCF8 \uC11D\uAD81"
+  tagline: "\uB290\uB9AC\uC9C0\uB9CC \uD55C \uBC1C\uC774 \uBB35\uC9C1\uD558\uB2E4.
+    \uBA3C \uAC70\uB9AC\uC5D0\uC11C \uD070 \uD55C \uBC29\uC744 \uB118\uAE30\uB294
+    \uC800\uACA9\uD615."
+  uiThemeColor: {r: 0.78, g: 0.52, b: 0.95, a: 1}
+  iconKey: T1_CrossbowIcon
+  icon: {fileID: 21300000, guid: 3498fcefa3e7e9046a22f82375ad2587, type: 3}
+  tier: 1
+  rarity: 0
+  baseAttack: 25
+  baseDefense: 2
+  attackSpeed: 0.8
+  attackRange: 8
+  areaOfEffect: 0.5
+  critChance: 25
+  critDamage: 1.25
+  groundEndCount: 2
+  airEndCount: 2
+  animationSet: {fileID: 11400000, guid: 13c9508a14118774a854c352a7399486, type: 2}
+  abilitySet: {fileID: 11400000, guid: 1d00c30a7d27c9f45998d431e3ee7f75, type: 2}
+  trailVfxPrefab: {fileID: 0}
+  weaponType: 6
+  evolution: {fileID: 0}
+  skillQ: {fileID: 11400000, guid: f13606e204e18f64ea72e2d77f8d9ee1, type: 2}
+  skillE: {fileID: 11400000, guid: cdd3c33e1f408f94bb84c42b02776fa7, type: 2}
+  holdThreshold: 2
+  promoteMode: 2
+  chargeStages: 2

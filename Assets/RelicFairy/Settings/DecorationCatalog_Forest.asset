@@ -1,0 +1,181 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbb2e2e4921128a43971504ab20ce783, type: 3}
+  m_Name: DecorationCatalog_Forest
+  m_EditorClassIdentifier: Assembly-CSharp::DecorationCatalogSO
+  themeMatch: Forest
+  entries:
+  - code: t
+    prefab: {fileID: 3896737664713206570, guid: 805d7f6afd06de14aaa8e3a53e62c3e1,
+      type: 3}
+    yOffset: 0
+    scale: 0.42
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: p
+    prefab: {fileID: 7013660787077639941, guid: f6e828628267561408dfe173c70c4246,
+      type: 3}
+    yOffset: 0
+    scale: 0.38
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: tb
+    prefab: {fileID: 4055896239770210117, guid: c7746c2acf35be34b89ddd83b9af4bcb,
+      type: 3}
+    yOffset: 0
+    scale: 0.4
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: tc
+    prefab: {fileID: 730165899074531412, guid: bf3cb3e31c6b90141a4aefeb4da7373e,
+      type: 3}
+    yOffset: 0
+    scale: 0.44
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: td
+    prefab: {fileID: 9188393060782003271, guid: c395f4c0b3f1f1241b793eed31bb55ca,
+      type: 3}
+    yOffset: 0
+    scale: 0.4
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: n
+    prefab: {fileID: 730165899074531412, guid: bf3cb3e31c6b90141a4aefeb4da7373e,
+      type: 3}
+    yOffset: 0
+    scale: 0.4
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: f
+    prefab: {fileID: 1031125914, guid: abc00000000007992870104272310159,
+      type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: l
+    prefab: {fileID: 4055896239770210117, guid: c7746c2acf35be34b89ddd83b9af4bcb,
+      type: 3}
+    yOffset: 0
+    scale: 0.26
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: m
+    prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0.45
+  - code: lL
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 2
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lM
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 4
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lH
+    prefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    yOffset: 6
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 1
+    wallInset: 0.45
+  - code: lC
+    prefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 0
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r1
+    prefab: {fileID: 1031125266, guid: abc00000000006981315685590065739, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: r2
+    prefab: {fileID: 1031125300, guid: abc00000000015461637500741923270, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0
+  - code: alt
+    prefab: {fileID: 1031119978, guid: abc00000000012857661513297908409, type: 3}
+    yOffset: 0
+    scale: 1
+    randomYRotation: 1
+    sizeX: 2
+    sizeZ: 2
+    faceNearestWall: 0
+    wallInset: 0
+  - code: sta
+    prefab: {fileID: 1031125134, guid: abc00000000003064275970823802713, type: 3}
+    yOffset: 0
+    scale: 1.2
+    randomYRotation: 1
+    sizeX: 1
+    sizeZ: 1
+    faceNearestWall: 0
+    wallInset: 0

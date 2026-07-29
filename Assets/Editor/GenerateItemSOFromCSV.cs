@@ -13,10 +13,10 @@ using System.IO;
 /// </summary>
 public static class GenerateItemSOFromCSV
 {
-    private const string SOFolder = "Assets/Abyss/Shared/Item/SOdata";
-    private const string DatabasePath = "Assets/Abyss/Shared/Item/SOdata/ItemSODatabase.asset";
+    private const string SOFolder = "Assets/RelicFairy/Shared/Item/SOdata";
+    private const string DatabasePath = "Assets/RelicFairy/Shared/Item/SOdata/ItemSODatabase.asset";
 
-    [MenuItem("Tools/Item/Generate SO from CSV")]
+    [MenuItem("RelicFairy/Gameplay/Item/Generate SO from CSV")]
     public static void Generate()
     {
         // CSV 로드
@@ -82,18 +82,21 @@ public static class GenerateItemSOFromCSV
             var newSO = ScriptableObject.CreateInstance<ItemSO>();
             newSO.itemId = itemId;
 
-            // displayName: description에서 가져오거나 itemId 변환
-            if (!string.IsNullOrEmpty(meta.description))
+            // displayName: item_name(룬 이름) 우선, 없으면 description, 최후 itemId 변환
+            if (!string.IsNullOrEmpty(meta.item_name))
+                newSO.displayName = meta.item_name;
+            else if (!string.IsNullOrEmpty(meta.description))
                 newSO.displayName = meta.description;
             else
                 newSO.displayName = itemId.Replace("item_", "").Replace("_", " ");
 
-            // rarity
-            newSO.rarity = meta.rarity switch
+            // rarity — 신 CSV는 grade 컬럼이므로 ResolvedRarity 경유
+            newSO.rarity = meta.ResolvedRarity switch
             {
-                "Rare" => ItemRarity.Rare,
-                "Epic" => ItemRarity.Epic,
-                _ => ItemRarity.Common,
+                "Rare"      => ItemRarity.Rare,
+                "Epic"      => ItemRarity.Epic,
+                "Legendary" => ItemRarity.Legendary,
+                _           => ItemRarity.Common,
             };
 
             // category

@@ -6,23 +6,26 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Abyss/Scenes/Logo.unity
-    guid: 0f347859b0b563045ade5226b7eba638
-  - enabled: 1
-    path: Assets/Abyss/Scenes/Login.unity
-    guid: d4153066ed87dad4bb47a33062d65076
-  - enabled: 1
-    path: Assets/Abyss/Scenes/Lobby.unity
+    path: Assets/RelicFairy/Scenes/GameScenes/Lobby.unity
     guid: cdbd8c9b3f2ec4c4687c2ec5c6a9e8a5
   - enabled: 1
-    path: Assets/Abyss/Scenes/GameScene.unity
+    path: Assets/RelicFairy/Scenes/GameScenes/Tutorial.unity
+    guid: 80a2e6d6ca3577947b5747c86530bf45
+  - enabled: 1
+    path: Assets/RelicFairy/Scenes/GameScenes/BaseCamp.unity
+    guid: b7865cfa39d36804b9590a88ae51d679
+  - enabled: 1
+    path: Assets/RelicFairy/Scenes/GameScenes/Game_Intro.unity
+    guid: 19eb44a4fe30ddb4b9ed3f8b75c62df7
+  - enabled: 1
+    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch1.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
-    path: Assets/Abyss/Scenes/StageMap.unity
-    guid: 635dbfbeba406604d9a739f5e3d48f28
+    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch2.unity
+    guid: 35ff12cdb4f67db4ca6cb2762775a311
   - enabled: 1
-    path: Assets/Abyss/Scenes/StartScene.unity
-    guid: 8b0456c15b8edfa4a9d55ad3cbf46bb2
+    path: Assets/RelicFairy/Scenes/GameScenes/GameScene_Ch3.unity
+    guid: b8013b35c501d334caf0a5fe95d20fb3
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 9ab410270870c5d438a3caf7889cab42,
       type: 2}

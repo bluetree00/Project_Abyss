@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c1d7b2521b0e1bd40a2745937400ad49
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 355960
+  packageName: CombatGirls_SwordShieldCharacterPack
+  packageVersion: 1.1
+  assetPath: Assets/CombatGirlsCharacterPack/CombatGirl_Shield/Materials/Cloth/Shield_Sword_Cloth_06.mat
+  uploadId: 848774

@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a09bf47594568e347aaccd16cf580350, type: 3}
+  m_Name: Lich_TwinCastPattern
+  m_EditorClassIdentifier: Assembly-CSharp::RelicFairy.Monster.LichTwinCastPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  maxRange: 25
+  castDuration: 0.7
+  fakeFlashDuration: 0.25
+  feintGapDuration: 0.45
+  recoveryDuration: 0.6
+  projectilePrefab: {fileID: 8282548314473357432, guid: 6dff2fd6f02ca2d459b3fa8e7896a429,
+    type: 3}
+  projectileSpeed: 14
+  projectileRange: 30
+  damageMultiplier: 1.1
+  trajectoryBeamWidth: 0.12
+  castVfxPrefab: {fileID: 0}
+  patternCooldown: 7

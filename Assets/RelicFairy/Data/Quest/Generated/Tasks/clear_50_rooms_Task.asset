@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce6fd903e505270419ee161a87ef1855, type: 3}
+  m_Name: clear_50_rooms_Task
+  m_EditorClassIdentifier: Assembly-CSharp::Task
+  category: {fileID: 11400000, guid: 0912c96fd3e6cf0429209aa4b4ad45dd, type: 2}
+  codeName: clear_50_rooms
+  description: "\uBC29 50\uAC1C \uD074\uB9AC\uC5B4"
+  action: {fileID: 11400000, guid: 23262582d486a954b9535570591ab18a, type: 2}
+  targets:
+  - {fileID: 11400000, guid: 6de5e9a624b82b64c94c482970896bf1, type: 2}
+  intialSuccessValue: {fileID: 0}
+  needSuccessToComplete: 50
+  canReceiveReportDuringCompletion: 0

@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95d84735d3c1927499746979873409a8, type: 3}
+  m_Name: NamelessPlungeAbility
+  m_EditorClassIdentifier: 
+  steps:
+  - stepIndex: 0
+    order: 0
+    baseDamage: 35
+    knockbackMultiplier: 3
+    selfMovement: {x: 0, y: 0, z: 0}
+    effect:
+      payloadKey: NamelessSlash
+      socket: 0
+      space: 0
+      positionOffset: {x: 0, y: 1, z: 0.5}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      scaleMultiplier: 0.7
+      lifeTimeMultiplier: 1.5
+      behavior: {fileID: 0}
+    collider:
+      mode: 1
+      damage: 35
+      trailRadiusOverride: 0
+      colliderPrefabKey: 
+      positionOffset: {x: 0, y: 0, z: 0}
+      rotationEuler: {x: 0, y: 0, z: 0}
+      sizeMultiplier: 2
+      hitInterval: 0
+      duration: 0.4
+      shape: 0
+      behavior: {fileID: 0}
+    hitEffectKey: SwordHitImpact
+    hitEffectScale: 0.42
+    oneShot: 1
+    rotateToMouse: 0

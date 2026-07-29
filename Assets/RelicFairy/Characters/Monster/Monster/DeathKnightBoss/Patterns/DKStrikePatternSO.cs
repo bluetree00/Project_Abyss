@@ -1,0 +1,614 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+
+namespace RelicFairy.Monster
+{
+/// <summary>
+/// DeathKnight 스트라이크 패턴.
+///
+/// 흐름:
+///  MovingToCenter  → Walk1 재생, NavMesh로 맵 중앙 이동
+///  TileExpansion   → Idle2 루프, DK 무적 + FireShield + 부유검 소환
+///                    경고 타일 벽 위(플레이어 공간)부터 행 단위로 DK 방향 채움
+///                    같은 색 검 파괴 → GuardianShield PyramidStrikeAnchor 위치에 생성
+///                    아무 검 파괴 → 타일 확장 가속
+///  SlashAttack     → 전 가로줄 Sword Slash 15 + slashHitDelay 후 피격
+///                    GuardianShield 내 플레이어 면제
+///  Recovery        → recoveryTime 후 AttackReadyState
+/// </summary>
+[CreateAssetMenu(menuName = "Abyss/Boss/DeathKnight/DK_StrikePattern",
+                 fileName = "DK_StrikePattern")]
+public class DKStrikePatternSO : BossPatternSO
+{
+    [Header("Grid Tiles")]
+    [Tooltip("흰색 경고 타일 프리팹")]
+    public GameObject whiteTilePrefab;
+    [Tooltip("검은색 경고 타일 프리팹")]
+    public GameObject blackTilePrefab;
+
+    [Header("VFX")]
+    [Tooltip("Sword Slash 15 — 가로줄 슬래시 이펙트")]
+    public GameObject impactVfxPrefab;
+    [Tooltip("FireShield — DK를 감싸는 이펙트 (데스나이트 이펙트 폴더)")]
+    public GameObject fireShieldPrefab;
+    [Tooltip("Effect_09_GuardianShield — 보호막 이펙트 (데스나이트 이펙트 폴더)")]
+    public GameObject guardianShieldPrefab;
+    [Tooltip("GuardianShield 보호 반경")]
+    public float guardianShieldRadius = 2f;
+
+    [Header("Floating Swords")]
+    [Tooltip("SM_DarkKnight2_Sword 메시 프리팹")]
+    public GameObject floatingSwordPrefab;
+    [Tooltip("흰색 검 머티리얼")]
+    public Material whiteSwordMaterial;
+    [Tooltip("검은색 검 머티리얼")]
+    public Material blackSwordMaterial;
+    [Tooltip("DK 좌우 수평 거리")]
+    public float swordSideOffset   = 2.5f;
+    [Tooltip("소환 높이")]
+    public float swordHeight        = 2.2f;
+    [Tooltip("상하 부동 진폭")]
+    public float swordBobAmplitude  = 0.25f;
+    [Tooltip("상하 부동 속도")]
+    public float swordBobSpeed      = 1.5f;
+    [Tooltip("검 최대 체력")]
+    public float swordHp            = 30f;
+    [Tooltip("소환 검 스케일 (SM_Statue_01b ≈ 3 units, 검 메시 1.56 units → 기본 2.0으로 비슷하게 맞춤)")]
+    public float swordScale          = 2f;
+    [Tooltip("부유 검 피격 CapsuleCollider 반지름 (로컬 기준, 스케일 적용 전).")]
+    public float swordColliderRadius = 0.5f;
+    [Tooltip("부유 검 피격 CapsuleCollider 높이 (로컬 기준, 스케일 적용 전). 위아래 피격 범위를 결정.")]
+    public float swordColliderHeight = 3.0f;
+
+    [Header("Sword Light")]
+    [Tooltip("스포트라이트 범위 (m). 0이면 라이트 생략.")]
+    public float swordLightRange     = 12f;
+    [Tooltip("스포트라이트 강도 — 무대 조명처럼 검을 강조하려면 높은 값 권장")]
+    public float swordLightIntensity = 25f;
+    [Tooltip("스포트라이트 외각 원뿔 각도 (도). 좁을수록 무대조명처럼 집중됨.")]
+    public float swordLightSpotAngle = 20f;
+    [Tooltip("라이트 세계 좌표 기준 검 루트 위 오프셋 (m)")]
+    public float swordLightYOffset   = 3.5f;
+
+    [Header("Timing")]
+    [Tooltip("타일 링 1층 확장 간격 (초)")]
+    public float tileLayerDelay     = 0.35f;
+    [Tooltip("전체 맵 덮인 후 슬래시 발동까지 대기")]
+    public float slashHitDelay      = 1.2f;
+    [Tooltip("슬래시 후 AttackReady 까지 대기")]
+    public float recoveryTime       = 0.4f;
+    [Tooltip("다른 색 검 파괴 시 타일 확장 가속 배수")]
+    public float wrongSwordSpeedMult = 2.5f;
+
+    [Header("Damage")]
+    public float damageMultiplier    = 1.5f;
+    public float knockbackMultiplier = 1f;
+
+    [Header("Sound")]
+    [Tooltip("Big Slash — 전체 맵 슬래시 발동 시 1회만 재생 (모든 줄이 동시에 떨어져도 중복 재생 금지)")]
+    public AudioClip bigSlashSfx;
+
+    private DKStrikeState _state;
+
+    public override void Initialize(BossPatternContext ctx) => _state = new DKStrikeState(this);
+    public override void OnRecycled()                       => _state = new DKStrikeState(this);
+
+    public override bool CanExecute(BossPatternContext ctx)
+        => ctx.Ctx.Runtime.PlayerTarget != null;
+
+    public override SpecialStateBase GetRuntimeState() => _state;
+}
+
+public class DKStrikeState : FullLockState<DKStrikePatternSO>
+{
+    private const string AnimIdle2 = "Idle2";
+
+    private enum Phase { TileExpansion, SlashAttack, Recovery }
+
+    // ── 페이즈 ────────────────────────────────────────────
+    private Phase _phase;
+    private float _timer;
+
+    // ── 타일 ─────────────────────────────────────────────
+    private List<DKTileInfo> _tiles;
+    private int              _currentRow;
+    private int              _totalRows;
+    private int              _tileZStart;
+    private int              _tileZStep;
+    private float            _tileLayerTimer;
+    private float            _activeTileDelay;
+    private DKSwordColor     _swordColor;
+    private Transform        _anchor;
+
+    // Effect_09_GuardianShield 프리팹 스케일(1,1,1) 기준 구체 방출기 반경
+    private const float ShieldVfxSphereUnit = 15f;
+
+    // ── 이펙트 ────────────────────────────────────────────
+    private GameObject _fireShieldVfx;
+    private GameObject _guardianShieldVfx;
+    private bool       _guardianShieldActive;
+    private Vector3    _guardianShieldPos;
+
+    // ── 부유 검 ───────────────────────────────────────────
+    private readonly List<DKFloatingSword> _swords = new List<DKFloatingSword>();
+    private bool                           _patternEnded;
+    private DeathKnightBossBlackboard      _dkBB;
+
+    // ── 슬래시 ───────────────────────────────────────────
+    private bool                    _damageDone;
+    private CancellationTokenSource _vfxCts;
+
+    public DKStrikeState(DKStrikePatternSO data) : base(data) { }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Enter / Exit
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override void Enter(MonsterContext ctx)
+    {
+        _phase                = Phase.TileExpansion;
+        _timer                = 0f;
+        _tiles                = new List<DKTileInfo>();
+        _currentRow           = 0;
+        _tileLayerTimer       = 0f;
+        _activeTileDelay      = Data.tileLayerDelay;
+        _swordColor           = GetSwordColor(ctx);
+        _fireShieldVfx        = null;
+        _guardianShieldVfx    = null;
+        _guardianShieldActive = false;
+        _guardianShieldPos    = Vector3.zero;
+        _swords.Clear();
+        _patternEnded = false;
+        _damageDone   = false;
+
+        _vfxCts?.Cancel();
+        _vfxCts?.Dispose();
+        _vfxCts = new CancellationTokenSource();
+
+        _dkBB   = (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard;
+        _anchor = (ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor;
+        var anchor = _anchor;
+        if (anchor != null)
+        {
+            // 앵커의 실제 위치(y 포함)를 그대로 사용해 타일이 앵커 바닥 위에 생성되도록 함
+            DKBossRoomContext.SetWorldCenterOverride(anchor.position);
+        }
+
+        _totalRows = DKBossRoomContext.Height - 2;
+        // DK forward 기준으로 타일 채움 방향 결정 (기존과 반대 방향으로 채움)
+        Vector3 fwd = ctx.Transform.forward; fwd.y = 0f;
+        if (fwd.z <= 0f) { _tileZStart = DKBossRoomContext.Height - 2;      _tileZStep = -1; }
+        else              { _tileZStart = 1;                                 _tileZStep = 1;  }
+
+        // 보스는 항상 현재 위치 고정 — 앵커 유무와 무관하게 이동 없이 즉시 TileExpansion 시작
+        StopAgent(ctx);
+        PlayAnim(ctx, AnimIdle2);
+        (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(true);
+        SpawnFireShield(ctx);
+        SpawnFloatingSwords(ctx);
+        _phase          = Phase.TileExpansion;
+        _timer          = 0f;
+        _tileLayerTimer = 0f;
+    }
+
+    public override void Exit(MonsterContext ctx)
+    {
+        _patternEnded = true;
+        _vfxCts?.Cancel();
+        _vfxCts?.Dispose();
+        _vfxCts = null;
+        (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SetInvincible(false);
+        _dkBB?.SetGuardianShield(false);
+        _dkBB = null;
+        if ((ctx.Monster as DeathKnightBossMonster)?.PyramidStrikeAnchor != null)
+            DKBossRoomContext.ClearWorldCenterOverride();
+        CleanupEffects();
+        DKGridPatternHelper.DestroyTiles(_tiles);
+        RestoreAgent(ctx);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Update
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    public override void Update(MonsterContext ctx)
+    {
+        _timer += Time.deltaTime;
+
+        switch (_phase)
+        {
+            case Phase.TileExpansion:  UpdateTileExpansion(ctx);  break;
+            case Phase.SlashAttack:    UpdateSlashAttack(ctx);    break;
+            case Phase.Recovery:       UpdateRecovery(ctx);       break;
+        }
+    }
+
+    // ── Phase: TileExpansion ───────────────────────────────
+
+    private void UpdateTileExpansion(MonsterContext ctx)
+    {
+        _tileLayerTimer += Time.deltaTime;
+
+        if (_currentRow < _totalRows && _tileLayerTimer >= _activeTileDelay)
+        {
+            _tileLayerTimer = 0f;
+            SpawnTileRow(_currentRow);
+            _currentRow++;
+        }
+
+        // 전체 맵 덮임 → 양방향 슬래시 VFX 분산 스폰 후 피격 대기
+        if (_currentRow >= _totalRows)
+        {
+            FireAllRowSlashVfxAsync(_vfxCts.Token).Forget();
+            // Sword Slash 15 이펙트가 스폰되는 시점에 맞춰 재생. 클립 앞 무음 구간은 건너뛰어 0.5초부터 재생
+            Managers.Sound?.PlayEffectAt(Data.bigSlashSfx, DKBossRoomContext.WorldCenter, startTime: 0.5f);
+            _phase = Phase.SlashAttack;
+            _timer = 0f;
+        }
+    }
+
+    // ── Phase: SlashAttack ─────────────────────────────────
+
+    private void UpdateSlashAttack(MonsterContext ctx)
+    {
+        if (!_damageDone && _timer >= Data.slashHitDelay)
+        {
+            _damageDone = true;
+            ApplySlashDamage(ctx);
+            // §3 타격감 — 전멸기급 강공격 (0.2s 히트스톱)
+            BossImpactFeedback.TriggerHitStop(0.2f);
+            BossImpactFeedback.TriggerCameraShake(0.2f, 0.4f);
+            BossImpactFeedback.TriggerScreenFlash(new Color(1f, 0.9f, 0.7f, 0.5f), 0.1f);
+            _phase = Phase.Recovery;
+            _timer = 0f;
+        }
+    }
+
+    // ── Phase: Recovery ────────────────────────────────────
+
+    private void UpdateRecovery(MonsterContext ctx)
+    {
+        if (_timer >= Data.recoveryTime)
+            ctx.Monster.ChangeState<AttackReadyState>();
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 타일 확장
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void SpawnTileRow(int rowIdx)
+    {
+        int z = _tileZStart + _tileZStep * rowIdx;
+        GameObject prefab = _swordColor == DKSwordColor.White
+            ? Data.whiteTilePrefab : Data.blackTilePrefab;
+        if (prefab == null) return;
+
+        for (int x = 1; x <= DKBossRoomContext.Width - 2; x++)
+            SpawnOneTile(x, z, prefab);
+    }
+
+    private void SpawnOneTile(int x, int z, GameObject prefab)
+    {
+        if (!DKBossRoomContext.IsInterior(x, z)) return;
+        Vector3    pos = DKBossRoomContext.CellToWorld(x, z, 0.05f);
+        GameObject go  = BossEffectPool.Spawn(prefab, pos, Quaternion.Euler(-90f, 0f, 0f));
+        if (go == null) return;
+        go.transform.localScale = Vector3.one * DKBossRoomContext.CellSize;
+        _tiles.Add(new DKTileInfo { Cell = new Vector2Int(x, z), Color = _swordColor, GO = go });
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 슬래시 & 피격
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private async UniTaskVoid FireAllRowSlashVfxAsync(CancellationToken ct)
+    {
+        if (Data.impactVfxPrefab == null) return;
+        Color tint = _swordColor == DKSwordColor.White ? Color.white : DKGridPatternHelper.DarkTint;
+        float rowLen = DKGridPatternHelper.RowLineLength();
+        const int perFrame = 5;
+
+        try
+        {
+            for (int z = 1; z <= DKBossRoomContext.Height - 2; z++)
+            {
+                Vector3 pos = DKBossRoomContext.CellToWorld(DKBossRoomContext.Width / 2, z, 0.1f);
+                DKGridPatternHelper.SpawnStretchedVfx(
+                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f,  90f, 0f), rowLen, tint);
+                DKGridPatternHelper.SpawnStretchedVfx(
+                    Data.impactVfxPrefab, pos, Quaternion.Euler(0f, -90f, 0f), rowLen, tint);
+
+                if (z % perFrame == 0)
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void ApplySlashDamage(MonsterContext ctx)
+    {
+        if (ctx?.Runtime?.PlayerTarget == null) return;
+
+        // GuardianShield 안에 있으면 면제 (XZ 평면 거리만 비교)
+        if (_guardianShieldActive)
+        {
+            Vector3 playerXZ = new Vector3(ctx.Runtime.PlayerTarget.position.x, 0f, ctx.Runtime.PlayerTarget.position.z);
+            Vector3 shieldXZ = new Vector3(_guardianShieldPos.x, 0f, _guardianShieldPos.z);
+            if (Vector3.Distance(playerXZ, shieldXZ) <= Data.guardianShieldRadius) return;
+        }
+
+        var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
+        if (player == null) return;
+
+        int dmg = Mathf.Max(1, (int)(ctx.Config.stat.attackPower * Data.damageMultiplier));
+        player.TakeDamage(dmg);
+
+        Vector3 toPlayer = ctx.Runtime.PlayerTarget.position - ctx.Transform.position;
+        toPlayer.y = 0.2f;
+        Vector3 knockDir = toPlayer.sqrMagnitude > 0.001f ? toPlayer.normalized : ctx.Transform.forward;
+        player.ApplyKnockback(knockDir * ctx.Config.stat.knockbackForce * Data.knockbackMultiplier);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // FireShield & 부유검
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void SpawnFireShield(MonsterContext ctx)
+    {
+        if (Data.fireShieldPrefab == null) return;
+        _fireShieldVfx = BossEffectPool.Spawn(
+            Data.fireShieldPrefab, ctx.Transform.position, Quaternion.identity);
+        if (_fireShieldVfx == null) return;
+        _fireShieldVfx.transform.SetParent(ctx.Transform, worldPositionStays: true);
+        // Effect_09 셰이더는 _TintColor(HDR)로 색상 제어 — TintVfx의 _BaseColor/_Color 경로가 무효
+        DKGridPatternHelper.TintShieldVfx(_fireShieldVfx, _swordColor);
+    }
+
+    private void SpawnFloatingSwords(MonsterContext ctx)
+    {
+        if (Data.floatingSwordPrefab == null) return;
+
+        Vector3 dkPos  = ctx.Transform.position;
+        var     dkBoss = ctx.Monster as DeathKnightBossMonster;
+
+        bool leftIsWhite = UnityEngine.Random.value > 0.5f;
+        bool leftIsSame  = leftIsWhite == (_swordColor == DKSwordColor.White);
+
+        // 고정 세계 X축 기준 — 보스 시선 방향에 무관하게 항상 동일한 좌우 2지점에 소환
+        SpawnOneSword(
+            dkPos - Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos.y, dkBoss,
+            leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
+            leftIsSame);
+
+        SpawnOneSword(
+            dkPos + Vector3.right * Data.swordSideOffset + Vector3.up * Data.swordHeight,
+            dkPos.y, dkBoss,
+            !leftIsWhite ? DKSwordColor.White : DKSwordColor.Black,
+            !leftIsSame);
+    }
+
+    private void SpawnOneSword(Vector3 position, float groundY, DeathKnightBossMonster dkBoss,
+                                DKSwordColor color, bool isSameColorAsDK)
+    {
+        // 칼끝이 바닥을 향하도록 X축 180° 회전
+        var go = BossEffectPool.Spawn(
+            Data.floatingSwordPrefab, position, Quaternion.Euler(180f, 0f, 0f));
+        if (go == null) return;
+        go.transform.localScale = Vector3.one * Data.swordScale;
+
+        // 풀에서 재사용 시 남아 있는 오라 자식 오브젝트 해제
+        for (int i = go.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = go.transform.GetChild(i);
+            if (child.name == "SwordSpotLight") continue;
+            child.SetParent(null, false);
+            BossEffectPool.Release(child.gameObject);
+        }
+
+        // 색상 머티리얼 적용
+        var rend = go.GetComponentInChildren<Renderer>();
+        if (rend != null)
+        {
+            Material mat = color == DKSwordColor.White
+                ? Data.whiteSwordMaterial : Data.blackSwordMaterial;
+            if (mat != null) rend.material = mat;
+        }
+
+        // 루트에 CapsuleCollider(Y축) 항상 확보 (위아래 피격 범위 보장)
+        var col = go.GetComponent<CapsuleCollider>();
+        if (col == null) col = go.AddComponent<CapsuleCollider>();
+        col.direction = 1; // Y축
+        col.radius    = Data.swordColliderRadius;
+        col.height    = Data.swordColliderHeight;
+
+        // Kinematic Rigidbody: OnTriggerEnter는 두 객체 중 하나에 Rigidbody가 있어야 발동
+        // 보스는 MonsterBase → Rigidbody 있음. 검은 없으므로 직접 추가.
+        var rb = go.GetComponent<Rigidbody>();
+        if (rb == null) rb = go.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity  = false;
+
+        // 스포트라이트 — 무대 조명처럼 검 아래를 집중 조명
+        if (Data.swordLightRange > 0f)
+        {
+            Transform existingLight = go.transform.Find("SwordSpotLight");
+            Light lt;
+            if (existingLight == null)
+            {
+                var lightGo = new GameObject("SwordSpotLight");
+                lightGo.transform.SetParent(go.transform, false);
+                lightGo.transform.localPosition = Vector3.up * (Data.swordLightYOffset / Data.swordScale);
+                lightGo.transform.rotation = Quaternion.LookRotation(Vector3.down);
+                lt              = lightGo.AddComponent<Light>();
+                lt.type         = LightType.Spot;
+                lt.spotAngle    = Data.swordLightSpotAngle;
+                lt.innerSpotAngle = Data.swordLightSpotAngle * 0.4f;
+                lt.range        = Data.swordLightRange;
+                lt.intensity    = Data.swordLightIntensity;
+            }
+            else
+            {
+                lt = existingLight.GetComponent<Light>();
+            }
+            if (lt != null)
+                lt.color = color == DKSwordColor.White
+                    ? new Color(0.92f, 0.96f, 1f)
+                    : new Color(0.65f, 0.35f, 1f);
+        }
+
+        // DKFloatingSword 컴포넌트
+        var sword = go.GetComponent<DKFloatingSword>();
+        if (sword == null) sword = go.AddComponent<DKFloatingSword>();
+
+        sword.Initialize(
+            isSameColorAsDK,
+            Data.swordHp,
+            Data.swordBobAmplitude,
+            Data.swordBobSpeed,
+            OnSwordDestroyed);
+
+        SpawnSwordAura(position, groundY, dkBoss, color, go.transform);
+
+        // Monster 레이어 부여 — URP 외곽선 Render Objects가 검도 동일한 파란 테두리로 표시
+        int monsterLayer = LayerMask.NameToLayer("Monster");
+        if (monsterLayer >= 0)
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                r.gameObject.layer = monsterLayer;
+
+        _swords.Add(sword);
+    }
+
+    /// <summary>검 바로 아래 바닥에 보스와 동일한 색상의 오라를 띄운다 (검과 함께 반환됨).</summary>
+    private static void SpawnSwordAura(Vector3 swordPos, float groundY, DeathKnightBossMonster dkBoss,
+                                        DKSwordColor color, Transform parent)
+    {
+        if (dkBoss == null) return;
+        GameObject auraPrefab = color == DKSwordColor.White ? dkBoss.WhiteAuraPrefab : dkBoss.BlackAuraPrefab;
+        if (auraPrefab == null) return;
+
+        Vector3 groundPos = new Vector3(swordPos.x, groundY, swordPos.z);
+        var     auraGo    = BossEffectPool.Spawn(auraPrefab, groundPos, Quaternion.identity, parent);
+
+        // 보스용으로 꺼둔 바닥 마법진 이펙트는 검 아래에서는 그대로 보여줘도 된다.
+        foreach (Transform child in auraGo.transform)
+            if (child.name == "Glow" || child.name == "Aura_Effect")
+                child.gameObject.SetActive(true);
+    }
+
+    private void OnSwordDestroyed(bool isSameColorAsDK, Vector3 position)
+    {
+        if (_patternEnded) return;
+
+        if (isSameColorAsDK)
+        {
+            // 같은 색 검 파괴 → GuardianShield를 PyramidStrikeAnchor 위치에 생성
+            Vector3 groundPos = _anchor != null
+                ? new Vector3(_anchor.position.x, DKBossRoomContext.WorldCenter.y, _anchor.position.z)
+                : DKBossRoomContext.WorldCenter;
+            _guardianShieldActive = true;
+            _guardianShieldPos    = groundPos;
+            _dkBB?.SetGuardianShield(true, groundPos, Data.guardianShieldRadius);
+
+            if (Data.guardianShieldPrefab != null)
+            {
+                _guardianShieldVfx = BossEffectPool.Spawn(
+                    Data.guardianShieldPrefab, groundPos, Quaternion.identity);
+                if (_guardianShieldVfx != null)
+                {
+                    _guardianShieldVfx.transform.localScale =
+                        Vector3.one * (Data.guardianShieldRadius / ShieldVfxSphereUnit);
+                    ApplyGuardianShieldTint(_guardianShieldVfx, _swordColor);
+                }
+            }
+        }
+
+        // 아무 색이든 검 파괴 시 타일 확장 가속
+        _activeTileDelay = Mathf.Max(0.05f, _activeTileDelay / Data.wrongSwordSpeedMult);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 정리
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private void CleanupEffects()
+    {
+        if (_fireShieldVfx != null)
+        {
+            _fireShieldVfx.transform.SetParent(null);
+            BossEffectPool.Release(_fireShieldVfx);
+            _fireShieldVfx = null;
+        }
+
+        if (_guardianShieldVfx != null)
+        {
+            BossEffectPool.Release(_guardianShieldVfx);
+            _guardianShieldVfx = null;
+        }
+
+        foreach (var sword in _swords)
+        {
+            if (sword != null && sword.gameObject != null)
+                BossEffectPool.Release(sword.gameObject);
+        }
+        _swords.Clear();
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 헬퍼
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private static void StopAgent(MonsterContext ctx)
+    {
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped = true;
+            ctx.Agent.velocity  = Vector3.zero;
+            ctx.Agent.ResetPath();
+        }
+    }
+
+    private static void RestoreAgent(MonsterContext ctx)
+    {
+        if (ctx.Agent != null && ctx.Agent.isOnNavMesh)
+        {
+            ctx.Agent.isStopped        = false;
+            ctx.Agent.stoppingDistance = 1.0f;
+        }
+    }
+
+    private static void PlayAnim(MonsterContext ctx, string stateName)
+    {
+        if (ctx.Animator == null) return;
+        if (!ctx.Animator.HasState(0, Animator.StringToHash(stateName))) return;
+        ctx.Animator.speed = (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.AnimSpeedMult ?? 1f;
+        ctx.Animator.CrossFade(stateName, 0.15f);
+    }
+
+    private static DKSwordColor GetSwordColor(MonsterContext ctx)
+        => (ctx.Monster as DeathKnightBossMonster)?.DKBlackboard.SwordColor ?? DKSwordColor.White;
+
+    // Effect_09 셰이더는 _TintColor(HDR)로 색상 제어 — TintVfx의 _BaseColor/_Color 경로가 무효
+    private static void ApplyGuardianShieldTint(GameObject go, DKSwordColor swordColor)
+    {
+        // White: 밝은 은백색 HDR / Black: 어두운 남보라 HDR (additive에서 가시적)
+        Color tint = swordColor == DKSwordColor.White
+            ? new Color(5f, 5.5f, 6f, 1f)
+            : new Color(0.8f, 0.4f, 3f, 1f);
+
+        foreach (var rend in go.GetComponentsInChildren<Renderer>(true))
+            foreach (var mat in rend.materials)
+                if (mat.HasProperty("_TintColor"))
+                    mat.SetColor("_TintColor", tint);
+
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(Color.white);
+        }
+    }
+}
+}

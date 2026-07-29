@@ -1,0 +1,164 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92fad7c4a24a8a14ebc172f2aaa6a914, type: 3}
+  m_Name: DragonBossConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.BossConfigSO
+  monsterName: DragonBoss
+  grade: 3
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  stat:
+    maxHp: 15000
+    defense: 20
+    attackPower: 200
+    moveSpeed: 7
+    nativeElement: -1
+    attackRange: 4
+    attackRadius: 3
+    attackRate: 1
+    attackDelay: 0.8
+    knockbackForce: 20
+    attackShape: {fileID: 0}
+    hitVfxPrefab: {fileID: 0}
+    hitVfxScale: 1
+    hitVfxOffset: {x: 0, y: 0, z: 0}
+  detection:
+    detectionRange: 20
+    chaseGiveUpRange: 30
+  patrol:
+    patrolType: 0
+    patrolRange: 5
+    patrolSpeed: 2
+    waypointWaitTime: 0.5
+  combat:
+    damageApplyDelay: 0.4
+    maxHitsPerAttack: 0
+    targetLayer:
+      serializedVersion: 2
+      m_Bits: 0
+  animation:
+    animatorControllerAddress: 
+    idleStateName: Idle
+    patrolStateName: Idle
+    chaseStateName: WalkChase
+    attackReadyStateName: AttackReady
+    attackStateName: AttackReady
+    getHitStateName: GetHit
+    dieStateName: Die
+    attackTrigger: 
+    getHitTrigger: 
+    dieTrigger: 
+    detectTrigger: 
+    speedParam: 
+    speedDampTime: 0.1
+    crossFadeDuration: 0.15
+  elemental:
+    maxAccumulationScale: 1
+    lightning:
+      resistance: 1
+      overrideState: {fileID: 0}
+    water:
+      resistance: 1
+      overrideState: {fileID: 0}
+    fire:
+      resistance: 1
+      overrideState: {fileID: 0}
+    grass:
+      resistance: 1
+      overrideState: {fileID: 0}
+    earth:
+      resistance: 1
+      overrideState: {fileID: 0}
+  drop:
+    coinMin: 5
+    coinMax: 8
+    coinValue: 1
+  specialStates: []
+  stateOverrides: []
+  patternBreakDurationMin: 0.7
+  patternBreakDurationMax: 1
+  patternRepeatPenaltyDuration: 20
+  patternRepeatPenaltyMult: 0.1
+  condPhase2HpThreshold: 0.5
+  condDistClose: 5
+  condDistFar: 8
+  condTimePressureSecs: 8
+  patternEntries:
+  - conditions: 06000000
+    patterns:
+    - {fileID: 11400000, guid: 837b1b81e711cce44836ceaa00fd1fbd, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 07000000
+    patterns:
+    - {fileID: 11400000, guid: dada1ec1eb0cbd540bb5895c1238115b, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 08000000
+    patterns:
+    - {fileID: 11400000, guid: 33159e261434dad4898bcc7e1078f1d9, type: 2}
+    selectionMode: 0
+    forceExecute: 1
+  - conditions: 0f00000009000000
+    patterns:
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
+    - {fileID: 11400000, guid: 18e5301f1cf53974280d1b3f1f18bd35, type: 2}
+    - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
+    - {fileID: 11400000, guid: ceeafc3c15fb0a74ea297c4a28a371ed, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 1000000009000000
+    patterns:
+    - {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605, type: 2}
+    - {fileID: 11400000, guid: 0cbb765717811dd42890d111d477baf9, type: 2}
+    - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
+    - {fileID: 11400000, guid: 74a5f92f0d2c74d4b9f70c3eb439968d, type: 2}
+    - {fileID: 11400000, guid: 43ab687a0aeda1041aa1299750583028, type: 2}
+    - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 0f0000000a000000
+    patterns:
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
+    - {fileID: 11400000, guid: f3bb9b012aab7ff4385a5b1163c66220, type: 2}
+    - {fileID: 11400000, guid: ceeafc3c15fb0a74ea297c4a28a371ed, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 100000000a000000
+    patterns:
+    - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
+    - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: 492216fbc76924b4981b1bb524cb1401, type: 2}
+    - {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605, type: 2}
+    - {fileID: 11400000, guid: 0cbb765717811dd42890d111d477baf9, type: 2}
+    - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 0f0000000b000000
+    patterns:
+    - {fileID: 11400000, guid: d6ad2cdb070cf7746b9e482391a44610, type: 2}
+    - {fileID: 11400000, guid: 23094d91072ce764598c863739042d99, type: 2}
+    - {fileID: 11400000, guid: ceeafc3c15fb0a74ea297c4a28a371ed, type: 2}
+    selectionMode: 0
+    forceExecute: 0
+  - conditions: 100000000b000000
+    patterns:
+    - {fileID: 11400000, guid: 4e1d020cf84b49849ed4042ac0fbd229, type: 2}
+    - {fileID: 11400000, guid: b6697dc0d78e4532b3078c733584c916, type: 2}
+    - {fileID: 11400000, guid: b2b426fa510a49d4d8cd658230b19d68, type: 2}
+    - {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605, type: 2}
+    - {fileID: 11400000, guid: 0cbb765717811dd42890d111d477baf9, type: 2}
+    - {fileID: 11400000, guid: c94a7c14f97ed6a42aac9c357b1691e7, type: 2}
+    selectionMode: 0
+    forceExecute: 0

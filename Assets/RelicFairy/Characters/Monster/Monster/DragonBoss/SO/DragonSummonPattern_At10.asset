@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d34da58c66dd9cc4c8feddd6543025b9, type: 3}
+  m_Name: DragonSummonPattern_At10
+  m_EditorClassIdentifier: Assembly-CSharp::Abyss.Monster.DragonSummonPatternSO
+  _vfxPrefab: {fileID: 0}
+  _vfxScale: 1
+  _vfxOffset: {x: 0, y: 0, z: 0}
+  _vfxFollowTransform: 0
+  weight: 1
+  effectPrefab: {fileID: 0}
+  playerStatusEffect: {fileID: 0}
+  patternTag: 
+  breakOverride: -1
+  _summonPhase: 2
+  _hoverHeight: 8
+  _takeoffStateName: Takeoff
+  _landingStateName: Landing
+  _eggPrefab: {fileID: 1345337343759970, guid: 728cc3e54a654af46bffeb08c0bf897c, type: 3}
+  _triangleRadius: 4
+  _eggDropHeight: 8
+  _eggDropDuration: 1.5
+  _eggCrackDelay: 0.8
+  _miniDragonPrefab: {fileID: 3246159262785727669, guid: 714f07f145d35924fb9671342321d622,
+    type: 3}
+  _miniScale: 0.35
+  _miniHp: 150
+  _miniSpeed: 4.5
+  _miniBreathRange: 8
+  _miniBreathCooldown: 6
+  _miniBreathDamage: 15
+  _miniBreathSpeed: 6
+  _iceBreathPrefab: {fileID: 1427661989262336, guid: 1d47296c0c34abd4c9bf1e6335b22dcc,
+    type: 3}
+  _thunderBreathPrefab: {fileID: 1012013889074000, guid: 39893baea49e18a4187b715724396e90,
+    type: 3}
+  _fireBreathPrefab: {fileID: 1294834399362254, guid: 08d41074362b67e42b2ee0503764bf0b,
+    type: 3}
+  _iceColor: {r: 0.5, g: 0.85, b: 1, a: 1}
+  _thunderColor: {r: 0.65, g: 0.3, b: 1, a: 1}
+  _fireColor: {r: 1, g: 0.35, b: 0.1, a: 1}
+  _iceStatusEffect: {fileID: 11400000, guid: 52f77d88dce185549a5371d61b74a341, type: 2}
+  _thunderStatusEffect: {fileID: 11400000, guid: 13fc451eb7c351a498e908777b2ba39d,
+    type: 2}
+  _fireStatusEffect: {fileID: 0}
+  _miniBreathWarningPrefab: {fileID: 1173698457435006, guid: cbe5151d1ac46c44dadb19833a241e92,
+    type: 3}
+  _miniBreathWarningScale: 1.5
+  _landingFollowUpPattern: {fileID: 0}
+  _breathSweepPattern: {fileID: 11400000, guid: 0cbb765717811dd42890d111d477baf9,
+    type: 2}
+  _fireballRainPattern: {fileID: 11400000, guid: 55f468e93ea187f47a26b6c7d97ff605,
+    type: 2}
+  _airPatternInterval: 8

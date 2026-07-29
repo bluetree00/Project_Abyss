@@ -1,0 +1,80 @@
+using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+
+/// <summary>
+/// 콜라이더 진입 시 DialogueSequenceSO를 재생하는 구간별 대사 트리거.
+/// BoxCollider(isTrigger=true)와 함께 배치. triggerOnce=true(기본)면 1회만 발동.
+/// </summary>
+[RequireComponent(typeof(Collider))]
+public sealed class DialogueZoneTrigger : MonoBehaviour
+{
+    [Header("대사")]
+    [Tooltip("설정 시 DIALOGUE_DATA.csv의 이 시퀀스를 우선 재생(구간별 시나리오 대사). 비어 있으면 아래 SO 사용.")]
+    [SerializeField] private string csvSequenceId;
+    [SerializeField] private DialogueSequenceSO dialogue;
+    [SerializeField] private bool blockPlayerInput = true;
+    [SerializeField] private bool triggerOnce = true;
+
+    private bool _triggered;
+
+    private void Reset()
+    {
+        if (TryGetComponent<Collider>(out var col))
+            col.isTrigger = true;
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (_triggered && triggerOnce) return;
+        if (!other.TryGetComponent<PlayerController>(out var player))
+            player = other.GetComponentInParent<PlayerController>();
+        if (player == null) return;
+
+        if (triggerOnce) _triggered = true;
+        ShowDialogueAsync(player, this.GetCancellationTokenOnDestroy()).Forget();
+    }
+
+    private async UniTaskVoid ShowDialogueAsync(PlayerController player, CancellationToken ct)
+    {
+        try
+        {
+            // UI 채널로 막는다. 컷신 채널(SetInputEnabled)을 쓰면 대사가 끝나는 순간
+            // 컷신이 걸어둔 차단까지 풀려 연출 중에 이동·공격이 가능해진다.
+            if (blockPlayerInput) player.SetUiBlocked(true);
+
+            // CSV(DIALOGUE_DATA) 우선 — 구간별 시나리오 대사. 미설정 시 SO 폴백.
+            DialogueLine[] csvLines = null;
+            if (!string.IsNullOrEmpty(csvSequenceId))
+            {
+                var dlg = Managers.DialogueData;
+                if (dlg != null)
+                {
+                    if (!dlg.IsInitialized) await dlg.InitializeAsync();
+                    csvLines = dlg.GetLines(csvSequenceId);
+                }
+            }
+
+            var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
+            if (popup != null)
+            {
+                if (csvLines != null && csvLines.Length > 0) await popup.ShowAsync(csvLines);
+                else if (dialogue != null)                   await popup.ShowAsync(dialogue);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (blockPlayerInput && player != null)
+                player.SetUiBlocked(false);   // 자기 사유만 해제 — 컷신 차단은 그대로 둔다
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!TryGetComponent<Collider>(out var col)) return;
+        Gizmos.color = new Color(0.2f, 0.8f, 0.2f, 0.3f);
+        Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
+    }
+}
