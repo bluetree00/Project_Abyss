@@ -20,6 +20,13 @@ public class RunFlowController : MonoBehaviour
     private string _structureConfigKey = "RUN_STRUCTURE_DEFAULT";
     // 해석된 런 구조(IRunStructure): CSV(RUN_STRUCTURE) 정본 → SO 폴백. 인터페이스라 [SerializeField] 불가하여 별도 보유.
     private IRunStructure _resolvedStructure;
+    // 테스트 전용 보스 임계값 오버라이드. RunFlowController는 씬에 배치되지 않고 런타임 AddComponent로만
+    // 생성되므로 인스펙터로 못 만진다 → GameRunBootstrapper가 자기 직렬화 값을 여기에 주입한다.
+    private int _bossThresholdOverride;
+
+    /// <summary>0이면 무시(정상 진행). 1 이상이면 그 방 수만큼 지난 뒤 보스 전방이 나온다 — 테스트용.</summary>
+    public void SetBossThresholdOverride(int value) => _bossThresholdOverride = Mathf.Max(0, value);
+
     [SerializeField] private string _poolKey = "CHAPTER_1_ROOM_POOL";
     [SerializeField, Tooltip("시작 방 pool_key. 비우면 첫 Normal 방 사용.")]
     private string _startPoolKey;
@@ -117,7 +124,7 @@ public class RunFlowController : MonoBehaviour
         int seed    = _seed != 0 ? _seed : Environment.TickCount;
         _masterSeed = seed;
         _rng        = new System.Random(seed);
-        _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed);
+        _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
         _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
         DumpRunPlan(seed);
 
@@ -165,7 +172,7 @@ public class RunFlowController : MonoBehaviour
         await EnsureStructureConfigAsync();
 
         _rng       = new System.Random(_masterSeed);
-        _sequencer = new RunSequencer(_pool, _resolvedStructure, _masterSeed);
+        _sequencer = new RunSequencer(_pool, _resolvedStructure, _masterSeed, _bossThresholdOverride);
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns);
         _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
         DumpRunPlan(_masterSeed);
@@ -217,7 +224,7 @@ public class RunFlowController : MonoBehaviour
         int chapterNum = (int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? 0);
         int seed       = RunSequencer.Combine(_masterSeed, 7000 + chapterNum); // 챕터별 결정적 시드
         _rng           = new System.Random(seed);
-        _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed);
+        _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
         _runPlan       = _sequencer.BuildPlan();
         DumpRunPlan(seed);
 
@@ -276,7 +283,11 @@ public class RunFlowController : MonoBehaviour
             LogResolvedStructure($"Addressable-SO({key})", chapter);
     }
 
-    // [검증용 임시] 해석된 런 구조의 실제 수치를 한 줄로 출력 — CSV/SO 어느 소스가 들어갔는지 확인. 검증 끝나면 제거.
+    // 해석된 런 구조의 실제 수치를 한 줄로 출력 — CSV/SO 어느 소스가 들어갔는지 확인용.
+    // RUN_STRUCTURE CDN 업로드 여부에 따라 소스가 갈리므로 진단 가치가 남아 있어 유지한다.
+    // 릴리즈 빌드에서는 Conditional이 호출문과 본문(StringBuilder 조립 포함)을 전부 제거한다.
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
     private void LogResolvedStructure(string source, ChapterId chapter)
     {
         var s = _resolvedStructure;
@@ -287,7 +298,7 @@ public class RunFlowController : MonoBehaviour
             var k = s.GetMilestoneKind(v);
             if (k.HasValue) ms.Append($"{v}:{k.Value} ");
         }
-        Debug.Log($"[RunStructure검증] {chapter} 소스={source} boss@{s.BossThreshold} " +
+        RFLog.D($"[RunStructure검증] {chapter} 소스={source} boss@{s.BossThreshold} " +
                   $"shop{s.ShopChance:0.##}/{s.ShopMaxPerChapter} event{s.EventChance:0.##}/{s.EventMaxPerChapter} elite{s.EliteChance:0.##} " +
                   $"diff[0→{s.DifficultyAt(0):0.##} / {s.BossThreshold}→{s.DifficultyAt(s.BossThreshold):0.##}] ms{{{ms.ToString().Trim()}}}");
     }
@@ -338,7 +349,11 @@ public class RunFlowController : MonoBehaviour
         bool mirror = mirrorRoll == 1;
         // 방 빌드 RNG — 같은 (마스터 시드, visitCount)면 스포너 플랜까지 동일(이어하기 시 방 완전 재현)
         var roomRng = new System.Random(RunSequencer.Combine(_masterSeed, _sequencer.VisitCount));
-        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct, roomRng); // 블록 숨김 상태로 빌드(디졸브는 여기서)
+        // 외형 RNG — 블록 배리언트·장식 회전용. roomRng와 스트림을 분리한 이유:
+        // roomRng는 스포너 플랜 다음에 상점/재련소 구성 롤에도 쓰인다. 외형 뽑기를 같은 스트림에서
+        // 소비하면 그 뒤 롤이 전부 밀려 기존 세이브의 상점 구성이 달라진다. 별도 시드로 격리한다.
+        var visualRng = new System.Random(RunSequencer.Combine(_masterSeed ^ 0x5EED, _sequencer.VisitCount));
+        var result  = await grb.BuildProcRoomAsync(plan.entry, roomAnchor, mirror, _heading, ct, roomRng, visualRng); // 블록 숨김 상태로 빌드(디졸브는 여기서)
         if (result == null)
         {
             await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);

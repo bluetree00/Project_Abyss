@@ -78,7 +78,9 @@ public class BlockPalette : ScriptableObject
     }
 
     /// <summary>TileType에 맞는 BlockDef를 가중치 랜덤으로 선택.</summary>
-    public BlockDef Pick(TileType type)
+    /// <param name="rng">시드 RNG. 넘기면 선택이 결정적이 되어 같은 시드로 같은 방을 재현할 수 있다
+    /// (이어하기). null이면 Unity 전역 Random — 재현이 필요 없는 경로(레거시 존 빌드·에디터 툴)용.</param>
+    public BlockDef Pick(TileType type, System.Random rng = null)
     {
         BuildCacheIfNeeded();
 
@@ -92,7 +94,7 @@ public class BlockPalette : ScriptableObject
         int total = 0;
         foreach (var b in list) total += b.weight;
 
-        int roll = Random.Range(0, total);
+        int roll = rng != null ? rng.Next(0, total) : Random.Range(0, total);
         int acc = 0;
         foreach (var b in list)
         {
