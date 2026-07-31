@@ -66,6 +66,7 @@ public class RunSequencer
     private readonly List<ZonePoolEntry>     _pool;
     private readonly IRunStructure           _config;
     private readonly int                     _seed;
+    private readonly int                     _bossThresholdOverride; // >0이면 테스트용으로 config 값을 대체
     private readonly Dictionary<string, int> _cooldowns = new();
 
     private Phase _phase = Phase.Normal;
@@ -90,12 +91,20 @@ public class RunSequencer
     /// <summary>방별 자식 시드. 같은 (마스터 시드, visitCount) → 동일 롤 → 이어하기 재현.</summary>
     public static int Combine(int seed, int visitCount) => unchecked((seed * 397) ^ visitCount);
 
-    public RunSequencer(IEnumerable<ZonePoolEntry> pool, IRunStructure config, int seed)
+    /// <param name="bossThresholdOverride">0이면 무시(정상). 1 이상이면 config의 BossThreshold 대신 이 값으로
+    /// 보스 어프로치를 게이팅한다 — 보스 전방/보스방을 빨리 보기 위한 <b>테스트 전용</b> 값이다.</param>
+    public RunSequencer(IEnumerable<ZonePoolEntry> pool, IRunStructure config, int seed,
+                        int bossThresholdOverride = 0)
     {
         _pool   = pool != null ? new List<ZonePoolEntry>(pool) : new List<ZonePoolEntry>();
         _config = config;
         _seed   = seed;
+        _bossThresholdOverride = bossThresholdOverride;
     }
+
+    /// <summary>실효 보스 임계값. 테스트 오버라이드가 있으면 그것을, 없으면 런 구조(CSV/SO) 값을 쓴다.</summary>
+    private int EffectiveBossThreshold
+        => _bossThresholdOverride > 0 ? _bossThresholdOverride : (_config?.BossThreshold ?? int.MaxValue);
 
     /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.</summary>
     public void RestoreState(int visitCount, int phase, int shopUsed, int eventUsed,
@@ -148,7 +157,7 @@ public class RunSequencer
             return result;
         }
         if (_phase == Phase.PreBoss
-            || (_phase == Phase.Normal && _config != null && _visitCount >= _config.BossThreshold))
+            || (_phase == Phase.Normal && _config != null && _visitCount >= EffectiveBossThreshold))
         {
             _phase = Phase.PreBoss;
             result.Add(new DoorPlan { kind = RoomPlanKind.PreBoss, entry = BossEntry(_config?.PreBossRoomKey, RoomPlanKind.PreBoss) });

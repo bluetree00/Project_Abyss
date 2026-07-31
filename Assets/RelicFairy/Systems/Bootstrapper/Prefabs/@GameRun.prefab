@@ -950,6 +950,7 @@ MonoBehaviour:
   playerPrefabKey: 
   startBodyKey: PlayerCharacter
   debugDefaultWeaponKey: T3_Katana
+  debugDefaultWeaponSlot1Key: 
   debugDefaultRelic: {fileID: 11400000, guid: 0296196c76b8a14448eba2486d733d86, type: 2}
   directCombatMapPrefabKey: 
   playerSpawnPoint: {fileID: 7189097491912087768}
@@ -961,6 +962,7 @@ MonoBehaviour:
   startRoomMapKey: 
   startWithZoneLayout: 1
   runFlowController: {fileID: 0}
+  debugBossThresholdOverride: 0
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs:
   - {fileID: 1566606819545522146, guid: 68ccc7cc0f9498246b459a83571e3c1b, type: 3}
@@ -995,6 +997,8 @@ MonoBehaviour:
   shopPriceTable: {fileID: 11400000, guid: 2949d10f21086224384d054a24e55ace, type: 2}
   luckRollTable: {fileID: 11400000, guid: 4d1eb6308887f1c4faa5035e4e3cb010, type: 2}
   shopNpcAddressableKey: Shop/ShopNpc
+  crucibleNpcAddressableKey: Crucible/CrucibleNpc
+  refineryNpcAddressableKey: Refinery/RefineryNpc
   crucibleDecorPrefabs:
   - {fileID: 1031028762, guid: abc00000000008081074528185519464, type: 3}
   - {fileID: 1031121775, guid: abc00000000016458457109440764598, type: 3}
@@ -1376,6 +1380,9 @@ MonoBehaviour:
   dkPlayerOrbitTop: {x: 5, y: 2}
   dkPlayerOrbitMiddle: {x: 5, y: 2}
   dkPlayerOrbitBottom: {x: 5, y: 4.7}
+  processionalOrbitTop: {x: 5, y: 12}
+  processionalOrbitMiddle: {x: 2.5, y: 13}
+  processionalOrbitBottom: {x: 0.8, y: 12}
   topDownHeight: 35
   topDownAscendDuration: 1.2
 --- !u!114 &2049533231868588447
