@@ -42,6 +42,10 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     [Tooltip("절차 진행 컨트롤러. 비우면 런타임에 AddComponent로 생성(RunFlowController 기본 풀 키 사용).")]
     [SerializeField] private RunFlowController runFlowController;
 
+    [SerializeField, Tooltip("[테스트 전용] 0이면 정상(런 구조의 boss_threshold 사용). 1 이상이면 그 방 수만큼 지난 뒤 " +
+        "보스 전방 통로가 나온다. 예: 1 = 첫 방 클리어 직후 보스 전방. 출시 전 반드시 0으로 되돌릴 것.")]
+    private int debugBossThresholdOverride = 0;
+
     [Tooltip("스타트 방 진입 시 재생할 대화 시퀀스 SO. 서버 CSV에 'StartRoom' 시퀀스가 없을 때 폴백으로 사용.")]
     [SerializeField] private DialogueSequenceSO startRoomDialogueSO;
 
@@ -933,6 +937,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     public async UniTask StartProcGenRunAsync()
     {
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+        flow.SetBossThresholdOverride(debugBossThresholdOverride);
 
         // 현재 챕터의 룸 풀 키 결정: 서버 → SO → 규칙(CHAPTER_N_ROOM_POOL) 폴백
         // StartRoom 이탈 흐름은 StartNewRunAsync를 거치지 않아 세션 챕터가 미설정(0)일 수 있으므로 씬에서 유추.
@@ -3095,6 +3100,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         // 절차 흐름 재개 — 저장된 방을 동일 시드로 재생성, 입구에서 시작
         var flow = runFlowController != null ? runFlowController : gameObject.AddComponent<RunFlowController>();
+        flow.SetBossThresholdOverride(debugBossThresholdOverride);
         var meta = BuildMetaFromSave(save);
         var structureKey = ResolveStructureKey(chapter, serverEntry, chapterSO);
         await flow.ResumeAsync(meta, new Vector3(0f, 0f, 2000f), poolKey, ct, structureKey);
