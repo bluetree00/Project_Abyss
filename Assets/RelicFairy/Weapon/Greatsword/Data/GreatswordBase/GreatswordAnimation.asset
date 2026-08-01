@@ -40,6 +40,7 @@ MonoBehaviour:
       comboWindowOpen: 0.25
       comboWindowClose: 0.35
       attackEndAt: 0.35
+      recoveryEndAt: 0.8
       attackStepDistance: 0.4
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.3
@@ -57,6 +58,7 @@ MonoBehaviour:
       comboWindowOpen: 0.25
       comboWindowClose: 0.35
       attackEndAt: 0.35
+      recoveryEndAt: 0.8
       attackStepDistance: 0.4
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.3
@@ -74,6 +76,7 @@ MonoBehaviour:
       comboWindowOpen: 0.25
       comboWindowClose: 0.35
       attackEndAt: 0.35
+      recoveryEndAt: 0.8
       attackStepDistance: 0.6
       attackStepStartNorm: 0.05
       attackStepEndNorm: 0.30
