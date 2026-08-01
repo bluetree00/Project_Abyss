@@ -15,6 +15,7 @@ public class LocoMoveState : ILayerState<LocoState>
 
     private float _runCharge01; // 걷기→달리기 램프 진행도(0→1), 이동 지속 시 차오름
     private bool _forceRun;     // 대시(우클릭) 직후 — 즉시 풀 달리기 유지
+    private float _animFloor;   // 이동 입력 유지 중 블렌드 하한(도달한 최고 속도비, 의도 속도로 상한)
 
     public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
     {
@@ -30,6 +31,7 @@ public class LocoMoveState : ILayerState<LocoState>
             _controller.Anim.CrossFadeInFixedTime("MoveBlend", _controller.ConsumeLocoBlend(0.14f));
 
         _runCharge01 = 0f;
+        _animFloor = 0f;
         // 대시 직후 진입이면 바로 풀 달리기로 시작.
         _forceRun = _controller.ConsumeRunAfterDash();
         if (_forceRun) _runCharge01 = 1f;
@@ -69,8 +71,17 @@ public class LocoMoveState : ILayerState<LocoState>
         // 실제 이동 처리 (Move가 RunBlend01로 속도 보간)
         _controller.MoveAbility?.Move(_controller, dir);
 
-        // 블렌드 파라미터 — 실제 수평 속도비율로 구동(가속 램프·runCharge·정지감속이 애니에 자동 반영, 발미끄러짐 해소).
-        float animSpeed = moving ? _controller.HorizontalSpeed01 : 0f;
+        // 블렌드 파라미터 — 실속도 기반이되, 이동 입력이 유지되는 동안은 '이미 도달한 속도비'를 하한으로 깐다.
+        // 실속도만 쓰면 달리는 중에 하위 상태로 튄다: MoveTowards가 속도벡터 공간을 직선으로 가로지르므로
+        // 90° 선회만으로 크기가 1/√2(0.707)로, 180° 반전이면 0까지 떨어지고, groundDrag(4)로 인한
+        // 프레임 리플까지 겹쳐 Walk/Idle 구간을 찍는다. 하한은 의도 속도(IntendedSpeed01)를 넘지 않으므로
+        // 출발 시 Idle→Walk→Run 램프는 그대로 살아있고, 이동 감속 버프에서도 발이 미끄러지지 않는다.
+        // 올라갈 땐 실속도를 따라가고 내려올 땐 붙잡는 비대칭 = run↔walk 경계 히스테리시스.
+        float actual01 = _controller.HorizontalSpeed01;
+        _animFloor = moving
+            ? Mathf.Min(Mathf.Max(_animFloor, actual01), _controller.IntendedSpeed01)
+            : 0f;
+        float animSpeed = moving ? Mathf.Max(actual01, _animFloor) : 0f;
         SetSpeedParam(_controller.Anim, animSpeed);
 
         // Air 전이 — 스텝 오르는 중엔 잠깐 공중 판정이 떠도 낙하 상태로 빠지지 않음.

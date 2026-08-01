@@ -442,6 +442,9 @@ public class PlayerController : CharacterBase
             return Mathf.Clamp01(mag / runMax);
         }
     }
+    /// <summary>이동 능력이 이번 프레임 겨냥한 목표 속도를 runMax 기준 0~1로 정규화(급반전 제동 적용 전).
+    /// DefaultMoveAbility가 설정, LocoMoveState가 애니 블렌드 하한의 상한값으로 사용.</summary>
+    public float IntendedSpeed01 { get; set; }
     private bool _runAfterDash;
     /// <summary>대시(우클릭) 종료 시 다음 이동을 달리기로 시작하도록 요청.</summary>
     public void RequestRunAfterDash() => _runAfterDash = true;
