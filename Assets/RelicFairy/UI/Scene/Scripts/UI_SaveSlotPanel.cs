@@ -46,7 +46,7 @@ public class UI_SaveSlotPanel : UI_Base
 
     [Header("이어하기 임시 차단")]
     [Tooltip("켜면 저장된 슬롯을 눌러도 이어하기 대신 '세밀 작업 중' 안내를 띄운다. 재개하려면 끄면 된다.")]
-    [SerializeField] private bool blockResume = true;
+    [SerializeField] private bool blockResume = false;
     [TextArea, SerializeField]
     private string blockResumeMessage =
         "현재 세밀 작업이 진행 중입니다.\n저장된 게임을 <b>삭제</b>한 뒤 새로 시작해 주세요.";
