@@ -467,7 +467,7 @@ public class ActAttackState : ILayerState<ActState>
             _controller.Combo.ResetStep();
             _controller.Combo.CloseWindow();
             _controller.NotifyComboFinished(finalStep);
-            // 콤보 마지막 타 — 이어갈 다음 타가 없으므로 회수만 재생(chainable 아님).
+            // 콤보 마지막 타 — 회수를 재생한다(공중은 Exit 에서 JumpBlend 로 복귀하므로 제외).
             if (!isAir && TryEnterRecovery()) return;
             _stateChanger.Change(ActState.None);
             return;
@@ -503,7 +503,6 @@ public class ActAttackState : ILayerState<ActState>
         else if (!_controller.Combo.ComboWindowOpen)
         {
             // 콤보 창이 이미 닫힌 채 체인 지점에 도달 — 후속 입력이 없다는 뜻이니 회수를 재생한다.
-            // 회수 중 Light 입력이 들어오면 그 자리에서 다음 타로 이어간다(스텝 유지).
             if (TryEnterRecovery()) return;
             _controller.Combo.ResetStep();
             _stateChanger.Change(ActState.None);
