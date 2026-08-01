@@ -326,6 +326,10 @@ public class RunFlowController : MonoBehaviour
             _gatePortalPrefab = grb.GatePortalPrefab;
         }
 
+        // 방 종류를 런 세션에 알린다 — 클리어 보상(RoomRewardTable)이 이 값으로 갈린다.
+        // 방 빌드보다 먼저 세팅해야 RoomClearGate가 붙는 시점(AttachRoomClearController)에 이미 유효하다.
+        grb.Run?.SetCurrentRoomKind(plan.kind);
+
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
 
