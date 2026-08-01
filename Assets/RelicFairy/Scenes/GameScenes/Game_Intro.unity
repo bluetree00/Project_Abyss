@@ -1322,8 +1322,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46584716, y: 0.000013992249, z: 0.000013429239, w: 0.8848652}
-  m_LocalPosition: {x: -0.09696491, y: 4.925447, z: -3.5000076}
+  m_LocalRotation: {x: -0.050037805, y: -0.26166093, z: -0.013585184, w: 0.9637662}
+  m_LocalPosition: {x: 3.6520002, y: 0.421, z: -3.5400002}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1787,6 +1787,37 @@ Transform:
   - {fileID: 1704362184}
   - {fileID: 1449300681}
   m_Father: {fileID: 1660576856}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &361454892
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 361454893}
+  m_Layer: 0
+  m_Name: '@ScreenFade'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &361454893
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 361454892}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &383064336
 GameObject:
@@ -4232,6 +4263,37 @@ Transform:
   - {fileID: 974027616}
   - {fileID: 152400609}
   m_Father: {fileID: 1660576856}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &964657678
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 964657679}
+  m_Layer: 0
+  m_Name: '@ScreenFade'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &964657679
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 964657678}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &966409003
 GameObject:
@@ -10200,6 +10262,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Road_Boss_Ch3
       objectReference: {fileID: 0}
+    - target: {fileID: 5139710013812972749, guid: dd9c3a810a866cc4db709b61f83f3d94,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6173997071412915197, guid: dd9c3a810a866cc4db709b61f83f3d94,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -10279,3 +10346,5 @@ SceneRoots:
   - {fileID: 1275825198}
   - {fileID: 1878514178}
   - {fileID: 2138031926}
+  - {fileID: 361454893}
+  - {fileID: 964657679}
