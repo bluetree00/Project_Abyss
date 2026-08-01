@@ -22,7 +22,7 @@ MonoBehaviour:
   - groupType: 0
     clipMappings:
     - baseClipName: Idle_Wait_B
-      addressableKey: APose_Idle
+      addressableKey: SS_Idle
       actionType: 0
     - baseClipName: Mvm_Walk
       addressableKey: 'APose_Walk[GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace]'
@@ -94,20 +94,10 @@ MonoBehaviour:
       comboWindowOpen: -1
       comboWindowClose: -1
       attackEndAt: -1
-    - baseClipName: Attack_5Combo_2_Inplace
+    - baseClipName: ESkill_01
       addressableKey: GreatswordESkill
       actionType: 4
       comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: Attack_5Combo_5
-      addressableKey: GreatswordESkill_T3
-      actionType: 4
-      comboIndex: 2
       isPlunge: 0
       plungeFallSpeed: 0
       plungeDescendAt: 0

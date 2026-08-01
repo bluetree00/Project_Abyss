@@ -1762,7 +1762,15 @@ public class PlayerController : CharacterBase
         foreach (var mapping in animSet.GetAllMappings())
         {
             var clip = Managers.AnimationResources.GetClip(mapping.addressableKey);
-            if (clip != null) _animSvc.Override(mapping.baseClipName, clip);
+            if (clip == null) continue; // 어드레서블 미등록 — AnimationResourceManager 가 이미 경고했다.
+
+            // Override 키는 컨트롤러 상태가 물고 있는 '원본 클립 이름'이다. baseClipName(=상태 이름)과
+            // 다르거나 그런 상태가 없으면 조용히 실패해 무기 클립이 영영 적용되지 않는다.
+            // 지금까지 이 실패가 묻혀 있었으므로 반드시 드러낸다.
+            if (!_animSvc.Override(mapping.baseClipName, clip))
+                Debug.LogWarning($"[PlayerController] 애니 오버라이드 실패 — 무기 '{newWeapon.weaponSOKey}' " +
+                                 $"키 '{mapping.baseClipName}' (addressable '{mapping.addressableKey}'). " +
+                                 $"컨트롤러에 그 이름의 원본 클립이 없다.");
         }
 
         AssignAttackPolicyForWeapon(newWeapon);
