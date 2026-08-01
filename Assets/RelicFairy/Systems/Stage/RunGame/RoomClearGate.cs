@@ -16,9 +16,6 @@ using UnityEngine;
 public class RoomClearGate : MonoBehaviour
 {
     // ── Constants ──────────────────────────────────────────────
-    // [임시] 드롭 확률 100% 강제. 추후 LuckRollService.TryRollDrop으로 복구할 때 false로 변경.
-    private const bool ForceDropAlways = true;
-
     /// <summary>일반 룸 클리어 시 제시할 룬 후보 수(3지선다).</summary>
     private const int RuneChoiceCount = 3;
 
@@ -223,7 +220,7 @@ public class RoomClearGate : MonoBehaviour
             return false;
         }
 
-        if (!ForceDropAlways && !LuckRollService.TryRollDrop(ResolvePlayerLuck(), luckTable))
+        if (!LuckRollService.TryRollDrop(ResolvePlayerLuck(), luckTable))
         {
             Debug.Log($"[RoomClearGate] 드롭 확률 미통과 (luck={ResolvePlayerLuck()})");
             return false;
