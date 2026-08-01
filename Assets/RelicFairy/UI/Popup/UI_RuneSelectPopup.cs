@@ -154,6 +154,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     /// <summary>
     /// 카드 순차 공개. 팝업 안이라 <c>timeScale == 0</c>이므로 unscaled UI 트윈과
     /// <see cref="VolumePulseService"/>만 쓴다(§A-5).
+    ///
+    /// 카드 간격은 <b>스태거</b>다 — 앞 카드가 다 열리기를 기다리지 않고 간격만큼만 두고 다음 카드를
+    /// 띄운다. 순차로 기다리면 Common 3장에도 0.5초가 넘게 걸려 §D 검증기준(Common 3장 ≤ 0.35s /
+    /// Legendary 포함 ≤ 1.1s)을 넘긴다. 카드는 오름차순이라 <b>마지막(최고 등급)</b>이 항상 가장 길고,
+    /// 그 카드의 완료만 기다리면 시퀀스 종료 시점이 정확해진다.
     /// </summary>
     private async UniTaskVoid PlayRevealSequenceAsync()
     {
@@ -167,6 +172,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             {
                 var card = _cards[i];
                 var spec = RewardPresentation.For(card.Rarity);
+                bool isLast = i == _cards.Count - 1;
 
                 if (_revealSkipped || spec.CardPopDuration <= 0f)
                 {
@@ -174,25 +180,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
                     continue;
                 }
 
-                Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
+                // 마지막 카드만 완료를 기다린다. 앞 카드들은 스태거 간격을 두고 겹쳐 진행한다.
+                if (isLast) await PresentCardAsync(card, spec, ct);
+                else        PresentCardAsync(card, spec, ct).Forget();
 
-                await UIJuice.PopInAsync(card.Rt, card.Group, spec.CardPopDuration,
-                                         fromScale: 0.9f, fromYOffset: -18f, rotZ: spec.CardPopRotation, ct);
-
-                if (spec.FlashPulses > 0 && card.Fill != null)
-                    UIJuice.FlashAsync(card.Fill, RewardPresentation.FrameColor(card.Rarity),
-                                       0.18f, spec.FlashPulses, ct).Forget();
-
-                // 등급 라벨 굴림 리빌 — 확률·결과는 이미 확정. 표시만 계단식으로 오른다(§C-3-b).
-                await RevealRarityLabelAsync(card, spec, ct);
-
-                if (spec.PulsePeak > 0f)
-                    VolumePulseService.Pulse(spec.PulsePeak, spec.PulseDuration);
-
-                if (spec.ScreenFlashAlpha > 0f)
-                    PlayScreenFlashAsync(spec.ScreenFlashAlpha, ct).Forget();
-
-                if (!_revealSkipped && spec.CardStagger > 0f && i < _cards.Count - 1)
+                if (!isLast && !_revealSkipped && spec.CardStagger > 0f)
                     await UIJuice.HoldAsync(spec.CardStagger, ct);
             }
         }
@@ -203,6 +195,29 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             for (int i = 0; i < _cards.Count; i++) RevealCardInstant(_cards[i]);
             _revealing = false;
         }
+    }
+
+    /// <summary>카드 1장의 공개 — 팝인 → 프레임 플래시 → 굴림 리빌 → (상위 등급) 화면 방점.</summary>
+    private async UniTask PresentCardAsync(CardView card, RewardPresentation.TierSpec spec,
+                                           System.Threading.CancellationToken ct)
+    {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
+
+        await UIJuice.PopInAsync(card.Rt, card.Group, spec.CardPopDuration,
+                                 fromScale: 0.9f, fromYOffset: -18f, rotZ: spec.CardPopRotation, ct);
+
+        if (spec.FlashPulses > 0 && card.Fill != null)
+            UIJuice.FlashAsync(card.Fill, RewardPresentation.FrameColor(card.Rarity),
+                               0.18f, spec.FlashPulses, ct).Forget();
+
+        // 등급 라벨 굴림 리빌 — 확률·결과는 이미 확정. 표시만 계단식으로 오른다(§C-3-b).
+        await RevealRarityLabelAsync(card, spec, ct);
+
+        if (spec.PulsePeak > 0f)
+            VolumePulseService.Pulse(spec.PulsePeak, spec.PulseDuration);
+
+        if (spec.ScreenFlashAlpha > 0f)
+            PlayScreenFlashAsync(spec.ScreenFlashAlpha, ct).Forget();
     }
 
     /// <summary>카드를 최종 상태로 즉시 확정(스킵·연출 끔·취소 공통).</summary>
