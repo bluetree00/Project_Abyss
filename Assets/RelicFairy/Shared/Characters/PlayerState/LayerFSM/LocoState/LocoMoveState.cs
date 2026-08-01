@@ -6,11 +6,11 @@ public class LocoMoveState : ILayerState<LocoState>
     private ILayerStateChanger<LocoState> _stateChanger;
 
     // MoveSpeed 댐핑 — 비대칭.
-    // 가속측은 약간 크게(0.10): 가속 구간만 살짝 뭉쳐 블렌드가 읽히게 한다.
-    // Idle→Walk→Run 3단의 페이스는 이 damp 가 아니라 runRampDuration(목표속도 램프)이 쥐고 있으므로
-    // 여기서 더 키우면(0.20) 램프 위에 damp 지연이 덧붙어 출발이 굼떠질 뿐이다.
+    // 가속측은 아주 살짝만(0.06): 프레임 단위 계단을 뭉개는 정도. 이 값이 곧 출발 지연이라
+    // 즉발감을 원하면 여기부터 깎아야 한다(1.5×damp 만큼 도달이 늦어진다).
+    // Idle→Walk→Run 3단의 페이스는 이 damp 가 아니라 runRampDuration(목표속도 램프)이 쥔다.
     // 감속측은 작게(0.08): 정지가 늦으면 발이 끌리므로 즉시 따라붙는다.
-    private const float BlendDampAccel = 0.10f;
+    private const float BlendDampAccel = 0.06f;
     private const float BlendDampDecel = 0.08f;
     // CharacterData.runRampDuration 미설정 시 사용할 기본 램프 시간(초).
     private const float DefaultRunRamp = 1.0f;

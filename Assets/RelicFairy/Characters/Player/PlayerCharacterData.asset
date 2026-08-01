@@ -15,7 +15,7 @@ MonoBehaviour:
   characterName: PlayerCharacter
   baseMoveSpeed: 5
   baseRunSpeed: 8
-  runRampDuration: 1
+  runRampDuration: 0.4
   maxHealth: 250
   baseMeleeAttack: 45
   baseRangedAttack: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
   airControlMultiplier: 0.5
   groundDrag: 4
   airDrag: 0.5
-  moveAccel: 60
+  moveAccel: 75
   moveDecel: 60
   reverseAccelMultiplier: 1.75
   initialBoost: 0
