@@ -138,6 +138,6 @@ public class ActSkillState : ActSkillStateBase<ActState>
             if (mapping != null) animName = mapping.baseClipName;
         }
 
-        _controller.Anim.CrossFade(animName, 0.08f);
+        _controller.Anim.CrossFadeInFixedTime(animName, 0.06f);
     }
 }

@@ -55,7 +55,7 @@ public class ActPlungeState : ILayerState<ActState>
                     ?? _controller.GetComponentInChildren<PlayerAnimationEventReceiver>();
         SubscribeReceiver();
 
-        _controller.Anim.CrossFade(clip, 0.1f);
+        _controller.Anim.CrossFadeInFixedTime(clip, 0.06f);
         _prepStateHash = Animator.StringToHash(clip);
 
         // descendAt == 0이면 즉시 하강, 아니면 Update()에서 폴링 후 하강
@@ -111,7 +111,7 @@ public class ActPlungeState : ILayerState<ActState>
         // 착지
         _landed = true;
         _controller.StopHorizontalMovement();
-        _controller.Anim.CrossFade("PlungeLand", 0.05f);
+        _controller.Anim.CrossFadeInFixedTime("PlungeLand", 0.08f);
         _controller.OnAttackHitStep(0);
 
         Debug.Log("[ActPlungeState] 착지 — PlungeLand 재생");

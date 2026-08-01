@@ -48,12 +48,12 @@ public class ActAttackChargeState : ILayerState<ActState>
         {
             _guardPhase = GuardPhase.Looping;
             _acceptElapsed = 0f;
-            _controller.Anim.CrossFade("HeavyCharge", 0.08f);
+            _controller.Anim.CrossFadeInFixedTime("HeavyCharge", 0.06f);
             SubscribeGuardEvents();
         }
         else
         {
-            _controller.Anim.CrossFade("HeavyCharge", 0.08f);
+            _controller.Anim.CrossFadeInFixedTime("HeavyCharge", 0.06f);
         }
     }
 
@@ -165,7 +165,7 @@ public class ActAttackChargeState : ILayerState<ActState>
         UnsubscribeAcceptEnd(); // 연속 피격 시 중복 구독 방지
         _guardPhase = GuardPhase.Accepting;
         _acceptElapsed = 0f;
-        _controller.Anim.CrossFade("HeavyChargeAccept", 0.05f);
+        _controller.Anim.CrossFadeInFixedTime("HeavyChargeAccept", 0.06f);
         SubscribeAcceptEnd();
     }
 
@@ -178,7 +178,7 @@ public class ActAttackChargeState : ILayerState<ActState>
         // Accept 완료 → Loop로 복귀
         _guardPhase = GuardPhase.Looping;
         _acceptElapsed = 0f;
-        _controller.Anim.CrossFade("HeavyCharge", 0.1f);
+        _controller.Anim.CrossFadeInFixedTime("HeavyCharge", 0.10f);
     }
 
     private void FireExit(ActState next)

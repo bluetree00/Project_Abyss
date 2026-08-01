@@ -6,8 +6,8 @@ public class LocoDodgeState : ILayerState<LocoState>
     // 이보다 느리면 사실상 정지로 보고 바라보는 방향으로 폴백 → 진짜 정지 상태는 현행과 동일.
     private const float MinVelSqrForDirFallback = 0.25f; // 0.5 m/s
 
-    // 구르기 → 로코모션 복귀 크로스페이드 길이. 기본(0.05s)은 자세 차가 커서 스냅이 보인다.
-    private const float DodgeExitBlend = 0.15f;
+    // 구르기 → 로코모션 복귀 크로스페이드 길이(초, 고정시간). 로코모션 기본(0.14s)은 자세 차가 커서 짧다.
+    private const float DodgeExitBlend = 0.18f;
 
     // 대시 중 허용할 최대 상승 속도(m/s).
     // 경사/계단을 고속으로 타면 호버 스프링(지면이 급히 솟아 error 급증)과 콜라이더 충돌 반발이
@@ -82,7 +82,7 @@ public class LocoDodgeState : ILayerState<LocoState>
         // 저스트 회피 장전 — 대시 중(무적 구간)에 공격을 맞으면 슬로모 + 이동 보너스로 보상. 회피당 1회.
         _controller.ArmPerfectDodge();
 
-        _controller.Anim.CrossFade("Dodge", 0.05f);
+        _controller.Anim.CrossFadeInFixedTime("Dodge", 0.06f);
         _controller.SetMoveScale(0f);
         _controller.FirePassive(PassiveTrigger.OnDodge, new PassiveContext());
 
@@ -162,7 +162,7 @@ public class LocoDodgeState : ILayerState<LocoState>
 
     public void Exit()
     {
-        // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 짧은 블렌드(0.05s)면 툭 튀며 선다.
+        // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 로코모션 기본 블렌드(0.14s)면 아직 짧다.
         // 다음 로코모션 진입의 크로스페이드를 길게 예약해 부드럽게 이어붙인다(다른 전이엔 영향 없음).
         _controller.RequestLocoBlend(DodgeExitBlend);
 

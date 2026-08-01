@@ -1858,7 +1858,7 @@ public class PlayerController : CharacterBase
 
         // 즉시 점프 애니메이션 시작 (AirState 전이를 기다리지 않음)
         Anim.SetFloat("JumpValue", 0f);
-        Anim.CrossFade("JumpBlend", 0.05f);
+        Anim.CrossFadeInFixedTime("JumpBlend", 0.08f);
     }
 
     /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>

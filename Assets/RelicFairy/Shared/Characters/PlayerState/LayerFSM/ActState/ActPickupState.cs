@@ -42,7 +42,7 @@ public class ActPickupState : ILayerState<ActState>
 
         _controller.SetMoveScale(0f);
         _controller.Combo.SetAttacking(true);
-        _controller.Anim.CrossFade("WeaponPickup", 0.1f);
+        _controller.Anim.CrossFadeInFixedTime("WeaponPickup", 0.10f);
 
         RunAsync(data, source).Forget();
     }

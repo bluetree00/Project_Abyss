@@ -416,7 +416,7 @@ public class ActAttackState : ILayerState<ActState>
 
         // 공중 공격 종료 후 체공 애니메이션 복귀
         if (!_controller.IsGrounded())
-            _controller.Anim.CrossFade("JumpBlend", 0.1f);
+            _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
 
         _controller.ActiveExecution = null;
         _execution?.Cleanup(forceEffects: false);
@@ -602,7 +602,7 @@ public class ActAttackState : ILayerState<ActState>
         {
             if (anim.HasState(layerIndex, stateHash))
             {
-                anim.CrossFade(stateHash, 0.08f);
+                anim.CrossFadeInFixedTime(stateHash, 0.06f);
                 playedHash = stateHash;
             }
             else if (stateToPlay != fallbackStateName)
@@ -610,7 +610,7 @@ public class ActAttackState : ILayerState<ActState>
                 int fbHash = Animator.StringToHash(fallbackStateName);
                 if (anim.HasState(layerIndex, fbHash))
                 {
-                    anim.CrossFade(fbHash, 0.08f);
+                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
                     playedHash = fbHash;
                     Debug.Log($"[ActAttackState] Fallback to ground state: {fallbackStateName}");
                 }
@@ -628,7 +628,7 @@ public class ActAttackState : ILayerState<ActState>
         {
             if (anim.HasState(layerIndex, stateHash))
             {
-                anim.CrossFade(stateHash, 0.08f);
+                anim.CrossFadeInFixedTime(stateHash, 0.06f);
                 playedHash = stateHash;
             }
             else
@@ -636,7 +636,7 @@ public class ActAttackState : ILayerState<ActState>
                 int fbHash = Animator.StringToHash(fallbackStateName);
                 if (anim.HasState(layerIndex, fbHash))
                 {
-                    anim.CrossFade(fbHash, 0.08f);
+                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
                     playedHash = fbHash;
                     Debug.Log($"[ActAttackState] Air state not found ({stateToPlay}), fallback: {fallbackStateName}");
                 }
