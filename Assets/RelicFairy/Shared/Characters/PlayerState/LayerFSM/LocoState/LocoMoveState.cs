@@ -36,7 +36,13 @@ public class LocoMoveState : ILayerState<LocoState>
         _animFloor = 0f;
         // 대시 직후 진입이면 바로 풀 달리기로 시작.
         _forceRun = _controller.ConsumeRunAfterDash();
-        if (_forceRun) _runCharge01 = 1f;
+        if (_forceRun)
+        {
+            _runCharge01 = 1f;
+            // 애니 블렌드 하한도 풀 달리기로 프라임 — 회피 직후 걷기부터 다시 차오르는 것을 막는다.
+            // 첫 Update의 Min(..., IntendedSpeed01)이 실제 상한으로 눌러주므로 과속 포즈는 안 나온다.
+            _animFloor = 1f;
+        }
     }
 
     public void Update()
