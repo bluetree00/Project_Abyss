@@ -1007,8 +1007,15 @@ public class PlayerController : CharacterBase
 
     // 슬루 ease-out — 목표까지 남은 각이 이 값(도) 이하면 각속도를 부드럽게 줄여 짧은 회전·마무리를 매끄럽게 한다.
     // ease-in은 두지 않는다(시작은 전속력) → 방향전환 반응성/선회감 제거 유지, 끝만 부드럽게 안착.
-    private const float FacingSlewEaseOutAngle = 40f;
-    private const float FacingSlewEaseFloor = 0.18f; // 목표 직전 정체 방지용 최저 속도비
+    //
+    // 이 꼬리는 각도 폭이 고정이라(SmoothStep이 t를 clamp하므로 남은 각 > EaseOutAngle 구간은 이미 전속)
+    // 큰 회전일수록 비중이 커지지는 않는다. 실제 손실원은 EaseFloor였다 — 0.18이면 마지막 ~9°를
+    // 130°/s로 기어서 그 구간만 0.073s를 먹었고, 180° 반전이 0.36s가 되어 속도 반전(≈0.15s)보다 크게 느렸다.
+    // 밴드를 25°로 좁히고 바닥을 0.5로 올려 180° 반전을 0.27s로 당긴다(ease 없는 이론 하한 0.25s).
+    // 각속도 상한(turnSpeedDegPerSec 720)은 건드리지 않는다 — 전환의 시각 표현이 회전뿐이라
+    // 각속도를 올리면 "휙 도는" 인상이 강해진다.
+    private const float FacingSlewEaseOutAngle = 25f;
+    private const float FacingSlewEaseFloor = 0.5f; // 목표 직전 정체 방지용 최저 속도비
 
     /// <summary>즉시(1회) 회전 지정. 스킬/회피/조준 등 한 프레임 스냅 또는 자체 보간 writer용. 진행 중인 이동 회전 슬루를 취소한다.
     /// 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.MoveRotation으로 수행.</summary>
