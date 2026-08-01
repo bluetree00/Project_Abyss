@@ -35,7 +35,8 @@ public static class HitFeedbackService
     /// </summary>
     private static void PlayDefaultFeel(in HitInfo info)
     {
-        HitFeelService.Hit(info.Damage, info.IsCritical, WeaponFeelTable.For(info.WeaponType));
+        // AttackDirection(공격자→피격자)을 그대로 넘겨 카메라가 타격 방향으로 밀린다.
+        HitFeelService.Hit(info.Damage, info.IsCritical, WeaponFeelTable.For(info.WeaponType), info.AttackDirection);
     }
 
     /// <summary>피격자 로컬 피드백 — IHitReceiver 구현체에게 직접 전달.</summary>

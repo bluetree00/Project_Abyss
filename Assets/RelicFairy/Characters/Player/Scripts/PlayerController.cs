@@ -181,7 +181,13 @@ public class PlayerController : CharacterBase
             // 글로벌 히트스톱은 의도적으로 생략(들어오는 피해에 프리즈=렉 체감, 보스별 설계 히트스톱은 별도 유지).
             float maxHp = RuntimeStats != null ? Mathf.Max(1f, RuntimeStats.MaxHp) : 100f;
             float sev = Mathf.Clamp01(finalDmg / (maxHp * 0.2f)); // 최대HP 20% 피해 = 최대 강도
-            HitFeelService.CameraShake(Mathf.Lerp(0.05f, 0.16f, sev), 0.18f);
+
+            // 가해자→피해자 방향으로 화면을 밀어 "어디서 맞았는지"가 읽히게 한다.
+            // 가해자 미상(장판/도트 등)이면 0 벡터 → 기존 무방향 셰이크와 동일.
+            Vector3 hitDir = attacker != null
+                ? transform.position - attacker.transform.position
+                : Vector3.zero;
+            HitFeelService.CameraShakeDirectional(hitDir, Mathf.Lerp(0.05f, 0.16f, sev), 0.18f);
 
             // 룬 속성 OnDamaged 통지(어둠 게이지 등). 실제 피해가 들어갈 때만 — i-frame/회피/무효/사망무효는 위에서 이미 return.
             _runeEffects?.NotifyDamaged(finalDmg, attacker);
