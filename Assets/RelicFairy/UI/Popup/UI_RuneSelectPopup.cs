@@ -27,9 +27,15 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     // ── 레이아웃 ──
     private const float WindowW = 1040f;   // 룬 획득 바탕 아트 실측(2081×1241 @2x → 1040×620)
     private const float WindowH = 620f;
-    private const float CardW   = 300f;
+    private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
     private const float CardH   = 380f;
     private const float CardGap = 24f;
+    private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
+
+    // 등급 확률 막대 — 창 좌하단, [선택]/[넘기기] 좌측 여백에 앉힌다.
+    private const float OddsBarW      = 236f;
+    private const float OddsBarH      = 78f;
+    private const float OddsBarMargin = 20f;
     private const float CardY   = -26f;   // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다
 
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
@@ -55,6 +61,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
     private int _selected = -1;
+    private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
     private bool _built;
     private bool _skinned;   // 아트 로드 성공 — 선택 피드백을 색 틴트 대신 밝기로 처리
 
@@ -360,6 +367,27 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Stretch(skipLbl.rectTransform);
         skipLbl.text = "넘기기";
+
+        BuildOddsBar();
+    }
+
+    /// <summary>
+    /// 이 방의 등급 확률 막대. "확률로 뜬다"는 사실이 화면에 처음 존재하게 만든다 —
+    /// 그래야 굴림 리빌(§C-3-b)이 "연출"이 아니라 "정보"로 읽힌다.
+    ///
+    /// 값의 출처는 행운이 아니라 <see cref="RoomRewardTable"/>(방 종류)다. 정예방에 들어가면
+    /// 막대가 눈에 띄게 위로 쏠려, 위험을 감수한 대가가 숫자로 보인다.
+    /// <see cref="OddsBarView"/>는 이미 구현돼 있었으나 호출처가 0개였다 — 그대로 재사용한다.
+    /// </summary>
+    private void BuildOddsBar()
+    {
+        var kind = GameRunBootstrapper.Instance?.Run?.CurrentRoomKind ?? RoomPlanKind.Normal;
+        var (rare, epic, legendary) = RoomRewardTable.For(kind).Weights.Normalized();
+
+        var bar = OddsBarView.Create(_windowRoot,
+            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(OddsBarMargin, OddsBarMargin), new Vector2(OddsBarW, OddsBarH));
+        bar.SetOdds(rare, epic, legendary, heated: false);
     }
 
     private void BuildCards()
@@ -368,8 +396,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _cards.Clear();
 
         int n = _candidates.Count;
-        float totalW = n * CardW + (n - 1) * CardGap;
-        float startX = -totalW * 0.5f + CardW * 0.5f;
+
+        // 카드 폭은 후보 수에 맞춰 줄인다. 300 고정이던 시절엔 3장까지만 창에 들어갔고,
+        // 정예방 4지선다(RoomRewardTable)에서 카드가 창 밖으로 밀려났다.
+        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
+
+        float totalW = n * _cardW + (n - 1) * CardGap;
+        float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         for (int i = 0; i < n; i++)
         {
@@ -381,7 +415,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             var cardRT = (RectTransform)card.transform.parent;   // 위치/크기는 테두리(outer)에
             ShopUIStyle.Anchor(cardRT,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(startX + i * (CardW + CardGap), CardY), new Vector2(CardW, CardH));
+                new Vector2(startX + i * (_cardW + CardGap), CardY), new Vector2(_cardW, CardH));
 
             AddClick(cardRT.gameObject, () => SetSelected(idx));
 
@@ -496,7 +530,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var shapeBox = ShopUIStyle.MakeImage(card, "ShapeBox", ShopUIStyle.IconBg);
         ShopUIStyle.Anchor(shapeBox.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -18f), new Vector2(CardW - 40f, ShapeBoxH));
+            new Vector2(0f, -18f), new Vector2(_cardW - 40f, ShapeBoxH));
 
         bool canPlace = BuildShapePreview(shapeBox.transform, data);
 
@@ -505,7 +539,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -172f), new Vector2(CardW - 24f, 26f));
+            new Vector2(0f, -172f), new Vector2(_cardW - 24f, 26f));
         name.text = data.displayName ?? data.itemId;
         FitSingleLine(name);
 
@@ -518,7 +552,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         meta.richText = true;
         ShopUIStyle.Anchor(meta.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -200f), new Vector2(CardW - 24f, 22f));
+            new Vector2(0f, -200f), new Vector2(_cardW - 24f, 22f));
         // 등급 라벨은 굴림 리빌이 다시 쓴다 — 뒤에 붙는 고정부(칸수·속성)만 따로 보관한다.
         string metaSuffix = (cells > 0 ? $" · {cells}칸" : string.Empty) + elemTag;
         if (view != null)
@@ -537,14 +571,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(fxBg, fxSkin, sliced: true);
             ShopUIStyle.Anchor(fxBg.rectTransform,
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -224f), new Vector2(CardW - 28f, 96f));
+                new Vector2(0f, -224f), new Vector2(_cardW - 28f, 96f));
         }
 
         // 효과 목록
         var fxRoot = ShopUIStyle.MakeRect(card, "Effects").GetComponent<RectTransform>();
         ShopUIStyle.Anchor(fxRoot,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -228f), new Vector2(CardW - 32f, 86f));
+            new Vector2(0f, -228f), new Vector2(_cardW - 32f, 86f));
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = false; vlg.childForceExpandHeight = false;
         vlg.spacing = 2f;
@@ -559,7 +593,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(bar, placeSkin, sliced: true);
             ShopUIStyle.Anchor(bar.rectTransform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 16f), new Vector2(CardW - 28f, 32f));
+                new Vector2(0f, 16f), new Vector2(_cardW - 28f, 32f));
             badgeParent = bar.transform;
         }
 
@@ -570,7 +604,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         else
             ShopUIStyle.Anchor(badge.rectTransform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 14f), new Vector2(CardW - 24f, 24f));
+                new Vector2(0f, 14f), new Vector2(_cardW - 24f, 24f));
         badge.text = canPlace ? "놓을 자리 있음" : "놓을 자리 없음";
         FitSingleLine(badge);
     }
@@ -652,7 +686,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int cols = maxX - minX + 1, rows = maxY - minY + 1;
 
         // 박스에 꽉 차도록 셀 크기를 역산 — 1칸 룬은 크게, 큰 모양은 줄여서 항상 형태가 읽히게 한다.
-        float boxW = CardW - 40f - 16f;   // ShapeBox 폭 - 여백
+        float boxW = _cardW - 40f - 16f;   // ShapeBox 폭 - 여백
         float boxH = ShapeBoxH   - 16f;
         float fitW = (boxW - (cols - 1) * MiniGap) / Mathf.Max(1, cols);
         float fitH = (boxH - (rows - 1) * MiniGap) / Mathf.Max(1, rows);
