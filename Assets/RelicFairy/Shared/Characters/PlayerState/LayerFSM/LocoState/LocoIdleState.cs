@@ -52,6 +52,7 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Exit() { }
 
-    static void SetSpeedParam(Animator anim, float target01, float damp = 0.1f)
+    // 정지 방향은 빠르게 따라붙어야 발이 안 끌린다 → 기본 damp 0.08.
+    static void SetSpeedParam(Animator anim, float target01, float damp = 0.08f)
         => anim.SetFloat("MoveSpeed", Mathf.Clamp01(target01), damp, Time.deltaTime);
 }

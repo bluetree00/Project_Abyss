@@ -5,8 +5,11 @@ public class LocoMoveState : ILayerState<LocoState>
     private PlayerController _controller;
     private ILayerStateChanger<LocoState> _stateChanger;
 
-    // MoveSpeed 댐핑(작게 — 속도 평활은 가속 모델 한 곳에서만, 여긴 미세 떨림만 제거).
-    private const float BlendDamp = 0.08f;
+    // MoveSpeed 댐핑 — 비대칭.
+    // 가속측은 크게(0.20): 실가속이 빨라 Idle→Walk→Run 3단이 순식간에 통과하는 것을 늦춰 블렌드가 눈에 읽히게 한다.
+    // 감속측은 작게(0.08): 정지가 늦으면 발이 끌리므로 즉시 따라붙는다.
+    private const float BlendDampAccel = 0.20f;
+    private const float BlendDampDecel = 0.08f;
     // CharacterData.runRampDuration 미설정 시 사용할 기본 램프 시간(초).
     private const float DefaultRunRamp = 1.0f;
 
@@ -68,7 +71,7 @@ public class LocoMoveState : ILayerState<LocoState>
 
         // 블렌드 파라미터 — 실제 수평 속도비율로 구동(가속 램프·runCharge·정지감속이 애니에 자동 반영, 발미끄러짐 해소).
         float animSpeed = moving ? _controller.HorizontalSpeed01 : 0f;
-        SetSpeedParam(_controller.Anim, animSpeed, BlendDamp);
+        SetSpeedParam(_controller.Anim, animSpeed);
 
         // Air 전이 — 스텝 오르는 중엔 잠깐 공중 판정이 떠도 낙하 상태로 빠지지 않음.
         if (!_controller.IsGrounded() && !_controller.IsStepClimbing)
@@ -84,6 +87,11 @@ public class LocoMoveState : ILayerState<LocoState>
 
     public void Exit() => _controller.IsRunning = false;
 
-    static void SetSpeedParam(Animator anim, float target01, float damp)
-        => anim.SetFloat("MoveSpeed", Mathf.Clamp01(target01), damp, Time.deltaTime);
+    // 목표가 현재보다 크면 가속(느린 damp), 작으면 감속(빠른 damp).
+    static void SetSpeedParam(Animator anim, float target01)
+    {
+        float t = Mathf.Clamp01(target01);
+        float damp = t > anim.GetFloat("MoveSpeed") ? BlendDampAccel : BlendDampDecel;
+        anim.SetFloat("MoveSpeed", t, damp, Time.deltaTime);
+    }
 }
