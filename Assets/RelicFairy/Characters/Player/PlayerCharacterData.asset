@@ -72,7 +72,7 @@ MonoBehaviour:
   reverseAccelMultiplier: 1.75
   initialBoost: 0
   turnSpeedDegPerSec: 720
-  sharpTurnMoveSlowdown: 0
+  sharpTurnMoveSlowdown: 0.28
   sharpTurnAngle: 135
   conClass: 0
   portrait: {fileID: 0}
