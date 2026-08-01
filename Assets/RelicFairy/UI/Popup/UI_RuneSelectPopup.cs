@@ -33,9 +33,11 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
 
     // 등급 확률 막대 — 창 좌하단, [선택]/[넘기기] 좌측 여백에 앉힌다.
+    // 여백 8 기준으로 막대 상단(-222)이 카드 하단(CardY-CardH/2 = -216)보다 낮아 겹치지 않고,
+    // 오른쪽 끝(-272)도 [선택] 버튼 왼쪽 끝(-190)에 닿지 않는다.
     private const float OddsBarW      = 236f;
     private const float OddsBarH      = 78f;
-    private const float OddsBarMargin = 20f;
+    private const float OddsBarMargin = 8f;
     private const float CardY   = -26f;   // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다
 
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
