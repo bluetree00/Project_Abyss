@@ -15,9 +15,17 @@ public class LocoMoveState : ILayerState<LocoState>
     // CharacterData.runRampDuration 미설정 시 사용할 기본 램프 시간(초).
     private const float DefaultRunRamp = 1.0f;
 
+    // 이동 입력 유예(coyote) 창(초). 키보드 방향 반전은 입력이 순간 (0,0)을 지난다
+    // (W+S 동시 = Vector2 컴포짓 상쇄, 떼고 누르기 = 30~80ms 공백).
+    // 유예가 없으면 그 한 프레임에 Idle로 전이하며 _runCharge01/_animFloor가 리셋돼
+    // 달리기를 처음부터 다시 램프한다 — 사용자가 본 "달리다 걷기로 튐"의 마지막 경로.
+    // 0.12s: 반전 공백(≤0.08s)은 덮고 진짜 정지의 인지 지연은 감속 램프 길이(≈0.13s) 안에 든다.
+    private const float MoveInputGrace = 0.12f;
+
     private float _runCharge01; // 걷기→달리기 램프 진행도(0→1), 이동 지속 시 차오름
     private bool _forceRun;     // 대시(우클릭) 직후 — 즉시 풀 달리기 유지
     private float _animFloor;   // 이동 입력 유지 중 블렌드 하한(도달한 최고 속도비, 의도 속도로 상한)
+    private float _noInputSince; // 이동 입력이 0이 된 시각(음수 = 입력 유지 중). 유예 판정용
 
     public void Init(PlayerController c, ILayerStateChanger<LocoState> changer)
     {
@@ -34,6 +42,7 @@ public class LocoMoveState : ILayerState<LocoState>
 
         _runCharge01 = 0f;
         _animFloor = 0f;
+        _noInputSince = -1f;
         // 대시 직후 진입이면 바로 풀 달리기로 시작.
         _forceRun = _controller.ConsumeRunAfterDash();
         if (_forceRun)
@@ -48,7 +57,15 @@ public class LocoMoveState : ILayerState<LocoState>
     public void Update()
     {
         var dir = _controller.MoveDirection * _controller.MoveScale;
-        bool moving = dir.sqrMagnitude > 0.0001f;
+        bool hasInput = dir.sqrMagnitude > 0.0001f;
+
+        // 입력 유예(coyote) — "진짜로 멈춤"과 "방향 반전 순간 공백"을 시간으로 구분한다.
+        // 입력이 0이 된 시각을 찍어두고, MoveInputGrace 안이면 여전히 '이동 중'으로 취급한다.
+        // 유예 중 입력이 돌아오면 _noInputSince가 다시 음수가 되어 상태 전이·리셋이 아예 일어나지 않는다.
+        if (hasInput) _noInputSince = -1f;
+        else if (_noInputSince < 0f) _noInputSince = Time.time;
+        bool inGrace = !hasInput && Time.time - _noInputSince < MoveInputGrace;
+        bool moving = hasInput || inGrace;
 
         // 이동 지속 시 걷기→달리기 램프(무장비 포함). 대시 직후(_forceRun)면 즉시 풀 달리기, 아니면 램프 시간 동안 점진 가속.
         bool canRun = moving;
@@ -58,7 +75,7 @@ public class LocoMoveState : ILayerState<LocoState>
             {
                 _runCharge01 = 1f;
             }
-            else
+            else if (hasInput) // 유예 중에는 램프를 '유지'만 하고 더 차오르지 않게 한다(입력이 없는 구간이므로).
             {
                 var cd = _controller.CharacterData;
                 float ramp = (cd != null && cd.runRampDuration > 0.01f) ? cd.runRampDuration : DefaultRunRamp;
@@ -67,7 +84,7 @@ public class LocoMoveState : ILayerState<LocoState>
         }
         else
         {
-            _runCharge01 = 0f; // 정지 시 즉시 리셋
+            _runCharge01 = 0f; // 유예까지 지난 진짜 정지 — 리셋
         }
 
         // 가벼운 ease-in-out 보간율 → 속도/애니 공통 적용
@@ -85,10 +102,13 @@ public class LocoMoveState : ILayerState<LocoState>
         // 프레임 리플까지 겹쳐 Walk/Idle 구간을 찍는다. 하한은 의도 속도(IntendedSpeed01)를 넘지 않으므로
         // 출발 시 Idle→Walk→Run 램프는 그대로 살아있고, 이동 감속 버프에서도 발이 미끄러지지 않는다.
         // 올라갈 땐 실속도를 따라가고 내려올 땐 붙잡는 비대칭 = run↔walk 경계 히스테리시스.
+        // 유예 중에는 하한을 갱신하지 않고 '홀드'한다 — dir이 0이라 Move가 IntendedSpeed01을 0으로
+        // 내려놓으므로, 평소 규칙(의도 속도로 상한)을 그대로 적용하면 하한이 0으로 무너져 유예가 무의미해진다.
         float actual01 = _controller.HorizontalSpeed01;
-        _animFloor = moving
-            ? Mathf.Min(Mathf.Max(_animFloor, actual01), _controller.IntendedSpeed01)
-            : 0f;
+        if (hasInput)
+            _animFloor = Mathf.Min(Mathf.Max(_animFloor, actual01), _controller.IntendedSpeed01);
+        else if (!inGrace)
+            _animFloor = 0f;
         float animSpeed = moving ? Mathf.Max(actual01, _animFloor) : 0f;
         SetSpeedParam(_controller.Anim, animSpeed);
 
@@ -99,7 +119,8 @@ public class LocoMoveState : ILayerState<LocoState>
             return;
         }
 
-        // Idle 전이 (실제 이동 입력 기준)
+        // Idle 전이 — 입력이 끊긴 뒤 유예(MoveInputGrace)까지 지나야 넘어간다.
+        // Air/회피/공격 전이는 위/외부에서 처리되므로 유예가 막지 않는다.
         if (!moving)
             _stateChanger.Change(LocoState.Idle);
     }
