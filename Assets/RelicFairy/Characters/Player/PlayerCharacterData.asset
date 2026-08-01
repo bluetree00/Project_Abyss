@@ -67,8 +67,8 @@ MonoBehaviour:
   airControlMultiplier: 0.5
   groundDrag: 4
   airDrag: 0.5
-  moveAccel: 90
-  moveDecel: 110
+  moveAccel: 28
+  moveDecel: 60
   reverseAccelMultiplier: 1.75
   initialBoost: 0
   turnSpeedDegPerSec: 720
