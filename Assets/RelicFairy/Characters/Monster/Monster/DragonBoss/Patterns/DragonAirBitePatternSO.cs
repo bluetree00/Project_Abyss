@@ -42,6 +42,7 @@ public class DragonAirBreathPatternSO : BossPatternSO
     [SerializeField] private float _attackRadius = 2.8f;
     [SerializeField] private float _attackCenterForwardOffset = 1.4f;
     [SerializeField] private int _attackDamage = 24;
+    [SerializeField] private float _damageMultiplier = 1.5f;
 
     [Header("Fireball")]
     [SerializeField] private GameObject _fireballPrefab;
@@ -96,6 +97,7 @@ public class DragonAirBreathPatternSO : BossPatternSO
     public float AttackRadius => _attackRadius;
     public float AttackCenterForwardOffset => _attackCenterForwardOffset;
     public int AttackDamage => _attackDamage;
+    public float DamageMultiplier => _damageMultiplier;
     public GameObject FireballPrefab => _fireballPrefab;
     public float FireballScale => _fireballScale;
     public GameObject ExplosionPrefab => _explosionPrefab;
@@ -438,7 +440,7 @@ internal sealed class DragonAirBreathState : FullLockState<DragonAirBreathPatter
             if (player == null)
                 continue;
 
-            player.TakeDamage(Data.AttackDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             Data.playerStatusEffect?.Apply(player);
             break;
         }

@@ -56,7 +56,9 @@ public class DragonBreathSweepPatternSO : BossPatternSO
 
     [Header("Damage")]
     [SerializeField] private int _breathDamage = 20;
+    [SerializeField] private float _breathDamageMultiplier = 1.5f;
     [SerializeField] private int _tsunamiDamage = 10;
+    [SerializeField] private float _tsunamiDamageMultiplier = 0.5f;
     [SerializeField] private float _tsunamiDuration = 5f;
     [SerializeField] private float _tsunamiTickInterval = 1f;
     [Tooltip("브레스 파티클 도달 지연 보정: 기하학 계산이 비주얼보다 빨리 잡히는 경우 증가 (셀 단위)")]
@@ -127,7 +129,9 @@ public class DragonBreathSweepPatternSO : BossPatternSO
     public float TsunamiScale => _tsunamiScale;
     public AudioClip ResidualFireSfx => _residualFireSfx;
     public int BreathDamage => _breathDamage;
+    public float BreathDamageMultiplier => _breathDamageMultiplier;
     public int TsunamiDamage => _tsunamiDamage;
+    public float TsunamiDamageMultiplier => _tsunamiDamageMultiplier;
     public float TsunamiDuration => _tsunamiDuration;
     public float TsunamiTickInterval => _tsunamiTickInterval;
     public float TsunamiLagCells    => _tsunamiLagCells;
@@ -870,7 +874,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(Data.BreathDamage);
+        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.BreathDamageMultiplier));
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
@@ -887,7 +891,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         var player = ctx.Runtime.PlayerTarget.GetComponent<PlayerController>();
         if (player == null) return;
 
-        player.TakeDamage(Data.TsunamiDamage);
+        player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.TsunamiDamageMultiplier));
         PlayerStatusEffectVisuals.ApplyScreenEffectTimed(Data.ScreenFireEffectPrefab, 1f, Data.ScreenFireGraceDuration, "StatusEffectScreen_" + StatusEffectType.Slow);
     }
 
@@ -1280,7 +1284,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             float halfExtent = (e.HalfR + 0.5f) * DragonBossRoomContext.CellSize;
             Vector3 d = playerPos - e.LandPos;
             if (Mathf.Abs(d.x) <= halfExtent && Mathf.Abs(d.z) <= halfExtent)
-                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Data.MeteorPattern.AttackDamage);
+                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.MeteorPattern.DamageMultiplier));
         }
     }
 

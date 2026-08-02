@@ -24,6 +24,7 @@ public class DragonFireballRainPatternSO : BossPatternSO
     [SerializeField] private float  _fallHeight        = 35f;
     [SerializeField] private float  _fallSpeed         = 18f;
     [SerializeField] private int    _attackDamage      = 30;
+    [SerializeField] private float  _damageMultiplier  = 1.5f;
     [SerializeField] private float  _damageRadius      = 1.5f;
     [SerializeField] private Color  _warningColor      = new Color(1.0f, 0.35f, 0.1f, 0.5f);
     [SerializeField] private GameObject _fireballPrefab;
@@ -62,6 +63,7 @@ public class DragonFireballRainPatternSO : BossPatternSO
     public float  FallHeight       => _fallHeight;
     public float  FallSpeed        => _fallSpeed;
     public int    AttackDamage     => _attackDamage;
+    public float  DamageMultiplier => _damageMultiplier;
     public float  DamageRadius     => _damageRadius;
     public Color  WarningColor     => _warningColor;
     public GameObject FireballPrefab    => _fireballPrefab;
@@ -384,7 +386,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             Vector3 playerPos = ctx.Runtime.PlayerTarget.position;
             playerPos.y = e.LandPos.y;
             if (Vector3.Distance(playerPos, e.LandPos) <= Data.DamageRadius)
-                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Data.AttackDamage);
+                ctx.Runtime.PlayerTarget.GetComponent<PlayerController>()?.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
         }
 
         SpawnScorchCluster(e.LandPos, ctx);

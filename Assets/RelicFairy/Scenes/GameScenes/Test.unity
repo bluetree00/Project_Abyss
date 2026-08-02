@@ -602,6 +602,7 @@ MonoBehaviour:
   startRoomMapKey: 
   startWithZoneLayout: 0
   runFlowController: {fileID: 0}
+  debugBossThresholdOverride: 0
   startRoomDialogueSO: {fileID: 0}
   characterPickupPrefabs: []
   weaponPickupPrefabs:
@@ -972,7 +973,7 @@ PrefabInstance:
     - target: {fileID: 2914289304035155840, guid: 78f9a44eacc9e934cb37c54ce041fb0c,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8267987811358081670, guid: 78f9a44eacc9e934cb37c54ce041fb0c,
         type: 3}

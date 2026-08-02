@@ -28,6 +28,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [Header("공격")]
     [SerializeField] private float  _attackAnimDuration  = 1.8f;
     [SerializeField] private int    _attackDamage        = 25;
+    [SerializeField] private float  _damageMultiplier    = 1.5f;
     [SerializeField] private GameObject _windBlastPrefab;
     [Tooltip("날개치기 발동 시 재생할 사운드")]
     [SerializeField] private AudioClip _wingStrikeSfx;
@@ -59,6 +60,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public Color  WarningColor       => _warningColor;
     public float  AttackAnimDuration => _attackAnimDuration;
     public int    AttackDamage       => _attackDamage;
+    public float  DamageMultiplier   => _damageMultiplier;
     public GameObject WindBlastPrefab => _windBlastPrefab;
     public AudioClip  WingStrikeSfx   => _wingStrikeSfx;
     public float  WingStrikeSfxDelay => _wingStrikeSfxDelay;
@@ -390,7 +392,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Data.AttackDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             Data.StatusEffect?.Apply(player);
             break;
         }

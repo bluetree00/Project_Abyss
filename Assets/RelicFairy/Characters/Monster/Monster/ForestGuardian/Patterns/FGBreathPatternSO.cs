@@ -79,6 +79,9 @@ public class FGBreathPatternSO : BossPatternSO
     [Tooltip("브레스 이펙트 프리팹 (EarthBeam 등). 보스 왼손 위치에 배치. null이면 재생 안 함.")]
     public GameObject breathVfxPrefab;
 
+    [Tooltip("브레스 VFX 기준 사거리(m). startSpeed=1일 때 파티클이 도달하는 거리. 에디터에서 실측 후 조정.")]
+    public float vfxReferenceLength = 8f;
+
     // ── 사운드 ────────────────────────────────────────────
     [Header("Breath — Sound")]
     [Tooltip("브레스 지속 중 루프 재생할 사운드. null이면 재생 안 함.")]
@@ -123,6 +126,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
     private GameObject  _warningGO;
     private RectWarning _rectWarning;
     private GameObject  _breathVfxGO;
+    private Transform   _beamBody;
     private AudioSource _beamAudioSource;
     private Bounds      _arenaBounds;
 
@@ -204,6 +208,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
                 UpdateCurrentRange(ctx);
                 RotateTowardPlayer(ctx);
                 UpdateBreathVfxTransform(ctx);
+                SyncBreathEffectScale();
 
                 _damageTimer += dt;
                 if (_damageTimer >= Data.damageTick)
@@ -269,7 +274,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         if (forward.sqrMagnitude < 0.0001f) return Data.range;
         forward.Normalize();
 
-        float result = Data.range;
+        float result = float.MaxValue;
         if (Mathf.Abs(forward.x) > 0.0001f)
         {
             float bx = forward.x > 0f ? _arenaBounds.max.x : _arenaBounds.min.x;
@@ -282,7 +287,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
             float t  = (bz - origin.z) / forward.z;
             if (t > 0f) result = Mathf.Min(result, t);
         }
-        return result;
+        return result < float.MaxValue ? result : Data.range;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -385,6 +390,7 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         if (Data.breathVfxPrefab != null)
         {
             _breathVfxGO = Managers.ObjectPooler.SpawnFromPrefab(Data.breathVfxPrefab, ObjectPoolerManager.PoolType.Effect, ctx.Transform.position, Quaternion.identity);
+            _beamBody = _breathVfxGO.transform.Find("BeamBody/BeamBody");
             UpdateBreathVfxTransform(ctx);
 
             // Phase 2에서 파티클 VFX를 애니메이션 속도와 동기화 후 Play
@@ -421,19 +427,22 @@ public class FGBreathState : FullLockState<FGBreathPatternSO>
         _breathVfxGO.transform.SetPositionAndRotation(
             origin,
             Quaternion.LookRotation(ctx.Transform.forward));
+    }
 
-        // BeamBody Z 스케일을 현재 사거리(_currentRange)에 맞춰 매 프레임 갱신
-        var beamBody = _breathVfxGO.transform.Find("BeamBody");
-        if (beamBody != null)
-        {
-            Vector3 s = beamBody.localScale;
-            s.z = _currentRange > 0f ? _currentRange : Data.range;
-            beamBody.localScale = s;
-        }
+    private void SyncBreathEffectScale()
+    {
+        if (_beamBody == null) return;
+        float reference = Mathf.Max(0.01f, Data.vfxReferenceLength);
+        float scaleZ    = Mathf.Max(0.01f, _currentRange / reference);
+        Vector3 s = _beamBody.localScale;
+        s.z = scaleZ;
+        _beamBody.localScale = s;
     }
 
     private void StopBreathVfx()
     {
+        _beamBody = null;
+
         if (_breathVfxGO != null)
         {
             float maxLifetime = 0f;

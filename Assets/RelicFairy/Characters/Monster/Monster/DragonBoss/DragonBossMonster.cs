@@ -755,10 +755,10 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         if (_dragonBB == null || _config is not BossConfigSO bossConfig || bossConfig.patternEntries == null)
             return;
 
-        float takeoffMult = _dragonBB.GroundedPatternStreak >= 2
+        float takeoffMult = _dragonBB.GroundedPatternStreak >= 3
             ? _airTransitionWeightMultiplier
             : 1f;
-        float landingMult = _dragonBB.AirbornePatternStreak >= 2
+        float landingMult = _dragonBB.AirbornePatternStreak >= 3
             ? _airTransitionWeightMultiplier
             : 1f;
 

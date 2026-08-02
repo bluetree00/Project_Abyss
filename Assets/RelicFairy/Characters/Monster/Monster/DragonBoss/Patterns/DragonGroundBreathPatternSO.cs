@@ -32,6 +32,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     [SerializeField] private float _breathRange        = 24f;
     [SerializeField] private float _breathRadius       = 0.8f;
     [SerializeField] private int   _breathDamagePerSec = 20;
+    [SerializeField] private float _damageMultiplier   = 0.5f;
 
     [Header("사거리 점진 확장 (브레스 진행에 따라 맵 끝까지 늘어남)")]
     [Tooltip("브레스 시작 시점 사거리 = 전체 사거리(맵 경계까지) * 이 비율")]
@@ -68,6 +69,7 @@ public class DragonGroundBreathPatternSO : BossPatternSO
     public float  BreathRange           => _breathRange;
     public float  BreathRadius          => _breathRadius;
     public int    BreathDamagePerSec    => _breathDamagePerSec;
+    public float  DamageMultiplier      => _damageMultiplier;
     public float  RangeStartRatio       => _rangeStartRatio;
     public float  RangeGrowDuration     => _rangeGrowDuration;
     public float  VfxReferenceLength    => _vfxReferenceLength;
@@ -519,7 +521,7 @@ internal sealed class DragonGroundBreathState : FullLockState<DragonGroundBreath
                   ?? ctx.Runtime.PlayerTarget.GetComponentInParent<PlayerController>();
         if (player == null) return;
 
-        float dmg = Data.BreathDamagePerSec * DamageTick;
+        float dmg = ctx.Config.stat.attackPower * Data.DamageMultiplier * DamageTick;
         player.TakeDamage(Mathf.RoundToInt(dmg));
         Data.StatusEffect?.Apply(player);
     }
