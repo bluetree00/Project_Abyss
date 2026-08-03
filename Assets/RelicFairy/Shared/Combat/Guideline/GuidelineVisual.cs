@@ -48,6 +48,7 @@ public static class GuidelineVisual
     private static readonly Color Light    = new(1.00f, 0.96f, 0.60f, 0.80f);
     private static readonly Color Dark     = new(0.60f, 0.30f, 0.90f, 0.90f);
 
+    private static readonly Color Blood    = new(0.78f, 0.12f, 0.16f, 0.90f);   // 출혈 — 진홍
     private static readonly Color Synergy  = new(1.00f, 0.70f, 0.25f, 0.85f);
     private static readonly Color CritCol  = new(1.00f, 0.30f, 0.30f, 0.90f);
     private static readonly Color RelicCol = new(1.00f, 0.72f, 0.20f, 1.00f);
@@ -107,6 +108,7 @@ public static class GuidelineVisual
             case "freeze":                c = IceDeep;  label = "빙결"; break;
             case "shatter":               c = IceDeep;  label = "분쇄"; break;
             case "poison": case "item_poison": c = Grass; label = "독";   break;
+            case "bleed":                 c = Blood;    label = "출혈"; break;
             case "poison_atk":            c = Grass;    label = "약화"; break;
             case "vulnerable":            c = Grass;    label = "취약"; break;
             case "item_mark":             c = Dark;     label = "표식"; break;

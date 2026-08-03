@@ -25,6 +25,7 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
     private float  _timer;        // 현재 구간 경과
     private float  _chargeAccel;  // 잔열 — 처치로 적립되는 충전 가속(0 = 정속)
     private bool   _markActiveLast;
+    private bool   _holdNoon;     // [파츠] 영원한 정오 — true면 정오 구간에 고정(황혼·충전 제거)
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다.
     private string _label = "여명";
@@ -62,6 +63,14 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
         // 정오가 왔다 갔다 하며 실제 전투에 쓸 사이클을 허공에 버렸다.
         // (차단형 팝업 구간은 timeScale=0이라 deltaTime이 0 → 별도 처리 불필요)
         if (!IsRunActive) return;
+
+        // [파츠] 영원한 정오 — 정오에 고정하고 사이클을 멈춘다.
+        if (_holdNoon)
+        {
+            if (_phase != ZPhase.Noon) { _phase = ZPhase.Noon; _timer = 0f; _markActiveLast = false; OnChanged?.Invoke(); }
+            else _timer = 0f;
+            return;
+        }
 
         float accel = _phase == ZPhase.Charging ? _chargeAccel : 0f;
         _timer += Time.deltaTime * (1f + accel);
@@ -114,6 +123,15 @@ public sealed class ZenithGauge : MonoBehaviour, IRelicResource
 
     /// <summary>현재 충전 가속(0 = 정속, 1 = 2배속). HUD/디버그 표시용.</summary>
     public float ChargeAccel => _chargeAccel;
+
+    /// <summary>[파츠] 영원한 정오 — on이면 즉시 정오로 진입해 그 구간에서 벗어나지 않는다(황혼·충전 제거).</summary>
+    public void SetHoldNoon(bool on)
+    {
+        if (_holdNoon == on) return;
+        _holdNoon = on;
+        if (on) { _phase = ZPhase.Noon; _timer = 0f; _markActiveLast = false; }
+        OnChanged?.Invoke();
+    }
 
     // ── IRelicResource ──
     public float Fill => _phase switch

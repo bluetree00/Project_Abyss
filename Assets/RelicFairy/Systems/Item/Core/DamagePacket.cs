@@ -34,4 +34,5 @@ public struct DamageReport
     public bool WasKill;
     public bool IsCrit;            // 치명타 여부 (룬 OnCrit 라우팅에 사용)
     public Vector3 HitPosition;
+    public WeaponActionType ActionType;   // 공격 종류(스킬 특화 파츠가 심판의 일격 등 식별에 사용)
 }

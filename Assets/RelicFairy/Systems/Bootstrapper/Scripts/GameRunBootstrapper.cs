@@ -244,6 +244,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         _run.OnMapSpawnRequested += OnMapSpawnRequestedHandler;
         _run.OnBossRoomCleared += OnBossRoomClearedHandler;
+        _run.OnPlayerBound += ActivateRelicParts;   // 새 챕터/이어하기 플레이어에 런 고정 파츠 재활성
     }
 
     /// <summary>보스방 클리어 신호 → 유물 파츠 드래프트 → (비최종)이어지는 길 / (최종)런 클리어.
@@ -328,6 +329,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             // 팝업 로드 실패 — 보상이 조용히 증발하지 않도록 첫 후보를 자동 지급한다.
             loadout.AddRelicPart(candidates[0].part_id);
+            ActivateRelicParts(_run?.Player);
             Debug.LogWarning("[GameRunBootstrapper] 파츠 드래프트 팝업 로드 실패 — 첫 후보 자동 지급");
             return;
         }
@@ -339,8 +341,21 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         if (popup.Result != null)
         {
             loadout.AddRelicPart(popup.Result.part_id);
+            ActivateRelicParts(_run?.Player);
             Debug.Log($"[GameRunBootstrapper] 파츠 획득: {popup.Result.part_id} ({popup.Result.part_name})");
         }
+    }
+
+    /// <summary>
+    /// 로드아웃의 파츠를 플레이어 효과 허브에 동기화(idempotent — 이미 활성인 key는 무시).
+    /// 호출 경로 둘: (1) 보스 드래프트 획득 직후 살아있는 플레이어에, (2) OnPlayerBound로
+    /// 새 챕터/이어하기의 새 플레이어에 런 고정 파츠 재활성.
+    /// </summary>
+    private void ActivateRelicParts(PlayerController player)
+    {
+        var loadout = AppBootstrapper.Instance?.Loadout;
+        if (player == null || loadout == null || loadout.RelicPartIds.Count == 0) return;
+        player.RuneEffects.Parts.SyncFromLoadout(loadout.RelicPartIds);
     }
 
     /// <summary>풀에서 중복 없이 count개를 무작위로 뽑는다(풀이 작으면 있는 만큼).</summary>
@@ -463,6 +478,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             _run.OnMapSpawnRequested -= OnMapSpawnRequestedHandler;
             _run.OnBossRoomCleared -= OnBossRoomClearedHandler;
+            _run.OnPlayerBound -= ActivateRelicParts;
 
             // 씬 이탈 전 현재 무기 슬롯 저장
             if (_run.IsRunning)

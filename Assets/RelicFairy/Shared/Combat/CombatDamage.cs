@@ -242,6 +242,7 @@ public static class CombatDamage
             Target      = target,
             IsCrit      = isCrit,
             HitPosition = hitPoint,
+            ActionType  = actionType,
         };
         mgr?.OnPostDealDamage(report);
 
