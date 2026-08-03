@@ -2,6 +2,36 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
+/// 조명 프리팹 위에 덮어씌우는 챕터 무드 값.
+/// 프리팹은 전 챕터가 공유하고(WallTorch/CenterLight), 색·세기·범위만 팔레트가 소유한다.
+/// 프리팹을 챕터 수만큼 복제하지 않는 이유: 두 프리팹 모두 메시 없는 Point Light 단독이라
+/// 복제해봐야 달라지는 건 이 세 값뿐이다.
+/// </summary>
+[System.Serializable]
+public class LightTint
+{
+    [Tooltip("조명 색. 알파 0이면 프리팹 원본 색을 유지한다(미설정 취급).")]
+    public Color color = new Color(0f, 0f, 0f, 0f);
+
+    [Min(0f), Tooltip("프리팹 강도에 곱할 배율. 1이면 원본 유지.")]
+    public float intensityMul = 1f;
+
+    [Min(0f), Tooltip("프리팹 범위(range)에 곱할 배율. 1이면 원본 유지.")]
+    public float rangeMul = 1f;
+
+    /// <summary>대상 계층의 Light에 적용. 미설정 값은 건드리지 않는다.</summary>
+    public void ApplyTo(GameObject go)
+    {
+        if (go == null) return;
+        var lt = go.GetComponentInChildren<Light>();   // 자기 자신 포함 — WallTorch는 Light가 자식에 있다
+        if (lt == null) return;
+        if (color.a > 0f) lt.color = color;
+        if (!Mathf.Approximately(intensityMul, 1f)) lt.intensity *= intensityMul;
+        if (!Mathf.Approximately(rangeMul, 1f))     lt.range     *= rangeMul;
+    }
+}
+
+/// <summary>
 /// 팔레트별 방 조명 설정. BlockPalette에 직렬화되어 테마별 조명을 바인딩한다.
 /// </summary>
 [System.Serializable]
@@ -21,6 +51,13 @@ public class RoomLightingConfig
 
     [Min(0), Tooltip("배치할 벽 조명 최대 개수. 0이면 무제한(현행). 큰 방의 과도한 실시간 조명을 캡한다.")]
     public int maxWallLights = 0;
+
+    [Header("Chapter Mood")]
+    [Tooltip("벽 조명 무드. 챕터 지배색을 여기서 준다.")]
+    public LightTint wallLightTint = new();
+
+    [Tooltip("중앙 조명 무드. 벽 조명과 다른 색을 주면 방에 2색 대비가 생긴다.")]
+    public LightTint centerLightTint = new();
 }
 
 /// <summary>벽을 세우는 방식. 팔레트(테마)별로 다르다.</summary>

@@ -455,6 +455,9 @@ public class MapBuilder
             var go = Object.Instantiate(cfg.wallLightPrefab,
                 parent.TransformPoint(lightLocal), Quaternion.LookRotation(inwardDir), parent);
 
+            // 챕터 무드를 먼저 입히고, 출구 승격은 그 위에 곱한다(승격은 무드가 아니라 위계다).
+            cfg.wallLightTint?.ApplyTo(go);
+
             if (boost)
             {
                 // 주 출구를 '더 중요해 보이는 조명'으로 — 밝기 위계로 경로를 읽히게 한다.
@@ -529,9 +532,10 @@ public class MapBuilder
         if (cfg.centerLightPrefab != null)
         {
             float ceilingY = baseY + wallLayers * cellSize;
-            Object.Instantiate(cfg.centerLightPrefab,
+            var centerGo = Object.Instantiate(cfg.centerLightPrefab,
                 parent.TransformPoint(new Vector3(0f, ceilingY - cellSize * 0.3f, 0f)),
                 Quaternion.identity, parent);
+            cfg.centerLightTint?.ApplyTo(centerGo);
         }
     }
 

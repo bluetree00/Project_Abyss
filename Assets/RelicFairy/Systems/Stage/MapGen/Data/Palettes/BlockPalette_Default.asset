@@ -13,6 +13,25 @@ MonoBehaviour:
   m_Name: BlockPalette_Default
   m_EditorClassIdentifier: Assembly-CSharp::BlockPalette
   themeMatch: "*"
+  wallMode: 0
+  wallHeight: 10
+  hasCeiling: 1
+  lighting:
+    wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
+      type: 3}
+    centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
+      type: 3}
+    wallLightSpacing: 6
+    wallLightHeightRatio: 0.34
+    maxWallLights: 16
+    wallLightTint:
+      color: {r: 1, g: 0.72, b: 0.42, a: 1}
+      intensityMul: 1
+      rangeMul: 1
+    centerLightTint:
+      color: {r: 1, g: 0.9, b: 0.78, a: 1}
+      intensityMul: 0.9
+      rangeMul: 1
   blocks:
   - {fileID: 11400000, guid: 94a14fa013e401448ab5e1ddd546d093, type: 2}
   - {fileID: 11400000, guid: 258b2e752cd469c4383375a3b0785d1c, type: 2}

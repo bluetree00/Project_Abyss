@@ -21,9 +21,17 @@ MonoBehaviour:
       type: 3}
     centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
       type: 3}
-    wallLightSpacing: 8
-    wallLightHeightRatio: 0.35
-    maxWallLights: 12
+    wallLightSpacing: 6
+    wallLightHeightRatio: 0.3
+    maxWallLights: 18
+    wallLightTint:
+      color: {r: 0.62, g: 0.42, b: 1.0, a: 1}
+      intensityMul: 1.4
+      rangeMul: 0.75
+    centerLightTint:
+      color: {r: 0.55, g: 0.6, b: 0.95, a: 1}
+      intensityMul: 0.5
+      rangeMul: 0.9
   blocks:
   - {fileID: 11400000, guid: 9aa8b58e024dd3d4fa8175d71645cde8, type: 2}
   - {fileID: 11400000, guid: 0eb3ff44f728bde4eb330fbe506d6066, type: 2}
