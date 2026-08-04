@@ -161,6 +161,20 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     [Tooltip("걷기/달리기 클립 1회 재생 중 발이 닿는 시점들 (normalizedTime, 0~1). 48프레임 클립 기준 24프레임마다 = {0, 0.5}")]
     [SerializeField] private float[] _footstepPhases = new float[] { 0f, 0.5f };
 
+    [Header("Dragon — 공중 패시브 메테오")]
+    [Tooltip("공중 상태일 때 독자 쿨타임으로 발동할 메테오 SO. null이면 비활성.")]
+    [SerializeField] private DragonFireballRainPatternSO _passiveMeteorSO;
+    [Tooltip("메테오 쿨타임 하한 (초)")]
+    [SerializeField] private float _passiveMeteorCooldownMin = 12f;
+    [Tooltip("메테오 쿨타임 상한 (초)")]
+    [SerializeField] private float _passiveMeteorCooldownMax = 20f;
+    [Tooltip("공중 진입 직후 첫 발동까지 대기 시간 (초)")]
+    [SerializeField] private float _passiveMeteorInitialDelay = 4f;
+    [Tooltip("메테오 버스트 지속 시간 하한 (초)")]
+    [SerializeField] private float _passiveMeteorBurstMin = 5f;
+    [Tooltip("메테오 버스트 지속 시간 상한 (초)")]
+    [SerializeField] private float _passiveMeteorBurstMax = 10f;
+
     // ── 읽기 전용 프로퍼티 (상태 클래스에서 접근) ──────────
     public string WalkChaseStateName   => _walkChaseStateName;
     public string RunChaseStateName    => _runChaseStateName;
@@ -221,11 +235,15 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     public BossAttackBlackboard Blackboard => _dragonBB;
 
     // ── 보스 전용 필드 ────────────────────────────────────
-    private DragonBossBlackboard  _dragonBB;
-    private BossPatternContext    _patternCtx;
-    private BossPatternRunner     _runner;
-    private DragonDormantState    _dormantState;
-    private bool                  _pendingTriggerEntrance;
+    private DragonBossBlackboard         _dragonBB;
+    private BossPatternContext           _patternCtx;
+    private BossPatternRunner            _runner;
+    private DragonDormantState           _dormantState;
+    private bool                         _pendingTriggerEntrance;
+    private DragonAirMeteorPassiveRunner _meteorPassiveRunner;
+    private System.Threading.CancellationTokenSource _meteorPassiveCts;
+    private Vector3                      _preEntranceSpawnPos;
+    private bool                         _hasPreEntranceSpawnPos;
 
     // ── 공중 히트박스 ─────────────────────────────────────
     private CapsuleCollider _capsule;
@@ -309,7 +327,16 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
 
     protected override void OnInitialized()
     {
+        // OnEnable에서 고공으로 이동했으므로 InitAsync가 잘못된 위치를 SpawnPosition으로 저장했을 수 있음 → 착지 지점으로 복원
+        if (_hasPreEntranceSpawnPos && _runtime != null)
+        {
+            _runtime.SpawnPosition  = _preEntranceSpawnPos;
+            _hasPreEntranceSpawnPos = false;
+        }
+
         InitializeRoomContext(); // OnEnable이 _runtime 생성 전에 호출된 경우를 위한 재시도
+        // BreathSweep/FireballRain 경고장판 풀 사전 워밍 — 전투 중 첫 스폰 시 CreatePrimitive 렉 방지
+        QuadTilePool.Prewarm(DragonBossRoomContext.Width * DragonBossRoomContext.Height);
         BindBossHud();
         if (_clawTrailCtrl == null)
             _clawTrailCtrl = GetComponent<DragonClawTrailController>();
@@ -550,6 +577,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         _pendingTriggerEntrance     = false;
         _normalSfxTimer = 0f;
         _normalSfxNextInterval = UnityEngine.Random.Range(_normalSfxIntervalMin, _normalSfxIntervalMax);
+        StopMeteorPassiveRunner();
         // pool 재활성: 등장 연출 재진입
         if (_dormantState != null)
             ChangeState(_dormantState);
@@ -623,6 +651,37 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
         bool poiseBroke = _dragonBB.ApplyPoiseDamage();
         if (!poiseBroke)
             _suppressGetHitThisHit = true;
+    }
+
+    protected override void OnDisable()
+    {
+        StopMeteorPassiveRunner();
+        base.OnDisable();
+    }
+
+    private void StartMeteorPassiveRunner()
+    {
+        if (_passiveMeteorSO == null) return;
+        StopMeteorPassiveRunner();
+        _meteorPassiveCts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(
+            destroyCancellationToken);
+        _meteorPassiveRunner = new DragonAirMeteorPassiveRunner(
+            _ctx,
+            _passiveMeteorSO,
+            _passiveMeteorCooldownMin,
+            _passiveMeteorCooldownMax,
+            _passiveMeteorInitialDelay,
+            _passiveMeteorBurstMin,
+            _passiveMeteorBurstMax);
+        _meteorPassiveRunner.Start(_meteorPassiveCts.Token);
+    }
+
+    private void StopMeteorPassiveRunner()
+    {
+        _meteorPassiveCts?.Cancel();
+        _meteorPassiveCts?.Dispose();
+        _meteorPassiveCts    = null;
+        _meteorPassiveRunner = null;
     }
 
     public void UnbindBossHudPublic() => UnbindBossHudIfBound();
@@ -823,6 +882,20 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     // IBossEntrance
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    /// <summary>
+    /// BossSpawner가 SetActive 직전에 호출 — 비활성 상태에서 착지 지점을 저장하고 연출 시작 고공 위치로 이동한다.
+    /// 활성화(SetActive=true) 시점에 이미 바닥 배치 위치가 아닌 고공에 위치하게 되어 배치 모습이 렌더링되지 않는다.
+    /// </summary>
+    public void PrePositionForEntrance()
+    {
+        _preEntranceSpawnPos    = transform.position;
+        _hasPreEntranceSpawnPos = true;
+        transform.position += new Vector3(_entranceFlyInOffset.x, _entranceDescendHeight, _entranceFlyInOffset.y);
+        Vector3 flightDir = new Vector3(-_entranceFlyInOffset.x, 0f, -_entranceFlyInOffset.y);
+        if (flightDir.sqrMagnitude > 0.01f)
+            transform.rotation = Quaternion.LookRotation(flightDir.normalized, Vector3.up);
+    }
+
     /// <summary>DragonDormantState가 플레이어를 감지했을 때 발행 — BossRoomController가 카메라 팬을 시작한다.</summary>
     public override bool HasEntranceAnimation => true;
 
@@ -838,6 +911,7 @@ public class DragonBossMonster : MonsterBase, IBoss, IBossEntrance
     internal void FireCombatReady()
     {
         _runner?.EnsureMinBreakCooldown(3f);
+        StartMeteorPassiveRunner();
         OnCombatReady?.Invoke();
         RaiseBossCombatReady();
     }

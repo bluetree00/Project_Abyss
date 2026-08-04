@@ -82,10 +82,24 @@ public abstract class GroundFieldBase : MonoBehaviour
         _auraHandle = 0;
     }
 
+    private static int s_groundMask = -1;
+
+    // 공중 위치(공중 몬스터 피격 등)에 장판이 떠있지 않도록 Ground 레이어 기준으로 Y를 스냅한다.
+    private static Vector3 SnapToFloor(Vector3 pos)
+    {
+        if (s_groundMask < 0)
+            s_groundMask = 1 << LayerMask.NameToLayer("Ground");
+
+        var origin = new Vector3(pos.x, pos.y + 50f, pos.z);
+        return Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 100f, s_groundMask)
+            ? new Vector3(pos.x, hit.point.y, pos.z)
+            : pos;
+    }
+
     /// <summary>장판 생성 초기화. 고정 위치(추적 없음).</summary>
     public virtual void Initialize(Vector3 position, float radius, float lifetime, GameObject instigator)
     {
-        transform.position = position;
+        transform.position = SnapToFloor(position);
         _radius       = Mathf.Max(0.1f, radius);
         _lifetime     = Mathf.Max(0f, lifetime);
         _instigator   = instigator;

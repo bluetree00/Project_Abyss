@@ -21,7 +21,8 @@ public class DragonSummonPatternSO : BossPatternSO
 
     [Header("알 소환")]
     [SerializeField] private GameObject _eggPrefab;
-    [SerializeField] private float _triangleRadius  = 5f;
+    [SerializeField] private int   _minSpawnCount   = 3;
+    [SerializeField] private int   _maxSpawnCount   = 5;
     [SerializeField] private float _eggDropHeight   = 8f;
     [SerializeField] private float _eggDropDuration = 1.5f;
     [SerializeField] private float _eggCrackDelay   = 0.8f;
@@ -73,7 +74,8 @@ public class DragonSummonPatternSO : BossPatternSO
     public string TakeoffStateName              => _takeoffStateName;
     public string LandingStateName              => _landingStateName;
     public GameObject EggPrefab                 => _eggPrefab;
-    public float  TriangleRadius                => _triangleRadius;
+    public int    MinSpawnCount                 => _minSpawnCount;
+    public int    MaxSpawnCount                 => _maxSpawnCount;
     public float  EggDropHeight                 => _eggDropHeight;
     public float  EggDropDuration               => _eggDropDuration;
     public float  EggCrackDelay                 => _eggCrackDelay;
@@ -166,12 +168,11 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 {
     private enum Phase { Takeoff, Hover, WaitMinions, Landing, Done }
 
-    private const int TotalMinions = 3;
-
     private Phase   _phase;
     private float   _timer;
     private int     _takeoffHash;
     private Vector3 _hoverPos;
+    private int     _totalMinions;
     private int     _minionsSpawned;
     private int     _minionsAlive;
     private bool    _resuming;
@@ -182,6 +183,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
     internal void Reset()
     {
         _phase                    = Phase.Done;
+        _totalMinions             = 0;
         _minionsSpawned           = 0;
         _minionsAlive             = 0;
         _resuming                 = false;
@@ -290,7 +292,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         ctx.Transform.position = _hoverPos;
         FacePlayer(ctx);
 
-        if (_minionsSpawned >= TotalMinions)
+        if (_minionsSpawned >= _totalMinions && _totalMinions > 0)
         {
             _phase = Phase.WaitMinions;
             _timer = Data.AirPatternInterval; // 진입 즉시 BreathSweep 발동
@@ -305,7 +307,7 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
         FacePlayer(ctx);
 
         // 미니 드래곤이 모두 죽기 전까지는 절대로 착지하지 않음
-        bool allDead = _minionsSpawned >= TotalMinions && _minionsAlive <= 0;
+        bool allDead = _minionsSpawned >= _totalMinions && _totalMinions > 0 && _minionsAlive <= 0;
         if (allDead)
         {
             StartLanding(ctx);
@@ -357,22 +359,30 @@ internal sealed class DragonSummonState : FullLockState<DragonSummonPatternSO>
 
     private void SpawnEggs(MonsterContext ctx)
     {
+        _totalMinions = Random.Range(Data.MinSpawnCount, Data.MaxSpawnCount + 1);
+
         if (Data.EggPrefab == null)
         {
-            _minionsSpawned = TotalMinions;
+            _minionsSpawned = _totalMinions;
             return;
         }
 
         var (eggColor, miniColor, breathPrefab) = Data.GetElementAssets();
-        Vector3 center = ctx.Runtime.PlayerTarget != null
-            ? ctx.Runtime.PlayerTarget.position
-            : ctx.Transform.position;
 
-        for (int i = 0; i < TotalMinions; i++)
+        for (int i = 0; i < _totalMinions; i++)
         {
-            float   angle    = i * 120f * Mathf.Deg2Rad;
-            Vector3 offset   = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * Data.TriangleRadius;
-            Vector3 ground   = center + offset;
+            int cx = Random.Range(2, DragonBossRoomContext.Width  - 2);
+            int cz = Random.Range(2, DragonBossRoomContext.Height - 2);
+            Vector3 landBase = DragonBossRoomContext.CellToWorld(cx, cz, 0f);
+            Vector3 ground;
+            if (Physics.Raycast(new Vector3(landBase.x, landBase.y + 50f, landBase.z), Vector3.down, out RaycastHit hit, 100f))
+                ground = hit.point + Vector3.up * 0.05f;
+            else
+            {
+                ground   = landBase;
+                ground.y = ctx.Runtime.SpawnPosition.y + 0.05f;
+            }
+
             Vector3 spawnPos = ground + Vector3.up * Data.EggDropHeight;
 
             var go  = Object.Instantiate(Data.EggPrefab, spawnPos, Quaternion.identity);

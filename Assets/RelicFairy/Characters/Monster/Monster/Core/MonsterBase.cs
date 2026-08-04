@@ -947,7 +947,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             // "Setting linear velocity of kinematic body" 경고가 발생하므로, 전환→임펄스 순서가 필수.
             ChangeState<GetHitState>();
 
-            if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled))
+            if (instigator != null && _rb != null && (_agent == null || !_agent.isActiveAndEnabled)
+                && Grade != MonsterGrade.Boss)
             {
                 _rb.isKinematic = false;
                 Vector3 dir = (transform.position - instigator.transform.position).normalized;

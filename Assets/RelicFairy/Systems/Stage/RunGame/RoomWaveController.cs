@@ -297,6 +297,7 @@ public sealed class RoomWaveController : MonoBehaviour
     private void HandleLegacyMonsterSpawned(MonsterBase monster)
     {
         if (monster == null) return;
+        Debug.Log($"[RoomWave] 몬스터 스폰 감지 '{monster.name}' — OnDied 구독", this);
         monster.OnDied += HandleLegacyMonsterDied;
     }
 
@@ -308,6 +309,7 @@ public sealed class RoomWaveController : MonoBehaviour
             _lastKillPosition = monster.transform.position;
             _hasKillPosition  = true;
         }
+        Debug.Log($"[RoomWave] 몬스터 사망 감지 '{(monster != null ? monster.name : "null")}' — active={_active} cleared={_cleared} killed={_killed+1}/{_targetKillCount}", this);
         if (!_active || _cleared) return;
 
         _killed++;
@@ -332,7 +334,7 @@ public sealed class RoomWaveController : MonoBehaviour
         var ct = this.GetCancellationTokenOnDestroy();
         try
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(PreExitDelay), cancellationToken: ct);
+            await UniTask.Delay(TimeSpan.FromSeconds(PreExitDelay), ignoreTimeScale: true, cancellationToken: ct);
 
             _run?.EnterStandby();
 

@@ -138,11 +138,6 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
         PlayAnim(ctx, Data.HoverStateName);
 
-        // [DESIGN GUIDE] LeapCooldown 은 DragonBossBlackboard 소속이어야 합니다.
-        // 베이스 타입(BossAttackBlackboard) 캐스팅 대신 DragonBossBlackboard 로 캐스팅하세요.
-        // 예: if (ctx.Blackboard is DragonBossBlackboard dragonBB) dragonBB.LeapCooldown = ...
-        var bb = (ctx.Monster as IBoss)?.Blackboard;
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
     }
 
     public override void Update(MonsterContext ctx)
@@ -161,7 +156,11 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     }
 
     public override void Exit(MonsterContext ctx)
-        => DestroyWarning();
+    {
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
+        DestroyWarning();
+    }
 
     // ── Takeoff ───────────────────────────────────────────────────────────────
 

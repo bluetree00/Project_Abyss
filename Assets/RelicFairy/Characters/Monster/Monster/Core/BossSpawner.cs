@@ -138,7 +138,10 @@ public class BossSpawner : MonoBehaviour
         }
         else if (!placedBoss.gameObject.activeSelf)
         {
-            // 디졸브 미사용/자체 등장 보스: 비활성 배치 시 여기서 직접 활성화(보스 미등장 방지).
+            // 자체 등장 연출 보스: 활성화 전에 연출 시작 위치로 이동 (배치 위치가 렌더링되지 않도록)
+            if (placedBoss is DragonBossMonster dragonBoss)
+                dragonBoss.PrePositionForEntrance();
+
             placedBoss.gameObject.SetActive(true);
         }
     }

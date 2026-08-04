@@ -224,7 +224,27 @@ public class BossPatternRunner
 
     BossPatternSO SelectWeightedRandom(BossPatternEntry entry)
     {
+        // 1차: 직전 패턴 제외
         float total = 0f;
+        foreach (var p in entry.patterns)
+        {
+            if (p == null || !p.CanExecute(_ctx) || p == _lastPatternSO) continue;
+            total += Mathf.Max(0f, p.weight);
+        }
+        if (total > 0f)
+        {
+            float roll = UnityEngine.Random.Range(0f, total);
+            float acc  = 0f;
+            foreach (var p in entry.patterns)
+            {
+                if (p == null || !p.CanExecute(_ctx) || p == _lastPatternSO) continue;
+                acc += Mathf.Max(0f, p.weight);
+                if (roll <= acc) return p;
+            }
+        }
+
+        // 폴백: 선택 가능한 패턴이 직전 패턴 하나뿐인 경우
+        total = 0f;
         foreach (var p in entry.patterns)
         {
             if (p == null || !p.CanExecute(_ctx)) continue;
@@ -232,13 +252,13 @@ public class BossPatternRunner
         }
         if (total <= 0f) return null;
 
-        float roll = UnityEngine.Random.Range(0f, total);
-        float acc  = 0f;
+        float r = UnityEngine.Random.Range(0f, total);
+        float a  = 0f;
         foreach (var p in entry.patterns)
         {
             if (p == null || !p.CanExecute(_ctx)) continue;
-            acc += ApplyRepeatPenalty(p);
-            if (roll <= acc) return p;
+            a += ApplyRepeatPenalty(p);
+            if (r <= a) return p;
         }
         return null;
     }
@@ -303,6 +323,18 @@ public class BossPatternRunner
 
     BossPatternSO SelectRandom(BossPatternEntry entry, bool checkCanExecute)
     {
+        // 1차: 직전 패턴 제외
+        _randomCandidates.Clear();
+        foreach (var p in entry.patterns)
+        {
+            if (p == null || p == _lastPatternSO) continue;
+            if (checkCanExecute && !p.CanExecute(_ctx)) continue;
+            _randomCandidates.Add(p);
+        }
+        if (_randomCandidates.Count > 0)
+            return _randomCandidates[UnityEngine.Random.Range(0, _randomCandidates.Count)];
+
+        // 폴백: 직전 패턴 하나뿐인 경우
         _randomCandidates.Clear();
         foreach (var p in entry.patterns)
         {

@@ -188,7 +188,9 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private struct ScorchEntry
     {
-        public GameObject Go;
+        public GameObject  Go;
+        public MeshRenderer Mr;
+        public Material    OwnedMat; // null for BossEffectPool items
         public float Timer;
         public float MaxTimer;
     }
@@ -240,6 +242,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private readonly List<Vector2Int>   _warnCells = new();
     private readonly List<GameObject>   _warnTiles = new();
     private readonly List<Material>     _warnMats  = new();
+    private readonly List<MeshRenderer> _warnMrs   = new();
     private readonly List<TsunamiEntry> _tsunamis  = new();
     private readonly List<ScorchEntry>  _scorches  = new();
     private readonly List<MeteorEntry>  _meteors   = new();
@@ -248,6 +251,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private bool  _cameraReturned;
 
     private GameObject  _flameBreathGo;
+    private GameObject  _followLightGo;
     private Light       _followLight;
     private AudioSource _flameBreathAudioSource;
     private GameObject  _playerAuraInstance;
@@ -263,6 +267,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         RestoreDragonSpeedDirect();
         CleanupWarn();
         CleanupFollowLight();
+        if (_followLightGo != null) { Object.Destroy(_followLightGo); _followLightGo = null; _followLight = null; }
         CleanupFlameBreath();
         CleanupAllTsunamis();
         CleanupAllScorches();
@@ -291,8 +296,6 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
         _meteorSpawning    = false;
         _cameraReturned    = false;
         if (ctx.Agent != null) ctx.Agent.enabled = false;
-        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard bb)
-            bb.LeapCooldown = Data.Cooldown;
 
         if (Data.BreathHorizReach > 0f)
         {
@@ -329,6 +332,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     public override void Exit(MonsterContext ctx)
     {
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
         RestoreDragonSpeed(ctx);
         CleanupWarn();
         CleanupFollowLight();
@@ -636,28 +641,21 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             return pa.CompareTo(pb);
         });
 
-        var shader = Shader.Find("Sprites/Default")
-                  ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
-
-        float fallbackY = ctx.Runtime.SpawnPosition.y;
+        // 바닥은 평탄하므로 레인 중심 1회만 레이캐스트 후 전 타일에 재사용
+        float floorY = GetFloorY(_laneCenter, ctx) + 0.05f;
+        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
         foreach (var cell in _warnCells)
         {
             Vector3 pos = DragonBossRoomContext.CellToWorld(cell.x, cell.y, 0f);
-            pos.y = GetFloorY(pos, ctx) + 0.05f;
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            pos.y = floorY;
+            var (go, mr, mat) = QuadTilePool.Rent();
             go.name = "BreathSweepWarn";
-            Object.Destroy(go.GetComponent<MeshCollider>());
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(90f, 0f, 0f));
             go.transform.localScale = Vector3.one;
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows    = false;
-            Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
-            var mat = new Material(shader);
             mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
-            mr.material = mat;
             _warnTiles.Add(go);
             _warnMats.Add(mat);
+            _warnMrs.Add(mr);
         }
     }
 
@@ -725,14 +723,18 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CreateFollowLight(MonsterContext ctx)
     {
-        var go = new GameObject("DragonSweepSpotlight");
-        _followLight = go.AddComponent<Light>();
-        _followLight.type = LightType.Spot;
-        _followLight.color = Data.LightColor;
-        _followLight.intensity = Data.LightIntensity;
-        _followLight.range = Data.LightRange;
-        _followLight.spotAngle = Data.LightSpotAngle;
-        _followLight.shadows = LightShadows.Hard;
+        if (_followLightGo == null)
+        {
+            _followLightGo = new GameObject("DragonSweepSpotlight");
+            _followLight   = _followLightGo.AddComponent<Light>();
+            _followLight.type      = LightType.Spot;
+            _followLight.color     = Data.LightColor;
+            _followLight.intensity = Data.LightIntensity;
+            _followLight.range     = Data.LightRange;
+            _followLight.spotAngle = Data.LightSpotAngle;
+            _followLight.shadows   = LightShadows.Hard;
+        }
+        _followLightGo.SetActive(true);
         UpdateFollowLight(ctx);
     }
 
@@ -745,9 +747,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupFollowLight()
     {
-        if (_followLight == null) return;
-        Object.Destroy(_followLight.gameObject);
-        _followLight = null;
+        if (_followLightGo != null)
+            _followLightGo.SetActive(false);
     }
 
     private static int s_groundLayerMask = -1;
@@ -933,10 +934,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupWarn()
     {
-        foreach (var go in _warnTiles) if (go != null) Object.Destroy(go);
-        foreach (var mat in _warnMats) if (mat != null) Object.Destroy(mat);
+        for (int i = 0; i < _warnTiles.Count; i++)
+            QuadTilePool.Return(_warnTiles[i], _warnMrs[i], _warnMats[i]);
         _warnTiles.Clear();
         _warnMats.Clear();
+        _warnMrs.Clear();
     }
 
     // ─── Scorch marks ────────────────────────────────────────────────────────
@@ -985,18 +987,13 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
                 length * Random.Range(1.5f, 2.0f),
                 2f * laneHalf * 0.92f);  // 경고장판 전체 너비를 넘지 않도록 클램프
 
-            var go  = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var (go, mr, ownedMat) = QuadTilePool.Rent();
             go.name = "ScorchMark";
-            Object.Destroy(go.GetComponent<MeshCollider>());
             go.transform.SetPositionAndRotation(pos, rot);
             go.transform.localScale = new Vector3(length, width, 1f);
+            mr.sharedMaterial = mat;
 
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows    = false;
-            mr.material          = mat;
-
-            _scorches.Add(new ScorchEntry { Go = go, Timer = 0f, MaxTimer = Data.ScorchDuration });
+            _scorches.Add(new ScorchEntry { Go = go, Mr = mr, OwnedMat = ownedMat, Timer = 0f, MaxTimer = Data.ScorchDuration });
         }
     }
 
@@ -1026,7 +1023,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             foreach (var mb in go.GetComponentsInChildren<VariousTranslateMove>(true))
                 mb.enabled = false;
 
-            _scorches.Add(new ScorchEntry { Go = go, Timer = 0f, MaxTimer = Data.TsunamiDuration });
+            _scorches.Add(new ScorchEntry { Go = go, Mr = null, OwnedMat = null, Timer = 0f, MaxTimer = Data.TsunamiDuration });
         }
     }
 
@@ -1038,7 +1035,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             e.Timer += Time.deltaTime;
             if (e.Timer >= e.MaxTimer)
             {
-                if (e.Go != null) BossEffectPool.Release(e.Go);
+                if (e.Go != null)
+                {
+                    if (e.OwnedMat != null) QuadTilePool.Return(e.Go, e.Mr, e.OwnedMat);
+                    else BossEffectPool.Release(e.Go);
+                }
                 _scorches.RemoveAt(i);
                 continue;
             }
@@ -1048,7 +1049,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private void CleanupAllScorches()
     {
-        foreach (var e in _scorches) if (e.Go != null) BossEffectPool.Release(e.Go);
+        foreach (var e in _scorches)
+        {
+            if (e.Go == null) continue;
+            if (e.OwnedMat != null) QuadTilePool.Return(e.Go, e.Mr, e.OwnedMat);
+            else BossEffectPool.Release(e.Go);
+        }
         _scorches.Clear();
     }
 
@@ -1172,7 +1178,7 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             HalfR         = halfR,
         };
 
-        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        Color meteorFireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
         for (int dx = -halfR; dx <= halfR; dx++)
         for (int dz = -halfR; dz <= halfR; dz++)
         {
@@ -1180,20 +1186,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
             if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
 
             Vector3 tilePos = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var (go, _, mat) = QuadTilePool.Rent();
             go.name = "MeteorWarn";
-            Object.Destroy(go.GetComponent<MeshCollider>());
-            go.transform.position  = tilePos;
-            go.transform.rotation  = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.position   = tilePos;
+            go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
             go.transform.localScale = Vector3.one;
-
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows    = false;
-            Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
-            var mat = new Material(shader);
-            mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
-            mr.material = mat;
+            mat.color = new Color(meteorFireBase.r, meteorFireBase.g, meteorFireBase.b, 0f);
             entry.WarnTiles.Add(go);
             entry.WarnMats.Add(mat);
         }
@@ -1290,8 +1288,12 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
 
     private static void DestroyMeteorWarnTiles(ref MeteorEntry e)
     {
-        foreach (var go in e.WarnTiles) if (go != null) Object.Destroy(go);
-        foreach (var mat in e.WarnMats) if (mat != null) Object.Destroy(mat);
+        for (int i = 0; i < e.WarnTiles.Count; i++)
+        {
+            var go = e.WarnTiles[i];
+            if (go == null) continue;
+            QuadTilePool.Return(go, go.GetComponent<MeshRenderer>(), e.WarnMats[i]);
+        }
         e.WarnTiles.Clear();
         e.WarnMats.Clear();
     }
@@ -1324,11 +1326,11 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     {
         if (Data.PlayerAuraPrefab == null || ctx?.Runtime?.PlayerTarget == null) return;
         RemovePlayerAura();
-        _playerAuraInstance = Object.Instantiate(
+        _playerAuraInstance = BossEffectPool.Spawn(
             Data.PlayerAuraPrefab,
             ctx.Runtime.PlayerTarget.position,
-            Quaternion.identity,
-            ctx.Runtime.PlayerTarget);
+            Quaternion.identity);
+        _playerAuraInstance.transform.SetParent(ctx.Runtime.PlayerTarget, worldPositionStays: true);
         _playerAuraInstance.name                    = "PlayerAura_BreathSweep";
         _playerAuraInstance.transform.localPosition = Vector3.zero;
         _playerAuraInstance.transform.localScale    = Vector3.one * Data.PlayerAuraScale;
@@ -1337,7 +1339,8 @@ internal sealed class DragonBreathSweepState : FullLockState<DragonBreathSweepPa
     private void RemovePlayerAura()
     {
         if (_playerAuraInstance == null) return;
-        Object.Destroy(_playerAuraInstance);
+        _playerAuraInstance.transform.SetParent(null);
+        BossEffectPool.Release(_playerAuraInstance);
         _playerAuraInstance = null;
     }
 

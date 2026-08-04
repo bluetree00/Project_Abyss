@@ -279,8 +279,39 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         {
             // 코리더 스타일(CorridorStyleSO)은 레거시 존맵 데이터에 묶여 있어 절차 생성 방에는 없다.
             // null을 넘기면 BossExitPath가 아레나 바닥 머티리얼을 그대로 빌려 톤을 맞춘다.
-            BossExitPath.Spawn(center, _currentArena, null);
+            Debug.Log($"[BossClear] BossExitPath.Spawn 호출. center={center}, arena={(_currentArena != null ? _currentArena.name : "null")}");
+            Vector3 exitPos = BossExitPath.Spawn(center, _currentArena, null);
+            Debug.Log($"[BossClear] Spawn 완료. exitPos={exitPos}");
+            await PlayExitPathCinematicAsync(exitPos, ct);
         }
+    }
+
+    /// <summary>
+    /// 보스 클리어 후 다음 챕터 길(BossExitPath)로 카메라가 서서히 이동했다 플레이어 시점으로 복귀하는 연출.
+    /// </summary>
+    private async UniTask PlayExitPathCinematicAsync(Vector3 exitPos, CancellationToken ct)
+    {
+        var cam = GameCameraController.Instance;
+        Transform playerTransform = _run?.Player?.transform
+                                 ?? Managers.Player?.PlayerTransform;
+        if (cam == null || playerTransform == null)
+        {
+            Debug.LogWarning($"[BossClear] 카메라 연출 스킵 — cam={cam != null}, player={playerTransform != null}");
+            return;
+        }
+
+        try
+        {
+            await cam.PanToZoneAndReturnAsync(
+                exitPos,
+                moveDuration:   2.5f,
+                holdDuration:   1.5f,
+                returnDuration: 2.0f,
+                playerTransform,
+                ct,
+                customViewOffset: new Vector3(0f, 12f, -10f));
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     /// <summary>무한 루프 진입 — 심연 깊이 +1, Ch1으로 회귀. 챕터 전환 기계를 재사용해 로드아웃을 유지한 채 Ch1 씬을 새로 시작한다.</summary>
@@ -2632,6 +2663,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
 
         if (spawners.Count == 0 && bossSpawner == null) return;
 
+        Debug.Log($"[AttachRoomClear] GO='{mapGO.name}' spawners={spawners.Count} bossSpawner={bossSpawner?.name ?? "null"}");
         var controller = mapGO.AddComponent<RoomWaveController>();
         controller.Initialize(_run, spawners, bossSpawner, luckRollTable, clearEndEffectPrefab, clearEndEffect2Prefab);
     }

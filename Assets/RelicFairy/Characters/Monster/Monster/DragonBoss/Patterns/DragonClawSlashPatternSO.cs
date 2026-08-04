@@ -136,8 +136,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
         PlayAnim(ctx, Data.JumpUpStateName);
 
-        var bb = GetBlackboard(ctx);
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
     }
 
     public override void Update(MonsterContext ctx)
@@ -154,6 +152,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     public override void Exit(MonsterContext ctx)
     {
+        if (GetBlackboard(ctx) is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
         _clawTrail?.StopAll();
         if (ctx.Agent == null) return;
         DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);

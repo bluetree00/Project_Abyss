@@ -129,7 +129,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         public bool  Landed;
     }
 
-    private struct ScorchEntry { public GameObject Go; public float Timer; public float MaxTimer; }
+    private struct ScorchEntry { public GameObject Go; public MeshRenderer Mr; public Material Mat; public float Timer; public float MaxTimer; }
 
     private static Texture2D s_ScorchTex;
     private static Material  s_ScorchMat;
@@ -166,9 +166,6 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
         if (ctx.Agent != null) ctx.Agent.enabled = false;
 
-        var bb = (ctx.Monster as IBoss)?.Blackboard;
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
-
         PlayAnim(ctx, Data.HoverStateName);
     }
 
@@ -182,7 +179,13 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         }
     }
 
-    public override void Exit(MonsterContext ctx) { CleanupAll(); CleanupAllScorches(); }
+    public override void Exit(MonsterContext ctx)
+    {
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
+        CleanupAll();
+        CleanupAllScorches();
+    }
 
     // ── Rise ─────────────────────────────────────────────────────────────────
 
@@ -332,43 +335,24 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
         };
 
         // 3×3 경고 타일 생성
+        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
         for (int dx = -1; dx <= 1; dx++)
+        for (int dz = -1; dz <= 1; dz++)
         {
-            for (int dz = -1; dz <= 1; dz++)
-            {
-                int tx = cx + dx, tz = cz + dz;
-                if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
+            int tx = cx + dx, tz = cz + dz;
+            if (!DragonBossRoomContext.IsInterior(tx, tz)) continue;
 
-                var go = CreateWarnTile(DragonBossRoomContext.CellToWorld(tx, tz, 0.1f));
-                if (go == null) continue;
-
-                entry.WarnTiles.Add(go);
-                var mr = go.GetComponent<MeshRenderer>();
-                if (mr != null) entry.WarnMats.Add(mr.material);
-            }
+            var (go, _, mat) = QuadTilePool.Rent();
+            go.name = "FireballWarn";
+            go.transform.position   = DragonBossRoomContext.CellToWorld(tx, tz, 0.1f);
+            go.transform.rotation   = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.localScale = Vector3.one;
+            mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
+            entry.WarnTiles.Add(go);
+            entry.WarnMats.Add(mat);
         }
 
         _entries.Add(entry);
-    }
-
-    private static GameObject CreateWarnTile(Vector3 worldPos)
-    {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        go.name = "FireballWarn";
-        Object.Destroy(go.GetComponent<MeshCollider>());
-        go.transform.position = worldPos;
-        go.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        go.transform.localScale = Vector3.one;
-
-        var mr = go.GetComponent<MeshRenderer>();
-        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        mr.receiveShadows = false;
-        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
-        Color fireBase = DragonBossVisualHelper.GetElementColor(DragonBossBlackboard.DragonElement.Fire);
-        var mat = new Material(shader);
-        mat.color = new Color(fireBase.r, fireBase.g, fireBase.b, 0f);
-        mr.material = mat;
-        return go;
     }
 
     // ── 충돌 처리 (스폰 즉시 호출 — 데미지·스코치·폭발 이펙트) ─────────────
@@ -396,7 +380,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
     private void SpawnScorchCluster(Vector3 landPos, MonsterContext ctx)
     {
-        var mat  = GetOrCreateScorchMaterial();
+        var scorchMat = GetOrCreateScorchMaterial();
         float cell = DragonBossRoomContext.CellSize;
 
         for (int i = 0; i < Mathf.Max(1, Data.ScorchClusterCount); i++)
@@ -414,19 +398,13 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             float scaleZ    = scaleBase * Random.Range(0.7f, 1.3f);
             float yRot      = Random.Range(0f, 360f);
 
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var (go, mr, ownedMat) = QuadTilePool.Rent();
             go.name = "ScorchMark";
-            Object.Destroy(go.GetComponent<MeshCollider>());
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(90f, yRot, 0f));
             go.transform.localScale = new Vector3(scaleX, scaleZ, 1f);
+            mr.sharedMaterial = scorchMat;
 
-            var mr = go.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows    = false;
-            mr.material          = mat;
-
-            // 패턴 상태와 무관하게 독립적으로 소멸
-            Object.Destroy(go, Data.ScorchDuration);
+            _scorches.Add(new ScorchEntry { Go = go, Mr = mr, Mat = ownedMat, Timer = 0f, MaxTimer = Data.ScorchDuration });
         }
     }
 
@@ -438,7 +416,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
             e.Timer += Time.deltaTime;
             if (e.Timer >= e.MaxTimer)
             {
-                if (e.Go != null) Object.Destroy(e.Go);
+                if (e.Go != null) QuadTilePool.Return(e.Go, e.Mr, e.Mat);
                 _scorches.RemoveAt(i);
                 continue;
             }
@@ -448,7 +426,7 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
     private void CleanupAllScorches()
     {
-        foreach (var e in _scorches) if (e.Go != null) Object.Destroy(e.Go);
+        foreach (var e in _scorches) if (e.Go != null) QuadTilePool.Return(e.Go, e.Mr, e.Mat);
         _scorches.Clear();
     }
 
@@ -515,10 +493,12 @@ internal sealed class DragonFireballRainState : FullLockState<DragonFireballRain
 
     private static void DestroyWarnTiles(ref FireballEntry e)
     {
-        foreach (var go in e.WarnTiles)
-            if (go != null) Object.Destroy(go);
-        foreach (var mat in e.WarnMats)
-            if (mat != null) Object.Destroy(mat);
+        for (int i = 0; i < e.WarnTiles.Count; i++)
+        {
+            var go = e.WarnTiles[i];
+            if (go == null) continue;
+            QuadTilePool.Return(go, go.GetComponent<MeshRenderer>(), e.WarnMats[i]);
+        }
         e.WarnTiles.Clear();
         e.WarnMats.Clear();
     }
