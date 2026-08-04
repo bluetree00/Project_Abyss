@@ -42,6 +42,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3020577257423737201}
   - component: {fileID: 5576050907435535996}
+  - component: {fileID: 6089399467140926601}
   m_Layer: 0
   m_Name: PointLight
   m_TagString: Untagged
@@ -129,3 +130,23 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &6089399467140926601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5035222193185122118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96e8a465dca0cc54fae4c8c200c201f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OccaSoftware.Buto.Runtime::OccaSoftware.Buto.Runtime.ButoLight
+  inheritDataFromLightComponent: 1
+  lightComponent: {fileID: 5576050907435535996}
+  areaSizeCached: {x: 0, y: 0, z: 0, w: 0}
+  lightColor: {r: 1, g: 1, b: 1, a: 1}
+  bias: 0
+  lightRange: 0
+  lightIntensity: 10
+  IntensityMultiplier: 0.6
