@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -19,6 +20,12 @@ public static class DissolveEffect
 
     private static readonly string[] FallbackColorProps =
         { "_Color01", "_Color", "_MainColor", "_TintColor", "_AlbedoColor" };
+
+    // 텍스처 이름도 제각각이다. 이 프로젝트 석재·목재는 커스텀 ShaderGraph라 URP 표준 _BaseMap을 안 쓴다
+    // (Gothic_Interior=_BaseColorMap, Leartes S_Masking=_Base). _BaseMap만 보면 복사가 실패해
+    // 텍스처 없는 단색 몸체 + 시안 엣지로 디졸브된다 — "청록색으로 깨져 보이는" 증상의 다른 축.
+    private static readonly string[] FallbackTextureProps =
+        { "_BaseColorMap", "_MainTex", "_Base", "_Albedo", "_AlbedoMap" };
 
     private const float EdgeFadePortion = 0.25f;
     private const float MaxEdgeWidth    = 0.12f;
@@ -401,9 +408,9 @@ public static class DissolveEffect
         else UnityEngine.Object.Destroy(m);
     }
 
-    /// <summary>디졸브 대상 렌더러 수집. "~" 프리픽스 헬퍼 오브젝트(~GroundShadow 발밑그림자 등)는 제외 —
-    /// 이들은 비동기로 sharedMaterial을 세팅하므로 디졸브의 머티리얼 캡처/복원과 레이스가 날 수 있다.
-    /// 본체 렌더러 캡처/복원 로직 자체는 변경 없음.</summary>
+    /// <summary>디졸브 대상 렌더러 수집. 아래 둘은 제외한다(본체 렌더러 캡처/복원 로직은 변경 없음).
+    /// · "~" 프리픽스 헬퍼 오브젝트(~GroundShadow 발밑그림자 등) — 비동기로 sharedMaterial을 세팅하므로 레이스.
+    /// · 월드 텍스트(TMP) — 글리프가 깨진 시안 덩어리로 나온다(<see cref="IsDissolveExcluded"/> 참조).</summary>
     private static Renderer[] CollectDissolveRenderers(GameObject target)
     {
         var all = target.GetComponentsInChildren<Renderer>(true);
@@ -423,7 +430,18 @@ public static class DissolveEffect
     {
         if (r == null) return true;
         var n = r.gameObject.name;
-        return n.Length > 0 && n[0] == '~';
+        if (n.Length > 0 && n[0] == '~') return true;
+
+        // 월드 텍스트(TMP)는 제외한다. TMP 메시는 SDF 아틀라스를 전제로 그려지는데, 그 위에 디졸브
+        // 머티리얼이 덮이면 글리프가 엣지색(DefaultEdgeColor = HDR 시안) 덩어리로 깨져 보인다.
+        // 제단·픽업처럼 라벨/[F] 안내를 자식으로 단 오브젝트가 사라질 때 나오던 "청록색 깨짐"이 이것.
+        if (r.TryGetComponent<TMP_Text>(out _)) return true;
+
+        // 파티클·트레일도 제외. 이들은 자체 셰이더(가산 블렌드·소프트파티클)로 그려지는데 디졸브
+        // 머티리얼(불투명 Lit)로 갈아끼우면 파티클 쿼드가 통째로 엣지색 판때기가 된다 —
+        // 입자 수만큼 시안 사각형이 흩뿌려져 "오브젝트가 잔뜩 튀어나온" 것처럼 보인다.
+        // 디졸브는 메시 표면을 깎는 연출이라 애초에 입자에는 의미가 없다.
+        return r is ParticleSystemRenderer || r is TrailRenderer;
     }
 
     private static List<Material> ReplaceMaterials(
@@ -441,8 +459,20 @@ public static class DissolveEffect
 
                 if (orig != null)
                 {
-                    if (orig.HasProperty(BaseMapID) && inst.HasProperty(BaseMapID))
-                        inst.SetTexture(BaseMapID, orig.GetTexture(BaseMapID));
+                    if (inst.HasProperty(BaseMapID))
+                    {
+                        var tex = orig.HasProperty(BaseMapID) ? orig.GetTexture(BaseMapID) : null;
+                        if (tex == null)
+                        {
+                            foreach (var propName in FallbackTextureProps)
+                            {
+                                if (!orig.HasProperty(propName)) continue;
+                                tex = orig.GetTexture(propName);
+                                if (tex != null) break;
+                            }
+                        }
+                        if (tex != null) inst.SetTexture(BaseMapID, tex);
+                    }
                     if (orig.HasProperty(BaseColorID) && inst.HasProperty(BaseColorID))
                         inst.SetColor(BaseColorID, orig.GetColor(BaseColorID));
 

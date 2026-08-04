@@ -16,6 +16,15 @@ MonoBehaviour:
   wallMode: 1
   wallHeight: 8
   hasCeiling: 1
+  veilMode: 0
+  corridorFogPrefab: {fileID: 6930174999031227623, guid: a3a908fc5452d224bb73a08f9b798a09, type: 3}
+  veilLayers: 5
+  veilHeight: 3.2
+  veilScale: 0.5
+  veilTint: {r: 0, g: 0, b: 0, a: 0}
+  veilRadianceIntensity: 6
+  sealDoorPrefab: {fileID: 1031046332, guid: abc00000000003500428051136095348, type: 3}
+  sealDoorMotion: 0
   lighting:
     wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
       type: 3}

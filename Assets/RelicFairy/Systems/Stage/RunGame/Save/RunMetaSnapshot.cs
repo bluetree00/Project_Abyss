@@ -10,8 +10,18 @@ public struct RunMetaSnapshot
     public int masterSeed;          // 런 마스터 시드
     public int visitCount;          // RunSequencer 진행 방 수
     public int seqPhase;            // RunSequencer.Phase (int)
+    // 특수방 챕터 캡 소모(= 실제로 방문한 횟수). 4종 전부 저장해야 이어하기로 캡이 리셋되지 않는다.
     public int shopUsed;
     public int eventUsed;
+    public int crucibleUsed;
+    public int refineryUsed;
+
+    // PRD 미출현 누적 — 안 만나거나 지나칠수록 다음 방 등장 확률이 오른다. 복원 안 하면 기대치가 초기화된다.
+    public int shopMiss;
+    public int eventMiss;
+    public int crucibleMiss;
+    public int refineryMiss;
+
     public int heading;             // 현재 방 진입 방향(DoorEdge int)
     public int anchorToggle;        // 리프프로그 앵커 토글
 

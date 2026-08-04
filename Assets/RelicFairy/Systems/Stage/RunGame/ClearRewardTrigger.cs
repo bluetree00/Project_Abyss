@@ -158,7 +158,9 @@ public class ClearRewardTrigger : MonoBehaviour
         // GameRunBootstrapper.OnBossRoomClearedHandler(NotifyBossRoomCleared 구독)가 전담한다.
         // 보스방은 이제 이 트리거를 스폰하지 않으므로(RoomClearGate 참조) _isBossRoom 분기는 여기서 다루지 않는다.
 
-        // 방 경계 저장은 로컬 권위(RunFlowController.SaveRunState)가 담당하므로 여기서는 별도 저장하지 않는다.
+        // 보상 확정 → 즉시 저장. 방 경계 저장(SaveRunState)은 방 '입장' 시점이고 클리어 저장은
+        // 보상 지급 '전'에 끝나 있어, 여기서 안 하면 방금 받은 룬·아이템이 다음 방 입장까지 미저장으로 남는다.
+        RunFlowController.Active?.SaveNow("clear-reward");
 
         // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
         // 존 선택 UI가 그리드 위에 겹쳐 표시된다.

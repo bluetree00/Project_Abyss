@@ -124,6 +124,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private readonly Dictionary<string, DmgTakenAmpSlot> _dmgTakenAmpSlots = new();
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
+    // 마지막으로 받은 피해의 종류 — 막타 히트스톱(DieState)이 "플레이어의 직접 타격이었나"를 판정하는 근거.
+    // TakeDamage/TakeSynergyDamage를 우회해 HP를 깎는 보스 기믹은 직접 세팅해야 한다(영혼 기둥 등).
+    protected DamageKind           _lastDamageKind      = DamageKind.Normal;
     // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
     private readonly MonsterStatusReceiver _status = new();
 
@@ -853,6 +856,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
+        _lastDamageKind = kind;
+
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
@@ -884,6 +889,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             OnFatalDamage();
         }
     }
+
+    /// <summary>마지막으로 받은 피해의 종류. 치명타(사망) 직후엔 곧 '무엇이 죽였는가'가 된다 —
+    /// DieState가 막타 히트스톱을 걸지 말지 판정하는 데 쓴다.</summary>
+    public DamageKind LastDamageKind => _lastDamageKind;
 
     /// <summary>상태이상 통합 수신기(ST). 룬·아이템 효과가 CC/Slow/DoT를 부여하는 진입점.</summary>
     public MonsterStatusReceiver Status { get { _status.AttachOwner(this); return _status; } }
@@ -925,6 +934,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
+        _lastDamageKind = DamageKind.Normal;   // 주 피해 경로 = 플레이어 직접 타격
 
         // [서약] 출력 피해 변조는 여기서 하지 않는다 — 소유자는 CombatDamage 파이프라인 ③ 한 곳뿐이다.
         // 여기서 또 걸면 주 피해가 파이프라인 ③ + 여기로 두 번 곱해져 배율이 제곱되고,
@@ -1303,6 +1314,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _dmgTakenAmpSlots.Clear();
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
+        _lastDamageKind      = DamageKind.Normal;
         _status.Reset();
         _statusCcActive      = false;
         _statusSlowActive    = false;

@@ -89,6 +89,10 @@ public class FallRecoveryController : MonoBehaviour
             int maxHp = _pc.RuntimeStats.MaxHp;
             int dmg = Mathf.Max(1, Mathf.RoundToInt(maxHp * fallDamageRatio));
             _pc.RuntimeStats.Damage(dmg);
+
+            // 사망 판정은 PlayerController.TakeDamage 안에서만 돌기 때문에, 직접 차감으로 HP가 0이 되면
+            // 죽지 않은 채 남아 다음 피격까지 살아 있었다. 낙사로 HP가 바닥나면 여기서 즉시 사망 처리.
+            if (_pc.RuntimeStats.Hp <= 0) _pc.NotifyHpDepleted();
         }
 
         // 리스폰 위치 — 안전 지점이 확보된 상태면 그 위에, 아니면 현재 XZ 유지한 상태에서 Y=0 복귀

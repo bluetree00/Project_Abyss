@@ -4,11 +4,19 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 대각선(cell.x + cell.y) 방향으로 한 줄씩 동시 디졸브 등장.
-/// 같은 대각선의 타일은 동시에 나타나고, 대각선 간격으로 파도가 이동한다.
+/// 방 블록을 파도처럼 디졸브 등장시킨다.
+///
+/// 기본은 <b>진입 지점 기준 방사형</b> — 플레이어를 중심으로 바깥으로 퍼지며 드러난다.
+/// (예전엔 대각선 코너 스윕이라 "구석부터 격자가 조립되는" 생성 과정처럼 보였다.
+///  방사형은 "내가 선 자리에서 방이 드러난다"로 읽혀 훨씬 자연스럽다.)
+/// 원점이 주어지지 않으면 기존 대각선 스윕으로 폴백한다.
 /// </summary>
 public sealed class DissolveEntrance : IMapEntrance
 {
+    /// <summary>방사형 파도의 링 두께(m). 좁으면 파도가 잘게 쪼개져 오히려 조립처럼 보인다.</summary>
+    private const float RingSize = 3f;
+
+    private readonly Vector3? _origin;
     /// <summary>
     /// 파도(대각선 순차 등장) 전체에 허용하는 시간 상한(초).
     ///
@@ -22,8 +30,10 @@ public sealed class DissolveEntrance : IMapEntrance
     private readonly float _staggerInterval;
     private readonly float _duration;
 
-    public DissolveEntrance(float staggerInterval = 0.045f, float duration = 0.28f)
+    /// <param name="origin">방사형 파도의 중심(보통 플레이어 진입 위치). null이면 대각선 스윕.</param>
+    public DissolveEntrance(Vector3? origin = null, float staggerInterval = 0.045f, float duration = 0.28f)
     {
+        _origin          = origin;
         _staggerInterval = staggerInterval;
         _duration        = duration;
     }
@@ -35,7 +45,7 @@ public sealed class DissolveEntrance : IMapEntrance
     {
         if (blocks == null || blocks.Count == 0) return;
 
-        // 대각선(x+z) 기준으로 그룹화
+        // 진입점 기준 링(방사형) 또는 대각선으로 그룹화 — 키가 작을수록 먼저 등장.
         var groups = new SortedDictionary<int, List<(GameObject tile, Renderer[] rs)>>();
 
         for (int i = 0; i < blocks.Count; i++)
@@ -52,7 +62,9 @@ public sealed class DissolveEntrance : IMapEntrance
 
             foreach (var r in rs) r.enabled = false;   // 선로드 전까지 숨김
 
-            int diagKey = b.cell.x + b.cell.y;
+            int diagKey = _origin.HasValue
+                ? Mathf.RoundToInt(Vector3.Distance(_origin.Value, b.targetPosition) / RingSize)
+                : b.cell.x + b.cell.y;
             if (!groups.TryGetValue(diagKey, out var list))
             {
                 list = new List<(GameObject, Renderer[])>();

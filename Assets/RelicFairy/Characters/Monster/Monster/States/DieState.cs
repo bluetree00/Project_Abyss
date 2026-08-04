@@ -24,10 +24,15 @@ public class DieState : IMonsterState
         SpawnGoldDrop(ctx);
 
         // 처치 연출 — 막타(킬) 히트스톱 + 사망 위치 VFX 버스트
+        //
+        // 히트스톱은 <b>플레이어가 직접 때려서 죽였을 때만</b> 건다. 화상·독 틱(Dot)이나 장판·시너지
+        // 즉발(Synergy)로 죽은 것까지 걸면, 후반부에 0.09초 프리즈가 0.5초마다 연쇄로 터져
+        // 게임 전체가 렉 걸린 것처럼 보인다(타격 입력과 무관한 정지라 손맛에도 기여하지 않는다).
         var fx = ctx.Death;
         if (fx != null)
         {
-            if (fx.killHitStopDuration > 0f)
+            bool directHitKill = ctx.Monster.LastDamageKind == DamageKind.Normal;
+            if (directHitKill && fx.killHitStopDuration > 0f)
                 HitFeelService.KillImpact(fx.killHitStopScale, fx.killHitStopDuration);
             if (!string.IsNullOrEmpty(fx.deathVfxKey))
                 SpawnDeathVfx(ctx.Monster.transform.position, fx.deathVfxKey, fx.deathVfxScale).Forget();

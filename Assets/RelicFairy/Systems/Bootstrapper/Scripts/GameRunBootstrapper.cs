@@ -1587,7 +1587,9 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                     // 통로 길이를 문마다 결정적으로 변주 — 균일하면 인공적이라 '진짜 구조'로 안 읽힌다.
                     // 셀 좌표 해시로 안정 변주(±): rng 스트림을 소비하지 않아 save/restore 결정성 유지.
                     int hash = ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0xF;   // 0..15
-                    int len  = procDoorCorridorLength + 4 + hash;                    // 기본+4 ~ +19 → 더 길고 제각각
+                    // 편차를 키운다 — 문마다 '얼마나 멀리 이어지는가'가 확연히 달라야 통로가 진짜 구조로 읽힌다.
+                    // (기본6 기준 12 ~ 34칸. 짧은 통로는 다음 방이 바로 보이고, 긴 통로는 안개 속으로 사라진다.)
+                    int len  = procDoorCorridorLength + 6 + (hash * 3) / 2;
                     blocks.AddRange(MapBuilder.BuildDoorCorridor(
                         palette, roomGO.transform, centerLocal, info.edge, info.width,
                         len, blockCellSize, blockBaseY, effWallLayers, visualRng));
@@ -1625,6 +1627,13 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         InitializeMinimapForRoom(roomGO, w, h);
         AttachRoomClearController(roomGO);
 
+        // 비전투 방(상점·이벤트·재련소·정제소)은 장식이 동선을 막지 않게 통행 차단을 푼다.
+        // 전투방에서는 나무·기둥이 엄폐·회피 지형으로 의미가 있지만, 볼일만 보고 나가는 방에서는
+        // 걸리적거리기만 한다. 방 셋업(NPC·매대) 호출 '전'에 돌려서 이후 생성물엔 영향이 없다.
+        if (IsShopCategory(entry.category) || IsEventCategory(entry.category)
+            || IsCrucibleCategory(entry.category) || IsRefineryCategory(entry.category))
+            DisableDecorationBlocking(roomGO);
+
         // 상점 방이면 ShopRoomController 부착 — 진열 롤에 roomRng를 넘겨 결정적(이어하기 재현) 추첨.
         // (MapBuilder가 stall 타일에서 ShopStallInteraction을 이미 생성한 시점)
         if (IsShopCategory(entry.category))
@@ -1649,6 +1658,8 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             roomGO   = roomGO,
             blocks   = blocks,
             hasCeiling = palette != null && palette.HasCeiling, // 천장 방이면 상공 부감 인트로 스킵(천장만 비치는 문제)
+            sealDoorPrefab = palette != null ? palette.SealDoorPrefab : null, // 테마 문(없으면 공용 폴백)
+            sealDoorMotion = palette != null ? palette.SealDoorMotion : SealDoorMotion.Drop,
 
             entryPos = customArenaEntryPos ?? (cls.entrance.HasValue
                 ? CellToWorldFloor(cls.entrance.Value, anchor, w, h) + DoorInwardOffset(doorInfos[cls.entrance.Value].edge)
@@ -2199,6 +2210,37 @@ public sealed class GameRunBootstrapper : MonoBehaviour
     {
         if (instance == null) return;
         await DissolveEffect.PlayAppearAsync(instance, 0.6f, ct);
+    }
+
+    /// <summary>
+    /// 비전투 방의 장식(<c>Deco_*</c>) 통행 차단을 해제한다. 렌더링은 그대로 두고 콜라이더만 끈다.
+    ///
+    /// 대상은 DecorationHandler가 심은 오브젝트뿐이다(이름 규약 <c>Deco_{x}_{y}_{code}</c>).
+    /// 벽·바닥(팔레트 블록)과 매대·NPC·챌린지 오브젝트는 다른 이름이라 건드리지 않는다.
+    /// 트리거 콜라이더는 남긴다 — 상호작용/VFX 판정을 쓰는 장식이 있을 수 있다.
+    /// </summary>
+    private static void DisableDecorationBlocking(GameObject roomGO)
+    {
+        if (roomGO == null) return;
+
+        int disabled = 0;
+        var root = roomGO.transform;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            if (!child.name.StartsWith("Deco_", System.StringComparison.Ordinal)) continue;
+
+            var cols = child.GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+            {
+                if (cols[c] == null || cols[c].isTrigger || !cols[c].enabled) continue;
+                cols[c].enabled = false;
+                disabled++;
+            }
+        }
+
+        if (disabled > 0)
+            Debug.Log($"[GameRunBootstrapper] 비전투 방 장식 통행 차단 해제 — 콜라이더 {disabled}개");
     }
 
     private static bool IsShopCategory(string category)
@@ -2948,9 +2990,22 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         WorldAwakeningAltar.SpawnAt(basePos + new Vector3(4f, 0f, 2f));
     }
 
-    /// <summary>챕터 시작 대기방의 조립 서약 제단(원인×효과). 세 대기방 경로 공통 — 첫 서약=실버 고정은 제단이 판정.</summary>
+    /// <summary>
+    /// 챕터 시작 대기방의 조립 서약 제단(원인×효과). 세 대기방 경로 공통 — 첫 서약=실버 고정은 제단이 판정.
+    ///
+    /// 제단 출처가 둘이다: 이 코드 스폰과, 방 CSV의 <c>CV</c> 토큰(CovenantAltarHandler).
+    /// 대기방 CSV에 CV가 하나라도 있으면 코드 것과 겹쳐 제단이 여러 개 서고,
+    /// 서약은 대기방당 1회라 나머지는 전부 죽은 오브젝트가 된다.
+    /// 이미 있으면 만들지 않는다 — CSV가 제단 위치를 지정했다면 그쪽을 존중하는 게 맞다.
+    /// </summary>
     private void SpawnCovenantAltar(Vector3 basePos)
     {
+        var existing = Object.FindFirstObjectByType<WorldCovenantAltar>(FindObjectsInactive.Include);
+        if (existing != null)
+        {
+            Debug.Log($"[GameRunBootstrapper] 서약 제단이 이미 있음({existing.name}) — 코드 스폰 생략");
+            return;
+        }
         WorldCovenantAltar.SpawnAt(basePos + new Vector3(-4f, 0f, 2f));
     }
 
@@ -3184,6 +3239,12 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             seqPhase           = save.seqPhase,
             shopUsed           = save.shopUsed,
             eventUsed          = save.eventUsed,
+            crucibleUsed       = save.crucibleUsed,
+            refineryUsed       = save.refineryUsed,
+            shopMiss           = save.shopMiss,
+            eventMiss          = save.eventMiss,
+            crucibleMiss       = save.crucibleMiss,
+            refineryMiss       = save.refineryMiss,
             heading            = save.heading,
             anchorToggle       = save.anchorToggle,
             currentRoomPoolKey = save.currentRoomPoolKey,
