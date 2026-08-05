@@ -146,7 +146,11 @@ public sealed class RunItemInventory
     {
         if (items == null) return;
         foreach (var item in items)
-            if (item != null) _placedItems.Add(item);
+        {
+            if (item == null) continue;
+            item.RestoreAssetRefs();   // 아이콘(Sprite 직참조)은 JSON 왕복에서 사라진다 — SO에서 되찾는다
+            _placedItems.Add(item);
+        }
         if (_placedItems.Count > 0)
             OnPlacedChanged?.Invoke();
     }
@@ -156,7 +160,11 @@ public sealed class RunItemInventory
     {
         if (items == null) return;
         foreach (var item in items)
-            if (item != null) _stagingItems.Add(item);
+        {
+            if (item == null) continue;
+            item.RestoreAssetRefs();   // 아이콘(Sprite 직참조)은 JSON 왕복에서 사라진다 — SO에서 되찾는다
+            _stagingItems.Add(item);
+        }
         if (_stagingItems.Count > 0)
             OnStagingChanged?.Invoke();
     }

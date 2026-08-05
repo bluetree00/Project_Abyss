@@ -88,7 +88,7 @@ public class StaminaBarView : MonoBehaviour
 
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 50;
+        canvas.sortingOrder = UISortingOrder.WorldGauge;
 
         // 프로젝트 캔버스 기준 준수 — 1920×1080, Scale With Screen Size, Match 0.5
         var scaler = canvasGo.AddComponent<CanvasScaler>();

@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// </summary>
 public static class ScreenFade
 {
-    private const int SortingOrder = 10000;
+    private const int SortingOrder = UISortingOrder.ScreenFade;
 
     private static readonly Vector2 FullMin = Vector2.zero;
     private static readonly Vector2 FullMax = Vector2.one;

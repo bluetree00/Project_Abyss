@@ -426,7 +426,7 @@ public class ClearRewardTrigger : MonoBehaviour
 
         var canvas = _promptGO.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 5;
+        canvas.sortingOrder = UISortingOrder.WorldProp;
         _promptGO.AddComponent<CanvasScaler>();
         _promptGO.AddComponent<GraphicRaycaster>();
 

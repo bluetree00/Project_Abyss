@@ -11,7 +11,6 @@ using UnityEngine;
 public class QuestManager
 {
     #region Save Keys
-    private const string kSaveRootPath             = "questSystem";
     private const string kActiveQuestsSavePath      = "activeQuests";
     private const string kCompletedQuestsSavePath   = "completedQuests";
     private const string kActiveAchievementsSavePath    = "activeAchievements";
@@ -46,6 +45,12 @@ public class QuestManager
     private QuestDatabase _questDatabase;
     private QuestDatabase _achievementDatabase;
 
+    // 진행도는 슬롯별 파일이 정본(quest_save_{slot}.json). 슬롯 = 독립 세이브.
+    private readonly QuestSaveStore _store = new QuestSaveStore();
+
+    /// <summary>현재 플레이 중인 슬롯. RunProgressManager가 아직 없으면(테스트 씬 직접 실행) 0번.</summary>
+    private static int ActiveSlot => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
+
     public IReadOnlyList<Quest> ActiveQuests        => _activeQuests;
     public IReadOnlyList<Quest> CompletedQuests     => _completedQuests;
     public IReadOnlyList<Quest> ActiveAchievements  => _activeAchievements;
@@ -69,16 +74,48 @@ public class QuestManager
         _achievementDatabase = achievementDb;
 
         if (!Load())
-        {
-            // 최초 부팅: 업적 전체 등록. 항목마다 저장하면 PlayerPrefs를 수십 번 쓰므로 끝에 1회만 저장한다.
-            _suppressSave = true;
-            foreach (var achievement in _achievementDatabase.Quests)
-                Register(achievement);
-            _suppressSave = false;
-            Save();
-        }
+            SeedFreshSlot(notify: true);
 
         onInitialized?.Invoke();
+    }
+
+    /// <summary>
+    /// 활성 슬롯이 바뀐 뒤(로비 슬롯 선택) 그 슬롯의 진행도를 다시 읽는다.
+    /// 슬롯은 독립 세이브라, 갈아끼우지 않으면 직전 슬롯의 퀘스트·업적이 그대로 따라온다.
+    /// Initialize 전이면 무동작 — 곧 이어질 Initialize가 활성 슬롯을 읽는다.
+    /// </summary>
+    public void ReloadForActiveSlot()
+    {
+        if (!IsInitialized) return;
+
+        _activeQuests.Clear();
+        _completedQuests.Clear();
+        _activeAchievements.Clear();
+        _completedAchievements.Clear();
+
+        // 슬롯 전환은 메뉴 동작이다 — 등장 이벤트를 쏘면 로비에서 업적 알림이 우수수 뜬다.
+        if (!Load())
+            SeedFreshSlot(notify: false);
+    }
+
+    /// <summary>슬롯 삭제/새 게임 — 그 슬롯의 퀘스트 진행도를 버린다. 활성 슬롯이면 즉시 다시 세운다.</summary>
+    public void ClearSlot(int slot)
+    {
+        _store.Delete(slot);
+        if (slot == ActiveSlot) ReloadForActiveSlot();
+    }
+
+    /// <summary>세이브가 없는 슬롯의 시작 상태 — 업적 전체 등록.
+    /// 항목마다 저장하면 파일을 수십 번 쓰므로 끝에 1회만 저장한다.</summary>
+    private void SeedFreshSlot(bool notify)
+    {
+        if (_achievementDatabase == null) return;
+
+        _suppressSave = true;
+        foreach (var achievement in _achievementDatabase.Quests)
+            Register(achievement, notify);
+        _suppressSave = false;
+        Save();
     }
 
     // ──────────────────────────────────────────────────────────
@@ -190,8 +227,7 @@ public class QuestManager
         root.Add(kActiveAchievementsSavePath,   CreateSaveData(_activeAchievements));
         root.Add(kCompletedAchievementsSavePath, CreateSaveData(_completedAchievements));
 
-        PlayerPrefs.SetString(kSaveRootPath, root.ToString());
-        PlayerPrefs.Save();
+        _store.Save(ActiveSlot, root.ToString());
     }
 
     // ──────────────────────────────────────────────────────────
@@ -227,9 +263,23 @@ public class QuestManager
 
     private bool Load()
     {
-        if (!PlayerPrefs.HasKey(kSaveRootPath)) return false;
+        int slot = ActiveSlot;
+        _store.MigrateIfNeeded(slot);   // 레거시 PlayerPrefs → 슬롯 파일(1회, 원본 보존)
 
-        var root = JObject.Parse(PlayerPrefs.GetString(kSaveRootPath));
+        string json = _store.Load(slot);
+        if (string.IsNullOrWhiteSpace(json)) return false;
+
+        JObject root;
+        try
+        {
+            root = JObject.Parse(json);
+        }
+        catch (Exception e)
+        {
+            // 손상된 진행도로 크래시 내는 것보다, 이 슬롯을 새로 세우는 편이 낫다.
+            Debug.LogWarning($"[QuestManager] 슬롯{slot} 퀘스트 세이브 파싱 실패 — 새로 시작: {e.Message}");
+            return false;
+        }
 
         LoadSaveDatas(root[kActiveQuestsSavePath],         _questDatabase,       LoadActiveQuest);
         LoadSaveDatas(root[kCompletedQuestsSavePath],      _questDatabase,       LoadCompletedQuest);

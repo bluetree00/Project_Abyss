@@ -56,7 +56,7 @@ public sealed class ThunderGroggyVignetteView : MonoBehaviour
 
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 99;
+        canvas.sortingOrder = UISortingOrder.MetaVignette;
 
         var scaler = root.AddComponent<CanvasScaler>();
         scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;

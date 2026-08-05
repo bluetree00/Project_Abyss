@@ -182,7 +182,7 @@ public class WeaponForgeAltar : MonoBehaviour
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.85f, 0.85f, 0.95f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
-        _worldText.sortingOrder = 10;
+        _worldText.sortingOrder = UISortingOrder.WorldLabel;
         TMPOutlineHelper.ApplyDefault(_worldText);
 
         if (_camTransform != null) _worldText.transform.rotation = _camTransform.rotation;
@@ -200,7 +200,7 @@ public class WeaponForgeAltar : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
-        tmp.sortingOrder = 11;
+        tmp.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(tmp);
         tmp.text = "<color=#FFD700>[F]</color> 보조 무기";
 

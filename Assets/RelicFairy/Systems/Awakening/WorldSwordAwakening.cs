@@ -218,7 +218,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.95f, 0.85f, 0.55f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
-        _worldText.sortingOrder = 10;
+        _worldText.sortingOrder = UISortingOrder.WorldLabel;
         TMPOutlineHelper.ApplyDefault(_worldText);
     }
 
@@ -234,7 +234,7 @@ public sealed class WorldSwordAwakening : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
-        tmp.sortingOrder = 11;
+        tmp.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(tmp);
         tmp.text = "<color=#FFD700>[F]</color> 검을 쥔다";
 

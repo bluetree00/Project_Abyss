@@ -92,7 +92,7 @@ public sealed class IntroMordredDirector : MonoBehaviour
     [Tooltip("목표 종횡비. 2.39=시네마스코프.")]
     [SerializeField] private float letterboxAspect = 2.39f;
     [Tooltip("레터박스 캔버스 정렬 순서. UI 팝업(200~)보다 낮아야 대사창을 가리지 않는다.")]
-    [SerializeField] private int   letterboxSortingOrder = 150;
+    [SerializeField] private int   letterboxSortingOrder = UISortingOrder.Letterbox;
     [Tooltip("전투 진입 시 HUD 페이드 인 시간(초).")]
     [SerializeField] private float hudFadeDuration = 0.8f;
     [Tooltip("보스 등장 연출(카메라 팬)이 끝나 조작이 돌아온 뒤 HUD를 띄우기까지의 대기(초).")]

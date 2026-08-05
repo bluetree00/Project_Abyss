@@ -89,7 +89,7 @@ public sealed class NpcAmbientChatter : MonoBehaviour
         _text.alignment = TextAlignmentOptions.Center;
         _text.color     = _baseColor;
         _text.textWrappingMode = TextWrappingModes.NoWrap;
-        _text.sortingOrder = 12;
+        _text.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(_text);
     }
 

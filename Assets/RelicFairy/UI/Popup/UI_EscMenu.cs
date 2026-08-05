@@ -15,7 +15,7 @@ using UnityEngine.UI;
 public sealed class UI_EscMenu : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────
-    private const int   SortingOrder = 500;
+    private const int   SortingOrder = UISortingOrder.SystemModal;
     private const float PanelW = 420f, PanelH = 340f;
     private const float BtnW   = 320f, BtnH   = 66f, BtnGap = 16f;
 

@@ -87,6 +87,15 @@ Thumbs.db
 *.bak
 *.orig
 
+# 본체가 무시되는 파일의 .meta 는 함께 무시한다.
+# .meta 만 올라가면 다른 작업자 Unity 에서 대상 없는 고아 meta 경고가 뜬다.
+*.bak.meta
+*.orig.meta
+*.unitypackage.meta
+
+# 에디터 작업 중 남기는 스크린샷/캡처 산출물
+/Captures/
+
 # ----------------------------
 # Crash reports
 # ----------------------------

@@ -131,7 +131,7 @@ public sealed class OnboardingGuideArrow : MonoBehaviour
         canvasGo.transform.SetParent(transform, false);
         var canvas = canvasGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 500;
+        canvas.sortingOrder = UISortingOrder.HudIndicator;
 
         var go = new GameObject("GuideArrowUI", typeof(RectTransform));
         go.transform.SetParent(canvasGo.transform, false);

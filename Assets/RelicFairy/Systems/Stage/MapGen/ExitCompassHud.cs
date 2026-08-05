@@ -18,7 +18,7 @@ public sealed class ExitCompassHud : MonoBehaviour
 {
     private const float EdgeMargin  = 88f;   // 화면 가장자리 여백(px)
     private const float OnScreenUp  = 58f;   // 화면 안일 때 출구 위로 띄우는 오프셋(px)
-    private const int   SortOrder   = 640;
+    private const int   SortOrder   = UISortingOrder.HudIndicator;  // 팝업 위에 뜨던 버그 수정(640→120)
 
     // 배지 치수(1920×1080 기준). 맨 텍스트가 아니라 판때기 배지로 띄워야 배경과 섞이지 않는다.
     private const float PlateW      = 264f;

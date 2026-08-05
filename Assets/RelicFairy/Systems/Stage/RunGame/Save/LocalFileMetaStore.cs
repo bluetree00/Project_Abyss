@@ -1,87 +1,85 @@
 using System;
-using System.IO;
 using UnityEngine;
 
 /// <summary>
-/// persistentDataPath 기반 영구 메타(UserGameData) 로컬 저장소. (PR5)
+/// 영구 메타(UserGameData) 로컬 저장소. <b>슬롯별 파일</b>(<c>meta_save_{slot}.json</c>).
 ///
-/// 권위 정책(보수): 로컬이 있으면 로컬 우선, 없으면 서버값을 로컬로 이관(최초 1회).
-/// 저장은 로컬+뒤끝 병행(이중 기록) — 뒤끝은 백업/텔레메트리. 손상 시 .bak 폴백, 그래도 실패면 서버값 사용.
+/// 슬롯 = 독립 세이브. 각성·심연의 정수·보스 봉인·누적 통계가 슬롯마다 따로 자란다.
+/// 뒤끝은 계정당 1행이라 슬롯을 담지 못하므로, 로컬이 슬롯별 권위이고 서버는 활성 슬롯의
+/// 스냅샷(백업/텔레메트리)으로만 남는다.
+///
+/// 손상 시 .bak 폴백, 읽기 반환 직전 SaveSanitizer 정규화 — 거부·삭제는 절대 하지 않는다.
 /// </summary>
 public sealed class LocalFileMetaStore
 {
-    private const string FileName = "meta_save.json";
-    private const string TempName = "meta_save.tmp";
-    private const string BakName  = "meta_save.bak";
+    private const string Tag = "MetaStore";
 
-    private static string Dir      => Application.persistentDataPath;
-    private static string FilePath => Path.Combine(Dir, FileName);
-    private static string TempPath => Path.Combine(Dir, TempName);
-    private static string BakPath  => Path.Combine(Dir, BakName);
+    /// <summary>슬롯 도입 이전의 단일 메타. 마이그레이션 후 이름만 바꿔 보관한다(삭제 금지).</summary>
+    private const string LegacyName    = "meta_save.json";
+    private const string LegacyArchive = "meta_save.legacy.bak";
 
-    public bool HasSave() => File.Exists(FilePath) || File.Exists(BakPath);
+    private static string FilePath(int slot) => SaveFileIO.PathFor($"meta_save_{slot}.json");
 
-    /// <summary>로컬 메타를 로드한다(없거나 손상 시 null → 호출측이 서버값 유지).</summary>
-    public UserGameData Load()
+    public bool HasSave(int slot) => SaveFileIO.Exists(FilePath(slot));
+
+    /// <summary>슬롯 메타를 로드한다(없거나 손상 시 null → 호출측이 시작값을 정한다).</summary>
+    public UserGameData Load(int slot)
     {
-        var data = TryReadFrom(FilePath);
-        if (data != null) return data;
-
-        var bak = TryReadFrom(BakPath);
-        if (bak != null)
-            Debug.LogWarning("[MetaStore] 본 메타 손상 — .bak에서 복구");
-        return bak;
-    }
-
-    public void Save(UserGameData data)
-    {
-        if (data == null) return;
+        string json = SaveFileIO.ReadWithBackup(FilePath(slot), Tag);
+        if (string.IsNullOrWhiteSpace(json)) return null;
 
         try
         {
-            string json = JsonUtility.ToJson(data);
-            File.WriteAllText(TempPath, json);
-
-            if (File.Exists(FilePath))
-            {
-                File.Copy(FilePath, BakPath, true);
-                SaveIntegrity.CopySidecar(FilePath, BakPath);
-                File.Delete(FilePath);
-            }
-            File.Move(TempPath, FilePath);
-
-            // 새 본파일 서명 기록(실패해도 저장은 성공 — 격리됨).
-            SaveIntegrity.WriteSidecar(FilePath, json);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[MetaStore] 저장 실패: {e}");
-        }
-    }
-
-    private static UserGameData TryReadFrom(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) return null;
-            string json = File.ReadAllText(path);
-            if (string.IsNullOrWhiteSpace(json)) return null;
-
-            // 사이드카 서명 검증: 불일치해도 경고만, 로드는 진행(데이터 손실 0).
-            if (SaveIntegrity.Verify(path, json) == SaveIntegrity.SignatureStatus.Mismatch)
-                Debug.LogWarning($"[SaveIntegrity] 메타 서명 불일치 — 변조 의심 ({Path.GetFileName(path)})");
-
             var data = JsonUtility.FromJson<UserGameData>(json);
             if (data == null) return null;
 
-            // 반환 직전 중앙 정규화 — 모든 호출자가 클램프된 값 수령.
+            // 반환 직전 중앙 정규화 — 모든 호출자가 클램프된 값을 수령한다.
             SaveSanitizer.Sanitize(data);
             return data;
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"[MetaStore] 읽기 실패 ({Path.GetFileName(path)}): {e.Message}");
+            Debug.LogWarning($"[{Tag}] 슬롯{slot} 역직렬화 실패: {e.Message}");
             return null;
         }
+    }
+
+    public void Save(int slot, UserGameData data)
+    {
+        if (data == null) return;
+        SaveFileIO.WriteAtomic(FilePath(slot), JsonUtility.ToJson(data), Tag);
+    }
+
+    public void Delete(int slot) => SaveFileIO.Delete(FilePath(slot));
+
+    /// <summary>
+    /// 레거시 단일 <c>meta_save.json</c>을 지정 슬롯으로 1회 이전한다. 기존 진행 무손실이 최우선.
+    /// - 대상 슬롯에 파일이 이미 있으면 덮어쓰지 않는다.
+    /// - 이전에 성공했을 때만 레거시를 보관용 이름으로 바꾼다(실패 시 다음 실행 재시도).
+    /// </summary>
+    public void MigrateIfNeeded(int slot)
+    {
+        if (HasSave(slot)) return;
+
+        string legacyPath = SaveFileIO.PathFor(LegacyName);
+        if (!SaveFileIO.Exists(legacyPath)) return;
+
+        string json = SaveFileIO.ReadWithBackup(legacyPath, Tag);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            Debug.LogWarning($"[{Tag}] 레거시 메타 읽기 실패 — 마이그레이션 보류(원본 보존)");
+            return;
+        }
+
+        SaveFileIO.WriteAtomic(FilePath(slot), json, Tag);
+
+        if (!HasSave(slot))
+        {
+            Debug.LogWarning($"[{Tag}] 슬롯{slot} 파일 생성 실패 — 레거시 보존(다음 실행 재시도)");
+            return;
+        }
+
+        SaveFileIO.Archive(legacyPath, LegacyArchive, Tag);
+        Debug.Log($"[{Tag}] 레거시 메타 → 슬롯{slot} 마이그레이션 완료(원본은 {LegacyArchive}로 보관)");
     }
 }

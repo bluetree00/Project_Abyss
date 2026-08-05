@@ -8,7 +8,7 @@ public class UIManager
     // 팝업 정렬 베이스. Canvas_HUD(100)보다 위, Canvas_Overlay(2000)보다 아래에 위치해야
     // 팝업/대사가 HUD 위에, 토스트·로딩·페이드(Overlay) 아래에 렌더된다.
     // ⚠️ 리셋(ClearOnSceneTransition)도 반드시 이 상수로 — 과거 10으로 리셋해 전환 후 대사가 HUD 뒤로 묻힌 버그.
-    const int PopupBaseOrder = 200;
+    const int PopupBaseOrder = UISortingOrder.PopupStack;
     int _order = PopupBaseOrder;
 
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
