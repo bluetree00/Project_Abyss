@@ -46,6 +46,7 @@ MonoBehaviour:
   - {fileID: 2727510200406805465}
   - {fileID: 17831466159348514}
   - {fileID: -728031646644961547}
+  - {fileID: 6542222272736901441}
   m_RendererFeatureMap: d98b80881310da25229b40be9f593f00
   m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 0}
@@ -159,6 +160,27 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
+--- !u!114 &6542222272736901441
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1614fc811f8f184697d9bee70ab9fe5, type: 3}
+  m_Name: DecalRendererFeature
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.DecalRendererFeature
+  m_Active: 1
+  m_Settings:
+    technique: 1
+    maxDrawDistance: 120
+    decalLayers: 0
+    dBufferSettings:
+      surfaceData: 1
+    screenSpaceSettings:
+      normalBlend: 0
 --- !u!114 &9196103274581715336
 MonoBehaviour:
   m_ObjectHideFlags: 0

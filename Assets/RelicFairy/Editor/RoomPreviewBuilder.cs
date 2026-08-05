@@ -65,6 +65,7 @@ public static class RoomPreviewBuilder
         if (palette.HasCeiling)
             MapBuilder.BuildCeiling(grid, palette, root, 1f, 0f, wallLayers * 1f);
         MapBuilder.BuildRoomLights(grid, root, 1f, 0f, wallLayers, palette.Lighting);
+        MapBuilder.BuildFloorDecals(grid, root, 1f, 0f, palette, poolKey.GetHashCode());
 
         Debug.Log($"[RoomPreview] Ch{chapter} '{poolKey}' {w}x{h} · 팔레트 {palette.name}(theme {palette.ThemeMatch}) " +
                   $"· 벽 {wallLayers}층 · 천장 {palette.HasCeiling} · 반경 약 {Mathf.Max(w, h) * 0.5f:0.#}m");

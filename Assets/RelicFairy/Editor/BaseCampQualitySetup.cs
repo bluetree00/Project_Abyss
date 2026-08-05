@@ -5,6 +5,7 @@ using OccaSoftware.Buto.Runtime;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// BaseCamp 품질 셋업 도구.
@@ -439,12 +440,17 @@ public static class BaseCampQualitySetup
             AssetDatabase.AddObjectToAsset(fog, profile);
         }
 
-        // 광장 바닥이 7.42 다. 그 살짝 아래에서 시작해 6m 위(y 12)에서 걷히게 하면
-        // 안개가 광장 높이에만 깔리고 위를 향한 시선은 빠져나간다 — 우주 배경이 살아난다.
+        // BaseCamp 는 높이가 두 층이다. 스폰 포인트 실측:
+        //   PlayerSpawnPoint (-3.91, -0.18, -21.62)  ← 최초 스폰. 하부 구역
+        //   ReturnSpawnPoint (26.48,  7.42,  16.50)  ← 광장 레벨
+        // 처음에 광장(7.42)만 보고 baseHeight 6 / boundary 6 으로 잡았더니 y 6~12 에만 깔려
+        // 플레이어가 처음 서는 하부 구역에는 안개가 아예 없었다.
+        // -2 부터 15m 위(y 13)까지로 넓혀 두 층을 모두 덮는다. 그 위로는 걷히므로 우주 배경은 남는다.
+        // 예전에 배경이 회백색으로 덮였던 것은 높이가 아니라 밀도 1.2 와 ButoLight 55개 때문이었다.
         void Set<T>(VolumeParameter<T> p, T v) { p.overrideState = true; p.value = v; }
         Set(fog.mode,                    VolumetricFogMode.On);
-        Set(fog.baseHeight,              6f);
-        Set(fog.attenuationBoundarySize, 6f);
+        Set(fog.baseHeight,              -2f);
+        Set(fog.attenuationBoundarySize, 15f);
         Set(fog.fogDensity,              0.35f);
         Set(fog.lightIntensity,          0.8f);
         Set(fog.maxDistanceVolumetric,   60f);
@@ -461,6 +467,282 @@ public static class BaseCampQualitySetup
 
         Debug.Log($"[BaseCampQuality] BaseCamp 전용 포그 볼륨 — 우선순위 {volume.priority}, " +
                   $"baseHeight 6 / boundary 6 / density 0.35 (공유 프로파일은 챕터 기준 유지)");
+    }
+
+    // ── 바닥 데칼 산포 ─────────────────────────────────────────────
+    // 광장 바닥은 7m 타일을 정격자로 깐 것이라 근거리에서 다이아몬드 무늬 반복이 그대로 읽힌다.
+    // 텍스처를 바꾸는 것보다 데칼을 겹치는 쪽이 싸고, 같은 방식이 챕터 방에도 통한다.
+    //
+    // 시드를 고정해 재현 가능하게 둔다. 다시 돌려도 같은 배치가 나와야 미세 조정이 가능하다.
+    // 40개 / 1,100㎡ 로는 위에서만 반복이 깨지고 눈높이에서는 거의 안 보였다.
+    // 밀도를 2배 이상으로 올리고 불투명도 하한도 함께 올려 겹침이 실제로 읽히게 한다.
+    private const string DecalRootName = "PlazaDecals";
+    private const int    DecalSeed     = 20260805;
+    private const int    DecalCount    = 90;
+
+    // 가장자리에서 안쪽으로 물린 범위. 데칼이 난간 밖 허공으로 삐져나가지 않게 한다.
+    private static readonly Rect DecalArea = Rect.MinMaxRect(39f, 2f, 76f, 32f);   // (xMin, zMin, xMax, zMax)
+
+    private static readonly string[] DecalMaterials =
+    {
+        "Assets/RelicFairy/Prefabs/Stage/Decals/Mat_Decal_Grunge_01.mat",
+        "Assets/RelicFairy/Prefabs/Stage/Decals/Mat_Decal_Grunge_02.mat",
+    };
+
+    [MenuItem("RelicFairy/BaseCamp/18. 광장 바닥 데칼 산포")]
+    public static void ScatterFloorDecals()
+    {
+        var mats = DecalMaterials
+            .Select(AssetDatabase.LoadAssetAtPath<Material>)
+            .Where(m => m != null)
+            .ToArray();
+        if (mats.Length == 0) { Debug.LogError("[BaseCampQuality] 데칼 머티리얼을 못 찾았다. 메뉴 8을 먼저 실행."); return; }
+
+        var existing = GameObject.Find(DecalRootName);
+        if (existing != null) Object.DestroyImmediate(existing);   // 재실행 시 이전 배치를 걷어낸다
+
+        var root = new GameObject(DecalRootName).transform;
+        var rng = new System.Random(DecalSeed);
+        float Range(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+        for (int i = 0; i < DecalCount; i++)
+        {
+            var go = new GameObject($"Decal_{i:00}");
+            go.transform.SetParent(root, false);
+            go.transform.position = new Vector3(Range(DecalArea.xMin, DecalArea.xMax),
+                                                FloorY + 0.5f,   // 바닥 위에서 아래로 투영
+                                                Range(DecalArea.yMin, DecalArea.yMax));
+            // 프로젝터는 자기 -Z 로 투영한다. X 90도로 세워야 바닥을 향한다.
+            go.transform.rotation = Quaternion.Euler(90f, Range(0f, 360f), 0f);
+
+            var projector = go.AddComponent<DecalProjector>();
+            projector.material = mats[rng.Next(mats.Length)];
+            float w = Range(2.5f, 6f);
+            projector.size = new Vector3(w, w * Range(0.7f, 1.3f), 2f);   // 깊이 2m — 바닥만 물게
+            projector.pivot = new Vector3(0f, 0f, 1f);                    // 박스 앞면이 바닥에 닿게
+            projector.fadeFactor = Range(0.5f, 0.95f);                    // 옅게 겹쳐야 반복이 자연스럽게 깨진다
+        }
+
+        Debug.Log($"[BaseCampQuality] 광장 데칼 {DecalCount}개 산포 — 머티리얼 {mats.Length}종 · " +
+                  $"시드 {DecalSeed} · 범위 x{DecalArea.xMin}~{DecalArea.xMax} z{DecalArea.yMin}~{DecalArea.yMax}");
+    }
+
+    // 캐릭터가 바닥에서 떠 보이는 원인을 가른다.
+    // 후보는 셋이고 셋 다 숫자로 구분된다.
+    //   (a) 바닥 콜라이더 윗면이 렌더 윗면보다 높다  → 타일의 두 bounds.max.y 차이
+    //   (b) 플레이어 캡슐 바닥이 모델 발바닥보다 위다 → 캡슐 하단 vs 렌더러 bounds.min.y
+    //   (c) 접지 코드가 띄운다                        → 위 둘이 0에 가까우면 남는 것이 이것
+    [MenuItem("RelicFairy/BaseCamp/19. 캐릭터 부양 원인 진단")]
+    public static void DiagnoseFloatingCharacter()
+    {
+        // (a0) 씬 전체 Ground 레이어 콜라이더 — 콜라이더 윗면이 렌더 윗면보다 높은 곳 찾기.
+        //      광장 격자만 보면 회랑·하부 구역처럼 다른 바닥을 놓친다.
+        {
+            int ground = LayerMask.NameToLayer("Ground");
+            var offenders = new List<(string name, float diff, float y)>();
+            int scanned = 0;
+
+            foreach (var col in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+            {
+                if (col.gameObject.layer != ground || col.isTrigger) continue;
+
+                float renderTop = float.MinValue;
+                foreach (var r in col.GetComponentsInChildren<MeshRenderer>())
+                    renderTop = Mathf.Max(renderTop, r.bounds.max.y);
+                if (renderTop <= float.MinValue) continue;
+
+                scanned++;
+                float diff = col.bounds.max.y - renderTop;
+                if (diff > 0.01f) offenders.Add((col.name, diff, col.bounds.max.y));
+            }
+
+            offenders.Sort((a, b) => b.diff.CompareTo(a.diff));
+            Debug.Log($"[진단] (a0) Ground 콜라이더 {scanned}개 검사 — 콜라이더가 렌더보다 1cm 넘게 높은 것 " +
+                      $"{offenders.Count}개");
+            foreach (var (n, d, y) in offenders.Take(8))
+                Debug.Log($"[진단]      +{d:0.###}m  '{n}'  (콜라이더 윗면 y={y:0.##})");
+        }
+
+        // (a) 광장 바닥 타일 — 렌더 윗면 vs 콜라이더 윗면
+        var grid = GameObject.Find(GridRootName);
+        if (grid == null) { Debug.LogWarning("[진단] PlazaFloor_Grid 없음"); }
+        else
+        {
+            // 타일은 콜라이더가 루트에, 렌더러는 LOD 자식에 있다. 타일 단위로 묶어서 비교한다.
+            int checkedCount = 0;
+            float worst = 0f; string worstName = "";
+            foreach (Transform tile in grid.transform)
+            {
+                var col = tile.GetComponentInChildren<Collider>();
+                if (col == null) continue;
+
+                float renderTop = float.MinValue;
+                foreach (var r in tile.GetComponentsInChildren<MeshRenderer>())
+                    renderTop = Mathf.Max(renderTop, r.bounds.max.y);
+                if (renderTop <= float.MinValue) continue;
+
+                float diff = col.bounds.max.y - renderTop;
+                if (Mathf.Abs(diff) > Mathf.Abs(worst)) { worst = diff; worstName = tile.name; }
+                checkedCount++;
+            }
+            Debug.Log($"[진단] (a) 바닥 타일 {checkedCount}개 — 콜라이더 윗면 − 렌더 윗면 최대차 " +
+                      $"{worst:0.####}m ('{worstName}')  ※ 양수면 콜라이더가 더 높다");
+        }
+
+        // (b) 플레이어 프리팹 — 캡슐 하단 vs 모델 발바닥
+        const string PlayerPrefab = "Assets/RelicFairy/Characters/Player/Gawain/Prefabs/PlayerCharacter.prefab";
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefab);
+        if (prefab == null) { Debug.LogWarning($"[진단] 플레이어 프리팹 없음: {PlayerPrefab}"); return; }
+
+        var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        try
+        {
+            inst.transform.position = Vector3.zero;
+
+            float capsuleBottom = float.NaN;
+            if (inst.TryGetComponent<CapsuleCollider>(out var cap))
+                capsuleBottom = cap.center.y - Mathf.Max(cap.height, cap.radius * 2f) * 0.5f;
+
+            float meshMin = float.MaxValue;
+            foreach (var r in inst.GetComponentsInChildren<Renderer>())
+            {
+                if (r is ParticleSystemRenderer or TrailRenderer) continue;
+                meshMin = Mathf.Min(meshMin, r.bounds.min.y);
+            }
+
+            Debug.Log($"[진단] (b) 플레이어 — 캡슐 하단 y={capsuleBottom:0.####} · " +
+                      $"모델 최저점 y={meshMin:0.####} · 차이 {capsuleBottom - meshMin:0.####}m  " +
+                      $"※ 양수면 캡슐이 발바닥보다 위 = 그만큼 떠 보인다");
+            Debug.Log($"[진단] 참고 — Physics.defaultContactOffset={Physics.defaultContactOffset} " +
+                      $"(리지드바디는 이만큼 항상 띄워 붙는다)");
+        }
+        finally { Object.DestroyImmediate(inst); }
+    }
+
+    // 진단 결과 캡슐 하단(y 0.0017)이 모델 발바닥(y -0.0302)보다 3.2cm 위였다.
+    // 리지드바디가 유지하는 접촉 간격 1cm 까지 더해 4.2cm 떠 보인다.
+    //
+    // 플로팅 컨트롤러였다면 이 간격이 의도(floatRideHeight 만큼 띄워야 발이 안착)지만,
+    // PlayerCharacterData.useFloatingController = 0 이라 레이 접지 경로를 쓴다. 즉 의도가 아니다.
+    //
+    // Height/Radius 는 그대로 두고 Center.y 만 내린다. 피격 판정 폭은 변하지 않고
+    // 캡슐 상단만 같이 3.2cm 내려간다.
+    [MenuItem("RelicFairy/BaseCamp/20. 플레이어 캡슐 접지 보정")]
+    public static void FixPlayerCapsuleGrounding()
+    {
+        const string PlayerPrefab = "Assets/RelicFairy/Characters/Player/Gawain/Prefabs/PlayerCharacter.prefab";
+
+        var root = PrefabUtility.LoadPrefabContents(PlayerPrefab);
+        if (root == null) { Debug.LogError($"[BaseCampQuality] 프리팹을 못 열었다: {PlayerPrefab}"); return; }
+
+        try
+        {
+            if (!root.TryGetComponent<CapsuleCollider>(out var cap))
+            { Debug.LogError("[BaseCampQuality] CapsuleCollider 없음"); return; }
+
+            float bottom = cap.center.y - Mathf.Max(cap.height, cap.radius * 2f) * 0.5f;
+
+            float footY = float.MaxValue;
+            foreach (var r in root.GetComponentsInChildren<Renderer>())
+            {
+                if (r is ParticleSystemRenderer or TrailRenderer) continue;
+                footY = Mathf.Min(footY, r.bounds.min.y);
+            }
+            if (footY >= float.MaxValue) { Debug.LogError("[BaseCampQuality] 렌더러를 못 찾았다"); return; }
+
+            float delta = bottom - footY;
+            if (Mathf.Abs(delta) < 0.001f)
+            { Debug.Log($"[BaseCampQuality] 이미 정렬돼 있다 (차이 {delta:0.####}m). 변경 없음."); return; }
+
+            var before = cap.center;
+            cap.center = new Vector3(before.x, before.y - delta, before.z);
+
+            PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefab);
+            Debug.Log($"[BaseCampQuality] 플레이어 캡슐 Center.y {before.y:0.####} → {cap.center.y:0.####} " +
+                      $"(−{delta:0.####}m). 캡슐 하단이 발바닥 y={footY:0.####} 에 정렬됨. " +
+                      $"접촉 간격 {Physics.defaultContactOffset}m 는 물리 엔진 동작이라 남는다.");
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
+    // 캡슐 자체가 떠 있다면 리지드바디가 무언가에 얹혀 있다는 뜻이다.
+    // 지정한 지점에서 아래로 내려다보며, 그 XZ 를 덮는 모든 비트리거 콜라이더를 윗면 높이 순으로 나열한다.
+    // 렌더러가 없는(=보이지 않는) 콜라이더가 바닥보다 위에 있으면 그것이 범인이다.
+    [MenuItem("RelicFairy/BaseCamp/21. 특정 지점 바닥 스택 조사")]
+    public static void ProbeGroundStack()
+    {
+        // 광장 중앙과 최초 스폰 지점 두 곳을 본다.
+        var probes = new (string label, Vector3 pos)[]
+        {
+            // 실행 중 플레이어 실측 위치 — 여기가 핵심 조사 지점이다.
+            ("플레이어 실측", new Vector3(44.69f, 20f, 20.54f)),
+            ("광장 중앙",   new Vector3(57f, 20f, 17f)),
+            ("최초 스폰",   new Vector3(-3.91f, 20f, -21.62f)),
+            ("복귀 스폰",   new Vector3(26.48f, 20f, 16.5f)),
+        };
+
+        foreach (var (label, pos) in probes)
+        {
+            var hits = new List<(string name, float top, bool visible, string layer, string type)>();
+
+            foreach (var col in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+            {
+                if (col.isTrigger) continue;
+                var bb = col.bounds;
+                if (pos.x < bb.min.x || pos.x > bb.max.x) continue;
+                if (pos.z < bb.min.z || pos.z > bb.max.z) continue;
+                if (bb.max.y > pos.y) continue;   // 조사 지점보다 위는 무시
+
+                bool visible = col.GetComponentInChildren<MeshRenderer>() != null
+                            || col.GetComponentInChildren<SkinnedMeshRenderer>() != null;
+                hits.Add((col.name, bb.max.y, visible, LayerMask.LayerToName(col.gameObject.layer),
+                          col.GetType().Name));
+            }
+
+            hits.Sort((a, b) => b.top.CompareTo(a.top));
+            Debug.Log($"[진단] ── {label} (x={pos.x}, z={pos.z}) — 아래쪽 콜라이더 {hits.Count}개 ──");
+            foreach (var (n, top, vis, lyr, ty) in hits.Take(6))
+                Debug.Log($"[진단]    윗면 y={top:0.###}  {(vis ? "보임  " : "안보임")}  [{lyr}]  {ty}  '{n}'");
+        }
+    }
+
+    // 플레이 중인 실제 플레이어를 재서 정적 분석과 대조한다.
+    // 발밑으로 레이를 쏴 무엇에 얹혀 있는지, 얼마나 떠 있는지 직접 확인한다.
+    [MenuItem("RelicFairy/BaseCamp/22. 실행 중 플레이어 접지 실측")]
+    public static void MeasureRuntimeGrounding()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[진단] 플레이 모드에서 실행해야 한다."); return; }
+
+        var player = GameObject.Find("PlayerCharacter(Clone)");
+        if (player == null) { Debug.LogWarning("[진단] PlayerCharacter(Clone) 을 못 찾았다."); return; }
+
+        var t = player.transform;
+        Debug.Log($"[진단] 플레이어 위치 = ({t.position.x:0.###}, {t.position.y:0.###}, {t.position.z:0.###})");
+
+        if (player.TryGetComponent<CapsuleCollider>(out var cap))
+        {
+            float bottom = cap.bounds.min.y;
+            Debug.Log($"[진단] 캡슐 월드 하단 y={bottom:0.###}  (center.y={cap.center.y:0.####} h={cap.height:0.###})");
+        }
+
+        float footY = float.MaxValue;
+        foreach (var r in player.GetComponentsInChildren<Renderer>())
+        {
+            if (r is ParticleSystemRenderer or TrailRenderer) continue;
+            footY = Mathf.Min(footY, r.bounds.min.y);
+        }
+        Debug.Log($"[진단] 모델 최저점 월드 y={footY:0.###}");
+
+        // 발밑 레이 — 전체 레이어
+        var origin = t.position + Vector3.up * 0.5f;
+        var all = Physics.RaycastAll(origin, Vector3.down, 5f);
+        System.Array.Sort(all, (a, b) => a.distance.CompareTo(b.distance));
+        Debug.Log($"[진단] 발밑 레이 적중 {all.Length}건 (원점 y={origin.y:0.###} 에서 아래로 5m)");
+        foreach (var h in all.Take(5))
+            Debug.Log($"[진단]    y={h.point.y:0.###}  거리 {h.distance:0.###}  [{LayerMask.LayerToName(h.collider.gameObject.layer)}]  '{h.collider.name}'");
+
+        if (player.TryGetComponent<Rigidbody>(out var rb))
+            Debug.Log($"[진단] 리지드바디 속도 y={rb.linearVelocity.y:0.####}  sleeping={rb.IsSleeping()}");
     }
 
     [MenuItem("RelicFairy/BaseCamp/15. 베이크 취소")]

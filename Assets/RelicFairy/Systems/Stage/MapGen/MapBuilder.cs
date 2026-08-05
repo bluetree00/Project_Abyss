@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// TileType[,] 그리드 + BlockPalette → 블록 인스턴스 생성.
@@ -403,6 +404,75 @@ public class MapBuilder
     /// 중요도에 따라 다르게 밝혀야 한다(R. Yang, "How to Light a Level", GDC 2018).
     /// 균일 배치만 하면 "밝은 곳이 갈 곳"이라는 신호가 성립하지 않는다.
     /// </param>
+    /// <summary>
+    /// 바닥 셀 위에 데칼을 흩뿌려 타일 무늬 반복을 깬다.
+    ///
+    /// 챕터 방은 런타임 생성이라 라이트맵도 리플렉션 프로브도 못 쓴다. 데칼은 버퍼 기반이라
+    /// 지오메트리가 언제 생기든 상관없이 얹히므로, 절차 생성 콘텐츠에 쓸 수 있는 몇 안 되는
+    /// 표면 디테일 수단이다.
+    ///
+    /// 시드는 호출부가 넘긴다. 이어하기로 같은 방을 다시 세울 때 같은 배치가 나와야
+    /// 플레이어가 기억하는 공간과 어긋나지 않는다.
+    /// </summary>
+    public static void BuildFloorDecals(
+        TileType[,]  grid,
+        Transform    parent,
+        float        cellSize,
+        float        baseY,
+        BlockPalette palette,
+        int          seed)
+    {
+        if (palette == null || parent == null) return;
+
+        var mats = palette.FloorDecalMaterials;
+        if (mats == null || mats.Count == 0) return;
+        if (palette.DecalsPer100SqM <= 0f) return;
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+
+        // 데칼을 얹을 수 있는 셀만 모은다. 벽·구멍 위에 뿌리면 허공에 뜬다.
+        var floorCells = new List<Vector2Int>();
+        for (int x = 0; x < w; x++)
+        for (int z = 0; z < h; z++)
+            if (grid[x, z] != TileType.Wall && grid[x, z] != TileType.Empty)
+                floorCells.Add(new Vector2Int(x, z));
+
+        if (floorCells.Count == 0) return;
+
+        float areaSqM = floorCells.Count * cellSize * cellSize;
+        int   count   = Mathf.RoundToInt(areaSqM / 100f * palette.DecalsPer100SqM);
+        if (count <= 0) return;
+
+        var root = new GameObject("FloorDecals").transform;
+        root.SetParent(parent, false);
+
+        var rng = new System.Random(seed);
+        float Range(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+        for (int i = 0; i < count; i++)
+        {
+            var cell = floorCells[rng.Next(floorCells.Count)];
+
+            var go = new GameObject($"Decal_{i:000}");
+            go.transform.SetParent(root, false);
+            go.transform.localPosition = new Vector3(
+                cell.x * cellSize - offset.x + Range(-0.5f, 0.5f) * cellSize,
+                baseY + 0.5f,                                   // 위에서 아래로 투영
+                cell.y * cellSize - offset.z + Range(-0.5f, 0.5f) * cellSize);
+            // 프로젝터는 자기 -Z 로 투영한다. X 90도로 세워야 바닥을 향한다.
+            go.transform.localRotation = Quaternion.Euler(90f, Range(0f, 360f), 0f);
+
+            var projector = go.AddComponent<DecalProjector>();
+            projector.material   = mats[rng.Next(mats.Count)];
+            float size           = Range(1.5f, 3.5f) * cellSize;
+            projector.size       = new Vector3(size, size * Range(0.7f, 1.3f), 2f);
+            projector.pivot      = new Vector3(0f, 0f, 1f);     // 박스 앞면이 바닥에 닿게
+            projector.fadeFactor = Range(0.3f, 0.65f);
+        }
+    }
+
     public static void BuildRoomLights(
         TileType[,]        grid,
         Transform          parent,

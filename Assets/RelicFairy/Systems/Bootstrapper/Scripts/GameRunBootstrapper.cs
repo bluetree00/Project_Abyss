@@ -1571,6 +1571,11 @@ public sealed class GameRunBootstrapper : MonoBehaviour
                 lightDoorCells.AddRange(cls.turns);
                 MapBuilder.BuildRoomLights(grid, roomGO.transform, blockCellSize, blockBaseY, effWallLayers,
                     palette.Lighting, lightDoorCells);
+
+                // 바닥 무늬 반복을 깨는 데칼. 이어하기로 같은 방을 다시 세울 때 배치가 같아야 하므로
+                // 방 좌표에서 시드를 유도한다(런 시드가 여기까지 내려오지 않는다).
+                MapBuilder.BuildFloorDecals(grid, roomGO.transform, blockCellSize, blockBaseY, palette,
+                    roomGO.transform.position.GetHashCode());
             }
             await UniTask.Yield(ct);
 

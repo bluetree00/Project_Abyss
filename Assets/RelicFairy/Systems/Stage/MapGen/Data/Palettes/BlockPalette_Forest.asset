@@ -16,15 +16,6 @@ MonoBehaviour:
   wallMode: 1
   wallHeight: 8
   hasCeiling: 0
-  veilMode: 0
-  corridorFogPrefab: {fileID: 6930174999031227623, guid: a3a908fc5452d224bb73a08f9b798a09, type: 3}
-  veilLayers: 4
-  veilHeight: 0.6
-  veilScale: 0.45
-  veilTint: {r: 0, g: 0, b: 0, a: 0}
-  veilRadianceIntensity: 6
-  sealDoorPrefab: {fileID: 1031144939, guid: abc00000000014045476076057746752, type: 3}
-  sealDoorMotion: 1
   lighting:
     wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
       type: 3}
@@ -41,6 +32,20 @@ MonoBehaviour:
       color: {r: 0.7, g: 0.9, b: 0.85, a: 1}
       intensityMul: 0.9
       rangeMul: 1.15
+  floorDecalMaterials:
+  - {fileID: 2100000, guid: c1ea7ec2966c810469ca22a4dab2c1b6, type: 2}
+  - {fileID: 2100000, guid: 689a51d0a482da549b7448b20f594464, type: 2}
+  decalsPer100SqM: 8
+  veilMode: 0
+  corridorFogPrefab: {fileID: 6930174999031227623, guid: a3a908fc5452d224bb73a08f9b798a09,
+    type: 3}
+  veilLayers: 4
+  veilHeight: 0.6
+  veilScale: 0.45
+  veilTint: {r: 0, g: 0, b: 0, a: 0}
+  veilRadianceIntensity: 6
+  sealDoorPrefab: {fileID: 1031144939, guid: abc00000000014045476076057746752, type: 3}
+  sealDoorMotion: 1
   blocks:
   - {fileID: 11400000, guid: 6bfba40b082f66549bb9192b1f434331, type: 2}
   - {fileID: 11400000, guid: 6210a5df7c32f604e86b821372770ad1, type: 2}

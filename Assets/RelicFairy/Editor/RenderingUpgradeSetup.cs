@@ -287,6 +287,314 @@ public static class RenderingUpgradeSetup
                   "암부 청보라 / 명부 금색 · 그레인 0.15");
     }
 
+    // ── 데칼 ───────────────────────────────────────────────────────
+    // 바닥 타일이 근거리에서 반복되는 것을 깨는 수단. 텍스처를 바꾸는 것보다 싸고,
+    // 스크린/버퍼 기반이라 런타임에 생성되는 챕터 방 지오메트리에도 그대로 얹힌다.
+    //
+    // 기법은 DBuffer 를 쓴다. 근거:
+    //   · DBuffer 는 조명 평가 전에 데칼을 버퍼에 그려서, 밑면 메시와 똑같이 그림자와
+    //     스페큘러를 받는다. Screen Space 는 노멀 블렌딩만 지원한다.
+    //   · Surface Data 를 Albedo Normal MAOS 로 두면 데칼이 알베도뿐 아니라 노멀·메탈릭·
+    //     스무스니스·AO 까지 덮어쓴다 — 젖은 자국이나 마모가 반사까지 바뀌어야 설득력이 생긴다.
+    //   · 제약은 OpenGL/GLES 비호환과 DepthNormal 프리패스 요구. 이 프로젝트는 d3d11 이라 무관.
+    private const string DecalMaterialDir = "Assets/RelicFairy/Prefabs/Stage/Decals";
+
+    // 프로젝트에 데칼용 마스크 텍스처가 없다. 후보를 전부 실측한 결과:
+    //   T_StoneDebris_01a/02a_B : 알파 255 고정 → 사각형이 통째로 찍힌다. 사용 불가.
+    //   T_Grunge_01b            : 알파 1~127
+    //   T_Grunge_02a            : 알파 8~212
+    // 그런지 둘은 알파에 변화가 있지만 타일링용이라 가장자리에서 0이 되지 않는다.
+    // 그대로 쓰면 경계가 직선으로 보인다.
+    //
+    // 그래서 원본 알파에 가장자리 감쇠를 곱한 데칼 전용 텍스처를 생성해서 쓴다.
+    // (원본은 건드리지 않는다 — 다른 곳에서 타일링 텍스처로 쓰고 있다)
+    private const string DecalTextureDir = "Assets/RelicFairy/Prefabs/Stage/Decals";
+
+    // 원본 그런지 RGB 에 곱할 값. 1이면 원본(밝은 회색)이라 어두운 바닥에서 튄다.
+    private const float DecalAlbedoScale = 0.4f;
+
+    private static readonly (string outName, string source)[] DecalMaskSources =
+    {
+        ("T_DecalGrunge_01", "Assets/RelicFairy/_Imported/Gothic_Interior/Environment/Asset/Texture/T_Grunge/T_Grunge_01b.png"),
+        ("T_DecalGrunge_02", "Assets/RelicFairy/_Imported/Gothic_Interior/Environment/Asset/Texture/T_Grunge/T_Grunge_02a.png"),
+    };
+
+    /// <summary>원본 그런지에 가장자리 감쇠를 입혀 데칼용 텍스처를 만든다.</summary>
+    private static void GenerateDecalMasks()
+    {
+        foreach (var (outName, source) in DecalMaskSources)
+        {
+            string outPath = $"{DecalTextureDir}/{outName}.png";
+
+            // 에셋 임포터의 isReadable 을 건드리지 않도록 원본 파일을 직접 디코드한다.
+            var src = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!src.LoadImage(File.ReadAllBytes(source)))
+            {
+                Debug.LogError($"[Rendering] 텍스처 디코드 실패: {source}");
+                continue;
+            }
+
+            int w = src.width, h = src.height;
+            var px = src.GetPixels32();
+            float maxA = 0f;
+
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h * 2f - 1f;      // -1 ~ 1
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f) / w * 2f - 1f;
+
+                    // 원형 감쇠. 반지름 0.55 까지는 그대로 두고 1.0 에서 0 이 되게 부드럽게 떨군다.
+                    float r = Mathf.Sqrt(u * u + v * v);
+                    float fall = 1f - Mathf.SmoothStep(0.55f, 1f, r);
+
+                    int i = y * w + x;
+
+                    // 원본 그런지의 RGB 는 밝은 회색이다. 그대로 쓰면 밝은 석재 바닥에서는 때로 읽히지만
+                    // 어두운 숲 바닥에서는 눈 자국처럼 튄다. 때는 어둡게 입혀야 어느 바닥에서든 성립한다.
+                    px[i].r = (byte)(px[i].r * DecalAlbedoScale);
+                    px[i].g = (byte)(px[i].g * DecalAlbedoScale);
+                    px[i].b = (byte)(px[i].b * DecalAlbedoScale);
+
+                    float a = px[i].a / 255f * fall;
+                    if (a > maxA) maxA = a;
+                    px[i].a = (byte)Mathf.RoundToInt(Mathf.Clamp01(a) * 255f);
+                }
+            }
+
+            // 원본 알파 상한이 127/255 수준이라 그대로 두면 너무 옅다. 중심이 1에 닿도록 정규화한다.
+            if (maxA > 0.001f && maxA < 0.99f)
+            {
+                float gain = 1f / maxA;
+                for (int i = 0; i < px.Length; i++)
+                    px[i].a = (byte)Mathf.RoundToInt(Mathf.Clamp01(px[i].a / 255f * gain) * 255f);
+            }
+
+            src.SetPixels32(px);
+            src.Apply(false, false);
+            File.WriteAllBytes(outPath, src.EncodeToPNG());
+            Object.DestroyImmediate(src);
+
+            AssetDatabase.ImportAsset(outPath, ImportAssetOptions.ForceUpdate);
+            if (AssetImporter.GetAtPath(outPath) is TextureImporter ti)
+            {
+                ti.textureType          = TextureImporterType.Default;
+                ti.alphaSource          = TextureImporterAlphaSource.FromInput;
+                ti.alphaIsTransparency  = true;     // 밉맵 생성 시 가장자리 색 번짐 방지
+                ti.sRGBTexture          = true;
+                ti.maxTextureSize       = 1024;     // 데칼에 2048 은 과하다
+                ti.SaveAndReimport();
+            }
+            Debug.Log($"[Rendering] 데칼 마스크 생성 → {outName}.png ({w}x{h}, 알파 상한 {maxA:0.00} → 정규화)");
+        }
+    }
+
+    // (머티리얼명, 베이스맵(알파=불투명도), 노멀맵)
+    private static readonly (string name, string baseMap, string normal, string maos)[] DecalSources =
+    {
+        ("Mat_Decal_Grunge_01", $"{DecalTextureDir}/T_DecalGrunge_01.png", null, null),
+        ("Mat_Decal_Grunge_02", $"{DecalTextureDir}/T_DecalGrunge_02.png", null, null),
+    };
+
+    [MenuItem("RelicFairy/Rendering/8. 데칼 배선 (DBuffer) + 데칼 머티리얼 생성")]
+    public static void SetupDecals()
+    {
+        // 1) 렌더러 페이처 등록
+        foreach (string path in RendererPaths)
+        {
+            var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(path);
+            if (data == null) { Debug.LogError($"[Rendering] 렌더러 없음: {path}"); continue; }
+
+            var feature = data.rendererFeatures.OfType<DecalRendererFeature>().FirstOrDefault();
+            if (feature == null)
+            {
+                feature = ScriptableObject.CreateInstance<DecalRendererFeature>();
+                feature.name = "DecalRendererFeature";
+                data.rendererFeatures.Add(feature);
+                AssetDatabase.AddObjectToAsset(feature, data);
+                Debug.Log($"[Rendering] 데칼 페이처 추가 → {Path.GetFileName(path)}");
+            }
+
+            // surfaceData 는 m_Settings 직속이 아니라 dBufferSettings 안에 있다.
+            // 경로를 틀리면 FindProperty 가 null 을 돌려주고 그대로 NRE 가 난다 — 반드시 확인하고 쓴다.
+            var fso = new SerializedObject(feature);
+            void SetEnum(string propPath, int value, string label)
+            {
+                var p = fso.FindProperty(propPath);
+                if (p == null) { Debug.LogWarning($"[Rendering] {label} 경로 없음: {propPath}"); return; }
+                p.enumValueIndex = value;
+            }
+            void SetFloat(string propPath, float value, string label)
+            {
+                var p = fso.FindProperty(propPath);
+                if (p == null) { Debug.LogWarning($"[Rendering] {label} 경로 없음: {propPath}"); return; }
+                p.floatValue = value;
+            }
+
+            // SurfaceData 는 Albedo Normal(1). 스톡 'Shader Graphs/Decal' 이 노출하는 출력이
+            // Base_Map / Normal_Map 뿐이라, AlbedoNormalMAOS(2)로 두면 쓰지도 않는 MAOS
+            // 렌더타깃을 하나 더 잡아 대역폭만 버린다. MAOS 가 필요해지면 데칼 셰이더그래프를
+            // 따로 만든 뒤 여기도 2로 올린다.
+            SetEnum ("m_Settings.technique",                    1,    "기법(DBuffer)");
+            SetEnum ("m_Settings.dBufferSettings.surfaceData",  1,    "SurfaceData(AlbedoNormal)");
+            SetFloat("m_Settings.maxDrawDistance",              120f, "최대 그리기 거리");
+            fso.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(data);
+        }
+
+        // 2) 데칼 마스크 텍스처 생성 후 머티리얼 생성
+        if (!AssetDatabase.IsValidFolder(DecalMaterialDir))
+            AssetDatabase.CreateFolder("Assets/RelicFairy/Prefabs/Stage", "Decals");
+
+        GenerateDecalMasks();
+
+        var shader = Shader.Find("Shader Graphs/Decal");
+        if (shader == null) { Debug.LogError("[Rendering] 'Shader Graphs/Decal' 셰이더를 못 찾았다."); return; }
+
+        int made = 0;
+        foreach (var (name, baseMap, normal, maos) in DecalSources)
+        {
+            string path = $"{DecalMaterialDir}/{name}.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(shader);
+                AssetDatabase.CreateAsset(mat, path);
+                made++;
+            }
+
+            // 스톡 데칼 셰이더의 프로퍼티명은 Base_Map / Normal_Map / Normal_Blend 다.
+            // URP Lit 관례인 _BaseMap 이 아니다 — 이름이 틀리면 조용히 아무 일도 안 일어난다.
+            void Bind(string prop, string texPath)
+            {
+                if (texPath == null) return;
+                if (!mat.HasProperty(prop)) { Debug.LogWarning($"[Rendering] 프로퍼티 없음: {prop}"); return; }
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+                if (tex == null) { Debug.LogWarning($"[Rendering] 텍스처 없음: {texPath}"); return; }
+                mat.SetTexture(prop, tex);
+            }
+            Bind("Base_Map",   baseMap);
+            Bind("Normal_Map", normal);
+
+            if (mat.HasProperty("Normal_Blend")) mat.SetFloat("Normal_Blend", normal != null ? 1f : 0f);
+            EditorUtility.SetDirty(mat);
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"[Rendering] 데칼 — DBuffer · Albedo Normal MAOS · 최대거리 120 · 머티리얼 신규 {made}개 " +
+                  $"(총 {DecalSources.Length}개)");
+    }
+
+    // 프로젝트에 룩 프로파일이 두 개 병존한다.
+    //   GameVolumeProfile : BaseCamp · Ch1~4 · Tutorial
+    //   PP_Global_Dark    : Game_Intro · LichTest · DragonTest · Test
+    // PP_Global_Dark 는 이미 ACES 에 Bloom 1.1/0.4, FilmGrain 0.12, WhiteBalance -8,
+    // saturation -5 로 잘 잡혀 있다 — 의도적으로 더 어둡고 차갑고 탈채도된 룩이다.
+    // 그 성격은 유지하고, 빠져 있는 명암 색분리만 같은 값으로 맞춰 톤 언어를 통일한다.
+    private const string DarkProfilePath = "Assets/Settings/PostProcessing/PP_Global_Dark.asset";
+
+    [MenuItem("RelicFairy/Rendering/9. 인트로·보스테스트 프로파일에 명암 색분리 적용")]
+    public static void ApplyShadowSplitToDarkProfile()
+    {
+        var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(DarkProfilePath);
+        if (profile == null) { Debug.LogError($"[Rendering] 프로파일 없음: {DarkProfilePath}"); return; }
+
+        profile.components.RemoveAll(c => c == null);
+
+        ShadowsMidtonesHighlights smh;
+        if (profile.Has<ShadowsMidtonesHighlights>())
+        {
+            smh = profile.components.OfType<ShadowsMidtonesHighlights>().First();
+        }
+        else
+        {
+            smh = profile.Add<ShadowsMidtonesHighlights>(overrides: false);
+            smh.name = nameof(ShadowsMidtonesHighlights);
+            AssetDatabase.AddObjectToAsset(smh, profile);
+        }
+
+        void Set<TV>(VolumeParameter<TV> p, TV v) { p.overrideState = true; p.value = v; }
+        Set(smh.shadows,         new Vector4(0.88f, 0.93f, 1.12f, 0f));
+        Set(smh.midtones,        new Vector4(1.00f, 1.00f, 1.00f, 0f));
+        Set(smh.highlights,      new Vector4(1.10f, 1.03f, 0.90f, 0f));
+        Set(smh.shadowsEnd,      0.35f);
+        Set(smh.highlightsStart, 0.55f);
+
+        // 볼류메트릭도 이 계열에는 아예 없었다. 스폰 포인트 실측 결과 이 프로파일을 쓰는 씬은
+        // 전부 y ≈ 0 대다 — Game_Intro 1.0 / LichTest 0.0 / DragonTest 0.0.
+        // 챕터 방과 같은 높이대이므로 같은 기준(-2 부터 15m)을 쓴다.
+        // 밀도는 BaseCamp(개방 광장, 0.35)보다 높이되 챕터 기본값(1.2)보다는 낮게 잡는다 —
+        // 인트로 아레나는 반쯤 닫힌 공간이라 그 중간이다.
+        ButoVolumetricFog fog;
+        if (profile.Has<ButoVolumetricFog>())
+        {
+            fog = profile.components.OfType<ButoVolumetricFog>().First();
+        }
+        else
+        {
+            fog = profile.Add<ButoVolumetricFog>(overrides: false);
+            fog.name = nameof(ButoVolumetricFog);
+            AssetDatabase.AddObjectToAsset(fog, profile);
+        }
+        Set(fog.mode,                    VolumetricFogMode.On);
+        Set(fog.baseHeight,              -2f);
+        Set(fog.attenuationBoundarySize, 15f);
+        Set(fog.fogDensity,              0.6f);
+        Set(fog.lightIntensity,          0.8f);
+        Set(fog.maxDistanceVolumetric,   70f);
+        Set(fog.anisotropy,              0.3f);
+
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Rendering] PP_Global_Dark — 명암 색분리 + 볼류메트릭(baseHeight -2 / boundary 15 / " +
+                  "density 0.6) 적용. 노출·채도·화이트밸런스는 기존 유지");
+    }
+
+    // 챕터 방은 런타임 생성이라 라이트맵·리플렉션 프로브를 못 쓴다. 표면 디테일을 넣을 수단이
+    // 데칼밖에 없으므로, 6개 팔레트 전부에 같은 그런지 데칼을 물려 최소 기준선을 만든다.
+    // 챕터별로 다른 데칼을 쓰고 싶으면 팔레트에서 개별 교체하면 된다.
+    [MenuItem("RelicFairy/Rendering/10. 팔레트에 바닥 데칼 배선")]
+    public static void WireDecalsToPalettes()
+    {
+        var mats = new[]
+        {
+            AssetDatabase.LoadAssetAtPath<Material>($"{DecalMaterialDir}/Mat_Decal_Grunge_01.mat"),
+            AssetDatabase.LoadAssetAtPath<Material>($"{DecalMaterialDir}/Mat_Decal_Grunge_02.mat"),
+        }.Where(m => m != null).ToArray();
+
+        if (mats.Length == 0) { Debug.LogError("[Rendering] 데칼 머티리얼이 없다. 메뉴 8을 먼저 실행."); return; }
+
+        var guids = AssetDatabase.FindAssets("t:BlockPalette");
+        int wired = 0;
+
+        foreach (var guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var palette = AssetDatabase.LoadAssetAtPath<BlockPalette>(path);
+            if (palette == null) continue;
+
+            var so   = new SerializedObject(palette);
+            var list = so.FindProperty("floorDecalMaterials");
+            if (list == null) { Debug.LogWarning($"[Rendering] floorDecalMaterials 없음: {path}"); continue; }
+
+            list.ClearArray();
+            for (int i = 0; i < mats.Length; i++)
+            {
+                list.InsertArrayElementAtIndex(i);
+                list.GetArrayElementAtIndex(i).objectReferenceValue = mats[i];
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(palette);
+            wired++;
+            Debug.Log($"[Rendering] 데칼 배선 → {Path.GetFileNameWithoutExtension(path)} ({mats.Length}종)");
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[Rendering] 팔레트 {wired}개에 바닥 데칼 배선 완료");
+    }
+
     [MenuItem("RelicFairy/Rendering/2. Buto 등록 상태 확인")]
     public static void VerifyButoFeature()
     {

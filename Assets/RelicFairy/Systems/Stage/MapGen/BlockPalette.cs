@@ -113,6 +113,16 @@ public class BlockPalette : ScriptableObject
     [Header("Lighting")]
     [SerializeField] private RoomLightingConfig lighting = new();
 
+    [Header("Floor Decals")]
+    [Tooltip("바닥에 흩뿌릴 데칼 머티리얼. 비우면 데칼 없음.\n" +
+             "타일 프리팹이 정격자로 반복되면 근거리에서 무늬 되풀이가 그대로 읽힌다. " +
+             "데칼은 그 위에 얼룩을 겹쳐 반복을 깬다 — 텍스처를 늘리는 것보다 싸다.")]
+    [SerializeField] private List<Material> floorDecalMaterials = new();
+
+    [Min(0f), Tooltip("바닥 100㎡당 데칼 개수. 0이면 배치하지 않는다.\n" +
+                      "런타임 생성이라 개수가 곧 비용이다. 8 전후가 반복을 깨면서도 부담이 적다.")]
+    [SerializeField] private float decalsPer100SqM = 8f;
+
     [Header("Corridor / Door — 테마 컨셉 일치용")]
     [Tooltip("통로 끝 '다음 방'을 가리는 방식.\n" +
              "Fog = 어둠·안개로 덮는다(숲·폐허·요새).\n" +
@@ -158,6 +168,8 @@ public class BlockPalette : ScriptableObject
     public int WallHeight => wallHeight;
     public bool HasCeiling => hasCeiling;
     public RoomLightingConfig Lighting => lighting;
+    public IReadOnlyList<Material> FloorDecalMaterials => floorDecalMaterials;
+    public float DecalsPer100SqM => decalsPer100SqM;
     public GameObject       CorridorFogPrefab => corridorFogPrefab;
     public GameObject       SealDoorPrefab    => sealDoorPrefab;
     public SealDoorMotion   SealDoorMotion    => sealDoorMotion;
