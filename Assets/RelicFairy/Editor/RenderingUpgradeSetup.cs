@@ -595,6 +595,113 @@ public static class RenderingUpgradeSetup
         Debug.Log($"[Rendering] 팔레트 {wired}개에 바닥 데칼 배선 완료");
     }
 
+    // Unity 6 의 GPU Resident Drawer.
+    // 렌더링할 오브젝트 데이터를 GPU 에 상주시켜 CPU 측 드로우 제출과 컬링 비용을 크게 줄인다.
+    // BaseCamp 만 해도 Static 오브젝트가 17,336개라 이 기능이 겨냥하는 지점에 정확히 해당한다.
+    // 성능 여유가 생기면 광원·데칼·볼류메트릭의 상한도 함께 올라간다.
+    //
+    // 전제: 대상 오브젝트가 Static(배칭 가능)이어야 한다 — 1번 메뉴로 이미 지정돼 있다.
+    [MenuItem("RelicFairy/Rendering/11. GPU Resident Drawer 활성화")]
+    public static void EnableGpuResidentDrawer()
+    {
+        var urpAssets = new[]
+        {
+            "Assets/Settings/URP-Performant.asset",
+            "Assets/Settings/URP-Balanced.asset",
+            "Assets/Settings/URP-HighFidelity.asset",
+        };
+
+        foreach (string path in urpAssets)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(path);
+            if (asset == null) { Debug.LogError($"[Rendering] URP 에셋 없음: {path}"); continue; }
+
+            var so = new SerializedObject(asset);
+            void Set(string prop, int value, string label)
+            {
+                var p = so.FindProperty(prop);
+                if (p == null) { Debug.LogWarning($"[Rendering] {label} 경로 없음: {prop}"); return; }
+                if (p.propertyType == SerializedPropertyType.Boolean) p.boolValue = value != 0;
+                else p.intValue = value;
+            }
+
+            Set("m_GPUResidentDrawerMode", 1, "GPU Resident Drawer(InstancedDrawing)");
+            Set("m_GPUResidentDrawerEnableOcclusionCullingInCameras", 1, "GPU 오클루전 컬링");
+            // 화면에서 이 비율보다 작아지는 메시는 그리지 않는다. 0이면 컷오프 없음.
+            // 소품이 만 단위라 아주 작은 것부터 걷어내면 효과가 크다.
+            var smp = so.FindProperty("m_SmallMeshScreenPercentage");
+            if (smp != null) smp.floatValue = 1.5f;
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+            Debug.Log($"[Rendering] {Path.GetFileName(path)} — GPU Resident Drawer ON · 오클루전 컬링 ON · " +
+                      $"소형 메시 컷오프 1.5%");
+        }
+
+        // GRD 는 DOTS 인스턴싱 셰이더 변형을 쓴다. 기본 스트리핑 설정이면 빌드 때 그 변형이
+        // 통째로 제거돼 플레이어에서만 깨진다 — 에디터에서는 멀쩡해 보이므로 놓치기 쉽다.
+        // 프로퍼티는 읽기 전용이라 GraphicsSettings 에셋을 직접 쓴다.
+        // 열거형 값은 이름으로 얻어 하드코딩을 피한다(버전에 따라 정수값이 달라질 수 있다).
+        var gsAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset").FirstOrDefault();
+        if (gsAsset == null) Debug.LogWarning("[Rendering] GraphicsSettings 에셋을 못 읽었다.");
+        else
+        {
+            var gso  = new SerializedObject(gsAsset);
+            var prop = gso.FindProperty("m_BrgStripping");
+            if (prop == null) Debug.LogWarning("[Rendering] m_BrgStripping 프로퍼티 없음");
+            else
+            {
+                int keepAll = (int)UnityEditor.Rendering.BatchRendererGroupStrippingMode.KeepAll;
+                prop.intValue = keepAll;
+                gso.ApplyModifiedPropertiesWithoutUndo();
+                Debug.Log($"[Rendering] BatchRendererGroup Variants → Keep All (값 {keepAll}) " +
+                          "— 빌드 시 DOTS 인스턴싱 셰이더 보존");
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+    }
+
+    // 화면공간 렌즈 플레어. 블룸 밉을 재사용하므로 추가 비용이 작고, 광원이 화면에 들어올 때
+    // 렌즈가 반응하는 느낌을 준다 — 화톳불·포털처럼 밝은 점광원이 많은 이 게임에 잘 맞는다.
+    // 값을 세게 주면 싸구려 렌즈 효과가 되므로 "있는 줄 모르게" 정도로만 잡는다.
+    [MenuItem("RelicFairy/Rendering/12. 화면공간 렌즈 플레어")]
+    public static void ApplyScreenSpaceLensFlare()
+    {
+        foreach (string profilePath in new[] { GameProfilePath, DarkProfilePath })
+        {
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath);
+            if (profile == null) { Debug.LogError($"[Rendering] 프로파일 없음: {profilePath}"); continue; }
+
+            profile.components.RemoveAll(c => c == null);
+
+            ScreenSpaceLensFlare flare;
+            if (profile.Has<ScreenSpaceLensFlare>())
+            {
+                flare = profile.components.OfType<ScreenSpaceLensFlare>().First();
+            }
+            else
+            {
+                flare = profile.Add<ScreenSpaceLensFlare>(overrides: false);
+                flare.name = nameof(ScreenSpaceLensFlare);
+                AssetDatabase.AddObjectToAsset(flare, profile);
+            }
+
+            void Set<TV>(VolumeParameter<TV> p, TV v) { p.overrideState = true; p.value = v; }
+            Set(flare.intensity,               0.35f);
+            Set(flare.tintColor,               new Color(1f, 0.95f, 0.85f, 1f));  // 화톳불 금색 쪽
+            Set(flare.firstFlareIntensity,     0.6f);
+            Set(flare.secondaryFlareIntensity, 0.3f);
+            Set(flare.warpedFlareIntensity,    0.25f);
+            Set(flare.streaksIntensity,        0.2f);   // 수평 줄기는 약하게 — 강하면 SF 느낌이 된다
+            Set(flare.vignetteEffect,          0.7f);   // 화면 중앙보다 가장자리에서 강하게
+
+            EditorUtility.SetDirty(profile);
+            Debug.Log($"[Rendering] 렌즈 플레어 → {Path.GetFileNameWithoutExtension(profilePath)} (세기 0.35)");
+        }
+        AssetDatabase.SaveAssets();
+    }
+
     [MenuItem("RelicFairy/Rendering/2. Buto 등록 상태 확인")]
     public static void VerifyButoFeature()
     {
