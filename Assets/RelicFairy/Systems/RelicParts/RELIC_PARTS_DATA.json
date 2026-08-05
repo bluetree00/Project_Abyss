@@ -76,7 +76,7 @@
       "part_kind": "core",
       "part_id": "lancelot_core_endless_frenzy",
       "part_name": "끝나지 않는 광란",
-      "description": "광란이 끝날 때 광기 스택이 남아 있으면 소모하고 유지한다. 스택만 있으면 상시 광란을 이어간다.",
+      "description": "광란이 끝날 때 한 번 더 광란을 이어간다.",
       "effect_key": "lancelot_endless_frenzy",
       "boss_tier": 3
     },
@@ -88,7 +88,8 @@
       "part_name": "피의 만찬",
       "description": "광란 중 적을 처치하면 그 적에 쌓인 출혈이 주변 적들에게 번진다.",
       "effect_key": "lancelot_blood_feast",
-      "boss_tier": 3
+      "boss_tier": 3,
+      "requires": "lancelot_eff_bleed_brand"
     },
     {
       "index": 1203,
@@ -96,7 +97,7 @@
       "part_kind": "core",
       "part_id": "lancelot_core_betrayer_brand",
       "part_name": "배신자의 낙인",
-      "description": "심판의 일격에 맞은 적이 체력 25% 이하면 처형한다. 보스는 처형되지 않고 광기가 즉시 가득 찬다.",
+      "description": "심판의 일격에 맞은 적이 체력 25% 이하면 처형한다. 보스는 처형되지 않고 광란이 유지된다.",
       "effect_key": "lancelot_betrayer_brand",
       "boss_tier": 3
     },

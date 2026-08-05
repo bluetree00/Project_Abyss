@@ -58,6 +58,42 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         Destroy(this);
     }
 
+    /// <summary>대상 화상의 fraction(0~1)만큼을 즉시 피해로 터뜨리고, 그 비율만큼 잔여를 줄인다(나머지는 계속 탄다). — 가웨인 '불사르기'.</summary>
+    public static void DetonateOn(GameObject target, float fraction)
+    {
+        if (target != null && target.TryGetComponent<MonsterBurnHandler>(out var h)) h.Detonate(fraction);
+    }
+
+    /// <summary>남은 화상의 fraction 비율을 즉시 피해로 가하고, 그만큼 잔여시간을 소진. 전부 소진되면 소멸.</summary>
+    public void Detonate(float fraction)
+    {
+        fraction = Mathf.Clamp01(fraction);
+        if (_target == null || fraction <= 0f || _remaining <= 0f) return;
+
+        float burst = _dps * _remaining * fraction;
+        if (burst > 0f) DealDot(burst);
+
+        _remaining -= _remaining * fraction;   // 터뜨린 비율만큼 잔여 소진
+        if (_remaining <= 0f) Destroy(this);
+    }
+
+    /// <summary>from의 화상을 to에게 그대로 옮긴다(전염) — dps·잔여시간·간격 복사. from에 화상이 없으면 무시. 가웨인 '화상 전염/재앙'.</summary>
+    public static void SpreadTo(GameObject from, GameObject to, GameObject instigator)
+    {
+        if (from == null || to == null) return;
+        if (!from.TryGetComponent<MonsterBurnHandler>(out var src) || src._remaining <= 0f) return;
+        Apply(to, src._dps, src._remaining, src._tickInterval, instigator);
+    }
+
+    /// <summary>대상 화상의 잔여시간을 addSeconds만큼 연장(중첩 근사). 화상이 없으면 무시. 가웨인 '심판의 낙인' 보스 분기.</summary>
+    public static void ExtendOn(GameObject target, float addSeconds)
+    {
+        if (target == null || addSeconds <= 0f) return;
+        if (!target.TryGetComponent<MonsterBurnHandler>(out var h) || h._remaining <= 0f) return;
+        h._remaining += addSeconds;
+        h._total = Mathf.Max(h._total, h._remaining);
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────
     private void Update()
     {

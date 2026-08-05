@@ -22,6 +22,13 @@ public class ActAttackState : ILayerState<ActState>
     private float _stateElapsed;
     private const float StateTimeout = 1f;
 
+    // ── 회수(recovery) 상태 ─────────────────────────────────────────────────
+    // attackEndAt 은 "다음 콤보가 발사되는 체인 지점"이라 그대로 올리면 콤보가 그만큼 느려진다.
+    // 그래서 체인 지점은 두고, 후속 입력이 없을 때만 recoveryEndAt 까지 클립을 마저 재생해
+    // 잘려나가던 회수 동작을 되살린다. 입력이 들어오면 즉시 취소되므로 반응성 손실은 없다.
+    private bool  _inRecovery;
+    private float _recoveryEnd;
+
     // ── Lunge Step 상태 ─────────────────────────────────────────────────────
     private WeaponAnimationSetSO.ClipMapping _currentMapping;
     private float _stepLastNT;
@@ -130,6 +137,7 @@ public class ActAttackState : ILayerState<ActState>
     public void Update()
     {
         PollAnimationTiming();
+        if (_inRecovery) { UpdateRecovery(); return; }
         HandleComboInput();
     }
 
@@ -181,6 +189,13 @@ public class ActAttackState : ILayerState<ActState>
         {
             _attackEndFired = true;
             OnAttackEnd();
+        }
+
+        // 회수 구간 종료 — 클립 끝(1.0)도 안전망으로 함께 본다.
+        if (_inRecovery && (t >= _recoveryEnd || t >= 1f))
+        {
+            EndRecovery();
+            return;
         }
 
         // 회전 Lerp — 목표 회전까지 부드럽게 (순간이동 느낌 방지)
@@ -371,7 +386,8 @@ public class ActAttackState : ILayerState<ActState>
             if (_waitingForComboInput)
             {
                 _waitingForComboInput = false;
-                _stateChanger.Change(ActState.None);
+                if (!TryEnterRecovery())
+                    _stateChanger.Change(ActState.None);
             }
             return;
         }
@@ -396,6 +412,8 @@ public class ActAttackState : ILayerState<ActState>
         UnsubscribeReceiver();
 
         _waitingForComboInput = false;
+        _inRecovery           = false;
+        _recoveryEnd          = 0f;
         _currentStateHash     = 0;
         _currentMapping        = null;
         _stepLastNT            = 0f;
@@ -416,7 +434,7 @@ public class ActAttackState : ILayerState<ActState>
 
         // 공중 공격 종료 후 체공 애니메이션 복귀
         if (!_controller.IsGrounded())
-            _controller.Anim.CrossFade("JumpBlend", 0.1f);
+            _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
 
         _controller.ActiveExecution = null;
         _execution?.Cleanup(forceEffects: false);
@@ -449,6 +467,8 @@ public class ActAttackState : ILayerState<ActState>
             _controller.Combo.ResetStep();
             _controller.Combo.CloseWindow();
             _controller.NotifyComboFinished(finalStep);
+            // 콤보 마지막 타 — 회수를 재생한다(공중은 Exit 에서 JumpBlend 로 복귀하므로 제외).
+            if (!isAir && TryEnterRecovery()) return;
             _stateChanger.Change(ActState.None);
             return;
         }
@@ -482,6 +502,8 @@ public class ActAttackState : ILayerState<ActState>
         }
         else if (!_controller.Combo.ComboWindowOpen)
         {
+            // 콤보 창이 이미 닫힌 채 체인 지점에 도달 — 후속 입력이 없다는 뜻이니 회수를 재생한다.
+            if (TryEnterRecovery()) return;
             _controller.Combo.ResetStep();
             _stateChanger.Change(ActState.None);
         }
@@ -489,6 +511,43 @@ public class ActAttackState : ILayerState<ActState>
         {
             _waitingForComboInput = true;
         }
+    }
+
+    // ── 회수(recovery) ───────────────────────────────────────────────────────
+    /// <summary>
+    /// 회수 구간 진입 시도. mapping.recoveryEndAt 이 체인 지점(attackEndAt)보다 뒤일 때만 성립한다.
+    /// 성립하면 상태를 종료하지 않고 그 시점까지 현재 클립을 계속 재생한다(잘려나가던 회수 동작 복원).
+    /// </summary>
+    private bool TryEnterRecovery()
+    {
+        if (_inRecovery) return true;
+        if (_currentMapping == null || _currentStateHash == 0) return false;
+        if (!_controller.IsGrounded()) return false;
+
+        float rec = _currentMapping.recoveryEndAt;
+        if (rec <= _attackEnd) return false;
+
+        _inRecovery  = true;
+        _recoveryEnd = rec;
+        return true;
+    }
+
+    /// <summary>
+    /// 회수 중 입력 감시. 어떤 입력이든(공격·회피·스킬·이동) 들어오면 그 프레임에 회수를 끊는다.
+    /// 버퍼는 소비하지 않는다 — 상태를 빠져나간 뒤 평소 입력 경로가 그대로 처리하므로
+    /// 회수를 넣기 전과 동일하게 반응한다(추가 지연 0).
+    /// </summary>
+    private void UpdateRecovery()
+    {
+        if (_controller.InputBuffer.Count > 0) { EndRecovery(); return; }
+        if (_controller.MoveDirection.sqrMagnitude > 0.0001f) EndRecovery();
+    }
+
+    private void EndRecovery()
+    {
+        _inRecovery = false;
+        _controller.Combo.ResetStep();
+        _stateChanger.Change(ActState.None);
     }
 
 
@@ -602,7 +661,7 @@ public class ActAttackState : ILayerState<ActState>
         {
             if (anim.HasState(layerIndex, stateHash))
             {
-                anim.CrossFade(stateHash, 0.08f);
+                anim.CrossFadeInFixedTime(stateHash, 0.06f);
                 playedHash = stateHash;
             }
             else if (stateToPlay != fallbackStateName)
@@ -610,7 +669,7 @@ public class ActAttackState : ILayerState<ActState>
                 int fbHash = Animator.StringToHash(fallbackStateName);
                 if (anim.HasState(layerIndex, fbHash))
                 {
-                    anim.CrossFade(fbHash, 0.08f);
+                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
                     playedHash = fbHash;
                     Debug.Log($"[ActAttackState] Fallback to ground state: {fallbackStateName}");
                 }
@@ -628,7 +687,7 @@ public class ActAttackState : ILayerState<ActState>
         {
             if (anim.HasState(layerIndex, stateHash))
             {
-                anim.CrossFade(stateHash, 0.08f);
+                anim.CrossFadeInFixedTime(stateHash, 0.06f);
                 playedHash = stateHash;
             }
             else
@@ -636,7 +695,7 @@ public class ActAttackState : ILayerState<ActState>
                 int fbHash = Animator.StringToHash(fallbackStateName);
                 if (anim.HasState(layerIndex, fbHash))
                 {
-                    anim.CrossFade(fbHash, 0.08f);
+                    anim.CrossFadeInFixedTime(fbHash, 0.06f);
                     playedHash = fbHash;
                     Debug.Log($"[ActAttackState] Air state not found ({stateToPlay}), fallback: {fallbackStateName}");
                 }

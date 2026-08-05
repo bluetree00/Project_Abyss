@@ -55,6 +55,12 @@ public static class SaveSanitizer
         d.visitCount       = ClampMin(d.visitCount,       0, ref changed);
         d.shopUsed         = ClampMin(d.shopUsed,         0, ref changed);
         d.eventUsed        = ClampMin(d.eventUsed,        0, ref changed);
+        d.crucibleUsed     = ClampMin(d.crucibleUsed,     0, ref changed);
+        d.refineryUsed     = ClampMin(d.refineryUsed,     0, ref changed);
+        d.shopMiss         = ClampMin(d.shopMiss,         0, ref changed);
+        d.eventMiss        = ClampMin(d.eventMiss,        0, ref changed);
+        d.crucibleMiss     = ClampMin(d.crucibleMiss,     0, ref changed);
+        d.refineryMiss     = ClampMin(d.refineryMiss,     0, ref changed);
 
         d.weaponCurrentSlot = ClampRange(d.weaponCurrentSlot, MinWeaponSlot, MaxWeaponSlot, ref changed);
 

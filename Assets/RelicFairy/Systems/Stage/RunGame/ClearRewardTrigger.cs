@@ -25,6 +25,11 @@ public class ClearRewardTrigger : MonoBehaviour
     private const float WorldIconHeight  = 2.8f;
     private const float WorldCanvasScale = 0.005f;
 
+    /// <summary>차징 상승 SFX의 시작 피치. 종료 피치는 등급 스펙(TierSpec.SfxPitch)이 정한다.</summary>
+    private const float ChargeStartPitch = 0.85f;
+    /// <summary>다중 라운드(챌린지 보상)에서 2라운드부터 차징 길이 배율.</summary>
+    private const float MultiRoundChargeScale = 0.4f;
+
     // ── Private fields ─────────────────────────────────────────
     private GameRunSession _run;
     private List<(RuntimeItemData data, ItemSO so)> _rewards;
@@ -131,6 +136,11 @@ public class ClearRewardTrigger : MonoBehaviour
 
         var ct = this.GetCancellationTokenOnDestroy();
 
+        // 기대감 빌드업 — 반드시 팝업이 열리기 <b>전</b>에. 팝업이 열리면 timeScale=0이라
+        // 카메라·슬로우모·히트스톱이 전부 무효가 된다(구현설계_보상공개연출 §A-5).
+        try { await PlayChargeUpAsync(ct); }
+        catch (OperationCanceledException) { return; }
+
         // 수령 확인 팝업(UI_ClearReward)은 뺐다 — [F]로 이미 "받겠다"고 누른 뒤라
         // 같은 질문을 한 번 더 하는 셈이었고, 실제 보상 화면(룬 선택/획득)이 바로 뒤에 또 뜬다.
         // 클릭 두 번이 늘 뿐 정보가 없어, 곧장 보상 지급 화면으로 넘어간다.
@@ -148,7 +158,9 @@ public class ClearRewardTrigger : MonoBehaviour
         // GameRunBootstrapper.OnBossRoomClearedHandler(NotifyBossRoomCleared 구독)가 전담한다.
         // 보스방은 이제 이 트리거를 스폰하지 않으므로(RoomClearGate 참조) _isBossRoom 분기는 여기서 다루지 않는다.
 
-        // 방 경계 저장은 로컬 권위(RunFlowController.SaveRunState)가 담당하므로 여기서는 별도 저장하지 않는다.
+        // 보상 확정 → 즉시 저장. 방 경계 저장(SaveRunState)은 방 '입장' 시점이고 클리어 저장은
+        // 보상 지급 '전'에 끝나 있어, 여기서 안 하면 방금 받은 룬·아이템이 다음 방 입장까지 미저장으로 남는다.
+        RunFlowController.Active?.SaveNow("clear-reward");
 
         // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
         // 존 선택 UI가 그리드 위에 겹쳐 표시된다.
@@ -162,6 +174,63 @@ public class ClearRewardTrigger : MonoBehaviour
 
         // 절차 진행: RunFlowController가 출구 게이트를 담당하므로 레거시 존 클리어 게이트는 활성화하지 않는다.
         Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// [F] ~ 팝업 오픈 사이 0~0.55s의 기대감 구간(§C-1 Beat 1). 후보 중 <b>최고 등급</b>이 강도를 정한다.
+    ///
+    /// 여기가 카메라·슬로우모를 쓸 수 있는 유일한 구간이다 — 팝업이 열리는 순간 Pause(0f)가 잡혀
+    /// 그 뒤로는 UI 로컬 트윈과 VolumePulse만 살아남는다.
+    /// 슬로우 요청은 <c>finally</c>에서 반드시 해제한다(미해제 시 팝업 종료 후에도 슬로우가 남는다).
+    /// </summary>
+    private async UniTask PlayChargeUpAsync(System.Threading.CancellationToken ct)
+    {
+        var tier = RewardPresentation.MaxRarity(_rewards);
+        var spec = RewardPresentation.For(tier);
+
+        // 연속 라운드 감쇠 — 같은 연출 3연타는 지루함이 된다(§C-1 스킵 규칙).
+        float duration = spec.ChargeDuration * (_choiceRounds > 1 ? MultiRoundChargeScale : 1f);
+        if (duration <= 0f) return;
+
+        bool slowed = false;
+        try
+        {
+            if (spec.SlowMotionScale < 1f)
+            {
+                TimeScaleArbiter.Acquire(this, spec.SlowMotionScale, TimeScaleArbiter.Priority.SlowMotion);
+                slowed = true;
+            }
+
+            if (tier == ItemRarity.Legendary)
+                HitFeelService.CameraShake(0.06f, 0.20f);
+
+            // 상승 SFX — 신규 클립 없이 기존 1클립을 피치 램프로 쓴다(§C-4 "피치 인자로 무료 티어링").
+            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.5f, ChargeStartPitch).Forget();
+
+            // 보상 오브젝트 떨림 — 내용 공개 전 상자가 떨리는 신호(각성 사전 신호).
+            Vector3 basePos = transform.position;
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                float ramp = t / duration;
+                if (spec.ShakeAmplitude > 0f)
+                {
+                    float amp = spec.ShakeAmplitude * ramp;
+                    transform.position = basePos + new Vector3(
+                        Mathf.Sin(t * 62f) * amp, Mathf.Sin(t * 47f) * amp * 0.6f, Mathf.Cos(t * 55f) * amp);
+                }
+                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            }
+            transform.position = basePos;
+
+            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.6f, spec.SfxPitch).Forget();
+        }
+        finally
+        {
+            // 취소·파괴 어느 경로로 빠져도 timeScale 누수가 없게(§C-1 · GameRunBootstrapper 동일 패턴).
+            if (slowed) TimeScaleArbiter.Release(this);
+        }
     }
 
     /// <summary>
@@ -286,10 +355,18 @@ public class ClearRewardTrigger : MonoBehaviour
         rt.sizeDelta  = new Vector2(200f, 140f);
         rt.localScale = Vector3.one * WorldCanvasScale;
 
+        // 아이콘 배경을 최고 등급 색으로 물들인다 — 방을 깨고 돌아보는 순간 "이번 건 금색이다"가
+        // 성립하고, 주우러 가는 3초가 통째로 기대감 구간이 된다(ARPG loot beam과 같은 역할, §C-3-a).
+        var maxRarity = RewardPresentation.MaxRarity(_rewards);
+        var rarityCol = RewardPresentation.FrameColor(maxRarity);
+
         var iconBgGO  = new GameObject("IconBG");
         iconBgGO.transform.SetParent(_worldIndicatorGO.transform, false);
         var iconBgImg = iconBgGO.AddComponent<Image>();
-        iconBgImg.color = new Color(0.1f, 0.1f, 0.1f, 0.75f);
+        // Common은 기존 무채색 그대로 — 하위가 눈에 띄면 상위가 사건이 되지 않는다.
+        iconBgImg.color = maxRarity == ItemRarity.Common
+            ? new Color(0.1f, 0.1f, 0.1f, 0.75f)
+            : new Color(rarityCol.r * 0.45f, rarityCol.g * 0.45f, rarityCol.b * 0.45f, 0.85f);
         var iconBgRT  = iconBgGO.GetComponent<RectTransform>();
         iconBgRT.anchorMin        = new Vector2(0.5f, 0.5f);
         iconBgRT.anchorMax        = new Vector2(0.5f, 0.5f);

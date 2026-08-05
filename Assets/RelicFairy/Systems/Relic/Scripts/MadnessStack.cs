@@ -27,6 +27,12 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     // 광란(Frenzy) 상태 — 빈틈 대체
     private bool  _frenzy;
     private float _frenzyEnd;
+    private float _retainRatio;   // [파츠] 식지 않는 광기 — 광란 종료 후 남길 스택 비율(0 = 전부 초기화)
+
+    // [파츠] 끝나지 않는 광란 — 광란 1회당 한 번 자동 재점화(스택 MAX 유지 → 공격 보너스 보존).
+    private bool  _endlessFrenzy;
+    private bool  _endlessUsed;         // 이번 광란에서 재점화를 이미 썼는가(무한 방지)
+    private float _lastFrenzyDuration = 6f;
 
     // 라벨 캐시 — 표시값이 바뀔 때만 문자열을 새로 만든다(매 프레임 alloc 방지).
     private string _label = "광기 0%";
@@ -81,6 +87,8 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     {
         _frenzy    = true;
         _frenzyEnd = Time.time + Mathf.Max(0.1f, duration);
+        _lastFrenzyDuration = Mathf.Max(0.1f, duration);
+        _endlessUsed = false;          // 새 광란 진입 → 재점화 1회 재충전
         _decayAccum = 0f;
         OnChanged?.Invoke();
         OnFrenzyChanged?.Invoke(true);
@@ -94,10 +102,16 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
         OnChanged?.Invoke();
     }
 
+    /// <summary>[파츠] 식지 않는 광기 — 광란 종료 시 남길 스택 비율(0~1). 0이면 기존대로 전부 초기화.</summary>
+    public void SetRetainRatio(float ratio) => _retainRatio = Mathf.Clamp01(ratio);
+
+    /// <summary>[파츠] 끝나지 않는 광란 — on이면 광란이 끝날 때 1회 자동 재점화(지속을 한 번 더 연장).</summary>
+    public void SetEndlessFrenzy(bool on) => _endlessFrenzy = on;
+
     private void ExitFrenzy()
     {
         _frenzy = false;
-        _stacks = 0;               // 게이지 초기화
+        _stacks = Mathf.Clamp(Mathf.RoundToInt(_maxStacks * _retainRatio), 0, _maxStacks);  // 파츠 시 절반 유지
         _decayAccum = 0f;
         _lastAttackTime = Time.time;
         OnChanged?.Invoke();
@@ -108,7 +122,17 @@ public sealed class MadnessStack : MonoBehaviour, IRelicResource
     {
         if (_frenzy)
         {
-            if (Time.time >= _frenzyEnd) ExitFrenzy();
+            if (Time.time >= _frenzyEnd)
+            {
+                // [파츠] 끝나지 않는 광란 — 종료 직전 1회 자동 재점화(스택·상태 유지, 종료 이벤트 없음).
+                if (_endlessFrenzy && !_endlessUsed)
+                {
+                    _endlessUsed = true;
+                    _frenzyEnd = Time.time + _lastFrenzyDuration;
+                    OnChanged?.Invoke();
+                }
+                else ExitFrenzy();
+            }
             return;                 // 광란 중 감쇠 없음
         }
         if (_stacks <= 0) return;

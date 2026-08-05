@@ -17,12 +17,12 @@ MonoBehaviour:
     AOMethod: 1
     Downsample: 1
     AfterOpaque: 0
-    Source: 0
-    NormalSamples: 0
-    Intensity: 0.5
-    DirectLightingStrength: 0.25
-    Radius: 0.25
-    Samples: 2
+    Source: 1
+    NormalSamples: 1
+    Intensity: 0.75
+    DirectLightingStrength: 0.35
+    Radius: 0.4
+    Samples: 1
     BlurQuality: 0
     Falloff: 100
     SampleCount: -1
@@ -56,6 +56,8 @@ MonoBehaviour:
   - {fileID: -1878332245247344467}
   - {fileID: 8074071009507972506}
   - {fileID: 721593349391626801}
+  - {fileID: 5982652269470152141}
+  - {fileID: 7280309925824348687}
   m_RendererFeatureMap: adc0de57c6d2eee59a95000dcedc0c7031b2c5fe539d030a
   m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 0}
@@ -78,13 +80,13 @@ MonoBehaviour:
     failOperation: 0
     zFailOperation: 0
   m_ShadowTransparentReceive: 1
-  m_RenderingMode: 0
+  m_RenderingMode: 2
   m_DepthPrimingMode: 0
   m_CopyDepthMode: 0
   m_DepthAttachmentFormat: 0
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
-  m_IntermediateTextureMode: 1
+  m_IntermediateTextureMode: 0
 --- !u!114 &721593349391626801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -127,6 +129,42 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
+--- !u!114 &5982652269470152141
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96dab975e69883249a56554e791c4fd0, type: 3}
+  m_Name: ButoRenderFeature
+  m_EditorClassIdentifier: OccaSoftware.Buto.Runtime::OccaSoftware.Buto.Runtime.ButoRenderFeature
+  m_Active: 1
+  settings:
+    renderPassEvent: 450
+--- !u!114 &7280309925824348687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1614fc811f8f184697d9bee70ab9fe5, type: 3}
+  m_Name: DecalRendererFeature
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.DecalRendererFeature
+  m_Active: 1
+  m_Settings:
+    technique: 1
+    maxDrawDistance: 120
+    decalLayers: 0
+    dBufferSettings:
+      surfaceData: 1
+    screenSpaceSettings:
+      normalBlend: 0
 --- !u!114 &8074071009507972506
 MonoBehaviour:
   m_ObjectHideFlags: 0

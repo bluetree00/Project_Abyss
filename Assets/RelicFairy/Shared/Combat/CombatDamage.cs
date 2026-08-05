@@ -197,7 +197,10 @@ public static class CombatDamage
             var prs = GameRunBootstrapper.Instance?.Run?.Player?.RuntimeStats;
             if (prs != null && prs.ConsumePenetrateNextHit())
             {
-                tgtMb.TakeSynergyDamage(finalDmg, owner, 1f, isCrit);   // 방어 완전 무시
+                // 방어 완전 무시. 경로만 관통이고 실체는 근접 평타(주 피해)라 kind는 Normal —
+                // ⑥-b와 같은 규약이다. 기본값(Synergy)으로 두면 데미지 숫자 색이 시너지로 나오고,
+                // 이 타격으로 죽인 몹이 막타 히트스톱을 잃는다(DieState는 Normal 킬에만 건다).
+                tgtMb.TakeSynergyDamage(finalDmg, owner, 1f, isCrit, DamageKind.Normal);
                 penetrated = true;
             }
         }
@@ -242,6 +245,7 @@ public static class CombatDamage
             Target      = target,
             IsCrit      = isCrit,
             HitPosition = hitPoint,
+            ActionType  = actionType,
         };
         mgr?.OnPostDealDamage(report);
 

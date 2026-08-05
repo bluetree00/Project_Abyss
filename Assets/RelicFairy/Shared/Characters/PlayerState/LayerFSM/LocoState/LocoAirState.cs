@@ -52,7 +52,7 @@ public class LocoAirState : ILayerState<LocoState>
                 // 실제 추락 — 추락 루프 애니 재생.
                 _phase = AirPhase.Loop;
                 _controller.Anim.SetFloat("JumpValue", 1f);
-                _controller.Anim.CrossFade("JumpBlend", 0.1f);
+                _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
             }
         }
     }
@@ -88,7 +88,7 @@ public class LocoAirState : ILayerState<LocoState>
                 {
                     _phase = AirPhase.Loop;
                     _controller.Anim.SetFloat("JumpValue", 1f);
-                    _controller.Anim.CrossFade("JumpBlend", 0.1f);
+                    _controller.Anim.CrossFadeInFixedTime("JumpBlend", 0.10f);
                 }
                 break;
 
@@ -139,7 +139,7 @@ public class LocoAirState : ILayerState<LocoState>
             HitFeelService.CameraShake(Mathf.Lerp(0.03f, 0.12f, impact), 0.14f);
 
         // 공중 공격 중이든 아니든, 착지 애니메이션 강제 재생
-        _controller.Anim.CrossFade("JumpLand", 0.05f);
+        _controller.Anim.CrossFadeInFixedTime("JumpLand", 0.08f);
 
         // 아이템 효과: 점프 착지 hook
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;

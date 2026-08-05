@@ -21,7 +21,7 @@ MonoBehaviour:
   - groupType: 0
     clipMappings:
     - baseClipName: Idle_Wait_B
-      addressableKey: APose_Idle
+      addressableKey: SS_Idle
       actionType: 0
     - baseClipName: Mvm_Walk
       addressableKey: 'APose_Walk[GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace]'
@@ -107,16 +107,6 @@ MonoBehaviour:
     - baseClipName: ESkill_01
       addressableKey: ESkill_01
       actionType: 4
-      comboIndex: 0
-      isPlunge: 0
-      plungeFallSpeed: 0
-      plungeDescendAt: 0
-      comboWindowOpen: -1
-      comboWindowClose: -1
-      attackEndAt: -1
-    - baseClipName: RSkill_01
-      addressableKey: RSkill_01
-      actionType: 5
       comboIndex: 0
       isPlunge: 0
       plungeFallSpeed: 0

@@ -216,7 +216,47 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             OpenCrucibleTestAsync().Forget();
         if (GUI.Button(new Rect(bx, by + bh + 6f, bw, bh), "정제소 테스트"))
             OpenRefineryTestAsync().Forget();
+        if (GUI.Button(new Rect(bx, by + (bh + 6f) * 2f, bw, bh), "보상팝업(정예)"))
+            OpenRewardTestAsync(RoomPlanKind.Elite).Forget();
+        if (GUI.Button(new Rect(bx, by + (bh + 6f) * 3f, bw, bh), "보상팝업(일반)"))
+            OpenRewardTestAsync(RoomPlanKind.Normal).Forget();
         GUI.color = prev;
+    }
+
+    /// <summary>[임시 검증용] 방 종류 규칙으로 후보를 굴려 룬 선택 팝업을 바로 연다.</summary>
+    private async UniTaskVoid OpenRewardTestAsync(RoomPlanKind kind)
+    {
+        var run = GetCurrentRun();
+        if (run == null || !run.IsRunning) { Debug.LogWarning("[DebugTest] 런 없음"); return; }
+
+        run.SetCurrentRoomKind(kind);
+        var rule = RoomRewardTable.For(kind);
+
+        var list = new System.Collections.Generic.List<(RuntimeItemData data, ItemSO so)>();
+        var seen = new System.Collections.Generic.HashSet<string>();
+        for (int attempt = 0; attempt < rule.ChoiceCount * 8 && list.Count < rule.ChoiceCount; attempt++)
+        {
+            var rarity = RoomRewardTable.RollRarity(rule.Weights);
+            if (rule.RarityFloor.HasValue && rarity < rule.RarityFloor.Value) rarity = rule.RarityFloor.Value;
+            var pool = ItemSORegistry.GetByRarity(rarity);
+            while ((pool == null || pool.Count == 0) && rarity > ItemRarity.Common)
+            {
+                rarity--;
+                pool = ItemSORegistry.GetByRarity(rarity);
+            }
+            if (pool == null || pool.Count == 0) break;
+            var so = pool[UnityEngine.Random.Range(0, pool.Count)];
+            if (!seen.Add(so.itemId)) continue;
+            var d = RuntimeItemData.FromSO(so);
+            if (d != null) list.Add((d, so));
+        }
+
+        Debug.Log($"[DebugTest] 보상팝업 {kind} — 후보 {list.Count} / 등급 " +
+                  string.Join(",", list.ConvertAll(c => c.data.rarity.ToString())));
+
+        var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_RuneSelectPopup>();
+        if (popup == null) { Debug.LogWarning("[DebugTest] UI_RuneSelectPopup 로드 실패"); return; }
+        popup.Setup(list, run.ItemInventory);
     }
 
     /// <summary>테스트용 재련소 오픈 — NPC 없이 임시 컨트롤러를 만들어 UI만 직접 띄운다(컨트롤러 캐시·재사용).</summary>

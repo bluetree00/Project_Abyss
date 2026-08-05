@@ -1,0 +1,35 @@
+<!--
+  IL2CPP 관리 코드 스트리핑 방어.
+
+  · 뒤끝(TheBackend) SDK와 그 의존 DLL은 내부에서 리플렉션/직렬화를 쓴다.
+    스트리핑되면 빌드에서만 런타임 예외가 나므로 통째로 보존한다.
+  · 토큰 핸들러는 TokenRegistry.EnsureInitialized()가
+    Assembly.GetExecutingAssembly().GetTypes() → [TokenHandler] 검사 →
+    Activator.CreateInstance 로만 찾는다. 코드에서 직접 참조하는 곳이 없어
+    스트리퍼가 미사용으로 판단해 지울 수 있다. 지워지면 맵 생성 시
+    "핸들러 0개 등록"이 되어 몬스터/장식/픽업이 전부 사라진다.
+    전부 Assembly-CSharp의 전역 네임스페이스에 있다.
+-->
+<linker>
+  <assembly fullname="Backend" preserve="all"/>
+  <assembly fullname="LitJSON" preserve="all"/>
+  <assembly fullname="WebSocket4Net" preserve="all"/>
+  <assembly fullname="TheBackendSettings" preserve="all"/>
+  <assembly fullname="TheBackendMultiSettings" preserve="all"/>
+  <assembly fullname="TheBackendHashKeySettings" preserve="all"/>
+  <assembly fullname="Newtonsoft.Json" preserve="all"/>
+
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="ITokenHandler" preserve="all"/>
+    <type fullname="TokenHandlerAttribute" preserve="all"/>
+
+    <type fullname="BossSpawnHandler" preserve="all"/>
+    <type fullname="MonsterSpawnHandler" preserve="all"/>
+    <type fullname="MonsterSpawnCandidateHandler" preserve="all"/>
+    <type fullname="DecorationHandler" preserve="all"/>
+    <type fullname="CharacterPickupHandler" preserve="all"/>
+    <type fullname="CovenantAltarHandler" preserve="all"/>
+    <type fullname="PitTriggerHandler" preserve="all"/>
+    <type fullname="WeaponPickupHandler" preserve="all"/>
+  </assembly>
+</linker>

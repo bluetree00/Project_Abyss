@@ -11,8 +11,8 @@ public enum RoomPlanKind
     Event,
     PreBoss,
     Boss,
-    Crucible,   // 재련소(무기 강화/승급 + 도박) — 마일스톤 강제 전용
-    Refinery,   // 정제소(룬 지급/룬판) — 마일스톤 강제 전용
+    Crucible,   // 재련소(무기 강화/승급 + 도박) — PRD 확률 등장, 챕터당 1회
+    Refinery,   // 정제소(룬 지급/룬판) — PRD 확률 등장, 챕터당 1회
 }
 
 /// <summary>한 출구 문의 계획. 종류 + 선택된 방 템플릿(entry).</summary>
@@ -61,6 +61,22 @@ public class RunSequencer
 {
     private const float DifficultyTolerance = 0.35f;
 
+    // ── 특수방 등장 확률(PRD) ────────────────────────────────
+    // 재련소·정제소는 런 구조 데이터(CSV/SO)에 확률 컬럼이 없다 — 여기 상수가 튜닝 노브다.
+    // 상점·이벤트는 기존 config의 ShopChance/EventChance를 baseline으로 그대로 쓴다.
+    private const float CrucibleBaseChance = 0.10f;
+    private const float RefineryBaseChance = 0.10f;
+
+    /// <summary>한 방에 특수방이 뜰 확률의 상한. 오래 못 만난 타입이 쌓이면 PRD 확률 합이 1을 넘는데,
+    /// 상한이 없으면 후반이 특수방으로만 채워져 전투가 사라진다.</summary>
+    private const float SpecialSlotCap = 0.55f;
+
+    /// <summary>PRD 대상 특수방 4종. 등장 순서 편향을 막기 위해 매 롤마다 섞어 쓴다.</summary>
+    private static readonly RoomPlanKind[] SpecialKinds =
+    {
+        RoomPlanKind.Shop, RoomPlanKind.Event, RoomPlanKind.Crucible, RoomPlanKind.Refinery,
+    };
+
     private enum Phase { Normal, PreBoss, Boss, Done }
 
     private readonly List<ZonePoolEntry>     _pool;
@@ -73,19 +89,33 @@ public class RunSequencer
     private int   _visitCount;
     private int   _shopUsed;
     private int   _eventUsed;
-    private int   _crucibleUsed;   // 챕터당 1 (마일스톤 강제 전용)
-    private int   _refineryUsed;   // 챕터당 1 (마일스톤 강제 전용)
+    private int   _crucibleUsed;   // 챕터당 1
+    private int   _refineryUsed;   // 챕터당 1
+
+    // PRD(의사난수분포) 미출현 누적 — 해당 특수방을 '방문하지 않은' 방 수.
+    // 확률 = baseline × (miss+1) 이므로, 안 만나거나 그냥 지나칠수록 다음 방에서 뜰 확률이 올라간다.
+    private int   _shopMiss, _eventMiss, _crucibleMiss, _refineryMiss;
+
     private RoomPlanKind _lastCommittedKind = RoomPlanKind.Normal; // 직전 진입 방(같은 특수방 연속 방지)
+
+    // 특수방 후보 셔플용 재사용 버퍼(롤마다 new 방지)
+    private readonly List<RoomPlanKind> _specialBuffer = new(4);
 
     public int  VisitCount     => _visitCount;
     public bool InBossApproach => _phase != Phase.Normal;
     public bool IsDone         => _phase == Phase.Done;
 
     // ── 이어하기 직렬화용 상태 노출 ──
-    public int Seed      => _seed;
-    public int PhaseInt  => (int)_phase;
-    public int ShopUsed  => _shopUsed;
-    public int EventUsed => _eventUsed;
+    public int Seed          => _seed;
+    public int PhaseInt      => (int)_phase;
+    public int ShopUsed      => _shopUsed;
+    public int EventUsed     => _eventUsed;
+    public int CrucibleUsed  => _crucibleUsed;
+    public int RefineryUsed  => _refineryUsed;
+    public int ShopMiss      => _shopMiss;
+    public int EventMiss     => _eventMiss;
+    public int CrucibleMiss  => _crucibleMiss;
+    public int RefineryMiss  => _refineryMiss;
     public IReadOnlyDictionary<string, int> Cooldowns => _cooldowns;
 
     /// <summary>방별 자식 시드. 같은 (마스터 시드, visitCount) → 동일 롤 → 이어하기 재현.</summary>
@@ -106,14 +136,24 @@ public class RunSequencer
     private int EffectiveBossThreshold
         => _bossThresholdOverride > 0 ? _bossThresholdOverride : (_config?.BossThreshold ?? int.MaxValue);
 
-    /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.</summary>
+    /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.
+    /// 재련/정제 캡과 PRD 미출현 누적은 구 세이브에 없으므로 기본값 0(=만량·미출현 없음)으로 폴백한다.</summary>
     public void RestoreState(int visitCount, int phase, int shopUsed, int eventUsed,
-                             IEnumerable<CooldownKV> cooldowns)
+                             IEnumerable<CooldownKV> cooldowns,
+                             int crucibleUsed = 0, int refineryUsed = 0,
+                             int shopMiss = 0, int eventMiss = 0,
+                             int crucibleMiss = 0, int refineryMiss = 0)
     {
-        _visitCount = visitCount;
-        _phase      = (Phase)phase;
-        _shopUsed   = shopUsed;
-        _eventUsed  = eventUsed;
+        _visitCount   = visitCount;
+        _phase        = (Phase)phase;
+        _shopUsed     = shopUsed;
+        _eventUsed    = eventUsed;
+        _crucibleUsed = crucibleUsed;
+        _refineryUsed = refineryUsed;
+        _shopMiss     = shopMiss;
+        _eventMiss    = eventMiss;
+        _crucibleMiss = crucibleMiss;
+        _refineryMiss = refineryMiss;
         _cooldowns.Clear();
         if (cooldowns != null)
             foreach (var c in cooldowns)
@@ -122,10 +162,10 @@ public class RunSequencer
 
     // ── Public ──────────────────────────────────────
 
-    /// <summary>런 시작 시 1회 호출. 마스터 시드+config로 보스 도달까지 전 깊이의 출구 종류를 미리 산출한다.
-    /// 라이브 상태를 건드리지 않도록 동일 (pool/config/seed) 클론을 만들어 기존 RollExits 로직을 그대로 재생한다 —
-    /// 단일 결정 로직(RollExits)을 공유하므로 라이브 진행과 종류가 구조적으로 일치한다(드리프트 불가).
-    /// KIND는 경로 독립(깊이 결정적)이라 어느 문을 커밋해도 다음 깊이 종류가 동일하다.</summary>
+    /// <summary>런 시작 시 1회 호출. 마스터 시드+config로 보스 도달까지의 출구 종류를 산출한다.
+    /// 라이브 상태를 건드리지 않도록 동일 (pool/config/seed) 클론에서 RollExits 로직을 그대로 재생한다.
+    /// ⚠️ 특수방이 PRD 확률 + <b>방문 이력</b>에 의존하도록 바뀐 뒤로 이것은 <b>확정 일정표가 아니라 예보</b>다 —
+    /// "매번 첫 문으로 직진한다"는 가정의 한 가지 시나리오일 뿐이고, 실제 플레이는 방문에 따라 갈라진다.</summary>
     public RunPlan BuildPlan()
     {
         var plan = new RunPlan();
@@ -167,16 +207,12 @@ public class RunSequencer
         // 방별 자식 RNG — 같은 (시드, visitCount)면 동일 출구 (이어하기 재현)
         var rng = new System.Random(Combine(_seed, _visitCount));
 
-        // 확정 마일스톤: 진입할 방 순번(_visitCount+1)에 강제 종류가 있으면 확률형을 덮어쓴다.
-        // Boss/PreBoss는 BossThreshold 게이팅이 담당하므로 마일스톤 종류로 와도 무시(null 처리).
-        RoomPlanKind? forced = _config?.GetMilestoneKind(_visitCount + 1);
-        if (forced == RoomPlanKind.Boss || forced == RoomPlanKind.PreBoss) forced = null;
-        // 챕터 캡을 넘는 마일스톤은 무시 — 캡이 우선(상점 등이 무제한으로 늘어나는 것 방지).
-        if (forced.HasValue && IsSpecialKind(forced.Value) && !CanUseSpecial(forced.Value)) forced = null;
-        if (forced.HasValue) NoteForcedSpecial(forced.Value); // 특수방 캡 카운터에 반영(확률형과 합산)
+        // 특수방 타이밍은 <b>고정 마일스톤이 아니라 PRD 확률</b>이 정한다(§방구조 개편).
+        // 예외는 하나뿐 — 보스까지 남은 방이 모자라면 아직 못 만난 특수방을 강제 배치한다(하드 피티).
+        RoomPlanKind? forced = PendingPitySpecial(rng);
 
         // 일반 페이즈 — 2슬롯(직진/턴). 특수방(상점/이벤트/재련소/정제소)은 한 문쌍 최대 1개.
-        // 마일스톤 강제는 '문 하나'에만 적용한다 — 두 문을 같은 종류로 채우면
+        // 피티 강제는 '문 하나'에만 적용한다 — 두 문을 같은 종류로 채우면
         // "상점 | 상점"처럼 중복 선택지가 되어 고르는 의미가 사라진다.
         bool specialUsed = false;
         for (int i = 0; i < 2; i++)
@@ -208,6 +244,10 @@ public class RunSequencer
         if (chosen.entry != null && !string.IsNullOrEmpty(chosen.entry.pool_key))
             _cooldowns[chosen.entry.pool_key] = CooldownFor(chosen.kind);
 
+        // 특수방 캡은 <b>실제로 들어갔을 때만</b> 소모된다. 문에 떴는데 안 고르면 사라지지 않고
+        // 오히려 PRD 누적이 올라 다음 방에서 다시 뜰 확률이 높아진다.
+        NoteSpecialVisit(chosen.kind);
+
         _lastCommittedKind = chosen.kind;   // 같은 특수방 연속 배치 방지용
 
         if (chosen.kind == RoomPlanKind.PreBoss) _phase = Phase.Boss;
@@ -235,7 +275,7 @@ public class RunSequencer
         k == RoomPlanKind.Shop || k == RoomPlanKind.Event ||
         k == RoomPlanKind.Crucible || k == RoomPlanKind.Refinery;
 
-    /// <summary>챕터 캡 잔여 여부. 재련소/정제소는 챕터당 1개(마일스톤 강제 전용).</summary>
+    /// <summary>챕터 캡 잔여 여부(= 아직 방문하지 않았는가). 재련소/정제소는 챕터당 1개.</summary>
     private bool CanUseSpecial(RoomPlanKind k) => k switch
     {
         RoomPlanKind.Shop     => _config == null || _shopUsed  < _config.ShopMaxPerChapter,
@@ -245,13 +285,96 @@ public class RunSequencer
         _                     => true,
     };
 
-    /// <summary>강제(마일스톤) 특수방도 챕터 캡 카운터에 반영 — 확률형 추가 발생을 억제한다.</summary>
-    private void NoteForcedSpecial(RoomPlanKind kind)
+    /// <summary>
+    /// 방 진입 확정 시 특수방 상태 갱신. 들어간 종류는 캡을 소모하고 누적을 리셋,
+    /// 들어가지 않은 (캡이 남은) 종류는 누적 +1 → 다음 방 등장 확률이 올라간다.
+    /// </summary>
+    private void NoteSpecialVisit(RoomPlanKind visited)
     {
-        if (kind == RoomPlanKind.Shop)          _shopUsed++;
-        else if (kind == RoomPlanKind.Event)    _eventUsed++;
-        else if (kind == RoomPlanKind.Crucible) _crucibleUsed++;
-        else if (kind == RoomPlanKind.Refinery) _refineryUsed++;
+        for (int i = 0; i < SpecialKinds.Length; i++)
+        {
+            var k = SpecialKinds[i];
+            if (k == visited)
+            {
+                IncUsed(k);
+                SetMiss(k, 0);
+            }
+            else if (CanUseSpecial(k)) SetMiss(k, MissOf(k) + 1);
+        }
+    }
+
+    private void IncUsed(RoomPlanKind k)
+    {
+        if (k == RoomPlanKind.Shop)          _shopUsed++;
+        else if (k == RoomPlanKind.Event)    _eventUsed++;
+        else if (k == RoomPlanKind.Crucible) _crucibleUsed++;
+        else if (k == RoomPlanKind.Refinery) _refineryUsed++;
+    }
+
+    private int MissOf(RoomPlanKind k) => k switch
+    {
+        RoomPlanKind.Shop     => _shopMiss,
+        RoomPlanKind.Event    => _eventMiss,
+        RoomPlanKind.Crucible => _crucibleMiss,
+        RoomPlanKind.Refinery => _refineryMiss,
+        _                     => 0,
+    };
+
+    private void SetMiss(RoomPlanKind k, int v)
+    {
+        if (k == RoomPlanKind.Shop)          _shopMiss     = v;
+        else if (k == RoomPlanKind.Event)    _eventMiss    = v;
+        else if (k == RoomPlanKind.Crucible) _crucibleMiss = v;
+        else if (k == RoomPlanKind.Refinery) _refineryMiss = v;
+    }
+
+    /// <summary>특수방 기본 등장 확률(PRD 상수 C). 상점·이벤트는 런 구조 데이터, 재련·정제는 코드 상수.</summary>
+    private float BaseChance(RoomPlanKind k) => k switch
+    {
+        RoomPlanKind.Shop     => _config?.ShopChance  ?? 0f,
+        RoomPlanKind.Event    => _config?.EventChance ?? 0f,
+        RoomPlanKind.Crucible => CrucibleBaseChance,
+        RoomPlanKind.Refinery => RefineryBaseChance,
+        _                     => 0f,
+    };
+
+    /// <summary>PRD 확률 — P(N) = C × N (N = 미출현 누적 + 1). 안 만날수록 선형으로 올라 결국 확정에 가까워진다.</summary>
+    private float SpecialChance(RoomPlanKind k)
+    {
+        float c = BaseChance(k);
+        return c <= 0f ? 0f : Mathf.Clamp01(c * (MissOf(k) + 1));
+    }
+
+    /// <summary>
+    /// 하드 피티 — 보스까지 남은 방이 '아직 못 만난 특수방 수' 이하로 줄면 그 중 하나를 강제 배치한다.
+    /// 순수 확률만 두면 "챕터 내내 상점 0회" 같은 불운이 나오므로 상한을 건다(가장 오래 기다린 종류 우선).
+    /// </summary>
+    private RoomPlanKind? PendingPitySpecial(System.Random rng)
+    {
+        if (_config == null) return null;
+
+        int roomsLeft = EffectiveBossThreshold - _visitCount;
+        if (roomsLeft <= 0) return null;
+
+        // 가장 오래 기다린(miss 최대) 종류들을 모은다.
+        _specialBuffer.Clear();
+        int pending = 0, bestMiss = -1;
+        for (int i = 0; i < SpecialKinds.Length; i++)
+        {
+            var k = SpecialKinds[i];
+            if (!CanUseSpecial(k) || BaseChance(k) <= 0f) continue;
+            pending++;
+
+            int m = MissOf(k);
+            if (m > bestMiss) { bestMiss = m; _specialBuffer.Clear(); _specialBuffer.Add(k); }
+            else if (m == bestMiss) _specialBuffer.Add(k);
+        }
+
+        if (pending == 0 || roomsLeft > pending || _specialBuffer.Count == 0) return null;
+
+        // ⚠️ 동률일 때 무작위로 고른다. 배열 순서대로 뽑으면 miss가 같은 초반에 항상 상점만 강제돼
+        //    재련·정제가 뒤로 밀리고 노출이 극단적으로 치우친다(시뮬레이션에서 상점 독점 확인).
+        return _specialBuffer[rng.Next(_specialBuffer.Count)];
     }
 
     /// <summary>보스/보스전방 템플릿 해석: 지정 pool_key 우선, 비었거나 못 찾으면 카테고리 첫 항목으로 폴백.
@@ -262,42 +385,46 @@ public class RunSequencer
     private ZonePoolEntry FirstByCategory(string category)
         => _pool.Find(p => string.Equals(p.category, category, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// 문 하나의 종류를 굴린다. <b>"특수 슬롯이 열리는가"와 "어느 종류인가"를 분리</b>한다 —
+    /// 열림 확률은 후보 PRD 확률의 합(상한 <see cref="SpecialSlotCap"/>), 종류는 그 확률로 가중 추첨.
+    /// 순차 판정으로 하면 baseline이 높은 상점이 슬롯을 독점해 재련·정제가 거의 안 뜬다.
+    /// <b>여기서는 캡을 소모하지 않는다</b> — 소모는 실제 진입 시(<see cref="NoteSpecialVisit"/>).
+    /// </summary>
     private RoomPlanKind RollKind(System.Random rng, ref bool specialUsed)
     {
         if (_config == null) return RoomPlanKind.Normal;
 
-        if (!specialUsed && CanRollRandomSpecial(RoomPlanKind.Shop, _shopUsed, _config.ShopMaxPerChapter)
-            && Roll(rng, _config.ShopChance))
+        if (!specialUsed)
         {
-            _shopUsed++; specialUsed = true; return RoomPlanKind.Shop;
+            _specialBuffer.Clear();
+            float total = 0f;
+            for (int i = 0; i < SpecialKinds.Length; i++)
+            {
+                var k = SpecialKinds[i];
+                // 캡이 남고, 직전에 들어간 종류가 아니어야 한다("상점 → 상점" 연속 방지).
+                if (!CanUseSpecial(k) || _lastCommittedKind == k) continue;
+                float c = SpecialChance(k);
+                if (c <= 0f) continue;
+                _specialBuffer.Add(k);
+                total += c;
+            }
+
+            if (_specialBuffer.Count > 0 && Roll(rng, Mathf.Min(SpecialSlotCap, total)))
+            {
+                float r = (float)rng.NextDouble() * total;
+                for (int i = 0; i < _specialBuffer.Count; i++)
+                {
+                    r -= SpecialChance(_specialBuffer[i]);
+                    if (r > 0f && i < _specialBuffer.Count - 1) continue;
+                    specialUsed = true;
+                    return _specialBuffer[i];
+                }
+            }
         }
-        if (!specialUsed && CanRollRandomSpecial(RoomPlanKind.Event, _eventUsed, _config.EventMaxPerChapter)
-            && Roll(rng, _config.EventChance))
-        {
-            _eventUsed++; specialUsed = true; return RoomPlanKind.Event;
-        }
+
         if (Roll(rng, _config.EliteChance)) return RoomPlanKind.Elite;
         return RoomPlanKind.Normal;
-    }
-
-    /// <summary>확률형 특수방 허용 여부.
-    /// (1) 뒤에 올 <b>마일스톤 몫을 예약</b>해 캡을 미리 소진하지 않는다 — 설계된 배치가 사라지는 것 방지.
-    /// (2) <b>직전 방과 같은 특수 종류</b>면 거른다 — "상점 → 상점" 연속 방지.</summary>
-    private bool CanRollRandomSpecial(RoomPlanKind kind, int used, int max)
-    {
-        if (_lastCommittedKind == kind) return false;
-        return used + RemainingMilestones(kind) < max;
-    }
-
-    /// <summary>다음 방 이후(보스 게이팅 전)로 남아 있는 해당 종류 마일스톤 수.</summary>
-    private int RemainingMilestones(RoomPlanKind kind)
-    {
-        if (_config == null) return 0;
-        int last = Mathf.Max(_config.BossThreshold, _visitCount + 1);
-        int n = 0;
-        for (int v = _visitCount + 2; v <= last; v++)
-            if (_config.GetMilestoneKind(v) == kind) n++;
-        return n;
     }
 
     private ZonePoolEntry PickEntry(System.Random rng, RoomPlanKind kind, string excludeKey = null)

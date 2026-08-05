@@ -166,6 +166,17 @@ public sealed class GameRunSession
     /// </summary>
     public int CrucibleRollIndex { get; set; }
 
+    /// <summary>
+    /// 지금 들어와 있는 방의 종류. 클리어 보상(<see cref="RoomRewardTable"/>)이 이 값으로 갈린다 —
+    /// 정예방이 일반방과 같은 보상을 주던 결함(통합설계서 §3-2)의 해소 지점.
+    /// 방 빌드 권한은 RunFlowController에 있으므로 그쪽이 방 진입마다 세팅한다.
+    /// 레거시(단일 세계) 경로는 세팅하지 않으므로 기본값 Normal로 남는다.
+    /// </summary>
+    public RoomPlanKind CurrentRoomKind { get; private set; } = RoomPlanKind.Normal;
+
+    /// <summary>방 진입 시 RunFlowController가 호출.</summary>
+    public void SetCurrentRoomKind(RoomPlanKind kind) => CurrentRoomKind = kind;
+
     // 씬 전환 시 무기 슬롯 복원용
     public WeaponData[] SavedWeaponSlots { get; private set; }
     public int SavedCurrentSlotIndex { get; private set; } = -1;

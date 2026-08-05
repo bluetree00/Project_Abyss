@@ -27,10 +27,20 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     // ── 레이아웃 ──
     private const float WindowW = 1040f;   // 룬 획득 바탕 아트 실측(2081×1241 @2x → 1040×620)
     private const float WindowH = 620f;
-    private const float CardW   = 300f;
+    private const float CardW   = 300f;   // 카드 폭 상한 — 후보가 많으면 이 아래로 줄어든다
     private const float CardH   = 380f;
     private const float CardGap = 24f;
-    private const float CardY   = -26f;   // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다
+    private const float CardSideMargin = 40f;   // 카드 열 좌우 여백(창 안쪽)
+
+    // 등급 확률 막대 — 창 좌하단, [선택]/[넘기기] 좌측 여백에 앉힌다.
+    // 여백 8 기준으로 막대 상단(-222)이 카드 하단(CardY-CardH/2 = -210)보다 낮아 겹치지 않고,
+    // 오른쪽 끝(-272)도 [선택] 버튼 왼쪽 끝(-190)에 닿지 않는다.
+    private const float OddsBarW      = 236f;
+    private const float OddsBarH      = 78f;
+    private const float OddsBarMargin = 8f;
+    // 하단 [선택]/[넘기기]와 겹치지 않게 카드를 살짝 올린다.
+    // -26이면 막대와의 여유가 6px뿐이라 720p(0.667배)에서 4px로 뭉개져 붙어 보였다 → -20으로 12px 확보.
+    private const float CardY   = -20f;
 
     // 모양 미리보기 셀은 고정 크기가 아니라 <b>박스에 맞춰 확대</b>한다.
     // 고정 22px이던 시절엔 1칸 룬이 점처럼 보여 무슨 모양인지 분간이 안 됐다.
@@ -38,6 +48,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private const float MiniGap     = 4f;
     private const float MiniCellMax = 62f;   // 1~2칸 룬이 시원하게 보이는 상한
     private const float MiniCellMin = 18f;   // 9칸(3×3)도 박스를 안 넘도록 하한
+
+    // ── 공개 연출 ──
+    /// <summary>니어미스 멈칫 길이(초). Legendary 경로에서만 1회.</summary>
+    private const float NearMissHold  = 0.08f;
+    /// <summary>전체화면 플래시 페이드 길이(초).</summary>
+    private const float ScreenFlashDur = 0.25f;
 
     private static readonly Color CardSelected  = new(0.20f, 0.17f, 0.10f, 1f);
     private static readonly Color SelectBorder  = new(0.88f, 0.72f, 0.32f, 1f);
@@ -49,6 +65,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private List<(RuntimeItemData data, ItemSO so)> _candidates;
     private RunItemInventory _inventory;
     private int _selected = -1;
+    private float _cardW = CardW;   // 후보 수에 맞춰 산출된 실제 카드 폭
     private bool _built;
     private bool _skinned;   // 아트 로드 성공 — 선택 피드백을 색 틴트 대신 밝기로 처리
 
@@ -57,6 +74,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     private TMP_Text _counterText;
     private Image    _confirmBtnImg;
     private TMP_Text _confirmLabel;
+    private Image    _screenFlash;      // Legendary 전체화면 플래시 오버레이(코드 생성 Image 1장)
+
+    /// <summary>공개 시퀀스 진행 중인가 — 아무 입력이 들어오면 즉시 스냅한다.</summary>
+    private bool _revealing;
+    /// <summary>스킵 요청됨 — 진행 중 트윈을 최종 상태로 확정한다(파괴가 아니라 완료).</summary>
+    private bool _revealSkipped;
 
     /// <summary>선택된 룬. 넘겼으면 null.</summary>
     public RuntimeItemData Result { get; private set; }
@@ -65,9 +88,16 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private sealed class CardView
     {
-        public Image      Border;
-        public Image      Fill;
-        public GameObject Root;
+        public Image       Border;
+        public Image       Fill;
+        public GameObject  Root;
+        public RectTransform Rt;
+        public CanvasGroup Group;
+        public Vector2     BasePos;
+        public Image[]     RarityFrame;   // 상하좌우 4조각 — 등급 색/두께. 선택 피드백과 충돌하지 않게 분리
+        public TMP_Text    MetaText;      // 굴림 리빌 대상(등급 라벨 줄)
+        public string      MetaSuffix;    // 등급 라벨 뒤에 붙는 고정부(칸수·속성)
+        public ItemRarity  Rarity;
     }
 
     // ── Lifecycle ──
@@ -76,6 +106,15 @@ public sealed class UI_RuneSelectPopup : UI_Popup
     {
         base.Init();
         BuildChrome();
+    }
+
+    private void Update()
+    {
+        // 아무 입력 = 스냅. 시퀀스가 끝나야 고를 수 있는 게 아니라, 언제든 끊고 바로 고를 수 있어야 한다.
+        // (카드 클릭·[선택]·[넘기기]는 각 핸들러가 SkipReveal을 부른다)
+        if (!_revealing) return;
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.F) || Input.GetMouseButtonDown(0))
+            SkipReveal();
     }
 
     // ── Public API ──
@@ -102,9 +141,156 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             return;
         }
 
+        // 공개 순서 = 등급 오름차순. 제일 좋은 카드가 마지막에 열려야 상승감이 생긴다(§C-1 Beat 3).
+        // 후보 리스트 자체를 정렬하므로 _selected 인덱스와 카드 순서가 항상 일치한다.
+        _candidates.Sort((a, b) => a.data.rarity.CompareTo(b.data.rarity));
+
         BuildCards();
         RefreshCounter();
         SetSelected(-1);
+
+        // 선택은 이 시점부터 이미 가능하다 — 시퀀스가 끝나야 고를 수 있는 게 아니다(§C-1 스킵 규칙).
+        PlayRevealSequenceAsync().Forget();
+    }
+
+    /// <summary>
+    /// 카드 순차 공개. 팝업 안이라 <c>timeScale == 0</c>이므로 unscaled UI 트윈과
+    /// <see cref="VolumePulseService"/>만 쓴다(§A-5).
+    ///
+    /// 카드 간격은 <b>스태거</b>다 — 앞 카드가 다 열리기를 기다리지 않고 간격만큼만 두고 다음 카드를
+    /// 띄운다. 순차로 기다리면 Common 3장에도 0.5초가 넘게 걸려 §D 검증기준(Common 3장 ≤ 0.35s /
+    /// Legendary 포함 ≤ 1.1s)을 넘긴다. 카드는 오름차순이라 <b>마지막(최고 등급)</b>이 항상 가장 길고,
+    /// 그 카드의 완료만 기다리면 시퀀스 종료 시점이 정확해진다.
+    /// </summary>
+    private async UniTaskVoid PlayRevealSequenceAsync()
+    {
+        var ct = destroyCancellationToken;
+        _revealing     = true;
+        _revealSkipped = false;
+
+        try
+        {
+            for (int i = 0; i < _cards.Count; i++)
+            {
+                var card = _cards[i];
+                var spec = RewardPresentation.For(card.Rarity);
+                bool isLast = i == _cards.Count - 1;
+
+                if (_revealSkipped || spec.CardPopDuration <= 0f)
+                {
+                    RevealCardInstant(card);
+                    continue;
+                }
+
+                // 마지막 카드만 완료를 기다린다. 앞 카드들은 스태거 간격을 두고 겹쳐 진행한다.
+                if (isLast) await PresentCardAsync(card, spec, ct);
+                else        PresentCardAsync(card, spec, ct).Forget();
+
+                if (!isLast && !_revealSkipped && spec.CardStagger > 0f)
+                    await UIJuice.HoldAsync(spec.CardStagger, ct);
+            }
+        }
+        catch (OperationCanceledException) { return; }
+        finally
+        {
+            // 취소·스킵 어느 경로로 빠져도 카드가 반투명·축소 상태로 남지 않게 확정한다.
+            for (int i = 0; i < _cards.Count; i++) RevealCardInstant(_cards[i]);
+            _revealing = false;
+        }
+    }
+
+    /// <summary>카드 1장의 공개 — 팝인 → 프레임 플래시 → 굴림 리빌 → (상위 등급) 화면 방점.</summary>
+    private async UniTask PresentCardAsync(CardView card, RewardPresentation.TierSpec spec,
+                                           System.Threading.CancellationToken ct)
+    {
+        Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.55f, spec.SfxPitch).Forget();
+
+        await UIJuice.PopInAsync(card.Rt, card.Group, spec.CardPopDuration,
+                                 fromScale: 0.9f, fromYOffset: -18f, rotZ: spec.CardPopRotation, ct);
+
+        if (spec.FlashPulses > 0 && card.Fill != null)
+            UIJuice.FlashAsync(card.Fill, RewardPresentation.FrameColor(card.Rarity),
+                               0.18f, spec.FlashPulses, ct).Forget();
+
+        // 등급 라벨 굴림 리빌 — 확률·결과는 이미 확정. 표시만 계단식으로 오른다(§C-3-b).
+        await RevealRarityLabelAsync(card, spec, ct);
+
+        if (spec.PulsePeak > 0f)
+            VolumePulseService.Pulse(spec.PulsePeak, spec.PulseDuration);
+
+        if (spec.ScreenFlashAlpha > 0f)
+            PlayScreenFlashAsync(spec.ScreenFlashAlpha, ct).Forget();
+    }
+
+    /// <summary>카드를 최종 상태로 즉시 확정(스킵·연출 끔·취소 공통).</summary>
+    private void RevealCardInstant(CardView card)
+    {
+        if (card == null) return;
+        UIJuice.SnapPopIn(card.Rt, card.Group, card.BasePos);
+        SetMetaLabel(card, card.Rarity);
+        ApplyRarityFrame(card, card.Rarity);
+    }
+
+    /// <summary>
+    /// 등급 라벨을 Common부터 실제 등급까지 계단식으로 올린다. 프레임 색도 라벨과 동기해 함께 오른다.
+    /// Legendary만 도달 직전 1회 "멈칫"(니어미스) — 확률·결과 불변, 축약/끔에서는 자동 생략.
+    /// </summary>
+    private async UniTask RevealRarityLabelAsync(CardView card, RewardPresentation.TierSpec spec,
+                                                 System.Threading.CancellationToken ct)
+    {
+        int steps = (int)card.Rarity;   // Common=0 → 오를 계단 수
+        if (spec.RevealDuration <= 0f || steps <= 0 || _revealSkipped)
+        {
+            SetMetaLabel(card, card.Rarity);
+            ApplyRarityFrame(card, card.Rarity);
+            return;
+        }
+
+        float perStep = spec.RevealDuration / steps;
+
+        for (int r = 0; r <= steps; r++)
+        {
+            var shown = (ItemRarity)r;
+            SetMetaLabel(card, shown);
+            ApplyRarityFrame(card, shown);
+
+            if (r == steps) break;
+
+            // 각 단 상승마다 피치가 오른다 — "승급의 첫 신호는 사운드"(§C-3-b).
+            Managers.Sound?.PlayEffectAsync(SoundKey.Sfx.UiButton, 0.4f,
+                                            RewardPresentation.For(shown).SfxPitch).Forget();
+
+            // 니어미스 — ★ 직전 ◆에서 한 번만 멈칫한다.
+            bool nearMiss = card.Rarity == ItemRarity.Legendary && r == steps - 1;
+            await UIJuice.HoldAsync(nearMiss ? perStep + NearMissHold : perStep, ct);
+
+            if (_revealSkipped)
+            {
+                SetMetaLabel(card, card.Rarity);
+                ApplyRarityFrame(card, card.Rarity);
+                return;
+            }
+        }
+    }
+
+    /// <summary>Legendary 전체화면 금색 플래시. 코드 생성 Image 1장 + 알파 트윈(신규 아트 0).</summary>
+    private async UniTaskVoid PlayScreenFlashAsync(float alpha, System.Threading.CancellationToken ct)
+    {
+        if (_screenFlash == null) return;
+
+        var c = RewardPresentation.FrameColor(ItemRarity.Legendary);
+        c.a = alpha;
+        _screenFlash.color = c;
+
+        try { await UIJuice.FadeOutAsync(_screenFlash, alpha, ScreenFlashDur, ct); }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>진행 중인 공개 연출을 최종 상태로 스냅한다. 어떤 입력이든 들어오면 호출.</summary>
+    private void SkipReveal()
+    {
+        if (!_revealing) return;
+        _revealSkipped = true;
     }
 
     // ── Build ──
@@ -158,6 +344,12 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             new Vector2(-34f, -30f), new Vector2(420f, 28f));
 
         BuildFooter();
+
+        // 전체화면 플래시 오버레이 — Legendary 방점 전용. 평소엔 알파 0이라 아무것도 가리지 않는다.
+        // 창(window)이 아니라 팝업 루트에 붙여 화면 전체를 덮되, 레이캐스트는 받지 않는다.
+        _screenFlash = ShopUIStyle.MakeImage(transform, "ScreenFlash", new Color(1f, 1f, 1f, 0f));
+        ShopUIStyle.Stretch(_screenFlash.rectTransform);
+        _screenFlash.raycastTarget = false;
     }
 
     private Transform _windowRoot;
@@ -194,6 +386,27 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
         ShopUIStyle.Stretch(skipLbl.rectTransform);
         skipLbl.text = "넘기기";
+
+        BuildOddsBar();
+    }
+
+    /// <summary>
+    /// 이 방의 등급 확률 막대. "확률로 뜬다"는 사실이 화면에 처음 존재하게 만든다 —
+    /// 그래야 굴림 리빌(§C-3-b)이 "연출"이 아니라 "정보"로 읽힌다.
+    ///
+    /// 값의 출처는 행운이 아니라 <see cref="RoomRewardTable"/>(방 종류)다. 정예방에 들어가면
+    /// 막대가 눈에 띄게 위로 쏠려, 위험을 감수한 대가가 숫자로 보인다.
+    /// <see cref="OddsBarView"/>는 이미 구현돼 있었으나 호출처가 0개였다 — 그대로 재사용한다.
+    /// </summary>
+    private void BuildOddsBar()
+    {
+        var kind = GameRunBootstrapper.Instance?.Run?.CurrentRoomKind ?? RoomPlanKind.Normal;
+        var (rare, epic, legendary) = RoomRewardTable.For(kind).Weights.Normalized();
+
+        var bar = OddsBarView.Create(_windowRoot,
+            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(OddsBarMargin, OddsBarMargin), new Vector2(OddsBarW, OddsBarH));
+        bar.SetOdds(rare, epic, legendary, heated: false);
     }
 
     private void BuildCards()
@@ -202,8 +415,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         _cards.Clear();
 
         int n = _candidates.Count;
-        float totalW = n * CardW + (n - 1) * CardGap;
-        float startX = -totalW * 0.5f + CardW * 0.5f;
+
+        // 카드 폭은 후보 수에 맞춰 줄인다. 300 고정이던 시절엔 3장까지만 창에 들어갔고,
+        // 정예방 4지선다(RoomRewardTable)에서 카드가 창 밖으로 밀려났다.
+        float avail = WindowW - CardSideMargin * 2f - (n - 1) * CardGap;
+        _cardW = Mathf.Min(CardW, avail / Mathf.Max(1, n));
+
+        float totalW = n * _cardW + (n - 1) * CardGap;
+        float startX = -totalW * 0.5f + _cardW * 0.5f;
 
         for (int i = 0; i < n; i++)
         {
@@ -215,27 +434,96 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             var cardRT = (RectTransform)card.transform.parent;   // 위치/크기는 테두리(outer)에
             ShopUIStyle.Anchor(cardRT,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(startX + i * (CardW + CardGap), CardY), new Vector2(CardW, CardH));
+                new Vector2(startX + i * (_cardW + CardGap), CardY), new Vector2(_cardW, CardH));
 
             AddClick(cardRT.gameObject, () => SetSelected(idx));
 
             var view = new CardView
             {
-                Root   = cardRT.gameObject,                  // outer(테두리)가 루트
-                Border = cardRT.GetComponent<Image>(),
-                Fill   = card,
+                Root    = cardRT.gameObject,                 // outer(테두리)가 루트
+                Border  = cardRT.GetComponent<Image>(),
+                Fill    = card,
+                Rt      = cardRT,
+                Group   = cardRT.gameObject.AddComponent<CanvasGroup>(),
+                BasePos = cardRT.anchoredPosition,
+                Rarity  = data.rarity,
             };
             // 카드 테두리 라인아트 + 채움 — 미로드면 색 박스 유지
             var skin = UISkin.RuneSelect;
             ShopUIStyle.Skin(view.Border, skin?.cardFrame, sliced: true);
             ShopUIStyle.Skin(view.Fill,   skin?.cardFill,  sliced: true);
+
+            // 등급 프레임 — 스킨 아트/선택 피드백과 색이 충돌하지 않도록 별도 4조각으로 얹는다.
+            // "프레임=희귀도 / 리본·엠블럼=속성" 규칙(통합설계서 §5 P0-8)의 첫 적용처.
+            view.RarityFrame = BuildRarityFrame(cardRT, data.rarity);
             _cards.Add(view);
 
-            BuildCardContent(card.transform, data, so);
+            BuildCardContent(card.transform, data, so, view);
+
+            // 연출이 켜져 있으면 숨은 상태에서 시작한다(공개는 PlayRevealSequenceAsync가 담당).
+            var spec = RewardPresentation.For(data.rarity);
+            if (spec.CardPopDuration > 0f)
+            {
+                view.Group.alpha  = 0f;
+                view.Rt.localScale = Vector3.one * 0.9f;
+            }
         }
     }
 
-    private void BuildCardContent(Transform card, RuntimeItemData data, ItemSO so)
+    /// <summary>등급 색 프레임 4조각(상·하·좌·우). 두께는 등급이 올라갈수록 두꺼워진다.</summary>
+    private static Image[] BuildRarityFrame(RectTransform cardRT, ItemRarity rarity)
+    {
+        float th = ShopUIStyle.RarityBorder(rarity);
+        var col  = RewardPresentation.FrameColor(rarity);
+        var bars = new Image[4];
+
+        // (anchorMin, anchorMax, pivot, pos, size) — 두께 방향만 고정하고 나머지는 늘린다.
+        var specs = new[]
+        {
+            (new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 0f),  new Vector2(0f, th)),  // 상
+            (new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 0f),  new Vector2(0f, th)),  // 하
+            (new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(0f, 0f),  new Vector2(th, 0f)),  // 좌
+            (new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(0f, 0f),  new Vector2(th, 0f)),  // 우
+        };
+
+        for (int i = 0; i < specs.Length; i++)
+        {
+            var bar = ShopUIStyle.MakeImage(cardRT, $"RarityBar{i}", col);
+            ShopUIStyle.Anchor(bar.rectTransform, specs[i].Item1, specs[i].Item2, specs[i].Item3,
+                               specs[i].Item4, specs[i].Item5);
+            bars[i] = bar;
+        }
+        return bars;
+    }
+
+    /// <summary>프레임 색·두께를 표시 등급에 맞춘다(굴림 리빌 중 계단마다 호출).</summary>
+    private static void ApplyRarityFrame(CardView card, ItemRarity shown)
+    {
+        if (card?.RarityFrame == null) return;
+
+        var col = RewardPresentation.FrameColor(shown);
+        float th = ShopUIStyle.RarityBorder(shown);
+
+        for (int i = 0; i < card.RarityFrame.Length; i++)
+        {
+            var bar = card.RarityFrame[i];
+            if (bar == null) continue;
+            bar.color = col;
+            // 0·1 = 가로 막대(높이가 두께), 2·3 = 세로 막대(폭이 두께)
+            var sd = bar.rectTransform.sizeDelta;
+            bar.rectTransform.sizeDelta = i < 2 ? new Vector2(sd.x, th) : new Vector2(th, sd.y);
+        }
+    }
+
+    /// <summary>등급 라벨 줄을 표시 등급으로 다시 쓴다(굴림 리빌).</summary>
+    private static void SetMetaLabel(CardView card, ItemRarity shown)
+    {
+        if (card?.MetaText == null) return;
+        card.MetaText.color = ShopUIStyle.RarityGlow(shown);
+        card.MetaText.text  = RewardPresentation.RarityLabel(shown) + card.MetaSuffix;
+    }
+
+    private void BuildCardContent(Transform card, RuntimeItemData data, ItemSO so, CardView view)
     {
         // 상단 속성 리본 — 완성본의 색 막대. 어느 존에 놓을지 알려주는 근거색이다.
         int elemIdx = ElementIndex(data.element);
@@ -261,7 +549,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var shapeBox = ShopUIStyle.MakeImage(card, "ShapeBox", ShopUIStyle.IconBg);
         ShopUIStyle.Anchor(shapeBox.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -18f), new Vector2(CardW - 40f, ShapeBoxH));
+            new Vector2(0f, -18f), new Vector2(_cardW - 40f, ShapeBoxH));
 
         bool canPlace = BuildShapePreview(shapeBox.transform, data);
 
@@ -270,7 +558,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             TextAlignmentOptions.Center, ShopUIStyle.TextPrimary);
         ShopUIStyle.Anchor(name.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -172f), new Vector2(CardW - 24f, 26f));
+            new Vector2(0f, -172f), new Vector2(_cardW - 24f, 26f));
         name.text = data.displayName ?? data.itemId;
         FitSingleLine(name);
 
@@ -283,8 +571,15 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         meta.richText = true;
         ShopUIStyle.Anchor(meta.rectTransform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -200f), new Vector2(CardW - 24f, 22f));
-        meta.text = (cells > 0 ? $"{RarityLabel(data.rarity)} · {cells}칸" : RarityLabel(data.rarity)) + elemTag;
+            new Vector2(0f, -200f), new Vector2(_cardW - 24f, 22f));
+        // 등급 라벨은 굴림 리빌이 다시 쓴다 — 뒤에 붙는 고정부(칸수·속성)만 따로 보관한다.
+        string metaSuffix = (cells > 0 ? $" · {cells}칸" : string.Empty) + elemTag;
+        if (view != null)
+        {
+            view.MetaText   = meta;
+            view.MetaSuffix = metaSuffix;
+        }
+        meta.text = RewardPresentation.RarityLabel(data.rarity) + metaSuffix;
         FitSingleLine(meta);
 
         // 효과 칸 배경 — 아트 있으면 박스로, 없으면 표시 안 함(투명 폴백)
@@ -295,14 +590,14 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(fxBg, fxSkin, sliced: true);
             ShopUIStyle.Anchor(fxBg.rectTransform,
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -224f), new Vector2(CardW - 28f, 96f));
+                new Vector2(0f, -224f), new Vector2(_cardW - 28f, 96f));
         }
 
         // 효과 목록
         var fxRoot = ShopUIStyle.MakeRect(card, "Effects").GetComponent<RectTransform>();
         ShopUIStyle.Anchor(fxRoot,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -228f), new Vector2(CardW - 32f, 86f));
+            new Vector2(0f, -228f), new Vector2(_cardW - 32f, 86f));
         var vlg = fxRoot.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.childControlHeight = false; vlg.childForceExpandHeight = false;
         vlg.spacing = 2f;
@@ -317,7 +612,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
             ShopUIStyle.Skin(bar, placeSkin, sliced: true);
             ShopUIStyle.Anchor(bar.rectTransform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 16f), new Vector2(CardW - 28f, 32f));
+                new Vector2(0f, 16f), new Vector2(_cardW - 28f, 32f));
             badgeParent = bar.transform;
         }
 
@@ -328,7 +623,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         else
             ShopUIStyle.Anchor(badge.rectTransform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 14f), new Vector2(CardW - 24f, 24f));
+                new Vector2(0f, 14f), new Vector2(_cardW - 24f, 24f));
         badge.text = canPlace ? "놓을 자리 있음" : "놓을 자리 없음";
         FitSingleLine(badge);
     }
@@ -410,7 +705,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         int cols = maxX - minX + 1, rows = maxY - minY + 1;
 
         // 박스에 꽉 차도록 셀 크기를 역산 — 1칸 룬은 크게, 큰 모양은 줄여서 항상 형태가 읽히게 한다.
-        float boxW = CardW - 40f - 16f;   // ShapeBox 폭 - 여백
+        float boxW = _cardW - 40f - 16f;   // ShapeBox 폭 - 여백
         float boxH = ShapeBoxH   - 16f;
         float fitW = (boxW - (cols - 1) * MiniGap) / Mathf.Max(1, cols);
         float fitH = (boxH - (rows - 1) * MiniGap) / Mathf.Max(1, rows);
@@ -450,6 +745,7 @@ public sealed class UI_RuneSelectPopup : UI_Popup
 
     private void SetSelected(int index)
     {
+        SkipReveal();
         Managers.Sound.PlayEffectAsync(SoundKey.Sfx.UiButton).Forget();
         _selected = index;
 
@@ -554,12 +850,4 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var offsets = RuneDataManager.ParseCellOffsets(entry);
         return offsets?.Length ?? 0;
     }
-
-    private static string RarityLabel(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Rare      => "◇ Rare",
-        ItemRarity.Epic      => "◆ Epic",
-        ItemRarity.Legendary => "◆ Legendary",
-        _                    => "· Common",
-    };
 }

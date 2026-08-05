@@ -46,12 +46,22 @@ public static class HitFeelService
     private const float ShakeMaxAngle      = 4f;
     private const float ShakeFrequency     = 24f;
 
+    // 방향성 펀치 — 무방향 노이즈보다 작은 각도로, 더 빨리 사그라들게(툭 밀렸다 돌아오는 느낌).
+    private const float PunchMaxAngle      = 3f;
+    private const float PunchAmountScale   = 0.8f;   // 같은 amplitude 기준 노이즈 대비 펀치 비중
+
     // ── Public Methods ───────────────────────────────────────────────
     /// <summary>일정 시간 동안 timeScale을 강제 조정한 후 복귀.
     /// 막타(킬) 히트스톱 보호 윈도 동안에는 일반 히트스톱이 덮어쓰지 않는다.</summary>
     public static void HitStop(float scale = 0.05f, float duration = 0.06f)
     {
         if (Time.unscaledTime < _killFreezeUntil) return;   // 킬 freeze 보호 중 → 무시
+
+        // 슬로모/일시정지 구간에서는 히트스톱을 생략한다.
+        // 저스트회피 슬로모 중에는 플레이어 Animator 만 UnscaledTime 으로 돌기 때문에(위치타임 구현),
+        // 여기서 timeScale 을 더 내리면 세계는 멈추는데 플레이어만 안 멈추는 어긋난 그림이 된다.
+        if (TimeScaleArbiter.HasRequestAtOrAbove(TimeScaleArbiter.Priority.SlowMotion)) return;
+
         float end = Time.unscaledTime + duration;
         // 다단/동시 히트 튐 방지 — 진행 중 스톱이 더 길게 끝나면 새 (짧은) 스톱은 무시(더 긴 쪽 유지).
         if (_stopCo != null && end <= _hitStopUntil) return;
@@ -80,6 +90,17 @@ public static class HitFeelService
         _shakeExt.AddTrauma(trauma, ShakeMaxAngle, ShakeFrequency, decay);
     }
 
+    /// <summary>카메라를 특정 방향으로 밀어내는 방향성 셰이크. worldDir 이 0이면 기존 무방향 셰이크와 동일.
+    /// 무방향 노이즈와 같은 확장(<see cref="CameraShakeExtension"/>)에서 합성되므로 이중 흔들림이 나지 않는다.</summary>
+    public static void CameraShakeDirectional(Vector3 worldDir, float amplitude = 0.08f, float duration = 0.12f)
+    {
+        if (!EnsureShake()) return;
+        float trauma = Mathf.Clamp01(amplitude * TraumaPerAmplitude);
+        float decay  = 1f / Mathf.Max(0.05f, duration);
+        _shakeExt.AddTrauma(trauma, ShakeMaxAngle, ShakeFrequency, decay);
+        _shakeExt.AddDirectionalPunch(worldDir, trauma * PunchAmountScale, PunchMaxAngle, decay * 2f);
+    }
+
     /// <summary>데미지 비례 히트 피드백 — 정지 길이를 데미지에 비례시키되 상한으로 클램프.
     /// 깊이(timeScale)·셰이크는 비크리/크리 앵커 고정(기존 Light/Crit 체감 유지). 무기 무관 기본 프로필.</summary>
     public static void Hit(float damage, bool isCritical)
@@ -88,16 +109,20 @@ public static class HitFeelService
     /// <summary>무기별 손맛 프로필 적용 히트 피드백 — 정지 길이는 데미지 비례 × feel.StopDurationMult,
     /// 깊이·셰이크는 feel 값. 무기마다 무게감/카메라 셰이크가 달라진다.</summary>
     public static void Hit(float damage, bool isCritical, in WeaponFeel feel)
+        => Hit(damage, isCritical, feel, Vector3.zero);
+
+    /// <summary>방향(공격자→피격자)까지 반영한 히트 피드백. hitDirection 이 0이면 무방향과 동일.</summary>
+    public static void Hit(float damage, bool isCritical, in WeaponFeel feel, Vector3 hitDirection)
     {
         if (isCritical)
         {
             HitStop(feel.CritStopScale, CritStopDuration(damage) * feel.StopDurationMult);
-            CameraShake(feel.CritShakeAmp, feel.CritShakeDur);
+            CameraShakeDirectional(hitDirection, feel.CritShakeAmp, feel.CritShakeDur);
         }
         else
         {
             HitStop(feel.StopScale, HitStopDuration(damage) * feel.StopDurationMult);
-            CameraShake(feel.ShakeAmp, feel.ShakeDur);
+            CameraShakeDirectional(hitDirection, feel.ShakeAmp, feel.ShakeDur);
         }
     }
 

@@ -11,6 +11,13 @@ public sealed class ProcRoomResult
     public Vector3                      entryPos;     // 플레이어 진입(등장) 위치 (개구부 안쪽)
     public bool                         hasEntrance;  // 입구 문 존재 여부 (시작방은 false)
     public bool                         hasCeiling;   // 팔레트 천장 유무 — 상공 부감 인트로 카메라가 천장 방을 스킵할지 판단
+    /// <summary>이 방 테마의 봉인 석문 프리팹(BlockPalette). null이면 공용 문으로 폴백.
+    /// 문과 통로·벽이 같은 팔레트에서 나와야 테마 컨셉이 어긋나지 않는다.</summary>
+    public GameObject                   sealDoorPrefab;
+
+    /// <summary>문 등장 방식(BlockPalette). 뿌리 같은 자연물은 떨어지지 않고 바닥에서 자라야 한다.</summary>
+    public SealDoorMotion               sealDoorMotion;
+
     public ProcExitSlot                 entrance;     // 들어온 입구 — 진입 후 잠금(봉인) 패널 배치용
     public List<ProcExitSlot>           exits;        // 클리어 후 공개할 출구 슬롯
     public List<MapBuilder.PlacedBlock> blocks;       // 디졸브 등장용 블록(빌드 시 렌더러 숨김 상태) — 화면 복귀 후 호출자가 재생

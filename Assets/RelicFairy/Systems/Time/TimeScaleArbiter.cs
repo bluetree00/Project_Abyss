@@ -51,6 +51,16 @@ public static class TimeScaleArbiter
     /// <summary>현재 owner 가 요청을 들고 있는지.</summary>
     public static bool IsHeldBy(object owner) => owner != null && _requests.ContainsKey(owner);
 
+    /// <summary>지정 우선순위 이상의 요청이 하나라도 걸려 있는지.
+    /// 히트스톱이 슬로모/일시정지 구간을 덮어쓰지 않도록 판단할 때 쓴다.</summary>
+    public static bool HasRequestAtOrAbove(Priority priority)
+    {
+        int p = (int)priority;
+        foreach (var kv in _requests)
+            if (kv.Value.PriorityValue >= p) return true;
+        return false;
+    }
+
     /// <summary>현재 timeScale을 잡고 있는 소유자들을 사람이 읽는 문자열로. 디버그/진단용.</summary>
     public static string DescribeHolders()
     {

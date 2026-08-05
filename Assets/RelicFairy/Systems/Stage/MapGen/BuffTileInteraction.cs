@@ -117,6 +117,10 @@ public class BuffTileInteraction : MonoBehaviour
         {
             int damage = (int)result.Modifier.Value;
             session.Player?.RuntimeStats?.Damage(damage);
+
+            // 직접 차감이라 사망 판정(TakeDamage 내부)을 안 탄다 — HP가 0이면 즉시 사망 처리.
+            if (session.Player != null && session.Player.RuntimeStats.Hp <= 0)
+                session.Player.NotifyHpDepleted();
             noticeMsg = $"<color=#FF4444>즉시 피해 {damage}</color>";
             Debug.Log($"[BuffTile] 즉시 피해 {damage} (티어 {result.Tier})");
         }

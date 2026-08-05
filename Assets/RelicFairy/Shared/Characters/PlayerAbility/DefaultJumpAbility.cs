@@ -134,6 +134,14 @@ public class DefaultJumpAbility : IJumpAbility
 
         if (_isGrounded) return;
 
+        // 스텝 오르기 중에는 중력을 주지 않는다.
+        // StepClimb 는 수직 "속도"(3~12m/s)로 단차를 올리는데, 오르는 동안 캐릭터가 접지 밴드를
+        // 벗어나면 여기서 중력(-28, 하강 시 fallMultiplier 2배)이 붙어 오르는 힘과 매 프레임 다툰다.
+        // 그 결과가 단차에서의 떨림이다. groundCheckDistance 가 스텝 높이보다 크던 시절에는
+        // 접지가 유지돼 드러나지 않았을 뿐, 원래 있던 구조적 충돌이다.
+        // IsStepClimbing 은 상승 프레임마다 갱신되는 0.08초짜리라 오르기가 끝나면 즉시 풀린다.
+        if (controller.IsStepClimbing) return;
+
         var rb = controller.Rigid;
         if (rb == null) return;
 

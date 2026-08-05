@@ -44,7 +44,8 @@ public class RunFlowController : MonoBehaviour
 
     [Header("게이트 문 (봉인 → 정보 공개)")]
     [SerializeField, Tooltip("클리어 시 문 정보 공개(색 전환+글로우) 시간(초).")] private float _gateRevealDuration = 0.6f;
-    [SerializeField, Tooltip("공개 시 글로우(emission) 세기.")]                  private float _gateGlowIntensity = 2.5f;
+    // (제거됨) _gateGlowIntensity — 공개 글로우는 꺼진 marker 머티리얼에 적용돼 화면에 나타나지 않았다.
+    //          공개 연출은 석문 상승이 담당하고, 문 너머 통로는 MapBuilder.BuildDoorCorridor가 이미 깔아둔다.
 
     // 봉인(전투 중 막힌 문) / 입구 잠금 색 — 중립 톤
     private static readonly Color SealedColor = new Color(0.10f, 0.11f, 0.13f);
@@ -86,7 +87,15 @@ public class RunFlowController : MonoBehaviour
         public float        openH;   // 개구부 높이(문 낙하/상승 거리)
         public Vector3      sealedLocalPos; // 석문의 닫힘(봉인) 로컬 위치 — 낙하 대기 중에도 목표를 잃지 않게 보관
         public bool         opening;        // 공개(상승) 시작됨 — 진행 중인 낙하가 이걸 보고 물러난다
+
+        /// <summary>true면 낙하가 아니라 <b>바닥에서 자라오르는</b> 문(뿌리·덩굴). 위치 대신 세로 스케일을 애니메이션한다.</summary>
+        public bool         grows;
+        /// <summary>다 자란 상태의 스케일 — Grow 연출의 목표값.</summary>
+        public Vector3      fullScale;
     }
+
+    /// <summary>방 진입 안개 베일이 걷히는 시간(초). 디졸브 조립 구간을 덮을 만큼은 길어야 한다.</summary>
+    private const float FogVeilClearSeconds = 1.6f;
 
     private Vector3 _baseAnchor;
     private int     _anchorToggle;
@@ -173,7 +182,9 @@ public class RunFlowController : MonoBehaviour
 
         _rng       = new System.Random(_masterSeed);
         _sequencer = new RunSequencer(_pool, _resolvedStructure, _masterSeed, _bossThresholdOverride);
-        _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns);
+        _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns,
+                                meta.crucibleUsed, meta.refineryUsed,
+                                meta.shopMiss, meta.eventMiss, meta.crucibleMiss, meta.refineryMiss);
         _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
         DumpRunPlan(_masterSeed);
 
@@ -326,6 +337,10 @@ public class RunFlowController : MonoBehaviour
             _gatePortalPrefab = grb.GatePortalPrefab;
         }
 
+        // 방 종류를 런 세션에 알린다 — 클리어 보상(RoomRewardTable)이 이 값으로 갈린다.
+        // 방 빌드보다 먼저 세팅해야 RoomClearGate가 붙는 시점(AttachRoomClearController)에 이미 유효하다.
+        grb.Run?.SetCurrentRoomKind(plan.kind);
+
         var dir = WipeDir(fromEdge);
         _heading = (int)fromEdge; // 탄 출구의 절대 방향 = 새 진행 방향 → 다음 방을 이만큼 회전
 
@@ -383,9 +398,17 @@ public class RunFlowController : MonoBehaviour
         }
 
         // 디졸브 먼저 시작 → 약간 지연 → 화면 복귀(디졸브 진행 중 진입) → 완료 대기. 첫 방 포함 모든 절차 방에 적용.
+        // 파도는 <b>진입 지점 기준 방사형</b> — 구석부터 격자가 조립되는 것처럼 보이던 대각선 스윕을 대체한다.
         var dissolve = result.blocks != null
-            ? new DissolveEntrance().PlayAsync(result.blocks, default, ct)
+            ? new DissolveEntrance(result.entryPos).PlayAsync(result.blocks, default, ct)
             : UniTask.CompletedTask;
+
+        // 안개 베일 — 화면 복귀 후에도 남은 조립 구간을 덮는다. 안개 '색'은 챕터 라이팅 것을 그대로 쓴다.
+        // ⚠️ <b>절대 await 하지 않는다.</b> 이 뒤로 입력 잠금 해제(SetPlayerInput(true))까지 이어지므로
+        //    기다리면 베일 시간만큼 플레이어가 문 앞에서 못 움직인다. 순수 연출이라 배경에서 흘려보낸다.
+        //    (ct에 묶여 있고 finally에서 안개를 원복하므로 방 전환이 끊겨도 정리는 보장된다.)
+        EntranceFogVeil.PlayAsync(FogVeilClearSeconds, ct).Forget();
+
         if (_revealDelay > 0f)
             await UniTask.Delay(TimeSpan.FromSeconds(_revealDelay), ignoreTimeScale: true, cancellationToken: ct);
         await ScreenFade.RevealAsync(dir, _revealDuration, _revealCurve, ct);
@@ -555,6 +578,14 @@ public class RunFlowController : MonoBehaviour
         // 선택/편집 UI가 열려있으면 닫힐 때까지 대기 후 대사.
         await Managers.UI.WaitUntilNoBlockingPopupAsync();
 
+        // 씬 로딩 오버레이를 먼저 내린다. 보스방 이어하기는 이 대사가 방 빌드 체인 안에서 await되고,
+        // 오버레이는 그 체인이 끝난 뒤(GameRunBootstrapper의 NotifySceneReady)에야 내려간다 —
+        // 즉 대사창이 오버레이 뒤에 가려진 채 클릭을 기다려 "로딩 100%에서 멈춘" 것처럼 보였다.
+        // (UI_DialoguePopup은 원시 Input으로 넘기므로 오버레이의 레이캐스트 차단도 안 먹혔다.)
+        // 이미 내려가 있으면 HideAsync가 즉시 반환하므로 일반 방 진입엔 영향 없다.
+        var loading = UI_SceneLoading.Instance;
+        if (loading != null) await loading.HideAsync();
+
         var popup = await Managers.UI.ShowPopupUIAndGetAsync<UI_DialoguePopup>();
         if (popup == null) return;
         try { await popup.ShowAsync(lines); }
@@ -579,6 +610,12 @@ public class RunFlowController : MonoBehaviour
             seqPhase           = _sequencer.PhaseInt,
             shopUsed           = _sequencer.ShopUsed,
             eventUsed          = _sequencer.EventUsed,
+            crucibleUsed       = _sequencer.CrucibleUsed,
+            refineryUsed       = _sequencer.RefineryUsed,
+            shopMiss           = _sequencer.ShopMiss,
+            eventMiss          = _sequencer.EventMiss,
+            crucibleMiss       = _sequencer.CrucibleMiss,
+            refineryMiss       = _sequencer.RefineryMiss,
             heading            = (int)fromEdge,
             anchorToggle       = _anchorToggle,
             currentRoomPoolKey = plan.entry?.pool_key,
@@ -702,7 +739,14 @@ public class RunFlowController : MonoBehaviour
         Debug.Log(sb.ToString());
     }
 
-    /// <summary>라이브 RollExits 종류가 사전 일정표와 일치하는지 검증(드리프트 감지). 불일치 시 경고만(동작 영향 없음).</summary>
+    /// <summary>
+    /// 라이브 RollExits 종류를 시작 시점 <b>예보</b>와 대조한다(디버그 정보).
+    /// 특수방이 PRD 확률 + 방문 이력으로 정해지도록 바뀐 뒤로 <b>불일치는 정상</b>이다 —
+    /// 플레이어가 무엇을 방문했느냐에 따라 이후 방 종류가 실제로 달라지기 때문.
+    /// 그래서 경고가 아니라 에디터 전용 로그로만 남긴다.
+    /// </summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
     private void VerifyAgainstPlan(int visitIndex, List<DoorPlan> liveExits)
     {
         if (_runPlan == null || liveExits == null) return;
@@ -713,7 +757,7 @@ public class RunFlowController : MonoBehaviour
             for (int i = 0; match && i < liveExits.Count; i++)
                 if (ch.exitKinds[i] != liveExits[i].kind) match = false;
             if (!match)
-                Debug.LogWarning($"[RunPlan] 드리프트 감지 visit={visitIndex} — 일정표와 라이브 출구 종류 불일치.");
+                RFLog.D($"[RunPlan] 예보와 다름 visit={visitIndex} — 방문 이력(PRD)에 따른 정상 분기.");
             return;
         }
     }
@@ -769,7 +813,7 @@ public class RunFlowController : MonoBehaviour
     private void RevealGates(List<DoorPlan> exits)
     {
         int n = Mathf.Min(_gates.Count, exits.Count);
-        var marks = new List<(Transform target, string label, Color color)>(n);
+        var marks = new List<(Transform target, string title, string subtitle, Color color)>(n);
         for (int i = 0; i < n; i++)
         {
             if (_gates[i] == null) continue;
@@ -781,6 +825,7 @@ public class RunFlowController : MonoBehaviour
             if (tr != null)
                 marks.Add((tr,
                            KindGlyph(exits[i].kind) + " " + KindKor(exits[i].kind),
+                           KindSubtitle(exits[i].kind),
                            KindBrightColor(exits[i].kind)));
         }
         if (marks.Count > 0) ExitCompassHud.Create().SetExits(marks);
@@ -815,6 +860,8 @@ public class RunFlowController : MonoBehaviour
             portal = portal != null ? portal.gameObject : null,
             door = door, openH = oh,
             sealedLocalPos = door != null ? door.localPosition : Vector3.zero,
+            grows          = _current != null && _current.sealDoorMotion == SealDoorMotion.Grow,
+            fullScale      = door != null ? door.localScale : Vector3.one,
         };
 
         // 통과 차단 콜라이더(blocker)는 이 시점에 이미 서 있다 — 석문이 언제 내려오든 방 밖으로 못 나간다.
@@ -839,6 +886,10 @@ public class RunFlowController : MonoBehaviour
         Vector3 sealedPos = view.sealedLocalPos;
         Vector3 upPos = sealedPos + Vector3.up * Mathf.Max(1f, openH); // 개구부 바로 위에서 시작(불필요한 장거리 낙하 제거)
         float   dur       = 0.6f;
+
+        // 유기물 문(뿌리·덩굴)은 하늘에서 떨어지면 컨셉이 깨진다 — 바닥에 붙은 채 자라오른다.
+        if (view.grows) { SealDoorGrowAsync(view, grow: true, primary).Forget(); return; }
+
         door.localPosition = upPos;
         try
         {
@@ -862,6 +913,54 @@ public class RunFlowController : MonoBehaviour
         catch (OperationCanceledException) { return; }
 
         PlayDoorImpact(door, openH, primary); // 먼지 + (대표문) 흔들림·사운드
+    }
+
+    /// <summary>
+    /// 유기물 봉인 문 연출 — <b>바닥에 뿌리를 붙인 채</b> 세로로 자라오르거나(grow=true) 시들어 내려간다.
+    /// 위치를 움직이지 않으므로 아래쪽이 항상 지면에 닿아 있다("떠 있는 뿌리" 방지).
+    /// 스케일 피벗이 메시 중앙이라, 자라는 동안 아래 끝이 지면에 머물도록 위치를 함께 보정한다.
+    /// </summary>
+    private async UniTaskVoid SealDoorGrowAsync(GateView view, bool grow, bool primary)
+    {
+        var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
+        var door = view?.door;
+        if (door == null) return;
+
+        Vector3 full   = view.fullScale;
+        Vector3 basePos = view.sealedLocalPos;
+        float   halfH  = view.openH * 0.5f;      // 게이트 원점 = 개구부 중앙 → 바닥은 -halfH
+        float   dur    = grow ? 0.75f : 0.45f;
+
+        void Apply(float k)
+        {
+            k = Mathf.Clamp01(k);
+            door.localScale = new Vector3(full.x, full.y * k, full.z);
+            // 세로 스케일이 줄면 바운즈 중심도 내려온다 → 아래 끝이 항상 지면(-halfH)에 남도록 위치를 보정한다.
+            // 유도: 다 자랐을 때(k=1) 바운즈 중심이 개구부 중앙(y=0)이므로 basePos.y = -b.center.y·sy.
+            //       임의 k에서 중심 목표는 -halfH + halfH·k → localY = -halfH + k·(halfH + basePos.y).
+            door.localPosition = new Vector3(basePos.x, -halfH + (basePos.y + halfH) * k, basePos.z);
+        }
+
+        Apply(grow ? 0f : 1f);
+        try
+        {
+            float t = 0f;
+            while (t < dur)
+            {
+                if (door == null) return;
+                if (grow && view.opening) return;   // 이미 열리기 시작했으면 봉인은 물러난다
+                ct.ThrowIfCancellationRequested();
+                t += Time.deltaTime;
+                float k = Mathf.SmoothStep(0f, 1f, t / dur);
+                Apply(grow ? k : 1f - k);
+                await UniTask.Yield();
+            }
+            if (grow && view.opening) return;
+            Apply(grow ? 1f : 0f);
+        }
+        catch (OperationCanceledException) { return; }
+
+        if (grow) PlayDoorImpact(door, view.openH, primary);   // 뿌리가 박히는 충격
     }
 
     /// <summary>석문 착지 임팩트 — 먼지 VFX(모든 문) + 카메라 흔들림·봉인 사운드(대표 문 1회). 리소스 없으면 해당 요소 생략.</summary>
@@ -898,6 +997,9 @@ public class RunFlowController : MonoBehaviour
     {
         var ct = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
         if (view?.door == null) return;
+
+        // 유기물 문은 위로 솟아 열리지 않는다 — 자란 뿌리가 시들어 지면으로 잦아든다.
+        if (view.grows) { SealDoorGrowAsync(view, grow: false, primary: false).Forget(); return; }
 
         var     door      = view.door;
         Vector3 sealedPos = door.localPosition;              // 시작 = 지금 있는 자리(중간에서 이어받기)
@@ -949,18 +1051,108 @@ public class RunFlowController : MonoBehaviour
     /// <summary>봉인 석문(Gothic 석재)을 개구부 크기에 맞춰 닫힘 위치에 인스턴스화. 프리팹 없으면 null.</summary>
     private Transform SpawnSealDoor(Transform parent, float ow, float oh)
     {
-        var doorPrefab = GameRunBootstrapper.Instance?.GateSealDoorPrefab;
+        // 테마 문 우선 — 문·통로·벽이 같은 팔레트에서 나와야 컨셉이 어긋나지 않는다(숲 방에 고딕 석문 방지).
+        var doorPrefab = _current?.sealDoorPrefab ?? GameRunBootstrapper.Instance?.GateSealDoorPrefab;
         if (doorPrefab == null) return null;
         var door = Instantiate(doorPrefab, parent);
         door.name = "SealDoor";
         door.transform.localRotation = Quaternion.identity;
-        door.transform.localScale    = new Vector3(ow / SealDoorMeshW, oh / SealDoorMeshH, 1f);
-        // 코너 피벗(0..W,0..H) → 개구부 중앙 정렬(게이트 원점 = 개구부 중앙)
-        door.transform.localPosition = new Vector3(-ow * 0.5f, -oh * 0.5f, -0.25f);
+        door.transform.localScale    = Vector3.one;
+
+        // 프리팹마다 메시 치수·피벗이 달라 상수(7×11.5)로는 테마 문을 못 맞춘다.
+        // 실제 렌더러 바운즈를 재서 개구부에 맞추면 어떤 자산을 꽂아도 정확히 들어찬다.
+        bool measured = TryMeasureLocalBounds(door, out var b);
+        if (measured)
+        {
+            float sx = ow / Mathf.Max(0.01f, b.size.x);
+            float sy = oh / Mathf.Max(0.01f, b.size.y);
+            door.transform.localScale = new Vector3(sx, sy, 1f);
+            // 바운즈 중심을 개구부 중앙(게이트 원점)에 맞춘다 — 피벗이 코너든 중앙이든 무관.
+            // 게이트 원점은 개구부 '중앙'이므로, 바닥은 로컬 y = -oh/2 지점이다.
+            door.transform.localPosition = new Vector3(-b.center.x * sx, -b.center.y * sy, -0.25f);
+        }
+        else
+        {
+            // 렌더러가 없는 특수 프리팹 — 기존 규약(코너 피벗 7×11.5)으로 폴백.
+            door.transform.localScale    = new Vector3(ow / SealDoorMeshW, oh / SealDoorMeshH, 1f);
+            door.transform.localPosition = new Vector3(-ow * 0.5f, -oh * 0.5f, -0.25f);
+        }
+
         SetLayerRecursive(door, 8); // Wall 레이어
         // 문 메시의 콜라이더(MeshCollider 등)는 불필요 — 게이트 blocker가 통과 차단 담당. 제거로 인스턴스화·물리 비용 절감.
         foreach (var col in door.GetComponentsInChildren<Collider>()) Destroy(col);
+        AddOcclusionProxyCollider(door, measured, b);
         return door.transform;
+    }
+
+    /// <summary>
+    /// 봉인 석문에 개구부 크기 BoxCollider 1개를 남긴다 — <b>카메라 가림 페이드용 프록시</b>.
+    ///
+    /// <see cref="CameraOcclusionFader"/>는 카메라→플레이어 SphereCast로 <b>콜라이더</b>를 맞춘 뒤
+    /// 그 자식 렌더러를 반투명화한다. 위에서 메시 콜라이더를 전부 지우면 문은 Wall 레이어인데도
+    /// 캐스트에 걸리지 않아, 플레이어 뒤에서 내려온 입구 석문이 불투명한 채로 시야를 덮어버린다.
+    /// 프록시는 문과 함께 움직이므로 문이 열려(위로 올라가) 있는 동안은 자동으로 대상에서 빠진다.
+    /// (트리거로 두면 안 된다 — 페이더의 캐스트가 QueryTriggerInteraction.Ignore다.)
+    /// </summary>
+    private static void AddOcclusionProxyCollider(GameObject door, bool measured, Bounds local)
+    {
+        var proxy = door.AddComponent<BoxCollider>();
+        if (measured)
+        {
+            // ⚠️ 두께에 메시 Z 깊이를 쓰면 안 된다. 뿌리·덤불처럼 두꺼운 문(SM_roots_*)은 Z가 몇 미터라
+            //    솔리드 콜라이더가 문 앞뒤로 튀어나와 <b>플레이어가 문에 끼인다</b>(Wall 레이어라 충돌함).
+            //    가림 판정은 문 평면을 막기만 하면 되므로 항상 얇게, 문 평면(z=0)에 둔다.
+            proxy.center = new Vector3(local.center.x, local.center.y, 0f);
+            proxy.size   = new Vector3(local.size.x, local.size.y, MinDoorProxyThickness);
+        }
+        else
+        {
+            // 폴백 규약(코너 피벗 7×11.5) — 스케일 전 로컬 치수로 잡으면 스케일이 개구부에 맞춰준다.
+            proxy.center = new Vector3(SealDoorMeshW * 0.5f, SealDoorMeshH * 0.5f, 0f);
+            proxy.size   = new Vector3(SealDoorMeshW, SealDoorMeshH, MinDoorProxyThickness);
+        }
+    }
+
+    /// <summary>문 프록시 콜라이더의 최소 두께(로컬). 판형 메시라도 SphereCast에 안정적으로 걸리게.</summary>
+    private const float MinDoorProxyThickness = 0.2f;
+
+    /// <summary>
+    /// 인스턴스의 렌더러 바운즈를 <b>자기 로컬 공간</b>에서 합산한다(스케일 1 상태에서 호출).
+    /// 문 프리팹마다 메시 크기·피벗이 제각각이라, 상수 대신 이 값으로 개구부에 맞춘다.
+    /// </summary>
+    private static bool TryMeasureLocalBounds(GameObject go, out Bounds local)
+    {
+        local = default;
+        var rends = go.GetComponentsInChildren<Renderer>(true);
+        if (rends.Length == 0) return false;
+
+        bool has = false;
+        var root = go.transform;
+        for (int i = 0; i < rends.Length; i++)
+        {
+            var mf = rends[i].GetComponent<MeshFilter>();
+            var mesh = mf != null ? mf.sharedMesh : null;
+            if (mesh == null) continue;
+
+            // 메시 바운즈의 8개 꼭짓점을 루트 로컬로 옮겨 감싼다.
+            // ⚠️ extents에 스케일 벡터를 곱하는 방식은 자식이 회전돼 있으면(FBX 임포트에서 흔하다) 축이 섞여
+            //    치수가 어긋난다 — 문이 엉뚱한 크기·위치로 앉는 원인. 꼭짓점 변환은 회전에 무관하게 정확하다.
+            var mb = mesh.bounds;
+            var t  = rends[i].transform;
+            var c  = mb.center;
+            var e  = mb.extents;
+
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                var corner = c + new Vector3(e.x * sx, e.y * sy, e.z * sz);
+                var p      = root.InverseTransformPoint(t.TransformPoint(corner));
+                if (!has) { local = new Bounds(p, Vector3.zero); has = true; }
+                else        local.Encapsulate(p);
+            }
+        }
+        return has && local.size.x > 0.01f && local.size.y > 0.01f;
     }
 
     private static void SetLayerRecursive(GameObject go, int layer)
@@ -1012,6 +1204,7 @@ public class RunFlowController : MonoBehaviour
     private static float MarkerW(ProcExitSlot slot) => slot.openingWidth  > 0.01f ? slot.openingWidth  : 4f;
     private static float MarkerH(ProcExitSlot slot) => slot.openingHeight > 0.01f ? slot.openingHeight : 3f;
 
+
     /// <summary>문 엣지 → 전환 와이프 스크린 방향. 직진=위 / 우턴=오른쪽 / 좌턴=왼쪽.</summary>
     private static Vector2 WipeDir(DoorEdge edge) => edge switch
     {
@@ -1049,7 +1242,6 @@ public class RunFlowController : MonoBehaviour
     {
         var ct  = _cts != null ? _cts.Token : this.GetCancellationTokenOnDestroy();
         var rend = view.marker;
-        Color to = KindColor(plan.kind);
 
         // 봉인 석문이 위로 올라가며 열림 → 그 뒤 포탈이 드러난다. + 열림 사운드.
         if (view.door != null)
@@ -1059,44 +1251,32 @@ public class RunFlowController : MonoBehaviour
             Managers.Sound?.PlayEvent(SoundEvent.DoorOpen);
         }
 
-        // 포탈 VFX 활성화 — "문이 열린다" 연출. 포탈이 있으면 레거시 색 슬래브(불투명 큐브)를 숨겨 포탈로 대체.
-        if (view.portal != null)
-        {
-            view.portal.SetActive(true);
-            if (rend != null) rend.enabled = false; // 보라 사각형 제거 → 포탈이 개구부를 채움
-        }
+        if (view.portal != null) view.portal.SetActive(true);   // 포탈 프리팹이 배선된 경우에만(현재 미사용)
+
+        // (통로는 방 빌드 시 MapBuilder.BuildDoorCorridor가 팔레트 블록으로 이미 깔아둔다 — 여기서 만들지 않는다.)
 
         // 다음 방 정보 라벨 — 봉인 중엔 없다가 공개와 함께 페이드인
         TextMeshProUGUI label = (rend != null) ? CreateGateLabel(rend.transform.parent, plan.kind, rend.transform.localScale.y) : null;
 
-        if (rend != null)
+        // ⚠️ 예전엔 여기서 marker 머티리얼의 색/발광을 애니메이션했는데, marker는 생성 시점에
+        //    enabled=false로 꺼져 있어(석문이 시각 담당) <b>화면에 아무것도 나타나지 않았다</b> —
+        //    라벨만 떠 있는 것처럼 보인 원인. 이제 연출은 석문 상승 + 통로가 담당하고, 여기선 라벨만 페이드인한다.
+        if (label != null)
         {
-            var mat = rend.material;
-            mat.EnableKeyword("_EMISSION");
-            Color from = mat.color;
             float dur = Mathf.Max(0.01f, _gateRevealDuration);
             try
             {
                 float t = 0f;
                 while (t < dur)
                 {
-                    if (rend == null) break;
+                    if (label == null) break;
                     ct.ThrowIfCancellationRequested();
                     t += Time.deltaTime;
-                    float k    = Mathf.Clamp01(t / dur);
-                    float glow = Mathf.Sin(k * Mathf.PI); // 0→1→0 펄스
-                    mat.color = Color.Lerp(from, to, k);
-                    mat.SetColor("_EmissionColor", to * (glow * _gateGlowIntensity));
-                    if (label != null) { var lc = label.color; lc.a = k; label.color = lc; }
+                    var lc = label.color; lc.a = Mathf.Clamp01(t / dur); label.color = lc;
                     await UniTask.Yield();
                 }
             }
             catch (OperationCanceledException) { return; }
-            if (rend != null)
-            {
-                rend.material.color = to;
-                rend.material.SetColor("_EmissionColor", to * 0.4f); // 잔광
-            }
             if (label != null) { var lc = label.color; lc.a = 1f; label.color = lc; }
         }
 
@@ -1117,11 +1297,13 @@ public class RunFlowController : MonoBehaviour
         if (Camera.main != null) go.transform.rotation = Camera.main.transform.rotation; // 카메라 향해 빌보드(1회)
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta  = new Vector2(360f, 110f);
+        rt.sizeDelta  = new Vector2(420f, 150f);
         rt.localScale = Vector3.one * 0.02f;
 
         var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text      = KindGlyph(kind) + " " + KindKor(kind);
+        // 2행 — 종류 + 그 방에서 얻는 것. 게이트 앞에서 바로 판단할 수 있게 한다.
+        tmp.text      = KindGlyph(kind) + " " + KindKor(kind)
+                        + "\n<size=55%><color=#BEC6D6>" + KindSubtitle(kind) + "</color></size>";
         tmp.fontSize  = 62f;
         tmp.fontStyle = FontStyles.Bold;
         tmp.alignment = TextAlignmentOptions.Center;
@@ -1154,9 +1336,39 @@ public class RunFlowController : MonoBehaviour
         RoomPlanKind.Elite    => "◆",
         RoomPlanKind.Shop     => "■",
         RoomPlanKind.Event    => "◇",
-        RoomPlanKind.Crucible => "●",
-        RoomPlanKind.Refinery => "◈",
-        _                     => "▪",
+        // ⚠️ ● ◈ ▪ 는 DNFForgedBlade TTF에 없어 □로 깨진다(폰트 화이트리스트: · × — … ← ↑ → ↓ ↗ ↘ ■ □ ▲ ▶ ▼ ◀ ◆ ◇).
+        RoomPlanKind.Crucible => "▼",
+        RoomPlanKind.Refinery => "◀",
+        _                     => "·",
+    };
+
+    /// <summary>문 프리뷰 2행 — "그 방에서 무엇을 얻는가". 이동을 결정으로 만드는 정보.
+    /// 전투방은 보상 등급·후보 수(RoomRewardTable 실값), 서비스방은 기능을 적는다.</summary>
+    private static string KindSubtitle(RoomPlanKind kind)
+    {
+        switch (kind)
+        {
+            case RoomPlanKind.Shop:     return "물건 구매";
+            case RoomPlanKind.Crucible: return "무기 강화 · 승급";
+            case RoomPlanKind.Refinery: return "룬 정제";
+            case RoomPlanKind.Event:    return "시험 · 선택";
+            case RoomPlanKind.Boss:     return "결전";
+            case RoomPlanKind.PreBoss:  return "보스 직전";
+        }
+
+        var rule  = RoomRewardTable.For(kind);
+        string floor = rule.RarityFloor.HasValue ? RarityKor(rule.RarityFloor.Value) + " 이상" : "보상";
+        return rule.EnhanceMaterial > 0
+            ? $"{floor} · 후보 {rule.ChoiceCount} · 강화재료 {rule.EnhanceMaterial}"
+            : $"{floor} · 후보 {rule.ChoiceCount}";
+    }
+
+    private static string RarityKor(ItemRarity r) => r switch
+    {
+        ItemRarity.Rare      => "희귀",
+        ItemRarity.Epic      => "영웅",
+        ItemRarity.Legendary => "전설",
+        _                    => "일반",
     };
 
     /// <summary>방 종류 → 표시용 한글 라벨.</summary>
@@ -1249,6 +1461,17 @@ public class RunFlowController : MonoBehaviour
     }
 
     private void Awake() => Active = this;
+
+    /// <summary>
+    /// 앱 종료(ESC 메뉴 "게임 종료" / Alt+F4 / 에디터 정지) 직전 현재 상태를 저장한다.
+    ///
+    /// 저장은 방 경계 + 상점/재련소/서약 확정에서만 일어나므로, 그 뒤에 바뀐 것들
+    /// (룬 보드 배치, 정제 결과, 클리어 보상, 무기 강화)이 종료 시 통째로 날아갔다.
+    /// SaveRunLocal은 라이브 세션에서 무기 슬롯·룬 셀을 다시 캡처하므로 여기 한 번이면 전부 잡힌다.
+    ///
+    /// ※ "로비로 가기"는 여기 오지 않는다 — 그 경로는 EndRun()으로 세이브를 의도적으로 폐기한다(런 포기).
+    /// </summary>
+    private void OnApplicationQuit() => SaveNow("app-quit");
 
     private void OnDestroy()
     {
