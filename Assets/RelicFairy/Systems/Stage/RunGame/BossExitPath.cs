@@ -12,9 +12,9 @@ using UnityEngine;
 /// 길 끝에는 기존 ChapterGate를 그대로 세워 전환 판정을 재사용한다(전환 로직 무수정).
 ///
 /// 출구 방향 결정 순서:
-///   1) 프리팹의 Exit 마커(이름이 "Exit"로 시작하는 자식) — 커스텀 아레나 규약과 동일
-///   2) 폴백: PlayerSpawn 반대 방향(= 보스 뒤편)으로 바닥 경계까지 전진
-/// 마커가 없어도 Ch1·Ch2·Ch4처럼 '남쪽 입구 → 북쪽 보스' 구조면 폴백만으로 올바르게 잡힌다.
+///   1) Next_Ch 마커(이름이 "Next_Ch"로 시작) — roomCenter 기준으로 exitPos 산출, 경로·게이트 위치 자동 계산
+///   2) Exit 마커(이름이 "Exit"로 시작) — 마커 위치에서 forward 방향으로 PathLength 연장
+///   3) 폴백: PlayerSpawn 반대 방향(= 보스 뒤편)으로 바닥 경계까지 전진
 /// </summary>
 public sealed class BossExitPath : MonoBehaviour
 {
@@ -41,62 +41,120 @@ public sealed class BossExitPath : MonoBehaviour
     /// <summary>
     /// 보스방 클리어 시 호출. 아레나에서 출구 방향을 산출해 길을 깔고 끝에 챕터 게이트를 세운다.
     /// arena가 null이면(격자 폴백 방) 기존 동작대로 roomCenter에 게이트만 세운다.
+    /// 반환값: 실제 출구 월드 위치(카메라 연출 등에 사용). 폴백 시 roomCenter 반환.
     /// </summary>
-    public static void Spawn(Vector3 roomCenter, Transform arena, CorridorStyleSO style)
+    public static Vector3 Spawn(Vector3 roomCenter, Transform arena, CorridorStyleSO style)
     {
         if (arena == null)
         {
             // 커스텀 아레나가 아닌 방 — 길을 깔 기준 형상이 없다. 기존 게이트로 폴백.
             Debug.Log("[BossExitPath] 아레나 없음 — 챕터 게이트만 스폰(폴백)");
             ChapterGate.Spawn(roomCenter);
-            return;
+            return roomCenter;
         }
 
         var go = new GameObject("@BossExitPath");
         go.transform.position = roomCenter;
-        go.AddComponent<BossExitPath>().Build(roomCenter, arena, style);
+        return go.AddComponent<BossExitPath>().Build(roomCenter, arena, style);
     }
 
     // ── Private Methods ────────────────────────────────────────
 
-    private void Build(Vector3 roomCenter, Transform arena, CorridorStyleSO style)
+    private Vector3 Build(Vector3 roomCenter, Transform arena, CorridorStyleSO style)
     {
-        if (!ResolveExit(roomCenter, arena, out Vector3 exitPos, out Vector3 dir))
+        if (!ResolveExit(roomCenter, arena, out Vector3 exitPos, out Vector3 dir, out Transform exitMarker, out float dynamicPathLen, out Vector3 wallPos))
         {
             Debug.LogWarning("[BossExitPath] 출구 방향 산출 실패 — 챕터 게이트만 스폰(폴백)");
             ChapterGate.Spawn(roomCenter);
-            return;
+            return roomCenter;
         }
 
         // 출구 Y를 실제 걷는 바닥 표면으로 스냅한다.
-        // Exit 마커가 기둥(SM_PROXY_Tower 등) 피벗에 붙으면 그 Y가 바닥 밑동일 수 있고(Ch2 사례),
-        // 그대로 쓰면 길이 걷는 바닥 아래로 깔려 넘어갈 수 없다. 길은 항상 지면 복도이므로
-        // 출구 지점에서 Ground를 내리쏴 실제 표면 Y로 맞춘다(못 찾으면 원래 Y 유지 — 회귀 0).
-        exitPos.y = SnapToGroundY(exitPos);
+        exitPos.y  = SnapToGroundY(exitPos, arena);
+        wallPos.y  = exitPos.y; // 벽 개방 위치도 동일한 바닥 Y로 보정
 
-        OpenWallAt(exitPos, dir, arena);
+        // BossExitMarker에 등록된 이름 기반 벽 먼저 제거, 그 다음 물리 감지 벽 제거
+        DeactivateMarkerWalls(exitMarker);
+        OpenWallAt(wallPos, dir, arena);
 
+        float pathLen = dynamicPathLen > 0f ? dynamicPathLen : PathLength;
         Material tileMat = style?.floorTilePrefab != null ? null : SampleFloorMaterial(arena);
-        BuildPathAsync(exitPos, dir, style, tileMat, this.GetCancellationTokenOnDestroy()).Forget();
+        BuildPathAsync(exitPos, dir, pathLen, style, tileMat, this.GetCancellationTokenOnDestroy()).Forget();
+
+        // 게이트 위치를 반환 — 카메라 연출이 포탈 정면을 비추도록 path 끝점을 넘긴다.
+        return exitPos + dir * pathLen;
+    }
+
+    /// <summary>BossExitMarker에 등록된 벽 오브젝트를 비활성화한다.</summary>
+    private static void DeactivateMarkerWalls(Transform marker)
+    {
+        if (marker == null) { Debug.LogWarning("[BossExitPath] DeactivateMarkerWalls: exitMarker null"); return; }
+        if (!marker.TryGetComponent<BossExitMarker>(out var bossMarker)) { Debug.LogWarning($"[BossExitPath] DeactivateMarkerWalls: '{marker.name}'에 BossExitMarker 없음"); return; }
+        var walls = bossMarker.WallsToHide;
+        int count = 0;
+        for (int i = 0; i < walls.Length; i++)
+        {
+            if (walls[i] == null) continue;
+            walls[i].SetActive(false);
+            count++;
+        }
+        if (count > 0) Debug.Log($"[BossExitPath] 마커 벽 {count}개 비활성화");
     }
 
     /// <summary>
-    /// 출구 지점과 방향을 정한다. Exit 마커 우선, 없으면 PlayerSpawn 반대편 바닥 경계.
+    /// 출구 지점과 방향을 정한다. Next_Ch 마커 우선, 없으면 Exit 마커, 없으면 PlayerSpawn 반대편 바닥 경계.
+    /// exitMarker: 찾은 마커 Transform (없으면 null — BossExitMarker 조회에 사용).
+    /// dynamicPathLen: Next_Ch 마커 시 자동 산출된 경로 길이(0=상수 PathLength 사용).
+    /// wallPos: 벽을 개방할 기준 위치(항상 출구 마커 위치 — exitPos와 다를 수 있다).
     /// </summary>
-    private bool ResolveExit(Vector3 roomCenter, Transform arena, out Vector3 exitPos, out Vector3 dir)
+    private bool ResolveExit(Vector3 roomCenter, Transform arena,
+        out Vector3 exitPos, out Vector3 dir, out Transform exitMarker,
+        out float dynamicPathLen, out Vector3 wallPos)
     {
-        exitPos = roomCenter;
-        dir     = Vector3.forward;
+        exitPos        = roomCenter;
+        dir            = Vector3.forward;
+        exitMarker     = null;
+        dynamicPathLen = 0f;
+        wallPos        = roomCenter;
 
-        // 1) Exit 마커 — 커스텀 아레나 규약(GameRunBootstrapper.CollectArenaExitSlots와 동일)
+        // 1) 전체 스캔 — Next_Ch 우선, Exit 폴백 (순서가 달라도 Next_Ch가 항상 이긴다)
         var all = arena.GetComponentsInChildren<Transform>(true);
+        Transform nextChT = null, exitT = null;
         for (int i = 0; i < all.Length; i++)
         {
             var t = all[i];
-            if (t == arena || !t.name.StartsWith("Exit", StringComparison.OrdinalIgnoreCase)) continue;
+            if (t == arena) continue;
+            if (nextChT == null && t.name.StartsWith("Next_Ch", StringComparison.OrdinalIgnoreCase))
+                nextChT = t;
+            if (exitT == null && t.name.StartsWith("Exit", StringComparison.OrdinalIgnoreCase))
+                exitT = t;
+            if (nextChT != null && exitT != null) break;
+        }
 
-            exitPos = t.position;
-            dir     = Flatten(t.forward);
+        var chosen = nextChT ?? exitT;
+        if (chosen != null)
+        {
+            exitMarker = chosen;
+            wallPos    = chosen.position;
+
+            if (nextChT != null)
+            {
+                // Next_Ch 마커: 마커 위치에서 경로를 시작해 19m 연장한다.
+                var spawn2 = arena.Find("PlayerSpawn");
+                if (spawn2 != null)
+                    dir = Flatten(nextChT.position - spawn2.position);
+                else
+                    dir = Flatten(nextChT.forward);
+                exitPos        = nextChT.position;
+                dynamicPathLen = 19f;
+            }
+            else
+            {
+                // Exit 마커: 마커 위치에서 시작, 회전으로 방향 명시.
+                exitPos = exitT.position;
+                dir     = Flatten(exitT.forward);
+            }
+
             return dir.sqrMagnitude > 0.01f;
         }
 
@@ -113,18 +171,30 @@ public sealed class BossExitPath : MonoBehaviour
 
         // 바닥 경계까지 전진해 벽 위치를 출구로 삼는다.
         exitPos = ProjectToFloorEdge(arena, roomCenter, dir);
+        wallPos = exitPos;
         return true;
     }
 
-    /// <summary>출구 XZ에서 Ground 레이어를 내리쏴 걷는 바닥 표면 Y를 구한다. 못 맞히면 원래 Y 유지.</summary>
-    private static float SnapToGroundY(Vector3 exitPos)
+    /// <summary>출구 XZ에서 Ground 레이어를 내리쏴 걷는 바닥 표면 Y를 구한다.
+    /// 마커 Y가 바닥 아래일 수 있어(Ch2 사례) 충분히 높은 지점에서 쏜다.
+    /// 레이캐스트 실패(아레나 외부엔 아직 Ground 없음) 시 arena Floor 렌더러 상단을 폴백으로 쓴다.</summary>
+    private static float SnapToGroundY(Vector3 exitPos, Transform arena)
     {
         int mask = 1 << GroundLayer;
-        var origin = exitPos + Vector3.up * 10f;
-        // 바닥이 트리거일 수도 있어(예: 일부 아레나 Floor) Collide로 강제 검사.
-        return Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Collide)
-            ? hit.point.y
-            : exitPos.y;
+        // 마커가 바닥 아래에 있어도 반드시 위에서 쏘도록 +100 오프셋
+        var origin = new Vector3(exitPos.x, exitPos.y + 100f, exitPos.z);
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 200f, mask, QueryTriggerInteraction.Collide))
+            return hit.point.y;
+
+        // 아레나 외부엔 아직 Ground 콜라이더가 없어 실패하는 경우 — Floor 렌더러 상단을 폴백으로 사용
+        if (arena != null)
+        {
+            var floor = FindFloor(arena);
+            var rend  = floor?.GetComponent<Renderer>();
+            if (rend != null) return rend.bounds.max.y;
+        }
+
+        return exitPos.y;
     }
 
     /// <summary>아레나 바닥 렌더러 경계에서 dir 방향 끝점을 구한다. 바닥을 못 찾으면 방 중앙에서 고정 거리.</summary>
@@ -169,7 +239,7 @@ public sealed class BossExitPath : MonoBehaviour
         {
             var t = hits[i].transform;
             if (!t.IsChildOf(arena)) continue;                 // 아레나 밖 오브젝트는 건드리지 않는다
-            if (t.name.StartsWith("Floor", StringComparison.OrdinalIgnoreCase)) continue;
+            if (t.name.IndexOf("Floor", StringComparison.OrdinalIgnoreCase) >= 0) continue;
             if (t.GetComponentInParent<PlayerController>() != null) continue;
 
             t.gameObject.SetActive(false);
@@ -190,10 +260,10 @@ public sealed class BossExitPath : MonoBehaviour
 
     /// <summary>길을 한 행씩 깔며 드러낸다 — 출구에서 바깥으로 뻗어나가는 연출.</summary>
     private async UniTaskVoid BuildPathAsync(
-        Vector3 exitPos, Vector3 dir, CorridorStyleSO style, Material fallbackMat, CancellationToken ct)
+        Vector3 exitPos, Vector3 dir, float pathLength, CorridorStyleSO style, Material fallbackMat, CancellationToken ct)
     {
         var right = Vector3.Cross(Vector3.up, dir).normalized;
-        int rows   = Mathf.CeilToInt(PathLength / TileSize);
+        int rows   = Mathf.CeilToInt(pathLength / TileSize);
         int half   = PathWidth / 2;
         var rot    = Quaternion.LookRotation(dir);
 
@@ -212,10 +282,10 @@ public sealed class BossExitPath : MonoBehaviour
 
                 SpawnEdgeDeco(rowCenter, right, half, i, style);
 
-                await UniTask.Delay(TimeSpan.FromSeconds(RevealStep), cancellationToken: ct);
+                await UniTask.Delay(TimeSpan.FromSeconds(RevealStep), ignoreTimeScale: true, cancellationToken: ct);
             }
 
-            PlaceGateAtEnd(exitPos + dir * PathLength, dir);
+            PlaceGateAtEnd(exitPos + dir * pathLength, dir);
         }
         catch (OperationCanceledException)
         {
@@ -277,7 +347,7 @@ public sealed class BossExitPath : MonoBehaviour
             {
                 if (tile == null) return;
                 ct.ThrowIfCancellationRequested();
-                t += Time.deltaTime;
+                t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / TileRiseTime);
                 tile.position = Vector3.Lerp(from, to, 1f - (1f - k) * (1f - k)); // ease-out
                 await UniTask.Yield();

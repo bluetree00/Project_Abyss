@@ -1,5 +1,6 @@
 using UnityEngine;
 using RelicFairy.Monster;
+using System.Collections.Generic;
 
 /// <summary>
 /// Ch2 드래곤 보스 아레나 사망 후처리.
@@ -75,9 +76,18 @@ public class DragonBossArenaController : MonoBehaviour
         if (_proxyTower9 != null)
             _proxyTower9.SetActive(false);
 
-        if (_floorRenderers == null || _savedFloorMats == null) return;
-        for (int i = 0; i < _floorRenderers.Length; i++)
-            if (_floorRenderers[i] != null && _savedFloorMats[i] != null)
-                _floorRenderers[i].sharedMaterials = _savedFloorMats[i];
+        if (_floorRenderers != null && _savedFloorMats != null)
+            for (int i = 0; i < _floorRenderers.Length; i++)
+                if (_floorRenderers[i] != null && _savedFloorMats[i] != null)
+                    _floorRenderers[i].sharedMaterials = _savedFloorMats[i];
+
+        KillRemainingMiniDragons();
+    }
+
+    private static void KillRemainingMiniDragons()
+    {
+        var minis = new List<DragonMiniDragon>(Object.FindObjectsByType<DragonMiniDragon>(FindObjectsSortMode.None));
+        foreach (var mini in minis)
+            mini.ForceKill();
     }
 }

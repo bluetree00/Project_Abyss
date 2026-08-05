@@ -18,9 +18,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   stat:
-    maxHp: 15000
-    defense: 20
-    attackPower: 200
+    maxHp: 30000
+    defense: 60
+    attackPower: 300
     moveSpeed: 7
     nativeElement: -1
     attackRange: 4
@@ -85,8 +85,8 @@ MonoBehaviour:
     coinValue: 1
   specialStates: []
   stateOverrides: []
-  patternBreakDurationMin: 0.7
-  patternBreakDurationMax: 1
+  patternBreakDurationMin: 0.3
+  patternBreakDurationMax: 0.6
   patternRepeatPenaltyDuration: 20
   patternRepeatPenaltyMult: 0.1
   condPhase2HpThreshold: 0.5

@@ -150,6 +150,16 @@ public sealed class DragonMiniDragon : MonoBehaviour, IDamageable, IKillable
         }
     }
 
+    /// <summary>보스 사망 시 소환수를 즉시 처리한다. 사망 애니메이션 없이 OnDied만 발행하고 오브젝트를 파괴.</summary>
+    public void ForceKill()
+    {
+        if (IsDead) return;
+        IsDead = true;
+        if (_agent != null) _agent.enabled = false;
+        OnDied?.Invoke(this);
+        Destroy(gameObject);
+    }
+
     // ── IDamageable ──────────────────────────────────────────────────────────
 
     public void TakeDamage(float amount, GameObject instigator, float knockbackMultiplier = 1f, bool isCrit = false)

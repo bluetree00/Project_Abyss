@@ -15,4 +15,5 @@
 Assets/RelicFairy/Characters/Monster/Monster/DragonBoss/Prefab/DragonBoss.prefab filter=lfs diff=lfs merge=lfs -text
 Assets/RelicFairy/Characters/Monster/Monster/ForestGuardian/Prefab/ForestGuardian.prefab filter=lfs diff=lfs merge=lfs -text
 Assets/RelicFairy/Systems/Stage/MapGen/Prefabs/Arena_Boss_*.prefab filter=lfs diff=lfs merge=lfs -text
+Assets/RelicFairy/Systems/Stage/MapGen/Prefabs/Road_Boss_*.prefab filter=lfs diff=lfs merge=lfs -text
 *.exr  filter=lfs diff=lfs merge=lfs -text

@@ -234,7 +234,9 @@ public sealed class BossPooledEffect : MonoBehaviour
 {
     public GameObject SourcePrefab { get; set; }
 
-    private Coroutine _releaseRoutine;
+    private Coroutine     _releaseRoutine;
+    private TrailRenderer[]  _cachedTrails;
+    private ParticleSystem[] _cachedParticles;
 
     public void ScheduleRelease(float delay)
     {
@@ -256,10 +258,13 @@ public sealed class BossPooledEffect : MonoBehaviour
 
     public void ResetVisuals()
     {
-        foreach (var trail in GetComponentsInChildren<TrailRenderer>(true))
+        _cachedTrails    ??= GetComponentsInChildren<TrailRenderer>(true);
+        _cachedParticles ??= GetComponentsInChildren<ParticleSystem>(true);
+
+        foreach (var trail in _cachedTrails)
             trail.Clear();
 
-        foreach (var particle in GetComponentsInChildren<ParticleSystem>(true))
+        foreach (var particle in _cachedParticles)
         {
             particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             particle.Play(true);
@@ -276,6 +281,97 @@ public sealed class BossPooledEffect : MonoBehaviour
     private void OnDisable()
     {
         CancelScheduledRelease();
+    }
+}
+
+public static class QuadTilePool
+{
+    private static readonly Queue<(GameObject go, MeshRenderer mr, Material mat)> _pool = new();
+    private static Shader    _shader;
+    private static Mesh      _quadMesh;
+    private static Transform _container;
+
+    private static Shader GetShader()
+    {
+        if (_shader == null)
+            _shader = Shader.Find("Sprites/Default")
+                   ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        return _shader;
+    }
+
+    private static Mesh GetQuadMesh()
+    {
+        if (_quadMesh != null) return _quadMesh;
+        var temp = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        _quadMesh = temp.GetComponent<MeshFilter>().sharedMesh;
+        Object.Destroy(temp);
+        return _quadMesh;
+    }
+
+    private static void EnsureContainer()
+    {
+        if (_container != null) return;
+        var existing = GameObject.Find("@QuadTilePool");
+        if (existing == null)
+        {
+            existing = new GameObject("@QuadTilePool");
+            Object.DontDestroyOnLoad(existing);
+        }
+        _container = existing.transform;
+    }
+
+    /// <summary>전투 전 초기화 시점에 호출해 풀을 사전 생성한다. 전투 중 첫 Rent 시 렉 방지.</summary>
+    public static void Prewarm(int count)
+    {
+        EnsureContainer();
+        // 이전 씬 리로드로 파괴된 null 항목 정리 후 유효 항목만 남김
+        int existing = _pool.Count;
+        int validCount = 0;
+        for (int i = 0; i < existing; i++)
+        {
+            var item = _pool.Dequeue();
+            if (item.go != null) { _pool.Enqueue(item); validCount++; }
+        }
+        for (int i = validCount; i < count; i++)
+            _pool.Enqueue(CreateNew());
+    }
+
+    public static (GameObject go, MeshRenderer mr, Material mat) Rent()
+    {
+        while (_pool.Count > 0)
+        {
+            var item = _pool.Dequeue();
+            if (item.go != null) { item.mr.enabled = true; return item; }
+        }
+        var newItem = CreateNew();
+        newItem.mr.enabled = true;
+        return newItem;
+    }
+
+    private static (GameObject go, MeshRenderer mr, Material mat) CreateNew()
+    {
+        EnsureContainer();
+        var go = new GameObject("PooledQuad");
+        go.transform.SetParent(_container, false);
+        var mf = go.AddComponent<MeshFilter>();
+        mf.sharedMesh = GetQuadMesh();
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+        mr.enabled           = false; // 풀 대기 상태 — Rent 시 enabled=true로 전환
+        var mat = new Material(GetShader());
+        mr.sharedMaterial    = mat;
+        return (go, mr, mat);
+    }
+
+    public static void Return(GameObject go, MeshRenderer mr, Material ownedMat)
+    {
+        if (go == null) return;
+        go.name = "PooledQuad";
+        if (_container != null) go.transform.SetParent(_container, false);
+        if (mr != null) { mr.sharedMaterial = ownedMat; mr.enabled = false; }
+        if (ownedMat != null) ownedMat.color = Color.clear;
+        _pool.Enqueue((go, mr, ownedMat));
     }
 }
 }

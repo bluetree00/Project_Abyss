@@ -26,6 +26,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
     [SerializeField] private float _swingSfxDelay    = 0.3f;
     [SerializeField] private float _attackRadius     = 2.5f;
     [SerializeField] private int   _attackDamage     = 20;
+    [SerializeField] private float _damageMultiplier = 1.5f;
 
     [Header("Effect")]
     [Tooltip("Marker 7 Danger zone prefab for attack warning")]
@@ -53,6 +54,7 @@ public class DragonClawSlashPatternSO : BossPatternSO
     public float       SwingSfxDelay    => _swingSfxDelay;
     public float       AttackRadius     => _attackRadius;
     public int         AttackDamage     => _attackDamage;
+    public float       DamageMultiplier => _damageMultiplier;
     public GameObject  DangerZonePrefab => _dangerZonePrefab;
     public AudioClip    ClawSfx          => _clawSfx;
     public float       EndPoseDuration  => _endPoseDuration;
@@ -134,8 +136,6 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
         PlayAnim(ctx, Data.JumpUpStateName);
 
-        var bb = GetBlackboard(ctx);
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
     }
 
     public override void Update(MonsterContext ctx)
@@ -152,6 +152,8 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
 
     public override void Exit(MonsterContext ctx)
     {
+        if (GetBlackboard(ctx) is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
         _clawTrail?.StopAll();
         if (ctx.Agent == null) return;
         DragonPatternFloorUtils.EnsureAgentOnNavMesh(ctx);
@@ -268,7 +270,7 @@ internal sealed class DragonClawSlashState : FullLockState<DragonClawSlashPatter
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Data.AttackDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             break;
         }
     }

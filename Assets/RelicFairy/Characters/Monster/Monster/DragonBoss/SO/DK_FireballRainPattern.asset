@@ -38,7 +38,7 @@ MonoBehaviour:
   _fireballScale: 1
   _explosionPrefab: {fileID: 0}
   _explosionScale: 1
-  _impactDelay: 1.2
+  _impactDelay: 0.6
   _meteorHitDuration: 2.5
   _rainSfx: {fileID: 8300000, guid: a06387a0fba4b4143ad732379a923964, type: 3}
   _fireRainSfx: {fileID: 8300000, guid: a98dd6a28c0bc404da33ae613be45ae0, type: 3}

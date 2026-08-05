@@ -21,7 +21,7 @@ MonoBehaviour:
   stat:
     maxHp: 100
     defense: 3
-    attackPower: 12
+    attackPower: 36
     moveSpeed: 2
     attackRange: 1.8
     attackRadius: 1.8

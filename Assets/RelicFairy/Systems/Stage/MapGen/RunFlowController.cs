@@ -513,7 +513,10 @@ public class RunFlowController : MonoBehaviour
         // 봉인/게이트가 서고 나서야 조작 복원 — 리빌·대사 창 동안 출구로 못 나가게 잠갔던 것을 푼다.
         SetPlayerInput(true);
 
-        if (restoreCleared)
+        // 보스방은 하데스식 — 이어하기에서도 항상 보스 전투를 다시 시작한다.
+        // restoreCleared 단축 경로를 타면 NotifyBossRoomCleared가 즉시 발행돼
+        // 보스 트리거 없이 포탈·벽 제거가 먼저 실행되므로 제외한다.
+        if (restoreCleared && !isBossRoom)
         {
             if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out var clearedWave))
                 clearedWave.enabled = false;   // Activate() 미호출 + 비활성 → 몬스터 스폰 없음

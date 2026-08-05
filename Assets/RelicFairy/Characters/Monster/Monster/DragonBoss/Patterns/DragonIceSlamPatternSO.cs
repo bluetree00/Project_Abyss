@@ -33,6 +33,7 @@ public class DragonIceSlamPatternSO : BossPatternSO
     [Header("Slam")]
     [SerializeField] private float _flyDownSpeed = 14f;
     [SerializeField] private int _slamDamage = 40;
+    [SerializeField] private float _damageMultiplier = 1.5f;
     [SerializeField] private float _slamRadius = 7f;
     [SerializeField] private GameObject _slamEffectPrefab;
     [SerializeField] private float _slamEffectScale = 4f;
@@ -61,6 +62,7 @@ public class DragonIceSlamPatternSO : BossPatternSO
     public Color       PillarTintColor         => _pillarTintColor;
     public float       FlyDownSpeed            => _flyDownSpeed;
     public int         SlamDamage              => _slamDamage;
+    public float       DamageMultiplier        => _damageMultiplier;
     public float       SlamRadius              => _slamRadius;
     public GameObject  SlamEffectPrefab        => _slamEffectPrefab;
     public float       SlamEffectScale         => _slamEffectScale;
@@ -364,7 +366,7 @@ internal sealed class DragonIceSlamState : FullLockState<DragonIceSlamPatternSO>
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
 
-            player.TakeDamage(Data.SlamDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             Data.playerStatusEffect?.Apply(player);
             break;
         }

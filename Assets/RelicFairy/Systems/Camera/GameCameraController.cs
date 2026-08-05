@@ -1009,6 +1009,8 @@ public class GameCameraController : MonoBehaviour
         _panCts?.Cancel();
         _panCts?.Dispose();
         _panCts = new CancellationTokenSource();
+        // TopDown 해제 애니메이션이 진행 중이면 취소 — 같은 프레임에 transform을 동시 제어하면 카메라가 튀는 문제 방지
+        _topDownReturnCts?.Cancel();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(_panCts.Token, ct);
         int myVersion = System.Threading.Interlocked.Increment(ref _panVersion);
         _isPanning = true;
@@ -1053,40 +1055,19 @@ public class GameCameraController : MonoBehaviour
             // 2) 존 조망 유지
             await UniTask.Delay(TimeSpan.FromSeconds(holdDuration), cancellationToken: linked.Token);
 
-            // 3) 플레이어 위치로 복귀
-            Vector3    retStart    = transform.position;
-            Quaternion retStartRot = transform.rotation;
-            Vector3    retEnd      = playerTransform != null
-                ? playerTransform.position + _originalPosition
-                : fromPos;
-
-            for (float t = 0f; t < returnDuration; t += Time.deltaTime)
-            {
-                linked.Token.ThrowIfCancellationRequested();
-                float ease = PanEase(t / returnDuration);
-                transform.position = Vector3.Lerp(retStart, retEnd, ease);
-                transform.rotation = Quaternion.Slerp(retStartRot, _originalRotation, ease);
-                await UniTask.Yield(linked.Token);
-            }
+            // 3) 플레이어 위치로 복귀 — Cinemachine 실제 포즈로 블렌드 (스냅 없음)
+            await BlendToActiveCameraAsync(returnDuration, linked.Token);
         }
         catch (OperationCanceledException) { }
         finally
         {
-            // 마지막 팬만 Cinemachine을 원래 상태로 복원한다.
-            // 이전 팬은 새 팬이 이어받으므로 복원하지 않는다.
+            // BlendToActiveCameraAsync가 정상 경로에선 brain + _isPanning을 이미 복원.
+            // 취소·예외 시에만 보장한다.
             if (myVersion == _panVersion)
             {
                 _isPanning = false;
-                if (_brain != null)
-                {
-                    if (playerTransform != null)
-                    {
-                        transform.position = playerTransform.position + _originalPosition;
-                        transform.rotation = _originalRotation;
-                    }
-                    if (_prePanBrainEnabled) _brain.enabled = true;
-                }
                 if (_cinemachine != null && _prePanCmEnabled) _cinemachine.enabled = true;
+                if (_brain != null && _prePanBrainEnabled)    _brain.enabled       = true;
             }
         }
     }

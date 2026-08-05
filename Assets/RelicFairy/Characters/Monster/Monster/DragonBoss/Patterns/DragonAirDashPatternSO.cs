@@ -22,6 +22,7 @@ public class DragonAirDashPatternSO : BossPatternSO
     [SerializeField] private float _dashCollisionRadius = 1.1f;
     [SerializeField] private float _dashHitRadius = 2.5f;
     [SerializeField] private int _dashDamage = 28;
+    [SerializeField] private float _damageMultiplier = 1.5f;
     [SerializeField] private int _selfCrashDamage = 80;
     [SerializeField] private float _wallStopPadding = 0.3f;
     [Tooltip("돌진 시작 시 재생할 사운드")]
@@ -56,6 +57,7 @@ public class DragonAirDashPatternSO : BossPatternSO
     public float DashCollisionRadius => _dashCollisionRadius;
     public float DashHitRadius => _dashHitRadius;
     public int DashDamage => _dashDamage;
+    public float DamageMultiplier => _damageMultiplier;
     public int SelfCrashDamage => _selfCrashDamage;
     public float WallStopPadding => _wallStopPadding;
     public AudioClip DashSfx => _dashSfx;
@@ -433,7 +435,7 @@ internal sealed class DragonAirDashState : FullLockState<DragonAirDashPatternSO>
                 continue;
 
             _playerHit = true;
-            player.TakeDamage(Data.DashDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             break;
         }
     }

@@ -17,7 +17,7 @@ namespace RelicFairy.Monster
 ///       → 멀리서 브레스를 뿜으며 비행 → 진입로 바위 파괴 → 착지(Landing_Touchdown) → Idle 전환
 ///       → [2단계] 착지 즉시 보스 대각선 아래 클로즈업 컷 + "Dragon Boss" HUD
 ///       → [3단계] HUD 소멸 → 플레이어 카메라로 복귀 + 입력 복구
-///       → [4단계] 플레이어가 보스 인식 범위(_detectionRange) 진입 → ChaseState 전환 + OnCombatReady 발행
+///       → [4단계] 연출 완료 즉시 ChaseState 전환 + OnCombatReady 발행 → 보스 체력 HUD 등장
 /// </summary>
 public class DragonDormantState : IMonsterState
 {
@@ -155,6 +155,9 @@ public class DragonDormantState : IMonsterState
         {
             var cam = GameCameraController.Instance;
 
+            // PanToZoneAndReturnAsync의 복귀 단계가 시퀀스 도중 Cinemachine을 재활성화하는 것을 방지
+            cam?.TakeManualControl();
+
             // 브레스를 뿜으며 착지 지점 위까지 비행
             await FlyInWithBreathAsync(ctx, dragon, cam, ct);
 
@@ -189,7 +192,7 @@ public class DragonDormantState : IMonsterState
 
             // 3단계: HUD 소멸 → 플레이어 카메라로 복귀
             if (cam != null)
-                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 0f, ct);
+                await cam.ReturnToPlayerAsync(ctx.Runtime.PlayerTarget, 1.5f, ct);
         }
         catch (OperationCanceledException)
         {
@@ -200,9 +203,13 @@ public class DragonDormantState : IMonsterState
         if (dragon.DragonBlackboard != null)
             dragon.DragonBlackboard.BodyState = BodyState.Grounded;
 
-        // 착지 완료 — 입력 복구. 전투는 플레이어가 보스 인식 범위에 들어와야 시작된다.
+        // 착지 완료 — 입력 복구 + 즉시 전투 돌입 + HUD 등장
         ctx.Runtime.CachedPlayer?.SetInputEnabled(true);
-        _landed = true;
+        _landed          = true;
+        _combatTriggered = true;
+        var dragonRef    = ctx.Monster as DragonBossMonster;
+        dragonRef?.FireCombatReady();
+        ctx.Monster.ChangeState<ChaseState>();
     }
 
     private static async UniTask FlyInWithBreathAsync(MonsterContext ctx, DragonBossMonster dragon, GameCameraController cam, CancellationToken ct)

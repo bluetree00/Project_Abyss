@@ -19,7 +19,7 @@ MonoBehaviour:
     m_Bits: 64
   stat:
     maxHp: 7000
-    defense: 5
+    defense: 50
     attackPower: 100
     moveSpeed: 3
     attackRange: 2.5

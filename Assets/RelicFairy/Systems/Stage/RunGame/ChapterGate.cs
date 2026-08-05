@@ -84,7 +84,7 @@ public sealed class ChapterGate : MonoBehaviour
         {
             while (t < AppearDuration)
             {
-                t += Time.deltaTime;
+                t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / AppearDuration);
                 if (visual != null) visual.localScale = Vector3.Lerp(Vector3.zero, to, k);
                 if (mat != null) mat.SetColor("_EmissionColor", GateColor * (k * GlowIntensity));

@@ -276,6 +276,7 @@ public class CameraOcclusionFader : MonoBehaviour
             m.SetColor(BaseColorID, c);
         }
         // SRP Batcher와 호환되는 방식으로 MPB 적용
+        _mpb ??= new MaterialPropertyBlock();
         r.GetPropertyBlock(_mpb);
         _mpb.SetFloat("_Surface", 1f);
         r.SetPropertyBlock(_mpb);

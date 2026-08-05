@@ -28,6 +28,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     [Header("공격")]
     [SerializeField] private float  _attackAnimDuration  = 1.8f;
     [SerializeField] private int    _attackDamage        = 25;
+    [SerializeField] private float  _damageMultiplier    = 1.5f;
     [SerializeField] private GameObject _windBlastPrefab;
     [Tooltip("날개치기 발동 시 재생할 사운드")]
     [SerializeField] private AudioClip _wingStrikeSfx;
@@ -59,6 +60,7 @@ public class DragonStormWingsPatternSO : BossPatternSO
     public Color  WarningColor       => _warningColor;
     public float  AttackAnimDuration => _attackAnimDuration;
     public int    AttackDamage       => _attackDamage;
+    public float  DamageMultiplier   => _damageMultiplier;
     public GameObject WindBlastPrefab => _windBlastPrefab;
     public AudioClip  WingStrikeSfx   => _wingStrikeSfx;
     public float  WingStrikeSfxDelay => _wingStrikeSfxDelay;
@@ -136,11 +138,6 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
 
         PlayAnim(ctx, Data.HoverStateName);
 
-        // [DESIGN GUIDE] LeapCooldown 은 DragonBossBlackboard 소속이어야 합니다.
-        // 베이스 타입(BossAttackBlackboard) 캐스팅 대신 DragonBossBlackboard 로 캐스팅하세요.
-        // 예: if (ctx.Blackboard is DragonBossBlackboard dragonBB) dragonBB.LeapCooldown = ...
-        var bb = (ctx.Monster as IBoss)?.Blackboard;
-        if (bb != null) bb.LeapCooldown = Data.Cooldown;
     }
 
     public override void Update(MonsterContext ctx)
@@ -159,7 +156,11 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
     }
 
     public override void Exit(MonsterContext ctx)
-        => DestroyWarning();
+    {
+        if ((ctx.Monster as IBoss)?.Blackboard is DragonBossBlackboard exitBb)
+            exitBb.LeapCooldown = Data.Cooldown;
+        DestroyWarning();
+    }
 
     // ── Takeoff ───────────────────────────────────────────────────────────────
 
@@ -390,7 +391,7 @@ internal sealed class DragonStormWingsState : FullLockState<DragonStormWingsPatt
             var player = col.GetComponent<PlayerController>()
                       ?? col.GetComponentInParent<PlayerController>();
             if (player == null) continue;
-            player.TakeDamage(Data.AttackDamage);
+            player.TakeDamage(Mathf.RoundToInt(ctx.Config.stat.attackPower * Data.DamageMultiplier));
             Data.StatusEffect?.Apply(player);
             break;
         }
