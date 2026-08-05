@@ -21,9 +21,31 @@ MonoBehaviour:
       type: 3}
     centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
       type: 3}
-    wallLightSpacing: 8
-    wallLightHeightRatio: 0.35
-    maxWallLights: 12
+    wallLightSpacing: 6
+    wallLightHeightRatio: 0.3
+    maxWallLights: 18
+    wallLightTint:
+      color: {r: 0.62, g: 0.42, b: 1, a: 1}
+      intensityMul: 1.4
+      rangeMul: 0.75
+    centerLightTint:
+      color: {r: 0.55, g: 0.6, b: 0.95, a: 1}
+      intensityMul: 0.5
+      rangeMul: 0.9
+  floorDecalMaterials:
+  - {fileID: 2100000, guid: c1ea7ec2966c810469ca22a4dab2c1b6, type: 2}
+  - {fileID: 2100000, guid: 689a51d0a482da549b7448b20f594464, type: 2}
+  decalsPer100SqM: 8
+  veilMode: 0
+  corridorFogPrefab: {fileID: 6930174999031227623, guid: a3a908fc5452d224bb73a08f9b798a09,
+    type: 3}
+  veilLayers: 5
+  veilHeight: 3.2
+  veilScale: 0.5
+  veilTint: {r: 0, g: 0, b: 0, a: 0}
+  veilRadianceIntensity: 6
+  sealDoorPrefab: {fileID: 1031046332, guid: abc00000000003500428051136095348, type: 3}
+  sealDoorMotion: 0
   blocks:
   - {fileID: 11400000, guid: 9aa8b58e024dd3d4fa8175d71645cde8, type: 2}
   - {fileID: 11400000, guid: 0eb3ff44f728bde4eb330fbe506d6066, type: 2}

@@ -19,8 +19,10 @@ public class ActNoneState : ILayerState<ActState> //act 상태의 idle의 역활
         if (_controller.IsGrounded())
         {
             var anim = _controller.Anim;
+            // normalizedTimeOffset 인자를 주지 않는다 — 0으로 주면 공격이 끝날 때마다
+            // 보행 사이클이 0프레임으로 리셋돼 발 위치가 툭 튄다. 현재 위상을 유지한 채 이어붙인다.
             if (anim != null)
-                anim.CrossFade("MoveBlend", 0.15f, 0, 0f);
+                anim.CrossFadeInFixedTime("MoveBlend", 0.14f);
         }
     }
 

@@ -43,6 +43,7 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
             float decel = (cd != null && cd.moveDecel > 0.01f) ? cd.moveDecel : DefaultDecel;
             Vector2 stopped = Vector2.MoveTowards(curHoriz, Vector2.zero, decel * dt);
             rb.linearVelocity = new Vector3(stopped.x, rb.linearVelocity.y, stopped.y);
+            owner.IntendedSpeed01 = 0f;
             owner.StopFacingSlew();
             return;
         }
@@ -67,6 +68,10 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 
         // 저스트 회피 슬로모 — 세계는 느려져도 플레이어는 빠르게 움직인다(평소 1이라 무영향).
         currentMaxSpeed *= owner.BonusMoveSpeedMultiplier;
+
+        // 애니 블렌드용 '의도 속도비' 공개 — 급반전 마찰 제동을 적용하기 전 값이다.
+        // 제동은 의도된 순간 감속이라 애니가 그대로 따라가면 달리다가 걷기로 튄다.
+        owner.IntendedSpeed01 = runSpd > 0.01f ? Mathf.Clamp01(currentMaxSpeed / runSpd) : 0f;
 
         // [마찰 제동] 급반전 구간(sharpTurn)에서만 이동속도를 깎아 무게감 부여 → 안쪽 각도는 감속 없이 속도 유지.
         // 조준이 facing을 주도하는 공격/스킬 중에는 적용하지 않는다(move-vs-aim 오판 방지).
@@ -145,6 +150,14 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
 
         // 4) 목적지 헤드룸 — 상단에 캡슐이 들어갈 천장 여유 확인(벽/천장으로 기어올라 끼임 차단).
         if (!HasHeadroom(owner, topHit.point)) return;
+
+#if UNITY_EDITOR
+        // [임시 진단] 평지 이동 중에도 단차 오르기가 발동하는지 확인용.
+        // 평지에서 이 로그가 계속 찍히면 바닥 콜라이더에 2cm 이상의 턱이 있다는 뜻이다.
+        // 원인 규명 후 제거한다.
+        Debug.Log($"[StepClimb] deltaY={deltaY:0.###}m  대상='{topHit.collider.name}'  " +
+                  $"수평속도={speed:0.##}  위치y={pos.y:0.###}");
+#endif
 
         // 5) 물리 피드백 상승 — 위치 강제 없이 수직 속도로. remaining/dt 캡으로 오버슈트 0(상단에 정확히 안착).
         float dt = Time.fixedDeltaTime;

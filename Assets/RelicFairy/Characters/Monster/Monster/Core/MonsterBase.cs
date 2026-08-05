@@ -124,6 +124,9 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     private readonly Dictionary<string, DmgTakenAmpSlot> _dmgTakenAmpSlots = new();
     private float                  _defenseMulti        = 1f;
     private float                  _attackSpeedMulti    = 1f;
+    // 마지막으로 받은 피해의 종류 — 막타 히트스톱(DieState)이 "플레이어의 직접 타격이었나"를 판정하는 근거.
+    // TakeDamage/TakeSynergyDamage를 우회해 HP를 깎는 보스 기믹은 직접 세팅해야 한다(영혼 기둥 등).
+    protected DamageKind           _lastDamageKind      = DamageKind.Normal;
     // 상태이상 통합 수신기(ST) — CC(스턴/빙결)·Slow(서리)·DoT(점화/독)를 한 틀로. 풀-안전 plain class.
     private readonly MonsterStatusReceiver _status = new();
 
@@ -229,9 +232,6 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
     // 초기화
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// <summary>비-보스 몬스터 시각 크기 배율(핵앤슬래시 가독성). 1이면 미적용. 보스는 항상 원본 크기.</summary>
-    private const float NonBossVisualScale = 0.8f;
-
     /// <summary>전 몬스터 플레이어 탐색 범위 배율. 1이면 미적용. detectionRange/chaseGiveUpRange에 곱해진다.
     /// 차트 기본값(detectionRange 5m)에 1.5배는 방 크기에 비해 너무 좁아, 플레이어가 안 오는 몹을
     /// 일일이 찾아다니는 피로가 컸다 → 3배로 올려 방에 들어서면 대부분 스스로 붙게 한다.</summary>
@@ -295,16 +295,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _agent.stoppingDistance = _config.stat.attackRange;
         _baseAgentSpeed         = _config.stat.moveSpeed;
 
-        // 3-1. 비-보스 몬스터 시각 크기 축소 (핵앤슬래시 가독성).
+        // 3-1. 비-보스 몬스터 시각 크기 정규화 (핵앤슬래시 가독성).
+        //      전역 상수 배율(구 NonBossVisualScale 0.8) 대신 SO의 visualHeightMeters를 목표로
+        //      "실측 대비 배율"을 구해 적용한다 → 모델 원본 크기가 제각각이어도 실루엣이 밴드에 맞는다.
         //      콜라이더/발밑그림자/HP바/외곽선은 lossyScale로 자동 추종되며,
-        //      NavMeshAgent radius/height만 월드값이라 함께 축소해 정합을 맞춘다.
-        //      InitAsync는 인스턴스당 1회만 실행 → 풀 재사용(OnEnable) 시 중복 축소 없음.
-        if (_config.grade != MonsterGrade.Boss && NonBossVisualScale != 1f)
-        {
-            transform.localScale *= NonBossVisualScale;
-            _agent.radius        *= NonBossVisualScale;
-            _agent.height        *= NonBossVisualScale;
-        }
+        //      NavMeshAgent radius/height만 월드값이라 함께 곱해 정합을 맞춘다.
+        //      InitAsync는 인스턴스당 1회만 실행 → 풀 재사용(OnEnable) 시 중복 적용 없음.
+        if (_config.grade != MonsterGrade.Boss)
+            ApplyVisualHeightScale();
 
         // 3-2. 피격 시각 피드백(빨강 플래시) 자동 부착 — 프리팹에 명시 부착 안 된 몬스터도 적용.
         //      VictimHitFeedback은 프로필 미배정 시 공유 기본 프로필(빨강 더블블링크)을 사용한다.
@@ -391,6 +389,49 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         if (DetectionRangeMultiplier == 1f || config == null || config.detection == null) return;
         config.detection.detectionRange   *= DetectionRangeMultiplier;
         config.detection.chaseGiveUpRange *= DetectionRangeMultiplier;
+    }
+
+    /// <summary>SO의 visualHeightMeters(등급 배율 포함)를 목표로 루트 스케일을 보정한다.
+    /// 값이 0(미지정)이거나 렌더러가 없으면 프리팹 원본 크기를 그대로 둔다.
+    /// InitAsync에서 인스턴스당 1회만 호출된다.</summary>
+    private void ApplyVisualHeightScale()
+    {
+        float target = _config.ResolveVisualHeight();
+        if (target <= 0f) return;
+
+        float measured = MeasureModelHeight();
+        if (measured <= 0.001f) return;
+
+        float k = target / measured;
+        if (Mathf.Approximately(k, 1f)) return;
+
+        transform.localScale *= k;
+        _agent.radius        *= k;
+        _agent.height        *= k;
+    }
+
+    /// <summary>현재 월드 스케일이 반영된 모델 실루엣 높이(m). 파티클/트레일은 크기가 들쭉날쭉해 제외한다.
+    /// SkinnedMeshRenderer.bounds는 메시에 구워진 로컬 바운즈 기반이라 애니메이션 포즈와 무관하게 안정적이다.</summary>
+    private float MeasureModelHeight()
+    {
+        var renderers = GetComponentsInChildren<Renderer>(true);
+        bool  any = false;
+        float min = 0f, max = 0f;
+
+        foreach (var r in renderers)
+        {
+            if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+
+            var b = r.bounds;
+            if (!any) { min = b.min.y; max = b.max.y; any = true; }
+            else
+            {
+                if (b.min.y < min) min = b.min.y;
+                if (b.max.y > max) max = b.max.y;
+            }
+        }
+
+        return any ? max - min : 0f;
     }
 
     /// <summary>현재 런/챕터의 난이도 배율을 _difficultyScale에 반영. 보스는 1 고정(자체 밸런스 유지).
@@ -815,6 +856,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         var constraints = _fsm?.CurrentConstraints ?? SpecialStateConstraint.None;
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
 
+        _lastDamageKind = kind;
+
         float defense = _baseDefense * _defenseMulti * Mathf.Clamp01(1f - defenseIgnore);
         float actual  = Mathf.Max(1f, (amount - defense) * _runtime.DamageMultiplier * _incomingDamageMulti * CurrentDamageTakenMult());
         _runtime.CurrentHp -= (int)actual;
@@ -846,6 +889,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
             OnFatalDamage();
         }
     }
+
+    /// <summary>마지막으로 받은 피해의 종류. 치명타(사망) 직후엔 곧 '무엇이 죽였는가'가 된다 —
+    /// DieState가 막타 히트스톱을 걸지 말지 판정하는 데 쓴다.</summary>
+    public DamageKind LastDamageKind => _lastDamageKind;
 
     /// <summary>상태이상 통합 수신기(ST). 룬·아이템 효과가 CC/Slow/DoT를 부여하는 진입점.</summary>
     public MonsterStatusReceiver Status { get { _status.AttachOwner(this); return _status; } }
@@ -887,6 +934,8 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
 
         // 무적 상태 — 데미지 자체 무시
         if ((constraints & SpecialStateConstraint.Invincible) != 0) return;
+
+        _lastDamageKind = DamageKind.Normal;   // 주 피해 경로 = 플레이어 직접 타격
 
         // [서약] 출력 피해 변조는 여기서 하지 않는다 — 소유자는 CombatDamage 파이프라인 ③ 한 곳뿐이다.
         // 여기서 또 걸면 주 피해가 파이프라인 ③ + 여기로 두 번 곱해져 배율이 제곱되고,
@@ -1266,6 +1315,7 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _dmgTakenAmpSlots.Clear();
         _defenseMulti        = 1f;
         _attackSpeedMulti    = 1f;
+        _lastDamageKind      = DamageKind.Normal;
         _status.Reset();
         _statusCcActive      = false;
         _statusSlowActive    = false;

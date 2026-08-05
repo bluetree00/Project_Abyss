@@ -3,7 +3,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 룸 클리어 게이트 — 클리어 시점에 이펙트 시퀀스를 재생하고 행운치 기반으로 보상 오브젝트를 스폰한다.
+/// 룸 클리어 게이트 — 클리어 시점에 이펙트 시퀀스를 재생하고 <b>방 종류에 따라</b> 보상 오브젝트를 스폰한다.
 ///
 /// 호출 흐름:
 ///   1) RoomWaveController → Initialize(run, luckTable, endEffect, endEffect2)
@@ -12,18 +12,17 @@ using UnityEngine;
 /// Activate가 수행하는 일:
 ///   · roomCenter 위치에 EndEffect 재생
 ///   · 딜레이 후 EndEffect2 스폰 + ClearRewardTrigger 부착 (F키 보상 상호작용)
+///
+/// 드롭 확률·등급 분포·후보 수·연료는 <see cref="RoomRewardTable"/>(방 종류 기반)가 정한다.
+/// 예전엔 행운(Luck) 테이블 하나가 전부를 정했는데, Luck이 사실상 움직이지 않아 정예방이 일반방과
+/// 완전히 같은 보상을 줬다(통합설계서 §3-2 결함 F). 행운 계열 코드는 다른 경로에서 계속 쓰이므로 남긴다.
 /// </summary>
 public class RoomClearGate : MonoBehaviour
 {
     // ── Constants ──────────────────────────────────────────────
-    // [임시] 드롭 확률 100% 강제. 추후 LuckRollService.TryRollDrop으로 복구할 때 false로 변경.
-    private const bool ForceDropAlways = true;
-
-    /// <summary>일반 룸 클리어 시 제시할 룬 후보 수(3지선다).</summary>
+    // 후보 수·원석량은 RoomRewardTable이 방 종류별로 정한다. 챌린지 경로만 후보 수를 고정으로 쓴다.
+    /// <summary>이벤트 챌린지 보상 1라운드의 룬 후보 수(3지선다).</summary>
     private const int RuneChoiceCount = 3;
-
-    /// <summary>일반 방 클리어 시 지급하는 원석(정제소 연료). 설계 §2.8 기준 방당 4.</summary>
-    private const int ClearOreReward = 4;
 
     // ── [SerializeField] ───────────────────────────────────────
     [Header("클리어 이펙트")]
@@ -39,7 +38,9 @@ public class RoomClearGate : MonoBehaviour
     [SerializeField, Tooltip("클리어 이펙트/보상 오브젝트를 바닥(사망 위치)에서 위로 띄우는 높이(m)."), Min(0f)]
     private float effectHeightOffset = 0.6f;
 
-    [Header("Drop Table (옵션 — Initialize에서 주입 권장)")]
+    [Header("Drop Table (레거시 — 드롭 굴림에서 분리됨)")]
+    // [레거시] 드롭 확률·등급은 이제 RoomRewardTable(방 종류)이 정한다. 이 참조는 주입 시그니처 호환을
+    // 위해 남아 있을 뿐 클리어 보상 굴림에는 쓰이지 않는다. Luck 테이블 자체는 상점 진열 등 다른 경로에서 사용 중.
     [SerializeField] private LuckRollTableSO luckTable;
 
     // ── Private fields ─────────────────────────────────────────
@@ -123,13 +124,15 @@ public class RoomClearGate : MonoBehaviour
         }
         else
         {
-            // 일반 룸 클리어 = 3지선다. 후보를 담고 ClearRewardTrigger에 '선택형'으로 넘긴다.
-            rewards.AddRange(RollRewardChoices(RuneChoiceCount));
+            // 일반 룸 클리어 = 3지선다. 후보 수·등급 하한·연료를 방 종류가 정한다(§2-2-①·§3-2).
+            // 정예방은 여기서 후보 4 + Rare 하한 + 연료 증량으로 갈린다 — "정예를 피하는 게 최적"의 해소 지점.
+            var rule = RoomRewardTable.For(RoomKind());
+            rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
             isChoice = rewards.Count > 0;
 
             // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
             // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
-            GrantClearOre();
+            GrantClearFuel(rule);
         }
 
         // [보류] 보스드랍 아이템(EffectManager.GetBonusBossDropCount)의 '보스방 추가 롤' 보너스.
@@ -170,21 +173,34 @@ public class RoomClearGate : MonoBehaviour
         trigger.Initialize(_run, rewards, _isBossRoom, isChoice, choiceRounds);
     }
 
-    /// <summary>방 클리어 원석 지급 — 정제소 연료. 드랍 판정과 무관하게 확정 지급(생산 경로 보장).</summary>
-    private void GrantClearOre()
+    /// <summary>방 클리어 연료 지급 — 정제소 원석 + (정예방) 재련소 강화재료. 드랍 판정과 무관하게 확정 지급.</summary>
+    private void GrantClearFuel(in RoomRewardTable.Rule rule)
     {
         var bank = _run?.FuelBank;
-        if (bank == null || ClearOreReward <= 0) return;
+        if (bank == null) return;
 
-        bank.Add(FuelKind.RuneOre, ClearOreReward);
-        ItemEffectVfxHelper.ShowNotice($"<color=#7FD0FF>원석 +{ClearOreReward}</color>  (정제소 연료)");
+        if (rule.Ore > 0)
+        {
+            bank.Add(FuelKind.RuneOre, rule.Ore);
+            ItemEffectVfxHelper.ShowNotice($"<color=#7FD0FF>원석 +{rule.Ore}</color>  (정제소 연료)");
+        }
+
+        if (rule.EnhanceMaterial > 0)
+        {
+            bank.Add(FuelKind.EnhanceMaterial, rule.EnhanceMaterial);
+            ItemEffectVfxHelper.ShowNotice($"<color=#FFB466>강화재료 +{rule.EnhanceMaterial}</color>  (재련소 연료)");
+        }
     }
 
     private (RuntimeItemData data, ItemSO so) RollRewardItem(ItemRarity? floor = null)
     {
-        if (!PassDropGate()) return (null, null);
-        return PickItemByRolledRarity(floor);
+        var rule = RoomRewardTable.For(RoomKind());
+        if (!RoomRewardTable.RollDrop(rule)) return (null, null);
+        return PickItemByRolledRarity(floor, rule.Weights);
     }
+
+    /// <summary>현재 방 종류. 런 세션이 없으면(레거시 단일세계 경로) 일반방으로 본다.</summary>
+    private RoomPlanKind RoomKind() => _run?.CurrentRoomKind ?? RoomPlanKind.Normal;
 
     /// <summary>
     /// 선택 팝업용 후보 N개를 뽑는다. 드랍 판정은 한 번만 하고, 같은 아이템이 겹치지 않도록 중복을 배제한다.
@@ -194,7 +210,8 @@ public class RoomClearGate : MonoBehaviour
         int count, ItemRarity? floor = null)
     {
         var result = new System.Collections.Generic.List<(RuntimeItemData, ItemSO)>(count);
-        if (count <= 0 || !PassDropGate()) return result;
+        var rule   = RoomRewardTable.For(RoomKind());
+        if (count <= 0 || !RoomRewardTable.RollDrop(rule)) return result;
 
         var picked = new System.Collections.Generic.HashSet<string>();
         // 풀이 작아 중복이 반복될 때를 대비한 안전장치(무한 루프 방지).
@@ -202,7 +219,7 @@ public class RoomClearGate : MonoBehaviour
 
         for (int attempt = 0; attempt < maxAttempts && result.Count < count; attempt++)
         {
-            var (d, s) = PickItemByRolledRarity(floor);
+            var (d, s) = PickItemByRolledRarity(floor, rule.Weights);
             if (d == null || s == null) continue;
             if (!picked.Add(s.itemId)) continue;   // 이미 뽑힌 아이템 → 다시 굴림
             result.Add((d, s));
@@ -214,30 +231,12 @@ public class RoomClearGate : MonoBehaviour
         return result;
     }
 
-    /// <summary>드랍 자체가 발생하는지(행운·드랍확률) 판정. 후보를 여러 개 뽑을 때도 이 관문은 1회만 통과한다.</summary>
-    private bool PassDropGate()
+    /// <summary>등급을 굴려 아이템 1개를 뽑는다(등급 폴백 포함). 드랍 발생 판정은 호출부가 먼저 통과시킨다.</summary>
+    private (RuntimeItemData data, ItemSO so) PickItemByRolledRarity(
+        ItemRarity? floor, in RoomRewardTable.RarityWeights weights)
     {
-        if (luckTable == null)
-        {
-            Debug.LogWarning("[RoomClearGate] luckTable 미할당 — 아이템 드랍 생략");
-            return false;
-        }
-
-        if (!ForceDropAlways && !LuckRollService.TryRollDrop(ResolvePlayerLuck(), luckTable))
-        {
-            Debug.Log($"[RoomClearGate] 드롭 확률 미통과 (luck={ResolvePlayerLuck()})");
-            return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>등급을 굴려 아이템 1개를 뽑는다(등급 폴백 포함). 드랍 판정은 <see cref="PassDropGate"/>가 담당.</summary>
-    private (RuntimeItemData data, ItemSO so) PickItemByRolledRarity(ItemRarity? floor)
-    {
-        int luck = ResolvePlayerLuck();
-        var rarity = LuckRollService.RollRarity(luck, luckTable);
-        if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 챌린지 등급 rarity 하한
+        var rarity = RoomRewardTable.RollRarity(weights);
+        if (floor.HasValue && rarity < floor.Value) rarity = floor.Value;   // 방 종류·챌린지 등급 rarity 하한
 
         // 등급 폴백 — 굴린 등급에 보유 아이템이 없을 수 있다(예: 아이템 풀이 Common/Rare뿐인데
         // LuckRollTable은 luck 1부터 Epic/Legendary를 굴린다). 드랍을 통째로 날리는 대신 한 단계씩
@@ -267,10 +266,11 @@ public class RoomClearGate : MonoBehaviour
             return (null, null);
         }
 
-        Debug.Log($"[RoomClearGate] 보상 아이템 선택: {so.itemId} (rarity={rarity}, luck={luck})");
+        Debug.Log($"[RoomClearGate] 보상 아이템 선택: {so.itemId} (rarity={rarity}, room={RoomKind()})");
         return (data, so);
     }
 
+    /// <summary>[레거시] 플레이어 행운치. 드롭 굴림에서 분리됐다(RoomRewardTable로 이관). 삭제하지 않고 남긴다.</summary>
     private int ResolvePlayerLuck()
     {
         var player = _run?.Player;

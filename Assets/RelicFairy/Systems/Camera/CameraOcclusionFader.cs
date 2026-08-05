@@ -19,6 +19,16 @@ public class CameraOcclusionFader : MonoBehaviour
     private static readonly int BaseMapID   = Shader.PropertyToID("_BaseMap");
     private static readonly int BumpMapID   = Shader.PropertyToID("_BumpMap");
 
+    // 원본 → 페이드용 URP Lit로 옮길 때 찾아볼 프로퍼티 이름들(앞에서부터 먼저 맞는 것 1개).
+    //
+    // 이 프로젝트의 석재·목재는 대부분 커스텀 ShaderGraph라 URP 표준 이름을 쓰지 않는다:
+    //   · Gothic_Interior(봉인 석문 4종) = _BaseColorMap / _BaseColor
+    //   · Leartes S_Masking(숲 봉인문 뿌리) = _Base, 색 프로퍼티 없음
+    // _BaseMap만 보면 전부 실패해 텍스처 없는 흰 판으로 페이드된다.
+    private static readonly string[] TextureProps = { "_BaseMap", "_BaseColorMap", "_MainTex", "_Base", "_Albedo" };
+    private static readonly string[] ColorProps   = { "_BaseColor", "_Color", "_BaseTintColor", "_MainColor" };
+    private static readonly string[] NormalProps  = { "_BumpMap", "_NormalMap", "_Normal" };
+
     // ── SerializeField ────────────────────────────────────────────────────
     [Header("Detection")]
     [SerializeField] private LayerMask occlusionMask = ~0;
@@ -203,9 +213,9 @@ public class CameraOcclusionFader : MonoBehaviour
                 copy = new Material(_fadeShader);
                 if (orig != null)
                 {
-                    if (orig.HasProperty(BaseMapID)   && copy.HasProperty(BaseMapID))   copy.SetTexture(BaseMapID, orig.GetTexture(BaseMapID));
-                    if (orig.HasProperty(BaseColorID) && copy.HasProperty(BaseColorID)) copy.SetColor(BaseColorID, orig.GetColor(BaseColorID));
-                    if (orig.HasProperty(BumpMapID)   && copy.HasProperty(BumpMapID))   copy.SetTexture(BumpMapID, orig.GetTexture(BumpMapID));
+                    CopyFirstTexture(orig, copy, TextureProps, BaseMapID);
+                    CopyFirstTexture(orig, copy, NormalProps,  BumpMapID);
+                    CopyFirstColor(orig, copy, ColorProps, BaseColorID);
                 }
             }
             else
@@ -225,6 +235,32 @@ public class CameraOcclusionFader : MonoBehaviour
             faded        = fadedMats,
             currentAlpha = 1f,
         };
+    }
+
+    /// <summary>후보 중 원본이 가진 첫 텍스처를 페이드 머티리얼의 dstId로 옮긴다. 없으면 아무것도 안 한다.</summary>
+    private static void CopyFirstTexture(Material orig, Material copy, string[] candidates, int dstId)
+    {
+        if (!copy.HasProperty(dstId)) return;
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (!orig.HasProperty(candidates[i])) continue;
+            var tex = orig.GetTexture(candidates[i]);
+            if (tex == null) continue;
+            copy.SetTexture(dstId, tex);
+            return;
+        }
+    }
+
+    /// <summary>후보 중 원본이 가진 첫 색을 옮긴다. 알파는 페이드가 매 프레임 덮어쓰므로 무시한다.</summary>
+    private static void CopyFirstColor(Material orig, Material copy, string[] candidates, int dstId)
+    {
+        if (!copy.HasProperty(dstId)) return;
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (!orig.HasProperty(candidates[i])) continue;
+            copy.SetColor(dstId, orig.GetColor(candidates[i]));
+            return;
+        }
     }
 
     // _mpb 재사용 — new MaterialPropertyBlock() 없음

@@ -86,6 +86,6 @@ public class ActHeavyAttackState : ILayerState<ActState>
     {
         var action = _controller.CurrentAttackTypeForEffect;
         string animName = $"{action}Attack";
-        _controller.Anim.CrossFade(animName, 0.08f);
+        _controller.Anim.CrossFadeInFixedTime(animName, 0.06f);
     }
 }

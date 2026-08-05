@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -13,9 +12,10 @@ using UnityEngine.Rendering.Universal;
 ///
 /// 하는 일
 ///   1) Assets/RelicFairy/Settings/GameVolumeProfile.asset 생성(없으면) + 오버라이드 일괄 세팅
-///      Bloom / Vignette / ColorAdjustments / LiftGammaGain / Tonemapping(ACES)
-///      ※ Azure Nature 의 AN_PostProcessing_Volume 구성을 기반으로 강도 톤다운
-///      ※ MotionBlur 는 제외 (VolumePulseService 의 피격 펄스와 충돌)
+///      Bloom / Vignette / ColorAdjustments / LiftGammaGain / Tonemapping(Neutral) / MotionBlur(비활성)
+///      ※ 이 프로파일은 전 챕터 공통 톤이다. 챕터별 분위기는 씬 라이팅(Directional/Ambient/Fog)과
+///        BlockPalette 의 방 조명 무드가 담당하며, 여기서 챕터를 나누지 않는다.
+///      ※ 서드파티 오버라이드(ButoVolumetricFog 등)는 재실행해도 보존된다.
 ///   2) 씬 내 모든 Camera의 UniversalAdditionalCameraData.renderPostProcessing = true
 ///
 /// 하지 않는 일 (씬 디자인을 침해하므로 수동)
@@ -43,7 +43,7 @@ public static class SetupCinematicLook
 
         Debug.Log(
             $"[SetupCinematicLook] 적용 완료\n" +
-            $"  · Profile: {ProfilePath} (오버라이드 5종, AN 기반 톤다운)\n" +
+            $"  · Profile: {ProfilePath} (툴 소유 오버라이드 6종 재작성, 그 외는 보존)\n" +
             $"  · Post-Processing 활성화된 Camera: {camCount}개\n" +
             $"  · Volume 배치는 씬에 직접 (Volume 컴포넌트 + sharedProfile = GameVolumeProfile)\n" +
             $"  · SSAO 추가는 메뉴 'RelicFairy/Setup/Add SSAO to All URP Renderers' 참고");
@@ -66,49 +66,67 @@ public static class SetupCinematicLook
 
     private static void ClearAndPopulate(VolumeProfile profile)
     {
-        // 기존 오버라이드 제거 (재실행 안전성)
-        var existing = new List<VolumeComponent>(profile.components);
-        foreach (var comp in existing)
-        {
-            if (comp == null) continue;
-            profile.Remove(comp.GetType());
-            Object.DestroyImmediate(comp, true);
-        }
-        profile.components.Clear();
+        // 이 툴이 소유하는 오버라이드만 제거하고 다시 만든다.
+        // 전체 Clear 를 하지 않는 이유: 프로파일에는 툴이 모르는 서드파티 오버라이드
+        // (ButoVolumetricFog 등)가 함께 들어 있고, 예전 구현은 재실행 시 그것까지 지웠다.
+        RemoveIfPresent<Bloom>(profile);
+        RemoveIfPresent<Vignette>(profile);
+        RemoveIfPresent<ColorAdjustments>(profile);
+        RemoveIfPresent<LiftGammaGain>(profile);
+        RemoveIfPresent<Tonemapping>(profile);
+        RemoveIfPresent<MotionBlur>(profile);
 
-        // Bloom — AN 기반 + 뿌연 느낌 줄임 (threshold ↑, intensity ↓)
+        // ── 아래 값은 GameVolumeProfile.asset 의 현재 저작값과 일치해야 한다 ──
+        // 이 메뉴는 "초기 생성용"이지 "재적용용"이 아니다. 값이 어긋나 있으면 한 번 눌렀을 때
+        // 색보정 리서치 결론(ACES→Neutral 전환, 노출/채도 재조정)이 통째로 되돌아간다.
+
+        // Bloom
         var bloom = AddOverride<Bloom>(profile);
-        bloom.threshold.overrideState = true; bloom.threshold.value = 0.7f;
-        bloom.intensity.overrideState = true; bloom.intensity.value = 0.25f;
-        bloom.scatter.overrideState   = true; bloom.scatter.value   = 0.6f;
-        bloom.tint.overrideState      = true; bloom.tint.value      = new Color(1f, 0.904989f, 0.8066038f, 1f);
+        bloom.threshold.overrideState = true; bloom.threshold.value = 0.9f;
+        bloom.intensity.overrideState = true; bloom.intensity.value = 0.62f;
+        bloom.scatter.overrideState   = true; bloom.scatter.value   = 0.75f;
+        bloom.tint.overrideState      = true; bloom.tint.value      = new Color(1f, 0.96f, 0.9f, 1f);
+        bloom.highQualityFiltering.overrideState = true; bloom.highQualityFiltering.value = true;
+        bloom.maxIterations.overrideState = true; bloom.maxIterations.value = 6;
 
-        // Vignette — AN 원본 값 그대로
+        // Vignette
         var vign = AddOverride<Vignette>(profile);
-        vign.intensity.overrideState  = true; vign.intensity.value  = 0.35f;
-        vign.smoothness.overrideState = true; vign.smoothness.value = 0.35f;
+        vign.intensity.overrideState  = true; vign.intensity.value  = 0.33f;
+        vign.smoothness.overrideState = true; vign.smoothness.value = 0.4f;
 
-        // Color Adjustments — AN 원본 + colorFilter 살짝 웜으로 따뜻함 보강
+        // Color Adjustments — 웜 캐스트 유지, 노출/채도는 툰 기준으로 낮게
         var ca = AddOverride<ColorAdjustments>(profile);
-        ca.postExposure.overrideState = true; ca.postExposure.value = 0.8f;
+        ca.postExposure.overrideState = true; ca.postExposure.value = 0.4f;
         ca.contrast.overrideState     = true; ca.contrast.value     = 10f;
-        ca.saturation.overrideState   = true; ca.saturation.value   = 2f;
-        ca.colorFilter.overrideState  = true; ca.colorFilter.value  = new Color(1f, 0.98f, 0.94f, 1f); // 살짝 웜 캐스트
+        ca.saturation.overrideState   = true; ca.saturation.value   = 5f;
+        ca.colorFilter.overrideState  = true; ca.colorFilter.value  = new Color(1f, 0.97f, 0.93f, 1f);
 
-        // Lift Gamma Gain — AN 원본 값 그대로 (그림자 따뜻한 시그니처)
+        // Lift Gamma Gain — 쿨 그림자 + 웜 하이라이트 (split toning)
         var lgg = AddOverride<LiftGammaGain>(profile);
-        lgg.lift.overrideState = true; lgg.lift.value = new Vector4(1f, 0.9612974f, 0.9404001f, 0.01986097f);
+        lgg.lift.overrideState  = true; lgg.lift.value  = new Vector4(0.96039605f, 0.96039605f, 1f, 0.02f);
+        lgg.gamma.overrideState = true; lgg.gamma.value = new Vector4(1f, 1f, 1f, 0.05f);
+        lgg.gain.overrideState  = true; lgg.gain.value  = new Vector4(1f, 0.9809524f, 0.9238096f, 0.05f);
 
-        // Tonemapping — ACES (AN 그대로)
+        // Tonemapping — Neutral.
+        // ACES 는 채널별 시그모이드로 밝은 색을 흰색화하고 채도를 파괴해 툰 플랫컬러와 충돌한다.
+        // 스타일라이즈드/툰에서 ACES 회피는 업계 합의이며, 이 프로젝트도 그 결론으로 전환했다.
         var tm = AddOverride<Tonemapping>(profile);
-        tm.mode.overrideState = true; tm.mode.value = TonemappingMode.ACES;
+        tm.mode.overrideState = true; tm.mode.value = TonemappingMode.Neutral;
 
-        // Motion Blur — AN 0.5 → 0.2 톤다운 (뿌연 느낌 줄임)
-        // 주의: VolumePulseService 가 피격 시 별도 Volume(priority 10)으로 MotionBlur 펄스 적용.
+        // Motion Blur — 비활성 상태로 보유.
+        // VolumePulseService 가 피격 시 별도 Volume(priority 10)으로 펄스를 주므로 기본은 꺼둔다.
         var mb = AddOverride<MotionBlur>(profile);
+        mb.active = false;
         mb.quality.overrideState   = true; mb.quality.value   = MotionBlurQuality.High;
         mb.intensity.overrideState = true; mb.intensity.value = 0.2f;
         mb.clamp.overrideState     = true; mb.clamp.value     = 0.05f;
+    }
+
+    private static void RemoveIfPresent<T>(VolumeProfile profile) where T : VolumeComponent
+    {
+        if (!profile.TryGet<T>(out var comp) || comp == null) return;
+        profile.Remove<T>();
+        Object.DestroyImmediate(comp, true);
     }
 
     // VolumeProfile.Add<T>() 만으로는 sub-asset 등록이 안 되어 직렬화 시 fileID:0 깨짐 발생.

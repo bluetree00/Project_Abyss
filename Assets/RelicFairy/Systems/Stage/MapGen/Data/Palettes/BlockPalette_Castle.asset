@@ -15,15 +15,36 @@ MonoBehaviour:
   themeMatch: Sacred
   wallMode: 0
   wallHeight: 11
-  hasCeiling: 1
+  hasCeiling: 0
   lighting:
     wallLightPrefab: {fileID: 5011665491625452208, guid: 6023d0004f3fed4459a52bcf42654137,
       type: 3}
     centerLightPrefab: {fileID: 2287234484802276672, guid: 3c83c5d992838ae409375802fe0d5615,
       type: 3}
     wallLightSpacing: 4
-    wallLightHeightRatio: 0.5
+    wallLightHeightRatio: 0.34
     maxWallLights: 24
+    wallLightTint:
+      color: {r: 1, g: 0.94, b: 0.78, a: 1}
+      intensityMul: 1.1
+      rangeMul: 1
+    centerLightTint:
+      color: {r: 1, g: 0.97, b: 0.88, a: 1}
+      intensityMul: 2
+      rangeMul: 1.7
+  floorDecalMaterials:
+  - {fileID: 2100000, guid: c1ea7ec2966c810469ca22a4dab2c1b6, type: 2}
+  - {fileID: 2100000, guid: 689a51d0a482da549b7448b20f594464, type: 2}
+  decalsPer100SqM: 8
+  veilMode: 1
+  corridorFogPrefab: {fileID: 0}
+  veilLayers: 3
+  veilHeight: 1
+  veilScale: 1
+  veilTint: {r: 0, g: 0, b: 0, a: 0}
+  veilRadianceIntensity: 7.5
+  sealDoorPrefab: {fileID: 1030972349, guid: abc00000000015049655650342659921, type: 3}
+  sealDoorMotion: 0
   blocks:
   - {fileID: 11400000, guid: 3fb0670adf3ea8444937443f20187802, type: 2}
   - {fileID: 11400000, guid: bce95e81718979c46a676d9eb5a3a202, type: 2}

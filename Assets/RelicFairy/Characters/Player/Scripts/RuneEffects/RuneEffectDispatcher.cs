@@ -22,6 +22,14 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     private float _lastSkillTime = -999f;
     private bool _subscribed;
 
+    // 유물 파츠(개화) 효과 허브. 룬과 같은 전투 신호에 반응하되 데이터 소스·수명이 달라
+    // 별도 핸들러가 팬아웃한다(상세는 RelicPartEffectHandler). 파츠 획득 시 지연 생성.
+    private RelicPartEffectHandler _parts;
+    /// <summary>유물 파츠 효과 허브(지연 생성). 드래프트 획득 후 SyncFromLoadout로 활성화한다.</summary>
+    public RelicPartEffectHandler Parts => _parts ??= new RelicPartEffectHandler(_player);
+    /// <summary>파츠 허브(미생성 시 null). 신호 팬아웃 지점에서 불필요한 생성 없이 참조.</summary>
+    public RelicPartEffectHandler PartsOrNull => _parts;
+
     // 중앙(CENTER) 공명 — 활성 속성 효과의 value를 배수로 끌어올린다.
     // 효과들이 Entry.value를 직접 읽으므로, 24개 클래스를 건드리지 않고
     // "value를 곱한 사본 엔트리로 효과를 재생성"하는 방식으로 증폭한다.
@@ -243,6 +251,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             QuestEvents.OnMonsterKilled -= HandleKill;
             _subscribed = false;
         }
+        _parts?.Detach();   // 파츠는 런 고정 — 런 종료(플레이어 파괴)에서만 회수.
         Clear();
     }
 
@@ -250,6 +259,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         _resources.Tick(dt);
         for (int i = 0; i < _active.Count; i++) _active[i].Tick(dt, _player);
+        _parts?.Tick(dt);
     }
 
     // ── 버프창 수집(IBuffViewSource) ────────────────────────
@@ -273,6 +283,7 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     {
         _lastSkillTime = UnityEngine.Time.time;
         for (int i = 0; i < _active.Count; i++) _active[i].OnSkillUsed(_player);
+        _parts?.NotifySkillUsed();
     }
 
     /// <summary>최근 스킬 사용 후 window초 이내인지. "스킬 적중" 근사 판정(빙결 등)에 사용 — 스킬 실행 경로(ActSkillStateBase)에 연동.</summary>
@@ -284,7 +295,9 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     /// </summary>
     public void NotifyHit(in DamageReport report)
     {
-        if (_active.Count == 0 || report.Target == null) return;
+        if (report.Target == null) return;
+        bool hasParts = _parts != null && _parts.Active.Count > 0;
+        if (_active.Count == 0 && !hasParts) return;
 
         Vector3 dir = report.Attacker != null
             ? (report.Target.transform.position - report.Attacker.transform.position)
@@ -297,13 +310,14 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             attackDirection: dir,
             damage:          report.DamageDealt,
             isCritical:      report.IsCrit,
-            actionType:      default);
+            actionType:      report.ActionType);
 
         for (int i = 0; i < _active.Count; i++)
         {
             _active[i].OnHit(info, _player);
             if (info.IsCritical) _active[i].OnCrit(info, _player);
         }
+        if (hasParts) _parts.NotifyHit(info);
 
         // [가이드라인 비주얼] 룬 활성 중 치명타 표시(통지만)
         if (info.IsCritical && report.Target != null)
@@ -316,7 +330,9 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
     /// </summary>
     public void NotifyDamaged(float damage, GameObject attacker)
     {
-        if (_active.Count == 0 || _player == null) return;
+        if (_player == null) return;
+        bool hasParts = _parts != null && _parts.Active.Count > 0;
+        if (_active.Count == 0 && !hasParts) return;
 
         Vector3 dir = attacker != null
             ? (_player.transform.position - attacker.transform.position)
@@ -332,12 +348,14 @@ public sealed class RuneEffectDispatcher : IBuffViewSource
             actionType:      default);
 
         for (int i = 0; i < _active.Count; i++) _active[i].OnDamaged(info, _player);
+        if (hasParts) _parts.NotifyDamaged(info);
     }
 
     // ── QuestEvents.OnMonsterKilled 라우팅 ──
     private void HandleKill(string codeName)
     {
         for (int i = 0; i < _active.Count; i++) _active[i].OnKill(_player);
+        // 파츠 처치 신호는 죽은 적 GameObject가 필요해 ItemEffectManager.OnKill(target)에서 별도 발화한다.
     }
 
 }

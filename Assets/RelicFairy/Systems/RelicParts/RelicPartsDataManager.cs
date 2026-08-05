@@ -63,8 +63,9 @@ public sealed class RelicPartsDataManager
     }
 
     /// <summary>
-    /// 드래프트 후보 풀 — 해당 유물의 파츠 중 boss_tier가 일치하고, 이미 보유하지 않은 것.
-    /// bossTier 1 = 기능 파츠(effect/behavior/trigger), 3 = 코어 진화(core). 데이터의 boss_tier로 구분한다.
+    /// 드래프트 후보 풀 — 해당 유물의 파츠 중 boss_tier가 일치하고, 이미 보유하지 않았으며,
+    /// 선행 파츠(requires) 요구를 충족한 것. bossTier 1 = 기능 파츠, 3 = 코어 진화(데이터 boss_tier).
+    /// requires는 CSV 컬럼 — 값이 있으면 그 part_id를 보유해야 후보에 오른다(죽은 픽 방지).
     /// </summary>
     public List<RelicPartEntry> GetDraftPool(string relicId, int bossTier, IReadOnlyList<string> ownedPartIds)
     {
@@ -75,6 +76,8 @@ public sealed class RelicPartsDataManager
         {
             if (e.boss_tier != bossTier) continue;
             if (Owns(ownedPartIds, e.part_id)) continue;
+            // 선행 파츠 미보유면 제외(죽은 픽 방지) — requires 빈칸이면 항상 통과.
+            if (!string.IsNullOrEmpty(e.requires) && !Owns(ownedPartIds, e.requires)) continue;
             result.Add(e);
         }
         return result;
@@ -163,6 +166,7 @@ public sealed class RelicPartsDataManager
                 description = row.TryGetString("description"),
                 effect_key  = row.TryGetString("effect_key"),
                 boss_tier   = row.TryGetInt("boss_tier"),
+                requires    = row.TryGetString("requires"),   // 컬럼 없으면 빈 문자열(선행조건 없음)
             };
         }
         catch { return null; }

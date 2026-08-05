@@ -6,8 +6,8 @@ public class LocoDodgeState : ILayerState<LocoState>
     // 이보다 느리면 사실상 정지로 보고 바라보는 방향으로 폴백 → 진짜 정지 상태는 현행과 동일.
     private const float MinVelSqrForDirFallback = 0.25f; // 0.5 m/s
 
-    // 구르기 → 로코모션 복귀 크로스페이드 길이. 기본(0.05s)은 자세 차가 커서 스냅이 보인다.
-    private const float DodgeExitBlend = 0.15f;
+    // 구르기 → 로코모션 복귀 크로스페이드 길이(초, 고정시간). 로코모션 기본(0.14s)은 자세 차가 커서 짧다.
+    private const float DodgeExitBlend = 0.18f;
 
     // 대시 중 허용할 최대 상승 속도(m/s).
     // 경사/계단을 고속으로 타면 호버 스프링(지면이 급히 솟아 error 급증)과 콜라이더 충돌 반발이
@@ -82,7 +82,7 @@ public class LocoDodgeState : ILayerState<LocoState>
         // 저스트 회피 장전 — 대시 중(무적 구간)에 공격을 맞으면 슬로모 + 이동 보너스로 보상. 회피당 1회.
         _controller.ArmPerfectDodge();
 
-        _controller.Anim.CrossFade("Dodge", 0.05f);
+        _controller.Anim.CrossFadeInFixedTime("Dodge", 0.06f);
         _controller.SetMoveScale(0f);
         _controller.FirePassive(PassiveTrigger.OnDodge, new PassiveContext());
 
@@ -136,13 +136,21 @@ public class LocoDodgeState : ILayerState<LocoState>
             float vy = _controller.Rigid.linearVelocity.y;
 
             float walkSpd = _controller.CharacterData.baseMoveSpeed;
-            float runSpd  = _controller.CharacterData.baseRunSpeed;
-            float maxSpd  = Mathf.Max(walkSpd, Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(_controller.RunBlend01)));
+            float runSpd  = _controller.CharacterData.baseRunSpeed > 0.01f
+                ? _controller.CharacterData.baseRunSpeed
+                : walkSpd;
+            bool hasMoveInput = _controller.MoveDirection.sqrMagnitude > 0.0001f;
+
+            // 이동 입력이 있으면 회피 직전 상태와 무관하게 '달리기 최고속'으로 이어받는다.
+            // 예전엔 회피 이전의 RunBlend01(정지/걷기에서 회피했으면 대개 0)로 걷기속도를 물려줘,
+            // 회피가 끝난 뒤 걷기부터 램프를 다시 타는 재가속 구간이 남았다.
+            // 입력이 없으면 종전대로 현재 최고속으로만 낮춰 넘기고 정지는 Idle의 감속(moveDecel)에 맡긴다.
+            float maxSpd = hasMoveInput
+                ? runSpd
+                : Mathf.Max(walkSpd, Mathf.Lerp(walkSpd, runSpd, Mathf.Clamp01(_controller.RunBlend01)));
             maxSpd *= _controller.RuntimeStats?.MoveSpeedMultiplier ?? 1f;
 
-            Vector3 carryDir = _controller.MoveDirection.sqrMagnitude > 0.0001f
-                ? _controller.MoveDirection.normalized
-                : _dodgeDir;
+            Vector3 carryDir = hasMoveInput ? _controller.MoveDirection.normalized : _dodgeDir;
             Vector3 carry = carryDir * maxSpd;
 
             _controller.Rigid.linearVelocity = new Vector3(carry.x, vy, carry.z);
@@ -154,15 +162,27 @@ public class LocoDodgeState : ILayerState<LocoState>
 
             _controller.SetMoveScale(1f);
             var next = !_controller.IsGrounded() ? LocoState.Air
-                       : (_controller.MoveDirection.sqrMagnitude > 0.0001f ? LocoState.Move
-                                                                           : LocoState.Idle);
+                       : (hasMoveInput ? LocoState.Move : LocoState.Idle);
+
+            // 회피 → 이동 복귀 프라임. 취소/피격 경로(Exit)가 아니라 정상 종료 지점에서만 건다.
+            //  · RotateTowardsInput: 회피 방향과 입력 방향이 다를 때 facing을 입력 쪽으로 즉시 스냅.
+            //    속도(carryDir)는 이미 입력 방향이라, 슬루(720°/s)에 맡기면 반대 방향 회피 후
+            //    최대 0.25s 동안 옆/뒤로 미끄러지는 주행이 보인다.
+            //  · RequestRunAfterDash: LocoMoveState.Enter가 이걸 소비해 _runCharge01/_animFloor를
+            //    풀 달리기로 시작 → 걷기 램프를 다시 타지 않는다.
+            if (next == LocoState.Move)
+            {
+                _controller.RotateTowardsInput();
+                _controller.RequestRunAfterDash();
+            }
+
             _stateChanger.Change(next);
         }
     }
 
     public void Exit()
     {
-        // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 짧은 블렌드(0.05s)면 툭 튀며 선다.
+        // 구르기 자세 → 로코모션 복귀는 자세 차이가 커서 로코모션 기본 블렌드(0.14s)면 아직 짧다.
         // 다음 로코모션 진입의 크로스페이드를 길게 예약해 부드럽게 이어붙인다(다른 전이엔 영향 없음).
         _controller.RequestLocoBlend(DodgeExitBlend);
 
@@ -184,9 +204,9 @@ public class LocoDodgeState : ILayerState<LocoState>
 
         _controller.SetMoveScale(1f);
 
-        // 우클릭 대시 후 — 유물 보유 시 다음 이동을 달리기로 시작(정지 전까지 유지)
-        if (_controller.HasRelic && _controller.IsGrounded())
-            _controller.RequestRunAfterDash();
+        // 다음 이동을 달리기로 시작하는 프라임은 Update의 정상 종료 분기로 옮겼다.
+        // 여기(Exit)는 피격/중단 취소 경로에서도 불리므로 프라임 지점으로 부적절했고,
+        // HasRelic 게이트도 실효가 없었다(LocoMoveState의 걷기→달리기 램프는 이미 무장비 포함).
 
         // 아이템 효과: 구르기 종료 hook
         var mgr = GameRunBootstrapper.Instance?.Run?.EffectManager;

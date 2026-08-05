@@ -24,6 +24,14 @@ public class MonsterConfigSO : ScriptableObject
     [Tooltip("플레이어 레이어 마스크 (감지 및 공격 판정에 공통 사용)")]
     public LayerMask playerLayer;
 
+    [Header("시각 크기")]
+    [Tooltip("등급 배율 적용 전 기준 신장(m). 0이면 리스케일하지 않고 프리팹 원본 크기를 유지한다.\n" +
+             "실제 표시 신장 = visualHeightMeters × 등급 배율(Common 1.0 / Rare 1.1 / Elite 1.25).\n" +
+             "밴드: 소형 1.1~1.4 / 표준 1.6~2.0 / 대형 2.3~2.7 / 미니보스 2.7~3.2 / 보스 3.6~5.4.\n" +
+             "일반 몹(비-보스)의 표시 신장 상한은 2.7 — 보스 최소치를 넘지 않게 유지한다.\n" +
+             "보스 등급은 리스케일 대상이 아니다(프리팹 원본 크기 사용).")]
+    public float visualHeightMeters;
+
     // ── 인라인 데이터 ─────────────────────────────────────
     [Header("데이터 — 수치/애니메이션 (JSON으로 덮어쓰기 가능)")]
     public MonsterStatData      stat      = new MonsterStatData();
@@ -47,6 +55,18 @@ public class MonsterConfigSO : ScriptableObject
              "  • BKChaseStateSO  → ChaseState 하나만 선회 추격으로 교체\n" +
              "  • SnailShellOverrideSO → Chase/AttackReady/Attack 세 상태가 SharedTimer 공유")]
     public List<MonsterStateOverrideSO> stateOverrides;
+
+    /// <summary>등급 배율까지 반영한 최종 표시 신장(m). 0이면 리스케일하지 않는다는 뜻.</summary>
+    public float ResolveVisualHeight()
+        => visualHeightMeters <= 0f ? 0f : visualHeightMeters * GradeScale(grade);
+
+    /// <summary>등급별 크기 배율. 상위 등급일수록 한눈에 커 보이게 한다.</summary>
+    public static float GradeScale(MonsterGrade grade) => grade switch
+    {
+        MonsterGrade.Rare  => 1.1f,
+        MonsterGrade.Elite => 1.25f,
+        _                  => 1f,
+    };
 }
 
 /// <summary>

@@ -17,6 +17,7 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
+  visualHeightMeters: 1.1
   stat:
     maxHp: 10
     defense: 1

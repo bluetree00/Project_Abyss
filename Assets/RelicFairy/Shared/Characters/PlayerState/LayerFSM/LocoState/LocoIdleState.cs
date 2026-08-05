@@ -16,7 +16,7 @@ public class LocoIdleState : ILayerState<LocoState>
         // 공격/스킬 중이면 CrossFade 생략 (공격 애니메이션 덮어쓰기 방지)
         // 회피 종료처럼 자세 차이가 큰 복귀는 RequestLocoBlend로 더 긴 블렌드를 예약해 스냅을 없앤다.
         if (!_controller.Combo.IsAttacking)
-            _controller.Anim.CrossFade("MoveBlend", _controller.ConsumeLocoBlend(0.1f));
+            _controller.Anim.CrossFadeInFixedTime("MoveBlend", _controller.ConsumeLocoBlend(0.14f));
         SetSpeedParam(_controller.Anim, 0f);
 
         // 정지 → 달리기 상태/대시-후-달리기 요청 해제 (다음 이동은 걷기부터)
@@ -52,6 +52,7 @@ public class LocoIdleState : ILayerState<LocoState>
 
     public void Exit() { }
 
-    static void SetSpeedParam(Animator anim, float target01, float damp = 0.1f)
+    // 정지 방향은 빠르게 따라붙어야 발이 안 끌린다 → 기본 damp 0.08.
+    static void SetSpeedParam(Animator anim, float target01, float damp = 0.08f)
         => anim.SetFloat("MoveSpeed", Mathf.Clamp01(target01), damp, Time.deltaTime);
 }

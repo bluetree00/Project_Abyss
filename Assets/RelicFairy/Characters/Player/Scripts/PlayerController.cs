@@ -181,7 +181,13 @@ public class PlayerController : CharacterBase
             // 글로벌 히트스톱은 의도적으로 생략(들어오는 피해에 프리즈=렉 체감, 보스별 설계 히트스톱은 별도 유지).
             float maxHp = RuntimeStats != null ? Mathf.Max(1f, RuntimeStats.MaxHp) : 100f;
             float sev = Mathf.Clamp01(finalDmg / (maxHp * 0.2f)); // 최대HP 20% 피해 = 최대 강도
-            HitFeelService.CameraShake(Mathf.Lerp(0.05f, 0.16f, sev), 0.18f);
+
+            // 가해자→피해자 방향으로 화면을 밀어 "어디서 맞았는지"가 읽히게 한다.
+            // 가해자 미상(장판/도트 등)이면 0 벡터 → 기존 무방향 셰이크와 동일.
+            Vector3 hitDir = attacker != null
+                ? transform.position - attacker.transform.position
+                : Vector3.zero;
+            HitFeelService.CameraShakeDirectional(hitDir, Mathf.Lerp(0.05f, 0.16f, sev), 0.18f);
 
             // 룬 속성 OnDamaged 통지(어둠 게이지 등). 실제 피해가 들어갈 때만 — i-frame/회피/무효/사망무효는 위에서 이미 return.
             _runeEffects?.NotifyDamaged(finalDmg, attacker);
@@ -436,6 +442,9 @@ public class PlayerController : CharacterBase
             return Mathf.Clamp01(mag / runMax);
         }
     }
+    /// <summary>이동 능력이 이번 프레임 겨냥한 목표 속도를 runMax 기준 0~1로 정규화(급반전 제동 적용 전).
+    /// DefaultMoveAbility가 설정, LocoMoveState가 애니 블렌드 하한의 상한값으로 사용.</summary>
+    public float IntendedSpeed01 { get; set; }
     private bool _runAfterDash;
     /// <summary>대시(우클릭) 종료 시 다음 이동을 달리기로 시작하도록 요청.</summary>
     public void RequestRunAfterDash() => _runAfterDash = true;
@@ -998,8 +1007,15 @@ public class PlayerController : CharacterBase
 
     // 슬루 ease-out — 목표까지 남은 각이 이 값(도) 이하면 각속도를 부드럽게 줄여 짧은 회전·마무리를 매끄럽게 한다.
     // ease-in은 두지 않는다(시작은 전속력) → 방향전환 반응성/선회감 제거 유지, 끝만 부드럽게 안착.
-    private const float FacingSlewEaseOutAngle = 40f;
-    private const float FacingSlewEaseFloor = 0.18f; // 목표 직전 정체 방지용 최저 속도비
+    //
+    // 이 꼬리는 각도 폭이 고정이라(SmoothStep이 t를 clamp하므로 남은 각 > EaseOutAngle 구간은 이미 전속)
+    // 큰 회전일수록 비중이 커지지는 않는다. 실제 손실원은 EaseFloor였다 — 0.18이면 마지막 ~9°를
+    // 130°/s로 기어서 그 구간만 0.073s를 먹었고, 180° 반전이 0.36s가 되어 속도 반전(≈0.15s)보다 크게 느렸다.
+    // 밴드를 25°로 좁히고 바닥을 0.5로 올려 180° 반전을 0.27s로 당긴다(ease 없는 이론 하한 0.25s).
+    // 각속도 상한(turnSpeedDegPerSec 720)은 건드리지 않는다 — 전환의 시각 표현이 회전뿐이라
+    // 각속도를 올리면 "휙 도는" 인상이 강해진다.
+    private const float FacingSlewEaseOutAngle = 25f;
+    private const float FacingSlewEaseFloor = 0.5f; // 목표 직전 정체 방지용 최저 속도비
 
     /// <summary>즉시(1회) 회전 지정. 스킬/회피/조준 등 한 프레임 스냅 또는 자체 보간 writer용. 진행 중인 이동 회전 슬루를 취소한다.
     /// 실제 적용은 FixedUpdate(ApplyFacing)에서 Rigidbody.MoveRotation으로 수행.</summary>
@@ -1762,7 +1778,15 @@ public class PlayerController : CharacterBase
         foreach (var mapping in animSet.GetAllMappings())
         {
             var clip = Managers.AnimationResources.GetClip(mapping.addressableKey);
-            if (clip != null) _animSvc.Override(mapping.baseClipName, clip);
+            if (clip == null) continue; // 어드레서블 미등록 — AnimationResourceManager 가 이미 경고했다.
+
+            // Override 키는 컨트롤러 상태가 물고 있는 '원본 클립 이름'이다. baseClipName(=상태 이름)과
+            // 다르거나 그런 상태가 없으면 조용히 실패해 무기 클립이 영영 적용되지 않는다.
+            // 지금까지 이 실패가 묻혀 있었으므로 반드시 드러낸다.
+            if (!_animSvc.Override(mapping.baseClipName, clip))
+                Debug.LogWarning($"[PlayerController] 애니 오버라이드 실패 — 무기 '{newWeapon.weaponSOKey}' " +
+                                 $"키 '{mapping.baseClipName}' (addressable '{mapping.addressableKey}'). " +
+                                 $"컨트롤러에 그 이름의 원본 클립이 없다.");
         }
 
         AssignAttackPolicyForWeapon(newWeapon);
@@ -1858,7 +1882,7 @@ public class PlayerController : CharacterBase
 
         // 즉시 점프 애니메이션 시작 (AirState 전이를 기다리지 않음)
         Anim.SetFloat("JumpValue", 0f);
-        Anim.CrossFade("JumpBlend", 0.05f);
+        Anim.CrossFadeInFixedTime("JumpBlend", 0.08f);
     }
 
     /// <summary>공중 공격 진입 시 호출 — 낙하 속도를 즉시 멈추고 체공 시작</summary>

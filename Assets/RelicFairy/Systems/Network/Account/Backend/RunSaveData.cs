@@ -63,6 +63,12 @@ public class RunSaveData
     public int    seqPhase;
     public int    shopUsed;
     public int    eventUsed;
+    public int    crucibleUsed;         // 재련소 방문(캡 소모) — 없으면 이어하기마다 캡이 리셋된다
+    public int    refineryUsed;         // 정제소 방문(캡 소모)
+    public int    shopMiss;             // PRD 미출현 누적 — 특수방 등장 기대치. 복원 안 하면 초기화된다
+    public int    eventMiss;
+    public int    crucibleMiss;
+    public int    refineryMiss;
     public int    heading;
     public int    anchorToggle;
     public string currentRoomPoolKey;

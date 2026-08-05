@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,9 +19,40 @@ public static class ShopUIStyle
     public static string PanelSpriteKey = "";   // 윈도우 배경 9-slice
     public static string FrameSpriteKey = "";    // 카드 테두리 9-slice
     public static string CoinSpriteKey  = "";    // 골드 코인 아이콘
-    public static Action<string> Sfx;            // "shop_open"/"shop_buy"/"shop_reject"/"shop_reroll"
+    /// <summary>
+    /// 상점·재련소 SFX 훅. <b>기본 라우팅이 걸려 있다</b> — 예전엔 이 필드에 대입하는 코드가
+    /// 프로젝트 어디에도 없어서, <c>PlaySfx</c>를 부르는 22곳(상점 구매·거부·리롤, 재련소 성공·잭팟·실패)이
+    /// <b>한 번도 소리를 낸 적이 없었다</b>. 외부에서 대입하면 그쪽이 우선한다.
+    /// </summary>
+    public static Action<string> Sfx = DefaultSfx;
 
     public static void PlaySfx(string key) => Sfx?.Invoke(key);
+
+    /// <summary>
+    /// 기본 라우팅 — 전용 클립이 아직 없으므로 기존 UI 클립 1종을 <b>피치·볼륨으로 구분</b>해 쓴다.
+    /// (성공은 올라가고, 거부·실패는 내려간다.) 전용 오디오가 들어오면 여기 키만 갈아끼우면 된다.
+    /// </summary>
+    private static void DefaultSfx(string key)
+    {
+        var sound = Managers.Sound;
+        if (sound == null || string.IsNullOrEmpty(key)) return;
+
+        (float volume, float pitch) = key switch
+        {
+            "crucible_jackpot" => (1.00f, 1.45f),
+            "crucible_success" => (0.85f, 1.20f),
+            "enhance_success"  => (0.85f, 1.20f),
+            "shop_buy"         => (0.80f, 1.10f),
+            "shop_reroll"      => (0.70f, 1.25f),
+            "shop_open"        => (0.60f, 1.00f),
+            "shop_close"       => (0.55f, 0.90f),
+            "crucible_fail"    => (0.80f, 0.65f),
+            "shop_reject"      => (0.65f, 0.70f),
+            _                  => (0.65f, 1.00f),
+        };
+
+        sound.PlayEffectAsync(SoundKey.Sfx.UiButton, volume, pitch).Forget();
+    }
 
     // ── 팔레트 (다크 판타지/유물) ───────────────────────────
     public static readonly Color Veil        = new(0f, 0f, 0f, 0.80f);

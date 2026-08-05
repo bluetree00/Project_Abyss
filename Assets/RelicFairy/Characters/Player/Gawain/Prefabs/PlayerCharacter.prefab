@@ -140,7 +140,7 @@ CapsuleCollider:
   m_Radius: 0.26838902
   m_Height: 1.1494575
   m_Direction: 1
-  m_Center: {x: -0.0050507486, y: 0.57640946, z: 0.0141810775}
+  m_Center: {x: -0.0050507486, y: 0.5445689, z: 0.0141810775}
 --- !u!114 &1338888466502873317
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -199,6 +199,7 @@ MonoBehaviour:
   EventReceiver: {fileID: 0}
   locoStateDebug: 0
   actStateDebug: 0
+  _freezeLoopSfx: {fileID: 0}
   handTransform: {fileID: 0}
   handTransformLeft: {fileID: 0}
 --- !u!1001 &1697851272020990271
@@ -374,6 +375,7 @@ MonoBehaviour:
   stiffness: 0.2
   damping: 0.4
   gravity: 0.3
+  maxBendAngle: 60
   maxDeltaTime: 0.03
 --- !u!4 &5254294612690553099 stripped
 Transform:

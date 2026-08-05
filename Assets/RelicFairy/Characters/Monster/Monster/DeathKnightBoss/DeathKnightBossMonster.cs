@@ -416,6 +416,9 @@ public class DeathKnightBossMonster : MonsterBase, IBoss, IBossEntrance
     public void SoulPillarApplyDamage(int amount)
     {
         if (_runtime == null || _runtime.IsDead) return;
+        // 기둥을 부순 건 플레이어의 직접 타격이다 — 이 경로로 죽여도 막타 히트스톱이 살아야 한다.
+        // (TakeDamage를 우회하므로 피해 종류가 갱신되지 않아 직전 DoT 틱이 남을 수 있다)
+        _lastDamageKind = DamageKind.Normal;
         _runtime.CurrentHp = Mathf.Max(0, _runtime.CurrentHp - amount);
         NotifyHpChanged();
         if (_runtime.CurrentHp <= 0)

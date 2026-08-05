@@ -6,7 +6,7 @@ using UnityEngine;
 /// 유물 성장(개화)은 런 내 임시 성장으로, 보스 클리어 시 3지선다 드래프트로 획득한다.
 /// 수치가 아닌 기능/메커니즘 변화만 담는다("+20% 데미지"는 파츠 아닌 각성/무기 강화가 담당).
 ///
-/// CSV 컬럼: index | relic_id | part_kind | part_id | part_name | description | effect_key | boss_tier
+/// CSV 컬럼: index | relic_id | part_kind | part_id | part_name | description | effect_key | boss_tier | requires
 /// </summary>
 [System.Serializable]
 public sealed class RelicPartEntry
@@ -19,6 +19,7 @@ public sealed class RelicPartEntry
     public string description;  // 표시 설명
     public string effect_key;   // 런타임 효과 훅 식별자 (구현은 후속)
     public int    boss_tier;    // 등장 시점: 1 = Ch1·Ch2 기능 파츠 풀 / 3 = Ch3 코어 진화 풀
+    public string requires;     // 선행 파츠 part_id(없으면 빈칸). 이 파츠 미보유면 드래프트 후보에서 제외(죽은 픽 방지)
 }
 
 [System.Serializable]

@@ -185,6 +185,12 @@ public class RunProgressManager : MonoBehaviour
         d.seqPhase          = m.seqPhase;
         d.shopUsed          = m.shopUsed;
         d.eventUsed         = m.eventUsed;
+        d.crucibleUsed      = m.crucibleUsed;
+        d.refineryUsed      = m.refineryUsed;
+        d.shopMiss          = m.shopMiss;
+        d.eventMiss         = m.eventMiss;
+        d.crucibleMiss      = m.crucibleMiss;
+        d.refineryMiss      = m.refineryMiss;
         d.heading           = m.heading;
         d.anchorToggle      = m.anchorToggle;
         d.currentRoomPoolKey = m.currentRoomPoolKey;

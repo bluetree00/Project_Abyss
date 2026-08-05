@@ -89,7 +89,14 @@ public class WorldCovenantAltar : MonoBehaviour
         GameObject prefab;
         try { prefab = await addr.TryLoadAssetAsync<GameObject>(TomeVisualKey); }
         catch (OperationCanceledException) { return; }
-        if (prefab == null || this == null) return;
+        if (this == null) return;
+        if (prefab == null)
+        {
+            // 조용히 넘기면 "제단이 안 보인다"로만 드러나 원인 추적이 오래 걸린다.
+            Debug.LogWarning($"[WorldCovenantAltar] '{TomeVisualKey}' 로드 실패 — 마도서 없이 투명 제단으로 동작. " +
+                             "Addressables 주소가 끊겼는지 확인할 것.");
+            return;
+        }
 
         _tomeBasePos = transform.position + Vector3.up * TomeVisualY;
         var go = Instantiate(prefab, _tomeBasePos, Quaternion.identity, transform);
@@ -177,6 +184,12 @@ public class WorldCovenantAltar : MonoBehaviour
         catch (OperationCanceledException) { return; }
 
         if (this == null) return;
+
+        // 라벨/안내는 디졸브 대상에서 제외된다(TMP는 디졸브 머티리얼이 씌워지면 깨진다).
+        // 제단만 사라지고 "서약 완료" 글자만 공중에 남는 그림을 막기 위해 여기서 먼저 끈다.
+        if (_worldText != null) _worldText.gameObject.SetActive(false);
+        ShowPrompt(false);
+
         DissolveEffect.PlayDisappear(gameObject, 0.6f, () => { if (this != null) Destroy(gameObject); });
     }
 

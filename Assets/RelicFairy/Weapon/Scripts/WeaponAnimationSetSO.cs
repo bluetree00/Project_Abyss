@@ -25,7 +25,11 @@ public class WeaponAnimationSetSO : ScriptableObject
         [Header("콤보 타이밍 Override (0~1 normalized, -1 = AnimSet 기본값 사용)")]
         [Range(-1f, 1f)] public float comboWindowOpen  = -1f;
         [Range(-1f, 1f)] public float comboWindowClose = -1f;
+        [Tooltip("다음 콤보가 발사되는 '체인 지점'. 회수 동작의 끝이 아니다 — 회수는 recoveryEndAt 로 따로 지정한다.")]
         [Range(-1f, 1f)] public float attackEndAt      = -1f;
+        [Tooltip("회수(recovery) 종료 시점. attackEndAt 보다 뒤여야 유효. 후속 입력이 없을 때만 여기까지 클립을 마저 재생한다. " +
+                 "어떤 입력이든 들어오면 즉시 취소되므로 콤보 반응성은 변하지 않는다. -1 = 회수 없음(종전 동작).")]
+        [Range(-1f, 1f)] public float recoveryEndAt    = -1f;
 
         [Header("공격 중 전진 (Lunge Step)")]
         [Tooltip("이 콤보 단계에서 전진할 거리(m). 0 이면 전진 없음.")]

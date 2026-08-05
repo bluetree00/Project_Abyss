@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// TileType[,] 그리드 + BlockPalette → 블록 인스턴스 생성.
@@ -403,6 +404,75 @@ public class MapBuilder
     /// 중요도에 따라 다르게 밝혀야 한다(R. Yang, "How to Light a Level", GDC 2018).
     /// 균일 배치만 하면 "밝은 곳이 갈 곳"이라는 신호가 성립하지 않는다.
     /// </param>
+    /// <summary>
+    /// 바닥 셀 위에 데칼을 흩뿌려 타일 무늬 반복을 깬다.
+    ///
+    /// 챕터 방은 런타임 생성이라 라이트맵도 리플렉션 프로브도 못 쓴다. 데칼은 버퍼 기반이라
+    /// 지오메트리가 언제 생기든 상관없이 얹히므로, 절차 생성 콘텐츠에 쓸 수 있는 몇 안 되는
+    /// 표면 디테일 수단이다.
+    ///
+    /// 시드는 호출부가 넘긴다. 이어하기로 같은 방을 다시 세울 때 같은 배치가 나와야
+    /// 플레이어가 기억하는 공간과 어긋나지 않는다.
+    /// </summary>
+    public static void BuildFloorDecals(
+        TileType[,]  grid,
+        Transform    parent,
+        float        cellSize,
+        float        baseY,
+        BlockPalette palette,
+        int          seed)
+    {
+        if (palette == null || parent == null) return;
+
+        var mats = palette.FloorDecalMaterials;
+        if (mats == null || mats.Count == 0) return;
+        if (palette.DecalsPer100SqM <= 0f) return;
+
+        int w = grid.GetLength(0);
+        int h = grid.GetLength(1);
+        var offset = new Vector3((w - 1) * 0.5f * cellSize, 0f, (h - 1) * 0.5f * cellSize);
+
+        // 데칼을 얹을 수 있는 셀만 모은다. 벽·구멍 위에 뿌리면 허공에 뜬다.
+        var floorCells = new List<Vector2Int>();
+        for (int x = 0; x < w; x++)
+        for (int z = 0; z < h; z++)
+            if (grid[x, z] != TileType.Wall && grid[x, z] != TileType.Empty)
+                floorCells.Add(new Vector2Int(x, z));
+
+        if (floorCells.Count == 0) return;
+
+        float areaSqM = floorCells.Count * cellSize * cellSize;
+        int   count   = Mathf.RoundToInt(areaSqM / 100f * palette.DecalsPer100SqM);
+        if (count <= 0) return;
+
+        var root = new GameObject("FloorDecals").transform;
+        root.SetParent(parent, false);
+
+        var rng = new System.Random(seed);
+        float Range(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+        for (int i = 0; i < count; i++)
+        {
+            var cell = floorCells[rng.Next(floorCells.Count)];
+
+            var go = new GameObject($"Decal_{i:000}");
+            go.transform.SetParent(root, false);
+            go.transform.localPosition = new Vector3(
+                cell.x * cellSize - offset.x + Range(-0.5f, 0.5f) * cellSize,
+                baseY + 0.5f,                                   // 위에서 아래로 투영
+                cell.y * cellSize - offset.z + Range(-0.5f, 0.5f) * cellSize);
+            // 프로젝터는 자기 -Z 로 투영한다. X 90도로 세워야 바닥을 향한다.
+            go.transform.localRotation = Quaternion.Euler(90f, Range(0f, 360f), 0f);
+
+            var projector = go.AddComponent<DecalProjector>();
+            projector.material   = mats[rng.Next(mats.Count)];
+            float size           = Range(1.5f, 3.5f) * cellSize;
+            projector.size       = new Vector3(size, size * Range(0.7f, 1.3f), 2f);
+            projector.pivot      = new Vector3(0f, 0f, 1f);     // 박스 앞면이 바닥에 닿게
+            projector.fadeFactor = Range(0.3f, 0.65f);
+        }
+    }
+
     public static void BuildRoomLights(
         TileType[,]        grid,
         Transform          parent,
@@ -454,6 +524,9 @@ public class MapBuilder
             var lightLocal = wallLocal + inwardDir * (cellSize * 0.45f);
             var go = Object.Instantiate(cfg.wallLightPrefab,
                 parent.TransformPoint(lightLocal), Quaternion.LookRotation(inwardDir), parent);
+
+            // 챕터 무드를 먼저 입히고, 출구 승격은 그 위에 곱한다(승격은 무드가 아니라 위계다).
+            cfg.wallLightTint?.ApplyTo(go);
 
             if (boost)
             {
@@ -529,9 +602,10 @@ public class MapBuilder
         if (cfg.centerLightPrefab != null)
         {
             float ceilingY = baseY + wallLayers * cellSize;
-            Object.Instantiate(cfg.centerLightPrefab,
+            var centerGo = Object.Instantiate(cfg.centerLightPrefab,
                 parent.TransformPoint(new Vector3(0f, ceilingY - cellSize * 0.3f, 0f)),
                 Quaternion.identity, parent);
+            cfg.centerLightTint?.ApplyTo(centerGo);
         }
     }
 
@@ -544,6 +618,9 @@ public class MapBuilder
     /// <param name="edge">문 엣지 — 바깥 방향 결정(North=+Z/South=-Z/East=+X/West=-X).</param>
     /// <param name="widthCells">개구부 폭(셀 수). 측벽은 폭+1 위치에 세운다.</param>
     /// <param name="lengthCells">바깥으로 뻗는 길이(셀 수). 0 이하면 아무것도 안 함.</param>
+    /// <summary>문 하나의 복도+챔버에 배치할 실시간 조명 상한. 방마다 문이 최대 3개라 캡이 없으면 조명이 폭증한다.</summary>
+    private const int MaxCorridorLights = 12;
+
     public static List<PlacedBlock> BuildDoorCorridor(
         BlockPalette palette,
         Transform    parent,
@@ -586,6 +663,34 @@ public class MapBuilder
         int half       = Mathf.Max(0, widthCells / 2); // RoomDoorPlanner.Open과 동일 규약(개구부 = 2*half+1)
         float ceilingY = baseY + wallLayers * cellSize;
 
+        // ── 통로·챔버 조명 ────────────────────────────────────────
+        // 예전엔 복도와 끝 챔버에 조명이 <b>하나도 없어</b> 앰비언트만 받는 평평한 덩어리로 보였다 —
+        // 문 너머가 "대충 만든 임시 방"처럼 읽히던 주원인. 방과 <b>같은 팔레트 조명 설정</b>을 쓰므로
+        // 챕터 무드(색·강도)가 방에서 통로로 그대로 이어진다.
+        var   lightCfg  = palette.Lighting;
+        bool  canLight  = lightCfg != null && lightCfg.wallLightPrefab != null;
+        int   lightStep = canLight ? Mathf.Max(2, lightCfg.wallLightSpacing) : int.MaxValue;
+        float lightY    = baseY + wallLayers * cellSize * (lightCfg?.wallLightHeightRatio ?? 0.4f);
+        int   lightBudget = MaxCorridorLights;   // 실시간 조명 폭증 방지(문마다 복도+챔버가 생긴다)
+
+        // 측벽 안쪽 면에 조명 1개. lateralCells = 벽이 선 측면 칸수.
+        void PlaceSideLight(Vector3 axisLocal, int sign, int lateralCells)
+        {
+            if (!canLight || lightBudget <= 0) return;
+
+            Vector3 inward  = -sign * lateral;
+            Vector3 wallLoc = axisLocal + lateral * (sign * lateralCells * cellSize);
+            wallLoc.y = lightY;
+
+            var go = Object.Instantiate(
+                lightCfg.wallLightPrefab,
+                parent.TransformPoint(wallLoc + inward * (cellSize * 0.45f)),
+                Quaternion.LookRotation(parent.TransformDirection(inward)),
+                parent);
+            lightCfg.wallLightTint?.ApplyTo(go);   // 챕터 무드
+            lightBudget--;
+        }
+
         // step=1..length: 바닥(개구부 폭) + 측벽(폭+1) + 천장
         for (int step = 1; step <= lengthCells; step++)
         {
@@ -605,6 +710,11 @@ public class MapBuilder
             if (wallDef?.prefab != null)
                 for (int sign = -1; sign <= 1; sign += 2)
                     StackWall(wallDef, parent, axis + lateral * (sign * (half + 1) * cellSize), baseY, cellSize, wallReps, $"Corridor_W_{step}_{sign}", placed);
+
+            // 일정 간격으로 양쪽 벽에 조명 — 통로가 "이어지는 길"로 읽히게 한다.
+            if (step % lightStep == 0)
+                for (int sign = -1; sign <= 1; sign += 2)
+                    PlaceSideLight(axis, sign, half + 1);
         }
 
         // 끝막이 대신 — 복도 끝을 '다음 방'으로 열어, 통로가 실제 다른 방으로 이어진 것처럼 보이게 한다.
@@ -618,7 +728,10 @@ public class MapBuilder
             int nearStep     = lengthCells + 1;
             int farStep      = lengthCells + chamberDepth;
 
-            // 바닥만 깔고 천장은 덮지 않는다(개방) — 본 방과 동일한 개방형이라 부감에서 '방'으로 보인다.
+            // 천장은 <b>방과 같은 방식</b>으로 맞춘다 — 열린 방(숲·폐허·성역)은 개방, 덮인 방(요새)은 덮는다.
+            // 요새처럼 밀폐된 챕터에서 문 너머만 뻥 뚫려 있으면 컨셉이 어긋난다.
+            bool chamberCeiling = palette.HasCeiling && ceilUse?.prefab != null;
+
             for (int step = nearStep; step <= farStep; step++)
             {
                 Vector3 axis = openingCenterLocal + outward * (step * cellSize);
@@ -626,10 +739,29 @@ public class MapBuilder
                 {
                     Vector3 fLocal = axis + lateral * (lat * cellSize); fLocal.y = baseY;
                     Place(floorDef, parent, fLocal, Quaternion.identity, 3, $"Chamber_F_{step}_{lat}", TileType.Floor, placed);
+
+                    if (chamberCeiling)
+                    {
+                        Vector3 cLocal = fLocal; cLocal.y = ceilingY;
+                        Place(ceilUse, parent, cLocal, ceilFlip ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity,
+                              3, $"Chamber_C_{step}_{lat}", TileType.Ceiling, placed);
+                    }
                 }
                 for (int sign = -1; sign <= 1; sign += 2)
                     StackWall(wallDef, parent, axis + lateral * (sign * (chamberHalf + 1) * cellSize), baseY, cellSize, wallReps, $"Chamber_W_{step}_{sign}", placed);
+
+                // 챔버 벽 조명 — 불 켜진 공간이라야 '다음 방'으로 읽힌다(어두우면 그냥 덩어리).
+                if ((step - nearStep) % lightStep == 0)
+                    for (int sign = -1; sign <= 1; sign += 2)
+                        PlaceSideLight(axis, sign, chamberHalf + 1);
             }
+            // ── 베일 ──
+            // 챔버는 '다음 방'을 흉내낸 빈 공간이라 또렷하게 보이면 가짜 티가 난다.
+            // 입구를 가려 <b>암시</b>로 바꾼다 — 안 보이면 상상이 채우고, 깊이감도 함께 생긴다.
+            // 가리는 방식은 챕터 컨셉이 정한다(어둠/안개 vs 빛).
+            BuildCorridorVeil(palette, parent, openingCenterLocal, outward,
+                              lengthCells, chamberHalf, cellSize, baseY, wallLayers);
+
             // 근벽(어깨) — 복도 개구부(±half) 밖의 넓어진 부분을 막아 '방 입구(문틀)'를 만든다.
             Vector3 nearAxis = openingCenterLocal + outward * (lengthCells * cellSize);
             for (int lat = half + 1; lat <= chamberHalf; lat++)
@@ -656,6 +788,74 @@ public class MapBuilder
         }
 
         return placed;
+    }
+
+    /// <summary>
+    /// 통로 끝 '다음 방'을 가리는 베일. 챕터 컨셉에 따라 두 방식으로 갈린다.
+    ///  · <b>Fog</b>      — 안개를 겹겹이 깔아 어둠으로 지운다(숲=낮게 깔린 미스트 / 폐허=흩날리는 먼지 / 요새=밀폐된 연무).
+    ///  · <b>Radiance</b> — 챔버 입구에 강한 빛을 세워 <b>너무 밝아 안 보이게</b> 한다(성역).
+    ///    다른 챕터가 어둠으로 가릴 때 성역만 빛으로 가리면 챕터 대비가 가장 강하게 선다.
+    /// 색은 팔레트가 정한 베일색(기본 = 챕터 지배색인 벽조명 색)을 쓴다.
+    /// </summary>
+    private static void BuildCorridorVeil(
+        BlockPalette palette, Transform parent, Vector3 openingCenterLocal, Vector3 outward,
+        int lengthCells, int chamberHalf, float cellSize, float baseY, int wallLayers)
+    {
+        if (palette == null) return;
+
+        Color veilColor = palette.VeilColor;
+        float spread    = (chamberHalf + 1) * cellSize;
+        Vector3 mouth   = openingCenterLocal + outward * ((lengthCells + 1) * cellSize);
+
+        if (palette.VeilMode == CorridorVeilMode.Radiance)
+        {
+            // 성역 — 챔버 입구에서 쏟아지는 빛. 실루엣만 남고 안쪽 형상은 날아간다.
+            var go = new GameObject("Corridor_Radiance");
+            go.transform.SetParent(parent, false);
+            var local = mouth; local.y = baseY + wallLayers * cellSize * 0.6f;
+            go.transform.localPosition = local;
+
+            var lt = go.AddComponent<Light>();
+            lt.type      = LightType.Point;
+            lt.color     = veilColor;
+            lt.intensity = palette.VeilRadianceIntensity;
+            lt.range     = spread * 1.6f * palette.VeilScale;
+            lt.shadows   = LightShadows.None;   // 가리는 게 목적이라 그림자는 오히려 형상을 드러낸다
+            return;
+        }
+
+        if (palette.CorridorFogPrefab == null) return;
+
+        // 안개 — 겹 수·높이·크기를 팔레트가 정한다(챕터마다 다른 밀도·기류).
+        int layers = palette.VeilLayers;
+        for (int f = 0; f < layers; f++)
+        {
+            Vector3 fogLocal = mouth + outward * (f * 4f * cellSize);   // 안쪽으로 갈수록 겹쳐 더 짙게
+            fogLocal.y = baseY + palette.VeilHeight;
+
+            var fog = Object.Instantiate(palette.CorridorFogPrefab,
+                                         parent.TransformPoint(fogLocal), parent.rotation, parent);
+            fog.name = $"Corridor_Veil_{f}";
+
+            // ⚠️ 프리팹은 <b>이미 자기 크기를 갖고 있다</b>(루트 스케일·파티클 크기).
+            //    이걸 덮어쓰고 챔버 폭(m)을 스케일로 쓰면 수십 배가 되어 안개가 본 방까지 삼킨다.
+            //    반드시 원본 스케일에 배율만 곱한다.
+            fog.transform.localScale = palette.CorridorFogPrefab.transform.localScale * palette.VeilScale;
+
+            TintParticles(fog, veilColor);
+        }
+    }
+
+    /// <summary>안개 프리팹을 챕터 색으로 물들인다 — 프리팹 하나로 전 챕터를 커버하기 위함.</summary>
+    private static void TintParticles(GameObject go, Color c)
+    {
+        var systems = go.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+            var sc   = main.startColor.color;
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(c.r, c.g, c.b, sc.a));
+        }
     }
 
     /// <summary>local 위치에 블록 1개 인스턴스화 후 placed에 기록.</summary>

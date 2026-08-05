@@ -169,6 +169,10 @@ public sealed class ItemEffectManager
         foreach (var eff in _activeEffects)
             if (eff.IsActive(_ctx))
                 eff.OnKill(_ctx, target);
+
+        // 유물 파츠 처치 훅 — 죽은 적 GameObject를 넘겨 화상/출혈 전염·처치 보상 등에 쓴다.
+        // (룬 디스패처의 QuestEvents 경로는 codeName뿐이라 여기서 발화. 미생성 시 no-op.)
+        _ctx.Player?.RuneEffectsOrNull?.PartsOrNull?.NotifyKill(target);
     }
 
     /// <summary>활성 보스드랍 아이템들의 추가 드랍 횟수 합(설계 ④). RoomClearGate가 보스방에서 호출.</summary>
