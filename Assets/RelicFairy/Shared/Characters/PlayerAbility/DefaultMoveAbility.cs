@@ -151,6 +151,14 @@ public class DefaultMoveAbility : IMoveAbility<PlayerController>
         // 4) 목적지 헤드룸 — 상단에 캡슐이 들어갈 천장 여유 확인(벽/천장으로 기어올라 끼임 차단).
         if (!HasHeadroom(owner, topHit.point)) return;
 
+#if UNITY_EDITOR
+        // [임시 진단] 평지 이동 중에도 단차 오르기가 발동하는지 확인용.
+        // 평지에서 이 로그가 계속 찍히면 바닥 콜라이더에 2cm 이상의 턱이 있다는 뜻이다.
+        // 원인 규명 후 제거한다.
+        Debug.Log($"[StepClimb] deltaY={deltaY:0.###}m  대상='{topHit.collider.name}'  " +
+                  $"수평속도={speed:0.##}  위치y={pos.y:0.###}");
+#endif
+
         // 5) 물리 피드백 상승 — 위치 강제 없이 수직 속도로. remaining/dt 캡으로 오버슈트 0(상단에 정확히 안착).
         float dt = Time.fixedDeltaTime;
         float remaining = topHit.point.y - pos.y;
