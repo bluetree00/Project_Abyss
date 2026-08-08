@@ -1317,6 +1317,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _attackSpeedMulti    = 1f;
         _lastDamageKind      = DamageKind.Normal;
         _status.Reset();
+
+        // 화상은 MonsterStatusReceiver를 타지 않는 독립 컴포넌트라 _status.Reset()으로 지워지지 않는다.
+        // 불타는 도중 죽어 풀로 돌아가면 남은 시간이 그대로 얼어붙었다가, 재사용된 몬스터가
+        // 활성화되는 즉시 이어서 틱을 때린다 — 스폰하자마자 즉사하던 원인.
+        if (TryGetComponent<MonsterBurnHandler>(out var burn)) Destroy(burn);
         _statusCcActive      = false;
         _statusSlowActive    = false;
         _telegraphing        = false;
