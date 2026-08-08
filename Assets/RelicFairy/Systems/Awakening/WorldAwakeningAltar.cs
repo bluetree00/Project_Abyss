@@ -69,18 +69,28 @@ public class WorldAwakeningAltar : MonoBehaviour
 
         try
         {
-            await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
+            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
+            if (panel != null)
+            {
+                // 가드는 팝업이 <b>닫힐 때까지</b> 유지한다. 열리자마자 풀면 F 연타에
+                // 같은 팝업이 스택에 겹쳐 쌓여 한 번 닫아도 잔재가 남는다.
+                panel.OnClosed += HandlePanelClosed;   // 팝업은 닫힐 때 파괴되므로 해제는 불필요
+                return;
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Debug.LogWarning($"[WorldAwakeningAltar] 팝업 로드 실패: {e.Message}");
         }
-        finally
-        {
-            _opening = false;
-            if (_playerInRange) ShowPrompt(true);
-        }
+
+        HandlePanelClosed();
+    }
+
+    private void HandlePanelClosed()
+    {
+        _opening = false;
+        if (_playerInRange) ShowPrompt(true);
     }
 
     private void BillboardTexts()
