@@ -106,7 +106,12 @@ public class WeaponEffectHandler
                     effectObj.transform.position = firePos;
                     effectObj.transform.rotation = Quaternion.LookRotation(fireDir);
 
-                    float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.AttackPower);
+                    // 화살은 '원거리' 공격력으로 계산한다. 예전엔 AttackPower(= Max(근접,원거리))라
+                    // 근접 스탯이 더 높은 빌드에서 화살 데미지가 근접 스탯을 타고 올라갔다(활 빌드 오염).
+                    // 근접/콜라이더 경로(SetupColliderInstance·합쳐진 프리팹)와 동일하게 무기 종류로 스탯을 고른다.
+                    var arrowKind = _player.WeaponManager?.CurrentWeaponData?.weaponType.GetAttackStatKind()
+                                    ?? AttackStatKind.Ranged;
+                    float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.GetEffectiveAttack(arrowKind));
                     arrow.Fire(fireDir, _player.gameObject, dmg);
                     execution?.RegisterEffect(effectObj);
 
