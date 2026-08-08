@@ -92,8 +92,13 @@ public class RunStructureDataManager
         try
         {
             // TryGetInt/Float는 컬럼이 없거나 파싱에 실패해도 조용히 0을 돌려준다.
-            // 그 0을 그대로 쓰면 boss_threshold=0(첫 방부터 보스), shop_cap=0(상점 전멸)처럼
-            // 런이 통째로 망가진다 — 0/음수는 '값 없음'으로 보고 필드 기본값을 남긴다.
+            // 그 0을 그대로 쓰면 boss_threshold=0(첫 방부터 보스)처럼 런이 통째로 망가지므로
+            // '값 없음'과 '명시된 값'을 구분해야 한다 — 값이 있을 때만 필드를 덮고, 없으면 기본값을 남긴다.
+            //
+            // 값 크기로 판정하지 않는 이유: 0이 유효한 설정인 필드가 있다.
+            // shop_cap=0(이 챕터엔 상점 없음)·elite_chance=0(엘리트 없음)은 기획이 의도할 수 있는 값이라,
+            // 이걸 '값 없음'으로 보면 차트로 끌 수가 없어진다. 반대로 boss_threshold 는 0이 곧 고장이라
+            // 값 검사도 함께 둔다.
             var e = new RunStructureEntry
             {
                 chapter_id       = row.TryGetString("chapter_id"),
@@ -106,21 +111,39 @@ public class RunStructureDataManager
                 stat_version     = row.TryGetInt("stat_version"),
             };
 
-            int bossThreshold = row.TryGetInt("boss_threshold");
-            if (bossThreshold > 0) e.boss_threshold = bossThreshold;
+            // boss_threshold 만 값 검사까지 — 0/음수면 첫 방부터 보스가 되어 런이 성립하지 않는다.
+            if (TryColumnInt(row, "boss_threshold", out int bossThreshold) && bossThreshold > 0)
+                e.boss_threshold = bossThreshold;
 
-            int shopCap = row.TryGetInt("shop_cap");
-            if (shopCap > 0) e.shop_cap = shopCap;
+            if (TryColumnInt(row, "shop_cap", out int shopCap) && shopCap >= 0)
+                e.shop_cap = shopCap;
 
-            int eventCap = row.TryGetInt("event_cap");
-            if (eventCap > 0) e.event_cap = eventCap;
+            if (TryColumnInt(row, "event_cap", out int eventCap) && eventCap >= 0)
+                e.event_cap = eventCap;
 
-            float eliteChance = row.TryGetFloat("elite_chance");
-            if (eliteChance > 0f) e.elite_chance = eliteChance;
+            if (TryColumnFloat(row, "elite_chance", out float eliteChance) && eliteChance >= 0f)
+                e.elite_chance = eliteChance;
 
             return e;
         }
         catch { return null; }
+    }
+
+    // 컬럼이 실제로 있고 파싱되는가. TryGetString 은 컬럼이 없거나 null 이면 빈 문자열을 준다.
+    private static bool TryColumnInt(JsonData row, string key, out int value)
+    {
+        value = 0;
+        string s = row.TryGetString(key);
+        return !string.IsNullOrWhiteSpace(s) && int.TryParse(s, out value);
+    }
+
+    private static bool TryColumnFloat(JsonData row, string key, out float value)
+    {
+        value = 0f;
+        string s = row.TryGetString(key);
+        return !string.IsNullOrWhiteSpace(s)
+               && float.TryParse(s, System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out value);
     }
 }
 

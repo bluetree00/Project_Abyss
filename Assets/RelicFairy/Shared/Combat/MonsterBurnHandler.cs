@@ -77,6 +77,24 @@ public sealed class MonsterBurnHandler : MonoBehaviour
         if (_remaining <= 0f) Destroy(this);
     }
 
+    /// <summary>
+    /// 풀 반환 시 화상을 즉시 무해화한다. Destroy 는 프레임 끝에야 실제로 제거되므로,
+    /// 그 사이에 Update 가 한 번 더 돌거나 같은 프레임에 몬스터가 재사용되면 남은 화상이 그대로 이어져
+    /// 스폰하자마자 피해가 들어간다. 상태를 먼저 지워 그 창을 없애고 나서 컴포넌트를 제거한다.
+    /// (_target 을 비우면 Update 는 피해 없이 곧바로 빠져나간다.)
+    /// </summary>
+    public void CancelForPooling()
+    {
+        _target     = null;
+        _monster    = null;
+        _instigator = null;
+        _dps        = 0f;
+        _remaining  = 0f;
+        _total      = 0f;
+        _tickAccum  = 0f;
+        Destroy(this);
+    }
+
     /// <summary>from의 화상을 to에게 그대로 옮긴다(전염) — dps·잔여시간·간격 복사. from에 화상이 없으면 무시. 가웨인 '화상 전염/재앙'.</summary>
     public static void SpreadTo(GameObject from, GameObject to, GameObject instigator)
     {

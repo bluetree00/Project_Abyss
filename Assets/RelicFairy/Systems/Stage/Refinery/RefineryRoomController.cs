@@ -132,6 +132,10 @@ public sealed class RefineryRoomController : MonoBehaviour
     /// <summary>UI_RefineryPanel이 닫힐 때 호출 — 중복 오픈 가드 해제.</summary>
     private void HandlePanelClosed()
     {
+        // 팝업의 OnDestroy가 이 이벤트를 쏘므로 씬 언로드/종료 때도 불린다.
+        // 그때는 이 컨트롤러가 이미 파괴돼 있을 수 있어, 그대로 진행하면 MissingReferenceException 이 난다.
+        if (this == null) return;
+
         _uiOpen = false;
         if (_npc != null) _npc.SetInteractable(true);
     }

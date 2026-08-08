@@ -89,6 +89,10 @@ public class WorldAwakeningAltar : MonoBehaviour
 
     private void HandlePanelClosed()
     {
+        // 팝업의 OnDestroy가 이 이벤트를 쏘므로 씬 언로드/종료 때도 불린다.
+        // 그때는 제단이 이미 파괴돼 있을 수 있어, 그대로 진행하면 MissingReferenceException 이 난다.
+        if (this == null) return;
+
         _opening = false;
         if (_playerInRange) ShowPrompt(true);
     }

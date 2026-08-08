@@ -198,7 +198,13 @@ public class BasicArrow : MonoBehaviour
 
         // SetActive(false)만 하면 풀의 대기열로 돌아가지 않는다 — 그 인스턴스는 영영 재사용되지 않고
         // 화살을 쏠 때마다 풀이 새 인스턴스를 찍어낸다(평타 1발 = 1누수). Despawn이 비활성화까지 처리한다.
-        Managers.ObjectPooler?.Despawn(gameObject);
+        //
+        // 풀러 자체가 없는 시점(씬 정리·종료 등)에는 Despawn을 못 부른다. 그때 아무것도 안 하면
+        // 화살이 활성인 채로 남아 계속 날아가며 충돌한다 — 최소한 비활성화는 보장한다.
+        if (Managers.ObjectPooler != null)
+            Managers.ObjectPooler.Despawn(gameObject);
+        else
+            gameObject.SetActive(false);
     }
 
     private void CleanupVisualEffect()

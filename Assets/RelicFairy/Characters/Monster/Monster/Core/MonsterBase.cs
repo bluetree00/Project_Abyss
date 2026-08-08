@@ -1325,7 +1325,10 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         // 화상은 MonsterStatusReceiver를 타지 않는 독립 컴포넌트라 _status.Reset()으로 지워지지 않는다.
         // 불타는 도중 죽어 풀로 돌아가면 남은 시간이 그대로 얼어붙었다가, 재사용된 몬스터가
         // 활성화되는 즉시 이어서 틱을 때린다 — 스폰하자마자 즉사하던 원인.
-        if (TryGetComponent<MonsterBurnHandler>(out var burn)) Destroy(burn);
+        //
+        // Destroy 만으로는 부족하다 — 실제 제거는 프레임 끝이라 그 전에 Update 가 한 번 더 돌거나
+        // 같은 프레임에 재스폰되면 화상이 그대로 살아 있다. 상태를 먼저 비우고 제거한다.
+        if (TryGetComponent<MonsterBurnHandler>(out var burn)) burn.CancelForPooling();
         _statusCcActive      = false;
         _statusSlowActive    = false;
         _telegraphing        = false;
