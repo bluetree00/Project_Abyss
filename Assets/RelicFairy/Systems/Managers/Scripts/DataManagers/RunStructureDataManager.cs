@@ -91,21 +91,34 @@ public class RunStructureDataManager
     {
         try
         {
-            return new RunStructureEntry
+            // TryGetInt/Float는 컬럼이 없거나 파싱에 실패해도 조용히 0을 돌려준다.
+            // 그 0을 그대로 쓰면 boss_threshold=0(첫 방부터 보스), shop_cap=0(상점 전멸)처럼
+            // 런이 통째로 망가진다 — 0/음수는 '값 없음'으로 보고 필드 기본값을 남긴다.
+            var e = new RunStructureEntry
             {
                 chapter_id       = row.TryGetString("chapter_id"),
-                boss_threshold   = row.TryGetInt("boss_threshold"),
                 preboss_pool_key = row.TryGetString("preboss_pool_key"),
                 boss_pool_key    = row.TryGetString("boss_pool_key"),
                 shop_chance      = row.TryGetFloat("shop_chance"),
-                shop_cap         = row.TryGetInt("shop_cap"),
                 event_chance     = row.TryGetFloat("event_chance"),
-                event_cap        = row.TryGetInt("event_cap"),
-                elite_chance     = row.TryGetFloat("elite_chance"),
                 difficulty_curve = row.TryGetString("difficulty_curve"),
                 milestones       = row.TryGetString("milestones"),
                 stat_version     = row.TryGetInt("stat_version"),
             };
+
+            int bossThreshold = row.TryGetInt("boss_threshold");
+            if (bossThreshold > 0) e.boss_threshold = bossThreshold;
+
+            int shopCap = row.TryGetInt("shop_cap");
+            if (shopCap > 0) e.shop_cap = shopCap;
+
+            int eventCap = row.TryGetInt("event_cap");
+            if (eventCap > 0) e.event_cap = eventCap;
+
+            float eliteChance = row.TryGetFloat("elite_chance");
+            if (eliteChance > 0f) e.elite_chance = eliteChance;
+
+            return e;
         }
         catch { return null; }
     }

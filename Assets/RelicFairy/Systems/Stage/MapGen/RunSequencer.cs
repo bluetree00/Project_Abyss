@@ -132,9 +132,12 @@ public class RunSequencer
         _bossThresholdOverride = bossThresholdOverride;
     }
 
-    /// <summary>실효 보스 임계값. 테스트 오버라이드가 있으면 그것을, 없으면 런 구조(CSV/SO) 값을 쓴다.</summary>
+    /// <summary>실효 보스 임계값. 테스트 오버라이드가 있으면 그것을, 없으면 런 구조(CSV/SO) 값을 쓴다.
+    /// 구조값이 0/음수로 들어오면(차트 컬럼 누락 등) 첫 방부터 보스로 직행하므로 최소 1로 막는다.</summary>
     private int EffectiveBossThreshold
-        => _bossThresholdOverride > 0 ? _bossThresholdOverride : (_config?.BossThreshold ?? int.MaxValue);
+        => _bossThresholdOverride > 0
+            ? _bossThresholdOverride
+            : (_config != null ? Mathf.Max(1, _config.BossThreshold) : int.MaxValue);
 
     /// <summary>이어하기: 저장된 시퀀서 진행 상태를 복원한다.
     /// 재련/정제 캡과 PRD 미출현 누적은 구 세이브에 없으므로 기본값 0(=만량·미출현 없음)으로 폴백한다.</summary>
