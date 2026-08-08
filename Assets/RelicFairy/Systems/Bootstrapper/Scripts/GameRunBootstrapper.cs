@@ -553,12 +553,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // CDN 로드 실패 또는 0개면 오프라인 JSON 폴백
         if (mapData.GetAll().Count == 0)
         {
-            Debug.Log("[GameRunBootstrapper] MapData 0개 — Addressables/STAGEDATA_MAP.json 폴백");
-            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("STAGEDATA_MAP");
+            Debug.Log("[GameRunBootstrapper] MapData 0개 — STAGEDATA_MAP.json 오프라인 폴백");
+            // 폴백 실물은 Resources/STAGEDATA_MAP.json (Addressable 미등록) — Resources도 함께 본다.
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("STAGEDATA_MAP")
+                            ?? Resources.Load<TextAsset>("STAGEDATA_MAP");
             if (textAsset != null)
                 mapData.InitializeFromJson(textAsset.text);
             else
-                Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json not found in Addressables");
+                Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json 없음 (Addressables·Resources 모두)");
         }
     }
 
