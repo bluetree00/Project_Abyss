@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class BasicArrow : MonoBehaviour
 {
+    /// <summary>히트 VFX 안전 수명(초). CombatDamage의 클램프 구간(0.5~3s) 안쪽 값.</summary>
+    private const float HitVfxLife = 2f;
+
     [SerializeField] private float speed = 30f;
     [SerializeField] private float damage = 20f;
     [SerializeField] private float lifetime = 5f;
@@ -192,7 +195,10 @@ public class BasicArrow : MonoBehaviour
     {
         CleanupVisualEffect();
         SetModelVisible(true);
-        gameObject.SetActive(false);
+
+        // SetActive(false)만 하면 풀의 대기열로 돌아가지 않는다 — 그 인스턴스는 영영 재사용되지 않고
+        // 화살을 쏠 때마다 풀이 새 인스턴스를 찍어낸다(평타 1발 = 1누수). Despawn이 비활성화까지 처리한다.
+        Managers.ObjectPooler?.Despawn(gameObject);
     }
 
     private void CleanupVisualEffect()
@@ -241,6 +247,7 @@ public class BasicArrow : MonoBehaviour
 
         if (fx == null) return;
         fx.transform.localScale = Vector3.one * hitEffectScale;
+        EnsureVfxLifetime(fx);
     }
 
     private static async void SpawnEffectAt(Vector3 pos, string key, float scale)
@@ -250,5 +257,19 @@ public class BasicArrow : MonoBehaviour
             pos, Quaternion.identity);
         if (fx == null) return;
         fx.transform.localScale = Vector3.one * scale;
+        EnsureVfxLifetime(fx);
+    }
+
+    /// <summary>
+    /// 스스로 회수되지 못하는 히트 VFX에 수명을 붙인다(CombatDamage.SpawnHitEffectAsync와 같은 방식).
+    /// EffectBehaviour가 있으면 그쪽이 회수하므로 건드리지 않는다 — 이중 Despawn 방지.
+    /// </summary>
+    private static void EnsureVfxLifetime(GameObject fx)
+    {
+        if (fx.GetComponent<EffectBehaviour>() != null) return;
+
+        if (!fx.TryGetComponent<PooledVfxLifetime>(out var life))
+            life = fx.AddComponent<PooledVfxLifetime>();
+        life.SetLife(HitVfxLife);
     }
 }
