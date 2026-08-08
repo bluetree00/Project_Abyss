@@ -193,6 +193,7 @@ public class RunProgressManager : MonoBehaviour
 
         // 절차생성 진행
         d.masterSeed        = m.masterSeed;
+        d.chapterSeed       = m.chapterSeed;   // Ch2+ 이어하기 맵 재현(0=구버전 → 복원 시 재계산)
         d.visitCount        = m.visitCount;
         d.seqPhase          = m.seqPhase;
         d.shopUsed          = m.shopUsed;
@@ -209,6 +210,7 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomKind   = m.currentRoomKind;
         d.currentRoomMirror = m.currentRoomMirror;
         d.currentRoomCleared = m.currentRoomCleared;   // 클리어 후 저장 → 복원 시 몹 재스폰 방지
+        d.currentRoomRewardPending = m.currentRoomRewardPending;   // 미수령 보상 → 복원 시 1회만 재배치
         d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)
 
         var cdw = new CooldownListWrapper();

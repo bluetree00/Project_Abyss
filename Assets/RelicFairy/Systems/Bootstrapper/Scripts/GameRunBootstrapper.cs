@@ -3274,6 +3274,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return new RunMetaSnapshot
         {
             masterSeed         = save.masterSeed,
+            chapterSeed        = save.chapterSeed,          // 0=구버전 세이브 → RunFlowController가 재계산
             visitCount         = save.visitCount,
             seqPhase           = save.seqPhase,
             shopUsed           = save.shopUsed,
@@ -3290,6 +3291,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
             currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
+            currentRoomRewardPending = save.currentRoomRewardPending,   // 미수령 보상만 복원(구버전=false)
             crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치
             cooldowns          = cooldowns,
         };

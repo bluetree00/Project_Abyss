@@ -173,6 +173,20 @@ public sealed class RoomWaveController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 이어하기 복원 — 저장 당시 "클리어했지만 아직 안 받은" 클리어 보상만 방에 다시 세운다.
+    /// 전투는 재개하지 않는다(Activate 미호출). 연료 재지급도 없다 — RoomClearGate.ActivateRestoredReward 참조.
+    /// </summary>
+    public void SpawnPendingClearReward(Vector3 center, int rerollSeed)
+    {
+        _cleared = true;   // 이후 어떤 경로로도 클리어 시퀀스가 다시 돌지 않게 잠근다
+
+        var gate = GetComponent<RoomClearGate>() ?? gameObject.AddComponent<RoomClearGate>();
+        gate.Initialize(_run, _luckTable, _clearEndEffectPrefab, _clearEndEffect2Prefab);
+        gate.ActivateRestoredReward(center, rerollSeed);
+        Debug.Log("[RoomWave] 이어하기 — 미수령 클리어 보상 재배치", this);
+    }
+
     private void OnDestroy()
     {
         foreach (var s in _spawners)

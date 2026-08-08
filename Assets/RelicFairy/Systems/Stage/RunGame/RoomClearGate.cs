@@ -49,6 +49,8 @@ public class RoomClearGate : MonoBehaviour
     private bool _isBossRoom;
     private ChallengeGrade? _challengeGrade;   // 이벤트 챌린지 성과(있으면 보상 스케일·연료 지급)
     private bool _isInteraction;               // 상호작용 챌린지 보상이면 천장 클램프(§6-3)
+    private bool _restoreMode;                 // 이어하기 복원 굴림(연료 재지급 금지 + 후보 결정적 고정)
+    private int  _restoreSeed;
 
     // ── Public Methods ─────────────────────────────────────────
 
@@ -73,6 +75,23 @@ public class RoomClearGate : MonoBehaviour
     {
         if (_activated) return;
         _activated = true;
+
+        PlayClearEffectSequenceAsync(roomCenterWorld).Forget();
+    }
+
+    /// <summary>
+    /// 이어하기 복원 전용 — 저장 당시 "클리어했지만 아직 [F]로 안 받은" 보상만 다시 세운다.
+    ///
+    /// 일반 Activate와 두 가지가 다르다:
+    ///   · 연료(원석/강화재료)를 <b>재지급하지 않는다</b> — 클리어 시점에 이미 은행에 들어가 저장됐다.
+    ///   · 후보 굴림을 rerollSeed로 고정한다 — 재접속을 반복해도 같은 3지선다가 나와 save-scum이 막힌다.
+    /// </summary>
+    public void ActivateRestoredReward(Vector3 roomCenterWorld, int rerollSeed)
+    {
+        if (_activated) return;
+        _activated   = true;
+        _restoreMode = true;
+        _restoreSeed = rerollSeed;
 
         PlayClearEffectSequenceAsync(roomCenterWorld).Forget();
     }
@@ -127,12 +146,27 @@ public class RoomClearGate : MonoBehaviour
             // 일반 룸 클리어 = 3지선다. 후보 수·등급 하한·연료를 방 종류가 정한다(§2-2-①·§3-2).
             // 정예방은 여기서 후보 4 + Rare 하한 + 연료 증량으로 갈린다 — "정예를 피하는 게 최적"의 해소 지점.
             var rule = RoomRewardTable.For(RoomKind());
-            rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
-            isChoice = rewards.Count > 0;
 
-            // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
-            // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
-            GrantClearFuel(rule);
+            if (_restoreMode)
+            {
+                // 복원 굴림: 전역 Random 상태를 방 시드로 잠깐 갈아끼워 후보를 결정적으로 뽑고 되돌린다.
+                // (되돌리지 않으면 이후 전투/연출의 난수까지 이 시드에 묶인다.)
+                var prevState = UnityEngine.Random.state;
+                UnityEngine.Random.InitState(_restoreSeed);
+                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
+                UnityEngine.Random.state = prevState;
+            }
+            else
+            {
+                rewards.AddRange(RollRewardChoices(rule.ChoiceCount, rule.RarityFloor));
+
+                // 정제소 연료 — 방 클리어마다 원석 지급(설계 §2.8: 40방 × 4 ≈ 160).
+                // 원석은 정제소의 유일한 정규 소비처이므로, 생산이 없으면 정제소 자체가 죽는다.
+                // 복원 경로에서는 지급하지 않는다 — 클리어 시점에 이미 지급·저장됐기 때문(이중지급 방지).
+                GrantClearFuel(rule);
+            }
+
+            isChoice = rewards.Count > 0;
         }
 
         // [보류] 보스드랍 아이템(EffectManager.GetBonusBossDropCount)의 '보스방 추가 롤' 보너스.
@@ -171,6 +205,9 @@ public class RoomClearGate : MonoBehaviour
 
         var trigger = rewardGO.AddComponent<ClearRewardTrigger>();
         trigger.Initialize(_run, rewards, _isBossRoom, isChoice, choiceRounds);
+
+        // "보상은 떠 있는데 아직 안 받았다"를 세이브에 남긴다 — 이 상태로 종료해도 이어하기에서 되살아난다.
+        RunFlowController.Active?.NotifyClearRewardSpawned();
     }
 
     /// <summary>방 클리어 연료 지급 — 정제소 원석 + (정예방) 재련소 강화재료. 드랍 판정과 무관하게 확정 지급.</summary>
