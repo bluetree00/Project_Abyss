@@ -112,8 +112,12 @@ public class UI_Pause : UI_Popup
 		_currentTab = tabName;  // 현재 탭 상태 저장
 	}
 
-	private void OnDestroy()
+	// base(UI_Popup)의 OnDestroy는 BlocksGameplay 팝업이 사라졌음을 UIManager에 알린다.
+	// override가 아닌 private으로 두면 그 통지가 통째로 가려져(메서드 하이딩) 게임플레이 차단이 안 풀렸다.
+	protected override void OnDestroy()
 	{
+		base.OnDestroy();
+
 		// 방어적 Release — Resume/Exit 없이 강제 파괴되어도 timeScale 0 고착 방지(멱등 no-op 가드).
 		TimeScaleArbiter.Release(this);
 	}

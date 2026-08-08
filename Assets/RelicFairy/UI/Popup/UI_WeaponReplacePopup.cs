@@ -108,6 +108,18 @@ public class UI_WeaponReplacePopup : UI_Popup
 
     public UniTask<int?> WaitForChoiceAsync() => _tcs.Task;
 
+    /// <summary>
+    /// 정상 경로(Complete) 없이 파괴돼도 대기를 끝낸다 — 씬 전환·CloseAllPopupUI 등.
+    /// 이게 없으면 _tcs가 영구 미완료라 WaitForChoiceAsync가 무한 대기하고, 그 뒤 흐름(픽업 처리)이 멈춘다.
+    /// null = '버림'(아무 슬롯도 교체 안 함)이라 아이템을 잃되 상태는 어긋나지 않는 안전한 기본값이다.
+    /// Complete가 이미 결과를 넣었으면 TrySetResult가 false를 반환하고 무시된다.
+    /// </summary>
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
+        _tcs?.TrySetResult(null);
+    }
+
     // ──────────────────────────────────────────────────────────
     // 내부
     // ──────────────────────────────────────────────────────────

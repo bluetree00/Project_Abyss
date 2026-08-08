@@ -54,8 +54,10 @@ public sealed class UI_ItemAcquisitionPopup : UI_Popup
             rejectButton.onClick.AddListener(OnRejectClicked);
     }
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup) — private OnDestroy는 이걸 가린다
+
         if (openGridButton != null)
             openGridButton.onClick.RemoveListener(OnOpenGridClicked);
         if (rejectButton != null)

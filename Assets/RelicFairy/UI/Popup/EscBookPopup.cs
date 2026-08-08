@@ -172,8 +172,9 @@ public sealed class EscBookPopup : UI_Popup
 #endif
     }
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();   // 메서드 하이딩(CS0114) 해소 — UI_Popup의 차단 잠금 통지를 가리지 않는다
         TimeScaleArbiter.Release(this);
     }
 }
