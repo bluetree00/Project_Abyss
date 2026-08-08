@@ -622,8 +622,11 @@ public static class BaseCampQualitySetup
     // 진단 결과 캡슐 하단(y 0.0017)이 모델 발바닥(y -0.0302)보다 3.2cm 위였다.
     // 리지드바디가 유지하는 접촉 간격 1cm 까지 더해 4.2cm 떠 보인다.
     //
-    // 플로팅 컨트롤러였다면 이 간격이 의도(floatRideHeight 만큼 띄워야 발이 안착)지만,
-    // PlayerCharacterData.useFloatingController = 0 이라 레이 접지 경로를 쓴다. 즉 의도가 아니다.
+    // 플로팅 컨트롤러였다면 이 간격이 의도(floatRideHeight 만큼 띄워야 발이 안착)다.
+    // [정정] 이 진단을 쓸 당시엔 useFloatingController = 0(레이 접지)였지만,
+    //        '계단 접지 재설계'(ddd82a8) 이후 PlayerCharacterData.useFloatingController = 1 이다.
+    //        즉 현재 런타임 접지는 DefaultJumpAbility의 플로팅(스프링) 경로가 담당하고,
+    //        아래 캡슐 보정은 레이 접지 시절 기준의 값이다 — 접지 문제를 진단할 땐 이 전제를 먼저 확인할 것.
     //
     // Height/Radius 는 그대로 두고 Center.y 만 내린다. 피격 판정 폭은 변하지 않고
     // 캡슐 상단만 같이 3.2cm 내려간다.

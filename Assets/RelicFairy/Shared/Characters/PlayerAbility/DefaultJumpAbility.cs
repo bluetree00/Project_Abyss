@@ -1,5 +1,19 @@
 using UnityEngine;
 
+/// <summary>
+/// 플레이어 점프/접지. 접지 구현이 <b>두 갈래</b>이고 CharacterData.useFloatingController가 그중 하나를 고른다.
+///
+///   · true  → 플로팅(스프링 호버). UpdateFloatGroundCheck / ApplyFloat.
+///   · false → 레이(스피어캐스트) 접지. UpdateGroundCheck / ApplyGravity 의 아래쪽 본문.
+///
+/// [현재 상태] 유일한 캐릭터 데이터인 PlayerCharacterData.useFloatingController = 1 이다
+/// ('계단 접지 재설계' ddd82a8에서 0 → 1). 즉 <b>레이 접지 경로는 런타임에서 실행되지 않는다</b> —
+/// 그 시절 튜닝인 groundCheckDistance(0.15)·캡슐 Center 보정·GroundSettleEpsilon·스텝다운 스냅도 함께 비활성이다.
+/// 접지 관련 증상을 진단할 때 이쪽 코드를 먼저 읽으면 틀린 결론이 나온다.
+///
+/// 레이 경로는 플래그를 되돌릴 때를 대비한 대안 구현으로 남겨 둔다(삭제하면 useFloatingController=0이
+/// 접지 없는 상태가 된다). 게임필 비교가 끝나 한쪽으로 확정되면 그때 정리할 것.
+/// </summary>
 public class DefaultJumpAbility : IJumpAbility
 {
     //============================================================

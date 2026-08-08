@@ -274,7 +274,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 if (this == null) return;
 
                 // 2-1. 서버 CDN으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
-                // ApplyServerStatOverride(); // 임시 비활성화
+                // ApplyServerStatOverride(); // 의도적 동결 — 되살리려면 밸런스 재조정이 선행돼야 한다.
+                //   MONSTER_ELEMENT_STAT_DATA는 정상 데이터가 들어 있지만 현재 SO 수치와 축이 다르다.
+                //   실측(2026-08-08): Slime HP 10→40 / ATK 30→5, Orc ATK 54→12, DemonKing HP 300→900.
+                //   지금 켜면 전 몬스터 HP·공격력이 배수로 뒤집힌다. 차트를 정본으로 삼기로 결정하는
+                //   시점에 CSV 쪽을 현재 SO 기준으로 재작성한 뒤 함께 켤 것.
 
                 // 2-2. 전 몬스터 플레이어 탐색 범위 상향. 캐시 채움 시(타입당 1회)만 적용 → 인스턴스 누적 없음.
                 ApplyDetectionRangeBoost(_config);
