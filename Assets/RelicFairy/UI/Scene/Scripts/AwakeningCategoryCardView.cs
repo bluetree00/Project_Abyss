@@ -57,7 +57,9 @@ public class AwakeningCategoryCardView : MonoBehaviour
         bool canUpgrade = !maxed && data.CanAfford;
         if (upgradeButton)
         {
-            upgradeButton.interactable = !maxed;
+            // 비용을 못 내거나(정수 부족·cost 0 = 차트 미로드) 최대치면 눌리지 않는다.
+            // 예전엔 !maxed만 봐서 cost 0인 상태에서 버튼이 계속 눌렸다.
+            upgradeButton.interactable = canUpgrade;
             var colors = upgradeButton.colors;
             colors.normalColor = canUpgrade ? btnAffordable : btnUnaffordable;
             upgradeButton.colors = colors;

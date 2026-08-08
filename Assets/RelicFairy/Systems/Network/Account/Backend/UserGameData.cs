@@ -96,12 +96,21 @@ public class UserGameData
             abyssEssence += result.GainedEssence;
     }
 
-    /// <summary>각성 레벨을 1 올리고 비용을 차감한다. 비용이 부족하면 false 반환.</summary>
+    /// <summary>
+    /// 각성 레벨을 1 올리고 비용을 차감한다. 비용이 부족하거나 최대 레벨이면 false 반환.
+    /// <para>cost&lt;=0은 <b>거부</b>한다 — 차트 미로드/컬럼 누락이면 GetUpgradeCost가 0을 돌려주는데,
+    /// 그대로 통과시키면 정수 0으로 각성이 무한히 올라간다(무료 각성).</para>
+    /// </summary>
     public bool TryUpgradeAwakening(string categoryId, int cost)
     {
+        if (cost <= 0) return false;
         if (abyssEssence < cost) return false;
 
-        abyssEssence -= cost;
+        // 최대 레벨 도달 검사 — 데이터가 없으면(maxLevel<=0) 올릴 근거 자체가 없으므로 거부.
+        int maxLevel = Managers.RelicAwakening?.GetMaxLevel(categoryId) ?? 0;
+        if (maxLevel <= 0 || GetAwakeningLevel(categoryId) >= maxLevel) return false;
+
+        // 차감은 카테고리 검증 뒤에 — 먼저 빼면 알 수 없는 categoryId에서 정수만 사라진다.
         switch (categoryId)
         {
             case AwakeningCategory.Sword:  awakeningLevelSword++;  break;
@@ -112,6 +121,8 @@ public class UserGameData
             case AwakeningCategory.Luck:   awakeningLevelLuck++;   break;
             default: return false;
         }
+
+        abyssEssence -= cost;
         return true;
     }
 
