@@ -13,22 +13,25 @@ MonoBehaviour:
   m_Name: StageData
   m_EditorClassIdentifier: 
   m_GroupName: StageData
-  m_Data:
-    m_SerializedData: []
   m_GUID: c2fc2d31b26efff43bf40d41dd854055
   m_SerializeEntries:
-  - m_GUID: 94fffd0521886ef4ab286bb77b72e32b
-    m_Address: EnhanceTable
+  - m_GUID: 030f08b690b8cab4e88a70c5afbf4a04
+    m_Address: CHAPTER_1_ZONE_LAYOUT
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 9d8cc533fb32d6e40a4ca366785b2804
-    m_Address: STAGEDATA_ROOMS
+  - m_GUID: 161c35a291d32154b8c9ab56407556c5
+    m_Address: CHAPTER_3_RUN_STRUCTURE
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6c17696832d6bc9448da2d76b5567563
-    m_Address: STAGEDATA_STAGE
+  - m_GUID: 4f37ed8cc553a734cbe922020c290fc8
+    m_Address: Default
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5303a320e9a03e0459d4e663a203bd50
+    m_Address: CHAPTER_2_ZONE_LAYOUT
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -37,13 +40,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c28724d86258ce245b7c343b35b395d5
-    m_Address: Cave
+  - m_GUID: 6232c7446bf4bc74381142a54a2b2267
+    m_Address: CHAPTER_3_ZONE_LAYOUT
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c5f04f220d9b1c044b3e58d1d7ab4814
-    m_Address: Castle
+  - m_GUID: 6c17696832d6bc9448da2d76b5567563
+    m_Address: STAGEDATA_STAGE
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -57,13 +60,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4f37ed8cc553a734cbe922020c290fc8
-    m_Address: Default
+  - m_GUID: 89a8f9f8e41580a45874446c80194471
+    m_Address: CHAPTER_4_RUN_STRUCTURE
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 030f08b690b8cab4e88a70c5afbf4a04
-    m_Address: CHAPTER_1_ZONE_LAYOUT
+  - m_GUID: 94fffd0521886ef4ab286bb77b72e32b
+    m_Address: EnhanceTable
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9d8cc533fb32d6e40a4ca366785b2804
+    m_Address: STAGEDATA_ROOMS
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a927d306966a56e488a8751ff563a45e
+    m_Address: CHAPTER_4_ZONE_LAYOUT
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -77,18 +90,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c28724d86258ce245b7c343b35b395d5
+    m_Address: Cave
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c5f04f220d9b1c044b3e58d1d7ab4814
+    m_Address: Castle
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: de9c04e2dbd85ab43b8b89313c643fa0
     m_Address: CHAPTER_2_RUN_STRUCTURE
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 161c35a291d32154b8c9ab56407556c5
-    m_Address: CHAPTER_3_RUN_STRUCTURE
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 89a8f9f8e41580a45874446c80194471
-    m_Address: CHAPTER_4_RUN_STRUCTURE
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
