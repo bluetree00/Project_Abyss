@@ -24,6 +24,7 @@ public static class UIJuice
         float t = 0f;
         while (t < 1f)
         {
+            if (rt == null) return;
             t = Mathf.Min(t + Time.unscaledDeltaTime / Mathf.Max(0.01f, duration), 1f);
             float e = EaseOutBack(t);
 

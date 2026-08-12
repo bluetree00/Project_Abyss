@@ -284,6 +284,12 @@ public class PlayerController : CharacterBase
     /// <summary>잡기 패턴이 붙들기 시작/해제 시 호출. 이동 잠금(SetMoveScale)과 같은 수명으로 다뤄야 한다.</summary>
     public void SetGrabbed(bool grabbed) => IsGrabbed = grabbed;
 
+    /// <summary>분신(ShadowClone)으로 동작 중인 경우. 카메라/입력/PlayerManager 등록 생략.</summary>
+    public bool IsShadowClone { get; private set; }
+
+    /// <summary>분신으로 마킹. Awake 전에 호출해야 카메라 등록이 방지된다.</summary>
+    public void SetAsShadowClone() => IsShadowClone = true;
+
     /// <summary>
     /// 플레이어 입력 전체를 활성/비활성화한다(컷신·연출 채널).
     /// 보스 등장 연출 등 컷씬 구간에서 false로 호출해 행동을 막는다.
@@ -1100,31 +1106,21 @@ public class PlayerController : CharacterBase
         InitPassives();
         ApplyRelic();
 
-        // 회피 연출(잔상/틴트/먼지/트레일) 런타임 자동 부착 — 프리팹/씬 수동 배선 불가 환경 대응.
-        // 중복 부착 금지. 시각 자원(CharacterData optional 필드) 미할당 시 컴포넌트는 무동작.
-        if (!TryGetComponent<DodgePresentation>(out _))
-            gameObject.AddComponent<DodgePresentation>();
-
-        // 스태미너 바(원신·명조식) — 동일한 런타임 자동 부착. HUD 프리팹을 건드리지 않는다.
-        if (!TryGetComponent<StaminaBarView>(out _))
-            gameObject.AddComponent<StaminaBarView>();
-
-        // 전투 중 카메라 자동 줌아웃 — 낮은 몰입 구도와 다수 적 가독성을 둘 다 가져간다.
-        if (!TryGetComponent<CombatCameraFraming>(out _))
-            gameObject.AddComponent<CombatCameraFraming>();
-
-        // 카메라 리그 기준점을 플레이어보다 앞에 — 구도는 그대로, 위치만 앞으로.
-        if (!TryGetComponent<CameraRigAnchor>(out _))
-            gameObject.AddComponent<CameraRigAnchor>();
-
-        // 검 공격/대시 칼날 트레일(INab Weapon Trail) 구동기 — 동일한 런타임 자동 부착 패턴.
-        // 트레일 프리팹 미할당(무기 SO / CharacterData) 시 무동작.
-        if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
-            gameObject.AddComponent<PlayerWeaponTrailVfx>();
-
-        // 자동추적 대상 화살표(현재 에임어시스트 타겟을 머리 위 화살표로 실시간 표시) — 동일 자동 부착 패턴.
-        if (!TryGetComponent<AimTargetIndicator>(out _))
-            gameObject.AddComponent<AimTargetIndicator>();
+        if (!IsShadowClone)
+        {
+            if (!TryGetComponent<DodgePresentation>(out _))
+                gameObject.AddComponent<DodgePresentation>();
+            if (!TryGetComponent<StaminaBarView>(out _))
+                gameObject.AddComponent<StaminaBarView>();
+            if (!TryGetComponent<CombatCameraFraming>(out _))
+                gameObject.AddComponent<CombatCameraFraming>();
+            if (!TryGetComponent<CameraRigAnchor>(out _))
+                gameObject.AddComponent<CameraRigAnchor>();
+            if (!TryGetComponent<PlayerWeaponTrailVfx>(out _))
+                gameObject.AddComponent<PlayerWeaponTrailVfx>();
+            if (!TryGetComponent<AimTargetIndicator>(out _))
+                gameObject.AddComponent<AimTargetIndicator>();
+        }
 
         if (inputReady) BindInputActions();
     }
@@ -1195,6 +1191,7 @@ public class PlayerController : CharacterBase
     private void FixedUpdate()
     {
         if (characterData == null) return;
+        if (IsShadowClone) return;
 
         JumpAbility?.UpdateGroundCheck(this);
         JumpAbility?.ApplyGravity(this);
@@ -1291,7 +1288,8 @@ public class PlayerController : CharacterBase
 
     private void InitCoreComponents()
     {
-        Managers.Player.SetPlayer(transform);
+        if (!IsShadowClone)
+            Managers.Player.SetPlayer(transform);
         handTransform = Util.FindDeepChild(transform, "WeaponMount")
                      ?? Util.FindDeepChild(transform, "WeaponSocket");
         handTransformLeft = Util.FindDeepChild(transform, "WeaponMountLeft")
@@ -1483,6 +1481,7 @@ public class PlayerController : CharacterBase
 
     private void InitInputActions()
     {
+        if (IsShadowClone) return;
         if (inputActions != null)
         {
             inputActions.Player.Disable();
@@ -1905,6 +1904,7 @@ public class PlayerController : CharacterBase
 
     protected virtual void SetupCamera()
     {
+        if (IsShadowClone) return;
         if (cinemachineCamera == null)
             cinemachineCamera = FindFirstObjectByType<CinemachineFreeLook>();
 

@@ -312,7 +312,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
     /// <paramref name="elementId"/>를 주면 속성 배치 제약(<see cref="RuneZoneRule"/>)까지 함께 본다 —
     /// 이게 없으면 "놓을 자리 있음"으로 표시된 룬이 막상 판에서는 어디에도 안 들어간다.
     /// </summary>
-    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets, string elementId = null)
+    public bool CanPlaceAnywhere(IReadOnlyList<Vector2Int> offsets, string elementId = null, bool isLegendary = false)
     {
         if (offsets == null || offsets.Count == 0) return false;
         // 판이 아직 빌드된 적 없으면(첫 룬 획득 등) 판정 불가 → 막지 않는다(permissive).
@@ -329,7 +329,7 @@ public sealed class MerlinRuneHexGridView : MonoBehaviour
             {
                 var cell = anchor + offsets[i];
                 if (!placeable.Contains(cell)) { fits = false; break; }
-                if (!_cellZones.TryGetValue(cell, out var zc) || !RuneZoneRule.Accepts(zc, elementId))
+                if (!_cellZones.TryGetValue(cell, out var zc) || !RuneZoneRule.Accepts(zc, elementId, isLegendary))
                 { fits = false; break; }
             }
             if (fits) return true;

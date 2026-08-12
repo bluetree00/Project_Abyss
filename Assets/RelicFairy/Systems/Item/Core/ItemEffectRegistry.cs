@@ -161,6 +161,26 @@ public static class ItemEffectRegistry
 
         // ── T3/T4 형태변형 (Tier3/ShapeEffects) ─────────────
 
+        // ── 레전드리 룬 효과 ─────────────────────────────────
+        Register("FireLegendAoe",         s => new FireLegendAoeEffect(s));
+        Register("FireLegendSingle",       s => new FireLegendSingleEffect(s));
+        Register("FireLegendProjectile",   s => new FireLegendProjectileEffect(s));
+        Register("IceLegendAoe",          s => new IceLegendAoeEffect(s));
+        Register("IceLegendSingle",       s => new IceLegendSingleEffect(s));
+        Register("IceLegendField",        s => new IceLegendFieldEffect(s));
+        Register("ElecLegendAoe",         s => new ElecLegendAoeEffect(s));
+        Register("ElecLegendSingle",      s => new ElecLegendSingleEffect(s));
+        Register("ElecLegendProjectile",  s => new ElecLegendProjectileEffect(s));
+        Register("GrassLegendAoe",        s => new GrassLegendAoeEffect(s));
+        Register("GrassLegendSingle",     s => new GrassLegendSingleEffect(s));
+        Register("GrassLegendProjectile", s => new GrassLegendProjectileEffect(s));
+        Register("LightLegendAoe",        s => new LightLegendAoeEffect(s));
+        Register("LightLegendSingle",     s => new LightLegendSingleEffect(s));
+        Register("LightLegendProjectile", s => new LightLegendProjectileEffect(s));
+        Register("DarkLegendAoe",         s => new DarkLegendAoeEffect(s));
+        Register("DarkLegendSingle",      s => new DarkLegendSingleEffect(s));
+        Register("DarkLegendProjectile",  s => new DarkLegendProjectileEffect(s));
+
         Debug.Log($"[ItemEffectRegistry] {_creators.Count}개 effectType 등록 완료");
     }
 }

@@ -15,11 +15,13 @@
 public static class RuneZoneRule
 {
     /// <summary>존 코드 <paramref name="zoneCode"/> 칸에 속성 <paramref name="elementId"/> 룬을 놓을 수 있는가.</summary>
-    public static bool Accepts(char zoneCode, string elementId)
+    /// <param name="isLegendary">레전드리 등급 룬이면 true. 레전드리는 중앙(CENTER)에 배치 불가.</param>
+    public static bool Accepts(char zoneCode, string elementId, bool isLegendary = false)
     {
         if (zoneCode == '\0') return true;                    // 속성 존이 없는 판(레거시 그리드) — 제약 없음
         if (string.IsNullOrEmpty(elementId)) return true;      // 무속성 룬
-        if (zoneCode == ElementDef.CenterCode) return true;    // 중앙 공명 — 중립 허브
+        if (zoneCode == ElementDef.CenterCode)
+            return !isLegendary;                              // 중앙 공명 — 레전드리는 자기 속성 존에만
 
         char want = ElementDef.IdToCode(elementId);
         // ElementDef에 없는 속성값(데이터 오타·신규 속성 미등록 등)이면 제약하지 않는다.
@@ -30,8 +32,8 @@ public static class RuneZoneRule
     }
 
     /// <summary>칸 단위 판정. square가 null이면 판정 대상이 아니므로 통과.</summary>
-    public static bool Accepts(GridSquare square, string elementId)
-        => square == null || Accepts(square.zoneCode, elementId);
+    public static bool Accepts(GridSquare square, string elementId, bool isLegendary = false)
+        => square == null || Accepts(square.zoneCode, elementId, isLegendary);
 
     /// <summary>룬 아이템의 속성 zone_id("FIRE" 등). 아이템이 없거나 무속성이면 null.</summary>
     public static string ElementOf(RuntimeItemData item)
