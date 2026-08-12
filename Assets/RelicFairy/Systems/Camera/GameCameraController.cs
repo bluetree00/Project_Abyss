@@ -159,7 +159,7 @@ public class GameCameraController : MonoBehaviour
 
         _fadeCanvas = go.GetComponent<Canvas>();
         _fadeCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _fadeCanvas.sortingOrder = 9999;
+        _fadeCanvas.sortingOrder = UISortingOrder.CameraFade;
 
         var scaler = go.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

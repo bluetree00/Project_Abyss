@@ -61,11 +61,17 @@ public sealed class HudView : MonoBehaviour
 
     // 재화 라인 — 골드/강화재료/원석이 같은 줄에 같은 배경으로. 0이면 연료 pill 숨김.
     private RectTransform _currencyRow;
+    private GameObject    _goldSlot;
     private GameObject    _enhanceMatSlot;
     private GameObject    _runeOreSlot;
     private TMP_Text      _enhanceMatText;
     private TMP_Text      _runeOreText;
     private bool          _currencyBuilt;
+
+    // 재화 표시 정책 — "실제로 얻은 재화만 보인다".
+    // 한 번 획득하면 그 런 동안은 계속 보인다(0으로 써 버렸다고 칸이 사라지면 깜빡여 읽기 나쁘다).
+    // 로비 복귀·새 런 시작에서 ResetCurrencyVisibility()로 되돌린다.
+    private bool _goldSeen, _enhanceMatSeen, _runeOreSeen;
 
     public CombatPanelView   CombatPanel   => combatPanel;
     public BossPanelView     BossPanel     => bossPanelView;
@@ -139,14 +145,16 @@ public sealed class HudView : MonoBehaviour
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
 
         // 골드 — 기존 goldText를 pill 안으로 이동(래거시 위치 정리). 테두리엔 코인이 포함됨.
-        MakeCurrencyPill("Pill_Gold", goldFrameSprite != null ? goldFrameSprite : currencyFrameSprite,
-                         iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _, reuseText: goldText);
+        _goldSlot = MakeCurrencyPill("Pill_Gold", goldFrameSprite != null ? goldFrameSprite : currencyFrameSprite,
+                                     iconColor: null, GoldFrameTint, TipGoldTitle, TipGoldBody, out _, reuseText: goldText);
 
         // 강화재료 / 원석 — 코인 없는 공용 테두리가 있으면 그걸, 없으면 배경(내부)만.
         _enhanceMatSlot = MakeCurrencyPill("Pill_EnhanceMat", currencyFrameSprite, EnhanceMatIcon,
                                            EnhanceFrameTint, TipEnhanceTitle, TipEnhanceBody, out _enhanceMatText);
         _runeOreSlot    = MakeCurrencyPill("Pill_RuneOre",    currencyFrameSprite, RuneOreIcon,
                                            RuneOreFrameTint, TipRuneOreTitle, TipRuneOreBody, out _runeOreText);
+        // 아직 아무것도 얻지 않은 상태로 시작 — 획득 시 setter가 켠다.
+        _goldSlot?.SetActive(_goldSeen);
         _enhanceMatSlot.SetActive(false);
         _runeOreSlot.SetActive(false);
 
@@ -259,11 +267,31 @@ public sealed class HudView : MonoBehaviour
         SetActiveSafe(gridPanel,        (sections & HUDIds.Section.GridPanel)      != 0);
         SetActiveSafe(bossPanelView,    (sections & HUDIds.Section.BossPanel)      != 0);
         SetActiveSafe(systemNoticesRoot,(sections & HUDIds.Section.SystemNotices)  != 0);
-        SetActiveSafe(minimapPanel,     (sections & HUDIds.Section.Minimap)        != 0);
+        bool showMinimap = (sections & HUDIds.Section.Minimap) != 0;
+        SetActiveSafe(minimapPanel,     showMinimap);
         SetActiveSafe(covenantPanel,    (sections & HUDIds.Section.CovenantPanel)  != 0);
+
+        // TopBar의 맵 아이콘은 미니맵과 한 세트다. 로비엔 맵이 없는데 TopBar만 켜져
+        // 아이콘이 홀로 남아 있었다 — 미니맵 섹션에 묶어 함께 켜고 끈다.
+        SetMapIconVisible(showMinimap);
 
         if (showCombat)
             EnsureCombatPanelVisible();
+    }
+
+    private Transform _mapIcon;
+    private bool      _mapIconSearched;
+
+    /// <summary>TopBar 맵 아이콘 표시. 참조가 없어 이름으로 1회만 찾아 캐시한다(GoldIcon과 동일 패턴).</summary>
+    private void SetMapIconVisible(bool on)
+    {
+        if (!_mapIconSearched)
+        {
+            _mapIconSearched = true;
+            _mapIcon = FindChildRecursive(transform, "HUD_Map");
+        }
+        if (_mapIcon != null && _mapIcon.gameObject.activeSelf != on)
+            _mapIcon.gameObject.SetActive(on);
     }
 
     public void EnsureCombatPanelVisible()
@@ -289,22 +317,58 @@ public sealed class HudView : MonoBehaviour
 
     public void SetGold(int gold)
     {
-        if (goldText != null)
-            goldText.text = gold.ToString();
+        EnsureCurrencyRow();
+        if (goldText != null) goldText.text = gold.ToString();
+
+        if (gold > 0) _goldSeen = true;
+        ApplyCurrencyVisibility();
     }
 
     public void SetEnhanceMaterial(int amount)
     {
         EnsureCurrencyRow();
         if (_enhanceMatText != null) _enhanceMatText.text = amount.ToString();
-        if (_enhanceMatSlot != null) _enhanceMatSlot.SetActive(amount > 0);
+
+        if (amount > 0) _enhanceMatSeen = true;
+        ApplyCurrencyVisibility();
     }
 
     public void SetRuneOre(int amount)
     {
         EnsureCurrencyRow();
         if (_runeOreText != null) _runeOreText.text = amount.ToString();
-        if (_runeOreSlot != null) _runeOreSlot.SetActive(amount > 0);
+
+        if (amount > 0) _runeOreSeen = true;
+        ApplyCurrencyVisibility();
+    }
+
+    /// <summary>
+    /// 재화 칸 표시 갱신 — <b>얻은 적 있는 재화만</b> 보인다.
+    /// 아직 못 얻은 재화 칸을 미리 띄우면 "쓸 수 없는 자원"이 화면을 차지해 정보 밀도만 올린다.
+    /// </summary>
+    private void ApplyCurrencyVisibility()
+    {
+        // pill이 만들어지지 않은 스킨(스프라이트 미지정)에서는 goldText 자체를 켜고 끈다.
+        var goldTarget = _goldSlot != null ? _goldSlot : (goldText != null ? goldText.gameObject : null);
+        if (goldTarget != null && goldTarget.activeSelf != _goldSeen) goldTarget.SetActive(_goldSeen);
+
+        if (_enhanceMatSlot != null && _enhanceMatSlot.activeSelf != _enhanceMatSeen)
+            _enhanceMatSlot.SetActive(_enhanceMatSeen);
+        if (_runeOreSlot != null && _runeOreSlot.activeSelf != _runeOreSeen)
+            _runeOreSlot.SetActive(_runeOreSeen);
+    }
+
+    /// <summary>
+    /// 재화 표시를 "아직 아무것도 못 얻음"으로 되돌린다. 로비 진입·새 런 시작에서 호출.
+    /// (런 재화는 런 스코프라 로비에서 지난 런의 골드가 남아 보이면 안 된다.)
+    /// </summary>
+    public void ResetCurrencyVisibility()
+    {
+        _goldSeen = _enhanceMatSeen = _runeOreSeen = false;
+        if (goldText != null) goldText.text = "0";
+        if (_enhanceMatText != null) _enhanceMatText.text = "0";
+        if (_runeOreText != null) _runeOreText.text = "0";
+        ApplyCurrencyVisibility();
     }
 
     private static void SetActiveSafe(MonoBehaviour comp, bool on)

@@ -225,7 +225,7 @@ public static class UltimateCinematicService
         UnityEngine.Object.DontDestroyOnLoad(go);
         _canvas = go.AddComponent<Canvas>();
         _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _canvas.sortingOrder = 5000;
+        _canvas.sortingOrder = UISortingOrder.Cinematic;
         var scaler = go.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);

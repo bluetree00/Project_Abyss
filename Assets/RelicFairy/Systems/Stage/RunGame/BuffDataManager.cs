@@ -39,8 +39,10 @@ public class BuffDataManager
 
         if (_byTypeTier.Count == 0)
         {
-            Debug.Log("[BuffDataManager] CDN 실패 — Addressables 폴백");
-            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BUFF_DATA");
+            Debug.Log("[BuffDataManager] CDN 실패 — 오프라인 폴백");
+            // 폴백 실물은 Resources/BUFF_DATA.json (Addressable 미등록) — Resources도 함께 본다.
+            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("BUFF_DATA")
+                       ?? Resources.Load<TextAsset>("BUFF_DATA");
             if (json != null)
             {
                 var col = JsonUtility.FromJson<BuffEntryCollection>(json.text);

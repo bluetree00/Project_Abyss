@@ -46,6 +46,25 @@ public class RuntimeItemData
             : ElementDef.CenterId;
     }
 
+    // ── 세이브 복원 ──
+
+    /// <summary>
+    /// JsonUtility 왕복에서 잃어버린 <b>에셋 참조</b>를 SO에서 다시 채운다. 이어하기 복원 직후 1회 호출.
+    ///
+    /// icon은 Sprite 직참조라 JSON에는 인스턴스 ID로만 남고, 다음 실행에서는 null로 되살아난다.
+    /// iconKey로 재로드하면 될 것 같지만 ItemSO의 iconKey는 전 항목이 비어 있어 메울 수 없다 —
+    /// itemId로 SO를 되찾는 것이 유일한 경로다.
+    ///
+    /// 값 데이터(효과·속성·등급)는 세이브가 정본이므로 건드리지 않는다.
+    /// </summary>
+    public void RestoreAssetRefs()
+    {
+        if (icon != null) return;
+
+        var so = ItemSORegistry.Find(itemId);
+        if (so != null && so.icon != null) icon = so.icon;
+    }
+
     // ── 팩토리 ──
 
     /// <summary>

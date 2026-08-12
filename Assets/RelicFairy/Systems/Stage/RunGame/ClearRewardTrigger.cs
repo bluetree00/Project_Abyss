@@ -160,6 +160,9 @@ public class ClearRewardTrigger : MonoBehaviour
 
         // 보상 확정 → 즉시 저장. 방 경계 저장(SaveRunState)은 방 '입장' 시점이고 클리어 저장은
         // 보상 지급 '전'에 끝나 있어, 여기서 안 하면 방금 받은 룬·아이템이 다음 방 입장까지 미저장으로 남는다.
+        // 수령 확정 → '미수령' 플래그를 내린 뒤 저장. 순서가 뒤바뀌면 이미 받은 보상이
+        // pending=true인 채 저장돼 이어하기에서 한 번 더 지급된다(이중지급).
+        RunFlowController.Active?.NotifyClearRewardClaimed();
         RunFlowController.Active?.SaveNow("clear-reward");
 
         // 그리드 패널이 열려 있으면 닫힐 때까지 대기 — 열려 있는 동안 게이트를 활성화하면
@@ -426,7 +429,7 @@ public class ClearRewardTrigger : MonoBehaviour
 
         var canvas = _promptGO.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 5;
+        canvas.sortingOrder = UISortingOrder.WorldProp;
         _promptGO.AddComponent<CanvasScaler>();
         _promptGO.AddComponent<GraphicRaycaster>();
 

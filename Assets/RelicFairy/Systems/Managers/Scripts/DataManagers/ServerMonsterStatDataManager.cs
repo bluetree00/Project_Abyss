@@ -30,8 +30,10 @@ public class ServerMonsterStatDataManager
 
         if (_byId.Count == 0)
         {
-            Debug.Log("[ServerMonsterStatDataManager] CDN 실패 — Addressables 폴백");
-            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MONSTER_ELEMENT_STAT_DATA");
+            Debug.Log("[ServerMonsterStatDataManager] CDN 실패 — 오프라인 폴백");
+            // 폴백 실물은 Resources/MONSTER_ELEMENT_STAT_DATA.json (Addressable 미등록) — Resources도 함께 본다.
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MONSTER_ELEMENT_STAT_DATA")
+                            ?? Resources.Load<TextAsset>("MONSTER_ELEMENT_STAT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<MonsterElementStatEntryCollection>(textAsset.text);

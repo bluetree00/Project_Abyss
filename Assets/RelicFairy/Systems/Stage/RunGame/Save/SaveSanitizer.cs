@@ -73,8 +73,9 @@ public static class SaveSanitizer
         // 재련소 RNG 소비 수: ≥0. 음수면 스트림 진행이 깨져 save-scum이 뚫린다.
         d.crucibleRollIndex = ClampMin(d.crucibleRollIndex, 0, ref changed);
 
-        // masterSeed·heading·anchorToggle·currentRoomKind/Mirror·seqPhase 등 절차생성
+        // masterSeed·chapterSeed·heading·anchorToggle·currentRoomKind/Mirror·seqPhase 등 절차생성
         // 내부 상태는 클램프하지 않는다(시드 정합성/복원 무결성 보존, 과도 개입 금지).
+        // chapterSeed는 0이 "구버전 세이브(미기록)" 신호라 0을 교정해서도 안 된다 — 복원 시 재계산된다.
 
         // JSON 문자열 필드: 파싱 실패 시에만 빈 값 폴백(크래시 방지). 내용은 강제 수정 안 함.
         d.itemsJson              = SafeJson<ItemListWrapper>(d.itemsJson, ref changed);

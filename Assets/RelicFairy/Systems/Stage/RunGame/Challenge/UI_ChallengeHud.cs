@@ -15,7 +15,7 @@ public sealed class UI_ChallengeHud : MonoBehaviour
         var canvasGO = new GameObject("ChallengeHudCanvas", typeof(Canvas));
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 400;
+        canvas.sortingOrder = UISortingOrder.HudIndicator;
 
         var hud = canvasGO.AddComponent<UI_ChallengeHud>();
         hud._objective = hud.MakeText(canvasGO.transform, new Vector2(0f, -44f), 30f, new Color(1f, 0.9f, 0.5f));

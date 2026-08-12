@@ -622,8 +622,11 @@ public static class BaseCampQualitySetup
     // 진단 결과 캡슐 하단(y 0.0017)이 모델 발바닥(y -0.0302)보다 3.2cm 위였다.
     // 리지드바디가 유지하는 접촉 간격 1cm 까지 더해 4.2cm 떠 보인다.
     //
-    // 플로팅 컨트롤러였다면 이 간격이 의도(floatRideHeight 만큼 띄워야 발이 안착)지만,
-    // PlayerCharacterData.useFloatingController = 0 이라 레이 접지 경로를 쓴다. 즉 의도가 아니다.
+    // 플로팅 컨트롤러였다면 이 간격이 의도(floatRideHeight 만큼 띄워야 발이 안착)다.
+    // [정정] 이 진단을 쓸 당시엔 useFloatingController = 0(레이 접지)였지만,
+    //        '계단 접지 재설계'(ddd82a8) 이후 PlayerCharacterData.useFloatingController = 1 이다.
+    //        즉 현재 런타임 접지는 DefaultJumpAbility의 플로팅(스프링) 경로가 담당하고,
+    //        아래 캡슐 보정은 레이 접지 시절 기준의 값이다 — 접지 문제를 진단할 땐 이 전제를 먼저 확인할 것.
     //
     // Height/Radius 는 그대로 두고 Center.y 만 내린다. 피격 판정 폭은 변하지 않고
     // 캡슐 상단만 같이 3.2cm 내려간다.
@@ -650,17 +653,30 @@ public static class BaseCampQualitySetup
             }
             if (footY >= float.MaxValue) { Debug.LogError("[BaseCampQuality] 렌더러를 못 찾았다"); return; }
 
-            float delta = bottom - footY;
+            // 플로팅(스프링 호버) 컨트롤러를 쓰면 캡슐이 지면에 닿지 않는다.
+            // 스프링이 캐릭터를 받치므로 캡슐 바닥을 rideHeight 만큼 띄워야 한다
+            // (CharacterData 주석: "콜라이더 바닥을 floatRideHeight만큼 띄워야 발이 지면 안착").
+            // 캡슐이 지면에 닿아 있으면 스프링과 접촉력이 서로 밀어 진동한다.
+            var data = AssetDatabase.LoadAssetAtPath<CharacterData>(
+                "Assets/RelicFairy/Characters/Player/PlayerCharacterData.asset");
+            bool floating = data != null && data.useFloatingController;
+
+            // 레이 경로: 캡슐이 실제로 지면에 얹히므로 접촉 간격만 상쇄한다(음수 = 위로).
+            // 플로팅 경로: rideHeight 만큼 위로 띄운다.
+            float ExtraSink = floating ? -data.floatRideHeight : -0.015f;
+
+            // 목표 기준으로 계산해 재실행해도 수렴한다(누적 하강 방지).
+            float delta = bottom - (footY - ExtraSink);
             if (Mathf.Abs(delta) < 0.001f)
-            { Debug.Log($"[BaseCampQuality] 이미 정렬돼 있다 (차이 {delta:0.####}m). 변경 없음."); return; }
+            { Debug.Log($"[BaseCampQuality] 이미 목표 위치다 (차이 {delta:0.####}m). 변경 없음."); return; }
 
             var before = cap.center;
             cap.center = new Vector3(before.x, before.y - delta, before.z);
 
             PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefab);
             Debug.Log($"[BaseCampQuality] 플레이어 캡슐 Center.y {before.y:0.####} → {cap.center.y:0.####} " +
-                      $"(−{delta:0.####}m). 캡슐 하단이 발바닥 y={footY:0.####} 에 정렬됨. " +
-                      $"접촉 간격 {Physics.defaultContactOffset}m 는 물리 엔진 동작이라 남는다.");
+                      $"(Δ{-delta:0.####}m) · 모드 {(floating ? "플로팅(스프링)" : "레이 접지")} · " +
+                      $"캡슐 하단 = 발바닥({footY:0.####}) {(-ExtraSink):+0.####;-0.####}m");
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }
     }
@@ -743,6 +759,69 @@ public static class BaseCampQualitySetup
 
         if (player.TryGetComponent<Rigidbody>(out var rb))
             Debug.Log($"[진단] 리지드바디 속도 y={rb.linearVelocity.y:0.####}  sleeping={rb.IsSleeping()}");
+    }
+
+    // Foot IK 배선.
+    // OnAnimatorIK 는 AnimatorController 레이어의 IK Pass 가 켜져 있어야 호출된다.
+    // 컴포넌트만 붙이면 아무 일도 일어나지 않으므로 둘을 함께 처리한다.
+    [MenuItem("RelicFairy/BaseCamp/23. Foot IK 배선 (컴포넌트 + IK Pass)")]
+    public static void SetupFootIK()
+    {
+        const string PlayerPrefab = "Assets/RelicFairy/Characters/Player/Gawain/Prefabs/PlayerCharacter.prefab";
+
+        var root = PrefabUtility.LoadPrefabContents(PlayerPrefab);
+        if (root == null) { Debug.LogError($"[FootIK] 프리팹을 못 열었다: {PlayerPrefab}"); return; }
+
+        RuntimeAnimatorController rac = null;
+        try
+        {
+            if (!root.TryGetComponent<Animator>(out var animator))
+            { Debug.LogError("[FootIK] Animator 없음"); return; }
+
+            if (!animator.isHuman)
+                Debug.LogWarning("[FootIK] 리그가 휴머노이드가 아니다 — Foot IK 는 휴머노이드에서만 동작한다.");
+
+            rac = animator.runtimeAnimatorController;
+
+            if (!root.TryGetComponent<PlayerFootIK>(out _))
+            {
+                root.AddComponent<PlayerFootIK>();
+                Debug.Log("[FootIK] PlayerFootIK 컴포넌트 부착");
+            }
+            else Debug.Log("[FootIK] PlayerFootIK 이미 부착돼 있음");
+
+            PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefab);
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+
+        // 오버라이드 컨트롤러면 원본까지 따라간다.
+        while (rac is AnimatorOverrideController ovr) rac = ovr.runtimeAnimatorController;
+
+        if (rac is not UnityEditor.Animations.AnimatorController ac)
+        { Debug.LogError($"[FootIK] AnimatorController 를 못 찾았다 (현재: {rac?.GetType().Name ?? "null"})"); return; }
+
+        // IK Pass 는 베이스 레이어에만 켠다.
+        // OnAnimatorIK 는 켜진 레이어마다 호출되므로, 여러 레이어에 켜면 골반 보정과 가중치 보간이
+        // 프레임당 중복 실행된다. 컴포넌트가 layerIndex 로 거르긴 하지만 애초에 켤 이유가 없다.
+        var so = new SerializedObject(ac);
+        var layers = so.FindProperty("m_AnimatorLayers");
+        int on = 0;
+        for (int i = 0; i < layers.arraySize; i++)
+        {
+            var layer = layers.GetArrayElementAtIndex(i);
+            var ik = layer.FindPropertyRelative("m_IKPass");
+            var nm = layer.FindPropertyRelative("m_Name");
+            if (ik == null) continue;
+
+            bool want = i == 0;
+            if (ik.boolValue != want) { ik.boolValue = want; if (want) on++; }
+            Debug.Log($"[FootIK]   레이어 '{nm?.stringValue}' IK Pass = {(want ? "ON" : "OFF")}");
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(ac);
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[FootIK] 배선 완료 — 컨트롤러 '{ac.name}' 레이어 {layers.arraySize}개 중 {on}개 신규 활성화");
     }
 
     [MenuItem("RelicFairy/BaseCamp/15. 베이크 취소")]

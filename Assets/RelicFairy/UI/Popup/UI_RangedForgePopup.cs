@@ -100,6 +100,17 @@ public class UI_RangedForgePopup : UI_Popup
 
     public UniTask<WeaponSO> WaitForChoiceAsync() => _tcs.Task;
 
+    /// <summary>
+    /// 정상 경로(Complete) 없이 파괴돼도 대기를 끝낸다 — 씬 전환·CloseAllPopupUI 등.
+    /// 이게 없으면 _tcs가 영구 미완료라 WaitForChoiceAsync가 무한 대기하고 모루가 영구히 잠긴다.
+    /// null = Cancel과 같은 값이라 안전한 기본값이다. Complete가 먼저면 TrySetResult가 무시된다.
+    /// </summary>
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();   // 차단 잠금 누수 방지(UI_Popup)
+        _tcs?.TrySetResult(null);
+    }
+
     // ── 캐러셀 ────────────────────────────────────────────────
     private void Step(int dir)
     {

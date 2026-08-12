@@ -27,8 +27,22 @@ public class BackendGameData : MonoBehaviour
 
     private string _rowInDate;
 
-    // PR5: 메타 로컬 저장소(권위) + 뒤끝 병행(백업/텔레메트리). 보수적 이중 기록.
+    // 메타 로컬 저장소(슬롯별 권위) + 뒤끝 병행(백업/텔레메트리). 보수적 이중 기록.
     private readonly LocalFileMetaStore _metaStore = new LocalFileMetaStore();
+
+    /// <summary>계정의 원래 진행이 사는 슬롯. 서버/레거시 값은 여기로만 흘러든다.</summary>
+    private const int PrimarySlot = 0;
+
+    /// <summary>현재 Data가 어느 슬롯 것인지. -1 = 아직 슬롯을 안 읽음.</summary>
+    private int _loadedSlot = -1;
+
+    /// <summary>
+    /// 로그인 시 서버에서 읽은 값의 사본. 0번 슬롯에 로컬 파일이 <b>처음</b> 생길 때 시작값으로 딱 한 번 쓰인다.
+    /// 한 번 쓰고 버리는 이유: 이게 남아 있으면 0번 슬롯에서 "새 게임"을 눌러도 서버 진행이 되살아난다.
+    /// </summary>
+    private UserGameData _serverSnapshot;
+
+    private static int ActiveSlot => RunProgressManager.Instance?.ActiveSlotIndex ?? 0;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
     private void Awake()
@@ -92,17 +106,61 @@ public class BackendGameData : MonoBehaviour
 
         await tcs.Task;
 
-        // PR5: 로컬 메타 권위. 로컬 있으면 우선 적용(오프라인/이어쓰기), 없으면 서버값을 로컬로 이관(최초 1회).
-        var local = _metaStore.Load();
+        // 서버에서 읽은 값을 따로 붙잡아 둔다 — 0번 슬롯 최초 생성 때의 시작값이다.
+        _serverSnapshot = JsonUtility.FromJson<UserGameData>(JsonUtility.ToJson(Data));
+
+        // 로컬 슬롯 메타가 권위. 로그인 직후엔 아직 슬롯을 안 골랐으므로 0번으로 시작한다.
+        LoadLocalMeta(ActiveSlot);
+    }
+
+    /// <summary>
+    /// 활성 슬롯의 메타를 현재 Data로 올린다(로비에서 슬롯을 고른 직후 호출).
+    /// 슬롯은 독립 세이브라, 갈아끼우지 않으면 직전 슬롯의 각성·정수가 그대로 따라온다.
+    /// </summary>
+    public void ApplyActiveSlot()
+    {
+        int slot = ActiveSlot;
+        if (_loadedSlot == slot) return;
+        LoadLocalMeta(slot);
+    }
+
+    /// <summary>
+    /// 슬롯 삭제/새 게임으로 그 슬롯 메타 파일이 사라졌을 때 — 메모리에 남은 값을 버리고 다시 세운다.
+    /// 이게 없으면 방금 지운 슬롯의 각성이 화면에 그대로 떠 있다.
+    /// </summary>
+    public void InvalidateSlot(int slot)
+    {
+        if (_loadedSlot != slot) return;
+        _loadedSlot = -1;
+        LoadLocalMeta(slot);
+    }
+
+    /// <summary>슬롯 메타를 읽어 Data에 앉힌다. 파일이 없으면 그 슬롯의 시작값을 정하고 곧바로 기록한다.</summary>
+    private void LoadLocalMeta(int slot)
+    {
+        _metaStore.MigrateIfNeeded(slot);   // 레거시 meta_save.json → 슬롯 파일(1회, 원본 보관)
+
+        var local = _metaStore.Load(slot);
         if (local != null)
         {
             Data = local;
-            OnDataLoaded?.Invoke();
+        }
+        else if (slot == PrimarySlot && _serverSnapshot != null)
+        {
+            // 계정의 원래 진행을 0번 슬롯이 물려받는다(기존 플레이어 이관). 딱 한 번만.
+            Data = _serverSnapshot;
+            _serverSnapshot = null;
+            _metaStore.Save(slot, Data);
         }
         else
         {
-            _metaStore.Save(Data);
+            // 처음 쓰는 슬롯 — 다른 슬롯의 성장을 물려주지 않는다.
+            Data.Reset();
+            _metaStore.Save(slot, Data);
         }
+
+        _loadedSlot = slot;
+        OnDataLoaded?.Invoke();
     }
 
     /// <summary>회원가입 완료 시 호출. USER_DATA 테이블에 초기 row를 삽입한다.</summary>
@@ -135,8 +193,10 @@ public class BackendGameData : MonoBehaviour
     /// <summary>현재 Data를 로컬(권위) + 뒤끝(백업/텔레메트리)에 반영. 재화 직접 변경 후에도 호출 가능.</summary>
     public async UniTask SaveAsync()
     {
-        // PR5: 로컬 우선 저장 — 오프라인에도 메타(각성/통화)가 보존된다.
-        _metaStore.Save(Data);
+        // 로컬(슬롯) 우선 저장 — 오프라인에도 각성·정수가 보존된다.
+        // 아직 슬롯을 안 읽었으면(로그인 전 재화 변경 등) 활성 슬롯에 기록한다.
+        int slot = _loadedSlot >= 0 ? _loadedSlot : ActiveSlot;
+        _metaStore.Save(slot, Data);
 
         if (string.IsNullOrEmpty(_rowInDate))
         {

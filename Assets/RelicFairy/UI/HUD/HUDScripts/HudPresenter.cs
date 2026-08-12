@@ -128,6 +128,9 @@ public sealed class HudPresenter : MonoBehaviour
             return;
         }
 
+        // 이 런의 실제 보유량으로만 재화 칸을 켠다 — 직전 런의 잔상이 남지 않게 먼저 초기화.
+        view.ResetCurrencyVisibility();
+
         if (_provider != null && _provider.TryGet(out var data))
         {
             view.CombatPanel?.SetHp(data.Hp, data.MaxHp);
@@ -230,6 +233,10 @@ public sealed class HudPresenter : MonoBehaviour
 
         _userInfo = userInfo;
         _userInfo.onUserInfoEvent.AddListener(HandleNicknameChanged);
+
+        // 로비엔 진행 중인 런이 없다 — 지난 런의 골드가 남아 보이지 않게 재화 표시를 초기화한다.
+        // (재화 칸은 "실제로 얻었을 때"만 켜진다.)
+        view?.ResetCurrencyVisibility();
 
         SetMode(HUDIds.Mode.Lobby);
     }
@@ -382,11 +389,65 @@ public sealed class HudPresenter : MonoBehaviour
             _lastBuffItems.Add(items[i]);
     }
 
-    /// <summary>버프 획득 알림 텍스트 표시.</summary>
-    public void ShowBuffNotice(string message) => view?.CombatPanel?.ShowBuffNotice(message);
+    /// <summary>버프 획득 알림 텍스트 표시. 컷씬 중이면 끝난 뒤로 미룬다.</summary>
+    public void ShowBuffNotice(string message)
+    {
+        if (DeferDuringCutscene(isItem: false, message)) return;
+        view?.CombatPanel?.ShowBuffNotice(message);
+    }
 
-    /// <summary>아이템 효과 발동 알림 (왼쪽 스택형).</summary>
-    public void ShowItemEffectNotice(string message) => view?.CombatPanel?.ShowItemEffectNotice(message);
+    /// <summary>아이템 효과 발동 알림 (왼쪽 스택형). 컷씬 중이면 끝난 뒤로 미룬다.</summary>
+    public void ShowItemEffectNotice(string message)
+    {
+        if (DeferDuringCutscene(isItem: true, message)) return;
+        view?.CombatPanel?.ShowItemEffectNotice(message);
+    }
+
+    // ── 컷씬 중 알림 보류 ────────────────────────────────────
+    // 알림 텍스트는 CombatPanel 안에 있는데 컷씬 모드에선 그 패널이 꺼진다.
+    // 그대로 두면 <b>화면에 뜨지도 않고 만료 타이머만 돌아 알림이 조용히 유실</b>된다.
+    // 그래서 컷씬 동안에는 쌓아두고, 컷씬이 끝나면 순서대로 보여준다.
+    private readonly Queue<(bool isItem, string msg)> _deferredNotices = new();
+    private bool _flushingNotices;
+
+    /// <summary>보류 상한 — 컷씬이 길어도 알림이 무한정 쌓여 끝난 뒤 도배되지 않게 한다.</summary>
+    private const int   MaxDeferredNotices = 3;
+    /// <summary>보류분을 하나씩 보여주는 간격(초). 알림 슬롯이 1개라 겹치면 덮어써진다.</summary>
+    private const float DeferredNoticeGap  = 1.1f;
+
+    private bool DeferDuringCutscene(bool isItem, string message)
+    {
+        if (_currentMode != HUDIds.Mode.Cutscene || string.IsNullOrEmpty(message)) return false;
+
+        // 넘치면 가장 오래된 것부터 버린다 — 최근 획득이 더 중요하다.
+        while (_deferredNotices.Count >= MaxDeferredNotices) _deferredNotices.Dequeue();
+        _deferredNotices.Enqueue((isItem, message));
+        return true;
+    }
+
+    /// <summary>컷씬이 끝나면 보류분을 간격을 두고 차례로 표시한다.</summary>
+    private async UniTaskVoid FlushDeferredNoticesAsync()
+    {
+        if (_flushingNotices) return;
+        _flushingNotices = true;
+
+        var ct = this.GetCancellationTokenOnDestroy();
+        try
+        {
+            while (_deferredNotices.Count > 0)
+            {
+                var (isItem, msg) = _deferredNotices.Dequeue();
+                if (isItem) view?.CombatPanel?.ShowItemEffectNotice(msg);
+                else        view?.CombatPanel?.ShowBuffNotice(msg);
+
+                if (_deferredNotices.Count > 0)
+                    await UniTask.Delay(System.TimeSpan.FromSeconds(DeferredNoticeGap),
+                                        ignoreTimeScale: true, cancellationToken: ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally { _flushingNotices = false; }
+    }
     private void HandleCooldownChanged(SkillType skill, float remaining, float total)
         => view?.CombatPanel?.SetSkillCooldown(skill, remaining, total);
 
@@ -552,8 +613,13 @@ public sealed class HudPresenter : MonoBehaviour
 
         if (_currentMode == mode) return;
 
+        var prev = _currentMode;
         _currentMode = mode;
         view.SetSections(ResolveSections(mode));
+
+        // 컷씬을 벗어나면 그동안 미뤄둔 알림을 차례로 보여준다.
+        if (prev == HUDIds.Mode.Cutscene && mode != HUDIds.Mode.Cutscene && _deferredNotices.Count > 0)
+            FlushDeferredNoticesAsync().Forget();
     }
 
     private static HUDIds.Section ResolveSections(HUDIds.Mode mode)

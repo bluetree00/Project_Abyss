@@ -16,7 +16,7 @@ using UnityEngine.UI;
 /// </summary>
 public static class CinematicFrame
 {
-    private const int   SortingOrder        = 9000;   // ScreenFade(10000) 와이프보다 아래
+    private const int   SortingOrder        = UISortingOrder.Letterbox;  // 전환 와이프보다 아래(밴드 유지)
     private const float DefaultAspect       = 2.39f;  // 시네마스코프
     private const float TitleLineFromBottom = 0.28f;  // 삼분할 하단선 부근
     private const float SafeAreaMargin      = 0.10f;  // 좌우 세이프영역(타이틀 폭)

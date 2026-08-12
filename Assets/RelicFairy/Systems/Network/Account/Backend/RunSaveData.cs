@@ -59,6 +59,7 @@ public class RunSaveData
 
     // 절차생성 진행 상태 (RunFlowController/RunSequencer)
     public int    masterSeed;
+    public int    chapterSeed;          // 현재 챕터 시퀀서 시드(Ch1=masterSeed, Ch2+=파생). 0=구버전 → 복원 시 재계산
     public int    visitCount;
     public int    seqPhase;
     public int    shopUsed;
@@ -75,6 +76,7 @@ public class RunSaveData
     public int    currentRoomKind;
     public int    currentRoomMirror;
     public bool   currentRoomCleared;     // 클리어 후 저장 지원 — 복원 시 몹 재스폰 방지 + 출구 개방
+    public bool   currentRoomRewardPending; // 클리어 보상 미수령 — 복원 시 보상 재배치(수령했으면 false → 이중지급 차단)
     public int    crucibleRollIndex;      // 재련소 결정적 롤 소비 수 — 복원 시 스트림 진행(save-scum 방지)
     public string cooldownsJson;          // CooldownListWrapper JSON
 }

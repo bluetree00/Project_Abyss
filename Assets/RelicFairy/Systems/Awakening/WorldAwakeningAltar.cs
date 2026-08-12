@@ -69,18 +69,32 @@ public class WorldAwakeningAltar : MonoBehaviour
 
         try
         {
-            await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
+            var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_AwakeningPanel>();
+            if (panel != null)
+            {
+                // 가드는 팝업이 <b>닫힐 때까지</b> 유지한다. 열리자마자 풀면 F 연타에
+                // 같은 팝업이 스택에 겹쳐 쌓여 한 번 닫아도 잔재가 남는다.
+                panel.OnClosed += HandlePanelClosed;   // 팝업은 닫힐 때 파괴되므로 해제는 불필요
+                return;
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Debug.LogWarning($"[WorldAwakeningAltar] 팝업 로드 실패: {e.Message}");
         }
-        finally
-        {
-            _opening = false;
-            if (_playerInRange) ShowPrompt(true);
-        }
+
+        HandlePanelClosed();
+    }
+
+    private void HandlePanelClosed()
+    {
+        // 팝업의 OnDestroy가 이 이벤트를 쏘므로 씬 언로드/종료 때도 불린다.
+        // 그때는 제단이 이미 파괴돼 있을 수 있어, 그대로 진행하면 MissingReferenceException 이 난다.
+        if (this == null) return;
+
+        _opening = false;
+        if (_playerInRange) ShowPrompt(true);
     }
 
     private void BillboardTexts()
@@ -105,7 +119,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.9f, 0.7f, 0.2f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
-        _worldText.sortingOrder = 10;
+        _worldText.sortingOrder = UISortingOrder.WorldLabel;
         TMPOutlineHelper.ApplyDefault(_worldText);
     }
 
@@ -121,7 +135,7 @@ public class WorldAwakeningAltar : MonoBehaviour
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
-        _promptText.sortingOrder = 11;
+        _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(_promptText);
         _promptText.text = "<color=#FFD700>[F]</color> 각성 관리";
 

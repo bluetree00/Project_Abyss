@@ -34,8 +34,10 @@ public class ServerEquipmentDataManager
         // 0건이면 Resources 폴백
         if (_byId.Count == 0)
         {
-            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — Addressables 폴백");
-            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("EQUIPMENT_DATA");
+            Debug.Log("[ServerEquipmentDataManager] CDN 실패 — 오프라인 폴백");
+            // 폴백 실물은 Resources/EQUIPMENT_DATA.json (Addressable 미등록) — Resources도 함께 본다.
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("EQUIPMENT_DATA")
+                            ?? Resources.Load<TextAsset>("EQUIPMENT_DATA");
             if (textAsset != null)
             {
                 var col = JsonUtility.FromJson<EquipmentEntryCollection>(textAsset.text);

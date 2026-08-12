@@ -274,7 +274,11 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
                 if (this == null) return;
 
                 // 2-1. 서버 CDN으로 수치 오버라이드 (Addressable JSON 위에 덮어쓰기)
-                // ApplyServerStatOverride(); // 임시 비활성화
+                // ApplyServerStatOverride(); // 의도적 동결 — 되살리려면 밸런스 재조정이 선행돼야 한다.
+                //   MONSTER_ELEMENT_STAT_DATA는 정상 데이터가 들어 있지만 현재 SO 수치와 축이 다르다.
+                //   실측(2026-08-08): Slime HP 10→40 / ATK 30→5, Orc ATK 54→12, DemonKing HP 300→900.
+                //   지금 켜면 전 몬스터 HP·공격력이 배수로 뒤집힌다. 차트를 정본으로 삼기로 결정하는
+                //   시점에 CSV 쪽을 현재 SO 기준으로 재작성한 뒤 함께 켤 것.
 
                 // 2-2. 전 몬스터 플레이어 탐색 범위 상향. 캐시 채움 시(타입당 1회)만 적용 → 인스턴스 누적 없음.
                 ApplyDetectionRangeBoost(_config);
@@ -1317,6 +1321,14 @@ public abstract class MonsterBase : MonoBehaviour, IDamageable
         _attackSpeedMulti    = 1f;
         _lastDamageKind      = DamageKind.Normal;
         _status.Reset();
+
+        // 화상은 MonsterStatusReceiver를 타지 않는 독립 컴포넌트라 _status.Reset()으로 지워지지 않는다.
+        // 불타는 도중 죽어 풀로 돌아가면 남은 시간이 그대로 얼어붙었다가, 재사용된 몬스터가
+        // 활성화되는 즉시 이어서 틱을 때린다 — 스폰하자마자 즉사하던 원인.
+        //
+        // Destroy 만으로는 부족하다 — 실제 제거는 프레임 끝이라 그 전에 Update 가 한 번 더 돌거나
+        // 같은 프레임에 재스폰되면 화상이 그대로 살아 있다. 상태를 먼저 비우고 제거한다.
+        if (TryGetComponent<MonsterBurnHandler>(out var burn)) burn.CancelForPooling();
         _statusCcActive      = false;
         _statusSlowActive    = false;
         _telegraphing        = false;

@@ -32,8 +32,13 @@ public class ItemDataManager
 
         if (_itemById.Count == 0)
         {
-            Debug.Log("[ItemDataManager] CDN 실패 — Addressables 폴백");
-            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("ITEM_DATA");
+            Debug.Log("[ItemDataManager] CDN 실패 — 오프라인 폴백");
+            // 폴백 실물은 Assets/RelicFairy/Resources/ITEM_DATA.json 이고 Addressable 주소로는
+            // 등록되어 있지 않다(= Addressables 분기만 있던 시절엔 항상 null → 폴백이 사장돼 있었다).
+            // Resources 폴더 자산은 등록 없이는 Addressables로 잡히지 않으므로 Resources.Load를 함께 탄다.
+            // (프로젝트 규약은 AddressableManager 경유지만, 여기는 CDN 실패 시 최후 오프라인 경로다.)
+            var json = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("ITEM_DATA")
+                       ?? Resources.Load<TextAsset>("ITEM_DATA");
             if (json != null)
             {
                 var col = JsonUtility.FromJson<ItemEntryCollection>(json.text);

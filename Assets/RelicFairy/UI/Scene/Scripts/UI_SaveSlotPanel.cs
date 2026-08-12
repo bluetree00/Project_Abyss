@@ -332,6 +332,11 @@ public class UI_SaveSlotPanel : UI_Base
         var rpm = RunProgressManager.Instance;
         if (rpm != null) rpm.ActiveSlotIndex = slotIndex;
 
+        // 슬롯 = 독립 세이브. 진행 런뿐 아니라 영구 메타(각성·정수·봉인)와 퀘스트도 이 슬롯 것으로 갈아끼운다.
+        // 여기서 안 바꾸면 직전에 고른 슬롯의 성장과 퀘스트 완료가 그대로 따라 들어간다.
+        BackendGameData.Instance?.ApplyActiveSlot();
+        Managers.Quest?.ReloadForActiveSlot();
+
         Close();
 
         Managers.Sound.FadeOutBgmAsync().Forget();

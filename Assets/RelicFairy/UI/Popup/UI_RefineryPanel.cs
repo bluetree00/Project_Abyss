@@ -17,6 +17,9 @@ public sealed class UI_RefineryPanel : UI_Popup
     public override bool BlocksGameplay => true;
     public override bool CloseOnEscape  => true;
 
+    /// <summary>패널이 사라졌음을 알린다 — 방 컨트롤러의 중복 오픈 가드 해제용(상점/재련소와 동일 규약).</summary>
+    public event Action OnClosed;
+
     // 창 크기는 배경 아트(정제소 바탕@2x 2089×1267)의 실치수 = 1044×634.
     // 요소 크기는 전부 각 아트의 실치수(@2x ÷ 2), 위치는 완성본 전체 사진(890×538)에서
     // 창 중심 기준 오프셋을 환산(가로 ×1.173 / 세로 ×1.178)한 값이다.
@@ -75,6 +78,12 @@ public sealed class UI_RefineryPanel : UI_Popup
         _svc = GameRunBootstrapper.Instance?.Run?.Refinery;
         BuildUI();
         Refresh();
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        OnClosed?.Invoke();
     }
 
     /// <summary>방 특전은 이 패널을 닫으면 사라진다 — 상시 탭(룬판 버튼)으로 다시 열면 특전 없이 열려야 한다.</summary>

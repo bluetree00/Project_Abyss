@@ -1439,7 +1439,12 @@ public class PlayerController : CharacterBase
         data.jumpForce                  = e.jump_force;
         data.gravity                    = e.gravity;
         data.fallMultiplier             = e.fall_multiplier;
-        data.groundCheckDistance        = e.ground_check_distance;
+        // groundCheckDistance 는 차트에서 덮어쓰지 않는다.
+        // 이 값은 밸런스 스탯이 아니라 캡슐 크기·스케일에 종속된 콜라이더 정합용 물리 상수다.
+        // 서버 값(0.3)이 SO(0.15)를 덮어쓰면 접지 허용 밴드가 25cm 로 벌어져
+        // 캐릭터가 지면 위에 뜬 채로 멈춘다(접지 판정 시 중력이 꺼지므로).
+        // 포이즈·스태미너를 CSV 컬럼 없이 SO 값으로 두는 것과 같은 판단이다.
+        //   data.groundCheckDistance = e.ground_check_distance;   ← 의도적으로 제거
         data.airControlMultiplier       = e.air_control_multiplier;
         data.groundDrag                 = e.ground_drag;
         data.airDrag                    = e.air_drag;

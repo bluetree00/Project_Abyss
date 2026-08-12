@@ -41,15 +41,19 @@ public class PlayerDataManager
         // 0건이면 Resources 폴백
         if (_playerById.Count == 0)
         {
-            Debug.Log("[PlayerDataManager] CDN 실패 — Addressables 폴백");
-            var playerJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("CHARACTER_DATA");
+            Debug.Log("[PlayerDataManager] CDN 실패 — 오프라인 폴백");
+            // 폴백 실물은 Resources/CHARACTER_DATA.json·PASSIVE_DATA.json 이며 Addressable 미등록이다.
+            // Addressables만 보던 시절엔 항상 null이라 폴백 자체가 죽어 있었다(주석은 Resources를 가리키고 있었다).
+            var playerJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("CHARACTER_DATA")
+                             ?? Resources.Load<TextAsset>("CHARACTER_DATA");
             if (playerJson != null)
             {
                 var col = JsonUtility.FromJson<PlayerStatEntryCollection>(playerJson.text);
                 if (col?.players != null)
                     foreach (var p in col.players) _playerById[p.char_id] = p;
             }
-            var passiveJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("PASSIVE_DATA");
+            var passiveJson = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("PASSIVE_DATA")
+                              ?? Resources.Load<TextAsset>("PASSIVE_DATA");
             if (passiveJson != null)
             {
                 var col = JsonUtility.FromJson<PassiveEntryCollection>(passiveJson.text);

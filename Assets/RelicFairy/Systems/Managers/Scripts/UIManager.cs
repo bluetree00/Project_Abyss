@@ -8,7 +8,7 @@ public class UIManager
     // 팝업 정렬 베이스. Canvas_HUD(100)보다 위, Canvas_Overlay(2000)보다 아래에 위치해야
     // 팝업/대사가 HUD 위에, 토스트·로딩·페이드(Overlay) 아래에 렌더된다.
     // ⚠️ 리셋(ClearOnSceneTransition)도 반드시 이 상수로 — 과거 10으로 리셋해 전환 후 대사가 HUD 뒤로 묻힌 버그.
-    const int PopupBaseOrder = 200;
+    const int PopupBaseOrder = UISortingOrder.PopupStack;
     int _order = PopupBaseOrder;
 
     Stack<UI_Popup> _popupStack = new Stack<UI_Popup>();
@@ -150,7 +150,13 @@ public class UIManager
             _menuUI.gameObject.SetActive(false);
 
         ui.gameObject.SetActive(true);
-        ui.Init();
+
+        // Init은 '구조 바인딩 1회'다. @UIRoot는 DDOL이라 같은 인스턴스가 다시 보여지는데,
+        // 매번 Init을 부르면 onClick 리스너가 겹겹이 쌓여 버튼 1회 클릭이 N번 실행됐다.
+        // 표시할 때마다 되돌려야 하는 상태는 각 UI의 OnEnable이 담당한다.
+        if (!ui.IsInitialized)
+            ui.Init();
+
         _menuUI = ui;
     }
 
@@ -185,6 +191,13 @@ public class UIManager
             {
                 existing.SetActive(true);
                 var cached = existing.GetComponent<T>();
+
+                // 이미 스택에 있는 인스턴스는 다시 push하지 않는다.
+                // 같은 인스턴스가 두 겹 쌓이면 닫기 1회로는 한 겹만 빠져 좀비 항목이 남고,
+                // 그 항목 때문에 ESC가 먹히지 않거나 게임플레이 차단(시간정지)이 안 풀린다.
+                if (cached != null && _popupStack.Contains(cached))
+                    return cached;
+
                 _popupStack.Push(cached);
                 RefreshGameplayBlock();
                 cached.PlayOpenAnimation();
@@ -259,11 +272,16 @@ public class UIManager
     /// </summary>
     public bool TryCloseTopPopupOnEscape()
     {
+        // 파괴됐는데 아직 pop되지 않은 '좀비' 항목을 먼저 걷어낸다.
+        // 남겨두면 Peek()이 계속 null을 돌려주고 ESC는 true(소비)로만 끝나 아무 것도 닫히지 않는다
+        // — 일시정지도 못 열고 팝업도 못 닫는 소프트락. CloseTopPopup이 null 항목을 안전하게 처리한다.
+        while (_popupStack.Count > 0 && _popupStack.Peek() == null)
+            CloseTopPopup(immediate: true);
+
         if (_popupStack.Count == 0) return false;
 
         UI_Popup top = _popupStack.Peek();
-        // 파괴됐는데 아직 pop되지 않은 항목은 건드리지 않는다(_order/_uiObjects 정합 유지).
-        if (top != null && top.CloseOnEscape)
+        if (top.CloseOnEscape)
             top.ClosePopupUI();
 
         return true;
@@ -366,6 +384,13 @@ public class UIManager
     {
         CloseAllPopupUI();
         CloseMenuUI();
+
+        // 룬판(UI_GridPanel)은 UI_Popup이 아니라 팝업 스택에 없다 — CloseAllPopupUI가 못 닫는다.
+        // 열린 채 씬이 넘어가면 OpenPanel의 TimeScaleArbiter.Acquire(0)가 풀리지 않아 시간이 고착된다.
+        // Close()가 Release + ExitGridSynergy까지 수행하므로 열려 있을 때만 호출한다.
+        if (UI_GridPanel.Instance != null && UI_GridPanel.Instance.IsOpen)
+            UI_GridPanel.Instance.Close();
+
         _order = PopupBaseOrder;
 
         if (!IsRootInjected)

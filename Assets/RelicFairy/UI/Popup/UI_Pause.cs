@@ -7,6 +7,14 @@ using UnityEngine.UI;
 
 public class UI_Pause : UI_Popup
 {
+	/// <summary>
+	/// 일시정지도 <b>게임플레이 차단 팝업</b>이다. 이 값이 false면 자체 TimeScaleArbiter로 시간은 멈춰도
+	/// <c>UIManager.IsGameplayBlocked</c>가 false라, 이 값을 보는 쪽(대사 이벤트 대기 등)이
+	/// "차단 아님"으로 오판한다. TimeScaleArbiter는 소유자별로 Acquire/Release를 관리하므로
+	/// UIManager와 이 팝업이 각각 잡아도 충돌하지 않는다(둘 다 Priority.Pause, 각자 해제).
+	/// </summary>
+	public override bool BlocksGameplay => true;
+
 	enum GameObjects
 	{
 		Background,
@@ -104,8 +112,12 @@ public class UI_Pause : UI_Popup
 		_currentTab = tabName;  // 현재 탭 상태 저장
 	}
 
-	private void OnDestroy()
+	// base(UI_Popup)의 OnDestroy는 BlocksGameplay 팝업이 사라졌음을 UIManager에 알린다.
+	// override가 아닌 private으로 두면 그 통지가 통째로 가려져(메서드 하이딩) 게임플레이 차단이 안 풀렸다.
+	protected override void OnDestroy()
 	{
+		base.OnDestroy();
+
 		// 방어적 Release — Resume/Exit 없이 강제 파괴되어도 timeScale 0 고착 방지(멱등 no-op 가드).
 		TimeScaleArbiter.Release(this);
 	}

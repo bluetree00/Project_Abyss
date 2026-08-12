@@ -8,15 +8,22 @@ public sealed class DebugStageRunPanel : MonoBehaviour
     [Header("Optional")]
     [SerializeField] private GameRunBootstrapper bootstrapper;
 
+    // 치트(F5 방 스킵 / F7 아이템 스폰)와 테스트 버튼은 에디터·개발빌드 전용이다.
+    // 릴리스 빌드에서는 통째로 컴파일되지 않아 무동작 — 씬의 GameObject는 그대로 두고 코드만 막는다.
+    // (자동 런 시작 경로 Start()/StartRun()은 출하 씬 진입 흐름이 의존할 수 있어 가드 밖에 남긴다.)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     [Header("Debug Keys")]
     [SerializeField] private KeyCode clearRoomKey = KeyCode.F5;
     [SerializeField] private KeyCode spawnItemKey = KeyCode.F7;
+#endif
     private bool _started;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     [Header("테스트 버튼 (재련소/정제소 즉시 오픈)")]
     [Tooltip("개발 편의용 좌상단 버튼. 두 방 모두 실제 진입 경로가 생겨 평시엔 꺼 둔다 — 필요할 때만 켤 것.")]
     [SerializeField] private bool showTestButtons = false;
     private CrucibleRoomController _testCrucible;
+#endif
 
     private void Awake()
     {
@@ -41,6 +48,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         StartRun().Forget();
     }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     private static readonly string[] DebugSpawnItems =
     {
         "item_t1_dull_blade",          // 힘의 룬 — 전체 공격력 +4 (Always)
@@ -150,6 +158,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
             }
         };
     }
+#endif
 
     private async UniTaskVoid StartRun()
     {
@@ -171,6 +180,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
 
     // ── 디버그 키 가이드 UI ────────────────────────────────
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     [SerializeField, Tooltip("레거시 디버그 키 힌트 오버레이 표시(기본 off — F5/F6/F7 키 자체는 유지)")]
     private bool showGuiHints = false;
 
@@ -300,6 +310,7 @@ public sealed class DebugStageRunPanel : MonoBehaviour
         var panel = await Managers.UI.ShowPopupUIAndGetAsync<UI_RefineryPanel>();
         if (panel == null) Debug.LogWarning("[DebugTest] UI_RefineryPanel 로드 실패");
     }
+#endif
 
     /// <summary>
     /// GameRunBootstrapper 또는 AppBootstrapper.CurrentRun에서 세션을 가져옵니다.

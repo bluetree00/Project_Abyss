@@ -28,6 +28,9 @@ public class RunProgressManager : MonoBehaviour
     // 진행 중 런 세이브는 로컬 파일(persistentDataPath)이 단독 권위.
     private readonly IRunSaveStore _localStore = new LocalFileRunSaveStore();
 
+    // 슬롯은 독립 세이브 — 슬롯 수명(삭제/새 게임)은 영구 메타까지 함께 책임진다.
+    private readonly LocalFileMetaStore _metaStore = new LocalFileMetaStore();
+
     // ─────────────────────────────────────────────────────────
     // Properties
     // ─────────────────────────────────────────────────────────
@@ -82,12 +85,21 @@ public class RunProgressManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 슬롯을 <b>처음 상태</b>로 되돌린다 — 세이브 + 초회 진행도(온보딩) + 시도 횟수.
+    /// 슬롯을 <b>처음 상태</b>로 되돌린다 — 진행 런 + 영구 메타 + 퀘스트 + 초회 진행도(온보딩) + 시도 횟수.
     /// "새 게임"과 "슬롯 삭제"만 이 경로다. 이 슬롯으로 다시 시작하면 초회 경험이 그대로 재현된다.
+    ///
+    /// 슬롯은 독립 세이브이므로 각성·심연의 정수·보스 봉인·퀘스트 완료까지 함께 버린다 —
+    /// 남겨두면 "새 게임"인데 지난 플레이의 성장과 퀘스트가 그대로 붙어 있다. 다른 슬롯은 무영향.
     /// </summary>
     public void ResetSlot(int slot)
     {
         _localStore.Delete(slot);
+        _metaStore.Delete(slot);
+        Managers.Quest?.ClearSlot(slot);
+
+        // 파일을 지웠어도 메모리에는 방금까지의 값이 남아 있다 — 화면에 그대로 뜨지 않게 다시 세운다.
+        BackendGameData.Instance?.InvalidateSlot(slot);
+
         BaseCampOnboardingDirector.ClearForSlot(slot);
         ClearRetryCount(slot);
     }
@@ -169,18 +181,19 @@ public class RunProgressManager : MonoBehaviour
         int retry = GetRetryCount(slot);
 
         var data = BuildSaveData(session, slot, retry, false, prev);
-        ApplyExtendedFields(data, session, meta);
+        ApplyExtendedFields(data, session, meta, prev);
 
         _localStore.Save(slot, data);
     }
 
     /// <summary>로컬 세이브 전용 확장 필드 채움. BuildSaveData 공통 필드와 별개.</summary>
-    private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m)
+    private static void ApplyExtendedFields(RunSaveData d, GameRunSession s, in RunMetaSnapshot m, RunSaveData prev)
     {
         d.saveVersion       = 1;
 
         // 절차생성 진행
         d.masterSeed        = m.masterSeed;
+        d.chapterSeed       = m.chapterSeed;   // Ch2+ 이어하기 맵 재현(0=구버전 → 복원 시 재계산)
         d.visitCount        = m.visitCount;
         d.seqPhase          = m.seqPhase;
         d.shopUsed          = m.shopUsed;
@@ -197,6 +210,7 @@ public class RunProgressManager : MonoBehaviour
         d.currentRoomKind   = m.currentRoomKind;
         d.currentRoomMirror = m.currentRoomMirror;
         d.currentRoomCleared = m.currentRoomCleared;   // 클리어 후 저장 → 복원 시 몹 재스폰 방지
+        d.currentRoomRewardPending = m.currentRoomRewardPending;   // 미수령 보상 → 복원 시 1회만 재배치
         d.crucibleRollIndex  = m.crucibleRollIndex;    // 재련소 RNG 스트림 위치(save-scum 방지)
 
         var cdw = new CooldownListWrapper();
@@ -238,10 +252,25 @@ public class RunProgressManager : MonoBehaviour
         d.runeCellsJson = JsonUtility.ToJson(cw);
 
         // 룬 보드 Shape 배치 (재편집용)
+        //
+        // 점유 셀과 배치는 <b>수명이 다른 두 소스</b>에서 온다 — 셀은 UI_GridPanel(DDOL)의 헥사 뷰,
+        // 배치는 puzzle 인스턴스의 BoardManager다. 판이 아직 안 세워졌거나 이미 버려진 순간에 저장하면
+        // 배치만 빈 값으로 돌아오는데, 그대로 덮어쓰면 이어하기에서 <b>칸은 점유됐는데 룬 그림이 없는 판</b>이 된다
+        // (시너지는 셀에서 재계산되므로 눈에 띄지도 않는다).
+        // 그래서 "배치 0 + 점유 있음" 비대칭이면 직전 저장의 배치를 그대로 남긴다.
         var pw         = new RunePlacementListWrapper();
         var placements = MerlinRuneBridge.Instance?.CaptureRunePlacements();
         if (placements != null) pw.items.AddRange(placements);
-        d.runePlacementsJson = JsonUtility.ToJson(pw);
+
+        if (pw.items.Count == 0 && cw.items.Count > 0 && !string.IsNullOrEmpty(prev?.runePlacementsJson))
+        {
+            d.runePlacementsJson = prev.runePlacementsJson;
+            Debug.LogWarning($"[RunSave] 룬 배치 캡처 실패(점유 {cw.items.Count}칸) — 직전 저장의 배치를 유지한다");
+        }
+        else
+        {
+            d.runePlacementsJson = JsonUtility.ToJson(pw);
+        }
     }
 
     /// <summary>무기 슬롯 강화/승급 상태를 세이브에 캡처. 라이브 WeaponManager → 씬 전환 저장 슬롯 순.</summary>

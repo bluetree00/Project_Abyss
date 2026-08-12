@@ -33,6 +33,7 @@ public sealed class RefineryRoomController : MonoBehaviour
     private GameObject     _npcInstance;
     private ShopNpcInteraction _npc;
     private bool _initialized;
+    private bool _uiOpen;
 
     /// <summary>이 방의 특전(입장 시 결정성 롤로 1종). 방은 "좋은 조건으로 정제하는 곳".</summary>
     private RefineryPerk _perk = RefineryPerk.None;
@@ -97,7 +98,11 @@ public sealed class RefineryRoomController : MonoBehaviour
                     .Initialize(ChatterLines, 9f, new Color(0.62f, 0.85f, 1f));
     }
 
-    private void HandleNpcInteract() => OpenRefineryAsync().Forget();
+    private void HandleNpcInteract()
+    {
+        if (_uiOpen) return;   // 연타로 같은 팝업이 겹쳐 쌓이는 것을 막는다(상점/재련소와 동일 규약)
+        OpenRefineryAsync().Forget();
+    }
 
     /// <summary>정제소 패널을 방 특전과 함께 연다. 특전은 패널이 닫힐 때 해제된다(상시 탭엔 안 붙음).</summary>
     private async UniTaskVoid OpenRefineryAsync()
@@ -105,6 +110,8 @@ public sealed class RefineryRoomController : MonoBehaviour
         var svc = _run?.Refinery;
         if (svc == null) { Debug.LogWarning("[Refinery] 정제소 서비스 없음(런 미시작)"); return; }
 
+        _uiOpen = true;
+        if (_npc != null) _npc.SetInteractable(false);
         svc.SetRoomPerk(_perk);
 
         try
@@ -114,9 +121,23 @@ public sealed class RefineryRoomController : MonoBehaviour
             {
                 Debug.LogWarning("[Refinery] UI_RefineryPanel 로드 실패");
                 svc.ClearRoomPerk();
+                HandlePanelClosed();
+                return;
             }
+            panel.OnClosed += HandlePanelClosed;   // 팝업은 닫힐 때 파괴되므로 해제는 불필요
         }
-        catch (OperationCanceledException) { svc.ClearRoomPerk(); }
+        catch (OperationCanceledException) { svc.ClearRoomPerk(); HandlePanelClosed(); }
+    }
+
+    /// <summary>UI_RefineryPanel이 닫힐 때 호출 — 중복 오픈 가드 해제.</summary>
+    private void HandlePanelClosed()
+    {
+        // 팝업의 OnDestroy가 이 이벤트를 쏘므로 씬 언로드/종료 때도 불린다.
+        // 그때는 이 컨트롤러가 이미 파괴돼 있을 수 있어, 그대로 진행하면 MissingReferenceException 이 난다.
+        if (this == null) return;
+
+        _uiOpen = false;
+        if (_npc != null) _npc.SetInteractable(true);
     }
 
     // ── 소품 배치 (재련소와 동일 규약: 첫 소품=정제대(정면), 나머지=NPC 뒤 반원) ───────

@@ -49,9 +49,18 @@ public class UI_Lobby : UI_Scene
         if (saveSlotPanel != null)
         {
             saveSlotPanel.Init();
-            saveSlotPanel.Close();
             saveSlotPanel.OnClosed += OnSaveSlotPanelClosed;
         }
+    }
+
+    /// <summary>
+    /// 표시될 때마다 되돌려야 하는 상태. Init은 이제 1회만 도므로(리스너 중복 방지) 여기로 옮겼다.
+    /// 런을 시작할 땐 슬롯 패널이 열린 채 로비를 떠나므로, 돌아왔을 때 그대로면 타이틀이 가려진다.
+    /// </summary>
+    private void OnEnable()
+    {
+        saveSlotPanel?.Close();
+        SetTitleImage(true);
     }
 
     // ─────────────────────────────────────────────────────────

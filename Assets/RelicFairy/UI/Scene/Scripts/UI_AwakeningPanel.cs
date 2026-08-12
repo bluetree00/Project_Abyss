@@ -33,6 +33,9 @@ public class UI_AwakeningPanel : UI_Popup
     private static readonly string[] CategoryNames =
         { "검", "방패", "심장", "발걸음", "마력", "행운" };
 
+    /// <summary>패널이 사라졌음을 알린다 — 제단(WorldAwakeningAltar)의 중복 오픈 가드 해제용.</summary>
+    public event Action OnClosed;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     public override void Init()
@@ -49,6 +52,12 @@ public class UI_AwakeningPanel : UI_Popup
         }
 
         Refresh();
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        OnClosed?.Invoke();
     }
 
     // ── 내부 ──────────────────────────────────────────────────────────────

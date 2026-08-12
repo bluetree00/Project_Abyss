@@ -58,7 +58,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   minFallAnimHeight: 0.6
-  useFloatingController: 0
+  useFloatingController: 1
   floatRideHeight: 0.4
   floatSpring: 4000
   floatDamper: 900

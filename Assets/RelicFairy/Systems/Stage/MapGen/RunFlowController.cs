@@ -63,6 +63,11 @@ public class RunFlowController : MonoBehaviour
 
     private bool     _currentRoomCleared;   // 현재 방 클리어 여부(세이브 기록)
     private bool     _resumedRoomCleared;   // 이어하기: 저장 당시 방이 클리어 상태였는가(1회성)
+    // 클리어 보상 오브젝트가 스폰됐지만 아직 [F]로 수령되지 않았는가(= 미수령). 세이브 기록.
+    // 이게 없으면 "클리어 → 보상 안 줍고 종료 → 이어하기"에서 보상이 통째로 사라지고,
+    // 반대로 무조건 되살리면 이미 받은 보상까지 다시 줘 이중지급이 된다. 수령 시점에 false로 내린다.
+    private bool     _currentRoomRewardPending;
+    private bool     _resumedRewardPending; // 이어하기: 저장 당시 미수령 보상이 있었는가(1회성)
     private DoorPlan _lastPlan;             // 재저장(S2/S3)용 방 정보 캐시
     private DoorEdge _lastEdge;
     private int      _lastMirror;
@@ -101,6 +106,10 @@ public class RunFlowController : MonoBehaviour
     private int     _anchorToggle;
     private int     _heading; // 현재 진행 방향(0=N,1=E,2=S,3=W). 탄 출구 엣지로 갱신 → 다음 방 회전에 사용.
     private int     _masterSeed; // 런 마스터 시드 (세이브/이어하기 결정성).
+    // 현재 챕터의 시퀀서 시드. Ch1은 마스터 시드 그대로, Ch2+는 마스터 시드에서 챕터별로 파생된다.
+    // 이걸 저장하지 않던 시절엔 Ch2+ 이어하기가 시퀀서를 '마스터 시드'로 되살려
+    // 저장 당시와 다른 방 순서를 만들었다(같은 방을 재생성해도 이후 진행이 어긋남).
+    private int     _chapterSeed;
     private bool    _resuming;   // 이어하기 재생성 중 — 중복 저장 억제용.
     private string  _resolvedStructureKey; // 이번 런의 챕터별 구조 config 키(StartRun/Resume에서 주입). 비면 _structureConfigKey.
 
@@ -130,8 +139,9 @@ public class RunFlowController : MonoBehaviour
 
         await EnsureStructureConfigAsync();
 
-        int seed    = _seed != 0 ? _seed : Environment.TickCount;
-        _masterSeed = seed;
+        int seed     = _seed != 0 ? _seed : Environment.TickCount;
+        _masterSeed  = seed;
+        _chapterSeed = seed;   // Ch1(런 시작) = 마스터 시드
         _rng        = new System.Random(seed);
         _sequencer  = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
         _runPlan    = _sequencer.BuildPlan(); // 시작 시 전체 일정표 1회 산출(시드+config 순수 함수)
@@ -163,8 +173,17 @@ public class RunFlowController : MonoBehaviour
         _anchorToggle = meta.anchorToggle;
         _heading      = meta.heading;
 
+        // 챕터 시드 복원. 구버전 세이브(필드 없음 → 0)는 마스터 시드+현재 챕터로 같은 공식을 다시 태워
+        // 저장 당시 값을 그대로 재현한다(Ch1이면 마스터 시드 = 기존 동작 그대로). 무손실 마이그레이션.
+        int resumeChapter = (int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? ChapterId.Chapter1);
+        _chapterSeed = meta.chapterSeed != 0
+            ? meta.chapterSeed
+            : ChapterSeed(_masterSeed, resumeChapter);
+
         // 저장 당시 방이 클리어 상태였는가 → true면 재생성 시 몹을 스폰하지 않고 출구만 연다.
         _resumedRoomCleared = meta.currentRoomCleared;
+        // 저장 당시 아직 안 받은 클리어 보상이 있었는가 → true면 재생성 시 보상만 다시 세운다.
+        _resumedRewardPending = meta.currentRoomRewardPending;
 
         // 재련소 결정적 롤 스트림 재개 위치 — 방 안 저장 후 재접속해도 같은 롤을 다시 굴리지 못하게.
         var resumeSession = GameRunBootstrapper.Instance?.Run;
@@ -180,13 +199,13 @@ public class RunFlowController : MonoBehaviour
 
         await EnsureStructureConfigAsync();
 
-        _rng       = new System.Random(_masterSeed);
-        _sequencer = new RunSequencer(_pool, _resolvedStructure, _masterSeed, _bossThresholdOverride);
+        _rng       = new System.Random(_chapterSeed);
+        _sequencer = new RunSequencer(_pool, _resolvedStructure, _chapterSeed, _bossThresholdOverride);
         _sequencer.RestoreState(meta.visitCount, meta.seqPhase, meta.shopUsed, meta.eventUsed, meta.cooldowns,
                                 meta.crucibleUsed, meta.refineryUsed,
                                 meta.shopMiss, meta.eventMiss, meta.crucibleMiss, meta.refineryMiss);
         _runPlan   = _sequencer.BuildPlan(); // 이어하기: 동일 시드+config로 일정표 재생성(직렬화 없음, 원본과 동일)
-        DumpRunPlan(_masterSeed);
+        DumpRunPlan(_chapterSeed);
 
         var entry = !string.IsNullOrEmpty(meta.currentRoomPoolKey)
             ? _pool.Find(p => string.Equals(p.pool_key, meta.currentRoomPoolKey, StringComparison.OrdinalIgnoreCase))
@@ -233,7 +252,8 @@ public class RunFlowController : MonoBehaviour
         await EnsureStructureConfigAsync();
 
         int chapterNum = (int)(GameRunBootstrapper.Instance?.Run?.CurrentChapter ?? 0);
-        int seed       = RunSequencer.Combine(_masterSeed, 7000 + chapterNum); // 챕터별 결정적 시드
+        int seed       = ChapterSeed(_masterSeed, chapterNum); // 챕터별 결정적 시드
+        _chapterSeed   = seed;                                 // 세이브로 넘겨 이어하기에서 같은 시드로 복원
         _rng           = new System.Random(seed);
         _sequencer     = new RunSequencer(_pool, _resolvedStructure, seed, _bossThresholdOverride);
         _runPlan       = _sequencer.BuildPlan();
@@ -253,6 +273,11 @@ public class RunFlowController : MonoBehaviour
     }
 
     // ── Private ─────────────────────────────────────
+
+    /// <summary>챕터별 시퀀서 시드. Ch1은 마스터 시드 그대로, Ch2+는 마스터 시드에서 결정적으로 파생.
+    /// 진행(StartNextChapterAsync)과 이어하기 폴백이 같은 공식을 쓰도록 한 곳에 둔다.</summary>
+    private static int ChapterSeed(int masterSeed, int chapterNum)
+        => chapterNum <= 1 ? masterSeed : RunSequencer.Combine(masterSeed, 7000 + chapterNum);
 
     /// <summary>런 구조(IRunStructure)를 해석한다. 우선순위: 인스펙터 SO(명시 오버라이드)
     /// → CSV 정본(RUN_STRUCTURE, 서버 CDN) → SO 오프라인 폴백(Addressables) → null(전 방 Normal 안전동작).
@@ -431,6 +456,7 @@ public class RunFlowController : MonoBehaviour
         if (!_resuming)
         {
             _currentRoomCleared = false;
+            _currentRoomRewardPending = false;
             var s = GameRunBootstrapper.Instance?.Run;
             if (s != null) s.CrucibleRollIndex = 0;   // 방마다 시드가 다르므로 롤 카운터도 새로
         }
@@ -439,6 +465,10 @@ public class RunFlowController : MonoBehaviour
         // (이게 없으면 보상은 챙긴 채 몹이 부활해 중복 파밍이 된다.)
         bool restoreCleared = _resuming && _resumedRoomCleared;
         _resumedRoomCleared = false;   // 1회성 — 다음 방으로 새어나가지 않게
+
+        // 저장 당시 스폰돼 있던 '미수령' 보상만 복원 대상. 이미 받은 보상은 pending=false로 저장돼 걸러진다.
+        bool restoreReward = restoreCleared && _resumedRewardPending;
+        _resumedRewardPending = false;   // 1회성
 
         // 출구 문 봉인 + 입구 잠금. entry로 석문 등장 방식을 고른다.
         void SealRoom(SealDoorEntry entry)
@@ -519,7 +549,17 @@ public class RunFlowController : MonoBehaviour
         if (restoreCleared && !isBossRoom)
         {
             if (result.roomGO != null && result.roomGO.TryGetComponent<RoomWaveController>(out var clearedWave))
+            {
                 clearedWave.enabled = false;   // Activate() 미호출 + 비활성 → 몬스터 스폰 없음
+
+                // 클리어는 했지만 [F]로 안 받은 보상이 있었으면 그 보상만 다시 세운다.
+                // 연료(원석/강화재료)는 클리어 시점에 이미 은행에 들어가 저장됐으므로 재지급하지 않는다.
+                // 후보 굴림은 방 시드로 고정 — 재접속을 반복해도 같은 3지선다가 나와 save-scum이 막힌다.
+                if (restoreReward)
+                    clearedWave.SpawnPendingClearReward(
+                        result.roomGO.transform.position,
+                        RunSequencer.Combine(_chapterSeed ^ 0x2C1A, _sequencer.VisitCount));
+            }
             _currentWave = null;
             // 정상 클리어 경로를 그대로 탄다: 저장은 _resuming 가드로 무시되고,
             // RollExits는 롤 '전' 상태로 저장돼 있었으므로 같은 시드로 동일 출구가 재현된다.
@@ -561,6 +601,19 @@ public class RunFlowController : MonoBehaviour
         SaveRunState(_lastPlan, _lastEdge, _lastMirror);
         Debug.Log($"[RunFlow] 자동저장 — {reason}");
     }
+
+    /// <summary>클리어 보상 오브젝트가 방에 세워졌다(아직 미수령). RoomClearGate가 호출.
+    /// 여기서 한 번 더 저장해야 "클리어 저장(보상 스폰 전) → 종료"에서 보상이 사라지지 않는다.</summary>
+    public void NotifyClearRewardSpawned()
+    {
+        if (_currentRoomRewardPending) return;
+        _currentRoomRewardPending = true;
+        SaveNow("clear-reward-pending");   // 복원 중(_resuming)이면 내부에서 무시
+    }
+
+    /// <summary>클리어 보상을 실제로 받았다. ClearRewardTrigger가 지급 확정 직후 호출(저장은 호출측이 이어서 수행).
+    /// 이 플래그가 내려가야 이어하기에서 같은 보상을 다시 주지 않는다(이중지급 차단).</summary>
+    public void NotifyClearRewardClaimed() => _currentRoomRewardPending = false;
 
     /// <summary>방 입장 대사 이벤트. 현재는 보스룸만 — 챕터별 BossRoom_Ch{N}_Enter를 방문변형(첫/반복)으로 재생.</summary>
     private async UniTask PlayRoomEntryDialogueAsync(RoomPlanKind kind, CancellationToken ct)
@@ -606,6 +659,7 @@ public class RunFlowController : MonoBehaviour
         var meta = new RunMetaSnapshot
         {
             masterSeed         = _masterSeed,
+            chapterSeed        = _chapterSeed,
             visitCount         = _sequencer.VisitCount,
             seqPhase           = _sequencer.PhaseInt,
             shopUsed           = _sequencer.ShopUsed,
@@ -622,6 +676,7 @@ public class RunFlowController : MonoBehaviour
             currentRoomKind    = (int)plan.kind,
             currentRoomMirror  = mirror,
             currentRoomCleared = _currentRoomCleared,
+            currentRoomRewardPending = _currentRoomRewardPending,
             crucibleRollIndex  = session.CrucibleRollIndex,
             cooldowns          = cooldowns,
         };

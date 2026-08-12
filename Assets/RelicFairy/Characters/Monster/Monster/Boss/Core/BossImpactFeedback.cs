@@ -49,7 +49,7 @@ public sealed class BossImpactFeedbackHost : MonoBehaviour
         canvasGo.transform.SetParent(transform);
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 9999;
+        canvas.sortingOrder = UISortingOrder.Impact;
         canvasGo.AddComponent<CanvasScaler>();
 
         var imgGo = new GameObject("FlashImage");

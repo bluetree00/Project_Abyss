@@ -19,7 +19,7 @@ using UnityEngine.UI;
 public sealed class IntroPageBook : MonoBehaviour
 {
     // ── Constants ────────────────────────────────────────────────────
-    private const int   SortingOrder       = 5;      // UI 팝업(200~)보다 아래 — 대사창이 페이지 위에 온다
+    private const int   SortingOrder       = UISortingOrder.WorldProp;  // 화면 UI(팝업 400+)보다 아래
     private const float PushInPerSec       = 0.010f; // 페이지가 초당 밀려 들어오는 배율
     private const float CrossFade          = 0.7f;   // 페이지 넘김(크로스 디졸브) 시간
     private const float DissolveExtraScale = 0.40f;  // 씬으로 빨려 들어갈 때 추가 확대

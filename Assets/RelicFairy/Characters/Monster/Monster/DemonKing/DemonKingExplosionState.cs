@@ -52,6 +52,9 @@ public class DemonKingExplosionState : InvincibleState<DemonKingExplosionData>
     private static void ApplyAreaDamage(MonsterContext ctx, float radius, float damage, float knockbackForce)
     {
         var selfDamageable = ctx.Monster as IDamageable;
+        // 플레이어는 콜라이더를 여러 개 가질 수 있다(본체 캡슐 + 피격/상호작용 트리거).
+        // 폭발 1회의 피해·넉백이 콜라이더 수만큼 중복 적용되지 않게 1회로 막는다.
+        bool playerHit = false;
         foreach (var col in Physics.OverlapSphere(ctx.Transform.position, radius))
         {
             if (col.transform.IsChildOf(ctx.Transform)) continue;
@@ -65,6 +68,13 @@ public class DemonKingExplosionState : InvincibleState<DemonKingExplosionData>
                       ?? col.GetComponentInParent<PlayerController>();
             if (player != null)
             {
+                if (playerHit) continue;
+                playerHit = true;
+                // 폭발 데미지(Data.explosionDamage)를 플레이어에게도 적용한다.
+                // 예전엔 넉백만 주고 continue라 "대폭발인데 아무 피해가 없는" 상태였다 —
+                // 아래 IDamageable 분기는 플레이어 분기에서 이미 continue되어 절대 닿지 않는다.
+                // 몬스터→플레이어 피해는 MonsterBase.DealDamageToPlayer와 같은 경로(PlayerController.TakeDamage)를 쓴다.
+                player.TakeDamage((int)damage, ctx.Monster.gameObject);
                 player.ApplyKnockback(blastDir * knockbackForce, 0.4f);
                 continue;
             }

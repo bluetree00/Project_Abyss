@@ -246,7 +246,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _worldText.alignment = TextAlignmentOptions.Center;
         _worldText.color = new Color(0.8f, 0.5f, 1f);
         _worldText.textWrappingMode = TextWrappingModes.NoWrap;
-        _worldText.sortingOrder = 10;
+        _worldText.sortingOrder = UISortingOrder.WorldLabel;
         TMPOutlineHelper.ApplyDefault(_worldText);
     }
 
@@ -262,7 +262,7 @@ public class WorldCovenantAltar : MonoBehaviour
         _promptText.alignment = TextAlignmentOptions.Center;
         _promptText.color = Color.white;
         _promptText.textWrappingMode = TextWrappingModes.NoWrap;
-        _promptText.sortingOrder = 11;
+        _promptText.sortingOrder = UISortingOrder.WorldPrompt;
         TMPOutlineHelper.ApplyDefault(_promptText);
         _promptText.text = "<color=#FFD700>[F]</color> 서약 조립";
 

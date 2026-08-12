@@ -553,12 +553,14 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         // CDN 로드 실패 또는 0개면 오프라인 JSON 폴백
         if (mapData.GetAll().Count == 0)
         {
-            Debug.Log("[GameRunBootstrapper] MapData 0개 — Addressables/STAGEDATA_MAP.json 폴백");
-            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("STAGEDATA_MAP");
+            Debug.Log("[GameRunBootstrapper] MapData 0개 — STAGEDATA_MAP.json 오프라인 폴백");
+            // 폴백 실물은 Resources/STAGEDATA_MAP.json (Addressable 미등록) — Resources도 함께 본다.
+            var textAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("STAGEDATA_MAP")
+                            ?? Resources.Load<TextAsset>("STAGEDATA_MAP");
             if (textAsset != null)
                 mapData.InitializeFromJson(textAsset.text);
             else
-                Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json not found in Addressables");
+                Debug.LogWarning("[GameRunBootstrapper] STAGEDATA_MAP.json 없음 (Addressables·Resources 모두)");
         }
     }
 
@@ -1126,7 +1128,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var go = new GameObject("@RunEndMessage");
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32000;
+        canvas.sortingOrder = UISortingOrder.RunBoundary;
 
         var tmp = new GameObject("Text").AddComponent<TextMeshProUGUI>();
         tmp.transform.SetParent(go.transform, false);
@@ -1194,7 +1196,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var go = new GameObject("@AbyssLoopChoice");
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32050;
+        canvas.sortingOrder = UISortingOrder.RunChoice;
         go.AddComponent<GraphicRaycaster>();
 
         TimeScaleArbiter.Acquire(this, 0f, TimeScaleArbiter.Priority.Pause);
@@ -1272,7 +1274,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         var go = new GameObject("@MerlinRevival");
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32000;
+        canvas.sortingOrder = UISortingOrder.RunBoundary;
 
         try
         {
@@ -3272,6 +3274,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         return new RunMetaSnapshot
         {
             masterSeed         = save.masterSeed,
+            chapterSeed        = save.chapterSeed,          // 0=구버전 세이브 → RunFlowController가 재계산
             visitCount         = save.visitCount,
             seqPhase           = save.seqPhase,
             shopUsed           = save.shopUsed,
@@ -3288,6 +3291,7 @@ public sealed class GameRunBootstrapper : MonoBehaviour
             currentRoomKind    = save.currentRoomKind,
             currentRoomMirror  = save.currentRoomMirror,
             currentRoomCleared = save.currentRoomCleared,   // 클리어 상태로 복원 → 몹 재스폰 X
+            currentRoomRewardPending = save.currentRoomRewardPending,   // 미수령 보상만 복원(구버전=false)
             crucibleRollIndex  = save.crucibleRollIndex,    // 재련소 RNG 스트림 재개 위치
             cooldowns          = cooldowns,
         };
@@ -3312,19 +3316,28 @@ public sealed class GameRunBootstrapper : MonoBehaviour
         MerlinRuneBridge.Instance?.ResetSynergyState(); // 브릿지 적용 가드 초기화(중복 적용 방지)
 
         // Shape 재구성(재편집 가능 상태) — 실패해도 점유 기반 복원으로 폴백(시너지 무영향)
+        int restoredShapes = 0;
         try
         {
             if (!string.IsNullOrEmpty(save.runePlacementsJson))
             {
                 var pw = JsonUtility.FromJson<RunePlacementListWrapper>(save.runePlacementsJson);
                 if (pw?.items != null && pw.items.Count > 0)
+                {
                     MerlinRuneBridge.Instance?.RestoreRunePlacements(pw.items);
+                    restoredShapes = pw.items.Count;
+                }
             }
         }
         catch (System.Exception e)
         {
             Debug.LogWarning($"[GameRunBootstrapper] 룬 Shape 재구성 실패(점유 폴백): {e.Message}");
         }
+
+        // 점유는 있는데 배치가 하나도 안 살아나면 판에 룬 그림이 없다 — 시너지만 붙어 있어
+        // 화면만 봐서는 알아채기 어려우므로 여기서 소리를 낸다.
+        if (restoredShapes == 0)
+            Debug.LogWarning($"[GameRunBootstrapper] 룬 배치 복원 0건 — 점유 {w.items.Count}칸만 반영(판에 룬이 그려지지 않음)");
 
         // 점유 셀 기반 시너지 재계산 (권위) — Shape 재구성 여부와 무관하게 빌드 효과 보장
         MerlinRuneBridge.Instance?.RestoreRuneCells(w.items);

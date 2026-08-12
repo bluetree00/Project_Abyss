@@ -87,7 +87,18 @@ public sealed class CovenantHandler
 
     // ── 획득 / 강화 / 진화 ──────────────────────────────
     /// <summary>새 서약 추가 (런 시작 or 분기 구간)</summary>
-    public bool TryAdd(string covenantId)
+    public bool TryAdd(string covenantId) => TryAdd(covenantId, restoring: false);
+
+    /// <param name="restoring">
+    /// 이어하기 복원 경로. 목록·스탯·HUD는 똑같이 세우되 <b>'획득'의 부작용</b>
+    /// (퀘스트 보고·획득 토스트·즉시 저장)은 건너뛴다.
+    ///
+    /// 복원은 새로 얻는 게 아니라 이미 갖고 있던 것을 되세우는 일이다. 구분하지 않으면
+    /// 이어하기 한 번마다 퀘스트에 서약 획득이 다시 쌓이고(퀘스트 진행도는 슬롯 공용
+    /// PlayerPrefs라 오염이 다른 슬롯까지 남는다), 판이 뜨자마자 이미 가진 서약이
+    /// "서약 획득!" 토스트로 떠오른다.
+    /// </param>
+    private bool TryAdd(string covenantId, bool restoring)
     {
         if (_covenants.Count >= MaxCovenants) return false;
         if (_covenants.Any(c => c.CovenantId == covenantId)) return false;
@@ -101,6 +112,8 @@ public sealed class CovenantHandler
         _covenants.Add(covenant);
         RefreshStats();
         OnCovenantListChanged?.Invoke();
+
+        if (restoring) return true;
 
         // 퀘스트: 서약 획득 보고 (target='*'이면 어떤 서약이든 수용)
         QuestEvents.Report("Covenant", covenantId);
@@ -145,7 +158,7 @@ public sealed class CovenantHandler
         foreach (var e in entries)
         {
             if (e == null || string.IsNullOrEmpty(e.id)) continue;
-            if (!TryAdd(e.id)) continue;
+            if (!TryAdd(e.id, restoring: true)) continue;
 
             var stage = (CovenantStage)e.stage;
             if (stage >= CovenantStage.Enhanced) TryEnhance(e.id);
