@@ -47,11 +47,12 @@ public class ChapterDataSO : ScriptableObject
     [Tooltip("이 챕터 보스방에서 소환할 보스 스폰 테이블. BossSpawner가 GameRunSession 경유로 조회한다. 비우면 BossSpawner의 직렬화 폴백 사용.")]
     public MonsterSpawnTableSO bossSpawnTable;
 
-    [Header("보상")]
-    [Tooltip("골드 드롭 배수")]
-    public float goldMultiplier = 1f;
-    [Tooltip("아이템 드롭 확률 배수")]
-    public float itemDropMultiplier = 1f;
+    // [제거됨 2026-08-12] goldMultiplier / itemDropMultiplier —
+    // 대입만 되고 읽는 코드가 0곳이라 챕터별 보상 배율이 실제로는 전혀 걸리지 않았다.
+    // 골드는 MonsterConfigSO.drop(전 등급 5~8G)만으로도 런당 2,400~5,100G가 나와 이미 과잉이고,
+    // 아이템 드롭 확률은 RoomRewardTable이 방 종류로 결정하므로 배율을 얹을 지점 자체가 없다.
+    // 챕터별 보상 차등이 필요해지면 RoomRewardTable에 챕터 축을 추가하는 쪽이 정본이다.
+    // CHAPTER_DATA.csv의 gold_multiplier / item_drop_multiplier 컬럼은 파싱하지 않으므로 남아 있어도 무해.
 
     [Header("존 레이아웃")]
     [Tooltip("뒤끝 CDN 차트 키. 이 챕터의 전체 존 배치 데이터를 담은 테이블 (예: chapter_1_zone_layout). 레거시/고정 방식.")]
@@ -86,8 +87,6 @@ public class ChapterDataSO : ScriptableObject
             difficultyScale  = difficultyScale,
             monsterCountScale = monsterCountScale,
             monsterPoolTag   = monsterPoolTag,
-            goldMultiplier   = goldMultiplier,
-            itemDropMultiplier = itemDropMultiplier,
             zoneLayoutKey    = zoneLayoutKey,
             zoneSlotKey      = zoneSlotKey,
             zonePoolKey      = zonePoolKey,
@@ -127,10 +126,6 @@ public class ChapterRuntimeData
     public float monsterCountScale = 1f;
     public string monsterPoolTag;
 
-    // 보상
-    public float goldMultiplier = 1f;
-    public float itemDropMultiplier = 1f;
-
     // 존 레이아웃
     public string zoneLayoutKey;
     public string zoneSlotKey;
@@ -153,8 +148,6 @@ public class ChapterRuntimeData
         if (!string.IsNullOrEmpty(server.monster_pool_tag)) monsterPoolTag = server.monster_pool_tag;
         if (server.difficulty_scale > 0) difficultyScale = server.difficulty_scale;
         if (server.monster_count_scale > 0) monsterCountScale = server.monster_count_scale;
-        if (server.gold_multiplier > 0) goldMultiplier = server.gold_multiplier;
-        if (server.item_drop_multiplier > 0) itemDropMultiplier = server.item_drop_multiplier;
         if (!string.IsNullOrEmpty(server.zone_layout_key)) zoneLayoutKey = server.zone_layout_key;
         if (!string.IsNullOrEmpty(server.zone_slot_key))   zoneSlotKey   = server.zone_slot_key;
         if (!string.IsNullOrEmpty(server.zone_pool_key))   zonePoolKey   = server.zone_pool_key;
@@ -177,8 +170,8 @@ public class ChapterServerEntry
     public float difficulty_scale;
     public float monster_count_scale;
     public string monster_pool_tag;
-    public float gold_multiplier;
-    public float item_drop_multiplier;
+    // [제거됨 2026-08-12] gold_multiplier / item_drop_multiplier — 소비처 0곳(ChapterDataSO 주석 참조).
+    // CHAPTER_DATA.csv에 컬럼이 남아 있어도 파싱하지 않는다.
 
     // 존 레이아웃
     public string zone_layout_key;

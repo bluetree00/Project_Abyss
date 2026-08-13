@@ -21,12 +21,10 @@ MonoBehaviour:
   decorationSprites: []
   theme: Fortress
   bgmKey: bgm_abyss
-  difficultyScale: 2.2
+  difficultyScale: 3.0
   monsterCountScale: 1.6
   monsterPoolTag: 4
   bossSpawnTable: {fileID: 11400000, guid: 880c546a040888c499c89d944405966e, type: 2}
-  goldMultiplier: 1.6
-  itemDropMultiplier: 1
   middleLayers: 11
   peakLayer: 7
   fieldPrefabKey: FieldPrefab_Abyss

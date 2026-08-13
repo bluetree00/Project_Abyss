@@ -245,6 +245,16 @@ public class RunProgressManager : MonoBehaviour
         stg.items.AddRange(s.ItemInventory.StagingItems);
         d.stagingItemsJson = JsonUtility.ToJson(stg);
 
+        // 원거리 파츠 — 장착·레벨은 런 진행분이라 저장해야 이어하기에서 살아난다.
+        var parts = RangedPartsState.Current;
+        if (parts != null)
+        {
+            var partWrapper = new RangedPartListWrapper();
+            partWrapper.items.AddRange(parts.Equipped_);
+            d.rangedPartsJson            = JsonUtility.ToJson(partWrapper);
+            d.rangedWeaponEnhanceLevel   = parts.WeaponEnhanceLevel;
+        }
+
         // 룬 보드 점유 셀 (시너지 권위)
         var cw    = new Vector2IntListWrapper();
         var cells = MerlinRuneBridge.Instance?.CaptureRuneCells();

@@ -60,7 +60,20 @@ public static class EffectIconRegistry
     }
 
     // ── 자동 로드(조용한 폴백) ───────────────────────────────────
-    private static async UniTaskVoid TryAutoLoadAsync()
+
+    /// <summary>
+    /// 앱 부트에서 1회 호출(<see cref="RuneArt.PreloadAsync"/> · <see cref="UISkin.PreloadAsync"/> 관례).
+    ///
+    /// 지연 로드만으로는 부족한 곳이 있다 — <see cref="ShopProduct"/>처럼 <b>생성 시점에 Sprite를 붙들어
+    /// 두는</b> 소비자는 첫 조회에서 받은 플레이스홀더가 그대로 굳는다. 미리 로드해 그 창을 없앤다.
+    /// </summary>
+    public static async UniTask PreloadAsync()
+    {
+        if (_loadAttempted) return;
+        await TryAutoLoadAsync();
+    }
+
+    private static async UniTask TryAutoLoadAsync()
     {
         _loadAttempted = true;
         var am = Managers.AddressableManager;

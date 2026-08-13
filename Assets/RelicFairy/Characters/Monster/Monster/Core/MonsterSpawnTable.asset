@@ -84,13 +84,13 @@ MonoBehaviour:
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: CrabMonsterMonster
     addressableKey: CrabMonster/CrabMonster
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: FlyingDemonMonster
     addressableKey: FlyingDemon/FlyingDemon
     grade: 2
@@ -126,7 +126,7 @@ MonoBehaviour:
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: BattleBeeMonster
     addressableKey: BattleBee/BattleBee
     grade: 0
@@ -210,19 +210,19 @@ MonoBehaviour:
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: CrabMonster
     addressableKey: CrabMonster/CrabMonster
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: WormMonster
     addressableKey: WormMonster/WormMonster
     grade: 0
     poolTags: 
     weight: 1
-    enabled: 1
+    enabled: 0
   - displayName: ForestGuardianMonster
     addressableKey: ForestGuardian/ForestGuardian
     grade: 3

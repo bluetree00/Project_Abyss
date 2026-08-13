@@ -12,32 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22a89dda1e0945949b62f5a47a0c3992, type: 3}
   m_Name: ShopSkin
   m_EditorClassIdentifier:
-  background: {fileID: 21300000, guid: ca45fb5d625e0d74c9939f24f6d2f9c8, type: 3}
-  windowBorder: {fileID: 21300000, guid: 671f035f1e6010149b335324ec258b1a, type: 3}
-  portraitBand: {fileID: 21300000, guid: 09298a9a949a98a4e97b7e3563887acb, type: 3}
-  lanternIcon: {fileID: 21300000, guid: 599e2a6429a498c46a60d4823365a7f8, type: 3}
-  rerollButton: {fileID: 21300000, guid: aa14b3f2be82f5a4b8a14b2ed6223a6d, type: 3}
-  dealTab: {fileID: 21300000, guid: 4b4423f0af2f41e4a8801fc72a1ecfd0, type: 3}
-  dealBorder: {fileID: 21300000, guid: 8e6544fbdd8d31a4099a70256cc20839, type: 3}
-  dealContentBg: {fileID: 21300000, guid: 6d756c04131f65a4096568d3c9aca31f, type: 3}
-  dealItemBg: {fileID: 21300000, guid: 4942d414fdb8e0f4f9ba321216ef1053, type: 3}
-  dealItemBorder: {fileID: 21300000, guid: 9f46d0e70920eb1449a193a5e1a5cb0b, type: 3}
-  cardBg: {fileID: 21300000, guid: 5529700877e38184f887a9d677369c68, type: 3}
-  cardAccent:
-  - {fileID: 21300000, guid: 10792db6bb565534c8380f9d67da5210, type: 3}
-  - {fileID: 21300000, guid: f54985c94bb4562488738f7b22e35a36, type: 3}
-  - {fileID: 21300000, guid: 150eb5a6e6fcc0841ae2e486764e5a07, type: 3}
-  - {fileID: 21300000, guid: cd52cb8c578ec6b409454f20238cbd25, type: 3}
+  background: {fileID: 21300000, guid: 17567518a306c0442bb0a3e97ad8b27f, type: 3}
+  topBand: {fileID: 21300000, guid: 54f6d09e5c2e5554faddd7b26609dfd1, type: 3}
+  titleBoard: {fileID: 21300000, guid: 58841303fb848c643b5646772b5d08da, type: 3}
+  crest: {fileID: 21300000, guid: 95c0966a04e5d0c409ec403dedcce47b, type: 3}
+  goldCoin: {fileID: 21300000, guid: e82062bb89c9ee34fbeceda085125579, type: 3}
+  cornerTopLeft: {fileID: 21300000, guid: 2c5a1d6881462da4db37372aa585b043, type: 3}
+  cornerTopRight: {fileID: 21300000, guid: ee31dbea69f3f704d986f8da20f2c4ba, type: 3}
+  cornerBottomLeft: {fileID: 21300000, guid: a779ddca3936a504eb00cebf0c7b8452, type: 3}
+  cornerBottomRight: {fileID: 21300000, guid: 0659946e868b59d4e87457501ff8962a, type: 3}
+  dealPanel: {fileID: 21300000, guid: 0ae7e867863e6704f8ef2846d3fd74f1, type: 3}
+  cardBg: {fileID: 21300000, guid: 7b782f5f500acb54d8cefba81f4134fc, type: 3}
+  cardBgSold: {fileID: 21300000, guid: 49188308c423edc4fa5018b8b866331d, type: 3}
+  soldStamp: {fileID: 21300000, guid: 41ca980e8c63a914d99bf0ed6464edea, type: 3}
+  iconFill: {fileID: 21300000, guid: 5690cdd3054ea41469966869eddc3ce0, type: 3}
+  iconFrame: {fileID: 21300000, guid: 2627f424c11abf3428df3c4274c0e8a7, type: 3}
+  categoryBadgeBg:
+  - {fileID: 21300000, guid: ba820f0ce31aedf46bb86c78766455c1, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 21300000, guid: 140249897a1adf74e8dcf80a81edf647, type: 3}
   categoryBadge:
-  - {fileID: 21300000, guid: a919fd69647eb464696d451578daddb6, type: 3}
-  - {fileID: 21300000, guid: 8ce5feed4c28fe34c84b3e415f7ec0df, type: 3}
-  - {fileID: 21300000, guid: 3b71359a631bdcb4ca0d38a70d430ad7, type: 3}
-  - {fileID: 21300000, guid: 4dc5ddfcbdf4fb54189ede4379c5f7c7, type: 3}
-  buyButton: {fileID: 21300000, guid: 9c7b1f1e8c11e28479e1b525fdcfe25d, type: 3}
-  selectedWindow: {fileID: 21300000, guid: bd77745acdc5b7b499b93f95093458f1, type: 3}
-  selectedBg: {fileID: 21300000, guid: cdda804e0679c8a40879ac66efb30982, type: 3}
-  selectedBorder:
-  - {fileID: 21300000, guid: 06b80cb7811d11443b60c8c2969df31b, type: 3}
-  - {fileID: 21300000, guid: bd78e7ce40af9844da6c275e4842ded9, type: 3}
-  - {fileID: 21300000, guid: aba9253b22c56cc4da1f86972c065792, type: 3}
-  - {fileID: 21300000, guid: 0c37319304c605e438e6b9faefbc3525, type: 3}
+  - {fileID: 21300000, guid: 97f12512d8d77c5429b1539d3ccd0f6e, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 21300000, guid: 3d5f5dc0363ddee4597b66a645e03058, type: 3}
+  selectedPanel: {fileID: 21300000, guid: 6417c1742a201984b8701b263a6363b5, type: 3}
+  buyButton: {fileID: 21300000, guid: 8fb4232830ecf1046afa747a6d7f663a, type: 3}
+  rerollButton: {fileID: 21300000, guid: 5e559ce32c408fa4ea62c04a1e95e351, type: 3}

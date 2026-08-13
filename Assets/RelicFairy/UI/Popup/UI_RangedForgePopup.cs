@@ -21,9 +21,23 @@ using UnityEngine.UI;
 public class UI_RangedForgePopup : UI_Popup
 {
     // ── Constants ─────────────────────────────────────────────
+    // 아트가 있으면 패널은 bg.png 비율(1289:1338 = 0.9634)을 지켜야 테두리와 상·하단 문장이 찌그러지지 않는다.
+    // 높이는 "내용이 필요로 하는 세로(≈590) + 아트 프레임 여백(위 72 / 아래 52)"로 잡았다 —
+    // 목업 비율만 따르면 프레임 여백만큼 내용이 눌려 이름·스탯이 겹친다(FixHeight 주석 참고).
+    private const float SkinPanelWidth  = 688f;
+    private const float SkinPanelHeight = 714f;
     private const float PanelWidth  = 620f;
     private const float PanelHeight = 640f;   // 카드 내용(아이콘+4줄 스탯)이 눌리지 않을 최소치
     private const float SlideTime   = 0.18f;
+
+    // 아이콘 홀더 — 채움(356) 기준. 테두리·외곽선은 원본 비율대로 조금씩 크다.
+    private const float HolderSize        = 184f;
+    private const float HolderFrameScale  = 359f / 356f;
+    private const float HolderOutlineScale = 373f / 356f;
+
+    private const float ArrowW = 42f, ArrowH = 102f;   // 좌/우측 버튼 84×204
+    private const float DividerW = 280f, DividerH = 37f;
+    private const float EquipW = 160f, EquipH = 52f;   // 장착버튼 254×84
 
     private static readonly Color PanelBg   = new(0.07f, 0.06f, 0.10f, 0.97f);
     private static readonly Color PanelLine = new(0.55f, 0.72f, 0.95f, 1f);
@@ -63,9 +77,12 @@ public class UI_RangedForgePopup : UI_Popup
     private Image         _confirmBg;
     private TMP_Text      _confirmLabel;
 
+    private WeaponForgeSkinSO _skin;
+
     private readonly List<Entry> _entries = new();
     private readonly List<Image> _dotImgs = new();
     private readonly Dictionary<Button, TMP_Text> _arrowGlyphs = new();   // SetArrow가 색을 바꾼다(버튼 2개)
+    private readonly Dictionary<Button, Image>    _arrowArts   = new();   // 아트 화살표는 글리프 대신 이 이미지를 흐린다
     private readonly StringBuilder _sb = new();
     private static Material s_textMat;
 
@@ -80,6 +97,7 @@ public class UI_RangedForgePopup : UI_Popup
     public override void Init()
     {
         base.Init();
+        _skin = UISkin.WeaponForge;
         BuildLayout();
     }
 
@@ -210,8 +228,13 @@ public class UI_RangedForgePopup : UI_Popup
     // ── 상태 표시 ─────────────────────────────────────────────
     private void SetArrow(Button btn, bool on)
     {
-        if (btn != null) btn.interactable = on;
-        if (btn != null && _arrowGlyphs.TryGetValue(btn, out var glyph) && glyph != null)
+        if (btn == null) return;
+        btn.interactable = on;
+
+        // 아트 화살표는 알파로, 글리프 화살표는 색으로 비활성을 알린다.
+        if (_arrowArts.TryGetValue(btn, out var art) && art != null)
+            art.color = on ? Color.white : new Color(1f, 1f, 1f, 0.3f);
+        else if (_arrowGlyphs.TryGetValue(btn, out var glyph) && glyph != null)
             glyph.color = on ? ArrowOn : ArrowOff;
     }
 
@@ -227,11 +250,12 @@ public class UI_RangedForgePopup : UI_Popup
         if (_confirm != null) _confirm.interactable = ok;
         if (_confirmLabel != null)
             _confirmLabel.color = ok ? TitleColor : new Color(TitleColor.r, TitleColor.g, TitleColor.b, 0.35f);
-        // 확정 버튼을 무기 테마색으로 눌러 깐다(선택 가능할 때만).
+        // 확정 버튼: 아트가 있으면 테마색을 곱하지 않는다(황동 명판이 파랗게 물든다) — 알파로만 잠금을 알린다.
         if (_confirmBg != null)
-            _confirmBg.color = ok
-                ? new Color(theme.r * 0.32f, theme.g * 0.32f, theme.b * 0.40f, 1f)
-                : new Color(0.14f, 0.15f, 0.18f, 1f);
+            _confirmBg.color = _skin?.equipButton != null
+                ? (ok ? Color.white : new Color(1f, 1f, 1f, 0.35f))
+                : (ok ? new Color(theme.r * 0.32f, theme.g * 0.32f, theme.b * 0.40f, 1f)
+                      : new Color(0.14f, 0.15f, 0.18f, 1f));
     }
 
     private void Confirm()
@@ -259,18 +283,27 @@ public class UI_RangedForgePopup : UI_Popup
         Stretch(dim.rectTransform);
         dim.raycastTarget = true;
 
-        var panel = NewImage("Panel", root, PanelBg);
+        bool skinned = _skin?.panelBackground != null;
+
+        var panel = NewImage("Panel", root, skinned ? Color.white : PanelBg);
         var prt = panel.rectTransform;
         prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f);
         prt.pivot = new Vector2(0.5f, 0.5f);
-        prt.sizeDelta = new Vector2(PanelWidth, PanelHeight);
+        prt.sizeDelta = skinned ? new Vector2(SkinPanelWidth, SkinPanelHeight)
+                                : new Vector2(PanelWidth, PanelHeight);
 
-        var line = panel.gameObject.AddComponent<Outline>();
-        line.effectColor = PanelLine;
-        line.effectDistance = new Vector2(2f, -2f);
+        // 아트에 테두리가 이미 그려져 있다 — Outline을 겹치면 이중 테두리가 된다.
+        if (skinned) ShopUIStyle.Skin(panel, _skin.panelBackground);
+        else
+        {
+            var line = panel.gameObject.AddComponent<Outline>();
+            line.effectColor = PanelLine;
+            line.effectDistance = new Vector2(2f, -2f);
+        }
 
         var v = panel.gameObject.AddComponent<VerticalLayoutGroup>();
-        v.padding = new RectOffset(28, 28, 24, 22);
+        // 아트 여백은 bg.png의 프레임 안쪽 비율(위 0.100 / 아래 0.067 / 좌우 얇은 금선)에서 뽑았다.
+        v.padding = skinned ? new RectOffset(30, 30, 72, 52) : new RectOffset(28, 28, 24, 22);
         v.spacing = 12f;
         v.childControlWidth = true;  v.childForceExpandWidth  = true;
         v.childControlHeight = true; v.childForceExpandHeight = false;
@@ -284,7 +317,24 @@ public class UI_RangedForgePopup : UI_Popup
 
         BuildViewer(prt);   // ◀  [카드]  ▶
         BuildDotsRow(prt);
+        BuildDivider(prt);
         BuildButtons(prt);
+    }
+
+    /// <summary>이름·스탯과 버튼 사이 구분 장식. 아트가 없으면 줄 자체를 만들지 않는다.</summary>
+    private void BuildDivider(RectTransform parent)
+    {
+        if (_skin?.divider == null) return;
+
+        var row = NewRect("Divider", parent);
+        FixHeight(row.gameObject, DividerH);
+
+        var img = NewImage("Art", row, Color.white);
+        var rt = img.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(DividerW, DividerH);
+        img.raycastTarget = false;
+        ShopUIStyle.Skin(img, _skin.divider);
     }
 
     /// <summary>◀ 화살표 · 카드 무대 · ▶ 화살표 — 가로 3분할.</summary>
@@ -298,7 +348,7 @@ public class UI_RangedForgePopup : UI_Popup
         h.childControlWidth = true;  h.childForceExpandWidth  = false;
         h.childControlHeight = true; h.childForceExpandHeight = true;
 
-        _prev = BuildArrow(row, "◀", -1);
+        _prev = BuildArrow(row, "◀", -1, _skin?.arrowLeft);
 
         // 무대 — 레이아웃이 폭을 정하는 자식. 이건 절대 슬라이드로 만지지 않는다.
         var stage = NewRect("Stage", row.transform);
@@ -320,15 +370,20 @@ public class UI_RangedForgePopup : UI_Popup
 
         BuildCardBody(_slider);
 
-        _next = BuildArrow(row, "▶", +1);
+        _next = BuildArrow(row, "▶", +1, _skin?.arrowRight);
     }
 
-    /// <summary>화살표 버튼 — 색은 글리프 텍스트로 제어(SetArrow가 _arrowGlyphs를 통해 바꾼다).</summary>
-    private Button BuildArrow(RectTransform parent, string glyph, int dir)
+    /// <summary>
+    /// 화살표 버튼. 아트가 있으면 판정면(box)은 투명하게 두고 <b>자식 이미지</b>에 아트를 얹는다 —
+    /// box는 레이아웃이 세로로 늘리는 칸이라 거기 아트를 직접 넣으면 화살표가 세로로 늘어난다.
+    /// 비활성 표시는 아트면 알파, 아니면 글리프 색으로 한다(SetArrow).
+    /// </summary>
+    private Button BuildArrow(RectTransform parent, string glyph, int dir, Sprite art)
     {
-        var box = NewImage("Arrow", parent, new Color(1f, 1f, 1f, 0.04f));
+        var box = NewImage("Arrow", parent, new Color(1f, 1f, 1f, art != null ? 0f : 0.04f));
         var le = box.gameObject.AddComponent<LayoutElement>();
-        le.preferredWidth = 52f; le.minWidth = 52f;
+        float w = art != null ? ArrowW + 10f : 52f;
+        le.preferredWidth = w; le.minWidth = w;
 
         var btn = box.gameObject.AddComponent<Button>();
         btn.targetGraphic = box;
@@ -337,8 +392,21 @@ public class UI_RangedForgePopup : UI_Popup
         var t = NewText("G", box.rectTransform, 34f, ArrowOn, FontStyles.Bold, TextAlignmentOptions.Center);
         t.text = glyph;
         Stretch(t.rectTransform);
-
         _arrowGlyphs[btn] = t;
+
+        if (art != null)
+        {
+            t.gameObject.SetActive(false);   // 아트에 화살촉이 그려져 있어 글리프는 중복이다
+
+            var img = NewImage("Art", box.rectTransform, Color.white);
+            var rt = img.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(ArrowW, ArrowH);
+            img.raycastTarget = false;
+            ShopUIStyle.Skin(img, art);
+            _arrowArts[btn] = img;
+        }
+
         return btn;
     }
 
@@ -354,11 +422,36 @@ public class UI_RangedForgePopup : UI_Popup
         // 무대에 들어갈 세로 예산이 카드 내용보다 작으면 VerticalLayoutGroup이 자식을 최소높이까지
         // 눌러버린다. TMP의 최소높이는 0이라 글자는 그대로 그려지면서 칸만 사라져 서로 겹쳐 보였다
         // (이름·설명·스탯이 한 덩어리로 뭉치던 원인). 그래서 각 줄에 높이를 못 박는다.
+        bool hasHolder = _skin?.holderFill != null;
         var iconBox = NewRect("IconBox", stage);
-        FixHeight(iconBox.gameObject, 130f);
-        _icon = NewImage("Icon", iconBox, Color.white);
-        Stretch(_icon.rectTransform);
+        FixHeight(iconBox.gameObject, hasHolder ? HolderSize : 130f);
+
+        // 아트 홀더는 정사각형이라 폭 전체를 쓰면 안 된다 — 가운데 정사각 칸을 따로 만든다.
+        RectTransform host = iconBox;
+        if (hasHolder)
+        {
+            host = NewRect("Holder", iconBox);
+            CenterBox(host, HolderSize, HolderSize);
+
+            var fill = NewImage("Fill", host, Color.white);
+            Stretch(fill.rectTransform);
+            fill.raycastTarget = false;
+            ShopUIStyle.Skin(fill, _skin.holderFill);
+        }
+
+        _icon = NewImage("Icon", host, Color.white);
+        // 홀더 안에서는 테두리를 먹지 않도록 안쪽으로 들여넣는다.
+        if (hasHolder) ShopUIStyle.Stretch(_icon.rectTransform, 22f);
+        else           Stretch(_icon.rectTransform);
         _icon.preserveAspect = true;
+
+        // 테두리·외곽선은 아이콘 위로 지나가야 액자가 된다(원본 비율대로 조금씩 크다).
+        // 채움이 없으면 칸 크기가 홀더 기준이 아니라서 겹쳐봐야 어긋난다 — 세트로만 얹는다.
+        if (hasHolder)
+        {
+            AddHolderOverlay(host, "Frame",   _skin.holderFrame,   HolderFrameScale);
+            AddHolderOverlay(host, "Outline", _skin.holderOutline, HolderOutlineScale);
+        }
 
         // 이름 + 잠금 배지
         _name = NewText("Name", stage, 26f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
@@ -380,6 +473,25 @@ public class UI_RangedForgePopup : UI_Popup
         _stats = NewText("Stats", stage, 16f, BodyColor, FontStyles.Normal, TextAlignmentOptions.Center);
         _stats.lineSpacing = 6f;
         FixHeight(_stats.gameObject, 104f);
+    }
+
+    /// <summary>부모 한가운데 고정 크기 칸을 만든다(레이아웃이 늘리지 못하게).</summary>
+    private static void CenterBox(RectTransform rt, float w, float h)
+    {
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(w, h);
+        rt.anchoredPosition = Vector2.zero;
+    }
+
+    /// <summary>홀더 위에 겹치는 테두리/외곽선. 아트가 없으면 만들지 않는다.</summary>
+    private static void AddHolderOverlay(RectTransform host, string name, Sprite art, float scale)
+    {
+        if (art == null) return;
+
+        var img = NewImage(name, host, Color.white);
+        CenterBox(img.rectTransform, HolderSize * scale, HolderSize * scale);
+        img.raycastTarget = false;
+        ShopUIStyle.Skin(img, art);
     }
 
     /// <summary>레이아웃 그룹이 눌러도 줄지 않도록 높이를 고정한다(min=preferred, flexible=0).</summary>
@@ -419,31 +531,72 @@ public class UI_RangedForgePopup : UI_Popup
 
     private void BuildButtons(RectTransform parent)
     {
+        bool skinned = _skin?.equipButton != null;
+
         var row = NewRect("Buttons", parent);
-        FixHeight(row.gameObject, 56f);   // 남는 세로를 버튼이 먹어 정사각형처럼 커지지 않게 고정
+        FixHeight(row.gameObject, skinned ? EquipH : 56f);   // 남는 세로를 버튼이 먹어 커지지 않게 고정
         var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
         h.spacing = 14f;
-        h.childControlWidth = true;  h.childForceExpandWidth  = true;
+        h.childAlignment = TextAnchor.MiddleCenter;
+        // 아트 버튼은 원본 비율이 있어 늘리면 구워진 글자가 깨진다 — 폭을 각자 고정한다.
+        h.childControlWidth = true;  h.childForceExpandWidth  = !skinned;
         h.childControlHeight = true; h.childForceExpandHeight = true;
 
-        _confirmBg = NewImage("Btn_Confirm", row, new Color(0.16f, 0.30f, 0.44f, 1f));
+        _confirmBg = NewImage("Btn_Confirm", row, skinned ? Color.white : new Color(0.16f, 0.30f, 0.44f, 1f));
         _confirm = _confirmBg.gameObject.AddComponent<Button>();
         _confirm.targetGraphic = _confirmBg;
         _confirm.onClick.AddListener(Confirm);
-        var cl = _confirmBg.gameObject.AddComponent<Outline>();
-        cl.effectColor = new Color(Accent.r, Accent.g, Accent.b, 0.55f);
-        cl.effectDistance = new Vector2(1.5f, -1.5f);
+
         _confirmLabel = NewText("L", _confirmBg.rectTransform, 22f, TitleColor, FontStyles.Bold, TextAlignmentOptions.Center);
         _confirmLabel.text = "확정";
         Stretch(_confirmLabel.rectTransform);
 
-        var cancelBg = NewImage("Btn_Cancel", row, new Color(0.16f, 0.16f, 0.19f, 1f));
+        if (skinned)
+        {
+            ShopUIStyle.Skin(_confirmBg, _skin.equipButton);
+            FixWidth(_confirmBg.gameObject, EquipW);
+            // 아트에 "장착하기"가 구워져 있다 — 코드 라벨을 남기면 두 벌이 겹친다.
+            _confirmLabel.gameObject.SetActive(false);
+
+            if (_skin.equipGlyph != null)
+            {
+                var glyph = NewImage("Glyph", _confirmBg.rectTransform, Color.white);
+                var grt = glyph.rectTransform;
+                grt.anchorMin = grt.anchorMax = new Vector2(0f, 0.5f);
+                grt.pivot = new Vector2(0f, 0.5f);
+                grt.sizeDelta = new Vector2(22f, 22f);
+                grt.anchoredPosition = new Vector2(24f, 0f);
+                glyph.raycastTarget = false;
+                glyph.preserveAspect = true;
+                ShopUIStyle.Skin(glyph, _skin.equipGlyph);
+            }
+        }
+        else
+        {
+            var cl = _confirmBg.gameObject.AddComponent<Outline>();
+            cl.effectColor = new Color(Accent.r, Accent.g, Accent.b, 0.55f);
+            cl.effectDistance = new Vector2(1.5f, -1.5f);
+        }
+
+        // 취소 — 완성본엔 없지만 이 팝업은 ESC로도 못 닫아서(CloseOnEscape=false) 유일한 탈출구다.
+        // 전용 아트가 없으므로 주 버튼보다 작고 수수하게 둔다.
+        var cancelBg = NewImage("Btn_Cancel", row, new Color(0.16f, 0.16f, 0.19f, 0.92f));
         var cancel = cancelBg.gameObject.AddComponent<Button>();
         cancel.targetGraphic = cancelBg;
         cancel.onClick.AddListener(Cancel);
-        var t = NewText("L", cancelBg.rectTransform, 22f, BodyColor, FontStyles.Bold, TextAlignmentOptions.Center);
+        if (skinned) FixWidth(cancelBg.gameObject, 110f);
+        var t = NewText("L", cancelBg.rectTransform, skinned ? 18f : 22f, BodyColor, FontStyles.Bold, TextAlignmentOptions.Center);
         t.text = "취소";
         Stretch(t.rectTransform);
+    }
+
+    /// <summary>레이아웃 그룹이 늘리지 못하게 폭을 고정한다(min=preferred, flexible=0).</summary>
+    private static void FixWidth(GameObject go, float width)
+    {
+        var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
+        le.minWidth       = width;
+        le.preferredWidth = width;
+        le.flexibleWidth  = 0f;
     }
 
     // ── 생성 헬퍼 ─────────────────────────────────────────────

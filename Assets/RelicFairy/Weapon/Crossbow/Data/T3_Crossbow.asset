@@ -21,7 +21,7 @@ MonoBehaviour:
   rarity: 2
   baseAttack: 25
   baseDefense: 2
-  attackSpeed: 0.8
+  attackSpeed: 1
   attackRange: 8
   areaOfEffect: 0.5
   groundEndCount: 2

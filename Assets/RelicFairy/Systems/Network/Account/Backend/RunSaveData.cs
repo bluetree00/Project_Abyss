@@ -56,6 +56,8 @@ public class RunSaveData
     public string runeCellsJson;          // Vector2IntListWrapper JSON — 룬 보드 점유 셀(시너지 권위)
     public string runePlacementsJson;     // RunePlacementListWrapper JSON — Shape 재구성(재편집)용
     public string stagingItemsJson;       // ItemListWrapper JSON — 보관함 아이템
+    public string rangedPartsJson;        // RangedPartListWrapper JSON — 원거리 파츠 장착·레벨
+    public int    rangedWeaponEnhanceLevel; // 원거리 무기 강화 레벨(파츠 슬롯 해금 근거)
 
     // 절차생성 진행 상태 (RunFlowController/RunSequencer)
     public int    masterSeed;
@@ -82,6 +84,13 @@ public class RunSaveData
 }
 
 // ── 로컬 세이브 확장용 래퍼/엔트리 ──
+
+/// <summary>원거리 파츠 장착 목록 직렬화 래퍼(JsonUtility는 최상위 배열을 못 다룬다).</summary>
+[Serializable]
+public sealed class RangedPartListWrapper
+{
+    public System.Collections.Generic.List<RangedPartsState.Equipped> items = new();
+}
 
 [Serializable]
 public sealed class Vector2IntListWrapper

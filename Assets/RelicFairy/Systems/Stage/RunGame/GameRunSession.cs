@@ -300,6 +300,10 @@ public sealed class GameRunSession
             PlayerState = CreateInitialPlayerStateFromSession();
             RunDelta = new RunDelta();
 
+            // 원거리 파츠는 런 스코프 — 새 런은 빈 상태로 시작한다(직전 런 장착이 새어 나오지 않게).
+            RangedPartsState.Current = new RangedPartsState();
+            RangedPartsState.ApplyTestCarry();   // 베이스캠프 테스트 제단을 쓴 경우에만 동작(평소 무해)
+
             // 신규 런 강화재료 시작 지급 — 재련소(첫 소비처)가 이벤트방(첫 생산처)보다 앞 순번일 수 있어
             // 첫 재련소에서 강화재료=0이 되는 갭을 막는 안전장치. 이어하기(RestoreFromSaveAsync)는 이 경로를
             // 거치지 않으므로 이중지급 없음. 신규 런 = 새 세션(FuelBank 잔량 0)이라 정확히 초기량만 지급된다.
@@ -358,6 +362,15 @@ public sealed class GameRunSession
             PlayerState.RestorePotions(save.potionCount, save.potionCapacity > 0 ? save.potionCapacity : PlayerRunState.DefaultPotionCapacity);
 
             RunDelta = new RunDelta();
+
+            // 원거리 파츠 복원 — 장착·레벨은 런 진행분이라 세이브에서 되살린다.
+            RangedPartsState.Current = new RangedPartsState();
+            if (!string.IsNullOrEmpty(save.rangedPartsJson))
+            {
+                var pw = JsonUtility.FromJson<RangedPartListWrapper>(save.rangedPartsJson);
+                if (pw?.items != null)
+                    RangedPartsState.Current.Restore(pw.items, save.rangedWeaponEnhanceLevel);
+            }
 
             if (!string.IsNullOrEmpty(save.itemsJson))
             {

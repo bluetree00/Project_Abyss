@@ -21,12 +21,10 @@ MonoBehaviour:
   decorationSprites: []
   theme: Sacred
   bgmKey: bgm_castle
-  difficultyScale: 1.7
+  difficultyScale: 2.2
   monsterCountScale: 1.4
   monsterPoolTag: 3
   bossSpawnTable: {fileID: 11400000, guid: 88b7a054f5cb4894daedd602bd1dbb60, type: 2}
-  goldMultiplier: 1.4
-  itemDropMultiplier: 1
   middleLayers: 9
   peakLayer: 6
   fieldPrefabKey: FieldPrefab_Castle

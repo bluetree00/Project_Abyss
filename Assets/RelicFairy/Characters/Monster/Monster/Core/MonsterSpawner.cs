@@ -39,6 +39,23 @@ public enum GradeMatchMode
 /// </summary>
 public class MonsterSpawner : MonoBehaviour
 {
+    /// <summary>동시 생존 상한(<see cref="MonsterBudget"/>)에 걸렸을 때 자리를 다시 확인하는 주기(초).</summary>
+    private const float BudgetPollInterval = 0.25f;
+
+    // ── 스폰 지점 여유 검사 ────────────────────────────────
+    // NavMesh는 장식(나무·기둥·석상)을 <b>담고 있지 않다</b> —
+    // DecorationHandler가 모든 장식에 NavMeshModifier.ignoreFromBuild=true를 붙이고,
+    // 게다가 장식은 PostBuild(=NavMesh 베이크 이후)에 생성된다.
+    // 그래서 NavMesh.SamplePosition은 장식 한가운데도 "유효한 바닥"이라고 답한다
+    // → 몬스터가 장애물 위/속에 박힌 채 소환된다. 물리로 한 번 더 거른다.
+    /// <summary>스폰 여유 반경(m). 몬스터 몸 반경 근사.</summary>
+    private const float SpawnClearRadius = 0.5f;
+    /// <summary>검사 구의 중심 높이(m). 바닥 블록 윗면(≈0.1)보다 위라 바닥에 걸리지 않는다.</summary>
+    private const float SpawnClearHeight = 0.9f;
+    /// <summary>막힘으로 볼 레이어 — Default(0, 장식) + Wall(8). Ground(3)·Player(6)·Monster(7)는 제외.
+    /// (MapBuilder 규약: 벽=8, 바닥=3 / DecorationHandler가 만드는 장식=0)</summary>
+    private const int SpawnBlockMask = (1 << 0) | (1 << 8);
+
     [Header("스폰 테이블")]
     [Tooltip("소환할 몬스터 목록 SO. 'Create > RelicFairy > Monster > Spawn Table'로 생성.")]
     [SerializeField] private MonsterSpawnTableSO spawnTable;
@@ -241,6 +258,9 @@ public class MonsterSpawner : MonoBehaviour
         }
         catch (System.OperationCanceledException) { return; }
 
+        // 스폰 여유 검사용 물리 쿼리 대비 — autoSyncTransforms=0이라 1회 동기화가 필요하다.
+        Physics.SyncTransforms();
+
         while (true)
         {
             try
@@ -276,6 +296,33 @@ public class MonsterSpawner : MonoBehaviour
         _spawnedMonsters.RemoveAll(m => m == null || !m.gameObject.activeInHierarchy);
     }
 
+    /// <summary>
+    /// 동시 생존 상한(<see cref="MonsterBudget"/>)에 자리가 날 때까지 대기한다. 취소되면 false.
+    ///
+    /// 매 확인마다 <see cref="PurgeReturnedMonsters"/>를 먼저 부르는 것이 핵심이다 —
+    /// <see cref="AliveCount"/>가 곧 예산 사용량인데, 정리가 없으면 죽은 몹이 계속 산 것으로 잡혀
+    /// 상한에 한 번 걸리면 <b>영원히 스폰이 재개되지 않는다</b>.
+    /// (기존엔 정리 호출이 레거시 <c>SpawnLoop</c> 안에만 있어 웨이브 경로에서는 돌지 않았다.)
+    /// </summary>
+    private async UniTask<bool> WaitForSpawnBudgetAsync(CancellationToken ct)
+    {
+        PurgeReturnedMonsters();
+        if (MonsterBudget.CanSpawn) return true;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await UniTask.Delay(System.TimeSpan.FromSeconds(BudgetPollInterval), cancellationToken: ct);
+            }
+            catch (System.OperationCanceledException) { return false; }
+
+            PurgeReturnedMonsters();
+            if (MonsterBudget.CanSpawn) return true;
+        }
+        return false;
+    }
+
     /// <summary>단일 웨이브 스폰. _waveEntries의 모든 그룹(등급 상한 × 마릿수)을 하나의 웨이브로 합쳐
     /// 한 마리씩 랜덤 간격으로 연속 스폰한다. waveIndex는 항상 0(단일 웨이브)이며 무시된다.
     /// 그룹별 maxGrade를 유지하며 ct가 취소되면 즉시 중단. 실제 스폰된 수를 반환.</summary>
@@ -286,6 +333,11 @@ public class MonsterSpawner : MonoBehaviour
             Debug.LogWarning($"[MonsterSpawner:{name}] SpawnWaveAsync: 웨이브 그룹이 비어 있음", this);
             return 0;
         }
+
+        // 스폰 여유 검사(IsSpawnSpotClear)가 쓰는 물리 쿼리를 위해 트랜스폼을 1회 동기화한다.
+        // 프로젝트 설정이 autoSyncTransforms=0이라, PostBuild에서 갓 생성된 장식 콜라이더가
+        // 동기화 전에는 쿼리에 안 잡힌다(장식은 움직이지 않으므로 웨이브당 1회면 충분).
+        Physics.SyncTransforms();
 
         // 이 웨이브 동안 targetGrade를 그룹별로 일시 교체 — TrySpawnOneAsync의 PassesGradeFilter에 반영됨.
         // SpawnWaveAsync는 같은 인스턴스에 대해 순차 실행되므로 동시성 문제 없음.
@@ -307,6 +359,11 @@ public class MonsterSpawner : MonoBehaviour
             for (int i = 0; i < count; i++)
             {
                 if (ct.IsCancellationRequested) { targetGrade = prevGrade; return spawned; }
+
+                // 방 전체 동시 상한(MonsterBudget)을 여기서도 지킨다.
+                // 예전엔 이 경로에 검사가 없어, 절차생성 방(전부 웨이브 모드)에서는 상한이 사실상 죽어 있었다
+                // — 정예방 32마리가 한꺼번에 살아 있었다. 자리가 날 때까지 기다렸다가 이어서 소환한다.
+                if (!await WaitForSpawnBudgetAsync(ct)) { targetGrade = prevGrade; return spawned; }
 
                 if (await TrySpawnOneAsync()) spawned++;
                 remaining--;
@@ -528,7 +585,7 @@ public class MonsterSpawner : MonoBehaviour
             if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, navMeshSampleDistance, NavMesh.AllAreas))
             {
                 // NavMesh 스냅이 문틈으로 복도에 붙는 경우 차단 — 경계 안일 때만 채택
-                if (!_hasFieldBounds || ContainsXZ(_fieldBounds, hit.position))
+                if ((!_hasFieldBounds || ContainsXZ(_fieldBounds, hit.position)) && IsSpawnSpotClear(hit.position))
                 {
                     result = hit.position;
                     return true;
@@ -536,17 +593,51 @@ public class MonsterSpawner : MonoBehaviour
             }
         }
 
-        // 폴백: 스포너 자기 위치(방 안 보장)로 스냅 — 스폰 누락 방지
-        if (NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas))
+        // 폴백 ① 스포너 자기 위치(방 안 보장)
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas)
+            && IsSpawnSpotClear(selfHit.position))
         {
             result = selfHit.position;
             return true;
         }
 
-        Debug.LogWarning("[MonsterSpawner] 유효한 NavMesh 소환 위치를 찾지 못했습니다.", this);
+        // 폴백 ② 스포너 둘레를 한 바퀴 훑어 빈 곳을 찾는다.
+        //     스포너 셀이 통째로 장식(멀티셀 나무 등) 밑에 깔린 경우가 있어 자기 위치만으로는 못 빠져나온다.
+        for (int ring = 1; ring <= 3; ring++)
+        {
+            float r = spawnRadius * (ring / 3f);
+            for (int a = 0; a < 8; a++)
+            {
+                float rad = a * Mathf.PI * 0.25f;
+                Vector3 p = transform.position + new Vector3(Mathf.Cos(rad) * r, 0f, Mathf.Sin(rad) * r);
+                if (_hasFieldBounds) p = ClampXZ(p, _fieldBounds);
+                if (NavMesh.SamplePosition(p, out NavMeshHit ringHit, navMeshSampleDistance, NavMesh.AllAreas)
+                    && (!_hasFieldBounds || ContainsXZ(_fieldBounds, ringHit.position))
+                    && IsSpawnSpotClear(ringHit.position))
+                {
+                    result = ringHit.position;
+                    return true;
+                }
+            }
+        }
+
+        Debug.LogWarning("[MonsterSpawner] 장애물에 막히지 않은 소환 위치를 찾지 못했습니다 — " +
+                         "스포너 주변이 장식으로 덮여 있는지 확인하세요.", this);
         result = Vector3.zero;
         return false;
     }
+
+    /// <summary>
+    /// 그 자리에 몬스터가 들어갈 실물 여유가 있는가.
+    ///
+    /// NavMesh만 믿으면 안 된다 — 장식은 <see cref="Unity.AI.Navigation.NavMeshModifier"/>
+    /// <c>ignoreFromBuild=true</c>로 베이크에서 빠지고, 생성 시점도 NavMesh 베이크 이후(PostBuild)라
+    /// <c>NavMesh.SamplePosition</c>이 나무·기둥 한가운데를 멀쩡한 바닥으로 답한다.
+    /// 그래서 물리로 한 번 더 거른다.
+    /// </summary>
+    private static bool IsSpawnSpotClear(Vector3 pos)
+        => !Physics.CheckSphere(pos + Vector3.up * SpawnClearHeight, SpawnClearRadius,
+                                SpawnBlockMask, QueryTriggerInteraction.Ignore);
 
     /// <summary>X·Z만 경계 안으로 클램프(Y는 유지).</summary>
     private static Vector3 ClampXZ(Vector3 p, Bounds b)

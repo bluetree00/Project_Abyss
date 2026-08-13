@@ -21,7 +21,7 @@ MonoBehaviour:
   rarity: 1
   baseAttack: 55
   baseDefense: 8
-  attackSpeed: 0.7
+  attackSpeed: 1
   attackRange: 1.5
   areaOfEffect: 1.5
   critChance: 25

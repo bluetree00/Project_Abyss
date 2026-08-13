@@ -19,6 +19,8 @@ public sealed class PlayerRuntimeStats
     public float HeavyChargeThreshold { get; private set; }
     public float MoveSpeedMultiplier { get; private set; } = 1f;
     public int BonusProjectile { get; private set; }
+    /// <summary>아이템이 주는 투사체 관통 수. CombatSpawner가 발사 요청에 얹는다(예전엔 집계만 되고 읽는 곳이 없었다).</summary>
+    public int ProjectilePierceBonus { get; private set; }
 
     // ── 아이템 확장 스탯 (AccumulatedStats 기반) ─────────────────────────────────
     // 전투
@@ -339,6 +341,8 @@ public sealed class PlayerRuntimeStats
     private float _itemRollCooldown;
     private float _itemRollDistance;
     private float _itemRangedRange;
+    private int   _itemProjectileCount;   // acc.ProjectileCountBonus — 소비처: CombatSpawner
+    private int   _itemProjectilePierce;  // acc.ProjectilePierceBonus — 소비처: CombatSpawner
     private float _itemHealingReceived;
     private float _itemDebuffResistance;
     private float _itemDamageReduction;
@@ -549,6 +553,7 @@ public sealed class PlayerRuntimeStats
         _itemAllDamagePercent = 0f; _itemSkillDamage = 0f; _itemAllStatsPercent = 0f; _itemRollCooldown = 0f; _itemRollDistance = 0f;
         _itemCritChance = 0f; _itemCritDamage = 0f; _itemDefensePercent = 0f; _itemMaxHpPercent = 0f;
         _itemRangedRange = 0f; _itemHealingReceived = 0f; _itemDebuffResistance = 0f;
+        _itemProjectileCount = 0; _itemProjectilePierce = 0;
         _itemDamageReduction = 0f; _itemLifesteal = 0f; _itemAllElementBonus = 0f;
         _itemSpecialRoomChance = 0f; _itemHighGradeItemChance = 0f;
         _itemConsumableSlotBonus = 0; _itemDebuffDuration = 0f;
@@ -580,6 +585,8 @@ public sealed class PlayerRuntimeStats
         _itemMaxHpPercent = acc.MaxHPPercent;
         _itemAllStatsPercent = acc.AllStatsPercent;
         _itemRollCooldown = acc.RollCooldown;
+        _itemProjectileCount  = acc.ProjectileCountBonus;    // 죽어 있던 집계 연결
+        _itemProjectilePierce = acc.ProjectilePierceBonus;
         _itemRollDistance = acc.RollDistance;
         _itemRangedRange = acc.RangedRange;
         _itemHealingReceived = acc.HealingReceived;
@@ -932,7 +939,9 @@ public sealed class PlayerRuntimeStats
 
         AttackSpeedMultiplier = Mathf.Max(0.1f, 1f + _bonusAttackSpeed + _synergyDynAttackSpeed + _itemDyn.attackSpeed + _roomAttackSpeed + _covenantAttackSpeed + _itemAttackSpeed + _relicAttackSpeed + _reactionAttackSpeed);
         MoveSpeedMultiplier  = Mathf.Max(0.1f, 1f + _itemDyn.moveSpeed + _roomMoveSpeed + _covenantMoveSpeed + _itemMoveSpeed + _awakeningMoveSpeed + _relicMoveSpeed);
-        BonusProjectile      = Mathf.Max(0, _roomProjectile);
+        // 방 버프 + 아이템 추가 투사체를 합산한다 — 예전엔 방 버프만 반영돼 아이템 멀티샷이 무효였다.
+        BonusProjectile       = Mathf.Max(0, _roomProjectile + _itemProjectileCount);
+        ProjectilePierceBonus = Mathf.Max(0, _itemProjectilePierce);
         SkillCooldownReduction = Mathf.Clamp01(_passiveSkillCdr + _itemSkillCdr + _awakeningSkillCdr + _relicSkillCdr + _reactionSkillCdr + _masterySkillCdr);
         ActiveItemCooldownReduction = Mathf.Clamp01(_passiveActiveItemCdr + _itemActiveItemCdr);
 

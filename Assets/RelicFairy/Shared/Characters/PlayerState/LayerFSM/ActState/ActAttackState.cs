@@ -721,7 +721,27 @@ public class ActAttackState : ILayerState<ActState>
         float baseSpeed = animSet?.lightAttackAnimSpeed ?? 1.0f;
         anim.speed = _controller.GlobalAttackAnimSpeedScale
                    * (_controller.RuntimeStats?.AttackSpeedMultiplier ?? 1f)
-                   * baseSpeed;
+                   * baseSpeed
+                   * WeaponTempo(_controller);
+    }
+
+    /// <summary>
+    /// 무기별 공격 템포 배율(EQUIPMENT_DATA <c>attack_speed</c>). 1.0 = 기준 템포.
+    ///
+    /// 이 값은 예전엔 <b>어디에서도 읽히지 않아</b> 카타나 1.5 / 대검 1.0 / 석궁 1.0 / 보우 1.8이
+    /// 캐릭터 정보창에 "공속 x1.5"로 표시만 되고 실제 템포는 애니메이션 클립 길이가 100% 결정했다.
+    /// 표시와 실제를 일치시키기 위해 여기서 소비한다.
+    ///
+    /// <c>animSet.lightAttackAnimSpeed</c>와 역할이 다르다 —
+    /// 그쪽은 애니 팩마다 다른 <b>원본 클립 템포를 맞추는 에셋 보정</b>이고,
+    /// 이 값은 차트에서 굴리는 <b>무기 밸런스 노브</b>다. 그래서 곱해서 함께 쓴다.
+    ///
+    /// 0 이하(차트 컬럼 누락·구 SO)는 "값 없음"으로 보고 1배로 막는다 — 0이면 애니가 정지한다.
+    /// </summary>
+    private static float WeaponTempo(PlayerController controller)
+    {
+        var wd = controller?.WeaponManager?.CurrentWeaponData;
+        return (wd != null && wd.attackSpeed > 0f) ? wd.attackSpeed : 1f;
     }
 
     // ── 타이밍 해석 ──────────────────────────────────────────────────────────

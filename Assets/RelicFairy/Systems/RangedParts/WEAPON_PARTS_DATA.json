@@ -1,0 +1,59 @@
+{
+  "entries": [
+    {
+      "index": 2101,
+      "part_id": "part_split",
+      "part_name": "분열의 시위",
+      "description": "화살이 갈래로 나뉜다. 강화 임계를 넘을 때마다 갈래가 하나씩 늘어난다.",
+      "kind": "split",
+      "base_value": 1,
+      "per_level": 0,
+      "milestone_every": 3,
+      "max_level": 12
+    },
+    {
+      "index": 2102,
+      "part_id": "part_pierce",
+      "part_name": "관통의 촉",
+      "description": "화살이 적을 꿰뚫고 나아간다. 강화 임계를 넘을 때마다 관통 수가 하나씩 늘어난다.",
+      "kind": "pierce",
+      "base_value": 1,
+      "per_level": 0,
+      "milestone_every": 3,
+      "max_level": 12
+    },
+    {
+      "index": 2103,
+      "part_id": "part_explode",
+      "part_name": "작렬의 탄두",
+      "description": "착탄 지점이 폭발한다. 강화할수록 폭발 반경이 넓어진다.",
+      "kind": "explode",
+      "base_value": 1.5,
+      "per_level": 0.25,
+      "milestone_every": 0,
+      "max_level": 10
+    },
+    {
+      "index": 2104,
+      "part_id": "part_homing",
+      "part_name": "추적의 깃",
+      "description": "화살이 궤적을 꺾어 적을 쫓는다. 관통과 함께 쓰면 꿰뚫은 뒤 되돌아와 다시 때린다.",
+      "kind": "homing",
+      "base_value": 90,
+      "per_level": 30,
+      "milestone_every": 0,
+      "max_level": 10
+    },
+    {
+      "index": 2105,
+      "part_id": "part_power",
+      "part_name": "거력의 축",
+      "description": "화살이 굵고 무거워진다. 크기와 위력이 함께 오른다.",
+      "kind": "power",
+      "base_value": 0.2,
+      "per_level": 0.1,
+      "milestone_every": 0,
+      "max_level": 10
+    }
+  ]
+}

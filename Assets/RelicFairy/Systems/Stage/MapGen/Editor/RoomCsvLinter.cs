@@ -35,11 +35,13 @@ public static class RoomCsvLinter
     {
         "F", "W", "O", "P", "B", "S", "Sw", "Si", "N", "E", "X", "T", "C",
         ".", "Pt", "R", "D", "CP", "WP", "SG", "CV",
+        "NC", "NP",   // 서비스 방 무대 앵커(카운터·소품). NS는 방향 접미사가 붙어 아래 정규식으로 판정.
     };
 
     private static readonly Regex SpawnerRegex = new Regex(@"^[Mm]([cCrReE][0-9]*)+$", RegexOptions.Compiled);
     private static readonly Regex DoorRegex    = new Regex(@"^DR[0-9]*$", RegexOptions.Compiled);
     private static readonly Regex PickupRegex  = new Regex(@"^(WP|CP)[0-9]+$", RegexOptions.Compiled);
+    private static readonly Regex NpcAnchorRegex = new Regex(@"^NS[nsewNSEW]?$", RegexOptions.Compiled);
 
     private const string DocsRelative = "RelicFairy/Docs";
     private static readonly string[] CsvNames =
@@ -300,6 +302,7 @@ public static class RoomCsvLinter
         if (SpawnerRegex.IsMatch(t)) return true;
         if (DoorRegex.IsMatch(t)) return true;
         if (PickupRegex.IsMatch(t)) return true;
+        if (NpcAnchorRegex.IsMatch(t)) return true;    // 서비스 NPC 자리 NS(+방향)
         if (t.Length >= 2 && t[0] == 'd') return true; // 장식 d<code>
         return false;
     }
@@ -334,7 +337,7 @@ public static class RoomCsvLinter
         }
 
         // (2) 핸들러 토큰: 레지스트리가 린터가 아는 코드만 갖는지
-        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt", "CV" };
+        var known = new HashSet<string> { "M", "m", "B", "d", "WP", "CP", "Pt", "CV", "NS", "NC", "NP" };
         foreach (var kv in TokenRegistry.ExactHandlers)
             if (!known.Contains(kv.Key))
             {

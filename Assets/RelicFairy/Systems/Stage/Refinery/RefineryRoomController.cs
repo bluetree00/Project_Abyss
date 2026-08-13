@@ -147,6 +147,11 @@ public sealed class RefineryRoomController : MonoBehaviour
 
         ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
 
+        // grid_csv가 무대를 지정했으면(NC/NP 토큰) 그대로 쓴다. 없으면 아래 탐색 배치로 폴백.
+        if (ServiceRoomDecorPlacer.TryPlaceFromAnchors(transform, _decorPrefabs, npcPos,
+                                                       npcPos.y - NpcStandHeight, "RefineryCounter"))
+            return;
+
         Vector3 fwd   = npcRot * Vector3.forward;   // NPC가 바라보는 방향(=플레이어 쪽)
         Vector3 back  = -fwd;
         Vector3 right = npcRot * Vector3.right;

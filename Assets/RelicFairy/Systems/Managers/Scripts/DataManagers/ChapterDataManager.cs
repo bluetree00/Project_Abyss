@@ -127,8 +127,7 @@ public class ChapterDataManager
                 difficulty_scale    = row.TryGetFloat("difficulty_scale"),
                 monster_count_scale = row.TryGetFloat("monster_count_scale"),
                 monster_pool_tag    = row.TryGetString("monster_pool_tag"),
-                gold_multiplier     = row.TryGetFloat("gold_multiplier"),
-                item_drop_multiplier = row.TryGetFloat("item_drop_multiplier"),
+                // gold_multiplier / item_drop_multiplier 컬럼은 파싱하지 않는다 — 소비처가 없어 제거(2026-08-12).
                 zone_layout_key     = row.TryGetString("zone_layout_key"),
                 zone_pool_key       = row.TryGetString("zone_pool_key"),
                 total_layers        = row.TryGetInt("total_layers"),

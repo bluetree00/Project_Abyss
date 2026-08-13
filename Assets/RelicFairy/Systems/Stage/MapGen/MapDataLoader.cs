@@ -233,8 +233,20 @@ public static class MapDataLoader
             "WP" => TileType.WeaponPickup,
             "CV" => TileType.Floor,   // 서약 제단 — 바닥 위에 CovenantAltarHandler가 PostBuild 스폰
             "SG" => TileType.StartGate,
-            _    => UnknownToFloor(s),
+            // 서비스 방 무대 앵커 — 전부 바닥. 실제 오브젝트는 PostBuild 토큰 핸들러가 얹는다.
+            // NS는 방향 접미사(NSn/NSs/NSe/NSw)를 가질 수 있어 아래 StartsWith로 따로 받는다.
+            "NC" => TileType.Floor,   // 판매대/작업대 자리
+            "NP" => TileType.Floor,   // 배경 소품 자리
+            _    => ServiceAnchorOrUnknown(s),
         };
+    }
+
+    /// <summary>NPC 자리 토큰 <c>NS</c>(+방향 접미사 n/s/e/w)를 바닥으로 받고, 그 외는 미등록 처리로 넘긴다.
+    /// 접미사가 붙어도 타일은 항상 Floor — 방향은 ServiceNpcAnchorHandler가 RawToken에서 읽는다.</summary>
+    private static TileType ServiceAnchorOrUnknown(string s)
+    {
+        if (s.Length >= 2 && s[0] == 'N' && s[1] == 'S') return TileType.Floor;
+        return UnknownToFloor(s);
     }
 
     // 미등록 토큰이 default로 떨어질 때 1회 경고하는 dedup 집합 (도메인 리로드마다 초기화).

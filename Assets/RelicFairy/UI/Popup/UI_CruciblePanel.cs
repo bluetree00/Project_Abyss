@@ -264,6 +264,7 @@ public sealed class UI_CruciblePanel : UI_Popup
         SkinButton(_enhanceBtn, tab == 0 ? _skin?.enhanceButton : _skin?.partEnhanceButton, _enhanceLabel);
 
         _targetSlot = tab == 0 ? PlayerWeaponManager.Slot0 : 1;
+        if (tab == 1) RefreshRangedParts();   // 장착·해금 상태를 열 때마다 최신으로
         if (_controller != null) { UpdateTargetDialogue(); RefreshAll(); }
     }
 
@@ -457,10 +458,12 @@ public sealed class UI_CruciblePanel : UI_Popup
                            new Vector2(0, 6), new Vector2(-40, 22));
     }
 
-    /// <summary>파츠 슬롯 4칸(활·분열 선택·관통·빈). 슬롯 UI만 — 로직은 Phase 3.</summary>
+    /// <summary>
+    /// 파츠 슬롯 4칸. 내용은 <see cref="RangedPartsState"/>가 정하고, 클릭하면 강화 대상으로 선택된다.
+    /// 슬롯 해금 수는 원거리 무기 강화 레벨에 종속되므로 잠긴 칸은 회색으로 남는다.
+    /// </summary>
     private void BuildRangedParts(Transform c)
     {
-        string[] labels = { "활", "분열 선택", "관통", "빈" };
         const float box = 150f, h = 96f, gap = 20f;
         int n = _partsSlots.Length;
         float totalW = n * box + (n - 1) * gap;
@@ -476,9 +479,116 @@ public sealed class UI_CruciblePanel : UI_Popup
 
             var mark = ShopUIStyle.MakeText(slot.transform, "Mark", 16f, FontStyles.Bold,
                                             TextAlignmentOptions.Center, ShopUIStyle.TextDim);
-            mark.text = i < labels.Length ? labels[i] : "";
             ShopUIStyle.Stretch(mark.rectTransform);
             _partsMark[i] = mark;
+
+            int idx = i;   // 클로저 캡처 — 루프 변수를 그대로 쓰면 전 슬롯이 마지막 인덱스를 가리킨다
+            var btn = slot.gameObject.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            btn.onClick.AddListener(() => SelectPartSlot(idx));
+        }
+
+        RefreshRangedParts();
+    }
+
+    /// <summary>강화 대상으로 고른 파츠 슬롯. -1이면 미선택.</summary>
+    private int _selectedPartSlot = -1;
+
+    /// <summary>
+    /// 파츠 슬롯 클릭.
+    ///  · 빈 칸  → 아직 안 낀 파츠를 장착한다(획득 경제는 후속 — 지금은 재련소에서 바로 끼운다).
+    ///  · 낀 칸  → 강화 대상으로 선택. 이미 선택된 칸을 다시 누르면 해제한다.
+    /// </summary>
+    private void SelectPartSlot(int index)
+    {
+        var state = RangedPartsState.Current;
+        if (state == null || index >= state.UnlockedSlots) return;   // 잠긴 칸은 선택 불가
+
+        // 빈 칸 → 장착
+        if (index >= state.Equipped_.Count)
+        {
+            var def = FindUnequippedPart(state);
+            if (def == null) { SetPartHint("장착할 수 있는 파츠가 없습니다"); return; }
+
+            if (state.Equip(def.part_id))
+            {
+                _selectedPartSlot = state.Equipped_.Count - 1;
+                SetPartHint($"{def.part_name} 장착 — {def.description}");
+            }
+            RefreshRangedParts();
+            return;
+        }
+
+        // 이미 선택된 칸을 다시 누르면 해제(교체 흐름의 임시 경로)
+        if (_selectedPartSlot == index)
+        {
+            string id = state.Equipped_[index].partId;
+            var def = Managers.WeaponParts?.GetById(id);
+            state.Unequip(id);
+            _selectedPartSlot = -1;
+            SetPartHint($"{(def != null ? def.part_name : id)} 해제");
+            RefreshRangedParts();
+            return;
+        }
+
+        _selectedPartSlot = index;
+        RefreshRangedParts();
+    }
+
+    /// <summary>아직 장착하지 않은 파츠 정의 하나. 없으면 null.</summary>
+    private static WeaponPartEntry FindUnequippedPart(RangedPartsState state)
+    {
+        var all = Managers.WeaponParts?.All;
+        if (all == null) return null;
+
+        for (int i = 0; i < all.Count; i++)
+        {
+            if (state.LevelOf(all[i].part_id) == 0) return all[i];
+        }
+        return null;
+    }
+
+    /// <summary>파츠 탭 안내 문구. 전용 슬롯이 없어 NPC 대사창을 그대로 쓴다(정보가 한 곳에 모임).</summary>
+    private void SetPartHint(string msg)
+    {
+        if (_dialogText != null) _dialogText.text = msg;
+    }
+
+    /// <summary>장착 상태를 슬롯 UI에 반영한다. 파츠 탭을 열거나 강화한 뒤 호출.</summary>
+    private void RefreshRangedParts()
+    {
+        var state = RangedPartsState.Current;
+        var data  = Managers.WeaponParts;
+
+        // 슬롯 해금은 원거리 무기 강화 레벨에 종속된다 — 재련소에서 무기를 올리면 칸이 열린다.
+        if (state != null && _controller != null)
+            state.SetWeaponEnhanceLevel(_controller.LevelAt(RangedParts.RangedSlot));
+
+        for (int i = 0; i < _partsSlots.Length; i++)
+        {
+            if (_partsMark[i] == null) continue;
+
+            bool unlocked = state != null && i < state.UnlockedSlots;
+            if (!unlocked)
+            {
+                _partsMark[i].text  = "잠김";
+                _partsMark[i].color = ShopUIStyle.TextDim;
+                continue;
+            }
+
+            var list = state.Equipped_;
+            if (i >= list.Count)
+            {
+                _partsMark[i].text  = "빈 슬롯";
+                _partsMark[i].color = ShopUIStyle.TextDim;
+                continue;
+            }
+
+            var def  = data?.GetById(list[i].partId);
+            string nm = def != null ? def.part_name : list[i].partId;
+            _partsMark[i].text  = $"{nm}\nLv.{list[i].level}";
+            // 선택된 칸은 금색으로 — 강화 버튼이 어디에 걸리는지 보이게 한다.
+            _partsMark[i].color = (i == _selectedPartSlot) ? ShopUIStyle.Gold : ShopUIStyle.TextPrimary;
         }
     }
 
@@ -822,9 +932,37 @@ public sealed class UI_CruciblePanel : UI_Popup
     private void OnEnhanceClicked()
     {
         if (_controller == null || _animating) return;
+
+        // 파츠 탭은 무기가 아니라 '장착된 파츠'를 올린다 — 대상이 다르므로 경로를 가른다.
+        if (_activeTab == 1) { EnhanceSelectedPart(); return; }
+
         // 컨트롤러가 결과를 즉시 확정(OnCrucibleChanged→RefreshAll 동기 발화). 연출은 표시층만 재생.
         var result = _controller.TryEnhance(_targetSlot);
         PlayEnhanceSequence(result).Forget();
+    }
+
+    /// <summary>
+    /// 선택한 파츠를 1레벨 올린다. 임계를 넘으면 효과가 계단 상승한다(분열 갈래 +1 등).
+    /// 성공/실패 도박 판정은 무기 강화(탭1)와 같은 프레임을 쓸 예정 — 지금은 확정 상승이다.
+    /// </summary>
+    private void EnhanceSelectedPart()
+    {
+        var state = RangedPartsState.Current;
+        if (state == null) return;
+
+        if (_selectedPartSlot < 0 || _selectedPartSlot >= state.Equipped_.Count)
+        {
+            SetPartHint("강화할 파츠를 먼저 선택하세요");
+            return;
+        }
+
+        string partId = state.Equipped_[_selectedPartSlot].partId;
+        int before = state.LevelOf(partId);
+        state.LevelUp(partId);
+        int after = state.LevelOf(partId);
+
+        SetPartHint(after == before ? "이미 최대 레벨입니다" : $"파츠 강화 성공 — Lv.{before} → Lv.{after}");
+        RefreshRangedParts();
     }
 
     private void OnPromoteClicked(string legendId)

@@ -226,7 +226,7 @@ public static class AbyssPeddlerCatalog
         return new ShopProduct(ShopProductCategory.Buff, row.buffName,
             string.IsNullOrEmpty(row.description) ? $"{StatLabel(row.statType)} 강화({gradeLabel})" : row.description,
             $"적용  런 유지 버프(버프창) · 값 {valStr}",
-            row.price, TierRarity(row.tier), null,
+            row.price, TierRarity(row.tier), EffectIconRegistry.GetSprite(IconBuff),
             s =>
             {
                 if (s?.BuffHandler == null) return false;
@@ -260,7 +260,7 @@ public static class AbyssPeddlerCatalog
             : meta.description;
 
         return new ShopProduct(ShopProductCategory.Rune, name, effect,
-            "적용  구매 즉시 판에 배치", RarityPrice(rarity), rarity, null,
+            "적용  구매 즉시 판에 배치", RarityPrice(rarity), rarity, EffectIconRegistry.GetSprite(IconRune),
             s =>
             {
                 if (s?.ItemInventory == null) return false;
@@ -295,7 +295,7 @@ public static class AbyssPeddlerCatalog
         int price = 20 * amt;
         return new ShopProduct(ShopProductCategory.Material, $"강화재료 x{amt}",
             "재련소 무기강화 연료", "적용  강화재료 은행에 적립",
-            price, ItemRarity.Common, null,
+            price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconMaterial),
             s => { s?.FuelBank?.Add(FuelKind.EnhanceMaterial, amt); return s?.FuelBank != null; });
     }
 
@@ -306,7 +306,7 @@ public static class AbyssPeddlerCatalog
         int price = 60 * amt;
         return new ShopProduct(ShopProductCategory.Potion, $"체력 포션 x{amt}",
             "즉시 회복 소모품", "적용  퀵슬롯 포션 추가",
-            price, ItemRarity.Common, null,
+            price, ItemRarity.Common, EffectIconRegistry.GetSprite(IconPotion),
             s => { if (s?.PlayerState == null) return false; s.PlayerState.AddPotion(amt); return true; });
     }
 
@@ -316,9 +316,18 @@ public static class AbyssPeddlerCatalog
         int amt = 6 + rng.Next(0, 4);   // 6~9
         return new ShopProduct(ShopProductCategory.Material, $"원석 x{amt}",
             "정제소 룬 재련 연료", "적용  원석 은행에 적립",
-            10 * amt, ItemRarity.Common, null,
+            10 * amt, ItemRarity.Common, EffectIconRegistry.GetSprite(IconMaterial),
             s => { s?.FuelBank?.Add(FuelKind.RuneOre, amt); return s?.FuelBank != null; });
     }
+
+    // ── 상품 아이콘 ──
+    // EffectIconRegistry(IconKey → Sprite)를 그대로 쓴다 — 프로젝트의 아이콘 해석 단일 창구다.
+    // 상점 전용 키를 쓰는 이유: heal/atk 같은 기존 어휘에 얹으면 HUD 버프칸 아이콘까지 같이 바뀐다.
+    // 미등록 키는 조용히 색 토큰 플레이스홀더로 떨어진다(룬이 현재 그렇다 — 아트 재납품 예정).
+    private const string IconPotion   = "shop_potion";     // 체력 물약 (확정 아트)
+    private const string IconMaterial = "shop_material";   // 무기강화 재료 (임시 아트 — 원석과 공용)
+    private const string IconBuff     = "shop_buff";       // 생명가호 (임시 아트 — 버프 전종 공용)
+    private const string IconRune     = "shop_rune";       // 미납품 → 플레이스홀더
 
     // ── 헬퍼 ──
     private static ItemRarity TierRarity(int tier) => tier >= 3 ? ItemRarity.Epic : tier == 2 ? ItemRarity.Rare : ItemRarity.Common;

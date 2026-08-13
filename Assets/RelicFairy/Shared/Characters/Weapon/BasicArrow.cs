@@ -1,10 +1,18 @@
 using System.Collections.Generic;
+using RelicFairy.Monster;
 using UnityEngine;
 
 public class BasicArrow : MonoBehaviour
 {
     /// <summary>히트 VFX 안전 수명(초). CombatDamage의 클램프 구간(0.5~3s) 안쪽 값.</summary>
     private const float HitVfxLife = 2f;
+
+    /// <summary>유도 목표 탐색 반경(m)·최대 후보 수. 매 프레임이 아니라 목표를 잃었을 때만 돈다.</summary>
+    private const float HomingSearchRadius = 18f;
+    private const int   HomingSearchMax    = 8;
+
+    /// <summary>유도 탐색용 공유 버퍼 — 투사체마다 리스트를 만들면 발사마다 할당이 생긴다.</summary>
+    private static readonly List<MonsterBase> s_homingBuffer = new();
 
     [SerializeField] private float speed = 30f;
     [SerializeField] private float damage = 20f;
@@ -33,6 +41,16 @@ public class BasicArrow : MonoBehaviour
     private GameObject _visualEffect;
     private bool _hideModel;
 
+    // ── 원거리 파츠 옵션 (CombatSpawner가 설정) ──
+    /// <summary>속도 배율. 프리팹 speed는 [SerializeField]라 직접 못 바꾸므로 배율로 얹는다.</summary>
+    private float _speedMult = 1f;
+    /// <summary>유도 선회 강도(0=직선). 초당 회전 각도로 쓴다 — 에임 보정이 아니라 궤적 조작.</summary>
+    private float _homing;
+    /// <summary>관통 후 뒤로 선회해 되돌아올지(유도 × 관통 시너지).</summary>
+    private bool  _returnOnPierce;
+    private bool  _returning;
+    private Transform _homingTarget;
+
     /// <summary>기본 발사</summary>
     public void Fire(Vector3 dir, GameObject instigator = null, float dmg = -1f)
     {
@@ -50,6 +68,13 @@ public class BasicArrow : MonoBehaviour
         _pierced = null;
         _hideModel = false;
         _visualEffect = null;
+
+        // 파츠 옵션은 발사마다 초기화 — 풀에서 재사용되므로 이전 발사의 설정이 남으면 안 된다.
+        _speedMult      = 1f;
+        _homing         = 0f;
+        _returnOnPierce = false;
+        _returning      = false;
+        _homingTarget   = null;
 
         SetModelVisible(true);
         gameObject.SetActive(true);
@@ -73,6 +98,19 @@ public class BasicArrow : MonoBehaviour
         _explodeDamage = explosionDamage;
         _explodeEffectKey = effectKey;
         _explodeEffectScale = effectScale;
+    }
+
+    /// <summary>속도 배율 설정(원거리 파츠). 프리팹 speed에 곱해진다.</summary>
+    public void SetSpeedMultiplier(float mult) => _speedMult = Mathf.Max(0.05f, mult);
+
+    /// <summary>
+    /// 유도 설정(원거리 파츠). strength=초당 선회 각도, 0이면 직선.
+    /// returnOnPierce가 켜지면 관통 후 뒤로 돌아 되돌아온다 — 유도 × 관통 결합 시너지.
+    /// </summary>
+    public void SetHoming(float strength, bool returnOnPierce)
+    {
+        _homing         = Mathf.Max(0f, strength);
+        _returnOnPierce = returnOnPierce;
     }
 
     /// <summary>투사체 비주얼을 이펙트로 교체 (스킬용). 모델/트레일을 숨기고 이펙트를 자식으로 부착.</summary>
@@ -123,11 +161,51 @@ public class BasicArrow : MonoBehaviour
     {
         if (direction == Vector3.zero) return;
 
-        transform.position += direction * speed * Time.deltaTime;
+        if (_homing > 0f) SteerHoming(Time.deltaTime);
+
+        transform.position += direction * (speed * _speedMult) * Time.deltaTime;
 
         _timer -= Time.deltaTime;
         if (_timer <= 0f)
             Deactivate();
+    }
+
+    /// <summary>
+    /// 유도 — 목표를 향해 <b>궤적을 선회</b>시킨다(순간 방향 전환이 아니라 초당 각도 제한).
+    /// 되돌아오는 중이면 시전자를 목표로 삼아 부메랑처럼 돌아온다.
+    /// </summary>
+    private void SteerHoming(float dt)
+    {
+        Transform goal = _returning
+            ? (_instigator != null ? _instigator.transform : null)
+            : AcquireTarget();
+        if (goal == null) return;
+
+        Vector3 desired = (goal.position + Vector3.up * 0.8f) - transform.position;
+        if (desired.sqrMagnitude < 0.01f) return;
+
+        direction = Vector3.RotateTowards(direction, desired.normalized,
+                                          _homing * Mathf.Deg2Rad * dt, 0f).normalized;
+        ApplyRotation();
+    }
+
+    /// <summary>가장 가까운 살아있는 적. 이미 관통한 대상은 제외해 같은 적을 다시 쫓지 않는다.</summary>
+    private Transform AcquireTarget()
+    {
+        // 매 프레임 재탐색하지 않는다 — 대상이 살아있으면 그대로 유지(탐색 비용·궤적 흔들림 방지).
+        if (_homingTarget != null && _homingTarget.gameObject.activeInHierarchy) return _homingTarget;
+
+        int n = CombatQuery.GetNearbyEnemies(transform.position, HomingSearchRadius, _instigator,
+                                             HomingSearchMax, s_homingBuffer);
+        for (int i = 0; i < n; i++)
+        {
+            var mb = s_homingBuffer[i];
+            if (mb == null) continue;
+            if (_pierced != null && _pierced.Contains(mb.gameObject)) continue;   // 이미 뚫은 적은 건너뛴다
+            _homingTarget = mb.transform;
+            return _homingTarget;
+        }
+        return null;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -181,8 +259,20 @@ public class BasicArrow : MonoBehaviour
         {
             _pierced?.Add(victim);
             _pierceCount++;
+            _homingTarget = null;   // 뚫은 적은 놓아주고 다음 목표를 찾는다
+
             if (_pierceCount >= _maxPierceCount)
-                Deactivate();
+            {
+                // [유도 × 관통] 관통을 다 쓰면 사라지는 대신 뒤로 돌아 되돌아온다.
+                // 돌아오는 동안 관통 기록을 비워 같은 적을 다시 때릴 수 있게 한다(재타격이 이 조합의 보상).
+                if (_returnOnPierce && !_returning && _homing > 0f)
+                {
+                    _returning = true;
+                    _pierceCount = 0;
+                    _pierced?.Clear();
+                }
+                else Deactivate();
+            }
             // 관통 중이면 비활성화하지 않음
         }
         else

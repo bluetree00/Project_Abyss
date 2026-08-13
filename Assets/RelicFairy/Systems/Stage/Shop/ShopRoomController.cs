@@ -291,6 +291,11 @@ public class ShopRoomController : MonoBehaviour
 
         ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
 
+        // grid_csv가 무대를 지정했으면(NC/NP 토큰) 그대로 쓴다. 없으면 아래 탐색 배치로 폴백.
+        float anchorGroundY = npcPos.y - NpcStandHeight;
+        if (ServiceRoomDecorPlacer.TryPlaceFromAnchors(transform, _decorPrefabs, npcPos, anchorGroundY, "ShopCounter"))
+            return;
+
         var rng = _roomRng ?? new System.Random();
         Vector3 fwd   = npcRot * Vector3.forward;   // 플레이어 쪽
         Vector3 back  = -fwd;

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ca4d9ca6be8e0342a127f2b7d1af2b3, type: 3}
+  m_Name: EffectIconSet
+  m_EditorClassIdentifier:
+  entries:
+  - key: shop_potion
+    sprite: {fileID: 21300000, guid: 96731947b25dde741bf74c9ce434647a, type: 3}
+  - key: shop_material
+    sprite: {fileID: 21300000, guid: 72962ee8990c70a42bfd168bc0ac1bd3, type: 3}
+  - key: shop_buff
+    sprite: {fileID: 21300000, guid: 12a834d637ad2334db37c6745ae4ac59, type: 3}
+  - key: shop_buff_offense
+    sprite: {fileID: 21300000, guid: 7a19c11671fd1684185b115c0d8dc414, type: 3}

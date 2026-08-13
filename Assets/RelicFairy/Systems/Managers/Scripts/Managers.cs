@@ -54,6 +54,7 @@ public sealed class Managers : MonoBehaviour
     private RelicStatDataManager _relicStatDataManager;
     private RelicAwakeningDataManager _relicAwakeningDataManager;
     private RelicPartsDataManager _relicPartsDataManager;
+    private WeaponPartsDataManager _weaponPartsDataManager;
     private ServerMonsterStatDataManager _serverMonsterStatDataManager;
     private ShopDataManager _shopDataManager;
     private QuestManager _questManager;
@@ -360,6 +361,21 @@ public sealed class Managers : MonoBehaviour
                 inst._relicPartsDataManager = new RelicPartsDataManager();
 
             return inst._relicPartsDataManager;
+        }
+    }
+
+    /// <summary>원거리 파츠 정적 정의(WEAPON_PARTS_DATA). 장착 상태는 RangedPartsState(런 스코프)가 따로 든다.</summary>
+    public static WeaponPartsDataManager WeaponParts
+    {
+        get
+        {
+            var inst = Instance;
+            if (inst == null) return null;
+
+            if (inst._weaponPartsDataManager == null)
+                inst._weaponPartsDataManager = new WeaponPartsDataManager();
+
+            return inst._weaponPartsDataManager;
         }
     }
 

@@ -24,8 +24,6 @@ MonoBehaviour:
   difficultyScale: 2.7
   monsterCountScale: 2
   monsterPoolTag: 5
-  goldMultiplier: 2
-  itemDropMultiplier: 1
   middleLayers: 13
   peakLayer: 8
   fieldPrefabKey: FieldPrefab_Throne

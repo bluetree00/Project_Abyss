@@ -578,7 +578,8 @@ public sealed class AppBootstrapper : MonoBehaviour
                 Managers.ItemData.InitializeAsync(),
                 Managers.RuneData.InitializeAsync(),
                 Managers.RelicStatData.InitializeAsync(),
-                Managers.RelicParts.InitializeAsync()
+                Managers.RelicParts.InitializeAsync(),
+                Managers.WeaponParts.InitializeAsync()    // 원거리 파츠 정적 정의
             );
             startScene = Define.Scene.Lobby;
         }
@@ -596,6 +597,7 @@ public sealed class AppBootstrapper : MonoBehaviour
                     Managers.RuneData.InitializeAsync(),
                     Managers.RelicStatData.InitializeAsync(),
                     Managers.RelicParts.InitializeAsync(),
+                    Managers.WeaponParts.InitializeAsync(),   // 원거리 파츠 정적 정의
                     BackendGameData.Instance.LoadAsync()
                 );
                 Debug.Log("[AppBootstrapper] 자동 로그인 성공");
@@ -608,7 +610,8 @@ public sealed class AppBootstrapper : MonoBehaviour
                     Managers.ItemData.InitializeAsync(),
                     Managers.RuneData.InitializeAsync(),
                     Managers.RelicStatData.InitializeAsync(),
-                    Managers.RelicParts.InitializeAsync()
+                    Managers.RelicParts.InitializeAsync(),
+                    Managers.WeaponParts.InitializeAsync()    // 원거리 파츠 정적 정의
                 );
             }
             if (startScene == Define.Scene.Logo)
@@ -621,6 +624,7 @@ public sealed class AppBootstrapper : MonoBehaviour
         // 룬 등급 아트 라이브러리 사전 로드(로컬 Addressable, 로그인 무관). 실패해도 색상 폴백.
         RuneArt.PreloadAsync().Forget();
         UISkin.PreloadAsync().Forget();   // 화면별 아트 스킨(정제소 등) — 미등록이면 색 폴백
+        EffectIconRegistry.PreloadAsync().Forget();   // 효과/상품 아이콘 — 미등록이면 플레이스홀더
         ShopBuffTable.PreloadAsync().Forget();   // 상점 판매 버프 표(SHOP_BUFF_DATA.csv)
 
         // 7) (선택) Flow 시작 (SceneTransitionManager 바인딩 필수)

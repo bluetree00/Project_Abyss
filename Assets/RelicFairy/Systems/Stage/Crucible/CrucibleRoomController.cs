@@ -172,6 +172,8 @@ public class CrucibleRoomController : MonoBehaviour
 
     public float SuccessChanceAt(int slot) => Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
     public int   MaxAt(int slot)           => WeaponEnhanceService.MaxEnhance(GetSlot(slot), _table);
+    /// <summary>해당 슬롯 무기의 현재 강화 레벨. 원거리 파츠 슬롯 해금 근거로도 쓰인다.</summary>
+    public int   LevelAt(int slot)         { var w = GetSlot(slot); return w != null ? w.enhanceLevel : 0; }
     public int   CostAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? WeaponEnhanceService.CostWith(_table, w.enhanceLevel, CostMult) : 0; }
     public int   DropAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? _table.DropAt(w.enhanceLevel) : 0; }
     public float EffectiveAttackAt(int slot) => WeaponEnhanceService.EffectiveAttack(GetSlot(slot), _table);
@@ -276,6 +278,11 @@ public class CrucibleRoomController : MonoBehaviour
         if (_decorPrefabs == null || _decorPrefabs.Length == 0) return;
 
         ServiceRoomDecorPlacer.SyncPhysics();   // 갓 생성된 벽 콜라이더를 쿼리에 반영
+
+        // grid_csv가 무대를 지정했으면(NC/NP 토큰) 그대로 쓴다. 없으면 아래 탐색 배치로 폴백.
+        if (ServiceRoomDecorPlacer.TryPlaceFromAnchors(transform, _decorPrefabs, npcPos,
+                                                       npcPos.y - NpcStandHeight, "CrucibleCounter"))
+            return;
 
         Vector3 fwd   = npcRot * Vector3.forward; // NPC가 바라보는 방향(=플레이어 쪽)
         Vector3 back  = -fwd;                     // 무대 안쪽

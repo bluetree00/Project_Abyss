@@ -74,8 +74,13 @@ public static class RoomRewardTable
         // 정예 — 확정 드롭 + Rare 하한 + 후보 4 + 연료 증량 + 강화재료(§3-2 개편표).
         RoomPlanKind.Elite => new Rule(1f, 4, ItemRarity.Rare, EliteWeights, ore: 6, enhanceMaterial: 2),
 
-        // 보스 전 통로 — 결전 직전이라 일반방과 같은 바닥을 보장한다.
-        RoomPlanKind.PreBoss => new Rule(1f, 3, null, NormalWeights, ore: 4, enhanceMaterial: 0),
+        // [제거됨 2026-08-12] PreBoss 규칙 —
+        // 보스 전 통로는 전 챕터 grid_csv에 스포너가 0개다. 그래서 AttachRoomClearController가
+        // RoomWaveController를 아예 안 붙이고, RoomClearGate가 돌지 않는다.
+        // 즉 여기 규칙이 있어도 <b>한 번도 호출되지 않았다</b>(보상 0이 실제 동작).
+        // 규칙만 남겨두면 "보스 직전에 룬 3지선다 + 원석 4가 나온다"는 잘못된 정보가 되므로 지운다.
+        // PreBoss는 결전 직전 숨 고르는 순수 통로로 확정한다 — 보상을 주려면 방 데이터에
+        // 스포너를 넣어 전투방으로 만들거나, 별도 지급 경로를 세우는 쪽이 정본이다.
 
         // 이벤트 — 확정 보상. 등급/개수는 챌린지 성과(ChallengeRewardTable)가 따로 덮어쓴다.
         RoomPlanKind.Event => new Rule(1f, 3, null, NormalWeights, ore: 4, enhanceMaterial: 0),

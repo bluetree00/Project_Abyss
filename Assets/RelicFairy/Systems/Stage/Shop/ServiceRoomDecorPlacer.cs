@@ -83,6 +83,58 @@ public static class ServiceRoomDecorPlacer
         return go;
     }
 
+    /// <summary>
+    /// grid_csv가 찍어둔 <see cref="ServiceDecorAnchor"/> 자리에 소품을 놓는다.
+    /// 앵커가 하나도 없으면 <c>false</c>를 돌려 호출부가 기존 탐색 배치로 폴백하게 한다(회귀 0).
+    ///
+    /// 매칭 규칙 — <c>Counter</c> 앵커 = <paramref name="prefabs"/>[0],
+    /// <c>Prop</c> 앵커 = [1] 이후를 <b>배치 순서대로</b>. 앵커가 남으면 소품을 순환시키지 않고 비운다
+    /// (같은 소품이 두 번 서는 것보다 빈 자리가 낫다).
+    /// 소품은 모두 NPC를 바라본다 — 무대의 중심이 NPC라는 것을 형태로 알린다.
+    /// </summary>
+    public static bool TryPlaceFromAnchors(Transform room, GameObject[] prefabs,
+                                           Vector3 npcPos, float groundY, string counterName = null)
+    {
+        if (room == null || prefabs == null || prefabs.Length == 0) return false;
+
+        var anchors = room.GetComponentsInChildren<ServiceDecorAnchor>(true);
+        if (anchors == null || anchors.Length == 0) return false;
+
+        int propIndex = 1;   // [0]은 카운터 몫
+        for (int i = 0; i < anchors.Length; i++)
+        {
+            var a = anchors[i];
+            if (a == null) continue;
+
+            GameObject prefab;
+            string name = null;
+            if (a.Kind == ServiceDecorAnchor.Slot.Counter)
+            {
+                prefab = prefabs[0];
+                name = counterName;
+            }
+            else
+            {
+                if (propIndex >= prefabs.Length) continue;   // 소품이 모자라면 그 자리는 비운다
+                prefab = prefabs[propIndex++];
+            }
+            if (prefab == null) continue;
+
+            Vector3 pos = a.transform.position;
+            pos.y = groundY;
+
+            // 소품이 NPC를 향하도록 — 기존 탐색 경로와 같은 규약.
+            Vector3 toNpc = npcPos - pos;
+            toNpc.y = 0f;
+            float yaw = toNpc.sqrMagnitude > 0.0001f
+                ? Mathf.Atan2(toNpc.x, toNpc.z) * Mathf.Rad2Deg
+                : a.transform.eulerAngles.y;
+
+            Place(prefab, pos, yaw, groundY, room, name);
+        }
+        return true;
+    }
+
     /// <summary>NPC가 벽을 등지도록 바라볼 방향을 고른다 — 주변에서 가장 트인 쪽.
     /// (방 블록이 막 생성된 직후 호출되므로 여기서 물리 트랜스폼을 1회 동기화한다.)</summary>
     public static Quaternion ResolveFacing(Vector3 npcPos, Quaternion fallback)

@@ -112,17 +112,19 @@ public class WeaponEffectHandler
                     var arrowKind = _player.WeaponManager?.CurrentWeaponData?.weaponType.GetAttackStatKind()
                                     ?? AttackStatKind.Ranged;
                     float dmg = DamageFormula.Calculate(s.baseDamage, _player.RuntimeStats.GetEffectiveAttack(arrowKind));
-                    arrow.Fire(fireDir, _player.gameObject, dmg);
+
+                    // 발사는 전부 단일 퍼널을 지난다 — 원거리 파츠·아이템·방버프가 여기서 한 번에 얹힌다.
+                    // (예전엔 부채꼴 15°·추가탄 ±8°/80ms가 각자 스폰 코드를 복제해 소스가 4갈래로 흩어져 있었다.)
+                    var req = ProjectileRequest.Create(
+                        e.payloadKey, firePos, fireDir, dmg, _player.gameObject,
+                        _player.WeaponManager != null ? _player.WeaponManager.CurrentSlotIndex : 0,
+                        e.scaleMultiplier);
+
+                    CombatSpawner.SpawnProjectile(ref req, arrow, execution != null ? execution.RegisterEffect : null);
                     execution?.RegisterEffect(effectObj);
 
-                    // 아이템 패시브: 고정 부채꼴 추가 투사체
-                    int bonusProjectile = _player.RuntimeStats.BonusProjectile;
-                    if (bonusProjectile > 0)
-                        SpawnFanShots(e, s, firePos, fireDir, dmg, bonusProjectile, execution);
-
-                    // 스킬 버프: 랜덤 spread 추가 투사체
-                    if (_player.ExtraShotCount > 0)
-                        SpawnExtraShots(e, s, firePos, fireDir, dmg, execution);
+                    // 주 투사체 크기도 파츠(크기·위력) 반영 — 추가 갈래는 퍼널이 이미 적용한다.
+                    effectObj.transform.localScale = Vector3.one * (e.scaleMultiplier * req.sizeMult);
 
                     // 공중 발사 시 짧은 체공
                     if (!_player.IsGrounded())
@@ -305,101 +307,8 @@ public class WeaponEffectHandler
         ci.attackId            = _player.Combo != null ? _player.Combo.CurrentComboStep : 0;
     }
 
-    /// <summary>
-    /// 아이템 패시브 BonusProjectile에 의한 고정 부채꼴 추가 투사체.
-    /// 원본 발사 방향을 기준으로 균등 간격으로 퍼짐.
-    /// +1: 좌/우 각 1발 (±angleStep)
-    /// +2: 좌/우 각 1발 + 중앙 1발은 이미 원본이므로 ±angleStep, ±angleStep*2 에서 2발
-    /// → 총 투사체 = 1(원본) + bonusCount
-    /// </summary>
-    private async void SpawnFanShots(
-        WeaponAbilitySO.EffectStep e,
-        WeaponAbilitySO.AbilityStep s,
-        Vector3 basePos, Vector3 baseDir, float dmg,
-        int bonusCount,
-        AbilityExecution execution)
-    {
-        const float angleStep = 15f;  // 투사체 간 각도 간격
+    // (제거됨) SpawnFanShots / SpawnExtraShots —
+    //   부채꼴 15°·추가탄 ±8°/80ms 하드코딩을 각자 들고 있던 중복 스폰 경로였다.
+    //   CombatSpawner의 count/spreadDeg로 흡수 — 투사체 증가 소스가 한 곳으로 모였다.
 
-        // 각도 배열 생성: +1이면 [-15, +15], +2이면 [-15, +15], +3이면 [-30, -15, +15, +30] ...
-        // 원본(0도)은 이미 발사됐으므로 제외
-        var angles = new System.Collections.Generic.List<float>();
-        for (int i = 1; i <= bonusCount; i++)
-        {
-            // 홀수번째: 좌, 짝수번째: 우 교대 배치
-            if (i % 2 == 1)
-                angles.Add(-angleStep * ((i + 1) / 2));
-            else
-                angles.Add(angleStep * (i / 2));
-        }
-
-        for (int i = 0; i < angles.Count; i++)
-        {
-            if (_player == null) return;
-
-            Vector3 dir = Quaternion.Euler(0f, angles[i], 0f) * baseDir;
-            // 부채꼴 위치 오프셋: 각도 방향으로 약간 벌림
-            Vector3 right = Vector3.Cross(Vector3.up, baseDir).normalized;
-            float lateralOffset = Mathf.Sin(angles[i] * Mathf.Deg2Rad) * 0.3f;
-            Vector3 spawnPos = basePos + right * lateralOffset;
-
-            var fanObj = await Managers.ObjectPooler.SpawnAsync(
-                e.payloadKey, ObjectPoolerManager.PoolType.Effect, spawnPos, Quaternion.LookRotation(dir));
-            if (fanObj == null || _player == null) return;
-
-            fanObj.transform.localScale = Vector3.one * e.scaleMultiplier;
-
-            if (fanObj.TryGetComponent<BasicArrow>(out var fanArrow))
-            {
-                fanArrow.Fire(dir, _player.gameObject, dmg);
-                execution?.RegisterEffect(fanObj);
-            }
-
-            if (fanObj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(e.behavior, _player.transform, e.lifeTimeMultiplier);
-        }
-    }
-
-    /// <summary>ExtraShotCount 스킬 버프에 의한 랜덤 spread 추가 화살 발사</summary>
-    private async void SpawnExtraShots(
-        WeaponAbilitySO.EffectStep e,
-        WeaponAbilitySO.AbilityStep s,
-        Vector3 basePos, Vector3 baseDir, float dmg,
-        AbilityExecution execution)
-    {
-        int count = _player.ExtraShotCount;
-        for (int i = 0; i < count; i++)
-        {
-            try
-            {
-                await UniTask.Delay(80, cancellationToken: _player.gameObject.GetCancellationTokenOnDestroy());
-            }
-            catch (System.OperationCanceledException) { return; }
-
-            if (_player == null) return;
-
-            // 방향 + 위치 랜덤으로 여러발 나가는 느낌
-            float spread = Random.Range(-8f, 8f);
-            Vector3 dir = Quaternion.Euler(0f, spread, 0f) * baseDir;
-            Vector3 right = Vector3.Cross(Vector3.up, baseDir).normalized;
-            Vector3 spawnPos = basePos
-                + right * Random.Range(-0.4f, 0.4f)
-                + Vector3.up * Random.Range(-0.2f, 0.2f);
-
-            var extraObj = await Managers.ObjectPooler.SpawnAsync(
-                e.payloadKey, ObjectPoolerManager.PoolType.Effect, spawnPos, Quaternion.LookRotation(dir));
-            if (extraObj == null || _player == null) return;
-
-            extraObj.transform.localScale = Vector3.one * e.scaleMultiplier;
-
-            if (extraObj.TryGetComponent<BasicArrow>(out var extraArrow))
-            {
-                extraArrow.Fire(dir, _player.gameObject, dmg);
-                execution?.RegisterEffect(extraObj);
-            }
-
-            if (extraObj.TryGetComponent<EffectBehaviour>(out var eb))
-                eb.Initialize(e.behavior, _player.transform, e.lifeTimeMultiplier);
-        }
-    }
 }
