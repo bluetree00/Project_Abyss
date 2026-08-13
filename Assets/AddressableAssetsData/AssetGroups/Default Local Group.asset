@@ -185,6 +185,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 60e41c861ab7ea245af3bc9c64137d52
+    m_Address: LegendaryVfxCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 616ea02332804bc4fb1dc30a16c74b70
     m_Address: Ch3_Boss
     m_ReadOnly: 0

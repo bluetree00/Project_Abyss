@@ -691,10 +691,10 @@ public sealed class UI_RuneSelectPopup : UI_Popup
         var offsets = RuneDataManager.ParseCellOffsets(entry);
         if (offsets == null || offsets.Length == 0) return true;
 
-        // 속성까지 넘긴다 — 룬은 자기 속성 존(또는 중앙)에만 놓이므로,
+        // 속성까지 넘긴다 — 룬은 자기 속성 존(레전드리는 중앙 제외)에만 놓이므로,
         // 모양만 보고 판정하면 "자리 있음"으로 뜬 룬이 막상 판에서는 들어갈 곳이 없다.
         bool canPlace = MerlinRuneBridge.Instance == null
-            || MerlinRuneBridge.Instance.CanPlaceShape(offsets, data.element);
+            || MerlinRuneBridge.Instance.CanPlaceShape(offsets, data.element, data.rarity == ItemRarity.Legendary);
 
         int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
         foreach (var o in offsets)

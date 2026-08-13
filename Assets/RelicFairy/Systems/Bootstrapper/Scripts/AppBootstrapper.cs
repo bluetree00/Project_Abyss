@@ -459,6 +459,8 @@ public sealed class AppBootstrapper : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        LegendaryRuntime.EnsureExists();
+
         // RunProgressManager (이어하기 저장) — 뒤끝 로그인 전부터 인스턴스 준비
         if (RunProgressManager.Instance == null)
         {

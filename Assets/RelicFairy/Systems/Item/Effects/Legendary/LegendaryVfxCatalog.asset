@@ -1,0 +1,92 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18fd7e71d21392c4b8b38576a9478eb3, type: 3}
+  m_Name: LegendaryVfxCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::LegendaryVfxCatalog
+  fireAoeVfx: {fileID: 8398201861461398018, guid: 099eb0bceb74fb4428621a4259fa03c2,
+    type: 3}
+  fireSingleVfx: {fileID: 5711988094466745346, guid: ef77aeb97e282c642b636f1e637ec665,
+    type: 3}
+  fireOrbVfx: {fileID: 7866002994442904433, guid: ce5e6c05cc9837b4e8e08e6507db9d07,
+    type: 3}
+  fireHitVfx: {fileID: 8172394614802003838, guid: 7d3425a96b729534e9e11b2591f8fd20,
+    type: 3}
+  fireAoeHitVfx: {fileID: 1373873258365392, guid: cd5def2bb4f6b4e4ab15ba0b6f35b29d,
+    type: 3}
+  fireSingleHitVfx: {fileID: 4830294202082529915, guid: 04e8b0b6ae02ffb419cc12f41626e4e5,
+    type: 3}
+  fireOrbHitVfx: {fileID: 1299586717950946, guid: 5740ae2e014a8b14886dad7e67951070,
+    type: 3}
+  iceAoeVfx: {fileID: 3060538840033308853, guid: b65a233b9927456458501944410a7647,
+    type: 3}
+  iceSingleVfx: {fileID: 8432317251264659796, guid: c010541b216137240bde60349595f2fc,
+    type: 3}
+  iceFieldVfx: {fileID: 2069352338822879331, guid: 9bd2b17ccd2d70e4890d08479ab9f4a2,
+    type: 3}
+  iceHitVfx: {fileID: 1320316104850776, guid: 1977fc844cb969a44866c4dcd32996d1, type: 3}
+  iceAoeHitVfx: {fileID: 4186470608034871016, guid: 4b780a14d074f2f4cb9b853b6644dce1,
+    type: 3}
+  iceFieldHitVfx: {fileID: 1231636063597364, guid: 3aa0fab185f378240b831342bde74b26,
+    type: 3}
+  elecAoeVfx: {fileID: 3835836343253444776, guid: 697f14c51452d3845bc61f48f38ece09,
+    type: 3}
+  elecSingleVfx: {fileID: 4333675573145591185, guid: 742d80cc30bd77449a4dbe90df5f629e,
+    type: 3}
+  elecBallVfx: {fileID: 100000, guid: e517b3f9449d945ac97bf9897d01e434, type: 3}
+  elecHitVfx: {fileID: 1065618375357958, guid: 6f8068e2c99ffb04b932ec74e5773db5, type: 3}
+  elecAoeHitVfx: {fileID: 1065618375357958, guid: 6f8068e2c99ffb04b932ec74e5773db5,
+    type: 3}
+  elecSingleHitVfx: {fileID: 1065618375357958, guid: 6f8068e2c99ffb04b932ec74e5773db5,
+    type: 3}
+  elecOrbHitVfx: {fileID: 1065618375357958, guid: 6f8068e2c99ffb04b932ec74e5773db5,
+    type: 3}
+  grassAoeVfx: {fileID: 8100751516763994463, guid: a566b7c8c7df18c4ba44056226c21053,
+    type: 3}
+  grassSingleVfx: {fileID: 5553282686423105297, guid: 7777e16916606af4c95211f312d012db,
+    type: 3}
+  grassStormVfx: {fileID: 3606119888665947560, guid: d5176f7455470c244a2db77c0bd469bd,
+    type: 3}
+  grassArrowVfx: {fileID: 1437680763721510, guid: a311f5de96916bf44bcb1dae61840939,
+    type: 3}
+  grassHitVfx: {fileID: 1438542530079480, guid: 21710859533a00746ad2bdd323061a2d,
+    type: 3}
+  grassAoeHitVfx: {fileID: 1327231448029640, guid: b0035d79b41032446a5de0e41abe9823,
+    type: 3}
+  grassSingleHitVfx: {fileID: 1612276239566916, guid: ab764946428361d499eb0f88769e33b7,
+    type: 3}
+  lightAoeVfx: {fileID: 8019357315374348090, guid: 9ffed2368353595408da89eccf2f2094,
+    type: 3}
+  lightJudgeVfx: {fileID: 1339483653523732529, guid: b7016aae7bbdcd54fb4bf3a41bf01a60,
+    type: 3}
+  lightBeamVfx: {fileID: 6104107114863222821, guid: f8b6a6f913bc4c748af1eb91ba8d1a23,
+    type: 3}
+  lightSwordVfx: {fileID: 5912344974454636654, guid: a5e8f365e98f6b94c9ee19b1acba5d58,
+    type: 3}
+  lightHitVfx: {fileID: 4186470608034871016, guid: b64d71c4378388f43837ae5702cd0e0d,
+    type: 3}
+  lightAoeHitVfx: {fileID: 1296333435415890, guid: a1c8123c6777d6f45948a5e4b821a569,
+    type: 3}
+  lightSingleHitVfx: {fileID: 4186470608034871016, guid: b64d71c4378388f43837ae5702cd0e0d,
+    type: 3}
+  darkAoeVfx: {fileID: 7230900929259635890, guid: 71a38334933488340a25d3c6a8c75f2f,
+    type: 3}
+  darkDeathWaveVfx: {fileID: 1992029900475280859, guid: 4dfb534a3a08e5d49bd0b6362fbedce1,
+    type: 3}
+  darkSingleVfx: {fileID: 1604487808337520302, guid: ab41d91f175f20242b66a3c60c877b98,
+    type: 3}
+  darkCloneVfx: {fileID: 0}
+  darkScytheVfx: {fileID: 100000, guid: 81a801e116e716f42a04e26d3f7e00e9, type: 3}
+  darkHitVfx: {fileID: 1220213892471706, guid: 800cddb992d3f5e4eb2348b90447f4a7, type: 3}
+  darkAoeHitVfx: {fileID: 1220213892471706, guid: 800cddb992d3f5e4eb2348b90447f4a7,
+    type: 3}
+  darkSingleHitVfx: {fileID: 1348390491135638, guid: d7d554880214e644bbbbfc89aa884b26,
+    type: 3}

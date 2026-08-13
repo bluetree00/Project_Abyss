@@ -332,7 +332,7 @@ public class MerlinRuneBridge : MonoBehaviour
     /// 해당 모양을 지금 판에 놓을 자리가 있는지. <b>읽기 전용</b>이며 배치 화면이 닫혀 있어도 동작한다.
     /// 룬 선택 팝업이 후보마다 "배치 가능/자리 없음"을 표시하는 데 쓴다.
     /// </summary>
-    public bool CanPlaceShape(IReadOnlyList<Vector2Int> cellOffsets, string elementId = null)
+    public bool CanPlaceShape(IReadOnlyList<Vector2Int> cellOffsets, string elementId = null, bool isLegendary = false)
     {
         if (cellOffsets == null || cellOffsets.Count == 0) return false;
 
@@ -343,7 +343,7 @@ public class MerlinRuneBridge : MonoBehaviour
             Debug.LogWarning("[MerlinRuneBridge] CanPlaceShape: HexGridView 없음 — 배치 가능으로 간주");
             return true;
         }
-        return view.CanPlaceAnywhere(cellOffsets, elementId);
+        return view.CanPlaceAnywhere(cellOffsets, elementId, isLegendary);
     }
 
     /// <summary>현재 배치된 Shape 스냅샷(재구성용). 점유 셀(CaptureRuneCells)과 별개.</summary>

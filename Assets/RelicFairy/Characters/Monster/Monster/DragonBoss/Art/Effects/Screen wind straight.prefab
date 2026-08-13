@@ -305,7 +305,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 20.52801
+      scalar: 19.094376
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -358,7 +358,7 @@ ParticleSystem:
     startSizeY:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 11.547005
+      scalar: 10.740586
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -690,7 +690,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 20.52801, y: 11.547005, z: 1}
+    m_Scale: {x: 19.094376, y: 10.740586, z: 1}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0

@@ -253,6 +253,26 @@ public static class EffectMetaRegistry
         Register("SkillProjectileCount",        "스킬 투사체 수",       EffectCategory.Special, EffectUnit.FlatInt, "projectile");
         Register("MeleeShapeCircle",            "근접 원형 범위",       EffectCategory.Special, EffectUnit.None,    "dmg");
 
+        // ── 레전드리 룬 효과 ──────────────────────────────────────
+        Register("FireLegendAoe",         "마그마 분출",     EffectCategory.Special, EffectUnit.None, "fire");
+        Register("FireLegendSingle",      "불사조 강타",     EffectCategory.Special, EffectUnit.None, "fire");
+        Register("FireLegendProjectile",  "화염 오브",       EffectCategory.Special, EffectUnit.None, "fire");
+        Register("IceLegendAoe",          "빙하 파동",       EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("IceLegendSingle",       "얼음 창 폭격",   EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("IceLegendField",        "영구 빙판",       EffectCategory.Special, EffectUnit.None, "freeze");
+        Register("ElecLegendAoe",         "천둥 폭격",       EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("ElecLegendSingle",      "과전류 포박",     EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("ElecLegendProjectile",  "전자기 구체",     EffectCategory.Special, EffectUnit.None, "lightning");
+        Register("GrassLegendAoe",        "포자 폭발",       EffectCategory.Special, EffectUnit.None, "poison");
+        Register("GrassLegendSingle",     "덩굴 구속",       EffectCategory.Special, EffectUnit.None, "poison");
+        Register("GrassLegendProjectile", "사방 독 화살",   EffectCategory.Special, EffectUnit.None, "poison");
+        Register("LightLegendAoe",        "신성 폭발",       EffectCategory.Special, EffectUnit.None, "special");
+        Register("LightLegendSingle",     "성스러운 심판",   EffectCategory.Special, EffectUnit.None, "special");
+        Register("LightLegendProjectile", "영원의 성검",     EffectCategory.Special, EffectUnit.None, "special");
+        Register("DarkLegendAoe",         "심연 잠식",       EffectCategory.Special, EffectUnit.None, "special");
+        Register("DarkLegendSingle",      "그림자 분신",     EffectCategory.Special, EffectUnit.None, "special");
+        Register("DarkLegendProjectile",  "어둠의 낫",       EffectCategory.Special, EffectUnit.None, "special");
+
         Debug.Log($"[EffectMetaRegistry] {_table.Count}개 effectType 메타 등록 완료");
     }
 }

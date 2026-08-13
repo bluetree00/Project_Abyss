@@ -85,6 +85,33 @@ public class RuneDataManager
             }
         }
 
+        // Addressables 파일로 shape 보충/갱신 (CSV도 파싱, 모양 변경 시 덮어씀)
+        try
+        {
+            var pieceAsset = await Managers.AddressableManager.TryLoadAssetAsync<TextAsset>("MERLIN_RUNE_PIECE_DATA");
+            if (pieceAsset != null)
+            {
+                var col = JsonUtility.FromJson<RunePieceEntryCollection>(pieceAsset.text);
+                if (col?.shapes == null)
+                    col = ParseCsvToPieceCollection(pieceAsset.text);
+                if (col?.shapes != null)
+                {
+                    bool changed = false;
+                    foreach (var s in col.shapes)
+                    {
+                        if (!_pieceById.TryGetValue(s.shape_id, out var cur)
+                            || cur.r1 != s.r1 || cur.r2 != s.r2 || cur.r3 != s.r3 || cur.r4 != s.r4)
+                        {
+                            _pieceById[s.shape_id] = s;
+                            changed = true;
+                        }
+                    }
+                    if (changed) SavePiecesToJson();
+                }
+            }
+        }
+        catch (Exception e) { Debug.LogWarning($"[RuneDataManager] Addressables shape merge 실패: {e.Message}"); }
+
         IsInitialized = true;
         Debug.Log($"[RuneDataManager] 초기화 완료. 룬 조각 {_pieceById.Count}종, 존 {_synergyByZone.Count}종, 존맵 {_zoneMapRows.Count}행");
     }
@@ -390,4 +417,30 @@ public class RuneDataManager
 
     /// <summary>compat: 구 grid rows01 파싱. 현재 스키마에서는 빈 배열 반환.</summary>
     public static int[][] ParseGridRows(RuneSynergyEntry meta) => System.Array.Empty<int[]>();
+
+    // CSV 헤더: shape_id,shape_name,r1,r2,r3,r4,cell_size,stat_version
+    private static RunePieceEntryCollection ParseCsvToPieceCollection(string csv)
+    {
+        var col = new RunePieceEntryCollection { shapes = new List<RunePieceEntry>() };
+        var lines = csv.Split('\n');
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i].Trim();
+            if (string.IsNullOrEmpty(line)) continue;
+            var p = line.Split(',');
+            if (p.Length < 6 || !int.TryParse(p[0].Trim(), out int id)) continue;
+            col.shapes.Add(new RunePieceEntry
+            {
+                shape_id   = id,
+                shape_name = p[1].Trim(),
+                r1         = p[2].Trim(),
+                r2         = p[3].Trim(),
+                r3         = p[4].Trim(),
+                r4         = p[5].Trim(),
+                cell_size  = p.Length > 6 && float.TryParse(p[6].Trim(), out float cs) ? cs : 40f,
+                stat_version = p.Length > 7 && int.TryParse(p[7].Trim(), out int sv) ? sv : 1,
+            });
+        }
+        return col;
+    }
 }

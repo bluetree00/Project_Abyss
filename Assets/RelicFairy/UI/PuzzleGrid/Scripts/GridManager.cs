@@ -111,6 +111,7 @@ public class GridManager : MonoBehaviour
 
         var result = new List<GridSquare>(offsets.Count);
         string element = RuneZoneRule.ElementOf(shape.ItemData);
+        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
 
         foreach (var off in offsets)
         {
@@ -123,7 +124,7 @@ public class GridManager : MonoBehaviour
 
             if (found == null) { allValid = false; continue; }   // 판 밖
             if (!found.isPlaceable || found.isOccupied) allValid = false;
-            if (!RuneZoneRule.Accepts(found, element))    allValid = false;
+            if (!RuneZoneRule.Accepts(found, element, isLegendary)) allValid = false;
             if (!result.Contains(found)) result.Add(found);
         }
 
@@ -184,6 +185,7 @@ public class GridManager : MonoBehaviour
         bool allValid = true;
         var targets = new List<GridSquare>();
         string element = RuneZoneRule.ElementOf(shape.ItemData);
+        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -196,7 +198,7 @@ public class GridManager : MonoBehaviour
             if (firstBlock == null) { firstBlock = block; firstTargetSq = sq; }
             if (!sq.isPlaceable || sq.isOccupied) allValid = false;
             // 속성 불일치 칸은 프리뷰에서 빨강 — 손을 놓기 전에 왜 안 되는지 보이게 한다.
-            if (!RuneZoneRule.Accepts(sq, element)) allValid = false;
+            if (!RuneZoneRule.Accepts(sq, element, isLegendary)) allValid = false;
             if (!targets.Contains(sq)) targets.Add(sq);
         }
 
@@ -255,6 +257,7 @@ public class GridManager : MonoBehaviour
         RectTransform firstBlock = null;
         RectTransform firstTarget = null;
         string element = RuneZoneRule.ElementOf(shape.ItemData);
+        bool isLegendary = shape.ItemData?.rarity == ItemRarity.Legendary;
 
         for (int i = 0; i < shape.transform.childCount; i++)
         {
@@ -266,8 +269,8 @@ public class GridManager : MonoBehaviour
             if (square == null) return false;
             if (!square.isPlaceable) return false;
             if (square.isOccupied) return false;
-            // 룬은 자기 속성 존(또는 중앙)에만 놓인다.
-            if (!RuneZoneRule.Accepts(square, element)) return false;
+            // 룬은 자기 속성 존에만 놓인다 (레전드리는 중앙 금지).
+            if (!RuneZoneRule.Accepts(square, element, isLegendary)) return false;
 
             if (!candidateSquares.Contains(square))
                 candidateSquares.Add(square);
