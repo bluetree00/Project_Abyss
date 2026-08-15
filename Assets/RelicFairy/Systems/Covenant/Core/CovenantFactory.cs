@@ -14,7 +14,19 @@ public static class CovenantFactory
             var body = covenantId.Substring(AssembledCovenant.Prefix.Length);
             int sep = body.IndexOf('|');
             if (sep > 0)
-                return new AssembledCovenant(body.Substring(0, sep), body.Substring(sep + 1));
+            {
+                var made = new AssembledCovenant(body.Substring(0, sep), body.Substring(sep + 1));
+
+                // 팔레트에서 원인·효과를 못 찾으면(옛 세이브의 사라진 id 등) 껍데기가 남는다.
+                // 그대로 넘기면 아무 일도 안 하는 서약이 4칸 중 한 칸을 영구히 차지한다 —
+                // 차라리 슬롯을 돌려주고 경고를 남긴다. 개명이라면 CovenantPalette의 별칭 표에 등록할 것.
+                if (!made.Resolved)
+                {
+                    UnityEngine.Debug.LogWarning($"[CovenantFactory] 미해결 조립 서약 ID(원인/효과 없음): {covenantId}");
+                    return null;
+                }
+                return made;
+            }
             UnityEngine.Debug.LogWarning($"[CovenantFactory] 잘못된 조립 서약 ID: {covenantId}");
             return null;
         }

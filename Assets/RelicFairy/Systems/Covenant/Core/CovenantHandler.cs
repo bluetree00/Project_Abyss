@@ -158,7 +158,13 @@ public sealed class CovenantHandler
         foreach (var e in entries)
         {
             if (e == null || string.IsNullOrEmpty(e.id)) continue;
-            if (!TryAdd(e.id, restoring: true)) continue;
+            if (!TryAdd(e.id, restoring: true))
+            {
+                // 해석 못 한 id는 슬롯을 차지하지 않는다(CovenantFactory가 null 반환).
+                // 조용히 넘기면 "서약이 하나 사라졌다"가 버그 리포트로만 돌아온다 — 흔적을 남긴다.
+                Debug.LogWarning($"[CovenantHandler] 서약 복원 실패(미해결 id·중복·슬롯 초과): {e.id}");
+                continue;
+            }
 
             var stage = (CovenantStage)e.stage;
             if (stage >= CovenantStage.Enhanced) TryEnhance(e.id);
