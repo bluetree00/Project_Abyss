@@ -13,6 +13,7 @@ public sealed class RangedPartsTestAltar : MonoBehaviour
 {
     private const float PromptOffsetY = 1.8f;
     private const float LabelOffsetY  = 1.2f;
+    private const float TriggerRadius = 2.5f;
 
     [Header("월드 텍스트")]
     [SerializeField] private TMP_FontAsset worldTextFont;
@@ -24,6 +25,15 @@ public sealed class RangedPartsTestAltar : MonoBehaviour
     private GameObject  _promptGo;
 
     // ── Lifecycle ───────────────────────────────────────────
+
+    private void Awake()
+    {
+        // 트리거가 아니면 상호작용이 통째로 죽고, 오히려 플레이어를 막는 벽이 된다.
+        // 씬에 어떻게 배치됐든 여기서 보정한다(WeaponForgeAltar와 동일).
+        var col = GetComponent<Collider>();
+        col.isTrigger = true;
+        if (col is SphereCollider sphere && sphere.radius < TriggerRadius) sphere.radius = TriggerRadius;
+    }
 
     private void Start()
     {
@@ -65,7 +75,7 @@ public sealed class RangedPartsTestAltar : MonoBehaviour
 
         var col = go.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        col.radius    = 2.5f;
+        col.radius    = TriggerRadius;
 
         return go.AddComponent<RangedPartsTestAltar>();
     }

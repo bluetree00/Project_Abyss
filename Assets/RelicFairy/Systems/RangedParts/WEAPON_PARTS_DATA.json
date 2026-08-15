@@ -9,7 +9,9 @@
       "base_value": 1,
       "per_level": 0,
       "milestone_every": 3,
-      "max_level": 12
+      "max_level": 12,
+      "cost_base": 4,
+      "cost_growth": 1.30
     },
     {
       "index": 2102,
@@ -20,7 +22,9 @@
       "base_value": 1,
       "per_level": 0,
       "milestone_every": 3,
-      "max_level": 12
+      "max_level": 12,
+      "cost_base": 3,
+      "cost_growth": 1.28
     },
     {
       "index": 2103,
@@ -31,7 +35,9 @@
       "base_value": 1.5,
       "per_level": 0.25,
       "milestone_every": 0,
-      "max_level": 10
+      "max_level": 10,
+      "cost_base": 3,
+      "cost_growth": 1.28
     },
     {
       "index": 2104,
@@ -42,7 +48,9 @@
       "base_value": 90,
       "per_level": 30,
       "milestone_every": 0,
-      "max_level": 10
+      "max_level": 10,
+      "cost_base": 3,
+      "cost_growth": 1.30
     },
     {
       "index": 2105,
@@ -53,7 +61,9 @@
       "base_value": 0.2,
       "per_level": 0.1,
       "milestone_every": 0,
-      "max_level": 10
+      "max_level": 10,
+      "cost_base": 4,
+      "cost_growth": 1.32
     }
   ]
 }

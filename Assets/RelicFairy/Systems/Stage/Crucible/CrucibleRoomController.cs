@@ -66,7 +66,23 @@ public class CrucibleRoomController : MonoBehaviour
     public int Streak => _streak;
     public bool LastJackpot => _lastJackpot;
     public int LastRefund => _lastRefund;
-    public EnhanceTableSO.LegendDef[] Legends => _table != null ? _table.Legends : Array.Empty<EnhanceTableSO.LegendDef>();
+    /// <summary>
+    /// 승급 후보 전설 목록. 「전설 3종 개방」 전에는 <b>맨 앞 1종</b>만 보인다(기억의 제단).
+    /// 승급 자체는 해금과 무관하게 되고, 해금이 넓히는 것은 고를 수 있는 폭이다.
+    /// </summary>
+    public EnhanceTableSO.LegendDef[] Legends
+    {
+        get
+        {
+            var all = _table != null ? _table.Legends : Array.Empty<EnhanceTableSO.LegendDef>();
+            int allowed = MemoryAltarService.LegendChoiceCount;
+            if (all.Length <= allowed) return all;
+
+            var cut = new EnhanceTableSO.LegendDef[allowed];
+            Array.Copy(all, cut, allowed);
+            return cut;
+        }
+    }
 
     public CrucibleEvent ActiveEvent => _event;
     public bool HasEvent => _event != CrucibleEvent.None;
@@ -172,8 +188,6 @@ public class CrucibleRoomController : MonoBehaviour
 
     public float SuccessChanceAt(int slot) => Mathf.Clamp01(WeaponEnhanceService.SuccessChance(GetSlot(slot), _table) + SuccessBonus);
     public int   MaxAt(int slot)           => WeaponEnhanceService.MaxEnhance(GetSlot(slot), _table);
-    /// <summary>해당 슬롯 무기의 현재 강화 레벨. 원거리 파츠 슬롯 해금 근거로도 쓰인다.</summary>
-    public int   LevelAt(int slot)         { var w = GetSlot(slot); return w != null ? w.enhanceLevel : 0; }
     public int   CostAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? WeaponEnhanceService.CostWith(_table, w.enhanceLevel, CostMult) : 0; }
     public int   DropAt(int slot)          { var w = GetSlot(slot); return (w != null && _table != null) ? _table.DropAt(w.enhanceLevel) : 0; }
     public float EffectiveAttackAt(int slot) => WeaponEnhanceService.EffectiveAttack(GetSlot(slot), _table);
@@ -209,10 +223,18 @@ public class CrucibleRoomController : MonoBehaviour
         // 롤 소비 기록 — 거부(재료부족/최대치)는 롤을 굴리지 않으므로 세지 않는다.
         if (!result.IsReject) BumpRoll(1);
 
+        // 원거리 슬롯에 부은 재료는 파츠 티어의 진척이 된다. 성공·실패를 가리지 않는 게 요점 —
+        // 강화 실패는 재료와 레벨을 함께 앗아가지만, 그 손실이 파츠 게이지로는 남는다.
+        if (targetSlot == PlayerWeaponManager.Slot1 && result.spent > 0)
+            RangedPartsState.Current?.AddInvestment(result.spent);
+
         if (result.outcome == EnhanceOutcome.Success)
         {
             _streak++;
             RollJackpot(fuel, result.spent);   // 잭팟 굴림도 내부에서 롤 소비를 기록
+
+            // 「석궁」·「대장장이의 인장」 할인 조건 집계 — 도달한 최고 강화 수치만 남는다.
+            _run.ReportEnhanceLevel(target.enhanceLevel);
         }
         else if (result.outcome == EnhanceOutcome.FailDropped)
         {
@@ -230,6 +252,74 @@ public class CrucibleRoomController : MonoBehaviour
         return result;
     }
 
+    // ── 원거리 파츠 강화 (UI가 호출) ────────────────────────
+    //
+    // 무기 강화와 달리 <b>확정 상승</b>이다. 파츠는 계단형(분열·관통은 3레벨마다만 수치가 오름)이라
+    // 여기에 실패 판정까지 얹으면 "재료를 냈는데 실패하고, 성공해도 눈에 띄는 변화가 없는" 이중 불투명이 된다.
+    // 긴장은 도박이 아니라 <b>기회비용</b>이 만든다 — 같은 강화재료를 무기에 쓰면 공격력과 파츠 슬롯이 열리고,
+    // 파츠에 쓰면 투사체 구조가 바뀐다. 재료가 유한하므로 매 재련소가 배분 결정이 된다.
+    //
+    // 확정이라 RNG를 소비하지 않는다 → BumpRoll 없음(승급과 같은 취급).
+
+    /// <summary>파츠 강화 1회 시도. 확정 성공 — 재료가 모자라거나 상한이면 거부.</summary>
+    public EnhanceResult TryEnhancePart(string partId)
+    {
+        if (_run == null || !_run.IsRunning) return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
+
+        var state = RangedPartsState.Current;
+        var fuel  = _run.FuelBank;
+        var def   = Managers.WeaponParts?.GetById(partId);
+        if (state == null || fuel == null || def == null)
+            return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);
+
+        int level = state.LevelOf(partId);
+        if (level <= 0) return EnhanceResult.Reject(EnhanceOutcome.RejectInvalid);   // 미장착
+        if (def.max_level > 0 && level >= def.max_level)
+            return EnhanceResult.Reject(EnhanceOutcome.RejectMaxed);
+
+        int cost = PartCostAt(partId);
+        if (!fuel.TrySpend(FuelKind.EnhanceMaterial, cost))
+            return EnhanceResult.Reject(EnhanceOutcome.RejectNoFuel);
+
+        state.LevelUp(partId);
+
+        // 잭팟은 무기 강화 전용(도박의 보상축) — 파츠는 확정이라 굴리지 않는다.
+        _lastJackpot = false;
+        _lastRefund  = 0;
+
+        SaveNow("crucible-part-enhance");   // S3: 확정 즉시 저장 — 다음 방까지 미루면 진행분이 날아간다
+        OnCrucibleChanged?.Invoke();
+
+        // chance=1 / roll=0 → 연출층이 '확정 성공'으로 읽는다(니어미스 판정에도 걸리지 않음).
+        return new EnhanceResult
+        {
+            outcome     = EnhanceOutcome.Success,
+            beforeLevel = level,
+            afterLevel  = state.LevelOf(partId),
+            spent       = cost,
+            chance      = 1f,
+            roll        = 0.0,
+        };
+    }
+
+    /// <summary>파츠 지급(티어 보상 선택) 확정 후 즉시 저장 — 방 안에서 끊겨도 지급이 날아가지 않게.</summary>
+    public void SavePartGrant()
+    {
+        SaveNow("crucible-part-grant");
+        OnCrucibleChanged?.Invoke();
+    }
+
+    /// <summary>파츠 다음 강화 비용(할인 이벤트 반영). 상한이면 0.</summary>
+    public int PartCostAt(string partId)
+    {
+        var def = Managers.WeaponParts?.GetById(partId);
+        var state = RangedPartsState.Current;
+        if (def == null || state == null) return 0;
+
+        int raw = def.CostAt(state.LevelOf(partId));
+        return raw <= 0 ? 0 : Mathf.Max(1, Mathf.CeilToInt(raw * CostMult));
+    }
+
     /// <summary>결정적 롤 소비 수를 세션에 누적(세이브에 기록 → 복원 시 스트림 재개).</summary>
     private void BumpRoll(int n)
     {
@@ -238,6 +328,16 @@ public class CrucibleRoomController : MonoBehaviour
 
     /// <summary>행동 확정 즉시 저장(S3). 방 경계가 아니어도 진행분이 보존된다.</summary>
     private static void SaveNow(string reason) => RunFlowController.Active?.SaveNow(reason);
+
+    /// <summary>해당 전설이 지금 고를 수 있는 후보인지(기억의 제단 「전설 3종 개방」).</summary>
+    private bool IsLegendAllowed(string legendId)
+    {
+        if (string.IsNullOrEmpty(legendId)) return false;
+
+        foreach (var l in Legends)
+            if (string.Equals(l.legendId, legendId, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
 
     /// <summary>승급 시도(확정 성공, 재료 대량). legendId는 Legends에서 택1.</summary>
     public PromoteResult TryPromote(int targetSlot, string legendId)
@@ -248,6 +348,10 @@ public class CrucibleRoomController : MonoBehaviour
         var target = GetSlot(targetSlot);
         var fuel   = _run.FuelBank;
         if (target == null || fuel == null)
+            return PromoteResult.Reject(PromoteOutcome.RejectInvalidLegend);
+
+        // 후보 제한을 여기서도 검증한다 — Legends(표시용)만 자르면 UI를 우회한 호출이 통과한다.
+        if (!IsLegendAllowed(legendId))
             return PromoteResult.Reject(PromoteOutcome.RejectInvalidLegend);
 
         var result = WeaponEnhanceService.TryPromote(target, legendId, _table, fuel);
