@@ -150,6 +150,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4ee45bb4770e68d44ad92c515113d40e
+    m_Address: WEAPON_PARTS_DATA
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 51f58a7ac453dab48a238fee31899d31
     m_Address: GoldDot
     m_ReadOnly: 0
@@ -235,11 +240,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 943cedb7515504442881bea46323ee66
-    m_Address: UI/EffectIconSet
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8943c0e696b59cc448db461a0ed4ee21
     m_Address: Refinery/RefineryNpc
     m_ReadOnly: 0
@@ -257,6 +257,26 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9396a1704f2be8a41addba3c7eab9f0d
     m_Address: UI/Popup/UI_Pause
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 943cedb7515504442881bea46323ee66
+    m_Address: UI/EffectIconSet
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8b0b0056b0739024b8ae7246f17df9d2
+    m_Address: UI/RelicInfoSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 316c97aa6d8bdae4a8d71febd3052fd6
+    m_Address: UI/DialogueSkin
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6a6d056bb4423944a369de0f0ae1e22
+    m_Address: UI/CovenantSkin
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -322,11 +342,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c0dcd06a6e50fec48afa69029c4dbd9a
     m_Address: RELIC_PARTS_DATA
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4ee45bb4770e68d44ad92c515113d40e
-    m_Address: WEAPON_PARTS_DATA
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
